@@ -1,0 +1,31 @@
+# dependências e builds
+node_modules/
+.pnpm-store/
+.next/
+dist/
+build/
+out/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# segredos — nunca commitar
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+
+# infra local
+infra/local/data/
+infra/local/.env
+
+# sistema e editores
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
