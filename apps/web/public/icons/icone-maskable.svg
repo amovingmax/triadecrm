@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Variante "maskable": fundo até a borda e o "K" dentro da zona segura central (80%). -->
+  <rect width="512" height="512" fill="#171717"/>
+  <path d="M197 155v202M197 261l136-106M223 261l110 96" fill="none" stroke="#ffffff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

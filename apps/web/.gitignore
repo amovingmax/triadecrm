@@ -1,0 +1,3 @@
+# Específico do apps/web — o .gitignore da raiz cobre node_modules, .next, .env* (exceto .env.example) etc.
+# next-env.d.ts é gerado por `next dev`, `next build` e `next typegen`.
+next-env.d.ts
