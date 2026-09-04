@@ -45,6 +45,49 @@ Outros comandos:
 | `pnpm db:stop`                                              | derruba a stack local                                                                    |
 | `pnpm --filter @komune/workers dev ingest`                  | roda um worker em dev (`ingest`, `wa` ou `ai`)                                           |
 
+### Entrar no app local sem passar pelo Google
+
+O único provedor de produção é o Google, mas em desenvolvimento (e no CI) dá para abrir uma sessão pela API admin do Auth. A `SERVICE_ROLE_KEY` local sai de `supabase status` e é uma chave pública de desenvolvimento, igual em toda máquina; a de produção nunca sai do Vault.
+
+O e-mail precisa estar na allowlist (`public.allowed_users`) ou num domínio autorizado (`public.allowed_domains`, hoje `komune.app.br` com papel `sdr`), senão o gatilho `on_auth_user_created` recusa o cadastro.
+
+```bash
+source scripts/dev-env.sh
+SRK=$(supabase status -o json | python3 -c "import sys,json;print(json.load(sys.stdin)['SERVICE_ROLE_KEY'])")
+AK=$(supabase status -o json  | python3 -c "import sys,json;print(json.load(sys.stdin)['ANON_KEY'])")
+
+# 1. cria o usuário já confirmado (o gatilho cria o profile e o papel vem do domínio)
+curl -s -X POST "http://127.0.0.1:54321/auth/v1/admin/users" \
+  -H "apikey: $SRK" -H "Authorization: Bearer $SRK" -H "Content-Type: application/json" \
+  -d '{"email":"dev@komune.app.br","password":"komune-dev-2026","email_confirm":true,
+       "user_metadata":{"full_name":"Dev Local"}}'
+
+# 2. pega um access_token (o claim app_metadata.app_role já vem preenchido pelo hook)
+curl -s -X POST "http://127.0.0.1:54321/auth/v1/token?grant_type=password" \
+  -H "apikey: $AK" -H "Content-Type: application/json" \
+  -d '{"email":"dev@komune.app.br","password":"komune-dev-2026"}'
+```
+
+Para papel diferente de `sdr`, inclua o e-mail em `public.allowed_users` com o papel desejado **antes** de criar o usuário, ou ajuste depois:
+
+```bash
+docker exec -i supabase_db_komune-crm psql -U postgres -d postgres \
+  -c "update public.profiles set role = 'gestor' where id = (select id from auth.users where email = 'dev@komune.app.br');"
+```
+
+O papel entra no JWT na emissão: depois de mudar `profiles.role`, peça um token novo (o passo 2).
+
+No navegador, a sessão vive em cookie e o `@supabase/ssr` a monta sozinho depois do OAuth. Para testar por `curl` sem navegador, transforme a resposta do passo 2 em cookie (`sb-127-auth-token`, valor `base64-` + base64url do JSON da sessão) e mande em `Cookie:`:
+
+```bash
+node -e "const s=require('fs').readFileSync(0,'utf8');
+  console.log('sb-127-auth-token=base64-'+Buffer.from(s).toString('base64url'))" < sessao.json
+```
+
+### Carga de desenvolvimento (5.000 parceiros)
+
+`pnpm db:seed-dev` aplica `scripts/seed-dev-5k.sql`: 5.000 organizações com nome coerente com a categoria, bairros de Natal, telefones E.164 válidos e únicos, CNPJ com dígito verificador em parte da base, e um negócio por organização espalhado pelas etapas e pelas temperaturas. É determinística (sem `random()`), reaplicável e apaga só o que ela criou (`collector = 'seed-dev-5k'`). Também cria quatro perfis de desenvolvimento, para o filtro "responsável" ter mais de uma opção. Nunca aplique em produção.
+
 **Atenção:** o projeto está linkado ao Supabase remoto `komune-crm`. Não rode `supabase db push`, `supabase functions deploy` ou `migration up --linked` à mão; o deploy é feito pelo CI depois de revisão.
 
 ## Estrutura de pastas
