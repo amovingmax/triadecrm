@@ -1,8 +1,8 @@
-# KOMUNE CRM — instruções para o Claude Code
+# Tríade — CRM de captação da KOMUNE · instruções para o Claude Code
 
 ## O que é este repositório
 
-CRM web próprio da KOMUNE (marketplace de eventos, Natal/RN) para captação, manutenção e ativação de fornecedores, produtores e cerimonialistas. Módulos: base de parceiros, "Radar" (coleta em fontes públicas), funis kanban, inbox de WhatsApp com robô assistido em nome da Heloísa, agenda e rotas de visita, pré-cadastro na plataforma Komune, metas com Assistente de cobrança, relatórios e administração/LGPD.
+**Tríade** é o CRM web próprio da KOMUNE (marketplace de eventos, Natal/RN) para captação, manutenção e ativação de fornecedores, produtores e cerimonialistas. Módulos: base de parceiros, "Radar" (coleta em fontes públicas), funis kanban, inbox de WhatsApp com robô assistido em nome da Heloísa, agenda e rotas de visita, pré-cadastro na plataforma Komune, metas com Assistente de cobrança, relatórios e administração/LGPD.
 
 A fonte da verdade do produto é `docs/PRD-CRM-Captacao-KOMUNE-v1.0.md`. Quando o PRD e este arquivo divergirem, vale o PRD; quando o PRD e o código divergirem, avise antes de mudar qualquer um dos dois.
 

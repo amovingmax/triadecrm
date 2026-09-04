@@ -31,17 +31,17 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl()),
   title: {
-    default: 'KOMUNE CRM',
-    template: '%s · KOMUNE CRM',
+    default: 'Tríade',
+    template: '%s · Tríade',
   },
   description:
     'CRM de captação da KOMUNE: parceiros, Radar, funis, conversas de WhatsApp, agenda, metas e relatórios.',
-  applicationName: 'KOMUNE CRM',
+  applicationName: 'Tríade',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'KOMUNE CRM',
+    title: 'Tríade',
   },
   icons: {
     icon: [

@@ -29,7 +29,7 @@ export const AVISOS: Record<ChaveAviso, AvisoAcesso> = {
     grave: true,
     rotuloBotao: 'Entrar com outra conta',
   },
-  // public.custom_access_token_hook devolve 403 "Usuário sem perfil no KOMUNE CRM"
+  // public.custom_access_token_hook devolve 403 "Usuário sem perfil no Tríade"
   // quando não existe linha em profiles: o Google autentica, o CRM não libera.
   'sem-perfil': {
     titulo: 'Sua conta Google funcionou, mas ela ainda não tem perfil no CRM.',

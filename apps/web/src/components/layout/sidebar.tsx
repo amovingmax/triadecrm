@@ -23,7 +23,7 @@ export function Sidebar({ papel }: { papel: AppRole }) {
   return (
     <aside className="sticky top-0 hidden h-dvh w-52 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
       <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border px-3">
-        <Link href="/meu-dia" className="toque" aria-label="KOMUNE CRM, ir para Meu dia">
+        <Link href="/meu-dia" className="toque" aria-label="Tríade, ir para Meu dia">
           <Logo className="text-[15px]" />
         </Link>
       </div>

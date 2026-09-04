@@ -3,7 +3,7 @@ import type { MetadataRoute } from 'next';
 /** Manifest da PWA (PRD §8: instalável no celular, mobile-first nas telas de campo). Servido em /manifest.webmanifest. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'KOMUNE CRM',
+    name: 'Tríade',
     short_name: 'KOMUNE',
     description:
       'CRM de captação da KOMUNE: parceiros, Radar, funis, conversas de WhatsApp, agenda, metas e relatórios.',

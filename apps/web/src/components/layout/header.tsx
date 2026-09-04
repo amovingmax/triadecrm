@@ -26,7 +26,7 @@ export function Header({ sessao }: { sessao: Sessao }) {
       <Link
         href="/meu-dia"
         className="toque -ml-1.5 inline-flex h-11 min-w-11 items-center justify-center md:hidden"
-        aria-label="KOMUNE CRM, ir para Meu dia"
+        aria-label="Tríade, ir para Meu dia"
         title="Meu dia"
       >
         <Logo somenteIcone className="sm:hidden" />

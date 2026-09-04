@@ -3,7 +3,7 @@
 import { motion, type Transition } from 'motion/react';
 
 import { useMovimento } from '@/components/movimento';
-import { MarcaK } from '@/components/logo';
+import { MarcaTriade } from '@/components/logo';
 import { cn } from '@/lib/utils';
 
 import { BotaoGoogle } from './botao-google';
@@ -110,7 +110,7 @@ export function TelaLogin({ next, aviso }: { next: string; aviso: AvisoAcesso | 
               do brilho radial, o esmaecido do claro para em 4,40:1. E o eyebrow é para ser
               lido, não para sumir. */}
           <span className="pilula inline-flex items-center gap-2 py-1.5 pr-3.5 pl-1.5 text-xs text-foreground">
-            <MarcaK className="size-5" />
+            <MarcaTriade className="size-5" />
             Acesso restrito ao time
           </span>
         </motion.div>
@@ -119,7 +119,7 @@ export function TelaLogin({ next, aviso }: { next: string; aviso: AvisoAcesso | 
           {...entrada(1)}
           className="titulo-gradiente mt-7 text-4xl leading-[1.05] font-medium sm:text-5xl lg:text-6xl"
         >
-          KOMUNE CRM
+          Tríade
         </motion.h1>
 
         <motion.p
