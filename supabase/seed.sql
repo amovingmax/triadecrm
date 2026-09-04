@@ -199,7 +199,7 @@ on conflict (slug) do update
 --    dia sem envio porque o comércio de eventos para e a equipe não trabalha.
 --    O ano seguinte é semeado junto porque as cadências viram o ano: um D+30/D+60 de Nutrição
 --    disparado em novembro/dezembro cai em janeiro, e sem 2027 o CRM trataria 01/01/2027
---    (sexta) como dia útil. A autoverificação do bloco 12 exige ano corrente + 1.
+--    (sexta) como dia útil. A autoverificação do bloco 13 exige ano corrente + 1.
 -- =====================================================================
 insert into public.holidays (date, name, scope) values
   ('2026-01-01', 'Confraternização Universal',                                  'nacional'),
@@ -1054,21 +1054,132 @@ on conflict (domain) do update
       is_active    = excluded.is_active;
 
 insert into public.allowed_users (email, role, note) values
-  ('rafael@rafaelabreu.com', 'admin', 'Rafael'),
-  ('amovingmax@gmail.com',   'admin', 'Matheus'),
-  ('komune@komune.app.br',   'admin', 'Conta corporativa KOMUNE')
+  ('rafael@rafaelabreu.com',       'admin',      'Rafael, conta pessoal'),
+  ('amovingmax@gmail.com',         'admin',      'Matheus, conta pessoal'),
+  ('komune@komune.app.br',         'admin',      'Conta corporativa KOMUNE')
+  -- PENDENTE DE DECISÃO HUMANA (Rafael, com Matheus e Luiz): entraram aqui, no diff do
+  -- catálogo de desfechos do D3, cinco contas do domínio da empresa informadas pelo
+  -- Matheus em 04/09/2026 — matheus.admin@, luyz.admin@ e rafael.admin@ como 'admin',
+  -- dennis.admin@ como 'financeiro' e heloiza.admin@ como 'sdr'. Ficaram FORA por três
+  -- motivos: conceder admin é decisão de acesso, e não de catálogo, e não viaja no mesmo
+  -- commit; a tela de origem dizia "e-mail alternativo", que no Google Workspace é
+  -- apelido, e apelido não casa com o e-mail que o OAuth devolve, então as linhas podem
+  -- nascer mortas; e o teste 08_seed (itens "3 e-mails nominais" e "os e-mails nominais
+  -- iniciais são admin") reprova a lista com elas. Enquanto isso, quem tem conta
+  -- @komune.app.br entra pelo allowed_domains abaixo como 'sdr' e o admin promove em
+  -- profiles.role depois do primeiro login, que é o caminho de menor privilégio.
 on conflict (email) do update
   set role = excluded.role,
       note = excluded.note;
 
 -- =====================================================================
--- 12. Autoverificação: a seed falha (e o db reset também) se as contagens esperadas não baterem.
+-- 12. Catálogo de desfechos de interação (RF-FUN-12 catálogo e RF-FUN-13 janela de
+--     recontato; spec docs/design/spec-desfechos-de-interacao.md §3; tabela criada na
+--     migração 20260904000800). Alimenta os chips do formulário de 20 s (RF-MET-06), a
+--     contagem de porta batida e porta aberta (RF-MET-01), a fila das 06:00 (RF-CON-08),
+--     o Meu dia (RF-MET-04) e os relatórios por canal (RF-REL-02/06). Convenções:
+--       * Uma linha por superfície (whatsapp, ligacao, visita, reuniao, instagram_dm);
+--         'triagem' fica reservada para os motivos de descarte da caixa de triagem (D4).
+--       * name = rótulo do chip, no máximo 28 caracteres, para caber na tela do celular.
+--         "Perfil inativo, não fornece" encurta o texto da §3 ("Perfil inativo ou não é
+--         fornecedor", 34 caracteres), que não passaria no check da tabela.
+--       * position agrupa por superfície (1xx WhatsApp, 2xx ligação, 3xx visita,
+--         4xx reunião, 5xx DM) e ordena os chips dentro dela.
+--       * cooldown_days = piso de espera lido como FILTRO da fila, nunca gatilho de
+--         reenvio (spec §5); 36500 = permanente. can_reactivate = false tira o alvo da
+--         reativação do RF-CON-15; o BLOQUEIO da view v_contact_cooldown, esse, só nasce
+--         de desfecho que leva o negócio a etapa de perda, e cai na reabertura humana
+--         registrada (RF-FUN-08), menos no opt-out, que não reabre (RF-CON-18).
+--       * "Número inválido" e "Número errado" são a exceção proposital: can_reactivate
+--         = false (ficam fora da reativação) com cooldown_days = 36500 e SEM etapa de
+--         destino, logo NÃO bloqueiam a organização. Quem segura o alvo é a janela, e
+--         ela cai sozinha no primeiro toque por outro canal (DM, visita, ligação no
+--         número novo), que é literalmente a próxima ação desses dois chips. Com
+--         cooldown 0 o número morto voltaria à fila das 06:00 na manhã seguinte,
+--         gastando vaga do teto do RF-CON-10 e repetindo envio a um número que a Cloud
+--         API já recusou (risco 2, quality rating). PENDENTE DE DECISÃO HUMANA
+--         (Rafael/Bárbara): a §3 da spec dizia cooldown 0 nas duas linhas.
+--       * next_action_offset_days nulo = a data sai da temperatura resultante
+--         (D+1 quente, D+3 morno, D+7 frio, RF-MET-06), que é o caso de "na data combinada".
+--       * target_stage_slug é slug e não FK: a etapa é por funil e o destino se resolve
+--         no funil do próprio negócio. Todos os slugs abaixo existem no funil fornecedor
+--         (bloco 7) e a autoverificação do bloco 13 confere isso.
+--       * counts_as é o TETO da contagem: porta aberta só é gravada se o formulário
+--         também disser decisor ou influenciador (RF-MET-01).
+--       * requires_lost_reason = true exige lost_reason_id no negócio (RF-FUN-04). Os dois
+--         desfechos de opt-out vão para a etapa optout, que é perda sem motivo da lista.
+--     Como os demais catálogos, a seed governa estas linhas: reaplicar devolve nome,
+--     posição, janela e is_active ao padrão do produto enquanto a tela de administração
+--     (RF-ADM-02) não existe. Chip aposentado é sempre is_active = false, nunca delete,
+--     porque atividades antigas apontam para ele.
+-- =====================================================================
+insert into public.interaction_outcomes
+  (slug, name, surfaces, position, is_active, cooldown_days, can_reactivate,
+   next_action_kind, next_action_label, next_action_offset_days,
+   target_stage_slug, sets_temperature, requires_lost_reason, counts_as) values
+  -- ---------- WhatsApp (7) — o desfecho descreve a PORTA; o que foi dito é a intenção do Apêndice C ----------
+  ('wa_sem_resposta',        'Enviado, sem resposta',      '{whatsapp}',     101, true,     3, true,  'follow_up', 'Follow-up D+3',              3, null,                    null,     false, 'batida'),
+  ('wa_respondeu',           'Respondeu',                  '{whatsapp}',     102, true,     0, true,  'message',   'Responder em 15 min',        0, 'respondeu',             'morno',  false, 'aberta'),
+  ('wa_nao_e_a_pessoa',      'Não é a pessoa',             '{whatsapp}',     103, true,     0, true,  'other',     'Achar o decisor',            0, null,                    null,     false, 'batida'),
+  ('wa_agora_nao',           'Agora não',                  '{whatsapp}',     104, true,    30, true,  'message',   'Reativar com gancho',       30, 'nutricao',              'frio',   false, 'aberta'),
+  ('wa_nao_firme',           'Não, definitivo',            '{whatsapp}',     105, true,    90, false, null,        null,                      null, 'perdido',               null,     true,  'aberta'),
+  ('wa_numero_invalido',     'Número inválido',            '{whatsapp}',     106, true, 36500, false, 'other',     'Buscar outro canal',         0, null,                    null,     false, 'nenhuma'),
+  ('wa_optout',              'Pediu para parar',           '{whatsapp}',     107, true, 36500, false, null,        null,                      null, 'optout',                'frio',   false, 'nenhuma'),
+  -- ---------- Ligação (8) — chips do formulário de 20 s (RF-MET-06); régua 1+1 do RF-CON-13 ----------
+  ('lig_nao_atendeu',        'Não atendeu',                '{ligacao}',      201, true,     1, true,  'call',      'Ligar D+1 (última)',         1, null,                    null,     false, 'batida'),
+  ('lig_caixa_postal',       'Caixa postal',               '{ligacao}',      202, true,     1, true,  'call',      'Ligar D+1',                  1, null,                    null,     false, 'batida'),
+  ('lig_numero_errado',      'Número errado',              '{ligacao}',      203, true, 36500, false, 'other',     'Buscar outro canal',         0, null,                    null,     false, 'nenhuma'),
+  ('lig_atendeu_retorna',    'Atendeu, retorna depois',    '{ligacao}',      204, true,     2, true,  'call',      'Ligar na data combinada', null, null,                    'morno',  false, 'aberta'),
+  ('lig_interessado',        'Interessado',                '{ligacao}',      205, true,     0, true,  'meeting',   'Marcar apresentação',     null, 'em_conversa',           'quente', false, 'aberta'),
+  ('lig_agora_nao',          'Agora não',                  '{ligacao}',      206, true,    30, true,  'message',   'Reativar com gancho',       30, 'nutricao',              'frio',   false, 'aberta'),
+  ('lig_sem_interesse',      'Sem interesse',              '{ligacao}',      207, true,    90, false, null,        null,                      null, 'perdido',               null,     true,  'aberta'),
+  ('lig_reuniao_marcada',    'Reunião marcada',            '{ligacao}',      208, true,     0, true,  'meeting',   'Reunião na data',         null, 'reuniao_marcada',       'quente', false, 'aberta'),
+  -- ---------- Visita (7) — templates de visita do R07 §5 ----------
+  ('vis_nao_estava',         'Não estava / fechado',       '{visita}',       301, true,     7, true,  'visit',     'Visitar D+7 na zona',        7, null,                    null,     false, 'batida'),
+  ('vis_funcionario',        'Falei com funcionário',      '{visita}',       302, true,     2, true,  'call',      'Ligar ao decisor D+2',       2, null,                    null,     false, 'batida'),
+  ('vis_decisor_interessado','Decisor interessado',        '{visita}',       303, true,     0, true,  'meeting',   'Marcar apresentação ou link', null, 'em_conversa',        'quente', false, 'aberta'),
+  ('vis_decisor_agora_nao',  'Decisor, agora não',         '{visita}',       304, true,    30, true,  'message',   'Reativar com gancho',       30, 'nutricao',              'frio',   false, 'aberta'),
+  ('vis_decisor_recusou',    'Decisor recusou',            '{visita}',       305, true,    90, false, null,        null,                      null, 'perdido',               null,     true,  'aberta'),
+  ('vis_cadastro_iniciado',  'Cadastro iniciado na hora',  '{visita}',       306, true,     3, true,  'follow_up', 'Retomar o cadastro D+3',     3, 'cadastro_em_andamento', 'quente', false, 'aberta'),
+  ('vis_sem_perfil',         'Sem perfil (fora do ICP)',   '{visita}',       307, true, 36500, false, null,        null,                      null, 'perdido',               null,     true,  'batida'),
+  -- ---------- Reunião (6) ----------
+  ('reu_interessado',        'Realizada, interessado',     '{reuniao}',      401, true,     0, true,  'message',   'Pedir autorização hoje',     0, 'apresentacao_realizada','quente', false, 'aberta'),
+  ('reu_autorizou',          'Realizada, autorizou',       '{reuniao}',      402, true,     0, true,  'message',   'Enviar link de cadastro',    0, 'autorizou',             'quente', false, 'aberta'),
+  ('reu_objecao',            'Realizada, com objeção',     '{reuniao}',      403, true,     1, true,  'follow_up', 'Follow-up D+1',              1, 'apresentacao_realizada','quente', false, 'aberta'),
+  ('reu_nao',                'Realizada, não',             '{reuniao}',      404, true,    90, false, null,        null,                      null, 'perdido',               null,     true,  'aberta'),
+  ('reu_no_show',            'No-show',                    '{reuniao}',      405, true,     1, true,  'meeting',   'Reagendar em 24 h',          1, null,                    null,     false, 'batida'),
+  ('reu_reagendada',         'Reagendada',                 '{reuniao}',      406, true,     0, true,  'meeting',   'Reunião na nova data',    null, 'reuniao_marcada',       'quente', false, 'batida'),
+  -- ---------- Instagram DM (6) ----------
+  ('dm_sem_resposta',        'DM enviada, sem resposta',   '{instagram_dm}', 501, true,     5, true,  'call',      'Ligar ou visitar D+5',       5, null,                    null,     false, 'batida'),
+  ('dm_respondeu',           'Respondeu na DM',            '{instagram_dm}', 502, true,     0, true,  'message',   'Responder em 15 min',        0, 'respondeu',             'morno',  false, 'aberta'),
+  ('dm_pediu_whatsapp',      'Pediu contato no WhatsApp',  '{instagram_dm}', 503, true,     0, true,  'message',   'Mensagem no WhatsApp hoje',  0, 'respondeu',             'morno',  false, 'aberta'),
+  ('dm_nao_e_a_pessoa',      'Não é a pessoa',             '{instagram_dm}', 504, true,     0, true,  'other',     'Achar o decisor',            0, null,                    null,     false, 'batida'),
+  ('dm_perfil_inativo',      'Perfil inativo, não fornece','{instagram_dm}', 505, true, 36500, false, null,        null,                      null, 'perdido',               null,     true,  'nenhuma'),
+  ('dm_optout',              'Pediu para parar',           '{instagram_dm}', 506, true, 36500, false, null,        null,                      null, 'optout',                'frio',   false, 'nenhuma')
+on conflict (slug) do update
+  set name                    = excluded.name,
+      surfaces                = excluded.surfaces,
+      position                = excluded.position,
+      is_active               = excluded.is_active,
+      cooldown_days           = excluded.cooldown_days,
+      can_reactivate          = excluded.can_reactivate,
+      next_action_kind        = excluded.next_action_kind,
+      next_action_label       = excluded.next_action_label,
+      next_action_offset_days = excluded.next_action_offset_days,
+      target_stage_slug       = excluded.target_stage_slug,
+      sets_temperature        = excluded.sets_temperature,
+      requires_lost_reason    = excluded.requires_lost_reason,
+      counts_as               = excluded.counts_as;
+
+-- =====================================================================
+-- 13. Autoverificação: a seed falha (e o db reset também) se as contagens esperadas não baterem.
 -- =====================================================================
 do $$
 declare
   n_cat  int;  n_pipe int;  n_forn int;  n_ativ int;  n_prod int;
   n_hol  int;  n_tpl  int;  n_city int;  n_src  int;  n_lost int;
   n_hol1 int;  ano    int := extract(year from (now() at time zone 'America/Fortaleza'))::int;
+  n_out  int;  n_sup  int;
 begin
   select count(*) into n_cat  from public.categories;
   select count(*) into n_pipe from public.pipelines;
@@ -1082,6 +1193,11 @@ begin
   select count(*) into n_city from public.cities;
   select count(*) into n_src  from public.sources;
   select count(*) into n_lost from public.lost_reasons;
+  select count(*) into n_out from public.interaction_outcomes;
+  -- Teto de 8 chips ativos por superfície: acima disso ninguém tabula dentro dos 20 s do RF-MET-06.
+  select coalesce(max(c), 0) into n_sup
+    from (select count(*) as c from public.interaction_outcomes o, unnest(o.surfaces) as sup
+           where o.is_active group by sup) t;
 
   if n_cat <> 19 then raise exception 'seed: esperadas 19 categorias, encontradas %', n_cat; end if;
   if n_pipe <> 3 then raise exception 'seed: esperados 3 funis, encontrados %', n_pipe; end if;
@@ -1092,10 +1208,20 @@ begin
   if n_hol1 < 16 then raise exception 'seed: % feriados de % (esperados ao menos 16; cadências viram o ano)', n_hol1, ano + 1; end if;
   if n_tpl < 40  then raise exception 'seed: % modelos de mensagem (esperados ≥ 40)', n_tpl; end if;
   if n_lost <> 9 then raise exception 'seed: esperados 9 motivos de perda, encontrados %', n_lost; end if;
+  if n_out <> 34 then raise exception 'seed: esperados 34 desfechos de interação, encontrados %', n_out; end if;
+  if n_sup > 8   then raise exception 'seed: superfície com % desfechos ativos (máximo 8, RF-MET-06)', n_sup; end if;
+  if exists (
+    select 1 from public.interaction_outcomes o
+     where o.target_stage_slug is not null
+       and not exists (select 1 from public.stages s join public.pipelines p on p.id = s.pipeline_id
+                        where p.slug = 'fornecedor' and s.slug = o.target_stage_slug)
+  ) then
+    raise exception 'seed: desfecho com etapa de destino que não existe no funil fornecedor';
+  end if;
   if exists (select 1 from public.stages where position < 0) then
     raise warning 'seed: há etapas órfãs (posição negativa) que não constam mais da seed';
   end if;
 
-  raise notice 'seed ok: % cidades, % categorias, % fontes, % feriados em % e % em %, % funis (fornecedor %, ativacao %, produtor % etapas), % motivos de perda, % modelos de mensagem',
-    n_city, n_cat, n_src, n_hol, ano, n_hol1, ano + 1, n_pipe, n_forn, n_ativ, n_prod, n_lost, n_tpl;
+  raise notice 'seed ok: % cidades, % categorias, % fontes, % feriados em % e % em %, % funis (fornecedor %, ativacao %, produtor % etapas), % motivos de perda, % desfechos de interação (máximo % por superfície), % modelos de mensagem',
+    n_city, n_cat, n_src, n_hol, ano, n_hol1, ano + 1, n_pipe, n_forn, n_ativ, n_prod, n_lost, n_out, n_sup, n_tpl;
 end $$;
