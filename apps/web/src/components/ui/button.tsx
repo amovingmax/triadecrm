@@ -14,14 +14,23 @@ const buttonVariants = cva(
         // "cliente" na escala térmica, e um botão verde apagaria essa leitura.
         // `acao-gradiente` já traz hover 1.02, active 0.98 e 150ms.
         default: 'acao-gradiente',
+        // A borda é `--input` (degrau 450) e não `--border`: o `--border` do claro
+        // mede 1,15:1 contra o fundo da página, ou seja o botão ficava sem contorno
+        // nenhum. O 450 é o degrau que o sistema reserva para limite de controle
+        // (3,23:1 no claro, 5,16:1 no escuro), o mesmo do Input e do SelectTrigger.
+        // Sem preenchimento no escuro: `bg-input/30` era herança do shadcn, onde
+        // `--input` é branco translúcido; aqui pintaria 30% de um cinza claro.
         outline:
-          'border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
+          'border-input bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
         ghost:
           'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50',
+        // Mesma regra do Badge: preenchimento em brasa cheia (gráfico), texto em
+        // `--destructive-texto`, preenchimento capado em 10% nos dois modos e realce
+        // de passagem em borda. Subir a tinta no hover derrubaria o texto para 3,5:1.
         destructive:
-          'bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40',
+          'bg-destructive/10 text-destructive-texto hover:border-destructive focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/10 dark:focus-visible:ring-destructive/40',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {

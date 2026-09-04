@@ -11,8 +11,12 @@ const badgeVariants = cva(
       variant: {
         default: 'bg-primary text-primary-foreground [a]:hover:bg-primary/80',
         secondary: 'bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80',
+        // A brasa aqui é preenchimento (objeto gráfico, 3:1); o TEXTO usa
+        // `--destructive-texto`, a mesma separação da escala térmica. O preenchimento
+        // fica capado em 10% nos dois modos: em 20% no escuro a tinta cai para 4,17:1
+        // dentro da folha. O realce de passagem é BORDA, não mais tinta sob o texto.
         destructive:
-          'bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20',
+          'bg-destructive/10 text-destructive-texto focus-visible:ring-destructive/20 dark:bg-destructive/10 dark:focus-visible:ring-destructive/40 [a]:hover:border-destructive',
         outline: 'border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground',
         // Pílula do acabamento do template: borda hairline, cartão a 50% e desfoque
         // leve. É a forma do chip de estado da casca (cabeçalho, estado vazio,
