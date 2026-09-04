@@ -45,17 +45,41 @@ menos 4,5:1 sobre fundo, cartão, muted e sobre o próprio chip; `fundo` é o `c
 | morno         | `#b37a1f` / `#865b17` | `#e0a33e` / `#e0a33e` |
 | quente        | `#c4472b` / `#ac3e26` | `#e5644a` / `#e97e68` |
 | cliente       | `#1a9a49` / `#147437` | `#34d399` / `#34d399` |
-| cliente_ativo | `#047857` / `#047152` | `#10b981` / `#10b981` |
+| cliente_ativo | `#047857` / `#047152` | `#059669` / `#10b981` |
 
-Dois desvios dos alvos da direção, ambos por contraste medido. O `cliente` do claro sai do
-`#22c55e` do tema porque esse verde rende só 2,07:1 contra o muted e a barra térmica é
-objeto gráfico: descido 10 pontos de luminosidade ele chega a 3,31:1. Com o `cliente` mais
-fundo, o `#059669` proposto para `cliente_ativo` ficaria a 5 pontos dele e o par deixaria de
-ser legível numa barra de 3px, então `cliente_ativo` passou a `#047857`, que é o outro verde
-do próprio Ocean Breeze (o `chart-4` do tema) e repõe os cerca de 12 pontos de degrau que o
-modo escuro tem entre as duas. No escuro, morno, cliente e cliente_ativo já passam em 4,5:1
-com a cor cheia, então `texto` e `cor` são o mesmo valor: clarear ali seria enfraquecer a cor
-sem ganho de leitura.
+Três desvios dos alvos da direção, todos por contraste medido, e os dois primeiros são o
+mesmo problema visto de cada lado.
+
+O `cliente` do claro sai do `#22c55e` do tema porque esse verde rende só 2,07:1 contra o
+muted e a barra térmica é objeto gráfico: descido 10 pontos de luminosidade ele chega a
+3,31:1. Com o `cliente` mais fundo, o `#059669` proposto para `cliente_ativo` ficaria a 5
+pontos dele e o par deixaria de ser legível numa barra de 3px, então no CLARO
+`cliente_ativo` passou a `#047857`, o outro verde do próprio Ocean Breeze (o `chart-4` do
+tema).
+
+No ESCURO o desvio é o inverso, e foi corrigido na rodada de 04/09. O `cliente` ficou no
+`#34d399` do tema, então quem tinha de descer era o `cliente_ativo`: em `#10b981` o par
+media 1,32:1 entre si (dE 9,1) e numa barra de 3px os dois eram o mesmo pixel. Em `#059669`
+(o `chart-5` do tema, e o valor que a direção já pedia) o par sobe para 1,96:1 e dE 22,9,
+na mesma ordem de grandeza do par do claro (1,50:1, dE 29,2). Como objeto gráfico o
+`#059669` mede 4,74:1 sobre o fundo, 4,29:1 sobre o muted e 3,88:1 sobre o cartão, os três
+acima dos 3:1.
+
+Esse 3,88:1 é o motivo do terceiro desvio: no escuro, `morno` e `cliente` continuam com
+`texto` igual a `cor` (a cor cheia já passa em 4,5:1 e clarear seria enfraquecê-la sem
+ganho), mas `cliente_ativo` deixou de espelhar. A cor é `#059669` e o texto é `#10b981`,
+que mede 5,01:1 sobre o chip sobre o cartão e 6,16:1 sobre o chip sobre o fundo.
+
+**A cor sozinha não carrega a leitura.** Mesmo com a escala afinada, temperaturas vizinhas
+ficam entre 1,14:1 e 1,96:1 entre si, e o par `quente` contra `cliente` do claro (1,35:1) é
+a colisão clássica vermelho contra verde, invisível para protanopia e deuteranopia,
+justamente nas duas leituras que mudam o comportamento em campo. Por isso o rótulo textual
+é obrigatório onde a linha decide alguma coisa: `ChipTemperatura`
+(`src/components/temperatura/chip-temperatura.tsx`) aparece na ficha, na primeira linha de
+metadados do cartão do celular e numa coluna própria e SEMPRE visível da tabela (nunca num
+degrau `2xl:table-cell`, senão sumiria justo no notebook de 1280px, que é onde a lista é
+lida). Quando o chip está visível, a `BarraTermica` daquela linha recebe `semRotulo`, para
+o leitor de tela não anunciar a temperatura duas vezes.
 
 Rampa azul-ardósia (matiz por volta de 217deg, derivada dos valores literais do Ocean
 Breeze). Os nomes da rampa continuam `grafite-NNN` para não quebrar o que já os consome;
@@ -87,7 +111,10 @@ e cansa. `--input` continua sendo o degrau `450` nos dois modos, que é o único
 utilitário `acao-gradiente` é a variante `default` do `Button` do shadcn; as outras variantes
 não mudaram. No escuro é o gradiente branco do template com texto quase preto (pior pixel,
 a parada de 60% sobre o cartão: 8,04:1). No claro é o inverso em tinta com texto quase
-branco (mesmo pior pixel: 4,70:1). Interação: `scale` 1.02 no hover, 0.98 no toque, 150ms,
+branco. A parada final do claro é `0.72`, e não os `0.6` da primeira versão: em `0.6` esse
+pior pixel ficava em 4,70:1 sobre o cartão, 4% acima do mínimo, e o botão do login usa 16px,
+que ainda conta como texto normal; em `0.72` ele sobe para 7,09:1 sobre o cartão, 7,31:1
+sobre o fundo e 7,41:1 sobre o muted, e o gradiente continua sendo lido como gradiente. Interação: `scale` 1.02 no hover, 0.98 no toque, 150ms,
 na propriedade `scale` e não em `transform`, para compor com o `translate-y-px` que o botão
 já aplica.
 
@@ -110,6 +137,34 @@ lateral, 5,05:1 no realce de passagem, 5,63:1 na barra inferior) e o degrau `400
 em `--sidebar-primary` (tinta cheia). `--sidebar-border` é o `--hairline`, o mesmo do
 cabeçalho, para a régua do topo atravessar a tela inteira.
 
+## Piso de contraste medido
+
+Números da rodada de 04/09/2026, calculados dos valores literais do `globals.css` com a
+fórmula de luminância da WCAG 2.x, compondo o alfa em sRGB. Estão fixados no teste
+`src/components/temperatura/contraste.test.ts`, que lê o próprio `globals.css`: se um token
+mudar e derrubar um par, o teste falha dizendo qual caiu e para quanto. Ele não substitui
+medir na tela; impede a regressão silenciosa, que foi como a paleta anterior conseguiu
+descer o texto destrutivo para 3,99:1 sem ninguém notar.
+
+Barra térmica contra fundo, cartão e muted (mínimo 3:1). Claro: frio 3,89 / 4,13 / 3,79;
+morno 3,42 / 3,64 / 3,34; quente 4,57 / 4,86 / 4,45; cliente 3,40 / 3,61 / **3,31**;
+cliente_ativo 5,11 / 5,43 / 4,98. Escuro: frio 5,85 / 4,79 / 5,30; morno 8,06 / 6,60 / 7,30;
+quente 5,32 / 4,36 / 4,82; cliente 9,29 / 7,61 / 8,41; cliente_ativo 4,74 / **3,88** / 4,29.
+
+Variante `-texto` sobre o próprio chip, nas mesmas três superfícies (mínimo 4,5:1). Claro:
+de 4,64 (cliente_ativo sobre muted) a 5,07. Escuro: de 4,64 (frio e quente sobre o cartão) a
+7,44.
+
+**Cliente sobre o muted do claro, em 3,31:1, é o ponto mais apertado do sistema inteiro**,
+com 10% de folga: qualquer clareamento futuro do `--muted` claro (`#f3f4f6`) reprova a barra
+de `cliente`. O segundo mais apertado é `cliente_ativo` sobre o cartão do escuro, em 3,88:1.
+
+Fora da escala: `--destructive-texto` mede de 4,76 a 5,85 sobre fundo, cartão, popover, muted
+e sobre o preenchimento a 10% de cada um; a brasa cheia, de 4,36 a 5,32 como objeto gráfico;
+`--input` de 3,15 (muted claro) a 5,16; o placeholder (`--muted-foreground`) de 4,64 (muted
+claro) a 6,96; o corpo do texto de 9,37 a 12,12. O pior pixel da ação em gradiente, que era
+4,70:1 no claro, subiu para 7,09:1 com a parada final em `0.72`.
+
 ## Acabamento (utilitários prontos)
 
 Os itens de acabamento da direção viraram utilitário em `globals.css`, para as telas
@@ -125,7 +180,7 @@ consumirem sem reescrever valor. O login consome `pilula`, `titulo-gradiente`,
 | `titulo-gradiente` | texto em gradiente da tinta para 60% dela, já com `tracking` de -0.05em | só o título do login |
 | `brilho-radial` | gradiente radial em CSS, sem imagem externa e sem cromia | fundo de herói |
 | `sombra-base`, `sombra-base-forte` | sombra tingida pela base, nunca preta pura | cartão, folha, diálogo |
-| `corpo-tabela` | tracking de -0.011em para tabela feita com div | grade sem `<table>` |
+| `corpo-tabela` | tracking de -0.011em para tabela feita com div | grade sem `<table>`, e a lista de cartões do celular |
 
 ## Tipografia
 
@@ -179,7 +234,10 @@ Permitidos: entrada escalonada das linhas (máx. 24, 15ms de intervalo, desliga 
 primeira renderização); skeleton com a forma da tabela, parado (a forma já é o sinal); folha de cadastro com mola
 (stiffness 260, damping 30); `scale(0.98)` no toque; pulso lento de 2,4s na ESPESSURA da barra
 térmica (`scaleX`, nunca opacidade: abaixar o alfa apagaria justamente a linha que precisa
-ser vista) só quando `deals.needs_attention`; opacidade mais 2px na troca de rota; sequência de entrada no
+ser vista) só quando `deals.needs_attention`, e sempre como ACENTO sobre um sinal que já
+existe parado (a barra em atenção nasce com 6px permanentes, o dobro dos 3px normais: o halo
+mede de 1,5:1 a 1,8:1 no claro e nunca poderia carregar o estado sozinho, nem para quem
+pediu menos movimento nem para o olhar de relance que cai no vale do ciclo); opacidade mais 2px na troca de rota; sequência de entrada no
 login, uma vez só. Proibidos: laço infinito decorativo, parallax, marquee, cursor
 customizado, ouvinte de scroll, animação de width, height, top ou left. Tudo passa por
 `useMovimento()` (`src/components/movimento/usar-movimento.ts`), e o `globals.css` tem uma

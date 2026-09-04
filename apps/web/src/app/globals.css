@@ -37,6 +37,11 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  /* Tinta do destrutivo. O `--destructive` é a brasa cheia e serve como objeto
+     gráfico (preenchimento, borda, anel, ícone, mínimo de 3:1); TEXTO destrutivo
+     usa esta variante, medida em 4,5:1 sobre fundo, cartão, muted e sobre o
+     próprio preenchimento a 10%. É a mesma regra da escala térmica. */
+  --color-destructive-texto: var(--destructive-texto);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -58,6 +63,9 @@
   /* Segundo nível de borda: linha translúcida para tabela e cabeçalho.
      `border-hairline` no lugar de `border-border` onde a grade cansaria. */
   --color-hairline: var(--hairline);
+
+  /* Véu de diálogo e folha: tingido pela base, nunca preto puro. */
+  --color-veu: var(--veu);
 
   /* Escala térmica exposta ao Tailwind: bg-quente, text-morno-texto, bg-frio-fundo... */
   --color-frio: var(--frio);
@@ -201,8 +209,12 @@
   --muted-foreground: var(--grafite-500);
   --accent: var(--grafite-100);
   --accent-foreground: var(--grafite-900);
-  /* Destrutivo reaproveita a brasa: é o mesmo alarme, e evita uma sexta cor. */
+  /* Destrutivo reaproveita a brasa: é o mesmo alarme, e evita uma sexta cor.
+     `--destructive` é a marca gráfica (preenchimento, borda, anel, ícone) e cumpre
+     os 3:1 da WCAG 1.4.11; para TEXTO existe `--destructive-texto`, porque a brasa
+     cheia sobre um preenchimento a 10% para em 3,99:1 e reprovaria os 4,5:1. */
   --destructive: var(--quente);
+  --destructive-texto: var(--quente-texto);
   /* Borda forte: campo, divisória de seção, contorno de cartão. */
   --border: var(--grafite-200);
   /* A borda do campo é o único limite visível do controle: 3:1 contra o fundo. */
@@ -211,15 +223,21 @@
   /* Hairline: linha de tabela e borda de cabeçalho. Borda cheia numa tabela
      densa vira grade e cansa; a linha translúcida separa sem desenhar. */
   --hairline: rgb(0 0 0 / 0.08);
+  /* Véu do diálogo e da folha. Tingido pela base como as sombras: preto puro está
+     fora da paleta, e o véu precisa valer sozinho, sem depender do backdrop-filter. */
+  --veu: color-mix(in oklab, var(--grafite-900) 25%, transparent);
 
   /* Ação em gradiente (substitui o primary verde do tema). O verde foi para a
      escala térmica, onde significa "cliente". No claro: tinta que esmaece para
-     baixo, texto quase branco. Pior pixel (parada de 60% sobre o cartão): 4,70:1. */
+     baixo, texto quase branco. A parada final é 0.72 e não 0.6: em 0.6 o pior pixel
+     do sistema inteiro ficava em 4,70:1 sobre o cartão, 4% acima do mínimo, e o
+     botão do login usa 16px, que ainda conta como texto normal. Em 0.72 esse mesmo
+     pixel sobe para cerca de 5,9:1 e o gradiente continua sendo lido como gradiente. */
   --acao-gradiente: linear-gradient(
     to bottom,
     var(--grafite-900),
     rgb(15 23 42 / 0.95),
-    rgb(15 23 42 / 0.6)
+    rgb(15 23 42 / 0.72)
   );
   --acao-texto: var(--grafite-25);
 
@@ -275,8 +293,15 @@
   --quente-texto: #e97e68;
   --cliente: #34d399; /* o verde do próprio Ocean Breeze, agora com significado */
   --cliente-texto: #34d399; /* 6,00:1 sobre o chip */
-  --cliente-ativo: #10b981;
-  --cliente-ativo-texto: #10b981; /* 4,77:1 sobre o chip */
+  /* O par verde do escuro estava em 1,32:1 entre si (dE 9,1): numa barra de 3px os
+     dois eram o mesmo pixel. Descer `cliente_ativo` para o #059669 (o chart-5 do
+     próprio Ocean Breeze, e o valor que a direção pedia) abre o par para 1,96:1 e
+     dE 22,9, na mesma ordem de grandeza do par do claro. Como objeto gráfico ele
+     mede 4,74:1 sobre o fundo, 4,29:1 sobre o muted e 3,88:1 sobre o cartão. Esse
+     3,88:1 é justamente o motivo de `-texto` deixar de espelhar a cor aqui: para
+     texto vale o #10b981, que mede 5,77:1 sobre o cartão e 5,02:1 sobre o chip. */
+  --cliente-ativo: #059669;
+  --cliente-ativo-texto: #10b981; /* 5,77:1 sobre o cartão, 5,02:1 sobre o chip */
 
   /* A rampa é a mesma dos dois lados; o que inverte é o papel de cada degrau. */
   --background: var(--grafite-900);
@@ -294,10 +319,12 @@
   --accent: var(--grafite-700);
   --accent-foreground: var(--grafite-300);
   --destructive: var(--quente);
+  --destructive-texto: var(--quente-texto);
   --border: var(--grafite-600);
   --input: var(--grafite-450);
   --ring: var(--grafite-300);
   --hairline: rgb(255 255 255 / 0.08);
+  --veu: color-mix(in oklab, var(--grafite-950) 45%, transparent);
 
   /* Ação: o gradiente branco do template, com texto quase preto.
      Pior pixel (parada de 60% sobre o cartão): 8,04:1. */
@@ -460,19 +487,21 @@
   }
 }
 
-/* Pulso da barra térmica: só quando o negócio passou do prazo da etapa
-   (deals.needs_attention). A barra ENGROSSA e volta, sempre em cor cheia: baixar a
-   opacidade apagaria justamente a linha que precisa ser vista (o âmbar tem só 3,34:1
-   de folga contra o muted do claro, então qualquer alfa abaixo de 1 fura o mínimo de
-   3:1 da WCAG 1.4.11). Só transform, sem custo de layout: 3px x 2,33 dá ~7px e o
-   conteúdo da linha começa em 16px (pl-4), então nada é encoberto. */
+/* Pulso da barra térmica: só quando o negócio está esfriando (deals.needs_attention).
+   A barra ENGROSSA e volta, sempre em cor cheia: baixar a opacidade apagaria justamente
+   a linha que precisa ser vista (o âmbar tem só 3,34:1 de folga contra o muted do claro,
+   então qualquer alfa abaixo de 1 fura o mínimo de 3:1 da WCAG 1.4.11). O pulso é ACENTO,
+   não o sinal: a barra em atenção já nasce com 6px permanentes (o dobro dos 3px normais),
+   porque o halo mede de 1,5:1 a 1,8:1 no claro e nunca poderia carregar o estado sozinho.
+   Só transform, sem custo de layout: 6px x 1,83 dá ~11px, ainda dentro dos 12px do halo,
+   e o conteúdo da linha começa em 16px (pl-4), então nada é encoberto. */
 @keyframes pulso-termico {
   0%,
   100% {
     transform: scaleX(1);
   }
   50% {
-    transform: scaleX(2.33);
+    transform: scaleX(1.83);
   }
 }
 
@@ -496,6 +525,35 @@
 
 @utility revelar-linha {
   animation: revelar-linha 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* ---------------------------------------------------------------------------
+   Avisos (sonner). O `richColors` do sonner foi retirado do layout: ele injeta em
+   runtime uma paleta própria (verde, vermelho, âmbar e azul) que não está na rampa
+   e não significa temperatura. O pior era o verde de sucesso, hsl(150 86% 65%),
+   praticamente o #34d399 reservado para `cliente`: um retângulo verde no topo da
+   tela, em cima de uma lista onde verde só pode querer dizer que o parceiro fechou.
+   Sem `richColors`, o aviso volta a usar --popover, --popover-foreground e --border,
+   e o ícone por tipo continua sendo desenhado (a regra [data-icon] do sonner não
+   depende de [data-rich-colors]).
+
+   As três regras abaixo ficam FORA de @layer de propósito: a folha do sonner também
+   é injetada sem camada e vence utilitário do Tailwind por especificidade. A
+   descrição precisa de !important porque o seletor do sonner é 0,3,0 e este é 0,2,0;
+   sem isso ela cairia num #3f3f3f (claro) ou #e8e8e8 (escuro) fixos, fora da rampa.
+   No erro, a brasa entra só no ícone e na borda: preenchimento cheio recriaria o
+   retângulo que concorre com a temperatura `quente` na mesma tela. O sucesso fica
+   sem cor nenhuma, que é o ponto. */
+.cn-toast [data-description] {
+  color: var(--muted-foreground) !important;
+}
+
+.cn-toast[data-type='error'] [data-icon] {
+  color: var(--destructive);
+}
+
+.cn-toast[data-type='error'] {
+  border-color: color-mix(in oklab, var(--destructive) 40%, var(--border));
 }
 
 /* Rede de segurança: mesmo se um componente esquecer o useReducedMotion,
