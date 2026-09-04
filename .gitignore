@@ -40,3 +40,6 @@ test-results/
 
 # dev containers / build local
 .docker/
+
+# credencial de sessão gerada por apps/web/scripts/sessao-dev.mjs — nunca commitar
+apps/web/scripts/.sessao-dev.json
