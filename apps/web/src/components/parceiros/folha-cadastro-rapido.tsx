@@ -315,7 +315,7 @@ function Formulario({
       ) : null}
 
       {falha ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive-texto">
           {falha}
         </p>
       ) : null}
@@ -351,7 +351,7 @@ function Campo({
       <Label htmlFor={id}>{rotulo}</Label>
       {children(id, Boolean(erro))}
       {erro ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive-texto">
           {erro}
         </p>
       ) : dica ? (

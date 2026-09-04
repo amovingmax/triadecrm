@@ -1,4 +1,5 @@
 export { BarraTermica } from './barra-termica';
+export { ChipTemperatura } from './chip-temperatura';
 export { DiasSemContato, formatarDiasSemContato } from './dias-sem-contato';
 export {
   compararPorTemperatura,

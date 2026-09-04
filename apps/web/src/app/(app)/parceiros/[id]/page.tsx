@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { BarraTermica, definicaoTemperatura } from '@/components/temperatura';
+import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
 import { TransicaoPagina } from '@/components/movimento';
 import {
   carregarFicha,
@@ -46,7 +46,6 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
   const ficha = await carregarFicha(id);
   if (!ficha) notFound();
 
-  const escala = definicaoTemperatura(ficha.temperatura);
   const principal = ficha.negocios.find((n) => n.status === 'open') ?? ficha.negocios[0] ?? null;
   const diasNaEtapa = principal ? diasDesde(principal.naEtapaDesde) : null;
   const diasSemContato = principal ? diasDesde(principal.ultimoContatoEm) : null;
@@ -62,21 +61,18 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
 
       {/* -------------------------------------------------- cabeçalho */}
       <header className="relative flex flex-col gap-3 pl-4">
+        {/* O rótulo da temperatura está visível no chip logo abaixo, então a barra
+            não repete a informação para o leitor de tela. */}
         <BarraTermica
           temperatura={ficha.temperatura}
           needsAttention={principal?.precisaAtencao ?? false}
           posicao="absoluta"
+          semRotulo
         />
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-heading text-2xl font-semibold tracking-tight">{ficha.nome}</h1>
-          <span
-            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-medium"
-            style={{ backgroundColor: escala.corFundo, color: escala.corTexto }}
-            title={escala.descricao}
-          >
-            {escala.rotulo}
-          </span>
+          <ChipTemperatura temperatura={ficha.temperatura} />
           {ficha.vip ? <Badge variant="outline">VIP</Badge> : null}
           {ficha.naoContatar ? (
             <Badge variant="destructive">

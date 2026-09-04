@@ -5,7 +5,7 @@ import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-tab
 
 import { cn } from '@/lib/utils';
 import { RevelarLista, useRevelarLinha } from '@/components/movimento';
-import { BarraTermica, DiasSemContato } from '@/components/temperatura';
+import { BarraTermica, ChipTemperatura, DiasSemContato } from '@/components/temperatura';
 
 import { formatarLocal, formatarProximaAcao, formatarTelefone } from './formatos';
 import type { LinhaParceiro } from './tipos';
@@ -49,6 +49,7 @@ const coluna = createColumnHelper<typeof recursos, LinhaParceiro>();
 const CLASSES: Record<string, string> = {
   nome: 'w-[clamp(13rem,20vw,20rem)]',
   dias: 'w-28',
+  temperatura: 'w-32',
   telefone: 'w-40',
   categoria: 'hidden w-52 lg:table-cell',
   local: 'hidden w-44 xl:table-cell',
@@ -87,6 +88,16 @@ const colunas = coluna.columns([
     id: 'dias',
     header: 'Sem contato',
     cell: ({ getValue }) => <DiasSemContato dias={getValue()} />,
+  }),
+  // Coluna própria, SEMPRE visível, e não um degrau `2xl:table-cell`: cinco matizes
+  // num traço de 3px não sobrevivem a deuteranopia (no claro o par quente/cliente mede
+  // 1,35:1 entre si), então o rótulo textual é o reforço que não depende de matiz. Se
+  // entrasse junto de responsável e etapa, sumiria justamente no notebook de 1280px,
+  // que é onde a lista é lida.
+  coluna.accessor('temperature', {
+    id: 'temperatura',
+    header: 'Temperatura',
+    cell: ({ getValue }) => <ChipTemperatura temperatura={getValue()} />,
   }),
   coluna.accessor('primary_category', {
     id: 'categoria',
@@ -236,10 +247,13 @@ function Linha({ indice, children }: { indice: number; children: React.ReactNode
 function CelulaNome({ linha }: { linha: LinhaParceiro }) {
   return (
     <div className="relative flex h-9 items-center">
+      {/* `semRotulo`: a coluna Temperatura já anuncia o rótulo nesta mesma linha,
+          e sem isso o leitor de tela leria a temperatura duas vezes por parceiro. */}
       <BarraTermica
         temperatura={linha.temperature}
         needsAttention={linha.needs_attention}
         posicao="absoluta"
+        semRotulo
       />
       <Link
         href={`/parceiros/${linha.id}`}

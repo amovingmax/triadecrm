@@ -16,21 +16,33 @@ import { definicaoTemperatura, type Temperatura } from './escala-termica';
  * e todos os outros ficam acima; nenhuma sumiu com a troca de paleta, então os
  * valores da escala continuam os mesmos.
  *
- * Quando o negócio passa do prazo da etapa (`deals.needs_attention`), a barra
- * DESTACA de dois jeitos, os dois somando luz e nunca tirando:
+ * Quando o negócio está esfriando (`deals.needs_attention`: morno com mais de 7 dias
+ * ou quente com mais de 5 dias sem contato), a barra DESTACA de três jeitos, os três
+ * somando e nunca tirando:
  *
- * 1. um halo fixo de 12px que se apaga para a direita, na própria cor da temperatura
- *    (é fundo decorativo atrás da barra, que continua em cor cheia);
- * 2. um pulso lento de ESPESSURA (3px que vai a 7px e volta), nunca de opacidade:
- *    baixar o alfa apagaria justamente a linha que precisa ser vista (foi o que
- *    levou o âmbar a 1,40:1 no claro na primeira versão).
+ * 1. a barra ENGROSSA de 3px para 6px, permanentemente. É o sinal, e é o único que
+ *    não depende de movimento nem de preferência do sistema: 3px contra 6px é razão
+ *    exata de 2, o par fina/grossa mais legível no sol e no escuro;
+ * 2. um pulso lento de espessura por cima disso (6px que vai a ~11px e volta), nunca
+ *    de opacidade: baixar o alfa apagaria justamente a linha que precisa ser vista
+ *    (foi o que levou o âmbar a 1,40:1 no claro na primeira versão);
+ * 3. um halo de 12px que se apaga para a direita, na própria cor da temperatura.
  *
- * O halo é estático de propósito: quem pediu menos movimento no sistema perde o
- * pulso (useReducedMotion, mais a rede de segurança em globals.css) e antes ficava
- * sem sinal nenhum. Agora o realce continua lá, parado.
+ * O halo é DECORAÇÃO, não sinal: medido contra o fundo ele fica entre 1,53:1 e 1,74:1
+ * no claro e entre 1,74:1 e 2,36:1 no escuro, longe dos 3:1 da WCAG 1.4.11. Foi por
+ * isso que a espessura virou permanente: quem pediu menos movimento no sistema perde
+ * o pulso (useReducedMotion, mais a rede de segurança em globals.css) e não pode ficar
+ * dependendo do halo, e mesmo com movimento ligado o olhar de relance cai no vale do
+ * ciclo, onde a barra media exatamente os mesmos 3px de uma linha normal.
  *
  * O conjunto cabe nos 12px do halo e os 16px de `pl-4` de quem usa a barra, então
  * nem o pulso nem o halo encostam no texto da linha.
+ *
+ * A barra não leva `title`: ela é `pointer-events-none` (senão engoliria o toque do
+ * link da linha), então o navegador nunca mostraria a dica. Quem carrega o rótulo
+ * legível é o `ChipTemperatura`, visível na lista, na tabela e na ficha; aqui fica o
+ * `sr-only`, e as telas que já mostram o chip passam `semRotulo` para o leitor de
+ * tela não anunciar a mesma temperatura duas vezes.
  */
 export function BarraTermica({
   temperatura,
@@ -52,8 +64,10 @@ export function BarraTermica({
   const definicao = definicaoTemperatura(temperatura);
   const pulsa = needsAttention && !movimentoReduzido;
 
+  // `needs_attention` é esfriamento, não prazo de etapa: o banco o define como morno
+  // com mais de 7 dias ou quente com mais de 5 dias sem contato (PRD §5.6).
   const rotulo = needsAttention
-    ? `Temperatura: ${definicao.rotulo}. Passou do prazo da etapa.`
+    ? `Temperatura: ${definicao.rotulo}. Esfriando por falta de contato.`
     : `Temperatura: ${definicao.rotulo}.`;
 
   return (
@@ -79,7 +93,12 @@ export function BarraTermica({
     >
       <span
         aria-hidden="true"
-        className={cn('w-[3px] shrink-0 self-stretch rounded-none', pulsa && 'pulso-termico')}
+        className={cn(
+          'shrink-0 self-stretch rounded-none',
+          // A espessura é o sinal e é permanente; o pulso é só o acento por cima.
+          needsAttention ? 'w-[6px]' : 'w-[3px]',
+          pulsa && 'pulso-termico',
+        )}
         style={{ backgroundColor: definicao.cor }}
       />
       {!semRotulo && <span className="sr-only">{rotulo}</span>}
