@@ -909,6 +909,13 @@ export const RPC_TABULAR_CHAMADA = 'tabular_chamada' as const;
 export const RPC_MONTAR_LOTE = 'montar_lote' as const;
 /** RPC que devolve um item à fila sem tabular (aba fechada, engano). */
 export const RPC_DEVOLVER_ITEM = 'devolver_item_do_lote' as const;
+/**
+ * RPC do opt-out imediato, independente do roteiro, do desfecho e da tabulação.
+ * O CLAUDE.md manda suprimir "imediatamente", e quem pede para sair da lista no meio
+ * da ligação não pode depender de a ligação chegar a ser tabulada: se ela cair, se a
+ * pessoa fechar a aba ou sair pelo menu, o pedido já valeu.
+ */
+export const RPC_MARCAR_NAO_LIGAR = 'marcar_nao_ligar_mais' as const;
 
 /**
  * "Com quem você falou" é o MESMO vocabulário da `/registrar` (`ComQuem`), porque é o

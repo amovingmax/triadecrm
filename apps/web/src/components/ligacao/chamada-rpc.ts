@@ -17,6 +17,7 @@ import {
   noSchema,
   resultadoTabulacaoSchema,
   RPC_DEVOLVER_ITEM,
+  RPC_MARCAR_NAO_LIGAR,
   RPC_INICIAR_CHAMADA,
   RPC_MONTAR_LOTE,
   RPC_TABULAR_CHAMADA,
@@ -448,4 +449,40 @@ export function fraseDaRecusaDaChamada(
 export async function devolverItem(itemId: string, motivo?: string): Promise<void> {
   const supabase = createClient();
   await supabase.rpc(RPC_DEVOLVER_ITEM, { p_item_id: itemId, p_motivo: motivo ?? null });
+}
+
+// ---------------------------------------------------------------------------
+// Opt-out imediato
+// ---------------------------------------------------------------------------
+
+/**
+ * Grava o "não me ligue mais" NA HORA, sem esperar a tabulação.
+ *
+ * Por que não espera: o guardrail do produto é suprimir no instante do pedido. Se
+ * isto só valesse no commit, quem pedisse para sair e visse a ligação cair — ou o
+ * operador sair pelo menu — continuaria na fila. Foi medido acontecendo.
+ *
+ * A RPC é idempotente por (organização, pessoa), então marcar de novo no commit não
+ * duplica nada: `tabular_chamada` continua mandando `p_pediu_para_nao_ligar`, e é ele
+ * que garante a supressão mesmo se ESTA chamada não sair (rede caindo, aba morrendo).
+ * Duas portas para a mesma consequência é de propósito — a barata falha aberta.
+ *
+ * O efeito colateral aceito: o negócio pode ir para a etapa de opt-out agora e ser
+ * movido de novo pelo desfecho no commit. Supressão é garantia, etapa é apresentação;
+ * perder um opt-out é inaceitável, e o cartão aparecer numa etapa por um instante não.
+ */
+export async function marcarNaoLigarMais(entrada: {
+  itemId: string;
+  organizationId?: string | null;
+  contactId?: string | null;
+  evidencia?: string | null;
+}): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc(RPC_MARCAR_NAO_LIGAR, {
+    p_item_id: entrada.itemId,
+    p_organization_id: entrada.organizationId ?? null,
+    p_contact_id: entrada.contactId ?? null,
+    p_evidencia: entrada.evidencia ?? null,
+  });
+  if (error) levantar(error.code, error);
 }

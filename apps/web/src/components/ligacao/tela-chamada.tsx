@@ -31,6 +31,7 @@ import {
   ErroDaLigacao,
   fraseDaRecusaDaChamada,
   MENSAGENS_DE_RECUSA_DA_FILA,
+  marcarNaoLigarMais,
   puxarProximo,
   tabularChamada,
 } from './chamada-rpc';
@@ -113,9 +114,16 @@ export function TelaChamada({
   const [confirmarOptoutNaFolha, setConfirmarOptoutNaFolha] = useState(false);
   /**
    * "Ele pediu para não ser mais procurado", marcado na barra de tabulação e válido
-   * de qualquer nó do roteiro (D6). Só é gravado no commit, com o resultado, porque é
-   * a atividade que prova que o pedido existiu — é a mesma ordem que o nó `fim_optout`
-   * já usava, e o caminho é o mesmo `p_pediu_para_nao_ligar` de `tabular_chamada`.
+   * de qualquer nó do roteiro (D6).
+   *
+   * A supressão é gravada NA HORA, por `marcar_nao_ligar_mais`, e não espera o commit:
+   * o CLAUDE.md manda suprimir no instante do pedido, e quem pede para sair não pode
+   * depender de a ligação chegar a ser tabulada — foi medido o contrário acontecendo
+   * (marcar, sair pelo menu, e o contato voltar para a fila sem nenhum registro).
+   *
+   * O estado continua viajando no commit (`p_pediu_para_nao_ligar`) de propósito: são
+   * duas portas para a mesma consequência, a RPC é idempotente por (organização,
+   * pessoa), e assim a supressão vale mesmo se a chamada imediata não sair.
    */
   const [optoutMarcado, setOptoutMarcado] = useState(false);
   const [pedindoOptout, setPedindoOptout] = useState(false);
@@ -807,12 +815,30 @@ export function TelaChamada({
               para este contato de novo, em nenhum modo, e as tarefas abertas dele são
               canceladas.
             </p>
-            <p>Isto não tem volta, e vale a partir do momento em que você gravar o resultado.</p>
+            <p>Isto não tem volta, e vale a partir de agora — não depende de gravar o resultado.</p>
           </>
         }
         aoConfirmar={() => {
+          // Vale JÁ. O guardrail do produto é suprimir no instante do pedido, e quem
+          // pede para sair não pode depender de a ligação chegar a ser tabulada: se ela
+          // cair, ou se a pessoa sair pelo menu, o pedido tem de ter valido do mesmo
+          // jeito. Foi medido acontecendo o contrário.
           setOptoutMarcado(true);
           setPedindoOptout(false);
+          void marcarNaoLigarMais({
+            itemId: item.id,
+            organizationId: item.organizationId,
+            contactId: item.contatoId ?? null,
+            evidencia: 'Pedido na ligação, marcado na barra de tabulação.',
+          }).catch((erro) => {
+            // A supressão continua garantida pelo commit (`p_pediu_para_nao_ligar`), que
+            // é a segunda porta. Mas a pessoa precisa saber que a primeira não pegou,
+            // senão ela sai da tela achando que o pedido já valeu.
+            console.error('[ligacao] opt-out imediato falhou', erro);
+            setErroDaGravacao(
+              'O pedido de não ligar mais ainda não foi gravado. Grave o resultado desta ligação para ele valer.',
+            );
+          });
         }}
       />
     </div>
