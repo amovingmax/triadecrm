@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Ícone placeholder do KOMUNE CRM: quadrado escuro (theme_color #171717) com um "K" em traços. -->
-  <rect width="512" height="512" rx="112" fill="#171717"/>
-  <path d="M182 130v252M182 262l170-132M215 262l137 120" fill="none" stroke="#ffffff" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Ícone placeholder do KOMUNE CRM: quadrado escuro (theme_color #12151a, o grafite 950 do sistema) com um "K" em traços. -->
+  <rect width="512" height="512" rx="112" fill="#12151a"/>
+  <path d="M182 130v252M182 262l170-132M215 262l137 120" fill="none" stroke="#f6f7f9" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

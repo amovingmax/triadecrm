@@ -4,127 +4,263 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================================
+   SISTEMA VISUAL DO KOMUNE CRM
+   Decisão-mãe: a única cor cromática da interface é a ESCALA TÉRMICA do negócio
+   (frio, morno, quente, cliente, cliente_ativo, calculada no banco, PRD §5.6).
+   Todo o resto é tinta neutra de grafite frio. Assim a cor sempre significa uma
+   coisa só, e a Heloísa lê a lista de relance, no sol, com uma mão só.
+   Documentação: docs/design/sistema-visual.md
+   ========================================================================== */
+
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Fontes: Geist Sans na interface, Geist Mono obrigatório em todo número. */
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
+
+  /* Tokens do shadcn (não renomear: os 16 componentes instalados dependem deles). */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Escala térmica exposta ao Tailwind: bg-quente, text-morno-texto, bg-frio-fundo... */
+  --color-frio: var(--frio);
+  --color-frio-texto: var(--frio-texto);
+  --color-frio-fundo: var(--frio-fundo);
+  --color-morno: var(--morno);
+  --color-morno-texto: var(--morno-texto);
+  --color-morno-fundo: var(--morno-fundo);
+  --color-quente: var(--quente);
+  --color-quente-texto: var(--quente-texto);
+  --color-quente-fundo: var(--quente-fundo);
+  --color-cliente: var(--cliente);
+  --color-cliente-texto: var(--cliente-texto);
+  --color-cliente-fundo: var(--cliente-fundo);
+  --color-cliente-ativo: var(--cliente-ativo);
+  --color-cliente-ativo-texto: var(--cliente-ativo-texto);
+  --color-cliente-ativo-fundo: var(--cliente-ativo-fundo);
+
+  /* Grafite frio, disponível como utilitário quando o token semântico não serve. */
+  --color-grafite-25: var(--grafite-25);
+  --color-grafite-50: var(--grafite-50);
+  --color-grafite-100: var(--grafite-100);
+  --color-grafite-200: var(--grafite-200);
+  --color-grafite-300: var(--grafite-300);
+  --color-grafite-400: var(--grafite-400);
+  --color-grafite-450: var(--grafite-450);
+  --color-grafite-500: var(--grafite-500);
+  --color-grafite-600: var(--grafite-600);
+  --color-grafite-700: var(--grafite-700);
+  --color-grafite-800: var(--grafite-800);
+  --color-grafite-850: var(--grafite-850);
+  --color-grafite-900: var(--grafite-900);
+  --color-grafite-950: var(--grafite-950);
+
+  /* Um raio só: 8px em tudo que se toca, 12px em tudo que contém.
+     A escala do shadcn (sm..4xl) é achatada nesses dois valores de propósito:
+     sem isso o botão (rounded-lg), o chip (rounded-4xl) e o cartão (rounded-xl)
+     desenhariam três curvas diferentes na mesma tela. */
+  --radius-sm: var(--raio-interativo);
+  --radius-md: var(--raio-interativo);
+  --radius-lg: var(--raio-interativo);
+  --radius-xl: var(--raio-container);
+  --radius-2xl: var(--raio-container);
+  --radius-3xl: var(--raio-container);
+  --radius-4xl: var(--raio-interativo);
 }
 
+/* ---------------------------------------------------------------------------
+   Tipografia. Geist entra por next/font no layout (variáveis --font-geist-*),
+   com a pilha do sistema atrás para o primeiro paint e para o caso de falha.
+   Nada de Inter, nada de serifa: ênfase vem do peso da mesma família.
+   -------------------------------------------------------------------------- */
 :root {
-  /* Fontes do sistema: sem download em build/CI e com aparência nativa na PWA (iOS/Android). */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
-    monospace;
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
 }
 
+/* ---------------------------------------------------------------------------
+   Forma. Dois raios, e só. Interativo (botão, campo, chip) = 8px.
+   Contêiner (cartão, folha, diálogo) = 12px. A barra térmica não tem raio.
+   -------------------------------------------------------------------------- */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --raio-interativo: 0.5rem;
+  --raio-container: 0.75rem;
+  /* Compatibilidade: componentes e o sonner ainda leem --radius direto. */
+  --radius: var(--raio-interativo);
 }
 
+/* ---------------------------------------------------------------------------
+   MODO CLARO
+   Neutros de grafite frio (matiz levemente azulada, ~222deg): o zinc puro do
+   Tailwind é morto demais ao lado do azul-mar e da brasa da escala térmica.
+   Sem preto puro e sem branco puro: o fundo é papel, não monitor.
+   -------------------------------------------------------------------------- */
+:root {
+  --grafite-25: #fcfcfd;
+  --grafite-50: #f6f7f9;
+  --grafite-100: #eceef2;
+  --grafite-200: #dfe2e9;
+  --grafite-300: #c6cbd5;
+  --grafite-400: #99a0ad;
+  --grafite-450: #868d9a;
+  --grafite-500: #666d7a;
+  --grafite-600: #545c69;
+  --grafite-700: #3c434e;
+  --grafite-800: #282d36;
+  --grafite-850: #2f353f;
+  --grafite-900: #1b1f26;
+  --grafite-950: #12151a;
+
+  /* Escala térmica: as cinco cores cromáticas de toda a interface.
+     `-texto` é a variante que passa em contraste 4.5:1 sobre o fundo da página
+     (o âmbar e a brasa puros são bonitos como marca e fracos como texto);
+     `-fundo` é o preenchimento tênue para chips e faixas. */
+  --frio: #3b6fa8; /* azul-mar profundo de Natal: parado, ainda não é problema */
+  --frio-texto: #2f5c8c;
+  --frio-fundo: color-mix(in oklab, var(--frio) 12%, transparent);
+  /* Âmbar: conversa viva, precisa de cadência. O plano pedia #c98a2e; escurecido
+     em 6% de luminosidade porque a barra térmica é um objeto gráfico e precisa de
+     3:1 contra o fundo (WCAG 1.4.11), e o âmbar original parava em 2,74:1. */
+  --morno: #bd822b;
+  --morno-texto: #8a5a12;
+  --morno-fundo: color-mix(in oklab, var(--morno) 14%, transparent);
+  --quente: #c4472b; /* brasa: interesse declarado, responder hoje */
+  --quente-texto: #b03d22;
+  --quente-fundo: color-mix(in oklab, var(--quente) 12%, transparent);
+  --cliente: #2f7d5b; /* verde publicado: fechou */
+  --cliente-texto: #26654a;
+  --cliente-fundo: color-mix(in oklab, var(--cliente) 12%, transparent);
+  --cliente-ativo: #1f5c43; /* verde mais fundo: publicado e vendendo */
+  --cliente-ativo-texto: #1f5c43;
+  --cliente-ativo-fundo: color-mix(in oklab, var(--cliente-ativo) 12%, transparent);
+
+  /* Superfícies e tinta. A ação (botão primário, foco) é TINTA quase preta:
+     um botão laranja competiria com "quente" e a leitura da lista se perderia. */
+  --background: var(--grafite-50);
+  --foreground: var(--grafite-950);
+  --card: var(--grafite-25);
+  --card-foreground: var(--grafite-950);
+  --popover: var(--grafite-25);
+  --popover-foreground: var(--grafite-950);
+  --primary: var(--grafite-900);
+  --primary-foreground: var(--grafite-50);
+  --secondary: var(--grafite-100);
+  --secondary-foreground: var(--grafite-800);
+  --muted: var(--grafite-100);
+  --muted-foreground: var(--grafite-500);
+  --accent: var(--grafite-100);
+  --accent-foreground: var(--grafite-900);
+  /* Destrutivo reaproveita a brasa: é o mesmo alarme, e evita uma sexta cor. */
+  --destructive: var(--quente);
+  --border: var(--grafite-200);
+  /* A borda do campo é o único limite visível do controle: 3:1 contra o fundo. */
+  --input: var(--grafite-450);
+  --ring: var(--grafite-900);
+
+  /* Gráficos: rampa neutra. Cor cromática em relatório voltaria a competir
+     com a escala térmica; quando o gráfico for POR temperatura, use --frio e cia. */
+  --chart-1: var(--grafite-300);
+  --chart-2: var(--grafite-400);
+  --chart-3: var(--grafite-500);
+  --chart-4: var(--grafite-700);
+  --chart-5: var(--grafite-900);
+
+  --sidebar: var(--grafite-100);
+  --sidebar-foreground: var(--grafite-950);
+  --sidebar-primary: var(--grafite-900);
+  --sidebar-primary-foreground: var(--grafite-50);
+  --sidebar-accent: var(--grafite-200);
+  --sidebar-accent-foreground: var(--grafite-900);
+  --sidebar-border: var(--grafite-200);
+  --sidebar-ring: var(--grafite-900);
+}
+
+/* ---------------------------------------------------------------------------
+   MODO ESCURO
+   Mesma hierarquia, mesmo significado: a escala térmica clareia o suficiente
+   para manter contraste sobre o grafite, sem virar néon.
+   -------------------------------------------------------------------------- */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --frio: #5e96d1;
+  --frio-texto: #7fb0e0;
+  --morno: #e0a94f;
+  --morno-texto: #e8bc72;
+  --quente: #e06a4c;
+  --quente-texto: #ee8567;
+  --cliente: #4ca37c;
+  --cliente-texto: #6fbe99;
+  --cliente-ativo: #3c8467;
+  --cliente-ativo-texto: #62a98a;
+
+  /* A rampa de grafite é a mesma dos dois lados; o que inverte é o papel de cada
+     degrau. Fundo passa a ser o degrau 950, tinta passa a ser o degrau 100. */
+  --background: var(--grafite-950);
+  --foreground: var(--grafite-100);
+  --card: var(--grafite-900);
+  --card-foreground: var(--grafite-100);
+  --popover: var(--grafite-900);
+  --popover-foreground: var(--grafite-100);
+  --primary: var(--grafite-100);
+  --primary-foreground: var(--grafite-950);
+  --secondary: var(--grafite-800);
+  --secondary-foreground: var(--grafite-100);
+  --muted: var(--grafite-800);
+  --muted-foreground: var(--grafite-400);
+  --accent: var(--grafite-800);
+  --accent-foreground: var(--grafite-100);
+  --destructive: var(--quente);
+  --border: var(--grafite-850);
+  --input: var(--grafite-500);
+  --ring: var(--grafite-300);
+
+  --chart-1: var(--grafite-700);
+  --chart-2: var(--grafite-600);
+  --chart-3: var(--grafite-500);
+  --chart-4: var(--grafite-400);
+  --chart-5: var(--grafite-200);
+
+  --sidebar: var(--grafite-900);
+  --sidebar-foreground: var(--grafite-100);
+  --sidebar-primary: var(--grafite-100);
+  --sidebar-primary-foreground: var(--grafite-950);
+  --sidebar-accent: var(--grafite-800);
+  --sidebar-accent-foreground: var(--grafite-100);
+  --sidebar-border: var(--grafite-850);
+  --sidebar-ring: var(--grafite-500);
 }
 
 @layer base {
@@ -140,6 +276,77 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Utilitários do sistema.
+   -------------------------------------------------------------------------- */
+
+/* Todo número da interface (dias, contadores, telefone, CNPJ, valores) usa isto:
+   Geist Mono com largura fixa, para as colunas alinharem na vertical. */
+@utility numerico {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Resposta tátil no toque (o time trabalha no celular, entre visitas). */
+@utility toque {
+  transition: transform 120ms ease-out;
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Pulso da barra térmica: só quando o negócio passou do prazo da etapa
+   (deals.needs_attention). A barra ENGROSSA e volta, sempre em cor cheia: baixar a
+   opacidade apagaria justamente a linha que precisa ser vista (o âmbar tem só 3,07:1
+   de folga contra o fundo claro, então qualquer alfa abaixo de 1 fura o mínimo de
+   3:1 da WCAG 1.4.11). Só transform, sem custo de layout: 3px x 2,33 dá ~7px e o
+   conteúdo da linha começa em 16px (pl-4), então nada é encoberto. */
+@keyframes pulso-termico {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(2.33);
+  }
+}
+
+@utility pulso-termico {
+  transform-origin: left center;
+  animation: pulso-termico 2.4s ease-in-out infinite;
+}
+
+/* Entrada escalonada das linhas: os primeiros resultados chegam primeiro.
+   Só transform e opacity; o delay vem inline, e some depois do primeiro paint. */
+@keyframes revelar-linha {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility revelar-linha {
+  animation: revelar-linha 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Rede de segurança: mesmo se um componente esquecer o useReducedMotion,
+   quem pediu menos movimento no sistema não recebe animação nenhuma. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

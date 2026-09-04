@@ -14,8 +14,10 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#ffffff',
-    theme_color: '#171717',
+    // Espelha o viewport.themeColor de layout.tsx: --grafite-50 no claro e
+    // --grafite-950 no escuro. Branco puro e preto puro estão fora da paleta.
+    background_color: '#f6f7f9',
+    theme_color: '#12151a',
     categories: ['business', 'productivity'],
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
