@@ -66,6 +66,13 @@ comment on column public.interaction_outcomes.can_reactivate is 'false = não vo
 comment on column public.interaction_outcomes.counts_as is 'Teto da contagem (RF-MET-01): porta aberta só é gravada se o formulário também disser decisor/influenciador.';
 create index if not exists interaction_outcomes_surface_idx on public.interaction_outcomes using gin (surfaces);
 
+-- Auditoria do catálogo (§5: "chip novo é ato de gestor, auditado", RF-ADM-02/RF-ADM-03).
+-- cooldown_days, can_reactivate e counts_as governam supressão de contato e contagem de
+-- meta: mudar isso não pode acontecer sem linha em audit_log.
+drop trigger if exists audit_interaction_outcomes on public.interaction_outcomes;
+create trigger audit_interaction_outcomes after insert or update or delete
+  on public.interaction_outcomes for each row execute function app.audit();
+
 -- Catálogo: leitura para autenticados, escrita para admin/gestor (mesmo padrão da migração 000500).
 drop policy if exists interaction_outcomes_select on public.interaction_outcomes;
 drop policy if exists interaction_outcomes_insert on public.interaction_outcomes;
@@ -107,9 +114,12 @@ begin
     raise exception 'Desfecho % não vale para a superfície %.', o.slug, coalesce(s::text, 'indefinida') using errcode = '23514';
   end if;
   aberta := o.counts_as = 'aberta' and coalesce(new.metadata ->> 'com_quem', '') in ('decisor','influenciador');
+  -- cooldown_until vai como TEXTO NORMALIZADO EM UTC: o jsonb guarda o texto que a função
+  -- de saída do timestamptz produz, e esse texto muda com o TimeZone da sessão que gravou.
   new.metadata := new.metadata || jsonb_build_object(
     'outcome_slug', o.slug, 'door_opened', aberta, 'door_knocked', o.counts_as <> 'nenhuma',
-    'cooldown_until', (new.occurred_at + make_interval(days => o.cooldown_days)));
+    'cooldown_until', to_char((new.occurred_at + make_interval(days => o.cooldown_days))
+                                at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'));
   return new;
 end $$;
 drop trigger if exists activities_apply_outcome on public.activities;
@@ -121,21 +131,46 @@ create trigger activities_apply_outcome before insert or update on public.activi
 -- (app.org_is_visible) filtra as linhas. Sem opção declarada o padrão do Postgres é rodar como
 -- dona e devolver a carteira inteira a embaixador e leitura, furando RF-ADM-01. As três views da
 -- migração 000500 usam invoker = false porque embutem o filtro de carteira; esta não embute.
+-- Duas leituras diferentes do mesmo histórico, e é de propósito:
+--   * o PISO DE ESPERA sai da ÚLTIMA atividade com desfecho (com max(cooldown_days), um
+--     'wa_agora_nao' de 30 dias continuaria excluindo o alvo depois de ele responder);
+--   * o BLOQUEIO é GRUDENTO: sai do último desfecho bloqueante, e não da última linha.
+--     Se saísse da última, o worker do WhatsApp gravando 'wa_respondeu' numa mensagem que
+--     chega depois do opt-out desfaria o bloqueio sozinho, que é o guardrail que não pode
+--     cair. Por isso são duas CTEs, e não um `not u.can_reactivate` na linha final.
+--   * E bloqueia só o desfecho que EMPURRA O NEGÓCIO PARA ETAPA DE PERDA, que é a mesma
+--     condição que dá sentido à única saída codificada ("sair de etapa de perda"). Sem essa
+--     simetria, 'wa_numero_invalido' e 'lig_numero_errado' (can_reactivate = false, sem
+--     etapa de destino) prendiam a organização inteira, em todos os canais, para sempre.
 create or replace view public.v_contact_cooldown
 with (security_barrier = true, security_invoker = true) as
-  with ultimo as (
-    -- Janela da ÚLTIMA atividade com desfecho, e não o máximo do histórico: com max(), um
-    -- 'wa_agora_nao' de 30 dias continuaria excluindo o alvo depois de ele responder.
-    select distinct on (a.organization_id)
-           a.organization_id, a.occurred_at, o.cooldown_days, o.can_reactivate
+  with com_desfecho as (
+    -- activities.organization_id é ANULÁVEL e o worker de WhatsApp do D5 grava a mensagem
+    -- só com deal_id e contact_id: sem o coalesce, um 'wa_optout' assim não produziria
+    -- linha alguma aqui e o alvo continuaria elegível à fila pelo que esta view diz.
+    select coalesce(a.organization_id, d.organization_id) as organization_id,
+           a.occurred_at, a.created_at, a.id,
+           o.cooldown_days, o.can_reactivate, o.target_stage_slug
       from public.activities a
       join public.interaction_outcomes o on o.id = a.outcome_id
-     where a.organization_id is not null
-     order by a.organization_id, a.occurred_at desc, a.created_at desc, a.id desc
+      left join public.deals d on d.id = a.deal_id
+     where coalesce(a.organization_id, d.organization_id) is not null
+  ),
+  ultimo as (
+    select distinct on (c.organization_id) c.organization_id, c.occurred_at, c.cooldown_days
+      from com_desfecho c
+     order by c.organization_id, c.occurred_at desc, c.created_at desc, c.id desc
+  ),
+  bloqueio as (
+    select distinct on (c.organization_id) c.organization_id, c.occurred_at as blocked_since
+      from com_desfecho c
+     where not c.can_reactivate
+       and exists (select 1 from public.stages s where s.slug = c.target_stage_slug and s.is_lost)
+     order by c.organization_id, c.occurred_at desc, c.created_at desc, c.id desc
   )
   select u.organization_id,
          u.occurred_at + make_interval(days => u.cooldown_days) as cooldown_until,
-         (not u.can_reactivate) and not exists (
+         b.organization_id is not null and not exists (
            -- Saída do bloqueio: reabertura humana com motivo, saindo de uma etapa de perda
            -- (§5.3, RF-FUN-08). Opt-out não tem saída (RF-CON-18), daí o is_optout.
            select 1 from public.deal_stage_history h
@@ -143,14 +178,15 @@ with (security_barrier = true, security_invoker = true) as
              join public.stages sd on sd.id = h.from_stage_id
              join public.stages sp on sp.id = h.to_stage_id
             where d.organization_id = u.organization_id
-              and h.changed_at > u.occurred_at
+              and h.changed_at > b.blocked_since
               and h.changed_by is not null
               and h.reason is not null
               and sd.is_lost and not sd.is_optout
               and not sp.is_lost
          ) as blocked_forever
-    from ultimo u;
-comment on view public.v_contact_cooldown is 'Piso de espera e bloqueio por desfecho (RF-FUN-13). A fila filtra por aqui; nada aqui dispara envio. O bloqueio termina na reabertura registrada, e o cooldown de 90 dias continua valendo depois dela (§5.3).';
+    from ultimo u
+    left join bloqueio b on b.organization_id = u.organization_id;
+comment on view public.v_contact_cooldown is 'Piso de espera e bloqueio por desfecho (RF-FUN-13). A fila filtra por aqui; nada aqui dispara envio. Só bloqueia desfecho que leva o negócio a etapa de perda, e o bloqueio termina na reabertura registrada, com o cooldown do desfecho ainda valendo depois dela (§5.3).';
 ```
 
 ## 3. Lista fechada inicial (34 desfechos, no máximo 8 por superfície)
@@ -164,11 +200,11 @@ No WhatsApp o desfecho descreve **a porta** (enviou, entregou, respondeu, parou)
 | WhatsApp | Não é a pessoa | `wa_nao_e_a_pessoa` | batida | 0 | sim | achar o decisor | mantém |
 | WhatsApp | Agora não | `wa_agora_nao` | aberta | 30 | sim | reativar com gancho D+30 | nutricao -> frio |
 | WhatsApp | Não, definitivo | `wa_nao_firme` | aberta | 90 | não | nenhuma | perdido (motivo obrigatório) |
-| WhatsApp | Número inválido | `wa_numero_invalido` | nenhuma | 0 | não | buscar outro canal | mantém |
+| WhatsApp | Número inválido | `wa_numero_invalido` | nenhuma | 36500 | não | buscar outro canal | mantém |
 | WhatsApp | Pediu para parar | `wa_optout` | nenhuma | 36500 | não | nenhuma | optout -> frio |
 | Ligação | Não atendeu | `lig_nao_atendeu` | batida | 1 | sim | ligar D+1 (2ª e última, RF-CON-13) | mantém |
 | Ligação | Caixa postal | `lig_caixa_postal` | batida | 1 | sim | ligar D+1 | mantém |
-| Ligação | Número errado | `lig_numero_errado` | nenhuma | 0 | não | buscar outro canal | mantém |
+| Ligação | Número errado | `lig_numero_errado` | nenhuma | 36500 | não | buscar outro canal | mantém |
 | Ligação | Atendeu, retorna depois | `lig_atendeu_retorna` | aberta | 2 | sim | ligar na data combinada | mantém -> morno |
 | Ligação | Interessado | `lig_interessado` | aberta | 0 | sim | marcar apresentação | em_conversa -> quente |
 | Ligação | Agora não | `lig_agora_nao` | aberta | 30 | sim | reativar com gancho D+30 | nutricao -> frio |
@@ -179,7 +215,7 @@ No WhatsApp o desfecho descreve **a porta** (enviou, entregou, respondeu, parou)
 | Visita | Decisor interessado | `vis_decisor_interessado` | aberta | 0 | sim | marcar apresentação ou enviar link | em_conversa -> quente |
 | Visita | Decisor, agora não | `vis_decisor_agora_nao` | aberta | 30 | sim | reativar com gancho D+30 | nutricao -> frio |
 | Visita | Decisor recusou | `vis_decisor_recusou` | aberta | 90 | não | nenhuma | perdido (motivo obrigatório) |
-| Visita | Cadastro iniciado na hora | `vis_cadastro_iniciado` | aberta | 3 | sim | perturbar cadastro D+3 | cadastro_em_andamento -> quente |
+| Visita | Cadastro iniciado na hora | `vis_cadastro_iniciado` | aberta | 3 | sim | retomar o cadastro D+3 | cadastro_em_andamento -> quente |
 | Visita | Sem perfil (fora do ICP) | `vis_sem_perfil` | batida | 36500 | não | nenhuma | perdido (motivo obrigatório) |
 | Reunião | Realizada, interessado | `reu_interessado` | aberta | 0 | sim | pedir autorização no mesmo dia | apresentacao_realizada -> quente |
 | Reunião | Realizada, autorizou | `reu_autorizou` | aberta | 0 | sim | enviar link de reivindicação | autorizou -> quente |
@@ -191,15 +227,18 @@ No WhatsApp o desfecho descreve **a porta** (enviou, entregou, respondeu, parou)
 | DM | Respondeu na DM | `dm_respondeu` | aberta | 0 | sim | responder em 15 min | respondeu -> morno |
 | DM | Pediu contato no WhatsApp | `dm_pediu_whatsapp` | aberta | 0 | sim | mensagem no WhatsApp no mesmo dia | respondeu -> morno |
 | DM | Não é a pessoa | `dm_nao_e_a_pessoa` | batida | 0 | sim | achar o decisor | mantém |
-| DM | Perfil inativo ou não é fornecedor | `dm_perfil_inativo` | nenhuma | 36500 | não | nenhuma | perdido (motivo obrigatório) |
+| DM | Perfil inativo, não fornece | `dm_perfil_inativo` | nenhuma | 36500 | não | nenhuma | perdido (motivo obrigatório) |
 | DM | Pediu para parar | `dm_optout` | nenhuma | 36500 | não | nenhuma | optout -> frio |
 
 Regra de inflação: acima de 8 por superfície ninguém tabula dentro do orçamento de 20 s (RF-MET-06). Chip novo pelo gestor exige aposentar outro, sempre por `is_active = false` e nunca por `delete`, porque atividades antigas apontam para ele.
 
+**Duas linhas mudaram depois da revisão do D3, e estão PENDENTES DE DECISÃO HUMANA (Rafael/Bárbara, PRD §13 item 20):** `wa_numero_invalido` e `lig_numero_errado` passaram de cooldown 0 para 36500. Motivo: os dois têm `can_reactivate = false` e não têm etapa de destino, então, pela regra de bloqueio da §2 (só bloqueia quem vai para etapa de perda), eles deixaram de prender a organização para sempre. Com cooldown 0 o número morto voltaria à fila das 06:00 na manhã seguinte, gastando vaga do teto do RF-CON-10 e repetindo envio a um número que a Cloud API já recusou (risco 2, quality rating). A janela permanente segura o alvo e cai sozinha no primeiro toque por outro canal (DM, visita, ligação no número novo), que é literalmente a próxima ação do próprio chip, e vale também para organização que ainda não tem negócio (lead do Radar), cuja única saída antes passava por `public.deals`.
+
 ## 4. Como isso alimenta o resto
 
-- **Fila diária, RF-CON-08.** A montagem das 06:00 exclui as organizações com `v_contact_cooldown.cooldown_until > now()` ou `blocked_forever`, antes de ordenar por tier, categoria em déficit e zona do dia. O cooldown é filtro de entrada na fila, e a fila continua revisada item a item por gente. `blocked_forever` não é sentença: ele cai sozinho quando alguém registra a reabertura (mudança de etapa saindo da perda, com motivo e autor humano, RF-FUN-08), e aí o cooldown de 90 dias do desfecho ainda segura o alvo pelo prazo que a §5.3 pede. A exceção é o opt-out, que nunca reabre (RF-CON-18).
+- **Fila diária, RF-CON-08.** A montagem das 06:00 exclui as organizações com `v_contact_cooldown.cooldown_until > now()` ou `blocked_forever`, antes de ordenar por tier, categoria em déficit e zona do dia. O cooldown é filtro de entrada na fila, e a fila continua revisada item a item por gente. `blocked_forever` nasce só de desfecho que leva o negócio a etapa de perda, e não é sentença: ele cai sozinho quando alguém registra a reabertura (mudança de etapa saindo da perda, com motivo e autor humano, RF-FUN-08), e aí o cooldown de 90 dias do desfecho ainda segura o alvo pelo prazo que a §5.3 pede. A exceção é o opt-out, que nunca reabre (RF-CON-18). Número inválido e número errado não bloqueiam: eles seguram o alvo pela janela permanente, que cai no primeiro toque por outro canal, sem depender de mudança de etapa nenhuma — e é assim que a organização sem negócio também tem saída.
 - **Meu dia, RF-MET-04.** O critério 3 ("reunião ou visita passada sem resultado") vira consulta exata: atividade `visit`/`meeting` com `occurred_at` no passado e `outcome_id` nulo, que é a mesma linha que o trigger marcou com `metadata.outcome_pending`. Essa é a cobrança do desfecho, e por isso o banco não precisa recusar a gravação. O critério 4 usa `next_action_kind` e `next_action_offset_days` como data padrão da próxima ação criada pelo desfecho (RF-FUN-03), e o "porquê" do cartão passa a citar o nome do chip.
+- **Temperatura, PRD §5.6 (lacuna consciente do D3).** `sets_temperature` nasce como DADO: nada no banco o aplica. E o gatilho `zz_deals_apply_temperature` (migração 000400, BEFORE em `deals`) recalcula `new.temperature` em toda escrita, então worker ou RPC que tente gravar `deals.temperature` a partir do desfecho vai ver o valor descartado em silêncio. Enquanto isso não for decidido com o Rafael (sexto parâmetro em `app.compute_temperature`, ou não), a temperatura do desfecho só pode chegar ao negócio por `target_stage_slug` ou por `temperature_override`, nunca por escrita direta em `deals.temperature`. O mesmo vale para `next_action_*`, que hoje é dado lido pela UI.
 - **Porta batida e porta aberta, RF-MET-01.** Contagem lida de `metadata->>'door_knocked'` e `metadata->>'door_opened'`, escritos pelo trigger a partir de `counts_as` e do interlocutor. Some a divergência entre o que a tela mostra e o que a métrica conta, porque as duas leem a mesma linha.
 - **Relatórios, RF-REL-02 e RF-REL-06.** `interaction_outcomes` vira dimensão: funil por canal do primeiro contato com o desfecho nomeado, eficiência de canal pela razão entre `aberta` e `batida`, e motivo de perda cruzado com o desfecho que o produziu. Perda continua exigindo `lost_reason_id` (RF-FUN-04): o desfecho diz como a porta fechou, o motivo diz por quê, e nos seis desfechos marcados "perdido (motivo obrigatório)" na tabela da §3 os dois são obrigatórios juntos (os dois de opt-out vão para a etapa `optout`, que por definição do banco é perda sem motivo da lista fechada).
 
@@ -216,7 +255,10 @@ Regra de inflação: acima de 8 por superfície ninguém tabula dentro do orçam
 3. Desfecho fora da superfície é recusado (`vis_decisor_interessado` numa atividade `call` levanta exceção). Atividade `call`, `visit` ou `meeting` sem `outcome_id` **é aceita** e nasce com `metadata.outcome_pending = true` (o banco não trava a captura, RF-MET-06 e RF-BAS-15); `message` humana, `message` de robô e `note` passam sem desfecho e sem a marca; gravar o desfecho depois apaga a marca.
 4. `counts_as = 'aberta'` com `metadata.com_quem = 'funcionario'` grava `door_opened = false` e `door_knocked = true`; com `decisor`, grava `door_opened = true`; `counts_as = 'nenhuma'` grava `door_knocked = false` (número inválido não conta porta batida).
 5. `cooldown_until` em `metadata` é `occurred_at + cooldown_days`, e `v_contact_cooldown` devolve a janela da **última** atividade com desfecho, não o maior valor do histórico: `wa_agora_nao` (30 dias) seguido de `wa_respondeu` (0) devolve janela vencida.
-6. `blocked_forever` fica verdadeiro depois de um desfecho com `can_reactivate = false` e não volta a falso por um desfecho reativável posterior; volta a falso depois de uma reabertura registrada (mudança de etapa saindo de uma etapa de perda, com `reason` e `changed_by` preenchidos, RF-FUN-08 e §5.3). Saindo de uma etapa de opt-out não reabre (RF-CON-18).
+6. `blocked_forever` fica verdadeiro depois de um desfecho com `can_reactivate = false` **que leva o negócio a etapa de perda**, e não volta a falso por um desfecho reativável posterior; volta a falso depois de uma reabertura registrada (mudança de etapa saindo de uma etapa de perda, com `reason` e `changed_by` preenchidos, RF-FUN-08 e §5.3). Saindo de uma etapa de opt-out não reabre (RF-CON-18). `wa_numero_invalido` e `lig_numero_errado` NÃO bloqueiam (nem com negócio, nem em organização sem negócio): ficam em janela permanente, que vence no primeiro desfecho posterior em outra superfície, sem mudança de etapa. Asserção sobre o catálogo, para um chip futuro do gestor não recriar a armadilha: todo desfecho que bloqueia declara `target_stage_slug` de etapa de perda, e todo desfecho não reativável que não bloqueia tem `cooldown_days = 36500`.
+6b. Desfecho gravado sem `organization_id` (o worker do D5 grava mensagem só com `deal_id`) entra na view pela organização do negócio: um `wa_optout` assim bloqueia igual.
+6c. `metadata.cooldown_until` é gravado em UTC, no formato ISO 8601 com `Z`, independente do TimeZone da sessão que escreveu.
+6d. Criar, alterar e apagar chip do catálogo deixam linha em `audit_log` com o papel de quem alterou (RF-ADM-02, RF-ADM-03).
 7. Desfecho com `requires_lost_reason` só é aceito em negócio que tenha `lost_reason_id` (regra em `app.deals_before_write`, testada junto com RF-FUN-04).
 8. Desfecho inativo é recusado em atividade nova e continua legível nas atividades antigas que o referenciam.
 9. Seed: todo `slug` da §3 existe, nenhuma superfície passa de 8 ativos, todo `name` cabe em 28 caracteres, todo `target_stage_slug` corresponde a uma etapa do funil `fornecedor`, e reaplicar a seed não duplica linha nem muda `id` (padrão do 08_seed).

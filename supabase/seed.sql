@@ -1172,6 +1172,38 @@ on conflict (slug) do update
       counts_as               = excluded.counts_as;
 
 -- =====================================================================
+-- 12b. Equivalência de etapas entre funis (RF-FUN-12; PRD §5.3 ↔ §5.5)
+--
+--     `interaction_outcomes.target_stage_slug` é escrito no vocabulário do funil
+--     FORNECEDOR (é o que a autoverificação do bloco 13 confere). Cinco desses
+--     destinos não existem no funil produtor, que tem etapas próprias — sem esta
+--     tabela, os 8 desfechos que levam a Quente não moviam etapa nenhuma na metade
+--     da base que é produtor ou cerimonialista. `app.stage_for` (migração 001200)
+--     prefere sempre o slug literal e só cai aqui quando ele não existe no funil.
+--
+--     em_conversa NÃO tem linha aqui de propósito: o funil produtor não tem etapa
+--     equivalente (PRD §5.5 vai de "Respondeu" direto a "Demonstração marcada").
+--     `lig_interessado` e `vis_decisor_interessado` esquentam nesse funil pela
+--     intenção que declaram (`sets_temperature = quente`), não pela etapa.
+-- =====================================================================
+insert into public.stage_equivalences (pipeline_id, canonical_slug, stage_slug, note)
+select p.id, v.canonical_slug, v.stage_slug, v.note
+  from (values
+    ('produtor', 'reuniao_marcada',        'demonstracao_marcada',
+     'PRD §5.3 linha 5 ↔ §5.5 linha 4: data e formato confirmados.'),
+    ('produtor', 'apresentacao_realizada', 'demonstracao_realizada',
+     'PRD §5.3 linha 6 ↔ §5.5 linha 5: encontro feito, resultado registrado.'),
+    ('produtor', 'autorizou',              'parceria_aceita',
+     'PRD §5.3 linha 7 ↔ §5.5 linha 6: o sim registrado.'),
+    ('produtor', 'cadastro_em_andamento',  'parceria_aceita',
+     'PRD §5.5 linha 6: a automação de "Parceria aceita" é a criação assistida da conta.')
+  ) as v(pipeline, canonical_slug, stage_slug, note)
+  join public.pipelines p on p.slug = v.pipeline
+on conflict (pipeline_id, canonical_slug) do update
+  set stage_slug = excluded.stage_slug,
+      note       = excluded.note;
+
+-- =====================================================================
 -- 13. Autoverificação: a seed falha (e o db reset também) se as contagens esperadas não baterem.
 -- =====================================================================
 do $$
@@ -1179,7 +1211,7 @@ declare
   n_cat  int;  n_pipe int;  n_forn int;  n_ativ int;  n_prod int;
   n_hol  int;  n_tpl  int;  n_city int;  n_src  int;  n_lost int;
   n_hol1 int;  ano    int := extract(year from (now() at time zone 'America/Fortaleza'))::int;
-  n_out  int;  n_sup  int;
+  n_out  int;  n_sup  int;  n_eq int;  s_eq text;
 begin
   select count(*) into n_cat  from public.categories;
   select count(*) into n_pipe from public.pipelines;
@@ -1194,6 +1226,7 @@ begin
   select count(*) into n_src  from public.sources;
   select count(*) into n_lost from public.lost_reasons;
   select count(*) into n_out from public.interaction_outcomes;
+  select count(*) into n_eq  from public.stage_equivalences;
   -- Teto de 8 chips ativos por superfície: acima disso ninguém tabula dentro dos 20 s do RF-MET-06.
   select coalesce(max(c), 0) into n_sup
     from (select count(*) as c from public.interaction_outcomes o, unnest(o.surfaces) as sup
@@ -1210,6 +1243,7 @@ begin
   if n_lost <> 9 then raise exception 'seed: esperados 9 motivos de perda, encontrados %', n_lost; end if;
   if n_out <> 34 then raise exception 'seed: esperados 34 desfechos de interação, encontrados %', n_out; end if;
   if n_sup > 8   then raise exception 'seed: superfície com % desfechos ativos (máximo 8, RF-MET-06)', n_sup; end if;
+  if n_eq <> 4   then raise exception 'seed: esperadas 4 equivalências de etapa, encontradas %', n_eq; end if;
   if exists (
     select 1 from public.interaction_outcomes o
      where o.target_stage_slug is not null
@@ -1217,6 +1251,19 @@ begin
                         where p.slug = 'fornecedor' and s.slug = o.target_stage_slug)
   ) then
     raise exception 'seed: desfecho com etapa de destino que não existe no funil fornecedor';
+  end if;
+  -- E no funil PRODUTOR: todo destino tem de resolver, direto ou por equivalência.
+  -- A única ausência aceita é `em_conversa`, que o PRD §5.5 não descreve; qualquer
+  -- outra é regressão do achado "metade da base nunca esquenta".
+  select string_agg(distinct o.target_stage_slug, ', ' order by o.target_stage_slug) into s_eq
+    from public.interaction_outcomes o
+   where o.is_active and o.target_stage_slug is not null
+     and o.target_stage_slug <> 'em_conversa'
+     and not exists (select 1 from app.stage_for(
+                       (select id from public.pipelines where slug = 'produtor'),
+                       o.target_stage_slug));
+  if s_eq is not null then
+    raise exception 'seed: desfecho sem etapa no funil produtor (nem literal, nem equivalência): %', s_eq;
   end if;
   if exists (select 1 from public.stages where position < 0) then
     raise warning 'seed: há etapas órfãs (posição negativa) que não constam mais da seed';
