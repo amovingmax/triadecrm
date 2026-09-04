@@ -67,7 +67,10 @@ export function TelaLogin({ next, aviso }: { next: string; aviso: AvisoAcesso | 
 
         <div className="relative">
           <motion.div {...entrada(0)}>
-            <span className="pilula inline-flex items-center gap-2 py-1.5 pr-3.5 pl-1.5 text-xs text-muted-foreground">
+            {/* Tinta cheia, não esmaecida: sobre a pílula sobre o painel, no ponto mais forte
+                do brilho radial, o esmaecido do claro para em 4,40:1. E o eyebrow é para ser
+                lido, não para sumir. */}
+            <span className="pilula inline-flex items-center gap-2 py-1.5 pr-3.5 pl-1.5 text-xs text-foreground">
               <MarcaK className="size-5" />
               Acesso restrito ao time
             </span>

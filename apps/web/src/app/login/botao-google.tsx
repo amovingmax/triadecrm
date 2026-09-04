@@ -26,6 +26,8 @@ export function BotaoGoogle({
   const [carregando, setCarregando] = useState(false);
 
   async function entrar() {
+    // `aria-disabled` não bloqueia o clique como `disabled`: a guarda é aqui.
+    if (carregando) return;
     setCarregando(true);
     const supabase = createClient();
     const redirectTo = new URL('/auth/callback', window.location.origin);
@@ -51,12 +53,19 @@ export function BotaoGoogle({
   // 1.02 e toque em 0.98, em 150ms. `sombra-base` acrescenta a elevação tingida pela
   // base, nunca sombra preta. Nada de `toque` aqui: dois utilitários mexendo no mesmo
   // `transform` cancelariam o `translate-y-px` que o próprio botão aplica no clique.
+  //
+  // `aria-disabled` e não `disabled`: o `disabled:opacity-50` da base do Button
+  // atenuaria o botão inteiro, e o texto "Abrindo o Google" (que é justamente a
+  // mensagem de estado que a pessoa precisa ler para não clicar de novo) cairia para
+  // 2,02:1 no topo do gradiente e 1,47:1 na parada final. Assim o gradiente e o
+  // rótulo ficam cheios; quem trava o segundo clique é a guarda em `entrar`, e o
+  // `acao-gradiente` já ignora hover e toque quando aria-disabled está ligado.
   return (
     <Button
       size="lg"
-      className="sombra-base h-12 w-full justify-center text-base sm:w-auto sm:min-w-64"
+      className="sombra-base h-12 w-full justify-center text-base aria-disabled:cursor-progress sm:w-auto sm:min-w-64"
       onClick={entrar}
-      disabled={carregando}
+      aria-disabled={carregando}
       aria-busy={carregando}
     >
       {/* Sem giro redondo: o rótulo troca e o botão trava, que já é a resposta.
