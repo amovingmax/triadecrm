@@ -112,8 +112,14 @@ select is(
 select is(
   (select do_not_contact from public.organizations where id = 'b0000000-0000-4000-8000-000000000901'),
   false, 'consent: as tentativas bloqueadas não marcaram do_not_contact');
+-- Contagem restrita à organização do teste: a suppression_list é permanente e recebe linhas
+-- de qualquer opt-out real (inclusive o gravado pelo kanban), então contagem global aqui
+-- quebraria o teste sem que nada de segurança tivesse mudado.
 select is(
-  (select count(*)::int from public.suppression_list), 0,
+  (select count(*)::int from public.suppression_list s
+     where s.source_event_id in (select c.id from public.consent_events c
+                                  where c.organization_id = 'b0000000-0000-4000-8000-000000000901')),
+  0,
   'consent: as tentativas bloqueadas não suprimiram nada');
 -- Contraprova: a restrição é do papel do JWT, não da máquina. Worker e wa-webhook entram pelo
 -- service_role e continuam registrando o consentimento que chega pela conversa (RF-ADM-01).

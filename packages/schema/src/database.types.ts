@@ -12,7 +12,22 @@ export type Database = {
       [_ in never]: never
     }
     Views: {
-      [_ in never]: never
+      deal_cards: {
+        Row: {
+          card: Json | null
+          deal_id: string | null
+          next_action_at: string | null
+          next_action_state: string | null
+          org_deleted_at: string | null
+          organization_id: string | null
+          organization_name: string | null
+          owner_id: string | null
+          pipeline_id: number | null
+          search_name: string | null
+          stage_id: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       can_write: { Args: never; Returns: boolean }
@@ -35,6 +50,13 @@ export type Database = {
           organization_id: string
           reason: string
         }[]
+      }
+      interaction_surface: {
+        Args: {
+          p_channel: Database["app"]["Enums"]["channel"]
+          p_type: Database["app"]["Enums"]["activity_type"]
+        }
+        Returns: Database["app"]["Enums"]["interaction_surface"]
       }
       is_admin: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
@@ -99,6 +121,7 @@ export type Database = {
         | "erasure_request"
         | "erasure_done"
       deal_status: "open" | "won" | "lost" | "paused" | "nurturing"
+      door_kind: "aberta" | "batida" | "nenhuma"
       goal_metric:
         | "new_targets"
         | "doors_knocked"
@@ -110,6 +133,13 @@ export type Database = {
         | "pre_registrations"
         | "published"
       goal_period: "day" | "week" | "month"
+      interaction_surface:
+        | "whatsapp"
+        | "ligacao"
+        | "visita"
+        | "reuniao"
+        | "instagram_dm"
+        | "triagem"
       msg_direction: "in" | "out"
       msg_status:
         | "queued"
@@ -184,7 +214,7 @@ export type Database = {
           metadata: Json
           occurred_at: string
           organization_id: string | null
-          outcome: string | null
+          outcome_id: number | null
           type: Database["app"]["Enums"]["activity_type"]
           user_id: string | null
         }
@@ -201,7 +231,7 @@ export type Database = {
           metadata?: Json
           occurred_at?: string
           organization_id?: string | null
-          outcome?: string | null
+          outcome_id?: number | null
           type: Database["app"]["Enums"]["activity_type"]
           user_id?: string | null
         }
@@ -218,7 +248,7 @@ export type Database = {
           metadata?: Json
           occurred_at?: string
           organization_id?: string | null
-          outcome?: string | null
+          outcome_id?: number | null
           type?: Database["app"]["Enums"]["activity_type"]
           user_id?: string | null
         }
@@ -256,6 +286,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_outcome_id_fkey"
+            columns: ["outcome_id"]
+            isOneToOne: false
+            referencedRelation: "interaction_outcomes"
             referencedColumns: ["id"]
           },
           {
@@ -900,6 +937,63 @@ export type Database = {
           id?: number
           name?: string
           scope?: string
+        }
+        Relationships: []
+      }
+      interaction_outcomes: {
+        Row: {
+          can_reactivate: boolean
+          cooldown_days: number
+          counts_as: Database["app"]["Enums"]["door_kind"]
+          created_at: string
+          id: number
+          is_active: boolean
+          name: string
+          next_action_kind: Database["app"]["Enums"]["task_kind"] | null
+          next_action_label: string | null
+          next_action_offset_days: number | null
+          position: number
+          requires_lost_reason: boolean
+          sets_temperature: Database["app"]["Enums"]["temperature"] | null
+          slug: string
+          surfaces: Database["app"]["Enums"]["interaction_surface"][]
+          target_stage_slug: string | null
+        }
+        Insert: {
+          can_reactivate?: boolean
+          cooldown_days?: number
+          counts_as?: Database["app"]["Enums"]["door_kind"]
+          created_at?: string
+          id?: number
+          is_active?: boolean
+          name: string
+          next_action_kind?: Database["app"]["Enums"]["task_kind"] | null
+          next_action_label?: string | null
+          next_action_offset_days?: number | null
+          position?: number
+          requires_lost_reason?: boolean
+          sets_temperature?: Database["app"]["Enums"]["temperature"] | null
+          slug: string
+          surfaces: Database["app"]["Enums"]["interaction_surface"][]
+          target_stage_slug?: string | null
+        }
+        Update: {
+          can_reactivate?: boolean
+          cooldown_days?: number
+          counts_as?: Database["app"]["Enums"]["door_kind"]
+          created_at?: string
+          id?: number
+          is_active?: boolean
+          name?: string
+          next_action_kind?: Database["app"]["Enums"]["task_kind"] | null
+          next_action_label?: string | null
+          next_action_offset_days?: number | null
+          position?: number
+          requires_lost_reason?: boolean
+          sets_temperature?: Database["app"]["Enums"]["temperature"] | null
+          slug?: string
+          surfaces?: Database["app"]["Enums"]["interaction_surface"][]
+          target_stage_slug?: string | null
         }
         Relationships: []
       }
@@ -1946,9 +2040,54 @@ export type Database = {
           },
         ]
       }
+      v_contact_cooldown: {
+        Row: {
+          blocked_forever: boolean | null
+          cooldown_until: string | null
+          organization_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      deal_stage_timeline: {
+        Args: { p_deal_id: string }
+        Returns: {
+          changed_at: string
+          changed_by: string
+          changed_by_name: string
+          from_stage_id: number
+          from_stage_name: string
+          id: number
+          reason: string
+          to_stage_id: number
+          to_stage_name: string
+        }[]
+      }
+      move_deal: {
+        Args: {
+          p_deal_id: string
+          p_expected_stage_id?: number
+          p_fields?: Json
+          p_next_action?: Json
+          p_reason?: string
+          p_to_stage_id: number
+        }
+        Returns: Json
+      }
+      pipeline_board: {
+        Args: {
+          p_limit_per_stage?: number
+          p_offset?: number
+          p_only_mine?: boolean
+          p_owner_id?: string
+          p_pipeline_id: number
+          p_q?: string
+          p_stage_id?: number
+        }
+        Returns: Json
+      }
       quick_create_organization: {
         Args: {
           p_category_id: number
@@ -1956,6 +2095,27 @@ export type Database = {
           p_name: string
           p_phone: string
           p_source_id: number
+        }
+        Returns: Json
+      }
+      registrar_contato: {
+        Args: {
+          p_authorization_evidence?: string
+          p_body?: string
+          p_client_key: string
+          p_com_quem?: string
+          p_deal_id?: string
+          p_duration_min?: number
+          p_expected_stage_id?: number
+          p_lost_reason_id?: number
+          p_meeting_at?: string
+          p_meeting_format?: string
+          p_next_action_at?: string
+          p_next_action_kind?: Database["app"]["Enums"]["task_kind"]
+          p_next_action_title?: string
+          p_occurred_at?: string
+          p_organization_id: string
+          p_outcome_id: number
         }
         Returns: Json
       }
@@ -2150,6 +2310,7 @@ export const Constants = {
         "erasure_done",
       ],
       deal_status: ["open", "won", "lost", "paused", "nurturing"],
+      door_kind: ["aberta", "batida", "nenhuma"],
       goal_metric: [
         "new_targets",
         "doors_knocked",
@@ -2162,6 +2323,14 @@ export const Constants = {
         "published",
       ],
       goal_period: ["day", "week", "month"],
+      interaction_surface: [
+        "whatsapp",
+        "ligacao",
+        "visita",
+        "reuniao",
+        "instagram_dm",
+        "triagem",
+      ],
       msg_direction: ["in", "out"],
       msg_status: ["queued", "sent", "delivered", "read", "failed", "received"],
       msg_type: [

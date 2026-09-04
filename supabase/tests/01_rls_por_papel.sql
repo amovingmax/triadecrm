@@ -32,6 +32,13 @@ create function pg_temp.total_negocios() returns int language sql security defin
   select count(*)::int from public.deals
 $$;
 
+-- Mesmo raciocínio para a suppression_list: quem trabalha no funil pode gravar opt-out
+-- (etapa marcada com is_optout grava consent_event -> app.suppress), então a base não é
+-- mais previsível. "sdr lê a lista" tem de ser comparado com a base inteira.
+create function pg_temp.total_supressoes() returns int language sql security definer set search_path = '' as $$
+  select count(*)::int from public.suppression_list
+$$;
+
 -- ---------- usuários de teste (o trigger em auth.users cria o profile com o papel) ----------
 insert into public.allowed_users (email, role, note) values
   ('admin@teste.local',      'admin',      'pgTAP'),
@@ -195,7 +202,7 @@ select results_eq(
   $$select count(*)::int from public.pii_access_log$$, $$values (0)$$,
   'sdr: não lê o pii_access_log');
 select results_eq(
-  $$select count(*)::int from public.suppression_list$$, $$values (1)$$,
+  $$select count(*)::int from public.suppression_list$$, $$select pg_temp.total_supressoes()$$,
   'sdr: lê a suppression_list (consulta antes de enviar)');
 select throws_ok(
   $$insert into public.allowed_users (email, role) values ('x@teste.local', 'admin')$$, '42501', null,
