@@ -14,8 +14,12 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
-    // Espelha o viewport.themeColor de layout.tsx: --grafite-50 no claro e
-    // --grafite-900 no escuro. Branco puro e preto puro estão fora da paleta.
+    // O `theme_color` é o valor único do viewport.themeColor de layout.tsx
+    // (--grafite-900, o fundo do modo escuro, que é o padrão do produto): a cor da
+    // barra segue o tema escolhido NO CRM, não o prefers-color-scheme do aparelho.
+    // O `background_color` é a cor da splash da PWA instalada e aceita um valor só;
+    // hoje ele é o claro (--grafite-50) enquanto o app abre escuro. Pendência de
+    // decisão humana registrada no CHANGELOG. Branco e preto puros seguem fora.
     background_color: '#f0f8ff',
     theme_color: '#0f172a',
     categories: ['business', 'productivity'],

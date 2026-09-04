@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Ícone placeholder do KOMUNE CRM: quadrado escuro (theme_color #12151a, o grafite 950 do sistema) com um "K" em traços. -->
-  <rect width="512" height="512" rx="112" fill="#12151a"/>
-  <path d="M182 130v252M182 262l170-132M215 262l137 120" fill="none" stroke="#f6f7f9" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Ícone placeholder do KOMUNE CRM: quadrado escuro (#0f172a, o grafite-900 e o theme_color do manifest) com um "K" em traços (#fdfeff, o grafite-25).
+       O quadrado é escuro nos dois temas de propósito: é a cor que encosta nele no alternador de apps, e a variante maskable preenche a área segura inteira,
+       onde um quadrado quase branco viraria um bloco apagado sobre papel de parede claro e brigaria com a sombra do adaptive icon do Android. -->
+  <rect width="512" height="512" rx="112" fill="#0f172a"/>
+  <path d="M182 130v252M182 262l170-132M215 262l137 120" fill="none" stroke="#fdfeff" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

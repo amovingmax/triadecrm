@@ -60,6 +60,10 @@ export const viewport: Viewport = {
   // claro tem a barra atualizada pelo ProvedorTema, que segue o tema resolvido:
   // aqui não dá para usar `prefers-color-scheme`, que é o aparelho, e não a
   // escolha feita no CRM.
+  // Preço assumido: quem tem "Claro" salvo vê a moldura do navegador escura até o
+  // efeito do ProvedorTema rodar, um frame depois da hidratação. Só a COR da barra
+  // fica pendurada em JS; o `color-scheme` do documento, que é o que faria os
+  // controles nativos piscarem, o next-themes já carimba antes do primeiro paint.
   themeColor: '#0f172a',
   width: 'device-width',
   initialScale: 1,
@@ -82,7 +86,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="flex min-h-full flex-col">
         <ProvedorTema>
           <TooltipProvider>{children}</TooltipProvider>
-          <Toaster position="top-center" richColors closeButton />
+          {/* Sem `richColors`: ele injeta em runtime uma paleta própria (verde, vermelho,
+              âmbar e azul) fora da rampa, e o verde de sucesso é praticamente o #34d399
+              que significa `cliente` na escala térmica. Sem ele o aviso volta aos tokens
+              de sonner.tsx, e o erro entra pela brasa só no ícone e na borda (globals.css). */}
+          <Toaster position="top-center" closeButton />
         </ProvedorTema>
       </body>
     </html>
