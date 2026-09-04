@@ -22,7 +22,7 @@
     "db:lint": "supabase db lint --local",
     "db:test": "supabase test db --local",
     "db:types": "SUPABASE_DB_PASSWORD=postgres supabase gen types typescript --local --schema public,app > packages/schema/src/database.types.ts",
-    "db:seed-dev": "psql \"${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}\" -v ON_ERROR_STOP=1 -f scripts/seed-dev-5k.sql"
+    "db:seed-dev": "if command -v psql >/dev/null 2>&1; then psql \"${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}\" -v ON_ERROR_STOP=1 -f scripts/seed-dev-5k.sql; else docker exec -i supabase_db_komune-crm psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < scripts/seed-dev-5k.sql; fi"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -32,5 +32,20 @@
     "prettier": "3.9.6",
     "typescript": "catalog:",
     "typescript-eslint": "8.69.0"
-  }
+  },
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amovingmax/triadecrm.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/amovingmax/triadecrm/issues"
+  },
+  "homepage": "https://github.com/amovingmax/triadecrm#readme"
 }
