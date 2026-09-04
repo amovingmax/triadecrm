@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { RevelarLista, RevelarItem } from '@/components/movimento';
+import { RevelarLista, useRevelarLinha } from '@/components/movimento';
 import { BarraTermica, ChipTemperatura, DiasSemContato } from '@/components/temperatura';
 
-import { formatarLocal, formatarProximaAcao, formatarTelefone } from './formatos';
+import { formatarLocal, formatarTelefone } from './formatos';
+import { ProximaAcao } from './proxima-acao';
 import type { LinhaParceiro } from './tipos';
 
 /**
@@ -23,79 +23,89 @@ import type { LinhaParceiro } from './tipos';
  * A `<ul>` leva `corpo-tabela`: a regra base de tracking do `globals.css` só pega
  * `<table>`, e esta é a superfície mais estreita do produto, onde a largura da Poppins
  * empurra nome, categoria e bairro para o truncate.
+ *
+ * A largura útil do texto foi medida em 390px e refeita. Ela era de 219px, com 14 dos
+ * 50 nomes e 37 dos 50 subtítulos estourando; o pior subtítulo pedia 506px, e como
+ * categoria e bairro vinham concatenados por " · " numa linha só com `truncate`, o
+ * corte caía SEMPRE no fim, ou seja no BAIRRO, que é a informação de rota. Três
+ * mudanças devolvem ~90px ao nome sem custar uma linha de altura:
+ *
+ * 1. bairro ANTES da categoria: o que sobra fora da tela passa a ser a categoria, que
+ *    a Heloísa em geral já filtrou e que está na ficha, e não o bairro, que decide
+ *    para onde ela dirige;
+ * 2. o bloco da direita perde o `shrink-0` e o caso nulo vira um traço (`curto`), no
+ *    lugar dos 75px fixos que a frase "sem contato" gastava em todas as 50 linhas;
+ * 3. o chevron sai: o cartão inteiro já é o link, e o ícone gastava 28px com a coluna
+ *    da borda direita, que é justamente onde o botão flutuante pousa.
+ *
+ * O escalonamento de entrada vem do `useRevelarLinha` (className + delay no próprio
+ * `<li>`), e não do `<RevelarItem>`: o componente embrulha o filho numa `<div>`, o que
+ * (a) deixava o aninhamento em `<ul> > <div> > <li>`, inválido e sem semântica de
+ * lista, e (b) fazia cada `<li>` ser `:last-child` do próprio invólucro, então
+ * `last:border-b-0` casava com TODOS os cartões e a lista de 50 parceiros ficava sem
+ * nenhuma fronteira (medido: `border-bottom-width: 0px` em todo `<li>`).
  */
 export function ListaCartoes({ linhas }: { linhas: LinhaParceiro[] }) {
   return (
     <RevelarLista>
       <ul className="corpo-tabela flex flex-col">
         {linhas.map((linha, indice) => (
-          <RevelarItem key={linha.id} indice={indice}>
-            <li className="border-b border-hairline last:border-b-0">
-              <Link
-                href={`/parceiros/${linha.id}`}
-                className="relative flex min-h-16 items-center gap-3 py-2.5 pr-2 pl-4 outline-none active:bg-muted/60 focus-visible:bg-muted/60"
-              >
-                {/* `semRotulo`: o ChipTemperatura logo abaixo já anuncia a temperatura
-                    em texto, e o leitor de tela não pode lê-la duas vezes por cartão. */}
-                <BarraTermica
-                  temperatura={linha.temperature}
-                  needsAttention={linha.needs_attention}
-                  posicao="absoluta"
-                  semRotulo
-                />
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{linha.name}</p>
-                  <p className="truncate text-[0.8125rem] text-muted-foreground">
-                    {[linha.primary_category, formatarLocal(linha.neighborhood, linha.city) || null]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                  {/* O rótulo da temperatura abre a linha de metadados: cor sozinha,
-                      num traço de 3px, não sobrevive a daltonismo, e este é o cartão
-                      que o time lê no sol, com uma mão só. */}
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                    <ChipTemperatura temperatura={linha.temperature} comDescricao={false} />
-                    {linha.phone ? (
-                      <span className="numerico">{formatarTelefone(linha.phone)}</span>
-                    ) : null}
-                    {linha.stage ? <span>{linha.stage}</span> : null}
-                    <ProximaAcao iso={linha.next_action_at} />
-                  </p>
-                </div>
-
-                <div className="flex shrink-0 flex-col items-end gap-0.5">
-                  <DiasSemContato dias={linha.days_since_contact} />
-                  {linha.owner ? (
-                    <span className="max-w-24 truncate text-xs text-muted-foreground">
-                      {linha.owner}
-                    </span>
-                  ) : null}
-                </div>
-
-                {/* Cor de texto não leva `/NN` neste sistema, nem em ícone: o degrau
-                    `500` do claro já é o último que passa em 4,5:1. */}
-                <ChevronRight
-                  className="size-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-              </Link>
-            </li>
-          </RevelarItem>
+          <Cartao key={linha.id} linha={linha} indice={indice} />
         ))}
       </ul>
     </RevelarLista>
   );
 }
 
-function ProximaAcao({ iso }: { iso: string | null }) {
-  const acao = formatarProximaAcao(iso);
-  if (!acao) return null;
+function Cartao({ linha, indice }: { linha: LinhaParceiro; indice: number }) {
+  const revelar = useRevelarLinha(indice);
+  const local = formatarLocal(linha.neighborhood, linha.city);
+
   return (
-    // A mesma regra da tabela e da ficha: quando o texto principal é um número,
-    // ele sai em IBM Plex Mono. O celular é a superfície principal do time em campo.
-    <span className={cn(acao.numero && 'numerico', acao.atrasada && 'font-medium text-foreground')}>
-      {acao.texto}
-    </span>
+    <li
+      {...revelar}
+      className={cn('border-b border-hairline last:border-b-0', revelar.className)}
+    >
+      <Link
+        href={`/parceiros/${linha.id}`}
+        className="relative flex min-h-16 items-center gap-3 py-2.5 pr-3 pl-4 outline-none active:bg-muted/60 focus-visible:bg-muted/60"
+      >
+        {/* `semRotulo`: o ChipTemperatura logo abaixo já anuncia a temperatura e o
+            esfriamento em texto, e o leitor de tela não pode lê-los duas vezes. */}
+        <BarraTermica
+          temperatura={linha.temperature}
+          needsAttention={linha.needs_attention}
+          posicao="absoluta"
+          semRotulo
+        />
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{linha.name}</p>
+          <p className="truncate text-[0.8125rem] text-muted-foreground">
+            {[local || null, linha.primary_category].filter(Boolean).join(' · ')}
+          </p>
+          {/* O rótulo da temperatura abre a linha de metadados: cor sozinha, num traço
+              de 3px, não sobrevive a daltonismo, e este é o cartão que o time lê no
+              sol, com uma mão só. */}
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <ChipTemperatura
+              temperatura={linha.temperature}
+              esfriando={linha.needs_attention}
+              comDescricao={false}
+            />
+            {linha.phone ? <span className="numerico">{formatarTelefone(linha.phone)}</span> : null}
+            {linha.stage ? <span>{linha.stage}</span> : null}
+            <ProximaAcao iso={linha.next_action_at} />
+          </p>
+        </div>
+
+        <div className="flex max-w-24 min-w-0 flex-col items-end gap-0.5 text-right">
+          <DiasSemContato dias={linha.days_since_contact} atencao={linha.needs_attention} curto />
+          {linha.owner ? (
+            <span className="max-w-full truncate text-xs text-muted-foreground">{linha.owner}</span>
+          ) : null}
+        </div>
+      </Link>
+    </li>
   );
 }

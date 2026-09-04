@@ -15,14 +15,30 @@ import {
   ROTULO_STATUS,
   type NegocioDaFicha,
 } from '@/components/parceiros/ficha';
-import {
-  formatarData,
-  formatarDataHora,
-  formatarLocal,
-  formatarProximaAcao,
-  ROTULO_TIPO,
-} from '@/components/parceiros/formatos';
+import { formatarData, formatarLocal, ROTULO_TIPO } from '@/components/parceiros/formatos';
+import { ProximaAcao } from '@/components/parceiros/proxima-acao';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
+
+/**
+ * Separador de termos: espaço normal ANTES do ponto (ali pode quebrar) e espaço
+ * inquebrável DEPOIS. Assim o "·" desce junto do termo que apresenta em vez de ficar
+ * pendurado no fim da linha anterior, que era o que acontecia no celular quando o
+ * ponto era um item de flex independente.
+ */
+const SEPARADOR = ' \u00b7\u00a0';
+
+/** Junta termos com esse separador, ignorando os que vierem vazios. */
+function unir(...termos: (string | null | undefined)[]): string {
+  return termos.filter((t) => t && t.trim()).join(SEPARADOR);
+}
+
+/**
+ * Valor da ficha que é link. `min-h-11` no celular porque estes eram os alvos de 20px
+ * do levantamento (os únicos abaixo de 24px em 16 páginas); no desktop volta a ser
+ * uma linha de texto, que é onde o mouse já acerta.
+ */
+const LINK_VALOR =
+  'inline-flex min-h-11 items-center gap-1.5 underline underline-offset-4 md:min-h-0';
 
 export async function generateMetadata({
   params,
@@ -51,8 +67,15 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
   const diasSemContato = principal ? diasDesde(principal.ultimoContatoEm) : null;
 
   return (
-    <TransicaoPagina className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-      <Button asChild variant="ghost" size="sm" className="toque -ml-2 h-9 w-fit md:h-7">
+    // Sem `mx-auto`: centrada, a ficha começava em x=376 enquanto a lista, o cabeçalho
+    // do app e a busca global começam em x=232, e o mesmo clique movia o conteúdo 144px
+    // para dentro. A largura de leitura continua limitada em 896px; o que muda é que a
+    // coluna nasce na mesma margem de todas as outras telas.
+    <TransicaoPagina className="flex w-full max-w-4xl flex-col gap-6">
+      {/* 44px de alvo no celular (era 36), 28 no desktop: esta e o "Revelar" eram os
+          dois únicos controles de toque da ficha, e os dois estavam abaixo do mínimo
+          enquanto a lista e a barra inferior já cumpriam 44 e 64. */}
+      <Button asChild variant="ghost" size="sm" className="toque -ml-2 h-11 w-fit md:h-7">
         <Link href="/parceiros">
           <ArrowLeft aria-hidden="true" />
           Parceiros
@@ -72,7 +95,10 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-heading text-2xl font-semibold tracking-tight">{ficha.nome}</h1>
-          <ChipTemperatura temperatura={ficha.temperatura} />
+            <ChipTemperatura
+            temperatura={ficha.temperatura}
+            esfriando={principal?.precisaAtencao ?? false}
+          />
           {ficha.vip ? <Badge variant="outline">VIP</Badge> : null}
           {ficha.naoContatar ? (
             <Badge variant="destructive">
@@ -83,19 +109,23 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
         </div>
 
         {/* Duas linhas, um ponto médio em cada: encadear quatro numa faixa só vira
-            corrente sem hierarquia, e a ficha tem largura de sobra. */}
+            corrente sem hierarquia, e a ficha tem largura de sobra.
+
+            Cada linha é TEXTO CORRIDO, e não um `flex` com o ponto como item próprio.
+            Como item de flex o "·" podia terminar a linha sozinho, e terminava: no
+            celular lia-se "Fornecedor ·" numa linha e a categoria na seguinte. Aqui o
+            separador é `unir()`, que cola o ponto ao termo SEGUINTE com espaço
+            inquebrável, então ele viaja com o que apresenta e não pode ser o último
+            caractere de uma linha. */}
         <div className="flex flex-col gap-0.5 text-sm text-muted-foreground">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span>{ROTULO_TIPO[ficha.tipo] ?? ficha.tipo}</span>
-            {ficha.categorias.length ? <Ponto /> : null}
-            <span>{ficha.categorias.join(', ')}</span>
-          </div>
+          <p>{unir(ROTULO_TIPO[ficha.tipo] ?? ficha.tipo, ficha.categorias.join(', '))}</p>
           {formatarLocal(ficha.bairro, ficha.cidade) || ficha.responsavel ? (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span>{formatarLocal(ficha.bairro, ficha.cidade)}</span>
-              {formatarLocal(ficha.bairro, ficha.cidade) && ficha.responsavel ? <Ponto /> : null}
-              {ficha.responsavel ? <span>Responsável: {ficha.responsavel}</span> : null}
-            </div>
+            <p>
+              {unir(
+                formatarLocal(ficha.bairro, ficha.cidade),
+                ficha.responsavel ? `Responsável: ${ficha.responsavel}` : '',
+              )}
+            </p>
           ) : null}
         </div>
 
@@ -136,7 +166,12 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
       {/* -------------------------------------------------- campos */}
       <section>
         <h2 className="sr-only">Dados de contato e proveniência</h2>
-        <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
+        {/* Três colunas no `lg`: com duas, dentro de max-w-4xl, cada par rótulo/valor
+            recebia 432px para valores de ~95px ("Não informado"), e WhatsApp e
+            Instagram ficavam a 464px um do outro na mesma linha. A ~288px o par cabe
+            no campo de visão e ainda sobra espaço para o telefone mascarado mais o
+            botão Revelar. */}
+        <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
           <Linha rotulo="WhatsApp">
             <TelefoneRevelavel
               organizationId={ficha.id}
@@ -151,7 +186,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
                 href={`https://instagram.com/${ficha.instagram}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 underline underline-offset-4"
+                className={LINK_VALOR}
               >
                 {`@${ficha.instagram}`}
               </a>
@@ -166,7 +201,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
                 href={ficha.site}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 break-all underline underline-offset-4"
+                className={cn(LINK_VALOR, 'break-all')}
               >
                 {ficha.site.replace(/^https?:\/\/(www\.)?/, '')}
                 <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
@@ -178,7 +213,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
 
           <Linha rotulo="E-mail">
             {ficha.email ? (
-              <a href={`mailto:${ficha.email}`} className="break-all underline underline-offset-4">
+              <a href={`mailto:${ficha.email}`} className={cn(LINK_VALOR, 'break-all')}>
                 {ficha.email}
               </a>
             ) : (
@@ -208,7 +243,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
                   href={ficha.origemUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 underline underline-offset-4"
+                  className={LINK_VALOR}
                 >
                   {ficha.origem}
                   <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
@@ -273,57 +308,75 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
   );
 }
 
+/**
+ * Uma linha da lista de negócios da ficha.
+ *
+ * Duas correções em relação à primeira versão, as duas medidas na foto de 1440:
+ *
+ * 1. era o ÚNICO uso da `BarraTermica` sem um `ChipTemperatura` ao lado, ou seja, a
+ *    temperatura do negócio era dada só por um traço de 3px. No modo claro, com
+ *    deuteranopia, morno (#b37a1f) e quente (#c4472b) caem a 1,24:1 entre si: no
+ *    traço são o mesmo pixel, e são justamente as duas leituras que mudam o
+ *    comportamento em campo. Agora o chip abre a linha, como na tabela e no cartão,
+ *    e a barra passa a `semRotulo` para não anunciar a temperatura duas vezes;
+ * 2. o "haltere": com `flex-1` à esquerda numa linha de 896px, a próxima ação era
+ *    empurrada contra a borda direita e ficava a ~486px do texto a que pertence, sem
+ *    nenhuma coluna com que se alinhar (a ficha costuma ter um negócio só). Ela
+ *    desceu para a coluna da esquerda, onde é a continuação natural da frase "em que
+ *    pé está o negócio" e onde o celular já a jogava de qualquer jeito.
+ */
 function CartaoNegocio({ negocio }: { negocio: NegocioDaFicha }) {
-  const acao = formatarProximaAcao(negocio.proximaAcaoEm);
   const dias = diasDesde(negocio.ultimoContatoEm);
 
   return (
-    <li className="relative flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-hairline py-3 pl-4">
+    <li className="relative flex flex-col gap-1 border-b border-hairline py-3 pl-4">
       <BarraTermica
         temperatura={negocio.temperatura}
         needsAttention={negocio.precisaAtencao}
         posicao="absoluta"
+        semRotulo
       />
 
-      <div className="min-w-0 flex-1">
-        <p className="text-sm">
-          <span className="font-medium">{negocio.etapa}</span>
-          <span className="text-muted-foreground"> · {negocio.funil}</span>
-        </p>
-        {/* Um ponto médio por linha: status e responsável em cima, prioridade e
-            último contato embaixo, separados por vírgula. */}
-        <p className="text-xs text-muted-foreground">
-          {ROTULO_STATUS[negocio.status] ?? negocio.status}
-          {negocio.responsavel ? ` · ${negocio.responsavel}` : ''}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {negocio.tier ? `prioridade ${negocio.tier}, ` : ''}
-          {dias !== null ? (
-            <>
-              {'último contato há '}
-              <span className="numerico">{dias}</span>
-              {dias === 1 ? ' dia' : ' dias'}
-            </>
-          ) : (
-            'sem contato registrado'
-          )}
-        </p>
-      </div>
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <ChipTemperatura
+          temperatura={negocio.temperatura}
+          esfriando={negocio.precisaAtencao}
+          comDescricao={false}
+        />
+        <span className="text-muted-foreground">
+          <span className="font-medium text-foreground">{negocio.etapa}</span>
+          {SEPARADOR}
+          {negocio.funil}
+        </span>
+      </p>
+
+      {/* Um ponto médio por linha: status e responsável em cima, prioridade e
+          último contato embaixo, separados por vírgula. */}
+      <p className="text-xs text-muted-foreground">
+        {unir(ROTULO_STATUS[negocio.status] ?? negocio.status, negocio.responsavel ?? '')}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {negocio.tier ? `prioridade ${negocio.tier}, ` : ''}
+        {dias !== null ? (
+          <>
+            {'último contato há '}
+            <span className="numerico">{dias}</span>
+            {dias === 1 ? ' dia' : ' dias'}
+          </>
+        ) : (
+          'sem contato registrado'
+        )}
+      </p>
 
       {negocio.proximaAcao ? (
-        <p className="text-right text-sm">
-          <span>{negocio.proximaAcao}</span>
-          {acao ? (
-            <span
-              className={cn(
-                'block text-xs text-muted-foreground',
-                acao.numero && 'numerico',
-                acao.atrasada && 'font-medium text-foreground',
-              )}
-              title={formatarDataHora(negocio.proximaAcaoEm)}
-            >
-              {acao.texto}
-            </span>
+        <p className="text-sm">
+          <span className="text-muted-foreground">Próxima ação: </span>
+          {negocio.proximaAcao}
+          {negocio.proximaAcaoEm ? (
+            <>
+              {SEPARADOR}
+              <ProximaAcao iso={negocio.proximaAcaoEm} className="text-muted-foreground" />
+            </>
           ) : null}
         </p>
       ) : null}
@@ -342,10 +395,6 @@ function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode
 
 function Ausente() {
   return <span className="text-muted-foreground">Não informado</span>;
-}
-
-function Ponto() {
-  return <span aria-hidden="true">·</span>;
 }
 
 /** Espaço reservado para o que chega nos próximos dias do calendário (PRD §11.2). */

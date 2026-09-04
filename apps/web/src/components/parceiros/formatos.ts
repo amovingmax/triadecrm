@@ -58,14 +58,27 @@ export function formatarDataHora(iso: string | null | undefined): string {
 }
 
 /**
- * Próxima ação lida de relance: "hoje", "amanhã", "em 3 d", "atrasada 2 d".
- * `numero` marca quando o texto principal é um número (para receber a fonte mono);
+ * Próxima ação lida de relance: "hoje", "amanhã", "em 3 d", "2 d atrás".
+ *
+ * Devolve a frase em TRÊS PEDAÇOS, e não uma string só, porque só o dígito vai para a
+ * IBM Plex Mono. Vestir "em 4 d" inteiro de mono (o que acontecia antes, com `numero:
+ * true` aplicado ao span da frase toda) põe a preposição e a unidade numa segunda
+ * família no meio de uma linha de Poppins, e gasta 116px em seis caracteres. Mono
+ * serve para alinhar número, não para vestir frase, como diz a abertura deste arquivo
+ * e como `formatarDiasSemContato` já faz com `{numero, unidade}`.
+ *
  * `atrasada` deixa a linha decidir o peso, sem gastar cor (a cor é da temperatura).
  */
 export function formatarProximaAcao(iso: string | null | undefined): {
+  /** Texto em Poppins antes do dígito ("em ", ""). */
+  prefixo: string;
+  /** O dígito, e só ele, para receber o utilitário `numerico`. */
+  numero: string | null;
+  /** Texto em Poppins depois do dígito (" d", " d atrás"). */
+  sufixo: string;
+  /** A frase inteira, para `title`, leitor de tela e testes. */
   texto: string;
   detalhe: string;
-  numero: boolean;
   atrasada: boolean;
 } | null {
   if (!iso) return null;
@@ -74,12 +87,20 @@ export function formatarProximaAcao(iso: string | null | undefined): {
   const dias = diasDeDiferenca(new Date(), alvo);
   const detalhe = `${DATA_CURTA.format(alvo)}, ${DATA_HORA.format(alvo).slice(-5)}`;
 
-  if (dias === 0) return { texto: 'hoje', detalhe, numero: false, atrasada: false };
-  if (dias === 1) return { texto: 'amanhã', detalhe, numero: false, atrasada: false };
-  if (dias === -1) return { texto: 'ontem', detalhe, numero: false, atrasada: true };
-  if (dias < 0)
-    return { texto: `${Math.abs(dias)} d atrás`, detalhe, numero: true, atrasada: true };
-  return { texto: `em ${dias} d`, detalhe, numero: true, atrasada: false };
+  const monte = (prefixo: string, numero: string | null, sufixo: string, atrasada: boolean) => ({
+    prefixo,
+    numero,
+    sufixo,
+    texto: `${prefixo}${numero ?? ''}${sufixo}`,
+    detalhe,
+    atrasada,
+  });
+
+  if (dias === 0) return monte('hoje', null, '', false);
+  if (dias === 1) return monte('amanhã', null, '', false);
+  if (dias === -1) return monte('ontem', null, '', true);
+  if (dias < 0) return monte('', String(Math.abs(dias)), ' d atrás', true);
+  return monte('em ', String(dias), ' d', false);
 }
 
 /**

@@ -220,9 +220,29 @@
   /* A borda do campo é o único limite visível do controle: 3:1 contra o fundo. */
   --input: var(--grafite-450);
   --ring: var(--grafite-900);
-  /* Hairline: linha de tabela e borda de cabeçalho. Borda cheia numa tabela
-     densa vira grade e cansa; a linha translúcida separa sem desenhar. */
-  --hairline: rgb(0 0 0 / 0.08);
+  /* Hairline: linha de tabela, borda do cabeçalho, borda da pílula e da casca.
+     Borda cheia numa tabela densa vira grade e cansa; a linha translúcida separa
+     sem desenhar.
+
+     No claro ela sobe de 8% para 14% de preto, e o motivo NÃO é o fundo. Preto a
+     8% mede 1,195:1 (ΔL* 6,9) sobre o nosso #f0f8ff e 1,196:1 (ΔL* 7,1) sobre o
+     #ffffff do template: a diferença é de um milésimo, o aliceblue não tem culpa.
+     O que muda é o resto:
+     1. O mesmo alfa rende menos no claro do que no escuro. Branco a 8% sobre o
+        #0f172a separa ΔL* 9,0; preto a 8% sobre o #f0f8ff separa ΔL* 6,9. São 30%
+        de separação a menos justamente no tema que precisa de mais.
+     2. O claro é o tema do SOL. Sob luz forte o reflexo do vidro soma a mesma
+        luminância à linha e ao fundo, e uma razão perto de 1:1 é a primeira coisa
+        que some (o +0,05 da fórmula da WCAG modela um reflexo de escritório, não
+        o meio-dia de Natal).
+     3. A hairline é a ÚNICA divisória do produto: sem cartão por linha, sem zebra,
+        sem folga vertical. Ela não é acabamento, é toda a estrutura que sobra.
+     Em 14% mede 1,378:1 e ΔL* 12,2 sobre o fundo (1,380 sobre o cartão, 1,377
+     sobre o muted, 1,375 sobre a casca) — a faixa em que iOS e Material assentam
+     o separador do modo claro, ~1,75x a separação do escuro e ainda a metade do
+     caminho até virar grade. O escuro fica nos 8%: ele já separa mais, e não é o
+     tema que a Heloísa abre na rua. */
+  --hairline: rgb(0 0 0 / 0.14);
   /* Véu do diálogo e da folha. Tingido pela base como as sombras: preto puro está
      fora da paleta, e o véu precisa valer sozinho, sem depender do backdrop-filter. */
   --veu: color-mix(in oklab, var(--grafite-900) 25%, transparent);

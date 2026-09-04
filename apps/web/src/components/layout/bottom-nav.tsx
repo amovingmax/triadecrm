@@ -49,7 +49,7 @@ export function BottomNav({ papel }: { papel: AppRole }) {
         <Sheet open={aberto} onOpenChange={setAberto}>
           <SheetTrigger
             className={cn(
-              'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-none transition-colors',
+              'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-4 transition-colors',
               algumSecundarioAtivo
                 ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
                 : 'text-sidebar-muted-foreground',

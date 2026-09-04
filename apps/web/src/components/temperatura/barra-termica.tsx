@@ -43,6 +43,12 @@ import { definicaoTemperatura, type Temperatura } from './escala-termica';
  * legível é o `ChipTemperatura`, visível na lista, na tabela e na ficha; aqui fica o
  * `sr-only`, e as telas que já mostram o chip passam `semRotulo` para o leitor de
  * tela não anunciar a mesma temperatura duas vezes.
+ *
+ * `semRotulo` apaga o rótulo INTEIRO, esfriamento incluído, porque o `ChipTemperatura`
+ * das telas que o passam também diz "esfriando" em texto. Quando não há chip por
+ * perto (`semRotulo` desligado) o esfriamento é anunciado junto da temperatura. O que
+ * NÃO pode voltar a acontecer é o estado existir só como espessura de traço: 3px
+ * contra 6px não é informação para quem não vê a tela.
  */
 export function BarraTermica({
   temperatura,

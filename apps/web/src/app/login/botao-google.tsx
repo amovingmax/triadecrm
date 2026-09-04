@@ -49,6 +49,12 @@ export function BotaoGoogle({
     }
   }
 
+  // `w-full` em toda largura, inclusive no desktop: a caixa da ação tem 384px
+  // (max-w-sm) e o botão em 256px (o antigo `sm:w-auto sm:min-w-64`) deixava 128px
+  // de sobra à direita dentro do próprio bloco, o que o fazia ler como pedra solta
+  // num campo vazio em vez de bloco de ação. Cheio, ele fecha a caixa e rima de
+  // largura com a frase da coluna da tese.
+  //
   // A variante padrão do Button já é `acao-gradiente`: gradiente de ação, hover em
   // 1.02 e toque em 0.98, em 150ms. `sombra-base` acrescenta a elevação tingida pela
   // base, nunca sombra preta. Nada de `toque` aqui: dois utilitários mexendo no mesmo
@@ -63,7 +69,7 @@ export function BotaoGoogle({
   return (
     <Button
       size="lg"
-      className="sombra-base h-12 w-full justify-center text-base aria-disabled:cursor-progress sm:w-auto sm:min-w-64"
+      className="sombra-base h-12 w-full justify-center text-base aria-disabled:cursor-progress"
       onClick={entrar}
       aria-disabled={carregando}
       aria-busy={carregando}

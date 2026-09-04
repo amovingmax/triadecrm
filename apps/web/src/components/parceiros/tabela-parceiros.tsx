@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils';
 import { RevelarLista, useRevelarLinha } from '@/components/movimento';
 import { BarraTermica, ChipTemperatura, DiasSemContato } from '@/components/temperatura';
 
-import { formatarLocal, formatarProximaAcao, formatarTelefone } from './formatos';
+import { formatarLocal, formatarTelefone } from './formatos';
+import { ProximaAcao } from './proxima-acao';
 import type { LinhaParceiro } from './tipos';
 
 /**
@@ -45,14 +46,27 @@ const coluna = createColumnHelper<typeof recursos, LinhaParceiro>();
  * Largura e visibilidade por coluna, compartilhadas pelo cabeçalho e pela célula.
  * As larguras só valem porque a tabela é `table-fixed`; os breakpoints sobem um
  * degrau porque medem o viewport, e o contêiner tem 256px a menos que ele.
+ *
+ * O peso horizontal foi medido em 1440 e reequilibrado: `categoria` tinha 206px de
+ * caixa útil para um conteúdo que pede até 383px (20 das 25 linhas visíveis cortadas),
+ * enquanto sobrava folga nas colunas de largura fixa. Como a tabela é `table-fixed` e
+ * `w-full`, o navegador distribui a sobra PROPORCIONALMENTE às larguras declaradas, e
+ * era daí que vinha o ar: 1072px declarados em 1184px de contêiner inflavam tudo em
+ * 10%. Subindo `categoria` de w-52 para w-72 a sobra cai para 16px, a caixa útil da
+ * categoria vai de 206px para ~268px e o corte quase desaparece; o que encolhe são as
+ * colunas que estavam sobrando, não as que cortavam.
  */
 const CLASSES: Record<string, string> = {
   nome: 'w-[clamp(13rem,20vw,20rem)]',
   dias: 'w-28',
-  temperatura: 'w-32',
+  // w-40 e não w-32: com `esfriando` o chip passa a dizer "Quente · esfriando", que
+  // mede 127px com o preenchimento (medido no navegador, Poppins 12px medium). O
+  // sinal de esfriamento não pode nascer truncado, que era o defeito que ele veio
+  // consertar. Os 16px saem de `local`, que na base atual não trunca nenhuma linha.
+  temperatura: 'w-40',
   telefone: 'w-40',
-  categoria: 'hidden w-52 lg:table-cell',
-  local: 'hidden w-44 xl:table-cell',
+  categoria: 'hidden w-72 lg:table-cell',
+  local: 'hidden w-40 xl:table-cell',
   responsavel: 'hidden w-36 2xl:table-cell',
   etapa: 'hidden w-40 2xl:table-cell',
   proxima: 'hidden w-32 2xl:table-cell',
@@ -84,10 +98,19 @@ const colunas = coluna.columns([
     header: 'Parceiro',
     cell: ({ row }) => <CelulaNome linha={row.original} />,
   }),
+  // "Último contato" e não "Sem contato": a célula entrega uma DURAÇÃO (`4d`, `hoje`,
+  // `ontem`) e o cabeçalho nomeava um ESTADO, então na base fria as 50 linhas repetiam
+  // a própria palavra do cabeçalho. Com o nome certo, "sem contato" volta a ser a
+  // exceção informativa que ele deveria ser.
   coluna.accessor('days_since_contact', {
     id: 'dias',
-    header: 'Sem contato',
-    cell: ({ getValue }) => <DiasSemContato dias={getValue()} />,
+    header: 'Último contato',
+    cell: ({ row }) => (
+      <DiasSemContato
+        dias={row.original.days_since_contact}
+        atencao={row.original.needs_attention}
+      />
+    ),
   }),
   // Coluna própria, SEMPRE visível, e não um degrau `2xl:table-cell`: cinco matizes
   // num traço de 3px não sobrevivem a deuteranopia (no claro o par quente/cliente mede
@@ -97,7 +120,12 @@ const colunas = coluna.columns([
   coluna.accessor('temperature', {
     id: 'temperatura',
     header: 'Temperatura',
-    cell: ({ getValue }) => <ChipTemperatura temperatura={getValue()} />,
+    cell: ({ row }) => (
+      <ChipTemperatura
+        temperatura={row.original.temperature}
+        esfriando={row.original.needs_attention}
+      />
+    ),
   }),
   coluna.accessor('primary_category', {
     id: 'categoria',
@@ -142,6 +170,8 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
 
   return (
     <RevelarLista>
+      <ColunasEscondidas />
+
       {/* O contêiner rola na horizontal; a página nunca rola. */}
       <div className="relative w-full overflow-x-auto" style={SOMBRA_DE_ROLAGEM}>
         <table className="w-full table-fixed border-collapse text-sm">
@@ -191,8 +221,6 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
           </tbody>
         </table>
       </div>
-
-      <ColunasEscondidas />
     </RevelarLista>
   );
 }
@@ -205,10 +233,16 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
  * Sem este aviso a pessoa conclui que o dado não existe, e não que ele está a um
  * clique de distância. O texto é escolhido por CSS, no mesmo degrau em que a coluna
  * desaparece, então não há medição de largura nem ouvinte de resize.
+ *
+ * Fica ACIMA da tabela, e não abaixo: embaixo ele nascia em y=2163 num documento de
+ * 2283px, ou seja, para descobrir que existe uma coluna "Próxima ação" era preciso
+ * passar pelas 50 linhas. E não manda mais "rolar a tabela para o lado": abaixo do
+ * `2xl` as colunas escondidas estão em `display:none`, o contêiner não rola (medido:
+ * scrollWidth 1184 = clientWidth 1184 em 1440px) e rolar nunca as traria de volta.
  */
 function ColunasEscondidas() {
   return (
-    <p className="px-3 py-2 text-xs text-muted-foreground 2xl:hidden">
+    <p className="pb-2 text-xs text-muted-foreground 2xl:hidden">
       Nesta largura de tela,{' '}
       <span className="hidden xl:inline">responsável, etapa e próxima ação</span>
       <span className="hidden lg:inline xl:hidden">
@@ -217,7 +251,7 @@ function ColunasEscondidas() {
       <span className="lg:hidden">
         categoria, bairro e cidade, responsável, etapa e próxima ação
       </span>{' '}
-      só aparecem na ficha do parceiro. Role a tabela para o lado ou abra a ficha.
+      só aparecem na ficha do parceiro.
     </p>
   );
 }
@@ -267,21 +301,8 @@ function CelulaNome({ linha }: { linha: LinhaParceiro }) {
 }
 
 function CelulaProximaAcao({ iso }: { iso: string | null }) {
-  const acao = formatarProximaAcao(iso);
-  if (!acao) return <Vazio />;
-
-  return (
-    <span
-      title={acao.detalhe}
-      className={cn(
-        'text-[0.8125rem] text-muted-foreground',
-        acao.numero && 'numerico',
-        acao.atrasada && 'font-medium text-foreground',
-      )}
-    >
-      {acao.texto}
-    </span>
-  );
+  if (!iso) return <Vazio />;
+  return <ProximaAcao iso={iso} className="text-[0.8125rem] text-muted-foreground" />;
 }
 
 function Texto({ valor }: { valor: string | null }) {

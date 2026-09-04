@@ -45,46 +45,62 @@ export function BarraFiltros({
   const idBusca = useId();
   const ativos = contarFiltros(filtros);
 
+  const limpavel = ativos > 0 || filtros.q.trim() !== '';
+
   return (
-    <div className="flex flex-col gap-2">
+    // Uma linha só a partir do `md`: busca à esquerda, filtros ocupando a faixa que
+    // antes ficava vazia à direita. `items-center` alinha a fila de gatilhos com a
+    // CAIXA da busca (o rótulo em cima e a dica embaixo somam altura igual dos dois
+    // lados do campo, então o centro do bloco é o centro do input).
+    <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
       <CampoBusca id={idBusca} valor={filtros.q} aoMudar={(q) => aoMudar({ q })} />
 
-      {/* No celular a fila de filtros rola na horizontal; nada quebra a largura da tela. */}
-      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0 md:pb-0">
-        <FiltroLista
-          rotulo="Categoria"
-          valor={filtros.categoriaId}
-          aoMudar={(v) => aoMudar({ categoriaId: v, pagina: 1 })}
-          opcoes={catalogos.categorias.map((c) => ({ valor: c.id, rotulo: c.nome }))}
-        />
-        <FiltroLista
-          rotulo="Cidade"
-          valor={filtros.cidadeId}
-          aoMudar={(v) => aoMudar({ cidadeId: v, pagina: 1 })}
-          opcoes={catalogos.cidades.map((c) => ({
-            valor: c.id,
-            rotulo: c.nome,
-            grupo: c.grandeNatal ? 'Grande Natal' : 'Interior',
-          }))}
-        />
-        <FiltroLista
-          rotulo="Etapa"
-          valor={filtros.etapaId}
-          aoMudar={(v) => aoMudar({ etapaId: v, pagina: 1 })}
-          opcoes={catalogos.etapas.map((e) => ({ valor: e.id, rotulo: e.nome, grupo: e.funil }))}
-        />
-        <FiltroLista
-          rotulo="Responsável"
-          valor={filtros.responsavelId}
-          aoMudar={(v) => aoMudar({ responsavelId: v, pagina: 1 })}
-          opcoes={catalogos.pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
-        />
+      <div className="flex min-w-0 flex-col gap-2 md:flex-1 md:flex-row md:items-center md:gap-2">
+        {/* No celular a fila de filtros rola na horizontal; nada quebra a largura da
+            tela. A máscara à direita diz que ainda há gatilho fora dela: sem ela a
+            quarta pílula aparece guilhotinada rente à borda e lê como layout quebrado.
+            Some no `md`, onde os quatro cabem e a fila passa a quebrar em linha. */}
+        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] md:mx-0 md:flex-wrap md:px-0 md:pb-0 md:[mask-image:none]">
+          <FiltroLista
+            rotulo="Categoria"
+            valor={filtros.categoriaId}
+            aoMudar={(v) => aoMudar({ categoriaId: v, pagina: 1 })}
+            opcoes={catalogos.categorias.map((c) => ({ valor: c.id, rotulo: c.nome }))}
+          />
+          <FiltroLista
+            rotulo="Cidade"
+            valor={filtros.cidadeId}
+            aoMudar={(v) => aoMudar({ cidadeId: v, pagina: 1 })}
+            opcoes={catalogos.cidades.map((c) => ({
+              valor: c.id,
+              rotulo: c.nome,
+              grupo: c.grandeNatal ? 'Grande Natal' : 'Interior',
+            }))}
+          />
+          <FiltroLista
+            rotulo="Etapa"
+            valor={filtros.etapaId}
+            aoMudar={(v) => aoMudar({ etapaId: v, pagina: 1 })}
+            opcoes={catalogos.etapas.map((e) => ({ valor: e.id, rotulo: e.nome, grupo: e.funil }))}
+          />
+          <FiltroLista
+            rotulo="Responsável"
+            valor={filtros.responsavelId}
+            aoMudar={(v) => aoMudar({ responsavelId: v, pagina: 1 })}
+            opcoes={catalogos.pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
+          />
+        </div>
 
-        {ativos > 0 || filtros.q.trim() ? (
+        {/* Fora do rolador, de propósito: dentro dele o "Limpar" era o último item da
+            fila e nascia depois de x=470 numa tela de 390px, ou seja, o contador de
+            filtros ativos e o botão que os desfaz ficavam fora da tela justamente
+            quando havia filtro. Aqui ele é uma linha própria no celular e volta para
+            o fim da fila no `md`. */}
+        {limpavel ? (
           <Button
             variant="ghost"
             onClick={aoLimpar}
-            className="toque h-11 shrink-0 text-muted-foreground md:h-8"
+            className="toque h-11 w-fit shrink-0 text-muted-foreground md:h-8"
           >
             <X aria-hidden="true" />
             Limpar
@@ -135,8 +151,9 @@ function CampoBusca({
   // não escrever "buscar" duas vezes no mesmo palmo de tela.
   return (
     // Largura máxima no desktop: um campo de 1.500px de largura para digitar um nome
-    // não ajuda ninguém a mirar, e ainda descola a busca da fila de filtros embaixo.
-    <div className="md:max-w-xl">
+    // não ajuda ninguém a mirar. `max-w-sm` (e não `xl`) porque a busca agora divide a
+    // linha com os filtros: o campo pede a largura de um nome, não a da tela.
+    <div className="md:w-full md:max-w-sm md:shrink-0">
       <label htmlFor={id} className="mb-1 block text-xs font-medium text-foreground">
         Buscar parceiro
       </label>

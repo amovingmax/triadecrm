@@ -24,6 +24,13 @@ type Props = {
  *
  * O inativo usa `--sidebar-muted-foreground`, medido contra o azul da casca; o
  * `--muted-foreground` do conteúdo pararia em 4,45:1 sobre ele.
+ *
+ * Na barra inferior o rótulo tem `truncate` (`overflow: hidden`), então a caixa da
+ * linha precisa caber a tinta inteira: `leading-4` (16px) para os 16px que a Poppins
+ * ocupa a 11px, nunca `leading-none` (11px). Hoje "Meu dia / Parceiros / Funis /
+ * Conversas" não têm acento nem descendente e o corte não aparece, mas "Relatórios"
+ * ou "Agência" ali perderiam o topo do acento. Cabe nos 64px da barra: 20px de
+ * ícone + 4px + 16px de rótulo = 40px.
  */
 export function NavLink({ item, variante, onNavegar }: Props) {
   const pathname = usePathname();
@@ -36,7 +43,7 @@ export function NavLink({ item, variante, onNavegar }: Props) {
         href={item.href}
         aria-current={ativo ? 'page' : undefined}
         className={cn(
-          'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-none transition-colors',
+          'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-4 transition-colors',
           ativo
             ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
             : 'text-sidebar-muted-foreground',

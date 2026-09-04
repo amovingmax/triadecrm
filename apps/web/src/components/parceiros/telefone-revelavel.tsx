@@ -68,7 +68,11 @@ export function TelefoneRevelavel({
           size="sm"
           onClick={() => void revelar()}
           disabled={revelando}
-          className="toque h-9 md:h-7"
+          // 44px no celular: "Revelar" é a ação que destrava o telefone para ligar, ou
+          // seja A ação da ficha em campo, e vinha com 36px de altura enquanto a lista
+          // e a barra inferior já cumpriam 44 e 64. A classe `toque` só dá resposta
+          // tátil (scale no :active); ela não define tamanho nenhum.
+          className="toque h-11 md:h-7"
         >
           <Eye aria-hidden="true" />
           {revelando ? 'Revelando...' : 'Revelar'}
@@ -76,7 +80,7 @@ export function TelefoneRevelavel({
       ) : null}
 
       {whatsapp ? (
-        <Button asChild variant="ghost" size="sm" className="toque h-9 md:h-7">
+        <Button asChild variant="ghost" size="sm" className="toque h-11 md:h-7">
           <a href={whatsapp} target="_blank" rel="noopener noreferrer">
             <MessageCircle aria-hidden="true" />
             Abrir no WhatsApp
@@ -86,7 +90,10 @@ export function TelefoneRevelavel({
 
       {mascarado && !revelado ? (
         <span className="basis-full text-xs text-muted-foreground">
-          A revelação fica registrada com o seu nome e a data (RF-BAS-14).
+          A revelação fica registrada com o seu nome e a data (
+          {/* Um código de requisito é átomo: quebrado no hífen ("RF-" numa linha,
+              "BAS-14)." na outra, medido em 390px) ele deixa de ser pesquisável. */}
+          <span className="whitespace-nowrap">RF-BAS-14</span>).
         </span>
       ) : null}
     </div>

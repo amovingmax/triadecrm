@@ -13,6 +13,12 @@ import { type Sessao } from '@/lib/auth/session';
  *
  * A troca de rota entra por `TransicaoPagina` (opacidade mais 2px): confirma que a
  * navegação aconteceu quando uma lista dá lugar a outra lista parecida.
+ *
+ * O espaço acima do conteúdo é o maior da pilha de propósito: é a única fronteira
+ * entre dois níveis (casca e página). Com os 20px antigos ele empatava com os 16px
+ * que separam irmãos dentro da própria página, e o bloco "Parceiros / 100 parceiros
+ * na base" lia como uma segunda faixa do cabeçalho. Três degraus: 24px no celular e
+ * 32px no desktop na fronteira, 16px entre irmãos, 8px dentro de um grupo.
  */
 export function AppShell({ sessao, children }: { sessao: Sessao; children: React.ReactNode }) {
   return (
@@ -24,7 +30,7 @@ export function AppShell({ sessao, children }: { sessao: Sessao; children: React
 
         <main
           id="conteudo"
-          className="flex-1 px-4 pt-4 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-6 md:pt-5 md:pb-8"
+          className="flex-1 px-4 pt-6 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-6 md:pt-8 md:pb-8"
         >
           <TransicaoPagina>{children}</TransicaoPagina>
         </main>

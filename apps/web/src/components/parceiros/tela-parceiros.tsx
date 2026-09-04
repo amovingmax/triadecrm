@@ -128,6 +128,10 @@ export function TelaParceiros({
         aria-label="Lista de parceiros"
         className={cn(
           'border-t border-hairline',
+          // Folga do tamanho do botão flutuante (56px) mais respiro, só no celular e
+          // só quando ele existe: sem ela o último cartão da página nascia debaixo do
+          // flutuante e não havia como rolá-lo para fora.
+          podeCriar && 'pb-20 md:pb-0',
           // Enquanto a próxima página chega, a lista antiga fica apagada e sem toque:
           // o dado que está na tela ainda é o anterior, e a interface não finge que não.
           consulta.isPlaceholderData && 'pointer-events-none opacity-60',
@@ -172,14 +176,25 @@ export function TelaParceiros({
           {/* Botão flutuante do celular: 56px, acima da barra inferior e da área segura.
               Leva o gradiente de ação (variante `default` do Button, que é o
               `acao-gradiente`: branco no escuro, tinta no claro) e a sombra tingida
-              pela base, nunca a sombra preta do `shadow-lg`. Raio de 8px, o dos
-              interativos: o flutuante é para tocar, não é contêiner.
+              pela base, nunca a sombra preta do `shadow-lg`.
               A altura da barra inferior mais a área segura mantêm ele fora da
-              coluna da paginação, que no celular empilha à esquerda. */}
+              coluna da paginação, que no celular empilha à esquerda.
+
+              É CÍRCULO, e não mais um quadrado de raio 8px: com gradiente branco e
+              56x56 sobre a lista, o quadrado lia como um cartão solto deitado por
+              cima dos outros (na foto ele tapava o "sem contato" da linha "Agência
+              Rocas"); o círculo com anel da própria base lê como objeto flutuante e
+              se descola do que está embaixo. O anel também devolve a fronteira que
+              faltava entre ele e o texto da linha.
+
+              Continua sendo `fixed`: criar parceiro é ação de polegar, no canto onde
+              a mão descansa. O que mudou é que a lista agora tem folga inferior
+              (`pb` na seção), então qualquer cartão pode ser rolado para fora de
+              baixo dele, inclusive o último. */}
           <Button
             onClick={() => setFolhaAberta(true)}
             aria-label="Novo parceiro"
-            className="toque sombra-base-forte fixed right-4 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] z-40 size-14 rounded-lg md:hidden"
+            className="toque sombra-base-forte fixed right-4 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] z-40 size-14 rounded-full ring-4 ring-background md:hidden"
           >
             <Plus className="size-5" aria-hidden="true" />
           </Button>
