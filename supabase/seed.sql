@@ -1171,6 +1171,834 @@ on conflict (slug) do update
       requires_lost_reason    = excluded.requires_lost_reason,
       counts_as               = excluded.counts_as;
 
+-- ---------- 12a. Eixo comercial da ligação (R13 §3.3; migração 20260904001300) ----------
+-- `requires_answer` separa os dois eixos do R13 §3.3 dentro do catálogo que já existe.
+-- Cinco desfechos de ligação pressupõem CONVERSA e só podem ser escolhidos quando
+-- alguém atendeu; os três restantes (não atendeu, caixa postal, número errado) deixam
+-- de ser escolha de quem liga e passam a ser resultado da chamada, resolvido por
+-- `app.outcome_for_call_result`. Nenhum chip foi criado nem aposentado: a superfície
+-- `ligacao` continua com os mesmos 8, porque a Heloísa também liga do celular dela,
+-- fora de lote, e precisa deles na tela `/registrar` — que não lê esta coluna.
+-- Um UPDATE em vez de mais uma coluna no insert do bloco 12: a lista de 34 linhas
+-- descreve a consequência do desfecho, e esta coluna descreve QUEM pode escolhê-lo.
+update public.interaction_outcomes
+   set requires_answer = (slug in ('lig_atendeu_retorna', 'lig_interessado', 'lig_agora_nao',
+                                   'lig_sem_interesse', 'lig_reuniao_marcada'))
+ where 'ligacao'::app.interaction_surface = any (surfaces);
+update public.interaction_outcomes
+   set requires_answer = false
+ where not ('ligacao'::app.interaction_surface = any (surfaces))
+   and requires_answer;
+
+-- =====================================================================
+-- 12c. Roteiro de ligação em árvore (R13 §3.2 e §5; migração 20260904001300).
+--
+--     O roteiro NÃO é texto na lateral da tela: cada resposta possível do cliente é
+--     um botão, e a tela vira sozinha para a fala seguinte. Quem liga nunca precisa
+--     saber "o que falar agora" — e o sistema grava por onde a conversa passou
+--     (`call_attempts.caminho_script`), que depois de duas semanas responde a
+--     pergunta que nenhum palpite responde: em qual frase as pessoas desligam.
+--
+--     São 37 nós em duas variantes, e a bifurcação sai dos dois funis que já
+--     existem (R13 §5), não de pessoa física × jurídica:
+--       * FORNECEDOR (buffet, DJ, decoração, tenda, espaço) — gancho de DEMANDA:
+--         "aparecer para quem já está procurando". O dono do buffet não quer um app
+--         a mais; ele quer telefone tocando.
+--       * PRODUTOR e CERIMONIALISTA — gancho de CONTROLE: "montar o evento inteiro
+--         num lugar só". Quem organiza sofre com fornecedor que some, orçamento por
+--         WhatsApp e contrato solto.
+--     A variante é escolhida pelo SISTEMA, a partir de `organizations.kind`, e nunca
+--     por quem liga: a `abertura` é um nó só, com duas saídas "Sou eu, pode falar",
+--     e a tela mostra a que vale para o tipo da organização.
+--
+--     Três coisas que o roteiro carrega por obrigação, e não por redação:
+--       * AVISO DE ORIGEM no primeiro nó (`[origem]`, preenchido por `fraseDeOrigem`
+--         a partir de `sources.slug`) — exigência de transparência do legítimo
+--         interesse (R06) e o que derruba a desconfiança logo no começo;
+--       * o gancho cabe em 15 segundos e TERMINA EM PERGUNTA (R13 §5): quem pergunta
+--         conduz a ligação;
+--       * nenhuma promessa comercial fora da base de conhecimento — dúvida
+--         financeira sem resposta na FAQ vira "vou confirmar com o financeiro"
+--         (nó `obj_financeiro`).
+--
+--     Os 9 nós `objecao` formam o bloco lateral, alcançável de QUALQUER nó, e por
+--     isso ficam fora da árvore principal (`objecoesDoRoteiro` em tipos.ts).
+--     Os nós `fim` carregam o desfecho comercial e são o que faz a tabulação custar
+--     um toque; `fim_numero_errado` é o único que fecha pelo eixo TÉCNICO, porque
+--     "aqui não é o [Empresa]" é atendimento sem conversa comercial, e forçar um
+--     desfecho comercial ali gravaria uma recusa que ninguém fez.
+--
+--     O gatilho `app.call_scripts_validate` recusa a inserção se algum nó ficar sem
+--     saída em alguma das duas variantes, se algum destino não existir ou se algum
+--     `fim` não fechar por exatamente um dos dois eixos.
+-- =====================================================================
+insert into public.call_scripts (slug, nome, versao, arvore, is_published)
+values ('captacao_v1', 'Captação por ligação — v1', 1, $roteiro$[
+  {
+    "id": "abertura",
+    "tipo": "pergunta",
+    "variante": "ambas",
+    "texto": "[saudacao]! Aqui é [eu], da Komune. Peguei o contato de vocês [origem]. Falo com quem cuida dos eventos do [empresa]?",
+    "saidas": [
+      {
+        "rotulo": "Sou eu, pode falar",
+        "destino": "gancho_fornecedor"
+      },
+      {
+        "rotulo": "Sou eu, pode falar",
+        "destino": "gancho_produtor"
+      },
+      {
+        "rotulo": "Não é comigo",
+        "destino": "pedir_decisor"
+      },
+      {
+        "rotulo": "Aqui não é o [empresa]",
+        "destino": "fim_numero_errado"
+      },
+      {
+        "rotulo": "Tô ocupado agora",
+        "destino": "obj_sem_tempo"
+      },
+      {
+        "rotulo": "De onde tirou meu número?",
+        "destino": "obj_origem"
+      },
+      {
+        "rotulo": "Manda no WhatsApp",
+        "destino": "obj_whatsapp"
+      }
+    ],
+    "nota": "O aviso de origem é obrigatório (R13 §5; transparência do legítimo interesse, R06). Nunca pule."
+  },
+  {
+    "id": "pedir_decisor",
+    "tipo": "pergunta",
+    "variante": "ambas",
+    "texto": "Sem problema. E quem é que decide sobre os eventos aí no [empresa]? Consigo falar com ele agora?",
+    "saidas": [
+      {
+        "rotulo": "Vou passar pra ele",
+        "destino": "gancho_fornecedor"
+      },
+      {
+        "rotulo": "Vou passar pra ele",
+        "destino": "gancho_produtor"
+      },
+      {
+        "rotulo": "Ele não está agora",
+        "destino": "anotar_decisor"
+      },
+      {
+        "rotulo": "Não passo esse contato",
+        "destino": "fim_agora_nao"
+      }
+    ]
+  },
+  {
+    "id": "anotar_decisor",
+    "tipo": "captura",
+    "variante": "ambas",
+    "texto": "Tudo bem. Qual é o nome dele, e qual o melhor horário pra eu ligar?",
+    "saidas": [
+      {
+        "rotulo": "Anotei nome e horário",
+        "destino": "combinar_retorno"
+      },
+      {
+        "rotulo": "Não quis passar",
+        "destino": "fim_agora_nao"
+      }
+    ],
+    "campo": "decisor"
+  },
+  {
+    "id": "combinar_retorno",
+    "tipo": "captura",
+    "variante": "ambas",
+    "texto": "Fechado. Então eu ligo [dia], por volta das [hora]. Já anotei aqui.",
+    "saidas": [
+      {
+        "rotulo": "Combinado",
+        "destino": "fim_retorna"
+      },
+      {
+        "rotulo": "Prefere que eu não ligue",
+        "destino": "fim_optout"
+      }
+    ],
+    "campo": "retorno_combinado"
+  },
+  {
+    "id": "agendar_reuniao",
+    "tipo": "captura",
+    "variante": "ambas",
+    "texto": "Perfeito. São 20 minutos, por vídeo ou aí no [empresa], como você preferir. [dia] às [hora] serve?",
+    "saidas": [
+      {
+        "rotulo": "Serve, pode marcar",
+        "destino": "confirmar_contato"
+      },
+      {
+        "rotulo": "Melhor outro dia",
+        "destino": "combinar_retorno"
+      },
+      {
+        "rotulo": "Prefiro só por WhatsApp",
+        "destino": "obj_whatsapp"
+      }
+    ],
+    "campo": "reuniao_combinada"
+  },
+  {
+    "id": "confirmar_contato",
+    "tipo": "captura",
+    "variante": "ambas",
+    "texto": "Só pra eu não errar: esse mesmo número é o WhatsApp que vocês usam pro trabalho?",
+    "saidas": [
+      {
+        "rotulo": "É esse mesmo",
+        "destino": "enviar_whatsapp"
+      },
+      {
+        "rotulo": "É outro, anotei",
+        "destino": "enviar_whatsapp"
+      },
+      {
+        "rotulo": "Prefiro por e-mail",
+        "destino": "fim_interessado"
+      }
+    ],
+    "campo": "whatsapp_do_decisor"
+  },
+  {
+    "id": "enviar_whatsapp",
+    "tipo": "acao",
+    "variante": "ambas",
+    "texto": "Mande agora, pelo WhatsApp, a confirmação com dia, hora e link. Espere ele confirmar antes de desligar.",
+    "saidas": [
+      {
+        "rotulo": "Mandei e ele confirmou",
+        "destino": "fim_reuniao"
+      }
+    ],
+    "nota": "Confirmar na hora é o que derruba no-show (R08 §4.1)."
+  },
+  {
+    "id": "fim_reuniao",
+    "tipo": "fim",
+    "variante": "ambas",
+    "texto": "Combinado, então: [dia] às [hora]. Obrigado pelo tempo, [nome]. Até lá!",
+    "saidas": [],
+    "desfecho": "lig_reuniao_marcada",
+    "resultadoTecnico": null
+  },
+  {
+    "id": "fim_retorna",
+    "tipo": "fim",
+    "variante": "ambas",
+    "texto": "Perfeito, eu ligo [dia]. Obrigado, [nome]!",
+    "saidas": [],
+    "desfecho": "lig_atendeu_retorna",
+    "resultadoTecnico": null
+  },
+  {
+    "id": "fim_interessado",
+    "tipo": "fim",
+    "variante": "ambas",
+    "texto": "Ótimo. Vou te mandar por WhatsApp como funciona e a gente marca a conversa. Obrigado, [nome]!",
+    "saidas": [],
+    "desfecho": "lig_interessado",
+    "resultadoTecnico": null
+  },
+  {
+    "id": "fim_agora_nao",
+    "tipo": "fim",
+    "variante": "ambas",
+    "texto": "Entendi, [nome]. Guardo o contato e te procuro mais pra frente, antes da temporada. Obrigado!",
+    "saidas": [],
+    "desfecho": "lig_agora_nao",
+    "resultadoTecnico": null
+  },
+  {
+    "id": "fim_sem_interesse",
+    "tipo": "fim",
+    "variante": "ambas",
+    "texto": "Sem problema, [nome]. Obrigado pela franqueza e pelo tempo. Bom trabalho aí!",
+    "saidas": [],
+    "desfecho": "lig_sem_interesse",
+    "resultadoTecnico": null
+  },
+  {
+    "id": "fim_optout",
+    "tipo": "fim",
+    "variante": "ambas",
+    "texto": "Entendido, [nome]. Vou tirar o contato de vocês da nossa lista agora mesmo. Desculpe o incômodo.",
+    "saidas": [],
+    "desfecho": "lig_sem_interesse",
+    "resultadoTecnico": null,
+    "nota": "Marque também “não me ligue mais”: é o que registra o opt-out (RF-CON-18). Não tem volta."
+  },
+  {
+    "id": "fim_numero_errado",
+    "tipo": "fim",
+    "variante": "ambas",
+    "texto": "Desculpe o incômodo, foi engano meu. Tenha um bom dia!",
+    "saidas": [],
+    "desfecho": null,
+    "resultadoTecnico": "numero_invalido",
+    "nota": "Atendeu, mas não houve conversa comercial: fecha pelo eixo técnico, não por uma recusa que ninguém fez."
+  },
+  {
+    "id": "gancho_fornecedor",
+    "tipo": "pergunta",
+    "variante": "fornecedor",
+    "texto": "Ótimo. [nome], a Komune é onde quem está organizando casamento e festa em Natal procura fornecedor e fecha por lá. A gente está montando a lista de buffet, DJ, decoração e espaço da cidade. Hoje, de onde vêm os seus clientes?",
+    "saidas": [
+      {
+        "rotulo": "Indicação, boca a boca",
+        "destino": "forn_indicacao"
+      },
+      {
+        "rotulo": "Instagram",
+        "destino": "forn_indicacao"
+      },
+      {
+        "rotulo": "Já anuncio em site",
+        "destino": "forn_ja_anuncia"
+      },
+      {
+        "rotulo": "Tô cheio, não preciso",
+        "destino": "forn_sem_demanda"
+      },
+      {
+        "rotulo": "Como assim? Explica",
+        "destino": "forn_explica"
+      },
+      {
+        "rotulo": "Quanto custa?",
+        "destino": "obj_preco"
+      }
+    ],
+    "nota": "Gancho de DEMANDA (R13 §5): o dono do buffet não quer um app, quer telefone tocando. 15 segundos e termina em pergunta."
+  },
+  {
+    "id": "forn_indicacao",
+    "tipo": "pergunta",
+    "variante": "fornecedor",
+    "texto": "É o que eu mais escuto. Indicação traz cliente bom, mas só quando alguém lembra de você. Na Komune, quem está procurando buffet em Natal esta semana vê o [empresa] sem depender de ninguém lembrar. Isso te serve?",
+    "saidas": [
+      {
+        "rotulo": "Faz sentido",
+        "destino": "forn_qualifica"
+      },
+      {
+        "rotulo": "Já tentei site, não deu",
+        "destino": "obj_concorrente"
+      },
+      {
+        "rotulo": "Não quero mais um app",
+        "destino": "obj_mais_um_app"
+      },
+      {
+        "rotulo": "Quem já usa aí?",
+        "destino": "obj_quem_ja_usa"
+      }
+    ]
+  },
+  {
+    "id": "forn_ja_anuncia",
+    "tipo": "pergunta",
+    "variante": "fornecedor",
+    "texto": "Legal. E de lá chega pedido de orçamento de verdade, ou mais curioso perguntando preço?",
+    "saidas": [
+      {
+        "rotulo": "Mais curioso que cliente",
+        "destino": "forn_explica"
+      },
+      {
+        "rotulo": "Chega, funciona bem",
+        "destino": "obj_concorrente"
+      },
+      {
+        "rotulo": "Não meço isso",
+        "destino": "forn_explica"
+      }
+    ]
+  },
+  {
+    "id": "forn_explica",
+    "tipo": "pergunta",
+    "variante": "fornecedor",
+    "texto": "Funciona assim: quem quer contratar entra, filtra por data, tipo de festa e orçamento, e fala direto com você — o pedido chega com a data e o número de convidados já preenchidos. Quantos eventos o [empresa] faz por mês hoje?",
+    "saidas": [
+      {
+        "rotulo": "Ele respondeu quantos",
+        "destino": "forn_qualifica"
+      },
+      {
+        "rotulo": "Depende muito da época",
+        "destino": "forn_qualifica"
+      },
+      {
+        "rotulo": "Não quero falar disso",
+        "destino": "forn_proposta"
+      }
+    ]
+  },
+  {
+    "id": "forn_qualifica",
+    "tipo": "captura",
+    "variante": "fornecedor",
+    "texto": "Certo, anotei. E o que você quer mais: mais pedido chegando, ou pedido melhor, com data e orçamento já certos?",
+    "saidas": [
+      {
+        "rotulo": "Mais pedido",
+        "destino": "forn_proposta"
+      },
+      {
+        "rotulo": "Pedido melhor",
+        "destino": "forn_proposta"
+      },
+      {
+        "rotulo": "Nenhum dos dois agora",
+        "destino": "forn_sem_demanda"
+      }
+    ],
+    "campo": "eventos_por_mes"
+  },
+  {
+    "id": "forn_proposta",
+    "tipo": "pergunta",
+    "variante": "fornecedor",
+    "texto": "Então é o seguinte: em 20 minutos eu te mostro como o [empresa] apareceria pra quem está procurando agora, e você decide depois. Entrar na lista não custa nada. Topa marcar?",
+    "saidas": [
+      {
+        "rotulo": "Topo, vamos marcar",
+        "destino": "agendar_reuniao"
+      },
+      {
+        "rotulo": "Me manda por escrito antes",
+        "destino": "obj_whatsapp"
+      },
+      {
+        "rotulo": "Depois eu vejo",
+        "destino": "fim_agora_nao"
+      },
+      {
+        "rotulo": "Gostei, mas preciso pensar",
+        "destino": "fim_interessado"
+      },
+      {
+        "rotulo": "Não tenho interesse",
+        "destino": "fim_sem_interesse"
+      }
+    ]
+  },
+  {
+    "id": "forn_sem_demanda",
+    "tipo": "pergunta",
+    "variante": "fornecedor",
+    "texto": "Entendo, e é bom sinal. Só uma coisa: e nos meses fracos, junho e julho? Vale eu te procurar antes deles?",
+    "saidas": [
+      {
+        "rotulo": "Aí sim, me procura",
+        "destino": "combinar_retorno"
+      },
+      {
+        "rotulo": "Me explica rápido",
+        "destino": "forn_explica"
+      },
+      {
+        "rotulo": "Não precisa, obrigado",
+        "destino": "fim_sem_interesse"
+      }
+    ]
+  },
+  {
+    "id": "gancho_produtor",
+    "tipo": "pergunta",
+    "variante": "produtor",
+    "texto": "Ótimo. [nome], a Komune junta num lugar só os fornecedores de evento de Natal — buffet, som, decoração, espaço — com orçamento e contrato no mesmo painel. A gente está chamando quem organiza evento na cidade. Como você monta a lista de fornecedores hoje?",
+    "saidas": [
+      {
+        "rotulo": "Tenho os meus de sempre",
+        "destino": "prod_ja_tem"
+      },
+      {
+        "rotulo": "Planilha e WhatsApp",
+        "destino": "prod_planilha"
+      },
+      {
+        "rotulo": "Cada evento é um corre",
+        "destino": "prod_dor"
+      },
+      {
+        "rotulo": "Explica melhor",
+        "destino": "prod_explica"
+      },
+      {
+        "rotulo": "Quanto custa?",
+        "destino": "obj_preco"
+      }
+    ],
+    "nota": "Gancho de CONTROLE (R13 §5): quem organiza evento sofre com fornecedor que some, orçamento por WhatsApp e contrato solto."
+  },
+  {
+    "id": "prod_planilha",
+    "tipo": "pergunta",
+    "variante": "produtor",
+    "texto": "É o padrão do mercado. E quando um fornecedor some na semana do evento, quanto tempo você perde pra achar outro?",
+    "saidas": [
+      {
+        "rotulo": "Perco o dia inteiro",
+        "destino": "prod_dor"
+      },
+      {
+        "rotulo": "Isso quase não acontece",
+        "destino": "prod_ja_tem"
+      },
+      {
+        "rotulo": "Já perdi evento assim",
+        "destino": "prod_dor"
+      }
+    ]
+  },
+  {
+    "id": "prod_dor",
+    "tipo": "pergunta",
+    "variante": "produtor",
+    "texto": "Pois é. Na Komune você vê quem está disponível naquela data, com preço e contrato no mesmo lugar, e o histórico de quem já entregou bem. Isso resolveria alguma coisa pra você?",
+    "saidas": [
+      {
+        "rotulo": "Resolveria, sim",
+        "destino": "prod_qualifica"
+      },
+      {
+        "rotulo": "Não quero mais um app",
+        "destino": "obj_mais_um_app"
+      },
+      {
+        "rotulo": "Quem já usa aí?",
+        "destino": "obj_quem_ja_usa"
+      },
+      {
+        "rotulo": "Explica melhor",
+        "destino": "prod_explica"
+      }
+    ]
+  },
+  {
+    "id": "prod_explica",
+    "tipo": "pergunta",
+    "variante": "produtor",
+    "texto": "É um painel: você monta o evento, escolhe os fornecedores da cidade, manda o orçamento pra todos de uma vez e acompanha o que cada um respondeu. Quantos eventos você faz por ano?",
+    "saidas": [
+      {
+        "rotulo": "Ele respondeu quantos",
+        "destino": "prod_qualifica"
+      },
+      {
+        "rotulo": "Varia muito",
+        "destino": "prod_qualifica"
+      },
+      {
+        "rotulo": "Prefiro não dizer",
+        "destino": "prod_proposta"
+      }
+    ]
+  },
+  {
+    "id": "prod_qualifica",
+    "tipo": "captura",
+    "variante": "produtor",
+    "texto": "Anotei. E qual é o seu maior aperto hoje: achar fornecedor, controlar orçamento, ou o contrato?",
+    "saidas": [
+      {
+        "rotulo": "Achar fornecedor",
+        "destino": "prod_proposta"
+      },
+      {
+        "rotulo": "Orçamento",
+        "destino": "prod_proposta"
+      },
+      {
+        "rotulo": "Contrato",
+        "destino": "prod_proposta"
+      }
+    ],
+    "campo": "eventos_por_ano"
+  },
+  {
+    "id": "prod_proposta",
+    "tipo": "pergunta",
+    "variante": "produtor",
+    "texto": "Então vale 20 minutos: eu te mostro o painel com fornecedores reais de Natal e você me diz se serve. Entrar não custa nada. Topa marcar?",
+    "saidas": [
+      {
+        "rotulo": "Topo, vamos marcar",
+        "destino": "agendar_reuniao"
+      },
+      {
+        "rotulo": "Me manda por escrito antes",
+        "destino": "obj_whatsapp"
+      },
+      {
+        "rotulo": "Depois eu vejo",
+        "destino": "fim_agora_nao"
+      },
+      {
+        "rotulo": "Gostei, mas preciso pensar",
+        "destino": "fim_interessado"
+      },
+      {
+        "rotulo": "Não tenho interesse",
+        "destino": "fim_sem_interesse"
+      }
+    ]
+  },
+  {
+    "id": "prod_ja_tem",
+    "tipo": "pergunta",
+    "variante": "produtor",
+    "texto": "Ótimo, isso já é meio caminho. E quando o cliente pede algo que os seus de sempre não fazem — tenda grande, brinquedo, atração de fora? Onde você procura?",
+    "saidas": [
+      {
+        "rotulo": "Aí eu me viro no Google",
+        "destino": "prod_dor"
+      },
+      {
+        "rotulo": "Peço indicação",
+        "destino": "prod_dor"
+      },
+      {
+        "rotulo": "Nunca precisei",
+        "destino": "prod_proposta"
+      }
+    ]
+  },
+  {
+    "id": "obj_whatsapp",
+    "tipo": "objecao",
+    "variante": "ambas",
+    "texto": "Mando sim. Só que o que eu tenho pra mostrar não cabe em mensagem — são fornecedores reais e a agenda deles. Me dá 20 minutos e, se não servir, eu mesmo tiro vocês da lista. Que dia é melhor?",
+    "saidas": [
+      {
+        "rotulo": "Tudo bem, vamos marcar",
+        "destino": "agendar_reuniao"
+      },
+      {
+        "rotulo": "Manda mesmo assim",
+        "destino": "fim_interessado"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "forn_explica"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "prod_explica"
+      }
+    ]
+  },
+  {
+    "id": "obj_concorrente",
+    "tipo": "objecao",
+    "variante": "ambas",
+    "texto": "Conheço, é bom pra casamento. A gente é daqui de Natal e cobre festa de 15, corporativo e aniversário também — e você não paga pra aparecer. Dá pra ter os dois. Vale eu te mostrar a diferença?",
+    "saidas": [
+      {
+        "rotulo": "Vale, vamos marcar",
+        "destino": "agendar_reuniao"
+      },
+      {
+        "rotulo": "Por enquanto não",
+        "destino": "fim_agora_nao"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "forn_explica"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "prod_explica"
+      }
+    ]
+  },
+  {
+    "id": "obj_sem_tempo",
+    "tipo": "objecao",
+    "variante": "ambas",
+    "texto": "Eu sei, liguei em hora ruim mesmo. São 40 segundos: eu digo o que é e, se não servir, você me manda parar. Posso?",
+    "saidas": [
+      {
+        "rotulo": "Pode, fala",
+        "destino": "forn_explica"
+      },
+      {
+        "rotulo": "Pode, fala",
+        "destino": "prod_explica"
+      },
+      {
+        "rotulo": "Me liga outra hora",
+        "destino": "combinar_retorno"
+      },
+      {
+        "rotulo": "Não me ligue mais",
+        "destino": "fim_optout"
+      }
+    ]
+  },
+  {
+    "id": "obj_preco",
+    "tipo": "objecao",
+    "variante": "ambas",
+    "texto": "Entrar e montar o perfil não custa nada. A Komune só ganha quando o negócio fecha por lá — não fechou, você não paga. O número exato eu te mando por escrito, do jeito que o financeiro passou.",
+    "saidas": [
+      {
+        "rotulo": "Então tudo bem",
+        "destino": "agendar_reuniao"
+      },
+      {
+        "rotulo": "Quero o número agora",
+        "destino": "obj_financeiro"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "forn_explica"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "prod_explica"
+      }
+    ],
+    "nota": "Nunca prometa condição comercial fora da base de conhecimento. Percentual, prazo e desconto só com o que estiver na FAQ."
+  },
+  {
+    "id": "obj_mais_um_app",
+    "tipo": "objecao",
+    "variante": "ambas",
+    "texto": "Justo. Você não precisa instalar nada nem mudar o seu jeito de trabalhar: o pedido chega no seu WhatsApp, como já chega hoje. O painel é só onde a informação fica guardada.",
+    "saidas": [
+      {
+        "rotulo": "Assim eu vejo",
+        "destino": "agendar_reuniao"
+      },
+      {
+        "rotulo": "Mesmo assim, não",
+        "destino": "fim_agora_nao"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "forn_explica"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "prod_explica"
+      }
+    ]
+  },
+  {
+    "id": "obj_nao_preciso",
+    "tipo": "objecao",
+    "variante": "ambas",
+    "texto": "Que bom — é o melhor problema de se ter. Só que agenda cheia hoje não é agenda cheia em junho. Posso deixar o perfil pronto agora, sem custo, pra quando você quiser abrir a torneira?",
+    "saidas": [
+      {
+        "rotulo": "Pode, vamos ver",
+        "destino": "agendar_reuniao"
+      },
+      {
+        "rotulo": "Me procura mais pra frente",
+        "destino": "combinar_retorno"
+      },
+      {
+        "rotulo": "Não, obrigado",
+        "destino": "fim_sem_interesse"
+      }
+    ]
+  },
+  {
+    "id": "obj_quem_ja_usa",
+    "tipo": "objecao",
+    "variante": "ambas",
+    "texto": "A gente está montando a base agora, com fornecedor de Natal, um por segmento — é por isso que estou ligando pra vocês antes de abrir. Quem entra agora aparece primeiro.",
+    "saidas": [
+      {
+        "rotulo": "Quero ver isso",
+        "destino": "agendar_reuniao"
+      },
+      {
+        "rotulo": "Me manda por escrito",
+        "destino": "fim_interessado"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "forn_explica"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "prod_explica"
+      }
+    ],
+    "nota": "Nunca cite nome de parceiro que não autorizou. Se insistir: “vou confirmar com o marketing o que posso te mostrar”."
+  },
+  {
+    "id": "obj_origem",
+    "tipo": "objecao",
+    "variante": "ambas",
+    "texto": "Claro: peguei [origem]. Está tudo registrado do nosso lado e, se você quiser, eu apago o contato de vocês agora mesmo — é só falar.",
+    "saidas": [
+      {
+        "rotulo": "Tudo bem, continua",
+        "destino": "forn_explica"
+      },
+      {
+        "rotulo": "Tudo bem, continua",
+        "destino": "prod_explica"
+      },
+      {
+        "rotulo": "Apaga meu contato",
+        "destino": "fim_optout"
+      },
+      {
+        "rotulo": "Me liga outra hora",
+        "destino": "combinar_retorno"
+      }
+    ],
+    "nota": "Transparência de origem é exigência do legítimo interesse (R06). Se pedir para apagar, é opt-out imediato."
+  },
+  {
+    "id": "obj_financeiro",
+    "tipo": "objecao",
+    "variante": "ambas",
+    "texto": "Essa eu não vou te responder de cabeça pra não falar besteira: vou confirmar com o financeiro e te mando por escrito ainda hoje. Pode ser nesse mesmo número?",
+    "saidas": [
+      {
+        "rotulo": "Pode, manda por escrito",
+        "destino": "fim_interessado"
+      },
+      {
+        "rotulo": "Sem isso não continuo",
+        "destino": "fim_agora_nao"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "forn_proposta"
+      },
+      {
+        "rotulo": "Volta pro assunto",
+        "destino": "prod_proposta"
+      }
+    ],
+    "nota": "Dúvida financeira sem resposta na FAQ vira sempre “vou confirmar com o financeiro”. Nunca improvise número."
+  }
+]$roteiro$::jsonb, true)
+on conflict (slug, versao) do update
+  set nome         = excluded.nome,
+      arvore       = excluded.arvore,
+      is_published = excluded.is_published;
+
 -- =====================================================================
 -- 12b. Equivalência de etapas entre funis (RF-FUN-12; PRD §5.3 ↔ §5.5)
 --
@@ -1212,6 +2040,7 @@ declare
   n_hol  int;  n_tpl  int;  n_city int;  n_src  int;  n_lost int;
   n_hol1 int;  ano    int := extract(year from (now() at time zone 'America/Fortaleza'))::int;
   n_out  int;  n_sup  int;  n_eq int;  s_eq text;
+  n_nos int; n_rot_err int; n_ans int;
 begin
   select count(*) into n_cat  from public.categories;
   select count(*) into n_pipe from public.pipelines;
@@ -1227,6 +2056,14 @@ begin
   select count(*) into n_lost from public.lost_reasons;
   select count(*) into n_out from public.interaction_outcomes;
   select count(*) into n_eq  from public.stage_equivalences;
+  -- Roteiro de ligação (bloco 12c): nós da árvore, desfechos que exigem atendimento
+  -- e erros estruturais segundo app.validar_roteiro.
+  select jsonb_array_length(r.arvore), cardinality(app.validar_roteiro(r.arvore))
+    into n_nos, n_rot_err
+    from public.call_scripts r where r.slug = 'captacao_v1' and r.versao = 1;
+  select count(*) into n_ans
+    from public.interaction_outcomes o
+   where o.requires_answer and 'ligacao'::app.interaction_surface = any (o.surfaces);
   -- Teto de 8 chips ativos por superfície: acima disso ninguém tabula dentro dos 20 s do RF-MET-06.
   select coalesce(max(c), 0) into n_sup
     from (select count(*) as c from public.interaction_outcomes o, unnest(o.surfaces) as sup
@@ -1244,6 +2081,12 @@ begin
   if n_out <> 34 then raise exception 'seed: esperados 34 desfechos de interação, encontrados %', n_out; end if;
   if n_sup > 8   then raise exception 'seed: superfície com % desfechos ativos (máximo 8, RF-MET-06)', n_sup; end if;
   if n_eq <> 4   then raise exception 'seed: esperadas 4 equivalências de etapa, encontradas %', n_eq; end if;
+  if n_nos is null then raise exception 'seed: roteiro de ligação captacao_v1 não foi semeado'; end if;
+  if n_nos <> 37 then raise exception 'seed: roteiro de ligação com % nós (esperados 37)', n_nos; end if;
+  if n_rot_err > 0 then raise exception 'seed: roteiro de ligação com % erro(s) estrutural(is): %',
+    n_rot_err, array_to_string((select app.validar_roteiro(r.arvore) from public.call_scripts r
+                                 where r.slug = 'captacao_v1' and r.versao = 1), ' '); end if;
+  if n_ans <> 5 then raise exception 'seed: % desfechos de ligação com requires_answer (esperados 5, R13 §3.3)', n_ans; end if;
   if exists (
     select 1 from public.interaction_outcomes o
      where o.target_stage_slug is not null
@@ -1269,6 +2112,7 @@ begin
     raise warning 'seed: há etapas órfãs (posição negativa) que não constam mais da seed';
   end if;
 
+  raise notice 'seed ok (ligação): roteiro captacao_v1 com % nós, sem erro estrutural, e % desfechos comerciais de ligação', n_nos, n_ans;
   raise notice 'seed ok: % cidades, % categorias, % fontes, % feriados em % e % em %, % funis (fornecedor %, ativacao %, produtor % etapas), % motivos de perda, % desfechos de interação (máximo % por superfície), % modelos de mensagem',
     n_city, n_cat, n_src, n_hol, ano, n_hol1, ano + 1, n_pipe, n_forn, n_ativ, n_prod, n_lost, n_out, n_sup, n_tpl;
 end $$;

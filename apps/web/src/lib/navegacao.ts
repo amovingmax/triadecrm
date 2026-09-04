@@ -1,6 +1,7 @@
 /**
- * Navegação principal do CRM (kit/CLAUDE.md): Meu dia, Parceiros, Funis, Conversas, Radar, Agenda,
- * Metas, Relatórios, Admin. O dia indica quando cada tela chega, pelo calendário do PRD §11.2.
+ * Navegação principal do CRM (kit/CLAUDE.md): Meu dia, Parceiros, Funis, Ligar, Conversas, Radar,
+ * Agenda, Metas, Relatórios, Admin. O dia indica quando cada tela chega, pelo calendário do
+ * PRD §11.2.
  */
 import {
   CalendarDays,
@@ -8,6 +9,7 @@ import {
   Handshake,
   type LucideIcon,
   MessageCircle,
+  PhoneCall,
   Radar,
   Settings,
   SquareKanban,
@@ -58,6 +60,14 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     descricao:
       'Kanban dos funis de captação e de produtores, cartão com semáforo, próxima ação obrigatória e motivos de perda (RF-FUN).',
     principal: true,
+  },
+  {
+    href: '/ligar',
+    rotulo: 'Ligar',
+    icone: PhoneCall,
+    dia: 'D5',
+    descricao:
+      'Lote de prospecção ativa por ligação: fila reservada na montagem, roteiro em árvore e tabulação em dois eixos (R13).',
   },
   {
     href: '/conversas',
