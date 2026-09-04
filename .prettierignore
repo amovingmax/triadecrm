@@ -1,0 +1,21 @@
+# Dependências e saídas de build
+node_modules
+dist
+.next
+out
+coverage
+pnpm-lock.yaml
+
+# Supabase local e dados da máquina dedicada
+supabase/.temp
+supabase/.branches
+infra/local/data
+
+# Gerado por `pnpm db:types`
+packages/schema/src/database.types.ts
+
+# Documentação de produto (PRD e anexos) não é reformatada
+docs/
+
+# Gerado pelo Next.js (`next dev`/`next build`/`next typegen`)
+apps/web/next-env.d.ts

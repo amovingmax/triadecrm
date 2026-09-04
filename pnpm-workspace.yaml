@@ -1,0 +1,23 @@
+# Workspaces do monorepo KOMUNE CRM (estrutura definida no CLAUDE.md).
+packages:
+  - apps/*
+  - packages/*
+
+# Versões compartilhadas (pnpm catalogs): os pacotes declaram "catalog:" e a versão
+# fica fechada aqui, em um único lugar, para web, workers e packages não divergirem.
+catalog:
+  '@types/node': 22.20.1
+  tsup: 8.5.1
+  tsx: 4.23.13
+  typescript: 5.9.3
+  vitest: 4.1.11
+  zod: 4.5.4
+
+# O pnpm 11 bloqueia scripts de pós-instalação de dependências por segurança (allowBuilds substituiu
+# onlyBuiltDependencies); liberamos apenas os que precisam (esbuild valida o binário nativo).
+allowBuilds:
+  esbuild: true
+  # apps/web: sharp e unrs-resolver trazem binários pré-compilados (optionalDependencies); o script de
+  # pós-instalação não é necessário e fica explicitamente recusado para o pnpm não avisar a cada install.
+  sharp: false
+  unrs-resolver: false

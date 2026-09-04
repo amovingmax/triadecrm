@@ -1,0 +1,20 @@
+# Contexto de build da imagem dos workers (apps/workers/Dockerfile, construída a partir da raiz).
+# Segredos jamais entram na imagem.
+.env
+.env.*
+!.env.example
+
+.git
+.github
+.vscode
+docs
+supabase
+infra
+scripts
+**/node_modules
+**/dist
+**/.next
+**/out
+**/coverage
+**/*.log
+**/.DS_Store

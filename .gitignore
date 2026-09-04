@@ -20,7 +20,8 @@ supabase/.branches/
 supabase/.env
 
 # infra local
-infra/local/data/
+infra/local/data/*
+!infra/local/data/.gitkeep
 infra/local/.env
 
 # sistema e editores
@@ -29,3 +30,13 @@ infra/local/.env
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# ferramentas e caches do monorepo
+.eslintcache
+.vercel/
+playwright-report/
+test-results/
+*.tgz
+
+# dev containers / build local
+.docker/

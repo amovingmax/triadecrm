@@ -1,0 +1,36 @@
+{
+  "name": "komune-crm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CRM de captação da KOMUNE: base de parceiros, Radar, funis, inbox de WhatsApp, agenda, metas e pré-cadastro.",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=11"
+  },
+  "scripts": {
+    "dev": "pnpm -C apps/web dev",
+    "build": "pnpm -r --if-present build",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset --local",
+    "db:lint": "supabase db lint --local",
+    "db:test": "supabase test db --local",
+    "db:types": "SUPABASE_DB_PASSWORD=postgres supabase gen types typescript --local --schema public,app > packages/schema/src/database.types.ts",
+    "db:seed-dev": "psql \"${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}\" -v ON_ERROR_STOP=1 -f scripts/seed-dev-5k.sql"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.9.1",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.12.0",
+    "prettier": "3.9.6",
+    "typescript": "catalog:",
+    "typescript-eslint": "8.69.0"
+  }
+}

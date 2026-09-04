@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "Supabase.vscode-supabase-extension",
+    "ms-ossdata.vscode-pgsql",
+    "EditorConfig.EditorConfig",
+    "ms-azuretools.vscode-containers",
+    "Anthropic.claude-code"
+  ]
+}
