@@ -18,8 +18,9 @@ import { estaAtivo, navegacaoPara } from '@/lib/navegacao';
 import { cn } from '@/lib/utils';
 
 /**
- * Barra inferior do celular (até md): os 4 itens principais + "Mais", que abre um menu com os demais.
- * Mobile-first nas telas de campo (PRD §8): Meu dia, Parceiros, Funis e Conversas a um toque.
+ * Barra inferior do celular (até md): os 4 módulos de uso diário mais "Mais", que
+ * abre o resto numa folha. É a navegação de campo, a um polegar de distância
+ * (PRD §8): Meu dia, Parceiros, Funis e Conversas.
  */
 export function BottomNav({ papel }: { papel: AppRole }) {
   const pathname = usePathname();
@@ -35,7 +36,7 @@ export function BottomNav({ papel }: { papel: AppRole }) {
       aria-label="Navegação principal"
       className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 pb-[var(--area-segura-inferior)] backdrop-blur supports-backdrop-filter:bg-background/80 md:hidden"
     >
-      <div className="flex h-[var(--altura-barra-inferior)] items-stretch px-1">
+      <div className="flex h-[var(--altura-barra-inferior)] items-stretch">
         {principais.map((item) => (
           <NavLink key={item.href} item={item} variante="inferior" />
         ))}
@@ -43,20 +44,34 @@ export function BottomNav({ papel }: { papel: AppRole }) {
         <Sheet open={aberto} onOpenChange={setAberto}>
           <SheetTrigger
             className={cn(
-              'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md px-1 py-2 text-[11px] font-medium leading-none transition-colors',
-              algumSecundarioAtivo ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+              'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-none font-medium transition-colors',
+              algumSecundarioAtivo ? 'text-foreground' : 'text-muted-foreground',
             )}
-            aria-label="Mais opções de navegação"
+            aria-label="Mais áreas do CRM"
           >
-            <Ellipsis className="size-5" aria-hidden="true" />
+            <span
+              aria-hidden="true"
+              className={cn(
+                'absolute inset-x-3 top-0 h-0.5 bg-foreground',
+                algumSecundarioAtivo ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+            <Ellipsis
+              className={cn('size-5', algumSecundarioAtivo && 'stroke-[2.25]')}
+              aria-hidden="true"
+            />
             <span>Mais</span>
           </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl pb-[var(--area-segura-inferior)]">
-            <SheetHeader>
-              <SheetTitle>Mais</SheetTitle>
-              <SheetDescription>Outras áreas do CRM</SheetDescription>
+
+          <SheetContent
+            side="bottom"
+            className="gap-3 rounded-t-xl pb-[calc(var(--area-segura-inferior)+0.75rem)]"
+          >
+            <SheetHeader className="pb-1">
+              <SheetTitle>Mais áreas</SheetTitle>
+              <SheetDescription>Os módulos que não cabem na barra.</SheetDescription>
             </SheetHeader>
-            <div className="flex flex-col gap-1 px-3 pb-4">
+            <div className="flex flex-col gap-0.5 px-2">
               {secundarios.map((item) => (
                 <NavLink
                   key={item.href}

@@ -110,6 +110,35 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
   },
 ];
 
+/**
+ * Rota que abre o cadastro rápido de parceiro (RF-BAS-15).
+ *
+ * Contrato entre a casca e a tela de parceiros: a paleta de comandos e o botão de
+ * ação só navegam; quem lê `?novo=1` e abre a folha é a tela `/parceiros`. Assim o
+ * atalho funciona de qualquer módulo e o endereço pode ser compartilhado.
+ */
+export const HREF_NOVO_PARCEIRO = '/parceiros?novo=1';
+
+/** Papéis que criam parceiro. A autorização de verdade é o RLS; isto só evita oferecer o que vai falhar. */
+const PAPEIS_QUE_CRIAM: readonly AppRole[] = ['admin', 'gestor', 'sdr', 'embaixador'];
+
+export function podeCriarParceiro(papel: AppRole): boolean {
+  return PAPEIS_QUE_CRIAM.includes(papel);
+}
+
+/**
+ * Espelho de `app.reads_base_pii()`: papéis que leem o telefone inteiro na base.
+ *
+ * Não confunda com `podeCriarParceiro`: os conjuntos são diferentes de propósito
+ * (sdr e embaixador criam e não leem PII; leitura e financeiro leem PII e não criam).
+ * Serve só para explicar o resultado da busca; quem decide é o Postgres.
+ */
+const PAPEIS_QUE_LEEM_TELEFONE: readonly AppRole[] = ['admin', 'gestor', 'leitura', 'financeiro'];
+
+export function leTelefoneCompleto(papel: AppRole): boolean {
+  return PAPEIS_QUE_LEEM_TELEFONE.includes(papel);
+}
+
 /** Itens visíveis para um papel. */
 export function navegacaoPara(papel: AppRole): ItemNavegacao[] {
   return NAVEGACAO.filter((item) => !item.papeis || item.papeis.includes(papel));
