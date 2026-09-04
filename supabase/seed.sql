@@ -1231,6 +1231,18 @@ update public.interaction_outcomes
 --     O gatilho `app.call_scripts_validate` recusa a inserção se algum nó ficar sem
 --     saída em alguma das duas variantes, se algum destino não existir ou se algum
 --     `fim` não fechar por exatamente um dos dois eixos.
+--
+--  6. QUEM PERGUNTA O NÚMERO É QUEM O GUARDA (conserto do achado D4). Até
+--     04/09/2026 os nós de volume — `forn_explica` ("Quantos eventos o [empresa]
+--     faz por mês hoje?") e `prod_explica` ("Quantos eventos você faz por ano?") —
+--     eram do tipo `pergunta`, que não captura nada, enquanto `forn_qualifica`
+--     ("mais pedido ou pedido melhor?") gravava a resposta dela no campo
+--     `eventos_por_mes` e `prod_qualifica` ("qual é o seu maior aperto?") no campo
+--     `eventos_por_ano`. Medido no banco local: capturas = {"eventos_por_mes":
+--     "Mais pedido"}. O número de eventos, que é o dado de qualificação do
+--     R13 §3.2, nunca era gravado — e o que estava lá tinha o nome de outra coisa.
+--     Agora cada nó captura a SUA resposta: eventos_por_mes / eventos_por_ano nos
+--     nós de volume, prioridade_do_dono e maior_aperto nos de qualificação.
 -- =====================================================================
 insert into public.call_scripts (slug, nome, versao, arvore, is_published)
 values ('captacao_v1', 'Captação por ligação — v1', 1, $roteiro$[
@@ -1528,7 +1540,7 @@ values ('captacao_v1', 'Captação por ligação — v1', 1, $roteiro$[
   },
   {
     "id": "forn_explica",
-    "tipo": "pergunta",
+    "tipo": "captura",
     "variante": "fornecedor",
     "texto": "Funciona assim: quem quer contratar entra, filtra por data, tipo de festa e orçamento, e fala direto com você — o pedido chega com a data e o número de convidados já preenchidos. Quantos eventos o [empresa] faz por mês hoje?",
     "saidas": [
@@ -1544,7 +1556,8 @@ values ('captacao_v1', 'Captação por ligação — v1', 1, $roteiro$[
         "rotulo": "Não quero falar disso",
         "destino": "forn_proposta"
       }
-    ]
+    ],
+    "campo": "eventos_por_mes"
   },
   {
     "id": "forn_qualifica",
@@ -1565,7 +1578,7 @@ values ('captacao_v1', 'Captação por ligação — v1', 1, $roteiro$[
         "destino": "forn_sem_demanda"
       }
     ],
-    "campo": "eventos_por_mes"
+    "campo": "prioridade_do_dono"
   },
   {
     "id": "forn_proposta",
@@ -1690,7 +1703,7 @@ values ('captacao_v1', 'Captação por ligação — v1', 1, $roteiro$[
   },
   {
     "id": "prod_explica",
-    "tipo": "pergunta",
+    "tipo": "captura",
     "variante": "produtor",
     "texto": "É um painel: você monta o evento, escolhe os fornecedores da cidade, manda o orçamento pra todos de uma vez e acompanha o que cada um respondeu. Quantos eventos você faz por ano?",
     "saidas": [
@@ -1706,7 +1719,8 @@ values ('captacao_v1', 'Captação por ligação — v1', 1, $roteiro$[
         "rotulo": "Prefiro não dizer",
         "destino": "prod_proposta"
       }
-    ]
+    ],
+    "campo": "eventos_por_ano"
   },
   {
     "id": "prod_qualifica",
@@ -1727,7 +1741,7 @@ values ('captacao_v1', 'Captação por ligação — v1', 1, $roteiro$[
         "destino": "prod_proposta"
       }
     ],
-    "campo": "eventos_por_ano"
+    "campo": "maior_aperto"
   },
   {
     "id": "prod_proposta",

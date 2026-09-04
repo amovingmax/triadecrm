@@ -1,6 +1,6 @@
 'use client';
 
-import { CalendarClock, CircleCheck, RotateCw, TriangleAlert } from 'lucide-react';
+import { CalendarClock, CircleCheck, RotateCw, SkipForward, TriangleAlert } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -67,6 +67,43 @@ export function FilaAcabou({
     >
       <Button type="button" onClick={aoMontarOutro}>
         Montar outro lote
+      </Button>
+    </Moldura>
+  );
+}
+
+/**
+ * A fila "acabou", mas só porque os pulados do turno ainda estão reservados com ela.
+ *
+ * Dizer "acabou a fila" aqui seria mentira, e mandar montar outro lote seria pior: o
+ * lote tem contato de sobra, ele está preso na reserva de quem pulou. A saída é uma
+ * só, e é um toque.
+ */
+export function SoSobraramOsPulados({
+  pulados,
+  aoRetomar,
+  aoVoltar,
+}: {
+  pulados: number;
+  aoRetomar: () => void;
+  aoVoltar: () => void;
+}) {
+  return (
+    <Moldura
+      icone={<SkipForward className="size-5" aria-hidden="true" />}
+      titulo="Só sobrou o que você pulou"
+      texto={
+        pulados === 1
+          ? 'O único contato que resta na fila deste lote é o que você pulou neste turno.'
+          : `Os ${pulados} contatos que restam na fila deste lote são os que você pulou neste turno.`
+      }
+    >
+      <Button type="button" onClick={aoRetomar}>
+        <RotateCw aria-hidden="true" />
+        {pulados === 1 ? 'Voltar para ele' : 'Voltar para eles'}
+      </Button>
+      <Button type="button" variant="outline" onClick={aoVoltar}>
+        Voltar aos lotes
       </Button>
     </Moldura>
   );

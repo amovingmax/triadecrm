@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, NotebookPen, RotateCcw } from 'lucide-react';
+import { ArrowRight, NotebookPen, PauseCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -35,13 +35,27 @@ import {
  * commit, `sdr` não tem `delete` em `activities` (a política `activities_delete` é só
  * admin), e prometer um desfazer que o banco não deixa cumprir seria mentira. O que
  * dá para corrigir sem mentir é a anotação, e ela está aqui num toque.
+ *
+ * ===========================================================================
+ * A contagem PARA no primeiro toque, e não volta a andar
+ * ===========================================================================
+ * Os 5 segundos existem para quem não vai fazer nada — e para essa pessoa eles são o
+ * ganho do módulo. Para quem TOCOU em alguma coisa aqui, eles eram um sequestro: foi
+ * medido com uma anotação de 40 caracteres, que a tela levou embora no meio da frase
+ * junto com o contato. Por isso o primeiro toque em QUALQUER controle deste recibo
+ * (o rádio de "com quem falou", o botão de anotar, o campo de texto) para a contagem,
+ * e ela não recomeça: quem começou a escrever decide quando vai para o próximo, no
+ * botão que já está aqui embaixo. Nada se perde e nada anda sozinho por cima.
  */
 export function ChamadaRecibo({
   item,
   rotulo,
   desfecho,
   resultado,
+  comQuemGravado,
   restaMs,
+  pausado,
+  aoPausar,
   aoProximo,
 }: {
   item: ItemDoLote;
@@ -50,23 +64,33 @@ export function ChamadaRecibo({
   /** Nulo quando ninguém atendeu: aí não há interlocutor a confirmar. */
   desfecho: DesfechoDeLigacao | null;
   resultado: Extract<ResultadoTabulacao, { tabulado: true }>;
+  /** O que a tabulação REALMENTE gravou em `metadata.com_quem`. */
+  comQuemGravado: ComQuem;
   restaMs: number;
+  /** A contagem parou porque a pessoa tocou em alguma coisa aqui. */
+  pausado: boolean;
+  aoPausar: () => void;
   aoProximo: () => void;
 }) {
   const [anotando, setAnotando] = useState(false);
   const [texto, setTexto] = useState('');
   const [salvando, setSalvando] = useState(false);
-  const [comQuem, setComQuem] = useState<ComQuem>('nao_informado');
+  const [comQuem, setComQuem] = useState<ComQuem>(comQuemGravado);
 
   const proxima = formatarQuando(resultado.proxima_acao_em);
   const fracao = Math.max(0, Math.min(1, restaMs / ESPERA_ANTES_DO_PROXIMO_MS));
 
   /**
-   * O único toque opcional do recibo, e ele vale por uma métrica: RF-MET-01 só conta
-   * porta ABERTA quando o registro AFIRMA que a conversa foi com o decisor ou com
-   * quem influencia a decisão. A tabulação grava `nao_informado` (porta batida, que é
-   * honesto) e a correção acontece aqui, num toque, sem segurar a fila. Quem
-   * recalcula a porta é o gatilho do banco, não esta tela.
+   * A correção de quem estava do outro lado, e ela vale por uma métrica: RF-MET-01 só
+   * conta porta ABERTA quando o registro AFIRMA que a conversa foi com o decisor ou
+   * com quem influencia a decisão.
+   *
+   * A PERGUNTA não mora mais aqui: ela é feita na barra de tabulação, antes do commit
+   * (`ChamadaTabulacao`), porque perguntar depois é perguntar a quem já está discando
+   * o próximo — e o que ficava gravado era `nao_informado` em quase toda ligação
+   * atendida, reunião marcada inclusive. O que sobra aqui é a correção do que já foi
+   * gravado, com o valor real pré-selecionado. Quem recalcula a porta é o gatilho do
+   * banco, não esta tela.
    */
   async function corrigir(valor: ComQuem) {
     if (!resultado.activity_id) return;
@@ -93,11 +117,21 @@ export function ChamadaRecibo({
   }
 
   return (
-    <div className="flex flex-col gap-5 pt-2">
+    // O primeiro toque em qualquer controle daqui de dentro para a contagem. Fica na
+    // captura (`onPointerDownCapture` / `onFocusCapture`) para valer também para o
+    // teclado e para o foco que o `autoFocus` do campo de anotação dá sozinho.
+    <div
+      className="flex flex-col gap-5 pt-2"
+      onPointerDownCapture={aoPausar}
+      onFocusCapture={aoPausar}
+    >
       <div
         aria-hidden="true"
-        className="h-1.5 w-full origin-left bg-foreground transition-transform duration-150 ease-linear"
-        style={{ transform: `scaleX(${1 - fracao})` }}
+        className={cn(
+          'h-1.5 w-full origin-left transition-transform duration-150 ease-linear',
+          pausado ? 'bg-muted' : 'bg-foreground',
+        )}
+        style={{ transform: `scaleX(${pausado ? 0 : 1 - fracao})` }}
       />
 
       <div className="flex flex-col gap-2">
@@ -130,7 +164,9 @@ export function ChamadaRecibo({
 
       {desfecho && resultado.activity_id && perguntaComQuem(desfecho) ? (
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1.5 text-sm text-muted-foreground">Com quem você falou?</legend>
+          <legend className="mb-1.5 text-sm text-muted-foreground">
+            Com quem você falou — corrija se estiver errado
+          </legend>
           <div className="flex flex-wrap gap-2">
             {COM_QUEM_ABRE_PORTA.map((valor) => (
               <button
@@ -182,6 +218,16 @@ export function ChamadaRecibo({
             Anotar
           </button>
         )
+      ) : null}
+
+      {pausado ? (
+        <p
+          aria-live="polite"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground"
+        >
+          <PauseCircle className="size-3.5" aria-hidden="true" />
+          A fila esperou por você. Termine aqui e toque em Próximo.
+        </p>
       ) : null}
 
       <Button type="button" className="h-12 w-full text-base sm:w-auto" onClick={aoProximo}>

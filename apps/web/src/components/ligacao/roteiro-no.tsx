@@ -32,6 +32,16 @@ import {
  *
  * O corpo é grande porque quem lê está lendo em voz alta enquanto olha para outra
  * coisa: o texto precisa ser pego de relance, a meio metro da tela.
+ *
+ * O campo de anotação aparece em TODO nó que declara `campo`, e não só nos de
+ * `tipo: captura`: quem decide onde cada resposta é guardada é a árvore publicada, e
+ * amarrar a anotação ao `tipo` era o que podia deixar uma pergunta com campo — a de
+ * volume, "Quantos eventos o [empresa] faz por mês?" — sem onde ser escrita.
+ *
+ * A linha de baixo do campo diz a verdade sobre o que acontece em branco, e ela muda
+ * com a árvore: quando alguma saída declara `valor`, o toque grava sozinho; quando
+ * nenhuma declara (porque ali o rótulo é instrução para quem liga, e não resposta do
+ * cliente), campo em branco não grava nada.
  */
 export function RoteiroNo({
   roteiro,
@@ -117,7 +127,7 @@ export function RoteiroNo({
         </div>
       ) : null}
 
-      {no.tipo === 'captura' && no.campo && !somenteLeitura ? (
+      {no.campo && !somenteLeitura ? (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={campoCaptura}>Anotar (opcional)</Label>
           <Input
@@ -128,7 +138,9 @@ export function RoteiroNo({
             className="h-11 max-w-md"
           />
           <p className="text-xs text-muted-foreground">
-            Em branco, fica gravada a resposta que você tocar abaixo.
+            {saidas.some((s) => s.valor)
+              ? 'Em branco, fica gravada a resposta que você tocar abaixo.'
+              : 'Em branco, este campo não é gravado.'}
           </p>
         </div>
       ) : null}
@@ -158,7 +170,13 @@ export function RoteiroNo({
   );
 }
 
-/** Um exemplo do que se anota em cada campo de captura do roteiro `captacao_v1`. */
+/**
+ * Um exemplo do que se anota em cada campo do roteiro `captacao_v1`.
+ *
+ * A chave é o `campo` do nó, e o mapa é só o placeholder: quem decide ONDE cada
+ * resposta é guardada é a árvore publicada, não esta tela. Campo que a árvore trouxer
+ * e não estiver aqui cai no texto genérico em vez de sumir.
+ */
 const PLACEHOLDER_DA_CAPTURA: Readonly<Record<string, string>> = {
   decisor: 'Nome do dono e melhor horário',
   retorno_combinado: 'O que ficou combinado',
@@ -166,4 +184,6 @@ const PLACEHOLDER_DA_CAPTURA: Readonly<Record<string, string>> = {
   whatsapp_do_decisor: 'O WhatsApp que ele passou',
   eventos_por_mes: 'Quantos eventos por mês',
   eventos_por_ano: 'Quantos eventos por ano',
+  prioridade_do_dono: 'Mais pedido, ou pedido melhor',
+  maior_aperto: 'O que mais aperta hoje',
 };

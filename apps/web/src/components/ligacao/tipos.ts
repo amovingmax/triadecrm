@@ -641,6 +641,25 @@ export const saidaSchema = z.object({
   rotulo: z.string().trim().min(1).max(48),
   /** Id do próximo nó. */
   destino: z.string().trim().min(1),
+  /**
+   * O que esta resposta VALE no `campo` do nó, quando ela é a própria resposta.
+   *
+   * Existe porque nem todo rótulo é resposta. Em "Quantos eventos o [empresa] faz por
+   * mês?" os rótulos são instrução para quem liga — "Ele respondeu quantos", "Depende
+   * muito da época" —, e gravar o rótulo ali encheria `eventos_por_mes` com uma frase
+   * que não é número. Em "mais pedido, ou pedido melhor?" o rótulo É a resposta
+   * ("Mais pedido"), e aí um toque grava.
+   *
+   * A regra da tela é, portanto: o campo guarda o que a pessoa ESCREVEU; na falta,
+   * guarda `valor` quando a árvore declara um; e, na falta dos dois, guarda nada —
+   * porque campo vazio é honesto e campo com a frase errada não é.
+   */
+  valor: z
+    .string()
+    .trim()
+    .max(80)
+    .nullish()
+    .transform((v) => v ?? null),
 });
 
 export type SaidaDoNo = z.infer<typeof saidaSchema>;

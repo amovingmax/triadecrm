@@ -223,15 +223,23 @@ export async function carregarBaseDaMontagem(pipelineId: number): Promise<BaseDa
     const espera = esperaDaOrganizacao.get(organizacao.id);
     const temTelefone = (organizacao.phone_e164 ?? '').trim().length > 0;
 
-    // A MESMA ordem do `case` de `app.call_candidates`. A `suppression_list` fica de
-    // fora porque é guardada por hash e só a montagem consegue compará-la.
+    // A MESMA ordem do `case` de `app.call_candidates`, que desde a migração
+    // 20260904001500 é a ordem da GRAVIDADE: quem pediu para não ser procurado é
+    // nomeado antes de qualquer outra coisa. Esta cópia tinha ficado com a ordem
+    // antiga (`sem_negocio_aberto` primeiro) e escondia o opt-out da prévia — o
+    // `app.consent_apply` fecha o negócio de quem pede para sair, então os dois
+    // motivos valem ao mesmo tempo e o que a tela mostrava era o menos importante.
+    // Medido em 04/09/2026: a prévia dizia "4 sem negócio aberto" no mesmo recorte
+    // em que `montar_lote` devolvia `{nao_contatar: 2, sem_negocio_aberto: 2}`.
+    // A `suppression_list` continua de fora porque é guardada por hash e só a
+    // montagem consegue compará-la.
     const motivo: MotivoDeExclusao | null =
-      negocio.status !== 'open'
-        ? 'sem_negocio_aberto'
+      organizacao.do_not_contact
+        ? 'nao_contatar'
         : !temTelefone
           ? 'sem_telefone'
-          : organizacao.do_not_contact
-            ? 'nao_contatar'
+          : negocio.status !== 'open'
+            ? 'sem_negocio_aberto'
             : espera?.blocked_forever
               ? 'em_janela_de_recontato'
               : espera?.cooldown_until && Date.parse(espera.cooldown_until) > agora

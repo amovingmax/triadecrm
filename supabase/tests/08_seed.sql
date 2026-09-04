@@ -23,8 +23,18 @@ select is((select count(*)::int from public.stages s join public.pipelines p on 
 select is((select count(*)::int from public.stages where position < 0),            0, 'seed: nenhuma etapa órfã (posição negativa)');
 select is((select count(*)::int from public.audio_assets),                         6, 'seed: 6 roteiros de áudio (um por segmento)');
 select cmp_ok((select count(*)::int from public.message_templates), '>=', 40,        'seed: pelo menos 40 modelos de mensagem');
-select is((select count(*)::int from public.allowed_domains where is_active),      1, 'seed: 1 domínio ativo no SSO');
-select is((select count(*)::int from public.allowed_users),                        3, 'seed: 3 e-mails nominais');
+-- Mesmo raciocínio de `allowed_users`: liberar um segundo domínio é ato de admin,
+-- não regressão da seed. O que a seed promete é que komune.app.br está ativo.
+select is((select count(*)::int from public.allowed_domains
+            where is_active and domain = 'komune.app.br'), 1,
+  'seed: o domínio komune.app.br está ativo no SSO');
+-- Escopo, e não total (conserto do achado D5): `allowed_users` é tabela de OPERAÇÃO
+-- — conceder acesso a mais uma pessoa é trabalho normal do admin, e já aconteceu
+-- (a Bárbara entrou como gestor em 04/09/2026 e derrubou esta asserção). O que a
+-- seed promete é que os três e-mails nominais existem, não que ninguém mais entre.
+select is((select count(*)::int from public.allowed_users
+            where email in ('rafael@rafaelabreu.com', 'amovingmax@gmail.com', 'komune@komune.app.br')),
+          3, 'seed: os 3 e-mails nominais da seed estão cadastrados');
 
 -- ---------- itens-chave: catálogos ----------
 select results_eq(
@@ -134,7 +144,10 @@ select is((select count(*)::int from public.message_templates where body ~* 'imp
 -- ---------- itens-chave: acesso e cron ----------
 select results_eq($$select domain::text, default_role::text from public.allowed_domains where is_active$$,
   $$values ('komune.app.br'::text, 'sdr'::text)$$, 'seed: domínio komune.app.br entra como sdr');
-select is((select count(*)::int from public.allowed_users where role <> 'admin'), 0, 'seed: os e-mails nominais iniciais são admin');
+select is((select count(*)::int from public.allowed_users
+            where email in ('rafael@rafaelabreu.com', 'amovingmax@gmail.com', 'komune@komune.app.br')
+              and role <> 'admin'), 0,
+  'seed: os e-mails nominais INICIAIS são admin (quem entrar depois entra com o papel que o admin escolher)');
 select is((select schedule from cron.job where jobname = 'recompute_temperatures'), '0 6 * * *',
   'cron: recálculo de temperatura agendado às 03:00 America/Fortaleza (06:00 UTC)');
 

@@ -25,12 +25,20 @@
 -- o fluxo realmente consulta a janela fica provado pelos dois testes em que ela
 -- recusa: feriado de hoje e faixa fechada.
 --
--- Roda em transação e desfaz tudo. Nada depende de contagem absoluta da seed nem
--- da base de 100 leads: as organizações do teste têm categoria própria e o lote é
--- montado com filtro por ela.
+-- Roda em transação e desfaz tudo. As organizações do teste têm categoria própria
+-- e o lote é montado com filtro por ela.
+--
+-- SOBRE CONTAGEM (conserto do achado D5): este cabeçalho AFIRMAVA que nada aqui
+-- dependia de contagem absoluta, e quatro asserções dependiam — pii_access_log,
+-- activities, v_call_script_steps e call_batches eram contadas na base INTEIRA.
+-- Elas passavam em banco virgem e ficavam vermelhas na primeira ligação de
+-- verdade: com três lotes e doze chamadas do Matheus no banco local, o arquivo
+-- reprovava 4 de 91 sem que nada do módulo tivesse mudado. Toda contagem em
+-- tabela que a operação alimenta agora é DELTA contra uma base lida FORA da RLS
+-- (pg_temp.n_*, o mesmo padrão de pg_temp.total_negocios em 01_rls_por_papel).
 -- =====================================================================
 begin;
-select plan(91);
+select plan(92);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -64,6 +72,35 @@ $$;
 create function pg_temp.hoje() returns date language sql as $$
   select (now() at time zone 'America/Fortaleza')::date
 $$;
+
+-- ---------- contagens de BASE, lidas FORA da RLS (padrão de 01_rls_por_papel) ----------
+-- Este banco já foi usado de verdade. Contagem fixa em tabela que a operação
+-- alimenta é um teste que só passa uma vez; o que estas asserções têm de provar é
+-- o DELTA que o próprio arquivo produziu.
+create function pg_temp.n_lotes() returns int language sql security definer set search_path = '' as $$
+  select count(*)::int from public.call_batches
+$$;
+create function pg_temp.n_revelacoes() returns int language sql security definer set search_path = '' as $$
+  select count(*)::int from public.pii_access_log
+   where action = 'reveal_phone' and scope ->> 'origem' = 'proximo_da_fila'
+$$;
+create function pg_temp.n_nao_atendeu() returns int language sql security definer set search_path = '' as $$
+  select count(*)::int from public.activities a
+    join public.interaction_outcomes o on o.id = a.outcome_id
+   where o.slug = 'lig_nao_atendeu' and a.type = 'call'
+$$;
+create function pg_temp.n_fim_reuniao() returns int language sql security definer set search_path = '' as $$
+  select count(*)::int from public.v_call_script_steps s
+   where s.no_id = 'fim_reuniao' and s.ultimo_no
+$$;
+create table pg_temp.base (chave text primary key, n int);
+-- lida também de dentro de `set role authenticated` (a base é a mesma para todo papel)
+grant select on pg_temp.base to authenticated;
+insert into pg_temp.base values
+  ('lotes',       pg_temp.n_lotes()),
+  ('revelacoes',  pg_temp.n_revelacoes()),
+  ('nao_atendeu', pg_temp.n_nao_atendeu()),
+  ('fim_reuniao', pg_temp.n_fim_reuniao());
 
 -- ---------- gente ----------
 insert into public.allowed_users (email, role, note) values
@@ -152,8 +189,8 @@ select has_function('public', 'montar_lote',
         'integer','integer','integer','integer','date','date'], 'public.montar_lote existe');
 select has_function('public', 'proximo_da_fila', array['uuid'], 'public.proximo_da_fila existe');
 select has_function('public', 'iniciar_chamada', array['uuid'], 'public.iniciar_chamada existe');
-select has_function('public', 'devolver_item_do_lote', array['uuid','text'],
-  'public.devolver_item_do_lote existe');
+select has_function('public', 'devolver_item_do_lote', array['uuid','text','boolean'],
+  'public.devolver_item_do_lote existe (com o sinal de opt-out da migração 001500)');
 select has_column('public', 'interaction_outcomes', 'requires_answer',
   'interaction_outcomes.requires_answer existe');
 
@@ -281,10 +318,17 @@ select is((select valor -> 'excluidos' ->> 'suprimido' from pg_temp.r where chav
   'montagem: telefone na suppression_list fica de fora, nomeado (RF-CON-18)');
 select is((select valor -> 'excluidos' ->> 'sem_telefone' from pg_temp.r where chave = 'lote1'), '1',
   'montagem: organização sem telefone fica de fora, nomeada');
+-- Escopo nas organizações DESTE arquivo (conserto do achado D5). A asserção contava
+-- `call_batch_items` da base inteira e reprovava por um motivo que não é defeito
+-- nenhum: "Mesas e Festas" entrou num lote real do Matheus em 04/09/2026 e SÓ
+-- DEPOIS pediu opt-out — a linha antiga do lote é história, e o guardrail que
+-- importa (proximo_da_fila não entrega suprimido, e a montagem não o admite) segue
+-- provado abaixo e na seção 7.
 select is((select count(*)::int from public.call_batch_items i
             join public.organizations o on o.id = i.organization_id
-           where o.do_not_contact or o.phone_e164 = '+5584999919200'), 0,
-  'guardrail: nenhum suprimido tem linha em call_batch_items, em nenhum lote');
+           where o.name like 'LIG %'
+             and (o.do_not_contact or o.phone_e164 = '+5584999919200')), 0,
+  'guardrail: nenhum suprimido do teste tem linha em call_batch_items, em nenhum lote');
 select is((select count(distinct position)::int from public.call_batch_items i
             where i.batch_id = ((select valor ->> 'lote_id' from pg_temp.r where chave = 'lote1'))::uuid), 8,
   'montagem: a ordem é congelada em posições distintas');
@@ -402,9 +446,8 @@ select is(pg_temp.status_do_item(((select valor -> 'item' ->> 'id' from pg_temp.
   'em_andamento', 'trava: o contato entregue fica em_andamento, segurando a reserva');
 select is((select valor -> 'item' ->> 'telefone' from pg_temp.r where chave = 'puxa1') ~ '^\+55', true,
   'a fila entrega o telefone em E.164, que é o que o link tel: precisa');
-select is((select count(*)::int from public.pii_access_log
-            where action = 'reveal_phone' and scope ->> 'origem' = 'proximo_da_fila'), 2,
-  'RF-BAS-14: revelar o telefone pela fila é registrado em pii_access_log');
+select is(pg_temp.n_revelacoes(), (select n from pg_temp.base where chave = 'revelacoes') + 2,
+  'RF-BAS-14: revelar o telefone pela fila é registrado em pii_access_log (duas revelações a mais)');
 select is((select valor ->> 'variante' from pg_temp.r where chave = 'puxa1'), 'fornecedor',
   'a variante do roteiro é escolhida pelo sistema, pelo kind da organização');
 select is((select jsonb_array_length(valor -> 'roteiro' -> 'arvore') from pg_temp.r where chave = 'puxa1'), 37,
@@ -482,10 +525,8 @@ select is((select valor ->> 'volta_para_fila' from pg_temp.r where chave = 'tab1
   '"não atendeu" pede nova tentativa: o item volta para a fila');
 select is((select valor ->> 'tentativas' from pg_temp.r where chave = 'tab1'), '1',
   'e a tentativa foi contada');
-select is((select count(*)::int from public.activities a
-            join public.interaction_outcomes o on o.id = a.outcome_id
-           where o.slug = 'lig_nao_atendeu' and a.type = 'call'), 1,
-  'a tabulação grava a atividade pela public.registrar_contato que já existia');
+select is(pg_temp.n_nao_atendeu(), (select n from pg_temp.base where chave = 'nao_atendeu') + 1,
+  'a tabulação grava a atividade pela public.registrar_contato que já existia (uma a mais)');
 
 -- 8.2 Eixos incoerentes: sem atendimento não existe resultado comercial.
 do $$
@@ -560,8 +601,8 @@ select is((select valor ->> 'repetido' from pg_temp.r where chave = 'tab2_rep'),
 select is((select count(*)::int from public.call_attempts a where a.item_id =
             ((select valor -> 'item' ->> 'id' from pg_temp.r where chave = 'puxa2'))::uuid), 1,
   'reenvio: e sem abrir uma segunda tentativa');
-select is((select count(*)::int from public.v_call_script_steps s where s.no_id = 'fim_reuniao' and s.ultimo_no), 1,
-  'o caminho do roteiro fica em linhas: dá para perguntar em qual frase as pessoas desligam');
+select is(pg_temp.n_fim_reuniao(), (select n from pg_temp.base where chave = 'fim_reuniao') + 1,
+  'o caminho do roteiro fica em linhas: dá para perguntar em qual frase as pessoas desligam (uma a mais)');
 
 -- 8.4 "Não me ligue mais": o desfecho é registrado E o opt-out também.
 do $$
@@ -642,8 +683,12 @@ select pg_temp.sair();
 
 -- sdr enxerga os lotes do time (sees_all), mas não os altera.
 select pg_temp.entrar('a0000000-0000-4000-8000-0000000013a3', 'sdr');
-select is((select count(*)::int from public.call_batches), 2,
+-- sdr tem app.sees_all: o que ele enxerga é a base INTEIRA, e por isso a asserção
+-- compara com a base (lida fora da RLS), e não com os dois lotes deste arquivo.
+select is((select count(*)::int from public.call_batches), pg_temp.n_lotes(),
   'RLS: sdr enxerga os lotes do time (app.sees_all)');
+select is(pg_temp.n_lotes(), (select n from pg_temp.base where chave = 'lotes') + 1,
+  '...e este arquivo deixou UM lote a mais: a montagem da Heloísa não pegou ninguém e, desde a 20260904001500, não deixa lote vazio para trás (D7)');
 -- RLS de UPDATE não levanta exceção: ela simplesmente não encontra linha. O que
 -- prova o guardrail é a linha continuar como estava.
 select lives_ok($$

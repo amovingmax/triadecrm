@@ -4,7 +4,7 @@
 -- espelho na organização e app.recompute_temperatures().
 -- =====================================================================
 begin;
-select plan(44);
+select plan(45);
 
 create function pg_temp.funil(p_slug text) returns int language sql as $$
   select id from public.pipelines where slug = p_slug
@@ -125,6 +125,17 @@ select is((select temperature::text from public.organizations where id = 'b00000
   'organizations: negócio perdido não conta no espelho');
 
 -- recálculo noturno (pg_cron): corrige temperatura defasada
+--
+-- DRENA A BASE ANTES DE FORJAR (conserto do achado D5). `app.recompute_temperatures`
+-- devolve quantos negócios da BASE INTEIRA mudaram, e a base é compartilhada: basta
+-- um negócio real ter ficado defasado (uma ligação tabulada com o gatilho de
+-- temperatura já disparado, por exemplo) para a asserção "mudou 1" virar "mudou 2"
+-- sem que nada da regra tivesse mudado. Medido: have 2, want 1, no banco local
+-- depois das primeiras doze chamadas. Uma rodada antes do forjamento zera essa
+-- dívida, e o que a asserção passa a medir é exatamente o negócio que este arquivo
+-- desalinhou — que é o que ela sempre quis dizer.
+select ok(app.recompute_temperatures() >= 0,
+  'recompute_temperatures: a base é alinhada antes do forjamento (o teste mede o delta, não a dívida da base)');
 -- Desliga o trigger de cálculo só para forjar um valor defasado (postgres é dono da tabela).
 alter table public.deals disable trigger zz_deals_apply_temperature;
 update public.deals set temperature = 'quente', needs_attention = false where id = 'd0000000-0000-4000-8000-000000000401';

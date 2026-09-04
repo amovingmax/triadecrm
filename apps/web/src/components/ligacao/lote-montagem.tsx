@@ -103,21 +103,76 @@ function diaDaSemanaPorExtenso(): string {
   return new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, weekday: 'long' }).format(new Date());
 }
 
-const ROTULO_TEMPERATURA: Record<TemperaturaDeOrigem, string> = {
-  frio: 'frios',
-  morno: 'mornos',
-  quente: 'quentes',
+/**
+ * A temperatura como adjetivo, nas quatro flexões. O lote é sempre um GRUPO de
+ * contatos, então o número é sempre o plural; o gênero é o do nome do funil.
+ */
+const ROTULO_TEMPERATURA: Record<TemperaturaDeOrigem, { m: string; f: string }> = {
+  frio: { m: 'frios', f: 'frias' },
+  morno: { m: 'mornos', f: 'mornas' },
+  quente: { m: 'quentes', f: 'quentes' },
 };
+
+/**
+ * Plural de uma palavra em português, no pouco que este nome precisa.
+ *
+ * Cobre o que aparece em nome de funil: terminação em `r`/`z`/`s` (fornecedor →
+ * fornecedores), em `ão` (não há hoje, mas o dia em que houver não vai sair "ãos"),
+ * em `l` (casal → casais), em `m` (homem → homens) e o resto com `s`. Palavra já no
+ * plural fica como está.
+ */
+export function pluralDaPalavra(palavra: string): string {
+  const p = palavra.toLocaleLowerCase('pt-BR');
+  if (p.endsWith('s')) return palavra;
+  if (p.endsWith('ão')) return `${palavra.slice(0, -2)}ões`;
+  if (p.endsWith('r') || p.endsWith('z')) return `${palavra}es`;
+  if (p.endsWith('m')) return `${palavra.slice(0, -1)}ns`;
+  if (p.endsWith('l')) return `${palavra.slice(0, -(p.endsWith('il') ? 2 : 1))}is`;
+  return `${palavra}s`;
+}
+
+/**
+ * O nome do funil virado em sujeito de lote: plural, e com o gênero que o adjetivo
+ * seguinte tem de seguir.
+ *
+ * "Captação de fornecedor" descreve UMA captação de UM tipo de parceiro; um lote é um
+ * punhado de gente. Sem isto, o nome sugerido saía "Fornecedor frios — sexta", que é
+ * a primeira coisa que o Matheus lê de manhã e a única frase do produto que ele lê
+ * antes de decidir se confia no resto. Cada pedaço ligado por " e " é pluralizado, e o
+ * feminino só vale quando TODOS os núcleos são femininos — é a concordância do
+ * português, e é o que evita "Produtores e cerimonialistas frias".
+ */
+export function sujeitoDoLote(nomeDoFunil: string): { texto: string; feminino: boolean } {
+  const cru = nomeDoFunil.replace(/^Capta(ção|cao) de\s+/i, '').trim();
+  const partes = cru.split(/\s+e\s+/).filter(Boolean);
+  const plurais = partes.map((parte) =>
+    parte
+      .split(/\s+/)
+      .map((palavra) => pluralDaPalavra(palavra))
+      .join(' '),
+  );
+  // Núcleo de cada parte: a primeira palavra ("produtor de eventos" → "produtor").
+  const feminino =
+    partes.length > 0 &&
+    partes.every((parte) => (parte.split(/\s+/)[0] ?? '').toLocaleLowerCase('pt-BR').endsWith('a'));
+  const texto = plurais.join(' e ');
+  return { texto: `${texto.charAt(0).toLocaleUpperCase('pt-BR')}${texto.slice(1)}`, feminino };
+}
 
 /**
  * O nome que já vem escrito. "Buffets frios — quinta" é o exemplo do R13, e nomear o
  * lote é o que faz a lista de amanhã ser legível — mas digitar um nome não pode ser o
  * primeiro obstáculo do dia. Quem quiser troca; quem não quiser não perde um toque.
  */
-function nomeSugerido(funil: FunilDeLigacao | null, temperaturas: TemperaturaDeOrigem[]): string {
-  const base = funil ? funil.nome.replace(/^Captação de /i, '') : 'Parceiros';
-  const calor = temperaturas.length === 1 ? ` ${ROTULO_TEMPERATURA[temperaturas[0]!]}` : '';
-  return `${base[0]?.toUpperCase()}${base.slice(1)}${calor} — ${diaDaSemanaPorExtenso().replace('-feira', '')}`;
+export function nomeSugerido(
+  funil: FunilDeLigacao | null,
+  temperaturas: TemperaturaDeOrigem[],
+  diaDaSemana: string = diaDaSemanaPorExtenso(),
+): string {
+  const sujeito = funil ? sujeitoDoLote(funil.nome) : { texto: 'Parceiros', feminino: false };
+  const temperatura = temperaturas.length === 1 ? ROTULO_TEMPERATURA[temperaturas[0]!] : null;
+  const calor = temperatura ? ` ${sujeito.feminino ? temperatura.f : temperatura.m}` : '';
+  return `${sujeito.texto}${calor} — ${diaDaSemana.replace('-feira', '')}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -674,7 +729,7 @@ function AvisoDaMistura({
         Um lote não mistura temperaturas.
       </p>
       <p className="text-sm text-foreground/90">
-        Você marcou {listar(temperaturas.map((t) => ROTULO_TEMPERATURA[t]))}. Se os dois grupos
+        Você marcou {listar(temperaturas.map((t) => ROTULO_TEMPERATURA[t].m))}. Se os dois grupos
         entrarem no mesmo lote, a conversão dele vira uma média sem significado: os quentes carregam
         os frios e ninguém consegue dizer se foi o roteiro que funcionou ou se a base já era boa. É
         por isso que a origem de temperatura é campo do lote, e não filtro.
@@ -690,7 +745,7 @@ function AvisoDaMistura({
             className="toque h-11 md:h-9"
             onClick={() => aoFicarCom(temperatura)}
           >
-            Ficar só com {ROTULO_TEMPERATURA[temperatura]}
+            Ficar só com {ROTULO_TEMPERATURA[temperatura].m}
           </Button>
         ))}
       </div>
