@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 
 /**
- * Dias desde o último contato, em Geist Mono. Ao lado da barra térmica, é o par que
+ * Dias desde o último contato, em IBM Plex Mono. Ao lado da barra térmica, é o par que
  * a Heloísa lê de relance: a cor diz o calor, o número diz o quanto está parado.
  *
  * Mono com `tabular-nums` (utilitário `numerico`) para as colunas alinharem na
@@ -23,8 +23,12 @@ export function DiasSemContato({
     <span
       title={descricao}
       className={cn(
-        'inline-flex items-baseline text-sm text-muted-foreground',
-        mono && 'numerico',
+        'inline-flex items-baseline whitespace-nowrap text-muted-foreground',
+        // O número é o sinal: fica em 14px e em mono. "hoje", "ontem" e "sem contato"
+        // são palavra, não número, e caem para 12px. Poppins é larga, e no cartão do
+        // celular "sem contato" em 14px comia a coluna do nome; a hierarquia continua
+        // sendo de tamanho, nunca de uma cor de texto mais clara.
+        mono ? 'numerico text-sm' : 'text-xs',
         className,
       )}
     >

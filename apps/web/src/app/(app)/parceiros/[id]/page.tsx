@@ -251,7 +251,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
             Este parceiro ainda não está em nenhum funil.
           </p>
         ) : (
-          <ul className="flex flex-col border-t border-border">
+          <ul className="flex flex-col border-t border-hairline">
             {ficha.negocios.map((negocio) => (
               <CartaoNegocio key={negocio.id} negocio={negocio} />
             ))}
@@ -282,7 +282,7 @@ function CartaoNegocio({ negocio }: { negocio: NegocioDaFicha }) {
   const dias = diasDesde(negocio.ultimoContatoEm);
 
   return (
-    <li className="relative flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border/70 py-3 pl-4">
+    <li className="relative flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-hairline py-3 pl-4">
       <BarraTermica
         temperatura={negocio.temperatura}
         needsAttention={negocio.precisaAtencao}

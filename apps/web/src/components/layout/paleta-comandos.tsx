@@ -62,15 +62,19 @@ export function PaletaComandos({ papel }: { papel: AppRole }) {
         onClick={() => setAberta(true)}
         aria-keyshortcuts="Meta+K Control+K"
         className={cn(
-          'toque h-8 gap-2 px-2 text-muted-foreground hover:text-foreground',
-          'md:w-64 md:justify-start md:pr-1.5',
+          // No celular é só a lupa, e ela precisa dos 44px de alvo de toque; no
+          // desktop vira o campo largo com a dica da tecla. O `h-11` vence o `h-7`
+          // do tamanho `sm` porque os dois são utilitários de mesma especificidade
+          // e o tailwind-merge fica com o último.
+          'toque size-11 justify-center gap-2 px-0 text-muted-foreground hover:text-foreground',
+          'md:h-8 md:w-64 md:justify-start md:px-2 md:pr-1.5',
         )}
       >
         <Search aria-hidden="true" />
         <span className="hidden md:inline">Buscar ou ir para</span>
         <span className="sr-only md:hidden">Buscar ou ir para</span>
         <kbd
-          className="numerico ml-auto hidden h-5 min-w-10 items-center justify-center rounded-lg border px-1.5 text-[11px] md:inline-flex"
+          className="numerico pilula ml-auto hidden h-5 min-w-10 items-center justify-center px-1.5 text-[11px] md:inline-flex"
           aria-hidden="true"
         >
           {teclaMeta ? `${teclaMeta} K` : ''}
@@ -95,13 +99,14 @@ export function PaletaComandos({ papel }: { papel: AppRole }) {
               return (
                 <CommandItem
                   key={item.href}
+                  className="min-h-11 md:min-h-0"
                   value={item.rotulo}
                   keywords={[item.href.replace('/', ''), item.descricao]}
                   onSelect={() => executar(() => router.push(item.href))}
                 >
                   <Icone aria-hidden="true" />
                   <span>{item.rotulo}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
+                  <span className="pilula ml-auto shrink-0 px-2 py-0.5 text-[11px] text-muted-foreground">
                     chega no <span className="numerico">{item.dia}</span>
                   </span>
                 </CommandItem>
@@ -114,6 +119,7 @@ export function PaletaComandos({ papel }: { papel: AppRole }) {
               <CommandSeparator />
               <CommandGroup heading="Ações">
                 <CommandItem
+                  className="min-h-11 md:min-h-0"
                   value="Novo parceiro"
                   keywords={['cadastrar', 'criar', 'organizacao', 'fornecedor', 'contato']}
                   onSelect={() => executar(() => router.push(HREF_NOVO_PARCEIRO))}
@@ -130,6 +136,7 @@ export function PaletaComandos({ papel }: { papel: AppRole }) {
             {TEMAS.map(({ valor, rotulo, icone: Icone }) => (
               <CommandItem
                 key={valor}
+                className="min-h-11 md:min-h-0"
                 value={`Tema ${rotulo}`}
                 keywords={['tema', 'cor', 'claro', 'escuro', 'noite']}
                 onSelect={() => executar(() => setTheme(valor))}

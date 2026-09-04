@@ -13,10 +13,13 @@ import type { LinhaParceiro } from './tipos';
 /**
  * A lista de parceiros no desktop.
  *
- * Densidade alta de propósito: sem cartão em volta, linhas de 1px, nada de badge
- * redondo repetido em toda coluna. O que carrega significado é a BARRA TÉRMICA na
- * borda esquerda (cor = temperatura calculada pelo banco, PRD §5.6) ao lado dos DIAS
- * SEM CONTATO em fonte monoespaçada. Cor diz o calor, número diz o quanto está parado.
+ * Densidade alta de propósito: sem cartão em volta, a tabela vive direto sobre a base
+ * Ocean Breeze e as linhas são separadas por HAIRLINE translúcida (`border-hairline`,
+ * branco a 8% no escuro, preto a 8% no claro), nunca por borda cheia: borda cheia numa
+ * tabela desta densidade vira grade e cansa. O que carrega significado é a BARRA TÉRMICA
+ * na borda esquerda (cor = temperatura calculada pelo banco, PRD §5.6) ao lado dos DIAS
+ * SEM CONTATO em IBM Plex Mono com tabular-nums. Cor diz o calor, número diz o quanto
+ * está parado.
  *
  * A tabela cabe na tela em vez de sangrar para fora dela: `table-fixed` faz as
  * larguras declaradas valerem (sem isso o layout automático segue o max-content e o
@@ -133,15 +136,18 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
         <table className="w-full table-fixed border-collapse text-sm">
           <thead>
             {tabela.getHeaderGroups().map((grupo) => (
-              <tr key={grupo.id} className="border-b border-border">
+              <tr key={grupo.id} className="border-b border-hairline">
                 {grupo.headers.map((cabecalho) => (
                   <th
                     key={cabecalho.id}
                     scope="col"
                     className={cn(
-                      'h-9 px-3 text-left align-middle text-xs font-medium whitespace-nowrap text-muted-foreground',
+                      // `truncate` é rede de segurança da troca de fonte: Poppins é
+                      // mais larga que a Geist anterior, e com `table-fixed` um
+                      // rótulo que crescesse sangraria por cima da coluna vizinha.
+                      'h-9 truncate px-3 text-left align-middle text-xs font-medium text-muted-foreground',
                       cabecalho.column.id === 'nome' &&
-                        'sticky left-0 z-20 border-r border-border bg-background pl-4',
+                        'sticky left-0 z-20 border-r border-hairline bg-background pl-4',
                       CLASSES[cabecalho.column.id],
                     )}
                   >
@@ -162,7 +168,7 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
                       celula.column.id === 'nome' &&
                         // Fundo opaco para o conteúdo passar por baixo, e o mesmo
                         // resultado do hover da linha (muted a 50% sobre o fundo).
-                        'sticky left-0 z-10 border-r border-border bg-background p-0 group-hover/linha:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]',
+                        'sticky left-0 z-10 border-r border-hairline bg-background p-0 group-hover/linha:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]',
                       CLASSES[celula.column.id],
                     )}
                   >
@@ -174,7 +180,34 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
           </tbody>
         </table>
       </div>
+
+      <ColunasEscondidas />
     </RevelarLista>
+  );
+}
+
+/**
+ * Nenhuma coluna some em silêncio.
+ *
+ * As colunas secundárias entram por degrau de largura, e numa tela de 1280px (o
+ * notebook do time) responsável, etapa e próxima ação simplesmente não estão lá.
+ * Sem este aviso a pessoa conclui que o dado não existe, e não que ele está a um
+ * clique de distância. O texto é escolhido por CSS, no mesmo degrau em que a coluna
+ * desaparece, então não há medição de largura nem ouvinte de resize.
+ */
+function ColunasEscondidas() {
+  return (
+    <p className="px-3 py-2 text-xs text-muted-foreground 2xl:hidden">
+      Nesta largura de tela,{' '}
+      <span className="hidden xl:inline">responsável, etapa e próxima ação</span>
+      <span className="hidden lg:inline xl:hidden">
+        bairro e cidade, responsável, etapa e próxima ação
+      </span>
+      <span className="lg:hidden">
+        categoria, bairro e cidade, responsável, etapa e próxima ação
+      </span>{' '}
+      só aparecem na ficha do parceiro. Role a tabela para o lado ou abra a ficha.
+    </p>
   );
 }
 
@@ -190,7 +223,7 @@ function Linha({ indice, children }: { indice: number; children: React.ReactNode
     <tr
       {...revelar}
       className={cn(
-        'group/linha border-b border-border/70 transition-colors last:border-b-0 hover:bg-muted/50',
+        'group/linha border-b border-hairline transition-colors last:border-b-0 hover:bg-muted/50',
         revelar.className,
       )}
     >

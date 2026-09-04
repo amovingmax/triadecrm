@@ -47,10 +47,14 @@ export function BotaoGoogle({
     }
   }
 
+  // A variante padrão do Button já é `acao-gradiente`: gradiente de ação, hover em
+  // 1.02 e toque em 0.98, em 150ms. `sombra-base` acrescenta a elevação tingida pela
+  // base, nunca sombra preta. Nada de `toque` aqui: dois utilitários mexendo no mesmo
+  // `transform` cancelariam o `translate-y-px` que o próprio botão aplica no clique.
   return (
     <Button
       size="lg"
-      className="toque h-12 w-full justify-center text-base sm:w-auto sm:min-w-64"
+      className="sombra-base h-12 w-full justify-center text-base sm:w-auto sm:min-w-64"
       onClick={entrar}
       disabled={carregando}
       aria-busy={carregando}

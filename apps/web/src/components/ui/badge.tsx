@@ -14,6 +14,13 @@ const badgeVariants = cva(
         destructive:
           'bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20',
         outline: 'border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground',
+        // Pílula do acabamento do template: borda hairline, cartão a 50% e desfoque
+        // leve. É a forma do chip de estado da casca (cabeçalho, estado vazio,
+        // dica de tecla). `rounded-full` e `border-hairline` estão aqui de propósito:
+        // o tailwind-merge tira o `rounded-4xl` e o `border-transparent` da base, e
+        // com isso o resultado não depende da ordem em que o Tailwind emite a
+        // classe `pilula` e as utilitárias.
+        pilula: 'pilula rounded-full border-hairline text-foreground',
         ghost: 'hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50',
         link: 'text-primary underline-offset-4 hover:underline',
       },

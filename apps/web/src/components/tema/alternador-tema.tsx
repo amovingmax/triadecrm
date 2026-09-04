@@ -4,6 +4,7 @@ import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,18 +26,20 @@ export const TEMAS = [
 /**
  * Troca de tema no cabeçalho. Discreto de propósito: um ícone, sem rótulo, à
  * esquerda do usuário. O time usa o celular no sol (claro) e no fim do dia,
- * dentro do carro (escuro), então a troca precisa estar a um toque.
+ * dentro do carro (escuro), então a troca precisa estar a um toque, sempre visível.
  *
  * O tema real só é conhecido depois da hidratação (o next-themes escreve a classe
- * no <html> por script, antes do React). Até lá o botão renderiza o ícone neutro
- * e fica desabilitado: assim nada pisca nem diverge entre servidor e navegador.
+ * no <html> por script, antes do React). Até lá o botão mostra a lua, que é o
+ * padrão do produto, e fica desabilitado: assim o ícone não troca no meio do
+ * caminho nem diverge entre servidor e navegador.
  */
 export function AlternadorTema() {
   const { theme, setTheme } = useTheme();
   const montado = useMontado();
 
-  const atual = TEMAS.find((t) => t.valor === theme) ?? TEMAS[2];
-  const Icone = montado ? atual.icone : Monitor;
+  // Sem tema conhecido, o padrão é o escuro (TEMAS[1]), como no ProvedorTema.
+  const atual = TEMAS.find((t) => t.valor === theme) ?? TEMAS[1];
+  const Icone = montado ? atual.icone : Moon;
 
   return (
     <DropdownMenu>
@@ -44,7 +47,7 @@ export function AlternadorTema() {
         <Button
           variant="ghost"
           size="icon-sm"
-          className="toque text-muted-foreground hover:text-foreground"
+          className="toque size-11 text-muted-foreground hover:text-foreground md:size-7"
           disabled={!montado}
           aria-label={montado ? `Tema: ${atual.rotulo}. Trocar tema` : 'Trocar tema'}
         >
@@ -57,7 +60,7 @@ export function AlternadorTema() {
             key={valor}
             onSelect={() => setTheme(valor)}
             aria-checked={theme === valor}
-            className={theme === valor ? 'font-medium' : undefined}
+            className={cn('min-h-11 md:min-h-0', theme === valor && 'font-medium')}
           >
             <IconeItem aria-hidden="true" />
             {rotulo}

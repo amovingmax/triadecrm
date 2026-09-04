@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { GeistMono } from 'geist/font/mono';
-import { GeistSans } from 'geist/font/sans';
+import { IBM_Plex_Mono, Poppins } from 'next/font/google';
 
 import './globals.css';
 
@@ -8,6 +7,26 @@ import { ProvedorTema } from '@/components/tema/provedor-tema';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { appUrl } from '@/lib/env';
+
+/**
+ * Poppins na interface e no display (Ocean Breeze + acabamento do template),
+ * IBM Plex Mono em todo número (400 e 500). Ênfase vem do peso da mesma
+ * família (400, 500, 600), nunca de uma segunda família. `next/font` baixa e hospeda os
+ * arquivos no build, então em campo não há requisição a CDN nem pulo de layout.
+ */
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-poppins',
+  display: 'swap',
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-ibm-plex-mono',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl()),
@@ -36,26 +55,28 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // Barra do navegador na cor do fundo de cada tema (grafite frio, nunca preto puro).
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f6f7f9' },
-    { media: '(prefers-color-scheme: dark)', color: '#12151a' },
-  ],
+  // O padrão do produto é o escuro, então a barra do navegador nasce no fundo
+  // escuro do Ocean Breeze (azul-ardósia, nunca preto puro). Quem troca para o
+  // claro tem a barra atualizada pelo ProvedorTema, que segue o tema resolvido:
+  // aqui não dá para usar `prefers-color-scheme`, que é o aparelho, e não a
+  // escolha feita no CRM.
+  themeColor: '#0f172a',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  colorScheme: 'light dark',
+  // Escuro primeiro: é o que o next-themes resolve por padrão, e é o que os
+  // controles nativos (barra de rolagem, campo de data) devem desenhar.
+  colorScheme: 'dark light',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // Geist entra por next/font (arquivos locais, sem requisição a CDN em build ou em campo):
-    // `.variable` publica --font-geist-sans e --font-geist-mono, lidos pelo globals.css.
+    // `.variable` publica --font-poppins e --font-ibm-plex-mono, lidos pelo globals.css.
     // `suppressHydrationWarning` é exigido pelo next-themes, que escreve a classe do tema
     // no <html> antes da hidratação.
     <html
       lang="pt-BR"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      className={`${poppins.variable} ${ibmPlexMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">

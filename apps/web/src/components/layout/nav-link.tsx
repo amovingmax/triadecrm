@@ -16,9 +16,14 @@ type Props = {
  * Link de navegação com estado ativo pela rota atual; serve a lateral do desktop,
  * a barra inferior do celular e o menu "Mais".
  *
- * O item ativo ganha uma marca de 2px em tinta (à esquerda na lateral, no topo na
- * barra inferior): é a mesma gramática da barra térmica da lista, sem gastar cor
- * cromática, que na interface só significa temperatura.
+ * O ativo se marca por três coisas sem cromia: peso (font-medium), um fundo sutil
+ * (tinta a 8% sobre a própria base da casca, 1,20:1 contra ela) e uma marca de 2px
+ * em tinta, à esquerda na lateral e no topo na barra inferior. É a mesma gramática
+ * da barra térmica da lista, e nenhuma delas gasta cor cromática, que na interface
+ * só significa temperatura.
+ *
+ * O inativo usa `--sidebar-muted-foreground`, medido contra o azul da casca; o
+ * `--muted-foreground` do conteúdo pararia em 4,45:1 sobre ele.
  */
 export function NavLink({ item, variante, onNavegar }: Props) {
   const pathname = usePathname();
@@ -31,14 +36,16 @@ export function NavLink({ item, variante, onNavegar }: Props) {
         href={item.href}
         aria-current={ativo ? 'page' : undefined}
         className={cn(
-          'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-none font-medium transition-colors',
-          ativo ? 'text-foreground' : 'text-muted-foreground',
+          'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-none transition-colors',
+          ativo
+            ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+            : 'text-sidebar-muted-foreground',
         )}
       >
         <span
           aria-hidden="true"
           className={cn(
-            'absolute inset-x-3 top-0 h-0.5 bg-foreground',
+            'absolute inset-x-3 top-0 h-0.5 bg-sidebar-primary',
             ativo ? 'opacity-100' : 'opacity-0',
           )}
         />
@@ -76,7 +83,7 @@ export function NavLink({ item, variante, onNavegar }: Props) {
         'relative flex h-8 items-center gap-2.5 rounded-lg pr-2 pl-3 text-[13px] transition-colors',
         ativo
           ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-          : 'text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+          : 'text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
       )}
     >
       {ativo ? (

@@ -30,7 +30,7 @@ export function EsqueletoLista() {
         {Array.from({ length: 8 }, (_, i) => (
           <li
             key={i}
-            className="relative flex min-h-16 items-center gap-3 border-b border-border/70 py-2.5 pl-4"
+            className="relative flex min-h-16 items-center gap-3 border-b border-hairline py-2.5 pl-4"
           >
             <Skeleton className="absolute left-0 h-10 w-[3px] rounded-none" />
             <div className="flex-1 space-y-1.5">
@@ -44,13 +44,13 @@ export function EsqueletoLista() {
 
       {/* Desktop: a forma da tabela */}
       <div className="hidden md:block">
-        <div className="flex h-9 items-center gap-3 border-b border-border px-3">
+        <div className="flex h-9 items-center gap-3 border-b border-hairline px-3">
           {['w-20', 'w-16', 'w-24', 'w-16', 'w-20', 'w-20', 'w-14', 'w-20'].map((l, i) => (
             <Skeleton key={i} className={`h-3 ${l}`} />
           ))}
         </div>
         {Array.from({ length: 12 }, (_, linha) => (
-          <div key={linha} className="flex h-9 items-center gap-3 border-b border-border/70 px-3">
+          <div key={linha} className="flex h-9 items-center gap-3 border-b border-hairline px-3">
             <Skeleton className="h-4 w-[3px] rounded-none" />
             <Skeleton className={`h-3.5 ${larguras[linha % larguras.length]}`} />
             <Skeleton className="h-3.5 w-32" />

@@ -128,15 +128,19 @@ function CampoBusca({
     return () => window.clearTimeout(relogio);
   }, [texto, aoMudar]);
 
-  // A lista de formatos aceitos é a característica não óbvia deste campo (RF-BAS-12) e
-  // não pode viver no placeholder, que some na primeira tecla: ela fica numa dica
-  // permanente embaixo, ligada ao campo por aria-describedby.
+  // Duas coisas ficam permanentes em volta do campo, e nenhuma delas no placeholder,
+  // que some na primeira tecla: o RÓTULO em cima (quem volta da ficha com a busca já
+  // preenchida precisa saber o que aquele texto é) e a lista de formatos aceitos
+  // embaixo (RF-BAS-12), ligada ao campo por aria-describedby. Sem placeholder, para
+  // não escrever "buscar" duas vezes no mesmo palmo de tela.
   return (
-    <div>
+    // Largura máxima no desktop: um campo de 1.500px de largura para digitar um nome
+    // não ajuda ninguém a mirar, e ainda descola a busca da fila de filtros embaixo.
+    <div className="md:max-w-xl">
+      <label htmlFor={id} className="mb-1 block text-xs font-medium text-foreground">
+        Buscar parceiro
+      </label>
       <div className="relative">
-        <label htmlFor={id} className="sr-only">
-          Buscar parceiro
-        </label>
         <Search
           className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
           aria-hidden="true"
@@ -150,7 +154,6 @@ function CampoBusca({
           aria-describedby={`${id}-dica`}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder="Buscar"
           className="h-11 pl-9 md:h-9"
         />
         {texto ? (
@@ -159,7 +162,7 @@ function CampoBusca({
             variant="ghost"
             size="icon-sm"
             onClick={() => setTexto('')}
-            className="absolute top-1/2 right-1.5 -translate-y-1/2"
+            className="absolute top-1/2 right-1.5 size-11 -translate-y-1/2 md:size-7"
           >
             <X aria-hidden="true" />
             <span className="sr-only">Limpar a busca</span>

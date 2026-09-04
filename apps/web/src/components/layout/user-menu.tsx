@@ -35,7 +35,7 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
           <Button
             variant="ghost"
             size="lg"
-            className="toque gap-2 px-1 sm:pr-1.5"
+            className="toque h-11 min-w-11 justify-center gap-2 px-1 sm:min-w-0 sm:pr-1.5 md:h-9"
             aria-label={`Menu de ${sessao.nome}, ${rotuloPapel}`}
           >
             <Avatar className="size-7">
@@ -70,7 +70,10 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
             </span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => formSair.current?.requestSubmit()}>
+          <DropdownMenuItem
+            className="min-h-11 md:min-h-0"
+            onSelect={() => formSair.current?.requestSubmit()}
+          >
             <LogOut aria-hidden="true" />
             Sair
           </DropdownMenuItem>

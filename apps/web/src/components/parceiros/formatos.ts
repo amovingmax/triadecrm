@@ -2,7 +2,7 @@ import { formatPhoneBr, TIMEZONE } from '@komune/schema';
 
 /**
  * Formatação da tela de Parceiros. Sem travessão em nenhum texto visível, e todo
- * número sai pronto para o utilitário `numerico` (Geist Mono com tabular-nums).
+ * número sai pronto para o utilitário `numerico` (IBM Plex Mono com tabular-nums).
  *
  * Tudo que envolve data usa o fuso `America/Fortaleza` (CLAUDE.md): o time está em
  * Natal e a "próxima ação de amanhã às 9h" precisa ser amanhã às 9h para todo mundo.
@@ -15,7 +15,7 @@ const DATA_CURTA = new Intl.DateTimeFormat('pt-BR', {
 });
 
 /**
- * Data só de dígitos (04/09/2026), e não por extenso: ela sai em Geist Mono, e mono
+ * Data só de dígitos (04/09/2026), e não por extenso: ela sai em IBM Plex Mono, e mono
  * serve para alinhar número, não para vestir uma frase inteira.
  */
 const DATA_NUMERICA = new Intl.DateTimeFormat('pt-BR', {

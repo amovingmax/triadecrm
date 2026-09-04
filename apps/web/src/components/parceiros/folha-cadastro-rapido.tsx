@@ -67,9 +67,12 @@ export function FolhaCadastroRapido({
 
   return (
     <Sheet open={aberta} onOpenChange={(v) => !v && aoFechar()}>
+      {/* Elevação do Ocean Breeze: sombra TINGIDA pela base (`sombra-base-forte`),
+          nunca preta pura. A ação principal da folha ("Salvar parceiro") é a
+          variante `default` do Button, que já é o gradiente de ação. */}
       <SheetContent
         side={ehCelular ? 'bottom' : 'right'}
-        className="max-h-[92dvh] overflow-y-auto pb-[calc(1rem+var(--area-segura-inferior))] sm:max-w-md"
+        className="sombra-base-forte max-h-[92dvh] overflow-y-auto pb-[calc(1rem+var(--area-segura-inferior))] max-md:rounded-t-xl sm:max-w-md md:max-h-none"
       >
         <SheetHeader>
           <SheetTitle>Novo parceiro</SheetTitle>

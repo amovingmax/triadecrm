@@ -5,21 +5,23 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================================
-   SISTEMA VISUAL DO KOMUNE CRM
+   SISTEMA VISUAL DO KOMUNE CRM, repaginação Ocean Breeze
    Decisão-mãe: a única cor cromática da interface é a ESCALA TÉRMICA do negócio
    (frio, morno, quente, cliente, cliente_ativo, calculada no banco, PRD §5.6).
-   Todo o resto é tinta neutra de grafite frio. Assim a cor sempre significa uma
-   coisa só, e a Heloísa lê a lista de relance, no sol, com uma mão só.
-   Documentação: docs/design/sistema-visual.md
+   Todo o resto é base neutra azul-ardósia (matiz ~217deg, do tema Ocean Breeze)
+   ou a AÇÃO em gradiente (branco no escuro, tinta no claro). Assim a cor sempre
+   significa uma coisa só, e a Heloísa lê a lista de relance, no sol, com uma mão só.
+   Direção: docs/design/direcao-visual-ocean-breeze.md
+   Sistema:  docs/design/sistema-visual.md
    ========================================================================== */
 
 @theme inline {
-  /* Fontes: Geist Sans na interface, Geist Mono obrigatório em todo número. */
+  /* Fontes: Poppins na interface, IBM Plex Mono obrigatório em todo número. */
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
 
-  /* Tokens do shadcn (não renomear: os 16 componentes instalados dependem deles). */
+  /* Tokens do shadcn (não renomear: os 17 componentes instalados dependem deles). */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -45,12 +47,17 @@
   --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Segundo nível de borda: linha translúcida para tabela e cabeçalho.
+     `border-hairline` no lugar de `border-border` onde a grade cansaria. */
+  --color-hairline: var(--hairline);
 
   /* Escala térmica exposta ao Tailwind: bg-quente, text-morno-texto, bg-frio-fundo... */
   --color-frio: var(--frio);
@@ -69,7 +76,8 @@
   --color-cliente-ativo-texto: var(--cliente-ativo-texto);
   --color-cliente-ativo-fundo: var(--cliente-ativo-fundo);
 
-  /* Grafite frio, disponível como utilitário quando o token semântico não serve. */
+  /* Azul-ardósia, disponível como utilitário quando o token semântico não serve.
+     Os nomes da rampa não mudaram (`grafite-NNN`): só os valores. */
   --color-grafite-25: var(--grafite-25);
   --color-grafite-50: var(--grafite-50);
   --color-grafite-100: var(--grafite-100);
@@ -80,6 +88,7 @@
   --color-grafite-500: var(--grafite-500);
   --color-grafite-600: var(--grafite-600);
   --color-grafite-700: var(--grafite-700);
+  --color-grafite-750: var(--grafite-750);
   --color-grafite-800: var(--grafite-800);
   --color-grafite-850: var(--grafite-850);
   --color-grafite-900: var(--grafite-900);
@@ -99,16 +108,18 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Tipografia. Geist entra por next/font no layout (variáveis --font-geist-*),
-   com a pilha do sistema atrás para o primeiro paint e para o caso de falha.
-   Nada de Inter, nada de serifa: ênfase vem do peso da mesma família.
+   Tipografia. Poppins e IBM Plex Mono entram por next/font no layout
+   (variáveis --font-poppins e --font-ibm-plex-mono), com a pilha do sistema
+   atrás para o primeiro paint e para o caso de falha. Nada de @import de fonte
+   dentro do CSS: no Next isso atrasa a primeira renderização e dá pulo de layout.
+   Ênfase vem do peso da mesma família (400, 500, 600), nunca de outra família.
    -------------------------------------------------------------------------- */
 :root {
   --font-sans:
-    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    var(--font-poppins), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   --font-mono:
-    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    var(--font-ibm-plex-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', 'Courier New', monospace;
 }
 
@@ -125,59 +136,65 @@
 
 /* ---------------------------------------------------------------------------
    MODO CLARO
-   Neutros de grafite frio (matiz levemente azulada, ~222deg): o zinc puro do
-   Tailwind é morto demais ao lado do azul-mar e da brasa da escala térmica.
-   Sem preto puro e sem branco puro: o fundo é papel, não monitor.
+   Rampa azul-ardósia derivada do Ocean Breeze (matiz ~217deg): o fundo é o
+   `aliceblue` #f0f8ff do tema, a tinta é #374151, a borda é #e5e7eb. Os degraus
+   intermediários preenchem a rampa no mesmo matiz. Sem preto puro e sem branco
+   puro: o cartão para em #fdfeff, um traço de azul acima do fundo da página.
    -------------------------------------------------------------------------- */
 :root {
-  --grafite-25: #fcfcfd;
-  --grafite-50: #f6f7f9;
-  --grafite-100: #eceef2;
-  --grafite-200: #dfe2e9;
-  --grafite-300: #c6cbd5;
-  --grafite-400: #99a0ad;
-  --grafite-450: #868d9a;
-  --grafite-500: #666d7a;
-  --grafite-600: #545c69;
-  --grafite-700: #3c434e;
-  --grafite-800: #282d36;
-  --grafite-850: #2f353f;
-  --grafite-900: #1b1f26;
-  --grafite-950: #12151a;
+  --grafite-25: #fdfeff; /* cartão e popover: o "branco" do Ocean Breeze, sem ser #fff */
+  --grafite-50: #f0f8ff; /* fundo da página (aliceblue do tema) */
+  --grafite-100: #f3f4f6; /* muted / secondary / accent do tema */
+  --grafite-200: #e5e7eb; /* borda forte do tema */
+  --grafite-300: #d1d5db; /* tinta do modo escuro (foreground do tema) */
+  --grafite-400: #94a3b8;
+  --grafite-450: #7c8ba1; /* borda de campo: 3:1 contra o fundo nos dois modos */
+  --grafite-500: #686e7c; /* texto esmaecido do claro (o #6b7280 do tema, 1 ponto mais fundo) */
+  --grafite-600: #4b5563; /* borda forte do escuro (border do tema) */
+  --grafite-700: #374151; /* tinta do modo claro (foreground do tema) */
+  --grafite-750: #2d3748; /* secondary do escuro (do tema) */
+  --grafite-800: #1e293b; /* cartão do escuro (card do tema) */
+  --grafite-850: #19212e; /* muted do escuro (do tema) */
+  --grafite-900: #0f172a; /* fundo do escuro (background do tema) e ação em tinta no claro */
+  --grafite-950: #0a1020; /* tinta mais funda: texto da ação clara, sombra */
 
   /* Escala térmica: as cinco cores cromáticas de toda a interface.
-     `-texto` é a variante que passa em contraste 4.5:1 sobre o fundo da página
-     (o âmbar e a brasa puros são bonitos como marca e fracos como texto);
-     `-fundo` é o preenchimento tênue para chips e faixas. */
-  --frio: #3b6fa8; /* azul-mar profundo de Natal: parado, ainda não é problema */
-  --frio-texto: #2f5c8c;
+     `cor` é a marca (barra, ponto) e precisa de 3:1 contra a superfície
+     (WCAG 1.4.11, objeto gráfico); `-texto` é a variante medida em pelo menos
+     4,5:1 sobre fundo, cartão, muted E sobre o próprio chip; `-fundo` é o
+     preenchimento tênue do chip e da faixa. */
+  --frio: #5b7fa6; /* aço frio: parado, ainda não é problema */
+  --frio-texto: #4a6788;
   --frio-fundo: color-mix(in oklab, var(--frio) 12%, transparent);
-  /* Âmbar: conversa viva, precisa de cadência. O plano pedia #c98a2e; escurecido
-     em 6% de luminosidade porque a barra térmica é um objeto gráfico e precisa de
-     3:1 contra o fundo (WCAG 1.4.11), e o âmbar original parava em 2,74:1. */
-  --morno: #bd822b;
-  --morno-texto: #8a5a12;
+  --morno: #b37a1f; /* âmbar: conversa viva, precisa de cadência */
+  --morno-texto: #865b17;
   --morno-fundo: color-mix(in oklab, var(--morno) 14%, transparent);
   --quente: #c4472b; /* brasa: interesse declarado, responder hoje */
-  --quente-texto: #b03d22;
+  --quente-texto: #ac3e26;
   --quente-fundo: color-mix(in oklab, var(--quente) 12%, transparent);
-  --cliente: #2f7d5b; /* verde publicado: fechou */
-  --cliente-texto: #26654a;
+  /* O verde do Ocean Breeze (#22c55e) só rende 2,07:1 contra o muted do claro e
+     furaria o mínimo de 3:1 da barra térmica; descido 10 pontos de luminosidade,
+     ele chega a 3,31:1 sem sair do matiz. */
+  --cliente: #1a9a49; /* verde publicado: fechou */
+  --cliente-texto: #147437;
   --cliente-fundo: color-mix(in oklab, var(--cliente) 12%, transparent);
-  --cliente-ativo: #1f5c43; /* verde mais fundo: publicado e vendendo */
-  --cliente-ativo-texto: #1f5c43;
+  /* Com o `cliente` mais fundo, o #059669 da direção ficaria a 5 pontos dele e o
+     par deixaria de ser legível numa barra de 3px. #047857 é o outro verde do
+     próprio Ocean Breeze (chart-4) e repõe os ~12 pontos de degrau do modo escuro. */
+  --cliente-ativo: #047857; /* verde mais fundo: publicado e vendendo */
+  --cliente-ativo-texto: #047152;
   --cliente-ativo-fundo: color-mix(in oklab, var(--cliente-ativo) 12%, transparent);
 
-  /* Superfícies e tinta. A ação (botão primário, foco) é TINTA quase preta:
-     um botão laranja competiria com "quente" e a leitura da lista se perderia. */
+  /* Superfícies e tinta. A ação (botão primário, foco) é TINTA, nunca cor:
+     o verde do tema seria lido como "cliente" e apagaria a escala térmica. */
   --background: var(--grafite-50);
-  --foreground: var(--grafite-950);
+  --foreground: var(--grafite-700);
   --card: var(--grafite-25);
-  --card-foreground: var(--grafite-950);
+  --card-foreground: var(--grafite-700);
   --popover: var(--grafite-25);
-  --popover-foreground: var(--grafite-950);
+  --popover-foreground: var(--grafite-700);
   --primary: var(--grafite-900);
-  --primary-foreground: var(--grafite-50);
+  --primary-foreground: var(--grafite-25);
   --secondary: var(--grafite-100);
   --secondary-foreground: var(--grafite-800);
   --muted: var(--grafite-100);
@@ -186,10 +203,33 @@
   --accent-foreground: var(--grafite-900);
   /* Destrutivo reaproveita a brasa: é o mesmo alarme, e evita uma sexta cor. */
   --destructive: var(--quente);
+  /* Borda forte: campo, divisória de seção, contorno de cartão. */
   --border: var(--grafite-200);
   /* A borda do campo é o único limite visível do controle: 3:1 contra o fundo. */
   --input: var(--grafite-450);
   --ring: var(--grafite-900);
+  /* Hairline: linha de tabela e borda de cabeçalho. Borda cheia numa tabela
+     densa vira grade e cansa; a linha translúcida separa sem desenhar. */
+  --hairline: rgb(0 0 0 / 0.08);
+
+  /* Ação em gradiente (substitui o primary verde do tema). O verde foi para a
+     escala térmica, onde significa "cliente". No claro: tinta que esmaece para
+     baixo, texto quase branco. Pior pixel (parada de 60% sobre o cartão): 4,70:1. */
+  --acao-gradiente: linear-gradient(
+    to bottom,
+    var(--grafite-900),
+    rgb(15 23 42 / 0.95),
+    rgb(15 23 42 / 0.6)
+  );
+  --acao-texto: var(--grafite-25);
+
+  /* Título em gradiente: só no login (espalhar isso pelo app vira clichê). */
+  --titulo-gradiente: linear-gradient(to bottom, var(--grafite-900), rgb(15 23 42 / 0.6));
+  /* Brilho do herói: gradiente radial em CSS, sem imagem externa e sem cromia. */
+  --brilho-cor: color-mix(in oklab, var(--grafite-400) 26%, transparent);
+  /* Sombra tingida pela base, nunca preta pura. */
+  --sombra-cor: color-mix(in oklab, var(--grafite-900) 12%, transparent);
+  --sombra-cor-forte: color-mix(in oklab, var(--grafite-900) 18%, transparent);
 
   /* Gráficos: rampa neutra. Cor cromática em relatório voltaria a competir
      com a escala térmica; quando o gráfico for POR temperatura, use --frio e cia. */
@@ -199,68 +239,98 @@
   --chart-4: var(--grafite-700);
   --chart-5: var(--grafite-900);
 
-  --sidebar: var(--grafite-100);
-  --sidebar-foreground: var(--grafite-950);
+  /* Casca (lateral do desktop e barra inferior do celular). É a única superfície
+     fora da rampa grafite: #e0f2fe é o azul-céu do próprio Ocean Breeze (o
+     `secondary` do tema) e separa a navegação do conteúdo sem gastar borda,
+     sombra nem cor cromática. */
+  --sidebar: #e0f2fe;
+  --sidebar-foreground: var(--grafite-700); /* 8,98:1 sobre a lateral */
+  /* Item inativo. Valor novo, e não o grafite-500 do resto da interface: aquele
+     para em 4,45:1 sobre este azul. Este mede 5,57:1 na lateral, 5,05:1 no realce
+     de passagem e 5,63:1 na barra inferior. */
+  --sidebar-muted-foreground: #55606e;
   --sidebar-primary: var(--grafite-900);
-  --sidebar-primary-foreground: var(--grafite-50);
-  --sidebar-accent: var(--grafite-200);
-  --sidebar-accent-foreground: var(--grafite-900);
-  --sidebar-border: var(--grafite-200);
+  --sidebar-primary-foreground: var(--grafite-25);
+  /* Item ativo: tinta a 8% sobre a própria base, um fundo de 1,20:1 que se nota
+     sem virar bloco. O que marca o ativo é o peso mais a marca de 2px em tinta;
+     cor cromática, na interface, só significa temperatura. */
+  --sidebar-accent: color-mix(in oklab, var(--grafite-900) 8%, var(--sidebar));
+  --sidebar-accent-foreground: var(--grafite-900); /* 12,96:1 sobre o item ativo */
+  /* A casca é separada do conteúdo pela mesma linha translúcida do cabeçalho. */
+  --sidebar-border: var(--hairline);
   --sidebar-ring: var(--grafite-900);
 }
 
 /* ---------------------------------------------------------------------------
-   MODO ESCURO
-   Mesma hierarquia, mesmo significado: a escala térmica clareia o suficiente
-   para manter contraste sobre o grafite, sem virar néon.
+   MODO ESCURO (padrão do produto)
+   Mesma hierarquia, mesmo significado. O fundo é o #0f172a do Ocean Breeze:
+   preto puro está fora, ele apagaria a profundidade entre fundo, cartão e folha.
    -------------------------------------------------------------------------- */
 .dark {
-  --frio: #5e96d1;
-  --frio-texto: #7fb0e0;
-  --morno: #e0a94f;
-  --morno-texto: #e8bc72;
-  --quente: #e06a4c;
-  --quente-texto: #ee8567;
-  --cliente: #4ca37c;
-  --cliente-texto: #6fbe99;
-  --cliente-ativo: #3c8467;
-  --cliente-ativo-texto: #62a98a;
+  --frio: #7a96b8;
+  --frio-texto: #89a2c0;
+  --morno: #e0a33e;
+  --morno-texto: #e0a33e; /* o âmbar já passa em 5,14:1 sobre o chip: não precisa clarear */
+  --quente: #e5644a;
+  --quente-texto: #e97e68;
+  --cliente: #34d399; /* o verde do próprio Ocean Breeze, agora com significado */
+  --cliente-texto: #34d399; /* 6,00:1 sobre o chip */
+  --cliente-ativo: #10b981;
+  --cliente-ativo-texto: #10b981; /* 4,77:1 sobre o chip */
 
-  /* A rampa de grafite é a mesma dos dois lados; o que inverte é o papel de cada
-     degrau. Fundo passa a ser o degrau 950, tinta passa a ser o degrau 100. */
-  --background: var(--grafite-950);
-  --foreground: var(--grafite-100);
-  --card: var(--grafite-900);
-  --card-foreground: var(--grafite-100);
-  --popover: var(--grafite-900);
-  --popover-foreground: var(--grafite-100);
-  --primary: var(--grafite-100);
+  /* A rampa é a mesma dos dois lados; o que inverte é o papel de cada degrau. */
+  --background: var(--grafite-900);
+  --foreground: var(--grafite-300);
+  --card: var(--grafite-800);
+  --card-foreground: var(--grafite-300);
+  --popover: var(--grafite-800);
+  --popover-foreground: var(--grafite-300);
+  --primary: var(--grafite-25);
   --primary-foreground: var(--grafite-950);
-  --secondary: var(--grafite-800);
-  --secondary-foreground: var(--grafite-100);
-  --muted: var(--grafite-800);
+  --secondary: var(--grafite-750);
+  --secondary-foreground: var(--grafite-300);
+  --muted: var(--grafite-850);
   --muted-foreground: var(--grafite-400);
-  --accent: var(--grafite-800);
-  --accent-foreground: var(--grafite-100);
+  --accent: var(--grafite-700);
+  --accent-foreground: var(--grafite-300);
   --destructive: var(--quente);
-  --border: var(--grafite-850);
-  --input: var(--grafite-500);
+  --border: var(--grafite-600);
+  --input: var(--grafite-450);
   --ring: var(--grafite-300);
+  --hairline: rgb(255 255 255 / 0.08);
 
-  --chart-1: var(--grafite-700);
-  --chart-2: var(--grafite-600);
-  --chart-3: var(--grafite-500);
+  /* Ação: o gradiente branco do template, com texto quase preto.
+     Pior pixel (parada de 60% sobre o cartão): 8,04:1. */
+  --acao-gradiente: linear-gradient(
+    to bottom,
+    #ffffff,
+    rgb(255 255 255 / 0.95),
+    rgb(255 255 255 / 0.6)
+  );
+  --acao-texto: var(--grafite-950);
+
+  --titulo-gradiente: linear-gradient(to bottom, #ffffff, rgb(255 255 255 / 0.6));
+  --brilho-cor: color-mix(in oklab, var(--grafite-300) 12%, transparent);
+  --sombra-cor: color-mix(in oklab, var(--grafite-950) 55%, transparent);
+  --sombra-cor-forte: color-mix(in oklab, var(--grafite-950) 70%, transparent);
+
+  --chart-1: var(--grafite-600);
+  --chart-2: var(--grafite-500);
+  --chart-3: var(--grafite-450);
   --chart-4: var(--grafite-400);
   --chart-5: var(--grafite-200);
 
-  --sidebar: var(--grafite-900);
-  --sidebar-foreground: var(--grafite-100);
-  --sidebar-primary: var(--grafite-100);
+  /* No escuro a casca é o #1e293b do Ocean Breeze (o `card` do tema), um degrau
+     acima do fundo: a mesma leitura do claro, com os papéis invertidos. */
+  --sidebar: var(--grafite-800);
+  --sidebar-foreground: var(--grafite-300); /* 9,93:1 sobre a lateral */
+  --sidebar-muted-foreground: var(--grafite-400); /* 5,71:1 na lateral, 5,04:1 no realce */
+  --sidebar-primary: var(--grafite-25);
   --sidebar-primary-foreground: var(--grafite-950);
-  --sidebar-accent: var(--grafite-800);
-  --sidebar-accent-foreground: var(--grafite-100);
-  --sidebar-border: var(--grafite-850);
-  --sidebar-ring: var(--grafite-500);
+  --sidebar-accent: color-mix(in oklab, #ffffff 8%, var(--sidebar));
+  --sidebar-accent-foreground: var(--grafite-25); /* 11,73:1 sobre o item ativo */
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--grafite-400);
 }
 
 @layer base {
@@ -277,6 +347,12 @@
   html {
     @apply font-sans;
   }
+  /* Poppins é geométrica e larga: numa tabela densa ela empurra a linha para a
+     direita e come coluna. O tracking negativo devolve a densidade sem trocar de
+     família. Os números já saem em IBM Plex Mono, que é onde a largura importa. */
+  table {
+    letter-spacing: -0.011em;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -284,11 +360,96 @@
    -------------------------------------------------------------------------- */
 
 /* Todo número da interface (dias, contadores, telefone, CNPJ, valores) usa isto:
-   Geist Mono com largura fixa, para as colunas alinharem na vertical. */
+   IBM Plex Mono com largura fixa, para as colunas alinharem na vertical. */
 @utility numerico {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+}
+
+/* Corpo de tabela feito com div (TanStack Table sem <table>): mesmo tracking
+   negativo da regra base, para o Poppins não inflar a linha. */
+@utility corpo-tabela {
+  letter-spacing: -0.011em;
+}
+
+/* Ação principal em gradiente: branco no escuro, tinta no claro. É o `default`
+   do Button do shadcn e serve para qualquer superfície de ação fora dele.
+   Usa a propriedade `scale` (não `transform`), então compõe com o
+   `translate-y-px` que o botão já aplica no toque. */
+@utility acao-gradiente {
+  background-image: var(--acao-gradiente);
+  color: var(--acao-texto);
+  transition:
+    scale 150ms ease-out,
+    box-shadow 150ms ease-out;
+  &:hover:not(:disabled):not([aria-disabled='true']) {
+    scale: 1.02;
+  }
+  &:active:not(:disabled):not([aria-disabled='true']) {
+    scale: 0.98;
+  }
+}
+
+/* Cabeçalho fixo do template: base a 80% com desfoque e hairline embaixo. */
+@utility superficie-vidro {
+  background-color: color-mix(in oklab, var(--background) 80%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--hairline);
+  /* Sem desfoque, translúcido vira texto sobre texto: o navegador que não tem
+     backdrop-filter recebe a base cheia. */
+  @supports not ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
+    background-color: var(--background);
+  }
+}
+
+/* Barra inferior do celular: mesma gramática do cabeçalho, com a linha em cima e
+   sobre a base da CASCA (a lateral), não sobre a do conteúdo. É o que diz ao
+   polegar que aquela faixa não faz parte da lista que ele está rolando. */
+@utility superficie-vidro-inferior {
+  background-color: color-mix(in oklab, var(--sidebar) 85%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--hairline);
+  @supports not ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
+    background-color: var(--sidebar);
+  }
+}
+
+/* Pílula de eyebrow e chip de estado: borda fina, cartão a 50%, desfoque leve. */
+@utility pilula {
+  border-radius: 9999px;
+  border: 1px solid var(--hairline);
+  background-color: color-mix(in oklab, var(--card) 50%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+/* Título em gradiente. SÓ no login: espalhar pelo app vira clichê e atrapalha a
+   leitura. Já carrega o tracking de -0.05em que a direção pede para esse título. */
+@utility titulo-gradiente {
+  background-image: var(--titulo-gradiente);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  letter-spacing: -0.05em;
+}
+
+/* Brilho atrás do herói: gradiente radial em CSS, sem imagem de CDN e sem cromia
+   (cor cromática aqui competiria com a escala térmica). */
+@utility brilho-radial {
+  background-image: radial-gradient(60% 55% at 50% 0%, var(--brilho-cor) 0%, transparent 70%);
+}
+
+/* Elevação: sombra tingida pela base, nunca preta pura (a geometria é a do
+   Ocean Breeze: deslocamento de 4px, desfoque de 8px, espalhamento de -1px). */
+@utility sombra-base {
+  box-shadow: 0 4px 8px -1px var(--sombra-cor);
+}
+
+@utility sombra-base-forte {
+  box-shadow: 0 12px 28px -6px var(--sombra-cor-forte);
 }
 
 /* Resposta tátil no toque (o time trabalha no celular, entre visitas). */
@@ -301,8 +462,8 @@
 
 /* Pulso da barra térmica: só quando o negócio passou do prazo da etapa
    (deals.needs_attention). A barra ENGROSSA e volta, sempre em cor cheia: baixar a
-   opacidade apagaria justamente a linha que precisa ser vista (o âmbar tem só 3,07:1
-   de folga contra o fundo claro, então qualquer alfa abaixo de 1 fura o mínimo de
+   opacidade apagaria justamente a linha que precisa ser vista (o âmbar tem só 3,34:1
+   de folga contra o muted do claro, então qualquer alfa abaixo de 1 fura o mínimo de
    3:1 da WCAG 1.4.11). Só transform, sem custo de layout: 3px x 2,33 dá ~7px e o
    conteúdo da linha começa em 16px (pl-4), então nada é encoberto. */
 @keyframes pulso-termico {

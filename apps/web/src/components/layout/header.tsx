@@ -10,10 +10,14 @@ import { type Sessao } from '@/lib/auth/session';
  * Cabeçalho fixo de 56px (o teto da densidade 7: a lista é que precisa da altura).
  * Traz a marca no celular, onde não há lateral; a paleta de comandos com a dica da
  * tecla; a troca de tema; e o usuário com nome, papel e saída.
+ *
+ * `superficie-vidro` é o acabamento do template: a base a 80% com desfoque e uma
+ * hairline embaixo, no lugar de uma borda cheia. A lista passa por baixo do
+ * cabeçalho enquanto rola, e a linha fina separa sem desenhar uma segunda régua.
  */
 export function Header({ sessao }: { sessao: Sessao }) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-backdrop-filter:bg-background/80 md:px-6">
+    <header className="superficie-vidro sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 px-3 md:px-6">
       <Link
         href="/meu-dia"
         className="toque md:hidden"

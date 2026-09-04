@@ -12,8 +12,11 @@ import type { LinhaParceiro } from './tipos';
 
 /**
  * A mesma lista no celular, que é onde a Heloísa trabalha: entre visitas, no sol,
- * com uma mão só. A tabela vira cartão, mas a leitura é a mesma da tela grande —
+ * com uma mão só. A tabela vira cartão, mas a leitura é a mesma da tela grande:
  * barra térmica na borda esquerda, nome, e os dias sem contato em mono à direita.
+ *
+ * Os cartões vivem direto sobre a base Ocean Breeze e são separados por hairline
+ * translúcida (`border-hairline`), a mesma linha da tabela, nunca por borda cheia.
  *
  * O cartão inteiro é o alvo de toque, com 64px de altura (bem acima dos 44px mínimos).
  */
@@ -23,7 +26,7 @@ export function ListaCartoes({ linhas }: { linhas: LinhaParceiro[] }) {
       <ul className="flex flex-col">
         {linhas.map((linha, indice) => (
           <RevelarItem key={linha.id} indice={indice}>
-            <li className="border-b border-border/70 last:border-b-0">
+            <li className="border-b border-hairline last:border-b-0">
               <Link
                 href={`/parceiros/${linha.id}`}
                 className="relative flex min-h-16 items-center gap-3 py-2.5 pr-2 pl-4 outline-none active:bg-muted/60 focus-visible:bg-muted/60"
@@ -77,7 +80,7 @@ function ProximaAcao({ iso }: { iso: string | null }) {
   if (!acao) return null;
   return (
     // A mesma regra da tabela e da ficha: quando o texto principal é um número,
-    // ele sai em Geist Mono. O celular é a superfície principal do time em campo.
+    // ele sai em IBM Plex Mono. O celular é a superfície principal do time em campo.
     <span className={cn(acao.numero && 'numerico', acao.atrasada && 'font-medium text-foreground')}>
       {acao.texto}
     </span>

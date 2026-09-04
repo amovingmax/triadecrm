@@ -22,8 +22,8 @@ export default async function PaginaSemPermissao() {
             Sem permissão
           </CardTitle>
           <CardDescription>
-            Seu papel <Badge variant="secondary">{ROTULO_PAPEL[sessao.papel]}</Badge> não dá acesso
-            a esta área. Se precisar dela, peça a um admin (Rafael, Luiz ou Matheus).
+            Seu papel <Badge variant="pilula">{ROTULO_PAPEL[sessao.papel]}</Badge> não dá acesso a
+            esta área. Se precisar dela, peça a um admin (Rafael, Luiz ou Matheus).
           </CardDescription>
         </CardHeader>
         <CardContent>

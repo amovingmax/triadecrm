@@ -64,9 +64,15 @@ function SheetContent({
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>
-            <Button variant="ghost" className="absolute top-3 right-3" size="icon-sm">
+            {/* 44px de alvo de toque no celular (a folha é uma tela de campo),
+                voltando aos 28px do `icon-sm` no desktop. */}
+            <Button
+              variant="ghost"
+              className="absolute top-2 right-2 size-11 md:top-3 md:right-3 md:size-7"
+              size="icon-sm"
+            >
               <XIcon />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">Fechar</span>
             </Button>
           </SheetPrimitive.Close>
         )}
