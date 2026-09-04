@@ -1,0 +1,24 @@
+{
+  "name": "@komune/prompts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prompts versionados e evals dos fluxos de IA do CRM (classificação, extração, rascunhos, resumos, Assistente).",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}
