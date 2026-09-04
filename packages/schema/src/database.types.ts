@@ -1974,10 +1974,13 @@ export type Database = {
         }
         Returns: {
           city: string
+          days_since_contact: number
           id: string
           instagram_handle: string
           kind: Database["app"]["Enums"]["org_kind"]
+          last_activity_at: string
           name: string
+          needs_attention: boolean
           neighborhood: string
           next_action_at: string
           owner: string
