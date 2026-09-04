@@ -4,7 +4,7 @@ import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Tríade',
-    short_name: 'KOMUNE',
+    short_name: 'Tríade',
     description:
       'CRM de captação da KOMUNE: parceiros, Radar, funis, conversas de WhatsApp, agenda, metas e relatórios.',
     lang: 'pt-BR',

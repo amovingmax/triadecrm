@@ -6,7 +6,17 @@ import nextTs from 'eslint-config-next/typescript';
 import prettier from 'eslint-config-prettier';
 
 export default defineConfig([
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'coverage/**', 'next-env.d.ts', 'public/**']),
+  // `.next-*/**` cobre os builds de conferência feitos com NEXT_DIST_DIR (ver next.config.ts):
+  // sem isso o lint passa a analisar o bundle gerado e falha em código que não é nosso.
+  globalIgnores([
+    '.next/**',
+    '.next-*/**',
+    'out/**',
+    'build/**',
+    'coverage/**',
+    'next-env.d.ts',
+    'public/**',
+  ]),
   ...nextVitals,
   ...nextTs,
   {

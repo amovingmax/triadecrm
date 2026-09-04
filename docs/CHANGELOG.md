@@ -374,3 +374,312 @@ Arquivos tocados nesta conferência: `supabase/migrations/20260904001200_desfech
   5. A previsão pintada nos 5 s do desfazer continua usando o slug literal (`preverRegistro`/`etapasAlvo` não conhecem a `stage_equivalences`): no funil produtor ela promete "a etapa não muda" e a resposta do banco corrige para "Identificado → Demonstração marcada". Corrige-se sozinha, mas os comentários de `tipos.ts` sobre "5 dos 9 destinos" ficaram desatualizados.
   6. O agente do banco não escreveu entrada de CHANGELOG para a migração `001200` (regra do CLAUDE.md); o que está registrado acima veio da conferência.
 - **Dado de desenvolvimento.** Os registros desta conferência ficaram no banco local (10 negócios do funil produtor movidos/aquecidos, 1 do fornecedor, atividades de teste em `Chácara Alvorada`, `D&R Eventos`, `Neuma Leão Buffet`, `Cerimonial Odineide Melo`, `Celebrations`). Um `supabase db reset` desfaz.
+
+## D8/D9 — 04/09/2026 — Metas, "Meu dia" e relatórios, lado do banco (RF-MET-01/02/03/04, RF-REL-01/02/03/04/06/10/11)
+
+Migração `supabase/migrations/20260904001400_metas_e_relatorios.sql`; testes `supabase/tests/14_metas_e_relatorios.sql` (73 asserções). Nenhum arquivo de outro módulo foi tocado.
+
+### Entregue
+
+- **`public.goals`** — meta por pessoa (ou por time, com `user_id` nulo) × métrica × período (dia, semana, mês), com `target`, `note` e `created_by`. Gatilho `app.goals_before_write` normaliza `period_start` (semana = segunda, mês = dia 1), sem o que dois registros da mesma semana escapariam do índice único. Índices únicos parciais por pessoa e por time; auditoria em `audit_log`; RLS: **admin e gestor leem e escrevem todas; qualquer outro papel só lê a própria (e a do seu time) e não escreve nenhuma** — definir meta é ato de gestão, não da pessoa cobrada. Embaixador não lê meta.
+- **`app.portas` e `app.portas_contadas`** — projeção única da interação, onde moram os dois tetos antimanipulação do RF-MET-01: **1 porta batida por alvo por dia** e **1 porta aberta por alvo a cada 30 dias**. Tela de metas, "Meu dia" e todos os relatórios leem daqui, para que a barra da Heloísa e o relatório de segunda nunca discordem. Não são superfície de API (revogadas de `authenticated`): trazem o alvo de toda atividade e sdr/embaixador leem parceiro pela view mascarada (RF-BAS-14).
+- **`public.goal_progress(p_user_id, p_period, p_ref)`** — uma linha por métrica do catálogo, com meta (nula quando não definida), realizado, percentual, dias úteis do período, dias decorridos e ritmo necessário. Lê `activities`, `deal_stage_history`, `organizations` e `goals`. A pessoa lê a própria; gestor e admin leem a de qualquer um.
+- **`public.meu_dia(p_user_id, p_limite)`** — a fila do dia já ordenada por urgência (RF-MET-04): reunião em menos de 3 h → interação sem resultado → tarefa vencida → próxima ação vencida → tarefa de hoje → próxima ação de hoje → negócio sem próxima ação → negócio parado além do SLA da etapa → tarefa futura. Cada item traz o "porquê" em português. Reusa `app.deal_cards` (a mesma projeção do kanban), não inventa uma segunda definição de "parado". **Cada negócio entra uma vez só**, e negócio que já tem tarefa aberta não duplica a empresa na fila. **Alvo com `do_not_contact` fica de fora** — guardrail de opt-out.
+- **Seis funções de relatório**, todas com período explícito (padrão: últimos 30 dias), sem PII e barradas para o embaixador: `relatorio_funil`, `relatorio_por_responsavel`, `relatorio_por_categoria`, `relatorio_por_bairro`, `relatorio_por_fonte`, `relatorio_por_horario`. Nenhuma tabela de agregação e nenhum `pg_cron`: os números do MVP saem de centenas de linhas.
+- **Defeito encontrado e consertado dentro desta tarefa.** A primeira versão do `relatorio_funil` calculava a conversão etapa a etapa contra quem entrou *exatamente* na etapa anterior e devolvia **300%**, **200%** e **150%** na base real — porque neste produto a etapa é pulada o tempo todo (o registro de contato leva o negócio de "Prospectado" direto para "Em conversa"). A conversão passou a ser calculada sobre `chegaram_ate` (alcançou esta etapa **ou** qualquer etapa adiante na linha do funil), que só decresce; `alcancaram` continua exposto ao lado, cru. Coberto por asserção.
+
+### O que está honestamente desligado (e a tela precisa dizer)
+
+- **`replies` (respostas recebidas)** volta de `goal_progress` com `mensuravel = false`, `realizado` nulo e o motivo escrito: depende do inbox de WhatsApp do D5, e a tabela de mensagens não existe. Não devolve zero.
+- **`pre_registrations` e `published`** vêm do funil como **PROXY declarado** (entrada nas etapas "Cadastro em andamento" e de ganho). A fonte da verdade é a plataforma Komune, cuja integração ainda não está ligada. O campo `fonte` de cada linha começa com `PROXY:` para a tela poder mostrar a ressalva.
+- **Os dois primeiros critérios do RF-MET-04** ("parceiro respondeu e está sem resposta há mais de 2 h") **não estão** no `meu_dia`: dependem de `messages`, que nasce no D5. Fila curta e verdadeira em vez de fila cheia e falsa.
+- O teto de 30 dias da porta aberta é medido contra a porta aberta **anterior** do mesmo alvo (contada ou não), e não contra a última contada. Em sequências longas isso conta menos que a leitura gulosa (dias 0, 20 e 40 contam 1, não 2). É deliberado: numa métrica que existe para não ser inflada, errar para menos é o lado certo. Está escrito no comentário da view.
+
+### Precisa de decisão humana
+
+1. **`app.goal_metric` ganhou o rótulo `calls_made` (ligações).** É o único ponto desta migração fora do Apêndice D do PRD, que trata a ligação como uma das formas de "porta batida". Foi acrescentado porque existe um módulo de ligação próprio e a meta pedida é "ligações por dia", que `doors_knocked` não sabe separar de mensagem e visita. Nenhum rótulo existente mudou. **Rafael/Matheus confirmam ou mandam remover.**
+2. **`meetings_booked` conta entradas nas etapas "Reunião marcada" e "Demonstração marcada"** e atribui a `coalesce(deal_stage_history.changed_by, deals.owner_id)` — porque movimento feito por automação grava `changed_by` nulo. Se a atribuição correta for outra (por exemplo, sempre o dono do negócio), é decisão de gestão.
+3. **A etiqueta de categoria do RF-REL-03** usa a meta de 5 publicados por categoria escrita no PRD. Se a meta mudar, muda aqui.
+4. Relatórios são liberados para `app.sees_all()` (admin, gestor, sdr, leitura, financeiro) porque **as duas pessoas do MVP são `sdr`**. Se a intenção for restringir o relatório por responsável a admin e gestor, é troca de uma linha por função.
+
+### Verificado
+
+`supabase test db` — 13 arquivos, **822 asserções, PASS** (as 749 anteriores continuam verdes; o arquivo novo traz 73). `supabase db lint --local` e `--level warning`: sem apontamento. `packages/schema/src/database.types.ts` regenerado (`pnpm db:types`). `pnpm lint`, `pnpm typecheck` e `pnpm test` (268: 105 schema, 13 workers, 150 web) verdes. A migração foi aplicada em transação única no banco local (`psql --single-transaction`), e não por `supabase db reset`, para não derrubar o dado de desenvolvimento de outro trabalho em andamento na mesma base; ela é idempotente e reaplicável (a seção 4b derruba as funções antes de recriar, porque `create or replace` não muda tipo de retorno).
+
+## D5 — 04/09/2026 — Prospecção ativa por ligação, lado do banco (R13 §3.1–3.4 e §6; RF-FUN-12/13, RF-MET-01/06, RF-CON-11/18, RF-BAS-14, RF-ADM-01)
+
+Migração `20260904001300_modulo_de_ligacao.sql`, seed (blocos 12a e 12c) e pgTAP `13_modulo_de_ligacao.sql`. É a parte de baixo do princípio do R13 §3.1: **quem liga não escolhe para quem ligar e não decide o que fazer depois.**
+
+### Entregue
+
+- **`public.call_scripts`** — roteiro em árvore, versionado, com a árvore em `jsonb`. `app.validar_roteiro` (espelho de `validarRoteiro` em `components/ligacao/tipos.ts`) recusa, por gatilho, árvore em que algum nó fique sem saída em alguma das duas variantes, algum destino não exista ou algum `fim` não feche por exatamente um dos dois eixos. Índice único parcial garante uma versão publicada por slug.
+- **`public.call_batches`** — o lote: funil ÚNICO, origem ÚNICA de temperatura (campo, não filtro), roteiro congelado em `(script_id, script_version)`, ordem (`prioridade`/`mais_parado`/`aleatorio` com semente), teto de tentativas, piso de horas entre elas, meta e período. Contadores `total`/`pending`/`talked` materializados por gatilho.
+- **`public.call_batch_items`** — a fila, com a ordem congelada em `position` na montagem. **A reserva vive aqui, em dois índices únicos parciais** (`organization_id` e `phone_e164`, enquanto o item está `fila` ou `em_andamento`): sem eles, o Matheus e a Heloísa ligam para o mesmo buffet no mesmo dia. O segundo índice não é redundância — `organizations.phone_e164` só é único entre organizações vivas.
+- **`public.call_attempts`** — a chamada, com os dois eixos do R13 §3.3 separados: `resultado` (eixo técnico, `app.call_result`) e `outcome_id` (eixo comercial, o catálogo que já existia). `caminho_script` guarda os nós percorridos, e a view `public.v_call_script_steps` os devolve em linhas, com marca de último nó — é a resposta à pergunta do R13 §3.2: em qual frase as pessoas desligam.
+- **`public.montar_lote(...)`** — monta e **reserva na criação**. Devolve `entraram` e `excluidos` por motivo nomeado (`sem_negocio_aberto`, `sem_telefone`, `nao_contatar`, `suprimido`, `temperatura_diferente`, `em_janela_de_recontato`, `reservado_em_outro_lote`), para a tela dizer a verdade sobre o tamanho ("pedi 25, vieram 18").
+- **`public.proximo_da_fila(lote)`** — entrega o próximo com `for update skip locked`, revela o telefone com registro em `pii_access_log`, e **recusa com motivo nomeado**: `fora_da_janela` (com `domingo`, `feriado`, `antes_da_abertura` ou `depois_do_fechamento` no detalhe), `lote_encerrado`, `fora_do_periodo`, `lote_de_outro_dono`, `fila_vazia`.
+- **`public.iniciar_chamada(item)`**, **`public.tabular_chamada(...)`** e **`public.devolver_item_do_lote(item, motivo)`** — abrir, fechar e desistir. `app.expirar_reservas()` no `pg_cron` a cada 10 min devolve à fila o item cuja reserva de 30 min venceu (aba fechada no meio de uma ligação) e libera lote encerrado ou fora do período.
+- **A consequência comercial NÃO foi reimplementada.** `tabular_chamada` é `security invoker` e delega etapa, temperatura, próxima ação, cooldown e guardrail de supressão a `public.registrar_contato`, que já existia. O que ela acrescenta é o eixo técnico, a coerência entre os dois eixos, o retorno do item à fila quando o catálogo pede nova tentativa e a idempotência da tabulação.
+- **Nenhum chip novo no catálogo.** A superfície `ligacao` continua com os mesmos 8 desfechos (o teto do RF-MET-06). O eixo técnico vive fora do catálogo e se liga a ele por `app.outcome_for_call_result` (7 resultados → 3 desfechos existentes). A coluna aditiva `interaction_outcomes.requires_answer` marca os 5 que pressupõem conversa; a tela `/registrar` não a lê e não mudou.
+- **Janela de horário como regra de banco** (R13 §6): `app.call_window_hours` (seg–sex 9h–20h, sáb 10h–13h; **domingo é ausência de linha, não uma linha com zeros**), `app.proxima_abertura`, `app.instante_local` e `app.call_window`, espelhos de `JANELA_DE_LIGACAO`/`janelaDeLigacao` em `components/ligacao/tipos.ts`. A **tabulação nunca é recusada por horário**: uma ligação que começou 19h58 é tabulada 20h03, e recusar isso perderia o registro de uma conversa que aconteceu.
+- **Seed do roteiro `captacao_v1`**, 37 nós nas duas variantes (fornecedor = gancho de demanda, produtor/cerimonialista = gancho de controle, R13 §5), com aviso de origem no primeiro nó, ganchos que terminam em pergunta, 9 nós de objeção alcançáveis de qualquer ponto e o validador de promessas escrito no roteiro (`obj_financeiro` → "vou confirmar com o financeiro"). A autoverificação da seed falha se o roteiro tiver erro estrutural, se não tiver 37 nós ou se `requires_answer` não marcar exatamente 5 desfechos.
+
+### Decisões que valem registrar
+
+- **O telefone copiado no item não é legível por `authenticated`.** `call_batch_items.phone_e164` é cópia de `organizations.phone_e164` (o número reservado é o número discado, mesmo que alguém edite a ficha depois) — e deixá-la legível teria desfeito a máscara do RF-BAS-14 pela porta dos fundos. O `select` da tabela é concedido **coluna a coluna**, sem ela; quem revela é `proximo_da_fila`/`iniciar_chamada`, com registro em `pii_access_log`, como o `reveal_phone` já fazia.
+- **O guardrail de supressão vale duas vezes**: na montagem e ao puxar da fila. Alguém pode pedir opt-out depois do lote montado — nesse caso o item sai do lote como `devolvido`, liberando a reserva, em vez de ser entregue.
+- **Telefonia continua sendo adaptador, não integração.** `app.call_provider` nasce com o valor `manual`. Nenhuma credencial, nenhum fornecedor, nenhuma chamada externa.
+- **Defeito encontrado pelo `supabase db lint` e consertado dentro desta tarefa:** em `app.validar_roteiro`, `v_erros := v_erros || 'literal'` resolvia como `array_cat(anyarray, anyarray)` e estourava "malformed array literal" — só no caminho do erro, que é justamente o que a função existe para percorrer. Corrigido com `::text` explícito e coberto por asserção. A função passou de `immutable` para `stable`, porque `format()` é `stable`.
+
+### Pendente / precisa de decisão humana
+
+1. **Meta por pessoa** (ligações/dia, reuniões/semana): `call_batches.target_calls` já existe e nasce nulo (R13 §8.2). **Rafael/Matheus**.
+2. **Fornecedor de telefonia** (R13 §8.1). Enquanto não houver, o adaptador é `manual` e `call_attempts.atendida_em` só é preenchido quando quem ligou entra na árvore do roteiro — não há AMD.
+3. **A reunião cai na agenda de quem?** (R13 §8.3) Hoje a tarefa da próxima ação vai para o dono do negócio, que é quem o assumiu ao tabular.
+4. As frases de origem por fonte (`FRASE_DE_ORIGEM`) vivem no cliente; as 100 organizações da base são todas `sources.slug = 'planilha'`. Quando o Radar preencher `source_id` de verdade, cada linha passa a falar a própria origem sem mudar o roteiro.
+5. Falta a tela (`app/(app)/ligar`) e os componentes de `components/ligacao/**` — esta tarefa entregou só o lado do banco.
+
+### Verificado
+
+`supabase db reset` (seed com "roteiro captacao_v1 com 37 nós, sem erro estrutural"), `supabase test db --local` — 15 arquivos, **980 asserções**; o arquivo novo traz **91, todas verdes**, e nenhum teste antigo quebrou por causa desta migração. `supabase db lint --local`: sem nenhum apontamento nos objetos deste módulo. `packages/schema/src/database.types.ts` regenerado. `pnpm lint`, `pnpm typecheck` e `pnpm test` (343) verdes.
+
+**Regressão que NÃO é desta tarefa:** `supabase/tests/09_seguranca_acesso.sql` falha nas asserções 49 e 50 por causa de `20260904001401_radar_candidatos.sql`, que cria `app.cpf_is_valid`, `app.ddd_da_regiao` e `app.supplier_candidates_normalize` sem revogar o `EXECUTE` que o Postgres concede a `PUBLIC` (padrão da migração `000500`). Como a `001401` roda **depois** da `001300`, o conserto tem de ser no arquivo dela, e não aqui.
+
+## D5 — 04/09/2026 — Conversas: linha do tempo de interações por parceiro (RF-CON-05 parcial, RF-CON-06; anexo R04)
+
+### O que foi entregue
+
+A rota `/conversas` deixou de ser o `EmConstrucao` e virou o módulo de verdade, com dado real da base (100 organizações, `activities` e `deal_stage_history`).
+
+- **Lista à esquerda**, ordenada pela interação mais recente; quem nunca foi contatado vai para o fim, em ordem alfabética (é a fila de quem falta abordar, não rodapé morto). Cada linha traz barra térmica, nome, `ChipTemperatura`, ícone do canal, o desfecho da última interação, bairro/categoria e os dias sem contato (`DiasSemContato`, reusado de `components/temperatura`).
+- **Linha do tempo à direita**: uma coluna só, em ordem cronológica, com atividades (ligação, visita, reunião, mensagem, nota), mudanças de etapa (`deal_stage_history`) e a entrada na base (o import da lista-semente R09). Cada evento mostra o desfecho do catálogo (`interaction_outcomes`), o autor, a hora no fuso de Natal, com quem se falou, a duração e a marca "porta aberta" (`metadata.door_opened`, RF-MET-01). Separador por dia ("hoje", "ontem", "sábado, 29/08").
+- **Cabeçalho da conversa** (o "ficha ao lado da conversa" do RF-CON-05): temperatura, etapa e funil, onde, categoria, responsável, último contato, telefone com revelação auditada (reusa `TelefoneRevelavel`, RF-BAS-14) e a próxima ação combinada.
+- **Registrar contato** sai daqui por link para `/registrar?org=<id>`, que já é o contrato publicado daquela tela; não há segunda porta de entrada para `registrar_contato`.
+- **Filtros**: busca por nome/categoria/bairro (sem acento, como `unaccent`+`lower`), responsável (dono do negócio **ou** quem registrou a interação — 72 das 100 organizações ainda estão com o negócio sem dono), canal e faixa de dias sem contato (hoje, até 3, mais de 7, mais de 14, nunca falei). Recorte e conversa aberta vivem na URL (`?q=&responsavel=&canal=&janela=&org=`).
+- **Celular**: uma coisa por vez. A lista ocupa a tela; ao tocar num parceiro ela dá lugar à conversa em tela cheia, com "voltar" de 44px. Alvos de toque medidos em 390×844: 113 alvos, mínimo 44px, zero rolagem horizontal.
+- **Honestidade na própria tela** (`AvisoWhatsapp`): o inbox do RF-CON-05 não existe porque depende da verificação do CNPJ da Komune no Meta Business, do Coexistence do número "Heloísa · Komune" e da aprovação dos modelos de mensagem (RF-CON-02) — semanas, e nada disso é código. O aviso diz isso onde a pessoa procuraria as mensagens, e diz que quando o número for aprovado cada mensagem entra na mesma coluna. Atividade de mensagem sem corpo mostra "Registro manual: o CRM guardou o desfecho, não o texto da mensagem".
+
+### Arquivos
+
+`apps/web/src/app/(app)/conversas/{page,layout}.tsx` e `apps/web/src/components/conversas/` (`tipos.ts`, `montagem.ts` + `montagem.test.ts`, `formatos.ts`, `dados.ts`, `catalogos.ts`, `tela-conversas.tsx`, `lista-conversas.tsx`, `conversa.tsx`, `linha-do-tempo.tsx`, `filtros-conversas.tsx`, `estados.tsx`, `aviso-whatsapp.tsx`, `icones.tsx`).
+
+### Verificado
+
+`pnpm --filter web typecheck` verde; `eslint` sem apontamento em `components/conversas/**` e `app/(app)/conversas/**`; 25 testes Vitest novos em `montagem.test.ts` (ordenação, "sem contato" nunca vira "hoje", o import da lista-semente não conta como conversa, filtros, agrupamento por dia no fuso de Natal). Nove fotos em 1440×900 e 390×844, tema claro e escuro, conferidas uma a uma.
+
+### Pendente (depende de coisa que ainda não existe)
+
+- Mensagens de WhatsApp na coluna: precisa da verificação do CNPJ na Meta, do Coexistence e dos modelos aprovados (RF-CON-02/03), mais a tabela `messages` e a Edge Function `wa-webhook`. `activities.message_id` já existe e espera a FK.
+- Envio, respostas prontas, áudio da biblioteca, indicador de janela de 24 h, status da conversa e transferência entre pessoas (o resto do RF-CON-05) só fazem sentido depois disso.
+- A lista agrega no cliente sobre três leituras com teto (500 organizações, 3000 atividades) porque o PostgREST não faz `distinct on` e a numeração de migração desta rodada estava reservada a outro módulo. Quando o Radar entregar os ≥ 300 candidatos, trocar `carregarConversas` por uma RPC `distinct on (organization_id) … order by occurred_at desc` com paginação; a tela não muda. Enquanto isso a interface avisa quando bate no teto.
+- SLA de primeira resposta (RF-CON-04) e os filtros "sem resposta há > 2 h" / "aguardando humano" dependem de mensagem recebida, que ainda não chega.
+
+## D7 — 04/09/2026 — Agenda: reuniões, visitas do dia e desfecho do compromisso (RF-AGE-01/05/07/08, RF-ROT-03/05 parcial)
+
+A rota `/agenda` deixou de ser o `EmConstrucao` e virou o módulo de verdade, lendo os compromissos reais da base (100 organizações da lista-semente do R09) e devolvendo o desfecho **pelo caminho que já existe**: `public.registrar_contato` com desfechos de `public.interaction_outcomes`. A Agenda não tem regra de funil própria — quem move etapa, temperatura, porta e próxima ação continua sendo o Postgres.
+
+### O que a tela faz
+
+- **Sem tabela nova de eventos, e de propósito.** Um compromisso já é uma `public.tasks` de tipo `meeting` ou `visit` com `due_at`, criada pelo catálogo de desfechos ("Reunião marcada" produz a tarefa na data combinada; "Não estava / fechado" produz a visita de D+7).
+- **A distinção que a tela não apaga**: `kind = 'meeting'` não quer dizer "reunião marcada". Metade dessas tarefas na base real é "Marcar apresentação", e a hora que ela carrega (09:00) é o prazo da régua do RF-MET-06, não uma hora combinada. Então o dia vem em quatro blocos: **Com hora marcada** (reunião cujo negócio está numa etapa que exige `meeting_at`, lido de `stages.required_fields` — hoje `reuniao_marcada` e `demonstracao_marcada`), **Visitas do dia**, **Apresentações a marcar** e **Já registrados**. Só o primeiro bloco mostra relógio.
+- **Visitas agrupadas por bairro** (RF-ROT-03), ordem do relógio dentro do grupo, com desempate por nome para a ordem não mudar a cada carregamento (as cinco visitas de um dia nascem todas às 09:00). Botão "Google Maps" por parada.
+- **Realizada / Não compareceu / Reagendar** (e, na visita, **Registrar a visita / Não estava**) são recortes do catálogo, derivados de campos que ele já declara (`SLUGS_REUNIAO_AGENDADA` para reagendar; `com_quem = 'ninguem'` para o ausente), nunca de uma lista de slugs em código — o gestor edita o catálogo (RF-ADM-02). O desfecho que precisa de campo a mais (motivo de perda, nova data e formato, evidência de autorização) abre a `FolhaExtra` de `components/registro`, reusada inteira. Depois de gravar, a tarefa do compromisso é fechada (`status = 'done'`), senão a reunião de quinta pediria desfecho na quinta seguinte.
+- **Visão de semana** (sete colunas no desktop, sete blocos no celular) e tira de navegação com a contagem de abertos por dia. Dia e visão vivem na URL (`?dia=&visao=`).
+- **Honestidade na própria tela**: um bloco "O que ainda não está ligado" diz que Google Calendar (RF-AGE-02/04), lembretes de 24 h e 1 h (RF-AGE-06) e rota otimizada (RF-ROT-03) não existem ainda e de que cada um depende. A nota das visitas explica que o link do Maps busca por nome e bairro porque nenhuma organização da base tem endereço nem coordenada.
+
+### Arquivos
+
+`apps/web/src/app/(app)/agenda/page.tsx` e `apps/web/src/components/agenda/` (`tipos.ts` + `tipos.test.ts`, `dados.ts`, `consultas.ts`, `registrar-desfecho.ts`, `tela-agenda.tsx`, `tira-semana.tsx`, `lista-dia.tsx`, `visao-semana.tsx`, `cartao-compromisso.tsx`, `folha-desfecho.tsx`, `estados.tsx`).
+
+### Verificado
+
+`pnpm --filter web typecheck` verde; `eslint` sem apontamento em `components/agenda/**` e `app/(app)/agenda/**`; 16 testes Vitest novos em `tipos.test.ts` (aritmética de calendário sem depender do fuso da máquina, hora no relógio de Natal, blocos do dia, agrupamento por bairro com ordem estável, link do mapa, recortes do catálogo incluindo o caso `do_not_contact`). Dezoito fotos em 1440×900 e 390×844, tema claro e escuro (dia, semana, dia vazio, folhas de desfecho e o estado depois de registrar), conferidas uma a uma; medidas do script: zero rolagem horizontal, nenhum alvo de toque abaixo de 44px, contraste WCAG AA em todos os pares medidos. O caminho de escrita foi exercitado de ponta a ponta no banco local: "Realizada, interessado" numa reunião moveu o negócio para "Apresentação realizada", criou "Pedir autorização hoje" e fechou a tarefa do compromisso.
+
+### Pendente (depende de coisa que ainda não existe)
+
+- **Google Calendar** (RF-AGE-02, RF-AGE-04, RF-AGE-05, RF-ROT-04): `freeBusy`, `sugerir_slots`, criação do evento com Meet e o bloco "Rota Zona Sul" dependem da conta Google do time conectada ao CRM. Hoje o compromisso vive só no CRM.
+- **Lembretes de 24 h e 1 h, ping de no-show e cobrança do resultado** (RF-AGE-06, RF-AGE-07 automático, RF-AGE-08): dependem do número oficial na Cloud API da Meta e dos modelos de utilidade aprovados. O no-show manual já funciona.
+- **Rota otimizada e modo rota** (RF-ROT-01/02/03/05): sem geocodificação não há matriz de tempos. Hoje: ordem por bairro e um link de busca do Maps por parada. Quando `lat`/`lng` existirem, entra a ordem por vizinho mais próximo e o link `maps/dir` com as paradas.
+- **Página pública de agendamento** (RF-AGE-09) é v2, fora do MVP.
+- A Agenda lê a semana inteira em três consultas ao PostgREST (`tasks`, `organizations_view`, `deals`). Com o volume do MVP isso é uma ida barata; se a fila de visitas crescer muito, vira uma RPC.
+
+### Decisão humana
+
+- O desfecho `reu_reagendada` grava a nova data e move o negócio de volta para "Reunião marcada", mas **remarcar uma visita** não tem desfecho equivalente no catálogo: hoje o caminho é "Não estava / fechado", que já reagenda para D+7 na zona. Se Rafael/Heloísa quiserem escolher a data da nova visita, é preciso um desfecho novo em `interaction_outcomes` (RF-ADM-02), não código.
+
+## D4 — 04/09/2026 — Radar: catálogo de fontes, fila de revisão e entrada manual (RF-RAD-01, 03, 04, 05, 09, 11, 16)
+
+### O que foi entregue
+
+A rota `/radar` deixou de ser o `EmConstrucao` e virou o módulo de verdade — **sem inventar candidato nenhum**. O coletor automático é o D4 do calendário e ainda não existe; a tela diz isso na cara, e entrega o que já funciona.
+
+**Banco (`20260904001401_radar_candidatos.sql`)**
+
+- `public.supplier_candidates` — a entidade resolvida da esteira `raw_capture → source_record → supplier_candidate → revisão → organizations` (ADR-08). Só a lista permitida de campos do RF-RAD-04, proveniência obrigatória (`source_id`, `source_url`, `collected_at`, `collector`, `payload`), RLS por papel (só quem trabalha a fila lê; só admin apaga) e `app.audit()` em toda escrita.
+- **Higiene na entrada em gatilho** (RF-RAD-16 / RF-BAS-16): CPF com dígito verificador válido é apagado do nome empresarial de MEI e **nunca persistido** (o descarte fica em `flags` e datado em `payload`); telefone normalizado para E.164; DDD fora do RN e vizinhos, `@instagram` fora do padrão e CNPJ que não fecha **marcam** o candidato para revisão em vez de reprová-lo; candidato sem nenhum canal de contato é marcado; telefone/CNPJ/@ já suprimidos fazem o candidato nascer `do_not_contact` (RF-RAD-09).
+- `app.cpf_is_valid(text)` e `app.ddd_da_regiao(text)` — funções de apoio da higiene. A primeira existe para **descartar** CPF, não para guardá-lo (ADR-09).
+- `public.radar_fila(...)` — a fila do RF-RAD-11 com paginação, filtros e as **duplicatas já resolvidas por linha** (`app.find_org_matches`, uma linha por ficha, a regra de maior confiança). Telefone e e-mail seguem o mascaramento do RF-BAS-14.
+- `public.radar_criar_candidato(...)` — entrada manual pela mesma esteira do coletor.
+- `public.radar_revisar_candidato(...)` — aprovar (cria organização + negócio na primeira etapa com "Primeiro contato" no próximo dia útil), mesclar (completa **só** campo vazio da ficha existente, nunca sobrescreve), recusar (motivo escrito obrigatório, com constraint no banco) e marcar não contatar.
+- `public.radar_alternar_fonte(...)` — ligar uma fonte exige `robots_ok` avaliado e termos registrados (RF-RAD-01); fonte de `scrape` com `robots_ok = false` nunca liga (RF-RAD-03).
+- `public.radar_resumo()` — os números do topo; devolve nulo para papel que não trabalha a fila.
+
+**Tela (`/radar`)**
+
+- **Aviso permanente e honesto**: a coleta automática não está ligada, o worker é o D4 e depende da máquina dedicada no ar (Luiz) e do parecer do advogado sobre o Casamentos.com.br (Dennis, PRD §13). Diz também que "fonte ligada" quer dizer *liberada como origem*, não "coletando".
+- **Fila de revisão**: cartão com tudo o que a decisão precisa (origem com link, categoria, bairro, canais de contato, observação, o que a higiene marcou **com a explicação do que fazer**, e as fichas da base que podem ser a mesma empresa, com a regra do casamento em português e a porcentagem). Ações: Aprovar, Mesclar aqui, Recusar, Não contatar. Atalhos do RF-RAD-11 presos ao cartão em foco (A, M, R, N), nunca à página.
+- **Catálogo das 11 fontes** (aba `?aba=fontes`), lido de `sources`: tipo, fase, `robots.txt`, intervalo mínimo entre requisições, periodicidade, campos permitidos do RF-RAD-04 traduzidos, a avaliação jurídica do R03 em `<details>` e a chave de ligar/desligar (só gestor e admin). Rodapé diz por que **GetNinjas está fora**.
+- **Entrada manual** em folha lateral (por baixo no celular): nome e fonte bastam; o resto é opcional. A resposta conta o que a higiene marcou.
+- Esqueleto no formato final do cartão, vazio que explica por que está vazio, erro em português com saída. Alvo de toque mínimo de 44px no celular (medido: zero abaixo), zero rolagem horizontal em 390×844.
+
+### Arquivos
+
+`supabase/migrations/20260904001401_radar_candidatos.sql` · `supabase/tests/14_radar_candidatos.sql` (69 asserções) · `apps/web/src/app/(app)/radar/{page,layout}.tsx` · `apps/web/src/components/radar/` (`tipos.ts`, `dados.ts` + `dados.test.ts`, `catalogos.ts`, `tela-radar.tsx`, `barra-fila.tsx`, `cartao-candidato.tsx`, `catalogo-fontes.tsx`, `folha-candidato.tsx`, `dialogo-decisao.tsx`, `aviso-coleta.tsx`, `estados.tsx`) · `packages/schema/src/database.types.ts` regenerado.
+
+### Verificado
+
+`pnpm --filter web typecheck` e `eslint` verdes; 9 testes Vitest novos (leitura do `config` jsonb de cada fonte, tradução de erro, cobertura dos motivos das RPCs); 69 asserções pgTAP verdes; `supabase db lint --local` sem nenhum apontamento nos objetos deste módulo. Aprovar, mesclar, recusar e a recusa de ligar fonte sem `robots.txt` avaliado foram exercitados de ponta a ponta pelo navegador. Vinte e uma fotos em 1440×900 e 390×844, tema claro e escuro, conferidas uma a uma. **A base voltou ao estado real (100 organizações, fila com 0 candidatos): os candidatos usados para fotografar a fila cheia foram apagados.**
+
+**Conserto de regressão apontada no D5 (módulo de ligação):** as três funções novas em `app` (`cpf_is_valid`, `ddd_da_regiao`, `supplier_candidates_normalize`) nasciam com o `EXECUTE` que o Postgres dá a `PUBLIC` e quebravam as asserções 49 e 50 de `09_seguranca_acesso.sql`. A `001401` agora revoga e concede como a `000500` faz; o teste 09 voltou a passar inteiro.
+
+### Precisa de decisão humana
+
+1. **Nome da tabela**: o Apêndice D do PRD diz `supplier_candidate` (singular); aqui ficou `supplier_candidates`, no plural, como todas as tabelas já implementadas. É só nomenclatura — **Rafael/Matheus** confirmam.
+2. **Quem mescla**: mesclar altera a ficha, então respeita a regra que já existe (`app.org_is_editable`: gestor/admin ou dono da ficha). Como 72 das 100 organizações estão sem dono, um `sdr` não consegue mesclar quase nada e recebe a recusa explicada. Se a Heloísa for revisar a fila, ou ela é `gestor`, ou essa regra precisa ser revista — **Rafael/Matheus**.
+3. **Exceção do RF-RAD-04** (nota, nº de avaliações, preço "a partir de" e capacidade como sinais numéricos internos): as colunas existem e ficam nulas; a validação com o advogado segue pendente (PRD §13, item 10) — **Dennis**.
+
+### Pendente (depende de coisa que ainda não existe)
+
+- **O coletor.** Nenhuma fonte é lida por robô: falta o `worker-ingest` (D4), a máquina dedicada com Docker (Luiz) e o parecer jurídico sobre o Casamentos.com.br (Dennis). Enquanto isso a fila só enche pela entrada manual — e a tela diz exatamente isso.
+- **`raw_capture`, `source_record`, `field_provenance` e `ingest_jobs`** não foram criadas: são do worker. A proveniência do que entra hoje mora em `supplier_candidates.payload`.
+- **Score do RF-RAD-12**: a coluna `score` existe e fica nula, porque os sinais (nota, avaliações, presença em ≥ 2 diretórios, seguidores) vêm da coleta. A tela não mostra número inventado.
+- **Painel de cobertura do RF-RAD-13** (categoria × bairro, % com WhatsApp válido, taxa de resposta por fonte, alerta de queda > 30% entre execuções) precisa de execuções para comparar.
+- **Enriquecimento do RF-RAD-07** (RFB, Places, Business Discovery, site do fornecedor) e a **retenção do RF-RAD-15** (candidato nunca contatado apagado em 90 dias) esperam o `pg_cron` dos workers.
+
+## D8 — 04/09/2026 — Metas: meta contra realizado por pessoa e por período (RF-MET-01, RF-MET-02)
+
+### O que foi entregue
+
+A rota `/metas` deixou de ser o `EmConstrucao` e passou a ler `public.goal_progress` (migração `20260904001400`). A tela não soma nada: escolhe o recorte, mostra o número e diz, em português, o que falta e a que ritmo. A conta inteira (portas contadas com os tetos do RF-MET-01, dias úteis, ritmo necessário) continua no Postgres (ADR-03).
+
+- **Recorte**: dia, semana e mês, com passo para trás e para a frente e volta para o período atual. A aritmética de período do navegador espelha `app.goal_bounds` (semana na segunda, mês no dia 1) e existe só para saber o que pedir e escrever o rótulo antes da resposta chegar; quando a resposta chega, valem `periodo_inicio` e `periodo_fim` do banco.
+- **Um cartão por pessoa, lado a lado, em ordem alfabética.** Sem posição, sem pontuação composta, sem cor de vitória: o leaderboard do RF-MET-09 é v1 e vem com regra própria de reconhecimento; antecipá-lo aqui seria o painel de call center que o R07 §3.1 documenta como risco (Lei de Goodhart). Dentro do cartão: portas abertas em número grande (a meta do plano), depois as métricas COM meta, e por último, recolhido, o que não tem meta.
+- **Barra neutra, de propósito.** A única cromia do produto é a escala térmica do negócio; verde de "bateu" e vermelho de "não bateu" inventariam um sexto significado para a cor. Quem carrega o estado é a extensão do preenchimento, o número em IBM Plex Mono e a frase embaixo. A barra leva ainda uma **marca de ritmo**: um traço na fração de dias úteis já decorrida, para separar "atrás" de "adiantado" de relance.
+- **Quem define a meta**: só gestor e admin veem "Definir meta"; a folha grava em `public.goals` (leitura + `update`/`insert`, porque a chave única é um índice parcial e o `on_conflict` do PostgREST não aponta para índice com predicado) e oferece remover. `sdr` vê só o próprio cartão e uma linha dizendo que o alvo é definido pelo gestor — a tela nem sugere o que a RLS recusaria.
+- **Honestidade na própria tela**: cada métrica carrega a frase de contagem escrita no banco (`goal_progress.fonte`), "Cadastros iniciados" e "Publicados" levam o chip **proxy** com a explicação de que a fonte da verdade é a plataforma Komune, e "Respostas recebidas" aparece **sem número** (traço), dizendo que depende do inbox de WhatsApp do D5. Nenhuma dessas frases está no código da tela: vêm do banco, para não divergirem.
+
+### Arquivos
+
+`apps/web/src/app/(app)/metas/{page,layout}.tsx` · `apps/web/src/components/metas/` (`periodo.ts` + `periodo.test.ts`, `tipos.ts`, `dados.ts`, `tela-metas.tsx`, `cartao-pessoa.tsx`, `barra-progresso.tsx`, `frase-da-meta.tsx`, `folha-meta.tsx`, `seletor-periodo.tsx`).
+
+### Verificado
+
+`pnpm --filter web typecheck` e `eslint` verdes nos arquivos deste módulo (o único erro restante do `tsc` do app está em `app/(app)/ligar/page.tsx`, de outro módulo); 18 testes Vitest novos da aritmética de período. Definir, editar e remover meta foram exercitados de ponta a ponta pelo navegador com sessão de gestor — as 11 metas do plano em `public.goals` foram criadas PELA TELA, não por SQL. Dezoito fotos em 1440×900 e 390×844, tema claro e escuro, conferidas uma a uma, incluindo carregando (esqueleto no formato final), erro e a folha de definição. Medido: zero rolagem horizontal, zero alvo de toque abaixo de 44px no celular, nenhum par de cor reprovado no contraste.
+
+### Precisa de decisão humana
+
+1. **Os valores das metas** gravados hoje são os padrões escritos no PRD RF-MET-02 e no R07 §3.2 (3 portas abertas/dia, 9 batidas/dia, 2 reuniões marcadas/dia, 15 portas abertas/semana, 5 cadastros/semana, 3 publicações/semana, 120 alvos novos/mês), que o próprio PRD marca como "a confirmar por Rafael". Estão no banco local para a tela ter o que mostrar; **Rafael** fecha a tabela.
+2. **Meta do time** (`goals.user_id` nulo, `team_id` preenchido) e as metas coletivas do RF-MET-02 (450 alvos até 30/09, 100 fornecedores até 06/11, 14 categorias com ≥ 5 até 04/12) **não** têm tela: a tabela `public.teams` está vazia e ninguém tem `team_id`. Antes de construir, é preciso decidir se existe "time" no MVP com duas pessoas — **Rafael/Matheus**.
+
+### Pendente (depende de coisa que ainda não existe)
+
+- **Respostas recebidas** (`replies`) não é medível: depende do inbox de WhatsApp (D5) e da tabela de mensagens. A linha aparece sem número, com o motivo escrito, em vez de mostrar zero.
+- **Cadastros iniciados e Publicados** saem do funil do CRM como proxy declarado; a fonte da verdade é a plataforma Komune, cuja integração (`crm-pre-registration` + webhook de status) ainda não está ligada.
+- **Dias neutros, meta proporcional à dedicação e streaks** (RF-MET-02, R07 §3.4) não têm coluna nem tela: `goals.note` guarda o "por quê" em texto livre enquanto isso.
+- **Leaderboard, badges e desafios** (RF-MET-09) são v1 e ficaram deliberadamente de fora.
+- **Métrica `calls_made`**: continua sendo o único desvio do Apêndice D do PRD, registrado na migração `20260904001400` e pendente de confirmação de Rafael/Matheus. A tela a trata como qualquer outra métrica.
+
+## D10 — 04/09/2026 — Admin: pessoas, catálogos e ferramentas de LGPD (RF-ADM-01 a RF-ADM-04, RF-ADM-06; PRD §7.9 e §10; anexo R06)
+
+### O que foi entregue
+
+A rota `/admin` deixou de ser o `EmConstrucao` e virou o módulo de verdade, em três abas com aba e seção na URL (`/admin?aba=lgpd&secao=auditoria` é link que se manda no grupo). Quem não é admin nem gestor **não** cai mais em `/sem-permissao`: recebe uma tela que diz o que existe ali, que nada disso muda o trabalho do dia e a quem pedir — não é erro, é o desenho de acesso aparecendo (RF-ADM-01).
+
+- **Pessoas** (RF-ADM-01, RF-ADM-06): quem tem acesso hoje (papel, situação, desde quando, e o que aquele papel faz em uma linha), a lista de permitidos e os domínios permitidos. Admin troca papel pelo seletor da linha, tira e devolve acesso com confirmação que conta a consequência, adiciona e remove e-mail da lista. Ninguém altera o próprio papel nem o próprio acesso (a tela nem oferece). Gestor lê tudo isso e a tela diz que só admin altera; a lista de permitidos é só de admin (`allowed_users_admin_select`) e aparece como "Só para admin", não como erro. Toda troca de papel avisa que **vale a partir do próximo login da pessoa** — é o hook que carimba `app_metadata.app_role` no token.
+- **Catálogos** (RF-ADM-02), em seis seções com contagem: categorias (19, com quantos parceiros usam cada uma), cidades (22, com "Grande Natal"), feriados (32, com a data em dia da semana e formulário para acrescentar e remover), motivos de perda (9, com quantos negócios se perderam por cada um), desfechos de interação (34) e modelos de mensagem (124, com busca no texto e leitura do corpo). Edição leve de propósito: ligar, desligar e, nos feriados, acrescentar e remover. Nome, slug e as consequências continuam vindo de migração e seed, como o PRD define para o MVP.
+- **Desfecho é coisa séria, e a tela trata como tal.** Cada linha mostra a consequência automática inteira antes do clique (etapa de destino pelo NOME da etapa, temperatura, próxima ação com prazo, janela de silêncio, se conta como porta aberta ou batida) e o desligar passa por uma confirmação que repete, com os valores daquele desfecho, exatamente o que deixa de acontecer e quantas atividades já foram registradas com ele.
+- **LGPD** (RF-ADM-03, RF-ADM-04) em quatro registros: **lista de supressão** (quem pediu para parar, com o motivo, o canal, a data, quem registrou e o começo do hash — explicando na tela por que ali não há telefone: o banco guarda o hash, PRD §10.6) mais os parceiros marcados "não contatar"; **telefones revelados** (`pii_access_log`, com filtro por pessoa e por dia); **auditoria** (`audit_log`, filtro por pessoa e por dia, paginada, com o nome do parceiro ou do negócio resolvido no lugar do UUID e o diff em português); **exportar parceiro** (busca por nome e arquivo JSON com ficha, contatos, negócios, atividades, tarefas e consentimentos).
+- **A auditoria não vira atalho para ler telefone.** O `audit_log` guarda a linha inteira, telefone incluído. A tela mostra QUE o campo mudou e nunca QUAL era o valor para telefone, e-mail, CNPJ, @instagram, endereço, coordenada, corpo de mensagem e evidência de consentimento — esses aparecem como "mudou, sem exibir o valor", com o motivo escrito num aviso. Para ver um número continua havendo um caminho só: a ficha do parceiro, com `reveal_phone` e registro.
+- **Exportação honesta.** O telefone só entra no arquivo se for pedido, e quando é pedido passa pela RPC `reveal_phone`, que grava a revelação em `pii_access_log` — foi assim que a primeira linha real desse registro nasceu. A tela diz, em português, que a exportação em si ainda não vira uma linha `export_csv`, porque isso depende da Edge Function `export-lgpd` (v1).
+
+### Arquivos
+
+`apps/web/src/app/(app)/admin/{page,layout}.tsx` · `apps/web/src/components/admin/` (`tipos.ts`, `formatos.ts` + `formatos.test.ts`, `dados.ts`, `estados.tsx`, `abas.tsx`, `confirmar.tsx`, `tela-admin.tsx`, `area-restrita.tsx`, `painel-pessoas.tsx`, `painel-catalogos.tsx`, `painel-lgpd.tsx`, `exportar-parceiro.tsx`).
+
+### Verificado
+
+`pnpm --filter web typecheck` verde e `eslint` limpo nos arquivos deste módulo; 280 testes Vitest do app passam, 11 deles novos (fuso de Natal na data pura e no recorte do dia, tradução de ação/tabela, o diff que nunca expõe campo sensível, janela de silêncio, erro em português, leitura de aba e seção da URL). Fluxos exercitados de ponta a ponta pelo navegador com sessão real: adicionar e-mail na lista de permitidos (foi assim que a conta de gestor deste teste nasceu), abrir o texto de um modelo, abrir a confirmação de desligar um desfecho e gerar o arquivo de exportação com telefone (arquivo JSON conferido; a revelação apareceu no registro de acesso no mesmo minuto). Trinta e cinco fotos em 1440×900 e 390×844, tema claro e escuro, conferidas uma a uma, incluindo os estados vazios, a tela de quem não é admin nem gestor e as três abas vistas por um gestor de verdade. Medido: zero rolagem horizontal, nenhum alvo de toque abaixo de 44px no celular (o único item medido abaixo disso é o `<select>` escondido de 1px que o Radix cria, presente em todas as telas), contraste AA no claro e no escuro.
+
+### Precisa de decisão humana
+
+1. **Um único admin ativo.** O CRM local tem uma conta admin; o PRD prevê três (Rafael, Luiz e Matheus). A tela avisa isso em destaque enquanto houver só uma. **Rafael/Luiz** definem os e-mails reais.
+2. **`allowed_domains` com `komune.app.br → sdr` está aberto**: qualquer e-mail do domínio entra sozinho como SDR. A tela deixa fechar o domínio, mas a política é decisão de acesso — **Rafael/Luiz**.
+3. **Desligar desfecho e categoria não é reversível na estatística**: as atividades já registradas continuam apontando para o item desligado. Se a intenção for reescrever a régua (nome, etapa de destino, prazo), isso é migração, não tela — **Matheus**.
+
+### Pendente (depende de coisa que ainda não existe)
+
+- **Exportação oficial do titular** (`export-lgpd`): a Edge Function do PRD não existe neste MVP. O arquivo é montado no navegador com o que a sessão já pode ler, e a exportação sem telefone não deixa rastro no sistema. A tela diz isso.
+- **`message_templates` não envia nada**: o WhatsApp depende da Cloud API oficial e da aprovação dos modelos pela Meta (RF-CON-01, trabalho do Luiz). A coluna de situação diz o que está no catálogo, não o que a Meta aprovou — está escrito na tela.
+- **Lista de supressão e registro de acesso a telefone nascem vazios** e assim aparecem: nenhum dado de mentira foi criado para encher a tela. Eles enchem sozinhos quando alguém responder SAIR ou revelar um telefone.
+- **Pedidos de titulares, retenção automática (RF-ADM-05) e observabilidade dos workers (RF-ADM-07)** ficaram fora: são v1 e dependem de `pg_cron` e dos workers.
+- **Etapas e SLAs por funil, automações por etapa, cadências, limites de envio, zonas de rota e FAQ da IA** — o resto do RF-ADM-02 — continuam vindo de migração e seed.
+## D10 — Publicação na Vercel (preparação)
+
+### Entregue
+
+Build de produção conferido de verdade (`pnpm --filter web build`, Next 16.3.4 com Turbopack): **passa**, sem erro e sem aviso. 20 rotas — `/` e `/manifest.webmanifest` estáticas, as demais renderizadas sob demanda, mais o proxy. Repetido com variáveis de produção falsas (`https://exemplo.supabase.co`) para provar que o build **não** depende de um Supabase alcançável: nada é buscado do banco em tempo de build.
+
+- **`apps/web/next.config.ts`**: acrescentado `distDir: process.env.NEXT_DIST_DIR ?? '.next'`. O padrão continua `.next`, que é o que a Vercel espera; a variável existe só para rodar um build de conferência na mesma máquina sem derrubar o `pnpm dev`, que mantém o `.next` aberto. `.gitignore` passou a ignorar `.next-*/`.
+- **`apps/web/vercel.json`** (novo): `framework: nextjs` e `regions: ["gru1"]`. Sem isso as funções nasceriam nos Estados Unidos e cada consulta ao Supabase de São Paulo daria uma volta ao continente.
+- **`apps/web/.env.example`** reescrito: são **três** variáveis, todas `NEXT_PUBLIC_*`, todas públicas por natureza — `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_APP_URL`. Conferido por varredura no `apps/web/src`: o app **não** usa `service_role`, Anthropic, Meta, HMAC da Komune nem Sentry em lugar nenhum, e não tem Route Handler de API. Nenhum segredo deve ser cadastrado na Vercel.
+- **`.env.example` da raiz**: cabeçalho corrigido para **Tríade** e uma seção nova dizendo onde cada variável mora (máquina dedicada, Edge Functions Secrets ou painel da Vercel), mais a `NEXT_PUBLIC_APP_URL` que faltava na lista.
+- **`docs/operacao/publicar-na-vercel.md`** (novo): passo a passo do zero — criar conta, importar `amovingmax/triadecrm`, apontar o **Root Directory** para `apps/web` (o erro mais comum em monorepo pnpm), Node 22, colar as três variáveis, publicar, e o que ajustar no Supabase e no Google depois que a URL existe. Inclui tabela de erros por sintoma, o que é gratuito, onde começa a custar, e como a Heloísa instala a PWA no iPhone e no Android.
+
+### Precisa de decisão humana
+
+1. **Plano da Vercel.** O Hobby é gratuito e tecnicamente suficiente para duas pessoas, mas os termos de uso o restringem a projeto pessoal sem fins comerciais; o Tríade é ferramenta interna de empresa. O plano correto é o Pro (~US$ 20/mês por membro) — **Rafael**.
+2. **Plano do Supabase.** O projeto Free **pausa depois de 7 dias sem atividade** e não tem backup diário. Para uma base de captação real, o Pro (US$ 25/mês) é o argumento de backup, não de volume — **Rafael/Luiz**.
+3. **Domínio próprio** (algo como `triade.komune.app.br`) em vez do `*.vercel.app` — **Rafael/Luiz**.
+
+### Pendente (bloqueia o uso em produção, e não é código)
+
+- **Migrações `20260904001300`, `20260904001400` e `20260904001401` não estão aplicadas no projeto remoto `komune-crm`.** Conferido em 04/09/2026: o remoto tem o schema até `…001200` e os dados reais (100 organizações, 100 negócios, 34 desfechos, 8 e-mails na allowlist), mas `call_attempts`, `call_scripts`, `goals` e `supplier_candidates` respondem 404. Sem `supabase db push`, as telas de Ligação, Metas, Relatórios e Radar quebram em produção. É operação combinada com o **Luiz** (ADR-02).
+- **Linhas de catálogo das tabelas novas.** `call_scripts` e `goals` nascem vazias no remoto: essas linhas vivem no `supabase/seed.sql`, que só roda em `supabase db reset` (local) e não viaja no `db push`. Precisa de um caminho de carga combinado com os donos desses módulos.
+- **Hook `custom_access_token` no remoto.** Se estiver desligado no painel, o token sai sem `app_role` e todo mundo entra como `leitura`. Ligar em Authentication → Hooks.
+- **Sem *service worker*.** A PWA instala e abre em tela cheia (o HTTPS da Vercel é justamente o que faltava), mas **não funciona sem internet**. Para o uso da Heloísa na rua, em Natal, isso é a próxima peça da PWA — e não é a publicação que resolve.
+
+### Não muda com este deploy
+
+Coletor do Radar, WhatsApp Cloud API, filas `pgmq`/`pg_cron` e os workers `ingest | wa | ai` continuam fora: são a máquina dedicada e o deploy de Edge Functions do Supabase, não a Vercel. Cada tela afetada já diz isso em português para quem a abre.
+
+## D5 — 04/09/2026 — Ligar: montar e acompanhar o lote, lado da interface (R13 §3.1 e §6; RF-FUN-12/13, RF-BAS-14)
+
+Rota `/ligar` (o momento de MONTAR; quem liga trabalha em `/ligar/[id]`, do outro workflow). Nada de dado de mentira: a tela lê as 100 organizações reais e os 99 negócios da base.
+
+- `components/ligacao/consultas.ts` — camada de rede. Catálogos (`pipelines` filtrados para fornecedor e produtor, `call_scripts` publicados), `carregarBaseDaMontagem` (seis consultas pequenas por funil, uma vez, e todo filtro depois disso é memória), `montarLote` (RPC `public.montar_lote` com o retorno revalidado por zod), `carregarLotes` (contadores + reuniões por `call_attempts.outcome_id = lig_reuniao_marcada`) e `encerrarLote`.
+- `components/ligacao/lote-montagem.tsx` + `lote-previa.tsx` — folha de montagem em quatro toques (funil, temperatura, "Montar N", e o nome já vem escrito) com **prévia do volume ao vivo**: quantos entram do tamanho pedido, quantos estão no recorte e quem fica de fora por motivo nomeado (sem telefone, não contatar, em janela de recontato, **já reservado em outro lote**, sem negócio aberto). Tamanho, ordem, tentativas, horas entre tentativas, meta, período e roteiro ficam atrás de "Ajustar".
+- **Regra dura do R13 §3.1 na tela**: a temperatura é lista, não rádio. Marcar duas mostra o motivo escrito ("a conversão do lote vira uma média sem significado: os quentes carregam os frios e ninguém consegue dizer se foi o roteiro que funcionou ou se a base já era boa"), oferece "Ficar só com frios/quentes" e **desabilita** a montagem até sobrar uma.
+- Recorte × lente: o que vai para `montar_lote` é funil + temperatura + categorias; cidade, bairro, telefone, tentativas acumuladas e tempo parado são **leitura** (mudam a prévia e a composição, nunca o lote), e a tela escreve isso. Motivo: `public.montar_lote` não recebe esses parâmetros — oferecer um filtro que a montagem ignora produziria um lote diferente do que a tela mostrou.
+- `components/ligacao/lote-lista.tsx` + `fila-progresso.tsx` — lista de lotes com os quatro números em IBM Plex Mono (`Faltam · Feitos · Atenderam · Reuniões`), barra de andamento, roteiro/ordem/tentativas, "Abrir e ligar" e "Encerrar" (com a consequência escrita: "os N que ainda estão na fila voltam para a base").
+- `components/ligacao/lote-estados.tsx` — esqueleto no formato final, vazio que diz o que um lote é e o que fazer, e erro traduzido por `traduzirFalha` (nada do Postgres chega à tela).
+- `lib/navegacao.ts` — item "Ligar" (`PhoneCall`, D5) no menu.
+- `?montar=1` abre a folha de montagem já aberta (só para quem pode montar), para o "montar outro lote" da tela de chamada cair direto no trabalho.
+- Verificado: `pnpm --filter web typecheck`, `eslint` e `prettier --check` limpos nos arquivos tocados; `vitest` 287 testes (7 novos em `lote-previa.test.ts`, cobrindo elegibilidade, contagem por motivo, teto do tamanho e a garantia de que a lente não encolhe o lote). Fotos autenticadas em 1440 e 390 conferidas: prévia com dados reais (44 no recorte · 22 podem entrar · 20 sem telefone), aviso de mistura de temperatura, recibo do banco ("22 de 25 pedidos entraram"), lista com dois lotes e sem rolagem horizontal no celular.
+- Pendente: cidade, bairro, tentativas e tempo parado só viram recorte de verdade se `public.montar_lote` ganhar esses parâmetros (hoje são lente de leitura); a prévia não enxerga a `suppression_list` (hash + função no schema `app`, fora do PostgREST), então quem conta suprimido é a montagem; `encerrar` não tem "pausar" na tela, embora o status exista.
+- Decisão humana: se a prévia deve ganhar filtro real por bairro (exige mais um parâmetro em `montar_lote`) ou se o recorte por funil, temperatura e categoria basta para as duas pessoas que ligam.
+## D5 — 04/09/2026 — Ligar: a tela onde se liga, `/ligar/[id]` (R13 §3.1 a §3.4 e §6; RF-BAS-14, RF-FUN-04, RF-MET-01, RF-CON-18)
+
+A outra metade do módulo de ligação: montar o lote é `/ligar` (do outro workflow); **ligar** é `/ligar/[id]`, aqui. A separação é o desenho, não arrumação de arquivos — montar é uma vez por turno e é onde se pensa; ligar é o dia inteiro e é onde não se escolhe mais para quem ligar (R13 §3.1). Nada de dado de mentira: a fila sai de `public.proximo_da_fila` sobre as 100 organizações reais.
+
+- `app/(app)/ligar/[id]/page.tsx` + `components/ligacao/tela-ligar.tsx` — a rota. O servidor entrega só listas estáveis (catálogo de desfechos com `requires_answer`, motivos de perda, etapas, feriados, funis, roteiros publicados, categorias); **nenhum telefone passa pelo servidor da tela**: quem revela é `proximo_da_fila`, no cliente, com registro em `pii_access_log`.
+- `components/ligacao/tela-chamada.tsx` — o ciclo: **discar (1 toque) → falar (1 toque por nó) → tabular (1 toque) → próximo (0 toques)**. Contato que não atendeu custa 2 toques; que atendeu, de 6 a 8. O recibo some sozinho em 5 s e traz o próximo já com a fala de abertura pronta (o "encerrar-e-próxima" do R13 §7.6).
+- `components/ligacao/chamada-provedor.ts` — o adaptador **manual** por trás de `ProvedorTelefonia`: não existe discador contratado, então "Ligar" abre o `tel:` do aparelho, "Copiar número" serve a quem liga de outro telefone e "Liguei" a quem já discou por fora — os três abrem a MESMA tentativa (`iniciar_chamada`) e o mesmo cronômetro. `detectaAtendimento: false`, porque não há AMD e a tela não finge saber que alguém atendeu.
+- `components/ligacao/chamada-cabecalho.tsx` — nome, categoria, bairro, etapa, temperatura, tentativa (com aviso de última) e o **número em corpo de cartaz** em IBM Plex Mono. No celular o cabeçalho encolhe durante a chamada: numa tela de 390 px a ficha inteira empurrava a fala para baixo da dobra.
+- `components/ligacao/roteiro-no.tsx` + `roteiro-objecoes.tsx` + `roteiro-texto.ts` — a árvore de 37 nós: uma fala em corpo grande e as respostas do cliente como botões; cada toque empilha o id do nó em `caminho_script`. As objeções ficam em coluna fixa no desktop e em gaveta no celular, alcançáveis de qualquer nó. Placeholders preenchidos com o que a ligação tem em mãos (`[saudacao]`, `[empresa]`, `[nome]`, `[origem]`, `[eu]`, `[dia]`, `[hora]`), e `[dia]`/`[hora]` recebem a **próxima abertura da janela** como proposta, para a frase não ser lida quebrada em voz alta.
+- `components/ligacao/chamada-tabulacao.tsx` — os dois eixos do R13 §3.3 desenhados na forma da barra: sem conversa, os quatro resultados TÉCNICOS ficam sempre à mão; com conversa, eles somem e o que aparece é o desfecho comercial (do nó `fim`, num botão só, ou os cinco do catálogo em "Encerrar agora"). Os cinco saem de `interaction_outcomes.requires_answer`, não de lista em código.
+- `components/ligacao/chamada-extras.tsx` — os quatro casos que custam um toque a mais, nenhum por burocracia: reunião (data, hora, formato), sem interesse (motivo de perda), retorna depois (data combinada) e "não me ligue mais" (confirmação, porque não tem volta). A data já combinada no roteiro entra preenchida.
+- `components/ligacao/chamada-recibo.tsx` — o que foi gravado, a próxima ação, se o contato volta para a fila e quantos faltam. **Não existe "Desfazer"**: a tabulação é o commit e `sdr` não tem `delete` em `activities`; prometer um desfazer que o banco não deixa cumprir seria mentira. O que dá para corrigir sem mentir está lá: a anotação e o "com quem você falou?" (RF-MET-01, um toque, `corrigirComQuem`).
+- `components/ligacao/chamada-rpc.ts` — as cinco RPCs com o retorno revalidado por zod e recusa prevista traduzida; nenhum texto do Postgres chega à tela. `chamada-janela.ts` monta a frase do bloqueio a partir de `abreEm` calculado sobre a `holidays` real, em vez da frase fechada do contrato — no domingo 06/09 a segunda é feriado e a fila só volta na terça, e as duas datas não podiam brigar na mesma linha.
+- Verificado: `pnpm --filter web typecheck`, `eslint` e `prettier --check` limpos. Fotos autenticadas em 1440 e 390 conferidas com a base real (Agência DJs Party, Anima Mix, Bar Service Coquetéis): discagem, chamada em curso com cronômetro, objeção, nó de fim, folha de reunião pré-preenchida, recibo de "não atendeu" e de "reunião marcada", e a janela bloqueada no domingo com "Abre terça-feira, 08 de setembro, às 09:00". Sem rolagem horizontal em 390 px; contraste e alvos de toque medidos pelo `--medidas`. Conferido no banco: `call_attempts` com `caminho_script` de 9 nós e `capturas`, negócio movido para `reuniao_marcada`, temperatura `quente` e a tarefa na data da reunião.
+- Pendente: a reserva de um item aberto e abandonado só cai por `app.expirar_reservas` (30 min, `pg_cron`) — a tela não devolve sozinha ao sair, e oferece "Pular este contato" como saída explícita; o rascunho local da ligação em curso (`CHAVE_LIGACAO_EM_CURSO`) não foi implementado, então recarregar a página no meio de uma conversa perde o caminho já percorrido (a tentativa em `call_attempts` continua aberta e é fechada sem resultado quando o item é devolvido); `chamada_muda` e `queda_de_linha` continuam reservados para o dia em que houver discador, porque no modo manual não há evento que os distinga de "não atendeu".
+- Redação da seed: os nós `gancho_fornecedor`, `gancho_produtor`, `fim_reuniao` e `fim_retorna` chamam a pessoa pelo nome no meio da frase, e 66 dos 100 parceiros não têm contato nomeado — sem emenda a fala saía "Ótimo., a Komune…" e "Obrigado pelo tempo,. Até lá!". A tela costura a pontuação (`costurarPontuacao`), mas a correção definitiva é reescrever esses quatro textos no `supabase/seed.sql` (bloco 12c), que é do outro workflow.

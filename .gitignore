@@ -2,6 +2,8 @@
 node_modules/
 .pnpm-store/
 .next/
+# builds de conferência feitos com NEXT_DIST_DIR (não derrubam o `pnpm dev`)
+.next-*/
 dist/
 build/
 out/
