@@ -24,6 +24,13 @@ begin
   perform set_config('request.jwt.claims', '', true);
   execute 'reset role';
 end $$;
+-- Total de negócios na base, lido FORA da RLS (definer, dono postgres). "Vê todos os
+-- negócios" tem de ser comparado com a base inteira, e não com um número fixo: qualquer
+-- carga de dados de outro processo (a seed de leads, por exemplo) tornaria a contagem
+-- fixa falsa sem que nada de RLS tivesse mudado.
+create function pg_temp.total_negocios() returns int language sql security definer set search_path = '' as $$
+  select count(*)::int from public.deals
+$$;
 
 -- ---------- usuários de teste (o trigger em auth.users cria o profile com o papel) ----------
 insert into public.allowed_users (email, role, note) values
@@ -126,7 +133,7 @@ select is(
   '+5584999990011',
   'financeiro: telefone completo em contacts');
 select results_eq(
-  $$select count(*)::int from public.deals$$, $$values (2)$$,
+  $$select count(*)::int from public.deals$$, $$select pg_temp.total_negocios()$$,
   'financeiro: vê todos os negócios');
 select results_eq(
   $$select count(*)::int from public.suppression_list$$, $$values (0)$$,
@@ -194,7 +201,7 @@ select throws_ok(
   $$insert into public.allowed_users (email, role) values ('x@teste.local', 'admin')$$, '42501', null,
   'sdr: não escreve em allowed_users');
 select results_eq(
-  $$select count(*)::int from public.deals$$, $$values (2)$$,
+  $$select count(*)::int from public.deals$$, $$select pg_temp.total_negocios()$$,
   'sdr: vê todos os negócios do funil');
 select results_eq(
   $$with u as (update public.deals set next_action = 'x' where id = 'd0000000-0000-4000-8000-000000000001' returning 1) select count(*)::int from u$$,
