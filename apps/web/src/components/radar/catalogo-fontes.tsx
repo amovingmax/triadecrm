@@ -27,10 +27,11 @@ import {
  * de requisições. Cada texto aqui vem do banco (`sources`), que por sua vez veio
  * da avaliação do anexo R03 — nada é escrito na tela à mão.
  *
- * Ligar uma fonte aqui NÃO começa coleta nenhuma. Enquanto o worker não existir,
- * ligada quer dizer só uma coisa: ela pode ser escolhida como origem de um
- * candidato ou de um parceiro. A tela diz isso em vez de deixar a chave sugerir
- * um robô que não existe.
+ * Ligar uma fonte aqui NÃO começa coleta nenhuma, e a distinção continua valendo
+ * agora que o coletor existe: ligada quer dizer "liberada como origem" — ela pode
+ * ser escolhida no cadastro de um candidato ou de um parceiro, e o coletor só a
+ * lê quando alguém agenda uma coleta. Desligar, sim, para a coleta: o worker
+ * recusa lote de fonte desligada (RF-RAD-01).
  */
 export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
   const clienteDeConsultas = useQueryClient();
@@ -49,8 +50,8 @@ export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
       }
       toast.success(variaveis.ligar ? 'Fonte ligada.' : 'Fonte desligada.', {
         description: variaveis.ligar
-          ? 'Ela já pode ser escolhida como origem. A coleta automática continua desligada.'
-          : 'Ela deixa de aparecer como origem em cadastros novos.',
+          ? 'Ela já pode ser escolhida como origem, e o coletor volta a aceitar coleta dela. Ligar não inicia coleta nenhuma sozinho.'
+          : 'Ela deixa de aparecer como origem em cadastros novos, e o coletor passa a recusar coleta dela.',
       });
       void clienteDeConsultas.invalidateQueries({ queryKey: ['radar'] });
     },

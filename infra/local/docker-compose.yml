@@ -1,18 +1,41 @@
-# Docker Compose da máquina dedicada do KOMUNE CRM (ADR-04: recepção em nuvem, processamento local).
-# Sobe os três workers (mesma imagem, comandos diferentes) e o Metabase OSS.
+# ---------------------------------------------------------------------------
+# TRÍADE — máquina dedicada (ADR-04: recepção em nuvem, processamento local).
 #
-# Uso, a partir desta pasta (infra/local):
-#   docker compose build                      # constrói a imagem dos workers a partir da raiz do repo
-#   docker compose up -d                      # sobe só o Metabase (os workers ficam no profile "workers")
-#   docker compose --profile workers up -d    # sobe Metabase + workers
-#   docker compose logs -f worker-wa
-#   docker compose --profile workers down     # derruba tudo (os dados do Metabase ficam em ./data)
+# O que roda aqui: os três workers (uma imagem, três comandos), o Metabase (painéis),
+# o OSRM (matriz de tempos da rota da tarde, RF-ROT-03) e o faster-whisper (transcrição
+# do áudio que o fornecedor manda, RF-MET-07 e R05 §"Transcrever áudio recebido").
 #
-# Segredos: lidos de ../../.env (raiz do repo, gitignored; modelo em ../../.env.example).
-# Overrides só desta máquina, se precisar: ./.env (opcional, também gitignored).
-# Ainda por vir (PRD §9.2): osrm/vroom (rotas, D7) e faster-whisper (transcrição de áudio, v2).
+# O que NÃO roda aqui: recepção de webhook. Meta e Komune batem nas Edge Functions do
+# Supabase, que enfileiram em `pgmq`; estes contêineres só CONSOMEM fila. Por isso
+# nenhum serviço publica porta para a internet — o único `ports:` do arquivo é o do
+# Metabase, preso em 127.0.0.1. Administração pela Tailscale.
+# Passo a passo do zero: docs/operacao/maquina-do-luiz.md
+#
+# Perfis (ligue com COMPOSE_PROFILES no ./.env, ou --profile na linha de comando):
+#   (nenhum)      metabase, faster-whisper
+#   workers       worker-ingest, worker-wa, worker-ai
+#   rotas         osrm  (exige o grafo já preparado — veja o perfil osrm-preparo)
+#   osrm-preparo  osrm-preparo (tarefa única: extract → partition → customize)
+#   tunel         cloudflared (só se o Metabase precisar sair do tailnet)
+#
+# Segredos: `../../.env` (raiz do repo, gitignored) + `./.env` (só desta máquina, gitignored).
+# Modelo das variáveis desta pasta: ./.env.example. Nenhum valor de segredo neste arquivo.
+# ---------------------------------------------------------------------------
 
 name: komune-crm
+
+# Rotação de log: sem isso o disco da casa do Luiz enche sozinho em algumas semanas.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+x-endurecimento: &endurecimento
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
 
 x-worker: &worker
   build:
@@ -20,62 +43,317 @@ x-worker: &worker
     dockerfile: apps/workers/Dockerfile
   image: komune-crm/workers:local
   env_file:
+    # Ambiente da máquina dedicada (Supabase, Meta, Anthropic). Modelo: ../../.env.example
     - path: ../../.env
       required: true
+    # Ajustes só desta máquina (limites, URLs do OSRM/whisper). Modelo: ./.env.example
     - path: ./.env
       required: false
   environment:
     NODE_ENV: production
     TZ: America/Fortaleza
-  # Até D4/D5/D6 os workers só registram um heartbeat e encerram; por isso ficam atrás do profile "workers".
+    # Contrato com os serviços locais: nomes de serviço da rede do Compose, nunca IP nem porta do host.
+    OSRM_URL: http://osrm:5000
+    WHISPER_URL: http://faster-whisper:9000
+    # Identifica a linha de `worker_heartbeats` (PK é worker + instance). Uma máquina, uma instância.
+    WORKER_INSTANCE: ${WORKER_INSTANCE:-default}
   profiles: ['workers']
   restart: unless-stopped
-  # Logs em JSON no stdout, com rotação para não encher o disco da máquina.
-  logging:
-    driver: json-file
-    options:
-      max-size: '10m'
-      max-file: '5'
-  # Permite ao contêiner alcançar serviços do host (ex.: Supabase local em 127.0.0.1:54321/54322) também em Linux.
+  # tini como PID 1: repassa SIGTERM ao Node e recolhe zumbis (o Node sozinho, como PID 1, não faz nem um nem outro).
+  init: true
+  # Tempo para o worker terminar a mensagem que está na mão antes do SIGKILL (visibility timeout do pgmq).
+  stop_grace_period: 30s
+  logging: *logging
+  <<: *endurecimento
+  # Sistema de arquivos imutável: o worker só escreve em /tmp. Se alguém injetar código, não há onde gravá-lo.
+  read_only: true
+  tmpfs:
+    - /tmp:size=256m,mode=1777
+  volumes:
+    - ./healthchecks:/opt/healthchecks:ro
+  # Permite alcançar serviços do host (Supabase local em dev) também no Linux.
   extra_hosts:
     - 'host.docker.internal:host-gateway'
 
 services:
-  # Radar: scrapers, planilhas e base CNPJ → esteira de ingestão (D4).
+  # -------------------------------------------------------------------------
+  # Workers — uma imagem, três comandos (CLAUDE.md, ADR-04).
+  #
+  # Healthcheck: NÃO é "o processo está de pé". Um worker vivo sem rede, com chave errada
+  # ou travado num laço engana qualquer verificação de processo e está parado para o CRM.
+  # O script pergunta ao Supabase o mesmo que a tela do Radar pergunta — "esse worker bateu
+  # ponto nos últimos WORKER_HEARTBEAT_MAX_AGE_S segundos?" (public.worker_heartbeats) —,
+  # então ele cobre processo + rede + credencial + trabalho de verdade, de uma vez.
+  # -------------------------------------------------------------------------
+
+  # Radar: scrapers, planilhas e base CNPJ → esteira de ingestão (D4, RF-RAD, ADR-08).
   worker-ingest:
     <<: *worker
     command: ['ingest']
+    mem_limit: ${MEM_WORKER_INGEST:-2g}
+    mem_reservation: 512m
+    memswap_limit: ${MEM_WORKER_INGEST:-2g}
+    cpus: 2.0
+    pids_limit: 512
+    # O Chromium do Crawlee/Playwright (D4) morre com os 64 MB de /dev/shm padrão do Docker.
+    shm_size: 512m
+    healthcheck:
+      test: ['CMD', 'node', '/opt/healthchecks/worker-heartbeat.mjs', 'ingest']
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
 
-  # WhatsApp: envios pela Cloud API da Meta, cadências, áudios (D5).
+  # WhatsApp: envios pela Cloud API da Meta, cadências e áudios (D5, RF-CON, ADR-06).
   worker-wa:
     <<: *worker
     command: ['wa']
+    mem_limit: ${MEM_WORKER_WA:-512m}
+    mem_reservation: 128m
+    memswap_limit: ${MEM_WORKER_WA:-512m}
+    cpus: 1.0
+    pids_limit: 256
+    healthcheck:
+      test: ['CMD', 'node', '/opt/healthchecks/worker-heartbeat.mjs', 'wa']
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
 
-  # IA: classificação, rascunhos, resumos e Assistente (D6).
+  # IA: classificação e extração (Haiku 4.5), rascunhos, resumos e Assistente (Sonnet 5) — D6, ADR-10.
+  # Depende do whisper porque a primeira coisa que a IA faz hoje é transcrever o áudio recebido (R13).
   worker-ai:
     <<: *worker
     command: ['ai']
+    mem_limit: ${MEM_WORKER_AI:-768m}
+    mem_reservation: 192m
+    memswap_limit: ${MEM_WORKER_AI:-768m}
+    cpus: 1.0
+    pids_limit: 256
+    depends_on:
+      faster-whisper:
+        condition: service_healthy
+        # Se o perfil do whisper estiver desligado, o worker-ai sobe assim mesmo (e cai no fallback de API).
+        required: false
+    healthcheck:
+      test: ['CMD', 'node', '/opt/healthchecks/worker-heartbeat.mjs', 'ai']
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
 
-  # Metabase OSS (AGPL, usuários ilimitados) para os painéis do PRD §7.8 (RF-REL) e o relatório de segunda.
-  # Conecte-o ao Postgres com uma role SOMENTE LEITURA (R05): em dev, host.docker.internal:54322 (postgres/postgres);
-  # em produção, o pooler do Supabase (Supavisor, modo sessão) com a role de leitura criada nas migrações.
+  # -------------------------------------------------------------------------
+  # Metabase OSS (AGPL, usuários ilimitados) — painéis do PRD §7.8 (RF-REL).
+  #
+  # Porta presa em 127.0.0.1: de fora da máquina só se chega pelo tailnet
+  # (`tailscale serve --bg 3001`) ou, se precisar sair do tailnet, pelo cloudflared.
+  # Conectar SEMPRE com role somente leitura (R05): em produção, o pooler do Supabase
+  # (Supavisor, modo sessão); em desenvolvimento, host.docker.internal:54322.
+  # -------------------------------------------------------------------------
   metabase:
-    image: metabase/metabase:v0.63.x
-    ports:
-      - '3001:3000'
+    image: metabase/metabase:v0.63.5
+    env_file:
+      - path: ./.env
+        required: false
     environment:
-      # Banco interno do Metabase (H2) persistido no volume abaixo; migrar para Postgres se virar uso intenso.
+      # Banco interno do Metabase. H2 aguenta duas pessoas com folga; migrar para Postgres se crescer.
       MB_DB_FILE: /metabase-data/metabase.db
       JAVA_TIMEZONE: America/Fortaleza
       MB_SITE_LOCALE: pt_BR
+      # A JVM enxerga a memória do cgroup e fica abaixo do mem_limit em vez de ser morta pelo OOM killer.
+      JAVA_OPTS: -XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError
+    ports:
+      # Loopback do host, de propósito: nada de LAN, nada de internet.
+      - '127.0.0.1:${METABASE_PORT:-3001}:3000'
     volumes:
       - ./data/metabase:/metabase-data
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # O entrypoint do Metabase cria o usuário `metabase` e troca de usuário com `su` antes de subir a JVM;
+    # sem estas cinco capabilities ele morre em laço com "adduser: Operation not permitted".
+    # São as cinco de que ele precisa e nada além: o resto continua caído.
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    mem_limit: ${MEM_METABASE:-2g}
+    mem_reservation: 512m
+    memswap_limit: ${MEM_METABASE:-2g}
+    cpus: 2.0
+    pids_limit: 512
     healthcheck:
-      test: ['CMD', 'curl', '--fail', '-I', 'http://localhost:3000/api/health']
+      # /api/health só devolve {"status":"ok"} depois de migrar o banco interno e subir a aplicação:
+      # o `grep` no corpo é o que separa "a porta abriu" de "o Metabase está pronto".
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:3000/api/health | grep -q ''"status":"ok"''']
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 180s
+
+  # -------------------------------------------------------------------------
+  # OSRM — matriz de tempos e ordem das visitas da tarde (RF-ROT-03).
+  #
+  # Sem porta publicada: quem consulta é o worker, pela rede do Compose (http://osrm:5000).
+  # Exige o grafo já preparado em ./data/osrm (perfil osrm-preparo, abaixo).
+  # -------------------------------------------------------------------------
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v6.0.0
+    command:
+      [
+        'osrm-routed',
+        '--algorithm',
+        'mld',
+        '--max-table-size',
+        '${OSRM_MAX_TABLE_SIZE:-200}',
+        '/data/${OSRM_ARQUIVO:-rio-grande-do-norte-latest}.osrm',
+      ]
+    volumes:
+      # Somente leitura: o osrm-routed não escreve nada; quem escreve é o osrm-preparo.
+      - ./data/osrm:/data:ro
+    expose:
+      - '5000'
+    profiles: ['rotas']
+    restart: unless-stopped
+    init: true
+    logging: *logging
+    <<: *endurecimento
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    mem_limit: ${MEM_OSRM:-1g}
+    mem_reservation: 256m
+    memswap_limit: ${MEM_OSRM:-1g}
+    cpus: 2.0
+    pids_limit: 256
+    healthcheck:
+      # Rota de verdade dentro de Natal (Ponta Negra → Cidade Alta, lon,lat). Se o grafo não
+      # carregou, o OSRM responde na porta e devolve erro; exigir "code":"Ok" é o que pega isso.
+      test:
+        [
+          'CMD-SHELL',
+          'wget -qO- ''http://127.0.0.1:5000/route/v1/driving/-35.1858,-5.8811;-35.2094,-5.7945?overview=false'' | grep -q ''"code":"Ok"''',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Tarefa única (não é serviço): transforma o .osm.pbf do OpenStreetMap no grafo que o osrm-routed lê.
+  # Rode com:  docker compose --profile osrm-preparo run --rm osrm-preparo
+  # Baixe antes o extrato do Rio Grande do Norte (~23 MB; cobre Natal, Parnamirim e a região metropolitana):
+  #   curl -fL --create-dirs -o data/osrm/rio-grande-do-norte-latest.osm.pbf \
+  #     https://download.openstreetmap.fr/extracts/south-america/brazil/northeast/rio-grande-do-norte-latest.osm.pbf
+  # (A Geofabrik só publica o Nordeste inteiro, 440 MB — 19x maior, sem cobrir uma rua a mais das que a Heloísa visita.)
+  osrm-preparo:
+    image: ghcr.io/project-osrm/osrm-backend:v6.0.0
+    entrypoint: ['/bin/sh', '-euc']
+    command:
+      - |
+        arquivo="${OSRM_ARQUIVO:-rio-grande-do-norte-latest}"
+        test -f "/data/$${arquivo}.osm.pbf" || {
+          echo "Falta /data/$${arquivo}.osm.pbf — baixe o extrato da Geofabrik primeiro." >&2
+          exit 1
+        }
+        echo "1/3 extract ($${arquivo})"   && osrm-extract   -p /opt/car.lua "/data/$${arquivo}.osm.pbf"
+        echo "2/3 partition ($${arquivo})" && osrm-partition "/data/$${arquivo}.osrm"
+        echo "3/3 customize ($${arquivo})" && osrm-customize "/data/$${arquivo}.osrm"
+        echo "grafo pronto: /data/$${arquivo}.osrm"
+    volumes:
+      - ./data/osrm:/data
+    profiles: ['osrm-preparo']
+    restart: 'no'
+    logging: *logging
+    <<: *endurecimento
+    # O extract é a fase que come memória — bem mais que o osrm-routed depois. 4g dá folga para o RN;
+    # se um dia trocar o extrato pelo Nordeste inteiro da Geofabrik, suba para 8g.
+    mem_limit: ${MEM_OSRM_PREPARO:-4g}
+    memswap_limit: ${MEM_OSRM_PREPARO:-4g}
+    cpus: 4.0
+
+  # -------------------------------------------------------------------------
+  # faster-whisper — transcrição em pt-BR do áudio que o fornecedor manda (RF-MET-07, R05).
+  #
+  # Prioridade nº 1 da IA depois do R13: o primeiro contato virou ligação, mas o fornecedor
+  # responde em áudio de qualquer jeito. Local, sem porta publicada, sem áudio saindo da máquina.
+  # -------------------------------------------------------------------------
+  faster-whisper:
+    image: onerahmet/openai-whisper-asr-webservice:v1.9.1
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      ASR_ENGINE: faster_whisper
+      ASR_MODEL: ${WHISPER_MODEL:-small}
+      ASR_DEVICE: cpu
+      # int8 na CPU: cabe na memória e transcreve um áudio de 30 s em poucos segundos.
+      ASR_QUANTIZATION: ${WHISPER_QUANTIZATION:-int8}
+      # Cache do modelo no volume: baixa uma vez, sobrevive a `docker compose down`.
+      ASR_MODEL_PATH: /data/whisper
+      # 0 = modelo fica carregado. Descarregar entre áudios devolveria 30 s de latência a cada nota de voz.
+      MODEL_IDLE_TIMEOUT: '0'
+      TZ: America/Fortaleza
+    volumes:
+      - ./data/whisper:/data/whisper
+      - ./healthchecks:/opt/healthchecks:ro
+    expose:
+      - '9000'
+    restart: unless-stopped
+    init: true
+    logging: *logging
+    <<: *endurecimento
+    tmpfs:
+      - /tmp:size=512m
+    mem_limit: ${MEM_WHISPER:-3g}
+    mem_reservation: 1g
+    memswap_limit: ${MEM_WHISPER:-3g}
+    cpus: ${WHISPER_CPUS:-4.0}
+    pids_limit: 512
+    healthcheck:
+      # Manda 0,4 s de áudio para /asr e exige transcrição de volta. A porta 9000 abre muito
+      # antes de o modelo carregar; só a transcrição prova que dá para usar.
+      test: ['CMD', 'python3', '/opt/healthchecks/whisper-transcreve.py']
+      # A primeira chamada baixa o modelo (~500 MB no "small"): start_period longo de propósito.
+      interval: 60s
+      timeout: 60s
+      retries: 3
+      start_period: 900s
+
+  # -------------------------------------------------------------------------
+  # Cloudflare Tunnel — OPCIONAL, e só para o Metabase.
+  #
+  # Só existe para o caso "o Rafael precisa abrir o painel num aparelho sem Tailscale".
+  # Conexão de saída (a máquina disca para a Cloudflare): continua sem porta aberta no roteador.
+  # Se ligar, ponha o Cloudflare Access na frente — senão o painel do CRM fica público na internet.
+  # A imagem é distroless (não tem shell): não há healthcheck de dentro do contêiner.
+  # Para conferir de fora:  docker compose exec metabase curl -fsS http://cloudflared:2000/ready
+  # -------------------------------------------------------------------------
+  cloudflared:
+    image: cloudflare/cloudflared:2026.6.1
+    # O token fica num arquivo só dele (gitignored), para não vazar para os outros contêineres
+    # pelo ./.env compartilhado. Nunca por interpolação: segredo não entra em arquivo versionado.
+    env_file:
+      - path: ./.env
+        required: false
+      - path: ./.env.cloudflared
+        required: true
+    command: ['tunnel', '--no-autoupdate', '--metrics', '0.0.0.0:2000', 'run']
+    expose:
+      - '2000'
+    profiles: ['tunel']
+    restart: unless-stopped
+    logging: *logging
+    <<: *endurecimento
+    mem_limit: ${MEM_CLOUDFLARED:-256m}
+    memswap_limit: ${MEM_CLOUDFLARED:-256m}
+    cpus: 0.5
+    pids_limit: 128

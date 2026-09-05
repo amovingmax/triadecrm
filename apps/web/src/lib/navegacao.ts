@@ -1,16 +1,18 @@
 /**
  * Navegação principal do CRM (kit/CLAUDE.md): Meu dia, Parceiros, Funis, Ligar, Conversas, Radar,
- * Agenda, Metas, Relatórios, Admin. O dia indica quando cada tela chega, pelo calendário do
+ * Cadências, Agenda, Metas, Relatórios, Admin. O dia indica quando cada tela chega, pelo calendário do
  * PRD §11.2.
  */
 import {
   CalendarDays,
   ChartColumn,
   Handshake,
+  Upload,
   type LucideIcon,
   MessageCircle,
   PhoneCall,
   Radar,
+  Route,
   Settings,
   SquareKanban,
   Sun,
@@ -53,6 +55,15 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     principal: true,
   },
   {
+    href: '/importar',
+    rotulo: 'Importar',
+    icone: Upload,
+    dia: 'D2',
+    descricao:
+      'Planilha (XLSX ou CSV) para dentro da base pela esteira de ingestão: mapa de colunas, prévia com duplicatas nomeadas e lote com desfazer de 48 h (RF-BAS-07, RF-BAS-17).',
+    papeis: ['admin', 'gestor', 'sdr', 'embaixador'],
+  },
+  {
     href: '/funis',
     rotulo: 'Funis',
     icone: SquareKanban,
@@ -85,6 +96,14 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     dia: 'D4',
     descricao:
       'Candidatos coletados em fontes públicas, fila de revisão e pontuação por lacuna de oferta (RF-RAD).',
+  },
+  {
+    href: '/cadencias',
+    rotulo: 'Cadências',
+    icone: Route,
+    dia: 'D7',
+    descricao:
+      'Réguas de toque em ordem (canal, atraso, condição), quantas organizações param em cada passo e o resumo do dia das 07:30 e 18:00 (RF-CON-13, RF-AST-02).',
   },
   {
     href: '/agenda',

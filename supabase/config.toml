@@ -445,3 +445,30 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+
+# ===========================================================================
+# Edge Functions da integração (migração 20260904001810, ADR-02 e ADR-04)
+# ===========================================================================
+# `verify_jwt` NÃO é a segurança destas funções — é só a primeira porta do
+# gateway. Quem manda em cada uma:
+#   komune-push     credencial de service_role, conferida em tempo constante
+#   komune-webhook  assinatura HMAC + carimbo dentro da janela (5 min)
+#   claim-link      o token de reivindicação (32 bytes, hash no banco, 7 dias)
+#   export-lgpd     o token do titular OU o JWT de quem entrou no Triade
+#
+# As duas que ficam com `verify_jwt = false` são as que precisam ser chamadas
+# por quem não tem, e não pode ter, credencial do Supabase: a plataforma
+# Komune e o fornecedor abrindo o link no celular. Ambas trazem a própria
+# credencial no lugar — e ela é conferida ANTES de qualquer efeito.
+[functions.komune-push]
+verify_jwt = true
+
+[functions.komune-webhook]
+verify_jwt = false
+
+[functions.claim-link]
+verify_jwt = false
+
+[functions.export-lgpd]
+verify_jwt = false

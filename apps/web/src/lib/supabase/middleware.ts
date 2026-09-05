@@ -13,9 +13,18 @@ import { supabaseAnonKey, supabaseUrl } from '@/lib/env';
 /** Rota inicial de quem está autenticado. */
 export const ROTA_INICIAL = '/meu-dia';
 
-/** Rotas acessíveis sem sessão: login e o fluxo de callback/signout do Supabase Auth. */
+/**
+ * Rotas acessíveis sem sessão: login, o fluxo de callback/signout do Supabase Auth
+ * e a página de reivindicação do pré-cadastro.
+ *
+ * `/c/<token>` é a única rota do produto feita para quem NÃO é do time: é o link
+ * que o fornecedor abre para dizer se o perfil é dele (RF-PRE-08). Mandá-la para
+ * o /login seria pedir ao dono do buffet uma conta que ele não tem. Quem protege
+ * a rota é o token — 32 bytes, guardados só como hash, válidos por 7 dias — e o
+ * fato de `anon` não ter grant de tabela nenhuma no banco.
+ */
 export function ehRotaPublica(pathname: string): boolean {
-  return pathname === '/login' || pathname.startsWith('/auth/');
+  return pathname === '/login' || pathname.startsWith('/auth/') || pathname.startsWith('/c/');
 }
 
 /**

@@ -21,7 +21,16 @@ select is((select count(*)::int from public.stages s join public.pipelines p on 
 select is((select count(*)::int from public.stages s join public.pipelines p on p.id = s.pipeline_id where p.slug = 'ativacao'),    7, 'seed: 7 etapas no funil de ativação');
 select is((select count(*)::int from public.stages s join public.pipelines p on p.id = s.pipeline_id where p.slug = 'produtor'),   14, 'seed: 14 etapas no funil de produtor');
 select is((select count(*)::int from public.stages where position < 0),            0, 'seed: nenhuma etapa órfã (posição negativa)');
-select is((select count(*)::int from public.audio_assets),                         6, 'seed: 6 roteiros de áudio (um por segmento)');
+-- Escopo, e não total: a seed nasceu com seis áudios de APRESENTAÇÃO, um por
+-- segmento (R08 §2), e a migração das cadências (20260904001700) acrescentou
+-- 'gen-onb-ajuda-1', que é passo de cadência de onboarding e não apresentação.
+-- Somar a tabela inteira transformaria "um por segmento" num teste que quebra
+-- toda vez que a Heloísa grava um áudio novo. O que a seed promete são estes seis.
+select results_eq(
+  $$select slug from public.audio_assets where slug like '%-aud-1' order by slug$$,
+  $$values ('aeb-aud-1'::text), ('cer-aud-1'::text), ('esp-aud-1'::text),
+           ('for-aud-1'::text), ('inf-aud-1'::text), ('pre-aud-1'::text)$$,
+  'seed: 6 roteiros de áudio de apresentação, um por segmento (R08 §2)');
 select cmp_ok((select count(*)::int from public.message_templates), '>=', 40,        'seed: pelo menos 40 modelos de mensagem');
 -- Mesmo raciocínio de `allowed_users`: liberar um segundo domínio é ato de admin,
 -- não regressão da seed. O que a seed promete é que komune.app.br está ativo.

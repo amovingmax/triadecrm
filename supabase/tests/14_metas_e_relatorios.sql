@@ -48,6 +48,18 @@ create function pg_temp.fonte() returns int language sql as $$
   select id from public.sources where slug = 'captura_campo'
 $$;
 
+-- Âncora de relógio. As métricas do RF-MET-01 são recortadas pelo DIA civil em
+-- America/Fortaleza, então fixar interação com `now() - 3 horas` é apostar que a
+-- suíte nunca roda de madrugada: às 00h28 de Fortaleza aquelas três ligações
+-- caem em ONTEM e o "realizado" do dia vira zero. Isto não é folga do código —
+-- é o teste ler o próprio relógio errado. Aqui a hora do dia é escolhida, e não
+-- sorteada pelo horário em que alguém aperta enter.
+create function pg_temp.hoje_as(p_hora numeric) returns timestamptz language sql stable as $$
+  select (((now() at time zone 'America/Fortaleza')::date::timestamp
+           + make_interval(mins => (p_hora * 60)::int))
+          at time zone 'America/Fortaleza')
+$$;
+
 -- ---------- pessoas ----------
 insert into public.allowed_users (email, role, note) values
   ('mt.gestor@teste.local', 'gestor',     'pgTAP metas'),
@@ -105,15 +117,15 @@ insert into public.activities
   (id, type, channel, organization_id, deal_id, user_id, occurred_at, outcome_id, metadata) values
   ('f1400000-0000-4000-8000-000000001401', 'call', 'phone',
      'c1400000-0000-4000-8000-000000001401', 'e1400000-0000-4000-8000-000000001401',
-     'a1400000-0000-4000-8000-000000001402', now() - interval '3 hours',
+     'a1400000-0000-4000-8000-000000001402', pg_temp.hoje_as(9),
      pg_temp.desfecho('lig_nao_atendeu'), '{"com_quem":"ninguem"}'::jsonb),
   ('f1400000-0000-4000-8000-000000001402', 'call', 'phone',
      'c1400000-0000-4000-8000-000000001401', 'e1400000-0000-4000-8000-000000001401',
-     'a1400000-0000-4000-8000-000000001402', now() - interval '2 hours',
+     'a1400000-0000-4000-8000-000000001402', pg_temp.hoje_as(10),
      pg_temp.desfecho('lig_nao_atendeu'), '{"com_quem":"ninguem"}'::jsonb),
   ('f1400000-0000-4000-8000-000000001403', 'call', 'phone',
      'c1400000-0000-4000-8000-000000001402', 'e1400000-0000-4000-8000-000000001402',
-     'a1400000-0000-4000-8000-000000001402', now() - interval '1 hour',
+     'a1400000-0000-4000-8000-000000001402', pg_temp.hoje_as(11),
      pg_temp.desfecho('lig_interessado'), '{"com_quem":"decisor"}'::jsonb);
 
 -- SDR 2: duas portas abertas no alvo 404 com 10 dias de intervalo (só a 1ª conta)
@@ -122,19 +134,19 @@ insert into public.activities
   (id, type, channel, organization_id, deal_id, user_id, occurred_at, outcome_id, metadata) values
   ('f1400000-0000-4000-8000-000000001404', 'call', 'phone',
      'c1400000-0000-4000-8000-000000001404', 'e1400000-0000-4000-8000-000000001404',
-     'a1400000-0000-4000-8000-000000001403', now() - interval '10 days',
+     'a1400000-0000-4000-8000-000000001403', pg_temp.hoje_as(10) - interval '10 days',
      pg_temp.desfecho('lig_interessado'), '{"com_quem":"decisor"}'::jsonb),
   ('f1400000-0000-4000-8000-000000001405', 'call', 'phone',
      'c1400000-0000-4000-8000-000000001404', 'e1400000-0000-4000-8000-000000001404',
-     'a1400000-0000-4000-8000-000000001403', now(),
+     'a1400000-0000-4000-8000-000000001403', pg_temp.hoje_as(10),
      pg_temp.desfecho('lig_interessado'), '{"com_quem":"decisor"}'::jsonb),
   ('f1400000-0000-4000-8000-000000001406', 'call', 'phone',
      'c1400000-0000-4000-8000-000000001405', 'e1400000-0000-4000-8000-000000001405',
-     'a1400000-0000-4000-8000-000000001403', now() - interval '40 days',
+     'a1400000-0000-4000-8000-000000001403', pg_temp.hoje_as(10) - interval '40 days',
      pg_temp.desfecho('lig_interessado'), '{"com_quem":"decisor"}'::jsonb),
   ('f1400000-0000-4000-8000-000000001407', 'call', 'phone',
      'c1400000-0000-4000-8000-000000001405', 'e1400000-0000-4000-8000-000000001405',
-     'a1400000-0000-4000-8000-000000001403', now(),
+     'a1400000-0000-4000-8000-000000001403', pg_temp.hoje_as(10),
      pg_temp.desfecho('lig_interessado'), '{"com_quem":"decisor"}'::jsonb);
 
 -- ---------- tarefas do SDR 1 ----------

@@ -18,6 +18,8 @@ import {
 import { formatarData, formatarLocal, ROTULO_TIPO } from '@/components/parceiros/formatos';
 import { ProximaAcao } from '@/components/parceiros/proxima-acao';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
+import { PainelPreCadastro } from '@/components/precadastro/painel-precadastro';
+import { requireSession } from '@/lib/auth/session';
 
 /**
  * Separador de termos: espaço normal ANTES do ponto (ali pode quebrar) e espaço
@@ -59,7 +61,7 @@ export async function generateMetadata({
  */
 export default async function Pagina({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const ficha = await carregarFicha(id);
+  const [ficha, sessao] = await Promise.all([carregarFicha(id), requireSession()]);
   if (!ficha) notFound();
 
   const principal = ficha.negocios.find((n) => n.status === 'open') ?? ficha.negocios[0] ?? null;
@@ -289,6 +291,20 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
           </ul>
         )}
       </section>
+
+      <Separator />
+
+      {/* -------------------------------------------------- pré-cadastro na Komune */}
+      {/* Depois dos negócios de propósito: o pré-cadastro é o que vem DEPOIS de o
+          negócio andar, e a escada dele (rascunho, autorização, link) só faz
+          sentido para quem já leu em que pé a conversa está. */}
+      <PainelPreCadastro
+        organizationId={ficha.id}
+        papel={sessao.papel}
+        naoContatar={ficha.naoContatar}
+      />
+
+      <Separator />
 
       {/* -------------------------------------------------- o que ainda vem */}
       <section className="grid gap-3 sm:grid-cols-2">

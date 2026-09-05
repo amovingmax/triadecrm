@@ -44,8 +44,11 @@ export function EsqueletoDaFila() {
 }
 
 /**
- * Não há candidato nenhum na fila. Diz o motivo verdadeiro (a coleta não roda) e
- * aponta o caminho que existe hoje.
+ * Não há candidato nenhum na fila. Fila vazia aqui não quer dizer defeito: pode
+ * ser que tudo já tenha sido revisado, ou que ninguém tenha agendado coleta. Quem
+ * separa esses dois casos do "coletor caiu" é o painel do coletor, no topo da
+ * tela — por isso o texto daqui não especula sobre o robô, e aponta o caminho que
+ * funciona sempre, que é cadastrar à mão.
  */
 export function FilaVazia({ aoCadastrar }: { aoCadastrar: (() => void) | null }) {
   return (
@@ -54,8 +57,8 @@ export function FilaVazia({ aoCadastrar }: { aoCadastrar: (() => void) | null })
       titulo="Nenhum candidato esperando revisão"
       texto={
         aoCadastrar
-          ? 'É o esperado por enquanto: o coletor automático ainda não roda, então nada entra sozinho. O que você achar na mão entra por aqui e passa pela mesma revisão.'
-          : 'É o esperado por enquanto: o coletor automático ainda não roda, então nada entra sozinho. Quem cadastra candidato é o time comercial.'
+          ? 'Ou tudo já foi revisado, ou nenhuma coleta trouxe alvo novo. O estado do coletor está no painel acima. O que você achar na mão entra por aqui e passa pela mesma revisão.'
+          : 'Ou tudo já foi revisado, ou nenhuma coleta trouxe alvo novo. O estado do coletor está no painel acima. Quem cadastra candidato é o time comercial.'
       }
     >
       {aoCadastrar ? (

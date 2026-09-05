@@ -78,8 +78,14 @@ update public.organizations
        city_id      = (select id from public.cities where name = 'Natal'),
        neighborhood = 'Ponta Negra'
  where id = 'b0000000-0000-4000-8000-000000000202';
+-- Fixo da fixture no prefixo 3000-0203, que carrega o sufixo do próprio UUID e
+-- não existe em Natal: `organizations_phone_uq` é global e o banco de
+-- desenvolvimento tem ficha real importada de planilha e de coleta. Um número
+-- "plausível" aqui vira colisão no dia em que a base ganhar o parceiro que o
+-- usa de verdade — foi o que aconteceu com o antigo 84 3206-4212 (Safari
+-- Buffet). Fixture de chave única não empresta número que alguém possa ter.
 insert into public.organizations (id, name, phone_e164, neighborhood, website, source_id) values
-  ('b0000000-0000-4000-8000-000000000203', 'Dedup Espaço Tirol', '84 3206-4212', 'Tirol',
+  ('b0000000-0000-4000-8000-000000000203', 'Dedup Espaço Tirol', '84 3000-0203', 'Tirol',
    'https://www.instagram.com/dedup.espaco', pg_temp.fonte('captura_campo'));
 
 select results_eq(
@@ -99,11 +105,11 @@ select results_eq(
   $$values ('b0000000-0000-4000-8000-000000000202'::uuid, 0.95::numeric, 'phone'::text)$$,
   'find_org_matches: celular exato com confiança 0,95');
 select results_eq(
-  $$select organization_id, confidence, reason from app.find_org_matches('{"phone_e164":"84 3206-4212","neighborhood":"tirol"}')$$,
+  $$select organization_id, confidence, reason from app.find_org_matches('{"phone_e164":"84 3000-0203","neighborhood":"tirol"}')$$,
   $$values ('b0000000-0000-4000-8000-000000000203'::uuid, 0.90::numeric, 'landline_neighborhood'::text)$$,
   'find_org_matches: fixo + mesmo bairro com confiança 0,90');
 select is(
-  (select count(*)::int from app.find_org_matches('{"phone_e164":"84 3206-4212","neighborhood":"Lagoa Nova"}')),
+  (select count(*)::int from app.find_org_matches('{"phone_e164":"84 3000-0203","neighborhood":"Lagoa Nova"}')),
   0, 'find_org_matches: fixo em outro bairro não é duplicata (recepção compartilhada)');
 select results_eq(
   $$select organization_id, confidence, reason from app.find_org_matches('{"website":"http://dedupbuffet.com.br/"}')$$,

@@ -712,3 +712,264 @@ O que foi medido, um a um: D1 pular troca de contato (Nupalito → Potiban) e, e
 - **Pendente, e é o resto do D6:** o controle "Pediu para não ser mais procurado" da barra só grava quando a ligação é tabulada. Marcar e sair sem gravar não deixa nada: medido — `consent_events` 0, `suppression_list` 0, `do_not_contact` false, e o contato volta para a fila. A faixa vermelha avisa ("Grave o resultado abaixo para o pedido valer"), mas o guardrail do CLAUDE.md diz IMEDIATAMENTE, e a RPC que faria isso (`public.marcar_nao_ligar_mais`) existe, está testada e **não é chamada por nenhuma linha do app**. Não foi ligada aqui porque não é conserto trivial: registrar o opt-out antes de `registrar_contato` faz `app.consent_apply` mover o negócio para a etapa de opt-out e, em seguida, o desfecho o move de novo — que é o efeito que a migração 001500 documentou querer evitar. É decisão de desenho para Rafael/Matheus.
 - **Também pendente (fora dos 11, mas o Matheus tropeça amanhã):** o cartão do lote mostra "4 atenderam · 133% dos feitos" porque `call_batches.total` exclui `devolvido` e `talked` não — e opt-out vira `devolvido`, então o D6 tornou comum um absurdo aritmético que já existia; o negócio de quem pede opt-out E recebe um desfecho de perda ("Sem interesse") termina em "Perdido" sem a marca `is_optout` (medido: Vitória Produções), porque `app.consent_apply` só move negócio `open`; `prioridade_do_dono` e `maior_aperto` nunca são gravados por toque, porque nenhuma saída da seed declara o `valor` que a tela passou a exigir (o campo diz a verdade: "Em branco, este campo não é gravado"); e em 390 px a barra de tabulação com "Pediu para não ser mais procurado" + "Com quem você falou?" ocupa metade da tela e empurra as respostas do roteiro para trás dela.
 - **Estado da base local depois da conferência:** foram gravadas 4 ligações de verdade (Vitória Produções — opt-out + sem interesse; WSOM Natal — reunião marcada; Anima Mix — agora não; Churrascos S/A — não atendeu) e o lote "Produtor e cerimonialista frios — sexta" foi **encerrado** durante o teste do D7/D8, o que devolveu seus 22 contatos à base. Ele precisa ser montado de novo antes do turno.
+
+### D5 — CI no GitHub Actions (`.github/workflows/ci.yml`, `docs/operacao/ci.md`)
+
+- **Entregue:** um workflow, dois trabalhos em paralelo, em `pull_request` e `push` para `main`. **Aplicação:** guarda contra `.env` versionado, `pnpm install --frozen-lockfile` (Node 22 do `.nvmrc`, pnpm 11.25.0 do `packageManager`, cache do armazém do pnpm por `pnpm-lock.yaml`), `pnpm lint`, `pnpm typecheck`, `pnpm test`. **Banco:** `supabase start -x studio,imgproxy,vector,realtime,edge-runtime` (banco novo → migrações na ordem → `seed.sql`), `supabase db lint --local --level warning --fail-on warning`, `supabase test db --local` e `supabase stop --no-backup` em `always()`. Cada trabalho para no primeiro passo vermelho e escreve no resumo do PR uma tabela com o resultado de cada passo e o comando para reproduzir na máquina. Nenhum segredo no arquivo; os dois únicos (`SUPABASE_AUTH_GOOGLE_CLIENT_ID`/`SECRET`) são opcionais e têm valor de reserva, para o CI ficar verde inclusive em PR de fork.
+- **Verificado sem tocar na stack de desenvolvimento:** cópia do `supabase/` em pasta de rascunho, com `project_id` e portas trocados, e `supabase start --workdir`. Sintaxe conferida com `actionlint 1.7.7` (0 erros) e com `js-yaml`; os blocos `run:` de resumo foram executados em bash com `GITHUB_STEP_SUMMARY` apontando para arquivo, e a guarda de segredo foi provada nos dois sentidos (repositório real = OK; repositório de teste com `.env` rastreado = falha com a mensagem certa). Sequência do trabalho de banco rodada de ponta a ponta em banco novo: `start` exit 0 (20 migrações + semente), `db lint` exit 0, `supabase test db` **18 arquivos, 1395 asserções, `Result: PASS`**, `stop` exit 0. `pnpm install --frozen-lockfile` conferido em cópia isolada só com os `package.json` e o lockfile: "Already up to date".
+- **O CI encontrou dois defeitos que só aparecem em banco novo — e por isso ele nasce vermelho no banco:**
+  1. **`20260904001700_cadencias_e_precadastro.sql` depende da semente.** Os `insert` de `cadence_steps` citam slugs de desfecho (`lig_nao_atendeu`, `lig_caixa_postal`) e `template_code` que só existem depois da `supabase/seed.sql` — e as migrações rodam ANTES dela. Em banco novo: `ERROR: ultimo_desfecho_em cita desfecho que não existe no catálogo. (SQLSTATE 23503)` e, resolvido esse, `violates foreign key constraint "cadence_steps_template_code_fkey"`. Na máquina de quem já tem a semente aplicada nada disso aparece. Conserto é de quem escreveu a migração: os passos das cadências devem sair da migração e ir para a semente, ou o catálogo citado precisa nascer em migração.
+  2. **Cinco migrações com o mesmo carimbo de versão `20260904001802_`** (`coletor_do_radar`, `importacao_de_planilha`, `integracao_komune`, `precadastro_na_ficha`, `tela_das_cadencias`). A versão é chave primária de `supabase_migrations.schema_migrations`: a segunda derruba a aplicação com `duplicate key value violates unique constraint "schema_migrations_pkey" — Key (version)=(20260904001802) already exists`. Um carimbo por arquivo.
+- **Pendente:** `pnpm format:check` fica fora do CI até uma faxina — hoje 44 arquivos do repositório estão fora do padrão do Prettier e o passo deixaria `main` vermelha por motivo cosmético. Fora também `pnpm build` (a Vercel já constrói a cada push), Playwright (os testes ainda não existem) e a conferência de que `packages/schema/src/database.types.ts` está atualizado. Proteção do ramo `main` exigindo os dois *status checks* é passo manual do Matheus, descrito em `docs/operacao/ci.md`.
+- **Estado no momento da entrega:** `pnpm lint` verde; `pnpm test` verde (42 arquivos, 594 testes); `pnpm typecheck` vermelho em `apps/web/src/components/importacao/planilha.ts:386` (`TS2532`), trabalho em curso de outro workflow, não do CI.
+
+### D9 — as quatro Edge Functions da integração com a Komune (`supabase/functions/**`, `20260904001810_integracao_komune.sql`, `docs/operacao/contrato-precadastro.md`)
+
+A pasta `supabase/functions/` estava vazia. Entra o **lado Triade inteiro** da integração do ADR-02, provado contra um dublê local que implementa o `crm-pre-registration` da Komune com as mesmas conferências do contrato. O lado da Komune continua a fazer (Matheus) e está documentado campo a campo.
+
+- **`komune-push`** (RF-PRE-01). Drena a fila `komune_sync`, assina o payload com HMAC-SHA256 e faz `POST` no `crm-pre-registration` com `Idempotency-Key`. Porta fechada: só a chave de `service_role`, conferida em **tempo constante** — JWT válido de `anon` é recusado com `401` pela própria função, não pelo gateway (medido).
+- **`komune-webhook`** (RF-PRE-13). Recebe o status da Komune. A ordem é a segurança: corpo cru com teto de 256 KB → assinatura e carimbo → `JSON.parse` → `delivery_id` → Postgres. Assinatura **ausente, malformada, de outro segredo, de corpo alterado depois de assinado** e **carimbo fora da janela de 300 s nos dois sentidos** saem todas com a **mesma frase** e `401`; o motivo fica só no log.
+- **`claim-link`** (RF-PRE-07/08). `GET ?token=` abre o rascunho; `POST` aceita (com prova) ou recusa. IP e user-agent vêm da conexão, **nunca do corpo** — prova que o titular digita não é prova. Medido de ponta a ponta: aceite gravou `parceiro-v1` + hash do termo + `187.19.44.201` + user-agent do iPhone + `claim_link` + quem aceitou; o token morreu no aceite; a recusa "não é meu" suprimiu o telefone (hash em `suppression_list`), abriu `erasure_request` e agendou o apagamento em 48 h.
+- **`export-lgpd`** (LGPD art. 9º e art. 18, I/II). Duas portas: `?token=` (o titular, sem login) e JWT (interno). O dossiê traz **a proveniência campo a campo com a URL exata da coleta** — a resposta que faltou no caso KASPR —, o que já foi compartilhado com quem, a retenção e como sair. SDR recebe `403`; exportação sem motivo recebe `400`; toda exportação interna cai em `pii_access_log` (novo valor `export_lgpd`) e abre um `access_request` em `consent_events`.
+- **Migração `20260904001810_integracao_komune.sql`** (1.019 linhas, idempotente, reaplicada 3×): `app.segredo`/`app.gravar_segredo` sobre o Vault (`EXECUTE` só para `service_role`); filas `komune_sync` e `komune_dlq` (pgmq) com `komune_outbox` de livro-caixa; `app.komune_payload` (contrato mínimo v0, com `CHECK` recusando CPF/Pix/dado bancário e token em claro **na porta de saída também**); gatilho que enfileira nos dois únicos momentos legítimos (link emitido, reivindicado); backoff de 30 s dobrando até 1 h, 6 tentativas e dead-letter; `webhook_deliveries` (idempotência por entrega) e `komune_event_map` (19 eventos traduzidos, acrescentar evento é `INSERT`, não deploy); `app.lgpd_dossie`; `public.komune_fila_status()` para a tela de administração; e cinco funções finas em `public` com `EXECUTE` só para `service_role` — o schema `app` continua fora da API.
+- **A chave geral nasce desligada.** `app_settings['integracao.komune'].push_ativo = false`: a fila enche e **nada sai** enquanto o outro lado não existir. Medido: com a chave desligada, `komune-push` devolve `ativo:false` e o dublê não recebe nada; ligada, envia e grava `komune_supplier_id` nos dois lados.
+- **Duas regras que valem contra a plataforma.** (1) Nenhum push sem autorização vigente em `consent_events` e nenhum push para alvo suprimido — provado nas duas portas (`gerar_link_de_reivindicacao` e `app.komune_enfileirar` devolvem `sem_autorizacao`). (2) A Komune dizer "publiquei" **não publica**: sem aceite provado em `pre_registration_acceptances`, o Triade recusa e grava um evento `returned` (RF-PRE-02).
+- **Fail-closed.** Sem segredo no ambiente e sem segredo no Vault, a função responde **503** em vez de aceitar sem conferir. Medido: apagado o `komune_webhook_secret` do Vault, o webhook passou a recusar com `integracao_nao_configurada`; devolvido o segredo, voltou a aplicar. Nenhum segredo em arquivo versionado, nenhum valor padrão.
+- **Idempotência nos dois níveis.** Mesmo estado enfileirado duas vezes → uma mensagem só (`estado_ja_enfileirado`). Mesma `Idempotency-Key` chegando duas vezes na Komune → o dublê devolveu `idempotente: true` com o mesmo `komune_supplier_id`. Mesma `delivery_id` reentregue → `duplicado: true`, sem segundo efeito.
+- **Testes.** `supabase/functions/_compartilhado/assinatura.test.ts` — **16 casos em Deno**, sem rede e sem banco, cobrindo assinatura ausente/malformada/de outro segredo/de corpo alterado, carimbo velho e no futuro, reuso de assinatura com outro carimbo, e a comparação em tempo constante (inclusive comprimentos diferentes). `supabase/tests/19_integracao_komune.sql` — **68 asserções pgTAP** sobre superfície de execução, porteira, chave geral, idempotência, tradução de eventos, recusa de publicação sem prova e as duas portas do direito de acesso.
+- **Verificado:** `supabase test db --local` em toda a suíte — **20 arquivos, 1.535 asserções, `Result: PASS`** (a migração nova não quebrou nada de ninguém). `deno check` e `deno lint` limpos nos quatro `index.ts` e no módulo compartilhado. `supabase db lint --local` sem apontamento novo (os três avisos são de `importacao_*`, de outro workflow). `pnpm lint` e `pnpm typecheck` verdes. `prettier --check` verde em `supabase/functions/**`.
+- **Carimbo da migração corrigido:** o arquivo nasceu como `20260904001802_`, que já era o quinto com esse número (o CI do D5 apontou a colisão); renomeado para `20260904001810_` para não disputar com os renomeios dos outros quatro.
+- **Pendente / decisão humana:**
+  - **Segredos de produção.** `komune_push_secret`, `komune_webhook_secret` e `komune_push_url` precisam ser gravados no Vault dos **dois** projetos (Luiz/Matheus), com `app.gravar_segredo`. Os valores usados no teste são locais e descartáveis. A v0 **não tem convivência de duas chaves na rotação** — trocar exige janela combinada.
+  - **`triade_functions_url` e `triade_service_role_key`** não estão no Vault, então o job `pg_cron` `komune_push` (a cada 5 min) devolve `segredos_ausentes` e não faz nada. É o comportamento seguro hoje; grave os dois quando o outro lado existir.
+  - **`packages/schema/src/database.types.ts` não foi regenerado** (arquivo compartilhado, fora desta faixa): quem for construir a tela de administração da fila precisa rodar `pnpm db:types` para enxergar `komune_outbox`, `webhook_deliveries`, `komune_event_map` e `public.komune_fila_status()`.
+  - **Não existe tela** para `komune_fila_status()` nem para a `komune_dlq`. Hoje a fila só se lê por SQL. Quando alguém falhar 6 vezes, ninguém fica sabendo pela interface.
+  - **A `komune_outbox` já tem 11 linhas pendentes** de pré-cadastros criados por outro workflow durante o dia: são reais e vão subir quando a chave geral for ligada. Confira antes de ligar.
+  - **Achado, não conserto:** `organizations` com qualquer `consent_events` **não pode ser apagada de vez** — o `DELETE` em cascata bate no `app.forbid_change()` da tabela append-only e a transação inteira aborta. O caminho é sempre `deleted_at`. Vale registrar no PRD §10.6, porque hoje o `on delete cascade` de `consent_events` é letra morta.
+
+### D7 — Tela das cadências e Resumo do dia (RF-CON-13..17, RF-MET-04, RF-AST-02; PRD §7.4 e §7.7; R07 §8, R13 §7)
+
+- **Entregue — banco (`supabase/migrations/20260904001890_tela_das_cadencias.sql`, 3 leituras e 1 interruptor, nada que envie):**
+  - `public.cadencias_visao()` — a tela numa chamada: as 5 cadências, os passos **em ordem** com canal, atraso (e de onde ele conta), condição, tiers, modelo e áudio, mais quatro contagens por passo (`aqui` = matrícula ativa parada ali, `pendentes`, `feitos`, `pulados`), matrículas por status, tetos e consumo do dia por canal (RF-CON-10, na ordem do R13 §7: voz primeiro) e o estado do que roda sozinho (nome e agenda dos jobs `cadencias_agendar` e `cadencias_encerrar_silencio` lidos de `cron.job`) contra o que não roda (batida do worker de WhatsApp em `worker_heartbeats`, flag do modo automático). É `security definer` porque precisa ler `cron.job`, mas **conta só o que a RLS da organização permite** — o embaixador não conta a carteira alheia (provado no pgTAP).
+  - `public.ligar_cadencia(slug, ativa)` — o interruptor, com recusa legível. Existe em vez de um `update` porque a RLS de `cadences` é `USING (is_manager())` e um UPDATE que não casa com a política **não estoura**: devolve zero linhas, e a tela ficaria mentindo em silêncio para a Heloísa (`sdr`). Desligar **não encerra ninguém**: `matricular_em_cadencia` já filtra por `is_active`, então fecha a entrada e quem está dentro segue — o retorno diz quantas matrículas ativas continuam correndo, e a tela repete isso na confirmação. Auditado com `LIGAR_CADENCIA`/`DESLIGAR_CADENCIA`.
+  - `public.resumo_do_dia(pessoa, momento)` — o resumo das 07:30 e das 18:00 calculado do dia civil de `America/Fortaleza`: agenda de hoje, fila com o porquê (reusa `public.meu_dia`, para não existirem duas ordenações de urgência no produto), toques de cadência pendentes, metas, o que foi feito (registros, portas abertas × batidas pelo `counts_as` do catálogo, tarefas fechadas, cartões movidos, por tipo de atividade), ontem como referência e `sem_registro` — o campo que separa "não fez" de "não registrou" (R07 §8.2). `entrega.envio_automatico` é **falso** e é dado, não prosa: no dia em que o worker subir, a frase da tela muda sozinha. Pessoa lê o próprio; gestor e admin leem o de qualquer um.
+  - **O modo automático (RF-CON-09) virou linha e virou guarda.** `app_settings` ganhou `cadencia.modo_automatico = {"ligado": false, "decisao": "ADR-05"}` e o gatilho `app.app_settings_modo_automatico` **recusa ligá-la** (42501, no INSERT e no UPDATE). Decisão de projeto que só existe em prosa é decisão que alguém desfaz por engano numa tela de configuração.
+- **Entregue — telas (`apps/web/src/components/cadencias/**`, `app/(app)/cadencias/**`; item "Cadências" na navegação):**
+  - `/cadencias` — abre pelo que a máquina faz e pelo que ela **não** faz (três linhas curtas, o porquê num `details`, cada frase saindo de dado real), depois os tetos do dia por canal, depois as réguas. Cada cartão traz a régua inteira, passo a passo, com a contagem à direita. Ligar/desligar aparece só para gestor e admin; para os demais, uma linha no alto diz de quem é. A tela diz que passo e condição **não** se editam por aqui (a régua vive nas migrações; edição pelo gestor é v1, RF-ADM-02).
+  - `/cadencias/resumo` — os dois recortes do mesmo dia (07:30 "quem te espera hoje" · 18:00 "o que ficou"), com a marca de qual deles o relógio pediria. Abre dizendo que **não é enviado**. A noite abre pelo que foi feito (R07 §4.2: celebrar antes de cobrar) e, num dia sem nenhum registro, faz a pergunta do anexo em vez de exibir um zero acusatório.
+  - Esqueleto em todos os carregamentos, vazio que diz o que fazer ("nenhuma organização está em cadência" → abrir o funil) e erro em português com o que tentar. Nenhum `any`, nenhum TODO, nenhum texto em inglês.
+- **Verificado com execução:** `supabase test db --local` — `18_tela_das_cadencias.sql`, **plan(72), 72/72**, incluindo os deltas da contagem por passo (matrícula parada no passo 2 = +1 "aqui" ali e 0 no passo 1), o escopo por RLS do embaixador, as cinco recusas do interruptor, as duas recusas do modo automático e a prova de que o gatilho antigo do teto duro do RF-CON-10 continua vivo. `pnpm -C apps/web test`: 32 asserções novas em `formatos.test.ts` e `tipos.test.ts` (fuso, plural em português, vocabulário fechado da condição, parse zod das duas RPCs). `pnpm -C apps/web lint` e `typecheck` verdes. Migração reaplicada 2× sem erro. Fotos em 1440 e 390 conferidas: sem rolagem horizontal, nenhum alvo de toque abaixo de 44 px, contraste do título 12,12:1.
+- **Dois defeitos que a tela pegou em si mesma, e valem estar escritos:** o texto do atraso ("há 18 d") discordava do motivo que o próprio banco manda na mesma linha ("Tarefa vencida há 19 dia(s)"), porque `meu_dia` conta dias civis e corta em 48 h enquanto a tela truncava em 24 h — dois números para a mesma coisa, colados, fazem a pessoa parar de confiar nos dois; e o plural de `activities.type` era deduzido por sufixo e escrevia "ligaçãos". Os dois estão travados por teste.
+- **Pendente:** o envio de verdade (07:30/18:00 por WhatsApp) depende do número aprovado na Meta e do `worker-wa`; "reprogramar tudo para amanhã às 08:00" com uma resposta (R07 §8.2) não existe — o adiamento é item a item no Meu dia; edição de passo e condição pelo gestor fica para a v1 (RF-ADM-02); a agenda do resumo sai de `tasks` de tipo reunião/visita, porque a tabela de eventos da agenda (D7) ainda não existe.
+- **Achado em outro módulo, para quem for dono:** `supabase/tests/03_dedup.sql` ficou vermelho no banco local (`duplicate key ... organizations_phone_uq, +558432064212`) porque a aprovação de 32 candidatos do Radar criou "Safari Buffet" com esse telefone — o teste fixa um número que a operação real passou a usar. É dado real entrando, não regressão de migração.
+
+### D9 — Pré-cadastro na ficha e a página pública de reivindicação (RF-PRE-05, RF-PRE-07, RF-PRE-08, RF-PRE-16; R10 §3 telas T1/T3; R06 PRE-01..09)
+
+O banco do pré-cadastro já existia inteiro (20260904001700): rascunho, token, aceite com prova, recusa sem login e retenção. Faltavam as duas pontas humanas — o painel que a Heloísa opera na ficha e a página que o dono do buffet abre depois da ligação. É isso que entrou.
+
+- **Entregue — banco (`supabase/migrations/20260904001830_precadastro_na_ficha.sql`, duas funções, nada redefinido de ninguém):**
+  - `app.prefill_da_organizacao(uuid)` — monta o `prefilled` do rascunho no Postgres, e não no navegador. Leva só o factual do RF-PRE-03 que a coleta pode olhar (nome, categorias, cidade, bairro, @ e site) e deixa de fora descrição, faixa de preço e avaliação, que são texto de terceiro.
+  - **O telefone não entra no rascunho**, e essa é a decisão que motivou a migração. A ficha só tem em mãos o telefone de `organizations_view`, que é **mascarado** para `sdr` e `embaixador` (RF-BAS-14): montar o prefill na tela gravaria "+55 84 9\*\*\*\*-\*\*12" no rascunho, ou obrigaria a revelar o número (e gravar em `pii_access_log`) só para montar uma prévia. Fora isso, `pre_registrations.prefilled` é lido por `pre_cadastro_do_parceiro` sem máscara e sem log, e a página pública mostra o `prefilled` inteiro — copiar o número para lá abriria um segundo caminho de leitura do telefone que escapa do RF-BAS-14, numa superfície sem login. Quem abre o link é o dono do número: ele não precisa que a gente o mostre.
+  - `public.criar_pre_cadastro_da_ficha(uuid)` — envelope fino sobre `criar_pre_cadastro`: monta o prefill, leva a proveniência (nome da fonte e `source_url`, exigidos por PRE-04 e RF-BAS-10) e grava `photos_found_count = 0`, porque a coleta não copia foto (R03) e a página diz isso ao fornecedor com todas as letras. Toda a validação (permissão, supressão, whitelist, evento no log) continua acontecendo uma vez só, lá dentro.
+- **Entregue — a ficha (`apps/web/src/components/precadastro/**`, montado em `app/(app)/parceiros/[id]/page.tsx`):** o painel é uma **escada de três degraus** — rascunho → autorização → link — e a escada é o conteúdo. O degrau do meio não é nosso: o botão que emite o link **nasce desabilitado** e a frase debaixo dele diz, no lugar exato onde a mão ia clicar, que sem registro em `consent_events` o link não sai e que a autorização se pede na conversa (segunda mensagem, nunca a primeira). A RPC recusa de qualquer jeito; o que a tela faz é não deixar a pessoa descobrir isso batendo na porta. Depois de emitido, o painel mostra o endereço completo, o botão de copiar, "abrir como o fornecedor vê", a validade e o **aviso de que o endereço aparece uma vez só** (o banco guarda só o sha256). Quando existe link ativo cujo endereço já não temos, o terceiro degrau diz isso em vez de fingir. Mais: o que vai no rascunho em pares rótulo/valor, o estado do lado da Komune (`publicado`) e o histórico de onboarding num `details`.
+- **Entregue — a página pública (`apps/web/src/app/c/[token]/**`), a segunda superfície de vitrine do produto e a única sem login:** duas etapas numa página só, sem navegação. **T1**, a pergunta: pílula "Rascunho privado · não publicado", "Este perfil é seu?" em gradiente, o nome do negócio, e a **prova** — o que a Komune anotou, de onde veio, "nenhuma foto sua foi copiada" e a data em que o rascunho se apaga sozinho. Um botão. **T3**, o aceite: as cláusulas de **dados** e de **fotos** em moldura própria e no topo (R06 PRE-06 não admite que fiquem diluídas), depois o resto do termo, a **versão e o hash** à vista, três caixas **nunca pré-marcadas** (duas obrigatórias, marketing opcional e separado) e o campo "quem está autorizando". A saída — "não é meu, ou não quero aparecer" — está visível nas duas etapas, não pede nome e não negocia.
+- **A prova do aceite é montada no servidor, não no formulário** (`acoes.ts`, Server Actions): IP e user-agent saem dos cabeçalhos da requisição e o hash do termo é **recalculado** a partir do mesmo texto que a página renderizou. Se o hash viesse do formulário, a prova provaria o que o cliente quisesse. As duas caixas obrigatórias são conferidas de novo no servidor: `required` no HTML é conveniência, não regra.
+- **`/c/` entrou em `ehRotaPublica`** (`lib/supabase/middleware.ts`): é a única rota do produto feita para quem não é do time, e mandá-la para o `/login` seria pedir ao dono do buffet uma conta que ele não tem. Quem protege a rota é o token (32 bytes, guardado só como hash, 7 dias) e o fato de `anon` não ter grant de tabela nenhuma. A página usa um cliente Supabase **sem cookies**, para que um usuário do CRM que abra o link não fale com o banco como `authenticated`. `referrer: 'no-referrer'` na metadata, porque o token está na URL.
+- **Dois defeitos que a construção pegou, os dois consertados:**
+  1. **O React limpa o formulário depois de cada Server Action.** Um erro de rede apagava o nome que a pessoa acabou de digitar no celular. O campo virou controlado. As caixas continuam voltando desmarcadas de propósito (guardar "marcado" entre envios é a porta de entrada de uma caixa pré-marcada, e o PRE-06 não abre exceção), e o alerta agora avisa isso.
+  2. **Parênteses aninhados** em "informação pública do seu negócio (Planilha (importação))" — o nome da fonte já vem com parênteses. A origem saiu para frase própria ("Origem: Planilha (importação).") nas duas telas.
+- **Verificado com execução real, ponta a ponta, com navegador:** ficha (rascunho criado, botão travado por falta de autorização) → `consent_events` registrado → link emitido pela interface → página pública aberta sem sessão → aceite. No banco: `pre_registration_acceptances` com `who_accepted='Neuma Leão'`, `terms_version='precadastro-2026-09-v1'`, `terms_hash=2f7ffb82…` (**confere com o sha256 do módulo `termo.ts`**), `ip`, `user_agent` real, `auth_method='claim_link'`; `pre_registrations` com `claimed_at` preenchido e `claim_token_hash = null` (o token morre no aceite). A **recusa** também foi percorrida no navegador em outra ficha: `status='rejected'`, `purge_after` em 48 h, `erasure_request` em `consent_events`, `organizations.do_not_contact = true` e o negócio movido para "Opt-out / não contatar". Tentativa de enviar com as caixas desmarcadas (atributo `required` removido no navegador, que é o ataque real) foi recusada **pelo servidor**. Link já usado devolve "Este link não vale mais", sem dizer de quem era.
+- **Testes:** `supabase/tests/20_precadastro_na_ficha.sql` — **plan(35), 35/35 verdes**, com a asserção central escrita por extenso ("O TELEFONE NÃO ENTRA no rascunho, mesmo estando na whitelist"). `apps/web/src/components/precadastro/tipos.test.ts` (14 casos: leitura defensiva do jsonb, ordem dos campos, motivos traduzidos, estabilidade do texto canônico do termo) e `apps/web/src/lib/supabase/rotas-publicas.test.ts` (6 casos: `/c/` abre, nenhuma tela do CRM abre, `/conversas` não é confundida com `/c/`). `pnpm -C apps/web lint`, `typecheck` e `test` (**389 testes**) verdes; `packages/schema` idem. Migração reaplicada 2× sem erro. Fotos em 1440 e 390, claro e escuro, conferidas uma a uma.
+- **Pendente / decisão humana:**
+  - **BLOQUEANTE: o texto do termo não passou pelo Dennis.** `components/precadastro/termo.ts` traz a redação de produto do que a LGPD exige que esteja escrito, não a redação jurídica final. Enquanto `REVISADO_PELO_JURIDICO` for `false`, **a ficha avisa o time** ao lado do botão que emite o link; a página do fornecedor não carrega esse aviso, porque o problema é nosso. Ao fechar o texto: trocar as cláusulas, **subir `TERMO_VERSAO`** e virar a constante. Nunca editar cláusula sem mudar a versão — os aceites já gravados apontam para a versão e para o hash do texto que a pessoa leu.
+  - **O domínio do link.** `gerar_link_de_reivindicacao` (da 20260904001700) devolve `https://parceiros.komune.app/c/<token>` **fixo no corpo da função**, e esse domínio ainda não existe: a página mora dentro deste Next. O painel monta o endereço com a origem da própria aplicação e ignora o `url` da RPC. Quando o domínio de produção for decidido (Luiz, DNS), o certo é virar `app_settings`, porque o worker de WhatsApp também vai precisar montar esse link.
+  - **Não existe T2 (OTP).** O R10 previa confirmação do WhatsApp por código antes do aceite; hoje a autenticação é o próprio link (`auth_method='claim_link'`), que é o que a 20260904001700 implementou. Quem tiver o link aceita. Decidir se o OTP entra antes do primeiro fornecedor real.
+  - **`claimed_channel` é gravado como `'whatsapp'` fixo** por `aceitar_reivindicacao`, mesmo quando o `auth_method` é `claim_link`. Achado, não conserto: a coluna é de outro arquivo e a correção mexe numa RPC que já tem teste.
+  - **`pre_registrations` não pode ser apagada**, nem por admin: o `on delete cascade` para `pre_registration_events` bate no `app.forbid_change()` da tabela append-only e a transação inteira aborta. A política `pre_registrations_delete` (`using is_admin()`) é letra morta. Mesmo achado que o D6 registrou para `consent_events`.
+  - **Dado local, para quem for tirar foto:** a prova da recusa marcou **Alfa Cerimonial e Assessoria** (`b0cb63ca-…`) como `do_not_contact` no banco local, com supressão e negócio em opt-out. Foi um teste, não uma decisão de fornecedor — e **não há caminho de produto para desfazer** (não existe RPC de dessupressão; é assim de propósito). Se atrapalhar, é `supabase db reset`.
+
+## D4 — 05/09/2026 — O coletor do Radar coletando de verdade (RF-RAD-01/03/04/12, RF-ADM-07; ADR-04, ADR-08, ADR-11; anexos R03 §2.1 e R06 SCR-01/SCR-02)
+
+`apps/workers/src/workers/ingest.ts` tinha 15 linhas e não fazia nada. Agora existe um coletor que
+consome as filas `pgmq`, respeita o robots.txt e o limite de cada fonte, e traz candidato real para
+a fila de revisão. Rodou contra o **Casamentos.com.br**, em volume pequeno, e trouxe **282
+candidatos reais de Natal** (fotografia 71, cerimonialistas 42, DJs/bandas 38, locais 36,
+celebrante/beleza/convites 34, doces 17, decoração 17, buffet 13, bar 5, animação 4, e 5 sem
+categoria de propósito).
+
+- **Entregue — o worker (`apps/workers/src/**`, tudo novo salvo o CLI):**
+  - **Três etapas, três filas** (`ingest/etapas.ts`): `ingest_jobs` planeja a coleta e enfileira as
+    listagens; `ingest_pages` busca uma listagem, extrai e grava a captura; `ingest_records` chama
+    `esteira_processar_captura` e o candidato nasce. Nenhuma regra de negócio mora no worker — dedup,
+    higiene, resolução, proveniência campo a campo e retenção são as funções da `20260904001600`
+    (ADR-03). O worker busca, filtra e chama a RPC.
+  - **Dois tipos de erro, tratados diferente de propósito.** Transitório (rede, 5xx) falha, ganha
+    backoff exponencial e volta; passado o teto, cai na dead-letter com o erro junto. Determinístico
+    (robots proíbe, fonte desligada, fonte sem adaptador, captura sem identidade) **conclui** a
+    mensagem e escreve o motivo em `import_batches.error`: repetir cinco vezes só atrasaria a
+    dead-letter e bateria de novo numa porta que já disse não.
+  - **Crawlee** (`ingest/coletor.ts`), com `CheerioCrawler` para fonte de HTML servido e
+    `PlaywrightCrawler` para fonte que só existe depois do JavaScript. Duas coisas ficam **fora**
+    dele: a persistência (`persistStorage = false` e uma `RequestQueue` em memória por corrida —
+    senão o Crawlee guardaria a fila em disco e pularia como "já visitada" uma URL que a `pgmq`
+    mandou buscar de novo, dois donos para a mesma decisão) e o user-agent
+    (`useHeaderGenerator = false`; o padrão do Crawlee é gerar cabeçalho de navegador real, que é
+    exatamente "trocar o user-agent para disfarçar").
+  - **A portaria** (`ingest/robots.ts` + `guarda.ts`): analisador próprio de robots.txt (RFC 9309 —
+    grupos por agente, `Allow`/`Disallow` com `*` e `$`, padrão mais longo vence, empate exato vai
+    para o `Allow`, `Crawl-delay`), consultado antes de **cada** requisição. Existe além do
+    `respectRobotsTxtFile` do Crawlee porque o Crawlee pula a URL proibida **em silêncio**, e
+    silêncio aqui faria uma coleta terminar "sem candidatos" sem ninguém saber por quê: aqui o
+    veredito tem nome, vira log, vira `import_batches.error` e vira frase na tela. Robots
+    inalcançável (5xx, rede caída) = **host proibido por inteiro**.
+  - **A whitelist do R06 do lado do worker** (`ingest/whitelist.ts`, cópia literal de
+    `app.payload_e_permitido`): o campo proibido nunca sai da máquina do coletor, e a recusa tem
+    **nome** (o banco só diria `campo_fora_da_whitelist` para o objeto inteiro). Conferido no banco:
+    as 345 capturas têm exatamente 12 chaves distintas, todas da whitelist; zero referência a
+    `cdn0`, foto ou descrição.
+  - **Adaptador do Casamentos.com.br** (`ingest/casamentos.ts`): lê o `ItemList` em **JSON-LD** da
+    listagem categoria × cidade, que é onde o site publica nome, endereço, CEP, cidade, faixa de
+    preço, nota e nº de avaliações. `image`, `description` e as avaliações em texto vêm no mesmo
+    objeto e são descartadas no mesmo passo — não existe caminho no arquivo que as ponha no payload.
+    Paginação **só** pelo `<link rel="next">` da própria página; montar `--2`, `--3` no código
+    geraria requisição para página inexistente. O perfil de cada fornecedor **não é visitado**:
+    telefone e site ficam atrás de `emp-ShowTelefonoTrace.php` e `emp-ShowWebsiteTrace.php`, os dois
+    em `Disallow`. Por isso todo candidato nasce com a marca `sem_contato`, e está certo.
+  - **CLI** (`--agendar`, `--fonte`, `--categorias`, `--paginas`, `--rotulo`, `--uma-vez`), com lista
+    fechada de opções: `--pagians=3` digitado errado para o comando, em vez de rodar uma coleta
+    diferente da pedida e ser descoberto depois no banco.
+  - **Batida de ponto** (`lib/pulso.ts`): `esteira_bater_ponto` a cada 20 s, com contadores da
+    corrida. Falhar ao dizer "estou vivo" é motivo de log, nunca de parar de trabalhar.
+- **Entregue — banco (`supabase/migrations/20260904001802_coletor_do_radar.sql`):**
+  - Quatro invólucros em `public` para as funções de fila que já existiam em `app`
+    (`esteira_fila_enfileirar/ler/concluir/falhar`) — o schema `app` **não é exposto ao PostgREST**
+    (`config.toml`), e o worker fala com o banco por HTTPS (ADR-04). São `security invoker`, corpo de
+    uma linha, execução só para `service_role`. Mais `esteira_estado_lote`, para o coletor mover o
+    lote entre `na_fila → rodando → concluido/falhou` sem UPDATE solto na tabela.
+  - O catálogo das 18 listagens de Natal (R03 §2.1) em `sources.config.collector.catalogo` e o mapa
+    categoria-da-fonte → categoria do CRM em `source_category_map`: **o que** coletar é dado (muda
+    sem deploy), **como** extrair é código. `cabine-de-fotos` fica de fora do mapa de propósito —
+    sem mapa a categoria chega nula e quem revisa escolhe, que é a regra da `20260904001600`.
+- **Entregue — a tela (`apps/web/src/components/radar/painel-coletor.tsx`, substitui
+  `aviso-coleta.tsx`):** o painel separa duas coisas que, sem ele, desenham a mesma tela — "não há
+  nada para revisar hoje" e "o coletor está desligado desde ontem". Mostra o veredito do banco
+  (`esteira_saude()`: batida nos últimos 2 minutos), a última batida, máquina, versão, mensagens
+  tratadas e falhas, as quatro filas **na ordem da esteira** (e não na ordem alfabética do banco,
+  que começaria por "Parou com erro"), e as três últimas coletas com o que trouxeram. Sem cor
+  cromática em estado nenhum: verde e vermelho aqui significariam temperatura. No celular ficam o
+  título, a frase, a batida e as filas; a ficha da máquina e o histórico são de desktop, porque na
+  mão da Heloísa a tela é da fila de revisão. `leitura` e `financeiro` recebem 42501 de
+  `esteira_saude` — não é erro de tela, e o painel diz uma frase em vez de um alarme.
+- **Quatro defeitos que a execução real pegou, os quatro consertados:**
+  1. **O worker era "papel leitura" para o próprio banco.** Guardas escritos como "com claims, exige
+     `can_write()`; sem claims é o worker" partiam de uma premissa falsa: **a chave `service_role`
+     também é um JWT**. O PostgREST põe as claims dela em `request.jwt.claims`, `app.role()` não acha
+     `app_metadata.app_role`, cai no padrão de menor privilégio e o coletor levava 42501. Aconteceu
+     duas vezes na primeira coleta real: `esteira_abrir_lote` ("Papel leitura não abre lote de
+     ingestão") e `app.find_org_matches` ("Papel leitura não consulta candidatos a duplicata",
+     chamada de dentro de `app.resolver_source_record`). O conserto foi em `app.can_write()`, e não
+     em cada guarda, porque a afirmação "service_role não escreve" já era falsa: `service_role` é
+     BYPASSRLS e escreve em tudo — o guarda não protegia nada, só quebrava o único chamador honesto.
+     Nova `app.e_o_worker()` lê a claim `role` do JWT (e **não** `current_user`: dentro de
+     `security definer` o `current_user` já é o dono da função, e foi assim que a primeira versão
+     respondeu "falso" para o próprio worker). Nenhuma política de RLS muda: todas são
+     `to authenticated`, e `service_role` nunca é avaliado por elas.
+  2. **O limite por fonte não estava sendo respeitado entre mensagens.** O `sameDomainDelaySecs` do
+     Crawlee só vale dentro de uma corrida, e cada mensagem de `ingest_pages` abre a sua: quatro
+     listagens saíram em 4 segundos com `rate_limit_seconds = 4`. O freio passou para o worker
+     (`ingest/acelerador.ts`, por host, com relógio e sono injetáveis para o teste não esperar de
+     verdade). Depois do conserto o log mostra `esperou_ms` de 2.345 a 3.129 entre páginas, que é o
+     intervalo de 4 s menos o tempo que a própria busca levou. Quando a fonte declara `Crawl-delay`
+     maior que o do catálogo, vale o maior.
+  3. **O processo morria calado no meio da espera.** O sono do freio usava `unref()`, e um timer com
+     `unref()` não segura o laço de eventos: o Node encerrava o processo durante os 4 segundos, e a
+     coleta parava depois da primeira listagem sem erro nenhum. `unref()` ficou só onde é pano de
+     fundo (o relógio da batida de ponto). A mensagem que estava em voo voltou sozinha quando o
+     `visibility timeout` de 180 s expirou — o que é a prova de que a fila faz o que promete.
+  4. **A recoleta mensal não atualizava `last_seen_at`.** A chave de idempotência do registro era
+     `reg:<raw_capture_id>`; como conteúdo idêntico devolve a **mesma** `raw_capture`, a chave já
+     estava processada e nada era enfileirado — e `source_record.last_seen_at`, que é o que a
+     retenção do PRD §10.6 lê, ficava congelado na primeira coleta. Passou a ser
+     `reg:<batch_id>:<raw_capture_id>`: idempotente dentro do lote, que é onde precisa ser.
+- **Verificado com execução real, quatro corridas contra a fonte:**
+  - Robots.txt buscado e obedecido (`grupos: 2`; o grupo que vale para o KomuneBot é o `*`, e o
+    `Disallow: /` do GPTBot não é nosso).
+  - Corrida 1 (2 categorias): 2 páginas, 49 capturas, **49 candidatos**.
+    Corrida 2 (as mesmas 2 + 1 nova, `--paginas=2`): **49 capturas repetidas → 0 candidatos novos**,
+    19 novas → 19 candidatos, e a página 2 veio do `rel="next"`. Idempotência e paginação provadas na
+    mesma corrida. Corrida 3: o freio de 4 s. Corrida 4 (catálogo completo, 18 categorias): **21
+    listagens, 207 capturas, 207 candidatos**, zero falhas, zero dead-letter.
+  - No banco: 345 `raw_capture`, 345 `source_record`, 282 candidatos do robô, **813 linhas de
+    `field_provenance`** (é isto que responde "de onde vocês tiraram meu contato?" com a URL exata),
+    5 lotes em `import_batches` com `stats` preenchido, `worker_heartbeats` com a batida do coletor.
+    Os candidatos já chegam com `ja_existe_na_base` quando batem com as 100 organizações que já
+    existiam — a dedup rodou.
+- **Testes:** `supabase/tests/21_coletor_do_radar.sql` (**plan(36), 36/36 verdes**) prende o defeito
+  do "papel leitura", os grants das quatro bocas da fila, a idempotência pelo invólucro, o ciclo do
+  lote e o fato de nenhum caminho do catálogo cair num prefixo proibido pelo robots. No worker,
+  **54 testes Vitest** novos (robots RFC 9309 com o arquivo real da fonte, whitelist com foto/CPF/Pix,
+  adaptador com um recorte fiel do JSON-LD real, freio por host com relógio falso, CLI). Na web,
+  `painel-coletor.test.ts`. `pnpm lint`, `typecheck` e `test` verdes em `apps/workers` e `apps/web`
+  (**394 testes**); `supabase db lint` sem apontamento nas funções novas; migração reaplicada 3× sem
+  erro. Fotos do `/radar` em 1440 e 390, coletando e parado.
+- **Pendente / decisão humana:**
+  - **BLOQUEANTE de produção: o parecer do advogado sobre o Casamentos.com.br não saiu** (PRD §13,
+    Dennis). O robots.txt libera as listagens e os perfis, e a coleta segue as mitigações do R03 §2.1
+    (volume mínimo, 1 req/4 s, sem foto, sem avaliação em texto, sem "ver telefone"), mas os Termos
+    §2.3 proíbem crawler. O que está no repositório roda contra a **stack local**; ligar isso em
+    produção é decisão do Dennis e do Rafael.
+  - **Só uma fonte tem adaptador.** Base CNPJ (a fonte mais completa e legalmente mais confortável,
+    R03 §2.6), Places, TeleListas e OLX continuam sem coletor; a esteira já está pronta para eles.
+  - **O Casamentos não publica telefone**, então os 282 candidatos nascem `sem_contato`: eles são a
+    espinha dorsal da lista-alvo, e o WhatsApp precisa vir do cruzamento com a base CNPJ (D4) ou do
+    próprio fornecedor. Aprovar em massa sem isso enche o funil de ficha sem canal.
+  - **Ninguém agenda a coleta pela interface ainda.** Hoje é linha de comando na máquina dedicada; o
+    botão "coletar agora" no Radar e o `pg_cron` mensal ficam para depois do parecer.
+  - **`03_dedup.sql` está falhando, e não é deste trabalho:** a importação de planilha rodada em
+    paralelo (lote `planilha-ponte-preenchida.xlsx · 05/09/2026, 01:21`) criou **Safari Buffet** com
+    o telefone `+558432064212`, que é uma constante fixa do teste — o `insert` da fixture bate no
+    índice `organizations_phone_uq` e o arquivo aborta. O coletor não escreve telefone nenhum (0
+    candidatos com telefone). Conserto: a fixture do 03 precisa de telefone próprio, como o 16 e o 17
+    já fazem.
+  - **Ambiente:** o `.env` da raiz aponta para o projeto **remoto**. Para desenvolvimento foi criado
+    um `.env.local` (gitignored) com a URL e a `service_role` da stack local; o README dos workers
+    explica. Vale conferir se é isso mesmo que se quer no `.env` da máquina de quem desenvolve.
+
+## D2 — 05/09/2026 — Importar planilha: da planilha-ponte para dentro da base (RF-BAS-07, RF-BAS-16, RF-BAS-17; ADR-08; anexos R06 e R09)
+
+A planilha-ponte do Dia 0 (`docs/planilha-ponte/`) entra no CRM pela **mesma esteira do Radar** (ADR-08): `raw_capture → source_record → supplier_candidate → revisão → organizations`. Nenhum caminho novo de escrita foi criado — a importação só decide qual caminho existente cada linha percorre.
+
+### Migração `20260904001820_importacao_de_planilha.sql`
+- **Resolvedores de catálogo** (`app.chave_catalogo`, `app.importacao_categoria/cidade/fonte/pessoa/etapa/canal/data`): o texto da lista suspensa vira id do CRM por casamento exato, por slug e só então por trigrama (limiar 0,55), e a prévia **sempre diz** quando o casamento foi aproximado. `Solutudo` e `Organizando Eventos` casam com a fonte agrupada `TeleListas / GuiaMais / Organizando Eventos / Solutudo` porque os apelidos estão no próprio nome da fonte. Dois "Matheus" na equipe ⇒ o dono fica em branco com aviso, em vez de virar palpite.
+- **`app.importacao_normalizar(jsonb)`** (STABLE): uma linha vira o objeto canônico da esteira — telefone em E.164, `@` normalizado, CPF varrido de qualquer texto livre (RF-BAS-16/ADR-09) e `payload` já dentro da whitelist do R06 SCR-01. O `external_id` sai da **identidade** (celular > @ > CNPJ > nome+cidade) e **nunca** do número da linha: reordenar a planilha não duplica a base.
+- **`public.importacao_previa(jsonb)`**: classifica sem escrever nada — entra / já existe (com o **nome** da ficha e a chave que casou) / vai para revisão / não contatar / já importado / não dá para importar. Teto de 500 linhas por chamada.
+- **`public.importacao_gravar(uuid, jsonb)`**: grava em pedaços de até 200 linhas por `esteira_gravar_captura` → `esteira_processar_captura` → `app.promover_candidato`. Duplicata **não é mesclada nem descartada**: vira candidato marcado `ja_existe_na_base` na fila do Radar, que já sabe mesclar e recusar.
+- **`public.importacao_encerrar_lote(uuid, text)`** e **`public.importacao_lotes(int)`**: fecham o lote e listam o histórico; a janela de 48 h do desfazer (RF-BAS-17) passa a contar do **fim** da gravação, não da abertura — um lote grande não nasce com uma hora a menos.
+- **Opt-out**: linha com "Opt-out" ou "Pediu para parar" nunca vira alvo. Com ficha existente, grava `contact_optout` em `consent_events` e deixa `app.consent_apply` fazer o resto (do_not_contact, hashes na `suppression_list` e o negócio movido para a etapa de opt-out do funil); sem ficha, guarda só o hash da supressão.
+- **Histórico**: `ultimo_contato` + `resultado` viram uma atividade de **nota** com `outcome_id` nulo e chave de cliente determinística. Um desfecho de verdade moveria etapa, marcaria temperatura, abriria tarefa e dispararia cadência **hoje** por um contato de semana passada.
+
+### Tela `/importar` (`apps/web/src/app/(app)/importar`, `components/importacao/`)
+- Quatro passos numa tela: arquivo → o que é cada coluna → prévia → recibo. "Importar" entra na navegação (D2, papéis que escrevem na base).
+- **Leitor próprio de XLSX e CSV** (`planilha.ts`, só `fflate` de dependência, 8 kB): `sharedStrings`, `inlineStr`, resultado de fórmula, booleano e **número com formato de data** convertido pelo calendário do Excel (com o 29/02/1900 que nunca existiu); aba escolhida por nome; CSV RFC 4180 com separador descoberto fora de aspas e BOM removido. Recusa `.xls` com instrução em português, não com erro de biblioteca.
+- **Web Worker** (`planilha.worker.ts`): a leitura acontece fora da thread principal. Medido: **15.000 linhas em 391 ms, 1 worker, maior intervalo entre quadros 218 ms** (o desenho dos 17 cartões de mapeamento, não a leitura); durante a prévia das 15.000 linhas, **901 quadros e nenhum intervalo acima de 50 ms**.
+- **Mapa de colunas** (`mapeamento.ts`): sugere por sinônimo (exato e por semelhança, com "Confira" quando foi por semelhança), mostra **três respostas reais** de cada coluna e a pessoa corrige. A planilha-ponte casa as 17 colunas sozinha.
+- Prévia com contagens em mono, agrupada por decisão, com o **nome de quem cada linha duplica** e a chave que casou ("mesmo telefone", "nome muito parecido"). Teto de 300 linhas desenhadas por grupo. Estado de carregando com esqueleto e barra de progresso, vazio que diz o que fazer, erro em português com o que fazer.
+- Recibo com o desfazer de 48 h e atalhos para `/parceiros` e para a fila do Radar.
+
+### Verificado com execução real (banco local)
+- Planilha de teste montada a partir do **R09** (66 fornecedores, produtores e cerimonialistas reais de Natal) no formato exato da planilha-ponte, em `.xlsx` (reescrevendo a aba `Contatos` do arquivo real do Excel) e `.csv`; fixtures em `apps/web/src/components/importacao/fixtures/`.
+- **1ª importação pela tela**: 32 fichas + 32 negócios + 63 candidatos + 63 capturas; 30 duplicatas na fila do Radar; 1 opt-out suprimido; 3 linhas recusadas (2 sem contato, 1 sem nome).
+- **2ª importação do mesmo arquivo, pela tela**: `entra: 0`, `repetida: 33` — **0 organizações, 0 negócios, 0 candidatos, 0 capturas, 0 atividades**. A idempotência é herdada de quatro travas independentes (`raw_capture_conteudo_uq`, `source_record_fonte_externo_uq`, `app.promover_candidato` e `activities_client_key_idx`).
+- pgTAP `supabase/tests/22_importacao_de_planilha.sql`: **72/72**. `16` (125) e `17` (229) seguem verdes. `supabase db lint` sem apontamentos nas funções novas. Vitest 394 (39 novos em `planilha.test.ts` e `mapeamento.test.ts`, contra os arquivos reais). Lint e typecheck do monorepo verdes. `packages/schema/src/database.types.ts` regenerado.
+- Defeito encontrado e corrigido durante o teste: a prévia prometia "entra" onde a gravação recusava. `app.find_org_matches` só casa telefone com 0,95 quando é **celular** (o fixo dela exige bairro igual), mas o índice único `organizations_phone_uq` não faz essa distinção e `app.promover_candidato` bloqueia por ele. A prévia ganhou a mesma sonda das quatro chaves únicas, e o pgTAP fixa o caso (asserções 62–68).
+
+### Pendente
+- `ultimo_contato`/`resultado` **não** viram desfecho (`outcome_id`), só nota: quem quiser a métrica de portas retroativa precisa de uma decisão de produto sobre disparar (ou não) etapa, temperatura, tarefa e cadência por contato passado.
+- A tela não deixa corrigir **valor** de célula (categoria errada, cidade fora do catálogo): a linha vai para a fila do Radar, onde a correção já existe. Corrigir na própria prévia é escopo de outro dia.
+- Sem anexo de contrato/licença no lote (`import_batches.license_path` existe e não é preenchido pela tela): entra quando houver a primeira lista de terceiro (RF-BAS-10, regra Telekall do R09).
+- `field_provenance.tool` grava o slug da fonte, não `planilha:leitor-proprio` — vem de `app.resolver_source_record` (migração 001600), fora do que esta tarefa podia mexer.
+- Teto de leitura de 20.000 linhas por arquivo, com aviso na tela; acima disso a planilha deixou de ser a planilha-ponte e precisa de conversa antes do upload.
+
+### Decisão humana
+- Confirmar com Dennis se a nota de histórico ("Registrado na planilha-ponte — <resultado>") pode carregar o texto livre da coluna `resultado` como está, ou se ele deve ser normalizado antes de entrar na ficha.
+- Confirmar o limiar de 0,55 do casamento aproximado de categoria e etapa (hoje casa "Outros serviços (celebrante, …)" com "Celebrante, beleza, …", e recusa qualquer par de categorias diferentes).

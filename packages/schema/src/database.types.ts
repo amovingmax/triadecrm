@@ -88,7 +88,11 @@ export type Database = {
       }
     }
     Functions: {
+      abrir_proximo_toque: { Args: { p_enrollment: string }; Returns: Json }
+      aplicar_retencao: { Args: never; Returns: Json }
       business_days: { Args: { p_ate: string; p_de: string }; Returns: number }
+      cadencias_agendar: { Args: never; Returns: number }
+      cadencias_encerrar_silencio: { Args: never; Returns: number }
       call_batch_is_mine: { Args: { p_batch: string }; Returns: boolean }
       call_batch_is_visible: { Args: { p_batch: string }; Returns: boolean }
       call_candidates: {
@@ -118,6 +122,7 @@ export type Database = {
         }[]
       }
       can_write: { Args: never; Returns: boolean }
+      chave_catalogo: { Args: { t: string }; Returns: string }
       cnpj_is_valid: { Args: { c: string }; Returns: boolean }
       compute_temperature: {
         Args: {
@@ -128,6 +133,10 @@ export type Database = {
           p_status: Database["app"]["Enums"]["deal_status"]
         }
         Returns: Record<string, unknown>
+      }
+      condicao_do_passo: {
+        Args: { p_enrollment_id: string; p_step_id: number }
+        Returns: Json
       }
       contact_is_visible: { Args: { p_contact: string }; Returns: boolean }
       cpf_is_valid: { Args: { c: string }; Returns: boolean }
@@ -141,6 +150,53 @@ export type Database = {
         }
         Returns: boolean
       }
+      dia_util_de_operacao: { Args: { p_at?: string }; Returns: boolean }
+      e_o_worker: { Args: never; Returns: boolean }
+      encerrar_matricula: {
+        Args: {
+          p_enrollment: string
+          p_motivo: string
+          p_status?: Database["app"]["Enums"]["cadence_status"]
+        }
+        Returns: undefined
+      }
+      encerrar_por_silencio: {
+        Args: { p_enrollment: string }
+        Returns: undefined
+      }
+      esteira_concluir: {
+        Args: { p_key: string; p_msg_id: number; p_queue: string }
+        Returns: boolean
+      }
+      esteira_enfileirar: {
+        Args: {
+          p_batch_id?: string
+          p_delay?: number
+          p_key: string
+          p_payload: Json
+          p_queue: string
+        }
+        Returns: Json
+      }
+      esteira_falhar: {
+        Args: {
+          p_erro: string
+          p_key: string
+          p_msg_id: number
+          p_queue: string
+        }
+        Returns: Json
+      }
+      esteira_ler: {
+        Args: { p_qty?: number; p_queue: string }
+        Returns: unknown[]
+        SetofOptions: {
+          from: "*"
+          to: "message_record"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       expirar_reservas: { Args: never; Returns: number }
       find_org_matches: {
         Args: { n: Json; p_threshold?: number }
@@ -150,6 +206,7 @@ export type Database = {
           reason: string
         }[]
       }
+      flags_externas: { Args: never; Returns: string[] }
       goal_bounds: {
         Args: {
           p_period: Database["app"]["Enums"]["goal_period"]
@@ -160,6 +217,24 @@ export type Database = {
           period_start: string
         }[]
       }
+      gravar_segredo: {
+        Args: { p_descricao?: string; p_nome: string; p_valor: string }
+        Returns: undefined
+      }
+      importacao_canal: {
+        Args: { t: string }
+        Returns: Database["app"]["Enums"]["channel"]
+      }
+      importacao_categoria: { Args: { t: string }; Returns: Json }
+      importacao_cidade: { Args: { t: string }; Returns: Json }
+      importacao_data: { Args: { t: string }; Returns: string }
+      importacao_etapa: {
+        Args: { p_pipeline: number; t: string }
+        Returns: Json
+      }
+      importacao_fonte: { Args: { t: string }; Returns: Json }
+      importacao_normalizar: { Args: { p: Json }; Returns: Json }
+      importacao_pessoa: { Args: { t: string }; Returns: Json }
       instante_local: {
         Args: { p_dia: string; p_hora: number }
         Returns: string
@@ -182,7 +257,56 @@ export type Database = {
         Args: { p_contact_id?: string; p_organization_id: string }
         Returns: boolean
       }
+      ja_respondeu: { Args: { p_organization_id: string }; Returns: boolean }
+      janela_do_canal: {
+        Args: {
+          p_at?: string
+          p_channel: Database["app"]["Enums"]["channel"]
+          p_respondeu?: boolean
+        }
+        Returns: Json
+      }
+      komune_aplicar_evento: {
+        Args: { p_delivery_id: string; p_payload: Json }
+        Returns: Json
+      }
+      komune_enfileirar: {
+        Args: { p_motivo?: string; p_pre_registration_id: string }
+        Returns: Json
+      }
+      komune_falha: {
+        Args: {
+          p_erro: string
+          p_http_status?: number
+          p_msg_id: number
+          p_outbox_id: string
+        }
+        Returns: Json
+      }
+      komune_payload: { Args: { p_pre_registration_id: string }; Returns: Json }
+      komune_proximos: { Args: { p_qty?: number }; Returns: Json }
+      komune_push_disparar: { Args: never; Returns: Json }
+      komune_sucesso: {
+        Args: {
+          p_http_status: number
+          p_komune_supplier_id?: string
+          p_msg_id: number
+          p_outbox_id: string
+        }
+        Returns: Json
+      }
+      lgpd_dossie: { Args: { p_organization_id: string }; Returns: Json }
       mask_phone: { Args: { p: string }; Returns: string }
+      mesclar_candidato: {
+        Args: {
+          p_batch_id?: string
+          p_candidate_id: string
+          p_category_id?: number
+          p_organization_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       next_business_day: {
         Args: { p_days?: number; p_from: string }
         Returns: string
@@ -197,12 +321,106 @@ export type Database = {
         Args: { p_result: Database["app"]["Enums"]["call_result"] }
         Returns: string
       }
+      payload_e_permitido: { Args: { p: Json }; Returns: boolean }
+      payload_hash: { Args: { p: Json }; Returns: string }
+      pode_tocar: {
+        Args: {
+          p_channel: Database["app"]["Enums"]["channel"]
+          p_contact: string
+          p_org: string
+          p_quando?: string
+        }
+        Returns: Json
+      }
+      prazo_do_lote: {
+        Args: { p_inicio: string; p_max_tentativas: number }
+        Returns: string
+      }
+      precadastros_expirar: { Args: never; Returns: number }
+      precadastros_lembrete: { Args: never; Returns: number }
+      prefill_da_organizacao: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      prefilled_ok: { Args: { p: Json }; Returns: boolean }
+      promover_candidato: {
+        Args: {
+          p_batch_id?: string
+          p_candidate_id: string
+          p_category_id?: number
+          p_next_action?: string
+          p_next_action_at?: string
+          p_owner_id?: string
+          p_stage_id?: number
+        }
+        Returns: Json
+      }
       proxima_abertura: { Args: { p_dia: string }; Returns: string }
+      proxima_abertura_do_canal: {
+        Args: {
+          p_channel: Database["app"]["Enums"]["channel"]
+          p_dia: string
+          p_respondeu?: boolean
+        }
+        Returns: string
+      }
       reads_base_pii: { Args: never; Returns: boolean }
       recompute_temperatures: { Args: never; Returns: number }
+      recusa_de_tabulacao: {
+        Args: {
+          p_contato: string
+          p_detalhe: string
+          p_evidencia: string
+          p_motivo: string
+          p_optout: boolean
+          p_org: string
+        }
+        Returns: Json
+      }
+      recusar_candidato: {
+        Args: {
+          p_candidate_id: string
+          p_nao_contatar?: boolean
+          p_reason: string
+        }
+        Returns: Json
+      }
+      registrar_optout_de_contato: {
+        Args: {
+          p_canal?: Database["app"]["Enums"]["channel"]
+          p_contact_id?: string
+          p_evidencia?: string
+          p_organization_id: string
+        }
+        Returns: Json
+      }
+      registrar_proveniencia: {
+        Args: {
+          p_action: string
+          p_batch_id?: string
+          p_collected_at?: string
+          p_collector?: string
+          p_field: string
+          p_lia_version?: string
+          p_previous_value?: string
+          p_reason?: string
+          p_record_id: string
+          p_record_type: string
+          p_source_id?: number
+          p_source_url?: string
+          p_tool?: string
+        }
+        Returns: number
+      }
+      resolver_source_record: {
+        Args: { p_source_record_id: string }
+        Returns: Json
+      }
       role: { Args: never; Returns: Database["app"]["Enums"]["user_role"] }
       search_name: { Args: { n: string }; Returns: string }
       sees_all: { Args: never; Returns: boolean }
+      segredo: { Args: { p_nome: string }; Returns: string }
+      sem_cpf: { Args: { t: string }; Returns: string }
       sha256_hex: { Args: { t: string }; Returns: string }
       stage_for: {
         Args: { p_pipeline_id: number; p_slug: string }
@@ -224,6 +442,23 @@ export type Database = {
         }
         Returns: undefined
       }
+      tem_autorizacao_vigente: {
+        Args: { p_organization_id: string }
+        Returns: boolean
+      }
+      tem_cpf: { Args: { t: string }; Returns: boolean }
+      tem_toque_pendente: {
+        Args: { p_contact?: string; p_org: string }
+        Returns: boolean
+      }
+      teto_do_canal: {
+        Args: { p_channel: Database["app"]["Enums"]["channel"]; p_dia: string }
+        Returns: number
+      }
+      toques_do_dia: {
+        Args: { p_channel: Database["app"]["Enums"]["channel"]; p_dia: string }
+        Returns: number
+      }
       validar_roteiro: { Args: { p_arvore: Json }; Returns: string[] }
       website_domain: { Args: { u: string }; Returns: string }
     }
@@ -237,6 +472,7 @@ export type Database = {
         | "email"
         | "stage_change"
         | "system"
+      cadence_status: "ativa" | "pausada" | "concluida" | "encerrada"
       call_batch_status: "rascunho" | "ativo" | "pausado" | "encerrado"
       call_item_status: "fila" | "em_andamento" | "concluido" | "devolvido"
       call_order: "prioridade" | "mais_parado" | "aleatorio"
@@ -332,6 +568,7 @@ export type Database = {
         | "other"
       task_status: "todo" | "doing" | "done" | "cancelled"
       temperature: "frio" | "morno" | "quente" | "cliente" | "cliente_ativo"
+      touch_status: "pendente" | "feito" | "pulado" | "cancelado"
       user_role:
         | "admin"
         | "gestor"
@@ -524,6 +761,45 @@ export type Database = {
           },
         ]
       }
+      app_settings: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audio_assets: {
         Row: {
           context: string | null
@@ -620,6 +896,369 @@ export type Database = {
           old_data?: Json | null
           row_id?: string
           table_name?: string
+        }
+        Relationships: []
+      }
+      cadence_enrollments: {
+        Row: {
+          assignee_id: string | null
+          cadence_id: number
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          current_position: number
+          deal_id: string | null
+          end_reason: string | null
+          ended_at: string | null
+          enrolled_at: string
+          gancho: string | null
+          id: string
+          next_due_at: string | null
+          organization_id: string
+          status: Database["app"]["Enums"]["cadence_status"]
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          cadence_id: number
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_position?: number
+          deal_id?: string | null
+          end_reason?: string | null
+          ended_at?: string | null
+          enrolled_at?: string
+          gancho?: string | null
+          id?: string
+          next_due_at?: string | null
+          organization_id: string
+          status?: Database["app"]["Enums"]["cadence_status"]
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          cadence_id?: number
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_position?: number
+          deal_id?: string | null
+          end_reason?: string | null
+          ended_at?: string | null
+          enrolled_at?: string
+          gancho?: string | null
+          id?: string
+          next_due_at?: string | null
+          organization_id?: string
+          status?: Database["app"]["Enums"]["cadence_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_enrollments_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_enrollments_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_enrollments_cadence_id_fkey"
+            columns: ["cadence_id"]
+            isOneToOne: false
+            referencedRelation: "cadences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_enrollments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_enrollments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_enrollments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_enrollments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_enrollments_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_enrollments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_enrollments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cadence_steps: {
+        Row: {
+          audio_slug: string | null
+          cadence_id: number
+          channel: Database["app"]["Enums"]["channel"]
+          condition: Json
+          created_at: string
+          delay_days: number
+          delay_from: string
+          id: number
+          is_last_automatic: boolean
+          position: number
+          task_kind: Database["app"]["Enums"]["task_kind"]
+          template_code: string | null
+          tiers: string[]
+          title: string
+          window_hint: string | null
+        }
+        Insert: {
+          audio_slug?: string | null
+          cadence_id: number
+          channel: Database["app"]["Enums"]["channel"]
+          condition?: Json
+          created_at?: string
+          delay_days?: number
+          delay_from?: string
+          id?: number
+          is_last_automatic?: boolean
+          position: number
+          task_kind: Database["app"]["Enums"]["task_kind"]
+          template_code?: string | null
+          tiers?: string[]
+          title: string
+          window_hint?: string | null
+        }
+        Update: {
+          audio_slug?: string | null
+          cadence_id?: number
+          channel?: Database["app"]["Enums"]["channel"]
+          condition?: Json
+          created_at?: string
+          delay_days?: number
+          delay_from?: string
+          id?: number
+          is_last_automatic?: boolean
+          position?: number
+          task_kind?: Database["app"]["Enums"]["task_kind"]
+          template_code?: string | null
+          tiers?: string[]
+          title?: string
+          window_hint?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_steps_audio_slug_fkey"
+            columns: ["audio_slug"]
+            isOneToOne: false
+            referencedRelation: "audio_assets"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "cadence_steps_cadence_id_fkey"
+            columns: ["cadence_id"]
+            isOneToOne: false
+            referencedRelation: "cadences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_steps_template_code_fkey"
+            columns: ["template_code"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["template_code"]
+          },
+        ]
+      }
+      cadence_touches: {
+        Row: {
+          activity_id: string | null
+          channel: Database["app"]["Enums"]["channel"]
+          contact_id: string | null
+          created_at: string
+          done_at: string | null
+          due_at: string
+          enrollment_id: string
+          id: string
+          organization_id: string
+          position: number
+          skip_reason: string | null
+          status: Database["app"]["Enums"]["touch_status"]
+          step_id: number
+          task_id: string | null
+        }
+        Insert: {
+          activity_id?: string | null
+          channel: Database["app"]["Enums"]["channel"]
+          contact_id?: string | null
+          created_at?: string
+          done_at?: string | null
+          due_at: string
+          enrollment_id: string
+          id?: string
+          organization_id: string
+          position: number
+          skip_reason?: string | null
+          status?: Database["app"]["Enums"]["touch_status"]
+          step_id: number
+          task_id?: string | null
+        }
+        Update: {
+          activity_id?: string | null
+          channel?: Database["app"]["Enums"]["channel"]
+          contact_id?: string | null
+          created_at?: string
+          done_at?: string | null
+          due_at?: string
+          enrollment_id?: string
+          id?: string
+          organization_id?: string
+          position?: number
+          skip_reason?: string | null
+          status?: Database["app"]["Enums"]["touch_status"]
+          step_id?: number
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_touches_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_touches_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_touches_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_touches_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_touches_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_touches_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_touches_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_touches_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cadences: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_stage_slug: string | null
+          entry_note: string | null
+          id: number
+          is_active: boolean
+          limite_dias: number
+          max_touches: number
+          name: string
+          pipeline_slug: string
+          requires_authorization: boolean
+          requires_gancho: boolean
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_stage_slug?: string | null
+          entry_note?: string | null
+          id?: number
+          is_active?: boolean
+          limite_dias?: number
+          max_touches?: number
+          name: string
+          pipeline_slug?: string
+          requires_authorization?: boolean
+          requires_gancho?: boolean
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_stage_slug?: string | null
+          entry_note?: string | null
+          id?: number
+          is_active?: boolean
+          limite_dias?: number
+          max_touches?: number
+          name?: string
+          pipeline_slug?: string
+          requires_authorization?: boolean
+          requires_gancho?: boolean
+          slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1082,6 +1721,39 @@ export type Database = {
         }
         Relationships: []
       }
+      channel_windows: {
+        Row: {
+          ate: number
+          channel: Database["app"]["Enums"]["channel"]
+          de: number
+          dow: number
+          id: number
+          note: string | null
+          position: number
+          requires_reply: boolean
+        }
+        Insert: {
+          ate: number
+          channel: Database["app"]["Enums"]["channel"]
+          de: number
+          dow: number
+          id?: number
+          note?: string | null
+          position?: number
+          requires_reply?: boolean
+        }
+        Update: {
+          ate?: number
+          channel?: Database["app"]["Enums"]["channel"]
+          de?: number
+          dow?: number
+          id?: number
+          note?: string | null
+          position?: number
+          requires_reply?: boolean
+        }
+        Relationships: []
+      }
       cities: {
         Row: {
           created_at: string
@@ -1332,6 +2004,7 @@ export type Database = {
           created_at: string
           entered_stage_at: string
           id: string
+          import_batch_id: string | null
           last_activity_at: string | null
           last_intent: string | null
           last_intent_at: string | null
@@ -1362,6 +2035,7 @@ export type Database = {
           created_at?: string
           entered_stage_at?: string
           id?: string
+          import_batch_id?: string | null
           last_activity_at?: string | null
           last_intent?: string | null
           last_intent_at?: string | null
@@ -1392,6 +2066,7 @@ export type Database = {
           created_at?: string
           entered_stage_at?: string
           id?: string
+          import_batch_id?: string | null
           last_activity_at?: string | null
           last_intent?: string | null
           last_intent_at?: string | null
@@ -1417,6 +2092,13 @@ export type Database = {
           won_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "deals_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "deals_lost_reason_id_fkey"
             columns: ["lost_reason_id"]
@@ -1485,6 +2167,78 @@ export type Database = {
             columns: ["stage_id"]
             isOneToOne: false
             referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      field_provenance: {
+        Row: {
+          action: string
+          batch_id: string | null
+          collected_at: string
+          collector: string | null
+          created_at: string
+          field: string
+          id: number
+          legal_basis: string
+          lia_version: string | null
+          previous_value_hash: string | null
+          reason: string | null
+          record_id: string
+          record_type: string
+          source_id: number | null
+          source_url: string | null
+          tool: string | null
+        }
+        Insert: {
+          action: string
+          batch_id?: string | null
+          collected_at?: string
+          collector?: string | null
+          created_at?: string
+          field: string
+          id?: number
+          legal_basis?: string
+          lia_version?: string | null
+          previous_value_hash?: string | null
+          reason?: string | null
+          record_id: string
+          record_type: string
+          source_id?: number | null
+          source_url?: string | null
+          tool?: string | null
+        }
+        Update: {
+          action?: string
+          batch_id?: string | null
+          collected_at?: string
+          collector?: string | null
+          created_at?: string
+          field?: string
+          id?: number
+          legal_basis?: string
+          lia_version?: string | null
+          previous_value_hash?: string | null
+          reason?: string | null
+          record_id?: string
+          record_type?: string
+          source_id?: number | null
+          source_url?: string | null
+          tool?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_provenance_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_provenance_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
             referencedColumns: ["id"]
           },
         ]
@@ -1588,6 +2342,151 @@ export type Database = {
         }
         Relationships: []
       }
+      import_batches: {
+        Row: {
+          can_undo_until: string
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          label: string
+          license_path: string | null
+          params: Json
+          source_id: number
+          started_at: string | null
+          stats: Json
+          status: string
+          triggered_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          can_undo_until?: string
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          kind: string
+          label: string
+          license_path?: string | null
+          params?: Json
+          source_id: number
+          started_at?: string | null
+          stats?: Json
+          status?: string
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          can_undo_until?: string
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          label?: string
+          license_path?: string | null
+          params?: Json
+          source_id?: number
+          started_at?: string | null
+          stats?: Json
+          status?: string
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_batches_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_batches_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_batches_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ingest_dedup: {
+        Row: {
+          attempts: number
+          batch_id: string | null
+          first_seen_at: string
+          idempotency_key: string
+          last_error: string | null
+          msg_id: number | null
+          processed_at: string | null
+          queue: string
+        }
+        Insert: {
+          attempts?: number
+          batch_id?: string | null
+          first_seen_at?: string
+          idempotency_key: string
+          last_error?: string | null
+          msg_id?: number | null
+          processed_at?: string | null
+          queue: string
+        }
+        Update: {
+          attempts?: number
+          batch_id?: string | null
+          first_seen_at?: string
+          idempotency_key?: string
+          last_error?: string | null
+          msg_id?: number | null
+          processed_at?: string | null
+          queue?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingest_dedup_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingest_dedup_queue_fkey"
+            columns: ["queue"]
+            isOneToOne: false
+            referencedRelation: "ingest_queues"
+            referencedColumns: ["name"]
+          },
+        ]
+      }
+      ingest_queues: {
+        Row: {
+          description: string | null
+          max_attempts: number
+          name: string
+          visibility_seconds: number
+        }
+        Insert: {
+          description?: string | null
+          max_attempts?: number
+          name: string
+          visibility_seconds: number
+        }
+        Update: {
+          description?: string | null
+          max_attempts?: number
+          name?: string
+          visibility_seconds?: number
+        }
+        Relationships: []
+      }
       interaction_outcomes: {
         Row: {
           can_reactivate: boolean
@@ -1647,6 +2546,106 @@ export type Database = {
           target_stage_slug?: string | null
         }
         Relationships: []
+      }
+      komune_event_map: {
+        Row: {
+          atualiza: string | null
+          description: string | null
+          external: string
+          internal: string
+        }
+        Insert: {
+          atualiza?: string | null
+          description?: string | null
+          external: string
+          internal: string
+        }
+        Update: {
+          atualiza?: string | null
+          description?: string | null
+          external?: string
+          internal?: string
+        }
+        Relationships: []
+      }
+      komune_outbox: {
+        Row: {
+          attempts: number
+          first_seen_at: string
+          http_status: number | null
+          id: string
+          idempotency_key: string
+          komune_supplier_id: string | null
+          last_error: string | null
+          motivo: string
+          msg_id: number | null
+          organization_id: string
+          payload: Json
+          payload_hash: string
+          pre_registration_id: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          first_seen_at?: string
+          http_status?: number | null
+          id?: string
+          idempotency_key: string
+          komune_supplier_id?: string | null
+          last_error?: string | null
+          motivo: string
+          msg_id?: number | null
+          organization_id: string
+          payload: Json
+          payload_hash: string
+          pre_registration_id: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          first_seen_at?: string
+          http_status?: number | null
+          id?: string
+          idempotency_key?: string
+          komune_supplier_id?: string | null
+          last_error?: string | null
+          motivo?: string
+          msg_id?: number | null
+          organization_id?: string
+          payload?: Json
+          payload_hash?: string
+          pre_registration_id?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "komune_outbox_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "komune_outbox_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "komune_outbox_pre_registration_id_fkey"
+            columns: ["pre_registration_id"]
+            isOneToOne: false
+            referencedRelation: "pre_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lost_reasons: {
         Row: {
@@ -1891,6 +2890,7 @@ export type Database = {
           do_not_contact: boolean
           email: string | null
           id: string
+          import_batch_id: string | null
           instagram_handle: string | null
           is_natural_person: boolean
           kind: Database["app"]["Enums"]["org_kind"]
@@ -1933,6 +2933,7 @@ export type Database = {
           do_not_contact?: boolean
           email?: string | null
           id?: string
+          import_batch_id?: string | null
           instagram_handle?: string | null
           is_natural_person?: boolean
           kind?: Database["app"]["Enums"]["org_kind"]
@@ -1975,6 +2976,7 @@ export type Database = {
           do_not_contact?: boolean
           email?: string | null
           id?: string
+          import_batch_id?: string | null
           instagram_handle?: string | null
           is_natural_person?: boolean
           kind?: Database["app"]["Enums"]["org_kind"]
@@ -2009,6 +3011,13 @@ export type Database = {
             columns: ["city_id"]
             isOneToOne: false
             referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizations_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
             referencedColumns: ["id"]
           },
           {
@@ -2108,6 +3117,313 @@ export type Database = {
         }
         Relationships: []
       }
+      pre_registration_acceptances: {
+        Row: {
+          accepted_at: string
+          auth_method: string
+          consent_event_id: string | null
+          created_at: string
+          data_authorization: boolean
+          id: string
+          ip: unknown
+          marketing_optin: boolean
+          organization_id: string
+          photo_import_authorized: boolean
+          pre_registration_id: string
+          terms_accepted: boolean
+          terms_hash: string
+          terms_version: string
+          user_agent: string
+          who_accepted: string
+        }
+        Insert: {
+          accepted_at?: string
+          auth_method: string
+          consent_event_id?: string | null
+          created_at?: string
+          data_authorization: boolean
+          id?: string
+          ip: unknown
+          marketing_optin?: boolean
+          organization_id: string
+          photo_import_authorized?: boolean
+          pre_registration_id: string
+          terms_accepted: boolean
+          terms_hash: string
+          terms_version: string
+          user_agent: string
+          who_accepted: string
+        }
+        Update: {
+          accepted_at?: string
+          auth_method?: string
+          consent_event_id?: string | null
+          created_at?: string
+          data_authorization?: boolean
+          id?: string
+          ip?: unknown
+          marketing_optin?: boolean
+          organization_id?: string
+          photo_import_authorized?: boolean
+          pre_registration_id?: string
+          terms_accepted?: boolean
+          terms_hash?: string
+          terms_version?: string
+          user_agent?: string
+          who_accepted?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pre_registration_acceptances_consent_event_id_fkey"
+            columns: ["consent_event_id"]
+            isOneToOne: false
+            referencedRelation: "consent_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registration_acceptances_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registration_acceptances_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registration_acceptances_pre_registration_id_fkey"
+            columns: ["pre_registration_id"]
+            isOneToOne: false
+            referencedRelation: "pre_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pre_registration_events: {
+        Row: {
+          actor: string
+          actor_id: string | null
+          created_at: string
+          event: string
+          id: number
+          occurred_at: string
+          organization_id: string
+          payload: Json
+          pre_registration_id: string
+        }
+        Insert: {
+          actor?: string
+          actor_id?: string | null
+          created_at?: string
+          event: string
+          id?: number
+          occurred_at?: string
+          organization_id: string
+          payload?: Json
+          pre_registration_id: string
+        }
+        Update: {
+          actor?: string
+          actor_id?: string | null
+          created_at?: string
+          event?: string
+          id?: number
+          occurred_at?: string
+          organization_id?: string
+          payload?: Json
+          pre_registration_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pre_registration_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registration_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registration_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registration_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registration_events_pre_registration_id_fkey"
+            columns: ["pre_registration_id"]
+            isOneToOne: false
+            referencedRelation: "pre_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pre_registrations: {
+        Row: {
+          claim_link_opened_at: string | null
+          claim_link_sent_at: string | null
+          claim_token_expires_at: string | null
+          claim_token_hash: string | null
+          claim_token_issued_at: string | null
+          claim_token_version: number
+          claimed_at: string | null
+          claimed_channel: string | null
+          completeness_breakdown: Json
+          completeness_score: number | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          deal_id: string | null
+          expires_at: string
+          id: string
+          komune_supplier_id: string | null
+          organization_id: string
+          photos_found_count: number | null
+          prefilled: Json
+          published: boolean
+          purge_after: string | null
+          purged_at: string | null
+          refused_at: string | null
+          refused_reason: string | null
+          reminded_at: string | null
+          source_label: string | null
+          source_url: string | null
+          status: Database["app"]["Enums"]["prereg_status"]
+          updated_at: string
+        }
+        Insert: {
+          claim_link_opened_at?: string | null
+          claim_link_sent_at?: string | null
+          claim_token_expires_at?: string | null
+          claim_token_hash?: string | null
+          claim_token_issued_at?: string | null
+          claim_token_version?: number
+          claimed_at?: string | null
+          claimed_channel?: string | null
+          completeness_breakdown?: Json
+          completeness_score?: number | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string | null
+          expires_at?: string
+          id?: string
+          komune_supplier_id?: string | null
+          organization_id: string
+          photos_found_count?: number | null
+          prefilled?: Json
+          published?: boolean
+          purge_after?: string | null
+          purged_at?: string | null
+          refused_at?: string | null
+          refused_reason?: string | null
+          reminded_at?: string | null
+          source_label?: string | null
+          source_url?: string | null
+          status?: Database["app"]["Enums"]["prereg_status"]
+          updated_at?: string
+        }
+        Update: {
+          claim_link_opened_at?: string | null
+          claim_link_sent_at?: string | null
+          claim_token_expires_at?: string | null
+          claim_token_hash?: string | null
+          claim_token_issued_at?: string | null
+          claim_token_version?: number
+          claimed_at?: string | null
+          claimed_channel?: string | null
+          completeness_breakdown?: Json
+          completeness_score?: number | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string | null
+          expires_at?: string
+          id?: string
+          komune_supplier_id?: string | null
+          organization_id?: string
+          photos_found_count?: number | null
+          prefilled?: Json
+          published?: boolean
+          purge_after?: string | null
+          purged_at?: string | null
+          refused_at?: string | null
+          refused_reason?: string | null
+          reminded_at?: string | null
+          source_label?: string | null
+          source_url?: string | null
+          status?: Database["app"]["Enums"]["prereg_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pre_registrations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registrations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registrations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registrations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registrations_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_registrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           city_id: number | null
@@ -2158,6 +3474,295 @@ export type Database = {
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      raw_capture: {
+        Row: {
+          batch_id: string
+          collector: string
+          content_hash: string
+          created_at: string
+          external_id: string | null
+          fetched_at: string
+          http_status: number | null
+          id: string
+          payload: Json
+          purge_after: string
+          request_key: string
+          source_id: number
+          source_url: string | null
+        }
+        Insert: {
+          batch_id: string
+          collector: string
+          content_hash: string
+          created_at?: string
+          external_id?: string | null
+          fetched_at?: string
+          http_status?: number | null
+          id?: string
+          payload: Json
+          purge_after?: string
+          request_key: string
+          source_id: number
+          source_url?: string | null
+        }
+        Update: {
+          batch_id?: string
+          collector?: string
+          content_hash?: string
+          created_at?: string
+          external_id?: string | null
+          fetched_at?: string
+          http_status?: number | null
+          id?: string
+          payload?: Json
+          purge_after?: string
+          request_key?: string
+          source_id?: number
+          source_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_capture_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_capture_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retention_runs: {
+        Row: {
+          id: number
+          ran_at: string
+          report: Json
+        }
+        Insert: {
+          id?: number
+          ran_at?: string
+          report: Json
+        }
+        Update: {
+          id?: number
+          ran_at?: string
+          report?: Json
+        }
+        Relationships: []
+      }
+      source_category_map: {
+        Row: {
+          category_id: number
+          category_source: string
+          source_id: number
+        }
+        Insert: {
+          category_id: number
+          category_source: string
+          source_id: number
+        }
+        Update: {
+          category_id?: number
+          category_source?: string
+          source_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_category_map_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_category_map_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_record: {
+        Row: {
+          address: string | null
+          batch_id: string | null
+          candidate_id: string | null
+          capacity_max: number | null
+          category_id: number | null
+          category_source: string | null
+          cep: string | null
+          city_id: number | null
+          cnpj: string | null
+          content_hash: string
+          created_at: string
+          email: string | null
+          expires_at: string | null
+          external_id: string
+          first_seen_at: string
+          flags: string[]
+          id: string
+          instagram_handle: string | null
+          is_mei: boolean | null
+          is_natural_person: boolean
+          kind: Database["app"]["Enums"]["org_kind"]
+          last_seen_at: string
+          legal_name: string | null
+          name: string
+          neighborhood: string | null
+          opened_at: string | null
+          phone_e164: string | null
+          phones: Json
+          photos_count: number | null
+          place_id: string | null
+          price_from: number | null
+          rating: number | null
+          raw_capture_id: string | null
+          registry_status: string | null
+          reviews_count: number | null
+          search_name: string | null
+          source_id: number
+          source_url: string | null
+          updated_at: string
+          website: string | null
+          website_domain: string | null
+        }
+        Insert: {
+          address?: string | null
+          batch_id?: string | null
+          candidate_id?: string | null
+          capacity_max?: number | null
+          category_id?: number | null
+          category_source?: string | null
+          cep?: string | null
+          city_id?: number | null
+          cnpj?: string | null
+          content_hash?: string
+          created_at?: string
+          email?: string | null
+          expires_at?: string | null
+          external_id: string
+          first_seen_at?: string
+          flags?: string[]
+          id?: string
+          instagram_handle?: string | null
+          is_mei?: boolean | null
+          is_natural_person?: boolean
+          kind?: Database["app"]["Enums"]["org_kind"]
+          last_seen_at?: string
+          legal_name?: string | null
+          name: string
+          neighborhood?: string | null
+          opened_at?: string | null
+          phone_e164?: string | null
+          phones?: Json
+          photos_count?: number | null
+          place_id?: string | null
+          price_from?: number | null
+          rating?: number | null
+          raw_capture_id?: string | null
+          registry_status?: string | null
+          reviews_count?: number | null
+          search_name?: string | null
+          source_id: number
+          source_url?: string | null
+          updated_at?: string
+          website?: string | null
+          website_domain?: string | null
+        }
+        Update: {
+          address?: string | null
+          batch_id?: string | null
+          candidate_id?: string | null
+          capacity_max?: number | null
+          category_id?: number | null
+          category_source?: string | null
+          cep?: string | null
+          city_id?: number | null
+          cnpj?: string | null
+          content_hash?: string
+          created_at?: string
+          email?: string | null
+          expires_at?: string | null
+          external_id?: string
+          first_seen_at?: string
+          flags?: string[]
+          id?: string
+          instagram_handle?: string | null
+          is_mei?: boolean | null
+          is_natural_person?: boolean
+          kind?: Database["app"]["Enums"]["org_kind"]
+          last_seen_at?: string
+          legal_name?: string | null
+          name?: string
+          neighborhood?: string | null
+          opened_at?: string | null
+          phone_e164?: string | null
+          phones?: Json
+          photos_count?: number | null
+          place_id?: string | null
+          price_from?: number | null
+          rating?: number | null
+          raw_capture_id?: string | null
+          registry_status?: string | null
+          reviews_count?: number | null
+          search_name?: string | null
+          source_id?: number
+          source_url?: string | null
+          updated_at?: string
+          website?: string | null
+          website_domain?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_record_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_record_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_record_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_record_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_record_raw_capture_id_fkey"
+            columns: ["raw_capture_id"]
+            isOneToOne: false
+            referencedRelation: "raw_capture"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_record_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
             referencedColumns: ["id"]
           },
         ]
@@ -2326,6 +3931,7 @@ export type Database = {
           external_id: string | null
           flags: string[]
           id: string
+          import_batch_id: string | null
           instagram_handle: string | null
           is_natural_person: boolean
           kind: Database["app"]["Enums"]["org_kind"]
@@ -2366,6 +3972,7 @@ export type Database = {
           external_id?: string | null
           flags?: string[]
           id?: string
+          import_batch_id?: string | null
           instagram_handle?: string | null
           is_natural_person?: boolean
           kind?: Database["app"]["Enums"]["org_kind"]
@@ -2406,6 +4013,7 @@ export type Database = {
           external_id?: string | null
           flags?: string[]
           id?: string
+          import_batch_id?: string | null
           instagram_handle?: string | null
           is_natural_person?: boolean
           kind?: Database["app"]["Enums"]["org_kind"]
@@ -2459,6 +4067,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_candidates_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
             referencedColumns: ["id"]
           },
           {
@@ -2710,6 +4325,78 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_deliveries: {
+        Row: {
+          delivery_id: string
+          event: string | null
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          result: Json
+          source: string
+        }
+        Insert: {
+          delivery_id: string
+          event?: string | null
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          result?: Json
+          source: string
+        }
+        Update: {
+          delivery_id?: string
+          event?: string | null
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          result?: Json
+          source?: string
+        }
+        Relationships: []
+      }
+      worker_heartbeats: {
+        Row: {
+          details: Json
+          failed_total: number
+          host: string | null
+          instance: string
+          last_beat_at: string
+          processed_total: number
+          queue: string | null
+          started_at: string
+          status: string
+          version: string | null
+          worker: string
+        }
+        Insert: {
+          details?: Json
+          failed_total?: number
+          host?: string | null
+          instance?: string
+          last_beat_at?: string
+          processed_total?: number
+          queue?: string | null
+          started_at?: string
+          status?: string
+          version?: string | null
+          worker: string
+        }
+        Update: {
+          details?: Json
+          failed_total?: number
+          host?: string | null
+          instance?: string
+          last_beat_at?: string
+          processed_total?: number
+          queue?: string | null
+          started_at?: string
+          status?: string
+          version?: string | null
+          worker?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       contacts_view: {
@@ -2878,6 +4565,45 @@ export type Database = {
           },
         ]
       }
+      pg_all_foreign_keys: {
+        Row: {
+          fk_columns: unknown[] | null
+          fk_constraint_name: unknown
+          fk_schema_name: unknown
+          fk_table_name: unknown
+          fk_table_oid: unknown
+          is_deferrable: boolean | null
+          is_deferred: boolean | null
+          match_type: string | null
+          on_delete: string | null
+          on_update: string | null
+          pk_columns: unknown[] | null
+          pk_constraint_name: unknown
+          pk_index_name: unknown
+          pk_schema_name: unknown
+          pk_table_name: unknown
+          pk_table_oid: unknown
+        }
+        Relationships: []
+      }
+      tap_funky: {
+        Row: {
+          args: string | null
+          is_definer: boolean | null
+          is_strict: boolean | null
+          is_visible: boolean | null
+          kind: unknown
+          langoid: unknown
+          name: unknown
+          oid: unknown
+          owner: unknown
+          returns: string | null
+          returns_set: boolean | null
+          schema: unknown
+          volatility: string | null
+        }
+        Relationships: []
+      }
       team_directory: {
         Row: {
           city_id: number | null
@@ -2998,6 +4724,95 @@ export type Database = {
       }
     }
     Functions: {
+      _cleanup: { Args: never; Returns: boolean }
+      _contract_on: { Args: { "": string }; Returns: unknown }
+      _currtest: { Args: never; Returns: number }
+      _db_privs: { Args: never; Returns: unknown[] }
+      _extensions: { Args: never; Returns: unknown[] }
+      _get: { Args: { "": string }; Returns: number }
+      _get_latest: { Args: { "": string }; Returns: number[] }
+      _get_note: { Args: { "": string }; Returns: string }
+      _is_verbose: { Args: never; Returns: boolean }
+      _prokind: { Args: { p_oid: unknown }; Returns: unknown }
+      _query: { Args: { "": string }; Returns: string }
+      _refine_vol: { Args: { "": string }; Returns: string }
+      _retval: { Args: { "": string }; Returns: string }
+      _table_privs: { Args: never; Returns: unknown[] }
+      _temptypes: { Args: { "": string }; Returns: string }
+      _todo: { Args: never; Returns: string }
+      abrir_reivindicacao: {
+        Args: { p_ip?: string; p_token: string; p_user_agent?: string }
+        Returns: Json
+      }
+      aceitar_reivindicacao: {
+        Args: {
+          p_auth_method?: string
+          p_ip: string
+          p_marketing_optin?: boolean
+          p_photo_import?: boolean
+          p_terms_hash: string
+          p_terms_version: string
+          p_token: string
+          p_user_agent: string
+          p_who_accepted: string
+        }
+        Returns: Json
+      }
+      cadencia_do_parceiro: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      cadencias_visao: { Args: never; Returns: Json }
+      col_is_null:
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              schema_name: unknown
+              table_name: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              table_name: unknown
+            }
+            Returns: string
+          }
+      col_not_null:
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              schema_name: unknown
+              table_name: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              table_name: unknown
+            }
+            Returns: string
+          }
+      criar_pre_cadastro: {
+        Args: {
+          p_organization_id: string
+          p_photos_found?: number
+          p_prefilled?: Json
+          p_source_label?: string
+          p_source_url?: string
+        }
+        Returns: Json
+      }
+      criar_pre_cadastro_da_ficha: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       deal_stage_timeline: {
         Args: { p_deal_id: string }
@@ -3014,7 +4829,125 @@ export type Database = {
         }[]
       }
       devolver_item_do_lote: {
-        Args: { p_item_id: string; p_motivo?: string }
+        Args: {
+          p_item_id: string
+          p_motivo?: string
+          p_pediu_para_nao_ligar?: boolean
+        }
+        Returns: Json
+      }
+      diag:
+        | {
+            Args: { msg: unknown }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+        | {
+            Args: { msg: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+      diag_test_name: { Args: { "": string }; Returns: string }
+      do_tap:
+        | { Args: never; Returns: string[] }
+        | { Args: { "": string }; Returns: string[] }
+      encerrar_cadencia: {
+        Args: { p_enrollment_id: string; p_motivo: string }
+        Returns: Json
+      }
+      esteira_abrir_lote: {
+        Args: {
+          p_kind: string
+          p_label: string
+          p_license_path?: string
+          p_params?: Json
+          p_source_id: number
+        }
+        Returns: Json
+      }
+      esteira_bater_ponto: {
+        Args: {
+          p_details?: Json
+          p_failed?: number
+          p_host?: string
+          p_instance?: string
+          p_processed?: number
+          p_queue?: string
+          p_status?: string
+          p_version?: string
+          p_worker: string
+        }
+        Returns: Json
+      }
+      esteira_desfazer_lote: { Args: { p_batch_id: string }; Returns: Json }
+      esteira_estado_lote: {
+        Args: {
+          p_batch_id: string
+          p_error?: string
+          p_stats?: Json
+          p_status: string
+        }
+        Returns: Json
+      }
+      esteira_fila_concluir: {
+        Args: { p_key: string; p_msg_id: number; p_queue: string }
+        Returns: boolean
+      }
+      esteira_fila_enfileirar: {
+        Args: {
+          p_batch_id?: string
+          p_delay?: number
+          p_key: string
+          p_payload: Json
+          p_queue: string
+        }
+        Returns: Json
+      }
+      esteira_fila_falhar: {
+        Args: {
+          p_erro: string
+          p_key: string
+          p_msg_id: number
+          p_queue: string
+        }
+        Returns: Json
+      }
+      esteira_fila_ler: {
+        Args: { p_qty?: number; p_queue: string }
+        Returns: Json
+      }
+      esteira_gravar_captura: {
+        Args: {
+          p_batch_id: string
+          p_collector?: string
+          p_external_id?: string
+          p_http_status?: number
+          p_payload: Json
+          p_source_id: number
+          p_source_url?: string
+        }
+        Returns: Json
+      }
+      esteira_processar_captura: {
+        Args: { p_raw_capture_id: string }
+        Returns: Json
+      }
+      esteira_saude: { Args: never; Returns: Json }
+      exportar_lgpd: {
+        Args: { p_motivo?: string; p_organization_id: string }
+        Returns: Json
+      }
+      exportar_lgpd_por_token: { Args: { p_token: string }; Returns: Json }
+      fail:
+        | { Args: never; Returns: string }
+        | { Args: { "": string }; Returns: string }
+      findfuncs: { Args: { "": string }; Returns: string[] }
+      finish: { Args: { exception_on_failure?: boolean }; Returns: string[] }
+      format_type_string: { Args: { "": string }; Returns: string }
+      gerar_link_de_reivindicacao: {
+        Args: { p_organization_id: string }
         Returns: Json
       }
       goal_progress: {
@@ -3041,7 +4974,70 @@ export type Database = {
           ritmo_necessario: number
         }[]
       }
+      has_unique: { Args: { "": string }; Returns: string }
+      importacao_encerrar_lote: {
+        Args: { p_batch_id: string; p_erro?: string }
+        Returns: Json
+      }
+      importacao_gravar: {
+        Args: { p_batch_id: string; p_linhas: Json }
+        Returns: Json
+      }
+      importacao_lotes: { Args: { p_limit?: number }; Returns: Json }
+      importacao_previa: { Args: { p_linhas: Json }; Returns: Json }
+      in_todo: { Args: never; Returns: boolean }
       iniciar_chamada: { Args: { p_item_id: string }; Returns: Json }
+      integracao_segredo: { Args: { p_nome: string }; Returns: string }
+      is_empty: { Args: { "": string }; Returns: string }
+      isnt_empty: { Args: { "": string }; Returns: string }
+      komune_fila_status: { Args: never; Returns: Json }
+      komune_push_erro: {
+        Args: {
+          p_erro: string
+          p_http_status?: number
+          p_msg_id: number
+          p_outbox_id: string
+        }
+        Returns: Json
+      }
+      komune_push_lote: { Args: { p_qty?: number }; Returns: Json }
+      komune_push_ok: {
+        Args: {
+          p_http_status: number
+          p_komune_supplier_id?: string
+          p_msg_id: number
+          p_outbox_id: string
+        }
+        Returns: Json
+      }
+      komune_webhook_aplicar: {
+        Args: { p_delivery_id: string; p_payload: Json }
+        Returns: Json
+      }
+      ligar_cadencia: {
+        Args: { p_ativa: boolean; p_slug: string }
+        Returns: Json
+      }
+      lives_ok: { Args: { "": string }; Returns: string }
+      marcar_nao_ligar_mais: {
+        Args: {
+          p_contact_id?: string
+          p_evidencia?: string
+          p_item_id?: string
+          p_organization_id?: string
+        }
+        Returns: Json
+      }
+      matricular_em_cadencia: {
+        Args: {
+          p_assignee_id?: string
+          p_cadence_slug: string
+          p_deal_id?: string
+          p_gancho?: string
+          p_organization_id: string
+        }
+        Returns: Json
+      }
       meu_dia: {
         Args: { p_limite?: number; p_user_id?: string }
         Returns: {
@@ -3091,6 +5087,16 @@ export type Database = {
         }
         Returns: Json
       }
+      no_plan: { Args: never; Returns: boolean[] }
+      num_failed: { Args: never; Returns: number }
+      origem_dos_dados: { Args: { p_organization_id: string }; Returns: Json }
+      os_name: { Args: never; Returns: string }
+      pass:
+        | { Args: never; Returns: string }
+        | { Args: { "": string }; Returns: string }
+      pg_version: { Args: never; Returns: string }
+      pg_version_num: { Args: never; Returns: number }
+      pgtap_version: { Args: never; Returns: number }
       pipeline_board: {
         Args: {
           p_limit_per_stage?: number
@@ -3101,6 +5107,10 @@ export type Database = {
           p_q?: string
           p_stage_id?: number
         }
+        Returns: Json
+      }
+      pre_cadastro_do_parceiro: {
+        Args: { p_organization_id: string }
         Returns: Json
       }
       proximo_da_fila: { Args: { p_lote_id: string }; Returns: Json }
@@ -3187,6 +5197,10 @@ export type Database = {
           p_organization_id?: string
           p_reason?: string
         }
+        Returns: Json
+      }
+      recusar_reivindicacao: {
+        Args: { p_motivo?: string; p_token: string }
         Returns: Json
       }
       registrar_contato: {
@@ -3334,8 +5348,15 @@ export type Database = {
           visitas: number
         }[]
       }
+      resumo_do_dia: {
+        Args: { p_momento?: string; p_user_id?: string }
+        Returns: Json
+      }
       reveal_contact_phone: { Args: { p_contact_id: string }; Returns: string }
       reveal_phone: { Args: { p_organization_id: string }; Returns: string }
+      runtests:
+        | { Args: never; Returns: string[] }
+        | { Args: { "": string }; Returns: string[] }
       search_organizations: {
         Args: {
           p_category_id?: number
@@ -3366,6 +5387,9 @@ export type Database = {
           total_count: number
         }[]
       }
+      skip:
+        | { Args: { "": string }; Returns: string }
+        | { Args: { how_many: number; why: string }; Returns: string }
       tabular_chamada: {
         Args: {
           p_agendar_para?: string
@@ -3386,12 +5410,24 @@ export type Database = {
         }
         Returns: Json
       }
+      throws_ok: { Args: { "": string }; Returns: string }
+      todo:
+        | { Args: { how_many: number }; Returns: boolean[] }
+        | { Args: { how_many: number; why: string }; Returns: boolean[] }
+        | { Args: { why: string }; Returns: boolean[] }
+        | { Args: { how_many: number; why: string }; Returns: boolean[] }
+      todo_end: { Args: never; Returns: boolean[] }
+      todo_start:
+        | { Args: never; Returns: boolean[] }
+        | { Args: { "": string }; Returns: boolean[] }
     }
     Enums: {
       [_ in never]: never
     }
     CompositeTypes: {
-      [_ in never]: never
+      _time_trial_type: {
+        a_time: number | null
+      }
     }
   }
 }
@@ -3526,6 +5562,7 @@ export const Constants = {
         "stage_change",
         "system",
       ],
+      cadence_status: ["ativa", "pausada", "concluida", "encerrada"],
       call_batch_status: ["rascunho", "ativo", "pausado", "encerrado"],
       call_item_status: ["fila", "em_andamento", "concluido", "devolvido"],
       call_order: ["prioridade", "mais_parado", "aleatorio"],
@@ -3617,6 +5654,7 @@ export const Constants = {
       task_kind: ["call", "visit", "meeting", "message", "follow_up", "other"],
       task_status: ["todo", "doing", "done", "cancelled"],
       temperature: ["frio", "morno", "quente", "cliente", "cliente_ativo"],
+      touch_status: ["pendente", "feito", "pulado", "cancelado"],
       user_role: [
         "admin",
         "gestor",

@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { formatarNumero } from '@/components/parceiros/formatos';
 
-import { AvisoDeColeta } from './aviso-coleta';
 import { BarraDaFila } from './barra-fila';
 import { CartaoCandidato } from './cartao-candidato';
 import { CatalogoDeFontes } from './catalogo-fontes';
@@ -25,6 +24,7 @@ import {
 import { DialogoDeDecisao } from './dialogo-decisao';
 import { ErroDaFila, EsqueletoDaFila, FilaVazia, VazioPorFiltroDaFila } from './estados';
 import { FolhaDeCandidato } from './folha-candidato';
+import { PainelDoColetor } from './painel-coletor';
 import {
   FILTROS_INICIAIS,
   POR_PAGINA,
@@ -43,9 +43,9 @@ const SEM_LINHAS: CandidatoDaFila[] = [];
 /**
  * O Radar (PRD §7.3, RF-RAD-*).
  *
- * Três coisas, nesta ordem de importância: dizer com todas as letras que a coleta
- * automática não está ligada, trabalhar a fila de revisão do que já existe e
- * mostrar o catálogo das fontes com a avaliação legal de cada uma.
+ * Três coisas, nesta ordem de importância: dizer se o coletor está de pé (para
+ * "fila vazia" e "robô desligado" não desenharem a mesma tela), trabalhar a fila
+ * de revisão e mostrar o catálogo das fontes com a avaliação legal de cada uma.
  *
  * A fila, a criação e a decisão moram no Postgres (`radar_fila`,
  * `radar_criar_candidato`, `radar_revisar_candidato`): aqui só ficam o recorte
@@ -204,7 +204,7 @@ export function TelaRadar({
         ) : null}
       </header>
 
-      <AvisoDeColeta fontesLigadas={resumo.data?.fontes_ligadas ?? null} />
+      <PainelDoColetor />
 
       {/* Duas superfícies, não duas páginas: quem revisa precisa checar a regra de uma
           fonte sem perder o recorte da fila. */}

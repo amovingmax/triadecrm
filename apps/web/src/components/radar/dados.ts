@@ -11,11 +11,15 @@ import { createClient } from '@/lib/supabase/client';
 
 import {
   POR_PAGINA,
+  type BatidaDeWorker,
   type CandidatoDaFila,
+  type FilaDaEsteira,
   type FiltrosDaFila,
   type FonteDoRadar,
+  type LoteDeColeta,
   type ResultadoDaFila,
   type ResumoDoRadar,
+  type SaudeDaEsteira,
 } from './tipos';
 
 /** Chave de cache do TanStack Query para um recorte da fila. */
@@ -289,3 +293,79 @@ export const MOTIVO_DA_FONTE: Record<string, string> = {
   robots_proibe_coleta: 'O robots.txt desta fonte proíbe a coleta. Ela não pode ser ligada.',
   termos_nao_avaliados: 'Os termos de uso desta fonte ainda não foram avaliados.',
 };
+
+// ---------------------------------------------------------------------------
+// Saúde da esteira: o coletor está vivo? (RF-ADM-07)
+// ---------------------------------------------------------------------------
+
+/**
+ * `public.esteira_saude()` recusa quem não escreve na base (`leitura`,
+ * `financeiro`) com 42501. Isso não é erro de tela: é o papel certo vendo o que
+ * lhe cabe. A função devolve `null` nesse caso, e o painel diz uma frase em vez
+ * de mostrar um alarme vermelho para quem não tem o que fazer com ele.
+ */
+export async function buscarSaudeDaEsteira(): Promise<SaudeDaEsteira | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('esteira_saude');
+  if (error) {
+    if (/42501|não lê a saúde|permission/i.test(error.message)) return null;
+    throw new Error(error.message);
+  }
+
+  const bruto = objeto(data);
+  return {
+    workers: Array.isArray(bruto.workers) ? (bruto.workers as BatidaDeWorker[]) : [],
+    filas: Array.isArray(bruto.filas) ? (bruto.filas as FilaDaEsteira[]) : [],
+    coletor_vivo: bruto.coletor_vivo === true,
+    lotes_rodando: Number(bruto.lotes_rodando) || 0,
+    capturas_por_expurgar: Number(bruto.capturas_por_expurgar) || 0,
+    registros_por_resolver: Number(bruto.registros_por_resolver) || 0,
+    ultimo_expurgo: texto(bruto.ultimo_expurgo),
+  };
+}
+
+type LinhaDeLote = {
+  id: string;
+  label: string;
+  status: LoteDeColeta['status'];
+  stats: unknown;
+  error: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  sources: { name: string } | { name: string }[] | null;
+};
+
+function numeroOuNulo(valor: unknown): number | null {
+  return typeof valor === 'number' && Number.isFinite(valor) ? valor : null;
+}
+
+/** As últimas corridas de coleta, para a tela dizer o que o robô trouxe e quando. */
+export async function buscarColetasRecentes(limite = 3): Promise<LoteDeColeta[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('import_batches')
+    .select('id, label, status, stats, error, started_at, finished_at, created_at, sources(name)')
+    .eq('kind', 'coleta')
+    .order('created_at', { ascending: false })
+    .limit(limite);
+
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as LinhaDeLote[]).map((linha) => {
+    const estatisticas = objeto(linha.stats);
+    const fonte = Array.isArray(linha.sources) ? linha.sources[0] : linha.sources;
+    return {
+      id: linha.id,
+      rotulo: linha.label,
+      status: linha.status,
+      fonte: fonte ? fonte.name : null,
+      capturas: numeroOuNulo(estatisticas.capturas),
+      candidatos: numeroOuNulo(estatisticas.candidatos),
+      erro: linha.error,
+      comecou_em: linha.started_at,
+      terminou_em: linha.finished_at,
+      criado_em: linha.created_at,
+    };
+  });
+}

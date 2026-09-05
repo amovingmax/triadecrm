@@ -88,7 +88,7 @@ export type FonteDoRadar = {
   coletor: string | null;
   /** Periodicidade planejada (mensal, trimestral, sob demanda). */
   periodicidade: string | null;
-  /** O coletor desta fonte já está pronto para rodar? Hoje: nenhum está. */
+  /** O coletor desta fonte já está pronto para rodar? Hoje só o Casamentos.com.br tem adaptador escrito. */
   coletor_pronto: boolean;
   /** Campos que a fonte pode persistir (RF-RAD-04). */
   campos: string[];
@@ -262,4 +262,88 @@ export const ROTULO_DO_COLETOR: Record<string, string> = {
   business_discovery: 'API oficial do Instagram',
   manual: 'cadastro por pessoa',
   spreadsheet: 'importação de planilha',
+};
+
+// ---------------------------------------------------------------------------
+// Saúde da esteira de coleta (RF-ADM-07; RPC `public.esteira_saude`)
+// ---------------------------------------------------------------------------
+
+/** Uma batida de ponto de worker (`public.worker_heartbeats`). */
+export type BatidaDeWorker = {
+  worker: string;
+  instancia: string;
+  status: 'ok' | 'degradado' | 'parado';
+  fila: string | null;
+  versao: string | null;
+  host: string | null;
+  ultima_batida: string;
+  /** Segundos desde a última batida, contados pelo relógio do banco. */
+  ha_segundos: number;
+  /** O veredito do banco: batida nos últimos 2 minutos. A tela não recalcula isso. */
+  vivo: boolean;
+  processados: number;
+  falhas: number;
+};
+
+/** Profundidade de uma fila `pgmq` da esteira. */
+export type FilaDaEsteira = {
+  fila: string;
+  na_fila: number;
+  visiveis: number;
+  mais_antigo_segundos: number | null;
+  total_ja_enfileirado: number;
+};
+
+export type SaudeDaEsteira = {
+  workers: BatidaDeWorker[];
+  filas: FilaDaEsteira[];
+  coletor_vivo: boolean;
+  lotes_rodando: number;
+  capturas_por_expurgar: number;
+  registros_por_resolver: number;
+  ultimo_expurgo: string | null;
+};
+
+/** Um lote de coleta (`public.import_batches`), como a tela do Radar precisa dele. */
+export type LoteDeColeta = {
+  id: string;
+  rotulo: string;
+  status: 'previa' | 'na_fila' | 'rodando' | 'concluido' | 'falhou' | 'desfeito';
+  fonte: string | null;
+  capturas: number | null;
+  candidatos: number | null;
+  erro: string | null;
+  comecou_em: string | null;
+  terminou_em: string | null;
+  criado_em: string;
+};
+
+/** Nome em português de cada fila da esteira, para quem lê a tela não ver `ingest_dlq`. */
+export const ROTULO_DA_FILA: Record<string, { nome: string; explicacao: string }> = {
+  ingest_jobs: {
+    nome: 'Coletas a planejar',
+    explicacao: 'Ordens de coleta esperando o robô ler o catálogo da fonte e montar as páginas.',
+  },
+  ingest_pages: {
+    nome: 'Páginas a buscar',
+    explicacao: 'Listagens esperando a vez, no intervalo que cada fonte permite.',
+  },
+  ingest_records: {
+    nome: 'Capturas a resolver',
+    explicacao: 'O que já foi baixado e ainda vai virar candidato na fila de revisão.',
+  },
+  ingest_dlq: {
+    nome: 'Parou com erro',
+    explicacao:
+      'O que falhou além do limite de tentativas. Ninguém tenta de novo sozinho: é leitura de gente.',
+  },
+};
+
+export const ROTULO_DO_LOTE: Record<LoteDeColeta['status'], string> = {
+  previa: 'Aberto, ainda sem ordem na fila',
+  na_fila: 'Esperando o coletor',
+  rodando: 'Em andamento',
+  concluido: 'Concluída',
+  falhou: 'Parou com erro',
+  desfeito: 'Desfeita',
 };
