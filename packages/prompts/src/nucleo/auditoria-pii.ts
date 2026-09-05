@@ -344,6 +344,134 @@ function eLocalAuditado(digitos: string): boolean {
   return false;
 }
 
+/**
+ * ===========================================================================
+ * O NÚMERO DITADO POR EXTENSO — a leitura da 6ª versão desta camada (laudo §3.4)
+ * ===========================================================================
+ *
+ * "meu whats é oito quatro nove nove seis quatro cinco seis zero cinco quatro."
+ *
+ * Toda esta camada projeta DÍGITOS. Um número ditado não tem dígito: a projeção dele é
+ * vazia, e a auditoria devolvia `[]` para um telefone escrito inteiro na mensagem — o
+ * mesmo furo que a regra tinha, e pela mesma razão. Uma camada que erra junto com a
+ * outra não é uma segunda camada.
+ *
+ * Esta é uma implementação **própria**, como o resto do arquivo: a tabela de palavras é
+ * escrita aqui, não importada da regra, e o que ela decide é mais frouxo em tudo — não
+ * conhece faixa de móvel, não recusa data, não olha zona. As duas únicas exigências são
+ * as que evitam barrar mensagem legítima:
+ *
+ * 1. a corrida precisa ter **pelo menos uma palavra** (corrida só de dígitos já é vista
+ *    pelas duas varreduras de cima);
+ * 2. a janela de 8 ou 9 dígitos só vale a **corrida inteira** — deslizando, "um, dois,
+ *    três, quatro, cinco, seis, sete, oito, nove" barraria a chamada.
+ *
+ * A janela de 10 a 13 continua sem desconto: DDD válido e pronto.
+ *
+ * Roda **só em `verificarSemPii`**, nunca em `varrerMontagem`. `varrerMontagem` corre
+ * sobre a mensagem inteira, prompt de sistema junto, e os prompts deste pacote são texto
+ * em português escrito por nós: uma frase como "os dois, três ou quatro fatos" não pode
+ * ter chance de barrar toda chamada do produto. O que precisa desta leitura é o que veio
+ * de fora, e é exatamente isso que `verificarSemPii` recebe.
+ */
+const ALGARISMO_FALADO: ReadonlyMap<string, string> = new Map([
+  ['zero', '0'],
+  ['um', '1'],
+  ['uma', '1'],
+  ['dois', '2'],
+  ['duas', '2'],
+  ['tres', '3'],
+  ['quatro', '4'],
+  ['cinco', '5'],
+  ['seis', '6'],
+  ['meia', '6'],
+  ['sete', '7'],
+  ['oito', '8'],
+  ['nove', '9'],
+]);
+
+/** Entre duas fichas: espaço, invisível, vírgula, ponto e as grafias de hífen. */
+const SEPARADOR_FALADO =
+  /[\s\u00a0\u200b-\u200f\u2060\ufeff\u00ad,.\u00b7\u2022\u2043\u30fb\-\u2010-\u2015\u2212\uff0d\uff0e]/u;
+
+interface FichaFalada {
+  readonly digitos: string;
+  readonly inicio: number;
+  readonly fim: number;
+  readonly falada: boolean;
+}
+
+interface CorridaFalada {
+  readonly fichas: readonly FichaFalada[];
+  readonly digitos: string;
+  readonly deslocamentos: readonly number[];
+}
+
+function semAcento(valor: string): string {
+  return valor.normalize('NFD').replace(/[\u0300-\u036f]/gu, '').toLowerCase();
+}
+
+/** As corridas de fichas: palavra de algarismo ou corrida de dígitos, seguidas. */
+function corridasFaladas(texto: string): CorridaFalada[] {
+  const corridas: CorridaFalada[] = [];
+  let fichas: FichaFalada[] = [];
+  const fechar = (): void => {
+    if (fichas.length > 0 && fichas.some((f) => f.falada)) {
+      const deslocamentos: number[] = [];
+      let soma = 0;
+      for (const ficha of fichas) {
+        deslocamentos.push(soma);
+        soma += ficha.digitos.length;
+      }
+      deslocamentos.push(soma);
+      corridas.push({ fichas, digitos: fichas.map((f) => f.digitos).join(''), deslocamentos });
+    }
+    fichas = [];
+  };
+
+  for (let i = 0; i < texto.length; ) {
+    const codigo = texto.codePointAt(i) as number;
+    const largura = codigo > 0xffff ? 2 : 1;
+    const caractere = String.fromCodePoint(codigo);
+
+    if (valorDoDigito(caractere) !== undefined) {
+      let cursor = i;
+      let digitos = '';
+      while (cursor < texto.length) {
+        const c = texto.codePointAt(cursor) as number;
+        const w = c > 0xffff ? 2 : 1;
+        const algarismo = valorDoDigito(String.fromCodePoint(c));
+        if (algarismo === undefined) break;
+        digitos += algarismo;
+        cursor += w;
+      }
+      fichas.push({ digitos, inicio: i, fim: cursor, falada: false });
+      i = cursor;
+      continue;
+    }
+
+    if (LETRA.test(caractere)) {
+      let cursor = i;
+      while (cursor < texto.length) {
+        const c = texto.codePointAt(cursor) as number;
+        const w = c > 0xffff ? 2 : 1;
+        if (!LETRA.test(String.fromCodePoint(c))) break;
+        cursor += w;
+      }
+      const algarismo = ALGARISMO_FALADO.get(semAcento(texto.slice(i, cursor)));
+      if (algarismo === undefined) fechar();
+      else fichas.push({ digitos: algarismo, inicio: i, fim: cursor, falada: true });
+      i = cursor;
+      continue;
+    }
+
+    if (!SEPARADOR_FALADO.test(caractere)) fechar();
+    i += largura;
+  }
+  fechar();
+  return corridas;
+}
+
 /** Verificações próprias de e-mail e @: mais cruas que as da regra, e por isso pegam mais. */
 const EMAIL_AUDITADO = /[^\s@]+@[^\s@]+\.[^\s@,;]{2,}/g;
 const INSTAGRAM_AUDITADO = /(?:^|[^\w@])(@[A-Za-z0-9._]{2,}|(?:www\.)?instagram\.com\/\S+)/g;
@@ -409,6 +537,43 @@ function varrer(texto: string, quebrarNaLetra: boolean): ProblemaDePii[] {
         segmento.fins[i + comprimento - 1] as number,
       );
       i += comprimento;
+    }
+  }
+
+  // O ditado por extenso — só sobre o trecho de fora (ver o comentário de `corridasFaladas`).
+  if (!quebrarNaLetra) {
+    for (const corrida of corridasFaladas(texto)) {
+      const total = corrida.digitos.length;
+      let ficha = 0;
+      while (ficha < corrida.fichas.length) {
+        const abertura = corrida.deslocamentos[ficha] as number;
+        let escolhida = -1;
+        for (let fim = corrida.fichas.length; fim > ficha; fim -= 1) {
+          const comprimento = (corrida.deslocamentos[fim] as number) - abertura;
+          if (comprimento < 8 || comprimento > 13) continue;
+          const digitos = corrida.digitos.slice(abertura, abertura + comprimento);
+          const nacional = comprimento >= 10 && DDDS.has(Number(digitos.slice(0, 2)));
+          const local =
+            comprimento <= 9 &&
+            abertura === 0 &&
+            comprimento === total &&
+            eLocalAuditado(digitos);
+          if (!nacional && !local) continue;
+          if (!corrida.fichas.slice(ficha, fim).some((f) => f.falada)) continue;
+          escolhida = fim;
+          break;
+        }
+        if (escolhida < 0) {
+          ficha += 1;
+          continue;
+        }
+        registrar(
+          'TELEFONE',
+          (corrida.fichas[ficha] as FichaFalada).inicio,
+          (corrida.fichas[escolhida - 1] as FichaFalada).fim,
+        );
+        ficha = escolhida;
+      }
     }
   }
 

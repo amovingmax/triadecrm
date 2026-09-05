@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { bancoFalso, type LinhaFalsa, type TabelasFalsas } from './banco-de-teste';
 import { clienteDuble } from './duble';
-import { ErroDeterministico, tratarTrabalho } from './tarefas';
+import { ErroDeterministico, eDeterministico, tratarTrabalho } from './tarefas';
 
-import type { ContextoDaIa } from './execucao';
+import { AlvoSuprimidoError, type ContextoDaIa } from './execucao';
 import type { LogFields, Logger } from '../lib/log';
 
 function loggerDeTeste(): { logger: Logger; linhas: { nivel: string; msg: string; campos: LogFields }[] } {
@@ -427,5 +427,90 @@ describe('o despachante', () => {
     );
     expect(erro).toBeInstanceOf(ErroDeterministico);
     expect((erro as Error).message).toContain('transcribe_audio');
+  });
+});
+
+/**
+ * §3.3 do laudo — A IA NÃO CHAMA, NÃO PAGA E NÃO MANDA DADO DE SUPRIMIDO.
+ *
+ * Antes de 05/09/2026 nenhuma das quatro funções deste arquivo perguntava se
+ * o alvo estava suprimido: a única trava era o `insert` em `message_drafts`,
+ * que é o ÚLTIMO passo. O resultado medido pela varredura foram três
+ * `draft_followup` terminando em dead-letter sem produzir nada — depois de
+ * pagar a chamada e depois de o dado do contato ter saído para a Anthropic.
+ *
+ * A pergunta é a mesma de `public.proximo_da_fila` e de `app.komune_proximos`:
+ * uma RPC no topo do consumidor, com motivo nomeado, e a mensagem CONCLUÍDA
+ * (não falhada) — repetir não muda o mundo, e girar até a dead-letter só
+ * gastaria a mesma recusa cinco vezes.
+ */
+describe('5. §3.3 — o alvo suprimido não vira chamada paga', () => {
+  const suprimido = {
+    ia_alvo_suprimido: () => ({
+      suprimido: true,
+      motivo: 'contato_suprimido',
+      organization_id: ORG,
+      contact_id: CONTATO,
+    }),
+  };
+
+  for (const trabalho of [
+    {
+      purpose: 'transcribe_audio',
+      chave: `msg:${MENSAGEM}`,
+      message_id: MENSAGEM,
+      transcricao_bruta: 'oi, tenho interesse',
+      confianca_asr: 0.9,
+      duracao_seg: 12,
+    },
+    { purpose: 'classify_inbound', chave: `msg:${MENSAGEM}`, message_id: MENSAGEM },
+    { purpose: 'summarize_call', chave: `attempt:${TENTATIVA}`, attempt_id: TENTATIVA },
+    { purpose: 'draft_followup', chave: `attempt:${TENTATIVA}`, attempt_id: TENTATIVA },
+  ]) {
+    it(`${trabalho.purpose}: pergunta ANTES e não gasta nada`, async () => {
+      const banco = bancoFalso(tabelas(), { rpcs: suprimido });
+      const { logger } = loggerDeTeste();
+      const duble = clienteDuble({});
+      const contexto: ContextoDaIa = { cliente: banco.cliente, modelo: duble, logger };
+
+      const resultado = await tratarTrabalho(contexto, trabalho);
+
+      expect(resultado.feito).toBe(false);
+      expect(resultado.motivo).toBe('alvo_suprimido');
+      // Nem chamada, nem custo, nem linha em ai_runs: não houve gasto nenhum.
+      expect(duble.chamadas).toHaveLength(0);
+      expect(banco.tabelas.ai_runs).toHaveLength(0);
+      expect(resultado.custoUsd).toBeUndefined();
+      // E a pergunta foi a primeira coisa que o worker fez.
+      expect(banco.chamadasDeRpc[0]?.nome).toBe('ia_alvo_suprimido');
+      expect(banco.chamadasDeRpc[0]?.argumentos.p_purpose).toBe(trabalho.purpose);
+    });
+  }
+
+  it('alvo NÃO suprimido continua rodando: fechar tudo não é consertar nada', async () => {
+    const base = tabelas();
+    (base.messages?.[0] as LinhaFalsa).body = 'quanto custa o pacote?';
+    const banco = bancoFalso(base, {
+      rpcs: { ia_alvo_suprimido: () => ({ suprimido: false, motivo: null }) },
+    });
+    const { logger } = loggerDeTeste();
+    const duble = clienteDuble({});
+    const contexto: ContextoDaIa = { cliente: banco.cliente, modelo: duble, logger };
+
+    const resultado = await tratarTrabalho(contexto, {
+      purpose: 'classify_inbound',
+      chave: `msg:${MENSAGEM}`,
+      message_id: MENSAGEM,
+    });
+    expect(resultado.feito).toBe(true);
+    expect(duble.chamadas).toEqual(['classificacao']);
+  });
+});
+
+describe('6. o que a fila faz com cada erro', () => {
+  it('alvo suprimido é determinístico: conclui, não gira até a dead-letter', () => {
+    // Foi assim que a varredura achou o §3.3: três `draft_followup` girando até
+    // a dead-letter — três chamadas pagas — para um contato já suprimido.
+    expect(eDeterministico(new AlvoSuprimidoError('org', 1))).toBe(true);
   });
 });

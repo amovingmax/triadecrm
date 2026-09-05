@@ -119,10 +119,15 @@ export function ChamadaCabecalho({
           </p>
         ) : null}
 
+        {/* Durante a chamada, no celular, a contagem de tentativa sai da tela — ela é
+            decisão de ANTES de discar. O aviso da ÚLTIMA tentativa fica: ele muda o que
+            ela faz agora (deixar recado, insistir mais um pouco), e some seria esconder
+            justamente a linha que importa. */}
         <p
           className={cn(
             'flex items-center gap-1.5 text-sm',
             ultima ? 'text-destructive-texto' : 'text-muted-foreground',
+            emChamada && !ultima && 'max-sm:hidden',
           )}
         >
           {ultima ? <TriangleAlert className="size-4 shrink-0" aria-hidden="true" /> : null}
@@ -142,31 +147,47 @@ export function ChamadaCabecalho({
       <div
         className={cn(
           'flex flex-col gap-3 rounded-xl border border-hairline bg-card sm:p-5',
-          emChamada ? 'p-3' : 'p-4',
+          emChamada ? 'px-3 py-2 sm:py-5' : 'p-4',
         )}
       >
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
+        {/* Em chamada, no celular, o número e o cronômetro dividem UMA linha.
+            Medido em 390×844 antes disto: sobravam 120 px para a fala do roteiro — que
+            é a única coisa que ela precisa ler enquanto fala —, e a frase de abertura
+            saía cortada no meio, com as respostas inteiramente debaixo da barra de
+            tabulação. O número continua na tela porque ela pode precisar reditar; o que
+            ele não precisa mais é de corpo de cartaz, que serve a CONFERIR antes de
+            discar. No desktop nada muda. */}
+        <div
+          className={cn(
+            'flex flex-wrap items-baseline justify-between gap-3',
+            emChamada && 'max-sm:flex-nowrap max-sm:items-center max-sm:gap-2',
+          )}
+        >
           {/* O número é TEXTO, não link: quem disca é o botão, e um número que
               também disca faria a pessoa abrir o discador ao tentar selecioná-lo
               para copiar. */}
           <p
             className={cn(
               'numerico leading-none font-semibold tracking-tight select-all sm:text-4xl',
-              emChamada ? 'text-2xl sm:text-4xl' : 'text-3xl',
+              emChamada ? 'min-w-0 text-lg sm:text-4xl' : 'text-3xl',
             )}
           >
             {telefoneLegivel(item.telefone)}
           </p>
 
           {chamada ? (
-            <p className="flex items-center gap-2 text-sm font-medium">
+            <p className="flex shrink-0 items-center gap-2 text-sm font-medium">
               <span className="relative flex size-2.5">
                 <span
                   aria-hidden="true"
                   className="absolute inline-flex size-full rounded-full bg-quente"
                 />
               </span>
-              Em chamada
+              {/* No celular, em chamada, "Em chamada" sai da tela e fica só para quem
+                  lê por leitor: o ponto vermelho e o cronômetro correndo já dizem a
+                  mesma coisa, e as duas palavras eram o que espremia o número na linha
+                  de 390 px. */}
+              <span className="max-sm:sr-only">Em chamada</span>
               <span className="numerico text-lg" aria-label={`${segundos} segundos de chamada`}>
                 {cronometro(segundos)}
               </span>

@@ -175,18 +175,32 @@ export type ResumoDoDreno = {
  * O índice único da `client_key` já impede a linha duplicada no banco, mas gastar duas
  * viagens de rede num celular com sinal ruim é justamente o que não se quer.
  *
+ * `segurado` é a `clientKey` do registro que a tela está SEGURANDO na mão — aquele em
+ * que a pessoa tocou no recibo e cuja contagem do desfazer parou de correr por causa
+ * disso. O prazo dele já venceu no relógio, mas o "Desfazer" continua na tela: sem
+ * esta exceção o dreno automático mandaria o registro pelas costas dela em até
+ * `INTERVALO_DRENO_MS`, e o botão viraria mentira (laudo §3.12k). Nada se perde — quem
+ * segura envia ao tocar em "Registrar outro", ao sair da tela ou, se a aba morrer, no
+ * dreno do próximo carregamento, quando ninguém está mais olhando um desfazer.
+ *
  * `enviar` é injetável só para os testes; em produção é a RPC de verdade.
  */
 let drenoEmCurso: Promise<ResumoDoDreno> | null = null;
 
-export function drenarFila(enviar: typeof gravarRegistro = gravarRegistro): Promise<ResumoDoDreno> {
-  drenoEmCurso ??= drenar(enviar).finally(() => {
+export function drenarFila(
+  enviar: typeof gravarRegistro = gravarRegistro,
+  segurado: string | null = null,
+): Promise<ResumoDoDreno> {
+  drenoEmCurso ??= drenar(enviar, segurado).finally(() => {
     drenoEmCurso = null;
   });
   return drenoEmCurso;
 }
 
-async function drenar(enviar: typeof gravarRegistro): Promise<ResumoDoDreno> {
+async function drenar(
+  enviar: typeof gravarRegistro,
+  segurado: string | null,
+): Promise<ResumoDoDreno> {
   const fila = ler();
   if (fila.length === 0) return { enviados: 0, esperando: 0, parados: 0 };
 
@@ -194,6 +208,7 @@ async function drenar(enviar: typeof gravarRegistro): Promise<ResumoDoDreno> {
   let enviados = 0;
 
   for (const item of fila) {
+    if (item.clientKey === segurado) continue;
     if (item.esgotado || Date.parse(item.enviarApos) > agora) continue;
     try {
       const resultado = await enviar(item.pedido);

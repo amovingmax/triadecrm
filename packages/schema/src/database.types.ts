@@ -155,6 +155,7 @@ export type Database = {
       corpo_fixo_de_optout: { Args: { p_body: string }; Returns: string }
       cpf_is_valid: { Args: { c: string }; Returns: boolean }
       data_pt: { Args: { p_data: string }; Returns: string }
+      ddd_br_valido: { Args: { p: string }; Returns: boolean }
       ddd_da_regiao: { Args: { p_phone: string }; Returns: boolean }
       deal_set_intent: {
         Args: {
@@ -166,6 +167,7 @@ export type Database = {
         Returns: boolean
       }
       dia_util_de_operacao: { Args: { p_at?: string }; Returns: boolean }
+      dlq_drenar: { Args: { p_qty?: number }; Returns: Json }
       e_o_worker: { Args: never; Returns: boolean }
       encerrar_matricula: {
         Args: {
@@ -237,8 +239,23 @@ export type Database = {
         Args: { p_descricao?: string; p_nome: string; p_valor: string }
         Returns: undefined
       }
+      ia_alvo_do_trabalho: {
+        Args: { p_payload: Json }
+        Returns: {
+          contact_id: string
+          organization_id: string
+        }[]
+      }
+      ia_cancelar_trabalhos: {
+        Args: { p_organization_id: string }
+        Returns: number
+      }
       ia_enfileirar: {
         Args: { p_key: string; p_payload: Json; p_purpose: string }
+        Returns: Json
+      }
+      ia_trabalho_suprimido: {
+        Args: { p_payload: Json; p_purpose: string }
         Returns: Json
       }
       importacao_canal: {
@@ -281,6 +298,7 @@ export type Database = {
         Args: { p_contact_id?: string; p_organization_id: string }
         Returns: boolean
       }
+      itens_restantes_do_lote: { Args: { p_batch: string }; Returns: number }
       ja_respondeu: { Args: { p_organization_id: string }; Returns: boolean }
       janela_de_24h_aberta: {
         Args: { p_conversation_id: string; p_quando?: string }
@@ -345,6 +363,7 @@ export type Database = {
         }
         Returns: Json
       }
+      motivo_da_fila_vazia: { Args: { p_batch: string }; Returns: Json }
       next_business_day: {
         Args: { p_days?: number; p_from: string }
         Returns: string
@@ -573,15 +592,30 @@ export type Database = {
         Args: { p_channel: Database["app"]["Enums"]["channel"]; p_dia: string }
         Returns: number
       }
+      titulo_da_tentativa: {
+        Args: {
+          p_feitas: number
+          p_label: string
+          p_max: number
+          p_task: string
+        }
+        Returns: undefined
+      }
       toques_do_dia: {
         Args: { p_channel: Database["app"]["Enums"]["channel"]; p_dia: string }
         Returns: number
       }
+      uuid_seguro: { Args: { p_valor: string }; Returns: string }
       validar_roteiro: { Args: { p_arvore: Json }; Returns: string[] }
       wa_confirmacao_de_optout: {
         Args: { p_conversation_id: string }
         Returns: Json
       }
+      wa_confirmacao_proxima_em: {
+        Args: { p_tentativas: number; p_ultima_falha: string }
+        Returns: string
+      }
+      wa_confirmacao_teto: { Args: never; Returns: number }
       wa_confirmacoes_reenfileirar: { Args: { p_qty?: number }; Returns: Json }
       wa_enfileirar_envio: { Args: { p_message_id: string }; Returns: Json }
       wa_expirar_fila: {
@@ -2409,6 +2443,76 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dead_letters: {
+        Row: {
+          drenada_em: string
+          erro: string | null
+          fila: string
+          fila_de_origem: string | null
+          id: number
+          idempotency_key: string | null
+          lida_em: string | null
+          lida_por: string | null
+          morreu_em: string
+          msg_id: number | null
+          payload: Json
+          task_id: string | null
+          tentativas: number | null
+        }
+        Insert: {
+          drenada_em?: string
+          erro?: string | null
+          fila: string
+          fila_de_origem?: string | null
+          id?: number
+          idempotency_key?: string | null
+          lida_em?: string | null
+          lida_por?: string | null
+          morreu_em?: string
+          msg_id?: number | null
+          payload?: Json
+          task_id?: string | null
+          tentativas?: number | null
+        }
+        Update: {
+          drenada_em?: string
+          erro?: string | null
+          fila?: string
+          fila_de_origem?: string | null
+          id?: number
+          idempotency_key?: string | null
+          lida_em?: string | null
+          lida_por?: string | null
+          morreu_em?: string
+          msg_id?: number | null
+          payload?: Json
+          task_id?: string | null
+          tentativas?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dead_letters_lida_por_fkey"
+            columns: ["lida_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dead_letters_lida_por_fkey"
+            columns: ["lida_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dead_letters_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -5751,45 +5855,6 @@ export type Database = {
           },
         ]
       }
-      pg_all_foreign_keys: {
-        Row: {
-          fk_columns: unknown[] | null
-          fk_constraint_name: unknown
-          fk_schema_name: unknown
-          fk_table_name: unknown
-          fk_table_oid: unknown
-          is_deferrable: boolean | null
-          is_deferred: boolean | null
-          match_type: string | null
-          on_delete: string | null
-          on_update: string | null
-          pk_columns: unknown[] | null
-          pk_constraint_name: unknown
-          pk_index_name: unknown
-          pk_schema_name: unknown
-          pk_table_name: unknown
-          pk_table_oid: unknown
-        }
-        Relationships: []
-      }
-      tap_funky: {
-        Row: {
-          args: string | null
-          is_definer: boolean | null
-          is_strict: boolean | null
-          is_visible: boolean | null
-          kind: unknown
-          langoid: unknown
-          name: unknown
-          oid: unknown
-          owner: unknown
-          returns: string | null
-          returns_set: boolean | null
-          schema: unknown
-          volatility: string | null
-        }
-        Relationships: []
-      }
       team_directory: {
         Row: {
           city_id: number | null
@@ -5913,10 +5978,12 @@ export type Database = {
           assignee_id: string | null
           contact_id: string | null
           conversation_id: string | null
+          esgotou_tentativas: boolean | null
           motivo: string | null
           organization_id: string | null
           pediu_em: string | null
           pode_sair_agora: boolean | null
+          proxima_tentativa_em: string | null
           tentativas_falhas: number | null
           ultima_falha_em: string | null
           ultimo_erro: string | null
@@ -5968,22 +6035,6 @@ export type Database = {
       }
     }
     Functions: {
-      _cleanup: { Args: never; Returns: boolean }
-      _contract_on: { Args: { "": string }; Returns: unknown }
-      _currtest: { Args: never; Returns: number }
-      _db_privs: { Args: never; Returns: unknown[] }
-      _extensions: { Args: never; Returns: unknown[] }
-      _get: { Args: { "": string }; Returns: number }
-      _get_latest: { Args: { "": string }; Returns: number[] }
-      _get_note: { Args: { "": string }; Returns: string }
-      _is_verbose: { Args: never; Returns: boolean }
-      _prokind: { Args: { p_oid: unknown }; Returns: unknown }
-      _query: { Args: { "": string }; Returns: string }
-      _refine_vol: { Args: { "": string }; Returns: string }
-      _retval: { Args: { "": string }; Returns: string }
-      _table_privs: { Args: never; Returns: unknown[] }
-      _temptypes: { Args: { "": string }; Returns: string }
-      _todo: { Args: never; Returns: string }
       abrir_reivindicacao: {
         Args: { p_ip?: string; p_token: string; p_user_agent?: string }
         Returns: Json
@@ -6002,6 +6053,10 @@ export type Database = {
         }
         Returns: Json
       }
+      alvo_suprimido: {
+        Args: { p_contact_id?: string; p_organization_id: string }
+        Returns: boolean
+      }
       aprovar_rascunho: {
         Args: { p_draft_id: string; p_texto_final?: string }
         Returns: Json
@@ -6011,42 +6066,6 @@ export type Database = {
         Returns: Json
       }
       cadencias_visao: { Args: never; Returns: Json }
-      col_is_null:
-        | {
-            Args: {
-              column_name: unknown
-              description?: string
-              schema_name: unknown
-              table_name: unknown
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              column_name: unknown
-              description?: string
-              table_name: unknown
-            }
-            Returns: string
-          }
-      col_not_null:
-        | {
-            Args: {
-              column_name: unknown
-              description?: string
-              schema_name: unknown
-              table_name: unknown
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              column_name: unknown
-              description?: string
-              table_name: unknown
-            }
-            Returns: string
-          }
       criar_pre_cadastro: {
         Args: {
           p_organization_id: string
@@ -6088,23 +6107,7 @@ export type Database = {
         }
         Returns: Json
       }
-      diag:
-        | {
-            Args: { msg: unknown }
-            Returns: {
-              error: true
-            } & "Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
-          }
-        | {
-            Args: { msg: string }
-            Returns: {
-              error: true
-            } & "Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
-          }
-      diag_test_name: { Args: { "": string }; Returns: string }
-      do_tap:
-        | { Args: never; Returns: string[] }
-        | { Args: { "": string }; Returns: string[] }
+      dlq_drenar: { Args: { p_qty?: number }; Returns: Json }
       encerrar_cadencia: {
         Args: { p_enrollment_id: string; p_motivo: string }
         Returns: Json
@@ -6192,12 +6195,6 @@ export type Database = {
         Returns: Json
       }
       exportar_lgpd_por_token: { Args: { p_token: string }; Returns: Json }
-      fail:
-        | { Args: never; Returns: string }
-        | { Args: { "": string }; Returns: string }
-      findfuncs: { Args: { "": string }; Returns: string[] }
-      finish: { Args: { exception_on_failure?: boolean }; Returns: string[] }
-      format_type_string: { Args: { "": string }; Returns: string }
       geo_gravar: {
         Args: {
           p_addresstype?: string
@@ -6246,7 +6243,10 @@ export type Database = {
           ritmo_necessario: number
         }[]
       }
-      has_unique: { Args: { "": string }; Returns: string }
+      ia_alvo_suprimido: {
+        Args: { p_payload: Json; p_purpose: string }
+        Returns: Json
+      }
       ia_fila_enfileirar: {
         Args: { p_key: string; p_payload: Json; p_purpose: string }
         Returns: Json
@@ -6262,11 +6262,8 @@ export type Database = {
       }
       importacao_lotes: { Args: { p_limit?: number }; Returns: Json }
       importacao_previa: { Args: { p_linhas: Json }; Returns: Json }
-      in_todo: { Args: never; Returns: boolean }
       iniciar_chamada: { Args: { p_item_id: string }; Returns: Json }
       integracao_segredo: { Args: { p_nome: string }; Returns: string }
-      is_empty: { Args: { "": string }; Returns: string }
-      isnt_empty: { Args: { "": string }; Returns: string }
       komune_fila_status: { Args: never; Returns: Json }
       komune_push_erro: {
         Args: {
@@ -6295,7 +6292,6 @@ export type Database = {
         Args: { p_ativa: boolean; p_slug: string }
         Returns: Json
       }
-      lives_ok: { Args: { "": string }; Returns: string }
       marcar_nao_ligar_mais: {
         Args: {
           p_contact_id?: string
@@ -6364,16 +6360,7 @@ export type Database = {
         }
         Returns: Json
       }
-      no_plan: { Args: never; Returns: boolean[] }
-      num_failed: { Args: never; Returns: number }
       origem_dos_dados: { Args: { p_organization_id: string }; Returns: Json }
-      os_name: { Args: never; Returns: string }
-      pass:
-        | { Args: never; Returns: string }
-        | { Args: { "": string }; Returns: string }
-      pg_version: { Args: never; Returns: string }
-      pg_version_num: { Args: never; Returns: number }
-      pgtap_version: { Args: never; Returns: number }
       pipeline_board: {
         Args: {
           p_limit_per_stage?: number
@@ -6683,9 +6670,6 @@ export type Database = {
         Returns: Json
       }
       rota_proximas: { Args: { p_qty?: number }; Returns: Json }
-      runtests:
-        | { Args: never; Returns: string[] }
-        | { Args: { "": string }; Returns: string[] }
       search_organizations: {
         Args: {
           p_category_id?: number
@@ -6716,9 +6700,6 @@ export type Database = {
           total_count: number
         }[]
       }
-      skip:
-        | { Args: { "": string }; Returns: string }
-        | { Args: { how_many: number; why: string }; Returns: string }
       tabular_chamada: {
         Args: {
           p_agendar_para?: string
@@ -6739,16 +6720,6 @@ export type Database = {
         }
         Returns: Json
       }
-      throws_ok: { Args: { "": string }; Returns: string }
-      todo:
-        | { Args: { how_many: number }; Returns: boolean[] }
-        | { Args: { how_many: number; why: string }; Returns: boolean[] }
-        | { Args: { why: string }; Returns: boolean[] }
-        | { Args: { how_many: number; why: string }; Returns: boolean[] }
-      todo_end: { Args: never; Returns: boolean[] }
-      todo_start:
-        | { Args: never; Returns: boolean[] }
-        | { Args: { "": string }; Returns: boolean[] }
       wa_eco_registrar: {
         Args: {
           p_body?: string
@@ -6837,9 +6808,7 @@ export type Database = {
       [_ in never]: never
     }
     CompositeTypes: {
-      _time_trial_type: {
-        a_time: number | null
-      }
+      [_ in never]: never
     }
   }
 }

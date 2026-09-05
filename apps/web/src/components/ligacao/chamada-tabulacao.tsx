@@ -131,7 +131,7 @@ export function ChamadaTabulacao({
                 type="button"
                 variant="outline"
                 disabled={gravando}
-                className="h-12 flex-1 text-base sm:min-w-40"
+                className="min-h-12 flex-1 px-3 text-center text-base leading-tight whitespace-normal sm:min-w-40"
                 onClick={() => aoResultadoTecnico(resultado)}
               >
                 {ROTULOS_RESULTADO_TECNICO[resultado]}
@@ -329,7 +329,12 @@ function ListaComercial({
           type="button"
           variant="outline"
           disabled={gravando}
-          className="h-12 flex-1 text-base sm:min-w-40"
+          /* `whitespace-normal` e altura mínima em vez de fixa: o nome do desfecho vem
+             do catálogo (`interaction_outcomes.name`, RF-ADM-02) e não cabe numa
+             metade de 390 px. Medido em 05/09/2026: "Atendeu, retorna depois"
+             transbordava as duas bordas do botão, e a Heloísa lia a etiqueta por cima
+             da moldura no exato momento em que ela grava a conversa. */
+          className="min-h-12 flex-1 px-3 text-center text-base leading-tight whitespace-normal sm:min-w-40"
           onClick={() => aoDesfecho(desfecho)}
         >
           {desfecho.name}

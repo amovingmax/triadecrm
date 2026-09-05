@@ -26,8 +26,10 @@
  *
  * A repetição de regra é consciente e tem limite: o que a prévia NÃO consegue ver é a
  * `suppression_list` (guardada por hash, e a função que compara está no schema `app`,
- * fora do PostgREST). Quem vê é a montagem. Por isso a tela chama a prévia de
- * estimativa e mostra o resumo do banco depois de montar.
+ * fora do PostgREST). Quem vê é a montagem. Esse limite não é mais um comentário: está
+ * declarado em `MOTIVOS_INVISIVEIS_A_PREVIA`, o painel escreve "no máximo" por causa
+ * dele, e um teste falha se alguém acrescentar um motivo sem dizer de que lado ele
+ * está (laudo §3.12a).
  */
 import { z } from 'zod';
 
@@ -148,6 +150,83 @@ const TETO_DA_BASE = 1000;
 
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
+/**
+ * O que a prévia consegue ver de cada organização, e nada além disso.
+ *
+ * Os nomes são os da tela, e não os das colunas, porque é isto que a função responde:
+ * "esta linha entra hoje, e se não entra, por quê?".
+ */
+export type LeituraDaPrevia = {
+  naoContatar: boolean;
+  temTelefone: boolean;
+  negocioAberto: boolean;
+  /** `v_contact_cooldown.blocked_forever`: recusa definitiva, não espera. */
+  bloqueadoParaSempre: boolean;
+  /** O piso de recontato do RF-FUN-13 ainda não venceu. */
+  emEspera: boolean;
+  reservadaEmOutroLote: boolean;
+};
+
+/**
+ * Os motivos que a prévia NÃO consegue avaliar, declarados em vez de esquecidos.
+ *
+ * `suprimido` é o único, e é o defeito §3.12a do laudo: a `suppression_list` é
+ * guardada por HASH (`app.sha256_hex` do telefone/CNPJ/@) e a função que compara
+ * (`app.is_suppressed`) vive no schema `app`, fora do PostgREST — de propósito, para
+ * que ninguém consiga varrer a lista de quem pediu para sair. O telefone, que é a
+ * chave de longe mais comum, chega mascarado a `sdr` e a `embaixador` (RF-BAS-14), de
+ * modo que nem hashear no cliente resolveria. Quem enxerga é a montagem, que roda
+ * `security definer`.
+ *
+ * A consequência é o que a tela precisa dizer em voz alta: **o número da prévia é um
+ * TETO**. Quem foi suprimido conta como elegível aqui e é cortado no `montar_lote`,
+ * então "entram 25" pode virar 24 — nunca 26. Enquanto esta lista não estiver vazia, o
+ * painel escreve "no máximo" e explica por quê.
+ */
+export const MOTIVOS_INVISIVEIS_A_PREVIA: readonly MotivoDeExclusao[] = ['suprimido'];
+
+/**
+ * O motivo que a prévia avalia FORA deste `case`, e de propósito.
+ *
+ * A temperatura é o eixo da escolha (um lote tem origem única, R13 §3.1), então a tela
+ * filtra por ela e conta as exclusões DENTRO do grupo escolhido — que é o número que a
+ * pessoa quer ver ("dos 43 frios, 4 estão sem telefone"), e não "57 são de outra
+ * temperatura". Está declarado aqui para que a soma dos três conjuntos continue sendo
+ * a lista inteira de motivos, e ninguém acrescente um oitavo em silêncio.
+ */
+export const MOTIVOS_FORA_DO_CASO_DA_PREVIA: readonly MotivoDeExclusao[] = [
+  'temperatura_diferente',
+];
+
+/**
+ * O motivo que a prévia dá além da temperatura, avaliado na ordem de
+ * `app.call_candidates` (migração 20260904001500).
+ *
+ * A ordem é a da GRAVIDADE, e não a da conveniência de leitura: quem pediu para não
+ * ser procurado é nomeado antes de qualquer outra coisa. Esta cópia já tinha ficado
+ * com a ordem antiga (`sem_negocio_aberto` primeiro) e escondia o opt-out da prévia —
+ * `app.consent_apply` fecha o negócio de quem pede para sair, então os dois motivos
+ * valem ao mesmo tempo e o que a tela mostrava era o menos importante. Medido em
+ * 04/09/2026: a prévia dizia "4 sem negócio aberto" no mesmo recorte em que
+ * `montar_lote` devolvia `{nao_contatar: 2, sem_negocio_aberto: 2}`.
+ *
+ * Duas diferenças em relação ao `case` do banco, e as duas são deliberadas:
+ *
+ *  * `suprimido` não é avaliado aqui — ver `MOTIVOS_INVISIVEIS_A_PREVIA`;
+ *  * `temperatura_diferente` também não: a temperatura é o EIXO da escolha (um lote
+ *    não mistura), então a tela filtra por ela e conta as exclusões dentro do grupo
+ *    escolhido. "57 são de outra temperatura" não é resposta para quem já escolheu
+ *    ligar para os frios.
+ */
+export function motivoDaExclusao(leitura: LeituraDaPrevia): MotivoDeExclusao | null {
+  if (leitura.naoContatar) return 'nao_contatar';
+  if (!leitura.temTelefone) return 'sem_telefone';
+  if (!leitura.negocioAberto) return 'sem_negocio_aberto';
+  if (leitura.bloqueadoParaSempre || leitura.emEspera) return 'em_janela_de_recontato';
+  if (leitura.reservadaEmOutroLote) return 'reservado_em_outro_lote';
+  return null;
+}
+
 export async function carregarBaseDaMontagem(pipelineId: number): Promise<BaseDaMontagem> {
   const supabase = createClient();
 
@@ -223,30 +302,14 @@ export async function carregarBaseDaMontagem(pipelineId: number): Promise<BaseDa
     const espera = esperaDaOrganizacao.get(organizacao.id);
     const temTelefone = (organizacao.phone_e164 ?? '').trim().length > 0;
 
-    // A MESMA ordem do `case` de `app.call_candidates`, que desde a migração
-    // 20260904001500 é a ordem da GRAVIDADE: quem pediu para não ser procurado é
-    // nomeado antes de qualquer outra coisa. Esta cópia tinha ficado com a ordem
-    // antiga (`sem_negocio_aberto` primeiro) e escondia o opt-out da prévia — o
-    // `app.consent_apply` fecha o negócio de quem pede para sair, então os dois
-    // motivos valem ao mesmo tempo e o que a tela mostrava era o menos importante.
-    // Medido em 04/09/2026: a prévia dizia "4 sem negócio aberto" no mesmo recorte
-    // em que `montar_lote` devolvia `{nao_contatar: 2, sem_negocio_aberto: 2}`.
-    // A `suppression_list` continua de fora porque é guardada por hash e só a
-    // montagem consegue compará-la.
-    const motivo: MotivoDeExclusao | null =
-      organizacao.do_not_contact
-        ? 'nao_contatar'
-        : !temTelefone
-          ? 'sem_telefone'
-          : negocio.status !== 'open'
-            ? 'sem_negocio_aberto'
-            : espera?.blocked_forever
-              ? 'em_janela_de_recontato'
-              : espera?.cooldown_until && Date.parse(espera.cooldown_until) > agora
-                ? 'em_janela_de_recontato'
-                : reservadas.has(organizacao.id)
-                  ? 'reservado_em_outro_lote'
-                  : null;
+    const motivo = motivoDaExclusao({
+      naoContatar: organizacao.do_not_contact,
+      temTelefone,
+      negocioAberto: negocio.status === 'open',
+      bloqueadoParaSempre: Boolean(espera?.blocked_forever),
+      emEspera: Boolean(espera?.cooldown_until && Date.parse(espera.cooldown_until) > agora),
+      reservadaEmOutroLote: reservadas.has(organizacao.id),
+    });
 
     const idsDeCategoria = categoriasDaOrganizacao.get(organizacao.id) ?? [];
 

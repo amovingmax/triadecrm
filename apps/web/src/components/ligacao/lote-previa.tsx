@@ -39,7 +39,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChipTemperatura } from '@/components/temperatura';
 
-import { type CandidatoDaBase } from './consultas';
+import { MOTIVOS_INVISIVEIS_A_PREVIA, type CandidatoDaBase } from './consultas';
 import { MENSAGENS_DE_EXCLUSAO, type MotivoDeExclusao } from './tipos';
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,11 @@ export type PreviaDoLote = {
   noRecorte: number;
   /** Quantos entrariam hoje. */
   elegiveis: number;
-  /** Quantos vão para o lote de fato: o menor entre elegíveis e tamanho pedido. */
+  /**
+   * Quantos vão para o lote: o menor entre elegíveis e tamanho pedido — e um TETO, não
+   * uma promessa. A prévia não enxerga a `suppression_list`
+   * (`MOTIVOS_INVISIVEIS_A_PREVIA`), então o banco pode entregar menos. Nunca mais.
+   */
   entram: number;
   /** Quem fica de fora, por motivo, do maior para o menor. */
   excluidos: { motivo: MotivoDeExclusao; quantos: number }[];
@@ -281,6 +285,13 @@ export function PainelDaPrevia({
   className?: string;
 }) {
   const faltamParaOPedido = tamanho - previa.entram;
+  /**
+   * O número grande é um TETO, e não uma promessa, enquanto houver motivo de exclusão
+   * que a prévia não consegue avaliar — hoje há um, `suprimido` (laudo §3.12a). Quando
+   * a lista ficar vazia, a palavra "no máximo" some sozinha e o número volta a ser o
+   * que a tela diz que é.
+   */
+  const teto = MOTIVOS_INVISIVEIS_A_PREVIA.length > 0;
 
   return (
     <section
@@ -292,6 +303,7 @@ export function PainelDaPrevia({
           Prévia do lote
         </p>
         <p className="mt-1 flex items-baseline gap-2">
+          {teto ? <span className="text-sm text-muted-foreground">no máximo</span> : null}
           <span className="numerico font-heading text-4xl leading-none font-semibold">
             {previa.entram}
           </span>
@@ -310,6 +322,12 @@ export function PainelDaPrevia({
             </>
           ) : null}
         </p>
+        {teto ? (
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Pode entrar menos: quem pediu para não ser procurado fica guardado por hash, e só a
+            montagem confere essa lista. O resumo depois de montar é que diz quantos entraram.
+          </p>
+        ) : null}
       </div>
 
       {previa.porTemperatura.length > 1 ? (

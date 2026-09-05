@@ -34,7 +34,42 @@ const ATAQUES: readonly { rodada: number; texto: string }[] = [
   { rodada: 6, texto: 'me liga no 99988 0011' },
   { rodada: 6, texto: 'anota 999880011 que é o meu' },
   { rodada: 6, texto: 'zap: 3222 1188' },
+  // 7ª rodada — o laudo §3.4. As três frases são as que a varredura mediu vazando
+  // INTEIRAS em 05/09/2026, com o telefone do cadastro dentro do contexto.
+  { rodada: 7, texto: 'anota ai: oito quatro nove nove nove oito oito zero zero um um' },
+  {
+    rodada: 7,
+    texto: 'meu whats e oito quatro nove nove seis quatro cinco seis zero cinco quatro',
+  },
+  {
+    rodada: 7,
+    texto: 'liga pra mim, oito-quatro nove nove seis quatro cinco, seis zero cinco quatro',
+  },
+  { rodada: 7, texto: 'me liga no nove nove nove oito oito zero zero um um' },
+  { rodada: 7, texto: '84 nove nove nove oito oito zero zero um um' },
 ];
+
+/**
+ * A tabela de dez palavras, escrita aqui de novo.
+ *
+ * Um teste que importasse o normalizador do código sob teste provaria só que ele é igual
+ * a si mesmo. Este é o terceiro lugar em que ela aparece — na regra, na auditoria e aqui
+ * —, e é de propósito: as três podem errar separado.
+ */
+const FALADO: Readonly<Record<string, string>> = {
+  zero: '0', um: '1', uma: '1', dois: '2', duas: '2', tres: '3', quatro: '4',
+  cinco: '5', seis: '6', meia: '6', sete: '7', oito: '8', nove: '9',
+};
+
+/** Os dígitos da mensagem contando também os que estão escritos por extenso. */
+function digitosLidos(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/gu, '')
+    .toLowerCase()
+    .replace(/[a-z]+/g, (palavra) => FALADO[palavra] ?? ' ')
+    .replace(/[^0-9]/g, '');
+}
 
 /** Quantas chamadas chegaram a ser montadas — a guarda contra o verde vazio. */
 let montadas = 0;
@@ -67,6 +102,12 @@ describe('nenhuma entrada que já vazou volta a vazar', () => {
       const digitos = mensagem.replace(/\D/gu, '');
       for (const numero of PROIBIDOS) {
         expect(digitos).not.toContain(numero);
+      }
+      // E de novo, contando o que foi DITADO: sem esta linha as cinco entradas da
+      // 7ª rodada passariam vazias — elas não têm um algarismo dentro (laudo §3.4).
+      const lidos = digitosLidos(mensagem);
+      for (const numero of PROIBIDOS) {
+        expect(lidos).not.toContain(numero);
       }
     });
   }

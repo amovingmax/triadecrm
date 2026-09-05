@@ -45,9 +45,16 @@ type Falha = { causa: string; comoResolver?: string } | null;
  *   · classificar e gravar → Postgres, em pedaços, com barra andando;
  *   · nesta função → o passo atual, o mapa de colunas e a tradução dos erros.
  */
-export function TelaImportacao({ podeImportar, origemPlanilhaId }: {
+export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }: {
   /** Papéis que escrevem na base. A autorização de verdade é o RLS. */
   podeImportar: boolean;
+  /**
+   * Espelho de `app.is_manager()`: quem desfaz um lote (RF-BAS-17).
+   *
+   * Vem separado de `podeImportar` de propósito — quem importa (sdr) não desfaz,
+   * e oferecer o botão a ela era o §3.7 do laudo.
+   */
+  podeDesfazer: boolean;
   /** Id da fonte "planilha" no catálogo: é o `source_id` do lote. */
   origemPlanilhaId: number;
 }) {
@@ -340,6 +347,7 @@ export function TelaImportacao({ podeImportar, origemPlanilhaId }: {
       {etapa === 'recibo' && recibo ? (
         <Recibo
           recibo={recibo}
+          podeDesfazer={podeDesfazer}
           aoRecomecar={recomecar}
           aoDesfazer={() => {
             recomecar();

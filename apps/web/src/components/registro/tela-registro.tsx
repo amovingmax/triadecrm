@@ -114,6 +114,16 @@ export function TelaRegistro({
   const [fase, setFase] = useState<EstadoDoEnvio['fase'] | 'inativo'>('inativo');
   const [prazoEm, setPrazoEm] = useState(0);
   const [restaMs, setRestaMs] = useState(ESPERA_DESFAZER_MS);
+  /**
+   * A contagem do desfazer PAROU porque a pessoa tocou em alguma coisa no recibo.
+   *
+   * É a mesma regra do recibo da tela de ligação, e existe pelo mesmo motivo: os 5
+   * segundos são o pagamento de quem não vai fazer nada, e para quem TOCOU eles eram
+   * um sequestro — abrir "Anotar" e ver o "Desfazer" sumir no meio da frase, sem
+   * aviso. Parou, não volta a andar: quem começou a escrever decide quando o registro
+   * sobe, no botão que já está na tela (laudo §3.12k).
+   */
+  const [pausado, setPausado] = useState(false);
   const [resultado, setResultado] = useState<EstadoDoEnvio | null>(null);
   const [fila, setFila] = useState<readonly RegistroNaFila[]>([]);
   const [drenando, setDrenando] = useState(false);
@@ -133,8 +143,10 @@ export function TelaRegistro({
 
   const rascunhoRef = useRef<Rascunho | null>(null);
   const faseRef = useRef<EstadoDoEnvio['fase'] | 'inativo'>('inativo');
+  const pausadoRef = useRef(false);
   rascunhoRef.current = rascunho;
   faseRef.current = fase;
+  pausadoRef.current = pausado;
 
   /**
    * A fila sobe sozinha: ao abrir a tela, quando a rede volta, quando ela traz o app
@@ -152,7 +164,17 @@ export function TelaRegistro({
   const subirFila = useCallback(async () => {
     setDrenando(true);
     try {
-      const { enviados } = await drenarFila();
+      /**
+       * O registro que está na mão COM a contagem parada não sobe pelo dreno: o
+       * "Desfazer" está na tela e ainda vale. Sem isto, parar a contagem só adiava o
+       * envio até o próximo tique do relógio da fila, e o botão passava a mentir
+       * (laudo §3.12k). Todo o resto sobe normalmente.
+       */
+      const segurado =
+        pausadoRef.current && faseRef.current === 'segurando'
+          ? (rascunhoRef.current?.clientKey ?? null)
+          : null;
+      const { enviados } = await drenarFila(undefined, segurado);
       if (enviados > 0) {
         toast.success(
           enviados === 1
@@ -298,7 +320,7 @@ export function TelaRegistro({
 
   // A contagem regressiva. Quem chega ao fim dispara o envio.
   useEffect(() => {
-    if (fase !== 'segurando') return;
+    if (fase !== 'segurando' || pausado) return;
     const id = window.setInterval(() => {
       const resta = prazoEm - Date.now();
       if (resta <= 0) {
@@ -309,7 +331,7 @@ export function TelaRegistro({
       }
     }, 150);
     return () => window.clearInterval(id);
-  }, [fase, prazoEm]);
+  }, [fase, prazoEm, pausado]);
 
   // Sair da tela com um registro segurado não pode perdê-lo: quem some, envia.
   useEffect(
@@ -408,6 +430,7 @@ export function TelaRegistro({
     setResultado(null);
     setRestaMs(ESPERA_DESFAZER_MS);
     setPrazoEm(Date.now() + ESPERA_DESFAZER_MS);
+    setPausado(false);
     setFase('segurando');
   }
 
@@ -417,13 +440,17 @@ export function TelaRegistro({
     if (rascunhoRef.current) removerDaFila(rascunhoRef.current.clientKey);
     setFila(lerFila());
     setFase('inativo');
+    setPausado(false);
     setRascunho(null);
     setResultado(null);
   }
 
   function registrarOutro() {
+    // Segurando, com ou sem a contagem parada: sair daqui MANDA. É a saída que a
+    // frase do recibo promete para quem parou a contagem por ter tocado em algo.
     if (faseRef.current === 'segurando') void enviarRef.current();
     setFase('inativo');
+    setPausado(false);
     setRascunho(null);
     setResultado(null);
     setAlvo(null);
@@ -516,6 +543,8 @@ export function TelaRegistro({
           estado={estado}
           comQuem={rascunho.comQuem}
           observacao={rascunho.observacao}
+          pausado={pausado}
+          aoPausar={() => setPausado(true)}
           aoDesfazer={desfazer}
           aoCorrigirComQuem={ajustarComQuem}
           aoAnotar={ajustarObservacao}

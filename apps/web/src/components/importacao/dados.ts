@@ -11,6 +11,7 @@
  * pessoa vê progresso e um pedaço que falha não leva os outros junto.
  */
 import { createClient } from '@/lib/supabase/client';
+import { formatarNumero } from '@/components/parceiros/formatos';
 
 import type {
   Contagem,
@@ -47,6 +48,39 @@ export function totalDe(contagem: Contagem): number {
   return Object.values(contagem).reduce<number>((s, n) => s + (n ?? 0), 0);
 }
 
+/**
+ * Quantos CANDIDATOS a importação mandou para a fila de revisão do Radar.
+ *
+ * Não é `contagem.duplicata + contagem.revisao`: isso conta LINHAS da planilha, e
+ * linha não é candidato (§3.12g do laudo). Duas linhas da mesma empresa
+ * compartilham a mesma identidade (celular > @ > CNPJ > nome+cidade), viram a
+ * mesma captura e o MESMO candidato; e a linha que a esteira não conseguiu
+ * transformar em candidato (`sem_candidato`) não vai para fila nenhuma.
+ *
+ * Medido no banco em 05/09/2026, com a planilha-ponte preenchida mais uma
+ * segunda ocorrência de "Rios Recepções": o recibo mandava "decidir as 31" e a
+ * fila do Radar recebia 30.
+ */
+const DECISOES_QUE_VAO_PARA_A_FILA: readonly Decisao[] = ['duplicata', 'revisao'];
+
+/**
+ * `radar_fila` mostra `status = 'novo'` por padrão. `ja_revisado` é o motivo que
+ * o banco devolve quando o candidato existe mas JÁ SAIU da fila — decidido numa
+ * passagem anterior. Ele volta na resposta com `candidate_id`, e contá-lo
+ * mandaria a pessoa procurar no Radar o que não está mais lá.
+ */
+const MOTIVOS_FORA_DA_FILA: readonly string[] = ['ja_revisado'];
+
+export function candidatosNaFila(linhas: readonly LinhaGravada[]): number {
+  const candidatos = new Set<string>();
+  for (const l of linhas) {
+    if (!DECISOES_QUE_VAO_PARA_A_FILA.includes(l.decisao)) continue;
+    if (l.motivo && MOTIVOS_FORA_DA_FILA.includes(l.motivo)) continue;
+    if (l.candidate_id) candidatos.add(l.candidate_id);
+  }
+  return candidatos.size;
+}
+
 type RespostaDoBanco = {
   ok?: boolean;
   reason?: string;
@@ -54,8 +88,30 @@ type RespostaDoBanco = {
   linhas?: unknown[];
 };
 
-function conferir(data: unknown, erro: { message: string } | null): RespostaDoBanco {
-  if (erro) throw new Error(erro.message);
+/**
+ * Erro que veio do Postgres, COM o código SQLSTATE.
+ *
+ * O `error.message` do supabase-js traz só a frase do `raise exception`; o
+ * `42501` (permissão negada) viaja em `error.code`. Jogar o código fora era o
+ * §3.7 do laudo: a recusa "Papel sdr não desfaz importação" caía no genérico "o
+ * servidor não respondeu como esperado", e quem importava não ficava sabendo que
+ * o caminho era chamar um gestor.
+ */
+export class ErroDoBanco extends Error {
+  constructor(
+    message: string,
+    readonly codigo: string | null,
+  ) {
+    super(message);
+    this.name = 'ErroDoBanco';
+  }
+}
+
+function conferir(
+  data: unknown,
+  erro: { message: string; code?: string } | null,
+): RespostaDoBanco {
+  if (erro) throw new ErroDoBanco(erro.message, erro.code ?? null);
   const r = (data ?? {}) as RespostaDoBanco;
   if (r.ok === false) throw new Error(`recusado:${r.reason ?? 'desconhecido'}`);
   return r;
@@ -152,7 +208,7 @@ export async function encerrarLote(loteId: string, erro?: string): Promise<strin
 export async function buscarLotes(): Promise<LoteAnterior[]> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc('importacao_lotes', { p_limit: 8 });
-  if (error) throw new Error(error.message);
+  if (error) throw new ErroDoBanco(error.message, error.code ?? null);
   return (data ?? []) as LoteAnterior[];
 }
 
@@ -185,6 +241,41 @@ export async function desfazerLote(loteId: string): Promise<ResultadoDoDesfazer>
   };
 }
 
+/**
+ * O que o recibo diz depois de desfazer — sem inventar causa.
+ *
+ * A frase antiga era "N ficaram de pé porque alguém já trabalhou", e ela era
+ * falsa exatamente quando mais aparecia: até o conserto do §3.6 toda ficha
+ * recém-importada contava como tocada, porque quem a tocara era o PRÓPRIO
+ * importador (a nota do "último contato" da planilha). A pessoa lia que alguém
+ * tinha trabalhado a ficha um instante depois de ela mesma importar, e ia
+ * procurar um problema que não existia.
+ *
+ * Agora a frase enumera o que `public.esteira_desfazer_lote` de fato confere, e
+ * não afirma quem fez o quê.
+ */
+const POR_QUE_FICA =
+  'já têm histórico próprio: conversa registrada depois da importação, mudança de etapa, autorização ou ligação';
+
+export function fraseDoDesfazer({
+  organizacoes,
+  preservadas,
+}: Pick<ResultadoDoDesfazer, 'organizacoes' | 'preservadas'>): string {
+  const fichas = (n: number) => `${formatarNumero(n)} ${n === 1 ? 'ficha' : 'fichas'}`;
+
+  if (organizacoes === 0 && preservadas === 0) {
+    return 'Esse lote não tinha ficha para remover.';
+  }
+  if (organizacoes === 0) {
+    return `Nenhuma ficha removida: as ${formatarNumero(preservadas)} deste lote ${POR_QUE_FICA}.`;
+  }
+  const removidas = `${fichas(organizacoes)} ${organizacoes === 1 ? 'removida' : 'removidas'}.`;
+  if (preservadas === 0) return removidas;
+  return `${removidas} ${formatarNumero(preservadas)} ${
+    preservadas === 1 ? 'ficou' : 'ficaram'
+  } de pé porque ${POR_QUE_FICA}.`;
+}
+
 // ---------------------------------------------------------------------------
 // Erros
 // ---------------------------------------------------------------------------
@@ -204,9 +295,17 @@ const RECUSA: Record<string, string> = {
 /** Nunca mostre código do Postgres a quem está importando planilha. */
 export function mensagemDoErro(erro: unknown): string {
   const texto = erro instanceof Error ? erro.message : '';
+  const codigo = erro instanceof ErroDoBanco ? erro.codigo : null;
   const recusa = /^recusado:(.+)$/.exec(texto)?.[1];
   if (recusa) return RECUSA[recusa] ?? 'O servidor recusou a importação.';
-  if (/não importa planilha|42501|permission/i.test(texto)) {
+  // Os dois 42501 da importação são recusas diferentes e levam a ações
+  // diferentes: uma é "você não pode importar", a outra é "você importa, mas
+  // desfazer é de gestor". Dizer as duas com a mesma frase manda a pessoa
+  // procurar o acesso errado.
+  if (/não desfaz importação/i.test(texto)) {
+    return 'Só um gestor desfaz uma importação. Peça a um gestor para desfazer este lote.';
+  }
+  if (/não importa planilha|permission/i.test(texto) || codigo === '42501') {
     return 'O seu acesso não importa planilha. Fale com um gestor.';
   }
   if (/jwt|autenticad/i.test(texto)) return 'A sua sessão expirou. Entre de novo.';

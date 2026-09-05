@@ -60,10 +60,16 @@ import {
   gravarResumoDaLigacao,
   gravarTranscricao,
 } from './banco';
-import { ChamadaBloqueadaError, executar, leadIdCurto, type ContextoDaIa } from './execucao';
+import {
+  AlvoSuprimidoError,
+  ChamadaBloqueadaError,
+  executar,
+  leadIdCurto,
+  type ContextoDaIa,
+} from './execucao';
 import { enfileirarTrabalho } from './fila';
 
-import type { ClienteDoBanco } from '../ingest/esteira';
+import { ErroDaEsteira, type ClienteDoBanco } from '../ingest/esteira';
 
 /**
  * Erro que não adianta repetir: o mundo teria de mudar, não a tentativa.
@@ -77,7 +83,13 @@ export class ErroDeterministico extends Error {
 }
 
 export function eDeterministico(erro: unknown): boolean {
-  return erro instanceof ErroDeterministico || erro instanceof ChamadaBloqueadaError;
+  return (
+    erro instanceof ErroDeterministico ||
+    erro instanceof ChamadaBloqueadaError ||
+    // Alvo suprimido é o mais determinístico de todos: repetir não muda o mundo
+    // e cada volta é uma chamada paga (laudo §3.3).
+    erro instanceof AlvoSuprimidoError
+  );
 }
 
 /**
@@ -180,7 +192,7 @@ async function transcrever(
       contexto: payload.contexto ?? null,
     },
     contatoDoPrompt(ficha),
-    { organizationId: ficha.organizationId, conversationId: conversa.id },
+    { organizationId: ficha.organizationId, contactId: ficha.contactId, conversationId: conversa.id },
   );
 
   // Reidratar aqui é correto: `messages.transcript` é lido por gente.
@@ -261,7 +273,7 @@ async function resumirLigacao(
       desfecho: tentativa.desfecho,
     },
     contatoDoPrompt(ficha),
-    { organizationId: tentativa.organizationId, activityId: tentativa.activityId },
+    { organizationId: tentativa.organizationId, contactId: tentativa.contactId, activityId: tentativa.activityId },
   );
 
   const saida = executada.saida;
@@ -350,7 +362,7 @@ async function redigirFollowUp(
       gancho: payload.gancho ?? null,
     },
     contatoDoPrompt(ficha),
-    { organizationId: tentativa.organizationId, activityId: tentativa.activityId },
+    { organizationId: tentativa.organizationId, contactId: tentativa.contactId, activityId: tentativa.activityId },
   );
 
   // RF-CON-24: o validador roda DEPOIS do modelo e ANTES de qualquer pessoa ver.
@@ -472,7 +484,7 @@ async function classificarEntrada(
       jaRecebeuAudio: await jaRecebeuAudio(contexto.cliente, conversa.id),
     },
     contatoDoPrompt(ficha),
-    { organizationId: ficha.organizationId, conversationId: conversa.id },
+    { organizationId: ficha.organizationId, contactId: ficha.contactId, conversationId: conversa.id },
   );
 
   const decisao = decidirIntencao({
@@ -536,7 +548,63 @@ export async function tratarTrabalho(
         `os que têm são ${Object.keys(TRABALHOS).join(', ')}`,
     );
   }
+
+  // ------------------------------------------------------------------------
+  // A PERGUNTA DE SUPRESSÃO, ANTES DE QUALQUER COISA (laudo §3.3, RF-CON-18)
+  // ------------------------------------------------------------------------
+  // É a primeira instrução do consumidor, e é assim de propósito: as quatro
+  // funções abaixo LEEM a ficha (nome, telefone, e-mail) para montar o
+  // contexto da pseudonimização, e a chamada ao modelo custa dinheiro. Fazer
+  // a pergunta depois seria fazê-la tarde.
+  //
+  // A forma é a de `public.proximo_da_fila` e a de `app.komune_proximos`: uma
+  // pergunta ao banco, motivo NOMEADO na resposta, e o trabalho devolvido como
+  // "sem o que fazer" — nunca como falha. Falha giraria com backoff até a
+  // dead-letter, e repetir não muda o mundo: quem pediu para sair continuou
+  // tendo pedido para sair.
+  //
+  // A LIMPEZA da fila é do outro lado (`app.consent_apply` chama
+  // `app.ia_cancelar_trabalhos` desde a migração 20260905000803). As duas
+  // existem porque nenhuma sozinha basta: a limpeza não alcança a mensagem
+  // que um worker já leu, e a pergunta não impede a fila de crescer.
+  if (await alvoSuprimido(contexto, proposito, payload)) {
+    contexto.logger.warn('trabalho descartado: o alvo está suprimido', {
+      proposito,
+      chave: typeof payload.chave === 'string' ? payload.chave : null,
+      // Sem telefone e sem nome no log, como em todo o resto do worker.
+      guardrail: 'RF-CON-18',
+    });
+    return { proposito, feito: false, motivo: 'alvo_suprimido' };
+  }
+
   return TRABALHOS[proposito](contexto, payload);
+}
+
+/**
+ * O alvo deste trabalho está suprimido?
+ *
+ * Quem responde é o Postgres (`app.ia_trabalho_suprimido`, pela boca
+ * `public.ia_alvo_suprimido`), porque é lá que o estado mora e é lá que ele
+ * muda — repetir a regra em TypeScript criaria uma segunda verdade que
+ * envelhece sozinha (ADR-03).
+ *
+ * Erro de rede aqui NÃO libera o trabalho: a exceção sobe, a mensagem volta
+ * para a fila com backoff e alguém tenta de novo. "Não sei" não pode virar
+ * "então vou" — é a mesma decisão que a portaria do Radar toma quando o
+ * robots.txt fica inalcançável.
+ */
+async function alvoSuprimido(
+  contexto: ContextoDaIa,
+  proposito: PropositoConhecido,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  const { data, error } = await contexto.cliente.rpc('ia_alvo_suprimido', {
+    p_purpose: proposito,
+    p_payload: payload,
+  });
+  if (error) throw new ErroDaEsteira('ia_alvo_suprimido', error.message);
+  const resposta = (data ?? {}) as Record<string, unknown>;
+  return resposta.suprimido === true;
 }
 
 // ---------------------------------------------------------------------------

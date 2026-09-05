@@ -32,6 +32,14 @@ export interface VinculosDaChamada {
   readonly organizationId?: string | null;
   readonly activityId?: string | null;
   readonly conversationId?: string | null;
+  /**
+   * A pessoa do toque. NÃO vai para `ai_runs` — a tabela não tem a coluna, e
+   * pendurar PII na contabilidade seria criar um segundo lugar onde o contato
+   * mora (ADR-09). Existe só para a reconferência de supressão da entrega
+   * (`executar`, laudo §3.3): supressão de pessoa não é a mesma coisa que
+   * supressão de ficha.
+   */
+  readonly contactId?: string | null;
 }
 
 export interface ChamadaARegistrar {

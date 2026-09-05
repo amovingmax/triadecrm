@@ -4,7 +4,13 @@ import { PRECOS, transcricaoAudioV1 } from '@komune/prompts';
 
 import { bancoFalso, type LinhaFalsa } from './banco-de-teste';
 import { clienteDuble } from './duble';
-import { ChamadaBloqueadaError, executar, leadIdCurto, type ContextoDaIa } from './execucao';
+import {
+  AlvoSuprimidoError,
+  ChamadaBloqueadaError,
+  executar,
+  leadIdCurto,
+  type ContextoDaIa,
+} from './execucao';
 import { RespostaIlegivelError } from './cliente';
 
 import type { LogFields, Logger } from '../lib/log';
@@ -228,5 +234,52 @@ describe('executar', () => {
     expect(aviso).toBeDefined();
     expect(aviso?.campos.custo_do_banco).toBe(9.99);
     expect(banco.tabelas.ai_runs).toHaveLength(1);
+  });
+});
+
+/**
+ * §3.3 do laudo, a metade da ENTREGA.
+ *
+ * O consumidor da fila já pergunta se o alvo está suprimido (`tarefas.ts`), e
+ * o opt-out já esvazia `ai_jobs` (`app.consent_apply`). Falta a terceira, que
+ * é a que este projeto já esqueceu quatro vezes: **entre a leitura da fila e o
+ * POST ao modelo, o mundo muda.** A mensagem lida às 9h com o `visibility
+ * timeout` de cinco minutos pode ser postada às 9h04, e o opt-out pode ter
+ * chegado às 9h02 — pela conversa, pela ligação ou pelo botão da tela.
+ *
+ * Por isso a pergunta é refeita DEPOIS de montar a chamada e ANTES de enviá-la:
+ * é o mesmo lugar em que `public.wa_saida_proximos` reconfere a supressão na
+ * hora de entregar, e não na hora de enfileirar.
+ */
+describe('executar: a reconferência da entrega (laudo §3.3)', () => {
+  it('supressão que chega DEPOIS da montagem impede o POST — e não custa nada', async () => {
+    const { banco, contexto, duble } = montar({
+      rpcs: { alvo_suprimido: () => true },
+    });
+
+    await expect(
+      executar(contexto, transcricaoAudioV1, ENTRADA, CONTATO, { organizationId: 'org-1' }),
+    ).rejects.toBeInstanceOf(AlvoSuprimidoError);
+
+    expect(duble.chamadas).toHaveLength(0);
+    const corrida = banco.tabelas.ai_runs?.[0] as LinhaFalsa;
+    expect(corrida.status).toBe('bloqueado');
+    expect(Number(corrida.cost_usd)).toBe(0);
+    expect(String(corrida.error)).toContain('suprimido');
+    // E NENHUMA tarefa: o opt-out acabou de cancelar as tarefas dessa ficha,
+    // e abrir uma nova seria desfazer o guardrail com a mão de trás.
+    expect(banco.tabelas.tasks).toHaveLength(0);
+  });
+
+  it('sem supressão, a chamada sai como sempre saiu', async () => {
+    const { banco, contexto, duble } = montar({
+      rpcs: { alvo_suprimido: () => false },
+    });
+    const executada = await executar(contexto, transcricaoAudioV1, ENTRADA, CONTATO, {
+      organizationId: 'org-1',
+    });
+    expect(duble.chamadas).toEqual(['transcricao']);
+    expect(executada.custoUsd).toBeGreaterThan(0);
+    expect((banco.tabelas.ai_runs?.[0] as LinhaFalsa).status).toBe('ok');
   });
 });

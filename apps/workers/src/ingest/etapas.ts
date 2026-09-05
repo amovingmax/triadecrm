@@ -238,7 +238,10 @@ async function tratarJob(
 
   // A portaria antes de tudo. Se o robots.txt não puder ser lido, o host inteiro
   // fica proibido e a coleta para aqui — sem tentar outro caminho.
-  const raiz = await contexto.portaria.avaliar(new URL('/', fonte.base_url).toString());
+  const raiz = await contexto.portaria.avaliar(
+    new URL('/', fonte.base_url).toString(),
+    freioDoRobots(contexto, fonte.rate_limit_seconds),
+  );
   if (!raiz.permitido) {
     contagens.bloqueadas_pelo_robots += 1;
     await encerrarComRecusa('robots_proibe', raiz.explicacao);
@@ -250,7 +253,10 @@ async function tratarJob(
 
   for (const entrada of catalogo) {
     const url = new URL(entrada.caminho, fonte.base_url).toString();
-    const veredito = await contexto.portaria.avaliar(url);
+    const veredito = await contexto.portaria.avaliar(
+      url,
+      freioDoRobots(contexto, fonte.rate_limit_seconds),
+    );
     if (!veredito.permitido) {
       bloqueadas.push(entrada.categoria_origem);
       contagens.bloqueadas_pelo_robots += 1;
@@ -306,6 +312,22 @@ async function tratarJob(
   });
 }
 
+/**
+ * O freio que a portaria usa quando precisa ir à rede buscar um `/robots.txt`
+ * (laudo §3.12h).
+ *
+ * É o MESMO `Acelerador` da busca das páginas, de propósito: o limite do R03 é
+ * por host, e dois contadores seriam dois relógios. O intervalo é o que a fonte
+ * pede no catálogo do CRM — o `Crawl-delay` do robots ainda não dá para saber,
+ * porque é justamente ele que se vai buscar.
+ */
+function freioDoRobots(
+  contexto: ContextoDaEsteira,
+  intervaloSegundos: number,
+): (url: string) => Promise<unknown> {
+  return (url) => contexto.acelerador.aguardarAVez(hostDaUrl(url), intervaloSegundos);
+}
+
 // ---------------------------------------------------------------------------
 // Etapa 2 — ingest_pages: buscar uma listagem e gravar as capturas
 // ---------------------------------------------------------------------------
@@ -329,7 +351,10 @@ async function tratarPagina(
     return;
   }
 
-  const veredito = await contexto.portaria.avaliar(payload.url);
+  const veredito = await contexto.portaria.avaliar(
+    payload.url,
+    freioDoRobots(contexto, fonte.rate_limit_seconds),
+  );
   if (!veredito.permitido) {
     contagens.bloqueadas_pelo_robots += 1;
     logger.warn('página não buscada: o robots.txt proíbe', {
@@ -423,7 +448,10 @@ async function tratarPagina(
 
   // Paginação: só a que a própria página declarou, e só até o teto do lote.
   if (extraido.proximaUrl && payload.pagina < payload.max_paginas) {
-    const proximaPermitida = await contexto.portaria.avaliar(extraido.proximaUrl);
+    const proximaPermitida = await contexto.portaria.avaliar(
+      extraido.proximaUrl,
+      freioDoRobots(contexto, fonte.rate_limit_seconds),
+    );
     if (proximaPermitida.permitido) {
       const chave = chaveDaPagina(payload.batch_id, extraido.proximaUrl);
       await enfileirar(

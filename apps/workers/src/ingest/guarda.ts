@@ -12,10 +12,32 @@
  * Nada aqui tem caminho alternativo. Não existe opção de ignorar, não existe
  * lista de exceções e não existe segundo user-agent. Se a fonte barrar, o coletor
  * para e relata (CLAUDE.md).
+ *
+ * ## A busca do robots.txt também é uma requisição (laudo §3.12h)
+ *
+ * Ela conta para o limite por host, e até 05/09/2026 não contava: a portaria ia
+ * à rede por fora do `Acelerador`, e o host levava o `/robots.txt` e a página
+ * logo em seguida — duas requisições em ~40 ms com `rate_limit_seconds = 4`.
+ * Agora quem chama empresta o freio (`FreioDaPortaria`), e ele é acionado só na
+ * ida à rede — o cache não paga pedágio.
  */
 import { analisarRobots, avaliarCaminho, caminhoDaUrl, type Veredito } from './robots';
 
 import type { Logger } from '../lib/log';
+
+/**
+ * O freio, emprestado por quem chama.
+ *
+ * A `Portaria` não tem `Acelerador` próprio de propósito: o limite é por HOST e
+ * precisa ser o MESMO contador da busca das páginas — dois aceleradores lado a
+ * lado seriam dois relógios, e dois relógios não somam. Quem tem o acelerador
+ * (a esteira) empresta uma função que segura a vez.
+ *
+ * É acionado só quando a portaria vai à REDE. O robots.txt de um host é lido
+ * uma vez por corrida e depois vem do cache: cobrar o intervalo em cada
+ * consulta de cache multiplicaria o tempo de coleta sem proteger ninguém.
+ */
+export type FreioDaPortaria = (url: string) => Promise<unknown>;
 
 export interface VereditoDaPortaria {
   permitido: boolean;
@@ -39,12 +61,19 @@ export class Portaria {
     private readonly buscar: typeof fetch = fetch,
   ) {}
 
-  private async carregar(origem: string): Promise<EntradaDoCache> {
+  private async carregar(origem: string, freio?: FreioDaPortaria): Promise<EntradaDoCache> {
     const emCache = this.cache.get(origem);
     if (emCache) return emCache;
 
     const alvo = `${origem}/robots.txt`;
     let entrada: EntradaDoCache;
+
+    // (laudo §3.12h) A PRIMEIRA requisição que este worker faz a um host novo
+    // não é a página — é este arquivo. Sem passar pelo freio, o host levava
+    // duas requisições em ~40 ms, e o limite por fonte do R03 é um pedido da
+    // FONTE, não uma preferência nossa. O freio vem por parâmetro para ser o
+    // mesmo contador que a busca das páginas usa.
+    if (freio !== undefined) await freio(alvo);
 
     try {
       const resposta = await this.buscar(alvo, {
@@ -108,9 +137,9 @@ export class Portaria {
     return entrada;
   }
 
-  async avaliar(url: string): Promise<VereditoDaPortaria> {
+  async avaliar(url: string, freio?: FreioDaPortaria): Promise<VereditoDaPortaria> {
     const origem = new URL(url).origin;
-    const entrada = await this.carregar(origem);
+    const entrada = await this.carregar(origem, freio);
     const veredito = entrada.avaliar(url);
 
     if (!veredito.permitido) {

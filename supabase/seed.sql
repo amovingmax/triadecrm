@@ -370,6 +370,10 @@ on conflict (name) do update
 --        valor real fica em automations.
 --      * required_fields = [{"field","label",...}] exigidos para ENTRAR na etapa
 --        (RF-FUN-04: Reunião marcada = data e formato; Autorizou = evidência; Perdido = motivo).
+--        `consent_kind` = o valor digitado VIRA `consent_events` (é a prova de LGPD que
+--        libera o pré-cadastro). `"required": false` = declarado só para virar prova
+--        quando vier; não barra a entrada. Quem lê: a tela, `public.move_deal` e o
+--        gatilho `app.deals_before_write` (migração 20260905000800).
 --      * automations = [{"trigger":{...},"action":{...},"note":"..."}]. {SEG} = segmento do
 --        parceiro (AEB/INF/PRE/ESP/CER/FOR); "*" no código = variante sorteada (V1/V2/V3);
 --        approval:"human" = rascunho aprovado pela Heloísa (ADR-05 / RF-CON-22).
@@ -462,7 +466,7 @@ from (values
   ]$j$),
 
   ('fornecedor', 'autorizou', 'Autorizou', 7, 'quente', false, false, false, 72,
-   $j$[{"field":"authorization_evidence","label":"Evidência da autorização (texto literal, data e canal) registrada em consent_events","consent_kind":"data_use_authorized"}]$j$,
+   $j$[{"field":"authorization_evidence","label":"O que ele autorizou, com as palavras dele (a frase, a data e por onde veio)","consent_kind":"data_use_authorized"}]$j$,
    $j$[
     {"trigger":{"type":"on_enter"},"action":{"type":"pre_registration_upsert","edge_function":"crm-pre-registration"},"note":"Cria/atualiza o rascunho na Komune SÓ com autorização em consent_events (guardrail)"},
     {"trigger":{"type":"on_enter"},"action":{"type":"send_claim_link","channel":"whatsapp","code_channel":"email","template":"GEN-SYS-AVISO-PRECADASTRO"},"note":"Link único de reivindicação + código (v1: código pelo WhatsApp)"},
@@ -595,7 +599,25 @@ from (values
     {"trigger":{"type":"on_enter"},"action":{"type":"create_tasks","kind":"follow_up","days":[0],"assignee":"owner"},"note":"Follow-up no mesmo dia"}
   ]$j$),
 
-  ('produtor', 'parceria_aceita', 'Parceria aceita', 6, 'quente', false, false, false, 72, '[]', $j$[
+  -- A evidência da autorização também aqui (laudo §3.1): é para ESTA etapa que
+  -- `app.stage_for` resolve o desfecho "Realizada, autorizou" no funil produtor
+  -- (stage_equivalences, migração 20260904001200), e sem `consent_kind` a frase
+  -- literal que a Heloísa é OBRIGADA a digitar era descartada em silêncio —
+  -- metade da base chegava ao pré-cadastro com `sem_autorizacao` e ninguém
+  -- sabia por quê.
+  --   `"required": false` porque "Parceria aceita" é o destino de dois slugs
+  --   canônicos: `autorizou` (traz a evidência) e `cadastro_em_andamento` (o
+  --   desfecho "Cadastro iniciado na hora" de uma visita, que não coleta frase
+  --   nenhuma). Exigir aqui deixaria esse chip intabulável no funil produtor.
+  --   Quando a evidência vem, vira `consent_events`; quando não vem, a etapa
+  --   não é barrada por isso — e quem barra o pré-cadastro continua sendo
+  --   `gerar_link_de_reivindicacao`, `komune_push` e a cadência
+  --   `pos_autorizacao`, que recusam com `sem_autorizacao`.
+  --   PENDENTE DE DECISÃO HUMANA (Rafael/Heloísa): exigir aqui depende de
+  --   "Cadastro iniciado na hora" passar a colher a evidência também.
+  ('produtor', 'parceria_aceita', 'Parceria aceita', 6, 'quente', false, false, false, 72,
+   $j$[{"field":"authorization_evidence","label":"O que ele autorizou, com as palavras dele (a frase, a data e por onde veio)","consent_kind":"data_use_authorized","required":false}]$j$,
+   $j$[
     {"trigger":{"type":"on_enter"},"action":{"type":"create_task","kind":"other","title":"Criação assistida da conta de produtor (cerimonialista = perfil produtor com subcategoria)","assignee":"owner"},"note":"Conta criada em ≤ 72 h"}
   ]$j$),
 

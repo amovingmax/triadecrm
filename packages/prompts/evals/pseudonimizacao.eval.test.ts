@@ -247,7 +247,10 @@ const casos: readonly CasoDeEval<CasoDeTexto, string>[] = [
     esperado: 'contrato de 1990-2020 arquivado',
   },
 
-  // ---------------------------------------------------------------- conhecidos
+  // Era um caso `conhecido` ("a projeção só enxerga dígito") até o laudo §3.4 mostrar que
+  // ele vaza o telefone do CADASTRO — o caminho que a passada 2 diz que não pode falhar.
+  // A 7ª versão o resolve com a passada 6 (fichas ditadas), e por isso ele desceu para
+  // caso normal: o que ele documentava não é mais um limite, é um conserto.
   {
     nome: 'telefone falado por extenso na transcrição',
     entrada: {
@@ -255,13 +258,9 @@ const casos: readonly CasoDeEval<CasoDeTexto, string>[] = [
       contexto: CONTATO,
     },
     esperado: 'anota aí, [[TELEFONE_1]]',
-    conhecido: {
-      obtido: 'anota aí, oito quatro nove nove nove oito oito zero zero um um',
-      motivo:
-        'a projeção só enxerga dígito; número ditado por extenso não tem dígito nenhum. Segurado pela regra de RF-CON-27 (áudio recebido vai para humano no MVP), não pela detecção',
-      desde: '2026-09-05',
-    },
   },
+
+  // ---------------------------------------------------------------- conhecidos
   {
     nome: 'nome de terceiro que o CRM não conhece',
     entrada: { texto: 'quem decide é a Ana, sócia dele', contexto: CONTATO },
@@ -290,7 +289,7 @@ rodarEvals(
   'pseudonimização: o que sai do CRM antes de virar token',
   casos,
   ({ texto, contexto }) => pseudonimizar(texto, contexto).texto,
-  { conhecidosEsperados: 3 },
+  { conhecidosEsperados: 2 },
 );
 
 /**
@@ -1565,5 +1564,154 @@ describe('FURO C: telefone local, sem DDD e sem hífen', () => {
     expect(pseudonimizar('meu whats é 999880011', CONTATO).texto).toBe(
       'meu whats é [[TELEFONE_1]]',
     );
+  });
+});
+
+/**
+ * FURO C — O TELEFONE DITADO POR EXTENSO (laudo §3.4, 7ª versão, 2026-09-05)
+ * ===========================================================================
+ *
+ * "meu whats é oito quatro nove nove seis quatro cinco seis zero cinco quatro."
+ *
+ * É como se dita um número em áudio, e a transcrição do RF-CON-27 entrega isso
+ * literalmente. As seis versões anteriores procuravam telefone na **projeção de
+ * dígitos**, e por um motivo bom: formatação deixa de existir. Só que um número
+ * ditado não tem dígito nenhum — a projeção dele é vazia. As duas camadas
+ * olhavam para o texto e não viam número, e o telefone saía inteiro para a
+ * Anthropic. Escapava até o telefone que o CRM **já tem no cadastro**, cuja
+ * passada 2 diz, na linha 64 do arquivo, que "não pode falhar".
+ *
+ * O conserto é uma sétima passada: as dez palavras de algarismo (mais `meia`,
+ * que é como se dita o seis no Brasil) viram dígitos numa fita própria, e a
+ * janela corre sobre ela nos mesmos comprimentos da Anatel. Não substitui a
+ * projeção — é uma leitura a mais, do que a projeção não enxerga.
+ *
+ * O preço tem de ser medido, e está medido no bloco do corpus: o teto continua
+ * sendo **5 de 40**. "são oito eventos por mês" não pode virar telefone.
+ */
+describe('FURO C — telefone ditado por extenso (laudo §3.4)', () => {
+  it('o telefone DO CADASTRO ditado por extenso sai, como o escrito em dígitos', () => {
+    // 84 99988-0011 é o telefone de CONTATO. Ditado, ele não tem um dígito.
+    expect(
+      pseudonimizar(
+        'meu whats é oito quatro nove nove nove oito oito zero zero um um',
+        CONTATO,
+      ).texto,
+    ).toBe('meu whats é [[TELEFONE_1]]');
+    // E é o MESMO marcador do número escrito em dígitos: um número, um marcador.
+    expect(
+      pseudonimizar(
+        'anota ai: 84 99988-0011, ou seja oito quatro nove nove nove oito oito zero zero um um',
+        CONTATO,
+      ).texto,
+    ).toBe('anota ai: [[TELEFONE_1]], ou seja [[TELEFONE_1]]');
+  });
+
+  it('um telefone DESCONHECIDO ditado por extenso também sai — as três frases do laudo', () => {
+    for (const texto of [
+      'meu whats e oito quatro nove nove seis quatro cinco seis zero cinco quatro',
+      'liga pra mim, oito-quatro nove nove seis quatro cinco, seis zero cinco quatro',
+      'anota ai: oito quatro, nove nove seis quatro cinco seis zero cinco quatro',
+    ]) {
+      const { texto: protegido } = pseudonimizar(texto, CONTATO);
+      expect({ texto, temTelefone: protegido.includes('[[TELEFONE') }).toEqual({
+        texto,
+        temTelefone: true,
+      });
+      expect({ texto, sobrou: protegido.includes('nove nove seis quatro') }).toEqual({
+        texto,
+        sobrou: false,
+      });
+    }
+  });
+
+  it('`meia` é seis quando se dita número, e a mistura com dígitos também sai', () => {
+    expect(
+      pseudonimizar('é oito quatro nove nove meia quatro cinco meia zero cinco quatro', CONTATO)
+        .texto,
+    ).toBe('é [[TELEFONE_2]]');
+    // Metade em dígito, metade ditada: é o que mais aparece em transcrição.
+    expect(pseudonimizar('84 nove nove seis quatro cinco seis zero cinco quatro', CONTATO).texto)
+      .toBe('[[TELEFONE_2]]');
+  });
+
+  it('o local sem DDD ditado — nove dígitos — também sai', () => {
+    expect(
+      pseudonimizar('me liga no nove nove nove oito oito zero zero um um', CONTATO).texto,
+    ).toBe('me liga no [[TELEFONE_1]]');
+  });
+
+  it('a auditoria, que é a segunda camada, vê o mesmo — e ela não importa da regra', () => {
+    expect(
+      verificarSemPii('meu whats e oito quatro nove nove seis quatro cinco seis zero cinco quatro')
+        .length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('a chamada montada não carrega o número ditado', () => {
+    let mensagem: string | null;
+    try {
+      mensagem = prepararChamada(
+        transcricaoAudioV1,
+        {
+          leadId: CONTATO.leadId,
+          canal: 'whatsapp' as const,
+          duracaoSeg: 24,
+          transcricaoBruta:
+            'meu whats e oito quatro nove nove nove oito oito zero zero um um pode salvar',
+          confiancaAsr: 0.9,
+          contexto: null,
+        },
+        CONTATO,
+      ).mensagem;
+    } catch {
+      // Recusar é desfecho aceito: a chamada não sai, logo nada vaza.
+      mensagem = null;
+    }
+    if (mensagem !== null) {
+      expect(mensagem).not.toContain('nove nove nove oito oito zero zero um um');
+    }
+  });
+
+  /**
+   * O outro lado, e o que mede o preço: nenhuma destas pode virar telefone.
+   * "são oito eventos por mês" é o exemplo que o laudo escreve com todas as
+   * letras, e ele mora aqui para não voltar.
+   */
+  /**
+   * O PREÇO MEDIDO da passada 6, declarado como os outros preços deste arquivo.
+   *
+   * Oito palavras de algarismo seguidas que formem um local plausível pela
+   * Anatel viram marcador — mesmo quando são uma contagem. É o mesmo preço da
+   * passada 5 (oito dígitos é entropia curta), e ele custa uma palavra trocada
+   * no texto que vai ao modelo, nunca um vazamento. A contagem completa de 1 a
+   * 10 NÃO cai nisso, porque a corrida inteira (`123456789`) não começa com 9 —
+   * e é essa a trava que impede a janela de deslizar até achar `23456789`.
+   */
+  it('o preço: oito palavras de algarismo seguidas viram telefone, contagem inteira não', () => {
+    expect(pseudonimizar('quatro cinco seis sete oito nove um dois', CONTATO).texto).toBe(
+      '[[TELEFONE_2]]',
+    );
+    for (const texto of [
+      'um, dois, três, quatro, cinco, seis, sete, oito, nove, dez',
+      'um dois três quatro cinco seis sete oito nove',
+    ]) {
+      expect({ texto, saida: pseudonimizar(texto, CONTATO).texto }).toEqual({ texto, saida: texto });
+    }
+  });
+
+  it('quantidade escrita por extenso NÃO é telefone', () => {
+    for (const texto of [
+      'são oito eventos por mês',
+      'tenho dois salões e três garçons',
+      'faço uns seis eventos por mês, às vezes sete',
+      'de quatro a cinco horas de montagem',
+      'somos três sócios e nove funcionários',
+      'o pacote de quatro horas sai dois mil e oitocentos',
+      'preciso de dois garçons, um barman e cinco mesas',
+    ]) {
+      expect({ texto, saida: pseudonimizar(texto, CONTATO).texto }).toEqual({ texto, saida: texto });
+      expect({ texto, problemas: verificarSemPii(texto) }).toEqual({ texto, problemas: [] });
+    }
   });
 });

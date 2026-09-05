@@ -324,7 +324,15 @@ export type MotivoDeExclusao =
   | 'temperatura_diferente';
 
 export const MENSAGENS_DE_EXCLUSAO: Record<MotivoDeExclusao, string> = {
-  sem_telefone: 'sem telefone (34 dos 100 da base)',
+  // Este rótulo já vem colado a um número CALCULADO ("4 sem telefone"), nos dois
+  // lugares em que aparece — a prévia e o recibo da montagem. Ele trazia, além disso,
+  // um parêntese escrito à mão: "(34 dos 100 da base)". Era mentira na tela por dois
+  // motivos: o número nunca foi recalculado (a base cresce pelo Radar e pela
+  // importação, e o parêntese ficaria em "34 de 100" para sempre) e já estava errado
+  // no dia da varredura — 65 das 99 organizações vivas têm telefone, ou seja 34 de 99.
+  // Quem lê um número medido ao lado de um número inventado acredita nos dois.
+  // (Laudo §3.10.)
+  sem_telefone: 'sem telefone',
   suprimido: 'pediu para não ser contatado',
   nao_contatar: 'marcado como não contatar',
   em_janela_de_recontato: 'em janela de recontato (RF-FUN-13)',
@@ -933,6 +941,18 @@ const VALORES_COM_QUEM = [
 
 const comQuemSchema = z.enum(VALORES_COM_QUEM);
 
+/**
+ * Teto da duração gravada, em segundos (duas horas).
+ *
+ * Não é um número escolhido aqui: é o `check (duracao_seg is null or duracao_seg
+ * between 0 and 7200)` da migração 20260904001300. Mora como constante porque três
+ * lugares precisam concordar com ele — este schema, o corte que a tela faz antes de
+ * montar o pedido (`duracaoParaGravar`) e o teste que compara os dois. Enquanto o
+ * número estava escrito só no `.max(7200)`, a tela mandava o cronômetro cru e a
+ * recusa aparecia no cliente, sem saída (laudo §3.8).
+ */
+export const DURACAO_MAXIMA_SEG = 7200;
+
 export const tabularChamadaSchema = z
   .object({
     /** Idempotência, gerada no cliente. Mesmo mecanismo da `/registrar`. */
@@ -949,7 +969,7 @@ export const tabularChamadaSchema = z
       .transform((v) => v ?? null),
     comQuem: comQuemSchema,
     caminhoScript: z.array(z.string()).default([]),
-    duracaoSeg: z.number().int().min(0).max(7200),
+    duracaoSeg: z.number().int().min(0).max(DURACAO_MAXIMA_SEG),
     observacao: z
       .string()
       .trim()

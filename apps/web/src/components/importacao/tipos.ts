@@ -6,6 +6,22 @@
  * entre 04 e 09/09 e, no D2, a planilha entra no CRM. Por isso os nomes de campo
  * aqui são os nomes do cabeçalho de lá, e não uma tradução nova.
  */
+import type { AppRole } from '@/lib/auth/role';
+
+/**
+ * Espelho de `app.is_manager()`: quem desfaz um lote de importação (RF-BAS-17).
+ *
+ * Não é o mesmo conjunto de quem IMPORTA (`podeCriarParceiro`, que inclui sdr e
+ * embaixador), e essa diferença era o §3.7 do laudo: a Heloísa é sdr, importava,
+ * via o botão "Desfazer este lote", apertava e levava um 42501 traduzido como "o
+ * servidor não respondeu como esperado". Quem decide continua sendo o Postgres;
+ * isto só evita oferecer um botão que já se sabe que vai ser recusado.
+ */
+const PAPEIS_QUE_DESFAZEM: readonly AppRole[] = ['admin', 'gestor'];
+
+export function podeDesfazerLote(papel: AppRole): boolean {
+  return PAPEIS_QUE_DESFAZEM.includes(papel);
+}
 
 /** Campos que o CRM entende. A ordem é a de leitura da planilha. */
 export const CAMPOS = [

@@ -41,7 +41,7 @@ import {
 import { RespostaIlegivelError, type ClienteDoModelo } from './cliente';
 import { USO_ZERADO, registrarChamada, type VinculosDaChamada } from './registro';
 
-import type { ClienteDoBanco } from '../ingest/esteira';
+import { ErroDaEsteira, type ClienteDoBanco } from '../ingest/esteira';
 import type { Logger } from '../lib/log';
 
 /**
@@ -57,6 +57,31 @@ export class ChamadaBloqueadaError extends Error {
     this.name = 'ChamadaBloqueadaError';
     this.aiRunId = aiRunId;
     this.taskId = taskId;
+  }
+}
+
+/**
+ * A chamada não saiu porque o alvo está suprimido (laudo §3.3, RF-CON-18).
+ *
+ * Determinístico, e por dois motivos: repetir não muda o mundo (quem pediu
+ * para sair continuou tendo pedido) e repetir CUSTA — cada volta é uma chamada
+ * paga. A mensagem é concluída na fila, com a linha de `ai_runs` em
+ * `bloqueado` para provar que o guardrail disparou. Sem tarefa: o opt-out
+ * acabou de cancelar as tarefas dessa ficha, e abrir uma nova seria desfazer
+ * com a mão de trás o que a mão da frente fez.
+ */
+export class AlvoSuprimidoError extends Error {
+  readonly organizationId: string | null;
+  readonly aiRunId: number;
+
+  constructor(organizationId: string | null, aiRunId: number) {
+    super(
+      'A chamada não saiu — o alvo está suprimido (do_not_contact ou suppression_list) ' +
+        'entre a leitura da fila e a entrega.',
+    );
+    this.name = 'AlvoSuprimidoError';
+    this.organizationId = organizationId;
+    this.aiRunId = aiRunId;
   }
 }
 
@@ -130,6 +155,31 @@ export async function executar<Entrada, Saida>(
     throw erro;
   }
 
+  // ------------------------------------------------- reconferência da entrega
+  // (laudo §3.3) A fila foi lida há até cinco minutos — é o `visibility
+  // timeout` de `ai_jobs` — e um opt-out pode ter chegado nesse intervalo, pela
+  // conversa, pela ligação ou pelo botão da tela. A mesma lição da migração
+  // 20260905000100 (o dreno da Komune) e de `public.wa_saida_proximos`:
+  // reconferir na ENTREGA, não só na entrada. Aqui a montagem já aconteceu (é
+  // barata e não sai da máquina); o que não pode acontecer é o POST.
+  if (await alvoEstaSuprimido(contexto, vinculos)) {
+    const registro = await registrarChamada(contexto.cliente, contexto.logger, {
+      ...comum,
+      situacao: 'bloqueado',
+      uso: USO_ZERADO,
+      latenciaMs: null,
+      saida: null,
+      erro: 'alvo suprimido na entrega (RF-CON-18): a chamada não saiu',
+    });
+    contexto.logger.warn('chamada bloqueada: o alvo ficou suprimido antes da entrega', {
+      prompt: promptVersion,
+      ai_run_id: registro.id,
+      organization_id: vinculos.organizationId ?? null,
+      guardrail: 'RF-CON-18',
+    });
+    throw new AlvoSuprimidoError(vinculos.organizationId ?? null, registro.id);
+  }
+
   // ---------------------------------------------------------------- chamada
   const comecou = Date.now();
   let resposta;
@@ -199,6 +249,33 @@ export async function executar<Entrada, Saida>(
     custoUsd: registro.custoUsd,
     promptVersion,
   };
+}
+
+/**
+ * O alvo está suprimido AGORA?
+ *
+ * Quem responde é o Postgres (`app.is_suppressed_target`, pela boca
+ * `public.alvo_suprimido`), porque é lá que o estado mora. Sem vínculo nenhum
+ * não há o que perguntar — e não perguntar não é o mesmo que liberar: o
+ * consumidor da fila já perguntou pelo payload, com o alvo resolvido a partir
+ * da mensagem, da conversa, da tentativa ou do negócio.
+ *
+ * Erro de rede sobe: a mensagem volta para a fila com backoff. "Não sei" não
+ * vira "então vou".
+ */
+async function alvoEstaSuprimido(
+  contexto: ContextoDaIa,
+  vinculos: VinculosDaChamada,
+): Promise<boolean> {
+  const organizationId = vinculos.organizationId ?? null;
+  const contactId = vinculos.contactId ?? null;
+  if (organizationId === null && contactId === null) return false;
+  const { data, error } = await contexto.cliente.rpc('alvo_suprimido', {
+    p_organization_id: organizationId,
+    p_contact_id: contactId,
+  });
+  if (error) throw new ErroDaEsteira('alvo_suprimido', error.message);
+  return data === true;
 }
 
 /**

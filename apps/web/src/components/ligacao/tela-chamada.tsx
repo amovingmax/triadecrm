@@ -37,6 +37,16 @@ import {
 } from './chamada-rpc';
 import { ChamadaTabulacao } from './chamada-tabulacao';
 import {
+  capturaDoNo,
+  desviarParaObjecao,
+  duracaoParaGravar,
+  estadoAoDiscar,
+  passoDaLigacao,
+  responderNoRoteiro,
+  segundosDecorridos,
+  type EstadoDoRoteiro,
+} from './chamada-maquina';
+import {
   type ContextoDaLigacao,
   type LoteResumido,
   type RoteiroPublicado,
@@ -100,11 +110,15 @@ export function TelaChamada({
   const [chamada, setChamada] = useState<ChamadaEmCurso | null>(null);
   const [clientKey, setClientKey] = useState<string | null>(null);
   const [segundos, setSegundos] = useState(0);
-  const [noAtual, setNoAtual] = useState<string>(NO_DE_ABERTURA);
-  const [caminho, setCaminho] = useState<string[]>([]);
-  const [capturas, setCapturas] = useState<Record<string, string>>({});
+  /**
+   * Onde a conversa está, por onde passou e o que ela anotou — os quatro campos que
+   * andam JUNTOS a cada toque e que antes eram quatro `useState` separados. As regras
+   * de como esse estado anda vivem em `chamada-maquina.ts`, que é testável sem
+   * navegador (laudo §3.11).
+   */
+  const [percurso, setPercurso] = useState<EstadoDoRoteiro>(estadoAoDiscar);
+  const { noAtual, caminho, capturas, atendeu } = percurso;
   const [combinadoEm, setCombinadoEm] = useState<string | null>(null);
-  const [atendeu, setAtendeu] = useState(false);
   const [abrindo, setAbrindo] = useState(false);
   const [gravando, setGravando] = useState(false);
   const [erroDaGravacao, setErroDaGravacao] = useState<string | null>(null);
@@ -218,7 +232,7 @@ export function TelaChamada({
   useEffect(() => {
     if (iniciadaEm === null) return;
     const id = window.setInterval(
-      () => setSegundos(Math.max(0, Math.round((Date.now() - iniciadaEm) / 1000))),
+      () => setSegundos(segundosDecorridos(iniciadaEm, Date.now())),
       1000,
     );
     return () => window.clearInterval(id);
@@ -229,11 +243,8 @@ export function TelaChamada({
     setChamada(null);
     setClientKey(null);
     setSegundos(0);
-    setNoAtual(NO_DE_ABERTURA);
-    setCaminho([]);
-    setCapturas({});
+    setPercurso(estadoAoDiscar());
     setCombinadoEm(null);
-    setAtendeu(false);
     setPendente(null);
     setConfirmarOptoutNaFolha(false);
     setOptoutMarcado(false);
@@ -281,8 +292,7 @@ export function TelaChamada({
       const aberta = await provedor.iniciarChamada({ telefone: item.telefone, itemId: item.id });
       setChamada(aberta);
       setClientKey(crypto.randomUUID());
-      setNoAtual(NO_DE_ABERTURA);
-      setCaminho([NO_DE_ABERTURA]);
+      setPercurso(estadoAoDiscar());
       setSegundos(0);
     } catch (erro) {
       toast.error(
@@ -378,38 +388,20 @@ export function TelaChamada({
 
     // O primeiro toque numa resposta É a afirmação de que alguém atendeu: no
     // adaptador manual não há AMD, e a única coisa honesta que se pode dizer é que
-    // ela só lê a segunda fala se tem alguém do outro lado (R13 §3.3).
-    if (!atendeu) {
-      setAtendeu(true);
-      provedor.marcarAtendida();
-    }
+    // ela só lê a segunda fala se tem alguém do outro lado (R13 §3.3). Quem grava a
+    // afirmação é `responderNoRoteiro`; o que fica aqui é o efeito colateral no
+    // provedor de telefonia, que só pode acontecer UMA vez por chamada.
+    if (!atendeu) provedor.marcarAtendida();
 
-    // O que o toque grava no campo do nó: `saida.valor`, e só ele.
-    //
-    // Antes era o RÓTULO do botão, e o rótulo nem sempre é resposta: no nó do volume
-    // ("Quantos eventos o [empresa] faz por mês?") os rótulos são instrução para quem
-    // liga — "Ele respondeu quantos" —, e gravá-los enchia `eventos_por_mes` com uma
-    // frase que não é número. Onde o rótulo É a resposta, a árvore declara `valor` e
-    // um toque grava; onde não é, o campo guarda o que ela escreveu, ou fica vazio.
-    // Campo vazio é honesto; campo com a frase errada, não.
-    if (atual?.campo && saida.valor) {
-      const campo = atual.campo;
-      const valor = saida.valor;
-      setCapturas((c) => (c[campo]?.trim() ? c : { ...c, [campo]: valor }));
-    }
-
-    setNoAtual(saida.destino);
-    setCaminho((c) => [...c, saida.destino]);
+    // Para onde o roteiro anda, o que entra no caminho e o que o campo do nó guarda:
+    // tudo em `responderNoRoteiro` (regra e testes em `chamada-maquina.ts`).
+    setPercurso((estado) => responderNoRoteiro(estado, atual, saida));
   }
 
   /** Uma objeção é alcançável de qualquer nó e devolve ao fluxo pelas saídas dela. */
   function irParaObjecao(no: NoRoteiro) {
-    if (!atendeu) {
-      setAtendeu(true);
-      provedor.marcarAtendida();
-    }
-    setNoAtual(no.id);
-    setCaminho((c) => [...c, no.id]);
+    if (!atendeu) provedor.marcarAtendida();
+    setPercurso((estado) => desviarParaObjecao(estado, no));
   }
 
   // ---------------------------------------------------------------------------
@@ -448,7 +440,7 @@ export function TelaChamada({
           outcomeId: desfecho?.id ?? null,
           comQuem: comQuemGravado,
           caminhoScript: caminho,
-          duracaoSeg: segundos,
+          duracaoSeg: duracaoParaGravar(segundos),
           observacao: null,
           capturas,
           /**
@@ -560,6 +552,17 @@ export function TelaChamada({
   // `fim_optout` é o nó em que ele pede para não ser mais procurado: além do desfecho,
   // grava `consent_events.contact_optout`, e aí não tem volta (RF-CON-18).
   const fimEhOptout = noCorrente?.id === 'fim_optout';
+
+  /**
+   * Em que passo a ligação está — discar → falando → tabular → recibo (R13 §3.4).
+   * A regra é a de `passoDaLigacao`, e ela tem teste; a tela só desenha o que ela diz.
+   */
+  const passo = passoDaLigacao({
+    chamada: chamada !== null,
+    atendeu,
+    gravando,
+    recibo: recibo !== null,
+  });
 
   // ---------------------------------------------------------------------------
   // Render
@@ -679,7 +682,7 @@ export function TelaChamada({
           aoLigar={() => void ligar()}
         />
 
-        {chamada === null ? (
+        {passo === 'discar' ? (
           <>
             {noParaLer ? (
               <div className="rounded-xl border border-dashed border-hairline p-4 sm:p-5">
@@ -706,7 +709,7 @@ export function TelaChamada({
               <Button
                 type="button"
                 variant="ghost"
-                className="h-10 self-start text-muted-foreground"
+                className="h-11 self-start text-muted-foreground"
                 onClick={pular}
               >
                 <SkipForward aria-hidden="true" />
@@ -746,10 +749,12 @@ export function TelaChamada({
                   combinadoEm={combinadoEm}
                   sugestaoDeData={sugestaoDeData}
                   aoCombinar={setCombinadoEm}
-                  captura={(noParaLer.campo ? capturas[noParaLer.campo] : '') ?? ''}
+                  captura={capturaDoNo(percurso, noParaLer)}
                   aoCapturar={(valor) => {
                     const campo = noParaLer.campo;
-                    if (campo) setCapturas((c) => ({ ...c, [campo]: valor }));
+                    if (campo) {
+                      setPercurso((e) => ({ ...e, capturas: { ...e.capturas, [campo]: valor } }));
+                    }
                   }}
                   aoResponder={responder}
                 />
@@ -864,7 +869,9 @@ function Topo({
       <Button
         type="button"
         variant="ghost"
-        className="h-9 -ml-2 text-muted-foreground"
+        // 44 px no celular: é o botão de SAIR da tela, e ele estava com 36. No desktop
+        // segue compacto, onde quem clica tem um mouse.
+        className="h-11 -ml-2 text-muted-foreground sm:h-9"
         onClick={aoSair}
       >
         <ChevronLeft aria-hidden="true" />

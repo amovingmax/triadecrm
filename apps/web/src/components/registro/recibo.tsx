@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { ArrowRight, CloudOff, Loader2, NotebookPen, Undo2 } from 'lucide-react';
+import { ArrowRight, CloudOff, Loader2, NotebookPen, PauseCircle, Undo2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,22 @@ export type EstadoDoEnvio =
  *
  * As três coisas opcionais do recibo (próxima ação, com quem falou, anotação) não
  * bloqueiam nada e custam um toque cada.
+ *
+ * ===========================================================================
+ * A contagem PARA no primeiro toque, e não volta a andar
+ * ===========================================================================
+ * Os 5 segundos são o pagamento de quem não vai fazer nada. Para quem TOCOU em alguma
+ * coisa aqui eles eram um sequestro: abrir "Anotar" e ver o "Desfazer" sumir no meio
+ * da frase, sem aviso nenhum — o envio parte, e o que era arrependimento vira correção
+ * no banco. Por isso o primeiro toque em QUALQUER controle deste recibo (mudar a data,
+ * responder com quem falou, abrir a anotação, o próprio campo de texto) para a
+ * contagem, e ela não recomeça: quem começou a escrever decide quando o registro sobe,
+ * em "Registrar outro". Sair da tela também manda, como sempre mandou.
+ *
+ * É a MESMA forma do recibo da tela de ligação (`ligacao/chamada-recibo.tsx`), de
+ * propósito: dois recibos que se parecem não podem parar de contar de dois jeitos
+ * diferentes. A diferença de fundo é só o que a contagem segura — lá, o próximo
+ * contato da fila; aqui, o envio (laudo §3.12k).
  */
 export function Recibo({
   alvo,
@@ -53,6 +69,8 @@ export function Recibo({
   estado,
   comQuem,
   observacao,
+  pausado,
+  aoPausar,
   aoDesfazer,
   aoCorrigirComQuem,
   aoAnotar,
@@ -65,6 +83,9 @@ export function Recibo({
   estado: EstadoDoEnvio;
   comQuem: ComQuem;
   observacao: string;
+  /** A contagem parou porque a pessoa tocou em alguma coisa aqui. */
+  pausado: boolean;
+  aoPausar: () => void;
   aoDesfazer: () => void;
   aoCorrigirComQuem: (valor: ComQuem) => void;
   aoAnotar: (texto: string) => void;
@@ -85,7 +106,14 @@ export function Recibo({
   const proximaTitulo = resultado ? resultado.proxima_acao_titulo : previsao.proximaAcaoTitulo;
 
   return (
-    <div className="flex flex-col gap-5 pt-2">
+    // O primeiro toque em qualquer controle daqui de dentro para a contagem. Fica na
+    // captura (`onPointerDownCapture` / `onFocusCapture`) para valer também para o
+    // teclado e para o foco que o `autoFocus` da anotação dá sozinho.
+    <div
+      className="flex flex-col gap-5 pt-2"
+      onPointerDownCapture={aoPausar}
+      onFocusCapture={aoPausar}
+    >
       {/* A barra cresce da esquerda, na cor nova. Sem interpolação de cor: as cinco
           cores da escala são variáveis de CSS, e animar entre elas exigiria hex na
           mão — justamente o que `escala-termica.ts` existe para impedir. */}
@@ -144,7 +172,7 @@ export function Recibo({
       </div>
 
       {estado.fase === 'segurando' ? (
-        <ContagemParaDesfazer restaMs={estado.restaMs} aoDesfazer={aoDesfazer} />
+        <ContagemParaDesfazer restaMs={estado.restaMs} pausado={pausado} aoDesfazer={aoDesfazer} />
       ) : null}
       {estado.fase === 'enviando' ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -259,17 +287,25 @@ export function Recibo({
   );
 }
 
-/** A linha fina que conta os 5 segundos. É o botão de salvar, ao contrário. */
+/**
+ * A linha fina que conta os 5 segundos. É o botão de salvar, ao contrário.
+ *
+ * Parada, ela troca o relógio por uma frase: o "Desfazer" continua valendo e não há
+ * mais nenhum prazo correndo contra quem está escrevendo. O número sumir é parte da
+ * resposta — um relógio congelado seria pior do que nenhum.
+ */
 function ContagemParaDesfazer({
   restaMs,
+  pausado,
   aoDesfazer,
 }: {
   restaMs: number;
+  pausado: boolean;
   aoDesfazer: () => void;
 }) {
   const fracao = Math.max(0, Math.min(1, restaMs / ESPERA_DESFAZER_MS));
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <button
         type="button"
         onClick={aoDesfazer}
@@ -278,15 +314,27 @@ function ContagemParaDesfazer({
         <Undo2 className="size-4" aria-hidden="true" />
         Desfazer
       </button>
-      <span className="relative h-px flex-1 bg-hairline" aria-hidden="true">
-        <span
-          className="absolute inset-y-0 left-0 bg-foreground transition-[width] duration-200 ease-linear"
-          style={{ width: `${fracao * 100}%` }}
-        />
-      </span>
-      <span className="numerico w-6 text-right text-sm text-muted-foreground" aria-live="off">
-        {Math.ceil(restaMs / 1000)}
-      </span>
+      {pausado ? (
+        <p
+          aria-live="polite"
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted-foreground"
+        >
+          <PauseCircle className="size-3.5 shrink-0" aria-hidden="true" />
+          Esperei por você. Sobe quando você tocar em Registrar outro.
+        </p>
+      ) : (
+        <>
+          <span className="relative h-px flex-1 bg-hairline" aria-hidden="true">
+            <span
+              className="absolute inset-y-0 left-0 bg-foreground transition-[width] duration-200 ease-linear"
+              style={{ width: `${fracao * 100}%` }}
+            />
+          </span>
+          <span className="numerico w-6 text-right text-sm text-muted-foreground" aria-live="off">
+            {Math.ceil(restaMs / 1000)}
+          </span>
+        </>
+      )}
     </div>
   );
 }

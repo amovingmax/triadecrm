@@ -6,6 +6,17 @@
  * reidratado antes de chegar a uma pessoa. O que identifica o caso para o modelo é o
  * `leadId`, e mais nada.
  *
+ * ## O que mudou na 7ª versão (2026-09-05 — laudo §3.4)
+ *
+ * O número **ditado por extenso** — "oito quatro nove nove nove oito oito zero zero um
+ * um" — passava inteiro. As seis versões anteriores procuram na projeção de dígitos, e um
+ * número ditado não tem dígito: a projeção dele é vazia. Vazava até o telefone que o CRM
+ * **já tem no cadastro**, pela passada 2, que este arquivo diz que "não pode falhar".
+ * A passada 6 lê o texto em FICHAS (palavra de algarismo ou corrida de dígitos), soma os
+ * dígitos da corrida e roda a mesma janela da Anatel sobre ela. Ver `corridasDitadas`
+ * para as duas travas que seguram o falso positivo — medidas contra o mesmo corpus de 40
+ * mensagens: continua em 5 de 40.
+ *
  * ## O que mudou na 6ª versão (2026-09-05)
  *
  * O telefone **local, sem DDD**, deixou de ser reconhecido pela grafia. Até aqui a
@@ -81,6 +92,10 @@
  *    houve separador, e que seja telefone local plausível pela Anatel. É a passada da 6ª
  *    versão, e a única em que a janela não desliza livre — ver `gruposDeDigitos` para o
  *    porquê medido.
+ *
+ * 6. **Ditado por extenso.** As dez palavras de algarismo (mais `meia`) viram dígitos numa
+ *    fita própria, e a janela roda sobre ela. É a única passada que não usa a projeção,
+ *    porque é a única cujo objeto não tem dígito nenhum. Ver `corridasDitadas`.
  *
  * O que a regra **recusa** continua no texto — e é exatamente por isso que a recusa é
  * segura: o que ela deixa passar, a auditoria de `auditoria-pii.ts` enxerga, e a chamada
@@ -261,6 +276,16 @@ interface Ocorrencia {
   readonly fim: number;
   readonly tipo: TipoDePii;
   readonly original: string;
+  /**
+   * Os dígitos que este trecho VALE, quando o texto não os tem escritos.
+   *
+   * Existe por causa da passada 6: `oito quatro nove nove nove oito oito zero zero um um`
+   * é um telefone sem um algarismo dentro. A chave do marcador é feita dos dígitos (é o
+   * que faz `(84) 99988-0011` e `+5584999880011` virarem o mesmo `[[TELEFONE_1]]`), e sem
+   * este campo o número ditado cairia na chave vazia — todos os telefones ditados de uma
+   * conversa viravam um marcador só.
+   */
+  readonly digitos?: string;
 }
 
 type Intervalo = readonly [number, number];
@@ -512,6 +537,174 @@ function fronteirasLocais(digitos: string, grupo: GrupoDeDigitos): number[] {
   return [...fronteiras].sort((a, b) => a - b);
 }
 
+/**
+ * ===========================================================================
+ * O NÚMERO DITADO POR EXTENSO (7ª versão, 2026-09-05 — laudo §3.4)
+ * ===========================================================================
+ *
+ * "meu whats é oito quatro nove nove nove oito oito zero zero um um."
+ *
+ * As seis versões anteriores procuram telefone na **projeção de dígitos**, e isso
+ * funcionou justamente porque apaga a formatação. Um número ditado, porém, não tem
+ * formatação nem dígito: a projeção dele é **vazia**, e as duas camadas olhavam o texto e
+ * não viam número nenhum. Escapava até o telefone que o CRM já tem no cadastro — a
+ * passada 2, a que o arquivo diz que "não pode falhar".
+ *
+ * A leitura nova é uma fita própria, e não um remendo na projeção: o texto é lido em
+ * FICHAS, e cada ficha vale um ou mais algarismos — uma palavra de algarismo vale um, uma
+ * corrida de dígitos vale os dela. Fichas seguidas, separadas só por espaço, hífen, ponto
+ * ou vírgula, formam uma CORRIDA, e é sobre os dígitos da corrida que a janela roda, nos
+ * mesmos comprimentos da Anatel. `84 nove nove seis quatro cinco seis zero cinco quatro`
+ * — meio escrito, meio ditado, que é o que mais aparece em transcrição — é uma corrida só.
+ *
+ * ## As duas travas contra o falso positivo, e por que são estas
+ *
+ * Falso positivo aqui **estraga o texto que vai ao modelo**: trocar "são oito eventos por
+ * mês" por um marcador piora a resposta e não protege ninguém. As travas:
+ *
+ * 1. **A corrida precisa de pelo menos uma palavra.** Corrida só de dígitos é assunto das
+ *    passadas 2, 4 e 5, que já a resolvem melhor (com zonas de CEP, data e valor).
+ * 2. **Janela local (8 e 9 dígitos) só vale a corrida INTEIRA.** É a mesma aritmética da
+ *    passada 5: oito dígitos é entropia curta, e deslizar dentro da corrida acha telefone
+ *    onde não há. O caso concreto que isto barra é a contagem — "um, dois, três, quatro,
+ *    cinco, seis, sete, oito, nove" tem, deslizando, um `23456789` que passa pela Anatel.
+ *    Exigindo a corrida inteira, ela é `123456789`, que não começa com 9 e não é telefone.
+ *    Para 10 a 13 dígitos a janela pode deslizar: ali o DDD mais a faixa da Anatel
+ *    sustentam a decisão, e é isso que salva a pessoa que repete um dígito no fim.
+ *
+ * A variante conhecida (o telefone do cadastro) não passa por trava nenhuma: é o dado que
+ * o CRM tem em mãos, e ele sai onde aparecer.
+ */
+
+/**
+ * As dez palavras de algarismo. `meia` entra porque é como se dita o seis no Brasil
+ * ("meia-um-dois"), e `uma`/`duas` porque a transcrição escreve o que foi falado.
+ * A chave é comparada sem acento e em minúsculas (`três` → `tres`).
+ */
+const ALGARISMO_POR_EXTENSO: ReadonlyMap<string, string> = new Map([
+  ['zero', '0'],
+  ['um', '1'],
+  ['uma', '1'],
+  ['dois', '2'],
+  ['duas', '2'],
+  ['tres', '3'],
+  ['quatro', '4'],
+  ['cinco', '5'],
+  ['seis', '6'],
+  ['meia', '6'],
+  ['sete', '7'],
+  ['oito', '8'],
+  ['nove', '9'],
+]);
+
+/** O que pode aparecer ENTRE duas fichas sem quebrar a corrida. Vírgula entra: quem dita
+ * um número pontua ("oito quatro, nove nove seis..."). Barra, dois-pontos e o resto não. */
+const SEPARADOR_DITADO =
+  /[\s\u00a0\u200b-\u200f\u2060\ufeff\u00ad,.\u00b7\u2022\u2043\u30fb\-\u2010-\u2015\u2212\uff0d\uff0e]/u;
+
+/** Uma ficha: o pedaço de texto que vale um ou mais algarismos. */
+interface FichaDitada {
+  readonly digitos: string;
+  readonly inicio: number;
+  readonly fim: number;
+  readonly porExtenso: boolean;
+  /** Os índices da projeção que esta ficha ocupa (vazio quando é palavra). */
+  readonly naProjecao: readonly number[];
+}
+
+/** Uma corrida de fichas seguidas, e os dígitos que ela soma. */
+interface CorridaDitada {
+  readonly fichas: readonly FichaDitada[];
+  readonly digitos: string;
+  /** Deslocamento em dígitos do começo de cada ficha, mais o total no fim. */
+  readonly deslocamentos: readonly number[];
+}
+
+/** minúsculo e sem acento, para `Três` e `tres` serem a mesma palavra. */
+function palavraNormalizada(valor: string): string {
+  return valor.normalize('NFD').replace(ACENTOS, '').toLowerCase();
+}
+
+/**
+ * As corridas de fichas do texto.
+ *
+ * `quebrar` diz se uma ficha de dígitos já foi consumida por outra passada — quando foi,
+ * a corrida termina ali, para a passada 6 não engolir o que a 4 ou a 5 já trocaram.
+ */
+function corridasDitadas(
+  texto: string,
+  indiceDaPosicao: ReadonlyMap<number, number>,
+  jaConsumido: (indices: readonly number[]) => boolean,
+): CorridaDitada[] {
+  const corridas: CorridaDitada[] = [];
+  let fichas: FichaDitada[] = [];
+
+  const fechar = (): void => {
+    if (fichas.length > 0 && fichas.some((f) => f.porExtenso)) {
+      const deslocamentos: number[] = [];
+      let soma = 0;
+      for (const ficha of fichas) {
+        deslocamentos.push(soma);
+        soma += ficha.digitos.length;
+      }
+      deslocamentos.push(soma);
+      corridas.push({
+        fichas,
+        digitos: fichas.map((f) => f.digitos).join(''),
+        deslocamentos,
+      });
+    }
+    fichas = [];
+  };
+
+  for (let i = 0; i < texto.length; ) {
+    const codigo = texto.codePointAt(i) as number;
+    const largura = codigo > 0xffff ? 2 : 1;
+    const caractere = String.fromCodePoint(codigo);
+
+    if (valorDoDigito(caractere) !== undefined) {
+      // Uma corrida de dígitos é UMA ficha: `99988` vale cinco algarismos de uma vez.
+      let cursor = i;
+      let digitos = '';
+      const naProjecao: number[] = [];
+      while (cursor < texto.length) {
+        const c = texto.codePointAt(cursor) as number;
+        const w = c > 0xffff ? 2 : 1;
+        const algarismo = valorDoDigito(String.fromCodePoint(c));
+        if (algarismo === undefined) break;
+        digitos += algarismo;
+        const k = indiceDaPosicao.get(cursor);
+        if (k !== undefined) naProjecao.push(k);
+        cursor += w;
+      }
+      if (jaConsumido(naProjecao)) fechar();
+      else fichas.push({ digitos, inicio: i, fim: cursor, porExtenso: false, naProjecao });
+      i = cursor;
+      continue;
+    }
+
+    if (LETRA.test(caractere)) {
+      let cursor = i;
+      while (cursor < texto.length) {
+        const c = texto.codePointAt(cursor) as number;
+        const w = c > 0xffff ? 2 : 1;
+        if (!LETRA.test(String.fromCodePoint(c))) break;
+        cursor += w;
+      }
+      const algarismo = ALGARISMO_POR_EXTENSO.get(palavraNormalizada(texto.slice(i, cursor)));
+      if (algarismo === undefined) fechar();
+      else fichas.push({ digitos: algarismo, inicio: i, fim: cursor, porExtenso: true, naProjecao: [] });
+      i = cursor;
+      continue;
+    }
+
+    if (!SEPARADOR_DITADO.test(caractere)) fechar();
+    i += largura;
+  }
+  fechar();
+  return corridas;
+}
+
 function intervalosDe(texto: string, padroes: readonly RegExp[]): Intervalo[] {
   const intervalos: Intervalo[] = [];
   for (const padrao of padroes) {
@@ -581,6 +774,9 @@ function varrer(texto: string, variantes: readonly string[]): Ocorrencia[] {
     achados.push({ inicio, fim, tipo: 'TELEFONE', original: texto.slice(inicio, fim) });
     bloquear(indice, comprimento);
   };
+  /** Onde cada dígito da projeção está no texto — a passada 6 anda pelo texto, não por ela. */
+  const indiceDaPosicao = new Map<number, number>();
+  projecao.posicoes.forEach((posicao, k) => indiceDaPosicao.set(posicao, k));
 
   // ------------------------------------------------- 2. telefone conhecido
   // Substring da projeção, e nada mais. Se os dígitos do telefone do contato estão no
@@ -705,6 +901,60 @@ function varrer(texto: string, variantes: readonly string[]): Ocorrencia[] {
     }
   }
 
+  // -------------------------------------------------- 6. ditado por extenso
+  // O número que não tem dígito nenhum: `oito quatro nove nove nove oito oito zero zero
+  // um um`. Roda por último porque é a única passada que anda pelo TEXTO e não pela
+  // projeção — e porque, andando por último, ela vê o que as outras já consumiram e não
+  // engole trecho já trocado. Ver o bloco de comentário de `corridasDitadas`.
+  for (const corrida of corridasDitadas(texto, indiceDaPosicao, (indices) =>
+    indices.some((k) => bloqueado[k]),
+  )) {
+    const total = corrida.digitos.length;
+    let ficha = 0;
+    while (ficha < corrida.fichas.length) {
+      const abertura = corrida.deslocamentos[ficha] as number;
+      let escolhida = -1;
+      let janela = '';
+      for (let fim = corrida.fichas.length; fim > ficha; fim -= 1) {
+        const comprimento = (corrida.deslocamentos[fim] as number) - abertura;
+        if (comprimento < 8 || comprimento > 13) continue;
+        const digitos = corrida.digitos.slice(abertura, abertura + comprimento);
+        // A variante conhecida não passa por trava nenhuma: é o dado do cadastro.
+        const conhecida = variantes.includes(digitos);
+        const nacional = comprimento >= 10 && eTelefoneBrasileiro(digitos);
+        // Local só vale a corrida INTEIRA — a trava 2 do comentário acima.
+        const local =
+          comprimento <= 9 &&
+          abertura === 0 &&
+          comprimento === total &&
+          eTelefoneLocalBrasileiro(digitos);
+        if (!conhecida && !nacional && !local) continue;
+        // Uma janela só de dígitos escritos é assunto das passadas 2, 4 e 5.
+        if (!corrida.fichas.slice(ficha, fim).some((f) => f.porExtenso)) continue;
+        escolhida = fim;
+        janela = digitos;
+        break;
+      }
+      if (escolhida < 0) {
+        ficha += 1;
+        continue;
+      }
+      const primeira = corrida.fichas[ficha] as FichaDitada;
+      const ultima = corrida.fichas[escolhida - 1] as FichaDitada;
+      achados.push({
+        inicio: recuarSobrePrefixo(texto, primeira.inicio),
+        fim: ultima.fim,
+        tipo: 'TELEFONE',
+        original: texto.slice(recuarSobrePrefixo(texto, primeira.inicio), ultima.fim),
+        digitos: janela,
+      });
+      for (const f of corrida.fichas.slice(ficha, escolhida)) {
+        for (const k of f.naProjecao) bloqueado[k] = true;
+      }
+      ficha = escolhida;
+    }
+  }
+
   // Empate no início: fica o mais longo. É o que faz o e-mail engolir o telefone que
   // está dentro dele (`84988887777@gmail.com` é um e-mail, não um telefone e um resto).
   achados.sort((a, b) => a.inicio - b.inicio || b.fim - a.fim);
@@ -795,7 +1045,7 @@ export class Pseudonimizador {
     return new RegExp(`\\b${escaparRegex(valor)}\\b`, 'gi');
   }
 
-  #marcadorPara(tipo: TipoDePii, original: string): string {
+  #marcadorPara(tipo: TipoDePii, original: string, digitosDitados?: string): string {
     // A chave é o que faz duas grafias do mesmo dado virarem o mesmo marcador.
     // Telefone casa pelos 8 dígitos finais: `(84) 99999-0000`, `+5584999990000` e
     // `84 99999 0000` são o mesmo número — e é também o que faz a forma sem o nono
@@ -803,7 +1053,7 @@ export class Pseudonimizador {
     // para `12.345.678/0001-95` e `12345678000195` não virarem dois. @ casa pelo usuário.
     const chave =
       tipo === 'TELEFONE'
-        ? `TELEFONE:${digitosDe(original).slice(-8)}`
+        ? `TELEFONE:${(digitosDitados ?? digitosDe(original)).slice(-8)}`
         : tipo === 'DOCUMENTO'
           ? `DOCUMENTO:${original.replace(/[^0-9a-z]/gi, '').toLowerCase()}`
           : tipo === 'INSTAGRAM'
@@ -837,7 +1087,7 @@ export class Pseudonimizador {
     let cursor = 0;
     for (const achado of achados) {
       resultado += saida.slice(cursor, achado.inicio);
-      resultado += this.#marcadorPara(achado.tipo, achado.original);
+      resultado += this.#marcadorPara(achado.tipo, achado.original, achado.digitos);
       cursor = achado.fim;
     }
     return resultado + saida.slice(cursor);

@@ -157,6 +157,54 @@ describe('o registro é escrito no aparelho ANTES de qualquer ida à rede', () =
     expect(lerFila()).toHaveLength(1);
   });
 
+  it('não fura o desfazer PARADO: o registro segurado na tela não sobe pelas costas (laudo §3.12k)', async () => {
+    // A pessoa tocou em "Anotar" e a contagem parou. O prazo do desfazer venceu no
+    // relógio, mas o botão continua na tela — e o dreno do relógio da fila (a cada
+    // INTERVALO_DRENO_MS) chegaria antes dela terminar de escrever.
+    const p = pedido();
+    guardarPendente(p, { parceiro: 'Agito Produções', desfecho: 'Não atendeu' });
+
+    vi.setSystemTime(new Date('2026-09-04T13:05:00-03:00'));
+    const enviar = vi.fn().mockResolvedValue(ACEITO);
+
+    const resumo = await drenarFila(enviar, p.clientKey);
+
+    expect(enviar).not.toHaveBeenCalled();
+    expect(resumo.enviados).toBe(0);
+    expect(lerFila()).toHaveLength(1);
+  });
+
+  it('segurar UM não segura os outros: o resto da fila sobe na mesma passada', async () => {
+    const naMao = pedido('22222222-2222-4222-8222-222222222222');
+    const outro = pedido('33333333-3333-4333-8333-333333333333');
+    guardarPendente(naMao, { parceiro: 'Agito Produções', desfecho: 'Não atendeu' });
+    guardarPendente(outro, { parceiro: 'Buffet Anne', desfecho: 'Não atendeu' });
+
+    vi.setSystemTime(new Date('2026-09-04T13:05:00-03:00'));
+    const enviar = vi.fn().mockResolvedValue(ACEITO);
+
+    const resumo = await drenarFila(enviar, naMao.clientKey);
+
+    expect(enviar).toHaveBeenCalledTimes(1);
+    expect(resumo.enviados).toBe(1);
+    expect(lerFila().map((i) => i.clientKey)).toEqual([naMao.clientKey]);
+  });
+
+  it('o que ficou segurado quando a aba morreu sobe no carregamento seguinte: ninguém está mais olhando um desfazer', async () => {
+    const p = pedido();
+    guardarPendente(p, { parceiro: 'Agito Produções', desfecho: 'Não atendeu' });
+
+    vi.setSystemTime(new Date('2026-09-04T13:20:00-03:00'));
+    const enviar = vi.fn().mockResolvedValue(ACEITO);
+
+    // Tela nova, ninguém segurando nada.
+    const resumo = await drenarFila(enviar, null);
+
+    expect(enviar).toHaveBeenCalledTimes(1);
+    expect(resumo.enviados).toBe(1);
+    expect(lerFila()).toHaveLength(0);
+  });
+
   it('desfazer tira da fila, e aí sim o registro deixa de existir', () => {
     const p = pedido();
     guardarPendente(p, { parceiro: 'Agito Produções', desfecho: 'Não atendeu' });

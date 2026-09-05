@@ -1479,3 +1479,90 @@ Quem fica de fora aparece na tela com o motivo: `suprimido`, `apagada`, `sem_coo
 - **Heloísa / Rafael — de onde a rota parte.** A origem padrão é o centro de Natal, com `origem.confirmada = false` em `app_settings['rotas.planejador']`, e a tela avisa que ninguém confirmou. Só o primeiro trecho depende disso (a ordem das paradas, não). Se a Heloísa sempre sai de casa ou do escritório, é uma linha de configuração.
 - **Heloísa — as duas fichas de precisão incerta** (Ponta Negra e Cidade Satélite): o jeito de corrigir é ela dizer o endereço na visita. Enquanto isso, ficam fora da rota, com o motivo escrito.
 - **Rafael — as 61 fichas sem bairro.** É o maior ganho disponível: cada bairro preenchido move uma ficha de "só o município" para dentro do planejador, sem custo nenhum de geocodificação (o bairro provavelmente já está no cache).
+
+
+## Varredura — 05/09/2026 — Os três que só mordem quando a IA e o WhatsApp ligarem (laudo §3.3, §3.4, §3.5, §3.12h, §3.12n)
+
+Nenhum deles é feature. São guardrails que hoje estão fechados por acidente (0 modelos aprovados na Meta, worker `wa` nunca rodou, ninguém enfileira `ai_jobs` sozinho) e que precisavam estar fechados **por decisão** antes de o canal subir.
+
+### §3.3 — A IA chamava, pagava e mandava dado de contato suprimido
+
+Três peças, e nenhuma sozinha basta:
+
+- **A pergunta na entrada.** `tratarTrabalho` (`apps/workers/src/ia/tarefas.ts`) abre chamando `public.ia_alvo_suprimido`, que resolve o alvo do payload (mensagem, conversa, tentativa, negócio, pré-cadastro ou o par explícito) e responde com motivo nomeado. Trabalho de suprimido é **concluído** na fila, não falhado: repetir não muda o mundo e cada volta é uma chamada paga.
+- **A reconferência na entrega.** `executar` (`ia/execucao.ts`) pergunta de novo por `public.alvo_suprimido` **depois** de montar a chamada e **antes** do POST. O `visibility timeout` de `ai_jobs` é de 5 min; o opt-out cabe nesse intervalo. É a mesma lição da 20260905000100 e de `public.wa_saida_proximos`. Vira `AlvoSuprimidoError` (determinístico), com linha em `ai_runs` como `bloqueado` e custo zero — e **sem tarefa**, porque o opt-out acabou de cancelar as tarefas daquela ficha.
+- **A limpeza da fila.** `app.consent_apply` passa a chamar `app.ia_cancelar_trabalhos(o.id)` no mesmo laço em que já cancelava `tasks`. A mensagem sai de `ai_jobs` e a chave de `ingest_dedup` é fechada com o motivo escrito.
+
+### §3.4 — Telefone ditado por extenso chegava inteiro ao modelo
+
+`packages/prompts` ganhou uma **7ª passada** na regra e uma leitura nova na auditoria — duas implementações separadas, como manda o desenho das duas camadas. O texto é lido em FICHAS (palavra de algarismo ou corrida de dígitos) e a janela da Anatel roda sobre os dígitos da corrida. Duas travas contra o falso positivo: a corrida precisa de **pelo menos uma palavra**, e a janela local (8/9 dígitos) só vale a **corrida inteira**. O teto medido continua em **5 de 40** no corpus de mensagens reais de fornecedor.
+
+### §3.5 — A confirmação de opt-out era reenfileirada de 10 em 10 min, para sempre
+
+`app.wa_confirmacoes_reenfileirar` passa a ler o `tentativas_falhas` que a view já calculava: para em `app.wa_confirmacao_teto()` (5) e escala a espera da segunda falha em diante (10 min dobrando, teto de 6 h; a primeira falha não espera, para não desfazer o conserto da 20260905000400). `public.wa_confirmacoes_devidas` ganhou `esgotou_tentativas` e `proxima_tentativa_em`; `public.wa_saude()` ganhou a `acao_humana` correspondente.
+
+**Correção ao laudo, com prova.** O laudo diz que o caso real de hoje é "nenhum modelo aprovado na Meta". Não é: com o modelo não aprovado **e** a janela de 24 h fechada, `devida` é false e o laço não insere nada (medido: 0 confirmações em 10 voltas). O que dispara o acúmulo é a janela **aberta** somada a um envio que falha (medido: 10 confirmações em 10 voltas). O defeito é o mesmo; o gatilho é outro — e é o gatilho do dia em que o canal ligar.
+
+### §3.12h — A busca do robots.txt não passava pelo freio
+
+`Portaria.avaliar(url, freio?)` aciona o freio **só quando vai à rede** (o robots é lido uma vez por host; o cache não paga pedágio). `etapas.ts` empresta o mesmo `Acelerador` da busca das páginas — dois aceleradores seriam dois relógios.
+
+### §3.12n — As dead-letters ganharam dreno
+
+Dreno **não é reprocessar** (seria o laço que a esteira evitou de propósito). É mudar de lugar: `app.dlq_drenar` move o que morreu em `ingest_dlq`, `wa_dlq`, `ai_dlq`, `rotas_dlq` e `komune_dlq` para `public.dead_letters` (RLS de gestão), abre **uma tarefa por fila por dia** e roda em `pg_cron` de 15 em 15 min. A linha já lida vira histórico e sai em 180 dias; a que ninguém leu nunca é apagada por lá.
+
+### Provado rodando
+
+- **Antes/depois de §3.3, no banco local**: com a `app.consent_apply` da 20260904001200 restaurada dentro de um `begin/rollback`, o trabalho continua na fila depois do opt-out (`antes=1 depois=1`); com a nova, o pgTAP mede `delta = 1` (só o legítimo sobrou).
+- **Antes/depois de §3.5**: 10 voltas do cron com a Graph API falhando → **10 confirmações** antes, **5** depois (com o backoff desligado para medir o teto), e a 6ª volta devolve `{"esgotadas": 1, "reenfileiradas": 0}`.
+- **Antes/depois de §3.4**: os seis testes novos do `FURO C` e as cinco entradas da 7ª rodada de `verifica-vazamento` foram **vistos vermelhos** com a passada 6 desligada (10 falhas) e verdes com ela.
+- `supabase test db --local`: **PASS**, 34 arquivos, **2257 asserções** (34 novas em `supabase/tests/34_ia_supressao_optout_e_dlq.sql`).
+- `supabase db lint --local`: nada em `app` e `public` (só o ruído conhecido do PostGIS em `extensions`).
+- Vitest: `packages/prompts` 267, `apps/workers` 243 (11 novos), `apps/web` 530, `packages/schema` 105 — todos verdes. `pnpm typecheck` limpo no monorepo. `packages/schema/src/database.types.ts` regenerado.
+
+### Pendente / decisão humana
+
+- **`app.wa_confirmacao_teto()` = 5** é decisão de produto (Rafael/Heloísa), não de operação: por isso é função versionada, e não linha de configuração.
+- **Quem lê `public.dead_letters`** hoje é o admin mais antigo, porque a tarefa precisa de dono. Se a fila for do WhatsApp, o dono natural é o Luiz — falta a regra por fila.
+- `apps/web/src/components/ligacao/chamada-maquina.test.ts` está com um erro de lint (`consistent-type-imports`) que não é deste trabalho e não foi tocado: é de outro dono.
+
+---
+
+## D10 — 05/09/2026 — Conserto do laudo §3.2 e §3.12 b·c·d·e·f·j·l (a regra de recontato e seis miudezas de banco)
+
+Migração `supabase/migrations/20260905000801_recontato_e_miudezas.sql`; pgTAP `supabase/tests/32_recontato_e_miudezas.sql` (**60 asserções**), escrito antes da migração e **visto falhando 28 asserções contra o código antigo**.
+
+### §3.2 — Uma regra só de piso de recontato (era o defeito `[alta]`)
+
+- **O defeito, medido**: com um "agora não" de 30 dias registrado há 14 dias e um "não atendeu" de 1 dia registrado depois, a fila de ligação (`public.v_contact_cooldown`, que lia só o **último** desfecho) devolvia **2026-09-06** enquanto a cadência (`app.pode_tocar`, que fazia o **máximo** do histórico) devolvia **2026-09-21**. Vinte e oito dias de espera evaporavam de um lado e não do outro — em silêncio e **a favor de ligar demais**.
+- **A decisão**: o piso é o **máximo** de `occurred_at + cooldown_days`, com duas exceções nomeadas e só duas. **E1 — o alvo voltou a falar**: o que antecede a última porta aberta (`interaction_outcomes.counts_as = 'aberta'`) não conta mais. **E2 — canal morto**: "Número inválido" e "Número errado" (36500 dias, sem etapa de destino) só contam enquanto forem a última atividade; o primeiro toque por outro canal derruba a janela, que é a própria próxima ação desses dois chips. As duas exceções são as que a fila já aplicava; o máximo é o que a cadência já fazia. Nenhuma das duas leituras foi jogada fora — elas foram reconciliadas.
+- **Uma implementação, quatro leitores**: a regra vive só em `public.v_contact_cooldown`. `app.pode_tocar` **deixou de recalcular** e passou a ler a view (dentro de `security definer` ela roda como a dona e enxerga o histórico inteiro, como já fazia lendo `activities`; na tela continua filtrada pela carteira). A fila (`app.call_candidates`), a ficha (`public.registrar_contato`) e a prévia da montagem já liam a view.
+- **Guardrail reforçado, não afrouxado**: a porteira passou a consultar também o `blocked_forever` da mesma view. Sem isso, a exceção E1 abriria uma fresta real — um opt-out seguido de uma resposta gravada pelo worker deixaria a porteira sem nada a dizer, já que ela só olhava o `can_reactivate` da **última** atividade. Supressão continua sendo a primeira checagem, antes de qualquer conta de data.
+- **Efeito na base real**: **0 organizações** têm histórico com desfecho hoje (o CRM ainda não operou), então nenhuma ficha muda de estado com a troca de regra.
+
+### §3.12 — as miudezas
+
+- **b** — A tarefa de "ligar de novo" dizia "Ligar D+1 (última)" já na primeira de três tentativas. Dentro de um lote, `public.tabular_chamada` passa a escrever a tentativa real ("Ligar D+1 (tentativa 2 de 3)", "…, a última", "(tentativas do lote esgotadas)"). O rótulo do catálogo continua intacto para a ficha, onde a régua 1+1 do RF-CON-13 torna "última" verdadeira — `seed.sql` não foi tocado.
+- **c** — `public.montar_lote` devolve `termina_em_pedido` e `prazo_esticado`. O prazo continua sendo esticado (a decisão do D2 está de pé e escrita), mas deixa de ser esticado **em silêncio**.
+- **d** — `public.proximo_da_fila` passa a dizer **por que** não entregou ninguém: `detalhe` = `aguardando_intervalo` (com `volta_em`, `itens_esperando`) ou `tentativas_esgotadas` (com `itens_no_teto`). O `motivo` continua `fila_vazia` de propósito: o enum do zod na tela não aceita motivo novo, e quebrar a validação seria pior que informar pouco.
+- **e** — "Restantes" (na fila e na tabulação) passa por `app.itens_restantes_do_lote`, que não conta contato suprimido nem organização apagada. Quem pediu opt-out no meio do lote saía do número só quando alguém puxasse o próximo — até 30 minutos depois.
+- **f** — `app.normalize_phone_br` valida o DDD contra a numeração da Anatel (`app.ddd_br_valido`, 67 códigos) e não só contra o zero. DDD 23, 39, 56 e 78 viravam E.164 válido, entravam na dedup, no hash da `suppression_list` e no `tel:` da tela.
+- **j** — `last_activity_at` nulo virava "0 dias" e o quente que nunca foi tocado ficava quente para sempre. A regra pura (`app.compute_temperature`) **não mudou**; mudou a entrada: os chamadores passam `coalesce(last_activity_at, created_at)`. **Medido antes de aplicar nos 100 leads reais: 0 mudam de temperatura e 0 mudam de alerta** (os 100 estão em etapa fria, e o ramo frio não olha recência).
+- **l** — Confirmado: a "tarefa de reengajar" do PRD §5.6 não existia em lugar nenhum, só a bandeira `needs_attention`. `app.recompute_temperatures` passa a criar uma tarefa por negócio morno com alerta, sem duplicar enquanto a anterior estiver aberta, **nunca para contato suprimido**, e sem enviar nada (ADR-05). Na base real de hoje: **0 tarefas criadas** (nenhum morno).
+
+### Provado rodando
+
+- **pgTAP `32_recontato_e_miudezas.sql`: 60 asserções, todas verdes.** **Visto falhando** com o código antigo restaurado dentro da mesma transação: **28 asserções vermelhas**, entre elas `have: 2026-09-06 / want: 2026-09-21` na coluna da fila (§3.2), `have: quente / want: morno+alerta` (§3.12j), `have: 0 / want: 1` na tarefa de reengajar (§3.12l), `have: NULL / want: tentativas_esgotadas` (§3.12d) e `have: 3 / want: 2` em restantes (§3.12e).
+- `supabase test db`: **PASS, 34 arquivos, 2.258 asserções** (com os testes dos outros consertos do dia).
+- `supabase db lint` (com `pgtap` derrubada antes): nenhum achado novo em `public` nem nas funções `app` desta migração.
+- `pnpm lint`, `pnpm typecheck` e `pnpm test` verdes (267 + 105 + 243 + 530 testes). `packages/schema/src/database.types.ts` regenerado.
+
+### Pendente (é de tela, e cabe numa linha cada)
+
+- **§3.12c**: o recibo da montagem (`apps/web/src/components/ligacao/lote-montagem.tsx`) ainda não mostra `prazo_esticado`/`termina_em_pedido`. O zod de lá ignora campo extra, então nada quebra — a informação só não aparece. Frase sugerida: "Você pediu até 05/09; como o lote tem 3 tentativas, ele vale até 10/09 e reserva N contatos até lá."
+- **§3.12d**: `chamada-rpc.ts` ainda mostra "Acabou a fila deste lote" para os três casos. O `detalhe` e o `volta_em` já chegam à tela; falta usá-los ("Ninguém para ligar agora — o próximo volta às 14h" / "As tentativas deste lote acabaram").
+- **§3.12f**: falta a asserção gêmea do lado TypeScript afirmando que `telefone-br.ts` e `auditoria-pii.ts` têm os mesmos 67 DDDs. As três cópias (banco + duas em `packages/prompts`) são deliberadas — a do banco não tem como importar TypeScript, e as duas de lá são separadas de propósito para que o guardrail de LGPD tenha duas camadas de verdade. Hoje só o lado do banco tem alarme automático.
+
+### Precisa de decisão humana
+
+- **Rafael / Heloísa — a exceção E1.** Fica registrado que "o alvo voltou a falar" apaga a espera de um "agora não, me procure em 30 dias" **em qualquer canal**. É a leitura que a fila já tinha, e ela é defensável (quem respondeu reabriu o assunto), mas é uma decisão de produto: se a Heloísa preferir que "30 dias é 30 dias mesmo que a pessoa responda", é uma condição a mais na exceção E1 e um teste novo.
