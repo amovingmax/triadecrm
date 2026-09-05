@@ -24,13 +24,18 @@
 --      nunca do número da linha: reordenar a planilha não pode duplicar a base.
 --   8. Papel sem escrita não importa, nem a prévia.
 --
+-- A EQUIPE DESTE ARQUIVO É FIXTURE, e nasce logo abaixo do plano: perfis
+-- criados aqui dentro, pelo mesmo caminho do login real, e desfeitos no
+-- rollback. Nenhuma asserção lê o nome de gente de verdade — o porquê está
+-- escrito no bloco "a equipe DESTE arquivo".
+--
 -- NENHUMA asserção conta linha absoluta em tabela compartilhada: este banco tem
 -- operação real dentro. Tudo é delta ou escopo por lote deste arquivo.
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(72);
+select plan(73);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -46,11 +51,60 @@ begin
   execute 'reset role';
 end $$;
 
+-- ---------- a equipe DESTE arquivo (fixture, e não gente de verdade) ----------
+-- Até 05/09/2026 este teste pegava a equipe do banco em que estivesse rodando:
+-- `admin()` era "o primeiro admin por created_at", `leitor()` era "alguém com
+-- papel de leitura", e três asserções liam nomes REAIS — "Heloísa Cavalcanti"
+-- como responsável da planilha e dois "Matheus" para provar a ambiguidade.
+-- Esses perfis não estão em lugar nenhum do repositório: nasceram do primeiro
+-- login de gente de verdade na máquina de alguém. Consequências, todas medidas:
+--   * `supabase db reset` zera `auth.users`, e com ele o teste reprovava 4 de
+--     72 asserções — as 13, 15, 27 e 52 — em banco limpo, que é justamente o
+--     banco do CI e o de quem entra no projeto hoje;
+--   * a asserção 14 ("dois Matheus → dono em branco") PASSAVA em banco vazio
+--     pelo motivo errado: nenhum Matheus também devolve nulo. Teste que passa
+--     por ausência do dado não prova a regra que diz provar;
+--   * e o resultado mudava se alguém promovesse um papel ou logasse pela
+--     primeira vez — o teste media a máquina, não o código.
+-- Agora a equipe nasce aqui, dentro da transação que o `rollback` desfaz. Os
+-- nomes são propositalmente impossíveis na operação (sobrenome "Pgtap"), para
+-- o arquivo poder rodar contra o banco de trabalho sem esbarrar em gente de
+-- verdade nem alterar o que `app.importacao_pessoa` responde para ela.
+-- O caminho é o mesmo do login real (RF-ADM-01): linha em `allowed_users` com
+-- o papel, insert em `auth.users`, e o gatilho `on_auth_user_created` cria o
+-- perfil. Assim a fixture exercita a autorização em vez de contorná-la.
+create function pg_temp.contratar(p_nome text, p_papel text) returns uuid
+language plpgsql as $$
+declare
+  v_id    uuid  := gen_random_uuid();
+  v_email text  := 'pgtap22.' || replace(lower(extensions.unaccent(p_nome)), ' ', '.')
+                   || '@teste.invalid';
+begin
+  insert into public.allowed_users (email, role, note)
+  values (v_email, p_papel::app.user_role, 'Fixture do pgTAP 22 — desfeita no rollback');
+  insert into auth.users (id, email, raw_user_meta_data)
+  values (v_id, v_email, jsonb_build_object('full_name', p_nome));
+  return v_id;
+end $$;
+
+create temp table equipe(papel text primary key, id uuid not null);
+insert into equipe(papel, id) values
+  -- quem importa (as RPCs exigem papel de escrita)
+  ('admin',     pg_temp.contratar('Aristides Pgtap', 'admin')),
+  -- quem só lê: prova que a prévia recusa papel sem escrita
+  ('leitura',   pg_temp.contratar('Belmira Pgtap', 'leitura')),
+  -- primeiro nome ÚNICO: é o "responsavel" da planilha de teste, e a prova de
+  -- que o primeiro nome basta para achar o dono da carteira
+  ('unico',     pg_temp.contratar('Genoveva Pgtap', 'sdr')),
+  -- primeiro nome REPETIDO: a prova de que a ambiguidade vira aviso, e não palpite
+  ('ambiguo1',  pg_temp.contratar('Idalecio Pgtap Primeiro', 'sdr')),
+  ('ambiguo2',  pg_temp.contratar('Idalecio Pgtap Segundo', 'sdr'));
+
 create function pg_temp.admin() returns uuid language sql as $$
-  select id from public.profiles where role = 'admin' order by created_at limit 1
+  select id from equipe where papel = 'admin'
 $$;
 create function pg_temp.leitor() returns uuid language sql as $$
-  select id from public.profiles where role in ('leitura','financeiro') order by created_at limit 1
+  select id from equipe where papel = 'leitura'
 $$;
 
 -- Contadores lidos FORA da RLS, para medir delta em vez de total.
@@ -80,7 +134,7 @@ returns jsonb language sql immutable as $$
   select jsonb_strip_nulls(jsonb_build_object(
     'linha', p_n, 'nome', p_nome, 'whatsapp', nullif(p_tel, ''),
     'categoria', p_cat, 'origem', 'Planilha atual', 'cidade', 'Natal',
-    'tipo', 'fornecedor', 'etapa', 'Contatado', 'responsavel', 'Heloísa',
+    'tipo', 'fornecedor', 'etapa', 'Contatado', 'responsavel', 'Genoveva',
     'ultimo_contato', '2026-09-05', 'canal_ultimo_contato', 'Ligação',
     'resultado', 'Não respondeu', 'proxima_acao', 'Follow-up D+3')) || p_extra
 $$;
@@ -114,7 +168,7 @@ create function pg_temp.conta(p jsonb, p_chave text) returns int language sql as
   select coalesce((p -> 'contagem' ->> p_chave)::int, 0)
 $$;
 
-grant select on marco to authenticated;
+grant select on marco, equipe to authenticated;
 
 
 -- =====================================================================
@@ -148,11 +202,20 @@ select is((app.importacao_fonte('Solutudo') ->> 'id'),
 select is((app.importacao_fonte('Diretório que não existe')), '{}'::jsonb,
           'origem desconhecida não vira palpite: a origem é obrigatória por LGPD');
 
-select is((app.importacao_pessoa('Heloísa') ->> 'nome'), 'Heloísa Cavalcanti',
+-- Antes de medir o resolvedor de pessoas, medir a própria fixture: se um dia
+-- entrar na equipe de verdade alguém chamado Genoveva ou Idalecio, é ESTA
+-- asserção que reprova, dizendo o motivo, em vez de as três de baixo mentirem.
+select ok((select count(*) from public.profiles p
+            where p.is_active and app.chave_catalogo(p.full_name) like 'genoveva %') = 1
+          and (select count(*) from public.profiles p
+                where p.is_active and app.chave_catalogo(p.full_name) like 'idalecio %') = 2,
+          'a fixture manda no resolvedor: uma Genoveva e dois Idalecio, venha o banco vazio ou cheio');
+
+select is((app.importacao_pessoa('Genoveva') ->> 'nome'), 'Genoveva Pgtap',
           'o primeiro nome basta quando é o único');
-select is((app.importacao_pessoa('Matheus') ->> 'id'), null,
-          'dois "Matheus" na equipe: o dono fica em branco em vez de virar palpite');
-select is((app.importacao_pessoa('Matheus') ->> 'ambiguo'), 'true',
+select is((app.importacao_pessoa('Idalecio') ->> 'id'), null,
+          'dois "Idalecio" na equipe: o dono fica em branco em vez de virar palpite');
+select is((app.importacao_pessoa('Idalecio') ->> 'ambiguo'), 'true',
           'e a ambiguidade é dita, para a prévia poder avisar');
 
 select is(app.importacao_canal('WhatsApp (Heloísa · Komune)')::text, 'whatsapp', 'canal: WhatsApp');
@@ -280,7 +343,7 @@ select is((select pr.full_name from public.organizations o
              join public.deals d on d.organization_id = o.id
              join public.profiles pr on pr.id = d.owner_id
             where o.name = 'BETA IMPORTACAO PGTAP' and o.deleted_at is null),
-          'Heloísa Cavalcanti',
+          'Genoveva Pgtap',
           'e o responsável da planilha vira o dono da carteira');
 
 

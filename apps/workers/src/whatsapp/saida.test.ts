@@ -17,7 +17,12 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
-import { contagensDaSaidaZeradas, drenarSaida, formaDoEnvio } from './saida';
+import {
+  contagensDaSaidaZeradas,
+  drenarSaida,
+  formaDoEnvio,
+  reiniciarAvisoDePendencias,
+} from './saida';
 import { CONFIG_DE_ENVIO_PADRAO, esperaEntreEnvios } from './ponte';
 import { createLogger } from '../lib/log';
 
@@ -294,5 +299,127 @@ describe('a cadência humana (R04 §4)', () => {
   it('configuração invertida não produz espera negativa', () => {
     const ms = esperaEntreEnvios({ intervaloMinSeg: 200, intervaloMaxSeg: 10 }, () => 0.5);
     expect(ms).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. A pendência que só uma pessoa destrava (RF-CON-19, 20260905000400)
+// ---------------------------------------------------------------------------
+// Enquanto o GEN-SYS-OPTOUT não estiver aprovado no Meta Business, quem pede
+// para sair mais de 24 h depois da última mensagem não recebe a confirmação: a
+// Meta só aceita template aprovado fora da janela (R04 §2.1). O banco fica
+// devendo por escrito e paga sozinho quando der — mas uma dívida que ninguém
+// lê é uma dívida que ninguém paga, e o log do worker é onde se olha.
+
+const PENDENCIA = {
+  o_que: 'Aprovar o modelo GEN-SYS-OPTOUT no Meta Business (categoria utility, pt_BR).',
+  quem: 'Luiz (Meta Business) · Matheus revisa',
+  porque: 'Sem isso, quem pede para sair fora da janela de 24 h não recebe a confirmação.',
+  pessoas_esperando: 3,
+};
+
+function bancoComSaude(acoes: unknown[]): { cliente: ClienteDoBanco; chamadas: Chamada[] } {
+  const chamadas: Chamada[] = [];
+  const cliente = {
+    rpc: (nome: string, args: Record<string, unknown>) => {
+      chamadas.push({ nome, args });
+      if (nome === 'wa_saida_proximos') {
+        return Promise.resolve({ data: { itens: [], recusados: [] }, error: null });
+      }
+      if (nome === 'wa_saude') {
+        return Promise.resolve({ data: { acao_humana: acoes }, error: null });
+      }
+      return Promise.resolve({ data: { ok: true }, error: null });
+    },
+  } as unknown as ClienteDoBanco;
+  return { cliente, chamadas };
+}
+
+function contextoQueGrita(cliente: ClienteDoBanco, linhas: string[]): ContextoDaSaida {
+  return {
+    cliente,
+    graph: graphQueResponde({ ok: true, wamid: 'x' }),
+    logger: createLogger({
+      worker: 'teste',
+      level: 'error',
+      stdout: (linha: string) => linhas.push(linha),
+      stderr: (linha: string) => linhas.push(linha),
+    }),
+    config: CONFIG_DE_ENVIO_PADRAO,
+    dormir: async () => {},
+    sorteio: () => 0.5,
+    agora: () => 1_000_000,
+  };
+}
+
+describe('a pendência humana do RF-CON-19 no log do worker', () => {
+  it('com a fila vazia, o worker grita a ação humana — quem, o quê e quanta gente espera', async () => {
+    reiniciarAvisoDePendencias();
+    const linhas: string[] = [];
+    const { cliente } = bancoComSaude([PENDENCIA]);
+    await drenarSaida(contextoQueGrita(cliente, linhas), 5, contagensDaSaidaZeradas());
+
+    const grito = linhas.find((l) => l.includes('AÇÃO HUMANA PENDENTE'));
+    expect(grito).toBeDefined();
+    expect(grito).toContain('GEN-SYS-OPTOUT');
+    expect(grito).toContain('Luiz');
+    expect(grito).toContain('3');
+  });
+
+  it('e não repete a cada volta do laço: aviso repetido é aviso que se aprende a ignorar', async () => {
+    reiniciarAvisoDePendencias();
+    const linhas: string[] = [];
+    const { cliente, chamadas } = bancoComSaude([PENDENCIA]);
+    const ctx = contextoQueGrita(cliente, linhas);
+    await drenarSaida(ctx, 5, contagensDaSaidaZeradas());
+    await drenarSaida(ctx, 5, contagensDaSaidaZeradas());
+    await drenarSaida(ctx, 5, contagensDaSaidaZeradas());
+
+    expect(chamadas.filter((x) => x.nome === 'wa_saude')).toHaveLength(1);
+    expect(linhas.filter((l) => l.includes('AÇÃO HUMANA PENDENTE'))).toHaveLength(1);
+  });
+
+  it('sem pendência nenhuma o worker cala', async () => {
+    reiniciarAvisoDePendencias();
+    const linhas: string[] = [];
+    const { cliente } = bancoComSaude([]);
+    await drenarSaida(contextoQueGrita(cliente, linhas), 5, contagensDaSaidaZeradas());
+    expect(linhas.filter((l) => l.includes('AÇÃO HUMANA PENDENTE'))).toHaveLength(0);
+  });
+
+  it('e com a fila CHEIA o worker não para para olhar painel: envia primeiro', async () => {
+    reiniciarAvisoDePendencias();
+    const linhas: string[] = [];
+    const chamadas: Chamada[] = [];
+    const cliente = {
+      rpc: (nome: string, args: Record<string, unknown>) => {
+        chamadas.push({ nome, args });
+        if (nome === 'wa_saida_proximos') {
+          return Promise.resolve({ data: { itens: [item()], recusados: [] }, error: null });
+        }
+        return Promise.resolve({ data: { ok: true }, error: null });
+      },
+    } as unknown as ClienteDoBanco;
+    await drenarSaida(contextoQueGrita(cliente, linhas), 5, contagensDaSaidaZeradas());
+    expect(chamadas.filter((x) => x.nome === 'wa_saude')).toHaveLength(0);
+  });
+
+  it('painel que não responde não derruba o envio', async () => {
+    reiniciarAvisoDePendencias();
+    const linhas: string[] = [];
+    const cliente = {
+      rpc: (nome: string) => {
+        if (nome === 'wa_saida_proximos') {
+          return Promise.resolve({ data: { itens: [], recusados: [] }, error: null });
+        }
+        if (nome === 'wa_saude') {
+          return Promise.resolve({ data: null, error: { message: 'sem permissão' } });
+        }
+        return Promise.resolve({ data: { ok: true }, error: null });
+      },
+    } as unknown as ClienteDoBanco;
+    await expect(
+      drenarSaida(contextoQueGrita(cliente, linhas), 5, contagensDaSaidaZeradas()),
+    ).resolves.toBe(0);
   });
 });

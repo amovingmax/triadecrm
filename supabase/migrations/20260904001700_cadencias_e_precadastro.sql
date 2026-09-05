@@ -1713,130 +1713,40 @@ create policy cadence_touches_delete on public.cadence_touches
 
 
 -- ===========================================================================
--- D. AS CINCO CADÊNCIAS (seed)
+-- D. AS CINCO CADÊNCIAS (seed) — MUDOU DE LUGAR: está em `supabase/seed.sql`
 -- ===========================================================================
-
--- Dois modelos que as cadências novas exigem e que ainda não existiam.
--- GEN-FUP-LIG-V1 carrega o conteúdo obrigatório do RF-CON-12 (nome real +
--- Komune + finalidade + origem do contato + aviso de privacidade + saída fácil).
-insert into public.message_templates
-  (template_code, name, channel, category, segment, kind, language, body, variables)
-values
-  ('GEN-FUP-LIG-V1', 'Tentei te ligar — follow-up de voz', 'whatsapp', 'utility', 'GEN',
-   'followup', 'pt_BR',
-   'Oi, {{nome}}! Aqui é a Heloísa, da Komune, app de eventos de Natal. Tentei te ligar hoje e não consegui falar com você. Cheguei no contato de {{empresa}} pelo {{origem}} e queria só te apresentar a rede de fornecedores: sem mensalidade, você paga uma taxa quando fecha. Se preferir, me diz o melhor horário que eu ligo. Se não for o momento, é só responder SAIR. Como usamos seus dados: komune.app/privacidade',
-   '["empresa", "nome", "origem"]'::jsonb),
-  ('PRE-LINK-V1', 'Link de reivindicação do pré-cadastro', 'whatsapp', 'utility', 'GEN',
-   'onboarding', 'pt_BR',
-   '{{nome}}, preparei um rascunho do perfil de {{empresa}} na Komune com informações públicas do {{origem}}. Ninguém vê esse rascunho além de você — ele só entra no ar depois que você revisar, colocar suas fotos e aceitar os termos. O link é pessoal e vale por 7 dias: {{link}}. Se não quiser perfil, dá para pedir a remoção na própria página, sem login. Dúvidas sobre dados: komune.app/privacidade',
-   '["empresa", "link", "nome", "origem"]'::jsonb)
-on conflict (template_code) do nothing;
-
--- O áudio do D+3 do onboarding. Nasce sem arquivo: é a Heloísa que grava.
-insert into public.audio_assets (slug, title, segment, context, is_active)
-values ('gen-onb-ajuda-1', 'Onboarding — quer que eu termine por você? (20 s)', 'GEN',
-        'Cadência pos_autorizacao, passo D+3. A GRAVAR pela Heloísa. Sempre acompanhado do texto-resumo (R06 WA-13).',
-        true)
-on conflict (slug) do nothing;
-
--- As cadências.
-insert into public.cadences
-  (slug, name, pipeline_slug, max_touches, limite_dias, end_stage_slug,
-   requires_gancho, requires_authorization, entry_note, description)
-values
-  ('voz_primeiro', 'Primeiro contato por voz', 'fornecedor', 5, 14, 'nutricao', false, false,
-   'Negócio em Prospectado ou Contatado, organização com telefone, não suprimida.',
-   'A cadência-padrão da operação depois da virada de 04/09: ligação primeiro, WhatsApp como apoio (R13). Uma única mensagem iniciada por nós, e ela cabe folgado na régua 1+1 do RF-CON-13 porque a abertura foi por voz.'),
-  ('retomar_conversa', 'Retomar morno parado', 'fornecedor', 3, 14, 'nutricao', false, false,
-   'Entra por desfecho: lig_atendeu_retorna, reu_objecao, wa_respondeu sem próximo passo.',
-   'RF-CON-14. Cada toque com motivo novo; nunca dois no mesmo dia — garantido pela regra de um pendente.'),
-  ('pos_autorizacao', 'Onboarding até reivindicar', 'fornecedor', 5, 30, null, false, true,
-   'Etapa Autorizou E consent_events.data_use_authorized vigente. Sem essa linha o banco recusa.',
-   'RF-CON-16. Termina em `claimed`, que abre a cadência completar_cadastro.'),
-  ('completar_cadastro', 'Do claim à publicação', 'ativacao', 4, 21, null, false, false,
-   'Etapa Cadastro em andamento com claimed_at preenchido.',
-   'RF-CON-16, segunda metade. Cada toque cita o campo específico que falta, lido de pre_registrations.completeness_breakdown. Depois de D+14 vira tarefa humana e visita, sem cadência.'),
-  ('reativacao', 'Reativação com gancho', 'fornecedor', 2, 90, 'nutricao', true, false,
-   'NÃO nasce sozinha: exige gancho preenchido por gente (lead real, Research Request, evento próprio, case autorizado, sazonalidade).',
-   'RF-CON-15. Um toque por ciclo (D+30/D+60); dois ciclos sem resposta encerram. Nunca para "não" firme, perdido, opt-out ou desfecho não reativável — a porteira barra.')
-on conflict (slug) do nothing;
-
--- Os passos.
-insert into public.cadence_steps
-  (cadence_id, "position", channel, task_kind, delay_days, delay_from, title,
-   template_code, audio_slug, condition, tiers, window_hint, is_last_automatic)
-select c.id, p.pos, p.canal::app.channel, p.tarefa::app.task_kind, p.dias, p.de, p.titulo,
-       p.template, p.audio, p.cond::jsonb, p.tiers::text[], p.dica, p.ultimo
-  from (values
-    -- A · voz_primeiro
-    ('voz_primeiro', 1::smallint, 'phone', 'call', 0::smallint, 'matricula',
-     'Ligar: primeiro contato', null, null, '{"tem_telefone": true}', '{}',
-     'Roteiro em árvore por organizations.kind; aviso de origem no primeiro nó', false),
-    ('voz_primeiro', 2, 'phone', 'call', 1, 'passo_anterior',
-     'Ligar de novo — 2ª e última tentativa', null, null,
-     '{"ultimo_desfecho_em": ["lig_nao_atendeu", "lig_caixa_postal"]}', '{}',
-     'Se atendeu, a cadência encerra e quem manda é o desfecho', false),
-    ('voz_primeiro', 3, 'whatsapp', 'message', 3, 'passo_anterior',
-     'Mandar "tentei te ligar" (assistido)', 'GEN-FUP-LIG-V1', null,
-     '{"tem_telefone": true, "sem_resposta": true}', '{}',
-     'A ÚNICA mensagem iniciada por nós nesta cadência (RF-CON-12, RF-CON-13)', false),
-    ('voz_primeiro', 4, 'instagram', 'message', 7, 'matricula',
-     'DM no Instagram', null, null, '{"tem_instagram": true}', '{A+,A}', null, false),
-    ('voz_primeiro', 5, 'presencial', 'visit', 7, 'matricula',
-     'Visita na rota da zona', null, null, '{"bairro_geocodificado": true}', '{A+,A}',
-     'D+7 a D+10, na zona da rota do dia', true),
-
-    -- B · retomar_conversa
-    ('retomar_conversa', 1, 'phone', 'call', 0, 'data_combinada',
-     'Ligar na data que ele pediu', null, null, '{}', '{}',
-     'Item nº 1 do digest das 07:30 (RF-MET-04)', false),
-    ('retomar_conversa', 2, 'whatsapp', 'message', 2, 'passo_anterior',
-     'Retomar com motivo novo', 'GEN-FUP-D3-V1', null, '{}', '{}',
-     'Só dentro da janela de 24 h; fora dela vira ligação, não modelo pago', false),
-    ('retomar_conversa', 3, 'phone', 'call', 7, 'passo_anterior',
-     'Última tentativa', null, null, '{}', '{}', null, true),
-
-    -- C · pos_autorizacao
-    ('pos_autorizacao', 1, 'whatsapp', 'message', 0, 'matricula',
-     'Enviar o link de reivindicação', 'PRE-LINK-V1', null, '{}', '{}',
-     'Aviso do R06 §C.4: rascunho privado, criado de dados públicos, expira, sem login para recusar', false),
-    ('pos_autorizacao', 2, 'whatsapp', 'message', 1, 'matricula',
-     'Lembrete do link', 'GEN-ONB-D1-NAO-ABRIU', null, '{"claim_link_aberto": false}', '{}',
-     null, false),
-    ('pos_autorizacao', 3, 'whatsapp', 'message', 3, 'matricula',
-     'Áudio da Heloísa: quer que eu termine por você?', 'GEN-ONB-D7', 'gen-onb-ajuda-1',
-     '{"reivindicado": false}', '{}', 'Áudio sempre com texto-resumo (R06 WA-13)', false),
-    ('pos_autorizacao', 4, 'phone', 'call', 7, 'matricula',
-     'Ligar e terminar em 5 minutos — e regenerar o link', null, null,
-     '{"reivindicado": false}', '{}', 'O token expira em 7 dias; regenerar invalida o anterior', false),
-    ('pos_autorizacao', 5, 'whatsapp', 'message', 20, 'matricula',
-     'Aviso final antes de o rascunho ser apagado em D+30', 'GEN-ONB-D14', null,
-     '{"reivindicado": false}', '{}', null, true),
-
-    -- D · completar_cadastro
-    ('completar_cadastro', 1, 'whatsapp', 'message', 1, 'matricula',
-     'Falta pouco: citar o campo que falta', 'GEN-ONB-D1', null, '{}', '{}',
-     'O campo sai de pre_registrations.completeness_breakdown', false),
-    ('completar_cadastro', 2, 'whatsapp', 'message', 3, 'matricula',
-     'Falta só um campo — oferecer terminar por ligação', 'GEN-ONB-D3', null, '{}', '{}',
-     null, false),
-    ('completar_cadastro', 3, 'whatsapp', 'message', 7, 'matricula',
-     'Perfil 90% pronto e parado', 'GEN-ONB-D7', null, '{}', '{}', null, false),
-    ('completar_cadastro', 4, 'whatsapp', 'message', 14, 'matricula',
-     'Última lembrança automática', 'GEN-ONB-D14', null, '{}', '{}',
-     'Depois disto vira tarefa humana e visita, sem cadência', true),
-
-    -- E · reativacao
-    ('reativacao', 1, 'whatsapp', 'message', 30, 'matricula',
-     'Reativar com o gancho registrado', 'GEN-REA-60-V1', null, '{"tem_gancho": true}', '{}',
-     null, false),
-    ('reativacao', 2, 'whatsapp', 'message', 60, 'matricula',
-     'Segundo e último ciclo', 'GEN-REA-60-V2', null, '{"tem_gancho": true}', '{}',
-     'Dois ciclos sem resposta → não reativar automaticamente', true)
-  ) as p(cad, pos, canal, tarefa, dias, de, titulo, template, audio, cond, tiers, dica, ultimo)
-  join public.cadences c on c.slug = p.cad
- where not exists (select 1 from public.cadence_steps s
-                    where s.cadence_id = c.id and s."position" = p.pos);
+-- Até 05/09/2026 este trecho semeava aqui, dentro da migração, os dois modelos
+-- de mensagem novos, o áudio do onboarding, as cinco cadências e os dezenove
+-- passos. Isso QUEBRAVA `supabase db reset`, e não por descuido de escrita: as
+-- migrações rodam TODAS antes do `seed.sql`, e os passos citam, em
+-- `condition -> 'ultimo_desfecho_em'`, slugs de `interaction_outcomes`
+-- (`lig_nao_atendeu`, `lig_caixa_postal`) e, em `template_code`, modelos
+-- (`GEN-FUP-D3-V1`, `GEN-ONB-*`, `GEN-REA-60-*`) que só nascem no `seed.sql`.
+-- Do zero o banco parava aqui, com 23503:
+--   "ultimo_desfecho_em cita desfecho que não existe no catálogo".
+--
+-- Por que a saída foi mover o DADO, e não puxar o catálogo para uma migração:
+--   1. O CLAUDE.md já reparte as duas responsabilidades — `supabase/migrations`
+--      guarda o ESQUEMA (a forma), `supabase/seed.sql` guarda o CATÁLOGO
+--      operável ("categorias, cidades, feriados, funis/etapas, modelos de
+--      mensagem"). Cadência e passo são catálogo: o gestor edita pela tela, o
+--      conteúdo muda sem deploy. Estavam do lado errado da linha.
+--   2. Cadência é dado FOLHA: aponta para funil, etapa, desfecho e modelo, e
+--      nada aponta para ela. Semear a folha depois da raiz é a ordem natural;
+--      puxar `interaction_outcomes` e os 126 modelos para dentro de migração
+--      inverteria a divisão acima e ainda duplicaria o que o `seed.sql` já
+--      mantém idempotente.
+--   3. O bloco JÁ ERA idempotente (`on conflict do nothing` e `where not
+--      exists`), que é exatamente o contrato do `seed.sql` — ele roda em todo
+--      reset. Mover não exigiu reescrever uma linha do dado.
+--
+-- E por que apagar daqui não deixa dois bancos diferentes (a armadilha de mexer
+-- em migração já aplicada): quem já rodou esta migração TEM as linhas; o
+-- `seed.sql` roda em seguida e, sendo idempotente, não insere nada de novo nem
+-- muda o que existe. Quem monta do zero recebe as mesmas linhas pelo `seed.sql`.
+-- Os dois bancos terminam com o mesmo conteúdo — que é o teste que importa.
+-- A verificação está no bloco 13 do `seed.sql`: 5 cadências e 19 passos, ou o
+-- `db reset` falha.
 
 
 -- ===========================================================================

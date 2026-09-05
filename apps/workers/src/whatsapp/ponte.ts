@@ -244,6 +244,7 @@ export async function registrarOptOut(
   motivo: string | null;
   confirmacaoEnfileirada: boolean;
   confirmacaoMotivo: string | null;
+  confirmacaoDevendo: boolean;
 }> {
   const r = objeto(
     await rpc<unknown>(cliente, 'wa_optout_registrar', {
@@ -257,6 +258,11 @@ export async function registrarOptOut(
     motivo: texto(r.motivo),
     confirmacaoEnfileirada: r.confirmacao_enfileirada === true,
     confirmacaoMotivo: texto(r.confirmacao_motivo),
+    // `confirmacaoDevendo` (20260905000400) é a diferença entre "já respondi"
+    // e "não consegui responder". A segunda é uma dívida com quem pediu
+    // silêncio, e quem a paga é app.wa_confirmacoes_reenfileirar quando ela
+    // voltar a ser possível — não este worker.
+    confirmacaoDevendo: r.confirmacao_devendo === true,
   };
 }
 
@@ -479,4 +485,39 @@ export function esperaEntreEnvios(config: ConfigDeEnvio, sorteio = Math.random):
   const min = Math.max(0, config.intervaloMinSeg);
   const max = Math.max(min, config.intervaloMaxSeg);
   return Math.round((min + sorteio() * (max - min)) * 1000);
+}
+
+// ---------------------------------------------------------------------------
+// Saúde do WhatsApp (RF-CON-19)
+// ---------------------------------------------------------------------------
+
+/**
+ * Uma pendência que SÓ uma pessoa destrava. Hoje há uma que importa: enquanto
+ * o GEN-SYS-OPTOUT não estiver aprovado no Meta Business, quem pede para sair
+ * mais de 24 h depois da última mensagem não recebe a confirmação do
+ * RF-CON-19 — a Meta só aceita template aprovado fora da janela (R04 §2.1).
+ *
+ * O worker não conserta isso e não deve tentar. Ele grita, porque uma
+ * pendência que mora só num comentário de migração não é vista por ninguém.
+ */
+export interface AcaoHumana {
+  oQue: string;
+  quem: string | null;
+  porque: string | null;
+  pessoasEsperando: number | null;
+}
+
+export async function acoesHumanasDoWhatsapp(cliente: ClienteDoBanco): Promise<AcaoHumana[]> {
+  const r = objeto(await rpc<unknown>(cliente, 'wa_saude', {}));
+  const lista = Array.isArray(r.acao_humana) ? r.acao_humana : [];
+  return lista.map((item) => {
+    const a = objeto(item);
+    const n = Number(a.pessoas_esperando);
+    return {
+      oQue: texto(a.o_que) ?? 'pendência sem descrição',
+      quem: texto(a.quem),
+      porque: texto(a.porque),
+      pessoasEsperando: Number.isFinite(n) ? n : null,
+    };
+  });
 }

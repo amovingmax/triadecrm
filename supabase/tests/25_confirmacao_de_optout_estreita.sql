@@ -242,9 +242,14 @@ select is((select j ->> 'confirmacao_enfileirada' from pg_temp.opt1), 'true',
           'A CONFIRMAÇÃO LEGÍTIMA SAI: quem pediu para sair recebe a linha que o RF-CON-19 promete');
 create function pg_temp.msg1() returns uuid language sql as $$
   select (j ->> 'message_id')::uuid from pg_temp.opt1 $$;
+-- Desde 20260905000400 o texto fixo não tem mais vocativo: `{{nome}}` vinha
+-- de `contacts.first_name`, derivado por `split_part(full_name, ' ', 1)`, e
+-- um nome sem espaço colhido pelo Radar atravessava inteiro — texto livre,
+-- de fonte não confiável, na única mensagem que sai sem revisão humana.
+-- Ver 26_confirmacao_de_optout_residuais.sql, seção 1.
 select is((select body from public.messages where id = pg_temp.msg1()),
-          'Entendido, Marcos. Não vou mais te mandar mensagem. Obrigada pelo retorno e sucesso nos eventos.',
-          'com o texto FIXO do GEN-SYS-OPTOUT e o nome vindo de contacts — uma COLUNA, não o corpo do insert');
+          'Entendido. Não vou mais te mandar mensagem. Obrigada pelo retorno e sucesso nos eventos.',
+          'com o texto FIXO do GEN-SYS-OPTOUT, montado pelo banco — nunca o corpo que veio no insert');
 select is((select author_kind from public.messages where id = pg_temp.msg1()), 'system',
           'escrita pelo sistema');
 select ok((select optout_confirmation from public.messages where id = pg_temp.msg1()),
@@ -281,13 +286,14 @@ select is((select count(*)::int from public.messages
 -- =====================================================================
 -- 5. O CORPO É O TEXTO FIXO — e a variável vem de coluna
 -- =====================================================================
--- A conversa C não tem pessoa no cadastro. Sem nome, o texto perde o
--- vocativo (e a vírgula junto) — e quem faz isso é o banco, não quem
--- insere. É a prova de que {{nome}} nunca veio do corpo do insert.
+-- A conversa C não tem pessoa no cadastro, e o texto é o MESMO da conversa
+-- A, que tem: desde 20260905000400 a confirmação não tem vocativo nenhum.
+-- É a prova de que o corpo nunca dependeu do que veio no insert — e, agora,
+-- de que ele não depende de nada de fora.
 select app.suppress('phone', '+5584900000913', 'contact_optout', 'whatsapp'::app.channel, null);
 select is(app.wa_confirmacao_de_optout(pg_temp.c()) ->> 'corpo',
           'Entendido. Não vou mais te mandar mensagem. Obrigada pelo retorno e sucesso nos eventos.',
-          'sem pessoa no cadastro o vocativo vazio some, e é o banco que monta o texto');
+          'com pessoa ou sem, o texto é um só: é o banco que o monta, e não há variável nele');
 select throws_like($$
   insert into public.messages (conversation_id, direction, type, status, body,
                                author_kind, origin, template_id, optout_confirmation)

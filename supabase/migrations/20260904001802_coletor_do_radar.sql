@@ -158,81 +158,30 @@ grant execute on function public.esteira_estado_lote(uuid,text,jsonb,text) to se
 
 
 -- ---------------------------------------------------------------------------
--- 3. Catálogo de coleta do Casamentos.com.br (R03 §2.1)
+-- 3 e 4. Catálogo de coleta e mapa de categorias — MUDARAM PARA `supabase/seed.sql`
 -- ---------------------------------------------------------------------------
--- Cada entrada é uma página de listagem categoria × cidade. A paginação NÃO está
--- aqui: a própria página diz onde continua, no `<link rel="next">`, e é ele que o
--- worker segue — inventar `--2`, `--3` no código produziria requisição para
--- página que não existe, que é justamente o tipo de tráfego que a fonte não deve
--- receber de nós.
-update public.sources s
-   set config = jsonb_set(
-                  jsonb_set(s.config, '{collector,agente}',
-                            to_jsonb('KomuneBot/1.0 (+https://komune.app.br; CRM de captação da Komune)'::text), true),
-                  '{collector,catalogo}',
-                  '[
-                     {"categoria_origem": "cerimonialista",         "caminho": "/cerimonialista/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "espaco-casamento",       "caminho": "/espaco-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "fotografo-casamento",    "caminho": "/fotografo-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "filmagem-casamento",     "caminho": "/filmagem-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "buffet-casamento",       "caminho": "/buffet-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "musica-de-casamento",    "caminho": "/musica-de-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "decoracao-casamento",    "caminho": "/decoracao-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "doces-casamento",        "caminho": "/doces-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "bolo-casamento",         "caminho": "/bolo-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "convites-de-casamento",  "caminho": "/convites-de-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "lembrancas-de-casamento","caminho": "/lembrancas-de-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "florista-casamento",     "caminho": "/florista-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "carros-casamento",       "caminho": "/carros-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "animacao-festa",         "caminho": "/animacao-festa/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "beleza-noivas",          "caminho": "/beleza-noivas/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "celebrante",             "caminho": "/celebrante/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "cabine-de-fotos",        "caminho": "/cabine-de-fotos/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "bebidas-casamento",      "caminho": "/bebidas-casamento/rio-grande-do-norte/natal"}
-                   ]'::jsonb,
-                  true)
- where s.slug = 'casamentos_com_br';
-
-
--- ---------------------------------------------------------------------------
--- 4. Mapa da categoria da fonte → categoria do CRM
--- ---------------------------------------------------------------------------
--- Só o que é evidente. `cabine-de-fotos` não entra: cabine é serviço de foto para
--- uns e brinquedo de festa para outros, e chutar aqui contamina o funil inteiro
--- sem que ninguém tenha decidido. Sem mapa, `category_id` chega nulo e a fila de
--- revisão pergunta — que é o comportamento que a 001600 desenhou.
-insert into public.source_category_map (source_id, category_source, category_id)
-select s.id, m.categoria_origem, c.id
-  from public.sources s
-  join (values
-          ('cerimonialista',          'cerimonialistas_assessorias'),
-          ('espaco-casamento',        'locais_saloes_chacaras_hoteis'),
-          ('salao-casamento',         'locais_saloes_chacaras_hoteis'),
-          ('restaurante-casamento',   'locais_saloes_chacaras_hoteis'),
-          ('fazenda-casamento',       'locais_saloes_chacaras_hoteis'),
-          ('hotel-casamento',         'locais_saloes_chacaras_hoteis'),
-          ('fotografo-casamento',     'fotografia_video'),
-          ('filmagem-casamento',      'fotografia_video'),
-          ('buffet-casamento',        'buffet_adulto_corporativo'),
-          ('musica-de-casamento',     'djs_bandas_musicos'),
-          ('dj-para-casamento',       'djs_bandas_musicos'),
-          ('decoracao-casamento',     'decoracao_flores'),
-          ('florista-casamento',      'decoracao_flores'),
-          ('doces-casamento',         'doces_bolos_confeitaria'),
-          ('bolo-casamento',          'doces_bolos_confeitaria'),
-          ('convites-de-casamento',   'celebrante_beleza_convites_staff'),
-          ('lembrancas-de-casamento', 'celebrante_beleza_convites_staff'),
-          ('beleza-noivas',           'celebrante_beleza_convites_staff'),
-          ('celebrante',              'celebrante_beleza_convites_staff'),
-          ('carros-casamento',        'celebrante_beleza_convites_staff'),
-          ('animacao-festa',          'recreadores_animadores'),
-          ('bebidas-casamento',       'bar_drinks_chopp'),
-          ('tendas-casamentos',       'tendas_estruturas_palcos')
-       ) as m(categoria_origem, categoria_crm) on true
-  join public.categories c on c.slug = m.categoria_crm
- where s.slug = 'casamentos_com_br'
-on conflict (source_id, category_source) do update
-  set category_id = excluded.category_id;
+-- Aqui ficavam duas escritas de DADO: o `update public.sources set config = ...`
+-- que punha as 18 listagens de Natal do Casamentos.com.br em
+-- `config->collector->catalogo`, e o `insert into public.source_category_map`
+-- com o mapa categoria-da-fonte → categoria-do-CRM.
+--
+-- As duas dependiam de linhas que só nascem no `seed.sql` — `public.sources`
+-- (`casamentos_com_br`) e `public.categories` — e o `db reset` roda TODAS as
+-- migrações ANTES do seed. Em banco novo o `update` casava ZERO linhas e o
+-- `insert ... select` produzia ZERO linhas. Sem erro, sem aviso: o reset
+-- terminava "com sucesso" e o Radar nascia com catálogo vazio e sem mapa —
+-- 4 asserções do pgTAP 21 reprovavam (31, 33, 34 e 36) e, em produção, a
+-- primeira coleta não teria por onde começar. Falha silenciosa é pior que a
+-- barulhenta da 001700: esta não parava nada.
+--
+-- Mesma decisão da 001700, mesma razão: migração guarda a FORMA (aqui, a
+-- `source_category_map`, os estados do lote, o guarda do worker), o `seed.sql`
+-- guarda o CATÁLOGO — e caminho de listagem e mapa de categoria são catálogo,
+-- que o gestor edita sem deploy. Os dois blocos já eram idempotentes
+-- (`jsonb_set` sobre a mesma chave, `on conflict do update`), então em banco
+-- que já aplicou esta migração o seed reescreve o mesmo valor e nada muda:
+-- os dois bancos terminam iguais. Estão no `seed.sql`, bloco 3b, e a
+-- autoverificação do bloco 13 falha se o catálogo ou o mapa sumirem.
 
 
 -- ---------------------------------------------------------------------------

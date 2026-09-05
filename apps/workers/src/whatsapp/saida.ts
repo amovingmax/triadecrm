@@ -30,6 +30,7 @@
  * atrasa gente.
  */
 import {
+  acoesHumanasDoWhatsapp,
   envioDeuCerto,
   envioFalhou,
   envioFalhouDeVez,
@@ -50,6 +51,8 @@ export interface ContextoDaSaida {
   dormir?: (ms: number) => Promise<void>;
   /** Substituível no teste: o sorteio do intervalo. */
   sorteio?: () => number;
+  /** Substituível no teste: o relógio do aviso de pendências. */
+  agora?: () => number;
 }
 
 export interface ContagensDaSaida {
@@ -123,6 +126,50 @@ const dormirPadrao = (ms: number): Promise<void> =>
   new Promise((resolva) => {
     setTimeout(resolva, ms);
   });
+
+/**
+ * A PENDÊNCIA QUE SÓ UMA PESSOA DESTRAVA (RF-CON-19, migração 20260905000400).
+ *
+ * Enquanto o GEN-SYS-OPTOUT não estiver aprovado no Meta Business, quem pede
+ * para sair mais de 24 h depois da última mensagem NÃO recebe a confirmação: a
+ * Meta só aceita template aprovado fora da janela (R04 §2.1). O banco já não
+ * morre calado — ele fica devendo por escrito, em `public.wa_confirmacoes_
+ * devidas`, e `app.wa_confirmacoes_reenfileirar` paga sozinha quando voltar a
+ * ser possível. Mas uma dívida que ninguém lê é uma dívida que ninguém paga.
+ *
+ * Só na fila VAZIA, e no máximo de 15 em 15 minutos: o aviso é para ser lido,
+ * e aviso repetido a cada volta do laço vira ruído que se aprende a ignorar.
+ */
+const INTERVALO_DO_AVISO_MS = 15 * 60 * 1000;
+let ultimoAvisoEm = 0;
+
+/** Só para o teste: zera o relógio do aviso. */
+export function reiniciarAvisoDePendencias(): void {
+  ultimoAvisoEm = 0;
+}
+
+async function avisarPendencias(ctx: ContextoDaSaida, agora: number): Promise<void> {
+  if (agora - ultimoAvisoEm < INTERVALO_DO_AVISO_MS) return;
+  ultimoAvisoEm = agora;
+  let acoes;
+  try {
+    acoes = await acoesHumanasDoWhatsapp(ctx.cliente);
+  } catch (erro) {
+    // Um painel que não responde não pode derrubar o envio.
+    ctx.logger.warn('não deu para ler a saúde do WhatsApp', {
+      erro: erro instanceof Error ? erro.message : String(erro),
+    });
+    return;
+  }
+  for (const acao of acoes) {
+    ctx.logger.error('AÇÃO HUMANA PENDENTE no WhatsApp', {
+      o_que: acao.oQue,
+      quem: acao.quem,
+      porque: acao.porque,
+      pessoas_esperando: acao.pessoasEsperando,
+    });
+  }
+}
 
 /**
  * Drena um lote da fila de saída. Devolve quantos itens foram tratados — zero
@@ -234,6 +281,12 @@ export async function drenarSaida(
         acao: falha.acao,
       });
     }
+  }
+
+  // Fila vazia é o momento de olhar para o que NÃO está na fila: a
+  // confirmação de opt-out que ninguém consegue mandar (RF-CON-19).
+  if (lote.itens.length === 0 && lote.recusados.length === 0) {
+    await avisarPendencias(ctx, (ctx.agora ?? Date.now)());
   }
 
   return lote.itens.length;

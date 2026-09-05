@@ -152,6 +152,7 @@ export type Database = {
         Returns: Json
       }
       contact_is_visible: { Args: { p_contact: string }; Returns: boolean }
+      corpo_fixo_de_optout: { Args: { p_body: string }; Returns: string }
       cpf_is_valid: { Args: { c: string }; Returns: boolean }
       ddd_da_regiao: { Args: { p_phone: string }; Returns: boolean }
       deal_set_intent: {
@@ -365,6 +366,14 @@ export type Database = {
         }
         Returns: Json
       }
+      pode_enviar_confirmacao_optout: {
+        Args: {
+          p_com_teto?: boolean
+          p_conversation_id: string
+          p_quando?: string
+        }
+        Returns: Json
+      }
       pode_tocar: {
         Args: {
           p_channel: Database["app"]["Enums"]["channel"]
@@ -511,8 +520,16 @@ export type Database = {
         Returns: number
       }
       validar_roteiro: { Args: { p_arvore: Json }; Returns: string[] }
+      wa_confirmacao_de_optout: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
+      wa_confirmacoes_reenfileirar: { Args: { p_qty?: number }; Returns: Json }
       wa_enfileirar_envio: { Args: { p_message_id: string }; Returns: Json }
-      wa_expirar_fila: { Args: { p_horas?: number }; Returns: Json }
+      wa_expirar_fila: {
+        Args: { p_horas?: number; p_horas_confirmacao?: number }
+        Returns: Json
+      }
       wa_falha: {
         Args: {
           p_codigo?: string
@@ -947,6 +964,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_runs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
           },
           {
             foreignKeyName: "ai_runs_model_fkey"
@@ -3189,6 +3213,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "message_drafts_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
             foreignKeyName: "message_drafts_deal_id_fkey"
             columns: ["deal_id"]
             isOneToOne: false
@@ -3478,6 +3509,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
           },
           {
             foreignKeyName: "messages_draft_id_fkey"
@@ -5464,6 +5502,64 @@ export type Database = {
         }
         Relationships: []
       }
+      wa_confirmacoes_devidas: {
+        Row: {
+          assignee_id: string | null
+          contact_id: string | null
+          conversation_id: string | null
+          motivo: string | null
+          organization_id: string | null
+          pediu_em: string | null
+          pode_sair_agora: boolean | null
+          tentativas_falhas: number | null
+          ultima_falha_em: string | null
+          ultimo_erro: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       abrir_reivindicacao: {
@@ -6138,6 +6234,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      wa_saude: { Args: never; Returns: Json }
       wa_status_registrar: {
         Args: {
           p_codigo?: string

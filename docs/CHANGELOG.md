@@ -1263,3 +1263,84 @@ Em 390×844, na conversa com rascunho, a coluna do fio é um `overflow-y: auto` 
 
 ### Decisão humana
 - Fechar o furo de `optout_confirmation` é migração nova em arquivo de outro dono (`20260905000200`/`000201`) e mexe num guardrail do CLAUDE.md: não apliquei. Quem fechar precisa decidir se a confirmação passa a ser gerada exclusivamente por `public.wa_optout_registrar` (e a policy proíbe a coluna do lado do cliente), que é o desenho mais simples.
+
+### D5 — `supabase db reset` volta a montar o banco do zero, e o pgTAP 22 para de depender de quem logou na máquina
+
+Dois defeitos do mesmo gênero — **migração semeando dado que só nasce no `seed.sql`** —, e um teste que media a máquina em vez do código.
+
+**O problema de ordem.** `supabase db reset` roda TODAS as migrações e só depois o `seed.sql`. Duas migrações escreviam dado que depende do catálogo semeado:
+- `20260904001700_cadencias_e_precadastro.sql` §D semeava 5 cadências e 19 passos citando slugs de `interaction_outcomes` (`lig_nao_atendeu`, `lig_caixa_postal`) e `template_code` (`GEN-FUP-D3-V1`, `GEN-ONB-*`, `GEN-REA-60-*`). Do zero o reset **parava** em `ERROR: ultimo_desfecho_em cita desfecho que não existe no catálogo (SQLSTATE 23503)`. Ninguém conseguia montar o projeto, e a "fonte da verdade" do CLAUDE.md não era verificável.
+- `20260904001802_coletor_do_radar.sql` §3 e §4 punham as 18 listagens do Casamentos.com.br em `sources.config` e o mapa `source_category_map`, procurando `sources`/`categories` que ainda não existiam. Esse **não** dava erro: casava zero linhas e o reset terminava "com sucesso" com o Radar sem catálogo e sem mapa (pgTAP 21, asserções 31/33/34/36).
+
+**Decisão: mover o DADO, não a ordem de execução nem o catálogo.** O CLAUDE.md já reparte as responsabilidades — migração guarda a FORMA, `seed.sql` guarda o CATÁLOGO operável ("categorias, cidades, feriados, funis/etapas, modelos de mensagem"). Cadência, passo, caminho de listagem e mapa de categoria são catálogo: o gestor edita pela tela, sem deploy. São também dado FOLHA (apontam para funil, etapa, desfecho, modelo, fonte; nada aponta para eles), então semeá-los depois da raiz é a ordem natural. Puxar `interaction_outcomes` e os 126 modelos para dentro de migração inverteria essa divisão e duplicaria o que o seed já mantém.
+
+**Por que apagar de migração já aplicada não deixa dois bancos diferentes.** Os blocos já eram idempotentes (`on conflict do nothing`, `where not exists`, `jsonb_set` na mesma chave, `on conflict do update`). Quem já aplicou as migrações TEM as linhas; o `seed.sql` roda em seguida e não muda nada. Quem monta do zero recebe as mesmas linhas pelo seed. Medido: rodar os blocos contra o banco que já os tinha deu `INSERT 0 0` (cadências) e `UPDATE 1 / INSERT 0 23` (Radar) com o hash do conteúdo **idêntico** antes e depois. O texto movido é byte a byte o mesmo (conferido por `diff`).
+
+- `supabase/migrations/20260904001700_*` §D e `20260904001802_*` §3–4: o DML saiu, ficou lápide explicando o defeito, a decisão e para onde o dado foi.
+- `supabase/seed.sql`: novo bloco **3b** (catálogo e mapa do Radar, logo após as fontes) e novo bloco **12d** (as cinco cadências e os 19 passos, depois dos desfechos e dos modelos). A autoverificação do bloco 13 passou a falhar o reset se faltar catálogo (< 18), mapa (< 23), cadência (≠ 5) ou passo (≠ 19), ou se algum passo citar desfecho fora do catálogo — o barulho que faltava no caso do Radar.
+
+**pgTAP 22 não depende mais de quem logou.** O arquivo lia a equipe REAL do banco em que estivesse rodando: `admin()` = "primeiro admin por `created_at`", `leitor()` = "alguém com papel de leitura", e três asserções liam nomes de gente de verdade ("Heloísa Cavalcanti" como responsável da planilha, dois "Matheus" para provar a ambiguidade) — perfis que não existem no repositório, nascidos do primeiro login de alguém. Em banco limpo (o do CI) reprovavam **4 asserções: 13, 15, 27 e 52**; e a 14 ("dois Matheus → dono em branco") passava pelo motivo errado, porque nenhum Matheus também devolve nulo. **5 asserções dependiam disso, 4 quebravam.** Agora a equipe é fixture: `pg_temp.contratar()` cria `allowed_users` + `auth.users` e deixa o gatilho `on_auth_user_created` fazer o perfil — o mesmo caminho do login real (RF-ADM-01), dentro da transação que o `rollback` desfaz. Nomes impossíveis na operação (Aristides/Belmira/Genoveva/Idalecio Pgtap) para o arquivo rodar contra o banco de trabalho sem esbarrar em gente de verdade. Somou 1 asserção (plano 72 → 73): uma guarda que reprova, dizendo o motivo, se um dia entrar na equipe alguém com esses primeiros nomes.
+
+### Provado rodando
+- `supabase db reset` do zero, `exit=0`, com `seed ok (Radar): 18 listagens ... e 23 categorias mapeadas` e `seed ok (cadências): 5 cadências e 19 passos, todos com desfecho e modelo existentes`.
+- `supabase test db` no banco recém-resetado: **Files=27, Tests=1942, Result: PASS**.
+- `supabase test db` de novo depois de repor o estado de trabalho (4 usuários reais + 100 organizações da lista-semente R09): PASS — o teste 22 dá o mesmo resultado com e sem gente de verdade no banco, que é o ponto.
+- `supabase db lint`: `No schema errors found`.
+- `packages/schema/src/database.types.ts` NÃO foi regenerado: nada de esquema mudou aqui. A diferença que o `gen types` acusa hoje é de `20260905000300_confirmacao_de_optout_estreita.sql` (`pode_enviar_confirmacao_optout`, `wa_confirmacao_de_optout`, `wa_expirar_fila`), de outro dono.
+
+### Pendente
+- `20260904001200_desfechos_nos_dois_funis_e_supressao.sql` linha 160 tem o MESMO defeito (`insert into stage_equivalences ... join public.pipelines`, que em banco novo casa zero linhas), mas é inofensivo hoje porque o bloco 12b do `seed.sql` refaz o mesmo dado e a autoverificação confere `n_eq = 4`. Fica o DML morto na migração, para limpar junto quando alguém tocar nesse arquivo.
+- O estado de trabalho foi reposto em 100 organizações (`scripts/seed-leads-100.sql`), não nas 137 do registro anterior: o banco já estava com 0 organizações quando esta tarefa começou.
+
+## D5 — 05/09/2026 — Os três resíduos da confirmação de opt-out (RF-CON-19, RF-CON-10, RF-CON-11, RF-CON-22; ADR-05, ADR-06; anexos R04 §2.1, R08 §2.7, R09)
+
+A `20260905000300` tirou a confirmação do RF-CON-19 da porta de serviço. A conferência adversarial seguinte achou três buracos que sobraram, e os três têm a mesma raiz: **a migração olhou para uma COLUNA (`optout_confirmation`) quando devia ter olhado para o CAMINHO** — do estado até o que a Graph API recebe. Consertados em `supabase/migrations/20260905000400_confirmacao_de_optout_residuais.sql`, provados em `supabase/tests/26_confirmacao_de_optout_residuais.sql` (47 asserções).
+
+### D1 — o "texto fixo" tinha texto livre dentro, e o vocativo saiu
+
+`app.wa_confirmacao_de_optout` montava o corpo com `{{nome}}` vindo de `contacts.first_name`, que o gatilho de `20260904000300` deriva de `split_part(full_name, ' ', 1)`. Uma URL não tem espaço: atravessava inteira. Com o nome colhido pelo Radar numa fonte pública e nenhum usuário do CRM no caminho, o banco **obrigava** a sair, para um número SUPRIMIDO, sem rascunho e sem `reviewed_by`:
+
+> Entendido, Marcos.SUA-CONTA-SERA-CANCELADA-ACESSE-http://mal.invalido/x. Não vou mais te mandar mensagem. …
+
+**Decisão: o vocativo sai.** A alternativa (vocativo seguro por construção: primeiro token, só letras com acento/apóstrofo/hífen, 2 a 20 caracteres, caindo no texto sem vocativo quando não passasse) foi escrita e **medida contra 232 nomes reais** de fornecedores de Natal (lista-semente do R09 + fixture da planilha-ponte; `organizations` e `contacts` estavam vazias no banco local): **223 mantinham o vocativo (96,1%) e 9 o perdiam (3,9%)** — e os 9 são razão social, não gente (`Cerimoniais.com`, `D&R`, `i9`, `L & D`, `O Chef Eventos`, `Parnamirim: Art's`, `Z2`, `Motta's;`, `3652 Natal`). Nenhum primeiro nome de pessoa se perdia (Josy→Josy, Anne Vieira→Anne, José Carlos→José, Jôsy Buffet→Jôsy, Jô→Jô, D'Ávila→D'Ávila, Ana-Maria→Ana-Maria) e o ataque caía.
+
+A regra segura é barata em NOMES; o que a derrubou foi o MECANISMO. Fora da janela de 24 h o que vai no fio não é o corpo, é o template da Meta com `template_params`: vocativo = um parâmetro = mais uma coluna mutável no fio da mensagem que ninguém revisa (é o D2). E a Meta recusa parâmetro vazio — nos ~4% sem vocativo seriam precisos **dois** templates aprovados, dois textos, duas aprovações. Sem parâmetro, a frase que a 000300 escreveu para dispensar o ADR-05 ("não há o que aprovar numa mensagem que só pode ter um conteúdo possível") deixa de ser retórica: com `{{nome}}` a confirmação tinha uma FORMA possível, não um CONTEÚDO possível.
+
+- `app.corpo_fixo_de_optout(text)`: tira o vocativo com a pontuação junto e **falha fechada** — sobrou qualquer outro `{{…}}`, devolve NULL e a confirmação para de sair (`modelo_com_variavel_nao_suportada`).
+- O gatilho força `template_params = '[]'`, e declarar parâmetro é recusado por nome (`confirmacao_nao_tem_parametro`).
+- `seed.sql` **não** foi tocado (é de outro dono, e o reset o roda depois das migrações): quem tira o vocativo é a DERIVAÇÃO, que funciona com ou sem o placeholder.
+
+### D2 — o caminho até o fio era mutável
+
+Como gestor, sobre a confirmação `queued`: `update messages set template_id = <GEN-SYS-QUEM-SOMOS>, template_params = '["INJETADO PELO GESTOR"]'` **entrava**. E a varredura da vizinhança achou pior, e nem estava em `messages`: `update conversations set peer_phone_e164 = '+5584911112222'` **entrava** — o DESTINO da única mensagem que atravessa a lista de supressão.
+
+A regra passou a ser escrita como regra: **tudo o que o worker lê para montar a chamada da Graph API é imutável depois do insert.** O payload de `app.wa_proximos` é a definição. Entraram na lista: `type`, `template_id`, `template_params`, `audio_asset_id` (o que vai no fio), `origin` (porteava a reconferência da entrega — `origin <> 'crm'` a pulava inteira), `author_kind`, `organization_id`/`contact_id` (o alvo de `app.wa_motivo_de_recusa`) e `is_first_contact`/`business_initiated` (os tetos do RF-CON-10). E `app.conversations_before_write` passou a trancar `channel`, `business_number` e `peer_phone_e164`. Vale para toda mensagem, não só para a confirmação.
+
+### D3 — confirmação que falha nunca mais era tentada
+
+O passo 2 contava `exists (… optout_confirmation)` **sem filtrar status**: uma confirmação `failed` respondia `confirmacao_ja_enviada` para sempre. E como 0 de 126 modelos estão aprovados na Meta, TODA confirmação fora da janela de 24 h morre em `wa_saida_proximos` com `sem_modelo_aprovado`. Somados: quem liga pedindo para sair três dias depois nunca era respondido.
+
+**Decisão: não morrer calado — ficar devendo por escrito, e pagar sozinho quando der.**
+
+- `failed` deixou de contar como "já enviada", e o índice único `messages_uma_confirmacao_de_optout` passou a valer só para confirmação VIVA (`status <> 'failed'`).
+- Novo motivo `sem_modelo_aprovado_na_meta` e novo campo `devendo` no retorno de `app.wa_confirmacao_de_optout`: a linha que já se sabe que a Graph API recusa **não é criada** (nada de queimar linha, vaga na fila e um `failed`), mas o estado passa a dizer que o sistema deve.
+- `public.wa_confirmacoes_devidas` — a lista de a quem devemos resposta e desde quando, sob a mesma visibilidade do inbox, sem telefone e sem texto.
+- `app.wa_confirmacoes_reenfileirar(int)` + `pg_cron` de 10 em 10 min: reenfileira sozinha quando voltar a ser possível (janela reaberta, ou modelo aprovado).
+- `public.wa_optout_registrar` devolve `confirmacao_devendo`.
+
+### A ação humana ficou visível, e não num comentário
+
+- `public.wa_saude()` — o painel do WhatsApp (o do Radar continua sendo `public.esteira_saude`), cujo primeiro campo é `acao_humana`: o quê, quem, por quê e quanta gente está esperando.
+- O worker-wa grita essa mesma lista no log (`logger.error('AÇÃO HUMANA PENDENTE no WhatsApp', …)`), só com a fila vazia e no máximo de 15 em 15 min — aviso repetido a cada volta do laço é aviso que se aprende a ignorar.
+
+### Provado rodando
+- pgTAP 26 contra o código ANTERIOR (000200/000201/000300 reaplicadas, índice antigo restaurado, objetos novos derrubados): **30 de 33 asserções alcançáveis falham**, com o corpo do ataque impresso na diagnose (`have: Entendido, Marcos.SUA-CONTA-SERA-CANCELADA-ACESSE-http://mal.invalido/x. …`); as 14 restantes nem chegam a rodar porque os objetos não existiam.
+- pgTAP 26 depois do conserto: **47/47**. Suíte inteira: **1989 asserções, 0 falhas**, 28 arquivos.
+- `supabase db lint`: `No schema errors found`.
+- Vitest: 1001 testes verdes (workers 205, web 436, prompts 255, schema 105 + 1 pulado) — os 5 novos são de `saida.test.ts`, sobre o grito da pendência no log. `typecheck`, `lint` e `prettier --check` limpos.
+- `packages/schema/src/database.types.ts` regenerado (`pnpm db:types`): entram `corpo_fixo_de_optout`, `wa_confirmacoes_reenfileirar`, `wa_saude` e a view `wa_confirmacoes_devidas` — e sai a divergência que o registro anterior deixou pendente de `20260905000300`.
+- `supabase/tests/25_confirmacao_de_optout_estreita.sql`: **1 asserção atualizada** (a 18, que fixava `Entendido, Marcos.`), com comentário apontando para o motivo. É exatamente a afirmação que esta migração reverte; as outras 53 passam intactas.
+
+### Decisão humana
+- **Bárbara / Heloísa — o vocativo do `GEN-SYS-OPTOUT`.** O R08 §2.7 escreve "[Nome]" e o `seed.sql` ainda traz `{{nome}}`; a confirmação sai sem ele. Se o nome tiver de voltar, o caminho é o vocativo seguro medido acima **mais** um segundo template aprovado na Meta para o caso sem nome — e aí volta-se a discutir a dispensa do ADR-05. A pendência está em `public.wa_saude() -> 'acao_humana'`, não só aqui.
+- **Luiz / Matheus — aprovar o `GEN-SYS-OPTOUT` no Meta Business** (utility, pt_BR) e gravar `meta_template_name` e `meta_status = 'approved'`. Enquanto não for feito, ninguém que peça para sair fora da janela de 24 h recebe a confirmação do RF-CON-19: a dívida fica registrada e é paga sozinha no minuto seguinte à aprovação, mas não sai antes dela.

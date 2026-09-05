@@ -188,6 +188,96 @@ on conflict (slug) do update
       config             = case when public.sources.config = '{}'::jsonb then excluded.config else public.sources.config end;
 
 -- =====================================================================
+-- 3b. Catálogo de coleta do Radar e mapa de categorias da fonte (R03 §2.1;
+--     migração 20260904001802, blocos 3 e 4).
+--
+--     VEIO DA MIGRAÇÃO em 05/09/2026, pelo mesmo motivo das cadências do
+--     bloco 12d, e num caso pior: lá o banco novo PARAVA com erro; aqui ele
+--     terminava calado. O `update` do catálogo procurava `casamentos_com_br`
+--     em `public.sources` e o mapa procurava `public.categories` — as duas
+--     tabelas são semeadas AQUI, e o `db reset` roda todas as migrações antes
+--     deste arquivo. Zero linhas casadas, zero erro: o Radar nascia sem
+--     catálogo (nada a coletar) e sem mapa (toda captura cairia em revisão
+--     manual), e só o pgTAP 21 percebia.
+--
+--     Fica logo depois das fontes porque é dado DA fonte: a linha existe
+--     acima, e o que segue é a configuração de coleta dela. Idempotente —
+--     `jsonb_set` na mesma chave e `on conflict do update` —, então roda em
+--     todo reset sem duplicar nada.
+-- =====================================================================
+-- Cada entrada é uma página de listagem categoria × cidade. A paginação NÃO está
+-- aqui: a própria página diz onde continua, no `<link rel="next">`, e é ele que o
+-- worker segue — inventar `--2`, `--3` no código produziria requisição para
+-- página que não existe, que é justamente o tipo de tráfego que a fonte não deve
+-- receber de nós.
+update public.sources s
+   set config = jsonb_set(
+                  jsonb_set(s.config, '{collector,agente}',
+                            to_jsonb('KomuneBot/1.0 (+https://komune.app.br; CRM de captação da Komune)'::text), true),
+                  '{collector,catalogo}',
+                  '[
+                     {"categoria_origem": "cerimonialista",         "caminho": "/cerimonialista/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "espaco-casamento",       "caminho": "/espaco-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "fotografo-casamento",    "caminho": "/fotografo-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "filmagem-casamento",     "caminho": "/filmagem-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "buffet-casamento",       "caminho": "/buffet-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "musica-de-casamento",    "caminho": "/musica-de-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "decoracao-casamento",    "caminho": "/decoracao-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "doces-casamento",        "caminho": "/doces-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "bolo-casamento",         "caminho": "/bolo-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "convites-de-casamento",  "caminho": "/convites-de-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "lembrancas-de-casamento","caminho": "/lembrancas-de-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "florista-casamento",     "caminho": "/florista-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "carros-casamento",       "caminho": "/carros-casamento/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "animacao-festa",         "caminho": "/animacao-festa/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "beleza-noivas",          "caminho": "/beleza-noivas/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "celebrante",             "caminho": "/celebrante/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "cabine-de-fotos",        "caminho": "/cabine-de-fotos/rio-grande-do-norte/natal"},
+                     {"categoria_origem": "bebidas-casamento",      "caminho": "/bebidas-casamento/rio-grande-do-norte/natal"}
+                   ]'::jsonb,
+                  true)
+ where s.slug = 'casamentos_com_br';
+
+
+-- O mapa da categoria da fonte → categoria do CRM.
+-- Só o que é evidente. `cabine-de-fotos` não entra: cabine é serviço de foto para
+-- uns e brinquedo de festa para outros, e chutar aqui contamina o funil inteiro
+-- sem que ninguém tenha decidido. Sem mapa, `category_id` chega nulo e a fila de
+-- revisão pergunta — que é o comportamento que a 001600 desenhou.
+insert into public.source_category_map (source_id, category_source, category_id)
+select s.id, m.categoria_origem, c.id
+  from public.sources s
+  join (values
+          ('cerimonialista',          'cerimonialistas_assessorias'),
+          ('espaco-casamento',        'locais_saloes_chacaras_hoteis'),
+          ('salao-casamento',         'locais_saloes_chacaras_hoteis'),
+          ('restaurante-casamento',   'locais_saloes_chacaras_hoteis'),
+          ('fazenda-casamento',       'locais_saloes_chacaras_hoteis'),
+          ('hotel-casamento',         'locais_saloes_chacaras_hoteis'),
+          ('fotografo-casamento',     'fotografia_video'),
+          ('filmagem-casamento',      'fotografia_video'),
+          ('buffet-casamento',        'buffet_adulto_corporativo'),
+          ('musica-de-casamento',     'djs_bandas_musicos'),
+          ('dj-para-casamento',       'djs_bandas_musicos'),
+          ('decoracao-casamento',     'decoracao_flores'),
+          ('florista-casamento',      'decoracao_flores'),
+          ('doces-casamento',         'doces_bolos_confeitaria'),
+          ('bolo-casamento',          'doces_bolos_confeitaria'),
+          ('convites-de-casamento',   'celebrante_beleza_convites_staff'),
+          ('lembrancas-de-casamento', 'celebrante_beleza_convites_staff'),
+          ('beleza-noivas',           'celebrante_beleza_convites_staff'),
+          ('celebrante',              'celebrante_beleza_convites_staff'),
+          ('carros-casamento',        'celebrante_beleza_convites_staff'),
+          ('animacao-festa',          'recreadores_animadores'),
+          ('bebidas-casamento',       'bar_drinks_chopp'),
+          ('tendas-casamentos',       'tendas_estruturas_palcos')
+       ) as m(categoria_origem, categoria_crm) on true
+  join public.categories c on c.slug = m.categoria_crm
+ where s.slug = 'casamentos_com_br'
+on conflict (source_id, category_source) do update
+  set category_id = excluded.category_id;
+
+-- =====================================================================
 -- 4. Feriados 2026 e 2027 (RF-CON-11: nunca enviar em feriado; app.next_business_day).
 --    Datas conferidas: Páscoa 05/04/2026 → Carnaval 16–17/02, Sexta-feira Santa 03/04,
 --    Corpus Christi 04/06; Páscoa 28/03/2027 → Carnaval 08–09/02, Sexta-feira Santa 26/03,
@@ -2046,6 +2136,153 @@ on conflict (pipeline_id, canonical_slug) do update
       note       = excluded.note;
 
 -- =====================================================================
+-- 12d. As cinco cadências e os seus passos (RF-CON-12 a RF-CON-16;
+--      migração 20260904001700, seção D).
+--
+--      ESTE BLOCO VEIO DE DENTRO DA MIGRAÇÃO, em 05/09/2026, e a mudança foi
+--      de ORDEM, não de conteúdo: `supabase db reset` roda TODAS as migrações
+--      antes deste arquivo, e os passos citam desfecho (`ultimo_desfecho_em`:
+--      lig_nao_atendeu, lig_caixa_postal, validados por gatilho no bloco 12) e
+--      modelo (`template_code`: GEN-FUP-D3-V1, GEN-ONB-*, GEN-REA-60-*, com FK
+--      para `message_templates` do bloco 9/10) que nascem AQUI. Semeado lá, o
+--      banco novo morria em 23503 e a "fonte da verdade" do CLAUDE.md não
+--      replicava do zero.
+--
+--      O lugar certo é este: migração guarda a FORMA (tabelas, gatilhos, RLS,
+--      o motor da régua de silêncio), o seed guarda o CATÁLOGO OPERÁVEL — e
+--      cadência é catálogo, editável pelo gestor na tela, sem deploy. O bloco
+--      é idempotente (`on conflict do nothing`, `where not exists`), então
+--      roda em todo reset sem duplicar e sem sobrescrever o que o gestor
+--      tenha mudado. Em banco que já aplicou a migração antiga ele não insere
+--      nada — os dois bancos terminam iguais.
+--
+--      Depende, nesta ordem, dos blocos 7 (funis e etapas: `pipeline_slug`,
+--      `end_stage_slug` = nutricao), 9/10 (modelos) e 12 (desfechos).
+-- =====================================================================
+-- Dois modelos que as cadências novas exigem e que ainda não existiam.
+-- GEN-FUP-LIG-V1 carrega o conteúdo obrigatório do RF-CON-12 (nome real +
+-- Komune + finalidade + origem do contato + aviso de privacidade + saída fácil).
+insert into public.message_templates
+  (template_code, name, channel, category, segment, kind, language, body, variables)
+values
+  ('GEN-FUP-LIG-V1', 'Tentei te ligar — follow-up de voz', 'whatsapp', 'utility', 'GEN',
+   'followup', 'pt_BR',
+   'Oi, {{nome}}! Aqui é a Heloísa, da Komune, app de eventos de Natal. Tentei te ligar hoje e não consegui falar com você. Cheguei no contato de {{empresa}} pelo {{origem}} e queria só te apresentar a rede de fornecedores: sem mensalidade, você paga uma taxa quando fecha. Se preferir, me diz o melhor horário que eu ligo. Se não for o momento, é só responder SAIR. Como usamos seus dados: komune.app/privacidade',
+   '["empresa", "nome", "origem"]'::jsonb),
+  ('PRE-LINK-V1', 'Link de reivindicação do pré-cadastro', 'whatsapp', 'utility', 'GEN',
+   'onboarding', 'pt_BR',
+   '{{nome}}, preparei um rascunho do perfil de {{empresa}} na Komune com informações públicas do {{origem}}. Ninguém vê esse rascunho além de você — ele só entra no ar depois que você revisar, colocar suas fotos e aceitar os termos. O link é pessoal e vale por 7 dias: {{link}}. Se não quiser perfil, dá para pedir a remoção na própria página, sem login. Dúvidas sobre dados: komune.app/privacidade',
+   '["empresa", "link", "nome", "origem"]'::jsonb)
+on conflict (template_code) do nothing;
+
+-- O áudio do D+3 do onboarding. Nasce sem arquivo: é a Heloísa que grava.
+insert into public.audio_assets (slug, title, segment, context, is_active)
+values ('gen-onb-ajuda-1', 'Onboarding — quer que eu termine por você? (20 s)', 'GEN',
+        'Cadência pos_autorizacao, passo D+3. A GRAVAR pela Heloísa. Sempre acompanhado do texto-resumo (R06 WA-13).',
+        true)
+on conflict (slug) do nothing;
+
+-- As cadências.
+insert into public.cadences
+  (slug, name, pipeline_slug, max_touches, limite_dias, end_stage_slug,
+   requires_gancho, requires_authorization, entry_note, description)
+values
+  ('voz_primeiro', 'Primeiro contato por voz', 'fornecedor', 5, 14, 'nutricao', false, false,
+   'Negócio em Prospectado ou Contatado, organização com telefone, não suprimida.',
+   'A cadência-padrão da operação depois da virada de 04/09: ligação primeiro, WhatsApp como apoio (R13). Uma única mensagem iniciada por nós, e ela cabe folgado na régua 1+1 do RF-CON-13 porque a abertura foi por voz.'),
+  ('retomar_conversa', 'Retomar morno parado', 'fornecedor', 3, 14, 'nutricao', false, false,
+   'Entra por desfecho: lig_atendeu_retorna, reu_objecao, wa_respondeu sem próximo passo.',
+   'RF-CON-14. Cada toque com motivo novo; nunca dois no mesmo dia — garantido pela regra de um pendente.'),
+  ('pos_autorizacao', 'Onboarding até reivindicar', 'fornecedor', 5, 30, null, false, true,
+   'Etapa Autorizou E consent_events.data_use_authorized vigente. Sem essa linha o banco recusa.',
+   'RF-CON-16. Termina em `claimed`, que abre a cadência completar_cadastro.'),
+  ('completar_cadastro', 'Do claim à publicação', 'ativacao', 4, 21, null, false, false,
+   'Etapa Cadastro em andamento com claimed_at preenchido.',
+   'RF-CON-16, segunda metade. Cada toque cita o campo específico que falta, lido de pre_registrations.completeness_breakdown. Depois de D+14 vira tarefa humana e visita, sem cadência.'),
+  ('reativacao', 'Reativação com gancho', 'fornecedor', 2, 90, 'nutricao', true, false,
+   'NÃO nasce sozinha: exige gancho preenchido por gente (lead real, Research Request, evento próprio, case autorizado, sazonalidade).',
+   'RF-CON-15. Um toque por ciclo (D+30/D+60); dois ciclos sem resposta encerram. Nunca para "não" firme, perdido, opt-out ou desfecho não reativável — a porteira barra.')
+on conflict (slug) do nothing;
+
+-- Os passos.
+insert into public.cadence_steps
+  (cadence_id, "position", channel, task_kind, delay_days, delay_from, title,
+   template_code, audio_slug, condition, tiers, window_hint, is_last_automatic)
+select c.id, p.pos, p.canal::app.channel, p.tarefa::app.task_kind, p.dias, p.de, p.titulo,
+       p.template, p.audio, p.cond::jsonb, p.tiers::text[], p.dica, p.ultimo
+  from (values
+    -- A · voz_primeiro
+    ('voz_primeiro', 1::smallint, 'phone', 'call', 0::smallint, 'matricula',
+     'Ligar: primeiro contato', null, null, '{"tem_telefone": true}', '{}',
+     'Roteiro em árvore por organizations.kind; aviso de origem no primeiro nó', false),
+    ('voz_primeiro', 2, 'phone', 'call', 1, 'passo_anterior',
+     'Ligar de novo — 2ª e última tentativa', null, null,
+     '{"ultimo_desfecho_em": ["lig_nao_atendeu", "lig_caixa_postal"]}', '{}',
+     'Se atendeu, a cadência encerra e quem manda é o desfecho', false),
+    ('voz_primeiro', 3, 'whatsapp', 'message', 3, 'passo_anterior',
+     'Mandar "tentei te ligar" (assistido)', 'GEN-FUP-LIG-V1', null,
+     '{"tem_telefone": true, "sem_resposta": true}', '{}',
+     'A ÚNICA mensagem iniciada por nós nesta cadência (RF-CON-12, RF-CON-13)', false),
+    ('voz_primeiro', 4, 'instagram', 'message', 7, 'matricula',
+     'DM no Instagram', null, null, '{"tem_instagram": true}', '{A+,A}', null, false),
+    ('voz_primeiro', 5, 'presencial', 'visit', 7, 'matricula',
+     'Visita na rota da zona', null, null, '{"bairro_geocodificado": true}', '{A+,A}',
+     'D+7 a D+10, na zona da rota do dia', true),
+
+    -- B · retomar_conversa
+    ('retomar_conversa', 1, 'phone', 'call', 0, 'data_combinada',
+     'Ligar na data que ele pediu', null, null, '{}', '{}',
+     'Item nº 1 do digest das 07:30 (RF-MET-04)', false),
+    ('retomar_conversa', 2, 'whatsapp', 'message', 2, 'passo_anterior',
+     'Retomar com motivo novo', 'GEN-FUP-D3-V1', null, '{}', '{}',
+     'Só dentro da janela de 24 h; fora dela vira ligação, não modelo pago', false),
+    ('retomar_conversa', 3, 'phone', 'call', 7, 'passo_anterior',
+     'Última tentativa', null, null, '{}', '{}', null, true),
+
+    -- C · pos_autorizacao
+    ('pos_autorizacao', 1, 'whatsapp', 'message', 0, 'matricula',
+     'Enviar o link de reivindicação', 'PRE-LINK-V1', null, '{}', '{}',
+     'Aviso do R06 §C.4: rascunho privado, criado de dados públicos, expira, sem login para recusar', false),
+    ('pos_autorizacao', 2, 'whatsapp', 'message', 1, 'matricula',
+     'Lembrete do link', 'GEN-ONB-D1-NAO-ABRIU', null, '{"claim_link_aberto": false}', '{}',
+     null, false),
+    ('pos_autorizacao', 3, 'whatsapp', 'message', 3, 'matricula',
+     'Áudio da Heloísa: quer que eu termine por você?', 'GEN-ONB-D7', 'gen-onb-ajuda-1',
+     '{"reivindicado": false}', '{}', 'Áudio sempre com texto-resumo (R06 WA-13)', false),
+    ('pos_autorizacao', 4, 'phone', 'call', 7, 'matricula',
+     'Ligar e terminar em 5 minutos — e regenerar o link', null, null,
+     '{"reivindicado": false}', '{}', 'O token expira em 7 dias; regenerar invalida o anterior', false),
+    ('pos_autorizacao', 5, 'whatsapp', 'message', 20, 'matricula',
+     'Aviso final antes de o rascunho ser apagado em D+30', 'GEN-ONB-D14', null,
+     '{"reivindicado": false}', '{}', null, true),
+
+    -- D · completar_cadastro
+    ('completar_cadastro', 1, 'whatsapp', 'message', 1, 'matricula',
+     'Falta pouco: citar o campo que falta', 'GEN-ONB-D1', null, '{}', '{}',
+     'O campo sai de pre_registrations.completeness_breakdown', false),
+    ('completar_cadastro', 2, 'whatsapp', 'message', 3, 'matricula',
+     'Falta só um campo — oferecer terminar por ligação', 'GEN-ONB-D3', null, '{}', '{}',
+     null, false),
+    ('completar_cadastro', 3, 'whatsapp', 'message', 7, 'matricula',
+     'Perfil 90% pronto e parado', 'GEN-ONB-D7', null, '{}', '{}', null, false),
+    ('completar_cadastro', 4, 'whatsapp', 'message', 14, 'matricula',
+     'Última lembrança automática', 'GEN-ONB-D14', null, '{}', '{}',
+     'Depois disto vira tarefa humana e visita, sem cadência', true),
+
+    -- E · reativacao
+    ('reativacao', 1, 'whatsapp', 'message', 30, 'matricula',
+     'Reativar com o gancho registrado', 'GEN-REA-60-V1', null, '{"tem_gancho": true}', '{}',
+     null, false),
+    ('reativacao', 2, 'whatsapp', 'message', 60, 'matricula',
+     'Segundo e último ciclo', 'GEN-REA-60-V2', null, '{"tem_gancho": true}', '{}',
+     'Dois ciclos sem resposta → não reativar automaticamente', true)
+  ) as p(cad, pos, canal, tarefa, dias, de, titulo, template, audio, cond, tiers, dica, ultimo)
+  join public.cadences c on c.slug = p.cad
+ where not exists (select 1 from public.cadence_steps s
+                    where s.cadence_id = c.id and s."position" = p.pos);
+
+
+-- =====================================================================
 -- 13. Autoverificação: a seed falha (e o db reset também) se as contagens esperadas não baterem.
 -- =====================================================================
 do $$
@@ -2055,6 +2292,8 @@ declare
   n_hol1 int;  ano    int := extract(year from (now() at time zone 'America/Fortaleza'))::int;
   n_out  int;  n_sup  int;  n_eq int;  s_eq text;
   n_nos int; n_rot_err int; n_ans int;
+  n_cad int; n_pas int; n_cad_ruim text;
+  n_rad int; n_map int;
 begin
   select count(*) into n_cat  from public.categories;
   select count(*) into n_pipe from public.pipelines;
@@ -2078,6 +2317,31 @@ begin
   select count(*) into n_ans
     from public.interaction_outcomes o
    where o.requires_answer and 'ligacao'::app.interaction_surface = any (o.surfaces);
+  -- Radar (bloco 3b): catálogo de listagens e mapa de categorias. Vieram da
+  -- migração 20260904001802, que os escrevia ANTES de as fontes existirem e
+  -- por isso não escrevia nada — sem erro. Esta contagem é o barulho que
+  -- faltava.
+  select coalesce(jsonb_array_length(s.config -> 'collector' -> 'catalogo'), 0) into n_rad
+    from public.sources s where s.slug = 'casamentos_com_br';
+  select count(*) into n_map
+    from public.source_category_map m
+    join public.sources s on s.id = m.source_id
+   where s.slug = 'casamentos_com_br';
+
+  -- Cadências (bloco 12d): vieram da migração 20260904001700 para cá porque
+  -- citam desfecho e modelo que só existem neste arquivo. A contagem é o que
+  -- impede a regressão silenciosa — se o bloco parar de rodar, o reset falha
+  -- aqui em vez de deixar a operação sem régua de contato.
+  select count(*) into n_cad from public.cadences;
+  select count(*) into n_pas from public.cadence_steps;
+  -- E a prova de que a dependência foi de fato satisfeita: nenhum passo pode
+  -- apontar para modelo inexistente (a FK já garante) nem para desfecho fora
+  -- do catálogo (isto o gatilho garante na escrita; aqui é a rede).
+  select string_agg(distinct d, ', ' order by d) into n_cad_ruim
+    from public.cadence_steps st,
+         lateral jsonb_array_elements_text(coalesce(st.condition -> 'ultimo_desfecho_em', '[]'::jsonb)) d
+   where not exists (select 1 from public.interaction_outcomes o where o.slug = d);
+
   -- Teto de 8 chips ativos por superfície: acima disso ninguém tabula dentro dos 20 s do RF-MET-06.
   select coalesce(max(c), 0) into n_sup
     from (select count(*) as c from public.interaction_outcomes o, unnest(o.surfaces) as sup
@@ -2095,6 +2359,13 @@ begin
   if n_out <> 34 then raise exception 'seed: esperados 34 desfechos de interação, encontrados %', n_out; end if;
   if n_sup > 8   then raise exception 'seed: superfície com % desfechos ativos (máximo 8, RF-MET-06)', n_sup; end if;
   if n_eq <> 4   then raise exception 'seed: esperadas 4 equivalências de etapa, encontradas %', n_eq; end if;
+  if n_rad < 18  then raise exception 'seed: catálogo do Radar com % listagens (esperadas 18, R03 §2.1, bloco 3b)', n_rad; end if;
+  if n_map < 23  then raise exception 'seed: mapa de categorias do Radar com % linhas (esperadas ≥ 23, bloco 3b)', n_map; end if;
+  if n_cad <> 5  then raise exception 'seed: esperadas 5 cadências, encontradas % (bloco 12d)', n_cad; end if;
+  if n_pas <> 19 then raise exception 'seed: esperados 19 passos de cadência, encontrados % (bloco 12d)', n_pas; end if;
+  if n_cad_ruim is not null then
+    raise exception 'seed: passo de cadência cita desfecho fora do catálogo: %', n_cad_ruim;
+  end if;
   if n_nos is null then raise exception 'seed: roteiro de ligação captacao_v1 não foi semeado'; end if;
   if n_nos <> 37 then raise exception 'seed: roteiro de ligação com % nós (esperados 37)', n_nos; end if;
   if n_rot_err > 0 then raise exception 'seed: roteiro de ligação com % erro(s) estrutural(is): %',
@@ -2126,6 +2397,8 @@ begin
     raise warning 'seed: há etapas órfãs (posição negativa) que não constam mais da seed';
   end if;
 
+  raise notice 'seed ok (Radar): % listagens no catálogo do Casamentos.com.br e % categorias mapeadas', n_rad, n_map;
+  raise notice 'seed ok (cadências): % cadências e % passos, todos com desfecho e modelo existentes', n_cad, n_pas;
   raise notice 'seed ok (ligação): roteiro captacao_v1 com % nós, sem erro estrutural, e % desfechos comerciais de ligação', n_nos, n_ans;
   raise notice 'seed ok: % cidades, % categorias, % fontes, % feriados em % e % em %, % funis (fornecedor %, ativacao %, produtor % etapas), % motivos de perda, % desfechos de interação (máximo % por superfície), % modelos de mensagem',
     n_city, n_cat, n_src, n_hol, ano, n_hol1, ano + 1, n_pipe, n_forn, n_ativ, n_prod, n_lost, n_out, n_sup, n_tpl;
