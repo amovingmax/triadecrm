@@ -9,6 +9,7 @@ import {
   periodoDaUrl,
   periodoDe,
   periodoValido,
+  semanaDaUrl,
   somarDias,
   urlDoRecorte,
 } from './periodo';
@@ -118,5 +119,29 @@ describe('urlDoRecorte', () => {
     expect(
       urlDoRecorte({ chave: 'personalizado', de: '2026-08-01', ate: '2026-08-31' }, 'bairros'),
     ).toBe('?painel=bairros&de=2026-08-01&ate=2026-08-31');
+  });
+
+  it('o relatório de segunda leva a semana, e não o período', () => {
+    expect(urlDoRecorte(periodoDe('sete', HOJE), 'semana', '2026-08-24')).toBe(
+      '?painel=semana&semana=2026-08-24',
+    );
+  });
+
+  it('ignora semana que não é uma data', () => {
+    expect(urlDoRecorte(periodoDe('sete', HOJE), 'semana', 'ontem')).toBe(
+      '?painel=semana&periodo=sete',
+    );
+  });
+});
+
+describe('semanaDaUrl', () => {
+  it('aceita a segunda-feira em aaaa-mm-dd', () => {
+    expect(semanaDaUrl('2026-08-24')).toBe('2026-08-24');
+  });
+
+  it('recusa o que não é data e abre na última semana guardada', () => {
+    expect(semanaDaUrl(undefined)).toBeNull();
+    expect(semanaDaUrl('semana passada')).toBeNull();
+    expect(semanaDaUrl(['24/08/2026'])).toBeNull();
   });
 });

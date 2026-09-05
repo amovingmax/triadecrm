@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
 import { ProvedorConsultas } from '@/components/consultas/provedor-consultas';
-import { hojeEmNatal, periodoDaUrl } from '@/components/relatorios/periodo';
+import { hojeEmNatal, periodoDaUrl, semanaDaUrl } from '@/components/relatorios/periodo';
 import { TelaRelatorios } from '@/components/relatorios/tela-relatorios';
 import { painelDaUrl } from '@/components/relatorios/tipos';
 
@@ -17,7 +17,8 @@ export const metadata: Metadata = { title: 'Relatórios' };
  * própria carteira, RF-ADM-01) e o robô.
  *
  * O período inicial vem da query string, para que um link de relatório abra no mesmo
- * recorte de quem mandou.
+ * recorte de quem mandou. O relatório de segunda carrega `semana=aaaa-mm-dd` em vez
+ * de período: é a leitura que mais se manda para alguém.
  */
 export default async function Pagina({
   searchParams,
@@ -34,6 +35,7 @@ export default async function Pagina({
       <TelaRelatorios
         painelInicial={painelDaUrl(params.painel)}
         periodoInicial={periodoDaUrl(params, hojeEmNatal())}
+        semanaInicial={semanaDaUrl(params.semana)}
       />
     </ProvedorConsultas>
   );

@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+# Sobreposição de DESENVOLVIMENTO — só para a máquina de quem programa.
+#
+# Na máquina dedicada (docker-compose.yml) o OSRM não publica porta: quem fala
+# com ele é o worker, pela rede do Compose (`http://osrm:5000`). Em
+# desenvolvimento o worker roda FORA do Docker (`pnpm -C apps/workers dev`), e
+# de lá não existe rede do Compose para alcançar — daí esta sobreposição, que
+# prende a porta em 127.0.0.1 e em mais lugar nenhum.
+#
+# NÃO É PARA SUBIR NA MÁQUINA DO LUIZ. Lá o arquivo de produção basta, e abrir
+# porta é exatamente o que ele evita.
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+#     --profile rotas up -d osrm
+#   curl 'http://127.0.0.1:5000/route/v1/driving/-35.1858,-5.8811;-35.2094,-5.7945?overview=false'
+#
+# E, no `.env` da raiz (ou no ambiente do worker):
+#   OSRM_URL=http://127.0.0.1:5000
+# ---------------------------------------------------------------------------
+
+name: komune-crm
+
+services:
+  osrm:
+    ports:
+      # Loopback do host, de propósito: nada de LAN, nada de internet.
+      - '127.0.0.1:${OSRM_PORT_DEV:-5000}:5000'

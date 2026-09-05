@@ -19,6 +19,7 @@ import { ErroDaAgendaNaTela, EsqueletoAgenda } from './estados';
 import { FolhaDesfecho } from './folha-desfecho';
 import { ListaDoDia } from './lista-dia';
 import { registrarDesfechoDoCompromisso } from './registrar-desfecho';
+import { TelaRota } from './tela-rota';
 import { TiraDaSemana } from './tira-semana';
 import {
   contarPorDia,
@@ -82,7 +83,7 @@ export function TelaAgenda({
   const fim = somarDias(inicio, 6);
 
   useEffect(() => {
-    const alvo = `${window.location.pathname}?dia=${dia}${visao === 'semana' ? '&visao=semana' : ''}`;
+    const alvo = `${window.location.pathname}?dia=${dia}${visao === 'dia' ? '' : `&visao=${visao}`}`;
     if (alvo !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', alvo);
     }
@@ -189,7 +190,7 @@ export function TelaAgenda({
           role="group"
           aria-label="Como ver a agenda"
         >
-          {(['dia', 'semana'] as const).map((opcao) => (
+          {(['dia', 'semana', 'rota'] as const).map((opcao) => (
             <button
               key={opcao}
               type="button"
@@ -200,7 +201,7 @@ export function TelaAgenda({
                 visao === opcao ? 'acao-gradiente' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {opcao === 'dia' ? 'Dia' : 'Semana'}
+              {opcao === 'dia' ? 'Dia' : opcao === 'semana' ? 'Semana' : 'Rota'}
             </button>
           ))}
         </div>
@@ -217,7 +218,13 @@ export function TelaAgenda({
       />
 
       <section
-        aria-label={visao === 'dia' ? rotuloDiaPorExtenso(dia) : 'Semana inteira'}
+        aria-label={
+          visao === 'semana'
+            ? 'Semana inteira'
+            : visao === 'rota'
+              ? `Rota da tarde de ${rotuloDiaPorExtenso(dia)}`
+              : rotuloDiaPorExtenso(dia)
+        }
         className={cn(
           'border-t border-hairline pt-4',
           consulta.isPlaceholderData && 'pointer-events-none opacity-60',
@@ -240,6 +247,8 @@ export function TelaAgenda({
           />
         ) : visao === 'semana' ? (
           <VisaoDaSemana inicio={inicio} itens={itens} hoje={hoje} aoIrParaDia={irParaDia} />
+        ) : visao === 'rota' ? (
+          <TelaRota usuarioId={usuarioId} dia={dia} hoje={hoje} />
         ) : (
           <ListaDoDia
             dia={dia}
@@ -253,7 +262,7 @@ export function TelaAgenda({
         )}
       </section>
 
-      <AindaNaoLigado />
+      {visao === 'rota' ? null : <AindaNaoLigado />}
 
       <FolhaDesfecho
         pedido={pedido}
@@ -299,9 +308,10 @@ function AindaNaoLigado() {
           módulo de Conversas.
         </li>
         <li>
-          <span className="text-foreground">Rota otimizada</span> por tempo de deslocamento, com um
-          link único do Maps para as paradas do dia (RF-ROT-03): depende da geocodificação dos
-          endereços (RF-ROT-01). Por enquanto, ordem por bairro e um link de busca por parceiro.
+          <span className="text-foreground">Rota otimizada</span> por tempo de deslocamento já
+          existe: está na aba <span className="text-foreground">Rota</span> (RF-ROT-01 e RF-ROT-03).
+          Aqui, na lista do dia, a ordem continua sendo a do relógio e o agrupamento é por bairro —
+          são perguntas diferentes.
         </li>
         <li>
           <span className="text-foreground">Página pública de agendamento</span> (RF-AGE-09) está

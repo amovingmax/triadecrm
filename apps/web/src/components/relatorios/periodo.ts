@@ -131,9 +131,20 @@ export function periodoDaUrl(
   return periodoDe('trinta', hoje);
 }
 
-/** A query string que representa o recorte atual. */
-export function urlDoRecorte(periodo: Periodo, painel: string): string {
+/**
+ * A query string que representa o recorte atual.
+ *
+ * O relatório de segunda não é recortado por período, e sim pela SEMANA civil: ele
+ * carrega `semana=aaaa-mm-dd` (a segunda-feira) em vez de `periodo`. É o que faz o
+ * link mandado no grupo abrir na mesma semana de quem mandou, que é o uso principal
+ * desta leitura.
+ */
+export function urlDoRecorte(periodo: Periodo, painel: string, semana?: string | null): string {
   const params = new URLSearchParams({ painel });
+  if (semana && FORMATO_DIA.test(semana)) {
+    params.set('semana', semana);
+    return `?${params.toString()}`;
+  }
   if (periodo.chave === 'personalizado') {
     params.set('de', periodo.de);
     params.set('ate', periodo.ate);
@@ -141,6 +152,12 @@ export function urlDoRecorte(periodo: Periodo, painel: string): string {
     params.set('periodo', periodo.chave);
   }
   return `?${params.toString()}`;
+}
+
+/** A segunda-feira pedida na URL, ou nulo quando não há (a tela abre na última). */
+export function semanaDaUrl(valor: string | string[] | undefined): string | null {
+  const bruto = Array.isArray(valor) ? valor[0] : valor;
+  return bruto && FORMATO_DIA.test(bruto) ? bruto : null;
 }
 
 /** O dia de Natal a que pertence um instante do banco (`timestamptz` em ISO). */

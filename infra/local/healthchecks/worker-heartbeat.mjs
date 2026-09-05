@@ -11,13 +11,13 @@
  * Saudável = existe linha para (worker, instance), `last_beat_at` mais recente que
  * WORKER_HEARTBEAT_MAX_AGE_S e `status` diferente de 'parado'.
  *
- * Uso: node worker-heartbeat.mjs <ingest|wa|ai>
+ * Uso: node worker-heartbeat.mjs <ingest|wa|ai|rotas>
  * Saída: 0 saudável · 1 não saudável (o Docker marca o contêiner como unhealthy).
  *
  * Só usa o Node 22 da própria imagem dos workers: sem dependências, sem instalar nada.
  */
 
-const WORKERS = ['ingest', 'wa', 'ai'];
+const WORKERS = ['ingest', 'wa', 'ai', 'rotas'];
 
 function falhar(mensagem) {
   process.stderr.write(`${mensagem}\n`);

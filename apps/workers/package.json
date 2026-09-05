@@ -2,7 +2,7 @@
   "name": "@komune/workers",
   "version": "0.1.0",
   "private": true,
-  "description": "Workers da máquina dedicada do KOMUNE CRM: uma imagem Docker, três comandos (ingest | wa | ai).",
+  "description": "Workers da máquina dedicada do KOMUNE CRM: uma imagem Docker, quatro comandos (ingest | wa | ai | rotas).",
   "type": "module",
   "scripts": {
     "dev": "node --env-file-if-exists=../../.env.local --import tsx src/index.ts",

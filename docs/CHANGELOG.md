@@ -1344,3 +1344,138 @@ O passo 2 contava `exists (… optout_confirmation)` **sem filtrar status**: uma
 ### Decisão humana
 - **Bárbara / Heloísa — o vocativo do `GEN-SYS-OPTOUT`.** O R08 §2.7 escreve "[Nome]" e o `seed.sql` ainda traz `{{nome}}`; a confirmação sai sem ele. Se o nome tiver de voltar, o caminho é o vocativo seguro medido acima **mais** um segundo template aprovado na Meta para o caso sem nome — e aí volta-se a discutir a dispensa do ADR-05. A pendência está em `public.wa_saude() -> 'acao_humana'`, não só aqui.
 - **Luiz / Matheus — aprovar o `GEN-SYS-OPTOUT` no Meta Business** (utility, pt_BR) e gravar `meta_template_name` e `meta_status = 'approved'`. Enquanto não for feito, ninguém que peça para sair fora da janela de 24 h recebe a confirmação do RF-CON-19: a dívida fica registrada e é paga sozinha no minuto seguinte à aprovação, mas não sai antes dela.
+
+## D9 — 05/09/2026 — O relatório de segunda (RF-REL-09, RF-REL-01, RF-REL-10; PRD §7.8; anexo R07 §4 e §6)
+
+A tela `/relatorios` já respondia quando alguém perguntava. Faltava **o que chega pronto na segunda de manhã**. Entregue em `supabase/migrations/20260905000700_relatorio_semanal.sql`, provado em `supabase/tests/28_relatorio_semanal.sql` (76 asserções) e mostrado no painel **Semana** de `/relatorios`.
+
+### O texto é o produto, e ele é escrito para o celular do Rafael
+
+`app.relatorio_semanal_texto(fatos)` devolve um relatório em prosa curta — o número e o que ele quer dizer, não um painel transcrito. Quatro decisões de escrita ficaram no código, e não no gosto de quem escreveu:
+
+- **Comparação é só com a semana anterior.** São duas pessoas na operação (Matheus e Heloísa); ranking entre elas não muda decisão nenhuma e o RF-MET-09/RF-AST-06 o proíbem. O que muda decisão é a semana passada, calculada pela **mesma função** (`app.relatorio_semanal_numeros(de, ate)`, chamada duas vezes) — se fosse outra consulta, a comparação compararia duas definições.
+- **Tendência exige base nos dois lados.** `app.relatorio_semanal_comparavel_minimo()` = 5. Abaixo disso o texto imprime os dois números e diz "Com esta base ainda não dá para chamar de tendência", em vez de virar "+100%" sobre 2 contra 1.
+- **Zero fica na tela e é dito.** Com 99 alvos e nenhuma semana de contato registrado, quase tudo é zero. A linha zerada não some da tabela, e o cabeçalho do texto diz "É cedo. Nenhuma semana teve contato registrado ainda — o que vem abaixo é o que aconteceu, não tendência. Zero aqui costuma querer dizer 'ainda não', e não 'não funciona'."
+- **Proxy é marcado, como nas outras telas.** `cadastros_iniciados` e `publicados` saem do FUNIL, não da plataforma Komune: vêm com `proxy: true` no JSON, com o distintivo `proxy` na tabela e com a frase no texto.
+
+### O que o banco passou a ter
+
+- `public.weekly_reports` — uma linha por semana, chaveada pela segunda-feira. Guarda os **fatos** (jsonb auditável) e o **texto**. RLS de leitura por `app.sees_all()`; **sem** política de escrita e com `insert/update/delete` revogados de `authenticated` (o `alter default privileges` da 000500 os dava). Relatório que a API pode reescrever não é registro, é rascunho.
+- `app.relatorio_semanal_numeros(de, ate)` — 16 números do intervalo, todos lidos de `app.portas_contadas` (os tetos do RF-MET-01 valem aqui também), `deal_stage_history`, `organizations`, `consent_events` e `tasks` (fórmula de prazo do RF-REL-10, a mesma de `relatorio_por_responsavel`).
+- `app.relatorio_semanal_fatos(segunda)` — números com rótulo e delta, o que avançou e o que esfriou por etapa, a base de hoje por temperatura, até três coisas que merecem atenção (`atencao`) e todas as que dispararam (`atencao_todas`), mais as dependências não ligadas, por escrito.
+- `public.relatorio_semanal_gerar(semana)`, `public.relatorio_semanal(semana)` e `public.relatorios_semanais(n)` — a porta da tela. Sem parâmetro, `relatorio_semanal` abre na semana **fechada** mais recente, nunca na que está em curso.
+- `pg_cron` `relatorio_semanal`, `0 11 * * 1` (08:00 de Natal, segunda), chamando `app.relatorio_semanal_cron()`.
+- Utilitários de escrita em `app` (`numero_pt`, `percentual_pt`, `plural_pt`, `data_pt`, `frase_variacao_semanal`, `lista_de_etapas`, `lista_da_base`), todos revogados de `authenticated`: não são API.
+
+### O guardrail que a conferência achou
+
+As três regras de atenção que são **chamado para agir** — negócio quente parado, negócio sem próxima ação, alvo que respondeu e ninguém voltou — excluem `do_not_contact`. Cobrar retorno de quem pediu para sair é convidar ao toque proibido, e o CLAUDE.md não abre exceção nem para número agregado. E "respondeu e ninguém voltou" passou a contar por **alvo**, não por porta: quem respondeu duas vezes continua sendo uma pessoa só esperando.
+
+### O que NÃO foi entregue, e por que está escrito na tela
+
+- **A entrega automática não existe.** O R07 pede o resumo no WhatsApp do grupo de growth e o arquivo anexado. O CRM não tem canal de grupo (o inbox fala com FORNECEDOR, um a um, ADR-06/ADR-07) nem canal de e-mail. Então o job **gera e guarda**, a tela mostra, e a tela diz por escrito o que falta — com um botão "Copiar" para quem for mandar. Inventar um envio que não sai seria pior do que não ter envio.
+- **A narração por IA (RF-REL-01, ADR-10) não entrou.** O texto é determinístico: dos mesmos fatos sai sempre o mesmo texto, e por isso é testável por pgTAP. Quando o Sonnet 5 entrar, ele recebe `fatos` e substitui `texto`; o texto determinístico vira o que sai quando o modelo falha.
+
+### A tela
+
+- Painel **Semana**, o primeiro de `/relatorios` e o padrão da tela. Seletor das últimas oito semanas civis, com "em curso" e "não gerada" escritos no botão; procedência (quem gerou e quando) e o aviso de semana parcial; o texto num bloco com "Copiar"; as três coisas que merecem atenção ao lado dele no desktop e embaixo no celular; o que avançou / o que esfriou; a base de hoje por temperatura; e a tabela de 16 números (esta semana, semana anterior, diferença, o que quer dizer).
+- O recorte foi para a URL: `?painel=semana&semana=2026-08-24`. É a leitura que mais se manda para alguém, e um link tinha de abrir na mesma semana de quem mandou.
+- Semana não gerada não vira tela vazia: diz que ninguém gerou ainda, explica que o robô gera na segunda 08:00, e oferece "Gerar agora".
+
+### Exportação em CSV **e** em XLSX, nos oito painéis (RF-REL-09)
+
+`apps/web/src/components/relatorios/xlsx.ts` escreve o `.xlsx` à mão (zip + OOXML) com o `fflate` que já estava no projeto para LER a planilha da importação — em vez de instalar `xlsx`/`exceljs` (600 kB a 1 MB) para uma tabela sem fórmula, sem imagem e sem aba múltipla. As colunas são as MESMAS que desenham a tabela e escrevem o CSV (`Coluna<L>`); a diferença é que no XLSX o número entra como **número**: `1.234` vira 1234 com formato `#,##0` e `28,0%` vira 0,28 com formato `0.0%` — que é o que faz a planilha somar. Cabeçalho congelado e filtro ligado.
+
+### Provado rodando
+
+- `supabase test db --local`: 30 arquivos, **2122 asserções**; `28_relatorio_semanal.sql` **76/76 ok** e todos os demais ok, menos duas asserções de `09_seguranca_acesso.sql` que são de outro módulo (ver Pendente). Na rodada anterior, antes de a migração de rotas entrar, a suíte inteira deu **PASS com 2120**.
+- O `28_*` **visto falhando** antes: contra uma versão adulterada da migração (porta crua no lugar de `batida_conta`, qualquer mudança de etapa contada como avanço, `publicados` sem a marca de proxy), a asserção 4 acusou `have: 8 / want: 7`, a 14 `have: 7 / want: 5`, e a 24 reprovou. E contra a versão sem o guardrail de `do_not_contact`, as três asserções de guardrail acusaram `have: 2 / want: 1`.
+- `supabase db lint --local --schema app,public`: `No schema errors found`. (O lint sem `--schema` passou a acusar PostGIS em `extensions`, que não é deste módulo.)
+- Vitest: **1067 testes verdes** (web 476, workers 231, prompts 255, schema 105 + 1 pulado). Os 19 novos são de `xlsx.test.ts`; mais 4 em `periodo.test.ts`, sobre a semana na URL.
+- `typecheck` e `lint` limpos em `apps/web`. Nenhum `any`, nenhum TODO, nenhum texto em inglês na interface.
+- O `.xlsx` gerado foi **aberto com openpyxl**: aba nomeada, painel congelado em A2, filtro `A1:F17`, `1234` como inteiro com `#,##0`, `0,125` com `0.0%`, `3,5` com `#,##0.0` e `n/d` preservado como texto (e não como zero).
+- Download de ponta a ponta na tela real (Playwright com sessão autenticada): `triade-semana-2026-08-24-a-2026-08-30.csv` e `.xlsx` no painel Semana, e `triade-funil-2026-08-07-a-2026-09-05.xlsx` (34 linhas, 11 colunas) no painel Funil.
+- Fotos em 1440 e 390 conferidas: sem rolagem horizontal na página (`body_scrollWidth == clientWidth` nos dois), contraste 12,12 no texto principal e 6,96 no secundário (AA), e todo botão da tela com 44px ou mais no celular.
+- `packages/schema/src/database.types.ts` regenerado (`pnpm db:types`).
+
+### Pendente
+- **A suíte pgTAP está vermelha por causa de `20260905000600_rotas.sql`, não deste módulo.** As asserções 49 e 50 de `09_seguranca_acesso.sql` varrem o schema `app` atrás de função de gatilho aberta para a API, e acusam `have: 1 / want: 0`: `app.organizations_geo_precision()` (função de gatilho da migração de rotas) está com EXECUTE para `anon` **e** para `authenticated`, porque o padrão de fábrica do Postgres é EXECUTE para PUBLIC e a migração não o revogou. O conserto é uma linha na migração de rotas — `revoke all on function app.organizations_geo_precision() from public, anon, authenticated;` —, e é do outro dono. As 17 funções deste módulo foram conferidas uma a uma: nenhuma das 14 de `app` tem EXECUTE para ninguém, e as 3 de `public` só para `authenticated` e `service_role`.
+- **`supabase/tests/14_metas_e_relatorios.sql` linha 179 foi corrigida** (arquivo de outro módulo): a asserção contava `proname like 'relatorio\_%'` = 6 e quebrava assim que outro módulo nascesse com o mesmo prefixo. Passou a listar as seis funções pelo nome. Nada mais foi tocado nesse arquivo.
+- O relatório não traz o **burn-up do RF-REL-05** (acumulado × meta, ritmo necessário até 06/11) nem a **pauta do ritual com três experimentos candidatos** (RF-REL-09). Os dois dependem de metas cadastradas em `public.goals`, que ainda estão vazias, e de uma linha de escopo que ninguém fixou no banco. Fazer projeção sem meta cadastrada seria inventar o denominador.
+- **Ambiente local:** o banco estava sem `auth.users`, então os quatro perfis de desenvolvimento foram recriados a partir do bloco 2 de `scripts/seed-dev-5k.sql` (só as 4 pessoas, nenhuma das 5.000 organizações) para dar sessão às fotos.
+
+### Decisão humana
+- **Rafael / Luiz — por onde o relatório chega na segunda.** As opções reais são: (a) um número da Cloud API dedicado a mandar para o grupo de growth, (b) e-mail por um provedor transacional, ou (c) continuar como está, com alguém copiando o texto e colando no grupo. Enquanto não houver decisão, (c) é o que existe, e a tela diz isso. O trabalho que falta depois da decisão é pequeno: os fatos e o texto já estão guardados e versionados.
+- **Rafael — a linha de escopo do burn-up.** Para o relatório dizer "faltam X em Y dias úteis, ou seja, Z publicações por dia", é preciso cadastrar as metas (100 fornecedores até 06/11, 130 até 04/12, 30 produtores) em `public.goals`. Sem elas o relatório fica sem o número que o R07 §8 diz ser o mais importante da segunda.
+
+## D9 — 05/09/2026 — Rotas de visita: a base ganhou coordenada, e a tarde ganhou ordem (RF-ROT-01 a RF-ROT-05, RF-ROT-07; PRD §7.5; anexos R06 §5 e R09)
+
+O bloqueio era concreto e antigo: **0 das 100 organizações tinham coordenada**, e a `/agenda` dizia isso na cara — agrupava as visitas por bairro e explicava que rota otimizada não existia porque não havia latitude nenhuma. Não faltava código de roteirização; faltava geografia.
+
+### De onde vêm as coordenadas, e por que não do Google
+
+O R06 §5 é explícito: os termos da Google Maps Platform proíbem "copy and save business names, addresses, or user reviews" e limitam cache a `place_id`. Guardar a coordenada de um parceiro no CRM é exatamente esse "save". A mesma tabela do R06 diz o que usar no lugar: **OpenStreetMap (ODbL) para geodados**. Então a coordenada vem do **Nominatim**, sob ODbL — que permite guardar e exige atribuição (a licença fica em `geo_places.licenca` e a tela credita o OSM).
+
+O Google Maps continua no produto **para navegar**: abrir o app com um destino é uso de usuário final. O proibido é copiar a base deles, não abrir o app deles.
+
+A política do Nominatim é respeitada, não contornada: **1 requisição por segundo** (o cliente serializa e dorme; não há paralelismo no módulo), **User-Agent identificando a aplicação e um contato** (`NOMINATIM_USER_AGENT` é obrigatória — sem ela o worker se recusa a subir, em vez de mandar um UA genérico) e **cache** (`public.geo_places`, uma linha por pergunta). A base inteira são **21 perguntas**, porque se pergunta por bairro e não por ficha.
+
+### A distinção que o módulo inteiro existe para não apagar: centroide ≠ porta
+
+Geocodificar "Capim Macio, Natal" devolve o **centro do polígono do bairro**, com ~2,4 km de raio. Isso ordena visita muito bem e não serve para chegar a lugar nenhum. Mandar a Heloísa para o centroide achando que é a porta do buffet é pior do que não ter rota, porque ela sai do carro.
+
+Por isso a precisão é **parte do dado**, com CHECK no banco (`app.geo_precision`: `logradouro` | `bairro` | `cidade` | `incerta`), e sai do que o **OSM respondeu** (`addresstype`), não do que perguntamos. Junto vem `raio_m` — a meia-diagonal da caixa delimitadora, em metros, calculada pelo PostGIS: a incerteza vira número, e o número aparece na tela ("centro do bairro · ~2,4 km de raio").
+
+`incerta` não é preciosismo: na primeira passada real, **"Ponta Negra, Natal" devolveu uma PRAIA** (`natural/beach`) e **"Cidade Satélite" devolveu uma ESTAÇÃO FERROVIÁRIA** (`railway/railway`). Nenhuma das duas é o bairro que a pergunta pedia. Chamar aquilo de "centro do município" seria mentira com dado verdadeiro; chamar de "bairro" seria pior. As duas ficam fora do planejador, e a tela diz o que o OSM respondeu.
+
+Resultado da passada real: **100 de 100 fichas geocodificadas** — 37 com precisão de bairro (as que entram em rota), 61 só com o município (não têm bairro na ficha) e 2 incertas.
+
+### Quem calcula a ordem: OSRM, na máquina dedicada
+
+O web roda na Vercel e o OSRM roda na máquina do Luiz, sem porta publicada. A Vercel não alcança o OSRM, e não deve alcançar. O caminho é o de sempre (ADR-04): a tela **enfileira** em `pgmq`, o `worker-rotas` consome, chama `/table`, resolve a ordem e grava.
+
+Nada calcula distância em linha reta e chama de rota. Sem OSRM não há rota: o plano fica `falhou` com o motivo escrito, e a tela mostra o motivo. Com o worker desligado, a tela diz **"o worker de rotas não bate ponto desde 16:41"** e explica que o pedido fica guardado.
+
+A ordem é ótima **provada**, não heurística: com o teto de 6 paradas do RF-ROT-03 existem no máximo 720 sequências, e todas são testadas. É rota **aberta** (ninguém volta ao ponto de partida no fim da tarde). Acima de 7 paradas entra vizinho-mais-próximo + 2-opt, e o método usado é registrado.
+
+### A rota reconfere — quatro vezes, na forma do `20260905000100_dreno_reconfere.sql`
+
+A elegibilidade mora numa função só, `app.rota_alvos`, chamada em **quatro** pontos: na leitura da tela, no pedido, na saída da fila e **na gravação da ordem que voltou do OSRM, parada a parada**. Uma visita suprimida às 13:55 não entra numa rota calculada às 13:50, ainda que o OSRM tenha devolvido tempo para ela — e o total é recalculado do que sobrou, não somado do que o OSRM mandou. Quem cai é **nomeado** na resposta e no plano, não some em silêncio.
+
+Quem fica de fora aparece na tela com o motivo: `suprimido`, `apagada`, `sem_coordenada`, `so_cidade`, `precisao_incerta`.
+
+### O que foi entregue
+
+- **Migração `20260905000600_rotas.sql`**: PostGIS; `app.geo_precision` e `app.route_status`; `public.geo_places` (cache do Nominatim, com licença e proveniência); `organizations.geo_precision/geo_place_id/geo_radius_m/geocoded_at` + coluna gerada `geog` (geography) com índice GiST — o chão do check-in do RF-ROT-06; `route_plans` (um por pessoa e por dia) e `route_stops` (ordem, tempo e distância por trecho, precisão congelada); filas `rotas_jobs`/`rotas_dlq` na esteira que já existia (ADR-11); `app_settings['rotas.planejador']`; e as RPC `rota_do_dia`, `rota_montar`, `rota_proximas`, `rota_gravar_ordem`, `rota_falhar`, `geo_pendentes`, `geo_gravar`, com RLS e grants.
+- **Backfill + gatilho `a_organizations_geo_precision`**: coordenada que já existisse sem precisão declarada vira `incerta` em vez de travar a migração, e coordenada que entre pela `organizations_view` (que não tem coluna de precisão) é marcada como `incerta` em vez de virar um 23514 na cara de quem edita a ficha. Meia coordenada é apagada em vez de virar ponto no meio do oceano.
+- **`worker-rotas`** — quarto comando da mesma imagem (`apps/workers/src/rotas/`: `nominatim.ts`, `osrm.ts`, `ordem.ts`, `geocodificar.ts`, `banco.ts`; laço em `workers/rotas.ts`). `--geocodificar` faz uma passada e sai; sem a opção, consome `rotas_jobs`. Serviço no `infra/local/docker-compose.yml` com healthcheck por batida de ponto.
+- **`infra/local/docker-compose.dev.yml`** — sobreposição só de desenvolvimento que prende a porta do OSRM em `127.0.0.1:5000`, para o worker que roda fora do Docker alcançá-lo. Não é para subir na máquina do Luiz.
+- **Aba "Rota" em `/agenda`** (`?visao=rota`), mobile-first: resumo (paradas, minutos de carro, km), **um link para o trajeto inteiro** no Google Maps (sem `origin`, para partir de onde a pessoa está) e, por parada, número, nome, bairro, precisão com raio, tempo e distância desde a anterior, tempo acumulado, e os botões Maps / Waze / Registrar a visita. Todo link de navegação busca **pelo NOME** do parceiro, nunca pela coordenada. Duas paradas que dividem o mesmo centroide são declaradas ("o tempo entre as duas aparece como zero e não é").
+- **`scripts/seed-visitas-do-dia.sql`** — carga de desenvolvimento com os quatro casos que a tela precisa saber desenhar, incluindo uma ficha que entra na `suppression_list` **depois** de a tarefa nascer.
+- **CI**: `supabase db lint` passou a rodar com `--schema public,app`. Sem o recorte, o PostGIS instalado por esta migração reprovaria todo PR por avisos das funções PL/pgSQL da própria extensão.
+
+### Provado rodando
+
+- **Geocodificação real**: 21 perguntas ao Nominatim em **35,6 s** (≈1,7 s por pergunta, acima do 1 req/s exigido), 21 encontradas, 0 falhas, **100 fichas atualizadas**.
+- **OSRM real**: `docker compose --profile rotas up -d osrm` sobe `healthy` sobre o extrato do RN; a rota da tarde saiu com **4 paradas, 33 min de carro e 26,6 km**, em ordem diferente da do relógio (Tirol → Capim Macio → Lagoa Nova → Potengi), pelo método `exaustiva`.
+- **pgTAP `27_rotas.sql`: 57 asserções, todas verdes**, todas as contagens em delta. **Visto falhando**: com `app.rota_alvos` trocada por uma versão ingênua (que confia na decisão tomada quando a tarefa nasceu, como o dreno da Komune fazia), **13 asserções ficam vermelhas** e dizem exatamente o que aconteceu — `have: 4 / want: 3` nas paradas entregues ao OSRM, `have: 3 / want: 1` nas gravadas, `have: 600 / want: 300` no total.
+- **Migração aplicada do zero** (num `begin` que derruba tudo que ela cria e roda o arquivo inteiro, com `rollback` no fim): enum com os quatro valores, gatilho no lugar, filas registradas, e as coordenadas preexistentes rotuladas como `incerta` em vez de travar o `alter table` — que foi como o problema apareceu.
+- `supabase test db --local`: **PASS**, 30 arquivos, **2116 asserções**.
+- `supabase db lint --local --level warning --fail-on warning --schema public,app`: `No schema errors found` (e a versão sem `--schema`, que o CI rodava, **falhava com exit 1** por causa do PostGIS — daí a correção no workflow).
+- Vitest: **25 testes novos no worker** (`ordem`, `nominatim`, `osrm`) e **17 no web** (`rota-tipos`), todos verdes — suíte inteira em 231 (workers) e 476 (web). `pnpm lint` e `pnpm typecheck` limpos no monorepo, e `prettier --check` limpo nos arquivos novos.
+- Fotos em **1440 e 390** conferidas: sem rolagem horizontal, e todo alvo de toque da tela com 44px ou mais no celular depois de o nome do parceiro ganhar área de dedo (`min-h-11`). Fotografado também o estado "worker desligado".
+
+### O que está honestamente desligado (e a tela diz)
+
+- **Hora marcada dentro da rota** (o "TSP com janelas" do RF-ROT-03): a ordem é só por tempo de carro. O horário da tarefa de visita é prazo calculado, não hora combinada — e a própria Agenda já explica isso na aba Dia.
+- **Tempo dentro de cada visita**: os minutos são de deslocamento. Ninguém mediu quanto dura uma conversa, então a tela não soma um número que não existe.
+- **"Cheguei" com check-in por GPS (RF-ROT-06)** e **bloco no Google Calendar (RF-ROT-04)**: fora do MVP. A coluna `geog` com índice GiST já é o chão para o check-in de ≤200 m.
+- **Mapa com seleção por laço (RF-ROT-02)**: não entrou. Com 37 pontos em 15 centroides de bairro, um mapa mostraria 15 alfinetes empilhados — a lista honesta informa mais.
+- **Endereço com rua e número**: nenhuma das 100 fichas tem logradouro. Quando tiver, a mesma máquina geocodifica com precisão de porta e as frases da tela mudam sozinhas.
+- **`--geocodificar` é manual**: não entrou no `pg_cron`. São 21 perguntas hoje e uma a mais por bairro novo; agendar isso seria bater num serviço público de graça sem motivo.
+
+### Precisa de decisão humana
+
+- **Heloísa / Rafael — de onde a rota parte.** A origem padrão é o centro de Natal, com `origem.confirmada = false` em `app_settings['rotas.planejador']`, e a tela avisa que ninguém confirmou. Só o primeiro trecho depende disso (a ordem das paradas, não). Se a Heloísa sempre sai de casa ou do escritório, é uma linha de configuração.
+- **Heloísa — as duas fichas de precisão incerta** (Ponta Negra e Cidade Satélite): o jeito de corrigir é ela dizer o endereço na visita. Enquanto isso, ficam fora da rota, com o motivo escrito.
+- **Rafael — as 61 fichas sem bairro.** É o maior ganho disponível: cada bairro preenchido move uma ficha de "só o município" para dentro do planejador, sem custo nenhum de geocodificação (o bairro provavelmente já está no cache).

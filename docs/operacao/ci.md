@@ -30,7 +30,7 @@ fica em cache, com chave derivada do `pnpm-lock.yaml`.
 | passo | comando | por quê |
 | --- | --- | --- |
 | subir e migrar | `supabase start -x studio,imgproxy,vector,realtime,edge-runtime` | banco vazio, migrações na ordem, depois `supabase/seed.sql` |
-| esquema | `supabase db lint --local --level warning --fail-on warning` | erro de tipagem em função ou view derruba o CI |
+| esquema | `supabase db lint --local --level warning --fail-on warning --schema public,app` | erro de tipagem em função ou view derruba o CI. O recorte de schema existe porque o PostGIS (migração 20260905000600) traz funções PL/pgSQL próprias no schema `extensions` que emitem avisos — código de terceiro, que não é nosso para consertar |
 | pgTAP | `supabase test db --local` | RLS por papel, funções, esteira de ingestão, cadências e pré-cadastro |
 | limpeza | `supabase stop --no-backup` (sempre, mesmo em falha) | não deixa contêiner nem volume para trás |
 

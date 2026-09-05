@@ -1,5 +1,5 @@
 /**
- * CLI dos workers do KOMUNE CRM — uma imagem Docker, três comandos: ingest | wa | ai.
+ * CLI dos workers do KOMUNE CRM — uma imagem Docker, quatro comandos: ingest | wa | ai | rotas.
  *
  * `ingest` consome as filas `pgmq` da esteira de ingestão (RF-RAD). `wa` e `ai` ainda
  * validam o ambiente, registram um heartbeat no log e encerram com 0: os laços deles
@@ -12,6 +12,7 @@ import type { WorkerRunner } from './lib/context';
 import { formatEnvIssues, loadEnv } from './lib/env';
 import { createLogger } from './lib/log';
 import { runAi } from './workers/ai';
+import { runRotas } from './workers/rotas';
 import { runIngest } from './workers/ingest';
 import { runWa } from './workers/wa';
 
@@ -56,6 +57,8 @@ export async function main(argv: readonly string[]): Promise<number> {
       return start('wa', runWa, parsed.opcoes);
     case 'ai':
       return start('ai', runAi, parsed.opcoes);
+    case 'rotas':
+      return start('rotas', runRotas, parsed.opcoes);
   }
 }
 

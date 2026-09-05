@@ -12,6 +12,7 @@ import { ErroDoRelatorio, EsqueletoRelatorio, NotaDeAlcance, VazioDoRelatorio } 
 import type { Periodo } from './periodo';
 import { TabelaRelatorio } from './tabela';
 import type { Coluna, DefinicaoPainel } from './tipos';
+import { baixarXlsx, montarXlsx, nomeDoArquivoXlsx } from './xlsx';
 
 /** O que a tela precisa saber de uma consulta do TanStack Query, e nada além. */
 export type EstadoDaConsulta = {
@@ -25,9 +26,15 @@ export type EstadoDaConsulta = {
  * A moldura de todo painel: título, o que ele responde, exportação, resumo, tabela,
  * e a nota que diz o que esta leitura ainda não enxerga.
  *
- * O botão de CSV exporta as MESMAS colunas que estão na tela, na mesma ordem: as
- * definições de coluna servem aos dois (ver `csv.ts`). Ele só existe quando há linha,
- * porque baixar um arquivo com cabeçalho e nada dentro parece defeito.
+ * Os dois botões de exportação levam as MESMAS colunas que estão na tela, na mesma
+ * ordem: as definições de coluna servem aos três (ver `csv.ts` e `xlsx.ts`). Eles só
+ * existem quando há linha, porque baixar um arquivo com cabeçalho e nada dentro
+ * parece defeito.
+ *
+ * Por que os dois formatos, e não um: o CSV abre em qualquer lugar e é o que se cola
+ * num e-mail; o XLSX leva o número COMO NÚMERO, com formato de milhar e de
+ * percentual, e é o que soma numa célula sem ninguém ter de trocar ponto por vírgula.
+ * O RF-REL-09 pede os dois, e o Rafael pediu arquivo (R07 §4).
  */
 export function QuadroPainel<L>({
   painel,
@@ -76,16 +83,33 @@ export function QuadroPainel<L>({
         </div>
 
         {temLinhas ? (
-          <Button
-            variant="outline"
-            className="toque h-11 md:h-8"
-            onClick={() =>
-              baixarCsv(nomeDoArquivo(painel.chave, periodo), montarCsv(colunas, linhas))
-            }
-          >
-            <Download aria-hidden="true" />
-            Baixar CSV
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              aria-label={`Baixar ${painel.titulo} em CSV`}
+              className="toque h-11 md:h-8"
+              onClick={() =>
+                baixarCsv(nomeDoArquivo(painel.chave, periodo), montarCsv(colunas, linhas))
+              }
+            >
+              <Download aria-hidden="true" />
+              CSV
+            </Button>
+            <Button
+              variant="outline"
+              aria-label={`Baixar ${painel.titulo} em XLSX`}
+              className="toque h-11 md:h-8"
+              onClick={() =>
+                baixarXlsx(
+                  nomeDoArquivoXlsx(painel.chave, periodo),
+                  montarXlsx(painel.rotulo, colunas, linhas),
+                )
+              }
+            >
+              <Download aria-hidden="true" />
+              XLSX
+            </Button>
+          </div>
         ) : null}
       </header>
 

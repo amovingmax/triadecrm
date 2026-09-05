@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Imagem única dos workers do KOMUNE CRM (ingest | wa | ai). Node 22, multi-stage.
+# Imagem única dos workers do KOMUNE CRM (ingest | wa | ai | rotas). Node 22, multi-stage.
 #
 # Construir sempre a partir da RAIZ do repositório (o contexto precisa do workspace inteiro):
 #   docker build -f apps/workers/Dockerfile -t komune-crm/workers:local .

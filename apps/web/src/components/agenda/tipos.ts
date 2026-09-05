@@ -81,7 +81,12 @@ export type NaturezaDoCompromisso = 'marcado' | 'visita' | 'a_marcar';
 /** O dia em foco, sempre `YYYY-MM-DD` no fuso de Natal. */
 export type Dia = string;
 
-export type Visao = 'dia' | 'semana';
+/**
+ * As três visões da agenda. `rota` é a da tarde na rua (RF-ROT-03/05): mesma
+ * semana, mesmo dia, outra pergunta — não "o que tenho hoje", e sim "em que
+ * ordem eu ando".
+ */
+export type Visao = 'dia' | 'semana' | 'rota';
 
 // ---------------------------------------------------------------------------
 // Calendário: aritmética de dias civis, sem depender do fuso do aparelho

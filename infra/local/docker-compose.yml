@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # TRÍADE — máquina dedicada (ADR-04: recepção em nuvem, processamento local).
 #
-# O que roda aqui: os três workers (uma imagem, três comandos), o Metabase (painéis),
+# O que roda aqui: os quatro workers (uma imagem, quatro comandos), o Metabase (painéis),
 # o OSRM (matriz de tempos da rota da tarde, RF-ROT-03) e o faster-whisper (transcrição
 # do áudio que o fornecedor manda, RF-MET-07 e R05 §"Transcrever áudio recebido").
 #
@@ -13,7 +13,7 @@
 #
 # Perfis (ligue com COMPOSE_PROFILES no ./.env, ou --profile na linha de comando):
 #   (nenhum)      metabase, faster-whisper
-#   workers       worker-ingest, worker-wa, worker-ai
+#   workers       worker-ingest, worker-wa, worker-ai, worker-rotas
 #   rotas         osrm  (exige o grafo já preparado — veja o perfil osrm-preparo)
 #   osrm-preparo  osrm-preparo (tarefa única: extract → partition → customize)
 #   tunel         cloudflared (só se o Metabase precisar sair do tailnet)
@@ -55,6 +55,10 @@ x-worker: &worker
     # Contrato com os serviços locais: nomes de serviço da rede do Compose, nunca IP nem porta do host.
     OSRM_URL: http://osrm:5000
     WHISPER_URL: http://faster-whisper:9000
+    # A política do Nominatim exige User-Agent identificando a aplicação e um contato.
+    # Sai do ./.env desta máquina; sem ela, o `workers rotas` recusa subir (e é para recusar).
+    NOMINATIM_USER_AGENT: ${NOMINATIM_USER_AGENT:-}
+    NOMINATIM_URL: ${NOMINATIM_URL:-}
     # Identifica a linha de `worker_heartbeats` (PK é worker + instance). Uma máquina, uma instância.
     WORKER_INSTANCE: ${WORKER_INSTANCE:-default}
   profiles: ['workers']
@@ -77,7 +81,7 @@ x-worker: &worker
 
 services:
   # -------------------------------------------------------------------------
-  # Workers — uma imagem, três comandos (CLAUDE.md, ADR-04).
+  # Workers — uma imagem, quatro comandos (CLAUDE.md, ADR-04).
   #
   # Healthcheck: NÃO é "o processo está de pé". Um worker vivo sem rede, com chave errada
   # ou travado num laço engana qualquer verificação de processo e está parado para o CRM.
@@ -115,6 +119,31 @@ services:
     pids_limit: 256
     healthcheck:
       test: ['CMD', 'node', '/opt/healthchecks/worker-heartbeat.mjs', 'wa']
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+
+  # Rotas: ordem das visitas da tarde no OSRM e geocodificação pelo Nominatim (D9, RF-ROT).
+  #
+  # `depends_on: osrm` com `required: false` de propósito: sem o perfil `rotas` ligado, o
+  # worker sobe assim mesmo e o pedido de rota FALHA com motivo escrito na tela ("não deu
+  # para falar com o OSRM em http://osrm:5000"). É melhor do que o contêiner não subir e a
+  # tela ficar dizendo apenas "na fila" para sempre.
+  worker-rotas:
+    <<: *worker
+    command: ['rotas']
+    depends_on:
+      osrm:
+        condition: service_healthy
+        required: false
+    mem_limit: ${MEM_WORKER_ROTAS:-512m}
+    mem_reservation: 128m
+    memswap_limit: ${MEM_WORKER_ROTAS:-512m}
+    cpus: 1.0
+    pids_limit: 256
+    healthcheck:
+      test: ['CMD', 'node', '/opt/healthchecks/worker-heartbeat.mjs', 'rotas']
       interval: 60s
       timeout: 15s
       retries: 3

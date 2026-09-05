@@ -12,6 +12,7 @@ referência curta para quem desenvolve.
 | `worker-ingest`  | `workers`      | Radar: scrapers, planilhas, base CNPJ (D4, RF-RAD)                  | —                |
 | `worker-wa`      | `workers`      | WhatsApp Cloud API: envios, cadências, áudios (D5, RF-CON)          | —                |
 | `worker-ai`      | `workers`      | Haiku 4.5 e Sonnet 5: classificação, rascunhos, Assistente (ADR-10) | —                |
+| `worker-rotas`   | `workers`      | Ordem das visitas da tarde no OSRM e geocodificação (RF-ROT)         | —                |
 | `metabase`       | (padrão)       | Painéis do PRD §7.8 (RF-REL)                                        | `127.0.0.1:3001` |
 | `faster-whisper` | (padrão)       | Transcrição pt-BR do áudio recebido (RF-MET-07)                     | interna `9000`   |
 | `osrm`           | `rotas`        | Matriz de tempos e ordem das visitas da tarde (RF-ROT-03)           | interna `5000`   |
@@ -81,6 +82,33 @@ whisper): nada é instalado dentro do contêiner.
 - `data/metabase/` — banco interno do Metabase (H2). É o que se copia num backup.
 - `data/osrm/` — `.osm.pbf` do Rio Grande do Norte e o grafo gerado (~280 MB).
 - `data/whisper/` — cache do modelo (~500 MB no `small`), baixado na primeira transcrição.
+
+### Desenvolvimento: alcançar o OSRM de fora do Docker
+
+Nesta máquina o OSRM **não publica porta** (é assim que ele fica fora do alcance da LAN e da
+internet): quem fala com ele é o `worker-rotas`, pela rede do Compose. Quando o worker roda
+FORA do Docker — `pnpm -C apps/workers dev` na máquina de quem programa — não existe essa
+rede, e aí entra a sobreposição de desenvolvimento, que prende a porta em `127.0.0.1`:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile rotas up -d osrm
+curl 'http://127.0.0.1:5000/route/v1/driving/-35.1858,-5.8811;-35.2094,-5.7945?overview=false'
+# e no ambiente do worker: OSRM_URL=http://127.0.0.1:5000
+```
+
+`docker-compose.dev.yml` **não é para subir aqui na máquina do Luiz**: lá o arquivo de
+produção basta, e abrir porta é exatamente o que ele evita.
+
+### Geocodificar a base (uma vez, e a cada bairro novo)
+
+```bash
+docker compose exec worker-rotas node dist/index.js rotas --geocodificar
+```
+
+Faz uma passada pelo Nominatim do OpenStreetMap, a **1 requisição por segundo** (a política
+deles), com o `NOMINATIM_USER_AGENT` do `./.env` identificando a aplicação. Pergunta uma vez
+por bairro, não uma vez por ficha: a base inteira de hoje são 21 perguntas, ~35 s. O resultado
+fica em `public.geo_places` e não é perguntado de novo.
 
 Preparar o grafo do OSRM (uma vez, e de novo quando quiser mapa mais novo):
 

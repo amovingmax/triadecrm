@@ -55,6 +55,7 @@ export type Coluna<L> = {
 
 /** Os painéis da tela, na ordem da barra. */
 export type ChavePainel =
+  | 'semana'
   | 'funil'
   | 'categorias'
   | 'bairros'
@@ -74,6 +75,14 @@ export type DefinicaoPainel = {
 };
 
 export const PAINEIS: readonly DefinicaoPainel[] = [
+  {
+    chave: 'semana',
+    rotulo: 'Semana',
+    titulo: 'O relatório de segunda',
+    descricao:
+      'O que a semana rendeu, em texto pronto para ler no celular: o número e o que ele quer dizer.',
+    requisitos: 'RF-REL-09, RF-REL-01',
+  },
   {
     chave: 'funil',
     rotulo: 'Funil',
@@ -130,5 +139,14 @@ export const PAINEIS: readonly DefinicaoPainel[] = [
 export function painelDaUrl(valor: string | string[] | undefined): ChavePainel {
   const bruto = Array.isArray(valor) ? valor[0] : valor;
   const achado = PAINEIS.find((p) => p.chave === bruto);
-  return achado?.chave ?? 'funil';
+  return achado?.chave ?? 'semana';
+}
+
+/**
+ * O painel da semana não obedece à barra de período: ele é recortado pela SEMANA
+ * civil, e tem seletor próprio. Mostrar a barra de 7/30 dias ali seria oferecer um
+ * controle que não muda nada na tela.
+ */
+export function painelUsaPeriodo(chave: ChavePainel): boolean {
+  return chave !== 'semana';
 }

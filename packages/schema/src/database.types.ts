@@ -154,6 +154,7 @@ export type Database = {
       contact_is_visible: { Args: { p_contact: string }; Returns: boolean }
       corpo_fixo_de_optout: { Args: { p_body: string }; Returns: string }
       cpf_is_valid: { Args: { c: string }; Returns: boolean }
+      data_pt: { Args: { p_data: string }; Returns: string }
       ddd_da_regiao: { Args: { p_phone: string }; Returns: boolean }
       deal_set_intent: {
         Args: {
@@ -221,6 +222,7 @@ export type Database = {
         }[]
       }
       flags_externas: { Args: never; Returns: string[] }
+      frase_variacao_semanal: { Args: { p_numero: Json }; Returns: string }
       goal_bounds: {
         Args: {
           p_period: Database["app"]["Enums"]["goal_period"]
@@ -330,6 +332,8 @@ export type Database = {
         Returns: Json
       }
       lgpd_dossie: { Args: { p_organization_id: string }; Returns: Json }
+      lista_da_base: { Args: { p_base: Json }; Returns: string }
+      lista_de_etapas: { Args: { p_lista: Json }; Returns: string }
       mask_phone: { Args: { p: string }; Returns: string }
       mesclar_candidato: {
         Args: {
@@ -348,6 +352,7 @@ export type Database = {
       normalize_cnpj: { Args: { c: string }; Returns: string }
       normalize_instagram: { Args: { h: string }; Returns: string }
       normalize_phone_br: { Args: { p: string }; Returns: string }
+      numero_pt: { Args: { p_valor: number }; Returns: string }
       org_is_editable: { Args: { p_org: string }; Returns: boolean }
       org_is_mine: { Args: { p_org: string }; Returns: boolean }
       org_is_visible: { Args: { p_org: string }; Returns: boolean }
@@ -357,6 +362,11 @@ export type Database = {
       }
       payload_e_permitido: { Args: { p: Json }; Returns: boolean }
       payload_hash: { Args: { p: Json }; Returns: string }
+      percentual_pt: { Args: { p_valor: number }; Returns: string }
+      plural_pt: {
+        Args: { p_muitos: string; p_n: number; p_um: string }
+        Returns: string
+      }
       pode_enviar: {
         Args: {
           p_conversation_id: string
@@ -472,11 +482,59 @@ export type Database = {
         }
         Returns: number
       }
+      relatorio_semanal_catalogo: {
+        Args: never
+        Returns: {
+          ajuda: string
+          chave: string
+          ordem: number
+          proxy: boolean
+          rotulo: string
+        }[]
+      }
+      relatorio_semanal_comparavel_minimo: { Args: never; Returns: number }
+      relatorio_semanal_cron: { Args: never; Returns: string }
+      relatorio_semanal_fatos: {
+        Args: { p_semana_inicio: string }
+        Returns: Json
+      }
+      relatorio_semanal_gravar: {
+        Args: { p_por: string; p_por_id?: string; p_semana_inicio: string }
+        Returns: string
+      }
+      relatorio_semanal_numeros: {
+        Args: { p_ate: string; p_de: string }
+        Returns: Json
+      }
+      relatorio_semanal_texto: { Args: { p_fatos: Json }; Returns: string }
       resolver_source_record: {
         Args: { p_source_record_id: string }
         Returns: Json
       }
       role: { Args: never; Returns: Database["app"]["Enums"]["user_role"] }
+      rota_alvos: {
+        Args: { p_assignee: string; p_dia: string }
+        Returns: {
+          bairro: string
+          categoria: string
+          cidade: string
+          deal_id: string
+          due_at: string
+          elegivel: boolean
+          endereco: string
+          etapa: string
+          lat: number
+          lng: number
+          motivo: string
+          organizacao: string
+          organization_id: string
+          precisao: Database["app"]["Enums"]["geo_precision"]
+          raio_m: number
+          task_id: string
+          temperatura: Database["app"]["Enums"]["temperature"]
+          titulo: string
+        }[]
+      }
       search_name: { Args: { n: string }; Returns: string }
       sees_all: { Args: never; Returns: boolean }
       segredo: { Args: { p_nome: string }; Returns: string }
@@ -620,6 +678,7 @@ export type Database = {
         | "erasure_done"
       deal_status: "open" | "won" | "lost" | "paused" | "nurturing"
       door_kind: "aberta" | "batida" | "nenhuma"
+      geo_precision: "logradouro" | "bairro" | "cidade" | "incerta"
       goal_metric:
         | "new_targets"
         | "doors_knocked"
@@ -674,6 +733,7 @@ export type Database = {
         | "rejected"
         | "expired"
       review_status: "new" | "approved" | "rejected" | "merged" | "duplicate"
+      route_status: "enfileirada" | "pronta" | "falhou"
       source_kind: "scrape" | "import" | "manual" | "api" | "referral"
       task_kind:
         | "call"
@@ -2665,6 +2725,86 @@ export type Database = {
           },
         ]
       }
+      geo_places: {
+        Row: {
+          buscado_em: string
+          city_id: number | null
+          consulta: string
+          consulta_norm: string
+          created_at: string
+          display_name: string | null
+          encontrado: boolean
+          escopo: Database["app"]["Enums"]["geo_precision"]
+          fonte: string
+          id: number
+          lat: number | null
+          licenca: string
+          lng: number | null
+          neighborhood: string | null
+          osm_addresstype: string | null
+          osm_class: string | null
+          osm_id: number | null
+          osm_type: string | null
+          precisao: Database["app"]["Enums"]["geo_precision"] | null
+          raio_m: number | null
+          updated_at: string
+        }
+        Insert: {
+          buscado_em?: string
+          city_id?: number | null
+          consulta: string
+          consulta_norm: string
+          created_at?: string
+          display_name?: string | null
+          encontrado?: boolean
+          escopo: Database["app"]["Enums"]["geo_precision"]
+          fonte?: string
+          id?: never
+          lat?: number | null
+          licenca?: string
+          lng?: number | null
+          neighborhood?: string | null
+          osm_addresstype?: string | null
+          osm_class?: string | null
+          osm_id?: number | null
+          osm_type?: string | null
+          precisao?: Database["app"]["Enums"]["geo_precision"] | null
+          raio_m?: number | null
+          updated_at?: string
+        }
+        Update: {
+          buscado_em?: string
+          city_id?: number | null
+          consulta?: string
+          consulta_norm?: string
+          created_at?: string
+          display_name?: string | null
+          encontrado?: boolean
+          escopo?: Database["app"]["Enums"]["geo_precision"]
+          fonte?: string
+          id?: never
+          lat?: number | null
+          licenca?: string
+          lng?: number | null
+          neighborhood?: string | null
+          osm_addresstype?: string | null
+          osm_class?: string | null
+          osm_id?: number | null
+          osm_type?: string | null
+          precisao?: Database["app"]["Enums"]["geo_precision"] | null
+          raio_m?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "geo_places_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goals: {
         Row: {
           created_at: string
@@ -3708,6 +3848,11 @@ export type Database = {
           description: string | null
           do_not_contact: boolean
           email: string | null
+          geo_place_id: number | null
+          geo_precision: Database["app"]["Enums"]["geo_precision"] | null
+          geo_radius_m: number | null
+          geocoded_at: string | null
+          geog: unknown
           id: string
           import_batch_id: string | null
           instagram_handle: string | null
@@ -3751,6 +3896,11 @@ export type Database = {
           description?: string | null
           do_not_contact?: boolean
           email?: string | null
+          geo_place_id?: number | null
+          geo_precision?: Database["app"]["Enums"]["geo_precision"] | null
+          geo_radius_m?: number | null
+          geocoded_at?: string | null
+          geog?: unknown
           id?: string
           import_batch_id?: string | null
           instagram_handle?: string | null
@@ -3794,6 +3944,11 @@ export type Database = {
           description?: string | null
           do_not_contact?: boolean
           email?: string | null
+          geo_place_id?: number | null
+          geo_precision?: Database["app"]["Enums"]["geo_precision"] | null
+          geo_radius_m?: number | null
+          geocoded_at?: string | null
+          geog?: unknown
           id?: string
           import_batch_id?: string | null
           instagram_handle?: string | null
@@ -3830,6 +3985,13 @@ export type Database = {
             columns: ["city_id"]
             isOneToOne: false
             referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizations_geo_place_id_fkey"
+            columns: ["geo_place_id"]
+            isOneToOne: false
+            referencedRelation: "geo_places"
             referencedColumns: ["id"]
           },
           {
@@ -4377,6 +4539,163 @@ export type Database = {
           report?: Json
         }
         Relationships: []
+      }
+      route_plans: {
+        Row: {
+          assignee_id: string
+          computed_at: string | null
+          created_at: string
+          created_by: string | null
+          engine: string
+          failure_reason: string | null
+          id: string
+          origin_label: string
+          origin_lat: number
+          origin_lng: number
+          plan_date: string
+          status: Database["app"]["Enums"]["route_status"]
+          tentativa: number
+          total_meters: number | null
+          total_seconds: number | null
+          updated_at: string
+        }
+        Insert: {
+          assignee_id: string
+          computed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          engine?: string
+          failure_reason?: string | null
+          id?: string
+          origin_label: string
+          origin_lat: number
+          origin_lng: number
+          plan_date: string
+          status?: Database["app"]["Enums"]["route_status"]
+          tentativa?: number
+          total_meters?: number | null
+          total_seconds?: number | null
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string
+          computed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          engine?: string
+          failure_reason?: string | null
+          id?: string
+          origin_label?: string
+          origin_lat?: number
+          origin_lng?: number
+          plan_date?: string
+          status?: Database["app"]["Enums"]["route_status"]
+          tentativa?: number
+          total_meters?: number | null
+          total_seconds?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_plans_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_plans_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_stops: {
+        Row: {
+          created_at: string
+          geo_precision: Database["app"]["Enums"]["geo_precision"]
+          geo_radius_m: number | null
+          lat: number
+          lng: number
+          meters_from_prev: number
+          organization_id: string
+          plan_id: string
+          position: number
+          seconds_from_prev: number
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          geo_precision: Database["app"]["Enums"]["geo_precision"]
+          geo_radius_m?: number | null
+          lat: number
+          lng: number
+          meters_from_prev: number
+          organization_id: string
+          plan_id: string
+          position: number
+          seconds_from_prev: number
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          geo_precision?: Database["app"]["Enums"]["geo_precision"]
+          geo_radius_m?: number | null
+          lat?: number
+          lng?: number
+          meters_from_prev?: number
+          organization_id?: string
+          plan_id?: string
+          position?: number
+          seconds_from_prev?: number
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_stops_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_stops_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_stops_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "route_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_stops_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       source_category_map: {
         Row: {
@@ -5174,6 +5493,54 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_reports: {
+        Row: {
+          fatos: Json
+          gerado_em: string
+          gerado_por: string
+          gerado_por_id: string | null
+          parcial: boolean
+          semana_fim: string
+          semana_inicio: string
+          texto: string
+        }
+        Insert: {
+          fatos: Json
+          gerado_em?: string
+          gerado_por?: string
+          gerado_por_id?: string | null
+          parcial?: boolean
+          semana_fim: string
+          semana_inicio: string
+          texto: string
+        }
+        Update: {
+          fatos?: Json
+          gerado_em?: string
+          gerado_por?: string
+          gerado_por_id?: string | null
+          parcial?: boolean
+          semana_fim?: string
+          semana_inicio?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_reports_gerado_por_id_fkey"
+            columns: ["gerado_por_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_reports_gerado_por_id_fkey"
+            columns: ["gerado_por_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       worker_heartbeats: {
         Row: {
           details: Json
@@ -5384,6 +5751,45 @@ export type Database = {
           },
         ]
       }
+      pg_all_foreign_keys: {
+        Row: {
+          fk_columns: unknown[] | null
+          fk_constraint_name: unknown
+          fk_schema_name: unknown
+          fk_table_name: unknown
+          fk_table_oid: unknown
+          is_deferrable: boolean | null
+          is_deferred: boolean | null
+          match_type: string | null
+          on_delete: string | null
+          on_update: string | null
+          pk_columns: unknown[] | null
+          pk_constraint_name: unknown
+          pk_index_name: unknown
+          pk_schema_name: unknown
+          pk_table_name: unknown
+          pk_table_oid: unknown
+        }
+        Relationships: []
+      }
+      tap_funky: {
+        Row: {
+          args: string | null
+          is_definer: boolean | null
+          is_strict: boolean | null
+          is_visible: boolean | null
+          kind: unknown
+          langoid: unknown
+          name: unknown
+          oid: unknown
+          owner: unknown
+          returns: string | null
+          returns_set: boolean | null
+          schema: unknown
+          volatility: string | null
+        }
+        Relationships: []
+      }
       team_directory: {
         Row: {
           city_id: number | null
@@ -5562,6 +5968,22 @@ export type Database = {
       }
     }
     Functions: {
+      _cleanup: { Args: never; Returns: boolean }
+      _contract_on: { Args: { "": string }; Returns: unknown }
+      _currtest: { Args: never; Returns: number }
+      _db_privs: { Args: never; Returns: unknown[] }
+      _extensions: { Args: never; Returns: unknown[] }
+      _get: { Args: { "": string }; Returns: number }
+      _get_latest: { Args: { "": string }; Returns: number[] }
+      _get_note: { Args: { "": string }; Returns: string }
+      _is_verbose: { Args: never; Returns: boolean }
+      _prokind: { Args: { p_oid: unknown }; Returns: unknown }
+      _query: { Args: { "": string }; Returns: string }
+      _refine_vol: { Args: { "": string }; Returns: string }
+      _retval: { Args: { "": string }; Returns: string }
+      _table_privs: { Args: never; Returns: unknown[] }
+      _temptypes: { Args: { "": string }; Returns: string }
+      _todo: { Args: never; Returns: string }
       abrir_reivindicacao: {
         Args: { p_ip?: string; p_token: string; p_user_agent?: string }
         Returns: Json
@@ -5589,6 +6011,42 @@ export type Database = {
         Returns: Json
       }
       cadencias_visao: { Args: never; Returns: Json }
+      col_is_null:
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              schema_name: unknown
+              table_name: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              table_name: unknown
+            }
+            Returns: string
+          }
+      col_not_null:
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              schema_name: unknown
+              table_name: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              table_name: unknown
+            }
+            Returns: string
+          }
       criar_pre_cadastro: {
         Args: {
           p_organization_id: string
@@ -5630,6 +6088,23 @@ export type Database = {
         }
         Returns: Json
       }
+      diag:
+        | {
+            Args: { msg: unknown }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+        | {
+            Args: { msg: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+      diag_test_name: { Args: { "": string }; Returns: string }
+      do_tap:
+        | { Args: never; Returns: string[] }
+        | { Args: { "": string }; Returns: string[] }
       encerrar_cadencia: {
         Args: { p_enrollment_id: string; p_motivo: string }
         Returns: Json
@@ -5717,6 +6192,32 @@ export type Database = {
         Returns: Json
       }
       exportar_lgpd_por_token: { Args: { p_token: string }; Returns: Json }
+      fail:
+        | { Args: never; Returns: string }
+        | { Args: { "": string }; Returns: string }
+      findfuncs: { Args: { "": string }; Returns: string[] }
+      finish: { Args: { exception_on_failure?: boolean }; Returns: string[] }
+      format_type_string: { Args: { "": string }; Returns: string }
+      geo_gravar: {
+        Args: {
+          p_addresstype?: string
+          p_bbox?: number[]
+          p_city_id: number
+          p_consulta: string
+          p_display_name?: string
+          p_encontrado: boolean
+          p_escopo: string
+          p_lat?: number
+          p_licenca?: string
+          p_lng?: number
+          p_neighborhood: string
+          p_osm_class?: string
+          p_osm_id?: number
+          p_osm_type?: string
+        }
+        Returns: Json
+      }
+      geo_pendentes: { Args: { p_limite?: number }; Returns: Json }
       gerar_link_de_reivindicacao: {
         Args: { p_organization_id: string }
         Returns: Json
@@ -5745,6 +6246,7 @@ export type Database = {
           ritmo_necessario: number
         }[]
       }
+      has_unique: { Args: { "": string }; Returns: string }
       ia_fila_enfileirar: {
         Args: { p_key: string; p_payload: Json; p_purpose: string }
         Returns: Json
@@ -5760,8 +6262,11 @@ export type Database = {
       }
       importacao_lotes: { Args: { p_limit?: number }; Returns: Json }
       importacao_previa: { Args: { p_linhas: Json }; Returns: Json }
+      in_todo: { Args: never; Returns: boolean }
       iniciar_chamada: { Args: { p_item_id: string }; Returns: Json }
       integracao_segredo: { Args: { p_nome: string }; Returns: string }
+      is_empty: { Args: { "": string }; Returns: string }
+      isnt_empty: { Args: { "": string }; Returns: string }
       komune_fila_status: { Args: never; Returns: Json }
       komune_push_erro: {
         Args: {
@@ -5790,6 +6295,7 @@ export type Database = {
         Args: { p_ativa: boolean; p_slug: string }
         Returns: Json
       }
+      lives_ok: { Args: { "": string }; Returns: string }
       marcar_nao_ligar_mais: {
         Args: {
           p_contact_id?: string
@@ -5858,7 +6364,16 @@ export type Database = {
         }
         Returns: Json
       }
+      no_plan: { Args: never; Returns: boolean[] }
+      num_failed: { Args: never; Returns: number }
       origem_dos_dados: { Args: { p_organization_id: string }; Returns: Json }
+      os_name: { Args: never; Returns: string }
+      pass:
+        | { Args: never; Returns: string }
+        | { Args: { "": string }; Returns: string }
+      pg_version: { Args: never; Returns: string }
+      pg_version_num: { Args: never; Returns: number }
+      pgtap_version: { Args: never; Returns: number }
       pipeline_board: {
         Args: {
           p_limit_per_stage?: number
@@ -6110,12 +6625,67 @@ export type Database = {
           visitas: number
         }[]
       }
+      relatorio_semanal: {
+        Args: { p_semana_inicio?: string }
+        Returns: {
+          fatos: Json
+          gerado_em: string
+          gerado_por: string
+          gerado_por_nome: string
+          parcial: boolean
+          rotulo: string
+          semana_fim: string
+          semana_inicio: string
+          texto: string
+        }[]
+      }
+      relatorio_semanal_gerar: {
+        Args: { p_semana_inicio?: string }
+        Returns: string
+      }
+      relatorios_semanais: {
+        Args: { p_semanas?: number }
+        Returns: {
+          gerado: boolean
+          gerado_em: string
+          gerado_por: string
+          parcial: boolean
+          rotulo: string
+          semana_fim: string
+          semana_inicio: string
+        }[]
+      }
       resumo_do_dia: {
         Args: { p_momento?: string; p_user_id?: string }
         Returns: Json
       }
       reveal_contact_phone: { Args: { p_contact_id: string }; Returns: string }
       reveal_phone: { Args: { p_organization_id: string }; Returns: string }
+      rota_do_dia: {
+        Args: { p_assignee?: string; p_dia?: string }
+        Returns: Json
+      }
+      rota_falhar: {
+        Args: { p_motivo: string; p_plano_id: string }
+        Returns: boolean
+      }
+      rota_gravar_ordem: {
+        Args: {
+          p_paradas: Json
+          p_plano_id: string
+          p_total_meters: number
+          p_total_seconds: number
+        }
+        Returns: Json
+      }
+      rota_montar: {
+        Args: { p_assignee?: string; p_dia?: string; p_max_paradas?: number }
+        Returns: Json
+      }
+      rota_proximas: { Args: { p_qty?: number }; Returns: Json }
+      runtests:
+        | { Args: never; Returns: string[] }
+        | { Args: { "": string }; Returns: string[] }
       search_organizations: {
         Args: {
           p_category_id?: number
@@ -6146,6 +6716,9 @@ export type Database = {
           total_count: number
         }[]
       }
+      skip:
+        | { Args: { "": string }; Returns: string }
+        | { Args: { how_many: number; why: string }; Returns: string }
       tabular_chamada: {
         Args: {
           p_agendar_para?: string
@@ -6166,6 +6739,16 @@ export type Database = {
         }
         Returns: Json
       }
+      throws_ok: { Args: { "": string }; Returns: string }
+      todo:
+        | { Args: { how_many: number }; Returns: boolean[] }
+        | { Args: { how_many: number; why: string }; Returns: boolean[] }
+        | { Args: { why: string }; Returns: boolean[] }
+        | { Args: { how_many: number; why: string }; Returns: boolean[] }
+      todo_end: { Args: never; Returns: boolean[] }
+      todo_start:
+        | { Args: never; Returns: boolean[] }
+        | { Args: { "": string }; Returns: boolean[] }
       wa_eco_registrar: {
         Args: {
           p_body?: string
@@ -6254,7 +6837,9 @@ export type Database = {
       [_ in never]: never
     }
     CompositeTypes: {
-      [_ in never]: never
+      _time_trial_type: {
+        a_time: number | null
+      }
     }
   }
 }
@@ -6424,6 +7009,7 @@ export const Constants = {
       ],
       deal_status: ["open", "won", "lost", "paused", "nurturing"],
       door_kind: ["aberta", "batida", "nenhuma"],
+      geo_precision: ["logradouro", "bairro", "cidade", "incerta"],
       goal_metric: [
         "new_targets",
         "doors_knocked",
@@ -6477,6 +7063,7 @@ export const Constants = {
         "expired",
       ],
       review_status: ["new", "approved", "rejected", "merged", "duplicate"],
+      route_status: ["enfileirada", "pronta", "falhou"],
       source_kind: ["scrape", "import", "manual", "api", "referral"],
       task_kind: ["call", "visit", "meeting", "message", "follow_up", "other"],
       task_status: ["todo", "doing", "done", "cancelled"],

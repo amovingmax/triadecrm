@@ -135,7 +135,14 @@ jobs:
 
       - name: supabase db lint
         id: lint
-        run: supabase db lint --local --level warning --fail-on warning
+        # `--schema public,app`: são os dois schemas que este repositório escreve.
+        # Sem o recorte, o lint desce no `extensions` e passa a reprovar o PR por
+        # avisos das funções PL/pgSQL do PROPRIO PostGIS (`addgeometrycolumn`,
+        # `populate_geometry_columns`, `st_letters`…), instalado na migração
+        # 20260905000600 para as rotas de visita. Código de terceiro, dentro de uma
+        # extensão, não é nosso para consertar — e deixá-lo reprovando o CI treinaria
+        # todo mundo a ignorar o passo.
+        run: supabase db lint --local --level warning --fail-on warning --schema public,app
 
       - name: Testes do banco (pgTAP)
         id: pgtap

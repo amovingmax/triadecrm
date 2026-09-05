@@ -6,6 +6,8 @@
  * - wa: META_WA_ACCESS_TOKEN, META_WA_PHONE_NUMBER_ID (VERIFY_TOKEN e APP_SECRET são do webhook, na Edge Function);
  *        opcionais META_WA_GRAPH_URL e META_WA_API_VERSION, que apontam o cliente para o dublê local
  * - ai: ANTHROPIC_API_KEY; opcional ANTHROPIC_BASE_URL (dublê local)
+ * - rotas: OSRM_URL e NOMINATIM_USER_AGENT (a política do Nominatim EXIGE identificação);
+ *          opcional NOMINATIM_URL, para apontar para uma instância própria ou para um dublê
  */
 import { z } from 'zod';
 
@@ -65,10 +67,27 @@ const aiEnvSchema = baseEnvSchema.extend({
   ANTHROPIC_BASE_URL: optionalUrl,
 });
 
+/**
+ * Rotas (RF-ROT-01 e RF-ROT-03).
+ *
+ * `NOMINATIM_USER_AGENT` é OBRIGATÓRIA, e é obrigatória de propósito: a política
+ * de uso do Nominatim exige um User-Agent que identifique a aplicação e dê um
+ * contato. Um valor padrão embutido no código seria uma identificação falsa. Sem
+ * a variável, o worker não sobe — que é melhor do que subir escondido.
+ */
+const rotasEnvSchema = baseEnvSchema.extend({
+  /** Onde o OSRM responde. Na máquina dedicada, `http://osrm:5000` (rede do Compose). */
+  OSRM_URL: z.preprocess(emptyToUndefined, z.url().default('http://osrm:5000')),
+  NOMINATIM_USER_AGENT: required('NOMINATIM_USER_AGENT'),
+  /** Vazio = o serviço público do OpenStreetMap. */
+  NOMINATIM_URL: optionalUrl,
+});
+
 export const envSchemas = {
   ingest: baseEnvSchema,
   wa: waEnvSchema,
   ai: aiEnvSchema,
+  rotas: rotasEnvSchema,
 } as const;
 
 export type BaseEnv = z.infer<typeof baseEnvSchema>;

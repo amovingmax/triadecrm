@@ -44,10 +44,15 @@ export default async function Pagina({
         hoje={hoje}
         agoraIso={agora.toISOString()}
         diaInicial={diaDaUrl(params.dia) ?? hoje}
-        visaoInicial={params.visao === 'semana' ? ('semana' as Visao) : ('dia' as Visao)}
+        visaoInicial={visaoDaUrl(params.visao)}
       />
     </ProvedorConsultas>
   );
+}
+
+/** `?visao=semana` e `?visao=rota`; qualquer outra coisa é o dia. */
+function visaoDaUrl(valor: string | string[] | undefined): Visao {
+  return valor === 'semana' || valor === 'rota' ? valor : 'dia';
 }
 
 /** `?dia=2026-09-10`, quando é uma data de calendário de verdade. */

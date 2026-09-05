@@ -2,7 +2,7 @@
  * Parse dos argumentos do CLI dos workers. Sem dependências, para ser testável e rápido.
  */
 
-export const WORKER_COMMANDS = ['ingest', 'wa', 'ai'] as const;
+export const WORKER_COMMANDS = ['ingest', 'wa', 'ai', 'rotas'] as const;
 export type WorkerCommand = (typeof WORKER_COMMANDS)[number];
 
 /**
@@ -14,6 +14,7 @@ export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
   ingest: ['uma-vez', 'agendar', 'fonte', 'categorias', 'paginas', 'rotulo'],
   wa: ['uma-vez'],
   ai: ['uma-vez'],
+  rotas: ['uma-vez', 'geocodificar'],
 };
 
 export const USAGE = `Uso: workers <comando> [opções]
@@ -22,6 +23,7 @@ Comandos:
   ingest   Radar: coleta nas fontes públicas → esteira de ingestão (RF-RAD, anexos R03/R06)
   wa       WhatsApp: recebe, registra opt-out e envia pela Cloud API da Meta (D5, RF-CON)
   ai       IA: classificação, rascunhos, resumos e Assistente (D6, ADR-10)
+  rotas    Rotas de visita: geocodificação (Nominatim) e ordem das paradas no OSRM (RF-ROT)
 
 Opções de "ingest":
   --agendar              Abre um lote e enfileira a coleta antes de começar a consumir.
@@ -36,6 +38,11 @@ Opções de "wa":
 
 Opções de "ai":
   --uma-vez              Esvazia a fila ai_jobs uma vez e sai, em vez de ficar rodando.
+
+Opções de "rotas":
+  --geocodificar         Faz UMA passada de geocodificação no Nominatim (1 req/s) e sai.
+                         Não entra no laço da fila: as perguntas acabam.
+  --uma-vez              Esvazia a fila rotas_jobs uma vez e sai, em vez de ficar rodando.
 
 Opções gerais:
   -h, --help   Mostra esta ajuda

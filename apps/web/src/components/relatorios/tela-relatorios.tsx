@@ -10,8 +10,9 @@ import { PainelFontes } from './painel-fontes';
 import { PainelFunil } from './painel-funil';
 import { PainelHorarios } from './painel-horarios';
 import { PainelPessoas } from './painel-pessoas';
+import { PainelSemana } from './painel-semana';
 import { periodoValido, urlDoRecorte, type Periodo } from './periodo';
-import { PAINEIS, type ChavePainel } from './tipos';
+import { PAINEIS, painelUsaPeriodo, type ChavePainel } from './tipos';
 
 /**
  * A tela de Relatórios (RF-REL-01 a RF-REL-11).
@@ -31,13 +32,19 @@ import { PAINEIS, type ChavePainel } from './tipos';
 export function TelaRelatorios({
   painelInicial,
   periodoInicial,
+  semanaInicial,
 }: {
   painelInicial: ChavePainel;
   periodoInicial: Periodo;
+  /** A segunda-feira pedida na URL, quando o link veio do relatório de segunda. */
+  semanaInicial: string | null;
 }) {
   const [painel, setPainel] = useState<ChavePainel>(painelInicial);
   const [periodo, setPeriodo] = useState<Periodo>(periodoInicial);
   const [periodoAplicado, setPeriodoAplicado] = useState<Periodo>(periodoInicial);
+  // A semana mora aqui, e não dentro do painel, porque é ela que vai para a URL:
+  // o painel avisa qual semana está mostrando e a tela escreve o endereço.
+  const [semana, setSemana] = useState<string | null>(semanaInicial);
 
   const trocarPeriodo = useCallback((novo: Periodo) => {
     setPeriodo(novo);
@@ -45,11 +52,15 @@ export function TelaRelatorios({
   }, []);
 
   useEffect(() => {
-    const alvo = `${window.location.pathname}${urlDoRecorte(periodoAplicado, painel)}`;
+    const alvo = `${window.location.pathname}${urlDoRecorte(
+      periodoAplicado,
+      painel,
+      painel === 'semana' ? semana : null,
+    )}`;
     if (alvo !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', alvo);
     }
-  }, [painel, periodoAplicado]);
+  }, [painel, periodoAplicado, semana]);
 
   const definicao = PAINEIS.find((item) => item.chave === painel) ?? PAINEIS[0];
 
@@ -69,19 +80,42 @@ export function TelaRelatorios({
 
       <div className="flex flex-col gap-3 border-y border-hairline py-3">
         <SeletorDePainel painel={painel} aoTrocar={setPainel} />
-        <BarraDePeriodo periodo={periodo} aoTrocar={trocarPeriodo} />
+        {/* A leitura da semana tem recorte próprio (a semana civil) e seletor
+            próprio: a barra de 7/30 dias ali não mudaria número nenhum. */}
+        {painelUsaPeriodo(painel) ? (
+          <BarraDePeriodo periodo={periodo} aoTrocar={trocarPeriodo} />
+        ) : null}
       </div>
 
-      {definicao ? <Painel chave={definicao.chave} periodo={periodoAplicado} /> : null}
+      {definicao ? (
+        <Painel
+          chave={definicao.chave}
+          periodo={periodoAplicado}
+          semana={semana}
+          aoTrocarSemana={setSemana}
+        />
+      ) : null}
     </div>
   );
 }
 
-function Painel({ chave, periodo }: { chave: ChavePainel; periodo: Periodo }) {
+function Painel({
+  chave,
+  periodo,
+  semana,
+  aoTrocarSemana,
+}: {
+  chave: ChavePainel;
+  periodo: Periodo;
+  semana: string | null;
+  aoTrocarSemana: (semana: string) => void;
+}) {
   const painel = PAINEIS.find((item) => item.chave === chave);
   if (!painel) return null;
 
   switch (chave) {
+    case 'semana':
+      return <PainelSemana painel={painel} semana={semana} aoTrocarSemana={aoTrocarSemana} />;
     case 'funil':
       return <PainelFunil painel={painel} periodo={periodo} />;
     case 'categorias':

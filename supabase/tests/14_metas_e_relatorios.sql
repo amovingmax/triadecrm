@@ -176,8 +176,16 @@ select ok(to_regprocedure('public.meu_dia(uuid, int)') is not null,
   'estrutura: public.meu_dia(uuid, int) existe');
 select ok(to_regprocedure('public.relatorio_funil(date, date, int)') is not null,
   'estrutura: public.relatorio_funil(date, date, int) existe');
+-- A conta é das seis leituras DESTA migração, e por isso elas vão nomeadas. Antes
+-- ela era `proname like 'relatorio\_%'`, e quebrou no dia em que a migração
+-- 20260905000700 acrescentou `relatorio_semanal` e `relatorio_semanal_gerar` ao
+-- mesmo prefixo: contagem por prefixo falha toda vez que outro módulo nasce, sem
+-- nada estar errado. O relatório de segunda tem inventário próprio em 28_*.
 select ok((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-            where n.nspname = 'public' and p.proname like 'relatorio\_%') = 6,
+            where n.nspname = 'public'
+              and p.proname in ('relatorio_funil', 'relatorio_por_responsavel',
+                                'relatorio_por_categoria', 'relatorio_por_bairro',
+                                'relatorio_por_fonte', 'relatorio_por_horario')) = 6,
   'estrutura: são seis funções de relatório');
 select ok(not has_function_privilege('anon', 'public.meu_dia(uuid, int)', 'execute'),
   'privilégio: anon não executa meu_dia');
