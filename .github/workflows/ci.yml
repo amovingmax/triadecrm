@@ -1,0 +1,162 @@
+# ============================================================================
+# TRÍADE (CRM de captação da Komune) — integração contínua.
+#
+# O que este arquivo garante antes de qualquer código entrar em `main`:
+#   1. a aplicação passa em lint, tipos e testes (Node 22 + pnpm 11, como na máquina de quem desenvolve);
+#   2. o banco NASCE DO ZERO: sobe o Supabase local, aplica as migrações na ordem e roda a semente;
+#   3. o esquema passa no `supabase db lint` e a suíte pgTAP (RLS, funções, esteira, cadências) fica verde.
+#
+# Os dois trabalhos rodam em paralelo e param no primeiro passo vermelho: quem abriu o PR
+# descobre em minutos o que quebrou, e o resumo do fim de cada trabalho diz o comando exato
+# para reproduzir a falha na própria máquina.
+#
+# Segredos: NENHUM valor sensível mora aqui. Ver docs/operacao/ci.md, "Segredos".
+# ============================================================================
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Um push novo no mesmo ramo cancela a execução anterior: a fila anda e o retorno é rápido.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# O CI só lê o repositório: nenhum trabalho publica, comenta ou implanta nada.
+permissions:
+  contents: read
+
+env:
+  # Fuso de toda a lógica de janelas, cadências, digests e relatórios (CLAUDE.md).
+  TZ: America/Fortaleza
+  NEXT_TELEMETRY_DISABLED: '1'
+  # Sem cores ANSI: o log do painel do GitHub fica legível.
+  FORCE_COLOR: '0'
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1) Aplicação: web, workers e pacotes compartilhados.
+  # --------------------------------------------------------------------------
+  aplicacao:
+    name: Aplicação — lint, tipos e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Conferir que nenhum segredo foi versionado
+        run: |
+          set -uo pipefail
+          encontrados=$(git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.example$' || true)
+          if [ -n "$encontrados" ]; then
+            echo "::error::Arquivo de segredo versionado: $encontrados. Segredo só em .env local (gitignored) e no Vault."
+            exit 1
+          fi
+          echo "OK — só os modelos .env.example estão versionados."
+
+      - name: Instalar o pnpm
+        # A versão vem do campo "packageManager" do package.json (pnpm 11.25.0): um lugar só.
+        uses: pnpm/action-setup@v4
+
+      - name: Instalar o Node
+        uses: actions/setup-node@v4
+        with:
+          # A versão vem do .nvmrc (Node 22), a mesma que `source scripts/dev-env.sh` seleciona.
+          node-version-file: .nvmrc
+          # Cache do armazém do pnpm, com chave derivada do pnpm-lock.yaml.
+          cache: pnpm
+
+      - name: Instalar as dependências (lockfile congelado)
+        id: dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        id: lint
+        run: pnpm lint
+
+      - name: Tipos
+        id: tipos
+        run: pnpm typecheck
+
+      - name: Testes (Vitest)
+        id: testes
+        run: pnpm test
+
+      - name: O que quebrou
+        if: failure()
+        run: |
+          {
+            echo '### CI vermelho — Aplicação'
+            echo ''
+            echo '| passo | resultado | como reproduzir |'
+            echo '| --- | --- | --- |'
+            echo '| dependências | ${{ steps.dependencias.outcome || 'não chegou a rodar' }} | `pnpm install --frozen-lockfile` — se acusar lockfile desatualizado, rode `pnpm install` e faça commit do `pnpm-lock.yaml` |'
+            echo '| lint | ${{ steps.lint.outcome || 'não chegou a rodar' }} | `pnpm lint` |'
+            echo '| tipos | ${{ steps.tipos.outcome || 'não chegou a rodar' }} | `pnpm typecheck` |'
+            echo '| testes | ${{ steps.testes.outcome || 'não chegou a rodar' }} | `pnpm test` |'
+            echo ''
+            echo 'Antes de tudo: `source scripts/dev-env.sh` (Node 22 pelo nvm).'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # --------------------------------------------------------------------------
+  # 2) Banco: migrações do zero, semente, db lint e pgTAP.
+  #    Nada aqui toca banco remoto: a stack sobe e morre dentro da máquina do CI.
+  # --------------------------------------------------------------------------
+  banco:
+    name: Banco — migrações, db lint e pgTAP
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # O config.toml resolve estes dois `env(...)` para o login Google (RF-ADM-01). Nenhum dos dois
+      # é usado pelas migrações nem pelo pgTAP: sem segredo cadastrado, o valor de reserva mantém o
+      # CI verde (inclusive em PR vindo de fork) e o CLI não avisa de variável faltando em passo nenhum.
+      SUPABASE_AUTH_GOOGLE_CLIENT_ID: ${{ secrets.SUPABASE_AUTH_GOOGLE_CLIENT_ID || 'ci-sem-google' }}
+      SUPABASE_AUTH_GOOGLE_SECRET: ${{ secrets.SUPABASE_AUTH_GOOGLE_SECRET || 'ci-sem-google' }}
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar o Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          # Mesma versão usada no desenvolvimento (ver docs/operacao/ci.md para subir).
+          version: 2.109.0
+
+      - name: Subir o Supabase local e aplicar migrações e semente
+        id: subir
+        run: |
+          # Sobem só os contêineres de que as migrações e o pgTAP precisam (banco, auth, api).
+          # Studio, imgproxy, vector, realtime e edge-runtime ficam de fora para economizar minutos.
+          supabase start -x studio,imgproxy,vector,realtime,edge-runtime
+
+      - name: supabase db lint
+        id: lint
+        run: supabase db lint --local --level warning --fail-on warning
+
+      - name: Testes do banco (pgTAP)
+        id: pgtap
+        run: supabase test db --local
+
+      - name: O que quebrou
+        if: failure()
+        run: |
+          {
+            echo '### CI vermelho — Banco'
+            echo ''
+            echo '| passo | resultado | como reproduzir |'
+            echo '| --- | --- | --- |'
+            echo '| subir e migrar | ${{ steps.subir.outcome || 'não chegou a rodar' }} | `supabase db reset --local` (recria o banco local do zero — apaga os dados de desenvolvimento) |'
+            echo '| db lint | ${{ steps.lint.outcome || 'não chegou a rodar' }} | `pnpm db:lint` |'
+            echo '| pgTAP | ${{ steps.pgtap.outcome || 'não chegou a rodar' }} | `pnpm db:test` |'
+            echo ''
+            echo 'Falha só no CI e não na sua máquina quase sempre quer dizer **migração que depende de dado que a semente cria**:'
+            echo 'no CI o banco nasce vazio e as migrações rodam ANTES da `supabase/seed.sql`.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Derrubar a stack
+        if: always()
+        run: supabase stop --no-backup

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { AvisoWhatsapp } from './aviso-whatsapp';
+import type { DependenciasDaMeta } from './tipos';
 
 /**
  * A espera, os vazios e o erro das Conversas.
@@ -141,7 +142,7 @@ export function ErroDaTela({
  * É o lugar certo para o aviso inteiro do WhatsApp: é a primeira coisa que alguém vê
  * ao abrir o módulo, e é onde a pergunta "cadê minhas mensagens?" nasce.
  */
-export function NenhumaEscolhida() {
+export function NenhumaEscolhida({ meta }: { meta: DependenciasDaMeta | null }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-12 text-center">
       <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
@@ -150,11 +151,12 @@ export function NenhumaEscolhida() {
       <div className="space-y-1">
         <p className="font-heading font-medium">Escolha um parceiro à esquerda</p>
         <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-          A linha do tempo mostra tudo que já aconteceu com ele: ligação, visita, reunião,
-          nota e mudança de etapa, em ordem, com quem fez e o desfecho.
+          A conversa mostra tudo que já aconteceu com ele, na mesma coluna e em ordem:
+          mensagem recebida e enviada, ligação, visita, nota e mudança de etapa, com quem fez
+          e o desfecho.
         </p>
       </div>
-      <AvisoWhatsapp className="max-w-md text-left" />
+      <AvisoWhatsapp meta={meta} className="max-w-md text-left" />
     </div>
   );
 }

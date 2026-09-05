@@ -57,7 +57,7 @@ describe('parseArgs', () => {
       message: expect.stringContaining('--paginas'),
     });
     expect(parseArgs(['ingest', '--foo'])).toMatchObject({ kind: 'error' });
-    // `wa` e `ai` ainda não aceitam opção nenhuma.
+    // `wa` ainda não aceita opção nenhuma.
     expect(parseArgs(['wa', '--agendar'])).toMatchObject({ kind: 'error' });
   });
 

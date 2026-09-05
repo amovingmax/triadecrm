@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,8 @@ import { BarraTermica, ChipTemperatura, DiasSemContato } from '@/components/temp
 
 import { local } from './formatos';
 import { ICONE_CANAL } from './icones';
+import { ChipDaJanela } from './janela-24h';
+import { estadoDaJanela } from './mensagens';
 import { ROTULO_CANAL, type ItemConversa } from './tipos';
 
 /**
@@ -60,6 +62,10 @@ function Linha({
   const onde = local(item.bairro, item.cidade);
   const rodape = [onde, item.categoria].filter(Boolean).join(' · ');
   const alvo = useRef<HTMLLIElement>(null);
+  // O relógio da janela na linha da lista NÃO anda: ele é lido uma vez por
+  // repintura da lista. Cem linhas com um `setInterval` cada é bateria da
+  // Heloísa indo embora para mudar um "3 h" em "2 h" que ninguém está olhando.
+  const janela = estadoDaJanela(item.fio?.janelaExpiraEm ?? null);
 
   // Um link com `?org=` pode apontar para o quinquagésimo parceiro da lista. Sem isto,
   // a conversa abre à direita e a lista continua no topo, sem nenhuma linha acesa: a
@@ -90,7 +96,22 @@ function Linha({
 
         <span className="min-w-0 flex-1 space-y-1">
           <span className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{item.nome}</span>
+            <span
+              className={cn(
+                'min-w-0 flex-1 truncate text-sm',
+                item.naoLidas > 0 ? 'font-semibold' : 'font-medium',
+              )}
+            >
+              {item.nome}
+            </span>
+            {item.naoLidas > 0 ? (
+              <span
+                className="numerico inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background"
+                title={`${item.naoLidas} mensagem(ns) por ler`}
+              >
+                {item.naoLidas}
+              </span>
+            ) : null}
             <DiasSemContato
               dias={item.diasSemContato}
               atencao={item.precisaAtencao}
@@ -122,13 +143,22 @@ function Linha({
             </span>
           </span>
 
-          {rodape || item.naoContatar ? (
+          {rodape || item.naoContatar || item.rascunhoPendente || janela.situacao === 'aberta' ? (
             <span className="flex items-center gap-1.5">
               {item.naoContatar ? (
                 <Badge variant="pilula" className="h-5 shrink-0 px-1.5 text-[10px] font-normal">
                   não contatar
                 </Badge>
               ) : null}
+              {/* O rascunho pendente é o que faz alguém abrir esta linha AGORA:
+                  ele expira em três dias e some sozinho. Vem antes do endereço. */}
+              {item.rascunhoPendente ? (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-hairline px-1.5 text-[10px]">
+                  <Sparkles className="size-2.5" aria-hidden="true" />
+                  aprovar
+                </span>
+              ) : null}
+              <ChipDaJanela estado={janela} />
               {rodape ? (
                 <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
                   {rodape}

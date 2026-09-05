@@ -1,12 +1,13 @@
 'use client';
 
-import { DoorOpen } from 'lucide-react';
+import { CornerDownLeft, DoorOpen, Send } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 import { dataHoraCompleta, duracao, hora, rotuloDoDia } from './formatos';
 import { ICONE_TIPO } from './icones';
+import { Mensagem } from './mensagem-do-fio';
 import { ROTULO_AUTOR, ROTULO_CANAL, ROTULO_TIPO, type DiaDaLinha, type EventoDaLinha } from './tipos';
 
 /**
@@ -58,6 +59,33 @@ function SeparadorDeDia({ iso }: { iso: string }) {
 }
 
 function Evento({ evento }: { evento: EventoDaLinha }) {
+  // A mensagem é balão, não linha de registro: ela ocupa a largura do trilho e
+  // dispensa o cabeçalho de procedência, porque a própria assinatura do balão já
+  // diz quem escreveu, por onde e sob que regra saiu.
+  if (evento.genero === 'mensagem' && evento.mensagem) {
+    const recebida = evento.mensagem.entrada;
+    const Seta = recebida ? CornerDownLeft : Send;
+    return (
+      <li className="group relative flex gap-3 pb-4 last:pb-0">
+        <span
+          className="absolute top-8 bottom-0 left-4 w-px -translate-x-1/2 bg-hairline group-last:hidden"
+          role="presentation"
+        />
+        <span
+          className={cn(
+            'relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-hairline text-muted-foreground',
+            recebida ? 'bg-muted text-foreground' : 'bg-card',
+          )}
+        >
+          <Seta className="size-4" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <Mensagem mensagem={evento.mensagem} />
+        </div>
+      </li>
+    );
+  }
+
   const Icone = ICONE_TIPO[evento.tipo ?? 'note'];
   const tempo = duracao(evento.duracaoMin);
   const titulo = evento.desfecho ?? evento.titulo;

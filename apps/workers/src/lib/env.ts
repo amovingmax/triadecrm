@@ -3,8 +3,9 @@
  *
  * Todas as variáveis estão documentadas em `.env.example` na raiz. Cada comando exige só o que usa:
  * - base (todos): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY; opcionais SENTRY_DSN, KOMUNE_HMAC_SECRET, LOG_LEVEL, TZ
- * - wa: META_WA_ACCESS_TOKEN, META_WA_PHONE_NUMBER_ID (VERIFY_TOKEN e APP_SECRET são do webhook, na Edge Function)
- * - ai: ANTHROPIC_API_KEY
+ * - wa: META_WA_ACCESS_TOKEN, META_WA_PHONE_NUMBER_ID (VERIFY_TOKEN e APP_SECRET são do webhook, na Edge Function);
+ *        opcionais META_WA_GRAPH_URL e META_WA_API_VERSION, que apontam o cliente para o dublê local
+ * - ai: ANTHROPIC_API_KEY; opcional ANTHROPIC_BASE_URL (dublê local)
  */
 import { z } from 'zod';
 
@@ -44,10 +45,24 @@ const waEnvSchema = baseEnvSchema.extend({
   META_WA_PHONE_NUMBER_ID: required('META_WA_PHONE_NUMBER_ID'),
   META_WA_VERIFY_TOKEN: optionalString,
   META_WA_APP_SECRET: optionalString,
+  /**
+   * Base da Graph API. Vazia = a Meta de verdade. Em desenvolvimento e em teste
+   * aponta para o dublê local (`supabase/functions/_dubles/meta-graph-duble.mjs`),
+   * que é como o worker-wa é exercitado sem credencial nenhuma no repositório.
+   */
+  META_WA_GRAPH_URL: optionalUrl,
+  /** Versão da Graph API. Vazia = a versão contra a qual o cliente foi escrito. */
+  META_WA_API_VERSION: optionalString,
 });
 
 const aiEnvSchema = baseEnvSchema.extend({
   ANTHROPIC_API_KEY: required('ANTHROPIC_API_KEY'),
+  /**
+   * Para onde o SDK aponta. Vazio = API oficial da Anthropic. É por aqui que o
+   * dublê local entra pelo MESMO lugar que o cliente real, sem `if` no código
+   * do worker (apps/workers/src/ia/duble-servidor.ts).
+   */
+  ANTHROPIC_BASE_URL: optionalUrl,
 });
 
 export const envSchemas = {

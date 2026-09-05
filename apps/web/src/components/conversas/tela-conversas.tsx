@@ -15,6 +15,7 @@ import {
   VazioDeVerdade,
   VazioPorFiltro,
 } from './estados';
+import { contarFila, FilaDeAprovacao, FilaVazia, tempoDoMaisUrgente } from './fila-aprovacao';
 import { FiltrosDaConversa } from './filtros-conversas';
 import { numero } from './formatos';
 import { ListaConversas } from './lista-conversas';
@@ -26,6 +27,7 @@ import {
   ROTULO_JANELA,
   temRecorte,
   urlDoEstado,
+  type AbaDaEsquerda,
   type FiltrosConversas,
   type ItemConversa,
 } from './tipos';
@@ -64,15 +66,19 @@ export function TelaConversas({
   catalogos,
   filtrosIniciais,
   organizacaoInicial,
+  abaInicial,
 }: {
   catalogos: CatalogosConversas;
   filtrosIniciais: FiltrosConversas;
   /** Veio de `?org=<id>`: abre esta conversa já na entrada. */
   organizacaoInicial: string | null;
+  /** Veio de `?aba=aprovar`: entra direto na fila do ADR-05. */
+  abaInicial: AbaDaEsquerda;
 }) {
   const ehCelular = useEhCelular();
   const [filtros, setFiltros] = useState<FiltrosConversas>(filtrosIniciais);
   const [escolhidoId, setEscolhidoId] = useState<string | null>(organizacaoInicial);
+  const [aba, setAba] = useState<AbaDaEsquerda>(abaInicial);
 
   const consulta = useQuery({ queryKey: CHAVE_CONVERSAS, queryFn: carregarConversas });
 
@@ -82,26 +88,38 @@ export function TelaConversas({
       organizacoes: consulta.data.organizacoes,
       atividades: consulta.data.atividades,
       negocios: consulta.data.negocios,
+      fios: consulta.data.fios,
+      rascunhos: consulta.data.rascunhosPendentes,
       catalogos,
     });
   }, [consulta.data, catalogos]);
 
   const itens = useMemo(() => aplicarFiltros(todos, filtros), [todos, filtros]);
 
+  // A fila de aprovação NÃO passa pelo recorte da lista: ela é a fila do ADR-05
+  // inteira. Um rascunho escondido por um filtro de canal que alguém deixou
+  // ligado é um rascunho que expira sem ninguém ver — e o filtro é da OUTRA
+  // pergunta ("com quem eu falo agora?").
+  const paraAprovar = useMemo(() => todos.filter((i) => i.rascunhoPendente !== null), [todos]);
+  const fila = useMemo(() => contarFila(paraAprovar), [paraAprovar]);
+  const maisUrgente = useMemo(() => tempoDoMaisUrgente(paraAprovar), [paraAprovar]);
+
+  const daAba = aba === 'aprovar' ? paraAprovar : itens;
+
   // Sem escolha explícita, o desktop abre a primeira da lista. É derivação, não efeito:
   // um `setState` dentro de `useEffect` aqui reordenaria a tela depois de pintá-la.
-  const abertaId = escolhidoId ?? (ehCelular ? null : (itens[0]?.id ?? null));
+  const abertaId = escolhidoId ?? (ehCelular ? null : (daAba[0]?.id ?? null));
 
   // A conversa aberta é procurada em TODOS, não no recorte: mudar o filtro não pode
   // fechar na cara da pessoa a conversa que ela está lendo.
   const aberta = abertaId ? (todos.find((i) => i.id === abertaId) ?? null) : null;
 
   useEffect(() => {
-    const alvo = `${window.location.pathname}${urlDoEstado(filtros, escolhidoId)}`;
+    const alvo = `${window.location.pathname}${urlDoEstado(filtros, escolhidoId, aba)}`;
     if (alvo !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', alvo);
     }
-  }, [filtros, escolhidoId]);
+  }, [filtros, escolhidoId, aba]);
 
   const mudar = useCallback((parcial: Partial<FiltrosConversas>) => {
     setFiltros((atual) => ({ ...atual, ...parcial }));
@@ -113,12 +131,27 @@ export function TelaConversas({
   const recorte = temRecorte(filtros);
   const soBusca = recorte && contarFiltros(filtros) === 0;
   const comContato = todos.filter((i) => i.ultimaEm !== null).length;
+  const porLer = todos.reduce((soma, i) => soma + i.naoLidas, 0);
+  const meta = consulta.data?.meta ?? null;
+  const temFio = todos.some((i) => i.fio !== null);
 
   // No celular, conversa aberta é tela cheia: cabeçalho e filtros saem de cena.
   const telaCheia = ehCelular && aberta !== null;
 
   return (
-    <div className="flex w-full flex-col gap-4 md:h-[calc(100dvh-7.5rem)]">
+    <div
+      className={cn(
+        'flex w-full flex-col gap-4 md:h-[calc(100dvh-7.5rem)]',
+        // No celular, conversa aberta é tela cheia DE VERDADE: altura fixa,
+        // rolagem por dentro, caixa de resposta encostada na barra inferior. Sem
+        // isto a página inteira é que rola, a caixa de resposta fica no fim de
+        // uma página de três metros e a conversa não abre na última mensagem —
+        // que é o único lugar onde ela deveria abrir. A conta é a casca:
+        // cabeçalho de 3,5rem + 1,5rem de respiro em cima + 5rem da barra
+        // inferior com o respiro de baixo.
+        telaCheia && 'h-[calc(100dvh-10rem-var(--area-segura-inferior))]',
+      )}
+    >
       {telaCheia ? null : (
         <>
           <header className="flex flex-col gap-1">
@@ -131,6 +164,13 @@ export function TelaConversas({
                   <span className="numerico">{numero(itens.length)}</span>
                   {itens.length === 1 ? ' parceiro' : ' parceiros'} com esse filtro
                 </>
+              ) : porLer > 0 || fila.total > 0 ? (
+                <>
+                  <span className="numerico">{numero(porLer)}</span>
+                  {porLer === 1 ? ' mensagem por ler' : ' mensagens por ler'},{' '}
+                  <span className="numerico">{numero(fila.total)}</span>
+                  {fila.total === 1 ? ' rascunho esperando você' : ' rascunhos esperando você'}
+                </>
               ) : (
                 <>
                   <span className="numerico">{numero(comContato)}</span> com contato registrado,{' '}
@@ -141,12 +181,24 @@ export function TelaConversas({
             </p>
           </header>
 
-          <FiltrosDaConversa
-            filtros={filtros}
-            pessoas={catalogos.pessoas}
-            aoMudar={mudar}
-            aoLimpar={limpar}
+          <Abas
+            aba={aba}
+            aoTrocar={setAba}
+            naFila={fila.total}
+            comAviso={fila.comAviso}
+            maisUrgente={maisUrgente}
           />
+
+          {/* O recorte é da lista de conversas. Na fila de aprovação ele não
+              aparece porque não se aplica: lá a lista já é curta e é inteira. */}
+          {aba === 'conversas' ? (
+            <FiltrosDaConversa
+              filtros={filtros}
+              pessoas={catalogos.pessoas}
+              aoMudar={mudar}
+              aoLimpar={limpar}
+            />
+          ) : null}
 
           {consulta.data?.cortada ? (
             <p className="text-xs text-muted-foreground">
@@ -161,13 +213,14 @@ export function TelaConversas({
         className={cn(
           'grid min-h-0 flex-1 border-t border-hairline',
           'md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:overflow-hidden',
+          telaCheia && 'overflow-hidden',
         )}
       >
         {/* Lista. No celular ela some quando uma conversa está aberta (não é `hidden`:
             é não renderizar, para os cartões não trafegarem à toa no 4G da rua). */}
         {telaCheia ? null : (
           <section
-            aria-label="Parceiros por interação mais recente"
+            aria-label={aba === "aprovar" ? "Rascunhos esperando aprovação" : "Parceiros por interação mais recente"}
             // `min-w-0`: sem ele o item de grade assume `min-width: auto` e cresce até o
             // conteúdo, e em 390px a lista nascia com 484px de largura (o "hoje" e o
             // chevron caíam fora da tela). É a mesma armadilha do flex.
@@ -180,6 +233,16 @@ export function TelaConversas({
                 causa={mensagemDoErro(consulta.error)}
                 aoTentar={() => void consulta.refetch()}
               />
+            ) : aba === 'aprovar' ? (
+              paraAprovar.length === 0 ? (
+                <FilaVazia temFio={temFio} />
+              ) : (
+                <FilaDeAprovacao
+                  itens={paraAprovar}
+                  selecionadoId={aberta?.id ?? null}
+                  aoEscolher={setEscolhidoId}
+                />
+              )
             ) : itens.length === 0 && recorte ? (
               <VazioPorFiltro
                 descricao={descreverRecorte(filtros, catalogos)}
@@ -197,18 +260,131 @@ export function TelaConversas({
         {/* Conversa. No celular só existe quando alguém escolheu. */}
         {ehCelular && !aberta ? null : (
           <section
-            aria-label="Linha do tempo do parceiro"
+            aria-label="Conversa com o parceiro"
             className="min-h-0 min-w-0 md:overflow-hidden"
           >
             {consulta.isPending ? null : aberta ? (
-              <Conversa key={aberta.id} item={aberta} catalogos={catalogos} aoVoltar={voltar} />
+              <Conversa
+                key={aberta.id}
+                item={aberta}
+                catalogos={catalogos}
+                meta={meta}
+                aoVoltar={voltar}
+                escolhaExplicita={escolhidoId !== null}
+              />
             ) : (
-              <NenhumaEscolhida />
+              <NenhumaEscolhida meta={meta} />
             )}
           </section>
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * As duas listas da esquerda, num par de abas.
+ *
+ * A aba de aprovação carrega o número, e o número é o ponto: uma fila de
+ * aprovação sem contador é uma fila que ninguém sabe que existe. Quando o
+ * validador de promessas apitou em algum rascunho, isso também aparece aqui —
+ * antes de abrir, e não depois de ler o texto inteiro.
+ *
+ * O tempo até o mais urgente sumir fecha a linha. Rascunho vive três dias; sem
+ * essa conta, "5 esperando" parece uma pilha parada, quando às vezes é uma pilha
+ * que some hoje à noite.
+ */
+function Abas({
+  aba,
+  aoTrocar,
+  naFila,
+  comAviso,
+  maisUrgente,
+}: {
+  aba: AbaDaEsquerda;
+  aoTrocar: (aba: AbaDaEsquerda) => void;
+  naFila: number;
+  comAviso: number;
+  maisUrgente: { numero: string; unidade: string } | null;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div
+        role="tablist"
+        aria-label="O que mostrar na lista"
+        className="inline-flex w-fit gap-1 rounded-full border border-hairline p-0.5"
+      >
+        <Aba
+          ativa={aba === 'conversas'}
+          aoClicar={() => aoTrocar('conversas')}
+          rotulo="Conversas"
+        />
+        <Aba ativa={aba === 'aprovar'} aoClicar={() => aoTrocar('aprovar')} rotulo="Aprovar">
+          {naFila > 0 ? (
+            <span
+              className={cn(
+                'numerico inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]',
+                aba === 'aprovar'
+                  ? 'bg-background text-foreground'
+                  : 'bg-foreground text-background',
+              )}
+            >
+              {naFila}
+            </span>
+          ) : null}
+        </Aba>
+      </div>
+
+      {aba === 'aprovar' && naFila > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Nada sai sem uma pessoa aprovar (ADR-05).
+          {comAviso > 0 ? (
+            <>
+              {' '}
+              O validador de promessas apitou em{' '}
+              <span className="numerico">{numero(comAviso)}</span>
+              {comAviso === 1 ? ' deles' : ' deles'}.
+            </>
+          ) : null}
+          {maisUrgente ? (
+            <>
+              {' '}
+              O primeiro some em <span className="numerico">{maisUrgente.numero}</span>
+              {maisUrgente.unidade}.
+            </>
+          ) : null}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function Aba({
+  ativa,
+  aoClicar,
+  rotulo,
+  children,
+}: {
+  ativa: boolean;
+  aoClicar: () => void;
+  rotulo: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={ativa}
+      onClick={aoClicar}
+      className={cn(
+        'toque inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm outline-none',
+        'focus-visible:ring-3 focus-visible:ring-ring/50',
+        ativa ? 'bg-foreground font-medium text-background' : 'text-muted-foreground hover:bg-muted',
+      )}
+    >
+      {rotulo}
+      {children}
+    </button>
   );
 }
 

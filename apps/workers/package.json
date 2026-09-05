@@ -13,6 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.123.0",
+    "@komune/prompts": "workspace:*",
     "@komune/schema": "workspace:*",
     "@supabase/supabase-js": "2.112.4",
     "cheerio": "^1.2.0",

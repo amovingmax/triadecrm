@@ -1,4 +1,10 @@
-import type { ActivityType, Channel, Temperature } from '@komune/schema';
+import type {
+  ActivityType,
+  Channel,
+  MsgStatus,
+  MsgType,
+  Temperature,
+} from '@komune/schema';
 
 /**
  * Contrato da tela de Conversas (PRD §7.4, RF-CON-05/06/12; anexo R04).
@@ -6,22 +12,26 @@ import type { ActivityType, Channel, Temperature } from '@komune/schema';
  * ===========================================================================
  * O QUE ESTA TELA É HOJE, E POR QUÊ
  * ===========================================================================
- * O RF-CON-05 descreve um inbox de WhatsApp. Ele não pode existir ainda: o número
- * "Heloísa · Komune" depende da verificação do CNPJ da Komune no Meta Business e da
- * aprovação dos modelos de mensagem (RF-CON-02), e não existe nenhuma tabela de
- * mensagens no banco — as Edge Functions do RF-CON-03 ainda não recebem webhook
- * nenhum da Meta. Simular um inbox aqui seria encher a tela de conversa inventada.
+ * Até a migração 20260905000200 esta tela era o inbox SEM as mensagens: não havia
+ * tabela onde guardá-las. O que havia, e já tinha valor sozinho, era o histórico do
+ * relacionamento — 147 linhas em `activities` e 132 em `deal_stage_history` —, que é
+ * a metade do RF-CON-06 que não dependia da Meta, mais um aviso dizendo o que faltava.
  *
- * O que JÁ existe é o histórico real do relacionamento: 147 linhas em `activities`
- * (100 do import da lista-semente R09 e 47 registradas pela Heloísa na tela de
- * Registrar contato) e 132 em `deal_stage_history`. Juntas elas são exatamente a
- * "linha do tempo por parceiro" que o RF-CON-06 pede — a mesma coluna onde as
- * mensagens vão entrar quando o número for aprovado, no mesmo formato.
+ * Agora há tabela: `conversations`, `messages` e `message_drafts`. Então a tela é o
+ * inbox inteiro — mensagem nos dois sentidos, estado de entrega, o relógio da janela
+ * de 24 h e a fila de aprovação do ADR-05 —, e a promessa que este arquivo fazia foi
+ * cumprida ao pé da letra: cada mensagem virou mais um evento da MESMA coluna, com o
+ * mesmo separador de dia, sem tirar de lá nada do que já estava.
  *
- * Então esta tela é o inbox **sem as mensagens**: lista de parceiros à esquerda,
- * ordenada pela interação mais recente; a linha do tempo à direita; e um aviso, em
- * português, dizendo o que falta e de que depende. Quando o WhatsApp entrar, cada
- * mensagem vira mais um evento desta mesma coluna, sem mudar o que já está aqui.
+ * O que continua não existindo é o lado de fora. O worker que fala com a Meta
+ * (`apps/workers/src/workers/wa.ts`) EXISTE e envia de verdade — o que falta é a
+ * credencial: o número "Heloísa · Komune" espera a verificação do CNPJ no Meta
+ * Business, o token não está (nem deve estar) neste repositório e nenhum modelo
+ * foi aprovado (RF-CON-02). Ou seja: o que a pessoa aprova aqui ENTRA NA FILA, e
+ * a fila anda no dia em que o worker subir com o número. A tela diz isso com
+ * números lidos do banco (`DependenciasDaMeta`, incluindo o ponto que o worker
+ * bate em `worker_heartbeats`), e não num parágrafo fixo que continuaria escrito
+ * depois de deixar de ser verdade.
  *
  * ===========================================================================
  * DONO DESTE ARQUIVO
@@ -115,6 +125,14 @@ export type ItemConversa = {
   quemFalou: string[];
   /** Quantas interações humanas existem (o import da lista-semente não conta). */
   interacoes: number;
+
+  // -- O que o inbox acrescentou (migração 20260905000200) -------------------
+  /** O fio de WhatsApp deste parceiro; `null` quando ninguém nunca escreveu. */
+  fio: FioDaConversa | null;
+  /** Mensagens não lidas (`conversations.unread_count`). */
+  naoLidas: number;
+  /** Rascunho da IA à espera de aprovação. Um por fio (índice único no banco). */
+  rascunhoPendente: RascunhoDaIa | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -126,7 +144,7 @@ export type ItemConversa = {
  * diferentes: `interacao` é alguém falando com o parceiro, `etapa` é o negócio
  * andando no funil e `origem` é de onde o parceiro veio parar na base.
  */
-export type GeneroDoEvento = 'interacao' | 'etapa' | 'origem';
+export type GeneroDoEvento = 'interacao' | 'etapa' | 'origem' | 'mensagem';
 
 export type EventoDaLinha = {
   /** Único dentro da linha do tempo (prefixado pela origem, não é o id da tabela). */
@@ -149,6 +167,15 @@ export type EventoDaLinha = {
   duracaoMin: number | null;
   /** `metadata.door_opened` (RF-MET-01): porta aberta é diferente de porta batida. */
   portaAberta: boolean;
+  /**
+   * A mensagem, quando `genero` é `'mensagem'`.
+   *
+   * Ela entra na MESMA coluna das ligações e das mudanças de etapa porque a
+   * ligação de terça e o WhatsApp que a confirmou vinte minutos depois são a
+   * mesma conversa. Separar em abas apagaria a causa — que é a razão pela qual
+   * esta coluna nasceu cronológica ascendente, e não como pilha de auditoria.
+   */
+  mensagem: MensagemDoFio | null;
 };
 
 /** Eventos de um mesmo dia, para o separador de data da coluna. */
@@ -187,6 +214,18 @@ export const ROTULO_JANELA: Record<JanelaSemContato, string> = {
   mais14: 'Mais de 14 dias',
   nunca: 'Nunca falei',
 };
+
+/**
+ * As duas listas da esquerda.
+ *
+ * `conversas` é o inbox por parceiro; `aprovar` é a fila do ADR-05 — os rascunhos
+ * que a IA escreveu e ninguém leu ainda, de todos os parceiros juntos. São duas
+ * perguntas diferentes ("com quem eu falo agora?" e "o que está esperando por
+ * mim?") e uma lista só não responde as duas: a fila de aprovação some no meio de
+ * cem parceiros ordenados por recência, que é exatamente como um rascunho expira
+ * sem ninguém ver.
+ */
+export type AbaDaEsquerda = 'conversas' | 'aprovar';
 
 export type FiltrosConversas = {
   /** Texto livre sobre o nome, a categoria e o bairro do parceiro. */
@@ -228,10 +267,11 @@ function ehCanal(v: string): v is Channel {
   return v in ROTULO_CANAL;
 }
 
-/** Lê o recorte e a conversa aberta da query string (no servidor, de `searchParams`). */
+/** Lê o recorte, a aba e a conversa aberta da query string (de `searchParams`). */
 export function estadoDaUrl(params: Record<string, string | string[] | undefined>): {
   filtros: FiltrosConversas;
   organizacaoId: string | null;
+  aba: AbaDaEsquerda;
 } {
   const texto = (chave: string): string => {
     const v = params[chave];
@@ -250,17 +290,237 @@ export function estadoDaUrl(params: Record<string, string | string[] | undefined
       janela: ehJanela(janela) ? janela : 'qualquer',
     },
     organizacaoId: texto('org') || null,
+    aba: texto('aba') === 'aprovar' ? 'aprovar' : 'conversas',
   };
 }
 
-/** Escreve o recorte e a conversa aberta na query string, omitindo o que está no padrão. */
-export function urlDoEstado(f: FiltrosConversas, organizacaoId: string | null): string {
+/** Escreve o recorte, a aba e a conversa aberta na query string, omitindo o padrão. */
+export function urlDoEstado(
+  f: FiltrosConversas,
+  organizacaoId: string | null,
+  aba: AbaDaEsquerda = 'conversas',
+): string {
   const p = new URLSearchParams();
   if (f.q.trim()) p.set('q', f.q.trim());
   if (f.responsavelId) p.set('responsavel', f.responsavelId);
   if (f.canal) p.set('canal', f.canal);
   if (f.janela !== 'qualquer') p.set('janela', f.janela);
+  if (aba !== 'conversas') p.set('aba', aba);
   if (organizacaoId) p.set('org', organizacaoId);
   const busca = p.toString();
   return busca ? `?${busca}` : '';
 }
+
+// ===========================================================================
+// AS MENSAGENS (migração 20260905000200; RF-CON-03 a RF-CON-06, RF-CON-22)
+// ===========================================================================
+//
+// O aviso que esta tela carregava desde o D5 — "as mensagens de WhatsApp ainda
+// não chegam aqui" — vencia por uma razão simples: não existia tabela. Agora
+// existe (`conversations`, `messages`, `message_drafts`), e o que continua não
+// existindo é o LADO DE FORA: número aprovado na Meta, modelo aprovado, e o
+// worker de envio, que existe mas está parado — sem número nem token da Meta.
+//
+// A diferença importa para o texto da tela. Antes era "não há onde guardar";
+// agora é "há onde guardar, e o que sai daqui fica na fila". O aviso mudou de
+// frase por isso, e os números dele saem do banco (ver `dependenciasDaMeta`),
+// não de um parágrafo escrito à mão que envelhece calado.
+
+/** `app.msg_status` em pt-BR — o estado de entrega, na palavra da pessoa. */
+export const ROTULO_ENTREGA: Record<MsgStatus, string> = {
+  queued: 'na fila',
+  sent: 'enviada',
+  delivered: 'entregue',
+  read: 'lida',
+  failed: 'não saiu',
+  received: 'recebida',
+};
+
+/** `app.msg_type` em pt-BR. */
+export const ROTULO_TIPO_MENSAGEM: Record<MsgType, string> = {
+  text: 'Texto',
+  audio: 'Áudio',
+  image: 'Imagem',
+  video: 'Vídeo',
+  document: 'Documento',
+  template: 'Modelo aprovado',
+  interactive: 'Botões',
+  reaction: 'Reação',
+  system: 'Aviso do WhatsApp',
+};
+
+/** `messages.origin`: quem pediu esta linha. */
+export type OrigemDaMensagem = 'crm' | 'echo' | 'import';
+
+export const ROTULO_ORIGEM: Record<OrigemDaMensagem, string> = {
+  crm: 'pelo Tríade',
+  echo: 'pelo celular',
+  import: 'carga histórica',
+};
+
+/** `message_drafts.kind`: para que serve o rascunho (vocabulário do R08 e do R13). */
+export type TipoDeRascunho =
+  | 'followup_ligacao'
+  | 'resposta'
+  | 'objecao'
+  | 'onboarding'
+  | 'reativacao'
+  | 'outro';
+
+export const ROTULO_TIPO_RASCUNHO: Record<TipoDeRascunho, string> = {
+  followup_ligacao: 'Follow-up de ligação',
+  resposta: 'Resposta',
+  objecao: 'Objeção',
+  onboarding: 'Onboarding',
+  reativacao: 'Reativação',
+  outro: 'Outro',
+};
+
+/** `message_drafts.status`. */
+export type EstadoDoRascunho = 'pendente' | 'aprovado' | 'enviado' | 'descartado' | 'expirado';
+
+/** `conversations.status`. */
+export type EstadoDoFio = 'aguardando_nos' | 'aguardando_parceiro' | 'robo' | 'resolvida';
+
+export const ROTULO_ESTADO_DO_FIO: Record<EstadoDoFio, string> = {
+  aguardando_nos: 'esperando a gente',
+  aguardando_parceiro: 'esperando o parceiro',
+  robo: 'com o robô',
+  resolvida: 'resolvida',
+};
+
+/**
+ * Uma mensagem, do jeito que a tela precisa dela.
+ *
+ * `entregaDetalhe` não é decoração: "na fila" sem dizer que a fila não anda
+ * enquanto a Meta não aprovar o número é a mesma mentira que esta tela vinha
+ * evitando desde o primeiro dia, só que mais difícil de perceber.
+ */
+export type MensagemDoFio = {
+  id: string;
+  fioId: string;
+  em: string;
+  entrada: boolean;
+  tipo: MsgType;
+  status: MsgStatus;
+  texto: string | null;
+  /** Caminho do arquivo no Storage privado; `null` enquanto ninguém baixou a mídia. */
+  midiaCaminho: string | null;
+  midiaTipo: string | null;
+  /** Transcrição de máquina (faster-whisper local, RF-CON-27). Nunca conferida por gente. */
+  transcricao: string | null;
+  autorTipo: AutorTipo;
+  autor: string | null;
+  /** Quem aprovou o texto, quando foi a IA que redigiu (ADR-05). */
+  aprovadoPor: string | null;
+  origem: OrigemDaMensagem;
+  /** Saiu com a janela de 24 h fechada: é o que a Meta cobra como modelo. */
+  iniciadaPelaEmpresa: boolean;
+  primeiroContato: boolean;
+  confirmacaoDeOptout: boolean;
+  porModelo: boolean;
+  erroCodigo: string | null;
+  erroDetalhe: string | null;
+  enviadaEm: string | null;
+  entregueEm: string | null;
+  lidaEm: string | null;
+  falhouEm: string | null;
+};
+
+/** Um motivo do validador determinístico de promessas (RF-CON-24). */
+export type MotivoDoValidador = {
+  codigo: string;
+  trecho: string;
+  explicacao: string;
+};
+
+/** O veredito do validador, como ele saiu de `packages/prompts`. */
+export type VereditoDoValidador = {
+  situacao: 'aprovado' | 'substituido' | 'bloqueado' | 'sem_registro';
+  motivos: MotivoDoValidador[];
+  /** Para onde o texto cai quando bloqueia: texto fixo do segmento, ou uma pessoa. */
+  queda: 'texto_fixo' | 'humano' | null;
+};
+
+/** O rascunho da IA à espera de uma pessoa (ADR-05, RF-CON-22). */
+export type RascunhoDaIa = {
+  id: string;
+  organizacaoId: string;
+  fioId: string | null;
+  tipo: TipoDeRascunho;
+  estado: EstadoDoRascunho;
+  /** Imutável: é o que a IA escreveu, e é contra ele que se mede a edição. */
+  proposto: string;
+  final: string | null;
+  foiEditado: boolean;
+  /** Ids de fatos da base de conhecimento que o texto diz estar usando. */
+  afirmacoes: string[];
+  validador: VereditoDoValidador;
+  promptVersao: string | null;
+  criadoEm: string;
+  expiraEm: string;
+  revisadoPor: string | null;
+  revisadoEm: string | null;
+  motivoDoDescarte: string | null;
+};
+
+/**
+ * A janela de 24 h da Meta (R04 §2.1), que é o que decide se dá para responder
+ * livremente ou só por modelo aprovado.
+ *
+ * Três situações, e a terceira não é um detalhe: com quem nunca escreveu para a
+ * gente NÃO EXISTE janela — nada de "fechada há muito tempo". Dizer "fechada"
+ * ali seria sugerir que um dia ela esteve aberta.
+ */
+export type EstadoDaJanela =
+  | { situacao: 'aberta'; expiraEm: string; restanteMin: number }
+  | { situacao: 'fechada'; expirouEm: string; fechadaHaMin: number }
+  | { situacao: 'nunca' };
+
+/** O fio de conversa (uma linha de `conversations`), do jeito que a tela usa. */
+export type FioDaConversa = {
+  id: string;
+  organizacaoId: string | null;
+  canal: Channel;
+  /** Número do parceiro, em E.164. Vem cru do banco: o inbox não mascara o fio. */
+  telefoneParceiro: string;
+  /** O número da KOMUNE que fala neste fio (RF-CON-01). */
+  numeroDaEmpresa: string;
+  responsavelId: string;
+  responsavel: string | null;
+  estado: EstadoDoFio;
+  roboPausado: boolean;
+  naoLidas: number;
+  ultimaEm: string | null;
+  ultimaEntradaEm: string | null;
+  janelaExpiraEm: string | null;
+  /** O que a IA entendeu da última mensagem recebida (uma das 25 intenções do R08). */
+  intencao: string | null;
+  confianca: number | null;
+  resumo: string | null;
+};
+
+/**
+ * O que ainda depende da Meta, medido no banco em vez de escrito à mão.
+ *
+ * Um parágrafo fixo dizendo "faltam os modelos" continua na tela depois de os
+ * modelos serem aprovados, e ninguém percebe. Estes três números mudam sozinhos
+ * no dia em que a Meta responder.
+ */
+export type DependenciasDaMeta = {
+  /** `app_settings.whatsapp.envio.numero_padrao`: sem ele, nenhum fio nasce. */
+  numeroConfigurado: boolean;
+  modelosAprovados: number;
+  modelosAguardando: number;
+  /** Mensagens paradas em `queued`, esperando o worker rodar. */
+  naFila: number;
+  /**
+   * O ponto que o worker-wa bate em `worker_heartbeats`.
+   *
+   * É a única parte desta caixa que não é configuração e sim SINAL DE VIDA: um
+   * worker parado explica a fila que não anda melhor do que qualquer frase, e
+   * explica sem que ninguém precise manter a frase atualizada. `nunca` é o
+   * estado de quem nunca subiu nesta base.
+   */
+  worker: { estado: 'ok' | 'degradado' | 'parado' | 'nunca'; ultimaBatidaEm: string | null };
+};

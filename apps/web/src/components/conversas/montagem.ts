@@ -11,6 +11,14 @@ import {
   type ItemConversa,
 } from './tipos';
 import { chaveDoDia } from './formatos';
+import {
+  montarFio,
+  montarMensagens,
+  montarRascunho,
+  type FioCru,
+  type MensagemCrua,
+  type RascunhoCru,
+} from './mensagens';
 
 /**
  * A montagem da tela de Conversas, em funções puras.
@@ -153,17 +161,46 @@ export function montarConversas({
   atividades,
   negocios,
   catalogos,
+  fios = [],
+  rascunhos = [],
   agora = new Date(),
 }: {
   organizacoes: OrganizacaoCrua[];
   atividades: AtividadeCrua[];
   negocios: NegocioCru[];
   catalogos: CatalogosConversas;
+  /** Os fios de WhatsApp, um por par (número da empresa × número da pessoa). */
+  fios?: FioCru[];
+  /** Só os PENDENTES: é o que a fila de aprovação e o ponto na lista precisam. */
+  rascunhos?: RascunhoCru[];
   agora?: Date;
 }): ItemConversa[] {
   const nomeDaPessoa = new Map(catalogos.pessoas.map((p) => [p.id, p.nome]));
   const etapaPorId = new Map(catalogos.etapas.map((e) => [e.id, e]));
   const nomeDoDesfecho = new Map(catalogos.desfechos.map((d) => [d.id, d.nome]));
+
+  // O fio da organização. Pode haver mais de um (dois números da KOMUNE falando
+  // com a mesma ficha, RF-CON-01): fica o que teve mensagem mais recente, que é
+  // onde a conversa está viva.
+  const fioPorOrganizacao = new Map<string, FioCru>();
+  for (const f of fios) {
+    if (!f.organization_id) continue;
+    const atual = fioPorOrganizacao.get(f.organization_id);
+    if (!atual || (f.last_message_at ?? '') > (atual.last_message_at ?? '')) {
+      fioPorOrganizacao.set(f.organization_id, f);
+    }
+  }
+
+  // Um rascunho pendente por conversa é garantia do banco (índice único
+  // parcial); por ORGANIZAÇÃO ainda pode haver mais de um, e aí vale o que
+  // expira primeiro — é o que some sozinho se ninguém olhar.
+  const rascunhoPorOrganizacao = new Map<string, RascunhoCru>();
+  for (const r of rascunhos) {
+    const atual = rascunhoPorOrganizacao.get(r.organization_id);
+    if (!atual || r.expires_at < atual.expires_at) {
+      rascunhoPorOrganizacao.set(r.organization_id, r);
+    }
+  }
 
   const porOrganizacao = new Map<string, Acumulado>();
   for (const a of atividades) {
@@ -193,6 +230,8 @@ export function montarConversas({
     const ultima = acumulado?.ultima ?? null;
     const negocio = negocioEmFoco.get(o.id) ?? null;
     const etapa = negocio ? (etapaPorId.get(negocio.stage_id) ?? null) : null;
+    const fioCru = fioPorOrganizacao.get(o.id) ?? null;
+    const rascunhoCru = rascunhoPorOrganizacao.get(o.id) ?? null;
 
     return {
       id: o.id,
@@ -216,6 +255,9 @@ export function montarConversas({
       canais: [...(acumulado?.canais ?? [])],
       quemFalou: [...(acumulado?.quemFalou ?? [])],
       interacoes: acumulado?.interacoes ?? 0,
+      fio: fioCru ? montarFio(fioCru, nomeDaPessoa) : null,
+      naoLidas: fioCru?.unread_count ?? 0,
+      rascunhoPendente: rascunhoCru ? montarRascunho(rascunhoCru) : null,
     };
   });
 
@@ -255,18 +297,38 @@ function resumoDaAtividade(a: AtividadeCrua, nomeDoDesfecho: Map<number, string>
 }
 
 /**
- * Quem falou por último vem primeiro; quem nunca foi contatado vai para o fim, em
- * ordem alfabética.
+ * O instante que ordena a lista: a interação humana mais recente OU a última
+ * mensagem do fio, o que for mais novo.
  *
- * O fim da lista não é o rodapé morto: são os parceiros que ainda não receberam nenhum
- * toque, ou seja, a fila de quem falta abordar. Por isso eles ficam ordenados por nome
- * (previsível, dá para "continuar de onde parei") e não por id do import.
+ * Antes do inbox só existia a primeira. Sem esta soma, um parceiro que acabou de
+ * escrever no WhatsApp continuaria no meio da lista, atrás de uma ligação de três
+ * dias atrás — que é o defeito clássico de inbox: a mensagem chega e não sobe.
+ */
+export function momentoDaLista(item: ItemConversa): string | null {
+  const mensagem = item.fio?.ultimaEm ?? null;
+  if (!item.ultimaEm) return mensagem;
+  if (!mensagem) return item.ultimaEm;
+  return mensagem > item.ultimaEm ? mensagem : item.ultimaEm;
+}
+
+/**
+ * Quem tem mensagem por ler vem primeiro; depois, quem falou por último; quem
+ * nunca foi contatado vai para o fim, em ordem alfabética.
+ *
+ * O não lido ganha do recente de propósito: uma mensagem que chegou ontem e
+ * ninguém abriu é mais urgente do que uma ligação registrada hoje de manhã, e é
+ * ela que o RF-CON-04 quer que não caia num lugar onde ninguém vê. O fim da lista
+ * continua sendo a fila de quem falta abordar, em ordem de nome — previsível, dá
+ * para continuar de onde parou.
  */
 export function ordenarConversas(itens: ItemConversa[]): ItemConversa[] {
   return [...itens].sort((a, b) => {
-    if (a.ultimaEm && b.ultimaEm) return b.ultimaEm.localeCompare(a.ultimaEm);
-    if (a.ultimaEm) return -1;
-    if (b.ultimaEm) return 1;
+    if ((a.naoLidas > 0) !== (b.naoLidas > 0)) return a.naoLidas > 0 ? -1 : 1;
+    const ma = momentoDaLista(a);
+    const mb = momentoDaLista(b);
+    if (ma && mb) return mb.localeCompare(ma);
+    if (ma) return -1;
+    if (mb) return 1;
     return a.nome.localeCompare(b.nome, 'pt-BR');
   });
 }
@@ -346,10 +408,13 @@ export function montarLinhaDoTempo({
   atividades,
   historico,
   catalogos,
+  mensagens = [],
 }: {
   atividades: AtividadeCrua[];
   historico: HistoricoCru[];
   catalogos: CatalogosConversas;
+  /** As mensagens de WhatsApp deste parceiro, nos dois sentidos. */
+  mensagens?: MensagemCrua[];
 }): EventoDaLinha[] {
   const nomeDaPessoa = new Map(catalogos.pessoas.map((p) => [p.id, p.nome]));
   const etapaPorId = new Map(catalogos.etapas.map((e) => [e.id, e]));
@@ -371,6 +436,7 @@ export function montarLinhaDoTempo({
       comQuem: comQuemLegivel(a.metadata),
       duracaoMin: a.duration_min,
       portaAberta: boleanoDoMeta(a.metadata, 'door_opened'),
+      mensagem: null,
     };
   });
 
@@ -393,13 +459,37 @@ export function montarLinhaDoTempo({
       comQuem: null,
       duracaoMin: null,
       portaAberta: false,
+      mensagem: null,
     };
   });
 
+  // A mensagem entra na mesma coluna, não numa aba: é a promessa que o cabeçalho
+  // de `tipos.ts` fazia desde o D5, e é o que deixa ver que o WhatsApp das 14h20
+  // veio DEPOIS da ligação das 14h — e por causa dela.
+  const daMensagem = montarMensagens(mensagens, nomeDaPessoa).map(
+    (m): EventoDaLinha => ({
+      id: `mensagem:${m.id}`,
+      genero: 'mensagem',
+      em: m.em,
+      titulo: m.entrada ? 'Mensagem recebida' : 'Mensagem enviada',
+      desfecho: null,
+      detalhe: m.texto,
+      canal: 'whatsapp',
+      tipo: 'message',
+      autor: m.autor,
+      autorTipo: m.autorTipo,
+      comQuem: null,
+      duracaoMin: null,
+      portaAberta: false,
+      mensagem: m,
+    }),
+  );
+
   // Empate de segundo entre a atividade e a mudança de etapa que ela causou: a
-  // atividade primeiro, porque foi ela que causou a mudança.
-  const peso = { origem: 0, interacao: 1, etapa: 2 } as const;
-  return [...daAtividade, ...daEtapa].sort(
+  // atividade primeiro, porque foi ela que causou a mudança. A mensagem fica
+  // entre as duas: ela é o que aconteceu, e a etapa é a consequência.
+  const peso = { origem: 0, interacao: 1, mensagem: 2, etapa: 3 } as const;
+  return [...daAtividade, ...daEtapa, ...daMensagem].sort(
     (a, b) => a.em.localeCompare(b.em) || peso[a.genero] - peso[b.genero],
   );
 }

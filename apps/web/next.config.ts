@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   // Pacotes internos "just-in-time" (exportam o fonte TypeScript): o Next os transpila junto com o app.
-  transpilePackages: ['@komune/schema'],
+  transpilePackages: ['@komune/schema', '@komune/prompts'],
   // Sem o cabeçalho X-Powered-By (menos superfície de fingerprint).
   poweredByHeader: false,
   // Pasta de saída do build. O padrão (.next) é o que a Vercel espera e é o que vale em produção.

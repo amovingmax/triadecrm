@@ -7,6 +7,7 @@ import {
   diasDesde,
   ehInteracao,
   escolherNegocio,
+  momentoDaLista,
   montarConversas,
   montarLinhaDoTempo,
   normalizar,
@@ -16,6 +17,7 @@ import {
   type NegocioCru,
   type OrganizacaoCrua,
 } from './montagem';
+import type { FioCru, MensagemCrua, RascunhoCru } from './mensagens';
 import { FILTROS_VAZIOS } from './tipos';
 
 /**
@@ -365,5 +367,227 @@ describe('agruparPorDia', () => {
     const dias = agruparPorDia(eventos);
     expect(dias.map((d) => d.chave)).toEqual(['2026-09-04', '2026-09-05']);
     expect(dias[0]?.eventos).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// O inbox: as mensagens na mesma coluna, e o que elas mudam na lista
+// ---------------------------------------------------------------------------
+
+function fio(parcial: Partial<FioCru> & { id: string; organization_id: string }): FioCru {
+  return {
+    contact_id: null,
+    channel: 'whatsapp',
+    peer_phone_e164: '+5584999880011',
+    business_number: '+5584999990000',
+    assignee_id: HELOISA,
+    status: 'aguardando_nos',
+    bot_paused: false,
+    last_message_at: null,
+    last_inbound_at: null,
+    last_outbound_at: null,
+    window_expires_at: null,
+    unread_count: 0,
+    ai_summary: null,
+    ai_intent: null,
+    ai_confidence: null,
+    ...parcial,
+  };
+}
+
+function rascunho(parcial: Partial<RascunhoCru> & { id: string; organization_id: string }): RascunhoCru {
+  return {
+    conversation_id: null,
+    kind: 'resposta',
+    status: 'pendente',
+    proposed_body: 'A gente pode conversar quinta às 9h30?',
+    proposed_claims: [],
+    validator: { situacao: 'aprovado', texto: 'x' },
+    prompt_version: 'followup-ligacao@v1',
+    final_body: null,
+    foi_editado: null,
+    reviewed_by: null,
+    reviewed_at: null,
+    discard_reason: null,
+    created_at: '2026-09-10T09:00:00Z',
+    expires_at: '2026-09-13T09:00:00Z',
+    ...parcial,
+  };
+}
+
+function mensagemCrua(
+  parcial: Partial<MensagemCrua> & { id: string; conversation_id: string },
+): MensagemCrua {
+  return {
+    organization_id: 'o1',
+    direction: 'in',
+    type: 'text',
+    status: 'received',
+    body: 'oi',
+    media_path: null,
+    media_mime: null,
+    transcript: null,
+    template_id: null,
+    draft_id: null,
+    author_kind: 'system',
+    sent_by: null,
+    approved_by: null,
+    is_first_contact: false,
+    business_initiated: false,
+    optout_confirmation: false,
+    origin: 'crm',
+    error_code: null,
+    error_detail: null,
+    created_at: '2026-09-10T10:00:00Z',
+    sent_at: null,
+    delivered_at: null,
+    read_at: null,
+    failed_at: null,
+    ...parcial,
+  };
+}
+
+describe('montarLinhaDoTempo com mensagens', () => {
+  /**
+   * A promessa que o módulo carregava desde o D5, escrita no cabeçalho de
+   * `tipos.ts`: "quando o WhatsApp entrar, cada mensagem vira mais um evento
+   * DESTA MESMA coluna". Este teste é o que impede alguém de cumpri-la com uma
+   * aba separada — que é a saída fácil e apaga a relação de causa entre a
+   * ligação e o WhatsApp que veio depois dela.
+   */
+  it('a mensagem entra na mesma coluna, na posição cronológica dela', () => {
+    const eventos = montarLinhaDoTempo({
+      atividades: [
+        atividade({ id: 'lig', organization_id: 'o1', occurred_at: '2026-09-10T14:00:00Z' }),
+      ],
+      historico: [],
+      mensagens: [
+        mensagemCrua({ id: 'm1', conversation_id: 'f1', created_at: '2026-09-10T14:20:00Z' }),
+        mensagemCrua({ id: 'm0', conversation_id: 'f1', created_at: '2026-09-10T09:00:00Z' }),
+      ],
+      catalogos: CATALOGOS,
+    });
+
+    expect(eventos.map((e) => e.id)).toEqual(['mensagem:m0', 'atividade:lig', 'mensagem:m1']);
+    expect(eventos[2]?.genero).toBe('mensagem');
+    expect(eventos[2]?.mensagem?.texto).toBe('oi');
+    expect(eventos[0]?.mensagem?.entrada).toBe(true);
+  });
+
+  it('no mesmo segundo: a interação, depois a mensagem, depois a etapa que elas causaram', () => {
+    const instante = '2026-09-10T14:00:00Z';
+    const eventos = montarLinhaDoTempo({
+      atividades: [atividade({ id: 'lig', organization_id: 'o1', occurred_at: instante })],
+      historico: [
+        {
+          id: 1,
+          deal_id: 'd1',
+          changed_at: instante,
+          from_stage_id: 1,
+          to_stage_id: 2,
+          changed_by: HELOISA,
+          reason: null,
+        },
+      ],
+      mensagens: [mensagemCrua({ id: 'm', conversation_id: 'f1', created_at: instante })],
+      catalogos: CATALOGOS,
+    });
+
+    expect(eventos.map((e) => e.genero)).toEqual(['interacao', 'mensagem', 'etapa']);
+  });
+
+  it('sem mensagens, a coluna é exatamente a de antes', () => {
+    const semParametro = montarLinhaDoTempo({
+      atividades: [atividade({ id: 'a', organization_id: 'o1' })],
+      historico: [],
+      catalogos: CATALOGOS,
+    });
+    expect(semParametro).toHaveLength(1);
+    expect(semParametro[0]?.mensagem).toBeNull();
+  });
+});
+
+describe('montarConversas com o inbox', () => {
+  const agora = new Date('2026-09-10T12:00:00Z');
+  const organizacoes = [organizacao('o1', 'Neuma Leão Buffet'), organizacao('o2', 'Accord Cerimonial')];
+
+  it('pendura o fio, o contador de não lidas e o rascunho na ficha certa', () => {
+    const [item] = montarConversas({
+      organizacoes: [organizacao('o1', 'Neuma Leão Buffet')],
+      atividades: [],
+      negocios: [],
+      catalogos: CATALOGOS,
+      fios: [fio({ id: 'f1', organization_id: 'o1', unread_count: 3 })],
+      rascunhos: [rascunho({ id: 'r1', organization_id: 'o1', conversation_id: 'f1' })],
+      agora,
+    });
+
+    expect(item?.fio?.id).toBe('f1');
+    expect(item?.naoLidas).toBe(3);
+    expect(item?.rascunhoPendente?.id).toBe('r1');
+  });
+
+  it('mensagem por ler sobe na frente de quem foi contatado hoje', () => {
+    const itens = montarConversas({
+      organizacoes,
+      // o2 teve ligação HOJE; o1 não tem atividade nenhuma, só mensagem por ler.
+      atividades: [atividade({ id: 'a', organization_id: 'o2', occurred_at: '2026-09-10T11:00:00Z' })],
+      negocios: [],
+      catalogos: CATALOGOS,
+      fios: [
+        fio({
+          id: 'f1',
+          organization_id: 'o1',
+          unread_count: 1,
+          last_message_at: '2026-09-09T18:00:00Z',
+        }),
+      ],
+      agora,
+    });
+
+    expect(itens.map((i) => i.id)).toEqual(['o1', 'o2']);
+  });
+
+  it('a última mensagem do fio conta para a ordem, mesmo sem atividade registrada', () => {
+    const itens = montarConversas({
+      organizacoes,
+      atividades: [atividade({ id: 'a', organization_id: 'o2', occurred_at: '2026-09-10T08:00:00Z' })],
+      negocios: [],
+      catalogos: CATALOGOS,
+      // Sem "por ler" (já lida): quem decide é só o instante.
+      fios: [fio({ id: 'f1', organization_id: 'o1', last_message_at: '2026-09-10T11:00:00Z' })],
+      agora,
+    });
+
+    expect(itens.map((i) => i.id)).toEqual(['o1', 'o2']);
+    expect(momentoDaLista(itens[0]!)).toBe('2026-09-10T11:00:00Z');
+  });
+
+  it('sem fio nenhum, a ordem continua sendo a que já era', () => {
+    const itens = montarConversas({
+      organizacoes,
+      atividades: [atividade({ id: 'a', organization_id: 'o2', occurred_at: '2026-09-10T08:00:00Z' })],
+      negocios: [],
+      catalogos: CATALOGOS,
+      agora,
+    });
+    expect(itens.map((i) => i.id)).toEqual(['o2', 'o1']);
+    expect(itens[0]?.fio).toBeNull();
+    expect(itens[0]?.naoLidas).toBe(0);
+  });
+
+  it('com dois rascunhos na mesma ficha, vale o que expira primeiro', () => {
+    const [item] = montarConversas({
+      organizacoes: [organizacao('o1', 'Neuma Leão Buffet')],
+      atividades: [],
+      negocios: [],
+      catalogos: CATALOGOS,
+      rascunhos: [
+        rascunho({ id: 'depois', organization_id: 'o1', expires_at: '2026-09-14T09:00:00Z' }),
+        rascunho({ id: 'antes', organization_id: 'o1', expires_at: '2026-09-11T09:00:00Z' }),
+      ],
+      agora,
+    });
+    expect(item?.rascunhoPendente?.id).toBe('antes');
   });
 });

@@ -12,15 +12,15 @@ export type WorkerCommand = (typeof WORKER_COMMANDS)[number];
  */
 export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
   ingest: ['uma-vez', 'agendar', 'fonte', 'categorias', 'paginas', 'rotulo'],
-  wa: [],
-  ai: [],
+  wa: ['uma-vez'],
+  ai: ['uma-vez'],
 };
 
 export const USAGE = `Uso: workers <comando> [opções]
 
 Comandos:
   ingest   Radar: coleta nas fontes públicas → esteira de ingestão (RF-RAD, anexos R03/R06)
-  wa       WhatsApp: envios, cadências e áudios pela Cloud API da Meta (D5, RF-CON)
+  wa       WhatsApp: recebe, registra opt-out e envia pela Cloud API da Meta (D5, RF-CON)
   ai       IA: classificação, rascunhos, resumos e Assistente (D6, ADR-10)
 
 Opções de "ingest":
@@ -30,6 +30,12 @@ Opções de "ingest":
   --paginas=<n>          Teto de páginas de listagem por categoria (padrão: 1).
   --rotulo=<texto>       Rótulo do lote, como aparece no relatório.
   --uma-vez              Esvazia as filas uma vez e sai, em vez de ficar rodando.
+
+Opções de "wa":
+  --uma-vez              Esvazia as filas de entrada e de saída uma vez e sai.
+
+Opções de "ai":
+  --uma-vez              Esvazia a fila ai_jobs uma vez e sai, em vez de ficar rodando.
 
 Opções gerais:
   -h, --help   Mostra esta ajuda

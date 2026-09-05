@@ -89,6 +89,19 @@ export type Database = {
     }
     Functions: {
       abrir_proximo_toque: { Args: { p_enrollment: string }; Returns: Json }
+      ai_alerta_orcamento: { Args: never; Returns: Json }
+      ai_custo: {
+        Args: {
+          p_batch?: boolean
+          p_cache_read?: number
+          p_cache_write?: number
+          p_model: string
+          p_tokens_in: number
+          p_tokens_out: number
+        }
+        Returns: number
+      }
+      ai_gasto_do_mes: { Args: { p_ref?: string }; Returns: Json }
       aplicar_retencao: { Args: never; Returns: Json }
       business_days: { Args: { p_ate: string; p_de: string }; Returns: number }
       cadencias_agendar: { Args: never; Returns: number }
@@ -221,6 +234,10 @@ export type Database = {
         Args: { p_descricao?: string; p_nome: string; p_valor: string }
         Returns: undefined
       }
+      ia_enfileirar: {
+        Args: { p_key: string; p_payload: Json; p_purpose: string }
+        Returns: Json
+      }
       importacao_canal: {
         Args: { t: string }
         Returns: Database["app"]["Enums"]["channel"]
@@ -235,6 +252,10 @@ export type Database = {
       importacao_fonte: { Args: { t: string }; Returns: Json }
       importacao_normalizar: { Args: { p: Json }; Returns: Json }
       importacao_pessoa: { Args: { t: string }; Returns: Json }
+      iniciadas_pela_empresa: {
+        Args: { p_ate: string; p_de: string; p_numero: string }
+        Returns: number
+      }
       instante_local: {
         Args: { p_dia: string; p_hora: number }
         Returns: string
@@ -258,6 +279,10 @@ export type Database = {
         Returns: boolean
       }
       ja_respondeu: { Args: { p_organization_id: string }; Returns: boolean }
+      janela_de_24h_aberta: {
+        Args: { p_conversation_id: string; p_quando?: string }
+        Returns: boolean
+      }
       janela_do_canal: {
         Args: {
           p_at?: string
@@ -331,6 +356,15 @@ export type Database = {
       }
       payload_e_permitido: { Args: { p: Json }; Returns: boolean }
       payload_hash: { Args: { p: Json }; Returns: string }
+      pode_enviar: {
+        Args: {
+          p_conversation_id: string
+          p_primeiro_contato?: boolean
+          p_quando?: string
+          p_tem_template?: boolean
+        }
+        Returns: Json
+      }
       pode_tocar: {
         Args: {
           p_channel: Database["app"]["Enums"]["channel"]
@@ -351,6 +385,14 @@ export type Database = {
         Returns: Json
       }
       prefilled_ok: { Args: { p: Json }; Returns: boolean }
+      primeiros_contatos_do_dia: {
+        Args: {
+          p_channel: Database["app"]["Enums"]["channel"]
+          p_dia: string
+          p_numero?: string
+        }
+        Returns: number
+      }
       promover_candidato: {
         Args: {
           p_batch_id?: string
@@ -372,6 +414,7 @@ export type Database = {
         }
         Returns: string
       }
+      rascunhos_expirar: { Args: never; Returns: Json }
       reads_base_pii: { Args: never; Returns: boolean }
       recompute_temperatures: { Args: never; Returns: number }
       recusa_de_tabulacao: {
@@ -468,6 +511,54 @@ export type Database = {
         Returns: number
       }
       validar_roteiro: { Args: { p_arvore: Json }; Returns: string[] }
+      wa_enfileirar_envio: { Args: { p_message_id: string }; Returns: Json }
+      wa_expirar_fila: { Args: { p_horas?: number }; Returns: Json }
+      wa_falha: {
+        Args: {
+          p_codigo?: string
+          p_erro: string
+          p_message_id: string
+          p_msg_id: number
+        }
+        Returns: Json
+      }
+      wa_modelo_da_meta: { Args: { p_template_id: number }; Returns: Json }
+      wa_motivo_de_recusa: {
+        Args: {
+          p_contact_id?: string
+          p_organization_id: string
+          p_phone_e164?: string
+        }
+        Returns: string
+      }
+      wa_motivo_legivel: {
+        Args: { p_motivo: string; p_quando?: string }
+        Returns: string
+      }
+      wa_proximos: { Args: { p_qty?: number }; Returns: Json }
+      wa_registrar_entrada: {
+        Args: {
+          p_body?: string
+          p_business_number: string
+          p_media_id?: string
+          p_media_mime?: string
+          p_occurred_at?: string
+          p_peer_phone: string
+          p_type?: Database["app"]["Enums"]["msg_type"]
+          p_wamid: string
+        }
+        Returns: Json
+      }
+      wa_sucesso: {
+        Args: {
+          p_categoria?: string
+          p_custo?: number
+          p_message_id: string
+          p_msg_id: number
+          p_wamid: string
+        }
+        Returns: boolean
+      }
       website_domain: { Args: { u: string }; Returns: string }
     }
     Enums: {
@@ -667,6 +758,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "activities_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "activities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -699,6 +797,176 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_budget_alerts: {
+        Row: {
+          created_at: string
+          gasto_usd: number
+          mes: string
+          orcamento_usd: number
+          projecao_usd: number
+          situacao: string
+          task_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          gasto_usd: number
+          mes: string
+          orcamento_usd: number
+          projecao_usd: number
+          situacao: string
+          task_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          gasto_usd?: number
+          mes?: string
+          orcamento_usd?: number
+          projecao_usd?: number
+          situacao?: string
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_budget_alerts_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_model_prices: {
+        Row: {
+          entrada: number
+          escrita_de_cache: number
+          leitura_de_cache: number
+          model: string
+          rotulo: string
+          saida: number
+          updated_at: string
+          vigente_desde: string
+        }
+        Insert: {
+          entrada: number
+          escrita_de_cache: number
+          leitura_de_cache: number
+          model: string
+          rotulo: string
+          saida: number
+          updated_at?: string
+          vigente_desde?: string
+        }
+        Update: {
+          entrada?: number
+          escrita_de_cache?: number
+          leitura_de_cache?: number
+          model?: string
+          rotulo?: string
+          saida?: number
+          updated_at?: string
+          vigente_desde?: string
+        }
+        Relationships: []
+      }
+      ai_runs: {
+        Row: {
+          activity_id: string | null
+          batch: boolean
+          conversation_id: string | null
+          cost_usd: number
+          created_at: string
+          error: string | null
+          id: number
+          latency_ms: number | null
+          model: string
+          organization_id: string | null
+          output: Json | null
+          prompt_version: string
+          purpose: string
+          status: string
+          tokens_cache_read: number
+          tokens_cache_write: number
+          tokens_in: number
+          tokens_out: number
+        }
+        Insert: {
+          activity_id?: string | null
+          batch?: boolean
+          conversation_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          error?: string | null
+          id?: number
+          latency_ms?: number | null
+          model: string
+          organization_id?: string | null
+          output?: Json | null
+          prompt_version: string
+          purpose: string
+          status?: string
+          tokens_cache_read?: number
+          tokens_cache_write?: number
+          tokens_in?: number
+          tokens_out?: number
+        }
+        Update: {
+          activity_id?: string | null
+          batch?: boolean
+          conversation_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          error?: string | null
+          id?: number
+          latency_ms?: number | null
+          model?: string
+          organization_id?: string | null
+          output?: Json | null
+          prompt_version?: string
+          purpose?: string
+          status?: string
+          tokens_cache_read?: number
+          tokens_cache_write?: number
+          tokens_in?: number
+          tokens_out?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_runs_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_runs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_runs_model_fkey"
+            columns: ["model"]
+            isOneToOne: false
+            referencedRelation: "ai_model_prices"
+            referencedColumns: ["model"]
+          },
+          {
+            foreignKeyName: "ai_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
             referencedColumns: ["id"]
           },
         ]
@@ -1939,6 +2207,128 @@ export type Database = {
           },
         ]
       }
+      conversations: {
+        Row: {
+          ai_confidence: number | null
+          ai_intent: string | null
+          ai_summary: string | null
+          assignee_id: string
+          bot_paused: boolean
+          business_number: string
+          channel: Database["app"]["Enums"]["channel"]
+          contact_id: string | null
+          created_at: string
+          deal_id: string | null
+          id: string
+          last_inbound_at: string | null
+          last_message_at: string | null
+          last_outbound_at: string | null
+          organization_id: string | null
+          peer_phone_e164: string
+          snoozed_until: string | null
+          status: string
+          unread_count: number
+          updated_at: string
+          window_expires_at: string | null
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_intent?: string | null
+          ai_summary?: string | null
+          assignee_id: string
+          bot_paused?: boolean
+          business_number: string
+          channel?: Database["app"]["Enums"]["channel"]
+          contact_id?: string | null
+          created_at?: string
+          deal_id?: string | null
+          id?: string
+          last_inbound_at?: string | null
+          last_message_at?: string | null
+          last_outbound_at?: string | null
+          organization_id?: string | null
+          peer_phone_e164: string
+          snoozed_until?: string | null
+          status?: string
+          unread_count?: number
+          updated_at?: string
+          window_expires_at?: string | null
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_intent?: string | null
+          ai_summary?: string | null
+          assignee_id?: string
+          bot_paused?: boolean
+          business_number?: string
+          channel?: Database["app"]["Enums"]["channel"]
+          contact_id?: string | null
+          created_at?: string
+          deal_id?: string | null
+          id?: string
+          last_inbound_at?: string | null
+          last_message_at?: string | null
+          last_outbound_at?: string | null
+          organization_id?: string | null
+          peer_phone_e164?: string
+          snoozed_until?: string | null
+          status?: string
+          unread_count?: number
+          updated_at?: string
+          window_expires_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_stage_history: {
         Row: {
           changed_at: string
@@ -2477,23 +2867,37 @@ export type Database = {
       ingest_queues: {
         Row: {
           description: string | null
+          dlq: string | null
           max_attempts: number
           name: string
           visibility_seconds: number
+          worker: string
         }
         Insert: {
           description?: string | null
+          dlq?: string | null
           max_attempts?: number
           name: string
           visibility_seconds: number
+          worker?: string
         }
         Update: {
           description?: string | null
+          dlq?: string | null
           max_attempts?: number
           name?: string
           visibility_seconds?: number
+          worker?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ingest_queues_dlq_fkey"
+            columns: ["dlq"]
+            isOneToOne: false
+            referencedRelation: "ingest_queues"
+            referencedColumns: ["name"]
+          },
+        ]
       }
       interaction_outcomes: {
         Row: {
@@ -2679,6 +3083,162 @@ export type Database = {
         }
         Relationships: []
       }
+      message_drafts: {
+        Row: {
+          ai_run_id: number | null
+          channel: Database["app"]["Enums"]["channel"]
+          contact_id: string | null
+          conversation_id: string | null
+          created_at: string
+          deal_id: string | null
+          discard_reason: string | null
+          expires_at: string
+          final_body: string | null
+          foi_editado: boolean | null
+          id: string
+          kind: string
+          message_id: string | null
+          organization_id: string
+          prompt_version: string | null
+          proposed_audio_slug: string | null
+          proposed_body: string
+          proposed_claims: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          validator: Json
+        }
+        Insert: {
+          ai_run_id?: number | null
+          channel?: Database["app"]["Enums"]["channel"]
+          contact_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          deal_id?: string | null
+          discard_reason?: string | null
+          expires_at?: string
+          final_body?: string | null
+          foi_editado?: boolean | null
+          id?: string
+          kind: string
+          message_id?: string | null
+          organization_id: string
+          prompt_version?: string | null
+          proposed_audio_slug?: string | null
+          proposed_body: string
+          proposed_claims?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          validator?: Json
+        }
+        Update: {
+          ai_run_id?: number | null
+          channel?: Database["app"]["Enums"]["channel"]
+          contact_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          deal_id?: string | null
+          discard_reason?: string | null
+          expires_at?: string
+          final_body?: string | null
+          foi_editado?: boolean | null
+          id?: string
+          kind?: string
+          message_id?: string | null
+          organization_id?: string
+          prompt_version?: string | null
+          proposed_audio_slug?: string | null
+          proposed_body?: string
+          proposed_claims?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          validator?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_drafts_ai_run_id_fkey"
+            columns: ["ai_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_drafts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_drafts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_drafts_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_drafts_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_drafts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_drafts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_drafts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_drafts_proposed_audio_slug_fkey"
+            columns: ["proposed_audio_slug"]
+            isOneToOne: false
+            referencedRelation: "audio_assets"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "message_drafts_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_drafts_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_templates: {
         Row: {
           audio_asset_id: string | null
@@ -2746,6 +3306,219 @@ export type Database = {
             columns: ["audio_asset_id"]
             isOneToOne: false
             referencedRelation: "audio_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          activity_id: string | null
+          approved_by: string | null
+          audio_asset_id: string | null
+          author_kind: string
+          billable_category: string | null
+          body: string | null
+          business_initiated: boolean
+          cadence_touch_id: string | null
+          contact_id: string | null
+          conversation_id: string
+          cost_usd: number | null
+          created_at: string
+          delivered_at: string | null
+          direction: Database["app"]["Enums"]["msg_direction"]
+          draft_id: string | null
+          error_code: string | null
+          error_detail: string | null
+          failed_at: string | null
+          id: string
+          is_first_contact: boolean
+          media_id: string | null
+          media_mime: string | null
+          media_path: string | null
+          optout_confirmation: boolean
+          organization_id: string | null
+          origin: string
+          read_at: string | null
+          sent_at: string | null
+          sent_by: string | null
+          status: Database["app"]["Enums"]["msg_status"]
+          template_id: number | null
+          template_params: Json
+          transcript: string | null
+          type: Database["app"]["Enums"]["msg_type"]
+          wa_message_id: string | null
+        }
+        Insert: {
+          activity_id?: string | null
+          approved_by?: string | null
+          audio_asset_id?: string | null
+          author_kind?: string
+          billable_category?: string | null
+          body?: string | null
+          business_initiated?: boolean
+          cadence_touch_id?: string | null
+          contact_id?: string | null
+          conversation_id: string
+          cost_usd?: number | null
+          created_at?: string
+          delivered_at?: string | null
+          direction: Database["app"]["Enums"]["msg_direction"]
+          draft_id?: string | null
+          error_code?: string | null
+          error_detail?: string | null
+          failed_at?: string | null
+          id?: string
+          is_first_contact?: boolean
+          media_id?: string | null
+          media_mime?: string | null
+          media_path?: string | null
+          optout_confirmation?: boolean
+          organization_id?: string | null
+          origin?: string
+          read_at?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: Database["app"]["Enums"]["msg_status"]
+          template_id?: number | null
+          template_params?: Json
+          transcript?: string | null
+          type?: Database["app"]["Enums"]["msg_type"]
+          wa_message_id?: string | null
+        }
+        Update: {
+          activity_id?: string | null
+          approved_by?: string | null
+          audio_asset_id?: string | null
+          author_kind?: string
+          billable_category?: string | null
+          body?: string | null
+          business_initiated?: boolean
+          cadence_touch_id?: string | null
+          contact_id?: string | null
+          conversation_id?: string
+          cost_usd?: number | null
+          created_at?: string
+          delivered_at?: string | null
+          direction?: Database["app"]["Enums"]["msg_direction"]
+          draft_id?: string | null
+          error_code?: string | null
+          error_detail?: string | null
+          failed_at?: string | null
+          id?: string
+          is_first_contact?: boolean
+          media_id?: string | null
+          media_mime?: string | null
+          media_path?: string | null
+          optout_confirmation?: boolean
+          organization_id?: string | null
+          origin?: string
+          read_at?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: Database["app"]["Enums"]["msg_status"]
+          template_id?: number | null
+          template_params?: Json
+          transcript?: string | null
+          type?: Database["app"]["Enums"]["msg_type"]
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_audio_asset_id_fkey"
+            columns: ["audio_asset_id"]
+            isOneToOne: false
+            referencedRelation: "audio_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_cadence_touch_id_fkey"
+            columns: ["cadence_touch_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_touches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "message_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -4711,6 +5484,10 @@ export type Database = {
         }
         Returns: Json
       }
+      aprovar_rascunho: {
+        Args: { p_draft_id: string; p_texto_final?: string }
+        Returns: Json
+      }
       cadencia_do_parceiro: {
         Args: { p_organization_id: string }
         Returns: Json
@@ -4744,6 +5521,10 @@ export type Database = {
           to_stage_id: number
           to_stage_name: string
         }[]
+      }
+      descartar_rascunho: {
+        Args: { p_draft_id: string; p_motivo: string }
+        Returns: Json
       }
       devolver_item_do_lote: {
         Args: {
@@ -4868,6 +5649,11 @@ export type Database = {
           ritmo_necessario: number
         }[]
       }
+      ia_fila_enfileirar: {
+        Args: { p_key: string; p_payload: Json; p_purpose: string }
+        Returns: Json
+      }
+      ia_orcamento_status: { Args: never; Returns: Json }
       importacao_encerrar_lote: {
         Args: { p_batch_id: string; p_erro?: string }
         Returns: Json
@@ -5282,6 +6068,88 @@ export type Database = {
           p_reuniao_em?: string
           p_reuniao_formato?: string
         }
+        Returns: Json
+      }
+      wa_eco_registrar: {
+        Args: {
+          p_body?: string
+          p_business_number: string
+          p_media_id?: string
+          p_media_mime?: string
+          p_occurred_at?: string
+          p_peer_phone: string
+          p_type?: string
+          p_wamid: string
+        }
+        Returns: Json
+      }
+      wa_entrada_registrar: {
+        Args: {
+          p_body?: string
+          p_business_number: string
+          p_media_id?: string
+          p_media_mime?: string
+          p_occurred_at?: string
+          p_peer_phone: string
+          p_type?: string
+          p_wamid: string
+        }
+        Returns: Json
+      }
+      wa_midia_registrar: {
+        Args: { p_media_path: string; p_message_id: string }
+        Returns: Json
+      }
+      wa_optout_registrar: {
+        Args: {
+          p_confirmar?: boolean
+          p_conversation_id: string
+          p_evidencia?: string
+        }
+        Returns: Json
+      }
+      wa_saida_enfileirar_pendentes: { Args: { p_qty?: number }; Returns: Json }
+      wa_saida_falha: {
+        Args: {
+          p_codigo?: string
+          p_erro: string
+          p_message_id: string
+          p_msg_id: number
+        }
+        Returns: Json
+      }
+      wa_saida_falha_definitiva: {
+        Args: {
+          p_codigo?: string
+          p_erro: string
+          p_message_id: string
+          p_msg_id: number
+        }
+        Returns: Json
+      }
+      wa_saida_proximos: { Args: { p_qty?: number }; Returns: Json }
+      wa_saida_sucesso: {
+        Args: {
+          p_categoria?: string
+          p_custo?: number
+          p_message_id: string
+          p_msg_id: number
+          p_wamid: string
+        }
+        Returns: boolean
+      }
+      wa_status_registrar: {
+        Args: {
+          p_codigo?: string
+          p_detalhe?: string
+          p_ocorrido_em?: string
+          p_status: string
+          p_wamid: string
+        }
+        Returns: Json
+      }
+      wa_webhook_receber: {
+        Args: { p_delivery_id: string; p_itens?: Json; p_payload: Json }
         Returns: Json
       }
     }
