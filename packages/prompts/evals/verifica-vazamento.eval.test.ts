@@ -18,7 +18,7 @@ const ATAQUES = [
 describe('nenhuma entrada que já vazou volta a vazar', () => {
   for (const texto of ATAQUES) {
     it(texto, () => {
-      let saiu: string | null = null;
+      let saiu: string | null;
       try {
         saiu = prepararChamada(transcricaoAudioV1, {
           contato: { leadId: 'lead-0f21', nome: 'Marcos Tavares', telefones: ['+5584999880011'] },
