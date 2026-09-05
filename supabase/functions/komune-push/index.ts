@@ -14,6 +14,14 @@
 //     item se `integracao.komune.push_ativo` estiver ligado, se houver
 //     autorização vigente em `consent_events` e se o alvo não estiver
 //     suprimido. A função é braço, não cabeça (ADR-03).
+//
+//     Isso só é verdade desde `20260905000100_dreno_reconfere.sql`. Antes
+//     dela, `app.komune_proximos` confiava na decisão tomada lá atrás, na
+//     enfileirada, e entregava alegremente o pedido de quem tinha pedido
+//     para sair no intervalo. Hoje a fila RECONFERE item a item no instante
+//     da entrega e devolve, junto com `itens`, um `recusados` com o motivo
+//     de cada pedido que morreu no caminho — que esta função registra sem
+//     tentar interpretar: continua sendo braço.
 //   * Não manda token de reivindicação em claro. O payload leva o hash.
 // =============================================================================
 
@@ -30,9 +38,16 @@ interface ItemDaFila {
   payload: Record<string, unknown>;
 }
 
+interface RecusadoNaEntrega {
+  outbox_id: string;
+  motivo: string;
+}
+
 interface Lote {
   ativo: boolean;
   itens?: ItemDaFila[];
+  /** Pedidos que o Postgres descartou na entrega (supressão, recusa, ficha apagada). */
+  recusados?: RecusadoNaEntrega[];
   motivo?: string;
 }
 
@@ -100,8 +115,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   const itens = lote.itens ?? [];
+  const recusados = lote.recusados ?? [];
   let enviados = 0;
   let falhas = 0;
+
+  // O descarte já está feito e registrado no banco (status, motivo na linha,
+  // mensagem arquivada, linha do tempo do pré-cadastro). Aqui ele só aparece
+  // no log, para que "sumiu da fila" nunca seja um evento silencioso.
+  for (const recusado of recusados) {
+    registrar('info', {
+      funcao: 'komune-push',
+      outbox_id: recusado.outbox_id,
+      motivo: recusado.motivo,
+      resultado: 'descartado_na_entrega',
+    });
+  }
 
   for (const item of itens) {
     const corpoCru = JSON.stringify(item.payload);
@@ -187,5 +215,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
   }
 
-  return json({ ok: true, ativo: true, lidos: itens.length, enviados, falhas });
+  return json({
+    ok: true,
+    ativo: true,
+    lidos: itens.length,
+    enviados,
+    falhas,
+    descartados: recusados.length,
+  });
 });

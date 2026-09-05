@@ -973,3 +973,56 @@ A planilha-ponte do Dia 0 (`docs/planilha-ponte/`) entra no CRM pela **mesma est
 ### Decisão humana
 - Confirmar com Dennis se a nota de histórico ("Registrado na planilha-ponte — <resultado>") pode carregar o texto livre da coluna `resultado` como está, ou se ele deve ser normalizado antes de entrar na ficha.
 - Confirmar o limiar de 0,55 do casamento aproximado de categoria e etapa (hoje casa "Outros serviços (celebrante, …)" com "Celebrante, beleza, …", e recusa qualquer par de categorias diferentes).
+
+## D9 — 05/09/2026 — O dreno reconfere: nada sai para a Komune de quem já disse não (RF-PRE-01, RF-CON-18, RF-ADM-03; ADR-03, ADR-04, ADR-05, ADR-11; anexo R06)
+
+A conferência adversarial reprovou a entrega do D9 com um achado colhido no banco de verdade. `app.komune_proximos` é o **dreno** da fila de saída para a plataforma Komune, chamado pelo job 14 do `cron` a cada 5 minutos. Ele **não reconferia nada**: a única checagem de supressão e autorização vivia na enfileirada (`app.komune_enfileirar`), e a Edge Function `komune-push` está escrita assumindo que o Postgres já filtrou ("a função é braço, não cabeça", ADR-03).
+
+Linha do tempo real, do banco local:
+
+```
+01:21:57  Alfa Cerimonial e Assessoria autoriza  -> consent_events · data_use_authorized
+01:21:57  komune_outbox c132132c "link_emitido"  -> pendente
+01:23:24  komune_outbox 9b00fd02 "link_emitido"  -> pendente
+01:23:33  Alfa clica "Não é meu / não quero aparecer" em /c/<token>
+          -> consent_events · erasure_request · do_not_contact = true
+          -> pre_registrations.status = rejected, refused_at preenchido
+```
+
+A recusa cancelou cadência, tarefa e pré-cadastro. **Não cancelou o outbox.** Os dois payloads seguiam pendentes hoje, junto com um terceiro de uma ficha já apagada. Nada saía por um motivo só: `integracao.komune.push_ativo = false`. No dia em que o Matheus ligasse a chave, os três subiriam.
+
+### Migração `20260905000100_dreno_reconfere.sql`
+- **`app.komune_motivo_de_recusa(outbox_id)`** — a pergunta única "este pedido ainda pode sair?", com o motivo por escrito: `contato_suprimido`, `organizacao_apagada`, `pre_cadastro_recusado`, `pre_cadastro_apagado`, `sem_autorizacao`. São os **mesmos quatro critérios da enfileirada**, relidos no instante da entrega — inclusive `tem_autorizacao_vigente`, porque `data_use_revoked` **não** liga `do_not_contact` (veja `app.consent_apply`): sem essa linha, revogar a autorização não pararia o push.
+- **`app.komune_descartar(outbox_id, msg_id, motivo)`** — três efeitos: `komune_outbox.status = 'descartado'` com o motivo na própria linha (o valor já existia no `check` da tabela e ninguém usava), a mensagem `pgmq` **arquivada** (sem isso ela voltaria a cada leitura, para sempre) e um `returned` na linha do tempo do pré-cadastro. Idempotente: o `update` só pega quem está `pendente`, e o evento só nasce se o `update` pegou.
+- **`app.komune_proximos` passa a reconferir item a item**, na forma do molde que já existia no projeto (`public.proximo_da_fila`, migração 001300). Devolve, junto com `itens`, um `recusados` com o motivo de cada pedido que morreu no caminho. A diferença para o módulo de ligação é que aqui o item recusado **não volta para a fila**: morre.
+- **A dívida foi paga na própria migração**: os três pedidos pendentes de quem já tinha recusado saíram da fila pelo mesmo critério (`bf485717`, `c132132c`, `9b00fd02`, todos `contato_suprimido`), com as mensagens `pgmq` arquivadas.
+- **`public.komune_fila_status`** passa a contar `descartados` e a mostrar o `ultimo_descarte`. Recusa que ninguém vê é indistinguível de bug.
+
+### A varredura — o mesmo erro em outro lugar
+Varridas as oito funções do `cron.job` e as funções que entregam trabalho.
+
+**Já reconferiam:** `public.proximo_da_fila` e `public.iniciar_chamada` (o molde), `app.cadencias_agendar` → `app.abrir_proximo_toque` (chama `app.pode_tocar` no instante de criar o toque), `app.precadastros_lembrete` (a checagem está no mesmo laço que cria a tarefa) e `public.registrar_contato` (recalcula o guardrail nas duas organizações do par).
+
+**Não precisam:** `app.recompute_temperatures`, `app.expirar_reservas`, `app.aplicar_retencao`, `app.cadencias_encerrar_silencio`, `app.precadastros_expirar`, `app.komune_sucesso`/`app.komune_falha`. Nenhuma entrega ninguém a ninguém: só recalculam, encerram, apagam ou escrituram o que já aconteceu — o efeito é sempre no sentido seguro. A esteira de ingestão (`ingest_jobs`, `ingest_pages`, `ingest_records`) é fila de **entrada**; o ponto em que ela vira contato é a curadoria, logo abaixo.
+
+**Tinham o mesmo buraco (consertadas aqui):**
+- `app.promover_candidato` e `app.mesclar_candidato` liam `supplier_candidates.do_not_contact`, que é o **carimbo do dia da coleta** (escrito por `app.supplier_candidates_normalize`). Coletado na segunda, opt-out na quarta, curadoria na sexta: o carimbo dizia "pode" e a lista de supressão dizia "não" — e a ficha nova nascia com `do_not_contact = false`, porque `app.organizations_normalize` não consulta a lista. Agora releem a lista viva e **atualizam o carimbo**, para a fila do Radar não reoferecer o mesmo alvo amanhã.
+- `public.meu_dia` reconferia (bom), mas só `not o.do_not_contact` (insuficiente): não via o contato que pediu para sair numa ficha cujo dono não pediu, nem a ficha que herdou um telefone que está na `suppression_list`. Passa a usar `app.is_suppressed_target`, que é a pergunta inteira.
+
+**De propósito fora:** o item `desfecho_pendente` do `meu_dia` (interação registrada sem resultado) continua aparecendo para alvo suprimido. Não é contato: é tabular o que **já** aconteceu. Tirá-lo esconderia justamente o registro do "ela pediu para sair" que gerou a supressão.
+
+### Edge Function `komune-push`
+O comentário de cabeçalho dizia que a fila só devolve item legítimo — o que só passou a ser verdade agora, e está escrito assim. A função registra em log cada `descartado_na_entrega` que o Postgres devolve, e o corpo da resposta ganhou `descartados`. Continua sendo braço: não decide nada.
+
+### Verificado com execução real (banco local)
+- pgTAP `supabase/tests/23_dreno_reconfere.sql`: **43/43**. Cobre o ciclo completo (enfileira → o mundo muda → drena): item enfileirado antes da recusa não sai depois dela, item de organização apagada não sai, item de pré-cadastro recusado não sai, **o item legítimo continua saindo**, o descarte é idempotente e a mensagem é arquivada. Toda contagem é **delta** sobre a base medida no início.
+- **O teste foi visto falhando**: com a versão antiga de `app.komune_proximos` restaurada no banco, 10 asserções ficam vermelhas (15–19, 21–23, 25, 26); com as versões antigas de `promover_candidato`, `mesclar_candidato` e `meu_dia`, mais 3 (37, 39, 43).
+- Suíte inteira: **24 arquivos, 1.721 asserções, `Result: PASS`** (eram 1.678; nenhuma quebrou). `supabase db lint --local` sem apontamentos, com `drop extension pgtap` antes. `pnpm lint` e `pnpm typecheck` verdes.
+- `packages/schema/src/database.types.ts` regenerado. Além das duas funções novas, a regeneração **removeu 147 linhas de lixo do pgTAP** (`tap_funky`, `pg_all_foreign_keys`, `_cleanup`, `_currtest` e companhia) que estavam versionadas porque a geração anterior rodou com a extensão instalada em `public` — a mesma armadilha que polui o `db lint`.
+
+### Pendente
+- A migração conserta o dreno e limpa a dívida, mas **não existe um teto de idade** na `komune_outbox`: um pedido legítimo que fique pendente por semanas continua pendente. Vale decidir se `app.aplicar_retencao` deve descartar pendente com mais de N dias, ou se a reconciliação noturna (ainda não escrita) resolve isso.
+- A `komune_dlq` não é drenada por ninguém: pedido que estourou o teto de tentativas fica lá esperando gente. Precisa de tela ou de digest.
+
+### Decisão humana
+- **Antes de ligar `integracao.komune.push_ativo`**, o Matheus deve conferir `public.komune_fila_status()` e olhar `pendentes` **e** `descartados`: os 19 pedidos que sobraram pendentes no banco local são de fichas de teste, e o primeiro push real vai enviar todos eles de uma vez.
