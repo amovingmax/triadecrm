@@ -167,6 +167,16 @@ export type Resposta = {
  * gatilho: mensagem humana sem autor não é humana. `origin: 'crm'` também é da
  * política — eco e importação são coisas que o worker registra, não que alguém
  * digita.
+ *
+ * E repare no que este objeto NÃO tem, porque já foi a porta de um furo:
+ * `optout_confirmation`. Era um booleano de `public.messages` que quem inseria
+ * escrevia, e que fazia o gatilho sair da função antes da supressão, da janela
+ * e da aprovação — bastava mandá-lo aqui junto para uma mensagem de texto
+ * livre chegar ao celular de quem tinha acabado de pedir para sair. Desde a
+ * migração 20260905000300 ele é DERIVADO pelo banco a partir do estado, a
+ * policy `messages_insert` exige `not optout_confirmation`, e mandá-lo daqui
+ * é recusado. A confirmação de opt-out não passa por esta tela: quem a
+ * escreve é `public.wa_optout_registrar`, com o texto fixo do GEN-SYS-OPTOUT.
  */
 export async function responder({ fioId, texto, modeloId = null }: Resposta): Promise<void> {
   const supabase = createClient();

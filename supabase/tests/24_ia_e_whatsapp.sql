@@ -44,7 +44,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(94);
+select plan(95);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -376,7 +376,12 @@ select throws_ok($$
 select throws_ok($$
   insert into public.messages (conversation_id, direction, author_kind, body)
   values ('c0000000-0000-4000-8000-0000000c0001', 'out', 'system', 'mensagem do sistema qualquer') $$,
-  '23514', NULL, 'saída com author_kind "system" só existe como confirmação de opt-out');
+  '42501', NULL, 'saída com author_kind "system" só existe como confirmação de opt-out');
+select throws_like($$
+  insert into public.messages (conversation_id, direction, author_kind, body)
+  values ('c0000000-0000-4000-8000-0000000c0001', 'out', 'system', 'mensagem do sistema qualquer') $$,
+  '%sem_pedido_de_optout%',
+  'e desde 20260905000300 a recusa diz POR QUE não é uma: ninguém pediu para sair nesta conversa');
 
 select throws_ok($$
   insert into public.messages (conversation_id, direction, author_kind, body)
@@ -423,23 +428,34 @@ select lives_ok($$
                                   'text', 'SAIR') $$,
   'mensagem RECEBIDA de contato suprimido entra: barrá-la apagaria a prova do próprio opt-out');
 
--- A confirmação única do RF-CON-19: a exceção declarada.
-insert into public.messages (id, conversation_id, direction, author_kind, body,
-                             optout_confirmation, status)
+-- A confirmação única do RF-CON-19: a exceção, ESTREITADA pela migração
+-- 20260905000300. Ela deixou de ser DECLARADA por quem insere — era um
+-- booleano do cliente que fazia o gatilho sair da função antes de
+-- qualquer checagem — e passou a ser DERIVADA do estado: existe pedido
+-- de opt-out registrado para esta conversa e ele ainda não foi
+-- confirmado. O corpo também não vem do insert: é o texto fixo do
+-- GEN-SYS-OPTOUT, montado pelo banco. A prova inteira está em
+-- 25_confirmacao_de_optout_estreita.sql; o que esta seção sempre mediu
+-- continua aqui: a confirmação atravessa a supressão, e uma só.
+insert into public.messages (id, conversation_id, direction, author_kind, origin,
+                             template_id, status)
 values ('a1000000-0000-4000-8000-0000000a0002', 'c0000000-0000-4000-8000-0000000c0002', 'out',
-        'bot_fixed', 'Pronto, não te procuro mais. Obrigada!', true, 'sent');
-select pass('a confirmação de opt-out do RF-CON-19 SAI, e é a única mensagem que atravessa o guardrail');
+        'system', 'crm',
+        (select id from public.message_templates where template_code = 'GEN-SYS-OPTOUT'), 'sent');
+select ok((select optout_confirmation from public.messages
+            where id = 'a1000000-0000-4000-8000-0000000a0002'),
+          'a confirmação de opt-out do RF-CON-19 SAI para quem está suprimido — e a coluna foi DERIVADA pelo banco, não declarada por quem inseriu');
 select throws_ok($$
-  insert into public.messages (conversation_id, direction, author_kind, body,
-                               optout_confirmation, status)
-  values ('c0000000-0000-4000-8000-0000000c0002', 'out', 'bot_fixed', 'de novo?', true, 'sent') $$,
-  '23505', NULL, '"confirmação única" é índice único, não boa intenção: a segunda é recusada');
+  insert into public.messages (conversation_id, direction, author_kind, origin, template_id, status)
+  values ('c0000000-0000-4000-8000-0000000c0002', 'out', 'system', 'crm',
+          (select id from public.message_templates where template_code = 'GEN-SYS-OPTOUT'), 'sent') $$,
+  '42501', NULL, '"confirmação única" continua valendo: a segunda é recusada, agora por estado e com o motivo por escrito');
 select throws_ok($$
   insert into public.messages (conversation_id, direction, author_kind, body,
                                optout_confirmation, status)
   values ('c0000000-0000-4000-8000-0000000c0003', 'out', 'bot_ai', 'deixa eu explicar melhor...',
           true, 'sent') $$,
-  '23514', NULL, 'e a confirmação de opt-out é texto fixo, nunca redigida por IA');
+  '42501', NULL, 'e a confirmação de opt-out nunca é redigida por IA — nem ligada por quem insere');
 
 -- ---------------------------------------------------------------------
 -- A LIÇÃO DO DRENO: aprovado às 9h não é permissão para as 9h40

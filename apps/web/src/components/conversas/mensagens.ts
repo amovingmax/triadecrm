@@ -550,6 +550,30 @@ export const MOTIVOS_DE_RECUSA_DO_ENVIO: Record<string, string> = {
   janela_antes_da_abertura: 'Ainda não abriu o horário de envio de hoje.',
   janela_canal_sem_janela: 'Este canal não tem janela de envio configurada.',
   conversa_inexistente: 'Esta conversa não existe mais. Recarregue a página.',
+  // As recusas da confirmação de opt-out (RF-CON-19), estreitada na migração
+  // 20260905000300. A tela NÃO alcança nenhuma delas — a policy
+  // `messages_insert` proíbe `optout_confirmation` e o gatilho só deriva a
+  // coluna para `author_kind = 'system'`, que a tela também não escreve. Estão
+  // aqui porque a alternativa é a frase genérica "não deu para falar com o
+  // servidor" no dia em que alguém abrir um caminho novo: um motivo sem frase
+  // é um defeito silencioso, e este arquivo é o contrato com os nomes do banco.
+  confirmacao_nao_e_de_pessoa:
+    'A confirmação de opt-out é escrita pelo sistema, com texto fixo. Ninguém a envia à mão.',
+  confirmacao_nao_e_eco_nem_importacao:
+    'A confirmação de opt-out só sai pelo CRM, nunca como eco do celular ou importação.',
+  confirmacao_nao_nasce_de_rascunho:
+    'A confirmação de opt-out não vem de rascunho: ela tem um texto só, e não há o que aprovar.',
+  confirmacao_e_texto: 'A confirmação de opt-out é texto, não áudio nem mídia.',
+  modelo_nao_e_o_gen_sys_optout:
+    'A confirmação de opt-out sai pelo modelo GEN-SYS-OPTOUT, não por outro.',
+  texto_diferente_do_modelo_fixo:
+    'A confirmação de opt-out tem um texto só, escrito pelo banco. Outro texto não sai.',
+  sem_pedido_de_optout: 'Ninguém pediu para sair nesta conversa: não há o que confirmar.',
+  confirmacao_ja_enviada: 'A confirmação de opt-out já foi enviada nesta conversa. Uma só.',
+  sem_modelo_gen_sys_optout:
+    'O modelo GEN-SYS-OPTOUT está inativo ou não existe: sem ele não há confirmação para enviar.',
+  janela_depois_do_fechamento: 'O horário de envio de hoje já fechou.',
+  janela_dia_sem_janela: 'Hoje não tem janela de envio configurada para este canal.',
 };
 
 /**

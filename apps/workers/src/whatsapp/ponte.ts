@@ -220,11 +220,31 @@ export async function registrarRecibo(
   return { ok: r.ok === true, motivo: texto(r.motivo) };
 }
 
+/**
+ * Registra o opt-out e pede a confirmação de uma linha (RF-CON-19).
+ *
+ * O worker NÃO monta o texto da confirmação e não liga bandeira nenhuma: a
+ * migração 20260905000300 estreitou a exceção, e `optout_confirmation` passou
+ * a ser DERIVADA pelo banco a partir do estado (existe pedido de opt-out
+ * registrado e ele ainda não foi confirmado). Mandá-la daqui seria recusado —
+ * e é bom que seja: era exatamente por esse campo que um `insert` direto
+ * atravessava a supressão inteira.
+ *
+ * `confirmacaoMotivo` vem preenchido quando a confirmação NÃO foi enfileirada
+ * (`confirmacao_ja_enviada`, `sem_modelo_gen_sys_optout`, …). Sem ele o log
+ * dizia só "false", que é a diferença entre "já saiu antes" e "não existe
+ * modelo ativo" — duas coisas muito diferentes para quem lê o log às 2h.
+ */
 export async function registrarOptOut(
   cliente: ClienteDoBanco,
   conversationId: string,
   evidencia: string,
-): Promise<{ ok: boolean; motivo: string | null; confirmacaoEnfileirada: boolean }> {
+): Promise<{
+  ok: boolean;
+  motivo: string | null;
+  confirmacaoEnfileirada: boolean;
+  confirmacaoMotivo: string | null;
+}> {
   const r = objeto(
     await rpc<unknown>(cliente, 'wa_optout_registrar', {
       p_conversation_id: conversationId,
@@ -236,6 +256,7 @@ export async function registrarOptOut(
     ok: r.ok === true,
     motivo: texto(r.motivo),
     confirmacaoEnfileirada: r.confirmacao_enfileirada === true,
+    confirmacaoMotivo: texto(r.confirmacao_motivo),
   };
 }
 

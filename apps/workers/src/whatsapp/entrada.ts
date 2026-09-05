@@ -226,6 +226,7 @@ async function tratarMensagem(
       regra: veredito.regra,
       evidencia: veredito.evidencia,
       confirmacao_enfileirada: r.confirmacaoEnfileirada,
+      confirmacao_motivo: r.confirmacaoMotivo,
       motivo: r.motivo,
     });
     // O tratamento PARA aqui. Sem transcrição, sem classificação.
