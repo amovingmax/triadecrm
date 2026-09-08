@@ -1675,3 +1675,20 @@ A ida já estava provada de manhã (11 conferências contra a `crm-pre-registrat
 - **As outras Edge Functions do Tríade não subiram**: `komune-push`, `claim-link`, `export-lgpd`, `wa-webhook`. Só a `komune-webhook` foi publicada, porque era a que a volta exigia.
 - **Ninguém dispara a `komune-push` ainda** — a ida acontece quando alguém a chama, e não há cron nem worker fazendo isso no `komune-crm`.
 - **Dado de teste no `komune-dev`**: o pré-cadastro "Prova da volta" e sua linha em `crm_outbox` ficaram lá de propósito, como prova. Apagar é uma linha.
+
+### A ida também fechou, com dado real — e duas descobertas de operação (08/09/2026, manhã)
+
+`Neuma Leão Buffet e Decoração`, um dos 100 leads do R09, saiu do `komune-crm` e chegou ao `komune-dev` como `supplier_pre_registrations` em rascunho, com o `crm_organization_id` amarrando os dois lados. `komune_outbox` marcou `enviado`, `attempts 1`, `http_status 200`. **As duas direções do contrato do pré-cadastro estão provadas com dado de verdade.**
+
+O caminho exercitado foi o desenhado, e não um atalho: autorização registrada em `consent_events` → `criar_pre_cadastro_da_ficha` → `gerar_link_de_reivindicacao` (é a emissão do link que enfileira, pelo gatilho `app.pre_registrations_push`) → `app.komune_push_disparar` acordando a Edge Function.
+
+**Descoberta 1 — `pg_net` e `pg_cron` não existiam nos projetos.** O `komune-crm` não tinha `pg_net`, então `app.komune_push_disparar` falhava com `schema "net" does not exist`; o `komune-dev` não tinha `pg_cron`, e por isso o bloco de agendamento da migração das 13h foi **pulado** pelo próprio `if exists` (que era o comportamento desenhado, mas escondia o buraco). As duas foram criadas à mão. **Consequência a investigar: todo agendamento que as migrações registram só nasce se o `pg_cron` existir no momento em que a migração roda — e ele passou a existir depois do reset.**
+
+**Descoberta 2 — o Supabase injeta a chave do formato NOVO em `SUPABASE_SERVICE_ROLE_KEY`.** A `komune-push` compara o `Authorization` recebido com essa variável, e a chave **legada** (`eyJ…`, aba "Legacy") **não bate**. A que funciona é a `sb_secret_…` da aba "Publishable and secret API keys". Os dois 401 contaram a história e vale guardar a diferença entre eles, porque ela diz onde a chamada morreu:
+
+| Resposta | Quem recusou | O que significa |
+| --- | --- | --- |
+| `{"code":"UNAUTHORIZED_INVALID_JWT_FORMAT"}` | o portão do Supabase | o valor enviado não é um JWT (era a `sb_secret_` num campo que exigia JWT) |
+| `{"codigo":"nao_autorizado"}` | a própria função | o JWT é válido, mas não é o que a função espera |
+
+A suposição de que "service_role" significava a chave legada era minha, e estava errada. Está registrada aqui porque o próximo a mexer nisso vai supor a mesma coisa.
