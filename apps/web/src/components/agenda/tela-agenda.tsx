@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { NotaRecolhida } from '@/components/ui/nota-recolhida';
 import { cn } from '@/lib/utils';
 import {
   EXTRAS_VAZIOS,
@@ -294,33 +295,32 @@ export function TelaAgenda({
  */
 function AindaNaoLigado() {
   return (
-    <section className="flex flex-col gap-2 border-t border-hairline pt-4">
-      <h2 className="text-xs font-medium text-muted-foreground">O que ainda não está ligado</h2>
-      <ul className="flex max-w-prose flex-col gap-1.5 text-xs leading-relaxed text-muted-foreground">
+    <NotaRecolhida titulo="O que ainda não está ligado">
+      <ul className="flex flex-col gap-1.5">
         <li>
           <span className="text-foreground">Google Calendar</span> (horários livres, criação do
-          evento e link do Meet, RF-AGE-02 e RF-AGE-04): depende da conta Google do time conectada
+          evento e link do Meet): depende da conta Google do time conectada
           ao CRM. Hoje o compromisso vive só aqui.
         </li>
         <li>
           <span className="text-foreground">Lembretes de 24 h e 1 h</span> e o aviso de falta de
-          confirmação (RF-AGE-06): dependem do número oficial na Cloud API da Meta, que entra com o
+          confirmação: dependem do número oficial na Cloud API da Meta, que entra com o
           módulo de Conversas.
         </li>
         <li>
           <span className="text-foreground">Rota otimizada</span> por tempo de deslocamento já
-          existe: está na aba <span className="text-foreground">Rota</span> (RF-ROT-01 e RF-ROT-03).
+          existe: está na aba <span className="text-foreground">Rota</span>.
           Aqui, na lista do dia, a ordem continua sendo a do relógio e o agrupamento é por bairro —
           são perguntas diferentes.
         </li>
         <li>
-          <span className="text-foreground">Página pública de agendamento</span> (RF-AGE-09) está
+          <span className="text-foreground">Página pública de agendamento</span> está
           fora do MVP.
         </li>
       </ul>
-      <p className="text-xs text-muted-foreground">
+      <p className="mt-2">
         Todos os horários no fuso de Natal (America/Fortaleza), seja qual for o fuso do aparelho.
       </p>
-    </section>
+    </NotaRecolhida>
   );
 }

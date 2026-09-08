@@ -106,9 +106,6 @@ export function PaletaComandos({ papel }: { papel: AppRole }) {
                 >
                   <Icone aria-hidden="true" />
                   <span>{item.rotulo}</span>
-                  <span className="pilula ml-auto shrink-0 px-2 py-0.5 text-[11px] text-muted-foreground">
-                    chega no <span className="numerico">{item.dia}</span>
-                  </span>
                 </CommandItem>
               );
             })}

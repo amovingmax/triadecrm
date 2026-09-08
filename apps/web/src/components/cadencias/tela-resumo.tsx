@@ -57,7 +57,7 @@ export function TelaResumo({ nome }: { nome: string }) {
   const momento = dados?.momento ?? escolhido ?? 'manha';
 
   return (
-    <div className="flex w-full max-w-4xl flex-col gap-5">
+    <div className="flex mx-auto w-full max-w-4xl flex-col gap-5">
       <header className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">

@@ -90,10 +90,7 @@ export function TelefoneRevelavel({
 
       {mascarado && !revelado ? (
         <span className="basis-full text-xs text-muted-foreground">
-          A revelação fica registrada com o seu nome e a data (
-          {/* Um código de requisito é átomo: quebrado no hífen ("RF-" numa linha,
-              "BAS-14)." na outra, medido em 390px) ele deixa de ser pesquisável. */}
-          <span className="whitespace-nowrap">RF-BAS-14</span>).
+          A revelação fica registrada com o seu nome e a data.
         </span>
       ) : null}
     </div>

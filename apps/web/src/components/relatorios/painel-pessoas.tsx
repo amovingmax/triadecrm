@@ -196,7 +196,7 @@ export function PainelPessoas({ painel, periodo }: { painel: DefinicaoPainel; pe
       {
         chave: 'no_prazo',
         rotulo: 'No prazo',
-        ajuda: 'RF-REL-10: concluídas dentro do prazo, sobre o total de tarefas com prazo.',
+        ajuda: 'Concluídas dentro do prazo, sobre o total de tarefas com prazo.',
         numero: true,
         texto: (l) => formatarPercentual(l.percentual_no_prazo) ?? '',
         celula: (l) =>
@@ -240,7 +240,7 @@ export function PainelPessoas({ painel, periodo }: { painel: DefinicaoPainel; pe
       nota={
         <>
           Linha zerada aqui não é defeito: é quem ainda não registrou nada no período. Quatro
-          números do RF-REL-06 continuam de fora porque dependem do que ainda não está ligado:
+          números continuam de fora porque dependem do que ainda não está ligado:
           no-show de reunião, check-in de visita por GPS, comparecimento robô contra pessoa e o
           A/B da abertura, todos presos ao WhatsApp oficial e ao modo automático, que está
           desligado por decisão (ADR-05).

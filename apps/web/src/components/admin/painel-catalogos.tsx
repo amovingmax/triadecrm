@@ -545,7 +545,7 @@ function SecaoFeriados({
       <CabecalhoDeSecao
         titulo="Feriados"
         contagem={<Contagem n={futuros.length} rotulo="pela frente" />}
-        descricao="Dias em que nenhum primeiro contato sai (RF-CON-11) e que não contam como dia útil no cálculo de metas. Vale para 2026 e 2027, nacional, do RN e de Natal."
+        descricao="Dias em que nenhum primeiro contato sai e que não contam como dia útil no cálculo de metas. Vale para 2026 e 2027, nacional, do RN e de Natal."
       />
 
       <form
@@ -684,7 +684,7 @@ function SecaoMotivos({
       <CabecalhoDeSecao
         titulo="Motivos de perda"
         contagem={<Contagem n={dados.motivos.length} rotulo="motivos" />}
-        descricao="A lista que aparece quando um negócio vai para perdido (RF-FUN-04). É o que alimenta o relatório de por que a captação não fecha, então motivo genérico demais custa caro depois."
+        descricao="A lista que aparece quando um negócio vai para perdido. É o que alimenta o relatório de por que a captação não fecha, então motivo genérico demais custa caro depois."
       />
       <ListaAdmin
         rotuloDaLista="Motivos de perda do funil"
@@ -817,7 +817,7 @@ function SecaoDesfechos({
       <CabecalhoDeSecao
         titulo="Desfechos de interação"
         contagem={<Contagem n={dados.desfechos.length} rotulo="desfechos" />}
-        descricao="Os chips que a Heloísa toca no fim de cada contato (RF-FUN-12). São o catálogo mais perigoso da tela."
+        descricao="Os chips que a Heloísa toca no fim de cada contato. São o catálogo mais perigoso da tela."
       />
       <Aviso tom="atencao" titulo="Mexer aqui muda o que o CRM faz sozinho">
         <p>
@@ -925,7 +925,7 @@ function SecaoModelos({
         <p>
           Estes modelos existem no banco e podem ser lidos e copiados agora, mas nenhuma mensagem
           sai do CRM: o envio depende da Cloud API oficial da Meta e da aprovação dos modelos pela
-          própria Meta, que é trabalho do Luiz no Meta Business (RF-CON-01, D5). Enquanto isso, a
+          própria Meta, que é trabalho do Luiz no Meta Business. Enquanto isso, a
           coluna de situação diz o que está no catálogo, não o que a Meta aprovou.
         </p>
       </Aviso>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { IBM_Plex_Mono, Poppins } from 'next/font/google';
+import { Geist, Geist_Mono } from 'next/font/google';
 
 import './globals.css';
 
@@ -9,22 +9,31 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { appUrl } from '@/lib/env';
 
 /**
- * Poppins na interface e no display (Ocean Breeze + acabamento do template),
- * IBM Plex Mono em todo número (400 e 500). Ênfase vem do peso da mesma
- * família (400, 500, 600), nunca de uma segunda família. `next/font` baixa e hospeda os
- * arquivos no build, então em campo não há requisição a CDN nem pulo de layout.
+ * Geist na interface, Geist Mono em todo número.
+ *
+ * Poppins saiu em 08/09/2026: é uma geométrica de marca, desenhada para título
+ * curto e respiro. Numa tela densa, com tabela de 100 linhas e rótulo de 11px,
+ * ela fica larga, perde legibilidade nos tamanhos pequenos e dá ar de material
+ * de marketing a uma ferramenta de trabalho.
+ *
+ * Geist é grotesca neutra com altura de x generosa: aguenta 12px numa célula de
+ * tabela e some do caminho, que é o que uma ferramenta de uso diário precisa.
+ * O par Mono é da mesma família, então número e texto compartilham o esqueleto —
+ * telefone alinhado embaixo de telefone sem parecer outro tipo de coisa.
+ *
+ * Ênfase continua vindo do peso da MESMA família, nunca de uma segunda.
  */
-const poppins = Poppins({
+const geist = Geist({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
-  variable: '--font-poppins',
+  variable: '--font-geist',
   display: 'swap',
 });
 
-const ibmPlexMono = IBM_Plex_Mono({
+const geistMono = Geist_Mono({
   subsets: ['latin'],
   weight: ['400', '500'],
-  variable: '--font-ibm-plex-mono',
+  variable: '--font-geist-mono',
   display: 'swap',
 });
 
@@ -75,12 +84,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // `.variable` publica --font-poppins e --font-ibm-plex-mono, lidos pelo globals.css.
+    // `.variable` publica --font-geist e --font-geist-mono, lidos pelo globals.css.
     // `suppressHydrationWarning` é exigido pelo next-themes, que escreve a classe do tema
     // no <html> antes da hidratação.
     <html
       lang="pt-BR"
-      className={`${poppins.variable} ${ibmPlexMono.variable} h-full antialiased`}
+      className={`${geist.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">

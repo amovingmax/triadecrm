@@ -276,7 +276,7 @@ export const MOTIVO_DA_REVISAO: Record<string, string> = {
   motivo_obrigatorio: 'Escreva o motivo da recusa.',
   acao_invalida: 'Ação desconhecida.',
   candidato_nao_contatar:
-    'Esse contato pediu para não ser procurado (RF-ADM-04). Ele não pode virar parceiro.',
+    'Esse contato pediu para não ser procurado. Ele não pode virar parceiro.',
   categoria_obrigatoria: 'Escolha a categoria antes de aprovar.',
   organizacao_obrigatoria: 'Escolha com qual ficha mesclar.',
   organizacao_inexistente: 'Essa ficha não existe mais.',
@@ -289,7 +289,7 @@ export const MOTIVO_DA_REVISAO: Record<string, string> = {
 export const MOTIVO_DA_FONTE: Record<string, string> = {
   fonte_inexistente: 'Essa fonte não existe mais.',
   robots_nao_avaliado:
-    'O robots.txt desta fonte ainda não foi avaliado. Sem essa checagem registrada a fonte não liga (RF-RAD-01).',
+    'O robots.txt desta fonte ainda não foi avaliado. Sem essa checagem registrada a fonte não liga.',
   robots_proibe_coleta: 'O robots.txt desta fonte proíbe a coleta. Ela não pode ser ligada.',
   termos_nao_avaliados: 'Os termos de uso desta fonte ainda não foram avaliados.',
 };

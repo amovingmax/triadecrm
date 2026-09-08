@@ -544,7 +544,7 @@ export const MOTIVOS_DE_RECUSA_DO_ENVIO: Record<string, string> = {
   teto_do_numero: 'O teto de primeiros contatos do dia acabou neste número. Amanhã abre de novo.',
   teto_iniciadas_dia: 'O número já mandou o máximo de mensagens do dia.',
   teto_iniciadas_hora: 'O número já mandou o máximo da hora. Tente daqui a pouco.',
-  janela_fora_de_hora: 'Fora do horário de envio combinado (RF-CON-11).',
+  janela_fora_de_hora: 'Fora do horário de envio combinado.',
   janela_domingo: 'Domingo não sai mensagem.',
   janela_feriado: 'Feriado não sai mensagem.',
   janela_antes_da_abertura: 'Ainda não abriu o horário de envio de hoje.',

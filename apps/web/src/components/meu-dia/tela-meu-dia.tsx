@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, RotateCw } from 'lucide-react';
 
+import { NotaRecolhida } from '@/components/ui/nota-recolhida';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { RevelarLista } from '@/components/movimento';
@@ -84,7 +85,7 @@ export function TelaMeuDia({
     // o teto, em 1440px o prazo de cada linha fica a mais de um palmo do nome do
     // parceiro e a barra de meta vira um traço de 400px por causa de um número de
     // um dígito. Esta tela é uma fila que se lê de cima para baixo, não uma tabela.
-    <div className="flex w-full max-w-4xl flex-col gap-5">
+    <div className="flex mx-auto w-full max-w-4xl flex-col gap-5">
       {/* Sem `flex-wrap`: em 390px o botão quebrava para uma linha inteira só dele,
           encostado à esquerda, empurrando o resumo para baixo da dobra. Ele é uma
           ação secundária e o lugar dela é o canto, ao lado do título, nos dois
@@ -249,12 +250,8 @@ function chaveDoItem(item: ItemDoDia, ordem: number): string {
  */
 function NotaDoQueFalta({ cheia }: { cheia: boolean }) {
   return (
-    <section
-      aria-label="O que ainda não entra nesta fila"
-      className="rounded-lg border border-hairline bg-card px-4 py-3"
-    >
-      <p className="text-sm font-medium">O que ainda não entra nesta fila</p>
-      <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-4 text-xs text-muted-foreground">
+    <NotaRecolhida titulo="O que ainda não entra nesta fila">
+      <ul className="flex list-disc flex-col gap-1 pl-4">
         <li>
           Conversa de WhatsApp esperando resposta. O inbox oficial ainda não está ligado, então
           &quot;o parceiro respondeu e está sem resposta há mais de 2 h&quot; não tem como ser
@@ -262,8 +259,8 @@ function NotaDoQueFalta({ cheia }: { cheia: boolean }) {
         </li>
         <li>
           Link do Meet e rota otimizada das visitas. A reunião e a visita do dia já entram na fila,
-          vindas da Agenda; o que falta é o Google Calendar conectado (RF-AGE-02) e a
-          geocodificação dos endereços (RF-ROT-01).
+          vindas da Agenda; o que falta é o Google Calendar conectado e a
+          geocodificação dos endereços.
         </li>
         <li>Candidato novo esperando revisão: o coletor do Radar ainda não roda.</li>
         {cheia ? (
@@ -273,6 +270,6 @@ function NotaDoQueFalta({ cheia }: { cheia: boolean }) {
           </li>
         ) : null}
       </ul>
-    </section>
+    </NotaRecolhida>
   );
 }

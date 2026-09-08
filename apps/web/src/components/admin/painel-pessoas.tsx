@@ -274,7 +274,7 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
           A entrada é o login com Google, e só abre para quem está na{' '}
           <strong>lista de permitidos</strong> ou tem e-mail de um{' '}
           <strong>domínio permitido</strong>. O papel viaja no token da sessão, então{' '}
-          <strong>toda troca de papel só vale no próximo login da pessoa</strong> (RF-ADM-01).
+          <strong>toda troca de papel só vale no próximo login da pessoa</strong>.
         </p>
       </Aviso>
 

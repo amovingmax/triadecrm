@@ -158,7 +158,7 @@ function Formulario({
       }
       case 'telefone_suprimido':
         form.setError('phone', {
-          message: 'Esse número pediu para não ser contatado. Não dá para cadastrar (RF-ADM-04).',
+          message: 'Esse número pediu para não ser contatado. Não dá para cadastrar.',
         });
         return;
       case 'telefone_invalido':

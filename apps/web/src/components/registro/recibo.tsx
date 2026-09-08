@@ -223,7 +223,7 @@ export function Recibo({
           ) : null}
 
           {/* Só nos 10 desfechos em que o nome não afirma o interlocutor: é essa
-              resposta que separa porta batida de porta aberta (RF-MET-01), e por
+              resposta que separa porta batida de porta aberta, e por
               isso a consequência fica ao lado da pergunta, não no rodapé da tela.
               Pergunta em cima e botões embaixo porque, em 390px, os três numa linha
               só quebravam com um dos botões sozinho na segunda. */}

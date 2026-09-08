@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react';
 import { Download } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 import { baixarCsv, montarCsv, nomeDoArquivo } from './csv';
@@ -71,12 +70,7 @@ export function QuadroPainel<L>({
     <section className="flex w-full flex-col gap-4" aria-label={painel.titulo}>
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-heading text-lg font-semibold tracking-tight">{painel.titulo}</h2>
-            <Badge variant="pilula" className="h-6 px-2.5 text-[11px] font-normal">
-              {painel.requisitos}
-            </Badge>
-          </div>
+          <h2 className="font-heading text-lg font-semibold tracking-tight">{painel.titulo}</h2>
           <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">
             {painel.descricao}
           </p>

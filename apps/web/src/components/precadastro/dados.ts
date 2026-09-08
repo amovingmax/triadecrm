@@ -107,7 +107,7 @@ export const MOTIVO_DA_CRIACAO: Record<string, string> = {
     'Este contato pediu para não ser procurado. Nenhum pré-cadastro nasce para ele, e essa decisão é dele.',
   ficha_sem_nome: 'A ficha está sem nome. Complete o nome do parceiro antes de criar o rascunho.',
   campo_fora_da_whitelist:
-    'O rascunho tentou levar um campo que não é permitido (RF-PRE-03). Avise no grupo do time.',
+    'O rascunho tentou levar um campo que não é permitido. Avise no grupo do time.',
 };
 
 /** Motivos de `gerar_link_de_reivindicacao`. */

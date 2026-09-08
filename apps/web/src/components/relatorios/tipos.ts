@@ -70,8 +70,6 @@ export type DefinicaoPainel = {
   titulo: string;
   /** O que este painel responde, em uma frase. */
   descricao: string;
-  /** Requisitos do PRD §7 que ele atende. */
-  requisitos: string;
 };
 
 export const PAINEIS: readonly DefinicaoPainel[] = [
@@ -81,7 +79,6 @@ export const PAINEIS: readonly DefinicaoPainel[] = [
     titulo: 'O relatório de segunda',
     descricao:
       'O que a semana rendeu, em texto pronto para ler no celular: o número e o que ele quer dizer.',
-    requisitos: 'RF-REL-09, RF-REL-01',
   },
   {
     chave: 'funil',
@@ -89,35 +86,30 @@ export const PAINEIS: readonly DefinicaoPainel[] = [
     titulo: 'Funil por etapa e conversão',
     descricao:
       'Quantos negócios estão em cada etapa hoje e quanto da coorte do período chegou até ali.',
-    requisitos: 'RF-REL-02, RF-REL-04',
   },
   {
     chave: 'categorias',
     rotulo: 'Categorias',
     titulo: 'Densidade por categoria',
     descricao: 'Onde ainda há alvo para bater e onde a categoria secou sem publicar.',
-    requisitos: 'RF-REL-03',
   },
   {
     chave: 'bairros',
     rotulo: 'Bairros',
     titulo: 'Cobertura por bairro',
     descricao: 'O corte de zona que monta a rota: alvos, contato e portas por bairro.',
-    requisitos: 'RF-REL-02',
   },
   {
     chave: 'pessoas',
     rotulo: 'Pessoas',
     titulo: 'Atividade por responsável',
     descricao: 'Portas, ligações, visitas, reuniões e o prazo das próximas ações de cada pessoa.',
-    requisitos: 'RF-REL-06, RF-REL-10',
   },
   {
     chave: 'horarios',
     rotulo: 'Horários',
     titulo: 'Eficiência por faixa de horário',
     descricao: 'A que horas e por qual canal a porta abre. É o que decide quando ligar.',
-    requisitos: 'RF-REL-06',
   },
   {
     chave: 'fontes',
@@ -125,14 +117,12 @@ export const PAINEIS: readonly DefinicaoPainel[] = [
     titulo: 'Aproveitamento por fonte',
     descricao:
       'De cada fonte: quantos entraram, quantos responderam, autorizaram e publicaram.',
-    requisitos: 'RF-REL-11',
   },
   {
     chave: 'base',
     rotulo: 'Base',
     titulo: 'A base por temperatura',
     descricao: 'Como a base está dividida entre frio, morno, quente e cliente agora.',
-    requisitos: 'RF-REL-03, PRD §5.6',
   },
 ];
 

@@ -51,7 +51,7 @@ export function ResumoDoDia({
 
   return (
     <section aria-label="Resumo do dia" className="flex flex-col gap-3">
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border border-hairline bg-card px-4 py-3 sm:grid-cols-4 sm:gap-x-4">
         {visiveis.map((metrica) => (
           <CartaoDeMetrica key={metrica.metrica} metrica={metrica} />
         ))}
@@ -96,7 +96,7 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
   const bateu = percentual !== null && percentual >= 100;
 
   return (
-    <li className="flex flex-col gap-1.5 rounded-lg border border-hairline bg-card px-3 py-2.5">
+    <li className="flex flex-col gap-1.5 sm:border-l sm:border-hairline sm:pl-4 sm:first:border-l-0 sm:first:pl-0">
       <p className="truncate text-xs text-muted-foreground" title={metrica.rotulo}>
         {metrica.rotulo}
       </p>
@@ -135,9 +135,7 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
             {percentual}%
           </span>
         </div>
-      ) : (
-        <p className="text-[0.6875rem] text-muted-foreground">sem meta</p>
-      )}
+      ) : null}
     </li>
   );
 }
@@ -147,11 +145,11 @@ function EsqueletoDoResumo() {
   return (
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">Carregando o resumo do dia.</span>
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border border-hairline bg-card px-4 py-3 sm:grid-cols-4 sm:gap-x-4">
         {Array.from({ length: 4 }, (_, i) => (
           <li
             key={i}
-            className="flex flex-col gap-2 rounded-lg border border-hairline bg-card px-3 py-2.5"
+            className="flex flex-col gap-2 sm:border-l sm:border-hairline sm:pl-4 sm:first:border-l-0 sm:first:pl-0"
           >
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-6 w-10" />
