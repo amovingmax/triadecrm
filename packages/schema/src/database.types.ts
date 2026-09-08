@@ -254,6 +254,7 @@ export type Database = {
         Args: { p_key: string; p_payload: Json; p_purpose: string }
         Returns: Json
       }
+      ia_enfileirar_resumo: { Args: { p_attempt_id: string }; Returns: Json }
       ia_trabalho_suprimido: {
         Args: { p_payload: Json; p_purpose: string }
         Returns: Json

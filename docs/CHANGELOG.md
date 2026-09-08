@@ -1566,3 +1566,41 @@ Migração `supabase/migrations/20260905000801_recontato_e_miudezas.sql`; pgTAP 
 ### Precisa de decisão humana
 
 - **Rafael / Heloísa — a exceção E1.** Fica registrado que "o alvo voltou a falar" apaga a espera de um "agora não, me procure em 30 dias" **em qualquer canal**. É a leitura que a fila já tinha, e ela é defensável (quem respondeu reabriu o assunto), mas é uma decisão de produto: se a Heloísa preferir que "30 dias é 30 dias mesmo que a pessoa responda", é uma condição a mais na exceção E1 e um teste novo.
+
+---
+
+## D5/D10 — 06/09/2026 — A tabulação da ligação enfileira o resumo: dois prompts deixam de ser inertes (RF-CON-20, RF-CON-24; ADR-03, ADR-04, ADR-05, ADR-10, ADR-11; R13 §3.2)
+
+Migração `supabase/migrations/20260906000100_resumo_da_ligacao_enfileirado.sql`; pgTAP `supabase/tests/35_resumo_da_ligacao_enfileirado.sql` (**29 asserções**), escrito antes da migração e **visto falhando contra a versão anterior da função**.
+
+### O que faltava era uma linha, e ela valia dois prompts
+
+O pendente estava escrito na entrada do worker de IA desde o D10, com todas as letras: *"Ninguém enfileira `ai_jobs` sozinho ainda… a tabulação da ligação deveria enfileirar `summarize_call`"*. O worker de WhatsApp já enfileirava os dois trabalhos de conversa (`transcribe_audio` e `classify_inbound`); os dois de ligação não tinham gatilho nenhum. E como `draft_followup` nasce **de dentro** do `summarize_call` (`apps/workers/src/ia/tarefas.ts`), a falta desse gatilho deixava **dois dos quatro prompts** — com evals, custo medido e validador de promessas — prontos e sem ninguém para chamá-los.
+
+### A porta é estreita de propósito
+
+`app.ia_enfileirar` aceita qualquer propósito e qualquer payload, e por isso continua fora do alcance de `authenticated`: gasto que ninguém nomeou é gasto que ninguém orçou. Quem a tela alcança é `app.ia_enfileirar_resumo(attempt)`, que só sabe fazer uma coisa e faz **as mesmas cinco perguntas que `resumirLigacao` faria do outro lado da fila** — a chamada terminou? alguém atendeu? o roteiro foi percorrido? tem atividade? o alvo está suprimido? — mais a pergunta de dono (`can_write` e o dono do lote), porque é dinheiro. O que o worker recusaria não deve custar uma volta de fila para ouvir "não", e **toda recusa devolve motivo nomeado**: `tentativa_inexistente`, `sem_permissao`, `tentativa_aberta`, `sem_atendimento`, `caminho_vazio`, `sem_atividade`, `contato_suprimido`.
+
+**Por que dentro de `public.tabular_chamada` e não na tela.** Quem sabe que a conversa terminou é essa função, e o gasto tem de nascer na **mesma transação** da tabulação: se ela voltar atrás, a chamada paga volta junto. A tela pedindo o resumo depois seria uma segunda fonte da verdade sobre "esta ligação acabou" — que é exatamente o defeito que o laudo §3.2 achou no piso de recontato.
+
+A chamada fica **depois** do registro do opt-out, e não antes: quem pediu para sair na própria ligação já está suprimido quando a pergunta é feita (RF-CON-18). O retorno da tabulação ganhou `resumo_enfileirado` e `resumo_motivo` — enfileirar em silêncio seria a mesma coisa que não enfileirar.
+
+### Provado rodando
+
+- **pgTAP 35: 29 asserções, todas verdes.** **Visto falhando** com a `public.tabular_chamada` da 20260905000801 restaurada dentro da mesma transação: **9 asserções vermelhas**, entre elas `have: 0 / want: 1` nas mensagens em `ai_jobs`, `have: NULL / want: attempt:<uuid>` na chave que viaja dentro do payload e `have: 0 / want: 1` na chave fechada em `ingest_dedup`.
+- **A esteira inteira, de ponta a ponta, com o dublê local e sem rede.** Uma ligação tabulada na base de desenvolvimento (`lig_atendeu_retorna`, 3 passos de roteiro, 212 s) devolveu `resumo_enfileirado: true` e pôs **uma** mensagem em `ai_jobs`. O binário `workers ai --uma-vez`, com `ANTHROPIC_BASE_URL` apontada para o dublê, tratou **dois** trabalhos numa volta só: `ai_run 9` `resumo-ligacao@v1` US$ 0,00243 (230 in / 75 out / 486 de escrita de cache) e `ai_run 10` `followup-ligacao@v1` US$ 0,00411 (93 / 104 / 1154). O resumo foi gravado em `activities.metadata.resumo_ia`, com `ai_run_id` e `prompt_version`, e o rascunho entrou em `message_drafts` como **`pendente`** — o ADR-05 continua de pé, quem aprova é gente.
+- **Migração aplicada do zero**: `supabase db reset --local` aplicou as 36 migrações na ordem, com a nova no fim, e o seed passou nas suas próprias verificações.
+- `supabase test db --local`: **PASS, 35 arquivos, 2.287 asserções**.
+- `supabase db lint --local --level warning --fail-on warning --schema public,app`: `No schema errors found`.
+- `pnpm lint`, `pnpm typecheck` e `pnpm test` verdes no monorepo (268 + 105 + 243 + 530). `packages/schema/src/database.types.ts` regenerado (uma linha: `ia_enfileirar_resumo`).
+- Semente de prova apagada no fim: 100 organizações, `ai_runs`, `message_drafts`, `call_batches` e a fila `ai_jobs` zerados.
+
+### Pendente
+
+- **A tela ainda não mostra `resumo_enfileirado`/`resumo_motivo`.** O zod de `apps/web/src/components/ligacao/tipos.ts` ignora campo extra, então nada quebra — a informação chega e não aparece. É da mesma família dos pendentes §3.12c e §3.12d, e cabe na mesma frase: "o resumo desta ligação está na fila" ou "não vai ter resumo: ninguém percorreu o roteiro".
+- **Ninguém consome a fila em produção.** Não existe credencial da Anthropic no repositório e o `worker-ai` não roda em lugar nenhum: a mensagem fica em `ai_jobs` esperando. Com o worker ligado e **sem** chave, ela vai para `ai_dlq` depois de três tentativas — que é o comportamento desenhado, e agora tem dreno (`app.dlq_drenar`).
+- **Observação do dublê, não do modelo**: com uma ficha **sem contato cadastrado** (`contact_id` nulo), o rascunho saiu com `[[NOME_1]]` no vocativo, porque o dublê emite o token do gabarito mesmo sem nome no mapa para reidratar. Não prova nada sobre o modelo de verdade — mas é a primeira coisa a conferir na primeira chamada real.
+
+### Precisa de decisão humana
+
+- **Rafael / Heloísa — ligação atendida SEM roteiro não vira resumo.** Hoje o gatilho exige caminho percorrido, porque é o que o worker aceita e é a premissa de custo de `packages/prompts`. Quem tabula de cabeça, com a anotação escrita à mão e sem tocar no roteiro, não ganha resumo nem rascunho de follow-up. Se isso for comum no campo, a regra muda em um lugar só (`app.ia_enfileirar_resumo`) — e passa a custar uma chamada por ligação atendida, não por ligação com roteiro.
