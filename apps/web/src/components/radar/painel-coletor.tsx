@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { RadioTower, RotateCw, Unplug } from 'lucide-react';
 
+import { NotaRecolhida } from '@/components/ui/nota-recolhida';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -90,7 +91,7 @@ export function PainelDoColetor() {
   return (
     <section
       aria-labelledby="radar-coletor"
-      className="flex max-w-3xl flex-col gap-4 rounded-lg border border-hairline bg-muted/40 p-4"
+      className="flex flex-col gap-4 rounded-lg border border-hairline bg-muted/40 p-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 gap-3">
@@ -183,11 +184,11 @@ export function PainelDoColetor() {
         />
       </div>
 
-      <p className="hidden text-xs leading-relaxed text-muted-foreground md:block">
+      <NotaRecolhida titulo="Como o coletor se comporta" className="hidden md:block">
         O robô só traz candidato para a fila abaixo. Nada vira parceiro sem alguém decidir, e a
         coleta respeita o robots.txt e o intervalo de cada fonte — quando a fonte barra, o coletor
         para e registra o motivo em vez de tentar outro caminho.
-      </p>
+      </NotaRecolhida>
     </section>
   );
 }
@@ -297,7 +298,7 @@ function Moldura({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex max-w-3xl gap-3 rounded-lg border border-hairline bg-muted/40 p-4">
+    <section className="flex gap-3 rounded-lg border border-hairline bg-muted/40 p-4">
       <span
         className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground"
         aria-hidden="true"
@@ -317,7 +318,7 @@ function EsqueletoDoPainel() {
     <section
       aria-busy="true"
       aria-live="polite"
-      className="flex max-w-3xl flex-col gap-4 rounded-lg border border-hairline bg-muted/40 p-4"
+      className="flex flex-col gap-4 rounded-lg border border-hairline bg-muted/40 p-4"
     >
       <span className="sr-only">Carregando o estado do coletor.</span>
       <div className="flex items-start gap-3">

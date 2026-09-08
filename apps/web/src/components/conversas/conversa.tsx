@@ -325,7 +325,12 @@ export function Conversa({
           painel é menor que a janela. */}
       <div className="max-h-[45%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 p-4 md:p-5">
         <div className="max-w-3xl space-y-3">
-          <Janela24h estado={janela} />
+          {/* Sem fio, a janela de 24 h não acrescenta nada: os dois blocos ficavam
+              empilhados dizendo a mesma coisa em palavras diferentes ("nunca
+              escreveram para a gente" e "não há conversa de WhatsApp com este
+              parceiro"), e é o segundo que explica o caminho e oferece a ação.
+              Com fio, a janela volta — aí ela decide o que pode sair e quando. */}
+          {fio ? <Janela24h estado={janela} /> : null}
           <CaixaDeResposta
             fio={fio}
             janela={janela}

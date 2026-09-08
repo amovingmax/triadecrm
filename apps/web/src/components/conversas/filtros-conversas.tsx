@@ -133,7 +133,10 @@ function CampoBusca({
 
   return (
     <div className="md:w-full md:max-w-xs md:shrink-0">
-      <label htmlFor={id} className="mb-1 block text-xs font-medium text-foreground">
+      {/* Rótulo e lista de formatos saem do fluxo visual pelo mesmo motivo da busca de
+          Parceiros: três linhas para uma pergunta só. O `aria-describedby` continua
+          apontando para a lista, que segue no documento. */}
+      <label htmlFor={id} className="sr-only">
         Buscar parceiro
       </label>
       <div className="relative">
@@ -147,6 +150,7 @@ function CampoBusca({
           inputMode="search"
           autoComplete="off"
           enterKeyHint="search"
+          placeholder="Nome, categoria ou bairro"
           aria-describedby={`${id}-dica`}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
@@ -165,7 +169,7 @@ function CampoBusca({
           </Button>
         ) : null}
       </div>
-      <p id={`${id}-dica`} className="mt-1 text-xs text-muted-foreground">
+      <p id={`${id}-dica`} className="sr-only">
         Nome, categoria ou bairro.
       </p>
     </div>

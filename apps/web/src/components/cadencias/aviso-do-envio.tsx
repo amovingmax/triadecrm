@@ -73,7 +73,7 @@ export function AvisoDoEnvio({ visao }: { visao: VisaoDasCadencias }) {
           <strong className="font-medium text-foreground">
             {visao.envio.modo_automatico ? 'ligado' : 'desligado'}
           </strong>{' '}
-          por decisão do projeto ({visao.envio.modo_automatico_decisao}).
+          por decisão do projeto.
         </Linha>
       </ul>
 
@@ -105,7 +105,7 @@ export function AvisoDoEnvio({ visao }: { visao: VisaoDasCadencias }) {
           </li>
           <li>
             O modo automático está fora do MVP: quem aprova o primeiro contato e cada
-            resposta é gente ({visao.envio.modo_automatico_decisao}). O banco recusa ligar essa
+            resposta é gente. O banco recusa ligar essa
             chave.
           </li>
           <li>
@@ -140,11 +140,14 @@ export function TetosDoDia({ visao }: { visao: VisaoDasCadencias }) {
 
   return (
     <section aria-label="Tetos de toques por canal, hoje">
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {/* Uma faixa dividida por régua, e não quatro molduras: os quatro canais têm o
+          mesmo peso, então elevação repetida quatro vezes não comunica hierarquia
+          nenhuma — só ruído. Mesmo formato da faixa de indicadores do Meu dia. */}
+      <ul className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border border-hairline bg-card px-4 py-3 sm:grid-cols-4 sm:gap-x-4">
         {visao.canais.map((canal) => (
           <li
             key={canal.canal}
-            className="flex flex-col gap-1 rounded-lg border border-hairline bg-card px-3 py-2.5"
+            className="flex flex-col gap-1 sm:border-l sm:border-hairline sm:pl-4 sm:first:border-l-0 sm:first:pl-0"
           >
             <p className="truncate text-xs text-muted-foreground">{nomeDoCanal(canal.canal)}</p>
             <p className="flex items-baseline gap-1.5">

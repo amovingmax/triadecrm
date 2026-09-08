@@ -362,8 +362,8 @@ function OQueAIaEntendeu({ fio }: { fio: FioDaConversa | null }) {
         <p className="flex items-start gap-1.5 text-[11px] leading-relaxed">
           <CircleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
           <span>
-            Confiança abaixo de <span className="numerico">0,70</span>: o R08 manda uma pessoa
-            olhar. Confira se a intenção bate com o que está escrito acima.
+            Confiança abaixo de <span className="numerico">0,70</span>: por regra, uma pessoa tem
+            de olhar. Confira se a intenção bate com o que está escrito acima.
           </span>
         </p>
       ) : null}

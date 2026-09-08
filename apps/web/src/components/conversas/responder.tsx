@@ -92,8 +92,8 @@ function SemFio({ organizacaoId, className }: { organizacaoId: string; className
     <div className={cn('space-y-2 rounded-xl border border-dashed border-hairline p-3', className)}>
       <p className="text-sm font-medium">Não há conversa de WhatsApp com este parceiro</p>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Pelo R13, o primeiro contato é por LIGAÇÃO — o WhatsApp entra depois, para confirmar a
-        reunião e mandar o link. Um fio novo só nasce quando o parceiro escreve para o número da
+        O primeiro contato é por LIGAÇÃO, por decisão do projeto — o WhatsApp entra depois, para
+        confirmar a reunião e mandar o link. Um fio novo só nasce quando o parceiro escreve para o número da
         KOMUNE, ou quando a Heloísa manda a primeira mensagem pelo celular e o Coexistence
         avisa o CRM. As duas coisas dependem do número aprovado na Meta.
       </p>

@@ -292,7 +292,7 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
           <Aviso tom="atencao">
             <p>
               Há <strong>um único admin ativo</strong> no CRM. Se essa conta cair, ninguém promove
-              ninguém. O PRD prevê três (Rafael, Luiz e Matheus).
+              ninguém. O combinado é ter três: Rafael, Luiz e Matheus.
             </p>
           </Aviso>
         ) : null}

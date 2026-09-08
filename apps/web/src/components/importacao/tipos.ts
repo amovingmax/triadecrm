@@ -252,7 +252,7 @@ export const AVISO: Record<string, string> = {
   responsavel_ambiguo: 'Mais de uma pessoa com esse nome: a ficha fica com você.',
   tipo_diferente_da_categoria: 'O tipo discorda da categoria. Quem manda é a categoria.',
   data_invalida: 'Data que não dá para ler.',
-  cpf_descartado: 'Havia um CPF na linha. Foi apagado antes de gravar (ADR-09).',
+  cpf_descartado: 'Havia um CPF na linha. Foi apagado antes de gravar: o CRM não guarda CPF.',
 };
 
 export function textoDoMotivo(motivo: string | null): string | null {

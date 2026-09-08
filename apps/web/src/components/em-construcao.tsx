@@ -58,7 +58,7 @@ export function EmConstrucao({ titulo, dia, descricao }: Props) {
           resto da frase, senão o dia da semana aparece com o traço e o espaçamento
           da IBM Plex Mono no meio de uma linha de texto corrido. */}
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Calendário do MVP (PRD §11.2): de{' '}
+        Calendário do MVP: de{' '}
         <span className="text-foreground">
           <span className="numerico">D1</span>, sexta <span className="numerico">04/09</span>
         </span>{' '}

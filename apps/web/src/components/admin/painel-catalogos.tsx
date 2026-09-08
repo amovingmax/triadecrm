@@ -828,8 +828,8 @@ function SecaoDesfechos({
           exatamente o que deixa de acontecer.
         </p>
         <p className="mt-1">
-          Nome, etapa de destino e prazo continuam vindo do banco (migração e seed), como o PRD
-          define para o MVP: aqui dá para ligar e desligar, não para reescrever a regra.
+          Nome, etapa de destino e prazo continuam vindo do banco: aqui dá para ligar e
+          desligar um desfecho, não para reescrever a regra dele.
         </p>
       </Aviso>
       <ListaAdmin

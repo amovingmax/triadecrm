@@ -148,7 +148,7 @@ function CampoBusca({
 
   return (
     <div className="md:w-full md:max-w-sm md:shrink-0">
-      <label htmlFor={id} className="mb-1 block text-xs font-medium text-foreground">
+      <label htmlFor={id} className="sr-only">
         Buscar candidato
       </label>
       <div className="relative">
@@ -162,6 +162,7 @@ function CampoBusca({
           inputMode="search"
           autoComplete="off"
           enterKeyHint="search"
+          placeholder="Nome, telefone, @instagram ou CNPJ"
           aria-describedby={`${id}-dica`}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
@@ -180,7 +181,7 @@ function CampoBusca({
           </Button>
         ) : null}
       </div>
-      <p id={`${id}-dica`} className="mt-1 text-xs text-muted-foreground">
+      <p id={`${id}-dica`} className="sr-only">
         Nome, telefone, @instagram ou CNPJ.
       </p>
     </div>

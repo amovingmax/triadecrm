@@ -74,9 +74,8 @@ export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-        As <span className="numerico">11</span> fontes avaliadas no anexo R03, com a base legal, o
-        que os termos de uso permitem, o que o robots.txt libera e o intervalo mínimo entre
-        requisições.{' '}
+        As <span className="numerico">11</span> fontes avaliadas, com a base legal, o que os
+        termos de uso permitem, o que o robots.txt libera e o intervalo mínimo entre requisições.{' '}
         <span className="text-foreground">
           Ligar uma fonte aqui a libera como origem de cadastro — não inicia coleta nenhuma.
         </span>

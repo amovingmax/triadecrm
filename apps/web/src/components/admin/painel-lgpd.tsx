@@ -236,9 +236,9 @@ function SecaoSupressao({ nomes }: { nomes: Map<string, string> }) {
         <Aviso titulo="Por que aqui não tem telefone">
           <p>
             A lista guarda o <strong>hash</strong> do número, nunca o número: é o que permite
-            reconhecer um contato suprimido sem manter o dado de quem pediu para sumir (PRD §10.6,
-            “apagar dados, manter hash e data”). O nome do parceiro aparece quando o pedido veio de
-            uma conversa registrada no CRM.
+            reconhecer um contato suprimido sem manter o dado de quem pediu para sumir: apaga o
+            número, guarda o hash e a data. O nome do parceiro aparece quando o pedido veio de uma
+            conversa registrada no CRM.
           </p>
         </Aviso>
 

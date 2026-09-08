@@ -165,7 +165,8 @@ export function TelaMetas({
       {/* Ordem alfabética, nunca por resultado: esta tela acompanha, não classifica.
           Com uma pessoa só (o que sdr enxerga) o cartão não se estica pela tela
           inteira: uma coluna de 672px é a medida em que o número grande e a frase
-          embaixo ainda são lidos como um bloco. */}
+          embaixo ainda são lidos como um bloco. Ele se CENTRALIZA nessa medida —
+          encostado à esquerda, sobrava metade da tela vazia à direita. */}
       {erroGeral ? (
         <section
           aria-label="Metas por pessoa"
@@ -190,7 +191,7 @@ export function TelaMetas({
           aria-label="Metas por pessoa"
           className={cn(
             'grid grid-cols-1 items-start gap-4',
-            pessoas.length > 1 ? 'lg:grid-cols-2' : 'max-w-2xl',
+            pessoas.length > 1 ? 'lg:grid-cols-2' : 'mx-auto w-full max-w-2xl',
           )}
         >
           {pessoas.map((pessoa, indice) => {

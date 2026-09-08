@@ -337,7 +337,7 @@ function Abas({
 
       {aba === 'aprovar' && naFila > 0 ? (
         <p className="text-xs text-muted-foreground">
-          Nada sai sem uma pessoa aprovar (ADR-05).
+          Nada sai sem uma pessoa aprovar.
           {comAviso > 0 ? (
             <>
               {' '}

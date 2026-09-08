@@ -204,9 +204,15 @@ function Destaque({
         />
       ) : null}
 
-      <p className="text-sm text-muted-foreground">
-        <FraseDaMeta linha={linha} />
-      </p>
+      {/* Sem meta, a frase repete o "sem meta" que já está do lado do número — e o
+          aviso no topo da tela diz a mesma coisa uma terceira vez. Nos outros
+          estados ela carrega informação que não está em lugar nenhum (o ritmo, o
+          porquê de não dar para medir), e continua. */}
+      {situacao === 'sem_meta' ? null : (
+        <p className="text-sm text-muted-foreground">
+          <FraseDaMeta linha={linha} />
+        </p>
+      )}
 
       {situacao === 'sem_meta' && podeDefinir ? (
         <Button

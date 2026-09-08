@@ -78,7 +78,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: PhoneCall,
     dia: 'D5',
     descricao:
-      'Lote de prospecção ativa por ligação: fila reservada na montagem, roteiro em árvore e tabulação em dois eixos (R13).',
+      'Lote de prospecção ativa por ligação: fila reservada na montagem, roteiro em árvore e tabulação em dois eixos.',
   },
   {
     href: '/conversas',

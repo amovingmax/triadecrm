@@ -146,7 +146,7 @@ export function FilaVazia({ temFio }: { temFio: boolean }) {
         <p className="font-heading font-medium">Nada esperando aprovação</p>
         <p className="mx-auto max-w-sm text-sm text-muted-foreground">
           {temFio
-            ? 'Quando a IA redigir uma resposta ou um follow-up, ele aparece aqui antes de sair — e só sai depois que alguém aprovar (ADR-05).'
+            ? 'Quando a IA redigir uma resposta ou um follow-up, ele aparece aqui antes de sair — e só sai depois que alguém aprovar.'
             : 'A IA redige a partir do que o parceiro escreve, e ninguém escreveu ainda. Enquanto o número não for aprovado na Meta, essa fila fica vazia mesmo.'}
         </p>
       </div>

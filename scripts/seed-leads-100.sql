@@ -374,7 +374,7 @@ select
   null,
   'system',
   now(),
-  'Importado da lista-semente da pesquisa R09',
+  'Importado da lista-semente da pesquisa de mercado',
   jsonb_build_object(
     'origem',     'lista_semente_r09',
     'fonte',      'docs/anexos/R09-mercado-natal.md',
@@ -387,7 +387,7 @@ where not exists (
   select 1 from public.activities a
    where a.organization_id = r.organization_id
      and a.type = 'system'
-     and a.body = 'Importado da lista-semente da pesquisa R09'
+     and a.body = 'Importado da lista-semente da pesquisa de mercado'
 );
 
 commit;

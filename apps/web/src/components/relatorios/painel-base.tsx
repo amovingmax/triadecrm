@@ -224,7 +224,7 @@ export function PainelBase({ painel, periodo }: { painel: DefinicaoPainel; perio
 
       <NotaDeAlcance>
         A leitura de agora é a temperatura da organização, calculada pelo banco a partir da
-        etapa, da última intenção declarada e dos dias sem contato (PRD §5.6): é a mesma que
+        etapa, da última intenção declarada e dos dias sem contato: é a mesma que
         pinta a barra térmica em Parceiros e nos funis. Ela muda sozinha com o tempo, sem
         ninguém tocar em nada: alvo parado esfria.
       </NotaDeAlcance>

@@ -243,7 +243,7 @@ export function PainelPessoas({ painel, periodo }: { painel: DefinicaoPainel; pe
           números continuam de fora porque dependem do que ainda não está ligado:
           no-show de reunião, check-in de visita por GPS, comparecimento robô contra pessoa e o
           A/B da abertura, todos presos ao WhatsApp oficial e ao modo automático, que está
-          desligado por decisão (ADR-05).
+          desligado por decisão do projeto.
         </>
       }
     />
