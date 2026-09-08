@@ -1778,3 +1778,15 @@ Com isto, tudo o que a integração precisa está de pé em produção: as quatr
 **Falta um único comando, e ele é a virada de chave:** `app_settings['precadastro.link'].modelo`. Enquanto for nulo, a emissão de link recusa com `endereco_nao_configurado` e nenhum fornecedor recebe nada. Preenchê-lo com `https://admin.komune.app.br/seja-parceiro?pre={token}` é o instante em que a captação passa a poder mandar link para gente de verdade — e por isso ele ficou de fora desta sequência, para ser uma decisão e não um efeito colateral.
 
 **Dado de prova em produção:** os pré-cadastros "Anne Vieira Buffet e Eventos" (`komune`) e "Neuma Leão Buffet e Decoração" (`komune-dev`) ficaram no banco. São rascunhos, invisíveis na vitrine, e servem de evidência de que o caminho funcionou. Apagar é uma linha, quando alguém quiser.
+
+### A captação foi ligada (08/09/2026, tarde)
+
+`app_settings['precadastro.link'].modelo` = `https://admin.komune.app.br/seja-parceiro?pre={token}`, no `komune-crm`. **A partir deste commit, um link emitido no CRM vai para um fornecedor de verdade e o leva a um cadastro que já sabe o nome dele.**
+
+Um tropeço no caminho, e vale registrar porque foi meu: eu tinha aplicado a migração `20260908120000` **só no banco local** e mandei o Matheus rodar o `update` em produção. A linha não existia lá, o `update` acertou zero linhas, e o `select` devolveu vazio — os dois respondendo "success" sem fazer nada. **Comando que não faz nada e não reclama é o pior tipo de erro**, e só apareceu porque ele estranhou não ver o valor. A migração foi aplicada em produção pelo `psql` e registrada à mão em `supabase_migrations.schema_migrations`.
+
+E uma lição de comunicação, que ele teve de me cobrar: **são quatro lugares em jogo** — o SQL Editor de três projetos diferentes (`komune-crm`, `komune`, `komune-dev`) e o terminal — e eu vinha alternando entre eles sem dizer qual era qual. Todo comando daqui pra frente vem com o lugar escrito.
+
+### O ensaio que ainda não foi feito
+
+Ninguém percorreu o caminho como o fornecedor percorre. O que está provado é cada peça e o trânsito entre elas, não a experiência inteira em um celular. **Antes de a Heloísa mandar o primeiro link, alguém do time deveria emitir um para o próprio WhatsApp, abrir no telefone e completar o cadastro até o fim** — meia hora, e é a única forma de ver o que ela vai estar mandando.
