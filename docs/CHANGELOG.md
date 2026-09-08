@@ -1790,3 +1790,19 @@ E uma lição de comunicação, que ele teve de me cobrar: **são quatro lugares
 ### O ensaio que ainda não foi feito
 
 Ninguém percorreu o caminho como o fornecedor percorre. O que está provado é cada peça e o trânsito entre elas, não a experiência inteira em um celular. **Antes de a Heloísa mandar o primeiro link, alguém do time deveria emitir um para o próprio WhatsApp, abrir no telefone e completar o cadastro até o fim** — meia hora, e é a única forma de ver o que ela vai estar mandando.
+
+## D4 — 08/09/2026 — Rota e Radar acesos em produção, e o produtor que faltava (RF-RAD-01, RF-RAD-03, RF-ROT-01)
+
+Duas telas que diziam "não está ligado" passaram a ter dado real, rodando os workers da máquina do Matheus contra o banco de produção.
+
+**Rota (RF-ROT-01).** `workers rotas --geocodificar` contra o `komune-crm`: **21 perguntas ao Nominatim, 21 encontradas, 0 falhas, 100 fichas atualizadas** — 15 com precisão de bairro, 4 só de cidade, 2 incertas (Ponta Negra e Cidade Satélite, as mesmas de sempre: o OSM devolve uma praia e uma estação ferroviária, e o sistema prefere dizer "incerta" a fingir que é a porta).
+
+**Radar (RF-RAD-01/03).** Primeira coleta real em produção: duas páginas de cerimonialistas de Natal no Casamentos.com.br, `robots.txt` lido antes, 3,1 s de espera entre uma página e outra, **42 capturas, 42 candidatos, 0 bloqueadas, 0 falhas**. O chip do coletor virou "De pé" e a fila de curadoria tem 42 nomes reais esperando decisão humana.
+
+### O buraco que a coleta expôs
+
+**Ninguém enfileira `ingest_jobs`.** `public.esteira_abrir_lote` cria a linha em `import_batches` e devolve `{ok, batch_id}` — e para por aí. O worker consome a fila; o produtor não existe. Confirmado por varredura: a única chamada de `esteira_abrir_lote` no app é a da **importação de planilha**, e nenhuma linha do repositório enfileira na `ingest_jobs`.
+
+Na prática: **a tela do Radar não tem como pedir uma coleta.** Foi preciso chamar `esteira_fila_enfileirar` à mão, com o payload montado por fora, para o coletor ter trabalho. O worker está certo, o banco está certo, e falta o botão.
+
+Duas peças, e nenhuma é grande: um RPC que abre o lote **e** enfileira o trabalho na mesma transação, e um botão "Coletar agora" na aba Fontes do Radar (mais, depois, um `pg_cron` para a reexecução mensal que o R03 prevê). Fica registrado antes de virar "por que o Radar nunca traz ninguém".
