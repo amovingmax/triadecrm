@@ -1757,3 +1757,14 @@ Agora o endereço é uma linha de `app_settings['precadastro.link'].modelo`, com
   Vale a ressalva: **o endereço só deve ser gravado em produção depois de o `admin` subir com o wizard novo** (`komune-app` 29652be). Antes disso o link funciona, mas o wizard ignora o `?pre=` e abre em branco — o fornecedor consegue se cadastrar, só não vê o perfil já começado.
 - **A página `/c/[token]` e a Edge Function `claim-link` ficaram sem uso** com esta decisão. Não removi: apagar caminho de acesso a dado de titular merece commit próprio, e a `export-lgpd` compartilha peças com elas.
 - **O lado da Komune ainda não lê o token**: `/seja-parceiro?pre=<token>` hoje ignora o parâmetro e abre o formulário em branco. Degrada bem (o fornecedor ainda consegue se cadastrar), mas o "perfil já começado" só existe quando o wizard aprender a ler o pré-cadastro.
+
+### O lado Komune do wizard entrou em produção (08/09/2026, tarde)
+
+`admin.komune.app.br` foi publicado com o wizard que lê `?pre=<token>` (`komune-app` 29652be) e as quatro migrações foram aplicadas no projeto `komune` de **produção**, pelo `psql` no session pooler — o SQL Editor recusa esses arquivos por causa dos blocos `$$` longos, terceiro tropeço dele no dia.
+
+Conferido no banco de produção: **4 tabelas, 4 funções, 1 gatilho, 1 agendamento**. E conferido de fora, que é o que importa: `GET /api/onboarding/precadastro?token=x` responde `{"achado":false,"motivo":"nao_encontrado"}` — antes era 404 (rota inexistente) e depois `erro_interno` (rota no ar, função ausente no banco). Os três estados contaram a história do deploy.
+
+**Duas notas de operação:**
+
+- O `push` para a `main` do `komune-app` **não disparou deploy**. O projeto `komune-admin` na Vercel ou não está conectado ao repositório, ou publica de outra branch. Foi preciso `vercel --prod` à mão. Vale descobrir por quê: enquanto for assim, todo commit depende de alguém lembrar.
+- Em produção o `pg_cron` **existe**, então o agendamento `crm-webhook-push-tick` foi criado de verdade (no `komune-dev` ele tinha sido pulado). Ele nasce inofensivo: a consulta lê `crm_config`, que está vazia, e sem endereço não chama ninguém.
