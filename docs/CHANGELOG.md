@@ -1768,3 +1768,13 @@ Conferido no banco de produção: **4 tabelas, 4 funções, 1 gatilho, 1 agendam
 
 - O `push` para a `main` do `komune-app` **não disparou deploy**. O projeto `komune-admin` na Vercel ou não está conectado ao repositório, ou publica de outra branch. Foi preciso `vercel --prod` à mão. Vale descobrir por quê: enquanto for assim, todo commit depende de alguém lembrar.
 - Em produção o `pg_cron` **existe**, então o agendamento `crm-webhook-push-tick` foi criado de verdade (no `komune-dev` ele tinha sido pulado). Ele nasce inofensivo: a consulta lê `crm_config`, que está vazia, e sem endereço não chama ninguém.
+
+### A integração está completa em produção (08/09/2026, 15h31)
+
+`Anne Vieira Buffet e Eventos`, um dos 100 leads do R09, saiu do `komune-crm` e chegou ao **`komune` de produção** como rascunho, pelo caminho desenhado: autorização em `consent_events` → `criar_pre_cadastro_da_ficha` → `gerar_link_de_reivindicacao` (a emissão do link é o que enfileira) → `app.komune_push_disparar` → `crm-pre-registration`. Resposta `{"ok":true,"lidos":1,"enviados":1,"falhas":0}`.
+
+Com isto, tudo o que a integração precisa está de pé em produção: as quatro migrações, as duas Edge Functions, os segredos, o `crm_config`, o `komune_push_url` do Tríade apontando para lá, e o wizard do `admin.komune.app.br` sabendo ler `?pre=<token>`.
+
+**Falta um único comando, e ele é a virada de chave:** `app_settings['precadastro.link'].modelo`. Enquanto for nulo, a emissão de link recusa com `endereco_nao_configurado` e nenhum fornecedor recebe nada. Preenchê-lo com `https://admin.komune.app.br/seja-parceiro?pre={token}` é o instante em que a captação passa a poder mandar link para gente de verdade — e por isso ele ficou de fora desta sequência, para ser uma decisão e não um efeito colateral.
+
+**Dado de prova em produção:** os pré-cadastros "Anne Vieira Buffet e Eventos" (`komune`) e "Neuma Leão Buffet e Decoração" (`komune-dev`) ficaram no banco. São rascunhos, invisíveis na vitrine, e servem de evidência de que o caminho funcionou. Apagar é uma linha, quando alguém quiser.
