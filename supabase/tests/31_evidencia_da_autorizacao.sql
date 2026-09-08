@@ -18,6 +18,16 @@
 begin;
 select plan(26);
 
+-- 08/09/2026: emitir link passou a exigir endereço configurado
+-- (`app_settings[precadastro.link].modelo`, migração 20260908120000). Sem ele,
+-- `gerar_link_de_reivindicacao` recusa com `endereco_nao_configurado` — que é o
+-- comportamento certo e está testado no 36; aqui ele só precisa estar satisfeito
+-- para o arquivo poder testar o que ele veio testar.
+update public.app_settings
+   set value = jsonb_build_object('modelo', 'https://komune.app.br/seja-parceiro?pre={token}')
+ where key = 'precadastro.link';
+
+
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin

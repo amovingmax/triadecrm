@@ -42,16 +42,20 @@ export async function criarRascunho(organizationId: string): Promise<RespostaDeC
 export type RespostaDoLink = { ok: true; link: LinkEmitido } | { ok: false; motivo: string };
 
 /**
- * Emite o link e devolve o endereço COMPLETO da página pública.
+ * Emite o link e devolve o endereço para onde o fornecedor vai.
  *
- * O endereço é montado com a origem desta aplicação, e não com o `url` que a RPC
- * devolve: `gerar_link_de_reivindicacao` traz `https://parceiros.komune.app/c/…`
- * fixo no corpo da função, e esse domínio ainda não existe — a página `/c/<token>`
- * mora dentro deste Next. Enquanto o domínio de produção não for decidido (é
- * decisão do Luiz, DNS), o link certo é o desta origem. O `token` é o que importa,
- * e é ele que vem do banco.
+ * Quem decide esse endereço é o BANCO, não esta tela: ele sai de
+ * `app_settings[precadastro.link].modelo` (migração 20260908120000). Antes, esta
+ * função montava `origem + /c/<token>` por conta própria enquanto a RPC devolvia
+ * um domínio fixo que nunca existiu — dois lugares construindo o mesmo link, e
+ * nenhum deles sabendo o certo.
+ *
+ * A decisão de produto de 08/09/2026 é que o fornecedor **não passa por uma
+ * página daqui**: o link leva ao cadastro que a Komune já tem. Por isso o
+ * `origem` deixou de ser usado; ele continua no parâmetro porque a assinatura é
+ * chamada pela tela, e removê-lo é outro commit.
  */
-export async function gerarLink(organizationId: string, origem: string): Promise<RespostaDoLink> {
+export async function gerarLink(organizationId: string, _origem: string): Promise<RespostaDoLink> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc('gerar_link_de_reivindicacao', {
     p_organization_id: organizationId,
@@ -64,10 +68,16 @@ export async function gerarLink(organizationId: string, origem: string): Promise
   const token = texto(r.token);
   if (!token) return { ok: false, motivo: 'token_ausente' };
 
+  // O `url` vem pronto do banco. Se ele não vier, não improvisamos um endereço:
+  // link improvisado é link quebrado na mão de um fornecedor, e isso é pior que
+  // um botão que se recusa a funcionar e diz por quê.
+  const url = texto(r.url);
+  if (!url) return { ok: false, motivo: 'endereco_nao_configurado' };
+
   return {
     ok: true,
     link: {
-      url: `${origem.replace(/\/+$/, '')}/c/${token}`,
+      url,
       expiraEm: texto(r.expira_em),
       versao: numero(r.versao),
     },
@@ -111,6 +121,8 @@ export const MOTIVO_DO_LINK: Record<string, string> = {
   rascunho_encerrado: 'Este rascunho foi recusado ou apagado. Não há link a emitir.',
   ja_reivindicado: 'O fornecedor já reivindicou o perfil. O link não é mais necessário.',
   token_ausente: 'O banco não devolveu o link. Tente de novo; se continuar, avise no grupo do time.',
+  endereco_nao_configurado:
+    'Ninguém configurou para onde o link leva. Nenhum link foi emitido e o anterior continua valendo — peça a um admin para preencher o endereço do cadastro em Administração.',
 };
 
 /** Frase de um motivo, com uma saída genérica para o que não estiver mapeado. */

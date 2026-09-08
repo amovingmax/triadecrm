@@ -1723,3 +1723,35 @@ A suposição de que "service_role" significava a chave legada era minha, e esta
 **O checkout da Komune contradiz o modelo.** A migração `20260714170000_supplier_tiers.sql` faz a **comissão** variar por nível (Iniciante 10% → Bronze 10% → Prata 9% → Ouro 8%), e `supplier_tier_info` entrega esse `fee_rate` para `asaas-marketplace-checkout`, `asaas-book` e `asaas-pay-item-cota` — verificado no código, não suposto.
 
 Ou seja: **quem entra hoje é cobrado 10%**, enquanto a captação promete 8%. Se o modelo mudou e o código não acompanhou, a diferença aparece na primeira fatura do primeiro fornecedor que a Heloísa trouxer. Não toquei nisso: é o lado da Komune e é decisão de produto.
+
+## D9 — 08/09/2026 — O link do pré-cadastro sai do código, e o fornecedor deixa de passar por aqui (RF-PRE-07, RF-PRE-08; ADR-02)
+
+**Decisão de produto (Matheus, 08/09/2026): o fornecedor captado não passa por uma página do Tríade.** O link leva direto ao cadastro que a Komune já tem — `/seja-parceiro`, com o wizard de conta, CNPJ e segmentos, construído, testado e em produção há meses. Manter um caminho paralelo aqui seria dois fluxos para a mesma coisa, e o segundo nasceria sem uso.
+
+A conversa que levou a isso vale registrar, porque ela reverteu uma suposição minha. Eu tinha proposto manter a página daqui por causa do botão **"não é meu, não quero aparecer"** — a recusa que o CHANGELOG registra tendo sido usada de verdade pela Alfa Cerimonial. O Matheus desfez o nó: **o link só é enviado a quem já demonstrou interesse**, e o CRM nem deixa emitir link sem autorização registrada em `consent_events`. O botão resolvia um problema que este fluxo não cria; o guardrail que importa está a montante, e continua de pé.
+
+### O que estava errado, e eram três sintomas da mesma coisa
+
+1. `gerar_link_de_reivindicacao` devolvia `https://parceiros.komune.app/c/<token>` **fixo no corpo da função** — e esse domínio nunca existiu.
+2. A tela **ignorava** esse `url` e montava `window.location.origin + /c/<token>` por conta própria. Dois lugares construindo o mesmo endereço, e nenhum deles sabendo o certo.
+3. Corrigir exigia migração nova.
+
+Agora o endereço é uma linha de `app_settings['precadastro.link'].modelo`, com `{token}` onde o token entra. Apontar para outro lugar — do `komune-dev` para a Komune de produção, no dia em que a captação começar — virou um `update`.
+
+### A ordem das checagens é o conserto, não um detalhe
+
+**Gerar um link revoga o anterior.** Se a função descobrisse só no fim que não sabe o endereço, teria invalidado o link que já está no celular de um fornecedor para descobrir um problema nosso de configuração. Então a pergunta entrou junto com os outros guardrails, **antes do primeiro `update`** — e é essa a asserção que justifica o arquivo de teste, não a do endereço certo.
+
+`modelo` **nasce nulo de propósito.** Não chutei o domínio: `komune.app.br` aparece no código do admin, mas em que endereço o `/seja-parceiro` é servido é decisão de quem cuida do DNS. Um palpite viraria link quebrado na mão de um fornecedor real — e link quebrado é pior que botão desabilitado, porque o segundo se explica.
+
+### Provado
+
+- **pgTAP `36_link_do_precadastro.sql`: 13 asserções, todas verdes**, entre elas as duas que importam — sem endereço o motivo é `endereco_nao_configurado` **e a versão do token continua 0**; com endereço, a url sai do modelo com o token no lugar certo **e só então a versão sobe**. Modelo sem `{token}` é recusado igual a modelo nenhum.
+- **Dois testes existentes quebraram, e estavam certos em quebrar**: `17_cadencias_e_precadastro` (8 asserções, com o arquivo abortando em 158 de 229) e `31_evidencia_da_autorizacao` (2). Os dois emitem link e não conheciam a nova pré-condição. Ganharam a configuração no preparo — não um `if` na função para deixá-los passar.
+- `supabase test db --local`: **PASS, 36 arquivos, 2.300 asserções**. `db lint` limpo. `pnpm lint`, `typecheck` e `test` verdes (268 + 105 + 243 + 530).
+
+### Pendente
+
+- **Preencher o `modelo`** quando o endereço do `/seja-parceiro` for decidido. Enquanto ele for nulo, o botão de emitir link recusa com motivo legível na tela — de propósito.
+- **A página `/c/[token]` e a Edge Function `claim-link` ficaram sem uso** com esta decisão. Não removi: apagar caminho de acesso a dado de titular merece commit próprio, e a `export-lgpd` compartilha peças com elas.
+- **O lado da Komune ainda não lê o token**: `/seja-parceiro?pre=<token>` hoje ignora o parâmetro e abre o formulário em branco. Degrada bem (o fornecedor ainda consegue se cadastrar), mas o "perfil já começado" só existe quando o wizard aprender a ler o pré-cadastro.
