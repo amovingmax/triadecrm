@@ -1653,3 +1653,25 @@ As duas migrações foram aplicadas pelo SQL Editor do `komune-dev` (4 tabelas, 
 - **Os dois segredos**: `komune_push_secret` e `komune_webhook_secret`, 32 bytes em hex, gravados nos Vaults dos **dois** projetos na mesma janela.
 - **Deploy no `komune-dev` antes do `komune`**, com `--no-verify-jwt` nas duas funções (quem autentica é o HMAC, não o JWT).
 - **A promoção não copia telefone, Instagram nem site** do perfil para `suppliers`: as colunas de lá têm nomes e formatos próprios (`phone`, `address_*`) e mapear isso sem ver a tela de onboarding seria adivinhar. O dado não se perde — continua em `supplier_pre_registrations.perfil`.
+
+### A corrente fechou nos dois sentidos, em projetos de verdade (08/09/2026, à tarde)
+
+O que faltava não era código: era o **projeto do Tríade na nuvem estar 28 migrações atrás** do repositório. Ele parou na nº 8 — na prática, a versão de sexta de manhã. Tudo o que o fim de semana construiu existia só na máquina do Matheus.
+
+Corrigido hoje, na ordem: backup (`db dump` de schema e dados), `supabase db reset --linked`, o seed completo, e `scripts/seed-leads-100.sql` pelo **`psql` no session pooler** — porque o SQL Editor do painel não executa esse script (ele prepara o lote inteiro antes de rodar, e o `insert` é analisado quando a tabela de trabalho ainda não existe; falhou igual com tabela temporária e com tabela normal). Estado final conferido: **36 migrações, 100 parceiros, 126 modelos de mensagem, 1 roteiro de ligação, `app.gravar_segredo` existindo**.
+
+Com os três segredos no Vault (`komune_push_secret`, `komune_webhook_secret`, `komune_push_url`) e a `komune-webhook` publicada com `--no-verify-jwt`, a volta foi provada de ponta a ponta entre **dois projetos Supabase reais**:
+
+- No `komune-dev`, um pré-cadastro de prova e `public.crm_avisar('supplier.claimed', …)` puseram um aviso em `crm_outbox` (`pendente`).
+- `POST` na `crm-webhook-push` devolveu **`{"lidos":1,"enviados":1,"falharam":0}`**.
+- No `komune-dev`, a linha virou **`enviado`**, uma tentativa, sem erro.
+- No `komune-crm`, `public.webhook_deliveries` gravou a entrega com **o mesmo `delivery_id`** que a Komune gerou, o evento `supplier.claimed` e os `dados` intactos — ou seja, o Tríade **conferiu a assinatura HMAC** antes de aceitar.
+
+A ida já estava provada de manhã (11 conferências contra a `crm-pre-registration` no ar). **As duas metades do contrato do pré-cadastro estão de pé.**
+
+### Pendente depois disto
+
+- **Produção é outro dia.** Tudo acima é `komune-dev` ↔ `komune-crm`. Repetir no `komune` exige segredos NOVOS: o `CRON_SECRET` de desenvolvimento apareceu inteiro num terminal e o `TRIADE_PUSH_SECRET` teve dois terços expostos em mensagens de erro. Nenhum dos dois deve atravessar para produção.
+- **As outras Edge Functions do Tríade não subiram**: `komune-push`, `claim-link`, `export-lgpd`, `wa-webhook`. Só a `komune-webhook` foi publicada, porque era a que a volta exigia.
+- **Ninguém dispara a `komune-push` ainda** — a ida acontece quando alguém a chama, e não há cron nem worker fazendo isso no `komune-crm`.
+- **Dado de teste no `komune-dev`**: o pré-cadastro "Prova da volta" e sua linha em `crm_outbox` ficaram lá de propósito, como prova. Apagar é uma linha.
