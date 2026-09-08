@@ -1752,6 +1752,8 @@ Agora o endereço é uma linha de `app_settings['precadastro.link'].modelo`, com
 
 ### Pendente
 
-- **Preencher o `modelo`** quando o endereço do `/seja-parceiro` for decidido. Enquanto ele for nulo, o botão de emitir link recusa com motivo legível na tela — de propósito.
+- ~~Preencher o `modelo`~~ **decidido em 08/09/2026 (Matheus)**: o cadastro do negócio acontece em `https://admin.komune.app.br`, e a página de apresentação que vem antes é `https://komune.app.br/parceiros`. O link do CRM aponta para o **cadastro**, não para a apresentação — quem recebe esse link já foi convencido no telefone, e a apresentação é para quem chega frio. O valor a gravar em cada ambiente é `https://admin.komune.app.br/seja-parceiro?pre={token}`.
+
+  Vale a ressalva: **o endereço só deve ser gravado em produção depois de o `admin` subir com o wizard novo** (`komune-app` 29652be). Antes disso o link funciona, mas o wizard ignora o `?pre=` e abre em branco — o fornecedor consegue se cadastrar, só não vê o perfil já começado.
 - **A página `/c/[token]` e a Edge Function `claim-link` ficaram sem uso** com esta decisão. Não removi: apagar caminho de acesso a dado de titular merece commit próprio, e a `export-lgpd` compartilha peças com elas.
 - **O lado da Komune ainda não lê o token**: `/seja-parceiro?pre=<token>` hoje ignora o parâmetro e abre o formulário em branco. Degrada bem (o fornecedor ainda consegue se cadastrar), mas o "perfil já começado" só existe quando o wizard aprender a ler o pré-cadastro.
