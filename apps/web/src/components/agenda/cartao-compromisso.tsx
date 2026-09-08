@@ -17,6 +17,8 @@ import {
 } from './tipos';
 import { type DesfechoCatalogo } from '@/components/registro/tipos';
 
+import { BotaoDoGoogle } from './botao-google-agenda';
+
 /**
  * Um compromisso na lista do dia.
  *
@@ -186,6 +188,12 @@ export function CartaoCompromisso({
                 </a>
               </Button>
             ) : null}
+
+            {/* Só onde há hora combinada de verdade. Pôr no calendário uma tarefa
+                "Marcar apresentação", cuja hora é prazo calculado e não hora
+                combinada com ninguém, encheria a agenda de compromissos falsos —
+                é a mesma distinção que o cabeçalho de `tipos.ts` protege. */}
+            {temHora || ehVisita ? <BotaoDoGoogle compromisso={compromisso} /> : null}
           </div>
         )}
       </div>

@@ -5,6 +5,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner';
 
 import { NotaRecolhida } from '@/components/ui/nota-recolhida';
+
+import { ConexaoDaAgendaGoogle } from './conexao-google';
 import { cn } from '@/lib/utils';
 import {
   EXTRAS_VAZIOS,
@@ -263,7 +265,16 @@ export function TelaAgenda({
         )}
       </section>
 
-      {visao === 'rota' ? null : <AindaNaoLigado />}
+      {/* A conexão fica no PÉ da tela, não no topo: quem abre a Agenda vem ver o
+          dia, e uma faixa de configuração acima da lista empurraria o trabalho
+          para baixo da dobra todos os dias por causa de uma ação que se faz uma
+          vez. Na aba Rota ela não aparece — rota de visita não vira Meet. */}
+      {visao === 'rota' ? null : (
+        <>
+          <ConexaoDaAgendaGoogle />
+          <AindaNaoLigado />
+        </>
+      )}
 
       <FolhaDesfecho
         pedido={pedido}
@@ -298,9 +309,9 @@ function AindaNaoLigado() {
     <NotaRecolhida titulo="O que ainda não está ligado">
       <ul className="flex flex-col gap-1.5">
         <li>
-          <span className="text-foreground">Google Calendar</span> (horários livres, criação do
-          evento e link do Meet): depende da conta Google do time conectada
-          ao CRM. Hoje o compromisso vive só aqui.
+          <span className="text-foreground">Horários livres do Google</span>: a tela ainda não
+          consulta a sua agenda para sugerir horário vago. Criar o evento, com link do Meet e
+          convite, já funciona — é o botão &quot;Pôr na agenda&quot; em cada compromisso.
         </li>
         <li>
           <span className="text-foreground">Lembretes de 24 h e 1 h</span> e o aviso de falta de

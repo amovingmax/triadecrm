@@ -38,6 +38,7 @@ function compromisso(parcial: Partial<Compromisso> = {}): Compromisso {
     titulo: 'Reunião na data',
     quando: '2026-09-10T13:30:00.000Z',
     concluido: false,
+    google: null,
     organizationId: 'org-1',
     organizacao: 'Buffet Sabor',
     bairro: 'Tirol',

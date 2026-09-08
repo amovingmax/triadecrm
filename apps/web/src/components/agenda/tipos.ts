@@ -58,6 +58,12 @@ export type Compromisso = {
   quando: string;
   /** `tasks.status = 'done'`: já registrado, fica no rodapé do dia. */
   concluido: boolean;
+  /**
+   * O evento espelho no Google Agenda, quando existe
+   * (`public.compromissos_no_google`). Nulo quer dizer "ainda não foi para a
+   * agenda", e é o que decide entre o botão que CRIA e o link que ABRE.
+   */
+  google: { meetUrl: string | null; linkHtml: string | null } | null;
   organizationId: string;
   organizacao: string;
   bairro: string | null;

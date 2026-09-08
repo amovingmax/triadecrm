@@ -128,14 +128,31 @@ export async function buscarCompromissos(params: {
   const orgIds = [...new Set(linhas.map((t) => t.organization_id).filter((id) => id !== null))];
   const dealIds = [...new Set(linhas.map((t) => t.deal_id).filter((id) => id !== null))];
 
-  const [orgs, negocios] = await Promise.all([
+  const [orgs, negocios, espelhos] = await Promise.all([
     supabase.from('organizations_view').select(COLUNAS_ORG).in('id', orgIds),
     buscarNegocios(supabase, dealIds),
+    // Os eventos já criados no Google, das tarefas desta janela. Uma ida só, e
+    // não uma por cartão: numa semana cheia isso seriam trinta requisições para
+    // decidir o rótulo de um botão.
+    supabase
+      .from('compromissos_no_google')
+      .select('task_id, meet_url, link_html')
+      .in('task_id', linhas.map((t) => t.id)),
   ]);
 
   if (orgs.error) throw erroDe(orgs.error.code, orgs.error);
 
   const porOrg = new Map((orgs.data ?? []).map((o) => [o.id, o] as const));
+  // Erro aqui NÃO derruba a agenda: o espelho do Google é enfeite útil, e a lista
+  // do dia é o trabalho. Sem ele, os cartões oferecem criar o evento de novo — o
+  // que a rota recusa com `ja_tem_evento`, sem estragar nada.
+  const porTarefa = new Map(
+    ((espelhos.error ? [] : (espelhos.data ?? [])) as {
+      task_id: string;
+      meet_url: string | null;
+      link_html: string | null;
+    }[]).map((g) => [g.task_id, g] as const),
+  );
   const porNegocio = new Map(negocios.map((d) => [d.id, d] as const));
   const agora = Date.now();
   const marcamHora = new Set(params.etapasComHoraMarcada);
@@ -162,6 +179,12 @@ export async function buscarCompromissos(params: {
         titulo: tarefa.title,
         quando: tarefa.due_at,
         concluido: tarefa.status === 'done',
+        google: porTarefa.has(tarefa.id)
+          ? {
+              meetUrl: porTarefa.get(tarefa.id)!.meet_url,
+              linkHtml: porTarefa.get(tarefa.id)!.link_html,
+            }
+          : null,
         organizationId: tarefa.organization_id,
         organizacao: org.name,
         bairro: org.neighborhood,
