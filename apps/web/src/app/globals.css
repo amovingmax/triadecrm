@@ -117,17 +117,17 @@
 
 /* ---------------------------------------------------------------------------
    Tipografia. Poppins e IBM Plex Mono entram por next/font no layout
-   (variáveis --font-poppins e --font-ibm-plex-mono), com a pilha do sistema
+   (variáveis --font-geist e --font-geist-mono), com a pilha do sistema
    atrás para o primeiro paint e para o caso de falha. Nada de @import de fonte
    dentro do CSS: no Next isso atrasa a primeira renderização e dá pulo de layout.
    Ênfase vem do peso da mesma família (400, 500, 600), nunca de outra família.
    -------------------------------------------------------------------------- */
 :root {
   --font-sans:
-    var(--font-poppins), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    var(--font-geist), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   --font-mono:
-    var(--font-ibm-plex-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', 'Courier New', monospace;
 }
 
@@ -150,21 +150,21 @@
    puro: o cartão para em #fdfeff, um traço de azul acima do fundo da página.
    -------------------------------------------------------------------------- */
 :root {
-  --grafite-25: #fdfeff; /* cartão e popover: o "branco" do Ocean Breeze, sem ser #fff */
-  --grafite-50: #f0f8ff; /* fundo da página (aliceblue do tema) */
-  --grafite-100: #f3f4f6; /* muted / secondary / accent do tema */
-  --grafite-200: #e5e7eb; /* borda forte do tema */
-  --grafite-300: #d1d5db; /* tinta do modo escuro (foreground do tema) */
-  --grafite-400: #94a3b8;
-  --grafite-450: #7c8ba1; /* borda de campo: 3:1 contra o fundo nos dois modos */
-  --grafite-500: #686e7c; /* texto esmaecido do claro (o #6b7280 do tema, 1 ponto mais fundo) */
-  --grafite-600: #4b5563; /* borda forte do escuro (border do tema) */
-  --grafite-700: #374151; /* tinta do modo claro (foreground do tema) */
-  --grafite-750: #2d3748; /* secondary do escuro (do tema) */
-  --grafite-800: #1e293b; /* cartão do escuro (card do tema) */
-  --grafite-850: #19212e; /* muted do escuro (do tema) */
-  --grafite-900: #0f172a; /* fundo do escuro (background do tema) e ação em tinta no claro */
-  --grafite-950: #0a1020; /* tinta mais funda: texto da ação clara, sombra */
+  --grafite-25: #fcfcfd; /* cartão e popover: quase branco, nunca #fff (mata a profundidade) */
+  --grafite-50: #f7f7f8; /* fundo da página: neutro de verdade, sem tingimento azul */
+  --grafite-100: #f1f1f3; /* muted / secondary / accent do tema */
+  --grafite-200: #e4e4e8; /* borda forte do tema */
+  --grafite-300: #d3d3d8; /* tinta do modo escuro (foreground do tema) */
+  --grafite-400: #a1a1aa;
+  --grafite-450: #8a8a93; /* borda de campo: 3:1 contra o fundo nos dois modos */
+  --grafite-500: #6b6b73; /* texto esmaecido do claro (o #6b7280 do tema, 1 ponto mais fundo) */
+  --grafite-600: #52525b; /* borda forte do escuro (border do tema) */
+  --grafite-700: #3f3f46; /* tinta do modo claro (foreground do tema) */
+  --grafite-750: #333338; /* secondary do escuro (do tema) */
+  --grafite-800: #27272b; /* cartão do escuro (card do tema) */
+  --grafite-850: #1e1e21; /* muted do escuro (do tema) */
+  --grafite-900: #131316; /* fundo do escuro (background do tema) e ação em tinta no claro */
+  --grafite-950: #0c0c0e; /* tinta mais funda: texto da ação clara, sombra */
 
   /* Escala térmica: as cinco cores cromáticas de toda a interface.
      `cor` é a marca (barra, ponto) e precisa de 3:1 contra a superfície
@@ -225,11 +225,11 @@
      sem desenhar.
 
      No claro ela sobe de 8% para 14% de preto, e o motivo NÃO é o fundo. Preto a
-     8% mede 1,195:1 (ΔL* 6,9) sobre o nosso #f0f8ff e 1,196:1 (ΔL* 7,1) sobre o
+     8% mede 1,195:1 (ΔL* 6,9) sobre o nosso #f7f7f8 e 1,196:1 (ΔL* 7,1) sobre o
      #ffffff do template: a diferença é de um milésimo, o aliceblue não tem culpa.
      O que muda é o resto:
      1. O mesmo alfa rende menos no claro do que no escuro. Branco a 8% sobre o
-        #0f172a separa ΔL* 9,0; preto a 8% sobre o #f0f8ff separa ΔL* 6,9. São 30%
+        #131316 separa ΔL* 9,0; preto a 8% sobre o #f7f7f8 separa ΔL* 6,9. São 30%
         de separação a menos justamente no tema que precisa de mais.
      2. O claro é o tema do SOL. Sob luz forte o reflexo do vidro soma a mesma
         luminância à linha e ao fundo, e uma razão perto de 1:1 é a primeira coisa
