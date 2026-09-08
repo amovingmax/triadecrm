@@ -134,6 +134,15 @@ export function paraFonte(linha: LinhaDeFonte): FonteDoRadar {
     coletor: texto(coletor.kind),
     periodicidade: texto(coletor.schedule),
     coletor_pronto: coletor.enabled === true,
+    categorias_do_catalogo: Array.isArray(coletor.catalogo)
+      ? [
+          ...new Set(
+            coletor.catalogo
+              .map((e) => texto(objeto(e).categoria_origem))
+              .filter((c): c is string => c !== null),
+          ),
+        ]
+      : [],
     campos: listaDeTexto(config.fields_whitelist),
     robots_nota: texto(config.robots),
     curadoria_manual: config.manual_curation === true,
@@ -243,6 +252,63 @@ export async function alternarFonte(
   const r = objeto(data);
   return r.ok === true ? { ok: true } : { ok: false, motivo: texto(r.reason) ?? 'desconhecido' };
 }
+
+/**
+ * Pede uma coleta ao Radar.
+ *
+ * Uma chamada, uma transação no banco: abre o lote e enfileira o job. Não existe
+ * caminho aqui para abrir um sem o outro, de propósito — foi assim que o lote de
+ * 08/09 ficou em `previa` para sempre.
+ *
+ * `coletorDePe` é a diferença entre "o pedido entrou" e "os dados vêm". Com o
+ * worker parado o lote fica na fila esperando a máquina, e a tela diz isso em vez
+ * de deixar a pessoa achar que a coleta falhou.
+ */
+export async function coletarAgora(
+  fonteId: number,
+  categorias: string[] | null,
+  maxPaginas: number,
+): Promise<
+  | { ok: true; batchId: string; rotulo: string; categorias: string[]; coletorDePe: boolean }
+  | { ok: false; motivo: string; disponiveis?: string[] }
+> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('radar_coletar_agora', {
+    p_source_id: fonteId,
+    p_categorias: categorias && categorias.length > 0 ? categorias : null,
+    p_max_paginas: maxPaginas,
+  });
+
+  if (error) throw new Error(error.message);
+
+  const r = objeto(data);
+  if (r.ok !== true) {
+    return {
+      ok: false,
+      motivo: texto(r.motivo) ?? 'desconhecido',
+      disponiveis: listaDeTexto(r.disponiveis),
+    };
+  }
+  return {
+    ok: true,
+    batchId: texto(r.batch_id) ?? '',
+    rotulo: texto(r.rotulo) ?? '',
+    categorias: listaDeTexto(r.categorias),
+    coletorDePe: r.coletor_de_pe === true,
+  };
+}
+
+/** Motivos que a RPC de coleta devolve, escritos para quem apertou o botão. */
+export const MOTIVO_DA_COLETA: Record<string, string> = {
+  sem_permissao: 'O seu acesso não pede coleta.',
+  origem_invalida: 'Essa fonte não existe mais no catálogo.',
+  origem_desabilitada: 'Ligue a fonte antes de mandar coletar.',
+  coletor_desligado:
+    'O robô desta fonte ainda não foi escrito. Só o Casamentos.com.br tem coletor pronto.',
+  sem_catalogo: 'Esta fonte não tem caminho de coleta configurado. Fale com quem cuida do banco.',
+  categoria_fora_do_catalogo: 'Essa categoria não existe no catálogo desta fonte.',
+  ja_rodando: 'Já há uma coleta desta fonte em andamento. Espere ela terminar.',
+};
 
 // ---------------------------------------------------------------------------
 // Tradução de erro e de motivo

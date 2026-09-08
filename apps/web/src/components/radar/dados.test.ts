@@ -46,6 +46,57 @@ describe('paraFonte', () => {
     expect(fonte.robots_nota).toBe('/json/ bloqueado');
   });
 
+  it('lê as categorias do catálogo de coleta, sem repetir', () => {
+    const fonte = paraFonte(
+      linha({
+        config: {
+          collector: {
+            enabled: true,
+            catalogo: [
+              { caminho: '/cerimonialista/rn/natal', categoria_origem: 'cerimonialista' },
+              { caminho: '/buffet-casamento/rn/natal', categoria_origem: 'buffet-casamento' },
+              // Duas listagens da mesma categoria não são duas categorias: o botão
+              // mostraria "3 categorias" para duas.
+              { caminho: '/cerimonialista/rn/parnamirim', categoria_origem: 'cerimonialista' },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(fonte.categorias_do_catalogo).toEqual(['cerimonialista', 'buffet-casamento']);
+  });
+
+  it('descarta entrada do catálogo sem categoria, e não vira coleta vazia', () => {
+    const fonte = paraFonte(
+      linha({
+        config: {
+          collector: {
+            enabled: true,
+            catalogo: [
+              { caminho: '/a', categoria_origem: 'celebrante' },
+              { caminho: '/b' },
+              { caminho: '/c', categoria_origem: 7 },
+              'lixo',
+              null,
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(fonte.categorias_do_catalogo).toEqual(['celebrante']);
+  });
+
+  it('catálogo que não é lista vira lista vazia: o botão Coletar não aparece', () => {
+    for (const catalogo of [null, 'texto', 42, { a: 1 }]) {
+      expect(
+        paraFonte(linha({ config: { collector: { enabled: true, catalogo } } }))
+          .categorias_do_catalogo,
+      ).toEqual([]);
+    }
+  });
+
   it('aguenta config vazia sem inventar nada', () => {
     const fonte = paraFonte(linha({ config: {} }));
 
@@ -56,6 +107,7 @@ describe('paraFonte', () => {
     expect(fonte.campos).toEqual([]);
     expect(fonte.robots_nota).toBeNull();
     expect(fonte.curadoria_manual).toBe(false);
+    expect(fonte.categorias_do_catalogo).toEqual([]);
   });
 
   it('aguenta config nula, string ou lista (jsonb aceita tudo isso)', () => {

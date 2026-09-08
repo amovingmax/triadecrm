@@ -2,7 +2,15 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CircleAlert, CircleCheck, CircleHelp, ExternalLink, Power, PowerOff } from 'lucide-react';
+import {
+  CircleAlert,
+  CircleCheck,
+  CircleHelp,
+  ExternalLink,
+  Power,
+  PowerOff,
+  Radar,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -10,7 +18,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { alternarFonte, buscarFontes, mensagemDoErro, MOTIVO_DA_FONTE } from './dados';
+import {
+  alternarFonte,
+  buscarFontes,
+  coletarAgora,
+  mensagemDoErro,
+  MOTIVO_DA_COLETA,
+  MOTIVO_DA_FONTE,
+} from './dados';
 import { ErroDaFila } from './estados';
 import {
   ROTULO_DO_CAMPO,
@@ -36,6 +51,7 @@ import {
 export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
   const clienteDeConsultas = useQueryClient();
   const [alterando, setAlterando] = useState<number | null>(null);
+  const [coletando, setColetando] = useState<number | null>(null);
 
   const consulta = useQuery({ queryKey: ['radar', 'fontes'], queryFn: buscarFontes });
 
@@ -62,6 +78,30 @@ export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
     onSettled: () => setAlterando(null),
   });
 
+  const coleta = useMutation({
+    mutationFn: ({ id }: { id: number; nome: string }) => coletarAgora(id, null, 1),
+    onSuccess: (resposta, variaveis) => {
+      if (!resposta.ok) {
+        toast.error(`Não deu para coletar ${variaveis.nome}.`, {
+          description: MOTIVO_DA_COLETA[resposta.motivo] ?? 'Tente de novo.',
+        });
+        return;
+      }
+      // Duas mensagens diferentes de propósito. Com o worker parado, "coleta
+      // pedida" sem ressalva faria a pessoa voltar em dez minutos procurando
+      // candidatos que não vão chegar até alguém ligar a máquina.
+      toast.success('Coleta pedida.', {
+        description: resposta.coletorDePe
+          ? `${resposta.categorias.length} categorias de ${variaveis.nome}. Os candidatos aparecem na fila de revisão conforme chegam.`
+          : `${resposta.categorias.length} categorias de ${variaveis.nome}. O robô está parado: o pedido fica na fila até a máquina de coleta subir.`,
+      });
+      void clienteDeConsultas.invalidateQueries({ queryKey: ['radar'] });
+    },
+    onError: (erro) =>
+      toast.error('Não deu para pedir a coleta.', { description: mensagemDoErro(erro) }),
+    onSettled: () => setColetando(null),
+  });
+
   if (consulta.isPending) return <EsqueletoDasFontes />;
   if (consulta.isError) {
     return (
@@ -77,7 +117,8 @@ export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
         As <span className="numerico">11</span> fontes avaliadas, com a base legal, o que os
         termos de uso permitem, o que o robots.txt libera e o intervalo mínimo entre requisições.{' '}
         <span className="text-foreground">
-          Ligar uma fonte aqui a libera como origem de cadastro — não inicia coleta nenhuma.
+          Ligar uma fonte a libera como origem de cadastro; quem manda buscar é o botão Coletar,
+          que só aparece na fonte com robô escrito.
         </span>
       </p>
 
@@ -87,10 +128,15 @@ export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
             key={fonte.id}
             fonte={fonte}
             podeLigar={podeLigar}
-            ocupada={alterando === fonte.id}
+            ocupada={alterando === fonte.id || coletando === fonte.id}
+            coletando={coletando === fonte.id}
             aoAlternar={() => {
               setAlterando(fonte.id);
               mutacao.mutate({ id: fonte.id, ligar: !fonte.ligada });
+            }}
+            aoColetar={() => {
+              setColetando(fonte.id);
+              coleta.mutate({ id: fonte.id, nome: fonte.nome });
             }}
           />
         ))}
@@ -110,16 +156,26 @@ function LinhaDaFonte({
   fonte,
   podeLigar,
   ocupada,
+  coletando,
   aoAlternar,
+  aoColetar,
 }: {
   fonte: FonteDoRadar;
   podeLigar: boolean;
   ocupada: boolean;
+  coletando: boolean;
   aoAlternar: () => void;
+  aoColetar: () => void;
 }) {
   const robots = leituraDoRobots(fonte);
   // Fonte em que nenhuma requisição sai daqui: manual, indicação e planilha.
   const semRobo = fonte.tipo === 'manual' || fonte.tipo === 'referral' || fonte.base_url === null;
+  // "Coletar" só existe onde ele pode dar certo: quem pode ligar fonte, fonte
+  // ligada, robô escrito e catálogo com caminho. Fora disso o botão seria uma
+  // promessa — a RPC recusaria de qualquer jeito, e a pessoa descobriria depois
+  // do clique. Hoje isso é verdade só para o Casamentos.com.br.
+  const podeColetar =
+    podeLigar && fonte.ligada && fonte.coletor_pronto && fonte.categorias_do_catalogo.length > 0;
 
   return (
     <li
@@ -154,12 +210,26 @@ function LinhaDaFonte({
           </Badge>
         ) : null}
 
+        {podeColetar ? (
+          <Button
+            variant="outline"
+            onClick={aoColetar}
+            disabled={ocupada}
+            className="toque ml-auto h-11 md:h-8"
+          >
+            <Radar aria-hidden="true" />
+            {coletando ? 'Pedindo...' : 'Coletar'}
+          </Button>
+        ) : null}
+
         {podeLigar ? (
           <Button
             variant="outline"
             onClick={aoAlternar}
             aria-pressed={fonte.ligada}
-            className="toque ml-auto h-11 md:h-8"
+            /* Só um dos dois empurra para a direita: com Coletar na linha, quem
+               carrega o `ml-auto` é ele, e Ligar/Desligar fica colado ao lado. */
+            className={cn('toque h-11 md:h-8', !podeColetar && 'ml-auto')}
           >
             {fonte.ligada ? <PowerOff aria-hidden="true" /> : <Power aria-hidden="true" />}
             {fonte.ligada ? 'Desligar' : 'Ligar'}

@@ -90,6 +90,13 @@ export type FonteDoRadar = {
   periodicidade: string | null;
   /** O coletor desta fonte já está pronto para rodar? Hoje só o Casamentos.com.br tem adaptador escrito. */
   coletor_pronto: boolean;
+  /**
+   * As categorias que o catálogo de coleta desta fonte cobre
+   * (`config.collector.catalogo[].categoria_origem`). Vazio quer dizer que não há
+   * caminho para buscar, e é por isso que `radar_coletar_agora` recusa com
+   * `sem_catalogo` — a tela mostra o mesmo antes de deixar clicar.
+   */
+  categorias_do_catalogo: string[];
   /** Campos que a fonte pode persistir (RF-RAD-04). */
   campos: string[];
   /** Trecho do robots.txt relevante, quando o anexo R03 registrou. */
