@@ -120,11 +120,11 @@ describe('preços e conta por chamada', () => {
       {
         id: 'followup-ligacao',
         modelo: 'claude-sonnet-5',
-        tokensDeSistema: 1154,
+        tokensDeSistema: 1230,
         tokensDaMensagem: 90,
         tokensDeSaida: 119,
-        semCache: 0.00368,
-        comCache: 0.0016,
+        semCache: 0.00383,
+        comCache: 0.00162,
       },
       {
         id: 'classificar-intencao',

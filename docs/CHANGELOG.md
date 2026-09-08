@@ -1696,3 +1696,30 @@ O caminho exercitado foi o desenhado, e não um atalho: autorização registrada
 | `{"codigo":"nao_autorizado"}` | a própria função | o JWT é válido, mas não é o que a função espera |
 
 A suposição de que "service_role" significava a chave legada era minha, e estava errada. Está registrada aqui porque o próximo a mexer nisso vai supor a mesma coisa.
+
+## D6 — 08/09/2026 — A base de conhecimento prometia o que a Komune não cumpre (RF-CON-23, RF-CON-24; ADR-05; anexo R08 §5.4 e §7)
+
+`packages/prompts/src/nucleo/base-conhecimento.ts` autorizava a Heloísa e o robô a dizerem, com todas as letras:
+
+> *"Sem mensalidade, sem adesão, sem fidelidade e sem multa. O fornecedor paga 8% sobre o evento fechado."*
+
+**Existe mensalidade.** É a taxa mensal do escrow, ela é gamificada, e a régua dela está sendo refeita para ficar mais rígida do que a que está hoje no banco da Komune. Matheus corrigiu isto em 08/09/2026, e a correção não é de texto: era o **validador de promessas aprovando uma promessa falsa** — a peça construída justamente para impedir que o robô afirme o que a empresa não cumpre.
+
+### O que mudou na base (versão `2026-09-08`)
+
+- **`taxa`** deixou de dizer "sem mensalidade". Passou a dizer que a taxa da Komune é **8% e é FIXA** — não muda com tempo nem com volume. Isso é fato confirmado pelo Matheus.
+- **`produtor-cinco-por-cento`** é fato novo, e nasceu com as condições coladas nele: dos 8%, o produtor fica com 5% e a Komune com 3%, **para quem foi contratado pelo marketplace e já atua como produtor**. A versão anterior dizia isso de cerimonialista, sem condição nenhuma — uma oferta condicional escrita como regra geral é uma promessa que a primeira exceção desmente.
+- **`sem-mensalidade`** entrou em `NUNCA_AFIRMAR`.
+- **`mensalidade`, `mensal`, `escrow`, `custódia` e "nível de parceiro"** entraram em `TEMAS_FINANCEIROS_SEM_RESPOSTA`: o robô responde *"vou confirmar com o financeiro"* e abre tarefa, em vez de repetir um número que vai mudar. **Nenhum número novo foi inventado** — a régua é do Rafael e do Dennis, e ela ainda não fechou.
+
+### Provado
+
+- 11 conferências diretas: as cinco perguntas de mensalidade/escrow/nível caem no escape financeiro; "sem mensalidade" sumiu do texto que vai ao modelo e entrou na lista do proibido; 8%, 5% e 3% seguem autorizados, agora com as condições ditas.
+- `packages/prompts`: **268 testes verdes**.
+- O eval `custos.eval.test.ts` pegou sozinho o efeito colateral: a base cresceu, e com ela o bloco de sistema do `followup-ligacao` (**1.154 → 1.230 tokens**). `docs/operacao/prompts-e-custos.md` foi atualizado — a chamada vai de US$ 0,00368 para 0,00383, e o mês de ≈ US$ 4,07 para ≈ US$ 4,13. **É por isso que aquele teste existe**: documento de custo que ninguém recalcula vira ficção.
+
+### Precisa de decisão humana, e é urgente
+
+**O checkout da Komune contradiz o modelo.** A migração `20260714170000_supplier_tiers.sql` faz a **comissão** variar por nível (Iniciante 10% → Bronze 10% → Prata 9% → Ouro 8%), e `supplier_tier_info` entrega esse `fee_rate` para `asaas-marketplace-checkout`, `asaas-book` e `asaas-pay-item-cota` — verificado no código, não suposto.
+
+Ou seja: **quem entra hoje é cobrado 10%**, enquanto a captação promete 8%. Se o modelo mudou e o código não acompanhou, a diferença aparece na primeira fatura do primeiro fornecedor que a Heloísa trouxer. Não toquei nisso: é o lado da Komune e é decisão de produto.

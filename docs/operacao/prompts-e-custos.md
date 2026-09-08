@@ -53,7 +53,7 @@ A contagem verdadeira vem do `usage` da resposta e é ela que vai para `ai_runs`
 |---|---|---:|---:|---:|---:|---:|
 | `transcricao-audio@v1` | Haiku 4.5 | 446 | 79 | 91 | **0,00098** | 0,00058 |
 | `resumo-ligacao@v1` | Sonnet 5 | 486 | 268 | 101 | **0,00252** | 0,00164 |
-| `followup-ligacao@v1` | Sonnet 5 | 1.154 | 90 | 119 | **0,00368** | 0,00160 |
+| `followup-ligacao@v1` | Sonnet 5 | 1.230 | 90 | 119 | **0,00383** | 0,00162 |
 | `classificar-intencao@v1` | Haiku 4.5 | 966 | 49 | 55 | **0,00129** | 0,00042 |
 
 O bloco de sistema é a parte estável (persona, regras, base de conhecimento, taxonomia) e é
@@ -80,9 +80,9 @@ recebidas/dia** passando pelo classificador.
 |---|---:|---:|---:|---:|
 | `transcricao-audio@v1` | 252 | 0,00098 | **0,25** | 0,15 |
 | `resumo-ligacao@v1` | 441 | 0,00252 | **1,11** | 0,72 |
-| `followup-ligacao@v1` | 441 | 0,00368 | **1,62** | 0,71 |
+| `followup-ligacao@v1` | 441 | 0,00383 | **1,69** | 0,71 |
 | `classificar-intencao@v1` | 840 | 0,00129 | **1,08** | 0,35 |
-| **Total** | **1.974** | — | **≈ US$ 4,07/mês** | ≈ US$ 1,93/mês |
+| **Total** | **1.974** | — | **≈ US$ 4,13/mês** | ≈ US$ 1,93/mês |
 
 Vale dizer o que este número significa: **a IA não é o custo desta operação.** Quatro dólares
 por mês é menos que um dia de anúncio. O que custa aqui é o tempo das duas pessoas e a

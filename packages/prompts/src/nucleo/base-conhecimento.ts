@@ -23,7 +23,7 @@ export interface FatoDaBase {
   readonly valores: readonly string[];
 }
 
-export const VERSAO_DA_BASE = '2026-09-05' as const;
+export const VERSAO_DA_BASE = '2026-09-08' as const;
 
 export const FATOS: readonly FatoDaBase[] = [
   {
@@ -34,9 +34,24 @@ export const FATOS: readonly FatoDaBase[] = [
   },
   {
     id: 'taxa',
+    // CORRIGIDO em 08/09/2026 (Matheus). A frase anterior dizia "sem mensalidade",
+    // e é FALSA: existe uma taxa mensal do escrow, gamificada, cuja régua está
+    // sendo refeita e será mais rígida que a que está hoje no banco da Komune.
+    // Enquanto ela não fechar, "mensalidade" e "escrow" caem em
+    // TEMAS_FINANCEIROS_SEM_RESPOSTA e viram tarefa para o Dennis — nunca uma
+    // resposta inventada. Os 8% da Komune, esses, são FIXOS e nunca gamificados.
     texto:
-      'Sem mensalidade, sem adesão, sem fidelidade e sem multa. O fornecedor paga 8% sobre o evento fechado pela plataforma. Quando há cerimonialista organizando, a Komune fica com 3% e o cerimonialista recebe 5%.',
-    valores: ['8%', '3%', '5%'],
+      'Sem adesão, sem fidelidade e sem multa. A taxa da Komune é 8% sobre o evento fechado pela plataforma, e ela é fixa — não muda com o tempo nem com o volume.',
+    valores: ['8%'],
+  },
+  {
+    id: 'produtor-cinco-por-cento',
+    // Oferta de PRODUTOR, não regra geral, e com duas condições que precisam ser
+    // ditas junto: só vale para quem foi contratado pelo marketplace e já está
+    // trabalhando como produtor. Sem as condições, vira promessa que não se cumpre.
+    texto:
+      'Para o produtor há uma oferta própria: quando ele fecha uma contratação pelo marketplace, dos 8% ele fica com 5% e a Komune com 3%. Vale para quem foi contratado pela plataforma e já atua como produtor.',
+    valores: ['8%', '5%', '3%'],
   },
   {
     id: 'pagamento',
@@ -110,6 +125,11 @@ export const NUNCA_AFIRMAR: readonly { readonly id: string; readonly texto: stri
     texto: 'prazo de repasse, regra de cancelamento ou emissão de nota fora da FAQ',
   },
   {
+    id: 'sem-mensalidade',
+    texto:
+      'que não há mensalidade — existe a taxa mensal do escrow, e a régua dela está sendo refeita',
+  },
+  {
     id: 'datas-de-recurso',
     texto: 'data de lançamento de recurso sem confirmação de Luiz/Matheus',
   },
@@ -128,6 +148,11 @@ export const TEMAS_FINANCEIROS_SEM_RESPOSTA: readonly RegExp[] = [
   /\bmulta\b/i,
   /\bimposto\b|\btributa/i,
   /\bcpf\b|\bconta\s+banc[áa]ria\b|\bchave\s+pix\b/i,
+  // Acrescentados em 08/09/2026: a taxa mensal do escrow existe, é gamificada, e
+  // a régua está em revisão. Enquanto isso, ninguém responde de cabeça.
+  /\bmensalidade\b|\bmensal\b/i,
+  /\bescrow\b|\bcust[óo]dia\b/i,
+  /\bn[íi]vel\b[^?.!]*\b(parceiro|fornecedor)\b|\bgamifica/i,
 ];
 
 export const FRASE_DE_ESCAPE_FINANCEIRO =
