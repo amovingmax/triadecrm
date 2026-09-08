@@ -1639,6 +1639,14 @@ Quatro peças: a Edge Function `crm-pre-registration` (assinatura, carimbo nos d
 - **Um defeito meu, achado pelo meu próprio teste antes de chegar ao Matheus**: matar o token na reivindicação fazia o **segundo toque da mesma pessoa** cair em "link inválido ou vencido" — falso e assustador, e é o caso real de internet ruim. "Já reivindicado" passou a ser checado **antes** do vencimento.
 - **Os dois pontos de interoperação, conferidos contra o código real das duas pontas.** A assinatura HMAC: 8 conferências importando `_compartilhado/assinatura.ts` deste repo e comparando com a cópia que está na função da Komune — incluindo "um byte a mais no corpo derruba", "trocar o carimbo derruba", segredo diferente e UTF-8 com acento e emoji. E o hash do token de reivindicação: `app.sha256_hex` daqui e `encode(sha256(convert_to(...)))` de lá dão **o mesmo hex, byte a byte**.
 
+### Provado no komune-dev, e não só em banco descartável (08/09/2026, à noite)
+
+As duas migrações foram aplicadas pelo SQL Editor do `komune-dev` (4 tabelas, 4 funções; o bloco do `pg_cron` foi **pulado** pelo próprio `if exists`, porque a extensão não está ligada lá — que era o comportamento desenhado) e as duas Edge Functions subiram com `--no-verify-jwt`.
+
+`scripts/provar-crm-pre-registration.mjs` (no `komune-app`) então bateu na função de verdade, assinando como o Tríade assina: **11 conferências, todas verdes** — caminho feliz, `komune_supplier_id` nulo antes da reivindicação, chave de idempotência repetida devolvendo a mesma resposta, mesma organização com chave nova atualizando sem duplicar, assinatura torta 401, carimbo de 400 s 401, falta de `Idempotency-Key` 400, **CPF no corpo 422**, campo fora da whitelist do perfil 422, e as recusas de autenticação devolvendo todas a mesma frase.
+
+**Dez passaram de primeira; a décima primeira achou um defeito real.** A função devolvia `criado = false` para uma linha que ela acabara de criar, porque a decisão comparava `created_at` com `updated_at` — e o próprio payload do upsert escreve `updated_at`. Os dois nunca sairiam iguais, então `criado` era eternamente falso. A pergunta passou a ser feita **antes** do upsert, que é o único momento em que ela tem resposta. O Tríade não lê esse campo (só `komune_supplier_id`), então nada estava quebrado aqui — mas campo que mente é campo em que alguém acredita depois. **O banco descartável não pegaria isso**: lá a função HTTP nunca foi chamada.
+
 ### Pendente (e é do Matheus e do Luiz, não de código)
 
 - **Dois placeholders no `pg_cron`** da migração das 13h: a ref do projeto Komune e o `X-Cron-Secret`. Deixados à vista de propósito — não se inventa segredo nem endereço de projeto.
