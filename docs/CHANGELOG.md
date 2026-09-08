@@ -1604,3 +1604,44 @@ A chamada fica **depois** do registro do opt-out, e não antes: quem pediu para 
 ### Precisa de decisão humana
 
 - **Rafael / Heloísa — ligação atendida SEM roteiro não vira resumo.** Hoje o gatilho exige caminho percorrido, porque é o que o worker aceita e é a premissa de custo de `packages/prompts`. Quem tabula de cabeça, com a anotação escrita à mão e sem tocar no roteiro, não ganha resumo nem rascunho de follow-up. Se isso for comum no campo, a regra muda em um lugar só (`app.ia_enfileirar_resumo`) — e passa a custar uma chamada por ligação atendida, não por ligação com roteiro.
+
+---
+
+## D9 — 08/09/2026 — O lado Komune do pré-cadastro, e o contrato que estava mentindo (RF-PRE-01, RF-PRE-05, RF-PRE-07, RF-PRE-08; ADR-02, ADR-09; anexos R06 e R10)
+
+O código desta entrega **não está neste repositório**: está em `komune-app`, branch `precadastro-do-crm`, commit `c34f43a`. O que muda aqui é o contrato — que estava errado em três pontos, e o erro só apareceu quando alguém foi escrever a outra ponta.
+
+### O contrato foi escrito olhando só para um lado
+
+`docs/operacao/contrato-precadastro.md` mandava fazer upsert em `suppliers` com `publish_status = 'draft'` e `published = false`. **Nenhuma das três coisas existe assim na Komune**, e o schema real é a prova:
+
+- **`suppliers.document` é `NOT NULL`, e é CPF/CNPJ.** O Tríade nunca manda documento — é o ADR-09, e o próprio contrato manda recusar com 422 se um chegar. Um pré-cadastro não tem o que pôr nessa coluna.
+- **`suppliers.user_id` é `NOT NULL`**, e a RLS de lá é `user_id = auth.uid()`. O pré-cadastrado não tem conta: ela nasce quando ele abre o link.
+- **`suppliers.category_id` é `NOT NULL`** e é uuid do vocabulário deles; o Tríade manda categoria como texto do vocabulário daqui.
+- **`publish_status` e `published` não existem.** O vocabulário de lá é `onboarding_status` (`rascunho` → `em_analise` → `kyc_pendente` → `aprovado` → `ativo`), e quem aparece na vitrine é `status = 'approved' or onboarding_status in ('aprovado','ativo')`.
+
+A saída não foi afrouxar três `NOT NULL` de uma tabela central com RLS e trigger de espelho em cima — isso faria toda leitura de `suppliers` conviver com linha sem dono e sem documento. **O rascunho passou a ter casa própria** (`supplier_pre_registrations`) e só vira `suppliers` na reivindicação, quando a pessoa informa o que falta.
+
+### O que mudou neste repositório
+
+Só o contrato, em três pontos: o status do documento, o item 4 de "o que a Komune deve fazer" (com uma caixa explicando por que não é `suppliers`) e o corpo do `200`, que passou a declarar que **`komune_supplier_id` volta `null` até a reivindicação**.
+
+**Nenhuma linha de código do Tríade precisou mudar**, e isso foi verificado e não presumido: `komune-push/index.ts:164` já aceita `null` (`corpo?.komune_supplier_id ?? corpo?.supplier_id ?? null`) e `komune_push_ok` só grava o id quando ele vem preenchido (`coalesce`). O id chega depois, pelo webhook `supplier.claimed`.
+
+### O que foi escrito do outro lado
+
+Quatro peças: a Edge Function `crm-pre-registration` (assinatura, carimbo nos dois sentidos, HMAC em tempo constante, `Idempotency-Key` obrigatório, whitelist do perfil como `CHECK` no banco **além** da checagem na função), a função `reivindicar_precadastro` (o rascunho vira `suppliers` com `status='pending'` e `is_verified=false`, escritos de propósito porque é o que a policy `suppliers_self_insert` exige — reivindicar pelo link não pode ser atalho para nascer aprovado), a fila `crm_outbox` com a Edge Function `crm-webhook-push` que a esvazia, e os gatilhos que avisam publicação e despublicação sozinhos.
+
+### Provado rodando
+
+- **As duas migrações aplicadas num banco descartável**, com `auth.uid()` simulado. Os guardrails atacados um a um: perfil com CPF **recusado** pelo `CHECK`, hash de token torto **recusado**, `UPDATE` na linha do tempo **recusado** pelo gatilho append-only, segunda linha da mesma organização **recusada** pelo índice único.
+- **A corrente inteira, nas nove respostas certas**: sem sessão → `sem_sessao`; token errado → `link_invalido_ou_vencido`; documento torto → `documento_invalido`; sem categoria → `categoria_obrigatoria`; reivindicação boa → fornecedor criado `pending`/não verificado, token morto, `status='promovido'`; **repetida pelo mesmo dono → `repetido=true` e continua um fornecedor só**; outro dono → `ja_reivindicado`; publicou e despublicou → avisos na fila.
+- **Um defeito meu, achado pelo meu próprio teste antes de chegar ao Matheus**: matar o token na reivindicação fazia o **segundo toque da mesma pessoa** cair em "link inválido ou vencido" — falso e assustador, e é o caso real de internet ruim. "Já reivindicado" passou a ser checado **antes** do vencimento.
+- **Os dois pontos de interoperação, conferidos contra o código real das duas pontas.** A assinatura HMAC: 8 conferências importando `_compartilhado/assinatura.ts` deste repo e comparando com a cópia que está na função da Komune — incluindo "um byte a mais no corpo derruba", "trocar o carimbo derruba", segredo diferente e UTF-8 com acento e emoji. E o hash do token de reivindicação: `app.sha256_hex` daqui e `encode(sha256(convert_to(...)))` de lá dão **o mesmo hex, byte a byte**.
+
+### Pendente (e é do Matheus e do Luiz, não de código)
+
+- **Dois placeholders no `pg_cron`** da migração das 13h: a ref do projeto Komune e o `X-Cron-Secret`. Deixados à vista de propósito — não se inventa segredo nem endereço de projeto.
+- **Os dois segredos**: `komune_push_secret` e `komune_webhook_secret`, 32 bytes em hex, gravados nos Vaults dos **dois** projetos na mesma janela.
+- **Deploy no `komune-dev` antes do `komune`**, com `--no-verify-jwt` nas duas funções (quem autentica é o HMAC, não o JWT).
+- **A promoção não copia telefone, Instagram nem site** do perfil para `suppliers`: as colunas de lá têm nomes e formatos próprios (`phone`, `address_*`) e mapear isso sem ver a tela de onboarding seria adivinhar. O dado não se perde — continua em `supplier_pre_registrations.perfil`.

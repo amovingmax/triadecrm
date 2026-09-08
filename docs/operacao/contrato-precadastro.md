@@ -1,7 +1,9 @@
 # Contrato do pré-cadastro — Triade ↔ Komune
 
 **Versão do contrato:** v0 (contrato mínimo do MVP, PRD §7.6 / RF-PRE-01)
-**Status:** lado Triade **implementado e testado**; lado Komune **a implementar (Matheus)**
+**Status:** lado Triade **implementado e testado**; lado Komune **escrito e testado em
+banco descartável** (repo `komune-app`, branch `precadastro-do-crm`), aguardando revisão
+do Matheus e deploy no `komune-dev`
 **Última verificação de ponta a ponta:** 05/09/2026, contra o dublê local
 `supabase/functions/_dubles/komune-duble.mjs`
 
@@ -165,13 +167,28 @@ claim_token_hash` **e** `now() < claim_token_expires_at`.
 3. **Se a chave já foi vista**: não criar nada, devolver **200** com o mesmo
    `komune_supplier_id`. Reenviar tem de ser inócuo — o Triade reenvia em toda
    falha de rede.
-4. Upsert em `suppliers` por `crm_organization_id`, com
-   `origin = 'crm_pre_registration'`, `publish_status = 'draft'`,
-   `published = false`, `source_url`, `claim_token_hash`,
+4. Upsert em **`supplier_pre_registrations`** por `crm_organization_id`, com
+   `origin = 'crm_pre_registration'`, `source_url`, `claim_token_hash` e
    `claim_token_expires_at`.
 5. Registrar em `supplier_onboarding_events` (append-only) o que aconteceu.
 6. **Nunca publicar o perfil por causa desta chamada.** Publicação exige aceite
    provado, e o Triade recusa o webhook de publicação se não tiver a prova.
+
+> **Correção de 08/09/2026 — não é `suppliers`, e não são `publish_status` nem
+> `published`.** A v0 deste documento mandava fazer upsert direto em
+> `suppliers`. O schema real da Komune não aceita: `document` (CPF/CNPJ),
+> `user_id` e `category_id` são `NOT NULL`, e um pré-cadastro não tem nenhum dos
+> três — o Triade nunca manda documento (ADR-09), a conta do fornecedor só nasce
+> quando ele abre o link, e a categoria de lá é uuid do vocabulário deles.
+> Afrouxar três `NOT NULL` de uma tabela central com RLS e triggers em cima
+> seria pagar no lugar errado. O rascunho passa a morar em
+> `supplier_pre_registrations` e só vira `suppliers` na **reivindicação**
+> (`public.reivindicar_precadastro`), quando a pessoa informa o que falta.
+>
+> Pelo mesmo motivo, `publish_status` e `published` não existem na Komune: o
+> vocabulário de lá é `onboarding_status` (`rascunho` → `em_analise` →
+> `kyc_pendente` → `aprovado` → `ativo`), e quem aparece na vitrine é
+> `status = 'approved' or onboarding_status in ('aprovado','ativo')`.
 
 ### Respostas esperadas
 
@@ -185,8 +202,25 @@ claim_token_hash` **e** `now() < claim_token_expires_at`.
 Corpo do `200`:
 
 ```json
-{ "komune_supplier_id": "uuid", "publish_status": "draft", "published": false, "criado": true }
+{
+  "komune_supplier_id": null,
+  "komune_pre_registration_id": "uuid",
+  "publish_status": "draft",
+  "published": false,
+  "onboarding_status": "rascunho",
+  "criado": true
+}
 ```
+
+**`komune_supplier_id` é `null` até a reivindicação**, e isso é o normal, não um
+erro: enquanto o fornecedor não abriu o link, ele não existe em `suppliers`. O
+Triade já lida com isso — `komune-push/index.ts:164` aceita nulo e
+`komune_push_ok` só grava quando vem preenchido (`coalesce`). O id chega depois,
+no webhook `supplier.claimed`.
+
+`publish_status` e `published` continuam na resposta porque são verdade (nada
+foi publicado) e porque não custa nada mantê-los; a informação viva é
+`onboarding_status`.
 
 O Triade lê `komune_supplier_id` (aceita também `supplier_id`) e cola nos dois
 lados: `pre_registrations.komune_supplier_id` e
