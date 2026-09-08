@@ -1850,3 +1850,16 @@ Buraco encontrado na revisão de "o que falta para usar": a esteira de ingestão
 - `FonteDoRadar` ganhou `categorias_do_catalogo`, lido de `config.collector.catalogo[].categoria_origem` com deduplicação e guarda de tipo (jsonb livre: catálogo pode vir nulo, string, número ou objeto).
 - Verificado: 22 asserções pgTAP novas (`supabase/tests/37_a_coleta_cabe_num_botao.sql`), com ênfase em "nenhuma das cinco recusas abriu lote" e "lote e job entram juntos"; 533 testes Vitest (3 novos para a leitura do catálogo); lint, typecheck e build verdes; migração aplicada no `komune-crm` em nuvem e a RPC conferida por HTTP no PostgREST, devolvendo `coletor_desligado` para a OLX.
 - Pendente: a coleta de verdade só roda quando a máquina dedicada subir (Luiz). A tela não foi conferida no navegador nesta passada — a sessão do Playwright caiu.
+
+## D1 — 08/09/2026 — O acesso deixa de depender do domínio, e a porta de entrada para de vender (RF-ADM-01)
+
+Decisão do Rafael em 08/09/2026: **o login não pode mais depender de o e-mail ser `@komune.app.br`**. Cada conta desse domínio é uma assinatura do Google Workspace, e a operação não justifica o custo. O acesso passa a ser por **lista nominal**, com a conta Google pessoal de cada pessoa.
+
+Isso é mais restritivo que o desenho anterior, não menos: hoje quem tem e-mail do domínio entra sozinho como `sdr` pelo `allowed_domains`; a partir daqui ninguém entra por pertencer a um domínio, só por estar na lista que Admin → Pessoas controla.
+
+- **A mensagem de recusa parou de mentir**: ela mandava "entre com o seu e-mail @komune.app.br", que a partir desta decisão é mandar a pessoa tentar uma porta que não existe. Agora diz que o acesso é liberado um a um e quem pede.
+- **A instrução da tela de entrada** também deixou de citar o domínio.
+- **A frase de vitrine saiu do login**: "Leva o fornecedor de evento do primeiro contato ao perfil publicado" era texto de página de venda numa porta de ferramenta interna. Quem chega ali já trabalha na Komune. Ficou "CRM de captação da Komune", que é o que a tela precisa dizer.
+- **Siglas de requisito sem número** (`RF-BAS`, `RF-FUN`, `RF-CON`, `RF-RAD`, `RF-AGE`, `RF-ROT`, `RF-MET`, `RF-AST`, `RF-REL`, `RF-ADM`): a varredura de 08/09 exigia o número de dois dígitos e passou por cima dessas. Saíram das descrições de navegação e de um texto da ficha do parceiro.
+- Verificado: lint, typecheck e 533 testes verdes.
+- **Pendente, e é bloqueante para economizar de fato**: o `allowed_domains` de `komune.app.br` continua ATIVO de propósito. Desligá-lo antes de os e-mails pessoais estarem na lista tranca a equipe do lado de fora. A ordem é: (1) coletar o Gmail pessoal de cada pessoa, (2) incluir na lista em Admin → Pessoas, (3) cada um testa o login, (4) só então desligar o domínio e cancelar o Workspace.

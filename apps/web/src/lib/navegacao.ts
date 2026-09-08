@@ -51,7 +51,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: Handshake,
     dia: 'D1/D2',
     descricao:
-      'Base de organizações e pessoas com busca global, filtros, criação rápida com dedup por telefone e importação de planilha (RF-BAS).',
+      'Base de organizações e pessoas com busca global, filtros, criação rápida com dedup por telefone e importação de planilha.',
     principal: true,
   },
   {
@@ -69,7 +69,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: SquareKanban,
     dia: 'D3',
     descricao:
-      'Kanban dos funis de captação e de produtores, cartão com semáforo, próxima ação obrigatória e motivos de perda (RF-FUN).',
+      'Kanban dos funis de captação e de produtores, cartão com semáforo, próxima ação obrigatória e motivos de perda.',
     principal: true,
   },
   {
@@ -86,7 +86,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: MessageCircle,
     dia: 'D5',
     descricao:
-      'Inbox de WhatsApp com responsável, fila diária de primeiros contatos em modo assistido e opt-out por regra (RF-CON).',
+      'Inbox de WhatsApp com responsável, fila diária de primeiros contatos em modo assistido e opt-out por regra.',
     principal: true,
   },
   {
@@ -95,7 +95,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: Radar,
     dia: 'D4',
     descricao:
-      'Candidatos coletados em fontes públicas, fila de revisão e pontuação por lacuna de oferta (RF-RAD).',
+      'Candidatos coletados em fontes públicas, fila de revisão e pontuação por lacuna de oferta.',
   },
   {
     href: '/cadencias',
@@ -111,7 +111,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: CalendarDays,
     dia: 'D7',
     descricao:
-      'Reuniões em vídeo pela manhã, rota de visitas à tarde com link do Google Maps e lembretes (RF-AGE, RF-ROT).',
+      'Reuniões em vídeo pela manhã, rota de visitas à tarde com link do Google Maps e lembretes.',
   },
   {
     href: '/metas',
@@ -119,14 +119,14 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: Target,
     dia: 'D8',
     descricao:
-      'Metas diárias por pessoa (3 portas abertas), acumulado × meta e resumo das 18:00 pela Assistente (RF-MET, RF-AST).',
+      'Metas diárias por pessoa (3 portas abertas), acumulado × meta e resumo das 18:00 pela Assistente.',
   },
   {
     href: '/relatorios',
     rotulo: 'Relatórios',
     icone: ChartColumn,
     dia: 'D9',
-    descricao: 'Relatório de segunda-feira (texto + XLSX), funil e atividades por pessoa (RF-REL).',
+    descricao: 'Relatório de segunda-feira (texto + XLSX), funil e atividades por pessoa.',
   },
   {
     href: '/admin',
@@ -134,7 +134,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: Settings,
     dia: 'D1 (parcial)',
     descricao:
-      'Papéis e usuários, etapas e SLAs por funil, motivos de perda, modelos de mensagem, feriados e ferramentas LGPD (RF-ADM).',
+      'Papéis e usuários, etapas e SLAs por funil, motivos de perda, modelos de mensagem, feriados e ferramentas LGPD.',
     papeis: ['admin', 'gestor'],
   },
 ];

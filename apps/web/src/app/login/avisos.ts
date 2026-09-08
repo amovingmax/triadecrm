@@ -19,13 +19,17 @@ export interface AvisoAcesso {
 }
 
 export const AVISOS: Record<ChaveAviso, AvisoAcesso> = {
-  // app.handle_new_auth_user recusa o INSERT em auth.users: o e-mail não está em
-  // allowed_users nem em allowed_domains. O Google autenticou, o CRM nem chegou a criar
-  // a conta. Tentar de novo com a mesma conta nunca vai funcionar.
+  // app.handle_new_auth_user recusa o INSERT em auth.users: o e-mail não está na
+  // lista de permitidos. O Google autenticou, o CRM nem chegou a criar a conta.
+  // Tentar de novo com a mesma conta nunca vai funcionar.
+  //
+  // O texto NÃO manda mais usar o e-mail da empresa: desde 08/09/2026 o acesso é
+  // por lista nominal, e a conta Google pode ser pessoal. Mandar a pessoa "entrar
+  // com o e-mail @komune.app.br" era mandá-la tentar uma porta que não existe.
   'nao-autorizado': {
     titulo: 'Esse e-mail não tem acesso ao CRM.',
     saida:
-      'Entre com o seu e-mail @komune.app.br. Se você já usou o e-mail da empresa, peça a um admin (Rafael, Luiz ou Matheus) para liberar o seu acesso.',
+      'O acesso é liberado um a um. Peça a um admin (Rafael, Luiz ou Matheus) para incluir este e-mail na lista, ou entre com a conta que já foi liberada para você.',
     grave: true,
     rotuloBotao: 'Entrar com outra conta',
   },

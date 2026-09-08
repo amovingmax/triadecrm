@@ -122,15 +122,16 @@ export function TelaLogin({ next, aviso }: { next: string; aviso: AvisoAcesso | 
           Tríade
         </motion.h1>
 
+        {/* Aqui havia uma frase de vitrine ("Leva o fornecedor de evento do primeiro
+            contato ao perfil publicado"). Saiu: esta é a porta de uma ferramenta
+            interna, não uma página de venda. Quem chega já trabalha na Komune e já
+            sabe para que serve — a linha só empurrava para baixo as duas coisas que
+            a tela precisa entregar, que são o botão e a regra de acesso. */}
         <motion.p
           {...entrada(2)}
           className="mt-5 max-w-[32ch] text-base text-balance text-grafite-600 sm:text-lg dark:text-grafite-400"
         >
-          {/* Espaço inquebrável entre "do" e "primeiro": o `text-balance` otimiza
-              largura de linha, não sintaxe, e deixava a preposição pendurada no fim
-              da primeira linha, longe do substantivo que ela rege. Com o NBSP a
-              quebra passa a fechar sintagma nas duas larguras. */}
-          {'Leva o fornecedor de evento do\u00A0primeiro contato ao perfil publicado.'}
+          CRM de captação da Komune.
         </motion.p>
       </section>
 
@@ -183,8 +184,8 @@ export function TelaLogin({ next, aviso }: { next: string; aviso: AvisoAcesso | 
               {...entrada(4)}
               className="mt-4 text-sm text-grafite-500 dark:text-grafite-450"
             >
-              Entre com a conta Google do seu e-mail @komune.app.br. Se o seu acesso ainda não foi
-              liberado, peça a Rafael, Luiz ou Matheus.
+              Entre com a sua conta Google. Se o seu acesso ainda não foi liberado, peça a
+              Rafael, Luiz ou Matheus.
             </motion.p>
           )}
         </div>

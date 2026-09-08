@@ -316,7 +316,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
         <Marcador
           titulo="Conversa"
           dia="D5"
-          texto="Histórico do WhatsApp com o robô assistido, sempre com aprovação da Heloísa antes do envio (RF-CON)."
+          texto="Histórico do WhatsApp com o robô assistido, sempre com aprovação da Heloísa antes do envio."
           icone={<MessageSquare className="size-4" aria-hidden="true" />}
         />
       </section>
