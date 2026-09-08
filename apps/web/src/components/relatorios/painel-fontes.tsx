@@ -179,7 +179,7 @@ export function PainelFontes({ painel, periodo }: { painel: DefinicaoPainel; per
           ficam em zero porque o coletor do Radar ainda não roda: hoje todo alvo da base entrou
           por importação de planilha. Elas continuam listadas de propósito: a linha zerada é o
           lembrete do que falta ligar, e o dia em que o Radar rodar o número aparece aqui sem
-          mudar nada nesta tela. O lote de importação (RF-BAS-17) ainda não é coluna aqui: a
+          mudar nada nesta tela. O lote de importação ainda não é coluna aqui: a
           função do banco corta por fonte, não por lote.
         </>
       }

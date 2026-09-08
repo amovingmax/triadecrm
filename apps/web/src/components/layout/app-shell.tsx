@@ -32,7 +32,12 @@ export function AppShell({ sessao, children }: { sessao: Sessao; children: React
           id="conteudo"
           className="flex-1 px-4 pt-6 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-6 md:pt-8 md:pb-8"
         >
-          <TransicaoPagina>{children}</TransicaoPagina>
+          {/* Coluna centralizada com teto: cada tela ainda escolhe a própria medida de
+              leitura, mas nenhuma fica grudada na barra lateral com um terço de vazio
+              à direita, e nenhuma tabela se estica por 2500px num monitor ultrawide. */}
+          <div className="mx-auto w-full max-w-[1440px]">
+            <TransicaoPagina>{children}</TransicaoPagina>
+          </div>
         </main>
       </div>
 

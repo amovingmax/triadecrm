@@ -214,7 +214,7 @@ function SoModelo({ organizacaoId, className }: { organizacaoId: string; classNa
         <p className="text-xs leading-relaxed text-muted-foreground">
           A Meta não aprovou nenhum dos nossos modelos ainda, então não há o que mandar por aqui
           agora. Isso não é defeito do CRM: a aprovação de
-          modelo é do Meta Business e depende da verificação do CNPJ (RF-CON-02). O que funciona
+          modelo é do Meta Business e depende da verificação do CNPJ. O que funciona
           hoje é ligar.
         </p>
       ) : (

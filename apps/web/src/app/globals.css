@@ -277,23 +277,23 @@
   --chart-4: var(--grafite-700);
   --chart-5: var(--grafite-900);
 
-  /* Casca (lateral do desktop e barra inferior do celular). É a única superfície
-     fora da rampa grafite: #e0f2fe é o azul-céu do próprio Ocean Breeze (o
-     `secondary` do tema) e separa a navegação do conteúdo sem gastar borda,
-     sombra nem cor cromática. */
-  --sidebar: #e0f2fe;
-  --sidebar-foreground: var(--grafite-700); /* 8,98:1 sobre a lateral */
-  /* Item inativo. Valor novo, e não o grafite-500 do resto da interface: aquele
-     para em 4,45:1 sobre este azul. Este mede 5,57:1 na lateral, 5,05:1 no realce
-     de passagem e 5,63:1 na barra inferior. */
-  --sidebar-muted-foreground: #55606e;
+  /* Casca (lateral do desktop e barra inferior do celular). Um degrau da rampa
+     acima do fundo da página: separa a navegação do conteúdo por valor, não por
+     cor. O azul-céu que estava aqui era a única superfície cromática da interface
+     e puxava o olho para a navegação, que é o que menos importa na tela. */
+  --sidebar: var(--grafite-100);
+  --sidebar-foreground: var(--grafite-700); /* 9,26:1 sobre a lateral */
+  /* Item inativo. Valor próprio, e não o grafite-500 do resto da interface:
+     aquele cai para 3,97:1 no realce de passagem. Este mede 5,87:1 na lateral,
+     4,98:1 no realce e 6,19:1 na barra inferior. */
+  --sidebar-muted-foreground: #5c5c64;
   --sidebar-primary: var(--grafite-900);
   --sidebar-primary-foreground: var(--grafite-25);
   /* Item ativo: tinta a 8% sobre a própria base, um fundo de 1,20:1 que se nota
      sem virar bloco. O que marca o ativo é o peso mais a marca de 2px em tinta;
      cor cromática, na interface, só significa temperatura. */
   --sidebar-accent: color-mix(in oklab, var(--grafite-900) 8%, var(--sidebar));
-  --sidebar-accent-foreground: var(--grafite-900); /* 12,96:1 sobre o item ativo */
+  --sidebar-accent-foreground: var(--grafite-900); /* 13,93:1 sobre o item ativo */
   /* A casca é separada do conteúdo pela mesma linha translúcida do cabeçalho. */
   --sidebar-border: var(--hairline);
   --sidebar-ring: var(--grafite-900);
@@ -406,10 +406,11 @@
    Utilitários do sistema.
    -------------------------------------------------------------------------- */
 
-/* Todo número da interface (dias, contadores, telefone, CNPJ, valores) usa isto:
-   IBM Plex Mono com largura fixa, para as colunas alinharem na vertical. */
+/* Todo número da interface (dias, contadores, telefone, CNPJ, valores) usa isto.
+   Sem trocar de família: o Geist tem algarismo de largura fixa, que é o que faz a
+   coluna alinhar na vertical. A fonte monoespaçada saiu porque o zero cortado do
+   Geist Mono, num contador de 2xl, era lido como defeito da tela. */
 @utility numerico {
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }

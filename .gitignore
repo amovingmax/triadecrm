@@ -45,3 +45,7 @@ test-results/
 
 # credencial de sessão gerada por apps/web/scripts/sessao-dev.mjs — nunca commitar
 apps/web/scripts/.sessao-dev.json
+.vercel
+
+# Saída do Playwright MCP (capturas e snapshots de sessão)
+.playwright-mcp/

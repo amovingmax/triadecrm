@@ -223,7 +223,7 @@ describe('a resposta do banco', () => {
     });
     expect(recusa.registrado).toBe(false);
     if (!recusa.registrado) {
-      expect(MENSAGENS_DE_RECUSA[recusa.motivo]).toBe('Perda exige motivo (RF-FUN-04).');
+      expect(MENSAGENS_DE_RECUSA[recusa.motivo]).toBe('Perda exige motivo.');
     }
   });
 

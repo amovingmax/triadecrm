@@ -42,7 +42,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: Sun,
     dia: 'D8',
     descricao:
-      'Metas do dia, agenda (Meets e rota), fila de ações ordenada e conversas sem resposta, com abas Inbox / Feito / Futuro (RF-MET-03).',
+      'Metas do dia, agenda (Meets e rota), fila de ações ordenada e conversas sem resposta, com abas Inbox / Feito / Futuro.',
     principal: true,
   },
   {
@@ -60,7 +60,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: Upload,
     dia: 'D2',
     descricao:
-      'Planilha (XLSX ou CSV) para dentro da base pela esteira de ingestão: mapa de colunas, prévia com duplicatas nomeadas e lote com desfazer de 48 h (RF-BAS-07, RF-BAS-17).',
+      'Planilha (XLSX ou CSV) para dentro da base pela esteira de ingestão: mapa de colunas, prévia com duplicatas nomeadas e lote com desfazer de 48 h.',
     papeis: ['admin', 'gestor', 'sdr', 'embaixador'],
   },
   {
@@ -103,7 +103,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: Route,
     dia: 'D7',
     descricao:
-      'Réguas de toque em ordem (canal, atraso, condição), quantas organizações param em cada passo e o resumo do dia das 07:30 e 18:00 (RF-CON-13, RF-AST-02).',
+      'Réguas de toque em ordem (canal, atraso, condição), quantas organizações param em cada passo e o resumo do dia das 07:30 e 18:00.',
   },
   {
     href: '/agenda',

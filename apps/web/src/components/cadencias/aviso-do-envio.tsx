@@ -104,13 +104,13 @@ export function AvisoDoEnvio({ visao }: { visao: VisaoDasCadencias }) {
               : `Nenhum trabalhador bateu ponto (${vistoHa(wa.visto_em)}); até lá o toque vira tarefa e a mensagem sai à mão.`}
           </li>
           <li>
-            O modo automático (RF-CON-09) está fora do MVP: quem aprova o primeiro contato e cada
+            O modo automático está fora do MVP: quem aprova o primeiro contato e cada
             resposta é gente ({visao.envio.modo_automatico_decisao}). O banco recusa ligar essa
             chave.
           </li>
           <li>
             Passo, condição e atraso não se editam por esta tela: a régua vive nas migrações do
-            banco, e a edição pelo gestor está prevista para a v1 (RF-ADM-02).
+            banco, e a edição pelo gestor está prevista para a v1.
           </li>
         </ul>
       </details>

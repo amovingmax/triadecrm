@@ -929,7 +929,7 @@ export const MENSAGENS_DE_RECUSA: Record<
   fora_da_carteira: 'Este parceiro não está na sua carteira.',
   desfecho_invalido: 'Esse resultado saiu do catálogo. Recarregue a tela.',
   desfecho_fora_da_superficie: 'Esse resultado não vale para este canal.',
-  motivo_de_perda_obrigatorio: 'Perda exige motivo (RF-FUN-04).',
+  motivo_de_perda_obrigatorio: 'Perda exige motivo.',
   reuniao_sem_data: 'Reunião marcada precisa de data e hora.',
   autorizacao_sem_evidencia: 'Autorização precisa da evidência registrada.',
   organizacao_inexistente: 'Parceiro não encontrado.',

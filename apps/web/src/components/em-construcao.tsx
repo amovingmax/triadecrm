@@ -36,7 +36,7 @@ export function EmConstrucao({ titulo, dia, descricao }: Props) {
   const frase = descricao ?? item?.descricao;
 
   return (
-    <section className="flex w-full max-w-2xl flex-col gap-4">
+    <section className="flex mx-auto w-full max-w-2xl flex-col gap-4">
       <header className="flex flex-col gap-2">
         <h1 className="font-heading text-2xl font-semibold tracking-tight">{titulo}</h1>
         {/* Envolve em vez de cortar: em 320px de largura o chip cai para a linha

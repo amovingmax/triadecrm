@@ -216,7 +216,7 @@ export function ExportarParceiro({ quemExportou }: { quemExportou: string }) {
         <p className="mt-1">
           Ainda <strong>não</strong> é a exportação oficial do PRD: a Edge Function{' '}
           <span className="numerico">export-lgpd</span>, que assina o arquivo e grava a exportação
-          no registro de acesso, é da v1 (RF-ADM-04). Até lá, a exportação sem telefone não deixa
+          no registro de acesso, é da v1. Até lá, a exportação sem telefone não deixa
           rastro no sistema. Anote no processo do pedido quem exportou e quando.
         </p>
       </Aviso>

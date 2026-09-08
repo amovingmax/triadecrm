@@ -188,7 +188,7 @@ export function CartaoDeAprovacao({
               <span className="numerico">{texto.length}</span> de{' '}
               <span className="numerico">{LIMITES_PADRAO.maxCaracteres}</span> caracteres
             </span>
-            {longo ? <span>o RF-CON-24 pede no máximo isso por turno</span> : null}
+            {longo ? <span>o limite por turno é este</span> : null}
             {foiEditado ? (
               <button
                 type="button"

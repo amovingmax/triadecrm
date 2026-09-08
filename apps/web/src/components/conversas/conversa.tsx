@@ -240,7 +240,7 @@ export function Conversa({
             A grade custava 200 px do painel; com o rodapé do inbox embaixo, esses
             200 px eram a conversa inteira. Onde, categoria, dono e último contato
             são consulta de canto de olho — quem precisa do resto abre a ficha. O
-            telefone continua atrás da mesma RPC auditada (RF-BAS-14). */}
+            telefone continua atrás da mesma RPC auditada. */}
         <dl className="flex max-w-3xl flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <Campo rotulo="Onde">{onde || 'sem endereço na base'}</Campo>
           <Campo rotulo="Categoria">{item.categoria ?? 'sem categoria'}</Campo>

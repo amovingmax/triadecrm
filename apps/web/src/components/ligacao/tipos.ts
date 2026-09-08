@@ -335,7 +335,7 @@ export const MENSAGENS_DE_EXCLUSAO: Record<MotivoDeExclusao, string> = {
   sem_telefone: 'sem telefone',
   suprimido: 'pediu para não ser contatado',
   nao_contatar: 'marcado como não contatar',
-  em_janela_de_recontato: 'em janela de recontato (RF-FUN-13)',
+  em_janela_de_recontato: 'em janela de recontato',
   reservado_em_outro_lote: 'já reservado em outro lote',
   sem_negocio_aberto: 'sem negócio aberto no funil',
   temperatura_diferente: 'temperatura diferente da origem do lote',
@@ -1062,7 +1062,7 @@ export const MENSAGENS_DE_RECUSA_DA_CHAMADA: Record<
   chamada_ja_encerrada: 'Esta chamada já foi tabulada.',
   eixos_incoerentes: 'Sem atendimento não existe resultado comercial.',
   desfecho_invalido: 'Esse resultado saiu do catálogo. Recarregue a tela.',
-  motivo_de_perda_obrigatorio: 'Perda exige motivo (RF-FUN-04).',
+  motivo_de_perda_obrigatorio: 'Perda exige motivo.',
   reuniao_sem_data: 'Reunião marcada precisa de data e hora.',
   lote_encerrado: 'Este lote foi encerrado. Abra o lote de hoje.',
 };

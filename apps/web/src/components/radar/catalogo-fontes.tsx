@@ -76,7 +76,7 @@ export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
       <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
         As <span className="numerico">11</span> fontes avaliadas no anexo R03, com a base legal, o
         que os termos de uso permitem, o que o robots.txt libera e o intervalo mínimo entre
-        requisições (RF-RAD-01 e RF-RAD-03).{' '}
+        requisições.{' '}
         <span className="text-foreground">
           Ligar uma fonte aqui a libera como origem de cadastro — não inicia coleta nenhuma.
         </span>
@@ -220,7 +220,7 @@ function LinhaDaFonte({
 
       {fonte.campos.length > 0 ? (
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">Campos permitidos</span> (RF-RAD-04):{' '}
+          <span className="font-medium text-foreground">Campos permitidos</span>:{' '}
           {fonte.campos.map((campo) => ROTULO_DO_CAMPO[campo] ?? campo).join(', ')}.
         </p>
       ) : null}

@@ -129,7 +129,7 @@ export const SEMAFORO_PROXIMA_ACAO: Record<
 > = {
   sem: {
     rotulo: 'Sem próxima ação',
-    descricao: 'Negócio aberto sem próxima ação marcada: define uma ou justifica (RF-FUN-03).',
+    descricao: 'Negócio aberto sem próxima ação marcada: define uma ou justifica.',
   },
   hoje: { rotulo: 'Hoje', descricao: 'A próxima ação é para hoje.' },
   agendada: { rotulo: 'Agendada', descricao: 'A próxima ação tem data futura.' },

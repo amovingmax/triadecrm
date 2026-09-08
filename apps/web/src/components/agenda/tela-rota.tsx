@@ -16,6 +16,7 @@ import {
   Target,
 } from 'lucide-react';
 
+import { NotaRecolhida } from '@/components/ui/nota-recolhida';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -507,12 +508,11 @@ function ForaDaRota({ exclusoes }: { exclusoes: ReturnType<typeof agruparExcluso
 
 function AindaNaoLigado({ rota }: { rota: RotaDoDia }) {
   return (
-    <section className="flex flex-col gap-2 border-t border-hairline pt-4">
-      <h2 className="text-xs font-medium text-muted-foreground">O que ainda não está ligado</h2>
-      <ul className="flex max-w-prose flex-col gap-1.5 text-xs leading-relaxed text-muted-foreground">
+    <NotaRecolhida titulo="O que ainda não está ligado">
+      <ul className="flex flex-col gap-1.5">
         <li>
-          <span className="text-foreground">Hora marcada dentro da rota</span> (o &quot;TSP com
-          janelas&quot; do RF-ROT-03): a ordem é só por tempo de carro. O horário que aparece na
+          <span className="text-foreground">Hora marcada dentro da rota</span>: a ordem é só por
+          tempo de carro. O horário que aparece na
           tarefa de visita é prazo calculado, não hora combinada com o fornecedor — a Agenda explica
           isso na aba Dia.
         </li>
@@ -522,8 +522,8 @@ function AindaNaoLigado({ rota }: { rota: RotaDoDia }) {
           um número que não existe.
         </li>
         <li>
-          <span className="text-foreground">Cheguei, com check-in por GPS</span> (RF-ROT-06) e{' '}
-          <span className="text-foreground">bloco no Google Calendar</span> (RF-ROT-04): fora do
+          <span className="text-foreground">Cheguei, com check-in por GPS</span> e{' '}
+          <span className="text-foreground">bloco no Google Calendar</span>: fora do
           MVP. O resultado da visita continua sendo registrado pelo caminho de sempre.
         </li>
         <li>
@@ -532,8 +532,8 @@ function AindaNaoLigado({ rota }: { rota: RotaDoDia }) {
           estas frases mudam sozinhas.
         </li>
       </ul>
-      <p className="text-xs text-muted-foreground">{rota.atribuicao}</p>
-    </section>
+      <p className="mt-2">{rota.atribuicao}</p>
+    </NotaRecolhida>
   );
 }
 

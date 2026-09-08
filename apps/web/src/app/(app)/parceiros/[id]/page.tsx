@@ -73,7 +73,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
     // do app e a busca global começam em x=232, e o mesmo clique movia o conteúdo 144px
     // para dentro. A largura de leitura continua limitada em 896px; o que muda é que a
     // coluna nasce na mesma margem de todas as outras telas.
-    <TransicaoPagina className="flex w-full max-w-4xl flex-col gap-6">
+    <TransicaoPagina className="flex mx-auto w-full max-w-4xl flex-col gap-6">
       {/* 44px de alvo no celular (era 36), 28 no desktop: esta e o "Revelar" eram os
           dois únicos controles de toque da ficha, e os dois estavam abaixo do mínimo
           enquanto a lista e a barra inferior já cumpriam 44 e 64. */}
@@ -311,7 +311,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
         <Marcador
           titulo="Linha do tempo"
           dia="D3"
-          texto="Atividades, mudanças de etapa, visitas e notas em ordem, com quem fez cada coisa (RF-BAS-06, RF-FUN-08)."
+          texto="Atividades, mudanças de etapa, visitas e notas em ordem, com quem fez cada coisa."
         />
         <Marcador
           titulo="Conversa"

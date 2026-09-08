@@ -177,7 +177,7 @@ export function PainelCategorias({
       {
         chave: 'publicados',
         rotulo: 'Publicados',
-        ajuda: 'Negócios ganhos. A meta do RF-REL-03 é 5 por categoria.',
+        ajuda: 'Negócios ganhos. A meta é 5 por categoria.',
         numero: true,
         texto: (l) => formatarInteiro(l.publicados),
       },
@@ -247,9 +247,8 @@ export function PainelCategorias({
       }}
       nota={
         <>
-          A linha <span className="font-medium">quase lá</span> do RF-REL-03 (interessados mais em
-          cadastro) ainda não tem coluna
-          própria: o mais perto que o banco devolve hoje é a contagem de negócios quentes. As
+          A linha <span className="font-medium">quase lá</span> (interessados mais em cadastro)
+          ainda não tem coluna própria: o mais perto que o banco devolve hoje é a contagem de negócios quentes. As
           categorias em <span className="font-medium">Sem alvos</span> só saem do zero quando o
           coletor do Radar estiver ligado ou alguém importar uma lista nova.
         </>

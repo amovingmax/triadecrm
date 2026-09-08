@@ -206,7 +206,7 @@ export const EXPLICACAO_DA_MARCA: Record<string, { rotulo: string; explicacao: s
   suprimido: {
     rotulo: 'Pediu para não ser contatado',
     explicacao:
-      'Este contato está na lista de supressão (RF-ADM-04). Não pode virar alvo, em nenhum modo.',
+      'Este contato está na lista de supressão. Não pode virar alvo, em nenhum modo.',
   },
 };
 

@@ -144,17 +144,20 @@ function CampoBusca({
     return () => window.clearTimeout(relogio);
   }, [texto, aoMudar]);
 
-  // Duas coisas ficam permanentes em volta do campo, e nenhuma delas no placeholder,
-  // que some na primeira tecla: o RÓTULO em cima (quem volta da ficha com a busca já
-  // preenchida precisa saber o que aquele texto é) e a lista de formatos aceitos
-  // embaixo (RF-BAS-12), ligada ao campo por aria-describedby. Sem placeholder, para
-  // não escrever "buscar" duas vezes no mesmo palmo de tela.
+  // O campo ocupava três linhas — rótulo, caixa e lista de formatos aceitos — para
+  // fazer uma pergunta só, e as duas linhas de cinza em volta eram metade da poluição
+  // do topo desta tela. Agora a lista de formatos é o próprio placeholder e o rótulo
+  // é de leitor de tela. O que se perdeu com isso: o placeholder some na primeira
+  // tecla. O que não se perdeu: `aria-describedby` continua apontando para a lista,
+  // que segue no documento, e quem volta da ficha com a busca preenchida lê o nome
+  // que digitou dentro de um campo com lupa — não precisa de rótulo para saber que
+  // aquilo é uma busca.
   return (
     // Largura máxima no desktop: um campo de 1.500px de largura para digitar um nome
     // não ajuda ninguém a mirar. `max-w-sm` (e não `xl`) porque a busca agora divide a
     // linha com os filtros: o campo pede a largura de um nome, não a da tela.
     <div className="md:w-full md:max-w-sm md:shrink-0">
-      <label htmlFor={id} className="mb-1 block text-xs font-medium text-foreground">
+      <label htmlFor={id} className="sr-only">
         Buscar parceiro
       </label>
       <div className="relative">
@@ -168,6 +171,7 @@ function CampoBusca({
           inputMode="search"
           autoComplete="off"
           enterKeyHint="search"
+          placeholder="Nome, telefone, @instagram, CNPJ ou bairro"
           aria-describedby={`${id}-dica`}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
@@ -186,7 +190,7 @@ function CampoBusca({
           </Button>
         ) : null}
       </div>
-      <p id={`${id}-dica`} className="mt-1 text-xs text-muted-foreground">
+      <p id={`${id}-dica`} className="sr-only">
         Nome, telefone, @instagram, CNPJ ou bairro.
       </p>
     </div>

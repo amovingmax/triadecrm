@@ -267,7 +267,7 @@ function Audio({ mensagem }: { mensagem: MensagemDoFio }) {
       ) : (
         <p className="text-xs leading-relaxed text-muted-foreground">
           Sem transcrição: quem transcreve é o faster-whisper na máquina de Natal
-          (RF-CON-27), e ele ainda não roda.
+         , e ele ainda não roda.
         </p>
       )}
     </div>

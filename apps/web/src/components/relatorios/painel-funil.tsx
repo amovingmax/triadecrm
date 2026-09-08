@@ -223,7 +223,7 @@ export function PainelFunil({ painel, periodo }: { painel: DefinicaoPainel; peri
       }}
       nota={
         <>
-          Duas coisas do RF-REL-02 e do RF-REL-04 ainda não cabem nesta tabela porque não
+          Duas coisas ainda não cabem nesta tabela porque não
           existem no banco: o corte por canal do primeiro contato, que depende do WhatsApp
           oficial estar ligado, e os motivos de perda com as objeções mais citadas, que
           dependem de uma consulta própria sobre <span className="numerico">lost_reasons</span>.

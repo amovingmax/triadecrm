@@ -190,7 +190,7 @@ function Corpo({
       <Campo
         rotulo="Onde você achou"
         erro={form.formState.errors.fonteId?.message}
-        dica="A fonte fica gravada em cada dado (RF-BAS-10). Indicação e contato pessoal entram como prioridade A+."
+        dica="A fonte fica gravada em cada dado. Indicação e contato pessoal entram como prioridade A+."
       >
         {(id, invalido) => (
           <Controller

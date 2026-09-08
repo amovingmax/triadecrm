@@ -536,7 +536,7 @@ function SecaoAuditoria({
       <section className="flex flex-col gap-3">
         <CabecalhoDeSecao
           titulo="Auditoria"
-          descricao="Quem alterou o quê, em qual registro e quando (RF-ADM-03)."
+          descricao="Quem alterou o quê, em qual registro e quando."
         />
         <PainelRestrito registro="O registro de auditoria" />
       </section>

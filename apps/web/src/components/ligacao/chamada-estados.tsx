@@ -37,7 +37,7 @@ export function EsqueletoDaChamada() {
       </div>
 
       <div className="flex flex-col gap-4">
-        <Skeleton className="h-8 w-full max-w-2xl" />
+        <Skeleton className="h-8 mx-auto w-full max-w-2xl" />
         <Skeleton className="h-8 w-4/5 max-w-xl" />
         <div className="grid gap-2 sm:grid-cols-2">
           {Array.from({ length: 4 }, (_, i) => (

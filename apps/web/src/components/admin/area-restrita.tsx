@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
  */
 export function AreaRestrita({ papel }: { papel: AppRole }) {
   return (
-    <section className="flex w-full max-w-2xl flex-col gap-4">
+    <section className="flex mx-auto w-full max-w-2xl flex-col gap-4">
       <header className="flex flex-col gap-2">
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Admin</h1>
         <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
