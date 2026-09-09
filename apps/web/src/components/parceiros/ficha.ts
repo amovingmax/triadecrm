@@ -30,6 +30,14 @@ export type Ficha = {
   id: string;
   nome: string;
   razaoSocial: string | null;
+  /**
+   * Os ids de cidade e de categoria primária existem só para a folha de edição:
+   * a tela de leitura mostra os NOMES. Sem eles, abrir "Editar ficha" com a
+   * cidade já escolhida obrigaria a casar por nome — e dois municípios do RN
+   * com o mesmo nome fariam a escolha errada em silêncio.
+   */
+  cidadeId: number | null;
+  categoriaId: number | null;
   tipo: OrgKind;
   cnpj: string | null;
   telefone: string | null;
@@ -69,7 +77,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     // Uma string literal só: o supabase-js deduz o tipo do retorno a partir dela, e
     // uma concatenação em tempo de execução apagaria essa dedução.
     .select(
-      'id, name, legal_name, kind, cnpj, phone_e164, phone_is_masked, email, instagram_handle, website, city_name, neighborhood, address, temperature, temperature_override, temperature_override_reason, owner_id, source_id, source_url, collected_at, collector, is_natural_person, vip, do_not_contact, description, primary_category_name',
+      'id, name, legal_name, kind, cnpj, phone_e164, phone_is_masked, email, instagram_handle, website, city_id, city_name, neighborhood, address, temperature, temperature_override, temperature_override_reason, owner_id, source_id, source_url, collected_at, collector, is_natural_person, vip, do_not_contact, description, primary_category_name',
     )
     .eq('id', id)
     .maybeSingle();
@@ -89,7 +97,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
   const [categorias, negocios, origem, time] = await Promise.all([
     supabase
       .from('organization_categories')
-      .select('is_primary, categories(name)')
+      .select('is_primary, category_id, categories(name)')
       .eq('organization_id', id),
     supabase
       .from('deals')
@@ -129,6 +137,9 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     id: org.id,
     nome: org.name,
     razaoSocial: org.legal_name,
+    cidadeId: org.city_id,
+    categoriaId:
+      (categorias.data ?? []).find((c) => c.is_primary)?.category_id ?? null,
     tipo: org.kind,
     cnpj: org.cnpj,
     telefone: org.phone_e164,

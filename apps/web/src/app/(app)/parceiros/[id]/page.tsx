@@ -26,6 +26,8 @@ import {
 } from '@/components/parceiros/ficha';
 import { formatarData, formatarLocal, ROTULO_TIPO } from '@/components/parceiros/formatos';
 import { ProximaAcao } from '@/components/parceiros/proxima-acao';
+import { carregarCatalogos } from '@/components/parceiros/catalogos';
+import { FolhaEditarFicha } from '@/components/parceiros/folha-editar-ficha';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { PainelPreCadastro } from '@/components/precadastro/painel-precadastro';
 import { requireSession } from '@/lib/auth/session';
@@ -87,7 +89,15 @@ export async function generateMetadata({
  */
 export default async function Pagina({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [ficha, sessao] = await Promise.all([carregarFicha(id), requireSession()]);
+  // Os catálogos vêm junto, na mesma ida: a folha de edição precisa das 19
+  // categorias e das 22 cidades para montar os dois seletores, e buscá-los só ao
+  // abrir a folha deixaria os campos vazios por meio segundo — tempo suficiente
+  // para alguém salvar sem cidade achando que a ficha não tinha uma.
+  const [ficha, sessao, catalogos] = await Promise.all([
+    carregarFicha(id),
+    requireSession(),
+    carregarCatalogos(),
+  ]);
   if (!ficha) notFound();
 
   const principal = ficha.negocios.find((n) => n.status === 'open') ?? ficha.negocios[0] ?? null;
@@ -232,6 +242,32 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
               Ver no funil
             </Link>
           </Button>
+        ) : null}
+
+        {/* Editar fica com quem escreve, pelo mesmo motivo de "Registrar contato":
+            o gatilho `INSTEAD OF` da view recusaria a gravação com `app.can_write()`
+            no fim, depois de a pessoa ter preenchido o formulário inteiro. Quem só
+            lê continua vendo a ficha, e não vê um botão que sempre erra. */}
+        {podeEscrever ? (
+          <FolhaEditarFicha
+            catalogos={catalogos}
+            ficha={{
+              id: ficha.id,
+              name: ficha.nome,
+              legalName: ficha.razaoSocial,
+              telefone: ficha.telefone,
+              telefoneMascarado: ficha.telefoneMascarado,
+              email: ficha.email,
+              instagram: ficha.instagram,
+              site: ficha.site,
+              cnpj: ficha.cnpj,
+              bairro: ficha.bairro,
+              endereco: ficha.endereco,
+              descricao: ficha.descricao,
+              cidadeId: ficha.cidadeId,
+              categoriaId: ficha.categoriaId,
+            }}
+          />
         ) : null}
       </nav>
 
