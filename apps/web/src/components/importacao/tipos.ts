@@ -111,6 +111,15 @@ export type PlanilhaLida = {
   linhas: string[][];
   /** Linhas que existiam no arquivo e foram cortadas pelo teto de leitura. */
   cortadas: number;
+  /**
+   * Linhas ignoradas ANTES do cabeçalho — o título que quase toda planilha tem
+   * na primeira linha. Zero na maioria dos arquivos.
+   *
+   * A tela precisa disto para dizer o que fez: pular linha em silêncio é como
+   * a pessoa passa vinte minutos procurando uma coluna que o CRM decidiu que
+   * não existia.
+   */
+  tituloIgnorado: string[];
 };
 
 /** Mapa coluna → campo. O índice é a posição da coluna no cabeçalho. */

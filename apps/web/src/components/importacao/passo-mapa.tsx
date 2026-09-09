@@ -81,6 +81,20 @@ export function PassoMapa({
             {planilha.linhas.length === 1 ? 'linha' : 'linhas'} ·{' '}
             <span className="numerico">{planilha.cabecalho.length}</span> colunas
           </p>
+          {/* Pular linha em silêncio é como a pessoa passa vinte minutos procurando
+              uma coluna que o CRM decidiu que não existia. Se o título foi ignorado,
+              a tela mostra QUAL — quem conferir vê na hora se o palpite foi bom. */}
+          {planilha.tituloIgnorado.length > 0 ? (
+            <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+              {planilha.tituloIgnorado.length === 1
+                ? 'A primeira linha foi lida como título e não como cabeçalho:'
+                : 'As primeiras linhas foram lidas como título e não como cabeçalho:'}{' '}
+              <span className="text-foreground">
+                {planilha.tituloIgnorado.map((l) => `“${l}”`).join('; ')}
+              </span>
+              . O cabeçalho é a primeira linha com duas ou mais células preenchidas.
+            </p>
+          ) : null}
         </div>
         {pendentes.length > 0 ? (
           <Badge variant="destructive" className="h-auto py-1">

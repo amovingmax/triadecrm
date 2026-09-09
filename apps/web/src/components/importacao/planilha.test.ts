@@ -169,3 +169,61 @@ describe('escolha do leitor pela extensão', () => {
     expect(doCsv.linhas).toEqual(doXlsx.linhas);
   });
 });
+
+describe('título antes do cabeçalho', () => {
+  /**
+   * O caso real que quebrou: a planilha de fornecedores da Komune abre com um
+   * título mesclado na linha 1 e o cabeçalho de verdade na linha 2. Célula
+   * mesclada grava só na primeira posição, então a linha do título lê como UMA
+   * coluna — e a leitura antiga a adotava, cortando as seis colunas de dados
+   * para uma. A tela dizia "104 linhas · 1 colunas".
+   */
+  const comTitulo = [
+    'FORNECEDORES PARA EVENTOS — NATAL/RN (levantamento julho/2026);;;;;',
+    'Categoria;Fornecedor;Serviços oferecidos;Telefone / Contato;Endereço / Bairro;Avaliação Google',
+    'Espaço e estrutura básica;Chácara Alvorada;Chácara para eventos com piscina;(84) 92172-1371;R. Eng. João Hélio Alves Rocha - Planalto, Natal;4,5',
+    'Espaço e estrutura básica;Lótus Recepções;Casa de recepção com área verde;(84) 98807-3100;Av. Tropical, 170 - Pitimbu, Natal;4,9',
+  ].join('\r\n');
+
+  it('pula o título e adota a linha de baixo como cabeçalho', () => {
+    const planilha = lerCsv(comTitulo, 'fornecedores.csv');
+    expect(planilha.cabecalho).toEqual([
+      'Categoria',
+      'Fornecedor',
+      'Serviços oferecidos',
+      'Telefone / Contato',
+      'Endereço / Bairro',
+      'Avaliação Google',
+    ]);
+  });
+
+  it('e as linhas de dados chegam inteiras, não cortadas a uma coluna', () => {
+    const planilha = lerCsv(comTitulo, 'fornecedores.csv');
+    expect(planilha.linhas).toHaveLength(2);
+    expect(planilha.linhas[0]).toHaveLength(6);
+    expect(planilha.linhas[0]?.[3]).toBe('(84) 92172-1371');
+  });
+
+  it('diz QUAL título ignorou, para a pessoa conferir o palpite', () => {
+    const planilha = lerCsv(comTitulo, 'fornecedores.csv');
+    expect(planilha.tituloIgnorado).toEqual([
+      'FORNECEDORES PARA EVENTOS — NATAL/RN (levantamento julho/2026)',
+    ]);
+  });
+
+  it('planilha sem título não ignora nada', () => {
+    const planilha = lerCsv('Nome;Telefone\r\nBuffet Sabor;84999990001', 'simples.csv');
+    expect(planilha.cabecalho).toEqual(['Nome', 'Telefone']);
+    expect(planilha.tituloIgnorado).toEqual([]);
+    expect(planilha.linhas).toHaveLength(1);
+  });
+
+  it('lista de uma coluna só continua funcionando: nada tem duas células, e a regra antiga vale', () => {
+    // Sem esta exceção, uma planilha legítima de uma coluna perderia o cabeçalho
+    // e a primeira ficha viraria o nome da coluna.
+    const planilha = lerCsv('Nome\r\nBuffet Sabor\r\nMesas & Cia', 'lista.csv');
+    expect(planilha.cabecalho).toEqual(['Nome']);
+    expect(planilha.tituloIgnorado).toEqual([]);
+    expect(planilha.linhas).toHaveLength(2);
+  });
+});

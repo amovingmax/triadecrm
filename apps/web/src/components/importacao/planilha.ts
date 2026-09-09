@@ -371,23 +371,69 @@ function vazia(linha: string[]): boolean {
   return linha.every((c) => c.trim() === '');
 }
 
+function preenchidas(linha: string[]): number {
+  return linha.filter((c) => c.trim() !== '').length;
+}
+
 /**
- * Primeira linha não vazia vira cabeçalho; o resto vira dados.
+ * Acha o cabeçalho, pulando o título que quase toda planilha tem em cima.
  *
- * Uma linha em branco NO MEIO não encerra a leitura (é comum a equipe separar
- * blocos com uma linha vazia), mas também não vira ficha vazia: some.
+ * ---------------------------------------------------------------------------
+ * POR QUE NÃO É "A PRIMEIRA LINHA NÃO VAZIA"
+ * ---------------------------------------------------------------------------
+ * Era. E quebrou no primeiro arquivo real: a planilha de fornecedores da Komune
+ * abre com
+ *
+ *     A1: FORNECEDORES PARA EVENTOS — NATAL/RN (levantamento julho/2026, ...)
+ *     A2: Categoria | Fornecedor | Serviços | Telefone | Endereço | Avaliação
+ *
+ * O título está numa célula mesclada, e célula mesclada grava só na primeira
+ * posição — as outras vêm vazias. Então a linha 1 lida como "uma coluna", o CRM
+ * a adotou como cabeçalho, e `l.slice(0, cabecalho.length)` cortou as seis
+ * colunas de dados para uma. A tela disse "104 linhas · 1 colunas" e passou a
+ * exigir Categoria e Origem — que estavam ali, na linha logo abaixo.
+ *
+ * A REGRA: o cabeçalho é a primeira linha com DUAS OU MAIS células preenchidas.
+ * Um título ocupa uma; um cabeçalho de verdade, não. É a distinção mais barata
+ * que separa os dois casos sem pedir nada à pessoa.
+ *
+ * A EXCEÇÃO: planilha de uma coluna só (uma lista de nomes) existe e é legítima
+ * — nela nenhuma linha tem duas células. Aí vale a regra antiga, a primeira não
+ * vazia, e nada é pulado.
+ *
+ * O que NÃO fazemos aqui: adivinhar mais que isso. Nada de reconhecer nome de
+ * coluna, contar tipo de dado ou olhar formatação. Quanto mais esperto o palpite,
+ * mais difícil para a pessoa entender por que o CRM escolheu a linha errada — e
+ * é por isso que o que foi pulado sobe para a tela, em vez de sumir.
  */
 function montar(bruto: string[][], aba: string, abas: string[]): PlanilhaLida {
-  const primeira = bruto.findIndex((l) => !vazia(l));
-  const titulos = primeira === -1 ? undefined : bruto[primeira];
-  if (titulos === undefined) {
-    return { aba, abas, cabecalho: [], linhas: [], cortadas: 0 };
+  const naoVazias = bruto
+    .map((linha, i) => ({ linha, i }))
+    .filter(({ linha }) => !vazia(linha));
+
+  if (naoVazias.length === 0) {
+    return { aba, abas, cabecalho: [], linhas: [], cortadas: 0, tituloIgnorado: [] };
   }
 
-  const cabecalho = titulos.map((c) => c.trim());
+  // `naoVazias[0]` existe: o `length === 0` acima já saiu. O TypeScript não sabe
+  // disso com `noUncheckedIndexedAccess`, e a alternativa seria um `!` — que
+  // silencia o compilador sem provar nada.
+  const primeira = naoVazias[0];
+  if (primeira === undefined) {
+    return { aba, abas, cabecalho: [], linhas: [], cortadas: 0, tituloIgnorado: [] };
+  }
+  const escolhida = naoVazias.find(({ linha }) => preenchidas(linha) >= 2) ?? primeira;
+
+  // O que ficou para trás vira texto para a tela mostrar, e não um número solto:
+  // "ignorei 1 linha" não deixa ninguém conferir se o CRM ignorou a linha certa.
+  const tituloIgnorado = naoVazias
+    .filter(({ i }) => i < escolhida.i)
+    .map(({ linha }) => linha.filter((c) => c.trim() !== '').join(' · '));
+
+  const cabecalho = escolhida.linha.map((c) => c.trim());
   while (cabecalho.length > 0 && cabecalho[cabecalho.length - 1] === '') cabecalho.pop();
 
-  const corpo = bruto.slice(primeira + 1).filter((l) => !vazia(l));
+  const corpo = bruto.slice(escolhida.i + 1).filter((l) => !vazia(l));
   const cortadas = Math.max(0, corpo.length - TETO_DE_LINHAS);
   const linhas = corpo.slice(0, TETO_DE_LINHAS).map((l) => {
     const igual = l.slice(0, cabecalho.length).map((c) => c.trim());
@@ -395,7 +441,7 @@ function montar(bruto: string[][], aba: string, abas: string[]): PlanilhaLida {
     return igual;
   });
 
-  return { aba, abas, cabecalho, linhas, cortadas };
+  return { aba, abas, cabecalho, linhas, cortadas, tituloIgnorado };
 }
 
 /** Escolhe o leitor pelo nome do arquivo. */
