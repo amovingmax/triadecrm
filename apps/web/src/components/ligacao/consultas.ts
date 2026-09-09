@@ -375,6 +375,24 @@ const resultadoDaMontagemSchema = z.discriminatedUnion('montado', [
     excluidos: z.record(z.string(), z.number().int()),
     roteiro_id: z.uuid(),
     roteiro_versao: z.number().int(),
+    // O período do lote, que a montagem DECIDE e que ninguém via.
+    //
+    // `montar_lote` trata `p_termina_em` como piso, não como pedido: um lote de três
+    // tentativas precisa de três dias abertos, então "vale só hoje" vira "vale até
+    // 10/09" — e os contatos ficam reservados esse tempo todo, fora da montagem do
+    // resto do time, com o encerramento do lote como única forma de devolvê-los.
+    // A decisão está certa (encurtar seria prometer três tentativas e entregar uma);
+    // o silêncio é que não estava. Ver o cabeçalho §3.12c da migração 20260905000801.
+    //
+    // Os cinco são opcionais de propósito: eles apenas DESCREVEM o lote, e um banco
+    // uma migração atrás faria o `safeParse` falhar num lote que ACABOU de reservar
+    // 25 contatos — a tela diria "o servidor não respondeu" e perderia o `lote_id`.
+    // Quem decide se o lote existe é `montado` e `lote_id`, e esses seguem estritos.
+    max_tentativas: z.number().int().nullish(),
+    inicia_em: z.string().nullish(),
+    termina_em: z.string().nullish(),
+    termina_em_pedido: z.string().nullish(),
+    prazo_esticado: z.boolean().nullish(),
   }),
   z.object({
     montado: z.literal(false),
@@ -391,6 +409,11 @@ export const MENSAGENS_DE_RECUSA_DA_MONTAGEM: Record<string, string> = {
   tamanho_invalido: 'O tamanho do lote precisa ficar entre 1 e 60 contatos.',
   funil_invalido: 'Esse funil não existe mais. Recarregue a tela e escolha de novo.',
   roteiro_invalido: 'Esse roteiro não está publicado. Escolha outro.',
+  // `montar_lote` recusa antes de criar o lote quando ninguém do recorte é elegível
+  // (D7). Sem esta linha, a recusa mais frequente do fim do dia caía na frase genérica
+  // "confira os campos", que manda mexer justamente no que não está errado.
+  sem_candidatos:
+    'Ninguém desse recorte pode entrar num lote agora. Troque a temperatura, tire uma categoria, ou encerre um lote para devolver contatos à base.',
 };
 
 export function mensagemDaRecusaDaMontagem(motivo: string): string {

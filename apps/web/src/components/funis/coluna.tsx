@@ -68,6 +68,7 @@ export function ContagemDaEtapa({ total, className }: { total: number; className
 export function Coluna({
   etapa,
   arrastando,
+  podeMover,
   carregandoMais,
   aoCarregarMais,
   children,
@@ -75,6 +76,12 @@ export function Coluna({
   etapa: EtapaQuadro;
   /** Há um cartão em voo em algum lugar do quadro: acende as bordas dos alvos. */
   arrastando: boolean;
+  /**
+   * `app.can_write()`. A coluna vazia não pode convidar quem não move a arrastar um
+   * cartão: para `leitura` e `financeiro` o gesto não existe, e a frase diria o que a
+   * pessoa não consegue fazer.
+   */
+  podeMover: boolean;
   carregandoMais: boolean;
   aoCarregarMais: () => void;
   children: React.ReactNode;
@@ -112,9 +119,11 @@ export function Coluna({
 
         {etapa.total === 0 ? (
           <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-            {etapaEhDeSaida(etapa)
-              ? 'Nada aqui. Encerra-se um negócio arrastando o cartão para esta etapa.'
-              : 'Nada aqui. Arraste um cartão de outra etapa para começar.'}
+            {!podeMover
+              ? 'Nada aqui.'
+              : etapaEhDeSaida(etapa)
+                ? 'Nada aqui. Encerra-se um negócio arrastando o cartão para esta etapa.'
+                : 'Nada aqui. Arraste um cartão de outra etapa para começar.'}
           </p>
         ) : null}
 

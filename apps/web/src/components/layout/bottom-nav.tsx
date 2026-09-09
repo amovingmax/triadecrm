@@ -18,9 +18,21 @@ import { estaAtivo, navegacaoPara } from '@/lib/navegacao';
 import { cn } from '@/lib/utils';
 
 /**
- * Barra inferior do celular (até md): os 4 módulos de uso diário mais "Mais", que
- * abre o resto numa folha. É a navegação de campo, a um polegar de distância
- * (PRD §8): Meu dia, Parceiros, Funis e Conversas.
+ * Barra inferior do celular (até md): os módulos de uso diário mais "Mais", que abre
+ * o resto numa folha. É a navegação de campo, a um polegar de distância (PRD §8):
+ * Meu dia, Registrar, Parceiros, Funis e Conversas.
+ *
+ * Eram quatro até "Registrar" entrar. Ela é a única tela em que o trabalho de campo
+ * VIRA dado (temperatura, próxima ação e meta saem de lá), e estava fora da
+ * navegação inteira: chegava-se a ela por link de outro módulo ou pelo estado vazio
+ * do Meu dia, que só aparece quando não há o que registrar. Uma tela de campo que só
+ * se alcança de dentro de outra tela não é de campo.
+ *
+ * Cinco itens mais "Mais" são seis fatias de `flex-1`. Em 390px isso dá 65px por
+ * fatia, ainda acima do alvo de 44px, e os rótulos mais longos ("Parceiros",
+ * "Conversas") ficam no limite do `truncate`. A fusão dos 12 módulos em 6 é a tarefa
+ * que resolve isso de verdade; até lá, seis fatias é o preço de a tela de registro
+ * existir na navegação, e é mais barato que a ausência dela.
  *
  * A base é a da casca (a mesma da lateral do desktop: #e0f2fe no claro, #1e293b no
  * escuro), com desfoque e hairline em cima. Os 64px de altura são deliberados e
@@ -70,9 +82,14 @@ export function BottomNav({ papel }: { papel: AppRole }) {
             <span>Mais</span>
           </SheetTrigger>
 
+          {/* Teto de 80svh com rolagem própria: a folha é `h-auto` e cresce com o
+              conteúdo. Desde que cada linha passou a trazer a descrição do módulo,
+              oito módulos secundários passam de 500px, e num aparelho de 667px de
+              altura a folha sairia pelo topo levando junto os últimos itens. `svh`
+              e não `vh` porque a barra do navegador do celular entra na conta. */}
           <SheetContent
             side="bottom"
-            className="gap-3 rounded-t-xl pb-[calc(var(--area-segura-inferior)+0.75rem)]"
+            className="max-h-[80svh] gap-3 overflow-y-auto rounded-t-xl pb-[calc(var(--area-segura-inferior)+0.75rem)]"
           >
             <SheetHeader className="pb-1">
               <SheetTitle>Mais áreas</SheetTitle>

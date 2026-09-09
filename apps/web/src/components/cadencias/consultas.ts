@@ -3,9 +3,15 @@
 import { createClient } from '@/lib/supabase/client';
 
 import {
+  listaParaCadenciaSchema,
+  matriculaSchema,
+  portaDoNegocioSchema,
   resumoSchema,
   visaoSchema,
+  type ListaParaCadencia,
   type Momento,
+  type PortaDoNegocio,
+  type ResultadoDaMatricula,
   type ResumoDoDia,
   type VisaoDasCadencias,
 } from './tipos';
@@ -107,4 +113,68 @@ export function mensagemDoErro(erro: unknown): string {
     return 'O banco respondeu num formato que esta tela não reconhece. Avise no grupo do time.';
   }
   return 'O servidor não respondeu como esperado.';
+}
+
+// ---------------------------------------------------------------------------
+// A porta de entrada
+// ---------------------------------------------------------------------------
+
+/**
+ * As três chamadas que abrem a régua para alguém.
+ *
+ * `cadencias_do_negocio` e `negocios_para_cadencia` são leitura pura: perguntam ao
+ * mesmo guarda que a gravação consulta (`app.recusa_de_matricula`) o que ele
+ * responderia, sem escrever nada. `matricular_em_cadencia` é a única que grava — e é
+ * ela que existe no banco desde 04/09 sem ninguém chamar.
+ */
+
+/**
+ * Chave de cache da porta de um negócio. Vive pouco de propósito: um toque pendente
+ * que nasce em outra aba muda a resposta, e uma lista velha ofereceria justamente o
+ * que o banco acabou de fechar.
+ */
+export function chaveDaPortaDoNegocio(dealId: string) {
+  return ['cadencias', 'porta', dealId] as const;
+}
+
+export function chaveDosNegociosDaCadencia(slug: string, busca: string) {
+  return ['cadencias', 'elegiveis', slug, busca.trim()] as const;
+}
+
+export async function buscarPortaDoNegocio(dealId: string): Promise<PortaDoNegocio> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('cadencias_do_negocio', { p_deal_id: dealId });
+  if (error) throw new ErroDasCadencias(error.message, error.code);
+  return portaDoNegocioSchema.parse(data);
+}
+
+export async function buscarNegociosDaCadencia(
+  slug: string,
+  busca: string,
+): Promise<ListaParaCadencia> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('negocios_para_cadencia', {
+    p_cadence_slug: slug,
+    p_q: busca.trim() || undefined,
+    p_limit: 20,
+  });
+  if (error) throw new ErroDasCadencias(error.message, error.code);
+  return listaParaCadenciaSchema.parse(data);
+}
+
+export async function matricular(pedido: {
+  organizationId: string;
+  slug: string;
+  gancho?: string | null;
+  dealId?: string | null;
+}): Promise<ResultadoDaMatricula> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('matricular_em_cadencia', {
+    p_organization_id: pedido.organizationId,
+    p_cadence_slug: pedido.slug,
+    p_gancho: pedido.gancho?.trim() || undefined,
+    p_deal_id: pedido.dealId ?? undefined,
+  });
+  if (error) throw new ErroDasCadencias(error.message, error.code);
+  return matriculaSchema.parse(data);
 }

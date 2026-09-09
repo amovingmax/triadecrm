@@ -128,7 +128,16 @@ export function agruparFila(itens: readonly ItemDoDia[]): BlocoPreenchido[] {
   })).filter((bloco) => bloco.itens.length > 0);
 }
 
-/** Quantos itens são para hoje ou para trás — o número que a pessoa realmente deve. */
+/**
+ * Quantos itens não têm data à frente: o que venceu, o que vence hoje, o negócio sem
+ * próximo passo e o negócio parado na etapa. É o número que a pessoa realmente deve,
+ * e é o do cabeçalho da tela.
+ *
+ * Ele é de propósito MAIOR que o do bloco "Agora", que conta só a primeira das quatro
+ * faixas. Por isso o cabeçalho fala em "pendentes" e não em "para agora": enquanto os
+ * dois se chamavam a mesma coisa, a tela mostrava dois números com o mesmo nome e
+ * contas diferentes, um por cima do outro.
+ */
 export function contarPendentesDeHoje(itens: readonly ItemDoDia[]): number {
   return itens.filter((item) => item.prioridade <= 8).length;
 }
@@ -222,6 +231,44 @@ export const METRICAS_EM_DESTAQUE: readonly string[] = [
   'calls_made',
   'meetings_booked',
 ];
+
+/**
+ * O que cada número quer dizer, em uma linha.
+ *
+ * "Porta batida" e "porta aberta" são jargão de captação: quem entrou no time esta
+ * semana não tem como adivinhar que uma é o esforço e a outra é o resultado, e um
+ * número que a pessoa não sabe ler não é informação, é enfeite. Por isso a definição
+ * vai no cartão, à vista: `title` não existe no celular, que é onde esta tela mais é
+ * usada, e a nota de rodapé nasce fechada — as duas escondem justamente de quem
+ * ainda não sabe.
+ *
+ * Isto NÃO é a regra do número, e não tenta ser: a regra está no Postgres, e chega
+ * escrita em `fonte`, que continua sendo o texto exato para quem precisa do critério
+ * ("máx. 1 por alvo a cada 30 dias" e afins). Aqui é a leitura em português da mesma
+ * regra, e as duas andam juntas — mexeu no catálogo de `goal_progress`, mexe aqui.
+ *
+ * Métrica sem definição no mapa aparece sem a linha, em vez de aparecer com uma
+ * definição inventada.
+ */
+export const DEFINICAO_DA_METRICA: Record<string, string> = {
+  // "Um por alvo, por dia" não é preciosismo de rodapé: sem ele, quem ligou cinco
+  // vezes para o mesmo buffet lê "Portas batidas: 1" ao lado de "Ligações: 5" e
+  // conclui que a tela comeu quatro.
+  doors_knocked: 'Contato registrado. Um por alvo, por dia.',
+  doors_opened: 'Respondeu, e quem falou decide ou influencia.',
+  calls_made: 'Ligações registradas, atendidas ou não.',
+  meetings_booked: 'Negócios que chegaram à etapa de reunião.',
+  meetings_done: 'Reuniões que aconteceram. Furo não conta.',
+  visits_done: 'Visitas registradas em campo.',
+  new_targets: 'Parceiros novos com você como responsável.',
+  pre_registrations: 'Negócios que entraram em "Cadastro em andamento".',
+  published: 'Negócios ganhos no funil de captação.',
+  replies: 'Mensagens que o parceiro respondeu.',
+};
+
+export function definicaoDaMetrica(metrica: string): string | null {
+  return DEFINICAO_DA_METRICA[metrica] ?? null;
+}
 
 export function metricasVisiveis(metricas: readonly MetricaDoDia[]): MetricaDoDia[] {
   return metricas.filter(

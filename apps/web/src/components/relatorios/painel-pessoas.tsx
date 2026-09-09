@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { Settings } from 'lucide-react';
 
 import { ROTULO_PAPEL } from '@/lib/auth/role';
 
@@ -90,7 +92,20 @@ export function PainelPessoas({ painel, periodo }: { painel: DefinicaoPainel; pe
         rotulo: 'Pessoa',
         fixa: true,
         texto: (l) => l.pessoa_nome,
-        celula: (l) => <span className="font-medium">{l.pessoa_nome}</span>,
+        // A linha zerada é a que dá trabalho: para redistribuir carga é preciso ver
+        // a carteira de quem não registrou nada, e ela é um recorte que a lista de
+        // Parceiros já abre — `?responsavel=<uuid>` vira `p_owner_id` em
+        // `search_organizations`, com o mesmo id de `profiles` que
+        // `relatorio_por_responsavel` devolve. Isto não é ranking (RF-MET-09 e
+        // RF-AST-06 proíbem): é o caminho para a carteira, igual em toda linha.
+        celula: (l) => (
+          <Link
+            href={`/parceiros?responsavel=${l.pessoa_id}`}
+            className="font-medium underline-offset-4 hover:underline"
+          >
+            {l.pessoa_nome}
+          </Link>
+        ),
       },
       { chave: 'papel', rotulo: 'Papel', texto: (l) => ROTULO_PAPEL[l.papel] ?? l.papel },
       {
@@ -235,7 +250,16 @@ export function PainelPessoas({ painel, periodo }: { painel: DefinicaoPainel; pe
       resumo={<TirasDeResumo itens={resumo} />}
       vazio={{
         titulo: 'Nenhuma pessoa no relatório',
-        texto: 'Ninguém com papel de campo está cadastrado. Cadastre o time em Administração.',
+        texto: 'Ninguém com papel de campo está cadastrado. O time entra na Administração.',
+        acao: {
+          // A aba vive na URL de propósito (`components/admin/tipos.ts`), então o
+          // botão abre direto em Pessoas em vez de largar quem clicou na primeira
+          // aba para procurar. Quem não é admin nem gestor vê a tela que explica o
+          // que existe aqui e a quem pedir (RF-ADM-01), não um erro de permissão.
+          href: '/admin?aba=pessoas',
+          rotulo: 'Abrir Pessoas na Administração',
+          icone: <Settings aria-hidden="true" />,
+        },
       }}
       nota={
         <>

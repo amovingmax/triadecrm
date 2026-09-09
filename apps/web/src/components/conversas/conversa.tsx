@@ -33,8 +33,9 @@ import { ROTULO_ESTADO_DO_FIO, type DependenciasDaMeta, type ItemConversa } from
  * TRÊS ANDARES, E A ORDEM IMPORTA
  * ===========================================================================
  * 1. **Cabeçalho** — a ficha ao lado da conversa que o RF-CON-05 pede: nome,
- *    temperatura, etapa, responsável, telefone (revelado pela mesma RPC auditada
- *    da ficha) e a próxima ação combinada.
+ *    temperatura, etapa, responsável (dono do negócio) e quem está atendendo o fio
+ *    quando não é a mesma pessoa, telefone (revelado pela mesma RPC auditada da
+ *    ficha) e a próxima ação combinada.
  * 2. **A conversa**, que rola — mensagens, ligações, visitas e mudanças de etapa
  *    na MESMA coluna cronológica.
  * 3. **O rodapé, que não rola** — o relógio da janela de 24 h e, embaixo dele, o
@@ -160,6 +161,23 @@ export function Conversa({
   const onde = local(item.bairro, item.cidade);
   const contagem = contagemDeInteracoes(item.interacoes);
 
+  // DUAS COLUNAS, DUAS PALAVRAS.
+  //
+  // "Responsável" é o dono do NEGÓCIO (`deals.owner_id`) — é por ele que o kanban, a
+  // ficha e o filtro da barra perguntam. "Atendendo" é quem cuida do FIO
+  // (`conversations.assignee_id`), que é outra pessoa toda vez que alguém assume uma
+  // conversa de um negócio que não é seu.
+  //
+  // Um campo só, mostrando ora um ora outro, dizia "Responsável: Heloísa" no
+  // cabeçalho e escondia a mesma conversa quando a Heloísa filtrava "Responsável →
+  // Heloísa": a tela afirmava uma coisa com a palavra que o filtro usava para outra.
+  // Só aparece quando as duas pessoas são diferentes — repetir o mesmo nome em dois
+  // rótulos gastaria uma linha da ficha, que cabe em uma, para não informar nada.
+  const atendendo =
+    fio && fio.responsavelId !== item.responsavelId
+      ? (fio.responsavel ?? 'sem nome na base')
+      : null;
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-col gap-3 border-b border-hairline p-4 md:p-5">
@@ -244,9 +262,8 @@ export function Conversa({
         <dl className="flex max-w-3xl flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <Campo rotulo="Onde">{onde || 'sem endereço na base'}</Campo>
           <Campo rotulo="Categoria">{item.categoria ?? 'sem categoria'}</Campo>
-          <Campo rotulo="Responsável">
-            {fio?.responsavel ?? item.responsavel ?? 'sem dono'}
-          </Campo>
+          <Campo rotulo="Responsável">{item.responsavel ?? 'sem dono'}</Campo>
+          {atendendo ? <Campo rotulo="Atendendo">{atendendo}</Campo> : null}
           <Campo rotulo="Último contato">
             <DiasSemContato dias={item.diasSemContato} atencao={item.precisaAtencao} />
             <span>

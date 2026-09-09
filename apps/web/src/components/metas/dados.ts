@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { isAppRole, type AppRole } from '@/lib/auth/role';
 
 import type { Periodo } from './periodo';
 import type { LinhaProgresso } from './tipos';
@@ -21,6 +22,36 @@ export function chaveDoProgresso(pessoaId: string, periodo: Periodo, inicio: str
 
 /** Prefixo para invalidar tudo depois de salvar ou remover uma meta. */
 export const CHAVE_METAS = ['metas'] as const;
+
+/**
+ * Chave dos papéis do time. FORA de `CHAVE_METAS` de propósito: salvar uma meta
+ * invalida `['metas']` inteiro, e papel não muda porque alguém definiu um alvo.
+ */
+export const CHAVE_PAPEIS = ['time', 'papeis'] as const;
+
+/**
+ * O papel de cada pessoa do time, lido do diretório do próprio banco.
+ *
+ * `public.team_directory` é a view sem PII que todo autenticado enxerga — a mesma
+ * que a página usa para montar a lista de nomes. A tela precisa do papel para uma
+ * coisa só: dizer, no cartão de quem é `leitura`, `financeiro` ou `bot`, por que o
+ * realizado vai ficar em zero (`porQueFicaEmZero`). Ler o papel do banco em vez de
+ * receber de fora é o que impede a tela de decidir por conta própria quem trabalha.
+ *
+ * Falha aqui não derruba nada: quem chama trata o mapa ausente como "não sei o
+ * papel" e não mostra aviso nenhum — a tela de metas continua inteira sem isto.
+ */
+export async function buscarPapeisDoTime(): Promise<Record<string, AppRole>> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from('team_directory').select('id, role');
+  if (error) throw new Error(error.message);
+
+  const papeis: Record<string, AppRole> = {};
+  for (const linha of data ?? []) {
+    if (linha.id && isAppRole(linha.role)) papeis[linha.id] = linha.role;
+  }
+  return papeis;
+}
 
 export async function buscarProgresso(
   pessoaId: string,

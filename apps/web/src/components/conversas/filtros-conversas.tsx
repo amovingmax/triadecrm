@@ -61,10 +61,17 @@ export function FiltrosDaConversa({
 
       <div className="flex min-w-0 flex-col gap-2 md:flex-1 md:flex-row md:items-center md:gap-2">
         <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] md:mx-0 md:flex-wrap md:px-0 md:pb-0 md:[mask-image:none]">
+          {/* Este filtro pergunta por QUALQUER laço da pessoa com o parceiro: dono do
+              negócio, quem atende o fio de WhatsApp e quem registrou algum contato.
+              É de propósito mais largo que o campo "Responsável" do cabeçalho da
+              conversa, que mostra só o dono do negócio — quem filtra por si mesma
+              está perguntando "o que é meu?", e uma conversa que ela mesma atende não
+              pode ficar de fora da resposta. O gatilho só cabe com uma palavra, então
+              são a lista e o `aria` que dizem os três laços. */}
           <Filtro
             rotulo="Responsável"
-            todos="Todos os responsáveis"
-            aria="Filtrar por responsável"
+            todos="Qualquer pessoa do time"
+            aria="Filtrar por responsável: dono do negócio, quem atende a conversa ou quem registrou contato"
             valor={filtros.responsavelId}
             opcoes={pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
             aoMudar={(v) => aoMudar({ responsavelId: v })}

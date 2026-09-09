@@ -192,8 +192,28 @@ export function CartaoCompromisso({
             {/* Só onde há hora combinada de verdade. Pôr no calendário uma tarefa
                 "Marcar apresentação", cuja hora é prazo calculado e não hora
                 combinada com ninguém, encheria a agenda de compromissos falsos —
-                é a mesma distinção que o cabeçalho de `tipos.ts` protege. */}
-            {temHora || ehVisita ? <BotaoDoGoogle compromisso={compromisso} /> : null}
+                é a mesma distinção que o cabeçalho de `tipos.ts` protege.
+
+                A visita entra nessa conta, e é por isso que o `|| ehVisita` que
+                estava aqui saiu: a `visit` de D+7 nasce às 09:00 pela régua do
+                catálogo, e ninguém combinou 09:00 com o fornecedor. Uma terça com
+                cinco visitas virava cinco blocos de uma hora empilhados no mesmo
+                horário do Google Agenda de quem clicasse — e quem deixa de confiar
+                na agenda fica sem a única visão de agenda que tem. A aba Rota já
+                diz, na nota do rodapé, que bloco de visita no Google está fora do
+                MVP; era este botão que a desmentia.
+
+                Para a visita entrar aqui um dia falta o passo que não existe: uma
+                folha "a que horas você vai?" que grave o `due_at` da tarefa ANTES
+                de criar o evento. Enquanto ela não existe, é melhor não ter botão
+                do que ter um que inventa horário.
+
+                A segunda condição não é sobra: a visita que JÁ tem espelho no
+                Google (criada antes desta correção) continua com o botão, e nesse
+                estado ele não cria nada — abre o evento e oferece "Tirar da
+                agenda". Sem ela, esses eventos ficariam órfãos no calendário, sem
+                nenhum lugar no CRM de onde apagá-los. */}
+            {temHora || compromisso.google ? <BotaoDoGoogle compromisso={compromisso} /> : null}
           </div>
         )}
       </div>

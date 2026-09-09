@@ -7,7 +7,13 @@ import { Button } from '@/components/ui/button';
 
 import { baixarCsv, montarCsv, nomeDoArquivo } from './csv';
 import { mensagemDoErro } from './dados';
-import { ErroDoRelatorio, EsqueletoRelatorio, NotaDeAlcance, VazioDoRelatorio } from './estados';
+import {
+  ErroDoRelatorio,
+  EsqueletoRelatorio,
+  NotaDeAlcance,
+  VazioDoRelatorio,
+  type AcaoDoVazio,
+} from './estados';
 import type { Periodo } from './periodo';
 import { TabelaRelatorio } from './tabela';
 import type { Coluna, DefinicaoPainel } from './tipos';
@@ -61,7 +67,12 @@ export function QuadroPainel<L>({
   resumo?: ReactNode;
   /** O que esta leitura ainda não alcança, e do que depende. */
   nota?: ReactNode;
-  vazio?: { titulo: string; texto: string };
+  /**
+   * O vazio deste painel. `acao` só entra quando existe uma tela que resolve o vazio
+   * — o painel que não tem para onde mandar continua dizendo só o motivo, que é
+   * melhor que apontar para o lugar errado.
+   */
+  vazio?: { titulo: string; texto: ReactNode; acao?: AcaoDoVazio };
   colunasNoEsqueleto?: number;
 }) {
   const temLinhas = linhas.length > 0;
@@ -133,6 +144,7 @@ export function QuadroPainel<L>({
               vazio?.texto ??
               'Nenhum registro entrou nas datas escolhidas. Amplie o período ou confira se o time registrou os contatos do dia.'
             }
+            acao={vazio?.acao}
           />
         )}
       </div>

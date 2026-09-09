@@ -36,6 +36,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
+import { usePapel } from '@/components/cadencias/usar-papel';
 
 import {
   chaveDoQuadro,
@@ -64,6 +65,11 @@ import { useTelaPequena } from './usar-tela-pequena';
 export function TelaFunis({ filtrosIniciais }: { filtrosIniciais: FiltrosQuadro }) {
   const pequena = useTelaPequena();
   const cliente = useQueryClient();
+  // Quem move é `app.can_write()`, e quem responde isso é o banco. Sem esta pergunta o
+  // quadro era arrastável para `leitura` e `financeiro`, que o `move_deal` recusa
+  // antes de olhar qualquer dado — e a recusa falava de "carteira", que não é o
+  // problema deles.
+  const papel = usePapel();
   const [filtros, setFiltros] = useState<FiltrosQuadro>(filtrosIniciais);
   const [alvo, setAlvo] = useState<AlvoDeMovimento | null>(null);
 
@@ -125,6 +131,10 @@ export function TelaFunis({ filtrosIniciais }: { filtrosIniciais: FiltrosQuadro 
                   <span className="numerico">{total}</span>
                   {total === 1 ? ' negócio' : ' negócios'}
                   {comRecorte ? ' no recorte atual' : ` em ${funilAtual?.nome ?? 'este funil'}`}
+                  {/* Uma vez, aqui em cima — e não repetido em cada um dos quarenta
+                      cartões, onde viraria ruído sobre algo que não muda de cartão
+                      para cartão. */}
+                  {papel.escreve ? null : ' · seu perfil lê o funil e não move cartões'}
                 </>
               )}
             </p>
@@ -183,6 +193,7 @@ export function TelaFunis({ filtrosIniciais }: { filtrosIniciais: FiltrosQuadro 
             filtros={filtros}
             funilId={funilAtual?.id ?? 0}
             pequena={pequena}
+            podeMover={papel.escreve}
             aoAbrirMover={abrirMover}
             aoTrocarEtapa={(etapaId) => setFiltros((atual) => ({ ...atual, etapaId }))}
           />

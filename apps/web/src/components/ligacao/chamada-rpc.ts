@@ -168,6 +168,17 @@ export async function montarLote(entrada: MontarLote): Promise<Montagem> {
 // Ler um lote (leitura direta da tabela: `call_batches` não guarda telefone)
 // ---------------------------------------------------------------------------
 
+/** As colunas do lote mais o dono. Ver o lote e poder trabalhá-lo são duas perguntas. */
+const COLUNAS_DO_LOTE_COM_DONO = `${COLUNAS_DO_LOTE}, owner_id` as const;
+
+/** O lote aberto e de quem ele é — a segunda metade decide se dá para puxar contato. */
+export type LoteAberto = {
+  lote: LoteResumido;
+  /** Nome de quem montou; `null` quando o perfil não foi encontrado. */
+  dono: string | null;
+  ehMeu: boolean;
+};
+
 /**
  * O lote recém-montado, para a tela abrir sem esperar um `router.refresh()`.
  *
@@ -175,17 +186,41 @@ export async function montarLote(entrada: MontarLote): Promise<Montagem> {
  * visibilidade (`app.sees_all()` ou dono). Os contadores `total`, `pending` e
  * `talked` são materializados pelo gatilho `app.call_batches_refresh_counts`, então
  * reler o lote é uma consulta só e nunca uma contagem.
+ *
+ * O `owner_id` vem junto porque ENXERGAR o lote e PODER TRABALHÁ-LO são perguntas
+ * diferentes, e a política responde só a primeira: `call_batches_select` libera para
+ * `app.sees_all()`, que inclui `sdr`, `leitura` e `financeiro`. Quem entrega contato é
+ * `proximo_da_fila`, que exige `app.is_manager()` ou ser o dono. Sem o dono aqui, esta
+ * tela abria inteira para um lote alheio e só então dizia "não deu para seguir", sem
+ * conseguir dizer de QUEM é o lote — que é a informação que muda o que a pessoa faz.
  */
-export async function lerLote(loteId: string): Promise<LoteResumido | null> {
+export async function lerLote(loteId: string): Promise<LoteAberto | null> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from('call_batches')
-    .select(COLUNAS_DO_LOTE)
-    .eq('id', loteId)
-    .maybeSingle();
-  if (error) levantar(error.code, error);
-  if (!data) return null;
-  return loteDaLinha(data as LinhaDeLote);
+  const [linha, sessao] = await Promise.all([
+    supabase.from('call_batches').select(COLUNAS_DO_LOTE_COM_DONO).eq('id', loteId).maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
+  if (linha.error) levantar(linha.error.code, linha.error);
+  if (!linha.data) return null;
+
+  const bruta = linha.data as LinhaDeLote & { owner_id: string };
+  const meuId = sessao.data.user?.id ?? null;
+  const ehMeu = meuId !== null && bruta.owner_id === meuId;
+
+  // O nome do dono só é buscado quando o lote NÃO é meu: é a única situação em que a
+  // tela precisa nomear alguém, e o caminho comum (abrir o próprio lote) não paga
+  // uma consulta a mais por causa de um caso de exceção.
+  let dono: string | null = null;
+  if (!ehMeu) {
+    const perfil = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', bruta.owner_id)
+      .maybeSingle();
+    dono = perfil.data?.full_name ?? null;
+  }
+
+  return { lote: loteDaLinha(bruta), dono, ehMeu };
 }
 
 // ---------------------------------------------------------------------------
@@ -243,8 +278,25 @@ const proximoSchema = z.discriminatedUnion('ok', [
     ]),
     detalhe: z.string().nullish(),
     abre_em: z.string().nullish(),
+    // Só o ramo `fila_vazia` traz estes três (`app.motivo_da_fila_vazia`); as outras
+    // recusas nem sequer os constroem. Por isso `nullish` e não obrigatório: exigi-los
+    // faria a tela recusar com "formato desconhecido" toda vez que a janela fechasse.
+    itens_esperando: z.number().int().nullish(),
+    itens_no_teto: z.number().int().nullish(),
+    volta_em: z.string().nullish(),
   }),
 ]);
+
+/**
+ * Os dois "por quês" que o banco nomeia DENTRO de `fila_vazia` (migração
+ * 20260905000801, `app.motivo_da_fila_vazia`).
+ *
+ * Eles chegam em `detalhe`, e não como motivo novo, de propósito: um motivo novo
+ * quebraria o `z.enum` acima e derrubaria a tela inteira. O banco preferiu informar a
+ * mais a quebrar o contrato — e cabe aqui não jogar fora o que ele informou.
+ */
+export const FILA_AGUARDANDO_INTERVALO = 'aguardando_intervalo';
+export const FILA_TENTATIVAS_ESGOTADAS = 'tentativas_esgotadas';
 
 export type RespostaDoProximo =
   | {
@@ -260,6 +312,12 @@ export type RespostaDoProximo =
       motivo: Extract<z.infer<typeof proximoSchema>, { ok: false }>['motivo'];
       detalhe: string | null;
       abreEm: string | null;
+      /** `fila_vazia`: quantos ainda voltam quando o intervalo entre tentativas vencer. */
+      itensEsperando: number;
+      /** `fila_vazia`: quantos estouraram `max_tentativas` e não voltam neste lote. */
+      itensNoTeto: number;
+      /** Quando o primeiro dos que esperam volta à fila (ISO), ou `null`. */
+      voltaEm: string | null;
     };
 
 export const MENSAGENS_DE_RECUSA_DA_FILA: Record<
@@ -273,6 +331,19 @@ export const MENSAGENS_DE_RECUSA_DA_FILA: Record<
   fora_da_janela: 'Fora do horário de ligação. A fila volta na próxima janela.',
   fila_vazia: 'Acabou a fila deste lote.',
 };
+
+/**
+ * A recusa de `lote_de_outro_dono`, com o nome de quem montou quando ele é conhecido.
+ *
+ * "Este lote é de outra pessoa" obriga a adivinhar de quem, e a resposta muda o que se
+ * faz em seguida: se é da Heloísa, monte o seu; se é seu, em outra sessão, o problema é
+ * o login. O nome é a diferença entre uma recusa e uma instrução.
+ */
+export function fraseDoLoteDeOutroDono(dono: string | null): string {
+  return dono
+    ? `Este lote é de ${dono}. Quem puxa contato dele é quem o montou, ou um gestor. Volte e monte um lote seu.`
+    : MENSAGENS_DE_RECUSA_DA_FILA.lote_de_outro_dono;
+}
 
 /**
  * Puxa o próximo contato e RESERVA o item (`em_andamento`) por 30 minutos.
@@ -299,6 +370,9 @@ export async function puxarProximo(
       motivo: lido.data.motivo,
       detalhe: lido.data.detalhe ?? null,
       abreEm: lido.data.abre_em ?? null,
+      itensEsperando: lido.data.itens_esperando ?? 0,
+      itensNoTeto: lido.data.itens_no_teto ?? 0,
+      voltaEm: lido.data.volta_em ?? null,
     };
   }
 

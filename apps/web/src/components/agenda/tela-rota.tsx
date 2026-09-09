@@ -36,6 +36,7 @@ import {
   linkDoWaze,
   paradasNoMesmoPonto,
   rotuloDaPrecisao,
+  type MotivoDeExclusao,
   type ParadaDaRota,
   type RotaDoDia,
 } from './rota-tipos';
@@ -476,8 +477,24 @@ function CartaoDaParada({
 // Quem ficou de fora
 // ---------------------------------------------------------------------------
 
+/**
+ * Os motivos que são de LUGAR: a ficha não tem onde cair no mapa.
+ *
+ * Separá-los importa porque só eles soam como convite a consertar alguma coisa.
+ * "Pediu para não ser contatado" e "a ficha foi apagada" já estão resolvidos —
+ * é para ficarem de fora mesmo. Estes três terminam a frase na cabeça de quem
+ * lê com "então vá lá e preencha", e é essa continuação que `SemOndeConsertar`
+ * precisa desmentir.
+ */
+const MOTIVOS_DE_LUGAR: readonly MotivoDeExclusao[] = [
+  'sem_coordenada',
+  'so_cidade',
+  'precisao_incerta',
+];
+
 function ForaDaRota({ exclusoes }: { exclusoes: ReturnType<typeof agruparExclusoes> }) {
   const total = exclusoes.reduce((soma, g) => soma + g.itens.length, 0);
+  const faltaLugar = exclusoes.some((g) => MOTIVOS_DE_LUGAR.includes(g.motivo));
   return (
     <section className="flex flex-col gap-3 border-t border-hairline pt-4">
       <h2 className="text-xs font-medium text-muted-foreground">
@@ -498,7 +515,37 @@ function ForaDaRota({ exclusoes }: { exclusoes: ReturnType<typeof agruparExcluso
           </li>
         ))}
       </ul>
+      {faltaLugar ? <SemOndeConsertar /> : null}
     </section>
+  );
+}
+
+/**
+ * Por que esta tela não manda ninguém "corrigir o endereço da ficha".
+ *
+ * Porque o conserto não existe: não há nenhuma tela no CRM onde escrever bairro
+ * ou endereço numa ficha que já existe. A ficha do parceiro é de leitura, o
+ * cadastro rápido pede nome, categoria, WhatsApp e origem, e a importação de
+ * planilha devolve a linha que casou com uma ficha como `repetida`, sem tocar
+ * nela. Mandar consertar seria mandar procurar um botão que ninguém construiu —
+ * e a pessoa procuraria, e culparia a si mesma por não achar, porque a ordem
+ * veio do sistema.
+ *
+ * O caminho que existe de verdade é o Radar: `app.promover_candidato`, quando
+ * alguém mescla um candidato com uma ficha, preenche os campos VAZIOS dela —
+ * bairro e endereço entre eles. Só os vazios: mesclar completa, não corrige.
+ * Por isso a frase promete preenchimento e não correção.
+ */
+function SemOndeConsertar() {
+  return (
+    <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+      Não há hoje onde escrever bairro ou endereço numa ficha que já existe — nem na ficha do
+      parceiro, nem no cadastro rápido, e reimportar a planilha não altera ficha repetida. Quem
+      preenche esses campos é o Radar: quando a coleta traz o mesmo parceiro e alguém usa Mesclar, o
+      que estava em branco na ficha entra, e a visita passa a caber na rota. Até lá, estas visitas
+      continuam na aba <span className="text-foreground">Dia</span>, com o botão do mapa buscando o
+      parceiro pelo nome — que é como se chegava nelas antes de existir rota.
+    </p>
   );
 }
 
@@ -528,8 +575,9 @@ function AindaNaoLigado({ rota }: { rota: RotaDoDia }) {
         </li>
         <li>
           <span className="text-foreground">Endereço com rua e número</span>: nenhuma das 100 fichas
-          da base tem logradouro. Quando tiver, a mesma máquina geocodifica com precisão de porta e
-          estas frases mudam sozinhas.
+          da base tem logradouro, e não há onde digitá-lo — o CRM não tem edição de ficha. Ele só
+          entra pelo que a coleta trouxer: planilha nova, ou Mesclar no Radar. Quando entrar, a
+          mesma máquina geocodifica com precisão de porta e estas frases mudam sozinhas.
         </li>
       </ul>
       <p className="mt-2">{rota.atribuicao}</p>

@@ -41,7 +41,7 @@ import {
  * O quadro kanban do funil: colunas por etapa e arrastar-e-soltar (RF-FUN-01/02/09).
  *
  * Recebe o quadro já carregado — quem consulta é a tela, com `useQuadro` — e cuida de
- * uma coisa só: a **forma** do quadro e o caminho do movimento. Quatro decisões que
+ * uma coisa só: a **forma** do quadro e o caminho do movimento. Cinco decisões que
  * sustentam o resto do arquivo:
  *
  * 1. **A coluna é o alvo de soltar, e o único.** O funil não tem ordem manual dentro
@@ -68,6 +68,14 @@ import {
  *    de quem está de pé, na rua, com uma mão só. A tela vira trilha de etapas mais a
  *    lista da etapa aberta, e mover é um botão no cartão (RF-FUN-09). O `DndContext`
  *    nem é montado: sensor de ponteiro ativo numa lista que rola é atrito puro.
+ *
+ * 5. **Quem não move não arrasta.** `public.move_deal` para no `app.can_write()` antes
+ *    de olhar qualquer dado — `leitura` e `financeiro` não movem cartão nenhum. Até
+ *    09/09 o quadro era arrastável para eles: a pessoa pegava, soltava, o cartão
+ *    voltava e a recusa falava de "carteira". Com `podeMover` falso o `DndContext`
+ *    continua montado (ele é a moldura do teclado e dos alvos) mas fica **sem
+ *    sensores**, e os cartões não mostram alça nem botão. O gesto some inteiro em vez
+ *    de existir para falhar. A autorização continua no banco, intacta.
  */
 
 /**
@@ -83,6 +91,14 @@ export type PedidoDeAbrirMover = {
   etapaAtualId: number;
   etapaDestinoId?: number | null;
 };
+
+/**
+ * Nenhum sensor: o quadro fica olhável e imóvel.
+ *
+ * Constante de módulo, e não `[]` no JSX: um array novo a cada render faria o
+ * `DndContext` refazer os sensores em toda pintura da tela.
+ */
+const SEM_SENSORES: ReturnType<typeof useSensors> = [];
 
 /**
  * Quem está debaixo do cartão.
@@ -122,6 +138,7 @@ export function Quadro({
   filtros,
   funilId,
   pequena,
+  podeMover,
   aoAbrirMover,
   aoTrocarEtapa,
 }: {
@@ -131,6 +148,8 @@ export function Quadro({
   funilId: number;
   /** Abaixo de `md`: trilha de etapas mais lista, em vez de colunas. */
   pequena: boolean;
+  /** `app.can_write()`, lido do banco por `public.meu_papel()`. */
+  podeMover: boolean;
   aoAbrirMover: (pedido: PedidoDeAbrirMover) => void;
   /** No celular, trocar a etapa aberta (vai para a URL e para a RPC). */
   aoTrocarEtapa: (etapaId: number) => void;
@@ -148,6 +167,9 @@ export function Quadro({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: coordenadasPorTeclado }),
   );
+  // Sem sensor não nasce arraste: é o desligamento na raiz, e não um `disabled` em
+  // cada alça que alguém pode esquecer de propagar amanhã.
+  const sensoresAtivos = podeMover ? sensores : SEM_SENSORES;
 
   /** O caminho único de todo movimento do quadro: arraste do desktop e botão do celular. */
   const pedirMovimento = useCallback(
@@ -208,6 +230,7 @@ export function Quadro({
         <ListaDaEtapa
           etapa={aberta}
           emVoo={movimento.cartaoEmVoo}
+          podeMover={podeMover}
           carregando={paginacao.etapaCarregando === aberta.id}
           aoCarregarMais={() =>
             paginacao.carregarMais({ etapaId: aberta.id, carregados: aberta.cards.length })
@@ -230,6 +253,7 @@ export function Quadro({
       key={etapa.id}
       etapa={etapa}
       arrastando={cartaoArrastado !== null}
+      podeMover={podeMover}
       carregandoMais={paginacao.etapaCarregando === etapa.id}
       aoCarregarMais={() =>
         paginacao.carregarMais({ etapaId: etapa.id, carregados: etapa.cards.length })
@@ -241,6 +265,7 @@ export function Quadro({
           cartao={cartao}
           etapaId={etapa.id}
           emVoo={movimento.cartaoEmVoo === cartao.deal_id}
+          podeMover={podeMover}
           aoMover={() => aoAbrirMover({ cartao, etapaAtualId: etapa.id })}
         />
       ))}
@@ -252,7 +277,7 @@ export function Quadro({
       {avisos}
 
       <DndContext
-        sensors={sensores}
+        sensors={sensoresAtivos}
         collisionDetection={quemRecebeOCartao}
         accessibility={{
           announcements: avisosDeArraste,
@@ -300,12 +325,14 @@ export function Quadro({
 function ListaDaEtapa({
   etapa,
   emVoo,
+  podeMover,
   carregando,
   aoCarregarMais,
   aoAbrirMover,
 }: {
   etapa: EtapaQuadro;
   emVoo: string | null;
+  podeMover: boolean;
   carregando: boolean;
   aoCarregarMais: () => void;
   aoAbrirMover: (pedido: PedidoDeAbrirMover) => void;
@@ -320,14 +347,15 @@ function ListaDaEtapa({
           cartao={cartao}
           etapaId={etapa.id}
           emVoo={emVoo === cartao.deal_id}
+          podeMover={podeMover}
           aoMover={() => aoAbrirMover({ cartao, etapaAtualId: etapa.id })}
         />
       ))}
 
       {etapa.total === 0 ? (
         <p className="px-1 py-10 text-center text-sm text-muted-foreground">
-          Nenhum negócio em {etapa.name}. Escolha outra etapa na trilha acima, ou traga um cartão
-          para cá pelo botão &ldquo;Mover de etapa&rdquo;.
+          Nenhum negócio em {etapa.name}. Escolha outra etapa na trilha acima
+          {podeMover ? ', ou traga um cartão para cá pelo botão “Mover de etapa”' : ''}.
         </p>
       ) : null}
 

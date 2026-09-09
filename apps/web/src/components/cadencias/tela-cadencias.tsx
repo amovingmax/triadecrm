@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RotateCw, Sunrise } from 'lucide-react';
@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import { AvisoDoEnvio, TetosDoDia } from './aviso-do-envio';
 import { CartaoDaCadencia } from './cartao-da-cadencia';
 import { buscarCadencias, mensagemDoErro } from './consultas';
+import { DialogoDeMatricula } from './dialogo-matricula';
 import { ErroDaTela, EsqueletoDasCadencias, NinguemEmCadencia } from './estados';
 import { contatosNaCadencia } from './tipos';
+import { usePapel } from './usar-papel';
 
 /**
  * Cadências (RF-CON-13..17; R13 §7).
@@ -26,13 +28,24 @@ import { contatosNaCadencia } from './tipos';
  *  3. **qual é a régua, e quem está parado em qual passo?** — os passos em ordem, com
  *     canal, atraso e condição, e a contagem de organizações em cada um.
  *
- * Tudo vem de uma chamada só (`public.cadencias_visao`), porque as três respostas
- * têm de ser do mesmo instante: um teto lido às 10:00 ao lado de uma contagem lida às
- * 10:03 é uma tela que se contradiz sozinha.
+ * As três respostas vêm de uma chamada só (`public.cadencias_visao`), porque têm de
+ * ser do mesmo instante: um teto lido às 10:00 ao lado de uma contagem lida às 10:03 é
+ * uma tela que se contradiz sozinha. A segunda chamada (`public.meu_papel`) não
+ * responde nenhuma delas — ela só diz se esta pessoa pode matricular, muda uma vez por
+ * login e fica em cache por meia hora.
+ *
+ * A quarta pergunta chegou em 09/09 e é a que faltava: **como alguém entra numa
+ * régua?** Até então `matricular_em_cadencia` existia no banco sem uma única chamada
+ * no produto inteiro, e esta tela mostrava cinco réguas ligadas e permanentemente
+ * vazias. O botão "Matricular" de cada cartão é a porta.
  */
 export function TelaCadencias({ podeLigarDesligar }: { podeLigarDesligar: boolean }) {
   const clienteDeConsultas = useQueryClient();
   const visao = useQuery({ queryKey: ['cadencias', 'visao'], queryFn: buscarCadencias });
+  // Quem matricula é `app.pode_matricular()`, e é o banco que responde: repetir a
+  // lista de papéis aqui seria a segunda verdade que o ADR-03 evita.
+  const papel = usePapel();
+  const [matriculando, setMatriculando] = useState<{ slug: string; nome: string } | null>(null);
 
   const atualizar = useCallback(() => {
     void clienteDeConsultas.invalidateQueries({ queryKey: ['cadencias'] });
@@ -54,9 +67,12 @@ export function TelaCadencias({ podeLigarDesligar }: { podeLigarDesligar: boolea
               'não deu para ler as réguas'
             ) : (
               <>
-                <span className="numerico">{ligadas}</span>
-                {ligadas === 1 ? ' régua ligada' : ' réguas ligadas'} de{' '}
+                {/* "Ligada" dizia respeito à chave; o que a chave controla é a
+                    ENTRADA. Enquanto não havia porta de matrícula, a diferença não
+                    aparecia — agora aparece, e a frase passa a ser a de quem opera. */}
+                <span className="numerico">{ligadas}</span> de{' '}
                 <span className="numerico">{cadencias.length}</span>
+                {cadencias.length === 1 ? ' régua aceita' : ' réguas aceitam'} matrícula
                 {' · '}
                 {dentro > 0 ? (
                   <>
@@ -74,10 +90,14 @@ export function TelaCadencias({ podeLigarDesligar }: { podeLigarDesligar: boolea
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {/* Abaixo de `sm` o rótulo some e sobra um sol. Um ícone sem nome não é
+              link: no leitor de tela vira "link", sem mais nada, e no toque vira
+              adivinhação. O `sr-only` devolve o nome sem devolver a largura. */}
           <Button asChild variant="outline" className="toque h-11 md:h-9">
-            <Link href="/cadencias/resumo">
+            <Link href="/cadencias/resumo" aria-label="Abrir o Resumo do dia">
               <Sunrise aria-hidden="true" />
               <span className="hidden sm:inline">Resumo do dia</span>
+              <span className="sr-only sm:hidden">Resumo do dia</span>
             </Link>
           </Button>
           <Button
@@ -106,7 +126,9 @@ export function TelaCadencias({ podeLigarDesligar }: { podeLigarDesligar: boolea
           <AvisoDoEnvio visao={visao.data} />
           <TetosDoDia visao={visao.data} />
 
-          {dentro === 0 ? <NinguemEmCadencia quantasLigadas={ligadas} /> : null}
+          {dentro === 0 ? (
+            <NinguemEmCadencia quantasLigadas={ligadas} podeMatricular={papel.matricula} />
+          ) : null}
 
           <section aria-label="As réguas" className="flex flex-col gap-4">
             {visao.data.cadencias.map((cadencia) => (
@@ -114,12 +136,16 @@ export function TelaCadencias({ podeLigarDesligar }: { podeLigarDesligar: boolea
                 key={cadencia.slug}
                 cadencia={cadencia}
                 podeLigarDesligar={podeLigarDesligar}
+                podeMatricular={papel.matricula}
                 aoMudar={atualizar}
+                aoMatricular={() => setMatriculando({ slug: cadencia.slug, nome: cadencia.nome })}
               />
             ))}
           </section>
         </>
       )}
+
+      <DialogoDeMatricula cadencia={matriculando} aoFechar={() => setMatriculando(null)} />
     </div>
   );
 }

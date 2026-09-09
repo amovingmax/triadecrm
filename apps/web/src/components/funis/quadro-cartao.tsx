@@ -33,6 +33,19 @@ import type { CartaoQuadro } from './tipos';
  *
  * A alça mora no slot `acoes` do cartão, que já sobe de camada (`z-10`) acima do link
  * esticado do nome — senão pegar na alça abriria a ficha do parceiro.
+ *
+ * ---------------------------------------------------------------------------
+ * Quem não move não arrasta
+ * ---------------------------------------------------------------------------
+ * `public.move_deal` para no `app.can_write()` antes de olhar qualquer dado: `leitura`
+ * e `financeiro` não movem cartão nenhum, em etapa nenhuma, em funil nenhum. Até
+ * 09/09 o quadro era arrastável para eles do mesmo jeito — a pessoa pegava, soltava,
+ * o cartão voltava sozinho e a frase falava de "carteira", que não era o problema
+ * dela. Com `podeMover` falso o gesto some inteiro: sem alça, sem botão, sem
+ * `useDraggable` ativo. Um gesto que não existe não precisa de mensagem de erro.
+ *
+ * Isto NÃO é a autorização — quem autoriza é o `move_deal` e a RLS, e os dois
+ * continuam intactos. É o que evita ensinar um gesto que sempre falha.
  */
 
 /** Alça de arraste: o alvo focável do teclado e a dica visual de que o cartão se move. */
@@ -76,12 +89,15 @@ export function CartaoArrastavel({
   cartao,
   etapaId,
   emVoo = false,
+  podeMover,
   aoMover,
 }: {
   cartao: CartaoQuadro;
   etapaId: number;
   /** O banco ainda não respondeu sobre este cartão: fica apagado e sem toque. */
   emVoo?: boolean;
+  /** `app.can_write()`, lido do banco por `public.meu_papel()`. */
+  podeMover: boolean;
   /** Abre a folha de mover; a alça de arraste continua existindo em paralelo. */
   aoMover: () => void;
 }) {
@@ -95,7 +111,7 @@ export function CartaoArrastavel({
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({
     id: cartao.deal_id,
     data: dados,
-    disabled: emVoo,
+    disabled: emVoo || !podeMover,
     attributes: { roleDescription: 'cartão de negócio' },
   });
 
@@ -109,18 +125,20 @@ export function CartaoArrastavel({
       fantasma={isDragging || emVoo}
       className={emVoo ? 'pointer-events-none' : 'shrink-0'}
       acoes={
-        <>
-          <span className="w-full md:hidden">
-            <BotaoMover onClick={aoMover} />
-          </span>
-          <span className="hidden md:inline-flex">
-            <AlcaDeArraste
-              ref={setActivatorNodeRef}
-              nome={cartao.organization_name}
-              {...attributes}
-            />
-          </span>
-        </>
+        podeMover ? (
+          <>
+            <span className="w-full md:hidden">
+              <BotaoMover onClick={aoMover} />
+            </span>
+            <span className="hidden md:inline-flex">
+              <AlcaDeArraste
+                ref={setActivatorNodeRef}
+                nome={cartao.organization_name}
+                {...attributes}
+              />
+            </span>
+          </>
+        ) : null
       }
     />
   );

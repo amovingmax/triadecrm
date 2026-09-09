@@ -1,12 +1,15 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { Settings } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 import { carregarCategorias, chaveDoRelatorio } from './dados';
+import { LinkNoTexto } from './estados';
 import { formatarInteiro, formatarPercentual, rotuloDoGrupo } from './formatos';
 import { QuadroPainel, TirasDeResumo } from './painel';
 import type { Periodo } from './periodo';
@@ -122,7 +125,21 @@ export function PainelCategorias({
         rotulo: 'Categoria',
         fixa: true,
         texto: (l) => l.categoria_nome,
-        celula: (l) => <span className="font-medium">{l.categoria_nome}</span>,
+        // Toda linha desta tabela é um recorte que a lista de Parceiros já sabe
+        // abrir: `?categoria=<id>` vira `p_category_id` em `search_organizations`, e
+        // `categoria_id` aqui é o mesmo `categories.id`. Sem o link, a leitura
+        // terminava no número — "esta categoria tem 12 alvos sem toque" — e quem
+        // fosse trabalhar os 12 tinha de ir à outra tela e refazer o filtro na mão.
+        // O link fica também na categoria zerada de propósito: "Sem alvos" é
+        // afirmação sobre a base, e a lista vazia é onde ela se confere.
+        celula: (l) => (
+          <Link
+            href={`/parceiros?categoria=${l.categoria_id}`}
+            className="font-medium underline-offset-4 hover:underline"
+          >
+            {l.categoria_nome}
+          </Link>
+        ),
       },
       {
         chave: 'grupo',
@@ -243,14 +260,27 @@ export function PainelCategorias({
       resumo={<TirasDeResumo itens={resumo} />}
       vazio={{
         titulo: 'Nenhuma categoria ativa',
-        texto: 'O catálogo de categorias está vazio. Ele vem do seed; fale com quem cuida do banco.',
+        // O relatório lista só categoria ativa (`where c.is_active`), então este vazio
+        // tem duas causas com consertos diferentes: o seed não rodou, ou desativaram
+        // todas. O catálogo mostra as duas — e desfaz a segunda com um clique.
+        texto:
+          'Esta leitura lista só categoria ativa. Ou o catálogo veio vazio do seed, ou desativaram todas: as duas coisas se veem no catálogo, e a segunda se desfaz lá mesmo.',
+        acao: {
+          // Quem não é admin nem gestor cai numa tela que explica o que existe aqui e
+          // a quem pedir (RF-ADM-01), e não num "sem permissão": o link continua
+          // honesto para o SDR que também lê este relatório.
+          href: '/admin?aba=catalogos&secao=categorias',
+          rotulo: 'Abrir o catálogo de categorias',
+          icone: <Settings aria-hidden="true" />,
+        },
       }}
       nota={
         <>
           A linha <span className="font-medium">quase lá</span> (interessados mais em cadastro)
           ainda não tem coluna própria: o mais perto que o banco devolve hoje é a contagem de negócios quentes. As
-          categorias em <span className="font-medium">Sem alvos</span> só saem do zero quando o
-          coletor do Radar estiver ligado ou alguém importar uma lista nova.
+          categorias em <span className="font-medium">Sem alvos</span> só saem do zero quando
+          o <LinkNoTexto href="/radar?aba=fontes">coletor do Radar</LinkNoTexto> estiver ligado
+          ou alguém <LinkNoTexto href="/importar">importar uma lista nova</LinkNoTexto>.
         </>
       }
     />

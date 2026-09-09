@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { SquareKanban } from 'lucide-react';
 
 import { BarraTermica, ChipTemperatura, definicaoTemperatura } from '@/components/temperatura';
 
@@ -103,7 +105,19 @@ export function PainelFunil({ painel, periodo }: { painel: DefinicaoPainel; peri
           // então o `truncate` de fora não alcança ela).
           <span className="flex min-w-0 items-center gap-2.5">
             <BarraTermica temperatura={l.temperatura} semRotulo className="h-5" />
-            <span className="truncate font-medium">{l.etapa_nome}</span>
+            {/* "Agora" é a contagem de uma coluna do quadro, e o quadro sabe abrir
+                exatamente ela: `?funil=<slug>&etapa=<id>` é o contrato de
+                `filtrosQuadroDaUrl`, e `funil_slug`/`etapa_id` vêm prontos de
+                `relatorio_funil`. Ler "31 parados além do SLA" e ter de ir ao quadro
+                escolher o funil e achar a coluna na mão é o pedaço do trabalho que
+                esta tabela deveria ter poupado. Vale inclusive para nutrição, perda e
+                opt-out: no quadro elas existem, recolhidas no fim. */}
+            <Link
+              href={`/funis?funil=${l.funil_slug}&etapa=${l.etapa_id}`}
+              className="truncate font-medium underline-offset-4 hover:underline"
+            >
+              {l.etapa_nome}
+            </Link>
           </span>
         ),
       },
@@ -218,8 +232,21 @@ export function PainelFunil({ painel, periodo }: { painel: DefinicaoPainel; peri
       resumo={<TirasDeResumo itens={resumo} />}
       vazio={{
         titulo: 'Nenhum funil configurado',
+        // O texto anterior mandava conferir "em Administração se os funis do seed
+        // foram criados", e lá não há onde conferir: as seções de catálogo são
+        // categorias, cidades, feriados, motivos, desfechos e modelos — funil e etapa
+        // não estão entre elas (`components/admin/tipos.ts`). Quem seguisse a
+        // instrução procuraria, não acharia, e voltaria sem saber se o problema era o
+        // banco ou ela. O quadro é a tela onde o funil aparece, então é para lá que
+        // este botão manda; a criação continua sendo do seed, e a frase diz isso em
+        // vez de prometer um botão de criar que não existe.
         texto:
-          'O banco não devolveu etapa nenhuma. Confira em Administração se os funis do seed foram criados.',
+          'O banco não devolveu etapa nenhuma. Funil e etapa nascem do seed, não de uma tela: se o quadro abrir vazio também, quem cuida do banco precisa rodar a semeadura.',
+        acao: {
+          href: '/funis',
+          rotulo: 'Abrir o quadro dos funis',
+          icone: <SquareKanban aria-hidden="true" />,
+        },
       }}
       nota={
         <>

@@ -11,7 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton';
  *
  * "Nenhuma organização em cadência" não é falha e não é sucesso: é o estado real de
  * um produto que subiu a régua antes de matricular alguém. A tela diz isso com todas
- * as letras e aponta para o funil, que é de onde a matrícula sai.
+ * as letras e aponta para as portas que realmente existem — o botão do cartão e a
+ * folha de mover do funil.
  */
 
 /** Espera no formato final: o cartão da cadência com a lista de passos por baixo. */
@@ -78,10 +79,25 @@ export function EsqueletoDoResumo() {
  * A régua existe, mas ninguém entrou nela ainda.
  *
  * Não é comemoração e não é erro: nenhuma matrícula significa que nenhum toque vai
- * nascer, e é isso que a frase tem de dizer. O caminho de saída é o funil, porque a
- * matrícula parte de um negócio com dono.
+ * nascer, e é isso que a frase tem de dizer.
+ *
+ * Até 09/09 esta frase mandava a pessoa "para o funil" — e no funil não havia porta
+ * nenhuma: `matricular_em_cadencia` existia no banco e nada no produto a chamava. O
+ * texto apontava para uma saída que não existia, que é a pior espécie de estado vazio.
+ * Agora há duas portas de verdade, e o texto diz as duas: o botão "Matricular" em cada
+ * cartão abaixo, e a folha que se abre no funil depois de mover um cartão de etapa.
+ *
+ * Para quem não matricula (`leitura`, `financeiro`, `embaixador`), o botão do cartão
+ * não existe — então a frase não promete um botão que ela não vai encontrar.
  */
-export function NinguemEmCadencia({ quantasLigadas }: { quantasLigadas: number }) {
+export function NinguemEmCadencia({
+  quantasLigadas,
+  podeMatricular,
+}: {
+  quantasLigadas: number;
+  /** `app.pode_matricular()`, lido do banco. */
+  podeMatricular: boolean;
+}) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-xl border border-hairline bg-card px-6 py-10 text-center">
       <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
@@ -90,9 +106,12 @@ export function NinguemEmCadencia({ quantasLigadas }: { quantasLigadas: number }
       <div className="space-y-1">
         <p className="font-heading font-medium">Nenhuma organização está em cadência.</p>
         <p className="mx-auto max-w-md text-sm text-muted-foreground">
-          As <span className="numerico">{quantasLigadas}</span> réguas abaixo estão ligadas e
-          prontas, mas ninguém foi matriculado ainda — então nenhum toque vai nascer hoje. A
-          matrícula parte de um negócio com dono, no funil.
+          <span className="numerico">{quantasLigadas}</span>{' '}
+          {quantasLigadas === 1 ? 'régua aceita' : 'réguas aceitam'} matrícula, mas ninguém foi
+          matriculado ainda — então nenhum toque vai nascer hoje.{' '}
+          {podeMatricular
+            ? 'Use “Matricular” no cartão da régua, ou mova um cartão de etapa no funil: a folha de mover oferece a régua que faz sentido para aquela etapa.'
+            : 'Quem matricula é admin, gestor ou SDR — peça a quem tem o papel.'}
         </p>
       </div>
       <Button asChild variant="outline" className="toque h-11 md:h-9">

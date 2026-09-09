@@ -306,10 +306,17 @@ select is((select percentual from public.goal_progress() where metrica = 'doors_
   33.3::numeric, 'goal_progress: 1 de 3 é 33,3%');
 select is((select meta from public.goal_progress() where metrica = 'visits_done'),
   null, 'goal_progress: métrica sem meta definida vem com meta nula, e não com zero');
+-- Até 09/09/2026 estas duas asserções afirmavam que "respostas recebidas" NÃO era
+-- medível, porque a tabela de mensagens não existia. Ela existe desde a
+-- 20260905000200 e recebe; a frase gravada no banco é que tinha ficado para trás,
+-- e com `mensuravel = false` a folha de meta escondia a métrica do seletor — o
+-- gestor não tinha onde clicar para combinar "10 respostas nesta semana".
+-- A 20260909170000 passou a contar. Ver o cabeçalho dela para as quatro decisões
+-- da regra (de quem é a resposta, o que conta como resposta, e a janela).
 select is((select mensuravel from public.goal_progress() where metrica = 'replies'),
-  false, 'goal_progress: "respostas recebidas" ainda não é medível (depende do inbox do D5)');
+  true, 'goal_progress: "respostas recebidas" é medível — a tabela de mensagens existe e recebe');
 select is((select realizado from public.goal_progress() where metrica = 'replies'),
-  null, 'goal_progress: e volta sem número, em vez de fingir zero');
+  0, 'goal_progress: e sem resposta nenhuma no período devolve zero, que agora é um número honesto');
 select ok((select fonte from public.goal_progress() where metrica = 'published') like 'PROXY:%',
   'goal_progress: "publicados" se declara PROXY — a fonte da verdade é a plataforma');
 select ok((select dias_uteis_total from public.goal_progress(null, 'month') limit 1) between 19 and 23,

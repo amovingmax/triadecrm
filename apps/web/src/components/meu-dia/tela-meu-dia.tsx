@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, RotateCw } from 'lucide-react';
 
@@ -12,6 +13,7 @@ import { RevelarLista } from '@/components/movimento';
 import {
   buscarFilaDoDia,
   buscarResumoDoDia,
+  contarCandidatosAguardandoRevisao,
   contarNegociosSemResponsavel,
   LIMITE_DA_FILA,
   mensagemDoErro,
@@ -62,11 +64,19 @@ export function TelaMeuDia({
   const fila = useQuery({ queryKey: ['meu-dia', 'fila'], queryFn: buscarFilaDoDia });
   const resumo = useQuery({ queryKey: ['meu-dia', 'resumo'], queryFn: buscarResumoDoDia });
 
-  // Só quando a fila volta vazia: é a única situação em que o número muda o que a
-  // tela tem a dizer, e não custa uma terceira ida à rede em todo carregamento.
+  // As duas só quando a fila volta vazia: é a única situação em que esses números
+  // mudam o que a tela tem a dizer, e assim não custam ida à rede em carregamento
+  // nenhum dos outros. Separadas, e não numa consulta só: se uma falhar, a outra
+  // ainda aponta um caminho, e um caminho é o que falta nessa hora.
   const semDono = useQuery({
     queryKey: ['meu-dia', 'sem-responsavel'],
     queryFn: contarNegociosSemResponsavel,
+    enabled: fila.isSuccess && fila.data.length === 0,
+  });
+
+  const aRevisar = useQuery({
+    queryKey: ['meu-dia', 'radar-a-revisar'],
+    queryFn: contarCandidatosAguardandoRevisao,
     enabled: fila.isSuccess && fila.data.length === 0,
   });
 
@@ -96,6 +106,15 @@ export function TelaMeuDia({
             {saudacao}
             {nome ? `, ${nome}` : ''}.
           </h1>
+          {/* "Pendentes", e não "para agora": este número soma as quatro faixas que
+              não têm data à frente (vencido, com prazo para hoje, negócio sem
+              próximo passo e negócio parado na etapa), enquanto o bloco "Agora" lá
+              embaixo é só a primeira delas. Dois números com o mesmo nome e contas
+              diferentes na mesma tela fazem quem lê "14 itens para agora" em cima de
+              um bloco "Agora · 3" concluir que a tela perdeu onze pelo caminho.
+              Mudar o cabeçalho, e não o bloco, porque o total é o que a pessoa deve
+              hoje — contar só as prioridades do bloco esconderia o resto da dívida.
+              O zero já dizia "nada pendente"; agora a frase toda combina com ele. */}
           <p className="text-sm text-muted-foreground">
             {data}
             {fila.isPending ? (
@@ -104,7 +123,7 @@ export function TelaMeuDia({
               <>
                 {' · '}
                 <span className="numerico">{pendentes}</span>
-                {pendentes === 1 ? ' item para agora' : ' itens para agora'}
+                {pendentes === 1 ? ' item pendente' : ' itens pendentes'}
               </>
             ) : (
               ' · nada pendente'
@@ -142,7 +161,11 @@ export function TelaMeuDia({
         ) : fila.isError ? (
           <ErroDaFila causa={mensagemDoErro(fila.error)} aoTentar={() => void fila.refetch()} />
         ) : itens.length === 0 ? (
-          <FilaVazia nome={nome} semResponsavel={semDono.data ?? null} />
+          <FilaVazia
+            nome={nome}
+            semResponsavel={semDono.data ?? null}
+            aguardandoRevisao={aRevisar.data ?? null}
+          />
         ) : (
           <>
             {pendentes === 0 ? <NadaParaHoje quantosDepois={depois} /> : null}
@@ -247,6 +270,14 @@ function chaveDoItem(item: ItemDoDia, ordem: number): string {
  * O rodapé honesto. Metade do RF-MET-04 depende de coisa que ainda não existe, e a
  * tela diz isso em português em vez de fingir que a fila está completa — uma fila
  * curta e verdadeira vale mais que uma fila cheia e falsa.
+ *
+ * O que uma nota destas não pode fazer é inventar a limitação. Ela dizia que "o
+ * coletor do Radar ainda não roda" enquanto havia dezenas de candidatos reais
+ * esperando decisão na outra tela: uma nota errada sobre o que falta é pior que
+ * nota nenhuma, porque convence quem confia na tela de que não há o que fazer no
+ * CRM. O limite verdadeiro é outro, e é permanente — candidato não é alvo de
+ * contato até alguém aprovar, então ele nunca entrou nesta fila e continua sendo
+ * decidido no Radar.
  */
 function NotaDoQueFalta({ cheia }: { cheia: boolean }) {
   return (
@@ -262,7 +293,14 @@ function NotaDoQueFalta({ cheia }: { cheia: boolean }) {
           vindas da Agenda; o que falta é o Google Calendar conectado e a
           geocodificação dos endereços.
         </li>
-        <li>Candidato novo esperando revisão: o coletor do Radar ainda não roda.</li>
+        <li>
+          Candidato esperando revisão. Ele só vira alvo de contato depois de aprovado, então
+          nunca entra aqui — a fila de decisão fica em{' '}
+          <Link href="/radar" className="underline underline-offset-4 hover:text-foreground">
+            Radar
+          </Link>
+          .
+        </li>
         {cheia ? (
           <li>
             A fila mostra no máximo <span className="numerico">{LIMITE_DA_FILA}</span> itens de uma

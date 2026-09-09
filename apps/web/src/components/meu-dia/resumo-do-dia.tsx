@@ -6,7 +6,12 @@ import { Info, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { metricasVisiveis, ressalvasDasMetricas, type MetricaDoDia } from './tipos';
+import {
+  definicaoDaMetrica,
+  metricasVisiveis,
+  ressalvasDasMetricas,
+  type MetricaDoDia,
+} from './tipos';
 
 /**
  * O resumo que abre a tela: quanto já foi feito hoje, contra a meta quando ela
@@ -24,6 +29,12 @@ import { metricasVisiveis, ressalvasDasMetricas, type MetricaDoDia } from './tip
  *    tenha ou não meta definida, e hoje a tabela `goals` está vazia: esconder as
  *    métricas sem meta deixaria a tela em branco justamente para quem mais precisa
  *    ver o que fez. Sem meta, o cartão mostra o realizado e diz "sem meta".
+ *
+ * 3. **Cada número carrega a própria definição.** "Portas abertas" é jargão de
+ *    captação, e esta faixa é a primeira coisa que alguém vê ao entrar no CRM:
+ *    quatro números que a pessoa não sabe ler não abrem o dia, atrapalham. A
+ *    definição fica no pé do cartão, sempre visível, e não num `title` (que o
+ *    celular não mostra) nem dentro da nota, que nasce fechada.
  */
 export function ResumoDoDia({
   metricas,
@@ -71,11 +82,16 @@ export function ResumoDoDia({
         </p>
       ) : null}
 
+      {/* Chamava-se "De onde saem estes números" e listava só as exceções: quem
+          abria procurando o que é uma porta aberta não achava, porque a explicação
+          nunca esteve aqui. Agora a definição está no cartão e esta nota volta a se
+          chamar pelo que ela de fato guarda — a aproximação e o que ainda não é
+          medido. */}
       {ressalvas.length > 0 ? (
         <details className="text-xs text-muted-foreground">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 sm:min-h-8">
             <Info className="size-3.5 shrink-0" aria-hidden="true" />
-            <span className="underline underline-offset-4">De onde saem estes números</span>
+            <span className="underline underline-offset-4">Ressalvas destes números</span>
           </summary>
           <ul className="mt-1 flex list-disc flex-col gap-1 pl-8 sm:pl-5">
             {ressalvas.map((frase) => (
@@ -94,6 +110,7 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
   const percentual = meta && meta > 0 ? Math.round((realizado / meta) * 100) : null;
   const preenchido = percentual === null ? 0 : Math.min(100, percentual);
   const bateu = percentual !== null && percentual >= 100;
+  const definicao = definicaoDaMetrica(metrica.metrica);
 
   return (
     <li className="flex flex-col gap-1.5 sm:border-l sm:border-hairline sm:pl-4 sm:first:border-l-0 sm:first:pl-0">
@@ -135,6 +152,14 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
             {percentual}%
           </span>
         </div>
+      ) : null}
+
+      {/* A definição vai no PÉ do cartão, e não embaixo do rótulo: ela ocupa uma ou
+          duas linhas conforme a largura da coluna, e acima do número empurraria cada
+          um dos quatro para uma altura diferente — a faixa perderia a leitura de
+          relance, que é a única coisa que ela faz bem. */}
+      {definicao ? (
+        <p className="text-[0.6875rem] leading-snug text-muted-foreground">{definicao}</p>
       ) : null}
     </li>
   );

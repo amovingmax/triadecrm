@@ -1,8 +1,15 @@
 import type { ActivityType, Channel, DealStatus, Json, Temperature } from '@komune/schema';
 
-import { ROTULOS_COM_QUEM, type ComQuem } from '@/components/registro/tipos';
+import {
+  PAR_DA_SUPERFICIE,
+  ROTULOS_COM_QUEM,
+  type ComQuem,
+  type Superficie,
+} from '@/components/registro/tipos';
+import { rotuloDaSuperficie } from '@/components/relatorios/formatos';
 
 import {
+  ROTULO_CANAL,
   ROTULO_TIPO,
   type AutorTipo,
   type DiaDaLinha,
@@ -357,12 +364,25 @@ export function aplicarFiltros(itens: ItemConversa[], f: FiltrosConversas): Item
       if (!alvo.includes(busca)) return false;
     }
 
-    // "Responsável" abrange os dois donos que a base tem: quem é dono do NEGÓCIO e
-    // quem REGISTROU as interações. Filtrar só pelo primeiro esconderia as conversas
-    // das 72 organizações cujo negócio ainda está sem dono.
+    // "Responsável" abrange os TRÊS laços que a base tem com uma pessoa: dono do
+    // NEGÓCIO (`deals.owner_id`), quem ATENDE o fio de WhatsApp
+    // (`conversations.assignee_id`) e quem REGISTROU as interações. Filtrar só pelo
+    // primeiro esconderia as conversas das 72 organizações cujo negócio ainda está
+    // sem dono.
+    //
+    // O atendimento faltava aqui, e faltava do jeito mais caro: o cabeçalho da
+    // conversa mostrava o responsável do FIO e este filtro comparava com o dono do
+    // NEGÓCIO. Uma conversa atribuída à Heloísa cujo negócio é de outra pessoa
+    // aparecia com o nome dela em cima e SUMIA quando ela filtrava por si mesma —
+    // duas colunas diferentes chamadas pela mesma palavra, e a pessoa não se achando
+    // no próprio filtro. O cabeçalho passou a separar "Responsável" de "Atendendo"; o
+    // filtro continua largo de propósito, porque quem filtra por si mesma pergunta "o
+    // que é meu?", e uma conversa que ela atende é a resposta mais óbvia que existe.
     if (f.responsavelId !== null) {
       const meu =
-        item.responsavelId === f.responsavelId || item.quemFalou.includes(f.responsavelId);
+        item.responsavelId === f.responsavelId ||
+        item.fio?.responsavelId === f.responsavelId ||
+        item.quemFalou.includes(f.responsavelId);
       if (!meu) return false;
     }
 
@@ -394,6 +414,65 @@ export function cabeNaJanela(dias: number | null, janela: FiltrosConversas['jane
 // ---------------------------------------------------------------------------
 // A linha do tempo da direita
 // ---------------------------------------------------------------------------
+
+/**
+ * O par (tipo, canal) de volta para a superfície que o produziu.
+ *
+ * O mapa é IMPORTADO de `registro/tipos` em vez de copiado porque ele não é o
+ * contrato de uma tela: é o inverso de `app.interaction_surface(p_channel, p_type)`,
+ * a mesma função que o gatilho `activities_apply_outcome` usa para recusar desfecho
+ * fora da superfície. Uma cópia aqui envelheceria calada, e a linha do tempo passaria
+ * a nomear uma superfície que a RPC não produz mais.
+ *
+ * A chave junta os dois campos porque nenhum deles decide sozinho: `presencial` é
+ * visita E reunião, e é o tipo que separa as duas.
+ */
+const SUPERFICIE_DO_PAR = new Map<string, Superficie>(
+  (Object.entries(PAR_DA_SUPERFICIE) as [Superficie, { tipo: ActivityType; canal: Channel }][]).map(
+    ([superficie, par]) => [`${par.tipo}:${par.canal}`, superficie],
+  ),
+);
+
+export function superficieDaInteracao(
+  tipo: ActivityType | null,
+  canal: Channel | null,
+): Superficie | null {
+  if (!tipo || !canal) return null;
+  return SUPERFICIE_DO_PAR.get(`${tipo}:${canal}`) ?? null;
+}
+
+/**
+ * O que o evento foi e por onde, em UMA palavra quando uma palavra basta.
+ *
+ * Numa ligação a segunda linha escrevia "Ligação · Telefone": o tipo e o canal
+ * dizendo a mesma coisa, e quem lê procurando qual é a diferença entre as duas
+ * palavras. Quando o par (tipo, canal) é exatamente uma superfície de interação,
+ * vale o nome da SUPERFÍCIE — que é a palavra que a tela de registro, a régua de
+ * cadência, os relatórios e a administração já usam para a mesma coisa. É o que
+ * deixa afirmar que o passo "Ligação" da cadência e esta linha falam do mesmo
+ * evento; com "Telefone" de um lado e "Ligação" do outro não dava.
+ *
+ * Fora dos cinco pares conhecidos os dois campos voltam, porque aí eles não são
+ * redundantes: "Nota · Telefone" é a nota tomada durante uma ligação. O que não
+ * volta é a palavra repetida — `email` é tipo e canal, e escrevia "E-mail · E-mail".
+ */
+export function procedenciaDoEvento({
+  genero,
+  tipo,
+  canal,
+}: Pick<EventoDaLinha, 'genero' | 'tipo' | 'canal'>): string[] {
+  // "Entrou na base" já é o título do evento de origem: repetir "Registro do sistema"
+  // embaixo gastaria a segunda linha para não acrescentar nada.
+  if (genero === 'origem') return canal ? [ROTULO_CANAL[canal]] : [];
+
+  const superficie = superficieDaInteracao(tipo, canal);
+  if (superficie) return [rotuloDaSuperficie(superficie)];
+
+  const palavras: string[] = [];
+  if (tipo) palavras.push(ROTULO_TIPO[tipo]);
+  if (canal) palavras.push(ROTULO_CANAL[canal]);
+  return [...new Set(palavras)];
+}
 
 /**
  * Uma coluna só, em ordem cronológica (o mais antigo em cima), como uma conversa.

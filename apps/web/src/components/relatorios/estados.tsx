@@ -1,5 +1,7 @@
 'use client';
 
+import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { CircleAlert, Inbox, RotateCw } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -58,12 +60,67 @@ export function ErroDoRelatorio({ causa, aoTentar }: { causa: string; aoTentar: 
   );
 }
 
-/** Não há linha nenhuma no período: diz por quê e o que fazer para haver. */
-export function VazioDoRelatorio({ titulo, texto }: { titulo: string; texto: string }) {
+/**
+ * Para onde ir quando o vazio tem conserto.
+ *
+ * Só se preenche quando a tela de destino RESOLVE o vazio — mostra o que falta,
+ * deixa ligar ou deixa cadastrar. Um botão que abre uma tela onde o assunto não
+ * existe é pior que nenhum botão: gasta o clique e devolve a pessoa ao mesmo lugar,
+ * agora achando que já conferiu.
+ */
+export type AcaoDoVazio = {
+  href: string;
+  rotulo: string;
+  /** O ícone da tela de destino em `lib/navegacao`, para o botão e o menu combinarem. */
+  icone?: ReactNode;
+};
+
+/**
+ * Não há linha nenhuma no período: diz por quê, o que fazer para haver, e leva até lá.
+ *
+ * `texto` aceita nó, e não só string, porque a frase que explica o vazio às vezes
+ * precisa de um link no meio dela ("o coletor do Radar", "o catálogo") — e mandar a
+ * pessoa procurar a tela no menu depois de dizer o nome dela é a metade do caminho.
+ */
+export function VazioDoRelatorio({
+  titulo,
+  texto,
+  acao,
+}: {
+  titulo: string;
+  texto: ReactNode;
+  acao?: AcaoDoVazio;
+}) {
   return (
     <Moldura icone={<Inbox className="size-5" aria-hidden="true" />} titulo={titulo}>
       <p className="max-w-prose text-sm text-muted-foreground">{texto}</p>
+      {acao ? (
+        <Button asChild variant="outline" className="toque h-11 md:h-9">
+          <Link href={acao.href}>
+            {acao.icone}
+            {acao.rotulo}
+          </Link>
+        </Button>
+      ) : null}
     </Moldura>
+  );
+}
+
+/**
+ * O link dentro da frase.
+ *
+ * As notas destes painéis vivem citando outra tela pelo nome — "quando o coletor do
+ * Radar estiver ligado", "alguém importar uma lista nova", "a mesma barra térmica de
+ * Parceiros". Enquanto isso era só texto, a instrução terminava num nome e quem lia
+ * saía caçando o item no menu; instrução que não leva a lugar nenhum rende o mesmo
+ * que instrução nenhuma. O sublinhado é o mesmo do resumo das cadências, para link
+ * de texto ter uma cara só no produto inteiro.
+ */
+export function LinkNoTexto({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className="underline underline-offset-4 hover:text-foreground">
+      {children}
+    </Link>
   );
 }
 

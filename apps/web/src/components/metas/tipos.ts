@@ -1,6 +1,6 @@
 import type { GoalMetric } from '@komune/schema';
 
-import type { AppRole } from '@/lib/auth/role';
+import { ROTULO_PAPEL, type AppRole } from '@/lib/auth/role';
 
 import type { Periodo } from './periodo';
 
@@ -28,7 +28,12 @@ export type LinhaProgresso = {
   dias_uteis_total: number;
   dias_uteis_decorridos: number;
   ritmo_necessario: number | null;
-  /** `false` quando a métrica ainda não tem de onde sair (ex.: o inbox do D5). */
+  /**
+   * `false` quando a métrica ainda não tem de onde sair. Desde
+   * `20260909170000_a_meta_de_resposta_passa_a_ser_medivel.sql` as dez saem, mas a
+   * coluna e o tratamento dela ficam: quem responde "dá para medir?" é o banco, e
+   * a tela lê a resposta em vez de saber de cor qual métrica está ligada.
+   */
   mensuravel: boolean;
   /** Como o número é contado, em uma frase escrita no próprio banco. */
   fonte: string;
@@ -45,6 +50,53 @@ export type Pessoa = { id: string; nome: string };
  * negado — e para não montar cartão de gente que o banco não vai devolver.
  */
 export const PAPEIS_QUE_DEFINEM_META: readonly AppRole[] = ['admin', 'gestor'];
+
+/**
+ * Espelho de `app.can_write()`: quem o banco deixa registrar trabalho.
+ *
+ * É a mesma lista de `lib/navegacao.ts`, e pelo mesmo motivo: no banco é uma
+ * função só, e quem não passa por ela não grava atividade, não cria organização e
+ * não move negócio de etapa. Toda métrica de `goal_progress` conta exatamente
+ * isso — `activities`, `deal_stage_history`, `organizations` —, então para quem é
+ * `leitura`, `financeiro` ou `bot` o realizado nasce zero e morre zero.
+ *
+ * Quem decide continua sendo o Postgres. Isto aqui não recusa nada: serve para a
+ * tela poder DIZER, antes de alguém combinar um número, por que aquele número não
+ * vai se mexer. Se `app.can_write()` mudar de lista, esta frase passa a mentir —
+ * é o preço de espelhar, e o mesmo que os outros espelhos dessa função já pagam.
+ */
+export const PAPEIS_QUE_REGISTRAM_TRABALHO: readonly AppRole[] = [
+  'admin',
+  'gestor',
+  'sdr',
+  'embaixador',
+];
+
+/**
+ * Por que o realizado desta pessoa vai ficar em zero — ou `null` quando não vai.
+ *
+ * A tela AVISA e não impede, de propósito. Impedir seria inventar uma recusa que o
+ * banco não faz: a RLS de `public.goals` aceita meta para qualquer perfil, e pode
+ * ser combinado de propósito (alguém que troca de papel na semana que vem, um
+ * acordo registrado no 1:1). Quem decide se isso vira bloqueio é Rafael; enquanto
+ * não decide, o gestor tem o fato na frente antes de salvar, que é o que faltava.
+ *
+ * `papel` indefinido não vira aviso: o diretório pode não ter respondido ainda, e
+ * avisar por falta de resposta seria acusar sem prova.
+ */
+export function porQueFicaEmZero(
+  papel: AppRole | undefined,
+  nome: string,
+  ehVoce: boolean,
+): string | null {
+  if (papel === undefined || PAPEIS_QUE_REGISTRAM_TRABALHO.includes(papel)) return null;
+
+  const rotulo = ROTULO_PAPEL[papel];
+  if (ehVoce) {
+    return `O seu papel é ${rotulo}, e o Tríade não registra porta, ligação, visita nem cadastro em nome desse papel. Os números abaixo ficam em zero por isso, e não por falta de registro seu. Quem troca papel é o admin, na Administração.`;
+  }
+  return `${nome} tem o papel ${rotulo}, e o Tríade não registra porta, ligação, visita nem cadastro em nome desse papel. A meta definida aqui fica em zero até um admin trocar o papel, na Administração.`;
+}
 
 /**
  * A métrica em destaque no alto de cada cartão.

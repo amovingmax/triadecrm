@@ -7,6 +7,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
+import type { AppRole } from '@/lib/auth/role';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,7 +29,7 @@ import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
 import { mensagemDoErro, removerMeta, salvarMeta } from './dados';
 import type { Periodo, Segmento } from './periodo';
-import { METRICA_DESTAQUE, type LinhaProgresso, type Pessoa } from './tipos';
+import { METRICA_DESTAQUE, porQueFicaEmZero, type LinhaProgresso, type Pessoa } from './tipos';
 
 /**
  * Folha de definição de meta (RF-MET-02). Só gestor e admin chegam aqui: a RLS de
@@ -59,6 +60,7 @@ export function FolhaMeta({
   aberta,
   aoFechar,
   pessoa,
+  papel,
   periodo,
   inicio,
   rotuloPeriodo,
@@ -69,6 +71,8 @@ export function FolhaMeta({
   aberta: boolean;
   aoFechar: () => void;
   pessoa: Pessoa;
+  /** Papel da pessoa no diretório do banco; indefinido enquanto ele não responde. */
+  papel: AppRole | undefined;
   periodo: Periodo;
   inicio: string;
   rotuloPeriodo: Segmento[];
@@ -79,6 +83,10 @@ export function FolhaMeta({
   aoGravar: () => void;
 }) {
   const ehCelular = useEhCelular();
+  // O mesmo aviso do cartão, repetido aqui de propósito: é NESTA folha que alguém
+  // digita o número e clica em salvar, e uma folha aberta cobre o cartão que
+  // explicava por que aquele número nunca vai andar.
+  const ficaEmZero = porQueFicaEmZero(papel, pessoa.nome, false);
 
   return (
     <Sheet open={aberta} onOpenChange={(v) => !v && aoFechar()}>
@@ -98,6 +106,12 @@ export function FolhaMeta({
             . Outro período tem meta própria.
           </SheetDescription>
         </SheetHeader>
+
+        {ficaEmZero ? (
+          <p className="mx-4 rounded-lg border border-hairline bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+            {ficaEmZero}
+          </p>
+        ) : null}
 
         {aberta ? (
           <Formulario

@@ -76,8 +76,13 @@ export function FolhaCadastroRapido({
       >
         <SheetHeader>
           <SheetTitle>Novo parceiro</SheetTitle>
+          {/* Não diz mais "o resto da ficha pode ser preenchido depois": a ficha do
+              parceiro não tem edição, então a frase prometia uma porta que não existe
+              e mandava a pessoa procurar por ela. O que existe de verdade é o número
+              de WhatsApp, que a ficha sem telefone aceita depois (procurar-telefone),
+              e o que a folha entrega agora — que é o funil já andando. */}
           <SheetDescription>
-            Quatro campos agora; o resto da ficha pode ser preenchido depois.
+            Quatro campos e o parceiro entra no funil, com o primeiro contato marcado.
           </SheetDescription>
         </SheetHeader>
 

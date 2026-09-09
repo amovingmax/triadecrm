@@ -276,7 +276,13 @@ export type ItemHistoricoEtapa = {
 export type MotivoRecusaMover =
   /** O negócio não existe, foi apagado ou a RLS não mostra para quem pediu. */
   | 'negocio_nao_encontrado'
-  /** Papel sem escrita (leitura, financeiro) ou embaixador mexendo em carteira alheia. */
+  /**
+   * Três casos com um nome só, no `move_deal`: papel sem escrita (`leitura`,
+   * `financeiro`), cartão de outra pessoa e embaixador em organização fora da
+   * carteira dele. O primeiro deixou de chegar aqui em 09/09 — o quadro pergunta
+   * `public.meu_papel()` e não oferece o arrastar a quem não escreve —, então o que
+   * sobra é sobre O CARTÃO, e é isso que a frase diz.
+   */
   | 'sem_permissao'
   /** A etapa de destino pertence a outro funil. Erro de programa, não de quem usa. */
   | 'etapa_de_outro_funil'
@@ -295,7 +301,8 @@ export type MotivoRecusaMover =
 
 export const MENSAGENS_RECUSA_MOVER: Record<MotivoRecusaMover, string> = {
   negocio_nao_encontrado: 'Este negócio não está mais disponível para você.',
-  sem_permissao: 'Seu perfil não move negócios desta carteira.',
+  sem_permissao:
+    'Este negócio é de outra pessoa. Só o dono ou um gestor move — fale com quem está no cartão.',
   etapa_de_outro_funil: 'Esta etapa é de outro funil.',
   etapa_igual: 'O cartão já estava nesta etapa.',
   etapa_mudou: 'Alguém moveu este cartão antes de você. O quadro foi atualizado.',

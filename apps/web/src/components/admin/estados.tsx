@@ -97,7 +97,18 @@ export function Aviso({
 export type ColunaAdmin<T> = {
   id: string;
   rotulo: string;
-  /** Classe de largura da coluna no desktop (a tabela é `table-fixed`). */
+  /**
+   * Classe da coluna no desktop, aplicada no cabeçalho E na célula do corpo.
+   *
+   * A largura em si só precisaria do `<th>` — a tabela é `table-fixed`, e nesse modo
+   * quem dimensiona as colunas é a primeira linha. O que precisa das duas pontas é o
+   * `hidden ... xl:table-cell` que algumas colunas carregam junto: display vale por
+   * célula, não por coluna. Com a classe só no cabeçalho, entre 768 px e 1279 px — a
+   * largura em que o time abre o CRM no notebook — o corpo ficava com uma célula a mais
+   * que o cabeçalho e a linha inteira escorregava para a esquerda: em "Quem tem acesso"
+   * a frase do papel aparecia sob o rótulo "Acesso" e a data ia parar numa coluna sem
+   * rótulo nenhum.
+   */
   largura?: string;
   /** Coluna que dá nome à linha: vira o título do bloco no celular. */
   principal?: boolean;
@@ -119,7 +130,10 @@ export function ListaAdmin<T>({
   chave: (linha: T) => string | number;
   /** Botões da linha. Recebe a linha e devolve os controles, ou nada. */
   acoes?: (linha: T) => React.ReactNode;
-  /** Largura da coluna de ação. Duas ações na mesma linha pedem mais que o padrão. */
+  /**
+   * Largura da coluna de ação, no cabeçalho e na célula, como em `largura`. Duas ações
+   * na mesma linha pedem mais que o padrão.
+   */
   larguraDasAcoes?: string;
   rotuloDaLista: string;
 }) {
@@ -160,12 +174,12 @@ export function ListaAdmin<T>({
             {linhas.map((linha) => (
               <tr key={chave(linha)} className="border-b border-hairline last:border-0">
                 {colunas.map((coluna) => (
-                  <td key={coluna.id} className="py-2.5 pr-3 align-top">
+                  <td key={coluna.id} className={cn('py-2.5 pr-3 align-top', coluna.largura)}>
                     {coluna.celula(linha)}
                   </td>
                 ))}
                 {acoes ? (
-                  <td className="py-2.5 text-right align-top">
+                  <td className={cn('py-2.5 text-right align-top', larguraDasAcoes)}>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       {acoes(linha)}
                     </div>

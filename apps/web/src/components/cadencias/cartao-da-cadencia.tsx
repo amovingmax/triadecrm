@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Power, PowerOff } from 'lucide-react';
+import { Loader2, Power, PowerOff, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -21,6 +21,13 @@ import { contatosNaCadencia, type Cadencia } from './tipos';
  * continuam correndo — é a diferença entre "parei a cadência" e "parei de matricular",
  * e confundir as duas é o tipo de engano que só aparece três dias depois.
  *
+ * Sobre o estado da régua: até 09/09 o cartão dizia "ligada", e "ligada" era verdade
+ * sobre a chave e mentira sobre a porta — `matricular_em_cadencia` existia no banco e
+ * NINGUÉM a chamava, então nenhuma régua ligada podia receber ninguém. Agora a porta
+ * existe (o botão "Matricular"), e o rótulo diz o que a chave realmente controla:
+ * **aceitar matrícula nova**. É o que muda quando alguém liga ou desliga, e é a única
+ * coisa que muda — quem está dentro segue.
+ *
  * Quem não pode ligar nem desligar (a Heloísa é `sdr`) não vê botão nenhum, e quem
  * diz por quê é uma linha só, no alto da tela — repetir "é de gestor ou admin" nos
  * cinco cartões vira ruído sobre uma informação que não muda de cartão para cartão.
@@ -32,12 +39,18 @@ import { contatosNaCadencia, type Cadencia } from './tipos';
 export function CartaoDaCadencia({
   cadencia,
   podeLigarDesligar,
+  podeMatricular,
   aoMudar,
+  aoMatricular,
 }: {
   cadencia: Cadencia;
   podeLigarDesligar: boolean;
+  /** `app.pode_matricular()`, lido do banco: admin, gestor e sdr. */
+  podeMatricular: boolean;
   /** Recarrega a visão inteira: o interruptor muda contadores de outras seções. */
   aoMudar: () => void;
+  /** Abre a escolha de quem entra nesta régua. */
+  aoMatricular: () => void;
 }) {
   const [salvando, setSalvando] = useState(false);
   const dentro = contatosNaCadencia(cadencia);
@@ -80,7 +93,7 @@ export function CartaoDaCadencia({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-heading font-medium">{cadencia.nome}</h3>
             <Badge variant="pilula" className="font-normal">
-              {cadencia.ativa ? 'ligada' : 'desligada'}
+              {cadencia.ativa ? 'aceita matrícula' : 'não aceita matrícula nova'}
             </Badge>
             {cadencia.exige_autorizacao ? (
               <Badge variant="pilula" className="font-normal">
@@ -133,28 +146,42 @@ export function CartaoDaCadencia({
           </p>
         </div>
 
-        {podeLigarDesligar ? (
-          <Button
-            variant="outline"
-            onClick={() => void alternar()}
-            disabled={salvando}
-            title={
-              cadencia.ativa
-                ? 'Desligar fecha a entrada; quem já está dentro segue até o fim.'
-                : 'Ligar volta a aceitar matrículas novas.'
-            }
-            className="toque h-11 shrink-0 md:h-9"
-          >
-            {salvando ? (
-              <Loader2 className="animate-spin" aria-hidden="true" />
-            ) : cadencia.ativa ? (
-              <PowerOff aria-hidden="true" />
-            ) : (
-              <Power aria-hidden="true" />
-            )}
-            {cadencia.ativa ? 'Desligar' : 'Ligar'}
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {podeMatricular && cadencia.ativa ? (
+            <Button
+              variant="outline"
+              onClick={aoMatricular}
+              title={`Escolher quem entra em ${cadencia.nome}.`}
+              className="toque h-11 md:h-9"
+            >
+              <UserPlus aria-hidden="true" />
+              Matricular
+            </Button>
+          ) : null}
+
+          {podeLigarDesligar ? (
+            <Button
+              variant="outline"
+              onClick={() => void alternar()}
+              disabled={salvando}
+              title={
+                cadencia.ativa
+                  ? 'Desligar fecha a entrada; quem já está dentro segue até o fim.'
+                  : 'Ligar volta a aceitar matrículas novas.'
+              }
+              className="toque h-11 md:h-9"
+            >
+              {salvando ? (
+                <Loader2 className="animate-spin" aria-hidden="true" />
+              ) : cadencia.ativa ? (
+                <PowerOff aria-hidden="true" />
+              ) : (
+                <Power aria-hidden="true" />
+              )}
+              {cadencia.ativa ? 'Desligar' : 'Ligar'}
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       {cadencia.nota_de_entrada ? (

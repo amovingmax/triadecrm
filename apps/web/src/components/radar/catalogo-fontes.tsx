@@ -47,8 +47,21 @@ import {
  * ser escolhida no cadastro de um candidato ou de um parceiro, e o coletor só a
  * lê quando alguém agenda uma coleta. Desligar, sim, para a coleta: o worker
  * recusa lote de fonte desligada (RF-RAD-01).
+ *
+ * Ligar e coletar são dois direitos diferentes, e é por isso que chegam em duas
+ * propriedades: `radar_alternar_fonte` é de gestor e admin (mexer numa fonte é
+ * mexer na avaliação legal dela), enquanto `radar_coletar_agora` recusa com
+ * `sem_permissao` só quem `app.can_write()` recusa — os mesmos papéis que criam
+ * parceiro. Juntar os dois numa propriedade só foi o que tirou o botão Coletar
+ * de quem prospecta.
  */
-export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
+export function CatalogoDeFontes({
+  podeLigar,
+  podeColetar,
+}: {
+  podeLigar: boolean;
+  podeColetar: boolean;
+}) {
   const clienteDeConsultas = useQueryClient();
   const [alterando, setAlterando] = useState<number | null>(null);
   const [coletando, setColetando] = useState<number | null>(null);
@@ -114,11 +127,11 @@ export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-        As <span className="numerico">11</span> fontes avaliadas, com a base legal, o que os
-        termos de uso permitem, o que o robots.txt libera e o intervalo mínimo entre requisições.{' '}
+        As <span className="numerico">11</span> fontes avaliadas, com a base legal, o que os termos
+        de uso permitem, o que o robots.txt libera e o intervalo mínimo entre requisições.{' '}
         <span className="text-foreground">
-          Ligar uma fonte a libera como origem de cadastro; quem manda buscar é o botão Coletar,
-          que só aparece na fonte com robô escrito.
+          Ligar uma fonte a libera como origem de cadastro; quem manda buscar é o botão Coletar, que
+          aparece na fonte ligada e pronta para coletar, para quem cadastra parceiro.
         </span>
       </p>
 
@@ -128,6 +141,7 @@ export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
             key={fonte.id}
             fonte={fonte}
             podeLigar={podeLigar}
+            podeColetar={podeColetar}
             ocupada={alterando === fonte.id || coletando === fonte.id}
             coletando={coletando === fonte.id}
             aoAlternar={() => {
@@ -155,6 +169,7 @@ export function CatalogoDeFontes({ podeLigar }: { podeLigar: boolean }) {
 function LinhaDaFonte({
   fonte,
   podeLigar,
+  podeColetar,
   ocupada,
   coletando,
   aoAlternar,
@@ -162,6 +177,7 @@ function LinhaDaFonte({
 }: {
   fonte: FonteDoRadar;
   podeLigar: boolean;
+  podeColetar: boolean;
   ocupada: boolean;
   coletando: boolean;
   aoAlternar: () => void;
@@ -170,12 +186,24 @@ function LinhaDaFonte({
   const robots = leituraDoRobots(fonte);
   // Fonte em que nenhuma requisição sai daqui: manual, indicação e planilha.
   const semRobo = fonte.tipo === 'manual' || fonte.tipo === 'referral' || fonte.base_url === null;
-  // "Coletar" só existe onde ele pode dar certo: quem pode ligar fonte, fonte
-  // ligada, robô escrito e catálogo com caminho. Fora disso o botão seria uma
-  // promessa — a RPC recusaria de qualquer jeito, e a pessoa descobriria depois
-  // do clique. Hoje isso é verdade só para o Casamentos.com.br.
-  const podeColetar =
-    podeLigar && fonte.ligada && fonte.coletor_pronto && fonte.categorias_do_catalogo.length > 0;
+  // Dá para pedir coleta desta fonte? São as duas condições que `radar_coletar_agora`
+  // confere (`coletor_desligado` e `sem_catalogo`), e as duas juntas, porque nenhuma
+  // sozinha responde: `collector.enabled` está ligado em fontes que ainda não têm
+  // adaptador no worker (a carga da Receita, por exemplo), e é o catálogo de caminhos
+  // que separa quem o worker sabe buscar de quem ele só saberá um dia. Hoje o par só
+  // fecha no Casamentos.com.br.
+  const coletaLiberada = fonte.coletor_pronto && fonte.categorias_do_catalogo.length > 0;
+  // O botão pede as duas mais a fonte ligada — as três recusas que a linha JÁ diz em
+  // voz alta (o rótulo ligada/desligada ao lado, a situação do coletor logo abaixo).
+  // Esconder aqui não é reimplementar a regra do banco: é não oferecer um clique cujo
+  // "não" a pessoa está lendo na mesma linha. As recusas que a tela não tem como
+  // prever (`ja_rodando`, `categoria_fora_do_catalogo`) continuam vindo do banco, em
+  // toast.
+  //
+  // O que saiu daqui foi `podeLigar`: papel não é estado da fonte. `sdr` e
+  // `embaixador` passam por `app.can_write()` e a RPC aceita a coleta deles — a
+  // tela escondia o botão mesmo assim, e captação nesta casa é da equipe toda.
+  const mostrarColetar = podeColetar && fonte.ligada && coletaLiberada;
 
   return (
     <li
@@ -192,10 +220,13 @@ function LinhaDaFonte({
         <Badge variant="pilula" className="font-normal">
           {ROTULO_TIPO_DE_FONTE[fonte.tipo]}
         </Badge>
-        {/* "já funciona" é só para o que de fato funciona hoje: as origens em que uma
-            pessoa digita o dado. Todo o resto é promessa de calendário e é assim que
-            aparece. */}
-        {fonte.coletor === 'manual' ? (
+        {/* "já funciona" é só para o que de fato funciona hoje. Quando este rótulo foi
+            escrito, isso queria dizer apenas as origens em que uma pessoa digita o
+            dado; desde que o primeiro adaptador entrou no worker, a fonte que aceita
+            coleta também funciona hoje — chamá-la de "previsto para o MVP" seria a
+            tela tratar como promessa um botão que está ali do lado, funcionando.
+            Promessa de calendário continua sendo tudo o que ainda não coleta. */}
+        {fonte.coletor === 'manual' || coletaLiberada ? (
           <Badge variant="pilula" className="font-normal">
             já funciona hoje
           </Badge>
@@ -210,7 +241,7 @@ function LinhaDaFonte({
           </Badge>
         ) : null}
 
-        {podeColetar ? (
+        {mostrarColetar ? (
           <Button
             variant="outline"
             onClick={aoColetar}
@@ -229,13 +260,17 @@ function LinhaDaFonte({
             aria-pressed={fonte.ligada}
             /* Só um dos dois empurra para a direita: com Coletar na linha, quem
                carrega o `ml-auto` é ele, e Ligar/Desligar fica colado ao lado. */
-            className={cn('toque h-11 md:h-8', !podeColetar && 'ml-auto')}
+            className={cn('toque h-11 md:h-8', !mostrarColetar && 'ml-auto')}
           >
             {fonte.ligada ? <PowerOff aria-hidden="true" /> : <Power aria-hidden="true" />}
             {fonte.ligada ? 'Desligar' : 'Ligar'}
           </Button>
         ) : (
-          <Badge variant="pilula" className="ml-auto font-normal">
+          /* Mesmo `ml-auto` condicional do botão: agora que quem coleta pode não ser
+             quem liga, esta pílula e o Coletar aparecem na mesma linha, e dois
+             `ml-auto` dividiriam o espaço livre em vez de encostar os dois à
+             direita. */
+          <Badge variant="pilula" className={cn('font-normal', !mostrarColetar && 'ml-auto')}>
             {fonte.ligada ? 'ligada' : 'desligada'}
           </Badge>
         )}
@@ -263,12 +298,17 @@ function LinhaDaFonte({
             </li>
             {fonte.periodicidade ? <li>coleta {fonte.periodicidade}</li> : null}
             <li>
-              {/* O que o banco guarda em `collector.enabled` é "previsto para esta
-                  fase", não "rodando". Nenhum coletor existe ainda, e a linha diz
-                  isso com todas as letras — o contrário faria a tela prometer um
-                  robô que não há. */}
-              coletor por {ROTULO_DO_COLETOR[fonte.coletor ?? ''] ?? fonte.coletor}: ainda não
-              construído
+              {/* Esta linha dizia "ainda não construído" para toda fonte, e continuou
+                  dizendo depois que o primeiro robô foi escrito — do lado do botão
+                  Coletar, que dispara a coleta de verdade. Quem separa as duas
+                  situações é `coletaLiberada`, o mesmo par que a RPC exige.
+
+                  E ela promete só o que sabe: "dá para pedir coleta", não "está
+                  coletando". Quem está de pé ou parado é o worker, e isso é a nota do
+                  coletor no alto da tela, não uma propriedade da fonte — uma fonte
+                  pronta com o robô desligado deixa o pedido esperando na fila. */}
+              coletor por {ROTULO_DO_COLETOR[fonte.coletor ?? ''] ?? fonte.coletor}:{' '}
+              {coletaLiberada ? 'pronto, dá para pedir coleta' : 'ainda não dá para pedir coleta'}
             </li>
           </>
         )}

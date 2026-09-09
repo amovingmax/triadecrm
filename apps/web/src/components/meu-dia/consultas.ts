@@ -123,6 +123,30 @@ export async function contarNegociosSemResponsavel(): Promise<number | null> {
   return count ?? 0;
 }
 
+/**
+ * Quantos candidatos do Radar esperam uma decisão.
+ *
+ * Pelo mesmo motivo da contagem acima, e para desfazer a mesma mentira por outro
+ * lado: a fila do dia enxerga tarefa, atividade e negócio, e candidato não é
+ * nenhum dos três — candidato só vira alvo depois que alguém aprova. Com a fila
+ * vazia, essa pilha costuma ser o único trabalho que existe, e a tela que existe
+ * para mostrar trabalho não pode ser a única a não saber dele.
+ *
+ * A RLS de `supplier_candidates` exige `app.can_write()`: para `leitura` e
+ * `financeiro` a contagem volta zero (nenhuma linha visível, sem erro), e a tela
+ * deixa de oferecer um caminho que essas pessoas não podem percorrer. Falhar aqui
+ * não quebra nada: devolve `null` e o vazio volta a ser o genérico.
+ */
+export async function contarCandidatosAguardandoRevisao(): Promise<number | null> {
+  const supabase = createClient();
+  const { count, error } = await supabase
+    .from('supplier_candidates')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'novo');
+  if (error) return null;
+  return count ?? 0;
+}
+
 /** Erro do banco com o código preservado, para a tela traduzir em vez de exibir cru. */
 export class ErroDoDia extends Error {
   readonly codigo: string | undefined;

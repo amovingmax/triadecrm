@@ -27,10 +27,19 @@ type Props = {
  *
  * Na barra inferior o rótulo tem `truncate` (`overflow: hidden`), então a caixa da
  * linha precisa caber a tinta inteira: `leading-4` (16px) para os 16px que a Poppins
- * ocupa a 11px, nunca `leading-none` (11px). Hoje "Meu dia / Parceiros / Funis /
- * Conversas" não têm acento nem descendente e o corte não aparece, mas "Relatórios"
- * ou "Agência" ali perderiam o topo do acento. Cabe nos 64px da barra: 20px de
- * ícone + 4px + 16px de rótulo = 40px.
+ * ocupa a 11px, nunca `leading-none` (11px). Isso deixou de ser precaução no dia em
+ * que "Registrar" entrou na barra: o "g" é o primeiro descendente ali, e com
+ * `leading-none` a perna dele seria cortada. "Relatórios" e "Agência", se um dia
+ * subirem, perderiam o topo do acento pelo mesmo motivo. Cabe nos 64px da barra:
+ * 20px de ícone + 4px + 16px de rótulo = 40px.
+ *
+ * Na variante "menu" (a folha "Mais" do celular) o item traz a DESCRIÇÃO sob o
+ * rótulo. Treze rótulos de uma palavra são treze adivinhações: "Cadências", "Radar"
+ * e "Ligar" não dizem a ninguém o que há do outro lado, e a frase que explica isso
+ * já existia em `NAVEGACAO` servindo só de índice invisível da paleta. Duas linhas
+ * no máximo (`line-clamp-2`): a folha lista oito módulos, e um parágrafo por item
+ * empurraria os últimos para fora da tela. A frase inteira continua indo para a
+ * busca da paleta, que não depende do que está visível.
  */
 export function NavLink({ item, variante, onNavegar }: Props) {
   const pathname = usePathname();
@@ -69,14 +78,35 @@ export function NavLink({ item, variante, onNavegar }: Props) {
         aria-current={ativo ? 'page' : undefined}
         onClick={onNavegar}
         className={cn(
-          'toque flex h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors',
+          // `min-h-11` e não `h-11`: o alvo de toque continua garantido, mas a linha
+          // agora cresce com a descrição em vez de cortá-la pela metade.
+          'toque flex min-h-11 items-start gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
           ativo ? 'bg-accent font-medium text-accent-foreground' : 'text-foreground',
         )}
       >
         {/* Sem `item.dia` aqui: dia de calendário é metadado de roadmap. Quem abre um
             módulo que ainda não existe encontra o aviso "chega no D3" na própria tela. */}
-        <Icone className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="truncate">{item.rotulo}</span>
+        <Icone className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate">{item.rotulo}</span>
+          {/* `text-xs` e tinta secundária: é apoio ao rótulo, não um segundo rótulo.
+              Some quando a descrição está vazia em vez de abrir um buraco na linha.
+
+              No item ativo a tinta sobe para `accent-foreground`: sobre o `bg-accent`
+              do escuro (#3f3f46) o esmaecido para em 4,07:1, abaixo dos 4,5:1 que
+              12px exigem. Fora do ativo ele tem folga (5,81:1 no escuro, 5,15:1 no
+              claro) e a hierarquia se sustenta no tamanho, não na cor. */}
+          {item.descricao ? (
+            <span
+              className={cn(
+                'line-clamp-2 text-xs leading-snug',
+                ativo ? 'text-accent-foreground' : 'text-muted-foreground',
+              )}
+            >
+              {item.descricao}
+            </span>
+          ) : null}
+        </span>
       </Link>
     );
   }

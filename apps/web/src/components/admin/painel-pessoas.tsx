@@ -198,6 +198,12 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
           </Badge>
         ),
     },
+    // As três colunas `hidden ... xl:table-cell` desta tela continuam escondidas abaixo
+    // de 1280 px, e agora escondem cabeçalho e célula juntos. Somando as larguras, esta
+    // lista passa de 1000 px com a explicação do papel aberta: no notebook ela obrigaria
+    // a rolar de lado para chegar em "Acesso", que é a coluna pela qual se olha. O que
+    // some é detalhe (o que o papel faz, quem autorizou, a observação); o que decide —
+    // pessoa, papel, acesso — fica visível em qualquer largura.
     {
       id: 'oque',
       rotulo: 'O que esse papel faz',

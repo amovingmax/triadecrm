@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
+import { Download, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -11,7 +12,7 @@ import {
   TEMPERATURAS_EM_ORDEM,
 } from '@/components/temperatura';
 
-import { baixarCsv, montarCsv, nomeDoArquivo } from './csv';
+import { baixarCsv, montarCsv } from './csv';
 import {
   carregarBasePorTemperatura,
   carregarCategorias,
@@ -22,10 +23,10 @@ import {
   temperaturaPorEtapa,
   TETO_DO_HISTORICO,
 } from './dados';
-import { ErroDoRelatorio, EsqueletoRelatorio, NotaDeAlcance } from './estados';
+import { ErroDoRelatorio, EsqueletoRelatorio, LinkNoTexto, NotaDeAlcance } from './estados';
 import { formatarInteiro, formatarPercentual } from './formatos';
 import { TirasDeResumo } from './painel';
-import { diasDoPeriodo, formatarDia, type Periodo } from './periodo';
+import { diasDoPeriodo, formatarDia, hojeEmNatal, type Periodo } from './periodo';
 import { montarSerie, primeiroDiaComHistorico } from './serie-temperatura';
 import { TabelaRelatorio } from './tabela';
 import type { Coluna, DefinicaoPainel, FatiaTermica } from './tipos';
@@ -180,13 +181,22 @@ export function PainelBase({ painel, periodo }: { painel: DefinicaoPainel; perio
           <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">
             {painel.descricao}
           </p>
+          {/* A barra de período fica em cima desta tela e não mexe na tabela: dizer
+              isso aqui custa uma linha e evita a pergunta "troquei o mês e nada mudou,
+              quebrou?". Ela também explica por que o arquivo não leva o período no
+              nome, que é a mesma confusão vista do outro lado. */}
+          <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
+            A tabela é uma foto de hoje: o período escolhido lá em cima recorta só a evolução,
+            mais abaixo. Por isso o arquivo sai com a data de hoje no nome, e não com o período.
+          </p>
         </div>
 
         {fatias.length > 0 ? (
           <Button
             variant="outline"
+            aria-label="Baixar a base por temperatura em CSV (foto de hoje)"
             className="toque h-11 md:h-8"
-            onClick={() => baixarCsv(nomeDoArquivo('base', periodo), montarCsv(colunas, fatias))}
+            onClick={() => baixarCsv(nomeDaFoto(hojeEmNatal()), montarCsv(colunas, fatias))}
           >
             <Download aria-hidden="true" />
             Baixar CSV
@@ -225,20 +235,61 @@ export function PainelBase({ painel, periodo }: { painel: DefinicaoPainel; perio
       <NotaDeAlcance>
         A leitura de agora é a temperatura da organização, calculada pelo banco a partir da
         etapa, da última intenção declarada e dos dias sem contato: é a mesma que
-        pinta a barra térmica em Parceiros e nos funis. Ela muda sozinha com o tempo, sem
+        pinta a barra térmica em <LinkNoTexto href="/parceiros">Parceiros</LinkNoTexto> e nos{' '}
+        <LinkNoTexto href="/funis">funis</LinkNoTexto>. Ela muda sozinha com o tempo, sem
         ninguém tocar em nada: alvo parado esfria.
       </NotaDeAlcance>
     </section>
   );
 }
 
+/**
+ * O nome do arquivo da foto — e por que ele não passa por `nomeDoArquivo`.
+ *
+ * `nomeDoArquivo` carimba o período escolhido, e está certo nos painéis que SÃO um
+ * recorte. Este não é: a tabela que desce no CSV vem de `carregarBasePorTemperatura`,
+ * que não recebe `de` nem `ate` (nem a chave de cache dela pendura no período), e
+ * conta a base neste instante. Com o período no nome, "triade-base-2026-08-01-a-…" e
+ * "triade-base-2026-09-01-a-…" sairiam com nomes diferentes e conteúdo idêntico, e
+ * quem abrisse os dois lado a lado concluiria que a base não se mexeu no mês — uma
+ * conclusão errada tirada de dois arquivos corretos, que é o pior tipo de defeito de
+ * relatório, porque ninguém desconfia dele.
+ *
+ * O que muda esta tabela é o DIA em que ela foi baixada, então é o dia que vai no
+ * nome, no hoje de Natal (`hojeEmNatal`), como o resto da tela. A palavra "foto" fica
+ * no nome de propósito: na pasta de downloads, ao lado de `triade-funil-2026-…`, é
+ * ela que separa a leitura de instante da leitura de período sem precisar abrir o
+ * arquivo. Duas fotos do mesmo dia colidem no nome, e devem colidir: são o mesmo
+ * conteúdo.
+ *
+ * A alternativa era um cabeçalho dentro do arquivo dizendo "isto é uma foto". Ela
+ * perde porque só chega a quem abre o CSV, e a confusão acontece antes disso — na
+ * lista de arquivos, no anexo do e-mail, no nome que alguém lê em voz alta.
+ */
+function nomeDaFoto(hoje: string): string {
+  return `triade-base-foto-${hoje}.csv`;
+}
+
 /** A base inteira numa faixa só, na proporção de cada temperatura. */
 function FaixaDaBase({ fatias, total }: { fatias: readonly FatiaTermica[]; total: number }) {
   if (total === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        A base está vazia: nenhuma organização visível para o seu acesso.
-      </p>
+      // Enquanto o Radar não roda, a base só cresce por planilha, e este vazio tem um
+      // caminho de saída em vez de ser só um diagnóstico. O link vale para todo papel
+      // que lê relatório: quem não pode importar (leitura e financeiro) encontra lá a
+      // recusa com nome — "o seu acesso não importa planilha" — e não uma tela morta.
+      <div className="flex flex-col items-start gap-3">
+        <p className="max-w-prose text-sm text-muted-foreground">
+          A base está vazia: nenhuma organização visível para o seu acesso. Hoje a base cresce
+          por planilha, porque o coletor do Radar ainda não roda.
+        </p>
+        <Button asChild variant="outline" className="toque h-11 md:h-9">
+          <Link href="/importar">
+            <Upload aria-hidden="true" />
+            Importar uma planilha
+          </Link>
+        </Button>
+      </div>
     );
   }
 

@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, SkipForward } from 'lucide-react';
+import { ChevronLeft, Hourglass, PhoneOff, RotateCw, SkipForward } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { useMontado } from '@/lib/usar-cliente';
 import { DialogoConfirmar } from '@/components/admin/confirmar';
+import { formatarQuando } from '@/components/registro/formatos';
 import { comQuemPadrao, perguntaComQuem, type ComQuem } from '@/components/registro/tipos';
 
 import { ChamadaCabecalho, faltamAte } from './chamada-cabecalho';
@@ -29,7 +30,10 @@ import { criarProvedorManual } from './chamada-provedor';
 import {
   devolverItem,
   ErroDaLigacao,
+  FILA_AGUARDANDO_INTERVALO,
+  FILA_TENTATIVAS_ESGOTADAS,
   fraseDaRecusaDaChamada,
+  fraseDoLoteDeOutroDono,
   MENSAGENS_DE_RECUSA_DA_FILA,
   marcarNaoLigarMais,
   puxarProximo,
@@ -89,6 +93,7 @@ import {
  */
 export function TelaChamada({
   lote,
+  donoDoLote,
   roteiroConhecido,
   contexto,
   quemLiga,
@@ -96,6 +101,14 @@ export function TelaChamada({
   aoMontarOutro,
 }: {
   lote: LoteResumido;
+  /**
+   * Nome de quem montou o lote, e só quando NÃO é quem está olhando.
+   *
+   * Todo lote é legível por `app.sees_all()` (sdr, leitura e financeiro incluídos), mas
+   * `proximo_da_fila` só entrega contato ao dono ou a um gestor. Quando essa recusa vem,
+   * o nome é o que transforma "este lote é de outra pessoa" em "monte o seu".
+   */
+  donoDoLote: string | null;
   roteiroConhecido: RoteiroPublicado | null;
   contexto: ContextoDaLigacao;
   /** Nome de quem está ligando: entra no `[eu]` da fala de abertura. */
@@ -625,11 +638,38 @@ export function TelaChamada({
         {recusa.motivo === 'fila_vazia' && pulados.length > 0 ? (
           // A fila só "acabou" porque os pulados estão reservados com ela. Dizer
           // "acabou" aqui seria mentira, e mandar montar outro lote seria pior ainda.
+          // Vem antes da espera de propósito: os pulados são reserva de 30 minutos e
+          // voltam num toque; os que esperam o intervalo voltam daqui a horas.
           <SoSobraramOsPulados
             pulados={pulados.length}
             aoRetomar={() => {
               void devolverOsPulados().then(() => proximo.refetch());
             }}
+            aoVoltar={sair}
+          />
+        ) : recusa.motivo === 'fila_vazia' &&
+          recusa.detalhe === FILA_AGUARDANDO_INTERVALO &&
+          recusa.itensEsperando > 0 ? (
+          // O lote NÃO acabou: o intervalo entre tentativas (20 h, por padrão) ainda
+          // corre para quem não atendeu na primeira passada. Dizer "acabou" e oferecer
+          // montar outro lote é o pior conselho possível — o outro lote RESERVA mais
+          // contatos da base do time, para substituir gente que volta hoje à noite.
+          <FilaEsperandoOIntervalo
+            esperando={recusa.itensEsperando}
+            noTeto={recusa.itensNoTeto}
+            voltaEm={recusa.voltaEm}
+            aoVerificarDeNovo={() => void proximo.refetch()}
+            aoVoltar={sair}
+          />
+        ) : recusa.motivo === 'fila_vazia' &&
+          recusa.detalhe === FILA_TENTATIVAS_ESGOTADAS &&
+          recusa.itensNoTeto > 0 ? (
+          // Aqui "montar outro lote" é o conselho certo: quem estourou `max_tentativas`
+          // não volta mais NESTE lote. O número diz por que a fila parou antes do fim.
+          <TentativasEsgotadas
+            noTeto={recusa.itensNoTeto}
+            maxTentativas={lote.maxTentativas}
+            aoMontarOutro={aoMontarOutro}
             aoVoltar={sair}
           />
         ) : recusa.motivo === 'fila_vazia' ? (
@@ -638,8 +678,19 @@ export function TelaChamada({
           <ForaDaJanela janela={janela} aoTentarDeNovo={() => void proximo.refetch()} />
         ) : (
           <ErroDaChamada
-            frase={MENSAGENS_DE_RECUSA_DA_FILA[recusa.motivo]}
-            aoTentarDeNovo={() => void proximo.refetch()}
+            frase={
+              recusa.motivo === 'lote_de_outro_dono'
+                ? fraseDoLoteDeOutroDono(donoDoLote)
+                : MENSAGENS_DE_RECUSA_DA_FILA[recusa.motivo]
+            }
+            // Recusa de dono e de perfil não muda por tentar de novo: só a espera e a
+            // janela mudam sozinhas. Oferecer "tentar de novo" nas outras é convidar a
+            // pessoa a bater na mesma porta.
+            aoTentarDeNovo={
+              recusa.motivo === 'lote_de_outro_dono' || recusa.motivo === 'sem_permissao'
+                ? null
+                : () => void proximo.refetch()
+            }
             aoVoltar={sair}
           />
         )}
@@ -816,9 +867,8 @@ export function TelaChamada({
         descricao={
           <>
             <p>
-              {item.nome} entra na lista de supressão: ninguém liga, manda WhatsApp ou DM
-              para este contato de novo, em nenhum modo, e as tarefas abertas dele são
-              canceladas.
+              {item.nome} entra na lista de supressão: ninguém liga, manda WhatsApp ou DM para este
+              contato de novo, em nenhum modo, e as tarefas abertas dele são canceladas.
             </p>
             <p>Isto não tem volta, e vale a partir de agora — não depende de gravar o resultado.</p>
           </>
@@ -847,6 +897,158 @@ export function TelaChamada({
         }}
       />
     </div>
+  );
+}
+
+/**
+ * A moldura dos recados desta tela.
+ *
+ * É a mesma de `Moldura`, em `chamada-estados.tsx`, que não é exportada. A cópia é
+ * consciente e tem prazo: quando os dois arquivos forem tocados na mesma passada,
+ * exporte a de lá e apague esta. Duplicar quatro divs custa menos do que duas telas de
+ * "fila parada" com paddings diferentes.
+ */
+function Recado({
+  icone,
+  titulo,
+  children,
+  acoes,
+}: {
+  icone: React.ReactNode;
+  titulo: string;
+  children: React.ReactNode;
+  acoes: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-hairline bg-card px-6 py-14 text-center">
+      <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        {icone}
+      </span>
+      <h2 className="text-lg font-medium">{titulo}</h2>
+      <div className="flex max-w-md flex-col gap-2 text-sm text-balance text-muted-foreground">
+        {children}
+      </div>
+      <div className="mt-2 flex flex-wrap justify-center gap-2">{acoes}</div>
+    </div>
+  );
+}
+
+/**
+ * A fila parou porque o intervalo entre tentativas ainda corre — e isso NÃO é "acabou".
+ *
+ * É o caso mais comum do dia e o que estava sendo contado errado: a primeira passada da
+ * manhã termina, os que não atenderam ficam esperando as 20 h padrão de `montar_lote`, e
+ * a tela dizia "acabou a fila deste lote" e oferecia montar outro. Montar outro reserva
+ * contatos NOVOS da base — que somem da montagem do resto do time — para substituir
+ * gente que volta hoje à noite. O banco já dizia quantos são e a que horas voltam
+ * (`app.motivo_da_fila_vazia`); o que faltava era a tela não jogar fora.
+ */
+function FilaEsperandoOIntervalo({
+  esperando,
+  noTeto,
+  voltaEm,
+  aoVerificarDeNovo,
+  aoVoltar,
+}: {
+  esperando: number;
+  noTeto: number;
+  voltaEm: string | null;
+  aoVerificarDeNovo: () => void;
+  aoVoltar: () => void;
+}) {
+  const quando = formatarQuando(voltaEm);
+
+  return (
+    <Recado
+      icone={<Hourglass className="size-5" aria-hidden="true" />}
+      titulo={esperando === 1 ? 'Falta um, e ele ainda não pode' : 'A fila volta mais tarde'}
+      acoes={
+        <>
+          <Button type="button" onClick={aoVerificarDeNovo}>
+            <RotateCw aria-hidden="true" />
+            Verificar de novo
+          </Button>
+          <Button type="button" variant="outline" onClick={aoVoltar}>
+            Voltar aos lotes
+          </Button>
+        </>
+      }
+    >
+      <p>
+        <span className="numerico">{esperando}</span>
+        {esperando === 1
+          ? ' contato deste lote ainda espera o intervalo entre tentativas.'
+          : ' contatos deste lote ainda esperam o intervalo entre tentativas.'}
+        {quando ? (
+          <>
+            {' '}
+            {esperando === 1 ? 'Ele volta ' : 'O primeiro volta '}
+            <span className="numerico text-foreground">{quando}</span>.
+          </>
+        ) : null}
+      </p>
+      {noTeto > 0 ? (
+        <p>
+          Outros <span className="numerico">{noTeto}</span>
+          {noTeto === 1
+            ? ' já usou todas as tentativas e não volta neste lote.'
+            : ' já usaram todas as tentativas e não voltam neste lote.'}
+        </p>
+      ) : null}
+      <p>
+        Não monte outro lote por causa disto: o lote novo reserva contatos da base para substituir
+        quem volta hoje mesmo.
+      </p>
+    </Recado>
+  );
+}
+
+/**
+ * A fila parou porque todo mundo que sobrou já bateu no teto de tentativas.
+ *
+ * Diferente da espera: estes NÃO voltam. Montar outro lote é o conselho certo aqui, e o
+ * número é o que explica por que a fila parou antes de o lote acabar.
+ */
+function TentativasEsgotadas({
+  noTeto,
+  maxTentativas,
+  aoMontarOutro,
+  aoVoltar,
+}: {
+  noTeto: number;
+  maxTentativas: number;
+  aoMontarOutro: () => void;
+  aoVoltar: () => void;
+}) {
+  return (
+    <Recado
+      icone={<PhoneOff className="size-5" aria-hidden="true" />}
+      titulo="Quem falta já usou as tentativas"
+      acoes={
+        <>
+          <Button type="button" onClick={aoMontarOutro}>
+            Montar outro lote
+          </Button>
+          <Button type="button" variant="outline" onClick={aoVoltar}>
+            Voltar aos lotes
+          </Button>
+        </>
+      }
+    >
+      <p>
+        <span className="numerico">{noTeto}</span>
+        {noTeto === 1 ? ' contato deste lote já usou ' : ' contatos deste lote já usaram '}
+        {maxTentativas === 1 ? (
+          'a tentativa permitida'
+        ) : (
+          <>
+            as <span className="numerico">{maxTentativas}</span> tentativas permitidas
+          </>
+        )}
+        {noTeto === 1 ? ' e não volta mais para esta fila.' : ' e não voltam mais para esta fila.'}
+      </p>
+      <p>Encerre o lote na lista para devolvê-los à base, ou monte o próximo.</p>
+    </Recado>
   );
 }
 

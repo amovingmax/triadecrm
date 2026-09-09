@@ -23,10 +23,23 @@
  * Recusa do banco NÃO vira texto do Postgres na tela: a que a pessoa corrige volta
  * para o campo, em vermelho; a que muda o mundo fora da folha (alguém moveu antes,
  * o cartão sumiu) vira aviso e recarrega o quadro.
+ *
+ * ---------------------------------------------------------------------------
+ * Depois de mover, a pergunta seguinte
+ * ---------------------------------------------------------------------------
+ * "Este virou Contatado" é sempre seguido de "e agora, quem cobra o retorno?". Até
+ * 09/09 o produto não tinha resposta: `public.matricular_em_cadencia` existia no banco
+ * e nada no CRM a chamava, então as cinco réguas ficavam ligadas e vazias para sempre.
+ *
+ * A folha não fecha na hora do sucesso: ela troca de painel e oferece a régua que o
+ * BANCO diz que aceita este negócio nesta etapa (`public.cadencias_do_negocio`). A
+ * oferta é opcional — o movimento já está feito e já foi para o quadro antes de a
+ * pergunta aparecer —, e quando não há nada a oferecer a folha fecha como sempre
+ * fechou, sem um passo a mais.
  */
 import { useId, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowRight, CalendarClock, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CalendarClock, Check, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Controller, useForm, useWatch, type FieldErrors } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -49,6 +62,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useMovimento } from '@/components/movimento';
+import { EscolherCadencia } from '@/components/cadencias/escolher-cadencia';
 
 import {
   etapaEhDeSaida,
@@ -120,35 +134,30 @@ export function FolhaMover({
         side={pequena ? 'bottom' : 'right'}
         className="sombra-base-forte max-h-[92dvh] overflow-y-auto pb-[calc(1rem+var(--area-segura-inferior))] max-md:rounded-t-xl sm:max-w-md md:max-h-none"
       >
+        {/* A chave por negócio zera o miolo inteiro quando a folha troca de cartão:
+            nem os campos obrigatórios de uma etapa nem o painel de "já movi" podem
+            vazar para outro parceiro. */}
         {alvo ? (
-          <>
-            <SheetHeader>
-              {/* `pr-10`: nome de parceiro é longo ("Bar Service Coquetéis /
-                  Caipifrutas") e sem a folga ele passa por baixo do botão de fechar. */}
-              <SheetTitle className="pr-10">Mover {alvo.cartao.organization_name}</SheetTitle>
-              <SheetDescription>
-                O movimento fica registrado no histórico do negócio, com quem moveu e quando.
-              </SheetDescription>
-            </SheetHeader>
-
-            {/* A chave por negócio zera o formulário quando a folha troca de cartão:
-                campos obrigatórios de uma etapa não podem vazar para outro parceiro. */}
-            <Formulario
-              key={alvo.cartao.deal_id}
-              alvo={alvo}
-              etapas={etapas}
-              aoFechar={aoFechar}
-              aoMover={aoMover}
-              aoDesencontro={aoDesencontro}
-            />
-          </>
+          <Miolo
+            key={alvo.cartao.deal_id}
+            alvo={alvo}
+            etapas={etapas}
+            aoFechar={aoFechar}
+            aoMover={aoMover}
+            aoDesencontro={aoDesencontro}
+          />
         ) : null}
       </SheetContent>
     </Sheet>
   );
 }
 
-function Formulario({
+/**
+ * Os dois momentos da folha: escolher a etapa e, depois que o banco aceitou, escolher
+ * a régua. São painéis, e não duas folhas, porque é a mesma decisão continuada — e
+ * porque fechar e reabrir tiraria o foco do lugar em que a pessoa já estava olhando.
+ */
+function Miolo({
   alvo,
   etapas,
   aoFechar,
@@ -160,6 +169,67 @@ function Formulario({
   aoFechar: () => void;
   aoMover: (feito: MovimentoFeito) => void;
   aoDesencontro: () => void;
+}) {
+  const [movidoPara, setMovidoPara] = useState<string | null>(null);
+
+  return (
+    <>
+      <SheetHeader>
+        {/* `pr-10`: nome de parceiro é longo ("Bar Service Coquetéis /
+            Caipifrutas") e sem a folga ele passa por baixo do botão de fechar. */}
+        <SheetTitle className="pr-10">
+          {movidoPara ? alvo.cartao.organization_name : `Mover ${alvo.cartao.organization_name}`}
+        </SheetTitle>
+        <SheetDescription>
+          {movidoPara
+            ? 'A régua agenda as tarefas de acompanhamento. Ela não manda mensagem sozinha: quem manda é gente.'
+            : 'O movimento fica registrado no histórico do negócio, com quem moveu e quando.'}
+        </SheetDescription>
+      </SheetHeader>
+
+      {movidoPara ? (
+        <div className="flex flex-col gap-4 px-4 pb-4">
+          <p className="flex items-start gap-2 rounded-xl bg-muted/40 p-3 text-sm text-muted-foreground">
+            <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            Movido para {movidoPara}.
+          </p>
+          {/* Sem régua a oferecer, a folha fecha como sempre fechou: uma pergunta que
+              não tem resposta possível não vira um passo a mais no caminho. */}
+          <EscolherCadencia
+            dealId={alvo.cartao.deal_id}
+            aoFechar={aoFechar}
+            aoNadaAOferecer={aoFechar}
+          />
+        </div>
+      ) : (
+        <Formulario
+          alvo={alvo}
+          etapas={etapas}
+          aoFechar={aoFechar}
+          aoMover={aoMover}
+          aoDesencontro={aoDesencontro}
+          aoMoverParaEtapa={setMovidoPara}
+        />
+      )}
+    </>
+  );
+}
+
+function Formulario({
+  alvo,
+  etapas,
+  aoFechar,
+  aoMover,
+  aoDesencontro,
+  aoMoverParaEtapa,
+}: {
+  alvo: AlvoDeMovimento;
+  etapas: EtapaQuadro[];
+  aoFechar: () => void;
+  aoMover: (feito: MovimentoFeito) => void;
+  aoDesencontro: () => void;
+  /** O banco aceitou: a folha troca para o painel da régua com o nome da etapa. */
+  aoMoverParaEtapa: (nomeDaEtapa: string) => void;
 }) {
   const { mola } = useMovimento();
   const idBase = useId();
@@ -226,8 +296,10 @@ function Formulario({
           ? `${cartao.organization_name} agora está na sua carteira.`
           : cartao.organization_name,
       });
+      // O quadro recarrega ANTES da pergunta seguinte: o movimento está feito e não
+      // depende em nada do que a pessoa responder sobre a régua.
       aoMover(resultado);
-      aoFechar();
+      aoMoverParaEtapa(etapaDestino.name);
       return;
     }
 

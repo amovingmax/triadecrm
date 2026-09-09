@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { dataHoraCompleta, duracao, hora, rotuloDoDia } from './formatos';
 import { ICONE_TIPO } from './icones';
 import { Mensagem } from './mensagem-do-fio';
-import { ROTULO_AUTOR, ROTULO_CANAL, ROTULO_TIPO, type DiaDaLinha, type EventoDaLinha } from './tipos';
+import { procedenciaDoEvento } from './montagem';
+import { ROTULO_AUTOR, type DiaDaLinha, type EventoDaLinha } from './tipos';
 
 /**
  * A linha do tempo do parceiro: uma coluna só, do mais antigo ao mais recente.
@@ -91,10 +92,13 @@ function Evento({ evento }: { evento: EventoDaLinha }) {
   const titulo = evento.desfecho ?? evento.titulo;
 
   // A segunda linha é a procedência do evento: o que foi, por onde, com quem e quando.
-  const partes: string[] = [];
-  if (evento.genero === 'interacao' && evento.tipo) partes.push(ROTULO_TIPO[evento.tipo]);
-  if (evento.genero === 'etapa') partes.push('Mudança de etapa');
-  if (evento.canal) partes.push(ROTULO_CANAL[evento.canal]);
+  //
+  // O "o que foi, por onde" sai de `procedenciaDoEvento`, que devolve uma palavra só
+  // quando o tipo e o canal dizem a mesma coisa ("Ligação · Telefone" era o par que
+  // mandava a pessoa procurar diferença entre dois sinônimos). A escolha da palavra
+  // mora lá, e não aqui, porque é regra de vocabulário — a mesma que os relatórios e
+  // a régua de cadência usam — e porque assim ela é testável sem navegador.
+  const partes = procedenciaDoEvento(evento);
   if (evento.autor) partes.push(evento.autor);
   else if (evento.autorTipo !== 'human') partes.push(ROTULO_AUTOR[evento.autorTipo]);
   if (evento.comQuem) partes.push(evento.comQuem);

@@ -2,8 +2,10 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Radar } from 'lucide-react';
 
 import { carregarFontes, chaveDoRelatorio } from './dados';
+import { LinkNoTexto } from './estados';
 import { formatarInteiro, formatarPercentual, rotuloDoTipoDeFonte } from './formatos';
 import { QuadroPainel, TirasDeResumo } from './painel';
 import type { Periodo } from './periodo';
@@ -91,6 +93,13 @@ export function PainelFontes({ painel, periodo }: { painel: DefinicaoPainel; per
         rotulo: 'Fonte',
         fixa: true,
         texto: (l) => l.fonte_nome,
+        // Aqui o nome da fonte NÃO vira link, ao contrário de categoria e pessoa nas
+        // outras tabelas: os alvos que uma fonte trouxe não são um recorte que
+        // alguma tela abra hoje. `FiltrosParceiros` tem categoria, cidade, etapa e
+        // responsável — não tem origem —, e o Radar só aceita `?aba=fontes`, sem
+        // apontar para uma fonte específica. Um link para a lista inteira fingindo
+        // ser o recorte desta linha é pior que não ter link. O botão do vazio e os
+        // links da nota levam ao Radar, que é onde a fonte se liga.
         celula: (l) => <span className="font-medium">{l.fonte_nome}</span>,
       },
       {
@@ -171,16 +180,27 @@ export function PainelFontes({ painel, periodo }: { painel: DefinicaoPainel; per
       resumo={<TirasDeResumo itens={resumo} />}
       vazio={{
         titulo: 'Nenhuma fonte cadastrada',
-        texto: 'O catálogo de fontes vem do seed. Se está vazio, o banco não foi semeado.',
+        texto:
+          'O catálogo de fontes vem do seed. Se está vazio, o banco não foi semeado: a aba de fontes do Radar, que é onde elas aparecem e são ligadas, vai estar vazia também.',
+        acao: {
+          // As fontes moram no Radar, não na Administração: é lá que elas são
+          // listadas e que gestor e admin ligam ou desligam cada uma. A aba entra na
+          // URL porque a tela lê `?aba=fontes` (a outra superfície é a fila).
+          href: '/radar?aba=fontes',
+          rotulo: 'Ver as fontes no Radar',
+          icone: <Radar aria-hidden="true" />,
+        },
       }}
       nota={
         <>
           As fontes de coleta (Casamentos.com.br, Google Maps, Instagram, Sympla, TeleListas, OLX)
-          ficam em zero porque o coletor do Radar ainda não roda: hoje todo alvo da base entrou
-          por importação de planilha. Elas continuam listadas de propósito: a linha zerada é o
-          lembrete do que falta ligar, e o dia em que o Radar rodar o número aparece aqui sem
-          mudar nada nesta tela. O lote de importação ainda não é coluna aqui: a
-          função do banco corta por fonte, não por lote.
+          ficam em zero porque o{' '}
+          <LinkNoTexto href="/radar?aba=fontes">coletor do Radar</LinkNoTexto> ainda não roda: hoje
+          todo alvo da base entrou por{' '}
+          <LinkNoTexto href="/importar">importação de planilha</LinkNoTexto>. Elas continuam
+          listadas de propósito: a linha zerada é o lembrete do que falta ligar, e o dia em que o
+          Radar rodar o número aparece aqui sem mudar nada nesta tela. O lote de importação ainda
+          não é coluna aqui: a função do banco corta por fonte, não por lote.
         </>
       }
     />

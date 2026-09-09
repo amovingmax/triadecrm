@@ -58,14 +58,64 @@ function ehErroDePermissao(erro: { code?: string; message?: string } | null): bo
   return erro.code === '42501' || /row-level security|permission denied/i.test(erro.message ?? '');
 }
 
-/** Conta ocorrências de um id numa lista de linhas, para as colunas de uso dos catálogos. */
-function contar<T extends string | number>(valores: (T | null)[]): Map<T, number> {
-  const mapa = new Map<T, number>();
-  for (const valor of valores) {
-    if (valor === null || valor === undefined) continue;
-    mapa.set(valor, (mapa.get(valor) ?? 0) + 1);
+/**
+ * Conta NO SERVIDOR quantas linhas de `tabela` apontam para cada id de um catálogo.
+ *
+ * A primeira versão baixava a coluna inteira (`select('outcome_id')`) e contava no
+ * navegador. Dois defeitos, e o segundo é o pior. A API corta em `max_rows = 1000`
+ * (supabase/config.toml), então da milésima atividade em diante a contagem parava de
+ * crescer sem dizer nada — e `activities` passa de mil em poucas semanas de campo. E o
+ * erro dessas consultas não era checado: uma recusa da RLS ou uma queda de rede virava
+ * zero na coluna inteira. É justamente o número que o gestor lê para decidir se pode
+ * tirar uma linha do catálogo de uso; zero silencioso convida a desligar um desfecho
+ * que o time usa todo dia.
+ *
+ * Uma agregação num pedido só (`select=outcome_id,count()`) seria o caminho curto, mas
+ * o PostgREST deste projeto recusa agregação — responde `PGRST123, use of aggregate
+ * functions is not allowed`. O lugar certo pelo ADR-03 é uma view de agregação no
+ * Postgres, e view é migração, que está fora do alcance desta correção. Até ela
+ * existir, cada linha do catálogo pede a sua contagem com `head: true`: quem conta é o
+ * Postgres, o navegador não recebe linha nenhuma e a soma continua exata acima de mil.
+ * O preço é um pedido por linha de catálogo — hoje 84 (19 categorias, 22 cidades, 9
+ * motivos, 34 desfechos), todos minúsculos, e em lotes para não abrir 84 conexões de
+ * uma vez. Se algum catálogo crescer para centenas de linhas, a view deixa de ser
+ * preferência e vira necessidade.
+ */
+async function contarUsos(
+  tabela: 'organization_categories' | 'organizations_view' | 'deals' | 'activities',
+  coluna: 'category_id' | 'city_id' | 'lost_reason_id' | 'outcome_id',
+  ids: number[],
+  oQueConta: string,
+): Promise<Map<number, number>> {
+  const supabase = createClient();
+  const porId = new Map<number, number>();
+
+  // Oito por vez, e os quatro catálogos em paralelo entre si: 32 pedidos no ar no pico
+  // e umas quatro idas ao servidor, em vez de uma rajada de 84 pedidos disputando o
+  // pool de conexões do PostgREST.
+  const POR_LOTE = 8;
+
+  for (let inicio = 0; inicio < ids.length; inicio += POR_LOTE) {
+    const lote = await Promise.all(
+      ids.slice(inicio, inicio + POR_LOTE).map(async (id) => {
+        const { count, error } = await supabase
+          .from(tabela)
+          .select(coluna, { count: 'exact', head: true })
+          .eq(coluna, id);
+        return { id, count, error };
+      }),
+    );
+
+    for (const resposta of lote) {
+      // Contagem que falhou não vira zero. Zero aqui é uma afirmação ("ninguém usa,
+      // pode desligar"), e afirmação errada nesta coluna custa uma automação desligada
+      // no meio da operação. Sem número, a tela inteira diz que não carregou.
+      if (resposta.error) throw new Error(`Não deu para contar ${oQueConta}.`);
+      porId.set(resposta.id, resposta.count ?? 0);
+    }
   }
-  return mapa;
+
+  return porId;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,19 +262,7 @@ export async function trocarDominioAtivo(id: number, ativo: boolean): Promise<vo
 export async function carregarCatalogos(): Promise<DadosCatalogos> {
   const supabase = createClient();
 
-  const [
-    categorias,
-    cidades,
-    feriados,
-    motivos,
-    desfechos,
-    modelos,
-    usoCategorias,
-    usoCidades,
-    usoMotivos,
-    usoDesfechos,
-    etapas,
-  ] = await Promise.all([
+  const [categorias, cidades, feriados, motivos, desfechos, modelos, etapas] = await Promise.all([
     supabase
       .from('categories')
       .select('id, slug, name, group, priority, is_active, position')
@@ -256,10 +294,6 @@ export async function carregarCatalogos(): Promise<DadosCatalogos> {
           'version, is_active, meta_status',
       )
       .order('template_code'),
-    supabase.from('organization_categories').select('category_id'),
-    supabase.from('organizations_view').select('city_id'),
-    supabase.from('deals').select('lost_reason_id'),
-    supabase.from('activities').select('outcome_id'),
     // As etapas entram só para trocar o slug do desfecho ("nutricao") pelo nome que
     // aparece no kanban ("Nutrição"): é o mesmo lugar do funil, escrito como o time fala.
     supabase.from('stages').select('slug, name'),
@@ -268,23 +302,6 @@ export async function carregarCatalogos(): Promise<DadosCatalogos> {
   for (const resposta of [categorias, cidades, feriados, motivos, desfechos, modelos]) {
     if (resposta.error) throw new Error(resposta.error.message);
   }
-
-  const porCategoria = contar(
-    ((usoCategorias.data ?? []) as unknown as { category_id: number }[]).map((l) => l.category_id),
-  );
-  const porCidade = contar(
-    ((usoCidades.data ?? []) as unknown as { city_id: number | null }[]).map((l) => l.city_id),
-  );
-  const porMotivo = contar(
-    ((usoMotivos.data ?? []) as unknown as { lost_reason_id: number | null }[]).map(
-      (l) => l.lost_reason_id,
-    ),
-  );
-  const porDesfecho = contar(
-    ((usoDesfechos.data ?? []) as unknown as { outcome_id: number | null }[]).map(
-      (l) => l.outcome_id,
-    ),
-  );
 
   const nomeDaEtapa = new Map(
     ((etapas.data ?? []) as unknown as { slug: string; name: string }[]).map((e) => [
@@ -354,6 +371,36 @@ export async function carregarCatalogos(): Promise<DadosCatalogos> {
     is_active: boolean;
     meta_status: string | null;
   }[];
+
+  // Segunda ida ao servidor, e não dá para fundir com a primeira: a contagem é por id,
+  // e os ids só existem depois que o catálogo chega. Os quatro catálogos contam em
+  // paralelo entre si.
+  const [porCategoria, porCidade, porMotivo, porDesfecho] = await Promise.all([
+    contarUsos(
+      'organization_categories',
+      'category_id',
+      linhasCategorias.map((c) => c.id),
+      'os parceiros de cada categoria',
+    ),
+    contarUsos(
+      'organizations_view',
+      'city_id',
+      linhasCidades.map((c) => c.id),
+      'os parceiros de cada cidade',
+    ),
+    contarUsos(
+      'deals',
+      'lost_reason_id',
+      linhasMotivos.map((m) => m.id),
+      'os negócios perdidos por cada motivo',
+    ),
+    contarUsos(
+      'activities',
+      'outcome_id',
+      linhasDesfechos.map((d) => d.id),
+      'as atividades de cada desfecho',
+    ),
+  ]);
 
   const paraCategoria = (c: (typeof linhasCategorias)[number]): Categoria => ({
     id: c.id,

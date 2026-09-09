@@ -36,12 +36,18 @@ export function TelaLigar({
   const doServidor = contexto.lotes.find((l) => l.id === loteId);
 
   // O lote recém-montado pode não estar no que o servidor entregou (a montagem
-  // acontece em `/ligar`, no cliente), então ele é lido por id. Quando já veio do
-  // servidor, aquilo vale como dado inicial e a leitura só atualiza os contadores.
+  // acontece em `/ligar`, no cliente), então ele é lido por id.
+  //
+  // O que o servidor mandou entra como `placeholderData`, e não como `initialData`, e
+  // a diferença importa: `initialData` conta como dado FRESCO e, com `staleTime`, a
+  // consulta não sairia — e o dono do lote, que só a leitura traz, nunca chegaria.
+  // Placeholder desenha na hora e busca do mesmo jeito. Enquanto ele vale, o lote é
+  // tratado como meu: `contexto.lotes` só chega aqui pela lista de quem já estava na
+  // tela, e supor o contrário faria piscar um aviso falso a cada abertura.
   const lote = useQuery({
     queryKey: ['ligacao', 'lote', loteId],
     queryFn: () => lerLote(loteId),
-    initialData: doServidor,
+    placeholderData: doServidor ? { lote: doServidor, dono: null, ehMeu: true } : undefined,
     staleTime: 10_000,
     retry: false,
   });
@@ -63,7 +69,12 @@ export function TelaLigar({
           frase={
             lote.error instanceof ErroDaLigacao
               ? lote.error.message
-              : 'Este lote não existe mais, ou é de outra pessoa.'
+              : // A frase anterior — "não existe mais, ou é de outra pessoa" — juntava
+                // duas causas, e a segunda quase nunca era a certa: `call_batches_select`
+                // libera todo lote para `app.sees_all()`, então o lote alheio VEM na
+                // leitura. Chegar aqui é o lote não existir para quem está olhando; de
+                // quem ele é, quando existe, quem diz agora é a `TelaChamada`.
+                'Não encontramos este lote. Volte e escolha um da lista.'
           }
           aoTentarDeNovo={null}
           aoVoltar={() => router.push('/ligar')}
@@ -72,11 +83,14 @@ export function TelaLigar({
     );
   }
 
-  const aberto = lote.data;
+  const aberto = lote.data.lote;
 
   return (
     <TelaChamada
       lote={aberto}
+      // Só vem preenchido quando o lote é de outra pessoa (`lerLote` nem busca o nome
+      // no caso comum). É o que deixa a recusa do banco dizer de QUEM é o lote.
+      donoDoLote={lote.data.dono}
       roteiroConhecido={
         contexto.roteiros.find((r) => r.id === aberto.roteiroId) ?? contexto.roteiros[0] ?? null
       }

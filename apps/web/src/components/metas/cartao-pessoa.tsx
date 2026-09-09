@@ -4,6 +4,7 @@ import { useId } from 'react';
 import { ChevronDown, Pencil, RotateCw, Target } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import type { AppRole } from '@/lib/auth/role';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +18,7 @@ import {
   fracaoDecorrida,
   METRICA_DESTAQUE,
   percentualDaBarra,
+  porQueFicaEmZero,
   situacaoDaLinha,
   type LinhaProgresso,
   type Pessoa,
@@ -38,6 +40,7 @@ import {
 export function CartaoPessoa({
   pessoa,
   ehVoce,
+  papel,
   linhas,
   carregando,
   erro,
@@ -47,6 +50,11 @@ export function CartaoPessoa({
 }: {
   pessoa: Pessoa;
   ehVoce: boolean;
+  /**
+   * Papel desta pessoa no diretório do banco. Indefinido enquanto o diretório não
+   * responde — e aí o cartão simplesmente não fala em papel nenhum.
+   */
+  papel: AppRole | undefined;
   linhas: LinhaProgresso[] | undefined;
   carregando: boolean;
   erro: string | null;
@@ -66,6 +74,7 @@ export function CartaoPessoa({
   // como ruído.
   const prontoParaDefinir =
     !carregando && erro === null && linhas !== undefined && linhas.length > 0;
+  const ficaEmZero = porQueFicaEmZero(papel, pessoa.nome, ehVoce);
 
   return (
     <Card className="min-w-0">
@@ -95,6 +104,15 @@ export function CartaoPessoa({
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
+        {/* Antes dos números, e não depois: quem lê "0 de 3" e só embaixo descobre
+            que aquele zero é do papel, já leu o zero como resultado da pessoa. Sem
+            cor e sem ícone de alarme — é um fato de configuração, não um erro dela. */}
+        {ficaEmZero ? (
+          <p className="rounded-lg border border-hairline bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+            {ficaEmZero}
+          </p>
+        ) : null}
+
         {carregando ? (
           <EsqueletoCartao id={idSituacao} nome={pessoa.nome} podeDefinir={podeDefinir} />
         ) : erro ? (

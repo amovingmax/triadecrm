@@ -10,9 +10,13 @@ import {
 } from '@/lib/navegacao';
 
 describe('NAVEGACAO', () => {
-  it('tem exatamente os 4 módulos de uso diário na barra do celular', () => {
+  it('tem os 5 módulos de uso diário na barra do celular, com Registrar entre eles', () => {
     const principais = NAVEGACAO.filter((item) => item.principal).map((item) => item.rotulo);
-    expect(principais).toEqual(['Meu dia', 'Parceiros', 'Funis', 'Conversas']);
+    // Registrar entrou em 09/09/2026: é a tela onde o trabalho vira dado — cria a
+    // temperatura, a próxima ação e a meta — e era a única do produto fora da
+    // navegação, alcançável só por link de outra tela. Cinco fatias mais "Mais"
+    // cabem em 390px com o alvo de toque de 44px; a sexta não caberia.
+    expect(principais).toEqual(['Meu dia', 'Registrar', 'Parceiros', 'Funis', 'Conversas']);
   });
 
   it('não usa travessão em nenhum rótulo nem descrição', () => {

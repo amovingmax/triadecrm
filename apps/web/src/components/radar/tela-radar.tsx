@@ -43,9 +43,11 @@ const SEM_LINHAS: CandidatoDaFila[] = [];
 /**
  * O Radar (PRD §7.3, RF-RAD-*).
  *
- * Três coisas, nesta ordem de importância: dizer se o coletor está de pé (para
- * "fila vazia" e "robô desligado" não desenharem a mesma tela), trabalhar a fila
- * de revisão e mostrar o catálogo das fontes com a avaliação legal de cada uma.
+ * Três coisas, nesta ordem de importância: trabalhar a fila de revisão, mostrar o
+ * catálogo das fontes com a avaliação legal de cada uma e dizer se o coletor está
+ * de pé — este último em uma linha recolhida, porque ele existe para que "fila
+ * vazia" e "robô desligado" não desenhem a mesma tela, e não para ser lido todo
+ * dia.
  *
  * A fila, a criação e a decisão moram no Postgres (`radar_fila`,
  * `radar_criar_candidato`, `radar_revisar_candidato`): aqui só ficam o recorte
@@ -60,7 +62,13 @@ export function TelaRadar({
   catalogos: CatalogosDoRadar;
   /** Veio de `/radar?aba=fontes`: um link para a regra de uma fonte abre nela. */
   abaInicial?: Aba;
-  /** Papéis que trabalham a fila. A autorização de verdade é o RLS. */
+  /**
+   * Papéis que trabalham a fila. A autorização de verdade é o RLS.
+   *
+   * É o espelho de `app.can_write()` (admin, gestor, sdr, embaixador), a mesma
+   * guarda que `radar_coletar_agora` usa para recusar com `sem_permissao` — por
+   * isso ele também responde por quem pode mandar coletar, e não `podeLigarFonte`.
+   */
   podeDecidir: boolean;
   /** Só gestor e admin ligam ou desligam fonte (RF-RAD-01). */
   podeLigarFonte: boolean;
@@ -204,6 +212,17 @@ export function TelaRadar({
         ) : null}
       </header>
 
+      {/* Uma linha, não um painel. A telemetria do robô — batida, host, versão, quatro
+          contadores de fila, últimas coletas — abria o Radar por cima da fila: com 42
+          candidatos esperando decisão, a primeira coisa que a pessoa lia era o estado
+          de uma máquina desligada. A fila é o trabalho; o robô é nota de rodapé, e
+          agora se apresenta como uma (o veredito no título, o resto a um clique).
+
+          Continua ACIMA da fila, e não no pé da aba Fontes, por causa de quem depende
+          dele: `FilaVazia` (estados.tsx) manda procurar o estado do coletor "no painel
+          acima", e é exatamente com a fila vazia que a diferença entre "tudo revisado"
+          e "o robô caiu" decide o dia. Mudar de lugar sem mexer naquele texto trocaria
+          um painel grande demais por uma indicação errada. */}
       <PainelDoColetor />
 
       {/* Duas superfícies, não duas páginas: quem revisa precisa checar a regra de uma
@@ -222,7 +241,7 @@ export function TelaRadar({
       </nav>
 
       {aba === 'fontes' ? (
-        <CatalogoDeFontes podeLigar={podeLigarFonte} />
+        <CatalogoDeFontes podeLigar={podeLigarFonte} podeColetar={podeDecidir} />
       ) : (
         <>
           <BarraDaFila

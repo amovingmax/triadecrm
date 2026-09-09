@@ -1,7 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { CheckCheck, PhoneOutgoing, RotateCw, SquareKanban } from 'lucide-react';
+import {
+  CheckCheck,
+  PhoneOutgoing,
+  Radar,
+  RotateCw,
+  SquareKanban,
+  type LucideIcon,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -42,51 +49,98 @@ export function EsqueletoDaFila() {
   );
 }
 
+/** Um destino do vazio, com o rótulo dizendo o que se faz lá — não onde se chega. */
+type Caminho = { href: string; rotulo: string; Icone: LucideIcon };
+
+const FUNIL: Caminho = { href: '/funis', rotulo: 'Abrir o funil', Icone: SquareKanban };
+const RADAR: Caminho = { href: '/radar', rotulo: 'Revisar no Radar', Icone: Radar };
+const REGISTRAR: Caminho = {
+  href: '/registrar',
+  rotulo: 'Registrar um contato',
+  Icone: PhoneOutgoing,
+};
+
 /**
  * A fila zerou. É a única tela do produto em que não ter nada é o resultado certo,
  * então ela comemora e já oferece o passo seguinte — em vez de um vazio triste que
  * deixa a pessoa sem saber se quebrou.
  *
- * Com uma ressalva que hoje é a regra, não a exceção: os 100 negócios da lista-semente
- * entraram sem responsável ("a triagem distribui depois"), e a fila só enxerga o que
- * tem dono. Comemorar aí seria mentir por omissão — quando há negócio aberto sem
- * responsável, a tela diz o número e manda para o funil, que é onde se assume.
+ * Com duas ressalvas que hoje são a regra, não a exceção:
+ *
+ *   * os 100 negócios da lista-semente entraram sem responsável ("a triagem
+ *     distribui depois"), e a fila só enxerga o que tem dono;
+ *   * o Radar acumula candidato esperando decisão, e candidato não entra na fila do
+ *     dia porque candidato ainda não é alvo — só vira depois que alguém aprova.
+ *
+ * Comemorar em cima de qualquer uma das duas é mentir por omissão, e a mentira sai
+ * cara justamente aqui: esta é a tela que abre o CRM, e quem lê "fila zerada" fecha
+ * o aplicativo. Havendo pilha, a tela diz o número e leva até ela.
  */
 export function FilaVazia({
   nome,
   semResponsavel,
+  aguardandoRevisao,
 }: {
   nome: string;
   /** Negócios abertos sem dono na base inteira. `null` quando a contagem falhou. */
   semResponsavel: number | null;
+  /** Candidatos do Radar em "novo". `null` quando a contagem falhou ou o papel não os vê. */
+  aguardandoRevisao: number | null;
 }) {
-  const haTrabalhoSemDono = semResponsavel !== null && semResponsavel > 0;
+  const temSemDono = semResponsavel !== null && semResponsavel > 0;
+  const temParaRevisar = aguardandoRevisao !== null && aguardandoRevisao > 0;
+  const haTrabalho = temSemDono || temParaRevisar;
+
+  // Os caminhos em ordem de proveito, e só os dois primeiros viram botão: três
+  // botões lado a lado voltam a quebrar linha em 390px, e o terceiro nunca é o que
+  // a pessoa veio fazer. Sem trabalho represado, a ordem é a de sempre — registrar
+  // um contato primeiro, funil depois.
+  const caminhos = [
+    ...(temSemDono ? [FUNIL] : []),
+    ...(temParaRevisar ? [RADAR] : []),
+    REGISTRAR,
+    ...(temSemDono ? [] : [FUNIL]),
+  ].slice(0, 2);
+
+  const Destaque = (haTrabalho ? caminhos[0]?.Icone : undefined) ?? CheckCheck;
+
+  // Cada pilha pede uma coisa diferente, então o fecho da frase muda com ela:
+  // negócio sem dono pede que alguém assuma; candidato pede uma decisão.
+  const fecho =
+    temSemDono && temParaRevisar
+      ? '. Comece por onde preferir.'
+      : temSemDono
+        ? '. Assuma um no funil e ele passa a aparecer aqui.'
+        : '. Aprovado, o candidato vira parceiro e entra no funil.';
 
   return (
     <Moldura
-      icone={
-        haTrabalhoSemDono ? (
-          <SquareKanban className="size-5" aria-hidden="true" />
-        ) : (
-          <CheckCheck className="size-5" aria-hidden="true" />
-        )
-      }
+      icone={<Destaque className="size-5" aria-hidden="true" />}
       titulo={
-        haTrabalhoSemDono
-          ? 'A sua fila está vazia.'
-          : nome
-            ? `Fila zerada, ${nome}.`
-            : 'Fila zerada.'
+        haTrabalho ? 'A sua fila está vazia.' : nome ? `Fila zerada, ${nome}.` : 'Fila zerada.'
       }
       texto={
-        haTrabalhoSemDono ? (
+        haTrabalho ? (
           <>
-            Nada vencido e nada marcado para você. Mas a base tem{' '}
-            <span className="numerico">{semResponsavel}</span>
-            {semResponsavel === 1
-              ? ' negócio aberto ainda sem responsável'
-              : ' negócios abertos ainda sem responsável'}
-            : assuma um no funil e ele passa a aparecer aqui.
+            Nada vencido e nada marcado para você. Mas o trabalho existe:{' '}
+            {temSemDono ? (
+              <>
+                <span className="numerico">{semResponsavel}</span>
+                {semResponsavel === 1
+                  ? ' negócio aberto ainda sem responsável'
+                  : ' negócios abertos ainda sem responsável'}
+              </>
+            ) : null}
+            {temSemDono && temParaRevisar ? ' e ' : null}
+            {temParaRevisar ? (
+              <>
+                <span className="numerico">{aguardandoRevisao}</span>
+                {aguardandoRevisao === 1
+                  ? ' candidato do Radar esperando decisão'
+                  : ' candidatos do Radar esperando decisão'}
+              </>
+            ) : null}
+            {fecho}
           </>
         ) : (
           'Nada vencido, nada marcado para hoje e nenhum negócio seu sem próximo passo. Dá para puxar trabalho novo.'
@@ -94,26 +148,19 @@ export function FilaVazia({
       }
     >
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Button asChild className="toque h-11 md:h-9">
-          <Link href={haTrabalhoSemDono ? '/funis' : '/registrar'}>
-            {haTrabalhoSemDono ? (
-              <SquareKanban aria-hidden="true" />
-            ) : (
-              <PhoneOutgoing aria-hidden="true" />
-            )}
-            {haTrabalhoSemDono ? 'Abrir o funil' : 'Registrar um contato'}
-          </Link>
-        </Button>
-        <Button asChild variant="outline" className="toque h-11 md:h-9">
-          <Link href={haTrabalhoSemDono ? '/registrar' : '/funis'}>
-            {haTrabalhoSemDono ? (
-              <PhoneOutgoing aria-hidden="true" />
-            ) : (
-              <SquareKanban aria-hidden="true" />
-            )}
-            {haTrabalhoSemDono ? 'Registrar um contato' : 'Abrir o funil'}
-          </Link>
-        </Button>
+        {caminhos.map((caminho, ordem) => (
+          <Button
+            key={caminho.href}
+            asChild
+            variant={ordem === 0 ? 'default' : 'outline'}
+            className="toque h-11 md:h-9"
+          >
+            <Link href={caminho.href}>
+              <caminho.Icone aria-hidden="true" />
+              {caminho.rotulo}
+            </Link>
+          </Button>
+        ))}
       </div>
     </Moldura>
   );

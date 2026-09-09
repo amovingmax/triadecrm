@@ -941,11 +941,25 @@ function LenteDaBaseCampos({
   );
 }
 
+/** `YYYY-MM-DD` em dia e mês curtos, sem fuso: a string já é o dia civil de Fortaleza. */
+function diaCurto(dia: string): string {
+  const [ano, mes, resto] = dia.split('-');
+  if (!ano || !mes || !resto) return dia;
+  return `${resto}/${mes}`;
+}
+
 /**
  * O que o banco fez, com os números do banco.
  *
  * "25 pedidos, 18 entraram" é o que faz a pessoa aprender a montar o lote de amanhã;
  * "lote criado" não ensina nada.
+ *
+ * E a mesma régua vale para o PRAZO. `montar_lote` trata a data de fim como piso: um
+ * lote de três tentativas exige três dias abertos, então quem pede "vale só hoje"
+ * recebe um lote de vários dias — com os contatos reservados esse tempo todo, fora da
+ * montagem do resto do time, e com o encerramento do lote como única forma de
+ * devolvê-los antes. O banco já dizia tudo isso (`termina_em`, `termina_em_pedido`,
+ * `prazo_esticado`); faltava alguém escrever na tela.
  */
 function ReciboDaMontagem({
   resumo,
@@ -955,6 +969,12 @@ function ReciboDaMontagem({
   aoFechar: () => void;
 }) {
   const excluidos = exclusoesEmFrases(resumo.excluidos);
+  const ate = resumo.termina_em ? diaCurto(resumo.termina_em) : null;
+  const pedido = resumo.termina_em_pedido ? diaCurto(resumo.termina_em_pedido) : null;
+  const tentativas = resumo.max_tentativas ?? null;
+  // Só é "esticado" quando houve pedido explícito: montagem sem data de fim não pediu
+  // nada, e o banco já resolve isso em `prazo_esticado`.
+  const esticou = Boolean(resumo.prazo_esticado) && pedido !== null && ate !== null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -969,9 +989,38 @@ function ReciboDaMontagem({
             </span>
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Esses contatos estão reservados no seu nome: eles somem da montagem de todo mundo até o
-            lote acabar ou ser encerrado.
+            {ate ? (
+              <>
+                Reservados no seu nome até <span className="numerico text-foreground">{ate}</span>:
+                eles somem da montagem de todo mundo até lá, ou até o lote acabar. Para devolvê-los
+                antes, encerre o lote na lista.
+              </>
+            ) : (
+              <>
+                Esses contatos estão reservados no seu nome: eles somem da montagem de todo mundo
+                até o lote acabar ou ser encerrado.
+              </>
+            )}
           </p>
+          {esticou ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Você pediu até <span className="numerico">{pedido}</span>.{' '}
+              {tentativas !== null ? (
+                <>
+                  O lote tem <span className="numerico">{tentativas}</span>
+                  {tentativas === 1 ? ' tentativa' : ' tentativas'} por número, e cada uma precisa
+                  de um dia em que dá para ligar — por isso ele vale até{' '}
+                  <span className="numerico">{ate}</span>. Quem quer lote de um dia pede uma
+                  tentativa.
+                </>
+              ) : (
+                <>
+                  O prazo foi até <span className="numerico">{ate}</span> para caber as tentativas
+                  que você pediu.
+                </>
+              )}
+            </p>
+          ) : null}
         </div>
 
         {excluidos.length > 0 ? (

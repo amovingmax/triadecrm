@@ -798,6 +798,10 @@ function SecaoDesfechos({
       largura: 'w-28',
       celula: (d) => rotuloDaPorta(d.contaComo),
     },
+    // Mantida escondida abaixo de 1280 px (agora cabeçalho e célula juntos): com seis
+    // colunas mais a de ação, esta é a tabela mais larga da Admin, e "Já usado" é a
+    // única que não muda decisão nenhuma na linha — o número aparece por extenso na
+    // confirmação, que é onde ele pesa.
     {
       id: 'usos',
       rotulo: 'Já usado',
@@ -888,6 +892,10 @@ function SecaoModelos({
         </span>
       ),
     },
+    // Sai da tabela abaixo de 1280 px, mas continua no bloco do celular (sem
+    // `soNoDesktop`): na lista vertical o código cabe numa linha própria, na tabela ele
+    // rouba 14rem de uma largura que o notebook não tem. Quem procura por código tem o
+    // campo de busca logo acima.
     {
       id: 'codigo',
       rotulo: 'Código',
