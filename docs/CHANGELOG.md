@@ -1900,3 +1900,16 @@ O motivo está em `move_deal`: reagendar não altera a tarefa da reunião — el
 - **404/410 do Google não é erro de quem clicou**: o evento foi apagado por lá. O espelho é esquecido, em vez de a tarefa nova herdar um link morto.
 - Verificado: 15 asserções pgTAP novas (`supabase/tests/39_o_evento_acompanha_o_reagendamento.sql`); suíte 31–39 rodada inteira (223 asserções, só o 36 vermelho — ver a entrada seguinte); 533 testes Vitest; lint, typecheck e build verdes com as quatro rotas registradas; migração aplicada no `komune-crm` em nuvem.
 - Pendente: continua faltando virar as três chaves de `docs/operacao/ligar-a-agenda-do-google.md`. Conferido em 09/09: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e `SUPABASE_SERVICE_ROLE_KEY` ainda não estão na Vercel.
+
+## Correção — 09/09/2026 — O endereço do pré-cadastro vira migração
+
+Defeito encontrado rodando a suíte pgTAP inteira, e a espécie mais desagradável: **configuração de produção que não existe no repositório**.
+
+A migração `20260908120000` cria `app_settings['precadastro.link']` com `modelo = null` de propósito — enquanto o endereço não estivesse decidido, a emissão de link ficava recusada, porque botão que não funciona é melhor que link que não abre. O endereço foi decidido no mesmo dia e gravado em produção **com um UPDATE à mão**; o commit que registrou a decisão (`5ffb656`) mexeu no CHANGELOG e em nada mais.
+
+- **O sintoma que denunciou:** o teste `36_link_do_precadastro` passa no CI (banco novo, modelo nulo) e falha na máquina onde o UPDATE tinha sido rodado. Um teste cujo resultado depende de onde ele roda não está testando o produto.
+- **O sintoma que viria depois:** qualquer restauração do banco a partir das migrações desligaria a emissão de link em silêncio, e a tela diria "endereço não configurado" sem ninguém saber por quê. `komune-dev` nunca teve o valor.
+- **`20260909110000`** preenche o modelo, e só onde ele está NULO (`where value ->> 'modelo' is null`): rodar em produção não muda nada — conferido, `UPDATE 0` — e um ambiente que aponte para outro lugar continua apontando. `app_settings` segue sendo a tabela de configuração.
+- **Já recusei cravar valor de produção em migração uma vez**, com a URL e o segredo do cron do lado Komune, pelo motivo certo: a mesma migração roda em dev e em produção. Aqui é diferente — `admin.komune.app.br` não é ambiente nosso, é o cadastro real da Komune, e não existe "admin de desenvolvimento" para onde mandar um fornecedor de verdade.
+- **O teste 36 foi atualizado** para afirmar a verdade nova, e passou a CRIAR a situação "sem endereço" em vez de contar com o estado inicial do banco. `pg_temp.modelo` também foi corrigido: usava `jsonb_build_object('modelo', p_valor)`, que grava a string `"null"` em vez do nulo jsonb quando o parâmetro é nulo.
+- Verificado: `supabase db reset` (banco do zero, 40 migrações, seed) seguido de `supabase test db --local` — **39 arquivos, 2358 asserções, todas verdes**. É a primeira vez nesta sequência de trabalho que a suíte inteira foi rodada num banco recriado, e não incrementalmente.

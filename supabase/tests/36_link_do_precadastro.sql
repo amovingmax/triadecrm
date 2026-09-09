@@ -33,10 +33,13 @@ create function pg_temp.versao(p_org uuid) returns int
   language sql security definer set search_path = '' as $$
   select claim_token_version from public.pre_registrations where organization_id = p_org
 $$;
+-- `to_jsonb` de um text nulo dá `null` jsonb, que é o que a função de emissão lê
+-- como "não configurado". `jsonb_build_object('modelo', null)` faria o mesmo, mas
+-- por um caminho que some se alguém trocar o tipo do parâmetro.
 create function pg_temp.modelo(p_valor text) returns void
   language sql security definer set search_path = '' as $$
   update public.app_settings
-     set value = jsonb_build_object('modelo', p_valor)
+     set value = jsonb_build_object('modelo', to_jsonb(p_valor))
    where key = 'precadastro.link'
 $$;
 
@@ -62,11 +65,23 @@ values ('c0000000-0000-4000-8000-000000003601',
         (select s.id from public.stages s join public.pipelines p on p.id = s.pipeline_id
           where p.slug = 'fornecedor' and s.slug = 'prospectado'));
 
--- ---------- a configuração existe e nasce vazia ----------
+-- ---------- a configuração existe e aponta para o cadastro real ----------
+-- Até 09/09/2026 esta seção afirmava que o modelo "nasce VAZIO". Nascia mesmo, e
+-- era o certo enquanto o endereço não estivesse decidido. Ele foi decidido no
+-- mesmo dia, e a migração 20260909110000 passou a preenchê-lo — antes disso o
+-- valor só existia como UPDATE à mão em produção, o que fazia este arquivo
+-- passar no CI e falhar na máquina de quem tinha rodado o UPDATE.
 select ok(exists (select 1 from public.app_settings where key = 'precadastro.link'),
   'a configuração precadastro.link existe');
-select is((select value ->> 'modelo' from public.app_settings where key = 'precadastro.link'), null,
-  'e nasce VAZIA de propósito: melhor botão que não funciona do que link que não abre');
+select is((select value ->> 'modelo' from public.app_settings where key = 'precadastro.link'),
+  'https://admin.komune.app.br/seja-parceiro?pre={token}',
+  'e aponta para o cadastro da Komune, vindo de migração e não de UPDATE à mão');
+
+-- O caminho "sem endereço" continua sendo testado, mas agora o teste o CRIA em
+-- vez de contar com o estado inicial: a configuração vazia deixou de ser o padrão
+-- do banco e virou uma situação (alguém limpou, ou um ambiente novo ainda não
+-- decidiu). Testar o padrão de ontem seria testar o passado.
+select pg_temp.modelo(null);
 
 -- ---------- sem autorização, nem chega perto do endereço ----------
 do $$
