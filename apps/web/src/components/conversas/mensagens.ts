@@ -529,6 +529,12 @@ export function ordenarFila(rascunhos: RascunhoDaIa[]): RascunhoDaIa[] {
  * mesmos motivos que `app.pode_enviar` devolve, e é por eles que a frase é
  * escolhida — nunca pelo texto cru do Postgres, que fala de trigger e de RF.
  *
+ * A aprovação de rascunho entra pela mesma porta, e não é detalhe: `aprovar_rascunho`
+ * é RPC e devolve `{ok:false, motivo}` só para "já não estava pendente". Quando o
+ * parceiro pede para sair entre a IA escrever e a pessoa clicar, quem recusa é o
+ * `message_drafts_guard`, por exceção — então a frase certa depende desta tabela
+ * tanto quanto o envio depende.
+ *
  * Esta tabela é um CONTRATO com o banco, e um contrato que ninguém compila:
  * se um motivo for renomeado lá, aqui ninguém quebra, só some a frase e a
  * pessoa vê "não deu para falar com o servidor". Por isso os `mensagens.test.ts`
@@ -577,23 +583,46 @@ export const MOTIVOS_DE_RECUSA_DO_ENVIO: Record<string, string> = {
 };
 
 /**
+ * Os quatro prefixos que o Postgres escreve antes do motivo.
+ *
+ * Três deles têm a palavra "recusa" e um não tem — e essa exceção já custou uma
+ * frase errada na tela, então ela está escrita aqui em vez de subentendida:
+ *   `Envio recusado: teto_do_numero (RF-CON-10, ...)`       — messages_guard, insert
+ *   `Entrega recusada na saída: contato_suprimido — ...`    — messages_guard, update
+ *   `Rascunho recusado na origem: numero_suprimido (...)`   — message_drafts_guard, insert
+ *   `Não dá para aprovar: contato_suprimido (a pessoa ...)` — message_drafts_guard, update
+ *
+ * O certo seria o banco escrever um prefixo só, e vale padronizar no dia em que
+ * uma migração puder tocar o `message_drafts_guard`. Enquanto ele escreve dois
+ * jeitos, é aqui que os dois são reconhecidos — porque a alternativa (varrer o
+ * texto atrás de qualquer token conhecido, sem prefixo nenhum) devolveria frase
+ * de recusa para exceção que não é recusa: um "Transição de rascunho inválida:
+ * pendente → enviado" viraria a frase do motivo errado.
+ *
+ * O acento é opcional de propósito: nem todo caminho entre o `raise` e este
+ * regex devolve o texto do banco byte a byte, e um "a" sem til não pode ser a
+ * diferença entre dizer que o parceiro pediu para sair e não dizer nada.
+ */
+const PREFIXO_DA_RECUSA = /(?:recusad[oa][^:]*|n[ãa]o d[áa] para aprovar):\s*([a-z_]+)/i;
+
+/**
  * O motivo, extraído do texto da exceção — e procurado por igualdade, não por
  * "contém".
- *
- * Os três lugares onde o banco recusa escrevem o motivo depois de dois-pontos:
- *   `Envio recusado: teto_do_numero (RF-CON-10, ...)`      — messages_guard, insert
- *   `Entrega recusada na saída: contato_suprimido — ...`   — messages_guard, update
- *   `Rascunho recusado na origem: numero_suprimido (...)`  — message_drafts_guard
  *
  * Uma varredura por substring funcionaria hoje, porque nenhum motivo é pedaço
  * de outro. Mas "funciona porque a tabela ainda não tem duas entradas parecidas"
  * é o tipo de coisa que deixa de ser verdade num commit de outra pessoa, e o
  * defeito seria a frase errada na tela — silencioso. Capturar o token e comparar
  * por igualdade não tem esse jeito de quebrar.
+ *
+ * O `i` do regex vale para o prefixo, não para o motivo: o token é normalizado
+ * para minúsculas antes da busca, porque a chave do mapa é o nome exato que o
+ * `app.wa_motivo_de_recusa` devolve — comparar `Contato_Suprimido` com ele daria
+ * "motivo desconhecido" e a frase genérica, que é justamente o defeito.
  */
 export function fraseDaRecusaDoEnvio(texto: string): string | null {
-  const achado = /recusad[oa][^:]*:\s*([a-z_]+)/.exec(texto);
-  const motivo = achado?.[1];
+  const achado = PREFIXO_DA_RECUSA.exec(texto);
+  const motivo = achado?.[1]?.toLowerCase();
   if (!motivo) return null;
   return MOTIVOS_DE_RECUSA_DO_ENVIO[motivo] ?? null;
 }

@@ -48,7 +48,29 @@ export function TelaMetas({
   podeDefinir,
   hoje,
 }: {
-  /** Diretório do time, em ordem alfabética. Para sdr, só a própria pessoa. */
+  /**
+   * Diretório do time, em ordem alfabética. Para sdr, só a própria pessoa.
+   *
+   * FALTA NO BANCO — meta para quem o próprio banco impede de produzir o número.
+   * Esta lista traz todo perfil ativo, e `app.can_write()` só deixa admin, gestor,
+   * sdr e embaixador escreverem em `activities`, `organizations` e `deals`. Quem é
+   * `leitura`, `financeiro` ou `bot` nunca vai ter realizado em métrica nenhuma: a
+   * meta definida para essa pessoa fica presa em zero, e o Assistente passa a cobrar
+   * alguém que a RLS proíbe de registrar o trabalho. A tela não resolve isso
+   * sozinha: `Pessoa` é só `{ id, nome }`, e `goal_progress` devolve `mensuravel`
+   * por MÉTRICA, nunca por pessoa. Deduzir pelo papel aqui seria reescrever
+   * `app.can_write()` em TypeScript (ADR-03) e ficar defasado no dia em que ela
+   * mudar. O que resolve, no SQL:
+   *   1. `public.goal_progress` devolver `mensuravel = false` — com a `fonte`
+   *      dizendo que o papel dessa pessoa não registra atividade no CRM — quando o
+   *      alvo não passa em `app.can_write()`. A folha de meta já filtra o seletor
+   *      por `mensuravel`, então ele ficaria vazio sozinho, sem tela nova;
+   *   2. `goals_insert` e `goals_update` recusarem `user_id` de perfil que não
+   *      escreve, para não entrar meta impossível por chamada direta à API.
+   * PRECISA DE DECISÃO HUMANA (Rafael): se o gestor pode definir meta para alguém de
+   * `leitura` de propósito — combinado registrado antes de a pessoa trocar de papel
+   * —, então (1) é aviso, e não bloqueio.
+   */
   pessoas: Pessoa[];
   euId: string;
   /** Gestor e admin definem meta pela tela (a RLS de `public.goals` é a regra de verdade). */
@@ -103,6 +125,18 @@ export function TelaMetas({
     : semNenhumaMeta
       ? 'Nenhuma meta definida para este período. Os números abaixo são o realizado; use "Definir meta" no cartão da pessoa para dar um alvo a ele.'
       : null;
+
+  // As linhas de quem a folha vai editar, sem valor de reserva. Antes daqui saía
+  // `?? referencia` — a primeira resposta que tivesse chegado, de qualquer pessoa.
+  // Bastava UMA das consultas paralelas falhar (rede de celular, sessão expirada)
+  // para o gestor abrir "Meta de João", ver 12 no campo, achar que era a meta atual
+  // do João e salvar: gravava no João a meta da Maria, com o nome do João no título,
+  // no aviso de sucesso e no histórico — erro que ninguém descobre depois. Sem os
+  // dados da pessoa a folha não abre, e o botão que a abriria já está desabilitado
+  // no cartão dela.
+  const linhasDaFolha = folha
+    ? consultas[pessoas.findIndex((p) => p.id === folha.pessoa.id)]?.data
+    : undefined;
 
   function trocarPeriodo(novo: Periodo) {
     setPeriodo(novo);
@@ -215,15 +249,20 @@ export function TelaMetas({
 
       {referencia.length > 0 ? <ComoContamos linhas={referencia} /> : null}
 
-      {folha ? (
+      {folha && linhasDaFolha && linhasDaFolha.length > 0 ? (
         <FolhaMeta
           aberta
           aoFechar={() => setFolha(null)}
           pessoa={folha.pessoa}
           periodo={periodo}
-          inicio={primeira?.periodo_inicio ?? inicio}
+          // O período que a folha GRAVA é o mesmo que o título dela promete: `rotulo`
+          // e `inicio` saem do mesmo estado. Tirado de `periodo_inicio` de uma linha,
+          // durante a troca de período (o TanStack segura a resposta anterior por
+          // `keepPreviousData`) a folha dizia "Semana de 07/09" e escrevia na de
+          // 31/08. O gatilho `goals_before_write` normaliza de novo no banco.
+          inicio={inicio}
           rotuloPeriodo={rotulo}
-          linhas={consultas[pessoas.findIndex((p) => p.id === folha.pessoa.id)]?.data ?? referencia}
+          linhas={linhasDaFolha}
           metricaInicial={folha.metrica}
           aoGravar={() => void clienteDeConsultas.invalidateQueries({ queryKey: CHAVE_METAS })}
         />

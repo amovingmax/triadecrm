@@ -242,6 +242,58 @@ export async function desfazerLote(loteId: string): Promise<ResultadoDoDesfazer>
 }
 
 /**
+ * O tempo que ainda resta das 48 h, em pedaços: "restam", "31", "horas".
+ *
+ * Vem partido, e não como uma string só, porque só o dígito vai para a IBM Plex
+ * Mono (a abertura de `formatos.ts`): vestir "restam 31 horas" inteiro de mono põe
+ * duas famílias no meio de uma linha de Poppins para alinhar nada.
+ */
+export type PrazoDoDesfazer = {
+  /** "resta" ou "restam", para a frase concordar com o número. */
+  verbo: string;
+  /** O dígito, e só ele, para receber o utilitário `numerico`. */
+  numero: string;
+  unidade: string;
+  /** A frase inteira, para leitor de tela, `title` e testes. */
+  frase: string;
+};
+
+/**
+ * Quanto falta para a janela do desfazer fechar, ou nulo se ela já fechou.
+ *
+ * Arredonda para BAIXO de propósito. Dizer "restam 2 horas" quando faltam 1 h 50
+ * promete tempo que não existe, e quem confia na frase para deixar a decisão para
+ * depois do almoço encontra a janela fechada.
+ *
+ * O nulo é o que impede a lista de oferecer o botão numa aba aberta desde ontem:
+ * ali o `pode_desfazer` da resposta continua verdadeiro, porque foi calculado no
+ * banco na hora da consulta. Quem recusa de verdade segue sendo
+ * `esteira_desfazer_lote`, que confere o `can_undo_until` no relógio do servidor;
+ * isto só evita o clique que existiria para levar recusa.
+ */
+export function prazoDoDesfazer(
+  ate: string | null | undefined,
+  agora: Date = new Date(),
+): PrazoDoDesfazer | null {
+  if (!ate) return null;
+  const fim = new Date(ate).getTime();
+  if (Number.isNaN(fim)) return null;
+
+  const minutos = Math.floor((fim - agora.getTime()) / 60_000);
+  if (minutos <= 0) return null;
+
+  const monte = (quantidade: number, unidade: string, unidades: string): PrazoDoDesfazer => {
+    const verbo = quantidade === 1 ? 'resta' : 'restam';
+    const numero = formatarNumero(quantidade);
+    const nome = quantidade === 1 ? unidade : unidades;
+    return { verbo, numero, unidade: nome, frase: `${verbo} ${numero} ${nome}` };
+  };
+
+  if (minutos < 60) return monte(minutos, 'minuto', 'minutos');
+  return monte(Math.floor(minutos / 60), 'hora', 'horas');
+}
+
+/**
  * O que o recibo diz depois de desfazer — sem inventar causa.
  *
  * A frase antiga era "N ficaram de pé porque alguém já trabalhou", e ela era

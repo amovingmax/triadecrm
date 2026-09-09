@@ -57,11 +57,14 @@ export type Ficha = {
   negocios: NegocioDaFicha[];
 };
 
-/** `null` quando a ficha não existe ou está fora do que o papel enxerga. */
+/**
+ * `null` significa uma coisa só: a linha não está lá — não existe, ou está fora do que
+ * a RLS deixa este papel ver, que para quem olha dá no mesmo. Falha de leitura lança.
+ */
 export async function carregarFicha(id: string): Promise<Ficha | null> {
   const supabase = await createClient();
 
-  const { data: org } = await supabase
+  const { data: org, error } = await supabase
     .from('organizations_view')
     // Uma string literal só: o supabase-js deduz o tipo do retorno a partir dela, e
     // uma concatenação em tempo de execução apagaria essa dedução.
@@ -71,6 +74,16 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     .eq('id', id)
     .maybeSingle();
 
+  // "Deu erro" e "não tem" são coisas diferentes, e trocar uma pela outra sai caro:
+  // engolindo o erro e devolvendo `null`, a página caía no `notFound()` e escrevia
+  // "este parceiro não existe" — para um parceiro que existe — toda vez que a sessão
+  // expirava, a RLS barrava ou a rede caía no meio da rua. Quem lê isso conclui que o
+  // cadastro sumiu e recadastra por cima, criando a duplicata que a esteira de
+  // ingestão existe para evitar. Lançando, o limite de erro do segmento assume a falha
+  // como do CRM e oferece "Tentar de novo", que é a saída certa para os três casos.
+  if (error) {
+    throw new Error(`Não foi possível ler a ficha do parceiro: ${error.message}`);
+  }
   if (!org) return null;
 
   const [categorias, negocios, origem, time] = await Promise.all([

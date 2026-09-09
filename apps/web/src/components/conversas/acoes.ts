@@ -111,7 +111,20 @@ export async function aprovarRascunho(
     p_draft_id: rascunhoId,
     p_texto_final: texto,
   });
-  if (error) levantar(error.code, error);
+  if (error) {
+    // O motivo vem ANTES do código, pelo mesmo caminho de `responder()`.
+    //
+    // `message_drafts_guard` reconfere a supressão no instante do clique e
+    // levanta 42501 — o MESMO código de "papel não aprova envio". Sem esta
+    // tradução, quem tentasse aprovar um rascunho para quem acabou de pedir
+    // para sair lia "seu perfil não pode aprovar": iria pedir permissão ao
+    // admin, o admin veria o papel em ordem, e o fato de o parceiro ter pedido
+    // para sair não chegaria a ninguém. Um guardrail que a tela conta errado
+    // vira um chamado de suporte sobre permissão.
+    const frase = fraseDaRecusaDoEnvio(error.message);
+    if (frase) throw new ErroDaConversa(frase, false, error);
+    levantar(error.code, error);
+  }
 
   const lido = aprovacaoSchema.safeParse(data);
   if (!lido.success) {

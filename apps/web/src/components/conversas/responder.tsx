@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { FileCheck2, PenLine, Phone, SendHorizontal } from 'lucide-react';
+import { BellOff, FileCheck2, NotebookPen, PenLine, Phone, SendHorizontal } from 'lucide-react';
 import { LIMITES_PADRAO } from '@komune/prompts';
 
 import { cn } from '@/lib/utils';
@@ -39,17 +39,37 @@ import type { EstadoDaJanela, FioDaConversa } from './tipos';
  * gente QUER mandar, e o gatilho reconfere supressão e teto na hora da entrega,
  * não na hora do clique — quem pedir para sair nesse meio-tempo não recebe. Mas
  * é preciso dizer, e o botão diz.
+ *
+ * ===========================================================================
+ * E QUEM PEDIU PARA SAIR NÃO TEM CAIXA
+ * ===========================================================================
+ * A janela diz "agora não"; o opt-out diz "nunca mais". Por isso ele é a
+ * PRIMEIRA pergunta desta função, antes da janela e antes de existir fio: o que
+ * vale para texto livre vale igual para modelo aprovado e para o primeiro
+ * contato de um fio que ainda não nasceu. Um formulário aberto para quem pediu
+ * para sair é um convite a escrever uma mensagem que o banco vai recusar — e o
+ * pior é que a pessoa só descobre depois de escrever.
  */
 export function CaixaDeResposta({
   fio,
   janela,
   organizacaoId,
+  naoContatar = false,
   recolhida = false,
   className,
 }: {
   fio: FioDaConversa | null;
   janela: EstadoDaJanela;
   organizacaoId: string;
+  /**
+   * A ficha está em `do_not_contact`.
+   *
+   * O padrão é `false` porque a ausência do dado não pode virar um bloqueio: a
+   * tela que não souber informar mostra a caixa, e o gatilho continua sendo o
+   * guardrail de verdade. O contrário — presumir opt-out — esconderia a caixa
+   * de todo mundo no dia em que alguém esquecesse de passar a prop.
+   */
+  naoContatar?: boolean;
   /**
    * Há um rascunho esperando aprovação logo acima.
    *
@@ -63,6 +83,8 @@ export function CaixaDeResposta({
   className?: string;
 }) {
   const [aberta, setAberta] = useState(false);
+
+  if (naoContatar) return <PediuParaSair organizacaoId={organizacaoId} className={className} />;
 
   if (!fio) return <SemFio organizacaoId={organizacaoId} className={className} />;
 
@@ -83,6 +105,44 @@ export function CaixaDeResposta({
     <TextoLivre fio={fio} organizacaoId={organizacaoId} className={className} />
   ) : (
     <SoModelo organizacaoId={organizacaoId} className={className} />
+  );
+}
+
+/**
+ * O parceiro pediu para não receber mais nada.
+ *
+ * Este bloco não é um aviso ao lado de um campo que continua aceitando texto: ele
+ * SUBSTITUI o formulário. E não oferece "registrar contato por telefone", que é a
+ * saída dos outros dois blocos daqui — telefonar para quem pediu para sair é o
+ * mesmo contato por outro canal, e a tela de registro já recusa o caso. A única
+ * ação que sobra é a honesta: abrir a ficha e anotar.
+ */
+function PediuParaSair({
+  organizacaoId,
+  className,
+}: {
+  organizacaoId: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn('space-y-2 rounded-xl border border-dashed border-hairline p-3', className)}>
+      <p className="flex items-center gap-2 text-sm font-medium">
+        <BellOff className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        Este parceiro pediu para não receber mais mensagens
+      </p>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Nada sai daqui para ele: nem texto livre dentro da janela de 24 h, nem modelo aprovado
+        fora dela. O banco recusaria o envio de qualquer jeito, e a caixa fecha antes para
+        ninguém escrever à toa. Se ele procurou você, anote na ficha — anotação não devolve
+        ninguém para a fila.
+      </p>
+      <Button asChild variant="outline" className="toque h-11 md:h-9">
+        <Link href={`/parceiros/${organizacaoId}`}>
+          <NotebookPen aria-hidden="true" />
+          Abrir a ficha do parceiro
+        </Link>
+      </Button>
+    </div>
   );
 }
 

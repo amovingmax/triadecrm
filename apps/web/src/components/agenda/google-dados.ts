@@ -143,6 +143,13 @@ export const RECADO_DA_ROTA: Record<string, string> = {
     'A integração com o Google ainda não foi configurada no servidor. Fale com Luiz ou Matheus.',
   agenda_nao_conectada: 'Conecte a sua agenda Google antes, no topo desta tela.',
   tarefa_invisivel: 'Você não tem acesso a esse compromisso.',
+  // Enxergar a reunião não é poder desmarcá-la: o evento mora na agenda pessoal de
+  // quem o criou, e o Google avisa o fornecedor a cada mudança.
+  // FALTA AQUI (de quem cuida deste arquivo): no caminho de remarcar, quando a
+  // recusa é esta, o CRM já registrou o horário novo e o Google ficou no velho —
+  // a tela deveria dizer isso, e este recado sozinho não diz.
+  nao_e_seu:
+    'Esse evento está na agenda de quem marcou a reunião: só essa pessoa, ou um gestor, muda o horário ou tira do Google. Peça a ela para ajustar por lá.',
   ja_tem_evento: 'Esse compromisso já está no seu Google Agenda.',
   sem_horario: 'Esse compromisso não tem hora marcada.',
   evento_criado_sem_registro:

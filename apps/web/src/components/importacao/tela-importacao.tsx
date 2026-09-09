@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Upload } from 'lucide-react';
+import { FileSpreadsheet, Undo2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { DialogoConfirmar } from '@/components/admin/confirmar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatarDataHora, formatarNumero } from '@/components/parceiros/formatos';
@@ -12,12 +13,16 @@ import { formatarDataHora, formatarNumero } from '@/components/parceiros/formato
 import {
   abrirLote,
   buscarLotes,
+  desfazerLote,
   encerrarLote,
+  fraseDoDesfazer,
   gravar,
   mensagemDoErro,
   pedirPrevia,
+  prazoDoDesfazer,
   totalDe,
   type LinhaCrua,
+  type PrazoDoDesfazer,
 } from './dados';
 import { ErroDaImportacao, EsqueletoDaPrevia, Progresso, SemLotes } from './estados';
 import { faltando, linhaParaObjeto, sugerirMapa, temConteudo, type Sugestao } from './mapeamento';
@@ -26,7 +31,14 @@ import { PassoMapa } from './passo-mapa';
 import { PassoPrevia } from './passo-previa';
 import type { PedidoAoLeitor, RespostaDoLeitor } from './planilha.worker';
 import { Recibo } from './recibo';
-import { ROTULO_DECISAO, type Mapa, type PlanilhaLida, type Previa, type Recibo as TipoRecibo } from './tipos';
+import {
+  ROTULO_DECISAO,
+  type LoteAnterior,
+  type Mapa,
+  type PlanilhaLida,
+  type Previa,
+  type Recibo as TipoRecibo,
+} from './tipos';
 
 type Etapa = 'arquivo' | 'mapa' | 'previa' | 'recibo';
 
@@ -38,7 +50,9 @@ type Falha = { causa: string; comoResolver?: string } | null;
  * Quatro etapas numa tela só, porque são quatro momentos de um trabalho só:
  * escolher o arquivo, dizer o que é cada coluna, conferir a prévia e gravar.
  * Voltar é sempre possível até a gravação; depois dela, o que existe é o desfazer
- * de 48 h, que é uma promessa diferente e mora no recibo.
+ * de 48 h, que é uma promessa diferente e aparece em dois lugares: no recibo, para
+ * quem acabou de gravar, e em cada lote da lista, para quem só descobre o erro no
+ * dia seguinte.
  *
  * Onde cada coisa acontece
  *   · ler o arquivo → Web Worker (a tela não pode congelar em planilha grande);
@@ -282,7 +296,14 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }:
             ocupado={passoDaLeitura !== null}
             passo={passoDaLeitura}
           />
-          <ListaDeLotes lotes={lotes.data ?? null} carregando={lotes.isPending} />
+          <ListaDeLotes
+            lotes={lotes.data ?? null}
+            carregando={lotes.isPending}
+            podeDesfazer={podeDesfazer}
+            aoDesfazer={() => {
+              void clienteDeConsultas.invalidateQueries({ queryKey: ['importacao'] });
+            }}
+          />
         </>
       ) : null}
 
@@ -397,13 +418,60 @@ function ArquivoEscolhido({
   );
 }
 
+/**
+ * As importações anteriores — e o desfazer de 48 h onde ele é de fato usado.
+ *
+ * O botão do recibo só alcança quem acabou de gravar e ainda está com a tela
+ * aberta. O caso real do desfazer é outro: a planilha entra à noite e no dia
+ * seguinte alguém percebe que era o arquivo errado. Aí a pessoa abre esta tela,
+ * vê o lote com data e autor, e as 48 h continuam correndo no banco. Sem o botão
+ * aqui, o único caminho era apagar ficha por ficha.
+ *
+ * Quem decide continua sendo o Postgres (`app.is_manager()` e o `can_undo_until`
+ * no relógio do servidor). A tela só evita oferecer um botão que já se sabe
+ * recusado, e conta a quem não pode a quem pedir e até quando.
+ */
 function ListaDeLotes({
   lotes,
   carregando,
+  podeDesfazer,
+  aoDesfazer,
 }: {
-  lotes: Awaited<ReturnType<typeof buscarLotes>> | null;
+  lotes: LoteAnterior[] | null;
   carregando: boolean;
+  /** Espelho de `app.is_manager()`: quem desfaz um lote (RF-BAS-17). */
+  podeDesfazer: boolean;
+  /** Chamado depois de desfazer, para a lista e as contagens se refazerem. */
+  aoDesfazer: () => void;
 }) {
+  // Guarda junto o prazo que a pessoa VIU na linha: recalcular dentro do diálogo
+  // faria o texto discordar do botão que acabou de ser apertado.
+  const [confirmando, setConfirmando] = useState<{
+    lote: LoteAnterior;
+    prazo: PrazoDoDesfazer;
+  } | null>(null);
+  const [desfazendo, setDesfazendo] = useState<string | null>(null);
+
+  const desfazer = async (lote: LoteAnterior) => {
+    setConfirmando(null);
+    setDesfazendo(lote.id);
+    try {
+      const r = await desfazerLote(lote.id);
+      if (r.jaEstava) {
+        // Duas abas abertas, ou dois gestores no mesmo lote: o banco responde
+        // "já estava" em vez de errar, e dizer "removi" seria mentira.
+        toast.info('Esse lote já tinha sido desfeito.');
+      } else {
+        toast.success(fraseDoDesfazer(r));
+      }
+      aoDesfazer();
+    } catch (erro) {
+      toast.error(mensagemDoErro(erro));
+    } finally {
+      setDesfazendo(null);
+    }
+  };
+
   if (carregando) {
     return (
       <div aria-busy="true" className="h-24 animate-pulse rounded-xl bg-muted/60" aria-label="Carregando as importações anteriores" />
@@ -417,35 +485,108 @@ function ListaDeLotes({
         Importações anteriores
       </h2>
       <ul className="border-t border-hairline">
-        {lotes.map((lote) => (
-          <li
-            key={lote.id}
-            className="flex flex-col gap-1 border-b border-hairline py-3 md:flex-row md:items-center md:gap-4"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{lote.rotulo}</p>
-              <p className="text-sm text-muted-foreground">
-                <span className="numerico">{formatarDataHora(lote.criado_em)}</span>
-                {lote.quem ? ` · ${lote.quem}` : ''}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Badge variant="pilula" className="h-auto py-1">
-                <span className="numerico font-semibold">{formatarNumero(lote.organizacoes)}</span>
-                {lote.organizacoes === 1 ? 'ficha' : 'fichas'}
-              </Badge>
-              {(['duplicata', 'revisao', 'nao_contatar'] as const)
-                .filter((d) => (lote.stats[d] ?? 0) > 0)
-                .map((d) => (
-                  <Badge key={d} variant="outline" className="h-auto py-1 font-normal">
-                    <span className="numerico">{formatarNumero(lote.stats[d] ?? 0)}</span>
-                    {ROTULO_DECISAO[d].toLowerCase()}
-                  </Badge>
-                ))}
-            </div>
-          </li>
-        ))}
+        {lotes.map((lote) => {
+          // O `pode_desfazer` diz o que o banco respondeu na hora da consulta; o
+          // prazo confere o relógio agora. Numa aba aberta desde ontem o primeiro
+          // continua verdadeiro depois de as 48 h terem vencido, e oferecer o botão
+          // ali só renderia uma recusa.
+          const prazo = lote.pode_desfazer ? prazoDoDesfazer(lote.desfazer_ate) : null;
+
+          return (
+            <li
+              key={lote.id}
+              className="flex flex-col gap-1 border-b border-hairline py-3 md:flex-row md:items-center md:gap-4"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{lote.rotulo}</p>
+                <p className="text-sm text-muted-foreground">
+                  <span className="numerico">{formatarDataHora(lote.criado_em)}</span>
+                  {lote.quem ? ` · ${lote.quem}` : ''}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="pilula" className="h-auto py-1">
+                  <span className="numerico font-semibold">{formatarNumero(lote.organizacoes)}</span>
+                  {lote.organizacoes === 1 ? 'ficha' : 'fichas'}
+                </Badge>
+                {(['duplicata', 'revisao', 'nao_contatar'] as const)
+                  .filter((d) => (lote.stats[d] ?? 0) > 0)
+                  .map((d) => (
+                    <Badge key={d} variant="outline" className="h-auto py-1 font-normal">
+                      <span className="numerico">{formatarNumero(lote.stats[d] ?? 0)}</span>
+                      {ROTULO_DECISAO[d].toLowerCase()}
+                    </Badge>
+                  ))}
+              </div>
+
+              {prazo ? (
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  {podeDesfazer ? (
+                    <Button
+                      variant="destructive"
+                      // Um desfazer de cada vez: dois lotes em voo ao mesmo tempo
+                      // deixariam a lista contando duas histórias diferentes.
+                      disabled={desfazendo !== null}
+                      onClick={() => setConfirmando({ lote, prazo })}
+                      aria-label={`Desfazer a importação ${lote.rotulo}`}
+                      className="toque h-11 md:h-9"
+                    >
+                      <Undo2 aria-hidden="true" />
+                      {desfazendo === lote.id ? 'Desfazendo...' : 'Desfazer'}
+                    </Button>
+                  ) : null}
+                  <p className="text-sm text-muted-foreground">
+                    {podeDesfazer ? null : 'Desfazer é de gestor · '}
+                    {prazo.verbo} <span className="numerico">{prazo.numero}</span> {prazo.unidade}
+                  </p>
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
+
+      {confirmando ? (
+        <DialogoConfirmar
+          aberto
+          aoFechar={() => setConfirmando(null)}
+          titulo="Desfazer esta importação?"
+          perigo
+          rotuloConfirmar="Desfazer o lote"
+          descricao={
+            <>
+              <p>
+                {confirmando.lote.organizacoes > 0 ? (
+                  <>
+                    O lote{' '}
+                    <span className="font-medium text-foreground">{confirmando.lote.rotulo}</span>{' '}
+                    tem{' '}
+                    <span className="numerico">
+                      {formatarNumero(confirmando.lote.organizacoes)}
+                    </span>{' '}
+                    {confirmando.lote.organizacoes === 1 ? 'ficha' : 'fichas'} na base. Saem as que
+                    ninguém tocou depois da importação; as que já têm conversa registrada, mudança
+                    de etapa, autorização ou ligação ficam de pé, e o CRM diz quantas foram.
+                  </>
+                ) : (
+                  <>
+                    O lote{' '}
+                    <span className="font-medium text-foreground">{confirmando.lote.rotulo}</span>{' '}
+                    não tem ficha na base para remover. O que sai são os candidatos que ele deixou
+                    na fila do Radar.
+                  </>
+                )}
+              </p>
+              <p>
+                Os candidatos que ainda não foram decididos somem da fila do Radar junto. Para
+                trazer tudo de volta, só importando a planilha outra vez.
+              </p>
+              <p>Das 48 horas do desfazer, {confirmando.prazo.frase}.</p>
+            </>
+          }
+          aoConfirmar={() => void desfazer(confirmando.lote)}
+        />
+      ) : null}
     </section>
   );
 }

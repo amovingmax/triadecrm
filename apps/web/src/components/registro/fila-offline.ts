@@ -32,6 +32,17 @@ import { ErroDeRegistro, fraseDaRecusa, gravarRegistro } from './gravar';
  * vencida, recusa do servidor, tentativas esgotadas) marca `esgotado` e o item FICA
  * visível na tela, com o motivo e um botão de tentar de novo.
  *
+ * **A fila tem dono, e o dono está na chave.** O caderninho não é do aparelho: é da
+ * pessoa que estava logada quando ele foi escrito. O celular de campo passa de mão em
+ * mão — a Heloísa entrega o aparelho ao Gustavo no meio da tarde —, e uma chave fixa
+ * fazia com que o que ela anotou sobre três fornecedores (nome do parceiro, o que foi
+ * dito, a frase textual da autorização) continuasse legível para quem entrasse depois,
+ * sem sessão e sem deixar rastro em `pii_access_log`. Pior: aquilo subia assinado por
+ * quem entrou depois, e `activities.user_id` não tem conserto depois de gravado.
+ * Por isso a chave é `komune.registro.fila.v1:<usuarioId>`, o dono é declarado uma vez
+ * por `definirDonoDaFila` e, sem dono declarado, esta fila não lê e não grava nada —
+ * fila que não sabe de quem é não pode existir.
+ *
  * Todo acesso ao `localStorage` é protegido: aba privada, cota cheia ou armazenamento
  * bloqueado levantam exceção, e derrubar a tela por causa disso seria pior.
  */
@@ -45,9 +56,76 @@ function deposito(): Storage | null {
   }
 }
 
-function ler(): RegistroNaFila[] {
+function chaveDaPessoa(usuarioId: string): string {
+  return `${CHAVE_FILA_REGISTRO}:${usuarioId}`;
+}
+
+/**
+ * Quem é o dono da fila nesta sessão do navegador.
+ *
+ * Fica no módulo, e não em cada chamada, porque a tela de registro chama estas funções
+ * de vinte lugares (commit, correção do recibo, desfazer, dreno, botão de tentar de
+ * novo) e um `usuarioId` esquecido em um só desses lugares recriaria o vazamento
+ * inteiro. Declarar uma vez, no alto da tela, é a única forma de o esquecimento virar
+ * "a fila não funciona" (visível na hora) em vez de "a fila vaza" (invisível para
+ * sempre).
+ */
+let donoDaFila: string | null = null;
+
+/**
+ * Diz de quem é a fila daqui para a frente. A tela de registro chama isto com o
+ * `usuarioId` da sessão antes de qualquer leitura.
+ *
+ * Aproveita a passada para apagar o que ficou na chave antiga, sem dono. Apagar, e não
+ * adotar: aquela chave não guarda de quem era o que está lá dentro, e num aparelho
+ * compartilhado adotar significa subir a anotação de uma pessoa assinada por outra —
+ * erro que o banco não desfaz e que estraga meta, auditoria e a confiança na tela.
+ * O preço é perder o que ainda não tinha subido no dia desta atualização; é um preço de
+ * uma vez só, e é o único lado do erro que dá para reverter (a pessoa registra de novo).
+ */
+export function definirDonoDaFila(usuarioId: string | null): void {
+  const novo = usuarioId?.trim() || null;
+  // Sai cedo quando nada mudou porque a tela de registro declara o dono a cada
+  // passada de render, e ela renderiza a cada segundo enquanto a contagem do desfazer
+  // corre: mexer no `localStorage` (que é síncrono) sessenta vezes por minuto, no
+  // celular de campo, é travada de digitação por nada.
+  if (novo === donoDaFila) return;
+  donoDaFila = novo;
+  descartarFilaSemDono();
+}
+
+/** A fila da chave antiga, de dono desconhecido, não sobrevive a este carregamento. */
+function descartarFilaSemDono(): void {
   try {
-    const bruto = deposito()?.getItem(CHAVE_FILA_REGISTRO);
+    deposito()?.removeItem(CHAVE_FILA_REGISTRO);
+  } catch {
+    // Armazenamento bloqueado: não há o que apagar e não há por que derrubar a tela.
+  }
+}
+
+/**
+ * Sair apaga o caderninho de quem saiu.
+ *
+ * É o outro lado da chave por pessoa: a chave impede que o próximo a entrar LEIA o que
+ * ficou; isto impede que o que ficou continue no aparelho depois de a pessoa ir embora.
+ * Quem chama avisa antes o que vai ser apagado — descartar trabalho sem dizer é
+ * exatamente o defeito que esta fila existe para não ter.
+ */
+export function limparFilaAoSair(usuarioId: string | null): void {
+  try {
+    const onde = deposito();
+    if (onde && usuarioId) onde.removeItem(chaveDaPessoa(usuarioId));
+  } catch {
+    // Armazenamento bloqueado: nada foi guardado ali, então nada ficou para trás.
+  }
+  descartarFilaSemDono();
+  if (!usuarioId || donoDaFila === usuarioId) donoDaFila = null;
+}
+
+function ler(usuarioId: string | null): RegistroNaFila[] {
+  if (!usuarioId) return [];
+  try {
+    const bruto = deposito()?.getItem(chaveDaPessoa(usuarioId));
     if (!bruto) return [];
     const lista: unknown = JSON.parse(bruto);
     if (!Array.isArray(lista)) return [];
@@ -76,11 +154,11 @@ function ler(): RegistroNaFila[] {
   }
 }
 
-function escrever(fila: readonly RegistroNaFila[]): boolean {
+function escrever(usuarioId: string | null, fila: readonly RegistroNaFila[]): boolean {
   const onde = deposito();
-  if (!onde) return false;
+  if (!onde || !usuarioId) return false;
   try {
-    onde.setItem(CHAVE_FILA_REGISTRO, JSON.stringify(fila));
+    onde.setItem(chaveDaPessoa(usuarioId), JSON.stringify(fila));
     return true;
   } catch {
     return false;
@@ -88,7 +166,12 @@ function escrever(fila: readonly RegistroNaFila[]): boolean {
 }
 
 export function lerFila(): RegistroNaFila[] {
-  return ler();
+  return ler(donoDaFila);
+}
+
+/** A fila de uma pessoa sem declarar dono — para contar o que se perde ao sair. */
+export function lerFilaDaPessoa(usuarioId: string): RegistroNaFila[] {
+  return ler(usuarioId);
 }
 
 /**
@@ -101,8 +184,9 @@ export function guardarPendente(
   pedido: RegistroContato,
   dados: { parceiro: string; desfecho: string; esperaMs?: number },
 ): boolean {
+  const eu = donoDaFila;
   const agora = Date.now();
-  const fila = ler().filter((item) => item.clientKey !== pedido.clientKey);
+  const fila = ler(eu).filter((item) => item.clientKey !== pedido.clientKey);
   fila.push({
     clientKey: pedido.clientKey,
     criadoEm: new Date(agora).toISOString(),
@@ -114,7 +198,7 @@ export function guardarPendente(
     esgotado: false,
     pedido,
   });
-  return escrever(fila);
+  return escrever(eu, fila);
 }
 
 /**
@@ -125,18 +209,28 @@ export function guardarPendente(
  * correção subiria a versão de antes dela.
  */
 export function atualizarPedidoGuardado(pedido: RegistroContato): void {
-  escrever(ler().map((item) => (item.clientKey === pedido.clientKey ? { ...item, pedido } : item)));
+  const eu = donoDaFila;
+  escrever(
+    eu,
+    ler(eu).map((item) => (item.clientKey === pedido.clientKey ? { ...item, pedido } : item)),
+  );
 }
 
 /** Tira da fila: gravou, ela desfez ou ela mandou descartar. */
 export function removerDaFila(clientKey: string): void {
-  escrever(ler().filter((item) => item.clientKey !== clientKey));
+  const eu = donoDaFila;
+  escrever(
+    eu,
+    ler(eu).filter((item) => item.clientKey !== clientKey),
+  );
 }
 
 /** Anota o que aconteceu numa tentativa que falhou, mantendo o item guardado. */
 export function anotarFalha(clientKey: string, erro: string, esgotado: boolean): void {
+  const eu = donoDaFila;
   escrever(
-    ler().map((item) =>
+    eu,
+    ler(eu).map((item) =>
       item.clientKey === clientKey
         ? { ...item, tentativas: item.tentativas + 1, ultimoErro: erro, esgotado }
         : item,
@@ -146,9 +240,11 @@ export function anotarFalha(clientKey: string, erro: string, esgotado: boolean):
 
 /** Volta a tentar tudo o que tinha parado. É o botão "Tentar de novo" da tela. */
 export function reativarEsgotados(): void {
+  const eu = donoDaFila;
   const agora = new Date().toISOString();
   escrever(
-    ler().map((item) =>
+    eu,
+    ler(eu).map((item) =>
       item.esgotado ? { ...item, tentativas: 0, esgotado: false, enviarApos: agora } : item,
     ),
   );
@@ -201,7 +297,7 @@ async function drenar(
   enviar: typeof gravarRegistro,
   segurado: string | null,
 ): Promise<ResumoDoDreno> {
-  const fila = ler();
+  const fila = ler(donoDaFila);
   if (fila.length === 0) return { enviados: 0, esperando: 0, parados: 0 };
 
   const agora = Date.now();
@@ -225,7 +321,7 @@ async function drenar(
     }
   }
 
-  const restante = ler();
+  const restante = ler(donoDaFila);
   return {
     enviados,
     esperando: restante.filter((i) => !i.esgotado).length,

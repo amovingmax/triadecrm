@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { ChevronDown, Pencil, RotateCw, Target } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -54,6 +55,18 @@ export function CartaoPessoa({
   podeDefinir: boolean;
   aoDefinirMeta: (metrica: string | null) => void;
 }) {
+  const idSituacao = useId();
+  // Definir meta depende das linhas DESTA pessoa: a folha abre com o alvo atual dela
+  // já no campo, e sem os dados dela esse campo só poderia vir vazio ou com o número
+  // de outra pessoa — alvo trocado, salvo com o nome certo, que ninguém percebe
+  // depois. Por isso o botão não fica de enfeite enquanto a consulta desta pessoa não
+  // responde: ele desabilita e aponta (`aria-describedby`) para a frase que o corpo
+  // do cartão já mostra logo abaixo — o esqueleto, o erro ou o "nenhuma métrica".
+  // Repetir a mesma frase no cabeçalho, a um palmo dela, faria as duas serem lidas
+  // como ruído.
+  const prontoParaDefinir =
+    !carregando && erro === null && linhas !== undefined && linhas.length > 0;
+
   return (
     <Card className="min-w-0">
       <CardHeader>
@@ -69,6 +82,8 @@ export function CartaoPessoa({
           <CardAction>
             <Button
               variant="outline"
+              disabled={!prontoParaDefinir}
+              aria-describedby={prontoParaDefinir ? undefined : idSituacao}
               onClick={() => aoDefinirMeta(null)}
               className="toque h-11 md:h-8"
             >
@@ -81,14 +96,20 @@ export function CartaoPessoa({
 
       <CardContent className="flex flex-col gap-4">
         {carregando ? (
-          <EsqueletoCartao />
+          <EsqueletoCartao id={idSituacao} nome={pessoa.nome} podeDefinir={podeDefinir} />
         ) : erro ? (
-          <ErroDoCartao causa={erro} aoTentarDeNovo={aoTentarDeNovo} />
+          <ErroDoCartao
+            id={idSituacao}
+            causa={erro}
+            podeDefinir={podeDefinir}
+            aoTentarDeNovo={aoTentarDeNovo}
+          />
         ) : linhas && linhas.length > 0 ? (
           <Conteudo linhas={linhas} podeDefinir={podeDefinir} aoDefinirMeta={aoDefinirMeta} />
         ) : (
-          <p className="py-6 text-sm text-muted-foreground">
-            O banco não devolveu nenhuma métrica para esta pessoa neste período.
+          <p id={idSituacao} className="py-6 text-sm text-muted-foreground">
+            O banco não devolveu nenhuma métrica para {pessoa.nome} neste período.
+            {podeDefinir ? ' Sem métrica não há o que definir.' : null}
           </p>
         )}
       </CardContent>
@@ -329,10 +350,25 @@ function ChipProxy() {
   );
 }
 
-function EsqueletoCartao() {
+function EsqueletoCartao({
+  id,
+  nome,
+  podeDefinir,
+}: {
+  id: string;
+  nome: string;
+  podeDefinir: boolean;
+}) {
   return (
     <div aria-busy="true" className="flex flex-col gap-4">
-      <span className="sr-only">Carregando as metas.</span>
+      {/* Esta frase é também a explicação do botão "Definir meta" desabilitado: é ela
+          que o `aria-describedby` dele aponta, e por isso diz de QUEM são as metas. A
+          segunda oração só aparece para quem tem o botão — dizer a um sdr que não dá
+          para definir meta seria anunciar uma recusa que não é dele. */}
+      <span id={id} className="sr-only">
+        Carregando as metas de {nome}.
+        {podeDefinir ? ' Enquanto elas não chegam, não dá para definir meta.' : null}
+      </span>
       <div className="flex flex-col gap-2">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="h-11 w-28" />
@@ -354,10 +390,26 @@ function EsqueletoCartao() {
   );
 }
 
-function ErroDoCartao({ causa, aoTentarDeNovo }: { causa: string; aoTentarDeNovo: () => void }) {
+function ErroDoCartao({
+  id,
+  causa,
+  podeDefinir,
+  aoTentarDeNovo,
+}: {
+  id: string;
+  causa: string;
+  podeDefinir: boolean;
+  aoTentarDeNovo: () => void;
+}) {
   return (
     <div className="flex flex-col items-start gap-3 py-4">
-      <p className="text-sm text-muted-foreground">{causa}</p>
+      {/* A mesma frase serve de causa do erro e de motivo do botão desabilitado: sem
+          as metas desta pessoa, definir uma seria escrever por cima de um alvo que
+          ninguém está vendo. */}
+      <p id={id} className="text-sm text-muted-foreground">
+        {causa}
+        {podeDefinir ? ' Sem esses números não dá para definir meta.' : null}
+      </p>
       <Button variant="outline" onClick={aoTentarDeNovo} className="toque h-11 md:h-8">
         <RotateCw aria-hidden="true" />
         Tentar de novo

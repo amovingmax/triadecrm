@@ -3,9 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   anotarFalha,
   atualizarPedidoGuardado,
+  definirDonoDaFila,
   drenarFila,
   guardarPendente,
   lerFila,
+  lerFilaDaPessoa,
+  limparFilaAoSair,
   reativarEsgotados,
   removerDaFila,
 } from './fila-offline';
@@ -19,18 +22,31 @@ import {
 } from './tipos';
 
 /**
- * A fila offline — o caderninho que não pode perder folha.
+ * A fila offline — o caderninho que não pode perder folha, e que tem dono.
  *
- * O defeito que estes testes travam: o registro só era guardado DEPOIS de a rede
- * falhar, então os 5 segundos do desfazer eram um buraco. Aba fechada ali dentro,
+ * O primeiro defeito que estes testes travam: o registro só era guardado DEPOIS de a
+ * rede falhar, então os 5 segundos do desfazer eram um buraco. Aba fechada ali dentro,
  * bateria no fim, app derrubado — e o trabalho sumia sem ninguém saber. Agora o pedido
  * é escrito antes de qualquer ida à rede, e nada sai da fila sem gravar, sem alguém
  * desfazer ou sem alguém mandar descartar.
  *
+ * O segundo é do mesmo tamanho, do outro lado: a fila morava numa chave fixa. O celular
+ * de campo passa de mão em mão, e o que uma pessoa anotou sobre três parceiros — nome,
+ * o que foi dito, a frase da autorização — ficava legível para quem entrasse depois, e
+ * subia assinado por ela. A chave passou a levar o id de quem está logado, sair apaga o
+ * caderninho de quem saiu, e sem dono declarado esta fila não lê nem grava.
+ *
  * O `localStorage` é montado à mão porque o Vitest de apps/web roda em `node`, sem DOM
- * (`vitest.config.mts`). É o mesmo contrato: `getItem`, `setItem`, e exceção quando o
- * aparelho não deixa gravar.
+ * (`vitest.config.mts`). É o mesmo contrato: `getItem`, `setItem`, `removeItem`, e
+ * exceção quando o aparelho não deixa gravar.
  */
+
+const HELOISA = '5f0c4d1e-1111-4111-8111-aaaaaaaaaaaa';
+const GUSTAVO = '5f0c4d1e-2222-4222-8222-bbbbbbbbbbbb';
+
+function chaveDe(usuarioId: string) {
+  return `${CHAVE_FILA_REGISTRO}:${usuarioId}`;
+}
 
 function armazenamentoFalso(quebrado = false) {
   const mapa = new Map<string, string>();
@@ -106,11 +122,13 @@ const ACEITO: ResultadoRegistro = {
 
 beforeEach(() => {
   montarJanela();
+  definirDonoDaFila(HELOISA);
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-09-04T13:00:00-03:00'));
 });
 
 afterEach(() => {
+  definirDonoDaFila(null);
   vi.useRealTimers();
   delete (globalThis as { window?: unknown }).window;
 });
@@ -133,9 +151,9 @@ describe('o registro é escrito no aparelho ANTES de qualquer ida à rede', () =
 
     // O "tombo": a aba morre dentro da janela de 5 s. Nada de rede aconteceu, e o
     // localStorage é a única coisa que sobrevive.
-    const sobreviveu = janela().localStorage.getItem(CHAVE_FILA_REGISTRO);
+    const sobreviveu = janela().localStorage.getItem(chaveDe(HELOISA));
     montarJanela();
-    janela().localStorage.setItem(CHAVE_FILA_REGISTRO, sobreviveu ?? '[]');
+    janela().localStorage.setItem(chaveDe(HELOISA), sobreviveu ?? '[]');
 
     vi.setSystemTime(new Date('2026-09-04T13:05:00-03:00'));
     const enviar = vi.fn().mockResolvedValue(ACEITO);
@@ -227,6 +245,94 @@ describe('o registro é escrito no aparelho ANTES de qualquer ida à rede', () =
     const item = lerFila()[0]!;
     expect(item.pedido.comQuem).toBe('decisor');
     expect(item.enviarApos).toBe(prazo);
+  });
+});
+
+describe('o caderninho é de quem escreveu, e o aparelho é compartilhado', () => {
+  it('a anotação de uma não aparece para a outra no mesmo aparelho', () => {
+    guardarPendente(pedido(), { parceiro: 'Agito Produções', desfecho: 'Não atendeu' });
+    expect(lerFila()).toHaveLength(1);
+
+    // Ela entrega o celular. Quem entra depois não lê o que ela escreveu.
+    definirDonoDaFila(GUSTAVO);
+    expect(lerFila()).toEqual([]);
+
+    // E o que ele registrar não se mistura com o dela.
+    guardarPendente(pedido('44444444-4444-4444-8444-444444444444'), {
+      parceiro: 'Buffet Anne',
+      desfecho: 'Não atendeu',
+    });
+    expect(lerFila().map((i) => i.parceiro)).toEqual(['Buffet Anne']);
+
+    definirDonoDaFila(HELOISA);
+    expect(lerFila().map((i) => i.parceiro)).toEqual(['Agito Produções']);
+  });
+
+  it('o que uma pessoa guardou não sobe assinado pela outra', async () => {
+    const dela = pedido();
+    guardarPendente(dela, { parceiro: 'Agito Produções', desfecho: 'Não atendeu', esperaMs: 0 });
+
+    definirDonoDaFila(GUSTAVO);
+    const enviar = vi.fn().mockResolvedValue(ACEITO);
+    expect((await drenarFila(enviar)).enviados).toBe(0);
+    expect(enviar).not.toHaveBeenCalled();
+  });
+
+  it('sair apaga o caderninho de quem saiu', () => {
+    guardarPendente(pedido(), { parceiro: 'Agito Produções', desfecho: 'Não atendeu' });
+
+    limparFilaAoSair(HELOISA);
+
+    expect(janela().localStorage.getItem(chaveDe(HELOISA))).toBeNull();
+    // Sem dono declarado, nem quem sabe a chave lê pela porta da frente.
+    expect(lerFila()).toEqual([]);
+    expect(lerFilaDaPessoa(HELOISA)).toEqual([]);
+  });
+
+  it('sair não mexe no que ainda está guardado de outra pessoa', () => {
+    guardarPendente(pedido(), { parceiro: 'Agito Produções', desfecho: 'Não atendeu' });
+    definirDonoDaFila(GUSTAVO);
+    guardarPendente(pedido('44444444-4444-4444-8444-444444444444'), {
+      parceiro: 'Buffet Anne',
+      desfecho: 'Não atendeu',
+    });
+
+    limparFilaAoSair(GUSTAVO);
+
+    expect(lerFilaDaPessoa(GUSTAVO)).toEqual([]);
+    expect(lerFilaDaPessoa(HELOISA).map((i) => i.parceiro)).toEqual(['Agito Produções']);
+  });
+
+  it('a fila da chave antiga, sem dono, é apagada e não adotada por quem entrar', async () => {
+    // Como estava antes desta correção: uma chave só, sem dizer de quem é. Adotar
+    // significaria subir a anotação de alguém assinada por outra pessoa.
+    const orfa = [
+      {
+        clientKey: '33333333-3333-4333-8333-333333333333',
+        criadoEm: '2026-09-04T15:00:00.000Z',
+        tentativas: 0,
+        ultimoErro: null,
+        parceiro: 'Agito Produções',
+        desfecho: 'Não atendeu',
+        pedido: pedido('33333333-3333-4333-8333-333333333333'),
+      },
+    ];
+    janela().localStorage.setItem(CHAVE_FILA_REGISTRO, JSON.stringify(orfa));
+
+    definirDonoDaFila(GUSTAVO);
+
+    expect(janela().localStorage.getItem(CHAVE_FILA_REGISTRO)).toBeNull();
+    expect(lerFila()).toEqual([]);
+    const enviar = vi.fn().mockResolvedValue(ACEITO);
+    expect((await drenarFila(enviar)).enviados).toBe(0);
+    expect(enviar).not.toHaveBeenCalled();
+  });
+
+  it('sem dono declarado a fila não guarda nada, em vez de guardar sem dono', () => {
+    definirDonoDaFila(null);
+    expect(guardarPendente(pedido(), { parceiro: 'Agito', desfecho: 'Não atendeu' })).toBe(false);
+    expect(lerFila()).toEqual([]);
+    expect(janela().localStorage.mapa.size).toBe(0);
   });
 });
 
@@ -329,14 +435,14 @@ describe('nada some em silêncio', () => {
         pedido: pedido('33333333-3333-4333-8333-333333333333'),
       },
     ];
-    janela().localStorage.setItem(CHAVE_FILA_REGISTRO, JSON.stringify(antigo));
+    janela().localStorage.setItem(chaveDe(HELOISA), JSON.stringify(antigo));
 
     const enviar = vi.fn().mockResolvedValue(ACEITO);
     expect((await drenarFila(enviar)).enviados).toBe(1);
   });
 
   it('lixo no armazenamento não derruba a tela', () => {
-    janela().localStorage.setItem(CHAVE_FILA_REGISTRO, '{isto não é json');
+    janela().localStorage.setItem(chaveDe(HELOISA), '{isto não é json');
     expect(lerFila()).toEqual([]);
   });
 

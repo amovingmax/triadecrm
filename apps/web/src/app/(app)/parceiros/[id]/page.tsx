@@ -1,14 +1,23 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ExternalLink, MessageSquare, ShieldAlert } from 'lucide-react';
+import {
+  ArrowLeft,
+  ExternalLink,
+  MessageCircle,
+  PhoneOutgoing,
+  ShieldAlert,
+  SquareKanban,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { type AppRole } from '@/lib/auth/role';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
 import { TransicaoPagina } from '@/components/movimento';
+import { hrefDoFunil, type ItemDoDia } from '@/components/meu-dia/tipos';
 import {
   carregarFicha,
   diasDesde,
@@ -42,6 +51,16 @@ function unir(...termos: (string | null | undefined)[]): string {
 const LINK_VALOR =
   'inline-flex min-h-11 items-center gap-1.5 underline underline-offset-4 md:min-h-0';
 
+/**
+ * Espelho de `app.can_write()`, o mesmo par usado no painel de pré-cadastro e no lote
+ * de ligações. Quem decide é o Postgres; isto só evita oferecer a quem tem papel de
+ * leitura um botão cujo único desfecho é a recusa do banco duas telas adiante.
+ */
+const ESCREVEM: readonly AppRole[] = ['admin', 'gestor', 'sdr', 'embaixador'];
+
+/** Botão de saída da ficha: 44px de alvo no celular, 36 no desktop. */
+const SAIDA = 'toque h-11 w-full sm:h-9 sm:w-auto';
+
 export async function generateMetadata({
   params,
 }: {
@@ -56,8 +75,15 @@ export async function generateMetadata({
  *
  * Ordem de leitura pensada para quem abre isto no carro, antes de entrar na loja:
  * quem é (cabeçalho com temperatura, etapa e há quantos dias), como falar (telefone,
- * @, site), de onde veio (proveniência, exigência do RF-BAS-10) e em que pé está o
- * negócio. Linha do tempo e conversa entram no D3 e no D5.
+ * @, site), o que fazer agora (as saídas), de onde veio (proveniência, exigência do
+ * RF-BAS-10) e em que pé está o negócio.
+ *
+ * As saídas logo abaixo do cabeçalho não são enfeite: oito lugares do CRM apontam
+ * para cá — a fila do dia, o quadro dos funis, a busca global, o Radar, a agenda —, e
+ * até aqui a ficha era um beco. Quem chegava por "reunião em 2 h" lia o que precisava
+ * e então tinha que decorar o nome do parceiro e procurá-lo de novo em outro módulo
+ * para registrar o que aconteceu. Registrar, conversar e mover no funil são as três
+ * coisas que se faz depois de ler uma ficha, e agora as três estão a um toque.
  */
 export default async function Pagina({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -67,6 +93,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
   const principal = ficha.negocios.find((n) => n.status === 'open') ?? ficha.negocios[0] ?? null;
   const diasNaEtapa = principal ? diasDesde(principal.naEtapaDesde) : null;
   const diasSemContato = principal ? diasDesde(principal.ultimoContatoEm) : null;
+  const podeEscrever = ESCREVEM.includes(sessao.papel);
 
   return (
     // Sem `mx-auto`: centrada, a ficha começava em x=376 enquanto a lista, o cabeçalho
@@ -162,6 +189,51 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
           </p>
         ) : null}
       </header>
+
+      {/* -------------------------------------------------- saídas */}
+      {/* Empilhadas e largas no celular, lado a lado no desktop: na calçada o polegar
+          não acerta três alvos de 36px encostados um no outro. */}
+      <nav aria-label="O que fazer com este parceiro" className="flex flex-col gap-2 sm:flex-row">
+        {/* Papel de leitura não vê este: o `app.can_write()` recusaria a gravação no
+            fim do fluxo, depois de a pessoa ter escolhido parceiro, canal e desfecho. */}
+        {podeEscrever ? (
+          <Button asChild className={SAIDA}>
+            <Link href={`/registrar?org=${ficha.id}`}>
+              <PhoneOutgoing aria-hidden="true" />
+              Registrar contato
+            </Link>
+          </Button>
+        ) : null}
+
+        {/* Ler a conversa é leitura: cabe a qualquer papel. A tela de conversas abre
+            direto neste parceiro com `?org=`, e é lá que moram a linha do tempo e o
+            histórico do WhatsApp. */}
+        <Button asChild variant="outline" className={SAIDA}>
+          <Link href={`/conversas?org=${ficha.id}`}>
+            <MessageCircle aria-hidden="true" />
+            Abrir a conversa
+          </Link>
+        </Button>
+
+        {/* Sem negócio não há coluna para onde ir, e a seção "Negócios" logo abaixo já
+            diz isso com todas as letras — um botão aqui só levaria ao quadro vazio.
+
+            A URL sai de `hrefDoFunil`, a mesma da fila do dia: é ela que sabe traduzir
+            o NOME do funil no slug que o quadro usa. Copiar a montagem para cá é o que
+            faria os dois lugares divergirem no dia em que um terceiro funil entrar. O
+            `as` é estreito de propósito — a função lê só `funil` e `organizacao`, e o
+            resto do `ItemDoDia` é da fila do dia, não existe aqui. */}
+        {principal ? (
+          <Button asChild variant="outline" className={SAIDA}>
+            <Link
+              href={hrefDoFunil({ funil: principal.funil, organizacao: ficha.nome } as ItemDoDia)}
+            >
+              <SquareKanban aria-hidden="true" />
+              Ver no funil
+            </Link>
+          </Button>
+        ) : null}
+      </nav>
 
       <Separator />
 
@@ -304,22 +376,11 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
         naoContatar={ficha.naoContatar}
       />
 
-      <Separator />
-
-      {/* -------------------------------------------------- o que ainda vem */}
-      <section className="grid gap-3 sm:grid-cols-2">
-        <Marcador
-          titulo="Linha do tempo"
-          dia="D3"
-          texto="Atividades, mudanças de etapa, visitas e notas em ordem, com quem fez cada coisa."
-        />
-        <Marcador
-          titulo="Conversa"
-          dia="D5"
-          texto="Histórico do WhatsApp com o robô assistido, sempre com aprovação da Heloísa antes do envio."
-          icone={<MessageSquare className="size-4" aria-hidden="true" />}
-        />
-      </section>
+      {/* Aqui terminavam dois quadros tracejados que anunciavam a Linha do tempo e a
+          Conversa como coisas que ainda iam chegar. As duas existem hoje, inteiras, na
+          tela de conversas, e é para lá que o botão "Abrir a conversa" leva. Anunciar
+          como futuro o que já está pronto ensina o time a não procurar: quem lê aquilo
+          para de ir atrás do histórico e passa a perguntar no grupo. */}
     </TransicaoPagina>
   );
 }
@@ -411,32 +472,6 @@ function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode
 
 function Ausente() {
   return <span className="text-muted-foreground">Não informado</span>;
-}
-
-/** Espaço reservado para o que chega nos próximos dias do calendário (PRD §11.2). */
-function Marcador({
-  titulo,
-  dia,
-  texto,
-  icone,
-}: {
-  titulo: string;
-  dia: string;
-  texto: string;
-  icone?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-border p-4">
-      <p className="flex items-center gap-2 text-sm font-medium">
-        {icone}
-        {titulo}
-        <Badge variant="outline">
-          chega no <span className="numerico">{dia}</span>
-        </Badge>
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">{texto}</p>
-    </div>
-  );
 }
 
 /** 12.345.678/0001-95 */

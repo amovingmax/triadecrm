@@ -1,10 +1,18 @@
 'use client';
 
 import { ChevronDown, LogOut } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +21,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { lerFilaDaPessoa, limparFilaAoSair } from '@/components/registro/fila-offline';
+import type { RegistroNaFila } from '@/components/registro/tipos';
 import { ROTULO_PAPEL } from '@/lib/auth/role';
 import { type Sessao } from '@/lib/auth/session';
 
@@ -28,10 +38,43 @@ import { type Sessao } from '@/lib/auth/session';
  * 2px de fora. `leading-5` (20px) cobre os 19px do nome e `leading-4` (16px) cobre os
  * 16px do papel — e as duas somam exatamente os 36px do botão no desktop, então o
  * `gap` entre elas sai: a própria entrelinha já separa.
+ *
+ * **Sair também apaga o caderninho de campo.** A fila offline do registro é PII —
+ * nome de parceiro, o que foi dito, a frase da autorização — e o celular de campo é
+ * compartilhado: quem entrega o aparelho para o colega no meio da tarde não pode
+ * deixar as anotações no armazenamento do navegador, sem sessão e sem prazo. A chave
+ * por pessoa já impede que o próximo LEIA aquilo; a limpeza daqui impede que fique.
+ * Quando ainda há registro guardado, a saída para para avisar: apagar trabalho sem
+ * dizer é o mesmo defeito, do outro lado.
  */
 export function UserMenu({ sessao }: { sessao: Sessao }) {
   const formSair = useRef<HTMLFormElement>(null);
   const rotuloPapel = ROTULO_PAPEL[sessao.papel];
+  const [naoSubiram, setNaoSubiram] = useState<readonly RegistroNaFila[]>([]);
+  const [avisando, setAvisando] = useState(false);
+
+  function sair() {
+    limparFilaAoSair(sessao.id);
+    formSair.current?.requestSubmit();
+  }
+
+  function pedirParaSair() {
+    const guardados = lerFilaDaPessoa(sessao.id);
+    if (guardados.length === 0) {
+      sair();
+      return;
+    }
+    setNaoSubiram(guardados);
+    setAvisando(true);
+  }
+
+  const quantos = naoSubiram.length;
+  // Quatro linhas e o resto vira contagem: a lista aqui é para reconhecer o que está
+  // em jogo, não para revisar registro a registro — isso é a tela de registro.
+  const mostrados = naoSubiram.slice(0, 4);
+  const restantes = quantos - mostrados.length;
+  const titulo =
+    quantos === 1 ? '1 registro ainda não subiu' : `${quantos} registros ainda não subiram`;
 
   return (
     <>
@@ -78,15 +121,53 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
             </span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="min-h-11 md:min-h-0"
-            onSelect={() => formSair.current?.requestSubmit()}
-          >
+          <DropdownMenuItem className="min-h-11 md:min-h-0" onSelect={pedirParaSair}>
             <LogOut aria-hidden="true" />
             Sair
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Dialog open={avisando} onOpenChange={setAvisando}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{titulo}</DialogTitle>
+            <DialogDescription>
+              O que ainda não subiu está guardado só neste aparelho. Sair apaga isso daqui: o
+              celular é compartilhado, e o que você anotou não pode ficar para quem entrar depois.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ul className="flex flex-col divide-y divide-hairline border-y border-hairline">
+            {mostrados.map((item) => (
+              <li key={item.clientKey} className="truncate py-2 text-sm">
+                <span className="font-medium">{item.parceiro}</span>
+                <span className="text-muted-foreground"> · {item.desfecho}</span>
+              </li>
+            ))}
+            {restantes > 0 ? (
+              <li className="py-2 text-sm text-muted-foreground">
+                {restantes === 1 ? 'E mais 1 registro.' : `E mais ${restantes} registros.`}
+              </li>
+            ) : null}
+          </ul>
+
+          <p className="text-sm text-muted-foreground">
+            Para não perder: volte para Registrar, toque em “Tentar de novo” com a rede ligada e
+            saia depois.
+          </p>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAvisando(false)}>
+              Voltar
+            </Button>
+            <Button type="button" variant="destructive" onClick={sair}>
+              Sair e apagar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </>
   );
 }

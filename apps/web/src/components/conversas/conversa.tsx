@@ -331,10 +331,15 @@ export function Conversa({
               parceiro"), e é o segundo que explica o caminho e oferece a ação.
               Com fio, a janela volta — aí ela decide o que pode sair e quando. */}
           {fio ? <Janela24h estado={janela} /> : null}
+          {/* `naoContatar` viaja junto porque o rodapé é onde a pessoa ESCREVE: o
+              selo lá em cima informa, mas informar não impede ninguém de digitar
+              uma mensagem inteira e só descobrir na hora de enviar que o parceiro
+              tinha pedido para sair. Quem decide continua sendo o banco. */}
           <CaixaDeResposta
             fio={fio}
             janela={janela}
             organizacaoId={item.id}
+            naoContatar={item.naoContatar}
             recolhida={rascunho !== null}
           />
         </div>

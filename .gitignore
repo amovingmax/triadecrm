@@ -49,3 +49,6 @@ apps/web/scripts/.sessao-dev.json
 
 # Saída do Playwright MCP (capturas e snapshots de sessão)
 .playwright-mcp/
+
+# Scripts de workflow multi-agente (cópia de trabalho, não é fonte)
+.workflows/

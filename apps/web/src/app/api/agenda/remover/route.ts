@@ -15,9 +15,30 @@
  *
  * Como em `remarcar`, o token é o de QUEM CRIOU o evento: ele vive na agenda
  * daquela pessoa, e o token de quem está clicando não o alcança.
+ *
+ * ---------------------------------------------------------------------------
+ * QUEM PODE APAGAR
+ * ---------------------------------------------------------------------------
+ * Enxergar a tarefa não é poder desmarcá-la. Esta rota fala com o Google pelo
+ * cliente de serviço e com o token de outra pessoa, então a RLS de `tasks` — a
+ * única checagem que existia aqui — não protege nada do que vem depois: ela diz
+ * que a reunião aparece na tela de quem clicou, e mais nada. Com só isso, um
+ * perfil de Leitura, que o banco impede até de gravar uma atividade, apagava da
+ * agenda pessoal de outra pessoa um evento alheio, e o Google mandava ao
+ * fornecedor um e-mail de cancelamento de uma reunião que ninguém cancelou.
+ *
+ * A decisão passa a ser por papel E por autoria: admin e gestor respondem pela
+ * agenda do time; fora esses dois, só quem criou o evento o tira.
+ *
+ * Onde isso deveria morar: no Postgres (ADR-03), numa função que decida e que as
+ * duas rotas chamem. Está no TypeScript porque as rotas chegam ao espelho com o
+ * cliente de serviço, que passa por cima da RLS — e essa mudança é maior que a
+ * correção urgente. Enquanto não desce, a regra existe duplicada aqui e em
+ * `remarcar`, e mudar uma sem a outra é como as duas versões divergem.
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { getSession } from '@/lib/auth/session';
 import {
   apagarEvento,
   RECADO_DO_GOOGLE,
@@ -33,11 +54,15 @@ import {
 } from '@/lib/supabase/servidor-admin';
 
 export async function POST(request: NextRequest) {
+  // `getSession` e não `requireSession`: aquele redireciona para /login, e um
+  // redirecionamento aqui devolveria ao `fetch` do botão a página de login com
+  // status 200 — o cliente leria sucesso onde houve recusa. As claims são as
+  // mesmas que as páginas leem, e o papel sai delas; não há segunda fonte de
+  // verdade para papel.
+  const sessao = await getSession();
+  if (!sessao) return NextResponse.json({ ok: false, motivo: 'sem_sessao' }, { status: 401 });
+
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, motivo: 'sem_sessao' }, { status: 401 });
 
   if (!temChaveDeServico() || !temCredenciaisDoGoogle()) {
     registrarRecusa('agenda/remover', 'nao_configurado');
@@ -62,10 +87,26 @@ export async function POST(request: NextRequest) {
   const espelhoBruto = await rpcDoServidor(admin, 'agenda/remover', 'compromisso_do_google_ler', {
     p_task_id: taskId,
   });
-  const espelho = espelhoBruto as { evento_id?: string; agenda_id?: string } | null;
+  const espelho = espelhoBruto as {
+    evento_id?: string;
+    agenda_id?: string;
+    criado_por?: string | null;
+  } | null;
   if (!espelho?.evento_id) {
     registrarRecusa('agenda/remover', 'sem_espelho');
     return NextResponse.json({ ok: false, motivo: 'sem_espelho' }, { status: 404 });
+  }
+
+  // A autorização vem depois de ler o espelho porque é o espelho que sabe de quem
+  // é o evento, e antes de qualquer coisa que mexa no mundo: nada foi apagado no
+  // Google nem esquecido no banco até aqui.
+  //
+  // `criado_por` nulo é o perfil que saiu do CRM. O evento fica sem dono, e só
+  // admin ou gestor limpa — ninguém herda o compromisso de quem foi embora.
+  const respondePelaAgendaDoTime = sessao.papel === 'admin' || sessao.papel === 'gestor';
+  if (!respondePelaAgendaDoTime && espelho.criado_por !== sessao.id) {
+    registrarRecusa('agenda/remover', 'nao_e_seu', { papel: sessao.papel });
+    return NextResponse.json({ ok: false, motivo: 'nao_e_seu' }, { status: 403 });
   }
 
   const token = await rpcDoServidor<string>(

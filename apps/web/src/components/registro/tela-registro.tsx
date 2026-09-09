@@ -11,6 +11,7 @@ import type { ContextoDoRegistro } from './dados';
 import {
   anotarFalha,
   atualizarPedidoGuardado,
+  definirDonoDaFila,
   drenarFila,
   guardarPendente,
   lerFila,
@@ -104,6 +105,17 @@ export function TelaRegistro({
   /** Veio de `/registrar?org=<id>`: a ficha e a fila do dia abrem já no passo 2. */
   organizacaoInicial: string | null;
 }) {
+  /**
+   * O caderninho é de quem está logado, não do aparelho.
+   *
+   * O celular de campo passa de mão em mão. Sem declarar o dono aqui, a fila offline
+   * volta a morar numa chave só, e o que uma pessoa anotou sobre três parceiros —
+   * nome, o que foi dito, a frase da autorização — fica legível para quem entrar
+   * depois e sobe assinado por ela. Esta linha vem antes de qualquer leitura da fila:
+   * todas acontecem em efeito ou em toque, ou seja, depois desta passada.
+   */
+  definirDonoDaFila(usuarioId);
+
   const router = useRouter();
   const clienteDeConsultas = useQueryClient();
 

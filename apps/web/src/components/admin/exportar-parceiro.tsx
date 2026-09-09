@@ -12,25 +12,43 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 import { Aviso, CabecalhoDeSecao, Vazio } from './estados';
-import { mensagemDoErro } from './formatos';
+import { formatarDataHora, mensagemDoErro } from './formatos';
 
 /**
  * Exportar tudo o que o CRM guarda sobre um parceiro (RF-ADM-04).
  *
- * É a resposta a um pedido de titular: "o que vocês têm sobre mim?". O arquivo sai em
- * JSON, com a ficha, as pessoas de contato, os negócios, as atividades, as tarefas e
- * os eventos de consentimento — a mesma coisa que a pessoa veria se abrisse o CRM.
+ * É a resposta a um pedido de titular: "o que vocês têm sobre mim, e de onde tiraram?".
+ * Quem monta a resposta é o banco, pela RPC `public.exportar_lgpd(p_organization_id,
+ * p_motivo)` — esta tela só escolhe o parceiro, pega o motivo, chama e salva o JSON que
+ * voltou, sem tocar em uma vírgula dele.
  *
- * Duas honestidades que a tela diz em voz alta, em vez de esconder:
+ * Antes o arquivo era remontado aqui no navegador, com meia dúzia de consultas soltas, e
+ * isso dava três defeitos que só apareceriam numa fiscalização — tarde demais:
  *
- * 1. O telefone só entra no arquivo se for pedido, e quando é pedido ele passa pela
- *    RPC `reveal_phone`, que grava quem exportou, quando e de quem em `pii_access_log`.
- *    Não existe atalho aqui para ler número sem deixar registro (RF-BAS-14).
- * 2. A exportação em si ainda não vira uma linha de `export_csv` no registro de
- *    acesso: isso depende da Edge Function `export-lgpd` prevista no PRD, que não
- *    existe neste MVP. O arquivo é montado no navegador com o que a sua sessão já
- *    pode ler. Quem exporta com telefone deixa rastro; quem exporta sem telefone,
- *    hoje, não deixa.
+ * 1. A consulta de contatos trazia telefone e e-mail de todo mundo mesmo com a caixa
+ *    "Incluir o telefone" desmarcada. A caixa mascarava o telefone da ficha e deixava o
+ *    das pessoas passar.
+ * 2. O arquivo ainda AFIRMAVA por escrito que o telefone não tinha entrado. Uma frase
+ *    falsa no lugar exato onde alguém conferiria.
+ * 3. Exportação sem telefone não deixava rastro nenhum: nem `pii_access_log`, nem nada.
+ *    O CRM não tinha o que mostrar sobre o próprio uso da base, e a tela ainda mandava
+ *    anotar à mão "fora do sistema" — controle que não existe é controle que não vale.
+ *
+ * A RPC conserta os três de uma vez: devolve o dossiê com a proveniência campo a campo
+ * (a URL exata de onde cada dado veio, quando e por qual ferramenta), grava a exportação
+ * em `pii_access_log` com o motivo digitado aqui e abre um `access_request` em
+ * `consent_events`. O pedido do titular fica provado dos dois lados.
+ *
+ * O que se perdeu de propósito, e por quê:
+ *
+ *   * A caixa "Incluir o telefone" não existe mais. Ela só fazia sentido quando havia
+ *     dois caminhos, um auditado e outro não; agora só há o auditado, e o dossiê é a
+ *     resposta ao PRÓPRIO titular — esconder dele o telefone dele não protege ninguém.
+ *   * Negócios (`deals`) e tarefas (`tasks`) não vêm no dossiê, porque `app.lgpd_dossie`
+ *     não os monta. NÃO são remontados aqui: guardar PII num arquivo sem rastro é pior
+ *     que exportar menos. Se o time decidir que o titular também tem direito a essa
+ *     parte, a correção é acrescentar os dois blocos em `app.lgpd_dossie`, em migração
+ *     nova — não neste arquivo, que continuaria exportando por fora do registro.
  */
 
 type ParceiroEncontrado = {
@@ -64,87 +82,37 @@ async function procurarParceiros(termo: string): Promise<ParceiroEncontrado[]> {
   }));
 }
 
-type Registro = Record<string, unknown>;
+/**
+ * Recusas que `public.exportar_lgpd` e `app.lgpd_dossie` nomeiam, em português.
+ *
+ * A tela não repete a checagem antes de chamar: quem decide quem exporta e se o motivo
+ * serve é o banco (ADR-03). Um `if` daqui que barrasse antes só criaria uma segunda
+ * regra para divergir da primeira — e seria a regra sem valor legal.
+ */
+const MOTIVO_DA_EXPORTACAO: Record<string, string> = {
+  sem_permissao:
+    'O seu acesso não exporta dados de titular. Isso é de gestor, de admin ou de quem responde pelos pedidos de privacidade — peça a quem tem o papel.',
+  exportacao_exige_motivo:
+    'Escreva o motivo antes de gerar o arquivo. Ele fica guardado junto com a exportação, e é o que explica depois por que estes dados saíram.',
+  organizacao_inexistente:
+    'Este parceiro não está mais na base. Procure de novo pelo nome; se ele foi anonimizado, não há dossiê a emitir.',
+};
 
-async function montarExportacao(
-  parceiro: ParceiroEncontrado,
-  comTelefone: boolean,
-  quemExportou: string,
-): Promise<Registro> {
-  const supabase = createClient();
-
-  const [ficha, vinculos, negocios, atividades, tarefas, consentimentos] = await Promise.all([
-    supabase.from('organizations_view').select('*').eq('id', parceiro.id).maybeSingle(),
-    supabase
-      .from('organization_contacts')
-      .select('contact_id, role, is_primary')
-      .eq('organization_id', parceiro.id),
-    supabase
-      .from('deals')
-      .select(
-        'id, pipeline_id, stage_id, status, tier, score, temperature, next_action, next_action_at, ' +
-          'entered_stage_at, last_activity_at, lost_reason_id, won_at, lost_at, created_at',
-      )
-      .eq('organization_id', parceiro.id),
-    supabase
-      .from('activities')
-      .select('id, type, channel, occurred_at, duration_min, body, outcome_id, author_kind')
-      .eq('organization_id', parceiro.id)
-      .order('occurred_at', { ascending: false }),
-    supabase
-      .from('tasks')
-      .select('id, title, kind, status, due_at, completed_at, created_at')
-      .eq('organization_id', parceiro.id),
-    supabase
-      .from('consent_events')
-      .select('id, kind, channel, evidence_text, occurred_at, created_at')
-      .eq('organization_id', parceiro.id),
-  ]);
-
-  if (ficha.error) throw new Error(ficha.error.message);
-
-  const linhaFicha = (ficha.data ?? {}) as unknown as Registro;
-  const idsContatos = ((vinculos.data ?? []) as unknown as { contact_id: string }[]).map(
-    (v) => v.contact_id,
+function frase(motivo: string): string {
+  return (
+    MOTIVO_DA_EXPORTACAO[motivo] ??
+    'O servidor recusou a exportação e não disse por quê. Nada foi gerado. Avise no grupo do time.'
   );
+}
 
-  let contatos: Registro[] = [];
-  if (idsContatos.length > 0) {
-    const { data } = await supabase
-      .from('contacts_view')
-      .select('id, full_name, role_title, is_decision_maker, phone_e164, phone_is_masked, email')
-      .in('id', idsContatos);
-    contatos = (data ?? []) as unknown as Registro[];
-  }
+function objeto(valor: unknown): Record<string, unknown> {
+  return valor && typeof valor === 'object' && !Array.isArray(valor)
+    ? (valor as Record<string, unknown>)
+    : {};
+}
 
-  // O telefone do parceiro só entra pelo caminho auditado, e só quando pedido.
-  let telefone: string | null = null;
-  if (comTelefone) {
-    const { data, error } = await supabase.rpc('reveal_phone', {
-      p_organization_id: parceiro.id,
-    });
-    if (error) throw new Error(error.message);
-    telefone = (data as string | null) ?? null;
-  }
-
-  return {
-    gerado_em: new Date().toISOString(),
-    gerado_por: quemExportou,
-    aviso:
-      'Exportação de dados do titular gerada pelo Tríade (CRM de captação da Komune). ' +
-      'Contém o que o CRM guarda sobre este parceiro na data acima. ' +
-      (comTelefone
-        ? 'O telefone foi revelado pelo caminho auditado e a revelação ficou registrada.'
-        : 'O telefone NÃO foi incluído nesta exportação.'),
-    parceiro: comTelefone
-      ? { ...linhaFicha, phone_e164: telefone }
-      : { ...linhaFicha, phone_e164: null },
-    contatos,
-    negocios: (negocios.data ?? []) as unknown as Registro[],
-    atividades: (atividades.data ?? []) as unknown as Registro[],
-    tarefas: (tarefas.data ?? []) as unknown as Registro[],
-    consentimentos: (consentimentos.data ?? []) as unknown as Registro[],
-  };
+function texto(valor: unknown): string | null {
+  return typeof valor === 'string' && valor !== '' ? valor : null;
 }
 
 function baixar(nomeDoArquivo: string, conteudo: string) {
@@ -172,7 +140,9 @@ function apelido(nome: string): string {
 export function ExportarParceiro({ quemExportou }: { quemExportou: string }) {
   const [termo, setTermo] = useState('');
   const [escolhido, setEscolhido] = useState<ParceiroEncontrado | null>(null);
-  const [comTelefone, setComTelefone] = useState(false);
+  const [motivo, setMotivo] = useState('');
+  const [recusa, setRecusa] = useState<string | null>(null);
+  const [geradoEm, setGeradoEm] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
 
   const busca = useQuery({
@@ -181,17 +151,46 @@ export function ExportarParceiro({ quemExportou }: { quemExportou: string }) {
     enabled: termo.trim().length >= 2,
   });
 
+  function limparEscolha() {
+    setEscolhido(null);
+    setMotivo('');
+    setRecusa(null);
+    setGeradoEm(null);
+  }
+
   async function exportar() {
     if (!escolhido) return;
     setExportando(true);
+    setRecusa(null);
     try {
-      const dados = await montarExportacao(escolhido, comTelefone, quemExportou);
+      const supabase = createClient();
+      // O motivo vai como foi digitado: quem apara espaço e decide se serve é a RPC.
+      const { data, error } = await supabase.rpc('exportar_lgpd', {
+        p_organization_id: escolhido.id,
+        p_motivo: motivo,
+      });
+      if (error) throw new Error(error.message);
+
+      const dossie = objeto(data);
+      if (dossie.ok !== true) {
+        const explicacao = frase(texto(dossie.motivo) ?? 'desconhecido');
+        setRecusa(explicacao);
+        setGeradoEm(null);
+        toast.error('O arquivo não foi gerado.', { description: explicacao });
+        return;
+      }
+
+      // O que vai para o disco é exatamente o que o banco devolveu. Envelope nenhum:
+      // este arquivo é a prova do que foi respondido ao titular, e prova que a tela
+      // reescreveu é prova pela metade.
       const hoje = new Date().toISOString().slice(0, 10);
-      baixar(`triade-${apelido(escolhido.nome)}-${hoje}.json`, JSON.stringify(dados, null, 2));
-      toast.success('Arquivo gerado.', {
-        description: comTelefone
-          ? 'O telefone entrou no arquivo e a revelação ficou registrada no seu nome.'
-          : 'O telefone ficou de fora do arquivo.',
+      baixar(
+        `dossie-lgpd-${apelido(escolhido.nome)}-${hoje}.json`,
+        JSON.stringify(dossie, null, 2),
+      );
+      setGeradoEm(texto(dossie.gerado_em));
+      toast.success('Arquivo gerado, e a exportação ficou registrada.', {
+        description: `Consta no registro de acesso em nome de ${quemExportou}, com o motivo que você escreveu.`,
       });
     } catch (erro) {
       toast.error('Não deu para gerar o arquivo.', { description: mensagemDoErro(erro) });
@@ -207,17 +206,22 @@ export function ExportarParceiro({ quemExportou }: { quemExportou: string }) {
         descricao="Para responder a um pedido de titular: tudo o que o CRM guarda sobre um parceiro, num arquivo JSON."
       />
 
-      <Aviso titulo="O que este botão faz hoje, e o que ainda não faz">
+      <Aviso titulo="O que entra no arquivo, e o que fica registrado">
         <p>
-          O arquivo é montado no seu navegador com o que a sua sessão já pode ler: ficha, pessoas de
-          contato, negócios, atividades, tarefas e eventos de consentimento. O telefone só entra se
-          você pedir, e quando pede ele passa pela mesma revelação registrada da ficha do parceiro.
+          Quem monta o arquivo é o banco, não o seu navegador: a ficha com telefone e e-mail, a
+          origem de cada campo (de qual link veio, quando e por quem foi coletado), as pessoas de
+          contato, as autorizações, as conversas, o pré-cadastro, com quem os dados são
+          compartilhados e por quanto tempo ficam guardados.
         </p>
         <p className="mt-1">
-          Ainda <strong>não</strong> é a exportação oficial: a Edge Function{' '}
-          <span className="numerico">export-lgpd</span>, que assina o arquivo e grava a exportação
-          no registro de acesso, é da v1. Até lá, a exportação sem telefone não deixa
-          rastro no sistema. Anote no processo do pedido quem exportou e quando.
+          Toda exportação fica <strong>registrada</strong> com o seu nome, a data e o motivo que
+          você escrever, e abre um pedido de acesso no histórico do parceiro. Aqui não há caminho
+          para levar dado embora sem deixar rastro — e não é preciso anotar nada por fora.
+        </p>
+        <p className="mt-1">
+          Negócios e tarefas ficam de fora: o dossiê que o banco monta hoje não os inclui, e esta
+          tela não remonta dado por conta própria. Se a resposta ao titular precisar deles, a
+          mudança é no banco.
         </p>
       </Aviso>
 
@@ -236,7 +240,7 @@ export function ExportarParceiro({ quemExportou }: { quemExportou: string }) {
             placeholder="Buffet, DJ, espaço..."
             onChange={(evento) => {
               setTermo(evento.target.value);
-              setEscolhido(null);
+              limparEscolha();
             }}
             className="h-11 pl-8 md:h-9"
           />
@@ -287,20 +291,26 @@ export function ExportarParceiro({ quemExportou }: { quemExportou: string }) {
             </p>
           </div>
 
-          <label className="flex min-h-11 items-start gap-2.5 text-sm">
-            <input
-              type="checkbox"
-              checked={comTelefone}
-              onChange={(evento) => setComTelefone(evento.target.checked)}
-              className="mt-1 size-4 accent-foreground"
+          <div className="space-y-1.5">
+            <Label htmlFor="motivo-da-exportacao" className="text-xs">
+              Motivo da exportação
+            </Label>
+            <Input
+              id="motivo-da-exportacao"
+              value={motivo}
+              placeholder="Pedido do titular por e-mail"
+              onChange={(evento) => {
+                setMotivo(evento.target.value);
+                setRecusa(null);
+              }}
+              className="h-11 md:h-9"
             />
-            <span>
-              Incluir o telefone no arquivo.
-              <span className="block text-xs text-muted-foreground">
-                A revelação fica registrada com o seu nome e a data.
-              </span>
-            </span>
-          </label>
+            <p className="text-xs text-muted-foreground">
+              Escreva por que os dados estão saindo, em uma linha. Isso fica guardado junto com a
+              exportação e no histórico do parceiro — é o que responde, meses depois, quem exportou
+              e a pedido de quem.
+            </p>
+          </div>
 
           <div className="flex flex-wrap gap-2">
             <Button
@@ -311,17 +321,23 @@ export function ExportarParceiro({ quemExportou }: { quemExportou: string }) {
               <Download aria-hidden="true" />
               {exportando ? 'Gerando...' : 'Gerar o arquivo'}
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEscolhido(null);
-                setComTelefone(false);
-              }}
-              className="toque h-11 md:h-9"
-            >
+            <Button variant="outline" onClick={limparEscolha} className="toque h-11 md:h-9">
               Escolher outro
             </Button>
           </div>
+
+          {recusa ? (
+            <p className="text-sm" role="alert">
+              {recusa}
+            </p>
+          ) : null}
+
+          {geradoEm ? (
+            <p className="text-sm text-muted-foreground">
+              Arquivo gerado em {formatarDataHora(geradoEm)} e registrado no seu nome. Guarde-o no
+              processo do pedido; o CRM já guardou a prova de que ele saiu.
+            </p>
+          ) : null}
         </div>
       ) : null}
     </section>

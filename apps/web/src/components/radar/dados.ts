@@ -344,6 +344,12 @@ export const MOTIVO_DA_REVISAO: Record<string, string> = {
   candidato_nao_contatar:
     'Esse contato pediu para não ser procurado. Ele não pode virar parceiro.',
   categoria_obrigatoria: 'Escolha a categoria antes de aprovar.',
+  // O seletor de categoria só aparece para candidato SEM categoria: quem já tem
+  // uma, e ela foi tirada de uso no catálogo, não tem como trocá-la daqui. Sem
+  // dizer isso, o alvo fica preso na fila para sempre — "atualize e tente de
+  // novo" nunca resolve, porque o problema não está na fila.
+  categoria_invalida:
+    'A categoria deste alvo saiu de uso no catálogo. Peça a um administrador para reativá-la, ou recuse o alvo e cadastre-o pelo cadastro rápido com outra categoria.',
   organizacao_obrigatoria: 'Escolha com qual ficha mesclar.',
   organizacao_inexistente: 'Essa ficha não existe mais.',
   organizacao_fora_da_carteira:

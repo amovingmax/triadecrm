@@ -32,9 +32,30 @@
  * Bárbara pôs na agenda, o token da Heloísa não alcança aquele evento — o Google
  * responderia 404. Por isso `agenda_google_token_do_evento`, e não
  * `agenda_google_token`.
+ *
+ * ---------------------------------------------------------------------------
+ * QUEM PODE MEXER
+ * ---------------------------------------------------------------------------
+ * A RLS de `tasks`, a única checagem que existia aqui, responde uma pergunta
+ * mais fraca do que esta rota precisa: se a reunião aparece na tela de quem
+ * clicou. Depois dela a rota usa o cliente de serviço e o token de outra pessoa,
+ * e nada mais barra ninguém — um perfil de Leitura, que o banco impede até de
+ * gravar uma atividade, mudava a hora de um evento na agenda pessoal de quem o
+ * criou, e o Google avisava o fornecedor do novo horário. A pessoa que marcou
+ * não ficava sabendo.
+ *
+ * Agora decide papel E autoria: admin e gestor respondem pela agenda do time;
+ * fora esses dois, só quem criou o evento remarca.
+ *
+ * Onde isso deveria morar: no Postgres (ADR-03), numa função que decida e que as
+ * duas rotas chamem. Está no TypeScript porque as rotas chegam ao espelho com o
+ * cliente de serviço, que passa por cima da RLS — e essa mudança é maior que a
+ * correção urgente. Enquanto não desce, a regra existe duplicada aqui e em
+ * `remover`, e mudar uma sem a outra é como as duas versões divergem.
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { getSession } from '@/lib/auth/session';
 import {
   RECADO_DO_GOOGLE,
   remarcarEvento,
@@ -52,11 +73,15 @@ import {
 const MINUTOS_REUNIAO = 45;
 
 export async function POST(request: NextRequest) {
+  // `getSession` e não `requireSession`: aquele redireciona para /login, e um
+  // redirecionamento aqui devolveria ao `fetch` da tela a página de login com
+  // status 200 — o cliente leria sucesso onde houve recusa. As claims são as
+  // mesmas que as páginas leem, e o papel sai delas; não há segunda fonte de
+  // verdade para papel.
+  const sessao = await getSession();
+  if (!sessao) return NextResponse.json({ ok: false, motivo: 'sem_sessao' }, { status: 401 });
+
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, motivo: 'sem_sessao' }, { status: 401 });
 
   if (!temChaveDeServico() || !temCredenciaisDoGoogle()) {
     registrarRecusa('agenda/remarcar', 'nao_configurado');
@@ -93,12 +118,28 @@ export async function POST(request: NextRequest) {
   const espelhoBruto = await rpcDoServidor(admin, 'agenda/remarcar', 'compromisso_do_google_ler', {
     p_task_id: taskId,
   });
-  const espelho = espelhoBruto as { evento_id?: string; agenda_id?: string } | null;
+  const espelho = espelhoBruto as {
+    evento_id?: string;
+    agenda_id?: string;
+    criado_por?: string | null;
+  } | null;
   if (!espelho?.evento_id) {
     // Normal e não é erro: a reunião antiga nunca foi para o Google. Não há o que
     // remarcar, e a tarefa nova pode ser posta na agenda quando alguém quiser.
     registrarRecusa('agenda/remarcar', 'sem_espelho');
     return NextResponse.json({ ok: false, motivo: 'sem_espelho' }, { status: 404 });
+  }
+
+  // A autorização vem depois de ler o espelho porque é o espelho que sabe de quem
+  // é o evento, e antes de o Google ser tocado: até aqui nada mudou de horário e
+  // nenhum convidado foi avisado.
+  //
+  // `criado_por` nulo é o perfil que saiu do CRM. O evento fica sem dono, e só
+  // admin ou gestor mexe — ninguém herda o compromisso de quem foi embora.
+  const respondePelaAgendaDoTime = sessao.papel === 'admin' || sessao.papel === 'gestor';
+  if (!respondePelaAgendaDoTime && espelho.criado_por !== sessao.id) {
+    registrarRecusa('agenda/remarcar', 'nao_e_seu', { papel: sessao.papel });
+    return NextResponse.json({ ok: false, motivo: 'nao_e_seu' }, { status: 403 });
   }
 
   const token = await rpcDoServidor<string>(
