@@ -36,13 +36,14 @@
  * DUAS LARGURAS, E O CRITÉRIO É A PERGUNTA DA TELA
  * ---------------------------------------------------------------------------
  * `LEITURA`   uma coisa de cada vez, lida de cima para baixo: a fila do dia, um
- *             registro, um lote de ligação, as réguas de cadência, uma
- *             importação. Texto acima de ~90 caracteres por linha custa o
- *             retorno do olho, e é o que o teto evita.
+ *             registro, um lote de ligação, a ficha de um parceiro, as réguas de
+ *             cadência. Texto acima de ~90 caracteres por linha custa o retorno do
+ *             olho, e é o que o teto evita.
  *
  * `TRABALHO`  uma superfície que precisa de espaço: tabela de parceiros, quadro
- *             do funil, inbox de duas colunas, fila do Radar, relatórios,
- *             admin, agenda. Aqui o teto é o da casca, e a tela usa o que tem.
+ *             do funil, inbox de duas colunas, fila do Radar, relatórios, admin,
+ *             agenda, e a importação (o passo do mapa é uma tabela de quantas
+ *             colunas o arquivo tiver). Aqui o teto é o da casca.
  *
  * Se você está criando uma tela e não sabe qual usar: se ela tem tabela ou
  * quadro, é TRABALHO; se ela é uma lista ou um formulário, é LEITURA. Não

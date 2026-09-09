@@ -714,8 +714,13 @@ export function TelaChamada({
 
   const noParaLer = noCorrente ?? noPorId(roteiro, NO_DE_ABERTURA);
 
+  // Era `mx-auto max-w-5xl` enquanto os SEIS outros estados desta mesma tela já usavam
+  // `LEITURA`. Quer dizer: a cada desfecho gravado a tela encolhia 128px e escorregava
+  // 64px para a esquerda, e voltava ao clicar em "próximo" — trinta vezes por manhã,
+  // dentro do único fluxo do CRM que a pessoa usa sem tirar os olhos da tela. É o
+  // defeito que `lib/larguras.ts` descreve, e que eu tinha descrito sem consertar.
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className={LEITURA}>
       <Topo
         lote={lote}
         restantes={emMaos?.restantes ?? null}

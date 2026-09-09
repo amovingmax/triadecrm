@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { LEITURA } from '@/lib/larguras';
 import { type AppRole } from '@/lib/auth/role';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -106,11 +107,16 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
   const podeEscrever = ESCREVEM.includes(sessao.papel);
 
   return (
-    // Sem `mx-auto`: centrada, a ficha começava em x=376 enquanto a lista, o cabeçalho
-    // do app e a busca global começam em x=232, e o mesmo clique movia o conteúdo 144px
+    // Sem `mx-auto`: centrada, a ficha começava em x=385 enquanto a lista, o cabeçalho
+    // do app e a busca global começam em x=232, e o mesmo clique movia o conteúdo 153px
     // para dentro. A largura de leitura continua limitada em 896px; o que muda é que a
     // coluna nasce na mesma margem de todas as outras telas.
-    <TransicaoPagina className="flex mx-auto w-full max-w-4xl flex-col gap-6">
+    //
+    // Este comentário existia desde 09/09 e estava mentindo: eu escrevi a justificativa
+    // e deixei o `mx-auto` na classe. Medido em produção, o título da ficha estava em
+    // x=385 contra x=232 da lista — exatamente o salto que o texto acima diz ter
+    // matado. A régua agora é a constante, não a prosa.
+    <TransicaoPagina className={cn(LEITURA, 'flex flex-col gap-6')}>
       {/* 44px de alvo no celular (era 36), 28 no desktop: esta e o "Revelar" eram os
           dois únicos controles de toque da ficha, e os dois estavam abaixo do mínimo
           enquanto a lista e a barra inferior já cumpriam 44 e 64. */}

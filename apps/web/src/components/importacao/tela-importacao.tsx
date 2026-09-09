@@ -5,6 +5,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileSpreadsheet, Undo2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { cn } from '@/lib/utils';
+import { TRABALHO } from '@/lib/larguras';
 import { DialogoConfirmar } from '@/components/admin/confirmar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -277,8 +279,11 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }:
     );
   }
 
+  // TRABALHO, e não LEITURA: o passo do mapa mostra a prévia da planilha, que é uma
+  // tabela de quantas colunas o arquivo tiver. Numa coluna de 896px ela rolaria de
+  // lado justamente onde a pessoa precisa comparar cabeçalho com conteúdo.
   return (
-    <div className="flex w-full flex-col gap-6">
+    <div className={cn(TRABALHO, 'flex flex-col gap-6')}>
       <Cabecalho />
 
       {falha ? (

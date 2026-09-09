@@ -1,6 +1,8 @@
 import { CalendarClock } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { LEITURA } from '@/lib/larguras';
 import { NAVEGACAO } from '@/lib/navegacao';
 
 type Props = {
@@ -20,8 +22,8 @@ type Props = {
  * mesmo par título/subtítulo de `TelaParceiros`. Sete das oito rotas da lateral são
  * esta tela até o D10, então é ela que dita o ritmo do app — e com o `mx-auto
  * max-w-2xl` antigo o título saltava 304px para a direita e encolhia 4px a cada
- * clique da navegação. Uma âncora só (a goteira esquerda do conteúdo), e o
- * `max-w-2xl` fica apenas para segurar a medida de leitura.
+ * clique da navegação. Uma âncora só (a goteira esquerda do conteúdo), e a coluna
+ * de `@/lib/larguras` para segurar a medida de leitura.
  *
  * Sem a moldura de ícone que existia aqui: ela empurrava o h1 mais 48px para dentro,
  * e o desenho do módulo já está aceso ao lado, no item ativo da navegação. O que
@@ -36,7 +38,7 @@ export function EmConstrucao({ titulo, dia, descricao }: Props) {
   const frase = descricao ?? item?.descricao;
 
   return (
-    <section className="flex mx-auto w-full max-w-2xl flex-col gap-4">
+    <section className={cn(LEITURA, 'flex flex-col gap-4')}>
       <header className="flex flex-col gap-2">
         <h1 className="font-heading text-2xl font-semibold tracking-tight">{titulo}</h1>
         {/* Envolve em vez de cortar: em 320px de largura o chip cai para a linha

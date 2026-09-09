@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROTULO_PAPEL } from '@/lib/auth/role';
 import { requireSession } from '@/lib/auth/session';
+import { LEITURA } from '@/lib/larguras';
 
 export const metadata: Metadata = { title: 'Sem permissão' };
 
@@ -14,7 +15,7 @@ export default async function PaginaSemPermissao() {
   const sessao = await requireSession();
 
   return (
-    <div className="mx-auto w-full max-w-lg">
+    <div className={LEITURA}>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

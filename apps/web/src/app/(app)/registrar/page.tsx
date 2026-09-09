@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { requireSession } from '@/lib/auth/session';
+import { LEITURA } from '@/lib/larguras';
 import { carregarContextoDoRegistro } from '@/components/registro/dados';
 import { TelaRegistro } from '@/components/registro/tela-registro';
 
@@ -36,7 +37,11 @@ export default async function Pagina({
   const org = typeof params.org === 'string' ? params.org : null;
 
   return (
-    <div className="mx-auto w-full max-w-xl">
+    // Era `mx-auto max-w-xl`: a única tela do CRM que ainda se centralizava. Numa
+    // janela de 1425px o título nascia em x=528 enquanto as outras onze começavam em
+    // x=232 — quase 300px de salto no item nº2 do menu, o mais usado do dia. Agora é
+    // a mesma coluna de leitura do /ligar, que é o fluxo irmão deste.
+    <div className={LEITURA}>
       <h1 className="sr-only">Registrar contato</h1>
       <TelaRegistro usuarioId={sessao.id} contexto={contexto} organizacaoInicial={org} />
     </div>
