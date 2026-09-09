@@ -1947,3 +1947,25 @@ Defeito meu, descoberto em produção: "Procurar no Google" respondeu `ficha_ine
 - **As cinco rotas passaram a registrar toda recusa** no log da Vercel, com o mesmo motivo que a tela mostra e, quando vem do Google, o texto cru dele. `sem_sessao` fica de fora (rotina); telefone, token e chave nunca entram — o log é retido e exportável.
 - Verificado por HTTP contra o `komune-crm` em produção: as 11 funções respondem 200 pelo PostgREST, e o `aclexplode` confirma que só `postgres` e `service_role` executam — nem `anon` nem `authenticated`. Antes da correção, as mesmas chamadas davam 406.
 - **A lição operacional:** pgTAP não pega isso. Ele fala com o Postgres direto, e o problema estava na camada HTTP. Uma migração que cria função para o servidor consumir precisa de um teste que passe pelo PostgREST.
+
+## D10 — 09/09/2026 — Uma borda esquerda só, e uma barra de abas só (PRD §8)
+
+As duas queixas de layout da auditoria, que são a forma mais literal do "site incoerente": o título mudava de lugar a cada troca de tela, e o mesmo controle tinha cinco desenhos.
+
+**As quatro larguras viram duas** (`apps/web/src/lib/larguras.ts`). Havia quatro tetos e duas ancoragens, decididos tela a tela: seis em `max-w-4xl` centralizado, Metas em `max-w-2xl` centralizado, Importar em `max-w-2xl` à esquerda, seis sem teto. Numa janela de 1440px, ir de Parceiros para o Meu dia empurrava o título 168px para dentro. Agora **nenhuma tela se centraliza**: todas começam no mesmo x e o que muda é onde terminam. `LEITURA` (896px) para lista, formulário e fila; `TRABALHO` (sem teto próprio) para tabela, quadro e inbox. O único centro que sobra é o da casca, acima de 1440px, que move a coluna inteira e por isso não desloca nada.
+
+- Isso **desfaz de propósito** a centralização de 08/09, feita para responder à queixa de "espaço sobrando à direita". As duas queixas são reais e não têm o mesmo peso: espaço à direita de uma coluna de texto é normal; o título mudando de lugar entre telas é o que faz o produto parecer desmontado.
+
+**As cinco barras de abas viram uma** (`apps/web/src/components/ui/abas.tsx`, promovido de `admin/abas.tsx`). Agenda usava `acao-gradiente` — a ênfase visual reservada à ação primária do produto, gasta na escolha menos importante da tela; Radar era a única sublinhada; Conversas a única em pílula de raio cheio; Funis em `rounded-xl`. Um componente com `contagem`, `sufixo` e `rolavel`; três componentes `Aba` locais apagados.
+
+### Correção no mesmo dia — os comentários que diziam ter tirado o `mx-auto`
+
+Medi as treze telas em produção com o navegador em vez de confiar no que eu tinha escrito, e três comentários estavam mentindo: eu redigi a justificativa da mudança e deixei o `mx-auto` na classe.
+
+- **`/registrar` em x=528** contra x=232 das outras onze — 296px de salto no segundo item do menu, o mais usado do dia. Era a única tela que ainda se centralizava por inteiro.
+- **A ficha do parceiro em x=385**, sob um comentário que dizia "Sem `mx-auto`: centrada, a ficha começava em x=376…". Mesmo caso em `em-construcao` (o docblock explicava o salto de 304px) e em `area-restrita`.
+- **O estado principal do `/ligar` em `mx-auto max-w-5xl`**, enquanto os seis outros estados do mesmo componente já usavam `LEITURA`: a cada desfecho gravado a tela encolhia 128px e escorregava 64px, e voltava no "próximo". Trinta vezes por manhã, no único fluxo em que a pessoa não tira os olhos da tela — o defeito que o `larguras.ts` descreve, e que eu tinha descrito sem consertar.
+- **A importação trocou de lado na classificação:** o texto dizia LEITURA, o código dizia `w-full`. O passo do mapa mostra a prévia da planilha, que é uma tabela de quantas colunas o arquivo tiver; fica `TRABALHO`, declarado.
+- Medido depois do deploy: as treze telas começam em x=232. A ficha indenta 16px além disso, que é a goteira da `BarraTermica` — a mesma que as linhas da lista de Parceiros usam.
+- Verificado: lint, typecheck, 1165 testes e build verdes; medição por `getBoundingClientRect` em produção antes e depois.
+- **A lição:** um comentário que descreve a mudança não é prova de que a mudança aconteceu. Onde havia prosa explicando a régua, agora há a constante — e a régua se mede no navegador.
