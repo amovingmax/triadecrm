@@ -43,7 +43,11 @@ import {
 } from '@/lib/google/agenda';
 import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
-import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
+import {
+  criarClienteAdmin,
+  rpcDoServidor,
+  temChaveDeServico,
+} from '@/lib/supabase/servidor-admin';
 
 const MINUTOS_REUNIAO = 45;
 
@@ -86,9 +90,9 @@ export async function POST(request: NextRequest) {
 
   const admin = criarClienteAdmin();
 
-  const { data: espelhoBruto } = await admin
-    .schema('app')
-    .rpc('compromisso_do_google_ler', { p_task_id: taskId });
+  const espelhoBruto = await rpcDoServidor(admin, 'agenda/remarcar', 'compromisso_do_google_ler', {
+    p_task_id: taskId,
+  });
   const espelho = espelhoBruto as { evento_id?: string; agenda_id?: string } | null;
   if (!espelho?.evento_id) {
     // Normal e não é erro: a reunião antiga nunca foi para o Google. Não há o que
@@ -97,9 +101,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, motivo: 'sem_espelho' }, { status: 404 });
   }
 
-  const { data: token } = await admin
-    .schema('app')
-    .rpc('agenda_google_token_do_evento', { p_task_id: taskId });
+  const token = await rpcDoServidor<string>(
+    admin,
+    'agenda/remarcar',
+    'agenda_google_token_do_evento',
+    { p_task_id: taskId },
+  );
   if (!token) {
     // Quem criou o evento desconectou a agenda. O evento continua lá, e ninguém
     // aqui tem como alterá-lo.
@@ -119,7 +126,7 @@ export async function POST(request: NextRequest) {
     // Evento apagado à mão no Google: o espelho não descreve mais nada. Esquecer
     // é o certo — deixá-lo faria a tarefa nova herdar um link morto.
     if (r.motivo === 'evento_sumiu') {
-      await admin.schema('app').rpc('compromisso_do_google_esquecer', { p_task_id: taskId });
+      await admin.rpc('compromisso_do_google_esquecer', { p_task_id: taskId });
       registrarRecusa('agenda/remarcar', 'evento_sumiu');
       return NextResponse.json({ ok: false, motivo: 'evento_sumiu' }, { status: 409 });
     }
@@ -130,7 +137,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: mudou } = await admin.schema('app').rpc('compromisso_do_google_remanejar', {
+  const mudou = await rpcDoServidor(admin, 'agenda/remarcar', 'compromisso_do_google_remanejar', {
     p_task_antiga: taskId,
     p_novo_horario: quando.toISOString(),
   });

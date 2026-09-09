@@ -33,7 +33,11 @@ import {
 } from '@/lib/google/agenda';
 import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
-import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
+import {
+  criarClienteAdmin,
+  rpcDoServidor,
+  temChaveDeServico,
+} from '@/lib/supabase/servidor-admin';
 
 /** Duração padrão de uma reunião de apresentação. Visita não usa: ver abaixo. */
 const MINUTOS_REUNIAO = 45;
@@ -84,7 +88,7 @@ export async function POST(request: NextRequest) {
 
   const admin = criarClienteAdmin();
 
-  const { data: token } = await admin.schema('app').rpc('agenda_google_token', {
+  const token = await rpcDoServidor<string>(admin, 'agenda/evento', 'agenda_google_token', {
     p_user_id: user.id,
   });
   if (!token) {
@@ -92,13 +96,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, motivo: 'agenda_nao_conectada' }, { status: 409 });
   }
 
-  const { data: dados, error: erroDosDados } = await admin
-    .schema('app')
-    .rpc('agenda_dados_do_evento', { p_task_id: taskId });
-  if (erroDosDados || !dados) {
+  const dados = await rpcDoServidor(admin, 'agenda/evento', 'agenda_dados_do_evento', {
+    p_task_id: taskId,
+  });
+  if (!dados) {
     registrarRecusa('agenda/evento', 'falha_na_leitura');
     return NextResponse.json(
-      { ok: false, motivo: 'falha_na_leitura', detalhe: erroDosDados?.message },
+      { ok: false, motivo: 'falha_na_leitura' },
       { status: 500 },
     );
   }
@@ -148,13 +152,13 @@ export async function POST(request: NextRequest) {
     // ligação aqui é o que faz a tela oferecer "reconectar" na próxima vez, em
     // vez de repetir o mesmo erro.
     if (resultado.motivo === 'acesso_revogado') {
-      await admin.schema('app').rpc('agenda_google_falhou', {
+      await admin.rpc('agenda_google_falhou', {
         p_user_id: user.id,
         p_erro: resultado.detalhe,
         p_revogar: true,
       });
     } else {
-      await admin.schema('app').rpc('agenda_google_falhou', {
+      await admin.rpc('agenda_google_falhou', {
         p_user_id: user.id,
         p_erro: resultado.detalhe,
         p_revogar: false,
@@ -171,7 +175,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: gravou } = await admin.schema('app').rpc('compromisso_do_google_gravar', {
+  const gravou = await rpcDoServidor(admin, 'agenda/evento', 'compromisso_do_google_gravar', {
     p_task_id: taskId,
     p_evento_id: resultado.eventoId,
     p_agenda_id: resultado.agendaId,

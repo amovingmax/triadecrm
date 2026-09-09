@@ -1930,3 +1930,20 @@ A migração `20260908120000` cria `app_settings['precadastro.link']` com `model
 - **`server-only` agora tem alias no Vitest** (`vitest-server-only.ts`). Sem isso, nenhum módulo de servidor podia ser testado, e a lógica pura de `lib/google/*` ficaria permanentemente descoberta. A garantia de verdade continua sendo o build do Next, que é quem sabe o que foi para o navegador.
 - Verificado: 5 testes Vitest novos com os nomes reais das fichas (538 no total); lint, typecheck e build verdes com a rota registrada; migração aplicada no `komune-crm` em nuvem.
 - **Pendente:** falta `GOOGLE_MAPS_API_KEY` no servidor, com a Places API (New) habilitada. Sem ela o botão aparece e responde "a busca ainda não foi configurada".
+
+## Correção — 09/09/2026 — As rotas do servidor ganham porta em `public`
+
+Defeito meu, descoberto em produção: "Procurar no Google" respondeu `ficha_inexistente` para uma ficha que existe.
+
+**O erro.** Pus as funções de servidor em `app` pelo motivo certo — o PostgREST não expõe esse schema, então nem o navegador nem uma chave vazada alcançam o que mora lá. E aí escrevi as rotas do Next chamando `admin.schema('app').rpc(...)`, que fala com o banco **pelo PostgREST**. Usei a porta que eu mesmo tinha trancado. O PostgREST responde `PGRST106 — Only the following schemas are exposed: public, graphql_public`, com HTTP 406.
+
+**Duas falhas empilhadas.** A chamada impossível, e o erro engolido: as rotas faziam `const { data } = await admin.rpc(...)` e liam só o `data`, que vinha nulo — e um nulo virava a recusa nomeada mais próxima. A tela dizia uma coisa falsa e o log não dizia nada.
+
+**O alcance era maior do que pareceu.** Isso derrubava tudo que escrevi em 08 e 09/09 do lado servidor: a busca de telefone e a integração inteira com o Google Agenda. A agenda nunca tinha sido exercitada de ponta a ponta (falta a chave do Google no servidor), então lá o defeito ficou escondido — teria aparecido no primeiro clique de quem fosse usar.
+
+- **A correção já era o padrão da casa.** A migração `20260904001802` resolveu isto para as funções de fila: invólucro em `public`, corpo de uma linha, `security invoker`, `execute` só para `service_role`. `20260909130000` faz o mesmo para as 11 funções de servidor. `security invoker` é o que mantém a garantia: o invólucro não amplia privilégio, porque quem é `security definer` é a função interna, e o `grant` dela continua barrando qualquer papel que não seja `service_role`.
+- **Mesmo nome nos dois schemas**, de propósito: o invólucro é passagem pura, e renomear obrigaria quem lê a rota a procurar a correspondência. Com `search_path = ''` e chamada qualificada não há ambiguidade.
+- **`rpcDoServidor`** substitui todas as chamadas cruas: registra o erro com o nome da função e o código do Postgres antes de devolver nulo. O nulo continua virando recusa nomeada — a diferença é que agora existe rastro de por que veio nulo.
+- **As cinco rotas passaram a registrar toda recusa** no log da Vercel, com o mesmo motivo que a tela mostra e, quando vem do Google, o texto cru dele. `sem_sessao` fica de fora (rotina); telefone, token e chave nunca entram — o log é retido e exportável.
+- Verificado por HTTP contra o `komune-crm` em produção: as 11 funções respondem 200 pelo PostgREST, e o `aclexplode` confirma que só `postgres` e `service_role` executam — nem `anon` nem `authenticated`. Antes da correção, as mesmas chamadas davam 406.
+- **A lição operacional:** pgTAP não pega isso. Ele fala com o Postgres direto, e o problema estava na camada HTTP. Uma migração que cria função para o servidor consumir precisa de um teste que passe pelo PostgREST.

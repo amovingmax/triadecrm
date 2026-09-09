@@ -26,7 +26,11 @@ import {
 } from '@/lib/google/agenda';
 import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
-import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
+import {
+  criarClienteAdmin,
+  rpcDoServidor,
+  temChaveDeServico,
+} from '@/lib/supabase/servidor-admin';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -55,23 +59,26 @@ export async function POST(request: NextRequest) {
 
   const admin = criarClienteAdmin();
 
-  const { data: espelhoBruto } = await admin
-    .schema('app')
-    .rpc('compromisso_do_google_ler', { p_task_id: taskId });
+  const espelhoBruto = await rpcDoServidor(admin, 'agenda/remover', 'compromisso_do_google_ler', {
+    p_task_id: taskId,
+  });
   const espelho = espelhoBruto as { evento_id?: string; agenda_id?: string } | null;
   if (!espelho?.evento_id) {
     registrarRecusa('agenda/remover', 'sem_espelho');
     return NextResponse.json({ ok: false, motivo: 'sem_espelho' }, { status: 404 });
   }
 
-  const { data: token } = await admin
-    .schema('app')
-    .rpc('agenda_google_token_do_evento', { p_task_id: taskId });
+  const token = await rpcDoServidor<string>(
+    admin,
+    'agenda/remover',
+    'agenda_google_token_do_evento',
+    { p_task_id: taskId },
+  );
   if (!token) {
     // Quem criou desconectou. O espelho aqui não descreve mais nada que a gente
     // consiga alcançar, então ele é esquecido — e a pessoa apaga o evento pelo
     // próprio Google, se quiser.
-    await admin.schema('app').rpc('compromisso_do_google_esquecer', { p_task_id: taskId });
+    await admin.rpc('compromisso_do_google_esquecer', { p_task_id: taskId });
     registrarRecusa('agenda/remover', 'dono_desconectado');
     return NextResponse.json({ ok: false, motivo: 'dono_desconectado' }, { status: 409 });
   }
@@ -88,6 +95,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await admin.schema('app').rpc('compromisso_do_google_esquecer', { p_task_id: taskId });
+  await admin.rpc('compromisso_do_google_esquecer', { p_task_id: taskId });
   return NextResponse.json({ ok: true });
 }

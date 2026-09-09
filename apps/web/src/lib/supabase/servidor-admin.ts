@@ -40,3 +40,32 @@ export function criarClienteAdmin() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+
+/**
+ * Chama uma função do banco pelo cliente de serviço, e NUNCA engole o erro.
+ *
+ * Escrito depois de o erro engolido custar uma manhã. As rotas faziam
+ * `const { data } = await admin.rpc(...)` e liam só o `data`. Quando a chamada
+ * falhava — no caso, `PGRST106`, porque eu chamava um schema que o PostgREST não
+ * expõe — o `data` vinha nulo, e um nulo virava a recusa nomeada mais próxima:
+ * "a ficha não existe". A tela dizia uma coisa falsa e o log não dizia nada.
+ *
+ * Aqui o erro vira log com o nome da função e o código do Postgres, e a resposta
+ * continua sendo `null` para quem chamou — que já sabe tratar ausência. A
+ * diferença é que agora existe rastro de POR QUE veio nulo.
+ */
+export async function rpcDoServidor<T>(
+  admin: ReturnType<typeof criarClienteAdmin>,
+  rota: string,
+  funcao: string,
+  argumentos: Record<string, unknown>,
+): Promise<T | null> {
+  const { data, error } = await admin.rpc(funcao as never, argumentos as never);
+  if (error) {
+    console.error(
+      `[erro] ${rota} rpc=${funcao} codigo=${error.code ?? '?'} ${error.message ?? ''}`.trim(),
+    );
+    return null;
+  }
+  return (data ?? null) as T | null;
+}

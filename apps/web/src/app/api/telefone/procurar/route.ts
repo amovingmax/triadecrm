@@ -26,7 +26,11 @@ import {
 } from '@/lib/google/lugares';
 import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
-import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
+import {
+  criarClienteAdmin,
+  rpcDoServidor,
+  temChaveDeServico,
+} from '@/lib/supabase/servidor-admin';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -63,9 +67,9 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = criarClienteAdmin();
-  const { data: fichaBruta } = await admin
-    .schema('app')
-    .rpc('ficha_para_busca_de_telefone', { p_organization_id: orgId });
+  const fichaBruta = await rpcDoServidor(admin, 'telefone/procurar', 'ficha_para_busca_de_telefone', {
+    p_organization_id: orgId,
+  });
 
   const ficha = fichaBruta as {
     nome?: string;
@@ -104,7 +108,7 @@ export async function POST(request: NextRequest) {
   // Guarda o `place_id` do primeiro resultado (único campo que os Termos
   // permitem) e audita. O número NÃO vai junto — nem para o audit_log.
   const primeiro = r.lugares[0];
-  await admin.schema('app').rpc('registrar_busca_de_telefone', {
+  await rpcDoServidor(admin, 'telefone/procurar', 'registrar_busca_de_telefone', {
     p_organization_id: orgId,
     p_place_id: primeiro?.placeId ?? null,
     p_achou: r.lugares.some((l) => l.telefone !== null),

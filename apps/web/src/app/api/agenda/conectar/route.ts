@@ -24,7 +24,11 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { ESCOPO_AGENDA } from '@/lib/google/agenda';
 import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
-import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
+import {
+  criarClienteAdmin,
+  rpcDoServidor,
+  temChaveDeServico,
+} from '@/lib/supabase/servidor-admin';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -64,22 +68,21 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = criarClienteAdmin();
-  const { data, error } = await admin.schema('app').rpc('agenda_google_guardar', {
+  const data = await rpcDoServidor(admin, 'agenda/conectar', 'agenda_google_guardar', {
     p_user_id: user.id,
     p_refresh_token: refreshToken,
     p_email_google: email,
     p_escopos: [ESCOPO_AGENDA],
   });
 
-  if (error) {
+  // `rpcDoServidor` já registrou o erro no log com o código do Postgres; aqui o
+  // nulo só precisa virar recusa nomeada.
+  if (data === null) {
     registrarRecusa('agenda/conectar', 'falha_ao_guardar');
-    return NextResponse.json(
-      { ok: false, motivo: 'falha_ao_guardar', detalhe: error.message },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, motivo: 'falha_ao_guardar' }, { status: 500 });
   }
 
-  const r = (data ?? {}) as { ok?: boolean; motivo?: string; email?: string };
+  const r = data as { ok?: boolean; motivo?: string; email?: string };
   if (r.ok !== true) {
     return NextResponse.json({ ok: false, motivo: r.motivo ?? 'desconhecido' }, { status: 400 });
   }
