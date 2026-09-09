@@ -24,6 +24,7 @@ import {
   temCredenciaisDoGoogle,
   type MotivoDoGoogle,
 } from '@/lib/google/agenda';
+import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
 import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
 
@@ -35,15 +36,20 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, motivo: 'sem_sessao' }, { status: 401 });
 
   if (!temChaveDeServico() || !temCredenciaisDoGoogle()) {
+    registrarRecusa('agenda/remover', 'nao_configurado');
     return NextResponse.json({ ok: false, motivo: 'nao_configurado' }, { status: 503 });
   }
 
   const corpo = (await request.json().catch(() => ({}))) as { task_id?: unknown };
   const taskId = typeof corpo.task_id === 'string' ? corpo.task_id : '';
-  if (!taskId) return NextResponse.json({ ok: false, motivo: 'sem_tarefa' }, { status: 400 });
+  if (!taskId) {
+    registrarRecusa('agenda/remover', 'sem_tarefa');
+    return NextResponse.json({ ok: false, motivo: 'sem_tarefa' }, { status: 400 });
+  }
 
   const { data: visivel } = await supabase.from('tasks').select('id').eq('id', taskId).maybeSingle();
   if (!visivel) {
+    registrarRecusa('agenda/remover', 'tarefa_invisivel');
     return NextResponse.json({ ok: false, motivo: 'tarefa_invisivel' }, { status: 404 });
   }
 
@@ -54,6 +60,7 @@ export async function POST(request: NextRequest) {
     .rpc('compromisso_do_google_ler', { p_task_id: taskId });
   const espelho = espelhoBruto as { evento_id?: string; agenda_id?: string } | null;
   if (!espelho?.evento_id) {
+    registrarRecusa('agenda/remover', 'sem_espelho');
     return NextResponse.json({ ok: false, motivo: 'sem_espelho' }, { status: 404 });
   }
 
@@ -65,6 +72,7 @@ export async function POST(request: NextRequest) {
     // consiga alcançar, então ele é esquecido — e a pessoa apaga o evento pelo
     // próprio Google, se quiser.
     await admin.schema('app').rpc('compromisso_do_google_esquecer', { p_task_id: taskId });
+    registrarRecusa('agenda/remover', 'dono_desconectado');
     return NextResponse.json({ ok: false, motivo: 'dono_desconectado' }, { status: 409 });
   }
 
@@ -73,6 +81,7 @@ export async function POST(request: NextRequest) {
   // `apagarEvento` já trata 404 e 410 como sucesso: o estado desejado (evento
   // fora da agenda) é o estado atual.
   if (!r.ok) {
+    registrarRecusa('agenda/remover', r.motivo, { detalhe: r.detalhe });
     return NextResponse.json(
       { ok: false, motivo: r.motivo, recado: RECADO_DO_GOOGLE[r.motivo as MotivoDoGoogle] },
       { status: 502 },

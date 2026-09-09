@@ -41,6 +41,7 @@ import {
   temCredenciaisDoGoogle,
   type MotivoDoGoogle,
 } from '@/lib/google/agenda';
+import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
 import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
 
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, motivo: 'sem_sessao' }, { status: 401 });
 
   if (!temChaveDeServico() || !temCredenciaisDoGoogle()) {
+    registrarRecusa('agenda/remarcar', 'nao_configurado');
     return NextResponse.json({ ok: false, motivo: 'nao_configurado' }, { status: 503 });
   }
 
@@ -64,11 +66,13 @@ export async function POST(request: NextRequest) {
   const taskId = typeof corpo.task_id === 'string' ? corpo.task_id : '';
   const horario = typeof corpo.novo_horario === 'string' ? corpo.novo_horario : '';
   if (!taskId || !horario) {
+    registrarRecusa('agenda/remarcar', 'pedido_incompleto');
     return NextResponse.json({ ok: false, motivo: 'pedido_incompleto' }, { status: 400 });
   }
 
   const quando = new Date(horario);
   if (Number.isNaN(quando.getTime())) {
+    registrarRecusa('agenda/remarcar', 'horario_invalido');
     return NextResponse.json({ ok: false, motivo: 'horario_invalido' }, { status: 400 });
   }
 
@@ -76,6 +80,7 @@ export async function POST(request: NextRequest) {
   // antiga, não remarca o evento dela.
   const { data: visivel } = await supabase.from('tasks').select('id').eq('id', taskId).maybeSingle();
   if (!visivel) {
+    registrarRecusa('agenda/remarcar', 'tarefa_invisivel');
     return NextResponse.json({ ok: false, motivo: 'tarefa_invisivel' }, { status: 404 });
   }
 
@@ -88,6 +93,7 @@ export async function POST(request: NextRequest) {
   if (!espelho?.evento_id) {
     // Normal e não é erro: a reunião antiga nunca foi para o Google. Não há o que
     // remarcar, e a tarefa nova pode ser posta na agenda quando alguém quiser.
+    registrarRecusa('agenda/remarcar', 'sem_espelho');
     return NextResponse.json({ ok: false, motivo: 'sem_espelho' }, { status: 404 });
   }
 
@@ -97,6 +103,7 @@ export async function POST(request: NextRequest) {
   if (!token) {
     // Quem criou o evento desconectou a agenda. O evento continua lá, e ninguém
     // aqui tem como alterá-lo.
+    registrarRecusa('agenda/remarcar', 'dono_desconectado');
     return NextResponse.json({ ok: false, motivo: 'dono_desconectado' }, { status: 409 });
   }
 
@@ -113,8 +120,10 @@ export async function POST(request: NextRequest) {
     // é o certo — deixá-lo faria a tarefa nova herdar um link morto.
     if (r.motivo === 'evento_sumiu') {
       await admin.schema('app').rpc('compromisso_do_google_esquecer', { p_task_id: taskId });
+      registrarRecusa('agenda/remarcar', 'evento_sumiu');
       return NextResponse.json({ ok: false, motivo: 'evento_sumiu' }, { status: 409 });
     }
+    registrarRecusa('agenda/remarcar', r.motivo, { detalhe: r.detalhe });
     return NextResponse.json(
       { ok: false, motivo: r.motivo, recado: RECADO_DO_GOOGLE[r.motivo as MotivoDoGoogle] },
       { status: 502 },
@@ -131,6 +140,7 @@ export async function POST(request: NextRequest) {
     // O Google já está certo. O que falhou foi apontar o espelho para a tarefa
     // nova, e dizer "ok" aqui esconderia que a reunião nova vai oferecer "Pôr na
     // agenda" — e criar um segundo evento se alguém clicar.
+    registrarRecusa('agenda/remarcar', 'remarcado_sem_religar');
     return NextResponse.json(
       { ok: false, motivo: 'remarcado_sem_religar', detalhe: m.motivo },
       { status: 500 },

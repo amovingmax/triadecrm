@@ -22,6 +22,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { ESCOPO_AGENDA } from '@/lib/google/agenda';
+import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
 import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
 
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!temChaveDeServico()) {
+    registrarRecusa('agenda/conectar', 'nao_configurado');
     return NextResponse.json({ ok: false, motivo: 'nao_configurado' }, { status: 503 });
   }
 
@@ -50,12 +52,14 @@ export async function POST(request: NextRequest) {
     // refresh token com `access_type=offline` E `prompt=consent`. Quem já
     // consentiu antes e reconecta sem forçar o consentimento recebe só o access
     // token, e a ligação não pode ser guardada.
+    registrarRecusa('agenda/conectar', 'sem_refresh_token');
     return NextResponse.json({ ok: false, motivo: 'sem_refresh_token' }, { status: 400 });
   }
 
   const email =
     (typeof corpo.email === 'string' && corpo.email.trim()) || user.email || '';
   if (!email) {
+    registrarRecusa('agenda/conectar', 'sem_email');
     return NextResponse.json({ ok: false, motivo: 'sem_email' }, { status: 400 });
   }
 
@@ -68,6 +72,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (error) {
+    registrarRecusa('agenda/conectar', 'falha_ao_guardar');
     return NextResponse.json(
       { ok: false, motivo: 'falha_ao_guardar', detalhe: error.message },
       { status: 500 },

@@ -31,6 +31,7 @@ import {
   temCredenciaisDoGoogle,
   type MotivoDoGoogle,
 } from '@/lib/google/agenda';
+import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
 import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
 
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!temChaveDeServico() || !temCredenciaisDoGoogle()) {
+    registrarRecusa('agenda/evento', 'nao_configurado');
     return NextResponse.json(
       { ok: false, motivo: 'nao_configurado', recado: RECADO_DO_GOOGLE.nao_configurado },
       { status: 503 },
@@ -58,6 +60,7 @@ export async function POST(request: NextRequest) {
   const corpo = (await request.json().catch(() => ({}))) as { task_id?: unknown };
   const taskId = typeof corpo.task_id === 'string' ? corpo.task_id : '';
   if (!taskId) {
+    registrarRecusa('agenda/evento', 'sem_tarefa');
     return NextResponse.json({ ok: false, motivo: 'sem_tarefa' }, { status: 400 });
   }
 
@@ -68,12 +71,14 @@ export async function POST(request: NextRequest) {
     .eq('id', taskId)
     .maybeSingle();
   if (erroDeLeitura) {
+    registrarRecusa('agenda/evento', 'falha_na_leitura');
     return NextResponse.json(
       { ok: false, motivo: 'falha_na_leitura', detalhe: erroDeLeitura.message },
       { status: 500 },
     );
   }
   if (!visivel) {
+    registrarRecusa('agenda/evento', 'tarefa_invisivel');
     return NextResponse.json({ ok: false, motivo: 'tarefa_invisivel' }, { status: 404 });
   }
 
@@ -83,6 +88,7 @@ export async function POST(request: NextRequest) {
     p_user_id: user.id,
   });
   if (!token) {
+    registrarRecusa('agenda/evento', 'agenda_nao_conectada');
     return NextResponse.json({ ok: false, motivo: 'agenda_nao_conectada' }, { status: 409 });
   }
 
@@ -90,6 +96,7 @@ export async function POST(request: NextRequest) {
     .schema('app')
     .rpc('agenda_dados_do_evento', { p_task_id: taskId });
   if (erroDosDados || !dados) {
+    registrarRecusa('agenda/evento', 'falha_na_leitura');
     return NextResponse.json(
       { ok: false, motivo: 'falha_na_leitura', detalhe: erroDosDados?.message },
       { status: 500 },
@@ -110,9 +117,11 @@ export async function POST(request: NextRequest) {
   if (!t.quando) {
     // A agenda só lista tarefa com data, então isto seria uma corrida: alguém
     // limpou o prazo entre a tela carregar e o clique.
+    registrarRecusa('agenda/evento', 'sem_horario');
     return NextResponse.json({ ok: false, motivo: 'sem_horario' }, { status: 400 });
   }
   if (t.ja_tem_evento) {
+    registrarRecusa('agenda/evento', 'ja_tem_evento');
     return NextResponse.json({ ok: false, motivo: 'ja_tem_evento' }, { status: 409 });
   }
 
@@ -151,6 +160,7 @@ export async function POST(request: NextRequest) {
         p_revogar: false,
       });
     }
+    registrarRecusa('agenda/evento', resultado.motivo, { detalhe: resultado.detalhe });
     return NextResponse.json(
       {
         ok: false,
@@ -174,6 +184,7 @@ export async function POST(request: NextRequest) {
   if (g.ok !== true) {
     // O evento EXISTE no Google. Dizer "deu certo" seria mentira, e dizer "deu
     // errado" sem contar que o evento está lá faria a pessoa criar um segundo.
+    registrarRecusa('agenda/evento', 'evento_criado_sem_registro');
     return NextResponse.json(
       {
         ok: false,

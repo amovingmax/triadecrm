@@ -24,6 +24,7 @@ import {
   temChaveDoPlaces,
   type MotivoDoPlaces,
 } from '@/lib/google/lugares';
+import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
 import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
 
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, motivo: 'sem_sessao' }, { status: 401 });
 
   if (!temChaveDeServico() || !temChaveDoPlaces()) {
+    registrarRecusa('telefone/procurar', 'nao_configurado');
     return NextResponse.json(
       { ok: false, motivo: 'nao_configurado', recado: RECADO_DO_PLACES.nao_configurado },
       { status: 503 },
@@ -43,7 +45,10 @@ export async function POST(request: NextRequest) {
 
   const corpo = (await request.json().catch(() => ({}))) as { organization_id?: unknown };
   const orgId = typeof corpo.organization_id === 'string' ? corpo.organization_id : '';
-  if (!orgId) return NextResponse.json({ ok: false, motivo: 'sem_ficha' }, { status: 400 });
+  if (!orgId) {
+    registrarRecusa('telefone/procurar', 'sem_ficha');
+    return NextResponse.json({ ok: false, motivo: 'sem_ficha' }, { status: 400 });
+  }
 
   // Acesso pela RLS da pessoa: se ela não enxerga a ficha, não procura o
   // telefone dela.
@@ -52,7 +57,10 @@ export async function POST(request: NextRequest) {
     .select('id')
     .eq('id', orgId)
     .maybeSingle();
-  if (!visivel) return NextResponse.json({ ok: false, motivo: 'ficha_invisivel' }, { status: 404 });
+  if (!visivel) {
+    registrarRecusa('telefone/procurar', 'ficha_invisivel');
+    return NextResponse.json({ ok: false, motivo: 'ficha_invisivel' }, { status: 404 });
+  }
 
   const admin = criarClienteAdmin();
   const { data: fichaBruta } = await admin
@@ -70,12 +78,15 @@ export async function POST(request: NextRequest) {
   } | null;
 
   if (!ficha?.nome) {
+    registrarRecusa('telefone/procurar', 'ficha_inexistente');
     return NextResponse.json({ ok: false, motivo: 'ficha_inexistente' }, { status: 404 });
   }
   if (ficha.nao_contatar) {
+    registrarRecusa('telefone/procurar', 'nao_contatar');
     return NextResponse.json({ ok: false, motivo: 'nao_contatar' }, { status: 409 });
   }
   if (ficha.tem_telefone) {
+    registrarRecusa('telefone/procurar', 'ficha_ja_tem_telefone');
     return NextResponse.json({ ok: false, motivo: 'ficha_ja_tem_telefone' }, { status: 409 });
   }
 
@@ -83,6 +94,7 @@ export async function POST(request: NextRequest) {
   const r = await procurarLugar(consulta);
 
   if (!r.ok) {
+    registrarRecusa('telefone/procurar', r.motivo, { detalhe: r.detalhe });
     return NextResponse.json(
       { ok: false, motivo: r.motivo, recado: RECADO_DO_PLACES[r.motivo as MotivoDoPlaces] },
       { status: 502 },
