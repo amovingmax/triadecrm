@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 
 import { formatarTelefone, linkWhatsapp } from './formatos';
+import { ProcurarTelefone } from './procurar-telefone';
 
 /**
  * Telefone da ficha com revelação registrada (RF-BAS-14, RF-ADM-03).
@@ -32,8 +33,11 @@ export function TelefoneRevelavel({
   const [revelado, setRevelado] = useState<string | null>(mascarado ? null : telefone);
   const [revelando, setRevelando] = useState(false);
 
+  // Ficha sem telefone não é um beco: 34 das 100 fichas em produção estão assim,
+  // e um terço da base parada por falta de número é o maior buraco de alcance que
+  // existe hoje. O Places acha boa parte deles.
   if (!telefone) {
-    return <span className="text-muted-foreground">Sem WhatsApp cadastrado</span>;
+    return <ProcurarTelefone organizationId={organizationId} />;
   }
 
   const visivel = revelado ?? telefone;

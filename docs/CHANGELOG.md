@@ -1913,3 +1913,20 @@ A migração `20260908120000` cria `app_settings['precadastro.link']` com `model
 - **Já recusei cravar valor de produção em migração uma vez**, com a URL e o segredo do cron do lado Komune, pelo motivo certo: a mesma migração roda em dev e em produção. Aqui é diferente — `admin.komune.app.br` não é ambiente nosso, é o cadastro real da Komune, e não existe "admin de desenvolvimento" para onde mandar um fornecedor de verdade.
 - **O teste 36 foi atualizado** para afirmar a verdade nova, e passou a CRIAR a situação "sem endereço" em vez de contar com o estado inicial do banco. `pg_temp.modelo` também foi corrigido: usava `jsonb_build_object('modelo', p_valor)`, que grava a string `"null"` em vez do nulo jsonb quando o parâmetro é nulo.
 - Verificado: `supabase db reset` (banco do zero, 40 migrações, seed) seguido de `supabase test db --local` — **39 arquivos, 2358 asserções, todas verdes**. É a primeira vez nesta sequência de trabalho que a suíte inteira foi rodada num banco recriado, e não incrementalmente.
+
+## D2 — 09/09/2026 — Procurar telefone sem guardar o que não pode (RF-BAS-05)
+
+34 das 100 fichas em produção não têm telefone — um terço da base parado. Todas vieram da lista-semente do R09, que já as marca `sem_telefone_no_r09`, e nenhuma tem CNPJ, @instagram, site ou e-mail: só nome e categoria. Os 42 candidatos do Radar têm o mesmo buraco.
+
+**A restrição decidiu o desenho.** O R03 §2.4 é explícito: os Termos do Google proíbem armazenar conteúdo do Places, exceto `place_id` (e lat/lng por 30 dias). O telefone que a API devolve NÃO pode ser gravado. O anexo prescreve o uso que sobra — Places como *gatilho de descoberta*, com o dado definitivo vindo do fornecedor.
+
+- **Não existe botão "salvar na ficha", e não é esquecimento.** O número aparece na tela e morre ali: nenhuma coluna, nenhum cache, e nem no `audit_log` — guardá-lo na auditoria seria violar o contrato por uma porta lateral. A tela diz isso com todas as letras, porque a alternativa é alguém copiar o número na mão achando que está sendo esperto.
+- **O que fica é `place_id`**, o único campo que os Termos permitem, e que já existia como 2ª chave de dedup (RF-BAS-08). Só preenche quando está vazio: sobrescrever apagaria uma correspondência já confirmada.
+- **Três recusas antes de gastar consulta paga:** ficha que já tem telefone, contato em `do_not_contact` (procurar o telefone de quem pediu para sumir é o oposto de respeitar o pedido, mesmo sem guardar), e ficha que a RLS da pessoa não enxerga.
+- **`includePureServiceAreaBusinesses: true`** é essencial neste caso: cerimonialista, DJ e fotógrafo não têm loja física, e sem essa chave o Places não os devolve.
+- **Viés de 30 km no centro de Natal**, senão "Mega Eventos" volta de São Paulo. E **três resultados, não um**: para nome ambíguo ("Vybbe", "M3TA", "Grupo Feeling") quem decide qual é o negócio certo é a pessoa olhando o endereço.
+- **A categoria entra na consulta** pelo mesmo motivo, e o teste trava essa decisão.
+- **Field mask mínimo.** A cobrança do Places segue o SKU mais alto presente na máscara; pedir um campo a mais "porque pode ser útil" muda a faixa de preço da operação inteira. `nationalPhoneNumber` é Enterprise: US$ 35/mil, com mil grátis por mês — as 34 fichas cabem folgadas no gratuito.
+- **`server-only` agora tem alias no Vitest** (`vitest-server-only.ts`). Sem isso, nenhum módulo de servidor podia ser testado, e a lógica pura de `lib/google/*` ficaria permanentemente descoberta. A garantia de verdade continua sendo o build do Next, que é quem sabe o que foi para o navegador.
+- Verificado: 5 testes Vitest novos com os nomes reais das fichas (538 no total); lint, typecheck e build verdes com a rota registrada; migração aplicada no `komune-crm` em nuvem.
+- **Pendente:** falta `GOOGLE_MAPS_API_KEY` no servidor, com a Places API (New) habilitada. Sem ela o botão aparece e responde "a busca ainda não foi configurada".

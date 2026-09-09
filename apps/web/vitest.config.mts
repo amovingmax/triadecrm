@@ -6,6 +6,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Ver o comentário em vitest-server-only.ts.
+      'server-only': fileURLToPath(new URL('./vitest-server-only.ts', import.meta.url)),
     },
   },
   test: {
