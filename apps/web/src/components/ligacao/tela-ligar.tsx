@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
+import { LEITURA } from '@/lib/larguras';
+import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { type ContextoDaLigacao } from './chamada-contexto';
@@ -54,7 +56,7 @@ export function TelaLigar({
 
   if (lote.isPending) {
     return (
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+      <div className={cn(LEITURA, 'flex flex-col gap-4')}>
         <span className="sr-only">Abrindo o lote.</span>
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-40 w-full" />
@@ -64,7 +66,7 @@ export function TelaLigar({
 
   if (lote.isError || !lote.data) {
     return (
-      <div className="mx-auto w-full max-w-4xl">
+      <div className={LEITURA}>
         <ErroDaChamada
           frase={
             lote.error instanceof ErroDaLigacao

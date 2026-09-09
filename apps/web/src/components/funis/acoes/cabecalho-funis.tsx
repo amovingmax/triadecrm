@@ -18,42 +18,13 @@
  */
 import { Search, UserRound, Users, X } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { SeletorDeAba } from '@/components/ui/abas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 import type { FunilDisponivel } from './consultas';
 
 /** Aba de um funil no seletor. */
-function AbaDeFunil({
-  funil,
-  ativo,
-  aoEscolher,
-}: {
-  funil: FunilDisponivel;
-  ativo: boolean;
-  aoEscolher: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={ativo}
-      onClick={aoEscolher}
-      className={cn(
-        'toque h-11 shrink-0 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition-colors md:h-8',
-        ativo
-          ? 'bg-card text-foreground sombra-base'
-          : 'text-muted-foreground hover:text-foreground',
-      )}
-    >
-      {funil.nome}
-      {!funil.noQuadro ? (
-        <span className="ml-1.5 text-xs font-normal text-muted-foreground">(v1)</span>
-      ) : null}
-    </button>
-  );
-}
 
 export function SeletorDeFunil({
   funis,
@@ -78,20 +49,20 @@ export function SeletorDeFunil({
   return (
     // No celular a trilha rola na horizontal em vez de quebrar em duas linhas: três
     // nomes longos não cabem em 390px e empilhar empurraria o quadro para baixo da dobra.
-    <div
-      role="tablist"
-      aria-label="Funil"
-      className="-mx-1 flex gap-1 overflow-x-auto rounded-xl bg-muted/50 p-1 md:mx-0 md:w-fit"
-    >
-      {funis.map((funil) => (
-        <AbaDeFunil
-          key={funil.id}
-          funil={funil}
-          ativo={funil.slug === slugAtivo}
-          aoEscolher={() => aoEscolher(funil)}
-        />
-      ))}
-    </div>
+    <SeletorDeAba
+      rotulo="Funil"
+      rolavel
+      ativo={slugAtivo}
+      aoTrocar={(slug) => {
+        const escolhido = funis.find((f) => f.slug === slug);
+        if (escolhido) aoEscolher(escolhido);
+      }}
+      itens={funis.map((funil) => ({
+        id: funil.slug,
+        rotulo: funil.nome,
+        sufixo: funil.noQuadro ? undefined : '(v1)',
+      }))}
+    />
   );
 }
 

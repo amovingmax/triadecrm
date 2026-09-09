@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RotateCw, Sunrise } from 'lucide-react';
 
+import { LEITURA } from '@/lib/larguras';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -56,7 +57,7 @@ export function TelaCadencias({ podeLigarDesligar }: { podeLigarDesligar: boolea
   const dentro = cadencias.reduce((soma, c) => soma + contatosNaCadencia(c), 0);
 
   return (
-    <div className="flex mx-auto w-full max-w-4xl flex-col gap-5">
+    <div className={cn(LEITURA, 'flex flex-col gap-5')}>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="font-heading text-2xl font-semibold tracking-tight">Cadências</h1>

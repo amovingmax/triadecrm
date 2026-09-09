@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Hourglass, PhoneOff, RotateCw, SkipForward } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { LEITURA } from '@/lib/larguras';
 import { Button } from '@/components/ui/button';
 import { useMontado } from '@/lib/usar-cliente';
 import { DialogoConfirmar } from '@/components/admin/confirmar';
@@ -582,7 +583,7 @@ export function TelaChamada({
   // ---------------------------------------------------------------------------
   if (proximo.isPending || janela === null) {
     return (
-      <div className="mx-auto w-full max-w-4xl">
+      <div className={LEITURA}>
         <Topo lote={lote} restantes={null} fechaEm={null} aoSair={sair} />
         <EsqueletoDaChamada />
       </div>
@@ -595,7 +596,7 @@ export function TelaChamada({
         ? proximo.error.message
         : 'Não deu para falar com o servidor. Verifique a conexão e tente de novo.';
     return (
-      <div className="mx-auto w-full max-w-4xl">
+      <div className={LEITURA}>
         <Topo lote={lote} restantes={null} fechaEm={null} aoSair={sair} />
         <ErroDaChamada
           frase={frase}
@@ -608,7 +609,7 @@ export function TelaChamada({
 
   if (recibo) {
     return (
-      <div className="mx-auto w-full max-w-4xl">
+      <div className={LEITURA}>
         <Topo
           lote={lote}
           restantes={recibo.resultado.restantes}
@@ -633,7 +634,7 @@ export function TelaChamada({
   if (proximo.data && !proximo.data.ok) {
     const recusa = proximo.data;
     return (
-      <div className="mx-auto w-full max-w-4xl">
+      <div className={LEITURA}>
         <Topo lote={lote} restantes={null} fechaEm={null} aoSair={sair} />
         {recusa.motivo === 'fila_vazia' && pulados.length > 0 ? (
           // A fila só "acabou" porque os pulados estão reservados com ela. Dizer
@@ -700,7 +701,7 @@ export function TelaChamada({
 
   if (!item || !roteiro) {
     return (
-      <div className="mx-auto w-full max-w-4xl">
+      <div className={LEITURA}>
         <Topo lote={lote} restantes={null} fechaEm={null} aoSair={sair} />
         <ErroDaChamada
           frase="O servidor não devolveu o roteiro deste lote. Recarregue a página."

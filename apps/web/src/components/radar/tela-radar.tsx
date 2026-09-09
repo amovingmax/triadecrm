@@ -21,6 +21,8 @@ import {
   revisarCandidato,
   type AcaoDeRevisao,
 } from './dados';
+import { SeletorDeAba } from '@/components/ui/abas';
+
 import { DialogoDeDecisao } from './dialogo-decisao';
 import { ErroDaFila, EsqueletoDaFila, FilaVazia, VazioPorFiltroDaFila } from './estados';
 import { FolhaDeCandidato } from './folha-candidato';
@@ -227,18 +229,15 @@ export function TelaRadar({
 
       {/* Duas superfícies, não duas páginas: quem revisa precisa checar a regra de uma
           fonte sem perder o recorte da fila. */}
-      <nav
-        aria-label="Seções do Radar"
-        className="flex items-center gap-1 border-b border-hairline"
-      >
-        <Aba rotulo="Fila de revisão" ativa={aba === 'fila'} aoEscolher={() => setAba('fila')} />
-        <Aba
-          rotulo="Fontes"
-          contagem={resumo.data?.fontes_total ?? null}
-          ativa={aba === 'fontes'}
-          aoEscolher={() => setAba('fontes')}
-        />
-      </nav>
+      <SeletorDeAba
+        rotulo="Seções do Radar"
+        ativo={aba}
+        aoTrocar={setAba}
+        itens={[
+          { id: 'fila', rotulo: 'Fila de revisão' },
+          { id: 'fontes', rotulo: 'Fontes', contagem: resumo.data?.fontes_total ?? null },
+        ]}
+      />
 
       {aba === 'fontes' ? (
         <CatalogoDeFontes podeLigar={podeLigarFonte} podeColetar={podeDecidir} />
@@ -354,35 +353,6 @@ export function TelaRadar({
   );
 }
 
-function Aba({
-  rotulo,
-  contagem,
-  ativa,
-  aoEscolher,
-}: {
-  rotulo: string;
-  contagem?: number | null;
-  ativa: boolean;
-  aoEscolher: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={aoEscolher}
-      aria-current={ativa ? 'page' : undefined}
-      className={cn(
-        'toque -mb-px h-11 rounded-t-lg border-b-2 px-3 text-sm font-medium transition-colors',
-        'focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
-        ativa
-          ? 'border-foreground text-foreground'
-          : 'border-transparent text-muted-foreground hover:text-foreground',
-      )}
-    >
-      {rotulo}
-      {typeof contagem === 'number' ? <span className="numerico"> ({contagem})</span> : null}
-    </button>
-  );
-}
 
 function Tecla({ children }: { children: React.ReactNode }) {
   return (

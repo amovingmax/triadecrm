@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { SeletorDeAba } from '@/components/ui/abas';
 import { NotaRecolhida } from '@/components/ui/nota-recolhida';
 
 import { ConexaoDaAgendaGoogle } from './conexao-google';
@@ -198,26 +199,20 @@ export function TelaAgenda({
           </p>
         </div>
 
-        <div
-          className="flex items-center gap-1 rounded-lg border border-hairline p-0.5"
-          role="group"
-          aria-label="Como ver a agenda"
-        >
-          {(['dia', 'semana', 'rota'] as const).map((opcao) => (
-            <button
-              key={opcao}
-              type="button"
-              aria-pressed={visao === opcao}
-              onClick={() => setVisao(opcao)}
-              className={cn(
-                'toque h-10 rounded-[calc(var(--radius-lg)-2px)] px-3.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:h-7',
-                visao === opcao ? 'acao-gradiente' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {opcao === 'dia' ? 'Dia' : opcao === 'semana' ? 'Semana' : 'Rota'}
-            </button>
-          ))}
-        </div>
+        {/* Era um segmentado com contorno e a opção ativa em `acao-gradiente` — o
+            mesmo tratamento do botão de AÇÃO PRINCIPAL do produto, gasto aqui
+            para dizer qual das três visões está aberta. Escolher visão não é a
+            ação principal de tela nenhuma. */}
+        <SeletorDeAba
+          rotulo="Como ver a agenda"
+          ativo={visao}
+          aoTrocar={setVisao}
+          itens={[
+            { id: 'dia', rotulo: 'Dia' },
+            { id: 'semana', rotulo: 'Semana' },
+            { id: 'rota', rotulo: 'Rota' },
+          ]}
+        />
       </header>
 
       <TiraDaSemana

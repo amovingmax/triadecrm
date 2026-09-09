@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Moon, RotateCw, Sunrise } from 'lucide-react';
 
+import { LEITURA } from '@/lib/larguras';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -57,7 +58,7 @@ export function TelaResumo({ nome }: { nome: string }) {
   const momento = dados?.momento ?? escolhido ?? 'manha';
 
   return (
-    <div className="flex mx-auto w-full max-w-4xl flex-col gap-5">
+    <div className={cn(LEITURA, 'flex flex-col gap-5')}>
       <header className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">

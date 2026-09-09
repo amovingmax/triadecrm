@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
+import { SeletorDeAba } from '@/components/ui/abas';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
 import { Conversa } from './conversa';
@@ -309,31 +310,15 @@ function Abas({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <div
-        role="tablist"
-        aria-label="O que mostrar na lista"
-        className="inline-flex w-fit gap-1 rounded-full border border-hairline p-0.5"
-      >
-        <Aba
-          ativa={aba === 'conversas'}
-          aoClicar={() => aoTrocar('conversas')}
-          rotulo="Conversas"
-        />
-        <Aba ativa={aba === 'aprovar'} aoClicar={() => aoTrocar('aprovar')} rotulo="Aprovar">
-          {naFila > 0 ? (
-            <span
-              className={cn(
-                'numerico inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]',
-                aba === 'aprovar'
-                  ? 'bg-background text-foreground'
-                  : 'bg-foreground text-background',
-              )}
-            >
-              {naFila}
-            </span>
-          ) : null}
-        </Aba>
-      </div>
+      <SeletorDeAba
+        rotulo="O que mostrar na lista"
+        ativo={aba}
+        aoTrocar={aoTrocar}
+        itens={[
+          { id: 'conversas', rotulo: 'Conversas' },
+          { id: 'aprovar', rotulo: 'Aprovar', contagem: naFila },
+        ]}
+      />
 
       {aba === 'aprovar' && naFila > 0 ? (
         <p className="text-xs text-muted-foreground">
@@ -359,34 +344,6 @@ function Abas({
   );
 }
 
-function Aba({
-  ativa,
-  aoClicar,
-  rotulo,
-  children,
-}: {
-  ativa: boolean;
-  aoClicar: () => void;
-  rotulo: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={ativa}
-      onClick={aoClicar}
-      className={cn(
-        'toque inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm outline-none',
-        'focus-visible:ring-3 focus-visible:ring-ring/50',
-        ativa ? 'bg-foreground font-medium text-background' : 'text-muted-foreground hover:bg-muted',
-      )}
-    >
-      {rotulo}
-      {children}
-    </button>
-  );
-}
 
 /** Diz em português o que a pessoa filtrou, para o vazio não ser genérico. */
 function descreverRecorte(filtros: FiltrosConversas, catalogos: CatalogosConversas): string {

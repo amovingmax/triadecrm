@@ -245,7 +245,9 @@ export function TelaMetas({
           aria-label="Metas por pessoa"
           className={cn(
             'grid grid-cols-1 items-start gap-4',
-            pessoas.length > 1 ? 'lg:grid-cols-2' : 'mx-auto w-full max-w-2xl',
+            // Sem `mx-auto`: a borda esquerda do conteúdo não se mexe entre telas.
+            // Ver o porquê em @/lib/larguras.
+            pessoas.length > 1 ? 'lg:grid-cols-2' : 'w-full max-w-2xl',
           )}
         >
           {pessoas.map((pessoa, indice) => {

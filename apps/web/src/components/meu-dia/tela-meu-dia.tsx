@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, RotateCw } from 'lucide-react';
 
 import { NotaRecolhida } from '@/components/ui/nota-recolhida';
+import { LEITURA } from '@/lib/larguras';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { RevelarLista } from '@/components/movimento';
@@ -95,7 +96,7 @@ export function TelaMeuDia({
     // o teto, em 1440px o prazo de cada linha fica a mais de um palmo do nome do
     // parceiro e a barra de meta vira um traço de 400px por causa de um número de
     // um dígito. Esta tela é uma fila que se lê de cima para baixo, não uma tabela.
-    <div className="flex mx-auto w-full max-w-4xl flex-col gap-5">
+    <div className={cn(LEITURA, 'flex flex-col gap-5')}>
       {/* Sem `flex-wrap`: em 390px o botão quebrava para uma linha inteira só dele,
           encostado à esquerda, empurrando o resumo para baixo da dobra. Ele é uma
           ação secundária e o lugar dela é o canto, ao lado do título, nos dois
