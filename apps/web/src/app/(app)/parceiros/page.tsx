@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { requireSession } from '@/lib/auth/session';
-import { leTelefoneCompleto, podeCriarParceiro } from '@/lib/navegacao';
+import { leTelefoneCompleto, podeCriarParceiro, podeImportarPlanilha } from '@/lib/navegacao';
 import { carregarCatalogos } from '@/components/parceiros/catalogos';
 import { TelaParceiros } from '@/components/parceiros/tela-parceiros';
 import { filtrosDaUrl } from '@/components/parceiros/tipos';
@@ -37,6 +37,7 @@ export default async function Pagina({
       catalogos={catalogos}
       filtrosIniciais={filtrosDaUrl(params)}
       podeCriar={podeCriar}
+      podeImportar={podeImportarPlanilha(sessao.papel)}
       leTelefoneCompleto={leTelefoneCompleto(sessao.papel)}
       abrirCadastro={podeCriar && params.novo === '1'}
     />

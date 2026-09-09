@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
-import { requireSession } from '@/lib/auth/session';
+import { requireRole } from '@/lib/auth/session';
+import { PAPEIS_QUE_LIGAM } from '@/components/ligacao/chamada-contexto';
 import { carregarContextoDaLigacao } from '@/components/ligacao/chamada-dados';
 import { TelaLigar } from '@/components/ligacao/tela-ligar';
 
@@ -22,7 +23,9 @@ export const metadata: Metadata = { title: 'Ligando' };
  */
 export default async function Pagina({ params }: { params: Promise<{ id: string }> }) {
   const [sessao, contexto, { id }] = await Promise.all([
-    requireSession(),
+    // Mesma guarda de `/ligar`: a tela de trabalho não pode ser mais aberta
+    // que a tela que leva a ela.
+    requireRole(...PAPEIS_QUE_LIGAM),
     carregarContextoDaLigacao(),
     params,
   ]);

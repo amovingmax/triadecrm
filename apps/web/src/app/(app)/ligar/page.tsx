@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
-import { requireSession } from '@/lib/auth/session';
-import { podeLigar } from '@/components/ligacao/chamada-contexto';
+import { requireRole } from '@/lib/auth/session';
+import { PAPEIS_QUE_LIGAM } from '@/components/ligacao/chamada-contexto';
 import { TelaDeLotes } from '@/components/ligacao/lote-tela';
 
 export const metadata: Metadata = { title: 'Ligar' };
@@ -20,13 +20,21 @@ export const metadata: Metadata = { title: 'Ligar' };
  *
  * `?montar=1` abre a folha de montagem já aberta, para o atalho de outra tela cair
  * direto no trabalho.
+ *
+ * `requireRole` no lugar de `requireSession` desde 09/09/2026. A rota não tinha
+ * guarda de servidor nenhuma: `leitura` e `financeiro` viam o item no menu,
+ * entravam, montavam um lote inteiro e só descobriam a recusa quando a
+ * `registrar_contato` devolvia `sem_permissao` — depois de o trabalho estar feito.
+ * `PAPEIS_QUE_LIGAM` já era este conjunto no cliente; o que faltava era o servidor
+ * dizer a mesma coisa. O item de menu agora declara os mesmos papéis, então
+ * ninguém é ejetado para `/sem-permissao` por um link que o CRM ofereceu.
  */
 export default async function Pagina({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [sessao, params] = await Promise.all([requireSession(), searchParams]);
+  const [, params] = await Promise.all([requireRole(...PAPEIS_QUE_LIGAM), searchParams]);
 
-  return <TelaDeLotes podeMontar={podeLigar(sessao.papel)} abrirMontagem={params.montar === '1'} />;
+  return <TelaDeLotes podeMontar abrirMontagem={params.montar === '1'} />;
 }

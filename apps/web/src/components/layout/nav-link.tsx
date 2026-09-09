@@ -10,6 +10,14 @@ type Props = {
   item: ItemNavegacao;
   variante: 'lateral' | 'inferior' | 'menu';
   onNavegar?: () => void;
+  /**
+   * Quanta coisa está parada esperando nesta tela. `null` quando o item não conta
+   * (a maioria) ou quando a contagem falhou.
+   *
+   * O zero também não aparece: "Radar 0" ocupa o mesmo espaço de "Radar 42" e diz
+   * o contrário — que não há por que entrar. Fila vazia é silêncio.
+   */
+  contagem?: number | null;
 };
 
 /**
@@ -41,10 +49,11 @@ type Props = {
  * empurraria os últimos para fora da tela. A frase inteira continua indo para a
  * busca da paleta, que não depende do que está visível.
  */
-export function NavLink({ item, variante, onNavegar }: Props) {
+export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
   const pathname = usePathname();
   const ativo = estaAtivo(pathname, item.href);
   const Icone = item.icone;
+  const numero = contagem !== null && contagem > 0 ? contagem : null;
 
   if (variante === 'inferior') {
     return (
@@ -84,11 +93,19 @@ export function NavLink({ item, variante, onNavegar }: Props) {
           ativo ? 'bg-accent font-medium text-accent-foreground' : 'text-foreground',
         )}
       >
-        {/* Sem `item.dia` aqui: dia de calendário é metadado de roadmap. Quem abre um
-            módulo que ainda não existe encontra o aviso "chega no D3" na própria tela. */}
         <Icone className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="flex min-w-0 flex-col">
-          <span className="truncate">{item.rotulo}</span>
+          <span className="flex items-center gap-2">
+            <span className="truncate">{item.rotulo}</span>
+            {numero !== null ? (
+              <span
+                aria-label={`${numero} esperando`}
+                className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[11px] leading-none font-medium tabular-nums text-accent-foreground"
+              >
+                {numero > 99 ? '99+' : numero}
+              </span>
+            ) : null}
+          </span>
           {/* `text-xs` e tinta secundária: é apoio ao rótulo, não um segundo rótulo.
               Some quando a descrição está vazia em vez de abrir um buraco na linha.
 
@@ -131,6 +148,27 @@ export function NavLink({ item, variante, onNavegar }: Props) {
       ) : null}
       <Icone className="size-4 shrink-0" aria-hidden="true" />
       <span className="truncate">{item.rotulo}</span>
+      {numero !== null ? (
+        // `tabular-nums` porque os números da lateral ficam empilhados numa
+        // coluna e mudam sozinhos: sem largura fixa de dígito, "9" virando "12"
+        // empurra o alinhamento. `ml-auto` cola no fim da linha, contra a borda
+        // interna, que é onde o olho varre depois de ler o rótulo.
+        //
+        // Sem cor: é a mesma tinta do rótulo inativo, só mais firme. Um badge
+        // vermelho aqui seria a única cromia da lateral, e cromia neste produto
+        // significa temperatura — não urgência.
+        <span
+          aria-label={`${numero} esperando`}
+          className={cn(
+            'ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[11px] leading-none font-medium tabular-nums',
+            ativo
+              ? 'bg-sidebar-primary/15 text-sidebar-accent-foreground'
+              : 'bg-sidebar-accent/70 text-sidebar-muted-foreground',
+          )}
+        >
+          {numero > 99 ? '99+' : numero}
+        </span>
+      ) : null}
     </Link>
   );
 }

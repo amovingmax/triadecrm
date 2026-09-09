@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/header';
 import { Sidebar } from '@/components/layout/sidebar';
 import { TransicaoPagina } from '@/components/movimento';
 import { type Sessao } from '@/lib/auth/session';
+import { type ContagemDasFilas } from '@/lib/filas-do-menu';
 
 /**
  * Casca da área autenticada, responsiva e mobile-first (PRD §8):
@@ -20,10 +21,19 @@ import { type Sessao } from '@/lib/auth/session';
  * na base" lia como uma segunda faixa do cabeçalho. Três degraus: 24px no celular e
  * 32px no desktop na fronteira, 16px entre irmãos, 8px dentro de um grupo.
  */
-export function AppShell({ sessao, children }: { sessao: Sessao; children: React.ReactNode }) {
+export function AppShell({
+  sessao,
+  filas,
+  children,
+}: {
+  sessao: Sessao;
+  /** Quanto trabalho está parado em cada fila que o menu conta (`lib/filas-do-menu.ts`). */
+  filas: ContagemDasFilas;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex min-h-dvh bg-background">
-      <Sidebar papel={sessao.papel} />
+      <Sidebar papel={sessao.papel} filas={filas} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Header sessao={sessao} />
@@ -41,7 +51,7 @@ export function AppShell({ sessao, children }: { sessao: Sessao; children: React
         </main>
       </div>
 
-      <BottomNav papel={sessao.papel} />
+      <BottomNav papel={sessao.papel} filas={filas} />
     </div>
   );
 }

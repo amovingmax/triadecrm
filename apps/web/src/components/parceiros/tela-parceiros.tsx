@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronLeft, ChevronRight, Plus, Upload } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { HREF_IMPORTAR } from '@/lib/navegacao';
 import { Button } from '@/components/ui/button';
 
 import { BarraFiltros } from './barra-filtros';
@@ -41,6 +43,7 @@ export function TelaParceiros({
   catalogos,
   filtrosIniciais,
   podeCriar,
+  podeImportar,
   leTelefoneCompleto,
   abrirCadastro = false,
 }: {
@@ -48,6 +51,8 @@ export function TelaParceiros({
   filtrosIniciais: FiltrosParceiros;
   /** `leitura`, `financeiro` e o robô não criam parceiro (a regra de verdade é o RLS). */
   podeCriar: boolean;
+  /** Mesmo conjunto de quem cria. Separado porque são duas perguntas diferentes. */
+  podeImportar: boolean;
   /** Espelho de `app.reads_base_pii()`: só explica por que a busca por trecho não acha nada. */
   leTelefoneCompleto: boolean;
   /** Veio de `/parceiros?novo=1` (paleta de comandos): abre a folha já na entrada. */
@@ -113,13 +118,32 @@ export function TelaParceiros({
           </p>
         </div>
 
-        {/* No celular o botão é flutuante (o polegar não sobe até o cabeçalho). */}
-        {podeCriar ? (
-          <Button onClick={() => setFolhaAberta(true)} className="toque hidden md:inline-flex">
-            <Plus aria-hidden="true" />
-            Novo parceiro
-          </Button>
-        ) : null}
+        {/* No celular o botão de criar é flutuante (o polegar não sobe até o
+            cabeçalho); o de importar não tem versão de celular de propósito —
+            escolher arquivo e mapear coluna é trabalho de mesa.
+
+            "Importar planilha" mora aqui porque a rota saiu do menu, e porque
+            até 09/09/2026 esta tela não tinha UM link para `/importar`: os três
+            únicos links vivos do produto estavam em painéis de Relatórios. Quem
+            não usasse a paleta ⌘K chegava à importação pelo item da lateral ou
+            não chegava. As duas portas da base — cadastrar uma e carregar
+            trezentas — passam a ficar na mesma linha. */}
+        <div className="flex items-center gap-2">
+          {podeImportar ? (
+            <Button asChild variant="outline" className="toque hidden md:inline-flex">
+              <Link href={HREF_IMPORTAR}>
+                <Upload aria-hidden="true" />
+                Importar planilha
+              </Link>
+            </Button>
+          ) : null}
+          {podeCriar ? (
+            <Button onClick={() => setFolhaAberta(true)} className="toque hidden md:inline-flex">
+              <Plus aria-hidden="true" />
+              Novo parceiro
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       <BarraFiltros filtros={filtros} catalogos={catalogos} aoMudar={mudar} aoLimpar={limpar} />
