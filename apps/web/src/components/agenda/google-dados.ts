@@ -93,6 +93,49 @@ export async function criarEventoNoGoogle(taskId: string): Promise<RespostaDoEve
   };
 }
 
+/**
+ * Leva o evento junto quando a reunião é remarcada.
+ *
+ * Chamada DEPOIS de o registro ser gravado, porque só aí a tarefa nova existe —
+ * e é ela que o banco procura para receber o espelho. Falhar aqui não desfaz o
+ * registro: a reunião foi remarcada no CRM de qualquer jeito, e o que sobra é um
+ * evento no horário velho, que a tela avisa.
+ */
+export async function remarcarNoGoogle(
+  taskId: string,
+  /** ISO, como `folha-extra` guarda em `reuniaoEm` (via `doInputLocal`). */
+  novoHorarioIso: string,
+): Promise<{ ok: boolean; motivo?: string; recado?: string }> {
+  const resposta = await fetch('/api/agenda/remarcar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task_id: taskId, novo_horario: novoHorarioIso }),
+  });
+  const corpo = (await resposta.json().catch(() => ({}))) as {
+    ok?: boolean;
+    motivo?: string;
+    recado?: string;
+  };
+  return { ok: corpo.ok === true, motivo: corpo.motivo, recado: corpo.recado };
+}
+
+/** Tira o evento da agenda e esquece o espelho. */
+export async function removerDoGoogle(
+  taskId: string,
+): Promise<{ ok: boolean; motivo?: string; recado?: string }> {
+  const resposta = await fetch('/api/agenda/remover', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task_id: taskId }),
+  });
+  const corpo = (await resposta.json().catch(() => ({}))) as {
+    ok?: boolean;
+    motivo?: string;
+    recado?: string;
+  };
+  return { ok: corpo.ok === true, motivo: corpo.motivo, recado: corpo.recado };
+}
+
 /** Recusas que a própria rota nomeia, antes de o Google entrar na história. */
 export const RECADO_DA_ROTA: Record<string, string> = {
   sem_sessao: 'A sua sessão expirou. Entre de novo.',
@@ -104,4 +147,12 @@ export const RECADO_DA_ROTA: Record<string, string> = {
   sem_horario: 'Esse compromisso não tem hora marcada.',
   evento_criado_sem_registro:
     'O evento foi criado na sua agenda, mas o CRM não conseguiu registrar. Confira no Google antes de tentar de novo.',
+  sem_espelho: 'Esse compromisso não está no Google Agenda.',
+  dono_desconectado:
+    'Quem pôs esse evento na agenda desconectou a conta Google. Só essa pessoa consegue alterá-lo, ou dá para ajustar direto no Google.',
+  evento_sumiu: 'O evento não existe mais no Google — alguém apagou por lá.',
+  remarcado_sem_religar:
+    'O horário foi corrigido no Google, mas o CRM não conseguiu ligar o evento à reunião nova. Confira a agenda antes de pôr de novo, para não criar um segundo evento.',
+  pedido_incompleto: 'Faltou informação para remarcar. Recarregue a agenda e tente de novo.',
+  horario_invalido: 'A nova data não foi entendida.',
 };

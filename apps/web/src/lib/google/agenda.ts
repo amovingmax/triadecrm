@@ -37,6 +37,7 @@ export type MotivoDoGoogle =
   | 'api_desabilitada'
   | 'limite_do_google'
   | 'google_fora'
+  | 'evento_sumiu'
   | 'resposta_inesperada';
 
 export type Falha = { ok: false; motivo: MotivoDoGoogle; detalhe: string };
@@ -235,6 +236,74 @@ export async function criarEvento(
   };
 }
 
+
+/**
+ * Move um evento existente para outro horário.
+ *
+ * PATCH, e não apagar-e-criar, porque o Google tem semântica própria para isto:
+ * alterar o evento faz ele avisar o convidado de que a reunião FOI REMARCADA, com
+ * a mesma sala do Meet e o mesmo fio na caixa de entrada. Apagar e criar manda um
+ * cancelamento seguido de um convite novo — duas notificações, dois links, e a
+ * impressão de que a reunião caiu.
+ *
+ * `sendUpdates=all` de novo: sem isso o horário muda e o convidado não fica
+ * sabendo, que é o mesmo problema de antes com outra roupa.
+ */
+export async function remarcarEvento(
+  refreshToken: string,
+  agendaId: string,
+  eventoId: string,
+  inicio: Date,
+  duracaoMin: number,
+): Promise<{ ok: true; linkHtml: string | null; meetUrl: string | null } | Falha> {
+  const acesso = await pegarAccessToken(refreshToken);
+  if (!acesso.ok) return acesso;
+
+  const fim = new Date(inicio.getTime() + duracaoMin * 60_000);
+  const url = new URL(
+    `${URL_EVENTOS}/${encodeURIComponent(agendaId)}/events/${encodeURIComponent(eventoId)}`,
+  );
+  url.searchParams.set('sendUpdates', 'all');
+
+  let resposta: Response;
+  try {
+    resposta = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${acesso.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        start: { dateTime: inicio.toISOString(), timeZone: 'America/Fortaleza' },
+        end: { dateTime: fim.toISOString(), timeZone: 'America/Fortaleza' },
+      }),
+    });
+  } catch (erro) {
+    return { ok: false, motivo: 'google_fora', detalhe: String(erro) };
+  }
+
+  const dados = (await resposta.json().catch(() => ({}))) as {
+    htmlLink?: string;
+    hangoutLink?: string;
+    error?: { message?: string; errors?: { reason?: string }[] };
+  };
+
+  // 404/410: o evento não está mais lá — alguém apagou pelo Google. Não é erro de
+  // quem clicou, e não adianta repetir: quem chama trata como "esqueça o espelho".
+  if (resposta.status === 404 || resposta.status === 410) {
+    return { ok: false, motivo: 'evento_sumiu', detalhe: 'O evento não existe mais no Google.' };
+  }
+  if (!resposta.ok) {
+    return {
+      ok: false,
+      motivo: motivoDoErro(resposta.status, dados),
+      detalhe: dados.error?.message ?? String(resposta.status),
+    };
+  }
+
+  return { ok: true, linkHtml: dados.htmlLink ?? null, meetUrl: dados.hangoutLink ?? null };
+}
+
 /** Apaga o evento. Usado quando a reunião é cancelada no CRM. */
 export async function apagarEvento(
   refreshToken: string,
@@ -315,5 +384,6 @@ export const RECADO_DO_GOOGLE: Record<MotivoDoGoogle, string> = {
     'A API do Google Agenda ainda não está habilitada no projeto da Komune. Peça ao Luiz para habilitar.',
   limite_do_google: 'O Google recusou por limite de uso. Espere alguns minutos e tente de novo.',
   google_fora: 'Não deu para alcançar o Google agora. Tente de novo em instantes.',
+  evento_sumiu: 'O evento não existe mais no Google — alguém apagou por lá.',
   resposta_inesperada: 'O Google respondeu de um jeito que o CRM não entendeu.',
 };

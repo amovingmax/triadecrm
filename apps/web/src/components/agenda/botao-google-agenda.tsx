@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { CalendarPlus, Video } from 'lucide-react';
+import { CalendarPlus, CalendarX, Video } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 
-import { criarEventoNoGoogle, RECADO_DA_ROTA } from './google-dados';
+import { criarEventoNoGoogle, RECADO_DA_ROTA, removerDoGoogle } from './google-dados';
 import { type Compromisso } from './tipos';
 
 /**
@@ -41,16 +41,56 @@ export function BotaoDoGoogle({ compromisso }: { compromisso: Compromisso }) {
   const meet = compromisso.google?.meetUrl ?? null;
   const link = compromisso.google?.linkHtml ?? null;
 
+  async function tirarDaAgenda() {
+    setOcupado(true);
+    try {
+      const r = await removerDoGoogle(compromisso.taskId);
+      if (!r.ok) {
+        toast.error('Não deu para tirar da agenda.', {
+          description: r.recado ?? RECADO_DA_ROTA[r.motivo ?? ''] ?? 'Tente de novo.',
+        });
+        if (r.motivo === 'dono_desconectado' || r.motivo === 'sem_espelho') {
+          void clienteDeConsultas.invalidateQueries({ queryKey: ['agenda'] });
+        }
+        return;
+      }
+      toast.success('Tirado da agenda.', {
+        description: 'O convidado foi avisado do cancelamento.',
+      });
+      void clienteDeConsultas.invalidateQueries({ queryKey: ['agenda'] });
+    } finally {
+      setOcupado(false);
+    }
+  }
+
   if (jaEstaLa) {
     const destino = meet ?? link;
-    if (!destino) return null;
     return (
-      <Button asChild variant="outline" size="lg" className="toque h-11 md:h-9">
-        <a href={destino} target="_blank" rel="noopener noreferrer">
-          {meet ? <Video aria-hidden="true" /> : <CalendarPlus aria-hidden="true" />}
-          {meet ? 'Entrar no Meet' : 'Ver no Google'}
-        </a>
-      </Button>
+      <>
+        {destino ? (
+          <Button asChild variant="outline" size="lg" className="toque h-11 md:h-9">
+            <a href={destino} target="_blank" rel="noopener noreferrer">
+              {meet ? <Video aria-hidden="true" /> : <CalendarPlus aria-hidden="true" />}
+              {meet ? 'Entrar no Meet' : 'Ver no Google'}
+            </a>
+          </Button>
+        ) : null}
+
+        {/* A saída de emergência: reunião cancelada de vez, evento posto por
+            engano, ou dois eventos para a mesma reunião depois de um
+            remanejamento que falhou no meio. Sem ela, a única saída seria mexer
+            no Google por fora — e o espelho aqui ficaria mentindo. */}
+        <Button
+          variant="ghost"
+          size="lg"
+          onClick={tirarDaAgenda}
+          disabled={ocupado}
+          className="toque h-11 text-muted-foreground md:h-9"
+        >
+          <CalendarX aria-hidden="true" />
+          {ocupado ? 'Tirando...' : 'Tirar da agenda'}
+        </Button>
+      </>
     );
   }
 

@@ -134,6 +134,16 @@ export function TelaAgenda({
       if (!resultado.compromissoFechado) {
         toast.warning('O resultado foi gravado, mas o compromisso continuou aberto na lista.');
       }
+      /* O evento no Google ficou para trás. É `warning` e não `error` porque o
+         registro entrou: o que falhou foi levar o horário junto. E precisa
+         aparecer, porque é a única falha desta tela que ninguém aqui veria — quem
+         vê é o fornecedor, com um convite para uma hora que não vale mais. */
+      if (resultado.avisoDaAgenda) {
+        toast.warning('O evento no Google não acompanhou.', {
+          description: resultado.avisoDaAgenda,
+          duration: 12_000,
+        });
+      }
       void clienteDeConsultas.invalidateQueries({ queryKey: ['agenda'] });
     },
     onError: () => {

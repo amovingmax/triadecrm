@@ -18,6 +18,7 @@ import {
 } from '@/components/registro/tipos';
 
 import { concluirCompromisso } from './consultas';
+import { RECADO_DA_ROTA, remarcarNoGoogle } from './google-dados';
 import { type Compromisso } from './tipos';
 
 /**
@@ -40,6 +41,14 @@ export type ResultadoDoDesfecho = {
   frase: string;
   /** `false` quando o registro entrou mas a tarefa do compromisso não fechou. */
   compromissoFechado: boolean;
+  /**
+   * Recado sobre o evento no Google, quando houve um para levar junto.
+   *
+   * Nulo quer dizer "não havia evento" ou "foi remarcado sem ruído". Preenchido
+   * quer dizer que o registro entrou mas o Google ficou para trás, e isso PRECISA
+   * chegar à pessoa: o convite do fornecedor continua no horário velho.
+   */
+  avisoDaAgenda: string | null;
 };
 
 export async function registrarDesfechoDoCompromisso(entrada: {
@@ -57,6 +66,7 @@ export async function registrarDesfechoDoCompromisso(entrada: {
       ok: false,
       frase: 'Não achei este parceiro na base. Recarregue a agenda e tente de novo.',
       compromissoFechado: false,
+      avisoDaAgenda: null,
     };
   }
 
@@ -104,14 +114,52 @@ export async function registrarDesfechoDoCompromisso(entrada: {
 
     const resultado = await gravarRegistro(registro);
     if (!resultado.registrado) {
-      return { ok: false, frase: fraseDaRecusa(resultado), compromissoFechado: false };
+      return {
+        ok: false,
+        frase: fraseDaRecusa(resultado),
+        compromissoFechado: false,
+        avisoDaAgenda: null,
+      };
     }
 
     const fechou = await concluirCompromisso(compromisso.taskId);
-    return { ok: true, frase: fraseDoRegistro(compromisso, resultado), compromissoFechado: fechou };
+
+    /**
+     * O evento do Google vai junto para a data nova.
+     *
+     * Só aqui, e não antes: `move_deal` acabou de inserir a tarefa nova, e é ela
+     * que o banco procura para receber o espelho. Antes do registro, ela não
+     * existe.
+     *
+     * Falhar aqui NÃO desfaz nada — o reagendamento está gravado. O que sobra é
+     * um evento no horário velho na agenda do fornecedor, e é justamente por ser
+     * invisível do nosso lado que o aviso sobe para a tela.
+     */
+    let avisoDaAgenda: string | null = null;
+    if (compromisso.google && extras.reuniaoEm) {
+      try {
+        const r = await remarcarNoGoogle(compromisso.taskId, extras.reuniaoEm);
+        if (!r.ok && r.motivo !== 'sem_espelho') {
+          avisoDaAgenda =
+            r.recado ??
+            RECADO_DA_ROTA[r.motivo ?? ''] ??
+            'O horário mudou aqui, mas o evento no Google continua no horário antigo.';
+        }
+      } catch {
+        avisoDaAgenda =
+          'O horário mudou aqui, mas não deu para falar com o Google: o evento continua no horário antigo.';
+      }
+    }
+
+    return {
+      ok: true,
+      frase: fraseDoRegistro(compromisso, resultado),
+      compromissoFechado: fechou,
+      avisoDaAgenda,
+    };
   } catch (erro) {
     if (erro instanceof ErroDeRegistro) {
-      return { ok: false, frase: erro.message, compromissoFechado: false };
+      return { ok: false, frase: erro.message, compromissoFechado: false, avisoDaAgenda: null };
     }
     // ZodError de campo obrigatório que a folha deixou passar, ou defeito de programa.
     console.error('agenda: falha ao registrar o desfecho', erro);
@@ -119,6 +167,7 @@ export async function registrarDesfechoDoCompromisso(entrada: {
       ok: false,
       frase: 'Faltou algum campo obrigatório deste resultado. Confira e tente de novo.',
       compromissoFechado: false,
+      avisoDaAgenda: null,
     };
   }
 }

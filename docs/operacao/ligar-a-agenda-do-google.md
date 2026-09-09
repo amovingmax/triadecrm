@@ -84,6 +84,27 @@ Depois de salvar, **refazer o deploy** — variável nova só entra em build nov
 
 ---
 
+## O que acontece ao reagendar ou cancelar
+
+**Reagendar leva o evento junto.** O CRM altera o evento existente (não apaga e
+cria outro), então o Google avisa o convidado de que a reunião **foi remarcada**,
+mantendo a mesma sala do Meet e o mesmo fio de e-mail. Apagar e recriar mandaria
+um cancelamento seguido de um convite novo — duas notificações e a impressão de
+que a reunião caiu.
+
+Se o CRM não conseguir levar o evento junto, aparece um aviso amarelo dizendo
+isso. **Leia esse aviso**: é a única falha desta tela que ninguém da Komune veria
+sozinho — quem vê é o fornecedor, com um convite para uma hora que não vale mais.
+
+**Cancelar é manual, pelo botão "Tirar da agenda".** Ele apaga o evento e avisa o
+convidado. Serve também para evento posto por engano, ou para o caso raro de
+sobrarem dois eventos para a mesma reunião.
+
+**O evento pertence a quem o criou.** Se a Heloísa remarca uma reunião que a
+Bárbara pôs na agenda, o CRM usa a conexão da Bárbara — o evento está na agenda
+dela. Se a Bárbara tiver desconectado, a tela diz que só ela consegue alterar, ou
+que dá para ajustar direto no Google.
+
 ## Duas coisas que quem usa precisa saber
 
 **O convite só sai se o parceiro tiver e-mail na ficha.** Sem e-mail, o evento é
