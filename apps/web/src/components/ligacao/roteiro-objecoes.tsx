@@ -40,7 +40,17 @@ export function ObjecoesLaterais({
   if (objecoes.length === 0) return null;
 
   return (
-    <aside className="hidden w-56 shrink-0 flex-col gap-2 lg:flex" aria-label="Objeções">
+    // Rolagem própria e altura presa à janela: a coluna já ficava no limite com
+    // as nove objeções da v1, e a v2 tem quinze — porque cada variante passou a
+    // ter as suas, em vez de o cerimonialista ler as do fornecedor. Sem o teto,
+    // a lista empurrava o rodapé da tela para baixo do roteiro, que é justamente
+    // o que quem está ao telefone precisa ver.
+    //
+    // `sticky top-4`: a pessoa rola a fala do nó e a gaveta continua ali.
+    <aside
+      className="sticky top-4 hidden max-h-[calc(100dvh-6rem)] w-56 shrink-0 flex-col gap-2 overflow-y-auto lg:flex"
+      aria-label="Objeções"
+    >
       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
         Se ele disser
       </p>
@@ -122,14 +132,40 @@ export function rotuloDaObjecao(no: NoRoteiro): string {
   return inicio.length > 60 ? `${inicio.slice(0, 57)}…` : inicio;
 }
 
+/**
+ * O que a pessoa DISSE, na boca dela — não o nome interno do nó.
+ *
+ * Quem procura na gaveta está com o telefone no ouvido e acabou de ouvir uma
+ * frase; o rótulo tem de ser essa frase. Sem entrada aqui, a `rotuloDaObjecao`
+ * cai na primeira frase do nó, que é a RESPOSTA — e procurar a resposta pela
+ * resposta é o que faz alguém desistir e improvisar.
+ *
+ * As sete últimas entraram com a v2 do roteiro: são objeções que o R08 já tinha
+ * escrito e a árvore não tinha. Os pares `_prod` existem porque a resposta muda
+ * de lado — quem organiza não paga, recebe.
+ */
 const ROTULOS_DE_OBJECAO: Readonly<Record<string, string>> = {
   obj_whatsapp: 'Manda por WhatsApp',
   obj_concorrente: 'Já anuncio em outro site',
+  obj_concorrente_prod: 'Já anuncio em outro site',
   obj_sem_tempo: 'Não tenho tempo agora',
   obj_preco: 'Quanto custa?',
+  obj_preco_prod: 'E eu ganho o quê?',
+  obj_comissao: 'Não trabalho com comissão',
+  obj_comissao_por_fora: 'Não gosto de comissão por fora',
   obj_mais_um_app: 'Não quero mais um app',
-  obj_nao_preciso: 'Não preciso disso',
+  obj_mais_um_app_prod: 'Não quero mais um app',
+  obj_nao_preciso: 'Não preciso, estou cheio',
+  obj_nao_preciso_prod: 'Já tenho meus fornecedores',
   obj_quem_ja_usa: 'Quem já usa aí?',
+  obj_tem_gente: 'O app tem gente?',
+  obj_tem_gente_prod: 'O app tem gente?',
+  obj_meu_preco: 'Vocês tabelam meu preço?',
+  obj_meu_preco_prod: 'E o meu honorário?',
+  obj_vou_pensar: 'Vou ver e te falo',
   obj_origem: 'De onde tirou meu número?',
+  obj_golpe: 'Quem é você? É golpe?',
+  obj_hostil: 'Já ligaram, para de ligar',
   obj_financeiro: 'Dúvida de dinheiro',
+  prod_oito: 'Meus fornecedores não pagam 8%',
 };

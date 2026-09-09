@@ -1969,3 +1969,36 @@ Medi as treze telas em produção com o navegador em vez de confiar no que eu ti
 - Medido depois do deploy: as treze telas começam em x=232. A ficha indenta 16px além disso, que é a goteira da `BarraTermica` — a mesma que as linhas da lista de Parceiros usam.
 - Verificado: lint, typecheck, 1165 testes e build verdes; medição por `getBoundingClientRect` em produção antes e depois.
 - **A lição:** um comentário que descreve a mudança não é prova de que a mudança aconteceu. Onde havia prosa explicando a régua, agora há a constante — e a régua se mede no navegador.
+
+## D5/D10 — 09/09/2026 — O menu direciona, e o roteiro para de vender casamento (RF-CON-12, RF-CON-23/24; PRD §8)
+
+Duas queixas do Rafael no mesmo pedido: "muitas abas e pouco direcionamento" e "os scripts de Ligar estão com muito erro de português, e muito incoerentes com o que a Komune é de fato — fomos textar focando em nicho de casamento, sendo que casamento é apenas uma subcategoria de produtor".
+
+### O menu: três grupos, e um número que significa uma coisa só
+
+Não era pedido de menos telas: era pedido de que a lateral diga o que é cada uma antes do clique. **Todo dia** (Meu dia, Registrar, Ligar, Conversas, Agenda) · **A base** (Parceiros, Funis, Radar) · **Controle** (Cadências, Metas, Relatórios, Ajustes). Doze itens em três grupos nomeados leem-se como três coisas; Cadências sai da vista de quem trabalha o dia inteiro sem deixar de existir para quem configura.
+
+- **O realce não gasta cor**, porque a única cromia do produto é a escala térmica. Cabeçalho de seção, `mt-auto` empurrando "Controle" para o rodapé, e a única hairline da coluna. Distância e linha bastam.
+- **A regra do número:** um numeral ao lado do item significa TRABALHO PARADO ESPERANDO POR VOCÊ. Só Radar (candidato coletado e não revisado) e Conversas (rascunho que expira) contam; configuração não conta nunca. A contagem sobe do servidor no `layout` que já espera a sessão — dois `count exact, head` em paralelo, sem consulta no cliente.
+- **A ordem da barra do celular não mudou**, e isso custou um campo novo (`posicaoNaBarra`). Herdar a ordem dos grupos teria empurrado Conversas para a terceira fatia e Parceiros para a quarta: a lateral ordena por natureza, a barra por frequência do polegar.
+- **Três consertos de passagem:** `/ligar` não tinha guarda de servidor nenhuma (leitura e financeiro montavam um lote inteiro para descobrir a recusa no fim); `/parceiros` não tinha UM link para `/importar` (os três únicos do produto estavam em painéis de Relatórios), e o item virou botão; o campo `dia` e a tela "Em construção" morreram, porque nenhuma rota usava.
+- **Correção de uma afirmação minha:** a auditoria concluiu que "o menu é o cronograma de sprint virado barra lateral". A parte factual era o campo morto; a retórica não se sustenta — a ordem nunca foi a do calendário (o primeiro item é o D8, o segundo o D4).
+- **O que NÃO foi feito:** a fusão de 12 para 6, com Agenda, Metas, Cadências e Radar dissolvidas em abas. Nove juízes independentes mediram 40 e poucos arquivos, 3 a 5 dias, quebra do estado de URL (`urlDosFiltros` reconstrói a query e derrubaria a aba no primeiro filtro) e a morte da tabulação de compromisso, que só existe em `agenda/lista-dia.tsx`.
+
+### O roteiro de ligação: v2, com 60 nós
+
+O WhatsApp já estava certo — seis aberturas, uma por segmento, nenhuma liderando com casamento. **Era só o telefone que contava outra história da mesma empresa.** E, olhando de perto, três coisas piores que a queixa:
+
+- **Escondia o preço que o Rafael mandou dizer.** `obj_preco` respondia "quanto custa?" com "o número exato eu te mando por escrito" — usando o validador de promessas para não responder o que já está na FAQ aprovada. O R08 §1 manda o contrário ("Nunca esconder a taxa até a reunião — parece pegadinha") e a decisão da reunião está registrada: "vai dizer o custo que a gente cobra: 8%". Pior, o nó era `ambas`: o cerimonialista que perguntasse o preço ouvia que ia PAGAR, quando ele RECEBE 5% no contrato — o único argumento que vira a conversa com esse segmento, e que não existia em nó nenhum.
+- **Vendia quatro recursos que não existem:** orçamento em massa, módulo de contrato, calendário de disponibilidade e histórico de entrega. E invertia quem manda orçamento (é o fornecedor, não o produtor).
+- **Dizia que junho e julho são meses fracos.** Em Natal é São João e férias — alta temporada. A baixa que a própria casa documentou é janeiro e fevereiro, em três lugares do R08. Uma frase que entrega que quem liga não é da cidade.
+
+Português: 115 achados em cinco famílias. Artigo colado em `[empresa]` em sete lugares, que quebra em pelo menos 30 dos 67 nomes reais ("do Agência Rocas", "o Bodega da Terra"); gênero presumido dos dois lados, incluindo cinco "Obrigado" lidos em voz alta pela Heloísa; muleta de reconhecimento em 31 dos 37 nós; `obj_origem` dizendo "peguei [origem]", que deixa o verbo sem objeto em nove das onze origens; e "evento de Natal", que ao telefone é a festa de dezembro.
+
+Entrou o que faltava: o marcador **`[categoria]`**, que troca a enumeração fechada de quatro categorias pela categoria real de quem se está ligando; as saídas que não existiam ("já sou parceiro", "não trabalhamos com evento" — que caía em número errado, mentindo sobre a linha —, "não sou de Natal", "estou dirigindo", a secretária que aceita e-mail, e o desligamento no meio, que responde a pergunta do R13 §3.2); o **opt-out no ponto em que a recusa acontece**; e sete objeções que o R08 já tinha escrito.
+
+- **Versão 2, não update na v1.** `call_batch.script_id` congela o roteiro na montagem: quem está ligando agora termina o turno com a v1, e o próximo lote nasce com a v2. A v1 fica no banco, despublicada — roteiro é comparável (R13 §7.7).
+- **A árvore saiu da seed e passou a viver só na migração.** Estava nos dois lugares, e toda correção tinha de ser escrita duas vezes; o comentário da migração `20260904001500` registra isso. Duas cópias de um texto que se lê em voz alta para um estranho divergem, e divergir aqui é a Heloísa dizendo uma frase que ninguém revisou.
+- **`roteiro-publicado.test.ts`** (75 asserções) lê a árvore do arquivo que a publica e roda o `validarRoteiro` de verdade, mais o que o banco não cobre: alcançabilidade por variante, o comportamento de cada frase quando o marcador vem vazio, e as palavras que a casa decidiu que nunca saem.
+- Verificado: `db reset` + 2451 asserções pgTAP num banco novo; lint, typecheck, 634 testes Vitest e build verdes; as duas asserções que cravavam "37 nós" viraram piso e comparação com a versão publicada, para a próxima reescrita não exigir edição de teste.
+- **PENDENTE, e é decisão humana:** dez dos quinze verificadores adversariais morreram no limite de gasto da conta. Os ramos `produtor` e `objeções` ficaram sem revisão independente. **Antes de a Heloísa ler isso para um estranho, alguém precisa ler os 60 nós em voz alta** — é venda, e a régua final é o ouvido.

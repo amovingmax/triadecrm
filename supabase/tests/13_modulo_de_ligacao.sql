@@ -38,7 +38,7 @@
 -- (pg_temp.n_*, o mesmo padrão de pg_temp.total_negocios em 01_rls_por_papel).
 -- =====================================================================
 begin;
-select plan(92);
+select plan(93);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -263,8 +263,22 @@ select is(app.call_window('2026-09-06 15:00-03'::timestamptz) ->> 'abre_em',
 select is((select cardinality(app.validar_roteiro(r.arvore)) from public.call_scripts r
             where r.slug = 'captacao_v1'),
   0, 'o roteiro semeado não tem erro estrutural');
-select is((select jsonb_array_length(r.arvore) from public.call_scripts r where r.slug = 'captacao_v1'),
-  37, 'o roteiro semeado tem os 37 nós do contrato');
+-- Piso, e não igualdade. Este número era 37 e virou 60 na v2 (09/09/2026, o
+-- roteiro que parou de vender casamento), e travá-lo aqui transformaria toda
+-- reescrita de roteiro numa edição de teste — que é o jeito de o teste virar
+-- carimbo. O que importa no banco é a INTEGRIDADE ESTRUTURAL, que a asserção
+-- acima já cobra; o conteúdo tem dono próprio em
+-- `apps/web/src/components/ligacao/roteiro-publicado.test.ts`, que lê a mesma
+-- árvore com o validador do cliente.
+select cmp_ok((select jsonb_array_length(r.arvore) from public.call_scripts r
+                where r.slug = 'captacao_v1' and r.is_published),
+  '>=', 30, 'o roteiro publicado tem árvore de tamanho plausível');
+
+-- Uma versão publicada por slug, que é o que o índice único parcial garante e o
+-- que a montagem do lote pressupõe ao escolher roteiro em vez de versão.
+select is((select count(*)::int from public.call_scripts r
+            where r.slug = 'captacao_v1' and r.is_published),
+  1, 'exatamente uma versão publicada do roteiro de captação');
 select ok((select cardinality(app.validar_roteiro(
              '[{"id":"abertura","tipo":"pergunta","variante":"ambas","texto":"oi",
                 "saidas":[{"rotulo":"a","destino":"nao_existe"}]}]'::jsonb)) > 0),
@@ -450,7 +464,12 @@ select is(pg_temp.n_revelacoes(), (select n from pg_temp.base where chave = 'rev
   'RF-BAS-14: revelar o telefone pela fila é registrado em pii_access_log (duas revelações a mais)');
 select is((select valor ->> 'variante' from pg_temp.r where chave = 'puxa1'), 'fornecedor',
   'a variante do roteiro é escolhida pelo sistema, pelo kind da organização');
-select is((select jsonb_array_length(valor -> 'roteiro' -> 'arvore') from pg_temp.r where chave = 'puxa1'), 37,
+-- Inteiro = do mesmo tamanho do que está publicado, seja ele qual for. Congelar
+-- o roteiro na montagem é o que faz publicar a v2 no meio da tarde não mudar o
+-- lote em curso (R13 §7.7), e é isso que esta asserção protege.
+select is((select jsonb_array_length(valor -> 'roteiro' -> 'arvore') from pg_temp.r where chave = 'puxa1'),
+          (select jsonb_array_length(r.arvore) from public.call_scripts r
+            where r.slug = 'captacao_v1' and r.is_published),
   'a fila entrega o roteiro congelado do lote, inteiro');
 
 -- Lote de outra pessoa: sdr enxerga (sees_all), mas não puxa.

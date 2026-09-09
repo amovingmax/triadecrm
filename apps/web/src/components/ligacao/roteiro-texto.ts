@@ -75,11 +75,46 @@ export function primeiroNome(nome: string): string {
 }
 
 /**
+ * A categoria do parceiro, como se fala dela.
+ *
+ * O catálogo escreve para uma tabela de administração — "Buffet adulto/corporativo",
+ * "Som, iluminação e DJ com estrutura", "Locais: salões, chácaras, hotéis, restaurantes,
+ * praia", "Celebrante, beleza, convites, transfer, segurança, staff". Lido em voz alta,
+ * o segundo vira uma lista de compras e o quarto é impronunciável.
+ *
+ * A regra é a da fala: fica o que vem antes da primeira barra ou do primeiro prefixo de
+ * dois-pontos, e a primeira letra desce, porque a categoria entra no meio da frase
+ * ("vocês entram na categoria buffet adulto") e não no começo dela.
+ *
+ * `null` quando a organização não tem categoria — e é comum. `preencherTexto` apaga o
+ * marcador, e por isso toda frase do roteiro que usa `[categoria]` foi escrita para
+ * fechar sem ele: "…entram na categoria." continua sendo português.
+ */
+export function categoriaFalada(categoria: string | null): string | null {
+  if (!categoria) return null;
+  const primeira = categoria.split(/[/:]/)[0]?.trim();
+  if (!primeira) return null;
+  return primeira.charAt(0).toLocaleLowerCase('pt-BR') + primeira.slice(1);
+}
+
+/**
  * O texto do nó, já falável.
  *
- * `[dia]` e `[hora]` só existem depois que a pessoa combina alguma coisa; enquanto
- * não há data combinada eles somem, e a frase continua correndo ("Então eu ligo, já
- * anotei aqui"). É melhor do que ler uma data inventada pelo sistema em voz alta.
+ * Quatro dos oito marcadores podem vir vazios, e cada frase do roteiro foi escrita
+ * para continuar sendo português sem eles:
+ *
+ * - `[nome]` — 66 dos 100 parceiros da base não têm contato nomeado;
+ * - `[dia]` e `[hora]` — só existem depois que a pessoa combina alguma coisa;
+ * - `[categoria]` — nem toda organização tem categoria atribuída.
+ *
+ * Os outros quatro (`[saudacao]`, `[eu]`, `[origem]`, `[empresa]`) são calculados ou
+ * vêm de coluna não nula, e nunca faltam.
+ *
+ * A regra que isso impõe à REDAÇÃO, e que o teste do roteiro cobra: um marcador
+ * opcional só pode ficar colado numa pontuação, como aposto de uma palavra que
+ * sobrevive sozinha ("vocês entram na categoria [categoria].") — nunca depois de uma
+ * preposição ("começando por [categoria].") nem depois de um travessão, que
+ * `preencherTexto` não sabe recolher.
  */
 export function falaDoNo(
   texto: string,
@@ -92,11 +127,19 @@ export function falaDoNo(
     preencherTexto(texto, {
       saudacao: saudacaoDe(agora),
       empresa: item.nome,
-      nome: item.contatoNome,
+      // Primeiro nome também aqui, e não só em `eu`: o contato é gravado como veio
+      // da coleta, e "Obrigado pelo tempo, Maria das Graças Nogueira da Silva" não é
+      // frase que alguém diga ao telefone.
+      nome: item.contatoNome ? primeiroNome(item.contatoNome) : null,
       origem: fraseDeOrigem(item.origemSlug),
       eu: primeiroNome(quemLiga),
       dia: diaFalado(combinadoEm, agora),
       hora: horaFalada(combinadoEm),
+      // O marcador que desfaz o roteiro de casamento: em vez de uma enumeração
+      // fechada de quatro categorias ("buffet, DJ, decoração e espaço"), que dizia a
+      // doze das dezesseis categorias de fornecedor que a ligação não era para elas,
+      // o gancho fala a categoria DESTE parceiro.
+      categoria: categoriaFalada(item.categoria),
     }),
   );
 }
