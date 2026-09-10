@@ -10,7 +10,6 @@ import {
   Link2,
   Lock,
   ShieldCheck,
-  TriangleAlert,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -31,7 +30,6 @@ import {
   MOTIVO_DO_LINK,
 } from './dados';
 import { EsqueletoDoPainel, ErroDoPainel } from './estados';
-import { REVISADO_PELO_JURIDICO } from './termo';
 import {
   podeEmitirLink,
   ROTULO_ATOR,
@@ -282,18 +280,17 @@ export function PainelPreCadastro({
           naoContatar,
         })}</p>
 
-        {/* O aviso de que o termo ainda não passou pelo jurídico é do TIME. Ele
-            fica aqui, ao lado do botão que dispara o aceite, e nunca na página do
-            fornecedor: o problema é nosso. */}
-        {!REVISADO_PELO_JURIDICO && p.existe ? (
-          <p className="flex max-w-prose items-start gap-1.5 text-xs text-morno-texto">
-            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            <span>
-              O texto do termo que o fornecedor aceita ainda não passou pelo Dennis. Antes de usar
-              isto com parceiro de verdade, feche a redação com ele.
-            </span>
-          </p>
-        ) : null}
+        {/* Onde ficava o aviso de "o termo não passou pelo Dennis": o termo
+            que ele descrevia era o da página /c/<token> do próprio CRM, que saiu
+            do fluxo em 08/09/2026 quando o link passou a apontar direto para o
+            /seja-parceiro da Komune. Ninguém lia aquele texto, então o aviso
+            alertava sobre nada — e aviso permanente sobre nada é o jeito mais
+            rápido de ensinar o time a ignorar avisos.
+
+            O aceite agora acontece no wizard da Komune e volta pelo evento
+            `supplier.claimed`, virando linha de `pre_registration_acceptances`
+            (migração 20260910170000). É essa linha que a guarda do RF-PRE-02
+            exige para deixar um perfil chegar a "publicado". */}
       </div>
 
       {/* ------------------------------------------------ linha do tempo */}

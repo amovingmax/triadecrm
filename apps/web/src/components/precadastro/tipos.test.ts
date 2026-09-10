@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { frase, MOTIVO_DA_CRIACAO, MOTIVO_DO_LINK } from './dados';
-import { CLAUSULAS, TERMO_VERSAO, textoCanonicoDoTermo } from './termo';
 import { lerPreCadastro, lerRascunho, podeEmitirLink, ROTULO_SITUACAO } from './tipos';
 
 /**
@@ -127,22 +126,3 @@ describe('frase de motivo', () => {
   });
 });
 
-describe('texto canônico do termo', () => {
-  it('começa pela versão e traz todas as cláusulas na ordem', () => {
-    const texto = textoCanonicoDoTermo();
-    expect(texto.startsWith(`Termo de autorização Komune ${TERMO_VERSAO}`)).toBe(true);
-    for (const c of CLAUSULAS) {
-      expect(texto).toContain(c.titulo);
-      for (const p of c.paragrafos) expect(texto).toContain(p);
-    }
-  });
-
-  it('é estável entre chamadas — é ele que vira o hash da prova', () => {
-    expect(textoCanonicoDoTermo()).toBe(textoCanonicoDoTermo());
-  });
-
-  it('destaca a cláusula de dados e a de fotos (R06 PRE-06)', () => {
-    const destacadas = CLAUSULAS.filter((c) => c.destaque).map((c) => c.id);
-    expect(destacadas).toEqual(['dados', 'fotos']);
-  });
-});
