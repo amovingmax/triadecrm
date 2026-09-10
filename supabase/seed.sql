@@ -754,84 +754,84 @@ $b$Oi, {{nome}}, tudo bem? Aqui é a Heloísa, da Komune, aqui de Natal 🙂
 Vi o {{empresa}} no {{origem}} — as fotos da mesa de {{detalhe}} me chamaram atenção.
 A gente está montando a rede de fornecedores fundadores de um app de eventos da cidade, e buffet é a categoria mais pedida.
 Posso te explicar num áudio de 30 segundos?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('AEB-ABR-B', 'Abertura B (sem detalhe) — Alimentos & Bebidas', 'marketing', 'AEB', 'abertura', 'B', 'pending',   -- R08 §2.1
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Somos um app que conecta quem está organizando um evento com quem faz acontecer — e estamos escolhendo os primeiros buffets da rede fundadora.
 Sem mensalidade: o fornecedor só paga quando um evento fecha.
 Vi seu contato público no {{origem}}. Posso te explicar em 30 segundos por áudio?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('INF-ABR-A', 'Abertura A (com origem) — Infraestrutura', 'marketing', 'INF', 'abertura', 'A', 'pending',   -- R08 §2.2
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Vi a montagem da {{empresa}} no {{origem}} — a estrutura do {{detalhe}} ficou impecável.
 Estamos formando a rede de fornecedores fundadores de um app de eventos da cidade, e som/estrutura é o que mais falta pra quem organiza.
 Posso te explicar em um áudio de 30 segundos?
-Se não for o momento, me avisa sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me avisa sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('INF-ABR-B', 'Abertura B (sem detalhe) — Infraestrutura', 'marketing', 'INF', 'abertura', 'B', 'pending',   -- R08 §2.2
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Somos um app onde quem organiza evento em Natal encontra som, luz, estrutura e mobiliário num lugar só — e estamos escolhendo as primeiras empresas da rede fundadora.
 Sem mensalidade: paga só quando um evento fecha.
 Vi seu contato público no {{origem}}. Posso te explicar num áudio de 30 segundos?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('PRE-ABR-A', 'Abertura A (com origem) — Prestador de serviço', 'marketing', 'PRE', 'abertura', 'A', 'pending',   -- R08 §2.3
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Vi seu perfil no {{origem}} e o {{detalhe}} — seu estilo é bem {{estilo}}, gostei muito.
 Estamos montando a rede de fornecedores fundadores de um app de eventos da cidade, e {{categoria}} é uma das categorias prioritárias.
 Posso te explicar num áudio de 30 segundos?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('PRE-ABR-B', 'Abertura B (sem detalhe) — Prestador de serviço', 'marketing', 'PRE', 'abertura', 'B', 'pending',   -- R08 §2.3
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Somos um app onde quem organiza festa, casamento ou formatura em Natal encontra {{categoria}} pelo trabalho, não só pelo preço.
 Estamos escolhendo os primeiros da rede fundadora — sem mensalidade, paga só quando fecha.
 Vi seu contato público no {{origem}}. Posso te explicar em 30 segundos por áudio?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('ESP-ABR-A', 'Abertura A (com origem) — Espaço / local', 'marketing', 'ESP', 'abertura', 'A', 'pending',   -- R08 §2.4
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Vi o {{empresa}} no {{origem}} — o {{detalhe}} é lindo.
 Estamos montando a rede de fornecedores fundadores de um app de eventos da cidade, e espaço é a primeira coisa que todo mundo procura.
 Posso te explicar num áudio de 30 segundos?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('ESP-ABR-B', 'Abertura B (sem detalhe) — Espaço / local', 'marketing', 'ESP', 'abertura', 'B', 'pending',   -- R08 §2.4
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Somos um app onde quem organiza evento em Natal começa escolhendo o espaço — e estamos selecionando os primeiros locais da rede fundadora.
 Sem mensalidade: o espaço só paga quando uma reserva fecha.
 Vi seu contato público no {{origem}}. Posso te explicar em 30 segundos por áudio?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('CER-ABR-A', 'Abertura A (com origem) — Cerimonialista / assessoria', 'marketing', 'CER', 'abertura', 'A', 'pending',   -- R08 §2.5
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Vi a {{empresa}} no {{origem}} e o casamento {{detalhe}} — a condução ficou linda.
 Estamos montando a rede fundadora de um app de eventos da cidade, e cerimonialista pra gente não é fornecedor: é sócio do evento.
 Posso te explicar em um áudio de 30 segundos?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('CER-ABR-B', 'Abertura B (sem detalhe) — Cerimonialista / assessoria', 'marketing', 'CER', 'abertura', 'B', 'pending',   -- R08 §2.5
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Somos um app de eventos da cidade onde o cerimonialista organiza o evento com os fornecedores num lugar só e ainda recebe 5% do que fecha por lá, no contrato.
 Estamos escolhendo as primeiras assessorias fundadoras.
 Vi seu contato público no {{origem}}. Posso te explicar em 30 segundos por áudio?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('FOR-ABR-A', 'Abertura A (com origem) — Produtor de formatura', 'marketing', 'FOR', 'abertura', 'A', 'pending',   -- R08 §2.6
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Vi o baile de {{detalhe}} da {{empresa}} no {{origem}} — a produção ficou enorme.
 Estamos montando a rede fundadora de um app de eventos da cidade, e produtor de formatura é o perfil que mais contrata fornecedor por evento.
 Posso te explicar em um áudio de 30 segundos?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$),
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('FOR-ABR-B', 'Abertura B (sem detalhe) — Produtor de formatura', 'marketing', 'FOR', 'abertura', 'B', 'pending',   -- R08 §2.6
 $b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
 Somos um app de eventos da cidade onde o produtor monta o baile, contrata os fornecedores e organiza a turma (ingressos, rateio, comunicação) num lugar só.
 Estamos escolhendo os primeiros produtores fundadores.
 Vi seu contato público no {{origem}}. Posso te explicar em 30 segundos por áudio?
-Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade$b$);
+Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$);
 
 -- ---------- 9.2 Roteiros de áudio (kind 'audio_script'; corpo = transcrição; ligados a audio_assets) ----------
 -- Regra: áudio nunca na abertura; só após o "sim", precedido de SYS-PRE-AUDIO e seguido de
@@ -1024,7 +1024,7 @@ insert into seed_tpl (code, name, category, segment, kind, meta_status, body) va
 -- ---------- 9.8 Mensagens fixas do sistema (R08 §2.7 + PRD §10.7 / R06 §C / RF-CON-11/21/26) ----------
 insert into seed_tpl (code, name, category, segment, kind, body) values
   ('GEN-SYS-QUEM-SOMOS', 'Quem é você? / como pegou meu número?', 'service', 'GEN', 'sistema',   -- R08 §2.7 + PRD §10.7 e R06 C.3 (fonte com link, base legal, SAIR, encarregado)
-   $b$Justo perguntar. Sou a Heloísa, do comercial da Komune (komune.app / @komune.natal). A gente está montando a rede de fornecedores de eventos de Natal e encontrei seu contato no {{origem}}, que é público: {{source_url}}. A Komune usa dados de contato profissional públicos só para convidar fornecedores da região, com base no legítimo interesse previsto na LGPD (art. 7º, IX), e não repassa a ninguém. Se preferir não receber mais mensagens, é só responder SAIR que eu paro por aqui. Dúvidas sobre dados: {{email_encarregado}} · komune.app/privacidade$b$),
+   $b$Justo perguntar. Sou a Heloísa, do comercial da Komune (komune.app / @komune.natal). A gente está montando a rede de fornecedores de eventos de Natal e encontrei seu contato no {{origem}}, que é público: {{source_url}}. A Komune usa dados de contato profissional públicos só para convidar fornecedores da região, com base no legítimo interesse previsto na LGPD (art. 7º, IX), e não repassa a ninguém. Se preferir não receber mais mensagens, é só responder SAIR que eu paro por aqui. Dúvidas sobre dados: {{email_encarregado}} · komune.app.br/privacidade$b$),
   ('GEN-SYS-E-ROBO', 'É robô?', 'service', 'GEN', 'sistema',   -- R08 §2.7 (RF-CON-26: nunca negar automação)
    $b$Tem um pouco de cada 🙂 As primeiras mensagens saem de um sistema pra eu conseguir responder rápido, mas quem fala com você sou eu, Heloísa — o áudio é minha voz e a reunião sou eu. Quer que eu te mande o áudio agora?$b$),
   ('GEN-SYS-OPTOUT', 'Opt-out — confirmação única', 'service', 'GEN', 'sistema',   -- R08 §2.7 (RF-CON-19)
@@ -1052,7 +1052,7 @@ insert into seed_tpl (code, name, category, segment, kind, body) values
   ('GEN-SYS-PEDIDO-AUTORIZACAO', 'Pedido de autorização do pré-cadastro (2ª mensagem, após o áudio)', 'service', 'GEN', 'sistema',   -- PRD RF-CON-21 / Apêndice C
    $b$Pra adiantar, já deixei um rascunho privado do seu perfil com o que está público no seu {{origem}} — nome, categoria e bairro. Ninguém vê esse rascunho além de você, e nada é publicado sem o seu ok. Você autoriza a Komune a usar esse material? Se sim, te mando o link.$b$),
   ('GEN-SYS-AVISO-PRECADASTRO', 'Aviso de pré-cadastro (vai com o link de reivindicação)', 'service', 'GEN', 'sistema',   -- PRD §10.7 / R06 C.4 (PRE-04)
-   $b${{nome}}, para facilitar, preparei um rascunho do perfil de {{empresa}} na Komune com informações públicas (nome, categoria, bairro e contato). Ninguém vê esse rascunho além de você — ele só entra no ar se você revisar, adicionar suas fotos e aceitar os termos. Se você não quiser, ele é apagado automaticamente em 30 dias (ou na hora, se pedir). Link para revisar: {{link}}. Dúvidas sobre dados: komune.app/privacidade$b$),
+   $b${{nome}}, para facilitar, preparei um rascunho do perfil de {{empresa}} na Komune com informações públicas (nome, categoria, bairro e contato). Ninguém vê esse rascunho além de você — ele só entra no ar se você revisar, adicionar suas fotos e aceitar os termos. Se você não quiser, ele é apagado automaticamente em 30 dias (ou na hora, se pedir). Link para revisar: {{link}}. Dúvidas sobre dados: komune.app.br/privacidade$b$),
   ('GEN-SYS-EXCLUSAO-CONFIRMA', 'Confirmação de exclusão / oposição', 'service', 'GEN', 'sistema',   -- PRD §10.7 / R06 C.6 (RF-ADM-04)
    $b$Pronto, {{nome}}: removemos seus dados de contato da nossa base de prospecção e cancelamos qualquer mensagem futura. Guardamos apenas um registro mínimo (identificador do número + data) para garantir que não voltemos a te procurar, como a LGPD exige que respeitemos sua oposição. Se houver um rascunho de perfil, ele também foi apagado. Se precisar de comprovante ou tiver outra solicitação, fale com nosso encarregado de dados: {{email_encarregado}}. Obrigada pelo retorno.$b$),
   ('GEN-SYS-FORA-HORARIO', 'Resposta automática fora do horário (08–20 h)', 'service', 'GEN', 'sistema',   -- PRD RF-CON-11 ("resposta automática curta com previsão")
@@ -1391,11 +1391,11 @@ insert into public.message_templates
 values
   ('GEN-FUP-LIG-V1', 'Tentei te ligar — follow-up de voz', 'whatsapp', 'utility', 'GEN',
    'followup', 'pt_BR',
-   'Oi, {{nome}}! Aqui é a Heloísa, da Komune, app de eventos de Natal. Tentei te ligar hoje e não consegui falar com você. Cheguei no contato de {{empresa}} pelo {{origem}} e queria só te apresentar a rede de fornecedores: sem mensalidade, você paga uma taxa quando fecha. Se preferir, me diz o melhor horário que eu ligo. Se não for o momento, é só responder SAIR. Como usamos seus dados: komune.app/privacidade',
+   'Oi, {{nome}}! Aqui é a Heloísa, da Komune, app de eventos de Natal. Tentei te ligar hoje e não consegui falar com você. Cheguei no contato de {{empresa}} pelo {{origem}} e queria só te apresentar a rede de fornecedores: sem mensalidade, você paga uma taxa quando fecha. Se preferir, me diz o melhor horário que eu ligo. Se não for o momento, é só responder SAIR. Como usamos seus dados: komune.app.br/privacidade',
    '["empresa", "nome", "origem"]'::jsonb),
   ('PRE-LINK-V1', 'Link de reivindicação do pré-cadastro', 'whatsapp', 'utility', 'GEN',
    'onboarding', 'pt_BR',
-   '{{nome}}, preparei um rascunho do perfil de {{empresa}} na Komune com informações públicas do {{origem}}. Ninguém vê esse rascunho além de você — ele só entra no ar depois que você revisar, colocar suas fotos e aceitar os termos. O link é pessoal e vale por 7 dias: {{link}}. Se não quiser perfil, dá para pedir a remoção na própria página, sem login. Dúvidas sobre dados: komune.app/privacidade',
+   '{{nome}}, preparei um rascunho do perfil de {{empresa}} na Komune com informações públicas do {{origem}}. Ninguém vê esse rascunho além de você — ele só entra no ar depois que você revisar, colocar suas fotos e aceitar os termos. O link é pessoal e vale por 7 dias: {{link}}. Se não quiser perfil, dá para pedir a remoção na própria página, sem login. Dúvidas sobre dados: komune.app.br/privacidade',
    '["empresa", "link", "nome", "origem"]'::jsonb)
 on conflict (template_code) do nothing;
 
