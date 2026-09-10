@@ -2002,3 +2002,47 @@ Entrou o que faltava: o marcador **`[categoria]`**, que troca a enumeração fec
 - **`roteiro-publicado.test.ts`** (75 asserções) lê a árvore do arquivo que a publica e roda o `validarRoteiro` de verdade, mais o que o banco não cobre: alcançabilidade por variante, o comportamento de cada frase quando o marcador vem vazio, e as palavras que a casa decidiu que nunca saem.
 - Verificado: `db reset` + 2451 asserções pgTAP num banco novo; lint, typecheck, 634 testes Vitest e build verdes; as duas asserções que cravavam "37 nós" viraram piso e comparação com a versão publicada, para a próxima reescrita não exigir edição de teste.
 - **PENDENTE, e é decisão humana:** dez dos quinze verificadores adversariais morreram no limite de gasto da conta. Os ramos `produtor` e `objeções` ficaram sem revisão independente. **Antes de a Heloísa ler isso para um estranho, alguém precisa ler os 60 nós em voz alta** — é venda, e a régua final é o ouvido.
+
+## D9 — 10/09/2026 — O que a captação promete passa a ser o que a plataforma cobra (RF-CON-12, RF-CON-23; R06 §2)
+
+Três consertos que só apareceram quando alguém foi conferir o pré-cadastro de ponta a ponta. Dois eram do lado da Komune, e o repositório deste CRM não tinha como saber deles.
+
+### O aviso de privacidade estava morto nas 16 aberturas
+
+Toda abertura de WhatsApp termina com a linha que sustenta a base legal: "para não receber mais, responda SAIR. Como usamos seus dados: komune.app/privacidade". **`komune.app` não responde** — o domínio resolve no DNS e o servidor não atende; `https`, `http` e `www` devolvem os três falha de conexão, não 404. `komune.app.br/privacidade` responde 200, e é o endereço que o wizard da própria Komune já usa no aceite dos termos.
+
+O endereço certo já existia e já estava em uso do outro lado da integração; o CRM ficou com a versão sem `.br`, herdada do PRD §7. Corrigido na seed e aplicado em produção (`UPDATE 16`) antes do primeiro disparo — o número da Meta ainda não foi verificado, então nenhuma das 16 chegou a sair.
+
+- **Pendente de decisão humana:** o PRD §7 e §12.4 ainda escrevem `komune.app/privacidade`, e o R06 §10 pede `komune.app/privacidade-prospeccao`, um terceiro endereço. Enquanto o PRD disser o errado, ele volta pela próxima pessoa que copiar de lá.
+
+### A plataforma cobrava 10% enquanto a captação prometia 8%
+
+`supplier_tier_info` fazia a comissão variar por nível (Iniciante 10% → Bronze 10% → Prata 9% → Ouro 8%), e seis Edge Functions liam esse `fee_rate`. **Quem entrasse hoje seria cobrado 10%** — e o roteiro v2, publicado ontem, diz "São 8%" em voz alta ao telefone. A diferença apareceria na primeira fatura do primeiro fornecedor captado.
+
+Decisão do Matheus (10/09): a taxa é **8% fixa**, e a gamificação nunca foi sobre a comissão — é sobre o **custo da custódia**, os R$ 9,90 que o nível destrava (`absorb_escrow`), que continua igual.
+
+Feito no `komune-app` (commits `1cb5dea`, `d042bb7`, `b034700`), não neste repositório:
+
+- `supplier_tier_info.fee_rate` vira `0.08` literal; `tier`, `deliveries`, `rating` e `absorb_escrow` intactos.
+- Os quatro fallbacks de Edge Function (`DEFAULT_FEE_RATE`/`FEE_RATE`/o `0.10` inline) acompanham: eles valem quando a RPC falha, e um fallback de 10% é a comissão errada escondida atrás de um erro de rede.
+- **`asaas-book` passa a derivar o pedido mínimo da comissão.** O piso existe para a comissão cobrir os R$ 1,99 do Pix: a 10% bastavam R$ 19,90 (é de onde vem `MIN_CHARGE = 20`), a 8% o piso real é R$ 24,88. Sem isso, uma reserva de R$ 20 geraria comissão de R$ 1,60, o Asaas levaria R$ 1,99 e o `Math.max(0, …)` do split zeraria o repasse: venda fechada, comissão nenhuma. O comentário de lá já dizia "um piso que vale só num deles não é piso" — deixou de ser verdade quando o `marketplace-checkout` passou a derivar, e voltou a ser.
+- Verificado na aplicação: `NOTICE: comissão Komune: 8% fixa, conferida no caminho do Iniciante` — o bloco de conferência da migração consulta um fornecedor sem entregas e falharia se voltasse outra coisa.
+
+### O rateio 3% Komune + 5% produtor NÃO EXISTE em código
+
+Procurado em todas as Edge Functions: toda cobrança de marketplace nasce com `splits: [{ walletId: motherWallet, … }]` — **uma carteira só**. Não há caminho em que um terceiro receba.
+
+Hoje, se um cerimonialista organizar e contratar fornecedores, os 8% inteiros vão para a Komune e ele não recebe nada. E o roteiro v2 diz a ele, ao telefone: "os 5% estão no contrato, e cai automático quando o evento fecha".
+
+- **Precisa de decisão:** ou o split é construído antes da primeira ligação para cerimonialista, ou a frase sai do roteiro e fica só o que é verdade. Enquanto nenhuma das duas, é promessa de mecanismo inexistente — e cerimonialista é o segmento de maior alavancagem da captação (cada um dá acesso a 20–40 fornecedores).
+
+### O pré-cadastro estava 404 no ar, e a `main` da Komune estava atrás da produção
+
+`GET /api/onboarding/precadastro` respondia 404 em `admin.komune.app.br` enquanto as rotas irmãs respondiam — o deploy do painel era anterior ao commit que criou a rota. Quem clicasse no link do CRM abria formulário em branco: sem erro (o wizard tem `catch`), mas sem o "perfil já começado", que é a razão de existir do pré-cadastro. Redeploy feito; a rota responde `{"achado":false,"motivo":"nao_encontrado"}`.
+
+No caminho apareceu o problema maior: **11 migrações estavam na produção da Komune e não na `main`** — todas em `origin/luyz`, `origin/matheus` e `origin/produtor`, nenhuma mergeada. E as 4 do pré-cadastro estavam na `main` sem nunca terem rodado lá. O `db push` recusou por isso.
+
+O push, depois do `migration repair`, provou o que estava em dúvida: as quatro entraram como **no-op** (`relation "supplier_pre_registrations" already exists, skipping`). Os objetos já estavam na produção, criados pelas migrações de 01h e 02h de 08/09 — a mesma coisa com outro número. É o que explicava o pré-cadastro funcionar em produção sem que as migrações dele tivessem rodado.
+
+- **A causa é de processo, e vai repetir:** a produção é alimentada por branches de feature e a `main` não recebe, então `git log main` conta uma história diferente da que o banco conta. Registrado em `komune-app/docs/DIVERGENCIA-MIGRACOES-10-09-2026.md`.
+- **Erro meu, corrigido no mesmo dia:** o primeiro registro afirmava que as 11 nunca tinham existido como arquivo. Eu rodei `git log --all` antes do `git fetch` — o `--all` era completo para o que a máquina conhecia e incompleto para o que o remoto tinha. Reescrito em `b034700`.
