@@ -2063,3 +2063,14 @@ O time faz a captação **a partir da lista**, e ela só dizia "4d" — o mesmo 
 - **Erro meu de 10/09, pego pelo pgTAP 09:** `app.aceite_do_claimed()` nasceu executável por `anon`, porque EXECUTE para PUBLIC é o padrão do Postgres. Revogado em `20260911100100`. Eu tinha conferido o gatilho em produção e não tinha rodado a suíte.
 - Verificado: 2451 asserções pgTAP num banco novo; 640 testes Vitest (9 novos em `ultimo-contato.test.ts`); lint, typecheck e build verdes; a função conferida com dado real na produção antes da tela; a lista e o filtro olhados no navegador em produção.
 - **Polimento possível, não feito:** as linhas com contato ficam com a tag rente ao topo, porque a tabela tem altura de linha fixa pensada para uma linha só. Legível, mas apertado. Aumentar o respiro muda a densidade da tabela inteira, e é uma escolha que vale fazer olhando junto.
+
+### D3 — 11/09/2026 — A lista de Parceiros reorganizada (RF-BAS-15)
+
+Rafael, olhando a versão acima: "ficou misturado e desorganizado, organize melhor o design, ajuste esse crud". Tinha razão — o polimento que eu deixei "para olhar junto" era o problema principal.
+
+- **O que estava errado:** linhas de 36px com a coluna de contato em duas linhas espremida; o WhatsApp cortado na borda direita, justo a coluna de quem faz a captação; temperatura dita três vezes (barra, chip e cor da tag); Categoria e Bairro ocupando ~450px com texto truncado; a linha de baixo do contato em 11px.
+- **Toda linha tem a mesma anatomia de duas linhas, em 56px:** o nome com categoria · local embaixo; o desfecho com canal · quando · tentativa · quem embaixo. As colunas Categoria e Local saíram — viraram a segunda linha do nome.
+- **Ordem das colunas pela ordem do trabalho:** quem é → o que já aconteceu → o número para chamar → temperatura. O WhatsApp vem em terceiro e cabe inteiro em 1366px. Responsável, etapa e próxima ação só aparecem em telas de 1536px ou mais (e sempre na ficha).
+- **Celular:** o cartão ficou em três fileiras fixas — nome e temperatura; categoria · local e telefone; desfecho e quando · tentativa, ou "Ainda não contatado". Etapa, responsável e próxima ação saíram do cartão.
+- Texto secundário do contato de 11px para 12px.
+- Verificado: lint, typecheck, 26 testes de Parceiros e build verdes; olhado em produção a 1425px e a 390px.

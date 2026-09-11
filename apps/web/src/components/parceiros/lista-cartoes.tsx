@@ -7,7 +7,6 @@ import { RevelarLista, useRevelarLinha } from '@/components/movimento';
 import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
 
 import { formatarLocal, formatarTelefone } from './formatos';
-import { ProximaAcao } from './proxima-acao';
 import type { LinhaParceiro } from './tipos';
 import { resumoDoContato, TagDoContato } from './ultimo-contato';
 
@@ -81,46 +80,54 @@ function Cartao({ linha, indice }: { linha: LinhaParceiro; indice: number }) {
           semRotulo
         />
 
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{linha.name}</p>
-          <p className="truncate text-[0.8125rem] text-muted-foreground">
-            {[local || null, linha.primary_category].filter(Boolean).join(' · ')}
-          </p>
-          {/* O rótulo da temperatura abre a linha de metadados: cor sozinha, num traço
-              de 3px, não sobrevive a daltonismo, e este é o cartão que o time lê no
-              sol, com uma mão só. */}
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            <ChipTemperatura
-              temperatura={linha.temperature}
-              esfriando={linha.needs_attention}
-              comDescricao={false}
-            />
-            {/* O que o último contato deu, logo depois da temperatura: é o que o
-                time decide olhando a lista no celular, na rua — ligar de novo,
-                mandar mensagem ou procurar outro número. */}
-            <TagDoContato resumo={contato} />
-            {linha.phone ? <span className="numerico">{formatarTelefone(linha.phone)}</span> : null}
-            {linha.stage ? <span>{linha.stage}</span> : null}
-            <ProximaAcao iso={linha.next_action_at} />
-          </p>
-        </div>
+        {/* Três linhas, um assunto por linha — a mesma anatomia da tabela:
 
-        <div className="flex max-w-24 min-w-0 flex-col items-end gap-0.5 text-right">
-          {/* O "quando" do mesmo contato que a tag descreve, e não o do negócio:
-              tag e tempo saindo de fontes diferentes podiam se contradizer na
-              mesma linha. */}
-          <span
-            title={contato.descricao}
-            className={cn(
-              'text-xs whitespace-nowrap',
-              linha.needs_attention ? 'font-medium text-foreground' : 'text-muted-foreground',
+              nome ................................ temperatura
+              categoria · bairro ................... WhatsApp
+              [o que o contato deu] quando · tentativa
+
+            Antes a terceira linha juntava temperatura, tag, telefone, etapa e
+            próxima ação numa fileira só, que quebrava onde a largura mandasse. Era
+            o "misturado" da tela em miniatura. Etapa, responsável e próxima ação
+            estão a um toque, na ficha — e no desktop também só aparecem no 2xl. */}
+        <div className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1">
+          <p className="truncate font-medium">{linha.name}</p>
+          {/* O rótulo da temperatura fica no canto da primeira linha: cor sozinha,
+              num traço de 3px, não sobrevive a daltonismo, e este é o cartão que o
+              time lê no sol, com uma mão só. */}
+          <ChipTemperatura
+            temperatura={linha.temperature}
+            esfriando={linha.needs_attention}
+            comDescricao={false}
+            className="justify-self-end"
+          />
+
+          <p className="truncate text-xs text-muted-foreground">
+            {[linha.primary_category, local || null].filter(Boolean).join(' · ') || '-'}
+          </p>
+          {linha.phone ? (
+            <span className="numerico justify-self-end text-xs text-muted-foreground">
+              {formatarTelefone(linha.phone)}
+            </span>
+          ) : (
+            <span aria-hidden="true" />
+          )}
+
+          {/* A linha do contato ocupa as duas colunas: a tag e o "quando" são uma
+              frase só ("não atendeu, há 2 dias"), e cortá-la ao meio pela grade
+              separaria o que a pessoa lê junto. */}
+          <div className="col-span-2 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+            {contato.contatado ? (
+              <>
+                <TagDoContato resumo={contato} />
+                <span className="truncate" title={contato.descricao}>
+                  {[contato.quando, contato.tentativas].filter(Boolean).join(' · ')}
+                </span>
+              </>
+            ) : (
+              <span>Ainda não contatado</span>
             )}
-          >
-            {contato.quando ?? '-'}
-          </span>
-          {linha.owner ? (
-            <span className="max-w-full truncate text-xs text-muted-foreground">{linha.owner}</span>
-          ) : null}
+          </div>
         </div>
       </Link>
     </li>

@@ -181,12 +181,16 @@ export function UltimoContato({
   const Icone = r.canal?.icone;
 
   return (
-    <span title={r.descricao} className="flex min-w-0 flex-col gap-1">
+    <span title={r.descricao} className="flex min-w-0 flex-col items-start gap-1">
       <TagDoContato resumo={r} />
 
-      <span className="flex min-w-0 items-center gap-1.5 text-[11px] leading-none text-muted-foreground">
+      {/* 12px, e não os 11px da primeira versão. Canal, quando, tentativa e QUEM
+          são o que decide a próxima ligação — "a Ana ligou ontem" é o que evita a
+          segunda chamada da manhã —, e estavam no menor texto da tela. Continuam
+          secundários pela tinta, não por um tamanho que se lê com esforço. */}
+      <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
         {Icone && !compacto ? (
-          <Icone className="size-3 shrink-0" aria-label={r.canal?.rotulo} />
+          <Icone className="size-3.5 shrink-0" aria-label={r.canal?.rotulo} />
         ) : null}
         {r.quando ? <span className="whitespace-nowrap">{r.quando}</span> : null}
         {!compacto && r.tentativas ? (

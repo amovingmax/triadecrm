@@ -58,20 +58,19 @@ const coluna = createColumnHelper<typeof recursos, LinhaParceiro>();
  * colunas que estavam sobrando, não as que cortavam.
  */
 const CLASSES: Record<string, string> = {
-  nome: 'w-[clamp(13rem,20vw,20rem)]',
-  // Era w-28 quando a célula dizia só "4d". Agora ela diz O QUE o contato deu — a
-  // tag do desfecho em cima, canal/quando/tentativa/quem embaixo — e 112px não
-  // comportavam nem "Decisor interessado". 208px cabem a tag mais longa do catálogo
-  // ("Pediu contato no WhatsApp", medida em Poppins 12px medium) sem truncar.
-  dias: 'w-52',
-  // w-40 e não w-32: com `esfriando` o chip passa a dizer "Quente · esfriando", que
-  // mede 127px com o preenchimento (medido no navegador, Poppins 12px medium). O
-  // sinal de esfriamento não pode nascer truncado, que era o defeito que ele veio
-  // consertar. Os 16px saem de `local`, que na base atual não trunca nenhuma linha.
-  temperatura: 'w-40',
-  telefone: 'w-40',
-  categoria: 'hidden w-72 lg:table-cell',
-  local: 'hidden w-40 xl:table-cell',
+  // O nome passou a carregar DUAS linhas: o nome e, embaixo, categoria · bairro,
+  // cidade — que antes eram duas colunas próprias somando ~450px de largura
+  // declarada. Juntar as três num lugar só é o que devolveu espaço ao WhatsApp,
+  // que ficava cortado na borda direita a 1425px: justamente o dado que o time usa
+  // para FAZER o contato, e a última coisa da linha.
+  nome: 'w-[clamp(15rem,24vw,22rem)]',
+  // A tag do desfecho mais longa do catálogo ("Pediu contato no WhatsApp") e a
+  // linha de baixo (canal · quando · tentativa · quem) cabem em 240px sem cortar.
+  dias: 'w-60',
+  telefone: 'w-44',
+  // w-36 e não w-40: sem `esfriando` o chip mede 42px; com, 127px. Os 144px cobrem
+  // o pior caso — o sinal de esfriamento não pode nascer truncado.
+  temperatura: 'w-36',
   responsavel: 'hidden w-36 2xl:table-cell',
   etapa: 'hidden w-40 2xl:table-cell',
   proxima: 'hidden w-32 2xl:table-cell',
@@ -103,24 +102,26 @@ const colunas = coluna.columns([
     header: 'Parceiro',
     cell: ({ row }) => <CelulaNome linha={row.original} />,
   }),
-  // "Último contato" e não "Sem contato": a célula entrega uma DURAÇÃO (`4d`, `hoje`,
-  // `ontem`) e o cabeçalho nomeava um ESTADO, então na base fria as 50 linhas repetiam
-  // a própria palavra do cabeçalho. Com o nome certo, "sem contato" volta a ser a
-  // exceção informativa que ele deveria ser.
-  // A coluna passou a dizer O QUE o contato deu, e não só há quantos dias. O "4d"
-  // era o mesmo para quem marcou reunião e para quem não atendeu pela quarta vez,
-  // e o time — que faz a captação a partir desta lista — tinha de abrir ficha por
-  // ficha para saber a diferença. Ver `ultimo-contato.tsx`.
+  // O que o último contato DEU, e não só há quantos dias. Ver `ultimo-contato.tsx`.
   coluna.accessor('last_contact_at', {
     id: 'dias',
     header: 'Último contato',
     cell: ({ row }) => <UltimoContato linha={row.original} />,
   }),
-  // Coluna própria, SEMPRE visível, e não um degrau `2xl:table-cell`: cinco matizes
-  // num traço de 3px não sobrevivem a deuteranopia (no claro o par quente/cliente mede
-  // 1,35:1 entre si), então o rótulo textual é o reforço que não depende de matiz. Se
-  // entrasse junto de responsável e etapa, sumiria justamente no notebook de 1280px,
-  // que é onde a lista é lida.
+  // Terceira, e não última: é por onde o contato acontece. Antes vinha depois de
+  // categoria e bairro, e a 1425px já nascia cortado pela borda do contêiner.
+  coluna.accessor('phone', {
+    id: 'telefone',
+    header: 'WhatsApp',
+    cell: ({ getValue }) => {
+      const valor = getValue();
+      if (!valor) return <Vazio />;
+      return <span className="numerico text-[0.8125rem]">{formatarTelefone(valor)}</span>;
+    },
+  }),
+  // Coluna própria, SEMPRE visível: cinco matizes num traço de 3px não sobrevivem a
+  // deuteranopia (no claro o par quente/cliente mede 1,35:1 entre si), então o
+  // rótulo textual é o reforço que não depende de matiz.
   coluna.accessor('temperature', {
     id: 'temperatura',
     header: 'Temperatura',
@@ -130,27 +131,6 @@ const colunas = coluna.columns([
         esfriando={row.original.needs_attention}
       />
     ),
-  }),
-  coluna.accessor('primary_category', {
-    id: 'categoria',
-    header: 'Categoria',
-    cell: ({ getValue }) => <Texto valor={getValue()} />,
-  }),
-  coluna.display({
-    id: 'local',
-    header: 'Bairro e cidade',
-    cell: ({ row }) => (
-      <Texto valor={formatarLocal(row.original.neighborhood, row.original.city) || null} />
-    ),
-  }),
-  coluna.accessor('phone', {
-    id: 'telefone',
-    header: 'WhatsApp',
-    cell: ({ getValue }) => {
-      const valor = getValue();
-      if (!valor) return <Vazio />;
-      return <span className="numerico text-[0.8125rem]">{formatarTelefone(valor)}</span>;
-    },
   }),
   coluna.accessor('owner', {
     id: 'responsavel',
@@ -209,7 +189,12 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
                   <td
                     key={celula.id}
                     className={cn(
-                      'h-9 px-3 align-middle whitespace-nowrap',
+                      // 56px e não 36px. A tabela nasceu para uma linha por célula, e
+                      // a tag do contato com a linha de baixo ficava espremida rente ao
+                      // topo. Agora TODA linha tem a mesma anatomia — em cima o que
+                      // importa, embaixo o contexto —, e as células de uma linha só
+                      // (WhatsApp, temperatura) centralizam nessa mesma altura.
+                      'h-14 px-3 align-middle whitespace-nowrap',
                       celula.column.id === 'nome' &&
                         // Fundo opaco para o conteúdo passar por baixo, e o mesmo
                         // resultado do hover da linha (muted a 50% sobre o fundo).
@@ -247,15 +232,8 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
 function ColunasEscondidas() {
   return (
     <p className="pb-2 text-xs text-muted-foreground 2xl:hidden">
-      Nesta largura de tela,{' '}
-      <span className="hidden xl:inline">responsável, etapa e próxima ação</span>
-      <span className="hidden lg:inline xl:hidden">
-        bairro e cidade, responsável, etapa e próxima ação
-      </span>
-      <span className="lg:hidden">
-        categoria, bairro e cidade, responsável, etapa e próxima ação
-      </span>{' '}
-      só aparecem na ficha do parceiro.
+      Nesta largura de tela, responsável, etapa e próxima ação só aparecem na ficha do
+      parceiro.
     </p>
   );
 }
@@ -281,10 +259,19 @@ function Linha({ indice, children }: { indice: number; children: React.ReactNode
   );
 }
 
-/** Barra térmica + nome, com a linha inteira clicável até a ficha. */
+/**
+ * Barra térmica, nome e — embaixo — do que é e onde fica.
+ *
+ * A segunda linha junta o que antes eram duas colunas (categoria e bairro/cidade).
+ * Continuam sendo contexto, não identificação: ficam em 12px, na tinta secundária,
+ * e truncam primeiro. O nome é o que responde "de quem é esta linha?".
+ */
 function CelulaNome({ linha }: { linha: LinhaParceiro }) {
+  const onde = formatarLocal(linha.neighborhood, linha.city);
+  const contexto = [linha.primary_category, onde].filter(Boolean).join(' · ');
+
   return (
-    <div className="relative flex h-9 items-center">
+    <div className="relative flex h-14 items-center">
       {/* `semRotulo`: a coluna Temperatura já anuncia o rótulo nesta mesma linha,
           e sem isso o leitor de tela leria a temperatura duas vezes por parceiro. */}
       <BarraTermica
@@ -295,10 +282,16 @@ function CelulaNome({ linha }: { linha: LinhaParceiro }) {
       />
       <Link
         href={`/parceiros/${linha.id}`}
-        className="block min-w-0 flex-1 truncate rounded-lg py-1.5 pr-3 pl-4 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        title={linha.name}
+        className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 rounded-lg py-1.5 pr-3 pl-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
-        {linha.name}
+        <span className="truncate font-medium" title={linha.name}>
+          {linha.name}
+        </span>
+        {contexto ? (
+          <span className="truncate text-xs text-muted-foreground" title={contexto}>
+            {contexto}
+          </span>
+        ) : null}
       </Link>
     </div>
   );
