@@ -2046,3 +2046,20 @@ O push, depois do `migration repair`, provou o que estava em dúvida: as quatro 
 
 - **A causa é de processo, e vai repetir:** a produção é alimentada por branches de feature e a `main` não recebe, então `git log main` conta uma história diferente da que o banco conta. Registrado em `komune-app/docs/DIVERGENCIA-MIGRACOES-10-09-2026.md`.
 - **Erro meu, corrigido no mesmo dia:** o primeiro registro afirmava que as 11 nunca tinham existido como arquivo. Eu rodei `git log --all` antes do `git fetch` — o `--all` era completo para o que a máquina conhecia e incompleto para o que o remoto tinha. Reescrito em `b034700`.
+
+## D3 — 11/09/2026 — A lista de Parceiros diz o que o contato deu (RF-BAS-15, RF-FUN-12)
+
+Pedido do Rafael: "algo mais completo na aba de parceiros que fale melhor que já entramos em contato, e com a tag correta do que o contato resultou, pra gente se basear melhor, pois estamos usando muito a tela de parceiros pra entrar em contato."
+
+O time faz a captação **a partir da lista**, e ela só dizia "4d" — o mesmo "4d" para quem marcou reunião e para quem não atendeu pela quarta vez. Para saber a diferença, abrir ficha por ficha.
+
+- **O dado já existia.** Das 207 atividades da produção, as 39 que são contato de gente (24 ligações, 12 WhatsApp, 3 visitas) têm **todas** o desfecho gravado; as 168 restantes são eventos do sistema e corretamente não têm nenhum. O Registrar e o Ligar sempre gravaram a tag — faltava a lista recebê-la.
+- **`search_organizations`** passa a devolver o último contato de gente: desfecho, se houve conversa (`aberta`/`batida`/`nenhuma`), temperatura que ele aplica, canal, quando, quem e quantas tentativas. `drop function` em vez de `create or replace`, porque mudar o `returns table` cria uma função nova e as duas conviveriam.
+- **A coluna "Último contato"** mostra a tag na palavra do catálogo (a mesma que a pessoa tocou no Registrar) e embaixo canal · quando · tentativa · quem. "Quem" evita duas pessoas ligarem para o mesmo parceiro na mesma manhã; "4ª tentativa" diz quando parar de ligar e mandar mensagem.
+- **Cor só da escala térmica:** a tag pinta quente/morno/frio quando o desfecho aplica temperatura, e fica neutra quando não aplica. Número inválido leva contorno — é o único desfecho em que o próximo passo muda de natureza (achar outro número), e isso não pode depender de matiz.
+- **O canal sai do prefixo do desfecho** (`lig_`, `wa_`, `vis_`, `reu_`, `dm_`), não de `activities.channel`: visita e reunião gravam o mesmo `presencial`, e toda reunião apareceria como "Visita".
+- **Filtro "Contato"**, primeiro da barra, pelo último contato de gente. Na produção hoje: ainda não contatado **133**, tentou sem conversa **23** (a fila de ligar de novo), já conversou **8**, número inválido **4**. É o `counts_as` do catálogo, não os 34 desfechos soltos. Valor desconhecido é recusado pela função — filtro que falha em silêncio devolve a base inteira.
+- No celular a tag vai para a fileira de metadados (a coluna da direita tem 96px); o "quando" dali passa a vir do mesmo contato que a tag descreve.
+- **Erro meu de 10/09, pego pelo pgTAP 09:** `app.aceite_do_claimed()` nasceu executável por `anon`, porque EXECUTE para PUBLIC é o padrão do Postgres. Revogado em `20260911100100`. Eu tinha conferido o gatilho em produção e não tinha rodado a suíte.
+- Verificado: 2451 asserções pgTAP num banco novo; 640 testes Vitest (9 novos em `ultimo-contato.test.ts`); lint, typecheck e build verdes; a função conferida com dado real na produção antes da tela; a lista e o filtro olhados no navegador em produção.
+- **Polimento possível, não feito:** as linhas com contato ficam com a tag rente ao topo, porque a tabela tem altura de linha fixa pensada para uma linha só. Legível, mas apertado. Aumentar o respiro muda a densidade da tabela inteira, e é uma escolha que vale fazer olhando junto.
