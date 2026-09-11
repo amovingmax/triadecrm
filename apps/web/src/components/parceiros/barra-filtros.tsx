@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { contarFiltros, type Catalogos, type FiltrosParceiros } from './tipos';
+import { contarFiltros, SITUACOES_DO_CONTATO, type Catalogos, type FiltrosParceiros } from './tipos';
 
 /** Valor do "sem filtro" no Radix Select, que não aceita item com valor vazio. */
 const TODOS = 'todos';
@@ -61,6 +61,16 @@ export function BarraFiltros({
             quarta pílula aparece guilhotinada rente à borda e lê como layout quebrado.
             Some no `md`, onde os quatro cabem e a fila passa a quebrar em linha. */}
         <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] md:mx-0 md:flex-wrap md:px-0 md:pb-0 md:[mask-image:none]">
+          {/* PRIMEIRO da fila, e não o último: o time faz a captação a partir desta
+              lista, e a pergunta da manhã é "para quem eu ligo?" — quem ainda não
+              foi contatado, ou quem não atendeu e está esperando a próxima tentativa.
+              Categoria e cidade recortam o QUE; este recorta o PRÓXIMO PASSO. */}
+          <FiltroLista
+            rotulo="Contato"
+            valor={filtros.contato}
+            aoMudar={(v) => aoMudar({ contato: v, pagina: 1 })}
+            opcoes={SITUACOES_DO_CONTATO.map((c) => ({ valor: c.valor, rotulo: c.rotulo }))}
+          />
           <FiltroLista
             rotulo="Categoria"
             valor={filtros.categoriaId}

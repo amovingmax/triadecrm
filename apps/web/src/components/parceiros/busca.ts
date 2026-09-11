@@ -73,6 +73,10 @@ export function chaveDaBusca(f: FiltrosParceiros) {
     f.cidadeId,
     f.etapaId,
     f.responsavelId,
+    // Sem ele na chave, trocar "Tentou, sem conversa" por "Já conversou" devolvia a
+    // página do filtro anterior direto do cache — a lista mudaria de rótulo e não
+    // de conteúdo, e ninguém perceberia.
+    f.contato,
     f.pagina,
   ] as const;
 }
@@ -90,6 +94,7 @@ export async function buscarParceiros(f: FiltrosParceiros): Promise<ResultadoBus
     p_city_id: f.cidadeId ?? undefined,
     p_stage_id: f.etapaId ?? undefined,
     p_owner_id: f.responsavelId ?? undefined,
+    p_contato: f.contato ?? undefined,
     p_limit: POR_PAGINA,
     p_offset: (Math.max(1, f.pagina) - 1) * POR_PAGINA,
   });

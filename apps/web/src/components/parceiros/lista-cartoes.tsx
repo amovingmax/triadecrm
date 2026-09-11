@@ -4,11 +4,12 @@ import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
 import { RevelarLista, useRevelarLinha } from '@/components/movimento';
-import { BarraTermica, ChipTemperatura, DiasSemContato } from '@/components/temperatura';
+import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
 
 import { formatarLocal, formatarTelefone } from './formatos';
 import { ProximaAcao } from './proxima-acao';
 import type { LinhaParceiro } from './tipos';
+import { resumoDoContato, TagDoContato } from './ultimo-contato';
 
 /**
  * A mesma lista no celular, que é onde a Heloísa trabalha: entre visitas, no sol,
@@ -60,6 +61,7 @@ export function ListaCartoes({ linhas }: { linhas: LinhaParceiro[] }) {
 function Cartao({ linha, indice }: { linha: LinhaParceiro; indice: number }) {
   const revelar = useRevelarLinha(indice);
   const local = formatarLocal(linha.neighborhood, linha.city);
+  const contato = resumoDoContato(linha);
 
   return (
     <li
@@ -93,6 +95,10 @@ function Cartao({ linha, indice }: { linha: LinhaParceiro; indice: number }) {
               esfriando={linha.needs_attention}
               comDescricao={false}
             />
+            {/* O que o último contato deu, logo depois da temperatura: é o que o
+                time decide olhando a lista no celular, na rua — ligar de novo,
+                mandar mensagem ou procurar outro número. */}
+            <TagDoContato resumo={contato} />
             {linha.phone ? <span className="numerico">{formatarTelefone(linha.phone)}</span> : null}
             {linha.stage ? <span>{linha.stage}</span> : null}
             <ProximaAcao iso={linha.next_action_at} />
@@ -100,7 +106,18 @@ function Cartao({ linha, indice }: { linha: LinhaParceiro; indice: number }) {
         </div>
 
         <div className="flex max-w-24 min-w-0 flex-col items-end gap-0.5 text-right">
-          <DiasSemContato dias={linha.days_since_contact} atencao={linha.needs_attention} curto />
+          {/* O "quando" do mesmo contato que a tag descreve, e não o do negócio:
+              tag e tempo saindo de fontes diferentes podiam se contradizer na
+              mesma linha. */}
+          <span
+            title={contato.descricao}
+            className={cn(
+              'text-xs whitespace-nowrap',
+              linha.needs_attention ? 'font-medium text-foreground' : 'text-muted-foreground',
+            )}
+          >
+            {contato.quando ?? '-'}
+          </span>
           {linha.owner ? (
             <span className="max-w-full truncate text-xs text-muted-foreground">{linha.owner}</span>
           ) : null}

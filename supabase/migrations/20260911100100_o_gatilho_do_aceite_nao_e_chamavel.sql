@@ -1,0 +1,31 @@
+-- ===========================================================================
+-- O gatilho do aceite deixa de ser chamável pela API
+-- ===========================================================================
+--
+-- Erro meu, da `20260910160000`, pego pelo pgTAP 09 no primeiro `db reset`
+-- depois dele:
+--
+--   Failed 49: nenhuma função de gatilho do schema app é executável por
+--              authenticated/anon
+--   Failed 50: anon não executa função alguma do schema app (nem por EXECUTE
+--              de PUBLIC)
+--
+-- `create function` dá EXECUTE a PUBLIC por padrão, e `anon` herda de PUBLIC.
+-- `app.aceite_do_claimed()` nasceu sem o `revoke` que toda função de `app` tem
+-- — o padrão está escrito nas migrações desde a 000200 (`handle_new_auth_user`,
+-- `recompute_temperatures`, `suppress`…) e o teste 09 existe exatamente para
+-- varrer isso, em vez de depender de alguém lembrar.
+--
+-- O risco prático era pequeno: uma função `returns trigger` chamada direto
+-- falha antes de fazer qualquer coisa. Mas o teste está certo em não aceitar
+-- "risco pequeno" como critério — o critério é o schema `app` inteiro fechado
+-- para a API, e aí nenhuma função nova precisa ser analisada caso a caso.
+--
+-- Por que o teste não pegou ontem: ontem eu apliquei a migração direto na
+-- produção e conferi o comportamento do gatilho lá, mas não rodei o pgTAP
+-- depois dela. A suíte inteira só voltou a rodar hoje, e pegou na primeira vez.
+-- Gatilho não precisa de EXECUTE para disparar — quem dispara é o Postgres —,
+-- então o `revoke` não muda nada no funcionamento.
+-- ===========================================================================
+
+revoke all on function app.aceite_do_claimed() from public, anon, authenticated;

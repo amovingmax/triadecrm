@@ -5,11 +5,12 @@ import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-tab
 
 import { cn } from '@/lib/utils';
 import { RevelarLista, useRevelarLinha } from '@/components/movimento';
-import { BarraTermica, ChipTemperatura, DiasSemContato } from '@/components/temperatura';
+import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
 
 import { formatarLocal, formatarTelefone } from './formatos';
 import { ProximaAcao } from './proxima-acao';
 import type { LinhaParceiro } from './tipos';
+import { UltimoContato } from './ultimo-contato';
 
 /**
  * A lista de parceiros no desktop.
@@ -58,7 +59,11 @@ const coluna = createColumnHelper<typeof recursos, LinhaParceiro>();
  */
 const CLASSES: Record<string, string> = {
   nome: 'w-[clamp(13rem,20vw,20rem)]',
-  dias: 'w-28',
+  // Era w-28 quando a célula dizia só "4d". Agora ela diz O QUE o contato deu — a
+  // tag do desfecho em cima, canal/quando/tentativa/quem embaixo — e 112px não
+  // comportavam nem "Decisor interessado". 208px cabem a tag mais longa do catálogo
+  // ("Pediu contato no WhatsApp", medida em Poppins 12px medium) sem truncar.
+  dias: 'w-52',
   // w-40 e não w-32: com `esfriando` o chip passa a dizer "Quente · esfriando", que
   // mede 127px com o preenchimento (medido no navegador, Poppins 12px medium). O
   // sinal de esfriamento não pode nascer truncado, que era o defeito que ele veio
@@ -102,15 +107,14 @@ const colunas = coluna.columns([
   // `ontem`) e o cabeçalho nomeava um ESTADO, então na base fria as 50 linhas repetiam
   // a própria palavra do cabeçalho. Com o nome certo, "sem contato" volta a ser a
   // exceção informativa que ele deveria ser.
-  coluna.accessor('days_since_contact', {
+  // A coluna passou a dizer O QUE o contato deu, e não só há quantos dias. O "4d"
+  // era o mesmo para quem marcou reunião e para quem não atendeu pela quarta vez,
+  // e o time — que faz a captação a partir desta lista — tinha de abrir ficha por
+  // ficha para saber a diferença. Ver `ultimo-contato.tsx`.
+  coluna.accessor('last_contact_at', {
     id: 'dias',
     header: 'Último contato',
-    cell: ({ row }) => (
-      <DiasSemContato
-        dias={row.original.days_since_contact}
-        atencao={row.original.needs_attention}
-      />
-    ),
+    cell: ({ row }) => <UltimoContato linha={row.original} />,
   }),
   // Coluna própria, SEMPRE visível, e não um degrau `2xl:table-cell`: cinco matizes
   // num traço de 3px não sobrevivem a deuteranopia (no claro o par quente/cliente mede
