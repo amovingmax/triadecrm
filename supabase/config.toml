@@ -467,6 +467,12 @@ verify_jwt = true
 [functions.komune-webhook]
 verify_jwt = false
 
+# A Meta chama sem JWT do Supabase: quem confere é a assinatura X-Hub-Signature-256
+# dentro da função (wa-webhook/assinatura-meta.ts). Sem esta linha o deploy nasce
+# exigindo JWT e a Meta recebe 401 no handshake.
+[functions.wa-webhook]
+verify_jwt = false
+
 [functions.claim-link]
 verify_jwt = false
 

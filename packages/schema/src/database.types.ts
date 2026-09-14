@@ -9,7 +9,39 @@ export type Json =
 export type Database = {
   app: {
     Tables: {
-      [_ in never]: never
+      agendas_do_google: {
+        Row: {
+          conectada_em: string
+          email_google: string
+          escopos: string[]
+          revogada_em: string | null
+          segredo_id: string
+          ultimo_erro: string | null
+          ultimo_erro_em: string | null
+          user_id: string
+        }
+        Insert: {
+          conectada_em?: string
+          email_google: string
+          escopos?: string[]
+          revogada_em?: string | null
+          segredo_id: string
+          ultimo_erro?: string | null
+          ultimo_erro_em?: string | null
+          user_id: string
+        }
+        Update: {
+          conectada_em?: string
+          email_google?: string
+          escopos?: string[]
+          revogada_em?: string | null
+          segredo_id?: string
+          ultimo_erro?: string | null
+          ultimo_erro_em?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       deal_cards: {
@@ -89,6 +121,25 @@ export type Database = {
     }
     Functions: {
       abrir_proximo_toque: { Args: { p_enrollment: string }; Returns: Json }
+      agenda_dados_do_evento: { Args: { p_task_id: string }; Returns: Json }
+      agenda_google_falhou: {
+        Args: { p_erro: string; p_revogar: boolean; p_user_id: string }
+        Returns: undefined
+      }
+      agenda_google_guardar: {
+        Args: {
+          p_email_google: string
+          p_escopos: string[]
+          p_refresh_token: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      agenda_google_token: { Args: { p_user_id: string }; Returns: string }
+      agenda_google_token_do_evento: {
+        Args: { p_task_id: string }
+        Returns: string
+      }
       ai_alerta_orcamento: { Args: never; Returns: Json }
       ai_custo: {
         Args: {
@@ -137,6 +188,26 @@ export type Database = {
       can_write: { Args: never; Returns: boolean }
       chave_catalogo: { Args: { t: string }; Returns: string }
       cnpj_is_valid: { Args: { c: string }; Returns: boolean }
+      compromisso_do_google_esquecer: {
+        Args: { p_task_id: string }
+        Returns: Json
+      }
+      compromisso_do_google_gravar: {
+        Args: {
+          p_agenda_id: string
+          p_criado_por: string
+          p_evento_id: string
+          p_link_html: string
+          p_meet_url: string
+          p_task_id: string
+        }
+        Returns: Json
+      }
+      compromisso_do_google_ler: { Args: { p_task_id: string }; Returns: Json }
+      compromisso_do_google_remanejar: {
+        Args: { p_novo_horario: string; p_task_antiga: string }
+        Returns: Json
+      }
       compute_temperature: {
         Args: {
           p_last_activity_at: string
@@ -215,6 +286,10 @@ export type Database = {
         }
       }
       expirar_reservas: { Args: never; Returns: number }
+      ficha_para_busca_de_telefone: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       find_org_matches: {
         Args: { n: Json; p_threshold?: number }
         Returns: {
@@ -364,6 +439,12 @@ export type Database = {
         }
         Returns: Json
       }
+      modelo_parametro_limpo: { Args: { p_valor: string }; Returns: string }
+      modelo_renderizar: {
+        Args: { p_body: string; p_parametros: Json }
+        Returns: string
+      }
+      modelo_variaveis: { Args: { p_body: string }; Returns: string[] }
       motivo_da_fila_vazia: { Args: { p_batch: string }; Returns: Json }
       next_business_day: {
         Args: { p_days?: number; p_from: string }
@@ -404,6 +485,7 @@ export type Database = {
         }
         Returns: Json
       }
+      pode_matricular: { Args: never; Returns: boolean }
       pode_tocar: {
         Args: {
           p_channel: Database["app"]["Enums"]["channel"]
@@ -424,6 +506,7 @@ export type Database = {
         Returns: Json
       }
       prefilled_ok: { Args: { p: Json }; Returns: boolean }
+      primeiro_nome: { Args: { p_profile: string }; Returns: string }
       primeiros_contatos_do_dia: {
         Args: {
           p_channel: Database["app"]["Enums"]["channel"]
@@ -456,6 +539,15 @@ export type Database = {
       rascunhos_expirar: { Args: never; Returns: Json }
       reads_base_pii: { Args: never; Returns: boolean }
       recompute_temperatures: { Args: never; Returns: number }
+      recusa_de_matricula: {
+        Args: {
+          p_cadence_slug: string
+          p_deal_id?: string
+          p_gancho?: string
+          p_organization_id: string
+        }
+        Returns: Json
+      }
       recusa_de_tabulacao: {
         Args: {
           p_contato: string
@@ -472,6 +564,14 @@ export type Database = {
           p_candidate_id: string
           p_nao_contatar?: boolean
           p_reason: string
+        }
+        Returns: Json
+      }
+      registrar_busca_de_telefone: {
+        Args: {
+          p_achou: boolean
+          p_organization_id: string
+          p_place_id: string
         }
         Returns: Json
       }
@@ -557,6 +657,10 @@ export type Database = {
       }
       search_name: { Args: { n: string }; Returns: string }
       sees_all: { Args: never; Returns: boolean }
+      segmento_da_ficha: {
+        Args: { p_organization_id: string }
+        Returns: string
+      }
       segredo: { Args: { p_nome: string }; Returns: string }
       sem_cpf: { Args: { t: string }; Returns: string }
       sha256_hex: { Args: { t: string }; Returns: string }
@@ -618,6 +722,14 @@ export type Database = {
       }
       wa_confirmacao_teto: { Args: never; Returns: number }
       wa_confirmacoes_reenfileirar: { Args: { p_qty?: number }; Returns: Json }
+      wa_destino_da_ficha: {
+        Args: { p_organization_id: string }
+        Returns: {
+          contact_id: string
+          primeiro_nome: string
+          telefone: string
+        }[]
+      }
       wa_enfileirar_envio: { Args: { p_message_id: string }; Returns: Json }
       wa_expirar_fila: {
         Args: { p_horas?: number; p_horas_confirmacao?: number }
@@ -645,6 +757,7 @@ export type Database = {
         Args: { p_motivo: string; p_quando?: string }
         Returns: string
       }
+      wa_numero_padrao: { Args: never; Returns: string }
       wa_proximos: { Args: { p_qty?: number }; Returns: Json }
       wa_registrar_entrada: {
         Args: {
@@ -2176,6 +2289,61 @@ export type Database = {
         }
         Relationships: []
       }
+      compromissos_no_google: {
+        Row: {
+          agenda_id: string
+          criado_em: string
+          criado_por: string | null
+          evento_id: string
+          link_html: string | null
+          meet_url: string | null
+          sincronizado_em: string
+          task_id: string
+        }
+        Insert: {
+          agenda_id?: string
+          criado_em?: string
+          criado_por?: string | null
+          evento_id: string
+          link_html?: string | null
+          meet_url?: string | null
+          sincronizado_em?: string
+          task_id: string
+        }
+        Update: {
+          agenda_id?: string
+          criado_em?: string
+          criado_por?: string | null
+          evento_id?: string
+          link_html?: string | null
+          meet_url?: string | null
+          sincronizado_em?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compromissos_no_google_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compromissos_no_google_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compromissos_no_google_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: true
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consent_events: {
         Row: {
           channel: Database["app"]["Enums"]["channel"] | null
@@ -3526,7 +3694,11 @@ export type Database = {
           is_active: boolean
           kind: string | null
           language: string
+          meta_rejection_reason: string | null
           meta_status: string | null
+          meta_status_raw: string | null
+          meta_synced_at: string | null
+          meta_template_id: string | null
           meta_template_name: string | null
           name: string
           segment: string | null
@@ -3546,7 +3718,11 @@ export type Database = {
           is_active?: boolean
           kind?: string | null
           language?: string
+          meta_rejection_reason?: string | null
           meta_status?: string | null
+          meta_status_raw?: string | null
+          meta_synced_at?: string | null
+          meta_template_id?: string | null
           meta_template_name?: string | null
           name: string
           segment?: string | null
@@ -3566,7 +3742,11 @@ export type Database = {
           is_active?: boolean
           kind?: string | null
           language?: string
+          meta_rejection_reason?: string | null
           meta_status?: string | null
+          meta_status_raw?: string | null
+          meta_synced_at?: string | null
+          meta_template_id?: string | null
           meta_template_name?: string | null
           name?: string
           segment?: string | null
@@ -6054,6 +6234,27 @@ export type Database = {
         }
         Returns: Json
       }
+      agenda_dados_do_evento: { Args: { p_task_id: string }; Returns: Json }
+      agenda_google_desconectar: { Args: never; Returns: Json }
+      agenda_google_estado: { Args: never; Returns: Json }
+      agenda_google_falhou: {
+        Args: { p_erro: string; p_revogar: boolean; p_user_id: string }
+        Returns: undefined
+      }
+      agenda_google_guardar: {
+        Args: {
+          p_email_google: string
+          p_escopos: string[]
+          p_refresh_token: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      agenda_google_token: { Args: { p_user_id: string }; Returns: string }
+      agenda_google_token_do_evento: {
+        Args: { p_task_id: string }
+        Returns: string
+      }
       alvo_suprimido: {
         Args: { p_contact_id?: string; p_organization_id: string }
         Returns: boolean
@@ -6062,11 +6263,33 @@ export type Database = {
         Args: { p_draft_id: string; p_texto_final?: string }
         Returns: Json
       }
+      assumir_conversa: { Args: { p_conversation_id: string }; Returns: Json }
       cadencia_do_parceiro: {
         Args: { p_organization_id: string }
         Returns: Json
       }
+      cadencias_do_negocio: { Args: { p_deal_id: string }; Returns: Json }
       cadencias_visao: { Args: never; Returns: Json }
+      compromisso_do_google_esquecer: {
+        Args: { p_task_id: string }
+        Returns: Json
+      }
+      compromisso_do_google_gravar: {
+        Args: {
+          p_agenda_id: string
+          p_criado_por: string
+          p_evento_id: string
+          p_link_html: string
+          p_meet_url: string
+          p_task_id: string
+        }
+        Returns: Json
+      }
+      compromisso_do_google_ler: { Args: { p_task_id: string }; Returns: Json }
+      compromisso_do_google_remanejar: {
+        Args: { p_novo_horario: string; p_task_antiga: string }
+        Returns: Json
+      }
       criar_pre_cadastro: {
         Args: {
           p_organization_id: string
@@ -6196,6 +6419,10 @@ export type Database = {
         Returns: Json
       }
       exportar_lgpd_por_token: { Args: { p_token: string }; Returns: Json }
+      ficha_para_busca_de_telefone: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       geo_gravar: {
         Args: {
           p_addresstype?: string
@@ -6333,6 +6560,7 @@ export type Database = {
           titulo: string
         }[]
       }
+      meu_papel: { Args: never; Returns: Json }
       montar_lote: {
         Args: {
           p_categoria_ids?: number[]
@@ -6359,6 +6587,10 @@ export type Database = {
           p_reason?: string
           p_to_stage_id: number
         }
+        Returns: Json
+      }
+      negocios_para_cadencia: {
+        Args: { p_cadence_slug: string; p_limit?: number; p_q?: string }
         Returns: Json
       }
       origem_dos_dados: { Args: { p_organization_id: string }; Returns: Json }
@@ -6391,6 +6623,14 @@ export type Database = {
       }
       radar_alternar_fonte: {
         Args: { p_enabled: boolean; p_source_id: number }
+        Returns: Json
+      }
+      radar_coletar_agora: {
+        Args: {
+          p_categorias?: string[]
+          p_max_paginas?: number
+          p_source_id: number
+        }
         Returns: Json
       }
       radar_criar_candidato: {
@@ -6466,6 +6706,14 @@ export type Database = {
       }
       recusar_reivindicacao: {
         Args: { p_motivo?: string; p_token: string }
+        Returns: Json
+      }
+      registrar_busca_de_telefone: {
+        Args: {
+          p_achou: boolean
+          p_organization_id: string
+          p_place_id: string
+        }
         Returns: Json
       }
       registrar_contato: {
@@ -6675,6 +6923,7 @@ export type Database = {
         Args: {
           p_category_id?: number
           p_city_id?: number
+          p_contato?: string
           p_kind?: Database["app"]["Enums"]["org_kind"]
           p_limit?: number
           p_offset?: number
@@ -6684,11 +6933,19 @@ export type Database = {
         }
         Returns: {
           city: string
+          contact_attempts: number
           days_since_contact: number
           id: string
           instagram_handle: string
           kind: Database["app"]["Enums"]["org_kind"]
           last_activity_at: string
+          last_contact_at: string
+          last_contact_by: string
+          last_contact_channel: string
+          last_outcome_counts_as: string
+          last_outcome_name: string
+          last_outcome_slug: string
+          last_outcome_temperature: string
           name: string
           needs_attention: boolean
           neighborhood: string
@@ -6747,8 +7004,37 @@ export type Database = {
         }
         Returns: Json
       }
+      wa_enviar_modelo: {
+        Args: {
+          p_organization_id: string
+          p_parametros?: Json
+          p_template_id: number
+        }
+        Returns: Json
+      }
       wa_midia_registrar: {
         Args: { p_media_path: string; p_message_id: string }
+        Returns: Json
+      }
+      wa_modelo_meta_registrar: {
+        Args: {
+          p_id_meta?: string
+          p_motivo?: string
+          p_nome_meta: string
+          p_situacao_meta: string
+          p_template_id: number
+        }
+        Returns: Json
+      }
+      wa_modelos_para_meta: { Args: never; Returns: Json }
+      wa_numero_configurar: {
+        Args: {
+          p_nome_exibicao?: string
+          p_numero: string
+          p_phone_number_id: string
+          p_qualidade?: string
+          p_waba_id: string
+        }
         Returns: Json
       }
       wa_optout_registrar: {
@@ -6759,6 +7045,7 @@ export type Database = {
         }
         Returns: Json
       }
+      wa_preparar_envio: { Args: { p_organization_id: string }; Returns: Json }
       wa_saida_enfileirar_pendentes: { Args: { p_qty?: number }; Returns: Json }
       wa_saida_falha: {
         Args: {
