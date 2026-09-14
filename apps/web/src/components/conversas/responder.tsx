@@ -1,17 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { BellOff, FileCheck2, NotebookPen, PenLine, Phone, SendHorizontal } from 'lucide-react';
+import { BellOff, NotebookPen, PenLine, SendHorizontal } from 'lucide-react';
 import { LIMITES_PADRAO } from '@komune/prompts';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 import { ErroDaConversa, responder } from './acoes';
-import { CHAVE_CONVERSAS, chaveDaLinha, carregarModelosAprovados } from './dados';
+import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
+import { EnviarModelo } from './enviar-modelo';
 import { podeEscreverLivre } from './mensagens';
 import type { EstadoDaJanela, FioDaConversa } from './tipos';
 
@@ -32,13 +33,12 @@ import type { EstadoDaJanela, FioDaConversa } from './tipos';
  * tela existe para ninguém chegar até lá.
  *
  * ===========================================================================
- * E HOJE, NADA SAI
+ * E O QUE SAI, SAI PELA FILA
  * ===========================================================================
- * O que sai daqui entra em `messages` como `queued` e fica lá até o worker de
- * envio rodar com o número da Meta. É verdade útil: a fila é o registro do que a
- * gente QUER mandar, e o gatilho reconfere supressão e teto na hora da entrega,
- * não na hora do clique — quem pedir para sair nesse meio-tempo não recebe. Mas
- * é preciso dizer, e o botão diz.
+ * O que sai daqui entra em `messages` como `queued` e o worker de envio entrega
+ * pela Cloud API, com o número da KOMUNE. O gatilho reconfere supressão e teto
+ * na hora da entrega, não só na hora do clique — quem pedir para sair nesse
+ * meio-tempo não recebe.
  *
  * ===========================================================================
  * E QUEM PEDIU PARA SAIR NÃO TEM CAIXA
@@ -86,7 +86,9 @@ export function CaixaDeResposta({
 
   if (naoContatar) return <PediuParaSair organizacaoId={organizacaoId} className={className} />;
 
-  if (!fio) return <SemFio organizacaoId={organizacaoId} className={className} />;
+  // Sem conversa, ou com a janela de 24 h fechada, só modelo aprovado atravessa —
+  // e é a mesma caixa para os dois (migração 20260914100000).
+  if (!fio) return <EnviarModelo organizacaoId={organizacaoId} className={className} />;
 
   if (recolhida && !aberta) {
     return (
@@ -96,7 +98,7 @@ export function CaixaDeResposta({
         onClick={() => setAberta(true)}
       >
         <PenLine aria-hidden="true" />
-        Prefiro escrever eu mesma
+        Prefiro escrever a resposta
       </Button>
     );
   }
@@ -104,7 +106,7 @@ export function CaixaDeResposta({
   return podeEscreverLivre(janela) ? (
     <TextoLivre fio={fio} organizacaoId={organizacaoId} className={className} />
   ) : (
-    <SoModelo organizacaoId={organizacaoId} className={className} />
+    <EnviarModelo organizacaoId={organizacaoId} className={className} />
   );
 }
 
@@ -146,27 +148,6 @@ function PediuParaSair({
   );
 }
 
-/** Não existe fio: ninguém nunca trocou mensagem com este parceiro. */
-function SemFio({ organizacaoId, className }: { organizacaoId: string; className?: string }) {
-  return (
-    <div className={cn('space-y-2 rounded-xl border border-dashed border-hairline p-3', className)}>
-      <p className="text-sm font-medium">Não há conversa de WhatsApp com este parceiro</p>
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        O primeiro contato é por LIGAÇÃO, por decisão do projeto — o WhatsApp entra depois, para
-        confirmar a reunião e mandar o link. Um fio novo só nasce quando o parceiro escreve para o número da
-        KOMUNE, ou quando a Heloísa manda a primeira mensagem pelo celular e o Coexistence
-        avisa o CRM. As duas coisas dependem do número aprovado na Meta.
-      </p>
-      <Button asChild variant="outline" className="toque h-11 md:h-9">
-        <Link href={`/registrar?org=${organizacaoId}`}>
-          <Phone aria-hidden="true" />
-          Registrar contato por telefone
-        </Link>
-      </Button>
-    </div>
-  );
-}
-
 /** Janela aberta: texto livre, que é o que a Meta permite e não cobra. */
 function TextoLivre({
   fio,
@@ -184,8 +165,8 @@ function TextoLivre({
     mutationFn: () => responder({ fioId: fio.id, texto: texto.trim() }),
     onSuccess: () => {
       setTexto('');
-      toast.success('Mensagem na fila.', {
-        description: 'Ela sai quando o worker de envio rodar com o número liberado pela Meta.',
+      toast.success('Mensagem na fila do WhatsApp.', {
+        description: 'Sai pelo número da KOMUNE em instantes.',
       });
       void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
       void clientes.invalidateQueries({ queryKey: chaveDaLinha(organizacaoId) });
@@ -227,70 +208,18 @@ function TextoLivre({
           disabled={limpo.length === 0 || enviar.isPending}
         >
           <SendHorizontal aria-hidden="true" />
-          Pôr na fila
+          Enviar
         </Button>
+        <span className="w-full text-[11px] leading-relaxed text-muted-foreground">
+          O parceiro vê seu primeiro nome em negrito no começo da mensagem.
+        </span>
         <span
           className={cn('text-[11px] text-muted-foreground', longo && 'text-destructive-texto')}
         >
           <span className="numerico">{texto.length}</span> de{' '}
           <span className="numerico">{LIMITES_PADRAO.maxCaracteres}</span> caracteres
         </span>
-        <span className="w-full text-[11px] leading-relaxed text-muted-foreground">
-          Some texto na FILA, não no WhatsApp: falta o número aprovado na Meta. Para falar
-          agora, use o celular da Heloísa — o eco do Coexistence traz a mensagem para cá.
-        </span>
       </div>
     </form>
-  );
-}
-
-/**
- * Janela fechada: só modelo aprovado.
- *
- * A lista de modelos vem do banco e é filtrada por `meta_status = 'approved'` —
- * não por "está no CRM". São coisas diferentes: temos 39 modelos escritos e
- * nenhum aprovado, e mostrar os 39 num seletor faria a pessoa escolher um que a
- * Meta recusaria na entrega.
- */
-function SoModelo({ organizacaoId, className }: { organizacaoId: string; className?: string }) {
-  const modelos = useQuery({
-    queryKey: ['conversas', 'modelos-aprovados'],
-    queryFn: carregarModelosAprovados,
-    staleTime: 5 * 60_000,
-  });
-
-  const aprovados = modelos.data ?? [];
-
-  return (
-    <div className={cn('space-y-2 rounded-xl border border-dashed border-hairline p-3', className)}>
-      <p className="flex items-center gap-2 text-sm font-medium">
-        <FileCheck2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        Fora da janela, só modelo aprovado
-      </p>
-
-      {modelos.isPending ? (
-        <p className="text-xs text-muted-foreground">Vendo quais modelos a Meta já aprovou...</p>
-      ) : aprovados.length === 0 ? (
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          A Meta não aprovou nenhum dos nossos modelos ainda, então não há o que mandar por aqui
-          agora. Isso não é defeito do CRM: a aprovação de
-          modelo é do Meta Business e depende da verificação do CNPJ. O que funciona
-          hoje é ligar.
-        </p>
-      ) : (
-        <ul className="space-y-1 text-xs text-muted-foreground">
-          {aprovados.map((m) => (
-            <li key={m.id}>{m.nome}</li>
-          ))}
-        </ul>
-      )}
-
-      <Button asChild variant="outline" className="toque h-11 md:h-9">
-        <Link href={`/registrar?org=${organizacaoId}`}>
-          <Phone aria-hidden="true" />
-          Registrar contato por telefone
-        </Link>
-      </Button>
-    </div>
   );
 }

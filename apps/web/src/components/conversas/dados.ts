@@ -278,27 +278,3 @@ export function mensagemDoErro(erro: unknown): string {
   if (/fetch|network|failed|abort/i.test(texto)) return 'O aplicativo não alcançou o servidor.';
   return 'O servidor não respondeu.';
 }
-
-/** Um modelo que a Meta já aprovou — o único que atravessa a janela fechada. */
-export type ModeloAprovado = { id: number; nome: string; categoria: string };
-
-/**
- * Só os modelos com `meta_status = 'approved'`.
- *
- * O filtro é a diferença entre "existe no CRM" e "a Meta deixa passar". Hoje as
- * duas contas não batem: há dezenas de modelos escritos e nenhum aprovado, e um
- * seletor com os escritos faria a pessoa escolher um que seria recusado na
- * entrega — erro que só apareceria horas depois, no relatório de falhas.
- */
-export async function carregarModelosAprovados(): Promise<ModeloAprovado[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from('message_templates')
-    .select('id, name, category')
-    .eq('is_active', true)
-    .eq('channel', 'whatsapp')
-    .eq('meta_status', 'approved')
-    .order('name');
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((m) => ({ id: m.id, nome: m.name, categoria: m.category }));
-}

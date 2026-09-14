@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 
 import { urlDaMidia } from './acoes';
 import { dataHoraCompleta, hora } from './formatos';
-import { entregaDaMensagem } from './mensagens';
+import { entregaDaMensagem, separarAssinatura } from './mensagens';
 import { ROTULO_ORIGEM, ROTULO_TIPO_MENSAGEM, type MensagemDoFio } from './tipos';
 
 /**
@@ -70,9 +70,7 @@ export function Mensagem({ mensagem }: { mensagem: MensagemDoFio }) {
 
         {mensagem.tipo === 'audio' ? <Audio mensagem={mensagem} /> : null}
 
-        {mensagem.texto ? (
-          <p className="text-sm leading-relaxed whitespace-pre-line">{mensagem.texto}</p>
-        ) : null}
+        {mensagem.texto ? <Texto texto={mensagem.texto} /> : null}
 
         {mensagem.tipo !== 'audio' && semTexto ? <SemCorpo mensagem={mensagem} /> : null}
 
@@ -292,5 +290,21 @@ function Transcricao({ texto }: { texto: string }) {
       </p>
       <p className="text-sm leading-relaxed whitespace-pre-line italic">{texto}</p>
     </div>
+  );
+}
+
+/** O corpo, com a assinatura do atendente em negrito como o parceiro vê no WhatsApp. */
+function Texto({ texto }: { texto: string }) {
+  const { nome, resto } = separarAssinatura(texto);
+  return (
+    <p className="text-sm leading-relaxed whitespace-pre-line">
+      {nome ? (
+        <>
+          <span className="font-semibold">{nome}:</span>
+          {'\n'}
+        </>
+      ) : null}
+      {resto}
+    </p>
   );
 }

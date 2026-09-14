@@ -195,15 +195,27 @@ export type Entrega = {
 };
 
 /**
+ * A linha de assinatura que o banco põe no texto livre (`*Matheus:*` e quebra de
+ * linha, gatilho `messages_nome_do_atendente`). No WhatsApp o asterisco vira
+ * negrito; aqui a tela faz o mesmo, em vez de mostrar os asteriscos crus.
+ */
+const ASSINATURA = /^\*([^*\n]{1,60}):\*\n/;
+
+export function separarAssinatura(texto: string): { nome: string | null; resto: string } {
+  const achado = ASSINATURA.exec(texto);
+  if (!achado?.[1]) return { nome: null, resto: texto };
+  return { nome: achado[1], resto: texto.slice(achado[0].length) };
+}
+
+/**
  * O que a pessoa precisa saber sobre esta mensagem ter chegado (ou não).
  *
- * O caso que exige texto, e não só um ícone, é `queued`. Hoje toda mensagem que
- * sai daqui fica ali: o worker que entrega existe e fala com a Cloud API
- * oficial, mas não tem número nem token da Meta para usar. Um relógio cinza sem
- * legenda deixaria a Heloísa achando que a mensagem saiu — e ela vai continuar
- * na fila, do mesmo jeito, no dia em que o worker estiver de pé e o número
- * suprimido do outro lado. O aviso do topo da tela é que conta QUANTO falta;
- * aqui só é preciso não mentir.
+ * O caso que exige texto, e não só um ícone, é `queued`. Com o envio rodando, a
+ * fila dura segundos; quando dura mais, o worker escreve o PORQUÊ na linha
+ * (`error_detail`: fora do horário, teto do número) e é isso que aparece. Um
+ * relógio cinza sem legenda deixaria quem mandou achando que a mensagem saiu. O
+ * aviso do topo da tela é que conta se o envio está parado; aqui só é preciso
+ * não mentir.
  */
 export function entregaDaMensagem(m: MensagemDoFio): Entrega {
   if (m.entrada) {
@@ -213,7 +225,9 @@ export function entregaDaMensagem(m: MensagemDoFio): Entrega {
     case 'queued':
       return {
         rotulo: ROTULO_ENTREGA.queued,
-        detalhe: 'ainda não saiu: espera o worker de envio e o número na Meta',
+        detalhe: m.erroDetalhe
+          ? `ainda não saiu: ${m.erroDetalhe}`
+          : 'ainda não saiu: sai em instantes, quando o envio processar a fila',
         tom: 'espera',
       };
     case 'failed':
@@ -580,6 +594,17 @@ export const MOTIVOS_DE_RECUSA_DO_ENVIO: Record<string, string> = {
     'O modelo GEN-SYS-OPTOUT está inativo ou não existe: sem ele não há confirmação para enviar.',
   janela_depois_do_fechamento: 'O horário de envio de hoje já fechou.',
   janela_dia_sem_janela: 'Hoje não tem janela de envio configurada para este canal.',
+  // O envio a partir da ficha (`wa_preparar_envio` e `wa_enviar_modelo`,
+  // migração 20260914100000).
+  whatsapp_nao_configurado:
+    'O número de WhatsApp da KOMUNE ainda não foi conectado ao CRM. Enquanto isso, nada sai por aqui.',
+  ficha_sem_whatsapp: 'Esta ficha não tem WhatsApp cadastrado. Cadastre o número na ficha primeiro.',
+  modelo_inexistente: 'Este modelo foi desativado. Recarregue e escolha outro.',
+  modelo_de_sistema: 'Este modelo é do sistema e não é enviado à mão.',
+  modelo_sem_parametro: 'Falta preencher um dos campos do modelo.',
+  parametro_longo_demais: 'Um dos campos passou de 200 caracteres. Encurte e tente de novo.',
+  modelo_nao_aprovado_na_meta:
+    'A Meta ainda não aprovou este modelo. Fora da janela de 24 h só sai modelo aprovado.',
 };
 
 /**

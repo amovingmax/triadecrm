@@ -8,6 +8,7 @@ import {
   fichaDaIntencao,
   fraseDaRecusaDoEnvio,
   lerValidador,
+  separarAssinatura,
   montarFio,
   montarMensagens,
   montarRascunho,
@@ -496,5 +497,22 @@ describe('fraseDaRecusaDoEnvio', () => {
   it('motivo desconhecido devolve null: melhor a frase genérica que o texto do Postgres', () => {
     expect(fraseDaRecusaDoEnvio('duplicate key value violates unique constraint')).toBeNull();
     expect(fraseDaRecusaDoEnvio('Envio recusado: motivo_que_ninguem_previu')).toBeNull();
+  });
+});
+
+describe('separarAssinatura', () => {
+  it('reconhece a linha que o banco põe no texto livre', () => {
+    expect(separarAssinatura('*Matheus:*\nOi, Neuma!')).toEqual({ nome: 'Matheus', resto: 'Oi, Neuma!' });
+  });
+
+  it('texto sem assinatura passa inteiro', () => {
+    expect(separarAssinatura('Oi, Neuma! *Promoção*: 10%')).toEqual({
+      nome: null,
+      resto: 'Oi, Neuma! *Promoção*: 10%',
+    });
+  });
+
+  it('negrito no meio do texto não vira assinatura', () => {
+    expect(separarAssinatura('Oi!\n*Matheus:*\nteste').nome).toBeNull();
   });
 });

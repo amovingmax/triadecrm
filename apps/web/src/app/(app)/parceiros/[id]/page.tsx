@@ -32,6 +32,7 @@ import { FolhaEditarFicha } from '@/components/parceiros/folha-editar-ficha';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { PainelPreCadastro } from '@/components/precadastro/painel-precadastro';
 import { requireSession } from '@/lib/auth/session';
+import { whatsappConectado } from '@/components/conversas/whatsapp-conectado';
 
 /**
  * Separador de termos: espaço normal ANTES do ponto (ali pode quebrar) e espaço
@@ -94,10 +95,11 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
   // categorias e das 22 cidades para montar os dois seletores, e buscá-los só ao
   // abrir a folha deixaria os campos vazios por meio segundo — tempo suficiente
   // para alguém salvar sem cidade achando que a ficha não tinha uma.
-  const [ficha, sessao, catalogos] = await Promise.all([
+  const [ficha, sessao, catalogos, conectado] = await Promise.all([
     carregarFicha(id),
     requireSession(),
     carregarCatalogos(),
+    whatsappConectado(),
   ]);
   if (!ficha) notFound();
 
@@ -227,7 +229,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
         <Button asChild variant="outline" className={SAIDA}>
           <Link href={`/conversas?org=${ficha.id}`}>
             <MessageCircle aria-hidden="true" />
-            Abrir a conversa
+            {conectado && podeEscrever ? 'Conversar no WhatsApp' : 'Abrir a conversa'}
           </Link>
         </Button>
 
@@ -293,6 +295,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
               organizationId={ficha.id}
               telefone={ficha.telefone}
               mascarado={ficha.telefoneMascarado}
+              whatsapp={conectado && podeEscrever ? 'crm' : 'externo'}
             />
           </Linha>
 

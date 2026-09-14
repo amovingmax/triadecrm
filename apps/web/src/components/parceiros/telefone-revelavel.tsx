@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Eye, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,16 +20,29 @@ import { ProcurarTelefone } from './procurar-telefone';
  *
  * O aviso vem ANTES do clique, não depois. Quem toca no botão já sabe que a
  * revelação fica registrada; descobrir isso num toast seria uma pegadinha.
+ *
+ * O WHATSAPP. Enquanto o número da KOMUNE não estava conectado ao CRM, o único
+ * jeito de mandar mensagem era o `wa.me`, que abre o WhatsApp de quem clicou —
+ * e por isso só existia depois de revelar o número. Com o número conectado
+ * (migração 20260914100000) a mensagem sai de dentro do CRM, pelo número da
+ * empresa, e nem precisa revelar nada: o botão leva à conversa.
  */
 export function TelefoneRevelavel({
   organizationId,
   telefone,
   mascarado,
+  whatsapp: destino = 'externo',
 }: {
   organizationId: string;
   /** O que veio do banco: número completo ou máscara, conforme o papel. */
   telefone: string | null;
   mascarado: boolean;
+  /**
+   * Para onde o botão de WhatsApp leva: `crm` quando o número da KOMUNE está
+   * conectado; `nenhum` quando já se está na conversa; `externo` (o `wa.me`)
+   * enquanto o número não existe.
+   */
+  whatsapp?: 'externo' | 'crm' | 'nenhum';
 }) {
   const [revelado, setRevelado] = useState<string | null>(mascarado ? null : telefone);
   const [revelando, setRevelando] = useState(false);
@@ -41,7 +55,7 @@ export function TelefoneRevelavel({
   }
 
   const visivel = revelado ?? telefone;
-  const whatsapp = linkWhatsapp(revelado);
+  const whatsapp = destino === 'externo' ? linkWhatsapp(revelado) : null;
 
   async function revelar() {
     setRevelando(true);
@@ -80,6 +94,15 @@ export function TelefoneRevelavel({
         >
           <Eye aria-hidden="true" />
           {revelando ? 'Revelando...' : 'Revelar'}
+        </Button>
+      ) : null}
+
+      {destino === 'crm' ? (
+        <Button asChild variant="ghost" size="sm" className="toque h-11 md:h-7">
+          <Link href={`/conversas?org=${organizationId}`}>
+            <MessageCircle aria-hidden="true" />
+            Mandar WhatsApp
+          </Link>
         </Button>
       ) : null}
 

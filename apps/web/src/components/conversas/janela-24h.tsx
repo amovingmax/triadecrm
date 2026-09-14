@@ -135,16 +135,15 @@ function Explicacao({ estado }: { estado: EstadoDaJanela }) {
   if (estado.situacao === 'fechada') {
     return (
       <>
-        Fora da janela, a Meta só deixa passar modelo aprovado — e nenhum dos nossos foi
-        aprovado ainda. Texto livre daqui não sai. Ligar continua valendo.
+        Fora da janela, a Meta só deixa passar modelo aprovado: escolha um logo abaixo.
+        Texto livre só volta a sair quando o parceiro responder.
       </>
     );
   }
   return (
     <>
       A janela de <span className="numerico">24</span> h só existe depois que a pessoa
-      escreve. Enquanto ela não escrever, o caminho é a ligação ou o primeiro contato pelo
-      celular da Heloísa.
+      escreve. Enquanto ela não escrever, a mensagem sai por modelo aprovado pela Meta.
     </>
   );
 }

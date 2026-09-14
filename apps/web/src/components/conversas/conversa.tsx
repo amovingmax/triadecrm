@@ -13,6 +13,7 @@ import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { ChipTemperatura, DiasSemContato } from '@/components/temperatura';
 
 import { marcarComoLida } from './acoes';
+import { AssumirConversa, useEu } from './assumir-conversa';
 import { AvisoWhatsapp } from './aviso-whatsapp';
 import { CartaoDeAprovacao } from './aprovacao';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
@@ -173,10 +174,17 @@ export function Conversa({
   // Heloísa": a tela afirmava uma coisa com a palavra que o filtro usava para outra.
   // Só aparece quando as duas pessoas são diferentes — repetir o mesmo nome em dois
   // rótulos gastaria uma linha da ficha, que cabe em uma, para não informar nada.
-  const atendendo =
-    fio && fio.responsavelId !== item.responsavelId
-      ? (fio.responsavel ?? 'sem nome na base')
-      : null;
+  //
+  // Com o time inteiro no mesmo número (14/09/2026), "quem está falando com este
+  // parceiro" é a pergunta de toda conversa, e não só quando difere do dono: o
+  // campo aparece sempre que existe fio, e diz "você" quando é você.
+  const eu = useEu();
+  const atendendo = fio
+    ? fio.responsavelId && fio.responsavelId === eu?.id
+      ? 'você'
+      : (fio.responsavel ?? 'sem nome na base')
+    : null;
+  const podeAssumir = Boolean(fio && eu?.podeEscrever && fio.responsavelId !== eu.id);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -241,6 +249,7 @@ export function Conversa({
               Abrir ficha
             </Link>
           </Button>
+          {podeAssumir && fio ? <AssumirConversa fioId={fio.id} organizacaoId={item.id} /> : null}
         </div>
       </header>
 
@@ -276,6 +285,7 @@ export function Conversa({
               organizationId={item.id}
               telefone={item.telefone}
               mascarado={item.telefoneMascarado}
+              whatsapp={meta?.numeroConfigurado ? 'nenhum' : 'externo'}
             />
           </Campo>
           {negocio?.next_action || proxima ? (
