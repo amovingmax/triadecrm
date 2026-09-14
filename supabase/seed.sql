@@ -750,84 +750,84 @@ create temp table seed_tpl (
 -- ---------- 9.1 Aberturas A/B por segmento (R08 §2.1–2.6 + sufixo LGPD do PRD Apêndice C / §10.7) ----------
 insert into seed_tpl (code, name, category, segment, kind, variant, meta_status, body) values
   ('AEB-ABR-A', 'Abertura A (com origem) — Alimentos & Bebidas', 'marketing', 'AEB', 'abertura', 'A', 'pending',   -- R08 §2.1
-$b$Oi, {{nome}}, tudo bem? Aqui é a Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? Aqui é {{atendente}}, da Komune, aqui de Natal 🙂
 Vi o {{empresa}} no {{origem}} — as fotos da mesa de {{detalhe}} me chamaram atenção.
 A gente está montando a rede de fornecedores fundadores de um app de eventos da cidade, e buffet é a categoria mais pedida.
 Posso te explicar num áudio de 30 segundos?
 Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('AEB-ABR-B', 'Abertura B (sem detalhe) — Alimentos & Bebidas', 'marketing', 'AEB', 'abertura', 'B', 'pending',   -- R08 §2.1
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Somos um app que conecta quem está organizando um evento com quem faz acontecer — e estamos escolhendo os primeiros buffets da rede fundadora.
 Sem mensalidade: o fornecedor só paga quando um evento fecha.
 Vi seu contato público no {{origem}}. Posso te explicar em 30 segundos por áudio?
 Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('INF-ABR-A', 'Abertura A (com origem) — Infraestrutura', 'marketing', 'INF', 'abertura', 'A', 'pending',   -- R08 §2.2
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Vi a montagem da {{empresa}} no {{origem}} — a estrutura do {{detalhe}} ficou impecável.
 Estamos formando a rede de fornecedores fundadores de um app de eventos da cidade, e som/estrutura é o que mais falta pra quem organiza.
 Posso te explicar em um áudio de 30 segundos?
 Se não for o momento, me avisa sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('INF-ABR-B', 'Abertura B (sem detalhe) — Infraestrutura', 'marketing', 'INF', 'abertura', 'B', 'pending',   -- R08 §2.2
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Somos um app onde quem organiza evento em Natal encontra som, luz, estrutura e mobiliário num lugar só — e estamos escolhendo as primeiras empresas da rede fundadora.
 Sem mensalidade: paga só quando um evento fecha.
 Vi seu contato público no {{origem}}. Posso te explicar num áudio de 30 segundos?
 Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('PRE-ABR-A', 'Abertura A (com origem) — Prestador de serviço', 'marketing', 'PRE', 'abertura', 'A', 'pending',   -- R08 §2.3
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Vi seu perfil no {{origem}} e o {{detalhe}} — seu estilo é bem {{estilo}}, gostei muito.
 Estamos montando a rede de fornecedores fundadores de um app de eventos da cidade, e {{categoria}} é uma das categorias prioritárias.
 Posso te explicar num áudio de 30 segundos?
 Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('PRE-ABR-B', 'Abertura B (sem detalhe) — Prestador de serviço', 'marketing', 'PRE', 'abertura', 'B', 'pending',   -- R08 §2.3
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Somos um app onde quem organiza festa, casamento ou formatura em Natal encontra {{categoria}} pelo trabalho, não só pelo preço.
 Estamos escolhendo os primeiros da rede fundadora — sem mensalidade, paga só quando fecha.
 Vi seu contato público no {{origem}}. Posso te explicar em 30 segundos por áudio?
 Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('ESP-ABR-A', 'Abertura A (com origem) — Espaço / local', 'marketing', 'ESP', 'abertura', 'A', 'pending',   -- R08 §2.4
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Vi o {{empresa}} no {{origem}} — o {{detalhe}} é lindo.
 Estamos montando a rede de fornecedores fundadores de um app de eventos da cidade, e espaço é a primeira coisa que todo mundo procura.
 Posso te explicar num áudio de 30 segundos?
 Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('ESP-ABR-B', 'Abertura B (sem detalhe) — Espaço / local', 'marketing', 'ESP', 'abertura', 'B', 'pending',   -- R08 §2.4
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Somos um app onde quem organiza evento em Natal começa escolhendo o espaço — e estamos selecionando os primeiros locais da rede fundadora.
 Sem mensalidade: o espaço só paga quando uma reserva fecha.
 Vi seu contato público no {{origem}}. Posso te explicar em 30 segundos por áudio?
 Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('CER-ABR-A', 'Abertura A (com origem) — Cerimonialista / assessoria', 'marketing', 'CER', 'abertura', 'A', 'pending',   -- R08 §2.5
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Vi a {{empresa}} no {{origem}} e o casamento {{detalhe}} — a condução ficou linda.
 Estamos montando a rede fundadora de um app de eventos da cidade, e cerimonialista pra gente não é fornecedor: é sócio do evento.
 Posso te explicar em um áudio de 30 segundos?
 Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('CER-ABR-B', 'Abertura B (sem detalhe) — Cerimonialista / assessoria', 'marketing', 'CER', 'abertura', 'B', 'pending',   -- R08 §2.5
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Somos um app de eventos da cidade onde o cerimonialista organiza o evento com os fornecedores num lugar só e ainda recebe 5% do que fecha por lá, no contrato.
 Estamos escolhendo as primeiras assessorias fundadoras.
 Vi seu contato público no {{origem}}. Posso te explicar em 30 segundos por áudio?
 Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('FOR-ABR-A', 'Abertura A (com origem) — Produtor de formatura', 'marketing', 'FOR', 'abertura', 'A', 'pending',   -- R08 §2.6
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Vi o baile de {{detalhe}} da {{empresa}} no {{origem}} — a produção ficou enorme.
 Estamos montando a rede fundadora de um app de eventos da cidade, e produtor de formatura é o perfil que mais contrata fornecedor por evento.
 Posso te explicar em um áudio de 30 segundos?
 Se não for o momento, me diz sem problema — para não receber mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade$b$),
 
   ('FOR-ABR-B', 'Abertura B (sem detalhe) — Produtor de formatura', 'marketing', 'FOR', 'abertura', 'B', 'pending',   -- R08 §2.6
-$b$Oi, {{nome}}, tudo bem? Heloísa, da Komune, aqui de Natal 🙂
+$b$Oi, {{nome}}, tudo bem? {{atendente}}, da Komune, aqui de Natal 🙂
 Somos um app de eventos da cidade onde o produtor monta o baile, contrata os fornecedores e organiza a turma (ingressos, rateio, comunicação) num lugar só.
 Estamos escolhendo os primeiros produtores fundadores.
 Vi seu contato público no {{origem}}. Posso te explicar em 30 segundos por áudio?
@@ -996,30 +996,30 @@ insert into seed_tpl (code, name, category, segment, kind, body) values
 -- cadastrados para um teste A/B futuro, decidido por Bárbara/Dennis.
 insert into seed_tpl (code, name, category, segment, kind, meta_status, body) values
   ('GEN-FUP-D3-V1', 'Follow-up único D+3 — convite em aberto (PRD)', 'marketing', 'GEN', 'followup', 'pending',   -- PRD Apêndice C / R06 C.2
-   $b$Oi, {{nome}}, só passando para deixar o convite em aberto. Se fizer sentido, me diga o melhor horário para uma conversa rápida; se não, sem problema — respondendo SAIR eu não te escrevo mais. Abraço, Heloísa (Komune).$b$),
+   $b$Oi, {{nome}}, só passando para deixar o convite em aberto. Se fizer sentido, me diga o melhor horário para uma conversa rápida; se não, sem problema — respondendo SAIR eu não te escrevo mais. Abraço, {{atendente}} (Komune).$b$),
   ('GEN-FUP-D3-V2', 'Follow-up único D+3 — fundador novo', 'marketing', 'GEN', 'followup', 'pending',   -- R08 §3.2
-   $b${{nome}}, entrou mais um {{categoria}} fundador essa semana: {{fundador_autorizado}}. Queria ter você junto desde o começo. Posso te explicar em 30 s? Se não for o momento, é só responder SAIR que eu não te escrevo mais.$b$),
+   $b$Oi, {{nome}}, entrou mais um {{categoria}} fundador essa semana: {{fundador_autorizado}}. Queria ter você junto desde o começo. Posso te explicar em 30 s? Se não for o momento, é só responder SAIR que eu não te escrevo mais.$b$),
   ('GEN-FUP-D3-V3', 'Follow-up único D+3 — objetiva', 'marketing', 'GEN', 'followup', 'pending',   -- R08 §3.2
-   $b${{nome}}, deixa eu ser objetiva: sem mensalidade, 8% só quando fecha, destaque pra quem entra agora. Se fizer sentido, te mostro em 20 min; se não fizer, me diz (ou responde SAIR) que eu paro de te chamar 🙂$b$);
+   $b$Oi, {{nome}}, indo direto ao ponto: sem mensalidade, 8% só quando fecha, destaque pra quem entra agora. Se fizer sentido, te mostro em 20 min; se não fizer, me diz (ou responde SAIR) que eu paro de te chamar 🙂$b$);
 
 -- ---------- 9.6 Encerramento elegante D+10/14 — só para quem já interagiu (RF-CON-13/14; R08 §3.2 D+14) ----------
 insert into seed_tpl (code, name, category, segment, kind, meta_status, body) values
   ('GEN-FUP-D14-V1', 'Encerramento D+14 — lugar reservado', 'marketing', 'GEN', 'encerramento', 'pending',   -- R08 §3.2 / PRD Apêndice C
-   $b${{nome}}, pelo silêncio imagino que não seja o momento. Vou parar de te chamar por aqui. Se quiser retomar, é só responder 'sim' — o lugar de fundador fica reservado até {{data}}.$b$),
+   $b$Oi, {{nome}}, pelo silêncio imagino que não seja o momento. Vou parar de te chamar por aqui. Se quiser retomar, é só responder 'sim' — o lugar de fundador fica reservado até {{data}}. Sucesso nos eventos!$b$),
   ('GEN-FUP-D14-V2', 'Encerramento D+14 — última mensagem', 'marketing', 'GEN', 'encerramento', 'pending',   -- R08 §3.2
-   $b${{nome}}, última mensagem minha por agora, prometo 🙂 Se em algum momento fizer sentido, me chama que eu te mostro em 20 min. Sucesso nos eventos!$b$),
+   $b$Oi, {{nome}}, última mensagem minha por agora, prometo 🙂 Se em algum momento fizer sentido, me chama que eu te mostro em 20 min. Sucesso nos eventos!$b$),
   ('GEN-FUP-D14-V3', 'Encerramento D+14 — link do app', 'marketing', 'GEN', 'encerramento', 'pending',   -- R08 §3.2
-   $b${{nome}}, vou fechar sua conversa aqui pra não te incomodar. Deixo só o link do app pra você conhecer quando quiser: {{link_app}}. Qualquer coisa, é só chamar.$b$);
+   $b$Oi, {{nome}}, vou fechar sua conversa aqui pra não te incomodar. Deixo só o link do app pra você conhecer quando quiser: {{link_app}}. Qualquer coisa, é só chamar.$b$);
 
 -- ---------- 9.7 Reativação com gancho obrigatório (RF-CON-15; R08 §3.4) ----------
 -- Nunca para "não" firme, perdido ou opt-out; o CRM exige o campo gancho antes de liberar.
 insert into seed_tpl (code, name, category, segment, kind, meta_status, body) values
   ('GEN-REA-60-V1', 'Reativação D+60 — gancho', 'marketing', 'GEN', 'reativacao', 'pending',   -- R08 §3.4 / PRD Apêndice C
-   $b$Oi, {{nome}}, Heloísa da Komune. Faz um tempo que a gente conversou. Te chamo porque {{gancho}}. Se agora fizer sentido, te mostro em 20 min; se não, sem problema.$b$),
+   $b$Oi, {{nome}}, aqui é {{atendente}}, da Komune. Faz um tempo que a gente conversou. Te chamo porque {{gancho}}. Se agora fizer sentido, te mostro em 20 min; se não, sem problema.$b$),
   ('GEN-REA-60-V2', 'Reativação D+60 — novos fornecedores + gancho', 'marketing', 'GEN', 'reativacao', 'pending',   -- R08 §3.4
-   $b${{nome}}, lembra da Komune? Desde a nossa conversa entraram {{n}} fornecedores de {{categoria}} e {{gancho}}. Quer dar uma olhada?$b$),
+   $b$Oi, {{nome}}, lembra da Komune? Desde a nossa conversa entraram {{n}} fornecedores de {{categoria}} e {{gancho}}. Quer dar uma olhada?$b$),
   ('GEN-REA-90-V1', 'Reativação D+90 — perdido suave (1 toque)', 'marketing', 'GEN', 'reativacao', 'pending',   -- R08 §3.4
-   $b${{nome}}, sem insistência: {{gancho}}. Se quiser, é só responder 'quero'. Se não, já paro por aqui.$b$);
+   $b$Oi, {{nome}}, sem insistência: {{gancho}}. Se quiser, é só responder 'quero'. Se não, já paro por aqui.$b$);
 
 -- ---------- 9.8 Mensagens fixas do sistema (R08 §2.7 + PRD §10.7 / R06 §C / RF-CON-11/21/26) ----------
 insert into seed_tpl (code, name, category, segment, kind, body) values
@@ -1082,13 +1082,13 @@ insert into seed_tpl (code, name, category, segment, kind, meta_status, body) va
   ('GEN-AGD-24H-VISITA', 'Lembrete 24 h — visita (pede confirmação)', 'utility', 'GEN', 'agendamento', 'pending',   -- R08 §4.1 (adaptado para visita)
    $b$Oi, {{nome}}! Amanhã, {{hora}}, passo aí no {{endereco}} pra nossa conversa de 20 min. Tá confirmado? Responde "confirmo" ou "preciso remarcar", sem problema nenhum.$b$),
   ('GEN-AGD-1H-MEET', 'Lembrete 1 h — Meet', 'utility', 'GEN', 'agendamento', 'pending',   -- R08 §4.1
-   $b${{nome}}, daqui a pouco, às {{hora}} 🙂 Link: {{link}}. Já deixei seu perfil quase pronto pra te mostrar na tela.$b$),
+   $b$Oi, {{nome}}, daqui a pouco, às {{hora}} 🙂 Link: {{link}}. Já deixei seu perfil quase pronto pra te mostrar na tela.$b$),
   ('GEN-AGD-1H-VISITA', 'Lembrete 1 h — visita', 'utility', 'GEN', 'agendamento', 'pending',   -- R08 §4.1
-   $b${{nome}}, saio daqui em 30 min, chego aí por volta das {{hora}}. Tudo certo?$b$),
+   $b$Oi, {{nome}}, saio daqui em 30 min, chego aí por volta das {{hora}}. Tudo certo?$b$),
   ('GEN-AGD-NOSHOW-1', 'No-show — +15 min (humano tenta ligar antes)', 'utility', 'GEN', 'agendamento', 'pending',   -- R08 §4.1
    $b$Oi, {{nome}}, entrei na sala e não te encontrei — imagino que apareceu coisa aí, acontece. Consigo hoje às {{hora_hoje}} ou amanhã às {{hora_amanha}}. Qual encaixa?$b$),
   ('GEN-AGD-NOSHOW-2', 'No-show — D+1 sem resposta', 'utility', 'GEN', 'agendamento', 'pending',   -- R08 §4.1
-   $b${{nome}}, sem pressão: se preferir, me diz um dia da semana que vem que eu me adapto. Se não for o momento, também me diz que eu paro por aqui 🙂$b$);
+   $b$Oi, {{nome}}, sem pressão: se preferir, me diz um dia da semana que vem que eu me adapto. Se não for o momento, também me diz que eu paro por aqui 🙂$b$);
 
 -- ---------- 9.11 Onboarding — "perturbar com educação", publicação, 1º lead e feedback (R08 §4.3–4.4; RF-CON-16; PRD §5.4) ----------
 -- Sempre "falta só X" (campo lido da plataforma), nunca "você não terminou". No MVP viram
@@ -1097,27 +1097,27 @@ insert into seed_tpl (code, name, category, segment, kind, meta_status, body) va
   ('GEN-ONB-D1', 'Onboarding D+1 — abriu o painel', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.3
    $b$Oi, {{nome}}! Vi que você abriu o painel e já está com {{campos_preenchidos}} no lugar 👏 Falta só {{campo}} pra publicar. São 3 minutos: {{link}}. Qualquer dúvida, me chama que eu faço junto com você.$b$),
   ('GEN-ONB-D1-NAO-ABRIU', 'Onboarding D+1 — nem abriu', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.3
-   $b$Oi, {{nome}}! Seu pré-cadastro está te esperando aqui: {{link}}. Leva uns 15 minutos. Se preferir, marco 10 min por chamada e a gente faz junto — amanhã às {{hora_manha}} ou às {{hora_tarde}}?$b$),
+   $b$Oi, {{nome}}! Seu pré-cadastro está te esperando aqui: {{link}}. Leva uns 15 minutos. Se preferir, marco 10 min por chamada e a gente faz junto — amanhã às {{hora_manha}} ou às {{hora_tarde}}? Me diz qual fica melhor.$b$),
   ('GEN-ONB-D3', 'Onboarding D+3 — falta só um campo', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.3
-   $b${{nome}}, passando pra lembrar: falta só {{campo}} pra seu perfil ir ao ar. Tem {{n}} pessoas organizando {{tipo_evento}} pra {{mes}} e você ainda não aparece pra elas. Quer que eu ligue e a gente finaliza em 5 min?$b$),
+   $b$Oi, {{nome}}, passando pra lembrar: falta só {{campo}} pra seu perfil ir ao ar. Tem {{n}} pessoas organizando {{tipo_evento}} pra {{mes}} e você ainda não aparece pra elas. Quer que eu ligue e a gente finaliza em 5 min?$b$),
   ('GEN-ONB-D7', 'Onboarding D+7 — 90% pronto', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.3
-   $b${{nome}}, vou ser sincera: seu perfil está 90% pronto e parado 🙂 Sei que a rotina engole. Me dá 10 minutos hoje — te ligo às {{hora}} e a gente termina juntos? Se tiver travado em alguma coisa (documento, conta pra receber, foto), me diz que eu resolvo.$b$),
+   $b$Oi, {{nome}}, sem rodeios: seu perfil está 90% pronto e parado 🙂 Sei que a rotina engole. Me dá 10 minutos hoje — te ligo às {{hora}} e a gente termina juntos? Se tiver travado em alguma coisa (documento, conta pra receber, foto), me diz que eu resolvo.$b$),
   ('GEN-ONB-D14', 'Onboarding D+14 — última lembrança automática', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.3
-   $b${{nome}}, não quero ser chata, então essa é a última lembrança automática. Quando quiser terminar, o link é {{link}} e eu estou aqui. Se algo no cadastro te travou, me conta — isso ajuda a gente a melhorar pro próximo fundador.$b$),
+   $b$Oi, {{nome}}, não quero incomodar, então essa é a última lembrança automática. Quando quiser terminar, o link é {{link}} e eu estou aqui. Se algo no cadastro te travou, me conta — isso ajuda a gente a melhorar pro próximo fundador.$b$),
   ('GEN-ONB-TRAVOU', 'Onboarding — travou num passo', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.3
-   $b${{nome}}, vi que travou na parte de {{etapa_travada}}. Isso acontece — {{instrucao}}. Se preferir, te ligo agora e a gente resolve em 2 min.$b$),
+   $b$Oi, {{nome}}, vi que travou na parte de {{etapa_travada}}. Isso acontece — {{instrucao}}. Se preferir, te ligo agora e a gente resolve em 2 min.$b$),
   ('GEN-ONB-PUBLICADO', 'Publicado — parabéns + pedido de compartilhamento', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.4 / PRD Apêndice C
-   $b${{nome}}, seu perfil está no ar 🎉 Olha como ficou: {{link_perfil}}. Já com o selo de Fornecedor Fundador. Duas coisas que ajudam muito: (1) coloca o link na bio do Instagram; (2) me manda uma foto sua/da equipe pra gente te apresentar nos nossos canais essa semana. E lembra: pedido que chegar, responde em até 24 h — o app dá prioridade pra quem responde rápido.$b$),
+   $b$Oi, {{nome}}, seu perfil está no ar 🎉 Olha como ficou: {{link_perfil}}. Já com o selo de Fornecedor Fundador. Duas coisas que ajudam muito: (1) coloca o link na bio do Instagram; (2) me manda uma foto sua/da equipe pra gente te apresentar nos nossos canais essa semana. E lembra: pedido que chegar, responde em até 24 h — o app dá prioridade pra quem responde rápido.$b$),
   ('GEN-ONB-PRIMEIRO-LEAD', 'Primeiro lead — chegou!', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.4 / PRD Apêndice C
-   $b${{nome}}, chegou! 🎯 {{cliente}} pediu orçamento pra {{tipo_evento}} em {{data}}, {{n}} pessoas. Está no seu painel: {{link}}. Responde por lá em até 24 h que eu acompanho de perto — se precisar de ajuda pra montar a proposta, me chama.$b$),
+   $b$Oi, {{nome}}, chegou! 🎯 {{cliente}} pediu orçamento pra {{tipo_evento}} em {{data}}, {{n}} pessoas. Está no seu painel: {{link}}. Responde por lá em até 24 h que eu acompanho de perto — se precisar de ajuda pra montar a proposta, me chama.$b$),
   ('GEN-ONB-LEAD-SEM-RESPOSTA', 'Lead há 24 h sem resposta', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.4
-   $b${{nome}}, o pedido de {{cliente}} está esperando sua resposta desde ontem. Quer que eu te ajude a responder? Pedido parado esfria rápido.$b$),
+   $b$Oi, {{nome}}, o pedido de {{cliente}} está esperando sua resposta desde ontem. Quer que eu te ajude a responder? Pedido parado esfria rápido.$b$),
   ('GEN-ONB-FEEDBACK-7D', 'Feedback D+7 após publicar', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.4 / PRD Apêndice C
-   $b${{nome}}, uma pergunta rápida e sincera, pra gente melhorar: o que foi mais difícil no cadastro? E o que você esperava encontrar no app e não achou? Pode responder por áudio, do jeito que vier.$b$),
+   $b$Oi, {{nome}}, uma pergunta rápida e sincera, pra gente melhorar: o que foi mais difícil no cadastro? E o que você esperava encontrar no app e não achou? Pode responder por áudio, do jeito que vier.$b$),
   ('GEN-ONB-FEEDBACK-POS-LEAD', 'Feedback após o 1º lead respondido', 'utility', 'GEN', 'onboarding', 'pending',   -- R08 §4.4
-   $b${{nome}}, como foi o primeiro contato com {{cliente}}? Fechou, ficou em negociação ou não rolou? Me conta em uma linha — isso define quem a gente manda pra você em seguida.$b$),
+   $b$Oi, {{nome}}, como foi o primeiro contato com {{cliente}}? Fechou, ficou em negociação ou não rolou? Me conta em uma linha — isso define quem a gente manda pra você em seguida.$b$),
   ('GEN-ONB-PARTICIPACAO-VIDEO', 'Benefício Fundador — participação nos vídeos', 'marketing', 'GEN', 'onboarding', 'pending',   -- R08 §4.4
-   $b${{nome}}, como fundador você entra nos vídeos de lançamento da Komune. A gente grava {{dia}} em {{local}} — 15 minutos, você fala do seu trabalho e a gente cuida do resto. Topa? Se preferir, gravamos aí no seu espaço.$b$);
+   $b$Oi, {{nome}}, como fundador você entra nos vídeos de lançamento da Komune. A gente grava {{dia}} em {{local}} — 15 minutos, você fala do seu trabalho e a gente cuida do resto. Topa? Se preferir, gravamos aí no seu espaço.$b$);
 
 -- =====================================================================
 -- 10. Upsert final dos modelos: variables derivadas do corpo ({{nome}} → "nome"); áudio ligado
@@ -1391,11 +1391,11 @@ insert into public.message_templates
 values
   ('GEN-FUP-LIG-V1', 'Tentei te ligar — follow-up de voz', 'whatsapp', 'utility', 'GEN',
    'followup', 'pt_BR',
-   'Oi, {{nome}}! Aqui é a Heloísa, da Komune, app de eventos de Natal. Tentei te ligar hoje e não consegui falar com você. Cheguei no contato de {{empresa}} pelo {{origem}} e queria só te apresentar a rede de fornecedores: sem mensalidade, você paga uma taxa quando fecha. Se preferir, me diz o melhor horário que eu ligo. Se não for o momento, é só responder SAIR. Como usamos seus dados: komune.app.br/privacidade',
-   '["empresa", "nome", "origem"]'::jsonb),
+   'Oi, {{nome}}! Aqui é {{atendente}}, da Komune, app de eventos de Natal. Tentei te ligar hoje e não consegui falar com você. Cheguei no contato de {{empresa}} pelo {{origem}} e queria só te apresentar a rede de fornecedores: sem mensalidade, você paga uma taxa quando fecha. Se preferir, me diz o melhor horário que eu ligo. Se não for o momento, é só responder SAIR. Como usamos seus dados: komune.app.br/privacidade',
+   '["atendente", "empresa", "nome", "origem"]'::jsonb),
   ('PRE-LINK-V1', 'Link de reivindicação do pré-cadastro', 'whatsapp', 'utility', 'GEN',
    'onboarding', 'pt_BR',
-   '{{nome}}, preparei um rascunho do perfil de {{empresa}} na Komune com informações públicas do {{origem}}. Ninguém vê esse rascunho além de você — ele só entra no ar depois que você revisar, colocar suas fotos e aceitar os termos. O link é pessoal e vale por 7 dias: {{link}}. Se não quiser perfil, dá para pedir a remoção na própria página, sem login. Dúvidas sobre dados: komune.app.br/privacidade',
+   'Oi, {{nome}}, preparei um rascunho do perfil de {{empresa}} na Komune com informações públicas do {{origem}}. Ninguém vê esse rascunho além de você — ele só entra no ar depois que você revisar, colocar suas fotos e aceitar os termos. O link é pessoal e vale por 7 dias: {{link}}. Se não quiser perfil, dá para pedir a remoção na própria página, sem login. Dúvidas sobre dados: komune.app.br/privacidade',
    '["empresa", "link", "nome", "origem"]'::jsonb)
 on conflict (template_code) do nothing;
 
