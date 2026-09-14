@@ -3,8 +3,10 @@
  *
  * Todas as variáveis estão documentadas em `.env.example` na raiz. Cada comando exige só o que usa:
  * - base (todos): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY; opcionais SENTRY_DSN, KOMUNE_HMAC_SECRET, LOG_LEVEL, TZ
- * - wa: META_WA_ACCESS_TOKEN, META_WA_PHONE_NUMBER_ID (VERIFY_TOKEN e APP_SECRET são do webhook, na Edge Function);
- *        opcionais META_WA_GRAPH_URL e META_WA_API_VERSION, que apontam o cliente para o dublê local
+ * - wa: META_WA_ACCESS_TOKEN, META_WA_PHONE_NUMBER_ID; opcionais META_WA_GRAPH_URL e META_WA_API_VERSION
+ *        (apontam o cliente para o dublê local), META_WA_BUSINESS_ACCOUNT_ID (liga a sincronização de
+ *        modelos), e as que só `wa --conectar` usa: META_APP_ID, META_WA_APP_SECRET, META_WA_VERIFY_TOKEN,
+ *        META_WA_PIN e WA_WEBHOOK_URL — ele confere e diz o que falta, em vez de o zod barrar o laço normal
  * - ai: ANTHROPIC_API_KEY; opcional ANTHROPIC_BASE_URL (dublê local)
  * - rotas: OSRM_URL e NOMINATIM_USER_AGENT (a política do Nominatim EXIGE identificação);
  *          opcional NOMINATIM_URL, para apontar para uma instância própria ou para um dublê
@@ -55,6 +57,21 @@ const waEnvSchema = baseEnvSchema.extend({
   META_WA_GRAPH_URL: optionalUrl,
   /** Versão da Graph API. Vazia = a versão contra a qual o cliente foi escrito. */
   META_WA_API_VERSION: optionalString,
+  /**
+   * A conta do WhatsApp Business (WABA). Definida, o worker manda os modelos
+   * para aprovação e sincroniza o status na subida e a cada 30 min.
+   */
+  META_WA_BUSINESS_ACCOUNT_ID: optionalString,
+  /** O app da Meta: `wa --conectar` assina o webhook com `<app_id>|<app_secret>`. */
+  META_APP_ID: optionalString,
+  /**
+   * PIN de 6 dígitos da verificação em duas etapas, exigido pelo registro do
+   * número na Cloud API. Só `wa --conectar` usa, e só se o número não estiver
+   * registrado; o formato é conferido lá, com a frase certa.
+   */
+  META_WA_PIN: optionalString,
+  /** Onde a Meta entrega os webhooks. Vazia = `${SUPABASE_URL}/functions/v1/wa-webhook`. */
+  WA_WEBHOOK_URL: optionalUrl,
 });
 
 const aiEnvSchema = baseEnvSchema.extend({

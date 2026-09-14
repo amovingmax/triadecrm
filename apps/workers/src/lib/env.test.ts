@@ -34,6 +34,31 @@ describe('loadEnv', () => {
     ).toBe(true);
   });
 
+  it('as variáveis do --conectar são opcionais para o laço do wa', () => {
+    const wa = { ...base, META_WA_ACCESS_TOKEN: 'token', META_WA_PHONE_NUMBER_ID: '123' };
+    const vazio = loadEnv('wa', {
+      ...wa,
+      META_WA_BUSINESS_ACCOUNT_ID: '',
+      META_APP_ID: '',
+      META_WA_PIN: '',
+      WA_WEBHOOK_URL: '',
+    });
+    expect(vazio.ok).toBe(true);
+    if (!vazio.ok) return;
+    expect(vazio.env.META_WA_BUSINESS_ACCOUNT_ID).toBeUndefined();
+    expect(vazio.env.WA_WEBHOOK_URL).toBeUndefined();
+
+    const cheio = loadEnv('wa', {
+      ...wa,
+      META_WA_BUSINESS_ACCOUNT_ID: '777',
+      META_APP_ID: '4242',
+      META_WA_PIN: '123456',
+      WA_WEBHOOK_URL: 'https://projeto.supabase.co/functions/v1/wa-webhook',
+    });
+    expect(cheio.ok && cheio.env.META_WA_BUSINESS_ACCOUNT_ID).toBe('777');
+    expect(loadEnv('wa', { ...wa, WA_WEBHOOK_URL: 'nao-e-url' }).ok).toBe(false);
+  });
+
   it('exige ANTHROPIC_API_KEY só para ai', () => {
     expect(loadEnv('ai', base).ok).toBe(false);
     expect(loadEnv('ai', { ...base, ANTHROPIC_API_KEY: 'sk-teste' }).ok).toBe(true);

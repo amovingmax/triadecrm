@@ -1,11 +1,13 @@
 /**
  * A CLOUD API OFICIAL DA META (ADR-06, R04 §2.1 e §3 item 5).
  *
- * "WhatsApp: Cloud API oficial da Meta (direto ou via 360dialog), Coexistence
- * no número 'Heloísa · Komune'. Nunca Baileys, Evolution ou qualquer automação
- * não oficial."
+ * "WhatsApp: Cloud API oficial da Meta. Nunca Baileys, Evolution ou qualquer
+ * automação não oficial." Desde 14/09 o número da empresa fica SÓ na Cloud API
+ * (sem Coexistence), com conexão direta na Meta.
  *
- * São dois endpoints e uma tabela de erros. Sem SDK, sem dependência nova:
+ * O envio, a mídia, e uma porta genérica de GET/POST no Graph (`ler` e
+ * `publicar`) para o que é da conta e não da conversa: modelos de mensagem,
+ * registro do número e assinatura de webhooks. Sem SDK, sem dependência nova:
  * `fetch` do Node 22 e mais nada. O R04 §3 recomenda exatamente isto —
  * "200 linhas próprias sobre o Graph API (menos peças)".
  *
@@ -32,8 +34,13 @@
  * Graph API responde, com os mesmos códigos de erro.
  */
 
-/** Versão da Graph API contra a qual este cliente foi escrito. */
-export const VERSAO_PADRAO = 'v21.0';
+/**
+ * Versão padrão da Graph API. Era v21.0, que a Meta desliga em 21/01/2027; a
+ * v26.0 (29/07/2026) é a estável mais nova, e os changelogs da v22 à v26 não
+ * mudam nada do que este cliente usa (envio, mídia, modelos, registro,
+ * assinatura de webhooks). `META_WA_API_VERSION` sobrescreve.
+ */
+export const VERSAO_PADRAO = 'v26.0';
 
 export interface ConfigDaGraph {
   /** Base da API. Produção: https://graph.facebook.com. Teste: o dublê. */
@@ -49,27 +56,51 @@ export interface ConfigDaGraph {
 
 export type Destino = { para: string };
 
+/**
+ * Os parâmetros de um modelo, nas duas formas que a Meta aceita:
+ *   · lista  → POSICIONAIS (`{{1}}`, `{{2}}`), os modelos antigos;
+ *   · objeto → NOMEADOS (`{{nome}}`, `{{empresa}}`), `parameter_format: NAMED`.
+ */
+export type ParametrosDoModelo = readonly string[] | Readonly<Record<string, string>>;
+
 export type Envio =
   | (Destino & { tipo: 'texto'; corpo: string })
   | (Destino & {
       tipo: 'template';
       nome: string;
       idioma: string;
-      parametros: readonly string[];
+      parametros: ParametrosDoModelo;
     })
   | (Destino & { tipo: 'audio'; mediaId?: string; link?: string });
 
-export type ResultadoDoEnvio =
-  | { ok: true; wamid: string }
-  | {
-      ok: false;
-      /** Código da Meta (131047, 190…) ou um nome nosso para falha de transporte. */
-      codigo: string;
-      mensagem: string;
-      /** `true` = vale tentar de novo; `false` = repetir não muda nada. */
-      retentar: boolean;
-      httpStatus: number | null;
-    };
+/** A Graph API recusou, ou não respondeu. Mesma forma para envio e para conta. */
+export interface FalhaDaGraph {
+  ok: false;
+  /** Código da Meta (131047, 190…) ou um nome nosso para falha de transporte. */
+  codigo: string;
+  mensagem: string;
+  /** `true` = vale tentar de novo; `false` = repetir não muda nada. */
+  retentar: boolean;
+  httpStatus: number | null;
+  /** `error_subcode` da Meta (ex.: 2388024, modelo já existe no idioma). */
+  subcodigo?: number | null;
+}
+
+export type ResultadoDoEnvio = { ok: true; wamid: string } | FalhaDaGraph;
+
+/** Resposta de uma chamada genérica ao Graph (`ler`/`publicar`). */
+export type RespostaDaGraph =
+  { ok: true; json: Record<string, unknown>; httpStatus: number } | FalhaDaGraph;
+
+export interface OpcoesDoPost {
+  /**
+   * Manda o corpo como `application/x-www-form-urlencoded` em vez de JSON — é
+   * como os endpoints de app (`/{app-id}/subscriptions`) recebem o token do app.
+   */
+  formulario?: boolean;
+  /** Não manda o bearer do usuário de sistema (o token vai no próprio corpo). */
+  semBearer?: boolean;
+}
 
 /**
  * Códigos da Meta que valem uma nova tentativa. Lista FECHADA: o que não está
@@ -122,6 +153,18 @@ export class ClienteDaGraph {
     return `${base}/${this.config.versao}/${caminho}`;
   }
 
+  /**
+   * Tira do texto qualquer segredo conhecido antes de ele virar mensagem de
+   * erro — e, portanto, linha de log e coluna no banco.
+   */
+  private semSegredos(texto: string, extras: readonly string[] = []): string {
+    let limpo = texto;
+    for (const segredo of [this.config.token, ...extras]) {
+      if (segredo.length >= 6) limpo = limpo.split(segredo).join('***');
+    }
+    return limpo;
+  }
+
   /** O corpo do POST, no formato da Cloud API. */
   static payloadDoEnvio(envio: Envio): Record<string, unknown> {
     const base = {
@@ -134,24 +177,18 @@ export class ClienteDaGraph {
         // `preview_url: false`: link no primeiro toque é sinal de spam (R04 §4),
         // e prévia de link é um convite a colocá-lo.
         return { ...base, type: 'text', text: { preview_url: false, body: envio.corpo } };
-      case 'template':
+      case 'template': {
+        const parametros = parametrosDoCorpo(envio.parametros);
         return {
           ...base,
           type: 'template',
           template: {
             name: envio.nome,
             language: { code: envio.idioma },
-            components:
-              envio.parametros.length === 0
-                ? []
-                : [
-                    {
-                      type: 'body',
-                      parameters: envio.parametros.map((t) => ({ type: 'text', text: t })),
-                    },
-                  ],
+            components: parametros.length === 0 ? [] : [{ type: 'body', parameters: parametros }],
           },
         };
+      }
       case 'audio':
         return {
           ...base,
@@ -162,24 +199,89 @@ export class ClienteDaGraph {
   }
 
   async enviar(envio: Envio): Promise<ResultadoDoEnvio> {
-    const corpo = ClienteDaGraph.payloadDoEnvio(envio);
+    const resposta = await this.publicar(
+      `${this.config.phoneNumberId}/messages`,
+      ClienteDaGraph.payloadDoEnvio(envio),
+    );
+    if (!resposta.ok) return resposta;
+
+    const wamid = wamidDaResposta(resposta.json);
+    if (wamid === null) {
+      return {
+        ok: false,
+        codigo: 'resposta_sem_wamid',
+        mensagem: `A Meta respondeu 200 sem id de mensagem: ${JSON.stringify(resposta.json).slice(0, 200)}`,
+        retentar: true,
+        httpStatus: resposta.httpStatus,
+      };
+    }
+    return { ok: true, wamid };
+  }
+
+  /**
+   * GET genérico no Graph, com o bearer do usuário de sistema. O token vai no
+   * cabeçalho, nunca na URL: URL aparece em log de proxy, cabeçalho não.
+   */
+  async ler(
+    caminho: string,
+    consulta: Readonly<Record<string, string | number>> = {},
+  ): Promise<RespostaDaGraph> {
+    const url = new URL(this.url(caminho));
+    for (const [chave, valor] of Object.entries(consulta)) {
+      url.searchParams.set(chave, String(valor));
+    }
+    return this.chamar(url.toString(), {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${this.config.token}` },
+    });
+  }
+
+  /** POST genérico no Graph. Mesma tabela de erros do envio. */
+  async publicar(
+    caminho: string,
+    corpo: Readonly<Record<string, unknown>> = {},
+    opcoes: OpcoesDoPost = {},
+  ): Promise<RespostaDaGraph> {
+    const headers: Record<string, string> = {};
+    if (!opcoes.semBearer) headers.Authorization = `Bearer ${this.config.token}`;
+
+    let body: string;
+    const segredosDoCorpo: string[] = [];
+    if (opcoes.formulario) {
+      headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      const form = new URLSearchParams();
+      for (const [chave, valor] of Object.entries(corpo)) {
+        if (valor === undefined || valor === null) continue;
+        const texto = typeof valor === 'string' ? valor : JSON.stringify(valor);
+        if (chave === 'access_token') segredosDoCorpo.push(texto);
+        form.set(chave, texto);
+      }
+      body = form.toString();
+    } else {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(corpo);
+    }
+
+    return this.chamar(this.url(caminho), { method: 'POST', headers, body }, segredosDoCorpo);
+  }
+
+  private async chamar(
+    url: string,
+    init: { method: string; headers: Record<string, string>; body?: string },
+    segredosExtras: readonly string[] = [],
+  ): Promise<RespostaDaGraph> {
     let resposta: Response;
     try {
-      resposta = await this.buscar(this.url(`${this.config.phoneNumberId}/messages`), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.config.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(corpo),
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
+      resposta = await this.buscar(url, { ...init, signal: AbortSignal.timeout(this.timeoutMs) });
     } catch (erro) {
-      // Rede, DNS, tempo esgotado: o mundo, não a mensagem.
+      // Rede, DNS, tempo esgotado: o mundo, não o pedido.
       return {
         ok: false,
         codigo: 'sem_resposta_da_meta',
-        mensagem: erro instanceof Error ? erro.message : String(erro),
+        mensagem: this.semSegredos(
+          erro instanceof Error ? erro.message : String(erro),
+          segredosExtras,
+        ),
         retentar: true,
         httpStatus: null,
       };
@@ -189,20 +291,15 @@ export class ClienteDaGraph {
     const json = interpretarJson(texto);
 
     if (resposta.ok) {
-      const wamid = wamidDaResposta(json);
-      if (wamid === null) {
-        return {
-          ok: false,
-          codigo: 'resposta_sem_wamid',
-          mensagem: `A Meta respondeu 200 sem id de mensagem: ${texto.slice(0, 200)}`,
-          retentar: true,
-          httpStatus: resposta.status,
-        };
-      }
-      return { ok: true, wamid };
+      const objetoJson =
+        typeof json === 'object' && json !== null && !Array.isArray(json)
+          ? (json as Record<string, unknown>)
+          : {};
+      return { ok: true, json: objetoJson, httpStatus: resposta.status };
     }
 
-    return classificarErro(resposta.status, json, texto);
+    const falha = classificarErro(resposta.status, json, texto);
+    return { ...falha, mensagem: this.semSegredos(falha.mensagem, segredosExtras) };
   }
 
   /**
@@ -254,6 +351,34 @@ export class ClienteDaGraph {
   }
 }
 
+/**
+ * O valor de um parâmetro como a Meta aceita. A Graph API recusa parâmetro com
+ * quebra de linha, tab ou mais de 4 espaços seguidos (132012/131009); quem
+ * colou um nome com espaço sobrando não errou nada. Troca todo espaço em
+ * branco repetido por um espaço só — a mesma regra de
+ * `app.modelo_parametro_limpo` no banco.
+ */
+export function valorDeParametroLimpo(valor: unknown): string {
+  const texto =
+    typeof valor === 'string' ? valor : valor === null || valor === undefined ? '' : String(valor);
+  return texto.replace(/\s+/gu, ' ').trim();
+}
+
+/** A lista `parameters` do componente `body`: posicional ou nomeada. */
+export function parametrosDoCorpo(parametros: ParametrosDoModelo): Record<string, string>[] {
+  if (Array.isArray(parametros)) {
+    return (parametros as readonly unknown[]).map((t) => ({
+      type: 'text',
+      text: valorDeParametroLimpo(t),
+    }));
+  }
+  return Object.entries(parametros as Readonly<Record<string, unknown>>).map(([nome, valor]) => ({
+    type: 'text',
+    parameter_name: nome,
+    text: valorDeParametroLimpo(valor),
+  }));
+}
+
 /** O corpo da resposta como JSON, ou `null` quando não for. */
 function interpretarJson(texto: string): unknown {
   if (texto.length === 0) return null;
@@ -279,11 +404,7 @@ export function wamidDaResposta(json: unknown): string | null {
  * O erro da Graph API traduzido para a decisão que o worker precisa tomar.
  * Exportada para o teste poder medir a tabela sem subir servidor nenhum.
  */
-export function classificarErro(
-  httpStatus: number,
-  json: unknown,
-  textoCru = '',
-): Extract<ResultadoDoEnvio, { ok: false }> {
+export function classificarErro(httpStatus: number, json: unknown, textoCru = ''): FalhaDaGraph {
   const erro =
     typeof json === 'object' && json !== null
       ? ((json as { error?: unknown }).error as Record<string, unknown> | undefined)
@@ -295,6 +416,10 @@ export function classificarErro(
     typeof erro?.error_data === 'object' && erro.error_data !== null
       ? ((erro.error_data as { details?: unknown }).details ?? null)
       : null;
+  // Na criação de modelo, o motivo que se lê vem em `error_user_msg`; em
+  // `message` fica só "(#100) Invalid parameter".
+  const paraOUsuario = typeof erro?.error_user_msg === 'string' ? erro.error_user_msg : null;
+  const subcodigo = typeof erro?.error_subcode === 'number' ? erro.error_subcode : null;
 
   // 5xx e 429 são do transporte: o que a Meta diz no corpo não muda a decisão.
   const transporte = httpStatus >= 500 || httpStatus === 429;
@@ -308,11 +433,13 @@ export function classificarErro(
         : codigo !== null
           ? String(codigo)
           : `http_${httpStatus}`,
-    mensagem: [mensagemDaMeta, typeof detalhe === 'string' ? detalhe : null]
+    mensagem: [mensagemDaMeta, typeof detalhe === 'string' ? detalhe : null, paraOUsuario]
       .filter((p): p is string => typeof p === 'string' && p.trim() !== '')
+      .filter((p, i, todas) => todas.indexOf(p) === i)
       .join(' — ')
       .slice(0, 2000),
     retentar,
     httpStatus,
+    subcodigo,
   };
 }

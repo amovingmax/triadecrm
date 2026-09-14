@@ -38,7 +38,7 @@ import {
   proximosEnvios,
 } from './ponte';
 
-import type { ClienteDaGraph, Envio } from './graph';
+import type { ClienteDaGraph, Envio, ParametrosDoModelo } from './graph';
 import type { ClienteDoBanco, ConfigDeEnvio, ItemDeSaida } from './ponte';
 import type { Logger } from '../lib/log';
 
@@ -53,6 +53,13 @@ export interface ContextoDaSaida {
   sorteio?: () => number;
   /** Substituível no teste: o relógio do aviso de pendências. */
   agora?: () => number;
+  /**
+   * O worker está parando (SIGTERM)? Conferido antes de cada envio — inclusive
+   * logo depois do descanso da cadência, que acorda com o sinal. O que ficou
+   * do lote sem ser enviado volta sozinho quando o `visibility timeout` da
+   * `wa_outbound` (120 s) expira; reler não conta como tentativa.
+   */
+  deveParar?: () => boolean;
 }
 
 export interface ContagensDaSaida {
@@ -107,7 +114,7 @@ export function formaDoEnvio(
         para: item.para,
         nome: item.modelo.nome_meta,
         idioma: item.modelo.idioma,
-        parametros: item.template_params.map((p) => (typeof p === 'string' ? p : String(p ?? ''))),
+        parametros: parametrosDoItem(item.template_params),
       },
     };
   }
@@ -120,6 +127,20 @@ export function formaDoEnvio(
     };
   }
   return { ok: true, envio: { tipo: 'texto', para: item.para, corpo: item.corpo } };
+}
+
+/**
+ * `messages.template_params` em duas eras: LISTA para os modelos posicionais
+ * antigos (`{{1}}`), OBJETO para os nomeados (`{"nome":"Maria"}`). A forma do
+ * dado decide a forma do envio — o banco não precisa dizer qual é qual. A
+ * limpeza do valor (quebra de linha, tab, espaço repetido) é de `graph.ts`,
+ * que é quem conhece a regra da Meta.
+ */
+export function parametrosDoItem(bruto: ItemDeSaida['template_params']): ParametrosDoModelo {
+  const comoTexto = (v: unknown): string =>
+    typeof v === 'string' ? v : v === null || v === undefined ? '' : String(v);
+  if (Array.isArray(bruto)) return bruto.map(comoTexto);
+  return Object.fromEntries(Object.entries(bruto).map(([nome, valor]) => [nome, comoTexto(valor)]));
 }
 
 const dormirPadrao = (ms: number): Promise<void> =>
@@ -196,10 +217,23 @@ export async function drenarSaida(
   const dormir = ctx.dormir ?? dormirPadrao;
   let primeiro = true;
 
-  for (const item of lote.itens) {
+  for (const [indice, item] of lote.itens.entries()) {
+    if (ctx.deveParar?.()) {
+      ctx.logger.info('parada pedida: o resto do lote volta para a fila sozinho', {
+        nao_enviados: lote.itens.length - indice,
+      });
+      break;
+    }
     // Cadência humana só entre mensagens iniciadas pela empresa (R04 §4).
     if (!primeiro && !item.janela_aberta) {
       await dormir(esperaEntreEnvios(ctx.config, ctx.sorteio));
+      // O descanso acorda com a parada: não se envia depois de acordar por ela.
+      if (ctx.deveParar?.()) {
+        ctx.logger.info('parada pedida: o resto do lote volta para a fila sozinho', {
+          nao_enviados: lote.itens.length - indice,
+        });
+        break;
+      }
     }
     primeiro = false;
 

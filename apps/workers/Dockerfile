@@ -5,7 +5,12 @@
 #   docker build -f apps/workers/Dockerfile -t komune-crm/workers:local .
 # Executar um comando:
 #   docker run --rm --env-file .env komune-crm/workers:local ingest
-# Em produção o infra/local/docker-compose.yml sobe os três comandos com esta mesma imagem.
+# Ou só com variável de ambiente (é assim que uma nuvem como o Fly.io roda a imagem):
+#   docker run --rm --env-file .env -e WORKER_COMANDO=wa komune-crm/workers:local
+# Conectar o número da Meta de ponta a ponta, uma vez:
+#   docker run --rm --env-file .env komune-crm/workers:local wa --conectar
+# Em produção o infra/local/docker-compose.yml sobe os comandos com esta mesma imagem (com
+# `command:` explícito, que sempre ganha de WORKER_COMANDO).
 
 ARG NODE_IMAGE=node:22-alpine
 
@@ -44,4 +49,5 @@ COPY --from=build /repo/apps/workers/dist ./apps/workers/dist
 WORKDIR /app/apps/workers
 USER node
 ENTRYPOINT ["node", "dist/index.js"]
-CMD ["ingest"]
+# Sem CMD: sem comando na linha vale WORKER_COMANDO, e o padrão da imagem continua sendo ingest.
+ENV WORKER_COMANDO=ingest

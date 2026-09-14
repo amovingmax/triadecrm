@@ -12,7 +12,7 @@ export type WorkerCommand = (typeof WORKER_COMMANDS)[number];
  */
 export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
   ingest: ['uma-vez', 'agendar', 'fonte', 'categorias', 'paginas', 'rotulo'],
-  wa: ['uma-vez'],
+  wa: ['uma-vez', 'conectar', 'sincronizar-modelos'],
   ai: ['uma-vez'],
   rotas: ['uma-vez', 'geocodificar'],
 };
@@ -35,6 +35,10 @@ Opções de "ingest":
 
 Opções de "wa":
   --uma-vez              Esvazia as filas de entrada e de saída uma vez e sai.
+  --conectar             Conecta o número de ponta a ponta, uma vez, e sai: lê o número na
+                         Meta, registra na Cloud API (se preciso), assina os webhooks, grava
+                         o número no CRM e manda os modelos para aprovação.
+  --sincronizar-modelos  Só manda os modelos para aprovação e atualiza o status deles, e sai.
 
 Opções de "ai":
   --uma-vez              Esvazia a fila ai_jobs uma vez e sai, em vez de ficar rodando.
@@ -49,6 +53,9 @@ Opções gerais:
 
 Cada comando lê as variáveis de ambiente do processo (.env na raiz do repo, em dev,
 ou env_file do Docker Compose na máquina dedicada) e as valida antes de iniciar.
+
+Sem comando na linha, vale WORKER_COMANDO (ex.: WORKER_COMANDO=wa): é assim que uma
+nuvem roda a imagem só com variáveis de ambiente.
 `;
 
 /** Opções já separadas: `--uma-vez` vira `true`, `--paginas=2` vira `"2"`. */
@@ -63,21 +70,54 @@ export function isWorkerCommand(value: string): value is WorkerCommand {
   return (WORKER_COMMANDS as readonly string[]).includes(value);
 }
 
-/** Interpreta `argv` já sem `node` e o caminho do script (ou seja, `process.argv.slice(2)`). */
-export function parseArgs(argv: readonly string[]): ParsedArgs {
+/** O que o parse lê do ambiente. Só isto: o resto do ambiente é do `env.ts`. */
+export interface AmbienteDoCli {
+  WORKER_COMANDO?: string | undefined;
+}
+
+/**
+ * O comando que vem de `WORKER_COMANDO` quando a linha não traz um. Aceita
+ * opções junto (`WORKER_COMANDO="wa --uma-vez"`), separadas por espaço.
+ */
+function comandoDoAmbiente(ambiente: AmbienteDoCli): string[] {
+  const bruto = ambiente.WORKER_COMANDO?.trim() ?? '';
+  return bruto === '' ? [] : bruto.split(/\s+/);
+}
+
+/**
+ * Interpreta `argv` já sem `node` e o caminho do script (ou seja, `process.argv.slice(2)`).
+ *
+ * A ORDEM: comando posicional na linha → `WORKER_COMANDO` → erro. A linha
+ * ganha sempre, para que o Compose (`command: ['ingest']`) continue mandando
+ * mesmo numa máquina cujo `.env` tenha `WORKER_COMANDO` definido.
+ */
+export function parseArgs(argv: readonly string[], ambiente: AmbienteDoCli = {}): ParsedArgs {
   // `pnpm run <script> -- <args>` repassa o "--" literalmente; ele é só separador e pode ser ignorado.
-  const [first, ...rest] = argv.filter((arg) => arg !== '--');
+  const semSeparador = argv.filter((arg) => arg !== '--');
+  const primeiro = semSeparador[0];
+  const pediuAjuda = primeiro === '-h' || primeiro === '--help' || primeiro === 'help';
+
+  // Sem comando posicional (linha vazia, ou só opções): o ambiente completa.
+  const doAmbiente =
+    !pediuAjuda && (primeiro === undefined || primeiro.startsWith('--'))
+      ? comandoDoAmbiente(ambiente)
+      : [];
+  const [first, ...rest] = [...doAmbiente, ...semSeparador];
 
   if (first === undefined || first === '-h' || first === '--help' || first === 'help') {
     return first === undefined
-      ? { kind: 'error', message: 'Informe um comando.' }
+      ? {
+          kind: 'error',
+          message: 'Informe um comando (na linha, ou em WORKER_COMANDO).',
+        }
       : { kind: 'help' };
   }
 
   if (!isWorkerCommand(first)) {
+    const origem = doAmbiente.length > 0 ? ' em WORKER_COMANDO' : '';
     return {
       kind: 'error',
-      message: `Comando desconhecido: "${first}". Comandos válidos: ${WORKER_COMMANDS.join(', ')}.`,
+      message: `Comando desconhecido${origem}: "${first}". Comandos válidos: ${WORKER_COMMANDS.join(', ')}.`,
     };
   }
 

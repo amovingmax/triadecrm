@@ -57,11 +57,77 @@ describe('parseArgs', () => {
       message: expect.stringContaining('--paginas'),
     });
     expect(parseArgs(['ingest', '--foo'])).toMatchObject({ kind: 'error' });
-    // `wa` ainda não aceita opção nenhuma.
+    // Opção de outro comando não vale em `wa`.
     expect(parseArgs(['wa', '--agendar'])).toMatchObject({ kind: 'error' });
+  });
+
+  it('wa aceita --conectar e --sincronizar-modelos', () => {
+    expect(parseArgs(['wa', '--conectar'])).toEqual({
+      kind: 'run',
+      command: 'wa',
+      opcoes: { conectar: true },
+    });
+    expect(parseArgs(['wa', '--sincronizar-modelos'])).toEqual({
+      kind: 'run',
+      command: 'wa',
+      opcoes: { 'sincronizar-modelos': true },
+    });
   });
 
   it('erra com argumento solto', () => {
     expect(parseArgs(['ingest', 'casamentos'])).toMatchObject({ kind: 'error' });
+  });
+});
+
+describe('WORKER_COMANDO (a imagem rodando só com variável de ambiente)', () => {
+  it('sem comando na linha, vale WORKER_COMANDO', () => {
+    expect(parseArgs([], { WORKER_COMANDO: 'wa' })).toEqual({
+      kind: 'run',
+      command: 'wa',
+      opcoes: {},
+    });
+  });
+
+  it('só opções na linha: WORKER_COMANDO completa o comando', () => {
+    expect(parseArgs(['--uma-vez'], { WORKER_COMANDO: 'wa' })).toEqual({
+      kind: 'run',
+      command: 'wa',
+      opcoes: { 'uma-vez': true },
+    });
+  });
+
+  it('aceita opções dentro de WORKER_COMANDO', () => {
+    expect(parseArgs([], { WORKER_COMANDO: '  wa   --conectar ' })).toEqual({
+      kind: 'run',
+      command: 'wa',
+      opcoes: { conectar: true },
+    });
+  });
+
+  it('A LINHA SEMPRE GANHA: o Compose com `command: [ingest]` não vira wa', () => {
+    expect(parseArgs(['ingest'], { WORKER_COMANDO: 'wa' })).toEqual({
+      kind: 'run',
+      command: 'ingest',
+      opcoes: {},
+    });
+  });
+
+  it('ajuda continua sendo ajuda', () => {
+    expect(parseArgs(['--help'], { WORKER_COMANDO: 'wa' })).toEqual({ kind: 'help' });
+  });
+
+  it('vazio ou só espaço é o mesmo que ausente', () => {
+    expect(parseArgs([], { WORKER_COMANDO: '   ' })).toMatchObject({
+      kind: 'error',
+      message: expect.stringContaining('WORKER_COMANDO'),
+    });
+    expect(parseArgs([], {})).toMatchObject({ kind: 'error' });
+  });
+
+  it('comando desconhecido em WORKER_COMANDO diz de onde veio', () => {
+    expect(parseArgs([], { WORKER_COMANDO: 'bullmq' })).toMatchObject({
+      kind: 'error',
+      message: expect.stringContaining('em WORKER_COMANDO: "bullmq"'),
+    });
   });
 });

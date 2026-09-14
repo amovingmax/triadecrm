@@ -21,6 +21,7 @@ import {
   contagensDaSaidaZeradas,
   drenarSaida,
   formaDoEnvio,
+  parametrosDoItem,
   reiniciarAvisoDePendencias,
 } from './saida';
 import { CONFIG_DE_ENVIO_PADRAO, esperaEntreEnvios } from './ponte';
@@ -85,6 +86,27 @@ describe('a forma do envio', () => {
       idioma: 'pt_BR',
       parametros: ['Marcos'],
     });
+  });
+
+  it('modelo com parâmetros NOMEADOS: o objeto de template_params vira objeto no envio', () => {
+    const f = formaDoEnvio(
+      item({
+        janela_aberta: false,
+        modelo: { ...MODELO, nome_meta: 'aeb_abr_a_v1', categoria: 'marketing' },
+        template_params: { nome: 'Maria', empresa: 'Buffet X', n: 3, vazio: null },
+      }),
+    );
+    expect(f.ok === true && f.envio).toMatchObject({
+      tipo: 'template',
+      nome: 'aeb_abr_a_v1',
+      parametros: { nome: 'Maria', empresa: 'Buffet X', n: '3', vazio: '' },
+    });
+  });
+
+  it('parametrosDoItem mantém lista como lista (posicional) e objeto como objeto (nomeado)', () => {
+    expect(parametrosDoItem(['Marcos', 7])).toEqual(['Marcos', '7']);
+    expect(parametrosDoItem({ nome: 'Marcos' })).toEqual({ nome: 'Marcos' });
+    expect(parametrosDoItem([])).toEqual([]);
   });
 
   it('FORA DA JANELA E SEM MODELO APROVADO: não sai nada, e a linha diz por quê', () => {
@@ -223,6 +245,29 @@ describe('o dreno da fila de saída', () => {
     expect(def?.args.p_codigo).toBe('sem_modelo_aprovado');
   });
 
+  it('o template_params em OBJETO que o banco devolve chega à Graph como parâmetros nomeados', async () => {
+    const enviar = vi.fn(async () => ({ ok: true, wamid: 'wamid.N' }) as ResultadoDoEnvio);
+    const { cliente } = bancoFalso({
+      itens: [
+        {
+          ...item({ janela_aberta: false, modelo: MODELO }),
+          template_params: { nome: 'Maria', empresa: 'Buffet X' },
+        },
+      ],
+    });
+    await drenarSaida(
+      contexto(cliente, { enviar } as unknown as ClienteDaGraph),
+      5,
+      contagensDaSaidaZeradas(),
+    );
+    expect(enviar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tipo: 'template',
+        parametros: { nome: 'Maria', empresa: 'Buffet X' },
+      }),
+    );
+  });
+
   it('os recusados pelo banco são contados e registrados, não reenviados', async () => {
     const { cliente } = bancoFalso({
       itens: [],
@@ -288,6 +333,46 @@ describe('a cadência humana (R04 §4)', () => {
       contagensDaSaidaZeradas(),
     );
     expect(dormir).not.toHaveBeenCalled();
+  });
+
+  it('PARADA NO DESCANSO: o sinal acorda a espera e o resto do lote não sai', async () => {
+    // Na nuvem o SIGTERM tem prazo; dormir 180 s ouvindo nada seria morrer no
+    // meio do descanso. O que não saiu volta com o visibility timeout.
+    let parando = false;
+    const dormir = vi.fn(async () => {
+      parando = true; // o sinal chega durante o descanso
+    });
+    const enviar = vi.fn(async () => ({ ok: true, wamid: 'x' }) as ResultadoDoEnvio);
+    const { cliente } = bancoFalso({
+      itens: [
+        item({ janela_aberta: false, modelo: MODELO }),
+        item({ msg_id: 8, janela_aberta: false, modelo: MODELO }),
+        item({ msg_id: 9, janela_aberta: false, modelo: MODELO }),
+      ],
+    });
+    const c = contagensDaSaidaZeradas();
+    await drenarSaida(
+      {
+        ...contexto(cliente, { enviar } as unknown as ClienteDaGraph),
+        dormir,
+        deveParar: () => parando,
+      },
+      5,
+      c,
+    );
+    expect(enviar).toHaveBeenCalledTimes(1);
+    expect(c.enviados).toBe(1);
+  });
+
+  it('parada pedida antes do lote: nada sai', async () => {
+    const enviar = vi.fn();
+    const { cliente } = bancoFalso({ itens: [item()] });
+    await drenarSaida(
+      { ...contexto(cliente, { enviar } as unknown as ClienteDaGraph), deveParar: () => true },
+      5,
+      contagensDaSaidaZeradas(),
+    );
+    expect(enviar).not.toHaveBeenCalled();
   });
 
   it('o intervalo cai dentro da faixa configurada', () => {

@@ -312,7 +312,8 @@ export interface ItemDeSaida {
   para: string;
   tipo: string;
   corpo: string | null;
-  template_params: unknown[];
+  /** Lista = modelo posicional (antigo); objeto = modelo com parâmetros nomeados. */
+  template_params: unknown[] | Record<string, unknown>;
   audio_asset_id: string | null;
   janela_aberta: boolean;
   modelo: ModeloAprovado | null;
@@ -349,7 +350,11 @@ function paraItemDeSaida(bruto: unknown): ItemDeSaida | null {
     para,
     tipo: texto(i.tipo) ?? 'text',
     corpo: texto(i.corpo),
-    template_params: Array.isArray(i.template_params) ? i.template_params : [],
+    template_params: Array.isArray(i.template_params)
+      ? i.template_params
+      : typeof i.template_params === 'object' && i.template_params !== null
+        ? (i.template_params as Record<string, unknown>)
+        : [],
     audio_asset_id: texto(i.audio_asset_id),
     janela_aberta: i.janela_aberta === true,
     modelo:
@@ -520,4 +525,106 @@ export async function acoesHumanasDoWhatsapp(cliente: ClienteDoBanco): Promise<A
       pessoasEsperando: Number.isFinite(n) ? n : null,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Modelos na Meta e o número conectado (migração 20260914100000)
+// ---------------------------------------------------------------------------
+
+/** Um modelo que o worker manda para aprovação, como `wa_modelos_para_meta` devolve. */
+export interface ModeloParaMeta {
+  template_id: number;
+  codigo: string;
+  nome_meta_atual: string | null;
+  situacao_atual: 'approved' | 'pending' | 'rejected' | null;
+  nome_sugerido: string;
+  categoria: string;
+  idioma: string;
+  corpo: string;
+  variaveis: string[];
+}
+
+function paraModeloParaMeta(bruto: unknown): ModeloParaMeta | null {
+  const m = objeto(bruto);
+  const id = Number(m.template_id);
+  const nome = texto(m.nome_sugerido);
+  const corpo = typeof m.corpo === 'string' ? m.corpo : null;
+  if (!Number.isInteger(id) || nome === null || corpo === null) return null;
+  const situacao = texto(m.situacao_atual);
+  return {
+    template_id: id,
+    codigo: texto(m.codigo) ?? '',
+    nome_meta_atual: texto(m.nome_meta_atual),
+    situacao_atual:
+      situacao === 'approved' || situacao === 'pending' || situacao === 'rejected'
+        ? situacao
+        : null,
+    nome_sugerido: nome,
+    categoria: (texto(m.categoria) ?? '').toUpperCase(),
+    idioma: texto(m.idioma) ?? 'pt_BR',
+    corpo,
+    variaveis: Array.isArray(m.variaveis)
+      ? m.variaveis.filter((v): v is string => typeof v === 'string')
+      : [],
+  };
+}
+
+export async function modelosParaMeta(cliente: ClienteDoBanco): Promise<ModeloParaMeta[]> {
+  const bruto = await rpc<unknown>(cliente, 'wa_modelos_para_meta', {});
+  if (!Array.isArray(bruto)) return [];
+  return bruto.map(paraModeloParaMeta).filter((m): m is ModeloParaMeta => m !== null);
+}
+
+/**
+ * Grava o que a Meta respondeu sobre um modelo. `situacaoMeta` é o status CRU
+ * (APPROVED, PENDING, REJECTED, PAUSED…) ou `NAO_ENVIADO` quando o pedido não
+ * chegou a virar modelo na Meta; a leitura em três estados é do banco.
+ */
+export async function registrarModeloNaMeta(
+  cliente: ClienteDoBanco,
+  argumentos: {
+    templateId: number;
+    nomeMeta: string;
+    situacaoMeta: string;
+    motivo?: string | null;
+    idMeta?: string | null;
+  },
+): Promise<{ ok: boolean; metaStatus: string | null; motivo: string | null }> {
+  const r = objeto(
+    await rpc<unknown>(cliente, 'wa_modelo_meta_registrar', {
+      p_template_id: argumentos.templateId,
+      p_nome_meta: argumentos.nomeMeta,
+      p_situacao_meta: argumentos.situacaoMeta,
+      p_motivo: argumentos.motivo ? argumentos.motivo.slice(0, 2000) : null,
+      p_id_meta: argumentos.idMeta ?? null,
+    }),
+  );
+  return { ok: r.ok === true, metaStatus: texto(r.meta_status), motivo: texto(r.motivo) };
+}
+
+/** Grava o número conectado (o banco normaliza para E.164). */
+export async function configurarNumero(
+  cliente: ClienteDoBanco,
+  argumentos: {
+    numero: string;
+    phoneNumberId: string;
+    wabaId: string;
+    nomeExibicao: string | null;
+    qualidade: string | null;
+  },
+): Promise<{ ok: boolean; numeroPadrao: string | null; aquecimentoRecomecou: boolean }> {
+  const r = objeto(
+    await rpc<unknown>(cliente, 'wa_numero_configurar', {
+      p_numero: argumentos.numero,
+      p_phone_number_id: argumentos.phoneNumberId,
+      p_waba_id: argumentos.wabaId,
+      p_nome_exibicao: argumentos.nomeExibicao,
+      p_qualidade: argumentos.qualidade,
+    }),
+  );
+  return {
+    ok: r.ok === true,
+    numeroPadrao: texto(r.numero_padrao),
+    aquecimentoRecomecou: r.aquecimento_recomecou === true,
+  };
 }

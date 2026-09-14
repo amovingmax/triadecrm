@@ -1,0 +1,42 @@
+# =============================================================================
+# worker-wa no Fly.io — o motor do WhatsApp, ligado 24 h (decisão de 14/09/2026)
+# =============================================================================
+#
+# O mesmo apps/workers/Dockerfile da máquina dedicada, rodando só o comando `wa`.
+# Mudança de ADR-04 SÓ para o WhatsApp: o CRM na Vercel não fica ligado entre um
+# clique e outro, e a máquina dedicada ainda não existe. Ingest, IA e rotas
+# continuam onde estavam.
+#
+# Não publica porta nenhuma: não há [http_service]. A Meta fala com a Edge Function
+# `wa-webhook` no Supabase; este processo só busca a fila no banco e chama a Graph
+# API. Sem porta, sem auto-stop — a máquina fica de pé.
+#
+# Publicar (da RAIZ do repositório — o contexto do build é o monorepo inteiro):
+#   fly deploy . --config infra/nuvem/fly.worker-wa.toml --dockerfile apps/workers/Dockerfile
+#
+# Segredos vão por `fly secrets set` (nunca neste arquivo): SUPABASE_URL,
+# SUPABASE_SERVICE_ROLE_KEY, META_WA_ACCESS_TOKEN, META_WA_PHONE_NUMBER_ID,
+# META_WA_BUSINESS_ACCOUNT_ID. Passo a passo em docs/operacao/whatsapp-no-crm.md.
+# =============================================================================
+
+app = "triade-worker-wa"
+primary_region = "gru"
+
+# O SIGTERM acorda qualquer descanso (lib/dormir.ts) e o worker termina a mensagem
+# atual antes de sair. O pior caso é uma chamada à Graph API em andamento, com
+# timeout de 30 s — daí os 35.
+kill_signal = "SIGTERM"
+kill_timeout = "35s"
+
+[env]
+  WORKER_COMANDO = "wa"
+  NODE_ENV = "production"
+  TZ = "America/Fortaleza"
+
+# Caiu, volta. O que chegou enquanto ele estava fora espera na fila do banco.
+[[restart]]
+  policy = "always"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

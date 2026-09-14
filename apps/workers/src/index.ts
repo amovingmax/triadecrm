@@ -1,9 +1,9 @@
 /**
  * CLI dos workers do KOMUNE CRM — uma imagem Docker, quatro comandos: ingest | wa | ai | rotas.
  *
- * `ingest` consome as filas `pgmq` da esteira de ingestão (RF-RAD). `wa` e `ai` ainda
- * validam o ambiente, registram um heartbeat no log e encerram com 0: os laços deles
- * chegam em D5 (wa) e D6 (ai).
+ * `ingest` consome as filas `pgmq` da esteira de ingestão (RF-RAD); `wa` recebe e envia pela
+ * Cloud API da Meta (e `wa --conectar` liga o número de ponta a ponta); `ai` consome `ai_jobs`;
+ * `rotas` geocodifica e ordena visitas. Sem comando na linha, vale `WORKER_COMANDO`.
  *
  * Códigos de saída: 0 ok · 1 ambiente inválido ou falha em execução · 2 uso incorreto do CLI.
  */
@@ -39,7 +39,7 @@ async function start<C extends WorkerCommand>(
 }
 
 export async function main(argv: readonly string[]): Promise<number> {
-  const parsed = parseArgs(argv);
+  const parsed = parseArgs(argv, process.env);
 
   if (parsed.kind === 'help') {
     process.stdout.write(USAGE);

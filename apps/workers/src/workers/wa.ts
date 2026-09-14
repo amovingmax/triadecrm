@@ -23,7 +23,9 @@
  * precisa ser explicada duas vezes.
  *
  * ENCERRAMENTO: SIGINT e SIGTERM param depois da mensagem atual, nunca no
- * meio. Uma mensagem interrompida volta sozinha quando o `visibility timeout`
+ * meio — e ACORDAM qualquer descanso (a cadência de 45–180 s entre envios, o
+ * descanso de fila vazia, o intervalo entre pedidos de modelo), para que a
+ * parada na nuvem caiba no prazo do SIGTERM antes do SIGKILL. Uma mensagem interrompida volta sozinha quando o `visibility timeout`
  * expira, mas terminar o que já começou é mais barato que reprocessar — e, no
  * WhatsApp, reprocessar um envio interrompido depois do POST e antes do
  * registro é o único jeito de mandar a mesma mensagem duas vezes.
@@ -34,6 +36,15 @@
  * fazer. A única mensagem que sai sem alguém clicar é a confirmação de opt-out
  * do RF-CON-19, que é texto fixo enfileirado pelo próprio Postgres dentro da
  * transação da supressão.
+ *
+ * OS MODELOS NA META. Com `META_WA_BUSINESS_ACCOUNT_ID` definida, o worker manda
+ * os modelos para aprovação e sincroniza o status na subida e a cada 30 min —
+ * em segundo plano, porque a primeira passada pode levar um minuto e um minuto
+ * sem ler a entrada é um minuto sem responder quem escreveu. Falha só vira log.
+ *
+ * DOIS COMANDOS DE UMA VEZ SÓ, que saem ao terminar:
+ *   · `--conectar`            liga o número de ponta a ponta (`whatsapp/conectar.ts`);
+ *   · `--sincronizar-modelos` só a passada dos modelos.
  */
 import { ClienteDaGraph, VERSAO_PADRAO } from '../whatsapp/graph';
 import {
@@ -51,6 +62,14 @@ import {
   lerConfigDeEnvio,
 } from '../whatsapp/ponte';
 import { contagensDaSaidaZeradas, drenarSaida, type ContextoDaSaida } from '../whatsapp/saida';
+import { configDaConexao, conectarNumero } from '../whatsapp/conectar';
+import {
+  criarSincronizacaoPeriodica,
+  fraseDoResumo,
+  sincronizarModelos,
+  type SincronizacaoPeriodica,
+} from '../whatsapp/modelos-meta';
+import { dormir } from '../lib/dormir';
 import { criarPulso } from '../lib/pulso';
 
 import type { WorkerContext } from '../lib/context';
@@ -65,16 +84,11 @@ const LOTE_DE_SAIDA = 5;
 /** O balde privado das mídias recebidas (migração 20260905000201). */
 const BALDE_DE_MIDIAS = 'mensagens';
 
-/** Sem `unref()`: um timer que não segura o laço mataria o worker no descanso. */
-function dormir(ms: number): Promise<void> {
-  return new Promise((resolva) => {
-    setTimeout(resolva, ms);
-  });
-}
-
 export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
   const { env, logger, opcoes } = ctx;
   const umaVez = opcoes['uma-vez'] === true;
+  const conectar = opcoes.conectar !== undefined;
+  const soModelos = opcoes['sincronizar-modelos'] !== undefined;
 
   const cliente = criarClienteWa(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -88,7 +102,69 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
     token: env.META_WA_ACCESS_TOKEN,
   });
 
+  // ---- Comandos de uma vez só ----------------------------------------------
+  if (conectar) {
+    const conexao = configDaConexao(env);
+    if (!conexao.ok) {
+      process.stderr.write(
+        [
+          '`workers wa --conectar` precisa destas variáveis (modelo em .env.example):',
+          ...conexao.faltando.map((f) => `  - ${f}`),
+          '',
+        ].join('\n'),
+      );
+      return 1;
+    }
+    return conectarNumero({ cliente, graph, logger, config: conexao.config });
+  }
+
+  if (soModelos) {
+    if (!env.META_WA_BUSINESS_ACCOUNT_ID) {
+      process.stderr.write(
+        '`workers wa --sincronizar-modelos` precisa de META_WA_BUSINESS_ACCOUNT_ID (o id da conta do WhatsApp Business).\n',
+      );
+      return 1;
+    }
+    const r = await sincronizarModelos({
+      cliente,
+      graph,
+      wabaId: env.META_WA_BUSINESS_ACCOUNT_ID,
+      logger,
+    });
+    if (!r.ok) {
+      process.stderr.write(
+        `✗ Sincronização de modelos parou: ${r.erro} (até ali: ${fraseDoResumo(r.resumo)}).\n`,
+      );
+      return 1;
+    }
+    process.stdout.write(
+      `${r.resumo.falhas > 0 ? '✗' : '✓'} Modelos: ${fraseDoResumo(r.resumo)}.\n`,
+    );
+    return r.resumo.falhas > 0 ? 1 : 0;
+  }
+
+  // ---- O laço --------------------------------------------------------------
   const config = await lerConfigDeEnvio(cliente);
+
+  // A parada acorda todo descanso (lib/dormir.ts).
+  let parando = false;
+  const parada = new AbortController();
+  const dormirAtePararem = (ms: number): Promise<void> => dormir(ms, parada.signal);
+
+  const modelos: SincronizacaoPeriodica | null = env.META_WA_BUSINESS_ACCOUNT_ID
+    ? criarSincronizacaoPeriodica({
+        cliente,
+        graph,
+        wabaId: env.META_WA_BUSINESS_ACCOUNT_ID,
+        logger,
+        dormir: dormirAtePararem,
+      })
+    : null;
+  if (modelos === null) {
+    logger.info(
+      'META_WA_BUSINESS_ACCOUNT_ID vazia: os modelos não são sincronizados com a Meta por este worker',
+    );
+  }
 
   const contextoDaEntrada: ContextoDaEntrada = {
     cliente,
@@ -98,7 +174,14 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
     supabaseUrl: env.SUPABASE_URL,
     chaveServico: env.SUPABASE_SERVICE_ROLE_KEY,
   };
-  const contextoDaSaida: ContextoDaSaida = { cliente, graph, logger, config };
+  const contextoDaSaida: ContextoDaSaida = {
+    cliente,
+    graph,
+    logger,
+    config,
+    dormir: dormirAtePararem,
+    deveParar: () => parando,
+  };
 
   const entradas = contagensDaEntradaZeradas();
   const saidas = contagensDaSaidaZeradas();
@@ -110,10 +193,10 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
   });
   pulso.iniciar();
 
-  let parando = false;
   const pedirParada = (sinal: string): void => {
     if (parando) return;
     parando = true;
+    parada.abort();
     logger.info('parada pedida: o worker encerra depois da mensagem atual', { sinal });
   };
   process.on('SIGINT', () => pedirParada('SIGINT'));
@@ -125,10 +208,19 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
     for (;;) {
       if (parando) break;
 
+      // 0 · Os modelos na Meta, em segundo plano, quando der a hora.
+      modelos?.talvezDisparar();
+
       // 1 · O que chegou. Sempre antes do que sai.
-      const lidas = await consumirEntrada(contextoDaEntrada, entradas, () => {
-        falhas += 1;
-      });
+      const lidas = await consumirEntrada(
+        contextoDaEntrada,
+        entradas,
+        () => {
+          falhas += 1;
+        },
+        () => parando,
+      );
+      if (parando) break;
 
       // 2 · O que a tela aprovou e ainda não estava na fila.
       const pendentes = await enfileirarPendentes(cliente, 50);
@@ -145,8 +237,12 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
 
       if (lidas > 0 || enviadas > 0 || pendentes.enfileirados > 0) continue;
       if (umaVez) break;
-      await dormir(DESCANSO_MS);
+      await dormirAtePararem(DESCANSO_MS);
     }
+
+    // `--uma-vez` deixa a passada dos modelos terminar; um sinal a interrompe
+    // entre um modelo e outro.
+    await modelos?.encerrar(parando);
 
     logger.info('worker-wa encerrado', { ...entradas, ...saidas, falhas });
     await pulso.bater('parado', null, {
@@ -170,10 +266,15 @@ async function consumirEntrada(
   ctx: ContextoDaEntrada,
   contagens: ReturnType<typeof contagensDaEntradaZeradas>,
   aoFalhar: () => void,
+  deveParar: () => boolean,
 ): Promise<number> {
   const mensagens = await lerFila(ctx.cliente, FILA_ENTRADA, LOTE_DE_ENTRADA);
 
+  let tratadas = 0;
   for (const mensagem of mensagens) {
+    // Parada entre uma mensagem e outra: o resto volta com o visibility timeout.
+    if (deveParar()) break;
+    tratadas += 1;
     const chave = chaveDaMensagem(mensagem.mensagem);
     try {
       await tratarEntrada(ctx, mensagem.mensagem, contagens);
@@ -190,7 +291,7 @@ async function consumirEntrada(
       });
     }
   }
-  return mensagens.length;
+  return tratadas;
 }
 
 /**

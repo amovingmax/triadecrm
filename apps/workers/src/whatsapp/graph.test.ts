@@ -18,7 +18,19 @@ import { dirname, resolve } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { ClienteDaGraph, classificarErro, wamidDaResposta, VERSAO_PADRAO } from './graph';
+import {
+  ClienteDaGraph,
+  classificarErro,
+  parametrosDoCorpo,
+  valorDeParametroLimpo,
+  wamidDaResposta,
+  VERSAO_PADRAO,
+} from './graph';
+import {
+  SEGREDO_DO_APP_DE_TESTE,
+  subirDubleDaGraph,
+  type DubleDaGraph,
+} from './duble-da-graph-de-teste';
 
 // ---------------------------------------------------------------------------
 // 1. A tabela de erros — sem rede
@@ -80,6 +92,26 @@ describe('a decisão de tentar de novo', () => {
   it('resposta sem corpo reconhecível ainda produz um código nomeado', () => {
     expect(classificarErro(418, null, '<html>').codigo).toBe('http_418');
   });
+
+  it('guarda o subcódigo e o motivo "para o usuário" da criação de modelo', () => {
+    // Na criação de modelo, `message` diz só "Invalid parameter"; o motivo que
+    // se lê está em `error_user_msg`.
+    const r = classificarErro(400, {
+      error: {
+        message: 'Invalid parameter',
+        code: 100,
+        error_subcode: 2388024,
+        error_user_title: 'Content in This Language Already Exists',
+        error_user_msg: 'Content for pt_BR already exists for this template name.',
+      },
+    });
+    expect(r.subcodigo).toBe(2388024);
+    expect(r.codigo).toBe('100');
+    expect(r.mensagem).toBe(
+      'Invalid parameter — Content for pt_BR already exists for this template name.',
+    );
+    expect(r.retentar).toBe(false);
+  });
 });
 
 describe('o corpo do POST', () => {
@@ -117,6 +149,62 @@ describe('o corpo do POST', () => {
         ],
       },
     });
+  });
+
+  it('template com parâmetros NOMEADOS leva parameter_name em cada um', () => {
+    const p = ClienteDaGraph.payloadDoEnvio({
+      tipo: 'template',
+      para: '+5584988776655',
+      nome: 'aeb_abr_a_v1',
+      idioma: 'pt_BR',
+      parametros: { nome: 'Maria', empresa: 'Buffet X' },
+    });
+    expect(p).toEqual({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: '+5584988776655',
+      type: 'template',
+      template: {
+        name: 'aeb_abr_a_v1',
+        language: { code: 'pt_BR' },
+        components: [
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', parameter_name: 'nome', text: 'Maria' },
+              { type: 'text', parameter_name: 'empresa', text: 'Buffet X' },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  it('objeto de parâmetros vazio também não manda componente', () => {
+    const p = ClienteDaGraph.payloadDoEnvio({
+      tipo: 'template',
+      para: '+55849',
+      nome: 'x',
+      idioma: 'pt_BR',
+      parametros: {},
+    });
+    expect((p.template as { components: unknown[] }).components).toEqual([]);
+  });
+
+  it('valor com quebra de linha, tab ou espaço repetido é normalizado, não recusado', () => {
+    // A Meta recusa parâmetro com \n, \t ou mais de 4 espaços seguidos.
+    expect(valorDeParametroLimpo('Buffet\nSabor\tPotiguar')).toBe('Buffet Sabor Potiguar');
+    expect(valorDeParametroLimpo('  Maria      Clara \r\n')).toBe('Maria Clara');
+    expect(valorDeParametroLimpo(42)).toBe('42');
+    expect(valorDeParametroLimpo(null)).toBe('');
+    expect(parametrosDoCorpo({ detalhe: 'linha 1\n\nlinha 2' })).toEqual([
+      { type: 'text', parameter_name: 'detalhe', text: 'linha 1 linha 2' },
+    ]);
+    // A regra vale também para o posicional.
+    expect(parametrosDoCorpo(['a\tb', 'c     d'])).toEqual([
+      { type: 'text', text: 'a b' },
+      { type: 'text', text: 'c d' },
+    ]);
   });
 
   it('template sem parâmetro não manda componente vazio', () => {
@@ -284,5 +372,100 @@ describe('contra o dublê da Graph API (sem rede, sem credencial)', () => {
     const r = await morto.enviar({ tipo: 'texto', para: '+5584988776655', corpo: 'oi' });
     expect(r.ok === false && r.codigo).toBe('sem_resposta_da_meta');
     expect(r.ok === false && r.retentar).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. As chamadas da conta (ler/publicar) — modelos, número, webhooks
+// ---------------------------------------------------------------------------
+
+describe('GET e POST genéricos no Graph', () => {
+  let duble: DubleDaGraph;
+
+  beforeAll(async () => {
+    duble = await subirDubleDaGraph(8794);
+  }, 20_000);
+
+  afterAll(() => {
+    duble?.parar();
+  });
+
+  it('lê o número com os campos pedidos, com o bearer no cabeçalho', async () => {
+    const r = await duble.cliente().ler('1234567890', {
+      fields: 'display_phone_number,platform_type,status',
+    });
+    expect(r.ok).toBe(true);
+    expect(r.ok === true && r.json).toEqual({
+      id: '1234567890',
+      display_phone_number: '+55 84 99999-0000',
+      platform_type: 'CLOUD_API',
+      status: 'CONNECTED',
+    });
+  });
+
+  it('cria modelo e reconhece o "já existe" pelo subcódigo', async () => {
+    await duble.zerar();
+    const pedido = {
+      name: 'gen_teste_v1',
+      language: 'pt_BR',
+      category: 'UTILITY',
+      parameter_format: 'NAMED',
+      components: [{ type: 'BODY', text: 'Oi, {{nome}}, tudo bem?' }],
+    };
+    const primeira = await duble.cliente().publicar('777/message_templates', pedido);
+    expect(primeira.ok === true && primeira.json.status).toBe('PENDING');
+
+    const segunda = await duble.cliente().publicar('777/message_templates', pedido);
+    expect(segunda.ok).toBe(false);
+    expect(segunda.ok === false && segunda.subcodigo).toBe(2388024);
+    expect(segunda.ok === false && segunda.retentar).toBe(false);
+  });
+
+  it('manda formulário sem bearer quando o token do app vai no corpo', async () => {
+    await duble.zerar();
+    const r = await duble.cliente().publicar(
+      '4242/subscriptions',
+      {
+        access_token: `4242|${SEGREDO_DO_APP_DE_TESTE}`,
+        object: 'whatsapp_business_account',
+        callback_url: 'https://exemplo.supabase.co/functions/v1/wa-webhook',
+        verify_token: 'verificacao',
+        fields: 'messages',
+      },
+      { formulario: true, semBearer: true },
+    );
+    expect(r.ok).toBe(true);
+    const conta = await duble.conta();
+    expect(conta.assinaturasDoApp).toHaveLength(1);
+    expect(conta.assinaturasDoApp[0]?.fields).toBe('messages');
+  });
+
+  it('token errado numa chamada de conta também vira token_meta_invalido', async () => {
+    const r = await duble.cliente({ token: 'token-errado' }).ler('777/message_templates');
+    expect(r.ok === false && r.codigo).toBe('token_meta_invalido');
+  });
+});
+
+describe('segredo não vaza em mensagem de erro', () => {
+  it('nem o token do usuário de sistema, nem o token do app no corpo', async () => {
+    const token = 'EAAG-token-secreto-123';
+    const cliente = new ClienteDaGraph({
+      baseUrl: 'http://127.0.0.1:1',
+      versao: VERSAO_PADRAO,
+      phoneNumberId: '1',
+      token,
+      buscar: (async () => {
+        throw new Error(`falhou com ${token} e 99|segredo-do-app-xyz`);
+      }) as unknown as typeof fetch,
+    });
+    const r = await cliente.publicar(
+      '99/subscriptions',
+      { access_token: '99|segredo-do-app-xyz' },
+      { formulario: true, semBearer: true },
+    );
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.mensagem).not.toContain(token);
+    expect(r.ok === false && r.mensagem).not.toContain('segredo-do-app-xyz');
+    expect(r.ok === false && r.mensagem).toContain('***');
   });
 });
