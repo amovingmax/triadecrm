@@ -2140,3 +2140,17 @@ Pedido do Matheus: "todos os usuários que tenham acesso ao CRM utilizem dessa f
 **Decisão humana:**
 - As 37 trocas de texto são da Bárbara revisar (lista acima). Nada foi à Meta ainda, então mudar de novo é barato até o `--conectar`.
 - Textos de sistema ainda falam no feminino da Heloísa ("Obrigada pelo retorno" na confirmação de opt-out, "Sou a Heloísa" em `GEN-SYS-QUEM-SOMOS`) e respondem por qualquer um do time. Não mexi: a confirmação de opt-out tem texto fixo travado em teste.
+
+### O número conectado em produção (14/09/2026)
+
+Feito com o Rafael no painel da Meta, tela por tela (`docs/operacao/whatsapp-no-crm.md`):
+
+- **Meta:** portfólio `komune.app` (o administrador era só a conta do Instagram @komune.app, que não cria app; entrou um Facebook com acesso total), app **Tríade CRM** (caso de uso "Conectar-se com clientes pelo WhatsApp"), conta do WhatsApp **Komune**, número **+55 84 9931-8888** verificado e com o nome "Komune" liberado sem revisão, cartão cadastrado e usuário do sistema `triade-crm` com token sem validade. A Meta mostra o celular do DDD 84 sem o nono dígito, como o WhatsApp faz do DDD 31 em diante; o CRM grava `+5584999318888` e casa os dois.
+- **Supabase:** as migrações `20260914100000` e `20260914110000` aplicadas no `komune-crm` (conferido: funções, três gatilhos e nenhum modelo citando a Heloísa); `wa-webhook` publicada sem JWT, com `META_WA_VERIFY_TOKEN` e `META_WA_APP_SECRET` nos secrets. Handshake da Meta aceito; POST sem assinatura recusado com 401.
+- **`workers wa --conectar`, 6 de 6:** número registrado (`CLOUD_API/CONNECTED`), app assinado nos webhooks da conta, campo `messages`, número gravado em `whatsapp.envio.numero_padrao` (aquecimento do teto recomeçou hoje) e **42 modelos enviados para aprovação, 0 falhas**. Na primeira sincronização, os 42 seguiam `PENDING`.
+- **Git:** cinco commits na `main` e push.
+
+### Pendente para o WhatsApp funcionar de verdade
+- **Publicar a tela nova na Vercel.** O projeto `triade-crm` não publica pelo push (os deploys são pelo CLI, na conta do Luiz); o `vercel deploy --prod` ficou para uma pessoa rodar. Até lá, a produção mostra a tela antiga.
+- **Publicar o app na Meta** (modo Ao vivo, com `https://komune.app.br/privacidade`). Sem isso, mensagens de gente real não chegam pelo webhook.
+- **Subir o worker-wa no Fly.io** (conta + `fly auth login`). Sem o worker, nada sai da fila nem entra na conversa, e o status dos modelos só atualiza à mão (`--sincronizar-modelos`).
