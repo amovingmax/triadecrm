@@ -2074,3 +2074,69 @@ Rafael, olhando a versão acima: "ficou misturado e desorganizado, organize melh
 - **Celular:** o cartão ficou em três fileiras fixas — nome e temperatura; categoria · local e telefone; desfecho e quando · tentativa, ou "Ainda não contatado". Etapa, responsável e próxima ação saíram do cartão.
 - Texto secundário do contato de 11px para 12px.
 - Verificado: lint, typecheck, 26 testes de Parceiros e build verdes; olhado em produção a 1425px e a 390px.
+
+## D5/D8 — 14/09/2026 — O WhatsApp passa a sair do CRM (RF-CON-01, RF-CON-02, RF-CON-05, RF-CON-08, RF-CON-10, RF-CON-11; ADR-04, ADR-05, ADR-06)
+
+Pedido do Matheus: "o wpp utilizado para contatar os leads, tudo dentro do CRM". O time mandava a primeira mensagem por um botão que abria o WhatsApp Web.
+
+**Duas decisões dele, hoje:**
+- **O número fica só na Cloud API**, conectado direto na Meta, sem Coexistence. Conferido na documentação da Meta: o Coexistence (app do celular + API no mesmo número) só é liberado para Tech Provider ou parceiro intermediário. É o "caminho A sem app" que o RF-CON-02 já previa. Consequência: o número deixa de funcionar no app e no WhatsApp Web.
+- **O worker-wa roda num servidor na nuvem** (Fly.io, São Paulo), não na máquina dedicada, que ainda não existe. Muda o ADR-04 só para o WhatsApp; ingest, IA e rotas ficam onde estavam. O PRD (ADR-04, ADR-06, RF-CON-01/06/08) e o `CLAUDE.md` ainda descrevem Coexistence e processamento local — não foram alterados.
+
+### O banco (`20260914100000_o_whatsapp_passa_a_sair_do_crm.sql`, pgTAP `43_whatsapp_dentro_do_crm.sql`, 49 asserções)
+- **O fio passa a poder COMEÇAR no CRM.** Até aqui uma conversa só nascia quando o parceiro escrevia ou o eco do Coexistence avisava. `public.wa_enviar_modelo` acha ou cria a conversa pelo WhatsApp da ficha (o da organização, senão o da pessoa principal), exige valor para toda variável do modelo, exige aprovação da Meta fora da janela de 24 h, recusa modelo `GEN-SYS-*` e grava a mensagem assinada por quem clicou. Supressão, horário e tetos continuam sendo do `messages_guard`, e a recusa desfaz a conversa criada.
+- **`public.wa_preparar_envio`**, leitura pura: número conectado, WhatsApp da ficha, janela, primeiro contato, desde quando esperamos resposta, o que barraria agora e quando abre, sugestões de preenchimento (a origem só quando é lugar público — "Planilha (importação)" numa abertura é pior que campo vazio) e os modelos aprovados, com o segmento da ficha primeiro.
+- **Buraco fechado: primeiro contato era declarado por quem inseria.** A tela nunca escrevia `is_first_contact`, então um modelo para lead novo passava por fora do teto do número (RF-CON-10). Agora um gatilho deriva a coluna do estado da conversa antes do `messages_guard`. Controle negativo: sem o gatilho, 4 asserções ficam vermelhas.
+- **Número novo recomeça o aquecimento.** `wa_numero_configurar` grava o número e, quando ele muda, põe `cadencia.tetos.inicio` em hoje — a data semeada era 04/09, e um número nascendo agora cairia direto no teto da terceira semana.
+- **As portas do worker para a Meta:** `wa_modelos_para_meta` (a confirmação de opt-out vai como utility e com o texto fixo, sem o vocativo) e `wa_modelo_meta_registrar` (status cru guardado; qualquer status que não seja APPROVED, PENDING, IN_APPEAL ou LIMIT_EXCEEDED conta como não aprovado).
+
+### O worker-wa (`apps/workers`, 320 testes; eram 243)
+- Envio de modelo com **parâmetros nomeados**; os antigos continuam posicionais.
+- **`workers wa --conectar`**: confere o número, registra na Cloud API com o PIN, liga a conta ao app, grava o número no CRM e manda os modelos para aprovação, com ✓/✗ por passo. `--sincronizar-modelos` só a última parte; o laço sincroniza a cada 30 min.
+- A imagem roda por `WORKER_COMANDO` (o Fly não passa argumento); o SIGTERM acorda os descansos de 45–180 s entre envios.
+- Graph API padrão de v21.0 para **v26.0** (a v21 desliga em 21/01/2027).
+
+### A tela
+- **Conversas:** sem conversa, ou com a janela fechada, a caixa vira "Primeira mensagem": escolhe o modelo, preenche os campos (nome, empresa e origem já sugeridos), mostra o texto como vai chegar e envia. Fora do horário, suprimido, sem WhatsApp ou no teto, diz por quê e quando abre. Depois de mandar, não oferece a segunda mensagem de cara ("Esperando a resposta", com um toque para mandar outra).
+- **Ficha:** com o número conectado, "Abrir no WhatsApp" (o `wa.me`) vira **Mandar WhatsApp**, que leva à conversa — e não precisa revelar o telefone. Sem número conectado, tudo continua como hoje.
+- O aviso do topo deixou de falar em Coexistence e "celular da Heloísa": conta número conectado, envio rodando e modelo aprovado, e some quando os três existem.
+
+### Provado rodando
+- Banco local, navegador, sessão admin: ficha → Mandar WhatsApp → às 12h48 "Fora do horário de envio, abre hoje às 14:00" (é o intervalo de almoço da janela); com a janela aberta à mão, formulário preenchido e enviado → `messages` em `queued`, modelo, primeiro contato, parâmetros nomeados. 390 px sem rolagem lateral.
+- Worker de verdade contra o dublê da Graph API: a mesma mensagem saiu (`sent`, com wamid). A sincronização mandou 20 modelos e **segurou 22 antes de ir à Meta** (abaixo).
+- `supabase test db`: 43 arquivos, 2498 asserções, PASS. Web: 655 testes, lint, typecheck e build verdes. Workers: lint, typecheck, 320 testes e build verdes.
+
+### Pendente
+- **Nada disto está em produção.** Falta aplicar a migração no `komune-crm`, publicar `wa-webhook`, subir a web e fazer o passo a passo de `docs/operacao/whatsapp-no-crm.md` (Meta, webhook, Fly.io, `--conectar`).
+- **Mandar pelo CRM não registra contato nem move o negócio.** O RF-CON-08 previa isso pelo eco do Coexistence; sem eco, quem manda ainda precisa usar "Registrar contato". Automatizar é decidir que envio = tentativa com desfecho, e mexe em metas e temperatura.
+- A policy `messages_insert` ainda aceita `template_id` direto do cliente (o caminho antigo); o certo é modelo só por `wa_enviar_modelo`.
+- A Meta anunciou para 2026 identificadores de usuário por empresa no lugar do telefone em alguns webhooks; `wa-webhook`/`entrada.ts` não foram revistos para isso.
+
+### Decisão humana
+- ~~22 dos 42 modelos seriam recusados pela Meta~~ e ~~as aberturas assinam "Heloísa"~~: resolvidos na seção seguinte, por decisão do Matheus.
+- Atualizar o PRD (ADR-04 e ADR-06, RF-CON-01/06/08/08b) e o `CLAUDE.md` com as decisões de hoje (**Matheus/Rafael**).
+
+### D5 — 14/09/2026 — O time inteiro atende pelo mesmo número, cada um com o seu nome (RF-CON-04, RF-CON-06, RF-CON-12; ADR-05, ADR-06)
+
+Pedido do Matheus: "todos os usuários que tenham acesso ao CRM utilizem dessa ferramenta, cada pessoa poderá responder com base na necessidade, e aparecerá o nome de cada atendente, algo parecido com o que a BWA Global faz". Duas escolhas dele: **primeiro nome em negrito** no começo de cada mensagem, e **as aberturas levam o nome de quem envia**.
+
+**No banco (`20260914100000`, seção F):**
+- **A assinatura.** Texto livre sai com `*Matheus:*` e quebra de linha antes do texto (negrito no WhatsApp), gravado no próprio `messages.body` — o registro é o que foi ao fio. Gatilho `messages_nome_do_atendente`, que dispara **depois** do `messages_guard` (ordem alfabética), porque o guarda compara a mensagem de IA com o texto aprovado sem a assinatura. Mensagem de IA assina com quem aprovou. Modelo, confirmação de opt-out, eco e mídia ficam de fora. Desliga em `whatsapp.envio.assinar_com_nome`.
+- **`{{atendente}}` é sempre quem clicou.** `wa_enviar_modelo` sobrescreve o valor que vier da tela: um nome digitado ali seria alguém se apresentando como outra pessoa. `app.primeiro_nome` corta o nome do perfil e trata o que veio do e-mail ("matheus.rondon" → "Matheus") e o que veio em maiúsculas.
+- **Quem responde, atende.** Gatilho `messages_quem_responde_atende`: quem manda mensagem vira o "Atendendo" da conversa. O responsável pelo negócio não muda.
+- **`public.assumir_conversa`**: "deixa comigo" antes de responder, só onde a pessoa já poderia escrever. A policy de update de `conversations` continua estreita.
+
+**Os textos (`20260914110000_as_aberturas_levam_o_nome_de_quem_envia.sql` + `seed.sql`, com a mesma lista de 37 trocas):**
+- As 12 aberturas, `GEN-FUP-D3-V1`, `GEN-FUP-LIG-V1` e `GEN-REA-60-V1`: "Heloísa" → `{{atendente}}` ("Aqui é Matheus, da Komune").
+- 21 modelos começavam com `{{nome}}` e 2 terminavam numa variável — a Meta recusaria os 23. Ganharam "Oi, " na frente; `GEN-ONB-D1-NAO-ABRIU` ganhou "Me diz qual fica melhor." e `GEN-FUP-D14-V1` ganhou "Sucesso nos eventos!".
+- Três frases no feminino da primeira pessoa viraram neutras: "deixa eu ser objetiva" → "indo direto ao ponto" (`GEN-FUP-D3-V3`), "não quero ser chata" → "não quero incomodar" (`GEN-ONB-D14`), "vou ser sincera" → "sem rodeios" (`GEN-ONB-D7`).
+- Mensagens de serviço (roteiros de áudio, respostas a objeção, textos de sistema) não mudaram: não passam pela Meta, e os áudios são a voz da Heloísa.
+- **Provado igual nos dois caminhos:** banco com a seed antiga + a migração rodada duas vezes = banco novo com a seed nova, conferido pelo `diff` dos 126 modelos (corpo, variáveis e versão). A primeira comparação pegou dois defeitos meus — a troca não era idempotente ("Oi, Oi,", frase dobrada) e a seed tinha a lista de variáveis de um modelo escrita à mão — e os dois foram consertados antes.
+
+**Na tela:** o balão mostra o nome em negrito como o parceiro vê; "Atendendo" aparece em toda conversa (com "você" quando é você); botão **Assumir conversa** para quem pode escrever e não está atendendo; na caixa de modelo o nome não é campo, a prévia diz "a mensagem se apresenta com o seu nome"; "Prefiro escrever eu mesma" virou "Prefiro escrever a resposta".
+
+**Provado rodando:** pgTAP `43` com 64 asserções (controle negativo: sem os dois gatilhos, 3 vermelhas); suíte inteira 43 arquivos, 2515 asserções, PASS; web 87 testes em conversas, lint e typecheck verdes; workers 320 testes. No navegador, com dois usuários locais: Matheus manda a abertura ("Aqui é Matheus, da Komune"), o lead responde, a Heloísa abre a conversa e vê "Atendendo: Matheus Rondon" e o botão Assumir, responde, e a mensagem sai como `*Heloísa:*` com a conversa passando a "Atendendo: você".
+
+**Decisão humana:**
+- As 37 trocas de texto são da Bárbara revisar (lista acima). Nada foi à Meta ainda, então mudar de novo é barato até o `--conectar`.
+- Textos de sistema ainda falam no feminino da Heloísa ("Obrigada pelo retorno" na confirmação de opt-out, "Sou a Heloísa" em `GEN-SYS-QUEM-SOMOS`) e respondem por qualquer um do time. Não mexi: a confirmação de opt-out tem texto fixo travado em teste.
