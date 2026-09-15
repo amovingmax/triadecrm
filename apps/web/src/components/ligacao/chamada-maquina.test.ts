@@ -116,7 +116,9 @@ describe('passoDaLigacao', () => {
   });
 
   it('gravando é tabular, mesmo no meio da conversa: o commit já partiu', () => {
-    expect(passoDaLigacao({ ...mao, chamada: true, atendeu: true, gravando: true })).toBe('tabular');
+    expect(passoDaLigacao({ ...mao, chamada: true, atendeu: true, gravando: true })).toBe(
+      'tabular',
+    );
   });
 
   it('o recibo ganha de tudo, inclusive de uma chamada ainda não limpa', () => {
@@ -209,9 +211,9 @@ describe('duracaoParaGravar (laudo §3.8)', () => {
       capturas: {},
       pediuParaNaoLigar: false,
     };
-    expect(tabularChamadaSchema.safeParse({ ...base, duracaoSeg: DURACAO_MAXIMA_SEG }).success).toBe(
-      true,
-    );
+    expect(
+      tabularChamadaSchema.safeParse({ ...base, duracaoSeg: DURACAO_MAXIMA_SEG }).success,
+    ).toBe(true);
     expect(
       tabularChamadaSchema.safeParse({ ...base, duracaoSeg: DURACAO_MAXIMA_SEG + 1 }).success,
     ).toBe(false);

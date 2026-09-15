@@ -71,6 +71,8 @@ export interface ContagensDaEntrada {
   ecos: number;
   recibos: number;
   optouts: number;
+  /** Só com BSUID, sem telefone e sem conversa conhecida: foram para a dead-letter. */
+  sem_telefone: number;
   transcricoes_pedidas: number;
   classificacoes_pedidas: number;
   midias_baixadas: number;
@@ -84,6 +86,7 @@ export function contagensDaEntradaZeradas(): ContagensDaEntrada {
     ecos: 0,
     recibos: 0,
     optouts: 0,
+    sem_telefone: 0,
     transcricoes_pedidas: 0,
     classificacoes_pedidas: 0,
     midias_baixadas: 0,
@@ -132,6 +135,7 @@ async function tratarRecibo(
     ocorridoEm: texto(item.ocorrido_em) ?? new Date().toISOString(),
     codigo: texto(item.codigo),
     detalhe: texto(item.detalhe),
+    paraUserId: texto(item.para_user_id),
   });
   contagens.recibos += 1;
   if (!r.ok) {
@@ -175,8 +179,11 @@ async function tratarMensagem(
 ): Promise<void> {
   const wamid = texto(item.wamid);
   const de = texto(item.de);
+  // O BSUID (nomes de usuário do WhatsApp, 2026). Quem adota nome de usuário
+  // pode chegar sem telefone; aí o BSUID é a única identidade que veio.
+  const deUserId = texto(item.de_user_id);
   const numero = texto(item.numero_da_empresa);
-  if (wamid === null || de === null || numero === null) {
+  if (wamid === null || (de === null && deUserId === null) || numero === null) {
     contagens.ignorados += 1;
     ctx.logger.warn('mensagem da fila sem wamid ou sem número', { wamid });
     return;
@@ -190,12 +197,39 @@ async function tratarMensagem(
     wamid,
     numeroDaEmpresa: numero,
     de,
+    deUserId,
     tipo: tipoDaMensagem,
     corpo,
     mediaId: texto(item.media_id),
     mediaMime: texto(item.media_mime),
     ocorridoEm: texto(item.ocorrido_em) ?? new Date().toISOString(),
   });
+
+  if (gravada.sem_telefone) {
+    // Sem telefone e sem conversa que conheça o BSUID: o banco não abriu fio
+    // (não haveria como suprimir nem responder) e mandou a mensagem para a
+    // `wa_dlq`, com nome. O dreno a põe em `public.dead_letters` e abre a
+    // tarefa do admin. Um "SAIR" aqui não pode ser cumprido por telefone —
+    // por isso vira `error`, para ninguém achar que foi atendido.
+    contagens.sem_telefone += 1;
+    const veredito = pediuParaSair(corpo);
+    const dados = { wamid, bsuid: deUserId, nova_na_dlq: gravada.novo };
+    if (veredito.pediu) {
+      ctx.logger.error(
+        'pedido de opt-out SEM telefone: foi para a dead-letter e precisa de uma pessoa',
+        {
+          ...dados,
+          regra: veredito.regra,
+        },
+      );
+    } else {
+      ctx.logger.warn(
+        'mensagem sem telefone e sem conversa conhecida: foi para a dead-letter',
+        dados,
+      );
+    }
+    return;
+  }
 
   if (!gravada.novo) {
     // Reentrega da Meta. O índice único em `wa_message_id` fez o trabalho.

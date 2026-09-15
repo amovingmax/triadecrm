@@ -219,8 +219,7 @@ export function CartaoDeAprovacao({
       {descartando ? (
         <div className="space-y-2 rounded-lg border border-dashed border-hairline p-2.5">
           <p className="text-xs text-muted-foreground">
-            Por que este rascunho não presta? Sem o motivo, o prompt nunca fica sabendo que
-            errou.
+            Por que este rascunho não presta? Sem o motivo, o prompt nunca fica sabendo que errou.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {MOTIVOS_PRONTOS.map((pronto) => (
@@ -297,8 +296,8 @@ export function CartaoDeAprovacao({
       )}
 
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Aprovar assina o texto com o seu nome e põe a mensagem na fila. Ela sai quando o worker
-        de envio rodar com o número liberado pela Meta — quem entrega é ele, nunca esta tela.
+        Aprovar assina o texto com o seu nome e põe a mensagem na fila. Ela sai quando o worker de
+        envio rodar com o número liberado pela Meta — quem entrega é ele, nunca esta tela.
       </p>
     </section>
   );
@@ -343,7 +342,9 @@ function OQueAIaEntendeu({ fio }: { fio: FioDaConversa | null }) {
         <Brain className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="text-muted-foreground">A IA entendeu que o parceiro</span>
         <span className="font-medium">
-          {ficha ? ROTULO_INTENCAO[ficha.intencao] : `usou um rótulo desconhecido (${fio.intencao})`}
+          {ficha
+            ? ROTULO_INTENCAO[ficha.intencao]
+            : `usou um rótulo desconhecido (${fio.intencao})`}
         </span>
         {confianca !== null ? (
           <span className={cn('text-muted-foreground', incerta && 'text-foreground')}>
@@ -362,8 +363,8 @@ function OQueAIaEntendeu({ fio }: { fio: FioDaConversa | null }) {
         <p className="flex items-start gap-1.5 text-[11px] leading-relaxed">
           <CircleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
           <span>
-            Confiança abaixo de <span className="numerico">0,70</span>: por regra, uma pessoa tem
-            de olhar. Confira se a intenção bate com o que está escrito acima.
+            Confiança abaixo de <span className="numerico">0,70</span>: por regra, uma pessoa tem de
+            olhar. Confira se a intenção bate com o que está escrito acima.
           </span>
         </p>
       ) : null}
@@ -401,9 +402,9 @@ function AvisoDoValidador({ veredito }: { veredito: VereditoDoValidador }) {
 
       {veredito.situacao === 'sem_registro' ? (
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Não há registro de o validador ter rodado sobre este texto. Isso não é o mesmo que
-          ele ter passado: leia palavra por palavra antes de aprovar, principalmente número,
-          prazo e condição comercial.
+          Não há registro de o validador ter rodado sobre este texto. Isso não é o mesmo que ele ter
+          passado: leia palavra por palavra antes de aprovar, principalmente número, prazo e
+          condição comercial.
         </p>
       ) : null}
 

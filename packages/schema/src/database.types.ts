@@ -252,6 +252,10 @@ export type Database = {
         Args: { p_enrollment: string }
         Returns: undefined
       }
+      entrada_da_ligacao: {
+        Args: { p_stage_id: number; p_variante: string }
+        Returns: string
+      }
       esteira_concluir: {
         Args: { p_key: string; p_msg_id: number; p_queue: string }
         Returns: boolean
@@ -449,6 +453,10 @@ export type Database = {
       next_business_day: {
         Args: { p_days?: number; p_from: string }
         Returns: string
+      }
+      no_vale_na_variante: {
+        Args: { p_escopo: string; p_variante: string }
+        Returns: boolean
       }
       normalize_cnpj: { Args: { c: string }; Returns: string }
       normalize_instagram: { Args: { h: string }; Returns: string }
@@ -712,6 +720,17 @@ export type Database = {
       }
       uuid_seguro: { Args: { p_valor: string }; Returns: string }
       validar_roteiro: { Args: { p_arvore: Json }; Returns: string[] }
+      variante_da_ligacao: {
+        Args: {
+          p_batch_id: string
+          p_kind: Database["app"]["Enums"]["org_kind"]
+        }
+        Returns: string
+      }
+      wa_avancar_negocio: {
+        Args: { p_de: string[]; p_deal_id: string; p_para: string }
+        Returns: boolean
+      }
       wa_confirmacao_de_optout: {
         Args: { p_conversation_id: string }
         Returns: Json
@@ -731,6 +750,10 @@ export type Database = {
         }[]
       }
       wa_enfileirar_envio: { Args: { p_message_id: string }; Returns: Json }
+      wa_envio_no_funil: {
+        Args: { p_organization_id: string; p_template_code: string }
+        Returns: Json
+      }
       wa_expirar_fila: {
         Args: { p_horas?: number; p_horas_confirmacao?: number }
         Returns: Json
@@ -757,6 +780,10 @@ export type Database = {
         Args: { p_motivo: string; p_quando?: string }
         Returns: string
       }
+      wa_negocio_da_ficha: {
+        Args: { p_organization_id: string }
+        Returns: string
+      }
       wa_numero_padrao: { Args: never; Returns: string }
       wa_proximos: { Args: { p_qty?: number }; Returns: Json }
       wa_registrar_entrada: {
@@ -767,11 +794,13 @@ export type Database = {
           p_media_mime?: string
           p_occurred_at?: string
           p_peer_phone: string
+          p_peer_user_id?: string
           p_type?: Database["app"]["Enums"]["msg_type"]
           p_wamid: string
         }
         Returns: Json
       }
+      wa_resposta_no_funil: { Args: { p_message_id: string }; Returns: Json }
       wa_sucesso: {
         Args: {
           p_categoria?: string
@@ -2512,6 +2541,7 @@ export type Database = {
           last_outbound_at: string | null
           organization_id: string | null
           peer_phone_e164: string
+          peer_user_id: string | null
           snoozed_until: string | null
           status: string
           unread_count: number
@@ -2535,6 +2565,7 @@ export type Database = {
           last_outbound_at?: string | null
           organization_id?: string | null
           peer_phone_e164: string
+          peer_user_id?: string | null
           snoozed_until?: string | null
           status?: string
           unread_count?: number
@@ -2558,6 +2589,7 @@ export type Database = {
           last_outbound_at?: string | null
           organization_id?: string | null
           peer_phone_e164?: string
+          peer_user_id?: string | null
           snoozed_until?: string | null
           status?: string
           unread_count?: number
@@ -6290,6 +6322,15 @@ export type Database = {
         Args: { p_novo_horario: string; p_task_antiga: string }
         Returns: Json
       }
+      criar_ficha_da_conversa: {
+        Args: {
+          p_category_id: number
+          p_conversation_id: string
+          p_kind?: Database["app"]["Enums"]["org_kind"]
+          p_nome: string
+        }
+        Returns: Json
+      }
       criar_pre_cadastro: {
         Args: {
           p_organization_id: string
@@ -6978,6 +7019,10 @@ export type Database = {
         }
         Returns: Json
       }
+      vincular_conversa: {
+        Args: { p_conversation_id: string; p_organization_id: string }
+        Returns: Json
+      }
       wa_eco_registrar: {
         Args: {
           p_body?: string
@@ -6999,6 +7044,7 @@ export type Database = {
           p_media_mime?: string
           p_occurred_at?: string
           p_peer_phone: string
+          p_peer_user_id?: string
           p_type?: string
           p_wamid: string
         }
@@ -7083,6 +7129,7 @@ export type Database = {
           p_detalhe?: string
           p_ocorrido_em?: string
           p_status: string
+          p_user_id?: string
           p_wamid: string
         }
         Returns: Json

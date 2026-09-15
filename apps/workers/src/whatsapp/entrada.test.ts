@@ -287,6 +287,127 @@ describe('recibo e eco', () => {
   });
 });
 
+describe('BSUID — nomes de usuário do WhatsApp (migração 20260915120000)', () => {
+  const BSUID = 'BR.13491208655302741918';
+
+  it('com telefone e BSUID: os dois vão para o banco, e o resto segue igual', async () => {
+    const { cliente, chamadas } = bancoFalso();
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(contexto(cliente), { ...MENSAGEM, de_user_id: BSUID }, c);
+    expect(chamadas[0]?.nome).toBe('wa_entrada_registrar');
+    expect(chamadas[0]?.args.p_peer_phone).toBe('+5584988776655');
+    expect(chamadas[0]?.args.p_peer_user_id).toBe(BSUID);
+    expect(c.mensagens).toBe(1);
+    expect(c.classificacoes_pedidas).toBe(1);
+  });
+
+  it('item antigo da fila, sem de_user_id, manda BSUID nulo', async () => {
+    const { cliente, chamadas } = bancoFalso();
+    await tratarEntrada(contexto(cliente), { ...MENSAGEM }, contagensDaEntradaZeradas());
+    expect(chamadas[0]?.args.p_peer_user_id).toBeNull();
+  });
+
+  it('SEM telefone, conversa conhecida: o banco acha o fio e o opt-out continua valendo', async () => {
+    const { cliente, chamadas } = bancoFalso();
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(
+      contexto(cliente),
+      { ...MENSAGEM, de: null, de_user_id: BSUID, texto: 'SAIR' },
+      c,
+    );
+    expect(chamadas[0]?.args.p_peer_phone).toBeNull();
+    expect(chamadas[0]?.args.p_peer_user_id).toBe(BSUID);
+    expect(chamadas.map((x) => x.nome)).toEqual(['wa_entrada_registrar', 'wa_optout_registrar']);
+    expect(c.optouts).toBe(1);
+    expect(c.ignorados).toBe(0);
+  });
+
+  it('SEM telefone e ninguém conhece o BSUID: conta, avisa, e não chama mais nada', async () => {
+    const { cliente, chamadas } = bancoFalso({
+      wa_entrada_registrar: {
+        novo: true,
+        message_id: null,
+        conversation_id: null,
+        sem_telefone: true,
+      },
+    });
+    const linhas: string[] = [];
+    const ctx = {
+      ...contexto(cliente),
+      logger: createLogger({
+        worker: 'teste',
+        level: 'debug',
+        stdout: (l) => linhas.push(l),
+        stderr: (l) => linhas.push(l),
+      }),
+    };
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(ctx, { ...MENSAGEM, de: null, de_user_id: BSUID }, c);
+    expect(chamadas.map((x) => x.nome)).toEqual(['wa_entrada_registrar']);
+    expect(c.sem_telefone).toBe(1);
+    expect(c.mensagens).toBe(0);
+    expect(linhas.join('\n')).toContain('dead-letter');
+    expect(linhas.join('\n')).toContain(BSUID);
+  });
+
+  it('SEM telefone, ninguém conhece, e a pessoa pediu para SAIR: vira erro, sem opt-out falso', async () => {
+    const { cliente, chamadas } = bancoFalso({
+      wa_entrada_registrar: {
+        novo: true,
+        message_id: null,
+        conversation_id: null,
+        sem_telefone: true,
+      },
+    });
+    const erros: string[] = [];
+    const ctx = {
+      ...contexto(cliente),
+      logger: createLogger({
+        worker: 'teste',
+        level: 'error',
+        stdout: () => {},
+        stderr: (l) => erros.push(l),
+      }),
+    };
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(ctx, { ...MENSAGEM, de: null, de_user_id: BSUID, texto: 'parar' }, c);
+    // Não há conversa: chamar wa_optout_registrar com id nulo seria fingir.
+    expect(chamadas.some((x) => x.nome === 'wa_optout_registrar')).toBe(false);
+    expect(c.optouts).toBe(0);
+    expect(erros).toHaveLength(1);
+    expect(erros[0]).toContain('opt-out SEM telefone');
+  });
+
+  it('sem telefone E sem BSUID continua ignorada, sem ir ao banco', async () => {
+    const { cliente, chamadas } = bancoFalso();
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(contexto(cliente), { ...MENSAGEM, de: null, de_user_id: null }, c);
+    expect(c.ignorados).toBe(1);
+    expect(chamadas).toHaveLength(0);
+  });
+
+  it('recibo com recipient_user_id: aplicado pelo wamid e leva o BSUID junto', async () => {
+    const { cliente, chamadas } = bancoFalso();
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(
+      contexto(cliente),
+      {
+        tipo: 'recibo',
+        chave: 'status:wamid.X:read',
+        wamid: 'wamid.X',
+        estado: 'read',
+        para_user_id: BSUID,
+        ocorrido_em: '2026-09-15T12:00:00.000Z',
+      },
+      c,
+    );
+    expect(chamadas[0]?.nome).toBe('wa_status_registrar');
+    expect(chamadas[0]?.args.p_wamid).toBe('wamid.X');
+    expect(chamadas[0]?.args.p_user_id).toBe(BSUID);
+    expect(c.recibos).toBe(1);
+  });
+});
+
 describe('extensão do arquivo pelo mime', () => {
   it.each([
     ['audio/ogg; codecs=opus', '.ogg'],

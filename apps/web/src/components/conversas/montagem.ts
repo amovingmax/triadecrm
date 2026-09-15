@@ -97,6 +97,8 @@ export type HistoricoCru = {
 /** Listas pequenas e estáveis, lidas uma vez no servidor (ver `catalogos.ts`). */
 export type CatalogosConversas = {
   pessoas: { id: string; nome: string }[];
+  /** As categorias ativas, para criar a ficha de quem escreveu de fora da base. */
+  categorias?: { id: number; nome: string }[];
   etapas: { id: number; nome: string; funil: string }[];
   desfechos: { id: number; nome: string }[];
 };
@@ -330,7 +332,7 @@ export function momentoDaLista(item: ItemConversa): string | null {
  */
 export function ordenarConversas(itens: ItemConversa[]): ItemConversa[] {
   return [...itens].sort((a, b) => {
-    if ((a.naoLidas > 0) !== (b.naoLidas > 0)) return a.naoLidas > 0 ? -1 : 1;
+    if (a.naoLidas > 0 !== b.naoLidas > 0) return a.naoLidas > 0 ? -1 : 1;
     const ma = momentoDaLista(a);
     const mb = momentoDaLista(b);
     if (ma && mb) return mb.localeCompare(ma);
@@ -545,24 +547,22 @@ export function montarLinhaDoTempo({
   // A mensagem entra na mesma coluna, não numa aba: é a promessa que o cabeçalho
   // de `tipos.ts` fazia desde o D5, e é o que deixa ver que o WhatsApp das 14h20
   // veio DEPOIS da ligação das 14h — e por causa dela.
-  const daMensagem = montarMensagens(mensagens, nomeDaPessoa).map(
-    (m): EventoDaLinha => ({
-      id: `mensagem:${m.id}`,
-      genero: 'mensagem',
-      em: m.em,
-      titulo: m.entrada ? 'Mensagem recebida' : 'Mensagem enviada',
-      desfecho: null,
-      detalhe: m.texto,
-      canal: 'whatsapp',
-      tipo: 'message',
-      autor: m.autor,
-      autorTipo: m.autorTipo,
-      comQuem: null,
-      duracaoMin: null,
-      portaAberta: false,
-      mensagem: m,
-    }),
-  );
+  const daMensagem = montarMensagens(mensagens, nomeDaPessoa).map((m): EventoDaLinha => ({
+    id: `mensagem:${m.id}`,
+    genero: 'mensagem',
+    em: m.em,
+    titulo: m.entrada ? 'Mensagem recebida' : 'Mensagem enviada',
+    desfecho: null,
+    detalhe: m.texto,
+    canal: 'whatsapp',
+    tipo: 'message',
+    autor: m.autor,
+    autorTipo: m.autorTipo,
+    comQuem: null,
+    duracaoMin: null,
+    portaAberta: false,
+    mensagem: m,
+  }));
 
   // Empate de segundo entre a atividade e a mudança de etapa que ela causou: a
   // atividade primeiro, porque foi ela que causou a mudança. A mensagem fica

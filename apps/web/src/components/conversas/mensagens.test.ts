@@ -149,8 +149,9 @@ describe('entregaDaMensagem', () => {
   });
 
   it('na falha, mostra o detalhe do erro e cai para o código quando não há detalhe', () => {
-    expect(entregaDaMensagem(mensagem({ status: 'failed', erroDetalhe: 'número inválido' })))
-      .toMatchObject({ tom: 'falha', detalhe: 'número inválido' });
+    expect(
+      entregaDaMensagem(mensagem({ status: 'failed', erroDetalhe: 'número inválido' })),
+    ).toMatchObject({ tom: 'falha', detalhe: 'número inválido' });
     expect(entregaDaMensagem(mensagem({ status: 'failed', erroCodigo: '131049' })).detalhe).toBe(
       '131049',
     );
@@ -502,7 +503,10 @@ describe('fraseDaRecusaDoEnvio', () => {
 
 describe('separarAssinatura', () => {
   it('reconhece a linha que o banco põe no texto livre', () => {
-    expect(separarAssinatura('*Matheus:*\nOi, Neuma!')).toEqual({ nome: 'Matheus', resto: 'Oi, Neuma!' });
+    expect(separarAssinatura('*Matheus:*\nOi, Neuma!')).toEqual({
+      nome: 'Matheus',
+      resto: 'Oi, Neuma!',
+    });
   });
 
   it('texto sem assinatura passa inteiro', () => {

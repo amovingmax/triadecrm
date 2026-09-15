@@ -161,6 +161,11 @@ insert into public.sources (slug, name, kind, base_url, legal_basis, terms_notes
    null, 0.00, true,
    '{"collector": {"kind": "spreadsheet", "phase": "mvp", "enabled": true}, "requires_license_for_third_party_lists": true}'),
 
+  ('whatsapp_entrada', 'Chegou pelo WhatsApp', 'manual', null, 'legitimo_interesse',
+   'A pessoa escreveu para o número da KOMUNE e alguém do time criou a ficha a partir da conversa (migração 20260915130000). O dado veio dela mesma, no contexto de um contato comercial que ela iniciou.',
+   null, 0.00, true,
+   '{"collector": {"kind": "manual", "phase": "mvp", "enabled": true}}'),
+
   ('contato_pessoal', 'Contato pessoal', 'referral', null, 'legitimo_interesse',
    'Origem "contato pessoal de [pessoa do time]" (RF-BAS-15): relacionamento prévio; entra como Tier A+ no topo da fila, abertura assinada por quem conhece. Registrar quem é a pessoa do time em collector.',
    null, 0.00, true,

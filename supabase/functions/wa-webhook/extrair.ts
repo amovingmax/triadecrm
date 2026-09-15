@@ -23,6 +23,19 @@
 //
 // Nada aqui decide nada. Opt-out, supressão, janela e teto são do banco e do
 // worker; o adaptador não sabe o que é um opt-out.
+//
+// O BSUID (nomes de usuário do WhatsApp, 2026)
+// -----------------------------------------------------------------------------
+// Desde abril de 2026 a Meta manda, em todo webhook de `messages`, o
+// "business-scoped user ID": `messages[].from_user_id`, `statuses[].
+// recipient_user_id` e `contacts[].user_id` (formato `BR.<alfanumérico>`).
+// Quem adota nome de usuário pode chegar SEM telefone (`from`/`wa_id`
+// omitidos) quando não houve conversa com aquele número nos últimos 30 dias.
+// Por isso a mensagem sai daqui com `de` possivelmente nulo e com
+// `de_user_id`: descartar a mensagem de quem não mostrou o número seria
+// perder exatamente o "SAIR" de alguém. Quem decide o que fazer com ela é o
+// banco (`app.wa_registrar_entrada`, migração 20260915120000).
+// https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/
 // =============================================================================
 
 /** Um item já traduzido para o vocabulário do Tríade, pronto para a fila. */
@@ -31,7 +44,10 @@ export type ItemDaMeta =
       tipo: 'mensagem';
       chave: string;
       wamid: string;
-      de: string;
+      /** E.164. Nulo quando a pessoa adotou nome de usuário e a Meta omitiu o número. */
+      de: string | null;
+      /** O BSUID (`from_user_id`). Nulo em webhook anterior a abril de 2026. */
+      de_user_id: string | null;
       numero_da_empresa: string;
       phone_number_id: string | null;
       tipo_da_mensagem: string;
@@ -58,6 +74,8 @@ export type ItemDaMeta =
       chave: string;
       wamid: string;
       estado: string;
+      /** O BSUID de quem recebeu (`recipient_user_id`), para a conversa aprender. */
+      para_user_id: string | null;
       ocorrido_em: string;
       codigo: string | null;
       detalhe: string | null;
@@ -143,6 +161,19 @@ function conteudo(m: Record<string, unknown>): {
   };
 }
 
+/**
+ * O telefone de um BSUID segundo `value.contacts[]`, quando a Meta o mandou lá
+ * e não em `messages[].from`. Não inventa: sem `wa_id`, devolve nulo.
+ */
+function telefoneDoContato(contatos: unknown[], userId: string | null): string | null {
+  if (userId === null) return null;
+  for (const bruto of contatos) {
+    const c = objeto(bruto);
+    if (c && texto(c.user_id) === userId) return e164(c.wa_id);
+  }
+  return null;
+}
+
 /** Campos de `changes[].field` que este adaptador reconhece como "nossos". */
 const CAMPO_DE_MENSAGENS = 'messages';
 
@@ -181,8 +212,12 @@ export function extrairDaMeta(payload: unknown): Extracao {
         const m = objeto(bruta);
         if (!m) continue;
         const wamid = texto(m.id);
-        const de = e164(m.from);
-        if (wamid === null || de === null || numeroDaEmpresa === null) {
+        const deUserId = texto(m.from_user_id);
+        const de = e164(m.from) ?? telefoneDoContato(lista(valor.contacts), deUserId);
+        // Sem telefone E sem BSUID não há de quem seja. Só com o BSUID, a
+        // mensagem segue: o banco acha a conversa por ele ou a põe na
+        // dead-letter com nome — nunca some aqui.
+        if (wamid === null || (de === null && deUserId === null) || numeroDaEmpresa === null) {
           ignorados.push('mensagem_sem_id_ou_numero');
           continue;
         }
@@ -192,6 +227,7 @@ export function extrairDaMeta(payload: unknown): Extracao {
           chave: wamid,
           wamid,
           de,
+          de_user_id: deUserId,
           numero_da_empresa: numeroDaEmpresa,
           phone_number_id: phoneNumberId,
           tipo_da_mensagem: c.tipo,
@@ -249,6 +285,8 @@ export function extrairDaMeta(payload: unknown): Extracao {
           chave: `status:${wamid}:${estado}`,
           wamid,
           estado,
+          // O recibo é aplicado pelo wamid; o BSUID só ensina a conversa.
+          para_user_id: texto(s.recipient_user_id),
           ocorrido_em: instante(s.timestamp),
           // A Meta manda `code` como número (131049) e às vezes como string.
           codigo: erro ? (texto(erro.code) ?? numeroComoTexto(erro.code)) : null,

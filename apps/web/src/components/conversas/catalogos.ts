@@ -15,7 +15,7 @@ import type { CatalogosConversas } from './montagem';
 export async function carregarCatalogos(): Promise<CatalogosConversas> {
   const supabase = await createClient();
 
-  const [pessoas, etapas, funis, desfechos] = await Promise.all([
+  const [pessoas, etapas, funis, desfechos, categorias] = await Promise.all([
     supabase
       .from('team_directory')
       .select('id, full_name, is_active')
@@ -24,6 +24,7 @@ export async function carregarCatalogos(): Promise<CatalogosConversas> {
     supabase.from('stages').select('id, name, pipeline_id, position').order('position'),
     supabase.from('pipelines').select('id, name, position').order('position'),
     supabase.from('interaction_outcomes').select('id, name, position').order('position'),
+    supabase.from('categories').select('id, name').eq('is_active', true).order('position'),
   ]);
 
   const nomeDoFunil = new Map((funis.data ?? []).map((f) => [f.id, f.name]));
@@ -36,5 +37,6 @@ export async function carregarCatalogos(): Promise<CatalogosConversas> {
       funil: nomeDoFunil.get(e.pipeline_id) ?? 'Funil',
     })),
     desfechos: (desfechos.data ?? []).map((d) => ({ id: d.id, nome: d.name })),
+    categorias: (categorias.data ?? []).map((c) => ({ id: c.id, nome: c.name })),
   };
 }

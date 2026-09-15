@@ -133,6 +133,13 @@ export interface RespostaDeEntrada {
   novo: boolean;
   message_id: string | null;
   conversation_id: string | null;
+  /**
+   * Veio só com o BSUID, sem telefone, e nenhuma conversa conhecia esse BSUID
+   * (migração 20260915120000). O banco NÃO criou conversa — fio sem telefone
+   * não tem como ser suprimido — e mandou a mensagem para a `wa_dlq`, que o
+   * dreno põe em `public.dead_letters` com tarefa para o admin.
+   */
+  sem_telefone: boolean;
 }
 
 function paraRespostaDeEntrada(bruto: unknown): RespostaDeEntrada {
@@ -141,6 +148,7 @@ function paraRespostaDeEntrada(bruto: unknown): RespostaDeEntrada {
     novo: r.novo === true,
     message_id: texto(r.message_id),
     conversation_id: texto(r.conversation_id),
+    sem_telefone: r.sem_telefone === true,
   };
 }
 
@@ -149,7 +157,10 @@ export async function registrarEntrada(
   argumentos: {
     wamid: string;
     numeroDaEmpresa: string;
-    de: string;
+    /** Nulo quando a Meta omitiu o telefone (nome de usuário); aí `deUserId` é obrigatório. */
+    de: string | null;
+    /** O BSUID de quem escreveu (`from_user_id`). */
+    deUserId: string | null;
     tipo: string;
     corpo: string | null;
     mediaId: string | null;
@@ -167,6 +178,7 @@ export async function registrarEntrada(
       p_media_id: argumentos.mediaId,
       p_media_mime: argumentos.mediaMime,
       p_occurred_at: argumentos.ocorridoEm,
+      p_peer_user_id: argumentos.deUserId,
     }),
   );
 }
@@ -206,6 +218,8 @@ export async function registrarRecibo(
     ocorridoEm: string;
     codigo: string | null;
     detalhe: string | null;
+    /** O BSUID de quem recebeu: a conversa da mensagem passa a conhecê-lo. */
+    paraUserId: string | null;
   },
 ): Promise<{ ok: boolean; motivo: string | null }> {
   const r = objeto(
@@ -215,6 +229,7 @@ export async function registrarRecibo(
       p_ocorrido_em: argumentos.ocorridoEm,
       p_codigo: argumentos.codigo,
       p_detalhe: argumentos.detalhe,
+      p_user_id: argumentos.paraUserId,
     }),
   );
   return { ok: r.ok === true, motivo: texto(r.motivo) };

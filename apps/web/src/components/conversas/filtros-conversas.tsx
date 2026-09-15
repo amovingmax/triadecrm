@@ -207,7 +207,10 @@ function Filtro<T extends string>({
     >
       <SelectTrigger
         aria-label={aria}
-        className={cn('toque h-11 shrink-0 md:h-8', valor !== null && 'border-foreground/40 font-medium')}
+        className={cn(
+          'toque h-11 shrink-0 md:h-8',
+          valor !== null && 'border-foreground/40 font-medium',
+        )}
       >
         <SelectValue placeholder={rotulo}>
           {valor === null ? rotulo : opcoes.find((o) => o.valor === valor)?.rotulo}

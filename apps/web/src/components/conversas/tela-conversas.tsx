@@ -19,6 +19,8 @@ import {
 import { contarFila, FilaDeAprovacao, FilaVazia, tempoDoMaisUrgente } from './fila-aprovacao';
 import { FiltrosDaConversa } from './filtros-conversas';
 import { numero } from './formatos';
+import { ConversaForaDaBase, ListaForaDaBase } from './fora-da-base';
+import { conversasForaDaBase } from './fora-da-base-dados';
 import { ListaConversas } from './lista-conversas';
 import { aplicarFiltros, montarConversas, type CatalogosConversas } from './montagem';
 import {
@@ -80,6 +82,8 @@ export function TelaConversas({
   const [filtros, setFiltros] = useState<FiltrosConversas>(filtrosIniciais);
   const [escolhidoId, setEscolhidoId] = useState<string | null>(organizacaoInicial);
   const [aba, setAba] = useState<AbaDaEsquerda>(abaInicial);
+  /** A conversa aberta na aba "Fora da base" (id da conversa, não da ficha). */
+  const [foraId, setForaId] = useState<string | null>(null);
 
   const consulta = useQuery({ queryKey: CHAVE_CONVERSAS, queryFn: carregarConversas });
 
@@ -106,6 +110,11 @@ export function TelaConversas({
   const maisUrgente = useMemo(() => tempoDoMaisUrgente(paraAprovar), [paraAprovar]);
 
   const daAba = aba === 'aprovar' ? paraAprovar : itens;
+  const foraDaBase = useMemo(() => conversasForaDaBase(consulta.data?.fios ?? []), [consulta.data]);
+  const foraAberta =
+    aba === 'fora'
+      ? (foraDaBase.find((f) => f.id === foraId) ?? (ehCelular ? null : (foraDaBase[0] ?? null)))
+      : null;
 
   // Sem escolha explícita, o desktop abre a primeira da lista. É derivação, não efeito:
   // um `setState` dentro de `useEffect` aqui reordenaria a tela depois de pintá-la.
@@ -137,7 +146,7 @@ export function TelaConversas({
   const temFio = todos.some((i) => i.fio !== null);
 
   // No celular, conversa aberta é tela cheia: cabeçalho e filtros saem de cena.
-  const telaCheia = ehCelular && aberta !== null;
+  const telaCheia = ehCelular && (aba === 'fora' ? foraId !== null : aberta !== null);
 
   return (
     <div
@@ -186,6 +195,7 @@ export function TelaConversas({
             aba={aba}
             aoTrocar={setAba}
             naFila={fila.total}
+            foraDaBase={foraDaBase.length}
             comAviso={fila.comAviso}
             maisUrgente={maisUrgente}
           />
@@ -203,8 +213,8 @@ export function TelaConversas({
 
           {consulta.data?.cortada ? (
             <p className="text-xs text-muted-foreground">
-              A base passou do que esta tela lê de uma vez, então a lista está cortada.
-              Avise no grupo do time: o histórico precisa virar consulta paginada no banco.
+              A base passou do que esta tela lê de uma vez, então a lista está cortada. Avise no
+              grupo do time: o histórico precisa virar consulta paginada no banco.
             </p>
           ) : null}
         </>
@@ -221,7 +231,11 @@ export function TelaConversas({
             é não renderizar, para os cartões não trafegarem à toa no 4G da rua). */}
         {telaCheia ? null : (
           <section
-            aria-label={aba === "aprovar" ? "Rascunhos esperando aprovação" : "Parceiros por interação mais recente"}
+            aria-label={
+              aba === 'aprovar'
+                ? 'Rascunhos esperando aprovação'
+                : 'Parceiros por interação mais recente'
+            }
             // `min-w-0`: sem ele o item de grade assume `min-width: auto` e cresce até o
             // conteúdo, e em 390px a lista nascia com 484px de largura (o "hoje" e o
             // chevron caíam fora da tela). É a mesma armadilha do flex.
@@ -233,6 +247,12 @@ export function TelaConversas({
               <ErroDaTela
                 causa={mensagemDoErro(consulta.error)}
                 aoTentar={() => void consulta.refetch()}
+              />
+            ) : aba === 'fora' ? (
+              <ListaForaDaBase
+                fios={foraDaBase}
+                selecionadoId={foraAberta?.id ?? null}
+                aoEscolher={setForaId}
               />
             ) : aba === 'aprovar' ? (
               paraAprovar.length === 0 ? (
@@ -253,13 +273,40 @@ export function TelaConversas({
             ) : itens.length === 0 ? (
               <VazioDeVerdade />
             ) : (
-              <ListaConversas itens={itens} selecionadoId={aberta?.id ?? null} aoEscolher={setEscolhidoId} />
+              <ListaConversas
+                itens={itens}
+                selecionadoId={aberta?.id ?? null}
+                aoEscolher={setEscolhidoId}
+              />
             )}
           </section>
         )}
 
         {/* Conversa. No celular só existe quando alguém escolheu. */}
-        {ehCelular && !aberta ? null : (
+        {aba === 'fora' ? (
+          ehCelular && !foraId ? null : (
+            <section
+              aria-label="Conversa de número fora da base"
+              className="min-h-0 min-w-0 md:overflow-hidden"
+            >
+              {foraAberta ? (
+                <ConversaForaDaBase
+                  key={foraAberta.id}
+                  fio={foraAberta}
+                  catalogos={catalogos}
+                  aoVoltar={() => setForaId(null)}
+                  aoLigar={(organizacaoId) => {
+                    setForaId(null);
+                    setAba('conversas');
+                    setEscolhidoId(organizacaoId);
+                  }}
+                />
+              ) : consulta.isPending ? null : (
+                <NenhumaEscolhida meta={meta} />
+              )}
+            </section>
+          )
+        ) : ehCelular && !aberta ? null : (
           <section
             aria-label="Conversa com o parceiro"
             className="min-h-0 min-w-0 md:overflow-hidden"
@@ -299,12 +346,15 @@ function Abas({
   aba,
   aoTrocar,
   naFila,
+  foraDaBase,
   comAviso,
   maisUrgente,
 }: {
   aba: AbaDaEsquerda;
   aoTrocar: (aba: AbaDaEsquerda) => void;
   naFila: number;
+  /** Conversas de números que não são ficha. */
+  foraDaBase: number;
   comAviso: number;
   maisUrgente: { numero: string; unidade: string } | null;
 }) {
@@ -317,6 +367,7 @@ function Abas({
         itens={[
           { id: 'conversas', rotulo: 'Conversas' },
           { id: 'aprovar', rotulo: 'Aprovar', contagem: naFila },
+          { id: 'fora', rotulo: 'Fora da base', contagem: foraDaBase },
         ]}
       />
 
@@ -343,7 +394,6 @@ function Abas({
     </div>
   );
 }
-
 
 /** Diz em português o que a pessoa filtrou, para o vazio não ser genérico. */
 function descreverRecorte(filtros: FiltrosConversas, catalogos: CatalogosConversas): string {

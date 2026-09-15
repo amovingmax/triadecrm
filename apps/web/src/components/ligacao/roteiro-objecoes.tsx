@@ -168,4 +168,13 @@ const ROTULOS_DE_OBJECAO: Readonly<Record<string, string>> = {
   obj_hostil: 'Já ligaram, para de ligar',
   obj_financeiro: 'Dúvida de dinheiro',
   prod_oito: 'Meus fornecedores não pagam 8%',
+  // v3 (migração 20260915100000)
+  obj_taxa: 'Quanto é a taxa?',
+  obj_nao_decide: 'Não sou eu quem decide',
+  obj_sem_interesse: 'Não tenho interesse',
+  obj_pegadinha: 'Qual é a pegadinha?',
+  obj_por_fora: 'Isso é comissão por fora?',
+  obj_ja_tenho: 'Já tenho meus fornecedores',
+  obj_honorario: 'E o meu honorário?',
+  ativ_obj_whatsapp: 'Manda no WhatsApp',
 };

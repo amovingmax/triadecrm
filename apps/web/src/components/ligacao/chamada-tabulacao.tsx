@@ -227,8 +227,8 @@ function LinhaDeOptout({
       >
         <ShieldBan className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <span>
-          Ele pediu para não ser mais procurado. Grave o resultado abaixo para o pedido
-          valer: é ele que entra na lista de supressão.
+          Ele pediu para não ser mais procurado. Grave o resultado abaixo para o pedido valer: é ele
+          que entra na lista de supressão.
         </span>
       </p>
     );

@@ -96,9 +96,7 @@ export function valoresIniciais(
   sugeridos: Record<string, string>,
   digitados: Record<string, string> = {},
 ): Record<string, string> {
-  return Object.fromEntries(
-    modelo.variaveis.map((v) => [v, digitados[v] ?? sugeridos[v] ?? '']),
-  );
+  return Object.fromEntries(modelo.variaveis.map((v) => [v, digitados[v] ?? sugeridos[v] ?? '']));
 }
 
 // ---------------------------------------------------------------------------

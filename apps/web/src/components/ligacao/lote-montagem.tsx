@@ -172,6 +172,13 @@ export function nomeSugerido(
   temperaturas: TemperaturaDeOrigem[],
   diaDaSemana: string = diaDaSemanaPorExtenso(),
 ): string {
+  // A ativação liga para quem já é cliente: o nome do funil ("Ativação e sucesso do
+  // fornecedor") no plural virava "Ativações e sucessos dos fornecedores clientes".
+  if (funil?.slug === 'ativacao') {
+    const quem =
+      temperaturas.length === 1 && temperaturas[0] === 'cliente_ativo' ? ' — pedidos' : '';
+    return `Ativação${quem} — ${diaDaSemana.replace('-feira', '')}`;
+  }
   const sujeito = funil ? sujeitoDoLote(funil.nome) : { texto: 'Parceiros', feminino: false };
   const temperatura = temperaturas.length === 1 ? ROTULO_TEMPERATURA[temperaturas[0]!] : null;
   const calor = temperatura ? ` ${sujeito.feminino ? temperatura.f : temperatura.m}` : '';

@@ -1,10 +1,4 @@
-import type {
-  ActivityType,
-  Channel,
-  MsgStatus,
-  MsgType,
-  Temperature,
-} from '@komune/schema';
+import type { ActivityType, Channel, MsgStatus, MsgType, Temperature } from '@komune/schema';
 
 /**
  * Contrato da tela de Conversas (PRD §7.4, RF-CON-05/06/12; anexo R04).
@@ -224,8 +218,11 @@ export const ROTULO_JANELA: Record<JanelaSemContato, string> = {
  * mim?") e uma lista só não responde as duas: a fila de aprovação some no meio de
  * cem parceiros ordenados por recência, que é exatamente como um rascunho expira
  * sem ninguém ver.
+ *
+ * `fora` é a terceira pergunta ("quem escreveu e não é ficha?"): a conversa de um número
+ * que não está na base nasce sem organização, e a lista por parceiro não tem onde pô-la.
  */
-export type AbaDaEsquerda = 'conversas' | 'aprovar';
+export type AbaDaEsquerda = 'conversas' | 'aprovar' | 'fora';
 
 export type FiltrosConversas = {
   /** Texto livre sobre o nome, a categoria e o bairro do parceiro. */
@@ -245,7 +242,9 @@ export const FILTROS_VAZIOS: FiltrosConversas = {
 
 /** Há algum recorte ligado? Separa "a base está vazia" de "o filtro não achou nada". */
 export function temRecorte(f: FiltrosConversas): boolean {
-  return f.q.trim() !== '' || f.responsavelId !== null || f.canal !== null || f.janela !== 'qualquer';
+  return (
+    f.q.trim() !== '' || f.responsavelId !== null || f.canal !== null || f.janela !== 'qualquer'
+  );
 }
 
 /** Quantos filtros de lista (fora a busca) estão ligados: alimenta o contador. */
@@ -290,7 +289,7 @@ export function estadoDaUrl(params: Record<string, string | string[] | undefined
       janela: ehJanela(janela) ? janela : 'qualquer',
     },
     organizacaoId: texto('org') || null,
-    aba: texto('aba') === 'aprovar' ? 'aprovar' : 'conversas',
+    aba: texto('aba') === 'aprovar' ? 'aprovar' : texto('aba') === 'fora' ? 'fora' : 'conversas',
   };
 }
 
@@ -360,12 +359,7 @@ export const ROTULO_ORIGEM: Record<OrigemDaMensagem, string> = {
 
 /** `message_drafts.kind`: para que serve o rascunho (vocabulário do R08 e do R13). */
 export type TipoDeRascunho =
-  | 'followup_ligacao'
-  | 'resposta'
-  | 'objecao'
-  | 'onboarding'
-  | 'reativacao'
-  | 'outro';
+  'followup_ligacao' | 'resposta' | 'objecao' | 'onboarding' | 'reativacao' | 'outro';
 
 export const ROTULO_TIPO_RASCUNHO: Record<TipoDeRascunho, string> = {
   followup_ligacao: 'Follow-up de ligação',

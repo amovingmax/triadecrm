@@ -60,7 +60,9 @@ function organizacao(id: string, nome: string): OrganizacaoCrua {
   };
 }
 
-function atividade(parcial: Partial<AtividadeCrua> & { id: string; organization_id: string }): AtividadeCrua {
+function atividade(
+  parcial: Partial<AtividadeCrua> & { id: string; organization_id: string },
+): AtividadeCrua {
   return {
     deal_id: null,
     type: 'call',
@@ -76,7 +78,9 @@ function atividade(parcial: Partial<AtividadeCrua> & { id: string; organization_
   };
 }
 
-function negocio(parcial: Partial<NegocioCru> & { id: string; organization_id: string }): NegocioCru {
+function negocio(
+  parcial: Partial<NegocioCru> & { id: string; organization_id: string },
+): NegocioCru {
   return {
     stage_id: 1,
     status: 'open',
@@ -134,7 +138,12 @@ describe('montarConversas', () => {
       occurred_at: '2026-09-09T10:00:00Z',
       body: 'Importado da lista-semente da pesquisa R09',
     }),
-    atividade({ id: 'a1', organization_id: 'o1', occurred_at: '2026-09-08T14:00:00Z', outcome_id: 10 }),
+    atividade({
+      id: 'a1',
+      organization_id: 'o1',
+      occurred_at: '2026-09-08T14:00:00Z',
+      outcome_id: 10,
+    }),
     atividade({
       id: 'a2',
       organization_id: 'o1',
@@ -158,7 +167,13 @@ describe('montarConversas', () => {
     negocio({ id: 'd2', organization_id: 'o2' }),
   ];
 
-  const itens = montarConversas({ organizacoes, atividades, negocios, catalogos: CATALOGOS, agora });
+  const itens = montarConversas({
+    organizacoes,
+    atividades,
+    negocios,
+    catalogos: CATALOGOS,
+    agora,
+  });
 
   it('ordena por interação mais recente e joga quem nunca falou para o fim', () => {
     expect(itens.map((i) => i.id)).toEqual(['o1', 'o2', 'o3']);
@@ -258,15 +273,15 @@ describe('aplicarFiltros', () => {
   });
 
   it('filtra por canal usado em qualquer interação', () => {
-    expect(aplicarFiltros(itens, { ...FILTROS_VAZIOS, canal: 'whatsapp' }).map((i) => i.id)).toEqual(
-      ['o2'],
-    );
+    expect(
+      aplicarFiltros(itens, { ...FILTROS_VAZIOS, canal: 'whatsapp' }).map((i) => i.id),
+    ).toEqual(['o2']);
   });
 
   it('filtra por faixa de dias sem contato', () => {
-    expect(aplicarFiltros(itens, { ...FILTROS_VAZIOS, janela: 'mais14' }).map((i) => i.id)).toEqual([
-      'o2',
-    ]);
+    expect(aplicarFiltros(itens, { ...FILTROS_VAZIOS, janela: 'mais14' }).map((i) => i.id)).toEqual(
+      ['o2'],
+    );
   });
 });
 
@@ -395,7 +410,9 @@ function fio(parcial: Partial<FioCru> & { id: string; organization_id: string })
   };
 }
 
-function rascunho(parcial: Partial<RascunhoCru> & { id: string; organization_id: string }): RascunhoCru {
+function rascunho(
+  parcial: Partial<RascunhoCru> & { id: string; organization_id: string },
+): RascunhoCru {
   return {
     conversation_id: null,
     kind: 'resposta',
@@ -509,7 +526,10 @@ describe('montarLinhaDoTempo com mensagens', () => {
 
 describe('montarConversas com o inbox', () => {
   const agora = new Date('2026-09-10T12:00:00Z');
-  const organizacoes = [organizacao('o1', 'Neuma Leão Buffet'), organizacao('o2', 'Accord Cerimonial')];
+  const organizacoes = [
+    organizacao('o1', 'Neuma Leão Buffet'),
+    organizacao('o2', 'Accord Cerimonial'),
+  ];
 
   it('pendura o fio, o contador de não lidas e o rascunho na ficha certa', () => {
     const [item] = montarConversas({
@@ -531,7 +551,9 @@ describe('montarConversas com o inbox', () => {
     const itens = montarConversas({
       organizacoes,
       // o2 teve ligação HOJE; o1 não tem atividade nenhuma, só mensagem por ler.
-      atividades: [atividade({ id: 'a', organization_id: 'o2', occurred_at: '2026-09-10T11:00:00Z' })],
+      atividades: [
+        atividade({ id: 'a', organization_id: 'o2', occurred_at: '2026-09-10T11:00:00Z' }),
+      ],
       negocios: [],
       catalogos: CATALOGOS,
       fios: [
@@ -551,7 +573,9 @@ describe('montarConversas com o inbox', () => {
   it('a última mensagem do fio conta para a ordem, mesmo sem atividade registrada', () => {
     const itens = montarConversas({
       organizacoes,
-      atividades: [atividade({ id: 'a', organization_id: 'o2', occurred_at: '2026-09-10T08:00:00Z' })],
+      atividades: [
+        atividade({ id: 'a', organization_id: 'o2', occurred_at: '2026-09-10T08:00:00Z' }),
+      ],
       negocios: [],
       catalogos: CATALOGOS,
       // Sem "por ler" (já lida): quem decide é só o instante.
@@ -566,7 +590,9 @@ describe('montarConversas com o inbox', () => {
   it('sem fio nenhum, a ordem continua sendo a que já era', () => {
     const itens = montarConversas({
       organizacoes,
-      atividades: [atividade({ id: 'a', organization_id: 'o2', occurred_at: '2026-09-10T08:00:00Z' })],
+      atividades: [
+        atividade({ id: 'a', organization_id: 'o2', occurred_at: '2026-09-10T08:00:00Z' }),
+      ],
       negocios: [],
       catalogos: CATALOGOS,
       agora,

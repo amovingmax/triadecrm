@@ -56,13 +56,12 @@ import {
 export type FunilDeLigacao = { id: number; slug: string; nome: string };
 
 /**
- * Os funis em que se disca.
- *
- * São dois, e não os três do banco: `ativacao` anda por eventos da plataforma Komune
- * (PRD §6) e não tem prospecção fria. Oferecê-lo aqui seria oferecer um lote que a
- * montagem devolveria vazio.
+ * Os funis em que se disca: os três. A ativação entrou com o roteiro v3 (migração
+ * 20260915100000), que liga para quem já está na Komune pelo motivo da etapa — perfil
+ * incompleto, pedido parado ou sumiço. Antes dela o funil ficava de fora porque não
+ * havia o que dizer a um parceiro, e a montagem só teria o roteiro de captação.
  */
-const FUNIS_QUE_DISCAM: readonly string[] = ['fornecedor', 'produtor'];
+const FUNIS_QUE_DISCAM: readonly string[] = ['fornecedor', 'ativacao', 'produtor'];
 
 export const CHAVE_FUNIS_DE_LIGACAO = ['ligacao', 'funis'] as const;
 

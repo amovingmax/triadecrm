@@ -82,7 +82,10 @@ export function Janela24h({ estado, className }: { estado: EstadoDaJanela; class
 }
 
 function Icone({ estado, apertada }: { estado: EstadoDaJanela; apertada: boolean }) {
-  const classe = cn('mt-0.5 size-4 shrink-0', apertada ? 'text-foreground' : 'text-muted-foreground');
+  const classe = cn(
+    'mt-0.5 size-4 shrink-0',
+    apertada ? 'text-foreground' : 'text-muted-foreground',
+  );
   if (estado.situacao === 'aberta') {
     return apertada ? (
       <Clock className={classe} aria-hidden="true" />
@@ -127,23 +130,22 @@ function Explicacao({ estado }: { estado: EstadoDaJanela }) {
     return (
       <>
         Dá para responder livremente, com texto ou áudio, e não custa nada. Vale{' '}
-        <span className="numerico">24</span> h a contar da última mensagem que o parceiro
-        mandou.
+        <span className="numerico">24</span> h a contar da última mensagem que o parceiro mandou.
       </>
     );
   }
   if (estado.situacao === 'fechada') {
     return (
       <>
-        Fora da janela, a Meta só deixa passar modelo aprovado: escolha um logo abaixo.
-        Texto livre só volta a sair quando o parceiro responder.
+        Fora da janela, a Meta só deixa passar modelo aprovado: escolha um logo abaixo. Texto livre
+        só volta a sair quando o parceiro responder.
       </>
     );
   }
   return (
     <>
-      A janela de <span className="numerico">24</span> h só existe depois que a pessoa
-      escreve. Enquanto ela não escrever, a mensagem sai por modelo aprovado pela Meta.
+      A janela de <span className="numerico">24</span> h só existe depois que a pessoa escreve.
+      Enquanto ela não escrever, a mensagem sai por modelo aprovado pela Meta.
     </>
   );
 }

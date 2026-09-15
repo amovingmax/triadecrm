@@ -243,3 +243,87 @@ Deno.test('um lote com mensagem, eco e recibo sai com os três', () => {
     ['mensagem', 'eco', 'recibo'],
   );
 });
+
+// ---- BSUID (nomes de usuário do WhatsApp, 2026) ------------------------------
+// https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/
+
+Deno.test('BSUID com telefone: a mensagem sai com os dois', () => {
+  const { itens } = extrairDaMeta(
+    envelope({
+      metadata: METADADOS,
+      contacts: [
+        { profile: { name: 'Marcos' }, wa_id: '5584988776655', user_id: 'BR.13491208655302741918' },
+      ],
+      messages: [
+        {
+          from: '5584988776655',
+          from_user_id: 'BR.13491208655302741918',
+          id: 'wamid.BSUID.1',
+          timestamp: '1757030000',
+          type: 'text',
+          text: { body: 'oi' },
+        },
+      ],
+    }),
+  );
+  const m = so(itens, 'mensagem')[0];
+  assertEquals(m.de, '+5584988776655');
+  assertEquals(m.de_user_id, 'BR.13491208655302741918');
+});
+
+Deno.test('BSUID SEM telefone: a mensagem NÃO é descartada — segue com de = null', () => {
+  const { itens, ignorados } = extrairDaMeta(
+    envelope({
+      metadata: METADADOS,
+      contacts: [{ profile: { name: 'Marcos', username: 'marcos.som' }, user_id: 'BR.777' }],
+      messages: [
+        {
+          from_user_id: 'BR.777',
+          id: 'wamid.BSUID.2',
+          timestamp: '1757030000',
+          type: 'text',
+          text: { body: 'parar' },
+        },
+      ],
+    }),
+  );
+  assertEquals(ignorados, []);
+  const m = so(itens, 'mensagem')[0];
+  assertEquals(m.chave, 'wamid.BSUID.2');
+  assertEquals(m.de, null);
+  assertEquals(m.de_user_id, 'BR.777');
+  assertEquals(m.texto, 'parar');
+});
+
+Deno.test('BSUID sem `from`, mas com wa_id em contacts[]: o telefone vem do contato', () => {
+  const { itens } = extrairDaMeta(
+    envelope({
+      metadata: METADADOS,
+      contacts: [{ wa_id: '5584988776655', user_id: 'BR.888' }],
+      messages: [
+        {
+          from_user_id: 'BR.888',
+          id: 'wamid.BSUID.3',
+          timestamp: '1757030000',
+          type: 'text',
+          text: { body: 'x' },
+        },
+      ],
+    }),
+  );
+  assertEquals(so(itens, 'mensagem')[0].de, '+5584988776655');
+});
+
+Deno.test('recibo com recipient_user_id e sem recipient_id: continua valendo pelo wamid', () => {
+  const { itens } = extrairDaMeta(
+    envelope({
+      metadata: METADADOS,
+      statuses: [
+        { id: 'wamid.Z', status: 'read', timestamp: '1757030000', recipient_user_id: 'BR.999' },
+      ],
+    }),
+  );
+  const r = so(itens, 'recibo')[0];
+  assertEquals(r.chave, 'status:wamid.Z:read');
+  assertEquals(r.para_user_id, 'BR.999');
+});

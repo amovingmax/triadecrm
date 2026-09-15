@@ -133,10 +133,10 @@ function PediuParaSair({
         Este parceiro pediu para não receber mais mensagens
       </p>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Nada sai daqui para ele: nem texto livre dentro da janela de 24 h, nem modelo aprovado
-        fora dela. O banco recusaria o envio de qualquer jeito, e a caixa fecha antes para
-        ninguém escrever à toa. Se ele procurou você, anote na ficha — anotação não devolve
-        ninguém para a fila.
+        Nada sai daqui para ele: nem texto livre dentro da janela de 24 h, nem modelo aprovado fora
+        dela. O banco recusaria o envio de qualquer jeito, e a caixa fecha antes para ninguém
+        escrever à toa. Se ele procurou você, anote na ficha — anotação não devolve ninguém para a
+        fila.
       </p>
       <Button asChild variant="outline" className="toque h-11 md:h-9">
         <Link href={`/parceiros/${organizacaoId}`}>

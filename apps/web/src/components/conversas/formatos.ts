@@ -71,9 +71,14 @@ export function rotuloDoDia(
   if (dias === 0) return { palavra: 'hoje', numero: null, completo };
   if (dias === -1) return { palavra: 'ontem', numero: null, completo };
 
-  const mesmoAno = ISO_LOCAL.format(agora).slice(0, 4) === ISO_LOCAL.format(new Date(iso)).slice(0, 4);
+  const mesmoAno =
+    ISO_LOCAL.format(agora).slice(0, 4) === ISO_LOCAL.format(new Date(iso)).slice(0, 4);
   if (mesmoAno && dias > -7) {
-    return { palavra: `${DIA_SEMANA.format(new Date(iso))}, `, numero: DIA_MES.format(new Date(iso)), completo };
+    return {
+      palavra: `${DIA_SEMANA.format(new Date(iso))}, `,
+      numero: DIA_MES.format(new Date(iso)),
+      completo,
+    };
   }
   return { palavra: '', numero: mesmoAno ? DIA_MES.format(new Date(iso)) : completo, completo };
 }

@@ -151,9 +151,8 @@ export function NenhumaEscolhida({ meta }: { meta: DependenciasDaMeta | null }) 
       <div className="space-y-1">
         <p className="font-heading font-medium">Escolha um parceiro à esquerda</p>
         <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-          A conversa mostra tudo que já aconteceu com ele, na mesma coluna e em ordem:
-          mensagem recebida e enviada, ligação, visita, nota e mudança de etapa, com quem fez
-          e o desfecho.
+          A conversa mostra tudo que já aconteceu com ele, na mesma coluna e em ordem: mensagem
+          recebida e enviada, ligação, visita, nota e mudança de etapa, com quem fez e o desfecho.
         </p>
       </div>
       <AvisoWhatsapp meta={meta} className="max-w-md text-left" />

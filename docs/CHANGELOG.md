@@ -2181,3 +2181,39 @@ Base: o script de captação de fornecedores que o Rafael mandou (abertura com p
 **Decisão humana:**
 - Ler os 67 nós em voz alta antes do primeiro lote (Rafael/Heloísa). É venda, e a régua final é o ouvido.
 - "Por fora" e "repasse pela plataforma, com comprovante" são do texto aprovado; o prazo e a forma do repasse dos 5% são do Dennis confirmar.
+
+### 15/09/2026 — O WhatsApp guarda o BSUID (RF-CON-03, RF-CON-19; ADR-04)
+
+A Meta está lançando nomes de usuário no WhatsApp e, junto, o BSUID ("business-scoped user ID", `BR.<alfanumérico>`). Desde abril/2026 ele vem em todo webhook de `messages` (`messages[].from_user_id`, `statuses[].recipient_user_id`, `contacts[].user_id`); quem adota nome de usuário pode chegar **sem telefone** quando não houve conversa com aquele número nos últimos 30 dias. Até aqui a Edge Function descartava essa mensagem (`mensagem_sem_id_ou_numero`). Referência: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/
+
+**Migração `20260915120000_o_whatsapp_guarda_o_bsuid.sql`:**
+- `conversations.peer_user_id` (nullable, índice `conversations_bsuid_idx`, não único). A conversa aprende o BSUID na mensagem recebida e no recibo (`wa_status_registrar` ganhou `p_user_id`; é o primeiro lugar em que o BSUID aparece num fio que só teve mensagens nossas).
+- `wa_entrada_registrar` / `app.wa_registrar_entrada` ganharam `p_peer_user_id` e aceitam telefone nulo: a mensagem entra no fio que já conhece o BSUID (e o opt-out dela suprime o telefone daquele fio). Se nenhum fio conhece, **não nasce conversa sem telefone** (sem telefone não há supressão): a mensagem vai para a `wa_dlq` com o erro `mensagem_sem_telefone`, uma vez só por wamid, e o dreno a põe em `public.dead_letters` com tarefa para o admin. Sem telefone e sem BSUID, recusa.
+- Gatilho `conversations_bsuid_so_do_worker`: a tela não escreve o BSUID (pôr o BSUID de outra pessoa num fio desviaria o opt-out dela para o telefone errado).
+- As assinaturas antigas saíram; chamadas posicionais antigas continuam valendo pelos defaults.
+
+**Edge Function e worker:** `extrair.ts` passa `de` (pode ser nulo), `de_user_id` e `para_user_id` (telefone de `contacts[].wa_id` quando `from` falta). O worker manda o BSUID ao banco, conta `sem_telefone` e registra em `warn` (ou `error`, quando a mensagem parada é um pedido de opt-out). Envio continua indo para o telefone.
+
+**Provado rodando:** pgTAP `45` com 33 asserções e a suíte inteira verde (45 arquivos, 2580 testes); workers 327 testes Vitest, typecheck de todos os pacotes; Deno `extrair.test.ts` 14 testes; `db lint` sem apontamento em `app`/`public`. `database.types.ts` regenerado (pegou também três funções da migração do roteiro que faltavam).
+
+**Pendente:**
+- Ordem de publicação: migração → worker-wa → Edge Function `wa-webhook`. Worker novo com banco antigo falha em toda mensagem (parâmetro `p_peer_user_id` desconhecido).
+- Eco do Coexistence sem telefone continua descartado com nome (`eco_sem_id_ou_numero`); o número não usa mais Coexistence.
+- Mensagem de sistema `user_changed_user_id` (troca de número) não é tratada à parte; o fio reaprende o BSUID na próxima mensagem com telefone.
+
+**Decisão humana:** o CRM deve responder a quem só mostrou o nome de usuário (envio para BSUID pelo campo `recipient`, disponível desde julho/2026)? Isso exige conversa sem telefone e supressão por BSUID — hoje essas mensagens param na dead-letter para uma pessoa decidir.
+
+### 15/09/2026 — A conversa de quem não é ficha, e o funil que anda com o WhatsApp (RF-CON-05, RF-CON-06, RF-BAS-15, RF-CON-18)
+
+**Migração `20260915130000_a_conversa_fora_da_base_e_o_funil_do_whatsapp.sql`:**
+- **Modelo só pela RPC.** A policy `messages_insert` aceitava `template_id` direto do navegador, pulando as travas de `wa_enviar_modelo` (parâmetros, aprovação da Meta, nome de quem envia). Agora recusa; a caixa de texto não mudou (`responder` perdeu o `modeloId`, que ninguém usava).
+- **Números fora da base.** `public.vincular_conversa` liga a conversa a uma ficha visível (ficha e mensagens, telefone para a ficha que não tinha, evento na linha do tempo). `public.criar_ficha_da_conversa` usa o cadastro rápido de sempre (dedup, supressão, funil pelo tipo) com a origem nova **"Chegou pelo WhatsApp"** (`sources.whatsapp_entrada`) e liga a conversa. Número que já é de outra ficha volta com o id dela para a tela oferecer "Ligar a essa ficha".
+- **O funil anda com o WhatsApp.** A primeira mensagem enviada pelo CRM registra "Enviado, sem resposta" em nome de quem clicou (com o follow-up D+3 do catálogo) e leva o negócio de Prospectado/Identificado para Contatado. A primeira resposta do parceiro registra "Respondeu" (assinado por quem atende a conversa) e leva a Respondeu se o negócio estava antes. Só para a frente, uma vez só, nunca para contato suprimido, e falha no registro não barra a mensagem.
+
+**Na tela:** aba **Fora da base** em Conversas, com contador. Mostra o final do número (o número inteiro não aparece), as mensagens e duas saídas: **Criar ficha** (nome, tipo, categoria) e **Ligar a uma ficha** (busca da `/registrar`). Ligada, a conversa abre na ficha, na aba Conversas.
+
+**Ligação (acertos achados no navegador):** o funil de Ativação não aparecia na montagem de lote (`FUNIS_QUE_DISCAM` só tinha os dois de captação); as objeções novas da v3 apareciam na gaveta pela primeira frase da resposta e ganharam rótulo na boca do cliente (com teste que cobra todas); o nome sugerido do lote de ativação saía "Ativações e sucessos dos fornecedores clientes" e virou "Ativação — terça".
+
+**Provado rodando:** pgTAP `46` (23 asserções) e a suíte inteira (47 arquivos) verde, com `08_seed` contando 12 origens; web 696 testes, workers 327, lint e typecheck. **No navegador (local):** mensagem de número desconhecido aparece em Fora da base → Criar ficha → a conversa abre na ficha nova, em Respondeu, com a caixa de resposta aberta; lote de ativação montado com "Cliente", abertura escolhida pela etapa (em risco → reativar), fechamento com "Amanhã às 10h / Quinta-feira às 15h", folha de reunião com Google Meet e visita, recibo com "Mandar a confirmação no WhatsApp".
+
+**Não conferido no navegador:** a aba nova que o botão do recibo abre (o recado ao `EnviarModelo` tem teste unitário).

@@ -22,7 +22,12 @@ import { contagemDeInteracoes, local } from './formatos';
 import { Janela24h, useJanela } from './janela-24h';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { montarFio, montarRascunho, ordenarFila } from './mensagens';
-import { agruparPorDia, escolherNegocio, montarLinhaDoTempo, type CatalogosConversas } from './montagem';
+import {
+  agruparPorDia,
+  escolherNegocio,
+  montarLinhaDoTempo,
+  type CatalogosConversas,
+} from './montagem';
 import { CaixaDeResposta } from './responder';
 import { ROTULO_ESTADO_DO_FIO, type DependenciasDaMeta, type ItemConversa } from './tipos';
 
@@ -213,7 +218,9 @@ export function Conversa({
               {item.etapa ? (
                 <Badge variant="pilula" className="h-5 px-2 text-[11px] font-normal">
                   {item.etapa}
-                  {item.funil ? <span className="text-muted-foreground"> · {item.funil}</span> : null}
+                  {item.funil ? (
+                    <span className="text-muted-foreground"> · {item.funil}</span>
+                  ) : null}
                 </Badge>
               ) : null}
               {item.naoContatar ? (
@@ -404,8 +411,8 @@ function SemHistorico({ organizacaoId }: { organizacaoId: string }) {
       <div className="space-y-1">
         <p className="font-heading font-medium">Nada aconteceu com este parceiro ainda</p>
         <p className="max-w-prose text-sm text-muted-foreground">
-          A linha do tempo começa no primeiro contato. Registre a ligação, a visita ou a
-          mensagem e ela aparece aqui, com o desfecho e a etapa para onde o negócio foi.
+          A linha do tempo começa no primeiro contato. Registre a ligação, a visita ou a mensagem e
+          ela aparece aqui, com o desfecho e a etapa para onde o negócio foi.
         </p>
       </div>
       <Button asChild className="toque h-11 md:h-9">

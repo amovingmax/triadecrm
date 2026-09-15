@@ -219,7 +219,11 @@ export function separarAssinatura(texto: string): { nome: string | null; resto: 
  */
 export function entregaDaMensagem(m: MensagemDoFio): Entrega {
   if (m.entrada) {
-    return { rotulo: m.status === 'read' ? 'lida por você' : 'recebida', detalhe: null, tom: 'normal' };
+    return {
+      rotulo: m.status === 'read' ? 'lida por você' : 'recebida',
+      detalhe: null,
+      tom: 'normal',
+    };
   }
   switch (m.status) {
     case 'queued':
@@ -375,7 +379,9 @@ export function lerValidador(valor: Json): VereditoDoValidador {
 
 /** O validador apitou? É a pergunta que decide se a tela mostra o bloco de aviso. */
 export function validadorApitou(v: VereditoDoValidador): boolean {
-  return v.situacao === 'bloqueado' || v.situacao === 'substituido' || v.situacao === 'sem_registro';
+  return (
+    v.situacao === 'bloqueado' || v.situacao === 'substituido' || v.situacao === 'sem_registro'
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -424,7 +430,14 @@ const ESTADOS_DE_ENTREGA: readonly string[] = [
   'received',
 ];
 const AUTORES: readonly string[] = ['human', 'bot_fixed', 'bot_ai', 'system'];
-const CANAIS: readonly string[] = ['whatsapp', 'instagram', 'email', 'phone', 'presencial', 'other'];
+const CANAIS: readonly string[] = [
+  'whatsapp',
+  'instagram',
+  'email',
+  'phone',
+  'presencial',
+  'other',
+];
 
 export function montarMensagens(
   cruas: MensagemCrua[],
@@ -598,7 +611,8 @@ export const MOTIVOS_DE_RECUSA_DO_ENVIO: Record<string, string> = {
   // migração 20260914100000).
   whatsapp_nao_configurado:
     'O número de WhatsApp da KOMUNE ainda não foi conectado ao CRM. Enquanto isso, nada sai por aqui.',
-  ficha_sem_whatsapp: 'Esta ficha não tem WhatsApp cadastrado. Cadastre o número na ficha primeiro.',
+  ficha_sem_whatsapp:
+    'Esta ficha não tem WhatsApp cadastrado. Cadastre o número na ficha primeiro.',
   modelo_inexistente: 'Este modelo foi desativado. Recarregue e escolha outro.',
   modelo_de_sistema: 'Este modelo é do sistema e não é enviado à mão.',
   modelo_sem_parametro: 'Falta preencher um dos campos do modelo.',

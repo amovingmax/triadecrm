@@ -10,21 +10,29 @@ import { nomeSugerido, pluralDaPalavra, sujeitoDoLote } from './lote-montagem';
  */
 describe('nome sugerido do lote', () => {
   it('pluraliza o funil e concorda com a temperatura', () => {
-    expect(nomeSugerido({ id: 1, slug: 'fornecedor', nome: 'Captação de fornecedor' }, ['frio'], 'sexta-feira')).toBe(
-      'Fornecedores frios — sexta',
-    );
+    expect(
+      nomeSugerido(
+        { id: 1, slug: 'fornecedor', nome: 'Captação de fornecedor' },
+        ['frio'],
+        'sexta-feira',
+      ),
+    ).toBe('Fornecedores frios — sexta');
   });
 
   it('concorda no masculino quando um dos núcleos é masculino', () => {
     expect(
-      nomeSugerido({ id: 3, slug: 'produtor', nome: 'Produtor e cerimonialista' }, ['morno'], 'quinta-feira'),
+      nomeSugerido(
+        { id: 3, slug: 'produtor', nome: 'Produtor e cerimonialista' },
+        ['morno'],
+        'quinta-feira',
+      ),
     ).toBe('Produtores e cerimonialistas mornos — quinta');
   });
 
   it('concorda no feminino quando todos os núcleos são femininos', () => {
-    expect(nomeSugerido({ id: 9, slug: 'noiva', nome: 'Captação de noiva' }, ['frio'], 'segunda-feira')).toBe(
-      'Noivas frias — segunda',
-    );
+    expect(
+      nomeSugerido({ id: 9, slug: 'noiva', nome: 'Captação de noiva' }, ['frio'], 'segunda-feira'),
+    ).toBe('Noivas frias — segunda');
   });
 
   it('sem funil escolhido, ainda entrega um nome legível', () => {
@@ -33,12 +41,20 @@ describe('nome sugerido do lote', () => {
 
   it('mistura de temperaturas não vira adjetivo nenhum', () => {
     expect(
-      nomeSugerido({ id: 1, slug: 'fornecedor', nome: 'Captação de fornecedor' }, ['frio', 'morno'], 'terça-feira'),
+      nomeSugerido(
+        { id: 1, slug: 'fornecedor', nome: 'Captação de fornecedor' },
+        ['frio', 'morno'],
+        'terça-feira',
+      ),
     ).toBe('Fornecedores — terça');
   });
 
   it('cabe no limite de 60 caracteres do formulário', () => {
-    const nome = nomeSugerido({ id: 3, slug: 'produtor', nome: 'Produtor e cerimonialista' }, ['quente'], 'quarta-feira');
+    const nome = nomeSugerido(
+      { id: 3, slug: 'produtor', nome: 'Produtor e cerimonialista' },
+      ['quente'],
+      'quarta-feira',
+    );
     expect(nome.length).toBeLessThanOrEqual(60);
   });
 });
@@ -65,5 +81,15 @@ describe('sujeito do lote', () => {
       texto: 'Fornecedores',
       feminino: false,
     });
+  });
+});
+
+describe('o nome do lote de ativação', () => {
+  it('não pluraliza o nome do funil', () => {
+    const funil = { id: 2, slug: 'ativacao', nome: 'Ativação e sucesso do fornecedor' };
+    expect(nomeSugerido(funil, ['cliente'], 'terça-feira')).toBe('Ativação — terça');
+    expect(nomeSugerido(funil, ['cliente_ativo'], 'terça-feira')).toBe(
+      'Ativação — pedidos — terça',
+    );
   });
 });

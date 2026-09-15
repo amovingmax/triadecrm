@@ -60,7 +60,11 @@ function levantar(codigo: string | null | undefined, causa: unknown): never {
         causa,
       );
     case '23514':
-      throw new ErroDaConversa('O banco recusou este texto. Confira e tente de novo.', false, causa);
+      throw new ErroDaConversa(
+        'O banco recusou este texto. Confira e tente de novo.',
+        false,
+        causa,
+      );
     default:
       throw new ErroDaConversa(
         'Não deu para falar com o servidor. Verifique a conexão e tente de novo.',
@@ -169,8 +173,6 @@ export async function descartarRascunho(rascunhoId: string, motivo: string): Pro
 export type Resposta = {
   fioId: string;
   texto: string;
-  /** Preenchido quando a janela está fechada: fora dela só modelo aprovado sai. */
-  modeloId?: number | null;
 };
 
 /**
@@ -191,7 +193,7 @@ export type Resposta = {
  * é recusado. A confirmação de opt-out não passa por esta tela: quem a
  * escreve é `public.wa_optout_registrar`, com o texto fixo do GEN-SYS-OPTOUT.
  */
-export async function responder({ fioId, texto, modeloId = null }: Resposta): Promise<void> {
+export async function responder({ fioId, texto }: Resposta): Promise<void> {
   const supabase = createClient();
   const { data: sessao } = await supabase.auth.getUser();
   const eu = sessao.user?.id;
@@ -200,10 +202,11 @@ export async function responder({ fioId, texto, modeloId = null }: Resposta): Pr
   const { error } = await supabase.from('messages').insert({
     conversation_id: fioId,
     direction: 'out',
-    type: modeloId ? 'template' : 'text',
+    // Modelo não sai por aqui: a policy recusa (migração 20260915130000). Quem manda
+    // modelo é `public.wa_enviar_modelo`, pela caixa `EnviarModelo`.
+    type: 'text',
     status: 'queued',
     body: texto,
-    template_id: modeloId,
     author_kind: 'human',
     sent_by: eu,
     origin: 'crm',

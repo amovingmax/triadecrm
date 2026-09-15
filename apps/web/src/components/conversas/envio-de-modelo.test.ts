@@ -81,7 +81,11 @@ describe('valores', () => {
 
   it('parte do que o banco sugeriu e mantém o que a pessoa digitou', () => {
     expect(
-      valoresIniciais(ABERTURA, { nome: 'Mariana', empresa: 'Buffet', lixo: 'x' }, { nome: 'Mari' }),
+      valoresIniciais(
+        ABERTURA,
+        { nome: 'Mariana', empresa: 'Buffet', lixo: 'x' },
+        { nome: 'Mari' },
+      ),
     ).toEqual({ nome: 'Mari', empresa: 'Buffet', origem: '', detalhe: '' });
   });
 
