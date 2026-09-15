@@ -27,6 +27,7 @@ import {
   type ExtrasDaChamada,
 } from './chamada-extras';
 import { ChamadaRecibo } from './chamada-recibo';
+import { mensagemDeDepois, type MensagemDeDepois } from './depois-da-ligacao';
 import { criarProvedorManual } from './chamada-provedor';
 import {
   devolverItem,
@@ -64,6 +65,7 @@ import {
   janelaDeLigacao,
   NO_DE_ABERTURA,
   noPorId,
+  opcoesDeHorario,
   proximaAbertura,
   ROTULOS_RESULTADO_TECNICO,
   tabularChamadaSchema,
@@ -184,6 +186,7 @@ export function TelaChamada({
     desfecho: DesfechoDeLigacao | null;
     resultado: Extract<ResultadoTabulacao, { tabulado: true }>;
     comQuem: ComQuem;
+    whatsapp: MensagemDeDepois | null;
   } | null>(null);
   const [restaMs, setRestaMs] = useState(ESPERA_ANTES_DO_PROXIMO_MS);
   const [reciboPausado, setReciboPausado] = useState(false);
@@ -207,6 +210,11 @@ export function TelaChamada({
    */
   const sugestaoDeData = useMemo(
     () => proximaAbertura(hojeCivil(), contexto.feriados),
+    [contexto.feriados],
+  );
+  /** Os dois horários do fechamento ("amanhã às 10h ou quinta às 15h?"). */
+  const opcoes = useMemo(
+    () => opcoesDeHorario(hojeCivil(), contexto.feriados),
     [contexto.feriados],
   );
 
@@ -240,6 +248,7 @@ export function TelaChamada({
   const item = emMaos?.item ?? null;
   const roteiro = emMaos?.roteiro ?? null;
   const variante = emMaos?.variante ?? 'fornecedor';
+  const entrada = emMaos?.entrada ?? NO_DE_ABERTURA;
 
   // Cronômetro da chamada: começa no toque de "Ligar" / "Liguei" / "Copiar".
   const iniciadaEm = chamada ? Date.parse(chamada.iniciadaEm) : null;
@@ -306,7 +315,7 @@ export function TelaChamada({
       const aberta = await provedor.iniciarChamada({ telefone: item.telefone, itemId: item.id });
       setChamada(aberta);
       setClientKey(crypto.randomUUID());
-      setPercurso(estadoAoDiscar());
+      setPercurso(estadoAoDiscar(entrada));
       setSegundos(0);
     } catch (erro) {
       toast.error(
@@ -488,6 +497,14 @@ export function TelaChamada({
           desfecho,
           resultado: resposta,
           comQuem: comQuemGravado,
+          whatsapp: mensagemDeDepois({
+            variante,
+            resultado,
+            desfechoSlug: desfecho?.slug ?? null,
+            caminho,
+            reuniaoEm: extras.reuniaoEm,
+            reuniaoFormato: extras.reuniaoFormato,
+          }),
         });
         setRestaMs(ESPERA_ANTES_DO_PROXIMO_MS);
         setReciboPausado(false);
@@ -519,6 +536,7 @@ export function TelaChamada({
       item,
       provedor,
       segundos,
+      variante,
     ],
   );
 
@@ -622,6 +640,7 @@ export function TelaChamada({
           desfecho={recibo.desfecho}
           resultado={recibo.resultado}
           comQuemGravado={recibo.comQuem}
+          whatsapp={recibo.whatsapp}
           restaMs={restaMs}
           pausado={reciboPausado}
           aoPausar={pausarRecibo}
@@ -712,7 +731,9 @@ export function TelaChamada({
     );
   }
 
-  const noParaLer = noCorrente ?? noPorId(roteiro, NO_DE_ABERTURA);
+  // Antes de discar, a prévia é a fala de ENTRADA (a da ativação vem pela etapa); depois,
+  // o nó em que a conversa está.
+  const noParaLer = (passo === 'discar' ? null : noCorrente) ?? noPorId(roteiro, entrada);
 
   // Era `mx-auto max-w-5xl` enquanto os SEIS outros estados desta mesma tela já usavam
   // `LEITURA`. Quer dizer: a cada desfecho gravado a tela encolhia 128px e escorregava
@@ -754,6 +775,7 @@ export function TelaChamada({
                   quemLiga={quemLiga}
                   combinadoEm={combinadoEm}
                   sugestaoDeData={sugestaoDeData}
+                  opcoes={opcoes}
                   aoCombinar={setCombinadoEm}
                   captura=""
                   aoCapturar={() => {}}
@@ -805,6 +827,7 @@ export function TelaChamada({
                   quemLiga={quemLiga}
                   combinadoEm={combinadoEm}
                   sugestaoDeData={sugestaoDeData}
+                  opcoes={opcoes}
                   aoCombinar={setCombinadoEm}
                   captura={capturaDoNo(percurso, noParaLer)}
                   aoCapturar={(valor) => {
@@ -848,7 +871,7 @@ export function TelaChamada({
         desfecho={pendente}
         pediuParaNaoLigar={confirmarOptoutNaFolha}
         motivosPerda={contexto.motivosPerda}
-        formatosDaEtapa={contexto.formatosDeReuniao[lote.pipelineId] ?? []}
+        formatosDaEtapa={formatosDaReuniao(contexto.formatosDeReuniao[lote.pipelineId])}
         sugestaoDeData={combinadoEm ?? sugestaoDeData}
         aoConfirmar={(extras) => {
           if (pendente) {
@@ -1115,4 +1138,15 @@ function hojeCivil(): string {
     month: '2-digit',
     day: '2-digit',
   }).format(new Date());
+}
+
+/**
+ * Os formatos de reunião que a folha oferece. Vêm das etapas do funil (`meeting_format`);
+ * o funil de ativação não declara nenhum, e sem esta rede a folha exigiria um formato
+ * sem ter botão para escolher — a sessão marcada na ligação ficaria impossível de gravar.
+ */
+const FORMATOS_PADRAO = ['meet', 'visita'] as const;
+
+function formatosDaReuniao(doFunil: readonly string[] | undefined): readonly string[] {
+  return doFunil && doFunil.length > 0 ? doFunil : FORMATOS_PADRAO;
 }

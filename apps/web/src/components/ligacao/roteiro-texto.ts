@@ -1,6 +1,12 @@
 import { TIMEZONE } from '@komune/schema';
 
-import { fraseDeOrigem, horaEmFortaleza, preencherTexto, type ItemDoLote } from './tipos';
+import {
+  fraseDeOrigem,
+  horaEmFortaleza,
+  opcoesDeHorario,
+  preencherTexto,
+  type ItemDoLote,
+} from './tipos';
 
 /**
  * Os valores que entram nos placeholders do roteiro, e o pouco de cuidado que cada um
@@ -53,11 +59,23 @@ export function diaFalado(iso: string | null, agora: Date = new Date()): string 
   return `dia ${DIA_E_MES.format(quando)}`;
 }
 
-/** "09:00", na hora de Natal. */
+/**
+ * "às 10h" ou "às 14h30", na hora de Natal — como se diz ao telefone. A preposição vem
+ * junto porque a frase do roteiro não pode trazê-la: sem hora combinada, "às [hora]"
+ * viraria "às." na boca de quem lê.
+ */
 export function horaFalada(iso: string | null): string | null {
   if (!iso) return null;
   const quando = new Date(iso);
-  return Number.isNaN(quando.getTime()) ? null : HORA_CURTA.format(quando);
+  if (Number.isNaN(quando.getTime())) return null;
+  const [h = '00', m = '00'] = HORA_CURTA.format(quando).split(':');
+  const hora = String(Number(h));
+  return m === '00' ? `às ${hora}h` : `às ${hora}h${m}`;
+}
+
+/** "amanhã às 10h", "quinta-feira às 15h": um horário inteiro, falado. */
+export function horarioFalado(iso: string, agora: Date = new Date()): string {
+  return [diaFalado(iso, agora), horaFalada(iso)].filter(Boolean).join(' ');
 }
 
 function diaCivil(quando: Date): string {
@@ -122,7 +140,9 @@ export function falaDoNo(
   quemLiga: string,
   combinadoEm: string | null,
   agora: Date = new Date(),
+  opcoes: readonly [string, string] = opcoesDeHorario(diaCivil(agora), []),
 ): string {
+  const nome = item.contatoNome ? primeiroNome(item.contatoNome) : null;
   return costurarPontuacao(
     preencherTexto(texto, {
       saudacao: saudacaoDe(agora),
@@ -130,7 +150,10 @@ export function falaDoNo(
       // Primeiro nome também aqui, e não só em `eu`: o contato é gravado como veio
       // da coleta, e "Obrigado pelo tempo, Maria das Graças Nogueira da Silva" não é
       // frase que alguém diga ao telefone.
-      nome: item.contatoNome ? primeiroNome(item.contatoNome) : null,
+      nome,
+      // "Falo com Mariana?" ou, sem contato nomeado, "Falo com quem cuida dos eventos
+      // aí em Bodega da Terra?" — nunca vazio: a primeira pergunta não pode quebrar.
+      interlocutor: nome ?? `quem cuida dos eventos aí em ${item.nome}`,
       origem: fraseDeOrigem(item.origemSlug),
       eu: primeiroNome(quemLiga),
       dia: diaFalado(combinadoEm, agora),
@@ -140,6 +163,11 @@ export function falaDoNo(
       // doze das dezesseis categorias de fornecedor que a ligação não era para elas,
       // o gancho fala a categoria DESTE parceiro.
       categoria: categoriaFalada(item.categoria),
+      // A mesma categoria, para a frase que não fecha sem ela ("[area] é uma das
+      // categorias que os clientes mais procuram").
+      area: categoriaFalada(item.categoria) ?? 'a área de vocês',
+      opcao1: horarioFalado(opcoes[0], agora),
+      opcao2: horarioFalado(opcoes[1], agora),
     }),
   );
 }

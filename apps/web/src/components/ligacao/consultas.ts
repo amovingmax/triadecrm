@@ -38,6 +38,7 @@ import { type OrgKind, type Temperature } from '@komune/schema';
 import { createClient } from '@/lib/supabase/client';
 
 import {
+  ETAPAS_SEM_LIGACAO_DE_ATIVACAO,
   MENSAGENS_DE_EXCLUSAO,
   RPC_MONTAR_LOTE,
   montarLoteSchema,
@@ -160,6 +161,8 @@ export type LeituraDaPrevia = {
   naoContatar: boolean;
   temTelefone: boolean;
   negocioAberto: boolean;
+  /** Funil de ativação e negócio em primeira contratação ou recorrente. */
+  etapaSemLigacao?: boolean;
   /** `v_contact_cooldown.blocked_forever`: recusa definitiva, não espera. */
   bloqueadoParaSempre: boolean;
   /** O piso de recontato do RF-FUN-13 ainda não venceu. */
@@ -222,6 +225,7 @@ export function motivoDaExclusao(leitura: LeituraDaPrevia): MotivoDeExclusao | n
   if (leitura.naoContatar) return 'nao_contatar';
   if (!leitura.temTelefone) return 'sem_telefone';
   if (!leitura.negocioAberto) return 'sem_negocio_aberto';
+  if (leitura.etapaSemLigacao) return 'etapa_sem_ligacao';
   if (leitura.bloqueadoParaSempre || leitura.emEspera) return 'em_janela_de_recontato';
   if (leitura.reservadaEmOutroLote) return 'reservado_em_outro_lote';
   return null;
@@ -230,29 +234,34 @@ export function motivoDaExclusao(leitura: LeituraDaPrevia): MotivoDeExclusao | n
 export async function carregarBaseDaMontagem(pipelineId: number): Promise<BaseDaMontagem> {
   const supabase = createClient();
 
-  const [negocios, organizacoes, vinculos, categorias, esperas, reservas] = await Promise.all([
-    supabase
-      .from('deals')
-      .select('id, organization_id, status, temperature, last_activity_at')
-      .eq('pipeline_id', pipelineId)
-      .limit(TETO_DA_BASE),
-    supabase
-      .from('organizations_view')
-      .select('id, name, kind, phone_e164, do_not_contact, neighborhood, city_name')
-      .is('deleted_at', null)
-      .limit(TETO_DA_BASE),
-    supabase.from('organization_categories').select('organization_id, category_id'),
-    supabase
-      .from('categories')
-      .select('id, name, position')
-      .eq('is_active', true)
-      .order('position'),
-    supabase.from('v_contact_cooldown').select('organization_id, cooldown_until, blocked_forever'),
-    supabase
-      .from('call_batch_items')
-      .select('organization_id, status, attempts')
-      .limit(TETO_DA_BASE),
-  ]);
+  const [negocios, organizacoes, vinculos, categorias, esperas, reservas, funil, etapas] =
+    await Promise.all([
+      supabase
+        .from('deals')
+        .select('id, organization_id, status, temperature, last_activity_at, stage_id')
+        .eq('pipeline_id', pipelineId)
+        .limit(TETO_DA_BASE),
+      supabase
+        .from('organizations_view')
+        .select('id, name, kind, phone_e164, do_not_contact, neighborhood, city_name')
+        .is('deleted_at', null)
+        .limit(TETO_DA_BASE),
+      supabase.from('organization_categories').select('organization_id, category_id'),
+      supabase
+        .from('categories')
+        .select('id, name, position')
+        .eq('is_active', true)
+        .order('position'),
+      supabase
+        .from('v_contact_cooldown')
+        .select('organization_id, cooldown_until, blocked_forever'),
+      supabase
+        .from('call_batch_items')
+        .select('organization_id, status, attempts')
+        .limit(TETO_DA_BASE),
+      supabase.from('pipelines').select('slug').eq('id', pipelineId).maybeSingle(),
+      supabase.from('stages').select('id, slug').eq('pipeline_id', pipelineId),
+    ]);
 
   const falha =
     negocios.error ??
@@ -260,10 +269,20 @@ export async function carregarBaseDaMontagem(pipelineId: number): Promise<BaseDa
     vinculos.error ??
     categorias.error ??
     esperas.error ??
-    reservas.error;
+    reservas.error ??
+    funil.error ??
+    etapas.error;
   if (falha) throw falha;
 
   const agora = Date.now();
+  // Espelho do `when` de `app.call_candidates` (migração 20260915100000).
+  const etapasSemLigacao = new Set(
+    funil.data?.slug === 'ativacao'
+      ? (etapas.data ?? [])
+          .filter((e) => (ETAPAS_SEM_LIGACAO_DE_ATIVACAO as readonly string[]).includes(e.slug))
+          .map((e) => e.id)
+      : [],
+  );
   const porOrganizacao = new Map((organizacoes.data ?? []).map((o) => [o.id, o]));
   const nomeDaCategoria = new Map((categorias.data ?? []).map((c) => [c.id, c.name]));
 
@@ -306,6 +325,7 @@ export async function carregarBaseDaMontagem(pipelineId: number): Promise<BaseDa
       naoContatar: organizacao.do_not_contact,
       temTelefone,
       negocioAberto: negocio.status === 'open',
+      etapaSemLigacao: negocio.stage_id !== null && etapasSemLigacao.has(negocio.stage_id),
       bloqueadoParaSempre: Boolean(espera?.blocked_forever),
       emEspera: Boolean(espera?.cooldown_until && Date.parse(espera.cooldown_until) > agora),
       reservadaEmOutroLote: reservadas.has(organizacao.id),

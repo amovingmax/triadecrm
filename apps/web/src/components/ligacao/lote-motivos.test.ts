@@ -45,6 +45,7 @@ describe('motivoDaExclusao', () => {
     expect(motivoDaExclusao(leitura({ reservadaEmOutroLote: true }))).toBe(
       'reservado_em_outro_lote',
     );
+    expect(motivoDaExclusao(leitura({ etapaSemLigacao: true }))).toBe('etapa_sem_ligacao');
   });
 
   it('a ordem é a da GRAVIDADE: "não contatar" ganha de tudo o que vem depois', () => {
@@ -84,6 +85,7 @@ describe('o que a prévia não enxerga está declarado (laudo §3.12a)', () => {
         leitura({ emEspera: true }),
         leitura({ bloqueadoParaSempre: true }),
         leitura({ reservadaEmOutroLote: true }),
+        leitura({ etapaSemLigacao: true }),
       ] as LeituraDaPrevia[]
     )
       .map(motivoDaExclusao)

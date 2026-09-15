@@ -261,7 +261,7 @@ select is(app.call_window('2026-09-06 15:00-03'::timestamptz) ->> 'abre_em',
 -- 4. Roteiro em árvore
 -- =====================================================================
 select is((select cardinality(app.validar_roteiro(r.arvore)) from public.call_scripts r
-            where r.slug = 'captacao_v1'),
+            where r.slug = 'captacao_v1' and r.is_published),
   0, 'o roteiro semeado não tem erro estrutural');
 -- Piso, e não igualdade. Este número era 37 e virou 60 na v2 (09/09/2026, o
 -- roteiro que parou de vender casamento), e travá-lo aqui transformaria toda
@@ -316,7 +316,7 @@ begin
          p_nome               => 'LIG lote do Matheus',
          p_pipeline_id        => pg_temp.funil('fornecedor'),
          p_temperatura_origem => 'frio',
-         p_roteiro_id         => (select id from public.call_scripts where slug = 'captacao_v1'),
+         p_roteiro_id         => (select id from public.call_scripts where slug = 'captacao_v1' and is_published),
          p_categoria_ids      => array[901],
          p_tamanho            => 25);
   execute 'reset role';
@@ -359,7 +359,7 @@ begin
          p_nome               => 'LIG lote da Heloísa',
          p_pipeline_id        => pg_temp.funil('fornecedor'),
          p_temperatura_origem => 'frio',
-         p_roteiro_id         => (select id from public.call_scripts where slug = 'captacao_v1'),
+         p_roteiro_id         => (select id from public.call_scripts where slug = 'captacao_v1' and is_published),
          p_categoria_ids      => array[901],
          p_tamanho            => 25);
   execute 'reset role';
@@ -686,7 +686,7 @@ declare v jsonb;
 begin
   perform pg_temp.entrar('a0000000-0000-4000-8000-0000000013a4', 'leitura');
   v := public.montar_lote('LIG lote proibido', pg_temp.funil('fornecedor'), 'frio',
-                          (select id from public.call_scripts where slug = 'captacao_v1'));
+                          (select id from public.call_scripts where slug = 'captacao_v1' and is_published));
   execute 'reset role';
   insert into pg_temp.r values ('leitura', v);
 end $$;

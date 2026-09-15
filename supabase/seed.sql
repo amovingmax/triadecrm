@@ -1399,6 +1399,25 @@ values
    '["empresa", "link", "nome", "origem"]'::jsonb)
 on conflict (template_code) do nothing;
 
+-- Os três modelos de depois da ligação (roteiro v3, migração 20260915100000): a
+-- confirmação da reunião e o resumo para fornecedor e para produtor.
+insert into public.message_templates
+  (template_code, name, channel, category, segment, kind, language, body, variables)
+values
+  ('GEN-LIG-CONFIRMA', 'Depois da ligação — confirmação da reunião', 'whatsapp', 'utility', 'GEN',
+   'agendamento', 'pt_BR',
+   'Oi, {{nome}}! Aqui é {{atendente}}, da Komune. Valeu pela ligação de agora há pouco! Fica confirmada nossa conversa no dia {{data}}, às {{hora}}. Formato: {{formato}}. Qualquer coisa, é só me chamar por aqui.',
+   '["atendente", "data", "formato", "hora", "nome"]'::jsonb),
+  ('GEN-LIG-RESUMO-FOR', 'Depois da ligação — resumo para fornecedor', 'whatsapp', 'marketing', 'GEN',
+   'followup', 'pt_BR',
+   'Oi, {{nome}}! Aqui é {{atendente}}, da Komune. Como combinamos na ligação, segue o resumo: a Komune é um app de Natal que conecta os fornecedores de eventos com quem está organizando aniversários, casamentos, formaturas e eventos de empresa. Estar na plataforma é de graça: não tem mensalidade nem adesão, e vocês só pagam quando fecham um serviço por lá. Quando quiser ver por dentro, é só me chamar. Para não receber mais mensagens, responda SAIR. Como usamos seus dados: komune.app.br/privacidade',
+   '["atendente", "nome"]'::jsonb),
+  ('GEN-LIG-RESUMO-PRO', 'Depois da ligação — resumo para produtor e cerimonialista', 'whatsapp', 'marketing', 'GEN',
+   'followup', 'pt_BR',
+   'Oi, {{nome}}! Aqui é {{atendente}}, da Komune. Como combinamos na ligação, segue o resumo: a Komune é um app de Natal para quem organiza evento. Você monta o evento e contrata os fornecedores da cidade num lugar só, com preço e avaliação na tela. Pra quem organiza não tem custo nenhum, e você ainda recebe 5% de tudo que contratar de fornecedor pela Komune, depois que o serviço é entregue. Quando quiser ver por dentro, é só me chamar. Para não receber mais mensagens, responda SAIR. Como usamos seus dados: komune.app.br/privacidade',
+   '["atendente", "nome"]'::jsonb)
+on conflict (template_code) do nothing;
+
 -- O áudio do D+3 do onboarding. Nasce sem arquivo: é a Heloísa que grava.
 insert into public.audio_assets (slug, title, segment, context, is_active)
 values ('gen-onb-ajuda-1', 'Onboarding — quer que eu termine por você? (20 s)', 'GEN',

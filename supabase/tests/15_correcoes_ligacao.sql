@@ -466,24 +466,26 @@ select is(pg_temp.n_consent(((select valor ->> '_org' from pg_temp.r where chave
 -- =====================================================================
 -- 5. D4 — quem faz a pergunta do volume é quem guarda a resposta
 -- =====================================================================
+-- Os quatro nós são da v2 (a v3, de 15/09/2026, não pergunta volume na ligação). A v2
+-- continua no banco, despublicada, servindo os lotes montados com ela: é nela que se confere.
 select results_eq(
   $$select n ->> 'id', n ->> 'tipo', n ->> 'campo'
       from public.call_scripts s, jsonb_array_elements(s.arvore) n
-     where s.slug = 'captacao_v1' and n ->> 'id' = 'forn_explica'$$,
+     where s.slug = 'captacao_v1' and s.versao = 2 and n ->> 'id' = 'forn_explica'$$,
   $$values ('forn_explica'::text, 'captura'::text, 'eventos_por_mes'::text)$$,
   'D4: o nó que pergunta "quantos eventos por mês" é captura e guarda em eventos_por_mes');
 select results_eq(
   $$select n ->> 'id', n ->> 'tipo', n ->> 'campo'
       from public.call_scripts s, jsonb_array_elements(s.arvore) n
-     where s.slug = 'captacao_v1' and n ->> 'id' = 'prod_explica'$$,
+     where s.slug = 'captacao_v1' and s.versao = 2 and n ->> 'id' = 'prod_explica'$$,
   $$values ('prod_explica'::text, 'captura'::text, 'eventos_por_ano'::text)$$,
   'D4: o nó que pergunta "quantos eventos por ano" é captura e guarda em eventos_por_ano');
 select is((select n ->> 'campo' from public.call_scripts s, jsonb_array_elements(s.arvore) n
-            where s.slug = 'captacao_v1' and n ->> 'id' = 'forn_qualifica'),
+            where s.slug = 'captacao_v1' and s.versao = 2 and n ->> 'id' = 'forn_qualifica'),
   'prioridade_do_dono',
   'D4: "mais pedido ou pedido melhor" não é volume — vai para prioridade_do_dono');
 select is((select n ->> 'campo' from public.call_scripts s, jsonb_array_elements(s.arvore) n
-            where s.slug = 'captacao_v1' and n ->> 'id' = 'prod_qualifica'),
+            where s.slug = 'captacao_v1' and s.versao = 2 and n ->> 'id' = 'prod_qualifica'),
   'maior_aperto',
   'D4: "qual é o seu maior aperto" não é volume — vai para maior_aperto');
 select is((select count(*)::int from public.call_scripts s, jsonb_array_elements(s.arvore) n
@@ -494,7 +496,7 @@ select is((select count(*)::int from public.call_scripts s, jsonb_array_elements
               and n ->> 'texto' !~* 'quantos eventos'), 0,
   'D4: só nó que pergunta "quantos eventos" grava em eventos_por_mes/eventos_por_ano');
 select is((select cardinality(app.validar_roteiro(s.arvore)) from public.call_scripts s
-            where s.slug = 'captacao_v1'), 0,
+            where s.slug = 'captacao_v1' and s.is_published), 0,
   'D4: e a árvore corrigida continua válida para app.validar_roteiro');
 
 -- devolve o feriado de hoje, se havia (a transação some, mas o arquivo não mente)

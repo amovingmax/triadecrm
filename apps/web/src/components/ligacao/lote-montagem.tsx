@@ -77,6 +77,7 @@ import {
   EsqueletoDaPrevia,
   LENTE_LIMPA,
   PainelDaPrevia,
+  TEMPERATURAS_DA_CAPTACAO,
   TEMPERATURAS_DE_ORIGEM,
   calcularPrevia,
   lenteEstaLimpa,
@@ -111,6 +112,8 @@ const ROTULO_TEMPERATURA: Record<TemperaturaDeOrigem, { m: string; f: string }> 
   frio: { m: 'frios', f: 'frias' },
   morno: { m: 'mornos', f: 'mornas' },
   quente: { m: 'quentes', f: 'quentes' },
+  cliente: { m: 'clientes', f: 'clientes' },
+  cliente_ativo: { m: 'clientes ativos', f: 'clientes ativas' },
 };
 
 /**
@@ -399,6 +402,11 @@ function FormularioDeMontagem({ aoFechar }: { aoFechar: () => void }) {
                   const quantos = (base.data?.candidatos ?? []).filter(
                     (c) => c.temperatura === temperatura && c.motivo === null,
                   ).length;
+                  // As de cliente só aparecem no funil que as tem (a ativação).
+                  const naBase = (base.data?.candidatos ?? []).some(
+                    (c) => c.temperatura === temperatura,
+                  );
+                  if (!TEMPERATURAS_DA_CAPTACAO.includes(temperatura) && !naBase) return null;
                   return (
                     <Pastilha
                       key={temperatura}

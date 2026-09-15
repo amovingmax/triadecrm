@@ -12,8 +12,9 @@ import {
   paraInputLocal,
 } from '@/components/registro/formatos';
 
-import { falaDoNo } from './roteiro-texto';
+import { falaDoNo, horarioFalado } from './roteiro-texto';
 import {
+  SAIDA_DAS_OPCOES,
   saidasNaVariante,
   type ItemDoLote,
   type NoRoteiro,
@@ -51,6 +52,7 @@ export function RoteiroNo({
   quemLiga,
   combinadoEm,
   sugestaoDeData,
+  opcoes,
   aoCombinar,
   captura,
   aoCapturar,
@@ -71,6 +73,8 @@ export function RoteiroNo({
    * quebrada ao telefone é pior do que ler uma proposta que ela pode mudar num toque.
    */
   sugestaoDeData: string | null;
+  /** Os dois horários que o fechamento oferece (`opcoesDeHorario`): `[opcao1]` e `[opcao2]`. */
+  opcoes: readonly [string, string];
   aoCombinar: (iso: string | null) => void;
   captura: string;
   aoCapturar: (valor: string) => void;
@@ -82,7 +86,8 @@ export function RoteiroNo({
   const campoCaptura = useId();
 
   const combinado = combinadoEm ?? sugestaoDeData;
-  const fala = falaDoNo(no.texto, item, quemLiga, combinado);
+  const agora = new Date();
+  const fala = falaDoNo(no.texto, item, quemLiga, combinado, agora, opcoes);
   const saidas = saidasNaVariante(roteiro, no, variante);
   const combinaData = !somenteLeitura && /\[dia\]|\[hora\]/.test(no.texto);
 
@@ -150,24 +155,63 @@ export function RoteiroNo({
           <p className="sr-only" id={`${no.id}-legenda`}>
             O que ele respondeu
           </p>
-          {saidas.map((saida, indice) => (
-            <button
-              key={`${saida.destino}-${indice}`}
-              type="button"
-              onClick={() => aoResponder(saida)}
-              className="toque flex min-h-14 items-center gap-2.5 rounded-lg border border-hairline bg-card px-4 py-3 text-left text-base leading-snug font-medium transition-colors outline-none hover:border-input hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              <CornerDownRight
-                className="size-4 shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <span>{falaDoNo(saida.rotulo, item, quemLiga, combinado)}</span>
-            </button>
-          ))}
+          {saidas.flatMap((saida, indice) =>
+            // "Escolheu um dos dois horários" vira os dois horários: o toque combina a
+            // data que a pessoa escolheu e segue pela mesma saída.
+            saida.rotulo === SAIDA_DAS_OPCOES
+              ? opcoes.map((iso) => (
+                  <BotaoDeResposta
+                    key={`${saida.destino}-${indice}-${iso}`}
+                    destaque
+                    aoTocar={() => {
+                      aoCombinar(iso);
+                      aoResponder(saida);
+                    }}
+                  >
+                    {primeiraMaiuscula(horarioFalado(iso, agora))}
+                  </BotaoDeResposta>
+                ))
+              : [
+                  <BotaoDeResposta
+                    key={`${saida.destino}-${indice}`}
+                    aoTocar={() => aoResponder(saida)}
+                  >
+                    {falaDoNo(saida.rotulo, item, quemLiga, combinado, agora, opcoes)}
+                  </BotaoDeResposta>,
+                ],
+          )}
         </div>
       ) : null}
     </div>
   );
+}
+
+function BotaoDeResposta({
+  children,
+  aoTocar,
+  destaque = false,
+}: {
+  children: React.ReactNode;
+  aoTocar: () => void;
+  destaque?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={aoTocar}
+      className={cn(
+        'toque flex min-h-14 items-center gap-2.5 rounded-lg border bg-card px-4 py-3 text-left text-base leading-snug font-medium transition-colors outline-none hover:border-input hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50',
+        destaque ? 'border-input' : 'border-hairline',
+      )}
+    >
+      <CornerDownRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span>{children}</span>
+    </button>
+  );
+}
+
+function primeiraMaiuscula(texto: string): string {
+  return texto.charAt(0).toLocaleUpperCase('pt-BR') + texto.slice(1);
 }
 
 /**
@@ -186,4 +230,8 @@ const PLACEHOLDER_DA_CAPTURA: Readonly<Record<string, string>> = {
   eventos_por_ano: 'Quantos eventos por ano',
   prioridade_do_dono: 'Mais pedido, ou pedido melhor',
   maior_aperto: 'O que mais aperta hoje',
+  whatsapp_de_trabalho: 'Outro WhatsApp, se ele passou',
+  email_de_confirmacao: 'O e-mail que ele passou',
+  motivo_do_pedido: 'Por que não atendeu o pedido',
+  motivo_da_saida: 'Por que quer parar de usar',
 };

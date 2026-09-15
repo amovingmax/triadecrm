@@ -171,6 +171,26 @@ export function proximaAbertura(dia: string, feriados: readonly Feriado[]): stri
   return null;
 }
 
+/**
+ * Os dois horários que o fechamento oferece ("fica melhor [opcao1] ou [opcao2]?"):
+ * o próximo dia útil às 10h e o dia útil seguinte às 15h, no fuso de Natal.
+ *
+ * Dia útil aqui é segunda a sexta fora de feriado — e não a janela de LIGAÇÃO, que
+ * abre sábado: reunião de apresentação não se marca no sábado. Duas opções concretas
+ * em dias diferentes, manhã e tarde, é o que o script do Rafael pede: "podemos
+ * marcar?" dá à pessoa a chance de dizer não; "amanhã às 10h ou quinta às 15h?", não.
+ */
+export function opcoesDeHorario(dia: string, feriados: readonly Feriado[]): [string, string] {
+  const uteis: string[] = [];
+  for (let i = 1; uteis.length < 2 && i <= 30; i += 1) {
+    const candidato = somarDias(dia, i);
+    const dow = new Date(`${candidato}T12:00:00Z`).getUTCDay();
+    if (dow >= 1 && dow <= 5 && !feriados.includes(candidato)) uteis.push(candidato);
+  }
+  const [primeiro = somarDias(dia, 1), segundo = somarDias(dia, 2)] = uteis;
+  return [instanteLocal(primeiro, 10), instanteLocal(segundo, 15)];
+}
+
 function somarDias(dia: string, dias: number): string {
   const base = new Date(`${dia}T12:00:00Z`);
   base.setUTCDate(base.getUTCDate() + dias);
@@ -281,7 +301,7 @@ export const montarLoteSchema = z.object({
     .min(1, { error: 'Dê um nome ao lote (ex.: "Buffets frios — quinta").' })
     .max(60, { error: 'Máximo de 60 caracteres.' }),
   pipelineId: z.number().int().positive({ error: 'Escolha o funil.' }),
-  temperaturaOrigem: z.enum(['frio', 'morno', 'quente'], {
+  temperaturaOrigem: z.enum(['frio', 'morno', 'quente', 'cliente', 'cliente_ativo'], {
     error: 'Escolha a origem: um lote não mistura base quente com coleta fria.',
   }),
   /** Vazio = todas as categorias do funil. */
@@ -321,6 +341,7 @@ export type MotivoDeExclusao =
   | 'em_janela_de_recontato'
   | 'reservado_em_outro_lote'
   | 'sem_negocio_aberto'
+  | 'etapa_sem_ligacao'
   | 'temperatura_diferente';
 
 export const MENSAGENS_DE_EXCLUSAO: Record<MotivoDeExclusao, string> = {
@@ -338,6 +359,7 @@ export const MENSAGENS_DE_EXCLUSAO: Record<MotivoDeExclusao, string> = {
   em_janela_de_recontato: 'em janela de recontato',
   reservado_em_outro_lote: 'já reservado em outro lote',
   sem_negocio_aberto: 'sem negócio aberto no funil',
+  etapa_sem_ligacao: 'já contratam pela Komune',
   temperatura_diferente: 'temperatura diferente da origem do lote',
 };
 
@@ -574,15 +596,58 @@ export function tabulacaoCoerente(
 // ---------------------------------------------------------------------------
 
 /**
- * A variante é escolhida pelo SISTEMA, a partir de `organizations.kind` (R13 §5), e
- * nunca por quem liga. `cerimonialista` entra em `produtor` porque o gancho é o mesmo —
- * controle do evento — e porque é o funil em que ele está.
+ * A variante é escolhida pelo SISTEMA, e nunca por quem liga. Desde o roteiro v3
+ * (migração 20260915100000) ela sai do FUNIL do lote — `app.variante_da_ligacao` —,
+ * porque um fornecedor no funil de ativação não pode ouvir o pitch de captação.
+ * `variantePara` é a regra antiga, pelo `organizations.kind`, que o banco ainda usa
+ * para o funil sem variante própria.
  */
-export type VarianteRoteiro = 'fornecedor' | 'produtor';
+export type VarianteRoteiro = 'fornecedor' | 'produtor' | 'ativacao';
+
+export const VARIANTES_DO_ROTEIRO = ['fornecedor', 'produtor', 'ativacao'] as const;
 
 export function variantePara(kind: OrgKind): VarianteRoteiro {
   return kind === 'produtor' || kind === 'cerimonialista' ? 'produtor' : 'fornecedor';
 }
+
+/**
+ * A variante de um lote pelo slug do funil, espelho de `app.variante_da_ligacao`:
+ * `ativacao` só quando o roteiro tem nós de ativação (a v2 não tem).
+ */
+export function varianteDoFunil(
+  funilSlug: string,
+  kind: OrgKind,
+  roteiroTemAtivacao: boolean,
+): VarianteRoteiro {
+  if (funilSlug === 'ativacao' && roteiroTemAtivacao) return 'ativacao';
+  if (funilSlug === 'produtor') return 'produtor';
+  if (funilSlug === 'fornecedor') return 'fornecedor';
+  return variantePara(kind);
+}
+
+/**
+ * As entradas da ativação, pela etapa do negócio. Espelho de `app.entrada_da_ligacao`:
+ * quem está esperando responder um pedido ouve do pedido; quem sumiu, a reativação; o
+ * resto (publicado, perfil completo), o convite a completar o perfil. Primeira
+ * contratação e recorrente não chegam aqui: `app.call_candidates` os deixa fora do lote.
+ */
+export const ENTRADAS_DA_ATIVACAO = {
+  perfil: 'ativ_abertura_perfil',
+  pedido: 'ativ_abertura_pedido',
+  respondido: 'ativ_abertura_respondido',
+  reativar: 'ativ_abertura_reativar',
+} as const;
+
+export function entradaDaLigacao(variante: VarianteRoteiro, etapaSlug: string | null): string {
+  if (variante !== 'ativacao') return NO_DE_ABERTURA;
+  if (etapaSlug === 'primeiro_lead') return ENTRADAS_DA_ATIVACAO.pedido;
+  if (etapaSlug === 'lead_respondido') return ENTRADAS_DA_ATIVACAO.respondido;
+  if (etapaSlug === 'em_risco') return ENTRADAS_DA_ATIVACAO.reativar;
+  return ENTRADAS_DA_ATIVACAO.perfil;
+}
+
+/** Etapas do funil de ativação que não entram em lote de ligação. */
+export const ETAPAS_SEM_LIGACAO_DE_ATIVACAO = ['primeira_contratacao', 'recorrente'] as const;
 
 /**
  * A frase de origem do primeiro nó ("peguei o contato de vocês …"), por `sources.slug`.
@@ -621,11 +686,15 @@ export function fraseDeOrigem(slug: string): string {
   return FRASE_DE_ORIGEM[slug] ?? ORIGEM_PADRAO;
 }
 
-/** Um nó vale para uma variante ou para as duas. */
-export type EscopoDoNo = VarianteRoteiro | 'ambas';
+/**
+ * Onde um nó vale: numa variante, nas três (`ambas`, nome que ficou da v2) ou nas duas
+ * da captação (`captacao` = fornecedor e produtor). Espelho de `app.no_vale_na_variante`.
+ */
+export type EscopoDoNo = VarianteRoteiro | 'ambas' | 'captacao';
 
 export function noValeNaVariante(escopo: EscopoDoNo, variante: VarianteRoteiro): boolean {
-  return escopo === 'ambas' || escopo === variante;
+  if (escopo === 'ambas' || escopo === variante) return true;
+  return escopo === 'captacao' && variante !== 'ativacao';
 }
 
 /**
@@ -678,11 +747,12 @@ export const noSchema = z.object({
     .trim()
     .regex(/^[a-z0-9_]+$/, { error: 'Id do nó: minúsculas, números e _.' }),
   tipo: z.enum(['fala', 'pergunta', 'captura', 'objecao', 'acao', 'fim']),
-  variante: z.enum(['ambas', 'fornecedor', 'produtor']),
+  variante: z.enum(['ambas', 'captacao', 'fornecedor', 'produtor', 'ativacao']),
   /**
    * O texto que a pessoa fala, literal. Placeholders entre colchetes são substituídos
-   * pela tela (`preencherTexto`): `[saudacao]`, `[empresa]`, `[nome]`, `[origem]`
-   * (de `fraseDeOrigem`), `[eu]`, `[dia]`, `[hora]`.
+   * pela tela (`falaDoNo`): `[saudacao]`, `[empresa]`, `[nome]`, `[interlocutor]`,
+   * `[origem]` (de `fraseDeOrigem`), `[eu]`, `[categoria]`, `[area]`, `[dia]`, `[hora]`,
+   * `[opcao1]` e `[opcao2]` (os dois horários sugeridos, `opcoesDeHorario`).
    */
   texto: z.string().trim().min(1),
   saidas: z.array(saidaSchema).default([]),
@@ -729,7 +799,14 @@ export const roteiroSchema = z.object({
 
 export type Roteiro = z.infer<typeof roteiroSchema>;
 
-/** Id do nó de entrada. Fixo, e o mesmo nas duas variantes: a abertura é comum. */
+/**
+ * O rótulo da saída "a pessoa escolheu um dos dois horários". A tela não o mostra: no
+ * lugar dele desenha os dois horários falados ("Amanhã às 10h", "Quinta-feira às 15h"),
+ * e o toque num deles combina a data E segue por esta saída — um toque só.
+ */
+export const SAIDA_DAS_OPCOES = 'Escolheu um dos dois horários';
+
+/** Id do nó de entrada da captação (fornecedor e produtor). A ativação entra pela etapa. */
 export const NO_DE_ABERTURA = 'abertura';
 
 /**
@@ -764,9 +841,20 @@ export function validarRoteiro(roteiro: Roteiro): string[] {
     }
   }
 
-  // O mesmo nó pode ter saídas para as duas variantes (é assim que a abertura, que é
+  // A ativação só é conferida em árvore que TEM ativação: a v2 continua válida.
+  const temAtivacao = roteiro.nos.some((n) => n.variante === 'ativacao');
+  if (temAtivacao) {
+    for (const entrada of Object.values(ENTRADAS_DA_ATIVACAO)) {
+      if (!porId.has(entrada)) erros.push(`Falta o nó de entrada da ativação "${entrada}".`);
+    }
+  }
+
+  // O mesmo nó pode ter saídas para mais de uma variante (é assim que a abertura, que é
   // comum, cai no gancho certo). Um nó só está de pé se sobrar saída DEPOIS do filtro.
-  for (const variante of ['fornecedor', 'produtor'] as const) {
+  const variantes: VarianteRoteiro[] = temAtivacao
+    ? [...VARIANTES_DO_ROTEIRO]
+    : ['fornecedor', 'produtor'];
+  for (const variante of variantes) {
     for (const no of roteiro.nos) {
       if (!noValeNaVariante(no.variante, variante)) continue;
       if (no.tipo === 'fim' || no.tipo === 'acao') continue;

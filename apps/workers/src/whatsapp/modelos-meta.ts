@@ -57,6 +57,7 @@ export const EXEMPLOS_POR_VARIAVEL: Readonly<Record<string, string>> = {
   data: '20/10',
   dia: 'terça-feira',
   hora: '15h',
+  formato: 'Google Meet',
   hora_hoje: '15h',
   hora_amanha: '15h',
   hora_manha: '15h',

@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, NotebookPen, PauseCircle, RotateCcw } from 'lucide-react';
+import { ArrowRight, MessageCircle, NotebookPen, PauseCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { anotarNaAtividade, corrigirComQuem } from '@/components/registro/ajustes';
+import { guardarPedidoDeModelo } from '@/components/conversas/pedido-de-modelo';
 import { formatarQuando } from '@/components/registro/formatos';
 import {
   COM_QUEM_ABRE_PORTA,
@@ -16,6 +17,7 @@ import {
 } from '@/components/registro/tipos';
 
 import { cn } from '@/lib/utils';
+import type { MensagemDeDepois } from './depois-da-ligacao';
 import {
   ESPERA_ANTES_DO_PROXIMO_MS,
   type DesfechoDeLigacao,
@@ -53,6 +55,7 @@ export function ChamadaRecibo({
   desfecho,
   resultado,
   comQuemGravado,
+  whatsapp = null,
   restaMs,
   pausado,
   aoPausar,
@@ -66,6 +69,8 @@ export function ChamadaRecibo({
   resultado: Extract<ResultadoTabulacao, { tabulado: true }>;
   /** O que a tabulação REALMENTE gravou em `metadata.com_quem`. */
   comQuemGravado: ComQuem;
+  /** A mensagem que a ligação pede no WhatsApp (confirmação, resumo, "tentei te ligar"). */
+  whatsapp?: MensagemDeDepois | null;
   restaMs: number;
   /** A contagem parou porque a pessoa tocou em alguma coisa aqui. */
   pausado: boolean;
@@ -162,6 +167,27 @@ export function ChamadaRecibo({
         </p>
       </div>
 
+      {whatsapp ? (
+        // Abre a conversa em outra aba, com o modelo escolhido e preenchido: a fila
+        // desta aba fica onde está, e o toque já parou a contagem do recibo.
+        <Button
+          type="button"
+          variant="outline"
+          className="toque h-11 self-start"
+          onClick={() => {
+            guardarPedidoDeModelo({
+              organizacaoId: item.organizationId,
+              codigo: whatsapp.codigo,
+              valores: whatsapp.valores,
+            });
+            window.open(`/conversas?org=${item.organizationId}`, '_blank', 'noopener');
+          }}
+        >
+          <MessageCircle aria-hidden="true" />
+          {whatsapp.rotulo}
+        </Button>
+      ) : null}
+
       {desfecho && resultado.activity_id && perguntaComQuem(desfecho) ? (
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-1.5 text-sm text-muted-foreground">
@@ -221,12 +247,9 @@ export function ChamadaRecibo({
       ) : null}
 
       {pausado ? (
-        <p
-          aria-live="polite"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground"
-        >
-          <PauseCircle className="size-3.5" aria-hidden="true" />
-          A fila esperou por você. Termine aqui e toque em Próximo.
+        <p aria-live="polite" className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <PauseCircle className="size-3.5" aria-hidden="true" />A fila esperou por você. Termine
+          aqui e toque em Próximo.
         </p>
       ) : null}
 

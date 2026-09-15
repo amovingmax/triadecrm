@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 
 import { falaDoNo } from './roteiro-texto';
 import {
+  ENTRADAS_DA_ATIVACAO,
   NO_DE_ABERTURA,
   noSchema,
+  SAIDA_DAS_OPCOES,
   noValeNaVariante,
   objecoesDoRoteiro,
   roteiroSchema,
@@ -43,7 +45,7 @@ import {
  */
 
 const CAMINHO =
-  '../../../../../supabase/migrations/20260909180000_o_roteiro_para_de_vender_casamento.sql';
+  '../../../../../supabase/migrations/20260915100000_o_roteiro_ganha_os_tres_funis.sql';
 
 function arvorePublicada(): NoRoteiro[] {
   const sql = readFileSync(new URL(CAMINHO, import.meta.url), 'utf8');
@@ -56,23 +58,41 @@ const NOS = arvorePublicada();
 const ROTEIRO = roteiroSchema.parse({
   id: '00000000-0000-4000-8000-000000000000',
   slug: 'captacao_v1',
-  nome: 'Captação por ligação — v2',
-  versao: 2,
+  nome: 'Ligação — fornecedor, produtor e ativação (v3)',
+  versao: 3,
   nos: NOS,
 });
 
-const VARIANTES: VarianteRoteiro[] = ['fornecedor', 'produtor'];
+const VARIANTES: VarianteRoteiro[] = ['fornecedor', 'produtor', 'ativacao'];
+
+const ENTRADAS: Record<VarianteRoteiro, string[]> = {
+  fornecedor: [NO_DE_ABERTURA],
+  produtor: [NO_DE_ABERTURA],
+  ativacao: Object.values(ENTRADAS_DA_ATIVACAO),
+};
+
+const no = (id: string) => {
+  const achado = NOS.find((n) => n.id === id);
+  if (!achado) throw new Error(`nó ${id} não existe`);
+  return achado;
+};
+
+/** As falas que valem numa variante, juntas. */
+const falasDa = (variante: VarianteRoteiro) =>
+  NOS.filter((n) => noValeNaVariante(n.variante, variante))
+    .map((n) => n.texto)
+    .join('\n');
 
 describe('roteiro publicado', () => {
   it('passa no mesmo validador que o banco e a tela usam', () => {
     expect(validarRoteiro(ROTEIRO)).toEqual([]);
   });
 
-  it('não deixa nenhum nó fora do caminho, em nenhuma das duas variantes', () => {
+  it('não deixa nenhum nó fora do caminho, em nenhuma das três variantes', () => {
     for (const variante of VARIANTES) {
       const alcancaveis = new Set<string>();
       const pilha = [
-        NO_DE_ABERTURA,
+        ...ENTRADAS[variante],
         // O bloco lateral é alcançável de qualquer nó: a gaveta mostra toda
         // `objecao` da variante, sem depender de aresta.
         ...objecoesDoRoteiro(ROTEIRO, variante).map((n) => n.id),
@@ -126,6 +146,11 @@ describe('as frases sobrevivem ao marcador vazio', () => {
     '%s não deixa preposição nem travessão órfãos',
     (_id, texto) => {
       const fala = falaDoNo(texto, ITEM_PELADO, 'Heloísa Nogueira', null);
+      // Nenhum colchete chega à boca de quem lê: marcador desconhecido some em
+      // silêncio e deixa a frase manca, então todo marcador usado tem de existir.
+      for (const marcador of texto.match(/\[\w+\]/g) ?? []) {
+        expect(MARCADORES, `marcador desconhecido ${marcador}`).toContain(marcador);
+      }
       // Preposição seguida de pontuação é marcador que sumiu e levou o
       // complemento junto: "estou começando por." ou "eu ligo por volta das."
       expect(fala).not.toMatch(/\b(de|da|do|em|na|no|por|pra|com|às|as|até)\s*[.!?,]/iu);
@@ -135,6 +160,40 @@ describe('as frases sobrevivem ao marcador vazio', () => {
       expect(fala.trim()).toBe(fala);
     },
   );
+
+  it('a primeira pergunta nunca fica sem com quem falar', () => {
+    for (const id of [NO_DE_ABERTURA, ...Object.values(ENTRADAS_DA_ATIVACAO)]) {
+      expect(falaDoNo(no(id).texto, ITEM_PELADO, 'Rafael', null), id).toContain(
+        'Falo com quem cuida dos eventos aí em Bodega da Terra?',
+      );
+    }
+    const comNome = { ...ITEM_PELADO, contatoNome: 'Mariana Lima' };
+    expect(falaDoNo(no(NO_DE_ABERTURA).texto, comNome, 'Rafael', null)).toContain(
+      'Falo com Mariana?',
+    );
+  });
+
+  it('o fechamento oferece dois horários, e o toque neles é uma saída de verdade', () => {
+    const comOpcoes = NOS.filter((n) => n.texto.includes('[opcao1]'));
+    expect(comOpcoes.length).toBeGreaterThan(5);
+    for (const n of comOpcoes) {
+      expect(n.texto, n.id).toContain('[opcao2]');
+      expect(
+        n.saidas.some((s) => s.rotulo === SAIDA_DAS_OPCOES),
+        `${n.id} fala dois horários e não tem a saída deles`,
+      ).toBe(true);
+    }
+    // Quarta, 16/09/2026: as opções são quinta 10h e sexta 15h.
+    const fala = falaDoNo(
+      no('forn_fechamento').texto,
+      ITEM_PELADO,
+      'Rafael',
+      null,
+      new Date('2026-09-16T13:00:00Z'),
+      ['2026-09-17T10:00:00-03:00', '2026-09-18T15:00:00-03:00'],
+    );
+    expect(fala).toContain('Pra você fica melhor amanhã às 10h ou sexta-feira às 15h?');
+  });
 
   it('não presume o gênero de quem liga nem de quem atende', () => {
     for (const no of NOS) {
@@ -157,6 +216,21 @@ describe('as frases sobrevivem ao marcador vazio', () => {
     }
   });
 });
+
+const MARCADORES = [
+  '[saudacao]',
+  '[eu]',
+  '[nome]',
+  '[interlocutor]',
+  '[empresa]',
+  '[origem]',
+  '[categoria]',
+  '[area]',
+  '[dia]',
+  '[hora]',
+  '[opcao1]',
+  '[opcao2]',
+];
 
 describe('o que a casa decidiu que nunca se diz', () => {
   const TODO_O_TEXTO = NOS.map((n) => `${n.texto} ${n.nota ?? ''}`).join('\n');
@@ -182,24 +256,35 @@ describe('o que a casa decidiu que nunca se diz', () => {
     expect(SO_AS_FALAS).not.toMatch(/contrato no mesmo painel/iu);
   });
 
-  it('diz o preço em vez de adiá-lo', () => {
-    // A decisão do Rafael, registrada: "esquece a promoção; vai dizer o custo que
-    // a gente cobra: 8%". A v1 mandava a pergunta para o financeiro.
-    expect(SO_AS_FALAS).toMatch(/\b8%/u);
-    expect(SO_AS_FALAS).toMatch(/sem mensalidade|não tem mensalidade|paga mensalidade/iu);
-    // E o cerimonialista RECEBE: 3% Komune + 5% para ele, no contrato.
-    expect(SO_AS_FALAS).toMatch(/5%/u);
-    expect(SO_AS_FALAS).toMatch(/3%/u);
+  it('ao fornecedor, a gratuidade com ênfase e nenhum percentual', () => {
+    // A decisão do Rafael em 15/09/2026, que substitui a da v2 ("vai dizer o custo:
+    // 8%"): o foco é trazer para a reunião, com ênfase em que estar na Komune é de
+    // graça e o custo só existe com a demanda. Quem mostra a conta é a apresentação.
+    const fornecedor = falasDa('fornecedor');
+    expect(fornecedor).toMatch(/de graça/iu);
+    expect(fornecedor).toMatch(/não tem mensalidade/iu);
+    expect(fornecedor).not.toMatch(/\d+\s*%/u);
+  });
+
+  it('ao produtor, o que ele recebe: 5%, depois da entrega', () => {
+    const produtor = falasDa('produtor');
+    expect(produtor).toMatch(/5%/u);
+    expect(produtor).toMatch(/entreg/iu);
+    expect(produtor).not.toMatch(/\b(8|3)\s*%/u);
+  });
+
+  it('a ativação não promete pedido nem destaque', () => {
+    const ativacao = NOS.filter((n) => n.variante === 'ativacao')
+      .map((n) => n.texto)
+      .join('\n');
+    expect(ativacao).not.toMatch(/vai chegar pedido|vai vender|mais pedidos|destaque/iu);
+    expect(ativacao).not.toMatch(/\d+\s*%/u);
   });
 
   it('não abre a ligação por casamento, que é ocasião e não categoria', () => {
-    const abertura = NOS.find((n) => n.id === NO_DE_ABERTURA);
-    const ganchos = NOS.filter((n) => n.id.startsWith('gancho_'));
-    for (const no of [abertura, ...ganchos]) {
-      expect(no, 'gancho ausente').toBeDefined();
-      if (!no) continue;
-      const primeiraFrase = no.texto.split(/(?<=[.?!])\s/)[0] ?? no.texto;
-      expect(primeiraFrase, no.id).not.toMatch(/casamento|noiv/iu);
+    const inicio = ['abertura', 'permissao', 'forn_motivo', 'prod_motivo'].map(no);
+    for (const n of inicio) {
+      expect(n.texto, n.id).not.toMatch(/casamento|noiv/iu);
     }
     // Quando casamento aparece, aparece dentro de uma lista de ocasiões.
     for (const no of NOS) {
@@ -225,10 +310,13 @@ describe('o que a casa decidiu que nunca se diz', () => {
   it('oferece opt-out no ponto em que a recusa acontece', () => {
     // Na v1 o opt-out existia em três nós laterais e NÃO existia nas propostas,
     // que é onde a pessoa de fato diz não.
-    for (const id of ['forn_proposta', 'prod_proposta']) {
+    for (const id of ['forn_fechamento', 'prod_fechamento', 'obj_sem_interesse']) {
       const no = NOS.find((n) => n.id === id);
       expect(no, id).toBeDefined();
-      expect(no?.saidas.some((s) => s.destino === 'fim_optout'), id).toBe(true);
+      expect(
+        no?.saidas.some((s) => s.destino === 'fim_optout'),
+        id,
+      ).toBe(true);
     }
   });
 
@@ -255,17 +343,31 @@ describe('o que a casa decidiu que nunca se diz', () => {
   });
 });
 
+describe('o começo da captação (R06)', () => {
+  it('diz de onde veio o contato e como sair da lista antes do pitch', () => {
+    const permissao = no('permissao');
+    expect(permissao.texto).toContain('[origem]');
+    expect(permissao.texto).toMatch(/tiro da lista/iu);
+    expect(permissao.saidas.some((s) => s.destino === 'fim_optout')).toBe(true);
+    // E é o nó logo depois da abertura, para as duas variantes da captação.
+    expect(no(NO_DE_ABERTURA).saidas.find((s) => s.rotulo === 'Sou eu')?.destino).toBe('permissao');
+  });
+});
+
 describe('a gaveta de objeções', () => {
   it.each(VARIANTES)('mostra a %s um bloco sem contradição de preço', (variante) => {
     const objecoes = objecoesDoRoteiro(ROTEIRO, variante);
-    expect(objecoes.length).toBeGreaterThan(8);
+    expect(objecoes.length).toBeGreaterThan(variante === 'ativacao' ? 4 : 8);
+    const falas = objecoes.map((n) => n.texto).join('\n');
     if (variante === 'produtor') {
-      // O defeito que este roteiro existe para corrigir: na v1 as nove objeções
-      // eram todas `ambas`, e o cerimonialista que perguntava "quanto custa?"
-      // ouvia que ia PAGAR comissão. Ele recebe 5%.
-      const falas = objecoes.map((n) => n.texto).join('\n');
-      expect(falas).toMatch(/você não paga|Pra você, nada|não paga nada/iu);
+      // Na v1 o cerimonialista que perguntava "quanto custa?" ouvia que ia PAGAR
+      // comissão. Ele recebe 5%, e quem paga é o fornecedor.
+      expect(falas).toMatch(/quem paga é o fornecedor/iu);
       expect(falas).toMatch(/5%/u);
+    }
+    if (variante === 'fornecedor') {
+      expect(falas).toMatch(/de graça/iu);
+      expect(falas).not.toMatch(/\d+\s*%/u);
     }
   });
 

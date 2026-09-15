@@ -39,6 +39,7 @@ import {
   type PreviaDoEnvio,
 } from './envio-de-modelo';
 import { fraseDaRecusaDoEnvio, MOTIVOS_DE_RECUSA_DO_ENVIO } from './mensagens';
+import { esquecerPedidoDeModelo, lerPedidoDeModelo } from './pedido-de-modelo';
 
 /**
  * Mandar WhatsApp pelo CRM com um modelo aprovado pela Meta.
@@ -81,7 +82,11 @@ export function EnviarModelo({
             ? previa.error.message
             : 'Não deu para consultar o WhatsApp agora.'}
         </p>
-        <Button variant="outline" className="toque h-11 md:h-9" onClick={() => void previa.refetch()}>
+        <Button
+          variant="outline"
+          className="toque h-11 md:h-9"
+          onClick={() => void previa.refetch()}
+        >
           Tentar de novo
         </Button>
       </Moldura>
@@ -165,8 +170,8 @@ function EsperandoResposta({
     <Moldura className={className}>
       <p className="text-sm font-medium">Esperando a resposta</p>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        A última mensagem saiu {quandoFoi(desde)} e ainda não teve resposta. Mandar outra em
-        seguida costuma virar bloqueio; a retomada combinada é depois de três dias (D+3).
+        A última mensagem saiu {quandoFoi(desde)} e ainda não teve resposta. Mandar outra em seguida
+        costuma virar bloqueio; a retomada combinada é depois de três dias (D+3).
       </p>
       <Button variant="outline" className="toque h-11 md:h-9" onClick={() => setAberto(true)}>
         Mandar outra mensagem
@@ -185,13 +190,23 @@ function Formulario({
   className?: string;
 }) {
   const clientes = useQueryClient();
-  const [modeloId, setModeloId] = useState<number>(previa.modelos[0]!.id);
-  const [digitados, setDigitados] = useState<Record<string, string>>({});
+  // Veio do recibo da ligação ("Mandar a confirmação no WhatsApp"): o modelo já vem
+  // escolhido e o dia, a hora e o formato, preenchidos. A pessoa ainda revê e envia.
+  const [pedido] = useState(() => lerPedidoDeModelo(organizacaoId));
+  const modeloDoRecibo = pedido
+    ? (previa.modelos.find((m) => m.codigo === pedido.codigo) ?? null)
+    : null;
+  const [modeloId, setModeloId] = useState<number>(modeloDoRecibo?.id ?? previa.modelos[0]!.id);
+  const [digitados, setDigitados] = useState<Record<string, string>>(() =>
+    modeloDoRecibo ? pedido!.valores : {},
+  );
 
   const modelo = previa.modelos.find((m) => m.id === modeloId) ?? previa.modelos[0]!;
   const valores = valoresIniciais(modelo, previa.valores, digitados);
   const vazias = faltando(modelo, valores);
-  const longa = modelo.variaveis.find((v) => (valores[v] ?? '').trim().length > MAXIMO_POR_VARIAVEL);
+  const longa = modelo.variaveis.find(
+    (v) => (valores[v] ?? '').trim().length > MAXIMO_POR_VARIAVEL,
+  );
   const texto = preencher(modelo.corpo, valores);
 
   const grupos = useMemo(() => agrupar(previa.modelos), [previa.modelos]);
@@ -203,6 +218,7 @@ function Formulario({
     mutationFn: () => enviarModelo(organizacaoId, modelo.id, valores),
     onSuccess: (r) => {
       setDigitados({});
+      if (pedido) esquecerPedidoDeModelo();
       toast.success('Mensagem na fila do WhatsApp.', {
         description: r.primeiro_contato
           ? 'Sai pelo número da KOMUNE em instantes e conta como primeiro contato de hoje.'
@@ -243,6 +259,13 @@ function Formulario({
           </span>
         ) : null}
       </div>
+
+      {pedido && !modeloDoRecibo ? (
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          O modelo que a ligação pediu ({pedido.codigo}) ainda não foi aprovado pela Meta. Escolha
+          outro ou registre por telefone.
+        </p>
+      ) : null}
 
       <div className="space-y-1">
         <label htmlFor="modelo-whatsapp" className="text-xs text-muted-foreground">
@@ -340,7 +363,8 @@ function RegistrarPorTelefone({ organizacaoId }: { organizacaoId: string }) {
 function tituloDoBloqueio(motivo: string): string {
   if (motivo === 'whatsapp_nao_configurado') return 'O WhatsApp da KOMUNE ainda não está conectado';
   if (motivo === 'ficha_sem_whatsapp') return 'Esta ficha não tem WhatsApp';
-  if (motivo === 'contato_suprimido' || motivo === 'numero_suprimido') return 'Pediu para não receber';
+  if (motivo === 'contato_suprimido' || motivo === 'numero_suprimido')
+    return 'Pediu para não receber';
   if (motivo.startsWith('janela_')) return 'Fora do horário de envio';
   if (motivo.startsWith('teto_')) return 'Limite do dia atingido';
   return 'Agora não dá para mandar';
@@ -406,7 +430,10 @@ async function enviarModelo(
   }
   const lido = resultadoDoEnvioSchema.safeParse(data);
   if (!lido.success) {
-    throw new ErroDaConversa('A resposta do servidor veio incompleta. Recarregue a conversa.', false);
+    throw new ErroDaConversa(
+      'A resposta do servidor veio incompleta. Recarregue a conversa.',
+      false,
+    );
   }
   return lido.data;
 }

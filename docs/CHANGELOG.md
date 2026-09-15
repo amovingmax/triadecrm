@@ -2154,3 +2154,30 @@ Feito com o Rafael no painel da Meta, tela por tela (`docs/operacao/whatsapp-no-
 - **Publicar a tela nova na Vercel.** O projeto `triade-crm` não publica pelo push (os deploys são pelo CLI, na conta do Luiz); o `vercel deploy --prod` ficou para uma pessoa rodar. Até lá, a produção mostra a tela antiga.
 - **Publicar o app na Meta** (modo Ao vivo, com `https://komune.app.br/privacidade`). Sem isso, mensagens de gente real não chegam pelo webhook.
 - **Subir o worker-wa no Fly.io** (conta + `fly auth login`). Sem o worker, nada sai da fila nem entra na conversa, e o status dos modelos só atualiza à mão (`--sincronizar-modelos`).
+
+### 15/09/2026 — O roteiro de ligação ganha os três funis (R13, R08; RF-CON-12, RF-CON-18)
+
+Base: o script de captação de fornecedores que o Rafael mandou (abertura com permissão, quem somos, motivo, proposta sem mensalidade, fechamento com duas opções de horário, ramificações e a mensagem de WhatsApp de depois), adaptado a cada funil e aprovado por partes na conversa.
+
+**O roteiro (`20260915100000_o_roteiro_ganha_os_tres_funis.sql`): `captacao_v1` versão 3, 67 nós, publicado.** A v2 saiu de publicação e continua servindo os lotes montados com ela.
+- **Fornecedor:** abertura curta ("Falo com [nome]?"), permissão com a origem do contato e "se não fizer sentido eu tiro da lista" (R06), quem somos, por que liguei (a categoria dele), valor com ênfase em que estar na Komune é de graça e o custo só existe quando fecha, e fechamento com dois horários concretos. **Nenhum percentual dito na ligação** (decisão do Rafael: o foco é a reunião; a v2 dizia 8%). Objeções: quanto é a taxa (e a insistência), manda no WhatsApp, não sou eu quem decide, não tenho interesse, concorrente, não preciso, mais um app, meu preço.
+- **Produtor e cerimonialista:** o mesmo começo; valor = sem custo e recebe 5% do que contratar pela Komune, depois da entrega. Objeções: pegadinha (quem paga é o fornecedor), comissão por fora, já tenho fornecedores, honorário, mais um app.
+- **Ativação:** quatro aberturas, escolhidas pela etapa do negócio: completar o perfil (publicado, perfil completo), pedido esperando resposta (primeiro lead), pedido respondido (lead respondido) e reativar (em risco). Nenhuma fala promete pedido.
+- O fechamento mostra os dois horários como botões ("Amanhã às 10h", "Quinta-feira às 15h": próximo dia útil 10h e o seguinte 15h, sem sábado nem feriado); um toque combina a data e segue.
+
+**O motor:**
+- A variante sai do **funil do lote** (`app.variante_da_ligacao`), não mais do tipo da organização; `proximo_da_fila` devolve também o nó de `entrada` (`app.entrada_da_ligacao`, pela etapa ATUAL do negócio). Lote de ativação com a v2 cai na regra antiga.
+- `variante` do nó ganhou `captacao` (fornecedor + produtor) e `ativacao`; `app.validar_roteiro` e `validarRoteiro` conferem a ativação só em árvore que a tem; `call_attempts.variante` aceita `ativacao`.
+- `app.call_candidates`: quem está em primeira contratação no funil de ativação sai do lote com `etapa_sem_ligacao` ("já contratam pela Komune"), também na prévia.
+- A montagem de lote passou a oferecer as temperaturas `cliente` e `cliente_ativo` quando o funil tem gente nelas. **Sem isso não saía lote de ativação nenhum**: os negócios desse funil nunca são frio/morno/quente. Como um lote não mistura temperaturas, a ativação são dois lotes (perfil e reativação em "cliente"; pedidos em "cliente ativo").
+- A folha de reunião usa Google Meet e visita quando o funil não declara formatos (a ativação não declara, e a sessão marcada ficaria impossível de gravar).
+
+**WhatsApp depois da ligação:** três modelos novos, que o worker manda para a Meta na próxima sincronização: `GEN-LIG-CONFIRMA` (utilidade: dia, hora e formato), `GEN-LIG-RESUMO-FOR` e `GEN-LIG-RESUMO-PRO` (marketing, com SAIR e o link de privacidade). O recibo da ligação mostra o botão certo — confirmação para reunião marcada, resumo para quem pediu o material, "tentei te ligar" (`GEN-FUP-LIG-V1`) para fornecedor que não atendeu — e abre a conversa em outra aba com o modelo escolhido e preenchido. A pessoa ainda revê e envia.
+
+**Provado rodando:** pgTAP `44` com 32 asserções e a suíte inteira verde; os testes `13` e `15` passaram a olhar só a versão publicada (os quatro nós de volume do `15` são da v2 e seguem conferidos nela). Web 690 testes (roteiro publicado reescrito para a v3: alcançável nas três variantes, nenhum marcador desconhecido, nenhum percentual ao fornecedor, 5% ao produtor, origem e saída da lista no começo), workers 320, lint e typecheck verdes. **Não testado no navegador.**
+
+**Mudei do texto aprovado:** "quem entra agora fica em destaque pra quem está montando evento" virou "quem entra agora já está lá quando os clientes da cidade começarem a procurar". Destaque na vitrine é promessa de posição, que o R08 §5.4 proíbe e o teste do roteiro barra desde a v1 ("aparece primeiro").
+
+**Decisão humana:**
+- Ler os 67 nós em voz alta antes do primeiro lote (Rafael/Heloísa). É venda, e a régua final é o ouvido.
+- "Por fora" e "repasse pela plataforma, com comprovante" são do texto aprovado; o prazo e a forma do repasse dos 5% são do Dennis confirmar.

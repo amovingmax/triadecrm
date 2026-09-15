@@ -129,9 +129,13 @@ export type EstadoDoRoteiro = {
   atendeu: boolean;
 };
 
-/** O estado no instante em que a chamada abre: no nó de abertura, sem atendimento. */
-export function estadoAoDiscar(): EstadoDoRoteiro {
-  return { noAtual: NO_DE_ABERTURA, caminho: [NO_DE_ABERTURA], capturas: {}, atendeu: false };
+/**
+ * O estado no instante em que a chamada abre: no nó de entrada, sem atendimento. A
+ * captação entra pela abertura; a ativação, pelo nó que a etapa do negócio pede
+ * (`proximo_da_fila` devolve qual).
+ */
+export function estadoAoDiscar(entrada: string = NO_DE_ABERTURA): EstadoDoRoteiro {
+  return { noAtual: entrada, caminho: [entrada], capturas: {}, atendeu: false };
 }
 
 /**

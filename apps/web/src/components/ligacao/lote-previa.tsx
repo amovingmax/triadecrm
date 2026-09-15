@@ -47,7 +47,19 @@ import { MENSAGENS_DE_EXCLUSAO, type MotivoDeExclusao } from './tipos';
 // ---------------------------------------------------------------------------
 
 /** As três temperaturas que podem ser origem de um lote (as outras duas são cliente). */
-export const TEMPERATURAS_DE_ORIGEM = ['frio', 'morno', 'quente'] as const;
+/**
+ * As temperaturas de um lote. `cliente` e `cliente_ativo` são as do funil de ativação
+ * (quem já está na Komune): sem elas, lote de ativação não tinha origem para escolher.
+ * A tela de montagem só mostra as duas quando o funil tem gente nelas.
+ */
+export const TEMPERATURAS_DE_ORIGEM = [
+  'frio',
+  'morno',
+  'quente',
+  'cliente',
+  'cliente_ativo',
+] as const;
+export const TEMPERATURAS_DA_CAPTACAO: readonly TemperaturaDeOrigem[] = ['frio', 'morno', 'quente'];
 export type TemperaturaDeOrigem = (typeof TEMPERATURAS_DE_ORIGEM)[number];
 
 /**
@@ -269,6 +281,7 @@ const ICONES_DE_EXCLUSAO: Partial<Record<MotivoDeExclusao, React.ElementType>> =
   reservado_em_outro_lote: Users,
   em_janela_de_recontato: Repeat2,
   sem_negocio_aberto: CircleSlash,
+  etapa_sem_ligacao: CircleSlash,
   temperatura_diferente: CircleSlash,
 };
 

@@ -14,6 +14,7 @@ import {
 import {
   MENSAGENS_DE_RECUSA_DA_CHAMADA,
   MENSAGENS_DE_RECUSA_DA_DISCAGEM,
+  NO_DE_ABERTURA,
   noSchema,
   resultadoTabulacaoSchema,
   RPC_DEVOLVER_ITEM,
@@ -97,6 +98,7 @@ const MOTIVOS_DE_EXCLUSAO = [
   'em_janela_de_recontato',
   'reservado_em_outro_lote',
   'sem_negocio_aberto',
+  'etapa_sem_ligacao',
   'temperatura_diferente',
 ] as const satisfies readonly MotivoDeExclusao[];
 
@@ -262,7 +264,9 @@ const proximoSchema = z.discriminatedUnion('ok', [
       versao: z.number().int(),
       arvore: z.array(noSchema).min(1),
     }),
-    variante: z.enum(['fornecedor', 'produtor']),
+    variante: z.enum(['fornecedor', 'produtor', 'ativacao']),
+    /** Nó em que a fala começa. Antes da v3 o banco não mandava: vale a abertura. */
+    entrada: z.string().nullish(),
     restantes: z.number().int(),
     fecha_em: z.string().nullish(),
   }),
@@ -304,6 +308,7 @@ export type RespostaDoProximo =
       item: ItemDoLote;
       roteiro: Roteiro;
       variante: VarianteRoteiro;
+      entrada: string;
       restantes: number;
       fechaEm: string | null;
     }
@@ -412,6 +417,7 @@ export async function puxarProximo(
       nos: lido.data.roteiro.arvore,
     },
     variante: lido.data.variante,
+    entrada: lido.data.entrada ?? NO_DE_ABERTURA,
     restantes: lido.data.restantes,
     fechaEm: lido.data.fecha_em ?? null,
   };
