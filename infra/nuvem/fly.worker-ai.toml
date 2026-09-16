@@ -1,0 +1,55 @@
+# =============================================================================
+# worker-ai no Fly.io — quem faz a ficha da conversa e o Pulso do dia
+# (CRM Inteligente, Fase 2, 17/09/2026)
+# =============================================================================
+#
+# O mesmo apps/workers/Dockerfile do worker-wa, rodando só o comando `ai`. Ele
+# consome a fila `ai_jobs`: transcrição de áudio, classificação de entrada, resumo
+# e follow-up de ligação, a ficha de cada conversa e o Pulso do dia.
+#
+# Por que ele também sai da máquina dedicada: quem enfileira é o Postgres (cron de
+# 5 em 5 minutos para as análises, 18h30 para o Pulso). Trabalho enfileirado que
+# espera a máquina de alguém ligar não é análise — é fila crescendo.
+#
+# Não publica porta nenhuma: não há [http_service]. Ele só busca a fila no banco e
+# chama a API do modelo.
+#
+# Publicar (da RAIZ do repositório — o contexto do build é o monorepo inteiro):
+#   fly deploy . --config infra/nuvem/fly.worker-ai.toml --dockerfile apps/workers/Dockerfile
+#
+# Segredos vão por `fly secrets set` (nunca neste arquivo):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   — obrigatórios
+#   ANTHROPIC_API_KEY                          — obrigatório; sem ele o worker não sobe
+#   GROQ_API_KEY                               — transcrição de áudio; sem ele, o
+#                                                áudio recebido não vira texto e o
+#                                                log avisa (não derruba o worker)
+#
+# ATENÇÃO AO CUSTO: este é o único worker que gasta dinheiro por mensagem. O teto
+# mensal e o alerta de 80% vivem em `ai_budget_alerts` (PRD §9); os módulos da ficha
+# e do Pulso nascem DESLIGADOS em `app_settings.ia.crm_inteligente` — subir este
+# worker não liga nada sozinho.
+# =============================================================================
+
+app = "triade-worker-ai"
+primary_region = "gru"
+
+# O SIGTERM acorda o descanso (lib/dormir.ts) e o worker termina o trabalho atual
+# antes de sair. O pior caso é uma chamada ao modelo em andamento: Sonnet com
+# saída longa pode levar perto de um minuto, daí os 70 s.
+kill_signal = "SIGTERM"
+kill_timeout = "70s"
+
+[env]
+  WORKER_COMANDO = "ai"
+  NODE_ENV = "production"
+  TZ = "America/Fortaleza"
+
+# Caiu, volta. O que estava na fila continua na fila — a `pgmq` devolve a mensagem
+# quando o visibility timeout expira, e a chave de idempotência impede pagar duas
+# vezes pela mesma janela.
+[[restart]]
+  policy = "always"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
