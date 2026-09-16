@@ -3,7 +3,7 @@
 -- feriados, modelos de mensagem e controle de acesso (PRD §5, Apêndices C e F; R09 §E; R08 §2).
 -- =====================================================================
 begin;
-select plan(58);
+select plan(59);
 
 -- ---------- contagens ----------
 select is((select count(*)::int from public.cities),                              22, 'seed: 22 cidades');
@@ -131,8 +131,14 @@ select is((select count(*)::int from public.sources where slug ilike '%ninja%' o
   'seed: GetNinjas não entra no catálogo nem com outro nome ou slug (CLAUDE.md, PRD §10.2)');
 
 -- ---------- itens-chave: modelos de mensagem e áudios ----------
-select is((select count(*)::int from public.message_templates where template_code like '%-ABR-%'), 12,
-  'seed: 12 aberturas (6 segmentos × variantes A/B)');
+select is((select count(*)::int from public.message_templates
+            where template_code like '%-ABR-%' and segment <> 'GEN'), 12,
+  'seed: 12 aberturas por segmento (6 segmentos × variantes A/B)');
+-- As GEN-ABR-* são as aberturas livres de 16/09/2026: moldura aprovada com o texto
+-- escrito na hora. Não pertencem a segmento nenhum, e por isso ficam fora da conta.
+select is((select count(*)::int from public.message_templates
+            where template_code like 'GEN-ABR-%'), 3,
+  'seed: 3 aberturas livres (livre, parceria, lançamento)');
 select is((select count(*)::int from public.message_templates where template_code like '%-ABR-%' and (body !~ 'SAIR' or body !~* 'privacidade')), 0,
   'seed: toda abertura traz "SAIR" e o aviso de privacidade (RF-CON-12)');
 select results_eq(

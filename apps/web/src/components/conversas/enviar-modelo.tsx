@@ -24,16 +24,18 @@ import { ErroDaConversa } from './acoes';
 import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
 import {
   dicaDaVariavel,
+  escolherModeloInicial,
   faltando,
   fraseDoBloqueio,
   grupoDoModelo,
-  MAXIMO_POR_VARIAVEL,
   preencher,
   previaSchema,
   quandoFoi,
   resultadoDoEnvioSchema,
   rotuloDaVariavel,
+  tetoDaVariavel,
   valoresIniciais,
+  variavelLivreDoModelo,
   VARIAVEL_DO_ATENDENTE,
   type ModeloParaEnviar,
   type PreviaDoEnvio,
@@ -196,7 +198,12 @@ function Formulario({
   const modeloDoRecibo = pedido
     ? (previa.modelos.find((m) => m.codigo === pedido.codigo) ?? null)
     : null;
-  const [modeloId, setModeloId] = useState<number>(modeloDoRecibo?.id ?? previa.modelos[0]!.id);
+  const [modeloId, setModeloId] = useState<number>(
+    modeloDoRecibo?.id ??
+      escolherModeloInicial(previa.modelos, previa.valores)?.id ??
+      previa.modelos[0]!.id,
+  );
+  const [trocando, setTrocando] = useState(false);
   const [digitados, setDigitados] = useState<Record<string, string>>(() =>
     modeloDoRecibo ? pedido!.valores : {},
   );
@@ -204,14 +211,14 @@ function Formulario({
   const modelo = previa.modelos.find((m) => m.id === modeloId) ?? previa.modelos[0]!;
   const valores = valoresIniciais(modelo, previa.valores, digitados);
   const vazias = faltando(modelo, valores);
-  const longa = modelo.variaveis.find(
-    (v) => (valores[v] ?? '').trim().length > MAXIMO_POR_VARIAVEL,
-  );
+  const longa = modelo.variaveis.find((v) => (valores[v] ?? '').trim().length > tetoDaVariavel(v));
   const texto = preencher(modelo.corpo, valores);
 
   const grupos = useMemo(() => agrupar(previa.modelos), [previa.modelos]);
-  // `{{atendente}}` não é campo: o banco põe o nome de quem clicou, sempre.
-  const campos = modelo.variaveis.filter((v) => v !== VARIAVEL_DO_ATENDENTE);
+  // `{{atendente}}` não é campo: o banco põe o nome de quem clicou, sempre. E a
+  // variável de texto livre não é campo de formulário: ela É a mensagem.
+  const livre = variavelLivreDoModelo(modelo);
+  const campos = modelo.variaveis.filter((v) => v !== VARIAVEL_DO_ATENDENTE && v !== livre);
   const assinaComNome = modelo.variaveis.includes(VARIAVEL_DO_ATENDENTE);
 
   const enviar = useMutation({
@@ -260,6 +267,29 @@ function Formulario({
         ) : null}
       </div>
 
+      {livre ? (
+        <div className="space-y-1">
+          <label htmlFor={`livre-${modelo.id}`} className="text-xs text-muted-foreground">
+            O que você quer dizer
+          </label>
+          <textarea
+            id={`livre-${modelo.id}`}
+            autoFocus
+            rows={5}
+            value={valores[livre] ?? ''}
+            maxLength={tetoDaVariavel(livre)}
+            onChange={(e) => setDigitados((d) => ({ ...d, [livre]: e.target.value }))}
+            placeholder="Escreva como você falaria. A saudação com o seu nome e a saída (SAIR) já entram sozinhas."
+            className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-base leading-relaxed transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            <span className="numerico">{(valores[livre] ?? '').length}</span> de{' '}
+            <span className="numerico">{tetoDaVariavel(livre)}</span> caracteres. Sai num parágrafo
+            só: a Meta não aceita quebra de linha dentro do texto.
+          </p>
+        </div>
+      ) : null}
+
       {pedido && !modeloDoRecibo ? (
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           O modelo que a ligação pediu ({pedido.codigo}) ainda não foi aprovado pela Meta. Escolha
@@ -267,7 +297,18 @@ function Formulario({
         </p>
       ) : null}
 
-      <div className="space-y-1">
+      {trocando || previa.modelos.length === 1 ? null : (
+        <button
+          type="button"
+          onClick={() => setTrocando(true)}
+          className="self-start rounded px-1 text-xs text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          {livre ? 'Prefiro um texto pronto' : 'Trocar o texto pronto'} (
+          <span className="numerico">{previa.modelos.length}</span>)
+        </button>
+      )}
+
+      <div className={cn('space-y-1', !trocando && previa.modelos.length > 1 && 'hidden')}>
         <label htmlFor="modelo-whatsapp" className="text-xs text-muted-foreground">
           Modelo
         </label>
@@ -303,7 +344,7 @@ function Formulario({
                 <Input
                   id={id}
                   value={valores[v] ?? ''}
-                  maxLength={MAXIMO_POR_VARIAVEL}
+                  maxLength={tetoDaVariavel(v)}
                   placeholder={dica ?? undefined}
                   onChange={(e) => setDigitados((d) => ({ ...d, [v]: e.target.value }))}
                   className="h-11 md:h-9"

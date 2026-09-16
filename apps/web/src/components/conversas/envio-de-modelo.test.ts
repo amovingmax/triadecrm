@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { faltasDoWhatsapp } from './aviso-whatsapp';
 import {
+  escolherModeloInicial,
   faltando,
   fraseDoBloqueio,
   preencher,
@@ -10,7 +11,9 @@ import {
   quandoFoi,
   rotuloDaVariavel,
   valorLimpo,
+  tetoDaVariavel,
   valoresIniciais,
+  variavelLivreDoModelo,
   type ModeloParaEnviar,
 } from './envio-de-modelo';
 import { fraseDaRecusaDoEnvio, MOTIVOS_DE_RECUSA_DO_ENVIO } from './mensagens';
@@ -200,5 +203,57 @@ describe('faltasDoWhatsapp', () => {
     expect(faltas[0]).toContain('não foi conectado');
     expect(faltas[1]).toContain('envio está parado');
     expect(faltas[2]).toContain('não aprovou nenhum modelo');
+  });
+});
+
+describe('a abertura livre (migração 20260916100000)', () => {
+  const LIVRE: ModeloParaEnviar = {
+    id: 9,
+    codigo: 'GEN-ABR-LIVRE',
+    nome: 'Abertura livre — você escreve o meio',
+    tipo: 'abertura',
+    variante: null,
+    segmento: 'GEN',
+    corpo:
+      'Oi, {{nome}}! Aqui é {{atendente}}, da Komune, o aplicativo de eventos de Natal. {{mensagem}} Se não for o momento, é só responder SAIR.',
+    variaveis: ['nome', 'atendente', 'mensagem'],
+  };
+
+  it('o texto livre cabe em 900 caracteres; o resto continua em 200', () => {
+    expect(tetoDaVariavel('mensagem')).toBe(900);
+    expect(tetoDaVariavel('nome')).toBe(200);
+  });
+
+  it('a variável livre do modelo é achada, e não vira campo de formulário', () => {
+    expect(variavelLivreDoModelo(LIVRE)).toBe('mensagem');
+    expect(variavelLivreDoModelo(ABERTURA)).toBeNull();
+  });
+
+  it('a caixa abre no modelo em que se escreve, mesmo com outros na frente', () => {
+    expect(escolherModeloInicial([ABERTURA, LIVRE], {})?.codigo).toBe('GEN-ABR-LIVRE');
+  });
+
+  it('sem modelo livre, abre no que o banco já preenche inteiro', () => {
+    const pronto: ModeloParaEnviar = {
+      ...ABERTURA,
+      id: 7,
+      codigo: 'GEN-FUP-D3-V1',
+      corpo: 'Oi, {{nome}}, passando para saber se você viu.',
+      variaveis: ['nome'],
+    };
+    expect(escolherModeloInicial([ABERTURA, pronto], { nome: 'Mariana' })?.codigo).toBe(
+      'GEN-FUP-D3-V1',
+    );
+    expect(escolherModeloInicial([], {})).toBeNull();
+  });
+
+  it('o que a pessoa escreve sai num parágrafo só, como a Meta exige', () => {
+    expect(
+      preencher(LIVRE.corpo, {
+        nome: 'Ana',
+        atendente: 'Rafael',
+        mensagem: 'Linha um\nLinha dois',
+      }),
+    ).toContain('Linha um Linha dois');
   });
 });

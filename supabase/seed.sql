@@ -1404,6 +1404,29 @@ values
    '["empresa", "link", "nome", "origem"]'::jsonb)
 on conflict (template_code) do nothing;
 
+-- As aberturas livres (migração 20260916100000): a moldura aprovada pela Meta com
+-- o texto escrito na hora no lugar de {{mensagem}}.
+insert into public.message_templates
+  (template_code, name, channel, category, segment, kind, language, body, variables)
+values
+  ('GEN-ABR-LIVRE', 'Abertura livre — você escreve o meio', 'whatsapp', 'marketing', 'GEN',
+   'abertura', 'pt_BR',
+   'Oi, {{nome}}! Aqui é {{atendente}}, da Komune, o aplicativo de eventos de Natal. {{mensagem}} Se não for o momento, é só responder SAIR que eu não escrevo mais. Como usamos seus dados: komune.app.br/privacidade',
+   '["atendente", "mensagem", "nome"]'::jsonb),
+  ('GEN-ABR-PARCERIA', 'Abertura — parceria com divulgação gratuita', 'whatsapp', 'marketing', 'GEN',
+   'abertura', 'pt_BR',
+   'Oi, {{nome}}! Aqui é {{atendente}}, da Komune, um aplicativo novo de Natal para organizar eventos: num lugar só dá para montar o evento, contratar os fornecedores e pagar. Queria propor uma parceria com divulgação gratuita para {{empresa}}. Já estão com a gente {{referencias}}, e agora estamos escolhendo os primeiros parceiros. Posso te passar os detalhes, ou prefere marcar 20 minutos por vídeo? Se não for o momento, responda SAIR. Como usamos seus dados: komune.app.br/privacidade',
+   '["atendente", "empresa", "nome", "referencias"]'::jsonb),
+  ('GEN-ABR-LANCAMENTO', 'Abertura — lançamento com data e lugar', 'whatsapp', 'marketing', 'GEN',
+   'abertura', 'pt_BR',
+   'Oi, {{nome}}! Aqui é {{atendente}}, da Komune, o aplicativo de eventos de Natal. Nosso lançamento é {{quando}}, {{onde}}, e estamos fechando a lista dos primeiros parceiros — a divulgação de {{empresa}} no aplicativo é gratuita. Dá para conversar 20 minutos por vídeo, ou eu passo aí? Se não for o momento, responda SAIR. Como usamos seus dados: komune.app.br/privacidade',
+   '["atendente", "empresa", "nome", "onde", "quando"]'::jsonb),
+  ('GEN-FUP-LIVRE', 'Retomada livre — você escreve o meio', 'whatsapp', 'marketing', 'GEN',
+   'followup', 'pt_BR',
+   'Oi, {{nome}}! Aqui é {{atendente}}, da Komune. {{mensagem}} Se preferir que eu não escreva mais, responda SAIR. Como usamos seus dados: komune.app.br/privacidade',
+   '["atendente", "mensagem", "nome"]'::jsonb)
+on conflict (template_code) do nothing;
+
 -- Os três modelos de depois da ligação (roteiro v3, migração 20260915100000): a
 -- confirmação da reunião e o resumo para fornecedor e para produtor.
 insert into public.message_templates

@@ -87,8 +87,45 @@ export function faltando(modelo: ModeloParaEnviar, valores: Record<string, strin
  */
 export const VARIAVEL_DO_ATENDENTE = 'atendente';
 
-/** Teto de `wa_enviar_modelo` por variável. */
+/**
+ * As variáveis em que a pessoa ESCREVE a mensagem, e não preenche um dado.
+ *
+ * São o que tira a abertura do modelo pronto (migração 20260916100000): a Meta exige
+ * texto aprovado para começar conversa, então o que foi aprovado é a MOLDURA — a
+ * saudação com o nome de quem envia e a saída obrigatória — e o meio é escrito na hora.
+ */
+export const VARIAVEIS_DE_TEXTO_LIVRE: readonly string[] = ['mensagem', 'texto', 'recado'];
+
+/** Teto de `wa_enviar_modelo` por variável. Espelho de `app.modelo_teto_da_variavel`. */
 export const MAXIMO_POR_VARIAVEL = 200;
+export const MAXIMO_DO_TEXTO_LIVRE = 900;
+
+export function tetoDaVariavel(variavel: string): number {
+  return VARIAVEIS_DE_TEXTO_LIVRE.includes(variavel) ? MAXIMO_DO_TEXTO_LIVRE : MAXIMO_POR_VARIAVEL;
+}
+
+/** A variável de texto livre do modelo, quando ele tem uma. */
+export function variavelLivreDoModelo(modelo: ModeloParaEnviar): string | null {
+  return modelo.variaveis.find((v) => VARIAVEIS_DE_TEXTO_LIVRE.includes(v)) ?? null;
+}
+
+/**
+ * Qual modelo abre a caixa.
+ *
+ * Quem manda quer escrever, não escolher: o modelo de texto livre vem primeiro,
+ * depois o que o banco já sabe preencher inteiro (nenhum campo para digitar), e só
+ * então a ordem do servidor. Trocar continua a um toque.
+ */
+export function escolherModeloInicial(
+  modelos: readonly ModeloParaEnviar[],
+  sugeridos: Record<string, string>,
+): ModeloParaEnviar | null {
+  if (modelos.length === 0) return null;
+  const livre = modelos.find((m) => variavelLivreDoModelo(m) !== null);
+  if (livre) return livre;
+  const pronto = modelos.find((m) => faltando(m, valoresIniciais(m, sugeridos)).length === 0);
+  return pronto ?? modelos[0]!;
+}
 
 /** Começa pelo que o banco sugeriu e mantém o que a pessoa já tinha digitado. */
 export function valoresIniciais(
