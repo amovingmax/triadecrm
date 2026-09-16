@@ -214,6 +214,12 @@ desenvolvedor da Meta (OAuth) e três permissões: `business_management`,
 **de pessoa, não de aplicativo**: ação que muda o estado da conta exige alguém
 logado, e isso é de propósito.
 
+**A liberação é gradual (testado em 17/09).** A conta do Rafael ainda recebe
+"Not yet available for your account — WhatsApp Business Tools MCP is being
+gradually rolled out" na tela de OAuth. Não é configuração errada: é fila de
+liberação da Meta. A configuração fica pronta no `.mcp.json`; é só tentar `/mcp`
+de novo daqui a alguns dias.
+
 **O que ele resolve, e que hoje é trabalho manual no painel:** listar, criar,
 editar e apagar modelos (`whatsapp_biz_list_templates`, `create_template`,
 `update_template`, `delete_template`), configurar e assinar webhook, verificar o
