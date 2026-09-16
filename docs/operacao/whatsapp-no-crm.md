@@ -191,3 +191,46 @@ Os 42 modelos vão para a aprovação da Meta. Se algum voltar recusado, o motiv
 | Mensagem falha com 131026 | o número do parceiro não tem WhatsApp |
 | Mensagem falha com 131049 | a Meta segurou por excesso de mensagens de marketing para essa pessoa; tente outro dia |
 | Todos os modelos recusados | ler o motivo em `message_templates.meta_rejection_reason` e ajustar o texto no `seed.sql`/migração, subindo a versão |
+
+
+## O MCP da Meta (WhatsApp Business Tools) — 17/09/2026
+
+A Meta lançou em 15/09/2026 um servidor MCP oficial que liga um agente de IA
+(Claude, Cursor, Codex) direto à plataforma do WhatsApp Business:
+
+```
+https://mcp.facebook.com/whatsapp_business_tools
+```
+
+**Como ligar**, no diretório do repositório:
+
+```bash
+claude mcp add --transport http whatsapp_business_tools https://mcp.facebook.com/whatsapp_business_tools
+```
+
+Depois, `/mcp` dentro do Claude Code para entrar. Ele pede login com a conta de
+desenvolvedor da Meta (OAuth) e três permissões: `business_management`,
+`whatsapp_business_management` e `whatsapp_business_messaging`. A autenticação é
+**de pessoa, não de aplicativo**: ação que muda o estado da conta exige alguém
+logado, e isso é de propósito.
+
+**O que ele resolve, e que hoje é trabalho manual no painel:** listar, criar,
+editar e apagar modelos (`whatsapp_biz_list_templates`, `create_template`,
+`update_template`, `delete_template`), configurar e assinar webhook, verificar o
+negócio, ver status de termos e de pagamento, emitir token de usuário de sistema.
+Na prática: submeter um modelo novo e acompanhar a aprovação sem sair da conversa.
+
+**O que ele NÃO substitui.** O envio de produção continua sendo do `worker-wa`
+pela Cloud API, com a fila `wa_outbound`, os tetos de primeiro contato, a
+supressão, a janela de horário e a janela de 24 h (ADR-06). A própria Meta
+posiciona o MCP como beta, para desenvolvimento e teste — não para operação.
+
+**Cuidado com `whatsapp_biz_send_message`.** Ele existe no MCP e passa por fora
+de tudo o que o CRM garante: opt-out, teto diário, janela de horário, assinatura
+de quem enviou e registro em `messages`. Não use para falar com parceiro de
+verdade — uma mensagem que sai por fora não existe para o CRM, e o parceiro que
+pediu SAIR pode receber assim mesmo.
+
+**Onde fica a configuração.** Em `.mcp.json`, na raiz. O arquivo não guarda
+segredo (a autenticação é OAuth, por pessoa), então versioná-lo só decide se o
+resto do time herda o servidor ao abrir o repositório.
