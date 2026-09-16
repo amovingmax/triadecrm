@@ -554,3 +554,126 @@ export async function temRascunhoPendente(
   erroSe('message_drafts.count', error);
   return (count ?? 0) > 0;
 }
+
+// ---------------------------------------------------------------------------
+// A ficha da conversa (CRM Inteligente, Fase 2)
+//
+// As duas pontas moram no Postgres (`20260917110000`): ele monta a entrada e ele
+// grava a saída, conferindo cada evidência contra as mensagens da própria
+// conversa. O que está aqui é só a chamada — regra nenhuma.
+// ---------------------------------------------------------------------------
+
+export interface MensagemDaFicha {
+  readonly id: string;
+  readonly de: 'parceiro' | 'equipe' | 'robo';
+  readonly quando: string;
+  readonly texto: string;
+}
+
+export interface EntradaDaFichaDoBanco {
+  readonly existe: boolean;
+  readonly conversationId: string;
+  readonly organizationId: string | null;
+  readonly contactId: string | null;
+  readonly dealId: string | null;
+  readonly agora: string;
+  readonly etapa: string | null;
+  readonly etapasValidas: readonly string[];
+  readonly responsavel: string | null;
+  readonly temperatura: string | null;
+  readonly ultimaIntencao: string | null;
+  readonly fichaAnterior: string | null;
+  readonly analisadaEm: string | null;
+  readonly compromissosAbertos: readonly { id: string; oQue: string; prazo: string | null }[];
+  readonly mensagens: readonly MensagemDaFicha[];
+  /** Até onde esta janela leu. É ele que fecha a janela na gravação. */
+  readonly ateMessageId: string | null;
+  readonly camposVazios: readonly string[];
+}
+
+function lista(valor: unknown): unknown[] {
+  return Array.isArray(valor) ? valor : [];
+}
+
+export async function entradaDaFicha(
+  cliente: ClienteDoBanco,
+  conversationId: string,
+): Promise<EntradaDaFichaDoBanco | null> {
+  const { data, error } = await cliente.rpc('ia_entrada_da_ficha', {
+    p_conversation_id: conversationId,
+  });
+  erroSe('ia_entrada_da_ficha', error);
+  const bruto = (data ?? {}) as Record<string, unknown>;
+  if (bruto.existe !== true) return null;
+
+  return {
+    existe: true,
+    conversationId,
+    organizationId: texto(bruto.organization_id),
+    contactId: texto(bruto.contact_id),
+    dealId: texto(bruto.deal_id),
+    agora: texto(bruto.agora) ?? '',
+    etapa: texto(bruto.etapa),
+    etapasValidas: lista(bruto.etapas_validas).map(String),
+    responsavel: texto(bruto.responsavel),
+    temperatura: texto(bruto.temperatura),
+    ultimaIntencao: texto(bruto.ultima_intencao),
+    fichaAnterior: texto(bruto.ficha_anterior),
+    analisadaEm: texto(bruto.analisada_em),
+    compromissosAbertos: lista(bruto.compromissos_abertos).map((c) => {
+      const linha = c as Record<string, unknown>;
+      return {
+        id: texto(linha.id) ?? '',
+        oQue: texto(linha.o_que) ?? '',
+        prazo: texto(linha.prazo),
+      };
+    }),
+    mensagens: lista(bruto.mensagens).map((m) => {
+      const linha = m as Record<string, unknown>;
+      const de = texto(linha.de);
+      return {
+        id: texto(linha.id) ?? '',
+        de: de === 'parceiro' || de === 'robo' ? de : 'equipe',
+        quando: texto(linha.quando) ?? '',
+        texto: texto(linha.texto) ?? '',
+      };
+    }),
+    ateMessageId: texto(bruto.ate_message_id),
+    camposVazios: lista(bruto.campos_vazios).map(String),
+  };
+}
+
+export interface FichaGravada {
+  readonly compromissosNovos: number;
+  readonly compromissosCumpridos: number;
+  readonly sugestoes: number;
+  readonly evidenciasDescartadas: number;
+}
+
+export async function gravarFicha(
+  cliente: ClienteDoBanco,
+  conversationId: string,
+  saida: unknown,
+  aiRunId: number | null,
+  promptVersion: string,
+  ateMessageId: string | null,
+): Promise<FichaGravada> {
+  const { data, error } = await cliente.rpc('ia_gravar_ficha', {
+    p_conversation_id: conversationId,
+    p_saida: saida,
+    p_ai_run_id: aiRunId,
+    p_prompt_version: promptVersion,
+    // Fechar a janela em `now()` esconderia a mensagem que chegou enquanto o
+    // modelo pensava; fechá-la na última mensagem LIDA deixa a seguinte pendente.
+    p_ate_message_id: ateMessageId,
+  });
+  erroSe('ia_gravar_ficha', error);
+  const bruto = (data ?? {}) as Record<string, unknown>;
+  const numero = (valor: unknown): number => (typeof valor === 'number' ? valor : 0);
+  return {
+    compromissosNovos: numero(bruto.compromissos_novos),
+    compromissosCumpridos: numero(bruto.compromissos_cumpridos),
+    sugestoes: numero(bruto.sugestoes),
+    evidenciasDescartadas: numero(bruto.evidencias_descartadas),
+  };
+}

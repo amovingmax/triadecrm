@@ -33,12 +33,14 @@ import { z } from 'zod';
 
 import {
   INTENCOES,
+  INTENCOES_DA_FICHA,
   LIMIAR_DE_CONFIANCA,
   MAXIMO_DE_INAUDIVEIS,
   classificarIntencaoV1,
   decidirIntencao,
   decidirRoteamento,
   detectarOptOut,
+  fichaDaConversaV1,
   followupLigacaoV1,
   reidratar,
   resumoLigacaoV1,
@@ -46,7 +48,9 @@ import {
   validarPromessas,
   viradaProvavel,
   type Intencao,
+  type IntencaoDaFicha,
   type MapaDePseudonimos,
+  type SaidaDaFicha,
 } from '@komune/prompts';
 
 import { ErroDeTranscricao, transcrever as transcreverAudio, type TranscricaoBruta } from './asr';
@@ -56,8 +60,10 @@ import {
   buscarMensagem,
   buscarTentativa,
   criarRascunho,
+  entradaDaFicha,
   escalarConversa,
   gravarClassificacao,
+  gravarFicha,
   gravarResumoDaLigacao,
   gravarTranscricao,
 } from './banco';
@@ -142,11 +148,17 @@ const payloadDaClassificacao = z.object({
   message_id: uuid,
 });
 
+const payloadDaFicha = z.object({
+  purpose: z.literal('analisar_conversa'),
+  conversation_id: uuid,
+});
+
 const PAYLOADS = {
   transcribe_audio: payloadDaTranscricao,
   summarize_call: payloadDoResumo,
   draft_followup: payloadDoFollowUp,
   classify_inbound: payloadDaClassificacao,
+  analisar_conversa: payloadDaFicha,
 } as const;
 
 export type PropositoConhecido = keyof typeof PAYLOADS;
@@ -591,6 +603,157 @@ async function classificarEntrada(
 }
 
 // ---------------------------------------------------------------------------
+// 5. A ficha da conversa (CRM Inteligente, Fase 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * O dossiê de uma conversa: o que ela é, o quanto indica fechamento, o que a
+ * sustenta, o que foi prometido e o que o CRM ainda não sabe.
+ *
+ * As duas pontas são do Postgres (`app.ia_entrada_da_ficha` e
+ * `app.ia_gravar_ficha`): ele monta a entrada numa consulta só e grava a saída
+ * numa transação só, conferindo cada evidência contra as mensagens da própria
+ * conversa. Esta função é o meio — e só o meio.
+ *
+ * **Por que o modelo não vê o uuid das mensagens.** Ele recebe `m1`, `m2`, `m3`,
+ * na ordem da conversa, e devolve a evidência citando essas etiquetas. Duas razões:
+ * uuid é caro em token e, sobretudo, etiqueta que o modelo não conhece ele não
+ * consegue inventar — um `m9` numa conversa de quatro mensagens cai aqui, antes
+ * de chegar ao banco, e o que sobreviver ainda é conferido lá.
+ */
+async function analisarConversa(
+  contexto: ContextoDaIa,
+  bruto: unknown,
+): Promise<ResultadoDoTrabalho> {
+  const payload = interpretarPayload(payloadDaFicha, bruto);
+  const entrada = await entradaDaFicha(contexto.cliente, payload.conversation_id);
+  if (entrada === null) {
+    throw new ErroDeterministico(`conversa ${payload.conversation_id} não existe`);
+  }
+  if (entrada.mensagens.length === 0) {
+    // A janela fechou sem mensagem nova (a análise anterior já a cobriu). Não é
+    // erro e não é chamada paga: é a fila fazendo o que deveria.
+    return { proposito: 'analisar_conversa', feito: false, motivo: 'sem_mensagem_nova' };
+  }
+
+  // etiqueta → uuid. É por este mapa que a evidência volta a apontar para o banco.
+  const porEtiqueta = new Map<string, string>();
+  const mensagens = entrada.mensagens.map((m, indice) => {
+    const etiqueta = `m${indice + 1}`;
+    porEtiqueta.set(etiqueta, m.id);
+    return { messageId: etiqueta, de: m.de, quando: m.quando, texto: m.texto };
+  });
+
+  const ficha = await buscarContatoDaFicha(
+    contexto.cliente,
+    entrada.organizationId,
+    entrada.contactId,
+    null,
+  );
+  // O lead precisa ser o MESMO em toda análise desta conversa: conversa fora da
+  // base não tem organização, e sortear um id novo a cada chamada tiraria do
+  // modelo a única âncora estável que ele tem.
+  const leadId = leadIdCurto(entrada.organizationId ?? entrada.conversationId);
+
+  const executada = await executar(
+    contexto,
+    fichaDaConversaV1,
+    {
+      leadId,
+      agora: entrada.agora,
+      etapa: entrada.etapa,
+      etapasValidas: entrada.etapasValidas.slice(0, 20),
+      responsavel: entrada.responsavel,
+      temperaturaAtual: temperaturaConhecida(entrada.temperatura),
+      ultimaIntencao: intencaoDaFicha(entrada.ultimaIntencao),
+      fichaAnterior: entrada.fichaAnterior === null ? null : entrada.fichaAnterior.slice(0, 2000),
+      compromissosAbertos: entrada.compromissosAbertos
+        .slice(0, 20)
+        .map((c) => ({ id: c.id, oQue: c.oQue, prazo: c.prazo })),
+      mensagens,
+      camposVazios: entrada.camposVazios.slice(0, 20),
+    },
+    { ...contatoDoPrompt({ ...ficha, organizationId: entrada.organizationId }), leadId },
+    {
+      organizationId: entrada.organizationId,
+      contactId: entrada.contactId,
+      conversationId: entrada.conversationId,
+    },
+  );
+
+  const saida = comMessageIdDeVerdade(executada.saida, porEtiqueta);
+  const gravada = await gravarFicha(
+    contexto.cliente,
+    entrada.conversationId,
+    saida,
+    executada.aiRunId,
+    executada.promptVersion,
+    entrada.ateMessageId ?? entrada.mensagens[entrada.mensagens.length - 1]?.id ?? null,
+  );
+
+  contexto.logger.info('ficha da conversa atualizada', {
+    conversation_id: entrada.conversationId,
+    intencao: executada.saida.intencao,
+    score: executada.saida.scoreIntencao,
+    mensagens: mensagens.length,
+    primeira_analise: entrada.analisadaEm === null,
+    ...gravada,
+  });
+
+  return {
+    proposito: 'analisar_conversa',
+    feito: true,
+    aiRunId: executada.aiRunId,
+    custoUsd: executada.custoUsd,
+    detalhes: {
+      intencao: executada.saida.intencao,
+      score: executada.saida.scoreIntencao,
+      alertas: executada.saida.alertas,
+      ...gravada,
+    },
+  };
+}
+
+/**
+ * A evidência volta a apontar para o banco — e a que aponta para etiqueta que não
+ * existe some aqui mesmo. É a primeira das duas peneiras; a segunda é o banco,
+ * que confere o uuid contra as mensagens da conversa.
+ */
+function comMessageIdDeVerdade(
+  saida: SaidaDaFicha,
+  porEtiqueta: ReadonlyMap<string, string>,
+): Record<string, unknown> {
+  const real = (etiqueta: string): string | null => porEtiqueta.get(etiqueta) ?? null;
+  const comId = <T extends { messageId: string }>(itens: readonly T[]): T[] =>
+    itens
+      .map((item) => ({ ...item, messageId: real(item.messageId) }))
+      .filter((item): item is T => item.messageId !== null);
+
+  return {
+    ...saida,
+    sinais: comId(saida.sinais),
+    compromissosNovos: comId(saida.compromissosNovos),
+    compromissosCumpridos: comId(saida.compromissosCumpridos),
+    dadosExtraidos: comId(saida.dadosExtraidos),
+  };
+}
+
+function temperaturaConhecida(
+  valor: string | null,
+): 'frio' | 'morno' | 'quente' | 'cliente' | 'cliente_ativo' | null {
+  const conhecidas = ['frio', 'morno', 'quente', 'cliente', 'cliente_ativo'] as const;
+  return (conhecidas as readonly string[]).includes(valor ?? '')
+    ? (valor as (typeof conhecidas)[number])
+    : null;
+}
+
+function intencaoDaFicha(valor: string | null): IntencaoDaFicha | null {
+  return valor !== null && (INTENCOES_DA_FICHA as readonly string[]).includes(valor)
+    ? (valor as IntencaoDaFicha)
+    : null;
+}
+
+// ---------------------------------------------------------------------------
 // O despachante
 // ---------------------------------------------------------------------------
 
@@ -601,6 +764,7 @@ const TRABALHOS: Readonly<
   summarize_call: resumirLigacao,
   draft_followup: redigirFollowUp,
   classify_inbound: classificarEntrada,
+  analisar_conversa: analisarConversa,
 };
 
 export async function tratarTrabalho(

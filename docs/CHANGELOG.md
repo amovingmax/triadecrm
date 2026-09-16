@@ -2276,3 +2276,22 @@ A camada de IA sobre as conversas começa pelo alicerce. Nada do que entrou aqui
 - `ANTHROPIC_API_KEY` e `GROQ_API_KEY` no `.env` (e a avaliação de LGPD de mandar áudio ao Groq). A chamada de teste só falta sair para a API de verdade.
 - A migração `20260917100000` ainda não foi aplicada em produção, só no banco local.
 - `worker-ai` no Fly.io, junto com a Fase 2.
+
+### 17/09/2026 — CRM Inteligente, Fase 2 (parte 1): o worker analisa a conversa
+
+A Fase 1 deixou a mesa posta. Faltavam as duas pontas que fazem a análise acontecer, e as duas são do banco (ADR-03): o worker só liga uma na outra.
+
+**`app.ia_entrada_da_ficha` (`20260917110000`).** Tudo o que o prompt lê, numa consulta só: a janela de mensagens novas (ou a conversa inteira, na primeira análise), quem falou em cada uma, a ficha anterior, os compromissos em aberto, etapa, etapas válidas, responsável, temperatura e o que o CRM ainda não sabe. **A janela é cortada pelo par (data, id) da última mensagem lida**, e não pela data sozinha: duas mensagens no mesmo instante são o caso comum aqui — a que chega e a resposta do bot nascem na mesma transação, onde `now()` não anda.
+
+**`app.ia_gravar_ficha`.** O que voltou, gravado numa transação só, com **cada evidência conferida contra as mensagens da própria conversa**: sinal, compromisso, cumprimento ou dado extraído que aponte para mensagem de outra conversa (ou para um id que nem é id) é descartado, e a conta do que caiu volta para quem chamou. Ela não move etapa (`etapaSugerida` é sugestão e nada mais), não escreve em campo preenchido por gente, e só cria sugestão de campo com a bandeira ligada, para campo **vazio**, sempre `pendente`. Prazo que não veio escrito como data vira null — prazo chutado viraria cobrança errada no Pulso do dia.
+
+**Quem fecha a janela é a mensagem lida, não `now()`.** Fechar em `now()` esconderia a mensagem que chegasse enquanto o modelo pensa: ela ficaria antes do corte e nunca seria analisada. Agora a gravação recebe até onde leu, e a conversa **continua pendente** se chegou algo depois. Foi o pgTAP que achou isso.
+
+**No worker (`ia/tarefas.ts`).** O propósito `analisar_conversa` entrou na fila: lê a entrada, chama `ficha-da-conversa@v1`, devolve a saída para o banco. O modelo não vê uuid nenhum — ele recebe `m1`, `m2`, `m3` e cita essas etiquetas; etiqueta que ele inventar morre no worker, e o que passar ainda é conferido no banco. Janela sem mensagem nova não vira chamada paga.
+
+**Provado rodando:** pgTAP 49 (28 asserções) e a suíte inteira verde (49 arquivos, 2674 asserções); workers 344 testes (4 novos). E ponta a ponta no banco local, com o SDK real contra o dublê: cron enfileirou → worker analisou → `ficha_da_conversa` gravada (`ai_runs` 108, US$ 0,00173, 739 tokens de escrita de cache) → conversa saiu da fila com `ia_analisada_em` na data da última mensagem lida.
+
+**Decisão humana / pendente:**
+- As duas migrações da IA (`20260917100000`, `20260917110000`) ainda não foram aplicadas em produção.
+- Falta a tela: a ficha existe no banco e ninguém a vê ainda.
+- `ANTHROPIC_API_KEY` e `GROQ_API_KEY` no `.env`; `worker-ai` no Fly.io.

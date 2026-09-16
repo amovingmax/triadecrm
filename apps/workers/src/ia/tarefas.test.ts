@@ -514,3 +514,146 @@ describe('6. o que a fila faz com cada erro', () => {
     expect(eDeterministico(new AlvoSuprimidoError('org', 1))).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 7. A ficha da conversa (CRM Inteligente, Fase 2)
+// ---------------------------------------------------------------------------
+
+const M1 = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+const M2 = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+
+/** A entrada como o Postgres a devolve — é este contrato que o worker consome. */
+function entradaDoBanco(extras: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    existe: true,
+    conversation_id: CONVERSA,
+    organization_id: ORG,
+    contact_id: CONTATO,
+    deal_id: null,
+    agora: '2026-09-17 10:00',
+    etapa: 'Em conversa',
+    etapas_validas: ['Contatado', 'Respondeu', 'Em conversa'],
+    responsavel: 'Rafael',
+    temperatura: 'morno',
+    ultima_intencao: 'QUER_SABER_MAIS',
+    ficha_anterior: null,
+    analisada_em: null,
+    compromissos_abertos: [],
+    mensagens: [
+      { id: M1, de: 'equipe', quando: '17/09 09:00', texto: 'Oi! Aqui é a Komune.' },
+      { id: M2, de: 'parceiro', quando: '17/09 09:40', texto: 'Gostei, me manda a proposta?' },
+    ],
+    ate_message_id: M2,
+    campos_vazios: ['bairro'],
+    ...extras,
+  };
+}
+
+function montarFicha(dubleOpcoes = {}, entrada = entradaDoBanco()) {
+  const gravacoes: Record<string, unknown>[] = [];
+  const banco = bancoFalso(tabelas(), {
+    rpcs: {
+      ia_entrada_da_ficha: () => entrada,
+      ia_gravar_ficha: (argumentos) => {
+        gravacoes.push(argumentos);
+        return {
+          gravada: true,
+          compromissos_novos: 0,
+          compromissos_cumpridos: 0,
+          sugestoes: 0,
+          evidencias_descartadas: 0,
+        };
+      },
+    },
+  });
+  const { logger, linhas } = loggerDeTeste();
+  const duble = clienteDuble(dubleOpcoes);
+  const contexto: ContextoDaIa = { cliente: banco.cliente, modelo: duble, logger };
+  return { banco, contexto, linhas, duble, gravacoes };
+}
+
+describe('7. a ficha da conversa (CRM Inteligente, Fase 2)', () => {
+  it('analisa a janela e devolve a evidência apontando para a mensagem do banco', async () => {
+    const { contexto, gravacoes, banco } = montarFicha();
+
+    const resultado = await tratarTrabalho(contexto, {
+      purpose: 'analisar_conversa',
+      conversation_id: CONVERSA,
+    });
+
+    expect(resultado.feito).toBe(true);
+    expect(resultado.detalhes?.intencao).toBe('PEDIU_PROPOSTA');
+    expect(gravacoes).toHaveLength(1);
+    const saida = gravacoes[0]?.p_saida as { sinais: { messageId: string }[] };
+    // O modelo citou `m2`; o que chega ao banco é o uuid da segunda mensagem.
+    expect(saida.sinais[0]?.messageId).toBe(M2);
+    expect(gravacoes[0]?.p_conversation_id).toBe(CONVERSA);
+    expect(gravacoes[0]?.p_prompt_version).toBe('ficha-da-conversa@v1');
+    // A janela é fechada pela última mensagem LIDA, e não por `now()`: o que
+    // chegar enquanto o modelo pensa continua pendente para a janela seguinte.
+    expect(gravacoes[0]?.p_ate_message_id).toBe(M2);
+    // E a chamada foi contabilizada, como toda chamada paga.
+    expect(banco.tabelas.ai_runs).toHaveLength(1);
+  });
+
+  it('etiqueta que o modelo inventou não chega ao banco', async () => {
+    const { contexto, gravacoes } = montarFicha({
+      forcar: {
+        ficha: {
+          resumo: 'Inventou uma prova.',
+          intencao: 'AMBIGUO',
+          scoreIntencao: 30,
+          motivo: 'teste',
+          sentimento: 'neutro',
+          // `m9` não existe nesta conversa de duas mensagens.
+          sinais: [
+            { tipo: 'urgencia', polaridade: 'positivo', forca: 'forte', messageId: 'm9', trecho: 'x' },
+            { tipo: 'pediu_proposta', polaridade: 'positivo', forca: 'forte', messageId: 'm1', trecho: 'y' },
+          ],
+          objecoes: [],
+          etapaSugerida: null,
+          compromissosNovos: [
+            { quem: 'equipe', oQue: 'mandar proposta', prazo: null, messageId: 'm42' },
+          ],
+          compromissosCumpridos: [],
+          proximaAcao: { descricao: 'Responder', prazo: null },
+          dadosExtraidos: [],
+          alertas: [],
+          confianca: 0.5,
+          dadosInsuficientes: false,
+        },
+      },
+    });
+
+    await tratarTrabalho(contexto, { purpose: 'analisar_conversa', conversation_id: CONVERSA });
+
+    const saida = gravacoes[0]?.p_saida as {
+      sinais: { messageId: string }[];
+      compromissosNovos: unknown[];
+    };
+    // A primeira peneira é aqui; a segunda é o banco, que confere o uuid contra
+    // as mensagens da conversa. Sobra só o sinal que aponta para mensagem real.
+    expect(saida.sinais.map((s) => s.messageId)).toEqual([M1]);
+    expect(saida.compromissosNovos).toEqual([]);
+  });
+
+  it('janela sem mensagem nova não vira chamada paga', async () => {
+    const { contexto, gravacoes, banco } = montarFicha({}, entradaDoBanco({ mensagens: [] }));
+
+    const resultado = await tratarTrabalho(contexto, {
+      purpose: 'analisar_conversa',
+      conversation_id: CONVERSA,
+    });
+
+    expect(resultado).toMatchObject({ feito: false, motivo: 'sem_mensagem_nova' });
+    expect(gravacoes).toHaveLength(0);
+    expect(banco.tabelas.ai_runs).toHaveLength(0);
+  });
+
+  it('conversa que não existe é erro determinístico: a fila não gira cinco vezes', async () => {
+    const { contexto } = montarFicha({}, { existe: false } as never);
+    await expect(
+      tratarTrabalho(contexto, { purpose: 'analisar_conversa', conversation_id: CONVERSA }),
+    ).rejects.toBeInstanceOf(ErroDeterministico);
+  });
+});
