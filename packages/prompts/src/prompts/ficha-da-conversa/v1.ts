@@ -198,7 +198,14 @@ export const fichaDaConversaV1 = definirPrompt<EntradaDaFicha, SaidaDaFicha>({
   // pela pseudonimização e pela auditoria antes de virar mensagem para o modelo.
   camposDeTexto: ['mensagens', 'fichaAnterior', 'compromissosAbertos'],
   // Etiqueta nossa: o CRM gerou, o CRM guardou.
+  // Caminho aninhado: dentro de `mensagens`, o texto é do parceiro, mas o horário, o
+  // remetente e o id foram o CRM que escreveu. Colados ao texto, eles fabricavam telefone
+  // onde não havia (GATE 1).
   camposDoTriade: [
+    'mensagens[].messageId',
+    'mensagens[].de',
+    'mensagens[].quando',
+    'compromissosAbertos[].id',
     'leadId',
     'agora',
     'etapa',
@@ -208,6 +215,9 @@ export const fichaDaConversaV1 = definirPrompt<EntradaDaFicha, SaidaDaFicha>({
     'ultimaIntencao',
     'camposVazios',
   ],
+  // Uma chamada lê a conversa inteira, não uma mensagem: é a escala que escolhe a
+  // varredura de PII (GATE 1, decisão do dia 17/09/2026).
+  escala: 'conversa',
   maxTokens: 1200,
   montarMensagem: (dados) =>
     [

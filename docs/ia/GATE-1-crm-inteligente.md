@@ -1,6 +1,6 @@
 # GATE 1 — CRM Inteligente, Fase 1 (fundação)
 
-**Branch:** `feat/crm-inteligente` · **Data:** 17/09/2026 · **Estado:** construída, testada, **parada aguardando decisão**
+**Branch:** `feat/crm-inteligente` · **Data:** 17/09/2026 · **Estado:** construída, testada, com a decisão do guardrail tomada e implementada
 
 A Fase 1 é o alicerce: tabelas, fila, prompts e transcrição. Nada dela fala com parceiro,
 move etapa ou escreve em campo preenchido por gente. A ficha ainda **não roda sozinha** —
@@ -61,52 +61,42 @@ prompt, e imprime tokens e custo. Rodar duas vezes mede o cache.
 
 ---
 
-## 2. A decisão que falta (é o que trava a Fase 2)
+## 2. A decisão que era necessária — tomada e implementada
 
-**O guardrail de PII, como está hoje, impede a ficha de existir.** Não é bug: é uma
-calibragem feita para outra escala.
+**O guardrail de PII impedia a ficha de existir.** Não era bug: era calibragem feita para
+outra escala. Os quatro prompts antigos leem *uma* coisa por chamada; a ficha lê a conversa
+inteira, e conversa de fornecedor é data, horário, preço e quantidade — colados pela
+junção, viram telefone. Medido no corpus de 40 mensagens reais deste repositório,
+**nenhuma com telefone**, depois de a regra pseudonimizar:
 
-Os quatro prompts antigos leem **uma** coisa por chamada. A auditoria de PII
-(`nucleo/auditoria-pii.ts`) roda sobre os trechos de fora **colados sem fronteira nenhuma
-— nem de letra** e acusa qualquer corrida de 10 a 13 dígitos que comece por DDD válido.
-Nessa escala o falso positivo é barato.
-
-A ficha lê a **conversa inteira**. E conversa de fornecedor é feita de data, horário, preço
-e quantidade. Medido no corpus de 40 mensagens reais deste repositório, **nenhuma com
-telefone**:
-
-| | hoje | com fronteira de letra |
+| | varredura de mensagem | com fronteira de letra |
 | --- | --- | --- |
 | mensagens barradas sozinhas (40) | 5 | **0** |
 | conversas de 5 mensagens barradas (36) | 35 | **0** |
 | conversas de 10 mensagens barradas (31) | 31 | **0** |
 
-O exemplo mais típico do prompt já é barrado hoje: `09:40` + `parceiro` + "casamento dia
-12/12 para 150", colados, dão dez dígitos que começam por 94 — um DDD do Pará.
+**Decidido em 17/09/2026 (Rafael): opção B + C.**
 
-**O que a fronteira de letra perde**, medido sobre os 147 casos com 8+ dígitos da própria
-suíte de evals, no caminho real (depois da regra pseudonimizar): **um**. Telefone com
-palavra entre os grupos de dígitos — `é 84 depois 9 9988 depois 0011`. Telefone com
-caractere invisível entre os dígitos (`8​4​9​9​9​8​8​0​0​1​1`) continua sendo pego pelas duas.
+- **B — a escala entrou no contrato do prompt.** `escala: 'conversa'` faz a auditoria dos
+  trechos de fora usar a varredura com a fronteira de letra (atravessa pontuação, espaço,
+  hífen, barra e emoji; não atravessa palavra). Omitir `escala` é ser auditado como
+  mensagem: quem não declarar nada continua na varredura estrita, e os quatro prompts
+  antigos não mudaram uma linha.
+- **C — `camposDoTriade` passou a aceitar caminho aninhado.** `mensagens[].quando`,
+  `mensagens[].de`, `mensagens[].messageId` e os campos apurados de `conversas[]` são
+  metadado nosso: entram na auditoria campo a campo, mas não na junção. Caminho só é
+  aceito quando a raiz é texto de fora — o contrário significa que a raiz inteira devia
+  estar declarada, e `prepararChamada` recusa.
 
-### As opções
+**O que isso custa, em lista literal** (`evals/conversa-inteira.eval.test.ts`): de oito
+grafias de telefone de verdade, a varredura da conversa deixa de pegar **uma** — telefone
+com palavra entre os grupos de dígitos, `é 84 depois 9 9988 depois 0011`. E é a mesma
+única que a regra (Anatel) também não mascara: para ela chegar ao modelo, as duas camadas
+precisam falhar, e as duas só falham nesse caso. Se essa lista crescer, o teste fica
+vermelho e a mudança aparece no diff.
 
-| | O que muda | O que custa |
-| --- | --- | --- |
-| **A. Nada** | guardrail intacto | a ficha não existe; a Fase 2 não tem o que ligar |
-| **B. Fronteira de letra na conversa** (recomendada) | prompt que lê conversa passa a ser auditado com a varredura que atravessa pontuação, espaço e emoji, mas **não** atravessa palavra — a mesma que já roda hoje sobre a montagem | perde o telefone escrito com palavra no meio, **se** a regra também tiver falhado. A regra (Anatel, precisa) continua mascarando todo telefone de forma normal |
-| **C. Só corrigir o metadado** | `quando`/`de`/`messageId` passam a contar como campo nosso, não texto de fora | correto, mas **não resolve**: medido, 33 de 36 conversas continuam barradas |
-| **D. Tirar a junção de lista** | mensagens deixam de ser coladas umas nas outras | telefone repartido entre duas mensagens passa, e ainda restam ~85% barradas por mensagem isolada |
-
-**Recomendo B, com C junto** — B resolve, C deixa a classificação honesta. O que **não**
-recomendo é mexer nisso sem decisão registrada: por isso o guardrail está intacto neste
-commit, e há um eval (`evals/conversa-inteira.eval.test.ts`) que **fixa o número de hoje**.
-Se alguém afrouxar a auditoria sem decidir, aquele teste fica vermelho.
-
-> **Pergunta objetiva:** aprova a opção B (+C)? Se sim, ela entra num commit só, com o
-> eval mudando junto e a lista literal do que a fronteira de letra deixa de pegar.
-
----
+A regra de pseudonimização **não mudou em nada** — ela continua mascarando telefone,
+e-mail e @ em qualquer escala.
 
 ## 3. Arquivos
 
@@ -147,11 +137,13 @@ Para ver o debounce funcionando no banco local: mandar uma mensagem de entrada, 
 
 ## 5. Pendências
 
-1. **A decisão do item 2.** Sem ela a Fase 2 não começa.
-2. **`ANTHROPIC_API_KEY` não está no `.env`.** O custo por chamada acima é da tabela de
-   preços da API aplicada aos tokens medidos do nosso prompt; a chamada real de medição
-   (`workers ai --chamada-de-teste`) precisa da chave e da decisão do item 2 — hoje ela
-   para no guardrail, que é exatamente o que este relatório mede.
+1. **`ANTHROPIC_API_KEY` não está no `.env`.** O caminho inteiro já foi provado ponta a
+   ponta contra o dublê local (`ai_runs` 71: entrada 131, saída 182, leitura de cache 739,
+   custo contabilizado, saída validada pelo schema) — o que falta é a chave para a mesma
+   chamada sair para a API de verdade e o preço ser o da fatura, não o da tabela.
+2. **A migração `20260917100000` ainda não foi aplicada em produção**, só no banco local.
+   Enquanto não for, `--chamada-de-teste` apontado para produção falha no
+   `ai_runs_purpose_check` — que é o comportamento certo.
 3. **`GROQ_API_KEY`** para a transcrição (e a avaliação de LGPD de mandar áudio para o
    Groq — está em `docs/ia/GATE-0`, decisão 4).
 4. **`worker-ai` no Fly.io**, ao lado do `worker-wa`. Item 5 do plano da Fase 1; faz mais

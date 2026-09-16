@@ -98,8 +98,30 @@ export interface PromptVersionado<Entrada, Saida> extends MetadadosDePrompt {
    * que ninguém classificou não aparece aqui, e por não aparecer é tratado como de fora:
    * a classificação falha fechado. Cada campo desta lista continua sendo auditado
    * individualmente; o que ele não faz é entrar na junção.
+   *
+   * **Caminho aninhado** (GATE 1, 17/09/2026): quando o campo raiz é uma lista de objetos
+   * em que só *parte* é nossa, declare o caminho — `'mensagens[].quando'`, `'conversas[].leadId'`.
+   * `mensagens` inteiro é texto de fora (o parceiro escreveu), mas o horário, o remetente
+   * e o id da mensagem foram o CRM que escreveu, e colados ao texto eles fabricavam
+   * telefone onde não havia: `09:40` + `parceiro` + "dia 12/12 para 150" dá dez dígitos
+   * começando por 94. Só vale caminho cuja raiz esteja em `camposDeTexto` — se a raiz
+   * inteira fosse nossa, bastava declarar a raiz. O eval prova as duas coisas.
    */
   readonly camposDoTriade: readonly string[];
+  /**
+   * **O que uma chamada deste prompt lê**: uma mensagem, ou a conversa inteira.
+   *
+   * Muda a varredura de PII aplicada aos trechos de fora (`nucleo/auditoria-pii.ts`), e só
+   * isso. `'mensagem'` — o padrão, e o que vale para quem não declarar nada — usa a
+   * varredura sem fronteira nenhuma. `'conversa'` usa a varredura com fronteira de letra,
+   * porque na escala da conversa a outra barra praticamente tudo: data, horário, preço e
+   * quantidade, colados, viram telefone. A decisão, com os números medidos, está no
+   * comentário de `verificarSemPiiNaConversa` e em `docs/ia/GATE-1-crm-inteligente.md`.
+   *
+   * Omitir é a escolha estrita: prompt novo que ninguém classificou é auditado como
+   * mensagem. Falha fechado, como `camposDoTriade`.
+   */
+  readonly escala?: 'mensagem' | 'conversa';
   readonly exemplos: readonly ExemploDePrompt<Entrada, Saida>[];
 }
 

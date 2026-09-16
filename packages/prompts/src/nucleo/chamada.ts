@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { PiiNaChamadaError, type ProblemaDePii, varrerMontagem, verificarSemPii } from './auditoria-pii';
+import {
+  PiiNaChamadaError,
+  type ProblemaDePii,
+  varrerMontagem,
+  verificarSemPii,
+  verificarSemPiiNaConversa,
+} from './auditoria-pii';
 import { type ContextoDoContato, type MapaDePseudonimos, Pseudonimizador } from './pseudonimizacao';
 import {
   type ModeloAlvo,
@@ -308,6 +314,18 @@ export function raizDoCampo(campo: string): string {
   return corte === -1 ? campo : campo.slice(0, corte);
 }
 
+/**
+ * O caminho de um trecho, sem os índices, do jeito que um prompt o declara:
+ * `mensagens[3].quando` → `mensagens[].quando`, e o trecho do *nome* do campo
+ * (`mensagens[3].quando[nome do campo]`) vai para o mesmo lugar, porque a chave é tão
+ * nossa quanto o valor. É por este padrão que `camposDoTriade` aceita caminho aninhado.
+ */
+export function padraoDoCampo(campo: string): string {
+  return campo
+    .replace(/\[(?:nome do campo|chave \d+|valor \d+)\]$/, '')
+    .replace(/\[(?:\d+|conjunto \d+|chave \d+|valor \d+)\]/g, '[]');
+}
+
 const NAO_ENCONTRADO = Number.MAX_SAFE_INTEGER;
 
 /**
@@ -349,17 +367,30 @@ export function prepararChamada<Entrada, Saida>(
     protegido[campo] = protegerProfundo(protegido[campo], pseudonimizador, campo);
   }
   for (const campo of prompt.camposDoTriade) {
-    if (!(campo in protegido)) {
+    // Caminho aninhado (`mensagens[].quando`) existe se a raiz existir: o resto é forma,
+    // e o schema já garantiu a forma. O que não pode é declarar campo que não há.
+    const raiz = raizDoCampo(campo);
+    if (!(raiz in protegido)) {
       throw new Error(`${prompt.id}@v${prompt.versao}: campo do Tríade inexistente: ${campo}.`);
+    }
+    if (raiz !== campo && !prompt.camposDeTexto.includes(raiz)) {
+      throw new Error(
+        `${prompt.id}@v${prompt.versao}: ${campo} detalha uma raiz que não é texto de fora — ` +
+          `declare "${raiz}" inteiro em camposDoTriade.`,
+      );
     }
   }
   const segura = protegido as unknown as Entrada;
   const mensagem = prompt.montarMensagem(segura);
 
-  // A auditoria, sobre o que veio de fora e só sobre isso — sem fronteira nenhuma.
+  // A auditoria, sobre o que veio de fora e só sobre isso. Qual das duas varreduras
+  // depende da ESCALA do prompt: mensagem (sem fronteira nenhuma) ou conversa inteira
+  // (com a fronteira de letra). Quem não declara escala é auditado como mensagem, que é
+  // a estrita — ver o comentário de `verificarSemPiiNaConversa`.
+  const auditar = prompt.escala === 'conversa' ? verificarSemPiiNaConversa : verificarSemPii;
   const trechos = trechosDeFora(protegido);
   const problemas: ProblemaDePii[] = trechos.flatMap(({ campo, texto }) =>
-    verificarSemPii(texto).map((problema) => ({ ...problema, campo })),
+    auditar(texto).map((problema) => ({ ...problema, campo })),
   );
 
   // A junção: os trechos de **origem externa** colados um no outro, sem fronteira entre
@@ -368,7 +399,9 @@ export function prepararChamada<Entrada, Saida>(
   // sozinho e barrava exemplo legítimo. Campo não declarado em `camposDoTriade` é de
   // fora: a classificação falha fechado.
   const nossos = new Set(prompt.camposDoTriade);
-  const externos = trechos.filter(({ campo }) => !nossos.has(raizDoCampo(campo)));
+  const externos = trechos.filter(
+    ({ campo }) => !nossos.has(raizDoCampo(campo)) && !nossos.has(padraoDoCampo(campo)),
+  );
   const juncoes = new Set([
     naOrdemDaMensagem(externos, mensagem)
       .map(({ texto }) => texto)
@@ -377,7 +410,7 @@ export function prepararChamada<Entrada, Saida>(
   ]);
   for (const juncao of juncoes) {
     problemas.push(
-      ...verificarSemPii(juncao).map((problema) => ({
+      ...auditar(juncao).map((problema) => ({
         ...problema,
         campo: 'junção do texto de fora',
       })),

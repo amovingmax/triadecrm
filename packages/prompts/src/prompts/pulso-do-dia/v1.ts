@@ -143,7 +143,23 @@ export const pulsoDoDiaV1 = definirPrompt<EntradaDoPulso, SaidaDoPulso>({
   // pela pseudonimização e pela auditoria como qualquer mensagem.
   camposDeTexto: ['conversas', 'pulsoAnterior'],
   // Data, escopo, o nome de quem lê e os números que o Postgres apurou: tudo nosso.
-  camposDoTriade: ['dia', 'escopo', 'paraQuem', 'metricas'],
+  camposDoTriade: [
+    'dia',
+    'escopo',
+    'paraQuem',
+    'metricas',
+    // Dentro de `conversas`, só o resumo e o compromisso nasceram do que o parceiro
+    // escreveu; o resto o banco apurou.
+    'conversas[].leadId',
+    'conversas[].etapa',
+    'conversas[].temperatura',
+    'conversas[].scoreIntencao',
+    'conversas[].diasSemContato',
+    'conversas[].janelaFechaEmHoras',
+    'conversas[].responsavel',
+    'conversas[].alertas',
+  ],
+  escala: 'conversa',
   maxTokens: 1500,
   montarMensagem: (dados) =>
     [

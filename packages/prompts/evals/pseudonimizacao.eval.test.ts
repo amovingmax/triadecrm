@@ -9,7 +9,9 @@ import {
   TipoNaoAuditavelError,
   classificarIntencaoV1,
   definirPrompt,
+  fichaDaConversaV1,
   followupLigacaoV1,
+  pulsoDoDiaV1,
   prepararChamada,
   pseudonimizar,
   raizDoCampo,
@@ -806,6 +808,11 @@ describe('nenhum campo de entrada escapa da auditoria', () => {
     resumoLigacaoV1,
     followupLigacaoV1,
     classificarIntencaoV1,
+    // Os dois do CRM Inteligente entram aqui por decisão do GATE 1: eles leem conversa
+    // inteira (`escala: 'conversa'`), e a garantia de "nenhum exemplo real barrado" passa
+    // a valer para eles também.
+    fichaDaConversaV1,
+    pulsoDoDiaV1,
   ] as unknown as readonly PromptQualquer[];
 
   /** Um telefone que o CRM NÃO conhece: quem tem de pegá-lo é a varredura, não o cadastro. */
@@ -832,6 +839,9 @@ describe('nenhum campo de entrada escapa da auditoria', () => {
         const valor = validada[chave];
         // Booleano e nulo não têm como carregar dígito; todo o resto tem de ser auditado.
         if (valor === null || valor === undefined || typeof valor === 'boolean') continue;
+        // Lista vazia no exemplo também não carrega nada — e não ter o que auditar não é
+        // escapar da auditoria. O que este teste pega é o campo COM valor que não aparece.
+        if (Array.isArray(valor) && valor.length === 0) continue;
         expect({ prompt: prompt.id, chave, auditado: vistos.has(chave) }).toEqual({
           prompt: prompt.id,
           chave,
@@ -1254,6 +1264,11 @@ describe('o preço da junção, em número', () => {
     resumoLigacaoV1,
     followupLigacaoV1,
     classificarIntencaoV1,
+    // Os dois do CRM Inteligente entram aqui por decisão do GATE 1: eles leem conversa
+    // inteira (`escala: 'conversa'`), e a garantia de "nenhum exemplo real barrado" passa
+    // a valer para eles também.
+    fichaDaConversaV1,
+    pulsoDoDiaV1,
   ] as unknown as readonly PromptQualquer[];
 
   const barrou = (prompt: PromptQualquer, entrada: unknown): boolean => {
@@ -1265,7 +1280,7 @@ describe('o preço da junção, em número', () => {
     }
   };
 
-  it('os 10 exemplos reais dos próprios prompts: 0 barrados pela junção', () => {
+  it('os 15 exemplos reais dos próprios prompts: 0 barrados pela junção', () => {
     const exemplos = PROMPTS.flatMap((prompt) =>
       prompt.exemplos.map((exemplo) => ({
         prompt,
@@ -1273,7 +1288,7 @@ describe('o preço da junção, em número', () => {
         entrada: exemplo.entrada,
       })),
     );
-    expect(exemplos.length).toBe(10);
+    expect(exemplos.length).toBe(15);
     const barrados = exemplos
       .filter(({ prompt, entrada }) => barrou(prompt, entrada))
       .map(({ nome }) => nome);
@@ -1295,6 +1310,21 @@ describe('o preço da junção, em número', () => {
     }
   });
 
+  /**
+   * O caminho aninhado (`mensagens[].quando`) é a mesma trava, um nível abaixo: ele só
+   * existe para detalhar uma raiz que É texto de fora. Declarar `pistas[].texto` como
+   * nosso numa raiz que ninguém pseudonimiza seria dizer "isto é nosso" sobre um campo
+   * que nunca foi de ninguém — e aí a raiz inteira devia estar em `camposDoTriade`.
+   */
+  it('caminho aninhado só detalha raiz que a regra pseudonimiza', () => {
+    for (const prompt of PROMPTS) {
+      const soltos = prompt.camposDoTriade
+        .filter((campo) => raizDoCampo(campo) !== campo)
+        .filter((campo) => !prompt.camposDeTexto.includes(raizDoCampo(campo)));
+      expect({ prompt: prompt.id, soltos }).toEqual({ prompt: prompt.id, soltos: [] });
+    }
+  });
+
   it('todo nome declarado em camposDoTriade existe mesmo no schema de entrada', () => {
     for (const prompt of PROMPTS) {
       const chaves = new Set(
@@ -1303,7 +1333,7 @@ describe('o preço da junção, em número', () => {
             {},
         ),
       );
-      const inventados = prompt.camposDoTriade.filter((campo) => !chaves.has(campo));
+      const inventados = prompt.camposDoTriade.filter((campo) => !chaves.has(raizDoCampo(campo)));
       expect({ prompt: prompt.id, inventados }).toEqual({ prompt: prompt.id, inventados: [] });
     }
   });

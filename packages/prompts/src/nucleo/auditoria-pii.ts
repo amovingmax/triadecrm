@@ -63,6 +63,16 @@
  * | o que recusa | CEP, data, valor, trecho que atravessa palavra | nada |
  * | falso negativo | evitado | inaceitável |
  * | falso positivo | evitado (estragaria o texto do modelo) | tolerado (a chamada só não sai) |
+ *
+ * ## A escala entrou na conta (6ª versão, 2026-09-17)
+ *
+ * "Falso positivo é tolerado" vale enquanto a chamada é uma mensagem. Quando o prompt lê
+ * a **conversa inteira** (`ficha-da-conversa`, `pulso-do-dia`), o tolerado vira 31 de 31
+ * conversas barradas num corpus sem telefone nenhum — o guardrail passa a decidir o
+ * produto. Para essa escala existe `verificarSemPiiNaConversa`, com a fronteira de letra;
+ * o que ela deixa de pegar está medido no comentário dela e fixado em eval. Quem escolhe
+ * uma ou outra continua sendo `prepararChamada`, pelo campo `escala` do prompt — e o
+ * padrão, para quem não declarar nada, é a varredura estrita.
  */
 
 import type { TipoDePii } from './pseudonimizacao';
@@ -494,6 +504,41 @@ export function verificarSemPii(texto: string): ProblemaDePii[] {
  * de sistema deste pacote barrariam toda chamada; com ela, custa zero falso positivo.
  */
 export function varrerMontagem(texto: string): ProblemaDePii[] {
+  return varrer(texto, true);
+}
+
+/**
+ * O guardrail sobre trecho de origem externa quando o prompt lê **uma conversa inteira**,
+ * e não uma mensagem só (`escala: 'conversa'` em `versionamento.ts`). Mesma varredura,
+ * com a fronteira de letra — a janela atravessa espaço, ponto, hífen, barra, emoji e
+ * quebra de linha, mas não atravessa palavra.
+ *
+ * ===========================================================================
+ * POR QUE A ESCALA MUDA A CALIBRAGEM (decisão do GATE 1, 17/09/2026)
+ * ===========================================================================
+ * `verificarSemPii` aceita qualquer corrida de 10 a 13 dígitos que comece por DDD válido,
+ * sem fronteira nenhuma. Lendo UMA mensagem, o falso positivo é barato e raro. Lendo a
+ * conversa inteira, ele é a regra: conversa de fornecedor é feita de data, horário, preço
+ * e quantidade, e a junção dos trechos cola tudo. Medido no corpus de 40 mensagens reais
+ * deste repositório, **nenhuma com telefone**, depois de a regra pseudonimizar:
+ *
+ * |                                  | `verificarSemPii` | aqui |
+ * | ---                              | --- | --- |
+ * | mensagens barradas sozinhas (40) | 5   | 0   |
+ * | conversas de 5 barradas (36)     | 35  | 0   |
+ * | conversas de 10 barradas (31)    | 31  | 0   |
+ *
+ * Com o guardrail de mensagem, conversa nenhuma viraria ficha — ou seja, o guardrail
+ * decidia o produto em vez de proteger o dado.
+ *
+ * **O que esta varredura deixa de pegar, medido nos 147 casos com 8+ dígitos da suíte de
+ * evals, no caminho real: um.** Telefone com palavra entre os grupos de dígitos —
+ * `é 84 depois 9 9988 depois 0011` —, e só quando a regra (que conhece a numeração da
+ * Anatel) também tiver falhado sobre o mesmo texto. Telefone com caractere invisível
+ * entre os dígitos continua sendo pego pelas duas. A lista está fixada em
+ * `evals/conversa-inteira.eval.test.ts`: encolher ou crescer aparece no diff.
+ */
+export function verificarSemPiiNaConversa(texto: string): ProblemaDePii[] {
   return varrer(texto, true);
 }
 

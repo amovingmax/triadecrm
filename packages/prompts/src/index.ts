@@ -56,6 +56,7 @@ export {
   type ProblemaDePii,
   varrerMontagem,
   verificarSemPii,
+  verificarSemPiiNaConversa,
 } from './nucleo/auditoria-pii';
 
 export {
