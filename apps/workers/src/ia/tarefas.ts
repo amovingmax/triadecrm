@@ -42,6 +42,7 @@ import {
   detectarOptOut,
   fichaDaConversaV1,
   followupLigacaoV1,
+  pulsoDoDiaV1,
   reidratar,
   resumoLigacaoV1,
   transcricaoAudioV1,
@@ -61,9 +62,11 @@ import {
   buscarTentativa,
   criarRascunho,
   entradaDaFicha,
+  entradaDoPulso,
   escalarConversa,
   gravarClassificacao,
   gravarFicha,
+  gravarPulso,
   gravarResumoDaLigacao,
   gravarTranscricao,
 } from './banco';
@@ -153,12 +156,20 @@ const payloadDaFicha = z.object({
   conversation_id: uuid,
 });
 
+const payloadDoPulso = z.object({
+  purpose: z.literal('pulso_do_dia'),
+  dia: z.string().min(8).max(10),
+  escopo: z.enum(['equipe', 'pessoa']).default('equipe'),
+  user_id: uuid.nullish(),
+});
+
 const PAYLOADS = {
   transcribe_audio: payloadDaTranscricao,
   summarize_call: payloadDoResumo,
   draft_followup: payloadDoFollowUp,
   classify_inbound: payloadDaClassificacao,
   analisar_conversa: payloadDaFicha,
+  pulso_do_dia: payloadDoPulso,
 } as const;
 
 export type PropositoConhecido = keyof typeof PAYLOADS;
@@ -754,6 +765,130 @@ function intencaoDaFicha(valor: string | null): IntencaoDaFicha | null {
 }
 
 // ---------------------------------------------------------------------------
+// 6. O Pulso do dia (CRM Inteligente, Fase 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * O resumo do dia: o que andou nas conversas e o que não pode passar de hoje.
+ *
+ * **Os números não passam pelo modelo para serem calculados — passam para serem
+ * lidos.** `app.ia_pulso_entrada` apura tudo em SQL e a ordem das conversas é a
+ * regra do produto (compromisso vencido > janela fechando > pediu proposta >
+ * risco > score). O modelo escreve o texto; a conta e a ordem são do banco.
+ *
+ * Dia sem conversa nenhuma não vira chamada paga: sem conversa, não há Pulso.
+ */
+async function escreverOPulso(
+  contexto: ContextoDaIa,
+  bruto: unknown,
+): Promise<ResultadoDoTrabalho> {
+  const payload = interpretarPayload(payloadDoPulso, bruto);
+  const entrada = await entradaDoPulso(
+    contexto.cliente,
+    payload.dia,
+    payload.escopo,
+    payload.user_id ?? null,
+  );
+
+  if (entrada.conversas.length === 0 && (entrada.metricas.mensagensRecebidas ?? 0) === 0) {
+    return { proposito: 'pulso_do_dia', feito: false, motivo: 'dia_sem_conversa' };
+  }
+
+  // O modelo lê `lead-a46814`, não o nome do parceiro nem o id da conversa. O mapa
+  // de volta fica aqui: é ele que transforma a prioridade que o modelo escreveu no
+  // link que a tela abre.
+  const porLead = new Map(entrada.conversas.map((c) => [c.leadId, c]));
+
+  const executada = await executar(
+    contexto,
+    pulsoDoDiaV1,
+    {
+      dia: entrada.dia,
+      escopo: entrada.escopo,
+      paraQuem: entrada.paraQuem,
+      metricas: {
+        conversasAtivas: entrada.metricas.conversasAtivas ?? 0,
+        mensagensRecebidas: entrada.metricas.mensagensRecebidas ?? 0,
+        mensagensEnviadas: entrada.metricas.mensagensEnviadas ?? 0,
+        semRespostaHa3Dias: entrada.metricas.semRespostaHa3Dias ?? 0,
+        janelasFechandoEm24h: entrada.metricas.janelasFechandoEm24h ?? 0,
+        compromissosVencidos: entrada.metricas.compromissosVencidos ?? 0,
+        reunioesMarcadas: entrada.metricas.reunioesMarcadas ?? 0,
+        novosContatos: entrada.metricas.novosContatos ?? 0,
+      },
+      conversas: entrada.conversas.slice(0, 40).map((c) => ({
+        leadId: c.leadId,
+        etapa: c.etapa,
+        temperatura: temperaturaConhecida(c.temperatura),
+        scoreIntencao: c.scoreIntencao,
+        diasSemContato: c.diasSemContato,
+        janelaFechaEmHoras: c.janelaFechaEmHoras,
+        responsavel: c.responsavel,
+        resumo: c.resumo,
+        alertas: c.alertas.filter((a) => ALERTAS_DO_PULSO.includes(a)),
+        compromissoVencido: c.compromissoVencido,
+      })),
+      pulsoAnterior: entrada.pulsoAnterior,
+    },
+    // O Pulso não é de um contato: é do dia. Sem nome e sem empresa para
+    // pseudonimizar — o que entra já vem por `lead-xxxxxx`.
+    { leadId: `pulso-${entrada.diaIso}`, nome: null, empresa: null },
+    {},
+  );
+
+  // Prioridade que cita lead que não estava na lista não vira linha na tela.
+  const prioridades = executada.saida.prioridades.flatMap((p) => {
+    const conversa = porLead.get(p.leadId);
+    if (conversa === undefined) return [];
+    return [
+      {
+        ...p,
+        conversation_id: conversa.conversationId,
+        organization_id: conversa.organizationId,
+        nome: conversa.nome,
+      },
+    ];
+  });
+
+  const pulsoId = await gravarPulso({
+    cliente: contexto.cliente,
+    dia: entrada.diaIso,
+    escopo: entrada.escopo,
+    userId: payload.user_id ?? null,
+    saida: { ...executada.saida, prioridades },
+    metricas: entrada.metricas,
+    aiRunId: executada.aiRunId,
+    promptVersion: executada.promptVersion,
+  });
+
+  contexto.logger.info('pulso do dia escrito', {
+    pulso_id: pulsoId,
+    dia: entrada.diaIso,
+    escopo: entrada.escopo,
+    conversas: entrada.conversas.length,
+    prioridades: prioridades.length,
+    descartadas: executada.saida.prioridades.length - prioridades.length,
+  });
+
+  return {
+    proposito: 'pulso_do_dia',
+    feito: true,
+    aiRunId: executada.aiRunId,
+    custoUsd: executada.custoUsd,
+    detalhes: { pulso_id: pulsoId, prioridades: prioridades.length },
+  };
+}
+
+/** Os alertas que o prompt conhece. O que não está aqui não entra na entrada dele. */
+const ALERTAS_DO_PULSO: readonly string[] = [
+  'reclamacao',
+  'concorrente_citado',
+  'pediu_proposta',
+  'pronto_para_fechar',
+  'risco_perda',
+];
+
+// ---------------------------------------------------------------------------
 // O despachante
 // ---------------------------------------------------------------------------
 
@@ -765,6 +900,7 @@ const TRABALHOS: Readonly<
   draft_followup: redigirFollowUp,
   classify_inbound: classificarEntrada,
   analisar_conversa: analisarConversa,
+  pulso_do_dia: escreverOPulso,
 };
 
 export async function tratarTrabalho(

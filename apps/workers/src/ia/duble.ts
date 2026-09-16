@@ -28,7 +28,13 @@ import { estimarTokens } from '@komune/prompts';
 import type { PedidoAoModelo, RespostaDoModelo, UsoDoModelo } from './cliente';
 
 /** Qual dos fluxos o esquema pedido descreve. */
-export type FluxoDoDuble = 'transcricao' | 'resumo' | 'followup' | 'classificacao' | 'ficha';
+export type FluxoDoDuble =
+  | 'transcricao'
+  | 'resumo'
+  | 'followup'
+  | 'classificacao'
+  | 'ficha'
+  | 'pulso';
 
 export class EsquemaDesconhecidoError extends Error {
   constructor(campos: readonly string[]) {
@@ -52,6 +58,9 @@ export function fluxoDoEsquema(esquema: Record<string, unknown>): FluxoDoDuble {
   // A ficha vem antes da classificação: ela também tem `intencao`, mas o que a
   // distingue é o score e os sinais que o sustentam (CRM Inteligente, Fase 1).
   if (campos.has('scoreIntencao')) return 'ficha';
+  // O Pulso é o único que tem prioridades e um título: ele fala do dia, não de
+  // uma conversa (CRM Inteligente, Fase 2).
+  if (campos.has('prioridades')) return 'pulso';
   if (campos.has('noDeVirada')) return 'resumo';
   if (campos.has('claims')) return 'followup';
   if (campos.has('intencao')) return 'classificacao';
@@ -222,12 +231,43 @@ function ficharConversa(mensagem: string): Record<string, unknown> {
   };
 }
 
+/**
+ * O Pulso do dublê: lê os leads da própria mensagem montada e escreve um texto
+ * coerente com os números que recebeu. Não é inteligência — é fixture que responde
+ * ao que entrou, para o teste exercitar o corte de prioridade que cita lead
+ * inexistente e a gravação com dado que muda.
+ */
+function pulsar(mensagem: string): Record<string, unknown> {
+  const leads = [...mensagem.matchAll(/^- (lead-[a-z0-9]+)/gm)].map((m) => m[1] as string);
+  const recebidas = campo(mensagem, '- mensagens recebidas') ?? '0';
+  const vencidos = Number(campo(mensagem, '- compromissos vencidos') ?? '0');
+  const primeiro = leads[0];
+
+  return {
+    titulo: vencidos > 0 ? 'Há promessa vencida esperando' : 'Dia sem nada vencido',
+    texto: `O dia teve ${recebidas} mensagens recebidas e ${leads.length} conversas na mesa.`,
+    prioridades: primeiro
+      ? [
+          {
+            leadId: primeiro,
+            porque: 'É a primeira da ordem que o banco entregou.',
+            acao: 'Responder hoje.',
+            urgencia: 'hoje',
+          },
+        ]
+      : [],
+    riscos: vencidos > 0 ? ['Promessa vencida sem resposta.'] : [],
+    diaSemMovimento: leads.length === 0,
+  };
+}
+
 const RESPOSTAS: Readonly<Record<FluxoDoDuble, (mensagem: string) => Record<string, unknown>>> = {
   transcricao: transcrever,
   resumo: resumir,
   followup: redigir,
   classificacao: classificar,
   ficha: ficharConversa,
+  pulso: pulsar,
 };
 
 // ---------------------------------------------------------------------------

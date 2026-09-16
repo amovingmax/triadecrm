@@ -21,6 +21,7 @@ import {
 } from './consultas';
 import { ErroDaFila, EsqueletoDaFila, FilaVazia, NadaParaHoje } from './estados';
 import { ItemDaFila } from './item-da-fila';
+import { PulsoDoDia } from './pulso-do-dia';
 import { ResumoDoDia } from './resumo-do-dia';
 import { agruparFila, contarPendentesDeHoje, type BlocoPreenchido, type ItemDoDia } from './tipos';
 
@@ -155,6 +156,11 @@ export function TelaMeuDia({
           podeDefinirMeta={podeDefinirMeta}
         />
       )}
+
+      {/* O Pulso é o CONTEXTO da fila — por que o dia está assim —, e contexto vem
+          antes da lista, não no lugar dela. Quem responde "o que eu faço agora?"
+          continua sendo a fila, que sai do Postgres com prioridade calculada. */}
+      <PulsoDoDia />
 
       <section aria-label="Fila do dia" className="flex flex-col gap-4">
         {fila.isPending ? (

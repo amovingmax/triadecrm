@@ -2311,3 +2311,22 @@ Aberta, ela mostra o motivo, os sinais (contra antes de a favor, forte antes de 
 Conversa curta demais não vira dossiê: uma linha discreta em vez do bloco. Conversa nunca analisada não mostra nada — o módulo nasce desligado e a tela não avisa o que não falta.
 
 **Provado no navegador** (local, 1440 px e 390 px): faixa fechada em uma linha, "Por quê" abrindo com os dois sinais na ordem certa, clique no sinal rolando até "Show, e quanto é a taxa?" e a piscada; em 390 px sem transbordo horizontal, com o alerta escondido e o 👍/👎 quebrando para a própria linha. Web 718 testes (17 novos), suíte inteira verde.
+
+### 17/09/2026 — O Pulso do dia (CRM Inteligente, Fase 2, parte 4)
+
+Às 18h30 (America/Fortaleza, de segunda a sexta) o cron enfileira o Pulso: o resumo do que aconteceu nas conversas e do que não pode passar de hoje. Ele se chama Pulso porque "Radar" já é o módulo de coleta.
+
+**A IA escreve o texto; ela nunca faz a conta (`20260917120000`).** `app.ia_pulso_entrada` apura tudo em SQL — conversas ativas, mensagens de cada lado, quem está há três dias sem resposta, janelas fechando, compromissos vencidos, reuniões marcadas, contatos novos — e a **ordem** das conversas também é do banco: compromisso que NÓS vencemos primeiro, depois janela fechando, depois quem pediu proposta, depois risco, depois score. O modelo recebe os números prontos e a lista já ordenada, e escreve a leitura deles. Número inventado num digest é pior que digest nenhum, porque alguém decide o dia seguinte por ele.
+
+**O que o modelo vê, e o que ele não vê.** Ele lê `lead-a46814`, nunca o nome do parceiro. O mapa de volta fica no worker: prioridade que cita lead fora da lista não vira linha na tela, e a que cita um de verdade vira link para a conversa.
+
+**Regerar cria versão nova**, não sobrescreve: o que a equipe leu às 18h30 continua existindo. A data por extenso é escrita em SQL (`app.ia_dia_por_extenso`) e não por `to_char(TMDay)`, que segue o `lc_time` do servidor e devolveria "Wednesday, 16 de September".
+
+**Na tela (Meu dia).** O Pulso entra entre o resumo de números e a fila — ele é o CONTEXTO da fila, e contexto vem antes da lista, não no lugar dela. Título, o texto em parágrafos, até cinco prioridades (nome do parceiro como link, "por quê" no `title`, urgência à direita) e os riscos. **Mostra o mais recente, e diz de quando é**: o Pulso sai às 18h30 e quem abre o Meu dia às 7h quer o de ontem; passando de dois dias, a tela diz que aquele foi "o último que saiu" — um painel que mostra o texto de terça como se fosse de hoje é a forma mais silenciosa de mentir.
+
+**Provado rodando:** pgTAP 50 (16 asserções) e a suíte inteira verde (50 arquivos, 2690 asserções); workers 347, web 726. E ponta a ponta no banco local, com o SDK real contra o dublê: cron enfileirou → worker escreveu (`ai_runs` 145, Sonnet, US$ 0,00281) → Pulso na tela do Meu dia, em 1440 px e 390 px.
+
+**Decisão humana / pendente:**
+- Os módulos `ficha` e `pulso` continuam desligados em `app_settings`: ligar é `update`, não deploy.
+- As três migrações da IA ainda não foram para produção.
+- No cabeçalho do aplicativo há 4 px de transbordo horizontal em 390 px (o bloco do avatar). É anterior a esta entrega e vale um conserto à parte.

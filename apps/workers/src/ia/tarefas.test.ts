@@ -657,3 +657,126 @@ describe('7. a ficha da conversa (CRM Inteligente, Fase 2)', () => {
     ).rejects.toBeInstanceOf(ErroDeterministico);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 8. O Pulso do dia (CRM Inteligente, Fase 2)
+// ---------------------------------------------------------------------------
+
+function entradaDoPulsoDoBanco(extras: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    dia: 'quinta-feira, 17 de setembro de 2026',
+    diaIso: '2026-09-17',
+    escopo: 'equipe',
+    paraQuem: null,
+    metricas: {
+      conversasAtivas: 4,
+      mensagensRecebidas: 9,
+      mensagensEnviadas: 8,
+      semRespostaHa3Dias: 1,
+      janelasFechandoEm24h: 2,
+      compromissosVencidos: 1,
+      reunioesMarcadas: 0,
+      novosContatos: 2,
+    },
+    conversas: [
+      {
+        leadId: 'lead-a46814',
+        conversationId: CONVERSA,
+        organizationId: ORG,
+        nome: 'Buffet Aurora',
+        etapa: 'Em conversa',
+        temperatura: 'quente',
+        scoreIntencao: 82,
+        diasSemContato: 0,
+        janelaFechaEmHoras: 6,
+        responsavel: 'Rafael',
+        resumo: 'Pediu proposta e está esperando desde ontem.',
+        alertas: ['pediu_proposta', 'inventado_pelo_banco'],
+        compromissoVencido: 'Mandar a proposta',
+      },
+    ],
+    pulsoAnterior: null,
+    ...extras,
+  };
+}
+
+function montarPulso(entrada = entradaDoPulsoDoBanco()) {
+  const gravacoes: Record<string, unknown>[] = [];
+  const banco = bancoFalso(tabelas(), {
+    rpcs: {
+      ia_pulso_entrada: () => entrada,
+      ia_gravar_pulso: (argumentos) => {
+        gravacoes.push(argumentos);
+        return '00000000-0000-4000-8000-0000000000p1'.replace('p', 'a');
+      },
+    },
+  });
+  const { logger, linhas } = loggerDeTeste();
+  const duble = clienteDuble();
+  const contexto: ContextoDaIa = { cliente: banco.cliente, modelo: duble, logger };
+  return { banco, contexto, linhas, gravacoes };
+}
+
+describe('8. o Pulso do dia (CRM Inteligente, Fase 2)', () => {
+  it('escreve o dia e devolve a prioridade apontando para a conversa de verdade', async () => {
+    const { contexto, gravacoes, banco } = montarPulso();
+
+    const resultado = await tratarTrabalho(contexto, {
+      purpose: 'pulso_do_dia',
+      dia: '2026-09-17',
+      escopo: 'equipe',
+    });
+
+    expect(resultado.feito).toBe(true);
+    expect(gravacoes).toHaveLength(1);
+    const saida = gravacoes[0]?.p_saida as {
+      prioridades: { leadId: string; conversation_id: string; nome: string }[];
+      titulo: string;
+    };
+    // O modelo escreveu `lead-a46814`; o que fica gravado sabe qual conversa é.
+    expect(saida.prioridades[0]?.conversation_id).toBe(CONVERSA);
+    expect(saida.prioridades[0]?.nome).toBe('Buffet Aurora');
+    expect(gravacoes[0]?.p_dia).toBe('2026-09-17');
+    // Os números gravados são os do BANCO, não os que o modelo repetiu no texto.
+    expect((gravacoes[0]?.p_metricas as Record<string, number>).mensagensRecebidas).toBe(9);
+    expect(banco.tabelas.ai_runs).toHaveLength(1);
+  });
+
+  it('prioridade que cita lead que não existe não vira linha na tela', async () => {
+    const entrada = entradaDoPulsoDoBanco({
+      // Sem conversa nenhuma na lista, o dublê não tem lead para citar — e se
+      // citasse, não haveria para onde apontar.
+      conversas: [],
+      metricas: { ...(entradaDoPulsoDoBanco().metricas as object), mensagensRecebidas: 3 },
+    });
+    const { contexto, gravacoes } = montarPulso(entrada);
+
+    await tratarTrabalho(contexto, { purpose: 'pulso_do_dia', dia: '2026-09-17' });
+
+    const saida = gravacoes[0]?.p_saida as { prioridades: unknown[] };
+    expect(saida.prioridades).toEqual([]);
+  });
+
+  it('dia sem conversa nenhuma não vira chamada paga', async () => {
+    const entrada = entradaDoPulsoDoBanco({
+      conversas: [],
+      metricas: {
+        conversasAtivas: 0,
+        mensagensRecebidas: 0,
+        mensagensEnviadas: 0,
+        semRespostaHa3Dias: 0,
+        janelasFechandoEm24h: 0,
+        compromissosVencidos: 0,
+        reunioesMarcadas: 0,
+        novosContatos: 0,
+      },
+    });
+    const { contexto, gravacoes, banco } = montarPulso(entrada);
+
+    const resultado = await tratarTrabalho(contexto, { purpose: 'pulso_do_dia', dia: '2026-09-17' });
+
+    expect(resultado).toMatchObject({ feito: false, motivo: 'dia_sem_conversa' });
+    expect(gravacoes).toHaveLength(0);
+    expect(banco.tabelas.ai_runs).toHaveLength(0);
+  });
+});

@@ -677,3 +677,110 @@ export async function gravarFicha(
     evidenciasDescartadas: numero(bruto.evidencias_descartadas),
   };
 }
+
+// ---------------------------------------------------------------------------
+// O Pulso do dia (CRM Inteligente, Fase 2)
+// ---------------------------------------------------------------------------
+
+export interface ConversaDoPulso {
+  readonly leadId: string;
+  readonly conversationId: string;
+  readonly organizationId: string | null;
+  readonly nome: string | null;
+  readonly etapa: string | null;
+  readonly temperatura: string | null;
+  readonly scoreIntencao: number | null;
+  readonly diasSemContato: number;
+  readonly janelaFechaEmHoras: number | null;
+  readonly responsavel: string | null;
+  readonly resumo: string | null;
+  readonly alertas: readonly string[];
+  readonly compromissoVencido: string | null;
+}
+
+export interface EntradaDoPulsoDoBanco {
+  readonly dia: string;
+  readonly diaIso: string;
+  readonly escopo: 'equipe' | 'pessoa';
+  readonly paraQuem: string | null;
+  readonly metricas: Record<string, number>;
+  readonly conversas: readonly ConversaDoPulso[];
+  readonly pulsoAnterior: string | null;
+}
+
+export async function entradaDoPulso(
+  cliente: ClienteDoBanco,
+  dia: string | null,
+  escopo: 'equipe' | 'pessoa' = 'equipe',
+  userId: string | null = null,
+): Promise<EntradaDoPulsoDoBanco> {
+  const { data, error } = await cliente.rpc('ia_pulso_entrada', {
+    p_dia: dia,
+    p_escopo: escopo,
+    p_user: userId,
+  });
+  erroSe('ia_pulso_entrada', error);
+  const bruto = (data ?? {}) as Record<string, unknown>;
+  const numeros = (valor: unknown): Record<string, number> => {
+    const saida: Record<string, number> = {};
+    if (typeof valor === 'object' && valor !== null) {
+      for (const [chave, v] of Object.entries(valor)) {
+        if (typeof v === 'number') saida[chave] = v;
+      }
+    }
+    return saida;
+  };
+
+  return {
+    dia: texto(bruto.dia) ?? '',
+    diaIso: texto(bruto.diaIso) ?? '',
+    escopo,
+    paraQuem: texto(bruto.paraQuem),
+    metricas: numeros(bruto.metricas),
+    conversas: (Array.isArray(bruto.conversas) ? bruto.conversas : []).map((c) => {
+      const linha = c as Record<string, unknown>;
+      const numero = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+      return {
+        leadId: texto(linha.leadId) ?? 'lead-?',
+        conversationId: texto(linha.conversationId) ?? '',
+        organizationId: texto(linha.organizationId),
+        nome: texto(linha.nome),
+        etapa: texto(linha.etapa),
+        temperatura: texto(linha.temperatura),
+        scoreIntencao: numero(linha.scoreIntencao),
+        diasSemContato: numero(linha.diasSemContato) ?? 0,
+        janelaFechaEmHoras: numero(linha.janelaFechaEmHoras),
+        responsavel: texto(linha.responsavel),
+        resumo: texto(linha.resumo),
+        alertas: Array.isArray(linha.alertas)
+          ? linha.alertas.filter((a): a is string => typeof a === 'string')
+          : [],
+        compromissoVencido: texto(linha.compromissoVencido),
+      };
+    }),
+    pulsoAnterior: texto(bruto.pulsoAnterior),
+  };
+}
+
+export async function gravarPulso(entrada: {
+  cliente: ClienteDoBanco;
+  dia: string;
+  escopo: 'equipe' | 'pessoa';
+  userId: string | null;
+  saida: unknown;
+  metricas: Record<string, number>;
+  aiRunId: number | null;
+  promptVersion: string;
+}): Promise<string> {
+  const { data, error } = await entrada.cliente.rpc('ia_gravar_pulso', {
+    p_dia: entrada.dia,
+    p_escopo: entrada.escopo,
+    p_user: entrada.userId,
+    p_saida: entrada.saida,
+    p_metricas: entrada.metricas,
+    p_ai_run_id: entrada.aiRunId,
+    p_prompt_version: entrada.promptVersion,
+  });
+  erroSe('ia_gravar_pulso', error);
+  return typeof data === 'string' ? data : '';
+}
