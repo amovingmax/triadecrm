@@ -63,6 +63,26 @@ function tabela(): readonly LinhaDaTabela[] {
   });
 }
 
+/**
+ * ATENÇÃO AO LER OS NÚMEROS DESTE ARQUIVO (medido em 17/09/2026).
+ *
+ * A tabela abaixo projeta o custo a partir dos tokens do PROMPT — sistema mais
+ * mensagem. A primeira chamada real de `ficha-da-conversa@v1` mostrou que a conta
+ * da fatura é maior, por duas razões que a projeção não via:
+ *
+ * 1. **O esquema da saída conta como entrada.** `output_config.format.schema` vai
+ *    no pedido: os 28 valores de intenção, os 19 tipos de sinal e o resto da forma
+ *    somaram ~2.200 tokens. Entrada real: 3.053, contra 870 de projeção.
+ * 2. **O cache não entra.** O bloco de sistema tem 739 tokens e o mínimo cacheável
+ *    do Haiku é maior que isso: `cache_control` é aceito e ignorado, e as duas
+ *    chamadas seguidas (`ai_runs` 157 e 158) vieram com escrita e leitura de cache
+ *    zeradas.
+ *
+ * Custo real medido: **US$ 0,0056 por ficha**, contra US$ 0,00215 de projeção —
+ * 2,6 vezes. No cenário do MVP (60 análises/dia) isso é ≈ US$ 7/mês, dentro do
+ * orçamento de US$ 25; por isso a projeção continua aqui, como estimativa dos
+ * tokens do prompt, e não como previsão de fatura.
+ */
 describe('preços e conta por chamada', () => {
   it('os preços da tabela são os da API em 05/09/2026', () => {
     expect(PRECOS['claude-haiku-4-5']).toEqual({

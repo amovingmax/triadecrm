@@ -100,11 +100,84 @@ const ESFORCO_POR_MODELO: Readonly<Record<string, 'low' | 'medium' | 'high'>> = 
   'claude-sonnet-5': 'low',
 };
 
-/** `$schema` é metadado do zod, não do pedido: sai antes de virar tráfego. */
+/**
+ * O JSON Schema reduzido ao que a saída estruturada da API aceita.
+ *
+ * ===========================================================================
+ * POR QUE É UMA LISTA DO QUE FICA, E NÃO DO QUE SAI
+ * ===========================================================================
+ * A saída estruturada aceita um SUBCONJUNTO do JSON Schema, e ela recusa com 400
+ * o que está fora — uma palavra-chave por vez, na ordem em que aparecem:
+ *
+ *   "For 'integer' type, properties maximum, minimum are not supported"
+ *   "For 'array' type, property 'maxItems' is not supported"
+ *
+ * Descobrir esse subconjunto uma recusa por vez custa uma chamada a cada volta e
+ * deixa o próximo prompt repetindo o mesmo 400. Então a regra é invertida: fica o
+ * que descreve a FORMA (tipo, campos, obrigatórios, itens, enum, união, referência)
+ * e sai todo o resto, que é restrição de VALOR.
+ *
+ * **As restrições continuam valendo** — quem as aplica é o zod, na volta
+ * (`interpretar`): score fora de 0–100, lista com mais itens que o teto ou texto
+ * mais longo que o máximo derrubam a resposta do mesmo jeito. O que se perde é a
+ * dica ao modelo, e essa os prompts já dão por escrito ("o resumo é factual e cabe
+ * em 400 caracteres", "no máximo 8 prioridades").
+ *
+ * `$schema` sai pelo mesmo motivo: é metadado do zod, não do pedido.
+ */
+const FORMA: ReadonlySet<string> = new Set([
+  'type',
+  'properties',
+  'required',
+  'items',
+  'prefixItems',
+  'enum',
+  'const',
+  'anyOf',
+  'oneOf',
+  'allOf',
+  'not',
+  'additionalProperties',
+  'description',
+  'title',
+  '$ref',
+  '$defs',
+  'definitions',
+]);
+
 function esquemaLimpo(esquema: Record<string, unknown>): Record<string, unknown> {
-  const { $schema: _ignorado, ...resto } = esquema;
-  return resto;
+  return soAForma(esquema) as Record<string, unknown>;
 }
+
+function soAForma(no: unknown): unknown {
+  if (Array.isArray(no)) return no.map(soAForma);
+  if (typeof no !== 'object' || no === null) return no;
+
+  const entrada = no as Record<string, unknown>;
+  const saida: Record<string, unknown> = {};
+  for (const [chave, valor] of Object.entries(entrada)) {
+    if (!FORMA.has(chave)) continue;
+    // `properties` e `$defs` são mapas de NOME para esquema: as chaves deles são
+    // nomes de campo, não palavras-chave, e não passam por esta peneira.
+    saida[chave] =
+      chave === 'properties' || chave === '$defs' || chave === 'definitions'
+        ? mapaDeEsquemas(valor)
+        : soAForma(valor);
+  }
+  return saida;
+}
+
+function mapaDeEsquemas(valor: unknown): unknown {
+  if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) return valor;
+  const saida: Record<string, unknown> = {};
+  for (const [nome, esquema] of Object.entries(valor as Record<string, unknown>)) {
+    saida[nome] = soAForma(esquema);
+  }
+  return saida;
+}
+
+/** Exportado só para o teste: é a parte do pedido que a API valida antes de pensar. */
+export { esquemaLimpo as esquemaParaAApi };
 
 /**
  * `output_config.format` garante que o primeiro bloco de texto é o JSON pedido.
