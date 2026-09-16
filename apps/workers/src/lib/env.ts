@@ -3,6 +3,7 @@
  *
  * Todas as variáveis estão documentadas em `.env.example` na raiz. Cada comando exige só o que usa:
  * - base (todos): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY; opcionais SENTRY_DSN, KOMUNE_HMAC_SECRET, LOG_LEVEL, TZ
+ *        e RESEND_API_KEY, que liga o aviso por e-mail do WhatsApp
  * - wa: META_WA_ACCESS_TOKEN, META_WA_PHONE_NUMBER_ID; opcionais META_WA_GRAPH_URL e META_WA_API_VERSION
  *        (apontam o cliente para o dublê local), META_WA_BUSINESS_ACCOUNT_ID (liga a sincronização de
  *        modelos), e as que só `wa --conectar` usa: META_APP_ID, META_WA_APP_SECRET, META_WA_VERIFY_TOKEN,
@@ -42,6 +43,12 @@ const baseEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: required('SUPABASE_SERVICE_ROLE_KEY'),
   SENTRY_DSN: optionalUrl,
   KOMUNE_HMAC_SECRET: optionalString,
+  /**
+   * Resend: liga o aviso por e-mail quando chega mensagem no WhatsApp (migração
+   * 20260916120000). Vazia = ninguém é avisado, e o worker diz isso no log; o
+   * resto do laço não depende dela.
+   */
+  RESEND_API_KEY: optionalString,
 });
 
 const waEnvSchema = baseEnvSchema.extend({

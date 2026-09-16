@@ -2217,3 +2217,25 @@ A Meta está lançando nomes de usuário no WhatsApp e, junto, o BSUID ("busines
 **Provado rodando:** pgTAP `46` (23 asserções) e a suíte inteira (47 arquivos) verde, com `08_seed` contando 12 origens; web 696 testes, workers 327, lint e typecheck. **No navegador (local):** mensagem de número desconhecido aparece em Fora da base → Criar ficha → a conversa abre na ficha nova, em Respondeu, com a caixa de resposta aberta; lote de ativação montado com "Cliente", abertura escolhida pela etapa (em risco → reativar), fechamento com "Amanhã às 10h / Quinta-feira às 15h", folha de reunião com Google Meet e visita, recibo com "Mandar a confirmação no WhatsApp".
 
 **Não conferido no navegador:** a aba nova que o botão do recibo abre (o recado ao `EnviarModelo` tem teste unitário).
+
+### 16/09/2026 — A abertura livre, o bot de entrada e o aviso do time (RF-CON-05, RF-CON-12, RF-CON-19, RF-CON-22)
+
+Três pedidos do Rafael depois do primeiro envio de verdade: "não quero ter modelo preso", "toda vez que alguém entra em contato, que tenha um bot inicial com pré-seleção por nicho" e "prepare um Resend para avisar a equipe".
+
+**A abertura fica livre (`20260916100000`).** Fora da janela de 24 h a Meta só aceita texto aprovado — isso é regra dela. O que passou a ser aprovado é a **moldura**: saudação com o nome de quem envia, o espaço livre (`{{mensagem}}`, até 900 caracteres) e a saída obrigatória (SAIR + privacidade, RF-CON-12). Entraram `GEN-ABR-LIVRE`, `GEN-ABR-PARCERIA` (a abertura que o Rafael já usava à mão: app novo, parceria com divulgação gratuita, prova social em `{{referencias}}`, convite para 20 minutos), `GEN-ABR-LANCAMENTO` (data e lugar em variável, para não envelhecer) e `GEN-FUP-LIVRE`. O teto por variável subiu de 200 para 900 nas variáveis de texto livre (`app.modelo_teto_da_variavel`); a limpeza de quebra de linha continua, porque a Meta recusa parâmetro com `\n`.
+**Na tela:** a caixa abre no modelo em que se escreve, com o campo grande na frente e o contador; o texto pronto virou um link discreto ("Prefiro um texto pronto"), e só aparece campo do que o banco não soube preencher.
+
+**O bot de entrada (`20260916110000`).** Quem escreve primeiro recebe o menu com quatro caminhos (fornecedor/parceiro, quero organizar evento, pagamentos, já sou parceiro). A escolha — número ou palavra em frase curta — responde com o texto daquela trilha, marca `ai_intent` na conversa e **abre tarefa** para quem atende. O bot fala no máximo duas vezes por conversa; depois é gente. Não entra em conversa que nós começamos, em quem pediu para sair (`app.wa_parece_optout`, espelho das duas regras de `optout.ts`), em contato suprimido nem com `bot_paused`. Menu e respostas são modelos de serviço (`GEN-SYS-MENU*`), e o que cada opção faz está em `app_settings` — mudar texto é `update`, não deploy. `public.wa_bot_ligar(false)` desliga (gestor e admin).
+
+**O aviso do time (`20260916120000` + worker).** O número vive só na Cloud API e não toca celular nenhum: ninguém ouve "plim". O worker-wa passou a mandar **um e-mail por lote** pelo Resend, com quem escreveu, a escolha do menu, a primeira linha e o link que abre a conversa (ou a aba "Fora da base"). O telefone inteiro não vai no e-mail — vai o fim dele (RF-BAS-14). Sem `RESEND_API_KEY`, nada sai e fica um `warn` no log. Destinatários, remetente e endereço do CRM em `app_settings.notificacoes.email`.
+
+**A ficha entra nas mensagens já gravadas (`20260916130000`).** Com o bot, a conversa de um número fora da base passa a ter mensagem ENVIADA antes do vínculo, e o carimbo da ficha batia na trava de imutabilidade do `messages_guard`. A trava continua recusando trocar o alvo de uma mensagem; o que passa é preencher de null para a ficha da própria conversa.
+
+**Perfil do número na Meta:** foto (o símbolo da Komune), recado "Onde conexões viram encontros", descrição, site, e-mail e cidade — o número estava sem perfil nenhum, e por isso chegava como contato cru.
+
+**Provado rodando:** pgTAP `47` (19 asserções) e a suíte inteira verde (48 arquivos); workers 334 testes (7 novos do aviso), web 701, lint e typecheck. O bot foi exercitado ponta a ponta no banco local: mensagem → menu → "3" → resposta do financeiro → tarefa aberta.
+
+**Decisão humana / pendente:**
+- `RESEND_API_KEY` no `.env` e no Fly, e trocar o remetente `onboarding@resend.dev` por um endereço do domínio komune.app.br (exige o domínio verificado no Resend).
+- O nome "Komune" ainda não aparece para quem recebe (`name_status: NON_EXISTS` na Meta). A verificação da empresa saiu hoje; se em algumas horas não aparecer, é preciso pedir o nome de exibição no WhatsApp Manager.
+- Os textos do menu e das quatro respostas são da Bárbara revisar.

@@ -57,6 +57,11 @@ const TIPOS_DE_VOZ: ReadonlySet<string> = new Set(['audio', 'voice']);
 
 export interface ContextoDaEntrada {
   cliente: ClienteDoBanco;
+  /**
+   * O que chegou nesta passada, para o aviso por e-mail sair UM por lote e não
+   * um por mensagem (`aviso-por-email.ts`). Quem esvazia é o laço do worker.
+   */
+  chegaram?: { conversationId: string; texto: string | null }[];
   graph: ClienteDaGraph;
   logger: Logger;
   /** Onde os bytes de mídia são guardados. Vazio desliga o download. */
@@ -245,6 +250,10 @@ async function tratarMensagem(
     ctx.logger.error('mensagem gravada sem conversa: nada mais é seguro daqui', { wamid });
     return;
   }
+
+  // Quem escreveu merece alguém do outro lado: o aviso do time sai depois do
+  // lote inteiro, com o que a conversa souber (ficha, escolha do menu).
+  ctx.chegaram?.push({ conversationId, texto: corpo });
 
   // 2 · OPT-OUT. Antes de tudo o mais.
   const veredito = pediuParaSair(corpo);

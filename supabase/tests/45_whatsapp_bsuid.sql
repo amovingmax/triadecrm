@@ -196,7 +196,8 @@ insert into pg_temp.r values ('saida', public.wa_entrada_registrar(
 insert into public.messages (conversation_id, direction, type, status, body, author_kind, sent_by)
 values (pg_temp.conv('saida'), 'out', 'text', 'queued', 'Mando já!', 'human', pg_temp.gestor());
 update public.messages set status = 'sent', wa_message_id = 'wamid.W45.SAIDA.1', sent_at = now()
- where conversation_id = pg_temp.conv('saida') and direction = 'out';
+ where conversation_id = pg_temp.conv('saida') and direction = 'out'
+   and author_kind = 'human';   -- o menu do bot de entrada também é 'out' desde 16/09
 
 select is(public.wa_status_registrar('wamid.W45.SAIDA.1', 'read', now(), null, null,
                                      'BR.4502000000000000001') ->> 'motivo',

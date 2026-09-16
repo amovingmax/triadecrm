@@ -46,6 +46,7 @@
  *   · `--conectar`            liga o número de ponta a ponta (`whatsapp/conectar.ts`);
  *   · `--sincronizar-modelos` só a passada dos modelos.
  */
+import { avisarPorEmail, type EntradaParaAviso } from '../whatsapp/aviso-por-email';
 import { ClienteDaGraph, VERSAO_PADRAO } from '../whatsapp/graph';
 import {
   contagensDaEntradaZeradas,
@@ -60,6 +61,8 @@ import {
   FILA_ENTRADA,
   lerFila,
   lerConfigDeEnvio,
+  lerConfigDoAviso,
+  lerConversasParaAviso,
 } from '../whatsapp/ponte';
 import { contagensDaSaidaZeradas, drenarSaida, type ContextoDaSaida } from '../whatsapp/saida';
 import { configDaConexao, conectarNumero } from '../whatsapp/conectar';
@@ -170,6 +173,7 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
     cliente,
     graph,
     logger,
+    chegaram: [],
     balde: BALDE_DE_MIDIAS,
     supabaseUrl: env.SUPABASE_URL,
     chaveServico: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -220,6 +224,9 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
         },
         () => parando,
       );
+      // 1b · Avisar o time. Um e-mail por lote: cinco mensagens em dez segundos
+      //      são uma conversa, e cinco e-mails são ruído.
+      await avisarDoQueChegou(contextoDaEntrada, env.RESEND_API_KEY);
       if (parando) break;
 
       // 2 · O que a tela aprovou e ainda não estava na fila.
@@ -262,6 +269,42 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
  * `wa_dlq` — a dead-letter PRÓPRIA do WhatsApp, para que ninguém precise
  * procurar mensagem de fornecedor no meio das falhas do Radar.
  */
+/**
+ * Manda o aviso do lote e esvazia a lista. Nada aqui derruba o laço: o e-mail é
+ * conforto do time, e a mensagem do parceiro já está gravada.
+ */
+async function avisarDoQueChegou(ctx: ContextoDaEntrada, chave: string | undefined): Promise<void> {
+  const chegaram = ctx.chegaram ?? [];
+  if (chegaram.length === 0) return;
+  ctx.chegaram = [];
+  try {
+    const config = await lerConfigDoAviso(ctx.cliente);
+    if (!config.ativo || config.para.length === 0) return;
+    const conversas = await lerConversasParaAviso(
+      ctx.cliente,
+      chegaram.map((c) => c.conversationId),
+    );
+    const entradas: EntradaParaAviso[] = chegaram.map((c) => {
+      const conversa = conversas.get(c.conversationId);
+      return {
+        ficha: conversa?.ficha ?? null,
+        organizationId: conversa?.organization_id ?? null,
+        telefone: conversa?.telefone ?? null,
+        opcao: conversa?.opcao ?? null,
+        texto: c.texto,
+      };
+    });
+    await avisarPorEmail(
+      entradas,
+      { ativo: config.ativo, para: config.para, de: config.de, urlDoCrm: config.url_do_crm },
+      chave,
+      ctx.logger,
+    );
+  } catch (erro) {
+    ctx.logger.error('aviso do lote falhou', { erro: (erro as Error).message });
+  }
+}
+
 async function consumirEntrada(
   ctx: ContextoDaEntrada,
   contagens: ReturnType<typeof contagensDaEntradaZeradas>,

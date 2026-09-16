@@ -643,3 +643,78 @@ export async function configurarNumero(
     aquecimentoRecomecou: r.aquecimento_recomecou === true,
   };
 }
+
+// ---------------------------------------------------------------------------
+// O aviso por e-mail (migração 20260916120000)
+// ---------------------------------------------------------------------------
+
+export interface ConfigDoAvisoCrua {
+  ativo: boolean;
+  de: string;
+  para: string[];
+  url_do_crm: string;
+}
+
+const AVISO_DESLIGADO: ConfigDoAvisoCrua = {
+  ativo: false,
+  de: '',
+  para: [],
+  url_do_crm: '',
+};
+
+/** `app_settings.notificacoes.email`. Sem a linha, o aviso fica desligado. */
+export async function lerConfigDoAviso(cliente: ClienteDoBanco): Promise<ConfigDoAvisoCrua> {
+  const { data, error } = await cliente
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'notificacoes.email')
+    .maybeSingle();
+  if (error || !data) return AVISO_DESLIGADO;
+  const v = objeto(data.value);
+  const para = Array.isArray(v.para)
+    ? v.para.filter((x): x is string => typeof x === 'string')
+    : [];
+  return {
+    ativo: v.ativo === true,
+    de: typeof v.de === 'string' ? v.de : AVISO_DESLIGADO.de,
+    para,
+    url_do_crm: typeof v.url_do_crm === 'string' ? v.url_do_crm : '',
+  };
+}
+
+export interface ConversaParaAviso {
+  id: string;
+  organization_id: string | null;
+  ficha: string | null;
+  telefone: string | null;
+  opcao: string | null;
+}
+
+/**
+ * Quem é quem, para o e-mail: nome da ficha (quando o número é conhecido), a
+ * escolha do menu do bot e o telefone — de que o aviso só usa os quatro últimos
+ * dígitos (RF-BAS-14).
+ */
+export async function lerConversasParaAviso(
+  cliente: ClienteDoBanco,
+  ids: readonly string[],
+): Promise<Map<string, ConversaParaAviso>> {
+  const mapa = new Map<string, ConversaParaAviso>();
+  if (ids.length === 0) return mapa;
+  const { data, error } = await cliente
+    .from('conversations')
+    .select('id, organization_id, peer_phone_e164, bot_opcao, organizations(name)')
+    .in('id', [...new Set(ids)]);
+  if (error || !data) return mapa;
+  for (const linha of data as unknown as Record<string, unknown>[]) {
+    const org = objeto(linha.organizations);
+    mapa.set(String(linha.id), {
+      id: String(linha.id),
+      organization_id: typeof linha.organization_id === 'string' ? linha.organization_id : null,
+      ficha: typeof org.name === 'string' ? org.name : null,
+      telefone: typeof linha.peer_phone_e164 === 'string' ? linha.peer_phone_e164 : null,
+      opcao: typeof linha.bot_opcao === 'string' ? linha.bot_opcao : null,
+    });
+  }
+  return mapa;
+}
