@@ -41,6 +41,12 @@ export interface ConfiguracaoDoAviso {
   ativo: boolean;
   para: string[];
   de: string;
+  /**
+   * Para onde vai o "responder" do e-mail. Existe por dois motivos: responder um
+   * aviso não pode ir para o vazio, e uma caixa que responde é sinal de correio de
+   * gente — o que ajuda o Gmail a não mandar o aviso para o spam.
+   */
+  responderPara?: string | null;
   urlDoCrm: string;
 }
 
@@ -118,6 +124,7 @@ export async function avisarPorEmail(
       body: JSON.stringify({
         from: config.de,
         to: config.para,
+        ...(config.responderPara ? { reply_to: config.responderPara } : {}),
         subject: assuntoDoAviso(entradas),
         text: corpoDoAviso(entradas, config.urlDoCrm),
       }),

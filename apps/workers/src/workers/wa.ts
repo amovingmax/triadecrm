@@ -296,7 +296,13 @@ async function avisarDoQueChegou(ctx: ContextoDaEntrada, chave: string | undefin
     });
     await avisarPorEmail(
       entradas,
-      { ativo: config.ativo, para: config.para, de: config.de, urlDoCrm: config.url_do_crm },
+      {
+        ativo: config.ativo,
+        para: config.para,
+        de: config.de,
+        responderPara: config.responder_para,
+        urlDoCrm: config.url_do_crm,
+      },
       chave,
       ctx.logger,
     );

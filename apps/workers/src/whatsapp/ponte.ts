@@ -652,6 +652,7 @@ export interface ConfigDoAvisoCrua {
   ativo: boolean;
   de: string;
   para: string[];
+  responder_para: string | null;
   url_do_crm: string;
 }
 
@@ -659,6 +660,7 @@ const AVISO_DESLIGADO: ConfigDoAvisoCrua = {
   ativo: false,
   de: '',
   para: [],
+  responder_para: null,
   url_do_crm: '',
 };
 
@@ -678,6 +680,7 @@ export async function lerConfigDoAviso(cliente: ClienteDoBanco): Promise<ConfigD
     ativo: v.ativo === true,
     de: typeof v.de === 'string' ? v.de : AVISO_DESLIGADO.de,
     para,
+    responder_para: typeof v.responder_para === 'string' ? v.responder_para : null,
     url_do_crm: typeof v.url_do_crm === 'string' ? v.url_do_crm : '',
   };
 }
