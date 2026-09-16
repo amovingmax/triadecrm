@@ -5,7 +5,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { BellOff, NotebookPen, PenLine, SendHorizontal } from 'lucide-react';
-import { LIMITES_PADRAO } from '@komune/prompts';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,12 @@ import { ErroDaConversa, responder } from './acoes';
 import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
 import { EnviarModelo } from './enviar-modelo';
 import { podeEscreverLivre } from './mensagens';
+
+/**
+ * O teto da Cloud API para uma mensagem de texto. É o único limite que existe de
+ * verdade aqui: `LIMITES_PADRAO.maxCaracteres` (300) é do robô, não de gente.
+ */
+const TETO_DO_WHATSAPP = 4096;
 import type { EstadoDaJanela, FioDaConversa } from './tipos';
 
 /**
@@ -180,7 +185,11 @@ function TextoLivre({
   });
 
   const limpo = texto.trim();
-  const longo = texto.length > LIMITES_PADRAO.maxCaracteres;
+  // O teto de 300 de `LIMITES_PADRAO` é do ROBÔ (RF-CON-24): ele existe para a
+  // resposta automática não virar um texto de vendas. Aplicá-lo a uma pessoa que
+  // está escrevendo à mão era um erro de categoria — quem fala com o parceiro é
+  // gente, e gente escreve o que precisa. O teto aqui é o da Cloud API.
+  const longo = texto.length > TETO_DO_WHATSAPP;
 
   return (
     <form
@@ -204,18 +213,14 @@ function TextoLivre({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[11px] leading-relaxed text-muted-foreground">
           Sai com seu primeiro nome em negrito na frente.
-          {longo ? null : (
-            <>
-              {' · '}
-              <span className="numerico">{texto.length}</span>/
-              <span className="numerico">{LIMITES_PADRAO.maxCaracteres}</span>
-            </>
-          )}
-          {longo ? (
-            <span className="text-destructive-texto">
+          {/* A contagem só aparece quando chega perto do teto da Cloud API. Um
+              contador sempre à vista transforma escrever numa prova de redação —
+              e aqui quem escreve é gente falando com gente. */}
+          {texto.length > TETO_DO_WHATSAPP - 400 ? (
+            <span className={cn(longo && 'text-destructive-texto')}>
               {' · '}
               <span className="numerico">{texto.length}</span> de{' '}
-              <span className="numerico">{LIMITES_PADRAO.maxCaracteres}</span> caracteres
+              <span className="numerico">{TETO_DO_WHATSAPP}</span> caracteres
             </span>
           ) : null}
         </span>

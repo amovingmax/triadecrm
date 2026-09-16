@@ -2330,3 +2330,15 @@ Conversa curta demais não vira dossiê: uma linha discreta em vez do bloco. Con
 - Os módulos `ficha` e `pulso` continuam desligados em `app_settings`: ligar é `update`, não deploy.
 - As três migrações da IA ainda não foram para produção.
 - No cabeçalho do aplicativo há 4 px de transbordo horizontal em 390 px (o bloco do avatar). É anterior a esta entrega e vale um conserto à parte.
+
+### 17/09/2026 — O CRM para de oferecer texto pronto
+
+"Não quero ficar preso a modelo, quero conversar de forma humana" (Rafael). Duas coisas mudaram, e uma delas era erro nosso.
+
+**O teto de 300 caracteres saiu da caixa de resposta.** Ele vinha de `LIMITES_PADRAO.maxCaracteres`, que é o limite do ROBÔ (RF-CON-24): existe para a resposta automática não virar texto de vendas. Aplicá-lo a uma pessoa escrevendo à mão era erro de categoria — quem fala com o parceiro é gente, e gente escreve o que precisa. O teto agora é o da Cloud API (4.096) e o contador só aparece nos últimos 400 caracteres: contador sempre à vista transforma escrever numa prova de redação. Não havia limite no banco; era só a tela.
+
+**A tela de envio passou a oferecer só as molduras em que se escreve.** O que a Meta exige fora da janela de 24 h é uma MOLDURA aprovada, não um texto pronto — e as molduras livres (`GEN-ABR-LIVRE`, `GEN-ABR-PARCERIA`, `GEN-ABR-LANCAMENTO`, `GEN-FUP-LIVRE`) já resolvem isso: saudação com o nome de quem envia e saída obrigatória (SAIR + privacidade) são fixas; o meio é um campo de 900 caracteres escrito na hora. Os 42 textos prontos continuam no banco — a Meta precisa deles aprovados para o operacional (confirmar reunião, lembrete, pós-ligação), que sai de outras telas com o texto já decidido —, mas **não são mais oferecidos para escolha**. O seletor de moldura só aparece se a pessoa pedir, e só quando há mais de uma.
+
+**Quando não há moldura livre aprovada** — o caso de hoje —, a tela diz isso em vez de cair no texto pronto: "Ainda não dá para abrir conversa por aqui... as molduras em que você escreve ainda estão na revisão deles". Devolver o texto pronto pela porta dos fundos seria desfazer a decisão.
+
+**Provado no navegador** (local, 1440 px), nos dois estados: com moldura livre aprovada (caixa de escrever, sem lista de prontos) e sem nenhuma (o aviso honesto, com "registrar por telefone" ao lado). Web 726 testes, suíte inteira verde.
