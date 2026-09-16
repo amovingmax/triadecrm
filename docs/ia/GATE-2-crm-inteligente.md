@@ -1,6 +1,6 @@
 # GATE 2 — CRM Inteligente, Fase 2 (a IA entra em serviço)
 
-**Branch:** `feat/crm-inteligente` · **Data:** 17/09/2026 · **Estado:** construída, testada, **fora de produção**
+**Branch:** `feat/crm-inteligente` · **Data:** 17/09/2026 · **Estado:** **em produção**, com a ficha ligada
 
 A Fase 1 pôs a mesa. A Fase 2 é a comida: o worker analisa conversa de verdade, a
 leitura aparece na tela com a evidência a um clique, e às 18h30 sai o Pulso do dia.
@@ -130,37 +130,100 @@ ANTHROPIC_BASE_URL=http://127.0.0.1:8787 ANTHROPIC_API_KEY=sk-ant-duble \
 
 ---
 
-## 4. O que isto custa
+## 4. O que isto custa — medido, não estimado
 
-| | modelo | por chamada | quando roda |
-| --- | --- | --- | --- |
-| `ficha-da-conversa@v1` | Haiku 4.5 | US$ 0,00215 | por janela de conversa (debounce de 10 min) |
-| `pulso-do-dia@v1` | Sonnet 5 | US$ 0,00506 | uma vez por dia útil |
-| transcrição (Groq) | whisper-large-v3-turbo | ≈ US$ 0,04/mês | por áudio recebido |
+A primeira chamada real mostrou que a projeção dos evals **subestima em 2,6×**, por
+duas razões que só a fatura mostra:
 
-No cenário do MVP (30 conversas ativas/dia), **≈ US$ 8/mês**. O alerta de 80% do
-orçamento continua em `ai_budget_alerts`.
+1. **O esquema da saída conta como entrada.** `output_config.format.schema` vai no
+   pedido: os 28 valores de intenção, os 19 tipos de sinal e o resto da forma somam
+   ~2.200 tokens. Entrada real de uma ficha: **3.053** tokens, contra 870 de projeção.
+2. **O cache não entra.** O bloco de sistema tem 739 tokens, abaixo do mínimo
+   cacheável do Haiku: `cache_control` é aceito e ignorado. Duas chamadas seguidas
+   (`ai_runs` 157 e 158) vieram com escrita e leitura de cache zeradas.
 
----
+| | projeção do eval | medido na fatura |
+| --- | --- | --- |
+| `ficha-da-conversa@v1` | US$ 0,00215 | **US$ 0,0044 – 0,0056** |
+| `classificar-intencao@v1` | US$ 0,00129 | **US$ 0,0028** |
+| `resumo-ligacao@v1` | US$ 0,00252 | **US$ 0,0070** |
 
-## 5. O que falta, e o que é seu
+**Primeiro dia em produção: 20 chamadas, US$ 0,076** — incluindo a fila que estava
+represada desde antes (8 classificações, 1 resumo, 1 follow-up) e as 6 primeiras
+fichas. No cenário do MVP (60 análises/dia) isso projeta **≈ US$ 12/mês**, ainda
+dentro do orçamento de US$ 25, com o alerta de 80% em `ai_budget_alerts`.
 
-1. **Aplicar as três migrações em produção.** Elas são aditivas e tudo nasce
-   desligado: `supabase db push --linked`. (Tentei; a política desta sessão bloqueia
-   deploy em produção, e é sua a decisão de quando.)
-2. **`ANTHROPIC_API_KEY`** no `.env` e como segredo do Fly. Sem ela o `worker-ai` não
-   sobe — e é ela que falta para medir o custo real de uma chamada.
-3. **`GROQ_API_KEY`** para a transcrição (sem ela o áudio não vira texto e o log
-   avisa; o worker continua de pé).
-4. **Subir o `worker-ai`**: `fly deploy . --config infra/nuvem/fly.worker-ai.toml --dockerfile apps/workers/Dockerfile`.
-5. **Ligar os módulos**, um de cada vez, quando quiser ver funcionando:
-   `update app_settings set value = jsonb_set(value,'{modulos,ficha}','true') where key='ia.crm_inteligente'`.
-   Recomendo ligar `ficha` primeiro, olhar as primeiras dez fichas e o custo em
-   `ai_runs`, e só então ligar `pulso`.
-6. **Deploy do web** (`vercel deploy --prod`), que é o que leva a leitura da IA e o
-   Pulso para a tela de vocês.
+**O que a API recusou pelo caminho:** a saída estruturada não aceita `minimum`,
+`maximum` em `integer` nem `maxItems` em `array`. O esquema enviado passou a ser só
+a FORMA; as faixas continuam valendo na volta, pelo zod.
 
-**Nota fora de escopo:** no cabeçalho do aplicativo há 4 px de transbordo horizontal
-em 390 px (o bloco do avatar). É anterior a esta entrega e vale um conserto à parte.
+## 5. O estado real, depois de subir
 
-⛔ **Fase 2 entregue. Aguardando os passos acima, que dependem de você.**
+**Feito e verificado em produção (17/09):**
+
+| | |
+| --- | --- |
+| As três migrações | aplicadas; as cinco tabelas respondendo |
+| `worker-ai` no Fly | `triade-worker-ai`, região `gru`, máquina de pé + standby |
+| Segredos no Fly | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` |
+| Deploy do web | `READY`, produção |
+| Módulo `ficha` | **ligado** |
+| Módulo `pulso` e os outros três | desligados |
+| Primeiras fichas | 5 escritas, leitura correta (inclusive `QUEM_E_VOCE` para uma mensagem automática da Meta e `FORA_ESCOPO` para quem perguntou de ingresso de samba) |
+
+## 6. ⚠️ O cron de produção não está rodando — e isso é maior que esta entrega
+
+Ao ligar a ficha, as seis conversas ficaram marcadas como pendentes e **nada foi
+enfileirado**. A causa não é da Fase 2:
+
+```
+execuções de cron nas últimas 24 h: 1
+```
+
+A única que rodou foi a diária (`recompute_temperatures`, 06:00 UTC). **Nenhum job
+abaixo de diário jamais aparece em `cron.job_run_details`:**
+
+| agendamento | job | última execução |
+| --- | --- | --- |
+| `*/5` | `komune_push` | nunca |
+| `*/5` | `ia_enfileirar_analises` | nunca |
+| `*/10` | `wa_confirmacoes_reenfileirar` | nunca |
+| `*/10` | `expirar_reservas_de_ligacao` | nunca |
+| `*/15` | `cadencias_agendar` | nunca |
+| `*/15` | `dlq_drenar` | nunca |
+| `7 * * * *` | `wa_expirar_fila` | nunca |
+
+Provado com um job de teste: `cron.schedule('teste', '* * * * *', 'select 1')`
+não executou em 200 segundos. O processo `pg_cron launcher` está vivo (12 dias) e
+parado em `wait_event = Extension`.
+
+**O que isso significa hoje:** a reconfirmação de mensagem no WhatsApp, o dreno da
+dead-letter, o agendamento de cadências, a expiração de reservas de ligação e o
+push do pré-cadastro para o app **não estão acontecendo sozinhos** — e não é de hoje.
+
+**O que eu faria, nesta ordem:**
+1. Reiniciar a instância do Postgres pelo painel do Supabase (Settings → General →
+   Restart project). Launcher do `pg_cron` travado costuma voltar com isso, e é o
+   teste mais barato.
+2. Se voltar, conferir em 10 minutos: `select count(*) from cron.job_run_details
+   where start_time > now() - interval '10 minutes'` tem de ser maior que zero.
+3. Se não voltar, é chamado para o suporte do Supabase — nenhum código nosso muda
+   esse comportamento.
+4. **Plano B, se o cron não voltar:** o `worker-ai` passa a enfileirar as análises
+   ele mesmo a cada volta do laço (ele já fica de pé o dia inteiro). São ~15 linhas
+   e uma porta pública nova; digo isso como alternativa, não como conserto do
+   problema — os outros cinco jobs continuariam parados.
+
+**Enquanto isso**, enfileirei as seis análises à mão
+(`select app.ia_enfileirar_analises(20)`) e as fichas estão lá.
+
+## 7. O que ainda falta
+
+1. **`GROQ_API_KEY`** — o console do Groq estava com erro de cadastro. Sem ela, áudio
+   recebido não vira transcrição (o worker avisa no log e segue). Quando sair:
+   `fly secrets set GROQ_API_KEY=... --app triade-worker-ai` e pronto, sem deploy.
+2. **Ligar o `pulso`** quando quiser o digest das 18h30 — depende do cron voltar.
+3. **Olhar as fichas na tela** (`/conversas`) e me dizer se a leitura está boa: é o
+   👍/👎 delas que calibra a versão seguinte.
+4. No cabeçalho do aplicativo há 4 px de transbordo horizontal em 390 px (o bloco do
+   avatar). Anterior a esta entrega.
