@@ -67,7 +67,12 @@ function Evento({ evento }: { evento: EventoDaLinha }) {
     const recebida = evento.mensagem.entrada;
     const Seta = recebida ? CornerDownLeft : Send;
     return (
-      <li className="group relative flex gap-3 pb-4 last:pb-0">
+      // O id é a âncora da evidência: a leitura da IA cita `message_id`, e clicar
+      // no sinal rola até a mensagem que o prova (`leitura-da-ia.tsx`).
+      <li
+        id={`evento-${evento.id}`}
+        className="group relative flex scroll-mt-4 gap-3 pb-4 transition-colors last:pb-0 data-[apontada]:bg-muted/60"
+      >
         <span
           className="absolute top-8 bottom-0 left-4 w-px -translate-x-1/2 bg-hairline group-last:hidden"
           role="presentation"

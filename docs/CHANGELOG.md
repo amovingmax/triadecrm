@@ -2295,3 +2295,19 @@ A Fase 1 deixou a mesa posta. Faltavam as duas pontas que fazem a análise acont
 - As duas migrações da IA (`20260917100000`, `20260917110000`) ainda não foram aplicadas em produção.
 - Falta a tela: a ficha existe no banco e ninguém a vê ainda.
 - `ANTHROPIC_API_KEY` e `GROQ_API_KEY` no `.env`; `worker-ai` no Fly.io.
+
+### 17/09/2026 — A leitura da IA aparece na conversa (CRM Inteligente, Fase 2, parte 2)
+
+A ficha existia no banco e ninguém a via. Agora ela é uma faixa dentro da conversa — entre os dados do parceiro e a primeira mensagem, que é onde ela fala sobre o que está logo abaixo.
+
+**Três decisões de desenho, e as três são decisão:**
+
+- **Sem cor.** A escala térmica é a única cromia do produto e pertence ao BANCO (etapa, intenção, dias parados). Pintar o score da IA com as mesmas cores diria que ele é temperatura, e ele não é. Cor é a verdade do CRM; tinta preta é a leitura da máquina.
+- **Uma linha, até alguém pedir mais.** Fechada, a faixa tem 40 px: score, faixa da rubrica, resumo e os alertas. O que sustenta o número abre em "Por quê" — no clique de quem duvidou dele, que é exatamente quem deve ver a evidência.
+- **Todo sinal aponta para a mensagem que o prova.** Clicar em "− reclamou do preço" rola até a mensagem e a pisca por dois segundos. Afirmação de máquina que não se confere em dois cliques é o que ninguém deveria acreditar.
+
+Aberta, ela mostra o motivo, os sinais (contra antes de a favor, forte antes de fraco — a ordem é o argumento), a próxima ação sugerida com prazo, o que foi prometido (com "venceu" quando o prazo passou) e o rodapé com a versão do prompt, quando foi lida e o 👍/👎. **A tela não corrige a ficha:** discordar é feedback (`feedback_da_ia`), que calibra a versão seguinte — corrigir texto de IA à mão criaria um dado sem dono.
+
+Conversa curta demais não vira dossiê: uma linha discreta em vez do bloco. Conversa nunca analisada não mostra nada — o módulo nasce desligado e a tela não avisa o que não falta.
+
+**Provado no navegador** (local, 1440 px e 390 px): faixa fechada em uma linha, "Por quê" abrindo com os dois sinais na ordem certa, clique no sinal rolando até "Show, e quanto é a taxa?" e a piscada; em 390 px sem transbordo horizontal, com o alerta escondido e o 👍/👎 quebrando para a própria linha. Web 718 testes (17 novos), suíte inteira verde.

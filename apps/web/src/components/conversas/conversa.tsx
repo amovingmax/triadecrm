@@ -20,6 +20,7 @@ import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro 
 import { ErroDaTela, EsqueletoLinha } from './estados';
 import { contagemDeInteracoes, local } from './formatos';
 import { FaixaDaJanela, Janela24h, useJanela } from './janela-24h';
+import { LeituraDaIa } from './leitura-da-ia';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { JANELA_APERTADA_MIN, montarFio, montarRascunho, ordenarFila } from './mensagens';
 import {
@@ -330,6 +331,11 @@ export function Conversa({
             </Campo>
           ) : null}
         </dl>
+
+        {/* A leitura da IA entra ENTRE a ficha e a conversa, e não num painel à
+            parte: ela fala sobre o que está logo abaixo, e a evidência de cada
+            sinal é uma mensagem daquela mesma coluna. Fechada, é uma linha. */}
+        {fio ? <LeituraDaIa fioId={fio.id} className="mt-2.5" /> : null}
 
         <AvisoWhatsapp meta={meta} compacto className="my-4 max-w-3xl" />
 
