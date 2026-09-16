@@ -19,9 +19,9 @@ import { CartaoDeAprovacao } from './aprovacao';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { ErroDaTela, EsqueletoLinha } from './estados';
 import { contagemDeInteracoes, local } from './formatos';
-import { Janela24h, useJanela } from './janela-24h';
+import { FaixaDaJanela, Janela24h, useJanela } from './janela-24h';
 import { LinhaDoTempo } from './linha-do-tempo';
-import { montarFio, montarRascunho, ordenarFila } from './mensagens';
+import { JANELA_APERTADA_MIN, montarFio, montarRascunho, ordenarFila } from './mensagens';
 import {
   agruparPorDia,
   escolherNegocio,
@@ -193,8 +193,8 @@ export function Conversa({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex flex-col gap-3 border-b border-hairline p-4 md:p-5">
-        <div className="flex items-start gap-2">
+      <header className="flex flex-col border-b border-hairline">
+        <div className="flex items-center gap-2 px-4 py-3 md:px-5">
           <Button
             variant="ghost"
             size="icon"
@@ -206,10 +206,10 @@ export function Conversa({
           </Button>
 
           <div className="min-w-0 flex-1">
-            <h2 className="font-heading text-lg leading-tight font-semibold tracking-tight">
+            <h2 className="truncate font-heading text-base leading-tight font-semibold tracking-tight">
               {item.nome}
             </h2>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
               <ChipTemperatura
                 temperatura={item.temperatura}
                 esfriando={item.precisaAtencao}
@@ -228,8 +228,14 @@ export function Conversa({
                   não contatar
                 </Badge>
               ) : null}
+              {/* O estado do fio ("esperando a gente") só aparece com largura de
+                  sobra: no celular a faixa da janela, logo abaixo, já diz o que
+                  dá para fazer agora — e três selos empilhados comem a conversa. */}
               {fio ? (
-                <Badge variant="pilula" className="h-5 px-2 text-[11px] font-normal">
+                <Badge
+                  variant="pilula"
+                  className="hidden h-5 px-2 text-[11px] font-normal sm:inline-flex"
+                >
                   {ROTULO_ESTADO_DO_FIO[fio.estado]}
                 </Badge>
               ) : null}
@@ -241,23 +247,32 @@ export function Conversa({
               ) : null}
             </p>
           </div>
+
+          {/* As ações ficam na MESMA linha do nome, alinhadas à direita. Elas eram
+              dois botões inteiros numa faixa própria: 64 px do painel gastos em toda
+              conversa para duas ações que a pessoa usa uma vez por visita, e que
+              empurravam a mensagem de hoje para fora da tela. */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {podeAssumir && fio ? <AssumirConversa fioId={fio.id} organizacaoId={item.id} /> : null}
+            <Button asChild variant="outline" size="sm" className="toque h-9">
+              <Link href={`/registrar?org=${item.id}`}>
+                <MessageSquarePlus aria-hidden="true" />
+                <span className="hidden sm:inline">Registrar contato</span>
+                <span className="sr-only sm:hidden">Registrar contato</span>
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="icon" className="toque size-9">
+              <Link href={`/parceiros/${item.id}`} title="Abrir a ficha do parceiro">
+                <ExternalLink aria-hidden="true" />
+                <span className="sr-only">Abrir ficha</span>
+              </Link>
+            </Button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button asChild className="toque h-11 md:h-9">
-            <Link href={`/registrar?org=${item.id}`}>
-              <MessageSquarePlus aria-hidden="true" />
-              Registrar contato
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="toque h-11 md:h-9">
-            <Link href={`/parceiros/${item.id}`}>
-              <ExternalLink aria-hidden="true" />
-              Abrir ficha
-            </Link>
-          </Button>
-          {podeAssumir && fio ? <AssumirConversa fioId={fio.id} organizacaoId={item.id} /> : null}
-        </div>
+        {/* A faixa da janela de 24 h: a única coisa desta tela que muda sozinha e
+            decide o que pode sair. Fica colada no cabeçalho, com 2 px de barra. */}
+        {fio ? <FaixaDaJanela estado={janela} className="border-t border-hairline" /> : null}
       </header>
 
       {/* A coluna de leitura fica em 48rem: numa tela de 1440 o painel tem mais de
@@ -275,7 +290,7 @@ export function Conversa({
             200 px eram a conversa inteira. Onde, categoria, dono e último contato
             são consulta de canto de olho — quem precisa do resto abre a ficha. O
             telefone continua atrás da mesma RPC auditada. */}
-        <dl className="flex max-w-3xl flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <dl className="flex max-w-3xl flex-wrap items-baseline gap-x-4 gap-y-1 pb-1 text-[11px] text-muted-foreground">
           <Campo rotulo="Onde">{onde || 'sem endereço na base'}</Campo>
           <Campo rotulo="Categoria">{item.categoria ?? 'sem categoria'}</Campo>
           <Campo rotulo="Responsável">{item.responsavel ?? 'sem dono'}</Campo>
@@ -316,7 +331,7 @@ export function Conversa({
           ) : null}
         </dl>
 
-        <AvisoWhatsapp meta={meta} compacto className="my-5 max-w-3xl" />
+        <AvisoWhatsapp meta={meta} compacto className="my-4 max-w-3xl" />
 
         {consulta.isPending ? (
           <EsqueletoLinha />
@@ -357,14 +372,15 @@ export function Conversa({
           O teto é 45% DO PAINEL, não da tela (`dvh`) — com `dvh` ele cabia na
           janela e mesmo assim espremia a conversa contra o cabeçalho, porque o
           painel é menor que a janela. */}
-      <div className="max-h-[45%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 p-4 md:p-5">
+      <div className="max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-4 py-3 md:px-5">
         <div className="max-w-3xl space-y-3">
-          {/* Sem fio, a janela de 24 h não acrescenta nada: os dois blocos ficavam
-              empilhados dizendo a mesma coisa em palavras diferentes ("nunca
-              escreveram para a gente" e "não há conversa de WhatsApp com este
-              parceiro"), e é o segundo que explica o caminho e oferece a ação.
-              Com fio, a janela volta — aí ela decide o que pode sair e quando. */}
-          {fio ? <Janela24h estado={janela} /> : null}
+          {/* O relógio da janela virou a FAIXA do cabeçalho (`FaixaDaJanela`): a hora
+              está sempre à vista e não custa mais três linhas em cima da caixa de
+              escrever. O cartão inteiro só volta quando a janela está APERTADA — aí
+              a regra importa de novo, porque a decisão muda em minutos. */}
+          {fio && janela.situacao === 'aberta' && janela.restanteMin <= JANELA_APERTADA_MIN ? (
+            <Janela24h estado={janela} />
+          ) : null}
           {/* `naoContatar` viaja junto porque o rodapé é onde a pessoa ESCREVE: o
               selo lá em cima informa, mas informar não impede ninguém de digitar
               uma mensagem inteira e só descobrir na hora de enviar que o parceiro

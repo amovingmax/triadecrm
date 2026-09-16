@@ -164,9 +164,9 @@ export function TelaConversas({
     >
       {telaCheia ? null : (
         <>
-          <header className="flex flex-col gap-1">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight">Conversas</h1>
-            <p className="text-sm text-muted-foreground">
+          <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h1 className="font-heading text-lg font-semibold tracking-tight">Conversas</h1>
+            <p className="text-xs text-muted-foreground">
               {consulta.isPending ? (
                 'Carregando o histórico...'
               ) : recorte ? (
@@ -191,25 +191,32 @@ export function TelaConversas({
             </p>
           </header>
 
-          <Abas
-            aba={aba}
-            aoTrocar={setAba}
-            naFila={fila.total}
-            foraDaBase={foraDaBase.length}
-            comAviso={fila.comAviso}
-            maisUrgente={maisUrgente}
-          />
-
-          {/* O recorte é da lista de conversas. Na fila de aprovação ele não
-              aparece porque não se aplica: lá a lista já é curta e é inteira. */}
-          {aba === 'conversas' ? (
-            <FiltrosDaConversa
-              filtros={filtros}
-              pessoas={catalogos.pessoas}
-              aoMudar={mudar}
-              aoLimpar={limpar}
+          {/* Abas e busca dividem a MESMA faixa no desktop. Empilhadas, elas e o
+              título somavam 200 px antes da primeira conversa — numa tela em que o
+              conteúdo é a lista. No celular continuam uma embaixo da outra, porque
+              lá a busca precisa da largura inteira. */}
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
+            <Abas
+              aba={aba}
+              aoTrocar={setAba}
+              naFila={fila.total}
+              foraDaBase={foraDaBase.length}
+              comAviso={fila.comAviso}
+              maisUrgente={maisUrgente}
             />
-          ) : null}
+
+            {/* O recorte é da lista de conversas. Na fila de aprovação ele não
+                aparece porque não se aplica: lá a lista já é curta e é inteira. */}
+            {aba === 'conversas' ? (
+              <FiltrosDaConversa
+                filtros={filtros}
+                pessoas={catalogos.pessoas}
+                aoMudar={mudar}
+                aoLimpar={limpar}
+                className="md:w-[26rem]"
+              />
+            ) : null}
+          </div>
 
           {consulta.data?.cortada ? (
             <p className="text-xs text-muted-foreground">
@@ -364,6 +371,9 @@ function Abas({
         rotulo="O que mostrar na lista"
         ativo={aba}
         aoTrocar={aoTrocar}
+        // Em 390 px "Fora da base" quebrava em duas linhas e a faixa das abas
+        // crescia; rolando de lado ela fica com a altura de uma linha só.
+        rolavel
         itens={[
           { id: 'conversas', rotulo: 'Conversas' },
           { id: 'aprovar', rotulo: 'Aprovar', contagem: naFila },

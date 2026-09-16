@@ -166,6 +166,83 @@ function Tempo({ minutos }: { minutos: number }) {
 }
 
 /**
+ * A FAIXA: a janela de 24 h como uma tira fina sob o cabeçalho da conversa.
+ *
+ * É o mesmo relógio do `Janela24h`, com outra pergunta em mente. O cartão
+ * responde "por que só dá para mandar modelo?" e ensina a regra; a faixa responde
+ * "quanto tempo eu tenho?" e não custa altura nenhuma da conversa — que é o
+ * espaço que a tela estava gastando com explicação repetida em toda visita.
+ *
+ * A barra do tempo é o desenho: 2 px que encurtam enquanto a janela corre, no
+ * topo da conversa, onde o olho passa antes de ler a primeira mensagem. Fechada
+ * ou inexistente, a barra some (não há o que contar) e sobra a frase curta, com
+ * a explicação inteira no `title` — quem precisa da regra continua a um passar
+ * de mouse, e quem precisa da hora já a tem.
+ */
+export function FaixaDaJanela({
+  estado,
+  className,
+}: {
+  estado: EstadoDaJanela;
+  className?: string;
+}) {
+  const aberta = estado.situacao === 'aberta';
+  const apertada = aberta && estado.restanteMin <= JANELA_APERTADA_MIN;
+  const resta = aberta ? tempoCurto(estado.restanteMin) : null;
+  // 24 h = 1440 min. A fração é o que sobra da janela, com um piso visível: uma
+  // barra de 0,3% some, e "quase no fim" é exatamente quando ela importa.
+  const fracao = aberta ? Math.max(0.02, Math.min(1, estado.restanteMin / 1440)) : 0;
+
+  return (
+    <div className={cn('flex flex-col', className)} title={explicacaoEmTexto(estado)}>
+      <div className="h-0.5 w-full bg-hairline" role="presentation">
+        <div
+          className={cn(
+            'h-full origin-left transition-[width] duration-700',
+            apertada ? 'bg-destructive' : 'bg-foreground/45',
+          )}
+          style={{ width: `${fracao * 100}%` }}
+        />
+      </div>
+      <p className="flex items-center gap-1.5 px-4 py-1.5 text-[11px] text-muted-foreground md:px-5">
+        {aberta ? (
+          apertada ? (
+            <Clock className="size-3 shrink-0 text-destructive-texto" aria-hidden="true" />
+          ) : (
+            <Unlock className="size-3 shrink-0" aria-hidden="true" />
+          )
+        ) : estado.situacao === 'fechada' ? (
+          <LockKeyhole className="size-3 shrink-0" aria-hidden="true" />
+        ) : (
+          <MessageSquareOff className="size-3 shrink-0" aria-hidden="true" />
+        )}
+        {aberta && resta ? (
+          <span className={cn(apertada && 'text-destructive-texto')}>
+            Resposta livre por mais <span className="numerico">{resta.numero}</span>
+            {resta.unidade}
+          </span>
+        ) : estado.situacao === 'fechada' ? (
+          <span>Fora da janela de 24 h: só modelo aprovado</span>
+        ) : (
+          <span>Ninguém escreveu ainda: a conversa começa por modelo aprovado</span>
+        )}
+      </p>
+    </div>
+  );
+}
+
+/** A mesma explicação do cartão, em texto puro, para o `title` da faixa. */
+function explicacaoEmTexto(estado: EstadoDaJanela): string {
+  if (estado.situacao === 'aberta') {
+    return `Dá para responder livremente, com texto ou áudio, e não custa nada. A janela vale 24 h a contar da última mensagem do parceiro, e fecha em ${dataHoraCompleta(estado.expiraEm)}.`;
+  }
+  if (estado.situacao === 'fechada') {
+    return 'Fora da janela, a Meta só deixa passar modelo aprovado. Texto livre volta a sair quando o parceiro responder.';
+  }
+  return 'A janela de 24 h só existe depois que a pessoa escreve. Enquanto ela não escrever, a mensagem sai por modelo aprovado pela Meta.';
+}
+
+/**
  * A versão de uma linha, para a linha da lista da esquerda.
  *
  * Só aparece quando a janela está ABERTA: é a informação acionável ("dá para

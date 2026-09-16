@@ -2239,3 +2239,15 @@ Três pedidos do Rafael depois do primeiro envio de verdade: "não quero ter mod
 - `RESEND_API_KEY` no `.env` e no Fly, e trocar o remetente `onboarding@resend.dev` por um endereço do domínio komune.app.br (exige o domínio verificado no Resend).
 - O nome "Komune" ainda não aparece para quem recebe (`name_status: NON_EXISTS` na Meta). A verificação da empresa saiu hoje; se em algumas horas não aparecer, é preciso pedir o nome de exibição no WhatsApp Manager.
 - Os textos do menu e das quatro respostas são da Bárbara revisar.
+
+### 16/09/2026 — A tela Conversas fica legível (RF-CON-05, RF-CON-06; sistema visual Ocean Breeze)
+
+"Está muito ruim de ver e de usar" — e estava: antes da primeira conversa havia 200 px de cabeçalho (título grande, abas, busca e três filtros abertos), cada linha da lista gastava três alturas de texto, e no painel da direita dois botões inteiros, a ficha e dois cartões de explicação empurravam a mensagem de hoje para fora da tela. Nenhuma cor nova: a escala térmica continua sendo a única cromia (sistema visual de 04/09).
+
+- **Uma faixa só no topo.** Título e contadores na mesma linha; abas e busca dividem a faixa seguinte no desktop. Os três recortes (responsável, canal, tempo sem contato) ficam fechados atrás de **Filtros (n)** e abrem sozinhos quando já há filtro ligado.
+- **Lista de duas linhas.** Sai o chip de temperatura — ela já é a barra de 3 px na borda, que é como a lista de Parceiros fala. Bairro e categoria saem da terceira linha e viram o `title` da linha. Os selos ("não contatar", "aprovar", "janela 23 h") terminam a linha da prévia. De 6 conversas visíveis para 12 em 900 px, e de 8 para 11 no celular.
+- **A janela de 24 h virou faixa** (`FaixaDaJanela`): uma barra de 2 px sob o cabeçalho da conversa que encurta enquanto o tempo corre, com a frase curta ao lado ("Resposta livre por mais 23 h") e a regra inteira no `title`. O cartão de três linhas só volta quando falta menos de uma hora — que é quando a regra decide de novo.
+- **Cabeçalho da conversa em uma linha:** nome, selos e, à direita, "Registrar contato" e o ícone de abrir a ficha. O estado do fio some no celular, onde a faixa já diz o que dá para fazer.
+- **Caixa de escrever com rodapé de uma linha:** a assinatura e a contagem à esquerda, Enviar à direita.
+
+**Provado no navegador (local, 1440 px e 390 px):** lista com 12 conversas visíveis, conversa abrindo na última mensagem, faixa da janela correndo, caixa de resposta à vista sem rolar. Web 701 testes, lint e typecheck verdes.

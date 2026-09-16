@@ -5,7 +5,7 @@ import { ChevronRight, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { BarraTermica, ChipTemperatura, DiasSemContato } from '@/components/temperatura';
+import { BarraTermica, DiasSemContato } from '@/components/temperatura';
 
 import { local } from './formatos';
 import { ICONE_CANAL } from './icones';
@@ -81,8 +81,11 @@ function Linha({
         type="button"
         onClick={() => aoEscolher(item.id)}
         aria-current={selecionado ? 'true' : undefined}
+        // Bairro e categoria saíram da terceira linha e vivem aqui: são consulta de
+        // canto de olho, e custavam 40 px por linha — metade da lista visível.
+        title={rodape || undefined}
         className={cn(
-          'relative flex min-h-[4.75rem] w-full items-center gap-3 py-3 pr-3 pl-4 text-left outline-none',
+          'relative flex min-h-[4rem] w-full items-center gap-3 py-2.5 pr-3 pl-4 text-left outline-none',
           'hover:bg-muted/50 focus-visible:bg-muted/60',
           selecionado && 'bg-muted',
         )}
@@ -94,7 +97,7 @@ function Linha({
           semRotulo
         />
 
-        <span className="min-w-0 flex-1 space-y-1">
+        <span className="min-w-0 flex-1 space-y-0.5">
           <span className="flex items-center gap-2">
             <span
               className={cn(
@@ -120,13 +123,11 @@ function Linha({
             />
           </span>
 
+          {/* A temperatura NÃO se repete em chip: ela já é a barra de 3 px na borda
+              esquerda, que é o que a lista de Parceiros usa e o que a pessoa lê de
+              relance. O chip ao lado dizia a mesma coisa em palavra, e era ele que
+              empurrava a prévia da conversa para uma terceira linha. */}
           <span className="flex items-center gap-1.5">
-            <ChipTemperatura
-              temperatura={item.temperatura}
-              esfriando={item.precisaAtencao}
-              comDescricao={false}
-              className="shrink-0 text-[11px]"
-            />
             {Icone ? (
               <Icone
                 className="size-3.5 shrink-0 text-muted-foreground"
@@ -141,31 +142,24 @@ function Linha({
             >
               {item.resumo ?? 'Nenhum contato registrado'}
             </span>
+            {/* Os selos terminam a MESMA linha da prévia. Numa linha própria eles
+                davam 20 px a cada conversa aberta — e "janela 23 h" é justamente o
+                que se lê junto com a última fala, não abaixo dela. */}
+            {item.naoContatar ? (
+              <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
+                não contatar
+              </Badge>
+            ) : null}
+            {/* O rascunho pendente é o que faz alguém abrir esta linha AGORA: ele
+                expira em três dias e some sozinho. */}
+            {item.rascunhoPendente ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-hairline px-1.5 text-[10px]">
+                <Sparkles className="size-2.5" aria-hidden="true" />
+                aprovar
+              </span>
+            ) : null}
+            <ChipDaJanela estado={janela} />
           </span>
-
-          {rodape || item.naoContatar || item.rascunhoPendente || janela.situacao === 'aberta' ? (
-            <span className="flex items-center gap-1.5">
-              {item.naoContatar ? (
-                <Badge variant="pilula" className="h-5 shrink-0 px-1.5 text-[10px] font-normal">
-                  não contatar
-                </Badge>
-              ) : null}
-              {/* O rascunho pendente é o que faz alguém abrir esta linha AGORA:
-                  ele expira em três dias e some sozinho. Vem antes do endereço. */}
-              {item.rascunhoPendente ? (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-hairline px-1.5 text-[10px]">
-                  <Sparkles className="size-2.5" aria-hidden="true" />
-                  aprovar
-                </span>
-              ) : null}
-              <ChipDaJanela estado={janela} />
-              {rodape ? (
-                <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                  {rodape}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
         </span>
 
         {/* Só no celular: lá a lista dá lugar à conversa numa tela nova, e o chevron é

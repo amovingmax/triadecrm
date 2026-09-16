@@ -201,7 +201,24 @@ function TextoLivre({
         placeholder="Escreva para o parceiro"
         className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-base leading-relaxed transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
       />
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[11px] leading-relaxed text-muted-foreground">
+          Sai com seu primeiro nome em negrito na frente.
+          {longo ? null : (
+            <>
+              {' · '}
+              <span className="numerico">{texto.length}</span>/
+              <span className="numerico">{LIMITES_PADRAO.maxCaracteres}</span>
+            </>
+          )}
+          {longo ? (
+            <span className="text-destructive-texto">
+              {' · '}
+              <span className="numerico">{texto.length}</span> de{' '}
+              <span className="numerico">{LIMITES_PADRAO.maxCaracteres}</span> caracteres
+            </span>
+          ) : null}
+        </span>
         <Button
           type="submit"
           className="toque h-11 md:h-9"
@@ -210,15 +227,6 @@ function TextoLivre({
           <SendHorizontal aria-hidden="true" />
           Enviar
         </Button>
-        <span className="w-full text-[11px] leading-relaxed text-muted-foreground">
-          O parceiro vê seu primeiro nome em negrito no começo da mensagem.
-        </span>
-        <span
-          className={cn('text-[11px] text-muted-foreground', longo && 'text-destructive-texto')}
-        >
-          <span className="numerico">{texto.length}</span> de{' '}
-          <span className="numerico">{LIMITES_PADRAO.maxCaracteres}</span> caracteres
-        </span>
       </div>
     </form>
   );

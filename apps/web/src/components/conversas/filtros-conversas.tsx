@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, SlidersHorizontal, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -43,23 +43,48 @@ export function FiltrosDaConversa({
   pessoas,
   aoMudar,
   aoLimpar,
+  className,
 }: {
   filtros: FiltrosConversas;
   pessoas: { id: string; nome: string }[];
   aoMudar: (parcial: Partial<FiltrosConversas>) => void;
   aoLimpar: () => void;
+  className?: string;
 }) {
   const idBusca = useId();
   const ativos = contarFiltros(filtros);
   const limpavel = ativos > 0 || filtros.q.trim() !== '';
+  // Os três recortes ficam FECHADOS até alguém pedir. Eles ocupavam uma faixa
+  // inteira acima da lista, em toda visita, para uma escolha que se faz uma vez
+  // por turno — e era essa faixa, somada ao título e às abas, que empurrava a
+  // lista para 200 px abaixo do topo da tela. Com filtro ligado, abrem sozinhos:
+  // recorte escondido é recorte esquecido.
+  const [abertos, setAbertos] = useState(ativos > 0);
 
   const mudarBusca = useCallback((q: string) => aoMudar({ q }), [aoMudar]);
 
   return (
-    <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-      <CampoBusca id={idBusca} valor={filtros.q} aoMudar={mudarBusca} />
+    <div className={cn('flex flex-col gap-2', className)}>
+      <div className="flex items-center gap-2">
+        <CampoBusca id={idBusca} valor={filtros.q} aoMudar={mudarBusca} />
+        <Button
+          variant={abertos ? 'secondary' : 'outline'}
+          onClick={() => setAbertos((v) => !v)}
+          aria-expanded={abertos}
+          className="toque h-11 shrink-0 md:h-9"
+        >
+          <SlidersHorizontal aria-hidden="true" />
+          Filtros
+          {ativos > 0 ? <span className="numerico">({ativos})</span> : null}
+        </Button>
+      </div>
 
-      <div className="flex min-w-0 flex-col gap-2 md:flex-1 md:flex-row md:items-center md:gap-2">
+      <div
+        className={cn(
+          'flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:gap-2',
+          !abertos && 'hidden',
+        )}
+      >
         <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] md:mx-0 md:flex-wrap md:px-0 md:pb-0 md:[mask-image:none]">
           {/* Este filtro pergunta por QUALQUER laço da pessoa com o parceiro: dono do
               negócio, quem atende o fio de WhatsApp e quem registrou algum contato.
