@@ -5,8 +5,11 @@
 A Fase 1 pôs a mesa. A Fase 2 é a comida: o worker analisa conversa de verdade, a
 leitura aparece na tela com a evidência a um clique, e às 18h30 sai o Pulso do dia.
 
-Nada disso está ligado. Os módulos nascem desligados em `app_settings.ia.crm_inteligente`,
-e as migrações ainda não foram para produção — o que falta está na seção 5.
+Subiu em 17/09: as três migrações estão aplicadas, o `worker-ai` está de pé no Fly e o
+módulo `ficha` foi ligado — as cinco primeiras leituras estão no banco. O `pulso` e os
+outros três módulos continuam desligados. O estado real está na seção 5, o que a
+produção mostrou de diferente do previsto na 4, e um achado que é maior que esta
+entrega na 6.
 
 ---
 
