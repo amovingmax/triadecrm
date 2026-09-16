@@ -49,6 +49,7 @@ import {
   type MapaDePseudonimos,
 } from '@komune/prompts';
 
+import { ErroDeTranscricao, transcrever as transcreverAudio, type TranscricaoBruta } from './asr';
 import {
   buscarContatoDaFicha,
   buscarConversa,
@@ -109,10 +110,18 @@ const uuid = z.string().uuid();
 const payloadDaTranscricao = z.object({
   purpose: z.literal('transcribe_audio'),
   message_id: uuid,
-  /** O que o faster-whisper devolveu (RF-CON-27). Áudio não vira token. */
-  transcricao_bruta: z.string().min(1).max(12000),
-  confianca_asr: z.number().min(0).max(1),
-  duracao_seg: z.number().int().min(1).max(600),
+  /**
+   * O texto do ASR. Continua aceito pronto — é assim que o `faster-whisper` da
+   * máquina dedicada entregaria (RF-CON-27) — e passou a ser OPCIONAL: sem ele, o
+   * worker busca o áudio no Storage e chama o ASR ele mesmo (CRM Inteligente,
+   * Fase 1). Áudio nunca vira token do Claude nos dois caminhos.
+   */
+  transcricao_bruta: z.string().min(1).max(12000).nullish(),
+  confianca_asr: z.number().min(0).max(1).nullish(),
+  duracao_seg: z.number().int().min(1).max(600).nullish(),
+  /** Onde o `worker-wa` guardou o arquivo, quando foi ele que enfileirou. */
+  media_path: z.string().max(400).nullish(),
+  media_mime: z.string().max(80).nullish(),
   contexto: z.string().max(400).nullish(),
 });
 
@@ -180,15 +189,26 @@ async function transcrever(
     conversa.telefone,
   );
 
+  // Quem ouve não é o Claude. Ou o texto do ASR já veio no payload, ou este worker
+  // busca o arquivo e chama o provedor de transcrição antes de gastar modelo.
+  const bruta =
+    payload.transcricao_bruta != null && payload.duracao_seg != null
+      ? {
+          texto: payload.transcricao_bruta,
+          confianca: payload.confianca_asr ?? 0.8,
+          duracaoSeg: payload.duracao_seg,
+        }
+      : await ouvirOAudio(contexto, payload.media_path ?? null, payload.media_mime ?? null);
+
   const executada = await executar(
     contexto,
     transcricaoAudioV1,
     {
       leadId: leadIdCurto(ficha.organizationId),
       canal: 'whatsapp',
-      duracaoSeg: payload.duracao_seg,
-      transcricaoBruta: payload.transcricao_bruta,
-      confiancaAsr: payload.confianca_asr,
+      duracaoSeg: bruta.duracaoSeg,
+      transcricaoBruta: bruta.texto,
+      confiancaAsr: bruta.confianca,
       contexto: payload.contexto ?? null,
     },
     contatoDoPrompt(ficha),
@@ -227,6 +247,52 @@ async function transcrever(
     custoUsd: executada.custoUsd,
     detalhes: { destino: roteamento.destino, motivos: roteamento.motivos },
   };
+}
+
+/**
+ * Busca o áudio no Storage e manda para o ASR.
+ *
+ * Erro aqui é nomeado e classificado: sem caminho, sem provedor ou sem chave é
+ * determinístico (repetir paga a mesma recusa); rede e 5xx do provedor voltam pela
+ * fila com backoff. É o mesmo critério do resto do worker.
+ */
+async function ouvirOAudio(
+  contexto: ContextoDaIa,
+  caminho: string | null,
+  mime: string | null,
+): Promise<TranscricaoBruta> {
+  const transcritor = contexto.transcritor;
+  if (transcritor === undefined) {
+    throw new ErroDeterministico(
+      'este worker subiu sem transcritor de áudio: configure GROQ_API_KEY (ia.transcricao em app_settings)',
+    );
+  }
+  if (caminho === null) {
+    throw new ErroDeterministico(
+      'trabalho de áudio sem transcrição pronta e sem media_path: não há o que ouvir',
+    );
+  }
+
+  const { data, error } = await contexto.cliente.storage.from(transcritor.balde).download(caminho);
+  if (error || !data) {
+    throw new ErroDeterministico(
+      `áudio ${caminho} não está no balde ${transcritor.balde}: ${error?.message ?? 'sem corpo'}`,
+    );
+  }
+
+  const bytes = new Uint8Array(await data.arrayBuffer());
+  try {
+    return await transcreverAudio(
+      { bytes, nome: caminho.split('/').pop() ?? 'audio.ogg', mime: mime ?? data.type ?? 'audio/ogg' },
+      transcritor.config,
+      transcritor.chave,
+    );
+  } catch (erro) {
+    if (erro instanceof ErroDeTranscricao && !erro.transitorio) {
+      throw new ErroDeterministico(erro.message);
+    }
+    throw erro;
+  }
 }
 
 // ---------------------------------------------------------------------------

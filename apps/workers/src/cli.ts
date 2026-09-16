@@ -13,7 +13,7 @@ export type WorkerCommand = (typeof WORKER_COMMANDS)[number];
 export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
   ingest: ['uma-vez', 'agendar', 'fonte', 'categorias', 'paginas', 'rotulo'],
   wa: ['uma-vez', 'conectar', 'sincronizar-modelos'],
-  ai: ['uma-vez'],
+  ai: ['uma-vez', 'chamada-de-teste'],
   rotas: ['uma-vez', 'geocodificar'],
 };
 
@@ -42,6 +42,9 @@ Opções de "wa":
 
 Opções de "ai":
   --uma-vez              Esvazia a fila ai_jobs uma vez e sai, em vez de ficar rodando.
+  --chamada-de-teste     Faz UMA chamada real ao modelo com uma conversa de exemplo e
+                         imprime tokens, cache e custo em dólar. É como se confere, sem
+                         mexer em dado de ninguém, quanto custa uma ficha de conversa.
 
 Opções de "rotas":
   --geocodificar         Faz UMA passada de geocodificação no Nominatim (1 req/s) e sai.

@@ -89,6 +89,19 @@ export interface ContextoDaIa {
   readonly cliente: ClienteDoBanco;
   readonly modelo: ClienteDoModelo;
   readonly logger: Logger;
+  /**
+   * O transcritor de áudio (`ia/asr.ts`). Opcional porque o Claude não transcreve:
+   * quem ouve é um provedor de ASR, e sem ele a esteira segue viva para tudo o que
+   * é texto. A tarefa de áudio é que recusa, com nome (CRM Inteligente, Fase 1).
+   */
+  readonly transcritor?: TranscritorDeAudio;
+}
+
+/** Tudo que a tarefa de áudio precisa saber sobre quem ouve. */
+export interface TranscritorDeAudio {
+  readonly balde: string;
+  readonly config: { provedor: string; modelo: string; duracaoMaximaSeg: number };
+  readonly chave: string | undefined;
 }
 
 export interface Executada<Saida> {

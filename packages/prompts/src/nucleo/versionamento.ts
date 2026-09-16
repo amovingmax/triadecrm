@@ -31,7 +31,13 @@ export type ModeloAlvo = (typeof MODELOS)[keyof typeof MODELOS];
  * agrupado (índice `ai_runs_purpose_day_idx`) e o alerta de 80% é lido.
  */
 export type PropositoDeAiRun =
-  'transcribe_audio' | 'summarize_call' | 'draft_followup' | 'classify_inbound';
+  | 'transcribe_audio'
+  | 'summarize_call'
+  | 'draft_followup'
+  | 'classify_inbound'
+  // CRM Inteligente (17/09/2026): a ficha por conversa e o Pulso do dia.
+  | 'analisar_conversa'
+  | 'pulso_do_dia';
 
 /**
  * Um caso do próprio prompt: entrada e a saída que a versão deve produzir.

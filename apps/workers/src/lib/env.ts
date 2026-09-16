@@ -49,6 +49,12 @@ const baseEnvSchema = z.object({
    * resto do laço não depende dela.
    */
   RESEND_API_KEY: optionalString,
+  /**
+   * Groq Whisper: quem OUVE o áudio recebido (o Claude não transcreve). Vazia = o
+   * áudio não vira transcrição e a tarefa recusa com nome; o resto da IA continua.
+   * Trocar de provedor é `app_settings.ia.crm_inteligente.transcricao`.
+   */
+  GROQ_API_KEY: optionalString,
 });
 
 const waEnvSchema = baseEnvSchema.extend({

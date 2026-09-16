@@ -1,5 +1,7 @@
 import { classificarIntencaoV1 } from './prompts/classificar-intencao/v1';
+import { fichaDaConversaV1 } from './prompts/ficha-da-conversa/v1';
 import { followupLigacaoV1 } from './prompts/followup-ligacao/v1';
+import { pulsoDoDiaV1 } from './prompts/pulso-do-dia/v1';
 import { resumoLigacaoV1 } from './prompts/resumo-ligacao/v1';
 import { transcricaoAudioV1 } from './prompts/transcricao-audio/v1';
 import { type MetadadosDePrompt, metadadosDoPrompt, selecionar } from './nucleo/versionamento';
@@ -18,6 +20,8 @@ import { type MetadadosDePrompt, metadadosDoPrompt, selecionar } from './nucleo/
  */
 export const CATALOGO = {
   'transcricao-audio': { 1: transcricaoAudioV1 },
+  'ficha-da-conversa': { 1: fichaDaConversaV1 },
+  'pulso-do-dia': { 1: pulsoDoDiaV1 },
   'resumo-ligacao': { 1: resumoLigacaoV1 },
   'followup-ligacao': { 1: followupLigacaoV1 },
   'classificar-intencao': { 1: classificarIntencaoV1 },
@@ -28,6 +32,8 @@ export type IdDePrompt = keyof typeof CATALOGO;
 /** A versão em produção de cada prompt. Mudar aqui é o deploy de um prompt. */
 export const VIGENTES = {
   'transcricao-audio': 1,
+  'ficha-da-conversa': 1,
+  'pulso-do-dia': 1,
   'resumo-ligacao': 1,
   'followup-ligacao': 1,
   'classificar-intencao': 1,
@@ -51,6 +57,8 @@ export function promptVigente<Id extends IdDePrompt>(
 /** Todas as versões publicadas, em metadados — é o que o documento de custos lê. */
 export const INVENTARIO: readonly MetadadosDePrompt[] = [
   metadadosDoPrompt(transcricaoAudioV1),
+  metadadosDoPrompt(fichaDaConversaV1),
+  metadadosDoPrompt(pulsoDoDiaV1),
   metadadosDoPrompt(resumoLigacaoV1),
   metadadosDoPrompt(followupLigacaoV1),
   metadadosDoPrompt(classificarIntencaoV1),

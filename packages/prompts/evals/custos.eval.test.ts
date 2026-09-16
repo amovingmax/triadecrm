@@ -109,6 +109,29 @@ describe('preços e conta por chamada', () => {
         comCache: 0.00058,
       },
       {
+        // CRM Inteligente (17/09/2026): a ficha lê a conversa e devolve o dossiê.
+        // É o prompt mais caro dos de Haiku porque carrega a rubrica do score.
+        id: 'ficha-da-conversa',
+        modelo: 'claude-haiku-4-5',
+        tokensDeSistema: 739,
+        tokensDaMensagem: 131,
+        tokensDeSaida: 256,
+        semCache: 0.00215,
+        comCache: 0.00148,
+      },
+      {
+        // CRM Inteligente (17/09/2026): o Pulso lê o dia inteiro e escreve o texto.
+        // É Sonnet porque é prosa que gente lê, e roda uma vez por dia (mais uma por
+        // pessoa que pedir a própria carteira) — o volume é que o torna barato.
+        id: 'pulso-do-dia',
+        modelo: 'claude-sonnet-5',
+        tokensDeSistema: 575,
+        tokensDaMensagem: 276,
+        tokensDeSaida: 336,
+        semCache: 0.00506,
+        comCache: 0.00403,
+      },
+      {
         id: 'resumo-ligacao',
         modelo: 'claude-sonnet-5',
         tokensDeSistema: 486,

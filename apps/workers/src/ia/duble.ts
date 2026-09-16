@@ -27,8 +27,8 @@ import { estimarTokens } from '@komune/prompts';
 
 import type { PedidoAoModelo, RespostaDoModelo, UsoDoModelo } from './cliente';
 
-/** Qual dos quatro fluxos o esquema pedido descreve. */
-export type FluxoDoDuble = 'transcricao' | 'resumo' | 'followup' | 'classificacao';
+/** Qual dos fluxos o esquema pedido descreve. */
+export type FluxoDoDuble = 'transcricao' | 'resumo' | 'followup' | 'classificacao' | 'ficha';
 
 export class EsquemaDesconhecidoError extends Error {
   constructor(campos: readonly string[]) {
@@ -49,6 +49,9 @@ function camposDoEsquema(esquema: Record<string, unknown>): string[] {
 export function fluxoDoEsquema(esquema: Record<string, unknown>): FluxoDoDuble {
   const campos = new Set(camposDoEsquema(esquema));
   if (campos.has('textoLimpo')) return 'transcricao';
+  // A ficha vem antes da classificação: ela também tem `intencao`, mas o que a
+  // distingue é o score e os sinais que o sustentam (CRM Inteligente, Fase 1).
+  if (campos.has('scoreIntencao')) return 'ficha';
   if (campos.has('noDeVirada')) return 'resumo';
   if (campos.has('claims')) return 'followup';
   if (campos.has('intencao')) return 'classificacao';
@@ -174,11 +177,57 @@ function classificar(mensagem: string): Record<string, unknown> {
   };
 }
 
+/**
+ * A ficha do dublê: lê o que dá para ler da própria mensagem montada (a última
+ * mensagem do parceiro) e devolve um dossiê coerente com ela. Não é inteligência —
+ * é fixture que responde ao que entrou, para o teste do worker exercitar validação,
+ * corte de evidência e gravação com dado que muda.
+ */
+function ficharConversa(mensagem: string): Record<string, unknown> {
+  const linhas = mensagem.split('\n').filter((l) => l.startsWith('['));
+  const ultima = linhas[linhas.length - 1] ?? '';
+  const messageId = /^\[([^\]]+)\]/.exec(ultima)?.[1] ?? 'm1';
+  const texto = ultima.slice(ultima.indexOf(':') + 1).trim();
+  const pediuProposta = /proposta|or[çc]amento/i.test(texto);
+
+  return {
+    resumo: limitar(texto === '' ? 'Conversa sem conteúdo novo.' : texto, 400),
+    intencao: pediuProposta ? 'PEDIU_PROPOSTA' : 'AMBIGUO',
+    scoreIntencao: pediuProposta ? 82 : 20,
+    motivo: pediuProposta ? 'Pediu proposta na última mensagem.' : 'Nada concreto na conversa.',
+    sentimento: 'neutro',
+    sinais: pediuProposta
+      ? [
+          {
+            tipo: 'pediu_proposta',
+            polaridade: 'positivo',
+            forca: 'forte',
+            messageId,
+            trecho: limitar(texto, 120),
+          },
+        ]
+      : [],
+    objecoes: [],
+    etapaSugerida: null,
+    compromissosNovos: [],
+    compromissosCumpridos: [],
+    proximaAcao: {
+      descricao: pediuProposta ? 'Mandar a proposta pedida' : 'Perguntar o que o parceiro precisa',
+      prazo: null,
+    },
+    dadosExtraidos: [],
+    alertas: pediuProposta ? ['pediu_proposta'] : [],
+    confianca: 0.8,
+    dadosInsuficientes: !pediuProposta,
+  };
+}
+
 const RESPOSTAS: Readonly<Record<FluxoDoDuble, (mensagem: string) => Record<string, unknown>>> = {
   transcricao: transcrever,
   resumo: resumir,
   followup: redigir,
   classificacao: classificar,
+  ficha: ficharConversa,
 };
 
 // ---------------------------------------------------------------------------

@@ -17,6 +17,22 @@
  */
 
 export {
+  type EntradaDaFicha,
+  type IntencaoDaFicha,
+  INTENCOES_DA_FICHA,
+  type SaidaDaFicha,
+  SINAIS_NEGATIVOS,
+  SINAIS_POSITIVOS,
+  fichaDaConversaV1,
+} from './prompts/ficha-da-conversa/v1';
+
+export {
+  type EntradaDoPulso,
+  type SaidaDoPulso,
+  pulsoDoDiaV1,
+} from './prompts/pulso-do-dia/v1';
+
+export {
   CATALOGO,
   INVENTARIO,
   type IdDePrompt,

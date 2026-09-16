@@ -111,9 +111,11 @@ describe('versionamento: a v2 não mexe na v1', () => {
 });
 
 describe('catálogo do Tríade', () => {
-  it('tem os quatro prompts, na ordem de prioridade do R13', () => {
+  it('tem os seis prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
     expect(Object.keys(CATALOGO)).toEqual([
       'transcricao-audio',
+      'ficha-da-conversa',
+      'pulso-do-dia',
       'resumo-ligacao',
       'followup-ligacao',
       'classificar-intencao',

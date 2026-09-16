@@ -37,7 +37,35 @@ import {
 } from '../ia/fila';
 import { criarPulso } from '../lib/pulso';
 
+import { ASR_PADRAO, type ConfiguracaoDoAsr } from '../ia/asr';
+import { chamadaDeTeste } from '../ia/chamada-de-teste';
 import type { ContextoDaIa } from '../ia/execucao';
+
+/** O balde privado das mídias recebidas (migração 20260905000201). */
+const BALDE_DE_MIDIAS = 'mensagens';
+
+/**
+ * O provedor de transcrição sai de `app_settings.ia.crm_inteligente.transcricao`,
+ * não do código: trocar Groq por faster-whisper no dia em que a máquina dedicada
+ * existir é um `update`, não um deploy.
+ */
+async function lerConfigDaTranscricao(
+  cliente: ReturnType<typeof criarClienteDaIa>,
+): Promise<ConfiguracaoDoAsr> {
+  const { data } = await cliente
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'ia.crm_inteligente')
+    .maybeSingle();
+  const valor = (data?.value ?? {}) as Record<string, unknown>;
+  const t = (valor.transcricao ?? {}) as Record<string, unknown>;
+  return {
+    provedor: typeof t.provedor === 'string' ? t.provedor : ASR_PADRAO.provedor,
+    modelo: typeof t.modelo === 'string' ? t.modelo : ASR_PADRAO.modelo,
+    duracaoMaximaSeg:
+      typeof t.duracao_maxima_seg === 'number' ? t.duracao_maxima_seg : ASR_PADRAO.duracaoMaximaSeg,
+  };
+}
 import type { WorkerContext } from '../lib/context';
 
 /** Descanso entre voltas quando a fila está vazia. */
@@ -59,6 +87,7 @@ function dormir(ms: number): Promise<void> {
 export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
   const { env, logger, opcoes } = ctx;
   const umaVez = opcoes['uma-vez'] === true;
+  const medir = opcoes['chamada-de-teste'] === true;
 
   const cliente = criarClienteDaIa(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
   // O cliente real e o dublê entram pelo mesmo lugar: `ANTHROPIC_BASE_URL`
@@ -68,7 +97,52 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
     chave: env.ANTHROPIC_API_KEY,
     baseUrl: env.ANTHROPIC_BASE_URL,
   });
-  const contexto: ContextoDaIa = { cliente, modelo, logger };
+  // Quem ouve o áudio não é o Claude (a API dele não transcreve). O transcritor é
+  // opcional: sem `GROQ_API_KEY` o worker sobe e trabalha todo o resto, e só a
+  // tarefa de áudio recusa — com nome, no log (CRM Inteligente, Fase 1).
+  const transcricao = await lerConfigDaTranscricao(cliente);
+  if (env.GROQ_API_KEY === undefined) {
+    logger.warn('sem GROQ_API_KEY: áudio recebido não vira transcrição', {
+      provedor: transcricao.provedor,
+    });
+  }
+  const contexto: ContextoDaIa = {
+    cliente,
+    modelo,
+    logger,
+    transcritor: {
+      balde: BALDE_DE_MIDIAS,
+      config: transcricao,
+      chave: env.GROQ_API_KEY,
+    },
+  };
+
+  // A medição do GATE 1: uma chamada real, o preço na tela, e sai. Não entra no
+  // laço da fila e não toca conversa de ninguém — o dado é o exemplo do prompt.
+  if (medir) {
+    const t0 = Date.now();
+    const r = await chamadaDeTeste(contexto);
+    logger.info('chamada de teste concluída', {
+      ai_run_id: r.aiRunId,
+      prompt: r.promptVersion,
+      modelo: r.modelo,
+      custo_usd: r.custoUsd,
+      latencia_ms: Date.now() - t0,
+    });
+    process.stdout.write(
+      [
+        `✓ Chamada real ao modelo: ${r.promptVersion} (${r.modelo})`,
+        `  custo desta chamada: US$ ${r.custoUsd.toFixed(6)}`,
+        `  ai_runs.id: ${r.aiRunId} — tokens e cache estão na linha`,
+        `  o modelo devolveu score ${r.scoreIntencao}: ${r.resumo}`,
+        '',
+        '  Rode de novo para ver a leitura de cache: a segunda chamada do mesmo',
+        '  prompt custa menos, e é dela que sai a projeção do mês.',
+        '',
+      ].join('\n'),
+    );
+    return 0;
+  }
 
   const pulso = criarPulso({ cliente, logger, worker: 'ai' });
   const contagens = { tratados: 0, vazios: 0, bloqueados: 0, falhas: 0, custoUsd: 0 };

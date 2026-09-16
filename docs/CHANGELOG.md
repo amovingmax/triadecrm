@@ -2251,3 +2251,24 @@ Três pedidos do Rafael depois do primeiro envio de verdade: "não quero ter mod
 - **Caixa de escrever com rodapé de uma linha:** a assinatura e a contagem à esquerda, Enviar à direita.
 
 **Provado no navegador (local, 1440 px e 390 px):** lista com 12 conversas visíveis, conversa abrindo na última mensagem, faixa da janela correndo, caixa de resposta à vista sem rolar. Web 701 testes, lint e typecheck verdes.
+
+### 17/09/2026 — CRM Inteligente, Fase 1: a fundação (GATE 0 aprovado; `feat/crm-inteligente`)
+
+A camada de IA sobre as conversas começa pelo alicerce. Nada do que entrou aqui fala com parceiro, move etapa ou escreve em campo preenchido por gente — e nada roda sozinho ainda: ligar o worker é a Fase 2. Relatório completo em `docs/ia/GATE-1-crm-inteligente.md`; a auditoria que autorizou tudo isto está em `docs/ia/GATE-0-crm-inteligente.md`.
+
+**As cinco tabelas (`20260917100000`).** `ficha_da_conversa` (o dossiê de uma conversa: resumo, score, sinais, objeções, próxima ação), `compromissos_da_conversa` (o que foi prometido, por quem, com a mensagem que prova), `pulso_do_dia` (o resumo diário — "Pulso" porque Radar já é o módulo de coleta), `sugestoes_de_campo` (o que a IA propõe preencher, para uma pessoa aceitar) e `feedback_da_ia` (👍/👎, que é o que calibra). Todas com RLS, e a visibilidade é **a da conversa**: quem não vê a conversa não vê a ficha; nenhuma tem policy de UPDATE para gente, porque quem escreve é o worker. **A temperatura continua sendo uma só**, a do banco — o pgTAP prova que não nasceu uma tabela paralela.
+
+**O debounce.** Mensagem carimba a conversa como pendente; ela só amadurece depois de 10 min de silêncio, ou no teto de 30 min quando a conversa não para. Número interno não vira ficha. A chave da janela inclui a **contagem** de mensagens, não só a última data: duas mensagens no mesmo segundo geravam a mesma chave e a segunda janela nunca era analisada — o pgTAP pegou isso antes de custar uma chamada.
+
+**Dois prompts novos.** `ficha-da-conversa@v1` (Haiku 4.5; as 25 intenções do R08 mais `PEDIU_PROPOSTA`, `PRONTO_PARA_FECHAR` e `RECLAMACAO`; todo sinal cita o `messageId` que o prova) e `pulso-do-dia@v1` (Sonnet 5; os números vêm apurados do Postgres e o modelo **não soma, não conta e não estima**). Custo medido por chamada: US$ 0,00215 e US$ 0,00506.
+
+**A transcrição de áudio (`ia/asr.ts`).** A API do Claude não transcreve áudio e o `faster-whisper` da máquina dedicada ainda não existe — o áudio chegava e a IA ficava sem metade da conversa. Entrou o Groq Whisper `large-v3-turbo` (≈ US$ 0,04/mês no cenário do MVP), com confiança derivada do `avg_logprob` ponderado pela duração. Sem chave, o erro é determinístico; áudio mudo ou acima de 10 min não vira chamada paga; o áudio nunca vira token do Claude.
+
+**`workers ai --chamada-de-teste`:** uma chamada pelo caminho real, com o exemplo do próprio prompt, imprimindo tokens e custo.
+
+**Provado rodando:** pgTAP 48 (23 asserções) e a suíte inteira verde — 48 arquivos, 2646 asserções; prompts 270, schema 105, workers 340, web 701; lint e typecheck limpos.
+
+**Decisão humana / pendente:**
+- **O guardrail de PII impede a ficha de existir, e isso precisa de decisão.** A auditoria foi calibrada para ler *uma* mensagem por chamada; a ficha lê a conversa inteira, e conversa de fornecedor é data, horário, preço e quantidade. Medido no corpus de 40 mensagens reais (nenhuma com telefone), depois da pseudonimização: hoje 31 de 31 conversas de 10 mensagens são barradas; com a fronteira de letra, 0. O que a fronteira de letra perde, medido nos 147 casos com 8+ dígitos da suíte: **um** — telefone com palavra entre os dígitos. O guardrail ficou **intacto** neste commit e um eval novo (`conversa-inteira.eval.test.ts`) fixa o número de hoje, para a decisão aparecer no diff. Opções e recomendação no GATE 1, seção 2.
+- `ANTHROPIC_API_KEY` e `GROQ_API_KEY` no `.env` (e a avaliação de LGPD de mandar áudio ao Groq).
+- `worker-ai` no Fly.io, junto com a Fase 2.
