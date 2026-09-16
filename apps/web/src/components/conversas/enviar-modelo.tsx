@@ -57,31 +57,20 @@ import { esquecerPedidoDeModelo, lerPedidoDeModelo } from './pedido-de-modelo';
  * discordarem, a recusa chega com a frase dele.
  */
 /**
- * As molduras em que a pessoa ESCREVE — as únicas que a tela oferece desde
- * 17/09/2026.
+ * A ORDEM da tela, decidida em 17/09/2026: primeiro a moldura em que se escreve,
+ * o texto pronto atrás de um link.
  *
- * ===========================================================================
- * POR QUE OS TEXTOS PRONTOS SAÍRAM DA TELA
- * ===========================================================================
- * "Não quero ficar preso a modelo, quero conversar de forma humana" (Rafael,
- * 17/09). E ele está certo: um texto pronto que a pessoa não escreveu chega como
- * mala direta, e o parceiro responde como se responde a mala direta.
+ * "Não quero ficar preso a modelo, quero conversar de forma humana" (Rafael). O
+ * que a Meta exige fora da janela de 24 h é uma MOLDURA aprovada — não um texto
+ * pronto —, e as molduras livres (`GEN-ABR-LIVRE`, `GEN-ABR-PARCERIA`,
+ * `GEN-ABR-LANCAMENTO`, `GEN-FUP-LIVRE`) resolvem isso: saudação e saída são
+ * fixas e aprovadas, o meio são 900 caracteres escritos na hora.
  *
- * O que a Meta exige fora da janela de 24 h é uma MOLDURA aprovada — não um texto
- * pronto. As molduras livres (`GEN-ABR-LIVRE`, `GEN-ABR-PARCERIA`,
- * `GEN-ABR-LANCAMENTO`, `GEN-FUP-LIVRE`) resolvem isso: a saudação com o nome de
- * quem envia e a saída obrigatória (SAIR + privacidade, RF-CON-12) são fixas e
- * aprovadas; o meio é um campo de 900 caracteres que a pessoa escreve na hora.
- *
- * Então a tela mostra só essas. O texto pronto continua no banco — a Meta precisa
- * dele aprovado para as mensagens operacionais (confirmar reunião, lembrete,
- * pós-ligação), que saem de OUTRAS telas com o texto já decidido, e chegam aqui
- * apenas quando o recibo da ligação pede um modelo específico.
+ * Elas é que abrem a tela — `escolherModeloInicial` prefere a livre. O texto
+ * pronto **continua disponível**, porque enquanto a Meta não aprova nenhuma
+ * moldura livre ele é o único jeito de começar conversa; some da primeira vista,
+ * não da mão de quem precisa dele.
  */
-function molduraLivre(modelo: ModeloParaEnviar): boolean {
-  return variavelLivreDoModelo(modelo) !== null;
-}
-
 export function EnviarModelo({
   organizacaoId,
   className,
@@ -224,11 +213,11 @@ function Formulario({
   const modeloDoRecibo = pedido
     ? (previa.modelos.find((m) => m.codigo === pedido.codigo) ?? null)
     : null;
-  // Só as molduras em que se escreve — mais a que o recibo da ligação pediu, que
-  // não é a pessoa escolhendo texto pronto: é um fluxo que já decidiu.
-  const oferecidos = previa.modelos.filter(
-    (m) => molduraLivre(m) || m.id === modeloDoRecibo?.id,
-  );
+  // A lista inteira: a moldura livre é o PADRÃO, e o texto pronto continua ali
+  // atrás de um link, para quem quiser (17/09, segunda passada). Esconder de vez
+  // deixava sem saída o dia em que nenhuma moldura livre está aprovada — que é
+  // exatamente hoje.
+  const oferecidos = previa.modelos;
   const [modeloId, setModeloId] = useState<number>(
     modeloDoRecibo?.id ??
       escolherModeloInicial(oferecidos, previa.valores)?.id ??
@@ -278,33 +267,6 @@ function Formulario({
       void clientes.invalidateQueries({ queryKey: chaveDaPrevia(organizacaoId) });
     },
   });
-
-  // Nenhuma moldura livre aprovada: a tela diz isso e oferece o caminho que existe.
-  // Cair no texto pronto seria devolver pela porta dos fundos o que saiu pela frente.
-  if (oferecidos.length === 0) {
-    return (
-      <Moldura className={className}>
-        <p className="flex items-center gap-2 text-sm font-medium">
-          <FileCheck2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          Ainda não dá para abrir conversa por aqui
-        </p>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Fora da janela de 24 h a Meta só aceita moldura aprovada, e as molduras em que
-          você escreve ainda estão na revisão deles
-          {previa.modelos_esperando_meta > 0 ? (
-            <>
-              {' ('}
-              <span className="numerico">{previa.modelos_esperando_meta}</span>
-              {' esperando)'}
-            </>
-          ) : null}
-          . Costuma levar de minutos a um dia. Enquanto isso: quem responder nas últimas
-          24 h você atende aqui, escrevendo livre.
-        </p>
-        <RegistrarPorTelefone organizacaoId={organizacaoId} />
-      </Moldura>
-    );
-  }
 
   const pode = vazias.length === 0 && !longa && !enviar.isPending;
 
@@ -365,7 +327,8 @@ function Formulario({
           onClick={() => setTrocando(true)}
           className="self-start rounded px-1 text-xs text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          Trocar a moldura (<span className="numerico">{oferecidos.length}</span>)
+          {livre ? 'Prefiro um texto pronto' : 'Trocar o texto'} (
+          <span className="numerico">{oferecidos.length}</span>)
         </button>
       )}
 
