@@ -26,6 +26,21 @@ export type Duplicata = {
   reason: string;
 };
 
+/**
+ * As quatro faixas da triagem, no vocabulário que a tabela já usava num CHECK
+ * desde o D4 — não em "alta/media/baixa", que seria um segundo idioma para a
+ * mesma coisa.
+ */
+export type FaixaDaTriagem = 'A+' | 'A' | 'B' | 'C';
+
+/** O que cada faixa quer dizer para quem revisa, em uma linha. */
+export const EXPLICACAO_DA_FAIXA: Record<FaixaDaTriagem, string> = {
+  'A+': 'Sinal forte: nota alta, muita avaliação e no lugar certo. Comece por estes.',
+  A: 'Vale o trabalho de achar o contato.',
+  B: 'Tem algum sinal, mas não se destaca.',
+  C: 'A fonte não trouxe sinal nenhum sobre este. Pode valer, mas ninguém sabe ainda.',
+};
+
 export type CandidatoDaFila = {
   id: string;
   nome: string;
@@ -50,8 +65,15 @@ export type CandidatoDaFila = {
   /** Avisos da higiene de entrada (RF-RAD-16). */
   sinalizacoes: string[];
   nao_contatar: boolean;
-  /** Score do RF-RAD-12: nulo até o coletor existir. */
+  /** Pontuação da triagem (RF-RAD-12), 0-100. Nula até a primeira repontuação. */
   pontuacao: number | null;
+  /**
+   * A faixa da pontuação: A+, A, B, C. Vem do banco junto com a pontuação, e não
+   * é calculada aqui de propósito — os cortes estão em `app_settings` e mudam
+   * sem deploy. Recalcular no navegador criaria uma segunda régua que diverge da
+   * primeira no dia em que alguém mexer nos cortes.
+   */
+  faixa: FaixaDaTriagem | null;
   coletado_em: string;
   coletor: string;
   criado_em: string;

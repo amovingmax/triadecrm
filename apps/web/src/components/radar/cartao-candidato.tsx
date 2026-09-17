@@ -29,6 +29,7 @@ import type { AcaoDeRevisao } from './dados';
  */
 const ALVO_INLINE = 'inline-flex min-h-11 items-center md:min-h-0';
 import {
+  EXPLICACAO_DA_FAIXA,
   EXPLICACAO_DA_MARCA,
   ROTULO_DA_REGRA,
   ROTULO_SITUACAO,
@@ -105,6 +106,25 @@ export function CartaoCandidato({
         <h3 className="font-heading text-[15px] leading-tight font-medium tracking-tight">
           {candidato.nome}
         </h3>
+
+        {/* A FAIXA DA TRIAGEM, ao lado do nome.
+            Ela responde a pergunta que a fila de 277 candidatos criou — "por
+            onde eu começo?" — e responde no lugar onde a pessoa já está olhando.
+            Sem cor: a escala térmica é a única cromia do dado, e faixa de
+            triagem não é temperatura. O `title` carrega o porquê, porque
+            pontuação que não se explica é pontuação que a equipe ignora. */}
+        {pendente && candidato.faixa ? (
+          <Badge
+            variant="pilula"
+            className="gap-1 font-normal"
+            title={EXPLICACAO_DA_FAIXA[candidato.faixa]}
+          >
+            <span className="font-medium">{candidato.faixa}</span>
+            {candidato.pontuacao === null ? null : (
+              <span className="numerico text-muted-foreground">{candidato.pontuacao}</span>
+            )}
+          </Badge>
+        ) : null}
 
         {candidato.nao_contatar ? (
           <Badge variant="destructive" className="gap-1">

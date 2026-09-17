@@ -2580,3 +2580,19 @@ A pergunta que o dado existente responde é outra, e é a que importa: **quais d
 **Provado:** pgTAP 55 novo (11 asserções, incluindo "zerar o peso da cidade muda a conta", que é o que prova que o parâmetro está no banco e não no código). E o teste de segurança 09 pegou um erro meu antes de eu perceber: as duas funções novas do schema `app` nasceram executáveis por `authenticated` e `anon`, porque no Postgres `create function` concede EXECUTE a PUBLIC. Revogadas. Suíte: **55 arquivos, 2745 asserções**.
 
 **Pendente desta frente:** a tela. Hoje a pontuação existe no banco e ninguém a vê — falta mostrar a faixa na fila, ordenar por ela e dar a tela onde os pesos se editam. E falta a camada de IA: julgar pelo nome e pela categoria se aquilo é mesmo um fornecedor de evento, que é o que a conta não alcança.
+
+### 17/09/2026 — A fila do Radar passa a seguir a triagem
+
+A pontuação existia desde a migração da manhã e **ninguém a via**: a fila devolvia `pontuacao` (nula até ontem) e ordenava por data. Com 277 candidatos, ordenar por data é ordenar por acaso — o primeiro da lista é o último que a fonte cuspiu, não o que vale mais o trabalho.
+
+Duas mudanças, na mesma função: a saída ganhou `faixa` (A+, A, B, C) ao lado da `pontuacao` que já existia, e a ordem passou a ser **pontuação primeiro, data como desempate**. `nulls last` importa: candidato ainda não pontuado não sobe ao topo por acidente nem afunda para sempre — fica depois dos pontuados e antes de ninguém.
+
+A função foi **copiada do banco com `pg_get_functiondef`**, não reescrita: são 100 linhas com mascaramento de PII por papel, busca por CNPJ e detecção de duplicata. Reescrever de cabeça é trocar uma dessas sem querer — foi a lição do `wa_proximos`, hoje de manhã. E foi recriada com DROP porque o Postgres não deixa `create or replace` mudar a lista de colunas devolvidas; os grants voltam logo abaixo, iguais aos de antes.
+
+**Na tela**, a faixa aparece ao lado do nome, só na fila de pendentes, com a pontuação em número menor e a explicação no `title` ("Sinal forte: nota alta, muita avaliação e no lugar certo. Comece por estes."). **Sem cor**: a escala térmica é a única cromia do dado, e faixa de triagem não é temperatura.
+
+A faixa vem do banco junto com a pontuação e **não é recalculada no navegador** — os cortes estão em `app_settings` e mudam sem deploy; uma segunda régua no cliente divergiria da primeira no dia em que alguém mexesse nos cortes.
+
+**Provado:** suíte do banco em 55 arquivos e **2745 asserções**; web 737, lint e typecheck limpos.
+
+**Pendente:** a tela onde os pesos se editam (hoje eles vivem em `app_settings` e só mudam por SQL) e a camada de IA — julgar pelo nome e pela categoria se aquilo é mesmo um fornecedor de evento, que é o que a conta aritmética não alcança.
