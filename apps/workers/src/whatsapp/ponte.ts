@@ -330,6 +330,9 @@ export interface ItemDeSaida {
   /** Lista = modelo posicional (antigo); objeto = modelo com parâmetros nomeados. */
   template_params: unknown[] | Record<string, unknown>;
   audio_asset_id: string | null;
+  /** Onde o áudio gravado na tela está, no balde privado `mensagens`. */
+  media_path: string | null;
+  media_mime: string | null;
   janela_aberta: boolean;
   modelo: ModeloAprovado | null;
 }
@@ -371,6 +374,8 @@ function paraItemDeSaida(bruto: unknown): ItemDeSaida | null {
         ? (i.template_params as Record<string, unknown>)
         : [],
     audio_asset_id: texto(i.audio_asset_id),
+    media_path: texto(i.media_path),
+    media_mime: texto(i.media_mime),
     janela_aberta: i.janela_aberta === true,
     modelo:
       nomeMeta === null

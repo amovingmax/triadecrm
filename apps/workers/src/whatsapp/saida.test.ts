@@ -48,6 +48,8 @@ function item(parcial: Partial<ItemDeSaida> = {}): ItemDeSaida {
     tipo: 'text',
     corpo: 'Oi, Marcos, aqui é a Heloísa',
     template_params: [],
+    media_path: null,
+    media_mime: null,
     audio_asset_id: null,
     janela_aberta: true,
     modelo: null,

@@ -2342,3 +2342,29 @@ Conversa curta demais não vira dossiê: uma linha discreta em vez do bloco. Con
 **Quando não há moldura livre aprovada** — o caso de hoje —, a tela diz isso em vez de cair no texto pronto: "Ainda não dá para abrir conversa por aqui... as molduras em que você escreve ainda estão na revisão deles". Devolver o texto pronto pela porta dos fundos seria desfazer a decisão.
 
 **Provado no navegador** (local, 1440 px), nos dois estados: com moldura livre aprovada (caixa de escrever, sem lista de prontos) e sem nenhuma (o aviso honesto, com "registrar por telefone" ao lado). Web 726 testes, suíte inteira verde.
+
+### 17/09/2026 — Áudio no CRM: ouvir o que chega e gravar o que sai (RF-CON-27; R04 §2.1, §6)
+
+"Quero a possibilidade de ouvir e mandar áudios pelo CRM com essa API do WhatsApp" (Rafael). Eram duas metades, e cada uma parava num lugar diferente.
+
+**Ouvir.** O arquivo sempre esteve guardado — o worker baixa toda mídia recebida para o balde privado `mensagens`, porque a URL da Meta expira em minutos. O que faltava era o endereço que assina a URL: o balde não tem política de leitura para `authenticated`, de propósito (migração `20260905000201`), e balde público de áudio de conversa é vazamento por configuração. Agora existe `POST /api/midia`, e ele pergunta nesta ordem: tem sessão? **esta pessoa enxerga esta mensagem** — perguntado com a sessão dela, quem responde é a RLS de `messages` — e só então a chave de serviço assina, por cinco minutos. O pedido é por `message_id`, nunca por caminho: caminho vindo do cliente é caminho que o cliente escolhe. Invisível e inexistente respondem igual (404), porque "existe, mas não é sua" já conta algo sobre a conversa de outra pessoa.
+
+**Mandar.** A pedra no meio era o navegador: o `MediaRecorder` do Chrome grava `audio/webm`, e **webm não está na lista da Cloud API**. A conversão é uma troca de embalagem, não uma recodificação — o webm já carrega Opus dentro, que é exatamente o que o `ogg` da Meta quer, então `ffmpeg -c:a copy` reescreve o contêiner sem tocar no som. Recodificar seria gastar CPU do worker para piorar a voz de alguém. O Safari grava `audio/mp4`, que sobe como está.
+
+O caminho inteiro: grava na tela (teto de 2 minutos, com relógio à vista e "ouça antes de enviar", porque voz não se revisa depois) → `POST /api/audio` sobe o arquivo com a chave de serviço **depois** de a sessão provar que alcança a conversa, e insere a linha em `messages` com a sessão dela, que é quem a policy `messages_insert` julga → o lote de saída passa a levar `media_path` e `media_mime` → o worker baixa, prepara e sobe à Meta (`POST /{phone_number_id}/media`) antes de enviar. Se o insert é recusado, o arquivo sai do balde junto: arquivo sem mensagem é lixo.
+
+**O que esta entrega não decide:** janela de 24 h, supressão, teto do dia e janela de horário. Nada disso é conferido na rota — quem confere é `app.wa_proximos`, no instante da entrega, e é assim que tem de ser: entre gravar e entregar passam segundos ou horas, e vale a resposta do momento em que a mensagem sai. A tela esconde o botão fora da janela porque é falta de educação oferecer o que vai falhar, mas a decisão continua no banco. **Áudio não é modelo aprovado: fora da janela a Meta recusa.**
+
+**A migração `20260917130000` acrescenta duas linhas a `app.wa_proximos`** — e só duas. O corpo foi copiado do banco em produção com `pg_get_functiondef`: reescrever de memória uma função que faz seis recusas diferentes no instante da entrega é trocar uma delas sem querer.
+
+**Erros do ffmpeg viraram motivos distintos** (`ffmpeg_ausente`, `audio_ilegivel`, `audio_vazio`, `audio_grande_demais`, `audio_de_tipo_recusado`), com retentativa só onde faz sentido: imagem sem ffmpeg é problema de configuração e tem de ser dito assim, não como "a Meta recusou o áudio", que mandaria alguém procurar no lugar errado. O `Dockerfile` do worker ganhou `apk add ffmpeg`.
+
+**Dois consertos de casa.** O componente de gravar resetava estado dentro de um efeito ao trocar de conversa; agora ele é remontado por `key={fio.id}`, que é o jeito do React, e a URL do blob vive num `ref` porque quem precisa dela por último é a limpeza da desmontagem, onde o estado já não responde. E o balão de áudio parou de prometer o que não existe: dizia "quem transcreve é o faster-whisper na máquina de Natal", que não roda — agora diz que a transcrição automática está desligada.
+
+**Provado rodando:** pgTAP 51 novo (8 asserções: o lote leva o caminho e o tipo, o texto continua com os dois vazios, e o áudio de quem pediu para sair morre na entrega) e a suíte inteira verde — **51 arquivos, 2698 asserções**. Vitest: workers 361 (10 do preparo do áudio), web 726, prompts 276, schema 105. Lint e typecheck limpos.
+
+**Conserto de teste:** os arquivos 49 e 50 dependiam de um usuário ativo que só existia no banco local — num banco recém-criado o trigger de `conversations` recusava a primeira mensagem (RF-CON-04). Cada um passou a trazer o próprio dono, como o 48 já fazia. Isso quebraria o CI na primeira execução.
+
+**Decisão humana / pendente:**
+- A migração `20260917130000` ainda não foi para produção, e o `triade-worker-wa` precisa de **novo deploy** (a imagem só agora tem ffmpeg). Sem os dois, gravar não envia.
+- Transcrição automática continua desligada: o Groq não foi adiante (a conta não sai da tela de erro). O caminho, se quiserem, é uma chave da OpenAI (~US$ 2/mês no volume de hoje).

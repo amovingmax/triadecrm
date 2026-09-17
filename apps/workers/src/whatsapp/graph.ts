@@ -237,6 +237,61 @@ export class ClienteDaGraph {
   }
 
   /** POST genérico no Graph. Mesma tabela de erros do envio. */
+  /**
+   * Sobe um arquivo para a Meta e devolve o id dele.
+   *
+   * A Cloud API não manda áudio por valor: primeiro o arquivo vira um `media
+   * id` (POST /media), e só depois a mensagem cita esse id. O id vale 30 dias e
+   * é do nosso número — não dá para reaproveitar o de outra conta.
+   *
+   * É `multipart`, e por isso não passa por `publicar`: aquele monta corpo de
+   * texto (JSON ou formulário), e aqui o corpo são bytes.
+   */
+  async subirMidia(arquivo: {
+    bytes: Uint8Array;
+    mime: string;
+    nome: string;
+  }): Promise<{ ok: true; mediaId: string } | { ok: false; motivo: string; retentar: boolean }> {
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('type', arquivo.mime);
+    form.append('file', new Blob([arquivo.bytes as unknown as BlobPart], { type: arquivo.mime }), arquivo.nome);
+
+    let resposta: Response;
+    try {
+      resposta = await this.buscar(this.url(`${this.config.phoneNumberId}/media`), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.config.token}` },
+        body: form,
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (erro) {
+      // Rede ou tempo esgotado: o mundo, não o arquivo. Vale tentar de novo.
+      return { ok: false, motivo: this.semSegredos((erro as Error).message), retentar: true };
+    }
+
+    const texto = await resposta.text();
+    if (!resposta.ok) {
+      return {
+        ok: false,
+        motivo: this.semSegredos(`a Meta recusou o arquivo (${resposta.status}): ${texto.slice(0, 300)}`),
+        // 5xx e 429 são dela; 4xx é do arquivo, e repetir dá o mesmo.
+        retentar: resposta.status === 429 || resposta.status >= 500,
+      };
+    }
+
+    let id: unknown;
+    try {
+      id = (JSON.parse(texto) as { id?: unknown }).id;
+    } catch {
+      return { ok: false, motivo: 'a Meta respondeu algo que não é JSON', retentar: true };
+    }
+    if (typeof id !== 'string' || id === '') {
+      return { ok: false, motivo: 'a Meta aceitou o arquivo mas não devolveu id', retentar: true };
+    }
+    return { ok: true, mediaId: id };
+  }
+
   async publicar(
     caminho: string,
     corpo: Readonly<Record<string, unknown>> = {},

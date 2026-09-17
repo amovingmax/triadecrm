@@ -40,6 +40,12 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 FROM ${NODE_IMAGE} AS runtime
 ENV NODE_ENV=production \
     TZ=America/Fortaleza
+# ffmpeg: o áudio que alguém grava no CRM chega em `webm` (é o que o Chrome sabe
+# gravar) e a Cloud API não aceita webm. A conversão é só troca de embalagem —
+# o Opus lá dentro sai igual, sem recodificar —, mas precisa do binário aqui.
+# São ~35 MB na imagem; sem ele o worker recusa o áudio dizendo que falta ffmpeg,
+# em vez de culpar o arquivo de quem gravou (ver whatsapp/audio-de-saida.ts).
+RUN apk add --no-cache ffmpeg
 WORKDIR /app
 # Mantém o layout do workspace para os symlinks do pnpm continuarem válidos.
 COPY --from=prod-deps /repo/node_modules ./node_modules

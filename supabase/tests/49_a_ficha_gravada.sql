@@ -26,6 +26,14 @@ create function pg_temp.ligar_sugestao(p_ligado boolean) returns void language s
    where key = 'ia.crm_inteligente'
 $$;
 
+-- Alguém ativo para assumir as conversas: sem isto o trigger de `conversations`
+-- recusa a primeira mensagem (RF-CON-04). O teste traz o seu próprio dono em vez
+-- de contar com quem já estiver no banco — banco recém-criado não tem ninguém.
+insert into public.allowed_users (email, role, note) values
+  ('f49.sdr@teste.local', 'sdr', 'pgTAP F49');
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('a0000000-0000-4000-8000-00000000f491', 'f49.sdr@teste.local', '{"full_name":"Sdr F49"}');
+
 update public.app_settings set value = jsonb_set(value, '{numero_padrao}', '"+5584999994900"')
  where key = 'whatsapp.envio';
 -- O bot de entrada fica de fora: ele responderia o menu e a janela da ficha

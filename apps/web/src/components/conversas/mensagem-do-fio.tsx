@@ -268,8 +268,7 @@ function Audio({ mensagem }: { mensagem: MensagemDoFio }) {
         <Transcricao texto={mensagem.transcricao} />
       ) : (
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Sem transcrição: quem transcreve é o faster-whisper na máquina de Natal , e ele ainda não
-          roda.
+          Sem transcrição — a transcrição automática está desligada. Toque no player para ouvir.
         </p>
       )}
     </div>

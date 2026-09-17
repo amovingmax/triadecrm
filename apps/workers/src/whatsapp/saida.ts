@@ -39,6 +39,13 @@ import {
 } from './ponte';
 
 import type { ClienteDaGraph, Envio, ParametrosDoModelo } from './graph';
+import { ErroDoAudio, prepararAudio } from './audio-de-saida';
+
+/**
+ * O balde privado das mídias (migração `20260905000201`). O mesmo de onde o
+ * áudio recebido é lido: entrada e saída moram juntas, por conversa.
+ */
+const BALDE_DAS_MIDIAS = 'mensagens';
 import type { ClienteDoBanco, ConfigDeEnvio, ItemDeSaida } from './ponte';
 import type { Logger } from '../lib/log';
 
@@ -87,6 +94,13 @@ export function formaDoEnvio(
   item: ItemDeSaida,
 ): { ok: true; envio: Envio } | { ok: false; codigo: string; motivo: string } {
   if (item.tipo === 'audio') {
+    // Áudio gravado na tela: o arquivo está no balde privado, e quem o sobe para
+    // a Meta é o laço de envio (`mediaId` entra lá, depois do upload).
+    if (item.media_path !== null && item.media_path !== '') {
+      return { ok: true, envio: { para: item.para, tipo: 'audio' } };
+    }
+    // Sem arquivo é a biblioteca da Heloísa (R04 §6): os sete registros de
+    // catálogo seguem sem ogg gravado, e não há de onde subir nada.
     return {
       ok: false,
       codigo: 'audio_sem_arquivo',
@@ -254,7 +268,44 @@ export async function drenarSaida(
       continue;
     }
 
-    const resultado = await ctx.graph.enviar(forma.envio);
+    // Áudio não vai por valor: o arquivo do balde vira um `media id` na Meta
+    // antes de a mensagem citá-lo. Só aqui, no instante do envio — subir na hora
+    // da gravação gastaria upload por áudio que a janela de 24 h vai recusar.
+    let envio = forma.envio;
+    if (envio.tipo === 'audio' && envio.mediaId === undefined) {
+      const subida = await subirOAudio(ctx, item);
+      if (!subida.ok) {
+        contagens.falhados += 1;
+        if (subida.retentar) {
+          const falha = await envioFalhou(ctx.cliente, {
+            msgId: item.msg_id,
+            messageId: item.message_id,
+            erro: subida.motivo,
+            codigo: subida.codigo,
+          });
+          ctx.logger.warn('áudio não subiu; volta para a fila', {
+            message_id: item.message_id,
+            codigo: subida.codigo,
+            tentativa: falha.tentativa,
+          });
+          continue;
+        }
+        await envioFalhouDeVez(ctx.cliente, {
+          msgId: item.msg_id,
+          messageId: item.message_id,
+          erro: subida.motivo,
+          codigo: subida.codigo,
+        });
+        ctx.logger.error('áudio impossível de enviar', {
+          message_id: item.message_id,
+          codigo: subida.codigo,
+        });
+        continue;
+      }
+      envio = { ...envio, mediaId: subida.mediaId };
+    }
+
+    const resultado = await ctx.graph.enviar(envio);
     if (resultado.ok) {
       contagens.enviados += 1;
       await envioDeuCerto(ctx.cliente, {
@@ -270,7 +321,7 @@ export async function drenarSaida(
       ctx.logger.info('mensagem enviada', {
         message_id: item.message_id,
         conversation_id: item.conversation_id,
-        forma: forma.envio.tipo,
+        forma: envio.tipo,
         janela_aberta: item.janela_aberta,
       });
       continue;
@@ -324,4 +375,62 @@ export async function drenarSaida(
   }
 
   return lote.itens.length;
+}
+
+/**
+ * O arquivo do balde vira um `media id` da Meta.
+ *
+ * Três passos e três jeitos de falhar, cada um com um desfecho diferente:
+ *
+ * 1. **Baixar do balde.** Falhou = problema nosso, transitório: volta para a
+ *    fila. O arquivo não some sozinho.
+ * 2. **Preparar** (trocar a embalagem do webm, conferir teto e tipo). Falhou =
+ *    o arquivo é o que é; tentar de novo dá o mesmo. Morre com o motivo escrito.
+ *    A exceção é `ffmpeg_ausente`: isso é configuração da imagem, e a mensagem
+ *    precisa dizer isso em vez de culpar o áudio de quem gravou.
+ * 3. **Subir para a Meta.** Quem decide se vale repetir é a resposta dela.
+ */
+async function subirOAudio(
+  ctx: ContextoDaSaida,
+  item: ItemDeSaida,
+): Promise<
+  { ok: true; mediaId: string } | { ok: false; motivo: string; codigo: string; retentar: boolean }
+> {
+  const caminho = item.media_path;
+  if (caminho === null || caminho === '') {
+    return { ok: false, motivo: 'a mensagem de áudio não tem arquivo', codigo: 'audio_sem_arquivo', retentar: false };
+  }
+
+  const { data, error } = await ctx.cliente.storage.from(BALDE_DAS_MIDIAS).download(caminho);
+  if (error || !data) {
+    return {
+      ok: false,
+      motivo: `o arquivo do áudio não foi lido do balde: ${error?.message ?? 'sem corpo'}`,
+      codigo: 'audio_nao_lido',
+      retentar: true,
+    };
+  }
+
+  let pronto;
+  try {
+    pronto = await prepararAudio({
+      bytes: new Uint8Array(await data.arrayBuffer()),
+      mime: item.media_mime,
+    });
+  } catch (erro) {
+    const doAudio = erro instanceof ErroDoAudio;
+    return {
+      ok: false,
+      motivo: (erro as Error).message,
+      codigo: doAudio ? erro.codigo : 'audio_ilegivel',
+      // Imagem sem ffmpeg é conserto de deploy, e a mensagem espera por ele.
+      retentar: doAudio && erro.codigo === 'ffmpeg_ausente',
+    };
+  }
+
+  const subida = await ctx.graph.subirMidia(pronto);
+  if (!subida.ok) {
+    return { ok: false, motivo: subida.motivo, codigo: 'audio_recusado_pela_meta', retentar: subida.retentar };
+  }
+  return { ok: true, mediaId: subida.mediaId };
 }

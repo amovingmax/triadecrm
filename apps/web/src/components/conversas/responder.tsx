@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { ErroDaConversa, responder } from './acoes';
 import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
 import { EnviarModelo } from './enviar-modelo';
+import { GravarAudio } from './gravar-audio';
 import { podeEscreverLivre } from './mensagens';
 
 /**
@@ -224,14 +225,19 @@ function TextoLivre({
             </span>
           ) : null}
         </span>
-        <Button
-          type="submit"
-          className="toque h-11 md:h-9"
-          disabled={limpo.length === 0 || enviar.isPending}
-        >
-          <SendHorizontal aria-hidden="true" />
-          Enviar
-        </Button>
+        <span className="flex items-center gap-1">
+          {/* Gravar fica ao lado de Enviar porque são a mesma decisão: como
+              mandar isto. Dentro da janela de 24 h os dois valem. */}
+          <GravarAudio key={fio.id} fioId={fio.id} />
+          <Button
+            type="submit"
+            className="toque h-11 md:h-9"
+            disabled={limpo.length === 0 || enviar.isPending}
+          >
+            <SendHorizontal aria-hidden="true" />
+            Enviar
+          </Button>
+        </span>
       </div>
     </form>
   );
