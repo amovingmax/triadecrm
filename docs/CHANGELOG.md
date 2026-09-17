@@ -2670,3 +2670,19 @@ O modelo de 190 caracteres de meia hora atrás ficou **inativo, não apagado**: 
 **Provado:** suíte em **56 arquivos e 2756 asserções**; web **744 testes**, com dois novos fixando que às 15h de Natal sai "Boa tarde" e às 8h sai "Bom dia" — pelo relógio de lá, não pelo do navegador de quem clica.
 
 **Pendente, e é o de sempre:** os três modelos nascem `pending` e vão à Meta na próxima sincronização. **Há risco real de recusa** — um corpo de duas palavras pode ser lido por ela como genérico demais —, e nesse caso a resposta dela virá com o motivo, no próprio CRM. Até lá a tela continua oferecendo a moldura livre.
+
+### 17/09/2026 — Publicado, e dois consertos que só produção mostrou
+
+Tudo o que foi feito hoje foi para o ar: **as doze migrações** e o CRM na Vercel.
+
+**A fila do Radar foi pontuada pela primeira vez:** 229 candidatos, e a distribuição diz algo sobre a fonte — **36 em A+, 72 em A, 5 em B, 116 em C**. Os 116 em C são os que o casamentos.com.br trouxe sem nota nenhuma; os 36 do topo são negócios com 4,8–5,0 e dezenas de avaliações (Macamirim Eventos, Tábua de Carne, Decidi Casar). A pergunta "por onde começo?" passou a ter resposta.
+
+**Os três cumprimentos estão na Meta, em análise** (`PENDING`), submetidos pela sincronização periódica. Até ela responder, a tela segue oferecendo a moldura livre — e a resposta dela, com motivo, aparece no próprio CRM.
+
+**Dois consertos que só apareceram em produção, e os dois eram meus:**
+
+1. **`radar_repontuar` recusava o worker.** Escrevi a checagem como "se tem JWT e não é admin/gestor, recusa", e o furo é que o **service_role TEM JWT**: o PostgREST põe a claim `role`, e `app.role()` — que lê `app_metadata.app_role`, uma claim de pessoa — não acha nada e devolve `leitura`. O sintoma em produção foi direto: *"Papel leitura não repontua o Radar"*. O CRM já tinha a resposta desde o D4 — `app.e_o_worker()`, escrita exatamente para isso, com o comentário que explica o porquê ("em security definer o `current_user` já é o dono da função").
+
+2. **O conserto quebrou um terceiro caso.** Ao trocar a condição, tirei quem chama **sem JWT nenhum**: `psql`, uma migração, o `pg_cron`. Quem pegou foi o pgTAP 55, que chama a função fora de qualquer papel — e é assim que ele deve chamar, porque testar regra de papel exige poder rodar sem papel. Agora os três casos estão escritos na ordem em que a pergunta se faz: não há JWT → é o banco falando com ele mesmo; é o worker → passa; é gente → admin ou gestor.
+
+**Provado:** suíte em **56 arquivos e 2756 asserções**, com a função nova aplicada em produção pelo mesmo caminho.
