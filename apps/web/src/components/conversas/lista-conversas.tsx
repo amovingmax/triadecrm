@@ -123,6 +123,31 @@ function Linha({
             />
           </span>
 
+          {/* O CONSELHO DA IA, quando existe.
+              Terceira linha, e só nas conversas que têm um: a ficha da conversa
+              escreve "Recontatar em 3-5 dias com abordagem diferente", e isso
+              vivia só dentro da conversa aberta — uma por vez. A pergunta "com
+              quem eu falo agora?" se faz olhando a LISTA, e a resposta tem de
+              estar aqui. Em itálico e esmaecido porque é opinião de máquina, não
+              fato do parceiro: a prévia acima é o que aconteceu; esta linha é o
+              que alguém acha que se deve fazer. */}
+          {item.leituraDaIa?.proximaAcao ? (
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground italic">
+                {item.leituraDaIa.proximaAcao}
+              </span>
+              {item.leituraDaIa.score === null ? null : (
+                <span
+                  className="numerico shrink-0 text-[10px] text-muted-foreground"
+                  title={`A IA vê ${item.leituraDaIa.score} de 100 de intenção de fechar nesta conversa`}
+                >
+                  {item.leituraDaIa.score}
+                </span>
+              )}
+            </span>
+          ) : null}
+
           {/* A temperatura NÃO se repete em chip: ela já é a barra de 3 px na borda
               esquerda, que é o que a lista de Parceiros usa e o que a pessoa lê de
               relance. O chip ao lado dizia a mesma coisa em palavra, e era ele que

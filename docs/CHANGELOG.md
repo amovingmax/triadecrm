@@ -2621,3 +2621,17 @@ O que a IA escreveu nas últimas três conversas, sem ninguém pedir:
 Não é o robô que falta. **É o lugar.** Isso só aparece dentro da conversa aberta, uma por vez — e o consultor faz a pergunta olhando para a LISTA, ou para o Meu dia. A parte que responde "em quem focar hoje" é o Pulso, que estava desligado e foi ligado hoje (primeiro às 18h30).
 
 Fica registrado como a próxima entrega, e ela é menor do que parecia: mostrar `proxima_acao` e o score na lista de Conversas e no Meu dia, em vez de escrever um segundo cérebro.
+
+### 17/09/2026 — O conselho da IA sai de dentro da conversa e chega na lista
+
+A sexta frente pedia "a IA lendo todas as mensagens e indicando ao consultor o que melhorar, como abordar, em quem focar". A ficha da conversa já escrevia isso — *"Recontatar Dennis em 3-5 dias com abordagem diferente"* — e escrevia bem. O problema era **onde**: só dentro da conversa aberta, uma por vez. A pergunta "com quem eu falo agora?" se faz olhando a LISTA.
+
+Agora a linha da lista tem uma terceira linha, quando há conselho: a próxima ação como a IA escreveu, em itálico e esmaecida, com o score de intenção (0–100) no fim. **Itálico e esmaecido não é decoração**: a prévia acima é o que aconteceu — fato do parceiro; esta linha é o que alguém acha que se deve fazer — opinião de máquina. Misturar as duas tipografias seria dar à opinião o peso do fato.
+
+**Leitura sem nada a dizer não vira linha.** A IA às vezes analisa uma conversa em que o parceiro só escreveu "oi": grava a ficha e não tem conselho. Um espaço em branco com ícone é ruído com cara de informação.
+
+**Uma nota minha que ficou errada, e foi corrigida junto.** Hoje de manhã eu escrevi, no eco do banco, que "a ficha da IA não mexe na lista: recarregar seis consultas porque um resumo foi reescrito seria pagar caro por texto". Era verdade enquanto o conselho só existia dentro da conversa. Deixou de ser no momento em que a lista passou a mostrá-lo — agora não recarregar deixaria o conselho velho **justamente onde a pessoa decide**. O teste que fixava o comportamento antigo foi reescrito, não apagado, com a razão da virada no comentário.
+
+E a lista **não quebra sem a IA**: se o módulo estiver desligado ou a tabela vazia, a leitura vem nula e a conversa aparece igual. Conversa é fato, conselho é acréscimo — inclusive no tratamento de erro da consulta.
+
+**Provado:** web **740 testes** (três novos: o conselho chega ao item certo, leitura vazia não vira linha, e sem leitura nenhuma o item existe igual), lint, typecheck e build limpos.

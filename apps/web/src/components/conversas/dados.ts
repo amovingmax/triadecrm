@@ -49,9 +49,30 @@ const COLUNAS_FIO =
 const COLUNAS_MENSAGEM =
   'id, conversation_id, organization_id, direction, type, status, body, media_path, media_mime, transcript, template_id, draft_id, author_kind, sent_by, approved_by, is_first_contact, business_initiated, optout_confirmation, origin, error_code, error_detail, created_at, sent_at, delivered_at, read_at, failed_at';
 
+/**
+ * O que a leitura da IA empresta à LISTA.
+ *
+ * Só quatro campos, e é de propósito: a lista responde "com quem eu falo agora?",
+ * e para isso bastam o que a IA recomenda fazer, o quanto ela viu de intenção e
+ * se há alerta. O resumo inteiro, os sinais, as objeções e os compromissos
+ * continuam onde já estavam — dentro da conversa, na faixa da IA. Trazer tudo
+ * para cá encheria a lista de texto que ninguém lê de relance.
+ */
+const COLUNAS_DA_LEITURA =
+  'conversation_id, organization_id, proxima_acao, score_intencao, intencao, alertas';
+
 /** Colunas do rascunho. `proposed_body` e `final_body` viajam os dois: a tela mostra a diferença. */
 const COLUNAS_RASCUNHO =
   'id, organization_id, conversation_id, kind, status, proposed_body, proposed_claims, validator, prompt_version, final_body, foi_editado, reviewed_by, reviewed_at, discard_reason, created_at, expires_at';
+
+export type LeituraCrua = {
+  conversation_id: string;
+  organization_id: string | null;
+  proxima_acao: string | null;
+  score_intencao: number | null;
+  intencao: string | null;
+  alertas: string[] | null;
+};
 
 export type BaseDasConversas = {
   organizacoes: OrganizacaoCrua[];
@@ -60,6 +81,8 @@ export type BaseDasConversas = {
   fios: FioCru[];
   /** Só os pendentes: é a fila de aprovação e o ponto na linha da lista. */
   rascunhosPendentes: RascunhoCru[];
+  /** A leitura da IA de cada conversa, só o que a lista usa. */
+  leituras: LeituraCrua[];
   /** O que ainda depende da Meta, contado no banco (ver `tipos.ts`). */
   meta: DependenciasDaMeta;
   /** `true` quando alguma leitura bateu no teto: a tela precisa dizer isso. */
@@ -77,7 +100,7 @@ export function chaveDaLinha(organizacaoId: string) {
 export async function carregarConversas(): Promise<BaseDasConversas> {
   const supabase = createClient();
 
-  const [organizacoes, atividades, negocios, fios, rascunhos, meta] = await Promise.all([
+  const [organizacoes, atividades, negocios, fios, rascunhos, leituras, meta] = await Promise.all([
     supabase
       .from('organizations_view')
       .select(
@@ -109,12 +132,15 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
       .eq('status', 'pendente')
       .order('expires_at')
       .limit(TETO_ORGANIZACOES),
+    supabase.from('ficha_da_conversa').select(COLUNAS_DA_LEITURA).limit(TETO_ORGANIZACOES),
     dependenciasDaMeta(supabase),
   ]);
 
   const erro =
     organizacoes.error ?? atividades.error ?? negocios.error ?? fios.error ?? rascunhos.error;
   if (erro) throw new Error(erro.message);
+  // A leitura da IA NÃO derruba a lista: o módulo pode estar desligado, a tabela
+  // pode estar vazia e a conversa existe do mesmo jeito. Conselho é acréscimo.
 
   return {
     organizacoes: organizacoes.data ?? [],
@@ -122,6 +148,7 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
     negocios: negocios.data ?? [],
     fios: fios.data ?? [],
     rascunhosPendentes: rascunhos.data ?? [],
+    leituras: (leituras.data ?? []) as LeituraCrua[],
     meta,
     cortada:
       (organizacoes.data?.length ?? 0) >= TETO_ORGANIZACOES ||

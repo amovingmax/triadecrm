@@ -1,5 +1,7 @@
 import type { ActivityType, Channel, DealStatus, Json, Temperature } from '@komune/schema';
 
+import type { LeituraCrua } from './dados';
+
 import {
   PAR_DA_SUPERFICIE,
   ROTULOS_COM_QUEM,
@@ -172,6 +174,7 @@ export function montarConversas({
   catalogos,
   fios = [],
   rascunhos = [],
+  leituras = [],
   agora = new Date(),
 }: {
   organizacoes: OrganizacaoCrua[];
@@ -182,6 +185,8 @@ export function montarConversas({
   fios?: FioCru[];
   /** Só os PENDENTES: é o que a fila de aprovação e o ponto na lista precisam. */
   rascunhos?: RascunhoCru[];
+  /** A leitura da IA por conversa. Vazia quando o módulo está desligado. */
+  leituras?: LeituraCrua[];
   agora?: Date;
 }): ItemConversa[] {
   const nomeDaPessoa = new Map(catalogos.pessoas.map((p) => [p.id, p.nome]));
@@ -234,6 +239,15 @@ export function montarConversas({
     if (!atual || melhorNegocio(d, atual)) negocioEmFoco.set(d.organization_id, d);
   }
 
+  // Uma leitura por PARCEIRO, não por conversa: a lista é de parceiros, e um
+  // parceiro pode ter mais de um fio (dois números do mesmo buffet). Fica a mais
+  // recentemente analisada — é ela que fala do que está acontecendo agora.
+  const leituraPorOrganizacao = new Map<string, LeituraCrua>();
+  for (const l of leituras) {
+    if (l.organization_id === null) continue;
+    leituraPorOrganizacao.set(l.organization_id, l);
+  }
+
   const itens = organizacoes.map((o): ItemConversa => {
     const acumulado = porOrganizacao.get(o.id);
     const ultima = acumulado?.ultima ?? null;
@@ -267,6 +281,7 @@ export function montarConversas({
       fio: fioCru ? montarFio(fioCru, nomeDaPessoa) : null,
       naoLidas: fioCru?.unread_count ?? 0,
       rascunhoPendente: rascunhoCru ? montarRascunho(rascunhoCru) : null,
+      leituraDaIa: montarLeitura(leituraPorOrganizacao.get(o.id) ?? null),
     };
   });
 
@@ -591,4 +606,25 @@ export function agruparPorDia(eventos: EventoDaLinha[]): DiaDaLinha[] {
     else dias.push({ chave, em: evento.em, eventos: [evento] });
   }
   return dias;
+}
+
+/**
+ * A leitura crua do banco vira o pedaço que a lista mostra.
+ *
+ * Devolve `null` quando não há conselho nem score: uma leitura vazia na tela é
+ * ruído com cara de informação, e a IA às vezes analisa uma conversa que não tem
+ * nada a dizer ainda ("o parceiro só escreveu 'oi'").
+ */
+function montarLeitura(crua: LeituraCrua | null): ItemConversa['leituraDaIa'] {
+  if (crua === null) return null;
+  const acao = (crua.proxima_acao ?? '').trim();
+  const score = typeof crua.score_intencao === 'number' ? crua.score_intencao : null;
+  const alertas = (crua.alertas ?? []).filter((a) => a.trim() !== '');
+  if (acao === '' && score === null && alertas.length === 0) return null;
+  return {
+    proximaAcao: acao === '' ? null : acao,
+    score,
+    intencao: crua.intencao,
+    alertas,
+  };
 }

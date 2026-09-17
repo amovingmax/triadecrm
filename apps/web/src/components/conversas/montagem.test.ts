@@ -639,3 +639,53 @@ describe('montarConversas com o inbox', () => {
     expect(item?.rascunhoPendente?.id).toBe('antes');
   });
 });
+
+describe('a leitura da IA na lista', () => {
+  const organizacoes = [organizacao('o1', 'Neuma Leão Buffet')];
+  const base = { organizacoes, atividades: [], negocios: [], catalogos: CATALOGOS };
+
+  it('vem para o item quando a IA já leu a conversa deste parceiro', () => {
+    const [primeiro] = montarConversas({
+      ...base,
+      leituras: [
+        {
+          conversation_id: 'f1',
+          organization_id: 'o1',
+          proxima_acao: 'Recontatar em 3 dias com abordagem diferente',
+          score_intencao: 62,
+          intencao: 'ME_CHAMA_DEPOIS',
+          alertas: [],
+        },
+      ],
+    });
+    expect(primeiro?.leituraDaIa?.proximaAcao).toBe('Recontatar em 3 dias com abordagem diferente');
+    expect(primeiro?.leituraDaIa?.score).toBe(62);
+  });
+
+  it('leitura sem nada a dizer não vira linha vazia na tela', () => {
+    // A IA às vezes analisa uma conversa em que o parceiro só escreveu "oi": ela
+    // grava a ficha e não tem conselho nenhum. Mostrar um espaço em branco com
+    // ícone seria ruído com cara de informação.
+    const [primeiro] = montarConversas({
+      ...base,
+      leituras: [
+        {
+          conversation_id: 'f1',
+          organization_id: 'o1',
+          proxima_acao: '   ',
+          score_intencao: null,
+          intencao: null,
+          alertas: [],
+        },
+      ],
+    });
+    expect(primeiro?.leituraDaIa).toBeNull();
+  });
+
+  it('sem leitura nenhuma, o item existe do mesmo jeito', () => {
+    // O módulo da IA pode estar desligado. Conversa é fato; conselho é acréscimo.
+    const [primeiro] = montarConversas(base);
+    expect(primeiro?.leituraDaIa).toBeNull();
+    expect(primeiro?.nome).toBe('Neuma Leão Buffet');
+  });
+});

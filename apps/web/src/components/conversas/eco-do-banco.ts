@@ -154,13 +154,15 @@ export function pendenciaVazia(): Pendencia {
 }
 
 export function somarAoPendente(pendencia: Pendencia, evento: EventoDoEco): Pendencia {
-  // A ficha da IA não mexe na lista: ela não muda ordem, prévia nem "por ler".
-  // Recarregar seis consultas porque um resumo foi reescrito seria pagar o preço
-  // da lista inteira para atualizar uma faixa de texto.
-  if (evento.tabela !== 'ficha_da_conversa') {
-    pendencia.lista = true;
-    if (evento.organizacaoId !== null) pendencia.organizacoes.add(evento.organizacaoId);
-  }
+  // A FICHA DA IA VOLTOU A MEXER NA LISTA — e a nota de antes ficou errada.
+  //
+  // Enquanto a leitura da IA só aparecia dentro da conversa, recarregar as seis
+  // consultas da lista por causa de um resumo reescrito era pagar caro por texto
+  // que ninguém estava vendo. Deixou de ser verdade no dia em que a lista passou
+  // a mostrar a próxima ação: agora um resumo novo MUDA o que está na tela, e não
+  // recarregar seria deixar o conselho velho no lugar onde se decide.
+  pendencia.lista = true;
+  if (evento.organizacaoId !== null) pendencia.organizacoes.add(evento.organizacaoId);
   if (evento.conversaId !== null) pendencia.fios.add(evento.conversaId);
   if (evento.respostaDoParceiro) pendencia.respostas.push(evento);
   return pendencia;

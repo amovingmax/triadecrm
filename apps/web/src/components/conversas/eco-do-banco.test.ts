@@ -98,9 +98,11 @@ describe('juntar a rajada', () => {
     expect(pendencia.respostas).toHaveLength(3);
   });
 
-  it('a leitura da IA atualiza a faixa dela, e NÃO recarrega a lista inteira', () => {
-    // Um resumo reescrito não muda ordem, prévia nem "por ler". Recarregar as
-    // seis consultas da lista por causa dele seria pagar caro por texto.
+  it('a leitura da IA recarrega a lista TAMBÉM — porque a lista passou a mostrá-la', () => {
+    // Este teste fixava o contrário até a lista ganhar a linha de "próxima ação".
+    // Enquanto o conselho só existia dentro da conversa, recarregar a lista por
+    // causa dele era desperdício; agora é o oposto — não recarregar deixaria o
+    // conselho velho justamente onde a pessoa decide com quem falar.
     const pendencia = pendenciaVazia();
     somarAoPendente(pendencia, {
       tabela: 'ficha_da_conversa',
@@ -108,8 +110,8 @@ describe('juntar a rajada', () => {
       organizacaoId: 'org-7',
       respostaDoParceiro: false,
     });
-    expect(pendencia.lista).toBe(false);
-    expect(pendencia.organizacoes.size).toBe(0);
+    expect(pendencia.lista).toBe(true);
+    expect([...pendencia.organizacoes]).toEqual(['org-7']);
     expect([...pendencia.fios]).toEqual(['fio-7']);
   });
 

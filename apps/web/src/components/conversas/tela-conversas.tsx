@@ -97,6 +97,7 @@ export function TelaConversas({
       negocios: consulta.data.negocios,
       fios: consulta.data.fios,
       rascunhos: consulta.data.rascunhosPendentes,
+      leituras: consulta.data.leituras,
       catalogos,
     });
   }, [consulta.data, catalogos]);

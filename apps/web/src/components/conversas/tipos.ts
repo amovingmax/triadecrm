@@ -85,6 +85,16 @@ export const ROTULO_AUTOR: Record<AutorTipo, string> = {
 // A conversa (uma linha da lista da esquerda)
 // ---------------------------------------------------------------------------
 
+/** A fatia da leitura da IA que a lista mostra. */
+export type LeituraNaLista = {
+  /** A frase de "o que fazer agora", como a IA escreveu. */
+  proximaAcao: string | null;
+  /** 0-100. É o quanto a IA viu de intenção de fechar, não a temperatura do CRM. */
+  score: number | null;
+  intencao: string | null;
+  alertas: string[];
+};
+
 export type ItemConversa = {
   /** É o id da organização: a conversa é com o parceiro, não com o negócio. */
   id: string;
@@ -105,6 +115,16 @@ export type ItemConversa = {
   /** Dono do negócio em foco (`deals.owner_id`). */
   responsavelId: string | null;
   responsavel: string | null;
+  /**
+   * O que a IA leu desta conversa — o pedaço que cabe na LISTA.
+   *
+   * A ficha inteira (resumo, sinais, objeções, compromissos) continua dentro da
+   * conversa. Aqui vem só o conselho e o quanto ela viu de intenção, porque a
+   * pergunta que se faz olhando a lista é "com quem eu falo agora?", e essa é a
+   * resposta. `null` quando a IA ainda não leu esta conversa — ou quando o
+   * módulo está desligado, que é um estado legítimo e não um erro.
+   */
+  leituraDaIa: LeituraNaLista | null;
   /** ISO da interação humana mais recente; `null` quando ninguém falou ainda. */
   ultimaEm: string | null;
   /** Dias inteiros desde `ultimaEm`; `null` quando nunca houve contato. */
