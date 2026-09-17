@@ -2469,3 +2469,17 @@ Fechando a investigação do áudio. Eram **duas** coisas, e nenhuma delas era o
 **O que foi eliminado por medição, antes:** o arquivo (ogg/opus mono 48 kHz, íntegro, com marca de fim), a conversão (volta da Meta byte a byte idêntica), a expiração (baixável por 8 minutos, medido minuto a minuto), a deduplicação (apagar e resubir os mesmos bytes devolve mídia sã), a conta (CONNECTED, qualidade verde) e a mídia em geral — uma imagem enviada ao mesmo aparelho abriu na hora, o que provou que o problema era só do áudio.
 
 **Provado no aparelho:** o mesmo áudio que falhava, reconvertido com a linha nova, tocou no iPhone. Workers 363 testes; um deles fixa a linha, porque ela é invisível e some no primeiro refactor de quem não souber o que ela faz.
+
+### 17/09/2026 — A janela do WhatsApp passa a ser o expediente: 8h às 17h45 (RF-CON-11)
+
+Às 13h55 a equipe não conseguia iniciar conversa com **nenhum** parceiro. A tela dizia "Fora do horário de envio — abre às 14h", e ninguém entendia o motivo.
+
+**O que era.** A janela de contato proativo (RF-CON-11) vinha semeada em duas faixas por dia útil, 9h–12h e 14h–18h — o intervalo de almoço do R08, escrito quando a pergunta era "a que horas o fornecedor de evento responde melhor?". Na prática virou uma parede de duas horas no meio do dia, e a tela não explicava a regra, só o relógio.
+
+**O que passa a ser.** Uma faixa por dia útil: **08:00–17:45**, o expediente da KOMUNE. Decisão do Rafael: *"tire essa trava e deixe nosso funcionamento das 8h às 17h45"*.
+
+**O que não mudou, e é de propósito:** domingo e feriado continuam fechados (RF-CON-11, R06 §3.4 — é compromisso escrito da operação, não preferência de horário); o CHECK `channel_windows_teto_legal` continua recusando qualquer configuração fora de 08:00–19:00 nos dias úteis; sábado segue 10h–12h e só para quem já respondeu; a janela de 24 h não tem relação com esta (responder quem escreveu é livre a qualquer hora, e sempre foi); a janela da ligação (`app.call_window`) não foi tocada.
+
+**Provado:** pgTAP 53 novo (10 asserções, começando por "meio-dia e meia está aberto" e "13h55 está aberto" — as duas horas exatas em que a equipe travou), e as cinco asserções do arquivo 17 que fixavam a regra antiga foram **reescritas, não apagadas**: elas continuam guardando o que importa (nunca antecipa a abertura, pula feriado e domingo), agora com 8h no lugar de 9h. Suíte inteira: 53 arquivos, **2722 asserções**.
+
+**Aplicado em produção como dado**, para a equipe não esperar o deploy: as dez faixas antigas saíram e as cinco novas entraram. A migração precisa ser publicada (`supabase db push --linked`) para o banco de desenvolvimento e o CI ficarem iguais — ela é idempotente e refaz exatamente o mesmo estado.

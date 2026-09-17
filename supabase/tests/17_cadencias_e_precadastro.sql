@@ -272,19 +272,21 @@ select ok(not app.dia_util_de_operacao('2026-09-07 10:00-03'::timestamptz),
 
 select is(app.janela_do_canal('whatsapp', '2026-09-08 10:00-03'::timestamptz) ->> 'aberta', 'true',
           'WhatsApp, terça 10h: janela aberta');
-select is(app.janela_do_canal('whatsapp', '2026-09-08 12:30-03'::timestamptz) ->> 'motivo',
-          'antes_da_abertura',
-          'WhatsApp, terça 12:30: o almoço fecha a janela');
-select is(app.janela_do_canal('whatsapp', '2026-09-08 12:30-03'::timestamptz) ->> 'abre_em',
-          '2026-09-08T14:00:00-03:00',
-          'e a reabertura é às 14h do mesmo dia — nunca antecipa, nunca inventa');
+-- O almoço deixou de fechar a janela em 17/09/2026: o WhatsApp passou a seguir o
+-- expediente da KOMUNE, 8h–17h45 (migração 20260917160000). O que continua
+-- valendo é a borda: antes de abrir, a função diz QUANDO abre, e nunca antecipa.
+select is(app.janela_do_canal('whatsapp', '2026-09-08 12:30-03'::timestamptz) ->> 'aberta', 'true',
+          'WhatsApp, terça 12:30: o almoço NÃO fecha mais a janela');
+select is(app.janela_do_canal('whatsapp', '2026-09-08 07:30-03'::timestamptz) ->> 'abre_em',
+          '2026-09-08T08:00:00-03:00',
+          'cedo demais: a reabertura é às 8h do mesmo dia — nunca antecipa, nunca inventa');
 select is(app.janela_do_canal('whatsapp', '2026-09-06 10:00-03'::timestamptz) ->> 'motivo',
           'domingo', 'WhatsApp, domingo: recusa por domingo');
 select is(app.janela_do_canal('whatsapp', '2026-09-07 15:00-03'::timestamptz) ->> 'motivo',
           'feriado', 'WhatsApp, 07/09: recusa por feriado');
 select is(app.janela_do_canal('whatsapp', '2026-09-06 10:00-03'::timestamptz) ->> 'abre_em',
-          '2026-09-08T09:00:00-03:00',
-          'e a próxima abertura pula o feriado de 07/09 e cai na terça, 9h');
+          '2026-09-08T08:00:00-03:00',
+          'e a próxima abertura pula o feriado de 07/09 e cai na terça, 8h');
 select is(app.janela_do_canal('whatsapp', '2026-09-05 11:00-03'::timestamptz, false) ->> 'motivo',
           'dia_sem_janela',
           'sábado, para quem NUNCA respondeu: não há janela (RF-CON-11)');
@@ -299,7 +301,7 @@ select is(app.janela_do_canal('phone', '2026-09-08 15:00-03'::timestamptz) ->> '
 select is(app.janela_do_canal('phone', '2026-09-07 15:00-03'::timestamptz) ->> 'motivo',
           'feriado', 'e o feriado bloqueia a ligação pela mesma tabela');
 select is(app.proxima_abertura_do_canal('2026-09-05'::date, 'whatsapp', false)::text,
-          '2026-09-08 09:00:00-03',
+          '2026-09-08 08:00:00-03',
           'a partir de sexta 04/09: pula sábado sem resposta, domingo e o feriado');
 select is(app.proxima_abertura_do_canal('2026-09-04'::date, 'whatsapp', true)::text,
           '2026-09-05 10:00:00-03',
@@ -422,7 +424,7 @@ select is(app.pode_tocar(pg_temp.org('11'), null, 'whatsapp',
           'domingo: a porteira recusa com motivo nomeado');
 select is((app.pode_tocar(pg_temp.org('11'), null, 'whatsapp',
                           '2026-09-06 10:00-03'::timestamptz) ->> 'quando')::timestamptz::text,
-          '2026-09-08 09:00:00-03',
+          '2026-09-08 08:00:00-03',
           'e adia para a terça, pulando o feriado — nunca antecipa');
 select is(app.pode_tocar(pg_temp.org('11'), null, 'whatsapp',
                          '2026-09-07 10:00-03'::timestamptz) ->> 'motivo', 'janela_feriado',
