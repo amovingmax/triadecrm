@@ -2596,3 +2596,28 @@ A faixa vem do banco junto com a pontuação e **não é recalculada no navegado
 **Provado:** suíte do banco em 55 arquivos e **2745 asserções**; web 737, lint e typecheck limpos.
 
 **Pendente:** a tela onde os pesos se editam (hoje eles vivem em `app_settings` e só mudam por SQL) e a camada de IA — julgar pelo nome e pela categoria se aquilo é mesmo um fornecedor de evento, que é o que a conta aritmética não alcança.
+
+### 17/09/2026 — Os pesos da triagem saem do código e viram tela
+
+Quem sabe se decoração vale mais que buffet neste mês é quem vende — e ele não abre editor de código nem espera deploy. A folha "Pesos da triagem" (admin e gestor, como ligar fonte) edita o que estava em `app_settings`: quanto vale cada sinal, a partir de quando ele conta, onde ficam as faixas A+/A/B/C, quais categorias são prioritárias e quais cidades são alvo.
+
+**Duas coisas que a folha faz questão de mostrar:**
+- **O efeito, em número.** Salvar repontua a fila inteira e diz quantos candidatos mudaram de lugar. Mexer em peso sem ver o resultado é mexer no escuro, e na segunda vez a pessoa para de mexer.
+- **Que nada é descartado.** A frase está escrita na folha porque a dúvida nasce sozinha em quem baixa um peso — "será que sumi com alguém?". Ninguém sai da fila (RF-RAD-08).
+
+**Um conserto de padrão no caminho:** a primeira versão copiava a resposta do servidor para o estado dentro de um efeito, e o lint do React recusou — com razão. Agora o formulário **nasce com os pesos**: só é montado quando eles chegam. Some o render a mais e some o "só na primeira vez" que existia para não apagar o que a pessoa acabou de digitar quando a consulta revalidasse.
+
+**Provado:** web 737 testes, lint, typecheck e build limpos.
+
+### 17/09/2026 — A IA já orienta o consultor; o que faltava era onde ela aparece
+
+Antes de construir a sexta frente ("a IA lê todas as mensagens e indica ao consultor o que melhorar, como abordar, em quem focar"), fui ver o que a ficha da conversa já guarda. Ela tem, e preenchido, desde hoje de manhã: `resumo`, `intencao`, `score_intencao`, `sentimento`, `objecoes`, `alertas`, `dados_extraidos` e **`proxima_acao`**.
+
+O que a IA escreveu nas últimas três conversas, sem ninguém pedir:
+
+> *"Recontatar Dennis em 3-5 dias com abordagem diferente ou validar se ainda há interesse em participar da plataforma."*
+> *"Aguardar resposta do parceiro à classificação de demanda. Se não responder em 24h, fazer follow-up com pergunta direta sobre interesse em ser fornecedor."*
+
+Não é o robô que falta. **É o lugar.** Isso só aparece dentro da conversa aberta, uma por vez — e o consultor faz a pergunta olhando para a LISTA, ou para o Meu dia. A parte que responde "em quem focar hoje" é o Pulso, que estava desligado e foi ligado hoje (primeiro às 18h30).
+
+Fica registrado como a próxima entrega, e ela é menor do que parecia: mostrar `proxima_acao` e o score na lista de Conversas e no Meu dia, em vez de escrever um segundo cérebro.

@@ -13,6 +13,7 @@ import { BarraDaFila } from './barra-fila';
 import { CartaoCandidato } from './cartao-candidato';
 import { AgendarColeta } from './agendar-coleta';
 import { CatalogoDeFontes } from './catalogo-fontes';
+import { PesosDaTriagem } from './pesos-da-triagem';
 import {
   buscarFila,
   buscarResumo,
@@ -212,6 +213,7 @@ export function TelaRadar({
               o limite que a fonte nos concede e responde pelo robots.txt (R03,
               R06 §3). O banco recusa de todo jeito — este `if` existe para não
               oferecer um botão que sempre erra. */}
+          {podeLigarFonte ? <PesosDaTriagem catalogos={catalogos} className="hidden md:inline-flex" /> : null}
           {podeLigarFonte ? <AgendarColeta className="hidden md:inline-flex" /> : null}
           {podeDecidir ? (
             <Button onClick={() => setFolhaAberta(true)} className="toque hidden md:inline-flex">

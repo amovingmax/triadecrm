@@ -506,3 +506,123 @@ export async function agendarColeta(argumentos: {
     maxPaginas: Number(bruto.max_paginas) || 1,
   };
 }
+
+// ===========================================================================
+// OS PESOS DA TRIAGEM (migração 20260917180000)
+// ===========================================================================
+//
+// Ficam em `app_settings`, e a RLS já resolve quem escreve: `app_settings_update`
+// exige gestor. A tela não precisa de RPC — precisa de honestidade sobre o que
+// acontece depois de salvar, que é repontuar a fila inteira.
+
+/** O formato que a tela edita. O banco guarda em snake_case, dentro de um JSON. */
+export interface PesosDaTriagem {
+  pesoNota: number;
+  pesoAvaliacoes: number;
+  pesoCategoria: number;
+  pesoCidade: number;
+  notaMinima: number;
+  avaliacoesParaValer: number;
+  corteAMais: number;
+  corteA: number;
+  corteB: number;
+  categoriasPrioritarias: number[];
+  cidadesAlvo: string[];
+}
+
+const PESOS_PADRAO: PesosDaTriagem = {
+  pesoNota: 35,
+  pesoAvaliacoes: 25,
+  pesoCategoria: 25,
+  pesoCidade: 15,
+  notaMinima: 4,
+  avaliacoesParaValer: 10,
+  corteAMais: 85,
+  corteA: 65,
+  corteB: 35,
+  categoriasPrioritarias: [],
+  cidadesAlvo: [],
+};
+
+function numero(v: unknown, padrao: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : padrao;
+}
+
+export async function lerPesosDaTriagem(): Promise<PesosDaTriagem> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'radar.triagem')
+    .maybeSingle();
+
+  if (error) throw new Error(mensagemDoErro(error));
+
+  const v = objeto(data?.value);
+  const pesos = objeto(v.pesos);
+  const categorias = Array.isArray(v.categorias_prioritarias) ? v.categorias_prioritarias : [];
+  const cidades = Array.isArray(v.cidades_alvo) ? v.cidades_alvo : [];
+
+  return {
+    pesoNota: numero(pesos.nota, PESOS_PADRAO.pesoNota),
+    pesoAvaliacoes: numero(pesos.avaliacoes, PESOS_PADRAO.pesoAvaliacoes),
+    pesoCategoria: numero(pesos.categoria, PESOS_PADRAO.pesoCategoria),
+    pesoCidade: numero(pesos.cidade, PESOS_PADRAO.pesoCidade),
+    notaMinima: numero(v.nota_minima, PESOS_PADRAO.notaMinima),
+    avaliacoesParaValer: numero(v.avaliacoes_para_valer, PESOS_PADRAO.avaliacoesParaValer),
+    corteAMais: numero(v.corte_a_mais, PESOS_PADRAO.corteAMais),
+    corteA: numero(v.corte_a, PESOS_PADRAO.corteA),
+    corteB: numero(v.corte_b, PESOS_PADRAO.corteB),
+    categoriasPrioritarias: categorias.filter((c): c is number => typeof c === 'number'),
+    cidadesAlvo: cidades.filter((c): c is string => typeof c === 'string'),
+  };
+}
+
+export async function salvarPesosDaTriagem(p: PesosDaTriagem): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('app_settings')
+    .update({
+      value: {
+        nota_minima: p.notaMinima,
+        avaliacoes_para_valer: p.avaliacoesParaValer,
+        cidades_alvo: p.cidadesAlvo,
+        categorias_prioritarias: p.categoriasPrioritarias,
+        pesos: {
+          nota: p.pesoNota,
+          avaliacoes: p.pesoAvaliacoes,
+          categoria: p.pesoCategoria,
+          cidade: p.pesoCidade,
+        },
+        corte_a_mais: p.corteAMais,
+        corte_a: p.corteA,
+        corte_b: p.corteB,
+      },
+    })
+    .eq('key', 'radar.triagem');
+
+  if (error) {
+    // A policy `app_settings_update` exige gestor. Dizer isso em português evita
+    // a pessoa achar que o CRM quebrou quando ela apenas não pode.
+    throw new Error(
+      error.code === '42501' || error.code === 'PGRST116'
+        ? 'Seu perfil não muda os pesos da triagem. Peça a um admin ou gestor.'
+        : mensagemDoErro(error),
+    );
+  }
+}
+
+/** Recalcula a fila inteira com os pesos atuais. Devolve quantos mudaram. */
+export async function repontuarORadar(): Promise<{ candidatos: number }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('radar_repontuar');
+  if (error) {
+    throw new Error(
+      error.code === '42501'
+        ? 'Seu perfil não repontua o Radar. Peça a um admin ou gestor.'
+        : mensagemDoErro(error),
+    );
+  }
+  const r = objeto(data);
+  return { candidatos: Number(r.candidatos) || 0 };
+}
