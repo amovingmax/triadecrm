@@ -268,8 +268,8 @@ describe('o cumprimento abre a conversa', () => {
     segmento: null,
     corpo: 'Boa tarde!',
     variaveis: [],
-  } as const;
-  const manha = { ...tarde, id: 89, codigo: 'GEN-ABR-OLA-MANHA', corpo: 'Bom dia!' } as const;
+  };
+  const manha = { ...tarde, id: 89, codigo: 'GEN-ABR-OLA-MANHA', corpo: 'Bom dia!' };
   const cumprimento = tarde;
   const livre = {
     id: 91,
@@ -280,7 +280,7 @@ describe('o cumprimento abre a conversa', () => {
     segmento: null,
     corpo: 'Oi, {{nome}}! Aqui é {{atendente}}. {{mensagem}}',
     variaveis: ['nome', 'atendente', 'mensagem'],
-  } as const;
+  };
 
   // 15h em Natal (UTC-3) é 18h em UTC. O `Date` guarda UTC, então este instante
   // é "à tarde" para quem está em Natal — que é o único relógio que importa.
