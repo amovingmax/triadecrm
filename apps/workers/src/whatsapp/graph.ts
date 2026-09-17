@@ -193,7 +193,20 @@ export class ClienteDaGraph {
         return {
           ...base,
           type: 'audio',
-          audio: envio.mediaId ? { id: envio.mediaId } : { link: envio.link },
+          // `voice: true` é a diferença entre MENSAGEM DE VOZ e ARQUIVO ANEXADO,
+          // e ela decide se o áudio toca.
+          //
+          // Sem o parâmetro (o padrão), a Cloud API entrega um arquivo de áudio:
+          // ícone de download, nada de onda sonora, nada de transcrição, e — o
+          // que quebrou tudo — **o aparelho não baixa sozinho**. Em 17/09/2026 o
+          // resultado foi um iPhone dizendo "este áudio não está mais
+          // disponível" em mensagem que a Meta jurava ter entregue e lido.
+          //
+          // Com `voice: true` é mensagem de voz: baixa sozinha, mostra a onda, e
+          // a Meta transcreve. Ela exige ogg/opus mono — que é exatamente o que
+          // `prepararAudio` garante, e é por isso que este parâmetro pode ser
+          // fixo em vez de condicional.
+          audio: envio.mediaId ? { id: envio.mediaId, voice: true } : { link: envio.link },
         };
     }
   }

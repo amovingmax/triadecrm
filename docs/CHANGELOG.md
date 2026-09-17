@@ -2436,3 +2436,20 @@ Ou seja: funciona agora. O que aconteceu com ele foi a aba que já estava aberta
 **O que o diagnóstico expôs, e que foi consertado.** A sondagem de reserva só existia quando o socket NÃO subia. Mas "ao vivo" quer dizer que o canal assinou — não que os eventos estão chegando. Se a publicação sumisse numa migração futura, ou se o socket ficasse aberto e surdo, a tela diria "ao vivo" e estaria morta em silêncio, que é a pior forma de quebrar. Agora a sondagem não some quando o eco sobe: ela desacelera para 90 s e vira vigia. Custa duas consultas minúsculas por minuto e meio, e troca um atraso infinito por um de noventa segundos.
 
 Ela também não busca duas vezes pela mesma mensagem: quando o eco já buscou, a sondagem só reposiciona a régua.
+
+### 17/09/2026 — O áudio sai como MENSAGEM DE VOZ (RF-CON-27)
+
+Faltava um parâmetro, e ele decide tudo. A Cloud API distingue duas coisas com o mesmo `type: "audio"`:
+
+- **`voice: true`** → mensagem de voz: **baixa sozinha** no aparelho, mostra a onda, e a Meta transcreve.
+- **omitido** (o nosso caso até agora) → **arquivo de áudio anexado**: ícone de download, sem onda, sem transcrição, e o aparelho **não baixa sozinho**.
+
+O sintoma no iPhone de quem recebia era "Este áudio não está mais disponível. Peça para reenviá-lo" — numa mensagem que a Meta jurava ter entregue e lido. No WhatsApp Web tocava sempre (o computador baixa o anexo sem drama), e áudio de contatos normais também (aqueles são mensagem de voz de verdade). Três pistas que apontavam para o mesmo lugar, e eu levei tempo demais para ler.
+
+O que **não** era, e foi medido antes de mexer: o arquivo (ogg/opus mono 48 kHz, íntegro), a conversão (o arquivo volta da Meta byte a byte idêntico), o formato do contêiner (marca de fim presente, cabeçalho igual ao do WhatsApp), a expiração (a mídia continuou baixável por 8 minutos de medição, minuto a minuto) e a deduplicação (apagar uma mídia e subir os mesmos bytes devolve outra que baixa normal).
+
+**A taxa caiu de 32 para 24 kbit/s** na mesma mudança, e por um motivo de regra: a Meta mostra ícone de download em vez de play quando a mensagem de voz passa de **512 KB**. A 32 kbit/s, os dois minutos que a tela deixa gravar dão 480 KB — passar raspando por um teto é o mesmo que não ter teto. A 24 são 360 KB, e ainda é mais do que os 19 kbit/s que o próprio WhatsApp usa nos áudios que ele nos manda.
+
+**Provado:** workers 363 testes, um deles fixando que todo áudio com `media id` sai com `voice: true`. E no aparelho: o mesmo áudio que falhava passou a chegar com onda sonora e controle de velocidade — o formato mudou, confirmado por captura de tela.
+
+**Pendente:** neste aparelho, mesmo como mensagem de voz, um áudio ainda não tocou. A investigação continua — o próximo corte é se mídia de outro tipo (imagem) baixa nele.

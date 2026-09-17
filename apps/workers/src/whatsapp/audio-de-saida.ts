@@ -71,7 +71,13 @@ const MIMES_QUE_SABEMOS_CONVERTER: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Voz, mono, 48 kHz, 32 kbit/s. É o que o WhatsApp manda, com folga de bitrate.
+ * Voz, mono, 48 kHz, 24 kbit/s.
+ *
+ * A taxa não é gosto: a Meta mostra ÍCONE DE DOWNLOAD em vez de play quando a
+ * mensagem de voz passa de 512 KB. A 32 kbit/s, os dois minutos que a tela
+ * permite gravar dão 480 KB — passar raspando por um teto é o mesmo que não ter
+ * teto. A 24 kbit/s são 360 KB, com folga, e ainda acima do que o próprio
+ * WhatsApp usa nos áudios que ele nos manda (medido: 19 kbit/s).
  * `-map_metadata -1` tira o que o navegador escreveu no arquivo (o Chrome assina
  * "Chrome", o Opera assina "Opera"): metadado de gravação não tem por que viajar
  * junto com a voz de alguém.
@@ -80,7 +86,7 @@ const ARGUMENTOS_DO_OPUS: readonly string[] = [
   '-vn',
   '-map_metadata', '-1',
   '-c:a', 'libopus',
-  '-b:a', '32k',
+  '-b:a', '24k',
   '-ar', '48000',
   '-ac', '1',
   '-application', 'voip',

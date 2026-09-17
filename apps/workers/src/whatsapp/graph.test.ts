@@ -217,6 +217,20 @@ describe('o corpo do POST', () => {
     });
     expect((p.template as { components: unknown[] }).components).toEqual([]);
   });
+
+  it('ÁUDIO SAI COMO MENSAGEM DE VOZ, e isto decide se ele toca', () => {
+    // Sem `voice: true` a Cloud API entrega um ARQUIVO de áudio: ícone de
+    // download, sem onda, sem transcrição — e o aparelho não baixa sozinho. Em
+    // 17/09/2026 isso apareceu como "este áudio não está mais disponível" num
+    // iPhone, em mensagem que a Meta dizia ter entregue e lido.
+    const p = ClienteDaGraph.payloadDoEnvio({
+      tipo: 'audio',
+      para: '+5584988776655',
+      mediaId: '123456789',
+    });
+    expect(p.type).toBe('audio');
+    expect(p.audio).toEqual({ id: '123456789', voice: true });
+  });
 });
 
 describe('o wamid da resposta', () => {
