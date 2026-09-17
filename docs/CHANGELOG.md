@@ -2380,3 +2380,19 @@ São duas listas diferentes de propósito, e eu tratei como se fossem uma: **"o 
 **E a frase genérica saiu.** "Tente de novo em alguns segundos" servia para falha de rede e para mais nada; aqui ela escondeu o motivo verdadeiro, que só existia no log do servidor. Cada recusa passa a se nomear — balde, chave faltando, formato, sessão, conversa fora do alcance —, e a do balde diz explicitamente que é configuração nossa, não erro de quem gravou. O detalhe do servidor vai junto na resposta e no console.
 
 **Provado:** três asserções novas no pgTAP 51 fixam a lista do balde (aceita webm, aceita ogg) — suíte com **2701 asserções**, tudo verde.
+
+### 17/09/2026 — Conserto: o áudio chegava e não tocava (RF-CON-27)
+
+A mensagem saiu, foi entregue e foi **lida** — e no celular de quem recebeu apareceu como áudio indisponível. O erro estava na minha decisão anterior, escrita com todas as letras no arquivo: *"recodificar seria o erro fácil aqui"*.
+
+**O que eu fiz e por quê.** O webm do navegador já carrega Opus dentro, que é o que o ogg da Meta quer; `ffmpeg -c:a copy` reescreve o contêiner sem tocar no som. O raciocínio está certo. O resultado, não.
+
+**O que a investigação mostrou.** Baixei o arquivo real do balde e medi: o remux saía com 4 s a **129 kbit/s** (66 KB), e o áudio que o **próprio WhatsApp** nos manda tem **19 kbit/s**. Os dois são ogg/opus mono 48 kHz, os dois passam no ffprobe, e a Meta aceitou os dois (HTTP 200, media id devolvido, `mime_type: audio/ogg` na consulta de volta). Subi o arquivo à Meta com e sem `codecs=opus` no tipo — ela guarda igual. Ou seja: **"a Meta aceita" não é "o aplicativo toca"**, e nenhuma inspeção do arquivo distingue os dois casos. Só enviando.
+
+**A decisão.** Parar de apostar na inspeção. Tudo que sai do CRM como áudio passa a ser ogg/opus mono, 48 kHz, 32 kbit/s, perfil `voip` — o formato que o WhatsApp produz para voz, com folga de bitrate sobre o dele. O arquivo real caiu de 66 KB para 16 KB. O ogg que já chega ogg continua intocado (converter ogg em ogg é só perder qualidade); o mp4 do Safari, que a Meta *aceitaria*, passa a ser convertido junto — depois desta lição, "aceito" não basta.
+
+A perda que eu usei como argumento contra recodificar é real e é irrelevante: **áudio que não toca tem qualidade zero**. O custo de CPU são milissegundos num worker que passa o dia esperando fila. `-map_metadata -1` entrou junto: o navegador assina o arquivo com o próprio nome, e isso não tem por que viajar com a voz de alguém.
+
+**Provado:** workers 362 testes; os do preparo passaram a fixar mono, 48 kHz e `voip`, e a proibir `copy`. A conversão foi medida no ffmpeg real (Alpine, o mesmo da imagem) contra o arquivo que falhou.
+
+**Pendente:** confirmar no celular. Este é o único teste que existe para "toca" — e por isso a mudança vai com o worker novo, para a próxima gravação sair já convertida.

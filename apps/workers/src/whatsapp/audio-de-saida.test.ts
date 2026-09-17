@@ -59,14 +59,20 @@ describe('o que a Meta aceita', () => {
     expect(tipoBase(null)).toBe('');
   });
 
-  it('mp4 do Safari e ogg sobem como estão', () => {
-    expect(comoSubir('audio/mp4')).toBe('como_esta');
+  it('só o ogg sobe como está — ele já É o formato de destino', () => {
     expect(comoSubir('audio/ogg')).toBe('como_esta');
     expect(MIMES_QUE_A_META_ACEITA.has('audio/mpeg')).toBe(true);
   });
 
-  it('webm do Chrome troca de embalagem', () => {
-    expect(comoSubir('audio/webm;codecs=opus')).toBe('trocar_embalagem');
+  it('o que o navegador grava vira ogg, inclusive o mp4 que a Meta aceitaria', () => {
+    // A lição de produção: a Meta aceitou o remux (200, media id devolvido), a
+    // mensagem foi entregue e LIDA, e no celular apareceu "áudio indisponível".
+    // "A Meta aceita" não é "o aplicativo toca" — então tudo sai no formato que
+    // o próprio WhatsApp usa para voz.
+    expect(comoSubir('audio/webm;codecs=opus')).toBe('converter');
+    expect(comoSubir('video/webm')).toBe('converter');
+    expect(comoSubir('audio/mp4')).toBe('converter');
+    expect(comoSubir('audio/aac')).toBe('converter');
   });
 
   it('e o que ela não conhece é recusado antes de virar chamada', () => {
@@ -76,22 +82,35 @@ describe('o que a Meta aceita', () => {
 });
 
 describe('preparar o áudio', () => {
-  it('não mexe no que já está no formato certo', async () => {
+  it('não mexe no que já é ogg: converter de ogg para ogg é só perder qualidade', async () => {
     const executar = ffmpegFalso({ codigo: 0 });
-    const pronto = await prepararAudio({ bytes, mime: 'audio/mp4' }, executar as never);
-    expect(pronto).toEqual({ bytes, mime: 'audio/mp4', nome: 'audio.m4a' });
+    const pronto = await prepararAudio({ bytes, mime: 'audio/ogg' }, executar as never);
+    expect(pronto).toEqual({ bytes, mime: 'audio/ogg', nome: 'audio.ogg' });
     expect(executar).not.toHaveBeenCalled();
   });
 
-  it('converte o webm e devolve ogg', async () => {
+  it('converte o webm em opus de voz, e não num remux', async () => {
     const convertido = Buffer.from([9, 9, 9]);
     const executar = ffmpegFalso({ codigo: 0, saida: convertido });
     const pronto = await prepararAudio({ bytes, mime: 'audio/webm;codecs=opus' }, executar as never);
     expect(pronto.mime).toBe('audio/ogg');
     expect(pronto.nome).toBe('audio.ogg');
     expect([...pronto.bytes]).toEqual([9, 9, 9]);
-    // `-c:a copy`: o som sai igual, só a embalagem muda.
-    expect(executar.mock.calls[0]?.[1] ?? []).toContain('copy');
+
+    const argumentos = executar.mock.calls[0]?.[1] ?? [];
+    // Mono, 48 kHz, perfil de voz: o que o WhatsApp manda. `copy` saiu daqui
+    // porque o arquivo que ele produzia era aceito pela Meta e não tocava.
+    expect(argumentos).toContain('libopus');
+    expect(argumentos).toContain('voip');
+    expect(argumentos).toEqual(expect.arrayContaining(['-ac', '1', '-ar', '48000']));
+    expect(argumentos).not.toContain('copy');
+  });
+
+  it('o mp4 do Safari também vira ogg', async () => {
+    const executar = ffmpegFalso({ codigo: 0, saida: Buffer.from([7]) });
+    const pronto = await prepararAudio({ bytes, mime: 'audio/mp4' }, executar as never);
+    expect(pronto.mime).toBe('audio/ogg');
+    expect(executar).toHaveBeenCalled();
   });
 
   it('arquivo vazio e arquivo gigante não viram chamada', async () => {
