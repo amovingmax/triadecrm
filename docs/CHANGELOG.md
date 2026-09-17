@@ -2635,3 +2635,22 @@ Agora a linha da lista tem uma terceira linha, quando há conselho: a próxima a
 E a lista **não quebra sem a IA**: se o módulo estiver desligado ou a tabela vazia, a leitura vem nula e a conversa aparece igual. Conversa é fato, conselho é acréscimo — inclusive no tratamento de erro da consulta.
 
 **Provado:** web **740 testes** (três novos: o conselho chega ao item certo, leitura vazia não vira linha, e sem leitura nenhuma o item existe igual), lint, typecheck e build limpos.
+
+### 17/09/2026 — Um cumprimento curto abre a conversa, sem campo para preencher
+
+"Não quero que fique assim. Quero começar apenas com boa tarde, bom dia — pra prender a atenção — e depois que eu souber que vou estar falando com o responsável, aí sim mando o que quero. Isso está muito errado." (Rafael)
+
+Ele estava certo. A tela oferecia a `GEN-ABR-LIVRE`, que pedia o **nome** de alguém que a base não conhece, exigia escrever um discurso antes de a pessoa dizer se era a responsável, e enterrava o cumprimento no meio de 240 caracteres.
+
+**O modelo novo (`GEN-ABR-CUMPRIMENTO`) não tem campo nenhum para preencher.** As duas variáveis vêm prontas do servidor: `{{atendente}}` já era o primeiro nome de quem clica, e `{{saudacao}}` passou a vir do **relógio de Natal** — Bom dia até 11h59, Boa tarde até 17h59, Boa noite depois. Um campo para escolher entre três palavras que o relógio já sabe é trabalho que o CRM inventa. Em primeiro contato, é ele que a tela escolhe sozinha; na retomada continua a moldura livre, porque aí já se sabe com quem se fala e cumprimentar de novo é começar do zero uma conversa que existe.
+
+**Duas travas que o texto teve de respeitar, e vale saber qual é de quem:**
+
+- **A Meta recusa modelo que COMEÇA com variável.** O texto natural — "{{saudacao}}! Aqui é..." — nunca seria aprovado. O "Oi!" fixo na frente não é enfeite: é o que torna o modelo submissível. **Quem pegou isso foi o teste 43 do próprio CRM**, antes de a Meta pegar.
+- **O "SAIR" e o link de privacidade são regra NOSSA** (RF-CON-12, R06 §2), não da Meta, e têm um teste guardando. Mexer neles é decisão do Dennis. O que dava para fazer sem essa decisão foi feito: de 240 para 190 caracteres, sem o nome do parceiro na frente, sem campo nenhum.
+
+A saudação entrou nos **dois** caminhos, e a razão de cada um é diferente: em `wa_preparar_envio` (senão a tela mostra um campo "Saudação" — exatamente o formulário de que ele reclamou) e em `wa_enviar_modelo` (senão o envio falha com "falta preencher: saudacao" no instante do clique). As duas funções foram copiadas do banco com `pg_get_functiondef` e receberam uma linha cada: são 137 e 123 linhas de guardrails, e reescrevê-las de memória é perder um sem perceber.
+
+**Provado:** pgTAP 56 novo (10 asserções, incluindo o fuso — 2h UTC é 23h em Natal, e um servidor com o próprio relógio diria "bom dia" para quem vai dormir). Suíte: **56 arquivos, 2755 asserções**. Web 743 testes, com três novos fixando a escolha por momento.
+
+**Decisão humana, e é a que sobra:** o modelo nasce `pending` e vai à Meta na próxima sincronização. Enquanto ela não aprovar, a tela continua com a moldura livre. E o SAIR + privacidade na primeira mensagem seguem esperando o Dennis — hoje eles custam 60 dos 190 caracteres.

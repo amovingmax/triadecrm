@@ -220,7 +220,7 @@ function Formulario({
   const oferecidos = previa.modelos;
   const [modeloId, setModeloId] = useState<number>(
     modeloDoRecibo?.id ??
-      escolherModeloInicial(oferecidos, previa.valores)?.id ??
+      escolherModeloInicial(oferecidos, previa.valores, previa.primeiro_contato)?.id ??
       oferecidos[0]?.id ??
       previa.modelos[0]!.id,
   );

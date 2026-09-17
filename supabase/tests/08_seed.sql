@@ -137,8 +137,8 @@ select is((select count(*)::int from public.message_templates
 -- As GEN-ABR-* são as aberturas livres de 16/09/2026: moldura aprovada com o texto
 -- escrito na hora. Não pertencem a segmento nenhum, e por isso ficam fora da conta.
 select is((select count(*)::int from public.message_templates
-            where template_code like 'GEN-ABR-%'), 3,
-  'seed: 3 aberturas livres (livre, parceria, lançamento)');
+            where template_code like 'GEN-ABR-%'), 4,
+  'seed: 4 aberturas genéricas (livre, parceria, lançamento e o cumprimento curto de 17/09)');
 select is((select count(*)::int from public.message_templates where template_code like '%-ABR-%' and (body !~ 'SAIR' or body !~* 'privacidade')), 0,
   'seed: toda abertura traz "SAIR" e o aviso de privacidade (RF-CON-12)');
 select results_eq(

@@ -257,3 +257,44 @@ describe('a abertura livre (migração 20260916100000)', () => {
     ).toContain('Linha um Linha dois');
   });
 });
+
+describe('o cumprimento abre a conversa', () => {
+  const cumprimento = {
+    id: 90,
+    codigo: 'GEN-ABR-CUMPRIMENTO',
+    nome: 'Cumprimento curto',
+    tipo: 'abertura',
+    variante: 'A',
+    segmento: null,
+    corpo: '{{saudacao}}! Aqui é {{atendente}}, da Komune. Falo com a pessoa responsável?',
+    variaveis: ['saudacao', 'atendente'],
+  } as const;
+  const livre = {
+    id: 91,
+    codigo: 'GEN-ABR-LIVRE',
+    nome: 'Abertura livre',
+    tipo: 'abertura',
+    variante: 'A',
+    segmento: null,
+    corpo: 'Oi, {{nome}}! Aqui é {{atendente}}. {{mensagem}}',
+    variaveis: ['nome', 'atendente', 'mensagem'],
+  } as const;
+
+  it('no PRIMEIRO contato escolhe o cumprimento, que não tem campo para preencher', () => {
+    const escolhido = escolherModeloInicial([livre, cumprimento], { atendente: 'Matheus' }, true);
+    expect(escolhido?.codigo).toBe('GEN-ABR-CUMPRIMENTO');
+  });
+
+  it('na RETOMADA escolhe a moldura livre: já se sabe com quem se fala', () => {
+    // Cumprimentar de novo seria começar do zero uma conversa que existe.
+    const escolhido = escolherModeloInicial([livre, cumprimento], { atendente: 'Matheus' }, false);
+    expect(escolhido?.codigo).toBe('GEN-ABR-LIVRE');
+  });
+
+  it('sem o cumprimento aprovado, o primeiro contato cai na moldura livre', () => {
+    // A Meta pode demorar ou recusar. A tela não pode ficar sem saída por isso.
+    const escolhido = escolherModeloInicial([livre], { atendente: 'Matheus' }, true);
+    expect(escolhido?.codigo).toBe('GEN-ABR-LIVRE');
+  });
+});
+

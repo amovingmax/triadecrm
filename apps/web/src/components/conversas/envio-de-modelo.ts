@@ -116,11 +116,38 @@ export function variavelLivreDoModelo(modelo: ModeloParaEnviar): string | null {
  * depois o que o banco já sabe preencher inteiro (nenhum campo para digitar), e só
  * então a ordem do servidor. Trocar continua a um toque.
  */
+/**
+ * O CUMPRIMENTO VEM PRIMEIRO — e só em primeiro contato.
+ *
+ * Abrir conversa com um parágrafo de 240 caracteres é pedir para alguém ler um
+ * discurso antes de dizer se é a pessoa certa. O jeito que funciona no WhatsApp
+ * é o que todo mundo faz: cumprimenta, descobre com quem está falando e AÍ fala.
+ * Foi exatamente esse o pedido — "começar apenas com boa tarde, e depois que eu
+ * souber que estou falando com o responsável, aí sim mando o que quero".
+ *
+ * Então a ordem de preferência muda com o momento:
+ *   1. **Primeiro contato** → o cumprimento, que não tem campo nenhum a
+ *      preencher: a saudação vem do relógio e o nome de quem envia, da sessão.
+ *      Um clique.
+ *   2. **Retomada** (a conversa existe, a janela fechou) → a moldura livre, onde
+ *      se escreve o que se quer dizer. Aqui já se sabe com quem se fala, e
+ *      cumprimentar de novo seria começar do zero uma conversa que existe.
+ *   3. Sem nenhuma das duas aprovadas → o que estiver pronto para enviar.
+ */
+export const CODIGO_DO_CUMPRIMENTO = 'GEN-ABR-CUMPRIMENTO';
+
 export function escolherModeloInicial(
   modelos: readonly ModeloParaEnviar[],
   sugeridos: Record<string, string>,
+  primeiroContato = false,
 ): ModeloParaEnviar | null {
   if (modelos.length === 0) return null;
+
+  if (primeiroContato) {
+    const cumprimento = modelos.find((m) => m.codigo === CODIGO_DO_CUMPRIMENTO);
+    if (cumprimento) return cumprimento;
+  }
+
   const livre = modelos.find((m) => variavelLivreDoModelo(m) !== null);
   if (livre) return livre;
   const pronto = modelos.find((m) => faltando(m, valoresIniciais(m, sugeridos)).length === 0);
