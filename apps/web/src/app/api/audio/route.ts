@@ -42,14 +42,21 @@ const TETO_BYTES = 16 * 1024 * 1024;
  * `mp4` é o do Safari e sobe como está. O resto não nasce de um `MediaRecorder`
  * e não tem por que entrar.
  */
-const TIPOS_ACEITOS = new Set(['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/mpeg', 'audio/aac']);
+const TIPOS_ACEITOS = new Set([
+  'audio/webm',
+  'video/webm',
+  'audio/mp4',
+  'audio/ogg',
+  'audio/mpeg',
+  'audio/aac',
+]);
 
 function tipoBase(mime: string): string {
   return mime.split(';')[0]!.trim().toLowerCase();
 }
 
 function extensaoDe(base: string): string {
-  if (base === 'audio/webm') return 'webm';
+  if (base === 'audio/webm' || base === 'video/webm') return 'webm';
   if (base === 'audio/mp4') return 'm4a';
   if (base === 'audio/mpeg') return 'mp3';
   if (base === 'audio/aac') return 'aac';
@@ -110,8 +117,14 @@ export async function POST(request: NextRequest) {
     .upload(caminho, await arquivo.arrayBuffer(), { contentType: base, upsert: false });
 
   if (erroDoBalde) {
+    // O detalhe vai junto: a primeira recusa deste caminho em produção foi o
+    // balde não aceitar `audio/webm` (só conhecia o que a Meta manda), e a tela
+    // dizia apenas "tente de novo". Recusa que não se nomeia custa uma tarde.
     registrarRecusa('audio/enviar', 'balde_recusou');
-    return NextResponse.json({ ok: false, motivo: 'balde_recusou' }, { status: 502 });
+    return NextResponse.json(
+      { ok: false, motivo: 'balde_recusou', detalhe: erroDoBalde.message },
+      { status: 502 },
+    );
   }
 
   // A linha vai com a sessão de quem gravou: a policy `messages_insert` decide,

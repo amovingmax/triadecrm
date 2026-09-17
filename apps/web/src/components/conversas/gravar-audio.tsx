@@ -75,8 +75,15 @@ export function GravarAudio({ fioId, className }: { fioId: string; className?: s
       corpo.append('conversation_id', fioId);
       corpo.append('arquivo', arquivo, 'audio');
       const resposta = await fetch('/api/audio', { method: 'POST', body: corpo });
-      const dados = (await resposta.json().catch(() => ({}))) as { ok?: boolean; motivo?: string };
-      if (!resposta.ok || !dados.ok) throw new Error(dados.motivo ?? 'falhou');
+      const dados = (await resposta.json().catch(() => ({}))) as {
+        ok?: boolean;
+        motivo?: string;
+        detalhe?: string;
+      };
+      if (!resposta.ok || !dados.ok) {
+        if (dados.detalhe) console.error('áudio recusado:', dados.motivo, dados.detalhe);
+        throw new Error(dados.motivo ?? 'falhou');
+      }
       return dados;
     },
     onSuccess: () => {
@@ -222,16 +229,34 @@ function relogioDe(segundos: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/**
+ * Cada recusa diz o próprio nome.
+ *
+ * "Tente de novo em alguns segundos" é a frase que não ajuda ninguém: ela serve
+ * para a falha de rede e para mais nada. Quando o balde recusou o formato da
+ * gravação, na primeira vez que isto rodou em produção, foi essa frase que
+ * apareceu — e o motivo verdadeiro só existia no log do servidor.
+ */
 function fraseDoErro(motivo: string): string {
   switch (motivo) {
     case 'audio_grande_demais':
-      return 'O áudio passou do teto de 16 MB da Meta.';
+      return 'O áudio passou do teto de 16 MB da Meta. Grave um mais curto.';
+    case 'audio_vazio':
+      return 'A gravação saiu vazia — o microfone pode não ter captado nada.';
     case 'tipo_nao_aceito':
-      return 'Este navegador gravou num formato que a Meta não aceita.';
+      return 'Este navegador gravou num formato que o CRM não aceita. Tente pelo Chrome.';
+    case 'balde_recusou':
+      return 'O arquivo não foi aceito no armazenamento. Isto é configuração nossa, não sua — avise quem cuida do CRM.';
+    case 'nao_configurado':
+      return 'Falta uma chave no servidor para guardar o arquivo. Avise quem cuida do CRM.';
     case 'conversa_invisivel':
       return 'Esta conversa não está mais no seu alcance.';
     case 'mensagem_recusada':
       return 'O banco recusou a mensagem — confira se você ainda atende esta conversa.';
+    case 'consulta_falhou':
+      return 'O servidor não conseguiu conferir a conversa. Tente de novo.';
+    case 'pedido_incompleto':
+      return 'O envio saiu sem o arquivo. Grave de novo.';
     case 'sem_sessao':
       return 'Sua sessão expirou. Entre de novo.';
     default:

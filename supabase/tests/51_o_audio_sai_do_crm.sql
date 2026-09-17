@@ -16,7 +16,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(8);
+select plan(11);
 
 create function pg_temp.entrar_worker() returns void language plpgsql as $$
 begin
@@ -101,5 +101,18 @@ select ok(pg_temp.item('a1000000-0000-4000-8000-0000000a5102') ->> 'media_path' 
 select is((select status from public.messages where id = 'a1000000-0000-4000-8000-0000000a5103'),
   'failed', 'e o áudio de quem pediu para sair morre na entrega, como o texto morreria');
 select pg_temp.sair();
+
+-- ---------- 4. o balde aceita o que o NAVEGADOR grava ----------
+-- Esta é a lição de uma recusa em produção: o balde `mensagens` nasceu com a
+-- lista de tipos da CLOUD API, porque o único remetente era o worker guardando
+-- o que chega. Quem grava pela tela é o segundo remetente, e o Chrome grava
+-- webm — que a Meta não aceita e que por isso não estava na lista. O upload era
+-- recusado antes de virar mensagem, e a tela só sabia dizer "tente de novo".
+select ok('audio/webm' = any (select unnest(allowed_mime_types) from storage.buckets where id = 'mensagens'),
+  'O BALDE ACEITA audio/webm — é o que o Chrome grava, e é o que a tela sobe');
+select ok('video/webm' = any (select unnest(allowed_mime_types) from storage.buckets where id = 'mensagens'),
+  'e video/webm também: alguns navegadores rotulam assim a gravação só de áudio');
+select ok('audio/ogg' = any (select unnest(allowed_mime_types) from storage.buckets where id = 'mensagens'),
+  'sem perder o ogg da Meta: guardar o que chega continua sendo o outro trabalho do balde');
 
 rollback;

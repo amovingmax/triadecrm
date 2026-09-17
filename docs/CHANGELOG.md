@@ -2368,3 +2368,15 @@ O caminho inteiro: grava na tela (teto de 2 minutos, com relógio à vista e "ou
 **Decisão humana / pendente:**
 - A migração `20260917130000` ainda não foi para produção, e o `triade-worker-wa` precisa de **novo deploy** (a imagem só agora tem ffmpeg). Sem os dois, gravar não envia.
 - Transcrição automática continua desligada: o Groq não foi adiante (a conta não sai da tela de erro). O caminho, se quiserem, é uma chave da OpenAI (~US$ 2/mês no volume de hoje).
+
+### 17/09/2026 — Conserto: o balde só aceitava o que a Meta manda
+
+A primeira gravação em produção devolveu "O áudio não entrou na fila. Tente de novo em alguns segundos." — e o motivo não era a fila.
+
+**O balde `mensagens` nasceu com a lista de tipos da Cloud API** (migração `20260905000201`), porque tinha um remetente só: o worker, guardando o que CHEGA — a URL da Meta expira em cinco minutos. Quem grava pela tela é um segundo remetente, e o Chrome grava `audio/webm`, que a Meta não aceita e que por isso nunca esteve na lista. O Storage recusava o upload antes de a mensagem existir.
+
+São duas listas diferentes de propósito, e eu tratei como se fossem uma: **"o que podemos guardar" não é "o que a Meta aceita receber"**. O webm entra no balde e não entra na Meta — quem troca a embalagem para ogg é o worker, no instante do envio. A migração `20260917140000` acrescenta `audio/webm` e `video/webm` (alguns navegadores rotulam assim a gravação só de áudio), sem tirar nada.
+
+**E a frase genérica saiu.** "Tente de novo em alguns segundos" servia para falha de rede e para mais nada; aqui ela escondeu o motivo verdadeiro, que só existia no log do servidor. Cada recusa passa a se nomear — balde, chave faltando, formato, sessão, conversa fora do alcance —, e a do balde diz explicitamente que é configuração nossa, não erro de quem gravou. O detalhe do servidor vai junto na resposta e no console.
+
+**Provado:** três asserções novas no pgTAP 51 fixam a lista do balde (aceita webm, aceita ogg) — suíte com **2701 asserções**, tudo verde.
