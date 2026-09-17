@@ -208,7 +208,11 @@ function SemCorpo({ mensagem }: { mensagem: MensagemDoFio }) {
 type EstadoDoArquivo = 'procurando' | 'pronto' | 'ausente';
 
 function Audio({ mensagem }: { mensagem: MensagemDoFio }) {
+  // O que identifica o áudio para o servidor é a MENSAGEM, não o caminho do
+  // arquivo (ver `urlDaMidia`). `midiaCaminho` continua valendo para saber se há
+  // arquivo guardado: sem ele, nem vale a ida ao servidor.
   const caminho = mensagem.midiaCaminho;
+  const messageId = mensagem.id;
   // A resposta guarda O CAMINHO que ela responde. Sem isso, trocar de conversa
   // mostraria por um instante a URL assinada do áudio anterior — que é um áudio
   // de outra pessoa.
@@ -217,13 +221,13 @@ function Audio({ mensagem }: { mensagem: MensagemDoFio }) {
   useEffect(() => {
     if (!caminho) return;
     let vivo = true;
-    void urlDaMidia(caminho).then((url) => {
+    void urlDaMidia(messageId).then((url) => {
       if (vivo) setAssinada({ caminho, url });
     });
     return () => {
       vivo = false;
     };
-  }, [caminho]);
+  }, [caminho, messageId]);
 
   // Derivado, não guardado: um `setEstado('ausente')` dentro do efeito faria
   // uma repintura em cascata só para dizer o que já dá para saber aqui.
@@ -255,7 +259,7 @@ function Audio({ mensagem }: { mensagem: MensagemDoFio }) {
           <span>
             {estado === 'procurando'
               ? 'Procurando o arquivo do áudio...'
-              : 'O áudio está guardado no balde privado do CRM, e esta tela ainda não tem permissão para abri-lo: falta o endereço no servidor que assina a URL. A transcrição abaixo é o que dá para ler agora.'}
+              : 'O arquivo deste áudio não está guardado no CRM — a URL da Meta expira em minutos, e ele chegou quando o motor estava parado. A transcrição abaixo é o que dá para ler.'}
           </span>
         </p>
       )}

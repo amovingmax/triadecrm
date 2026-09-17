@@ -266,22 +266,34 @@ export async function marcarComoLida(fioId: string): Promise<void> {
  */
 export const BUCKET_MIDIA = 'mensagens';
 
-/** Quanto tempo a URL assinada vale. Curta de propósito (PRD §10, R05). */
-const SEGUNDOS_DA_URL = 300;
-
 /**
- * URL assinada do arquivo, ou `null` quando esta tela não consegue assiná-la.
+ * URL assinada do áudio, pedida ao SERVIDOR.
  *
- * `null` não é erro nem defeito: hoje é o resultado esperado, porque o balde
- * `mensagens` não tem política de leitura para `authenticated` (veja
- * `BUCKET_MIDIA`). Quem chama trata como estado, não como falha — e o balão
- * mostra a transcrição do mesmo jeito.
+ * O balde `mensagens` é privado e não tem política para `authenticated`
+ * (migração `20260905000201`): assinar daqui sempre devolveu `null`, e por isso
+ * o balão vinha mostrando "falta o endereço no servidor que assina a URL". O
+ * endereço existe desde 17/09/2026 — `POST /api/midia`.
+ *
+ * **O pedido é por `message_id`, nunca por caminho.** Caminho vindo do cliente é
+ * caminho que o cliente escolhe: com ele, qualquer pessoa autenticada pediria o
+ * áudio de qualquer conversa. Com o id, quem responde se aquela mensagem é
+ * visível é a RLS da própria pessoa, do lado de lá.
+ *
+ * `null` continua sendo estado, não falha: mensagem sem arquivo guardado (o
+ * worker estava parado quando ela chegou) e mensagem invisível respondem igual,
+ * e o balão mostra a transcrição do mesmo jeito.
  */
-export async function urlDaMidia(caminho: string): Promise<string | null> {
-  const supabase = createClient();
-  const { data, error } = await supabase.storage
-    .from(BUCKET_MIDIA)
-    .createSignedUrl(caminho, SEGUNDOS_DA_URL);
-  if (error || !data?.signedUrl) return null;
-  return data.signedUrl;
+export async function urlDaMidia(messageId: string): Promise<string | null> {
+  try {
+    const resposta = await fetch('/api/midia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: messageId }),
+    });
+    if (!resposta.ok) return null;
+    const dados = (await resposta.json()) as { ok?: boolean; url?: string };
+    return dados.ok && typeof dados.url === 'string' ? dados.url : null;
+  } catch {
+    return null;
+  }
 }
