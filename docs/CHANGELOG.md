@@ -2499,3 +2499,21 @@ Deixados desligados, com motivo: **sugestões de campo** grava numa tabela que *
 O `worker-ingest` subiu para o Fly (`infra/nuvem/fly.worker-ingest.toml`), pelo mesmo motivo e com a mesma forma do `worker-wa` em 14/09: o ADR-04 manda o coletor rodar na máquina dedicada, que continua não existindo. Uma coleta foi agendada em seguida, e o resultado ficou medido: **9 páginas, 219 capturas, 113 candidatos novos, zero bloqueios de robots.txt** — a fila de revisão saiu de 12 para **277 candidatos**.
 
 **Pendente, e é decisão de gente:** agendar coleta continua sendo comando de terminal — não existe botão na tela, e deveria existir. E 277 candidatos esperando revisão é fila demais para uma pessoa: ou entra curadoria assistida pela IA, ou entra gente.
+
+### 17/09/2026 — O verde da Komune entra no CRM (decisão do Rafael)
+
+"O que me incomoda, por começo, é a falta de cores no CRM, tá feio."
+
+**A decisão que estava escrita, e o furo dela.** Desde o D1 este arquivo dizia: *"a ação (botão primário, foco) é TINTA, nunca cor: o verde do tema seria lido como 'cliente' e apagaria a escala térmica"*. O raciocínio protegia algo real — a escala térmica é o único código de cor que a equipe aprendeu, e diluí-lo custa caro. Mas a conclusão foi longe demais: sem cor nenhuma, o CRM ficou sem dono. Parece um template, não a ferramenta da KOMUNE.
+
+**A correção troca uma proibição de matiz por uma regra de território:**
+- o **verde da marca** (#24705c, o mesmo do `komune-app` — inventar um segundo verde seria ter duas marcas) vive no **cromo**: lateral, botão de ação, anel de foco, item ativo;
+- a **escala térmica** continua sendo a única cor **dentro do dado**: linha da lista, chip do parceiro, barra do funil.
+
+Os dois nunca dividem vizinhança. "Você está em Conversas" e "este parceiro está quente" não são lidos no mesmo pedaço de tela — e é isso, não o matiz, que impede a confusão. O verde de "cliente" (#1a9a49) é mais claro e mais saturado que o da marca; quem aprendeu que verde é "fechou" continua certo, porque no lugar onde essa pergunta se faz nada mudou.
+
+**O que mudou de concreto:** fundo da página `#f2f6f5` (o grafite puxado para o verde), lateral `#e6eeec`, item ativo com fundo, tinta e barra na marca, botão de ação em gradiente verde, anel de foco verde nos dois temas. No escuro a ação segue verde, mas o anel clareia para `#4a9d85`: o verde escuro mede 3,08:1 contra o fundo grafite, e 3:1 sem folga é o mesmo que não ter.
+
+**Provado:** a suíte de contraste do próprio CRM (`contraste.test.ts`, que mede cada par de cores contra WCAG) passa nos dois temas — **736 testes**. Ela chegou a recusar a primeira versão, porque eu escrevi as superfícies como `color-mix` de duas cores opacas e o medidor não resolve isso; viraram hexadecimal, que é como o resto da paleta vive: valor explícito, mensurável, sem "confie em mim".
+
+**Ainda não foi para produção** (falta `vercel --prod`), e é a primeira de seis frentes pedidas: cor, filtro por atendente, caixa de mensagem sem modelo, lotes do Radar, IA triando a fila do Radar e IA orientando o consultor.

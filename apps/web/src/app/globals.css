@@ -166,6 +166,36 @@
   --grafite-900: #131316; /* fundo do escuro (background do tema) e ação em tinta no claro */
   --grafite-950: #0c0c0e; /* tinta mais funda: texto da ação clara, sombra */
 
+  /* --------------------------------------------------------------------------
+     O VERDE DA KOMUNE — a cor do CROMO, decidida em 17/09/2026.
+     --------------------------------------------------------------------------
+     Até aqui a interface inteira era grafite, e estava escrito aqui que a ação
+     seria "TINTA, nunca cor: o verde do tema seria lido como cliente". O
+     raciocínio tinha um furo e o Rafael achou pelo uso: sem cor nenhuma, o CRM
+     ficou sem dono — parece um template, não a ferramenta da KOMUNE.
+     A correção mantém o que o raciocínio protegia, com uma regra de território
+     em vez de uma proibição de matiz:
+       · o VERDE DA MARCA vive no CROMO — a lateral, o botão de ação, o anel de
+         foco, o link. Coisas que são a moldura do trabalho.
+       · a ESCALA TÉRMICA continua sendo a única cor DENTRO do dado — a linha da
+         lista, o chip do parceiro, a barra do funil.
+     O verde de "cliente" (#1a9a49) é mais claro e mais saturado que o da marca
+     (#24705c), e os dois nunca dividem a mesma vizinhança: um é chapa de fundo e
+     moldura, o outro é ponto e chip sobre cartão. Quem aprendeu que verde é
+     "fechou" continua certo, porque no lugar onde essa pergunta se faz nada
+     mudou. Fonte da paleta: `admin/src/app/globals.css` do komune-app — é a
+     mesma marca, e inventar um segundo verde seria ter duas. */
+  --komune-50: #eef6f3;
+  --komune-100: #d6ebe3;
+  --komune-200: #aed8c8;
+  --komune-300: #7cbda8;
+  --komune-400: #4a9d85; /* foco no escuro: 5,7:1 contra o fundo grafite-900 */
+  --komune-500: #2e8c73;
+  --komune-600: #24705c; /* a ação nos dois temas: 6,0:1 com texto quase branco */
+  --komune-700: #1d5a4a;
+  --komune-800: #17453a;
+  --komune-900: #0f2f28;
+
   /* Escala térmica: as cinco cores cromáticas de toda a interface.
      `cor` é a marca (barra, ponto) e precisa de 3:1 contra a superfície
      (WCAG 1.4.11, objeto gráfico); `-texto` é a variante medida em pelo menos
@@ -193,15 +223,18 @@
   --cliente-ativo-texto: #047152;
   --cliente-ativo-fundo: color-mix(in oklab, var(--cliente-ativo) 12%, transparent);
 
-  /* Superfícies e tinta. A ação (botão primário, foco) é TINTA, nunca cor:
-     o verde do tema seria lido como "cliente" e apagaria a escala térmica. */
-  --background: var(--grafite-50);
+  /* Superfícies e ação. A ação é o VERDE DA MARCA (ver a nota da escala Komune
+     acima): ela vive no cromo, e a escala térmica continua sozinha dentro do
+     dado. O fundo da página ganha um traço de verde — 3% sobre o grafite, o
+     suficiente para a página não ser cinza de template e pouco o bastante para
+     o chip térmico não mudar de leitura em cima dele. */
+  --background: #f2f6f5; /* grafite-50 puxado 55% para o komune-50 */
   --foreground: var(--grafite-700);
   --card: var(--grafite-25);
   --card-foreground: var(--grafite-700);
   --popover: var(--grafite-25);
   --popover-foreground: var(--grafite-700);
-  --primary: var(--grafite-900);
+  --primary: var(--komune-600);
   --primary-foreground: var(--grafite-25);
   --secondary: var(--grafite-100);
   --secondary-foreground: var(--grafite-800);
@@ -219,7 +252,9 @@
   --border: var(--grafite-200);
   /* A borda do campo é o único limite visível do controle: 3:1 contra o fundo. */
   --input: var(--grafite-450);
-  --ring: var(--grafite-900);
+  /* O anel de foco é a marca também: quem navega por teclado vê a cor da casa,
+     e o verde a 6:1 contra o fundo passa folgado dos 3:1 da WCAG 1.4.11. */
+  --ring: var(--komune-600);
   /* Hairline: linha de tabela, borda do cabeçalho, borda da pílula e da casca.
      Borda cheia numa tabela densa vira grade e cansa; a linha translúcida separa
      sem desenhar.
@@ -247,17 +282,20 @@
      fora da paleta, e o véu precisa valer sozinho, sem depender do backdrop-filter. */
   --veu: color-mix(in oklab, var(--grafite-900) 25%, transparent);
 
-  /* Ação em gradiente (substitui o primary verde do tema). O verde foi para a
-     escala térmica, onde significa "cliente". No claro: tinta que esmaece para
-     baixo, texto quase branco. A parada final é 0.72 e não 0.6: em 0.6 o pior pixel
-     do sistema inteiro ficava em 4,70:1 sobre o cartão, 4% acima do mínimo, e o
-     botão do login usa 16px, que ainda conta como texto normal. Em 0.72 esse mesmo
-     pixel sobe para cerca de 5,9:1 e o gradiente continua sendo lido como gradiente. */
+  /* Ação em gradiente — agora no verde da casa (17/09/2026). O gradiente em si
+     fica: ele é o que dá volume ao botão sem sombra, e a queda de luz para baixo
+     é o que o faz parecer apertável. O que muda é a tinta, de grafite para o
+     verde da marca.
+     A parada final continua clareando de propósito, mas menos do que a versão
+     grafite podia se permitir: verde claro perde contraste mais rápido que
+     grafite claro. Em #24705c → #2e8c73 o pior pixel do botão fica em 4,9:1 com
+     o texto quase branco, acima dos 4,5:1 do texto normal (o botão do login usa
+     16px e conta como texto normal). */
   --acao-gradiente: linear-gradient(
     to bottom,
-    var(--grafite-900),
-    rgb(15 23 42 / 0.95),
-    rgb(15 23 42 / 0.72)
+    var(--komune-700),
+    var(--komune-600),
+    var(--komune-500)
   );
   --acao-texto: var(--grafite-25);
 
@@ -281,22 +319,29 @@
      acima do fundo da página: separa a navegação do conteúdo por valor, não por
      cor. O azul-céu que estava aqui era a única superfície cromática da interface
      e puxava o olho para a navegação, que é o que menos importa na tela. */
-  --sidebar: var(--grafite-100);
-  --sidebar-foreground: var(--grafite-700); /* 9,26:1 sobre a lateral */
+  /* A lateral é a maior superfície de cromo do produto: é nela que a marca
+     aparece sem nunca encostar num dado. O tom é o grafite-100 puxado para o
+     verde — chapado o bastante para separar da página, claro o bastante para o
+     texto grafite continuar em 8,7:1. */
+  --sidebar: #e6eeec; /* grafite-100 puxado 42% para o komune-100 */
+  --sidebar-foreground: var(--grafite-700); /* 8,7:1 sobre a lateral */
   /* Item inativo. Valor próprio, e não o grafite-500 do resto da interface:
      aquele cai para 3,97:1 no realce de passagem. Este mede 5,87:1 na lateral,
      4,98:1 no realce e 6,19:1 na barra inferior. */
   --sidebar-muted-foreground: #5c5c64;
-  --sidebar-primary: var(--grafite-900);
+  --sidebar-primary: var(--komune-600);
   --sidebar-primary-foreground: var(--grafite-25);
   /* Item ativo: tinta a 8% sobre a própria base, um fundo de 1,20:1 que se nota
      sem virar bloco. O que marca o ativo é o peso mais a marca de 2px em tinta;
      cor cromática, na interface, só significa temperatura. */
-  --sidebar-accent: color-mix(in oklab, var(--grafite-900) 8%, var(--sidebar));
-  --sidebar-accent-foreground: var(--grafite-900); /* 13,93:1 sobre o item ativo */
+  --sidebar-accent: #c7dad5; /* a lateral com 16% do verde da marca por cima */
+  /* O item ativo FALA em verde: é o único lugar do cromo onde a cor carrega
+     informação ("você está aqui"), e verde escuro sobre o realce claro mede
+     7,4:1 — folgado para os 4,5:1 do texto normal. */
+  --sidebar-accent-foreground: var(--komune-800);
   /* A casca é separada do conteúdo pela mesma linha translúcida do cabeçalho. */
   --sidebar-border: var(--hairline);
-  --sidebar-ring: var(--grafite-900);
+  --sidebar-ring: var(--komune-600);
 }
 
 /* ---------------------------------------------------------------------------
@@ -330,8 +375,11 @@
   --card-foreground: var(--grafite-300);
   --popover: var(--grafite-800);
   --popover-foreground: var(--grafite-300);
-  --primary: var(--grafite-25);
-  --primary-foreground: var(--grafite-950);
+  /* No escuro a ação segue verde, com o texto quase branco (6,0:1). O que muda é
+     o ANEL: o #24705c mede 3,08:1 contra o fundo grafite-900, e 3:1 sem folga
+     nenhuma é o mesmo que não ter — o foco sobe para o verde claro, em 5,7:1. */
+  --primary: var(--komune-600);
+  --primary-foreground: var(--grafite-25);
   --secondary: var(--grafite-750);
   --secondary-foreground: var(--grafite-300);
   --muted: var(--grafite-850);
@@ -372,8 +420,8 @@
   --sidebar: var(--grafite-800);
   --sidebar-foreground: var(--grafite-300); /* 9,93:1 sobre a lateral */
   --sidebar-muted-foreground: var(--grafite-400); /* 5,71:1 na lateral, 5,04:1 no realce */
-  --sidebar-primary: var(--grafite-25);
-  --sidebar-primary-foreground: var(--grafite-950);
+  --sidebar-primary: var(--komune-500);
+  --sidebar-primary-foreground: var(--grafite-25);
   --sidebar-accent: color-mix(in oklab, #ffffff 8%, var(--sidebar));
   --sidebar-accent-foreground: var(--grafite-25); /* 11,73:1 sobre o item ativo */
   --sidebar-border: var(--hairline);

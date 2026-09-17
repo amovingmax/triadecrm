@@ -24,11 +24,16 @@ type Props = {
  * Link de navegação com estado ativo pela rota atual; serve a lateral do desktop,
  * a barra inferior do celular e o menu "Mais".
  *
- * O ativo se marca por três coisas sem cromia: peso (font-medium), um fundo sutil
- * (tinta a 8% sobre a própria base da casca, 1,20:1 contra ela) e uma marca de 2px
- * em tinta, à esquerda na lateral e no topo na barra inferior. É a mesma gramática
- * da barra térmica da lista, e nenhuma delas gasta cor cromática, que na interface
- * só significa temperatura.
+ * O ativo se marca por quatro coisas: peso (font-medium), um fundo de marca a 16%
+ * sobre a base da casca, a tinta do rótulo em verde escuro (7,4:1) e uma marca de
+ * 2px na cor da marca, à esquerda na lateral e no topo na barra inferior.
+ *
+ * O verde aqui era proibido até 17/09/2026 — "cor só significa temperatura" — e a
+ * proibição valia enquanto a cor da marca e a da escala térmica dividissem o mesmo
+ * território. Não dividem: a térmica vive DENTRO do dado (linha da lista, chip do
+ * parceiro, barra do funil) e a marca vive no CROMO (esta lateral, o botão de
+ * ação, o anel de foco). "Você está em Conversas" e "este parceiro está quente"
+ * nunca são lidos no mesmo pedaço de tela.
  *
  * O inativo usa `--sidebar-muted-foreground`, medido contra o azul da casca; o
  * `--muted-foreground` do conteúdo pararia em 4,45:1 sobre ele.
