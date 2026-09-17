@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BotOff, ExternalLink, MessageSquarePlus } from 'lucide-react';
@@ -58,6 +58,9 @@ import { ROTULO_ESTADO_DO_FIO, type DependenciasDaMeta, type ItemConversa } from
  * segunda porta para `registrar_contato`, com outra previsão de temperatura e
  * outra fila offline.
  */
+/** Quantos pixels do fim ainda contam como "está no fim". */
+const FOLGA_DO_FIM = 120;
+
 export function Conversa({
   item,
   catalogos,
@@ -152,15 +155,40 @@ export function Conversa({
   const alvoDoRascunho = useRef<HTMLDivElement>(null);
   const quantosEventos = dias.reduce((soma, dia) => soma + dia.eventos.length, 0);
   const rascunhoId = rascunho?.id ?? null;
+
+  // QUEM ESTÁ LENDO O HISTÓRICO NÃO É PUXADO PARA O FIM.
+  //
+  // Enquanto a tela só se atualizava quando alguém recarregava, saltar para a
+  // última mensagem a cada mudança era sempre certo. Com o eco do banco, chega
+  // mensagem enquanto a pessoa lê — e rolar a tela debaixo de quem está lendo é
+  // a forma mais rápida de fazer alguém desistir de ler.
+  //
+  // A régua é onde ela ESTAVA antes de a mensagem chegar, medida durante a
+  // rolagem: perto do fim, acompanha; lendo o começo de agosto, fica onde está.
+  // Trocar de conversa sempre abre no fim, porque aí a pessoa pediu outra coisa.
+  const coladoNoFim = useRef(true);
+  const aoRolar = useCallback(() => {
+    const caixa = rolagem.current;
+    if (!caixa) return;
+    coladoNoFim.current = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < FOLGA_DO_FIM;
+  }, []);
+
+  const conversaAnterior = useRef<string | null>(null);
   useEffect(() => {
     const caixa = rolagem.current;
     if (!caixa) return;
+    const trocouDeConversa = conversaAnterior.current !== item.id;
+    conversaAnterior.current = item.id;
+    if (trocouDeConversa) coladoNoFim.current = true;
+
     const cartao = alvoDoRascunho.current;
     if (cartao) {
       caixa.scrollTop = Math.max(0, cartao.offsetTop - caixa.offsetTop - 12);
       return;
     }
-    if (quantosEventos > 0) caixa.scrollTop = caixa.scrollHeight;
+    if (quantosEventos > 0 && (trocouDeConversa || coladoNoFim.current)) {
+      caixa.scrollTop = caixa.scrollHeight;
+    }
   }, [item.id, quantosEventos, rascunhoId]);
 
   const negocio = consulta.data ? escolherNegocio(consulta.data.negocios) : null;
@@ -285,7 +313,7 @@ export function Conversa({
           blocos fixos somavam mais que a altura do painel e a conversa — a razão
           da tela — sobrava com trinta pixels. Endereço e categoria são consulta,
           não decisão: podem sair de vista quando a pessoa desce para ler. */}
-      <div ref={rolagem} className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
+      <div ref={rolagem} onScroll={aoRolar} className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
         {/* A ficha em UMA LINHA que quebra, e não numa grade de seis campos.
             A grade custava 200 px do painel; com o rodapé do inbox embaixo, esses
             200 px eram a conversa inteira. Onde, categoria, dono e último contato

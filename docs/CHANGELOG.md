@@ -2396,3 +2396,28 @@ A perda que eu usei como argumento contra recodificar é real e é irrelevante: 
 **Provado:** workers 362 testes; os do preparo passaram a fixar mono, 48 kHz e `voip`, e a proibir `copy`. A conversão foi medida no ffmpeg real (Alpine, o mesmo da imagem) contra o arquivo que falhou.
 
 **Pendente:** confirmar no celular. Este é o único teste que existe para "toca" — e por isso a mudança vai com o worker novo, para a próxima gravação sair já convertida.
+
+### 17/09/2026 — A tela de Conversas se atualiza sozinha (RF-CON-05, RF-CON-06)
+
+"Preciso de uma automatização que rode e atualize a tela a cada resposta do cliente" (Rafael). O atraso não era do motor: o worker-wa varre a fila a cada 5 s, então a resposta do parceiro está no banco segundos depois de ele apertar enviar. Quem não sabia era a tela — `useQuery` sem `refetchInterval` busca uma vez e para, e a resposta só aparecia para quem recarregava a página.
+
+**Escutar, e não perguntar.** A lista de Conversas custa seis leituras, e uma delas traz 3.000 atividades para ordenar no cliente. Repetir isso a cada 10 s, por pessoa e por aba aberta, seria pagar caro por uma tela que continuaria atrasada — só que menos. Agora o banco avisa (Supabase Realtime) e a tela busca só então; em dia parado, custo zero. A migração `20260917150000` publica quatro tabelas e só quatro: `messages` (a resposta chegando, e fila → enviado → entregue → lido), `conversations` (a janela de 24 h reabrindo, o "por ler"), `message_drafts` (a fila do ADR-05 crescendo) e `ficha_da_conversa` (a leitura da IA, que fica pronta 30–60 s depois). `activities`, `deals` e `organizations` ficam de fora: mudam por ação de quem está na tela, que já invalida a consulta na hora.
+
+**Quem protege o que viaja é a RLS**, a mesma da tela e do PostgREST — e isso foi medido, não suposto: com dois usuários reais assinando o mesmo canal no banco local, o admin recebeu a mensagem de entrada e o embaixador fora da carteira recebeu **zero** eventos.
+
+**As cinco decisões de comportamento**, todas do tipo que erra calado se ninguém as escrever:
+- **O evento não traz o conteúdo.** Ele diz "mudou algo nesta conversa"; quem busca é o TanStack Query, pelo PostgREST. Montar a mensagem a partir do payload seria manter duas montagens do mesmo dado, e a do evento nunca veria o que um gatilho mudou depois.
+- **Rajada vira uma busca só.** Áudio, texto e dois recibos em dois segundos são um `invalidate`, não quatro (janela de 400 ms).
+- **Aba escondida não busca.** Guarda o que mudou e resolve quando a pessoa volta — um CRM aberto em oito abas não multiplica por oito a carga de cada mensagem.
+- **A ficha da IA atualiza só a faixa dela.** Um resumo reescrito não muda ordem, prévia nem "por ler"; recarregar as seis consultas da lista por causa dele seria pagar o preço da lista inteira por um texto.
+- **Sem eco, pergunta barato.** Se o socket não sobe (rede da empresa, proxy), entra uma sondagem de duas consultas minúsculas a cada 20 s, que só dispara a busca pesada quando a assinatura muda — e **a tela diz em que modo está** ("ao vivo" ou "atualizando a cada 20 s"), porque "parece parado" e "está parado" precisam ser distinguíveis por quem usa.
+
+**O aviso é só do que a pessoa não está vendo.** Quem responde na conversa aberta já aparece na tela; avisar seria contar o que ela acabou de ler. Para as outras, um toast com o nome do parceiro e um "Abrir" que leva até lá.
+
+**A rolagem parou de puxar quem está lendo.** Antes, qualquer mudança levava a coluna para a última mensagem — sempre certo quando a tela só mudava por recarga. Com o eco, chega mensagem enquanto a pessoa lê agosto, e rolar a tela debaixo de quem está lendo é a forma mais rápida de fazer alguém desistir de ler. Agora a régua é onde ela estava: perto do fim, acompanha; lendo o histórico, fica. Trocar de conversa sempre abre no fim, porque aí ela pediu outra coisa.
+
+**Provado:** pgTAP 52 (11 asserções: as quatro publicadas, só elas, as quatro com RLS, e a `replica identity` padrão); suíte com **2712 asserções**. Vitest web 736 (10 novos, sobre o que recarregar e quando avisar). E o caminho inteiro medido contra a pilha local com JWT de verdade: canal `SUBSCRIBED`, `wa_entrada_registrar` → evento `INSERT` em `messages` com `direction: in` no assinante certo, nada no errado.
+
+**Decisão humana / pendente:**
+- A migração `20260917150000` e o deploy do web ainda não foram para produção.
+- O teste no navegador é de quem tem sessão: a entrada local é só por Google, e eu não tenho como logar aqui. O que dá para garantir daqui está garantido — o socket, a RLS e a decisão do que recarregar.

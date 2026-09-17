@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 import { SeletorDeAba } from '@/components/ui/abas';
@@ -9,6 +10,7 @@ import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
 import { Conversa } from './conversa';
 import { carregarConversas, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
+import { useEcoDasConversas, type EstadoDoEco, type EventoDoEco } from './eco-do-banco';
 import {
   ErroDaTela,
   EsqueletoLista,
@@ -131,6 +133,49 @@ export function TelaConversas({
     }
   }, [filtros, escolhidoId, aba]);
 
+  // O AVISO DE QUEM RESPONDEU.
+  //
+  // Só para conversa que NÃO está aberta: quem responde na conversa em que a
+  // pessoa está olhando já aparece na tela — avisar seria contar o que ela
+  // acabou de ver. O nome vem da lista já carregada; conversa nova ainda não
+  // tem nome aqui, e aí o aviso diz o que sabe em vez de inventar.
+  const nomePorId = useRef(new Map<string, string>());
+  useEffect(() => {
+    nomePorId.current = new Map(todos.map((i) => [i.id, i.nome]));
+  }, [todos]);
+
+  const aoResponderem = useCallback((respostas: EventoDoEco[]) => {
+    const nomes = [
+      ...new Set(
+        respostas
+          .map((r) => (r.organizacaoId === null ? null : nomePorId.current.get(r.organizacaoId)))
+          .filter((n): n is string => n !== undefined && n !== null),
+      ),
+    ];
+    const primeira = respostas[0];
+    const abrir =
+      nomes.length === 1 && primeira?.organizacaoId
+        ? {
+            label: 'Abrir',
+            onClick: () => {
+              setAba('conversas');
+              setEscolhidoId(primeira.organizacaoId);
+            },
+          }
+        : undefined;
+
+    toast.success(
+      nomes.length === 1
+        ? `${nomes[0]} respondeu.`
+        : respostas.length === 1
+          ? 'Chegou uma mensagem nova.'
+          : `Chegaram ${respostas.length} mensagens novas.`,
+      { description: 'A lista já está atualizada.', action: abrir },
+    );
+  }, []);
+
+  const eco = useEcoDasConversas({ organizacaoAberta: aberta?.id ?? null, aoResponderem });
+
   const mudar = useCallback((parcial: Partial<FiltrosConversas>) => {
     setFiltros((atual) => ({ ...atual, ...parcial }));
   }, []);
@@ -165,7 +210,10 @@ export function TelaConversas({
       {telaCheia ? null : (
         <>
           <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h1 className="font-heading text-lg font-semibold tracking-tight">Conversas</h1>
+            <h1 className="flex items-baseline gap-2 font-heading text-lg font-semibold tracking-tight">
+              Conversas
+              <EstadoAoVivo estado={eco} />
+            </h1>
             <p className="text-xs text-muted-foreground">
               {consulta.isPending ? (
                 'Carregando o histórico...'
@@ -349,6 +397,44 @@ export function TelaConversas({
  * essa conta, "5 esperando" parece uma pilha parada, quando às vezes é uma pilha
  * que some hoje à noite.
  */
+/**
+ * Em que modo a tela está se atualizando.
+ *
+ * Fala só quando há o que dizer. Ligada ao banco, um ponto e duas palavras —
+ * discretos, mas presentes, porque "a tela atualiza sozinha" é uma promessa e
+ * promessa sem sinal vira desconfiança no primeiro minuto de silêncio. Sem o
+ * eco, diz o que passou a fazer no lugar: quem precisa saber é quem vai esperar
+ * uma resposta olhando para a tela.
+ *
+ * `ligando` não mostra nada: um aviso que aparece por meio segundo em toda
+ * abertura de tela é piscada, não informação. Sem cor nenhuma — nesta tela a
+ * escala térmica é a única cor, e um ponto verde competiria com ela.
+ */
+function EstadoAoVivo({ estado }: { estado: EstadoDoEco }) {
+  if (estado === 'ligando') return null;
+
+  if (estado === 'sem_eco') {
+    return (
+      <span
+        className="text-[0.6875rem] font-normal text-muted-foreground"
+        title="A conexão ao vivo com o banco não subiu (rede ou proxy). A tela confere sozinha a cada 20 segundos."
+      >
+        atualizando a cada 20 s
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="flex items-baseline gap-1.5 text-[0.6875rem] font-normal text-muted-foreground"
+      title="A tela recebe do banco e se atualiza sozinha quando o parceiro responde."
+    >
+      <span aria-hidden="true" className="size-1.5 self-center rounded-full bg-current" />
+      ao vivo
+    </span>
+  );
+}
+
 function Abas({
   aba,
   aoTrocar,
