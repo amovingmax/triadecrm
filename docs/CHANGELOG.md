@@ -2453,3 +2453,19 @@ O que **não** era, e foi medido antes de mexer: o arquivo (ogg/opus mono 48 kHz
 **Provado:** workers 363 testes, um deles fixando que todo áudio com `media id` sai com `voice: true`. E no aparelho: o mesmo áudio que falhava passou a chegar com onda sonora e controle de velocidade — o formato mudou, confirmado por captura de tela.
 
 **Pendente:** neste aparelho, mesmo como mensagem de voz, um áudio ainda não tocou. A investigação continua — o próximo corte é se mídia de outro tipo (imagem) baixa nele.
+
+### 17/09/2026 — O áudio toca no celular: era o relógio do arquivo (RF-CON-27)
+
+Fechando a investigação do áudio. Eram **duas** coisas, e nenhuma delas era o que parecia.
+
+**1. Faltava `voice: true`** (commit anterior). Sem o parâmetro, a Cloud API entrega arquivo anexado em vez de mensagem de voz — e arquivo anexado o aparelho não baixa sozinho.
+
+**2. A marca do início do som saía deslocada.** O webm do `MediaRecorder` não traz duração nem instante inicial, e o Chrome escreve o primeiro pacote com um pequeno atraso. O ffmpeg arrastava esse vazio para o ogg: a primeira página de som saía marcada **47688** em vez de **48000** — deslocada exatamente pelo `pre-skip` de 312 amostras. O WhatsApp usa essa marca para saber onde o som começa; com ela errada, o aparelho recusa o áudio e mostra "este áudio não está mais disponível".
+
+`-af aresample=async=1:first_pts=0` resolve, e o custo é zero.
+
+**Como isso foi achado, porque o caminho importa.** A falha parecia intermitente — o mesmo áudio às vezes tocava depois de um tempo, e no WhatsApp Web tocava sempre. Intermitência empurra para explicações de rede, e foi para lá que eu fui primeiro (e errei). O que resolveu foi parar de explicar e medir: cinco arquivos enviados ao mesmo aparelho, cada um com uma origem e um codificador diferentes, e o cabeçalho de cada um lido byte a byte. A divisão foi exata — **os três com marca 48000 tocaram; os dois com 47688, não**. Só então a hipótese virou conserto.
+
+**O que foi eliminado por medição, antes:** o arquivo (ogg/opus mono 48 kHz, íntegro, com marca de fim), a conversão (volta da Meta byte a byte idêntica), a expiração (baixável por 8 minutos, medido minuto a minuto), a deduplicação (apagar e resubir os mesmos bytes devolve mídia sã), a conta (CONNECTED, qualidade verde) e a mídia em geral — uma imagem enviada ao mesmo aparelho abriu na hora, o que provou que o problema era só do áudio.
+
+**Provado no aparelho:** o mesmo áudio que falhava, reconvertido com a linha nova, tocou no iPhone. Workers 363 testes; um deles fixa a linha, porque ela é invisível e some no primeiro refactor de quem não souber o que ela faz.

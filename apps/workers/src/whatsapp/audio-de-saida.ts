@@ -85,6 +85,23 @@ const MIMES_QUE_SABEMOS_CONVERTER: ReadonlySet<string> = new Set([
 const ARGUMENTOS_DO_OPUS: readonly string[] = [
   '-vn',
   '-map_metadata', '-1',
+  // O RELÓGIO ZERADO — a linha que fez o áudio tocar no celular.
+  //
+  // O webm do `MediaRecorder` não traz duração nem instante inicial (o ffprobe
+  // diz `Duration: N/A`), e o Chrome escreve o primeiro pacote com um pequeno
+  // atraso. Sem esta linha o ffmpeg arrasta esse vazio para o ogg: a primeira
+  // página de som sai marcada 47688 em vez de 48000 — deslocada exatamente pelo
+  // `pre-skip` de 312 amostras.
+  //
+  // O WhatsApp lê essa marca para saber onde o som começa. Com ela deslocada, o
+  // aparelho recusa o áudio e mostra "este áudio não está mais disponível" — e o
+  // WhatsApp Web toca assim mesmo, o que faz a falha parecer intermitente e
+  // manda quem investiga para o lado errado.
+  //
+  // Foi medido, não deduzido: cinco arquivos, os três com marca 48000 tocaram no
+  // iPhone e os dois com 47688 não. Com esta linha o MESMO áudio que falhava
+  // passou a marcar 48000 e tocou.
+  '-af', 'aresample=async=1:first_pts=0',
   '-c:a', 'libopus',
   '-b:a', '24k',
   '-ar', '48000',

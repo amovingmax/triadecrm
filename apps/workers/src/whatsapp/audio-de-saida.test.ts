@@ -98,6 +98,9 @@ describe('preparar o áudio', () => {
     expect([...pronto.bytes]).toEqual([9, 9, 9]);
 
     const argumentos = executar.mock.calls[0]?.[1] ?? [];
+    // O relógio zerado: sem ele, a primeira página de som sai deslocada pelo
+    // pre-skip (47688 em vez de 48000) e o celular recusa o áudio inteiro.
+    expect(argumentos).toContain('aresample=async=1:first_pts=0');
     // Mono, 48 kHz, perfil de voz: o que o WhatsApp manda. `copy` saiu daqui
     // porque o arquivo que ele produzia era aceito pela Meta e não tocava.
     expect(argumentos).toContain('libopus');
