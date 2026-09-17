@@ -28,6 +28,7 @@ import type { AcaoDeRevisao } from './dados';
  * no celular, e o Radar também não pode ter.
  */
 const ALVO_INLINE = 'inline-flex min-h-11 items-center md:min-h-0';
+import { ProcurarTelefoneDoCandidato } from './procurar-telefone-do-candidato';
 import {
   EXPLICACAO_DA_FAIXA,
   EXPLICACAO_DA_MARCA,
@@ -215,6 +216,15 @@ export function CartaoCandidato({
           <li className="text-muted-foreground">Nenhum contato conhecido ainda.</li>
         ) : null}
       </ul>
+
+      {/* SEM TELEFONE, A BUSCA FICA AQUI — na hora da decisão, não depois dela.
+          A fila tinha 277 candidatos e UM telefone, e "existe número público
+          para este nome?" é parte de decidir se vale aprovar, não consequência
+          de ter aprovado. Só aparece para quem decide, e só em quem ainda não
+          tem número. */}
+      {pendente && podeDecidir && !candidato.telefone && !candidato.nao_contatar ? (
+        <ProcurarTelefoneDoCandidato candidatoId={candidato.id} />
+      ) : null}
 
       {candidato.observacao ? (
         <p className="max-w-prose text-sm text-muted-foreground">{candidato.observacao}</p>

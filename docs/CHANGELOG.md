@@ -2686,3 +2686,25 @@ Tudo o que foi feito hoje foi para o ar: **as doze migrações** e o CRM na Verc
 2. **O conserto quebrou um terceiro caso.** Ao trocar a condição, tirei quem chama **sem JWT nenhum**: `psql`, uma migração, o `pg_cron`. Quem pegou foi o pgTAP 55, que chama a função fora de qualquer papel — e é assim que ele deve chamar, porque testar regra de papel exige poder rodar sem papel. Agora os três casos estão escritos na ordem em que a pergunta se faz: não há JWT → é o banco falando com ele mesmo; é o worker → passa; é gente → admin ou gestor.
 
 **Provado:** suíte em **56 arquivos e 2756 asserções**, com a função nova aplicada em produção pelo mesmo caminho.
+
+### 17/09/2026 — O telefone: a investigação, a conclusão dura e o que dá para fazer
+
+A fila do Radar tem 277 candidatos e **um** telefone. Antes de escrever coletor novo, li o `robots.txt` de cada fonte que publica número. O resultado não é o que se queria:
+
+| Fonte | O que ela permite |
+|---|---|
+| **telelistas.net** | o `robots.txt` **não responde**. Sem ele, o RF-RAD-01 proíbe ligar a fonte |
+| **guiamais.com.br** | o robots libera (só `/pme/` e `/dicas/` fora), mas a listagem é montada por JavaScript: **não há dado nenhum no HTML** |
+| **solutudo.com.br** | o robots proíbe justamente `/empresas/busca/resultados*` — o caminho da descoberta |
+| **olx.com.br** | Cloudflare devolve **403 até para o `robots.txt`**. Passar por cima é contornar um bloqueio, e não é o que a gente faz |
+| **Google Places** | tem os telefones, e os Termos proíbem guardar — decisão já registrada (R03 §2.4) |
+
+**Não existe caminho de raspagem legal e barato para telefone.** Isso precisa ficar escrito, porque é a pergunta que volta toda vez que alguém olha a fila.
+
+**O que dá para fazer é o que o R03 §2.4 já tinha prescrito:** o Places como gatilho de **descoberta**. Ele mostra o número na tela; quem grava é a pessoa, depois de confirmar com o fornecedor. Isso já existia na ficha do parceiro — mas a ficha só nasce **depois** de alguém aprovar o candidato, e quem está revisando a fila precisa da informação **antes**: "existe telefone público para este nome?" é parte de decidir se vale a pena, não consequência de ter decidido.
+
+Então a busca entrou na fila: `/api/telefone/candidato` com as mesmas guardas da rota irmã, e na mesma ordem — sessão, RLS de quem pediu (candidato invisível responde igual a inexistente), e as recusas de produto (já tem telefone, pediu para não ser contatado). O botão aparece só para quem decide, e só em candidato sem número.
+
+**E ela não guarda nada.** O resultado vai para a tela e morre ali, com a frase dizendo por quê. Um "salvar automático" seria o botão proibido com outro nome.
+
+**Provado:** web 744 testes, lint, typecheck e build limpos, com as duas rotas no build.
