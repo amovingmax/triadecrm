@@ -388,6 +388,14 @@ export function aplicarFiltros(itens: ItemConversa[], f: FiltrosConversas): Item
       if (!meu) return false;
     }
 
+    // "Atendendo" é ESTREITO, e é essa a diferença. Ele pergunta só por
+    // `conversations.assignee_id`: quem está falando com este parceiro agora.
+    // Parceiro sem fio de WhatsApp não tem atendente e sai da lista — não é
+    // omissão, é a resposta certa para "o que a Heloísa está atendendo".
+    if (f.atendenteId !== null) {
+      if (item.fio?.responsavelId !== f.atendenteId) return false;
+    }
+
     if (f.canal !== null && !item.canais.includes(f.canal)) return false;
 
     if (!cabeNaJanela(item.diasSemContato, f.janela)) return false;

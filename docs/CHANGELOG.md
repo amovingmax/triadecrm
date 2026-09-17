@@ -2517,3 +2517,21 @@ Os dois nunca dividem vizinhança. "Você está em Conversas" e "este parceiro e
 **Provado:** a suíte de contraste do próprio CRM (`contraste.test.ts`, que mede cada par de cores contra WCAG) passa nos dois temas — **736 testes**. Ela chegou a recusar a primeira versão, porque eu escrevi as superfícies como `color-mix` de duas cores opacas e o medidor não resolve isso; viraram hexadecimal, que é como o resto da paleta vive: valor explícito, mensurável, sem "confie em mim".
 
 **Ainda não foi para produção** (falta `vercel --prod`), e é a primeira de seis frentes pedidas: cor, filtro por atendente, caixa de mensagem sem modelo, lotes do Radar, IA triando a fila do Radar e IA orientando o consultor.
+
+### 17/09/2026 — Conversas: filtro por quem atende, e a caixa de mensagem sem formulário
+
+Duas das seis frentes que o Rafael pediu.
+
+**1. "Atendendo" virou filtro próprio.** Havia um filtro de pessoa só, chamado "Responsável", e ele era largo de propósito: dono do negócio **ou** quem atende o fio **ou** quem registrou qualquer contato. Isso responde "o que é meu?" e foi escrito para quem filtra por si mesma. Mas quem coordena um time faz outra pergunta — "com quem a Heloísa está falando agora?" — e nessa a largura vira ruído: entram as fichas que ela tocou uma vez em agosto.
+
+Agora são dois. "Responsável" continua largo; **"Atendendo" é estreito**, olha só `conversations.assignee_id`. Parceiro sem fio de WhatsApp sai da lista quando ele está ligado, e isso é a resposta certa, não uma omissão. O recorte entra na URL (`?atendente=`), como os outros, então um link de "olha o que a Heloísa está atendendo" pode ser mandado no grupo.
+
+**2. A caixa de mensagem parou de pedir o que o CRM já sabe.** A queixa foi exata: *"eu falei que queria livre total, e você me deu um campo livre e um campo com nome do cliente que se encaixa num modelo pré-escrito"*. Era verdade: **toda** variável da moldura virava um campo, inclusive `{{nome}}`, que a ficha responde. Escrevia-se ao lado de um formulário perguntando um dado que já está na base.
+
+Agora o campo aparece **só quando o valor falta mesmo**. A lista sai de `previa.valores` — o que o servidor sabe — e não do que está digitado: se dependesse do digitado, apagar o texto faria o campo sumir embaixo do cursor.
+
+E **a prévia subiu**: "Como vai chegar" ficava depois dos campos, longe demais de onde se digita para ser lida enquanto se digita. Agora vem logo abaixo da caixa — a resposta à única pergunta que importa antes de mandar mensagem para um estranho.
+
+**O que não dá para mudar, e precisa ser dito:** fora das 24 h desde a última mensagem do parceiro, a Meta só aceita moldura aprovada. Não é decisão nossa nem preguiça de implementação. O que dá para fazer — e foi feito — é que a moldura não peça nada além do texto, e que a pessoa veja exatamente o que sai.
+
+**Provado:** 737 testes no web, um novo fixando que "Atendendo" é estreito e nunca traz quem só passou por perto.

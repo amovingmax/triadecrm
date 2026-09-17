@@ -272,6 +272,28 @@ describe('aplicarFiltros', () => {
     ).toEqual(['o2']);
   });
 
+  it('ATENDENDO é estreito: só quem cuida do fio, e nunca quem só passou por perto', () => {
+    // A diferença entre os dois filtros é o ponto inteiro. "Responsável" responde
+    // "o que é meu?" e abraça três laços; "Atendendo" responde "com quem esta
+    // pessoa está falando agora?" e olha só `conversations.assignee_id`.
+    const comFio = aplicarFiltros(itens, { ...FILTROS_VAZIOS, atendenteId: MATHEUS });
+    for (const item of comFio) {
+      expect(item.fio?.responsavelId).toBe(MATHEUS);
+    }
+
+    // Quem aparece no filtro largo por ter registrado UM contato não aparece
+    // neste — é exatamente a lista poluída de que o filtro antigo sofria.
+    const largo = aplicarFiltros(itens, { ...FILTROS_VAZIOS, responsavelId: MATHEUS });
+    expect(comFio.length).toBeLessThanOrEqual(largo.length);
+
+    // Parceiro sem fio de WhatsApp não tem atendente: sai da lista, e isso é a
+    // resposta certa, não uma omissão.
+    const semFio = itens.filter((i) => i.fio === null);
+    for (const item of semFio) {
+      expect(comFio.map((c) => c.id)).not.toContain(item.id);
+    }
+  });
+
   it('filtra por canal usado em qualquer interação', () => {
     expect(
       aplicarFiltros(itens, { ...FILTROS_VAZIOS, canal: 'whatsapp' }).map((i) => i.id),

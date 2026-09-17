@@ -242,7 +242,21 @@ function Formulario({
   // `{{atendente}}` não é campo: o banco põe o nome de quem clicou, sempre. E a
   // variável de texto livre não é campo de formulário: ela É a mensagem.
   const livre = variavelLivreDoModelo(modelo);
-  const campos = modelo.variaveis.filter((v) => v !== VARIAVEL_DO_ATENDENTE && v !== livre);
+
+  // CAMPO SÓ PARA O QUE O CRM NÃO SABE.
+  //
+  // Antes, toda variável da moldura virava um campo — inclusive `{{nome}}`, que a
+  // base já responde. O resultado era uma caixa de escrever ao lado de um
+  // formulário pedindo um dado que está na ficha, e a queixa foi exata: "me deu
+  // um campo livre e um campo com nome do cliente que se encaixa num modelo".
+  // Agora o campo aparece só quando falta mesmo o valor.
+  //
+  // A lista é calculada a partir de `previa.valores` — o que o SERVIDOR sabe —, e
+  // não do que está digitado: se dependesse do digitado, apagar o texto do campo
+  // faria o campo sumir embaixo do cursor.
+  const campos = modelo.variaveis.filter(
+    (v) => v !== VARIAVEL_DO_ATENDENTE && v !== livre && (previa.valores[v] ?? '').trim() === '',
+  );
   const assinaComNome = modelo.variaveis.includes(VARIAVEL_DO_ATENDENTE);
 
   const enviar = useMutation({
@@ -294,7 +308,7 @@ function Formulario({
       {livre ? (
         <div className="space-y-1">
           <label htmlFor={`livre-${modelo.id}`} className="text-xs text-muted-foreground">
-            O que você quer dizer
+            Escreva a mensagem
           </label>
           <textarea
             id={`livre-${modelo.id}`}
@@ -313,6 +327,23 @@ function Formulario({
           </p>
         </div>
       ) : null}
+
+      {/* O QUE VAI SAIR, COLADO NO QUE SE ESCREVE.
+          A prévia ficava lá embaixo, depois dos campos e antes do botão — longe
+          demais do lugar onde a pessoa digita para ser lida enquanto ela digita.
+          Aqui em cima ela vira o que é: a resposta à única pergunta que importa
+          antes de mandar uma mensagem para um estranho. */}
+      <div className="space-y-1">
+        <p className="text-xs text-muted-foreground">
+          Como vai chegar
+          {assinaComNome && previa.valores[VARIAVEL_DO_ATENDENTE]
+            ? ` · assinada com o seu nome (${previa.valores[VARIAVEL_DO_ATENDENTE]})`
+            : null}
+        </p>
+        <p className="rounded-lg border border-hairline bg-card/60 px-3 py-2 text-sm leading-relaxed whitespace-pre-line">
+          {texto}
+        </p>
+      </div>
 
       {pedido && !modeloDoRecibo ? (
         <p className="text-[11px] leading-relaxed text-muted-foreground">
@@ -380,18 +411,6 @@ function Formulario({
           })}
         </div>
       ) : null}
-
-      <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">
-          Como vai chegar
-          {assinaComNome && previa.valores[VARIAVEL_DO_ATENDENTE]
-            ? ` · a mensagem se apresenta com o seu nome (${previa.valores[VARIAVEL_DO_ATENDENTE]})`
-            : null}
-        </p>
-        <p className="rounded-lg border border-hairline bg-card/60 px-3 py-2 text-sm leading-relaxed whitespace-pre-line">
-          {texto}
-        </p>
-      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" className="toque h-11 md:h-9" disabled={!pode}>

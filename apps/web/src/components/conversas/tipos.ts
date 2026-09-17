@@ -229,6 +229,17 @@ export type FiltrosConversas = {
   q: string;
   /** Dono do negócio ou quem registrou alguma interação (`profiles.id`). */
   responsavelId: string | null;
+  /**
+   * Quem ATENDE o fio de WhatsApp (`conversations.assignee_id`), e só isso.
+   *
+   * Existe separado de `responsavelId` porque as duas perguntas são diferentes e
+   * a mistura escondia a resposta. "Responsável" é largo de propósito — dono do
+   * negócio, quem atende, quem registrou qualquer contato — e responde "o que é
+   * meu?". Este responde "quem está FALANDO com este parceiro agora?", que é a
+   * pergunta de quem coordena um time: ver só o que a Heloísa atende, sem as
+   * fichas que ela apenas tocou uma vez em agosto.
+   */
+  atendenteId: string | null;
   canal: Channel | null;
   janela: JanelaSemContato;
 };
@@ -236,6 +247,7 @@ export type FiltrosConversas = {
 export const FILTROS_VAZIOS: FiltrosConversas = {
   q: '',
   responsavelId: null,
+  atendenteId: null,
   canal: null,
   janela: 'qualquer',
 };
@@ -243,15 +255,22 @@ export const FILTROS_VAZIOS: FiltrosConversas = {
 /** Há algum recorte ligado? Separa "a base está vazia" de "o filtro não achou nada". */
 export function temRecorte(f: FiltrosConversas): boolean {
   return (
-    f.q.trim() !== '' || f.responsavelId !== null || f.canal !== null || f.janela !== 'qualquer'
+    f.q.trim() !== '' ||
+    f.responsavelId !== null ||
+    f.atendenteId !== null ||
+    f.canal !== null ||
+    f.janela !== 'qualquer'
   );
 }
 
 /** Quantos filtros de lista (fora a busca) estão ligados: alimenta o contador. */
 export function contarFiltros(f: FiltrosConversas): number {
-  return [f.responsavelId, f.canal, f.janela === 'qualquer' ? null : f.janela].filter(
-    (v) => v !== null,
-  ).length;
+  return [
+    f.responsavelId,
+    f.atendenteId,
+    f.canal,
+    f.janela === 'qualquer' ? null : f.janela,
+  ].filter((v) => v !== null).length;
 }
 
 // ---------------------------------------------------------------------------
@@ -285,6 +304,7 @@ export function estadoDaUrl(params: Record<string, string | string[] | undefined
       ...FILTROS_VAZIOS,
       q: texto('q'),
       responsavelId: texto('responsavel') || null,
+      atendenteId: texto('atendente') || null,
       canal: ehCanal(canal) ? canal : null,
       janela: ehJanela(janela) ? janela : 'qualquer',
     },
@@ -302,6 +322,7 @@ export function urlDoEstado(
   const p = new URLSearchParams();
   if (f.q.trim()) p.set('q', f.q.trim());
   if (f.responsavelId) p.set('responsavel', f.responsavelId);
+  if (f.atendenteId) p.set('atendente', f.atendenteId);
   if (f.canal) p.set('canal', f.canal);
   if (f.janela !== 'qualquer') p.set('janela', f.janela);
   if (aba !== 'conversas') p.set('aba', aba);

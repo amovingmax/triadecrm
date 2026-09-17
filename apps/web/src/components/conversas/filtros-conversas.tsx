@@ -101,6 +101,18 @@ export function FiltrosDaConversa({
             opcoes={pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
             aoMudar={(v) => aoMudar({ responsavelId: v })}
           />
+          {/* "Atendendo" vem logo depois de "Responsável" porque é a mesma lista de
+              gente e a pergunta vizinha — mas a resposta é outra, e a diferença
+              está no gatilho e no `aria`: um é largo (qualquer laço), o outro é
+              só quem cuida da conversa. Quem coordena o time usa este. */}
+          <Filtro
+            rotulo="Atendendo"
+            todos="Qualquer atendente"
+            aria="Filtrar por quem atende a conversa no WhatsApp"
+            valor={filtros.atendenteId}
+            opcoes={pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
+            aoMudar={(v) => aoMudar({ atendenteId: v })}
+          />
           <Filtro
             rotulo="Canal"
             todos="Todos os canais"

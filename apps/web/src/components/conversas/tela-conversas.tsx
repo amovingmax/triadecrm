@@ -497,6 +497,8 @@ function descreverRecorte(filtros: FiltrosConversas, catalogos: CatalogosConvers
   if (filtros.q.trim()) partes.push(`busca "${filtros.q.trim()}"`);
   const pessoa = catalogos.pessoas.find((p) => p.id === filtros.responsavelId);
   if (pessoa) partes.push(`responsável ${pessoa.nome}`);
+  const atende = catalogos.pessoas.find((p) => p.id === filtros.atendenteId);
+  if (atende) partes.push(`atendido por ${atende.nome}`);
   if (filtros.canal) partes.push(`canal ${ROTULO_CANAL[filtros.canal]}`);
   if (filtros.janela !== 'qualquer') partes.push(`"${ROTULO_JANELA[filtros.janela]}"`);
 
