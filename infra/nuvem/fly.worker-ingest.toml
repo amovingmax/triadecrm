@@ -1,0 +1,48 @@
+# =============================================================================
+# worker-ingest no Fly.io — o coletor do Radar (decisão de 17/09/2026)
+# =============================================================================
+#
+# O mesmo apps/workers/Dockerfile dos outros, rodando só o comando `ingest`.
+#
+# POR QUE ELE SAIU DA MÁQUINA LOCAL. O ADR-04 manda ingest, IA e rotas rodarem na
+# máquina dedicada — que continua não existindo. Na prática o coletor só rodava
+# quando alguém abria o terminal do próprio Mac, e em 17/09/2026 a tela do Radar
+# dizia "o coletor está parado, última batida 8 dias atrás" porque era
+# exatamente isso que estava acontecendo. Mesma mudança, e pelo mesmo motivo, que
+# o worker-wa fez em 14/09.
+#
+# Não publica porta nenhuma: ele lê fila no banco e busca página na web. Sem
+# porta, sem auto-stop — a máquina fica de pé e dorme entre as coletas (5 s de
+# descanso com a fila vazia, como os outros).
+#
+# Publicar (da RAIZ do repositório — o contexto do build é o monorepo inteiro):
+#   fly deploy . --config infra/nuvem/fly.worker-ingest.toml --dockerfile apps/workers/Dockerfile
+#
+# Segredos por `fly secrets set` (nunca aqui): SUPABASE_URL e
+# SUPABASE_SERVICE_ROLE_KEY. O coletor não precisa de mais nada — chave de IA e
+# token da Meta são dos outros dois workers.
+#
+# Agendar uma coleta (ele não agenda sozinho; quem decide o alvo é gente):
+#   fly ssh console -a triade-worker-ingest -C "node /app/apps/workers/dist/index.js ingest --agendar --fonte <slug> --paginas 3"
+# =============================================================================
+
+app = "triade-worker-ingest"
+primary_region = "gru"
+
+# O SIGTERM acorda o descanso (lib/dormir.ts) e o worker termina a página atual
+# antes de sair. O pior caso é uma busca em andamento.
+kill_signal = "SIGTERM"
+kill_timeout = "35s"
+
+[env]
+  WORKER_COMANDO = "ingest"
+  NODE_ENV = "production"
+  TZ = "America/Fortaleza"
+
+# Caiu, volta. O que estava na fila continua no banco, esperando.
+[[restart]]
+  policy = "always"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

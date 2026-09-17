@@ -2483,3 +2483,19 @@ Fechando a investigação do áudio. Eram **duas** coisas, e nenhuma delas era o
 **Provado:** pgTAP 53 novo (10 asserções, começando por "meio-dia e meia está aberto" e "13h55 está aberto" — as duas horas exatas em que a equipe travou), e as cinco asserções do arquivo 17 que fixavam a regra antiga foram **reescritas, não apagadas**: elas continuam guardando o que importa (nunca antecipa a abertura, pula feriado e domingo), agora com 8h no lugar de 9h. Suíte inteira: 53 arquivos, **2722 asserções**.
 
 **Aplicado em produção como dado**, para a equipe não esperar o deploy: as dez faixas antigas saíram e as cinco novas entraram. A migração precisa ser publicada (`supabase db push --linked`) para o banco de desenvolvimento e o CI ficarem iguais — ela é idempotente e refaz exatamente o mesmo estado.
+
+### 17/09/2026 — O Radar volta a existir, e a IA sai do escuro (RF-RAD, RF-CON-27)
+
+"A IA não mostra nada, estou controlando tudo na mão — e esse Radar está desfuncional" (Rafael). As duas coisas tinham causa, e nenhuma era código faltando.
+
+**A IA estava trabalhando e quase toda desligada.** Medido: 49 chamadas, **11 fichas em 13 conversas**, a última escrita às 12:55 de hoje, custo total acumulado de **US$ 0,17**. O que ela produz aparecia num lugar só — a faixa dentro da conversa. Os outros módulos estavam `false` em `app_settings`, e o orçamento de US$ 25/mês estava marcado `pendente_de_aprovacao`.
+
+Ligados agora: **Pulso do dia** (tem worker e tem tela; o primeiro sai hoje às 18h30 pelo `pg_cron`) e o **orçamento** (aprovado, US$ 25/mês com alerta em 80%).
+
+Deixados desligados, com motivo: **sugestões de campo** grava numa tabela que **nenhuma tela mostra** — ligar encheria um depósito invisível; **preenchimento automático** e **pergunte ao CRM** são chaves sem código por trás. Ligar qualquer um dos três hoje seria fingir funcionalidade.
+
+**O Radar estava parado por dois motivos, não um.** (1) O coletor só rodava na máquina do Rafael — última batida havia 9 dias, enquanto WhatsApp e IA batiam de minuto em minuto no Fly. (2) Nenhuma coleta estava agendada desde 08/09: mesmo ligando o coletor, as filas estavam vazias e a tela diria "0 a planejar" do mesmo jeito.
+
+O `worker-ingest` subiu para o Fly (`infra/nuvem/fly.worker-ingest.toml`), pelo mesmo motivo e com a mesma forma do `worker-wa` em 14/09: o ADR-04 manda o coletor rodar na máquina dedicada, que continua não existindo. Uma coleta foi agendada em seguida, e o resultado ficou medido: **9 páginas, 219 capturas, 113 candidatos novos, zero bloqueios de robots.txt** — a fila de revisão saiu de 12 para **277 candidatos**.
+
+**Pendente, e é decisão de gente:** agendar coleta continua sendo comando de terminal — não existe botão na tela, e deveria existir. E 277 candidatos esperando revisão é fila demais para uma pessoa: ou entra curadoria assistida pela IA, ou entra gente.
