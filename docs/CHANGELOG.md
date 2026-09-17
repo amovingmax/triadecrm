@@ -2553,3 +2553,30 @@ Terceira das seis frentes, e a metade que destrava o Radar de verdade.
 **Provado:** pgTAP 54 novo (12 asserções: SDR é recusado, fonte desligada e inexistente têm motivo nomeado, o lote sai de "prévia" para "na fila", a ordem entra na fila com a chave certa e as categorias escolhidas, e o segundo clique recebe "coleta_em_andamento"). Suíte: **54 arquivos, 2734 asserções**. Web: 737 testes, lint e typecheck limpos.
 
 **Pendente desta frente:** a LISTA de lotes continua como estava — três linhas dentro do painel do coletor. Organizar isso (o que cada coleta trouxe, quanto ainda espera revisão, dá para repetir) é a outra metade, e não foi feita hoje.
+
+### 17/09/2026 — A triagem do Radar: a fila vira uma ordem (RF-RAD-12)
+
+Quarta frente. O pedido era *"a IA filtrando as revisões do Radar em clientes que tenham número de contato, com parâmetros que eu personalizo"*. Medi antes de construir, e o número mudou o pedido:
+
+| Fonte | Candidatos | Com telefone | Com nota |
+|---|---|---|---|
+| casamentos.com.br | 260 | **0** | 140 |
+| planilha | 17 | 1 | 0 |
+
+**Dos 277, um tem telefone.** Não é falha do coletor: o site não publica número (esconde atrás de formulário), e o Places, que teria, não pode ser guardado — os Termos proíbem, e o R03 §2.4 já tinha resolvido isso ("Places é gatilho de descoberta; o dado definitivo vem do fornecedor"). Feito ao pé da letra, o filtro pedido deixaria **1 candidato** na tela: funcionaria e seria inútil.
+
+A pergunta que o dado existente responde é outra, e é a que importa: **quais desses valem o trabalho de caçar o telefone?** Rafael escolheu esse caminho.
+
+**O que pontua:** nota da fonte, número de avaliações, categoria prioritária e cidade-alvo. **Os pesos e os cortes vivem em `app_settings`**, não no código — quem sabe se decoração vale mais que buffet neste mês é quem vende. As colunas `score` e `tier` já existiam desde o D4, previstas pelo RF-RAD-12 e nunca preenchidas; o vocabulário das faixas (**A+, A, B, C**) também já estava decidido num CHECK, e eu tinha inventado "alta/media/baixa" antes de olhar — seria um segundo idioma para a mesma coisa dentro da mesma tabela.
+
+**Três decisões que valem explicação:**
+
+- **A escala se normaliza pelo que PODE pontuar.** Com `categorias_prioritarias` vazia (o estado de hoje), os 25 pontos da categoria não entram para candidato nenhum — somá-los ao teto faria o máximo possível ser 75 e a faixa A+ ficaria inalcançável **por configuração**. Uma régua cujo topo não existe.
+- **A pontuação ordena e nunca descarta.** Ninguém sai da fila por ter nota baixa: quem vira parceiro é decisão humana (RF-RAD-08), e uma nota que descarta sozinha é a IA decidindo pela equipe.
+- **Toda pontuação vem com o porquê** (`["nota 4.9 na fonte", "80 avaliações", "fica em Natal"]`). Nota que não se explica é nota que a equipe ignora na segunda semana.
+
+**Candidato novo nasce pontuado**, por gatilho: sem isso a coleta de segunda entraria sem nota e cairia no fim da fila por omissão — o pior lugar para um dado novo, porque ninguém desconfia de uma lista ordenada.
+
+**Provado:** pgTAP 55 novo (11 asserções, incluindo "zerar o peso da cidade muda a conta", que é o que prova que o parâmetro está no banco e não no código). E o teste de segurança 09 pegou um erro meu antes de eu perceber: as duas funções novas do schema `app` nasceram executáveis por `authenticated` e `anon`, porque no Postgres `create function` concede EXECUTE a PUBLIC. Revogadas. Suíte: **55 arquivos, 2745 asserções**.
+
+**Pendente desta frente:** a tela. Hoje a pontuação existe no banco e ninguém a vê — falta mostrar a faixa na fila, ordenar por ela e dar a tela onde os pesos se editam. E falta a camada de IA: julgar pelo nome e pela categoria se aquilo é mesmo um fornecedor de evento, que é o que a conta não alcança.
