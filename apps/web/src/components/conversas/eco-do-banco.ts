@@ -50,6 +50,10 @@ import { chaveDaLeitura } from './leitura-da-ia-dados';
  *    — e ela só dispara a busca pesada quando a assinatura muda. A tela diz em
  *    que modo está, porque "parece parado" e "está parado" precisam ser
  *    distinguíveis por quem usa.
+ * 5. **A sondagem não some quando o eco sobe**, só desacelera para 90 s. "Ao
+ *    vivo" quer dizer que o canal assinou, não que os eventos estão chegando:
+ *    um socket aberto e surdo deixaria a tela morta dizendo que está viva. O
+ *    atraso máximo passa a ser um minuto e meio em vez de infinito.
  */
 
 /** As tabelas publicadas no Realtime (migração `20260917150000`). */
@@ -80,6 +84,20 @@ export const ESPERA_DA_RAJADA_MS = 400;
 
 /** Ritmo da sondagem quando não há eco. Barata o bastante para ser frequente. */
 export const RITMO_SEM_ECO_MS = 20_000;
+
+/**
+ * Ritmo da MESMA sondagem enquanto o eco está de pé.
+ *
+ * Ela não some quando o socket sobe, e a razão é um modo de falha real: "ao
+ * vivo" quer dizer que o canal assinou, não que os eventos estão chegando. Se a
+ * publicação sumir numa migração futura, ou se o socket ficar aberto e surdo, a
+ * tela diria "ao vivo" e estaria morta — em silêncio, que é a pior forma.
+ *
+ * A noventa segundos ela custa duas consultas minúsculas por minuto e meio, e é
+ * o que garante que o atraso máximo da tela seja um minuto e meio em vez de
+ * infinito.
+ */
+export const RITMO_VIGIANDO_MS = 90_000;
 
 interface RegistroCru {
   readonly id?: unknown;
@@ -212,6 +230,8 @@ export function useEcoDasConversas({
 
   const pendente = useRef<Pendencia>(pendenciaVazia());
   const relogio = useRef<number | null>(null);
+  /** Quantas vezes o eco já buscou. A sondagem usa isto para não buscar de novo. */
+  const buscasDoEco = useRef(0);
 
   const resolver = useCallback(() => {
     if (relogio.current !== null) {
@@ -222,6 +242,7 @@ export function useEcoDasConversas({
     pendente.current = pendenciaVazia();
     if (!pendencia.lista && pendencia.fios.size === 0) return;
 
+    buscasDoEco.current += 1;
     if (pendencia.lista) void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
     for (const organizacaoId of pendencia.organizacoes) {
       void clientes.invalidateQueries({ queryKey: chaveDaLinha(organizacaoId) });
@@ -307,21 +328,26 @@ export function useEcoDasConversas({
     return () => document.removeEventListener('visibilitychange', aoVoltar);
   }, [resolver]);
 
-  // ---------- 3. a reserva, quando o eco não sobe ----------
+  // ---------- 3. a sondagem: reserva quando não há eco, vigia quando há ----------
   useEffect(() => {
-    if (estado === 'ao_vivo') return;
-
     const supabase = createClient();
     let ultima: string | null = null;
+    let buscasVistas = buscasDoEco.current;
     let vivo = true;
 
     const sondar = async () => {
       if (document.hidden) return;
       const agora = await lerAssinatura(supabase);
       if (!vivo || agora === null) return;
-      // A primeira leitura só estabelece o ponto de partida: buscar aqui seria
-      // repetir a busca que a tela acabou de fazer ao abrir.
-      if (ultima !== null && agora !== ultima) {
+
+      const ecoJaBuscou = buscasDoEco.current !== buscasVistas;
+      buscasVistas = buscasDoEco.current;
+
+      // Três motivos para só reposicionar a régua, sem buscar nada:
+      // é a primeira leitura (o ponto de partida), nada mudou, ou o eco já
+      // buscou por conta dele — e aí buscar de novo seria pagar duas vezes pela
+      // mesma mensagem.
+      if (ultima !== null && agora !== ultima && !ecoJaBuscou) {
         pendente.current.lista = true;
         const aberta = abertaAgora.current;
         if (aberta !== null) pendente.current.organizacoes.add(aberta);
@@ -331,7 +357,10 @@ export function useEcoDasConversas({
     };
 
     void sondar();
-    const id = window.setInterval(() => void sondar(), RITMO_SEM_ECO_MS);
+    const id = window.setInterval(
+      () => void sondar(),
+      estado === 'ao_vivo' ? RITMO_VIGIANDO_MS : RITMO_SEM_ECO_MS,
+    );
     return () => {
       vivo = false;
       window.clearInterval(id);

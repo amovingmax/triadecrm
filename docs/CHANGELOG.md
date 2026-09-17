@@ -2421,3 +2421,18 @@ A perda que eu usei como argumento contra recodificar é real e é irrelevante: 
 **Decisão humana / pendente:**
 - A migração `20260917150000` e o deploy do web ainda não foram para produção.
 - O teste no navegador é de quem tem sessão: a entrada local é só por Google, e eu não tenho como logar aqui. O que dá para garantir daqui está garantido — o socket, a RLS e a decisão do que recarregar.
+
+### 17/09/2026 — O eco, conferido em produção (e um modo de falha fechado)
+
+"Não está automatizado, teve uma resposta mas tive que dar F5" (Rafael). Fui atrás, e o caminho inteiro está de pé:
+
+- **Realtime de produção entrega** — com a chave de serviço, o evento de `conversations` chegou.
+- **A RLS deixa passar para quem é** — repetido com uma sessão real de produção (magic link gerado e trocado no diagnóstico, sem e-mail): canal `SUBSCRIBED`, evento recebido, e o PostgREST confirmando que a mesma sessão enxerga a conversa.
+- **O código está no ar** — os 22 pedaços de JS que a Vercel serve em `/conversas` foram baixados e o do eco está lá.
+- **E a tela reage** — num navegador de verdade, autenticado, o cabeçalho mostrava "ao vivo" e um toque no banco disparou **17 buscas** no mesmo instante: a lista, a linha do tempo e a leitura da IA.
+
+Ou seja: funciona agora. O que aconteceu com ele foi a aba que já estava aberta desde antes do deploy — JavaScript antigo continua rodando até a página recarregar, e foi o F5 que trouxe o código novo. Isso eu deveria ter dito quando pedi os dois comandos.
+
+**O que o diagnóstico expôs, e que foi consertado.** A sondagem de reserva só existia quando o socket NÃO subia. Mas "ao vivo" quer dizer que o canal assinou — não que os eventos estão chegando. Se a publicação sumisse numa migração futura, ou se o socket ficasse aberto e surdo, a tela diria "ao vivo" e estaria morta em silêncio, que é a pior forma de quebrar. Agora a sondagem não some quando o eco sobe: ela desacelera para 90 s e vira vigia. Custa duas consultas minúsculas por minuto e meio, e troca um atraso infinito por um de noventa segundos.
+
+Ela também não busca duas vezes pela mesma mensagem: quando o eco já buscou, a sondagem só reposiciona a régua.
