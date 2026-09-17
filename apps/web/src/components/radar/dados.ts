@@ -626,3 +626,27 @@ export async function repontuarORadar(): Promise<{ candidatos: number }> {
   const r = objeto(data);
   return { candidatos: Number(r.candidatos) || 0 };
 }
+
+/**
+ * Pede ao worker a leitura dos candidatos que a IA ainda não viu.
+ *
+ * O banco enfileira com chave do dia: apertar duas vezes na mesma tarde não
+ * gasta duas chamadas ao modelo.
+ */
+export async function pedirLeituraDaIa(): Promise<{ enfileirado: boolean; esperando: number; motivo?: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('radar_triar_com_ia');
+  if (error) {
+    throw new Error(
+      error.code === '42501'
+        ? 'Seu perfil não pede a leitura da IA. Peça a um admin ou gestor.'
+        : mensagemDoErro(error),
+    );
+  }
+  const r = objeto(data);
+  return {
+    enfileirado: r.enfileirado === true,
+    esperando: Number(r.esperando) || 0,
+    motivo: typeof r.motivo === 'string' ? r.motivo : undefined,
+  };
+}

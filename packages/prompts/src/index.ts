@@ -33,6 +33,12 @@ export {
 } from './prompts/pulso-do-dia/v1';
 
 export {
+  type EntradaDaTriagem,
+  type SaidaDaTriagem,
+  triagemDoRadarV1,
+} from './prompts/triagem-do-radar/v1';
+
+export {
   CATALOGO,
   INVENTARIO,
   type IdDePrompt,

@@ -43,6 +43,7 @@ import {
   fichaDaConversaV1,
   followupLigacaoV1,
   pulsoDoDiaV1,
+  triagemDoRadarV1,
   reidratar,
   resumoLigacaoV1,
   transcricaoAudioV1,
@@ -62,6 +63,7 @@ import {
   buscarTentativa,
   criarRascunho,
   entradaDaFicha,
+  entradaDaTriagem,
   entradaDoPulso,
   escalarConversa,
   gravarClassificacao,
@@ -69,6 +71,7 @@ import {
   gravarPulso,
   gravarResumoDaLigacao,
   gravarTranscricao,
+  gravarTriagem,
 } from './banco';
 import {
   AlvoSuprimidoError,
@@ -163,6 +166,11 @@ const payloadDoPulso = z.object({
   user_id: uuid.nullish(),
 });
 
+const payloadDaTriagem = z.object({
+  purpose: z.literal('triar_candidato'),
+  limite: z.number().int().min(1).max(30).default(30),
+});
+
 const PAYLOADS = {
   transcribe_audio: payloadDaTranscricao,
   summarize_call: payloadDoResumo,
@@ -170,6 +178,7 @@ const PAYLOADS = {
   classify_inbound: payloadDaClassificacao,
   analisar_conversa: payloadDaFicha,
   pulso_do_dia: payloadDoPulso,
+  triar_candidato: payloadDaTriagem,
 } as const;
 
 export type PropositoConhecido = keyof typeof PAYLOADS;
@@ -892,6 +901,95 @@ const ALERTAS_DO_PULSO: readonly string[] = [
 // O despachante
 // ---------------------------------------------------------------------------
 
+/**
+ * A IA lê o NOME do candidato — a metade que a conta não alcança.
+ *
+ * `app.radar_pontuar` soma nota, avaliações, categoria e cidade. "Fotografia
+ * Silva — Formaturas" e "Fotografia Silva — Casamentos" recebem dela a MESMA
+ * pontuação, e só um dos dois atende a KOMUNE. Quem separa os dois é a leitura.
+ *
+ * Três decisões que valem estar escritas:
+ *
+ * 1. **O veredito não muda o score.** Ele vira coluna própria na fila. Misturar
+ *    os dois faria a opinião do modelo reordenar o trabalho sem que ninguém
+ *    soubesse de onde veio a mudança — e o score é auditável justamente por ser
+ *    aritmética.
+ * 2. **Id que o modelo inventou é descartado**, como no Pulso e na ficha. O
+ *    banco ignora o que não existe, e aqui o número descartado vira log: se o
+ *    modelo passar a devolver lixo, alguém vê antes de o lixo virar dado.
+ * 3. **Lote de 30 e chave do dia.** 277 candidatos numa chamada seriam uma conta
+ *    grande tomada por um clique; e pedir duas vezes na mesma tarde não gasta
+ *    duas chamadas.
+ */
+async function triarCandidatos(
+  contexto: ContextoDaIa,
+  bruto: unknown,
+): Promise<ResultadoDoTrabalho> {
+  const payload = interpretarPayload(payloadDaTriagem, bruto);
+  const entrada = await entradaDaTriagem(contexto.cliente, payload.limite);
+
+  if (entrada.candidatos.length === 0) {
+    return { proposito: 'triar_candidato', feito: false, motivo: 'nenhum_candidato_novo' };
+  }
+
+  // O modelo recebe o NÚMERO da lista, nunca o uuid: o pseudonimizador lê uuid
+  // como documento e o troca por `[[DOCUMENTO_1]]` — o que está certo, e faria o
+  // veredito voltar sem dono. O mapa de volta fica aqui, como no Pulso.
+  const porNumero = new Map<string, string>();
+  const pedidos = entrada.candidatos.map((c, i) => {
+    const numero = String(i + 1);
+    porNumero.set(numero, String(c.id ?? ''));
+    return {
+    id: numero,
+    nome: String(c.nome ?? ''),
+    categoriaDaFonte: typeof c.categoriaDaFonte === 'string' ? c.categoriaDaFonte : null,
+    categoriaDoCrm: typeof c.categoriaDoCrm === 'string' ? c.categoriaDoCrm : null,
+    cidade: typeof c.cidade === 'string' ? c.cidade : null,
+    bairro: typeof c.bairro === 'string' ? c.bairro : null,
+    };
+  });
+
+  const executada = await executar(
+    contexto,
+    triagemDoRadarV1,
+    {
+      oQueProcuramos: entrada.oQueProcuramos,
+      categorias: entrada.categorias,
+      candidatos: pedidos,
+    },
+    // A triagem não é de um contato: é de um LOTE de nomes públicos que a fonte
+    // publicou. Não há pessoa para pseudonimizar — o nome do negócio É a
+    // pergunta, e sem ele não existe o que perguntar.
+    { leadId: `triagem-${pedidos.length}`, nome: null, empresa: null },
+    {},
+  );
+
+  // Número que o modelo inventou não vira dado — mesma regra do Pulso e da ficha.
+  const vereditos = executada.saida.vereditos.flatMap((v) => {
+    const id = porNumero.get(v.id);
+    return id === undefined ? [] : [{ ...v, id }];
+  });
+  const gravados = await gravarTriagem(contexto.cliente, vereditos);
+
+  contexto.logger.info('candidatos triados pela IA', {
+    pedidos: pedidos.length,
+    vereditos: executada.saida.vereditos.length,
+    descartados: executada.saida.vereditos.length - vereditos.length,
+    gravados,
+    sim: vereditos.filter((v) => v.veredito === 'sim').length,
+    nao: vereditos.filter((v) => v.veredito === 'nao').length,
+    incerto: vereditos.filter((v) => v.veredito === 'incerto').length,
+  });
+
+  return {
+    proposito: 'triar_candidato',
+    feito: true,
+    aiRunId: executada.aiRunId,
+    custoUsd: executada.custoUsd,
+    detalhes: { gravados, pedidos: pedidos.length },
+  };
+}
+
 const TRABALHOS: Readonly<
   Record<PropositoConhecido, (contexto: ContextoDaIa, bruto: unknown) => Promise<ResultadoDoTrabalho>>
 > = {
@@ -901,6 +999,7 @@ const TRABALHOS: Readonly<
   classify_inbound: classificarEntrada,
   analisar_conversa: analisarConversa,
   pulso_do_dia: escreverOPulso,
+  triar_candidato: triarCandidatos,
 };
 
 export async function tratarTrabalho(

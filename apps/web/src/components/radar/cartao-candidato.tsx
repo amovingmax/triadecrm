@@ -10,6 +10,7 @@ import {
   Globe,
   Merge,
   Phone,
+  Sparkles,
   TriangleAlert,
   X,
 } from 'lucide-react';
@@ -216,6 +217,28 @@ export function CartaoCandidato({
           <li className="text-muted-foreground">Nenhum contato conhecido ainda.</li>
         ) : null}
       </ul>
+
+      {/* O QUE A IA ACHOU DO NOME.
+          Vem em itálico e esmaecido, como na lista de Conversas e pelo mesmo
+          motivo: o resto do cartão é FATO (a fonte publicou isto), esta linha é
+          OPINIÃO (uma máquina leu o nome e achou). Dar a ambos a mesma
+          tipografia seria dar à opinião o peso do fato — e aqui a opinião pode
+          estar errada sobre um fornecedor de verdade. */}
+      {candidato.ia_veredito ? (
+        <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground italic">
+          <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+          <span>
+            <span className="font-medium not-italic">
+              {candidato.ia_veredito === 'sim'
+                ? 'A IA acha que é fornecedor de evento'
+                : candidato.ia_veredito === 'nao'
+                  ? 'A IA acha que NÃO é fornecedor de evento'
+                  : 'A IA não soube dizer pelo nome'}
+            </span>
+            {candidato.ia_porque ? <> · {candidato.ia_porque}</> : null}
+          </span>
+        </p>
+      ) : null}
 
       {/* SEM TELEFONE, A BUSCA FICA AQUI — na hora da decisão, não depois dela.
           A fila tinha 277 candidatos e UM telefone, e "existe número público

@@ -37,7 +37,10 @@ export type PropositoDeAiRun =
   | 'classify_inbound'
   // CRM Inteligente (17/09/2026): a ficha por conversa e o Pulso do dia.
   | 'analisar_conversa'
-  | 'pulso_do_dia';
+  | 'pulso_do_dia'
+  // A metade que LÊ da triagem do Radar: a conta soma nota e avaliações, e não
+  // sabe que "Fotografia Silva — Formaturas" não atende casamento.
+  | 'triar_candidato';
 
 /**
  * Um caso do próprio prompt: entrada e a saída que a versão deve produzir.

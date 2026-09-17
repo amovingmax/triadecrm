@@ -2708,3 +2708,38 @@ Então a busca entrou na fila: `/api/telefone/candidato` com as mesmas guardas d
 **E ela não guarda nada.** O resultado vai para a tela e morre ali, com a frase dizendo por quê. Um "salvar automático" seria o botão proibido com outro nome.
 
 **Provado:** web 744 testes, lint, typecheck e build limpos, com as duas rotas no build.
+
+### 17/09/2026 — A IA lê o nome do candidato: a metade que a conta não alcança
+
+Sexta e última frente. `app.radar_pontuar` soma nota, avaliações, categoria e cidade — ela ordena bem e **não sabe ler**. "Fotografia Silva — Formaturas" e "Fotografia Silva — Casamentos" recebem dela exatamente a mesma pontuação, e só um dos dois atende a KOMUNE.
+
+O prompt `triagem-do-radar@v1` (Haiku, saída estruturada) responde uma pergunta só: o nome sugere um fornecedor de evento? Em produção, com a fila real:
+
+| Veredito | Quantos |
+|---|---|
+| sim | 123 |
+| incerto | 50 |
+| nao | 7 |
+
+E o que ela escreveu nos "não" é o que a conta jamais veria:
+
+> *CB Formaturas* — "'Formaturas' no nome indica fotografia de formatura, não de casamento"
+> *Pipa Candles - Ateliê das Velas* — "Ateliê de velas é varejo, não fornecedor de serviço para eventos" (este estava em **faixa A**: nota alta e muitas avaliações)
+> *Padaria Vovó Tonha* — "Padaria não é fornecedor de festa; vende no balcão"
+
+**Custo de ler 180 candidatos: US$ 0,09.**
+
+**Quatro decisões que valem estar escritas:**
+
+- **O veredito não muda o score.** Ele é coluna própria. Misturar os dois faria a opinião do modelo reordenar o trabalho sem que ninguém soubesse de onde veio a mudança — e o score é auditável justamente por ser aritmética.
+- **Ele não aprova nem recusa ninguém** (RF-RAD-08). É opinião, e a tela mostra assim: em itálico e esmaecida, como o conselho na lista de Conversas, porque o resto do cartão é fato e esta linha não é.
+- **`incerto` é resposta legítima**, e são 50 delas. Forçar sim/não em "Ki-Pão Premium" produziria chute com cara de veredito — pior que silêncio, porque ninguém confere o que parece confiante.
+- **`ia_analisado_em` é gravado inclusive no "incerto"**: ele marca que a IA já olhou. Sem isso o mesmo nome voltaria ao modelo toda semana para receber o mesmo "não dá para saber" — e seria cobrado por isso.
+
+**Três consertos que só a produção mostrou, e os três eram meus:**
+
+1. **O propósito novo tinha DUAS listas para entrar**, e eu atualizei uma. O CHECK de `ai_runs.purpose` aceitava `triar_candidato`; o `if` dentro de `app.ia_enfileirar` não — e é ele que barra **antes** de qualquer chamada. A duplicação está certa (o CHECK protege a gravação, o `if` protege a fila, que é onde o gasto nasce); errado foi atualizar só uma.
+2. **O uuid do candidato virava `[[DOCUMENTO_1]]`.** Mandei o id do banco ao modelo, e o pseudonimizador — corretamente — leu um uuid como documento e o mascarou. Os 30 vereditos voltaram com o rótulo no lugar do id e **todos foram descartados**. Agora o modelo recebe o **número da lista** ("1", "2", "3") e o mapa de volta fica no worker, que é a mesma ideia do `lead-xxxxxx` do Pulso. Id de banco não tem por que viajar para fora.
+3. **O teto de saída estava encostado.** Trinta vereditos gastaram 1.875 tokens contra um teto de 2.000; a chamada seguinte estourou e voltou com JSON cortado no meio, que o leitor recusa — e com razão, porque metade de um veredito é pior que nenhum. Teto para 3.000 e lote para 20, os dois medidos e não estimados.
+
+**Provado:** prompts 276 testes (com a linha de custo do prompt novo na tabela publicada), workers 363, web 744, pgTAP 2756. Lint e typecheck limpos nos quatro pacotes. E rodando em produção: 180 candidatos lidos, 11 na fila para o próximo lote.

@@ -111,11 +111,15 @@ describe('versionamento: a v2 não mexe na v1', () => {
 });
 
 describe('catálogo do Tríade', () => {
-  it('tem os seis prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
+  it('tem os sete prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
     expect(Object.keys(CATALOGO)).toEqual([
       'transcricao-audio',
       'ficha-da-conversa',
       'pulso-do-dia',
+      // A metade que LÊ da triagem do Radar (17/09/2026): a conta soma nota e
+      // avaliações, e não sabe que "Fotografia Silva — Formaturas" não atende
+      // casamento.
+      'triagem-do-radar',
       'resumo-ligacao',
       'followup-ligacao',
       'classificar-intencao',

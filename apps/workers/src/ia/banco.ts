@@ -784,3 +784,37 @@ export async function gravarPulso(entrada: {
   erroSe('ia_gravar_pulso', error);
   return typeof data === 'string' ? data : '';
 }
+
+/**
+ * O lote de candidatos que a IA ainda não leu.
+ *
+ * Vem pronto do Postgres (`app.ia_candidatos_para_triar`), ordenado do mais
+ * pontuado para o menos: se o orçamento de uma chamada só alcança trinta, que
+ * sejam os trinta que a conta já considera mais promissores.
+ */
+export async function entradaDaTriagem(
+  cliente: ClienteDoBanco,
+  limite = 30,
+): Promise<{ oQueProcuramos: string; categorias: string[]; candidatos: Record<string, unknown>[] }> {
+  const { data, error } = await cliente.rpc('ia_triagem_entrada', { p_limite: limite });
+  erroSe('ia_triagem_entrada', error);
+  const bruto = (data ?? {}) as Record<string, unknown>;
+  return {
+    oQueProcuramos: typeof bruto.oQueProcuramos === 'string' ? bruto.oQueProcuramos : '',
+    categorias: Array.isArray(bruto.categorias) ? (bruto.categorias as string[]) : [],
+    candidatos: Array.isArray(bruto.candidatos)
+      ? (bruto.candidatos as Record<string, unknown>[])
+      : [],
+  };
+}
+
+/** Grava os vereditos. O banco só aceita do worker, e ignora id que não existe. */
+export async function gravarTriagem(
+  cliente: ClienteDoBanco,
+  vereditos: unknown[],
+): Promise<number> {
+  const { data, error } = await cliente.rpc('ia_gravar_triagem', { p_vereditos: vereditos });
+  erroSe('ia_gravar_triagem', error);
+  const bruto = (data ?? {}) as Record<string, unknown>;
+  return Number(bruto.gravados) || 0;
+}

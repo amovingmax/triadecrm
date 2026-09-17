@@ -74,6 +74,15 @@ export type CandidatoDaFila = {
    * primeira no dia em que alguém mexer nos cortes.
    */
   faixa: FaixaDaTriagem | null;
+  /**
+   * O que a IA achou do NOME: `sim`, `nao` ou `incerto`, com a frase dela.
+   *
+   * É OPINIÃO, e a tela precisa mostrar isso: ela não aprova, não recusa e não
+   * tira ninguém da fila (RF-RAD-08). `null` quando a IA ainda não leu — o que é
+   * o estado normal de um candidato recém-coletado.
+   */
+  ia_veredito: 'sim' | 'nao' | 'incerto' | null;
+  ia_porque: string | null;
   coletado_em: string;
   coletor: string;
   criado_em: string;

@@ -152,6 +152,18 @@ describe('preços e conta por chamada', () => {
         comCache: 0.00403,
       },
       {
+        // A metade que LÊ da triagem do Radar (17/09/2026). Trinta candidatos por
+        // chamada, e cada veredito é uma frase: é o prompt mais barato do
+        // catálogo, e precisa ser — a fila tem 277 nomes e recoleta todo mês.
+        id: 'triagem-do-radar',
+        modelo: 'claude-haiku-4-5',
+        tokensDeSistema: 315,
+        tokensDaMensagem: 191,
+        tokensDeSaida: 130,
+        semCache: 0.00116,
+        comCache: 0.00087,
+      },
+      {
         id: 'resumo-ligacao',
         modelo: 'claude-sonnet-5',
         tokensDeSistema: 486,
