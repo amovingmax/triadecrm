@@ -2535,3 +2535,21 @@ E **a prévia subiu**: "Como vai chegar" ficava depois dos campos, longe demais 
 **O que não dá para mudar, e precisa ser dito:** fora das 24 h desde a última mensagem do parceiro, a Meta só aceita moldura aprovada. Não é decisão nossa nem preguiça de implementação. O que dá para fazer — e foi feito — é que a moldura não peça nada além do texto, e que a pessoa veja exatamente o que sai.
 
 **Provado:** 737 testes no web, um novo fixando que "Atendendo" é estreito e nunca traz quem só passou por perto.
+
+### 17/09/2026 — Agendar coleta deixa de ser comando de terminal (RF-RAD-01, RF-RAD-03)
+
+Terceira das seis frentes, e a metade que destrava o Radar de verdade.
+
+**O buraco.** Mandar o coletor trabalhar exigia abrir um terminal e escrever `ingest --agendar --fonte=<slug> --paginas=N`. O efeito apareceu hoje: a última coleta tinha 9 dias, a fila estava zerada e a tela dizia "o coletor está parado". Verdade que levava à conclusão errada — o coletor parado era **consequência**, não causa. Não havia o que coletar porque ninguém tinha mandado, e não havia como mandar sem terminal.
+
+**A porta.** `public.radar_agendar_coleta` faz as duas chamadas que o terminal fazia: abre o lote e põe a ordem em `ingest_jobs`, com **o mesmo payload e a mesma chave de idempotência** (`job:<lote>`). O worker não sabe nem precisa saber se a ordem veio da tela ou do terminal.
+
+**Só admin e gestor.** Abrir lote aceita qualquer papel que escreve na base; agendar coleta não é a mesma coisa. Ela gasta o limite de requisições que a fonte nos concede, hospeda uma visita nossa no servidor dela e responde pelo robots.txt e pelos termos (R03, R06 §3) — decisão de operação, não de campo.
+
+**A trava do clique duplo.** Duas coletas simultâneas na mesma fonte dobram o tráfego que prometemos respeitar, e o segundo clique nervoso é o jeito mais fácil de isso acontecer. Se já existe lote daquela fonte esperando ou rodando, a função recusa e devolve o id do que já existe.
+
+**Na tela**, a folha "Coletar agora" pede duas coisas e explica as duas: a fonte (só as ligadas aparecem — ligar exige robots.txt avaliado, e isso é outra conversa, na aba Fontes) e quantas páginas por categoria (padrão 1: a primeira página traz quem a fonte considera mais relevante; o resto é cauda longa que enche a fila de revisão). O aviso de que a coleta visita o servidor de outra empresa com o nosso nome fica **antes** do botão, não depois.
+
+**Provado:** pgTAP 54 novo (12 asserções: SDR é recusado, fonte desligada e inexistente têm motivo nomeado, o lote sai de "prévia" para "na fila", a ordem entra na fila com a chave certa e as categorias escolhidas, e o segundo clique recebe "coleta_em_andamento"). Suíte: **54 arquivos, 2734 asserções**. Web: 737 testes, lint e typecheck limpos.
+
+**Pendente desta frente:** a LISTA de lotes continua como estava — três linhas dentro do painel do coletor. Organizar isso (o que cada coleta trouxe, quanto ainda espera revisão, dá para repetir) é a outra metade, e não foi feita hoje.

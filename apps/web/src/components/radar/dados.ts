@@ -441,3 +441,68 @@ export async function buscarColetasRecentes(limite = 3): Promise<LoteDeColeta[]>
     };
   });
 }
+
+// ===========================================================================
+// AGENDAR COLETA (migração 20260917170000)
+// ===========================================================================
+//
+// Mandar o Radar trabalhar era `ingest --agendar` num terminal. A tela dizia
+// "coletor parado, fila vazia" e quem olhava concluía que o Radar estava
+// quebrado — quando o que faltava era uma ordem. Esta é a ordem.
+
+/** O que a tela diz quando o banco recusa. Motivo sem frase é defeito silencioso. */
+export const MOTIVOS_DA_COLETA: Record<string, string> = {
+  fonte_inexistente: 'Esta fonte não existe mais no catálogo.',
+  fonte_desligada:
+    'Esta fonte está desligada. Ligar exige conferir o robots.txt e os termos dela (RF-RAD-01).',
+  coleta_em_andamento: 'Já existe uma coleta desta fonte esperando ou rodando. Espere ela terminar.',
+  origem_invalida: 'Esta fonte não existe mais no catálogo.',
+  origem_desabilitada: 'Esta fonte está desligada.',
+  lote_recusado: 'O banco não abriu o lote da coleta.',
+  fila_recusou: 'O lote abriu, mas a ordem não entrou na fila. Tente de novo.',
+};
+
+export interface ColetaAgendada {
+  readonly lote: string;
+  readonly rotulo: string;
+  readonly fonte: string;
+  readonly maxPaginas: number;
+}
+
+export async function agendarColeta(argumentos: {
+  fonteId: number;
+  maxPaginas: number;
+  categorias?: string[] | null;
+  rotulo?: string | null;
+}): Promise<ColetaAgendada> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('radar_agendar_coleta', {
+    p_source_id: argumentos.fonteId,
+    p_categorias: argumentos.categorias ?? null,
+    p_max_paginas: argumentos.maxPaginas,
+    p_rotulo: argumentos.rotulo ?? null,
+  });
+
+  if (error) {
+    // 42501 é a recusa por papel: só admin e gestor agendam, porque a coleta
+    // gasta o limite da fonte e responde pelo robots.txt.
+    throw new Error(
+      error.code === '42501'
+        ? 'Seu perfil não agenda coleta. Peça a um admin ou gestor.'
+        : mensagemDoErro(error),
+    );
+  }
+
+  const bruto = objeto(data);
+  if (!bruto.ok) {
+    const motivo = typeof bruto.motivo === 'string' ? bruto.motivo : '';
+    throw new Error(MOTIVOS_DA_COLETA[motivo] ?? 'A coleta não foi agendada.');
+  }
+
+  return {
+    lote: String(bruto.lote),
+    rotulo: String(bruto.rotulo ?? ''),
+    fonte: String(bruto.fonte ?? ''),
+    maxPaginas: Number(bruto.max_paginas) || 1,
+  };
+}
