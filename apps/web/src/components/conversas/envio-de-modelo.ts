@@ -134,18 +134,45 @@ export function variavelLivreDoModelo(modelo: ModeloParaEnviar): string | null {
  *      cumprimentar de novo seria começar do zero uma conversa que existe.
  *   3. Sem nenhuma das duas aprovadas → o que estiver pronto para enviar.
  */
-export const CODIGO_DO_CUMPRIMENTO = 'GEN-ABR-CUMPRIMENTO';
+/**
+ * O cumprimento solto, um por período do dia.
+ *
+ * São três modelos e não um com `{{saudacao}}` porque a Meta recusa modelo que
+ * COMEÇA com variável. Quem escolhe entre eles é o relógio de Natal, aqui: a
+ * pessoa não escolhe período do dia, do mesmo jeito que não escolhe o próprio
+ * nome na assinatura.
+ */
+export const CODIGOS_DO_CUMPRIMENTO = {
+  manha: 'GEN-ABR-OLA-MANHA',
+  tarde: 'GEN-ABR-OLA-TARDE',
+  noite: 'GEN-ABR-OLA-NOITE',
+} as const;
+
+/** Qual cumprimento cabe agora, no fuso de Natal — não no do navegador. */
+export function cumprimentoDaHora(agora: Date = new Date()): string {
+  const hora = Number(
+    new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Fortaleza',
+      hour: 'numeric',
+      hour12: false,
+    }).format(agora),
+  );
+  if (hora < 12) return CODIGOS_DO_CUMPRIMENTO.manha;
+  if (hora < 18) return CODIGOS_DO_CUMPRIMENTO.tarde;
+  return CODIGOS_DO_CUMPRIMENTO.noite;
+}
 
 export function escolherModeloInicial(
   modelos: readonly ModeloParaEnviar[],
   sugeridos: Record<string, string>,
   primeiroContato = false,
+  agora: Date = new Date(),
 ): ModeloParaEnviar | null {
   if (modelos.length === 0) return null;
 
   if (primeiroContato) {
-    const cumprimento = modelos.find((m) => m.codigo === CODIGO_DO_CUMPRIMENTO);
-    if (cumprimento) return cumprimento;
+    const daHora = modelos.find((m) => m.codigo === cumprimentoDaHora(agora));
+    if (daHora) return daHora;
   }
 
   const livre = modelos.find((m) => variavelLivreDoModelo(m) !== null);

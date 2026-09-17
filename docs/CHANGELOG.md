@@ -2654,3 +2654,19 @@ A saudação entrou nos **dois** caminhos, e a razão de cada um é diferente: e
 **Provado:** pgTAP 56 novo (10 asserções, incluindo o fuso — 2h UTC é 23h em Natal, e um servidor com o próprio relógio diria "bom dia" para quem vai dormir). Suíte: **56 arquivos, 2755 asserções**. Web 743 testes, com três novos fixando a escolha por momento.
 
 **Decisão humana, e é a que sobra:** o modelo nasce `pending` e vai à Meta na próxima sincronização. Enquanto ela não aprovar, a tela continua com a moldura livre. E o SAIR + privacidade na primeira mensagem seguem esperando o Dennis — hoje eles custam 60 dos 190 caracteres.
+
+### 17/09/2026 — O cumprimento vai solto: "Boa tarde!" e mais nada
+
+"O boa tarde tem que ser solto" (Rafael). O primeiro contato passa a ser só o cumprimento; quando a pessoa responde, a janela de 24 h abre e a conversa segue em texto livre — que é como todo mundo aborda alguém no WhatsApp.
+
+**São três modelos, não um.** A Meta recusa modelo que começa com variável (o teste 43 pegou isso hoje, antes dela), então `{{saudacao}}!` nunca seria aprovado. `Bom dia!`, `Boa tarde!` e `Boa noite!` são corpos fixos, e quem escolhe entre eles é o **relógio de Natal**, no CRM. A pessoa não escolhe período do dia, do mesmo jeito que não escolhe o próprio nome na assinatura.
+
+**A regra do SAIR mudou de escopo, e a decisão é do Rafael — está registrada com data na migração, no comentário da tabela e aqui.** Antes: toda abertura carregava "SAIR" e o link de privacidade (RF-CON-12, R06 §2). Agora: toda abertura **com conteúdo** carrega. O que o RF-CON-12 protege é a pessoa receber **oferta** sem saber de quem e sem saber como parar — e "Bom dia!" não é oferta: não diz o que a Komune é, não propõe nada, não pede dado nenhum. A identificação e a saída passam para a primeira mensagem que carrega conteúdo comercial.
+
+**O teste 08 passou a verificar os dois lados dessa regra**, e isso não é zelo: sem a segunda metade, bastaria alguém batizar um modelo de `GEN-ABR-OLA-QUALQUER-COISA` para escapar da exigência inteira. Então ele checa que (a) toda abertura com conteúdo traz SAIR e privacidade e (b) o que está isento é mesmo só o cumprimento — sem variável e com no máximo 12 caracteres.
+
+O modelo de 190 caracteres de meia hora atrás ficou **inativo, não apagado**: foi um passo intermediário de hoje, nunca chegou a ser aprovado, e a Meta ainda pode responder sobre ele. Modelo apagado é histórico apagado.
+
+**Provado:** suíte em **56 arquivos e 2756 asserções**; web **744 testes**, com dois novos fixando que às 15h de Natal sai "Boa tarde" e às 8h sai "Bom dia" — pelo relógio de lá, não pelo do navegador de quem clica.
+
+**Pendente, e é o de sempre:** os três modelos nascem `pending` e vão à Meta na próxima sincronização. **Há risco real de recusa** — um corpo de duas palavras pode ser lido por ela como genérico demais —, e nesse caso a resposta dela virá com o motivo, no próprio CRM. Até lá a tela continua oferecendo a moldura livre.

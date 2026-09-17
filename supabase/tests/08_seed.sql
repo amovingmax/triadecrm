@@ -3,7 +3,7 @@
 -- feriados, modelos de mensagem e controle de acesso (PRD §5, Apêndices C e F; R09 §E; R08 §2).
 -- =====================================================================
 begin;
-select plan(59);
+select plan(60);
 
 -- ---------- contagens ----------
 select is((select count(*)::int from public.cities),                              22, 'seed: 22 cidades');
@@ -137,10 +137,30 @@ select is((select count(*)::int from public.message_templates
 -- As GEN-ABR-* são as aberturas livres de 16/09/2026: moldura aprovada com o texto
 -- escrito na hora. Não pertencem a segmento nenhum, e por isso ficam fora da conta.
 select is((select count(*)::int from public.message_templates
-            where template_code like 'GEN-ABR-%'), 4,
-  'seed: 4 aberturas genéricas (livre, parceria, lançamento e o cumprimento curto de 17/09)');
-select is((select count(*)::int from public.message_templates where template_code like '%-ABR-%' and (body !~ 'SAIR' or body !~* 'privacidade')), 0,
-  'seed: toda abertura traz "SAIR" e o aviso de privacidade (RF-CON-12)');
+            where template_code like 'GEN-ABR-%' and is_active), 6,
+  'seed: 6 aberturas genéricas ativas (livre, parceria, lançamento e os três cumprimentos soltos)');
+
+-- A REGRA MUDOU EM 17/09/2026, POR DECISÃO DO RAFAEL, e mudou com escopo.
+--
+-- Antes: TODA abertura carregava "SAIR" e o link de privacidade (RF-CON-12).
+-- Agora: toda abertura COM CONTEÚDO carrega. Os três cumprimentos soltos — que
+-- são literalmente "Bom dia!" — ficam de fora, porque o que o RF-CON-12 protege
+-- é a pessoa receber OFERTA sem saber de quem e sem saber como parar, e um
+-- cumprimento não oferece nada.
+--
+-- O escopo é verificado dos DOIS lados: quem tem conteúdo precisa da saída, e
+-- quem está isento precisa ser mesmo só o cumprimento. Sem a segunda metade,
+-- bastaria alguém batizar um modelo de "OLA-" para escapar da regra inteira.
+select is((select count(*)::int from public.message_templates
+            where template_code like '%-ABR-%'
+              and template_code not like 'GEN-ABR-OLA-%'
+              and (body !~ 'SAIR' or body !~* 'privacidade')), 0,
+  'seed: toda abertura COM CONTEÚDO traz "SAIR" e o aviso de privacidade (RF-CON-12)');
+
+select is((select count(*)::int from public.message_templates
+            where template_code like 'GEN-ABR-OLA-%'
+              and (length(body) > 12 or body ~ '\{\{')), 0,
+  'e o que está isento é SÓ o cumprimento: nada de variável, nada acima de 12 caracteres');
 select results_eq(
   $$select variant, category, segment from public.message_templates where template_code in ('AEB-ABR-A', 'AEB-ABR-B') order by template_code$$,
   $$values ('A'::text, 'marketing'::text, 'AEB'::text), ('B'::text, 'marketing'::text, 'AEB'::text)$$,

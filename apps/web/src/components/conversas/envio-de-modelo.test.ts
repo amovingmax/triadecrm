@@ -259,16 +259,18 @@ describe('a abertura livre (migração 20260916100000)', () => {
 });
 
 describe('o cumprimento abre a conversa', () => {
-  const cumprimento = {
+  const tarde = {
     id: 90,
-    codigo: 'GEN-ABR-CUMPRIMENTO',
-    nome: 'Cumprimento curto',
+    codigo: 'GEN-ABR-OLA-TARDE',
+    nome: 'Boa tarde (cumprimento solto)',
     tipo: 'abertura',
     variante: 'A',
     segmento: null,
-    corpo: '{{saudacao}}! Aqui é {{atendente}}, da Komune. Falo com a pessoa responsável?',
-    variaveis: ['saudacao', 'atendente'],
+    corpo: 'Boa tarde!',
+    variaveis: [],
   } as const;
+  const manha = { ...tarde, id: 89, codigo: 'GEN-ABR-OLA-MANHA', corpo: 'Bom dia!' } as const;
+  const cumprimento = tarde;
   const livre = {
     id: 91,
     codigo: 'GEN-ABR-LIVRE',
@@ -280,20 +282,46 @@ describe('o cumprimento abre a conversa', () => {
     variaveis: ['nome', 'atendente', 'mensagem'],
   } as const;
 
-  it('no PRIMEIRO contato escolhe o cumprimento, que não tem campo para preencher', () => {
-    const escolhido = escolherModeloInicial([livre, cumprimento], { atendente: 'Matheus' }, true);
-    expect(escolhido?.codigo).toBe('GEN-ABR-CUMPRIMENTO');
+  // 15h em Natal (UTC-3) é 18h em UTC. O `Date` guarda UTC, então este instante
+  // é "à tarde" para quem está em Natal — que é o único relógio que importa.
+  const tresDaTarde = new Date('2026-09-17T18:00:00Z');
+  const oitoDaManha = new Date('2026-09-17T11:00:00Z');
+
+  it('no PRIMEIRO contato escolhe o cumprimento do PERÍODO, sem campo nenhum', () => {
+    const escolhido = escolherModeloInicial(
+      [livre, manha, tarde],
+      { atendente: 'Matheus' },
+      true,
+      tresDaTarde,
+    );
+    expect(escolhido?.codigo).toBe('GEN-ABR-OLA-TARDE');
+    expect(escolhido?.variaveis).toEqual([]);
+  });
+
+  it('de manhã escolhe o bom dia — o relógio é o de Natal, não o do navegador', () => {
+    const escolhido = escolherModeloInicial(
+      [livre, manha, tarde],
+      { atendente: 'Matheus' },
+      true,
+      oitoDaManha,
+    );
+    expect(escolhido?.codigo).toBe('GEN-ABR-OLA-MANHA');
   });
 
   it('na RETOMADA escolhe a moldura livre: já se sabe com quem se fala', () => {
     // Cumprimentar de novo seria começar do zero uma conversa que existe.
-    const escolhido = escolherModeloInicial([livre, cumprimento], { atendente: 'Matheus' }, false);
+    const escolhido = escolherModeloInicial(
+      [livre, cumprimento],
+      { atendente: 'Matheus' },
+      false,
+      tresDaTarde,
+    );
     expect(escolhido?.codigo).toBe('GEN-ABR-LIVRE');
   });
 
   it('sem o cumprimento aprovado, o primeiro contato cai na moldura livre', () => {
     // A Meta pode demorar ou recusar. A tela não pode ficar sem saída por isso.
-    const escolhido = escolherModeloInicial([livre], { atendente: 'Matheus' }, true);
+    const escolhido = escolherModeloInicial([livre], { atendente: 'Matheus' }, true, tresDaTarde);
     expect(escolhido?.codigo).toBe('GEN-ABR-LIVRE');
   });
 });
