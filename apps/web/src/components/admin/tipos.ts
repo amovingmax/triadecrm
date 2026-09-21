@@ -8,13 +8,19 @@
  */
 import type { AppRole } from '@/lib/auth/role';
 
-export type Aba = 'pessoas' | 'catalogos' | 'lgpd';
+export type Aba = 'pessoas' | 'atendimento' | 'catalogos' | 'lgpd';
 
 export const ABAS: readonly { id: Aba; rotulo: string; descricao: string }[] = [
   {
     id: 'pessoas',
     rotulo: 'Pessoas',
     descricao: 'Quem entra no CRM, com que papel, e quem está na lista de permitidos.',
+  },
+  {
+    id: 'atendimento',
+    rotulo: 'Atendimento',
+    descricao:
+      'O que o CRM faz sozinho no WhatsApp (lead automático, distribuição, fora do horário), as respostas prontas e as etiquetas.',
   },
   {
     id: 'catalogos',

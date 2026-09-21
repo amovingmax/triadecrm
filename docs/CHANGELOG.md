@@ -2807,3 +2807,15 @@ Entregue:
 - Testes: pgTAP 60 (14 asserções), 11 e 49 ajustados; Vitest da formatação do valor.
 
 Pendente: quem chega pelo WhatsApp entra com o telefone no nome; o nome do perfil do WhatsApp não é guardado hoje (pediria mudar a Edge Function `wa-webhook`).
+
+### 22/09/2026 — Fase 3: automações do atendimento (branch `feat/fase-3-automacoes`)
+
+Entregue:
+- Migração `20260922120000_automacoes_do_atendimento` (só acréscimos):
+  - Distribuição: conversa nova de quem não tem responsável na base cai com quem tem menos conversas abertas no setor (gatilho `conversations_a_distribuir`, antes do dono padrão); parceiro com dono continua com o dono; quando o menu automático manda a conversa para outro setor, ela vai para alguém desse setor.
+  - Fora do horário: fora de seg–sex 8h–17h45 (e em feriado), resposta automática (modelo de serviço `GEN-SYS-AUSENCIA`, sem aprovação da Meta porque vai dentro das 24 h), no máximo uma a cada 12 h por conversa, nunca por cima do menu automático nem para quem pediu para sair.
+  - Respostas prontas (`respostas_rapidas`), com três de partida: `/custo`, `/cadastro`, `/horario`.
+  - `public.virar_tarefa` e `public.atendimento_configurar`.
+- Ajustes → nova aba **Atendimento**: interruptores de lead automático, distribuição e fora do horário; texto do aviso; respostas prontas; etiquetas com cor.
+- Conversas: "/" na caixa de resposta oferece as respostas prontas; etiquetas do parceiro no topo (qualquer pessoa que escreve põe e tira); "Virar tarefa" em cada mensagem recebida (vira tarefa sua, próximo dia útil às 9h).
+- Testes: pgTAP 61 (17 asserções); 24 e 46 desligam as automações para continuar provando a conversa sem ficha; Vitest das respostas prontas.

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { SeletorDeAba } from './abas';
 import { PainelCatalogos } from './painel-catalogos';
 import { PainelLgpd } from './painel-lgpd';
+import { PainelAtendimento } from './painel-atendimento';
 import { PainelPessoas } from './painel-pessoas';
 import { ABAS, type Aba, type SecaoCatalogo, type SecaoLgpd } from './tipos';
 
@@ -75,6 +76,9 @@ export function TelaAdmin({
       />
 
       {aba === 'pessoas' ? <PainelPessoas sessao={sessao} /> : null}
+      {aba === 'atendimento' ? (
+        <PainelAtendimento podeEditar={sessao.papel === 'admin' || sessao.papel === 'gestor'} />
+      ) : null}
       {aba === 'catalogos' ? (
         <PainelCatalogos secao={catalogo} aoTrocarSecao={setCatalogo} />
       ) : null}

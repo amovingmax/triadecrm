@@ -23,15 +23,21 @@ export function EscolhaMultipla<T extends string | number>({
   opcoes,
   valor,
   aoMudar,
+  compacto = false,
 }: {
+  /** Pílula pequena, para caber numa linha de selos (topo da conversa). */
+  compacto?: boolean;
   rotulo: string;
   opcoes: readonly { valor: T; rotulo: string; grupo?: string }[];
   valor: T[];
   aoMudar: (v: T[]) => void;
 }) {
   const marcados = opcoes.filter((o) => valor.includes(o.valor));
-  const texto =
-    marcados.length === 0
+  // Compacto mora ao lado dos selos do que está marcado: repetir os nomes no
+  // botão seria dizer duas vezes a mesma coisa.
+  const texto = compacto
+    ? rotulo
+    : marcados.length === 0
       ? rotulo
       : marcados.length === 1
         ? `${rotulo}: ${marcados[0]?.rotulo}`
@@ -44,6 +50,7 @@ export function EscolhaMultipla<T extends string | number>({
           variant="outline"
           className={cn(
             'toque h-11 shrink-0 md:h-8',
+            compacto && 'md:h-6 md:px-2 md:text-xs',
             marcados.length > 0 && 'border-primary/50 bg-primary/5 text-foreground',
           )}
         >

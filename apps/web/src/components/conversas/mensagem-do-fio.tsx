@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 import { urlDaMidia } from './acoes';
+import { VirarTarefa } from './virar-tarefa';
 import { dataHoraCompleta, hora } from './formatos';
 import { entregaDaMensagem, separarAssinatura } from './mensagens';
 import { ROTULO_ORIGEM, ROTULO_TIPO_MENSAGEM, type MensagemDoFio } from './tipos';
@@ -103,6 +104,7 @@ export function Mensagem({ mensagem }: { mensagem: MensagemDoFio }) {
           {entrega.detalhe ? (
             <span className="w-full text-muted-foreground">{entrega.detalhe}</span>
           ) : null}
+          {mensagem.entrada ? <VirarTarefa mensagemId={mensagem.id} /> : null}
         </p>
       </div>
     </div>

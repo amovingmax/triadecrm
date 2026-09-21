@@ -15,6 +15,7 @@ import { ChipTemperatura, DiasSemContato } from '@/components/temperatura';
 import { marcarComoLida } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
+import { EtiquetasDoParceiro } from './etiquetas-do-parceiro';
 import { AvisoWhatsapp } from './aviso-whatsapp';
 import { CartaoDeAprovacao } from './aprovacao';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
@@ -267,6 +268,7 @@ export function Conversa({
                   {setorDoFio}
                 </Badge>
               ) : null}
+              <EtiquetasDoParceiro organizacaoId={item.id} podeEditar={Boolean(eu?.podeEscrever)} />
               {/* O estado do fio ("esperando a gente") só aparece com largura de
                   sobra: no celular a faixa da janela, logo abaixo, já diz o que
                   dá para fazer agora — e três selos empilhados comem a conversa. */}

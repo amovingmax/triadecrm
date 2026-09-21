@@ -154,6 +154,8 @@ export type Database = {
       }
       ai_gasto_do_mes: { Args: { p_ref?: string }; Returns: Json }
       aplicar_retencao: { Args: never; Returns: Json }
+      atendimento_liga: { Args: { p_chave: string }; Returns: boolean }
+      ausencia_responder: { Args: { p_message_id: string }; Returns: Json }
       business_days: { Args: { p_ate: string; p_de: string }; Returns: number }
       cadencias_agendar: { Args: never; Returns: number }
       cadencias_encerrar_silencio: { Args: never; Returns: number }
@@ -5690,6 +5692,51 @@ export type Database = {
           },
         ]
       }
+      respostas_rapidas: {
+        Row: {
+          atalho: string
+          ativo: boolean
+          criado_em: string
+          criado_por: string | null
+          id: number
+          texto: string
+          titulo: string
+        }
+        Insert: {
+          atalho: string
+          ativo?: boolean
+          criado_em?: string
+          criado_por?: string | null
+          id?: never
+          texto: string
+          titulo: string
+        }
+        Update: {
+          atalho?: string
+          ativo?: boolean
+          criado_em?: string
+          criado_por?: string | null
+          id?: never
+          texto?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "respostas_rapidas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "respostas_rapidas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       retention_runs: {
         Row: {
           id: number
@@ -7321,6 +7368,7 @@ export type Database = {
         Returns: Json
       }
       assumir_conversa: { Args: { p_conversation_id: string }; Returns: Json }
+      atendimento_configurar: { Args: { p: Json }; Returns: Json }
       cadencia_do_parceiro: {
         Args: { p_organization_id: string }
         Returns: Json
@@ -8124,6 +8172,10 @@ export type Database = {
       }
       vincular_conversa: {
         Args: { p_conversation_id: string; p_organization_id: string }
+        Returns: Json
+      }
+      virar_tarefa: {
+        Args: { p_message_id: string; p_quando?: string; p_titulo?: string }
         Returns: Json
       }
       wa_bot_ligar: { Args: { p_ativo: boolean }; Returns: Json }

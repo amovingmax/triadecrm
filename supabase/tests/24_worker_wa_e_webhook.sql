@@ -42,6 +42,12 @@
 begin;
 select plan(71);
 
+-- O lead automático (Fase 2) e a distribuição (Fase 3) mudariam o que este
+-- arquivo prova: a conversa de número desconhecido nascendo SEM ficha.
+update public.app_settings
+   set value = value || '{"lead_automatico": false, "distribuicao_automatica": false, "ausencia_ativa": false}'::jsonb
+ where key = 'atendimento';
+
 -- ---------- utilitários de sessão ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin

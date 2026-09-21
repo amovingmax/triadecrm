@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { BellOff, NotebookPen, PenLine, SendHorizontal } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 
 import { ErroDaConversa, responder } from './acoes';
@@ -14,6 +15,12 @@ import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
 import { EnviarModelo } from './enviar-modelo';
 import { GravarAudio } from './gravar-audio';
 import { podeEscreverLivre } from './mensagens';
+import {
+  aplicarResposta,
+  atalhoEmDigitacao,
+  respostasQueBatem,
+  type RespostaPronta,
+} from './respostas-prontas';
 
 /**
  * O teto da Cloud API para uma mensagem de texto. É o único limite que existe de
@@ -166,6 +173,20 @@ function TextoLivre({
 }) {
   const clientes = useQueryClient();
   const [texto, setTexto] = useState('');
+  const respostas = useQuery({
+    queryKey: ['conversas', 'respostas-prontas'],
+    queryFn: async (): Promise<RespostaPronta[]> => {
+      const { data } = await createClient()
+        .from('respostas_rapidas')
+        .select('id, atalho, titulo, texto')
+        .eq('ativo', true)
+        .order('atalho');
+      return (data ?? []) as RespostaPronta[];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const digitando = atalhoEmDigitacao(texto);
+  const sugestoes = digitando === null ? [] : respostasQueBatem(respostas.data ?? [], digitando);
 
   const enviar = useMutation({
     mutationFn: () => responder({ fioId: fio.id, texto: texto.trim() }),
@@ -203,12 +224,31 @@ function TextoLivre({
       <label htmlFor="resposta" className="sr-only">
         Escrever para o parceiro
       </label>
+      {sugestoes.length > 0 ? (
+        <ul
+          aria-label="Respostas prontas"
+          className="max-h-48 overflow-y-auto rounded-lg border border-hairline bg-popover shadow-sm"
+        >
+          {sugestoes.map((r) => (
+            <li key={r.id}>
+              <button
+                type="button"
+                onClick={() => setTexto(aplicarResposta(texto, r))}
+                className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+              >
+                <code className="shrink-0 text-primary">/{r.atalho}</code>
+                <span className="min-w-0 truncate text-muted-foreground">{r.titulo}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <textarea
         id="resposta"
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         rows={2}
-        placeholder="Escreva para o parceiro"
+        placeholder="Escreva para o parceiro (/ para respostas prontas)"
         className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-base leading-relaxed transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
       />
       <div className="flex flex-wrap items-center justify-between gap-2">
