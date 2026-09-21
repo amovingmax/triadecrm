@@ -5,10 +5,10 @@ import { requireSession } from '@/lib/auth/session';
 import { carregarCatalogos } from '@/components/parceiros/catalogos';
 import { TelaEnvios } from '@/components/envios/tela-envios';
 
-export const metadata: Metadata = { title: 'Envios em massa' };
+export const metadata: Metadata = { title: 'Campanhas' };
 
 /**
- * Envios em massa pelo WhatsApp (decisão do Rafael, 21/09/2026).
+ * Campanhas: envios em massa pelo WhatsApp (decisão do Rafael, 21/09/2026).
  *
  * Só admin e gestor: um lote mal montado derruba a nota do número de todo o
  * time. A autorização de verdade é do Postgres (`app.is_manager()` em toda

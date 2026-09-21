@@ -54,6 +54,10 @@ export type FiltroDoPublico = {
   cidades?: number[];
   responsaveis?: string[];
   temperaturas?: string[];
+  /** Etiquetas do parceiro (`organization_tags`): qualquer uma delas. */
+  tags?: number[];
+  /** Setor da conversa de WhatsApp do parceiro (Fase 5). */
+  setores?: number[];
   sem_contato_ha_dias?: number | null;
   busca?: string;
 };
@@ -149,12 +153,12 @@ export type Previa = z.infer<typeof previaSchema>;
 // ---------------------------------------------------------------------------
 
 export const STATUS_DO_ENVIO = {
-  agendado: 'Agendado',
+  agendado: 'Agendada',
   enviando: 'Enviando',
-  pausado: 'Pausado',
-  parado: 'Parado pela proteção',
-  concluido: 'Concluído',
-  cancelado: 'Cancelado',
+  pausado: 'Pausada',
+  parado: 'Parada pela proteção',
+  concluido: 'Concluída',
+  cancelado: 'Cancelada',
 } as const;
 export type StatusDoEnvio = keyof typeof STATUS_DO_ENVIO;
 

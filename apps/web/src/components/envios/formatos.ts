@@ -3,6 +3,7 @@ import {
   type AcaoDoBotao,
   type CampoDaFicha,
   type Contagem,
+  type FiltroDoPublico,
   type RegraDaVariavel,
 } from './tipos';
 
@@ -95,8 +96,8 @@ export function fraseDoMotivo(motivo: string | null | undefined): string {
 }
 
 const RECUSAS_DO_LOTE: Record<string, string> = {
-  sem_permissao: 'Só admin e gestor montam e controlam envios em massa.',
-  nome_invalido: 'Dê um nome ao envio (até 120 letras).',
+  sem_permissao: 'Só admin e gestor montam e controlam campanhas.',
+  nome_invalido: 'Dê um nome à campanha (até 120 letras).',
   tipo_invalido: 'Escolha entre modelo aprovado e texto livre.',
   modelo_inexistente: 'Este modelo não existe mais. Escolha outro.',
   modelo_nao_aprovado_na_meta: 'A Meta ainda não aprovou este modelo.',
@@ -104,12 +105,12 @@ const RECUSAS_DO_LOTE: Record<string, string> = {
   variavel_sem_regra: 'Uma variável ficou sem regra.',
   variavel_longa_demais: 'O texto de uma variável ficou longo demais.',
   publico_vazio: 'Ninguém marcado para receber.',
-  publico_grande_demais: 'No máximo 2.000 pessoas por envio.',
+  publico_grande_demais: 'No máximo 2.000 pessoas por campanha.',
   ritmo_invalido: 'O ritmo vai de 1 a 60 mensagens por hora.',
   inicio_distante_demais: 'Agende para no máximo 30 dias à frente.',
   assinatura_invalida: 'Escolha quem assina.',
   atendente_invalido: 'Um dos atendentes escolhidos não está ativo ou não pode enviar.',
-  envio_inexistente: 'Este envio não existe mais. Atualize a tela.',
+  envio_inexistente: 'Esta campanha não existe mais. Atualize a tela.',
   modelo_tem_atendente:
     'Este modelo diz "aqui é {{atendente}}". Em nome da Komune, escolha um modelo sem nome de atendente.',
   acoes_invalidas: 'Confira o que acontece em cada botão: o link precisa de texto e de rótulo.',
@@ -122,7 +123,7 @@ const RECUSAS_DO_LOTE: Record<string, string> = {
   variavel_na_borda: 'A mensagem não pode começar nem terminar com uma variável: a Meta recusa.',
   variaveis_coladas: 'Há duas variáveis coladas: ponha texto entre elas.',
   botoes_invalidos: 'Até 3 botões de até 25 letras, no máximo 1 de link, sem textos repetidos.',
-  acao_invalida_no_estado: 'O envio mudou de estado. Atualize a tela.',
+  acao_invalida_no_estado: 'A campanha mudou de estado. Atualize a tela.',
 };
 
 export function fraseDaRecusa(motivo: string | undefined, variavel?: string): string {
@@ -192,4 +193,60 @@ export function acoesPara(
     acoes[b.texto] = anteriores[b.texto] ?? acaoSugerida(b.texto);
   }
   return acoes;
+}
+
+// ---------------------------------------------------------------------------
+// A tela única da campanha (Fase 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * O nome que a campanha ganha sozinha: a mensagem e o dia. Quem monta uma por
+ * semana não precisa inventar nome; quem quer outro, escreve por cima.
+ */
+export function nomeSugerido(mensagem: string | null, agora: Date = new Date()): string {
+  const base = mensagem?.trim() ?? '';
+  if (base === '') return '';
+  const dia = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Fortaleza',
+    day: '2-digit',
+    month: '2-digit',
+  }).format(agora);
+  return `${base.slice(0, 100)} — ${dia}`;
+}
+
+/**
+ * O que a Meta cobra por mensagem de modelo no Brasil, em reais: os mesmos
+ * valores que a folha de criar modelo mostra. Marketing é cobrado sempre;
+ * utilidade é grátis para quem está com a janela de 24 h aberta.
+ */
+export const PRECO_POR_MENSAGEM = { marketing: 0.34, utility: 0.035 } as const;
+
+/** Estimativa do custo na Meta; `null` quando a categoria do modelo não diz. */
+export function custoEstimado(
+  categoria: string | null,
+  quantidade: number,
+  comJanela: number,
+): number | null {
+  if (categoria === 'marketing') return quantidade * PRECO_POR_MENSAGEM.marketing;
+  if (categoria === 'utility') {
+    return Math.max(quantidade - comJanela, 0) * PRECO_POR_MENSAGEM.utility;
+  }
+  return null;
+}
+
+export function formatarReais(valor: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+}
+
+/**
+ * Quantos filtros estão ligados dentro de "Mais filtros". O botão mostra o
+ * número: filtro escondido e esquecido é público menor sem ninguém saber por quê.
+ */
+export function filtrosEscondidos(f: FiltroDoPublico): number {
+  const listas = [f.tipos, f.etapas, f.categorias, f.cidades, f.responsaveis, f.temperaturas];
+  return (
+    listas.filter((l) => (l?.length ?? 0) > 0).length +
+    ((f.busca ?? '').trim() !== '' ? 1 : 0) +
+    (f.sem_contato_ha_dias === null || f.sem_contato_ha_dias === undefined ? 0 : 1)
+  );
 }

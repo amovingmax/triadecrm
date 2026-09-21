@@ -2826,3 +2826,16 @@ Entregue:
 - Migração `20260922130000_metricas_do_atendimento`: `public.relatorio_atendimento(p_de, p_ate)`, só leitura. Tempo de primeira resposta = da mensagem do parceiro que abre um bloco até a primeira resposta de GENTE (menu, aviso de fora do horário e confirmação de saída não contam), só com chegadas dentro do horário, em mediana. Mais: conversas, mensagens e primeira resposta por atendente; conversão por etapa da captação (reusa `relatorio_funil`); motivos de perda do período.
 - Relatórios: painel novo **Atendimento**, o primeiro e o padrão, com quatro números no topo (primeira resposta, respondidas em até 1 h, ainda sem resposta, negócios perdidos) e três blocos (por atendente, conversão por etapa, motivos de perda).
 - Testes: pgTAP 62 (9 asserções); 60 ficou imune a dados extras no banco local; Vitest do formato de minutos.
+
+### 22/09/2026 — Fase 5: campanhas numa tela só (branch `feat/fase-5-campanhas`)
+
+Entregue:
+- "Envios em massa" virou **Campanhas** (menu, título, botões, avisos e situações no feminino). A rota continua `/envios`.
+- A montagem deixou de ser um assistente de três passos e virou uma página só: à esquerda, **Para quem** (situação em pílulas de um clique, Etiqueta, Setor, "Mais filtros" recolhido com os filtros antigos e o número de filtros ligados, públicos salvos a um clique, contagem e a lista para desmarcar recolhida em "Ver quem") e **Mensagem** (um seletor só com os modelos aprovados e, no fim, o texto livre; só o texto fixo que falta aparece à vista). À direita, sempre à vista: a prévia de uma pessoa ("Ver outra pessoa"), quantos vão receber, duração, custo estimado na Meta (marketing ≈ R$ 0,34; utilidade ≈ R$ 0,035, grátis na janela; texto livre grátis), nome automático ("modelo — dd/mm"), "Agendar para outro horário" e o botão "Enviar para N", com o motivo ao lado quando está apagado.
+- Tudo que já tem padrão bom ficou em **Opções avançadas**, recolhido: quem assina (padrão: em nome da Komune), ritmo, o que cada botão faz, destino do link, de onde vem cada variável da ficha e as proteções.
+- Texto livre só põe na fila quem está com a janela de 24 h aberta (antes entravam todos e o resto aparecia como "pulado").
+- Migração `20260922140000_campanha_filtra_por_setor` (só recria `app.envio_publico`, mesma assinatura): filtro `setores` = setor da conversa de WhatsApp do parceiro. O filtro por etiqueta já existia no banco; faltava a tela.
+- Testes: pgTAP 63 (4 asserções: sem filtro, por setor, setor sem ninguém, por etiqueta); Vitest do nome automático, do custo e da contagem de filtros escondidos.
+- Retirado do repositório o `apps/web/t.mjs`, script de depuração que tinha entrado por engano num commit de 17/09.
+
+Achado de passagem, fora do escopo (não corrigido): `app.radar_pontuar` quebra com "malformed array literal" quando o candidato é de categoria prioritária (`v_porque || 'categoria prioritária'`, migração `20260917180000`). Só dispara se `categorias_prioritarias` tiver alguma categoria.

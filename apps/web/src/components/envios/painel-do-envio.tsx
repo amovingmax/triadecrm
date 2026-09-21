@@ -20,7 +20,7 @@ import { fraseDaRecusa, fraseDoMotivo, porcento } from './formatos';
 import { STATUS_DO_ENVIO, type Contagem, type ItemDoEnvio } from './tipos';
 
 /**
- * Um envio por dentro: os números, os botões de controle e cada pessoa com o
+ * Uma campanha por dentro: os números, os botões de controle e cada pessoa com o
  * que aconteceu com ela. Relê a cada 15 s enquanto está andando.
  */
 export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: () => void }) {
@@ -36,7 +36,7 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
   const mudar = useMutation({
     mutationFn: (acao: 'pausar' | 'retomar' | 'cancelar') => mudarEnvio(id ?? '', acao),
     onSuccess: (_r, acao) => {
-      toast.success(acao === 'pausar' ? 'Envio pausado.' : acao === 'retomar' ? 'Envio retomado.' : 'Envio cancelado.');
+      toast.success(acao === 'pausar' ? 'Campanha pausada.' : acao === 'retomar' ? 'Campanha retomada.' : 'Campanha cancelada.');
       void clientes.invalidateQueries({ queryKey: ['envios'] });
     },
     onError: (erro: Error) =>
@@ -51,10 +51,10 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
     <Sheet open={id !== null} onOpenChange={(v) => !v && aoFechar()}>
       <SheetContent className="flex w-full flex-col gap-0 sm:max-w-xl">
         <SheetHeader>
-          <SheetTitle>{envio?.nome ?? 'Envio'}</SheetTitle>
+          <SheetTitle>{envio?.nome ?? 'Campanha'}</SheetTitle>
           <SheetDescription>
             {envio
-              ? `${STATUS_DO_ENVIO[envio.status]} · ${envio.modelo ?? 'texto livre'} · ${envio.por_hora} por hora · criado por ${envio.criado_por ?? '—'}`
+              ? `${STATUS_DO_ENVIO[envio.status]} · ${envio.modelo ?? 'texto livre'} · ${envio.por_hora} por hora · criada por ${envio.criado_por ?? '—'}`
               : 'Carregando…'}
           </SheetDescription>
         </SheetHeader>
@@ -94,13 +94,13 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
                   className="toque h-11 text-destructive md:h-9"
                   disabled={mudar.isPending}
                   onClick={() => {
-                    if (window.confirm('Cancelar o envio? Quem ainda não recebeu não vai receber.')) {
+                    if (window.confirm('Cancelar a campanha? Quem ainda não recebeu não vai receber.')) {
                       mudar.mutate('cancelar');
                     }
                   }}
                 >
                   <X aria-hidden="true" />
-                  Cancelar envio
+                  Cancelar campanha
                 </Button>
               ) : null}
             </div>

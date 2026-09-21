@@ -62,6 +62,24 @@ export async function buscarPublico(filtro: FiltroDoPublico): Promise<PessoaDoPu
   return z.array(pessoaDoPublicoSchema).parse(data ?? []);
 }
 
+/** Os recortes que a campanha ganhou na Fase 5: etiqueta do parceiro e setor da conversa. */
+export async function buscarEtiquetasESetores(): Promise<{
+  etiquetas: { id: number; nome: string }[];
+  setores: { id: number; nome: string }[];
+}> {
+  const supabase = createClient();
+  const [etiquetas, setores] = await Promise.all([
+    supabase.from('tags').select('id, name').order('name'),
+    supabase.from('setores').select('id, nome').eq('ativo', true).order('posicao'),
+  ]);
+  if (etiquetas.error) throw new ErroDoEnvio(etiquetas.error.message);
+  if (setores.error) throw new ErroDoEnvio(setores.error.message);
+  return {
+    etiquetas: (etiquetas.data ?? []).map((t) => ({ id: t.id, nome: t.name })),
+    setores: setores.data ?? [],
+  };
+}
+
 /** Os modelos que dá para mandar em massa: ativos, de WhatsApp e aprovados pela Meta. */
 export async function buscarModelos(): Promise<Modelo[]> {
   const supabase = createClient();

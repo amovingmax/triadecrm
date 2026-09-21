@@ -15,12 +15,13 @@ import { Numeros, PainelDoEnvio } from './painel-do-envio';
 import { STATUS_DO_ENVIO, type Envio, type StatusDoEnvio } from './tipos';
 
 /**
- * Envios em massa pelo WhatsApp (decisão do Rafael, 21/09/2026).
+ * Campanhas: envios em massa pelo WhatsApp (decisão do Rafael, 21/09/2026;
+ * "Campanhas" e tela única desde a Fase 5).
  *
- * A tela tem dois estados: a lista dos envios, com o andamento de cada um, e o
- * assistente de um envio novo. O envio em si nunca acontece aqui: criar grava
- * a fila, e o relógio do banco manda uma por vez, pela mesma porteira do botão
- * da conversa.
+ * A tela tem dois estados: a lista das campanhas, com o andamento de cada uma,
+ * e a montagem de uma nova, numa página só. O envio em si nunca acontece aqui:
+ * criar grava a fila, e o relógio do banco manda uma por vez, pela mesma
+ * porteira do botão da conversa.
  */
 export function TelaEnvios({ catalogos }: { catalogos: Catalogos }) {
   const [montando, setMontando] = useState(false);
@@ -37,46 +38,46 @@ export function TelaEnvios({ catalogos }: { catalogos: Catalogos }) {
     <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-6 md:px-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Envios em massa</h1>
-          <p className="text-sm text-muted-foreground">
-            Uma mensagem para muita gente, no ritmo de uma pessoa: aos poucos, assinada, e com parada
-            automática se começarem a bloquear.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{montando ? 'Nova campanha' : 'Campanhas'}</h1>
+          {!montando ? (
+            <p className="text-sm text-muted-foreground">
+              Uma mensagem de WhatsApp para muitos parceiros, aos poucos e com parada automática se
+              começarem a bloquear.
+            </p>
+          ) : null}
         </div>
         {!montando ? (
           <Button className="toque h-11 md:h-9" onClick={() => setMontando(true)}>
             <Plus aria-hidden="true" />
-            Novo envio
+            Nova campanha
           </Button>
         ) : null}
       </header>
 
       {montando ? (
-        <div className="rounded-2xl border border-hairline bg-background p-4 md:p-5">
-          <NovoEnvio
-            catalogos={catalogos}
-            aoCancelar={() => setMontando(false)}
-            aoCriar={(id) => {
-              setMontando(false);
-              setAberto(id);
-            }}
-          />
-        </div>
+        <NovoEnvio
+          catalogos={catalogos}
+          aoCancelar={() => setMontando(false)}
+          aoCriar={(id) => {
+            setMontando(false);
+            setAberto(id);
+          }}
+        />
       ) : envios.isPending ? (
         <p className="text-sm text-muted-foreground">Carregando…</p>
       ) : envios.isError ? (
         <p className="text-sm text-destructive">
-          {envios.error instanceof ErroDoEnvio ? fraseDaRecusa(envios.error.motivo) : 'Não deu para ler os envios.'}
+          {envios.error instanceof ErroDoEnvio ? fraseDaRecusa(envios.error.motivo) : 'Não deu para ler as campanhas.'}
         </p>
       ) : (envios.data ?? []).length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-hairline py-14 text-center">
           <Megaphone className="size-8 text-muted-foreground" aria-hidden="true" />
           <p className="max-w-sm text-sm text-muted-foreground">
-            Nenhum envio ainda. Escolha um público, uma mensagem e o ritmo, e o CRM cuida do resto.
+            Nenhuma campanha ainda. Escolha para quem e a mensagem, e o CRM cuida do resto.
           </p>
           <Button className="toque h-11 md:h-9" onClick={() => setMontando(true)}>
             <Plus aria-hidden="true" />
-            Montar o primeiro envio
+            Montar a primeira campanha
           </Button>
         </div>
       ) : (

@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   acoesPara,
+  custoEstimado,
   duracaoEstimada,
+  filtrosEscondidos,
+  formatarReais,
   fraseDaRecusa,
   fraseDoMotivo,
+  nomeSugerido,
   progresso,
   regrasIncompletas,
   regrasPara,
@@ -95,5 +99,30 @@ describe('o que cada botão faz', () => {
     expect(acoes['Agora não']).toEqual({ acao: 'sair' });
     expect(acoes['Quero o convite']?.acao).toBe('link');
     expect(Object.keys(acoes)).toHaveLength(2);
+  });
+});
+
+describe('a tela única da campanha', () => {
+  it('o nome sai sozinho: a mensagem e o dia de Natal', () => {
+    // 22h de 21/09 em Natal já é 22/09 em UTC: vale o dia de Natal.
+    expect(nomeSugerido('Convite fundador', new Date('2026-09-22T01:00:00Z'))).toBe(
+      'Convite fundador — 21/09',
+    );
+    expect(nomeSugerido(null)).toBe('');
+    expect(nomeSugerido('   ')).toBe('');
+  });
+
+  it('marketing custa por mensagem; utilidade é grátis para quem está na janela', () => {
+    expect(custoEstimado('marketing', 100, 30)).toBeCloseTo(34);
+    expect(custoEstimado('utility', 100, 30)).toBeCloseTo(2.45);
+    expect(custoEstimado(null, 100, 0)).toBeNull();
+    expect(formatarReais(29.58).replace(/\s/g, ' ')).toBe('R$ 29,58');
+  });
+
+  it('conta os filtros escondidos em "Mais filtros", e só eles', () => {
+    expect(filtrosEscondidos({ situacoes: ['nunca_contatado'], tags: [1], setores: [2] })).toBe(0);
+    expect(
+      filtrosEscondidos({ cidades: [1], tipos: [], busca: ' buffet ', sem_contato_ha_dias: 0 }),
+    ).toBe(3);
   });
 });

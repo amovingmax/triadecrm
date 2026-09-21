@@ -278,11 +278,11 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     // derruba a nota do número de todo o time.
     href: '/envios',
     principal: true,
-    rotulo: 'Envios em massa',
+    rotulo: 'Campanhas',
     icone: Megaphone,
     grupo: 'todo_dia',
     descricao:
-      'Uma mensagem de WhatsApp para muitos parceiros: público por filtro, variáveis por pessoa, ritmo por hora, quem assina e parada automática se começarem a bloquear.',
+      'Uma mensagem de WhatsApp para muitos parceiros, montada numa tela só: público por situação, etiqueta ou setor, a mensagem aprovada e parada automática se começarem a bloquear.',
     papeis: ['admin', 'gestor'],
   },
   {
