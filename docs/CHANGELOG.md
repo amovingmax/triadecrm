@@ -2789,3 +2789,11 @@ Entregue:
 - Testes: pgTAP 59 (20 asserções); Vitest de filtros (Minhas/Meu setor/Todas) e da lateral.
 
 Pendente para a Fase 2 em diante: distribuição automática ao chegar (hoje só na transferência), mensagem de ausência, respostas rápidas, etiquetas na tela.
+
+### 22/09/2026 — Limpeza de contas duplicadas (pedido e aprovação do Rafael)
+
+- Script `supabase/snippets/2026-09-22_limpeza_de_contas_duplicadas.sql`, rodado em produção numa transação: antes de apagar, move tudo o que é da conta velha para a conta que fica (toda coluna que aponta para `profiles`).
+- Apagadas: `heloiza.admin@komune.app.br` (dados → Ana Heloiza Lima) e `matheus.admin@komune.app.br` (dados → Matheus, `rondonfamiliav@gmail.com`).
+- Desativadas, e não apagadas: `contato@komune.app.br` (dados de trabalho → `rafael@rafaelabreu.com`) e `prova.push@teste.local`. As duas aparecem em tabelas de trilha de auditoria só-de-inclusão (consentimentos e eventos do pré-cadastro), que não se reescrevem.
+- Ajustes → Pessoas esconde desativados por padrão, com "Mostrar desativados (n)".
+- Atenção: o domínio `komune.app.br` inteiro tem acesso. Uma conta `@komune.app.br` apagada volta se alguém entrar de novo com ela; as desativadas continuam sem acesso.

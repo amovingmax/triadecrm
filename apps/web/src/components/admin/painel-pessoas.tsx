@@ -64,6 +64,7 @@ import { O_QUE_O_PAPEL_FAZ, PAPEIS_ATRIBUIVEIS, type Permitido, type Pessoa } fr
  */
 export function PainelPessoas({ sessao }: { sessao: Sessao }) {
   const ehAdmin = sessao.papel === 'admin';
+  const [mostrarDesativadas, setMostrarDesativadas] = useState(false);
   const clienteDeConsultas = useQueryClient();
 
   const consulta = useQuery({
@@ -171,10 +172,15 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
     );
   }
 
-  const pessoas = consulta.data.pessoas;
+  const todas = consulta.data.pessoas;
+  // Desativados ficam escondidos por padrão (22/09/2026): contas antigas e de
+  // teste que não podem ser apagadas — aparecem na trilha de auditoria — não
+  // precisam ocupar a lista de quem trabalha no CRM todo dia.
+  const desativadas = todas.filter((p) => !p.ativo).length;
+  const pessoas = mostrarDesativadas ? todas : todas.filter((p) => p.ativo);
   const ativos = pessoas.filter((p) => p.ativo);
   // Diretório do time para traduzir id em nome na renderização (nunca dentro da consulta).
-  const nomes = new Map(pessoas.map((p) => [p.id, p.nome]));
+  const nomes = new Map(todas.map((p) => [p.id, p.nome]));
   const admins = ativos.filter((p) => p.papel === 'admin');
 
   const colunasPessoas: ColunaAdmin<Pessoa>[] = [
@@ -339,6 +345,20 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
               ninguém. O combinado é ter três: Rafael, Luiz e Matheus.
             </p>
           </Aviso>
+        ) : null}
+        {desativadas > 0 ? (
+          <div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="toque h-11 text-muted-foreground md:h-8"
+              onClick={() => setMostrarDesativadas((v) => !v)}
+            >
+              {mostrarDesativadas
+                ? 'Esconder desativados'
+                : `Mostrar desativados (${desativadas})`}
+            </Button>
+          </div>
         ) : null}
         <ListaAdmin
           rotuloDaLista="Pessoas com acesso ao CRM"
