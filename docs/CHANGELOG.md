@@ -2774,5 +2774,5 @@ Entregue:
 - Testes: pgTAP 58 (29 asserções), 43 e 57 ajustados; Vitest do worker (5 novos) e do web.
 
 Pendente / decisão:
-- Link rastreado no endereço da Komune (decisão do Rafael, 21/09/2026): `https://ir.komune.app.br/r/<código>`. O subdomínio aponta para o projeto do CRM na Vercel e só serve `/r/`; qualquer outro caminho vai para `komune.app.br` (`destinoNoHostDosLinks`, no proxy). Falta: registro `ir` CNAME `cname.vercel-dns.com.` no DNS do Registro.br e o domínio adicionado ao projeto `triade-crm` na Vercel — ANTES de publicar, porque a Meta revisa a URL do botão de link quando o modelo vai para aprovação.
+- Link rastreado no endereço da Komune (decisão do Rafael, 21/09/2026): `https://ir.komune.app.br/r/<código>`. O subdomínio aponta para o projeto do CRM na Vercel e só serve `/r/`; qualquer outro caminho vai para `komune.app.br` (`destinoNoHostDosLinks`, no proxy). Domínio adicionado ao projeto `triade-crm` na Vercel em 21/09/2026. Falta o registro `ir` tipo A `76.76.21.21` no DNS do Registro.br (recomendação da Vercel; o mesmo do `admin.komune.app.br`). Os três modelos ENV-* foram publicados PAUSADOS (`is_active = false` em produção) para o worker antigo não mandá-los à Meta sem botões; reativar depois que o endereço responder, porque a Meta revisa a URL do botão de link.
 - Publicar exige também o deploy do worker-wa no Fly (o worker mudou).
