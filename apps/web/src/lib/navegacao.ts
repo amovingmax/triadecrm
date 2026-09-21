@@ -136,7 +136,23 @@ export type ItemNavegacao = {
   papeis?: readonly AppRole[];
   /** A fila que este item conta na lateral. Ausente = nunca mostra número. */
   fila?: ChaveDeFila;
+  /**
+   * Um dos 6 itens sempre à vista na lateral (Fase 1, 21/09/2026). O resto mora
+   * em "Mais", fechado: 13 itens abertos era o que fazia a tela parecer poluída.
+   * A ordem dos principais é a de `ORDEM_PRINCIPAL`, não a do array.
+   */
+  principal?: boolean;
 };
+
+/** A ordem dos itens sempre à vista: do que se abre toda hora ao que se abre no fim do dia. */
+export const ORDEM_PRINCIPAL = [
+  '/meu-dia',
+  '/conversas',
+  '/funis',
+  '/parceiros',
+  '/envios',
+  '/relatorios',
+] as const;
 
 export type GrupoDeNavegacao = {
   chave: ChaveDeGrupo;
@@ -208,6 +224,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
   // -------------------------------------------------------------------------
   {
     href: '/meu-dia',
+    principal: true,
     rotulo: 'Meu dia',
     icone: Sun,
     grupo: 'todo_dia',
@@ -245,6 +262,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
   },
   {
     href: '/conversas',
+    principal: true,
     rotulo: 'Conversas',
     icone: MessageCircle,
     grupo: 'todo_dia',
@@ -259,6 +277,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     // Decisão do Rafael, 21/09/2026. Só admin e gestor: um lote mal montado
     // derruba a nota do número de todo o time.
     href: '/envios',
+    principal: true,
     rotulo: 'Envios em massa',
     icone: Megaphone,
     grupo: 'todo_dia',
@@ -280,6 +299,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
   // -------------------------------------------------------------------------
   {
     href: '/parceiros',
+    principal: true,
     rotulo: 'Parceiros',
     icone: Handshake,
     grupo: 'a_base',
@@ -292,6 +312,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
   },
   {
     href: '/funis',
+    principal: true,
     rotulo: 'Funis',
     icone: SquareKanban,
     grupo: 'a_base',
@@ -334,6 +355,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
   },
   {
     href: '/relatorios',
+    principal: true,
     rotulo: 'Relatórios',
     icone: ChartColumn,
     grupo: 'controle',
@@ -418,6 +440,25 @@ export function navegacaoAgrupada(
     grupo,
     itens: visiveis.filter((item) => item.grupo === grupo.chave),
   })).filter((bloco) => bloco.itens.length > 0);
+}
+
+/**
+ * A lateral em duas partes: os principais, sempre à vista, e o resto em "Mais".
+ * Um papel que não vê algum principal (Relatórios, por exemplo) só fica com
+ * menos itens à vista — o "Mais" não ganha nada em troca.
+ */
+export function navegacaoDaLateral(papel: AppRole): {
+  principais: ItemNavegacao[];
+  mais: ItemNavegacao[];
+} {
+  const visiveis = navegacaoPara(papel);
+  const ordem = ORDEM_PRINCIPAL as readonly string[];
+  return {
+    principais: visiveis
+      .filter((i) => i.principal)
+      .sort((a, b) => ordem.indexOf(a.href) - ordem.indexOf(b.href)),
+    mais: visiveis.filter((i) => !i.principal),
+  };
 }
 
 /**

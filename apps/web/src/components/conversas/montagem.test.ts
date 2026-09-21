@@ -418,6 +418,7 @@ function fio(parcial: Partial<FioCru> & { id: string; organization_id: string })
     peer_phone_e164: '+5584999880011',
     business_number: '+5584999990000',
     assignee_id: HELOISA,
+    setor_id: null,
     status: 'aguardando_nos',
     bot_paused: false,
     last_message_at: null,
@@ -687,5 +688,39 @@ describe('a leitura da IA na lista', () => {
     const [primeiro] = montarConversas(base);
     expect(primeiro?.leituraDaIa).toBeNull();
     expect(primeiro?.nome).toBe('Neuma Leão Buffet');
+  });
+});
+
+describe('Minhas, Meu setor e Todas (Fase 1)', () => {
+  const agora = new Date('2026-09-22T12:00:00Z');
+  const itens = montarConversas({
+    organizacoes: [
+      organizacao('o1', 'Buffet da Heloísa'),
+      organizacao('o2', 'Doces do Suporte'),
+      organizacao('o3', 'Espaço sem conversa'),
+    ],
+    atividades: [],
+    negocios: [],
+    catalogos: CATALOGOS,
+    fios: [
+      fio({ id: 'f1', organization_id: 'o1', assignee_id: HELOISA, setor_id: 1 }),
+      fio({ id: 'f2', organization_id: 'o2', assignee_id: MATHEUS, setor_id: 2 }),
+    ],
+    agora,
+  });
+  const quem = { euId: HELOISA, meusSetores: [2] };
+  const ids = (escopo: 'minhas' | 'setor' | 'todas') =>
+    aplicarFiltros(itens, { ...FILTROS_VAZIOS, escopo }, quem).map((i) => i.id).sort();
+
+  it('"Minhas" são as conversas que eu atendo', () => {
+    expect(ids('minhas')).toEqual(['o1']);
+  });
+
+  it('"Meu setor" são as conversas dos meus setores, de quem quer que atenda', () => {
+    expect(ids('setor')).toEqual(['o2']);
+  });
+
+  it('"Todas" não recorta nada, nem quem ainda não tem conversa', () => {
+    expect(ids('todas')).toEqual(['o1', 'o2', 'o3']);
   });
 });

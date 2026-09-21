@@ -260,14 +260,29 @@ export type FiltrosConversas = {
    * fichas que ela apenas tocou uma vez em agosto.
    */
   atendenteId: string | null;
+  /**
+   * De quem a lista mostra as conversas (Fase 1, 21/09/2026): as que EU atendo,
+   * as dos MEUS SETORES, ou todas. Fica fora do contador de "Filtros" porque é
+   * a pergunta de todo começo de turno, e mora num seletor próprio, à vista.
+   */
+  escopo: EscopoDaLista;
   canal: Channel | null;
   janela: JanelaSemContato;
 };
+
+/** Minhas · Meu setor · Todas. */
+export type EscopoDaLista = 'minhas' | 'setor' | 'todas';
+export const ESCOPOS: readonly { id: EscopoDaLista; rotulo: string }[] = [
+  { id: 'minhas', rotulo: 'Minhas' },
+  { id: 'setor', rotulo: 'Meu setor' },
+  { id: 'todas', rotulo: 'Todas' },
+];
 
 export const FILTROS_VAZIOS: FiltrosConversas = {
   q: '',
   responsavelId: null,
   atendenteId: null,
+  escopo: 'todas',
   canal: null,
   janela: 'qualquer',
 };
@@ -278,6 +293,7 @@ export function temRecorte(f: FiltrosConversas): boolean {
     f.q.trim() !== '' ||
     f.responsavelId !== null ||
     f.atendenteId !== null ||
+    f.escopo !== 'todas' ||
     f.canal !== null ||
     f.janela !== 'qualquer'
   );
@@ -325,6 +341,7 @@ export function estadoDaUrl(params: Record<string, string | string[] | undefined
       q: texto('q'),
       responsavelId: texto('responsavel') || null,
       atendenteId: texto('atendente') || null,
+      escopo: ESCOPOS.some((e) => e.id === texto('ver')) ? (texto('ver') as EscopoDaLista) : 'todas',
       canal: ehCanal(canal) ? canal : null,
       janela: ehJanela(janela) ? janela : 'qualquer',
     },
@@ -343,6 +360,7 @@ export function urlDoEstado(
   if (f.q.trim()) p.set('q', f.q.trim());
   if (f.responsavelId) p.set('responsavel', f.responsavelId);
   if (f.atendenteId) p.set('atendente', f.atendenteId);
+  if (f.escopo !== 'todas') p.set('ver', f.escopo);
   if (f.canal) p.set('canal', f.canal);
   if (f.janela !== 'qualquer') p.set('janela', f.janela);
   if (aba !== 'conversas') p.set('aba', aba);
@@ -523,6 +541,8 @@ export type FioDaConversa = {
   numeroDaEmpresa: string;
   responsavelId: string;
   responsavel: string | null;
+  /** O setor da conversa (Fase 1). `null` só em fio anterior à migração. */
+  setorId: number | null;
   estado: EstadoDoFio;
   roboPausado: boolean;
   naoLidas: number;

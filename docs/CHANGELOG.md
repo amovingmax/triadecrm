@@ -2776,3 +2776,16 @@ Entregue:
 Pendente / decisão:
 - Link rastreado no endereço da Komune (decisão do Rafael, 21/09/2026): `https://ir.komune.app.br/r/<código>`. O subdomínio aponta para o projeto do CRM na Vercel e só serve `/r/`; qualquer outro caminho vai para `komune.app.br` (`destinoNoHostDosLinks`, no proxy). No ar em 21/09/2026: registro `ir` A `76.76.21.21` no Registro.br (feito pelo Rafael), domínio no projeto `triade-crm` da Vercel, certificado emitido, `/r/<código>` redirecionando. Os três modelos ENV-* ficaram pausados até o endereço responder e foram mandados à Meta às 11h35, com os botões (conferido na Graph API): PENDING. Site republicado: `ir.komune.app.br` fora de `/r/` leva a `komune.app.br` (conferido). Pendente só a aprovação da Meta.
 - Publicar exige também o deploy do worker-wa no Fly (o worker mudou).
+
+### 22/09/2026 — Fase 1: atendimento em equipe (branch `feat/fase-1-atendimento`)
+
+Plano aprovado pelo Rafael em 21/09/2026 (referência de produto: gzappy.com; só API oficial, setores Comercial/Suporte/Financeiro, lead automático na Fase 2, funis mantidos com exibição simplificada).
+
+Entregue:
+- Migração `20260922100000_atendimento_em_equipe` (só acréscimos): `setores` (Comercial, Suporte, Financeiro), `setor_membros`, `conversations.setor_id` (toda conversa nasce no Comercial; o menu automático do WhatsApp manda para Financeiro ou Suporte pela intenção escolhida, configurável em `app_settings.atendimento`), `conversa_transferencias` e `public.transferir_conversa` (para pessoa ou setor, com nota; só o setor entrega a quem tem menos conversas abertas; quem recebe ganha tarefa com a nota) e `public.definir_setores_da_pessoa` (gestor/admin).
+- Conversas: seletor "Minhas · Meu setor · Todas" no topo da lista (vai na URL como `?ver=`), setor no cabeçalho, botão Transferir, e o aviso "Fulano está atendendo esta conversa. Se você responder, ela passa para você", com a nota da última transferência.
+- Ajustes → Pessoas: coluna Setores (gestor e admin mudam).
+- Menu lateral: 6 itens à vista (Meu dia, Conversas, Funis, Parceiros, Envios em massa, Relatórios) e o resto em "Mais", que abre sozinho quando a tela atual mora nele.
+- Testes: pgTAP 59 (20 asserções); Vitest de filtros (Minhas/Meu setor/Todas) e da lateral.
+
+Pendente para a Fase 2 em diante: distribuição automática ao chegar (hoje só na transferência), mensagem de ausência, respostas rápidas, etiquetas na tela.

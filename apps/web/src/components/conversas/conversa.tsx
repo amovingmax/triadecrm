@@ -14,6 +14,7 @@ import { ChipTemperatura, DiasSemContato } from '@/components/temperatura';
 
 import { marcarComoLida } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
+import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
 import { AvisoWhatsapp } from './aviso-whatsapp';
 import { CartaoDeAprovacao } from './aprovacao';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
@@ -64,12 +65,15 @@ const FOLGA_DO_FIM = 120;
 export function Conversa({
   item,
   catalogos,
+  setores,
   meta,
   aoVoltar,
   escolhaExplicita,
 }: {
   item: ItemConversa;
   catalogos: CatalogosConversas;
+  /** Os setores do atendimento (Fase 1): nome no cabeçalho e destino da transferência. */
+  setores: readonly { id: number; nome: string }[];
   /** O que ainda depende da Meta, para o aviso não ser um parágrafo fixo. */
   meta: DependenciasDaMeta | null;
   /** Só o celular usa: lá a conversa OCUPA a tela e precisa devolver para a lista. */
@@ -219,6 +223,7 @@ export function Conversa({
       : (fio.responsavel ?? 'sem nome na base')
     : null;
   const podeAssumir = Boolean(fio && eu?.podeEscrever && fio.responsavelId !== eu.id);
+  const setorDoFio = fio?.setorId != null ? (setores.find((s) => s.id === fio.setorId)?.nome ?? null) : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -257,6 +262,11 @@ export function Conversa({
                   não contatar
                 </Badge>
               ) : null}
+              {setorDoFio ? (
+                <Badge variant="pilula" className="h-5 px-2 text-[11px] font-normal">
+                  {setorDoFio}
+                </Badge>
+              ) : null}
               {/* O estado do fio ("esperando a gente") só aparece com largura de
                   sobra: no celular a faixa da janela, logo abaixo, já diz o que
                   dá para fazer agora — e três selos empilhados comem a conversa. */}
@@ -283,6 +293,14 @@ export function Conversa({
               empurravam a mensagem de hoje para fora da tela. */}
           <div className="flex shrink-0 items-center gap-1.5">
             {podeAssumir && fio ? <AssumirConversa fioId={fio.id} organizacaoId={item.id} /> : null}
+            {fio && eu?.podeEscrever ? (
+              <TransferirConversa
+                fioId={fio.id}
+                organizacaoId={item.id}
+                pessoas={catalogos.pessoas}
+                setores={setores}
+              />
+            ) : null}
             <Button asChild variant="outline" size="sm" className="toque h-9">
               <Link href={`/registrar?org=${item.id}`}>
                 <MessageSquarePlus aria-hidden="true" />
@@ -419,6 +437,14 @@ export function Conversa({
               selo lá em cima informa, mas informar não impede ninguém de digitar
               uma mensagem inteira e só descobrir na hora de enviar que o parceiro
               tinha pedido para sair. Quem decide continua sendo o banco. */}
+          {fio ? (
+            <AvisoDeQuemAtende
+              fioId={fio.id}
+              atendente={fio.responsavel}
+              paraMim={fio.responsavelId === eu?.id}
+              nomeDaPessoa={nomeDaPessoa}
+            />
+          ) : null}
           <CaixaDeResposta
             fio={fio}
             janela={janela}

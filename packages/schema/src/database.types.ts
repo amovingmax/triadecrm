@@ -795,6 +795,10 @@ export type Database = {
       }
       segredo: { Args: { p_nome: string }; Returns: string }
       sem_cpf: { Args: { t: string }; Returns: string }
+      setor_da_opcao_do_bot: { Args: { p_chave: string }; Returns: number }
+      setor_padrao: { Args: never; Returns: number }
+      setor_por_slug: { Args: { p_slug: string }; Returns: number }
+      setor_quem_recebe: { Args: { p_setor: number }; Returns: string }
       sha256_hex: { Args: { t: string }; Returns: string }
       stage_for: {
         Args: { p_pipeline_id: number; p_slug: string }
@@ -2753,6 +2757,113 @@ export type Database = {
           },
         ]
       }
+      conversa_transferencias: {
+        Row: {
+          conversation_id: string
+          de_pessoa: string | null
+          de_setor: number | null
+          feita_em: string
+          feita_por: string
+          id: number
+          nota: string | null
+          para_pessoa: string | null
+          para_setor: number | null
+        }
+        Insert: {
+          conversation_id: string
+          de_pessoa?: string | null
+          de_setor?: number | null
+          feita_em?: string
+          feita_por: string
+          id?: never
+          nota?: string | null
+          para_pessoa?: string | null
+          para_setor?: number | null
+        }
+        Update: {
+          conversation_id?: string
+          de_pessoa?: string | null
+          de_setor?: number | null
+          feita_em?: string
+          feita_por?: string
+          id?: never
+          nota?: string | null
+          para_pessoa?: string | null
+          para_setor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversa_transferencias_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_transferencias_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "conversa_transferencias_de_pessoa_fkey"
+            columns: ["de_pessoa"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_transferencias_de_pessoa_fkey"
+            columns: ["de_pessoa"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_transferencias_de_setor_fkey"
+            columns: ["de_setor"]
+            isOneToOne: false
+            referencedRelation: "setores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_transferencias_feita_por_fkey"
+            columns: ["feita_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_transferencias_feita_por_fkey"
+            columns: ["feita_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_transferencias_para_pessoa_fkey"
+            columns: ["para_pessoa"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_transferencias_para_pessoa_fkey"
+            columns: ["para_pessoa"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_transferencias_para_setor_fkey"
+            columns: ["para_setor"]
+            isOneToOne: false
+            referencedRelation: "setores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           ai_confidence: number | null
@@ -2776,6 +2887,7 @@ export type Database = {
           organization_id: string | null
           peer_phone_e164: string
           peer_user_id: string | null
+          setor_id: number | null
           snoozed_until: string | null
           status: string
           unread_count: number
@@ -2804,6 +2916,7 @@ export type Database = {
           organization_id?: string | null
           peer_phone_e164: string
           peer_user_id?: string | null
+          setor_id?: number | null
           snoozed_until?: string | null
           status?: string
           unread_count?: number
@@ -2832,6 +2945,7 @@ export type Database = {
           organization_id?: string | null
           peer_phone_e164?: string
           peer_user_id?: string | null
+          setor_id?: number | null
           snoozed_until?: string | null
           status?: string
           unread_count?: number
@@ -2886,6 +3000,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "setores"
             referencedColumns: ["id"]
           },
         ]
@@ -5739,6 +5860,70 @@ export type Database = {
           },
         ]
       }
+      setor_membros: {
+        Row: {
+          profile_id: string
+          setor_id: number
+        }
+        Insert: {
+          profile_id: string
+          setor_id: number
+        }
+        Update: {
+          profile_id?: string
+          setor_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setor_membros_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setor_membros_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setor_membros_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "setores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      setores: {
+        Row: {
+          ativo: boolean
+          criado_em: string
+          id: number
+          nome: string
+          posicao: number
+          slug: string
+        }
+        Insert: {
+          ativo?: boolean
+          criado_em?: string
+          id?: never
+          nome: string
+          posicao?: number
+          slug: string
+        }
+        Update: {
+          ativo?: boolean
+          criado_em?: string
+          id?: never
+          nome?: string
+          posicao?: number
+          slug?: string
+        }
+        Relationships: []
+      }
       source_category_map: {
         Row: {
           category_id: number
@@ -7195,6 +7380,10 @@ export type Database = {
           to_stage_name: string
         }[]
       }
+      definir_setores_da_pessoa: {
+        Args: { p_profile_id: string; p_setores: number[] }
+        Returns: Json
+      }
       descartar_rascunho: {
         Args: { p_draft_id: string; p_motivo: string }
         Returns: Json
@@ -7912,6 +8101,15 @@ export type Database = {
           p_resultado: Database["app"]["Enums"]["call_result"]
           p_reuniao_em?: string
           p_reuniao_formato?: string
+        }
+        Returns: Json
+      }
+      transferir_conversa: {
+        Args: {
+          p_conversation_id: string
+          p_nota?: string
+          p_para_pessoa?: string
+          p_para_setor?: number
         }
         Returns: Json
       }

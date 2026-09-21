@@ -18,12 +18,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { EscolhaMultipla } from '@/components/envios/escolha-multipla';
 
 import { DialogoConfirmar } from './confirmar';
 import {
   adicionarPermitido,
   carregarPermitidos,
   carregarPessoas,
+  carregarSetoresDoTime,
+  definirSetoresDaPessoa,
   removerPermitido,
   SemAcessoAoRegistro,
   trocarAcesso,
@@ -66,6 +69,17 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
   const consulta = useQuery({
     queryKey: ['admin', 'pessoas'],
     queryFn: carregarPessoas,
+  });
+
+  // Setores do atendimento (Fase 1): quem é de qual fila na tela de Conversas.
+  const setores = useQuery({ queryKey: ['admin', 'setores'], queryFn: carregarSetoresDoTime });
+  const podeMudarSetor = sessao.papel === 'admin' || sessao.papel === 'gestor';
+  const mudarSetores = useMutation({
+    mutationFn: ({ pessoa, ids }: { pessoa: Pessoa; ids: number[] }) =>
+      definirSetoresDaPessoa(pessoa.id, ids),
+    onSuccess: () => void clienteDeConsultas.invalidateQueries({ queryKey: ['admin', 'setores'] }),
+    onError: (erro) =>
+      toast.error('Não deu para mudar os setores.', { description: mensagemDoErro(erro) }),
   });
 
   const permitidos = useQuery({
@@ -212,6 +226,27 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
       celula: (p) => <span className="text-muted-foreground">{O_QUE_O_PAPEL_FAZ[p.papel]}</span>,
     },
     {
+      id: 'setores',
+      rotulo: 'Setores',
+      largura: 'w-44',
+      celula: (p) => {
+        const meus = setores.data?.daPessoa[p.id] ?? [];
+        const opcoes = (setores.data?.setores ?? []).map((s) => ({ valor: s.id, rotulo: s.nome }));
+        if (!podeMudarSetor) {
+          const nomes = opcoes.filter((o) => meus.includes(o.valor)).map((o) => o.rotulo);
+          return <span className="text-muted-foreground">{nomes.join(', ') || '—'}</span>;
+        }
+        return (
+          <EscolhaMultipla
+            rotulo="Setor"
+            opcoes={opcoes}
+            valor={meus}
+            aoMudar={(ids) => mudarSetores.mutate({ pessoa: p, ids })}
+          />
+        );
+      },
+    },
+    {
       id: 'acesso',
       rotulo: 'Acesso',
       largura: 'w-24',
@@ -221,7 +256,10 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
     {
       id: 'desde',
       rotulo: 'No CRM desde',
-      largura: 'w-28',
+      // Com a coluna de setores (Fase 1), esta só aparece em tela bem larga: a
+      // tabela passava da largura e cortava o botão de acesso, que decide.
+      largura: 'hidden w-28 2xl:table-cell',
+      soNoDesktop: true,
       celula: (p) => (
         <span className="numerico text-muted-foreground">{formatarData(p.criadoEm)}</span>
       ),

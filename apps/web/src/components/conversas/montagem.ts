@@ -370,10 +370,29 @@ export function normalizar(texto: string): string {
     .trim();
 }
 
-export function aplicarFiltros(itens: ItemConversa[], f: FiltrosConversas): ItemConversa[] {
+/** Quem está olhando a lista: é o que "Minhas" e "Meu setor" perguntam. */
+export type QuemVe = { euId: string | null; meusSetores: readonly number[] };
+
+export function aplicarFiltros(
+  itens: ItemConversa[],
+  f: FiltrosConversas,
+  quem: QuemVe = { euId: null, meusSetores: [] },
+): ItemConversa[] {
   const busca = normalizar(f.q);
 
   return itens.filter((item) => {
+    // "Minhas" e "Meu setor" perguntam pelo FIO de WhatsApp: parceiro sem
+    // conversa não tem quem atenda nem setor, e sai desses dois recortes.
+    if (f.escopo === 'minhas' && (quem.euId === null || item.fio?.responsavelId !== quem.euId)) {
+      return false;
+    }
+    if (
+      f.escopo === 'setor' &&
+      (item.fio?.setorId == null || !quem.meusSetores.includes(item.fio.setorId))
+    ) {
+      return false;
+    }
+
     if (busca) {
       const alvo = normalizar(
         [item.nome, item.categoria, item.bairro, item.cidade].filter(Boolean).join(' '),

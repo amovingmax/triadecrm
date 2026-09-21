@@ -43,7 +43,7 @@ const COLUNAS_ATIVIDADE =
  * restringe a quem é dono do fio.
  */
 const COLUNAS_FIO =
-  'id, organization_id, contact_id, channel, peer_phone_e164, business_number, assignee_id, status, bot_paused, last_message_at, last_inbound_at, last_outbound_at, window_expires_at, unread_count, ai_summary, ai_intent, ai_confidence';
+  'id, organization_id, contact_id, channel, peer_phone_e164, business_number, assignee_id, setor_id, status, bot_paused, last_message_at, last_inbound_at, last_outbound_at, window_expires_at, unread_count, ai_summary, ai_intent, ai_confidence';
 
 /** Colunas da mensagem. `body` pode ser null: a retenção dos 12 meses o apaga. */
 const COLUNAS_MENSAGEM =
@@ -87,6 +87,10 @@ export type BaseDasConversas = {
   meta: DependenciasDaMeta;
   /** `true` quando alguma leitura bateu no teto: a tela precisa dizer isso. */
   cortada: boolean;
+  /** Os setores do atendimento e os de quem está usando a tela (Fase 1). */
+  setores: { id: number; nome: string }[];
+  meusSetores: number[];
+  euId: string | null;
 };
 
 /** Chave da consulta da lista (TanStack Query). */
@@ -100,7 +104,10 @@ export function chaveDaLinha(organizacaoId: string) {
 export async function carregarConversas(): Promise<BaseDasConversas> {
   const supabase = createClient();
 
-  const [organizacoes, atividades, negocios, fios, rascunhos, leituras, meta] = await Promise.all([
+  const { data: sessao } = await supabase.auth.getSession();
+  const euId = sessao.session?.user.id ?? null;
+
+  const [organizacoes, atividades, negocios, fios, rascunhos, leituras, meta, setores, meus] = await Promise.all([
     supabase
       .from('organizations_view')
       .select(
@@ -134,6 +141,10 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
       .limit(TETO_ORGANIZACOES),
     supabase.from('ficha_da_conversa').select(COLUNAS_DA_LEITURA).limit(TETO_ORGANIZACOES),
     dependenciasDaMeta(supabase),
+    supabase.from('setores').select('id, nome').eq('ativo', true).order('posicao'),
+    euId
+      ? supabase.from('setor_membros').select('setor_id').eq('profile_id', euId)
+      : Promise.resolve({ data: [] as { setor_id: number }[] }),
   ]);
 
   const erro =
@@ -153,6 +164,10 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
     cortada:
       (organizacoes.data?.length ?? 0) >= TETO_ORGANIZACOES ||
       (atividades.data?.length ?? 0) >= TETO_ATIVIDADES,
+    // Setor é acréscimo, como a leitura da IA: sem ele a lista abre igual.
+    setores: setores.data ?? [],
+    meusSetores: (meus.data ?? []).map((m) => m.setor_id),
+    euId,
   };
 }
 

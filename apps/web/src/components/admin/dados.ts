@@ -760,3 +760,41 @@ export async function carregarAuditoria(
     temMais,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Setores do atendimento (Fase 1, 21/09/2026)
+// ---------------------------------------------------------------------------
+
+export type SetoresDoTime = {
+  setores: { id: number; nome: string }[];
+  /** `profiles.id` → setores dessa pessoa. */
+  daPessoa: Record<string, number[]>;
+};
+
+export async function carregarSetoresDoTime(): Promise<SetoresDoTime> {
+  const supabase = createClient();
+  const [setores, membros] = await Promise.all([
+    supabase.from('setores').select('id, nome').eq('ativo', true).order('posicao'),
+    supabase.from('setor_membros').select('setor_id, profile_id'),
+  ]);
+  if (setores.error) throw new Error(setores.error.message);
+  if (membros.error) throw new Error(membros.error.message);
+  const daPessoa: Record<string, number[]> = {};
+  for (const m of membros.data ?? []) {
+    (daPessoa[m.profile_id] ??= []).push(m.setor_id);
+  }
+  return { setores: setores.data ?? [], daPessoa };
+}
+
+export async function definirSetoresDaPessoa(pessoaId: string, setores: number[]): Promise<void> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('definir_setores_da_pessoa', {
+    p_profile_id: pessoaId,
+    p_setores: setores,
+  });
+  if (error) throw new Error(error.message);
+  const r = data as { ok?: boolean; motivo?: string } | null;
+  if (!r?.ok) {
+    throw new Error(r?.motivo === 'sem_permissao' ? 'Só admin e gestor mudam setores.' : 'O banco recusou.');
+  }
+}

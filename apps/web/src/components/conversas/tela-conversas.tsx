@@ -27,6 +27,7 @@ import { ListaConversas } from './lista-conversas';
 import { aplicarFiltros, montarConversas, type CatalogosConversas } from './montagem';
 import {
   contarFiltros,
+  ESCOPOS,
   FILTROS_VAZIOS,
   ROTULO_CANAL,
   ROTULO_JANELA,
@@ -102,7 +103,26 @@ export function TelaConversas({
     });
   }, [consulta.data, catalogos]);
 
-  const itens = useMemo(() => aplicarFiltros(todos, filtros), [todos, filtros]);
+  // Quem está olhando: é o que "Minhas" e "Meu setor" perguntam (Fase 1).
+  const quem = useMemo(
+    () => ({
+      euId: consulta.data?.euId ?? null,
+      meusSetores: consulta.data?.meusSetores ?? [],
+    }),
+    [consulta.data],
+  );
+  const itens = useMemo(() => aplicarFiltros(todos, filtros, quem), [todos, filtros, quem]);
+  const porEscopo = useMemo(
+    () =>
+      // "Todas" não leva número: é a lista inteira, e o número dela já está no
+      // cabeçalho. Sem ele, os três rótulos cabem na coluna de 20rem.
+      ESCOPOS.map((e) => ({
+        ...e,
+        contagem:
+          e.id === 'todas' ? null : aplicarFiltros(todos, { ...filtros, escopo: e.id }, quem).length,
+      })),
+    [todos, filtros, quem],
+  );
 
   // A fila de aprovação NÃO passa pelo recorte da lista: ela é a fila do ADR-05
   // inteira. Um rascunho escondido por um filtro de canal que alguém deixou
@@ -297,6 +317,16 @@ export function TelaConversas({
             // chevron caíam fora da tela). É a mesma armadilha do flex.
             className="min-h-0 min-w-0 md:overflow-y-auto md:border-r md:border-hairline"
           >
+            {aba === 'conversas' && !consulta.isPending ? (
+              <div className="sticky top-0 z-10 border-b border-hairline bg-background px-3 py-2">
+                <SeletorDeAba
+                  itens={porEscopo}
+                  ativo={filtros.escopo}
+                  aoTrocar={(escopo) => mudar({ escopo })}
+                  rotulo="De quem são as conversas"
+                />
+              </div>
+            ) : null}
             {consulta.isPending ? (
               <EsqueletoLista />
             ) : consulta.isError ? (
@@ -320,6 +350,10 @@ export function TelaConversas({
                   aoEscolher={setEscolhidoId}
                 />
               )
+            ) : filtros.escopo === 'setor' && quem.meusSetores.length === 0 ? (
+              <p className="px-4 py-8 text-sm text-muted-foreground">
+                Você ainda não está em nenhum setor. Um gestor coloca você em Ajustes → Pessoas.
+              </p>
             ) : itens.length === 0 && recorte ? (
               <VazioPorFiltro
                 descricao={descreverRecorte(filtros, catalogos)}
@@ -372,6 +406,7 @@ export function TelaConversas({
                 key={aberta.id}
                 item={aberta}
                 catalogos={catalogos}
+                setores={consulta.data?.setores ?? []}
                 meta={meta}
                 aoVoltar={voltar}
                 escolhaExplicita={escolhidoId !== null}
@@ -500,6 +535,8 @@ function descreverRecorte(filtros: FiltrosConversas, catalogos: CatalogosConvers
   if (pessoa) partes.push(`responsável ${pessoa.nome}`);
   const atende = catalogos.pessoas.find((p) => p.id === filtros.atendenteId);
   if (atende) partes.push(`atendido por ${atende.nome}`);
+  if (filtros.escopo === 'minhas') partes.push('"Minhas"');
+  if (filtros.escopo === 'setor') partes.push('"Meu setor"');
   if (filtros.canal) partes.push(`canal ${ROTULO_CANAL[filtros.canal]}`);
   if (filtros.janela !== 'qualquer') partes.push(`"${ROTULO_JANELA[filtros.janela]}"`);
 

@@ -1,12 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ChevronDown } from 'lucide-react';
 
 import { NavLink } from '@/components/layout/nav-link';
 import { Logo } from '@/components/logo';
 import { type AppRole } from '@/lib/auth/role';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
-import { navegacaoAgrupada } from '@/lib/navegacao';
+import { navegacaoDaLateral } from '@/lib/navegacao';
 import { cn } from '@/lib/utils';
 
 /**
@@ -48,7 +51,12 @@ import { cn } from '@/lib/utils';
  * Conversas (rascunho esperando aprovação). Ver a regra inteira em `navegacao.ts`.
  */
 export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFilas }) {
-  const blocos = navegacaoAgrupada(papel);
+  const { principais, mais } = navegacaoDaLateral(papel);
+  const pathname = usePathname();
+  // "Mais" nasce aberto quando a tela atual mora nele: um item aceso escondido
+  // num menu fechado é a pessoa sem saber onde está.
+  const estouNoMais = mais.some((i) => pathname === i.href || pathname.startsWith(`${i.href}/`));
+  const [maisAberto, setMaisAberto] = useState(estouNoMais);
 
   return (
     <aside className="sticky top-0 hidden h-dvh w-52 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
@@ -58,41 +66,44 @@ export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFi
         </Link>
       </div>
 
-      {/* Sem rodapé: carimbo de versão e faixa de localidade não ajudam quem está
-          usando o CRM (o fuso aparece onde é operacional, na data da próxima ação). */}
-      <nav aria-label="Navegação principal" className="flex flex-1 flex-col px-2 py-2">
-        {blocos.map(({ grupo, itens }, indice) => {
-          const ultimo = indice === blocos.length - 1;
-          return (
-            <section
-              key={grupo.chave}
-              aria-labelledby={`grupo-${grupo.chave}`}
-              className={cn(
-                'flex flex-col gap-0.5',
-                // O último grupo desce para o rodapé e ganha a única linha da
-                // coluna. `pt-2` depois da borda para o cabeçalho não encostar nela.
-                ultimo
-                  ? 'mt-auto border-t border-sidebar-border pt-2'
-                  : indice > 0 && 'mt-4',
-              )}
+      <nav aria-label="Navegação principal" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-2">
+        {principais.map((item) => (
+          <NavLink
+            key={item.href}
+            item={item}
+            variante="lateral"
+            contagem={item.fila ? (filas[item.fila] ?? null) : null}
+          />
+        ))}
+
+        {mais.length > 0 ? (
+          <div className="mt-3 border-t border-sidebar-border pt-2">
+            <button
+              type="button"
+              aria-expanded={maisAberto || estouNoMais}
+              onClick={() => setMaisAberto((v) => !v)}
+              className="toque flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[13px] text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
             >
-              <h2
-                id={`grupo-${grupo.chave}`}
-                className="px-3 pb-1 text-[11px] font-medium tracking-wide text-sidebar-muted-foreground/80"
-              >
-                {grupo.titulo}
-              </h2>
-              {itens.map((item) => (
-                <NavLink
-                  key={item.href}
-                  item={item}
-                  variante="lateral"
-                  contagem={item.fila ? (filas[item.fila] ?? null) : null}
-                />
-              ))}
-            </section>
-          );
-        })}
+              Mais
+              <ChevronDown
+                aria-hidden="true"
+                className={cn('size-4 transition-transform', (maisAberto || estouNoMais) && 'rotate-180')}
+              />
+            </button>
+            {maisAberto || estouNoMais ? (
+              <div className="mt-0.5 flex flex-col gap-0.5">
+                {mais.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    variante="lateral"
+                    contagem={item.fila ? (filas[item.fila] ?? null) : null}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </nav>
     </aside>
   );

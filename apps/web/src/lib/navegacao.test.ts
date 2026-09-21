@@ -9,6 +9,7 @@ import {
   leTelefoneCompleto,
   NAVEGACAO,
   navegacaoAgrupada,
+  navegacaoDaLateral,
   navegacaoPara,
   podeCriarParceiro,
   podeImportarPlanilha,
@@ -190,5 +191,30 @@ describe('leTelefoneCompleto', () => {
     expect(leTelefoneCompleto('sdr')).toBe(false);
     expect(leTelefoneCompleto('embaixador')).toBe(false);
     expect(leTelefoneCompleto('bot')).toBe(false);
+  });
+});
+
+describe('navegacaoDaLateral (Fase 1)', () => {
+  it('deixa 6 itens à vista para quem vê tudo, na ordem do dia', () => {
+    expect(navegacaoDaLateral('admin').principais.map((i) => i.href)).toEqual([
+      '/meu-dia',
+      '/conversas',
+      '/funis',
+      '/parceiros',
+      '/envios',
+      '/relatorios',
+    ]);
+  });
+
+  it('guarda o resto em "Mais", sem perder nenhum item', () => {
+    const { principais, mais } = navegacaoDaLateral('admin');
+    expect(principais.length + mais.length).toBe(navegacaoPara('admin').length);
+    expect(mais.map((i) => i.href)).toContain('/radar');
+  });
+
+  it('quem não vê um principal fica com menos à vista, e o "Mais" não ganha nada', () => {
+    const sdr = navegacaoDaLateral('sdr');
+    expect(sdr.principais.map((i) => i.href)).not.toContain('/envios');
+    expect(sdr.mais.map((i) => i.href)).not.toContain('/envios');
   });
 });

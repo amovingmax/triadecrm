@@ -55,6 +55,7 @@ export type FioCru = {
   peer_phone_e164: string;
   business_number: string;
   assignee_id: string;
+  setor_id: number | null;
   status: string;
   bot_paused: boolean;
   last_message_at: string | null;
@@ -491,6 +492,7 @@ export function montarFio(cru: FioCru, nomeDaPessoa: Map<string, string>): FioDa
     numeroDaEmpresa: cru.business_number,
     responsavelId: cru.assignee_id,
     responsavel: nomeDaPessoa.get(cru.assignee_id) ?? null,
+    setorId: cru.setor_id ?? null,
     estado: (ESTADOS_DE_FIO.includes(cru.status)
       ? cru.status
       : 'aguardando_nos') as FioDaConversa['estado'],
