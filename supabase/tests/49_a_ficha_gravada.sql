@@ -14,6 +14,11 @@
 begin;
 select plan(28);
 
+-- O lead automático (Fase 2) ligaria a conversa solta a uma ficha nova, e este
+-- arquivo precisa justamente de uma conversa SEM ficha.
+update public.app_settings set value = value || '{"lead_automatico": false}'::jsonb
+ where key = 'atendimento';
+
 create function pg_temp.conversa(p_peer text) returns uuid language sql security definer set search_path = '' as $$
   select id from public.conversations where peer_phone_e164 = p_peer
 $$;
