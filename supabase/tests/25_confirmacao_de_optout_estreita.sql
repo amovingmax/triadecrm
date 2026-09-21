@@ -327,8 +327,10 @@ select is(app.pode_enviar_confirmacao_optout(pg_temp.a(), '2026-09-16 10:00-03':
 -- DISPENSA 2 — a janela de 24 h. A conversa C não recebe mensagem desde
 -- que nasceu; empurrando a última entrada para 3 dias atrás, a janela
 -- fecha e a confirmação continua podendo.
-update public.conversations set last_inbound_at = now() - interval '3 days',
-       last_message_at = now() - interval '3 days' where id = pg_temp.c();
+-- Ancorado no mesmo 16/09 das asserções: "now() - 3 dias" virou bomba-relógio
+-- e passou a abrir a janela quando o calendário passou de 19/09.
+update public.conversations set last_inbound_at = '2026-09-13 10:00-03'::timestamptz,
+       last_message_at = '2026-09-13 10:00-03'::timestamptz where id = pg_temp.c();
 select ok(not app.janela_de_24h_aberta(pg_temp.c(), '2026-09-16 10:00-03'::timestamptz),
           'a janela de 24 h da conversa C está fechada');
 select is(app.pode_enviar_confirmacao_optout(pg_temp.c(), '2026-09-16 10:00-03'::timestamptz) ->> 'pode',

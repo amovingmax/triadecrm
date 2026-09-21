@@ -79,6 +79,7 @@ import {
   ChartColumn,
   Handshake,
   type LucideIcon,
+  Megaphone,
   MessageCircle,
   PhoneCall,
   Radar,
@@ -253,6 +254,17 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     // Rascunho pendente é trabalho parado de verdade: ele expira, e a mensagem
     // que expira é uma conversa que a pessoa não teve.
     fila: 'rascunhos',
+  },
+  {
+    // Decisão do Rafael, 21/09/2026. Só admin e gestor: um lote mal montado
+    // derruba a nota do número de todo o time.
+    href: '/envios',
+    rotulo: 'Envios em massa',
+    icone: Megaphone,
+    grupo: 'todo_dia',
+    descricao:
+      'Uma mensagem de WhatsApp para muitos parceiros: público por filtro, variáveis por pessoa, ritmo por hora, quem assina e parada automática se começarem a bloquear.',
+    papeis: ['admin', 'gestor'],
   },
   {
     href: '/agenda',

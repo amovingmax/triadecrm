@@ -2743,3 +2743,22 @@ E o que ela escreveu nos "não" é o que a conta jamais veria:
 3. **O teto de saída estava encostado.** Trinta vereditos gastaram 1.875 tokens contra um teto de 2.000; a chamada seguinte estourou e voltou com JSON cortado no meio, que o leitor recusa — e com razão, porque metade de um veredito é pior que nenhum. Teto para 3.000 e lote para 20, os dois medidos e não estimados.
 
 **Provado:** prompts 276 testes (com a linha de custo do prompt novo na tabela publicada), workers 363, web 744, pgTAP 2756. Lint e typecheck limpos nos quatro pacotes. E rodando em produção: 180 candidatos lidos, 11 na fila para o próximo lote.
+
+### 21/09/2026 — Pendência registrada: medir o cadastro de organizador (app Komune)
+
+- O conjunto de dados ORGANIZADORES (Gerenciador de Eventos da Meta) fica, mas não recebe nada ainda: o app Komune (Expo 54 / RN 0.81.5) não tem o SDK da Meta.
+- Falta: App ID na Meta para `com.convivia.app` (iOS) e `com.komune.app` (Android); `react-native-fbsdk-next` no app; evento de conta criada no cadastro do organizador; App ID ligado ao conjunto ORGANIZADORES. Exige build novo e subida às lojas.
+- Parado por decisão do Rafael em 21/09/2026; prioridade passou ao estudo de envio em massa pelo CRM.
+
+### 21/09/2026 — Envios em massa pelo WhatsApp (decisão do Rafael; revoga a recusa 22 do PRD §13 e tira do congelador o essencial do RF-CON-09)
+
+Entregue:
+- Migração `20260921100000_envios_em_massa`: tabelas `envios_em_massa`, `envios_em_massa_itens` e `publicos_salvos` (RLS: leitura só admin/gestor; escrita só pelas funções). RPCs `envio_em_massa_publico` (filtro por situação — nunca contatado, não respondeu, já conversou, janela de 24 h aberta, cadastrado na Komune —, tipo, etapa, categoria, cidade, responsável, temperatura, dias sem mensagem, nome), `envio_em_massa_previa`, `envio_em_massa_criar`, `envio_em_massa_mudar` (pausar, retomar, cancelar), `envios_em_massa_lista`, `envio_em_massa_detalhe`, `envio_em_massa_teto`.
+- O lote não tem porta própria: o relógio `app.envios_em_massa_rodar` (pg_cron, a cada minuto) veste o crachá de quem assina e chama o mesmo `wa_enviar_modelo` do botão da conversa (ou o mesmo insert do texto livre). Supressão, janela 8h–17h45, tetos do RF-CON-10 e modelo aprovado continuam sendo conferidos pela porteira de sempre.
+- Só do lote: ritmo por hora com intervalo sorteado (70–130%); teto e janela são espera, não pulo; quem recebeu mensagem nossa sem responder nas últimas 72 h fica de fora; parada automática com 3 ou mais saídas acima de 2% do enviado; texto livre só para quem está com a janela de 24 h aberta; variáveis por pessoa (campo da ficha com reserva, ou texto fixo); assinatura por mim, pelo responsável de cada parceiro, ou dividida entre atendentes.
+- Tela `/envios` (menu "Envios em massa", admin e gestor): assistente em 3 passos (para quem, a mensagem com prévia por pessoa, como e quando) e painel com enviadas, entregues, lidas, responderam, saíram e puladas por envio.
+- Testes: pgTAP 57 (38 asserções); Vitest `envios/formatos.test.ts`. Conserto de bomba-relógio no pgTAP 25 (data fixa misturada com `now() - 3 dias`).
+
+Pendente:
+- Mídia (áudio, imagem) em lote: fica para depois; hoje o lote manda modelo aprovado ou texto.
+- Criar modelo novo continua em Ajustes → Modelos, com aprovação da Meta.

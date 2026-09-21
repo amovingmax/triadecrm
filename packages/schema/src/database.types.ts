@@ -223,6 +223,10 @@ export type Database = {
         Returns: Json
       }
       contact_is_visible: { Args: { p_contact: string }; Returns: boolean }
+      conversa_visivel: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
       corpo_fixo_de_optout: { Args: { p_body: string }; Returns: string }
       cpf_is_valid: { Args: { c: string }; Returns: boolean }
       data_pt: { Args: { p_data: string }; Returns: string }
@@ -256,6 +260,58 @@ export type Database = {
         Args: { p_stage_id: number; p_variante: string }
         Returns: string
       }
+      envio_assinante: {
+        Args: {
+          p_atendentes: string[]
+          p_dono: string
+          p_modo: string
+          p_posicao: number
+          p_quem_cria: string
+        }
+        Returns: string
+      }
+      envio_campos_da_ficha: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      envio_contagem: { Args: { p_id: string }; Returns: Json }
+      envio_montar: {
+        Args: {
+          p_assinante: string
+          p_modelo_id: number
+          p_organization_id: string
+          p_texto: string
+          p_tipo: string
+          p_variaveis: Json
+        }
+        Returns: Json
+      }
+      envio_motivo_de_espera: { Args: { p_motivo: string }; Returns: boolean }
+      envio_publico: {
+        Args: { p_filtro: Json }
+        Returns: {
+          bloqueio: string
+          cadastrado_komune: boolean
+          categoria: string
+          cidade: string
+          etapa: string
+          nome: string
+          organization_id: string
+          responsavel: string
+          situacao: string
+          temperatura: string
+          tipo: string
+          ultimo_envio: string
+        }[]
+      }
+      envio_um: {
+        Args: {
+          p_envio: Database["public"]["Tables"]["envios_em_massa"]["Row"]
+          p_item: Database["public"]["Tables"]["envios_em_massa_itens"]["Row"]
+        }
+        Returns: Json
+      }
+      envios_em_massa_rodar: { Args: never; Returns: number }
       esteira_concluir: {
         Args: { p_key: string; p_msg_id: number; p_queue: string }
         Returns: boolean
@@ -325,19 +381,71 @@ export type Database = {
           organization_id: string
         }[]
       }
+      ia_campo_vazio: {
+        Args: { p_campo: string; p_org: string }
+        Returns: boolean
+      }
       ia_cancelar_trabalhos: {
         Args: { p_organization_id: string }
         Returns: number
       }
+      ia_candidatos_para_triar: { Args: { p_limite?: number }; Returns: Json }
+      ia_conversas_para_analisar: {
+        Args: { p_limite?: number }
+        Returns: {
+          conversation_id: string
+          mensagens_novas: number
+          pendente_desde: string
+        }[]
+      }
+      ia_dia_por_extenso: { Args: { p_dia: string }; Returns: string }
       ia_enfileirar: {
         Args: { p_key: string; p_payload: Json; p_purpose: string }
         Returns: Json
       }
+      ia_enfileirar_analises: { Args: { p_limite?: number }; Returns: number }
+      ia_enfileirar_pulso: { Args: { p_dia?: string }; Returns: number }
       ia_enfileirar_resumo: { Args: { p_attempt_id: string }; Returns: Json }
+      ia_entrada_da_ficha: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
+      ia_gravar_ficha: {
+        Args: {
+          p_ai_run_id?: number
+          p_ate_message_id?: string
+          p_conversation_id: string
+          p_prompt_version?: string
+          p_saida: Json
+        }
+        Returns: Json
+      }
+      ia_gravar_pulso: {
+        Args: {
+          p_ai_run_id?: number
+          p_dia: string
+          p_escopo: string
+          p_metricas: Json
+          p_prompt_version?: string
+          p_saida: Json
+          p_user: string
+        }
+        Returns: string
+      }
+      ia_mensagem_da_conversa: {
+        Args: { p_conversation: string; p_message: string }
+        Returns: boolean
+      }
+      ia_prazo: { Args: { p_texto: string }; Returns: string }
+      ia_pulso_entrada: {
+        Args: { p_dia?: string; p_escopo?: string; p_user?: string }
+        Returns: Json
+      }
       ia_trabalho_suprimido: {
         Args: { p_payload: Json; p_purpose: string }
         Returns: Json
       }
+      ia_uuid: { Args: { p_texto: string }; Returns: string }
       importacao_canal: {
         Args: { t: string }
         Returns: Database["app"]["Enums"]["channel"]
@@ -448,6 +556,7 @@ export type Database = {
         Args: { p_body: string; p_parametros: Json }
         Returns: string
       }
+      modelo_teto_da_variavel: { Args: { p_variavel: string }; Returns: number }
       modelo_variaveis: { Args: { p_body: string }; Returns: string[] }
       motivo_da_fila_vazia: { Args: { p_batch: string }; Returns: Json }
       next_business_day: {
@@ -543,6 +652,12 @@ export type Database = {
           p_respondeu?: boolean
         }
         Returns: string
+      }
+      radar_pontuar: {
+        Args: {
+          p_cand: Database["public"]["Tables"]["supplier_candidates"]["Row"]
+        }
+        Returns: Json
       }
       rascunhos_expirar: { Args: never; Returns: Json }
       reads_base_pii: { Args: never; Returns: boolean }
@@ -663,6 +778,7 @@ export type Database = {
           titulo: string
         }[]
       }
+      saudacao_do_momento: { Args: { p_quando?: string }; Returns: string }
       search_name: { Args: { n: string }; Returns: string }
       sees_all: { Args: never; Returns: boolean }
       segmento_da_ficha: {
@@ -731,6 +847,13 @@ export type Database = {
         Args: { p_de: string[]; p_deal_id: string; p_para: string }
         Returns: boolean
       }
+      wa_bot_config: { Args: never; Returns: Json }
+      wa_bot_de_entrada: { Args: { p_message_id: string }; Returns: Json }
+      wa_bot_dizer: {
+        Args: { p_codigo: string; p_conversation_id: string }
+        Returns: string
+      }
+      wa_bot_escolha: { Args: { p_texto: string }; Returns: Json }
       wa_confirmacao_de_optout: {
         Args: { p_conversation_id: string }
         Returns: Json
@@ -785,6 +908,7 @@ export type Database = {
         Returns: string
       }
       wa_numero_padrao: { Args: never; Returns: string }
+      wa_parece_optout: { Args: { p_texto: string }; Returns: boolean }
       wa_proximos: { Args: { p_qty?: number }; Returns: Json }
       wa_registrar_entrada: {
         Args: {
@@ -2318,6 +2442,104 @@ export type Database = {
         }
         Relationships: []
       }
+      compromissos_da_conversa: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          cumprido_em: string | null
+          cumprido_message_id: string | null
+          id: string
+          message_id: string | null
+          o_que: string
+          organization_id: string | null
+          prazo: string | null
+          quem: string
+          status: string
+          task_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          cumprido_em?: string | null
+          cumprido_message_id?: string | null
+          id?: string
+          message_id?: string | null
+          o_que: string
+          organization_id?: string | null
+          prazo?: string | null
+          quem: string
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          cumprido_em?: string | null
+          cumprido_message_id?: string | null
+          id?: string
+          message_id?: string | null
+          o_que?: string
+          organization_id?: string | null
+          prazo?: string | null
+          quem?: string
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compromissos_da_conversa_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compromissos_da_conversa_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "compromissos_da_conversa_cumprido_message_id_fkey"
+            columns: ["cumprido_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compromissos_da_conversa_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compromissos_da_conversa_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compromissos_da_conversa_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compromissos_da_conversa_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compromissos_no_google: {
         Row: {
           agenda_id: string
@@ -2529,12 +2751,16 @@ export type Database = {
           ai_intent: string | null
           ai_summary: string | null
           assignee_id: string
+          bot_estado: string | null
+          bot_opcao: string | null
           bot_paused: boolean
           business_number: string
           channel: Database["app"]["Enums"]["channel"]
           contact_id: string | null
           created_at: string
           deal_id: string | null
+          ia_analisada_em: string | null
+          ia_pendente_desde: string | null
           id: string
           last_inbound_at: string | null
           last_message_at: string | null
@@ -2553,12 +2779,16 @@ export type Database = {
           ai_intent?: string | null
           ai_summary?: string | null
           assignee_id: string
+          bot_estado?: string | null
+          bot_opcao?: string | null
           bot_paused?: boolean
           business_number: string
           channel?: Database["app"]["Enums"]["channel"]
           contact_id?: string | null
           created_at?: string
           deal_id?: string | null
+          ia_analisada_em?: string | null
+          ia_pendente_desde?: string | null
           id?: string
           last_inbound_at?: string | null
           last_message_at?: string | null
@@ -2577,12 +2807,16 @@ export type Database = {
           ai_intent?: string | null
           ai_summary?: string | null
           assignee_id?: string
+          bot_estado?: string | null
+          bot_opcao?: string | null
           bot_paused?: boolean
           business_number?: string
           channel?: Database["app"]["Enums"]["channel"]
           contact_id?: string | null
           created_at?: string
           deal_id?: string | null
+          ia_analisada_em?: string | null
+          ia_pendente_desde?: string | null
           id?: string
           last_inbound_at?: string | null
           last_message_at?: string | null
@@ -2954,6 +3188,359 @@ export type Database = {
             columns: ["stage_id"]
             isOneToOne: false
             referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      envios_em_massa: {
+        Row: {
+          assinatura: string
+          atendentes: string[]
+          atualizado_em: string
+          concluido_em: string | null
+          contar_desde: string
+          criado_em: string
+          criado_por: string
+          filtro: Json
+          id: string
+          inicio: string
+          modelo_id: number | null
+          motivo_parada: string | null
+          nome: string
+          por_hora: number
+          proximo_em: string
+          status: string
+          texto: string | null
+          tipo: string
+          variaveis: Json
+        }
+        Insert: {
+          assinatura: string
+          atendentes?: string[]
+          atualizado_em?: string
+          concluido_em?: string | null
+          contar_desde?: string
+          criado_em?: string
+          criado_por: string
+          filtro?: Json
+          id?: string
+          inicio?: string
+          modelo_id?: number | null
+          motivo_parada?: string | null
+          nome: string
+          por_hora: number
+          proximo_em?: string
+          status?: string
+          texto?: string | null
+          tipo: string
+          variaveis?: Json
+        }
+        Update: {
+          assinatura?: string
+          atendentes?: string[]
+          atualizado_em?: string
+          concluido_em?: string | null
+          contar_desde?: string
+          criado_em?: string
+          criado_por?: string
+          filtro?: Json
+          id?: string
+          inicio?: string
+          modelo_id?: number | null
+          motivo_parada?: string | null
+          nome?: string
+          por_hora?: number
+          proximo_em?: string
+          status?: string
+          texto?: string | null
+          tipo?: string
+          variaveis?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "envios_em_massa_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envios_em_massa_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envios_em_massa_modelo_id_fkey"
+            columns: ["modelo_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      envios_em_massa_itens: {
+        Row: {
+          assinante_id: string
+          envio_id: string
+          id: number
+          message_id: string | null
+          motivo: string | null
+          organization_id: string
+          posicao: number
+          processado_em: string | null
+          status: string
+        }
+        Insert: {
+          assinante_id: string
+          envio_id: string
+          id?: never
+          message_id?: string | null
+          motivo?: string | null
+          organization_id: string
+          posicao: number
+          processado_em?: string | null
+          status?: string
+        }
+        Update: {
+          assinante_id?: string
+          envio_id?: string
+          id?: never
+          message_id?: string | null
+          motivo?: string | null
+          organization_id?: string
+          posicao?: number
+          processado_em?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "envios_em_massa_itens_assinante_id_fkey"
+            columns: ["assinante_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envios_em_massa_itens_assinante_id_fkey"
+            columns: ["assinante_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envios_em_massa_itens_envio_id_fkey"
+            columns: ["envio_id"]
+            isOneToOne: false
+            referencedRelation: "envios_em_massa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envios_em_massa_itens_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envios_em_massa_itens_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envios_em_massa_itens_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_da_ia: {
+        Row: {
+          comentario: string | null
+          conversation_id: string | null
+          created_at: string
+          id: string
+          prompt_version: string | null
+          tipo: string
+          user_id: string | null
+          valor_da_ia: string | null
+          valor_humano: string | null
+        }
+        Insert: {
+          comentario?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          prompt_version?: string | null
+          tipo: string
+          user_id?: string | null
+          valor_da_ia?: string | null
+          valor_humano?: string | null
+        }
+        Update: {
+          comentario?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          prompt_version?: string | null
+          tipo?: string
+          user_id?: string | null
+          valor_da_ia?: string | null
+          valor_humano?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_da_ia_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_da_ia_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "feedback_da_ia_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_da_ia_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ficha_da_conversa: {
+        Row: {
+          ai_run_id: number | null
+          alertas: string[]
+          analisada_em: string | null
+          analise_completa_em: string | null
+          analises_incrementais: number
+          confianca: number | null
+          conversation_id: string
+          created_at: string
+          dados_extraidos: Json
+          dados_insuficientes: boolean
+          intencao: string | null
+          motivo: string | null
+          objecoes: string[]
+          organization_id: string | null
+          prompt_version: string | null
+          proxima_acao: string | null
+          proxima_acao_em: string | null
+          resumo: string | null
+          score_intencao: number | null
+          sentimento: string | null
+          sinais: Json
+          ultima_mensagem_analisada: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_run_id?: number | null
+          alertas?: string[]
+          analisada_em?: string | null
+          analise_completa_em?: string | null
+          analises_incrementais?: number
+          confianca?: number | null
+          conversation_id: string
+          created_at?: string
+          dados_extraidos?: Json
+          dados_insuficientes?: boolean
+          intencao?: string | null
+          motivo?: string | null
+          objecoes?: string[]
+          organization_id?: string | null
+          prompt_version?: string | null
+          proxima_acao?: string | null
+          proxima_acao_em?: string | null
+          resumo?: string | null
+          score_intencao?: number | null
+          sentimento?: string | null
+          sinais?: Json
+          ultima_mensagem_analisada?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_run_id?: number | null
+          alertas?: string[]
+          analisada_em?: string | null
+          analise_completa_em?: string | null
+          analises_incrementais?: number
+          confianca?: number | null
+          conversation_id?: string
+          created_at?: string
+          dados_extraidos?: Json
+          dados_insuficientes?: boolean
+          intencao?: string | null
+          motivo?: string | null
+          objecoes?: string[]
+          organization_id?: string | null
+          prompt_version?: string | null
+          proxima_acao?: string | null
+          proxima_acao_em?: string | null
+          resumo?: string | null
+          score_intencao?: number | null
+          sentimento?: string | null
+          sinais?: Json
+          ultima_mensagem_analisada?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ficha_da_conversa_ai_run_id_fkey"
+            columns: ["ai_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ficha_da_conversa_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ficha_da_conversa_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "ficha_da_conversa_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ficha_da_conversa_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ficha_da_conversa_ultima_mensagem_analisada_fkey"
+            columns: ["ultima_mensagem_analisada"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
         ]
@@ -4776,6 +5363,112 @@ export type Database = {
           },
         ]
       }
+      publicos_salvos: {
+        Row: {
+          criado_em: string
+          criado_por: string
+          filtro: Json
+          id: string
+          nome: string
+        }
+        Insert: {
+          criado_em?: string
+          criado_por?: string
+          filtro: Json
+          id?: string
+          nome: string
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string
+          filtro?: Json
+          id?: string
+          nome?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publicos_salvos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publicos_salvos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pulso_do_dia: {
+        Row: {
+          ai_run_id: number | null
+          canais: string[]
+          conteudo: Json
+          created_at: string
+          dia: string
+          entregue_em: string | null
+          escopo: string
+          id: string
+          metricas: Json
+          texto: string | null
+          user_id: string | null
+          versao: number
+        }
+        Insert: {
+          ai_run_id?: number | null
+          canais?: string[]
+          conteudo?: Json
+          created_at?: string
+          dia: string
+          entregue_em?: string | null
+          escopo: string
+          id?: string
+          metricas?: Json
+          texto?: string | null
+          user_id?: string | null
+          versao?: number
+        }
+        Update: {
+          ai_run_id?: number | null
+          canais?: string[]
+          conteudo?: Json
+          created_at?: string
+          dia?: string
+          entregue_em?: string | null
+          escopo?: string
+          id?: string
+          metricas?: Json
+          texto?: string | null
+          user_id?: string | null
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulso_do_dia_ai_run_id_fkey"
+            columns: ["ai_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulso_do_dia_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulso_do_dia_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       raw_capture: {
         Row: {
           batch_id: string
@@ -5371,6 +6064,104 @@ export type Database = {
           },
         ]
       }
+      sugestoes_de_campo: {
+        Row: {
+          campo: string
+          confianca: number
+          conversation_id: string | null
+          created_at: string
+          decidido_em: string | null
+          decidido_por: string | null
+          entidade: string
+          entidade_id: string
+          id: string
+          message_id: string | null
+          organization_id: string | null
+          status: string
+          valor: string
+        }
+        Insert: {
+          campo: string
+          confianca: number
+          conversation_id?: string | null
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          entidade: string
+          entidade_id: string
+          id?: string
+          message_id?: string | null
+          organization_id?: string | null
+          status?: string
+          valor: string
+        }
+        Update: {
+          campo?: string
+          confianca?: number
+          conversation_id?: string | null
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          entidade?: string
+          entidade_id?: string
+          id?: string
+          message_id?: string | null
+          organization_id?: string | null
+          status?: string
+          valor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sugestoes_de_campo_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sugestoes_de_campo_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "sugestoes_de_campo_decidido_por_fkey"
+            columns: ["decidido_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sugestoes_de_campo_decidido_por_fkey"
+            columns: ["decidido_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sugestoes_de_campo_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sugestoes_de_campo_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sugestoes_de_campo_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_candidates: {
         Row: {
           address: string | null
@@ -5385,6 +6176,10 @@ export type Database = {
           email: string | null
           external_id: string | null
           flags: string[]
+          ia_analisado_em: string | null
+          ia_confianca: number | null
+          ia_porque: string | null
+          ia_veredito: string | null
           id: string
           import_batch_id: string | null
           instagram_handle: string | null
@@ -5426,6 +6221,10 @@ export type Database = {
           email?: string | null
           external_id?: string | null
           flags?: string[]
+          ia_analisado_em?: string | null
+          ia_confianca?: number | null
+          ia_porque?: string | null
+          ia_veredito?: string | null
           id?: string
           import_batch_id?: string | null
           instagram_handle?: string | null
@@ -5467,6 +6266,10 @@ export type Database = {
           email?: string | null
           external_id?: string | null
           flags?: string[]
+          ia_analisado_em?: string | null
+          ia_confianca?: number | null
+          ia_porque?: string | null
+          ia_veredito?: string | null
           id?: string
           import_batch_id?: string | null
           instagram_handle?: string | null
@@ -6377,6 +7180,19 @@ export type Database = {
         Args: { p_enrollment_id: string; p_motivo: string }
         Returns: Json
       }
+      envio_em_massa_criar: { Args: { p_config: Json }; Returns: Json }
+      envio_em_massa_detalhe: { Args: { p_id: string }; Returns: Json }
+      envio_em_massa_mudar: {
+        Args: { p_acao: string; p_id: string }
+        Returns: Json
+      }
+      envio_em_massa_previa: {
+        Args: { p_config: Json; p_organizacoes: string[] }
+        Returns: Json
+      }
+      envio_em_massa_publico: { Args: { p_filtro: Json }; Returns: Json[] }
+      envio_em_massa_teto: { Args: never; Returns: Json }
+      envios_em_massa_lista: { Args: never; Returns: Json[] }
       esteira_abrir_lote: {
         Args: {
           p_kind: string
@@ -6516,11 +7332,43 @@ export type Database = {
         Args: { p_payload: Json; p_purpose: string }
         Returns: Json
       }
+      ia_entrada_da_ficha: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
       ia_fila_enfileirar: {
         Args: { p_key: string; p_payload: Json; p_purpose: string }
         Returns: Json
       }
+      ia_gravar_ficha: {
+        Args: {
+          p_ai_run_id?: number
+          p_ate_message_id?: string
+          p_conversation_id: string
+          p_prompt_version?: string
+          p_saida: Json
+        }
+        Returns: Json
+      }
+      ia_gravar_pulso: {
+        Args: {
+          p_ai_run_id?: number
+          p_dia: string
+          p_escopo: string
+          p_metricas: Json
+          p_prompt_version?: string
+          p_saida: Json
+          p_user: string
+        }
+        Returns: string
+      }
+      ia_gravar_triagem: { Args: { p_vereditos: Json }; Returns: Json }
       ia_orcamento_status: { Args: never; Returns: Json }
+      ia_pulso_entrada: {
+        Args: { p_dia?: string; p_escopo?: string; p_user?: string }
+        Returns: Json
+      }
+      ia_triagem_entrada: { Args: { p_limite?: number }; Returns: Json }
       importacao_encerrar_lote: {
         Args: { p_batch_id: string; p_erro?: string }
         Returns: Json
@@ -6662,6 +7510,15 @@ export type Database = {
         }
         Returns: Json
       }
+      radar_agendar_coleta: {
+        Args: {
+          p_categorias?: string[]
+          p_max_paginas?: number
+          p_rotulo?: string
+          p_source_id: number
+        }
+        Returns: Json
+      }
       radar_alternar_fonte: {
         Args: { p_enabled: boolean; p_source_id: number }
         Returns: Json
@@ -6711,9 +7568,12 @@ export type Database = {
           criado_em: string
           duplicatas: Json
           email: string
+          faixa: string
           fonte: string
           fonte_id: number
           fonte_tipo: Database["app"]["Enums"]["source_kind"]
+          ia_porque: string
+          ia_veredito: string
           id: string
           instagram: string
           motivo_da_revisao: string
@@ -6734,6 +7594,7 @@ export type Database = {
           total_count: number
         }[]
       }
+      radar_repontuar: { Args: never; Returns: Json }
       radar_resumo: { Args: never; Returns: Json }
       radar_revisar_candidato: {
         Args: {
@@ -6745,6 +7606,7 @@ export type Database = {
         }
         Returns: Json
       }
+      radar_triar_com_ia: { Args: never; Returns: Json }
       recusar_reivindicacao: {
         Args: { p_motivo?: string; p_token: string }
         Returns: Json
@@ -7023,6 +7885,7 @@ export type Database = {
         Args: { p_conversation_id: string; p_organization_id: string }
         Returns: Json
       }
+      wa_bot_ligar: { Args: { p_ativo: boolean }; Returns: Json }
       wa_eco_registrar: {
         Args: {
           p_body?: string
