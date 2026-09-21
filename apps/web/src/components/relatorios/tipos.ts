@@ -55,6 +55,7 @@ export type Coluna<L> = {
 
 /** Os painéis da tela, na ordem da barra. */
 export type ChavePainel =
+  | 'atendimento'
   | 'semana'
   | 'funil'
   | 'categorias'
@@ -73,6 +74,13 @@ export type DefinicaoPainel = {
 };
 
 export const PAINEIS: readonly DefinicaoPainel[] = [
+  {
+    chave: 'atendimento',
+    rotulo: 'Atendimento',
+    titulo: 'Como o time atende no WhatsApp',
+    descricao:
+      'Tempo de primeira resposta, conversas por atendente, conversão por etapa e motivos de perda.',
+  },
   {
     chave: 'semana',
     rotulo: 'Semana',
@@ -129,7 +137,7 @@ export const PAINEIS: readonly DefinicaoPainel[] = [
 export function painelDaUrl(valor: string | string[] | undefined): ChavePainel {
   const bruto = Array.isArray(valor) ? valor[0] : valor;
   const achado = PAINEIS.find((p) => p.chave === bruto);
-  return achado?.chave ?? 'semana';
+  return achado?.chave ?? 'atendimento';
 }
 
 /**

@@ -96,3 +96,17 @@ export function rotuloDoGrupo(valor: string | null | undefined): string {
   if (!valor) return '';
   return ROTULO_GRUPO[valor] ?? valor;
 }
+
+/** Minutos em linguagem de gente: "8 min", "1 h 20 min", "2 dias". */
+export function formatarMinutos(minutos: number | null | undefined): string {
+  if (minutos === null || minutos === undefined || !Number.isFinite(minutos)) return '—';
+  const m = Math.max(0, Math.round(minutos));
+  if (m < 60) return `${m} min`;
+  if (m < 60 * 24) {
+    const h = Math.floor(m / 60);
+    const resto = m % 60;
+    return resto === 0 ? `${h} h` : `${h} h ${resto} min`;
+  }
+  const dias = Math.round(m / (60 * 24));
+  return dias === 1 ? '1 dia' : `${dias} dias`;
+}

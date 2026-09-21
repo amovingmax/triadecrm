@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { BarraDePeriodo, SeletorDePainel } from './barra-recorte';
+import { PainelAtendimento } from './painel-atendimento';
 import { PainelBairros } from './painel-bairros';
 import { PainelBase } from './painel-base';
 import { PainelCategorias } from './painel-categorias';
@@ -114,6 +115,8 @@ function Painel({
   if (!painel) return null;
 
   switch (chave) {
+    case 'atendimento':
+      return <PainelAtendimento painel={painel} periodo={periodo} />;
     case 'semana':
       return <PainelSemana painel={painel} semana={semana} aoTrocarSemana={aoTrocarSemana} />;
     case 'funil':

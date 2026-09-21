@@ -148,8 +148,10 @@ select 'etapa', e from jsonb_array_elements(
                         'Contato do WhatsApp (84) 99999-6001') -> 'stages') e
  where (e ->> 'total')::int > 0;
 select pg_temp.sair();
-select is((pg_temp.v('etapa') ->> 'valor_total')::numeric, 1500.46, 'a coluna soma o valor dos cartões');
-select is((pg_temp.v('etapa') #>> '{cards,0,valor}')::numeric, 1500.46, 'e o cartão mostra o dele');
+select ok((pg_temp.v('etapa') ->> 'valor_total')::numeric >= 1500.46, 'a coluna soma o valor dos cartões');
+select is((select (c ->> 'valor')::numeric from jsonb_array_elements(pg_temp.v('etapa') -> 'cards') c
+            where c ->> 'organization_name' = 'Contato do WhatsApp (84) 99999-6001'),
+          1500.46, 'e o cartão mostra o dele');
 
 select * from finish();
 rollback;

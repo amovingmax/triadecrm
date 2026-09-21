@@ -145,3 +145,34 @@ export async function carregarHistoricoDeEtapas(): Promise<HistoricoDeEtapas> {
 export function temperaturaPorEtapa(linhas: LinhaFunil[]): Map<number, Temperature> {
   return new Map(linhas.map((linha) => [linha.etapa_id, linha.temperatura]));
 }
+
+/** O painel de atendimento (Fase 4): um objeto só, com os quatro blocos. */
+export type RelatorioAtendimento = {
+  primeira_resposta: {
+    chegadas: number;
+    respondidas: number;
+    sem_resposta: number;
+    mediana_min: number | null;
+    em_ate_1h: number;
+  };
+  por_atendente: {
+    pessoa_id: string;
+    nome: string;
+    conversas: number;
+    mensagens: number;
+    respondidas: number;
+    mediana_min: number | null;
+  }[];
+  conversao: { etapa: string; chegaram: number; conversao: number | null }[];
+  perdas: { motivo: string; total: number }[];
+};
+
+export async function carregarAtendimento(periodo: Periodo): Promise<RelatorioAtendimento> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('relatorio_atendimento', {
+    p_de: periodo.de,
+    p_ate: periodo.ate,
+  });
+  if (error) throw error;
+  return data as unknown as RelatorioAtendimento;
+}

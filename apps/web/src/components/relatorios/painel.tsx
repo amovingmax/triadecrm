@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { Download } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 import { baixarCsv, montarCsv, nomeDoArquivo } from './csv';
@@ -162,11 +163,19 @@ export function QuadroPainel<L>({
  */
 export function TirasDeResumo({
   itens,
+  colunas = 6,
 }: {
   itens: readonly { chave: string; rotulo: string; valor: string; apoio?: string; ajuda?: string }[];
+  /** Quatro tiras pedem quatro colunas: seis deixariam duas casas vazias. */
+  colunas?: 4 | 6;
 }) {
   return (
-    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-hairline sm:grid-cols-3 lg:grid-cols-6">
+    <dl
+      className={cn(
+        'grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-hairline',
+        colunas === 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-3 lg:grid-cols-6',
+      )}
+    >
       {itens.map((item) => (
         <div key={item.chave} className="flex flex-col gap-0.5 bg-card px-3 py-2.5" title={item.ajuda}>
           <dt className="text-xs leading-tight text-muted-foreground">{item.rotulo}</dt>

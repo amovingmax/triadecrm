@@ -2819,3 +2819,10 @@ Entregue:
 - Ajustes → nova aba **Atendimento**: interruptores de lead automático, distribuição e fora do horário; texto do aviso; respostas prontas; etiquetas com cor.
 - Conversas: "/" na caixa de resposta oferece as respostas prontas; etiquetas do parceiro no topo (qualquer pessoa que escreve põe e tira); "Virar tarefa" em cada mensagem recebida (vira tarefa sua, próximo dia útil às 9h).
 - Testes: pgTAP 61 (17 asserções); 24 e 46 desligam as automações para continuar provando a conversa sem ficha; Vitest das respostas prontas.
+
+### 22/09/2026 — Fase 4: métricas do atendimento (branch `feat/fase-4-metricas`)
+
+Entregue:
+- Migração `20260922130000_metricas_do_atendimento`: `public.relatorio_atendimento(p_de, p_ate)`, só leitura. Tempo de primeira resposta = da mensagem do parceiro que abre um bloco até a primeira resposta de GENTE (menu, aviso de fora do horário e confirmação de saída não contam), só com chegadas dentro do horário, em mediana. Mais: conversas, mensagens e primeira resposta por atendente; conversão por etapa da captação (reusa `relatorio_funil`); motivos de perda do período.
+- Relatórios: painel novo **Atendimento**, o primeiro e o padrão, com quatro números no topo (primeira resposta, respondidas em até 1 h, ainda sem resposta, negócios perdidos) e três blocos (por atendente, conversão por etapa, motivos de perda).
+- Testes: pgTAP 62 (9 asserções); 60 ficou imune a dados extras no banco local; Vitest do formato de minutos.

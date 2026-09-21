@@ -7920,6 +7920,10 @@ export type Database = {
         }
         Returns: Json
       }
+      relatorio_atendimento: {
+        Args: { p_ate?: string; p_de?: string }
+        Returns: Json
+      }
       relatorio_funil: {
         Args: { p_ate?: string; p_de?: string; p_pipeline_id?: number }
         Returns: {
