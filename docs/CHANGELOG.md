@@ -2762,3 +2762,17 @@ Entregue:
 Pendente:
 - Mídia (áudio, imagem) em lote: fica para depois; hoje o lote manda modelo aprovado ou texto.
 - Criar modelo novo continua em Ajustes → Modelos, com aprovação da Meta.
+
+### 21/09/2026 — O envio em massa fala em nome da Komune, pede uma ação e mede o resultado (decisão do Rafael)
+
+"Eu n quero com assinatura de quem mandou pela equipe, será mais voltado a ações que queremos que os leads façam." Modelo copiado das empresas de disparo pela API oficial: mensagem da marca, botão em vez de "me responde", passo seguinte automático e conversão medida.
+
+Entregue:
+- Migração `20260921110000_o_envio_fala_em_nome_da_komune`: botões nos modelos (`message_templates.botoes`, até 3, no máximo 1 de link); `public.modelo_whatsapp_criar` (modelo novo pela tela, validado como a Meta validaria, vai para aprovação na sincronização de 30 em 30 min); assinatura `marca` (sem nome de atendente; modelo com `{{atendente}}` não entra; texto livre sai sem "*Fulano:*" pelo ajuste de transação `app.voz`); ações por botão de resposta (`link` manda na hora uma mensagem com botão de link, grátis dentro das 24 h; `sair` registra o opt-out; `nada` deixa na caixa); link rastreado por item (`/r/<código>` → `public.envio_clique`, grava o primeiro clique e redireciona com utm); contagem com tocaram, clicaram e cadastraram (quem não estava na Komune ao criar o envio e passou a estar). Três modelos da marca semeados: ENV-CONVITE-FUNDADOR (botões "Quero o convite" / "Agora não"), ENV-CADASTRO-PENDENTE e ENV-COMPLETAR-PERFIL (botão de link).
+- Worker: pedido de aprovação com componente BUTTONS (resposta rápida e URL `base + {{1}}`); envio de modelo com o código do item no botão de link; modelo com botões sai como modelo mesmo dentro da janela (senão os botões sumiam); mensagem interativa `cta_url` para a resposta ao botão.
+- Web: rota pública `/r/[codigo]`; assistente com "Em nome da Komune" como padrão, botões do modelo na prévia, o que acontece em cada botão, destino do link e "Criar modelo novo"; painel e cartões com o funil da ação (enviadas → lidas → tocaram → clicaram → cadastraram). A dica "crie em Ajustes → Modelos" estava errada (Ajustes só lista) e saiu.
+- Testes: pgTAP 58 (29 asserções), 43 e 57 ajustados; Vitest do worker (5 novos) e do web.
+
+Pendente / decisão:
+- O link rastreado usa o domínio do CRM (`triade-crm-tawny.vercel.app/r/…`). Um subdomínio da Komune (ex.: `ir.komune.app.br`) passa mais confiança; pede DNS (Luiz) e, depois, trocar `envios.link.base` — os modelos com botão de link aprovados antes disso continuam no domínio antigo.
+- Publicar exige também o deploy do worker-wa no Fly (o worker mudou).

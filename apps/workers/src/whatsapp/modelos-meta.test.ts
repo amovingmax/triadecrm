@@ -48,6 +48,8 @@ function modelo(parcial: Partial<ModeloParaMeta> = {}): ModeloParaMeta {
     idioma: 'pt_BR',
     corpo: 'Oi, {{nome}}, tudo bem? Vi a {{empresa}} no {{origem}} e lembrei de você.',
     variaveis: ['nome', 'empresa', 'origem'],
+    botoes: [],
+    link_base: 'https://crm.teste/r/',
     ...parcial,
   };
 }
@@ -57,6 +59,29 @@ function modelo(parcial: Partial<ModeloParaMeta> = {}): ModeloParaMeta {
 // ---------------------------------------------------------------------------
 
 describe('o pedido de criação do modelo', () => {
+  it('leva os botões: resposta rápida e link rastreado com o código no fim', () => {
+    const pedido = montarPedidoDeModelo(
+      modelo({
+        botoes: [
+          { tipo: 'resposta', texto: 'Quero o convite' },
+          { tipo: 'link', texto: 'Criar meu perfil' },
+        ],
+      }),
+    );
+    expect(pedido.components[1]).toEqual({
+      type: 'BUTTONS',
+      buttons: [
+        { type: 'QUICK_REPLY', text: 'Quero o convite' },
+        {
+          type: 'URL',
+          text: 'Criar meu perfil',
+          url: 'https://crm.teste/r/{{1}}',
+          example: ['https://crm.teste/r/a1b2c3d4e5f6'],
+        },
+      ],
+    });
+  });
+
   it('tem exatamente o formato NAMED da Meta, com exemplo realista por variável', () => {
     expect(montarPedidoDeModelo(modelo())).toEqual({
       name: 'aeb_abr_a_v1',
@@ -93,8 +118,10 @@ describe('o pedido de criação do modelo', () => {
     const p = montarPedidoDeModelo(
       modelo({ corpo: 'Oi, {{ nome }}! Tudo certo, {{nome}}? Abraço.' }),
     );
-    expect(p.components[0]?.text).toBe('Oi, {{nome}}! Tudo certo, {{nome}}? Abraço.');
-    expect(p.components[0]?.example?.body_text_named_params).toEqual([
+    const corpo = p.components[0];
+    if (corpo?.type !== 'BODY') throw new Error('o primeiro componente é o corpo');
+    expect(corpo.text).toBe('Oi, {{nome}}! Tudo certo, {{nome}}? Abraço.');
+    expect(corpo.example?.body_text_named_params).toEqual([
       { param_name: 'nome', example: 'Mariana' },
     ]);
   });

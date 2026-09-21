@@ -53,6 +53,8 @@ function item(parcial: Partial<ItemDeSaida> = {}): ItemDeSaida {
     audio_asset_id: null,
     janela_aberta: true,
     modelo: null,
+    botoes: [],
+    link_codigo: 'crm',
     ...parcial,
   };
 }
@@ -69,6 +71,47 @@ const MODELO = {
 // ---------------------------------------------------------------------------
 
 describe('a forma do envio', () => {
+  it('modelo com botões sai como modelo mesmo dentro da janela, com o código no link', () => {
+    const f = formaDoEnvio(
+      item({
+        janela_aberta: true,
+        modelo: MODELO,
+        template_params: { nome: 'Ana' },
+        botoes: [
+          { tipo: 'resposta', texto: 'Quero' },
+          { tipo: 'link', texto: 'Criar meu perfil' },
+        ],
+        link_codigo: 'a1b2c3d4e5f6',
+      }),
+    );
+    expect(f).toMatchObject({
+      ok: true,
+      envio: { tipo: 'template', botaoDeLink: { indice: 1, sufixo: 'a1b2c3d4e5f6' } },
+    });
+  });
+
+  it('a resposta ao botão sai como mensagem com botão de link, só dentro da janela', () => {
+    const base = {
+      tipo: 'interactive',
+      corpo: 'Aqui está o seu convite.',
+      template_params: { botao: 'Criar meu perfil', url: 'https://crm.teste/r/a1b2c3d4e5f6' },
+    };
+    expect(formaDoEnvio(item(base))).toEqual({
+      ok: true,
+      envio: {
+        tipo: 'link',
+        para: '+5584988776655',
+        corpo: 'Aqui está o seu convite.',
+        rotulo: 'Criar meu perfil',
+        url: 'https://crm.teste/r/a1b2c3d4e5f6',
+      },
+    });
+    expect(formaDoEnvio(item({ ...base, janela_aberta: false }))).toMatchObject({
+      ok: false,
+      codigo: 'link_fora_da_janela',
+    });
+  });
+
   it('dentro da janela de 24 h, texto livre', () => {
     const f = formaDoEnvio(item());
     expect(f.ok).toBe(true);

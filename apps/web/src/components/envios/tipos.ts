@@ -85,6 +85,12 @@ export type PublicoSalvo = z.infer<typeof publicoSalvoSchema>;
 // A mensagem
 // ---------------------------------------------------------------------------
 
+export const botaoSchema = z.object({
+  tipo: z.enum(['resposta', 'link']),
+  texto: z.string(),
+});
+export type Botao = z.infer<typeof botaoSchema>;
+
 export const modeloSchema = z.object({
   id: z.number(),
   template_code: z.string(),
@@ -92,6 +98,7 @@ export const modeloSchema = z.object({
   body: z.string(),
   category: z.string().nullable(),
   kind: z.string().nullable(),
+  botoes: z.array(botaoSchema).catch([]),
 });
 export type Modelo = z.infer<typeof modeloSchema>;
 
@@ -111,7 +118,13 @@ export type RegraDaVariavel =
   | { fixo: string };
 
 export type TipoDoEnvio = 'modelo' | 'texto';
-export type Assinatura = 'eu' | 'responsavel' | 'revezar';
+export type Assinatura = 'marca' | 'eu' | 'responsavel' | 'revezar';
+
+/** O que acontece quando alguém toca num botão de resposta. */
+export type AcaoDoBotao =
+  | { acao: 'link'; texto: string; botao: string }
+  | { acao: 'sair' }
+  | { acao: 'nada' };
 
 export const previaSchema = z.object({
   ok: z.boolean(),
@@ -156,6 +169,9 @@ export const contagemSchema = z.object({
   falharam: z.number(),
   responderam: z.number(),
   sairam: z.number(),
+  tocaram: z.number().catch(0),
+  clicaram: z.number().catch(0),
+  cadastraram: z.number().catch(0),
 });
 export type Contagem = z.infer<typeof contagemSchema>;
 
@@ -173,6 +189,7 @@ export const envioSchema = z.object({
   criado_por: z.string().nullable(),
   modelo: z.string().nullable(),
   contagem: contagemSchema,
+  assinatura: z.enum(['marca', 'eu', 'responsavel', 'revezar']).optional().catch(undefined),
 });
 export type Envio = z.infer<typeof envioSchema>;
 
@@ -188,5 +205,8 @@ export const itemDoEnvioSchema = z.object({
   mensagem: z.string().nullable(),
   erro: z.string().nullable(),
   respondeu: z.boolean().nullable(),
+  botao_tocado: z.string().nullable().catch(null),
+  clicou: z.boolean().catch(false),
+  cadastrou: z.boolean().catch(false),
 });
 export type ItemDoEnvio = z.infer<typeof itemDoEnvioSchema>;

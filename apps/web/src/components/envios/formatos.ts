@@ -1,5 +1,6 @@
 import {
   CAMPOS_DA_FICHA,
+  type AcaoDoBotao,
   type CampoDaFicha,
   type Contagem,
   type RegraDaVariavel,
@@ -37,17 +38,17 @@ function ehCampo(v: string): v is CampoDaFicha {
 }
 
 /**
- * A regra que a tela sugere para uma variável. `{{nome}}` puxa o nome da
- * pessoa e, sem nome, diz "tudo bem" — "Oi, tudo bem!" lê melhor que "Oi, !".
- * Se o próprio modelo já pergunta "tudo bem?", a reserva vira "pessoal": o
- * teste no navegador mostrou "Oi, tudo bem, tudo bem?".
+ * A regra que a tela sugere para uma variável: puxa da ficha, com uma reserva
+ * que ainda lê bem quando a ficha não tem o dado — sem reserva, a pessoa
+ * seria pulada no envio. O teste no navegador ensinou as duas escolhas:
+ * "Oi, tudo bem. Aqui é a Komune" soa estranho ("pessoal" não), e metade das
+ * fichas não tem categoria ("fornecedores fundadores de eventos" lê bem).
  * Variável que não é campo da ficha vira texto fixo, a preencher.
  */
-export function regraSugerida(variavel: string, corpo = ''): RegraDaVariavel {
-  if (ehCampo(variavel)) {
-    const reservaDoNome = /tudo bem/i.test(corpo) ? 'pessoal' : 'tudo bem';
-    return { campo: variavel, reserva: variavel === 'nome' ? reservaDoNome : '' };
-  }
+const RESERVAS: Record<string, string> = { nome: 'pessoal', categoria: 'eventos', cidade: 'Natal' };
+
+export function regraSugerida(variavel: string): RegraDaVariavel {
+  if (ehCampo(variavel)) return { campo: variavel, reserva: RESERVAS[variavel] ?? '' };
   return { fixo: '' };
 }
 
@@ -57,7 +58,7 @@ export function regrasPara(
   anteriores: Record<string, RegraDaVariavel>,
 ): Record<string, RegraDaVariavel> {
   const regras: Record<string, RegraDaVariavel> = {};
-  for (const v of variaveisComRegra(corpo)) regras[v] = anteriores[v] ?? regraSugerida(v, corpo);
+  for (const v of variaveisComRegra(corpo)) regras[v] = anteriores[v] ?? regraSugerida(v);
   return regras;
 }
 
@@ -109,6 +110,18 @@ const RECUSAS_DO_LOTE: Record<string, string> = {
   assinatura_invalida: 'Escolha quem assina.',
   atendente_invalido: 'Um dos atendentes escolhidos não está ativo ou não pode enviar.',
   envio_inexistente: 'Este envio não existe mais. Atualize a tela.',
+  modelo_tem_atendente:
+    'Este modelo diz "aqui é {{atendente}}". Em nome da Komune, escolha um modelo sem nome de atendente.',
+  acoes_invalidas: 'Confira o que acontece em cada botão: o link precisa de texto e de rótulo.',
+  destino_invalido: 'O destino do link precisa começar com https://.',
+  nome_invalido_modelo: 'Dê ao modelo um nome de 3 a 80 letras.',
+  categoria_invalida: 'Escolha marketing ou utilidade.',
+  corpo_vazio: 'Escreva a mensagem.',
+  corpo_longo_demais: 'A mensagem passou de 1.024 letras.',
+  variavel_fora_do_formato: 'Variável fora do formato: use letras minúsculas, como {{nome}}.',
+  variavel_na_borda: 'A mensagem não pode começar nem terminar com uma variável: a Meta recusa.',
+  variaveis_coladas: 'Há duas variáveis coladas: ponha texto entre elas.',
+  botoes_invalidos: 'Até 3 botões de até 25 letras, no máximo 1 de link, sem textos repetidos.',
   acao_invalida_no_estado: 'O envio mudou de estado. Atualize a tela.',
 };
 
@@ -153,4 +166,30 @@ export function progresso(c: Contagem): number {
 export function porcento(parte: number, todo: number): string {
   if (todo <= 0) return '0%';
   return `${Math.round((parte / todo) * 100)}%`;
+}
+
+/**
+ * O que a tela sugere para cada botão de resposta: "Agora não" e parecidos
+ * encerram o contato; o resto manda o link — é a ação que o envio quer.
+ */
+export function acaoSugerida(textoDoBotao: string): AcaoDoBotao {
+  if (/agora n[aã]o|n[aã]o quero|sair|parar|sem interesse/i.test(textoDoBotao)) return { acao: 'sair' };
+  return {
+    acao: 'link',
+    texto: 'Que bom! O cadastro leva 5 minutos e é grátis. É só tocar no botão abaixo.',
+    botao: 'Criar meu perfil',
+  };
+}
+
+/** As ações dos botões de resposta de um modelo, mantendo as que já foram editadas. */
+export function acoesPara(
+  botoes: readonly { tipo: string; texto: string }[],
+  anteriores: Record<string, AcaoDoBotao>,
+): Record<string, AcaoDoBotao> {
+  const acoes: Record<string, AcaoDoBotao> = {};
+  for (const b of botoes) {
+    if (b.tipo !== 'resposta') continue;
+    acoes[b.texto] = anteriores[b.texto] ?? acaoSugerida(b.texto);
+  }
+  return acoes;
 }

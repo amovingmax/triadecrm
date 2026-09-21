@@ -11,7 +11,9 @@ import {
   pessoaDoPublicoSchema,
   previaSchema,
   publicoSalvoSchema,
+  type AcaoDoBotao,
   type Assinatura,
+  type Botao,
   type Envio,
   type FiltroDoPublico,
   type ItemDoEnvio,
@@ -65,7 +67,7 @@ export async function buscarModelos(): Promise<Modelo[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('message_templates')
-    .select('id, template_code, name, body, category, kind')
+    .select('id, template_code, name, body, category, kind, botoes')
     .eq('is_active', true)
     .eq('channel', 'whatsapp')
     .eq('meta_status', 'approved')
@@ -96,6 +98,10 @@ export type ConfigDoEnvio = {
   /** ISO; `null` é agora. */
   inicio: string | null;
   filtro: FiltroDoPublico;
+  /** Para onde vai quem toca no botão de link (https). */
+  linkDestino: string;
+  /** Por texto do botão de resposta. */
+  acoes: Record<string, AcaoDoBotao>;
 };
 
 function paraOBanco(c: ConfigDoEnvio, organizacoes: string[]) {
@@ -110,6 +116,8 @@ function paraOBanco(c: ConfigDoEnvio, organizacoes: string[]) {
     por_hora: c.porHora,
     inicio: c.inicio,
     filtro: c.filtro,
+    link_destino: c.linkDestino.trim() || null,
+    acoes: c.acoes,
     organizacoes,
   };
 }
@@ -183,4 +191,31 @@ export async function apagarPublico(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from('publicos_salvos').delete().eq('id', id);
   if (error) throw new ErroDoEnvio(error.message);
+}
+
+export async function criarModelo(modelo: {
+  nome: string;
+  categoria: 'marketing' | 'utility';
+  corpo: string;
+  botoes: Botao[];
+}): Promise<{ id: number; codigo: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('modelo_whatsapp_criar', { p: modelo });
+  if (error) throw new ErroDoEnvio(error.message);
+  const r = conferir(data);
+  return { id: Number(r.id), codigo: String(r.codigo) };
+}
+
+/** Modelos criados por aqui que ainda esperam a Meta: aparecem como "em análise". */
+export async function buscarModelosEmAnalise(): Promise<{ id: number; name: string; meta_status: string | null }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('message_templates')
+    .select('id, name, meta_status')
+    .eq('is_active', true)
+    .eq('kind', 'envio')
+    .or('meta_status.is.null,meta_status.neq.approved')
+    .order('created_at', { ascending: false });
+  if (error) throw new ErroDoEnvio(error.message);
+  return (data ?? []) as { id: number; name: string; meta_status: string | null }[];
 }

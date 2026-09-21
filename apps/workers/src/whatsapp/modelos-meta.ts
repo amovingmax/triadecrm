@@ -200,46 +200,79 @@ export function validarModelo(
 // O pedido de criação
 // ---------------------------------------------------------------------------
 
+/** Um botão no pedido de aprovação, no formato da Graph API. */
+export type BotaoDoPedido =
+  | { type: 'QUICK_REPLY'; text: string }
+  | { type: 'URL'; text: string; url: string; example: string[] };
+
 export interface PedidoDeModelo {
   name: string;
   language: string;
   category: string;
   parameter_format: 'NAMED';
-  components: {
-    type: 'BODY';
-    text: string;
-    example?: { body_text_named_params: { param_name: string; example: string }[] };
-  }[];
+  components: (
+    | {
+        type: 'BODY';
+        text: string;
+        example?: { body_text_named_params: { param_name: string; example: string }[] };
+      }
+    | { type: 'BUTTONS'; buttons: BotaoDoPedido[] }
+  )[];
 }
 
-/** O corpo do POST `/{WABA_ID}/message_templates`, com parâmetros nomeados. */
+/** Um código de exemplo para a URL do botão: a Meta revisa o link completo. */
+export const EXEMPLO_DE_CODIGO = 'a1b2c3d4e5f6';
+
+/**
+ * O corpo do POST `/{WABA_ID}/message_templates`, com parâmetros nomeados.
+ *
+ * O botão de link aponta sempre para o NOSSO endereço rastreado — `link_base`
+ * + `{{1}}` —, e o `{{1}}` é o código do item do envio (migração
+ * 20260921110000). O destino final é escolhido no envio, não no modelo: assim
+ * o mesmo modelo aprovado leva a lugares diferentes sem voltar à Meta.
+ */
 export function montarPedidoDeModelo(
-  item: Pick<ModeloParaMeta, 'nome_sugerido' | 'idioma' | 'categoria' | 'corpo'>,
+  item: Pick<ModeloParaMeta, 'nome_sugerido' | 'idioma' | 'categoria' | 'corpo'> &
+    Partial<Pick<ModeloParaMeta, 'botoes' | 'link_base'>>,
 ): PedidoDeModelo {
   // `{{ nome }}` e `{{nome}}` são a mesma variável; a Meta só aceita a segunda.
   const corpo = item.corpo.trim().replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, '{{$1}}');
   const variaveis = variaveisDoCorpo(corpo);
+  const componentes: PedidoDeModelo['components'] = [
+    {
+      type: 'BODY',
+      text: corpo,
+      ...(variaveis.length === 0
+        ? {}
+        : {
+            example: {
+              body_text_named_params: variaveis.map((v) => ({
+                param_name: v,
+                example: exemploDaVariavel(v),
+              })),
+            },
+          }),
+    },
+  ];
+  const botoes: BotaoDoPedido[] = (item.botoes ?? []).flatMap((b): BotaoDoPedido[] => {
+    if (b.tipo === 'resposta') return [{ type: 'QUICK_REPLY', text: b.texto }];
+    if (!item.link_base) return [];
+    return [
+      {
+        type: 'URL',
+        text: b.texto,
+        url: `${item.link_base}{{1}}`,
+        example: [`${item.link_base}${EXEMPLO_DE_CODIGO}`],
+      },
+    ];
+  });
+  if (botoes.length > 0) componentes.push({ type: 'BUTTONS', buttons: botoes });
   return {
     name: item.nome_sugerido,
     language: item.idioma,
     category: item.categoria,
     parameter_format: 'NAMED',
-    components: [
-      {
-        type: 'BODY',
-        text: corpo,
-        ...(variaveis.length === 0
-          ? {}
-          : {
-              example: {
-                body_text_named_params: variaveis.map((v) => ({
-                  param_name: v,
-                  example: exemploDaVariavel(v),
-                })),
-              },
-            }),
-      },
-    ],
+    components: componentes,
   };
 }
 

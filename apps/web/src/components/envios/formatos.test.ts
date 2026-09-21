@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  acoesPara,
   duracaoEstimada,
   fraseDaRecusa,
   fraseDoMotivo,
@@ -25,15 +26,12 @@ describe('as variáveis de um corpo', () => {
 });
 
 describe('as regras sugeridas', () => {
-  it('campo da ficha puxa da ficha; nome ganha "tudo bem" de reserva', () => {
-    expect(regrasPara('Oi {{nome}}, da {{empresa}}', {})).toEqual({
-      nome: { campo: 'nome', reserva: 'tudo bem' },
+  it('campo da ficha puxa da ficha, com uma reserva que ainda lê bem', () => {
+    expect(regrasPara('Oi {{nome}}, da {{empresa}}, de {{categoria}}', {})).toEqual({
+      nome: { campo: 'nome', reserva: 'pessoal' },
       empresa: { campo: 'empresa', reserva: '' },
+      categoria: { campo: 'categoria', reserva: 'eventos' },
     });
-  });
-
-  it('se o modelo já diz "tudo bem", a reserva do nome não repete', () => {
-    expect(regrasPara('Oi, {{nome}}, tudo bem?', {}).nome).toEqual({ campo: 'nome', reserva: 'pessoal' });
   });
 
   it('variável que não é da ficha vira texto fixo, e fica incompleta até alguém escrever', () => {
@@ -78,8 +76,24 @@ describe('o progresso', () => {
   it('conta enviada, pulada e cancelada como decidida', () => {
     const c = {
       total: 10, pendentes: 4, enviadas: 4, puladas: 1, canceladas: 1,
-      entregues: 3, lidas: 2, falharam: 0, responderam: 1, sairam: 0,
+      entregues: 3, lidas: 2, falharam: 0, responderam: 1, sairam: 0, tocaram: 0, clicaram: 0, cadastraram: 0,
     };
     expect(progresso(c)).toBeCloseTo(0.6);
+  });
+});
+
+describe('o que cada botão faz', () => {
+  it('"Agora não" encerra; o resto manda o link', () => {
+    const acoes = acoesPara(
+      [
+        { tipo: 'resposta', texto: 'Quero o convite' },
+        { tipo: 'resposta', texto: 'Agora não' },
+        { tipo: 'link', texto: 'Criar meu perfil' },
+      ],
+      {},
+    );
+    expect(acoes['Agora não']).toEqual({ acao: 'sair' });
+    expect(acoes['Quero o convite']?.acao).toBe('link');
+    expect(Object.keys(acoes)).toHaveLength(2);
   });
 });

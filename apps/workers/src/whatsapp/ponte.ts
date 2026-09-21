@@ -335,6 +335,27 @@ export interface ItemDeSaida {
   media_mime: string | null;
   janela_aberta: boolean;
   modelo: ModeloAprovado | null;
+  /** Botões do modelo (migração 20260921110000). Vazio = modelo sem botão. */
+  botoes: BotaoDoModelo[];
+  /** Sufixo do botão de link: o código do item do envio em massa, ou "crm". */
+  link_codigo: string;
+}
+
+/** Um botão de modelo, como `message_templates.botoes` guarda. */
+export interface BotaoDoModelo {
+  tipo: 'resposta' | 'link';
+  texto: string;
+}
+
+/** Os botões válidos de um JSON cru; o que não tiver forma de botão fica de fora. */
+export function paraBotoes(bruto: unknown): BotaoDoModelo[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto.flatMap((b) => {
+    const o = objeto(b);
+    const tipo = texto(o.tipo);
+    const rotulo = texto(o.texto);
+    return (tipo === 'resposta' || tipo === 'link') && rotulo !== null ? [{ tipo, texto: rotulo }] : [];
+  });
 }
 
 export interface Recusado {
@@ -377,6 +398,8 @@ function paraItemDeSaida(bruto: unknown): ItemDeSaida | null {
     media_path: texto(i.media_path),
     media_mime: texto(i.media_mime),
     janela_aberta: i.janela_aberta === true,
+    botoes: paraBotoes(i.botoes),
+    link_codigo: texto(i.link_codigo) ?? 'crm',
     modelo:
       nomeMeta === null
         ? null
@@ -562,6 +585,10 @@ export interface ModeloParaMeta {
   idioma: string;
   corpo: string;
   variaveis: string[];
+  /** Botões a aprovar junto (migração 20260921110000). */
+  botoes: BotaoDoModelo[];
+  /** Base do link rastreado: o botão de link aponta para base + código. */
+  link_base: string | null;
 }
 
 function paraModeloParaMeta(bruto: unknown): ModeloParaMeta | null {
@@ -586,6 +613,8 @@ function paraModeloParaMeta(bruto: unknown): ModeloParaMeta | null {
     variaveis: Array.isArray(m.variaveis)
       ? m.variaveis.filter((v): v is string => typeof v === 'string')
       : [],
+    botoes: paraBotoes(m.botoes),
+    link_base: texto(m.link_base),
   };
 }
 

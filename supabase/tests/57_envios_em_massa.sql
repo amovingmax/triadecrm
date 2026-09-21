@@ -120,7 +120,7 @@ insert into public.organization_contacts (organization_id, contact_id, is_primar
 -- 1. Quem monta
 -- =====================================================================
 select pg_temp.entrar(pg_temp.sdr(), 'sdr');
-select is(public.envio_em_massa_criar(jsonb_build_object('nome', 'x')) ->> 'motivo', 'sem_permissao',
+select is(public.envio_em_massa_criar(jsonb_build_object('nome', 'x', 'assinatura', 'eu')) ->> 'motivo', 'sem_permissao',
   'SDR não monta lote: um lote mal feito derruba o número de todo mundo');
 select throws_ok($$ select * from public.envio_em_massa_publico('{}') $$, '42501', NULL,
   'nem consulta o público');
@@ -143,16 +143,16 @@ select is((select count(*)::int from public.envio_em_massa_publico('{"busca":"E5
 -- =====================================================================
 -- 3. Criar recusa o que não pode dar certo
 -- =====================================================================
-select is(public.envio_em_massa_criar(jsonb_build_object(
+select is(public.envio_em_massa_criar(jsonb_build_object('assinatura', 'eu',
             'nome', 'Sem regra', 'tipo', 'modelo', 'modelo_id', pg_temp.modelo(),
             'variaveis', '{}'::jsonb, 'organizacoes', jsonb_build_array(pg_temp.org('01')))) ->> 'motivo',
   'variavel_sem_regra', 'toda variável precisa dizer de onde vem o valor');
-select is(public.envio_em_massa_criar(jsonb_build_object(
+select is(public.envio_em_massa_criar(jsonb_build_object('assinatura', 'eu',
             'nome', 'Não aprovado', 'tipo', 'modelo',
             'modelo_id', (select id from public.message_templates where template_code = 'GEN-FUP-D3-V1'),
             'organizacoes', jsonb_build_array(pg_temp.org('01')))) ->> 'motivo',
   'modelo_nao_aprovado_na_meta', 'modelo que a Meta não aprovou não entra em lote');
-select is(public.envio_em_massa_criar(jsonb_build_object(
+select is(public.envio_em_massa_criar(jsonb_build_object('assinatura', 'eu',
             'nome', 'Vazio', 'tipo', 'modelo', 'modelo_id', pg_temp.modelo(),
             'variaveis', pg_temp.regras(), 'organizacoes', '[]'::jsonb)) ->> 'motivo',
   'publico_vazio', 'lote sem ninguém não existe');
@@ -176,7 +176,7 @@ select is(pg_temp.v('previa') #>> '{itens,1,assinante}', 'Gilda',
 -- =====================================================================
 -- 5. O relógio
 -- =====================================================================
-insert into pg_temp.r values ('criar', public.envio_em_massa_criar(jsonb_build_object(
+insert into pg_temp.r values ('criar', public.envio_em_massa_criar(jsonb_build_object('assinatura', 'eu',
   'nome', 'Abertura buffets', 'tipo', 'modelo', 'modelo_id', pg_temp.modelo(),
   'variaveis', pg_temp.regras(), 'assinatura', 'eu', 'por_hora', 12,
   'organizacoes', jsonb_build_array(pg_temp.org('01'), pg_temp.org('03'), pg_temp.org('02')))));
@@ -214,7 +214,7 @@ select is((pg_temp.envio((pg_temp.v('criar') ->> 'id')::uuid)).status, 'concluid
 update public.app_settings set value = jsonb_set(value, '{whatsapp,depois}', '2')
  where key = 'cadencia.tetos';
 select pg_temp.entrar(pg_temp.gestor(), 'gestor');
-insert into pg_temp.r values ('teto', public.envio_em_massa_criar(jsonb_build_object(
+insert into pg_temp.r values ('teto', public.envio_em_massa_criar(jsonb_build_object('assinatura', 'eu',
   'nome', 'Teto', 'tipo', 'modelo', 'modelo_id', pg_temp.modelo(), 'variaveis', pg_temp.regras(),
   'organizacoes', jsonb_build_array(pg_temp.org('05')))));
 select pg_temp.sair();
@@ -230,7 +230,7 @@ update public.app_settings set value = jsonb_set(value, '{whatsapp,depois}', '10
 -- 7. A cortesia das 72 h
 -- =====================================================================
 select pg_temp.entrar(pg_temp.gestor(), 'gestor');
-insert into pg_temp.r values ('de_novo', public.envio_em_massa_criar(jsonb_build_object(
+insert into pg_temp.r values ('de_novo', public.envio_em_massa_criar(jsonb_build_object('assinatura', 'eu',
   'nome', 'De novo', 'tipo', 'modelo', 'modelo_id', pg_temp.modelo(), 'variaveis', pg_temp.regras(),
   'organizacoes', jsonb_build_array(pg_temp.org('01')))));
 select pg_temp.sair();
@@ -242,7 +242,7 @@ select is((pg_temp.item((pg_temp.v('de_novo') ->> 'id')::uuid, pg_temp.org('01')
 -- 8. Texto livre só com a janela aberta
 -- =====================================================================
 select pg_temp.entrar(pg_temp.gestor(), 'gestor');
-insert into pg_temp.r values ('texto', public.envio_em_massa_criar(jsonb_build_object(
+insert into pg_temp.r values ('texto', public.envio_em_massa_criar(jsonb_build_object('assinatura', 'eu',
   'nome', 'Texto', 'tipo', 'texto', 'texto', 'Oi {{nome}}, novidade!',
   'variaveis', '{"nome":{"campo":"nome","reserva":"tudo bem"}}'::jsonb,
   'organizacoes', jsonb_build_array(pg_temp.org('06')))));
@@ -255,7 +255,7 @@ select is((pg_temp.item((pg_temp.v('texto') ->> 'id')::uuid, pg_temp.org('06')))
 -- 9. A parada automática
 -- =====================================================================
 select pg_temp.entrar(pg_temp.gestor(), 'gestor');
-insert into pg_temp.r values ('parada', public.envio_em_massa_criar(jsonb_build_object(
+insert into pg_temp.r values ('parada', public.envio_em_massa_criar(jsonb_build_object('assinatura', 'eu',
   'nome', 'Parada', 'tipo', 'modelo', 'modelo_id', pg_temp.modelo(), 'variaveis', pg_temp.regras(),
   'por_hora', 60,
   'organizacoes', jsonb_build_array(pg_temp.org('05'), pg_temp.org('07'), pg_temp.org('08'), pg_temp.org('06')))));

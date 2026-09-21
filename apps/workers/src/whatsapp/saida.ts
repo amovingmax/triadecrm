@@ -109,10 +109,31 @@ export function formaDoEnvio(
     };
   }
 
+  // A resposta automática ao botão de um envio em massa: texto com UM botão de
+  // link. Só existe dentro da janela — a pessoa acabou de tocar num botão.
+  if (item.tipo === 'interactive') {
+    const p = Array.isArray(item.template_params) ? {} : item.template_params;
+    const rotulo = typeof p.botao === 'string' ? p.botao : '';
+    const url = typeof p.url === 'string' ? p.url : '';
+    if (!item.janela_aberta || item.corpo === null || rotulo === '' || !url.startsWith('https://')) {
+      return {
+        ok: false,
+        codigo: 'link_fora_da_janela',
+        motivo:
+          'A mensagem com botão de link só sai dentro das 24 h depois de a pessoa responder, e precisa de texto, rótulo e endereço.',
+      };
+    }
+    return { ok: true, envio: { tipo: 'link', para: item.para, corpo: item.corpo, rotulo, url } };
+  }
+
+  // Modelo COM botões sai como modelo mesmo dentro da janela: mandado como
+  // texto, os botões — que são a razão de ele existir — sumiriam.
+  const comBotoes = item.modelo !== null && item.botoes.length > 0;
+
   // Fora da janela de 24 h a Meta só aceita template. `wa_saida_proximos` já
   // matou o que chegasse aqui sem modelo aprovado; este `if` é a segunda
   // fechadura, não a primeira.
-  if (!item.janela_aberta) {
+  if (!item.janela_aberta || comBotoes) {
     if (item.modelo === null) {
       return {
         ok: false,
@@ -129,6 +150,7 @@ export function formaDoEnvio(
         nome: item.modelo.nome_meta,
         idioma: item.modelo.idioma,
         parametros: parametrosDoItem(item.template_params),
+        ...botaoDeLinkDoItem(item),
       },
     };
   }
@@ -141,6 +163,12 @@ export function formaDoEnvio(
     };
   }
   return { ok: true, envio: { tipo: 'texto', para: item.para, corpo: item.corpo } };
+}
+
+/** O botão de link do modelo, com o código do item como sufixo da URL. */
+function botaoDeLinkDoItem(item: ItemDeSaida): { botaoDeLink?: { indice: number; sufixo: string } } {
+  const indice = item.botoes.findIndex((b) => b.tipo === 'link');
+  return indice < 0 ? {} : { botaoDeLink: { indice, sufixo: item.link_codigo } };
 }
 
 /**

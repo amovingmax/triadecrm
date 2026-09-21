@@ -70,7 +70,17 @@ export type Envio =
       nome: string;
       idioma: string;
       parametros: ParametrosDoModelo;
+      /**
+       * O botão de link do modelo: a URL aprovada termina em `{{1}}`, e o
+       * sufixo é o código do item do envio (migração 20260921110000).
+       */
+      botaoDeLink?: { indice: number; sufixo: string };
     })
+  /**
+   * Mensagem com UM botão de link, dentro da janela de 24 h (não é modelo: é
+   * a resposta automática ao botão de um envio em massa).
+   */
+  | (Destino & { tipo: 'link'; corpo: string; rotulo: string; url: string })
   | (Destino & { tipo: 'audio'; mediaId?: string; link?: string });
 
 /** A Graph API recusou, ou não respondeu. Mesma forma para envio e para conta. */
@@ -179,16 +189,36 @@ export class ClienteDaGraph {
         return { ...base, type: 'text', text: { preview_url: false, body: envio.corpo } };
       case 'template': {
         const parametros = parametrosDoCorpo(envio.parametros);
+        const componentes: Record<string, unknown>[] =
+          parametros.length === 0 ? [] : [{ type: 'body', parameters: parametros }];
+        if (envio.botaoDeLink) {
+          componentes.push({
+            type: 'button',
+            sub_type: 'url',
+            index: String(envio.botaoDeLink.indice),
+            parameters: [{ type: 'text', text: envio.botaoDeLink.sufixo }],
+          });
+        }
         return {
           ...base,
           type: 'template',
           template: {
             name: envio.nome,
             language: { code: envio.idioma },
-            components: parametros.length === 0 ? [] : [{ type: 'body', parameters: parametros }],
+            components: componentes,
           },
         };
       }
+      case 'link':
+        return {
+          ...base,
+          type: 'interactive',
+          interactive: {
+            type: 'cta_url',
+            body: { text: envio.corpo },
+            action: { name: 'cta_url', parameters: { display_text: envio.rotulo, url: envio.url } },
+          },
+        };
       case 'audio':
         return {
           ...base,

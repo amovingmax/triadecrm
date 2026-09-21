@@ -22,9 +22,18 @@ export const ROTA_INICIAL = '/meu-dia';
  * o /login seria pedir ao dono do buffet uma conta que ele não tem. Quem protege
  * a rota é o token — 32 bytes, guardados só como hash, válidos por 7 dias — e o
  * fato de `anon` não ter grant de tabela nenhuma no banco.
+ *
+ * `/r/<código>` é o link rastreado dos envios em massa: também é aberto pelo
+ * parceiro, sem conta. Só grava o clique e redireciona para um destino que o
+ * banco escolhe (`public.envio_clique`).
  */
 export function ehRotaPublica(pathname: string): boolean {
-  return pathname === '/login' || pathname.startsWith('/auth/') || pathname.startsWith('/c/');
+  return (
+    pathname === '/login' ||
+    pathname.startsWith('/auth/') ||
+    pathname.startsWith('/c/') ||
+    pathname.startsWith('/r/')
+  );
 }
 
 /**

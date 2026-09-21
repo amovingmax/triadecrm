@@ -260,6 +260,10 @@ export type Database = {
         Args: { p_stage_id: number; p_variante: string }
         Returns: string
       }
+      envio_acoes_validas: {
+        Args: { p_acoes: Json; p_botoes: Json }
+        Returns: boolean
+      }
       envio_assinante: {
         Args: {
           p_atendentes: string[]
@@ -304,6 +308,7 @@ export type Database = {
           ultimo_envio: string
         }[]
       }
+      envio_resposta_ao_botao: { Args: { p_message_id: string }; Returns: Json }
       envio_um: {
         Args: {
           p_envio: Database["public"]["Tables"]["envios_em_massa"]["Row"]
@@ -551,6 +556,8 @@ export type Database = {
         }
         Returns: Json
       }
+      modelo_botoes_validos: { Args: { p_botoes: Json }; Returns: boolean }
+      modelo_corpo_invalido: { Args: { p_corpo: string }; Returns: string }
       modelo_parametro_limpo: { Args: { p_valor: string }; Returns: string }
       modelo_renderizar: {
         Args: { p_body: string; p_parametros: Json }
@@ -574,6 +581,7 @@ export type Database = {
       org_is_editable: { Args: { p_org: string }; Returns: boolean }
       org_is_mine: { Args: { p_org: string }; Returns: boolean }
       org_is_visible: { Args: { p_org: string }; Returns: boolean }
+      org_na_komune: { Args: { p_org: string }; Returns: boolean }
       outcome_for_call_result: {
         Args: { p_result: Database["app"]["Enums"]["call_result"] }
         Returns: string
@@ -3194,6 +3202,7 @@ export type Database = {
       }
       envios_em_massa: {
         Row: {
+          acoes: Json
           assinatura: string
           atendentes: string[]
           atualizado_em: string
@@ -3204,6 +3213,7 @@ export type Database = {
           filtro: Json
           id: string
           inicio: string
+          link_destino: string | null
           modelo_id: number | null
           motivo_parada: string | null
           nome: string
@@ -3215,6 +3225,7 @@ export type Database = {
           variaveis: Json
         }
         Insert: {
+          acoes?: Json
           assinatura: string
           atendentes?: string[]
           atualizado_em?: string
@@ -3225,6 +3236,7 @@ export type Database = {
           filtro?: Json
           id?: string
           inicio?: string
+          link_destino?: string | null
           modelo_id?: number | null
           motivo_parada?: string | null
           nome: string
@@ -3236,6 +3248,7 @@ export type Database = {
           variaveis?: Json
         }
         Update: {
+          acoes?: Json
           assinatura?: string
           atendentes?: string[]
           atualizado_em?: string
@@ -3246,6 +3259,7 @@ export type Database = {
           filtro?: Json
           id?: string
           inicio?: string
+          link_destino?: string | null
           modelo_id?: number | null
           motivo_parada?: string | null
           nome?: string
@@ -3283,8 +3297,13 @@ export type Database = {
       envios_em_massa_itens: {
         Row: {
           assinante_id: string
+          botao_em: string | null
+          botao_tocado: string | null
+          clicou_em: string | null
+          codigo: string
           envio_id: string
           id: number
+          ja_na_komune: boolean
           message_id: string | null
           motivo: string | null
           organization_id: string
@@ -3294,8 +3313,13 @@ export type Database = {
         }
         Insert: {
           assinante_id: string
+          botao_em?: string | null
+          botao_tocado?: string | null
+          clicou_em?: string | null
+          codigo?: string
           envio_id: string
           id?: never
+          ja_na_komune?: boolean
           message_id?: string | null
           motivo?: string | null
           organization_id: string
@@ -3305,8 +3329,13 @@ export type Database = {
         }
         Update: {
           assinante_id?: string
+          botao_em?: string | null
+          botao_tocado?: string | null
+          clicou_em?: string | null
+          codigo?: string
           envio_id?: string
           id?: never
+          ja_na_komune?: boolean
           message_id?: string | null
           motivo?: string | null
           organization_id?: string
@@ -4306,6 +4335,7 @@ export type Database = {
         Row: {
           audio_asset_id: string | null
           body: string
+          botoes: Json
           category: string
           channel: Database["app"]["Enums"]["channel"]
           created_at: string
@@ -4330,6 +4360,7 @@ export type Database = {
         Insert: {
           audio_asset_id?: string | null
           body: string
+          botoes?: Json
           category?: string
           channel?: Database["app"]["Enums"]["channel"]
           created_at?: string
@@ -4354,6 +4385,7 @@ export type Database = {
         Update: {
           audio_asset_id?: string | null
           body?: string
+          botoes?: Json
           category?: string
           channel?: Database["app"]["Enums"]["channel"]
           created_at?: string
@@ -7180,6 +7212,7 @@ export type Database = {
         Args: { p_enrollment_id: string; p_motivo: string }
         Returns: Json
       }
+      envio_clique: { Args: { p_codigo: string }; Returns: string }
       envio_em_massa_criar: { Args: { p_config: Json }; Returns: Json }
       envio_em_massa_detalhe: { Args: { p_id: string }; Returns: Json }
       envio_em_massa_mudar: {
@@ -7450,6 +7483,7 @@ export type Database = {
         }[]
       }
       meu_papel: { Args: never; Returns: Json }
+      modelo_whatsapp_criar: { Args: { p: Json }; Returns: Json }
       montar_lote: {
         Args: {
           p_categoria_ids?: number[]

@@ -105,7 +105,7 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
               ) : null}
             </div>
 
-            <Itens itens={detalhe.data?.itens ?? []} />
+            <Itens itens={detalhe.data?.itens ?? []} daMarca={envio.assinatura === 'marca'} />
           </div>
         ) : null}
       </SheetContent>
@@ -124,20 +124,32 @@ function hora(iso: string): string {
 }
 
 export function Numeros({ c, compacto = false }: { c: Contagem; compacto?: boolean }) {
-  const blocos: { rotulo: string; valor: number; de?: number; alerta?: boolean }[] = [
+  const blocos: { rotulo: string; valor: number; de?: number; alerta?: boolean; destaque?: boolean }[] = [
     { rotulo: 'Enviadas', valor: c.enviadas, de: c.total },
     { rotulo: 'Entregues', valor: c.entregues, de: c.enviadas },
     { rotulo: 'Lidas', valor: c.lidas, de: c.enviadas },
+    { rotulo: 'Tocaram no botão', valor: c.tocaram, de: c.enviadas },
+    { rotulo: 'Clicaram no link', valor: c.clicaram, de: c.enviadas },
+    { rotulo: 'Cadastraram', valor: c.cadastraram, de: c.enviadas, destaque: c.cadastraram > 0 },
     { rotulo: 'Responderam', valor: c.responderam, de: c.enviadas },
     { rotulo: 'Saíram', valor: c.sairam, de: c.enviadas, alerta: c.sairam > 0 },
     { rotulo: 'Puladas', valor: c.puladas },
   ];
+  // No cartão da lista, só o funil da ação: do envio ao cadastro.
+  const DO_CARTAO = ['Enviadas', 'Lidas', 'Tocaram no botão', 'Clicaram no link', 'Cadastraram'];
+  const visiveis = compacto ? blocos.filter((b) => DO_CARTAO.includes(b.rotulo)) : blocos;
   return (
-    <dl className={cn('grid gap-2', compacto ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-3')}>
-      {blocos.map((b) => (
+    <dl className={cn('grid gap-2', compacto ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-3')}>
+      {visiveis.map((b) => (
         <div key={b.rotulo} className="rounded-lg border border-hairline bg-card/60 px-2.5 py-2">
           <dt className="text-[11px] text-muted-foreground">{b.rotulo}</dt>
-          <dd className={cn('numerico text-lg font-semibold', b.alerta && 'text-destructive')}>
+          <dd
+            className={cn(
+              'numerico text-lg font-semibold',
+              b.alerta && 'text-destructive',
+              b.destaque && 'text-primary',
+            )}
+          >
             {b.valor}
             {b.de !== undefined && b.de > 0 && !compacto ? (
               <span className="ml-1 text-xs font-normal text-muted-foreground">{porcento(b.valor, b.de)}</span>
@@ -164,7 +176,7 @@ const ROTULO_DA_MENSAGEM: Record<string, string> = {
   failed: 'falhou',
 };
 
-function Itens({ itens }: { itens: ItemDoEnvio[] }) {
+function Itens({ itens, daMarca }: { itens: ItemDoEnvio[]; daMarca: boolean }) {
   return (
     <ul className="divide-y divide-hairline rounded-xl border border-hairline bg-card">
       {itens.map((i) => (
@@ -172,9 +184,12 @@ function Itens({ itens }: { itens: ItemDoEnvio[] }) {
           <span className="min-w-0 flex-1">
             <span className="font-medium">{i.nome}</span>
             <span className="block text-xs text-muted-foreground">
-              {i.assinante ? `assina ${i.assinante}` : null}
+              {daMarca ? 'em nome da Komune' : i.assinante ? `assina ${i.assinante}` : null}
               {i.status === 'enviada' && i.mensagem ? ` · ${ROTULO_DA_MENSAGEM[i.mensagem] ?? i.mensagem}` : null}
-              {i.respondeu ? ' · respondeu' : null}
+              {i.botao_tocado ? ` · tocou em “${i.botao_tocado}”` : null}
+              {i.clicou ? ' · clicou no link' : null}
+              {i.cadastrou ? ' · cadastrou-se na Komune' : null}
+              {i.respondeu && !i.botao_tocado ? ' · respondeu' : null}
             </span>
             {i.status === 'pulada' ? (
               <span className="block text-xs text-muted-foreground">{fraseDoMotivo(i.motivo)}</span>

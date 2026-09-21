@@ -115,6 +115,44 @@ describe('a decisão de tentar de novo', () => {
 });
 
 describe('o corpo do POST', () => {
+  it('modelo com botão de link manda o sufixo no índice do botão', () => {
+    const p = ClienteDaGraph.payloadDoEnvio({
+      tipo: 'template',
+      para: '+5584988776655',
+      nome: 'env_cadastro_pendente_v1',
+      idioma: 'pt_BR',
+      parametros: { nome: 'Ana' },
+      botaoDeLink: { indice: 0, sufixo: 'a1b2c3d4e5f6' },
+    });
+    expect((p.template as { components: unknown[] }).components[1]).toEqual({
+      type: 'button',
+      sub_type: 'url',
+      index: '0',
+      parameters: [{ type: 'text', text: 'a1b2c3d4e5f6' }],
+    });
+  });
+
+  it('a resposta ao botão vai como interativo com um botão de link', () => {
+    const p = ClienteDaGraph.payloadDoEnvio({
+      tipo: 'link',
+      para: '+5584988776655',
+      corpo: 'Aqui está o seu convite.',
+      rotulo: 'Criar meu perfil',
+      url: 'https://crm.teste/r/a1b2c3d4e5f6',
+    });
+    expect(p).toMatchObject({
+      type: 'interactive',
+      interactive: {
+        type: 'cta_url',
+        body: { text: 'Aqui está o seu convite.' },
+        action: {
+          name: 'cta_url',
+          parameters: { display_text: 'Criar meu perfil', url: 'https://crm.teste/r/a1b2c3d4e5f6' },
+        },
+      },
+    });
+  });
+
   it('texto vai sem prévia de link (link no 1º toque é sinal de spam, R04 §4)', () => {
     const p = ClienteDaGraph.payloadDoEnvio({ tipo: 'texto', para: '+5584988776655', corpo: 'oi' });
     expect(p).toMatchObject({

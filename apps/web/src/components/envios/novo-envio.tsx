@@ -29,8 +29,10 @@ import {
   salvarPublico,
   type ConfigDoEnvio,
 } from './dados';
+import { CriarModelo } from './criar-modelo';
 import { EscolhaMultipla } from './escolha-multipla';
 import {
+  acoesPara,
   duracaoEstimada,
   fraseDaRecusa,
   fraseDoMotivo,
@@ -43,6 +45,7 @@ import {
   SITUACOES,
   TEMPERATURAS,
   TIPOS_DE_PARCEIRO,
+  type AcaoDoBotao,
   type Assinatura,
   type FiltroDoPublico,
   type PessoaDoPublico,
@@ -67,6 +70,13 @@ const PASSOS = [
 ] as const;
 
 const RITMOS = [5, 10, 15, 20, 30, 45, 60] as const;
+
+/** Para onde vai quem toca no botão de link, se o envio não disser outro lugar. */
+const DESTINO_PADRAO = 'https://admin.komune.app.br/seja-parceiro';
+
+function temAtendente(corpo: string): boolean {
+  return /\{\{\s*atendente\s*\}\}/.test(corpo);
+}
 
 /** Quantas linhas o passo 1 desenha de cada vez. A seleção vale para todas. */
 const LINHAS_VISIVEIS = 150;
@@ -107,6 +117,8 @@ export function NovoEnvio({
   const [modeloId, setModeloId] = useState<number | null>(null);
   const [texto, setTexto] = useState('');
   const [regras, setRegras] = useState<Record<string, RegraDaVariavel>>({});
+  const [acoesEditadas, setAcoesEditadas] = useState<Record<string, AcaoDoBotao>>({});
+  const [linkDestino, setLinkDestino] = useState(DESTINO_PADRAO);
 
   const modelos = useQuery({ queryKey: ['envios', 'modelos'], queryFn: buscarModelos, staleTime: 60_000 });
   const modelo = modelos.data?.find((m) => m.id === modeloId) ?? null;
@@ -114,6 +126,13 @@ export function NovoEnvio({
   const variaveis = variaveisComRegra(corpo);
   const regrasDoCorpo = regrasPara(corpo, regras);
   const incompletas = regrasIncompletas(regrasDoCorpo);
+  const botoes = tipo === 'modelo' ? (modelo?.botoes ?? []) : [];
+  const acoes = acoesPara(botoes, acoesEditadas);
+  const precisaDeLink =
+    botoes.some((b) => b.tipo === 'link') || Object.values(acoes).some((a) => a.acao === 'link');
+  const acoesIncompletas = Object.values(acoes).some(
+    (a) => a.acao === 'link' && (a.texto.trim() === '' || a.botao.trim() === ''),
+  );
 
   function mudarCorpo(novoTipo: TipoDoEnvio, novoModelo: number | null, novoTexto: string) {
     setTipo(novoTipo);
@@ -129,7 +148,7 @@ export function NovoEnvio({
   const [porHora, setPorHora] = useState(20);
   const [quando, setQuando] = useState<'agora' | 'depois'>('agora');
   const [inicio, setInicio] = useState('');
-  const [assinatura, setAssinatura] = useState<Assinatura>('eu');
+  const [assinatura, setAssinatura] = useState<Assinatura>('marca');
   const [atendentes, setAtendentes] = useState<string[]>([]);
 
   const teto = useQuery({ queryKey: ['envios', 'teto'], queryFn: buscarTetoDeHoje, staleTime: 60_000 });
@@ -145,10 +164,17 @@ export function NovoEnvio({
     porHora,
     inicio: quando === 'depois' && inicio ? new Date(inicio).toISOString() : null,
     filtro,
+    linkDestino: precisaDeLink ? linkDestino : '',
+    acoes,
   };
 
+  // Em nome da marca ninguém assina: modelo com {{atendente}} não serve.
+  const conflitoDeAssinatura = assinatura === 'marca' && temAtendente(corpo);
   const mensagemPronta =
-    (tipo === 'modelo' ? modelo !== null : texto.trim().length > 0) && incompletas.length === 0;
+    (tipo === 'modelo' ? modelo !== null : texto.trim().length > 0) &&
+    incompletas.length === 0 &&
+    !acoesIncompletas &&
+    (!precisaDeLink || linkDestino.startsWith('https://'));
 
   const amostra = escolhidas.slice(0, 3).map((p) => p.organization_id);
   const previa = useQuery({
@@ -182,7 +208,11 @@ export function NovoEnvio({
   const tetoLivre = teto.data ? Math.max(teto.data.teto - teto.data.usados, 0) : null;
 
   const podeAvancar =
-    passo === 1 ? escolhidas.length > 0 : passo === 2 ? mensagemPronta : nome.trim().length > 0;
+    passo === 1
+      ? escolhidas.length > 0
+      : passo === 2
+        ? mensagemPronta
+        : nome.trim().length > 0 && !conflitoDeAssinatura;
 
   return (
     <div className="space-y-4">
@@ -351,22 +381,28 @@ export function NovoEnvio({
                     <SelectValue placeholder={modelos.isPending ? 'Carregando…' : 'Escolha o modelo'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {(modelos.data ?? []).map((m) => (
-                      <SelectItem key={m.id} value={String(m.id)}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
+                    {(modelos.data ?? [])
+                      .filter((m) => assinatura !== 'marca' || !temAtendente(m.body))
+                      .map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>
+                          {m.name}
+                          {m.botoes.length > 0 ? ` · ${m.botoes.length} botão(ões)` : ''}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 {modelo ? (
-                  <p className="rounded-lg border border-hairline bg-card/60 px-3 py-2 text-sm whitespace-pre-wrap">
-                    {modelo.body}
-                  </p>
+                  <div className="rounded-lg border border-hairline bg-card/60 px-3 py-2 text-sm">
+                    <p className="whitespace-pre-wrap">{modelo.body}</p>
+                    <ChipsDosBotoes botoes={botoes} />
+                  </div>
                 ) : null}
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Precisa de uma mensagem nova? Crie em Ajustes → Modelos de mensagem; ela vai para a
-                  Meta aprovar e aparece aqui quando voltar aprovada.
+                  {assinatura === 'marca'
+                    ? 'Mostrando só os modelos em nome da Komune (sem nome de atendente).'
+                    : 'Mostrando todos os modelos aprovados.'}
                 </p>
+                <CriarModelo />
               </div>
             ) : (
               <div className="space-y-1">
@@ -395,6 +431,39 @@ export function NovoEnvio({
                 </p>
               </div>
             )}
+
+            {Object.keys(acoes).length > 0 || precisaDeLink ? (
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  O que acontece em cada botão
+                </h3>
+                {Object.entries(acoes).map(([rotulo, acao]) => (
+                  <EditorDeAcao
+                    key={rotulo}
+                    rotulo={rotulo}
+                    acao={acao}
+                    aoMudar={(a) => setAcoesEditadas((atual) => ({ ...atual, [rotulo]: a }))}
+                  />
+                ))}
+                {precisaDeLink ? (
+                  <div className="space-y-1">
+                    <label htmlFor="destino-do-link" className="text-xs text-muted-foreground">
+                      Para onde o link leva
+                    </label>
+                    <Input
+                      id="destino-do-link"
+                      value={linkDestino}
+                      onChange={(e) => setLinkDestino(e.target.value)}
+                      className="h-11 md:h-9"
+                    />
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      O link passa pelo CRM, que conta o clique e marca a campanha (utm) antes de mandar
+                      a pessoa para lá. O pixel da Meta no site mostra quem se cadastrou vindo deste envio.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {variaveis.length > 0 ? (
               <div className="space-y-2">
@@ -436,12 +505,17 @@ export function NovoEnvio({
                   <div key={item.organization_id} className="rounded-xl border border-hairline bg-card p-3">
                     <p className="mb-1 text-xs text-muted-foreground">
                       Para <span className="font-medium text-foreground">{pessoa?.nome}</span>
-                      {item.assinante ? ` · assinada por ${item.assinante}` : null}
+                      {assinatura === 'marca'
+                        ? ' · em nome da Komune'
+                        : item.assinante
+                          ? ` · assinada por ${item.assinante}`
+                          : null}
                     </p>
                     {item.ok ? (
-                      <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm whitespace-pre-wrap text-foreground">
-                        {item.corpo}
-                      </p>
+                      <div className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-foreground">
+                        <p className="whitespace-pre-wrap">{item.corpo}</p>
+                        <ChipsDosBotoes botoes={botoes} />
+                      </div>
                     ) : (
                       <p className="text-sm text-destructive">
                         {fraseDoMotivo(item.motivo)} {item.variavel ? `({{${item.variavel}}})` : null}
@@ -516,6 +590,7 @@ export function NovoEnvio({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="marca">Em nome da Komune (sem nome de atendente)</SelectItem>
                   <SelectItem value="eu">Eu</SelectItem>
                   <SelectItem value="responsavel">O responsável de cada parceiro</SelectItem>
                   <SelectItem value="revezar">Dividir entre atendentes</SelectItem>
@@ -531,9 +606,18 @@ export function NovoEnvio({
                   />
                 </div>
               ) : null}
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                As respostas caem nas Conversas de quem assinou.
-              </p>
+              {conflitoDeAssinatura ? (
+                <p className="text-[11px] leading-relaxed text-destructive">
+                  O modelo escolhido diz o nome de quem envia. Em nome da Komune, volte e escolha um modelo
+                  sem nome de atendente.
+                </p>
+              ) : (
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {assinatura === 'marca'
+                    ? 'As respostas caem nas Conversas do responsável de cada parceiro (ou de quem montou o envio).'
+                    : 'As respostas caem nas Conversas de quem assinou.'}
+                </p>
+              )}
             </Campo>
           </div>
 
@@ -833,6 +917,85 @@ function ListaDoPublico({
         <button type="button" onClick={aoVerTodas} className="w-full border-t border-hairline py-2 text-sm text-primary hover:bg-muted/50">
           Mostrar as {total} (a seleção já vale para todas)
         </button>
+      ) : null}
+    </div>
+  );
+}
+
+function ChipsDosBotoes({ botoes }: { botoes: readonly { tipo: string; texto: string }[] }) {
+  if (botoes.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-col gap-1 border-t border-hairline pt-2">
+      {botoes.map((b) => (
+        <span
+          key={b.texto}
+          className="rounded-md bg-background/70 px-2 py-1 text-center text-xs font-medium text-primary"
+        >
+          {b.tipo === 'link' ? '↗ ' : ''}
+          {b.texto}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function EditorDeAcao({
+  rotulo,
+  acao,
+  aoMudar,
+}: {
+  rotulo: string;
+  acao: AcaoDoBotao;
+  aoMudar: (a: AcaoDoBotao) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border border-hairline p-2">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_14rem] sm:items-center">
+        <span className="text-sm">
+          Quem tocar em <span className="font-medium">“{rotulo}”</span>
+        </span>
+        <Select
+          value={acao.acao}
+          onValueChange={(v) =>
+            aoMudar(
+              v === 'link'
+                ? {
+                    acao: 'link',
+                    texto: 'Que bom! O cadastro leva 5 minutos e é grátis. É só tocar no botão abaixo.',
+                    botao: 'Criar meu perfil',
+                  }
+                : { acao: v as 'sair' | 'nada' },
+            )
+          }
+        >
+          <SelectTrigger className="toque h-11 md:h-8" aria-label={`O que acontece em “${rotulo}”`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="link">recebe o link na hora</SelectItem>
+            <SelectItem value="sair">sai da lista (não recebe mais)</SelectItem>
+            <SelectItem value="nada">fica na caixa para o time responder</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {acao.acao === 'link' ? (
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
+          <textarea
+            value={acao.texto}
+            maxLength={900}
+            rows={2}
+            onChange={(e) => aoMudar({ ...acao, texto: e.target.value })}
+            aria-label={`Texto que vai com o link em “${rotulo}”`}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          />
+          <Input
+            value={acao.botao}
+            maxLength={20}
+            onChange={(e) => aoMudar({ ...acao, botao: e.target.value })}
+            aria-label={`Rótulo do botão do link em “${rotulo}”`}
+            className="h-11 md:h-9"
+          />
+        </div>
       ) : null}
     </div>
   );

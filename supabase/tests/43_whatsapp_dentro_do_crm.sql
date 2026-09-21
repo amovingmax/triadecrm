@@ -371,7 +371,7 @@ select throws_ok(format($$ select public.wa_enviar_modelo(%L, %s, '{}') $$,
                  '42501', NULL, 'e o worker não envia modelo em nome de ninguém (ADR-05)');
 select pg_temp.sair();
 
-select is((select e.value - 'template_id' - 'corpo' - 'nome_meta_atual' - 'situacao_atual'
+select is((select e.value - 'template_id' - 'corpo' - 'nome_meta_atual' - 'situacao_atual' - 'botoes' - 'link_base'
              from jsonb_array_elements(pg_temp.v('para_meta')) e where e.value ->> 'codigo' = 'AEB-ABR-A'),
           jsonb_build_object('codigo', 'AEB-ABR-A', 'nome_sugerido', 'aeb_abr_a_v' ||
                                (select version from public.message_templates where template_code = 'AEB-ABR-A'),
