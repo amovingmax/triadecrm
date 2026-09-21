@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { destinoSeguro, ehRotaPublica, ROTA_INICIAL } from './middleware';
+import { destinoNoHostDosLinks, destinoSeguro, ehRotaPublica, ROTA_INICIAL } from './middleware';
 
 /**
  * A lista de rotas que abrem sem sessão é curta de propósito, e ficou mais longa
@@ -28,6 +28,13 @@ describe('ehRotaPublica', () => {
     ]) {
       expect(ehRotaPublica(rota)).toBe(false);
     }
+  });
+
+  it('o endereço dos links só abre links: o resto vai para o site da Komune', () => {
+    expect(destinoNoHostDosLinks('ir.komune.app.br', '/r/a1b2c3d4e5f6')).toBeNull();
+    expect(destinoNoHostDosLinks('ir.komune.app.br', '/login')).toBe('https://komune.app.br');
+    expect(destinoNoHostDosLinks('ir.komune.app.br', '/')).toBe('https://komune.app.br');
+    expect(destinoNoHostDosLinks('triade-crm-tawny.vercel.app', '/login')).toBeNull();
   });
 
   it('o link rastreado dos envios em massa abre sem sessão', () => {

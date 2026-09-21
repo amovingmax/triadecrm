@@ -58,7 +58,7 @@ comment on column public.message_templates.botoes is
 
 insert into public.app_settings (key, value, description) values
   ('envios.link', jsonb_build_object(
-     'base', 'https://triade-crm-tawny.vercel.app/r/',
+     'base', 'https://ir.komune.app.br/r/',
      'destino_padrao', 'https://admin.komune.app.br/seja-parceiro'),
    'Link rastreado dos envios em massa: o botão de link aponta para base || código; o destino padrão é para onde vai quem clica num link sem envio.')
 on conflict (key) do nothing;

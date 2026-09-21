@@ -48,7 +48,24 @@ export function destinoSeguro(valor: string | null | undefined): string {
   return valor;
 }
 
+/**
+ * O endereço dos links dos envios em massa (`ir.komune.app.br`, decisão do
+ * Rafael em 21/09/2026). Ele aponta para este mesmo app, mas só serve para
+ * UMA coisa: `/r/<código>`. Qualquer outro caminho nele vai para o site da
+ * Komune — o parceiro que apaga o código da URL não pode cair no login do CRM.
+ */
+export const HOST_DOS_LINKS = 'ir.komune.app.br';
+export const SITE_DA_KOMUNE = 'https://komune.app.br';
+
+export function destinoNoHostDosLinks(host: string | null, pathname: string): string | null {
+  if ((host ?? '').split(':')[0]?.toLowerCase() !== HOST_DOS_LINKS) return null;
+  return pathname.startsWith('/r/') ? null : SITE_DA_KOMUNE;
+}
+
 export async function atualizarSessao(request: NextRequest): Promise<NextResponse> {
+  const foraDoLink = destinoNoHostDosLinks(request.headers.get('host'), request.nextUrl.pathname);
+  if (foraDoLink !== null) return NextResponse.redirect(foraDoLink, 302);
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(supabaseUrl(), supabaseAnonKey(), {

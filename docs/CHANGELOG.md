@@ -2774,5 +2774,5 @@ Entregue:
 - Testes: pgTAP 58 (29 asserções), 43 e 57 ajustados; Vitest do worker (5 novos) e do web.
 
 Pendente / decisão:
-- O link rastreado usa o domínio do CRM (`triade-crm-tawny.vercel.app/r/…`). Um subdomínio da Komune (ex.: `ir.komune.app.br`) passa mais confiança; pede DNS (Luiz) e, depois, trocar `envios.link.base` — os modelos com botão de link aprovados antes disso continuam no domínio antigo.
+- Link rastreado no endereço da Komune (decisão do Rafael, 21/09/2026): `https://ir.komune.app.br/r/<código>`. O subdomínio aponta para o projeto do CRM na Vercel e só serve `/r/`; qualquer outro caminho vai para `komune.app.br` (`destinoNoHostDosLinks`, no proxy). Falta: registro `ir` CNAME `cname.vercel-dns.com.` no DNS do Registro.br e o domínio adicionado ao projeto `triade-crm` na Vercel — ANTES de publicar, porque a Meta revisa a URL do botão de link quando o modelo vai para aprovação.
 - Publicar exige também o deploy do worker-wa no Fly (o worker mudou).
