@@ -27,6 +27,7 @@ import {
 } from '@/components/parceiros/ficha';
 import { formatarData, formatarLocal, ROTULO_TIPO } from '@/components/parceiros/formatos';
 import { ProximaAcao } from '@/components/parceiros/proxima-acao';
+import { ValorDoNegocio } from '@/components/parceiros/valor-do-negocio';
 import { carregarCatalogos } from '@/components/parceiros/catalogos';
 import { FolhaEditarFicha } from '@/components/parceiros/folha-editar-ficha';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
@@ -403,7 +404,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
         ) : (
           <ul className="flex flex-col border-t border-hairline">
             {ficha.negocios.map((negocio) => (
-              <CartaoNegocio key={negocio.id} negocio={negocio} />
+              <CartaoNegocio key={negocio.id} negocio={negocio} podeEscrever={podeEscrever} />
             ))}
           </ul>
         )}
@@ -447,7 +448,13 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
  *    desceu para a coluna da esquerda, onde é a continuação natural da frase "em que
  *    pé está o negócio" e onde o celular já a jogava de qualquer jeito.
  */
-function CartaoNegocio({ negocio }: { negocio: NegocioDaFicha }) {
+function CartaoNegocio({
+  negocio,
+  podeEscrever,
+}: {
+  negocio: NegocioDaFicha;
+  podeEscrever: boolean;
+}) {
   const dias = diasDesde(negocio.ultimoContatoEm);
 
   return (
@@ -488,6 +495,11 @@ function CartaoNegocio({ negocio }: { negocio: NegocioDaFicha }) {
         ) : (
           'sem contato registrado'
         )}
+      </p>
+
+      <p className="text-sm">
+        <span className="text-muted-foreground">Valor: </span>
+        <ValorDoNegocio negocioId={negocio.id} valor={negocio.valor} podeEditar={podeEscrever} />
       </p>
 
       {negocio.proximaAcao ? (

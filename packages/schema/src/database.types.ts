@@ -542,6 +542,7 @@ export type Database = {
         }
         Returns: Json
       }
+      lead_automatico: { Args: { p_conversation_id: string }; Returns: Json }
       lgpd_dossie: { Args: { p_organization_id: string }; Returns: Json }
       lista_da_base: { Args: { p_base: Json }; Returns: string }
       lista_de_etapas: { Args: { p_lista: Json }; Returns: string }
@@ -820,6 +821,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      telefone_legivel: { Args: { p_e164: string }; Returns: string }
       tem_autorizacao_vigente: {
         Args: { p_organization_id: string }
         Returns: boolean
@@ -3177,6 +3179,7 @@ export type Database = {
           temperature: Database["app"]["Enums"]["temperature"]
           tier: string | null
           updated_at: string
+          valor: number | null
           won_at: string | null
         }
         Insert: {
@@ -3208,6 +3211,7 @@ export type Database = {
           temperature?: Database["app"]["Enums"]["temperature"]
           tier?: string | null
           updated_at?: string
+          valor?: number | null
           won_at?: string | null
         }
         Update: {
@@ -3239,6 +3243,7 @@ export type Database = {
           temperature?: Database["app"]["Enums"]["temperature"]
           tier?: string | null
           updated_at?: string
+          valor?: number | null
           won_at?: string | null
         }
         Relationships: [
@@ -7382,6 +7387,10 @@ export type Database = {
       }
       definir_setores_da_pessoa: {
         Args: { p_profile_id: string; p_setores: number[] }
+        Returns: Json
+      }
+      definir_valor_do_negocio: {
+        Args: { p_deal_id: string; p_valor: number }
         Returns: Json
       }
       descartar_rascunho: {

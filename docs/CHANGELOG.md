@@ -2797,3 +2797,13 @@ Pendente para a Fase 2 em diante: distribuição automática ao chegar (hoje só
 - Desativadas, e não apagadas: `contato@komune.app.br` (dados de trabalho → `rafael@rafaelabreu.com`) e `prova.push@teste.local`. As duas aparecem em tabelas de trilha de auditoria só-de-inclusão (consentimentos e eventos do pré-cadastro), que não se reescrevem.
 - Ajustes → Pessoas esconde desativados por padrão, com "Mostrar desativados (n)".
 - Atenção: o domínio `komune.app.br` inteiro tem acesso. Uma conta `@komune.app.br` apagada volta se alguém entrar de novo com ela; as desativadas continuam sem acesso.
+
+### 22/09/2026 — Fase 2: funil com lead automático e valor (branch `feat/fase-2-funil`)
+
+Entregue:
+- Migração `20260922110000_lead_automatico_e_valor` (só acréscimos). Lead automático: quem escreve pela primeira vez vira parceiro "Contato do WhatsApp (84) 9xxxx-xxxx", contato e negócio na captação de fornecedor, já na etapa Respondeu, com próxima ação "Responder no WhatsApp" para agora e origem "Chegou pelo WhatsApp". Regras do cadastro rápido (quem pediu para sair não entra; número que a base já conhece é ligado, nunca duplicado), sem exigir categoria. Com o menu automático ligado, espera a escolha e só cria para "quero ser fornecedor ou parceiro" ou para quem escreve com as próprias palavras; "quero organizar um evento" continua em "Fora da base". Desliga em `app_settings.atendimento.lead_automatico`.
+- Valor da oportunidade: `deals.valor`, `definir_valor_do_negocio`, valor no cartão do funil, soma no cabeçalho da coluna ("R$ 12,3 mil") e campo "Valor" com "Mudar" na ficha do parceiro.
+- O quadro já recolhia as colunas de encerramento e já contava cada coluna; não mudou.
+- Testes: pgTAP 60 (14 asserções), 11 e 49 ajustados; Vitest da formatação do valor.
+
+Pendente: quem chega pelo WhatsApp entra com o telefone no nome; o nome do perfil do WhatsApp não é guardado hoje (pediria mudar a Edge Function `wa-webhook`).
