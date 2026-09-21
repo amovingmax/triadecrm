@@ -2838,4 +2838,10 @@ Entregue:
 - Testes: pgTAP 63 (4 asserções: sem filtro, por setor, setor sem ninguém, por etiqueta); Vitest do nome automático, do custo e da contagem de filtros escondidos.
 - Retirado do repositório o `apps/web/t.mjs`, script de depuração que tinha entrado por engano num commit de 17/09.
 
-Achado de passagem, fora do escopo (não corrigido): `app.radar_pontuar` quebra com "malformed array literal" quando o candidato é de categoria prioritária (`v_porque || 'categoria prioritária'`, migração `20260917180000`). Só dispara se `categorias_prioritarias` tiver alguma categoria.
+Achado de passagem, fora do escopo: `app.radar_pontuar` quebrava com "malformed array literal" quando o candidato é de categoria prioritária. Corrigido na entrada seguinte.
+
+### 22/09/2026 — Radar: categoria prioritária quebrava a pontuação (branch `fix/radar-categoria-prioritaria`)
+
+Entregue:
+- Migração `20260922150000_radar_categoria_prioritaria`: recria `app.radar_pontuar` com uma linha trocada (`'categoria prioritária'::text`). O literal sem tipo fazia o Postgres escolher `array || array` e abortar. Antes, marcar uma categoria como prioritária na tela do Radar faria todo candidato dela abortar na entrada da fila e o "repontuar" quebrar. Em produção a lista de categorias prioritárias está vazia, então nada quebrou ainda.
+- Testes: pgTAP 64 (3 asserções), que falha na versão antiga e passa na nova.
