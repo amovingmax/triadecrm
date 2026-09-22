@@ -1,6 +1,5 @@
 import {
   CAMPOS_DA_FICHA,
-  type AcaoDoBotao,
   type CampoDaFicha,
   type Contagem,
   type FiltroDoPublico,
@@ -169,32 +168,6 @@ export function porcento(parte: number, todo: number): string {
   return `${Math.round((parte / todo) * 100)}%`;
 }
 
-/**
- * O que a tela sugere para cada botão de resposta: "Agora não" e parecidos
- * encerram o contato; o resto manda o link — é a ação que o envio quer.
- */
-export function acaoSugerida(textoDoBotao: string): AcaoDoBotao {
-  if (/agora n[aã]o|n[aã]o quero|sair|parar|sem interesse/i.test(textoDoBotao)) return { acao: 'sair' };
-  return {
-    acao: 'link',
-    texto: 'Que bom! O cadastro leva 5 minutos e é grátis. É só tocar no botão abaixo.',
-    botao: 'Criar meu perfil',
-  };
-}
-
-/** As ações dos botões de resposta de um modelo, mantendo as que já foram editadas. */
-export function acoesPara(
-  botoes: readonly { tipo: string; texto: string }[],
-  anteriores: Record<string, AcaoDoBotao>,
-): Record<string, AcaoDoBotao> {
-  const acoes: Record<string, AcaoDoBotao> = {};
-  for (const b of botoes) {
-    if (b.tipo !== 'resposta') continue;
-    acoes[b.texto] = anteriores[b.texto] ?? acaoSugerida(b.texto);
-  }
-  return acoes;
-}
-
 // ---------------------------------------------------------------------------
 // A tela única da campanha (Fase 5)
 // ---------------------------------------------------------------------------
@@ -249,4 +222,10 @@ export function filtrosEscondidos(f: FiltroDoPublico): number {
     ((f.busca ?? '').trim() !== '' ? 1 : 0) +
     (f.sem_contato_ha_dias === null || f.sem_contato_ha_dias === undefined ? 0 : 1)
   );
+}
+
+/** Como a lista chama a mensagem da campanha: os três cumprimentos são um só. */
+export function rotuloDaMensagem(modelo: string | null): string {
+  if (modelo === null) return 'Texto livre';
+  return /cumprimento solto/i.test(modelo) ? 'Cumprimento' : modelo;
 }

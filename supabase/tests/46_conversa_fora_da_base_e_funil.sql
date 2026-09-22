@@ -98,7 +98,9 @@ insert into public.deals (organization_id, pipeline_id, stage_id) values
   (pg_temp.org('62'), (select id from public.pipelines where slug = 'fornecedor'), pg_temp.etapa('fornecedor', 'prospectado')),
   (pg_temp.org('63'), (select id from public.pipelines where slug = 'fornecedor'), pg_temp.etapa('fornecedor', 'em_conversa'));
 
-update public.message_templates set meta_status = 'approved', meta_template_name = 'aeb_abr_a_v1'
+-- Fora de uso desde 22/09/2026 (só o cumprimento abre conversa); o teste reativa
+-- porque prova o mecanismo do envio, não o catálogo.
+update public.message_templates set meta_status = 'approved', meta_template_name = 'aeb_abr_a_v1', is_active = true
  where template_code = 'AEB-ABR-A';
 update public.app_settings set value = jsonb_set(value, '{inicio}', '"2026-09-04"') where key = 'cadencia.tetos';
 select pg_temp.entrar_como_worker();

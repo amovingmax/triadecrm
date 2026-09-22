@@ -136,9 +136,11 @@ select is((select count(*)::int from public.message_templates
   'seed: 12 aberturas por segmento (6 segmentos × variantes A/B)');
 -- As GEN-ABR-* são as aberturas livres de 16/09/2026: moldura aprovada com o texto
 -- escrito na hora. Não pertencem a segmento nenhum, e por isso ficam fora da conta.
+-- Desde 22/09/2026 só o cumprimento abre conversa: livre, parceria e lançamento
+-- saíram de uso (não foram apagados).
 select is((select count(*)::int from public.message_templates
-            where template_code like 'GEN-ABR-%' and is_active), 6,
-  'seed: 6 aberturas genéricas ativas (livre, parceria, lançamento e os três cumprimentos soltos)');
+            where template_code like 'GEN-ABR-%' and is_active), 3,
+  'seed: só os três cumprimentos soltos seguem ativos entre as aberturas genéricas');
 
 -- A REGRA MUDOU EM 17/09/2026, POR DECISÃO DO RAFAEL, e mudou com escopo.
 --

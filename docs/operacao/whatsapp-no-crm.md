@@ -167,8 +167,12 @@ Os 42 modelos vão para a aprovação da Meta. Se algum voltar recusado, o motiv
   de cada pessoa. Para desligar a assinatura:
   `update app_settings set value = jsonb_set(value, '{assinar_com_nome}', 'false') where key = 'whatsapp.envio';`
 
-- **Modelos.** A Meta aprova em minutos a um dia. O motor confere a cada 30 minutos; na
-  tela, a caixa de envio só oferece o que já foi aprovado. Para ver agora:
+- **Modelos.** Desde 22/09/2026, fora da janela de 24 h a conversa só abre com o cumprimento:
+  “Bom dia!”, “Boa tarde!” ou “Boa noite!”, escolhido pelo relógio de Natal — na conversa e
+  nas campanhas. Quando a pessoa responde, o resto vai em texto livre. A exceção é o recibo
+  da ligação, que ainda manda o resumo, a confirmação da reunião ou o “tentei te ligar”. Os
+  outros modelos estão fora de uso (não apagados). A Meta aprova em minutos a um dia; o
+  motor confere a cada 30 minutos. Para ver agora:
   `node apps/workers/dist/index.js wa --sincronizar-modelos`.
 - **O limite do dia recomeça.** Número novo começa com 20 primeiros contatos por dia na
   primeira semana, 35 na segunda e 45 depois (`cadencia.tetos`). O CRM zera essa contagem

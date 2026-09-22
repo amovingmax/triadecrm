@@ -1446,6 +1446,19 @@ values
    '["atendente", "nome"]'::jsonb)
 on conflict (template_code) do nothing;
 
+-- Fora da janela de 24 h, só o cumprimento (decisão do Rafael, 22/09/2026; o
+-- mesmo corte da migração 20260922160000). Sem isto, o upsert do bloco 10
+-- reativaria no banco local o que produção tirou de uso. Nada é apagado.
+update public.message_templates
+   set is_active = false
+ where channel = 'whatsapp'::app.channel
+   and category in ('marketing', 'utility')
+   and template_code not like 'GEN-SYS-%'
+   and template_code not in ('GEN-ABR-OLA-MANHA', 'GEN-ABR-OLA-TARDE', 'GEN-ABR-OLA-NOITE',
+                             'GEN-LIG-CONFIRMA', 'GEN-LIG-RESUMO-FOR', 'GEN-LIG-RESUMO-PRO',
+                             'GEN-FUP-LIG-V1')
+   and is_active;
+
 -- O áudio do D+3 do onboarding. Nasce sem arquivo: é a Heloísa que grava.
 insert into public.audio_assets (slug, title, segment, context, is_active)
 values ('gen-onb-ajuda-1', 'Onboarding — quer que eu termine por você? (20 s)', 'GEN',

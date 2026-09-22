@@ -13,7 +13,6 @@ import {
   publicoSalvoSchema,
   type AcaoDoBotao,
   type Assinatura,
-  type Botao,
   type Envio,
   type FiltroDoPublico,
   type ItemDoEnvio,
@@ -80,8 +79,11 @@ export async function buscarEtiquetasESetores(): Promise<{
   };
 }
 
-/** Os modelos que dá para mandar em massa: ativos, de WhatsApp e aprovados pela Meta. */
-export async function buscarModelos(): Promise<Modelo[]> {
+/**
+ * Os cumprimentos que dá para mandar em massa: ativos e aprovados pela Meta.
+ * Fora da janela, a campanha só abre conversa com eles (22/09/2026).
+ */
+export async function buscarCumprimentos(): Promise<Modelo[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('message_templates')
@@ -90,8 +92,8 @@ export async function buscarModelos(): Promise<Modelo[]> {
     .eq('channel', 'whatsapp')
     .eq('meta_status', 'approved')
     .not('meta_template_name', 'is', null)
-    .not('template_code', 'like', 'GEN-SYS-%')
-    .order('name');
+    .like('template_code', 'GEN-ABR-OLA-%')
+    .order('template_code');
   if (error) throw new ErroDoEnvio(error.message);
   return z.array(modeloSchema).parse(data ?? []);
 }
@@ -209,31 +211,4 @@ export async function apagarPublico(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from('publicos_salvos').delete().eq('id', id);
   if (error) throw new ErroDoEnvio(error.message);
-}
-
-export async function criarModelo(modelo: {
-  nome: string;
-  categoria: 'marketing' | 'utility';
-  corpo: string;
-  botoes: Botao[];
-}): Promise<{ id: number; codigo: string }> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc('modelo_whatsapp_criar', { p: modelo });
-  if (error) throw new ErroDoEnvio(error.message);
-  const r = conferir(data);
-  return { id: Number(r.id), codigo: String(r.codigo) };
-}
-
-/** Modelos criados por aqui que ainda esperam a Meta: aparecem como "em análise". */
-export async function buscarModelosEmAnalise(): Promise<{ id: number; name: string; meta_status: string | null }[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from('message_templates')
-    .select('id, name, meta_status')
-    .eq('is_active', true)
-    .eq('kind', 'envio')
-    .or('meta_status.is.null,meta_status.neq.approved')
-    .order('created_at', { ascending: false });
-  if (error) throw new ErroDoEnvio(error.message);
-  return (data ?? []) as { id: number; name: string; meta_status: string | null }[];
 }

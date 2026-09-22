@@ -104,36 +104,6 @@ export function tetoDaVariavel(variavel: string): number {
   return VARIAVEIS_DE_TEXTO_LIVRE.includes(variavel) ? MAXIMO_DO_TEXTO_LIVRE : MAXIMO_POR_VARIAVEL;
 }
 
-/** A variável de texto livre do modelo, quando ele tem uma. */
-export function variavelLivreDoModelo(modelo: ModeloParaEnviar): string | null {
-  return modelo.variaveis.find((v) => VARIAVEIS_DE_TEXTO_LIVRE.includes(v)) ?? null;
-}
-
-/**
- * Qual modelo abre a caixa.
- *
- * Quem manda quer escrever, não escolher: o modelo de texto livre vem primeiro,
- * depois o que o banco já sabe preencher inteiro (nenhum campo para digitar), e só
- * então a ordem do servidor. Trocar continua a um toque.
- */
-/**
- * O CUMPRIMENTO VEM PRIMEIRO — e só em primeiro contato.
- *
- * Abrir conversa com um parágrafo de 240 caracteres é pedir para alguém ler um
- * discurso antes de dizer se é a pessoa certa. O jeito que funciona no WhatsApp
- * é o que todo mundo faz: cumprimenta, descobre com quem está falando e AÍ fala.
- * Foi exatamente esse o pedido — "começar apenas com boa tarde, e depois que eu
- * souber que estou falando com o responsável, aí sim mando o que quero".
- *
- * Então a ordem de preferência muda com o momento:
- *   1. **Primeiro contato** → o cumprimento, que não tem campo nenhum a
- *      preencher: a saudação vem do relógio e o nome de quem envia, da sessão.
- *      Um clique.
- *   2. **Retomada** (a conversa existe, a janela fechou) → a moldura livre, onde
- *      se escreve o que se quer dizer. Aqui já se sabe com quem se fala, e
- *      cumprimentar de novo seria começar do zero uma conversa que existe.
- *   3. Sem nenhuma das duas aprovadas → o que estiver pronto para enviar.
- */
 /**
  * O cumprimento solto, um por período do dia.
  *
@@ -162,23 +132,28 @@ export function cumprimentoDaHora(agora: Date = new Date()): string {
   return CODIGOS_DO_CUMPRIMENTO.noite;
 }
 
+/**
+ * Qual modelo abre a caixa: o cumprimento do período, e só ele.
+ *
+ * Decisão do Rafael, 22/09/2026: "eu gosto da ideia de engessar a primeira
+ * mensagem pra desbloquear as 24 horas livres, mas essa mensagem poderia ser
+ * apenas bom dia, boa tarde e boa noite". Vale para o primeiro contato e para a
+ * retomada: fora da janela de 24 h, o cumprimento reabre a conversa, e o que se
+ * quer dizer vai em texto livre quando a pessoa responder.
+ *
+ * O modelo de depois da ligação não passa por aqui: ele chega escolhido pelo
+ * recibo da ligação (`pedido-de-modelo`).
+ */
 export function escolherModeloInicial(
   modelos: readonly ModeloParaEnviar[],
-  sugeridos: Record<string, string>,
-  primeiroContato = false,
   agora: Date = new Date(),
 ): ModeloParaEnviar | null {
-  if (modelos.length === 0) return null;
+  return modelos.find((m) => m.codigo === cumprimentoDaHora(agora)) ?? null;
+}
 
-  if (primeiroContato) {
-    const daHora = modelos.find((m) => m.codigo === cumprimentoDaHora(agora));
-    if (daHora) return daHora;
-  }
-
-  const livre = modelos.find((m) => variavelLivreDoModelo(m) !== null);
-  if (livre) return livre;
-  const pronto = modelos.find((m) => faltando(m, valoresIniciais(m, sugeridos)).length === 0);
-  return pronto ?? modelos[0]!;
+/** O modelo é um dos três cumprimentos soltos. */
+export function ehCumprimento(modelo: Pick<ModeloParaEnviar, 'codigo'>): boolean {
+  return (Object.values(CODIGOS_DO_CUMPRIMENTO) as string[]).includes(modelo.codigo);
 }
 
 /** Começa pelo que o banco sugeriu e mantém o que a pessoa já tinha digitado. */
@@ -239,20 +214,6 @@ export function rotuloDaVariavel(nome: string): string {
 
 export function dicaDaVariavel(nome: string): string | null {
   return DICAS[nome] ?? null;
-}
-
-const TIPOS: Record<string, string> = {
-  abertura: 'Abertura',
-  followup: 'Retomada',
-  reativacao: 'Reativação',
-  encerramento: 'Encerramento',
-  onboarding: 'Cadastro',
-  agendamento: 'Agenda',
-};
-
-/** O grupo do seletor: aberturas, retomadas, cadastro... */
-export function grupoDoModelo(m: ModeloParaEnviar): string {
-  return (m.tipo && TIPOS[m.tipo]) ?? 'Outros';
 }
 
 // ---------------------------------------------------------------------------

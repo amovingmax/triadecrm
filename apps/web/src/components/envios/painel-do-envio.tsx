@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/sheet';
 
 import { detalharEnvio, ErroDoEnvio, mudarEnvio } from './dados';
-import { fraseDaRecusa, fraseDoMotivo, porcento } from './formatos';
+import { fraseDaRecusa, fraseDoMotivo, porcento, rotuloDaMensagem } from './formatos';
 import { STATUS_DO_ENVIO, type Contagem, type ItemDoEnvio } from './tipos';
 
 /**
@@ -54,7 +54,7 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
           <SheetTitle>{envio?.nome ?? 'Campanha'}</SheetTitle>
           <SheetDescription>
             {envio
-              ? `${STATUS_DO_ENVIO[envio.status]} · ${envio.modelo ?? 'texto livre'} · ${envio.por_hora} por hora · criada por ${envio.criado_por ?? '—'}`
+              ? `${STATUS_DO_ENVIO[envio.status]} · ${rotuloDaMensagem(envio.modelo)} · ${envio.por_hora} por hora · criada por ${envio.criado_por ?? '—'}`
               : 'Carregando…'}
           </SheetDescription>
         </SheetHeader>

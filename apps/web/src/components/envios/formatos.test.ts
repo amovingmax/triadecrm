@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  acoesPara,
   custoEstimado,
   duracaoEstimada,
   filtrosEscondidos,
@@ -12,6 +11,7 @@ import {
   progresso,
   regrasIncompletas,
   regrasPara,
+  rotuloDaMensagem,
   variaveisComRegra,
   variaveisDoCorpo,
 } from './formatos';
@@ -86,22 +86,6 @@ describe('o progresso', () => {
   });
 });
 
-describe('o que cada botão faz', () => {
-  it('"Agora não" encerra; o resto manda o link', () => {
-    const acoes = acoesPara(
-      [
-        { tipo: 'resposta', texto: 'Quero o convite' },
-        { tipo: 'resposta', texto: 'Agora não' },
-        { tipo: 'link', texto: 'Criar meu perfil' },
-      ],
-      {},
-    );
-    expect(acoes['Agora não']).toEqual({ acao: 'sair' });
-    expect(acoes['Quero o convite']?.acao).toBe('link');
-    expect(Object.keys(acoes)).toHaveLength(2);
-  });
-});
-
 describe('a tela única da campanha', () => {
   it('o nome sai sozinho: a mensagem e o dia de Natal', () => {
     // 22h de 21/09 em Natal já é 22/09 em UTC: vale o dia de Natal.
@@ -124,5 +108,13 @@ describe('a tela única da campanha', () => {
     expect(
       filtrosEscondidos({ cidades: [1], tipos: [], busca: ' buffet ', sem_contato_ha_dias: 0 }),
     ).toBe(3);
+  });
+
+  it('os três cumprimentos aparecem como um só na lista de campanhas', () => {
+    expect(rotuloDaMensagem('Boa tarde (cumprimento solto)')).toBe('Cumprimento');
+    expect(rotuloDaMensagem(null)).toBe('Texto livre');
+    expect(rotuloDaMensagem('Convite de fornecedor fundador (Komune)')).toBe(
+      'Convite de fornecedor fundador (Komune)',
+    );
   });
 });

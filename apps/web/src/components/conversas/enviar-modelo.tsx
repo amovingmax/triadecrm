@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -10,24 +10,15 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 import { ErroDaConversa } from './acoes';
 import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
 import {
   dicaDaVariavel,
+  ehCumprimento,
   escolherModeloInicial,
   faltando,
   fraseDoBloqueio,
-  grupoDoModelo,
   preencher,
   previaSchema,
   quandoFoi,
@@ -35,9 +26,7 @@ import {
   rotuloDaVariavel,
   tetoDaVariavel,
   valoresIniciais,
-  variavelLivreDoModelo,
   VARIAVEL_DO_ATENDENTE,
-  type ModeloParaEnviar,
   type PreviaDoEnvio,
 } from './envio-de-modelo';
 import { fraseDaRecusaDoEnvio, MOTIVOS_DE_RECUSA_DO_ENVIO } from './mensagens';
@@ -57,19 +46,14 @@ import { esquecerPedidoDeModelo, lerPedidoDeModelo } from './pedido-de-modelo';
  * discordarem, a recusa chega com a frase dele.
  */
 /**
- * A ORDEM da tela, decidida em 17/09/2026: primeiro a moldura em que se escreve,
- * o texto pronto atrás de um link.
+ * Fora da janela de 24 h, só o cumprimento (decisão do Rafael, 22/09/2026).
  *
- * "Não quero ficar preso a modelo, quero conversar de forma humana" (Rafael). O
- * que a Meta exige fora da janela de 24 h é uma MOLDURA aprovada — não um texto
- * pronto —, e as molduras livres (`GEN-ABR-LIVRE`, `GEN-ABR-PARCERIA`,
- * `GEN-ABR-LANCAMENTO`, `GEN-FUP-LIVRE`) resolvem isso: saudação e saída são
- * fixas e aprovadas, o meio são 900 caracteres escritos na hora.
- *
- * Elas é que abrem a tela — `escolherModeloInicial` prefere a livre. O texto
- * pronto **continua disponível**, porque enquanto a Meta não aprova nenhuma
- * moldura livre ele é o único jeito de começar conversa; some da primeira vista,
- * não da mão de quem precisa dele.
+ * "Eu gosto da ideia de engessar a primeira mensagem pra desbloquear as 24
+ * horas livres, mas essa mensagem poderia ser apenas bom dia, boa tarde e boa
+ * noite." A caixa manda o cumprimento do período com um clique — no primeiro
+ * contato e na retomada — e o que se quer dizer vai em texto livre quando a
+ * pessoa responder. A exceção é o recibo da ligação, que chega com o seu
+ * modelo já escolhido (resumo, confirmação ou "tentei te ligar").
  */
 export function EnviarModelo({
   organizacaoId,
@@ -133,23 +117,7 @@ export function EnviarModelo({
   if (p.modelos.length === 0) {
     return (
       <Moldura className={className}>
-        <p className="flex items-center gap-2 text-sm font-medium">
-          <FileCheck2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          Nenhum modelo aprovado pela Meta ainda
-        </p>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          {p.janela_24h_aberta
-            ? 'A janela de 24 h está aberta: escreva a resposta no campo de texto.'
-            : 'Para começar conversa (ou retomar depois de 24 h sem resposta) a Meta só aceita modelo aprovado. '}
-          {p.janela_24h_aberta ? null : (
-            <>
-              <span className="numerico">{p.modelos_esperando_meta}</span>
-              {p.modelos_esperando_meta === 1
-                ? ' modelo está esperando a aprovação, que costuma levar de minutos a um dia.'
-                : ' modelos estão esperando a aprovação, que costuma levar de minutos a um dia.'}
-            </>
-          )}
-        </p>
+        <SemCumprimento janelaAberta={p.janela_24h_aberta} />
         <RegistrarPorTelefone organizacaoId={organizacaoId} />
       </Moldura>
     );
@@ -213,54 +181,30 @@ function Formulario({
   const modeloDoRecibo = pedido
     ? (previa.modelos.find((m) => m.codigo === pedido.codigo) ?? null)
     : null;
-  // A lista inteira: a moldura livre é o PADRÃO, e o texto pronto continua ali
-  // atrás de um link, para quem quiser (17/09, segunda passada). Esconder de vez
-  // deixava sem saída o dia em que nenhuma moldura livre está aprovada — que é
-  // exatamente hoje.
-  const oferecidos = previa.modelos;
-  const [modeloId, setModeloId] = useState<number>(
-    modeloDoRecibo?.id ??
-      escolherModeloInicial(oferecidos, previa.valores, previa.primeiro_contato)?.id ??
-      oferecidos[0]?.id ??
-      previa.modelos[0]!.id,
-  );
-  const [trocando, setTrocando] = useState(false);
+  // Fora o recibo, é o cumprimento do período, e mais nada. Calculado a cada
+  // desenho: a caixa aberta às 11h59 passa a dizer "Boa tarde!" ao meio-dia.
+  const modelo = modeloDoRecibo ?? escolherModeloInicial(previa.modelos);
   const [digitados, setDigitados] = useState<Record<string, string>>(() =>
     modeloDoRecibo ? pedido!.valores : {},
   );
 
-  const grupos = useMemo(() => agrupar(oferecidos), [oferecidos]);
+  const valores = modelo ? valoresIniciais(modelo, previa.valores, digitados) : {};
+  const vazias = modelo ? faltando(modelo, valores) : [];
+  const longa = modelo?.variaveis.find((v) => (valores[v] ?? '').trim().length > tetoDaVariavel(v));
+  const texto = modelo ? preencher(modelo.corpo, valores) : '';
+  const cumprimento = modelo !== null && ehCumprimento(modelo);
 
-
-  const modelo =
-    previa.modelos.find((m) => m.id === modeloId) ?? oferecidos[0] ?? previa.modelos[0]!;
-  const valores = valoresIniciais(modelo, previa.valores, digitados);
-  const vazias = faltando(modelo, valores);
-  const longa = modelo.variaveis.find((v) => (valores[v] ?? '').trim().length > tetoDaVariavel(v));
-  const texto = preencher(modelo.corpo, valores);
-
-  // `{{atendente}}` não é campo: o banco põe o nome de quem clicou, sempre. E a
-  // variável de texto livre não é campo de formulário: ela É a mensagem.
-  const livre = variavelLivreDoModelo(modelo);
-
-  // CAMPO SÓ PARA O QUE O CRM NÃO SABE.
-  //
-  // Antes, toda variável da moldura virava um campo — inclusive `{{nome}}`, que a
-  // base já responde. O resultado era uma caixa de escrever ao lado de um
-  // formulário pedindo um dado que está na ficha, e a queixa foi exata: "me deu
-  // um campo livre e um campo com nome do cliente que se encaixa num modelo".
-  // Agora o campo aparece só quando falta mesmo o valor.
-  //
-  // A lista é calculada a partir de `previa.valores` — o que o SERVIDOR sabe —, e
-  // não do que está digitado: se dependesse do digitado, apagar o texto do campo
-  // faria o campo sumir embaixo do cursor.
-  const campos = modelo.variaveis.filter(
-    (v) => v !== VARIAVEL_DO_ATENDENTE && v !== livre && (previa.valores[v] ?? '').trim() === '',
+  // CAMPO SÓ PARA O QUE O CRM NÃO SABE: o recibo da ligação já traz dia, hora e
+  // formato; o nome vem da ficha; `{{atendente}}` é o primeiro nome de quem
+  // clica. A lista sai de `previa.valores` — o que o SERVIDOR sabe —, e não do
+  // digitado: senão apagar o texto faria o campo sumir embaixo do cursor.
+  const campos = (modelo?.variaveis ?? []).filter(
+    (v) => v !== VARIAVEL_DO_ATENDENTE && (previa.valores[v] ?? '').trim() === '',
   );
-  const assinaComNome = modelo.variaveis.includes(VARIAVEL_DO_ATENDENTE);
+  const assinaComNome = modelo?.variaveis.includes(VARIAVEL_DO_ATENDENTE) ?? false;
 
   const enviar = useMutation({
-    mutationFn: () => enviarModelo(organizacaoId, modelo.id, valores),
+    mutationFn: () => enviarModelo(organizacaoId, modelo!.id, valores),
     onSuccess: (r) => {
       setDigitados({});
       if (pedido) esquecerPedidoDeModelo();
@@ -282,6 +226,15 @@ function Formulario({
     },
   });
 
+  if (!modelo) {
+    return (
+      <Moldura className={className}>
+        <SemCumprimento janelaAberta={previa.janela_24h_aberta} />
+        <RegistrarPorTelefone organizacaoId={organizacaoId} />
+      </Moldura>
+    );
+  }
+
   const pode = vazias.length === 0 && !longa && !enviar.isPending;
 
   return (
@@ -295,7 +248,11 @@ function Formulario({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-sm font-medium">
           <FileCheck2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          {previa.primeiro_contato ? 'Primeira mensagem' : 'Escrever para o parceiro'}
+          {!cumprimento
+            ? 'Depois da ligação'
+            : previa.primeiro_contato
+              ? 'Primeira mensagem'
+              : 'Retomar a conversa'}
         </p>
         {previa.primeiro_contato && previa.teto ? (
           <span className="text-[11px] text-muted-foreground">
@@ -305,88 +262,30 @@ function Formulario({
         ) : null}
       </div>
 
-      {livre ? (
+      {cumprimento ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Quando a pessoa responder, a conversa fica livre por 24 h: aí você escreve o que quiser.
+        </p>
+      ) : (
         <div className="space-y-1">
-          <label htmlFor={`livre-${modelo.id}`} className="text-xs text-muted-foreground">
-            Escreva a mensagem
-          </label>
-          <textarea
-            id={`livre-${modelo.id}`}
-            autoFocus
-            rows={5}
-            value={valores[livre] ?? ''}
-            maxLength={tetoDaVariavel(livre)}
-            onChange={(e) => setDigitados((d) => ({ ...d, [livre]: e.target.value }))}
-            placeholder="Escreva como você falaria. A saudação com o seu nome e a saída (SAIR) já entram sozinhas."
-            className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-base leading-relaxed transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
-          />
-          <p className="text-[11px] text-muted-foreground">
-            <span className="numerico">{(valores[livre] ?? '').length}</span> de{' '}
-            <span className="numerico">{tetoDaVariavel(livre)}</span> caracteres. Sai num parágrafo
-            só: a Meta não aceita quebra de linha dentro do texto.
+          <p className="text-xs text-muted-foreground">
+            Como vai chegar
+            {assinaComNome && previa.valores[VARIAVEL_DO_ATENDENTE]
+              ? ` · assinada com o seu nome (${previa.valores[VARIAVEL_DO_ATENDENTE]})`
+              : null}
+          </p>
+          <p className="rounded-lg border border-hairline bg-card/60 px-3 py-2 text-sm leading-relaxed whitespace-pre-line">
+            {texto}
           </p>
         </div>
-      ) : null}
-
-      {/* O QUE VAI SAIR, COLADO NO QUE SE ESCREVE.
-          A prévia ficava lá embaixo, depois dos campos e antes do botão — longe
-          demais do lugar onde a pessoa digita para ser lida enquanto ela digita.
-          Aqui em cima ela vira o que é: a resposta à única pergunta que importa
-          antes de mandar uma mensagem para um estranho. */}
-      <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">
-          Como vai chegar
-          {assinaComNome && previa.valores[VARIAVEL_DO_ATENDENTE]
-            ? ` · assinada com o seu nome (${previa.valores[VARIAVEL_DO_ATENDENTE]})`
-            : null}
-        </p>
-        <p className="rounded-lg border border-hairline bg-card/60 px-3 py-2 text-sm leading-relaxed whitespace-pre-line">
-          {texto}
-        </p>
-      </div>
+      )}
 
       {pedido && !modeloDoRecibo ? (
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          O modelo que a ligação pediu ({pedido.codigo}) ainda não foi aprovado pela Meta. Escolha
-          outro ou registre por telefone.
+          O modelo que a ligação pediu ({pedido.codigo}) não está aprovado pela Meta. Mande o
+          cumprimento e escreva o resto quando a pessoa responder.
         </p>
       ) : null}
-
-      {trocando || oferecidos.length <= 1 ? null : (
-        <button
-          type="button"
-          onClick={() => setTrocando(true)}
-          className="self-start rounded px-1 text-xs text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          {livre ? 'Prefiro um texto pronto' : 'Trocar o texto'} (
-          <span className="numerico">{oferecidos.length}</span>)
-        </button>
-      )}
-
-      {/* O seletor só existe depois de a pessoa PEDIR para trocar. Com uma moldura
-          só, mostrá-lo era mostrar uma escolha que não existe. */}
-      <div className={cn('space-y-1', !trocando && 'hidden')}>
-        <label htmlFor="modelo-whatsapp" className="text-xs text-muted-foreground">
-          Moldura
-        </label>
-        <Select value={String(modelo.id)} onValueChange={(v) => setModeloId(Number(v))}>
-          <SelectTrigger id="modelo-whatsapp" className="toque h-11 w-full md:h-9">
-            <SelectValue>{modelo.nome}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {grupos.map(([grupo, lista]) => (
-              <SelectGroup key={grupo}>
-                <SelectLabel>{grupo}</SelectLabel>
-                {lista.map((m) => (
-                  <SelectItem key={m.id} value={String(m.id)}>
-                    {m.nome}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
 
       {campos.length > 0 ? (
         <div className="grid gap-2 sm:grid-cols-2">
@@ -415,7 +314,7 @@ function Formulario({
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" className="toque h-11 md:h-9" disabled={!pode}>
           <SendHorizontal aria-hidden="true" />
-          {enviar.isPending ? 'Enviando...' : 'Enviar pelo WhatsApp'}
+          {enviar.isPending ? 'Enviando...' : cumprimento ? `Mandar “${texto}”` : 'Enviar pelo WhatsApp'}
         </Button>
         {vazias.length > 0 ? (
           <span className="text-[11px] text-muted-foreground">
@@ -424,6 +323,23 @@ function Formulario({
         ) : null}
       </div>
     </form>
+  );
+}
+
+/** O cumprimento ainda não passou pela Meta: sem ele, não dá para abrir conversa. */
+function SemCumprimento({ janelaAberta }: { janelaAberta: boolean }) {
+  return (
+    <>
+      <p className="flex items-center gap-2 text-sm font-medium">
+        <FileCheck2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        {janelaAberta ? 'Pode escrever livre' : 'O cumprimento ainda não foi aprovado pela Meta'}
+      </p>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {janelaAberta
+          ? 'A janela de 24 h está aberta: escreva a resposta no campo de texto.'
+          : 'Fora da janela de 24 h, a conversa só abre com "Bom dia!", "Boa tarde!" ou "Boa noite!", e a Meta ainda não liberou. Enquanto isso, dá para registrar um contato por telefone.'}
+      </p>
+    </>
   );
 }
 
@@ -454,15 +370,6 @@ function tituloDoBloqueio(motivo: string): string {
   if (motivo.startsWith('janela_')) return 'Fora do horário de envio';
   if (motivo.startsWith('teto_')) return 'Limite do dia atingido';
   return 'Agora não dá para mandar';
-}
-
-function agrupar(modelos: ModeloParaEnviar[]): [string, ModeloParaEnviar[]][] {
-  const mapa = new Map<string, ModeloParaEnviar[]>();
-  for (const m of modelos) {
-    const g = grupoDoModelo(m);
-    mapa.set(g, [...(mapa.get(g) ?? []), m]);
-  }
-  return [...mapa.entries()];
 }
 
 export function chaveDaPrevia(organizacaoId: string) {

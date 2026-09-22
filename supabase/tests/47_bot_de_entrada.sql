@@ -130,7 +130,9 @@ select ok(not app.wa_parece_optout('consigo para quinta às 9h30'),
 insert into public.organizations (id, name, phone_e164, source_id) values
   ('c0000000-0000-4000-8000-00000000b471', 'B47 Buffet', '+5584988884705',
    (select id from public.sources where slug = 'planilha'));
-update public.message_templates set meta_status = 'approved', meta_template_name = 'aeb_abr_a_v1'
+-- Fora de uso desde 22/09/2026 (só o cumprimento abre conversa); o teste reativa
+-- porque prova o mecanismo do envio, não o catálogo.
+update public.message_templates set meta_status = 'approved', meta_template_name = 'aeb_abr_a_v1', is_active = true
  where template_code = 'AEB-ABR-A';
 update public.app_settings set value = jsonb_set(value, '{inicio}', '"2026-09-04"') where key = 'cadencia.tetos';
 create or replace function app.janela_do_canal(p_channel app.channel,

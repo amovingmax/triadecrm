@@ -90,11 +90,13 @@ update public.app_settings
 update public.app_settings
    set value = jsonb_set(jsonb_set(value, '{inicio}', '"2026-01-01"'), '{whatsapp,depois}', '100')
  where key = 'cadencia.tetos';
+-- Fora de uso desde 22/09/2026 (só o cumprimento abre conversa); o teste reativa
+-- porque prova o mecanismo do envio, não o catálogo.
 update public.message_templates
-   set meta_status = 'approved', meta_template_name = 'aeb_abr_a_v1'
+   set meta_status = 'approved', meta_template_name = 'aeb_abr_a_v1', is_active = true
  where template_code = 'AEB-ABR-A';
 update public.message_templates
-   set meta_status = 'pending', meta_template_name = null
+   set meta_status = 'pending', meta_template_name = null, is_active = true
  where template_code = 'GEN-FUP-D3-V1';
 
 -- 01 com pessoa (nome Mariana) · 02 sem pessoa (usa a reserva) · 03 pediu para

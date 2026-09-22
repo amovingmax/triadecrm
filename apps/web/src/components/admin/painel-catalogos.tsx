@@ -929,12 +929,12 @@ function SecaoModelos({
         contagem={<Contagem n={dados.modelos.length} rotulo="modelos" />}
         descricao="Os textos que a Heloísa usa nas conversas, por canal, segmento e versão. Escritos por Bárbara e aprovados por Dennis para a parte financeira."
       />
-      <Aviso titulo="O envio pelo WhatsApp ainda não está ligado">
+      <Aviso titulo="Fora da janela de 24 h, só o cumprimento">
         <p>
-          Estes modelos existem no banco e podem ser lidos e copiados agora, mas nenhuma mensagem
-          sai do CRM: o envio depende da Cloud API oficial da Meta e da aprovação dos modelos pela
-          própria Meta, que é trabalho do Luiz no Meta Business. Enquanto isso, a
-          coluna de situação diz o que está no catálogo, não o que a Meta aprovou.
+          Para abrir conversa, o CRM manda “Bom dia!”, “Boa tarde!” ou “Boa noite!” e, depois de uma
+          ligação, o resumo ou a confirmação da reunião (decisão do Rafael, 22/09/2026). O resto vai
+          em texto livre quando a pessoa responder. Os outros modelos da Meta ficam aqui para
+          consulta, fora de uso.
         </p>
       </Aviso>
 

@@ -21,16 +21,16 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { cumprimentoDaHora } from '@/components/conversas/envio-de-modelo';
 import type { Catalogos } from '@/components/parceiros/tipos';
 
 import {
   apagarPublico,
+  buscarCumprimentos,
   buscarEtiquetasESetores,
-  buscarModelos,
   buscarPrevia,
   buscarPublico,
   buscarTetoDeHoje,
@@ -40,10 +40,8 @@ import {
   salvarPublico,
   type ConfigDoEnvio,
 } from './dados';
-import { CriarModelo } from './criar-modelo';
 import { EscolhaMultipla } from './escolha-multipla';
 import {
-  acoesPara,
   custoEstimado,
   duracaoEstimada,
   filtrosEscondidos,
@@ -60,7 +58,6 @@ import {
   SITUACOES,
   TEMPERATURAS,
   TIPOS_DE_PARCEIRO,
-  type AcaoDoBotao,
   type Assinatura,
   type FiltroDoPublico,
   type PessoaDoPublico,
@@ -74,9 +71,12 @@ import {
  *
  * À esquerda, as duas perguntas de toda campanha — para quem e qual
  * mensagem. À direita, sempre à vista, como ela chega e o botão de enviar.
- * Tudo o que tem um padrão bom (quem assina, ritmo, o que cada botão faz, o
- * destino do link, de onde vem cada variável) mora em "Opções avançadas", já
- * preenchido: quem não abre envia do jeito certo.
+ * Tudo o que tem um padrão bom (quem assina, ritmo, de onde vem cada variável)
+ * mora em "Opções avançadas", já preenchido: quem não abre envia do jeito certo.
+ *
+ * A mensagem é o cumprimento ou texto livre, e mais nada (decisão do Rafael,
+ * 22/09/2026): o cumprimento abre a janela de 24 h e o time conversa com quem
+ * responder; o texto livre fala com quem já está com a janela aberta.
  *
  * A lista de pessoas continua lá, recolhida: quem manda para 120 ainda pode
  * bater o olho e tirar os três que não fazem sentido. Quem o banco não deixaria
@@ -85,12 +85,6 @@ import {
  */
 
 const RITMOS = [5, 10, 15, 20, 30, 45, 60] as const;
-
-/** Para onde vai quem toca no botão de link, se a campanha não disser outro lugar. */
-const DESTINO_PADRAO = 'https://admin.komune.app.br/seja-parceiro';
-
-/** O item do seletor de mensagem que troca o modelo por texto livre. */
-const TEXTO_LIVRE = 'texto-livre';
 
 /** Quantas linhas a lista desenha de cada vez. A seleção vale para todas. */
 const LINHAS_VISIVEIS = 150;
@@ -157,11 +151,8 @@ export function NovoEnvio({
 
   // ---------------- mensagem ----------------
   const [tipo, setTipo] = useState<TipoDoEnvio>('modelo');
-  const [modeloId, setModeloId] = useState<number | null>(null);
   const [texto, setTexto] = useState('');
   const [regras, setRegras] = useState<Record<string, RegraDaVariavel>>({});
-  const [acoesEditadas, setAcoesEditadas] = useState<Record<string, AcaoDoBotao>>({});
-  const [linkDestino, setLinkDestino] = useState(DESTINO_PADRAO);
 
   // ---------------- como e quando ----------------
   const [nomeEscrito, setNomeEscrito] = useState<string | null>(null);
@@ -172,12 +163,20 @@ export function NovoEnvio({
   const [atendentes, setAtendentes] = useState<string[]>([]);
   const [vista, setVista] = useState(0);
 
-  const modelos = useQuery({ queryKey: ['envios', 'modelos'], queryFn: buscarModelos, staleTime: 60_000 });
-  // Em nome da marca ninguém assina: modelo com {{atendente}} nem aparece.
-  const modelosVisiveis = (modelos.data ?? []).filter(
-    (m) => assinatura !== 'marca' || !temAtendente(m.body),
-  );
-  const modelo = modelos.data?.find((m) => m.id === modeloId) ?? null;
+  // Fora da janela, só o cumprimento (decisão do Rafael, 22/09/2026). Os três
+  // viram uma opção só: o banco troca pelo do período na hora de cada envio
+  // (`app.modelo_da_hora`), então qualquer um serve de ponto de partida — o de
+  // agora deixa a prévia certa.
+  const cumprimentos = useQuery({
+    queryKey: ['envios', 'cumprimentos'],
+    queryFn: buscarCumprimentos,
+    staleTime: 60_000,
+  });
+  const modelo =
+    cumprimentos.data?.find((m) => m.template_code === cumprimentoDaHora()) ??
+    cumprimentos.data?.[0] ??
+    null;
+  const modeloId = tipo === 'modelo' ? (modelo?.id ?? null) : null;
   const corpo = tipo === 'modelo' ? (modelo?.body ?? '') : texto;
   const variaveis = variaveisComRegra(corpo);
   const regrasDoCorpo = regrasPara(corpo, regras);
@@ -186,24 +185,13 @@ export function NovoEnvio({
   // vista. O que vem da ficha já tem regra e reserva: fica nas opções.
   const fixas = variaveis.filter((v) => 'fixo' in (regrasDoCorpo[v] ?? { fixo: '' }));
   const daFicha = variaveis.filter((v) => !fixas.includes(v));
-  const botoes = tipo === 'modelo' ? (modelo?.botoes ?? []) : [];
-  const acoes = acoesPara(botoes, acoesEditadas);
-  const precisaDeLink =
-    botoes.some((b) => b.tipo === 'link') || Object.values(acoes).some((a) => a.acao === 'link');
-  const acoesIncompletas = Object.values(acoes).some(
-    (a) => a.acao === 'link' && (a.texto.trim() === '' || a.botao.trim() === ''),
-  );
 
-  function mudarCorpo(novoTipo: TipoDoEnvio, novoModelo: number | null, novoTexto: string) {
-    setTipo(novoTipo);
-    setModeloId(novoModelo);
+  function mudarTexto(novoTexto: string) {
     setTexto(novoTexto);
-    const novoCorpo =
-      novoTipo === 'modelo' ? (modelos.data?.find((m) => m.id === novoModelo)?.body ?? '') : novoTexto;
-    setRegras((r) => ({ ...r, ...regrasPara(novoCorpo, r) }));
+    setRegras((r) => ({ ...r, ...regrasPara(novoTexto, r) }));
   }
 
-  const nome = nomeEscrito ?? nomeSugerido(tipo === 'texto' ? 'Texto livre' : (modelo?.name ?? null));
+  const nome = nomeEscrito ?? nomeSugerido(tipo === 'texto' ? 'Texto livre' : 'Cumprimento');
 
   // Texto livre só chega a quem está com a janela de 24 h aberta: os outros nem
   // entram na fila (entrariam só para aparecer como "pulados").
@@ -228,16 +216,14 @@ export function NovoEnvio({
     porHora,
     inicio: agendar && inicio ? new Date(inicio).toISOString() : null,
     filtro,
-    linkDestino: precisaDeLink ? linkDestino : '',
-    acoes,
+    // O cumprimento não tem botão: nem link, nem ação.
+    linkDestino: '',
+    acoes: {},
   };
 
   const conflitoDeAssinatura = assinatura === 'marca' && temAtendente(corpo);
   const mensagemPronta =
-    (tipo === 'modelo' ? modelo !== null : texto.trim().length > 0) &&
-    incompletas.length === 0 &&
-    !acoesIncompletas &&
-    (!precisaDeLink || linkDestino.startsWith('https://'));
+    (tipo === 'modelo' ? modelo !== null : texto.trim().length > 0) && incompletas.length === 0;
 
   const amostra = destinatarios.slice(0, 3).map((p) => p.organization_id);
   const previa = useQuery({
@@ -271,18 +257,15 @@ export function NovoEnvio({
   function oQueFalta(): string | null {
     if (publico.isPending) return null;
     if (escolhidas.length === 0) return 'Ninguém no público: afrouxe um filtro.';
-    if (tipo === 'modelo' && !modelo) return 'Escolha a mensagem.';
+    if (tipo === 'modelo' && cumprimentos.isPending) return null;
+    if (tipo === 'modelo' && !modelo) return 'O cumprimento ainda não foi aprovado pela Meta.';
     if (tipo === 'texto' && texto.trim() === '') return 'Escreva o texto.';
     if (tipo === 'texto' && vaoReceber === 0) {
-      return 'Ninguém deste público falou com a gente nas últimas 24 h: texto livre não chega. Escolha um modelo.';
+      return 'Ninguém deste público falou com a gente nas últimas 24 h: texto livre não chega. Mande o cumprimento.';
     }
     if (incompletas.length > 0) return `Preencha ${incompletas.map((v) => `{{${v}}}`).join(', ')}.`;
     if (conflitoDeAssinatura) {
-      return 'Este modelo diz o nome de quem envia: troque quem assina em Opções avançadas ou escolha outro modelo.';
-    }
-    if (acoesIncompletas) return 'Confira o que acontece em cada botão, em Opções avançadas.';
-    if (precisaDeLink && !linkDestino.startsWith('https://')) {
-      return 'O destino do link precisa começar com https:// (Opções avançadas).';
+      return 'O texto diz o nome de quem envia: troque quem assina em Opções avançadas.';
     }
     if (assinatura === 'revezar' && atendentes.length === 0) {
       return 'Escolha quem divide a campanha, em Opções avançadas.';
@@ -514,28 +497,21 @@ export function NovoEnvio({
           <h2 id="bloco-mensagem" className="text-sm font-semibold">
             Mensagem
           </h2>
-          <Select
-            value={tipo === 'texto' ? TEXTO_LIVRE : modeloId === null ? '' : String(modeloId)}
-            onValueChange={(v) =>
-              v === TEXTO_LIVRE ? mudarCorpo('texto', modeloId, texto) : mudarCorpo('modelo', Number(v), texto)
-            }
-          >
-            <SelectTrigger aria-labelledby="bloco-mensagem" className="toque h-11 w-full md:h-9">
-              <SelectValue placeholder={modelos.isPending ? 'Carregando…' : 'Escolha a mensagem'} />
-            </SelectTrigger>
-            <SelectContent>
-              {modelosVisiveis.map((m) => (
-                <SelectItem key={m.id} value={String(m.id)}>
-                  {m.name}
-                  {m.botoes.length > 0
-                    ? ` · ${m.botoes.length} ${m.botoes.length === 1 ? 'botão' : 'botões'}`
-                    : ''}
-                </SelectItem>
-              ))}
-              {modelosVisiveis.length > 0 ? <SelectSeparator /> : null}
-              <SelectItem value={TEXTO_LIVRE}>Texto livre (só para quem falou nas últimas 24 h)</SelectItem>
-            </SelectContent>
-          </Select>
+          <div role="group" aria-labelledby="bloco-mensagem" className="flex flex-wrap gap-2">
+            <Chip ativo={tipo === 'modelo'} aoClicar={() => setTipo('modelo')}>
+              Cumprimento
+            </Chip>
+            <Chip ativo={tipo === 'texto'} aoClicar={() => setTipo('texto')}>
+              Texto livre
+            </Chip>
+          </div>
+
+          {tipo === 'modelo' ? (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              “Bom dia!”, “Boa tarde!” ou “Boa noite!”, conforme a hora de cada envio. Quem responder
+              abre 24 h de conversa livre com o time.
+            </p>
+          ) : null}
 
           {tipo === 'texto' ? (
             <div className="space-y-1">
@@ -544,7 +520,7 @@ export function NovoEnvio({
                 value={texto}
                 maxLength={1000}
                 rows={5}
-                onChange={(e) => mudarCorpo('texto', modeloId, e.target.value)}
+                onChange={(e) => mudarTexto(e.target.value)}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 placeholder="Oi, {{nome}}! Passando para contar que…"
               />
@@ -574,8 +550,6 @@ export function NovoEnvio({
               </div>
             );
           })}
-
-          <CriarModelo />
         </section>
 
         {/* -------------------------- Opções avançadas -------------------------- */}
@@ -648,34 +622,6 @@ export function NovoEnvio({
               </Campo>
             </div>
 
-            {Object.keys(acoes).length > 0 || precisaDeLink ? (
-              <div className="space-y-2">
-                <h3 className="text-xs font-medium text-muted-foreground">O que acontece em cada botão</h3>
-                {Object.entries(acoes).map(([rotulo, acao]) => (
-                  <EditorDeAcao
-                    key={rotulo}
-                    rotulo={rotulo}
-                    acao={acao}
-                    aoMudar={(a) => setAcoesEditadas((atual) => ({ ...atual, [rotulo]: a }))}
-                  />
-                ))}
-                {precisaDeLink ? (
-                  <Campo rotulo="Para onde o link leva" htmlFor="destino-do-link">
-                    <Input
-                      id="destino-do-link"
-                      value={linkDestino}
-                      onChange={(e) => setLinkDestino(e.target.value)}
-                      className="h-11 md:h-9"
-                    />
-                    <p className="text-[11px] leading-relaxed text-muted-foreground">
-                      O link passa pelo CRM, que conta o clique e marca a campanha antes de mandar a pessoa
-                      para lá.
-                    </p>
-                  </Campo>
-                ) : null}
-              </div>
-            ) : null}
-
             {daFicha.length > 0 ? (
               <div className="space-y-2">
                 <h3 className="text-xs font-medium text-muted-foreground">De onde vem cada variável</h3>
@@ -709,7 +655,7 @@ export function NovoEnvio({
             <h2 id="bloco-previa" className="text-sm font-semibold">
               Como chega
             </h2>
-            {itensDaPrevia.length > 1 ? (
+            {tipo === 'texto' && itensDaPrevia.length > 1 ? (
               <button
                 type="button"
                 onClick={() => setVista((i) => i + 1)}
@@ -723,7 +669,11 @@ export function NovoEnvio({
             <p className="text-sm text-muted-foreground">
               {incompletas.length > 0
                 ? `Preencha ${incompletas.map((v) => `{{${v}}}`).join(', ')} para ver a prévia.`
-                : 'Escolha a mensagem para ver a prévia.'}
+                : tipo === 'texto'
+                  ? 'Escreva o texto para ver a prévia.'
+                  : cumprimentos.isPending
+                    ? 'Carregando…'
+                    : 'O cumprimento ainda não foi aprovado pela Meta.'}
             </p>
           ) : amostra.length === 0 ? (
             <p className="text-sm text-muted-foreground">A prévia aparece quando houver alguém no público.</p>
@@ -745,7 +695,6 @@ export function NovoEnvio({
               {itemVisto.ok ? (
                 <div className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-foreground">
                   <p className="whitespace-pre-wrap">{itemVisto.corpo}</p>
-                  <ChipsDosBotoes botoes={botoes} />
                 </div>
               ) : (
                 <p className="text-sm text-destructive">
@@ -1114,85 +1063,6 @@ function ListaDoPublico({
         <button type="button" onClick={aoVerTodas} className="w-full border-t border-hairline py-2 text-sm text-primary hover:bg-muted/50">
           Mostrar as {total} (a seleção já vale para todas)
         </button>
-      ) : null}
-    </div>
-  );
-}
-
-function ChipsDosBotoes({ botoes }: { botoes: readonly { tipo: string; texto: string }[] }) {
-  if (botoes.length === 0) return null;
-  return (
-    <div className="mt-2 flex flex-col gap-1 border-t border-hairline pt-2">
-      {botoes.map((b) => (
-        <span
-          key={b.texto}
-          className="rounded-md bg-background/70 px-2 py-1 text-center text-xs font-medium text-primary"
-        >
-          {b.tipo === 'link' ? '↗ ' : ''}
-          {b.texto}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function EditorDeAcao({
-  rotulo,
-  acao,
-  aoMudar,
-}: {
-  rotulo: string;
-  acao: AcaoDoBotao;
-  aoMudar: (a: AcaoDoBotao) => void;
-}) {
-  return (
-    <div className="space-y-2 rounded-lg border border-hairline p-2">
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_14rem] sm:items-center">
-        <span className="text-sm">
-          Quem tocar em <span className="font-medium">“{rotulo}”</span>
-        </span>
-        <Select
-          value={acao.acao}
-          onValueChange={(v) =>
-            aoMudar(
-              v === 'link'
-                ? {
-                    acao: 'link',
-                    texto: 'Que bom! O cadastro leva 5 minutos e é grátis. É só tocar no botão abaixo.',
-                    botao: 'Criar meu perfil',
-                  }
-                : { acao: v as 'sair' | 'nada' },
-            )
-          }
-        >
-          <SelectTrigger className="toque h-11 md:h-8" aria-label={`O que acontece em “${rotulo}”`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="link">recebe o link na hora</SelectItem>
-            <SelectItem value="sair">sai da lista (não recebe mais)</SelectItem>
-            <SelectItem value="nada">fica na caixa para o time responder</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      {acao.acao === 'link' ? (
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
-          <textarea
-            value={acao.texto}
-            maxLength={900}
-            rows={2}
-            onChange={(e) => aoMudar({ ...acao, texto: e.target.value })}
-            aria-label={`Texto que vai com o link em “${rotulo}”`}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          />
-          <Input
-            value={acao.botao}
-            maxLength={20}
-            onChange={(e) => aoMudar({ ...acao, botao: e.target.value })}
-            aria-label={`Rótulo do botão do link em “${rotulo}”`}
-            className="h-11 md:h-9"
-          />
-        </div>
       ) : null}
     </div>
   );

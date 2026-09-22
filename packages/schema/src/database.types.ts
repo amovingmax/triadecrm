@@ -561,6 +561,10 @@ export type Database = {
       }
       modelo_botoes_validos: { Args: { p_botoes: Json }; Returns: boolean }
       modelo_corpo_invalido: { Args: { p_corpo: string }; Returns: string }
+      modelo_da_hora: {
+        Args: { p_modelo_id: number; p_quando?: string }
+        Returns: number
+      }
       modelo_parametro_limpo: { Args: { p_valor: string }; Returns: string }
       modelo_renderizar: {
         Args: { p_body: string; p_parametros: Json }

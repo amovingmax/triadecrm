@@ -282,7 +282,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: Megaphone,
     grupo: 'todo_dia',
     descricao:
-      'Uma mensagem de WhatsApp para muitos parceiros, montada numa tela só: público por situação, etiqueta ou setor, a mensagem aprovada e parada automática se começarem a bloquear.',
+      'Um cumprimento de WhatsApp para muitos parceiros, numa tela só: público por situação, etiqueta ou setor, e parada automática se começarem a bloquear.',
     papeis: ['admin', 'gestor'],
   },
   {

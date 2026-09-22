@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import type { Catalogos } from '@/components/parceiros/tipos';
 
 import { ErroDoEnvio, listarEnvios } from './dados';
-import { fraseDaRecusa, progresso } from './formatos';
+import { fraseDaRecusa, progresso, rotuloDaMensagem } from './formatos';
 import { NovoEnvio } from './novo-envio';
 import { Numeros, PainelDoEnvio } from './painel-do-envio';
 import { STATUS_DO_ENVIO, type Envio, type StatusDoEnvio } from './tipos';
@@ -41,8 +41,8 @@ export function TelaEnvios({ catalogos }: { catalogos: Catalogos }) {
           <h1 className="text-2xl font-semibold tracking-tight">{montando ? 'Nova campanha' : 'Campanhas'}</h1>
           {!montando ? (
             <p className="text-sm text-muted-foreground">
-              Uma mensagem de WhatsApp para muitos parceiros, aos poucos e com parada automática se
-              começarem a bloquear.
+              Um cumprimento para muitos parceiros, aos poucos e com parada automática se começarem a
+              bloquear. Quem responder cai nas Conversas, com 24 h para conversar livre.
             </p>
           ) : null}
         </div>
@@ -116,7 +116,7 @@ function CartaoDoEnvio({ envio, aoAbrir }: { envio: Envio; aoAbrir: () => void }
         <div className="min-w-0">
           <p className="truncate font-medium">{envio.nome}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {envio.modelo ?? 'Texto livre'} · {envio.por_hora}/h · {envio.criado_por ?? '—'}
+            {rotuloDaMensagem(envio.modelo)} · {envio.por_hora}/h · {envio.criado_por ?? '—'}
           </p>
         </div>
         <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium', COR_DO_STATUS[envio.status])}>

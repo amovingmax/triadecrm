@@ -2845,3 +2845,17 @@ Achado de passagem, fora do escopo: `app.radar_pontuar` quebrava com "malformed 
 Entregue:
 - Migração `20260922150000_radar_categoria_prioritaria`: recria `app.radar_pontuar` com uma linha trocada (`'categoria prioritária'::text`). O literal sem tipo fazia o Postgres escolher `array || array` e abortar. Antes, marcar uma categoria como prioritária na tela do Radar faria todo candidato dela abortar na entrada da fila e o "repontuar" quebrar. Em produção a lista de categorias prioritárias está vazia, então nada quebrou ainda.
 - Testes: pgTAP 64 (3 asserções), que falha na versão antiga e passa na nova.
+
+### 22/09/2026 — Fora da janela de 24 h, só o cumprimento (branch `feat/so-o-cumprimento`)
+
+"Eu gosto da ideia de engessar a primeira mensagem pra desbloquear as 24 horas livres, mas essa mensagem poderia ser apenas bom dia, boa tarde e boa noite, e nada mais além disso" (Rafael). Dos 54 modelos da Meta, só 3 tinham sido usados (6 mensagens).
+
+Entregue:
+- Migração `20260922160000_so_o_cumprimento`: ficam em uso só os três cumprimentos (`GEN-ABR-OLA-*`) e os quatro de depois da ligação (`GEN-LIG-CONFIRMA`, `GEN-LIG-RESUMO-FOR`, `GEN-LIG-RESUMO-PRO`, `GEN-FUP-LIG-V1`, escolha do Rafael). Os outros 47 saem de uso (`is_active = false`, nada apagado), inclusive os 3 convites com botão das campanhas, que ainda esperavam a Meta. Textos de dentro da janela (categoria `service`) e do sistema não mudam. O mesmo corte está no `seed.sql`.
+- `app.modelo_da_hora`: a campanha troca o cumprimento pelo do período na hora de cada envio (relógio de Natal). `app.envio_montar` e `app.envio_um` recriados com uma linha cada.
+- Conversas: fora da janela, a caixa manda o cumprimento com um clique ("Mandar “Bom dia!”"), no primeiro contato e na retomada; sem seletor de modelo e sem moldura livre. O recibo da ligação continua abrindo o seu modelo.
+- Campanhas: a mensagem é "Cumprimento" (padrão, já selecionado) ou "Texto livre". Saíram a lista de modelos, "Criar modelo novo", os botões e o destino do link. Na lista, os três cumprimentos aparecem como "Cumprimento".
+- Ajustes → Catálogos → Modelos: o aviso antigo ("o envio pelo WhatsApp ainda não está ligado") virou a regra nova. Guia `docs/operacao/whatsapp-no-crm.md` atualizado.
+- Testes: pgTAP 65 (9 asserções: o catálogo, o relógio e a campanha); 08 conta 3 aberturas genéricas ativas; 43, 46, 47, 57 e 58 reativam dentro do teste o modelo que usam (provam o mecanismo, não o catálogo). Vitest da escolha do cumprimento e do rótulo da campanha.
+
+Parado: o acompanhamento da aprovação dos 3 convites (cancelados). Eles continuam na fila da Meta; se forem aprovados, seguem fora de uso no CRM.

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { faltasDoWhatsapp } from './aviso-whatsapp';
 import {
+  ehCumprimento,
   escolherModeloInicial,
   faltando,
   fraseDoBloqueio,
@@ -13,7 +14,6 @@ import {
   valorLimpo,
   tetoDaVariavel,
   valoresIniciais,
-  variavelLivreDoModelo,
   type ModeloParaEnviar,
 } from './envio-de-modelo';
 import { fraseDaRecusaDoEnvio, MOTIVOS_DE_RECUSA_DO_ENVIO } from './mensagens';
@@ -206,7 +206,7 @@ describe('faltasDoWhatsapp', () => {
   });
 });
 
-describe('a abertura livre (migração 20260916100000)', () => {
+describe('o texto dentro da moldura (espelho do banco)', () => {
   const LIVRE: ModeloParaEnviar = {
     id: 9,
     codigo: 'GEN-ABR-LIVRE',
@@ -224,29 +224,6 @@ describe('a abertura livre (migração 20260916100000)', () => {
     expect(tetoDaVariavel('nome')).toBe(200);
   });
 
-  it('a variável livre do modelo é achada, e não vira campo de formulário', () => {
-    expect(variavelLivreDoModelo(LIVRE)).toBe('mensagem');
-    expect(variavelLivreDoModelo(ABERTURA)).toBeNull();
-  });
-
-  it('a caixa abre no modelo em que se escreve, mesmo com outros na frente', () => {
-    expect(escolherModeloInicial([ABERTURA, LIVRE], {})?.codigo).toBe('GEN-ABR-LIVRE');
-  });
-
-  it('sem modelo livre, abre no que o banco já preenche inteiro', () => {
-    const pronto: ModeloParaEnviar = {
-      ...ABERTURA,
-      id: 7,
-      codigo: 'GEN-FUP-D3-V1',
-      corpo: 'Oi, {{nome}}, passando para saber se você viu.',
-      variaveis: ['nome'],
-    };
-    expect(escolherModeloInicial([ABERTURA, pronto], { nome: 'Mariana' })?.codigo).toBe(
-      'GEN-FUP-D3-V1',
-    );
-    expect(escolherModeloInicial([], {})).toBeNull();
-  });
-
   it('o que a pessoa escreve sai num parágrafo só, como a Meta exige', () => {
     expect(
       preencher(LIVRE.corpo, {
@@ -258,7 +235,7 @@ describe('a abertura livre (migração 20260916100000)', () => {
   });
 });
 
-describe('o cumprimento abre a conversa', () => {
+describe('fora da janela, só o cumprimento (22/09/2026)', () => {
   const tarde = {
     id: 90,
     codigo: 'GEN-ABR-OLA-TARDE',
@@ -270,16 +247,15 @@ describe('o cumprimento abre a conversa', () => {
     variaveis: [],
   };
   const manha = { ...tarde, id: 89, codigo: 'GEN-ABR-OLA-MANHA', corpo: 'Bom dia!' };
-  const cumprimento = tarde;
-  const livre = {
-    id: 91,
-    codigo: 'GEN-ABR-LIVRE',
-    nome: 'Abertura livre',
-    tipo: 'abertura',
-    variante: 'A',
-    segmento: null,
-    corpo: 'Oi, {{nome}}! Aqui é {{atendente}}. {{mensagem}}',
-    variaveis: ['nome', 'atendente', 'mensagem'],
+  const resumo = {
+    id: 92,
+    codigo: 'GEN-LIG-RESUMO-FOR',
+    nome: 'Depois da ligação — resumo para fornecedor',
+    tipo: 'followup',
+    variante: null,
+    segmento: 'GEN',
+    corpo: 'Oi, {{nome}}! Aqui é {{atendente}}, da Komune. Como combinamos na ligação...',
+    variaveis: ['nome', 'atendente'],
   };
 
   // 15h em Natal (UTC-3) é 18h em UTC. O `Date` guarda UTC, então este instante
@@ -287,42 +263,28 @@ describe('o cumprimento abre a conversa', () => {
   const tresDaTarde = new Date('2026-09-17T18:00:00Z');
   const oitoDaManha = new Date('2026-09-17T11:00:00Z');
 
-  it('no PRIMEIRO contato escolhe o cumprimento do PERÍODO, sem campo nenhum', () => {
-    const escolhido = escolherModeloInicial(
-      [livre, manha, tarde],
-      { atendente: 'Matheus' },
-      true,
-      tresDaTarde,
-    );
+  it('a caixa abre no cumprimento do PERÍODO, sem campo nenhum', () => {
+    const escolhido = escolherModeloInicial([resumo, manha, tarde], tresDaTarde);
     expect(escolhido?.codigo).toBe('GEN-ABR-OLA-TARDE');
     expect(escolhido?.variaveis).toEqual([]);
   });
 
-  it('de manhã escolhe o bom dia — o relógio é o de Natal, não o do navegador', () => {
-    const escolhido = escolherModeloInicial(
-      [livre, manha, tarde],
-      { atendente: 'Matheus' },
-      true,
-      oitoDaManha,
+  it('de manhã, bom dia — o relógio é o de Natal, não o do navegador', () => {
+    expect(escolherModeloInicial([resumo, manha, tarde], oitoDaManha)?.codigo).toBe(
+      'GEN-ABR-OLA-MANHA',
     );
-    expect(escolhido?.codigo).toBe('GEN-ABR-OLA-MANHA');
   });
 
-  it('na RETOMADA escolhe a moldura livre: já se sabe com quem se fala', () => {
-    // Cumprimentar de novo seria começar do zero uma conversa que existe.
-    const escolhido = escolherModeloInicial(
-      [livre, cumprimento],
-      { atendente: 'Matheus' },
-      false,
-      tresDaTarde,
-    );
-    expect(escolhido?.codigo).toBe('GEN-ABR-LIVRE');
+  it('sem o cumprimento aprovado, não oferece outro modelo no lugar', () => {
+    // O de depois da ligação só vem pelo recibo da ligação, nunca como plano B.
+    expect(escolherModeloInicial([resumo, ABERTURA], tresDaTarde)).toBeNull();
+    expect(escolherModeloInicial([], tresDaTarde)).toBeNull();
   });
 
-  it('sem o cumprimento aprovado, o primeiro contato cai na moldura livre', () => {
-    // A Meta pode demorar ou recusar. A tela não pode ficar sem saída por isso.
-    const escolhido = escolherModeloInicial([livre], { atendente: 'Matheus' }, true, tresDaTarde);
-    expect(escolhido?.codigo).toBe('GEN-ABR-LIVRE');
+  it('reconhece os três cumprimentos, e só eles', () => {
+    expect(ehCumprimento(tarde)).toBe(true);
+    expect(ehCumprimento(manha)).toBe(true);
+    expect(ehCumprimento(resumo)).toBe(false);
+    expect(ehCumprimento(ABERTURA)).toBe(false);
   });
 });
-
