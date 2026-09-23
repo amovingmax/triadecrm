@@ -5,6 +5,7 @@ import { ChevronRight, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Etiqueta } from '@/components/etiqueta';
 import { BarraTermica, DiasSemContato } from '@/components/temperatura';
 
 import { local } from './formatos';
@@ -26,6 +27,9 @@ import { ROTULO_CANAL, type ItemConversa } from './tipos';
  * endereço acompanha por `replaceState` (ver `tela-conversas.tsx`). O alvo tem 76px de
  * altura, bem acima dos 44px mínimos, e o item selecionado leva `aria-current`.
  */
+/** Abaixo disto a nota da IA não muda decisão nenhuma, e vira ruído na linha. */
+const NOTA_QUE_VALE = 50;
+
 export function ListaConversas({
   itens,
   selecionadoId,
@@ -97,8 +101,8 @@ function Linha({
           semRotulo
         />
 
-        <span className="min-w-0 flex-1 space-y-0.5">
-          <span className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 space-y-1">
+          <span className="flex items-baseline gap-2">
             <span
               className={cn(
                 'min-w-0 flex-1 truncate text-sm',
@@ -107,9 +111,11 @@ function Linha({
             >
               {item.nome}
             </span>
+            {/* Por ler vai no verde da ação, e não no branco: é o único número da
+                linha que pede para alguém fazer alguma coisa. */}
             {item.naoLidas > 0 ? (
               <span
-                className="numerico inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background"
+                className="numerico inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
                 title={`${item.naoLidas} mensagem(ns) por ler`}
               >
                 {item.naoLidas}
@@ -123,35 +129,9 @@ function Linha({
             />
           </span>
 
-          {/* O CONSELHO DA IA, quando existe.
-              Terceira linha, e só nas conversas que têm um: a ficha da conversa
-              escreve "Recontatar em 3-5 dias com abordagem diferente", e isso
-              vivia só dentro da conversa aberta — uma por vez. A pergunta "com
-              quem eu falo agora?" se faz olhando a LISTA, e a resposta tem de
-              estar aqui. Em itálico e esmaecido porque é opinião de máquina, não
-              fato do parceiro: a prévia acima é o que aconteceu; esta linha é o
-              que alguém acha que se deve fazer. */}
-          {item.leituraDaIa?.proximaAcao ? (
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground italic">
-                {item.leituraDaIa.proximaAcao}
-              </span>
-              {item.leituraDaIa.score === null ? null : (
-                <span
-                  className="numerico shrink-0 text-[10px] text-muted-foreground"
-                  title={`A IA vê ${item.leituraDaIa.score} de 100 de intenção de fechar nesta conversa`}
-                >
-                  {item.leituraDaIa.score}
-                </span>
-              )}
-            </span>
-          ) : null}
-
-          {/* A temperatura NÃO se repete em chip: ela já é a barra de 3 px na borda
-              esquerda, que é o que a lista de Parceiros usa e o que a pessoa lê de
-              relance. O chip ao lado dizia a mesma coisa em palavra, e era ele que
-              empurrava a prévia da conversa para uma terceira linha. */}
+          {/* O QUE ACONTECEU, primeiro. A prévia da última interação é o fato; o
+              conselho da IA, logo abaixo, é opinião. Estavam trocados de ordem, e
+              a linha inteira lia como se a máquina falasse pelo parceiro. */}
           <span className="flex items-center gap-1.5">
             {Icone ? (
               <Icone
@@ -167,9 +147,6 @@ function Linha({
             >
               {item.resumo ?? 'Nenhum contato registrado'}
             </span>
-            {/* Os selos terminam a MESMA linha da prévia. Numa linha própria eles
-                davam 20 px a cada conversa aberta — e "janela 23 h" é justamente o
-                que se lê junto com a última fala, não abaixo dela. */}
             {item.naoContatar ? (
               <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
                 não contatar
@@ -185,6 +162,43 @@ function Linha({
             ) : null}
             <ChipDaJanela estado={janela} />
           </span>
+
+          {/* AS ETIQUETAS, com a cor que o gestor escolheu: é o que separa um
+              fundador de um contato qualquer antes de abrir a conversa. Duas, e o
+              resto em número — quatro pílulas comiam a largura da prévia. */}
+          {item.etiquetas.length > 0 ? (
+            <span className="flex flex-wrap items-center gap-1">
+              {item.etiquetas.slice(0, 2).map((e) => (
+                <Etiqueta key={e.id} nome={e.nome} cor={e.cor} className="h-4 px-1.5 text-[10px]" />
+              ))}
+              {item.etiquetas.length > 2 ? (
+                <span className="numerico text-[10px] text-muted-foreground">
+                  +{item.etiquetas.length - 2}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+
+          {/* O CONSELHO DA IA, quando existe: "Recontatar em 3-5 dias com abordagem
+              diferente". Sem itálico — em 11 px o itálico só atrapalha a leitura —,
+              e com o ícone dizendo de onde vem. A nota de intenção (0 a 100) só
+              aparece quando é alta: "15" solto na linha não decide nada. */}
+          {item.leituraDaIa?.proximaAcao ? (
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                {item.leituraDaIa.proximaAcao}
+              </span>
+              {(item.leituraDaIa.score ?? 0) >= NOTA_QUE_VALE ? (
+                <span
+                  className="numerico shrink-0 rounded-full bg-muted px-1.5 text-[10px] text-muted-foreground"
+                  title={`A IA vê ${item.leituraDaIa.score} de 100 de intenção de fechar nesta conversa`}
+                >
+                  IA {item.leituraDaIa.score}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
         </span>
 
         {/* Só no celular: lá a lista dá lugar à conversa numa tela nova, e o chevron é

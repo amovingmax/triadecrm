@@ -99,6 +99,8 @@ export function TelaConversas({
       fios: consulta.data.fios,
       rascunhos: consulta.data.rascunhosPendentes,
       leituras: consulta.data.leituras,
+      etiquetas: consulta.data.etiquetas,
+      etiquetasDoParceiro: consulta.data.etiquetasDoParceiro,
       catalogos,
     });
   }, [consulta.data, catalogos]);

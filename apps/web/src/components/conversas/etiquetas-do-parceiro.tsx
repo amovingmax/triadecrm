@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { createClient } from '@/lib/supabase/client';
+import { Etiqueta } from '@/components/etiqueta';
 import { EscolhaMultipla } from '@/components/envios/escolha-multipla';
 
 /**
@@ -69,13 +70,7 @@ export function EtiquetasDoParceiro({
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       {marcadas.map((t) => (
-        <span
-          key={t.id}
-          className="inline-flex h-5 items-center gap-1 rounded-full border border-hairline px-2 text-[11px]"
-        >
-          <span className="size-2 rounded-full" style={{ background: t.color ?? '#64748b' }} aria-hidden="true" />
-          {t.name}
-        </span>
+        <Etiqueta key={t.id} nome={t.name} cor={t.color} />
       ))}
       {podeEditar && todas.length > 0 ? (
         <EscolhaMultipla

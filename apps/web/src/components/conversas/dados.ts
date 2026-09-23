@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/client';
 
 import type { AtividadeCrua, HistoricoCru, NegocioCru, OrganizacaoCrua } from './montagem';
 import type { FioCru, MensagemCrua, RascunhoCru } from './mensagens';
-import type { DependenciasDaMeta } from './tipos';
+import type { DependenciasDaMeta, EtiquetaDoParceiro } from './tipos';
 
 /**
  * As consultas da tela de Conversas, no navegador, sob a mesma RLS de todo o resto.
@@ -32,7 +32,7 @@ export const TETO_ATIVIDADES = 3000;
 
 /** Colunas da atividade usadas pela lista e pela linha do tempo. */
 const COLUNAS_ATIVIDADE =
-  'id, organization_id, deal_id, type, channel, author_kind, occurred_at, body, duration_min, user_id, outcome_id, metadata';
+  'id, organization_id, deal_id, type, channel, author_kind, occurred_at, body, duration_min, user_id, outcome_id, metadata, message_id';
 
 /**
  * Colunas do fio. `peer_phone_e164` entra cru, sem máscara, e isso é decisão:
@@ -89,6 +89,10 @@ export type BaseDasConversas = {
   cortada: boolean;
   /** Os setores do atendimento e os de quem está usando a tela (Fase 1). */
   setores: { id: number; nome: string }[];
+  /** O catálogo de etiquetas, com a cor que o gestor escolheu. */
+  etiquetas: EtiquetaDoParceiro[];
+  /** Quem tem qual etiqueta. */
+  etiquetasDoParceiro: { organization_id: string; tag_id: number }[];
   meusSetores: number[];
   euId: string | null;
 };
@@ -107,7 +111,8 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
   const { data: sessao } = await supabase.auth.getSession();
   const euId = sessao.session?.user.id ?? null;
 
-  const [organizacoes, atividades, negocios, fios, rascunhos, leituras, meta, setores, meus] = await Promise.all([
+  const [organizacoes, atividades, negocios, fios, rascunhos, leituras, meta, setores, meus, etiquetas, etiquetasDoParceiro] =
+    await Promise.all([
     supabase
       .from('organizations_view')
       .select(
@@ -145,6 +150,10 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
     euId
       ? supabase.from('setor_membros').select('setor_id').eq('profile_id', euId)
       : Promise.resolve({ data: [] as { setor_id: number }[] }),
+    // As etiquetas do parceiro, para a LISTA mostrar de relance: são elas que
+    // dizem "fundador" antes de alguém abrir a conversa.
+    supabase.from('tags').select('id, name, color').order('name'),
+    supabase.from('organization_tags').select('organization_id, tag_id').limit(TETO_ORGANIZACOES * 3),
   ]);
 
   const erro =
@@ -166,6 +175,8 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
       (atividades.data?.length ?? 0) >= TETO_ATIVIDADES,
     // Setor é acréscimo, como a leitura da IA: sem ele a lista abre igual.
     setores: setores.data ?? [],
+    etiquetas: (etiquetas.data ?? []).map((t) => ({ id: t.id, nome: t.name, cor: t.color })),
+    etiquetasDoParceiro: etiquetasDoParceiro.data ?? [],
     meusSetores: (meus.data ?? []).map((m) => m.setor_id),
     euId,
   };

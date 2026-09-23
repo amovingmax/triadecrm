@@ -15,6 +15,7 @@ import {
   ROTULO_TIPO,
   type AutorTipo,
   type DiaDaLinha,
+  type EtiquetaDoParceiro,
   type EventoDaLinha,
   type FiltrosConversas,
   type ItemConversa,
@@ -60,6 +61,8 @@ export type AtividadeCrua = {
   user_id: string | null;
   outcome_id: number | null;
   metadata: Json;
+  /** A mensagem que esta atividade registra, quando ela nasceu de uma. */
+  message_id?: string | null;
 };
 
 export type OrganizacaoCrua = {
@@ -175,6 +178,8 @@ export function montarConversas({
   fios = [],
   rascunhos = [],
   leituras = [],
+  etiquetas = [],
+  etiquetasDoParceiro = [],
   agora = new Date(),
 }: {
   organizacoes: OrganizacaoCrua[];
@@ -187,9 +192,22 @@ export function montarConversas({
   rascunhos?: RascunhoCru[];
   /** A leitura da IA por conversa. Vazia quando o módulo está desligado. */
   leituras?: LeituraCrua[];
+  /** O catálogo de etiquetas e quem tem qual: a lista mostra as do parceiro. */
+  etiquetas?: EtiquetaDoParceiro[];
+  etiquetasDoParceiro?: { organization_id: string; tag_id: number }[];
   agora?: Date;
 }): ItemConversa[] {
   const nomeDaPessoa = new Map(catalogos.pessoas.map((p) => [p.id, p.nome]));
+  const etiquetaPorId = new Map(etiquetas.map((e) => [e.id, e]));
+  const etiquetasPorOrganizacao = new Map<string, EtiquetaDoParceiro[]>();
+  for (const v of etiquetasDoParceiro) {
+    const etiqueta = etiquetaPorId.get(v.tag_id);
+    if (!etiqueta) continue;
+    etiquetasPorOrganizacao.set(v.organization_id, [
+      ...(etiquetasPorOrganizacao.get(v.organization_id) ?? []),
+      etiqueta,
+    ]);
+  }
   const etapaPorId = new Map(catalogos.etapas.map((e) => [e.id, e]));
   const nomeDoDesfecho = new Map(catalogos.desfechos.map((d) => [d.id, d.nome]));
 
@@ -282,6 +300,7 @@ export function montarConversas({
       naoLidas: fioCru?.unread_count ?? 0,
       rascunhoPendente: rascunhoCru ? montarRascunho(rascunhoCru) : null,
       leituraDaIa: montarLeitura(leituraPorOrganizacao.get(o.id) ?? null),
+      etiquetas: etiquetasPorOrganizacao.get(o.id) ?? [],
     };
   });
 
@@ -565,7 +584,17 @@ export function montarLinhaDoTempo({
   const etapaPorId = new Map(catalogos.etapas.map((e) => [e.id, e]));
   const nomeDoDesfecho = new Map(catalogos.desfechos.map((d) => [d.id, d.nome]));
 
-  const daAtividade = atividades.map((a): EventoDaLinha => {
+  // A ATIVIDADE QUE ESPELHA UMA MENSAGEM NÃO VIRA NOTA.
+  //
+  // Toda mensagem do WhatsApp grava também uma atividade (é ela que alimenta o
+  // "último contato", a cadência e os relatórios). Na coluna, isso aparecia duas
+  // vezes: a nota "Respondeu · WhatsApp" e, logo abaixo, o balão com o texto. O
+  // balão diz tudo o que a nota dizia, e diz melhor. A nota volta a aparecer
+  // quando a mensagem NÃO está carregada — aí ela é o único registro do que houve.
+  const idsDasMensagens = new Set(mensagens.map((m) => m.id));
+  const daAtividade = atividades
+    .filter((a) => !(a.message_id && idsDasMensagens.has(a.message_id)))
+    .map((a): EventoDaLinha => {
     const interacao = ehInteracao(a);
     return {
       id: `atividade:${a.id}`,

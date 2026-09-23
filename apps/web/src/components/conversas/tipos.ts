@@ -95,6 +95,9 @@ export type LeituraNaLista = {
   alertas: string[];
 };
 
+/** Uma etiqueta do parceiro, como a lista e o cabeçalho mostram. */
+export type EtiquetaDoParceiro = { id: number; nome: string; cor: string | null };
+
 export type ItemConversa = {
   /** É o id da organização: a conversa é com o parceiro, não com o negócio. */
   id: string;
@@ -125,6 +128,8 @@ export type ItemConversa = {
    * módulo está desligado, que é um estado legítimo e não um erro.
    */
   leituraDaIa: LeituraNaLista | null;
+  /** As etiquetas do parceiro, para a lista mostrar de relance. */
+  etiquetas: EtiquetaDoParceiro[];
   /** ISO da interação humana mais recente; `null` quando ninguém falou ainda. */
   ultimaEm: string | null;
   /** Dias inteiros desde `ultimaEm`; `null` quando nunca houve contato. */

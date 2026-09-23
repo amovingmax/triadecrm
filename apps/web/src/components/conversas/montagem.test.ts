@@ -515,6 +515,46 @@ describe('montarLinhaDoTempo com mensagens', () => {
     expect(eventos[0]?.mensagem?.entrada).toBe(true);
   });
 
+  it('a atividade que espelha a mensagem não vira nota: o balão já é ela', () => {
+    const eventos = montarLinhaDoTempo({
+      atividades: [
+        atividade({
+          id: 'reg',
+          organization_id: 'o1',
+          type: 'message',
+          channel: 'whatsapp',
+          occurred_at: '2026-09-10T14:20:00Z',
+          message_id: 'm1',
+        }),
+      ],
+      historico: [],
+      mensagens: [
+        mensagemCrua({ id: 'm1', conversation_id: 'f1', created_at: '2026-09-10T14:20:00Z' }),
+      ],
+      catalogos: CATALOGOS,
+    });
+    expect(eventos.map((e) => e.id)).toEqual(['mensagem:m1']);
+  });
+
+  it('sem a mensagem carregada, a atividade continua sendo o registro do que houve', () => {
+    const eventos = montarLinhaDoTempo({
+      atividades: [
+        atividade({
+          id: 'reg',
+          organization_id: 'o1',
+          type: 'message',
+          channel: 'whatsapp',
+          occurred_at: '2026-09-10T14:20:00Z',
+          message_id: 'fora-da-janela',
+        }),
+      ],
+      historico: [],
+      mensagens: [],
+      catalogos: CATALOGOS,
+    });
+    expect(eventos.map((e) => e.id)).toEqual(['atividade:reg']);
+  });
+
   it('no mesmo segundo: a interação, depois a mensagem, depois a etapa que elas causaram', () => {
     const instante = '2026-09-10T14:00:00Z';
     const eventos = montarLinhaDoTempo({

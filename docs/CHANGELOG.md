@@ -2872,3 +2872,14 @@ Entregue:
 - **Caixa de resposta numa moldura só**: o texto cresce de 1 a 10 linhas, microfone e enviar dentro dela, Enter envia no computador (Shift+Enter quebra a linha) e no celular o Enter continua sendo quebra de linha. A dica dos atalhos só aparece no desktop com a caixa vazia.
 - A assinatura ("*Rafael:*" na primeira linha, como o parceiro vê) saiu do balão: o nome já está em cima dele. O texto enviado não mudou.
 - Testes: 4 asserções novas do agrupamento em `montagem.test.ts`; suíte do site em 776.
+
+### 23/09/2026 — A lista de conversas e as etiquetas (mesma branch `feat/conversa-bonita`)
+
+"Organize tb a tela de conversas, melhore a visualização das etiquetas" (Rafael).
+
+Entregue:
+- **Etiqueta com a cor de verdade** (`components/etiqueta.tsx`): a cor que o gestor escolhe em Ajustes pinta a pílula inteira (fundo em 18%, texto misturado com a cor do tema pelo `color-mix`), em vez de um ponto de 8 px dentro de uma pílula cinza igual às outras. Vale no cabeçalho da conversa e na lista.
+- **Etiquetas na lista**: a linha mostra até duas, e o resto em "+N". `carregarConversas` passou a trazer `tags` e `organization_tags`; `montarConversas` anexa a cada item.
+- **A linha da lista reordenada**: nome e por ler em cima, o FATO (última interação) no meio, o conselho da IA embaixo — estavam trocados, e a opinião da máquina lia como se fosse fala do parceiro. O itálico saiu (11 px em itálico não se lê), o "por ler" passou para o verde da ação, e a nota de intenção da IA só aparece de 50 para cima, como "IA 72": "15" solto não decide nada.
+- **Fim da mensagem em dobro**: toda mensagem do WhatsApp grava também uma atividade, e a coluna mostrava as duas — a nota "Respondeu · WhatsApp" e, logo abaixo, o balão com o texto. A atividade que espelha uma mensagem carregada deixou de virar nota; sem a mensagem à mão, ela continua aparecendo (é o único registro).
+- Testes: 2 asserções novas da regra da mensagem em dobro; suíte do site em 778.
