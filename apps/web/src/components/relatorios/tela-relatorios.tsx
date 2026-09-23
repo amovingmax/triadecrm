@@ -72,10 +72,9 @@ export function TelaRelatorios({
         {/* No celular esta frase gastava cinco linhas antes do primeiro número, e o
             painel logo abaixo já diz o que aquela leitura responde. Ela fica onde há
             espaço para ela. */}
-        <p className="hidden max-w-prose text-sm leading-relaxed text-muted-foreground md:block">
-          As leituras que mudam decisão: onde o funil trava, que categoria secou, que bairro
-          ainda não foi batido, a que horas a porta abre. Todo número sai de uma consulta do
-          banco, e o que está na tela desce em CSV.
+        <p className="hidden max-w-prose text-sm text-muted-foreground md:block">
+          Onde o funil trava, que categoria secou, que bairro ainda não foi batido. O que está
+          na tela desce em CSV.
         </p>
       </header>
 

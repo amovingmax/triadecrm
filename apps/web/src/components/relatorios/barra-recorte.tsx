@@ -132,9 +132,14 @@ export function BarraDePeriodo({
         </div>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
+      {/* A frase inteira virou `title`: ela explicava, em duas linhas fixas embaixo dos
+          botões, uma regra que vale para a tela toda e que ninguém relê depois da
+          primeira vez. O que muda — o período escolhido — continua escrito. */}
+      <p
+        className="text-xs text-muted-foreground"
+        title="Todo número desta tela obedece a este período, menos onde a tabela avisar o contrário."
+      >
         Período: <span className="numerico">{faixaDoPeriodo(periodo)}</span>, no fuso de Natal.
-        Todo número desta tela obedece a ele, menos onde a tabela avisar o contrário.
       </p>
     </div>
   );

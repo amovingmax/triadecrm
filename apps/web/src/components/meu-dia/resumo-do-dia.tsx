@@ -113,10 +113,16 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
   const definicao = definicaoDaMetrica(metrica.metrica);
 
   return (
-    <li className="flex flex-col gap-1.5 sm:border-l sm:border-hairline sm:pl-4 sm:first:border-l-0 sm:first:pl-0">
-      <p className="truncate text-xs text-muted-foreground" title={metrica.rotulo}>
-        {metrica.rotulo}
-      </p>
+    <li
+      // A DEFINIÇÃO VIROU TÍTULO (23/09/2026). "Contato registrado. Um por alvo, por
+      // dia." embaixo de cada número somava quatro parágrafos cinzas na primeira
+      // dobra da tela para explicar quatro palavras que o time usa todo dia. Quem
+      // ainda não sabe passa o mouse — ou abre "Ressalvas destes números", logo
+      // abaixo, que é onde a explicação longa mora de verdade.
+      title={definicao ? `${metrica.rotulo}: ${definicao}` : metrica.rotulo}
+      className="flex flex-col gap-1.5 sm:border-l sm:border-hairline sm:pl-4 sm:first:border-l-0 sm:first:pl-0"
+    >
+      <p className="truncate text-xs text-muted-foreground">{metrica.rotulo}</p>
 
       <p className="flex items-baseline gap-1.5">
         <span className="numerico text-2xl leading-none font-medium">{realizado}</span>
@@ -154,13 +160,8 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
         </div>
       ) : null}
 
-      {/* A definição vai no PÉ do cartão, e não embaixo do rótulo: ela ocupa uma ou
-          duas linhas conforme a largura da coluna, e acima do número empurraria cada
-          um dos quatro para uma altura diferente — a faixa perderia a leitura de
-          relance, que é a única coisa que ela faz bem. */}
-      {definicao ? (
-        <p className="text-[0.6875rem] leading-snug text-muted-foreground">{definicao}</p>
-      ) : null}
+      {/* A definição só existe como `title` do cartão: ver a nota acima. */}
+      <span className="sr-only">{definicao}</span>
     </li>
   );
 }

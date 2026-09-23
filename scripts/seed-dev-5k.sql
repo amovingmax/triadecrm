@@ -262,7 +262,9 @@ select
   '+5584' || '9' || lpad((30000000 + s.i)::text, 8, '0'),
   c.cidades[s.n_cidade + 1],
   case when c.cidades[s.n_cidade + 1] = 1 then c.bairros[s.n_bairro + 1] end,
-  s.n_origem + 1,
+  -- A origem sai do catálogo que EXISTE no banco: o id 10 (GetNinjas) saiu das
+  -- fontes em 09/2026 e o `+ 1` fixo quebrava o seed inteiro com 23503.
+  (select o.id from public.sources o order by o.id offset s.n_origem limit 1),
   e.stage_slug,
   nullif(c.intencoes[s.n_intencao + 1], ''),
   -- 0 a 59 dias sem contato, com metade da base concentrada em até 14 dias

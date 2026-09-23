@@ -63,10 +63,9 @@ function AlcaDeArraste({
       {...resto}
       aria-label={`Mover ${nome} de etapa`}
       title="Arraste, ou aperte espaço e use as setas."
-      className="inline-flex h-7 cursor-grab items-center gap-1 rounded-lg px-1.5 text-[0.6875rem] text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none active:cursor-grabbing"
+      className="inline-flex size-7 cursor-grab items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-opacity group-hover/cartao:opacity-100 hover:bg-accent hover:text-accent-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none active:cursor-grabbing md:opacity-0"
     >
-      <GripVertical className="size-3.5" aria-hidden="true" />
-      Mover
+      <GripVertical className="size-4" aria-hidden="true" />
     </span>
   );
 }

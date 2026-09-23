@@ -204,32 +204,27 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
       id: 'papel',
       rotulo: 'Papel',
       largura: 'w-44',
-      celula: (p) =>
-        ehAdmin ? (
-          <SeletorDePapel
-            valor={p.papel}
-            desabilitado={p.id === sessao.id || mudarPapel.isPending}
-            aoMudar={(papel) => mudarPapel.mutate({ pessoa: p, papel })}
-            rotulo={`Papel de ${p.nome}`}
-          />
-        ) : (
-          <Badge variant="pilula" className="h-6 px-2.5 font-normal">
-            {ROTULO_PAPEL[p.papel]}
-          </Badge>
-        ),
-    },
-    // As três colunas `hidden ... xl:table-cell` desta tela continuam escondidas abaixo
-    // de 1280 px, e agora escondem cabeçalho e célula juntos. Somando as larguras, esta
-    // lista passa de 1000 px com a explicação do papel aberta: no notebook ela obrigaria
-    // a rolar de lado para chegar em "Acesso", que é a coluna pela qual se olha. O que
-    // some é detalhe (o que o papel faz, quem autorizou, a observação); o que decide —
-    // pessoa, papel, acesso — fica visível em qualquer largura.
-    {
-      id: 'oque',
-      rotulo: 'O que esse papel faz',
-      largura: 'hidden w-72 xl:table-cell',
-      soNoDesktop: true,
-      celula: (p) => <span className="text-muted-foreground">{O_QUE_O_PAPEL_FAZ[p.papel]}</span>,
+      // A EXPLICAÇÃO DO PAPEL VIROU TÍTULO (23/09/2026): numa equipe em que quase
+      // todo mundo é SDR, a coluna "O que esse papel faz" repetia a mesma frase de
+      // duas linhas em cada pessoa — 288 px de largura para dizer cinco vezes a
+      // mesma coisa. Quem precisa da definição passa o mouse; quem decide olha
+      // pessoa, papel e acesso.
+      celula: (p) => (
+        <span title={O_QUE_O_PAPEL_FAZ[p.papel]}>
+          {ehAdmin ? (
+            <SeletorDePapel
+              valor={p.papel}
+              desabilitado={p.id === sessao.id || mudarPapel.isPending}
+              aoMudar={(papel) => mudarPapel.mutate({ pessoa: p, papel })}
+              rotulo={`Papel de ${p.nome}`}
+            />
+          ) : (
+            <Badge variant="pilula" className="h-6 px-2.5 font-normal">
+              {ROTULO_PAPEL[p.papel]}
+            </Badge>
+          )}
+        </span>
+      ),
     },
     {
       id: 'setores',

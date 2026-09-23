@@ -72,7 +72,9 @@ const CLASSES: Record<string, string> = {
   // o pior caso — o sinal de esfriamento não pode nascer truncado.
   temperatura: 'w-36',
   responsavel: 'hidden w-36 2xl:table-cell',
-  etapa: 'hidden w-40 2xl:table-cell',
+  // A etapa entra já no `xl`: a 1440px (o notebook do time) sobravam 200px de
+  // mesa vazia à direita, e etapa é a coluna que mais se procura das três.
+  etapa: 'hidden w-40 xl:table-cell',
   proxima: 'hidden w-32 2xl:table-cell',
 };
 
@@ -232,7 +234,9 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
 function ColunasEscondidas() {
   return (
     <p className="pb-2 text-xs text-muted-foreground 2xl:hidden">
-      Nesta largura de tela, responsável, etapa e próxima ação só aparecem na ficha do
+      Nesta largura de tela,{' '}
+      <span className="xl:hidden">responsável, etapa e próxima ação</span>
+      <span className="hidden xl:inline">responsável e próxima ação</span> só aparecem na ficha do
       parceiro.
     </p>
   );

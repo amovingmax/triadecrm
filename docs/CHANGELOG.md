@@ -2883,3 +2883,15 @@ Entregue:
 - **A linha da lista reordenada**: nome e por ler em cima, o FATO (última interação) no meio, o conselho da IA embaixo — estavam trocados, e a opinião da máquina lia como se fosse fala do parceiro. O itálico saiu (11 px em itálico não se lê), o "por ler" passou para o verde da ação, e a nota de intenção da IA só aparece de 50 para cima, como "IA 72": "15" solto não decide nada.
 - **Fim da mensagem em dobro**: toda mensagem do WhatsApp grava também uma atividade, e a coluna mostrava as duas — a nota "Respondeu · WhatsApp" e, logo abaixo, o balão com o texto. A atividade que espelha uma mensagem carregada deixou de virar nota; sem a mensagem à mão, ela continua aparecendo (é o único registro).
 - Testes: 2 asserções novas da regra da mensagem em dobro; suíte do site em 778.
+
+### 23/09/2026 — Uma passada de limpeza nas telas (mesma branch `feat/conversa-bonita`)
+
+"Melhore de forma geral as visualizações de tela no CRM, tá muito feias" (Rafael). Com o banco local em 5.004 parceiros e 5.141 negócios — o volume real —, o que aparece é sempre o mesmo defeito: texto explicativo repetido linha a linha, e textura no lugar de sinal.
+
+Entregue:
+- **Funil:** o cartão parado trocou a hachura diagonal por um véu de 5%. Com 1.677 negócios parados, metade do quadro virava um rachurado que brigava com o nome de cada parceiro; a pastilha "Parado há 56d" continua sendo quem diz o que é. A alça de arraste virou um ícone no canto, que aparece no hover (e sempre no foco do teclado): "Mover" escrito em todo cartão custava uma linha por cartão, coluna abaixo. Cabem 6 cartões por coluna onde cabiam 4.
+- **Parceiros:** a coluna **Etapa** entra já em 1280 px — a 1440 sobravam 200 px de mesa vazia à direita —, e o aviso das colunas escondidas passou a dizer só o que de fato falta naquela largura.
+- **Meu dia:** as definições dos quatro números ("Contato registrado. Um por alvo, por dia.") saíram da tela e viraram o `title` do cartão, com o texto ainda disponível para leitor de tela. Eram quatro parágrafos cinzas na primeira dobra para explicar quatro palavras que o time usa todo dia.
+- **Ajustes → Pessoas:** a coluna "O que esse papel faz" saiu. Numa equipe em que quase todo mundo é SDR, ela repetia a mesma frase de duas linhas em cada pessoa, em 288 px de largura; a definição virou o `title` do seletor de papel.
+- **Relatórios:** o parágrafo de abertura caiu de três linhas para uma, e a regra do período ("todo número desta tela obedece a ele") virou `title` da linha do período.
+- `scripts/seed-dev-5k.sql`: a origem dos parceiros passou a sair do catálogo que existe no banco. O `+ 1` fixo apontava para a fonte 10 (GetNinjas), removida em 09/2026, e o seed de desenvolvimento morria com 23503.

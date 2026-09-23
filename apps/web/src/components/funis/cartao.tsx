@@ -67,13 +67,16 @@ import type { CartaoQuadro } from './tipos';
  */
 
 /**
- * Hachura do cartão parado. Em tinta a 8% ela some no primeiro relance e aparece
- * quando o olho para, que é exatamente o peso certo: o alerta é a pastilha escrita;
- * a textura só marca o retângulo. Funciona igual nos dois modos porque `--foreground`
- * inverte junto com a superfície.
+ * O cartão parado ganha um VÉU, não mais a hachura diagonal (23/09/2026).
+ *
+ * A hachura em 8% funcionava num cartão; num quadro real ela pega metade da
+ * coluna — em 4.387 negócios, 1.677 estão parados — e a tela inteira vira um
+ * rachurado que briga com o texto de todo cartão. "Tá muito feio" (Rafael) é
+ * isto. O que carrega o significado continua sendo a pastilha escrita ("Parado
+ * há 56d"); o fundo só precisa marcar que aquele retângulo é diferente, e um
+ * véu uniforme de 5% faz isso sem riscar o nome do parceiro.
  */
-const HACHURA_PARADO =
-  'repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in oklab, var(--foreground) 8%, transparent) 7px 14px)';
+const VEU_PARADO = 'color-mix(in oklab, var(--foreground) 5%, transparent)';
 
 export type PropsCartaoNegocio = {
   cartao: CartaoQuadro;
@@ -113,7 +116,7 @@ export function CartaoNegocio({
       data-parado={cartao.is_rotting ? '' : undefined}
       data-arrastando={arrastando ? '' : undefined}
       className={cn(
-        'relative flex min-h-[76px] w-full flex-col gap-1.5 rounded-xl border border-hairline bg-card py-3 pr-3 pl-4',
+        'group/cartao relative flex min-h-[76px] w-full flex-col gap-1.5 rounded-xl border border-hairline bg-card py-2.5 pr-3 pl-4',
         'transition-shadow focus-within:ring-2 focus-within:ring-ring',
         arrastando ? 'sombra-base-forte' : 'sombra-base',
         // O fantasma é a silhueta do cartão que saiu do lugar; é o único ponto do
@@ -121,7 +124,7 @@ export function CartaoNegocio({
         fantasma && 'opacity-40',
         className,
       )}
-      style={{ ...(parado ? { backgroundImage: HACHURA_PARADO } : null), ...style }}
+      style={{ ...(parado ? { backgroundColor: VEU_PARADO } : null), ...style }}
       {...resto}
     >
       {/* `semRotulo`: o SemaforoTermico logo abaixo já anuncia a temperatura em texto,
@@ -219,8 +222,15 @@ export function CartaoNegocio({
         </span>
       </div>
 
-      {/* z-10: precisa ficar acima do link esticado, senão o toque no botão abriria a ficha. */}
-      {acoes ? <div className="relative z-10 flex items-center gap-2 pt-1">{acoes}</div> : null}
+      {/* A alça de arraste (e, no celular, o botão de mover) fica no CANTO, não numa
+          linha própria: "Mover" escrito em cada cartão era uma linha de 28 px repetida
+          coluna abaixo para dizer o que o cursor já diz ao passar por cima.
+          z-10: precisa ficar acima do link esticado, senão o toque abriria a ficha. */}
+      {acoes ? (
+        <div className="relative z-10 flex items-center gap-2 pt-1 md:absolute md:top-1.5 md:right-1.5 md:pt-0">
+          {acoes}
+        </div>
+      ) : null}
     </article>
   );
 }
