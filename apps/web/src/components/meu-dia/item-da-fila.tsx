@@ -9,6 +9,7 @@ import { useRevelarLinha } from '@/components/movimento';
 import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
 
 import { formatarQuando, quandoEmTexto } from './formatos';
+import { ICONE_DO_ITEM, iconeDoItem } from './icones';
 import { destinoDoItem, type ItemDoDia } from './tipos';
 
 /**
@@ -46,18 +47,41 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
   const motivo = explicar || !acao ? item.motivo : null;
   const local = formatarLocal(item.bairro, null);
 
+  const Icone = ICONE_DO_ITEM[iconeDoItem(item)];
+
   const miolo = (
     <>
       {item.temperatura ? (
         <BarraTermica temperatura={item.temperatura} posicao="absoluta" semRotulo />
       ) : null}
 
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <p className="truncate font-medium">{nome}</p>
-        {acao ? <p className="truncate text-[0.8125rem]">{acao}</p> : null}
-        {motivo ? <p className="text-xs text-muted-foreground">{motivo}</p> : null}
+      {/* O ÍCONE DO MOTIVO: reunião, tarefa, próxima ação, negócio parado. Ele diz
+          antes da leitura o que aquela linha é — e quando o prazo já venceu, ele
+          veste o tom de alerta, que é o único lugar da fila onde a cor significa
+          urgência e não temperatura. */}
+      <span
+        aria-hidden="true"
+        className={cn(
+          'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full',
+          quando.atencao ? 'bg-destructive/15 text-destructive-texto' : 'bg-muted text-muted-foreground',
+        )}
+      >
+        <Icone className="size-4.5" />
+      </span>
 
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      {/* Em tela larga, quem é o parceiro fica à esquerda e o CONTEXTO (temperatura,
+          etapa, bairro, categoria) vai para a direita, antes do prazo: a linha
+          ocupava um terço da largura e deixava metade da tela vazia, com três
+          andares de texto amontoados na margem esquerda. No celular ele volta a
+          empilhar, que é onde empilhar faz sentido. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 md:flex-row md:items-center md:gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{nome}</p>
+          {acao ? <p className="truncate text-[0.8125rem]">{acao}</p> : null}
+          {motivo ? <p className="text-xs text-muted-foreground">{motivo}</p> : null}
+        </div>
+
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground md:mt-0 md:max-w-[45%] md:shrink-0 md:justify-end">
           {item.temperatura ? (
             <ChipTemperatura temperatura={item.temperatura} comDescricao={false} />
           ) : null}
@@ -69,13 +93,16 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
         </p>
       </div>
 
-      <div className="flex shrink-0 items-start gap-0.5 pt-0.5">
+      <div className="flex shrink-0 items-center gap-0.5 pt-1">
+        {/* O prazo vencido vira pastilha: "há 6 d" em cinza, no fim de uma linha
+            cinza, era a informação mais urgente da tela escrita no tom mais baixo. */}
         <span
           title={quando.detalhe}
           className={cn(
-            'whitespace-nowrap',
-            quando.atencao ? 'font-medium text-foreground' : 'text-muted-foreground',
-            quando.numero && !quando.prefixo && !quando.sufixo ? 'text-sm' : 'text-xs',
+            'inline-flex items-center rounded-full whitespace-nowrap',
+            quando.atencao
+              ? 'bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive-texto'
+              : 'text-xs text-muted-foreground',
           )}
         >
           <span aria-hidden="true">
@@ -86,25 +113,25 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
           <span className="sr-only">{`${quandoEmTexto(quando)}. ${quando.detalhe}`}</span>
         </span>
         {destino ? (
-          <ChevronRight
-            className="mt-px size-4 shrink-0 text-muted-foreground"
-            aria-hidden="true"
-          />
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         ) : null}
       </div>
     </>
   );
 
-  const molde = 'relative flex min-h-[76px] items-start gap-3 py-3 pr-3 pl-4';
+  // A linha virou CARTÃO: cantos arredondados, fundo no hover e um respiro entre
+  // uma e outra, no lugar do filete cinza que ligava tudo num bloco só de texto.
+  const molde =
+    'relative flex min-h-[72px] items-start gap-3 rounded-xl py-2.5 pr-3 pl-4 transition-colors';
 
   return (
-    <li {...revelar} className={cn('border-b border-hairline last:border-b-0', revelar.className)}>
+    <li {...revelar} className={revelar.className}>
       {destino ? (
         <Link
           href={destino.href}
           className={cn(
             molde,
-            'outline-none active:bg-muted/60 focus-visible:bg-muted/60 md:hover:bg-muted/40',
+            'outline-none active:bg-muted/60 focus-visible:bg-muted/60 md:hover:bg-muted/50',
           )}
         >
           {miolo}

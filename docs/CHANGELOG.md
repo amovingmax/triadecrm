@@ -2895,3 +2895,14 @@ Entregue:
 - **Ajustes → Pessoas:** a coluna "O que esse papel faz" saiu. Numa equipe em que quase todo mundo é SDR, ela repetia a mesma frase de duas linhas em cada pessoa, em 288 px de largura; a definição virou o `title` do seletor de papel.
 - **Relatórios:** o parágrafo de abertura caiu de três linhas para uma, e a regra do período ("todo número desta tela obedece a ele") virou `title` da linha do período.
 - `scripts/seed-dev-5k.sql`: a origem dos parceiros passou a sair do catálogo que existe no banco. O `+ 1` fixo apontava para a fonte 10 (GetNinjas), removida em 09/2026, e o seed de desenvolvimento morria com 23503.
+
+### 23/09/2026 — Meu dia: a fila passou a dizer o que fazer
+
+"Mudou quase nada em meu dia, continua feio" (Rafael). Estava certo: na passada anterior só saíram as definições dos números. A fila continuava uma pilha de linhas de texto cinza, onde para saber se aquilo era uma ligação ou uma mensagem era preciso ler as duas linhas de cada item.
+
+Entregue:
+- **Ícone por gesto** (`meu-dia/icones.tsx`): o primeiro verbo do título decide — "Ligar D+1" é telefone, "Mandar o resumo" é conversa, "Visitar o espaço" é mapa, "Confirmar a reunião" é agenda. Sem verbo conhecido, vale o ícone do motivo de estar na fila (tarefa, próxima ação, negócio parado). A regra olha o COMEÇO do título de propósito: "Mandar o resumo combinado na ligação" é mensagem, não ligação. Pura e testada (6 asserções).
+- **Vencido parece vencido**: o ícone e o prazo do item atrasado vestem o tom de alerta ("há 6 d" numa pastilha), em vez de cinza no fim de uma linha cinza.
+- **A linha virou cartão**, com canto arredondado e respiro entre uma e outra, no lugar do filete que ligava tudo num bloco só. Em tela larga, o contexto (temperatura, etapa, bairro, categoria) foi para a direita: a fila usava um terço da largura e deixava metade da tela vazia.
+- **Os quatro números ganharam ícone** e cresceram (porta, porta aberta, telefone, agenda); a barra da meta batida fica verde.
+- Cabeçalho de bloco mais limpo: a explicação ("Passou da hora, ou acontece em menos de três horas") virou `title`, e a nota da meta parou de quebrar em três linhas no celular.

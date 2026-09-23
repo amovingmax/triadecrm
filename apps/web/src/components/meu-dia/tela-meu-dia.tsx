@@ -229,12 +229,14 @@ function Bloco({ bloco, deslocamento }: { bloco: BlocoPreenchido; deslocamento: 
           />
         ) : null}
       </span>
-      <span className="text-xs text-muted-foreground sm:text-right">{bloco.explicacao}</span>
+      {/* A explicação do bloco ("Passou da hora, ou acontece em menos de três
+          horas") vira `title`: ela é regra, lida uma vez, e disputava a linha do
+          cabeçalho com o que muda todo dia — o nome do bloco e a contagem. */}
+      <span className="sr-only">{bloco.explicacao}</span>
     </>
   );
 
-  const molde =
-    'flex w-full flex-col items-start gap-0.5 border-b border-hairline pb-2 text-left sm:flex-row sm:items-baseline sm:justify-between sm:gap-4';
+  const molde = 'flex w-full items-center gap-2 pb-1.5 text-left';
 
   return (
     <section aria-labelledby={idDoTitulo} className="flex flex-col">
@@ -244,6 +246,7 @@ function Bloco({ bloco, deslocamento }: { bloco: BlocoPreenchido; deslocamento: 
           onClick={() => setAberto((valor) => !valor)}
           aria-expanded={aberto}
           aria-controls={idDaLista}
+          title={bloco.explicacao}
           className={cn(
             molde,
             'toque min-h-11 cursor-pointer outline-none focus-visible:bg-muted/40 sm:min-h-9',
@@ -252,10 +255,12 @@ function Bloco({ bloco, deslocamento }: { bloco: BlocoPreenchido; deslocamento: 
           {cabecalho}
         </button>
       ) : (
-        <h2 className={molde}>{cabecalho}</h2>
+        <h2 className={molde} title={bloco.explicacao}>
+          {cabecalho}
+        </h2>
       )}
 
-      <ul id={idDaLista} hidden={!aberto}>
+      <ul id={idDaLista} hidden={!aberto} className="flex flex-col gap-0.5">
         {bloco.itens.map((item, ordem) => (
           <ItemDaFila key={chaveDoItem(item, ordem)} item={item} indice={deslocamento + ordem} />
         ))}

@@ -1,7 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { Info, Target } from 'lucide-react';
+import {
+  BadgeCheck,
+  CalendarCheck,
+  ClipboardList,
+  DoorClosed,
+  DoorOpen,
+  Info,
+  MapPin,
+  Phone,
+  Target,
+  UserPlus,
+  type LucideIcon,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -69,16 +81,20 @@ export function ResumoDoDia({
       </ul>
 
       {semNenhumaMeta ? (
-        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
-          <Target className="size-3.5 shrink-0" aria-hidden="true" />
-          Nenhuma meta definida para hoje: os números acima são só o realizado.
-          {podeDefinirMeta ? (
-            <Link href="/metas" className="underline underline-offset-4 hover:text-foreground">
-              Definir em Metas
-            </Link>
-          ) : (
-            <span>Quem define a meta é gestor ou admin.</span>
-          )}
+        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+          <Target className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+          {/* O texto inteiro num filho só: com `flex-wrap`, em 390 px o alvo ficava
+              sozinho numa linha e a frase começava na linha de baixo. */}
+          <span>
+            Sem meta para hoje: os números acima são só o realizado.{' '}
+            {podeDefinirMeta ? (
+              <Link href="/metas" className="underline underline-offset-4 hover:text-foreground">
+                Definir em Metas
+              </Link>
+            ) : (
+              <span>Quem define a meta é gestor ou admin.</span>
+            )}
+          </span>
         </p>
       ) : null}
 
@@ -104,6 +120,23 @@ export function ResumoDoDia({
   );
 }
 
+/**
+ * Um desenho por número. A faixa era quatro rótulos cinzas com quatro números do
+ * mesmo tamanho: nada dizia, de relance, qual deles era porta batida e qual era
+ * reunião. O ícone faz isso sem gastar linha.
+ */
+const ICONE_DA_METRICA: Record<string, LucideIcon> = {
+  doors_knocked: DoorOpen,
+  doors_opened: DoorClosed,
+  calls_made: Phone,
+  meetings_booked: CalendarCheck,
+  meetings_done: CalendarCheck,
+  visits_done: MapPin,
+  new_targets: UserPlus,
+  pre_registrations: ClipboardList,
+  published: BadgeCheck,
+};
+
 function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
   const realizado = metrica.realizado ?? 0;
   const meta = metrica.meta;
@@ -111,6 +144,7 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
   const preenchido = percentual === null ? 0 : Math.min(100, percentual);
   const bateu = percentual !== null && percentual >= 100;
   const definicao = definicaoDaMetrica(metrica.metrica);
+  const Icone = ICONE_DA_METRICA[metrica.metrica];
 
   return (
     <li
@@ -122,10 +156,20 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
       title={definicao ? `${metrica.rotulo}: ${definicao}` : metrica.rotulo}
       className="flex flex-col gap-1.5 sm:border-l sm:border-hairline sm:pl-4 sm:first:border-l-0 sm:first:pl-0"
     >
-      <p className="truncate text-xs text-muted-foreground">{metrica.rotulo}</p>
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {Icone ? <Icone className="size-3.5 shrink-0" aria-hidden="true" /> : null}
+        <span className="truncate">{metrica.rotulo}</span>
+      </p>
 
       <p className="flex items-baseline gap-1.5">
-        <span className="numerico text-2xl leading-none font-medium">{realizado}</span>
+        <span
+          className={cn(
+            'numerico text-3xl leading-none font-semibold',
+            realizado === 0 && 'text-muted-foreground',
+          )}
+        >
+          {realizado}
+        </span>
         {meta !== null ? (
           <span className="text-xs text-muted-foreground">
             de <span className="numerico">{meta}</span>
@@ -145,7 +189,7 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
           >
             <span
               aria-hidden="true"
-              className="block h-full rounded-full bg-foreground"
+              className={cn('block h-full rounded-full', bateu ? 'bg-primary' : 'bg-foreground')}
               style={{ width: `${preenchido}%` }}
             />
           </span>

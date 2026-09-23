@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { dataPorExtenso, formatarQuando, primeiroNome, saudacaoDoDia } from './formatos';
 import type { ItemDoDia } from './tipos';
+import { iconeDoItem } from './icones';
+import type { TipoDeItem } from './tipos';
 
 /**
  * Duas coisas são travadas aqui. A primeira é o fuso: o dia de trabalho é o de Natal,
@@ -102,5 +104,23 @@ describe('formatarQuando', () => {
       numero: null,
     });
     expect(formatarQuando(item({ quando: '2026-09-08T12:00:00Z' }), agora).numero).toBe('08/09');
+  });
+});
+
+describe('o ícone da linha da fila', () => {
+  const item = (tipo: TipoDeItem, titulo: string) => ({ tipo, titulo });
+
+  it('segue o verbo do título, que é o gesto que a pessoa vai fazer', () => {
+    expect(iconeDoItem(item('tarefa_hoje', 'Ligar D+1 (tentativa 2 de 3)'))).toBe('ligar');
+    expect(iconeDoItem(item('tarefa_hoje', 'Mandar o resumo combinado na ligação'))).toBe(
+      'escrever',
+    );
+    expect(iconeDoItem(item('tarefa_hoje', 'Visitar o espaço em Ponta Negra'))).toBe('visitar');
+    expect(iconeDoItem(item('tarefa_hoje', 'Confirmar a reunião de amanhã'))).toBe('agendar');
+  });
+
+  it('sem verbo conhecido, vale o motivo de estar na fila', () => {
+    expect(iconeDoItem(item('negocio_parado', 'Buffet Sabor do Mar'))).toBe('negocio_parado');
+    expect(iconeDoItem(item('reuniao_proxima', 'Apresentação para o dono'))).toBe('reuniao_proxima');
   });
 });
