@@ -2859,3 +2859,16 @@ Entregue:
 - Testes: pgTAP 65 (9 asserções: o catálogo, o relógio e a campanha); 08 conta 3 aberturas genéricas ativas; 43, 46, 47, 57 e 58 reativam dentro do teste o modelo que usam (provam o mecanismo, não o catálogo). Vitest da escolha do cumprimento e do rótulo da campanha.
 
 Parado: o acompanhamento da aprovação dos 3 convites (cancelados). Eles continuam na fila da Meta; se forem aprovados, seguem fora de uso no CRM.
+
+### 23/09/2026 — A conversa virou conversa (branch `feat/conversa-bonita`)
+
+"Tá muito ruim, muito feio. E no mobile tá ficando muito pequeno e ruim de ver a conversa" (Rafael). O fio era uma lista de registros: trilho de ícones de 44 px à esquerda, os dois lados no mesmo cinza, nome de quem escreveu dentro do balão, hora, entrega e "Virar tarefa" também dentro, e um cabeçalho que em 390 px empilhava quatro selos e três botões antes de a primeira mensagem aparecer.
+
+Entregue:
+- **Balões de verdade** (`mensagem-do-fio.tsx`): recebida à esquerda no cinza do tema (`muted` no claro, `card` no escuro), enviada à direita com véu da cor da marca, canto reto no lado de quem falou, texto em 15 px. Hora, entrega e selos saíram do balão e viraram uma linha miúda embaixo.
+- **Blocos por autor** (`mesmoBloco`, em `montagem.ts`): mensagens seguidas do mesmo autor em até 5 min se agrupam — o nome aparece uma vez, a hora só na última. Ligação, visita e mudança de etapa nunca entram em bloco.
+- **Sem trilho**: o que não é mensagem virou nota no meio da coluna (`linha-do-tempo.tsx`), e o dia virou pílula central. A coluna da conversa ficou centralizada no desktop.
+- **Cabeçalho do celular em uma linha**: nome + "Frio · esperando a gente"; os selos voltam a partir de `sm`. A ficha do parceiro (onde, categoria, dono, telefone) nasce recolhida no celular, atrás de uma linha.
+- **Caixa de resposta numa moldura só**: o texto cresce de 1 a 10 linhas, microfone e enviar dentro dela, Enter envia no computador (Shift+Enter quebra a linha) e no celular o Enter continua sendo quebra de linha. A dica dos atalhos só aparece no desktop com a caixa vazia.
+- A assinatura ("*Rafael:*" na primeira linha, como o parceiro vê) saiu do balão: o nome já está em cima dele. O texto enviado não mudou.
+- Testes: 4 asserções novas do agrupamento em `montagem.test.ts`; suíte do site em 776.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -161,6 +161,9 @@ function PediuParaSair({
   );
 }
 
+/** Até onde a caixa cresce sozinha: dez linhas, e daí em diante ela rola. */
+const ALTURA_MAXIMA = 220;
+
 /** Janela aberta: texto livre, que é o que a Meta permite e não cobra. */
 function TextoLivre({
   fio,
@@ -212,13 +215,27 @@ function TextoLivre({
   // está escrevendo à mão era um erro de categoria — quem fala com o parceiro é
   // gente, e gente escreve o que precisa. O teto aqui é o da Cloud API.
   const longo = texto.length > TETO_DO_WHATSAPP;
+  const pode = limpo.length > 0 && !enviar.isPending && !longo;
+
+  // A CAIXA CRESCE COM O TEXTO, de uma linha até dez.
+  //
+  // Ela era fixa em duas linhas: quem escreve três parágrafos digitava dentro de
+  // uma janelinha rolando, e quem escreve "ok" pagava duas linhas de altura numa
+  // tela de 390 px onde cada linha é uma mensagem a menos à vista.
+  const caixa = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = caixa.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, ALTURA_MAXIMA)}px`;
+  }, [texto]);
 
   return (
     <form
-      className={cn('space-y-2', className)}
+      className={cn('space-y-1.5', className)}
       onSubmit={(e) => {
         e.preventDefault();
-        if (limpo && !enviar.isPending) enviar.mutate();
+        if (pode) enviar.mutate();
       }}
     >
       <label htmlFor="resposta" className="sr-only">
@@ -227,7 +244,7 @@ function TextoLivre({
       {sugestoes.length > 0 ? (
         <ul
           aria-label="Respostas prontas"
-          className="max-h-48 overflow-y-auto rounded-lg border border-hairline bg-popover shadow-sm"
+          className="max-h-48 overflow-y-auto rounded-xl border border-hairline bg-popover shadow-sm"
         >
           {sugestoes.map((r) => (
             <li key={r.id}>
@@ -243,20 +260,55 @@ function TextoLivre({
           ))}
         </ul>
       ) : null}
-      <textarea
-        id="resposta"
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-        rows={2}
-        placeholder="Escreva para o parceiro (/ para respostas prontas)"
-        className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-base leading-relaxed transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
-      />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[11px] leading-relaxed text-muted-foreground">
+
+      {/* Uma caixa só: o texto, o microfone e o enviar na mesma moldura, como em
+          qualquer aplicativo de conversa. O botão inteiro numa linha própria
+          custava 56 px de tela e uma varredura de olho a mais. */}
+      <div className="flex items-end gap-1 rounded-2xl border border-input bg-card/60 py-1 pr-1 pl-2 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/40">
+        <textarea
+          id="resposta"
+          ref={caixa}
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter manda no computador; no celular o Enter do teclado é quebra
+            // de linha, e enviar ali seria mandar metade da frase toda vez.
+            if (e.key !== 'Enter' || e.shiftKey) return;
+            if (window.matchMedia?.('(pointer: coarse)').matches) return;
+            e.preventDefault();
+            if (pode) enviar.mutate();
+          }}
+          rows={1}
+          placeholder="Mensagem"
+          className="min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground"
+        />
+        {/* Gravar fica ao lado de Enviar porque são a mesma decisão: como mandar
+            isto. Dentro da janela de 24 h os dois valem. */}
+        <GravarAudio key={fio.id} fioId={fio.id} />
+        <Button
+          type="submit"
+          size="icon"
+          className="toque size-10 shrink-0 rounded-full md:size-9"
+          disabled={!pode}
+        >
+          <SendHorizontal aria-hidden="true" />
+          <span className="sr-only">Enviar pelo WhatsApp</span>
+        </Button>
+      </div>
+
+      {/* Com a caixa vazia, a dica dos atalhos — e só no computador, onde há
+          tecla para isso e espaço para dizer. No celular a mesma linha seria um
+          rodapé permanente sobre uma tela que já é estreita. */}
+      {texto.length === 0 ? (
+        <p className="hidden px-1 text-[11px] leading-relaxed text-muted-foreground md:block">
+          <code className="text-primary">/</code> abre as respostas prontas · Enter envia,
+          Shift+Enter quebra a linha
+        </p>
+      ) : null}
+
+      {texto.length > 0 ? (
+        <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
           Sai com seu primeiro nome em negrito na frente.
-          {/* A contagem só aparece quando chega perto do teto da Cloud API. Um
-              contador sempre à vista transforma escrever numa prova de redação —
-              e aqui quem escreve é gente falando com gente. */}
           {texto.length > TETO_DO_WHATSAPP - 400 ? (
             <span className={cn(longo && 'text-destructive-texto')}>
               {' · '}
@@ -264,21 +316,9 @@ function TextoLivre({
               <span className="numerico">{TETO_DO_WHATSAPP}</span> caracteres
             </span>
           ) : null}
-        </span>
-        <span className="flex items-center gap-1">
-          {/* Gravar fica ao lado de Enviar porque são a mesma decisão: como
-              mandar isto. Dentro da janela de 24 h os dois valem. */}
-          <GravarAudio key={fio.id} fioId={fio.id} />
-          <Button
-            type="submit"
-            className="toque h-11 md:h-9"
-            disabled={limpo.length === 0 || enviar.isPending}
-          >
-            <SendHorizontal aria-hidden="true" />
-            Enviar
-          </Button>
-        </span>
-      </div>
+        </p>
+      ) : null}
     </form>
   );
+
 }

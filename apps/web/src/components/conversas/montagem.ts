@@ -527,6 +527,28 @@ export function procedenciaDoEvento({
  * de desfechos criou (`activities_apply_outcome` grava a atividade e o `move_deal`
  * grava a etapa, no mesmo segundo).
  */
+/** Quantos minutos ainda contam como "a mesma fala". */
+export const MINUTOS_DO_BLOCO = 5;
+
+/**
+ * Duas mensagens do mesmo autor, uma seguida da outra: viram um bloco.
+ *
+ * É o que tira da tela a repetição de nome, hora e entrega a cada linha — e o
+ * que faz "mandei três mensagens seguidas" parecer três mensagens seguidas, e
+ * não três registros de auditoria. Evento que não é mensagem nunca entra em
+ * bloco: a ligação no meio da conversa é justamente o que separa um assunto do
+ * outro.
+ */
+export function mesmoBloco(a: EventoDaLinha | undefined, b: EventoDaLinha | undefined): boolean {
+  if (!a?.mensagem || !b?.mensagem) return false;
+  if (a.genero !== 'mensagem' || b.genero !== 'mensagem') return false;
+  if (a.mensagem.entrada !== b.mensagem.entrada) return false;
+  if ((a.mensagem.autor ?? '') !== (b.mensagem.autor ?? '')) return false;
+  if (a.mensagem.autorTipo !== b.mensagem.autorTipo) return false;
+  const minutos = Math.abs(new Date(b.em).getTime() - new Date(a.em).getTime()) / 60_000;
+  return minutos <= MINUTOS_DO_BLOCO;
+}
+
 export function montarLinhaDoTempo({
   atividades,
   historico,

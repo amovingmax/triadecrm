@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  mesmoBloco,
   agruparPorDia,
   aplicarFiltros,
   cabeNaJanela,
@@ -722,5 +723,60 @@ describe('Minhas, Meu setor e Todas (Fase 1)', () => {
 
   it('"Todas" não recorta nada, nem quem ainda não tem conversa', () => {
     expect(ids('todas')).toEqual(['o1', 'o2', 'o3']);
+  });
+});
+
+describe('mensagens seguidas do mesmo autor viram um bloco', () => {
+  const base = {
+    id: 'm1',
+    genero: 'mensagem' as const,
+    em: '2026-09-23T12:00:00Z',
+    titulo: 'Mensagem',
+    tipo: null,
+    canal: null,
+    autor: 'Rafael',
+    autorTipo: 'human' as const,
+    desfecho: null,
+    detalhe: null,
+    comQuem: null,
+    duracaoMin: null,
+    portaAberta: false,
+    mensagem: {
+      id: 'm1',
+      entrada: false,
+      autor: 'Rafael',
+      autorTipo: 'human' as const,
+    },
+  };
+  const evento = (mudancas: Record<string, unknown>) =>
+    ({ ...base, ...mudancas }) as unknown as Parameters<typeof mesmoBloco>[0];
+
+  it('duas nossas em menos de 5 minutos são o mesmo bloco', () => {
+    const a = evento({});
+    const b = evento({ id: 'm2', em: '2026-09-23T12:03:00Z' });
+    expect(mesmoBloco(a, b)).toBe(true);
+  });
+
+  it('meia hora depois, não', () => {
+    const a = evento({});
+    const b = evento({ id: 'm2', em: '2026-09-23T12:30:00Z' });
+    expect(mesmoBloco(a, b)).toBe(false);
+  });
+
+  it('a resposta do parceiro começa outro bloco', () => {
+    const a = evento({});
+    const b = evento({
+      id: 'm2',
+      em: '2026-09-23T12:01:00Z',
+      mensagem: { id: 'm2', entrada: true, autor: null, autorTipo: 'system' },
+    });
+    expect(mesmoBloco(a, b)).toBe(false);
+  });
+
+  it('o que não é mensagem (uma ligação no meio) nunca entra em bloco', () => {
+    const a = evento({});
+    const ligacao = evento({ id: 'a1', genero: 'atividade', mensagem: null });
+    expect(mesmoBloco(a, ligacao)).toBe(false);
+    expect(mesmoBloco(ligacao, a)).toBe(false);
   });
 });

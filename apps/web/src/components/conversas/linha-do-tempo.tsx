@@ -1,14 +1,13 @@
 'use client';
 
-import { CornerDownLeft, DoorOpen, Send } from 'lucide-react';
+import { DoorOpen } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 import { dataHoraCompleta, duracao, hora, rotuloDoDia } from './formatos';
 import { ICONE_TIPO } from './icones';
 import { Mensagem } from './mensagem-do-fio';
-import { procedenciaDoEvento } from './montagem';
+import { mesmoBloco, procedenciaDoEvento } from './montagem';
 import { ROTULO_AUTOR, type DiaDaLinha, type EventoDaLinha } from './tipos';
 
 /**
@@ -29,13 +28,18 @@ import { ROTULO_AUTOR, type DiaDaLinha, type EventoDaLinha } from './tipos';
  */
 export function LinhaDoTempo({ dias }: { dias: DiaDaLinha[] }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       {dias.map((dia) => (
         <section key={dia.chave} className="flex flex-col gap-3">
           <SeparadorDeDia iso={dia.em} />
           <ol className="flex flex-col">
-            {dia.eventos.map((evento) => (
-              <Evento key={evento.id} evento={evento} />
+            {dia.eventos.map((evento, i) => (
+              <Evento
+                key={evento.id}
+                evento={evento}
+                anterior={dia.eventos[i - 1]}
+                seguinte={dia.eventos[i + 1]}
+              />
             ))}
           </ol>
         </section>
@@ -44,50 +48,47 @@ export function LinhaDoTempo({ dias }: { dias: DiaDaLinha[] }) {
   );
 }
 
+/** O dia numa pílula no meio da coluna, como em qualquer conversa. */
 function SeparadorDeDia({ iso }: { iso: string }) {
   const { palavra, numero, completo } = rotuloDoDia(iso);
 
   return (
-    <div className="flex items-center gap-3">
-      <span className="h-px flex-1 bg-hairline" role="presentation" />
-      <span className="text-xs text-muted-foreground" title={completo}>
+    <div className="flex justify-center">
+      <span
+        className="rounded-full bg-muted px-3 py-1 text-[11px] text-muted-foreground"
+        title={completo}
+      >
         {palavra}
         {numero ? <span className="numerico">{numero}</span> : null}
       </span>
-      <span className="h-px flex-1 bg-hairline" role="presentation" />
     </div>
   );
 }
 
-function Evento({ evento }: { evento: EventoDaLinha }) {
-  // A mensagem é balão, não linha de registro: ela ocupa a largura do trilho e
-  // dispensa o cabeçalho de procedência, porque a própria assinatura do balão já
-  // diz quem escreveu, por onde e sob que regra saiu.
+function Evento({
+  evento,
+  anterior,
+  seguinte,
+}: {
+  evento: EventoDaLinha;
+  anterior?: EventoDaLinha;
+  seguinte?: EventoDaLinha;
+}) {
+  // A mensagem é balão, e o balão não tem trilho: o lado já diz quem falou, e os
+  // 44 px do trilho eram a diferença entre ler a conversa e espremê-la no celular.
   if (evento.genero === 'mensagem' && evento.mensagem) {
-    const recebida = evento.mensagem.entrada;
-    const Seta = recebida ? CornerDownLeft : Send;
     return (
       // O id é a âncora da evidência: a leitura da IA cita `message_id`, e clicar
       // no sinal rola até a mensagem que o prova (`leitura-da-ia.tsx`).
       <li
         id={`evento-${evento.id}`}
-        className="group relative flex scroll-mt-4 gap-3 pb-4 transition-colors last:pb-0 data-[apontada]:bg-muted/60"
+        className="scroll-mt-4 transition-colors data-[apontada]:bg-muted/60"
       >
-        <span
-          className="absolute top-8 bottom-0 left-4 w-px -translate-x-1/2 bg-hairline group-last:hidden"
-          role="presentation"
+        <Mensagem
+          mensagem={evento.mensagem}
+          agrupada={mesmoBloco(anterior, evento)}
+          fechaGrupo={!mesmoBloco(evento, seguinte)}
         />
-        <span
-          className={cn(
-            'relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-hairline text-muted-foreground',
-            recebida ? 'bg-muted text-foreground' : 'bg-card',
-          )}
-        >
-          <Seta className="size-4" aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <Mensagem mensagem={evento.mensagem} />
-        </div>
       </li>
     );
   }
@@ -112,26 +113,14 @@ function Evento({ evento }: { evento: EventoDaLinha }) {
   // isso é o que impede alguém de achar que a conversa some quando não aparece texto.
   const semTexto = evento.tipo === 'message' && !evento.detalhe;
 
+  // O que NÃO é mensagem vira nota no meio da coluna — a ligação de terça e a
+  // mudança de etapa que ela causou continuam no mesmo fio, na mesma ordem, mas
+  // sem disputar o lugar dos balões: elas são o que aconteceu, não o que foi dito.
   return (
-    <li className="group relative flex gap-3 pb-4 last:pb-0">
-      <span
-        className="absolute top-8 bottom-0 left-4 w-px -translate-x-1/2 bg-hairline group-last:hidden"
-        role="presentation"
-      />
-
-      <span
-        className={cn(
-          'relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-hairline bg-card text-muted-foreground',
-          // A mudança de etapa é o evento estrutural da coluna: é ela que explica por
-          // que o parceiro está onde está no funil. Ganha o preenchimento, não a cor.
-          evento.genero === 'etapa' && 'bg-muted text-foreground',
-        )}
-      >
-        <Icone className="size-4" aria-hidden="true" />
-      </span>
-
-      <div className="min-w-0 flex-1 space-y-1">
-        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+    <li className="flex justify-center pb-3">
+      <div className="w-full max-w-md space-y-1 rounded-xl border border-hairline bg-muted/40 px-3 py-2">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Icone className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="text-sm leading-snug font-medium">{titulo}</span>
           <time
             dateTime={evento.em}
@@ -169,9 +158,7 @@ function Evento({ evento }: { evento: EventoDaLinha }) {
         ) : null}
 
         {evento.detalhe ? (
-          <p className="rounded-lg border border-hairline bg-card/50 px-2.5 py-1.5 text-sm leading-relaxed whitespace-pre-line">
-            {evento.detalhe}
-          </p>
+          <p className="text-sm leading-relaxed whitespace-pre-line">{evento.detalhe}</p>
         ) : null}
 
         {semTexto ? (

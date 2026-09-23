@@ -10,7 +10,6 @@ import {
   FileText,
   Hourglass,
   Sparkles,
-  UserRound,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -20,23 +19,30 @@ import { urlDaMidia } from './acoes';
 import { VirarTarefa } from './virar-tarefa';
 import { dataHoraCompleta, hora } from './formatos';
 import { entregaDaMensagem, separarAssinatura } from './mensagens';
-import { ROTULO_ORIGEM, ROTULO_TIPO_MENSAGEM, type MensagemDoFio } from './tipos';
+import { ROTULO_TIPO_MENSAGEM, type MensagemDoFio } from './tipos';
 
 /**
- * Uma mensagem dentro da linha do tempo.
+ * Uma mensagem dentro da conversa — um balão de verdade.
  *
  * ===========================================================================
- * POR QUE ELA NÃO TEM ABA PRÓPRIA
+ * O QUE MUDOU EM 23/09/2026, E POR QUÊ
  * ===========================================================================
- * A mensagem divide a coluna com a ligação, a visita e a mudança de etapa, na
- * mesma ordem cronológica. É o desenho que o módulo já tinha, e ele estava certo
- * pelo motivo que só aparece em campo: o WhatsApp das 14h20 é a CONSEQUÊNCIA da
- * ligação das 14h. Em duas abas, quem lê perde a causa.
+ * "Tá muito ruim, muito feio... no mobile tá ficando muito pequeno e ruim de ver
+ * a conversa" (Rafael). O desenho anterior punha os dois lados em cinza quase
+ * igual, com um trilho de ícones de 44 px à esquerda, o nome de quem escreveu
+ * dentro do balão e a hora, a entrega e o botão "Virar tarefa" também dentro.
+ * Em 390 px sobrava meia tela para a conversa, e o olho não distinguia quem
+ * falou sem ler o rótulo.
  *
- * O que separa a mensagem do resto é a forma: ela é balão. Recebida encosta à
- * esquerda e é preenchida; enviada encosta à direita e é contornada. Sem cor —
- * a cromia desta interface é a escala térmica, e uma mensagem não tem
- * temperatura.
+ * Agora vale a gramática que todo mundo já conhece do WhatsApp:
+ *   * **recebida** encosta à esquerda, no cartão (`bg-card`);
+ *   * **enviada** encosta à direita, com um véu da cor da marca — o único uso de
+ *     cromia fora da escala térmica, e ele não compete com ela: verde é a AÇÃO
+ *     do produto (botão, link, foco), e "fui eu que falei" é ação;
+ *   * hora e entrega saem do balão e viram uma linha miúda embaixo, só na
+ *     ÚLTIMA mensagem de cada bloco do mesmo autor;
+ *   * quem escreveu aparece uma vez por bloco, e só quando acrescenta (a IA, o
+ *     robô, ou outra pessoa do time).
  *
  * ===========================================================================
  * O ÁUDIO
@@ -50,25 +56,47 @@ import { ROTULO_ORIGEM, ROTULO_TIPO_MENSAGEM, type MensagemDoFio } from './tipos
  * O player só aparece quando dá para assinar a URL do arquivo. Hoje, em geral,
  * não dá — o balde `mensagens` é privado e não tem política de leitura (ver
  * `BUCKET_MIDIA` em `acoes.ts`) —, e aí o balão diz isso com todas as letras em
- * vez de mostrar um controle de áudio que não toca. A transcrição fica de pé nos
- * dois casos, porque ela é a parte que a Heloísa lê na rua.
+ * vez de mostrar um controle de áudio que não toca.
  */
-export function Mensagem({ mensagem }: { mensagem: MensagemDoFio }) {
+export function Mensagem({
+  mensagem,
+  agrupada = false,
+  fechaGrupo = true,
+}: {
+  mensagem: MensagemDoFio;
+  /** Vem logo depois de outra do mesmo autor: sem nome em cima, colada na anterior. */
+  agrupada?: boolean;
+  /** É a última do bloco: só ela mostra hora e entrega. */
+  fechaGrupo?: boolean;
+}) {
   const entrega = entregaDaMensagem(mensagem);
   const semTexto = mensagem.texto === null;
+  const entrada = mensagem.entrada;
 
   return (
-    <div className={cn('flex w-full', mensagem.entrada ? 'justify-start' : 'justify-end')}>
+    <div
+      className={cn(
+        'group flex w-full flex-col',
+        entrada ? 'items-start' : 'items-end',
+        fechaGrupo ? 'pb-3' : 'pb-0.5',
+      )}
+    >
+      {agrupada ? null : <Quem mensagem={mensagem} />}
+
       <div
         className={cn(
-          'min-w-0 max-w-[92%] space-y-1.5 rounded-xl px-3 py-2 md:max-w-[34rem]',
-          mensagem.entrada
-            ? 'rounded-tl-sm bg-muted'
-            : 'rounded-tr-sm border border-hairline bg-card/60',
+          'min-w-0 max-w-[85%] space-y-2 px-3.5 py-2.5 text-[15px] leading-relaxed md:max-w-[34rem]',
+          // O canto reto é o "rabinho" do balão: fica no lado de quem falou, e só
+          // no último do bloco — no meio do bloco todos os cantos são redondos.
+          'rounded-2xl',
+          // O cinza da recebida muda de degrau com o tema: no claro o cartão é
+          // quase branco (some no fundo da página) e quem separa é o `muted`; no
+          // escuro é o contrário — o `muted` encosta no fundo e o cartão destaca.
+          entrada
+            ? cn('bg-muted text-foreground dark:bg-card', fechaGrupo && 'rounded-bl-md')
+            : cn('bg-primary/20 text-foreground', fechaGrupo && 'rounded-br-md'),
         )}
       >
-        <Assinatura mensagem={mensagem} />
-
         {mensagem.tipo === 'audio' ? <Audio mensagem={mensagem} /> : null}
 
         {mensagem.texto ? <Texto texto={mensagem.texto} /> : null}
@@ -81,12 +109,18 @@ export function Mensagem({ mensagem }: { mensagem: MensagemDoFio }) {
             <span>{mensagem.erroDetalhe ?? mensagem.erroCodigo}</span>
           </p>
         ) : null}
+      </div>
 
-        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground">
+      {fechaGrupo ? (
+        <p
+          className={cn(
+            'mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-[11px] text-muted-foreground',
+            entrada ? 'justify-start' : 'flex-row-reverse',
+          )}
+        >
           <time dateTime={mensagem.em} title={dataHoraCompleta(mensagem.em)} className="numerico">
             {hora(mensagem.em)}
           </time>
-          <span aria-hidden="true">·</span>
           <span
             className={cn(
               'inline-flex items-center gap-1',
@@ -101,84 +135,79 @@ export function Mensagem({ mensagem }: { mensagem: MensagemDoFio }) {
             ) : null}
             {entrega.rotulo}
           </span>
+          <Selos mensagem={mensagem} />
+          {entrada ? <VirarTarefa mensagemId={mensagem.id} /> : null}
           {entrega.detalhe ? (
             <span className="w-full text-muted-foreground">{entrega.detalhe}</span>
           ) : null}
-          {mensagem.entrada ? <VirarTarefa mensagemId={mensagem.id} /> : null}
         </p>
-      </div>
+      ) : null}
     </div>
   );
 }
 
 /**
- * Quem escreveu esta mensagem, e sob que regra ela saiu.
+ * Quem escreveu, em cima do balão e só quando acrescenta.
  *
- * A pilha de selos parece muita coisa, e cada um responde a uma pergunta que
- * alguém já fez em pé numa calçada: "isso saiu do meu celular ou do CRM?", "quem
- * aprovou esse texto?", "isso foi robô?", "isso gastou o teto do dia?".
+ * "O parceiro" em toda mensagem recebida era uma etiqueta repetida numa tela em
+ * que o lado do balão já diz isso. Sobra o que muda: a IA, o robô, e o nome de
+ * quem do time escreveu — porque o número é de todos e saber quem falou por
+ * último é a pergunta de quem entra na conversa agora.
  */
-function Assinatura({ mensagem }: { mensagem: MensagemDoFio }) {
+function Quem({ mensagem }: { mensagem: MensagemDoFio }) {
   const daIa = mensagem.autorTipo === 'bot_ai';
   const doRobo = mensagem.autorTipo === 'bot_fixed';
+  if (mensagem.entrada) return null;
 
-  const quem = mensagem.entrada
-    ? 'O parceiro'
-    : daIa
-      ? 'Rascunho da IA'
-      : doRobo
-        ? 'Texto fixo do robô'
-        : (mensagem.autor ?? 'Alguém do time');
+  const quem = daIa ? 'Rascunho da IA' : doRobo ? 'Texto fixo do robô' : (mensagem.autor ?? 'Alguém do time');
 
   return (
-    <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
-      {mensagem.entrada ? (
-        <UserRound className="size-3" aria-hidden="true" />
-      ) : daIa ? (
+    <p className="mb-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
+      {daIa ? (
         <Sparkles className="size-3" aria-hidden="true" />
       ) : doRobo ? (
         <Bot className="size-3" aria-hidden="true" />
       ) : null}
       <span className="font-medium text-foreground">{quem}</span>
-
-      {mensagem.entrada ? null : (
+      {daIa && mensagem.aprovadoPor ? (
         <>
           <span aria-hidden="true">·</span>
-          <span>{ROTULO_ORIGEM[mensagem.origem]}</span>
+          <span className="inline-flex items-center gap-1">
+            <BadgeCheck className="size-3" aria-hidden="true" />
+            {mensagem.aprovadoPor} aprovou
+          </span>
         </>
-      )}
-
-      {daIa && mensagem.aprovadoPor ? (
-        <Badge variant="pilula" className="h-4 gap-1 px-1.5 text-[10px] font-normal">
-          <BadgeCheck className="size-2.5" aria-hidden="true" />
-          {mensagem.aprovadoPor} aprovou
-        </Badge>
-      ) : null}
-
-      {mensagem.porModelo ? (
-        <Badge variant="pilula" className="h-4 px-1.5 text-[10px] font-normal">
-          modelo aprovado
-        </Badge>
-      ) : null}
-
-      {mensagem.primeiroContato ? (
-        <Badge variant="pilula" className="h-4 px-1.5 text-[10px] font-normal">
-          primeiro contato
-        </Badge>
-      ) : null}
-
-      {mensagem.confirmacaoDeOptout ? (
-        <Badge variant="pilula" className="h-4 px-1.5 text-[10px] font-normal">
-          confirmação de opt-out
-        </Badge>
-      ) : null}
-
-      {mensagem.iniciadaPelaEmpresa && !mensagem.entrada && !mensagem.confirmacaoDeOptout ? (
-        <Badge variant="pilula" className="h-4 px-1.5 text-[10px] font-normal">
-          fora da janela
-        </Badge>
       ) : null}
     </p>
+  );
+}
+
+/**
+ * Os selos da regra: sob que permissão a mensagem saiu.
+ *
+ * Eles respondem a perguntas que alguém já fez em pé numa calçada — "isso gastou
+ * o teto do dia?", "isso foi modelo aprovado?" —, mas são consulta, não leitura:
+ * por isso vão na linha miúda embaixo do balão, e não dentro dele.
+ */
+function Selos({ mensagem }: { mensagem: MensagemDoFio }) {
+  const selos = [
+    mensagem.porModelo ? 'modelo aprovado' : null,
+    mensagem.primeiroContato ? 'primeiro contato' : null,
+    mensagem.confirmacaoDeOptout ? 'confirmação de opt-out' : null,
+    mensagem.iniciadaPelaEmpresa && !mensagem.entrada && !mensagem.confirmacaoDeOptout
+      ? 'fora da janela'
+      : null,
+  ].filter((s): s is string => s !== null);
+  if (selos.length === 0) return null;
+
+  return (
+    <>
+      {selos.map((selo) => (
+        <Badge key={selo} variant="pilula" className="h-4 px-1.5 text-[10px] font-normal">
+          {selo}
+        </Badge>
+      ))}
+    </>
   );
 }
 
@@ -298,18 +327,15 @@ function Transcricao({ texto }: { texto: string }) {
   );
 }
 
-/** O corpo, com a assinatura do atendente em negrito como o parceiro vê no WhatsApp. */
+/**
+ * O corpo da mensagem.
+ *
+ * A assinatura ("*Rafael:*" na primeira linha, que é como o parceiro vê no
+ * WhatsApp) SAI do balão: quem escreveu já está dito em cima dele, e ler o mesmo
+ * nome duas vezes em toda mensagem nossa era a maior fonte de ruído da coluna.
+ * O texto que saiu continua inteiro no banco — aqui muda só o que a tela mostra.
+ */
 function Texto({ texto }: { texto: string }) {
-  const { nome, resto } = separarAssinatura(texto);
-  return (
-    <p className="text-sm leading-relaxed whitespace-pre-line">
-      {nome ? (
-        <>
-          <span className="font-semibold">{nome}:</span>
-          {'\n'}
-        </>
-      ) : null}
-      {resto}
-    </p>
-  );
+  const { resto } = separarAssinatura(texto);
+  return <p className="whitespace-pre-line">{resto}</p>;
 }

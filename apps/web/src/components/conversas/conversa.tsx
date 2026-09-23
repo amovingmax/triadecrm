@@ -1,16 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BotOff, ExternalLink, MessageSquarePlus } from 'lucide-react';
+import { ArrowLeft, BotOff, ChevronDown, ExternalLink, MessageSquarePlus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatarProximaAcao } from '@/components/parceiros/formatos';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
-import { ChipTemperatura, DiasSemContato } from '@/components/temperatura';
+import { ChipTemperatura, definicaoTemperatura, DiasSemContato } from '@/components/temperatura';
 
 import { marcarComoLida } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
@@ -218,6 +218,9 @@ export function Conversa({
   // parceiro" é a pergunta de toda conversa, e não só quando difere do dono: o
   // campo aparece sempre que existe fio, e diz "você" quando é você.
   const eu = useEu();
+  // A ficha (onde, categoria, dono, telefone) é consulta de canto de olho: no
+  // celular ela nasce recolhida atrás de uma linha, e no desktop continua à vista.
+  const [fichaAberta, setFichaAberta] = useState(false);
   const atendendo = fio
     ? fio.responsavelId && fio.responsavelId === eu?.id
       ? 'você'
@@ -229,7 +232,7 @@ export function Conversa({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-col border-b border-hairline">
-        <div className="flex items-center gap-2 px-4 py-3 md:px-5">
+        <div className="flex items-center gap-2 px-3 py-2 md:px-5 md:py-3">
           <Button
             variant="ghost"
             size="icon"
@@ -244,7 +247,19 @@ export function Conversa({
             <h2 className="truncate font-heading text-base leading-tight font-semibold tracking-tight">
               {item.nome}
             </h2>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+            {/* NO CELULAR, UMA LINHA. A pilha de selos ocupava três linhas em
+                390 px — metade do que sobrava para a conversa. Aqui ela vira uma
+                frase truncada, e os selos voltam inteiros a partir de `sm`. */}
+            <p className="truncate text-xs text-muted-foreground sm:hidden">
+              {[
+                definicaoTemperatura(item.temperatura).rotulo,
+                item.etapa,
+                fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+            <p className="mt-0.5 hidden flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground sm:flex">
               <ChipTemperatura
                 temperatura={item.temperatura}
                 esfriando={item.precisaAtencao}
@@ -339,7 +354,24 @@ export function Conversa({
             200 px eram a conversa inteira. Onde, categoria, dono e último contato
             são consulta de canto de olho — quem precisa do resto abre a ficha. O
             telefone continua atrás da mesma RPC auditada. */}
-        <dl className="flex max-w-3xl flex-wrap items-baseline gap-x-4 gap-y-1 pb-1 text-[11px] text-muted-foreground">
+        <button
+          type="button"
+          aria-expanded={fichaAberta}
+          onClick={() => setFichaAberta((v) => !v)}
+          className="toque -ml-1 mb-1 flex min-h-9 items-center gap-1 px-1 text-[11px] text-muted-foreground sm:hidden"
+        >
+          Ficha do parceiro
+          <ChevronDown
+            className={cn('size-3.5 transition-transform', fichaAberta && 'rotate-180')}
+            aria-hidden="true"
+          />
+        </button>
+        <dl
+          className={cn(
+            'mx-auto max-w-3xl flex-wrap items-baseline gap-x-4 gap-y-1 pb-1 text-[11px] text-muted-foreground sm:flex',
+            fichaAberta ? 'flex' : 'hidden',
+          )}
+        >
           <Campo rotulo="Onde">{onde || 'sem endereço na base'}</Campo>
           <Campo rotulo="Categoria">{item.categoria ?? 'sem categoria'}</Campo>
           <Campo rotulo="Responsável">{item.responsavel ?? 'sem dono'}</Campo>
@@ -383,9 +415,9 @@ export function Conversa({
         {/* A leitura da IA entra ENTRE a ficha e a conversa, e não num painel à
             parte: ela fala sobre o que está logo abaixo, e a evidência de cada
             sinal é uma mensagem daquela mesma coluna. Fechada, é uma linha. */}
-        {fio ? <LeituraDaIa fioId={fio.id} className="mt-2.5" /> : null}
+        {fio ? <LeituraDaIa fioId={fio.id} className="mx-auto mt-2.5 max-w-3xl" /> : null}
 
-        <AvisoWhatsapp meta={meta} compacto className="my-4 max-w-3xl" />
+        <AvisoWhatsapp meta={meta} compacto className="mx-auto my-4 max-w-3xl" />
 
         {consulta.isPending ? (
           <EsqueletoLinha />
@@ -397,7 +429,7 @@ export function Conversa({
         ) : dias.length === 0 ? (
           <SemHistorico organizacaoId={item.id} />
         ) : (
-          <div className="max-w-3xl">
+          <div className="mx-auto max-w-3xl">
             <LinhaDoTempo dias={dias} />
           </div>
         )}
@@ -415,7 +447,7 @@ export function Conversa({
               rascunho={rascunho}
               fio={fio}
               organizacaoId={item.id}
-              className="mt-4 max-w-3xl"
+              className="mx-auto mt-4 max-w-3xl"
             />
           </div>
         ) : null}
@@ -426,8 +458,8 @@ export function Conversa({
           O teto é 45% DO PAINEL, não da tela (`dvh`) — com `dvh` ele cabia na
           janela e mesmo assim espremia a conversa contra o cabeçalho, porque o
           painel é menor que a janela. */}
-      <div className="max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-4 py-3 md:px-5">
-        <div className="max-w-3xl space-y-3">
+      <div className="max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-3 py-2.5 md:px-5 md:py-3">
+        <div className="mx-auto max-w-3xl space-y-3">
           {/* O relógio da janela virou a FAIXA do cabeçalho (`FaixaDaJanela`): a hora
               está sempre à vista e não custa mais três linhas em cima da caixa de
               escrever. O cartão inteiro só volta quando a janela está APERTADA — aí
