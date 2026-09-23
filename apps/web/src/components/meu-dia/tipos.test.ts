@@ -159,3 +159,44 @@ describe('resumo do dia', () => {
     expect(ressalvas[1]).toContain('é uma aproximação');
   });
 });
+
+describe('avisos do sistema não são tarefa de carteira', () => {
+  const item = (parcial: Partial<ItemDoDia>): ItemDoDia => ({
+    prioridade: 3,
+    tipo: 'tarefa_atrasada',
+    motivo: 'venceu',
+    titulo: 'Ligar para o decisor',
+    quando: null,
+    atrasoHoras: 2,
+    tarefaId: 't1',
+    atividadeId: null,
+    negocioId: 'n1',
+    organizacaoId: 'o1',
+    organizacao: 'Buffet Sabor do Mar',
+    etapa: null,
+    bairro: null,
+    categoria: null,
+    temperatura: null,
+    funil: null,
+    ...parcial,
+  });
+
+  const doSistema = item({
+    titulo: 'Dead-letter ai_dlq: 1 mensagem morreu',
+    motivo: 'Dead-letter ai_dlq: 1 mensagem morreu',
+    negocioId: null,
+    organizacaoId: null,
+    organizacao: null,
+  });
+
+  it('vão para um bloco próprio, no fim da fila', () => {
+    const blocos = agruparFila([item({}), doSistema]);
+    expect(blocos.map((b) => b.id)).toEqual(['agora', 'sistema']);
+    expect(blocos[1]?.recolhidoPorPadrao).toBe(true);
+    expect(blocos[0]?.itens).toHaveLength(1);
+  });
+
+  it('e não contam como pendência da pessoa', () => {
+    expect(contarPendentesDeHoje([item({}), doSistema])).toBe(1);
+  });
+});

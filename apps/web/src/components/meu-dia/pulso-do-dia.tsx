@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, ChevronRight, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -64,18 +64,10 @@ export function PulsoDoDia({ className }: { className?: string }) {
         </span>
       </header>
 
-      {data.texto ? (
-        <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-          {data.texto
-            .split('\n')
-            .map((paragrafo) => paragrafo.trim())
-            .filter((paragrafo) => paragrafo !== '')
-            .map((paragrafo, indice) => (
-              <p key={indice}>{paragrafo}</p>
-            ))}
-        </div>
-      ) : null}
-
+      {/* AS PRIORIDADES PRIMEIRO, O TEXTO DEPOIS.
+          O pulso saía com quatro parágrafos de análise antes das três linhas que
+          dizem o que fazer — e ocupava a primeira tela inteira do CRM, todo dia.
+          A análise continua aqui, inteira, fechada: quem quer o contexto abre. */}
       {prioridades.length > 0 ? (
         <ul className="flex flex-col">
           {prioridades.map((p, indice) => (
@@ -84,20 +76,48 @@ export function PulsoDoDia({ className }: { className?: string }) {
         </ul>
       ) : null}
 
-      {data.riscos.length > 0 ? (
-        <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-          {data.riscos.map((risco, indice) => (
-            <li key={indice} className="flex gap-1.5">
-              <span aria-hidden="true">·</span>
-              <span>{risco}</span>
-            </li>
-          ))}
-        </ul>
+      {data.texto || data.riscos.length > 0 ? (
+        <details className="group">
+          <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              className="size-3.5 shrink-0 transition-transform group-open:rotate-90"
+              aria-hidden="true"
+            />
+            Ler o resumo do dia
+          </summary>
+
+          <div className="flex flex-col gap-2 pt-2">
+            {data.texto ? (
+              <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+                {data.texto
+                  .split('\n')
+                  .map((paragrafo) => paragrafo.trim())
+                  .filter((paragrafo) => paragrafo !== '')
+                  .map((paragrafo, indice) => (
+                    <p key={indice}>{paragrafo}</p>
+                  ))}
+              </div>
+            ) : null}
+
+            {data.riscos.length > 0 ? (
+              <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                {data.riscos.map((risco, indice) => (
+                  <li key={indice} className="flex gap-1.5">
+                    <span aria-hidden="true">·</span>
+                    <span>{risco}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </details>
       ) : null}
 
-      <p className="text-[11px] text-muted-foreground">
+      <p
+        className="text-[11px] text-muted-foreground"
+        title={data.promptVersion ?? undefined}
+      >
         Escrito pela IA sobre as conversas do dia
-        {data.promptVersion ? <> · {data.promptVersion}</> : null}
       </p>
     </section>
   );

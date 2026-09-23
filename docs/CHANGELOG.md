@@ -2906,3 +2906,12 @@ Entregue:
 - **A linha virou cartão**, com canto arredondado e respiro entre uma e outra, no lugar do filete que ligava tudo num bloco só. Em tela larga, o contexto (temperatura, etapa, bairro, categoria) foi para a direita: a fila usava um terço da largura e deixava metade da tela vazia.
 - **Os quatro números ganharam ícone** e cresceram (porta, porta aberta, telefone, agenda); a barra da meta batida fica verde.
 - Cabeçalho de bloco mais limpo: a explicação ("Passou da hora, ou acontece em menos de três horas") virou `title`, e a nota da meta parou de quebrar em três linhas no celular.
+
+### 23/09/2026 — Meu dia: o que é do motor sai da fila de quem vende
+
+Print da produção do Matheus: 60 itens pendentes, e no meio deles "Dead-letter ai_dlq (2026-09-17): 1 mensagem(ns) morreram", "IA bloqueada pelo guardrail de PII em classificar-intencao (ai_run 3)" — cada um com o título repetido na linha de baixo. E o pulso da IA ocupando a primeira tela inteira antes da primeira tarefa.
+
+Entregue:
+- **Aviso do motor tem bloco próprio** (`ehAvisoDoSistema`): item sem parceiro e sem negócio vai para "Avisos do sistema", no fim e fechado, e sai da conta de "pendentes" do cabeçalho — quem deve dead-letter é o CRM, não a pessoa. Dois testes fixam as duas metades.
+- **Fim do título repetido**: sem parceiro, o título JÁ é a primeira linha; a segunda só aparece quando diz outra coisa. O mesmo vale para o motivo, que agora some quando repete o que está acima.
+- **O pulso da IA virou três linhas**: o título, as prioridades (que é o que se faz) e um "Ler o resumo do dia" fechado, com a análise inteira e os riscos dentro. Ele vinha com quatro parágrafos de contexto ANTES das ações, todo dia, na primeira dobra.

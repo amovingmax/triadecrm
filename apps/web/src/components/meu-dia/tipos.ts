@@ -72,7 +72,7 @@ export function ehTipoConhecido(valor: string): valor is TipoDeItem {
  * que passou da hora, 5-6 é o resto do dia, 7 e 8 são os dois buracos que o funil
  * abre sozinho, 9 é o futuro.
  */
-export type IdDoBloco = 'agora' | 'hoje' | 'sem_proxima_acao' | 'parados' | 'depois';
+export type IdDoBloco = 'agora' | 'hoje' | 'sem_proxima_acao' | 'parados' | 'depois' | 'sistema';
 
 export type DefinicaoDeBloco = {
   id: IdDoBloco;
@@ -120,12 +120,41 @@ export const BLOCOS: readonly DefinicaoDeBloco[] = [
 
 export type BlocoPreenchido = DefinicaoDeBloco & { itens: ItemDoDia[] };
 
+/**
+ * AVISO DO SISTEMA NÃO É TAREFA DE CARTEIRA.
+ *
+ * O motor cria tarefa para o que ele mesmo precisa que alguém veja: "Dead-letter
+ * ai_dlq: 1 mensagem morreu", "IA bloqueada pelo guardrail de PII". São avisos
+ * legítimos, mas não têm parceiro, não têm negócio e não se resolvem ligando
+ * para ninguém — e no meio da fila eles empurravam para baixo os quatro buffets
+ * que estão esperando resposta há três dias.
+ *
+ * Eles vão para um bloco próprio, no fim e fechado, e saem da conta de
+ * "pendentes" do cabeçalho: quem deve isso é o CRM, não a pessoa.
+ */
+export function ehAvisoDoSistema(item: ItemDoDia): boolean {
+  return item.organizacaoId === null && item.negocioId === null;
+}
+
+const BLOCO_DO_SISTEMA: DefinicaoDeBloco = {
+  id: 'sistema',
+  titulo: 'Avisos do sistema',
+  explicacao: 'Sem parceiro e sem negócio: é o motor pedindo atenção, não a carteira.',
+  prioridades: [],
+  recolhidoPorPadrao: true,
+};
+
 /** Quebra a fila nos blocos acima, preservando a ordem que o banco devolveu. */
 export function agruparFila(itens: readonly ItemDoDia[]): BlocoPreenchido[] {
-  return BLOCOS.map((bloco) => ({
+  const daCarteira = itens.filter((item) => !ehAvisoDoSistema(item));
+  const doSistema = itens.filter(ehAvisoDoSistema);
+
+  const blocos = BLOCOS.map((bloco) => ({
     ...bloco,
-    itens: itens.filter((item) => bloco.prioridades.includes(item.prioridade)),
+    itens: daCarteira.filter((item) => bloco.prioridades.includes(item.prioridade)),
   })).filter((bloco) => bloco.itens.length > 0);
+
+  return doSistema.length > 0 ? [...blocos, { ...BLOCO_DO_SISTEMA, itens: doSistema }] : blocos;
 }
 
 /**
@@ -139,7 +168,8 @@ export function agruparFila(itens: readonly ItemDoDia[]): BlocoPreenchido[] {
  * contas diferentes, um por cima do outro.
  */
 export function contarPendentesDeHoje(itens: readonly ItemDoDia[]): number {
-  return itens.filter((item) => item.prioridade <= 8).length;
+  // Aviso do motor não entra na conta: ver `ehAvisoDoSistema`.
+  return itens.filter((item) => item.prioridade <= 8 && !ehAvisoDoSistema(item)).length;
 }
 
 // ---------------------------------------------------------------------------

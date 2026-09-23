@@ -37,14 +37,19 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
   const quando = formatarQuando(item);
 
   const nome = item.organizacao ?? item.titulo;
-  const acao = item.titulo !== item.organizacao ? item.titulo : null;
+  // O AVISO DO SISTEMA não tem parceiro: o título dele JÁ é a linha de cima.
+  // Sem esta condição, "Dead-letter ai_dlq: 1 mensagem morreu" aparecia duas
+  // vezes, uma embaixo da outra, em toda linha sem organização.
+  const acao = item.organizacao && item.titulo !== item.organizacao ? item.titulo : null;
   // Nesses três motivos a explicação do banco carrega o que a linha não tem em
   // lugar nenhum (a etapa em que empacou, o SLA, o que ficou faltando dizer).
   const explicar =
     item.tipo === 'sem_proxima_acao' ||
     item.tipo === 'negocio_parado' ||
     item.tipo === 'desfecho_pendente';
-  const motivo = explicar || !acao ? item.motivo : null;
+  // E o motivo só entra quando diz algo que as duas linhas acima não disseram.
+  const motivoCru = explicar || !acao ? item.motivo : null;
+  const motivo = motivoCru && motivoCru !== nome && motivoCru !== acao ? motivoCru : null;
   const local = formatarLocal(item.bairro, null);
 
   const Icone = ICONE_DO_ITEM[iconeDoItem(item)];
