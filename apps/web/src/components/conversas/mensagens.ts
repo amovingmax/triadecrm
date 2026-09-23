@@ -209,6 +209,43 @@ export function separarAssinatura(texto: string): { nome: string | null; resto: 
 }
 
 /**
+ * O QUE A META QUIS DIZER, em português.
+ *
+ * A recusa chega como um código e uma frase em inglês ("Message undeliverable"),
+ * que na tela não explica nada a quem só quer saber se precisa ligar. Aqui ficam
+ * os códigos que a gente de fato vê, com a causa provável e o que fazer. O que
+ * não estiver na lista continua aparecendo como veio, com o código junto: mentir
+ * sobre a causa é pior que mostrar o texto cru.
+ *
+ * Referência: códigos de erro da Cloud API (Meta). O 131026 é o que mais aparece
+ * e é o mais mal explicado: ele NÃO quer dizer "número errado" — quer dizer que
+ * aquele número não pode receber mensagem da API, e as causas são várias.
+ */
+const RECADO_DO_ERRO: Record<string, string> = {
+  '131026':
+    'o WhatsApp não entregou: este número não recebe mensagem pela API. Pode não ter WhatsApp, ser um número que também é de API (dois números de API não se falam) ou estar com o app muito antigo. Confira o número e, se estiver certo, fale por ligação.',
+  '131047':
+    'passou de 24 h desde a última mensagem da pessoa: fora da janela só sai modelo aprovado.',
+  '131048': 'o WhatsApp segurou o envio para este número (limite de qualidade). Tente mais tarde.',
+  '131049':
+    'o WhatsApp entregou marketing demais para esta pessoa hoje e segurou esta mensagem.',
+  '130472': 'a pessoa está fora do experimento de marketing da Meta neste período.',
+  '132000': 'o modelo tem um número de variáveis diferente do que a Meta aprovou.',
+  '132001': 'este modelo não existe mais na Meta, ou está com outro nome.',
+  '132005': 'o texto do modelo passou do tamanho que a Meta aceita.',
+  '131031': 'a conta do WhatsApp da Komune está bloqueada ou restrita na Meta.',
+  '133010': 'o número da Komune não está registrado na Cloud API.',
+};
+
+/** A frase da recusa: a nossa quando o código é conhecido, a da Meta quando não é. */
+export function recadoDoErro(codigo: string | null, detalhe: string | null): string | null {
+  const conhecido = codigo ? RECADO_DO_ERRO[codigo] : null;
+  if (conhecido) return conhecido;
+  if (detalhe && codigo) return `${detalhe} (código ${codigo})`;
+  return detalhe ?? codigo;
+}
+
+/**
  * O que a pessoa precisa saber sobre esta mensagem ter chegado (ou não).
  *
  * O caso que exige texto, e não só um ícone, é `queued`. Com o envio rodando, a
@@ -231,14 +268,14 @@ export function entregaDaMensagem(m: MensagemDoFio): Entrega {
       return {
         rotulo: ROTULO_ENTREGA.queued,
         detalhe: m.erroDetalhe
-          ? `ainda não saiu: ${m.erroDetalhe}`
+          ? `ainda não saiu: ${recadoDoErro(m.erroCodigo, m.erroDetalhe)}`
           : 'ainda não saiu: sai em instantes, quando o envio processar a fila',
         tom: 'espera',
       };
     case 'failed':
       return {
         rotulo: ROTULO_ENTREGA.failed,
-        detalhe: m.erroDetalhe ?? m.erroCodigo,
+        detalhe: recadoDoErro(m.erroCodigo, m.erroDetalhe),
         tom: 'falha',
       };
     case 'sent':

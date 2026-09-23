@@ -148,12 +148,23 @@ describe('entregaDaMensagem', () => {
     expect(entrega.detalhe).toContain('não saiu');
   });
 
-  it('na falha, mostra o detalhe do erro e cai para o código quando não há detalhe', () => {
+  it('na falha, traduz o código da Meta em vez de repetir o inglês dela', () => {
+    // 131026 é o "Message undeliverable": o código mais comum e o pior explicado.
+    const entrega = entregaDaMensagem(
+      mensagem({ status: 'failed', erroCodigo: '131026', erroDetalhe: 'Message undeliverable' }),
+    );
+    expect(entrega.tom).toBe('falha');
+    expect(entrega.detalhe).toContain('não recebe mensagem pela API');
+    expect(entrega.detalhe).not.toContain('undeliverable');
+  });
+
+  it('código desconhecido continua aparecendo como veio, com o número junto', () => {
     expect(
-      entregaDaMensagem(mensagem({ status: 'failed', erroDetalhe: 'número inválido' })),
-    ).toMatchObject({ tom: 'falha', detalhe: 'número inválido' });
-    expect(entregaDaMensagem(mensagem({ status: 'failed', erroCodigo: '131049' })).detalhe).toBe(
-      '131049',
+      entregaDaMensagem(mensagem({ status: 'failed', erroCodigo: '999999', erroDetalhe: 'Boom' }))
+        .detalhe,
+    ).toBe('Boom (código 999999)');
+    expect(entregaDaMensagem(mensagem({ status: 'failed', erroDetalhe: 'sem código' })).detalhe).toBe(
+      'sem código',
     );
   });
 

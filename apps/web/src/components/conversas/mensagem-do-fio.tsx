@@ -1,16 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  AudioLines,
-  BadgeCheck,
-  Ban,
-  Bot,
-  CircleAlert,
-  FileText,
-  Hourglass,
-  Sparkles,
-} from 'lucide-react';
+import { AudioLines, BadgeCheck, Ban, Bot, FileText, Hourglass, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -103,12 +94,6 @@ export function Mensagem({
 
         {mensagem.tipo !== 'audio' && semTexto ? <SemCorpo mensagem={mensagem} /> : null}
 
-        {mensagem.erroDetalhe || mensagem.erroCodigo ? (
-          <p className="flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
-            <CircleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-            <span>{mensagem.erroDetalhe ?? mensagem.erroCodigo}</span>
-          </p>
-        ) : null}
       </div>
 
       {fechaGrupo ? (

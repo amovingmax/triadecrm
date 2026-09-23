@@ -2915,3 +2915,14 @@ Entregue:
 - **Aviso do motor tem bloco próprio** (`ehAvisoDoSistema`): item sem parceiro e sem negócio vai para "Avisos do sistema", no fim e fechado, e sai da conta de "pendentes" do cabeçalho — quem deve dead-letter é o CRM, não a pessoa. Dois testes fixam as duas metades.
 - **Fim do título repetido**: sem parceiro, o título JÁ é a primeira linha; a segunda só aparece quando diz outra coisa. O mesmo vale para o motivo, que agora some quando repete o que está acima.
 - **O pulso da IA virou três linhas**: o título, as prioridades (que é o que se faz) e um "Ler o resumo do dia" fechado, com a análise inteira e os riscos dentro. Ele vinha com quatro parágrafos de contexto ANTES das ações, todo dia, na primeira dobra.
+
+### 23/09/2026 — "não saiu": o erro da Meta em português, uma vez só
+
+"Oq quer dizer esse não saiu ali e pq?" (Rafael, sobre um balão com "Message undeliverable" escrito duas vezes).
+
+Entregue:
+- **O código da Meta vira frase nossa** (`recadoDoErro`, em `conversas/mensagens.ts`): 131026 ("Message undeliverable") passa a dizer que aquele número não recebe mensagem pela API — pode não ter WhatsApp, pode ser outro número de API (dois números de API não se falam) ou estar com o app muito antigo —, e o que fazer. Mais nove códigos que a gente vê na prática (fora da janela, limite de marketing, modelo com variáveis a mais, conta restrita). Código desconhecido continua aparecendo como veio, com o número junto: inventar causa é pior que mostrar o inglês.
+- **A frase aparece uma vez**: o balão mostrava o erro dentro dele e a linha de baixo repetia o mesmo texto.
+- Testes: 2 asserções novas em `mensagens.test.ts`.
+
+Na base: as três falhas de 131026 em produção são todas do mesmo número (+55 84 99927-2577, o do Matheus). Todos os outros números receberam.
