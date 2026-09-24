@@ -33,10 +33,12 @@ import { PassoMapa } from './passo-mapa';
 import { PassoPrevia } from './passo-previa';
 import type { PedidoAoLeitor, RespostaDoLeitor } from './planilha.worker';
 import { Recibo } from './recibo';
+import { SeletorDeOrigem } from './seletor-de-origem';
 import {
   ROTULO_DECISAO,
   type LoteAnterior,
   type Mapa,
+  type OrigemDeArquivo,
   type PlanilhaLida,
   type Previa,
   type Recibo as TipoRecibo,
@@ -61,7 +63,7 @@ type Falha = { causa: string; comoResolver?: string } | null;
  *   · classificar e gravar → Postgres, em pedaços, com barra andando;
  *   · nesta função → o passo atual, o mapa de colunas e a tradução dos erros.
  */
-export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }: {
+export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
   /** Papéis que escrevem na base. A autorização de verdade é o RLS. */
   podeImportar: boolean;
   /**
@@ -71,10 +73,20 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }:
    * e oferecer o botão a ela era o §3.7 do laudo.
    */
   podeDesfazer: boolean;
-  /** Id da fonte "planilha" no catálogo: é o `source_id` do lote. */
-  origemPlanilhaId: number;
+  /**
+   * As fontes que entram por arquivo, para o seletor de origem do lote.
+   * Nunca vazia: a página garante a planilha como último recurso.
+   */
+  origens: readonly OrigemDeArquivo[];
 }) {
   const clienteDeConsultas = useQueryClient();
+
+  // A planilha continua sendo o padrão: é o caso de todo dia, e mudar o padrão
+  // faria a equipe rotular a planilha-ponte de Google Maps por distração.
+  const padrao = origens.find((o) => o.slug === 'planilha') ?? origens[0];
+  const [origemId, setOrigemId] = useState<number>(padrao?.id ?? 0);
+  const escolhida = origens.find((o) => o.id === origemId) ?? padrao;
+  const nomeDaOrigem = escolhida?.nome ?? '';
 
   const [etapa, setEtapa] = useState<Etapa>('arquivo');
   const [arquivo, setArquivo] = useState<File | null>(null);
@@ -174,10 +186,15 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }:
       if (!temConteudo(valores, mapa)) return;
       // +2: a linha 1 é o cabeçalho e a contagem da planilha começa em 1. Assim o
       // número que a prévia mostra é o número que a pessoa vê no Excel.
-      saida.push(linhaParaObjeto(valores, mapa, i + 2));
+      //
+      // A origem do lote entra aqui, e não só em `import_batches`: quem decide é
+      // `public.importacao_gravar`, com `coalesce((v_n ->> 'source_id')::int,
+      // v_b.source_id)` (`20260904001820:880-881`) — mandando nas duas, as duas
+      // passam a ser a mesma por construção.
+      saida.push(linhaParaObjeto(valores, mapa, i + 2, nomeDaOrigem));
     });
     return saida;
-  }, [planilha, mapa]);
+  }, [planilha, mapa, nomeDaOrigem]);
 
   const conferir = useCallback(async () => {
     const linhas = montarLinhas();
@@ -217,7 +234,7 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }:
 
     let loteId: string | null = null;
     try {
-      loteId = await abrirLote(rotulo, origemPlanilhaId);
+      loteId = await abrirLote(rotulo, origemId);
       const resultado = await gravar(loteId, linhas, (feitas, total) =>
         setAndamento({ rotulo: 'Gravando', feitas, total }),
       );
@@ -251,7 +268,7 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }:
     } finally {
       setAndamento(null);
     }
-  }, [arquivo, clienteDeConsultas, montarLinhas, origemPlanilhaId]);
+  }, [arquivo, clienteDeConsultas, montarLinhas, origemId]);
 
   const recomecar = useCallback(() => {
     setEtapa('arquivo');
@@ -263,7 +280,7 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }:
     setFalha(null);
   }, []);
 
-  const pendentes = faltando(mapa);
+  const pendentes = faltando(mapa, nomeDaOrigem);
   const podeConferir = planilha !== null && pendentes.length === 0;
 
   if (!podeImportar) {
@@ -296,6 +313,12 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }:
 
       {etapa === 'arquivo' ? (
         <>
+          <SeletorDeOrigem
+            origens={origens}
+            valor={origemId}
+            aoMudar={setOrigemId}
+            temColunaDeOrigem={false}
+          />
           <PassoArquivo
             aoEscolher={lerArquivoEscolhido}
             ocupado={passoDaLeitura !== null}
@@ -315,7 +338,19 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origemPlanilhaId }:
       {etapa === 'mapa' && planilha ? (
         <>
           <ArquivoEscolhido arquivo={arquivo} planilha={planilha} aoTrocar={recomecar} />
-          <PassoMapa planilha={planilha} mapa={mapa} sugestao={sugestao} aoMudar={setMapa} />
+          <SeletorDeOrigem
+            origens={origens}
+            valor={origemId}
+            aoMudar={setOrigemId}
+            temColunaDeOrigem={mapa.origem !== undefined}
+          />
+          <PassoMapa
+            planilha={planilha}
+            mapa={mapa}
+            sugestao={sugestao}
+            origemDoLote={nomeDaOrigem}
+            aoMudar={setMapa}
+          />
           <div className="flex flex-wrap items-center gap-3">
             <Button
               disabled={!podeConferir}

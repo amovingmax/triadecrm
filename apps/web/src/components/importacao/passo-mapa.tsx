@@ -42,11 +42,17 @@ export function PassoMapa({
   planilha,
   mapa,
   sugestao,
+  origemDoLote,
   aoMudar,
 }: {
   planilha: PlanilhaLida;
   mapa: Mapa;
   sugestao: Sugestao;
+  /**
+   * Nome da fonte escolhida no seletor do lote. Com ela, a coluna "Origem"
+   * deixa de ser obrigatória no arquivo: o CSV do Maps não tem uma.
+   */
+  origemDoLote: string;
   aoMudar: (mapa: Mapa) => void;
 }) {
   const porColuna = useMemo(() => {
@@ -58,7 +64,7 @@ export function PassoMapa({
     return saida;
   }, [mapa]);
 
-  const pendentes = faltando(mapa);
+  const pendentes = faltando(mapa, origemDoLote);
 
   /** Trocar o campo de uma coluna tira esse campo de onde ele estivesse antes. */
   const escolher = (coluna: number, valor: string) => {
