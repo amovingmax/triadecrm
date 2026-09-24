@@ -853,11 +853,15 @@ grant execute on function public.esteira_processar_captura(uuid) to service_role
 --
 -- kind = 'import', e não 'scrape'. É verdade literal — o CRM não visita o
 -- Google, o que entra é um arquivo que uma pessoa subiu — e é também o que
--- evita um estrago: `app.envio_variaveis` (20260921100000:268) e
--- `app.wa_preparar_abertura` (20260917200100:114) preenchem a variável
+-- evita um estrago: `app.envio_campos_da_ficha` (20260921100000:268) e
+-- `public.wa_preparar_envio` (20260917200100:114) preenchem a variável
 -- {{origem}} da mensagem com `s.name` quando `s.kind in ('scrape','api')`.
 -- Com 'scrape', a string "Google Maps (raspagem local)" iria literalmente
 -- dentro de um primeiro contato de campanha.
+-- (A spec §3.3 e a nota de rodapé 3 chamam as duas de `app.envio_variaveis` e
+-- `app.wa_preparar_abertura`. Esses dois nomes não existem em lugar nenhum do
+-- banco: os arquivos e as linhas citados estão certos, os nomes é que estavam
+-- trocados. Quem for conferir, procure pelos nomes acima.)
 --
 -- Nenhuma trava se perde com isso: `is_enabled = false` já faz
 -- `public.esteira_abrir_lote` recusar `p_kind='coleta'`
