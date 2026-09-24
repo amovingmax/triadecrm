@@ -76,10 +76,41 @@ export const ROTULO_CAMPO: Record<Campo, string> = {
  */
 export const CAMPOS_OBRIGATORIOS: readonly Campo[] = ['nome', 'categoria', 'origem'];
 
-/** Um campo a mais que a planilha-ponte não tem, mas que outras listas trazem. */
-export const CAMPOS_EXTRAS = ['cnpj', 'site'] as const;
+/**
+ * Campos que a planilha-ponte não tem, mas que outras listas trazem.
+ *
+ * Os cinco últimos entraram com o CSV do `google-maps-scraper-kit` (spec do pivô
+ * de 24/09/2026, §3.1): `app.importacao_normalizar` já sabia montar 9 chaves de
+ * payload enquanto `app.payload_e_permitido` permitia 22, e o que o Maps entrega
+ * de mais valioso — e-mail, endereço e o `cid` do lugar — caía nesse estreitamento.
+ *
+ * A ORDEM IMPORTA, e não é estética: `TODOS_OS_CAMPOS` é `[...CAMPOS, ...CAMPOS_EXTRAS]`,
+ * `acharCampo` percorre os campos nessa ordem e para no primeiro acerto. Entrando
+ * por último, nenhum campo novo pode roubar por semelhança uma coluna que hoje
+ * casa com um campo antigo.
+ *
+ * `nota` e `avaliacoes_qtd` são sinal numérico de pontuação e NUNCA vão para a
+ * tela como avaliação (RF-RAD-04): é a exceção consciente ao R06 SCR-02.
+ */
+export const CAMPOS_EXTRAS = [
+  'cnpj',
+  'site',
+  'place_id',
+  'email',
+  'endereco',
+  'nota',
+  'avaliacoes_qtd',
+] as const;
 export type CampoExtra = (typeof CAMPOS_EXTRAS)[number];
-export const ROTULO_EXTRA: Record<CampoExtra, string> = { cnpj: 'CNPJ', site: 'Site' };
+export const ROTULO_EXTRA: Record<CampoExtra, string> = {
+  cnpj: 'CNPJ',
+  site: 'Site',
+  place_id: 'ID do lugar no Maps',
+  email: 'E-mail',
+  endereco: 'Endereço',
+  nota: 'Nota do Google',
+  avaliacoes_qtd: 'Nº de avaliações',
+};
 
 export type CampoQualquer = Campo | CampoExtra;
 

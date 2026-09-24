@@ -126,3 +126,172 @@ describe('linha sem conteúdo', () => {
     expect(temConteudo(so_observacao, { observacoes: 16 })).toBe(true);
   });
 });
+
+/**
+ * O cabeçalho que o `google-maps-scraper-kit` devolve.
+ *
+ * As 29 colunas estão listadas na spec do pivô (§3.1): dez viram campo e
+ * dezenove são descartadas, cada uma com motivo escrito. O cabeçalho está aqui à
+ * mão de propósito — se o kit renomear uma coluna, quem tem de quebrar é este
+ * teste, e não a importação de 600 linhas na mão de quem está prospectando.
+ */
+const CABECALHO_DO_KIT = [
+  'link',
+  'title',
+  'category',
+  'address',
+  'open_hours',
+  'popular_times',
+  'website',
+  'phone',
+  'plus_code',
+  'review_count',
+  'review_rating',
+  'latitude',
+  'longitude',
+  'cid',
+  'status',
+  'descriptions',
+  'reviews_link',
+  'thumbnail',
+  'timezone',
+  'price_range',
+  'images',
+  'reservations',
+  'menu',
+  'owner',
+  'about',
+  'user_reviews',
+  'emails',
+  'facebook',
+  'linkedin',
+];
+
+describe('cabeçalho do google-maps-scraper-kit', () => {
+  const { mapa, motivos } = sugerirMapa(CABECALHO_DO_KIT);
+
+  it('casa as dez colunas que viram campo, todas por nome exato', () => {
+    expect(mapa.origem_detalhe).toBe(0);
+    expect(mapa.nome).toBe(1);
+    expect(mapa.categoria).toBe(2);
+    expect(mapa.endereco).toBe(3);
+    expect(mapa.site).toBe(6);
+    expect(mapa.whatsapp).toBe(7);
+    expect(mapa.avaliacoes_qtd).toBe(9);
+    expect(mapa.nota).toBe(10);
+    expect(mapa.place_id).toBe(13);
+    expect(mapa.email).toBe(26);
+    const dez = [
+      'origem_detalhe',
+      'nome',
+      'categoria',
+      'endereco',
+      'site',
+      'whatsapp',
+      'avaliacoes_qtd',
+      'nota',
+      'place_id',
+      'email',
+    ] as const;
+    expect(dez.map((c) => motivos[c])).toEqual(dez.map(() => 'exato'));
+  });
+
+  it('title, category e phone passam a casar: hoje não casavam com nada', () => {
+    expect(acharCampo('title')).toEqual({ campo: 'nome', motivo: 'exato' });
+    expect(acharCampo('category')).toEqual({ campo: 'categoria', motivo: 'exato' });
+    // `phone` não casava nem por semelhança: contém `hone`, e não `fone`.
+    expect(acharCampo('phone')).toEqual({ campo: 'whatsapp', motivo: 'exato' });
+  });
+
+  it('cid é o ID do lugar, e não a cidade', () => {
+    expect(acharCampo('cid')).toEqual({ campo: 'place_id', motivo: 'exato' });
+    expect(mapa.cidade).toBeUndefined();
+  });
+
+  it('"Endereço" deixa de cair em Site, e "Endereço na web" continua no Site', () => {
+    expect(acharCampo('Endereço')).toEqual({ campo: 'endereco', motivo: 'exato' });
+    expect(acharCampo('Endereço completo')).toEqual({ campo: 'endereco', motivo: 'exato' });
+    expect(acharCampo('Endereço na web')).toEqual({ campo: 'site', motivo: 'exato' });
+  });
+
+  it('a linha vira objeto só com o que foi mapeado', () => {
+    const valores = CABECALHO_DO_KIT.map((c) => `v_${c}`);
+    const objeto = linhaParaObjeto(valores, mapa, 2);
+    expect(objeto.place_id).toBe('v_cid');
+    expect(objeto.email).toBe('v_emails');
+    expect(objeto.endereco).toBe('v_address');
+    expect(objeto.nota).toBe('v_review_rating');
+    expect(objeto.avaliacoes_qtd).toBe('v_review_count');
+    expect('facebook' in objeto).toBe(false);
+    expect('linkedin' in objeto).toBe(false);
+    const valoresEmitidos = Object.values(objeto);
+    for (const proibida of [
+      'v_facebook',
+      'v_linkedin',
+      'v_thumbnail',
+      'v_user_reviews',
+      'v_images',
+    ]) {
+      expect(valoresEmitidos).not.toContain(proibida);
+    }
+  });
+
+  it('o CSV do kit não traz origem: ela vem do seletor do lote', () => {
+    expect(faltando(mapa)).toEqual(['origem']);
+  });
+});
+
+/**
+ * Trava de regressão: isto JÁ é verdade hoje, e o passo 6.4 não pode quebrar.
+ *
+ * Cinco sinônimos novos entram num casador que faz uma passada exata e depois uma
+ * por trecho. Um sinônimo curto demais rouba coluna alheia em silêncio, e o
+ * sintoma só aparece quando alguém importa 600 linhas com o campo trocado. Estes
+ * três testes passam antes e depois da mudança — é esse o ponto.
+ */
+describe('o que o cabeçalho do kit NÃO pode passar a casar', () => {
+  const { mapa } = sugerirMapa(CABECALHO_DO_KIT);
+
+  it('facebook não casa com nada, e nem linkedin nem reviews_link roubam o link do lugar', () => {
+    expect(acharCampo('facebook')).toBeNull();
+    // `linkedin` e `reviews_link` contêm `link`, então casam por SEMELHANÇA com
+    // "detalhe da origem". Nenhum dos dois entra no mapa: `link` já tomou o campo
+    // por nome exato, e `sugerirMapa` não deixa um acerto parecido substituir um
+    // exato.
+    expect(acharCampo('linkedin')).toEqual({ campo: 'origem_detalhe', motivo: 'parecido' });
+    expect(acharCampo('reviews_link')).toEqual({ campo: 'origem_detalhe', motivo: 'parecido' });
+    expect(mapa.origem_detalhe).toBe(CABECALHO_DO_KIT.indexOf('link'));
+  });
+
+  it('as colunas que a whitelist não recebe não viram campo nenhum', () => {
+    const fora = [
+      'plus_code',
+      'latitude',
+      'longitude',
+      'descriptions',
+      'about',
+      'images',
+      'thumbnail',
+      'user_reviews',
+      'price_range',
+      'open_hours',
+      'popular_times',
+      'menu',
+      'reservations',
+      'timezone',
+    ];
+    expect(fora.map(acharCampo)).toEqual(fora.map(() => null));
+  });
+
+  it('status e owner ainda casam: é o operador que os tira na tela', () => {
+    // `status` ("Operacional") cai em Etapa e `owner` (nome de pessoa) em
+    // Responsável. Os dois são sinônimos legítimos para planilha de CRM em
+    // inglês, então não saem de `SINONIMOS`: o passo 5 do roteiro de §3.4 manda
+    // conferir o mapa sugerido, e é lá que os dois são desmarcados. Este teste
+    // existe para que isso seja uma decisão escrita, e não um esquecimento.
+    expect(acharCampo('status')).toEqual({ campo: 'etapa', motivo: 'exato' });
+    expect(acharCampo('owner')).toEqual({ campo: 'responsavel', motivo: 'exato' });
+    expect(mapa.etapa).toBe(14);
+    expect(mapa.responsavel).toBe(23);
+  });
+});

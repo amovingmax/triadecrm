@@ -32,10 +32,10 @@ export function chave(texto: string): string {
  * usa (Google Sheets em português, Casamentos, TeleListas, Solutudo).
  */
 const SINONIMOS: Record<CampoQualquer, string[]> = {
-  nome: ['nome', 'nome fantasia', 'nome comercial', 'empresa', 'fornecedor', 'razao social', 'parceiro'],
+  nome: ['nome', 'nome fantasia', 'nome comercial', 'empresa', 'fornecedor', 'razao social', 'parceiro', 'title'],
   tipo: ['tipo', 'tipo de parceiro', 'natureza'],
-  categoria: ['categoria', 'segmento', 'ramo', 'servico', 'especialidade'],
-  whatsapp: ['whatsapp', 'whats', 'telefone', 'celular', 'fone', 'contato', 'tel', 'numero'],
+  categoria: ['categoria', 'segmento', 'ramo', 'servico', 'especialidade', 'category'],
+  whatsapp: ['whatsapp', 'whats', 'telefone', 'celular', 'fone', 'contato', 'tel', 'numero', 'phone'],
   origem: ['origem', 'fonte', 'de onde veio', 'canal de origem'],
   origem_detalhe: ['origem detalhe', 'detalhe da origem', 'link', 'url', 'link de origem', 'perfil'],
   cidade: ['cidade', 'municipio', 'localidade'],
@@ -51,6 +51,11 @@ const SINONIMOS: Record<CampoQualquer, string[]> = {
   observacoes: ['observacoes', 'observacao', 'obs', 'notas', 'anotacoes', 'comentarios'],
   cnpj: ['cnpj', 'documento', 'cnpj mf'],
   site: ['site', 'website', 'pagina', 'endereco na web'],
+  place_id: ['place id', 'cid', 'id do lugar', 'google cid'],
+  email: ['email', 'e mail', 'emails', 'e mails', 'correio eletronico'],
+  endereco: ['endereco', 'address', 'endereco completo', 'logradouro'],
+  nota: ['nota', 'review rating', 'nota google', 'avaliacao google', 'estrelas'],
+  avaliacoes_qtd: ['avaliacoes qtd', 'review count', 'avaliacoes', 'qtd de avaliacoes', 'numero de avaliacoes'],
 };
 
 const CHAVES: Array<{ campo: CampoQualquer; chaves: string[] }> = TODOS_OS_CAMPOS.map((campo) => ({
