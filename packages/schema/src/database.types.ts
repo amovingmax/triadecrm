@@ -258,6 +258,7 @@ export type Database = {
         Args: { p_enrollment: string }
         Returns: undefined
       }
+      endereco_br: { Args: { t: string }; Returns: Json }
       entrada_da_ligacao: {
         Args: { p_stage_id: number; p_variante: string }
         Returns: string
