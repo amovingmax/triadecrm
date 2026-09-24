@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — Fase 2: lead automático e valor (migração 20260922110000)
+-- pgTAP — Fase 2: lead automático (migrações 20260922110000 e 20260924120000)
 --
 -- O que este arquivo prova:
 --   1. SEM MENU AUTOMÁTICO, quem escreve pela primeira vez vira parceiro,
@@ -9,10 +9,10 @@
 --   3. NÚMERO QUE JÁ ESTÁ NA BASE não duplica: a conversa é ligada à ficha.
 --   4. DESLIGADO em Ajustes, nada é criado.
 --   5. O VALOR: quem escreve define; quem só lê não; negativo não; e o quadro
---      devolve o valor do cartão e a soma da coluna.
+--      volta a contar cartões, sem soma de dinheiro na coluna.
 -- =====================================================================
 begin;
-select plan(14);
+select plan(11);
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -126,32 +126,16 @@ select is(app.lead_automatico((pg_temp.conv('+5584999996005')).id) ->> 'motivo',
   'desligado em Ajustes, nada é criado');
 
 -- =====================================================================
--- 5. O valor
+-- 5. O valor saiu (24/09/2026)
+--
+-- O campo nasceu na migração de 22/09 cruzando a recusa escrita do RF-REL-12,
+-- e o Rafael o retirou dois dias depois: "esse campo n faz sentido pra gente".
+-- Estes dois testes existem para que ele não volte por descuido numa próxima
+-- recriação de `pipeline_board`.
 -- =====================================================================
-insert into pg_temp.r
-select 'deal', to_jsonb(d.id) from public.deals d
- where d.organization_id = (pg_temp.conv('+5584999996001')).organization_id;
-
-select pg_temp.entrar('a0000000-0000-4000-8000-000000006002', 'leitura');
-select is(public.definir_valor_do_negocio((pg_temp.v('deal') #>> '{}')::uuid, 1500) ->> 'motivo',
-  'sem_permissao', 'quem só lê não põe valor');
-select pg_temp.sair();
-
-select pg_temp.entrar('a0000000-0000-4000-8000-000000006001', 'sdr');
-select is(public.definir_valor_do_negocio((pg_temp.v('deal') #>> '{}')::uuid, -10) ->> 'motivo',
-  'valor_invalido', 'valor negativo não entra');
-select is(public.definir_valor_do_negocio((pg_temp.v('deal') #>> '{}')::uuid, 1500.456) ->> 'valor',
-  '1500.46', 'quem escreve põe o valor, em centavos');
-insert into pg_temp.r
-select 'etapa', e from jsonb_array_elements(
-  public.pipeline_board((select id from public.pipelines where slug = 'fornecedor'), false, null,
-                        'Contato do WhatsApp (84) 99999-6001') -> 'stages') e
- where (e ->> 'total')::int > 0;
-select pg_temp.sair();
-select ok((pg_temp.v('etapa') ->> 'valor_total')::numeric >= 1500.46, 'a coluna soma o valor dos cartões');
-select is((select (c ->> 'valor')::numeric from jsonb_array_elements(pg_temp.v('etapa') -> 'cards') c
-            where c ->> 'organization_name' = 'Contato do WhatsApp (84) 99999-6001'),
-          1500.46, 'e o cartão mostra o dele');
+select hasnt_column('public', 'deals', 'valor', 'o negócio não tem preço');
+select hasnt_function('public', 'definir_valor_do_negocio',
+  'e ninguém escreve valor em negócio nenhum');
 
 select * from finish();
 rollback;

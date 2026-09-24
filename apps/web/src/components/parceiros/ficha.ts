@@ -24,8 +24,6 @@ export type NegocioDaFicha = {
   ultimoContatoEm: string | null;
   naEtapaDesde: string;
   tier: string | null;
-  /** Valor estimado da oportunidade (Fase 2). */
-  valor: number | null;
 };
 
 export type Ficha = {
@@ -104,7 +102,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     supabase
       .from('deals')
       .select(
-        'id, status, temperature, needs_attention, owner_id, next_action, next_action_at, last_activity_at, entered_stage_at, tier, stage_id, pipeline_id, valor',
+        'id, status, temperature, needs_attention, owner_id, next_action, next_action_at, last_activity_at, entered_stage_at, tier, stage_id, pipeline_id',
       )
       .eq('organization_id', id)
       .order('updated_at', { ascending: false }),
@@ -179,7 +177,6 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
       ultimoContatoEm: d.last_activity_at,
       naEtapaDesde: d.entered_stage_at,
       tier: d.tier,
-      valor: d.valor ?? null,
     })),
   };
 }

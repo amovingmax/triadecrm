@@ -179,7 +179,6 @@ export type CartaoQuadro = {
   next_action_state: EstadoProximaAcao;
   updated_at: string;
   /** Valor estimado da oportunidade, em reais (Fase 2). `null` = ninguém pôs. */
-  valor?: number | null;
 };
 
 /** Uma coluna do quadro: a etapa, suas regras e a página de cartões carregada. */
@@ -200,8 +199,6 @@ export type EtapaQuadro = {
   total: number;
   /** Página carregada. `cards.length < total` quando a coluna foi cortada por `p_limit_per_stage`. */
   cards: CartaoQuadro[];
-  /** Soma do valor dos negócios da etapa, com os filtros (Fase 2). `null` = nenhum tem valor. */
-  valor_total?: number | null;
 };
 
 export type Quadro = {

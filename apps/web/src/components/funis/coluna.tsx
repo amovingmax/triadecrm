@@ -6,7 +6,6 @@ import { ChevronLeft, Flag, Loader2, MoonStar, Slash, Trophy } from 'lucide-reac
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { formatarValorDaColuna } from './cartao-formatos';
 import type { DadosDaColuna } from './quadro-teclado';
 import { etapaEhDeSaida, type EtapaQuadro } from './tipos';
 
@@ -112,11 +111,6 @@ export function Coluna({
         <h3 className="min-w-0 flex-1 truncate text-sm font-medium" title={etapa.name}>
           {etapa.name}
         </h3>
-        {formatarValorDaColuna(etapa.valor_total) ? (
-          <span className="numerico shrink-0 text-xs text-muted-foreground" title="Soma do valor dos negócios desta etapa">
-            {formatarValorDaColuna(etapa.valor_total)}
-          </span>
-        ) : null}
         <ContagemDaEtapa total={etapa.total} />
       </header>
 

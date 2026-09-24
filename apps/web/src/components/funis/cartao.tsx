@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import {
   formatarCategoriaELocal,
   formatarParado,
-  formatarValor,
   rotuloResponsavel,
 } from './cartao-formatos';
 import { SemaforoProximaAcao, SemaforoTermico } from './semaforo';
@@ -108,7 +107,6 @@ export function CartaoNegocio({
   const destino = href === undefined ? `/parceiros/${cartao.organization_id}` : href;
   const categoriaELocal = formatarCategoriaELocal(cartao);
   const parado = cartao.is_rotting ? formatarParado(cartao.days_in_stage) : null;
-  const valor = formatarValor(cartao.valor);
 
   return (
     <article
@@ -162,16 +160,9 @@ export function CartaoNegocio({
         ) : null}
       </div>
 
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="min-w-0 truncate text-xs text-muted-foreground">
-          {categoriaELocal || 'Categoria não informada'}
-        </p>
-        {valor ? (
-          <span className="numerico shrink-0 text-xs font-medium text-foreground" title="Valor da oportunidade">
-            {valor}
-          </span>
-        ) : null}
-      </div>
+      <p className="truncate text-xs text-muted-foreground">
+        {categoriaELocal || 'Categoria não informada'}
+      </p>
 
       {/* Os dias sem contato vêm nesta linha, e não ao lado do nome: numa coluna de
           kanban com 300px, "sem contato" (o valor de quase todo alvo novo) roubava uns

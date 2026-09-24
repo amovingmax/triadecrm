@@ -4,8 +4,6 @@ import {
   formatarCategoriaELocal,
   formatarParado,
   formatarPrazoProximaAcao,
-  formatarValor,
-  formatarValorDaColuna,
   rotuloResponsavel,
 } from './cartao-formatos';
 import type { CartaoQuadro } from './tipos';
@@ -174,19 +172,3 @@ describe('formatarParado', () => {
   });
 });
 
-describe('o valor da oportunidade (Fase 2)', () => {
-  it('mostra reais sem centavos quando não há centavos', () => {
-    expect(formatarValor(1500)?.replace(/\s/g, ' ')).toBe('R$ 1.500');
-    expect(formatarValor(1500.5)?.replace(/\s/g, ' ')).toBe('R$ 1.500,50');
-  });
-
-  it('não mostra nada sem valor, nem "R$ 0"', () => {
-    expect(formatarValor(null)).toBeNull();
-    expect(formatarValor(0)).toBeNull();
-  });
-
-  it('a soma da coluna fica curta a partir de 10 mil', () => {
-    expect(formatarValorDaColuna(9_000)?.replace(/\s/g, ' ')).toBe('R$ 9.000');
-    expect(formatarValorDaColuna(12_300)?.replace(/\s/g, ' ')).toMatch(/^R\$ 12,3 mil$/);
-  });
-});

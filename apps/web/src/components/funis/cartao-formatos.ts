@@ -186,28 +186,3 @@ export function formatarParado(dias: number): {
   };
 }
 
-/**
- * Valor da oportunidade no cartão: "R$ 1.500", com centavos só quando existem.
- * `null` e zero não aparecem — cartão sem valor não precisa de "R$ 0".
- */
-export function formatarValor(valor: number | null | undefined): string | null {
-  if (valor === null || valor === undefined || !(valor > 0)) return null;
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: Number.isInteger(valor) ? 0 : 2,
-    maximumFractionDigits: 2,
-  }).format(valor);
-}
-
-/** A soma da coluna, curta para caber no cabeçalho: "R$ 12 mil", "R$ 1,2 mi". */
-export function formatarValorDaColuna(valor: number | null | undefined): string | null {
-  if (valor === null || valor === undefined || !(valor > 0)) return null;
-  if (valor < 10_000) return formatarValor(valor);
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(valor);
-}

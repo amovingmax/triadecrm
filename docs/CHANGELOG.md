@@ -2926,3 +2926,29 @@ Entregue:
 - Testes: 2 asserções novas em `mensagens.test.ts`.
 
 Na base: as três falhas de 131026 em produção são todas do mesmo número (+55 84 99927-2577, o do Matheus). Todos os outros números receberam.
+
+### 24/09/2026 — O negócio volta a não ter preço
+
+"esse campo n faz sentido pra gente" (Rafael, ao ver pela primeira vez o campo de valor no cartão do funil).
+
+O campo nasceu na migração `20260922110000` sem que ninguém notasse que cruzava uma recusa já escrita: o **RF-REL-12** registra que "ficam recusados por escrito o valor por negócio e a probabilidade digitada pelo vendedor (a receita é 8% de uma transação futura, e probabilidade digitada é ficção)". A Komune não vende nada ao fornecedor — fica com 8% de uma festa que pode não acontecer, meses depois. Número digitado ali não é previsão, é palpite; e palpite somado no topo da coluna vira relatório.
+
+Entregue (migração `20260924120000_sem_valor_no_negocio.sql`):
+- **`deals.valor` e `public.definir_valor_do_negocio` saíram**; `public.pipeline_board` foi recriada sem o `join` em `deals`, que existia só para o valor — a coluna volta a contar cartões.
+- **Tela**: o valor sai do cartão do kanban, a soma sai do cabeçalho da coluna e a linha "Valor" sai da ficha do parceiro (`valor-do-negocio.tsx` apagado); `formatarValor`/`formatarValorDaColuna` foram removidas com os testes delas.
+- **Guardas contra o retorno**: duas asserções novas em `60_lead_automatico.sql` (renomeado, era `60_lead_automatico_e_valor.sql`) fixam que a coluna e a função não existem — para que uma próxima recriação de `pipeline_board` não os traga de volta por descuido. O contrato do cartão caiu de 23 para 22 chaves em `11_funil_kanban.sql`.
+- **Nada se perdeu**: conferido em produção antes de apagar, nenhum negócio tinha valor preenchido — o campo subiu dia 22 e ninguém chegou a usar.
+
+O peso de uma etapa continua sendo a contagem de negócios; o equivalente ao valor monetário continua sendo a categoria em déficit (RF-REL-03).
+
+Verificado: pgTAP 2.896 asserções em 65 arquivos, lint, typecheck e 780 testes do web, todos verdes, com o banco reconstruído do zero.
+
+### 24/09/2026 — Prazo da Meta: mensagem de serviço passa a ser paga em 01/10
+
+Apareceu ao conferir uma afirmação de terceiro ("mudança de diretriz da Meta em 1º de outubro"), que estava errada no assunto mas certa na data. O que a documentação da Meta diz:
+- **A partir de 01/10/2026 a mensagem de serviço é cobrada** (resposta dentro da janela de 24 h, grátis desde novembro de 2024), pela mesma tarifa de utilidade/autenticação do mercado, com faixa grátis de **1.000 por mês por número**.
+- **Quem não tiver forma de pagamento cadastrada até 30/09/2026 deixa de ter as mensagens de serviço entregues** — vale explicitamente para quem integra direto na Cloud API, que é o nosso caso.
+
+Conferido no Gerenciador do WhatsApp em 24/09: a conta Komune já é cobrada (R$ 2,57 no mês), ou seja, tem meio de pagamento ativo; o Rafael promoveu um cartão válido a padrão no Gerenciador de Negócios, no lugar de um PayPal não verificado. No volume de hoje (51 mensagens de atendimento no mês) a mudança não custa nada: 5% da faixa grátis.
+
+Achado colateral: a Meta já libera **2.000 conversas novas por dia** para o nosso número. O teto de 150/dia do CRM é nosso, não dela.
