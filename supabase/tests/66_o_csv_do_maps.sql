@@ -41,7 +41,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(32);
+select plan(39);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -682,6 +682,63 @@ select is(
   array['phone_e164', 'place_id'],
   'a ficha responde de onde veio o número com a URL do lugar no Maps, em phone_e164 E em place_id');
 
+
+-- =====================================================================
+-- A fonte nova: a linha é o registro escrito da decisão (§3.3, ADR-12)
+-- =====================================================================
+select ok(exists (
+  select 1 from public.sources s
+   where s.slug = 'google_maps_raspado'
+     and s.name = 'Google Maps (raspagem local)'
+     and s.kind = 'import'
+     and s.base_url = 'https://www.google.com/maps'
+     and s.legal_basis = 'legitimo_interesse'
+     and s.robots_ok = false
+     and s.rate_limit_seconds = 5.00
+     and s.is_enabled = false),
+  'a fonte google_maps_raspado existe: kind import, robots_ok false, 5 s entre requisições, desligada');
+
+select ok(coalesce((select s.terms_notes like '%CONTRARIA OS TERMOS DE SERVIÇO DO GOOGLE%'
+                     and s.terms_notes like '%SCR-04%'
+                     and s.terms_notes like '%ADR-12%'
+                     and s.terms_notes like '%600 lugares por rodada%'
+                      from public.sources s where s.slug = 'google_maps_raspado'), false),
+  'terms_notes carrega os quatro pedaços que nenhuma reescrita pode perder: os ToS do Google, a revogação do SCR-04, o ADR-12 e o limite da rodada');
+
+select is(
+  (select s.config from public.sources s where s.slug = 'google_maps_raspado'),
+  '{"adr": "ADR-12", "collector": {"kind": "externo", "phase": "mvp", "enabled": false}, "entrada_por_arquivo": true, "ferramenta": "google-maps-scraper-kit (MIT) sobre gosom/google-maps-scraper"}'::jsonb,
+  'o config da fonte é o do ADR-12: coletor externo e desligado, entrada por arquivo ligada');
+
+-- =====================================================================
+-- Teste 12 de §3.5 — a fonte nova não coleta; ela recebe arquivo
+-- =====================================================================
+select is(
+  public.esteira_abrir_lote('coleta',
+    (select s.id from public.sources s where s.slug = 'google_maps_raspado'),
+    'pgTAP maps coleta') ->> 'reason',
+  'origem_desabilitada',
+  'lote de COLETA na fonte nova é recusado: o CRM não visita o Google');
+
+select ok((public.esteira_abrir_lote('planilha',
+    (select s.id from public.sources s where s.slug = 'google_maps_raspado'),
+    'pgTAP maps planilha') ->> 'ok')::boolean,
+  'lote de PLANILHA na fonte nova abre: o CSV entra pela porta que já existe');
+
+-- =====================================================================
+-- Teste 13 de §3.5 — o rótulo do seletor não se confunde com o Places
+-- =====================================================================
+select is(
+  (select s.slug from public.sources s
+    where s.id = (app.importacao_fonte('Google Maps (raspagem local)') ->> 'id')::int),
+  'google_maps_raspado',
+  'o nome do seletor de origem casa com a fonte raspada');
+
+select is(
+  (select s.slug from public.sources s
+    where s.id = (app.importacao_fonte('Google Maps') ->> 'id')::int),
+  'google_places',
+  '"Google Maps" continua sendo o conector oficial do Places: a proveniência não se confunde');
 
 select * from finish();
 rollback;

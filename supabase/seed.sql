@@ -192,6 +192,12 @@ on conflict (slug) do update
       -- config só é semeada quando ainda está vazia (o gestor configura seletores/paginação depois).
       config             = case when public.sources.config = '{}'::jsonb then excluded.config else public.sources.config end;
 
+-- `google_maps_raspado` NÃO está na lista acima de propósito: ela nasce na
+-- migração 20260924130000, que é o registro escrito do ADR-12 e roda antes deste
+-- arquivo em todo ambiente. Uma cópia aqui só duplicaria o texto jurídico — e o
+-- `on conflict do update` acima sobrescreveria o original em silêncio se os dois
+-- divergissem um dia.
+
 -- =====================================================================
 -- 3b. Catálogo de coleta do Radar e mapa de categorias da fonte (R03 §2.1;
 --     migração 20260904001802, blocos 3 e 4).

@@ -11,7 +11,11 @@ select is((select count(*)::int from public.cities where is_metro_natal),       
 select is((select count(*)::int from public.categories),                          19, 'seed: 19 categorias (Apêndice F)');
 select is((select count(*)::int from public.categories where priority = 1),       10, 'seed: 10 categorias na onda P1');
 select is((select count(*)::int from public.categories where "group" = 'producao'), 3, 'seed: 3 categorias de produtores');
-select is((select count(*)::int from public.sources),                             12, 'seed: 12 origens/fontes, com "Chegou pelo WhatsApp" (GetNinjas não entra no catálogo)');
+-- 13 desde 24/09/2026: a migração 20260924130000 acrescentou `google_maps_raspado`
+-- (ADR-12). A contagem continua EXATA de propósito — entrar com uma fonte nova é
+-- decisão registrada, não trabalho de rotina, e é este número que obriga quem
+-- acrescenta uma a passar por aqui.
+select is((select count(*)::int from public.sources),                             13, 'seed: 13 origens/fontes, com "Chegou pelo WhatsApp" e o Google Maps raspado (GetNinjas não entra no catálogo)');
 select is((select count(*)::int from public.holidays where extract(year from date) = 2026), 16, 'seed: 16 feriados em 2026');
 select is((select count(*)::int from public.holidays where extract(year from date) = 2027), 16, 'seed: 16 feriados em 2027 (cadências viram o ano)');
 select is((select count(*)::int from public.lost_reasons),                         9, 'seed: 9 motivos de perda (PRD §5.3)');

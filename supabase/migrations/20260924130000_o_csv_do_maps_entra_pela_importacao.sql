@@ -35,6 +35,8 @@
 --      `category_source`/`category_id`, todos com `coalesce`. A segunda
 --      raspagem completa o que faltava em vez de deixar a linha presa na
 --      Revisão por `categoria_desconhecida`.
+--   5. A fonte `google_maps_raspado` no catálogo, com o ADR-12 inteiro escrito
+--      em `terms_notes` — `kind = 'import'` e desligada de propósito.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------------
@@ -816,3 +818,64 @@ comment on function public.esteira_processar_captura(uuid) is
   'Captura → source_record (com a higiene do RF-BAS-16 em gatilho) → candidato. Conteúdo idêntico só atualiza last_seen_at; conteúdo mudado marca `mudou_na_fonte`, COMPLETA o que estava vazio (inclusive CEP, place_id, cidade e categoria) e devolve o candidato à revisão.';
 revoke all on function public.esteira_processar_captura(uuid) from public, anon, authenticated;
 grant execute on function public.esteira_processar_captura(uuid) to service_role;
+
+-- ---------------------------------------------------------------------
+-- 6. A fonte nova, com o risco escrito na própria linha
+--
+-- A linha de `public.sources` é o registro da operação de tratamento
+-- (LGPD art. 37) e, aqui, também o registro escrito da decisão. Por isso
+-- ela nasce na MIGRAÇÃO: quem abrir o banco de produção daqui a um ano acha
+-- o ADR-12 inteiro em `terms_notes`, sem precisar do repositório.
+--
+-- E nasce SÓ na migração, sem cópia em supabase/seed.sql. A migração roda
+-- antes da seed em todo ambiente (`supabase db reset` aplica as migrações e
+-- só depois o seed.sql), então a linha já existe quando a seed começa — uma
+-- segunda cópia lá não acrescentaria nada e criaria 1,3 mil caracteres de
+-- texto jurídico que teriam de bater caractere a caractere, com o
+-- `on conflict (slug) do update` da seed (seed.sql:183-193) sobrescrevendo
+-- `terms_notes` em silêncio se divergissem. Não é hipótese: `whatsapp_entrada`
+-- está nos dois lugares e os dois textos JÁ divergem
+-- (20260915130000:59 vs seed.sql:171) — lá é inofensivo porque a migração usa
+-- `do nothing`. Aqui o texto é o registro legal, e ele tem um dono só.
+--
+-- `on conflict (slug) do update` (e não `do nothing`): esta migração roda uma
+-- vez, e se alguém tiver criado a linha à mão antes dela, o que vale é o texto
+-- aprovado, não o improviso.
+--
+-- kind = 'import', e não 'scrape'. É verdade literal — o CRM não visita o
+-- Google, o que entra é um arquivo que uma pessoa subiu — e é também o que
+-- evita um estrago: `app.envio_variaveis` (20260921100000:268) e
+-- `app.wa_preparar_abertura` (20260917200100:114) preenchem a variável
+-- {{origem}} da mensagem com `s.name` quando `s.kind in ('scrape','api')`.
+-- Com 'scrape', a string "Google Maps (raspagem local)" iria literalmente
+-- dentro de um primeiro contato de campanha.
+--
+-- Nenhuma trava se perde com isso: `is_enabled = false` já faz
+-- `public.esteira_abrir_lote` recusar `p_kind='coleta'`
+-- (20260904001600:1788-1790), `config.collector.enabled` é false, e não existe
+-- adaptador para esta fonte em apps/workers/src/ingest/adaptador.ts.
+-- ---------------------------------------------------------------------
+insert into public.sources (slug, name, kind, base_url, legal_basis, terms_notes,
+                            robots_ok, rate_limit_seconds, is_enabled, config)
+values (
+  'google_maps_raspado',
+  'Google Maps (raspagem local)',
+  'import',
+  'https://www.google.com/maps',
+  'legitimo_interesse',
+  'Raspagem do Google Maps por ferramenta local (google-maps-scraper-kit, MIT, sobre gosom/google-maps-scraper), em Docker em 127.0.0.1, fora do CRM. CONTRARIA OS TERMOS DE SERVIÇO DO GOOGLE, que proíbem extração automatizada, e REVOGA POR ESCRITO o R06 §B.1 SCR-04 ("nada de scraping direto ou via terceiros", docs/anexos/R06-lgpd-compliance.md:227), recusa de 04/09/2026. Decisão do Rafael em 24/09/2026, ADR-12, risco assumido no nível da empresa. O resto do SCR-03 continua valendo e é o que limita o dano: sem login, sem burla de CAPTCHA, sem proxy rotativo, user-agent identificado, 1 requisição a cada 5 s. O que coletamos são dados factuais de contato comercial publicados pelo próprio estabelecimento: nome, categoria, telefone, site, e-mail, endereço e dois números de reputação. Nunca foto, texto descritivo ou texto de avaliação. nota e avaliacoes_qtd entram apenas como sinal numérico de pontuação, pela mesma exceção consciente ao SCR-02 já registrada (RF-RAD-04, RF-RAD-12, PRD §13 item 10) — nunca exibidos como avaliação. Nunca republicação, nunca revenda. Limite: no máximo 2 rodadas por semana e 600 lugares por rodada, só Natal e região metropolitana. Consequência realista se der errado: bloqueio do IP ou CAPTCHA permanente na máquina que raspa — não há contrato entre a KOMUNE e o Google que possa ser rescindido, e não há dado de terceiro republicado que gere dano indenizável. O cid que gravamos em place_id NÃO É o place_id da Places API: se um dia ligarmos o conector oficial (google_places), os dois identificadores não casam.',
+  false,
+  5.00,
+  false,
+  '{"collector": {"kind": "externo", "phase": "mvp", "enabled": false}, "entrada_por_arquivo": true, "ferramenta": "google-maps-scraper-kit (MIT) sobre gosom/google-maps-scraper", "adr": "ADR-12"}'::jsonb
+)
+on conflict (slug) do update
+  set name               = excluded.name,
+      kind               = excluded.kind,
+      base_url           = excluded.base_url,
+      legal_basis        = excluded.legal_basis,
+      terms_notes        = excluded.terms_notes,
+      robots_ok          = excluded.robots_ok,
+      rate_limit_seconds = excluded.rate_limit_seconds,
+      is_enabled         = excluded.is_enabled,
+      config             = excluded.config;
