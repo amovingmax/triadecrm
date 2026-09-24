@@ -3005,3 +3005,37 @@ Correção na revisão: as duas funções que preenchem `{{origem}}` chamam-se `
 Pendente: o seletor de origem na tela de `/importar` é quem consome `entrada_por_arquivo` — até ele existir (Tarefa 8 do plano), a fonte nova está no banco mas não aparece para o operador.
 
 Pendente: corrigir os dois nomes na spec `docs/superpowers/specs/2026-09-24-pivo-scraper-e-robo-autonomo-design.md` (§3.3 e nota 3) e no plano, para que ninguém volte a copiá-los.
+
+### 24/09/2026 — Fase 1 do pivô: o CSV do Google Maps entra pela porta da planilha (ADR-12)
+
+A fila de revisão tinha **277 candidatos e um telefone**. Não era defeito do coletor: o casamentos.com.br não publica o número, e a varredura de `robots.txt` de 17/09 concluiu que não existe caminho de raspagem legal e barato para telefone. O Rafael decidiu em 24/09 raspar o Google Maps com o `gosom/google-maps-scraper` em Docker local — ciente de que contraria os Termos do Google e de que o R06 §B.1 SCR-04 já havia recusado. A decisão revoga essa recusa por escrito, e o risco está registrado na própria linha da fonte, em `sources.terms_notes`.
+
+Não construímos caminho novo. O CSV entra pela importação de planilha, pela mesma esteira do ADR-08 (`raw_capture → source_record → supplier_candidate → revisão → organizations`), com prévia antes de gravar e desfazer de 48 h. O que se consertou foi o estreitamento: o payload que a tela montava tinha 9 campos e a whitelist do banco permitia 22.
+
+Entregue (migração `20260924130000_o_csv_do_maps_entra_pela_importacao.sql`):
+- **`app.endereco_br(text)`**: um endereço do Maps vira `bairro`, `cidade` e `cep`. A regra devolve **nulo onde não casou, nunca palpite** — ficha sem bairro estraga a rota de visita, não a ficha.
+- **`app.importacao_normalizar` refeita**: o payload sai de 9 para 15 chaves (`place_id`, `email`, `endereco`, `nota`, `avaliacoes_qtd` e `cep`, todos já dentro da whitelist). A fonte passa a ser resolvida antes da categoria, e a categoria consulta `public.source_category_map` **antes** da queda difusa — senão um palpite de 0,55 de similaridade venceria o mapa escrito à mão.
+- **CPF varrido no endereço**, antes do payload: `raw_capture` guarda o payload cru, e o gatilho que limpa CPF só roda depois, em `source_record`. Sem isso, CPF de MEI ficaria guardado com retenção de coleta, fora do alcance da limpeza.
+- **`place_id` vira o `external_id`** da linha do Maps: o telefone muda, o `cid` não. A prévia passa a sondar as **quatro** chaves únicas (o comentário dizia quatro e o código testava três), e para de dizer "entra" onde a gravação responde "duplicata".
+- **A segunda raspagem grava o que faltava**: o ramo de UPDATE de `esteira_processar_captura` carregava 11 campos a menos que o de INSERT; `cep`, `place_id`, `city_id` e a categoria passam a entrar com `coalesce`. Sem isso, linha parada em revisão por `categoria_desconhecida` ficava presa para sempre.
+- **A fonte `google_maps_raspado`**, `kind = 'import'` e não `'scrape'` — com `'scrape'`, a string "Google Maps (raspagem local)" iria literalmente para dentro da variável `{{origem}}` de um primeiro contato de campanha.
+
+Na tela:
+- **Cinco campos novos** no mapa de colunas (ID do lugar, e-mail, endereço, nota, nº de avaliações) e o cabeçalho em inglês do kit passa a casar sozinho: `title`, `category`, `phone`, `cid`, `emails`, `address`, `review_rating`, `review_count`. `cid` entra como sinônimo **exato** de `place_id` — pela passada por trecho ele iria para **cidade**.
+- **O seletor de origem do lote**: a tela lista as fontes com `config.entrada_por_arquivo` e injeta o nome da escolhida em cada linha que não tiver coluna de origem. Um lote de raspagem rotulado "planilha" era mentira no registro legal das operações de tratamento, e `import_batches.source_id` é onde ela ficaria guardada. O critério é a chave da config, e não `is_enabled`: `is_enabled` governa só a coleta automática, e a fonte nova nasce desligada de propósito.
+- **Uma fixture de verdade**, `apps/web/src/components/importacao/fixtures/maps-natal-buffet.csv`: 20 lugares fictícios no formato exato do kit, com um telefone fixo, um sem e-mail, um endereço sem bairro, dois e-mails na mesma célula e um `cid` repetido.
+
+Na infra:
+- **Perfil `maps`** em `infra/local/docker-compose.yml`, porta presa em `127.0.0.1:8080`, saída em `data/maps/saida/` (já gitignored), com o passo a passo do operador no compose e no README. O endurecimento é escrito à mão neste serviço, como no `metabase`: Chromium em contêiner pede exceção, e o `x-endurecimento` compartilhado é de outros seis. O CRM **não** chama o raspador: a Vercel e o Fly.io não alcançam `127.0.0.1` em Natal, e com uma pessoa no meio a raspagem fica registrada em `import_batches.triggered_by`.
+
+Limite de conduta, escrito e não codificado: **2 rodadas por semana, 600 lugares por rodada, só Natal e região metropolitana**; sem login, sem burla de CAPTCHA, sem proxy rotativo, 1 requisição a cada 5 s. Esse intervalo é disciplina de quem opera — `-c 1` limita a concorrência a uma aba, não impõe atraso. Bloqueio de IP ou CAPTCHA: para e avisa.
+
+**Dívida assumida, e medida em teste.** Varrendo o CPF dentro de `app.importacao_normalizar`, o gatilho de higiene do `source_record` não o vê mais: a flag `cpf_descartado` e a linha de `public.field_provenance` com `reason = 'cpf'` deixam de existir por este caminho, e o registro do descarte passa a viver só na prévia, que não é armazenada. Duas asserções do arquivo 66 fixam exatamente isso (bloco 14b). O conserto natural é `public.importacao_gravar` chamar `app.registrar_proveniencia` quando a linha trouxer o aviso — função de 230 linhas que esta fase não substituiu.
+
+Pendente: o filtro por etiqueta, origem, temperatura e qualificação na lista de Parceiros (§7.1 da spec) NÃO entrou neste lote; a dívida do `field_provenance` do CPF acima; ADR-12 e ADR-13 ainda não estão na tabela do PRD §9.1, que para no ADR-11; e o critério de pronto 8 da §13 fala em "15 asserções" no arquivo 66, quando os 15 são os casos de §3.5 — o arquivo fecha a fase com 43.
+
+Precisa de decisão humana: a redação do `terms_notes` da fonte é a linha que vai ser lida se alguém perguntar por que raspamos — **o Rafael precisa ler e aprovar** (spec §12, decisão 1). E os 277 candidatos parados somem sozinhos em 16/12/2026 pela retenção: ou alguém trabalha os 108 de A+/A antes disso, ou eles somem (§12, decisão 8).
+
+Verificado: pgTAP 2.939 asserções em 66 arquivos (o 66 com 43), lint, typecheck e 811 testes do web em 51 arquivos, todos verdes, com o banco reconstruído do zero.
+
+O critério de pronto 6 da §13 — mais de 50% das linhas do lote com telefone — só se mede no primeiro lote de verdade: o banco local foi reconstruído do zero e ainda não recebeu nenhuma raspagem. É a primeira coisa a conferir quando o Rafael rodar o scraper.
