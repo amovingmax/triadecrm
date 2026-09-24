@@ -227,3 +227,89 @@ describe('título antes do cabeçalho', () => {
     expect(planilha.linhas).toHaveLength(2);
   });
 });
+
+describe('CSV do google-maps-scraper-kit', () => {
+  const cru = texto('maps-natal-buffet.csv');
+  const maps = lerCsv(cru, 'maps-natal-buffet.csv');
+
+  it('descobre a vírgula do kit, e não o ponto e vírgula do Excel', () => {
+    const primeiraLinha = cru.slice(1).split('\n')[0] ?? '';
+    expect(descobrirSeparador(primeiraLinha)).toBe(',');
+  });
+
+  it('tira o BOM e lê as 29 colunas', () => {
+    expect(cru.charCodeAt(0)).toBe(0xfeff);
+    expect(maps.cabecalho).toHaveLength(29);
+    expect(maps.cabecalho[0]).toBe('link');
+    expect(maps.cabecalho[13]).toBe('cid');
+    expect(maps.cabecalho[26]).toBe('emails');
+    expect(maps.cabecalho.at(-1)).toBe('linkedin');
+  });
+
+  it('lê as 20 linhas, sem confundir o cabeçalho com título', () => {
+    expect(maps.linhas).toHaveLength(20);
+    expect(maps.tituloIgnorado).toEqual([]);
+    expect(maps.cortadas).toBe(0);
+  });
+
+  it('nenhuma linha escorregou de coluna', () => {
+    // `montar` preenche e corta toda linha no tamanho do cabeçalho, então
+    // `l.length === 29` seria verdade mesmo com uma vírgula a mais ou a menos
+    // no arquivo. O que denuncia o escorregão é o CONTEÚDO de duas colunas
+    // distantes: o `cid` tem 20 dígitos e o fuso é o mesmo nas 20 linhas.
+    expect(maps.linhas.filter((l) => !/^\d{20}$/.test(l[13] ?? ''))).toEqual([]);
+    expect(maps.linhas.filter((l) => l[18] !== 'America/Fortaleza')).toEqual([]);
+  });
+
+  it('preserva a vírgula de dentro do endereço entre aspas', () => {
+    const linha = maps.linhas.find((l) => l[1] === 'Buffet Sabor do Sol');
+    expect(linha?.[3]).toBe('Av. Eng. Roberto Freire, 1234 - Capim Macio, Natal - RN, 59082-095');
+  });
+
+  it('preserva a vírgula de dentro da descrição entre aspas', () => {
+    const linha = maps.linhas.find((l) => l[1] === 'Espaço Jardim das Artes');
+    expect(linha?.[15]).toBe('Salão climatizado, jardim e estacionamento, com cozinha de apoio');
+  });
+
+  it('o telefone fixo chega inteiro', () => {
+    const linha = maps.linhas.find((l) => l[1] === 'Salão Mirante do Forte');
+    expect(linha?.[7]).toBe('+55 84 3999-9001');
+  });
+
+  it('lugar sem e-mail chega com a coluna vazia, e com telefone', () => {
+    const linha = maps.linhas.find((l) => l[1] === 'Espaço Verde Ponta Negra');
+    expect(linha?.[26]).toBe('');
+    expect(linha?.[7]).toBe('+55 84 99999-0005');
+    // Sem nota e sem nº de avaliações: um lugar recém-cadastrado no Maps.
+    expect(linha?.[9]).toBe('');
+    expect(linha?.[10]).toBe('');
+  });
+
+  it('endereço sem bairro chega como veio, sem completar nada', () => {
+    const linha = maps.linhas.find((l) => l[1] === 'Tendas Coqueiral');
+    expect(linha?.[3]).toBe('Rodovia BR-101, Km 12, Parnamirim - RN, 59146-000');
+  });
+
+  it('o mesmo cid aparece duas vezes, com telefone e nota diferentes', () => {
+    const repetidas = maps.linhas.filter((l) => l[13] === '10453218876690042117');
+    expect(repetidas).toHaveLength(2);
+    expect(repetidas[0]?.[7]).toBe('+55 84 99999-0001');
+    expect(repetidas[1]?.[7]).toBe('+55 84 99999-0013');
+    expect(repetidas[0]?.[10]).toBe('4.7');
+    expect(repetidas[1]?.[10]).toBe('4.8');
+  });
+
+  it('o ponto e vírgula de dentro do e-mail não vira separador', () => {
+    const linha = maps.linhas.find((l) => l[1] === 'Casa de Festas Pequeno Reino');
+    expect(linha?.[26]).toBe(
+      'festas@pequenoreinonatal.com.br;financeiro@pequenoreinonatal.com.br',
+    );
+  });
+
+  it('nenhum telefone da fixture pode ser de alguém de verdade', () => {
+    const fora = maps.linhas
+      .map((l) => l[7] ?? '')
+      .filter((t) => t !== '' && !/^\+55 84 (99999-00\d\d|3999-9001)$/.test(t));
+    expect(fora).toEqual([]);
+  });
+});
