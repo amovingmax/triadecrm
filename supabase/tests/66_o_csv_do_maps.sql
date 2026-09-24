@@ -41,7 +41,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(41);
+select plan(43);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -778,6 +778,18 @@ select is(
          order by s.slug collate "C"),
   array['google_maps_raspado', 'planilha'],
   'só as duas fontes que entram por arquivo aparecem no seletor de origem da importação');
+
+-- =====================================================================
+-- O índice do lugar (§3.2, bloco Índices): parcial, e NÃO único
+-- =====================================================================
+select has_index('public', 'supplier_candidates', 'supplier_candidates_place_idx',
+  'índice supplier_candidates_place_idx existe');
+
+select ok((select indexdef from pg_indexes
+            where schemaname = 'public'
+              and indexname = 'supplier_candidates_place_idx')
+          ~ '^CREATE INDEX .*\(place_id\) WHERE \(place_id IS NOT NULL\)$',
+  'o índice do lugar é parcial e não é único: o mesmo lugar pode chegar por duas fontes');
 
 select * from finish();
 rollback;

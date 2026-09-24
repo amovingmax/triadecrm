@@ -43,6 +43,9 @@
 --   7. `entrada_por_arquivo` em `google_maps_raspado` e `planilha`: é por esta
 --      chave que o seletor de origem de `/importar` filtra, e não por
 --      `is_enabled`.
+--   8. `supplier_candidates_place_idx`, parcial e NÃO único: a busca do
+--      candidato por `place_id` deixa de varrer a tabela, sem criar restrição
+--      nova — o mesmo lugar pode chegar por duas fontes.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------------
@@ -949,3 +952,20 @@ on conflict (source_id, category_source) do update
 update public.sources
    set config = config || '{"entrada_por_arquivo": true}'::jsonb
  where slug = 'planilha';
+
+-- ---------------------------------------------------------------------
+-- 9. Achar o candidato pelo lugar, sem varrer a tabela
+--
+-- O passo (3) de `app.resolver_source_record` (20260904001600:894-905) procura
+-- o candidato por `c.place_id = v_r.place_id` e hoje faz varredura de
+-- tabela — e a partir da Fase 1 quase toda linha que entra tem place_id.
+--
+-- É PARCIAL (só quem tem place_id) e NÃO É ÚNICO, de propósito: um índice
+-- único global seria uma restrição NOVA, e quebraria o caso legítimo do
+-- mesmo lugar chegando por duas fontes diferentes (o Maps raspado e, um dia,
+-- o conector oficial do Places). A unicidade que queremos já existe e é por
+-- fonte: `supplier_candidates_fonte_externo_uq (source_id, external_id)`
+-- (20260904001401:211), com `external_id = place_id` a partir desta fase.
+-- ---------------------------------------------------------------------
+create index if not exists supplier_candidates_place_idx
+  on public.supplier_candidates (place_id) where place_id is not null;
