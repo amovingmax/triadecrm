@@ -40,6 +40,9 @@
 --   6. O mapa das 12 categorias do Maps → categoria do CRM, só o que é
 --      evidente. Espelhado em `supabase/seed.sql`, que é quem serve o banco
 --      novo (aqui `public.categories` ainda não existe num `db reset`).
+--   7. `entrada_por_arquivo` em `google_maps_raspado` e `planilha`: é por esta
+--      chave que o seletor de origem de `/importar` filtra, e não por
+--      `is_enabled`.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------------
@@ -925,3 +928,24 @@ select s.id, m.categoria_origem, c.id
  where s.slug = 'google_maps_raspado'
 on conflict (source_id, category_source) do update
   set category_id = excluded.category_id;
+
+-- ---------------------------------------------------------------------
+-- 8. Quais fontes aparecem no seletor de origem da importação
+--
+-- A tela filtra por `config->>'entrada_por_arquivo' = 'true'`, e NÃO por
+-- `is_enabled`: `is_enabled` diz se o coletor automático pode rodar, e a
+-- fonte nova nasce desligada de propósito — mas é ela que o operador
+-- escolhe ao arrastar o CSV. A fonte nova já traz a chave no bloco 6; a
+-- `planilha` a recebe aqui, por `update` explícito e não por edição do
+-- literal da seed, porque o `on conflict` de lá preserva `config` quando ele
+-- já não está vazio (supabase/seed.sql:193) — num banco que já rodou a seed
+-- antes, mexer no literal não teria efeito nenhum.
+--
+-- Mesma ressalva de ordem do bloco 7: a linha `planilha` nasce só em
+-- supabase/seed.sql, então num `supabase db reset` ela ainda não existe
+-- quando esta migração roda e este update casa zero linhas. O espelho na
+-- seed cobre esse caso; este bloco é o que atende produção.
+-- ---------------------------------------------------------------------
+update public.sources
+   set config = config || '{"entrada_por_arquivo": true}'::jsonb
+ where slug = 'planilha';

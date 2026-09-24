@@ -198,6 +198,16 @@ on conflict (slug) do update
 -- `on conflict do update` acima sobrescreveria o original em silêncio se os dois
 -- divergissem um dia.
 
+-- As duas fontes que entram por ARQUIVO, e que por isso aparecem no seletor de
+-- origem de /importar. Fica num `update` à parte, e não no literal de `config`
+-- acima, porque o `on conflict` preserva `config` quando ele já não está vazio:
+-- num banco que já foi semeado antes, o literal não chegaria a valer. `||` é
+-- idempotente, então roda em todo reset sem efeito colateral.
+-- Espelha o bloco 8 da migração 20260924130000, que faz o mesmo em produção.
+update public.sources
+   set config = config || '{"entrada_por_arquivo": true}'::jsonb
+ where slug in ('planilha', 'google_maps_raspado');
+
 -- =====================================================================
 -- 3b. Catálogo de coleta do Radar e mapa de categorias da fonte (R03 §2.1;
 --     migração 20260904001802, blocos 3 e 4).

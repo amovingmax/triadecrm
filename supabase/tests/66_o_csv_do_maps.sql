@@ -41,7 +41,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(40);
+select plan(41);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -762,6 +762,22 @@ select is(
     "serviço de fotografia": "fotografia_video",
     "casa de festas infantis": "buffet_infantil_casa_de_festas"}'::jsonb,
   'as 12 categorias que o Maps devolve em Natal caem na categoria certa do CRM, e só elas');
+
+-- =====================================================================
+-- O seletor de origem da tela de importação (§3.2 item 7)
+-- =====================================================================
+-- `c66_maps` fica de fora: é a fixture deste arquivo (linha 92), criada pela
+-- Tarefa 2 como cópia fiel da fonte de produção — inclusive no
+-- `entrada_por_arquivo`, que ela também carrega. Ela some no `rollback` e
+-- nunca chega a nenhum seletor. O que se afirma aqui é o CATÁLOGO: uma
+-- terceira fonte de verdade ganhando a chave continua derrubando esta linha.
+select is(
+  array(select s.slug from public.sources s
+         where s.config ->> 'entrada_por_arquivo' = 'true'
+           and s.slug <> 'c66_maps'
+         order by s.slug collate "C"),
+  array['google_maps_raspado', 'planilha'],
+  'só as duas fontes que entram por arquivo aparecem no seletor de origem da importação');
 
 select * from finish();
 rollback;
