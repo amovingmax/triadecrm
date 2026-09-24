@@ -7,8 +7,8 @@
 #
 # O que NÃO roda aqui: recepção de webhook. Meta e Komune batem nas Edge Functions do
 # Supabase, que enfileiram em `pgmq`; estes contêineres só CONSOMEM fila. Por isso
-# nenhum serviço publica porta para a internet — o único `ports:` do arquivo é o do
-# Metabase, preso em 127.0.0.1. Administração pela Tailscale.
+# nenhum serviço publica porta para a internet — os dois únicos `ports:` do arquivo
+# (Metabase e maps-scraper) ficam presos em 127.0.0.1. Administração pela Tailscale.
 # Passo a passo do zero: docs/operacao/maquina-do-luiz.md
 #
 # Perfis (ligue com COMPOSE_PROFILES no ./.env, ou --profile na linha de comando):
@@ -17,6 +17,7 @@
 #   rotas         osrm  (exige o grafo já preparado — veja o perfil osrm-preparo)
 #   osrm-preparo  osrm-preparo (tarefa única: extract → partition → customize)
 #   tunel         cloudflared (só se o Metabase precisar sair do tailnet)
+#   maps          maps-scraper (ADR-12; raspagem do Google Maps, tarefa de operador — não deixe ligado)
 #
 # Segredos: `../../.env` (raiz do repo, gitignored) + `./.env` (só desta máquina, gitignored).
 # Modelo das variáveis desta pasta: ./.env.example. Nenhum valor de segredo neste arquivo.
@@ -386,3 +387,89 @@ services:
     memswap_limit: ${MEM_CLOUDFLARED:-256m}
     cpus: 0.5
     pids_limit: 128
+
+  # -------------------------------------------------------------------------
+  # maps-scraper — a lista de prospecção vem daqui (ADR-12).
+  #
+  # O que é: `gosom/google-maps-scraper` (MIT) em modo web — fila de tarefas na
+  # interface e um CSV por tarefa. Na máquina do Rafael a mesma coisa é operada
+  # pelo `google-maps-scraper-kit`, que é um invólucro de conveniência em volta
+  # deste mesmo binário: não muda o que é coletado nem o ritmo. Aqui rodamos a
+  # imagem de cima direto, porque é ela que existe publicada.
+  #
+  # Contraria os Termos do Google e REVOGA por escrito o R06 §B.1 SCR-04 —
+  # decisão do Rafael em 24/09/2026, risco assumido no nível da empresa e
+  # registrado em `sources.terms_notes` da fonte `google_maps_raspado`.
+  #
+  # O que continua valendo do SCR-03, e é o que limita o dano: sem login, sem
+  # burla de CAPTCHA, sem proxy rotativo, user-agent identificado, ritmo de 1
+  # requisição a cada 5 s. ATENÇÃO: `-c 1` é UMA aba por vez (concorrência), e
+  # NÃO um intervalo de 5 s — a ferramenta não conhece o nosso ritmo. O intervalo
+  # é limite de conduta, garantido por quem opera.
+  # Limite de conduta: no máximo 2 rodadas por semana, 600 lugares por rodada, só
+  # Natal e região metropolitana. Se der bloqueio de IP ou CAPTCHA: PARE E AVISE.
+  # Insistir com proxy ou login transforma quebra de contrato em acesso não
+  # autorizado.
+  #
+  # O CRM NÃO fala com este contêiner. A web roda na Vercel e o worker-wa no
+  # Fly.io; nenhum dos dois alcança 127.0.0.1 em Natal, e é de propósito: com uma
+  # pessoa no meio, quem sobe o arquivo nomeia o lote, lê a prévia e fica
+  # registrado em `import_batches.triggered_by`.
+  #
+  # PASSO A PASSO DO OPERADOR (spec §3.4):
+  #   1. mkdir -p infra/local/data/maps/saida
+  #      docker compose -f infra/local/docker-compose.yml --profile maps up -d
+  #   2. Pedir ao Claude Code a consulta: categoria + cidade ("buffet infantil em
+  #      Natal RN"), teto de 600 lugares, ritmo de 5 s.
+  #   3. O kit escreve em ./data/maps/saida/, por exemplo
+  #      2026-09-25-buffet-infantil-natal.csv
+  #   4. Abrir /importar, escolher "Google Maps (raspagem local)" no seletor de
+  #      origem e arrastar o CSV.
+  #   5. Conferir o mapa de colunas sugerido (a tela diz se cada acerto foi
+  #      `exato` ou `parecido`).
+  #   6. Ler a prévia — quantas entram, quantas são duplicata DE QUEM, quantas vão
+  #      para revisão, quantas pediram para parar — e gravar.
+  #   7. Ler o recibo, derrubar o contêiner (`--profile maps down`) e APAGAR O CSV
+  #      da pasta. Enquanto o arquivo existe, é uma base de dados pessoais fora do
+  #      CRM: sem retenção, sem RLS e sem auditoria.
+  # -------------------------------------------------------------------------
+  maps-scraper:
+    # Tag por variável porque a imagem sobe versão sem aviso, e pinar um número
+    # que não existe quebraria o `up` de quem clonar o repo. Fixe em ./.env
+    # quando uma rodada boa acontecer, para repeti-la igual.
+    image: gosom/google-maps-scraper:${MAPS_SCRAPER_TAG:-latest}
+    # -web sobe a interface na 8080, -data-folder é onde ela grava o CSV de cada
+    # tarefa, -c 1 é uma aba por vez.
+    command: ['-web', '-data-folder', '/app/webdata', '-c', '1']
+    ports:
+      # Loopback do host, de propósito: nada de LAN, nada de internet, nada que o
+      # CRM alcance. Quem abre a interface é a pessoa sentada na máquina.
+      - '127.0.0.1:${MAPS_SCRAPER_PORT:-8080}:8080'
+    volumes:
+      - ./data/maps/saida:/app/webdata
+    profiles: ['maps']
+    # `no`, e não `unless-stopped`: o raspador é tarefa de operador, ligada para
+    # uma rodada e desligada depois. Um raspador que volta sozinho a cada boot é
+    # exatamente o cron silencioso que a §3.4 recusou.
+    restart: 'no'
+    init: true
+    stop_grace_period: 30s
+    logging: *logging
+    # Endurecimento escrito à mão, e não `<<: *endurecimento`, pelo mesmo motivo
+    # do metabase logo acima: este contêiner roda um Chromium, e Chromium em
+    # contêiner é o caso clássico de precisar de exceção. Escrevendo aqui, a
+    # exceção não mexe no anchor de que os outros seis contêineres dependem.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # O Chromium morre com os 64 MB de /dev/shm padrão do Docker — mesmo motivo
+    # do worker-ingest.
+    shm_size: 512m
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    mem_limit: ${MEM_MAPS_SCRAPER:-2g}
+    mem_reservation: 512m
+    memswap_limit: ${MEM_MAPS_SCRAPER:-2g}
+    cpus: 2.0
+    pids_limit: 512

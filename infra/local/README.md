@@ -18,10 +18,12 @@ referência curta para quem desenvolve.
 | `osrm`           | `rotas`        | Matriz de tempos e ordem das visitas da tarde (RF-ROT-03)           | interna `5000`   |
 | `osrm-preparo`   | `osrm-preparo` | Tarefa única: `.osm.pbf` → grafo do OSRM                            | —                |
 | `cloudflared`    | `tunel`        | Opcional: Metabase fora do tailnet                                  | —                |
+| `maps-scraper`   | `maps`         | Lista de prospecção raspada do Google Maps (ADR-12)                 | `127.0.0.1:8080` |
 
 **Nenhum serviço abre porta para a internet.** A recepção de webhook (Meta, Komune) fica nas
-Edge Functions do Supabase, que enfileiram em `pgmq`; aqui só se **consome** fila. O único
-`ports:` do arquivo é o do Metabase, preso em `127.0.0.1` — de fora chega-se pela Tailscale.
+Edge Functions do Supabase, que enfileiram em `pgmq`; aqui só se **consome** fila. Os dois
+únicos `ports:` do arquivo — Metabase e `maps-scraper` — ficam presos em `127.0.0.1`; de fora
+chega-se pela Tailscale.
 
 ## Comandos
 
@@ -82,6 +84,59 @@ whisper): nada é instalado dentro do contêiner.
 - `data/metabase/` — banco interno do Metabase (H2). É o que se copia num backup.
 - `data/osrm/` — `.osm.pbf` do Rio Grande do Norte e o grafo gerado (~280 MB).
 - `data/whisper/` — cache do modelo (~500 MB no `small`), baixado na primeira transcrição.
+- `data/maps/saida/` — CSV de cada rodada do `maps-scraper`. **É base de dados pessoais**:
+  apague o arquivo assim que a importação terminar (passo 7 abaixo).
+
+### Raspar o Google Maps (perfil `maps`, ADR-12)
+
+A lista de prospecção vem daqui: o `gosom/google-maps-scraper` (MIT) devolve CSV **com
+telefone**, e o CSV entra pela porta da planilha — nenhum caminho novo de escrita para a
+base (ADR-08). Na máquina do Rafael a mesma coisa é operada pelo `google-maps-scraper-kit`,
+um invólucro de conveniência do mesmo binário.
+
+Isto **contraria os Termos de Serviço do Google** e revoga por escrito a recusa do
+R06 §B.1 SCR-04. É decisão do Rafael de 24/09/2026, com o risco registrado em
+`sources.terms_notes` da fonte `google_maps_raspado`. O que continua valendo, e é o que
+limita o dano: sem login, sem burla de CAPTCHA, sem proxy rotativo, user-agent
+identificado, 1 requisição a cada 5 s. Limite de conduta: **2 rodadas por semana, 600
+lugares por rodada, só Natal e região metropolitana**. Deu bloqueio de IP ou CAPTCHA:
+**pare e avise** — insistir com proxy ou login transforma quebra de contrato em acesso não
+autorizado.
+
+O ritmo de 5 s é **conduta de quem opera**, não flag: `-c 1` limita a concorrência a uma
+aba por vez e não impõe intervalo nenhum. Se uma versão da imagem passar a ter flag de
+atraso, ela entra no `command:` e este parágrafo muda.
+
+O CRM **não** chama este contêiner. A web roda na Vercel e o `worker-wa` no Fly.io, e
+nenhum dos dois alcança `127.0.0.1` em Natal. Com uma pessoa no meio, quem sobe o arquivo
+nomeia o lote, lê a prévia e fica registrado em `import_batches.triggered_by`: a raspagem
+vira decisão auditável em vez de cron silencioso.
+
+```bash
+# 1. subir (só durante a rodada; o perfil NÃO entra no COMPOSE_PROFILES do .env)
+mkdir -p data/maps/saida
+docker compose -f docker-compose.yml --profile maps up -d
+open http://127.0.0.1:8080
+
+# 2. pedir ao Claude Code a consulta: categoria + cidade ("buffet infantil em Natal RN"),
+#    teto de 600 lugares, ritmo de 5 s
+
+# 3. o kit escreve em ./data/maps/saida/, por exemplo:
+ls data/maps/saida
+
+# 7. terminada a importação, derrubar e APAGAR o arquivo
+docker compose -f docker-compose.yml --profile maps down
+rm data/maps/saida/*.csv
+```
+
+Entre os passos 3 e 7, no CRM: abrir `/importar`, escolher **Google Maps (raspagem local)**
+no seletor de origem, arrastar o CSV, conferir o mapa de colunas (a tela diz se cada acerto
+foi `exato` ou `parecido`), ler a prévia — quantas entram, quantas são duplicata **de quem**,
+quantas vão para revisão, quantas pediram para parar — e gravar. 600 linhas cabem sem
+ajuste: o cliente fatia em 200 para a prévia e 100 para a gravação.
+
+**O passo 7 não é zelo.** Enquanto o CSV existe na pasta, é uma base de dados pessoais fora
+do CRM: sem retenção, sem RLS e sem auditoria.
 
 ### Desenvolvimento: alcançar o OSRM de fora do Docker
 
