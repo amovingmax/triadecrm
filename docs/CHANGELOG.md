@@ -2980,3 +2980,24 @@ Achado colateral: a Meta já libera **2.000 conversas novas por dia** para o nos
 
 Verificado: pgTAP 2.928 asserções em 66 arquivos (o 66 com 32), com o banco reconstruído do zero;
 `pnpm db:types` sem diff e `pnpm db:lint` sem nenhum nome novo na lista de avisos antigos.
+
+### 24/09/2026 — A fonte do Google Maps entra no catálogo (Fase 1 do pivô)
+
+O catálogo de origens ganhou a linha que faltava para o CSV do Maps entrar pela porta da importação, e ela é também o registro escrito do **ADR-12** (spec `docs/superpowers/specs/2026-09-24-pivo-scraper-e-robo-autonomo-design.md`, §3.3). A redação do `terms_notes` é a da spec §3.3, transcrita palavra por palavra; ela subiu com o "faça tudo" do Rafael de 24/09. Se ele reescrever, o texto novo entra **na migração** e as quatro asserções de conteúdo continuam valendo — elas conferem os quatro pedaços que nenhuma reescrita pode perder (os ToS do Google, o SCR-04, o ADR-12 e o limite da rodada).
+
+Entregue, dentro da migração `20260924130000_o_csv_do_maps_entra_pela_importacao.sql`:
+- **`google_maps_raspado`**, `kind = 'import'` e `is_enabled = false`. Não é `'scrape'` de propósito: `app.envio_variaveis` e `app.wa_preparar_abertura` preenchem a variável `{{origem}}` com o nome da fonte quando o `kind` é `scrape` ou `api` — a string "Google Maps (raspagem local)" iria literalmente dentro de um primeiro contato de campanha. Desligada, `public.esteira_abrir_lote` recusa lote de coleta com `origem_desabilitada`; lote de planilha abre normalmente.
+- **O risco por escrito em `terms_notes`**: contraria os ToS do Google, revoga o R06 §B.1 SCR-04, decisão do Rafael em 24/09/2026, e os limites assumidos (sem login, sem CAPTCHA burlado, sem proxy, 1 req/5 s, 2 rodadas por semana, 600 lugares por rodada, só Natal e região).
+- **12 linhas em `public.source_category_map`**, em minúscula e com acento (é assim que a consulta lê). O que não é evidente fica de fora e vai para a Revisão com o motivo escrito.
+- **`entrada_por_arquivo`** em `google_maps_raspado` e `planilha`: é por esta chave que o seletor de origem da tela filtra, e não por `is_enabled`.
+- **`supplier_candidates_place_idx`**, parcial e não único: `app.resolver_source_record` procura o candidato por `place_id` e fazia varredura. Não é único porque o mesmo lugar pode chegar por duas fontes; a unicidade por fonte já existe em `supplier_candidates_fonte_externo_uq`.
+
+**A linha da fonte vive só na migração**, sem cópia em `supabase/seed.sql`. As migrações rodam antes do seed em todo ambiente, então a linha já existe quando a seed começa; uma segunda cópia seria 1,3 mil caracteres de texto jurídico obrigados a bater caractere a caractere, com o `on conflict do update` da seed sobrescrevendo o original em silêncio se divergissem — que é exatamente o que já aconteceu com `whatsapp_entrada`, cujos dois textos divergem desde 15/09.
+
+**O mapa de categorias, esse sim, está nos dois lugares**: `public.categories` nasce só na seed, que roda depois das migrações, então num `supabase db reset` o insert da migração casa zero linhas e termina calado — o mesmo tropeço de 05/09/2026 registrado no bloco 3b da seed. A migração serve a produção; a seed serve ao banco novo. E a autoverificação do bloco 13 da seed passou a contar essas 12 linhas: se um slug de categoria for renomeado, o `db reset` falha ali em vez de deixar 600 lugares indo para a Revisão sem motivo aparente.
+
+`supabase/tests/08_seed.sql` passou de 12 para 13 fontes. A contagem continua exata de propósito: entrar com uma origem nova é decisão registrada, não trabalho de rotina, e é este número que obriga quem acrescenta uma a passar por ali.
+
+Verificado: `pnpm db:reset && pnpm db:test` verdes (2.939 asserções em 66 arquivos, o 66 com 43), `pnpm db:types` sem diff, `pnpm db:lint` sem nenhum apontamento novo (a saída continua com os avisos antigos de `app.ia_prazo`, `app.radar_pontuar`, `app.envio_um` e das funções do PostGIS), `pnpm lint` e `pnpm typecheck` limpos.
+
+Pendente: o seletor de origem na tela de `/importar` é quem consome `entrada_por_arquivo` — até ele existir (Tarefa 8 do plano), a fonte nova está no banco mas não aparece para o operador.
