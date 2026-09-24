@@ -41,7 +41,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(39);
+select plan(40);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -739,6 +739,29 @@ select is(
     where s.id = (app.importacao_fonte('Google Maps') ->> 'id')::int),
   'google_places',
   '"Google Maps" continua sendo o conector oficial do Places: a proveniência não se confunde');
+
+-- =====================================================================
+-- O mapa categoria-do-Maps → categoria do CRM (§3.3): só o que é evidente
+-- =====================================================================
+select is(
+  (select jsonb_object_agg(m.category_source, c.slug)
+     from public.source_category_map m
+     join public.categories c on c.id = m.category_id
+     join public.sources s    on s.id = m.source_id
+    where s.slug = 'google_maps_raspado'),
+  '{"dj": "djs_bandas_musicos",
+    "buffet": "buffet_adulto_corporativo",
+    "confeitaria": "doces_bolos_confeitaria",
+    "floricultura": "decoracao_flores",
+    "fotógrafo": "fotografia_video",
+    "salão de festas": "locais_saloes_chacaras_hoteis",
+    "serviço de buffet": "buffet_adulto_corporativo",
+    "locação de tendas": "tendas_estruturas_palcos",
+    "espaço para eventos": "locais_saloes_chacaras_hoteis",
+    "aluguel de brinquedos": "locacao_brinquedos_inflaveis",
+    "serviço de fotografia": "fotografia_video",
+    "casa de festas infantis": "buffet_infantil_casa_de_festas"}'::jsonb,
+  'as 12 categorias que o Maps devolve em Natal caem na categoria certa do CRM, e só elas');
 
 select * from finish();
 rollback;

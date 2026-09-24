@@ -288,6 +288,39 @@ select s.id, m.categoria_origem, c.id
 on conflict (source_id, category_source) do update
   set category_id = excluded.category_id;
 
+
+-- O mapa do Google Maps raspado (ADR-12, spec §3.3). Espelho exato do que a
+-- migração 20260924130000 grava em produção: aqui ele existe porque, num
+-- `supabase db reset`, as migrações rodam ANTES deste arquivo e o insert de lá
+-- não acha `public.categories` para casar. Mesmo motivo do bloco acima.
+--
+-- A chave vai em minúscula e COM acento: quem lê é
+-- `lower(trim(v_p ->> 'categoria_origem'))`, sem `unaccent`.
+-- Só o evidente entra. "serviços para casamento", "loja de presentes" e as
+-- outras categorias soltas do Maps ficam de fora e vão para a Revisão com o
+-- motivo escrito — palpite aqui contamina o funil inteiro.
+insert into public.source_category_map (source_id, category_source, category_id)
+select s.id, m.categoria_origem, c.id
+  from public.sources s
+  join (values
+          ('buffet',                  'buffet_adulto_corporativo'),
+          ('serviço de buffet',       'buffet_adulto_corporativo'),
+          ('casa de festas infantis', 'buffet_infantil_casa_de_festas'),
+          ('fotógrafo',               'fotografia_video'),
+          ('serviço de fotografia',   'fotografia_video'),
+          ('salão de festas',         'locais_saloes_chacaras_hoteis'),
+          ('espaço para eventos',     'locais_saloes_chacaras_hoteis'),
+          ('aluguel de brinquedos',   'locacao_brinquedos_inflaveis'),
+          ('confeitaria',             'doces_bolos_confeitaria'),
+          ('floricultura',            'decoracao_flores'),
+          ('dj',                      'djs_bandas_musicos'),
+          ('locação de tendas',       'tendas_estruturas_palcos')
+       ) as m(categoria_origem, categoria_crm) on true
+  join public.categories c on c.slug = m.categoria_crm
+ where s.slug = 'google_maps_raspado'
+on conflict (source_id, category_source) do update
+  set category_id = excluded.category_id;
+
 -- =====================================================================
 -- 4. Feriados 2026 e 2027 (RF-CON-11: nunca enviar em feriado; app.next_business_day).
 --    Datas conferidas: Páscoa 05/04/2026 → Carnaval 16–17/02, Sexta-feira Santa 03/04,
@@ -1583,7 +1616,7 @@ declare
   n_out  int;  n_sup  int;  n_eq int;  s_eq text;
   n_nos int; n_rot_err int; n_ans int;
   n_cad int; n_pas int; n_cad_ruim text;
-  n_rad int; n_map int;
+  n_rad int; n_map int; n_map_google int;
 begin
   select count(*) into n_cat  from public.categories;
   select count(*) into n_pipe from public.pipelines;
@@ -1618,6 +1651,15 @@ begin
     join public.sources s on s.id = m.source_id
    where s.slug = 'casamentos_com_br';
 
+  -- O mesmo barulho para o mapa do Google Maps raspado (ADR-12, spec §3.3):
+  -- se um slug de categoria for renomeado, este insert casa menos de 12 linhas
+  -- e o reset falha aqui, em vez de deixar 600 lugares indo para a Revisão sem
+  -- ninguém entender por quê.
+  select count(*) into n_map_google
+    from public.source_category_map m
+    join public.sources s on s.id = m.source_id
+   where s.slug = 'google_maps_raspado';
+
   -- Cadências (bloco 12d): vieram da migração 20260904001700 para cá porque
   -- citam desfecho e modelo que só existem neste arquivo. A contagem é o que
   -- impede a regressão silenciosa — se o bloco parar de rodar, o reset falha
@@ -1651,6 +1693,7 @@ begin
   if n_eq <> 4   then raise exception 'seed: esperadas 4 equivalências de etapa, encontradas %', n_eq; end if;
   if n_rad < 18  then raise exception 'seed: catálogo do Radar com % listagens (esperadas 18, R03 §2.1, bloco 3b)', n_rad; end if;
   if n_map < 23  then raise exception 'seed: mapa de categorias do Radar com % linhas (esperadas ≥ 23, bloco 3b)', n_map; end if;
+  if n_map_google <> 12 then raise exception 'seed: mapa de categorias do Google Maps com % linhas (esperadas 12, ADR-12)', n_map_google; end if;
   if n_cad <> 5  then raise exception 'seed: esperadas 5 cadências, encontradas % (bloco 12d)', n_cad; end if;
   if n_pas <> 19 then raise exception 'seed: esperados 19 passos de cadência, encontrados % (bloco 12d)', n_pas; end if;
   if n_cad_ruim is not null then

@@ -37,6 +37,9 @@
 --      Revisão por `categoria_desconhecida`.
 --   5. A fonte `google_maps_raspado` no catálogo, com o ADR-12 inteiro escrito
 --      em `terms_notes` — `kind = 'import'` e desligada de propósito.
+--   6. O mapa das 12 categorias do Maps → categoria do CRM, só o que é
+--      evidente. Espelhado em `supabase/seed.sql`, que é quem serve o banco
+--      novo (aqui `public.categories` ainda não existe num `db reset`).
 -- =====================================================================
 
 -- ---------------------------------------------------------------------------
@@ -879,3 +882,46 @@ on conflict (slug) do update
       rate_limit_seconds = excluded.rate_limit_seconds,
       is_enabled         = excluded.is_enabled,
       config             = excluded.config;
+
+-- ---------------------------------------------------------------------
+-- 7. O mapa categoria-do-Maps → categoria do CRM
+--
+-- Só o que é evidente, a mesma régua que a seed já aplica ao Casamentos
+-- (supabase/seed.sql:247-283): o que não é evidente fica de fora, o
+-- candidato chega com `category_id` nulo e a Revisão pergunta.
+--
+-- A chave é gravada em MINÚSCULA E COM ACENTO porque é assim que as duas
+-- leituras a procuram: `public.esteira_processar_captura`
+-- (20260904001600:1906-1910) e `app.importacao_normalizar` (bloco 2 desta
+-- migração) comparam com `lower(trim(coalesce(v_p ->> 'categoria_origem','')))`
+-- — sem `unaccent`. "fotografo" sem acento aqui nunca casaria.
+--
+-- ORDEM, E ESTE É O PONTO DELICADO: `public.categories` é semeada só em
+-- supabase/seed.sql, que roda DEPOIS de todas as migrações. Num
+-- `supabase db reset` este insert casa ZERO linhas e termina calado — o
+-- mesmo tropeço de 05/09/2026 que o bloco 3b da seed descreve. Por isso o
+-- mapa está TAMBÉM lá, espelhado, e é de lá que o banco local e o CI o
+-- recebem. Aqui ele existe para o banco de PRODUÇÃO, onde as categorias já
+-- estão semeadas.
+-- ---------------------------------------------------------------------
+insert into public.source_category_map (source_id, category_source, category_id)
+select s.id, m.categoria_origem, c.id
+  from public.sources s
+  join (values
+          ('buffet',                  'buffet_adulto_corporativo'),
+          ('serviço de buffet',       'buffet_adulto_corporativo'),
+          ('casa de festas infantis', 'buffet_infantil_casa_de_festas'),
+          ('fotógrafo',               'fotografia_video'),
+          ('serviço de fotografia',   'fotografia_video'),
+          ('salão de festas',         'locais_saloes_chacaras_hoteis'),
+          ('espaço para eventos',     'locais_saloes_chacaras_hoteis'),
+          ('aluguel de brinquedos',   'locacao_brinquedos_inflaveis'),
+          ('confeitaria',             'doces_bolos_confeitaria'),
+          ('floricultura',            'decoracao_flores'),
+          ('dj',                      'djs_bandas_musicos'),
+          ('locação de tendas',       'tendas_estruturas_palcos')
+       ) as m(categoria_origem, categoria_crm) on true
+  join public.categories c on c.slug = m.categoria_crm
+ where s.slug = 'google_maps_raspado'
+on conflict (source_id, category_source) do update
+  set category_id = excluded.category_id;
