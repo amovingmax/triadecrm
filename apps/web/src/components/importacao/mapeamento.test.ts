@@ -295,3 +295,56 @@ describe('o que o cabeçalho do kit NÃO pode passar a casar', () => {
     expect(mapa.responsavel).toBe(23);
   });
 });
+
+describe('a origem do lote entra na linha', () => {
+  it('injeta o nome da fonte quando o arquivo não tem coluna de origem', () => {
+    const mapa: Mapa = { nome: 0, categoria: 1, whatsapp: 2 };
+    const objeto = linhaParaObjeto(
+      ['Buffet Alegria', 'Buffet', '84 99999-0000'],
+      mapa,
+      2,
+      'Google Maps (raspagem local)',
+    );
+    expect(objeto.origem).toBe('Google Maps (raspagem local)');
+  });
+
+  it('não mexe na linha quando o arquivo TEM coluna de origem', () => {
+    const mapa: Mapa = { nome: 0, categoria: 1, origem: 2 };
+    const objeto = linhaParaObjeto(
+      ['Buffet Alegria', 'Buffet', 'Indicação'],
+      mapa,
+      2,
+      'Google Maps (raspagem local)',
+    );
+    expect(objeto.origem).toBe('Indicação');
+  });
+
+  it('célula de origem vazia continua vazia: quem manda é a coluna', () => {
+    const mapa: Mapa = { nome: 0, categoria: 1, origem: 2 };
+    const objeto = linhaParaObjeto(
+      ['Buffet Alegria', 'Buffet', ''],
+      mapa,
+      2,
+      'Planilha (importação)',
+    );
+    expect('origem' in objeto).toBe(false);
+  });
+
+  it('sem origem escolhida, a linha sai como saía antes', () => {
+    const mapa: Mapa = { nome: 0, categoria: 1 };
+    expect('origem' in linhaParaObjeto(['A', 'B'], mapa, 2)).toBe(false);
+    expect('origem' in linhaParaObjeto(['A', 'B'], mapa, 2, '   ')).toBe(false);
+  });
+});
+
+describe('o obrigatório `origem`, com o seletor do lote', () => {
+  it('a origem escolhida no lote resolve o obrigatório', () => {
+    const mapa: Mapa = { nome: 0, categoria: 1 };
+    expect(faltando(mapa)).toEqual(['origem']);
+    expect(faltando(mapa, 'Google Maps (raspagem local)')).toEqual([]);
+  });
+
+  it('e não resolve nome nem categoria', () => {
+    expect(faltando({}, 'Google Maps (raspagem local)')).toEqual(['nome', 'categoria']);
+  });
+});

@@ -108,9 +108,24 @@ export function sugerirMapa(cabecalho: string[]): Sugestao {
   return { mapa, motivos };
 }
 
-/** Campos obrigatórios que o mapa ainda não cobre. */
-export function faltando(mapa: Mapa): CampoQualquer[] {
-  return CAMPOS_OBRIGATORIOS.filter((c) => mapa[c] === undefined);
+/** A origem escolhida no seletor do lote, sem espaço em volta. Vazio = nenhuma. */
+function origemDoLoteLimpa(origemDoLote?: string): string {
+  return (origemDoLote ?? '').trim();
+}
+
+/**
+ * Campos obrigatórios que o mapa ainda não cobre.
+ *
+ * `origemDoLote` é o nome da fonte escolhida no seletor da tela. Com ela,
+ * `origem` deixa de ser pendência do ARQUIVO: a linha ganha a origem do lote em
+ * `linhaParaObjeto`, e a exigência de LGPD continua cumprida — só que pelo
+ * seletor, e não por uma coluna que o CSV do Maps não tem.
+ */
+export function faltando(mapa: Mapa, origemDoLote?: string): CampoQualquer[] {
+  const doLote = origemDoLoteLimpa(origemDoLote);
+  return CAMPOS_OBRIGATORIOS.filter(
+    (c) => mapa[c] === undefined && !(c === 'origem' && doLote !== ''),
+  );
 }
 
 /**
@@ -119,11 +134,18 @@ export function faltando(mapa: Mapa): CampoQualquer[] {
  * O número da linha vai junto (`linha`) e é o número REAL do arquivo, contando o
  * cabeçalho: quando a prévia disser "linha 47", a pessoa abre a planilha, vai na
  * 47 e vê o problema. Sem isso, a prévia obriga a contar linhas com o dedo.
+ *
+ * `origemDoLote` é o nome da fonte escolhida no seletor. Ela entra só quando o
+ * ARQUIVO não tem coluna de origem. Na planilha-ponte a coluna existe e continua
+ * mandando — inclusive quando a célula está vazia: ali o vazio é um dado (quem
+ * preencheu não soube dizer de onde veio), e carimbá-lo com o nome do lote
+ * inventaria uma proveniência.
  */
 export function linhaParaObjeto(
   valores: string[],
   mapa: Mapa,
   numeroDaLinha: number,
+  origemDoLote?: string,
 ): Record<string, string | number> {
   const objeto: Record<string, string | number> = { linha: numeroDaLinha };
   for (const campo of TODOS_OS_CAMPOS) {
@@ -132,6 +154,8 @@ export function linhaParaObjeto(
     const valor = (valores[indice] ?? '').trim();
     if (valor) objeto[campo] = valor;
   }
+  const doLote = origemDoLoteLimpa(origemDoLote);
+  if (mapa.origem === undefined && doLote !== '') objeto.origem = doLote;
   return objeto;
 }
 
