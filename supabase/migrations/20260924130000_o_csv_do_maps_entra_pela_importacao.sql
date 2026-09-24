@@ -30,6 +30,11 @@
 --      `place_id`, a quarta chave de índice único — a mesma por que
 --      `app.promover_candidato` recusa. Sem isso a prévia prometia ficha que a
 --      gravação responderia como duplicata.
+--   4. `public.esteira_processar_captura(uuid)` recriada: o ramo "mudou na
+--      fonte" passa a carregar `cep`, `place_id`, `city_id` e o par
+--      `category_source`/`category_id`, todos com `coalesce`. A segunda
+--      raspagem completa o que faltava em vez de deixar a linha presa na
+--      Revisão por `categoria_desconhecida`.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------------
@@ -670,3 +675,144 @@ comment on function public.importacao_previa(jsonb) is
   'Prévia da importação de planilha (RF-BAS-07): linha a linha, o que vai acontecer — entra, é duplicata de QUAL ficha (com o nome), vai para revisão por qual motivo, ou não entra por ter pedido para parar. Sonda as quatro chaves de índice único, place_id incluído, na mesma ordem de app.promover_candidato. Não escreve nada. Máximo de 500 linhas por chamada.';
 revoke all on function public.importacao_previa(jsonb) from public, anon;
 grant execute on function public.importacao_previa(jsonb) to authenticated, service_role;
+
+
+-- ---------------------------------------------------------------------------
+-- 5. O ramo "mudou na fonte" passa a carregar quatro campos (§3.2 item 5)
+-- ---------------------------------------------------------------------------
+-- O ramo de INSERT carregava 29 colunas e o de UPDATE, 18. Quatro das que
+-- faltavam custam caro na Fase 1: `cep`, `place_id`, `city_id` e o par
+-- `category_source`/`category_id`. O Maps não devolve tudo em toda rodada — uma
+-- segunda raspagem que trouxesse o CEP, a cidade ou a categoria pela PRIMEIRA
+-- vez simplesmente não os gravava, e a linha que caiu na Revisão por
+-- `categoria_desconhecida` ficava presa lá para sempre.
+-- Os quatro entram com `coalesce(<o que veio>, <o que já estava>)`: a fonte só
+-- preenche vazio, nunca apaga o que alguém confirmou (RF-RAD-08).
+-- Os outros que só o INSERT carrega (`source_url`, `price_from`,
+-- `capacity_max`, `photos_count`, `opened_at`, `is_mei`, `external_id`) ficam
+-- como estão: não é este o conserto, e esta função é caminho crítico de toda
+-- importação. Transcrita inteira da definição viva
+-- (20260904001600_esteira_de_ingestao.sql:1868-1978); só as linhas marcadas
+-- com "NOVO" mudaram.
+create or replace function public.esteira_processar_captura(p_raw_capture_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_rc    public.raw_capture;
+  v_p     jsonb;
+  v_id    uuid;
+  v_hash  text;
+  v_antes text;
+  v_ext   text;
+  v_city  int;
+  v_cat   int;
+  v_tel   text;
+begin
+  select * into v_rc from public.raw_capture where id = p_raw_capture_id;
+  if v_rc.id is null then
+    return jsonb_build_object('ok', false, 'reason', 'captura_inexistente');
+  end if;
+  v_p := v_rc.payload;
+
+  -- Identidade do registro na fonte: o id externo da captura, e na falta dele o
+  -- que a fonte usa como identidade (CNPJ, place_id, @). Sem identidade não há
+  -- como reconhecer o mesmo fornecedor na próxima coleta.
+  v_ext := coalesce(v_rc.external_id, v_p ->> 'place_id',
+                    app.normalize_cnpj(v_p ->> 'cnpj'),
+                    app.normalize_instagram(v_p ->> 'instagram'),
+                    v_rc.source_url);
+  if v_ext is null then
+    return jsonb_build_object('ok', false, 'reason', 'sem_identidade_na_fonte');
+  end if;
+
+  select c.id into v_city
+    from public.cities c
+   where app.search_name(c.name) = app.search_name(v_p ->> 'cidade')
+   limit 1;
+  select m.category_id into v_cat
+    from public.source_category_map m
+   where m.source_id = v_rc.source_id
+     and m.category_source = lower(trim(coalesce(v_p ->> 'categoria_origem', '')))
+   limit 1;
+
+  -- O telefone principal é o primeiro que normaliza. Todos ficam em `phones`.
+  select app.normalize_phone_br(t) into v_tel
+    from jsonb_array_elements_text(
+           case when jsonb_typeof(v_p -> 'telefones') = 'array' then v_p -> 'telefones'
+                else '[]'::jsonb end) t
+   where app.normalize_phone_br(t) is not null
+   limit 1;
+
+  v_hash := app.payload_hash(v_p);
+
+  select sr.id, sr.content_hash into v_id, v_antes
+    from public.source_record sr
+   where sr.source_id = v_rc.source_id and sr.external_id = v_ext;
+
+  if v_id is null then
+    insert into public.source_record
+      (raw_capture_id, batch_id, source_id, external_id, source_url,
+       name, legal_name, cnpj, phone_e164, phones, email, instagram_handle, website,
+       place_id, city_id, neighborhood, address, cep, category_source, category_id,
+       rating, reviews_count, price_from, capacity_max, photos_count,
+       opened_at, is_mei, registry_status, content_hash)
+    values
+      (v_rc.id, v_rc.batch_id, v_rc.source_id, v_ext, coalesce(v_rc.source_url, v_p ->> 'source_url'),
+       coalesce(v_p ->> 'nome_comercial', v_p ->> 'razao_social'), v_p ->> 'razao_social',
+       v_p ->> 'cnpj', v_tel,
+       case when jsonb_typeof(v_p -> 'telefones') = 'array' then v_p -> 'telefones' else '[]'::jsonb end,
+       nullif(v_p ->> 'email', '')::extensions.citext, v_p ->> 'instagram', v_p ->> 'site',
+       v_p ->> 'place_id', v_city, v_p ->> 'bairro', v_p ->> 'endereco', v_p ->> 'cep',
+       lower(nullif(trim(coalesce(v_p ->> 'categoria_origem', '')), '')), v_cat,
+       nullif(v_p ->> 'nota', '')::numeric, nullif(v_p ->> 'avaliacoes_qtd', '')::int,
+       nullif(v_p ->> 'preco_a_partir_de', '')::numeric, nullif(v_p ->> 'capacidade_max', '')::int,
+       nullif(v_p ->> 'fotos_qtd', '')::int,
+       nullif(v_p ->> 'data_abertura', '')::date,
+       nullif(v_p ->> 'mei', '')::boolean, v_p ->> 'situacao_cadastral', v_hash)
+    returning id into v_id;
+  elsif v_antes = v_hash then
+    -- Nada mudou na fonte: só o carimbo de "visto agora". A mensagem é
+    -- concluída e o candidato não é tocado.
+    update public.source_record set last_seen_at = now(), raw_capture_id = v_rc.id where id = v_id;
+    return jsonb_build_object('ok', true, 'mudou', false, 'source_record_id', v_id);
+  else
+    -- Mudou em campo-chave: o candidato ganha a marca `mudou_na_fonte` e volta
+    -- para a fila de quem revisa (situação cadastral baixada, telefone novo).
+    update public.source_record sr
+       set raw_capture_id = v_rc.id, batch_id = v_rc.batch_id,
+           name = coalesce(v_p ->> 'nome_comercial', v_p ->> 'razao_social', sr.name),
+           legal_name = coalesce(v_p ->> 'razao_social', sr.legal_name),
+           cnpj = coalesce(v_p ->> 'cnpj', sr.cnpj),
+           phone_e164 = coalesce(v_tel, sr.phone_e164),
+           phones = case when jsonb_typeof(v_p -> 'telefones') = 'array' then v_p -> 'telefones' else sr.phones end,
+           email = coalesce(nullif(v_p ->> 'email', '')::extensions.citext, sr.email),
+           instagram_handle = coalesce(v_p ->> 'instagram', sr.instagram_handle),
+           website = coalesce(v_p ->> 'site', sr.website),
+           address = coalesce(v_p ->> 'endereco', sr.address),
+           neighborhood = coalesce(v_p ->> 'bairro', sr.neighborhood),
+           cep = coalesce(v_p ->> 'cep', sr.cep),                              -- NOVO
+           place_id = coalesce(v_p ->> 'place_id', sr.place_id),               -- NOVO
+           city_id = coalesce(v_city, sr.city_id),                             -- NOVO
+           category_source = coalesce(                                         -- NOVO
+             lower(nullif(trim(coalesce(v_p ->> 'categoria_origem', '')), '')),
+             sr.category_source),
+           category_id = coalesce(v_cat, sr.category_id),                      -- NOVO
+           registry_status = coalesce(v_p ->> 'situacao_cadastral', sr.registry_status),
+           rating = coalesce(nullif(v_p ->> 'nota', '')::numeric, sr.rating),
+           reviews_count = coalesce(nullif(v_p ->> 'avaliacoes_qtd', '')::int, sr.reviews_count),
+           content_hash = v_hash,
+           last_seen_at = now(),
+           flags = (select coalesce(array_agg(distinct f order by f), '{}')
+                      from unnest(sr.flags || array['mudou_na_fonte']) f)
+     where sr.id = v_id;
+  end if;
+
+  return app.resolver_source_record(v_id) || jsonb_build_object('source_record_id', v_id, 'mudou', true);
+end $$;
+comment on function public.esteira_processar_captura(uuid) is
+  'Captura → source_record (com a higiene do RF-BAS-16 em gatilho) → candidato. Conteúdo idêntico só atualiza last_seen_at; conteúdo mudado marca `mudou_na_fonte`, COMPLETA o que estava vazio (inclusive CEP, place_id, cidade e categoria) e devolve o candidato à revisão.';
+revoke all on function public.esteira_processar_captura(uuid) from public, anon, authenticated;
+grant execute on function public.esteira_processar_captura(uuid) to service_role;

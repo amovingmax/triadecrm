@@ -2952,3 +2952,31 @@ Apareceu ao conferir uma afirmação de terceiro ("mudança de diretriz da Meta 
 Conferido no Gerenciador do WhatsApp em 24/09: a conta Komune já é cobrada (R$ 2,57 no mês), ou seja, tem meio de pagamento ativo; o Rafael promoveu um cartão válido a padrão no Gerenciador de Negócios, no lugar de um PayPal não verificado. No volume de hoje (51 mensagens de atendimento no mês) a mudança não custa nada: 5% da faixa grátis.
 
 Achado colateral: a Meta já libera **2.000 conversas novas por dia** para o nosso número. O teto de 150/dia do CRM é nosso, não dela.
+
+### 24/09/2026 — A esteira de importação enxerga o lugar e completa o que faltava (Fase 1 do pivô)
+
+- **Esteira de importação, dois consertos de `place_id` e de campo vazio** (Fase 1 do pivô do Maps,
+  RF-BAS-07, RF-BAS-08, RF-RAD-08, ADR-08). `public.importacao_previa` passa a sondar `place_id`, na
+  mesma ordem e com os mesmos nomes de chave de `app.promover_candidato` — a prévia não promete mais
+  ficha que a gravação recusa. `public.esteira_processar_captura` passa a carregar `cep`, `place_id`,
+  `city_id` e `category_source`/`category_id` no ramo "mudou na fonte", com `coalesce`: a segunda
+  raspagem completa o que faltava em vez de deixar a linha presa na Revisão. Cobertura em
+  `supabase/tests/66_o_csv_do_maps.sql` (testes 5, 6, 7, 8, 10 e 11); `16` e `22` intocados e verdes.
+  Pendente: o descarte de CPF deixou de gerar linha em `public.field_provenance` (a limpeza agora
+  acontece antes do gatilho do `source_record`) — o conserto natural é `public.importacao_gravar`
+  registrar a proveniência quando a linha trouxer o aviso `cpf_descartado`, e isso não cabe nesta
+  fase. Decisão humana: se essa pendência entra na Fase 2 ou espera.
+- **Já estava na mesma migração, e ainda não tinha registro aqui**: `app.endereco_br(text)`, que
+  parte o endereço de uma coluna só do Maps em bairro, cidade e CEP devolvendo **nulo onde não
+  casou**; e `app.importacao_normalizar` refeita, com o payload da esteira saindo de 9 para 15
+  chaves (`place_id`, `email`, `endereco`, `cep`, `nota`, `avaliacoes_qtd` — todas já dentro da
+  whitelist do R06, nada foi ampliado), a fonte resolvida antes da categoria, o mapa
+  `public.source_category_map` consultado antes da queda difusa por trigrama e o CPF varrido de
+  `endereco` e `bairro` **antes** da `raw_capture`.
+- **Uma dívida de robustez, não consertada**: em `app.importacao_normalizar`, a conversão do número
+  de avaliações usa a guarda `^\d+$`, então um valor só de dígitos acima de 2^31 (o `cid` do Maps
+  tem 20) estoura `integer out of range` e derruba o lote inteiro em vez de virar o aviso
+  `avaliacoes_invalidas`. O conserto é trocar a guarda por `^\d{1,9}$`; fica para quem fechar a fase.
+
+Verificado: pgTAP 2.928 asserções em 66 arquivos (o 66 com 32), com o banco reconstruído do zero;
+`pnpm db:types` sem diff e `pnpm db:lint` sem nenhum nome novo na lista de avisos antigos.

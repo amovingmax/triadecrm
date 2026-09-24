@@ -41,7 +41,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(29);
+select plan(32);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -531,6 +531,157 @@ select is(array[
       where o.place_id = 'C66-SUPRIMIDO')],
   array[0, 0],
   'e nada nasce: nem ficha nem negócio para quem pediu para parar');
+
+-- =====================================================================
+-- 7 e 8. Segundo lote do mesmo lugar: completa sem duplicar (§3.2 item 5)
+-- =====================================================================
+-- Duas raspagens do mesmo `cid`. A primeira vem magra (o Maps nem sempre
+-- devolve endereço e categoria); a segunda traz nota nova, CEP, cidade e
+-- categoria. O ramo "mudou na fonte" tem de carregar os quatro — e ainda
+-- assim produzir UM candidato e UMA ficha.
+--
+-- Dois lotes, e não um: a chave de idempotência da captura é
+-- (batch_id, request_key), e o gatilho `app.raw_capture_normalize` monta
+-- request_key = sha256(source_id|coalesce(source_url, external_id, ''))
+-- (20260904001600:351-352). No mesmo lote, a segunda captura voltaria como
+-- `pedido_repetido` e nada seria processado.
+--
+-- A sessão volta a ser a do superusuário: `public.esteira_gravar_captura`,
+-- `public.esteira_processar_captura` e `app.promover_candidato` são revogadas
+-- de `authenticated` e concedidas só a `service_role`
+-- (20260904001600:2373-2374, 2381 e 1359-1362).
+select pg_temp.sair();
+
+-- O mapa de categoria desta fonte, só para este teste; o rollback desfaz.
+-- A seed só popula `source_category_map` para `casamentos_com_br`
+-- (supabase/seed.sql:252-283), então não há linha anterior a preservar.
+insert into public.source_category_map (source_id, category_source, category_id)
+values ((select id from public.sources where slug = 'planilha'), 'confeitaria',
+        (select id from public.categories where slug = 'doces_bolos_confeitaria'))
+on conflict (source_id, category_source) do nothing;
+
+create table pg_temp.t4_ids (chave text primary key, v uuid);
+
+insert into pg_temp.t4_ids
+select 'lote1', (public.esteira_abrir_lote('planilha',
+                   (select id from public.sources where slug = 'planilha'),
+                   'pgTAP 66 — primeira raspagem') ->> 'batch_id')::uuid;
+insert into pg_temp.t4_ids
+select 'lote2', (public.esteira_abrir_lote('planilha',
+                   (select id from public.sources where slug = 'planilha'),
+                   'pgTAP 66 — segunda raspagem') ->> 'batch_id')::uuid;
+
+-- Primeira raspagem: sem CEP, sem cidade, sem categoria. A `source_url` vai no
+-- PAYLOAD (é assim que `public.importacao_gravar` faz, :880-887) e não no
+-- argumento: o argumento entra na chave de idempotência e faria a segunda
+-- linha de uma mesma listagem ser engolida como pedido repetido.
+insert into pg_temp.t4_ids
+select 'rc1', (public.esteira_gravar_captura(
+          (select v from pg_temp.t4_ids where chave = 'lote1'),
+          (select id from public.sources where slug = 'planilha'),
+          jsonb_build_object('nome_comercial', 'DOCERIA PGTAP66',
+                             'place_id',       'CID-PGTAP66-7',
+                             'telefones',      jsonb_build_array('84 98766-0007'),
+                             'source_url',     'https://www.google.com/maps/place/?q=place_id:CID-PGTAP66-7',
+                             'nota',           '4.5'),
+          'CID-PGTAP66-7', null, null, 'pgTAP 66') ->> 'raw_capture_id')::uuid;
+
+-- Cada chamada no seu PRÓPRIO comando, e o retorno guardado em vez de
+-- descartado: se `esteira_processar_captura` ou `promover_candidato`
+-- recusarem, a coluna `v` vem nula e o motivo aparece aqui, e não seis linhas
+-- adiante como uma contagem zero sem explicação. É a mesma disciplina do
+-- comentário de 16_esteira_de_ingestao.sql:320-326.
+insert into pg_temp.t4_ids
+select 'sr1', (public.esteira_processar_captura(
+                 (select v from pg_temp.t4_ids where chave = 'rc1'))
+               ->> 'source_record_id')::uuid;
+
+insert into pg_temp.t4_ids
+select 'cand', (select sr.candidate_id from public.source_record sr
+                 where sr.id = (select v from pg_temp.t4_ids where chave = 'sr1'));
+
+insert into pg_temp.t4_ids
+select 'org', (app.promover_candidato(
+                 (select v from pg_temp.t4_ids where chave = 'cand'),
+                 null, null, null, null,
+                 (select id from public.categories where slug = 'buffet_adulto_corporativo'),
+                 (select v from pg_temp.t4_ids where chave = 'lote1'))
+               ->> 'organization_id')::uuid;
+
+-- Segunda raspagem: nota nova, e CEP, cidade e categoria pela primeira vez.
+insert into pg_temp.t4_ids
+select 'rc2', (public.esteira_gravar_captura(
+          (select v from pg_temp.t4_ids where chave = 'lote2'),
+          (select id from public.sources where slug = 'planilha'),
+          jsonb_build_object('nome_comercial',   'DOCERIA PGTAP66',
+                             'place_id',         'CID-PGTAP66-7',
+                             'telefones',        jsonb_build_array('84 98766-0007'),
+                             'source_url',       'https://www.google.com/maps/place/?q=place_id:CID-PGTAP66-7',
+                             'nota',             '4.8',
+                             'cep',              '59082-095',
+                             'cidade',           'Natal',
+                             'categoria_origem', 'Confeitaria'),
+          'CID-PGTAP66-7', null, null, 'pgTAP 66') ->> 'raw_capture_id')::uuid;
+insert into pg_temp.t4_ids
+select 'sr2', (public.esteira_processar_captura(
+                 (select v from pg_temp.t4_ids where chave = 'rc2'))
+               ->> 'source_record_id')::uuid;
+
+select is(array[
+    (select count(*)::int from public.supplier_candidates c where c.place_id = 'CID-PGTAP66-7'),
+    (select count(*)::int from public.organizations o
+      where o.place_id = 'CID-PGTAP66-7' and o.deleted_at is null),
+    (select count(*)::int from public.source_record sr
+      where sr.id = (select v from pg_temp.t4_ids where chave = 'sr1')
+        and sr.id = (select v from pg_temp.t4_ids where chave = 'sr2')
+        and 'mudou_na_fonte' = any (sr.flags))],
+  array[1, 1, 1],
+  'segunda raspagem com nota nova: um candidato, uma ficha, o mesmo registro de fonte marcado mudou_na_fonte');
+
+-- O CEP é comparado só com dígitos: o gatilho `app.source_record_normalize`
+-- guarda `cep` sem a máscara (20260904001600:690).
+select is(
+    (select array[sr.cep, sr.city_id::text, sr.category_id::text, sr.category_source]
+       from public.source_record sr
+      where sr.id = (select v from pg_temp.t4_ids where chave = 'sr2')),
+    array['59082095',
+          (select id::text from public.cities where name = 'Natal' and state = 'RN'),
+          (select id::text from public.categories where slug = 'doces_bolos_confeitaria'),
+          'confeitaria'],
+  'o segundo lote grava CEP, cidade e categoria que o primeiro não tinha');
+
+-- =====================================================================
+-- 11. "De onde vocês tiraram o meu número?" (§3.5 teste 11; critério de
+--     pronto 2 da §13; guardrail de proveniência da §10) — foco de revisão 4
+-- =====================================================================
+-- `app.resolver_source_record` grava `public.field_provenance` para dez campos
+-- (20260904001600:969-983), com a `source_url` do `source_record` — que vem do
+-- payload, porque a captura é gravada com o argumento `p_source_url` nulo de
+-- propósito. Se alguém tirar `source_url` do payload da importação, a resposta
+-- ao titular volta a ser "fontes públicas", que é literalmente o que multou a
+-- KASPR. Passa hoje, e é para continuar passando.
+--
+-- Roda como superusuário: `public.origem_dos_dados` confere
+-- `app.org_is_visible`, e sem JWT `app.role()` cai em `leitura`, que está em
+-- `app.sees_all()` (20260904000500:46-50).
+--
+-- `distinct`, e não a lista crua: `public.field_provenance` é registro
+-- append-only (`app.registrar_proveniencia` faz `insert`, :572) e
+-- `app.resolver_source_record` grava os dez campos a CADA passada. Com duas
+-- raspagens e uma promoção, `phone_e164` e `place_id` aparecem três vezes cada
+-- um — o que se afirma aqui é QUAIS campos a ficha sabe explicar, não quantas
+-- vezes foram vistos.
+select is(
+  (select array_agg(t.campo order by t.campo collate "C")
+     from (select distinct c ->> 'campo' as campo
+             from jsonb_array_elements(
+                    public.origem_dos_dados(
+                      (select v from pg_temp.t4_ids where chave = 'org')) -> 'campos') c
+            where c ->> 'url' = 'https://www.google.com/maps/place/?q=place_id:CID-PGTAP66-7'
+              and c ->> 'campo' in ('phone_e164', 'place_id')) t),
+  array['phone_e164', 'place_id'],
+  'a ficha responde de onde veio o número com a URL do lugar no Maps, em phone_e164 E em place_id');
+
 
 select * from finish();
 rollback;
