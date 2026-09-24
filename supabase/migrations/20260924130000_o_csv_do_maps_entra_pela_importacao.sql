@@ -26,6 +26,10 @@
 --      chaves, a categoria consulta o mapa da fonte antes da queda difusa, o
 --      `place_id` vira a identidade na fonte e o CPF é varrido do endereço e do
 --      bairro ANTES da `raw_capture`.
+--   3. `public.importacao_previa(jsonb)` recriada: a prévia passa a sondar o
+--      `place_id`, a quarta chave de índice único — a mesma por que
+--      `app.promover_candidato` recusa. Sem isso a prévia prometia ficha que a
+--      gravação responderia como duplicata.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------------
@@ -464,3 +468,205 @@ comment on function app.importacao_normalizar(jsonb) is
   'Uma linha de planilha ou do CSV do Google Maps (RF-BAS-07, ADR-12) vira o objeto canônico da esteira: telefone em E.164, endereço partido por app.endereco_br, categoria pelo mapa da fonte antes da queda difusa, external_id determinístico (place_id > celular > @ > CNPJ > nome+cidade) e payload de 15 campos já dentro da whitelist do R06 SCR-01, com CPF varrido de nome, observação, endereço e bairro ANTES da raw_capture. STABLE: a prévia e a gravação usam ESTA função, não duas parecidas.';
 revoke all on function app.importacao_normalizar(jsonb) from public, anon;
 grant execute on function app.importacao_normalizar(jsonb) to authenticated, service_role;
+
+
+-- ---------------------------------------------------------------------------
+-- 4. A prévia sonda o place_id (§3.2 item 4)
+-- ---------------------------------------------------------------------------
+-- (Não há seção 3: a numeração segue os itens do §3.2 da spec, e o item 3 — a
+-- identidade na fonte passa a ser o lugar — coube inteiro dentro da seção 2.)
+--
+-- O comentário da função dizia "as QUATRO chaves" e o código sondava três. Com
+-- o CSV do Maps a quarta é a que mais importa: o `cid` não muda, o telefone
+-- muda. Duas mudanças, e só duas:
+--   (a) `place_id` entra na chamada de `app.find_org_matches` — ela já conhece a
+--       chave (0,98, entre CNPJ e @instagram, 20260904000300:673-675) e só não a
+--       recebia daqui;
+--   (b) `place_id` entra na sonda das chaves únicas, na MESMA ORDEM e com os
+--       MESMOS NOMES de `app.promover_candidato` (20260905000100:482-495), que
+--       é quem recusa de verdade. Prévia e gravação não podem discordar.
+-- A sonda é cinto e suspensório: com (a) no lugar, quem responde primeiro é o
+-- `find_org_matches`. Ela existe para o dia em que as duas listas divergirem.
+-- Função transcrita inteira da definição viva
+-- (20260904001820_importacao_de_planilha.sql:587-756); só as linhas marcadas
+-- com "NOVO" mudaram.
+create or replace function public.importacao_previa(p_linhas jsonb)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_linha   jsonb;
+  v_n       jsonb;
+  v_saida   jsonb := '[]'::jsonb;
+  v_vistos  text[] := '{}'::text[];
+  v_chave   text;
+  v_dup     record;
+  v_ja      record;
+  v_decisao text;
+  v_motivo  text;
+  v_dupjson jsonb;
+  v_conta   jsonb := jsonb_build_object('entra', 0, 'duplicata', 0, 'revisao', 0,
+                                        'nao_contatar', 0, 'repetida', 0, 'erro', 0);
+begin
+  if not app.can_write() then
+    raise exception 'Papel % não importa planilha', app.role() using errcode = '42501';
+  end if;
+  if jsonb_typeof(p_linhas) <> 'array' then
+    return jsonb_build_object('ok', false, 'reason', 'linhas_invalidas');
+  end if;
+  if jsonb_array_length(p_linhas) > 500 then
+    return jsonb_build_object('ok', false, 'reason', 'lote_grande_demais');
+  end if;
+
+  for v_linha in select value from jsonb_array_elements(p_linhas) loop
+    v_n := app.importacao_normalizar(v_linha);
+    v_dupjson := null;
+    v_motivo := null;
+    v_dup := null;
+    v_ja := null;
+
+    if v_n ->> 'erro' is not null then
+      v_decisao := 'erro';
+      v_motivo  := v_n ->> 'erro';
+    elsif coalesce((v_n ->> 'optout')::boolean, false) then
+      v_decisao := 'nao_contatar';
+      v_motivo  := 'pediu_para_parar';
+    else
+      v_chave := coalesce(v_n ->> 'source_id', '0') || '|' || coalesce(v_n ->> 'external_id', '');
+      if v_chave = any (v_vistos) then
+        v_decisao := 'repetida';
+        v_motivo  := 'repetida_no_arquivo';
+      else
+        v_vistos := v_vistos || v_chave;
+
+        -- (1) Esta linha já entrou numa importação anterior? A esteira reconhece
+        -- pelo par (fonte, id externo), que é o mesmo par da gravação. É o que
+        -- faz a SEGUNDA prévia do mesmo arquivo dizer "já importado" em vez de
+        -- prometer 68 fichas que não vão nascer.
+        select o.id, o.name into v_ja
+          from public.source_record sr
+          join public.supplier_candidates c on c.id = sr.candidate_id
+          join public.organizations o on o.id = c.organization_id and o.deleted_at is null
+         where sr.source_id = coalesce((v_n ->> 'source_id')::int, -1)
+           and sr.external_id = coalesce(v_n ->> 'external_id', '')
+           and c.status = 'aprovado'
+         limit 1;
+
+        -- (2) UMA linha por ficha, a de maior confiança: `app.find_org_matches`
+        -- devolve uma por REGRA que casou, e a mesma empresa três vezes na tela
+        -- não é "três suspeitas", é ruído (mesmo critério da fila do Radar).
+        select u.organization_id, u.nome, u.confidence, u.reason, u.visivel
+          into v_dup
+          from (
+            select distinct on (m.organization_id)
+                   m.organization_id,
+                   case when app.org_is_visible(m.organization_id) then o.name end as nome,
+                   app.org_is_visible(m.organization_id) as visivel,
+                   m.confidence, m.reason
+              from app.find_org_matches(jsonb_build_object(
+                     'name', v_n ->> 'nome', 'cnpj', v_n ->> 'cnpj',
+                     'phone_e164', v_n ->> 'telefone',
+                     'instagram_handle', v_n ->> 'instagram',
+                     'place_id', v_n ->> 'place_id',            -- NOVO
+                     'city_id', v_n ->> 'cidade_id',
+                     'neighborhood', v_n ->> 'bairro',
+                     'category_id', v_n ->> 'categoria_id')) m
+              join public.organizations o
+                on o.id = m.organization_id and o.deleted_at is null
+             order by m.organization_id, m.confidence desc, m.reason
+          ) u
+         order by u.confidence desc, u.nome
+         limit 1;
+
+        -- (3) A sonda das QUATRO chaves que são índice único, igual à de
+        -- `app.promover_candidato`. Sem ela a prévia mentiria num caso concreto:
+        -- um telefone FIXO repetido bloqueia a promoção, mas `find_org_matches`
+        -- só casa telefone com celular (o fixo exige bairro igual). A prévia
+        -- dizia "entra" e a gravação recusava — que é o defeito que uma prévia
+        -- existe para não ter. A ordem do `case` e os nomes de chave são os de
+        -- `app.promover_candidato`: se as duas listas divergirem, a prévia volta
+        -- a mentir.
+        if v_dup.organization_id is null then
+          select o.id                     as organization_id,
+                 case when app.org_is_visible(o.id) then o.name end as nome,
+                 app.org_is_visible(o.id) as visivel,
+                 0.95::numeric            as confidence,
+                 (case when v_n ->> 'cnpj' is not null and o.cnpj = v_n ->> 'cnpj' then 'cnpj'
+                       when v_n ->> 'place_id' is not null
+                        and o.place_id = v_n ->> 'place_id' then 'place_id'   -- NOVO
+                       when v_n ->> 'instagram' is not null
+                        and o.instagram_handle = v_n ->> 'instagram' then 'instagram'
+                       else 'phone' end)  as reason
+            into v_dup
+            from public.organizations o
+           where o.deleted_at is null
+             and ((v_n ->> 'cnpj' is not null and o.cnpj = v_n ->> 'cnpj')
+               or (v_n ->> 'telefone' is not null and o.phone_e164 = v_n ->> 'telefone')
+               or (v_n ->> 'instagram' is not null and o.instagram_handle = v_n ->> 'instagram')
+               or (v_n ->> 'place_id' is not null and o.place_id = v_n ->> 'place_id'))  -- NOVO
+           limit 1;
+        end if;
+
+        if v_dup.organization_id is not null then
+          v_dupjson := jsonb_build_object(
+            'organization_id', v_dup.organization_id,
+            'nome', coalesce(v_dup.nome, 'Ficha de outra carteira'),
+            'visivel', v_dup.visivel,
+            'confianca', v_dup.confidence,
+            'chave', v_dup.reason);
+        end if;
+
+        -- A ordem é a MESMA de `public.importacao_gravar`. Se estas duas listas
+        -- de `if` divergirem, a prévia vira promessa quebrada — é por isso que
+        -- elas estão comentadas uma em função da outra.
+        if v_ja.id is not null then
+          v_decisao := 'repetida';
+          v_motivo  := 'ja_importado';
+          v_dupjson := jsonb_build_object(
+            'organization_id', v_ja.id,
+            'nome', case when app.org_is_visible(v_ja.id) then v_ja.name
+                         else 'Ficha de outra carteira' end,
+            'visivel', app.org_is_visible(v_ja.id),
+            'confianca', 1.0,
+            'chave', 'lote_anterior');
+        elsif v_dup.organization_id is not null then
+          v_decisao := 'duplicata';
+          v_motivo  := 'ja_existe_na_base';
+        elsif v_n ->> 'categoria_id' is null then
+          v_decisao := 'revisao';
+          v_motivo  := 'categoria_desconhecida';
+        elsif v_n ->> 'source_id' is null then
+          v_decisao := 'revisao';
+          v_motivo  := 'origem_desconhecida';
+        else
+          v_decisao := 'entra';
+        end if;
+      end if;
+    end if;
+
+    v_conta := jsonb_set(v_conta, array[v_decisao],
+                         to_jsonb(coalesce((v_conta ->> v_decisao)::int, 0) + 1));
+    v_saida := v_saida || jsonb_build_array(jsonb_build_object(
+      'linha',            (v_n ->> 'linha')::int,
+      'nome',             v_n ->> 'nome',
+      'decisao',          v_decisao,
+      'motivo',           v_motivo,
+      'duplicata',        v_dupjson,
+      'categoria',        v_n ->> 'categoria_nome',
+      'cidade',           v_n ->> 'cidade_nome',
+      'origem',           v_n ->> 'source_nome',
+      'etapa',            v_n ->> 'etapa_nome',
+      'responsavel',      v_n ->> 'responsavel_nome',
+      'telefone',         v_n ->> 'telefone_visivel',
+      'avisos',           v_n -> 'avisos'));
+  end loop;
+
+  return jsonb_build_object('ok', true, 'contagem', v_conta, 'linhas', v_saida);
+end $$;
+comment on function public.importacao_previa(jsonb) is
+  'Prévia da importação de planilha (RF-BAS-07): linha a linha, o que vai acontecer — entra, é duplicata de QUAL ficha (com o nome), vai para revisão por qual motivo, ou não entra por ter pedido para parar. Sonda as quatro chaves de índice único, place_id incluído, na mesma ordem de app.promover_candidato. Não escreve nada. Máximo de 500 linhas por chamada.';
+revoke all on function public.importacao_previa(jsonb) from public, anon;
+grant execute on function public.importacao_previa(jsonb) to authenticated, service_role;

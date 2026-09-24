@@ -41,7 +41,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(23);
+select plan(29);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -366,6 +366,171 @@ select ok(not app.payload_e_permitido(
             (app.importacao_normalizar(pg_temp.linha_maps()) -> 'payload')
             || '{"facebook": "https://facebook.com/buffetc66"}'::jsonb),
           'uma chave fora da whitelist do R06 SCR-01 reprova o payload inteiro, não só o campo');
+
+-- =====================================================================
+-- 5. A prévia sonda o place_id (§3.2 item 4)
+-- =====================================================================
+-- A ficha já está na base com o `cid` do lugar. O telefone é OUTRO (o Maps
+-- devolve o número que o dono publicou hoje) e o nome também. Sem o place_id
+-- nada casa: a prévia dizia "entra" e `app.promover_candidato` responderia
+-- "ja_existe_na_base" com chave 'place_id' na hora de gravar.
+--
+-- Os dois nomes são propositalmente dissemelhantes (ZWQX / BKJV). A regra de
+-- nome por trigram de `app.find_org_matches` não pode ser quem responde aqui,
+-- senão a asserção passaria pelo motivo errado; e a ficha nasce sem linha em
+-- `organization_categories`, o que também fecha o ramo de categoria daquela
+-- regra (20260904000300:698-710).
+select pg_temp.sair();   -- o bloco anterior pode ter deixado a sessão em papel
+
+insert into public.organizations (kind, name, phone_e164, place_id, source_id, collector)
+values ('fornecedor', 'ZWQX PGTAP66 FICHA ANTIGA', '+5584977660001', 'CID-PGTAP66-5',
+        (select id from public.sources where slug = 'planilha'), 'pgTAP 66');
+
+select pg_temp.entrar(pg_temp.admin(), 'admin');
+create temp table t3_previa as
+  select public.importacao_previa(jsonb_build_array(jsonb_build_object(
+           'linha',     1,
+           'nome',      'BKJV PGTAP66 NOME DE HOJE',
+           'whatsapp',  '84 97766-0002',
+           'place_id',  'CID-PGTAP66-5',
+           'categoria', 'Fotografia e vídeo',
+           'cidade',    'Natal',
+           'origem',    'planilha'))) as j;
+select pg_temp.sair();
+
+select is(array[
+    (select l ->> 'decisao'
+       from jsonb_array_elements((select j from pg_temp.t3_previa) -> 'linhas') l),
+    (select l -> 'duplicata' ->> 'chave'
+       from jsonb_array_elements((select j from pg_temp.t3_previa) -> 'linhas') l),
+    (select l -> 'duplicata' ->> 'nome'
+       from jsonb_array_elements((select j from pg_temp.t3_previa) -> 'linhas') l)],
+  array['duplicata', 'place_id', 'ZWQX PGTAP66 FICHA ANTIGA'],
+  'a prévia recusa pelo place_id, diz qual chave casou e de quem é a ficha');
+
+-- =====================================================================
+-- 6. Reimportar o mesmo arquivo não cria ficha nova (§3.5 teste 6;
+--    critério de pronto 3 da §13) — foco de revisão 3
+-- =====================================================================
+-- Dois lotes com a MESMA linha. O primeiro grava; o segundo tem de responder
+-- `repetida`/`ja_importado` na prévia E na gravação, e a base cresce UMA ficha
+-- ao todo. Quem responde é o ramo (1) de `public.importacao_previa` — que esta
+-- tarefa acabou de transcrever inteira — e o ramo `aprovado` de
+-- `public.importacao_gravar`. Passa antes e depois: é a rede da transcrição.
+--
+-- A linha é própria, sem CNPJ e sem @: o CNPJ de fixture 11222333000181
+-- poderia estar em outra ficha deste banco, e a asserção passaria a falhar por
+-- 'duplicata' — motivo certo, teste errado.
+--
+-- O `site` também é próprio, e pelo mesmo motivo. `pg_temp.linha_maps` traz
+-- `https://buffetc66.invalid`, e o bloco 14 já gravou uma ficha com esse
+-- domínio (SALAO C66 PGTAP): `app.find_org_matches` casa domínio a 0,90
+-- (20260904000300:692-696), então a PRIMEIRA volta sairia 'duplicata' por um
+-- vizinho de fixture, e não pelo que este bloco quer medir.
+create function pg_temp.linha_reimporte() returns jsonb language sql stable as $$
+  select pg_temp.linha_maps(jsonb_build_object(
+    'linha',     9,
+    'nome',      'BUFFET C66 REIMPORTE',
+    'whatsapp',  '84 97766-0090',
+    'place_id',  'C66-REIMPORTE',
+    'site',      'https://reimportec66.invalid',
+    'cnpj',      null,
+    'instagram', null))
+$$;
+
+select pg_temp.sair();
+create temp table t3b_antes as
+  select count(*)::int as n from public.organizations where deleted_at is null;
+
+select pg_temp.entrar(pg_temp.admin(), 'admin');
+create temp table t3b_l1 as
+  select (public.esteira_abrir_lote('planilha', 966, 'pgTAP 66 — primeira volta')
+          ->> 'batch_id')::uuid as id;
+create temp table t3b_g1 as
+  select public.importacao_gravar((select id from t3b_l1),
+                                  jsonb_build_array(pg_temp.linha_reimporte())) as j;
+create temp table t3b_l2 as
+  select (public.esteira_abrir_lote('planilha', 966, 'pgTAP 66 — segunda volta')
+          ->> 'batch_id')::uuid as id;
+create temp table t3b_p2 as
+  select public.importacao_previa(jsonb_build_array(pg_temp.linha_reimporte())) as j;
+create temp table t3b_g2 as
+  select public.importacao_gravar((select id from t3b_l2),
+                                  jsonb_build_array(pg_temp.linha_reimporte())) as j;
+select pg_temp.sair();
+
+select is(
+  (select l ->> 'decisao'
+     from jsonb_array_elements((select j from pg_temp.t3b_g1) -> 'linhas') l),
+  'entra',
+  'a primeira volta grava a ficha');
+
+select is(array[
+    (select l ->> 'decisao' from jsonb_array_elements((select j from pg_temp.t3b_p2) -> 'linhas') l),
+    (select l ->> 'motivo'  from jsonb_array_elements((select j from pg_temp.t3b_p2) -> 'linhas') l),
+    (select l ->> 'decisao' from jsonb_array_elements((select j from pg_temp.t3b_g2) -> 'linhas') l),
+    (select l ->> 'motivo'  from jsonb_array_elements((select j from pg_temp.t3b_g2) -> 'linhas') l)],
+  array['repetida', 'ja_importado', 'repetida', 'ja_importado'],
+  'na segunda volta a prévia e a gravação dizem a MESMA coisa: já importado');
+
+select is(
+  (select count(*)::int from public.organizations where deleted_at is null)
+  - (select n from pg_temp.t3b_antes),
+  1,
+  'e a base cresceu UMA ficha ao todo, não duas');
+
+-- =====================================================================
+-- 10. Quem pediu para parar não vira alvo (§3.5 teste 10; guardrail de
+--     opt-out da §10) — foco de revisão 5
+-- =====================================================================
+-- `app.is_suppressed` é consultado dentro de `app.importacao_normalizar`, e a
+-- decisão `nao_contatar` sai antes de qualquer escrita. Esta asserção é rede:
+-- ela existe para o dia em que alguém reordenar os `if` da prévia e a
+-- supressão virar enfeite. `app.suppress` é concedida só a service_role
+-- (20260904000400:493), por isso a sessão volta ao superusuário.
+-- O `site` é próprio pelo mesmo motivo do bloco 6: com o domínio de fixture
+-- compartilhado, uma supressão que parasse de funcionar sairia 'duplicata' em
+-- vez de criar ficha, e a segunda asserção passaria pelo motivo errado.
+create function pg_temp.linha_suprimida() returns jsonb language sql stable as $$
+  select pg_temp.linha_maps(jsonb_build_object(
+    'linha',     10,
+    'nome',      'BUFFET C66 PEDIU PARA PARAR',
+    'whatsapp',  '84 97766-0099',
+    'place_id',  'C66-SUPRIMIDO',
+    'site',      'https://paradoc66.invalid',
+    'cnpj',      null,
+    'instagram', null))
+$$;
+
+select pg_temp.sair();
+select app.suppress('phone', app.normalize_phone_br('84 97766-0099'),
+                    'pgTAP 66 — pediu para parar', 'whatsapp'::app.channel, null);
+
+select pg_temp.entrar(pg_temp.admin(), 'admin');
+create temp table t3c_l as
+  select (public.esteira_abrir_lote('planilha', 966, 'pgTAP 66 — quem pediu para parar')
+          ->> 'batch_id')::uuid as id;
+create temp table t3c_p as
+  select public.importacao_previa(jsonb_build_array(pg_temp.linha_suprimida())) as j;
+create temp table t3c_g as
+  select public.importacao_gravar((select id from t3c_l),
+                                  jsonb_build_array(pg_temp.linha_suprimida())) as j;
+select pg_temp.sair();
+
+select is(array[
+    (select l ->> 'decisao' from jsonb_array_elements((select j from pg_temp.t3c_p) -> 'linhas') l),
+    (select l ->> 'motivo'  from jsonb_array_elements((select j from pg_temp.t3c_p) -> 'linhas') l),
+    (select l ->> 'decisao' from jsonb_array_elements((select j from pg_temp.t3c_g) -> 'linhas') l)],
+  array['nao_contatar', 'pediu_para_parar', 'nao_contatar'],
+  'telefone na suppression_list: a prévia recusa antes de escrever, e a gravação também');
+
+select is(array[
+    (select count(*)::int from public.organizations o where o.place_id = 'C66-SUPRIMIDO'),
+    (select count(*)::int from public.deals d
+       join public.organizations o on o.id = d.organization_id
+      where o.place_id = 'C66-SUPRIMIDO')],
+  array[0, 0],
+  'e nada nasce: nem ficha nem negócio para quem pediu para parar');
 
 select * from finish();
 rollback;
