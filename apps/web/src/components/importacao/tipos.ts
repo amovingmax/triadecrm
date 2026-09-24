@@ -128,6 +128,48 @@ export function rotuloDoCampo(campo: CampoQualquer): string {
 }
 
 // ---------------------------------------------------------------------------
+// A origem do lote
+// ---------------------------------------------------------------------------
+
+/** Uma fonte do catálogo que aceita arquivo: o que o seletor de origem lista. */
+export type OrigemDeArquivo = {
+  /** `sources.id` — é o `source_id` do lote em `import_batches`. */
+  id: number;
+  /** `sources.slug` — só serve para a tela escolher o padrão. */
+  slug: string;
+  /**
+   * `sources.name`, e é ele que vai injetado em cada linha.
+   *
+   * O slug também casaria: `app.importacao_fonte` procura por
+   * `app.chave_catalogo(s.name) = k or app.chave_catalogo(s.slug) = k`
+   * (`20260904001820:227-229`), e as duas chaves levam à mesma linha. Manda-se
+   * o NOME porque é o texto que a pessoa acabou de ler no seletor, e é o texto
+   * que volta para a tela: `public.importacao_previa` devolve a coluna "Origem"
+   * como `v_n ->> 'source_nome'` (`:748`), ou seja, o nome que está no banco.
+   * Escrever o nome faz a ida e a volta dizerem a mesma coisa.
+   */
+  nome: string;
+};
+
+/**
+ * A fonte entra no seletor quando `config.entrada_por_arquivo` é verdadeiro.
+ *
+ * Não é `kind = 'import'` nem `is_enabled`: `is_enabled` governa a COLETA
+ * automática (`public.esteira_abrir_lote` só o consulta para `p_kind = 'coleta'`,
+ * `20260904001600:1788-1790`), e a fonte do Maps nasce desligada de propósito —
+ * a raspagem roda fora do CRM, num Docker em 127.0.0.1. Quem diz "esta fonte
+ * entra por arquivo que uma pessoa sobe" é a chave da config, e só ela.
+ *
+ * Aceita `true` e `"true"`: o jsonb guarda booleano, e um filtro de PostgREST
+ * por `config->>entrada_por_arquivo` devolveria texto.
+ */
+export function ehEntradaPorArquivo(config: unknown): boolean {
+  if (typeof config !== 'object' || config === null) return false;
+  const valor = (config as Record<string, unknown>).entrada_por_arquivo;
+  return valor === true || valor === 'true';
+}
+
+// ---------------------------------------------------------------------------
 // O arquivo lido
 // ---------------------------------------------------------------------------
 
