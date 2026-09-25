@@ -807,6 +807,10 @@ export type Database = {
         Args: { p_dono: string; p_limite?: number }
         Returns: Json
       }
+      reuniao_pode_mexer: {
+        Args: { r: Database["public"]["Tables"]["reunioes"]["Row"] }
+        Returns: boolean
+      }
       reuniao_por_extenso: { Args: { p_inicio: string }; Returns: string }
       reuniao_rampa_adiar: { Args: never; Returns: string }
       reuniao_rampa_ativa: { Args: never; Returns: boolean }
@@ -8415,6 +8419,15 @@ export type Database = {
         Args: { p_momento?: string; p_user_id?: string }
         Returns: Json
       }
+      reuniao_cancelar: {
+        Args: { p_id: string; p_motivo?: string }
+        Returns: Json
+      }
+      reuniao_confirmar: { Args: { p_id: string }; Returns: Json }
+      reuniao_desfecho: {
+        Args: { p_estado: string; p_id: string }
+        Returns: Json
+      }
       reuniao_horarios: {
         Args: { p_conversation_id: string; p_limite?: number }
         Returns: Json
@@ -8440,6 +8453,10 @@ export type Database = {
           p_local?: string
           p_observacao?: string
         }
+        Returns: Json
+      }
+      reuniao_remarcar: {
+        Args: { p_id: string; p_novo_inicio: string }
         Returns: Json
       }
       reveal_contact_phone: { Args: { p_contact_id: string }; Returns: string }

@@ -32,7 +32,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(48);
+select plan(60);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -169,6 +169,11 @@ create function pg_temp.livre1() returns timestamptz language sql stable as $$
   select inicio from livres74 where n = 1 $$;
 create function pg_temp.livre2() returns timestamptz language sql stable as $$
   select inicio from livres74 where n = 2 $$;
+
+-- As fixtures são lidas de dentro da sessão `authenticated` nas asserções
+-- que entram como gente (confirmar, cancelar, remarcar, fechar).
+grant select on equipe74, fixt74, dia74, livres74 to authenticated;
+
 
 select has_table('public', 'reunioes', 'a tabela public.reunioes existe');
 
@@ -403,7 +408,83 @@ update public.app_settings
  where key = 'agenda.reunioes';
 
 -- =====================================================================
--- 10. A frase que o modelo copia sai pronta do banco
+-- 11. CONFIRMAR, CANCELAR, REMARCAR E FECHAR — de gente, nesta fase
+-- =====================================================================
+create function pg_temp.reuniao_de(p_conversa uuid) returns uuid language sql stable as $$
+  select r.id from public.reunioes r
+   where r.conversation_id = p_conversa and r.estado <> 'remarcada'
+   order by r.criada_em desc limit 1
+$$;
+
+select pg_temp.entrar(pg_temp.dono2(), 'gestor');
+select is(public.reuniao_confirmar(pg_temp.reuniao_de(pg_temp.conversa_robo())) ->> 'estado', 'marcada',
+  'um clique tira a reunião do robô de "a confirmar"');
+select pg_temp.sair();
+select is((select estado from public.reunioes where id = pg_temp.reuniao_de(pg_temp.conversa_robo())),
+  'marcada', 'e o banco concorda');
+
+-- A RAMPA ANDANDO: a semana começou há alguns dias, e a correção a empurra.
+update public.app_settings
+   set value = jsonb_set(value, '{rampa,ate}',
+         to_jsonb(((now() at time zone 'America/Fortaleza')::date + 2)::text))
+ where key = 'agenda.reunioes';
+create temp table rampa74 as select (app.reuniao_config() #>> '{rampa,ate}')::date as d;
+
+-- REMARCAR. A antiga sai do caminho antes de a nova entrar.
+create temp table remarcada74 as select pg_temp.reuniao_de(pg_temp.conversa()) as antiga;
+grant select on remarcada74 to authenticated;
+select pg_temp.entrar(pg_temp.dono(), 'gestor');
+create temp table nova74 as
+  select public.reuniao_remarcar((select antiga from remarcada74),
+           (select inicio from livres74 where n = 4)) as r;
+select pg_temp.sair();
+select ok(coalesce(((select r from nova74) ->> 'ok')::boolean, false),
+  'remarcar devolve ok');
+select is((select estado from public.reunioes where id = (select antiga from remarcada74)), 'remarcada',
+  'remarcar NÃO altera a linha: marca a antiga como remarcada');
+select is((select remarcada_de from public.reunioes
+            where id = ((select r from nova74) ->> 'reuniao_id')::uuid),
+  (select antiga from remarcada74), 'e a nova aponta para ela');
+select is((select status::text from public.tasks t
+            join public.reunioes r on r.task_id = t.id
+           where r.id = (select antiga from remarcada74)), 'cancelled',
+  'o eco da antiga é cancelado junto: reunião e tarefa andam em par');
+select ok((select (app.reuniao_config() #>> '{rampa,ate}')::date) > (select d from rampa74),
+  'correção numa reunião do robô empurra a data de saída da rampa: "passada a semana SEM correção"');
+
+-- CANCELAR.
+select pg_temp.entrar(pg_temp.dono(), 'gestor');
+select is(public.reuniao_cancelar(((select r from nova74) ->> 'reuniao_id')::uuid,
+            'o parceiro desmarcou') ->> 'estado', 'cancelada',
+  'cancelar fecha a reunião pelo cartão');
+select pg_temp.sair();
+select is((select status::text from public.tasks t
+            join public.reunioes r on r.task_id = t.id
+           where r.id = ((select r from nova74) ->> 'reuniao_id')::uuid), 'cancelled',
+  'e cancela o eco junto');
+
+-- O DESFECHO, e o horário que volta à grade.
+select pg_temp.entrar(pg_temp.dono2(), 'gestor');
+select is(public.reuniao_desfecho(pg_temp.reuniao_de(pg_temp.conversa_robo()), 'nao_compareceu') ->> 'estado',
+  'nao_compareceu',
+  'o desfecho da tela fecha a reunião: sem isto a linha fica "marcada" para sempre, segurando o horário na trava e contando no teto do dia');
+select pg_temp.sair();
+select is(
+  (select count(*)::int
+     from app.reuniao_horarios_livres(pg_temp.dono2(), pg_temp.dia(), pg_temp.dia(), 50)),
+  9, 'e o horário volta à grade assim que a reunião deixa de estar viva');
+select is(public.reuniao_desfecho(pg_temp.reuniao_de(pg_temp.conversa_robo()), 'remarcada') ->> 'motivo',
+  'estado_invalido',
+  'o desfecho só aceita "realizada" e "nao_compareceu": remarcar tem porta própria');
+
+-- devolve a rampa ao estado de nascimento para o resto do arquivo
+update public.app_settings
+   set value = jsonb_set(value, '{rampa,ate}',
+         to_jsonb(((now() at time zone 'America/Fortaleza')::date + 7)::text))
+ where key = 'agenda.reunioes';
+
+-- =====================================================================
+-- 12. A frase que o modelo copia sai pronta do banco
 -- =====================================================================
 select is(app.reuniao_por_extenso(timestamptz '2026-10-01 13:20:00+00'),
   'quinta-feira, 1º de outubro, às 10h20',

@@ -707,3 +707,128 @@ revoke all on function public.reuniao_marcar_pelo_negocio(uuid, timestamptz, tex
 grant  execute on function public.reuniao_marcar_pelo_negocio(uuid, timestamptz, text, text, text) to authenticated;
 revoke all on function public.reuniao_livres(date, uuid)                           from public, anon, service_role;
 grant  execute on function public.reuniao_livres(date, uuid)                       to authenticated;
+
+-- =====================================================================
+-- I. CONFIRMAR, CANCELAR, REMARCAR E FECHAR — tudo de gente nesta fase
+-- =====================================================================
+create or replace function app.reuniao_pode_mexer(r public.reunioes)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select auth.uid() is not null and app.can_write()
+     and (app.org_is_visible(r.organization_id) or r.dono_id = auth.uid())
+$$;
+
+create or replace function public.reuniao_confirmar(p_id uuid)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare r public.reunioes%rowtype;
+begin
+  select * into r from public.reunioes where id = p_id;
+  if r.id is null then return jsonb_build_object('ok', false, 'motivo', 'nao_existe'); end if;
+  if not app.reuniao_pode_mexer(r) then
+    return jsonb_build_object('ok', false, 'motivo', 'sem_permissao'); end if;
+  if r.estado <> 'a_confirmar' then
+    return jsonb_build_object('ok', false, 'motivo', 'nao_esta_a_confirmar', 'estado', r.estado); end if;
+  update public.reunioes
+     set estado = 'marcada', confirmada_em = now(), confirmada_por = auth.uid(),
+         atualizada_em = now()
+   where id = p_id;
+  return jsonb_build_object('ok', true, 'estado', 'marcada',
+    'quando_por_extenso', app.reuniao_por_extenso(r.inicio),
+    'link', r.link, 'local', r.local);
+end $$;
+
+create or replace function public.reuniao_cancelar(p_id uuid, p_motivo text default null)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare r public.reunioes%rowtype;
+begin
+  select * into r from public.reunioes where id = p_id;
+  if r.id is null then return jsonb_build_object('ok', false, 'motivo', 'nao_existe'); end if;
+  if not app.reuniao_pode_mexer(r) then
+    return jsonb_build_object('ok', false, 'motivo', 'sem_permissao'); end if;
+  if r.estado not in ('a_confirmar','marcada','confirmada') then
+    return jsonb_build_object('ok', false, 'motivo', 'estado_invalido', 'estado', r.estado); end if;
+  update public.reunioes
+     set estado = 'cancelada', atualizada_em = now(),
+         observacao = coalesce(nullif(btrim(coalesce(p_motivo, '')), ''), observacao)
+   where id = p_id;
+  update public.tasks set status = 'cancelled'::app.task_status where id = r.task_id;
+  if r.marcada_por = 'robo' then perform app.reuniao_rampa_adiar(); end if;
+  perform app.esteira_enfileirar('reuniao_avisos',
+    jsonb_build_object('reuniao_id', p_id, 'motivo', 'cancelada',
+                       'chave', 'reuniao:' || p_id::text || ':cancelada'),
+    'reuniao:' || p_id::text || ':cancelada');
+  return jsonb_build_object('ok', true, 'estado', 'cancelada');
+end $$;
+
+-- Remarcar NÃO altera a linha: marca a antiga como `remarcada`, cria a nova
+-- com `remarcada_de` apontando para ela, e enfileira o aviso de novo.
+-- A antiga SAI DO CAMINHO antes de a nova entrar — senão a trava GiST recusa
+-- remarcar para um horário que encoste no próprio horário velho. O bloco
+-- `exception` existe para que a falha desfaça o flip e devolva o motivo, em
+-- vez de derrubar a transação de quem chamou.
+create or replace function public.reuniao_remarcar(p_id uuid, p_novo_inicio timestamptz)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare r public.reunioes%rowtype; v_nova jsonb; v_motivo text;
+begin
+  select * into r from public.reunioes where id = p_id;
+  if r.id is null then return jsonb_build_object('ok', false, 'motivo', 'nao_existe'); end if;
+  if not app.reuniao_pode_mexer(r) then
+    return jsonb_build_object('ok', false, 'motivo', 'sem_permissao'); end if;
+  if r.estado not in ('a_confirmar','marcada','confirmada') then
+    return jsonb_build_object('ok', false, 'motivo', 'estado_invalido', 'estado', r.estado); end if;
+  begin
+    update public.reunioes set estado = 'remarcada', atualizada_em = now() where id = p_id;
+    update public.tasks set status = 'cancelled'::app.task_status where id = r.task_id;
+    -- `marcada_por = 'pessoa'` sem case: só gente chega aqui (a função recusa
+    -- sem `auth.uid()`, e o robô não tem grant). Ramo de robô aqui seria
+    -- código morto a fingir que existe caminho.
+    v_nova := app.reuniao_gravar(r.conversation_id, r.deal_id, p_novo_inicio, r.formato,
+                                 r.local, r.observacao, 'pessoa', auth.uid());
+    if coalesce((v_nova ->> 'ok')::boolean, false) is not true then
+      raise exception '%', coalesce(v_nova ->> 'motivo', 'falhou') using errcode = 'P0001';
+    end if;
+    update public.reunioes set remarcada_de = p_id, atualizada_em = now()
+     where id = (v_nova ->> 'reuniao_id')::uuid;
+  exception when sqlstate 'P0001' then
+    v_motivo := sqlerrm;
+    return jsonb_build_object('ok', false, 'motivo', v_motivo,
+             'alternativas', app.reuniao_opcoes(r.dono_id, 3));
+  end;
+  if r.marcada_por = 'robo' then perform app.reuniao_rampa_adiar(); end if;
+  return v_nova || jsonb_build_object('remarcada_de', p_id);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- O DESFECHO
+--
+-- Sem ele, `realizada` e `nao_compareceu` são estados que o CHECK aceita e
+-- que NINGUÉM nunca escreve. A tela fecha a `tasks` e a linha em `reunioes`
+-- fica `marcada` para sempre: segurando o horário na restrição de exclusão,
+-- contando no teto de 4 do dia, e aparecendo na Agenda como compromisso vivo
+-- de uma semana atrás.
+-- ---------------------------------------------------------------------
+create or replace function public.reuniao_desfecho(p_id uuid, p_estado text)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare r public.reunioes%rowtype;
+begin
+  if p_estado not in ('realizada','nao_compareceu') then
+    return jsonb_build_object('ok', false, 'motivo', 'estado_invalido'); end if;
+  select * into r from public.reunioes where id = p_id;
+  if r.id is null then return jsonb_build_object('ok', false, 'motivo', 'nao_existe'); end if;
+  if not app.reuniao_pode_mexer(r) then
+    return jsonb_build_object('ok', false, 'motivo', 'sem_permissao'); end if;
+  if r.estado not in ('a_confirmar','marcada','confirmada') then
+    return jsonb_build_object('ok', false, 'motivo', 'ja_fechada', 'estado', r.estado); end if;
+  update public.reunioes set estado = p_estado, atualizada_em = now() where id = p_id;
+  return jsonb_build_object('ok', true, 'estado', p_estado);
+end $$;
+
+revoke all on function app.reuniao_pode_mexer(public.reunioes)          from public, anon;
+grant  execute on function app.reuniao_pode_mexer(public.reunioes)      to authenticated, service_role;
+revoke all on function public.reuniao_confirmar(uuid)                   from public, anon, service_role;
+revoke all on function public.reuniao_cancelar(uuid, text)              from public, anon, service_role;
+revoke all on function public.reuniao_remarcar(uuid, timestamptz)       from public, anon, service_role;
+revoke all on function public.reuniao_desfecho(uuid, text)              from public, anon, service_role;
+grant  execute on function public.reuniao_confirmar(uuid)               to authenticated;
+grant  execute on function public.reuniao_cancelar(uuid, text)          to authenticated;
+grant  execute on function public.reuniao_remarcar(uuid, timestamptz)   to authenticated;
+grant  execute on function public.reuniao_desfecho(uuid, text)          to authenticated;
