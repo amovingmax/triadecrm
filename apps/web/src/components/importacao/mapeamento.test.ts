@@ -355,3 +355,50 @@ describe('o obrigatório `origem`, com o seletor do lote', () => {
     expect(faltando({}, 'Google Maps (raspagem local)')).toEqual(['nome', 'categoria']);
   });
 });
+
+/**
+ * A trava contra a divergência silenciosa.
+ *
+ * `scripts/placar-importacao.sql` monta, em SQL, o MESMO objeto que
+ * `linhaParaObjeto` monta no navegador — dez campos, lidos de dez colunas do
+ * CSV do Maps. Se `sugerirMapa` passar a ler outra coluna, ou onze, ou nove, o
+ * placar continua verde medindo outra coisa que não a tela. Estes dois testes
+ * são o que impede isso: eles falham no dia em que a leitura mudar.
+ *
+ * Cabeçalho real de `listas/2026-09-25-fotografo-natal-rn.csv`, 36 colunas.
+ */
+const mapsFotografo = lerCsv(
+  readFileSync(
+    fileURLToPath(new URL('./fixtures/maps-natal-fotografo.csv', import.meta.url)),
+    'utf8',
+  ),
+  'maps-natal-fotografo.csv',
+);
+
+describe('o CSV de 36 colunas do Google Maps', () => {
+  it('casa exatamente 10 campos, todos por nome exato', () => {
+    const { mapa, motivos } = sugerirMapa(mapsFotografo.cabecalho);
+    expect(Object.keys(mapa).sort()).toEqual([
+      'avaliacoes_qtd',
+      'categoria',
+      'email',
+      'endereco',
+      'nome',
+      'nota',
+      'origem_detalhe',
+      'place_id',
+      'site',
+      'whatsapp',
+    ]);
+    expect(Object.values(motivos).filter((m) => m === 'parecido')).toEqual([]);
+  });
+
+  it('nas três disputas de coluna, ganha a certa', () => {
+    const { mapa } = sugerirMapa(mapsFotografo.cabecalho);
+    // `link` (1) vence `reviews_link` (18); `cid` (15) vence `place_id` (24);
+    // `address` (4) vence `complete_address` (30). Medido, não suposto.
+    expect(mapa.origem_detalhe).toBe(1);
+    expect(mapa.place_id).toBe(15);
+    expect(mapa.endereco).toBe(4);
+  });
+});
