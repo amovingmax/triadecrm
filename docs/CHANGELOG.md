@@ -3039,3 +3039,49 @@ Precisa de decisão humana: a redação do `terms_notes` da fonte é a linha que
 Verificado: pgTAP 2.939 asserções em 66 arquivos (o 66 com 43), lint, typecheck e 811 testes do web em 51 arquivos, todos verdes, com o banco reconstruído do zero.
 
 O critério de pronto 6 da §13 — mais de 50% das linhas do lote com telefone — só se mede no primeiro lote de verdade: o banco local foi reconstruído do zero e ainda não recebeu nenhuma raspagem. É a primeira coisa a conferir quando o Rafael rodar o scraper.
+
+---
+
+### 25/09/2026 — Fase 2 do pivô: o Radar desliga, a Revisão fica (ADR-12)
+
+O Radar sempre foi duas coisas num nome só: **o robô que saía colhendo** e **a fila onde uma pessoa decide**. A decisão do Rafael de 24/09 mata a primeira e promove a segunda — é por ela que passa cada linha do CSV do Google Maps.
+
+**Primeiro o interruptor, depois a tesoura.** Duas migrações, nessa ordem:
+
+- `20260925130000_o_radar_para_de_coletar.sql` — `is_enabled = false` em `casamentos_com_br`, `base_cnpj`, `sympla_outgo`, `olx` e `telelistas`. Um `update`, sem deploy, reversível. A linha da fonte **não** é apagada: é a proveniência dos 277 candidatos já colhidos (RF-RAD-05).
+- `20260925140000_a_revisao_fica_o_coletor_sai.sql` — dropa `radar_coletar_agora`, `radar_agendar_coleta` e `radar_alternar_fonte`, tira os três números de fonte de `radar_resumo` e apaga o catálogo de coleta do Casamentos.
+
+**São cinco fontes, não sete.** `instagram` e `google_places` continuam ligadas. Aqui `is_enabled` quer dizer "vale como ORIGEM no CRM" — desligar corta `radar_criar_candidato`, `quick_create_organization` e o select do cadastro rápido, nada disso tem a ver com robô. O Instagram no MVP é curadoria manual; o `google_places` é a busca de telefone por candidato que a Fase 1 manteve.
+
+**O mesmo estado na seed**, senão o próximo `db reset` religava tudo: o `on conflict do update` do bloco 3 tem `is_enabled = excluded.is_enabled`.
+
+**Quatro arquivos de pgTAP dependiam de fonte ligada, não dois.** O plano previa 16 e 21; eram também o 54 e o 23.
+
+- **16** e **21** religam `casamentos_com_br` dentro da própria transação, **fora** da sessão simulada — o precedente é `03_dedup.sql`, que faz o contrário para `telelistas`.
+- **54** (`agendar_coleta_pela_tela`) caiu com 7 asserções: o caminho feliz dele abre coleta no Casamentos. Religa igual, e depois some inteiro na tesoura.
+- **23** pedia `(select id from public.sources order by id limit 1)` a `radar_criar_candidato`: a primeira fonte por id era o Casamentos, e a função recusa origem desligada. Passou a pedir `captura_campo` pelo nome, que é o que o teste de fato precisa — ele mede o dreno relendo a supressão, não política de fonte.
+
+**O que saiu de código.** `apps/workers/src/workers/ingest.ts` e o que restava de `apps/workers/src/ingest/` — **14 arquivos**; `crawlee`, `playwright` e `cheerio`, que viajavam na imagem **compartilhada** dos workers sem ninguém usar; o serviço `worker-ingest` do Compose com o `shm_size: 512m` do Chromium; o `ENV WORKER_COMANDO=ingest` do Dockerfile; e as três superfícies de fonte da tela (catálogo, painel do coletor, agendar coleta — 935 linhas).
+
+**Quatro coisas que a spec previa e não deram certo assim:**
+
+- `ingest/esteira.ts` **não** foi apagado: nunca foi do coletor. É o cliente das filas `pgmq` e o `baterPonto` de todo worker, importado por nove arquivos de `ia/`, `rotas/` e `lib/`. Mudou de endereço para `apps/workers/src/fila/esteira.ts` — e, lá dentro, perdeu a superfície que só o coletor usava (leitor do catálogo, buscas de fonte, abrir/marcar lote, gravar/processar captura), que não tinha outro chamador.
+- `TipoDeFonte` **não** saiu de `tipos.ts`: é o tipo de `CandidatoDaFila.fonte_tipo`, que `public.radar_fila` devolve em toda linha.
+- `infra/nuvem/fly.worker-ingest.toml` **não** foi apagado. Enquanto o app existir na Fly, ele é o único registro de nome, região e custo — e leva agora o comando e a data no topo.
+- **Tirar o Playwright levou junto o `lib.dom` do TypeScript**, que uma dependência do coletor trazia sem que ninguém tivesse pedido. Três casts do `wa` e do `ai` apontavam para `BlobPart` e `BodyInit`, tipos de navegador num pacote de Node; dois viraram `new Blob([bytes])` seco e o terceiro passou a citar `RequestInit['body']`. Nenhum byte mudou de lugar.
+
+**A tela virou Revisão**: `/radar` → `/revisao` com 308 no `next.config.ts` (a query string sobrevive, e o recibo da importação continua levando quem gravou até quem decide); o item do menu sai de "A base" para "Todo dia", pela régua do próprio arquivo — depois da Fase 1 é na Revisão que o contato nasce. O número ao lado não mudou uma linha: ele sempre contou candidato em "novo", sem saber de onde veio.
+
+**O que NÃO mudou de nome: o banco.** `supplier_candidates`, `radar_fila`, `radar_resumo`, `radar_criar_candidato`, `radar_revisar_candidato`, `radar_repontuar`, `app.radar_pontuar` e os arquivos de pgTAP. Nome de banco é ledger; nome de tela é produto.
+
+**A batida do worker ganhou casa.** `painel-coletor.tsx` era a única superfície que mostrava `worker_heartbeats`, e `public.esteira_saude()` sempre devolveu a de todos. Uma linha por robô — `wa` e `ai` — entrou em Ajustes → Atendimento, justo antes de o robô passar a responder sozinho.
+
+**Os 277 candidatos ficam.** Nada apagado à mão, por três razões: entre os 108 do topo há negócio real de Natal que o scraper vai reencontrar **com telefone**; recusar em lote gravaria um "não" que ninguém decidiu; e apagar linha arrebenta `field_provenance`. A retenção do PRD §10.6 resolve com data — **16/12/2026** —, e a Revisão passa a dizer isso no cartão nos últimos 30 dias.
+
+Verificado, com o banco reconstruído do zero: pgTAP **2.900 asserções em 64 arquivos**, `pnpm db:types` com as três funções saindo do `database.types.ts` e sem diff depois do commit, `db:lint` sem apontamento novo, lint, typecheck, **803 testes do web em 52 arquivos**, 324 dos workers em 20, 276 dos prompts, 105 do schema, e o build da web.
+
+**Pendente, com data:** `fly scale count 0 -a triade-worker-ingest` (hoje) e `fly apps destroy triade-worker-ingest` **não antes de 03/10/2026** — sete dias de operação real com a Revisão recebendo CSV é o que autoriza apagar. No mesmo commit, `infra/nuvem/fly.worker-ingest.toml` sai. Nada disso foi executado nesta fase.
+
+**Pendente:** ADR-12 e ADR-13 continuam fora da tabela do PRD §9.1, que para no ADR-11; e o PRD §7.3, o R03 e o R06 ainda descrevem o Radar como coletor ligado.
+
+**Reversibilidade, escrita para ninguém prometer o que não existe:** entre as duas migrações, voltar atrás era `update ... is_enabled = true`. Depois da segunda, não é mais — o catálogo de coleta era as instruções de onde colher, e foi embora com o código que as lia. Voltar agora é `git revert`.
