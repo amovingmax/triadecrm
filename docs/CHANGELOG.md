@@ -3399,12 +3399,26 @@ Fotógrafo 10 → **13**; buffet 3 → **17**. Sobram 9 na fila (6 fotógrafo + 
 
 **Suíte:** pgTAP **3.042 asserções em 71 arquivos** (eram 3.028 em 69); web **832 testes em 55** (eram 814 em 52); workers 363 em 24; prompts 276; schema 105. `pnpm db:lint` sem apontamento novo, `pnpm db:types` com uma linha a mais (`categoria_na_fonte`), lint e typecheck verdes.
 
+## Importar sem fila — segunda leva (25/09/2026)
+
+### Tarefa 8 — A prévia para de mentir
+
+Migração `20261001110000_a_previa_para_de_mentir.sql`, e os três defeitos vêm dos mesmos 40 registros de `listas/`:
+
+**O site faltava na prévia.** `app.resolver_source_record` sempre passou `website` a `app.find_org_matches`; `public.importacao_previa` não passava. Domínio igual vale 0,90 na dedup, então a prévia dizia *"entra"* para uma linha que a gravação recusaria como duplicata — o defeito que uma prévia existe para não ter. `app.importacao_normalizar` já devolvia `site` no topo desde a tarefa 1; faltava o consumidor.
+
+**`keepo.io` não era host compartilhado.** As duas *Show Fotografias* têm `cid`, telefone e endereço diferentes, e o único ponto em comum é `keepo.io/showfotografias`. Link na bio não identifica empresa. Consertar o site sem consertar isto trocaria uma mentira por outra: prometeria duplicata onde há duas empresas. Entram na lista, junto de `linktr.ee` e `beacons.ai`, também `bio.link` e `campsite.bio`.
+
+**Dois `place_id` que diferem são dois negócios.** *Doce Sabor Buffet* e *Luz da Festa Kids* dividem o (84) 99988-0963 e têm `cid` diferentes; o bloco (3) de `app.resolver_source_record` casou por celular e pendurou o `source_record` de um no candidato do outro. A trava do bloco (4) não alcança o caso: ela exige mais de três candidatos no mesmo número, e aqui são dois. Agora o laço por telefone é recusado quando os dois lados têm `place_id` e eles divergem — e só nesse caso, porque sem `place_id` dos dois lados o celular continua sendo chave determinística (há asserção para isso: a trava não é um afrouxamento disfarçado).
+
+**E a marca chega ao candidato.** `telefone_compartilhado` era gravada no `source_record`, mas o bloco (5) insere o candidato com `v_r.flags` lido antes do `update` — o candidato nascia limpo e a fila mostrava dois nomes no mesmo número sem dizer por quê. Corrigido nos dois lugares que marcam (blocos 3b e 4). O texto do cartão já existia desde a tarefa 3.
+
+pgTAP novo: `78_a_previa_para_de_mentir.sql` (9 asserções, escrito vermelho antes — 4 falhavam). Fixtures com domínios `.invalid` e nomes dissemelhantes de propósito, para que quem responda seja a regra de domínio e não a de nome por trigram.
+
 ### O que ficou pendente
 
-- **A segunda leva (tarefas 5 a 8) não começou.** O recibo das 36 caixinhas, a tela de resolver categorias por nome (o coração: O(linhas) → O(nomes novos)), o aprovar em lote e os três consertos de dedup. Plano em `docs/superpowers/plans/2026-09-25-importar-sem-fila.md`.
+- **A segunda leva (tarefas 5 a 7) continua aberta.** O recibo das 36 caixinhas, a tela de resolver categorias por nome (o coração: O(linhas) → O(nomes novos)) e o aprovar em lote. Plano em `docs/superpowers/plans/2026-09-25-importar-sem-fila.md`.
 - **O `\echo` das categorias desconhecidas no placar ainda agrupa em nulo.** `public.importacao_previa` não devolve `categoria_origem` por linha — isso entra na tarefa 6.2. `app.importacao_normalizar` já o devolve; falta só subir à saída da prévia. O bloco está marcado no script.
-- **A prévia continua mentindo em um caso**, e é o da tarefa 8: ela não passa o site a `app.find_org_matches` (a gravação passa), então as duas *Show Fotografias*, que só se parecem pelo `keepo.io/showfotografias`, entram na prévia e viram duplicata ao gravar. `app.importacao_normalizar` já devolve `site` no topo desde a tarefa 1 — falta o consumidor. **`keepo.io` tem de entrar em `app.is_shared_web_host` no mesmo commit**, senão o conserto funde empresas sem relação.
-- **`telefone_compartilhado` tem texto no cartão mas ainda não chega lá.** A flag é gravada em `source_record` desde 04/09, mas o bloco (5) de `app.resolver_source_record` insere o candidato com a variável lida ANTES do `update` — conserto na tarefa 8.4.
 - **Os dois nomes de fonte na seed** (`Planilha (importação)`, `Google Maps (raspagem local)`) continuam com o texto antigo: mudá-los é migração, não texto, e o placar procura a fonte pelo `slug`.
 - **Tarefas 9 e 10 (aprendizado e IA) estão atrás de um portão**: não começam sem um plano detalhado próprio. A Fase 4 (a IA escrevendo) não foi tocada.
 
