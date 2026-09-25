@@ -181,15 +181,103 @@ Deno.test('eco do Coexistence: `to` é o fornecedor, `from` é o nosso número',
   assertEquals(e.texto, 'Oi, Marcos, aqui é a Heloísa');
 });
 
-Deno.test('campo que este adaptador não trata é NOMEADO como ignorado', () => {
+Deno.test('a qualidade do número vira item de saúde, não linha de ignorados', () => {
   const { itens, ignorados } = extrairDaMeta(
+    envelope(
+      {
+        display_phone_number: '5584999880011',
+        event: 'THROUGHPUT_UPGRADE',
+        max_daily_conversations_per_business: 'TIER_2K',
+        current_limit: 'TIER_2K', // obsoleto desde fev/2026; chega em conta antiga
+        old_limit: 'TIER_250',
+      },
+      'phone_number_quality_update',
+    ),
+  );
+  assertEquals(ignorados, []);
+  assertEquals(itens.length, 1);
+  const item = so(itens, 'saude')[0];
+  assertEquals(item.numero, '+5584999880011');
+  assertEquals(item.limite_atual, 'TIER_2K');
+  assertEquals(item.limite_anterior, 'TIER_250');
+  assertEquals(item.chave, 'saude:phone_number_quality_update:e1:1757030000:0');
+});
+
+Deno.test('o campo obsoleto sozinho ainda vale: conta antiga não fica sem tier', () => {
+  const { itens } = extrairDaMeta(
+    envelope(
+      { event: 'THROUGHPUT_UPGRADE', current_limit: 'TIER_250' },
+      'phone_number_quality_update',
+    ),
+  );
+  assertEquals(so(itens, 'saude')[0].limite_atual, 'TIER_250');
+});
+
+Deno.test('FLAGGED é a nota caindo, e chega ANTES da leitura da Graph', () => {
+  const { itens } = extrairDaMeta(
     envelope(
       { display_phone_number: '5584999880011', event: 'FLAGGED' },
       'phone_number_quality_update',
     ),
   );
+  assertEquals(so(itens, 'saude')[0].qualidade, 'RED');
+});
+
+Deno.test('UNFLAGGED não pinta de verde: só a Graph sabe a nota', () => {
+  // "Deixou de estar em alerta" não é "está bem". Inventar um GREEN aqui
+  // apagaria um RED verdadeiro que a leitura periódica já tivesse gravado.
+  const { itens } = extrairDaMeta(
+    envelope({ event: 'UNFLAGGED' }, 'phone_number_quality_update'),
+  );
+  assertEquals(so(itens, 'saude')[0].qualidade, null);
+});
+
+Deno.test('account_update traz restrição e banimento, e NÃO traz número', () => {
+  const { itens, ignorados } = extrairDaMeta(
+    envelope(
+      {
+        event: 'ACCOUNT_RESTRICTION',
+        restriction_info: [
+          { restriction_type: 'RESTRICTED_BIZ_INITIATED_MESSAGING', expiration: 1757030000 },
+        ],
+        ban_info: { waba_ban_state: 'DISABLE', waba_ban_date: '2026-09-25' },
+      },
+      'account_update',
+    ),
+  );
+  assertEquals(ignorados, []);
+  const item = so(itens, 'saude')[0];
+  // A restrição é da WABA: o número é do banco, por app.wa_numero_padrao().
+  assertEquals(item.numero, null);
+  assertEquals(item.banido, true);
+  assertEquals(item.restricoes.length, 1);
+  assertEquals(item.restricoes[0].restriction_type, 'RESTRICTED_BIZ_INITIATED_MESSAGING');
+});
+
+Deno.test('SCHEDULE_FOR_DISABLE ainda não é banimento: a porta não fechou', () => {
+  const { itens } = extrairDaMeta(
+    envelope({ event: 'DISABLED_UPDATE', ban_info: { waba_ban_state: 'SCHEDULE_FOR_DISABLE' } },
+      'account_update'),
+  );
+  assertEquals(so(itens, 'saude')[0].banido, false);
+});
+
+Deno.test('business_capability_update carrega o tier, que é a fonte viva', () => {
+  const { itens } = extrairDaMeta(
+    envelope(
+      { max_daily_conversations_per_business: 'TIER_10K', max_phone_numbers_per_waba: 25 },
+      'business_capability_update',
+    ),
+  );
+  assertEquals(so(itens, 'saude')[0].limite_atual, 'TIER_10K');
+});
+
+Deno.test('campo realmente desconhecido continua NOMEADO como ignorado', () => {
+  const { itens, ignorados } = extrairDaMeta(
+    envelope({ new_category: 'UTILITY' }, 'template_category_update'),
+  );
   assertEquals(itens.length, 0);
-  assertEquals(ignorados, ['field:phone_number_quality_update']);
+  assertEquals(ignorados, ['field:template_category_update']);
 });
 
 Deno.test('mensagem sem id ou sem número é descartada com nome, não em silêncio', () => {

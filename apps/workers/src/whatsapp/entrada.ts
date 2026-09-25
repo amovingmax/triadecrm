@@ -46,6 +46,7 @@ import {
   registrarMidia,
   registrarOptOut,
   registrarRecibo,
+  registrarSaude,
   type ClienteDoBanco,
 } from './ponte';
 
@@ -81,6 +82,8 @@ export interface ContagensDaEntrada {
   transcricoes_pedidas: number;
   classificacoes_pedidas: number;
   midias_baixadas: number;
+  /** Linhas de `public.wa_saude_numero` gravadas nesta passada (Fase 3 do pivô). */
+  saude_registrada: number;
   ignorados: number;
 }
 
@@ -95,6 +98,7 @@ export function contagensDaEntradaZeradas(): ContagensDaEntrada {
     transcricoes_pedidas: 0,
     classificacoes_pedidas: 0,
     midias_baixadas: 0,
+    saude_registrada: 0,
     ignorados: 0,
   };
 }
@@ -118,9 +122,52 @@ export async function tratarEntrada(
   if (tipo === 'recibo') return tratarRecibo(ctx, item, contagens);
   if (tipo === 'eco') return tratarEco(ctx, item, contagens);
   if (tipo === 'mensagem') return tratarMensagem(ctx, item, contagens);
+  if (tipo === 'saude') return tratarSaude(ctx, item, contagens);
 
   contagens.ignorados += 1;
   ctx.logger.warn('item da fila de entrada com tipo desconhecido', { tipo });
+}
+
+/**
+ * O que a Meta disse sobre o NÚMERO vira uma linha de histórico, e nada mais.
+ *
+ * Nenhuma decisão aqui: quem lê o histórico e decide o teto é
+ * `app.wa_teto_da_meta`, no banco (ADR-03). O worker só entrega o que chegou —
+ * inclusive o `value` inteiro, porque o que hoje ninguém lê pode ser a
+ * pergunta de amanhã, e um webhook não volta.
+ */
+async function tratarSaude(
+  ctx: ContextoDaEntrada,
+  item: Record<string, unknown>,
+  contagens: ContagensDaEntrada,
+): Promise<void> {
+  const campo = texto(item.campo);
+  if (campo === null) {
+    contagens.ignorados += 1;
+    return;
+  }
+  await registrarSaude(ctx.cliente, {
+    numero: item.numero ?? null,
+    origem: 'webhook',
+    campo,
+    evento: item.evento ?? null,
+    qualidade: item.qualidade ?? null,
+    limite_anterior: item.limite_anterior ?? null,
+    limite_atual: item.limite_atual ?? null,
+    conversas_por_dia: item.conversas_por_dia ?? null,
+    restricoes: item.restricoes ?? [],
+    banido: item.banido === true,
+    payload: item.payload ?? {},
+    ocorrido_em: item.ocorrido_em ?? null,
+  });
+  contagens.saude_registrada += 1;
+  ctx.logger.info('a Meta falou do nosso número', {
+    campo,
+    evento: texto(item.evento),
+    qualidade: texto(item.qualidade),
+    limite_atual: texto(item.limite_atual),
+    banido: item.banido === true,
+  });
 }
 
 async function tratarRecibo(

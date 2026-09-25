@@ -16,10 +16,22 @@
 //   value.statuses[]        → recibo de entrega do que mandamos        (out)
 //   value.message_echoes[]  → o que a Heloísa mandou pelo celular      (out, eco)
 //
-// O resto do webhook da Meta (`account_update`, `phone_number_quality_update`,
-// `template_status_update`) é reconhecido e IGNORADO com nome: um campo que
-// ninguém trata precisa aparecer no log como "ignorado", nunca sumir calado —
-// é assim que se descobre que a Meta começou a mandar algo novo.
+// E, desde a Fase 3 do pivô, três campos que falam do NÚMERO e não de uma
+// conversa (`field` em vez de `value.messages`):
+//
+//   phone_number_quality_update → nota caindo (FLAGGED) e tier novo
+//   account_update              → restrição, violação e banimento da WABA
+//   business_capability_update  → tier de conversas por dia
+//
+// Eles saem daqui como `tipo:'saude'` e vão para `public.wa_saude_registrar`.
+// Antes eram ignorados com nome, e o CRM só descobria que a Meta tinha cortado
+// o número quando as mensagens começavam a falhar. Com uma pessoa enviando,
+// ela via; com o robô, ninguém vê.
+//
+// O resto (`template_status_update`, `template_category_update`, …) continua
+// reconhecido e IGNORADO com nome: um campo que ninguém trata precisa aparecer
+// no log como "ignorado", nunca sumir calado — é assim que se descobre que a
+// Meta começou a mandar algo novo.
 //
 // Nada aqui decide nada. Opt-out, supressão, janela e teto são do banco e do
 // worker; o adaptador não sabe o que é um opt-out.
@@ -67,6 +79,28 @@ export type ItemDaMeta =
       texto: string | null;
       media_id: string | null;
       media_mime: string | null;
+      ocorrido_em: string;
+    }
+  | {
+      /**
+       * O que a Meta diz sobre o NÚMERO, não sobre uma conversa. O `value`
+       * inteiro viaja em `payload`: o que hoje não se lê pode ser a pergunta
+       * de amanhã, e um webhook não volta.
+       */
+      tipo: 'saude';
+      chave: string;
+      /** E.164. Nulo em `account_update`, que é da WABA e não traz o número. */
+      numero: string | null;
+      campo: string;
+      evento: string | null;
+      /** Só `FLAGGED` vira `'RED'`. O webhook não manda a nota em si. */
+      qualidade: string | null;
+      limite_anterior: string | null;
+      limite_atual: string | null;
+      conversas_por_dia: number | null;
+      restricoes: Record<string, unknown>[];
+      banido: boolean;
+      payload: Record<string, unknown>;
       ocorrido_em: string;
     }
   | {
@@ -177,6 +211,19 @@ function telefoneDoContato(contatos: unknown[], userId: string | null): string |
 /** Campos de `changes[].field` que este adaptador reconhece como "nossos". */
 const CAMPO_DE_MENSAGENS = 'messages';
 
+/**
+ * Campos de saúde do número que este adaptador traduz (Fase 3 do pivô).
+ *
+ * `messaging_limit_tier_update` NÃO está aqui porque não existe na referência
+ * da Meta — quem carrega o tier é `business_capability_update`, e também o
+ * `phone_number_quality_update`.
+ */
+const CAMPOS_DE_SAUDE = new Set([
+  'phone_number_quality_update',
+  'account_update',
+  'business_capability_update',
+]);
+
 export function extrairDaMeta(payload: unknown): Extracao {
   const itens: ItemDaMeta[] = [];
   const ignorados: string[] = [];
@@ -190,13 +237,51 @@ export function extrairDaMeta(payload: unknown): Extracao {
     const entrada = objeto(entradaBruta);
     if (!entrada) continue;
 
-    for (const mudancaBruta of lista(entrada.changes)) {
+    for (const [indice, mudancaBruta] of lista(entrada.changes).entries()) {
       const mudanca = objeto(mudancaBruta);
       if (!mudanca) continue;
       const campo = texto(mudanca.field) ?? '';
       if (campo !== CAMPO_DE_MENSAGENS) {
-        // `phone_number_quality_update`, `template_status_update`,
-        // `account_update`: reconhecidos, não tratados, nomeados no log.
+        if (CAMPOS_DE_SAUDE.has(campo)) {
+          const valor = objeto(mudanca.value) ?? {};
+          const ban = objeto(valor.ban_info) ?? {};
+          const evento = texto(valor.event);
+          // `max_daily_conversations_per_business` PRIMEIRO: `current_limit`,
+          // `old_limit` e `max_daily_conversation_per_phone` (singular) foram
+          // marcados para remoção em fevereiro de 2026 e só chegam de conta
+          // antiga. Ler o obsoleto antes do vivo deixaria o tier novo
+          // invisível no dia em que o velho sumir.
+          const tier = valor.max_daily_conversations_per_business;
+          const cru = valor.max_daily_conversation_per_phone;
+          itens.push({
+            tipo: 'saude',
+            // `entry.time` pode faltar; o índice desempata dentro do lote. A
+            // idempotência de ENTREGA já é de `public.wa_webhook_receber`.
+            chave: `saude:${campo}:${texto(entrada.id) ?? 'sem-id'}:${String(entrada.time ?? '')}:${indice}`,
+            numero: e164(valor.display_phone_number),
+            campo,
+            evento,
+            // O webhook NÃO manda a nota. Manda `FLAGGED`, que é a nota
+            // caindo: tratar como RED é o único aviso que chega antes da
+            // leitura da Graph, que pode estar a 30 min de distância.
+            // `UNFLAGGED` não vira GREEN — "deixou de estar em alerta" não é
+            // "está bem", e inventar um verde apagaria um vermelho verdadeiro.
+            qualidade: evento === 'FLAGGED' ? 'RED' : null,
+            limite_anterior: texto(valor.old_limit),
+            limite_atual: (typeof tier === 'string' ? tier : null) ?? texto(valor.current_limit),
+            conversas_por_dia:
+              typeof tier === 'number' ? tier : typeof cru === 'number' ? cru : null,
+            restricoes: lista(valor.restriction_info).map((r) => objeto(r) ?? {}),
+            // DISABLE (banido), REINSTATE (voltou), SCHEDULE_FOR_DISABLE (vai
+            // cair). Só DISABLE fecha a porta hoje.
+            banido: texto(ban.waba_ban_state) === 'DISABLE',
+            payload: valor,
+            ocorrido_em: instante(entrada.time),
+          });
+          continue;
+        }
+        // `template_status_update`, `template_category_update`, …:
+        // reconhecidos, não tratados, nomeados no log.
         ignorados.push(`field:${campo || 'ausente'}`);
         continue;
       }

@@ -408,6 +408,53 @@ describe('BSUID — nomes de usuário do WhatsApp (migração 20260915120000)', 
   });
 });
 
+describe('a saúde do número (Fase 3 do pivô)', () => {
+  const SAUDE = {
+    tipo: 'saude',
+    chave: 'saude:account_update:e1:1757030000:0',
+    numero: null,
+    campo: 'account_update',
+    evento: 'ACCOUNT_RESTRICTION',
+    qualidade: null,
+    limite_anterior: null,
+    limite_atual: null,
+    conversas_por_dia: null,
+    restricoes: [{ restriction_type: 'RESTRICTED_BIZ_INITIATED_MESSAGING' }],
+    banido: false,
+    payload: { event: 'ACCOUNT_RESTRICTION' },
+    ocorrido_em: '2026-09-25T12:00:00.000Z',
+  };
+
+  it('vira uma linha de histórico, e NENHUMA decisão do lado de cá', async () => {
+    const { cliente, chamadas } = bancoFalso({ wa_saude_registrar: 42 });
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(contexto(cliente), { ...SAUDE }, c);
+
+    expect(c.saude_registrada).toBe(1);
+    expect(c.ignorados).toBe(0);
+    expect(chamadas).toHaveLength(1);
+    expect(chamadas[0]?.nome).toBe('wa_saude_registrar');
+    const item = (chamadas[0]?.args as { p_item: Record<string, unknown> }).p_item;
+    expect(item.origem).toBe('webhook');
+    expect(item.campo).toBe('account_update');
+    // O `value` inteiro viaja: o que hoje ninguém lê pode ser a pergunta de
+    // amanhã, e um webhook não volta.
+    expect(item.payload).toEqual({ event: 'ACCOUNT_RESTRICTION' });
+    // O número vem nulo de propósito — `account_update` é da WABA. Quem o
+    // preenche é `app.wa_numero_padrao()`, dentro do banco.
+    expect(item.numero).toBe(null);
+  });
+
+  it('item de saúde sem campo é ignorado com nome, não gravado pela metade', async () => {
+    const { cliente, chamadas } = bancoFalso();
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(contexto(cliente), { tipo: 'saude' }, c);
+    expect(c.ignorados).toBe(1);
+    expect(c.saude_registrada).toBe(0);
+    expect(chamadas).toHaveLength(0);
+  });
+});
+
 describe('extensão do arquivo pelo mime', () => {
   it.each([
     ['audio/ogg; codecs=opus', '.ogg'],

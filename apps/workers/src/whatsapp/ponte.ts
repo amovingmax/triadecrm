@@ -210,6 +210,21 @@ export async function registrarEco(
   );
 }
 
+/**
+ * Uma linha do que a Meta disse sobre o nosso número.
+ *
+ * Nenhuma decisão do lado de cá: quem lê o histórico e transforma em teto é
+ * `app.wa_teto_da_meta` (ADR-03). O `value` inteiro vai junto em `payload` —
+ * o que hoje ninguém lê pode ser a pergunta de amanhã, e um webhook não volta.
+ */
+export async function registrarSaude(
+  cliente: ClienteDoBanco,
+  item: Record<string, unknown>,
+): Promise<number | null> {
+  const id = await rpc<unknown>(cliente, 'wa_saude_registrar', { p_item: item });
+  return typeof id === 'number' ? id : null;
+}
+
 export async function registrarRecibo(
   cliente: ClienteDoBanco,
   argumentos: {
