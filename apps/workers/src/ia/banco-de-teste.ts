@@ -46,6 +46,20 @@ export interface BancoFalso {
   readonly chamadasDeRpc: { nome: string; argumentos: Record<string, unknown> }[];
 }
 
+/**
+ * O que uma RPC responde quando o teste não disse nada.
+ *
+ * `{enfileirado:true}` é a resposta de quem enfileira, que era o único caso
+ * quando isto nasceu. `ia_pode_gastar` precisou de um padrão próprio: o banco
+ * de verdade, num mês sem gasto, diz `pode = true`, e um padrão que dissesse
+ * "não pode" faria TODO teste de chamada ao modelo morrer no freio — o que
+ * seria o dublê ensinando uma mentira sobre o mundo.
+ */
+const PADRAO_DE_RPC = { enfileirado: true, msg_id: 1 };
+const PADROES_DE_RPC: Record<string, unknown> = {
+  ia_pode_gastar: { pode: true, motivo: null },
+};
+
 let proximoId = 1;
 
 function novoUuid(): string {
@@ -228,10 +242,10 @@ export function bancoFalso(
     async rpc(nome: string, argumentos: Record<string, unknown>) {
       chamadasDeRpc.push({ nome, argumentos });
       const resposta = opcoes.rpcs?.[nome];
-      return await Promise.resolve({
-        data: resposta === undefined ? { enfileirado: true, msg_id: 1 } : resposta(argumentos),
-        error: null,
-      });
+      if (resposta !== undefined) {
+        return await Promise.resolve({ data: resposta(argumentos), error: null });
+      }
+      return await Promise.resolve({ data: PADROES_DE_RPC[nome] ?? PADRAO_DE_RPC, error: null });
     },
   };
 

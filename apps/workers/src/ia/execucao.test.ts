@@ -7,6 +7,7 @@ import { clienteDuble } from './duble';
 import {
   AlvoSuprimidoError,
   ChamadaBloqueadaError,
+  OrcamentoEsgotadoError,
   executar,
   leadIdCurto,
   type ContextoDaIa,
@@ -281,5 +282,45 @@ describe('executar: a reconferência da entrega (laudo §3.3)', () => {
     expect(duble.chamadas).toEqual(['transcricao']);
     expect(executada.custoUsd).toBeGreaterThan(0);
     expect((banco.tabelas.ai_runs?.[0] as LinhaFalsa).status).toBe('ok');
+  });
+});
+
+describe('o freio do orçamento na entrega', () => {
+  it('com o mês acabado, a chamada NÃO sai e a linha de ai_runs prova que o freio disparou', async () => {
+    const { banco, contexto, duble } = montar({
+      rpcs: {
+        alvo_suprimido: () => false,
+        ia_pode_gastar: () => ({ pode: false, motivo: 'orcamento_esgotado' }),
+      },
+    });
+
+    await expect(
+      executar(contexto, transcricaoAudioV1, ENTRADA, CONTATO, { organizationId: 'org-1' }),
+    ).rejects.toBeInstanceOf(OrcamentoEsgotadoError);
+
+    // O que importa nesta asserção: ZERO chamadas ao dublê. Um freio que
+    // registra depois de gastar não é freio, é contabilidade.
+    expect(duble.chamadas).toHaveLength(0);
+    const corrida = banco.tabelas.ai_runs?.[0] as LinhaFalsa;
+    expect(corrida.status).toBe('bloqueado');
+    expect(Number(corrida.cost_usd)).toBe(0);
+    expect(String(corrida.error)).toContain('orçamento');
+    // Sem tarefa daqui: `executar()` é genérica e o `digest` não tem conversa.
+    // Quem abre a tarefa é quem sabe se tem gente esperando resposta.
+    expect(banco.tabelas.tasks).toHaveLength(0);
+  });
+
+  it('o freio é perguntado DEPOIS da supressão: quem pediu para sair não vira linha de orçamento', async () => {
+    const { banco, contexto } = montar({
+      rpcs: {
+        alvo_suprimido: () => true,
+        ia_pode_gastar: () => ({ pode: false, motivo: 'orcamento_esgotado' }),
+      },
+    });
+
+    await expect(
+      executar(contexto, transcricaoAudioV1, ENTRADA, CONTATO, { organizationId: 'org-1' }),
+    ).rejects.toBeInstanceOf(AlvoSuprimidoError);
+    expect(String((banco.tabelas.ai_runs?.[0] as LinhaFalsa).error)).toContain('suprimido');
   });
 });

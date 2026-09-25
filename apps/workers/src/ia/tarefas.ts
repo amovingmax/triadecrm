@@ -76,6 +76,7 @@ import {
 import {
   AlvoSuprimidoError,
   ChamadaBloqueadaError,
+  OrcamentoEsgotadoError,
   executar,
   leadIdCurto,
   type ContextoDaIa,
@@ -101,7 +102,11 @@ export function eDeterministico(erro: unknown): boolean {
     erro instanceof ChamadaBloqueadaError ||
     // Alvo suprimido é o mais determinístico de todos: repetir não muda o mundo
     // e cada volta é uma chamada paga (laudo §3.3).
-    erro instanceof AlvoSuprimidoError
+    erro instanceof AlvoSuprimidoError ||
+    // O mês acabado é da mesma família: repetir não faz o dinheiro voltar, e a
+    // fila girando em cima do freio seria a própria fila pagando para bater na
+    // parede. O trabalho volta pelo cron `ia_retomar_adiados`, não pelo retry.
+    erro instanceof OrcamentoEsgotadoError
   );
 }
 

@@ -85,6 +85,30 @@ export class AlvoSuprimidoError extends Error {
   }
 }
 
+/**
+ * A chamada não saiu porque o mês de IA acabou (Fase 3 do pivô).
+ *
+ * Determinístico pelo mesmo motivo de `AlvoSuprimidoError`: repetir não muda o
+ * mundo — o mês continua acabado — e cada volta é uma chamada paga. A mensagem
+ * é concluída na fila com a linha de `ai_runs` em `bloqueado` e `cost_usd = 0`,
+ * que é o registro de que o freio disparou.
+ *
+ * Sem tarefa AQUI: `executar()` é genérica e o `digest` não tem conversa. Quem
+ * abre a tarefa é quem sabe se há alguém do outro lado esperando resposta —
+ * `classificarEntrada`, em `tarefas.ts`.
+ */
+export class OrcamentoEsgotadoError extends Error {
+  readonly motivo: string;
+  readonly aiRunId: number;
+
+  constructor(motivo: string, aiRunId: number) {
+    super(`A chamada não saiu — o freio do orçamento de IA a segurou: ${motivo}`);
+    this.name = 'OrcamentoEsgotadoError';
+    this.motivo = motivo;
+    this.aiRunId = aiRunId;
+  }
+}
+
 export interface ContextoDaIa {
   readonly cliente: ClienteDoBanco;
   readonly modelo: ClienteDoModelo;
@@ -193,6 +217,31 @@ export async function executar<Entrada, Saida>(
     throw new AlvoSuprimidoError(vinculos.organizationId ?? null, registro.id);
   }
 
+  // ------------------------------------------------------- o freio do dinheiro
+  // Depois da supressão e ANTES do POST, na mesma altura e pelo mesmo motivo:
+  // é aqui que o dinheiro nasce. A pergunta vai ao banco (ADR-03) porque o teto
+  // mora em `app_settings` e tem de mudar sem deploy. Em dois degraus — na
+  // linha de alerta param os propósitos que não são de atendimento; no teto
+  // inteiro param todos.
+  const freio = await orcamentoPermite(contexto, prompt.proposito);
+  if (freio !== null) {
+    const registro = await registrarChamada(contexto.cliente, contexto.logger, {
+      ...comum,
+      situacao: 'bloqueado',
+      uso: USO_ZERADO,
+      latenciaMs: null,
+      saida: null,
+      erro: `orçamento de IA: ${freio} — a chamada não saiu`,
+    });
+    contexto.logger.warn('chamada bloqueada: o orçamento de IA acabou', {
+      prompt: promptVersion,
+      ai_run_id: registro.id,
+      proposito: prompt.proposito,
+      motivo: freio,
+    });
+    throw new OrcamentoEsgotadoError(freio, registro.id);
+  }
+
   // ---------------------------------------------------------------- chamada
   const comecou = Date.now();
   let resposta;
@@ -289,6 +338,22 @@ async function alvoEstaSuprimido(
   });
   if (error) throw new ErroDaEsteira('alvo_suprimido', error.message);
   return data === true;
+}
+
+/**
+ * Pergunta ao banco se ainda dá para gastar com este propósito.
+ *
+ * Devolve `null` quando pode, e o motivo quando não pode. Erro de RPC sobe:
+ * um freio que não consegue perguntar não pode responder "então pode".
+ */
+async function orcamentoPermite(contexto: ContextoDaIa, proposito: string): Promise<string | null> {
+  const { data, error } = await contexto.cliente.rpc('ia_pode_gastar', { p_purpose: proposito });
+  if (error) throw new ErroDaEsteira('ia_pode_gastar', error.message);
+  const resposta = (data ?? {}) as { pode?: unknown; motivo?: unknown };
+  if (resposta.pode === true) return null;
+  return typeof resposta.motivo === 'string' && resposta.motivo !== ''
+    ? resposta.motivo
+    : 'orcamento_esgotado';
 }
 
 /**
