@@ -283,16 +283,23 @@ describe('o que o cabeçalho do kit NÃO pode passar a casar', () => {
     expect(fora.map(acharCampo)).toEqual(fora.map(() => null));
   });
 
-  it('status e owner ainda casam: é o operador que os tira na tela', () => {
-    // `status` ("Operacional") cai em Etapa e `owner` (nome de pessoa) em
-    // Responsável. Os dois são sinônimos legítimos para planilha de CRM em
-    // inglês, então não saem de `SINONIMOS`: o passo 5 do roteiro de §3.4 manda
-    // conferir o mapa sugerido, e é lá que os dois são desmarcados. Este teste
-    // existe para que isso seja uma decisão escrita, e não um esquecimento.
-    expect(acharCampo('status')).toEqual({ campo: 'etapa', motivo: 'exato' });
-    expect(acharCampo('owner')).toEqual({ campo: 'responsavel', motivo: 'exato' });
-    expect(mapa.etapa).toBe(14);
-    expect(mapa.responsavel).toBe(23);
+  it('status e owner não casam com nada: no Maps eles querem dizer outra coisa', () => {
+    // Medido no primeiro CSV raspado de verdade (25/09/2026): `status` é
+    // "Operacional" e `owner` é o nome do dono do negócio. Casavam por nome
+    // exato com Etapa e Responsável e sujavam as vinte linhas com dois avisos
+    // falsos cada. O banco nunca chutou — "Operacional" não vira etapa —, mas
+    // aviso falso em toda linha esconde o aviso de verdade.
+    expect(acharCampo('status')).toBeNull();
+    expect(acharCampo('owner')).toBeNull();
+    expect(mapa.etapa).toBeUndefined();
+    expect(mapa.responsavel).toBeUndefined();
+  });
+
+  it('e a planilha-ponte continua casando os dois pelos nomes dela', () => {
+    expect(acharCampo('etapa')).toEqual({ campo: 'etapa', motivo: 'exato' });
+    expect(acharCampo('situacao')).toEqual({ campo: 'etapa', motivo: 'exato' });
+    expect(acharCampo('responsavel')).toEqual({ campo: 'responsavel', motivo: 'exato' });
+    expect(acharCampo('dono')).toEqual({ campo: 'responsavel', motivo: 'exato' });
   });
 });
 

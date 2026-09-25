@@ -31,6 +31,22 @@ export function chave(texto: string): string {
  * da planilha-ponte; as outras são o que já apareceu nas exportações que o time
  * usa (Google Sheets em português, Casamentos, TeleListas, Solutudo).
  */
+/**
+ * `status` e `owner` NÃO entram aqui, e a ausência é deliberada (25/09/2026).
+ *
+ * Os dois pareciam sinônimos razoáveis de `etapa` e `responsavel` numa planilha
+ * de CRM em inglês. Só que o único arquivo real que traz essas duas colunas é o
+ * CSV do Google Maps, e lá elas querem dizer outra coisa: `status` é
+ * "Operacional" (o negócio está aberto) e `owner` é o nome do DONO DO NEGÓCIO,
+ * uma pessoa física de fora da equipe. Medido no primeiro CSV raspado de
+ * verdade: as duas casavam por nome exato nas vinte linhas.
+ *
+ * O banco não chuta — "Operacional" não vira etapa nenhuma e o nome do dono não
+ * vira responsável —, então não havia corrupção de dado. Havia coisa pior para
+ * quem opera: dois avisos falsos em TODA linha, e aviso falso esconde aviso de
+ * verdade. A planilha-ponte não perde nada: ela chama as colunas de `etapa` e
+ * `responsavel`, e `situacao`, `fase`, `dono` e `vendedor` continuam valendo.
+ */
 const SINONIMOS: Record<CampoQualquer, string[]> = {
   nome: ['nome', 'nome fantasia', 'nome comercial', 'empresa', 'fornecedor', 'razao social', 'parceiro', 'title'],
   tipo: ['tipo', 'tipo de parceiro', 'natureza'],
@@ -41,8 +57,8 @@ const SINONIMOS: Record<CampoQualquer, string[]> = {
   cidade: ['cidade', 'municipio', 'localidade'],
   bairro: ['bairro', 'regiao', 'zona'],
   instagram: ['instagram', 'insta', 'arroba', 'perfil instagram', 'ig'],
-  etapa: ['etapa', 'estagio', 'status', 'fase', 'situacao'],
-  responsavel: ['responsavel', 'dono', 'owner', 'quem falou', 'sdr', 'vendedor'],
+  etapa: ['etapa', 'estagio', 'fase', 'situacao'],
+  responsavel: ['responsavel', 'dono', 'quem falou', 'sdr', 'vendedor'],
   ultimo_contato: ['ultimo contato', 'data do ultimo contato', 'data contato', 'contato em'],
   canal_ultimo_contato: ['canal ultimo contato', 'canal', 'canal do contato', 'meio'],
   resultado: ['resultado', 'desfecho', 'retorno', 'o que aconteceu'],
