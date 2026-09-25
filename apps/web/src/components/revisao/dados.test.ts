@@ -1,154 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { MOTIVO_DA_FONTE, MOTIVO_DA_REVISAO, mensagemDoErro, paraFonte } from './dados';
-import type { LinhaDeFonte } from './dados';
+import { MOTIVO_DA_REVISAO, mensagemDoErro } from './dados';
 
 /**
- * `sources.config` é jsonb livre: das 11 fontes do catálogo, cada uma traz um
- * conjunto diferente de chaves, e nenhuma é garantida. Se a leitura quebrar ou
- * inventar valor, a tela passa a mentir sobre o que uma fonte pode coletar — que é
- * justamente o que este módulo existe para não fazer.
+ * O que a Revisão diz quando o banco recusa. Motivo sem frase é defeito
+ * silencioso: quem revisou 40 candidatos e levou um "23514" na cara não sabe se
+ * errou, se o CRM caiu, ou se aquele alvo simplesmente não pode entrar.
  */
-function linha(parcial: Partial<LinhaDeFonte> = {}): LinhaDeFonte {
-  return {
-    id: 1,
-    slug: 'casamentos_com_br',
-    name: 'Casamentos.com.br',
-    kind: 'scrape',
-    base_url: 'https://www.casamentos.com.br',
-    legal_basis: 'legitimo_interesse',
-    terms_notes: 'Coleta de baixo volume, mensal.',
-    robots_ok: true,
-    is_enabled: true,
-    rate_limit_seconds: '4.00',
-    config: {},
-    ...parcial,
-  };
-}
-
-describe('paraFonte', () => {
-  it('lê o coletor, os campos permitidos e a nota do robots.txt', () => {
-    const fonte = paraFonte(
-      linha({
-        config: {
-          robots: '/json/ bloqueado',
-          collector: { kind: 'http', phase: 'mvp', enabled: true, schedule: 'mensal' },
-          fields_whitelist: ['name', 'category'],
-        },
-      }),
-    );
-
-    expect(fonte.coletor).toBe('http');
-    expect(fonte.fase).toBe('mvp');
-    expect(fonte.periodicidade).toBe('mensal');
-    expect(fonte.coletor_pronto).toBe(true);
-    expect(fonte.campos).toEqual(['name', 'category']);
-    expect(fonte.robots_nota).toBe('/json/ bloqueado');
-  });
-
-  it('lê as categorias do catálogo de coleta, sem repetir', () => {
-    const fonte = paraFonte(
-      linha({
-        config: {
-          collector: {
-            enabled: true,
-            catalogo: [
-              { caminho: '/cerimonialista/rn/natal', categoria_origem: 'cerimonialista' },
-              { caminho: '/buffet-casamento/rn/natal', categoria_origem: 'buffet-casamento' },
-              // Duas listagens da mesma categoria não são duas categorias: o botão
-              // mostraria "3 categorias" para duas.
-              { caminho: '/cerimonialista/rn/parnamirim', categoria_origem: 'cerimonialista' },
-            ],
-          },
-        },
-      }),
-    );
-
-    expect(fonte.categorias_do_catalogo).toEqual(['cerimonialista', 'buffet-casamento']);
-  });
-
-  it('descarta entrada do catálogo sem categoria, e não vira coleta vazia', () => {
-    const fonte = paraFonte(
-      linha({
-        config: {
-          collector: {
-            enabled: true,
-            catalogo: [
-              { caminho: '/a', categoria_origem: 'celebrante' },
-              { caminho: '/b' },
-              { caminho: '/c', categoria_origem: 7 },
-              'lixo',
-              null,
-            ],
-          },
-        },
-      }),
-    );
-
-    expect(fonte.categorias_do_catalogo).toEqual(['celebrante']);
-  });
-
-  it('catálogo que não é lista vira lista vazia: o botão Coletar não aparece', () => {
-    for (const catalogo of [null, 'texto', 42, { a: 1 }]) {
-      expect(
-        paraFonte(linha({ config: { collector: { enabled: true, catalogo } } }))
-          .categorias_do_catalogo,
-      ).toEqual([]);
-    }
-  });
-
-  it('aguenta config vazia sem inventar nada', () => {
-    const fonte = paraFonte(linha({ config: {} }));
-
-    expect(fonte.coletor).toBeNull();
-    expect(fonte.fase).toBeNull();
-    expect(fonte.periodicidade).toBeNull();
-    expect(fonte.coletor_pronto).toBe(false);
-    expect(fonte.campos).toEqual([]);
-    expect(fonte.robots_nota).toBeNull();
-    expect(fonte.curadoria_manual).toBe(false);
-    expect(fonte.categorias_do_catalogo).toEqual([]);
-  });
-
-  it('aguenta config nula, string ou lista (jsonb aceita tudo isso)', () => {
-    for (const config of [null, 'texto', [1, 2, 3], 42]) {
-      const fonte = paraFonte(linha({ config }));
-      expect(fonte.campos).toEqual([]);
-      expect(fonte.coletor).toBeNull();
-    }
-  });
-
-  it('descarta campo permitido que não seja texto', () => {
-    const fonte = paraFonte(linha({ config: { fields_whitelist: ['name', 7, null, 'cep'] } }));
-    expect(fonte.campos).toEqual(['name', 'cep']);
-  });
-
-  it('só marca o coletor como pronto quando o valor é exatamente true', () => {
-    expect(paraFonte(linha({ config: { collector: { enabled: 'true' } } })).coletor_pronto).toBe(
-      false,
-    );
-    expect(paraFonte(linha({ config: { collector: { enabled: 1 } } })).coletor_pronto).toBe(false);
-    expect(paraFonte(linha({ config: { collector: { enabled: true } } })).coletor_pronto).toBe(
-      true,
-    );
-  });
-
-  it('converte o intervalo, que vem como texto do numeric do Postgres', () => {
-    expect(paraFonte(linha({ rate_limit_seconds: '4.00' })).intervalo_segundos).toBe(4);
-    expect(paraFonte(linha({ rate_limit_seconds: '0.00' })).intervalo_segundos).toBe(0);
-    expect(paraFonte(linha({ rate_limit_seconds: 10 })).intervalo_segundos).toBe(10);
-  });
-
-  it('preserva robots_ok nulo (não avaliado) sem virar false', () => {
-    expect(paraFonte(linha({ robots_ok: null })).robots_ok).toBeNull();
-    expect(paraFonte(linha({ robots_ok: false })).robots_ok).toBe(false);
-  });
-});
-
 describe('mensagemDoErro', () => {
   it('nunca devolve texto cru do Postgres', () => {
     expect(mensagemDoErro(new Error('permission denied for function radar_fila'))).toBe(
-      'O seu acesso não trabalha a fila do Radar.',
+      'O seu acesso não trabalha a fila de revisão.',
     );
     expect(mensagemDoErro(new Error('JWT expired'))).toBe('A sua sessão expirou.');
     expect(mensagemDoErro(new Error('TypeError: Failed to fetch'))).toBe(
@@ -162,7 +24,7 @@ describe('mensagemDoErro', () => {
 });
 
 describe('motivos traduzidos', () => {
-  it('cobre todos os motivos que as RPCs de revisão e de fonte devolvem', () => {
+  it('cobre todos os motivos que a RPC de revisão devolve', () => {
     for (const motivo of [
       'candidato_inexistente',
       'ja_revisado',
@@ -176,14 +38,6 @@ describe('motivos traduzidos', () => {
       'ja_existe_na_base',
     ]) {
       expect(MOTIVO_DA_REVISAO[motivo]).toBeTruthy();
-    }
-    for (const motivo of [
-      'fonte_inexistente',
-      'robots_nao_avaliado',
-      'robots_proibe_coleta',
-      'termos_nao_avaliados',
-    ]) {
-      expect(MOTIVO_DA_FONTE[motivo]).toBeTruthy();
     }
   });
 });

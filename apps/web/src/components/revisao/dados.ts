@@ -1,25 +1,20 @@
 /**
- * Idas ao banco do Radar, todas pelo cliente do navegador.
+ * Idas ao banco da Revisão, todas pelo cliente do navegador.
  *
  * O Postgres é quem manda: a fila, a criação e a decisão são funções `security
- * definer` (`radar_fila`, `radar_criar_candidato`, `radar_revisar_candidato`,
- * `radar_alternar_fonte`). Aqui só ficam a montagem dos argumentos, a tradução
- * do que volta e — o que mais importa nesta tela — a tradução do ERRO: quem
- * revisa nunca deve ler um código do Postgres.
+ * definer` (`radar_fila`, `radar_criar_candidato`, `radar_revisar_candidato` —
+ * nomes de banco, que não mudaram quando a tela mudou de nome). Aqui só ficam a
+ * montagem dos argumentos, a tradução do que volta e — o que mais importa nesta
+ * tela — a tradução do ERRO: quem revisa nunca deve ler um código do Postgres.
  */
 import { createClient } from '@/lib/supabase/client';
 
 import {
   POR_PAGINA,
-  type BatidaDeWorker,
   type CandidatoDaFila,
-  type FilaDaEsteira,
   type FiltrosDaFila,
-  type FonteDoRadar,
-  type LoteDeColeta,
   type ResultadoDaFila,
   type ResumoDoRadar,
-  type SaudeDaEsteira,
 } from './tipos';
 
 /** Chave de cache do TanStack Query para um recorte da fila. */
@@ -62,10 +57,10 @@ export async function buscarResumo(): Promise<ResumoDoRadar | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Catálogo de fontes
+// Leitura segura do que volta do banco
 // ---------------------------------------------------------------------------
 
-/** Leitura segura de um campo de `sources.config`, que é jsonb livre. */
+/** `jsonb` livre chega aqui como `unknown`: só objeto de verdade vira objeto. */
 function objeto(valor: unknown): Record<string, unknown> {
   return typeof valor === 'object' && valor !== null && !Array.isArray(valor)
     ? (valor as Record<string, unknown>)
@@ -76,77 +71,6 @@ function texto(valor: unknown): string | null {
 }
 function listaDeTexto(valor: unknown): string[] {
   return Array.isArray(valor) ? valor.filter((v): v is string => typeof v === 'string') : [];
-}
-
-export type LinhaDeFonte = {
-  id: number;
-  slug: string;
-  name: string;
-  kind: FonteDoRadar['tipo'];
-  base_url: string | null;
-  legal_basis: string;
-  terms_notes: string | null;
-  robots_ok: boolean | null;
-  is_enabled: boolean;
-  rate_limit_seconds: number | string;
-  config: unknown;
-};
-
-export async function buscarFontes(): Promise<FonteDoRadar[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from('sources')
-    .select(
-      'id, slug, name, kind, base_url, legal_basis, terms_notes, robots_ok, is_enabled, rate_limit_seconds, config',
-    )
-    .order('id');
-
-  if (error) throw new Error(error.message);
-
-  return ((data ?? []) as LinhaDeFonte[]).map(paraFonte);
-}
-
-/**
- * Traduz uma linha de `sources` para a fonte que a tela mostra.
- *
- * Fica separada e exportada porque `config` é jsonb livre: cada uma das 11 fontes
- * traz um conjunto diferente de chaves (umas têm `fields_whitelist`, outras têm
- * `cnaes` ou `sites`, o Instagram tem `manual_curation`), e nenhuma delas é
- * garantida. Toda leitura passa por guarda de tipo, e o teste cobre justamente as
- * formas que faltam campo.
- */
-export function paraFonte(linha: LinhaDeFonte): FonteDoRadar {
-  const config = objeto(linha.config);
-  const coletor = objeto(config.collector);
-
-  return {
-    id: linha.id,
-    slug: linha.slug,
-    nome: linha.name,
-    tipo: linha.kind,
-    base_url: linha.base_url,
-    base_legal: linha.legal_basis,
-    avaliacao: linha.terms_notes,
-    robots_ok: linha.robots_ok,
-    ligada: linha.is_enabled,
-    intervalo_segundos: Number(linha.rate_limit_seconds) || 0,
-    fase: texto(coletor.phase),
-    coletor: texto(coletor.kind),
-    periodicidade: texto(coletor.schedule),
-    coletor_pronto: coletor.enabled === true,
-    categorias_do_catalogo: Array.isArray(coletor.catalogo)
-      ? [
-          ...new Set(
-            coletor.catalogo
-              .map((e) => texto(objeto(e).categoria_origem))
-              .filter((c): c is string => c !== null),
-          ),
-        ]
-      : [],
-    campos: listaDeTexto(config.fields_whitelist),
-    robots_nota: texto(config.robots),
-    curadoria_manual: config.manual_curation === true,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -237,79 +161,6 @@ export async function revisarCandidato(args: {
   return { ok: false, motivo: texto(r.reason) ?? 'desconhecido', organizacaoId };
 }
 
-export async function alternarFonte(
-  fonteId: number,
-  ligar: boolean,
-): Promise<{ ok: boolean; motivo?: string }> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc('radar_alternar_fonte', {
-    p_source_id: fonteId,
-    p_enabled: ligar,
-  });
-
-  if (error) throw new Error(error.message);
-
-  const r = objeto(data);
-  return r.ok === true ? { ok: true } : { ok: false, motivo: texto(r.reason) ?? 'desconhecido' };
-}
-
-/**
- * Pede uma coleta ao Radar.
- *
- * Uma chamada, uma transação no banco: abre o lote e enfileira o job. Não existe
- * caminho aqui para abrir um sem o outro, de propósito — foi assim que o lote de
- * 08/09 ficou em `previa` para sempre.
- *
- * `coletorDePe` é a diferença entre "o pedido entrou" e "os dados vêm". Com o
- * worker parado o lote fica na fila esperando a máquina, e a tela diz isso em vez
- * de deixar a pessoa achar que a coleta falhou.
- */
-export async function coletarAgora(
-  fonteId: number,
-  categorias: string[] | null,
-  maxPaginas: number,
-): Promise<
-  | { ok: true; batchId: string; rotulo: string; categorias: string[]; coletorDePe: boolean }
-  | { ok: false; motivo: string; disponiveis?: string[] }
-> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc('radar_coletar_agora', {
-    p_source_id: fonteId,
-    p_categorias: categorias && categorias.length > 0 ? categorias : null,
-    p_max_paginas: maxPaginas,
-  });
-
-  if (error) throw new Error(error.message);
-
-  const r = objeto(data);
-  if (r.ok !== true) {
-    return {
-      ok: false,
-      motivo: texto(r.motivo) ?? 'desconhecido',
-      disponiveis: listaDeTexto(r.disponiveis),
-    };
-  }
-  return {
-    ok: true,
-    batchId: texto(r.batch_id) ?? '',
-    rotulo: texto(r.rotulo) ?? '',
-    categorias: listaDeTexto(r.categorias),
-    coletorDePe: r.coletor_de_pe === true,
-  };
-}
-
-/** Motivos que a RPC de coleta devolve, escritos para quem apertou o botão. */
-export const MOTIVO_DA_COLETA: Record<string, string> = {
-  sem_permissao: 'O seu acesso não pede coleta.',
-  origem_invalida: 'Essa fonte não existe mais no catálogo.',
-  origem_desabilitada: 'Ligue a fonte antes de mandar coletar.',
-  coletor_desligado:
-    'O robô desta fonte ainda não foi escrito. Só o Casamentos.com.br tem coletor pronto.',
-  sem_catalogo: 'Esta fonte não tem caminho de coleta configurado. Fale com quem cuida do banco.',
-  categoria_fora_do_catalogo: 'Essa categoria não existe no catálogo desta fonte.',
-  ja_rodando: 'Já há uma coleta desta fonte em andamento. Espere ela terminar.',
-};
-
 // ---------------------------------------------------------------------------
 // Tradução de erro e de motivo
 // ---------------------------------------------------------------------------
@@ -318,7 +169,7 @@ export const MOTIVO_DA_COLETA: Record<string, string> = {
 export function mensagemDoErro(erro: unknown): string {
   const texto = erro instanceof Error ? erro.message : '';
   if (/não trabalha a fila|não revisa|não cadastra|42501|permission/i.test(texto)) {
-    return 'O seu acesso não trabalha a fila do Radar.';
+    return 'O seu acesso não trabalha a fila de revisão.';
   }
   if (/jwt|autenticad/i.test(texto)) return 'A sua sessão expirou.';
   if (/fetch|network|failed/i.test(texto)) return 'O aplicativo não alcançou o servidor.';
@@ -356,156 +207,6 @@ export const MOTIVO_DA_REVISAO: Record<string, string> = {
     'Mesclar altera a ficha, e essa ficha não é sua. Peça ao gestor para mesclar ou para transferir a ficha para você.',
   ja_existe_na_base: 'Esse alvo já está na base. Mescle com a ficha em vez de aprovar.',
 };
-
-/** Motivos que a RPC de ligar/desligar fonte devolve (RF-RAD-01). */
-export const MOTIVO_DA_FONTE: Record<string, string> = {
-  fonte_inexistente: 'Essa fonte não existe mais.',
-  robots_nao_avaliado:
-    'O robots.txt desta fonte ainda não foi avaliado. Sem essa checagem registrada a fonte não liga.',
-  robots_proibe_coleta: 'O robots.txt desta fonte proíbe a coleta. Ela não pode ser ligada.',
-  termos_nao_avaliados: 'Os termos de uso desta fonte ainda não foram avaliados.',
-};
-
-// ---------------------------------------------------------------------------
-// Saúde da esteira: o coletor está vivo? (RF-ADM-07)
-// ---------------------------------------------------------------------------
-
-/**
- * `public.esteira_saude()` recusa quem não escreve na base (`leitura`,
- * `financeiro`) com 42501. Isso não é erro de tela: é o papel certo vendo o que
- * lhe cabe. A função devolve `null` nesse caso, e o painel diz uma frase em vez
- * de mostrar um alarme vermelho para quem não tem o que fazer com ele.
- */
-export async function buscarSaudeDaEsteira(): Promise<SaudeDaEsteira | null> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc('esteira_saude');
-  if (error) {
-    if (/42501|não lê a saúde|permission/i.test(error.message)) return null;
-    throw new Error(error.message);
-  }
-
-  const bruto = objeto(data);
-  return {
-    workers: Array.isArray(bruto.workers) ? (bruto.workers as BatidaDeWorker[]) : [],
-    filas: Array.isArray(bruto.filas) ? (bruto.filas as FilaDaEsteira[]) : [],
-    coletor_vivo: bruto.coletor_vivo === true,
-    lotes_rodando: Number(bruto.lotes_rodando) || 0,
-    capturas_por_expurgar: Number(bruto.capturas_por_expurgar) || 0,
-    registros_por_resolver: Number(bruto.registros_por_resolver) || 0,
-    ultimo_expurgo: texto(bruto.ultimo_expurgo),
-  };
-}
-
-type LinhaDeLote = {
-  id: string;
-  label: string;
-  status: LoteDeColeta['status'];
-  stats: unknown;
-  error: string | null;
-  started_at: string | null;
-  finished_at: string | null;
-  created_at: string;
-  sources: { name: string } | { name: string }[] | null;
-};
-
-function numeroOuNulo(valor: unknown): number | null {
-  return typeof valor === 'number' && Number.isFinite(valor) ? valor : null;
-}
-
-/** As últimas corridas de coleta, para a tela dizer o que o robô trouxe e quando. */
-export async function buscarColetasRecentes(limite = 3): Promise<LoteDeColeta[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from('import_batches')
-    .select('id, label, status, stats, error, started_at, finished_at, created_at, sources(name)')
-    .eq('kind', 'coleta')
-    .order('created_at', { ascending: false })
-    .limit(limite);
-
-  if (error) throw new Error(error.message);
-
-  return ((data ?? []) as LinhaDeLote[]).map((linha) => {
-    const estatisticas = objeto(linha.stats);
-    const fonte = Array.isArray(linha.sources) ? linha.sources[0] : linha.sources;
-    return {
-      id: linha.id,
-      rotulo: linha.label,
-      status: linha.status,
-      fonte: fonte ? fonte.name : null,
-      capturas: numeroOuNulo(estatisticas.capturas),
-      candidatos: numeroOuNulo(estatisticas.candidatos),
-      erro: linha.error,
-      comecou_em: linha.started_at,
-      terminou_em: linha.finished_at,
-      criado_em: linha.created_at,
-    };
-  });
-}
-
-// ===========================================================================
-// AGENDAR COLETA (migração 20260917170000)
-// ===========================================================================
-//
-// Mandar o Radar trabalhar era `ingest --agendar` num terminal. A tela dizia
-// "coletor parado, fila vazia" e quem olhava concluía que o Radar estava
-// quebrado — quando o que faltava era uma ordem. Esta é a ordem.
-
-/** O que a tela diz quando o banco recusa. Motivo sem frase é defeito silencioso. */
-export const MOTIVOS_DA_COLETA: Record<string, string> = {
-  fonte_inexistente: 'Esta fonte não existe mais no catálogo.',
-  fonte_desligada:
-    'Esta fonte está desligada. Ligar exige conferir o robots.txt e os termos dela (RF-RAD-01).',
-  coleta_em_andamento: 'Já existe uma coleta desta fonte esperando ou rodando. Espere ela terminar.',
-  origem_invalida: 'Esta fonte não existe mais no catálogo.',
-  origem_desabilitada: 'Esta fonte está desligada.',
-  lote_recusado: 'O banco não abriu o lote da coleta.',
-  fila_recusou: 'O lote abriu, mas a ordem não entrou na fila. Tente de novo.',
-};
-
-export interface ColetaAgendada {
-  readonly lote: string;
-  readonly rotulo: string;
-  readonly fonte: string;
-  readonly maxPaginas: number;
-}
-
-export async function agendarColeta(argumentos: {
-  fonteId: number;
-  maxPaginas: number;
-  categorias?: string[] | null;
-  rotulo?: string | null;
-}): Promise<ColetaAgendada> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc('radar_agendar_coleta', {
-    p_source_id: argumentos.fonteId,
-    p_categorias: argumentos.categorias ?? null,
-    p_max_paginas: argumentos.maxPaginas,
-    p_rotulo: argumentos.rotulo ?? null,
-  });
-
-  if (error) {
-    // 42501 é a recusa por papel: só admin e gestor agendam, porque a coleta
-    // gasta o limite da fonte e responde pelo robots.txt.
-    throw new Error(
-      error.code === '42501'
-        ? 'Seu perfil não agenda coleta. Peça a um admin ou gestor.'
-        : mensagemDoErro(error),
-    );
-  }
-
-  const bruto = objeto(data);
-  if (!bruto.ok) {
-    const motivo = typeof bruto.motivo === 'string' ? bruto.motivo : '';
-    throw new Error(MOTIVOS_DA_COLETA[motivo] ?? 'A coleta não foi agendada.');
-  }
-
-  return {
-    lote: String(bruto.lote),
-    rotulo: String(bruto.rotulo ?? ''),
-    fonte: String(bruto.fonte ?? ''),
-    maxPaginas: Number(bruto.max_paginas) || 1,
-  };
-}
 
 // ===========================================================================
 // OS PESOS DA TRIAGEM (migração 20260917180000)

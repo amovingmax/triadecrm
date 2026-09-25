@@ -44,11 +44,10 @@ export function EsqueletoDaFila() {
 }
 
 /**
- * Não há candidato nenhum na fila. Fila vazia aqui não quer dizer defeito: pode
- * ser que tudo já tenha sido revisado, ou que ninguém tenha agendado coleta. Quem
- * separa esses dois casos do "coletor caiu" é o painel do coletor, no topo da
- * tela — por isso o texto daqui não especula sobre o robô, e aponta o caminho que
- * funciona sempre, que é cadastrar à mão.
+ * Não há candidato nenhum na fila. Fila vazia aqui não quer dizer defeito: quer
+ * dizer que tudo que entrou já foi decidido. Quem enche a fila é a importação —
+ * cada linha do CSV que a esteira não resolveu sozinha —, então o caminho que o
+ * vazio oferece é o que produz fila, e não o que a explica.
  */
 export function FilaVazia({ aoCadastrar }: { aoCadastrar: (() => void) | null }) {
   return (
@@ -57,8 +56,8 @@ export function FilaVazia({ aoCadastrar }: { aoCadastrar: (() => void) | null })
       titulo="Nenhum candidato esperando revisão"
       texto={
         aoCadastrar
-          ? 'Ou tudo já foi revisado, ou nenhuma coleta trouxe alvo novo. O estado do coletor está no painel acima. O que você achar na mão entra por aqui e passa pela mesma revisão.'
-          : 'Ou tudo já foi revisado, ou nenhuma coleta trouxe alvo novo. O estado do coletor está no painel acima. Quem cadastra candidato é o time comercial.'
+          ? 'Tudo que entrou já foi decidido. A fila enche quando alguém importa uma lista e a esteira não resolve a linha sozinha — e o que você achar na mão entra por aqui e passa pela mesma revisão.'
+          : 'Tudo que entrou já foi decidido. A fila enche quando alguém importa uma lista e a esteira não resolve a linha sozinha. Quem cadastra candidato é o time comercial.'
       }
     >
       {aoCadastrar ? (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,8 +11,6 @@ import { formatarNumero } from '@/components/parceiros/formatos';
 
 import { BarraDaFila } from './barra-fila';
 import { CartaoCandidato } from './cartao-candidato';
-import { AgendarColeta } from './agendar-coleta';
-import { CatalogoDeFontes } from './catalogo-fontes';
 import { PedirLeituraDaIa } from './pedir-leitura-da-ia';
 import { PesosDaTriagem } from './pesos-da-triagem';
 import {
@@ -24,12 +22,10 @@ import {
   revisarCandidato,
   type AcaoDeRevisao,
 } from './dados';
-import { SeletorDeAba } from '@/components/ui/abas';
 
 import { DialogoDeDecisao } from './dialogo-decisao';
 import { ErroDaFila, EsqueletoDaFila, FilaVazia, VazioPorFiltroDaFila } from './estados';
 import { FolhaDeCandidato } from './folha-candidato';
-import { PainelDoColetor } from './painel-coletor';
 import {
   FILTROS_INICIAIS,
   POR_PAGINA,
@@ -40,19 +36,17 @@ import {
   type FiltrosDaFila,
 } from './tipos';
 
-type Aba = 'fila' | 'fontes';
-
 /** Lista vazia estável, para não trocar a identidade de `data` a cada renderização. */
 const SEM_LINHAS: CandidatoDaFila[] = [];
 
 /**
- * O Radar (PRD §7.3, RF-RAD-*).
+ * A Revisão (PRD §7.3, RF-RAD-*).
  *
- * Três coisas, nesta ordem de importância: trabalhar a fila de revisão, mostrar o
- * catálogo das fontes com a avaliação legal de cada uma e dizer se o coletor está
- * de pé — este último em uma linha recolhida, porque ele existe para que "fila
- * vazia" e "robô desligado" não desenhem a mesma tela, e não para ser lido todo
- * dia.
+ * Uma coisa só: trabalhar a fila de quem ainda não é parceiro, venha de onde
+ * vier. Em 25/09/2026 saíram o catálogo de fontes e o painel do coletor, e com
+ * uma superfície só a aba virou moldura vazia — quem enche esta fila é a
+ * importação, e a pergunta "o robô está de pé?" mudou de casa para
+ * Ajustes → Atendimento.
  *
  * A fila, a criação e a decisão moram no Postgres (`radar_fila`,
  * `radar_criar_candidato`, `radar_revisar_candidato`): aqui só ficam o recorte
@@ -60,13 +54,10 @@ const SEM_LINHAS: CandidatoDaFila[] = [];
  */
 export function TelaRevisao({
   catalogos,
-  abaInicial = 'fila',
   podeDecidir,
   podeAjustarTriagem,
 }: {
   catalogos: CatalogosDoRadar;
-  /** Veio de `/radar?aba=fontes`: um link para a regra de uma fonte abre nela. */
-  abaInicial?: Aba;
   /**
    * Papéis que trabalham a fila. A autorização de verdade é o RLS.
    *
@@ -79,17 +70,6 @@ export function TelaRevisao({
   podeAjustarTriagem: boolean;
 }) {
   const clienteDeConsultas = useQueryClient();
-  const [aba, setAba] = useState<Aba>(abaInicial);
-
-  // A aba acompanha a URL por replaceState: sem entrada nova no histórico (voltar
-  // tem de sair do Radar, não desfazer troca de aba) e sem ida ao servidor. Assim o
-  // endereço do catálogo de fontes pode ser mandado no grupo.
-  useEffect(() => {
-    const alvo = `${window.location.pathname}${aba === 'fontes' ? '?aba=fontes' : ''}`;
-    if (alvo !== `${window.location.pathname}${window.location.search}`) {
-      window.history.replaceState(null, '', alvo);
-    }
-  }, [aba]);
   const [filtros, setFiltros] = useState<FiltrosDaFila>(FILTROS_INICIAIS);
   const [folhaAberta, setFolhaAberta] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -104,7 +84,6 @@ export function TelaRevisao({
     queryKey: chaveDaFila(filtros),
     queryFn: () => buscarFila(filtros),
     placeholderData: keepPreviousData,
-    enabled: aba === 'fila',
   });
 
   const mudar = useCallback((parcial: Partial<FiltrosDaFila>) => {
@@ -192,12 +171,12 @@ export function TelaRevisao({
     <div className="flex w-full flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">Radar</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">Revisão</h1>
           <p className="text-sm text-muted-foreground">
             {resumo.isPending ? (
               'Carregando...'
             ) : novos === null ? (
-              'O seu acesso não trabalha a fila do Radar.'
+              'O seu acesso não trabalha a fila de revisão.'
             ) : novos === 0 ? (
               'Nenhum candidato esperando revisão.'
             ) : (
@@ -210,13 +189,13 @@ export function TelaRevisao({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* "Coletar agora" é de admin e gestor, como ligar fonte: a coleta gasta
-              o limite que a fonte nos concede e responde pelo robots.txt (R03,
-              R06 §3). O banco recusa de todo jeito — este `if` existe para não
+          {/* Pedir leitura da IA e mexer nos pesos da triagem são de admin e
+              gestor. O banco recusa de todo jeito — este `if` existe para não
               oferecer um botão que sempre erra. */}
           {podeAjustarTriagem ? <PedirLeituraDaIa className="hidden md:inline-flex" /> : null}
-          {podeAjustarTriagem ? <PesosDaTriagem catalogos={catalogos} className="hidden md:inline-flex" /> : null}
-          {podeAjustarTriagem ? <AgendarColeta className="hidden md:inline-flex" /> : null}
+          {podeAjustarTriagem ? (
+            <PesosDaTriagem catalogos={catalogos} className="hidden md:inline-flex" />
+          ) : null}
           {podeDecidir ? (
             <Button onClick={() => setFolhaAberta(true)} className="toque hidden md:inline-flex">
               <Plus aria-hidden="true" />
@@ -226,36 +205,7 @@ export function TelaRevisao({
         </div>
       </header>
 
-      {/* Uma linha, não um painel. A telemetria do robô — batida, host, versão, quatro
-          contadores de fila, últimas coletas — abria o Radar por cima da fila: com 42
-          candidatos esperando decisão, a primeira coisa que a pessoa lia era o estado
-          de uma máquina desligada. A fila é o trabalho; o robô é nota de rodapé, e
-          agora se apresenta como uma (o veredito no título, o resto a um clique).
-
-          Continua ACIMA da fila, e não no pé da aba Fontes, por causa de quem depende
-          dele: `FilaVazia` (estados.tsx) manda procurar o estado do coletor "no painel
-          acima", e é exatamente com a fila vazia que a diferença entre "tudo revisado"
-          e "o robô caiu" decide o dia. Mudar de lugar sem mexer naquele texto trocaria
-          um painel grande demais por uma indicação errada. */}
-      <PainelDoColetor />
-
-      {/* Duas superfícies, não duas páginas: quem revisa precisa checar a regra de uma
-          fonte sem perder o recorte da fila. */}
-      <SeletorDeAba
-        rotulo="Seções do Radar"
-        ativo={aba}
-        aoTrocar={setAba}
-        itens={[
-          { id: 'fila', rotulo: 'Fila de revisão' },
-          { id: 'fontes', rotulo: 'Fontes', contagem: resumo.data?.fontes_total ?? null },
-        ]}
-      />
-
-      {aba === 'fontes' ? (
-        <CatalogoDeFontes podeLigar={podeAjustarTriagem} podeColetar={podeDecidir} />
-      ) : (
-        <>
-          <BarraDaFila
+      <BarraDaFila
             filtros={filtros}
             fontes={catalogos.origens}
             categorias={catalogos.categorias}
@@ -265,7 +215,7 @@ export function TelaRevisao({
           />
 
           <section
-            aria-label="Fila de revisão do Radar"
+            aria-label="Fila de revisão"
             className={cn(
               'border-t border-hairline',
               podeDecidir && 'pb-20 md:pb-0',
@@ -326,20 +276,16 @@ export function TelaRevisao({
               }}
             />
           ) : null}
-        </>
-      )}
 
       {podeDecidir ? (
         <>
-          {aba === 'fila' ? (
-            <Button
-              onClick={() => setFolhaAberta(true)}
-              aria-label="Novo candidato"
-              className="toque sombra-base-forte fixed right-4 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] z-40 size-14 rounded-full ring-4 ring-background md:hidden"
-            >
-              <Plus className="size-5" aria-hidden="true" />
-            </Button>
-          ) : null}
+          <Button
+            onClick={() => setFolhaAberta(true)}
+            aria-label="Novo candidato"
+            className="toque sombra-base-forte fixed right-4 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] z-40 size-14 rounded-full ring-4 ring-background md:hidden"
+          >
+            <Plus className="size-5" aria-hidden="true" />
+          </Button>
 
           <FolhaDeCandidato
             aberta={folhaAberta}

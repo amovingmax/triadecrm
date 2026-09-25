@@ -75,8 +75,11 @@ export function BarraDaFila({
             </SelectContent>
           </Select>
 
+          {/* "Origem", e não "Fonte": a lista vem de `public.sources` INTEIRA
+              (catalogos.ts), ligadas e desligadas — é assim que se acha
+              candidato antigo, de uma origem que já não recebe ninguém. */}
           <FiltroLista
-            rotulo="Fonte"
+            rotulo="Origem"
             valor={filtros.fonteId}
             aoMudar={(v) => aoMudar({ fonteId: v, pagina: 1 })}
             opcoes={fontes.map((f) => ({ valor: f.id, rotulo: f.nome }))}
