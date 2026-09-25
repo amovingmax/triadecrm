@@ -80,7 +80,11 @@ export function TelaAdmin({
         <PainelAtendimento podeEditar={sessao.papel === 'admin' || sessao.papel === 'gestor'} />
       ) : null}
       {aba === 'catalogos' ? (
-        <PainelCatalogos secao={catalogo} aoTrocarSecao={setCatalogo} />
+        <PainelCatalogos
+          secao={catalogo}
+          aoTrocarSecao={setCatalogo}
+          podeEsquecer={sessao.papel === 'admin' || sessao.papel === 'gestor'}
+        />
       ) : null}
       {aba === 'lgpd' ? <PainelLgpd sessao={sessao} secao={lgpd} aoTrocarSecao={setLgpd} /> : null}
     </div>

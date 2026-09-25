@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 
 import { ChipsDeSecao } from './abas';
+import { PainelDePara } from './painel-de-para';
 import { DialogoConfirmar } from './confirmar';
 import {
   adicionarFeriado,
@@ -90,9 +91,12 @@ import {
 export function PainelCatalogos({
   secao,
   aoTrocarSecao,
+  podeEsquecer,
 }: {
   secao: SecaoCatalogo;
   aoTrocarSecao: (secao: SecaoCatalogo) => void;
+  /** Espelho de `app.is_manager()`: quem esquece uma regra aprendida do de-para. */
+  podeEsquecer: boolean;
 }) {
   const clienteDeConsultas = useQueryClient();
 
@@ -178,6 +182,9 @@ export function PainelCatalogos({
   const dados = consulta.data;
   const contagens: Record<SecaoCatalogo, number> = {
     categorias: dados.categorias.length,
+    // O de-para carrega sozinho, quando é aberto: são 18 linhas por fonte e não
+    // faz sentido buscá-las para mostrar um número na pílula.
+    de_para: 0,
     cidades: dados.cidades.length,
     feriados: dados.feriados.length,
     motivos: dados.motivos.length,
@@ -194,7 +201,8 @@ export function PainelCatalogos({
         itens={SECOES_CATALOGO.map((id) => ({
           id,
           rotulo: ROTULO_CATALOGO[id],
-          contagem: contagens[id],
+          // O de-para carrega sozinho quando é aberto, e não tem contagem aqui.
+          contagem: id === 'de_para' ? undefined : contagens[id],
         }))}
       />
 
@@ -212,6 +220,8 @@ export function PainelCatalogos({
           }
         />
       ) : null}
+
+      {secao === 'de_para' ? <PainelDePara podeEsquecer={podeEsquecer} /> : null}
 
       {secao === 'cidades' ? (
         <SecaoCidades

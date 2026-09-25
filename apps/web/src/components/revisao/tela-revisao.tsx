@@ -20,6 +20,7 @@ import {
   chaveDaFila,
   mensagemDoErro,
   MOTIVO_DA_REVISAO,
+  irmasPeloRotulo,
   revisarCandidato,
   revisarLote,
   type AcaoDeRevisao,
@@ -92,6 +93,21 @@ export function TelaRevisao({
 
   const resumo = useQuery({ queryKey: ['radar', 'resumo'], queryFn: buscarResumo });
 
+  /**
+   * Quantos outros nomes na fila vieram com o mesmo rótulo do que está no
+   * diálogo. Só é perguntado quando o diálogo abre em "aprovar" e o candidato
+   * tem rótulo: é uma consulta por clique, e não por cartão.
+   */
+  const irmasDoDialogo = useQuery({
+    queryKey: ['radar', 'irmas', decisao?.candidato.id ?? null],
+    queryFn: () => irmasPeloRotulo(decisao!.candidato.id),
+    enabled:
+      decisao !== null &&
+      decisao.acao === 'aprovar' &&
+      decisao.candidato.categoria_na_fonte !== null,
+  });
+  const irmas = decisao === null ? null : (irmasDoDialogo.data ?? null);
+
   const fila = useQuery({
     queryKey: chaveDaFila(filtros),
     queryFn: () => buscarFila(filtros),
@@ -116,7 +132,12 @@ export function TelaRevisao({
     async (
       candidato: CandidatoDaFila,
       acao: AcaoDeRevisao,
-      extra: { organizacaoId?: string; categoriaId?: number | null; motivo?: string | null } = {},
+      extra: {
+        organizacaoId?: string;
+        categoriaId?: number | null;
+        motivo?: string | null;
+        aprenderAgora?: boolean;
+      } = {},
     ) => {
       setOcupado(candidato.id);
       try {
@@ -126,6 +147,7 @@ export function TelaRevisao({
           organizacaoId: extra.organizacaoId ?? null,
           categoriaId: extra.categoriaId ?? candidato.categoria_id,
           motivo: extra.motivo ?? null,
+          aprenderAgora: extra.aprenderAgora ?? false,
         });
 
         if (!resposta.ok) {
@@ -137,9 +159,17 @@ export function TelaRevisao({
 
         setDecisao(null);
         if (resposta.situacao === 'aprovado') {
-          toast.success(`${candidato.nome} virou parceiro.`, {
-            description: `${candidato.nome} entrou no funil com "Primeiro contato" marcado para o próximo dia útil.`,
-          });
+          const juntos = resposta.irmasAprovadas ?? 0;
+          toast.success(
+            juntos > 0
+              ? `${candidato.nome} e mais ${formatarNumero(juntos)} viraram parceiro.`
+              : `${candidato.nome} virou parceiro.`,
+            {
+              description: resposta.virouRegra
+                ? `Entraram no funil com "Primeiro contato" no próximo dia útil. E o CRM passou a reconhecer “${candidato.categoria_na_fonte}” sozinho.`
+                : `${candidato.nome} entrou no funil com "Primeiro contato" marcado para o próximo dia útil.`,
+            },
+          );
         } else if (resposta.situacao === 'mesclado') {
           toast.success('Mesclado com a ficha existente.', {
             description: 'Só os campos que estavam vazios foram completados.',
@@ -458,9 +488,14 @@ export function TelaRevisao({
             categorias={catalogos.categorias}
             ocupado={ocupado !== null}
             aoFechar={() => setDecisao(null)}
-            aoConfirmar={({ categoriaId, motivo }) => {
+            irmas={irmas}
+            aoConfirmar={({ categoriaId, motivo, aprenderAgora }) => {
               if (!decisao) return;
-              void enviarDecisao(decisao.candidato, decisao.acao, { categoriaId, motivo });
+              void enviarDecisao(decisao.candidato, decisao.acao, {
+                categoriaId,
+                motivo,
+                aprenderAgora,
+              });
             }}
           />
         </>

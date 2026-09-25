@@ -3399,6 +3399,34 @@ Fotógrafo 10 → **13**; buffet 3 → **17**. Sobram 9 na fila (6 fotógrafo + 
 
 **Suíte:** pgTAP **3.042 asserções em 71 arquivos** (eram 3.028 em 69); web **832 testes em 55** (eram 814 em 52); workers 363 em 24; prompts 276; schema 105. `pnpm db:lint` sem apontamento novo, `pnpm db:types` com uma linha a mais (`categoria_na_fonte`), lint e typecheck verdes.
 
+## Importar sem fila — terceira leva (25/09/2026)
+
+O portão das tarefas 9 e 10 foi aberto com o plano próprio que ele exigia: `docs/superpowers/plans/2026-09-25-aprendizado-e-ia.md`. A decisão 2 do Rafael punha a IA **depois** que o de-para e a tela de resolver estivessem de pé — e estão, junto com o aprovar em lote.
+
+### Tarefa 9 — O CRM aprende com quem escolhe na fila
+
+Migração `20261001140000`. Quando alguém escolhe a categoria de um nome na fila, o CRM sabe três coisas: a fonte, o texto que a fonte usou e a categoria escolhida. É uma linha de `source_category_map` pronta, e até hoje era jogada fora — na importação seguinte, o mesmo rótulo do Google voltava a parar na fila.
+
+**Onde isto mora, e por que não é um gatilho de tabela.** `app.promover_candidato` também é chamada por `public.importacao_gravar`, onde a categoria veio do **próprio mapa**: ali não há nada que aprender, seria reescrever a regra com ela mesma. Um gatilho não sabe a diferença. Por isso o ponto é dentro de `public.radar_revisar_candidato`, no caminho `aprovar`, depois de `promover_candidato` voltar ok — **só se aprende onde uma pessoa escolheu**.
+
+**E nada escreve direto no mapa: propõe.** `public.source_category_proposta` acumula, e os cinco freios decidem se vira regra:
+
+1. **Nunca no primeiro clique.** Três escolhas, ou duas de **pessoas diferentes** — `quem` é um array, e não um contador, justamente para distinguir "duas pessoas concordaram" de "a mesma pessoa clicou duas vezes".
+2. **Discordância congela.** Proposta concorrente viva para a mesma chave: nada promove, e um humano desempata. É o *"revisão humana quando empatar"* do RF-RAD-06.
+3. **Vale só para frente** — e vale porque a função simplesmente não toca em `organizations`.
+4. **Um desfazer**, com o estrago à vista: `public.source_category_regras` lista cada regra com quem ensinou, quando, com quantas escolhas atrás e **quantas fichas ela criou**. Regra **semeada** não sai pela tela: ela é decisão de produto e volta na próxima publicação.
+5. **`audit_log` em toda promoção.**
+
+**Um sexto, que não estava no desenho e o teste exigiu:** o **lote não conta como N decisões**. `radar_revisar_lote` passa `p_propor => false`. Sem isso, aprovar 30 nomes num clique encheria o contador de uma vez e promoveria a regra na hora — o freio 1 viraria enfeite, e bastaria marcar tudo e apertar para ensinar ao CRM qualquer coisa.
+
+**O atalho que resolve a fila de hoje:** no diálogo de aprovar, *"Valer para os outros 5 que também vieram como 'Buffet infantil'"*. **Desmarcada por padrão.** Marcada, ela pula o contador — consentimento explícito vale mais que contagem, mas só quando é explícito — grava a regra na hora e aprova os outros pelo **mesmo caminho do cartão** (`radar_revisar_lote`). O número vem de um `count` real (`public.radar_irmas_pelo_rotulo`): prometer 5 e mexer em 9 seria pior que não oferecer.
+
+`app.categoria_na_fonte_do_candidato` é a junção `(source_id, external_id)` escrita **uma vez** e usada em três lugares — `category_source` mora em `source_record`, e não em `supplier_candidates`.
+
+A tela nova fica em **Admin → Catálogos → De-para das fontes**.
+
+pgTAP `81_o_crm_aprende_com_quem_escolhe.sql` (14 asserções), uma por freio, incluindo a que separa "dois cliques da mesma pessoa" de "duas pessoas concordando".
+
 ## Importar sem fila — segunda leva (25/09/2026)
 
 ### Tarefa 5 — As 36 caixinhas viram um recibo

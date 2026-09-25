@@ -893,3 +893,77 @@ export async function buscarFreios(): Promise<Freios | null> {
     },
   };
 }
+
+
+// ---------------------------------------------------------------------------
+// O de-para de categoria da fonte (RF-RAD-06)
+// ---------------------------------------------------------------------------
+
+/** Uma regra do de-para, com proveniência e o que ela rendeu. */
+export type RegraDoDePara = {
+  fonteId: number;
+  fonte: string;
+  nomeNaFonte: string;
+  categoriaId: number;
+  categoria: string;
+  origem: 'semeado' | 'aprendido';
+  quem: string | null;
+  aprendidoEm: string | null;
+  /** Quantas escolhas humanas sustentam a regra. Zero para a semeada. */
+  vezes: number;
+  /** Quantas fichas nasceram por causa dela, DEPOIS de ela existir. */
+  fichas: number;
+};
+
+export async function carregarRegrasDoDePara(): Promise<RegraDoDePara[]> {
+  const supabase = createClient();
+  // Sem `p_source_id`: o argumento é opcional no banco e o tipo gerado não
+  // aceita nulo — mandar nulo faz o retorno virar `any` e a tipagem some.
+  const { data, error } = await supabase.rpc('source_category_regras');
+  if (error) throw error;
+  // O tipo tabular gerado chega como `never[]` quando o argumento opcional não
+  // é passado; a forma está garantida pelo `returns table` da migração.
+  const linhas = (data ?? []) as Array<{
+    source_id: number;
+    fonte: string | null;
+    category_source: string;
+    category_id: number;
+    categoria: string | null;
+    origem: string | null;
+    quem: string | null;
+    aprendido_em: string | null;
+    vezes: number | null;
+    fichas: number | null;
+  }>;
+  return linhas.map((r) => ({
+    fonteId: r.source_id,
+    fonte: r.fonte ?? '',
+    nomeNaFonte: r.category_source,
+    categoriaId: r.category_id,
+    categoria: r.categoria ?? '',
+    origem: r.origem === 'aprendido' ? 'aprendido' : 'semeado',
+    quem: r.quem,
+    aprendidoEm: r.aprendido_em,
+    vezes: r.vezes ?? 0,
+    fichas: r.fichas ?? 0,
+  }));
+}
+
+/**
+ * Apaga uma regra APRENDIDA e a proposta que a sustentava.
+ *
+ * Regra semeada não sai por aqui: ela é decisão de produto e sai por migração —
+ * apagá-la pela tela faria a próxima publicação trazê-la de volta sem aviso.
+ * Fichas já criadas não são tocadas: a regra valia para frente, e desfazê-la
+ * também.
+ */
+export async function esquecerRegraDoDePara(fonteId: number, nomeNaFonte: string): Promise<void> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('source_category_esquecer', {
+    p_source_id: fonteId,
+    p_texto: nomeNaFonte,
+  });
+  if (error) throw error;
+  const r = (data ?? {}) as { ok?: boolean; reason?: string };
+  if (r.ok !== true) throw new Error(`recusado:${r.reason ?? 'desconhecido'}`);
+}

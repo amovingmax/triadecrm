@@ -132,7 +132,15 @@ export async function criarCandidato(v: NovoCandidato): Promise<RespostaDeCriaca
 export type AcaoDeRevisao = 'aprovar' | 'mesclar' | 'recusar' | 'nao_contatar';
 
 export type RespostaDeRevisao =
-  | { ok: true; situacao: string; organizacaoId: string | null }
+  | {
+      ok: true;
+      situacao: string;
+      organizacaoId: string | null;
+      /** Quantos outros o "valer para os outros N" aprovou junto. */
+      irmasAprovadas?: number;
+      /** A escolha virou regra do de-para agora? */
+      virouRegra?: boolean;
+    }
   | { ok: false; motivo: string; organizacaoId: string | null };
 
 export async function revisarCandidato(args: {
@@ -141,6 +149,14 @@ export async function revisarCandidato(args: {
   organizacaoId?: string | null;
   categoriaId?: number | null;
   motivo?: string | null;
+  /**
+   * "Valer para os outros N que também vieram como X."
+   *
+   * Grava a regra do de-para na hora, pulando o contador dos cinco freios, e
+   * aprova os outros pelo mesmo caminho do cartão. Consentimento explícito vale
+   * mais que contagem — mas só quando é explícito, e por isso o padrão é falso.
+   */
+  aprenderAgora?: boolean;
 }): Promise<RespostaDeRevisao> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc('radar_revisar_candidato', {
@@ -149,6 +165,7 @@ export async function revisarCandidato(args: {
     p_organization_id: args.organizacaoId ?? null,
     p_category_id: args.categoriaId ?? null,
     p_reason: args.motivo ?? null,
+    p_aprender_agora: args.aprenderAgora ?? false,
   });
 
   if (error) throw new Error(error.message);
@@ -156,9 +173,28 @@ export async function revisarCandidato(args: {
   const r = objeto(data);
   const organizacaoId = texto(r.organization_id);
   if (r.ok === true) {
-    return { ok: true, situacao: texto(r.status) ?? 'revisado', organizacaoId };
+    const irmas = objeto(r.irmas);
+    const aprendizado = objeto(r.aprendizado);
+    return {
+      ok: true,
+      situacao: texto(r.status) ?? 'revisado',
+      organizacaoId,
+      irmasAprovadas: typeof irmas.aprovados === 'number' ? irmas.aprovados : 0,
+      virouRegra: aprendizado.virou_regra === true,
+    };
   }
   return { ok: false, motivo: texto(r.reason) ?? 'desconhecido', organizacaoId };
+}
+
+/** Quantos outros nomes na fila vieram com o mesmo rótulo da fonte. */
+export async function irmasPeloRotulo(candidatoId: string): Promise<number> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('radar_irmas_pelo_rotulo', {
+    p_candidate_id: candidatoId,
+  });
+  if (error) throw new Error(error.message);
+  const r = objeto(data);
+  return typeof r.outros === 'number' ? r.outros : 0;
 }
 
 /** O que voltou de um lote: a conta, e o motivo de cada um que não passou. */

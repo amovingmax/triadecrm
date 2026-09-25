@@ -36,10 +36,18 @@ export const ABAS: readonly { id: Aba; rotulo: string; descricao: string }[] = [
 
 /** Seções da aba de catálogos. A ordem é a do uso diário, não a alfabética. */
 export type SecaoCatalogo =
-  'categorias' | 'cidades' | 'feriados' | 'motivos' | 'desfechos' | 'modelos';
+  | 'categorias'
+  /** O de-para de categoria de cada fonte, com o que o CRM aprendeu sozinho. */
+  | 'de_para'
+  | 'cidades'
+  | 'feriados'
+  | 'motivos'
+  | 'desfechos'
+  | 'modelos';
 
 export const SECOES_CATALOGO: readonly SecaoCatalogo[] = [
   'categorias',
+  'de_para',
   'cidades',
   'feriados',
   'motivos',
@@ -49,6 +57,7 @@ export const SECOES_CATALOGO: readonly SecaoCatalogo[] = [
 
 export const ROTULO_CATALOGO: Record<SecaoCatalogo, string> = {
   categorias: 'Categorias',
+  de_para: 'De-para das fontes',
   cidades: 'Cidades',
   feriados: 'Feriados',
   motivos: 'Motivos de perda',

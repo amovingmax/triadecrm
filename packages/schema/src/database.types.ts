@@ -145,6 +145,10 @@ export type Database = {
         }[]
       }
       can_write: { Args: never; Returns: boolean }
+      categoria_na_fonte_do_candidato: {
+        Args: { p_candidate_id: string }
+        Returns: string
+      }
       categoria_por_radical: { Args: { p_nome: string }; Returns: number }
       chave_catalogo: { Args: { t: string }; Returns: string }
       cnpj_is_valid: { Args: { c: string }; Returns: boolean }
@@ -600,6 +604,16 @@ export type Database = {
           p_next_action_at?: string
           p_owner_id?: string
           p_stage_id?: number
+        }
+        Returns: Json
+      }
+      propor_categoria_da_fonte: {
+        Args: {
+          p_agora?: boolean
+          p_category_id: number
+          p_quem: string
+          p_source_id: number
+          p_texto: string
         }
         Returns: Json
       }
@@ -6145,18 +6159,27 @@ export type Database = {
       }
       source_category_map: {
         Row: {
+          aprendido_em: string | null
+          aprendido_por: string | null
           category_id: number
           category_source: string
+          origem: string
           source_id: number
         }
         Insert: {
+          aprendido_em?: string | null
+          aprendido_por?: string | null
           category_id: number
           category_source: string
+          origem?: string
           source_id: number
         }
         Update: {
+          aprendido_em?: string | null
+          aprendido_por?: string | null
           category_id?: number
           category_source?: string
+          origem?: string
           source_id?: number
         }
         Relationships: [
@@ -6169,6 +6192,54 @@ export type Database = {
           },
           {
             foreignKeyName: "source_category_map_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_category_proposta: {
+        Row: {
+          category_id: number
+          category_source: string
+          primeira_em: string
+          quem: string[]
+          source_id: number
+          ultima_em: string
+          vezes: number
+          virou_regra_em: string | null
+        }
+        Insert: {
+          category_id: number
+          category_source: string
+          primeira_em?: string
+          quem?: string[]
+          source_id: number
+          ultima_em?: string
+          vezes?: number
+          virou_regra_em?: string | null
+        }
+        Update: {
+          category_id?: number
+          category_source?: string
+          primeira_em?: string
+          quem?: string[]
+          source_id?: number
+          ultima_em?: string
+          vezes?: number
+          virou_regra_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_category_proposta_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_category_proposta_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "sources"
@@ -8052,14 +8123,20 @@ export type Database = {
           total_count: number
         }[]
       }
+      radar_irmas_pelo_rotulo: {
+        Args: { p_candidate_id: string }
+        Returns: Json
+      }
       radar_repontuar: { Args: never; Returns: Json }
       radar_resumo: { Args: never; Returns: Json }
       radar_revisar_candidato: {
         Args: {
           p_acao: string
+          p_aprender_agora?: boolean
           p_candidate_id: string
           p_category_id?: number
           p_organization_id?: string
+          p_propor?: boolean
           p_reason?: string
         }
         Returns: Json
@@ -8370,6 +8447,26 @@ export type Database = {
           stage: string
           temperature: Database["app"]["Enums"]["temperature"]
           total_count: number
+        }[]
+      }
+      source_category_esquecer: {
+        Args: { p_source_id: number; p_texto: string }
+        Returns: Json
+      }
+      source_category_regras: {
+        Args: { p_source_id?: number }
+        Returns: {
+          aprendido_em: string
+          aprendido_por: string
+          categoria: string
+          category_id: number
+          category_source: string
+          fichas: number
+          fonte: string
+          origem: string
+          quem: string
+          source_id: number
+          vezes: number
         }[]
       }
       tabular_chamada: {

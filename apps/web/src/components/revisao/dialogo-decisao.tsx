@@ -39,13 +39,25 @@ export function DialogoDeDecisao({
   ocupado,
   aoFechar,
   aoConfirmar,
+  irmas,
 }: {
   candidato: CandidatoDaFila | null;
   acao: Exclude<AcaoDeRevisao, 'mesclar'>;
   categorias: OpcaoCategoriaRadar[];
   ocupado: boolean;
   aoFechar: () => void;
-  aoConfirmar: (dados: { categoriaId: number | null; motivo: string | null }) => void;
+  aoConfirmar: (dados: {
+    categoriaId: number | null;
+    motivo: string | null;
+    aprenderAgora?: boolean;
+  }) => void;
+  /**
+   * Quantos OUTROS nomes na fila vieram com o mesmo rótulo da fonte.
+   *
+   * `null` enquanto o banco não respondeu. Zero esconde a caixinha: oferecer
+   * "valer para os outros 0" é ruído.
+   */
+  irmas: number | null;
 }) {
   return (
     <Dialog open={candidato !== null} onOpenChange={(v) => !v && aoFechar()}>
@@ -62,6 +74,7 @@ export function DialogoDeDecisao({
             ocupado={ocupado}
             aoFechar={aoFechar}
             aoConfirmar={aoConfirmar}
+            irmas={irmas}
           />
         ) : null}
       </DialogContent>
@@ -76,19 +89,40 @@ function Conteudo({
   ocupado,
   aoFechar,
   aoConfirmar,
+  irmas,
 }: {
   candidato: CandidatoDaFila;
   acao: Exclude<AcaoDeRevisao, 'mesclar'>;
   categorias: OpcaoCategoriaRadar[];
   ocupado: boolean;
   aoFechar: () => void;
-  aoConfirmar: (dados: { categoriaId: number | null; motivo: string | null }) => void;
+  aoConfirmar: (dados: {
+    categoriaId: number | null;
+    motivo: string | null;
+    aprenderAgora?: boolean;
+  }) => void;
+  /**
+   * Quantos OUTROS nomes na fila vieram com o mesmo rótulo da fonte.
+   *
+   * `null` enquanto o banco não respondeu. Zero esconde a caixinha: oferecer
+   * "valer para os outros 0" é ruído.
+   */
+  irmas: number | null;
 }) {
   const idCategoria = useId();
   const idMotivo = useId();
   const [categoriaId, setCategoriaId] = useState<number | null>(candidato.categoria_id);
   const [motivo, setMotivo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+  /**
+   * DESMARCADA POR PADRÃO, e isso é o desenho.
+   *
+   * Marcar grava a regra do de-para na hora, pulando o contador dos cinco
+   * freios — consentimento explícito vale mais que contagem, mas só quando é
+   * explícito. Nascer marcada transformaria um clique distraído numa regra
+   * permanente que cria ficha errada para sempre.
+   */
+  const [aprenderAgora, setAprenderAgora] = useState(false);
 
   const recusa = acao !== 'aprovar';
 
@@ -101,7 +135,11 @@ function Conteudo({
       setErro('Escreva o motivo: quem abrir esse registro depois precisa entender a decisão.');
       return;
     }
-    aoConfirmar({ categoriaId, motivo: recusa ? motivo.trim() : null });
+    aoConfirmar({
+      categoriaId,
+      motivo: recusa ? motivo.trim() : null,
+      aprenderAgora: !recusa && aprenderAgora,
+    });
   }
 
   return (
@@ -164,6 +202,28 @@ function Conteudo({
             />
           </div>
         )}
+
+        {/* "Valer para os outros N": o número vem de um `count` real no banco
+            (`public.radar_irmas_pelo_rotulo`). Prometer 5 e mexer em 9 seria
+            pior que não oferecer. */}
+        {!recusa && candidato.categoria_na_fonte && irmas !== null && irmas > 0 ? (
+          <label className="flex max-w-prose items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={aprenderAgora}
+              onChange={(e) => setAprenderAgora(e.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-foreground"
+            />
+            <span>
+              Valer para {irmas === 1 ? 'o outro' : `os outros ${irmas}`} que também{' '}
+              {irmas === 1 ? 'veio' : 'vieram'} como “{candidato.categoria_na_fonte}”.{' '}
+              <span className="text-muted-foreground">
+                {irmas === 1 ? 'Ele vira' : 'Eles viram'} parceiro agora, e o CRM passa a
+                reconhecer esse nome sozinho nas próximas listas.
+              </span>
+            </span>
+          </label>
+        ) : null}
 
         {erro ? (
           <p role="alert" className="text-sm text-destructive-texto">
