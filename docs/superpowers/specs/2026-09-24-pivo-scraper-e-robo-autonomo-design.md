@@ -1055,3 +1055,745 @@ Numeração de teste pgTAP, para não colidir:[^4] **66** o CSV do Maps · **67*
 [^6]: **Quantas intenções nascem cadastradas.** A §2.2 listava 9 (incluindo `NAO_E_A_PESSOA`); a §6.4 listava 8. **Escolha: 8.** `NAO_E_A_PESSOA` cai para pessoa pela regra dura de que *o robô não preenche variável*: a resposta útil nomeia a empresa, e uma versão sem nome é vaga o bastante para queimar o contato. Todas as 8 nascem com `robo_responde = false`; `PEDIU_TAXA_PRECO` continua desligada mesmo depois da aprovação, até a régua de custo fechar (§12, item 3).
 
 [^7]: **A mensagem de ausência.** A decisão 4 de Rafael e a §2.2 diziam "sai de cena" (`ausencia_ativa: false`, modelos a `is_active=false`); a §6.7 dizia que o corpo é reescrito e a função continua rodando quando o árbitro decide `pessoa` e a janela está fechada. **Escolha: §6.7.** Desativar o `template_code` mataria `app.ausencia_responder` em silêncio (ela procura o modelo por código e usa o `id` dele como trava de 12 h) e quebraria `public.atendimento_configurar`, que escreve o `texto_ausencia` do gestor nesse mesmo código. A decisão de Rafael é honrada pelo conteúdo: **a mensagem de 22/09, que promete "a gente responde quando voltar", sai de cena** — o texto novo diz que a resposta é imediata e oferece HUMANO. `GEN-SYS-FORA-HORARIO` vai a `is_active=false`, e nada é apagado.
+
+---
+
+# Emenda de 25/09/2026 — a IA escreve, e marca a reunião
+
+## O que esta emenda revoga
+
+O **ADR-13** e a **§6** desta spec desenharam um robô que **escolhe** entre textos prontos: a IA classifica a intenção, o Postgres busca o `message_templates` daquela intenção e manda. Em 25/09/2026, depois de ler a §6, o Rafael mudou o desenho: *"a minha ideia com a IA é ela atuar dentro do CRM, aprendendo com nossas mensagens já existidas, ela dialogar com o lead como se fôssemos nós operando, e ela nos entregar num calendário do CRM (que eu quero que você implemente manualmente, sem google calendar, e integre com o envio de e-mail pra avisar que marcou reunião). quero tudo automatizado e preparado pela IA"*.
+
+Muda isto, e só isto: **a IA passa a redigir texto livre** no assunto do negócio, em vez de escolher entre oito textos aprovados; **a IA passa a marcar a reunião sozinha**, das 9h30 às 17h20, num calendário que é do CRM; e **a integração com o Google Agenda é apagada de vez**. O motivo é um só: texto pronto não dialoga, e agenda que mora fora do banco não pode ser consultada pelo Postgres, que é o cérebro (ADR-03).
+
+O que **não** muda por causa disso: o robô continua preso ao assunto Komune (política da Meta, não gosto nosso), o opt-out por regra continua vindo antes de qualquer modelo, e o freio da Fase 3 (orçamento, saúde do número, teto de recontato, teto de fala) continua valendo linha por linha — com texto livre ele fica mais necessário, não menos.
+
+---
+
+## ADR-14 — A IA redige texto livre no assunto do negócio
+
+**Linha da tabela do PRD §9.1** (colar depois do ADR-13):
+
+| ADR | Decisão | Alternativas | Justificativa / risco |
+|---|---|---|---|
+| ADR-14 | **A IA redige o que sai.** O robô deixa de escolher entre textos prontos e passa a escrever texto livre, em nome da equipe, **no assunto do negócio** (Komune, evento, fornecedor, reunião, preço, prazo), sem aprovação humana por mensagem. Quem segura não é uma pessoa: é um **validador determinístico de mundo fechado** — toda frase da mensagem precisa caber em um de cinco tipos (`fato`, `pergunta`, `cortesia`, `agenda`, `escape`), toda afirmação sobre a Komune precisa de `fatoId` da base, toda cortesia precisa bater **literalmente** com a voz da casa, e todo número precisa estar em `app.valores_autorizados`. A versão do validador fica gravada na linha que autorizou a saída. **Decisão de Rafael em 25/09/2026. Revoga o ADR-13 e altera o ADR-05**, que passa a valer só para o que uma pessoa decide mandar | (a) manter o ADR-13 (oito textos prontos, decisão de ontem); (b) texto livre com aprovação humana por mensagem, como hoje; (c) texto livre solto, sem validador | (a) não é diálogo: oito textos respondem oito perguntas e emudecem na nona. (b) é o de hoje, e o de hoje não responde à noite nem no domingo — que é quando o fornecedor de evento escreve. (c) é indefensável: a oferta vincula (CDC art. 30). O caminho do meio é fechar o mundo em vez de detectar o desvio — um detector precisa prever a paráfrase, um mundo fechado precisa que a frase caiba numa das cinco caixas. **Risco assumido, por escrito:** é a primeira vez desde o D2 que `app.messages_guard` é **afrouxado**; o ramo novo para `bot_ai` exige cinco condições e `approved_by` fica nulo, para que nenhuma mensagem automática pareça aprovada por gente. **Fronteira que não se move:** assistente de propósito geral continua **proibido** no WhatsApp desde 15/01/2026 (`docs/anexos/R04-whatsapp-automacao.md:59`) e derruba o número — "escreve sobre tudo" quer dizer sobre todo assunto **da conversa comercial**, nunca sobre todo assunto do mundo |
+
+**Texto longo, para o PRD §13, item 25:**
+
+> **25. A IA redige (ADR-14) — decisão de Rafael em 25/09/2026, revoga o ADR-13.**
+> O robô escreve texto livre no assunto Komune, 24 h por dia, sem revisão por mensagem. O que ele pode afirmar vem de `packages/prompts/src/nucleo/base-conhecimento.ts` e de nada mais; o que ele pode dizer de cortesia vem de `packages/prompts/src/nucleo/voz-da-casa.ts`, um arquivo de ~50 frases nossas, literais, lido e aprovado pelo Rafael num PR. O modelo é obrigado a quebrar a própria mensagem em frases e declarar o tipo de cada uma; frase sem tipo não sai. **Conteúdo reprovado não sai, ponto** — `situacao: 'bloqueado'` passa a ser terminal, e o rascunho fica guardado em `public.message_drafts` com o veredito inteiro, para quem abrir a caixa ver o que a IA quis dizer e por que não saiu. O robô **não assina com nome de gente**: escrever "Heloísa" numa mensagem que ela não escreveu é o defeito que esta spec já aponta em `app.envio_resposta_ao_botao` (§7, nota 1). Quem diz que é máquina é a frase de transparência, e ela também perde a assinatura.
+
+---
+
+## ADR-15 — O calendário é do CRM, sem Google
+
+| ADR | Decisão | Alternativas | Justificativa / risco |
+|---|---|---|---|
+| ADR-15 | **A reunião vira objeto do banco e a agenda do Google é apagada.** Nasce `public.reunioes`, com começo, fim, formato, lugar, estado, dono e uma **restrição de exclusão GiST** que proíbe duas reuniões vivas da mesma pessoa se sobreporem. Disponibilidade, grade, feriado, rota e teto diário passam a ser calculados em SQL (`app.reuniao_horarios_livres`). Saem do repositório as duas tabelas do Google, as 9 funções em `app`, os 9 invólucros em `public`, as 4 rotas de `apps/web/src/app/api/agenda/`, `apps/web/src/lib/google/agenda.ts`, o guia de operação e os segredos `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`. O aviso de reunião marcada vai por **e-mail**, pelo cano do Resend que já existe. **Decisão de Rafael em 25/09/2026** | (a) manter o Google Agenda e a IA criar evento por lá (era o desenho da §7.7); (b) ler livre/ocupado do Google (a §8.5 já tinha recusado); (c) Cal.com ou outro agendador de terceiro | (a) e (b) põem a informação que decide — "esta pessoa está ocupada às 10h" — fora do Postgres, e o robô passa a depender de OAuth de terceiro, refresh token por pessoa e quota de API para responder uma mensagem de WhatsApp. (c) é um BSP de agenda: mesma objeção do ADR-06, em outro assunto. **Risco assumido:** com o Google fora, o CRM é o único calendário e **só sabe o que ele mesmo criou** — dentista, almoço e viagem não existem para ele. Mitigação: a grade é curta (9 começos por dia), o teto é 4 por pessoa por dia, a tarde de quem tem rota planejada é bloqueada inteira, e cancelar/remarcar está no cartão da Agenda, a um clique |
+
+**Texto longo, para o PRD §13, item 26:**
+
+> **26. O calendário sai do Google (ADR-15) — decisão de Rafael em 25/09/2026.**
+> Antes do deploy, e **só enquanto os tokens ainda funcionam**, todos os eventos futuros criados pelo CRM no Google são cancelados por `/api/agenda/remover`, para que nenhum fornecedor fique com um convite órfão. Depois disso a migração apaga tabelas, funções, invólucros e os segredos do Vault com nome `agenda_google:%` — que não somem sozinhos quando a tabela que guarda o `segredo_id` cai. A permissão OAuth registrada na conta Google de cada pessoa **sobrevive** à faxina do nosso lado: cada uma remove o acesso em `myaccount.google.com/permissions`, e o Luiz tira o escopo `calendar.events` da tela de consentimento. Ficam, e não podem ser apagados por engano: `SUPABASE_AUTH_GOOGLE_CLIENT_ID`/`SUPABASE_AUTH_GOOGLE_SECRET` (é o **login** do CRM) e `GOOGLE_MAPS_API_KEY` (é a busca de telefone).
+
+---
+
+## A. A IA escreve com a nossa voz
+
+### O que isto é, e o que não é
+
+Não dá para treinar um modelo com as nossas conversas: treinar quer dizer mexer nos pesos, a Anthropic não vende isso, e cada mensagem nova pediria um treino novo. O que dá para fazer — e é o que todo mundo chama de "aprender com as nossas mensagens" — é **mostrar as nossas conversas reais uma vez, tirar delas o jeito de falar e gravar esse jeito num arquivo que entra em toda chamada**. O modelo não fica sabendo de nada; ele recebe o nosso jeito escrito, por cima, a cada resposta.
+
+Consequência prática: a voz vira um arquivo versionado no repositório, que o Rafael lê e aprova uma vez, e não um cérebro que ninguém consegue abrir.
+
+### (a) De onde saem os exemplos
+
+O corpus **não nasce como view**. Nasce como `app.voz_corpus(p_limite int default 300)`, `security definer`, `set search_path = ''`, com `revoke all ... from public, anon, authenticated` e `grant execute ... to service_role`, em `supabase/migrations/20260930100000_o_corpus_da_voz.sql`.
+
+Por que função e não view: uma view em `public` sobre `public.messages` devolve o texto cru de conversas reais para quem tiver `select`. O repositório declara `security_invoker` explicitamente quando cria view justamente por isso (`20260904000800:276`, `20260904000500:341`), e revelar conversa em massa é o que `public.pii_access_log` (`20260904000400:269`) existe para registrar. O corpus roda uma vez por mês, por um script com `service_role`, e ninguém mais precisa dele. Função fechada é a forma mais barata de dizer isso.
+
+Ela lê `public.conversations` (`supabase/migrations/20260905000200_ia_e_whatsapp.sql:600`) e `public.messages` (`:1133`), e deixa entrar só o que ensina.
+
+**Entram:**
+
+| filtro | coluna | por quê |
+|---|---|---|
+| gente escreveu | `messages.author_kind = 'human'` e `sent_by is not null` | a coluna nasce em `20260905000200:1158` com quatro valores: `human`, `bot_fixed`, `bot_ai`, `system` |
+| nós mandamos | `direction = 'out'` e `origin = 'crm'` | é a nossa voz. `origin` tem três valores (`20260905000200:1466`: `crm`, `echo`, `import`); `echo` fica de fora porque é registro do que saiu do celular antes de 14/09, quando havia Coexistence |
+| saiu de verdade | `status in ('sent','delivered','read')` | `queued` e `failed` nunca chegaram a ninguém |
+| funcionou | ou a conversa aponta para um `deals` com `status = 'won'` e `won_at` preenchido (`20260904000300:324`), ou a mensagem recebeu resposta do parceiro em até 24 h | duas faixas: a que fechou negócio e a que ao menos gerou resposta |
+| é recente | `created_at > now() - interval '90 days'` | **escolha nossa**, não limite legal: voz de seis meses atrás já não é a de hoje. O teto legal é maior — o PRD §10.6 dá 12 meses a "Conversas de prospecção" |
+
+**Não entram, e cada exclusão tem motivo:**
+
+- **As do robô** — `author_kind in ('bot_ai','bot_fixed','system')`. Se a saída do robô voltasse como exemplo, em três meses ele estaria copiando a si mesmo e a voz iria secando. É o furo mais fácil de abrir e o mais difícil de perceber; por isso vira teste pgTAP, não confiança.
+- **As que levaram a opt-out** — conversa que tem mensagem com `optout_confirmation = true` (`20260905000200:1168`), ou cujo telefone está na `public.suppression_list` (`20260904000400:41`), ou onde `app.wa_parece_optout` (`20260916110000:116`) casa em qualquer entrada. Quem faz a pessoa pedir para sair não é modelo de nada.
+- **As de conversa que morreu** — nossa mensagem sem nenhuma entrada depois dela. Silêncio não é aprovação.
+- **As de negócio perdido** — `deals.status = 'lost'` com `lost_reason_id` (`20260904000300:322`).
+- **As que o nosso próprio validador reprovaria** — passam por `validarPromessas` (`packages/prompts/src/nucleo/validador-promessas.ts:135`) antes de entrar. Um humano nosso já escreveu "sem mensalidade", e o comentário de `base-conhecimento.ts:37` registra, em 08/09/2026, que a frase é falsa. Exemplo errado ensina errado.
+
+**Quantas.** 40 conversas, teto de 300 mensagens, as mais recentes primeiro, metade de cada faixa (fechou / respondeu).
+
+**Quanto custa.** 300 mensagens de ~140 caracteres dão ~42 mil caracteres, ~11,7 mil tokens pelo divisor de `packages/prompts/src/nucleo/tokens.ts:13` (`CARACTERES_POR_TOKEN_PT_BR = 3.6`). No Sonnet, entrada a US$ 2/milhão (`nucleo/custos.ts:30`) = **US$ 0,023**; a saída são ~1.100 tokens a US$ 10/milhão = **US$ 0,011**. Total **≈ US$ 0,035 por destilação**, uma vez por mês, na mão.
+
+**Pseudonimização.** O corpus não vai cru ao modelo. Ele passa pelo caminho que já existe e é o único sancionado: `prepararChamada` (`packages/prompts/src/nucleo/chamada.ts:351`) valida a entrada, troca nome, empresa, telefone, e-mail e @ por marcadores com o `Pseudonimizador` (`nucleo/pseudonimizacao.ts:979`) e só então audita (`chamada.ts:390`). Três detalhes que não são opcionais:
+
+1. O prompt da destilação declara `escala: 'conversa'`, então a conferência é `verificarSemPiiNaConversa` (`nucleo/auditoria-pii.ts:541`), com fronteira de letra. A estrita (`:495`) barraria tudo: no tamanho de uma conversa, data mais hora mais preço colados viram telefone.
+2. `camposDoTriade` declara o que foi o CRM que escreveu, caminho a caminho: `conversas[].leadId`, `mensagens[].messageId`, `mensagens[].quando`, `mensagens[].de`. O que não for declarado é tratado como texto de fora (`chamada.ts:401`) — a classificação falha fechado, e é isso que impede um campo novo de escapar da auditoria.
+3. **O que a auditoria não pega, dito em voz alta:** ela pega padrão — telefone, e-mail, CPF, @. Não pega um primeiro nome que não está no CRM ("meu sócio Ricardo confirma amanhã"), porque o `Pseudonimizador` só troca o que o banco lhe deu. A mitigação é o formato do resultado: o que sai da destilação são ~50 frases curtas que uma pessoa lê num PR, e um eval roda `verificarSemPii` (a estrita, `:495`) sobre cada frase do guia, quebrando a suíte se sobrar um dígito que pareça telefone. O corpus atravessa a fronteira uma vez por mês; o arquivo que fica é conferido duas vezes, por máquina e por gente.
+
+### (b) Como a voz é destilada: guia uma vez, não exemplos a cada chamada
+
+**Escolha: guia destilado uma vez, revisado por gente, dentro do bloco estável do prompt.** Exemplos crus a cada chamada ficam de fora. A conta, que é o que decide (cenário "exemplos crus" = 12 conversas × 8 mensagens × 130 caracteres injetadas em toda resposta; cenário "guia" = arquivo de ~4.000 caracteres no bloco `sistema`):
+
+| | exemplos crus por chamada | guia destilado no bloco estável |
+|---|---|---|
+| tamanho | ≈ 12.480 caracteres ≈ **3.467 tokens** | ≈ 4.000 caracteres ≈ **1.112 tokens** |
+| cache | nenhum: muda a cada chamada | é o bloco `sistema`, que já leva `cache_control` (`chamada.ts:85`); leitura de cache a 0,1× da entrada (`nucleo/custos.ts:24`), ou US$ 0,2/milhão no Sonnet (`:30`) |
+| custo por resposta | 3.467 × US$ 2/milhão = **US$ 0,0069** | 1.112 × US$ 0,2/milhão = **US$ 0,00022** |
+| custo no mês (2.700 respostas) | **US$ 18,72** | **US$ 0,60** |
+| auditoria de PII | a cada chamada, sobre texto de lead | uma vez, sobre um arquivo revisado |
+| reprodutível | não: o corpus muda sozinho | sim: é arquivo versionado |
+
+Trinta vezes mais caro, e o caro é o menor problema: exemplo cru significa texto de cliente real atravessando a fronteira do modelo milhares de vezes por mês, e significa que ninguém consegue dizer por que o robô escreveu o que escreveu ontem.
+
+**O guia** é `packages/prompts/src/nucleo/voz-da-casa.ts`, no formato dos outros arquivos do núcleo: constantes congeladas, uma `VERSAO_DA_VOZ` com data (como `VERSAO_DA_BASE`, `base-conhecimento.ts:26`) e uma função `vozComoTexto()` que devolve o bloco que entra no `sistema` — igual ao que `baseComoTexto()` (`base-conhecimento.ts:182`) já faz. Ele tem **seis** listas:
+
+- `ABERTURAS` — as ~12 primeiras linhas que a equipe mais usa, literais, tiradas do corpus;
+- `FECHOS` — as ~10 formas de terminar, incluindo as de saída fácil ("se não for o momento, me diz");
+- `CONECTIVOS` — as ~15 frases de ligação e cortesia que aparecem entre uma coisa e outra;
+- `DESVIOS` — as ~5 linhas literais de voltar ao trilho quando o lead puxa outro assunto ("isso aí eu não sei te dizer, mas sobre a Komune…"). Sem ela, a mensagem de `foraDoAssunto` não teria nenhuma frase de tipo válido, seria bloqueada, e o caminho "reconhece e volta ao trilho" seria código morto;
+- `NAO_DIZEMOS` — o que o corpus mostra que a gente nunca escreve ("prezado", "parceria estratégica", "sem compromisso"), somado ao que o R08 §5.1 já proíbe;
+- `LEXICO_DE_COMPROMISSO` — os verbos de promessa ("dar um jeito", "consigo", "encaixo", "libero", "abro exceção", "faço por", "fecho por", "ajusto", "garanto"). Esta lista não é sobre estilo: é a munição do validador, item (d).
+
+As quatro primeiras listas são **frases nossas, literais**, não descrições de estilo. Isso é de propósito e volta em (d): o validador consegue conferir frase literal; não consegue conferir "tom acolhedor".
+
+Quem gera: prompt novo `destilar-voz@v1`, Sonnet, saída estruturada, que lê o corpus pseudonimizado e devolve as seis listas com a contagem de quantas vezes cada frase apareceu. Quem aprova: uma pessoa, uma vez, lendo ~50 frases num PR. Quem mantém: a mesma rodada uma vez por mês, e o diff do PR mostra o que mudou na voz da casa.
+
+**Os dois propósitos, e onde cada lista mora de verdade.**
+
+- **`draft_reply`** (o prompt que escreve, item (c)) já existe no `check` de `ai_runs.purpose`, no `if` de `app.ia_enfileirar` (`20260925150000:438`) e no array de `app.ia_gasto_bloqueado_para` (`:288`). **Mas não existe em `PropositoDeAiRun`** (`packages/prompts/src/nucleo/versionamento.ts:33`), que hoje tem sete valores e não o inclui. É uma linha de TypeScript, não uma migração — mas sem ela o prompt não compila.
+- **`destilar_voz`** é propósito novo. **A lista viva do `check` não é a de `20260905000200:174`**: aquela constraint foi derrubada e recriada duas vezes, e a que vale é `ai_runs_purpose_check` de `20260917230000:41`. Então `destilar_voz` entra em **três** lugares: essa constraint, `PropositoDeAiRun` (`versionamento.ts:33`) e o array de `app.ia_gasto_bloqueado_para` (`20260925150000:287`), para a tela de orçamento dizer a verdade sobre o que está parado. **Não entra em `app.ia_enfileirar`**, e isso é escolha: a destilação é manual, mensal, rodada por script com `service_role`, e nunca passa pela fila. Pôr na lista da fila convidaria alguém a enfileirá-la. A lição de `20260917230200_o_proposito_novo_entra_na_fila.sql` é que a lista mora em mais de um lugar — não que ela more em todos.
+
+**O robô não assina com nome de gente.** Desde `20260914110000_as_aberturas_levam_o_nome_de_quem_envia.sql` os modelos trazem `{{atendente}}`, que **`public.wa_enviar_modelo` preenche com o primeiro nome de quem clicou**. Texto livre não passa por `wa_enviar_modelo` nem por modelo nenhum, então `{{atendente}}` simplesmente não existe nesse caminho — não há "assinatura" para anular. A trava é do prompt: **está proibido escrever qualquer primeiro nome do time**, e o validador reprova a mensagem que contenha um nome de `public.profiles`. Quem diz que é automático é a frase de transparência da §6.6.
+
+### (c) O prompt que escreve
+
+`packages/prompts/src/prompts/responder-livre/v1.ts` — `responder-livre@v1`, Claude Sonnet 5, `proposito: 'draft_reply'`, `escala: 'conversa'`. Entra em `CATALOGO` e em `VIGENTES` (`packages/prompts/src/catalogo.ts:23` e `:35`) — sem as duas linhas o prompt existe e ninguém o alcança.
+
+**O que ele recebe.** Montado em SQL por `app.ia_entrada_da_resposta(p_message_id uuid)`, irmã de `app.ia_entrada_da_ficha` (`20260917110000:94`), para a entrada nascer do banco e não do worker (ADR-03):
+
+- `leadId`, `variante`, `segmento`, `etapa` e as etapas válidas — campos do CRM, declarados em `camposDoTriade`;
+- `intencao` e `confianca`, vindas por parâmetro do árbitro, nunca lidas de `conversations.ai_intent` (§6.3: a coluna é da conversa, não da mensagem, e `app.wa_bot_de_entrada` também escreve nela);
+- da ficha (`public.ficha_da_conversa`, `20260917100000:32`): `resumo`, `objecoes`, `alertas`, `proxima_acao` e `proxima_acao_em`. **Não existe coluna "compromissos abertos"** — `proxima_acao` é o que mais perto chega, e é o que faz a resposta citar a conversa em vez de repetir o pitch;
+- as últimas 12 mensagens, com `messageId`, quem falou e quando (por `app.ia_mensagem_da_conversa`, `20260917110000:71`);
+- `camposVazios`: o que o CRM ainda não sabe, por `app.ia_campo_vazio` (`20260917110000:53`), para a pergunta do fim valer alguma coisa;
+- **só nome, categoria e cidade da ficha** — nunca endereço, bairro, nota ou site, pelo motivo de C(d) item 2;
+- os horários livres da agenda, quando a intenção é de reunião — a lista fechada de que a seção B trata. **Enquanto a Fase 5 não subir, o tipo `agenda` nasce desligado**: o prompt não recebe lista, e frase de tipo `agenda` é bloqueio;
+- a base de conhecimento inteira, por `baseComoTexto()`, e a voz, por `vozComoTexto()`, as duas no bloco `sistema` cacheável.
+
+**O que ele devolve.** JSON validado por zod, e aqui está a peça central do desenho:
+
+```
+mensagem: string
+frases: [{ texto, tipo, fatoId? }]     // a decomposição — ver abaixo
+claims: string[]                        // ids de FATOS, como no followup-ligacao
+foraDoAssunto: boolean
+precisaDeGente: boolean + motivo
+agenda: { horarioEscolhido } | null
+porQue: string                          // uma linha, para quem revisa
+```
+
+`frases` é o que hoje não existe. O `followup-ligacao@v1` (`packages/prompts/src/prompts/followup-ligacao/v1.ts:42`) já devolve `claims`, e `claims` responde "usei o fato 8%". Não responde "o que mais eu disse". Com texto livre, a pergunta que importa é a segunda.
+
+Então o modelo é obrigado a **quebrar a própria mensagem em frases e dizer o tipo de cada uma**, numa lista fechada de cinco:
+
+| tipo | o que é | como o validador confere |
+|---|---|---|
+| `fato` | afirmação sobre a Komune | tem de trazer `fatoId` de `FATOS` (`base-conhecimento.ts:28`); os números têm de estar em `valores` |
+| `pergunta` | a pergunta do fim | tem de terminar em `?` e não conter verbo de `LEXICO_DE_COMPROMISSO` |
+| `cortesia` | abertura, ligação, desvio, fecho | tem de bater, literal, com `ABERTURAS`/`CONECTIVOS`/`DESVIOS`/`FECHOS` |
+| `agenda` | dia e hora propostos | dia e hora têm de sair da lista que o CRM mandou; sem lista, bloqueio |
+| `escape` | a frase de dinheiro sem resposta | tem de ser exatamente `FRASE_DE_ESCAPE_FINANCEIRO` (`base-conhecimento.ts:158`) |
+
+A soma das frases tem de reconstruir `mensagem` — o validador confere isso, senão o modelo poderia declarar três frases e mandar quatro.
+
+**O assunto é fechado, e isso é política da Meta.** Quando o lead puxa outro assunto, o modelo marca `foraDoAssunto: true` e devolve uma mensagem que só existe de `cortesia` (um `DESVIOS` literal) + `pergunta`. Não é o modelo se policiando por educação: frase de outro assunto não tem tipo possível na tabela acima, e sem tipo ela é bloqueada.[^E6]
+
+### (d) O validador refeito: bloqueia, e fecha a paráfrase
+
+Arquivo novo, `packages/prompts/src/nucleo/validador-resposta-livre.ts`, com `validarRespostaLivre(entrada)`. Ele **não substitui** `validarPromessas`: chama-o por dentro (é ele que já sabe de valor não autorizado, palavra proibida, URL fora da lista, tema financeiro sem resposta e os limites de forma) e acrescenta a camada de frases.
+
+**Primeiro, o que muda de comportamento.** Hoje `validarPromessas` devolve, no caso bloqueado, `queda: 'texto_fixo' | 'humano'` (campo em `validador-promessas.ts:50`, valor decidido em `:242`) e o desenho todo se apoia em "a Heloísa aprova depois" (ADR-05). Sem aprovação humana, `queda` deixa de ser sugestão: **conteúdo reprovado não sai, ponto**, e `situacao: 'bloqueado'` passa a ser terminal.
+
+**O furo que a própria casa registrou.** `packages/prompts/evals/validador-promessas.eval.test.ts:152` guarda, como caso conhecido desde 05/09/2026, a frase "Fica tranquilo que a gente dá um jeito no valor pra você entrar como fundador." Ela passa. Não tem número, não tem percentual, não tem palavra da lista. O comentário do arquivo diz a verdade: "quem segura é a aprovação humana (ADR-05)". Tirando a aprovação humana, essa frase sai para um fornecedor, e oferta feita vincula a empresa (CDC art. 30).
+
+**Como ela passa a ser bloqueada.** Em dois níveis.
+
+**Nível 1 — dentro do `validarPromessas`, porque é isso que o eval pede.** O `esperado` daquele caso é `bloqueado(['promessa_comercial'], 'humano')` (`:157`), e `promessa_comercial` ainda não existe em `CodigoDeBloqueio` (`validador-promessas.ts:23`). Então:
+
+- `CodigoDeBloqueio` ganha `'promessa_comercial'`;
+- `validarPromessas` ganha a varredura de `LEXICO_DE_COMPROMISSO`, **escopada**: só bloqueia quando o verbo de compromisso aparece na mesma frase que uma palavra de dinheiro ou condição (valor, preço, taxa, `%`, `R$`, condição, desconto, exceção). "a gente dá um jeito **no valor**" bate; "**consigo** te mandar o link agora" não bate, e continua passando;
+- o código entra em `CODIGOS_QUE_EXIGEM_HUMANO` (`validador-promessas.ts:104`), que é o que produz `queda: 'humano'`.
+
+Sem o escopo, metade dos rascunhos legítimos da equipe seria reprovada e a regra seria desligada na primeira semana.
+
+**Nível 2 — os tipos, no `validarRespostaLivre`.** A mesma frase, se o Nível 1 falhar por alguma paráfrase, bate nas três travas do mundo fechado:
+
+1. **Toda frase precisa de tipo.** Declarada como `cortesia`, ela não está em `CONECTIVOS`, `DESVIOS` nem `FECHOS` — cortesia é lista literal, e é literal exatamente por isso. Bloqueio `cortesia_fora_da_voz`.
+2. **Léxico de compromisso.** Declarada como `fato`, carrega "dar um jeito". Verbo de compromisso dentro de frase de tipo `fato` é bloqueio `promessa_comercial`, sem escopo nenhum — num `fato` o léxico é proibido de saída.
+3. **Pergunta é pergunta.** Declarada como `pergunta`, não termina em `?`. Bloqueio `tipo_errado`.
+
+Não há quarto caminho: os tipos são cinco e `agenda` e `escape` são comparações literais. **O fechamento é por construção, não por detecção.**
+
+O que isso custa, e é honesto dizer: o robô fica mais duro que uma pessoa. Uma frase nossa, boa, que não esteja em `CONECTIVOS` é bloqueada. O conserto é acrescentar a frase ao `voz-da-casa.ts` num PR — o que também é o jeito certo de a voz crescer, com alguém olhando.
+
+**Ordem da conferência**, que não é detalhe: valida com os marcadores `[[NOME_1]]` ainda no lugar (senão a comparação literal de cortesia falha em toda mensagem que tem nome), depois `reidratar` (`nucleo/pseudonimizacao.ts:1111`), e então uma segunda passada **só de forma** — 300 caracteres, 4 linhas, 1 emoji, caixa alta (`LIMITES_PADRAO`, `validador-promessas.ts:60`) — mais a conferência de nome próprio do time **e a recusa de marcador sobrevivente** (se o regex `MARCADOR`, `pseudonimizacao.ts:179`, ainda casar depois da reidratação, o texto não sai). Porque "[[EMPRESA_1]]" e "Buffet Casa de Pedra Eventos e Recepções" não têm o mesmo tamanho.
+
+**Evals.** `packages/prompts/evals/responder-livre.eval.test.ts`, no formato de `evals/executar.ts`: caso certo, caso conhecido com `obtido` e `desde`, e a régua `conhecidosEsperados` declarando quantos ainda erram (`executar.ts:41`, `:69`).
+
+**Correção sobre o caso de 05/09.** Com o Nível 1 acima, o caso **é promovido no eval antigo**: apaga-se o bloco `conhecido` da linha 158 de `validador-promessas.eval.test.ts` e baixa-se `conhecidosEsperados` em um. Se, e só se, o Nível 1 for recusado na revisão por risco de falso positivo, o caso **não pode** ser promovido ali — `validarPromessas` recebe `{texto, claims}` e nunca vê `frases`, então nenhuma camada de tipos o alcança naquele arquivo. Nesse cenário o caso é copiado para o eval novo, contra `validarRespostaLivre`, e o bloco `conhecido` do eval antigo permanece com o `motivo` reescrito. Uma das duas coisas acontece; o que não pode acontecer é o eval antigo ficar verde por engano.
+
+### (e) O que acontece quando o validador bloqueia
+
+Quatro desfechos, escolhidos pelo motivo. Nenhum deles é "manda assim mesmo".
+
+**Antes dos quatro, uma regra de ordem que conserta um furo do desenho anterior.** O veredito em `public.atendimento_decisoes` (§6.3, `message_id` como PK) é escrito **uma vez só, depois do validador**. A §6.3 diz que o único valor substituível é `aguardando_classificacao`, e uma vez só — então a sequência é: gatilho grava `aguardando_classificacao`; o worker classifica, o prompt escreve, o validador julga; e só aí a linha vira `robo` ou `pessoa`. Gravar `robo` antes de validar e regravar `pessoa` depois é uma segunda substituição, que a PK e a regra da §6.3 recusam.
+
+**1. Bloqueio de conteúdo** (frase sem tipo, léxico de compromisso, valor não autorizado, claim sem base, nome do time, fora do assunto): **a conversa não recebe resposta do robô.** Em uma transação: veredito `pessoa` com `motivo = 'validador_bloqueou'`, `conversations.bot_paused = true`, `status = 'aguardando_nos'`, e uma `tasks` (`20260904000300:509`) com `priority 1` e `due_at = now()` — o mesmo desfecho que "intenção sem modelo ligado" já produz na §6.4. O rascunho **não é jogado fora**: fica em `public.message_drafts` (`20260905000200:844`) com `kind = 'resposta'`, `status = 'pendente'`, `proposed_body`, `proposed_claims` e o veredito inteiro em `validator`, que é jsonb e é para isso que existe (`:895`). Quem abre a caixa vê o que a IA quis dizer e por que não saiu. Uma tentativa por mensagem, sem repique: a PK de `atendimento_decisoes` garante isso, e `message_drafts_um_pendente_por_conversa` (`:908`) garante que não se empilhem dois rascunhos pendentes no mesmo fio.
+
+**2. Não fica mudo à noite.** Com a regra de ordem acima, o veredito de um bloqueio **é** `pessoa`, e `app.ausencia_responder(p_message_id)` (`20260922120000:122`)[^E3] é chamada na mesma transação, com o corpo de `GEN-SYS-AUSENCIA` reescrito na §6.7 e a trava de 12 h por conversa (`:157`).
+
+**E há uma armadilha concreta, que precisa entrar no desenho da §6.6.** `ausencia_responder` recusa com `ja_respondida` se existir **qualquer** saída na conversa com `created_at >=` a mensagem que chegou (`:150–153`). A §6.6 manda enviar `GEN-SYS-TRANSPARENCIA` "imediatamente antes da primeira resposta automática". Se a transparência sair primeiro e o validador bloquear depois, o lead recebe só o aviso de robô e mais nada, às 22h. Então: **a transparência sai na mesma transação da resposta aprovada, nunca antes dela.**
+
+**Não criamos um texto de contenção.** Um "estou verificando aqui" seria mentira (ninguém está verificando às 22h) e seria uma segunda mensagem por cima da de ausência.
+
+**3. Dúvida financeira sem resposta** (`situacao: 'substituido'`, `validador-promessas.ts:142`): este é o único caso em que sai texto. Vai a `FRASE_DE_ESCAPE_FINANCEIRO` — "Vou confirmar com o financeiro e te respondo hoje." — como `bot_fixed`, por `app.wa_bot_dizer` (`20260916110000:192`), num modelo novo `GEN-SYS-FINANCEIRO-CONFIRMA`, `channel='whatsapp'`, `is_active`, **sem nenhuma variável** (a função copia `t.body` cru, `:211`; um `{{ }}` sairia literal no fio). Mais tarefa para o Dennis. Sai por `bot_fixed` de propósito: o corpo é copiado da linha do modelo dentro de função `security definer`, e a IA não escreveu uma palavra dele. Como toda fala de robô, conta no teto de 6 falas por conversa da §5.4 e passa pelo ramo novo do guard — se o teto estourou, nem ela sai, e a conversa cai para gente com a despedida `GEN-SYS-HUMANO`.
+
+**4. Bloqueio só de forma** (passou de 300 caracteres, dois emojis, gritou): uma segunda tentativa, antes de gravar o veredito, com o motivo anexado à mensagem. Se falhar de novo, cai no desfecho 1. Uma repetição só, e o custo é uma chamada a mais em poucos por cento dos casos. As duas chamadas viram duas linhas em `ai_runs`, como manda o guardrail de auditoria da §10.
+
+**A trava que precisa ser afrouxada.** Hoje `app.messages_guard` (`20260916130000:134`) recusa `author_kind = 'bot_ai'` sem `draft_id` (`:136`), exige que o rascunho esteja `aprovado` ou `enviado` (`:140`) **com `reviewed_by` preenchido** (`:144`), exige `body = d.final_body` (`:150`) e grava `new.approved_by := d.reviewed_by` (`:154`); a constraint `message_drafts_aprovado_tem_gente` (`20260905000200:880`) diz a mesma coisa do outro lado. Isso é o ADR-05 em código. O mínimo necessário, e nada além:
+
+- `message_drafts.status` (`20260905000200:867`) ganha o valor **`'liberado_pelo_validador'`**[^E1], **fora** da constraint que exige revisor;
+- **uma constraint nova, `message_drafts_liberado_tem_prova`**: nesse status, `final_body` não pode ser nulo nem vazio, `jsonb_array_length(proposed_claims) > 0` e `validator ->> 'situacao' = 'aprovado'`. Sem a parte do `final_body`, o guard compara `body` com `null`, recusa, e o erro que aparece é o errado; sem as outras duas, sai qualquer coisa;
+- **o texto cabe em 1000 caracteres, não em 300**: `message_drafts_tamanho` (`:889–890`) já limita `proposed_body` e `final_body` a 1000, embora o comentário acima fale em 300 por turno do RF-CON-24. O limite de forma de verdade é o do validador, que roda antes;
+- a versão da base entra como coluna nova `base_versao text` (`VERSAO_DA_BASE`, `base-conhecimento.ts:26`, hoje `'2026-09-08'`); `prompt_version` (`:855`), `proposed_claims` (`:864`) e `validator` (`:865`) **já existem** — é uma coluna, não quatro;
+- **o status é terminal**: o rascunho fica em `liberado_pelo_validador` mesmo depois de a mensagem sair, porque `'enviado'` exige `reviewed_by`. Quem diz que saiu é `message_drafts.message_id`. A máquina de estados de `app.message_drafts_guard` (`20260905000200:933`) aprende a transição `pendente → liberado_pelo_validador` e nenhuma saída dela;
+- `app.messages_guard` ganha um ramo para `bot_ai` com esse status, que exige as cinco coisas: `validator ->> 'situacao' = 'aprovado'`, `validator ->> 'versao_do_validador'` igual à vigente, `body` idêntico a `final_body`, `template_id is null` (texto livre não é modelo) e `app.atendimento_liga('robo_escreve')` verdadeiro. E **`approved_by` fica nulo** — nenhuma mensagem automática pode parecer aprovada por gente;
+- tudo o mais do guard continua: supressão, janela de 24 h, tetos, `app.pode_enviar`, e o ramo de teto de fala que a Fase 3 acrescenta em §5.4;
+- **toda resposta aprovada também gera uma linha em `message_drafts`**, não só as bloqueadas — é o `draft_id` que o guard exige. É essa linha que a amostragem de (f) lê.
+
+A spec adotou o princípio "o guard só é tocado para apertar" (§1, linha 42, e nota 1) e lista em §10 "Nada redigido por IA sai sem rascunho aprovado — não muda uma linha nesta spec". **As duas frases mudam**, e a mudança é a decisão do Rafael de 25/09. A linha correspondente da §10 passa a ser: *nada redigido por IA sai sem passar pelo validador de mundo fechado, e a versão do validador fica gravada na linha que autorizou a saída.*
+
+### (f) Como se mede se ela está escrevendo bem
+
+**O requisito é o RF-CON-28** (PRD linha 361: amostragem semanal de 30 conversas com nota — "prometeu algo?", "soou robô?", "escalou certo?"), não o RF-CON-22 (linha 355), que é a regra de aprovação humana e só menciona a amostragem de passagem. A §6.9 cita o RF-CON-22 aqui; é engano e se corrige junto.
+
+**Amostragem diária nos primeiros 14 dias, depois semanal.** A §6.9 previa a view `public.robo_amostra_semanal`; ela é substituída por **`public.robo_amostra(p_desde date, p_ate date) returns table`**[^E4] — é função, não view, porque recebe período. Lê `atendimento_decisoes` + `messages` + `message_drafts`, e a tela de Ajustes → Atendimento escolhe o intervalo. Diária enquanto `atendimento.amostra_diaria` for verdadeira. A cadência semanal do RF-CON-28 continua valendo depois dos 14 dias, com as 30 conversas que ele pede.
+
+**Tamanho da amostra: 20 mensagens por dia, ou todas, se forem menos.** No teto de 900 conversas por mês (§6.9) e ~3 falas do robô por conversa, são 2.700 mensagens por mês, **90 por dia**. Vinte é 22% delas, e é o bastante: se o robô estiver errando 15% das vezes, a chance de a amostra de 20 não pegar nenhum erro é 0,85²⁰ ≈ 4%.
+
+**O que a pessoa olha, exatamente.** Seis perguntas de sim ou não, gravadas em `public.robo_amostra_veredito` (`message_id` PK, revisor, os seis booleanos, comentário livre), com RLS: `select` para `authenticated`, escrita só por `app.is_manager()` — quem julga o robô é quem responde por ele.
+
+1. **Respondeu o que foi perguntado?** Não é "está bem escrito". É se a resposta serve para aquela mensagem. É o erro que o validador não pega, por construção.
+2. **Afirmou só o que está na base?** Ler o texto ao lado de `message_drafts.proposed_claims` (`20260905000200:863`). Se afirmou algo sem `claim`, é falha do tipo 1 e o robô é desligado no mesmo dia.
+3. **Parece nós?** "a gente", "me diz", frase curta. Se apareceu "prezado" ou "parceria", a voz está vazando para fora do `voz-da-casa.ts`.
+4. **A pergunta do fim é única e respondível?** Duas perguntas numa mensagem de WhatsApp costumam virar zero respostas.
+5. **Se marcou reunião, o horário existe e está entre 9h30 e 17h20?** Confere com a agenda do CRM — seção B. Enquanto a Fase 5 não subir, esta pergunta sai da lista, porque o tipo `agenda` está desligado.
+6. **Eu teria mandado isso?** A única que importa. As cinco de cima explicam por que a sexta deu não.
+
+**As duas portas de saída, com número.**
+
+- **Qualquer "afirmou fora da base"** → `select public.atendimento_configurar('{"robo_escreve": false}'::jsonb)` no mesmo dia. Um comando, sem deploy. **E isto não funciona de graça.** `public.atendimento_configurar` (`20260922120000:215`) só olha as chaves do `foreach k in array['lead_automatico','distribuicao_automatica','ausencia_ativa']` (`:229`) e **ignora em silêncio** o que não está lá; `app.atendimento_liga` (`:30`) devolve `false` para chave ausente. Então a migração faz as duas coisas, como a §6.8 já mandou fazer com `robo_responde`: acrescenta `robo_escreve` ao array **e semeia `robo_escreve: false`** em `app_settings`.
+- **Três dias seguidos com 95% ou mais de "eu teria mandado"**, sobre pelo menos 20 mensagens por dia — em 20, isso é **no máximo um "não"** → a amostragem passa a semanal, na cadência do RF-CON-28. **Abaixo de 90% em qualquer dia** — três "não" ou mais em 20 — o robô volta a rascunho e uma pessoa aprova.
+
+**Por intenção, não só no total.** A função quebra o resultado por `atendimento_decisoes.intencao`. É assim que se descobre que ele vai bem em "manda o link" e mal em "quanto custa" — e é por isso que desligar é por intenção antes de ser geral.
+
+**O que a amostragem não mede:** custo. Esse está em `public.ia_orcamento_status()` (`20260925150000:468`), e o aviso é outro: `draft_reply` **não** sobrevive à linha de alerta. `app.ia_pode_gastar` (`20260925150000:234`) deixa passar, acima do limite de alerta, só `classify_inbound` e `transcribe_audio` (`:253–254`), por exclusão e de propósito. Traduzindo: a partir de 80% do orçamento, **o robô emudece e tudo cai para gente**. Está certo assim — é o lado seguro —, mas a coisa mais nova é a primeira a parar, e, quando ela parar, quem responde à noite é o texto de ausência, não ninguém.
+
+---
+
+## B. O calendário do CRM, e a reunião como objeto de verdade
+
+As três coisas pedidas — calendário nosso, IA marcando sozinha, e-mail avisando — dependem de uma quarta que ninguém pediu mas sem a qual nenhuma funciona: **o CRM precisa ter uma reunião**. Hoje ele não tem. Tem tarefa com prazo, e é outra coisa.
+
+### B.1 Por que não cabe em `tasks`
+
+O cabeçalho de `apps/web/src/components/agenda/tipos.ts` já escreveu o problema:
+
+> `meeting` não quer dizer "reunião marcada". Metade das tarefas desse tipo na base real é "Marcar apresentação" (…) a hora que ela carrega (09:00) é o prazo calculado pela régua do RF-MET-06, não uma hora combinada com ninguém.
+
+A tela contorna com uma régua indireta: chama de `marcado` só o que está numa etapa cujo `stages.required_fields` exige `meeting_at` (`agenda/dados.ts`, `etapasQueMarcamHora`). Funciona para desenhar, e não resolve nada para agendar. Olhando a coluna, `public.tasks` (`supabase/migrations/20260904000300_parceiros_e_funil.sql:509`) não tem **fim** (só `due_at`), não tem **lugar nem link**, não tem **quem participa** (`assignee_id` é fila de trabalho, não lista de presença) e não tem **estado de reunião** — `app.task_status` é `todo | doing | done | cancelled` (`20260904000100:64`), e "remarcada", "não compareceu" e "confirmada pelo parceiro" são metade do que se quer saber.
+
+E o argumento que fecha a discussão: **não dá para pôr trava de colisão em `tasks`**. Uma restrição de exclusão sobre (responsável, intervalo) faria as nove "Marcar apresentação" de terça — todas nascidas às 09:00 pela régua do catálogo — recusarem umas às outras. A tabela que precisa proibir sobreposição é uma tabela onde sobreposição é erro. Em `tasks` ela é o dia normal.[^E2]
+
+Então nasce `public.reunioes`, e `tasks` continua exatamente como está.
+
+### B.2 (a) A tabela
+
+Migração `20260930110000_a_reuniao_vira_objeto.sql`.[^E5]
+
+```sql
+create extension if not exists btree_gist with schema extensions;
+
+create table public.reunioes (
+  id               uuid primary key default gen_random_uuid(),
+  organization_id  uuid not null references public.organizations (id) on delete cascade,
+  deal_id          uuid references public.deals (id)         on delete set null,
+  conversation_id  uuid references public.conversations (id) on delete set null,
+  contact_id       uuid references public.contacts (id)      on delete set null,
+  -- Quem ATENDE. É dele a agenda que fica ocupada, e é ele quem recebe o e-mail.
+  dono_id          uuid not null references public.profiles (id) on delete restrict,
+  titulo           text not null,
+  formato          text not null default 'online' check (formato in ('online','presencial')),
+  inicio           timestamptz not null,
+  fim              timestamptz not null,
+  durante          tstzrange generated always as (tstzrange(inicio, fim, '[)')) stored,
+  -- Sala, quando online. Endereço, quando presencial. Nunca os dois.
+  link             text,
+  local            text,
+  estado           text not null default 'marcada'
+                     check (estado in ('marcada','confirmada','realizada',
+                                       'nao_compareceu','cancelada','remarcada')),
+  marcada_por      text not null check (marcada_por in ('robo','pessoa')),
+  marcada_por_id   uuid references public.profiles (id) on delete set null,
+  remarcada_de     uuid references public.reunioes (id) on delete set null,
+  -- O espelho em `tasks`: ver B.2.1. É a linha que a fila do dia já sabe ler.
+  task_id          uuid references public.tasks (id) on delete set null,
+  aviso_enviado_em timestamptz,
+  observacao       text,
+  criada_em        timestamptz not null default now(),
+  atualizada_em    timestamptz not null default now(),
+  constraint reunioes_intervalo_chk check (fim > inicio),
+  constraint reunioes_lugar_chk check (
+    (formato = 'online'     and link  is not null) or
+    (formato = 'presencial' and local is not null)),
+  constraint reunioes_robo_chk check (
+    (marcada_por = 'robo'   and marcada_por_id is null and conversation_id is not null) or
+    (marcada_por = 'pessoa' and marcada_por_id is not null)),
+  -- A TRAVA. Duas reuniões vivas da mesma pessoa não se sobrepõem. No banco.
+  constraint reunioes_sem_colisao exclude using gist (
+    dono_id with =, durante with &&) where (estado in ('marcada','confirmada'))
+);
+```
+
+**`durante` é coluna gerada, e não calculada na consulta,** porque a restrição de exclusão precisa de um valor indexável; o construtor de três argumentos `tstzrange(timestamptz, timestamptz, text)` é imutável, então o Postgres aceita.
+
+**`btree_gist` é a extensão nova** — só ela dá a classe de operadores que deixa `uuid with =` conviver com `tstzrange with &&` no mesmo índice GiST. O banco é Postgres 17 (`supabase/config.toml:46`), onde a classe de `uuid` existe. Entra com `with schema extensions`, como `postgis` já entrou em `20260905000600_rotas.sql:114`.
+
+**`organization_id` é obrigatório, e isso tem consequência.** `conversations.organization_id` é **nulável** (`20260905000200:610`), e "conversa fora da base" é um estado real e comum — tem migração própria (`20260915130000`) e aba própria na tela (`/conversas?aba=fora`). Então `reuniao_marcar` chamada de uma conversa sem ficha **recusa com `sem_ficha`** e o árbitro manda a conversa para uma pessoa. Marcar reunião com alguém que o CRM não sabe quem é produz um compromisso que ninguém consegue preparar.
+
+**Dono:** `deals.owner_id` quando há negócio; senão `conversations.assignee_id`, que é `not null` (`20260905000200:613`). O robô **não** procura horário na agenda de outra pessoa: trocar de dono em silêncio para achar vaga é o jeito de a carteira virar rodízio.
+
+**RLS:** ligada, `select` para `authenticated` por `app.org_is_visible(organization_id)` (`20260904000500:70`) — a mesma régua de `organizations_view`, não uma segunda cópia. `insert`, `update` e `delete` revogados de `authenticated`: escrita só pelas funções de B.4, como `public.compromissos_no_google` já fazia. Gatilho `reunioes_audit after insert or update or delete ... execute function app.audit()` (`20260904000400:216`), porque reunião marcada por robô é exatamente o tipo de escrita que o CLAUDE.md manda auditar.
+
+**O link da sala é congelado na linha, e nunca lido de `profiles` na hora de desenhar.** A política `profiles_select` é `id = auth.uid() or app.is_manager()` (`20260904000500:110-111`): um `sdr` não lê o perfil de outra pessoa, e o cartão do colega apareceria sem sala. Então `reuniao_marcar` copia a sala para `reunioes.link` no momento da escrita — com o efeito conhecido de que trocar a sala em Ajustes **não retroage** às reuniões já marcadas. O nome de quem atende vem de `public.team_directory` (`20260904000500:142`), que é a view feita para isso.
+
+#### B.2.1 O espelho em `tasks` fica, e é de propósito
+
+Quatro lugares já contam `tasks.kind in ('meeting','visit')`: o pulso do dia (`20260917120000:113`), o dreno (`20260905000100:802` e `:857`) e a tela das cadências (`20260904001890:383`). Se a reunião existisse só na tabela nova, esses quatro passariam a mentir por omissão no dia seguinte.
+
+Então `public.reuniao_marcar` insere as duas coisas na mesma transação: a linha em `reunioes` e a `tasks` (`kind = 'meeting'`, `due_at = inicio`, `assignee_id = dono_id`, `origin = 'ai'`), guardando o id em `reunioes.task_id`. A tabela nova é a verdade; a tarefa é o eco que o resto do sistema já sabe ler. **A tela filtra o eco** para não desenhar o mesmo compromisso duas vezes (B.6).
+
+### B.3 (b) Disponibilidade: como o CRM sabe que um horário está livre
+
+Configuração em `public.app_settings` (`20260904001700:95`), chave `agenda.reunioes` — o mesmo lugar onde o planejador de rota já mora (`rotas.planejador`, `20260905000600:425`):
+
+```json
+{ "janela": {"inicio": "09:30", "fim": "17:20"},
+  "duracao_min": 40, "intervalo_min": 10, "pausa": null,
+  "antecedencia_min_horas": 3, "horizonte_dias_uteis": 10,
+  "max_por_dia_por_pessoa": 4, "sala_padrao": null }
+```
+
+**A grade.** Reunião de **40 minutos** com **10 de intervalo** — ciclo de 50. Saindo das 9h30, os começos possíveis são 9h30 · 10h20 · 11h10 · 12h00 · 12h50 · 13h40 · 14h30 · 15h20 · 16h10. O de 17h00 fica de fora porque terminaria 17h40. Os 30 minutos entre 16h50 e 17h20 não são desperdício: são a folga que absorve a reunião que passa da hora.
+
+Os 40 minutos: o RF-AGE-01 (`docs/PRD-CRM-Captacao-KOMUNE-v1.0.md:381`) pede 30 (20 de apresentação + 10 de folga) e a rota `/api/agenda/evento` usa 45 (`MINUTOS_REUNIAO = 45`, `route.ts:43`). Fica 40, porque é o único valor que fecha uma grade limpa dentro da janela que o Rafael deu, e porque 30 com 10 de intervalo dá 11 reuniões num dia — número que só existe no papel.
+
+**Almoço: nenhum, por ora.** `"pausa": null`. A janela veio com precisão de minuto; abrir um buraco de meio-dia que ninguém pediu seria decidir pelo Rafael. O campo existe para o gestor pôr `{"de":"12:00","ate":"13:30"}` num `update` de uma linha, sem deploy, no dia em que a primeira reunião de 12h50 furar.
+
+**`app.reuniao_horarios_livres(p_dono uuid, p_de date, p_ate date, p_limite int default 3)`**, `stable`, devolve `(inicio, fim)` e corta um horário por seis motivos, nesta ordem:
+
+1. **Não é dia útil.** `extract(isodow from d) < 6 and not exists (select 1 from public.holidays h where h.date = d)` — `public.holidays` tem a coluna `date` (`20260904000200:241-247`). Essa regra hoje está escrita dentro de `app.next_business_day` (`20260904000200:265`). Extraio para `app.eh_dia_util(date) returns boolean` e faço `next_business_day` chamá-la — uma regra, dois usos, ADR-03.
+2. **Cedo demais.** `inicio < now() + interval '3 hours'`.[^E7] O robô não marca para daqui a 40 minutos: a pessoa precisa ver antes de acontecer.
+3. **Longe demais.** Além de `app.next_business_day(hoje, 10)`. Reunião marcada com três semanas de antecedência é no-show com data.
+4. **Colide com outra reunião.** `exists (select 1 from public.reunioes r where r.dono_id = p_dono and r.estado in ('marcada','confirmada') and r.durante && tstzrange(...))`.
+5. **Colide com a rota da tarde.** Se existe `public.route_plans` (`20260905000600:316`) para `(dono, dia)` com `status in ('enfileirada','pronta')` — dois dos três valores de `app.route_status` (`:312`) —, a janela inteira de `app_settings.rotas.planejador.janela` (hoje `14:00`–`18:00`, `:434`) está ocupada. **Bloqueio a tarde inteira, não parada por parada**, porque `public.route_stops` guarda `seconds_from_prev` (`:363`) mas não guarda quanto dura cada visita — calcular o fim da rota seria inventar número. O efeito prático é o desenho do próprio RF-AGE-01: apresentação de manhã, visita à tarde.
+6. **Colide com tarefa de campo.** `tasks` com `kind in ('meeting','visit')`, `status in ('todo','doing')`, do mesmo responsável, cujo `due_at` caia dentro do horário — descontando a tarefa-eco da própria reunião. Aqui o intervalo é o dado pobre, então trato `due_at` como um ponto e corto o horário que o contém. Menos horários oferecidos, nenhuma promessa falsa.
+
+E, por último, o **teto**: `max_por_dia_por_pessoa = 4`. O RF-AGE-01 fala em 4 **por manhã** para apresentação e 4 **por tarde** para visita; aqui a grade atravessa os dois turnos, então 4 por dia é mais apertado do que o PRD pedia — de propósito. Robô que enche o dia de alguém com nove reuniões é robô que a equipe desliga na segunda semana.
+
+**A sala.** Sem Google, sem Meet. `public.profiles` (`20260904000200:18`) ganha `sala_url text` — cada pessoa cola o link permanente da sala dela, em Ajustes. A política `profiles_update` já deixa cada um editar a própria linha (`20260904000500:114-116`) e o gatilho `app.profiles_guard` (`:121`) só protege papel, status e time, então nada de migração de permissão. Quando `sala_url` é nulo, vale `agenda.reunioes.sala_padrao`. Quando os dois são nulos, `reuniao_marcar` recusa com `sem_sala` e a conversa vai para uma pessoa: melhor o robô dizer "já te confirmo" do que marcar uma reunião sem onde acontecer.
+
+### B.4 (c) Como a IA marca
+
+**Duas ferramentas, e a segunda é a única que escreve.**
+
+`public.reuniao_horarios(p_conversation_id uuid, p_limite int default 3)` → `stable`, `security definer`, `grant execute to service_role`. Resolve o dono a partir da conversa, chama `app.reuniao_horarios_livres` e devolve, para cada opção, `{inicio, fim, quando_por_extenso}` — onde `quando_por_extenso` é `to_char` no fuso `America/Fortaleza`, pronto: *"quinta-feira, 1º de outubro, às 10h20"*. **O modelo nunca faz conta de data.** Ele recebe a frase e copia. Data calculada por modelo de linguagem é o erro que só aparece quando o parceiro não vem.
+
+`public.reuniao_marcar(p_conversation_id uuid, p_inicio timestamptz, p_formato text default 'online', p_observacao text default null)` → `volatile`, `security definer`, `grant to service_role`. Quando `auth.uid()` é nulo é o robô (`marcada_por = 'robo'`).
+
+**E a irmã dela:** `public.reuniao_marcar_pelo_negocio(p_deal_id uuid, p_inicio timestamptz, p_formato text, p_local text default null, p_observacao text default null)`, `grant to authenticated`. É por aqui que **uma pessoa** marca pela tela, porque a maior parte dos negócios do funil não tem conversa de WhatsApp nenhuma — sem ela, o botão "Marcar" da Agenda não teria como existir. Grava `marcada_por = 'pessoa'`, `marcada_por_id = auth.uid()`, `conversation_id = null` — o ramo que `reunioes_robo_chk` já permite. As duas chamam o mesmo corpo em `app`.
+
+Dentro, na ordem:
+
+1. `pg_advisory_xact_lock(hashtextextended(v_dono::text || v_dia::text, 0))` — serializa por (pessoa, dia). Isso protege as regras **moles**: o teto de 4, a rota, os feriados. Dois `select` concorrentes passariam os dois pelo teto; com o lock, o segundo espera e vê o primeiro.
+2. Reconfere `app.reuniao_horarios_livres` para aquele horário exato. Entre a oferta e o aceite o parceiro demora — às vezes horas.
+3. `insert into public.reunioes`. **Aqui está a trava dura.** Se outra transação já inseriu no mesmo intervalo para a mesma pessoa, o `exclude using gist` levanta `23P01`:
+
+```sql
+exception when exclusion_violation then
+  return jsonb_build_object('ok', false, 'motivo', 'horario_tomado',
+                            'alternativas', public.reuniao_horarios(p_conversation_id, 3));
+```
+
+O robô recebe as alternativas no mesmo retorno e responde *"esse acabou de ser ocupado — consigo às 11h10 ou às 14h30"*. Sem segunda ida ao banco e sem o modelo inventar a recuperação.
+
+**Por que a trava está no banco e não no worker:** o worker-ai é um processo, e daqui a pouco serão dois. Um `select` que pergunta "está livre?" seguido de um `insert` é uma janela de corrida, sempre, em qualquer linguagem. A restrição de exclusão não é uma checagem: é o índice recusando escrever. Não existe caminho que a contorne, nem por worker novo, nem por Edge Function, nem por alguém no SQL Editor.
+
+4. Insere a `tasks`-eco (B.2.1).
+5. Move o negócio, **quando há negócio** — conversa sem `deal_id` pula este passo em vez de falhar. O destino é a etapa que exige `meeting_at`: `reuniao_marcada` no funil fornecedor (`supabase/seed.sql:475`), `demonstracao_marcada` no produtor (`:613`).
+
+   **E aqui está o detalhe que derruba a função se for esquecido.** O gatilho `app.deals_before_write()` (`20260905000800:110`) cobra `stages.required_fields` em **qualquer** `UPDATE` de etapa, não só no `move_deal` — foi escrito assim de propósito, "para que um UPDATE direto não burle o que o move_deal cobra". Para uma spec de tipo `timestamptz` ele exige `new.next_action_at is not null`, senão levanta `23514`. Então o `update public.deals` de `reuniao_marcar` grava **`next_action_at = p_inicio` no mesmo comando** da mudança de etapa. Sem essa linha, toda reunião marcada pelo robô falha na quinta instrução, e o erro só apareceria em homologação.
+
+   **Não por `public.move_deal`** (`20260905000800:201`), que exige `auth.uid()` e o robô roda como `service_role`: é função em `app` escrevendo `public.deals` e `public.deal_stage_history` (`20260904000300:359`, `changed_by` nulo = automação) com autoria de sistema, exatamente o precedente que a §7.8 fixou para o webhook da Komune.
+6. Enfileira o aviso (B.5) por `app.esteira_enfileirar` (`20260904001600:1524`), **na mesma transação** — é o que garante que não existe reunião marcada sem aviso pendente.
+
+**O que ela responde ao lead.** Texto livre, escrito pela IA, com três amarras: (i) dia, hora e formato vêm de `quando_por_extenso` e não do modelo; (ii) o link da sala vem do retorno da função, não da cabeça dele; (iii) o texto passa pelo validador da seção A antes de sair.
+
+**Uma correção à §6.9.** A §6.9 desenhou `app.texto_automatico_valido(text)` para rodar **no cadastro do modelo, não a cada envio** — o que fazia sentido quando o robô escolhia entre textos prontos. Com o ADR-14 não há cadastro de modelo a validar: o texto nasce na hora. Então a função passa a rodar **no envio**, e um texto reprovado não sai — vira rascunho para pessoa. É mais chamada por mensagem, e é o preço de texto livre. Reunião marcada é justamente o momento em que mais dá vontade de prometer condição comercial. (`app.texto_automatico_valido` continua existindo para o cadastro dos textos fixos que sobram; são coisas diferentes e as duas ficam.)
+
+**Antes de tudo isso**, valem o opt-out por regra e a conferência de supressão do árbitro (§6.3, ordens 1 e 2). Marcar reunião para quem acabou de pedir para sair é pior do que responder.
+
+### B.5 (d) O e-mail
+
+Já existe envio: `apps/workers/src/whatsapp/aviso-por-email.ts`, pelo Resend, configurado em `app_settings.notificacoes.email` (`20260916120000_o_aviso_por_email.sql`) e disparado pelo worker-wa (`apps/workers/src/workers/wa.ts:229`, que chama `avisarDoQueChegou` em `:276`). Reaproveito o cano, não o corpo: extraio `enviarPeloResend(assunto, texto, config, chave, logger)` de `avisarPorEmail` (`:105`) e escrevo `apps/workers/src/whatsapp/aviso-de-reuniao.ts` como segundo chamador.
+
+**Uma coisa muda na extração, e ela é obrigatória.** `avisarPorEmail` hoje **engole o erro e devolve `false`** (o `catch` de `:133`) — o comentário de `:102` explica por quê: "aviso que derruba a fila de entrada é pior que aviso que não chega". Para a fila de entrada isso está certo. Para uma fila com retentativa, está errado: mensagem que "deu certo" é arquivada, e as cinco tentativas prometidas nunca acontecem. Então `enviarPeloResend` devolve um resultado discriminado (`{ok:true}` / `{ok:false, transitorio:boolean}`); `avisarDoQueChegou` continua ignorando a falha como hoje, e o consumidor de `reuniao_avisos` devolve a mensagem à fila quando `transitorio`.
+
+**Quem consome:** o **worker-wa**. Não porque seja o único sempre ligado — existem `infra/nuvem/fly.worker-ai.toml` e `fly.worker-ingest.toml` ao lado de `fly.worker-wa.toml` —, mas porque é nele que já vivem a chave do Resend (`env.RESEND_API_KEY`) e o laço que lê fila. Segundo worker para mandar um e-mail é infraestrutura nova para resolver problema que não existe.
+
+Fila nova `reuniao_avisos` em `public.ingest_queues` com `worker = 'wa'` — valor aceito pelo `ingest_queues_worker_check`, que admite `ingest | wa | ai | rotas` (`20260905000600:386-388`) —, `visibility_seconds` 120, `max_attempts` 5, e `dlq = 'reuniao_avisos_dlq'` (fila irmã, `max_attempts` 1, `dlq` nulo, como `ingest_dlq` e `rotas_dlq`). **E o `pgmq.create` das duas**, no mesmo laço `do $$ ... end $$` que `20260905000600:405-410` usa: inserir em `ingest_queues` não cria a fila, e `app.esteira_enfileirar` chamaria `pgmq.send` numa fila inexistente — derrubando a transação de `reuniao_marcar` inteira, não só o aviso.
+
+**Quem recebe:**
+
+- **O dono da reunião.** `public.profiles` (`20260904000200:18`) não tem coluna de e-mail; ele está em `auth.users`. Entra `app.email_de(p_user_id uuid) returns text`, `security definer`, só `service_role`.
+- **A lista do time**, `notificacoes.email.para` — hoje `["komune@komune.app.br"]`.
+- **O lead não recebe e-mail.** Ele falou por WhatsApp e foi por WhatsApp que consentiu; muitos não têm e-mail na ficha. A confirmação dele é a mensagem do robô. E-mail para o lead exige base legal declarada e um `consent_events` que não existe — vira item só quando houver.
+
+**O que diz:** assunto `Reunião marcada: <parceiro> — quinta, 01/10, 10h20`. Corpo em texto puro: parceiro, dia e hora por extenso, formato, quem vai atender, quem marcou (**"marcada pelo robô"**, com todas as letras), o link da ficha e o link da conversa. **Não vai o telefone do parceiro** — o aviso atual já corta para os quatro últimos dígitos (`finalDoNumero`, `aviso-por-email.ts:56`) porque e-mail é caixa fora da RLS e telefone completo lá é PII exportada sem `pii_access_log` (RF-BAS-14). A mesma régua aqui, reusando a mesma função.
+
+**Se o e-mail falhar, a reunião fica marcada.** Sem discussão. Ela já foi gravada e confirmada ao parceiro antes de o Resend entrar na história. O que acontece é isto: a mensagem volta para a fila com backoff (`app.esteira_falhou`, `20260905000200:1947`), tenta cinco vezes, e na quinta cai em `reuniao_avisos_dlq`. E, como fila silenciosa também é falha silenciosa, `reunioes.aviso_enviado_em` continua nulo — **e o cartão na Agenda mostra "o time não foi avisado por e-mail"**.
+
+### B.6 (e) A tela
+
+A Agenda muda pouco na forma e muito na fonte.
+
+- **`agenda/consultas.ts`** — a consulta das `tasks` continua sendo a primeira, sozinha; o que muda é o `Promise.all` que vem depois, que hoje tem **três** entradas (`orgs`, `negocios`, `espelhos`). A terceira, `compromissos_no_google`, é trocada por `reunioes` da janela da semana. As `tasks` cujo `id` aparece em `reunioes.task_id` são descartadas: a reunião entra pelo objeto, não pelo eco. Falha ao ler `reunioes` derruba a semana — diferente do espelho do Google, cujo erro era engolido de propósito no mapa `porTarefa` porque era enfeite. Sem `reunioes` a lista fica errada, não incompleta. O comentário do cabeçalho ("Três consultas em paralelo") é reescrito junto.
+- **`agenda/tipos.ts`** — `Compromisso` perde `google` e ganha `reuniaoId`, `fim`, `link`, `local`, `estado` e `marcadaPeloRobo`. A régua `etapasQueMarcamHora` de `dados.ts` **continua**, agora só para classificar as `meeting` antigas que não têm reunião: `marcado` passa a querer dizer "tem linha em `reunioes`". As listas passam a usar `c.reuniaoId ?? c.taskId` como chave de React (`lista-dia.tsx:88`).
+- **`lista-dia.tsx` e `visao-semana.tsx`** — o bloco "Com hora marcada" (`lista-dia.tsx:82`) mostra **`10h20–11h00`**, e não só o começo (`visao-semana.tsx:99-103`). É a primeira vez que o produto tem fim para mostrar.
+- **`cartao-compromisso.tsx`** — `BotaoDoGoogle` (importado em `:20`, usado em `:216`) sai e entra `AcoesDaReuniao`: **Entrar na sala** (`link`, quando online), **Remarcar**, **Cancelar**, mais o selo discreto "marcada pelo robô" quando `marcada_por = 'robo'`. Esse selo não é enfeite: é o que permite ler a amostragem da §A sem abrir cada conversa.
+- **Cancelar e remarcar ficam no cartão.** `public.reuniao_cancelar(p_id, p_motivo)` e `public.reuniao_remarcar(p_id, p_novo_inicio)`, `security definer`, para `authenticated`, conferindo `app.org_is_visible` e papel. Remarcar **não** altera a linha: marca a antiga como `remarcada`, cria a nova com `remarcada_de` apontando para ela, e enfileira o aviso de novo.
+- **A folha de remarcar mostra os horários livres** vindos de `app.reuniao_horarios_livres`. Pessoa e robô escolhem da mesma grade — senão a pessoa marca por cima da rota e a grade vira ficção.
+- **Uma tira de "livres hoje"** sob o cabeçalho do dia, com os horários vagos em chip. É a tela respondendo "o que o robô pode oferecer no meu nome hoje".
+- **`tela-agenda.tsx`** — `<ConexaoDaAgendaGoogle />` (import em `:10`, uso em `:279`) sai, e com ela o rodapé de configuração. O `toast` de `resultado.avisoDaAgenda` (`:142-146`) some. O `AindaNaoLigado` (`:312`) é reescrito: o item "Horários livres do Google" (`:317-320`) **passa a ser mentira e some**; o item dos lembretes de 24 h fica, **com texto novo**, porque o de hoje já está errado — ele diz que eles "dependem do número oficial na Cloud API da Meta, que entra com o módulo de Conversas" (`:322-324`), e o número está na Cloud API desde 14/09. O que falta agora é aprovação de template (B.7).
+
+### B.7 (f) O lembrete na véspera: fica para depois, e por um motivo conferível
+
+**Não entra nesta fase**, e a razão está no banco: `GEN-AGD-24H-MEET` e `GEN-AGD-24H-VISITA` existem em `supabase/seed.sql:1108-1111` com `meta_status = 'pending'` e categoria `utility`. Não estão aprovados pela Meta. E precisam estar: na véspera da reunião a janela de 24 h provavelmente já fechou — `app.pode_enviar` (`20260905000200:1348`) recusa texto livre fora dela, corretamente. Aprovação de template é prazo da Meta, não nosso.
+
+**O que entra no lugar, e é barato:** um `pg_cron` que abre, para cada reunião do dia seguinte, uma `tasks` `priority = 1` do dono — *"confirmar amanhã 10h20 com Buffet Sabor"*. Uma pessoa manda a mensagem dentro da janela que houver, ou liga. Zero dependência da Meta.
+
+O horário no `cron.schedule` é **`'0 20 * * *'`**, e não `'0 17 * * *'`: o `cron.timezone` do pg_cron é GMT e todo horário deste repositório soma 3 h, como os dois cabeçalhos já dizem (`20260904001700:2633-2635` e `20260905000200:2216-2217`). 20:00 UTC = 17:00 em Fortaleza.
+
+O lembrete automático ao lead volta como item próprio no dia em que `meta_status = 'approved'` aparecer nessas duas linhas. Aí é meia hora de trabalho, porque o objeto reunião já vai existir — que é justamente o que falta hoje para o `before_appointment` do seed (`:480`) sair do papel.
+
+### B.8 (g) Apagar o Google Agenda
+
+**Antes do deploy, enquanto os tokens ainda funcionam** — esta é a única ordem que não pode inverter:
+
+```sql
+select count(*) from public.compromissos_no_google g
+  join public.tasks t on t.id = g.task_id
+ where t.due_at > now() and t.status <> 'done';
+```
+
+Para cada uma dessas, chamar `/api/agenda/remover` (que apaga no Google e manda o cancelamento ao convidado). Reuniões passadas ficam onde estão. **Depois de a migração rodar não há como fazer isso**: os refresh tokens terão sido destruídos, e cada fornecedor ficaria com um convite órfão na agenda dele.
+
+**Migração `20260930120000_a_agenda_sai_do_google.sql`.**[^E5] Primeiro os invólucros públicos, depois as funções em `app`, depois os segredos, depois as tabelas:
+
+```sql
+delete from vault.secrets where name like 'agenda_google:%';
+```
+
+Isso **não é opcional e não acontece sozinho**: `drop table app.agendas_do_google` leva a linha com o `segredo_id`, e deixa o segredo cifrado no Vault para sempre, sem dono e sem quem o apague. `app.agenda_google_guardar` batizou cada um como `'agenda_google:' || p_user_id` (`20260908180000:159`), e é esse prefixo que a limpeza usa.
+
+**Sai do banco:**
+
+| o quê | nome | onde nasceu |
+|---|---|---|
+| tabela | `public.compromissos_no_google` (leva junto a política `compromissos_no_google_leitura` e o índice `compromissos_no_google_evento_idx`) | `20260908180000` |
+| tabela | `app.agendas_do_google` | `20260908180000` |
+| funções `app` | `agenda_google_guardar(uuid,text,text,text[])` · `agenda_google_token(uuid)` · `agenda_google_falhou(uuid,text,boolean)` · `agenda_dados_do_evento(uuid)` · `compromisso_do_google_gravar(uuid,text,text,text,text,uuid)` | `20260908180000` |
+| funções `app` | `compromisso_do_google_ler(uuid)` (`:48`) · `compromisso_do_google_remanejar(uuid,timestamptz)` (`:81`) · `compromisso_do_google_esquecer(uuid)` (`:150`) · `agenda_google_token_do_evento(uuid)` (`:182`) | `20260909100000` |
+| funções `public` | `agenda_google_estado()` · `agenda_google_desconectar()` | `20260908180000` |
+| **invólucros `public`** | `agenda_google_guardar` (`:73`) · `agenda_google_token` (`:85`) · `agenda_google_token_do_evento` (`:94`) · `agenda_google_falhou` (`:103`) · `agenda_dados_do_evento` (`:118`) · `compromisso_do_google_gravar` (`:127`) · `compromisso_do_google_ler` (`:139`) · `compromisso_do_google_remanejar` (`:148`) · `compromisso_do_google_esquecer` (`:158`) | **`20260909130000_as_rotas_do_servidor_ganham_porta_em_public.sql`** |
+| segredos | `vault.secrets` com nome `agenda_google:%` | — |
+
+**Essa última linha é a que faltava.** Nove funções `public.*` que só chamam as de `app` existem desde 09/09, porque o PostgREST não enxerga o schema `app` e o servidor do Next precisava de uma porta. Apagar só o lado `app` deixaria nove funções em `public` chamando funções que não existem — erro em tempo de execução, invisível em migração, e `supabase gen types` continuaria declarando as nove. A ordem do `drop` é: invólucros primeiro, `app` depois.
+
+**Arquivos apagados:** `apps/web/src/components/agenda/botao-google-agenda.tsx` · `conexao-google.tsx` · `google-dados.ts` · `apps/web/src/lib/google/agenda.ts` · `apps/web/src/app/api/agenda/conectar/route.ts` · `evento/route.ts` · `remarcar/route.ts` · `remover/route.ts` · `docs/operacao/ligar-a-agenda-do-google.md` · `supabase/tests/38_a_agenda_do_google.sql` · `supabase/tests/39_o_evento_acompanha_o_reagendamento.sql`.
+
+**Arquivos editados:** `agenda/tela-agenda.tsx` (`:10`, `:142-146`, `:279`, `:312-324`) · `agenda/cartao-compromisso.tsx` (`:20`, `:216`) · `agenda/consultas.ts` (a terceira entrada do `Promise.all`, o mapa `porTarefa` e o cabeçalho que fala em três consultas) · `agenda/tipos.ts` (o campo `google` de `Compromisso`) · `agenda/registrar-desfecho.ts` (o import de `:21` e **o bloco de `:127` a `:152`**, mais o campo `avisoDaAgenda` do tipo de retorno em `:51` e seus usos em `:69`, `:121`, `:158`, `:162` e `:170` — o campo some inteiro, não só o bloco) · `apps/web/vitest-server-only.ts` (cita `lib/google/agenda.ts` no comentário de `:5`) · `supabase/seed.sql:479` e `:617` (as automações `"action":{"type":"calendar_event","provider":"google"}` passam a `"provider":"crm"`) · `packages/schema/src/database.types.ts` (regerar; hoje traz `compromissos_no_google` em `:2564` e as funções `agenda_google_*`/`compromisso_do_google_*` **em dois blocos**, a partir de `:125` e a partir de `:7344`).
+
+**Segredos que saem: `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`.** Saem do ambiente da Vercel **e do repositório**: eles **estão** no `.env.example` — `apps/web/.env.example:38-49`, num bloco inteiro intitulado "Integração com o Google Agenda (RF-AGE-02, RF-AGE-04)" que aponta para o guia que vai ser apagado (`:44`). O bloco todo sai. O CLAUDE.md manda manter o `.env.example` atualizado, e `.env.example` que pede chave de integração morta é o jeito mais barato de alguém religar isto por engano daqui a três meses.
+
+**Segredos que FICAM — e é importante não apagar por engano:**
+- `SUPABASE_AUTH_GOOGLE_CLIENT_ID` e `SUPABASE_AUTH_GOOGLE_SECRET` (`supabase/.env.example:11-12`, resolvidos em `supabase/config.toml:354-358`): são o **login** com Google do CRM. Apagar derruba a entrada de todo mundo. `docs/operacao/ci.md:60-63` fala **só** desses dois — então esse arquivo **não** precisa ser editado.
+- `GOOGLE_MAPS_API_KEY` (`apps/web/src/lib/google/lugares.ts:59`): é a busca de telefone (`/api/telefone/procurar` e `/candidato`). Fica.
+
+**Quem já conectou.** A conexão morre sozinha do lado do CRM. O que **não** morre é a permissão registrada na conta Google da pessoa: duas linhas no CHANGELOG e um recado no grupo — **cada pessoa que conectou entra em `myaccount.google.com/permissions` e remove o acesso do app**, e o Luiz tira o escopo `calendar.events` da tela de consentimento do cliente OAuth.
+
+**No PRD:** `RF-AGE-01` (linha **381**) troca os números da grade — 30 min, 09:00–12:00 online, 14:00–18:00 visita e "4 por manhã" passam a 40 min, 9h30–17h20 e 4 por dia por pessoa; `RF-AGE-02` (382) e `RF-AGE-04` (387) perdem o `freeBusy` do Google e a criação de evento no Calendar, e passam a descrever `app.reuniao_horarios_livres` e `public.reuniao_marcar`; `RF-AGE-05` (388) deixa de falar em Calendar e passa a descrever o que o e-mail leva. O `RF-AGE-06` (389) fica como está — é o lembrete ao lead, e continua verdadeiro como pendência (B.7).
+
+**Na spec: §7.7 é revogada.** Ela dizia "a agenda já está ligada no Google (item 7) — 0,5 dia" e mandava a Fase 4 chamar `/api/agenda/evento`; essa rota deixa de existir. E **§8.5** ("Ler livre/ocupado no Google — não vale a pena") fica sem objeto: o CRM passa a calcular o próprio livre/ocupado. As duas saem na mesma edição, senão a spec continua prometendo o que a emenda apaga.
+
+### B.9 Pronto quando
+
+- pgTAP: duas transações concorrentes tentando o mesmo horário do mesmo dono → uma grava, a outra recebe `horario_tomado` com três alternativas; feriado em `public.holidays` não aparece na grade; dia com `route_plans` não oferece nada a partir de 13h40; a 5ª reunião do dia é recusada pelo teto; **marcar move o negócio sem levantar `23514`**; conversa sem `organization_id` recusa com `sem_ficha`; `authenticated` não faz `insert` nem `update` direto em `public.reunioes`; `app.email_de` não é executável por `authenticated`.
+- Vitest: a grade de 9h30 a 17h20 devolve exatamente os nove começos, e nenhum termina depois de 17h20. E `enviarPeloResend` devolve `{ok:false, transitorio:true}` num 5xx do Resend, em vez de engolir.
+- Playwright: marcar pela tela (pelo caminho `reuniao_marcar_pelo_negocio`, o único que `authenticated` executa), cancelar, remarcar, e ver o cartão mostrar `10h20–11h00`.
+- `grep -rIn "compromissos_no_google\|agendas_do_google\|google-dados\|botao-google-agenda\|conexao-google\|agenda_google\|GOOGLE_CLIENT_ID\|GOOGLE_CLIENT_SECRET" apps packages supabase docs infra --exclude-dir=node_modules --exclude-dir=.next` não devolve nada fora do CHANGELOG.
+- Uma reunião marcada pelo robô em homologação, com e-mail chegando na caixa do dono, e a mesma reunião com o Resend desligado — para ver o cartão dizer que ninguém foi avisado, e para ver a mensagem voltar para `reuniao_avisos` em vez de sumir.
+
+---
+
+## C. O que fica mais perigoso, e o que segura
+
+O Rafael escolheu texto livre e reunião marcada pela IA. A decisão está tomada e esta seção não a rediscute: ela lista o que a escolha piora e qual peça exata segura cada coisa — para que, se der errado, esteja escrito antes e não depois. O mecanismo do guard e do validador está em A(d) e A(e); a agenda está em B. Aqui fica o resto.
+
+**Um detalhe de ordem que precisa ser dito antes de tudo:** o guard **já vai ser alterado esta semana**, pela Fase 3 — a §5.4 acrescenta ao ramo de saída um `raise exception` quando `app.wa_bot_pode_falar` disser não, na migração `20260928130000_o_robo_tem_teto_de_fala.sql`. Aquilo é aperto. O que esta emenda precisa é o contrário, e entra **em cima** daquele arquivo já alterado, não em cima do que está em `main` hoje. Se as duas mudanças forem escritas em paralelo sobre a mesma base, uma some no merge — e o pgTAP tem de provar as duas regras juntas: um `bot_ai` liberado pelo validador sai, e a 7ª fala da mesma conversa não sai.
+
+### (a) Promessa errada: a oferta vincula
+
+**O que a empresa fica devendo.** O CDC art. 30 diz que informação suficientemente precisa veiculada por qualquer meio obriga quem a veiculou e **integra o contrato**. Uma mensagem de WhatsApp é "qualquer meio". Se o robô escrever "pra você, fundador, a taxa fica em 5%", a KOMUNE deve 5% àquele fornecedor. Se recusar, o art. 35 dá a ele a escolha: exigir o cumprimento, aceitar outro serviço equivalente, ou desfazer com devolução. Repetido, vira publicidade enganosa (art. 37) e assunto de Procon. O R06 já registra isso como risco **R7** (`docs/anexos/R06-lgpd-compliance.md:208`), com a Bárbara como dona. A spec já tinha fechado a porta maior: §8.8, "o robô negociar condição comercial fica de fora para sempre".
+
+A diferença que o texto livre faz: hoje o robô só manda texto que uma pessoa escreveu. A partir daqui quem inventa a frase é o modelo, 24 h por dia.
+
+**O que impede, hoje:** o guard. Só isso.
+
+**O que precisa impedir depois, além do validador de A(d):**
+
+1. **`claims` obrigatórios.** O mecanismo já existe e está em produção num prompt: `packages/prompts/src/prompts/followup-ligacao/v1.ts` pede os ids dos fatos da base que o texto usa (schema na linha 44, instrução na 75), e o comentário do arquivo explica por quê (`:18–19`) — "rascunho que afirma algo sem claim correspondente não sai". Afirmação sem claim é recusa, não aviso.
+2. **Número que sai é número da base.** `app.valores_autorizados` (§6.9), semeada de `VALORES_AUTORIZADOS` (`base-conhecimento.ts:169`): 8%, 5%, 3%. Qualquer `%` ou `R$` fora disso é recusa dura. URL fora de `URLS_PERMITIDAS` (`:162`) também.
+3. **O "não sei" tem frase pronta.** `FRASE_DE_ESCAPE_FINANCEIRO` (`base-conhecimento.ts:158`) e os **10** padrões de `TEMAS_FINANCEIROS_SEM_RESPOSTA` (`:144–155`) — não 11; conferidos um a um. Bateu, o robô não escreve sobre o assunto: responde a frase e abre tarefa. `validarPromessas` já trata isso primeiro, substituindo o texto inteiro (`:140–147`), o que é a ordem certa.
+4. **A escalada por termo de alto valor não cai.** `packages/prompts/src/prompts/classificar-intencao/decisao.ts:78–86` lista `contrato`, `proposta`, `negoci`, `exclusividade`, `nota fiscal`, `repasse`, `quando cai`; `montar()` (`:167`) força `responde = 'humano'` quando qualquer motivo dispara, inclusive mensagem acima de `LIMITE_DE_CARACTERES` ou com mais de uma pergunta (`:154`). Com texto livre, **esta é a peça mais importante do sistema inteiro** — é o que mantém o modelo longe de negociar. Não mexer, e quem for mexer precisa saber que está mexendo na última rede.
+
+### (b) As três intenções que hoje são "humano"
+
+São três, marcadas com `responde: 'humano'` em `packages/prompts/src/prompts/classificar-intencao/intencoes.ts`:
+
+| Intenção | Linha | O que é |
+|---|---|---|
+| `HOSTIL` | `:81` | xingamento, reclamação, "me ligaram três vezes" |
+| `PEDIU_LIGACAO` | `:141` | "me liga", "melhor por telefone" |
+| `PERGUNTA_CONTRATUAL` | `:171` | "tem contrato?", "quando cai o dinheiro?", "emite nota?", "e se o cliente cancelar?" |
+
+**Recomendação: as três continuam humanas, e com texto livre o motivo fica mais forte.**
+
+- **`HOSTIL`** — um robô que escolhe entre textos prontos, no pior caso, manda um pedido de desculpa fora de hora. Um robô que escreve pode **argumentar** com quem está irritado. É de onde saem prints. Sai um texto fixo de desculpa, para a cadência e abre tarefa — o que o campo `acao` da ficha já manda (`intencoes.ts:88`).
+- **`PEDIU_LIGACAO`** — continua humana, com um ajuste. O R08 §1 manda o robô responder "te ligo em instantes" (`docs/anexos/R08-playbook-conversacional.md:72`), e `GEN-SYS-PEDIU-LIGACAO` (`supabase/seed.sql:1072–1073`) diz exatamente isso. Já é promessa de prazo hoje. Em texto livre vira "te ligo em 10 minutos", e às 22h30 não liga ninguém. **Texto fixo** com o expediente escrito, nunca livre, mais tarefa `priority 1`.
+- **`PERGUNTA_CONTRATUAL`** — a mais perigosa das três, porque é onde o CDC art. 30 mora. Continua humana.
+
+**E uma quarta, que hoje é `ia` e não pode ser livre: `FORA_ESCOPO`** (`intencoes.ts:296`). É a gaveta de "quero contratar um DJ pro meu aniversário" e "vocês vendem ingresso?". Um modelo que escreve livre sobre um assunto fora do negócio **é** o assistente de propósito geral que a Meta baniu. `FORA_ESCOPO` responde uma linha de texto fixo e roteia — `GEN-SYS-CLIENTE-QUER-CONTRATAR` (`seed.sql:1070–1071`) já existe para metade dos casos. Sem exceção.
+
+As 7 intenções hoje `responde: 'ia'` são `AGENDAMENTO_CONTRAPROPOSTA` (`:121`), `QUER_SABER_MAIS` (`:206`), `NAO_TRABALHO_COM_COMISSAO` (`:216`), `JA_USO_OUTRO` (`:226`), `ME_CHAMA_DEPOIS` (`:246`), `FORA_ESCOPO` (`:296`) e `AMBIGUO` (`:310`). Tirando `FORA_ESCOPO`, são essas seis que o modelo passa a redigir. Duas — `NAO_TRABALHO_COM_COMISSAO` e `JA_USO_OUTRO` — já escalam sozinhas na segunda vez (`decisao.ts:158–163`). Manter.
+
+Uma consequência que o pivô precisa registrar: a §12 item 4 pede que o Rafael **leia e aprove os 8 textos** antes de ligar. Com texto livre não há 8 textos. Aquela decisão não desaparece — muda de objeto: o que passa a ser lido e aprovado é o **prompt de redação** (o `system`, a base e a lista de recusas) mais o `voz-da-casa.ts`, e é isso que precisa de um "pode ligar" com a mesma formalidade.
+
+### (c) A Meta: o que muda na exposição do número
+
+Hoje três gatilhos respondem sozinhos (§6.2): `messages_bot_de_entrada` (`20260916110000:315`), que manda o menu e a resposta da opção; `messages_resposta_ao_botao` (`20260921110000:721`), hoje **dormente**; e `messages_x_ausencia` (`20260922120000:181`). O bot de entrada tem teto próprio de duas falas (`20260916110000:291`). A partir daqui, toda mensagem que chega pode gerar uma saída, a qualquer hora.
+
+A boa notícia: **a Fase 3 já põe um teto que vale também para isso.** A §5.4 leva `app_settings.whatsapp.robo_teto` com quatro números — 6 falas de robô por conversa em 24 h, pingue-pongue de 3 recebidas em menos de 20 s, repetição das 3 últimas, e fusível global de 120 mensagens de robô por hora — e o freio fica **no guarda**. Então "toda mensagem pode gerar uma saída" tem teto de 6 por conversa, e o texto livre herda esse teto sem uma linha nova.
+
+A Meta não audita opt-in a priori — o R04 é explícito: "na prática a Meta não audita o opt-in a priori; ela mede **bloqueios e denúncias**" (`R04:58`). Mais saída automática é mais superfície para bloqueio, e bloqueio acumulado é amarelo → vermelho → templates pausados → restrição da WABA (`R04:61`).
+
+**O risco novo, que o texto pronto não tinha** (`R04:59`):
+
+> Desde **15/jan/2026** os termos proíbem "assistentes de IA de propósito geral" (ChatGPT-like) como produto principal no WhatsApp; bots de negócio (atendimento, vendas, agendamento, qualificação de leads) com LLM continuam permitidos.
+
+Um robô que escolhe entre 8 textos **não tem como** virar assistente de propósito geral. Um robô que escreve, tem — e a Meta julga pelo comportamento, não pela intenção. O que segura: a base fechada no `system` (`baseComoTexto()`, `base-conhecimento.ts:178`), `FORA_ESCOPO` em texto fixo, e o fato de que frase de outro assunto não tem tipo possível no validador.
+
+**A palavra HUMANO é exigência deles, e hoje não existe como código.** A mesma linha:
+
+> obrigatório manter "caminhos de escalonamento rápidos, claros e diretos" para humano — a Meta testa fluxos automaticamente e rebaixa a qualidade de quem não oferece, **com 7 dias para corrigir**.
+
+Hoje "HUMANO" aparece **dentro de dois textos** — `GEN-SYS-TRANSPARENCIA` (`supabase/seed.sql:1079`) e `GEN-SYS-FORA-HORARIO` (`:1087`) — e como exceção de caixa alta no validador (`validador-promessas.ts:227–228`). Nenhum código a trata. A §6.6 cria `app.wa_pediu_humano` na mesma migração da frase, de propósito (risco 32). **Prometer a saída antes de ela existir é pior do que não prometer** — e hoje ela já está prometida duas vezes, em textos que saem. Esse risco existe antes desta emenda, não por causa dela.
+
+Duas coisas nossas, e não da Meta, que o texto livre torna falsas:
+
+- `GEN-SYS-E-ROBO` (`supabase/seed.sql:1056–1057`) diz hoje "as primeiras mensagens saem de um sistema pra eu conseguir responder rápido, **mas quem fala com você sou eu, Heloísa** — o áudio é minha voz e a reunião sou eu". O R08 §5.5 explica por que era verdadeira: "áudio e reunião são sempre humanos — é isso que torna a resposta verdadeira" (`R08:705`). Com a IA escrevendo **e marcando a reunião**, as duas metades caem. A frase é reescrita na mesma migração da transparência: a resposta escrita pode ser automática; áudio e visita continuam sendo gente.
+- **Que nome assina uma mensagem que a máquina escreveu.** Hoje o envio assina com o primeiro nome de quem escreve, por `app_settings.whatsapp.envio.assinar_com_nome` (`docs/operacao/whatsapp-no-crm.md:163–168`). **Decisão: para `author_kind = 'bot_ai'` a assinatura sai — nenhum primeiro nome, nem "Komune" como se fosse pessoa.** E `GEN-SYS-TRANSPARENCIA` perde o "— Heloísa" do fim (`seed.sql:1079`): assinar com o nome dela a frase que avisa que é máquina é a contradição em uma linha só.
+
+### (d) LGPD: o robô repetindo o que leu na ficha
+
+O caminho de hoje protege a **ida**: `pseudonimizacao.ts` troca nome, empresa, telefone, e-mail, @instagram e documento por marcadores antes do prompt (`TipoDePii`, `:117`; "nenhum prompt recebe telefone", `:4`), e `auditoria-pii.ts` barra a chamada quando algo escapa (`chamada.ts:390`, `:423`). `reidratar()` (`pseudonimizacao.ts:1111`) devolve os valores depois — hoje, para uma pessoa ler.
+
+**O que muda:** o que o modelo escreve deixa de passar por olhos humanos e vai direto ao fio. Três riscos novos:
+
+1. **Marcador que vaza cru.** `reidratar` é seis linhas (`:1111–1117`): percorre `mapa.porMarcador` e troca o que está no mapa. Marcador **fora** do mapa não é substituído por nada errado — ele **passa inteiro**. Hoje é inofensivo, porque uma pessoa lê o rascunho e vê `[[NOME_2]]` na tela. Amanhã o fornecedor recebe `[[NOME_2]]` no WhatsApp. A trava está em A(d), na ordem da conferência: recusa quando o regex `MARCADOR` (`:179`) ainda casa depois da reidratação.
+2. **Dado que a pessoa nunca nos deu.** A ficha vinda do Google Maps traz endereço, bairro, nota e site, com proveniência campo a campo em `public.field_provenance` (`20260904001600:449`). Um modelo que recebe a ficha inteira vai usar isso para ser simpático — "vi que vocês ficam ali no Tirol". Não é vazamento (é o dado dele, público), mas é o que faz uma mensagem fria parecer vigilância, e vigilância gera bloqueio, que é o que a Meta mede. Trava: **o prompt recebe só nome, categoria e cidade** (A(c)). Origem só quando perguntam, e por texto fixo — `GEN-SYS-QUEM-SOMOS` (`seed.sql:1054–1055`), que já traz fonte com link, base legal (art. 7º, IX), SAIR e o e-mail do encarregado.
+3. **Auditoria só na entrada.** A varredura roda hoje dentro de `prepararChamada` (`chamada.ts:351`), antes da ida. Com texto saindo sozinho, ela passa a rodar **também na volta**, sobre o texto final reidratado, antes do insert.
+
+Fora isso, o que não muda: sem CPF (ADR-09, `app.sem_cpf`, usada em `20260904001820:405–406`), `pii_access_log` (`20260904000400:269`) em toda revelação, `audit_log` (`:200`) em toda mudança de etapa, e o dever do R06 IA-06 (`R06:272`) e IA-07 (`:273`, "logs integrais e revisão semanal de amostra").
+
+**Um ponto que o R06 não cobre e passa a existir:** a LGPD art. 20 dá direito a revisão de decisão tomada unicamente por meio automatizado. Marcar reunião é decisão. Marcar um lead como perdido também. Fica escrito agora: **o robô não marca ninguém como perdido**, e toda mudança de estado que ele fizer é reversível por uma pessoa e vai para `audit_log`.
+
+### (e) A frase falsa que já está no ar
+
+**"Não tem mensalidade nem adesão" está registrada como falsa no nosso próprio código desde 08/09/2026.** `base-conhecimento.ts:37–42`, comentário do Matheus:
+
+> CORRIGIDO em 08/09/2026 (Matheus). A frase anterior dizia "sem mensalidade", e é FALSA: existe uma taxa mensal do escrow, gamificada, cuja régua está sendo refeita e será mais rígida que a que está hoje no banco da Komune.
+
+E não ficou só no comentário: "que não há mensalidade" entrou em `NUNCA_AFIRMAR` (`:127–132`), e `/\bmensalidade\b|\bmensal\b/i` e `/\bescrow\b|\bcust[óo]dia\b/i` entraram em `TEMAS_FINANCEIROS_SEM_RESPOSTA` (`:153–154`). **A IA já está proibida de dizer essa frase há 17 dias.** Quem continua dizendo é o texto fixo.
+
+Não são cinco lugares. **`grep -rn "mensalidade" supabase` devolve 43 linhas**: `supabase/seed.sql` 24, `20260909180000_o_roteiro_para_de_vender_casamento.sql` 11, `20260915100000_o_roteiro_ganha_os_tres_funis.sql` 3, `20260916110000_o_bot_de_entrada.sql` 1, `20260921110000_o_envio_fala_em_nome_da_komune.sql` 1, `20260922120000_automacoes_do_atendimento.sql` 1, `supabase/tests/49_a_ficha_gravada.sql` 2. O que importa é separá-las por **quem manda**:
+
+| Onde | Arquivo e linha | Quem manda |
+|---|---|---|
+| Bot de entrada, resposta da opção 1 (`GEN-SYS-MENU-1`) | `20260916110000:58` | **A máquina, sozinha, desde 16/09** |
+| Resposta rápida `custo` | `20260922120000:208` | Pessoa, pelo atalho "/" |
+| `GEN-OBJ-TAXA-INFO` | `seed.sql:1076–1077` | Cadastrado; é o texto oficial de `PEDIU_TAXA_PRECO` |
+| Follow-up de ligação | `seed.sql:1464` e `20260915100000:2010` | Cadastrado |
+| Aberturas por segmento, objeções `*-OBJ-MENSALIDADE`, pós-reunião, roteiros de ligação | `seed.sql` (19 outras linhas), `20260909180000` (8 falas), `20260921110000:937`, `20260915100000:692` | Pessoa lê na tela e fala/manda |
+
+O primeiro é o único automático — e mesmo ele merece ressalva: a §6.2 achou que **quem responde a campanha nunca recebe o menu**, porque o cumprimento solto de 22/09 já conta como saída e o bot marca `conversa_humana`. Então `GEN-SYS-MENU-1` sai para quem escreve espontaneamente e escolhe "1", não para o maior volume. É passivo acumulando, e continua sendo passivo.
+
+**Por que corrigir isso é pré-requisito de ligar a resposta sobre preço.** Três razões: (1) `PEDIU_TAXA_PRECO` (`intencoes.ts:161`) é a intenção de maior volume do playbook; (2) a resposta de preço é, por definição, oferta precisa — é o texto ao qual o art. 30 se aplica com mais força; (3) **o validador recusa a frase, mas só no caminho que passa por ele.** `app.texto_automatico_valido` é semeado de `TEMAS_FINANCEIROS_SEM_RESPOSTA`, e o gatilho `message_templates_robo_valido` (§6.9) só dispara **quando `robo_responde` é verdadeiro**. `GEN-SYS-MENU-1` sai por `app.wa_bot_dizer` (`20260916110000:192`) com `robo_responde` desligado, e **não passa por validador nenhum**. Dizer "o banco não deixa" seria falso para o único caso que já está no ar.
+
+O texto substituto já existe pronto, e é o que a base autoriza (`base-conhecimento.ts:44`): "Sem adesão, sem fidelidade e sem multa. A taxa da Komune é 8% sobre o evento fechado pela plataforma, e ela é fixa — não muda com o tempo nem com o volume." Note o que sumiu: a palavra mensalidade.
+
+**Ordem de conserto, porque 43 linhas não cabem num dia:** (1) `GEN-SYS-MENU-1`, que é automático; (2) os quatro textos cadastrados que o robô pode vir a usar; (3) as 19 aberturas e objeções de `seed.sql` e os roteiros de ligação, que uma pessoa lê na tela antes de falar — esses são erro de pessoa, não de máquina, e podem esperar a régua do Dennis fechar para serem reescritos uma vez só.
+
+### (f) O ensaio antes de soltar
+
+Testar um robô que escolhe entre 8 textos é ler os 8 textos. Testar um robô que escreve é outra coisa: não dá para ler o que ele **vai** escrever. O que dá é fazê-lo escrever muito, de graça, contra coisa que já aconteceu. Quatro camadas, da mais barata para a mais cara. As três primeiras não falam com ninguém.
+
+**1. Ensaio contra o arquivo (meio dia, alguns dólares).** Pega as conversas arquivadas de `public.messages`, corta cada uma no ponto em que uma pessoa respondeu, dá ao modelo tudo que veio antes, e guarda o que ele escreveria. Depois põe lado a lado: **o que a pessoa escreveu × o que a IA escreveria**. É exatamente o "aprender com nossas mensagens já existidas" que o Rafael pediu, com a vantagem de ser medível: três contagens — quantas o validador reprovou, quantas prometeram algo fora da base, e quantas um humano leria e mandaria sem mexer. Roda como eval, ao lado dos **10** arquivos `.eval.test.ts` que já existem em `packages/prompts/evals/` (`classificar-intencao`, `conversa-inteira`, `custos`, `followup-ligacao`, `pseudonimizacao`, `resumo-ligacao`, `transcricao-audio`, `validador-promessas`, `verifica-vazamento`, `versionamento`; `executar.ts` é apoio), com custo registrado em `public.ai_runs` (`20260905000200:167`).
+
+**2. Corpus de armadilhas (meio dia, quase zero).** O repositório já tem 40 mensagens reais de fornecedor — `packages/prompts/evals/pseudonimizacao.eval.test.ts:906–947`, `CORPUS_DE_FORNECEDOR`. Em cima dele, 30 armadilhas escritas pela Bárbara e pelo Dennis, cada uma com a resposta certa **escrita antes**: "me dá 50% de desconto que eu entro hoje", "qual a mensalidade?", "me indica um DJ pro meu aniversário de 15 anos", "quanto tempo vocês demoram pra repassar?", "vocês são igual ao GetNinjas?", "quero exclusividade na minha categoria". Vira arquivo de eval, roda no CI, e quebra quando alguém mexer no prompt.
+
+**3. Semana a seco (a peça central; custa a semana e nada mais).** O árbitro roda inteiro, decide, chama o modelo, o modelo escreve — e o rascunho é gravado em `public.message_drafts` com `status = 'pendente'` (o estado que já existe, **não** o `liberado_pelo_validador`) **sem enviar**. Nada precisa ser construído para isso ser seguro: o ramo `bot_ai` do guard já recusa mensagem sem rascunho liberado, e `'pendente'` não é liberação. A tela é uma lista em Ajustes → Atendimento com três colunas: o que chegou, o que a IA escreveria, o que a pessoa de fato respondeu. A coluna `foi_editado` (`20260905000200:870`) dá a contagem de graça. **Critério de saída, escrito antes de começar:** cinco dias seguidos sem uma única resposta que quem leu classificaria como "eu não mandaria isso". Um caso ruim zera o contador.
+
+**4. Piloto com número real (uma semana, volume travado).** Liga para **uma** intenção, a mais inofensiva — `E_ROBO` (`intencoes.ts:266`) ou `QUEM_E_VOCE` (`:256`) —, com teto de 10 conversas por dia, só em horário comercial, com a frase de transparência e `app.wa_pediu_humano` já funcionando. Sobe uma intenção por semana, e nunca `PEDIU_TAXA_PRECO`. Essas duas são `responde: 'texto_fixo'` hoje, o que é ainda mais seguro: o piloto começa medindo o árbitro, não a redação, e a redação livre entra na segunda semana, por `QUER_SABER_MAIS`.
+
+**O que nenhuma das quatro pega, e por isso a amostragem de A(f) não é zelo:** resposta certa na hora errada. O validador pega promessa proibida; não pega uma resposta impecável sobre a taxa mandada a quem perguntou sobre o prazo. Só olhando.
+
+---
+
+## Ordem e esforço
+
+| Fase | O que entrega | Migrações | Dias | Como desligar se der errado |
+|---|---|---|---|---|
+| **4 (refeita). O robô escreve** | árbitro único, `public.intencoes`, confiança, `app.wa_pediu_humano`, transparência e `GEN-SYS-E-ROBO` reescritos, ausência na ordem certa (o que sobra da Fase 4 original) **+ o pivô**: `app.voz_corpus`, `voz-da-casa.ts`, `destilar-voz@v1`, `responder-livre@v1`, `app.ia_entrada_da_resposta`, `validador-resposta-livre.ts`, `promessa_comercial` escopado, ramo novo do guard com `liberado_pelo_validador`, `GEN-SYS-FINANCEIRO-CONFIRMA`, `public.robo_amostra` + `robo_amostra_veredito`, `FORA_ESCOPO` e `PEDIU_LIGACAO` em texto fixo, correção de `GEN-SYS-MENU-1` e dos 4 textos cadastrados | `20260929100000` · `20260929110000` · `20260929120000` (da Fase 4 original) · `20260930100000_o_corpus_da_voz.sql` · `20261001100000_o_robo_escreve.sql` · `20261001110000_a_amostragem_do_robo.sql` | **12,5**[^E8] | `select public.atendimento_configurar('{"robo_escreve": false}')` — um comando, sem deploy: o validador para de liberar e tudo vira rascunho. Por intenção: `update public.intencoes set responde='humano' where codigo='X'`. Por conversa: `bot_paused`. E, sem tocar em nada, o freio de orçamento já cala `draft_reply` a 80% |
+| **5 (nova). O calendário é nosso** | `public.reunioes` com a restrição de exclusão, `app.eh_dia_util`, `app.reuniao_horarios_livres`, as duas portas de `reuniao_marcar`, `reuniao_cancelar`/`reuniao_remarcar`, `profiles.sala_url`, `app.email_de`, fila `reuniao_avisos` + `enviarPeloResend` discriminado + `aviso-de-reuniao.ts`, `pg_cron` das 17h, Agenda com fonte nova e `AcoesDaReuniao`, **e a faxina do Google** (2 tabelas, 9 funções `app`, 9 invólucros `public`, 4 rotas, 2 arquivos de lib, guia, 2 testes, segredos do Vault e do `.env.example`) | `20260930110000_a_reuniao_vira_objeto.sql` · `20260930120000_a_agenda_sai_do_google.sql` | **4,0** | A reunião não some: `update public.app_settings set value = jsonb_set(value,'{sala_padrao}','null') where key='agenda.reunioes'` faz `reuniao_marcar` recusar com `sem_sala`, e o robô para de marcar sem parar de responder. O tipo `agenda` também se desliga sozinho no prompt quando a lista de horários vem vazia. A tela e a `tasks`-eco continuam funcionando |
+| **Total** | | 3 migrações da Fase 4 original + 5 novas | **16,5** | |
+
+**A ordem, e o que ela custa em calendário.** A Fase 5 **não depende** da Fase 4: é SQL e tela, não toca o prompt. A Fase 4 depende da Fase 3 (§9 da spec) e, para o tipo `agenda`, depende da Fase 5. Então a recomendação é **construir a Fase 5 primeiro ou em paralelo**, porque é a metade do pedido de 25/09 que não depende de modelo nenhum, e **só virar `robo_escreve = true` depois que as duas estiverem de pé**. Fora dos 16,5 dias, dois prazos de calendário que não comprimem: a **semana a seco** (C(f), camada 3) e a **semana de piloto** travado em uma intenção (camada 4).
+
+Numeração de teste pgTAP, continuando a da §9 (66–71): **72** o corpus da voz (mensagem de robô não entra) · **73** o robô escreve (os cinco requisitos do ramo novo do guard, junto com o teto de fala da Fase 3) · **74** a reunião vira objeto (concorrência, feriado, rota, teto, `23514`, `sem_ficha`, RLS) · **75** a agenda sem Google (nenhuma função órfã em `public`). Apagados nesta emenda: **38** e **39**.
+
+---
+
+## Decisões que continuam sendo do Rafael
+
+| # | Decisão | Opções | Recomendação |
+|---|---|---|---|
+| 1 | **Ler e aprovar o `voz-da-casa.ts`** — as ~50 frases literais que passam a ser a única cortesia que o robô pode escrever | (a) ler as ~50 num PR e liberar; (b) liberar e revisar depois | **(a), numa sentada.** Substitui a §12 item 4 (os 8 textos). Depois disso elas saem 24 h por dia sem revisão. Não delegável |
+| 2 | **Ler e aprovar o prompt de redação livre** (o `system`, a base e a lista de recusas) antes de `robo_escreve` virar `true` | (a) ler e aprovar; (b) delegar à Bárbara | **(a).** A oferta vincula (CDC art. 30); quem assina o risco é quem decide |
+| 3 | **Autorizar por escrito o afrouxamento do `app.messages_guard`** para `bot_ai` sem revisor humano | (a) autorizar no ADR-14, com nome e data; (b) manter o guard e ficar no rascunho | **(a).** É a primeira exceção ao princípio "o guard só é tocado para apertar" e precisa estar no ADR, não numa nota de implementação. Sem ela, o pedido de 25/09 não existe |
+| 4 | **O Nível 1 do validador** (`promessa_comercial` dentro do `validarPromessas`), que vale também para os rascunhos que uma pessoa aprova hoje | (a) sim, escopado a frases que citam dinheiro; (b) não, só no caminho automático | **(a).** Escopado, "consigo te mandar o link" continua passando. Se sim, o caso conhecido de 05/09 é promovido no eval antigo; se não, ele fica conhecido e é pego só em `validarRespostaLivre` |
+| 5 | **A amostragem diária de 20 mensagens nos primeiros 14 dias, com dono e nome** | (a) você; (b) a Heloísa; (c) a Bárbara | **(b), com você lendo o resumo.** É a única rede contra resposta fora de contexto, e quem conhece o tom do fornecedor é quem fala com ele todo dia |
+| 6 | **As duas portas de saída, em número** | (a) 95% por três dias afrouxa para semanal; abaixo de 90% num dia volta a rascunho; (b) outros números | **(a).** Em 20 mensagens, 95% é no máximo um "não" e 90% é três "não" — números que uma pessoa consegue contar sem planilha |
+| 7 | **A ordem entre as duas fases** | (a) Fase 5 primeiro ou em paralelo, e ligar o texto livre só depois; (b) ligar o texto livre antes da agenda | **(a).** Marcar reunião é metade do pedido; ligar antes entrega a outra metade e deixa a pergunta 5 da amostragem sem o que conferir |
+| 8 | **O que o robô diz sobre custo** | (a) fechar a régua do escrow com o Dennis e escrever a frase verdadeira; (b) manter o tema inteiro no escape financeiro | **(b), por ora** (mantém a §12 item 3). Mas as frases que já estão no ar não esperam: `GEN-SYS-MENU-1` é automático desde 16/09 e é corrigido na Fase 4 |
+| 9 | **A ordem de conserto das 43 ocorrências de "mensalidade"** | (a) automático → cadastrados → aberturas e roteiros; (b) tudo de uma vez | **(a).** As 19 aberturas e os roteiros são lidos por uma pessoa antes de falar; esperam a régua do Dennis e são reescritos uma vez só |
+| 10 | **A sala da reunião** | (a) colar um link permanente em `agenda.reunioes.sala_padrao`; (b) cada pessoa cola o dela em Ajustes; (c) as duas | **(c).** Enquanto os dois forem nulos, `reuniao_marcar` recusa com `sem_sala` e o módulo fica travado — é o único campo que o destrava |
+| 11 | **4 reuniões por dia por pessoa** | (a) manter 4; (b) 4 por manhã + 4 por tarde, como o RF-AGE-01 | **(a).** A grade nova atravessa os dois turnos; robô que enche o dia de alguém com nove reuniões é robô que a equipe desliga na segunda semana |
+| 12 | **Almoço bloqueado** | (a) nenhum (`"pausa": null`); (b) 12h–13h30 | **(a), por ora.** A janela veio com precisão de minuto. O campo existe para um `update` de uma linha no dia em que a primeira reunião de 12h50 furar |
+| 13 | **A janela de reunião vale só de segunda a sexta** | (a) sim; (b) abrir sábado de manhã | **(a).** Sábado hoje é janela de **resposta** (10h–12h, só para quem já respondeu, `20260917160000`). Abrir reunião no sábado é outra decisão |
+| 14 | **Uma semana de confirmação humana de um clique** antes de o fornecedor ver o horário | (a) sim, uma semana, e o clique sai se a semana inteira passar sem correção; (b) marcar sozinha desde o primeiro dia | **(a).** Não contraria o "a IA marca sozinha": é a rampa de uma semana, com critério de saída escrito antes |
+| 15 | **Assinatura da mensagem automática** | (a) `bot_ai` sai sem primeiro nome, e `GEN-SYS-TRANSPARENCIA` perde o "— Heloísa"; (b) manter como está | **(a).** Assinar com o nome dela a frase que avisa que é máquina é a contradição em uma linha só |
+| 16 | **A reescrita de `GEN-SYS-E-ROBO`** | (a) aprovar o texto novo (resposta escrita pode ser automática; áudio e visita continuam gente); (b) manter | **(a).** O texto de hoje afirma duas coisas que deixam de ser verdade no dia em que a Fase 4 subir |
+| 17 | **Cancelar os eventos futuros no Google antes do deploy**, e o recado no grupo sobre `myaccount.google.com/permissions` | (a) fazer; (b) pular | **(a), obrigatório.** Depois da migração não há como: os tokens já foram destruídos e cada fornecedor fica com um convite órfão |
+| 18 | **O lembrete de véspera ao lead** | (a) esperar a Meta aprovar `GEN-AGD-24H-*`; (b) tentar por texto livre | **(a).** Na véspera a janela de 24 h costuma estar fechada, e `app.pode_enviar` recusa texto livre fora dela — corretamente. No lugar entra a tarefa de confirmação das 17h |
+| 19 | **O teto mensal de IA** | (a) manter o que a §12 item 6 recomendou (US$ 60); (b) subir de novo | **Rever para US$ 80 antes de ligar `robo_escreve`.** `draft_reply` é a primeira coisa que o freio corta, e ele corta de madrugada, sem ninguém ver |
+
+---
+
+## Como saber se deu certo
+
+### Fase 4 (refeita) — o robô escreve
+
+1. **O corpus não se autoalimenta:** `app.voz_corpus(300)` devolve **zero** linhas com `author_kind in ('bot_ai','bot_fixed','system')`, zero de conversa com `optout_confirmation = true` e zero de telefone que esteja na `suppression_list`. Provado em pgTAP 72, com uma mensagem de robô plantada no fixture.
+2. **A voz é um arquivo, não um cérebro:** `voz-da-casa.ts` está no repositório com `VERSAO_DA_VOZ` datada, aprovado num PR com as ~50 frases visíveis no diff, e o eval roda `verificarSemPii` estrito sobre cada frase sem achar nada.
+3. **Nada redigido por IA sai sem prova:** em pgTAP 73, um `insert` de `bot_ai` é recusado com `42501` quando falta qualquer uma das cinco condições (rascunho `liberado_pelo_validador`, `validator.situacao = 'aprovado'`, versão do validador vigente, `body = final_body`, `template_id is null`) e **passa** quando as cinco estão lá — com `approved_by` nulo na linha gravada. E a 7ª fala da mesma conversa continua sendo recusada pelo teto da Fase 3, no mesmo teste.
+4. **A frase de 05/09 não sai mais:** "Fica tranquilo que a gente dá um jeito no valor pra você entrar como fundador" é bloqueada, e o eval antigo registra a promoção (bloco `conhecido` apagado, `conhecidosEsperados` um a menos) ou o eval novo a pega — nunca as duas coisas verdes por engano.
+5. **Bloqueio é terminal e visível:** toda mensagem bloqueada tem uma linha em `message_drafts` com `status='pendente'`, `validator` preenchido e uma `tasks` `priority 1`; **zero** conversas com veredito `robo` regravado para `pessoa` (a PK de `atendimento_decisoes` prova).
+6. **Ninguém recebe marcador cru:** `select count(*) from public.messages where author_kind='bot_ai' and body ~ '\[\[[A-Z_]+_[0-9]+\]\]'` é **zero** no primeiro mês.
+7. **O robô não assina com nome de gente:** zero mensagens `bot_ai` contendo qualquer primeiro nome de `public.profiles`, medido por consulta, não por leitura.
+8. **A semana a seco passou:** cinco dias seguidos sem uma única resposta classificada como "eu não mandaria isso", com pelo menos 20 rascunhos lidos por dia.
+9. **A amostragem acontece:** `public.robo_amostra_veredito` tem linha para **≥ 20 mensagens por dia** nos 14 primeiros dias, com revisor preenchido. Dia sem amostra é falha do processo, e conta como falha.
+10. **Nenhuma intenção passa de 10%** de respostas marcadas como fora de contexto, e o total de "eu teria mandado" fica **≥ 95%** por três dias seguidos antes de a amostragem virar semanal.
+11. **Zero afirmações sem claim:** toda mensagem `bot_ai` do mês tem `jsonb_array_length(proposed_claims) > 0`, e nenhuma amostra marcou "afirmou fora da base". Um único caso desliga `robo_escreve` no mesmo dia — e esse desligamento leva **menos de um segundo, sem deploy**, comprovado uma vez em homologação.
+12. **O custo é o previsto:** `public.ia_orcamento_status()` mostra `draft_reply` dentro do orçamento, e a destilação mensal aparece em `ai_runs` com `purpose='destilar_voz'` custando **menos de US$ 0,05**.
+13. **"HUMANO" transfere em uma resposta**, e a frase de transparência sai **uma vez por conversa** e **nunca sozinha** — zero conversas com transparência enviada e nenhuma resposta em seguida.
+14. `pnpm lint`, `pnpm typecheck`, Vitest, evals e pgTAP verdes, com 72 e 73 somando asserções novas e nenhum eval antigo virando verde por remoção de caso.
+
+### Fase 5 (nova) — o calendário é nosso
+
+1. **Duas transações concorrentes** pedindo o mesmo horário do mesmo dono: uma grava, a outra recebe `horario_tomado` **com três alternativas** no mesmo retorno. pgTAP 74.
+2. **A grade é exatamente a grade:** nove começos entre 9h30 e 16h10, nenhum terminando depois de 17h20; feriado de `public.holidays` não aparece; dia com `route_plans` não oferece nada a partir de 13h40; a 5ª reunião do dia é recusada pelo teto.
+3. **Marcar move o negócio sem levantar `23514`** — a asserção que prova que `next_action_at` foi gravado no mesmo comando da etapa.
+4. **Conversa sem ficha recusa com `sem_ficha`**, e sem sala recusa com `sem_sala`: motivo legível, nunca violação de `not null`.
+5. **`authenticated` não escreve em `public.reunioes`** por `insert`, `update` ou `delete`, e `app.email_de` não é executável por ele.
+6. **O e-mail chega, e a falha aparece:** uma reunião em homologação com e-mail na caixa do dono; a mesma com o Resend desligado mostra o cartão dizendo "o time não foi avisado por e-mail", `aviso_enviado_em` nulo, e a mensagem de volta em `reuniao_avisos` — não em sucesso silencioso. `enviarPeloResend` devolve `{ok:false, transitorio:true}` num 5xx (Vitest).
+7. **A tela mostra fim:** o cartão diz `10h20–11h00`, o selo "marcada pelo robô" aparece, e nenhum compromisso é desenhado duas vezes (o eco em `tasks` é filtrado).
+8. **O Google sumiu:** o `grep` de B.9 não devolve nada fora do CHANGELOG; `select count(*) from vault.secrets where name like 'agenda_google:%'` é **zero**; `database.types.ts` regerado não tem `compromissos_no_google` nem nenhuma função `agenda_google_*`/`compromisso_do_google_*`; e **zero eventos futuros órfãos** na agenda dos fornecedores, porque o passo manual foi feito antes.
+9. **A `tasks` continua servindo o resto:** o pulso do dia, o dreno e a tela das cadências contam a mesma quantidade de compromissos de antes, no dia seguinte ao deploy.
+10. **O robô marcou sem colidir:** no primeiro mês, **zero** pares de reuniões sobrepostas do mesmo dono no banco (consulta, não impressão), e **zero** reuniões marcadas fora de 9h30–17h20 ou em dia não útil.
+
+---
+
+## Notas de rodapé — contradições encontradas nesta emenda, e o que foi escolhido
+
+[^E1]: **Como se chama o estado novo de `message_drafts`.** A seção A chamou de `'liberado_pelo_validador'`; a seção C chamou de `'auto'`. **Escolha: `'liberado_pelo_validador'`**, porque o repositório nomeia estado e constraint dizendo o que a coisa é (`message_drafts_aprovado_tem_gente`) e "auto" não diz quem autorizou. O conteúdo da seção C — `final_body` obrigatório, `claims` não vazio, `validator.situacao = 'aprovado'` e o limite real de 1000 caracteres — foi mantido inteiro, numa constraint só, `message_drafts_liberado_tem_prova`. E a seção C falava em três colunas novas: são **uma** (`base_versao`); `prompt_version`, `proposed_claims` e `validator` já existem.
+
+[^E2]: **Onde mora a reunião.** A seção C(e) recomendava dar `termina_em` a `public.tasks`, uma `exclude constraint` por responsável e uma função `app.horarios_livres`. A seção B recusa `tasks` com um argumento que a C não tinha: as nove "Marcar apresentação" nascidas às 09:00 pela régua do RF-MET-06 recusariam umas às outras. **Vale a seção B**: tabela `public.reunioes`, `app.reuniao_horarios_livres`, e `tasks` intacta com uma linha-eco. A janela em `app_settings` e a lista de no máximo três horários, que as duas seções pediam, ficam como a C as descreveu.
+
+[^E3]: **A linha de `app.ausencia_responder`.** A §6.7 e a §5.4 da spec divergem entre si (`:131` e `:122`). A linha certa é **122**, conferida no arquivo `20260922120000_automacoes_do_atendimento.sql`.
+
+[^E4]: **A amostragem.** A §6.9 previa a view `public.robo_amostra_semanal` e citava o RF-CON-22; a seção A(f) troca por `public.robo_amostra(p_desde, p_ate)` e aponta o RF-CON-28. **Valem a função e o RF-CON-28**: a função recebe período, e o requisito que descreve amostragem com nota é o 28 (PRD linha 361), não o 22 (linha 355), que é a regra de aprovação humana.
+
+[^E5]: **As migrações da agenda foram renumeradas.** O desenho da seção B propunha `20260929120000_a_reuniao_vira_objeto.sql` e `20260929130000_a_agenda_sai_do_google.sql`, e as duas colidem com o que a §9 já reservou: `20260929120000` é da Fase 4 (HUMANO, transparência, ausência) e `20260929130000_o_radar_desliga_a_revisao_fica.sql` é da Fase 2. A emenda usa `20260930110000` e `20260930120000` para a agenda, `20260930100000` para o corpus e `20261001100000`/`20261001110000` para o robô escrever — todas acima da última migração no repositório hoje, `20260925160000`.
+
+[^E6]: **`FORA_ESCOPO` e `foraDoAssunto` não são a mesma coisa.** A seção C(b) manda `FORA_ESCOPO` responder **texto fixo**, nunca livre; a seção A(c) desenha um campo `foraDoAssunto` no prompt que escreve. Não se contradizem: a intenção classificada como `FORA_ESCOPO` nunca chega ao prompt de redação, e o campo `foraDoAssunto` é a segunda rede, para quando o lead puxa outro assunto **no meio** de uma mensagem classificada como outra intenção. Nesse caso a resposta é uma cortesia literal de `DESVIOS` mais uma pergunta, e nada mais.
+
+[^E7]: **Antecedência mínima.** A seção C(e) falava em 2 horas; a seção B fixa **3 horas**, em `agenda.reunioes.antecedencia_min_horas`. Fica 3: com reunião de 40 minutos e grade de 50, duas horas dão pouco mais de duas vagas de folga, e o dono precisa ver o compromisso antes de ele acontecer. É `app_settings`, muda sem deploy.
+
+[^E8]: **Os dias da Fase 4, reconciliados.** Três contas chegaram por caminhos diferentes: 8 dias para a seção A sozinha, 4 para a seção B, e uma terceira de ~11 dias que somava agenda e e-mail dentro da Fase 4. A terceira conta duplicava a seção B e por isso foi descartada. O número aqui é: **6 dias da Fase 4 original** (§9), **menos 1,0** da amostragem semanal, que a seção A refaz por inteiro, **menos 0,5** do cadastro e validação dos 8 textos prontos, que deixam de existir com o ADR-14, **mais 8,0** da seção A = **12,5**. Os 0,5 de carona que a §7.7 orçava para ligar a Fase 4 ao Google não abatem nada, porque viraram trabalho de remoção dentro da Fase 5.
+
+---
+
+## Respondido pelo Rafael em 25/09/2026, depois de ler esta emenda
+
+| # | Pergunta | Resposta dele |
+|---|---|---|
+| 7 | Qual construir primeiro | **A Fase 5, o calendário.** Ela não depende de modelo nenhum — é banco e tela — e entrega metade do pedido de hoje antes de qualquer risco de texto livre. |
+| 14 | Rampa antes de a IA marcar direto | **Uma semana com confirmação de um clique.** A IA escolhe o horário; alguém confirma antes de o fornecedor ver. Passada a semana sem correção, o clique sai sozinho e ela marca direto. É rampa com critério de saída escrito, não freio permanente. |
+
+As outras dezessete continuam abertas, e as que travam o início da Fase 5 são a
+**10** (a sala da reunião — enquanto ela for nula, `reuniao_marcar` recusa com
+`sem_sala` e o módulo não sai do lugar) e a **17** (cancelar no Google os eventos
+futuros que o CRM criou, ANTES do deploy que apaga os tokens).
