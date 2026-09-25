@@ -496,3 +496,43 @@ comment on function public.ia_orcamento_status() is
   'Painel do custo de IA para admin, gestor e financeiro: gasto do mês, projeção pelo ritmo, situação, quebra por propósito, os alertas já emitidos e — desde a Fase 3 — se o mês está freado e quais propósitos o freio está recusando agora.';
 revoke all on function public.ia_orcamento_status() from public, anon;
 grant execute on function public.ia_orcamento_status() to authenticated, service_role;
+
+
+-- ---------------------------------------------------------------------
+-- 8. O outro dinheiro: o que a Meta cobra de SERVIÇO
+-- ---------------------------------------------------------------------
+-- O orçamento de IA não é a única conta que a Fase 4 faz crescer. Toda
+-- resposta que sai dentro da janela de 24 h — que é tudo o que um robô
+-- autônomo faz — abre ou mantém uma conversa de SERVIÇO, e a Meta cobra por
+-- ela. É o contrário exato de `app.iniciadas_pela_empresa`: aquela conta o
+-- que a empresa começou; esta conta o que a empresa respondeu.
+--
+-- NESTA FASE ELA SÓ MEDE. Um teto sem número medido seria um palpite, e um
+-- palpite que recusa mensagem de cliente é pior que nenhum teto. Primeiro se
+-- olha a curva por dois meses; o teto, se vier, vem depois e com número.
+--
+-- `security_invoker = false` com o filtro de papel escrito à mão, no molde de
+-- `public.wa_confirmacoes_devidas` (20260905000400:759): a pergunta é de
+-- custo, e custo é de quem paga a conta.
+drop view if exists public.wa_servico_do_mes;
+create view public.wa_servico_do_mes
+with (security_barrier = true, security_invoker = false) as
+select to_char((coalesce(m.sent_at, m.created_at) at time zone 'America/Fortaleza')::date,
+               'YYYY-MM')                                as mes,
+       c.business_number                                 as numero,
+       count(*)::int                                     as mensagens_de_servico,
+       count(distinct m.conversation_id)::int            as conversas,
+       min(coalesce(m.sent_at, m.created_at))            as primeira,
+       max(coalesce(m.sent_at, m.created_at))            as ultima
+  from public.messages m
+  join public.conversations c on c.id = m.conversation_id
+ where m.direction = 'out'::app.msg_direction
+   and not m.business_initiated
+   and m.status <> 'failed'::app.msg_status
+   and (select app.role()) in ('admin'::app.user_role, 'gestor'::app.user_role,
+                               'financeiro'::app.user_role)
+ group by 1, 2;
+comment on view public.wa_servico_do_mes is
+  'Quanto WhatsApp de SERVIÇO sai por mês e por número: saída dentro da janela de 24 h, que é o que a Meta cobra como conversa de serviço e o que um robô autônomo mais produz. O contrário exato de app.iniciadas_pela_empresa. Na Fase 3 ela só MEDE — teto sem número medido é palpite.';
+revoke all on public.wa_servico_do_mes from public, anon;
+grant select on public.wa_servico_do_mes to authenticated, service_role;

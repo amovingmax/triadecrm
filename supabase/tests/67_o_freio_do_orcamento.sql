@@ -29,7 +29,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(27);
+select plan(29);
 
 -- =====================================================================
 -- 1. O TETO, E AS DUAS LINHAS
@@ -178,6 +178,19 @@ select pg_temp.sair();
 delete from public.ai_runs where prompt_version = 'pgtap67-gasto@v1';
 select is(app.ia_retomar_adiados(10), 2,
   'com o mês folgado de novo, o cron reenfileira o que ficou devendo — e nada fica para trás');
+
+-- =====================================================================
+-- 7. O OUTRO DINHEIRO, MEDIDO
+-- =====================================================================
+-- A conta de serviço da Meta é a que a Fase 4 faz crescer: toda resposta
+-- dentro da janela de 24 h. Nesta fase ela SÓ MEDE — teto sem número medido
+-- é palpite, e palpite que recusa mensagem de cliente é pior que teto nenhum.
+select has_view('public', 'wa_servico_do_mes',
+  'o que a Meta cobra de serviço tem onde ser contado');
+select is((select count(*)::int from pg_views v
+            where v.schemaname = 'public' and v.viewname = 'wa_servico_do_mes'
+              and v.definition ~ 'NOT m\.business_initiated'), 1,
+  'e conta a saída de DENTRO da janela: o contrário exato de app.iniciadas_pela_empresa');
 
 select * from finish();
 rollback;
