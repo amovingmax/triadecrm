@@ -832,3 +832,120 @@ grant  execute on function public.reuniao_confirmar(uuid)               to authe
 grant  execute on function public.reuniao_cancelar(uuid, text)          to authenticated;
 grant  execute on function public.reuniao_remarcar(uuid, timestamptz)   to authenticated;
 grant  execute on function public.reuniao_desfecho(uuid, text)          to authenticated;
+
+-- =====================================================================
+-- J. O E-MAIL DO DONO
+-- =====================================================================
+-- `public.profiles` não tem coluna de e-mail; ele está em `auth.users`.
+create or replace function app.email_de(p_user_id uuid)
+returns text language sql stable security definer set search_path = '' as $$
+  select u.email::text from auth.users u where u.id = p_user_id
+$$;
+revoke all on function app.email_de(uuid) from public, anon, authenticated;
+grant execute on function app.email_de(uuid) to service_role;
+
+-- O consumidor, no molde de `public.rota_proximas`. NÃO vai o telefone do
+-- parceiro: e-mail é caixa fora da RLS, e telefone completo lá é PII
+-- exportada sem `pii_access_log` (RF-BAS-14).
+create or replace function public.reuniao_avisos_proximos(p_qty int default 5)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_msgs jsonb; v_msg jsonb; v_saida jsonb := '[]'::jsonb; r public.reunioes%rowtype;
+begin
+  v_msgs := public.esteira_fila_ler('reuniao_avisos', least(greatest(coalesce(p_qty,1),1), 20));
+  for v_msg in select * from jsonb_array_elements(v_msgs) loop
+    select * into r from public.reunioes where id = (v_msg -> 'mensagem' ->> 'reuniao_id')::uuid;
+    if r.id is null then
+      perform public.esteira_fila_concluir('reuniao_avisos',
+        (v_msg ->> 'msg_id')::bigint, v_msg -> 'mensagem' ->> 'chave');
+      continue;
+    end if;
+    v_saida := v_saida || jsonb_build_array(jsonb_build_object(
+      'msg_id', (v_msg ->> 'msg_id')::bigint,
+      'chave',  v_msg -> 'mensagem' ->> 'chave',
+      'motivo', v_msg -> 'mensagem' ->> 'motivo',
+      'reuniao_id', r.id, 'organization_id', r.organization_id,
+      'conversation_id', r.conversation_id,
+      'parceiro', (select o.name from public.organizations o where o.id = r.organization_id),
+      'quando_por_extenso', app.reuniao_por_extenso(r.inicio),
+      'quando_curto', to_char(r.inicio at time zone 'America/Fortaleza', 'DD/MM')
+                      || ', ' || to_char(r.inicio at time zone 'America/Fortaleza', 'HH24"h"MI'),
+      'formato', r.formato, 'link', r.link, 'local', r.local, 'estado', r.estado,
+      'marcada_pelo_robo', r.marcada_por = 'robo',
+      'atende', (select t.full_name from public.team_directory t where t.id = r.dono_id),
+      'email_do_dono', app.email_de(r.dono_id)));
+  end loop;
+  return v_saida;
+end $$;
+
+create or replace function public.reuniao_aviso_enviado(p_reuniao_id uuid)
+returns boolean language sql volatile security definer set search_path = '' as $$
+  update public.reunioes set aviso_enviado_em = now(), atualizada_em = now()
+   where id = p_reuniao_id returning true
+$$;
+
+revoke all on function public.reuniao_avisos_proximos(int)   from public, anon, authenticated;
+revoke all on function public.reuniao_aviso_enviado(uuid)    from public, anon, authenticated;
+grant  execute on function public.reuniao_avisos_proximos(int) to service_role;
+grant  execute on function public.reuniao_aviso_enviado(uuid)  to service_role;
+
+-- =====================================================================
+-- K. O LEMBRETE DA VÉSPERA
+--
+-- O lembrete AO LEAD não entra nesta fase, e a razão está no banco:
+-- `GEN-AGD-24H-MEET` e `GEN-AGD-24H-VISITA` têm `meta_status = 'pending'`
+-- em supabase/seed.sql. Na véspera a janela de 24 h provavelmente já fechou,
+-- e `app.pode_enviar` recusa texto livre fora dela — corretamente. Aprovação
+-- de template é prazo da Meta, não nosso.
+--
+-- O que entra no lugar, e é barato: uma tarefa `priority = 1` do dono.
+-- SEM tabela temporária: `create temp table ... on commit drop` com um
+-- `delete from` depois é código morto (ela não sobrevive ao commit), e
+-- referenciá-la sem qualificar dentro de `search_path = ''` é apostar numa
+-- resolução implícita de `pg_temp` que não precisa existir. Um CTE que
+-- escreve resolve as duas escritas numa instrução só.
+-- =====================================================================
+create or replace function app.reuniao_lembretes_da_vespera()
+returns int language plpgsql volatile security definer set search_path = '' as $$
+declare v_n int;
+begin
+  with alvo as (
+    select r.id, r.inicio, r.dono_id, r.organization_id, r.deal_id, r.contact_id
+      from public.reunioes r
+     where r.estado in ('a_confirmar','marcada','confirmada')
+       and r.lembrete_em is null
+       and (r.inicio at time zone 'America/Fortaleza')::date
+           = (now() at time zone 'America/Fortaleza')::date + 1
+  ),
+  marcadas as (
+    update public.reunioes r set lembrete_em = now(), atualizada_em = now()
+      from alvo a where r.id = a.id
+     returning r.id
+  )
+  insert into public.tasks (title, kind, status, priority, due_at, assignee_id,
+                            organization_id, deal_id, contact_id, origin)
+  select 'Confirmar amanhã '
+         || to_char(a.inicio at time zone 'America/Fortaleza', 'HH24"h"MI')
+         || ' com ' || coalesce(o.name, 'parceiro'),
+         'message'::app.task_kind, 'todo'::app.task_status, 1,
+         now(),
+         a.dono_id, a.organization_id, a.deal_id, a.contact_id, 'system'
+    from alvo a
+    join public.organizations o on o.id = a.organization_id
+   where exists (select 1 from marcadas m where m.id = a.id);
+  get diagnostics v_n = row_count;
+  return v_n;
+end $$;
+revoke all on function app.reuniao_lembretes_da_vespera() from public, anon, authenticated;
+grant execute on function app.reuniao_lembretes_da_vespera() to service_role;
+
+-- 20:00 UTC = 17:00 em Fortaleza. O `cron.timezone` do pg_cron é GMT e todo
+-- horário deste repositório soma 3 h (20260904001700:2633-2635).
+-- `due_at = now()`: a tarefa nasce para ser feita agora, e não com prazo às
+-- 17:00 de um dia que já são 17:00 — tarefa que nasce vencida é tarefa que
+-- ninguém confia.
+do $$ begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('reuniao_lembrete_vespera', '0 20 * * *',
+                          $cron$select app.reuniao_lembretes_da_vespera()$cron$);
+  end if;
+end $$;

@@ -255,6 +255,7 @@ export type Database = {
       dlq_drenar: { Args: { p_qty?: number }; Returns: Json }
       e_o_worker: { Args: never; Returns: boolean }
       eh_dia_util: { Args: { p_dia: string }; Returns: boolean }
+      email_de: { Args: { p_user_id: string }; Returns: string }
       encerrar_matricula: {
         Args: {
           p_enrollment: string
@@ -803,6 +804,7 @@ export type Database = {
           inicio: string
         }[]
       }
+      reuniao_lembretes_da_vespera: { Args: never; Returns: number }
       reuniao_opcoes: {
         Args: { p_dono: string; p_limite?: number }
         Returns: Json
@@ -8419,6 +8421,11 @@ export type Database = {
         Args: { p_momento?: string; p_user_id?: string }
         Returns: Json
       }
+      reuniao_aviso_enviado: {
+        Args: { p_reuniao_id: string }
+        Returns: boolean
+      }
+      reuniao_avisos_proximos: { Args: { p_qty?: number }; Returns: Json }
       reuniao_cancelar: {
         Args: { p_id: string; p_motivo?: string }
         Returns: Json

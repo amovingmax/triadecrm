@@ -32,7 +32,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(60);
+select plan(67);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -484,7 +484,44 @@ update public.app_settings
  where key = 'agenda.reunioes';
 
 -- =====================================================================
--- 12. A frase que o modelo copia sai pronta do banco
+-- 12. O AVISO POR E-MAIL, e o lembrete da véspera
+-- =====================================================================
+select ok(not has_function_privilege('authenticated', 'app.email_de(uuid)', 'EXECUTE'),
+  'app.email_de não é executável por authenticated: e-mail de gente está em auth.users, não em profiles');
+
+-- A fila tem o que `app.reuniao_gravar` enfileirou nas asserções acima. Ler
+-- um lote basta: o que se mede é a FORMA do que sai, não quantos saem.
+create temp table avisos74 as select public.reuniao_avisos_proximos(20) as j;
+select ok(jsonb_array_length((select j from avisos74)) > 0,
+  'o consumidor entrega os avisos das reuniões que acabaram de ser marcadas');
+select ok(
+  (select bool_and((e ->> 'email_do_dono') is not null)
+     from jsonb_array_elements((select j from avisos74)) e),
+  'com o e-mail de quem atende');
+select ok(
+  ((select j from avisos74)::text) !~ '\+55[0-9]{10,}',
+  'e SEM o telefone do parceiro: e-mail é caixa fora da RLS (RF-BAS-14)');
+select ok(
+  (select bool_and((e ->> 'quando_por_extenso') is not null and (e ->> 'quando_curto') is not null)
+     from jsonb_array_elements((select j from avisos74)) e),
+  'e com o dia e a hora já escritos: quem monta o e-mail não faz conta de data');
+
+-- O LEMBRETE DA VÉSPERA: uma reunião amanhã ganha tarefa do dono, e só uma.
+insert into public.reunioes (organization_id, dono_id, titulo, formato, inicio, fim,
+                             link, estado, marcada_por, marcada_por_id)
+select pg_temp.org(), pg_temp.dono3(), 'vespera', 'online',
+       (((now() at time zone 'America/Fortaleza')::date + 1) + time '09:30')
+         at time zone 'America/Fortaleza',
+       (((now() at time zone 'America/Fortaleza')::date + 1) + time '10:10')
+         at time zone 'America/Fortaleza',
+       'https://sala.invalid/v', 'marcada', 'pessoa', pg_temp.dono3();
+select is(app.reuniao_lembretes_da_vespera(), 1,
+  'a reunião de amanhã vira uma tarefa priority 1 do dono — o lembrete ao lead depende de template aprovado pela Meta, e esse prazo não é nosso');
+select is(app.reuniao_lembretes_da_vespera(), 0,
+  'e rodar de novo não duplica: `lembrete_em` é a marca que segura a segunda volta do cron');
+
+-- =====================================================================
+-- 13. A frase que o modelo copia sai pronta do banco
 -- =====================================================================
 select is(app.reuniao_por_extenso(timestamptz '2026-10-01 13:20:00+00'),
   'quinta-feira, 1º de outubro, às 10h20',
