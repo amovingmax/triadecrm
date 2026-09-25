@@ -3399,71 +3399,6 @@ Fotógrafo 10 → **13**; buffet 3 → **17**. Sobram 9 na fila (6 fotógrafo + 
 
 **Suíte:** pgTAP **3.042 asserções em 71 arquivos** (eram 3.028 em 69); web **832 testes em 55** (eram 814 em 52); workers 363 em 24; prompts 276; schema 105. `pnpm db:lint` sem apontamento novo, `pnpm db:types` com uma linha a mais (`categoria_na_fonte`), lint e typecheck verdes.
 
-## Importar sem fila — terceira leva (25/09/2026)
-
-O portão das tarefas 9 e 10 foi aberto com o plano próprio que ele exigia: `docs/superpowers/plans/2026-09-25-aprendizado-e-ia.md`. A decisão 2 do Rafael punha a IA **depois** que o de-para e a tela de resolver estivessem de pé — e estão, junto com o aprovar em lote.
-
-### Tarefa 9 — O CRM aprende com quem escolhe na fila
-
-Migração `20261001140000`. Quando alguém escolhe a categoria de um nome na fila, o CRM sabe três coisas: a fonte, o texto que a fonte usou e a categoria escolhida. É uma linha de `source_category_map` pronta, e até hoje era jogada fora — na importação seguinte, o mesmo rótulo do Google voltava a parar na fila.
-
-**Onde isto mora, e por que não é um gatilho de tabela.** `app.promover_candidato` também é chamada por `public.importacao_gravar`, onde a categoria veio do **próprio mapa**: ali não há nada que aprender, seria reescrever a regra com ela mesma. Um gatilho não sabe a diferença. Por isso o ponto é dentro de `public.radar_revisar_candidato`, no caminho `aprovar`, depois de `promover_candidato` voltar ok — **só se aprende onde uma pessoa escolheu**.
-
-**E nada escreve direto no mapa: propõe.** `public.source_category_proposta` acumula, e os cinco freios decidem se vira regra:
-
-1. **Nunca no primeiro clique.** Três escolhas, ou duas de **pessoas diferentes** — `quem` é um array, e não um contador, justamente para distinguir "duas pessoas concordaram" de "a mesma pessoa clicou duas vezes".
-2. **Discordância congela.** Proposta concorrente viva para a mesma chave: nada promove, e um humano desempata. É o *"revisão humana quando empatar"* do RF-RAD-06.
-3. **Vale só para frente** — e vale porque a função simplesmente não toca em `organizations`.
-4. **Um desfazer**, com o estrago à vista: `public.source_category_regras` lista cada regra com quem ensinou, quando, com quantas escolhas atrás e **quantas fichas ela criou**. Regra **semeada** não sai pela tela: ela é decisão de produto e volta na próxima publicação.
-5. **`audit_log` em toda promoção.**
-
-**Um sexto, que não estava no desenho e o teste exigiu:** o **lote não conta como N decisões**. `radar_revisar_lote` passa `p_propor => false`. Sem isso, aprovar 30 nomes num clique encheria o contador de uma vez e promoveria a regra na hora — o freio 1 viraria enfeite, e bastaria marcar tudo e apertar para ensinar ao CRM qualquer coisa.
-
-**O atalho que resolve a fila de hoje:** no diálogo de aprovar, *"Valer para os outros 5 que também vieram como 'Buffet infantil'"*. **Desmarcada por padrão.** Marcada, ela pula o contador — consentimento explícito vale mais que contagem, mas só quando é explícito — grava a regra na hora e aprova os outros pelo **mesmo caminho do cartão** (`radar_revisar_lote`). O número vem de um `count` real (`public.radar_irmas_pelo_rotulo`): prometer 5 e mexer em 9 seria pior que não oferecer.
-
-`app.categoria_na_fonte_do_candidato` é a junção `(source_id, external_id)` escrita **uma vez** e usada em três lugares — `category_source` mora em `source_record`, e não em `supplier_candidates`.
-
-A tela nova fica em **Admin → Catálogos → De-para das fontes**.
-
-pgTAP `81_o_crm_aprende_com_quem_escolhe.sql` (14 asserções), uma por freio, incluindo a que separa "dois cliques da mesma pessoa" de "duas pessoas concordando".
-
-### Tarefa 10 — A IA já sugeria categoria, e a gente jogava fora
-
-Migração `20261001150000`, prompt `triagem-do-radar@v2`, worker.
-
-O prompt já rodava sobre esta fila, já recebia as 19 categorias e já devolvia `categoriaSugerida`. `public.ia_gravar_triagem` gravava veredito, porquê e confiança e **descartava a categoria** — só ela morria no caminho, e a chamada era paga do mesmo jeito. Quatro defeitos, todos conferidos no código:
-
-**O rótulo da fonte não chegava ao modelo.** `app.ia_candidatos_para_triar` mandava `'categoriaDaFonte', null` **fixo**, com um comentário dizendo que o modelo só precisa do nome. Era verdade enquanto a única pergunta era *"isto é fornecedor de evento?"*; para a categoria, o rótulo é metade da pergunta — *"Loja de Presentes"* junto de *"PICMIMOS — Revelação de Fotos"* é uma leitura diferente de cada um deles sozinho. Agora vem do `source_record`, pela **mesma** junção `(source_id, external_id)` de `app.resolver_source_record`.
-
-**Só casa exato.** `ia_categoria_id` recebe o nome devolvido só quando ele casa com o catálogo por `app.chave_catalogo` — acento e caixa não contam, nome de **grupo** não vale. Categoria aproximada é ficha no funil errado, e funil errado é meta errada, relatório de déficit errado e pitch errado. `ia_run_id` guarda a chamada: opinião sem de onde ser conferida é palpite com cara de dado.
-
-**O exemplo do prompt ensinava a resposta errada.** A v1 devolvia `categoriaSugerida: 'Locais'` e `'Alimentos e Bebidas'` — nomes de **grupo**, não de categoria; as reais são "Locais: salões, chácaras, hotéis, restaurantes, praia" e "Buffet adulto/corporativo". Com a regra "só entra o que casar exato", o exemplo treinava o modelo a produzir string que nunca casa: a categoria sairia sempre nula, **em silêncio**, com a conta paga. Exemplo vale mais que instrução, então isto é **v2 com eval**, e não remendo. A v2 ainda manda copiar a categoria *letra por letra* e diz que o rótulo da fonte é **pista, não verdade** — quando o nome e o rótulo discordam, vale o nome. O eval `triagem-do-radar.eval.test.ts` falha se uma v3 desatenta voltar a inventar nome de categoria, e tem uma asserção que prova que a v1 **tinha** o defeito.
-
-**A chave da fila era do DIA.** `'triar:' || data` com limite 20 não eram "8 lotes" para 155 candidatos: eram **oito dias** — a segunda importação da mesma tarde enfileirava nada, em silêncio, e quem pedia a leitura via a tela responder "ok" sem nada acontecer. A chave passou a ser da **rodada**, e um pedido enfileira quantas rodadas o que está esperando pedir, até 15 (300 nomes). O teto existe porque a conta é de quem clicou.
-
-**E o freio do orçamento passou a ser dito.** Acima de 80% do teto só passam `classify_inbound` e `transcribe_audio` — a triagem não está na lista, e o trabalho seria enfileirado para morrer calado no worker. `radar_triar_com_ia` consulta `app.ia_pode_gastar` **antes** e a tela diz o motivo.
-
-**Nada vira ficha sozinho (RF-RAD-11).** A sugestão abre o diálogo já preenchida — e o diálogo **abre**, mesmo com sugestão: o trabalho humano sai de *escolher entre 19* e vira *confirmar ou trocar*. A categoria do candidato vence sempre a da IA: onde alguém já decidiu, a IA não opina por cima. E o diálogo diz **quem preencheu** — uma caixa preenchida sem dizer por quem é uma decisão tomada por ninguém.
-
-**O que ficou de fora, e é escolha:** limpar `ia_analisado_em` dos 155 já lidos para reprocessá-los. É uma segunda chamada paga por candidato e uma escrita em massa; a tarefa 7 resolve os 155 **de graça**, por grupo.
-
-pgTAP `82_a_ia_sugere_categoria.sql` (10 asserções). Custo da v2 medido no eval: US$ 0,00165 por chamada sem cache (era 0,00116) — continua o prompt mais barato do catálogo.
-
-### O placar das três levas
-
-| momento | das 40 linhas, viram parceiro sem ninguém responder nada |
-|---|---|
-| produção hoje, com o seletor no errado (o que o Rafael viu) | **0** |
-| linha de base, com a origem escolhida à mão | **13** |
-| depois da primeira leva | **30** |
-| **depois das três** | **30 sem responder nada, e 7 perguntas para o resto** |
-
-O número de fichas automáticas não sobe da primeira leva para cá — e não devia: as 9 que sobram param por **nome de categoria que o CRM não conhece**, e inventar um destino para elas é exatamente o que o desenho recusou. O que mudou é o **custo de resolver as 9**: eram 9 cartões, um a um, cada um com "Sem categoria" e uma lista de 19 opções. Agora são **7 perguntas numa tabela**, com o nome das empresas ao lado e a sugestão por radical no topo — e a resposta fica gravada, então na próxima lista do Maps são **zero**.
-
-Medido com `scripts/placar-importacao.sql` contra base limpa (`pnpm db:reset`): fotógrafo 13, buffet 17, 9 na fila por categoria, 1 que não entra (Rômulo Jordão, fotógrafo em Lisboa, telefone de Portugal, sem @ e sem CNPJ).
-
-**Suíte:** pgTAP **3.101 asserções em 76 arquivos** (eram 3.028 em 69 no começo do dia); web **848 testes em 55**; workers 363 em 24; prompts **284** em 11; schema 105. `pnpm db:lint` sem apontamento novo, lint e typecheck verdes.
-
 ## Importar sem fila — segunda leva (25/09/2026)
 
 ### Tarefa 5 — As 36 caixinhas viram um recibo
@@ -3530,12 +3465,79 @@ Migração `20261001110000_a_previa_para_de_mentir.sql`, e os três defeitos vê
 
 pgTAP novo: `78_a_previa_para_de_mentir.sql` (9 asserções, escrito vermelho antes — 4 falhavam). Fixtures com domínios `.invalid` e nomes dissemelhantes de propósito, para que quem responda seja a regra de domínio e não a de nome por trigram.
 
+## Importar sem fila — terceira leva (25/09/2026)
+
+O portão das tarefas 9 e 10 foi aberto com o plano próprio que ele exigia: `docs/superpowers/plans/2026-09-25-aprendizado-e-ia.md`. A decisão 2 do Rafael punha a IA **depois** que o de-para e a tela de resolver estivessem de pé — e estão, junto com o aprovar em lote.
+
+### Tarefa 9 — O CRM aprende com quem escolhe na fila
+
+Migração `20261001140000`. Quando alguém escolhe a categoria de um nome na fila, o CRM sabe três coisas: a fonte, o texto que a fonte usou e a categoria escolhida. É uma linha de `source_category_map` pronta, e até hoje era jogada fora — na importação seguinte, o mesmo rótulo do Google voltava a parar na fila.
+
+**Onde isto mora, e por que não é um gatilho de tabela.** `app.promover_candidato` também é chamada por `public.importacao_gravar`, onde a categoria veio do **próprio mapa**: ali não há nada que aprender, seria reescrever a regra com ela mesma. Um gatilho não sabe a diferença. Por isso o ponto é dentro de `public.radar_revisar_candidato`, no caminho `aprovar`, depois de `promover_candidato` voltar ok — **só se aprende onde uma pessoa escolheu**.
+
+**E nada escreve direto no mapa: propõe.** `public.source_category_proposta` acumula, e os cinco freios decidem se vira regra:
+
+1. **Nunca no primeiro clique.** Três escolhas, ou duas de **pessoas diferentes** — `quem` é um array, e não um contador, justamente para distinguir "duas pessoas concordaram" de "a mesma pessoa clicou duas vezes".
+2. **Discordância congela.** Proposta concorrente viva para a mesma chave: nada promove, e um humano desempata. É o *"revisão humana quando empatar"* do RF-RAD-06.
+3. **Vale só para frente** — e vale porque a função simplesmente não toca em `organizations`.
+4. **Um desfazer**, com o estrago à vista: `public.source_category_regras` lista cada regra com quem ensinou, quando, com quantas escolhas atrás e **quantas fichas ela criou**. Regra **semeada** não sai pela tela: ela é decisão de produto e volta na próxima publicação.
+5. **`audit_log` em toda promoção.**
+
+**Um sexto, que não estava no desenho e o teste exigiu:** o **lote não conta como N decisões**. `radar_revisar_lote` passa `p_propor => false`. Sem isso, aprovar 30 nomes num clique encheria o contador de uma vez e promoveria a regra na hora — o freio 1 viraria enfeite, e bastaria marcar tudo e apertar para ensinar ao CRM qualquer coisa.
+
+**O atalho que resolve a fila de hoje:** no diálogo de aprovar, *"Valer para os outros 5 que também vieram como 'Buffet infantil'"*. **Desmarcada por padrão.** Marcada, ela pula o contador — consentimento explícito vale mais que contagem, mas só quando é explícito — grava a regra na hora e aprova os outros pelo **mesmo caminho do cartão** (`radar_revisar_lote`). O número vem de um `count` real (`public.radar_irmas_pelo_rotulo`): prometer 5 e mexer em 9 seria pior que não oferecer.
+
+`app.categoria_na_fonte_do_candidato` é a junção `(source_id, external_id)` escrita **uma vez** e usada em três lugares — `category_source` mora em `source_record`, e não em `supplier_candidates`.
+
+A tela nova fica em **Admin → Catálogos → De-para das fontes**.
+
+pgTAP `81_o_crm_aprende_com_quem_escolhe.sql` (14 asserções), uma por freio, incluindo a que separa "dois cliques da mesma pessoa" de "duas pessoas concordando".
+
+### Tarefa 10 — A IA já sugeria categoria, e a gente jogava fora
+
+Migração `20261001150000`, prompt `triagem-do-radar@v2`, worker.
+
+O prompt já rodava sobre esta fila, já recebia as 19 categorias e já devolvia `categoriaSugerida`. `public.ia_gravar_triagem` gravava veredito, porquê e confiança e **descartava a categoria** — só ela morria no caminho, e a chamada era paga do mesmo jeito. Quatro defeitos, todos conferidos no código:
+
+**O rótulo da fonte não chegava ao modelo.** `app.ia_candidatos_para_triar` mandava `'categoriaDaFonte', null` **fixo**, com um comentário dizendo que o modelo só precisa do nome. Era verdade enquanto a única pergunta era *"isto é fornecedor de evento?"*; para a categoria, o rótulo é metade da pergunta — *"Loja de Presentes"* junto de *"PICMIMOS — Revelação de Fotos"* é uma leitura diferente de cada um deles sozinho. Agora vem do `source_record`, pela **mesma** junção `(source_id, external_id)` de `app.resolver_source_record`.
+
+**Só casa exato.** `ia_categoria_id` recebe o nome devolvido só quando ele casa com o catálogo por `app.chave_catalogo` — acento e caixa não contam, nome de **grupo** não vale. Categoria aproximada é ficha no funil errado, e funil errado é meta errada, relatório de déficit errado e pitch errado. `ia_run_id` guarda a chamada: opinião sem de onde ser conferida é palpite com cara de dado.
+
+**O exemplo do prompt ensinava a resposta errada.** A v1 devolvia `categoriaSugerida: 'Locais'` e `'Alimentos e Bebidas'` — nomes de **grupo**, não de categoria; as reais são "Locais: salões, chácaras, hotéis, restaurantes, praia" e "Buffet adulto/corporativo". Com a regra "só entra o que casar exato", o exemplo treinava o modelo a produzir string que nunca casa: a categoria sairia sempre nula, **em silêncio**, com a conta paga. Exemplo vale mais que instrução, então isto é **v2 com eval**, e não remendo. A v2 ainda manda copiar a categoria *letra por letra* e diz que o rótulo da fonte é **pista, não verdade** — quando o nome e o rótulo discordam, vale o nome. O eval `triagem-do-radar.eval.test.ts` falha se uma v3 desatenta voltar a inventar nome de categoria, e tem uma asserção que prova que a v1 **tinha** o defeito.
+
+**A chave da fila era do DIA.** `'triar:' || data` com limite 20 não eram "8 lotes" para 155 candidatos: eram **oito dias** — a segunda importação da mesma tarde enfileirava nada, em silêncio, e quem pedia a leitura via a tela responder "ok" sem nada acontecer. A chave passou a ser da **rodada**, e um pedido enfileira quantas rodadas o que está esperando pedir, até 15 (300 nomes). O teto existe porque a conta é de quem clicou.
+
+**E o freio do orçamento passou a ser dito.** Acima de 80% do teto só passam `classify_inbound` e `transcribe_audio` — a triagem não está na lista, e o trabalho seria enfileirado para morrer calado no worker. `radar_triar_com_ia` consulta `app.ia_pode_gastar` **antes** e a tela diz o motivo.
+
+**Nada vira ficha sozinho (RF-RAD-11).** A sugestão abre o diálogo já preenchida — e o diálogo **abre**, mesmo com sugestão: o trabalho humano sai de *escolher entre 19* e vira *confirmar ou trocar*. A categoria do candidato vence sempre a da IA: onde alguém já decidiu, a IA não opina por cima. E o diálogo diz **quem preencheu** — uma caixa preenchida sem dizer por quem é uma decisão tomada por ninguém.
+
+**O que ficou de fora, e é escolha:** limpar `ia_analisado_em` dos 155 já lidos para reprocessá-los. É uma segunda chamada paga por candidato e uma escrita em massa; a tarefa 7 resolve os 155 **de graça**, por grupo.
+
+pgTAP `82_a_ia_sugere_categoria.sql` (10 asserções). Custo da v2 medido no eval: US$ 0,00165 por chamada sem cache (era 0,00116) — continua o prompt mais barato do catálogo.
+
+### O placar das três levas
+
+| momento | das 40 linhas, viram parceiro sem ninguém responder nada |
+|---|---|
+| produção hoje, com o seletor no errado (o que o Rafael viu) | **0** |
+| linha de base, com a origem escolhida à mão | **13** |
+| depois da primeira leva | **30** |
+| **depois das três** | **30 sem responder nada, e 7 perguntas para o resto** |
+
+O número de fichas automáticas não sobe da primeira leva para cá — e não devia: as 9 que sobram param por **nome de categoria que o CRM não conhece**, e inventar um destino para elas é exatamente o que o desenho recusou. O que mudou é o **custo de resolver as 9**: eram 9 cartões, um a um, cada um com "Sem categoria" e uma lista de 19 opções. Agora são **7 perguntas numa tabela**, com o nome das empresas ao lado e a sugestão por radical no topo — e a resposta fica gravada, então na próxima lista do Maps são **zero**.
+
+Medido com `scripts/placar-importacao.sql` contra base limpa (`pnpm db:reset`): fotógrafo 13, buffet 17, 9 na fila por categoria, 1 que não entra (Rômulo Jordão, fotógrafo em Lisboa, telefone de Portugal, sem @ e sem CNPJ).
+
+**Suíte:** pgTAP **3.101 asserções em 76 arquivos** (eram 3.028 em 69 no começo do dia); web **848 testes em 55**; workers 363 em 24; prompts **284** em 11; schema 105. `pnpm db:lint` sem apontamento novo, lint e typecheck verdes.
+
 ### O que ficou pendente
 
-- **A segunda leva (tarefas 5 a 8) está inteira.** Falta a terceira: o aprendizado (tarefa 9) e a IA sugerindo categoria (tarefa 10), as duas atrás de um portão — não começam sem um plano detalhado próprio, e a decisão 2 do Rafael põe a IA depois da 6 e da 7, que acabaram de ficar de pé. Plano em `docs/superpowers/plans/2026-09-25-importar-sem-fila.md`.
+- **As dez tarefas do desenho estão inteiras**: a primeira leva (1 a 4), a segunda (5 a 8) e a terceira (9 e 10) — esta última só depois do plano próprio que o portão exigia, em `docs/superpowers/plans/2026-09-25-aprendizado-e-ia.md`.
 - **Os dois nomes de fonte na seed** (`Planilha (importação)`, `Google Maps (raspagem local)`) continuam com o texto antigo: mudá-los é migração, não texto, e o placar procura a fonte pelo `slug`.
-- **Tarefas 9 e 10 (aprendizado e IA) estão atrás de um portão**: não começam sem um plano detalhado próprio. A Fase 4 (a IA escrevendo) não foi tocada.
+- **Os 155 candidatos já lidos pela IA não foram reprocessados.** Limpar `ia_analisado_em` para relê-los é uma segunda chamada paga por candidato e uma escrita em massa; a tarefa 7 os resolve de graça, por grupo. É escolha, não esquecimento.
+- **A Fase 4 (a IA escrevendo) não foi tocada.**
+- **Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`. A produção continua mostrando "Radar" porque nem a Fase 2 nem nada desta rodada foi publicado.
 
 ### O que precisa de decisão humana
 
-Nada nesta leva. As quatro decisões do Rafael (25/09) foram seguidas: o mapa de categorias será ensinado por `app.can_write()` com auditoria (tarefa 6), a IA entra só depois do de-para e da tela de resolver, os 155 presos se resolvem por grupo agora que `categoria_na_fonte` existe, e **"Revisão" continua "Revisão"**.
+Nada nas três levas. As quatro decisões do Rafael (25/09) foram seguidas: o mapa de categorias é ensinado por `app.can_write()` com auditoria (tarefa 6), a IA entra só depois do de-para e da tela de resolver (tarefa 10), os 155 presos se resolvem por grupo agora que `categoria_na_fonte` existe (tarefas 4 e 7), e **"Revisão" continua "Revisão"**.
