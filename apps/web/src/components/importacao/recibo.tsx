@@ -44,6 +44,7 @@ export function Recibo({
 }) {
   const [desfazendo, setDesfazendo] = useState(false);
   const paraDecidir = candidatosNaFila(recibo.linhas);
+  const criados = recibo.contagem.entra ?? 0;
 
   const desfazer = async () => {
     setDesfazendo(true);
@@ -65,9 +66,13 @@ export function Recibo({
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h2 className="font-heading text-lg font-semibold tracking-tight">Importação concluída</h2>
+        <h2 className="font-heading text-lg font-semibold tracking-tight">
+          {criados === 0
+            ? 'Pronto — nenhuma virou parceiro ainda'
+            : `Pronto: ${formatarNumero(criados)} ${criados === 1 ? 'virou parceiro' : 'viraram parceiro'}`}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          Lote <span className="font-medium text-foreground">{recibo.rotulo}</span>
+          De <span className="font-medium text-foreground">{recibo.rotulo}</span>
           {recibo.desfazerAte ? (
             <>
               {' · dá para desfazer até '}
@@ -101,14 +106,18 @@ export function Recibo({
         {paraDecidir > 0 ? (
           <Button asChild variant="outline" className="toque h-11 md:h-9">
             <Link href="/revisao">
-              Decidir {paraDecidir === 1 ? 'a que ficou' : `as ${formatarNumero(paraDecidir)} que ficaram`} na fila
+              Escolher a categoria{' '}
+              {paraDecidir === 1
+                ? 'da que parou'
+                : `das ${formatarNumero(paraDecidir)} que pararam`}{' '}
+              na fila
               <ArrowRight aria-hidden="true" />
             </Link>
           </Button>
         ) : null}
 
         <Button variant="ghost" onClick={aoRecomecar} className="toque h-11 md:h-9">
-          Importar outra planilha
+          Trazer outra lista
         </Button>
 
         {podeDesfazer ? (
@@ -119,7 +128,7 @@ export function Recibo({
             className="toque h-11 md:h-9"
           >
             <Undo2 aria-hidden="true" />
-            {desfazendo ? 'Desfazendo...' : 'Desfazer este lote'}
+            {desfazendo ? 'Desfazendo...' : 'Desfazer esta importação'}
           </Button>
         ) : null}
       </div>
@@ -127,9 +136,9 @@ export function Recibo({
       <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
         {podeDesfazer ? (
           <>
-            O desfazer remove só o que este lote criou e ninguém tocou depois. Ficha com conversa
-            registrada, mudança de etapa, autorização ou ligação continua de pé, e o CRM diz quantas
-            foram.
+            Desfazer tira só os parceiros que esta importação criou e ninguém tocou depois. Quem
+            já tem conversa, mudança de etapa, autorização ou ligação fica de pé — o CRM diz
+            quantos.
           </>
         ) : (
           <>

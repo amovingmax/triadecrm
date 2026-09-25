@@ -53,17 +53,17 @@ export function FilaVazia({ aoCadastrar }: { aoCadastrar: (() => void) | null })
   return (
     <Moldura
       icone={<Inbox className="size-5" aria-hidden="true" />}
-      titulo="Nenhum candidato esperando revisão"
+      titulo="Fila vazia"
       texto={
         aoCadastrar
-          ? 'Tudo que entrou já foi decidido. A fila enche quando alguém importa uma lista e a esteira não resolve a linha sozinha — e o que você achar na mão entra por aqui e passa pela mesma revisão.'
-          : 'Tudo que entrou já foi decidido. A fila enche quando alguém importa uma lista e a esteira não resolve a linha sozinha. Quem cadastra candidato é o time comercial.'
+          ? 'Tudo que entrou já foi decidido. A fila enche quando uma lista traz um nome que o CRM não soube classificar sozinho — e o que você achar na mão entra por aqui e passa pela mesma decisão.'
+          : 'Tudo que entrou já foi decidido. A fila enche quando uma lista traz um nome que o CRM não soube classificar sozinho. Quem cadastra à mão é o time comercial.'
       }
     >
       {aoCadastrar ? (
         <Button onClick={aoCadastrar} className="toque h-11 md:h-9">
           <Plus aria-hidden="true" />
-          Cadastrar candidato
+          Cadastrar um nome
         </Button>
       ) : null}
     </Moldura>
@@ -83,7 +83,7 @@ export function VazioPorFiltroDaFila({
   return (
     <Moldura
       icone={<SearchX className="size-5" aria-hidden="true" />}
-      titulo={soBusca ? 'Nenhum candidato com esse texto' : 'Nenhum candidato com esse recorte'}
+      titulo={soBusca ? 'Nenhum nome com esse texto' : 'Nenhum nome com esse recorte'}
       texto={descricao}
     >
       <Button variant="outline" onClick={aoLimpar} className="toque h-11 md:h-9">

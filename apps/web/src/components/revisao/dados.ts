@@ -178,34 +178,34 @@ export function mensagemDoErro(erro: unknown): string {
 
 /** Motivos que a RPC de criação devolve, escritos para quem está cadastrando. */
 export const MOTIVO_DA_CRIACAO: Record<string, string> = {
-  nome_obrigatorio: 'Informe o nome do candidato.',
+  nome_obrigatorio: 'Informe o nome da empresa.',
   origem_invalida: 'Essa origem não existe mais no catálogo de fontes.',
   origem_desabilitada: 'Essa fonte está desligada. Ligue-a na aba Fontes ou escolha outra.',
   categoria_invalida: 'Essa categoria não está mais ativa. Escolha outra.',
   cnpj_invalido: 'O CNPJ não fecha: confira os dígitos.',
-  ja_esta_na_fila: 'Esse alvo já está esperando revisão na fila.',
+  ja_esta_na_fila: 'Esse nome já está esperando na fila.',
 };
 
 /** Motivos que a RPC de revisão devolve. */
 export const MOTIVO_DA_REVISAO: Record<string, string> = {
-  candidato_inexistente: 'Esse candidato não existe mais.',
-  ja_revisado: 'Alguém já revisou esse candidato. Atualize a fila.',
+  candidato_inexistente: 'Esse nome não existe mais na fila.',
+  ja_revisado: 'Alguém já decidiu esse nome. Atualize a fila.',
   motivo_obrigatorio: 'Escreva o motivo da recusa.',
   acao_invalida: 'Ação desconhecida.',
   candidato_nao_contatar:
     'Esse contato pediu para não ser procurado. Ele não pode virar parceiro.',
   categoria_obrigatoria: 'Escolha a categoria antes de aprovar.',
-  // O seletor de categoria só aparece para candidato SEM categoria: quem já tem
+  // O seletor de categoria só aparece para quem está SEM categoria: quem já tem
   // uma, e ela foi tirada de uso no catálogo, não tem como trocá-la daqui. Sem
-  // dizer isso, o alvo fica preso na fila para sempre — "atualize e tente de
+  // dizer isso, o nome fica preso na fila para sempre — "atualize e tente de
   // novo" nunca resolve, porque o problema não está na fila.
   categoria_invalida:
-    'A categoria deste alvo saiu de uso no catálogo. Peça a um administrador para reativá-la, ou recuse o alvo e cadastre-o pelo cadastro rápido com outra categoria.',
+    'A categoria deste nome saiu de uso. Peça a um administrador para reativá-la, ou descarte e cadastre à mão com outra categoria.',
   organizacao_obrigatoria: 'Escolha com qual ficha mesclar.',
   organizacao_inexistente: 'Essa ficha não existe mais.',
   organizacao_fora_da_carteira:
     'Mesclar altera a ficha, e essa ficha não é sua. Peça ao gestor para mesclar ou para transferir a ficha para você.',
-  ja_existe_na_base: 'Esse alvo já está na base. Mescle com a ficha em vez de aprovar.',
+  ja_existe_na_base: 'Este nome já é parceiro. Junte com o que existe.',
 };
 
 // ===========================================================================

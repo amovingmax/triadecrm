@@ -101,7 +101,7 @@ export function BarraDaFila({
             )}
           >
             <TriangleAlert aria-hidden="true" />
-            Só os marcados
+            Só os que têm um problema
             {marcados !== null ? <span className="numerico">({marcados})</span> : null}
           </Button>
         </div>

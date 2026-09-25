@@ -230,7 +230,10 @@ export function CartaoCandidato({
           </Dado>
         ) : null}
         {!candidato.telefone && !candidato.instagram && !candidato.site && !candidato.cnpj ? (
-          <li className="text-muted-foreground">Nenhum contato conhecido ainda.</li>
+          <li className="text-muted-foreground">
+            Sem telefone, @, site ou CNPJ. Virar parceiro cria a ficha, mas ninguém consegue falar
+            com ele ainda.
+          </li>
         ) : null}
       </ul>
 
@@ -298,8 +301,8 @@ export function CartaoCandidato({
         >
           <p className="text-xs font-medium">
             {candidato.duplicatas.length === 1
-              ? 'Uma ficha da base pode ser a mesma empresa'
-              : `${candidato.duplicatas.length} fichas da base podem ser a mesma empresa`}
+              ? 'Pode ser um parceiro que você já tem'
+              : `Podem ser ${candidato.duplicatas.length} parceiros que você já tem`}
           </p>
           <ul className="mt-2 flex flex-col gap-2">
             {candidato.duplicatas.map((d) => (
@@ -321,7 +324,7 @@ export function CartaoCandidato({
                     className="toque ml-auto h-11 md:h-8"
                   >
                     <Merge aria-hidden="true" />
-                    Mesclar aqui
+                    Juntar com este
                   </Button>
                 ) : null}
               </li>
@@ -339,7 +342,7 @@ export function CartaoCandidato({
             className="toque h-11 md:h-8"
           >
             <Check aria-hidden="true" />
-            Aprovar
+            Virar parceiro
           </Button>
           <Button
             variant="outline"
@@ -348,7 +351,7 @@ export function CartaoCandidato({
             className="toque h-11 md:h-8"
           >
             <X aria-hidden="true" />
-            Recusar
+            Descartar este nome
           </Button>
           <Button
             variant="ghost"
@@ -357,12 +360,12 @@ export function CartaoCandidato({
             className="toque h-11 text-muted-foreground md:h-8"
           >
             <CircleSlash aria-hidden="true" />
-            Não contatar
+            Nunca procurar
           </Button>
 
           {candidato.nao_contatar ? (
             <p className="text-xs text-muted-foreground">
-              Aprovar está bloqueado: este contato está na lista de supressão.
+              Esta empresa pediu para não ser procurada. Não dá para virar parceiro.
             </p>
           ) : null}
         </div>

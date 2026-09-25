@@ -80,7 +80,10 @@ export function PassoMapa({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h2 className="font-heading text-lg font-semibold tracking-tight">O que é cada coluna</h2>
+          <h2 className="font-heading text-lg font-semibold tracking-tight">
+            O CRM entendeu <span className="numerico">{porColuna.size}</span> das{' '}
+            <span className="numerico">{planilha.cabecalho.length}</span> colunas
+          </h2>
           <p className="text-sm text-muted-foreground">
             Aba <span className="font-medium text-foreground">{planilha.aba}</span> ·{' '}
             <span className="numerico">{planilha.linhas.length}</span>{' '}
@@ -105,12 +108,12 @@ export function PassoMapa({
         {pendentes.length > 0 ? (
           <Badge variant="destructive" className="h-auto py-1">
             <TriangleAlert aria-hidden="true" />
-            Falta indicar: {pendentes.map(rotuloDoCampo).join(', ')}
+            Sem {pendentes.map(rotuloDoCampo).join(' e ')} o CRM não consegue criar o parceiro.
           </Badge>
         ) : (
           <Badge variant="pilula" className="h-auto py-1">
             <Check aria-hidden="true" />
-            Tudo que é obrigatório está indicado
+            Pode seguir
           </Badge>
         )}
       </div>
@@ -139,12 +142,12 @@ export function PassoMapa({
                     {titulo || <span className="text-muted-foreground">Coluna sem título</span>}
                   </p>
                   <p className="truncate text-xs text-muted-foreground" title={amostra.join(' · ')}>
-                    {amostra.length > 0 ? amostra.join(' · ') : 'Sem exemplos nesta coluna'}
+                    {amostra.length > 0 ? amostra.join(' · ') : 'Esta coluna está vazia no arquivo'}
                   </p>
                 </div>
                 {conferir ? (
                   <Badge variant="outline" className="shrink-0">
-                    Confira
+                    Chutei — confira
                   </Badge>
                 ) : null}
               </div>
@@ -157,7 +160,7 @@ export function PassoMapa({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={IGNORAR}>Não importar esta coluna</SelectItem>
+                  <SelectItem value={IGNORAR}>O CRM não usa esta coluna</SelectItem>
                   {TODOS_OS_CAMPOS.map((c) => (
                     <SelectItem key={c} value={c}>
                       {rotuloDoCampo(c)}

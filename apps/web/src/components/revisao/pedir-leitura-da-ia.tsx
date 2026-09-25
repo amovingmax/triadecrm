@@ -31,7 +31,7 @@ export function PedirLeituraDaIa({ className }: { className?: string }) {
     mutationFn: pedirLeituraDaIa,
     onSuccess: (r) => {
       if (r.motivo === 'nada_para_ler') {
-        toast.success('A IA já leu todos os candidatos da fila.');
+        toast.success('A IA já leu todos os nomes da fila.');
         return;
       }
       toast.success('A IA foi acionada.', {

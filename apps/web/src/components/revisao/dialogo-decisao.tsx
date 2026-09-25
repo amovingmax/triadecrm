@@ -94,7 +94,7 @@ function Conteudo({
 
   function confirmar() {
     if (!recusa && categoriaId === null) {
-      setErro('Escolha a categoria: é ela que decide em qual funil o negócio nasce.');
+      setErro('Escolha a categoria — é ela que decide em que funil o parceiro nasce, e as metas e o relatório contam por ela.');
       return;
     }
     if (recusa && !motivo.trim()) {
@@ -109,17 +109,17 @@ function Conteudo({
       <DialogHeader>
         <DialogTitle>
           {acao === 'aprovar'
-            ? 'Aprovar candidato'
+            ? 'Falta a categoria'
             : acao === 'recusar'
-              ? 'Recusar candidato'
+              ? 'Descartar este nome'
               : 'Marcar como não contatar'}
         </DialogTitle>
         <DialogDescription>
           {acao === 'aprovar'
-            ? `${candidato.nome} vira parceiro e entra no funil na primeira etapa, com "Primeiro contato" marcado para o próximo dia útil.`
+            ? `Escolha a categoria e ${candidato.nome} vira parceiro, no funil, com "Primeiro contato" no próximo dia útil.`
             : acao === 'recusar'
-              ? `${candidato.nome} sai da fila. O motivo fica gravado junto com quem decidiu e quando.`
-              : `${candidato.nome} sai da fila e fica marcado para nunca virar alvo.`}
+              ? `${candidato.nome} sai da fila. O motivo fica gravado com quem decidiu e quando.`
+              : `${candidato.nome} sai da fila e fica marcado para nunca ser procurado.`}
         </DialogDescription>
       </DialogHeader>
 
@@ -178,9 +178,9 @@ function Conteudo({
           {ocupado
             ? 'Salvando...'
             : acao === 'aprovar'
-              ? 'Aprovar e criar parceiro'
+              ? 'Criar o parceiro'
               : acao === 'recusar'
-                ? 'Recusar'
+                ? 'Descartar'
                 : 'Marcar não contatar'}
         </Button>
       </DialogFooter>

@@ -125,7 +125,7 @@ export function TelaRevisao({
 
         setDecisao(null);
         if (resposta.situacao === 'aprovado') {
-          toast.success('Aprovado: virou parceiro.', {
+          toast.success(`${candidato.nome} virou parceiro.`, {
             description: `${candidato.nome} entrou no funil com "Primeiro contato" marcado para o próximo dia útil.`,
           });
         } else if (resposta.situacao === 'mesclado') {
@@ -133,7 +133,7 @@ export function TelaRevisao({
             description: 'Só os campos que estavam vazios foram completados.',
           });
         } else {
-          toast.success('Candidato recusado.', { description: candidato.nome });
+          toast.success('Nome descartado.', { description: candidato.nome });
         }
         recarregar();
       } catch (erro) {
@@ -176,13 +176,13 @@ export function TelaRevisao({
             {resumo.isPending ? (
               'Carregando...'
             ) : novos === null ? (
-              'O seu acesso não trabalha a fila de revisão.'
+              'O seu acesso não trabalha a fila.'
             ) : novos === 0 ? (
-              'Nenhum candidato esperando revisão.'
+              'Nada esperando. Tudo que entrou já foi decidido.'
             ) : (
               <>
                 <span className="numerico">{formatarNumero(novos)}</span>
-                {novos === 1 ? ' candidato esperando revisão' : ' candidatos esperando revisão'}
+                {novos === 1 ? ' nome esperando você' : ' nomes esperando você'}
               </>
             )}
           </p>
@@ -234,7 +234,7 @@ export function TelaRevisao({
               />
             ) : linhas.length === 0 && filtros.situacao !== 'novo' ? (
               <VazioPorFiltroDaFila
-                descricao={`Nenhum candidato em "${ROTULO_SITUACAO[filtros.situacao].toLowerCase()}".`}
+                descricao={`Nenhum nome em "${ROTULO_SITUACAO[filtros.situacao].toLowerCase()}".`}
                 aoLimpar={() => mudar({ situacao: 'novo' })}
               />
             ) : linhas.length === 0 ? (
@@ -281,7 +281,7 @@ export function TelaRevisao({
         <>
           <Button
             onClick={() => setFolhaAberta(true)}
-            aria-label="Novo candidato"
+            aria-label="Cadastrar um nome"
             className="toque sombra-base-forte fixed right-4 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] z-40 size-14 rounded-full ring-4 ring-background md:hidden"
           >
             <Plus className="size-5" aria-hidden="true" />

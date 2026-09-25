@@ -36,6 +36,8 @@ import type { PedidoAoLeitor, RespostaDoLeitor } from './planilha.worker';
 import { Recibo } from './recibo';
 import { SeletorDeOrigem } from './seletor-de-origem';
 import {
+  fraseDaPrevia,
+  fraseDeZero,
   ROTULO_DECISAO,
   type LoteAnterior,
   type Mapa,
@@ -237,7 +239,7 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
     setAndamento({ rotulo: 'Conferindo contra a base', feitas: 0, total: linhas.length });
     try {
       const resultado = await pedirPrevia(linhas, (feitas, total) =>
-        setAndamento({ rotulo: 'Conferindo contra a base', feitas, total }),
+        setAndamento({ rotulo: 'Vendo quem já está na base', feitas, total }),
       );
       setPrevia(resultado);
     } catch (erro) {
@@ -256,13 +258,13 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
     // data ao lado, e repetir a hora dentro do nome deixa a linha ilegível.
     const rotulo = arquivo.name;
     setFalha(null);
-    setAndamento({ rotulo: 'Gravando', feitas: 0, total: linhas.length });
+    setAndamento({ rotulo: 'Criando os parceiros', feitas: 0, total: linhas.length });
 
     let loteId: string | null = null;
     try {
       loteId = await abrirLote(rotulo, origemId);
       const resultado = await gravar(loteId, linhas, (feitas, total) =>
-        setAndamento({ rotulo: 'Gravando', feitas, total }),
+        setAndamento({ rotulo: 'Criando os parceiros', feitas, total }),
       );
       const desfazerAte = await encerrarLote(loteId);
       setRecibo({
@@ -279,9 +281,15 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
         // Zero não é fracasso: no reimport do mesmo arquivo é exatamente o
         // esperado. Um "sucesso: 0 fichas" faria a pessoa importar de novo
         // achando que falhou.
-        toast.info('Nada novo entrou: essas linhas já estavam na base.');
+        //
+        // Mas a frase tem de ser a do MAIOR grupo, e não a da duplicata sempre:
+        // no lote dos fotógrafos de 25/09/2026 nenhuma linha era duplicata, e a
+        // tela afirmou o contrário do que tinha acabado de acontecer.
+        toast.info(fraseDeZero(resultado.contagem));
       } else {
-        toast.success(`${formatarNumero(criadas)} ${criadas === 1 ? 'ficha criada' : 'fichas criadas'}.`);
+        toast.success(
+          `${formatarNumero(criadas)} ${criadas === 1 ? 'virou parceiro' : 'viraram parceiro'}.`,
+        );
       }
     } catch (erro) {
       if (loteId) await encerrarLote(loteId, 'Falhou no meio da gravação.').catch(() => undefined);
@@ -318,9 +326,10 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
       <div className="flex w-full flex-col gap-4">
         <Cabecalho />
         <ErroDaImportacao
-          titulo="O seu acesso não importa planilha"
-          causa="Importar traz gente de fora para dentro da base, e por isso é restrito a quem escreve nela."
-          comoResolver="Fale com um gestor se você precisa deste acesso."
+          titulo="O seu acesso não traz listas para a base"
+          causa="Quem traz gente de fora para dentro da base é gestor ou SDR."
+          comoResolver="Fale com um gestor se você precisa disso."
+
         />
       </div>
     );
@@ -391,7 +400,7 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
               onClick={() => void conferir()}
               className="toque h-11 md:h-9"
             >
-              Conferir antes de gravar
+              Ver o que vai acontecer
             </Button>
             {pendentes.length > 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -426,13 +435,15 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
                   className="toque h-11 md:h-9"
                 >
                   <Upload aria-hidden="true" />
-                  Gravar {formatarNumero(totalDe(previa.contagem))}{' '}
+                  Gravar {totalDe(previa.contagem) === 1 ? 'esta' : 'estas'}{' '}
+                  {formatarNumero(totalDe(previa.contagem))}{' '}
                   {totalDe(previa.contagem) === 1 ? 'linha' : 'linhas'}
                 </Button>
-                <p className="text-sm text-muted-foreground">
-                  {formatarNumero(previa.contagem.entra ?? 0)} viram ficha agora; o resto vai para a
-                  fila de Revisão ou não entra.
-                </p>
+                {/* O botão conta LINHAS, e não parceiros, porque é isso que ele
+                    faz: cada uma das linhas vira raw_capture → source_record →
+                    supplier_candidate (20260904001820:876-885), que é o que
+                    sustenta o ADR-08. Quantas viram parceiro vai na frase. */}
+                <p className="text-sm text-muted-foreground">{fraseDaPrevia(previa.contagem)}</p>
               </div>
             </>
           )}
@@ -457,10 +468,11 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
 function Cabecalho() {
   return (
     <header>
-      <h1 className="font-heading text-2xl font-semibold tracking-tight">Importar planilha</h1>
+      <h1 className="font-heading text-2xl font-semibold tracking-tight">
+        Trazer uma lista para a base
+      </h1>
       <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        A planilha vira ficha pela mesma esteira da Revisão: nada é gravado antes de você ver a
-        prévia, e o que já existe na base não é sobrescrito.
+        Você vê tudo antes de gravar, e nada que já está na base é sobrescrito.
       </p>
     </header>
   );
@@ -556,7 +568,7 @@ function ListaDeLotes({
   return (
     <section aria-labelledby="lotes" className="flex flex-col gap-2">
       <h2 id="lotes" className="font-heading font-medium tracking-tight">
-        Importações anteriores
+        O que você já trouxe
       </h2>
       <ul className="border-t border-hairline">
         {lotes.map((lote) => {
@@ -581,7 +593,7 @@ function ListaDeLotes({
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge variant="pilula" className="h-auto py-1">
                   <span className="numerico font-semibold">{formatarNumero(lote.organizacoes)}</span>
-                  {lote.organizacoes === 1 ? 'ficha' : 'fichas'}
+                  {lote.organizacoes === 1 ? 'parceiro' : 'parceiros'}
                 </Badge>
                 {(['duplicata', 'revisao', 'nao_contatar'] as const)
                   .filter((d) => (lote.stats[d] ?? 0) > 0)

@@ -40,11 +40,11 @@ type Lugar = {
 
 const RECADO: Record<string, string> = {
   sem_sessao: 'A sua sessão expirou. Entre de novo.',
-  sem_candidato: 'Faltou dizer qual candidato.',
-  candidato_invisivel: 'Este candidato não está mais no seu alcance.',
-  consulta_falhou: 'Não deu para ler o candidato agora.',
-  nao_contatar: 'Este candidato pediu para não ser contatado.',
-  ja_tem_telefone: 'Este candidato já tem telefone.',
+  sem_candidato: 'Faltou dizer qual nome.',
+  candidato_invisivel: 'Este nome não está mais no seu alcance.',
+  consulta_falhou: 'Não deu para ler este nome agora.',
+  nao_contatar: 'Esta empresa pediu para não ser procurada.',
+  ja_tem_telefone: 'Esta empresa já tem telefone.',
   nao_configurado: 'A busca no Google ainda não foi configurada no servidor. Fale com Luiz ou Matheus.',
 };
 

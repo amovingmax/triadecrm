@@ -273,50 +273,147 @@ export const ORDEM_DAS_DECISOES: readonly Decisao[] = [
 ];
 
 export const ROTULO_DECISAO: Record<Decisao, string> = {
-  entra: 'Entra na base',
-  duplicata: 'Já existe',
-  revisao: 'Vai para revisão',
-  nao_contatar: 'Não contatar',
-  repetida: 'Já importado antes',
-  erro: 'Não dá para importar',
+  entra: 'viram parceiro',
+  duplicata: 'já estão na base',
+  revisao: 'param na fila',
+  nao_contatar: 'já pediram para não receber',
+  repetida: 'já tinham entrado',
+  erro: 'não entram',
 };
 
-/** Uma frase que explica o grupo inteiro, no plural, para quem nunca importou nada. */
+/**
+ * Uma frase que explica o grupo inteiro, no plural, para quem nunca importou nada.
+ *
+ * QUATRO DESTAS FRASES MENTIAM, e as quatro foram conferidas contra o código
+ * em 25/09/2026:
+ *   · `entra` prometia "a etapa e o responsável da planilha". O CSV do Maps não
+ *     tem nem etapa nem responsável, e `app.promover_candidato` nasce com
+ *     `v_owner := coalesce(p_owner_id, auth.uid())` (20260905000100:425) e a
+ *     primeira etapa do funil (:514-518): quem importou vira o dono.
+ *   · `revisao` citava "o nome se parece com uma ficha existente". A prévia só
+ *     manda para `revisao` por `categoria_desconhecida` e `origem_desconhecida`
+ *     (20260924130000:652-659); nome parecido cai em `duplicata`, no `elsif` de
+ *     cima. `parecida_com_ficha` é código morto.
+ *   · `nao_contatar` dizia que "o número entra na lista de supressão". É ao
+ *     contrário: a linha cai aí porque `v_cand.do_not_contact` JÁ era verdadeiro
+ *     (20260904001820:920-921). Importar NUNCA põe ninguém na supressão, e lida
+ *     por um gestor a frase antiga fazia acreditar que resolvia opt-out.
+ *   · `duplicata` falava em "candidato" e "recusar", que são nomes internos.
+ */
 export const EXPLICACAO_DECISAO: Record<Decisao, string> = {
-  entra: 'Viram ficha e negócio no funil, com a etapa e o responsável da planilha.',
+  entra:
+    'Entram na base e no funil, na primeira etapa, com você como responsável. Se o arquivo trouxer etapa ou responsável, vale o que está nele.',
   duplicata:
-    'Já tem ficha na base. Nada é sobrescrito: cada uma vira candidato na fila de Revisão, onde você mescla ou recusa.',
+    'Nada é sobrescrito. Cada uma para na fila, com o parceiro parecido já apontado, para você juntar os dois ou descartar.',
   revisao:
-    'Falta um dado que o CRM não pode adivinhar (categoria, origem) ou o nome se parece com uma ficha existente. Vão para a fila de Revisão.',
+    'O CRM não reconheceu a categoria que veio no arquivo. Você escolhe a categoria na fila e elas viram parceiro.',
   nao_contatar:
-    'Pediram para parar. Não viram alvo: o número entra na lista de supressão e ninguém volta a escrever.',
+    'Essas empresas já tinham pedido para parar. Não entram, e ninguém volta a escrever.',
   repetida:
-    'Já tinham entrado: numa importação anterior, ou numa linha acima desta mesma planilha. Nada é criado de novo.',
-  erro: 'Falta o nome ou falta qualquer forma de contato. Corrija na planilha e importe de novo.',
+    'Vieram numa importação anterior, ou repetidas dentro deste mesmo arquivo. Nada é criado de novo.',
+  erro: 'Sem nome, ou sem telefone, @ e CNPJ: não há como falar com essa empresa. Corrija no arquivo e mande de novo.',
 };
+
+/**
+ * A frase debaixo do botão de gravar, montada da contagem.
+ *
+ * POR QUÊ: "12 viram ficha agora; o resto vai para a fila de Revisão ou não
+ * entra" escondia justamente o que a pessoa precisa saber antes de clicar —
+ * quantas param na fila, e por quê. A frase agora nomeia cada grupo com o seu
+ * número, e "o resto" deixa de existir.
+ */
+export function fraseDaPrevia(contagem: Contagem): string {
+  const entra = contagem.entra ?? 0;
+  const resto = ORDEM_DAS_DECISOES.filter((d) => d !== 'entra')
+    .map((d) => ({ decisao: d, n: contagem[d] ?? 0 }))
+    .filter((g) => g.n > 0);
+  const total = entra + resto.reduce((soma, g) => soma + g.n, 0);
+
+  const cabeca =
+    entra === 0
+      ? 'Nenhuma vira parceiro agora.'
+      : `${entra} ${entra === 1 ? 'vira parceiro' : 'viram parceiro'} agora.`;
+  if (resto.length === 0) return cabeca;
+
+  const partes = resto.map((g) => {
+    switch (g.decisao) {
+      case 'duplicata':
+        return `${g.n} ${g.n === 1 ? 'para' : 'param'} na fila porque já ${g.n === 1 ? 'está' : 'estão'} na base`;
+      case 'revisao':
+        return `${g.n} ${g.n === 1 ? 'para' : 'param'} na fila esperando categoria`;
+      case 'nao_contatar':
+        return `${g.n} já ${g.n === 1 ? 'pediu' : 'pediram'} para não receber`;
+      case 'repetida':
+        return `${g.n} já ${g.n === 1 ? 'tinha' : 'tinham'} entrado`;
+      default:
+        return `${g.n} não ${g.n === 1 ? 'entra' : 'entram'}`;
+    }
+  });
+  const outras = total - entra;
+  const lista =
+    partes.length === 1 ? partes[0]! : `${partes.slice(0, -1).join(', ')} e ${partes.at(-1)!}`;
+  return `${cabeca} ${outras === 1 ? 'A outra não some' : `As outras ${outras} não somem`}: ${lista}.`;
+}
+
+/**
+ * O que dizer quando NENHUMA linha virou parceiro.
+ *
+ * POR QUÊ: o aviso de hoje olhava só `contagem.entra === 0` e afirmava sempre
+ * "Nada novo entrou: essas linhas já estavam na base." No lote dos fotógrafos
+ * de 25/09/2026 NENHUMA era duplicata — 19 pararam por categoria e 1 deu erro.
+ * A tela disse o contrário do que tinha acabado de acontecer.
+ *
+ * A frase agora se monta do MAIOR grupo, que é o que de fato explica o zero. O
+ * empate desempata por `ORDEM_DAS_DECISOES`, que já põe o que exige decisão na
+ * frente.
+ */
+export function fraseDeZero(contagem: Contagem): string {
+  const grupos = ORDEM_DAS_DECISOES.filter((d) => d !== 'entra').map((d) => ({
+    decisao: d,
+    n: contagem[d] ?? 0,
+  }));
+  const maior = grupos.reduce((a, b) => (b.n > a.n ? b : a), grupos[0]!);
+  if (maior.n === 0) return 'Nenhuma linha entrou.';
+
+  const n = maior.n;
+  const plural = n === 1 ? 'a' : 'as';
+  switch (maior.decisao) {
+    case 'duplicata':
+      return `Nada novo entrou — ess${plural} ${n} já ${n === 1 ? 'estava' : 'estavam'} na base.`;
+    case 'revisao':
+      return `Nenhuma virou parceiro ainda: ${plural === 'a' ? 'a' : 'as'} ${n} ${
+        n === 1 ? 'parou' : 'pararam'
+      } na fila esperando categoria.`;
+    case 'nao_contatar':
+      return `Nenhuma entrou: ${n} já ${n === 1 ? 'tinha pedido' : 'tinham pedido'} para não receber.`;
+    case 'repetida':
+      return `Nada novo entrou — ess${plural} ${n} já ${n === 1 ? 'tinha' : 'tinham'} entrado antes.`;
+    default:
+      return `Nenhuma entrou: ${n} ${n === 1 ? 'linha' : 'linhas'} sem nome ou sem contato.`;
+  }
+}
 
 /** Motivos que as funções do banco devolvem, escritos para quem está importando. */
 export const MOTIVO: Record<string, string> = {
   sem_nome: 'A linha não tem nome.',
   sem_contato: 'Sem WhatsApp, sem @ e sem CNPJ: não há como falar com essa empresa.',
-  pediu_para_parar: 'Pediu para parar. O número vai para a lista de supressão.',
+  pediu_para_parar: 'Já tinha pedido para não receber. Não entra, e ninguém volta a escrever.',
   repetida_no_arquivo: 'A mesma empresa aparece mais de uma vez na planilha.',
-  ja_existe_na_base: 'Já tem ficha na base.',
-  parecida_com_ficha: 'O nome se parece com o de uma ficha que já existe.',
+  ja_existe_na_base: 'Já tem parceiro na base.',
   categoria_desconhecida: 'A categoria não bate com nenhuma do catálogo.',
   origem_desconhecida: 'A origem não bate com nenhuma fonte cadastrada.',
   ja_importado: 'Já tinha entrado numa importação anterior.',
   lote_anterior: 'Veio de um lote anterior.',
-  ja_revisado: 'Esse candidato já foi revisado.',
-  sem_candidato: 'A esteira não conseguiu montar o candidato.',
-  campo_fora_da_whitelist: 'A linha trazia um campo que a esteira não pode guardar.',
+  ja_revisado: 'Esse nome já foi decidido.',
+  sem_candidato: 'O CRM não conseguiu montar este nome.',
+  campo_fora_da_whitelist: 'A linha trazia um campo que o CRM não pode guardar.',
   sem_identidade_na_fonte: 'A linha não tem como ser reconhecida na próxima importação.',
   promocao_recusada: 'A ficha não pôde ser criada.',
   categoria_obrigatoria: 'Sem categoria não dá para escolher o funil.',
   categoria_invalida: 'Essa categoria não está mais ativa.',
   candidato_nao_contatar: 'Esse contato está na lista de supressão.',
-  captura_recusada: 'A esteira recusou a linha.',
-  processamento_recusado: 'A esteira não conseguiu processar a linha.',
+  captura_recusada: 'O CRM recusou a linha.',
+  processamento_recusado: 'O CRM não conseguiu processar a linha.',
 };
 
 /** Avisos da normalização: o que mudou ou o que ficou sem resolver, linha a linha. */

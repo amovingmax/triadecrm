@@ -40,8 +40,8 @@ import { EXPLICACAO_DA_MARCA, type CatalogosDoRadar } from './tipos';
  * contato dele são dois passos.
  */
 const formulario = z.object({
-  nome: z.string().trim().min(2, 'Escreva o nome do candidato.'),
-  fonteId: z.number({ error: 'Escolha de onde veio esse alvo.' }).int().positive(),
+  nome: z.string().trim().min(2, 'Escreva o nome da empresa.'),
+  fonteId: z.number({ error: 'Escolha de onde veio esse nome.' }).int().positive(),
   categoriaId: z.number().int().positive().nullable(),
   telefone: z.string().trim(),
   instagram: z.string().trim(),
@@ -75,7 +75,7 @@ export function FolhaDeCandidato({
         className="sombra-base-forte max-h-[92dvh] overflow-y-auto pb-[calc(1rem+var(--area-segura-inferior))] max-md:rounded-t-xl sm:max-w-md md:max-h-none"
       >
         <SheetHeader>
-          <SheetTitle>Novo candidato</SheetTitle>
+          <SheetTitle>Cadastrar um nome</SheetTitle>
           <SheetDescription>
             Entra na fila de revisão, não na base. Nome e origem bastam; o resto pode vir depois.
           </SheetDescription>
@@ -144,7 +144,7 @@ function Corpo({
       // As marcas da higiene são a informação mais útil do sucesso: o candidato
       // entrou, mas alguma coisa nele precisa de olho na revisão.
       const marca = resposta.marcas[0];
-      toast.success('Candidato na fila de revisão.', {
+      toast.success('Entrou na fila.', {
         description: resposta.naoContatar
           ? 'Atenção: esse contato está na lista de supressão e não poderá ser aprovado.'
           : marca
@@ -170,7 +170,7 @@ function Corpo({
       noValidate
     >
       <Campo
-        rotulo="Nome do candidato"
+        rotulo="Nome da empresa"
         erro={form.formState.errors.nome?.message}
         dica="Como o negócio se apresenta: o nome da fachada, do perfil ou do anúncio."
       >

@@ -49,8 +49,8 @@ export function SemLotes() {
       <div className="space-y-1">
         <p className="font-heading font-medium">Nenhuma planilha importada ainda</p>
         <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
-          Escolha o arquivo acima. O CRM sugere o que é cada coluna, você corrige o que estiver
-          errado e confere a prévia antes de qualquer coisa ser gravada.
+          Escolha o arquivo acima. O CRM lê as colunas sozinho e mostra o que vai acontecer com
+          cada linha. Nada é gravado antes de você mandar.
         </p>
       </div>
     </div>

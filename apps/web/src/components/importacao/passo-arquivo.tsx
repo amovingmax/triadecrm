@@ -75,8 +75,8 @@ export function PassoArquivo({
           {legenda ?? 'Arraste a planilha aqui ou escolha o arquivo'}
         </p>
         <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
-          Aceita .xlsx e .csv. A planilha-ponte do Dia 0 entra sem ajuste nenhum; qualquer outra
-          lista também entra, e você corrige as colunas no passo seguinte.
+          Aceita .xlsx e .csv. O CRM tenta entender as colunas sozinho e mostra o que entendeu
+          antes de gravar qualquer coisa.
         </p>
       </div>
 

@@ -164,7 +164,7 @@ export function temRecorteNaFila(f: FiltrosDaFila): boolean {
 // ---------------------------------------------------------------------------
 
 export const ROTULO_SITUACAO: Record<FiltroSituacao, string> = {
-  novo: 'Esperando revisão',
+  novo: 'Esperando você',
   aprovado: 'Aprovados',
   mesclado: 'Mesclados',
   recusado: 'Recusados',
@@ -205,7 +205,20 @@ export const EXPLICACAO_DA_MARCA: Record<string, { rotulo: string; explicacao: s
   suprimido: {
     rotulo: 'Pediu para não ser contatado',
     explicacao:
-      'Este contato está na lista de supressão. Não pode virar alvo, em nenhum modo.',
+      'Este contato está na lista de supressão. Não pode virar parceiro, em nenhum modo.',
+  },
+  // As duas de 25/09/2026. Sem elas o cartão renderizava o nome interno da
+  // flag: `cartao-candidato.tsx` faz `{nota?.rotulo ?? marca}`, e quem importou
+  // os 20 buffets leu, literalmente, "⚠ ja_existe_na_base".
+  ja_existe_na_base: {
+    rotulo: 'Já está na base',
+    explicacao:
+      'Um parceiro parecido já existe. Junte os dois em vez de criar um repetido.',
+  },
+  telefone_compartilhado: {
+    rotulo: 'Telefone de mais de um negócio',
+    explicacao:
+      'O mesmo número aparece em outros lugares do Google. Pode ser a mesma empresa com duas unidades, ou duas empresas que dividem o telefone — confira antes de decidir.',
   },
 };
 

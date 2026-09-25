@@ -3355,3 +3355,22 @@ Os textos do seletor mudaram junto (é a mesma tela): "De onde veio esta lista" 
 Fixtures: os dois CSV de `listas/` entraram como fixture do web. O `maps-natal-buffet.csv` antigo **fica**: é exportação de 29 colunas, com BOM e sem `data_id`, e é ela que prova que a regra não está grudada no formato de hoje — 8 asserções em `origem-detectada.test.ts`.
 
 **Prova de fato:** arrastando `listas/2026-09-25-fotografo-natal-rn.csv` sem tocar em nada, a origem já entra certa, e a prévia mostra **13 viram parceiro** em vez de 0. É a medida da tarefa 1 chegando à tela sem ninguém responder nada.
+
+### Tarefa 3 — A tela para de dizer o contrário do que aconteceu
+
+Sem mudar comportamento nenhum: quatro promessas que o código não cumpria, dois nomes internos que chegavam à tela e o glossário inteiro.
+
+**As quatro mentiras, conferidas linha a linha contra o código:**
+
+1. **O aviso que o Rafael leu quando 0 entraram.** O `if` era só `contagem.entra === 0` e a frase, fixa: *"Nada novo entrou: essas linhas já estavam na base."* No lote dos fotógrafos **nenhuma** era duplicata — 19 pararam por categoria e 1 deu erro. Agora a frase se monta do **maior grupo** (`fraseDeZero`, com teste): *"Nenhuma virou parceiro ainda: as 19 pararam na fila esperando categoria."*
+2. **"…ou o nome se parece com uma ficha existente"**, na explicação de "vai para revisão". A prévia só manda para `revisao` por `categoria_desconhecida` e `origem_desconhecida` (`20260924130000:652-659`); nome parecido cai em `duplicata`, no `elsif` de cima. O motivo `parecida_com_ficha` era **código morto** e saiu.
+3. **"com a etapa e o responsável da planilha".** O CSV do Maps não tem nem etapa nem responsável, e `app.promover_candidato` nasce com `coalesce(p_owner_id, auth.uid())` e a primeira etapa do funil: **quem importou vira o dono**.
+4. **"o número entra na lista de supressão".** É ao contrário: a linha cai em `nao_contatar` porque `do_not_contact` **já era** verdadeiro. **Importar nunca põe ninguém na supressão** — e lida por um gestor, a frase antiga fazia acreditar que a importação sozinha resolvia opt-out.
+
+**Os dois nomes internos.** `ja_existe_na_base` aparecia literalmente no cartão (`{nota?.rotulo ?? marca}`), porque a flag não existia em `EXPLICACAO_DA_MARCA` — quem importou os 20 buffets leu *"⚠ ja_existe_na_base · Confira este dado antes de decidir."*. Entraram as duas que faltavam: `ja_existe_na_base` e `telefone_compartilhado` (esta é gravada desde 04/09 e nunca teve texto).
+
+**A frase debaixo do botão** deixou de ter "o resto": `fraseDaPrevia` nomeia cada grupo com o seu número. E o botão passa a contar **linhas** de propósito — as 40 viram `raw_capture` → `source_record` → `supplier_candidate`, que é o que sustenta o ADR-08; quantas viram parceiro vai na frase de baixo.
+
+**Glossário:** *ficha* → **parceiro**, *candidato* → **nome**, *alvo* → **nome/empresa**, *lote* → **esta importação**, *esteira* → some. "Revisão" **continua Revisão** — decisão 4 do Rafael.
+
+Ficam de fora, e é escolha: os nomes das fontes na seed (`Planilha (importação)`, `Google Maps (raspagem local)`) precisam de migração própria, e o placar procura a fonte pelo `slug`, então não quebram.
