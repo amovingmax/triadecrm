@@ -3541,3 +3541,99 @@ Medido com `scripts/placar-importacao.sql` contra base limpa (`pnpm db:reset`): 
 ### O que precisa de decisão humana
 
 Nada nas três levas. As quatro decisões do Rafael (25/09) foram seguidas: o mapa de categorias é ensinado por `app.can_write()` com auditoria (tarefa 6), a IA entra só depois do de-para e da tela de resolver (tarefa 10), os 155 presos se resolvem por grupo agora que `categoria_na_fonte` existe (tarefas 4 e 7), e **"Revisão" continua "Revisão"**.
+## Importar sem fila — conferência do caminho inteiro (25/09/2026)
+
+Não é uma quarta leva: é percorrer o caminho como quem vai usar, contra base
+limpa (`pnpm db:reset`) e contra os dois CSV de verdade de `listas/`, e consertar
+o que aparecer.
+
+### O que foi medido, e não declarado
+
+**O caminho do arquivo à ficha, de ponta a ponta**, com
+`listas/2026-09-25-fotografo-natal-rn.csv` e `importacao_gravar` de verdade (em
+transação, desfeita no fim):
+
+| momento | fichas | na fila | não entram |
+|---|---|---|---|
+| soltar o arquivo — origem detectada, mapa pulado, nada respondido | **13** | 6 | 1 |
+| duas respostas na tela de resolver (*Impressões fotográficas*, *Loja de artigos para fotografia*) | **17** | 2 | 1 |
+| as 6 da fila aprovadas em lote, num clique | **19** | 0 | 1 |
+
+O desenho prometeu 12 sozinhas e 16 com duas respostas. São **13 e 17**.
+Decisões humanas no arquivo inteiro: soltar o arquivo, duas linhas de tabela,
+gravar. O seletor de origem não é uma delas, e o passo do mapa também não —
+`precisaPerguntar` é falso nos dois CSV, e o passo some.
+
+**A prévia e a gravação concordam exatamente**: `{"entra":13,"revisao":6,"erro":1}`
+nas duas, que é o que uma prévia existe para fazer.
+
+**Proveniência (ADR-08), contada no banco:** 19 `raw_capture` → 19
+`source_record` → 19 `supplier_candidates` → 13 `organizations`. A vigésima é o
+Rômulo Jordão, fotógrafo em Lisboa — `importacao_gravar` corta a linha com erro
+antes da esteira, como o desenho descreve, e ela aparece no recibo.
+
+**Opt-out no meio do lote, com supressão VIVA e não com o carimbo da coleta:**
+suprimi o telefone de um dos seis depois de ele já ser candidato
+(`do_not_contact` ainda `false`) e aprovei os seis em lote. Resultado: 5
+aprovados, 1 recusado com o motivo nomeado (`candidato_nao_contatar`), e o lote
+não caiu. A reconferência acontece dentro do laço, em `app.promover_candidato`.
+
+**O caminho velho continua entrando:** `22_importacao_de_planilha.sql` está verde
+e intocado desde antes desta rodada, e a planilha-ponte não pergunta nada no
+recibo de leitura — tem coluna de origem própria e casa as 17 colunas sozinha.
+
+**Suíte inteira:** pgTAP 3.101 asserções em 76 arquivos; web **856** testes em 55
+(eram 848 — as oito novas estão abaixo); workers 363 em 24; prompts 284 em 11;
+schema 105 em 3. `pnpm lint`, `pnpm typecheck` e `pnpm db:lint` verdes, este
+último com os três apontamentos de sempre (`app.radar_pontuar`, `app.ia_prazo`,
+`app.envio_um`) e o ruído do PostGIS, nenhum deles tocado por esta rodada.
+
+### Os três defeitos achados
+
+**A prévia e a gravação se separavam por um argumento omitido.** Quem respondia
+"não importar estas linhas" e depois corrigia a origem no "não é?" via a prévia
+contar de volta as linhas que acabara de tirar: `trocarOrigem` chamava
+`conferirCom` sem o corte, e o corte tinha valor padrão `[]`. A gravação
+continuava cortando. A tela mostrava, ao mesmo tempo, "Fora desta importação,
+por sua escolha: X" e números que contavam X. Conserto em três camadas: o
+argumento passa; o valor padrão sai das duas funções, então a próxima omissão é
+erro de compilação; e a montagem das linhas virou `montarLinhasDaPlanilha` em
+`mapeamento.ts`, pura e testada — prévia e gravação pela MESMA função. Cinco
+asserções novas contra o CSV de verdade.
+
+**A terceira marca que o cartão escrevia em nome interno.**
+`ja_existe_na_base` e `telefone_compartilhado` ganharam texto na tarefa 3;
+`mudou_na_fonte` ficou de fora pelo mesmo motivo, e é escrita no candidato por
+`public.esteira_processar_captura`. O cartão renderizava "⚠ mudou_na_fonte".
+Agora há entrada no dicionário e uma lista, `MARCAS_QUE_O_BANCO_ESCREVE`, com
+duas asserções que recusam a quarta marca que alguém acrescente sem texto.
+
+**O desfazer era o canto onde o vocabulário interno sobrou.** O diálogo de
+confirmar dizia "O lote X tem 13 fichas na base" e "os candidatos que ele deixou
+na fila"; as frases de resultado diziam "Esse lote não tinha ficha para remover"
+e "Agora é ficha por ficha". Junto foram a aba do navegador, que ainda dizia
+"Importar planilha" enquanto a tela já diz "Trazer uma lista para a base", e o
+botão de /parceiros que leva até ela. "Planilha" continua achável na paleta ⌘K
+pela descrição do item Parceiros.
+
+### O que foi conferido e estava certo
+
+- `public.radar_revisar_lote` fixa a ação em `'aprovar'` no código: não existe
+  parâmetro de ação, então "não contatar" e "recusar" são inalcançáveis em lote
+  por construção, e não por disciplina.
+- `source_category_proposta` tem RLS ligada e **nenhuma** política de INSERT ou
+  UPDATE: só as funções `security definer` escrevem.
+- `radar_fila` devolve `categoria_na_fonte` e o cartão diz como a fonte chamou
+  aquilo — foi por essa coluna que os seis da fila puderam ser aprovados por
+  grupo.
+- Ensinar categoria grava `ENSINAR_CATEGORIA` em `audit_log` com o papel e o
+  par, e `leitura` é recusada.
+- Nenhuma string de tela diz "Radar" na Revisão; o que sobra são nomes de tipo.
+
+### O que continua pendente
+
+O mesmo de antes, sem novidade: os dois nomes de fonte na seed
+(`Planilha (importação)`, `Google Maps (raspagem local)`) — o segundo aparece na
+linha "reconheci por cid, plus_code", e "raspagem local" é palavra nossa; os 155
+já lidos pela IA não foram reprocessados; a Fase 4 não foi tocada. **Nada subiu
+para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
