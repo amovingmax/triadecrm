@@ -29,11 +29,9 @@ import {
 } from './dados';
 import { ErroDaImportacao, EsqueletoDaPrevia, Progresso, SemLotes } from './estados';
 import {
-  chave,
   faltando,
-  linhaParaObjeto,
+  montarLinhasDaPlanilha,
   sugerirMapa,
-  temConteudo,
   type Sugestao,
 } from './mapeamento';
 import { detectarOrigem, type OrigemDetectada } from './origem-detectada';
@@ -178,27 +176,15 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
       planilha: PlanilhaLida,
       mapa: Mapa,
       nomeDaOrigem: string,
-      fora: readonly string[] = [],
-    ): LinhaCrua[] => {
-    const cortadas = new Set(fora.map((n) => chave(n)));
-    const saida: LinhaCrua[] = [];
-    planilha.linhas.forEach((valores, i) => {
-      if (!temConteudo(valores, mapa)) return;
-      // "Não importar estas linhas": a linha nem sai do navegador. Não há
-      // raw_capture, não há candidato, não há rastro — porque ela nunca entrou.
-      const daColuna = mapa.categoria === undefined ? '' : (valores[mapa.categoria] ?? '');
-      if (cortadas.size > 0 && cortadas.has(chave(daColuna))) return;
-      // +2: a linha 1 é o cabeçalho e a contagem da planilha começa em 1. Assim o
-      // número que a prévia mostra é o número que a pessoa vê no Excel.
-      //
-      // A origem do lote entra aqui, e não só em `import_batches`: quem decide é
-      // `public.importacao_gravar`, com `coalesce((v_n ->> 'source_id')::int,
-      // v_b.source_id)` (`20260904001820:880-881`) — mandando nas duas, as duas
-      // passam a ser a mesma por construção.
-      saida.push(linhaParaObjeto(valores, mapa, i + 2, nomeDaOrigem));
-    });
-    return saida;
-    },
+      // SEM VALOR PADRÃO, de propósito: o corte de "não importar estas linhas"
+      // já foi esquecido uma vez em `trocarOrigem`, e um `= []` silencioso faz
+      // a prévia contar linhas que a gravação corta. Obrigando o argumento, o
+      // typecheck recusa a próxima chamada distraída.
+      fora: readonly string[],
+    ): LinhaCrua[] =>
+      // A montagem em si é pura e vive em `mapeamento.ts`, testada lá: prévia e
+      // gravação passam pela MESMA função, e não por dois laços parecidos.
+      montarLinhasDaPlanilha(planilha, mapa, nomeDaOrigem, fora),
     [],
   );
 
@@ -211,7 +197,8 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
     planilha: PlanilhaLida,
     mapa: Mapa,
     nomeDaOrigem: string,
-    fora: readonly string[] = [],
+    /** Obrigatório pelo mesmo motivo de `montarLinhasDe`. */
+    fora: readonly string[],
   ) => {
     const linhas = montarLinhasDe(planilha, mapa, nomeDaOrigem, fora);
     if (linhas.length === 0) {
@@ -308,7 +295,8 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
         setEtapa('mapa');
         return;
       }
-      void conferirCom(lida, s.mapa, detectada.origem?.nome ?? '');
+      // Arquivo novo: `lerArquivoEscolhido` acabou de zerar `naoImportar`.
+      void conferirCom(lida, s.mapa, detectada.origem?.nome ?? '', []);
     });
 
     w.addEventListener('error', () => {
@@ -430,6 +418,15 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
    * tela, ela é REFEITA: a origem decide qual mapa de categorias o banco
    * consulta, então a mesma lista com outra origem dá outro resultado. Mostrar
    * a prévia velha ao lado da origem nova seria a quarta mentira da tela.
+   *
+   * `naoImportar` VAI JUNTO, e não é detalhe: quem já tinha respondido "não
+   * importar estas linhas" e depois corrigiu a origem no "não é?" via a prévia
+   * contar de volta as linhas que ela acabara de tirar, enquanto `montarLinhas`
+   * continuava cortando-as na gravação. A prévia prometia mais do que o botão
+   * escreve — o defeito exato que esta rodada existe para matar —, e o aviso
+   * "Fora desta importação, por sua escolha: X" ficava na tela contradizendo os
+   * números logo abaixo. O corte é por nome de categoria do arquivo, e o nome
+   * de categoria do arquivo não muda quando a origem muda.
    */
   const trocarOrigem = useCallback(
     (id: number) => {
@@ -437,9 +434,9 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
       setOrigemEscolhidaAMao(true);
       if (etapa !== 'previa' || !planilha) return;
       const nome = origens.find((o) => o.id === id)?.nome ?? '';
-      void conferirCom(planilha, mapa, nome);
+      void conferirCom(planilha, mapa, nome, naoImportar);
     },
-    [conferirCom, etapa, mapa, origens, planilha],
+    [conferirCom, etapa, mapa, naoImportar, origens, planilha],
   );
 
   const recomecar = useCallback(() => {

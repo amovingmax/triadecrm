@@ -14,6 +14,7 @@ import {
   TODOS_OS_CAMPOS,
   type CampoQualquer,
   type Mapa,
+  type PlanilhaLida,
 } from './tipos';
 
 /** Sem acento, sem caixa, sem pontuação e sem o `*` de obrigatório da planilha-ponte. */
@@ -180,4 +181,40 @@ export function temConteudo(valores: string[], mapa: Mapa): boolean {
   return Object.values(mapa).some(
     (indice) => indice !== undefined && (valores[indice] ?? '').trim() !== '',
   );
+}
+
+/**
+ * A planilha inteira virando as linhas que vão ao banco — uma vez, para a
+ * prévia e para a gravação.
+ *
+ * POR QUE EXISTE COMO FUNÇÃO PURA, e não como um laço dentro da tela: a prévia
+ * e o gravar precisam ver EXATAMENTE as mesmas linhas. Em 25/09/2026 eles se
+ * separaram por um argumento omitido — a tela refazia a prévia sem o corte de
+ * "não importar estas linhas" quando alguém corrigia a origem no "não é?", e
+ * então prometia mais linhas do que o botão escrevia. Com uma função só, e sem
+ * valor padrão para `fora`, a divergência vira erro de compilação.
+ *
+ * `fora` são NOMES DE CATEGORIA do arquivo, e não números de linha: a pessoa
+ * respondeu "não importar estas linhas" para um nome, na tela de resolver. A
+ * linha cortada NÃO SAI DO NAVEGADOR — não vira `raw_capture`, não vira
+ * candidato e não deixa rastro, porque nunca entrou. É o mesmo que apagar a
+ * linha do arquivo antes de mandar, e é por isso que não fere o ADR-08.
+ */
+export function montarLinhasDaPlanilha(
+  planilha: PlanilhaLida,
+  mapa: Mapa,
+  origemDoLote: string,
+  fora: readonly string[],
+): Array<Record<string, string | number>> {
+  const cortadas = new Set(fora.map((n) => chave(n)));
+  const saida: Array<Record<string, string | number>> = [];
+  planilha.linhas.forEach((valores, i) => {
+    if (!temConteudo(valores, mapa)) return;
+    const daColuna = mapa.categoria === undefined ? '' : (valores[mapa.categoria] ?? '');
+    if (cortadas.size > 0 && cortadas.has(chave(daColuna))) return;
+    // +2: a linha 1 é o cabeçalho e a contagem da planilha começa em 1. Assim o
+    // número que a prévia mostra é o número que a pessoa vê no Excel.
+    saida.push(linhaParaObjeto(valores, mapa, i + 2, origemDoLote));
+  });
+  return saida;
 }

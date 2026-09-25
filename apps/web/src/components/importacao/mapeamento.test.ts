@@ -9,7 +9,15 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { acharCampo, chave, faltando, linhaParaObjeto, sugerirMapa, temConteudo } from './mapeamento';
+import {
+  acharCampo,
+  chave,
+  faltando,
+  linhaParaObjeto,
+  montarLinhasDaPlanilha,
+  sugerirMapa,
+  temConteudo,
+} from './mapeamento';
 import { lerCsv } from './planilha';
 import type { Mapa } from './tipos';
 
@@ -400,5 +408,64 @@ describe('o CSV de 36 colunas do Google Maps', () => {
     expect(mapa.origem_detalhe).toBe(1);
     expect(mapa.place_id).toBe(15);
     expect(mapa.endereco).toBe(4);
+  });
+});
+
+/**
+ * A prévia e a gravação veem as MESMAS linhas.
+ *
+ * Em 25/09/2026 elas se separaram: a tela refazia a prévia sem o corte de "não
+ * importar estas linhas" quando alguém corrigia a origem no "não é?", e então
+ * prometia mais linhas do que o botão escrevia. Uma função pura, com `fora`
+ * obrigatório, é o que impede o próximo argumento omitido.
+ */
+describe('montarLinhasDaPlanilha', () => {
+  const planilhaDoMaps = lerCsv(
+    readFileSync(
+      fileURLToPath(new URL('./fixtures/maps-natal-fotografo.csv', import.meta.url)),
+      'utf8',
+    ),
+    'fotografo.csv',
+  );
+  const mapaDoMaps = sugerirMapa(planilhaDoMaps.cabecalho).mapa;
+  const MAPS = 'Google Maps (raspagem local)';
+
+  it('sem corte, sai uma linha por linha com conteúdo', () => {
+    const linhas = montarLinhasDaPlanilha(planilhaDoMaps, mapaDoMaps, MAPS, []);
+    expect(linhas).toHaveLength(20);
+    // O número é o do Excel: a linha 1 é o cabeçalho.
+    expect(linhas[0]!.linha).toBe(2);
+    expect(linhas[19]!.linha).toBe(21);
+  });
+
+  it('corta pelo NOME da categoria do arquivo, sem acento nem caixa', () => {
+    const linhas = montarLinhasDaPlanilha(planilhaDoMaps, mapaDoMaps, MAPS, [
+      'impressoes FOTOGRAFICAS',
+    ]);
+    expect(linhas).toHaveLength(18);
+    expect(linhas.some((l) => String(l.categoria).toLowerCase().includes('impress'))).toBe(false);
+    // E o número de linha das que sobraram NÃO é renumerado: quem procura no
+    // Excel procura pelo número do Excel.
+    expect(linhas[0]!.linha).toBe(2);
+  });
+
+  it('cortar dois nomes tira as linhas dos dois, e só elas', () => {
+    const linhas = montarLinhasDaPlanilha(planilhaDoMaps, mapaDoMaps, MAPS, [
+      'Impressões fotográficas',
+      'Loja de artigos para fotografia',
+    ]);
+    expect(linhas).toHaveLength(16);
+  });
+
+  it('nome que não está no arquivo não corta nada', () => {
+    expect(
+      montarLinhasDaPlanilha(planilhaDoMaps, mapaDoMaps, MAPS, ['Floricultura']),
+    ).toHaveLength(20);
+  });
+
+  it('a planilha-ponte, que traz a própria origem, passa inteira', () => {
+    const mapa = sugerirMapa(planilha.cabecalho).mapa;
+    const linhas = montarLinhasDaPlanilha(planilha, mapa, 'Planilha (importação)', []);
+    expect(linhas).toHaveLength(planilha.linhas.length);
   });
 });
