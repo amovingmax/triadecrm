@@ -219,7 +219,7 @@ export const EXPLICACAO_DA_MARCA: Record<string, { rotulo: string; explicacao: s
   sem_contato: {
     rotulo: 'Sem canal de contato',
     explicacao:
-      'Não há telefone, @, e-mail nem site. Aprovar cria a ficha, mas ninguém consegue falar com esse alvo ainda.',
+      'Não há telefone, @, e-mail nem site. Virar parceiro cria a ficha na base, mas ninguém consegue falar com essa empresa ainda.',
   },
   suprimido: {
     rotulo: 'Pediu para não ser contatado',
@@ -239,7 +239,39 @@ export const EXPLICACAO_DA_MARCA: Record<string, { rotulo: string; explicacao: s
     explicacao:
       'O mesmo número aparece em outros lugares do Google. Pode ser a mesma empresa com duas unidades, ou duas empresas que dividem o telefone — confira antes de decidir.',
   },
+  // A terceira que faltava, achada na conferência de 25/09/2026 pelo mesmo
+  // caminho das duas de cima: `public.esteira_processar_captura` copia
+  // `mudou_na_fonte` do `source_record` para as marcas do candidato
+  // (20261001090000:606), e sem esta entrada o cartão escrevia, literalmente,
+  // "⚠ mudou_na_fonte · Confira este dado antes de decidir." — que é o nome
+  // interno da marca e não diz nem o que mudou nem o que fazer.
+  mudou_na_fonte: {
+    rotulo: 'Mudou na fonte',
+    explicacao:
+      'A fonte trouxe este nome de novo, com dado diferente do que estava guardado — telefone, endereço, situação do CNPJ. O CRM completou o que faltava e devolveu para você conferir antes de decidir.',
+  },
 };
+
+/**
+ * Toda marca que o banco sabe escrever, para o teste provar que nenhuma chega
+ * à tela como nome interno.
+ *
+ * A lista é a do comentário de `public.source_record.flags`
+ * (`20260904001600:422`) mais `ja_existe_na_base`, que
+ * `app.resolver_source_record` põe no candidato.
+ */
+export const MARCAS_QUE_O_BANCO_ESCREVE: readonly string[] = [
+  'cpf_descartado',
+  'telefone_invalido',
+  'ddd_de_fora',
+  'instagram_fora_do_padrao',
+  'cnpj_invalido',
+  'sem_contato',
+  'suprimido',
+  'mudou_na_fonte',
+  'telefone_compartilhado',
+  'ja_existe_na_base',
+];
 
 /** Como a duplicata foi encontrada, em português. */
 export const ROTULO_DA_REGRA: Record<string, string> = {
