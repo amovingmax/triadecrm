@@ -3374,3 +3374,40 @@ Sem mudar comportamento nenhum: quatro promessas que o código não cumpria, doi
 **Glossário:** *ficha* → **parceiro**, *candidato* → **nome**, *alvo* → **nome/empresa**, *lote* → **esta importação**, *esteira* → some. "Revisão" **continua Revisão** — decisão 4 do Rafael.
 
 Ficam de fora, e é escolha: os nomes das fontes na seed (`Planilha (importação)`, `Google Maps (raspagem local)`) precisam de migração própria, e o placar procura a fonte pelo `slug`, então não quebram.
+
+### Tarefa 4 — A fila mostra o nome que veio da fonte
+
+Migração `20261001100000_a_fila_diz_o_nome_do_google.sql`. `public.radar_fila` ganha **`categoria_na_fonte`** e o cartão troca *"Sem categoria"* por **"Escolha a categoria · a fonte chamou de 'Impressões fotográficas'"**. O diálogo de aprovar abre com o mesmo nome.
+
+O texto **existia desde 04/09** em `public.source_record.category_source`; a fila é que nunca o devolvia — a palavra não aparecia uma vez em `apps/web/src`. É ele que torna os 155 presos **decidíveis**, e não só trabalhosos: com o nome à vista, a fila agrupa e a decisão passa a ser por grupo (é o que a tarefa 7 aprova em lote).
+
+**O cuidado que importa:** um candidato pode ter **vários** `source_record` — a chave única é `(source_id, external_id)` e o mesmo negócio chega por duas fontes. Um `join` comum devolveria o candidato duas vezes na fila. Por isso é `left join lateral … order by sr.last_seen_at desc limit 1`: o mais recente, que é o que a pessoa acabou de importar. Acrescentar coluna a um `returns table` exige `drop` + `create`, como já foi na `20260917230100`.
+
+Na mesma migração, o histórico da ficha: *"Aprovado na fila do Radar por X"* → *"Virou parceiro na fila, por X"*, no que já está gravado e na função que escreve os próximos (`app.promover_candidato`, a única viva que escreve essa linha). O `update` em massa tem filtro estreito de propósito — `public.activities` tem o gatilho `activities_apply_outcome`, que é `before insert or update`; para `type = 'system'` com `outcome_id` nulo ele é inofensivo, mas isso foi **medido**, não suposto.
+
+pgTAP novo: `77_a_fila_diz_o_nome_do_google.sql` (4 asserções, com fixtures próprias e nomes disjuntos — `radar_fila` busca por `like '%…%'`, e 'Fixture 77' casaria com 'Fixture 77 manual').
+
+### O placar da primeira leva
+
+| momento | das 40 linhas, viram parceiro sem ninguém responder nada |
+|---|---|
+| produção hoje, com o seletor no errado (o que o Rafael viu) | **0** |
+| linha de base, com a origem escolhida à mão | **13** |
+| **depois desta leva** | **30** |
+
+Fotógrafo 10 → **13**; buffet 3 → **17**. Sobram 9 na fila (6 fotógrafo + 3 buffet), todas por categoria que o CRM ainda não conhece, e 1 que não entra (o fotógrafo de Lisboa, telefone de Portugal). Base limpa, `pnpm db:reset`, medido com `scripts/placar-importacao.sql`.
+
+**Suíte:** pgTAP **3.042 asserções em 71 arquivos** (eram 3.028 em 69); web **832 testes em 55** (eram 814 em 52); workers 363 em 24; prompts 276; schema 105. `pnpm db:lint` sem apontamento novo, `pnpm db:types` com uma linha a mais (`categoria_na_fonte`), lint e typecheck verdes.
+
+### O que ficou pendente
+
+- **A segunda leva (tarefas 5 a 8) não começou.** O recibo das 36 caixinhas, a tela de resolver categorias por nome (o coração: O(linhas) → O(nomes novos)), o aprovar em lote e os três consertos de dedup. Plano em `docs/superpowers/plans/2026-09-25-importar-sem-fila.md`.
+- **O `\echo` das categorias desconhecidas no placar ainda agrupa em nulo.** `public.importacao_previa` não devolve `categoria_origem` por linha — isso entra na tarefa 6.2. `app.importacao_normalizar` já o devolve; falta só subir à saída da prévia. O bloco está marcado no script.
+- **A prévia continua mentindo em um caso**, e é o da tarefa 8: ela não passa o site a `app.find_org_matches` (a gravação passa), então as duas *Show Fotografias*, que só se parecem pelo `keepo.io/showfotografias`, entram na prévia e viram duplicata ao gravar. `app.importacao_normalizar` já devolve `site` no topo desde a tarefa 1 — falta o consumidor. **`keepo.io` tem de entrar em `app.is_shared_web_host` no mesmo commit**, senão o conserto funde empresas sem relação.
+- **`telefone_compartilhado` tem texto no cartão mas ainda não chega lá.** A flag é gravada em `source_record` desde 04/09, mas o bloco (5) de `app.resolver_source_record` insere o candidato com a variável lida ANTES do `update` — conserto na tarefa 8.4.
+- **Os dois nomes de fonte na seed** (`Planilha (importação)`, `Google Maps (raspagem local)`) continuam com o texto antigo: mudá-los é migração, não texto, e o placar procura a fonte pelo `slug`.
+- **Tarefas 9 e 10 (aprendizado e IA) estão atrás de um portão**: não começam sem um plano detalhado próprio. A Fase 4 (a IA escrevendo) não foi tocada.
+
+### O que precisa de decisão humana
+
+Nada nesta leva. As quatro decisões do Rafael (25/09) foram seguidas: o mapa de categorias será ensinado por `app.can_write()` com auditoria (tarefa 6), a IA entra só depois do de-para e da tela de resolver, os 155 presos se resolvem por grupo agora que `categoria_na_fonte` existe, e **"Revisão" continua "Revisão"**.

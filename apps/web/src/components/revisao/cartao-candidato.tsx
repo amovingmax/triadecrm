@@ -160,7 +160,17 @@ export function CartaoCandidato({
 
       {/* De onde veio e o que se sabe */}
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-        <span className="text-foreground">{candidato.categoria ?? 'Sem categoria'}</span>
+        <span className="text-foreground">
+          {candidato.categoria ?? 'Escolha a categoria'}
+        </span>
+        {/* O rótulo da fonte, quando o CRM não conhece a categoria. Sem ele a
+            pessoa adivinha entre 19 opções, e foi por isso que 155 nomes
+            ficaram parados na fila em vez de serem decididos por grupo. */}
+        {candidato.categoria === null && candidato.categoria_na_fonte ? (
+          <span className="text-muted-foreground">
+            {' · '}a fonte chamou de “{candidato.categoria_na_fonte}”
+          </span>
+        ) : null}
         {formatarLocal(candidato.bairro, candidato.cidade) ? (
           <>
             <Ponto />

@@ -8013,6 +8013,7 @@ export type Database = {
           bairro: string
           categoria: string
           categoria_id: number
+          categoria_na_fonte: string
           cidade: string
           cnpj: string
           coletado_em: string

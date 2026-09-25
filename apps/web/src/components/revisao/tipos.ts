@@ -60,6 +60,15 @@ export type CandidatoDaFila = {
   source_url: string | null;
   categoria_id: number | null;
   categoria: string | null;
+  /**
+   * Como a FONTE chamou isto (`source_record.category_source`, do registro mais
+   * recente).
+   *
+   * "Sem categoria" não ajuda ninguém a escolher entre 19 opções; "o Google
+   * chamou de Impressões fotográficas" ajuda. É este texto que torna os 155
+   * presos na fila decidíveis, e é por ele que a fila passa a agrupar.
+   */
+  categoria_na_fonte: string | null;
   tipo: string;
   cidade: string | null;
   bairro: string | null;

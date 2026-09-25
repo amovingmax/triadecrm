@@ -116,7 +116,9 @@ function Conteudo({
         </DialogTitle>
         <DialogDescription>
           {acao === 'aprovar'
-            ? `Escolha a categoria e ${candidato.nome} vira parceiro, no funil, com "Primeiro contato" no próximo dia útil.`
+            ? candidato.categoria_na_fonte
+              ? `O arquivo dizia “${candidato.categoria_na_fonte}”, que o CRM não conhece. Escolha a categoria e ${candidato.nome} vira parceiro, no funil, com "Primeiro contato" no próximo dia útil.`
+              : `Escolha a categoria e ${candidato.nome} vira parceiro, no funil, com "Primeiro contato" no próximo dia útil.`
             : acao === 'recusar'
               ? `${candidato.nome} sai da fila. O motivo fica gravado com quem decidiu e quando.`
               : `${candidato.nome} sai da fila e fica marcado para nunca ser procurado.`}
