@@ -205,10 +205,16 @@ select pg_temp.sair();
 select is(pg_temp.config('cadencia.tetos') ->> 'inicio', '2026-01-01',
           'o MESMO número reconectado não recomeça o aquecimento');
 -- Daqui para baixo o teto é o da primeira semana, contado a partir de hoje.
+-- TRÊS, e não dois, desde 25/09/2026: o teto passou a contar ABERTURA em vez de
+-- "primeiro contato" (migração 20260925170000), e o segundo envio para a mesma
+-- ficha — que não é primeiro contato, mas é conversa aberta pela empresa —
+-- passou a gastar cota como a Meta o conta. São três envios até a prévia da
+-- ficha 04: 01, 01b e 05. Reancorar o teto é o certo; afrouxá-lo seria reabrir
+-- justamente o furo que a migração fechou.
 update public.app_settings
    set value = jsonb_set(jsonb_set(value, '{inicio}',
                  to_jsonb(to_char((now() at time zone 'America/Fortaleza')::date, 'YYYY-MM-DD'))),
-                 '{whatsapp,semana1}', '2')
+                 '{whatsapp,semana1}', '3')
  where key = 'cadencia.tetos';
 
 -- =====================================================================
@@ -334,7 +340,7 @@ select is((select c.peer_phone_e164 from public.conversations c
 select pg_temp.entrar(pg_temp.sdr(), 'sdr');
 insert into pg_temp.r values ('previa_04', public.wa_preparar_envio(pg_temp.org('04')));
 select is(pg_temp.v('previa_04') #>> '{bloqueio,motivo}', 'teto_do_numero',
-          'teto da primeira semana (2) gasto: a prévia diz antes do clique');
+          'teto da primeira semana (3) gasto: a prévia diz antes do clique');
 select throws_like(
   format($$ select public.wa_enviar_modelo(%L, %s, '{"nome":"a","empresa":"b","origem":"c","detalhe":"d"}') $$,
          pg_temp.org('04'), pg_temp.modelo('AEB-ABR-A')),
