@@ -62,8 +62,8 @@ export function TelaRevisao({
    * Papéis que trabalham a fila. A autorização de verdade é o RLS.
    *
    * É o espelho de `app.can_write()` (admin, gestor, sdr, embaixador), a mesma
-   * guarda que `radar_coletar_agora` usa para recusar com `sem_permissao` — por
-   * isso ele também responde por quem trabalha a fila, e não `podeAjustarTriagem`.
+   * guarda que `radar_revisar_candidato` usa para recusar com `sem_permissao` —
+   * por isso é ele, e não `podeAjustarTriagem`, que responde por decidir na fila.
    */
   podeDecidir: boolean;
   /** Só gestor e admin ajustam os pesos da triagem e pedem leitura da IA. */

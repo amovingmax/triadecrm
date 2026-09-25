@@ -1,7 +1,7 @@
 /**
  * worker-wa — o WhatsApp (D5, RF-CON, anexos R04 e R13; ADR-04, ADR-05, ADR-06).
  *
- * Duas filas e um laço burro, na forma do worker-ingest: lê fila, trata a
+ * Duas filas e um laço burro: lê fila, trata a
  * mensagem, bate ponto, repete. Toda a inteligência mora no Postgres (ADR-03) —
  * supressão, janela de 24 h, janela de horário, teto do número, reconferência
  * na entrega e idempotência por wamid. Aqui há transporte e ordem.
