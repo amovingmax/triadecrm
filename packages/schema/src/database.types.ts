@@ -254,6 +254,7 @@ export type Database = {
       dia_util_de_operacao: { Args: { p_at?: string }; Returns: boolean }
       dlq_drenar: { Args: { p_qty?: number }; Returns: Json }
       e_o_worker: { Args: never; Returns: boolean }
+      eh_dia_util: { Args: { p_dia: string }; Returns: boolean }
       encerrar_matricula: {
         Args: {
           p_enrollment: string
@@ -781,6 +782,34 @@ export type Database = {
         Args: { p_source_record_id: string }
         Returns: Json
       }
+      reuniao_config: { Args: never; Returns: Json }
+      reuniao_gravar: {
+        Args: {
+          p_conversation_id: string
+          p_deal_id: string
+          p_formato: string
+          p_inicio: string
+          p_local: string
+          p_observacao: string
+          p_por: string
+          p_por_id: string
+        }
+        Returns: Json
+      }
+      reuniao_horarios_livres: {
+        Args: { p_ate: string; p_de: string; p_dono: string; p_limite?: number }
+        Returns: {
+          fim: string
+          inicio: string
+        }[]
+      }
+      reuniao_opcoes: {
+        Args: { p_dono: string; p_limite?: number }
+        Returns: Json
+      }
+      reuniao_por_extenso: { Args: { p_inicio: string }; Returns: string }
+      reuniao_rampa_adiar: { Args: never; Returns: string }
+      reuniao_rampa_ativa: { Args: never; Returns: boolean }
       role: { Args: never; Returns: Database["app"]["Enums"]["user_role"] }
       rota_alvos: {
         Args: { p_assignee: string; p_dia: string }
@@ -5543,6 +5572,7 @@ export type Database = {
           is_active: boolean
           phone_e164: string | null
           role: Database["app"]["Enums"]["user_role"]
+          sala_url: string | null
           team_id: number | null
           updated_at: string
         }
@@ -5555,6 +5585,7 @@ export type Database = {
           is_active?: boolean
           phone_e164?: string | null
           role?: Database["app"]["Enums"]["user_role"]
+          sala_url?: string | null
           team_id?: number | null
           updated_at?: string
         }
@@ -5567,6 +5598,7 @@ export type Database = {
           is_active?: boolean
           phone_e164?: string | null
           role?: Database["app"]["Enums"]["user_role"]
+          sala_url?: string | null
           team_id?: number | null
           updated_at?: string
         }
@@ -5818,6 +5850,196 @@ export type Database = {
           report?: Json
         }
         Relationships: []
+      }
+      reunioes: {
+        Row: {
+          atualizada_em: string
+          aviso_enviado_em: string | null
+          confirmada_em: string | null
+          confirmada_por: string | null
+          contact_id: string | null
+          conversation_id: string | null
+          criada_em: string
+          deal_id: string | null
+          dono_id: string
+          durante: unknown
+          estado: string
+          fim: string
+          formato: string
+          id: string
+          inicio: string
+          lembrete_em: string | null
+          link: string | null
+          local: string | null
+          marcada_por: string
+          marcada_por_id: string | null
+          observacao: string | null
+          organization_id: string
+          remarcada_de: string | null
+          task_id: string | null
+          titulo: string
+        }
+        Insert: {
+          atualizada_em?: string
+          aviso_enviado_em?: string | null
+          confirmada_em?: string | null
+          confirmada_por?: string | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          criada_em?: string
+          deal_id?: string | null
+          dono_id: string
+          durante?: unknown
+          estado?: string
+          fim: string
+          formato?: string
+          id?: string
+          inicio: string
+          lembrete_em?: string | null
+          link?: string | null
+          local?: string | null
+          marcada_por: string
+          marcada_por_id?: string | null
+          observacao?: string | null
+          organization_id: string
+          remarcada_de?: string | null
+          task_id?: string | null
+          titulo: string
+        }
+        Update: {
+          atualizada_em?: string
+          aviso_enviado_em?: string | null
+          confirmada_em?: string | null
+          confirmada_por?: string | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          criada_em?: string
+          deal_id?: string | null
+          dono_id?: string
+          durante?: unknown
+          estado?: string
+          fim?: string
+          formato?: string
+          id?: string
+          inicio?: string
+          lembrete_em?: string | null
+          link?: string | null
+          local?: string | null
+          marcada_por?: string
+          marcada_por_id?: string | null
+          observacao?: string | null
+          organization_id?: string
+          remarcada_de?: string | null
+          task_id?: string | null
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reunioes_confirmada_por_fkey"
+            columns: ["confirmada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_confirmada_por_fkey"
+            columns: ["confirmada_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "reunioes_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_dono_id_fkey"
+            columns: ["dono_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_dono_id_fkey"
+            columns: ["dono_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_marcada_por_id_fkey"
+            columns: ["marcada_por_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_marcada_por_id_fkey"
+            columns: ["marcada_por_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_remarcada_de_fkey"
+            columns: ["remarcada_de"]
+            isOneToOne: false
+            referencedRelation: "reunioes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       route_plans: {
         Row: {
@@ -8191,6 +8413,33 @@ export type Database = {
       }
       resumo_do_dia: {
         Args: { p_momento?: string; p_user_id?: string }
+        Returns: Json
+      }
+      reuniao_horarios: {
+        Args: { p_conversation_id: string; p_limite?: number }
+        Returns: Json
+      }
+      reuniao_livres: {
+        Args: { p_dia: string; p_dono?: string }
+        Returns: Json
+      }
+      reuniao_marcar: {
+        Args: {
+          p_conversation_id: string
+          p_formato?: string
+          p_inicio: string
+          p_observacao?: string
+        }
+        Returns: Json
+      }
+      reuniao_marcar_pelo_negocio: {
+        Args: {
+          p_deal_id: string
+          p_formato?: string
+          p_inicio: string
+          p_local?: string
+          p_observacao?: string
+        }
         Returns: Json
       }
       reveal_contact_phone: { Args: { p_contact_id: string }; Returns: string }
