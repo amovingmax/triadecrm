@@ -219,3 +219,171 @@ comment on function app.wa_teto_da_meta(text, timestamptz) is
   'O que a Meta permite hoje para o nosso número, lido de public.wa_saude_numero: teto de conversas iniciadas por dia (dobrado pela nota — YELLOW metade, RED zero), restrição de saída, restrição de entrada, banimento e até quando. Sem histórico nenhum, teto_dia é NULO: "não sei" não vira nem permissão nem proibição.';
 revoke all on function app.wa_teto_da_meta(text, timestamptz) from public, anon;
 grant execute on function app.wa_teto_da_meta(text, timestamptz) to authenticated, service_role;
+
+
+-- ---------------------------------------------------------------------
+-- 4. A porteira passa a conhecer a Meta
+-- ---------------------------------------------------------------------
+-- O TETO EFETIVO É O MENOR ENTRE O NOSSO E O DELA. Hoje a Meta libera 2.000
+-- conversas novas por dia e o nosso aquecimento está em 45: o menor continua
+-- sendo o nosso, e nada muda na prática. A peça existe para o dia em que a
+-- Meta cortar sem avisar — que é o dia em que ninguém estará olhando.
+--
+-- ONDE CADA COISA ENTRA, e por quê:
+--   passo 1.5 (antes da janela de 24 h): banimento e restrição de ENTRADA.
+--     `RESTRICTED_CUSTOMER_INITIATED_MESSAGING` derruba até a resposta dentro
+--     da janela — e o passo 2 liberaria. Depois do passo 2 seria tarde.
+--   passo 4.5: restrição de SAÍDA, que só atinge o que a empresa começa.
+--   passo 5: `least(nosso, dela)`, com `qualidade_vermelha` como motivo
+--     próprio quando o teto dela é zero.
+--   passo 6: o mesmo `least` sobre os 150/dia.
+--
+-- OS QUATRO MOTIVOS NOVOS SÃO ESPERA, e não morte: o lote de campanha dorme
+-- em vez de queimar a ficha. `app.envios_em_massa_rodar` já adormece o envio
+-- com `proximo_em` em vez de pular o item — nenhuma linha do motor muda.
+create or replace function app.pode_enviar(p_conversation_id uuid,
+                                           p_primeiro_contato boolean default false,
+                                           p_tem_template     boolean default false,
+                                           p_quando           timestamptz default now())
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  c          public.conversations%rowtype;
+  v_quando   timestamptz := coalesce(p_quando, now());
+  v_dia      date;
+  v_motivo   text;
+  v_janela   jsonb;
+  v_respondeu boolean;
+  v_teto     int;
+  v_usados   int;
+  v_cfg      jsonb;
+  v_td       int;
+  v_th       int;
+  v_meta     jsonb;
+  v_meta_dia int;
+begin
+  select * into c from public.conversations where id = p_conversation_id;
+  if not found then
+    return jsonb_build_object('pode', false, 'motivo', 'conversa_inexistente', 'quando', null);
+  end if;
+
+  -- 1 · Nunca mais.
+  v_motivo := app.wa_motivo_de_recusa(c.organization_id, c.contact_id, c.peer_phone_e164);
+  if v_motivo is not null then
+    return jsonb_build_object('pode', false, 'motivo', v_motivo, 'quando', null);
+  end if;
+
+  -- 1.5 · O que a Meta decidiu sobre a conta. Vem ANTES da janela de 24 h
+  --       porque a restrição de ENTRADA derruba a resposta dentro dela.
+  v_meta := app.wa_teto_da_meta(c.business_number, v_quando);
+  if coalesce((v_meta ->> 'banido')::boolean, false) then
+    -- Seis horas: não há o que fazer agora, e voltar a perguntar em seis horas
+    -- é mais barato que parar o lote para sempre por um DISABLE que às vezes
+    -- vira REINSTATE no mesmo dia.
+    return jsonb_build_object('pode', false, 'motivo', 'conta_banida',
+                              'quando', v_quando + interval '6 hours');
+  end if;
+  if coalesce((v_meta ->> 'restrito_entrada')::boolean, false) then
+    return jsonb_build_object('pode', false, 'motivo', 'meta_restringiu_entrada',
+                              'quando', (v_meta ->> 'ate')::timestamptz);
+  end if;
+
+  -- 2 · Dentro da janela de 24 h, responder é livre: foi a pessoa que
+  --     escreveu, e responder rápido é o que a política da Meta e o
+  --     RF-CON-04 pedem. Primeiro contato nunca cai aqui — por definição
+  --     não existe janela aberta com quem nunca falou com a gente.
+  if not p_primeiro_contato and app.janela_de_24h_aberta(c.id, v_quando) then
+    return jsonb_build_object('pode', true, 'motivo', null, 'quando', v_quando);
+  end if;
+
+  -- 3 · Daqui para baixo é mensagem INICIADA PELA EMPRESA. Fora da janela,
+  --     só template aprovado atravessa (R04 §2.1) — é regra da Meta, e
+  --     tentar mandar texto livre não dá erro nosso, dá erro deles.
+  if not p_tem_template and not app.janela_de_24h_aberta(c.id, v_quando) then
+    return jsonb_build_object('pode', false, 'motivo', 'sem_janela_e_sem_template', 'quando', null);
+  end if;
+
+  -- 4 · Janela de horário (RF-CON-11): domingo, feriado e fora de hora saem
+  --     daqui, porque `app.janela_do_canal` já os trata e devolve a próxima
+  --     abertura em America/Fortaleza.
+  v_respondeu := c.organization_id is not null and app.ja_respondeu(c.organization_id);
+  v_janela := app.janela_do_canal(c.channel, v_quando, v_respondeu);
+  if not coalesce((v_janela ->> 'aberta')::boolean, false) then
+    return jsonb_build_object('pode', false,
+                              'motivo', 'janela_' || coalesce(v_janela ->> 'motivo', 'fechada'),
+                              'quando', (v_janela ->> 'abre_em')::timestamptz);
+  end if;
+
+  -- 4.5 · Restrição de SAÍDA: só atinge o que a empresa começa, e daqui para
+  --       baixo é tudo o que a empresa começa.
+  if coalesce((v_meta ->> 'restrito_saida')::boolean, false) then
+    return jsonb_build_object('pode', false, 'motivo', 'meta_restringiu_saida',
+                              'quando', (v_meta ->> 'ate')::timestamptz);
+  end if;
+
+  v_dia := (v_quando at time zone 'America/Fortaleza')::date;
+  v_meta_dia := (v_meta ->> 'teto_dia')::int;
+
+  -- 5 · Teto de PRIMEIROS CONTATOS do dia, por canal e por número, agora
+  --     limitado também pelo da Meta.
+  if p_primeiro_contato then
+    v_teto   := least(app.teto_do_canal(c.channel, v_dia), coalesce(v_meta_dia, 2147483647));
+    v_usados := app.primeiros_contatos_do_dia(c.channel, v_dia, c.business_number);
+    if v_teto <= 0 then
+      -- Nota vermelha não é teto cheio. Teto cheio espera a próxima abertura;
+      -- nota vermelha espera o número melhorar, e são prazos diferentes.
+      return jsonb_build_object('pode', false, 'motivo', 'qualidade_vermelha',
+                                'quando', v_quando + interval '6 hours',
+                                'usados', v_usados, 'teto', v_teto);
+    end if;
+    if v_usados >= v_teto then
+      return jsonb_build_object('pode', false, 'motivo', 'teto_do_numero',
+                                'quando', app.proxima_abertura_do_canal(v_dia, c.channel, v_respondeu),
+                                'usados', v_usados, 'teto', v_teto);
+    end if;
+  end if;
+
+  -- 6 · Tetos de volume iniciado pela empresa: 150/dia e 60/hora (RF-CON-10),
+  --     o do dia limitado também pelo da Meta.
+  select s.value into v_cfg from public.app_settings s where s.key = 'whatsapp.envio';
+  v_td := least(coalesce((v_cfg ->> 'teto_iniciadas_dia')::int, 150),
+                coalesce(v_meta_dia, 2147483647));
+  v_th := coalesce((v_cfg ->> 'teto_iniciadas_hora')::int, 60);
+  if v_td <= 0 then
+    return jsonb_build_object('pode', false, 'motivo', 'qualidade_vermelha',
+                              'quando', v_quando + interval '6 hours');
+  end if;
+  if app.iniciadas_pela_empresa(c.business_number,
+                                (v_dia::timestamp at time zone 'America/Fortaleza'),
+                                ((v_dia + 1)::timestamp at time zone 'America/Fortaleza')) >= v_td then
+    return jsonb_build_object('pode', false, 'motivo', 'teto_iniciadas_dia',
+                              'quando', app.proxima_abertura_do_canal(v_dia, c.channel, v_respondeu));
+  end if;
+  if app.iniciadas_pela_empresa(c.business_number, v_quando - interval '1 hour', v_quando) >= v_th then
+    return jsonb_build_object('pode', false, 'motivo', 'teto_iniciadas_hora',
+                              'quando', v_quando + interval '1 hour');
+  end if;
+
+  return jsonb_build_object('pode', true, 'motivo', null, 'quando', v_quando);
+end $$;
+comment on function app.pode_enviar(uuid, boolean, boolean, timestamptz) is
+  'A porteira do envio, na forma de app.pode_tocar: supressão (nunca mais) → o que a Meta decidiu sobre a conta (banimento e restrição de entrada) → janela de 24 h → template obrigatório fora dela → janela de horário do RF-CON-11 → restrição de saída → teto de primeiros contatos, que é o MENOR entre o nosso e o da Meta → tetos de 150/dia e 60/hora, o do dia também limitado pela Meta. Devolve {pode, motivo, quando}; `quando` null significa que não existe uma próxima hora.';
+
+-- Os quatro motivos novos são ESPERA. Um lote de campanha que esbarre neles
+-- dorme e continua depois, em vez de queimar a ficha como "pulada": nada do
+-- que a Meta decide sobre a NOSSA conta é motivo para descartar um fornecedor.
+create or replace function app.envio_motivo_de_espera(p_motivo text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p_motivo like 'janela\_%' escape '\'
+      or p_motivo in ('teto_do_numero', 'teto_iniciadas_dia', 'teto_iniciadas_hora',
+                      'conta_banida', 'meta_restringiu_entrada', 'meta_restringiu_saida',
+                      'qualidade_vermelha')
+$$;
