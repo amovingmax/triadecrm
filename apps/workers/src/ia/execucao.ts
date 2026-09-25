@@ -41,7 +41,7 @@ import {
 import { RespostaIlegivelError, type ClienteDoModelo } from './cliente';
 import { USO_ZERADO, registrarChamada, type VinculosDaChamada } from './registro';
 
-import { ErroDaEsteira, type ClienteDoBanco } from '../ingest/esteira';
+import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
 import type { Logger } from '../lib/log';
 
 /**

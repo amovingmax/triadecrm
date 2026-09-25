@@ -18,7 +18,7 @@ export interface Logger {
 }
 
 export interface LoggerOptions {
-  /** Nome do worker, ex.: `worker-ingest`. Vai em toda linha. */
+  /** Nome do worker, ex.: `worker-wa`. Vai em toda linha. */
   worker: string;
   /** Nível mínimo registrado (padrão: info). */
   level?: LogLevel;

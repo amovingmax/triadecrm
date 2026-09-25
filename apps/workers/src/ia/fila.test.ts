@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { bancoFalso } from './banco-de-teste';
 import { chaveDaMensagem, enfileirarTrabalho } from './fila';
 
-import type { MensagemDaFila } from '../ingest/esteira';
+import type { MensagemDaFila } from '../fila/esteira';
 
 function mensagem(corpo: Record<string, unknown>, msgId = 42): MensagemDaFila {
   return { msg_id: msgId, entregas: 1, enfileirada_em: '2026-09-05T10:00:00Z', mensagem: corpo };

@@ -7,9 +7,14 @@ const base = {
   SUPABASE_SERVICE_ROLE_KEY: 'chave-de-teste',
 };
 
+// O comando `ingest` saiu em 25/09/2026, e com ele o único comando cujo esquema
+// era o BASE puro. O base continua sendo a parte de baixo dos três que
+// restaram, e `rotas` é o mais barato de vestir: uma obrigatória a mais.
+const baseRotas = { ...base, NOMINATIM_USER_AGENT: 'pgTAP (komune@komune.app.br)' };
+
 describe('loadEnv', () => {
-  it('aceita o ambiente base para ingest e aplica padrões', () => {
-    const result = loadEnv('ingest', { ...base, LOG_LEVEL: '', TZ: '' });
+  it('aceita o ambiente base para rotas e aplica padrões', () => {
+    const result = loadEnv('rotas', { ...baseRotas, LOG_LEVEL: '', TZ: '' });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.env.LOG_LEVEL).toBe('info');
@@ -19,7 +24,7 @@ describe('loadEnv', () => {
   });
 
   it('rejeita ambiente sem as variáveis do Supabase', () => {
-    const result = loadEnv('ingest', {});
+    const result = loadEnv('rotas', {});
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.issues.join('\n')).toContain('SUPABASE_URL');
@@ -27,7 +32,7 @@ describe('loadEnv', () => {
   });
 
   it('exige credenciais da Meta só para wa', () => {
-    expect(loadEnv('ingest', base).ok).toBe(true);
+    expect(loadEnv('rotas', baseRotas).ok).toBe(true);
     expect(loadEnv('wa', base).ok).toBe(false);
     expect(
       loadEnv('wa', { ...base, META_WA_ACCESS_TOKEN: 'token', META_WA_PHONE_NUMBER_ID: '123' }).ok,
@@ -65,7 +70,7 @@ describe('loadEnv', () => {
   });
 
   it('trata string vazia como ausente também em opcionais', () => {
-    const result = loadEnv('ingest', { ...base, SENTRY_DSN: '', KOMUNE_HMAC_SECRET: '' });
+    const result = loadEnv('rotas', { ...baseRotas, SENTRY_DSN: '', KOMUNE_HMAC_SECRET: '' });
     expect(result.ok).toBe(true);
   });
 

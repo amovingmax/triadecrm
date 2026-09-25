@@ -22,43 +22,34 @@ describe('parseArgs', () => {
     });
   });
 
+  it('"ingest" deixou de ser comando: o coletor do Radar saiu em 25/09/2026', () => {
+    // Não é detalhe de parse. Uma máquina antiga com `command: ['ingest']` no
+    // Compose, ou um `WORKER_COMANDO=ingest` esquecido num .env, precisa PARAR
+    // com a frase certa — e não subir um processo que dorme para sempre.
+    expect(parseArgs(['ingest'])).toMatchObject({
+      kind: 'error',
+      message: expect.stringContaining('ingest'),
+    });
+    expect(parseArgs([], { WORKER_COMANDO: 'ingest' })).toMatchObject({
+      kind: 'error',
+      message: expect.stringContaining('em WORKER_COMANDO: "ingest"'),
+    });
+  });
+
   it('ignora o separador "--" repassado pelo pnpm run', () => {
-    expect(parseArgs(['--', 'ingest'])).toEqual({ kind: 'run', command: 'ingest', opcoes: {} });
+    expect(parseArgs(['--', 'wa'])).toEqual({ kind: 'run', command: 'wa', opcoes: {} });
     expect(parseArgs(['--', '--help'])).toEqual({ kind: 'help' });
   });
 
-  it('lê as opções da coleta', () => {
-    expect(
-      parseArgs([
-        'ingest',
-        '--agendar',
-        '--fonte=casamentos_com_br',
-        '--categorias=cerimonialista,buffet-casamento',
-        '--paginas=2',
-        '--uma-vez',
-      ]),
-    ).toEqual({
-      kind: 'run',
-      command: 'ingest',
-      opcoes: {
-        agendar: true,
-        fonte: 'casamentos_com_br',
-        categorias: 'cerimonialista,buffet-casamento',
-        paginas: '2',
-        'uma-vez': true,
-      },
-    });
-  });
-
   it('erra com opções não reconhecidas, e diz quais valem', () => {
-    // Um `--pagians=3` digitado errado não pode virar uma coleta diferente da pedida.
-    expect(parseArgs(['ingest', '--pagians=3'])).toMatchObject({
+    // Um `--conetar` digitado errado não pode virar uma conexão diferente da pedida.
+    expect(parseArgs(['wa', '--conetar'])).toMatchObject({
       kind: 'error',
-      message: expect.stringContaining('--paginas'),
+      message: expect.stringContaining('--conectar'),
     });
-    expect(parseArgs(['ingest', '--foo'])).toMatchObject({ kind: 'error' });
-    // Opção de outro comando não vale em `wa`.
-    expect(parseArgs(['wa', '--agendar'])).toMatchObject({ kind: 'error' });
+    expect(parseArgs(['wa', '--foo'])).toMatchObject({ kind: 'error' });
+    // Opção de outro comando não vale em `ai`.
+    expect(parseArgs(['ai', '--conectar'])).toMatchObject({ kind: 'error' });
   });
 
   it('wa aceita --conectar e --sincronizar-modelos', () => {
@@ -75,7 +66,7 @@ describe('parseArgs', () => {
   });
 
   it('erra com argumento solto', () => {
-    expect(parseArgs(['ingest', 'casamentos'])).toMatchObject({ kind: 'error' });
+    expect(parseArgs(['wa', 'casamentos'])).toMatchObject({ kind: 'error' });
   });
 });
 
@@ -104,10 +95,10 @@ describe('WORKER_COMANDO (a imagem rodando só com variável de ambiente)', () =
     });
   });
 
-  it('A LINHA SEMPRE GANHA: o Compose com `command: [ingest]` não vira wa', () => {
-    expect(parseArgs(['ingest'], { WORKER_COMANDO: 'wa' })).toEqual({
+  it('A LINHA SEMPRE GANHA: o Compose com `command: [rotas]` não vira wa', () => {
+    expect(parseArgs(['rotas'], { WORKER_COMANDO: 'wa' })).toEqual({
       kind: 'run',
-      command: 'ingest',
+      command: 'rotas',
       opcoes: {},
     });
   });

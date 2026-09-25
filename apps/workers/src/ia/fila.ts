@@ -30,7 +30,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-import { ErroDaEsteira, type ClienteDoBanco, type MensagemDaFila } from '../ingest/esteira';
+import { ErroDaEsteira, type ClienteDoBanco, type MensagemDaFila } from '../fila/esteira';
 
 export type { ClienteDoBanco, MensagemDaFila };
 

@@ -13,7 +13,7 @@
  */
 import { hostname } from 'node:os';
 
-import { baterPonto, type ClienteDoBanco } from '../ingest/esteira';
+import { baterPonto, type ClienteDoBanco } from '../fila/esteira';
 import type { Logger } from './log';
 
 import pkg from '../../package.json' with { type: 'json' };

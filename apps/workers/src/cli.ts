@@ -2,16 +2,15 @@
  * Parse dos argumentos do CLI dos workers. Sem dependências, para ser testável e rápido.
  */
 
-export const WORKER_COMMANDS = ['ingest', 'wa', 'ai', 'rotas'] as const;
+export const WORKER_COMMANDS = ['wa', 'ai', 'rotas'] as const;
 export type WorkerCommand = (typeof WORKER_COMMANDS)[number];
 
 /**
- * Opções aceitas por comando. A lista é fechada de propósito: um `--pagians=3`
- * digitado errado precisa parar o comando, não rodar uma coleta diferente da que
- * a pessoa pediu e ser descoberto depois no banco.
+ * Opções aceitas por comando. A lista é fechada de propósito: um `--conetar`
+ * digitado errado precisa parar o comando, não abrir uma conexão diferente da
+ * que a pessoa pediu e ser descoberto depois no banco.
  */
 export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
-  ingest: ['uma-vez', 'agendar', 'fonte', 'categorias', 'paginas', 'rotulo'],
   wa: ['uma-vez', 'conectar', 'sincronizar-modelos'],
   ai: ['uma-vez', 'chamada-de-teste'],
   rotas: ['uma-vez', 'geocodificar'],
@@ -20,18 +19,9 @@ export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
 export const USAGE = `Uso: workers <comando> [opções]
 
 Comandos:
-  ingest   Radar: coleta nas fontes públicas → esteira de ingestão (RF-RAD, anexos R03/R06)
   wa       WhatsApp: recebe, registra opt-out e envia pela Cloud API da Meta (D5, RF-CON)
   ai       IA: classificação, rascunhos, resumos e Assistente (D6, ADR-10)
   rotas    Rotas de visita: geocodificação (Nominatim) e ordem das paradas no OSRM (RF-ROT)
-
-Opções de "ingest":
-  --agendar              Abre um lote e enfileira a coleta antes de começar a consumir.
-  --fonte=<slug>         Fonte a coletar (padrão: casamentos_com_br). Só com --agendar.
-  --categorias=a,b,c     Categorias da fonte a coletar (padrão: o catálogo inteiro da fonte).
-  --paginas=<n>          Teto de páginas de listagem por categoria (padrão: 1).
-  --rotulo=<texto>       Rótulo do lote, como aparece no relatório.
-  --uma-vez              Esvazia as filas uma vez e sai, em vez de ficar rodando.
 
 Opções de "wa":
   --uma-vez              Esvazia as filas de entrada e de saída uma vez e sai.
@@ -61,7 +51,7 @@ Sem comando na linha, vale WORKER_COMANDO (ex.: WORKER_COMANDO=wa): é assim que
 nuvem roda a imagem só com variáveis de ambiente.
 `;
 
-/** Opções já separadas: `--uma-vez` vira `true`, `--paginas=2` vira `"2"`. */
+/** Opções já separadas: `--uma-vez` vira `true`, `--opcao=valor` vira `"valor"`. */
 export type OpcoesDoComando = Readonly<Record<string, string | true>>;
 
 export type ParsedArgs =
@@ -91,7 +81,7 @@ function comandoDoAmbiente(ambiente: AmbienteDoCli): string[] {
  * Interpreta `argv` já sem `node` e o caminho do script (ou seja, `process.argv.slice(2)`).
  *
  * A ORDEM: comando posicional na linha → `WORKER_COMANDO` → erro. A linha
- * ganha sempre, para que o Compose (`command: ['ingest']`) continue mandando
+ * ganha sempre, para que o Compose (`command: ['rotas']`) continue mandando
  * mesmo numa máquina cujo `.env` tenha `WORKER_COMANDO` definido.
  */
 export function parseArgs(argv: readonly string[], ambiente: AmbienteDoCli = {}): ParsedArgs {

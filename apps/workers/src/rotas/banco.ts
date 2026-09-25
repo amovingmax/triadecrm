@@ -12,7 +12,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-import { ErroDaEsteira, type ClienteDoBanco } from '../ingest/esteira';
+import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
 
 import type { PerguntaDeGeocodificacao, RespostaDoNominatim } from './nominatim';
 

@@ -1,14 +1,14 @@
 /**
  * O banco visto do worker-wa: uma fachada fina sobre as RPCs de `public`.
  *
- * Mesma forma de `ingest/esteira.ts`, e pelo mesmo motivo: o cérebro é o
+ * Mesma forma de `fila/esteira.ts`, e pelo mesmo motivo: o cérebro é o
  * Postgres (ADR-03). Supressão, janela de 24 h, janela de horário, teto do
  * número, reconferência na entrega e idempotência por wamid já existem em
  * `app` (migração 20260905000200) e continuam lá. Este arquivo monta
  * argumento, traduz o que volta e dá NOME ao erro. Nenhuma regra de negócio
  * mora aqui, e é assim que precisa continuar.
  *
- * Por que não reusa `ingest/esteira.ts`: o `NomeDaFila` de lá é um tipo fechado
+ * Por que não reusa `fila/esteira.ts`: o `NomeDaFila` de lá é um tipo fechado
  * nas três filas do Radar, e alargá-lo para `wa_inbound`/`wa_outbound` mexeria
  * num arquivo de outro módulo para ganhar três linhas. As três chamadas de fila
  * daqui são as MESMAS funções de `public` — o que se repete é a assinatura, não

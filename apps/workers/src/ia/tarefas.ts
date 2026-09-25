@@ -82,7 +82,7 @@ import {
 } from './execucao';
 import { enfileirarTrabalho } from './fila';
 
-import { ErroDaEsteira, type ClienteDoBanco } from '../ingest/esteira';
+import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
 
 /**
  * Erro que não adianta repetir: o mundo teria de mudar, não a tentativa.

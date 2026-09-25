@@ -20,7 +20,7 @@
  */
 import { custoDaChamada, type ModeloAlvo, type PropositoDeAiRun } from '@komune/prompts';
 
-import { ErroDaEsteira, type ClienteDoBanco } from '../ingest/esteira';
+import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
 
 import type { UsoDoModelo } from './cliente';
 import type { Logger } from '../lib/log';

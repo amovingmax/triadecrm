@@ -20,7 +20,7 @@
  */
 import { custoDaChamada, type ModeloAlvo } from '@komune/prompts';
 
-import type { ClienteDoBanco } from '../ingest/esteira';
+import type { ClienteDoBanco } from '../fila/esteira';
 
 export type LinhaFalsa = Record<string, unknown>;
 export type TabelasFalsas = Record<string, LinhaFalsa[]>;

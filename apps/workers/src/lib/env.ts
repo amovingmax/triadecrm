@@ -114,7 +114,6 @@ const rotasEnvSchema = baseEnvSchema.extend({
 });
 
 export const envSchemas = {
-  ingest: baseEnvSchema,
   wa: waEnvSchema,
   ai: aiEnvSchema,
   rotas: rotasEnvSchema,

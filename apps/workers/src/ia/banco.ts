@@ -22,7 +22,7 @@
  *   follow-up     → `message_drafts` em `pendente` (a fila de aprovação, RF-CON-22)
  *   classificação → `conversations.ai_intent` / `ai_confidence`
  */
-import { ErroDaEsteira, type ClienteDoBanco } from '../ingest/esteira';
+import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
 
 // ---------------------------------------------------------------------------
 // Leituras
