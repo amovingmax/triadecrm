@@ -81,10 +81,20 @@ describe('NAVEGACAO', () => {
     // "tem coisa parada aqui". Configuração e leitura não contam NUNCA — um número
     // em Ajustes ensinaria a pessoa a ignorar os números que importam.
     const contam = NAVEGACAO.filter((item) => item.fila).map((item) => item.rotulo);
-    expect(contam.sort()).toEqual(['Conversas', 'Radar']);
+    expect(contam.sort()).toEqual(['Conversas', 'Revisão']);
 
     const controle = NAVEGACAO.filter((item) => item.grupo === 'controle');
     for (const item of controle) expect(item.fila).toBeUndefined();
+  });
+
+  it('a Revisão saiu de "A base" e foi para "Todo dia"', () => {
+    // A régua está no próprio arquivo: "A base" é "para achar alguém e para
+    // organizar, não para produzir contato". Depois da Fase 1 é na Revisão que o
+    // contato nasce — cada linha do CSV do Maps passa por lá antes de existir
+    // ficha. Continua FORA dos seis principais.
+    const revisao = NAVEGACAO.find((item) => item.href === '/revisao');
+    expect(revisao?.grupo).toBe('todo_dia');
+    expect(revisao?.principal).toBeUndefined();
   });
 
   it('não oferece Ligar a quem o banco vai recusar', () => {
@@ -146,7 +156,7 @@ describe('navegacaoAgrupada', () => {
       const deles = navegacaoPara(papel).map((i) => i.href);
       expect(deles).not.toContain('/ligar');
       expect(deles).not.toContain('/registrar');
-      expect(deles).not.toContain('/radar');
+      expect(deles).not.toContain('/revisao');
     }
   });
 });
@@ -209,7 +219,7 @@ describe('navegacaoDaLateral (Fase 1)', () => {
   it('guarda o resto em "Mais", sem perder nenhum item', () => {
     const { principais, mais } = navegacaoDaLateral('admin');
     expect(principais.length + mais.length).toBe(navegacaoPara('admin').length);
-    expect(mais.map((i) => i.href)).toContain('/radar');
+    expect(mais.map((i) => i.href)).toContain('/revisao');
   });
 
   it('quem não vê um principal fica com menos à vista, e o "Mais" não ganha nada', () => {

@@ -13,10 +13,11 @@ import { type ChaveDeFila } from '@/lib/navegacao';
  *
  * Por isso a lista é curta e vai continuar curta:
  *
- * - `candidatos` — candidato do Radar coletado e ainda não revisado. É o caso
- *   mais puro da regra: um robô já fez a parte dele e a fila parou numa pessoa.
- *   Sem o número, ninguém abre o Radar por vontade própria — abre-se o Radar
- *   *porque* alguém lembrou que ele existe, o que é o oposto de direcionamento.
+ * - `candidatos` — candidato na fila de Revisão, de qualquer origem, ainda não
+ *   decidido. É o caso mais puro da regra: a importação já fez a parte dela e a
+ *   linha parou numa pessoa. Sem o número, ninguém abre a Revisão por vontade
+ *   própria — abre-se *porque* alguém lembrou que ela existe, o que é o oposto
+ *   de direcionamento.
  * - `rascunhos` — rascunho da IA aguardando aprovação. Conta porque **expira**:
  *   um rascunho vencido é uma conversa que não aconteceu, e o custo do atraso é
  *   real, não estético.

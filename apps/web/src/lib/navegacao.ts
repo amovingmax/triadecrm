@@ -39,7 +39,7 @@
  *   **um número ao lado do item significa trabalho parado esperando por você.**
  *   Quem CONFIGURA nunca mostra número.
  *
- * É por isso que Radar e Conversas contam, e Cadências, Metas, Relatórios e
+ * É por isso que Revisão e Conversas contam, e Cadências, Metas, Relatórios e
  * Ajustes não contam nunca — nem quando teriam o que contar. A contagem chega
  * pronta do servidor (`lib/filas-do-menu.ts`), no mesmo `layout` que já busca a
  * sessão: sem consulta no cliente, sem estado de carregamento piscando na
@@ -78,11 +78,11 @@ import {
   CalendarDays,
   ChartColumn,
   Handshake,
+  ListChecks,
   type LucideIcon,
   Megaphone,
   MessageCircle,
   PhoneCall,
-  Radar,
   Route,
   Settings,
   SquareKanban,
@@ -194,7 +194,7 @@ export const GRUPOS: readonly GrupoDeNavegacao[] = [
  *
  * É o mesmo conjunto em vários lugares porque no banco é uma função só. Quem não
  * passa por ela não grava atividade, não cria organização e não revisa candidato
- * do Radar: a `public.registrar_contato` devolve `motivo: 'sem_permissao'`, e a
+ * na Revisão: a `public.registrar_contato` devolve `motivo: 'sem_permissao'`, e a
  * política de select de `supplier_candidates` nem mostra a fila. Oferecer esses
  * módulos a `leitura` ou `financeiro` é prometer uma tela cujo único desfecho é a
  * recusa lá no fim.
@@ -294,6 +294,19 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
       'Reuniões em vídeo pela manhã, rota de visitas à tarde com link do Google Maps e lembretes.',
   },
 
+  {
+    href: '/revisao',
+    rotulo: 'Revisão',
+    icone: ListChecks,
+    grupo: 'todo_dia',
+    descricao:
+      'A fila de quem ainda não é parceiro, de qualquer origem: cada nome com pontuação, o que a IA achou dele e as duplicatas já apontadas. Aprovar cria a ficha e o negócio no funil.',
+    papeis: PAPEIS_QUE_ESCREVEM,
+    // A fila de revisão é o exemplo mais puro da regra: candidato que entrou e
+    // não foi revisado é trabalho parado esperando uma pessoa decidir.
+    fila: 'candidatos',
+  },
+
   // -------------------------------------------------------------------------
   // A base
   // -------------------------------------------------------------------------
@@ -320,20 +333,6 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
       'Kanban dos funis de captação e de produtores, cartão com semáforo, próxima ação obrigatória e motivos de perda.',
     posicaoNaBarra: 4,
   },
-  {
-    href: '/radar',
-    rotulo: 'Radar',
-    icone: Radar,
-    grupo: 'a_base',
-    descricao:
-      'Fila de revisão dos candidatos de fontes públicas, cadastro manual, catálogo de fontes com robots.txt e termos avaliados, e o estado do coletor.',
-    papeis: PAPEIS_QUE_ESCREVEM,
-    // A fila de revisão é o exemplo mais puro da regra: candidato coletado e não
-    // revisado é trabalho que já foi feito por um robô e está parado esperando
-    // uma pessoa. Sem o número, ninguém abre o Radar por vontade própria.
-    fila: 'candidatos',
-  },
-
   // -------------------------------------------------------------------------
   // Controle
   // -------------------------------------------------------------------------
