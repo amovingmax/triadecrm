@@ -3085,3 +3085,60 @@ Verificado, com o banco reconstruído do zero: pgTAP **2.900 asserções em 64 a
 **Pendente:** ADR-12 e ADR-13 continuam fora da tabela do PRD §9.1, que para no ADR-11; e o PRD §7.3, o R03 e o R06 ainda descrevem o Radar como coletor ligado.
 
 **Reversibilidade, escrita para ninguém prometer o que não existe:** entre as duas migrações, voltar atrás era `update ... is_enabled = true`. Depois da segunda, não é mais — o catálogo de coleta era as instruções de onde colher, e foi embora com o código que as lia. Voltar agora é `git revert`.
+
+### 25/09/2026 — Fase 3 do pivô: o freio, antes de existir o que freiar (ADR-12)
+
+Até hoje o freio do gasto de IA **avisava**. `app.ai_alerta_orcamento` roda num cron diário, abre tarefa e não bloqueia; nenhum caminho entre a fila e a API da Anthropic perguntava quanto já se gastou. `app.pode_enviar` liberava qualquer resposta dentro das 24 h, sem horário e sem teto. O webhook da Meta jogava fora tudo o que não era `field=messages`. E o aquecimento (20 → 35 → 45) só era consultado quando `p_primeiro_contato` era verdadeiro.
+
+Com uma pessoa aprovando cada mensagem, **ela** era o freio: via a conta, via as mensagens falhando, e parava. Quando o robô responder sozinho (Fase 4), não há ninguém olhando. Esta fase constrói os freios que faltavam — **antes** de existir o que freiar.
+
+**Quatro migrações, nesta ordem:**
+
+- `20260925150000_o_orcamento_freia.sql` — o teto de IA sobe de US$ 25 para **US$ 60** e deixa de nascer pendente (decisão de Rafael, 25/09). `app.ai_gasto_do_mes` ganha o degrau `freou` e o campo `linha_do_freio_usd`; as duas linhas (alerta em 80%, freio no teto) passam a ser **derivadas**, sem segunda fonte. `app.ia_pode_gastar` recusa em dois degraus, `app.ia_enfileirar` pergunta antes de enfileirar, `public.wa_servico_do_mes` mede o que a Meta cobra de serviço.
+- `20260925160000_a_saude_do_numero.sql` — `public.wa_saude_numero` (append-only), `public.wa_saude_registrar`, `app.wa_teto_da_meta` e `app.pode_enviar` com os passos 1.5 e 4.5.
+- `20260925170000_o_teto_conta_aberturas.sql` — `app.aberturas_do_dia`, e os três portões passando a contar a mesma coisa.
+- `20260925180000_o_robo_tem_teto_de_fala.sql` — os quatro números do robô, `GEN-SYS-HUMANO`, o gatilho de freio e o aperto no `app.messages_guard`.
+
+**Quatro arquivos de pgTAP novos:** `67_o_freio_do_orcamento.sql`, `68_saude_do_numero.sql`, `69_teto_de_aberturas.sql`, `70_teto_de_fala_do_robo.sql`.
+
+**A regra do freio é escrita por EXCLUSÃO, e é de propósito.** Sobrevivem à linha de alerta só `classify_inbound` e `transcribe_audio` — os dois únicos propósitos que servem para entender quem escreveu agora. Escrita ao contrário (uma lista dos que param), um propósito novo nasceria livre, e o dia em que alguém esquecesse de acrescentá-lo seria o dia em que o freio deixaria de valer.
+
+**A recusa virou dívida anotada, não trabalho apagado.** Este é o buraco que o plano anterior não tinha visto. Levantei os cinco chamadores de `app.ia_enfileirar`: três refazem a chave sozinhos e não perdem nada; dois perdem para sempre. `app.ia_enfileirar_resumo` roda **dentro** da transação de `public.tabular_tentativa`, que commita — recusado ali, o `summarize_call` daquela ligação nunca mais é pedido, porque não existe cron que o repita. Recusar sem anotar não é "não gastar", é perder o trabalho em silêncio, que é pior que gastar: o gasto aparece na conta, a perda não aparece em lugar nenhum. Nasceu `public.ia_trabalho_adiado`, com o cron `ia_retomar_adiados` de 20 em 20 minutos.
+
+**A segunda porta da fila estava aberta.** `apps/workers/src/ia/fila.ts` chamava `esteira_fila_enfileirar` direto na fila `ai_jobs`, pulando a lista de propósitos, o freio e a dívida — e as duas únicas chamadas que passam por ali (`classify_inbound` depois da transcrição, `draft_followup` depois do resumo) são justamente as do caminho automático.
+
+**O que muda de comportamento, e é o que precisa ser avisado antes de subir:**
+
+> **A campanha de recontato passa de 150 para 45 mensagens por dia.** 3.000 fichas passam de 20 para 67 dias úteis. O teto agora é do **time inteiro** — um dia de follow-ups de cadência fora da janela come a mesma cota, que é como a Meta conta. Lote em andamento **não morre**: `teto_do_numero` já é espera em `app.envio_motivo_de_espera`, e `app.envios_em_massa_rodar` adormece o envio com `proximo_em` em vez de pular o item. Quem estiver com lote grande em curso vê o "termina em" triplicar de um dia para o outro — por isso a tela de `/envios` passa a dizer de quem é o teto.
+
+**As correções de fato, com as fontes lidas em 25/09/2026:**
+
+- `messaging_limit_tier_update` **não existe** na referência da Meta. Quem carrega o tier são `business_capability_update` e `phone_number_quality_update`.
+- `current_limit`, `old_limit` e `max_daily_conversation_per_phone` (singular) foram marcados para remoção em fevereiro de 2026 — já passou. A fonte viva é `max_daily_conversations_per_business`, e é ela que o adaptador lê primeiro; o obsoleto continua valendo como reserva para conta antiga.
+- **Campo de webhook não se assina por `subscribed_apps`.** Esse endpoint assina a *app* na WABA e aceita só `override_callback_uri` e `verify_token`; quais campos ela recebe é configuração do painel do app. O `--conectar` passa a **conferir** e dizer, pelo nome, o que falta — um passo verde que não assinou nada seria pior que passo nenhum.
+- `phone_number_quality_update` traz `FLAGGED`, que é a nota **caindo**, e lemos como `RED`: é o único aviso que chega antes da leitura da Graph. `UNFLAGGED` **não** vira `GREEN` — "deixou de estar em alerta" não é "está bem", e inventar um verde apagaria um vermelho verdadeiro.
+
+**Sete coisas que o plano previa e saíram diferentes** (cada uma com o comentário no código dizendo por quê):
+
+- O bloco do orçamento no `24_ia_e_whatsapp.sql` foi **reancorado**, não apagado: os degraus do exemplo do documento de custos saíram de 9/21 para 14/15/49, porque a âncora era o teto de 25. E o `delta` do alerta passou de 1 para 2 — um mês que pula direto para `freou` grava também a linha de 80%, que de outro modo nunca existiria.
+- A partição dos 12 propósitos é medida **na linha de alerta**, e não depois do teto: passado o teto param os 14, e a partição deixaria de ser visível.
+- `app.ia_gasto_bloqueado_para()` pergunta à própria `ia_pode_gastar`, propósito a propósito: não é uma segunda lista.
+- O ramo do enfileiramento em `transcreverAudio` está escrito e tratado, mas **dorme**: com `AUDIO_SEMPRE_HUMANO = true` (RF-CON-27), `decidirRoteamento` devolve sempre `humano`. Ele existe porque é a Fase 4 que vira essa chave, e o dia de virá-la não é o dia de descobrir que a recusa cai no silêncio. Quem é testado de verdade é o caminho de `resumirLigacao`.
+- **Três portões contavam, não dois.** Além de `app.pode_enviar` e `app.toques_do_dia` (a cadência), `public.wa_preparar_envio` — a prévia da ficha — tinha o mesmo `if v_primeiro`. Deixá-lo faria a tela oferecer o botão que a porteira recusa um segundo depois.
+- O teto do `43_whatsapp_dentro_do_crm.sql` foi reancorado de 2 para 3: o segundo envio para a mesma ficha passou a gastar cota, que é o furo fechando. Afrouxar o teto seria reabri-lo.
+- `public.wa_optout_registrar` tem assinatura `(uuid, text, boolean)` em que o terceiro argumento é `p_confirmar`, e **não** `p_amplo`. Com `false` a confirmação não sai.
+
+**Na tela.** `public.ia_orcamento_status()` não era chamada em lugar nenhum do `apps/web` — com quatro freios novos isso deixou de ser aceitável. `public.wa_freios_status()` responde os três numa pergunta só, e o painel de Ajustes → Atendimento abre com eles, **antes** dos interruptores: não adianta ligar uma automação que o orçamento já parou. "Primeiros contatos" vira **"aberturas"** onde o número mudou.
+
+Verificado, com o banco reconstruído do zero: pgTAP **2.976 asserções em 68 arquivos**, `pnpm db:lint` sem apontamento novo, `pnpm db:types` com as tabelas e funções novas e sem diff depois do commit, lint, typecheck, **804 testes do web em 52 arquivos**, **335 dos workers em 21**, e **36 do `wa-webhook` no Deno**.
+
+**Pendente, e com a ordem certa:**
+
+1. **Assinar à mão, no painel do app** (WhatsApp → Configuração → Webhooks): `phone_number_quality_update`, `account_update` e `business_capability_update`. Enquanto não forem assinados, a saúde só chega pela leitura da Graph de 30 em 30 minutos, e restrição/banimento/tier não chegam nunca. O quadro entrou em `docs/operacao/whatsapp-no-crm.md`, Parte 3.
+2. **Avisar quem estiver com campanha em curso** antes de subir a migração `20260925170000`: o ritmo cai de 150 para 45 no instante em que ela aplica.
+3. **Subir `cadencia.tetos.whatsapp.depois` de 45** — `update` do gestor, `teto_duro` de 100 já validado. Recomendação escrita: só depois de **duas semanas com `qualidade = 'GREEN'`** em `public.wa_saude_numero`, que agora é verificável.
+4. `public.wa_servico_do_mes` **só mede**. Teto sem número medido é palpite, e palpite que recusa mensagem de cliente é pior que teto nenhum: primeiro se olha a curva por dois meses.
+
+**Nada desta fase foi a produção:** sem `supabase db push`, sem `vercel`, sem `git push`, sem uma única chamada à Graph com o token real.
+
+**O que esta fase NÃO fez, de propósito:** o árbitro de quem responde, intenção → texto pronto, os `GEN-SYS-*` por intenção e o fim do teto de duas falas do bot de entrada. Tudo Fase 4 — que agora nasce dentro de freios que já existem.
