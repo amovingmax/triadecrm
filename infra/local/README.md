@@ -106,6 +106,15 @@ lugares por rodada, só Natal e região metropolitana**. Deu bloqueio de IP ou C
 **pare e avise** — insistir com proxy ou login transforma quebra de contrato em acesso não
 autorizado.
 
+**Quem raspa é o Rafael, e só ele** (decisão de 25/09/2026). Não instale este perfil em outra
+máquina. O limite do ADR-12 — 2 rodadas por semana, 600 lugares por rodada — é da EMPRESA, não
+de cada pessoa: com o raspador espalhado por notebooks ninguém enxerga o total, cada IP é
+bloqueado por conta, e cada máquina vira um lugar onde um CSV de dado pessoal fica sem
+retenção e sem auditoria. A equipe não precisa da lista crua: ela recebe os parceiros já
+dentro do CRM, na fila de Revisão. Se um dia precisar de mais de uma pessoa, o caminho é um
+raspador só na máquina dedicada, alcançável por `tailscale serve`, como o Metabase — e não
+uma cópia por pessoa.
+
 O ritmo de 5 s é **conduta de quem opera**, não flag: `-c 1` limita a concorrência a uma
 aba por vez e não impõe intervalo nenhum. Se uma versão da imagem passar a ter flag de
 atraso, ela entra no `command:` e este parágrafo muda.
