@@ -1,5 +1,7 @@
 import type { NextConfig } from 'next';
 
+import { REDIRECIONAMENTOS } from './src/lib/redirecionamentos';
+
 const nextConfig: NextConfig = {
   // Pacotes internos "just-in-time" (exportam o fonte TypeScript): o Next os transpila junto com o app.
   transpilePackages: ['@komune/schema', '@komune/prompts'],
@@ -12,6 +14,11 @@ const nextConfig: NextConfig = {
   images: {
     // Avatares do Google (foto do usuário logado).
     remotePatterns: [{ protocol: 'https', hostname: '*.googleusercontent.com' }],
+  },
+  // A lista mora em src/lib/redirecionamentos.ts porque o Vitest deste pacote
+  // só enxerga `src/**/*.test.ts`, e redirect sem teste some numa refatoração.
+  async redirects() {
+    return [...REDIRECIONAMENTOS];
   },
 };
 

@@ -39,7 +39,7 @@ describe('ehRotaPublica', () => {
 
   it('o link rastreado dos envios em massa abre sem sessão', () => {
     expect(ehRotaPublica('/r/a1b2c3d4e5f6')).toBe(true);
-    expect(ehRotaPublica('/radar')).toBe(false);
+    expect(ehRotaPublica('/revisao')).toBe(false);
   });
 
   it('não confunde /c/ com uma rota que apenas começa com "c"', () => {

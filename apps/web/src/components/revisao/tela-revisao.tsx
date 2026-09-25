@@ -58,11 +58,11 @@ const SEM_LINHAS: CandidatoDaFila[] = [];
  * `radar_criar_candidato`, `radar_revisar_candidato`): aqui só ficam o recorte
  * atual, a espera e a tradução do que voltou.
  */
-export function TelaRadar({
+export function TelaRevisao({
   catalogos,
   abaInicial = 'fila',
   podeDecidir,
-  podeLigarFonte,
+  podeAjustarTriagem,
 }: {
   catalogos: CatalogosDoRadar;
   /** Veio de `/radar?aba=fontes`: um link para a regra de uma fonte abre nela. */
@@ -72,11 +72,11 @@ export function TelaRadar({
    *
    * É o espelho de `app.can_write()` (admin, gestor, sdr, embaixador), a mesma
    * guarda que `radar_coletar_agora` usa para recusar com `sem_permissao` — por
-   * isso ele também responde por quem pode mandar coletar, e não `podeLigarFonte`.
+   * isso ele também responde por quem trabalha a fila, e não `podeAjustarTriagem`.
    */
   podeDecidir: boolean;
-  /** Só gestor e admin ligam ou desligam fonte (RF-RAD-01). */
-  podeLigarFonte: boolean;
+  /** Só gestor e admin ajustam os pesos da triagem e pedem leitura da IA. */
+  podeAjustarTriagem: boolean;
 }) {
   const clienteDeConsultas = useQueryClient();
   const [aba, setAba] = useState<Aba>(abaInicial);
@@ -214,9 +214,9 @@ export function TelaRadar({
               o limite que a fonte nos concede e responde pelo robots.txt (R03,
               R06 §3). O banco recusa de todo jeito — este `if` existe para não
               oferecer um botão que sempre erra. */}
-          {podeLigarFonte ? <PedirLeituraDaIa className="hidden md:inline-flex" /> : null}
-          {podeLigarFonte ? <PesosDaTriagem catalogos={catalogos} className="hidden md:inline-flex" /> : null}
-          {podeLigarFonte ? <AgendarColeta className="hidden md:inline-flex" /> : null}
+          {podeAjustarTriagem ? <PedirLeituraDaIa className="hidden md:inline-flex" /> : null}
+          {podeAjustarTriagem ? <PesosDaTriagem catalogos={catalogos} className="hidden md:inline-flex" /> : null}
+          {podeAjustarTriagem ? <AgendarColeta className="hidden md:inline-flex" /> : null}
           {podeDecidir ? (
             <Button onClick={() => setFolhaAberta(true)} className="toque hidden md:inline-flex">
               <Plus aria-hidden="true" />
@@ -252,7 +252,7 @@ export function TelaRadar({
       />
 
       {aba === 'fontes' ? (
-        <CatalogoDeFontes podeLigar={podeLigarFonte} podeColetar={podeDecidir} />
+        <CatalogoDeFontes podeLigar={podeAjustarTriagem} podeColetar={podeDecidir} />
       ) : (
         <>
           <BarraDaFila

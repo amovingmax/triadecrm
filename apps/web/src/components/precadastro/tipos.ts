@@ -3,7 +3,7 @@
  *
  * As três RPCs do módulo devolvem `jsonb`, então do lado do TypeScript tudo chega
  * como `unknown`. As leituras defensivas ficam aqui (mesma gramática de
- * `components/radar/dados.ts`), com teste próprio: nenhum campo do payload é
+ * `components/revisao/dados.ts`), com teste próprio: nenhum campo do payload é
  * garantido, e uma tela que quebra porque `linha_do_tempo` veio vazia é uma tela
  * que a Heloísa perde no meio da rua.
  */
