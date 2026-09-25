@@ -531,7 +531,7 @@ function ForaDaRota({ exclusoes }: { exclusoes: ReturnType<typeof agruparExcluso
  * e a pessoa procuraria, e culparia a si mesma por não achar, porque a ordem
  * veio do sistema.
  *
- * O caminho que existe de verdade é o Radar: `app.promover_candidato`, quando
+ * O caminho que existe de verdade é a Revisão: `app.promover_candidato`, quando
  * alguém mescla um candidato com uma ficha, preenche os campos VAZIOS dela —
  * bairro e endereço entre eles. Só os vazios: mesclar completa, não corrige.
  * Por isso a frase promete preenchimento e não correção.
@@ -541,7 +541,8 @@ function SemOndeConsertar() {
     <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
       Não há hoje onde escrever bairro ou endereço numa ficha que já existe — nem na ficha do
       parceiro, nem no cadastro rápido, e reimportar a planilha não altera ficha repetida. Quem
-      preenche esses campos é o Radar: quando a coleta traz o mesmo parceiro e alguém usa Mesclar, o
+      preenche esses campos é a Revisão: quando uma importação traz o mesmo parceiro e alguém usa
+      Mesclar, o
       que estava em branco na ficha entra, e a visita passa a caber na rota. Até lá, estas visitas
       continuam na aba <span className="text-foreground">Dia</span>, com o botão do mapa buscando o
       parceiro pelo nome — que é como se chegava nelas antes de existir rota.
@@ -576,7 +577,7 @@ function AindaNaoLigado({ rota }: { rota: RotaDoDia }) {
         <li>
           <span className="text-foreground">Endereço com rua e número</span>: nenhuma das 100 fichas
           da base tem logradouro, e não há onde digitá-lo — o CRM não tem edição de ficha. Ele só
-          entra pelo que a coleta trouxer: planilha nova, ou Mesclar no Radar. Quando entrar, a
+          entra pelo que uma importação trouxer: lista nova, ou Mesclar na Revisão. Quando entrar, a
           mesma máquina geocodifica com precisão de porta e estas frases mudam sozinhas.
         </li>
       </ul>

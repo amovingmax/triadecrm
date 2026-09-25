@@ -26,7 +26,7 @@ import type { AcaoDeRevisao } from './dados';
  * Link de texto que ainda é alvo de polegar: 44px de altura no celular, altura de
  * linha normal a partir do `md`. Sem isso o @ do Instagram e o nome da ficha
  * duplicada ficavam com 20px — o resto do app não tem nenhum alvo abaixo de 44px
- * no celular, e o Radar também não pode ter.
+ * no celular, e a Revisão também não pode ter.
  */
 const ALVO_INLINE = 'inline-flex min-h-11 items-center md:min-h-0';
 import { ProcurarTelefoneDoCandidato } from './procurar-telefone-do-candidato';

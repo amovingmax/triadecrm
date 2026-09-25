@@ -17,7 +17,7 @@ import type { DependenciasDaMeta, EtiquetaDoParceiro } from './tipos';
  * feita no cliente, sobre três leituras pequenas, e o custo está medido e limitado:
  * a base real tem 100 organizações, 147 atividades e 100 negócios.
  *
- * Os tetos abaixo são o contrato honesto disso. Quando a base crescer (o Radar promete
+ * Os tetos abaixo são o contrato honesto disso. Quando a base crescer (a importação promete
  * ≥ 300 candidatos), o certo é trocar `carregarConversas` por uma RPC com
  * `distinct on (organization_id) … order by occurred_at desc` e paginação de verdade;
  * a tela não muda, só a origem dos dados. Enquanto isso, a interface AVISA quando

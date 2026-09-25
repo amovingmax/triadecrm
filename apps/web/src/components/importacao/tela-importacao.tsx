@@ -397,7 +397,7 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
                 </Button>
                 <p className="text-sm text-muted-foreground">
                   {formatarNumero(previa.contagem.entra ?? 0)} viram ficha agora; o resto vai para a
-                  fila do Radar ou não entra.
+                  fila de Revisão ou não entra.
                 </p>
               </div>
             </>
@@ -425,7 +425,7 @@ function Cabecalho() {
     <header>
       <h1 className="font-heading text-2xl font-semibold tracking-tight">Importar planilha</h1>
       <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        A planilha vira ficha pela mesma esteira do Radar: nada é gravado antes de você ver a
+        A planilha vira ficha pela mesma esteira da Revisão: nada é gravado antes de você ver a
         prévia, e o que já existe na base não é sobrescrito.
       </p>
     </header>
@@ -613,12 +613,12 @@ function ListaDeLotes({
                     O lote{' '}
                     <span className="font-medium text-foreground">{confirmando.lote.rotulo}</span>{' '}
                     não tem ficha na base para remover. O que sai são os candidatos que ele deixou
-                    na fila do Radar.
+                    na fila de Revisão.
                   </>
                 )}
               </p>
               <p>
-                Os candidatos que ainda não foram decididos somem da fila do Radar junto. Para
+                Os candidatos que ainda não foram decididos somem da fila de Revisão junto. Para
                 trazer tudo de volta, só importando a planilha outra vez.
               </p>
               <p>Das 48 horas do desfazer, {confirmando.prazo.frase}.</p>

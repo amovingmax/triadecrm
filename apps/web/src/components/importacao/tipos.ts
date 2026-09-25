@@ -285,9 +285,9 @@ export const ROTULO_DECISAO: Record<Decisao, string> = {
 export const EXPLICACAO_DECISAO: Record<Decisao, string> = {
   entra: 'Viram ficha e negócio no funil, com a etapa e o responsável da planilha.',
   duplicata:
-    'Já tem ficha na base. Nada é sobrescrito: cada uma vira candidato na fila do Radar, onde você mescla ou recusa.',
+    'Já tem ficha na base. Nada é sobrescrito: cada uma vira candidato na fila de Revisão, onde você mescla ou recusa.',
   revisao:
-    'Falta um dado que o CRM não pode adivinhar (categoria, origem) ou o nome se parece com uma ficha existente. Vão para a fila do Radar.',
+    'Falta um dado que o CRM não pode adivinhar (categoria, origem) ou o nome se parece com uma ficha existente. Vão para a fila de Revisão.',
   nao_contatar:
     'Pediram para parar. Não viram alvo: o número entra na lista de supressão e ninguém volta a escrever.',
   repetida:
@@ -307,7 +307,7 @@ export const MOTIVO: Record<string, string> = {
   origem_desconhecida: 'A origem não bate com nenhuma fonte cadastrada.',
   ja_importado: 'Já tinha entrado numa importação anterior.',
   lote_anterior: 'Veio de um lote anterior.',
-  ja_revisado: 'Esse candidato já foi revisado no Radar.',
+  ja_revisado: 'Esse candidato já foi revisado.',
   sem_candidato: 'A esteira não conseguiu montar o candidato.',
   campo_fora_da_whitelist: 'A linha trazia um campo que a esteira não pode guardar.',
   sem_identidade_na_fonte: 'A linha não tem como ser reconhecida na próxima importação.',

@@ -79,7 +79,7 @@ export type AcaoDoVazio = {
  * Não há linha nenhuma no período: diz por quê, o que fazer para haver, e leva até lá.
  *
  * `texto` aceita nó, e não só string, porque a frase que explica o vazio às vezes
- * precisa de um link no meio dela ("o coletor do Radar", "o catálogo") — e mandar a
+ * precisa de um link no meio dela ("Importar", "a Revisão") — e mandar a
  * pessoa procurar a tela no menu depois de dizer o nome dela é a metade do caminho.
  */
 export function VazioDoRelatorio({
@@ -109,8 +109,8 @@ export function VazioDoRelatorio({
 /**
  * O link dentro da frase.
  *
- * As notas destes painéis vivem citando outra tela pelo nome — "quando o coletor do
- * Radar estiver ligado", "alguém importar uma lista nova", "a mesma barra térmica de
+ * As notas destes painéis vivem citando outra tela pelo nome — "passa pela Revisão",
+ * "alguém importar uma lista nova", "a mesma barra térmica de
  * Parceiros". Enquanto isso era só texto, a instrução terminava num nome e quem lia
  * saía caçando o item no menu; instrução que não leva a lugar nenhum rende o mesmo
  * que instrução nenhuma. O sublinhado é o mesmo do resumo das cadências, para link
@@ -147,8 +147,8 @@ function Moldura({
 /**
  * O aviso de honestidade: o que esta leitura AINDA não enxerga e de que ela depende.
  *
- * Existe porque metade do produto ainda não está ligada (o coletor do Radar e o
- * WhatsApp oficial), e um relatório que mostra zero sem dizer por quê faz o time
+ * Existe porque parte do produto ainda não está ligada (a integração com a
+ * plataforma Komune), e um relatório que mostra zero sem dizer por quê faz o time
  * concluir a coisa errada. Fica embaixo da tabela, em texto pequeno, nunca como
  * alarme: não é erro, é o estado do mundo hoje.
  */

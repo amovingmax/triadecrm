@@ -91,7 +91,7 @@ export function QuadroVazio({ nomeDoFunil }: { nomeDoFunil: string }) {
     <Moldura
       icone={<SquareKanban className="size-5" aria-hidden="true" />}
       titulo={`Nenhum negócio em ${nomeDoFunil}`}
-      texto="Cada parceiro cadastrado entra no funil automaticamente. Comece cadastrando um parceiro ou revisando os candidatos do Radar."
+      texto="Cada parceiro cadastrado entra no funil automaticamente. Comece cadastrando um parceiro ou revisando os candidatos na Revisão."
     />
   );
 }

@@ -320,7 +320,7 @@ export async function repontuarORadar(): Promise<{ candidatos: number }> {
   if (error) {
     throw new Error(
       error.code === '42501'
-        ? 'Seu perfil não repontua o Radar. Peça a um admin ou gestor.'
+        ? 'Seu perfil não repontua a fila. Peça a um admin ou gestor.'
         : mensagemDoErro(error),
     );
   }

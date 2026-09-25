@@ -231,7 +231,7 @@ function SecaoSupressao({ nomes }: { nomes: Map<string, string> }) {
           contagem={
             supressao.data ? <Contagem n={supressao.data.length} rotulo="suprimidos" /> : undefined
           }
-          descricao="Quem pediu para parar de receber contato. Toda fila de envio e toda ingestão do Radar consultam esta lista antes de tocar em qualquer número."
+          descricao="Quem pediu para parar de receber contato. Toda fila de envio e toda importação consultam esta lista antes de tocar em qualquer número."
         />
         <Aviso titulo="Por que aqui não tem telefone">
           <p>

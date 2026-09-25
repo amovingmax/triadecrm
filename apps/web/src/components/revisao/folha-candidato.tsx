@@ -31,12 +31,12 @@ import { criarCandidato, mensagemDoErro, MOTIVO_DA_CRIACAO } from './dados';
 import { EXPLICACAO_DA_MARCA, type CatalogosDoRadar } from './tipos';
 
 /**
- * Entrada manual de candidato — o que o Radar sabe fazer hoje.
+ * Entrada manual de candidato — o caminho que não depende de importação nenhuma.
  *
  * Não é um atalho para a base: o que entra aqui passa pela MESMA esteira do
  * coletor (ADR-08) — higiene do dado, consulta à lista de supressão, dedup contra
  * `organizations` — e só vira parceiro depois de aprovado na fila. É por isso que
- * este formulário aceita um alvo sem telefone: no Radar, achar o alvo e achar o
+ * este formulário aceita um alvo sem telefone: aqui, achar o alvo e achar o
  * contato dele são dois passos.
  */
 const formulario = z.object({

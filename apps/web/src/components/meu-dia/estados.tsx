@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import {
   CheckCheck,
+  ListChecks,
   PhoneOutgoing,
-  Radar,
   RotateCw,
   SquareKanban,
   type LucideIcon,
@@ -53,7 +53,7 @@ export function EsqueletoDaFila() {
 type Caminho = { href: string; rotulo: string; Icone: LucideIcon };
 
 const FUNIL: Caminho = { href: '/funis', rotulo: 'Abrir o funil', Icone: SquareKanban };
-const RADAR: Caminho = { href: '/radar', rotulo: 'Revisar no Radar', Icone: Radar };
+const REVISAO: Caminho = { href: '/revisao', rotulo: 'Ir para a Revisão', Icone: ListChecks };
 const REGISTRAR: Caminho = {
   href: '/registrar',
   rotulo: 'Registrar um contato',
@@ -69,7 +69,7 @@ const REGISTRAR: Caminho = {
  *
  *   * os 100 negócios da lista-semente entraram sem responsável ("a triagem
  *     distribui depois"), e a fila só enxerga o que tem dono;
- *   * o Radar acumula candidato esperando decisão, e candidato não entra na fila do
+ *   * a Revisão acumula candidato esperando decisão, e candidato não entra na fila do
  *     dia porque candidato ainda não é alvo — só vira depois que alguém aprova.
  *
  * Comemorar em cima de qualquer uma das duas é mentir por omissão, e a mentira sai
@@ -84,7 +84,7 @@ export function FilaVazia({
   nome: string;
   /** Negócios abertos sem dono na base inteira. `null` quando a contagem falhou. */
   semResponsavel: number | null;
-  /** Candidatos do Radar em "novo". `null` quando a contagem falhou ou o papel não os vê. */
+  /** Candidatos na Revisão em "novo". `null` quando a contagem falhou ou o papel não os vê. */
   aguardandoRevisao: number | null;
 }) {
   const temSemDono = semResponsavel !== null && semResponsavel > 0;
@@ -97,7 +97,7 @@ export function FilaVazia({
   // um contato primeiro, funil depois.
   const caminhos = [
     ...(temSemDono ? [FUNIL] : []),
-    ...(temParaRevisar ? [RADAR] : []),
+    ...(temParaRevisar ? [REVISAO] : []),
     REGISTRAR,
     ...(temSemDono ? [] : [FUNIL]),
   ].slice(0, 2);
@@ -136,8 +136,8 @@ export function FilaVazia({
               <>
                 <span className="numerico">{aguardandoRevisao}</span>
                 {aguardandoRevisao === 1
-                  ? ' candidato do Radar esperando decisão'
-                  : ' candidatos do Radar esperando decisão'}
+                  ? ' candidato esperando revisão'
+                  : ' candidatos esperando revisão'}
               </>
             ) : null}
             {fecho}

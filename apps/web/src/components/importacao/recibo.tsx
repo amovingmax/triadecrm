@@ -16,7 +16,7 @@ import { ORDEM_DAS_DECISOES, ROTULO_DECISAO, type Recibo as TipoRecibo } from '.
  * O que aconteceu, depois de gravar.
  *
  * Duas coisas importam aqui e nenhuma delas é a comemoração: para onde ir agora
- * (a fila do Radar, quando sobrou algo para decidir) e como voltar atrás. O
+ * (a fila de Revisão, quando sobrou algo para decidir) e como voltar atrás. O
  * desfazer é do RF-BAS-17 e vale 48 h; ele não desfaz cegamente — o banco só
  * remove o que o lote criou e ninguém tocou DEPOIS, e conta quantas fichas
  * ficaram de pé.
@@ -100,7 +100,7 @@ export function Recibo({
 
         {paraDecidir > 0 ? (
           <Button asChild variant="outline" className="toque h-11 md:h-9">
-            <Link href="/radar">
+            <Link href="/revisao">
               Decidir {paraDecidir === 1 ? 'a que ficou' : `as ${formatarNumero(paraDecidir)} que ficaram`} na fila
               <ArrowRight aria-hidden="true" />
             </Link>

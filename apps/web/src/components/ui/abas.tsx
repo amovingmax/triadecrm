@@ -11,12 +11,12 @@ import { cn } from '@/lib/utils';
  * Até 09/09/2026 o mesmo controle — "escolha qual recorte você está vendo" —
  * tinha CINCO desenhos diferentes, um por módulo: segmentado sobre `muted` com
  * raio `lg` na Admin, pílula com contorno e raio total nas Conversas,
- * segmentado com raio `xl` nos Funis, sublinhado com borda embaixo no Radar, e
+ * segmentado com raio `xl` nos Funis, sublinhado com borda embaixo nas Conversas, e
  * segmentado com contorno mais gradiente na Agenda. Três raios, dois
  * preenchimentos e um sublinhado para a mesma pergunta.
  *
  * O custo não é estético. Quem aprende que "a faixa cinza em cima troca a
- * seção" na Admin não reconhece o sublinhado do Radar como a mesma coisa, e
+ * seção" na Admin não reconhece o sublinhado das Conversas como a mesma coisa, e
  * procura a faixa cinza. E o desenho mais forte que existia — o gradiente da
  * Agenda, que é o da AÇÃO PRINCIPAL do produto — estava marcando a escolha
  * menos importante da tela.

@@ -41,7 +41,7 @@
  *             olho, e é o que o teto evita.
  *
  * `TRABALHO`  uma superfície que precisa de espaço: tabela de parceiros, quadro
- *             do funil, inbox de duas colunas, fila do Radar, relatórios, admin,
+ *             do funil, inbox de duas colunas, fila de Revisão, relatórios, admin,
  *             agenda, e a importação (o passo do mapa é uma tabela de quantas
  *             colunas o arquivo tiver). Aqui o teto é o da casca.
  *

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { CatalogosDoRadar } from './tipos';
 
 /**
- * Catálogos do Radar, lidos no servidor e entregues prontos à tela.
+ * Catálogos da Revisão, lidos no servidor e entregues prontos à tela.
  *
  * São três listas pequenas e estáveis (19 categorias, 22 cidades, 11 fontes) que
  * alimentam o recorte da fila e o formulário de entrada manual. Buscá-las no

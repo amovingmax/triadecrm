@@ -47,7 +47,7 @@ import { cn } from '@/lib/utils';
  * Agrupar diz para que serve cada tela. O número diz em qual delas tem trabalho
  * parado AGORA — que é a pergunta que a pessoa faz de manhã. A contagem chega
  * pronta do servidor (`lib/filas-do-menu.ts`), então nada pisca aqui durante a
- * navegação, e só dois itens contam: Radar (candidato esperando revisão) e
+ * navegação, e só dois itens contam: Revisão (candidato esperando decisão) e
  * Conversas (rascunho esperando aprovação). Ver a regra inteira em `navegacao.ts`.
  */
 export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFilas }) {

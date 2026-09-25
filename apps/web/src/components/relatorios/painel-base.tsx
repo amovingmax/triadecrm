@@ -274,14 +274,14 @@ function nomeDaFoto(hoje: string): string {
 function FaixaDaBase({ fatias, total }: { fatias: readonly FatiaTermica[]; total: number }) {
   if (total === 0) {
     return (
-      // Enquanto o Radar não roda, a base só cresce por planilha, e este vazio tem um
+      // A base só cresce por importação — o coletor saiu —, e este vazio tem um
       // caminho de saída em vez de ser só um diagnóstico. O link vale para todo papel
       // que lê relatório: quem não pode importar (leitura e financeiro) encontra lá a
       // recusa com nome — "o seu acesso não importa planilha" — e não uma tela morta.
       <div className="flex flex-col items-start gap-3">
         <p className="max-w-prose text-sm text-muted-foreground">
           A base está vazia: nenhuma organização visível para o seu acesso. Hoje a base cresce
-          por planilha, porque o coletor do Radar ainda não roda.
+          por importação: o coletor do Radar saiu em 25/09/2026.
         </p>
         <Button asChild variant="outline" className="toque h-11 md:h-9">
           <Link href="/importar">

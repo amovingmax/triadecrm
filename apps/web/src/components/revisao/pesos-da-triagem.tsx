@@ -30,7 +30,7 @@ import type { CatalogosDoRadar } from './tipos';
  * ===========================================================================
  * POR QUE ISTO É UMA TELA, E NÃO UMA CONSTANTE
  * ===========================================================================
- * A triagem ordena a fila do Radar por nota, avaliações, categoria e cidade. O
+ * A triagem ordena a fila de Revisão por nota, avaliações, categoria e cidade. O
  * quanto cada uma dessas coisas vale é pergunta de negócio, e a resposta muda:
  * num mês a KOMUNE precisa de espaço para festa grande, no outro precisa de
  * buffet barato. Quem sabe isso é quem vende, e ele não abre um editor de código

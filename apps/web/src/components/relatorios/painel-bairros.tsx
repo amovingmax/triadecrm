@@ -173,7 +173,7 @@ export function PainelBairros({ painel, periodo }: { painel: DefinicaoPainel; pe
         <>
           O bairro vem do endereço que a base já tem; ninguém geocodifica nada aqui ainda. As
           linhas em <span className="font-medium">Sem bairro</span> só diminuem quando alguém
-          completar o endereço na ficha ou quando o coletor do Radar trouxer o dado da fonte.
+          completar o endereço na ficha ou quando uma importação trouxer o dado da origem.
         </>
       }
     />

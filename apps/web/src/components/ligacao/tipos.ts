@@ -348,7 +348,7 @@ export const MENSAGENS_DE_EXCLUSAO: Record<MotivoDeExclusao, string> = {
   // Este rótulo já vem colado a um número CALCULADO ("4 sem telefone"), nos dois
   // lugares em que aparece — a prévia e o recibo da montagem. Ele trazia, além disso,
   // um parêntese escrito à mão: "(34 dos 100 da base)". Era mentira na tela por dois
-  // motivos: o número nunca foi recalculado (a base cresce pelo Radar e pela
+  // motivos: o número nunca foi recalculado (a base cresce pela
   // importação, e o parêntese ficaria em "34 de 100" para sempre) e já estava errado
   // no dia da varredura — 65 das 99 organizações vivas têm telefone, ou seja 34 de 99.
   // Quem lê um número medido ao lado de um número inventado acredita nos dois.
@@ -660,7 +660,7 @@ export const ETAPAS_SEM_LIGACAO_DE_ATIVACAO = ['primeira_contratacao', 'recorren
  * A frase de `planilha` merece explicação, porque é a de todas as 100 organizações de
  * hoje: a planilha foi montada a partir de diretórios públicos e do mercado de Natal
  * (R09), então "numa lista de fornecedores de evento aqui de Natal" é verdadeiro e
- * verificável. No dia em que o Radar preencher `source_id` de verdade, cada linha passa
+ * verificável. No dia em que a importação preencher `source_id` de verdade, cada linha passa
  * a falar a sua própria origem sem mudar uma vírgula do roteiro.
  *
  * Origem desconhecida cai em `ORIGEM_PADRAO`. Nunca em vazio: pular o aviso de origem é

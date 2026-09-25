@@ -12,7 +12,7 @@
  *     da mesma empresa viram UM candidato; linha que não gerou candidato não vai
  *     para fila nenhuma. Medido no banco em 05/09/2026 com a planilha-ponte de
  *     verdade mais uma segunda ocorrência de "Rios Recepções": o recibo dizia
- *     31 e a fila do Radar recebia 30.
+ *     31 e a fila de Revisão recebia 30.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -100,7 +100,7 @@ describe('§3.6 — a frase do recibo não inventa trabalho humano', () => {
   });
 });
 
-describe('§3.12g — a fila do Radar conta candidatos, não linhas', () => {
+describe('§3.12g — a fila de Revisão conta candidatos, não linhas', () => {
   it('duas linhas da mesma empresa são UM candidato', () => {
     expect(
       candidatosNaFila([
@@ -116,7 +116,7 @@ describe('§3.12g — a fila do Radar conta candidatos, não linhas', () => {
   // `ja_revisado` — candidato que existe mas NÃO está mais na fila (o status
   // dele não é `novo`, e `radar_fila` filtra por `novo`). Mandar decidir 64,
   // ou mesmo 34, é mandar procurar o que não está lá.
-  it('candidato já revisado não está na fila do Radar', () => {
+  it('candidato já revisado não está na fila de Revisão', () => {
     expect(
       candidatosNaFila([
         linha('revisao', 'c1', 'ja_revisado'),

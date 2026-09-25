@@ -119,7 +119,7 @@ describe('os rótulos de exclusão não trazem número escrito à mão (laudo §
    * no recibo da montagem. `sem_telefone` trazia, além disso, um parêntese digitado à
    * mão: "(34 dos 100 da base)". Quem lê um número medido ao lado de um número
    * inventado acredita nos dois, e este ficaria em "34 de 100" para sempre — a base
-   * cresce pelo Radar e pela importação. No dia da varredura ele já estava errado.
+   * cresce pela importação. No dia da varredura ele já estava errado.
    *
    * A única sequência de dígitos que um rótulo pode carregar é o id de um requisito
    * (RF-FUN-13), que não é quantidade e não envelhece.

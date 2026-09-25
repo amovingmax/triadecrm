@@ -14,7 +14,7 @@ type Props = {
    * Quanta coisa está parada esperando nesta tela. `null` quando o item não conta
    * (a maioria) ou quando a contagem falhou.
    *
-   * O zero também não aparece: "Radar 0" ocupa o mesmo espaço de "Radar 42" e diz
+   * O zero também não aparece: "Revisão 0" ocupa o mesmo espaço de "Revisão 42" e diz
    * o contrário — que não há por que entrar. Fila vazia é silêncio.
    */
   contagem?: number | null;
@@ -47,7 +47,7 @@ type Props = {
  * 20px de ícone + 4px + 16px de rótulo = 40px.
  *
  * Na variante "menu" (a folha "Mais" do celular) o item traz a DESCRIÇÃO sob o
- * rótulo. Treze rótulos de uma palavra são treze adivinhações: "Cadências", "Radar"
+ * rótulo. Treze rótulos de uma palavra são treze adivinhações: "Cadências", "Revisão"
  * e "Ligar" não dizem a ninguém o que há do outro lado, e a frase que explica isso
  * já existia em `NAVEGACAO` servindo só de índice invisível da paleta. Duas linhas
  * no máximo (`line-clamp-2`): a folha lista oito módulos, e um parágrafo por item

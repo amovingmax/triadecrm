@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     template: '%s · Tríade',
   },
   description:
-    'CRM de captação da KOMUNE: parceiros, Radar, funis, conversas de WhatsApp, agenda, metas e relatórios.',
+    'CRM de captação da KOMUNE: parceiros, Revisão, funis, conversas de WhatsApp, agenda, metas e relatórios.',
   applicationName: 'Tríade',
   manifest: '/manifest.webmanifest',
   appleWebApp: {

@@ -1,5 +1,5 @@
 /**
- * Procurar o telefone de um CANDIDATO do Radar, antes de ele virar parceiro.
+ * Procurar o telefone de um CANDIDATO da fila de Revisão, antes de ele virar parceiro.
  *
  * ===========================================================================
  * O NÚMERO QUE OBRIGOU ESTA ROTA A EXISTIR
@@ -9,7 +9,12 @@
  * legal e barato de raspagem para conseguir — foi investigado no mesmo dia, com
  * o robots.txt de cada fonte na mão:
  *
- *   · telelistas.net  — o robots.txt não responde. Sem ele, o RF-RAD-01 proíbe.
+ * (A varredura abaixo é de 17/09/2026 e continua valendo como REGISTRO da
+ * decisão, não como regra viva: o coletor do Radar saiu em 25/09/2026, e não há
+ * mais raspagem nenhuma para o RF-RAD-01 autorizar ou proibir. Esta rota só
+ * consulta o Places por candidato, mostra o número na tela e não grava nada.)
+ *
+ *   · telelistas.net  — o robots.txt não responde. Sem ele, o RF-RAD-01 proibia.
  *   · guiamais.com.br — o robots libera, mas a listagem é montada por
  *     JavaScript: não há dado nenhum no HTML.
  *   · solutudo.com.br — o robots proíbe justamente `/empresas/busca/resultados`,

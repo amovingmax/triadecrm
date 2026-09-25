@@ -49,7 +49,7 @@ export function totalDe(contagem: Contagem): number {
 }
 
 /**
- * Quantos CANDIDATOS a importação mandou para a fila de revisão do Radar.
+ * Quantos CANDIDATOS a importação mandou para a fila de Revisão.
  *
  * Não é `contagem.duplicata + contagem.revisao`: isso conta LINHAS da planilha, e
  * linha não é candidato (§3.12g do laudo). Duas linhas da mesma empresa
@@ -59,7 +59,7 @@ export function totalDe(contagem: Contagem): number {
  *
  * Medido no banco em 05/09/2026, com a planilha-ponte preenchida mais uma
  * segunda ocorrência de "Rios Recepções": o recibo mandava "decidir as 31" e a
- * fila do Radar recebia 30.
+ * fila de Revisão recebia 30.
  */
 const DECISOES_QUE_VAO_PARA_A_FILA: readonly Decisao[] = ['duplicata', 'revisao'];
 
@@ -67,7 +67,7 @@ const DECISOES_QUE_VAO_PARA_A_FILA: readonly Decisao[] = ['duplicata', 'revisao'
  * `radar_fila` mostra `status = 'novo'` por padrão. `ja_revisado` é o motivo que
  * o banco devolve quando o candidato existe mas JÁ SAIU da fila — decidido numa
  * passagem anterior. Ele volta na resposta com `candidate_id`, e contá-lo
- * mandaria a pessoa procurar no Radar o que não está mais lá.
+ * mandaria a pessoa procurar na Revisão o que não está mais lá.
  */
 const MOTIVOS_FORA_DA_FILA: readonly string[] = ['ja_revisado'];
 

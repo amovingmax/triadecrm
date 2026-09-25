@@ -289,7 +289,7 @@ function chaveDoItem(item: ItemDoDia, ordem: number): string {
  * nota nenhuma, porque convence quem confia na tela de que não há o que fazer no
  * CRM. O limite verdadeiro é outro, e é permanente — candidato não é alvo de
  * contato até alguém aprovar, então ele nunca entrou nesta fila e continua sendo
- * decidido no Radar.
+ * decidido na Revisão.
  */
 function NotaDoQueFalta({ cheia }: { cheia: boolean }) {
   return (
@@ -308,8 +308,8 @@ function NotaDoQueFalta({ cheia }: { cheia: boolean }) {
         <li>
           Candidato esperando revisão. Ele só vira alvo de contato depois de aprovado, então
           nunca entra aqui — a fila de decisão fica em{' '}
-          <Link href="/radar" className="underline underline-offset-4 hover:text-foreground">
-            Radar
+          <Link href="/revisao" className="underline underline-offset-4 hover:text-foreground">
+            Revisão
           </Link>
           .
         </li>

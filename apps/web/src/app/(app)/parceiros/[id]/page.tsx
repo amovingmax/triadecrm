@@ -83,7 +83,7 @@ export async function generateMetadata({
  * RF-BAS-10) e em que pé está o negócio.
  *
  * As saídas logo abaixo do cabeçalho não são enfeite: oito lugares do CRM apontam
- * para cá — a fila do dia, o quadro dos funis, a busca global, o Radar, a agenda —, e
+ * para cá — a fila do dia, o quadro dos funis, a busca global, a Revisão, a agenda —, e
  * até aqui a ficha era um beco. Quem chegava por "reunião em 2 h" lia o que precisava
  * e então tinha que decorar o nome do parceiro e procurá-lo de novo em outro módulo
  * para registrar o que aconteceu. Registrar, conversar e mover no funil são as três

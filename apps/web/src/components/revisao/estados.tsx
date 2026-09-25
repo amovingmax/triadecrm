@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * Os jeitos de a fila do Radar não ter linhas, mais a espera.
+ * Os jeitos de a fila de Revisão não ter linhas, mais a espera.
  *
  * A fila vazia aqui não é um acidente: enquanto o coletor não existir, o normal é
  * ela estar vazia. Por isso o estado vazio de verdade não pede desculpas — ele

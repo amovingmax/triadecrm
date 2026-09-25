@@ -279,8 +279,8 @@ export function PainelCategorias({
           A linha <span className="font-medium">quase lá</span> (interessados mais em cadastro)
           ainda não tem coluna própria: o mais perto que o banco devolve hoje é a contagem de negócios quentes. As
           categorias em <span className="font-medium">Sem alvos</span> só saem do zero quando
-          o <LinkNoTexto href="/radar?aba=fontes">coletor do Radar</LinkNoTexto> estiver ligado
-          ou alguém <LinkNoTexto href="/importar">importar uma lista nova</LinkNoTexto>.
+          alguém <LinkNoTexto href="/importar">importar uma lista nova</LinkNoTexto> — o coletor
+          do Radar saiu em 25/09/2026, e não há robô nenhum enchendo estas linhas.
         </>
       }
     />

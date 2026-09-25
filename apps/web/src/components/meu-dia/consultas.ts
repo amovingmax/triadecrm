@@ -124,7 +124,7 @@ export async function contarNegociosSemResponsavel(): Promise<number | null> {
 }
 
 /**
- * Quantos candidatos do Radar esperam uma decisão.
+ * Quantos candidatos na Revisão esperam uma decisão.
  *
  * Pelo mesmo motivo da contagem acima, e para desfazer a mesma mentira por outro
  * lado: a fila do dia enxerga tarefa, atividade e negócio, e candidato não é

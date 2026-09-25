@@ -119,7 +119,7 @@ const NOME_DA_TABELA: Record<string, string> = {
   call_batch_items: 'Item do lote de ligações',
   call_attempts: 'Tentativa de ligação',
   call_scripts: 'Roteiro de ligação',
-  supplier_candidates: 'Candidato do Radar',
+  supplier_candidates: 'Candidato na Revisão',
   organization_categories: 'Categoria do parceiro',
   organization_contacts: 'Contato do parceiro',
   organization_tags: 'Etiqueta do parceiro',
