@@ -30,9 +30,10 @@ import { ErroDaImportacao, EsqueletoDaPrevia, Progresso, SemLotes } from './esta
 import { faltando, linhaParaObjeto, sugerirMapa, temConteudo, type Sugestao } from './mapeamento';
 import { detectarOrigem, type OrigemDetectada } from './origem-detectada';
 import { PassoArquivo } from './passo-arquivo';
-import { PassoMapa } from './passo-mapa';
+import { PassoMapa, ReciboDasColunas } from './passo-mapa';
 import { PassoPrevia } from './passo-previa';
 import type { PedidoAoLeitor, RespostaDoLeitor } from './planilha.worker';
+import { montarReciboDeLeitura } from './recibo-de-leitura';
 import { Recibo } from './recibo';
 import { SeletorDeOrigem } from './seletor-de-origem';
 import {
@@ -133,6 +134,68 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
     };
   }, []);
 
+  /**
+   * As linhas com conteúdo, já no formato que o banco entende.
+   *
+   * Recebe planilha, mapa e origem por parâmetro, e não do estado, porque o
+   * passo do mapa pode ser PULADO: quando o recibo não tem nada em dúvida, a
+   * prévia é pedida dentro do próprio `addEventListener` do worker, antes de o
+   * React ter aplicado `setPlanilha`/`setMapa`.
+   */
+  const montarLinhasDe = useCallback(
+    (planilha: PlanilhaLida, mapa: Mapa, nomeDaOrigem: string): LinhaCrua[] => {
+    const saida: LinhaCrua[] = [];
+    planilha.linhas.forEach((valores, i) => {
+      if (!temConteudo(valores, mapa)) return;
+      // +2: a linha 1 é o cabeçalho e a contagem da planilha começa em 1. Assim o
+      // número que a prévia mostra é o número que a pessoa vê no Excel.
+      //
+      // A origem do lote entra aqui, e não só em `import_batches`: quem decide é
+      // `public.importacao_gravar`, com `coalesce((v_n ->> 'source_id')::int,
+      // v_b.source_id)` (`20260904001820:880-881`) — mandando nas duas, as duas
+      // passam a ser a mesma por construção.
+      saida.push(linhaParaObjeto(valores, mapa, i + 2, nomeDaOrigem));
+    });
+    return saida;
+    },
+    [],
+  );
+
+  const montarLinhas = useCallback((): LinhaCrua[] => {
+    if (!planilha) return [];
+    return montarLinhasDe(planilha, mapa, nomeDaOrigem);
+  }, [montarLinhasDe, planilha, mapa, nomeDaOrigem]);
+
+  const conferirCom = useCallback(async (
+    planilha: PlanilhaLida,
+    mapa: Mapa,
+    nomeDaOrigem: string,
+  ) => {
+    const linhas = montarLinhasDe(planilha, mapa, nomeDaOrigem);
+    if (linhas.length === 0) {
+      setFalha({
+        causa: 'Nenhuma linha tem conteúdo nas colunas que você indicou.',
+        comoResolver: 'Confira o mapa das colunas: talvez o nome esteja em outra.',
+      });
+      return;
+    }
+    setFalha(null);
+    setEtapa('previa');
+    setPrevia(null);
+    setAndamento({ rotulo: 'Conferindo contra a base', feitas: 0, total: linhas.length });
+    try {
+      const resultado = await pedirPrevia(linhas, (feitas, total) =>
+        setAndamento({ rotulo: 'Vendo quem já está na base', feitas, total }),
+      );
+      setPrevia(resultado);
+    } catch (erro) {
+      setFalha({ causa: mensagemDoErro(erro) });
+      setEtapa('mapa');
+    } finally {
+      setAndamento(null);
+    }
+  }, [montarLinhasDe]);
+
   const lerArquivoEscolhido = useCallback((escolhido: File) => {
     setFalha(null);
     setArquivo(escolhido);
@@ -191,7 +254,19 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
       setPlanilha(lida);
       setSugestao(s);
       setMapa(s.mapa);
-      setEtapa('mapa');
+
+      // O passo do mapa só existe quando há PERGUNTA a fazer: campo
+      // obrigatório sem coluna, ou coluna casada por semelhança. Nos dois CSV
+      // do Maps de 25/09/2026 são 10 acertos por nome exato em 36 colunas — a
+      // tela pedia 36 confirmações para não perguntar nada. Quando não há
+      // dúvida, o recibo do que foi lido aparece junto da prévia, e quem
+      // quiser mexer numa coluna volta por "ajustar as colunas".
+      const recibo = montarReciboDeLeitura(lida, s.mapa, s, detectada.origem?.nome ?? '');
+      if (recibo.precisaPerguntar) {
+        setEtapa('mapa');
+        return;
+      }
+      void conferirCom(lida, s.mapa, detectada.origem?.nome ?? '');
     });
 
     w.addEventListener('error', () => {
@@ -204,51 +279,13 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
 
     const pedido: PedidoAoLeitor = { arquivo: escolhido };
     w.postMessage(pedido);
-  }, []);
+  }, [conferirCom]);
 
-  /** As linhas com conteúdo, já no formato que o banco entende. */
-  const montarLinhas = useCallback((): LinhaCrua[] => {
-    if (!planilha) return [];
-    const saida: LinhaCrua[] = [];
-    planilha.linhas.forEach((valores, i) => {
-      if (!temConteudo(valores, mapa)) return;
-      // +2: a linha 1 é o cabeçalho e a contagem da planilha começa em 1. Assim o
-      // número que a prévia mostra é o número que a pessoa vê no Excel.
-      //
-      // A origem do lote entra aqui, e não só em `import_batches`: quem decide é
-      // `public.importacao_gravar`, com `coalesce((v_n ->> 'source_id')::int,
-      // v_b.source_id)` (`20260904001820:880-881`) — mandando nas duas, as duas
-      // passam a ser a mesma por construção.
-      saida.push(linhaParaObjeto(valores, mapa, i + 2, nomeDaOrigem));
-    });
-    return saida;
-  }, [planilha, mapa, nomeDaOrigem]);
 
   const conferir = useCallback(async () => {
-    const linhas = montarLinhas();
-    if (linhas.length === 0) {
-      setFalha({
-        causa: 'Nenhuma linha tem conteúdo nas colunas que você indicou.',
-        comoResolver: 'Confira o mapa das colunas: talvez o nome esteja em outra.',
-      });
-      return;
-    }
-    setFalha(null);
-    setEtapa('previa');
-    setPrevia(null);
-    setAndamento({ rotulo: 'Conferindo contra a base', feitas: 0, total: linhas.length });
-    try {
-      const resultado = await pedirPrevia(linhas, (feitas, total) =>
-        setAndamento({ rotulo: 'Vendo quem já está na base', feitas, total }),
-      );
-      setPrevia(resultado);
-    } catch (erro) {
-      setFalha({ causa: mensagemDoErro(erro) });
-      setEtapa('mapa');
-    } finally {
-      setAndamento(null);
-    }
-  }, [montarLinhas]);
+    if (!planilha) return;
+    await conferirCom(planilha, mapa, nomeDaOrigem);
+  }, [conferirCom, planilha, mapa, nomeDaOrigem]);
 
   const importar = useCallback(async () => {
     const linhas = montarLinhas();
@@ -303,6 +340,23 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
       setAndamento(null);
     }
   }, [arquivo, clienteDeConsultas, montarLinhas, origemId]);
+
+  /**
+   * A escolha manual de origem vence a detecção — e, quando a prévia já está na
+   * tela, ela é REFEITA: a origem decide qual mapa de categorias o banco
+   * consulta, então a mesma lista com outra origem dá outro resultado. Mostrar
+   * a prévia velha ao lado da origem nova seria a quarta mentira da tela.
+   */
+  const trocarOrigem = useCallback(
+    (id: number) => {
+      setOrigemId(id);
+      setOrigemEscolhidaAMao(true);
+      if (etapa !== 'previa' || !planilha) return;
+      const nome = origens.find((o) => o.id === id)?.nome ?? '';
+      void conferirCom(planilha, mapa, nome);
+    },
+    [conferirCom, etapa, mapa, origens, planilha],
+  );
 
   const recomecar = useCallback(() => {
     setEtapa('arquivo');
@@ -378,10 +432,7 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
           <SeletorDeOrigem
             origens={origens}
             valor={origemId}
-            aoMudar={(id) => {
-              setOrigemId(id);
-              setOrigemEscolhidaAMao(true);
-            }}
+            aoMudar={trocarOrigem}
             temColunaDeOrigem={mapa.origem !== undefined}
             deteccao={deteccao}
             aberto={menuDeOrigemAberto || origemEscolhidaAMao}
@@ -414,7 +465,26 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
       {etapa === 'previa' ? (
         <>
           {planilha ? (
-            <ArquivoEscolhido arquivo={arquivo} planilha={planilha} aoTrocar={recomecar} />
+            <>
+              <ArquivoEscolhido arquivo={arquivo} planilha={planilha} aoTrocar={recomecar} />
+              {/* A linha do arquivo e o recibo aparecem AQUI também, e não só no
+                  passo do mapa: quando não há nada em dúvida o passo do mapa
+                  nem acontece, e o que o CRM leu (e de onde ele acha que a
+                  lista veio) não pode ficar sem ser dito antes de gravar. */}
+              <SeletorDeOrigem
+                origens={origens}
+                valor={origemId}
+                aoMudar={trocarOrigem}
+                temColunaDeOrigem={mapa.origem !== undefined}
+                deteccao={deteccao}
+                aberto={menuDeOrigemAberto || origemEscolhidaAMao}
+                aoAbrir={() => setMenuDeOrigemAberto(true)}
+              />
+              <ReciboDasColunas
+                planilha={planilha}
+                recibo={montarReciboDeLeitura(planilha, mapa, sugestao, nomeDaOrigem)}
+              />
+            </>
           ) : null}
 
           {andamento ? <Progresso {...andamento} /> : null}

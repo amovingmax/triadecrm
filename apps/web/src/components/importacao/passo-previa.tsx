@@ -107,7 +107,7 @@ export function PassoPrevia({ previa, aoVoltar }: { previa: Previa; aoVoltar: ()
       <div>
         <Button variant="ghost" onClick={aoVoltar} className="toque h-11 md:h-9">
           <CornerDownRight className="rotate-180" aria-hidden="true" />
-          Voltar e corrigir as colunas
+          Ajustar as colunas
         </Button>
       </div>
     </div>

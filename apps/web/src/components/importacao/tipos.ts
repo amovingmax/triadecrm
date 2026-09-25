@@ -105,7 +105,11 @@ export type CampoExtra = (typeof CAMPOS_EXTRAS)[number];
 export const ROTULO_EXTRA: Record<CampoExtra, string> = {
   cnpj: 'CNPJ',
   site: 'Site',
-  place_id: 'ID do lugar no Maps',
+  // O `(cid)` não é decoração: o CSV do Maps tem uma coluna chamada `place_id`
+  // que NÃO é esta — o CRM guarda o `cid` (ADR-12). Sem o parêntese, o recibo
+  // diz "ID do lugar no Maps" e a coluna `place_id` aparece entre as ignoradas,
+  // e quem confere conclui que o CRM perdeu o identificador.
+  place_id: 'ID do lugar no Maps (cid)',
   email: 'E-mail',
   endereco: 'Endereço',
   nota: 'Nota do Google',

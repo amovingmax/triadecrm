@@ -3401,6 +3401,20 @@ Fotógrafo 10 → **13**; buffet 3 → **17**. Sobram 9 na fila (6 fotógrafo + 
 
 ## Importar sem fila — segunda leva (25/09/2026)
 
+### Tarefa 5 — As 36 caixinhas viram um recibo
+
+`recibo-de-leitura.ts`, novo e puro: dado o cabeçalho, o mapa e a sugestão, ele diz **o que foi lido**, o que ficou **em dúvida** e o que foi **ignorado, com o porquê**. A tela deixa de pedir confirmação de 36 caixinhas para mostrar 10 acertos que a máquina já fez — todos por nome exato, nenhum por semelhança, medido nos dois CSV de `listas/`.
+
+**A regra:** o recibo afirma; a pergunta só existe onde há dúvida. E dúvida é uma de duas coisas, e só: campo obrigatório sem coluna, ou coluna casada por **semelhança** (um "telefone 2" que virou WhatsApp é exatamente o erro que passa despercebido quando a tela diz "pronto"). **Disputa de coluna não é dúvida:** no CSV do Maps há três (`link` × `reviews_link`, `cid` × `place_id`, `address` × `complete_address`) e nas três a coluna certa ganha — perguntar seria pedir três confirmações inúteis por arquivo. Disputa vira linha na lista dos ignorados, com o motivo escrito.
+
+**O passo do mapa some quando não há pergunta.** Nos dois lotes reais sobram dois passos: arquivo → prévia → recibo. Para isso, `montarLinhasDe` e `conferirCom` passaram a receber planilha, mapa e origem **por parâmetro**: a prévia é pedida de dentro do `addEventListener` do worker, antes de o React ter aplicado `setPlanilha`/`setMapa`. Quem quiser mexer numa coluna volta por **"Ajustar as colunas"**, e a grade inteira continua inteira, atrás de *"Ver as 36 colunas do arquivo"*.
+
+**Duas linhas de texto que economizam um chamado.** `ROTULO_EXTRA.place_id` passa a dizer **"ID do lugar no Maps (cid)"**, e a coluna `place_id` do arquivo aparece entre as ignoradas com o motivo — *"o place_id da Places API não é o cid do Maps (ADR-12)"*. Sem isso, quem confere vê a coluna ignorada e conclui que o CRM perdeu o identificador do lugar. E a coluna `emails`, vazia nas vinte linhas dos dois arquivos, é anunciada como **"E-mail (vazia no arquivo)"**: um recibo que promete e-mail sem ressalva parece bug quando a ficha nasce sem.
+
+**A linha do arquivo e o recibo passaram a aparecer também na prévia**, e não só no passo do mapa — senão, com o passo pulado, o CRM nunca diria de onde achou que a lista veio. Trocar a origem ali **refaz a prévia**: a origem decide qual mapa de categorias o banco consulta, e mostrar a prévia velha ao lado da origem nova seria a quarta mentira da tela.
+
+Vitest: `recibo-de-leitura.test.ts`, 10 asserções contra as fixtures reais.
+
 ### Tarefa 8 — A prévia para de mentir
 
 Migração `20261001110000_a_previa_para_de_mentir.sql`, e os três defeitos vêm dos mesmos 40 registros de `listas/`:
