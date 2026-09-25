@@ -249,8 +249,13 @@ select is(app.ai_alerta_orcamento() ->> 'alertou', 'true',
           'com o mês corrente estourado, o alerta é emitido');
 select is(app.ai_alerta_orcamento() ->> 'motivo', 'ja_alertado',
           'e a segunda passada do cron não emite de novo: a chave (mês, situação) é a idempotência');
-select is(pg_temp.delta('alerta', pg_temp.n_alerta()), 1,
-          'uma linha de alerta, e uma só');
+-- Duas, e não uma, desde 25/09/2026: o mês corrente entra em `freou` (US$ 60
+-- de 60), e um mês que pula de `ok` para `freou` entre duas passadas do cron
+-- ficaria sem registro nenhum de ter passado de 80%. `app.ai_alerta_orcamento`
+-- grava as duas linhas de uma vez — a tarefa continua sendo uma só, a do
+-- degrau de agora. Continua idempotente: a segunda passada devolve ja_alertado.
+select is(pg_temp.delta('alerta', pg_temp.n_alerta()), 2,
+          'duas linhas de alerta no mês que pulou direto para o freio, e não uma a mais');
 select ok(exists (select 1 from public.tasks t
                    where t.origin = 'system' and t.title like 'Orçamento de IA:%'),
           'e uma tarefa para uma pessoa: alerta que ninguém lê não é alerta');

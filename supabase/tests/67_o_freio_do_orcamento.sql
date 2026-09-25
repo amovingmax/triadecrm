@@ -9,7 +9,13 @@
 --   2. AS DUAS LINHAS SÃO DERIVADAS. Alerta = teto x fracao_alerta; freio =
 --      o teto inteiro. Ninguém escreve 48 em lugar nenhum. Se um dia alguém
 --      escrever, este arquivo acusa: há duas fontes para o mesmo fato.
---   3. O FREIO RECUSA POR EXCLUSÃO. Na linha de alerta param os 12 propósitos
+--   3. A RECUSA NÃO EXPLODE. `app.ia_enfileirar_resumo` roda dentro da
+--      transação de `public.tabular_tentativa`: um `raise` ali abortaria a
+--      tabulação da ligação que a pessoa acabou de registrar. A recusa volta
+--      como valor. Propósito desconhecido, esse sim, continua explodindo.
+--   4. O MÊS QUE PULA DIRETO PARA O FREIO grava as duas linhas de alerta.
+--      Sem isso, o registro de "passamos de 80%" não existiria para esse mês.
+--   5. O FREIO RECUSA POR EXCLUSÃO. Na linha de alerta param os 12 propósitos
 --      que não são de atendimento; sobrevivem `classify_inbound` e
 --      `transcribe_audio`, que são os únicos que servem para entender quem
 --      escreveu agora. No teto inteiro param os 14. Os 12 são nomeados um a
@@ -18,7 +24,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(13);
+select plan(21);
 
 -- =====================================================================
 -- 1. O TETO, E AS DUAS LINHAS
@@ -86,6 +92,58 @@ select is(app.ia_pode_gastar('classify_inbound') ->> 'motivo', 'orcamento_esgota
   'e o motivo é o teto, não a linha de alerta: são prazos diferentes');
 select is(array_length(app.ia_gasto_bloqueado_para(), 1), 14,
   'passada a linha do freio, param os 14 — inclusive os dois do atendimento');
+
+-- =====================================================================
+-- 3. A FILA RECUSA — e a recusa é valor, não exceção
+-- =====================================================================
+select is((app.ia_enfileirar('draft_reply', '{}'::jsonb, 'pgtap67-a') ->> 'enfileirado')::boolean, false,
+  'com o mês freado, a fila da IA não enfileira');
+select is(app.ia_enfileirar('draft_reply', '{}'::jsonb, 'pgtap67-a') ->> 'motivo', 'orcamento',
+  'e diz por que: a recusa volta como VALOR, porque ela roda dentro da transação de quem chamou');
+select throws_ok(
+  $$select app.ia_enfileirar('inventar_coisa', '{}'::jsonb, 'pgtap67-b')$$,
+  '22023', NULL,
+  'propósito desconhecido continua EXPLODINDO: aquilo é erro de programação, não estado do mês');
+
+-- =====================================================================
+-- 4. O ALERTA GRAVA AS DUAS LINHAS
+-- =====================================================================
+-- O `delete` só é possível porque a transação inteira dá rollback.
+delete from public.ai_budget_alerts
+ where mes = to_char((now() at time zone 'America/Fortaleza')::date, 'YYYY-MM');
+
+select is(app.ai_alerta_orcamento() ->> 'situacao', 'freou',
+  'com US$ 61 de 60, a situação do mês é freou');
+select is((select count(*)::int from public.ai_budget_alerts a
+            where a.mes = to_char((now() at time zone 'America/Fortaleza')::date, 'YYYY-MM')), 2,
+  'e o alerta grava DUAS linhas: um mês que pula de ok para freou entre duas passadas do cron ficaria, de outro modo, sem registro nenhum de ter passado de 80%');
+select is(app.ai_alerta_orcamento() ->> 'motivo', 'ja_alertado',
+  'a segunda passada do cron não emite de novo: a chave (mês, situação) é a idempotência');
+
+-- =====================================================================
+-- 5. O PAINEL DIZ O QUE ESTÁ PARADO
+-- =====================================================================
+-- Sem perfil de verdade: `app.role()` e `auth.uid()` leem o JWT, e é o JWT
+-- que o PostgREST entrega. Mesmo utilitário do arquivo 24.
+create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', p_uid, 'role', 'authenticated',
+                      'app_metadata', json_build_object('app_role', p_papel))::text, true);
+  execute 'set local role authenticated';
+end $$;
+create function pg_temp.sair() returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', '', true);
+  execute 'reset role';
+end $$;
+
+select pg_temp.entrar('00000000-0000-4000-8000-000000000067'::uuid, 'admin');
+select is((public.ia_orcamento_status() ->> 'freado')::boolean, true,
+  'o painel sabe que o mês está freado');
+select is((public.ia_orcamento_status() ->> 'parados')::int, 14,
+  'e conta quantos propósitos o freio está recusando agora');
+select pg_temp.sair();
 
 select * from finish();
 rollback;

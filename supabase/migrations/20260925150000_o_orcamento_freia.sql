@@ -185,6 +185,21 @@ begin
     returning id into v_task;
   end if;
 
+  -- O mês pode pular direto de `ok` para `freou` — um lote de Batch API que
+  -- fecha entre duas passadas do cron faz exatamente isso. Sem esta linha, o
+  -- registro de "passamos de 80%" nunca existiria para esse mês, e quem for
+  -- olhar a história depois veria um freio sem aviso antes. A tarefa é uma
+  -- só, a do degrau de agora; a linha de 80% nasce sem tarefa de propósito.
+  if v_sit = 'freou' then
+    insert into public.ai_budget_alerts (mes, situacao, gasto_usd, projecao_usd, orcamento_usd, task_id)
+    values (v_mes, 'passou_de_80',
+            (v_estado ->> 'gasto_usd')::numeric,
+            (v_estado ->> 'projecao_do_mes_usd')::numeric,
+            (v_estado ->> 'orcamento_usd')::numeric,
+            null)
+    on conflict (mes, situacao) do nothing;
+  end if;
+
   insert into public.ai_budget_alerts (mes, situacao, gasto_usd, projecao_usd, orcamento_usd, task_id)
   values (v_mes, v_sit,
           (v_estado ->> 'gasto_usd')::numeric,
@@ -297,3 +312,82 @@ comment on function public.ia_pode_gastar(text) is
   'Casca de app.ia_pode_gastar para o worker-ai perguntar, antes de chamar o modelo, se ainda dá para gastar.';
 revoke all on function public.ia_pode_gastar(text) from public, anon, authenticated;
 grant execute on function public.ia_pode_gastar(text) to service_role;
+
+
+-- ---------------------------------------------------------------------
+-- 5. A fila pergunta ao freio antes de enfileirar
+-- ---------------------------------------------------------------------
+-- SEM `raise`, e isso é essencial: `app.ia_enfileirar_resumo` roda DENTRO da
+-- transação de `public.tabular_tentativa` (20260906000100:358). Uma exceção
+-- aqui abortaria a tabulação da ligação que a pessoa acabou de registrar —
+-- perder o trabalho dela para economizar centavos de IA seria trocar caro por
+-- barato. A recusa volta como `{enfileirado:false, motivo:'orcamento'}`, na
+-- mesma forma de `app.esteira_enfileirar`.
+--
+-- O propósito desconhecido continua EXPLODINDO com 22023: aquilo é erro de
+-- programação, não estado do mês, e tem de doer na hora.
+create or replace function app.ia_enfileirar(p_purpose text, p_payload jsonb, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_freio jsonb;
+begin
+  if p_purpose not in ('transcribe_audio', 'summarize_call', 'draft_followup', 'classify_inbound',
+                       'draft_reply', 'summarize_deal', 'next_action', 'digest',
+                       'extract_listing', 'assistant',
+                       'analisar_conversa', 'pulso_do_dia', 'perguntar_ao_crm',
+                       'triar_candidato') then
+    raise exception 'Propósito % não existe em ai_runs.purpose: gasto que ninguém nomeou é gasto que ninguém orçou', p_purpose
+      using errcode = '22023';
+  end if;
+
+  v_freio := app.ia_pode_gastar(p_purpose);
+  if not coalesce((v_freio ->> 'pode')::boolean, false) then
+    return jsonb_build_object('enfileirado', false, 'motivo', 'orcamento',
+                              'detalhe', v_freio ->> 'motivo');
+  end if;
+
+  return app.esteira_enfileirar('ai_jobs',
+                                jsonb_build_object('purpose', p_purpose) || coalesce(p_payload, '{}'::jsonb),
+                                p_purpose || ':' || p_key);
+end $$;
+comment on function app.ia_enfileirar(text, jsonb, text) is
+  'Porta única da fila de IA: confere a lista de propósitos (o CHECK de ai_runs protege a gravação; este if protege a FILA, que é onde o gasto nasce) e pergunta ao freio do orçamento. Recusa por orçamento volta como {enfileirado:false, motivo:"orcamento"}, nunca como exceção — roda dentro da transação de quem chamou.';
+
+-- ---------------------------------------------------------------------
+-- 6. O painel diz o que está parado
+-- ---------------------------------------------------------------------
+create or replace function public.ia_orcamento_status()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_parados text[];
+begin
+  if auth.uid() is null
+     or app.role() not in ('admin'::app.user_role, 'gestor'::app.user_role, 'financeiro'::app.user_role) then
+    raise exception 'Sem permissão para ver o orçamento de IA' using errcode = '42501';
+  end if;
+  v_parados := app.ia_gasto_bloqueado_para();
+  return app.ai_gasto_do_mes(null)
+         || jsonb_build_object(
+              'freado', (app.ai_gasto_do_mes(null) ->> 'situacao') = 'freou',
+              'parados', coalesce(array_length(v_parados, 1), 0),
+              'propositos_parados', to_jsonb(v_parados),
+              'alertas_do_mes',
+              coalesce((select jsonb_agg(jsonb_build_object('situacao', a.situacao, 'quando', a.created_at)
+                                         order by a.created_at)
+                          from public.ai_budget_alerts a
+                         where a.mes = to_char((now() at time zone 'America/Fortaleza')::date, 'YYYY-MM')),
+                       '[]'::jsonb));
+end $$;
+comment on function public.ia_orcamento_status() is
+  'Painel do custo de IA para admin, gestor e financeiro: gasto do mês, projeção pelo ritmo, situação, quebra por propósito, os alertas já emitidos e — desde a Fase 3 — se o mês está freado e quais propósitos o freio está recusando agora.';
+revoke all on function public.ia_orcamento_status() from public, anon;
+grant execute on function public.ia_orcamento_status() to authenticated, service_role;
