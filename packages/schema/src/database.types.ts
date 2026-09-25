@@ -7788,27 +7788,6 @@ export type Database = {
         }
         Returns: Json
       }
-      radar_agendar_coleta: {
-        Args: {
-          p_categorias?: string[]
-          p_max_paginas?: number
-          p_rotulo?: string
-          p_source_id: number
-        }
-        Returns: Json
-      }
-      radar_alternar_fonte: {
-        Args: { p_enabled: boolean; p_source_id: number }
-        Returns: Json
-      }
-      radar_coletar_agora: {
-        Args: {
-          p_categorias?: string[]
-          p_max_paginas?: number
-          p_source_id: number
-        }
-        Returns: Json
-      }
       radar_criar_candidato: {
         Args: {
           p_category_id?: number

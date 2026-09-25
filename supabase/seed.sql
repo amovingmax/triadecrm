@@ -216,57 +216,24 @@ update public.sources
  where slug in ('planilha', 'google_maps_raspado');
 
 -- =====================================================================
--- 3b. Catálogo de coleta do Radar e mapa de categorias da fonte (R03 §2.1;
---     migração 20260904001802, blocos 3 e 4).
+-- 3b. Mapa de categorias da fonte (R03 §2.1; migração 20260904001802, bloco 4).
 --
 --     VEIO DA MIGRAÇÃO em 05/09/2026, pelo mesmo motivo das cadências do
 --     bloco 12d, e num caso pior: lá o banco novo PARAVA com erro; aqui ele
---     terminava calado. O `update` do catálogo procurava `casamentos_com_br`
---     em `public.sources` e o mapa procurava `public.categories` — as duas
---     tabelas são semeadas AQUI, e o `db reset` roda todas as migrações antes
---     deste arquivo. Zero linhas casadas, zero erro: o Radar nascia sem
---     catálogo (nada a coletar) e sem mapa (toda captura cairia em revisão
---     manual), e só o pgTAP 21 percebia.
+--     terminava calado. O mapa procurava `public.categories`, que é semeada
+--     AQUI, e o `db reset` roda todas as migrações antes deste arquivo. Zero
+--     linhas casadas, zero erro: o banco nascia sem mapa (toda captura cairia
+--     em revisão manual), e só o pgTAP 21 percebia.
 --
---     Fica logo depois das fontes porque é dado DA fonte: a linha existe
---     acima, e o que segue é a configuração de coleta dela. Idempotente —
---     `jsonb_set` na mesma chave e `on conflict do update` —, então roda em
---     todo reset sem duplicar nada.
+--     O CATÁLOGO DE COLETA SAIU daqui em 25/09/2026, com a migração
+--     20260925140000. As 18 listagens do Casamentos eram instruções de coleta —
+--     em que caminho o worker entrava — e o worker não existe mais. O MAPA fica,
+--     e passa a valer por si: é ele que decide se uma linha importada já nasce
+--     com categoria ou se a Revisão pergunta.
+--
+--     Fica logo depois das fontes porque é dado DA fonte. Idempotente
+--     (`on conflict do update`), então roda em todo reset sem duplicar nada.
 -- =====================================================================
--- Cada entrada é uma página de listagem categoria × cidade. A paginação NÃO está
--- aqui: a própria página diz onde continua, no `<link rel="next">`, e é ele que o
--- worker segue — inventar `--2`, `--3` no código produziria requisição para
--- página que não existe, que é justamente o tipo de tráfego que a fonte não deve
--- receber de nós.
-update public.sources s
-   set config = jsonb_set(
-                  jsonb_set(s.config, '{collector,agente}',
-                            to_jsonb('KomuneBot/1.0 (+https://komune.app.br; CRM de captação da Komune)'::text), true),
-                  '{collector,catalogo}',
-                  '[
-                     {"categoria_origem": "cerimonialista",         "caminho": "/cerimonialista/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "espaco-casamento",       "caminho": "/espaco-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "fotografo-casamento",    "caminho": "/fotografo-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "filmagem-casamento",     "caminho": "/filmagem-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "buffet-casamento",       "caminho": "/buffet-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "musica-de-casamento",    "caminho": "/musica-de-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "decoracao-casamento",    "caminho": "/decoracao-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "doces-casamento",        "caminho": "/doces-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "bolo-casamento",         "caminho": "/bolo-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "convites-de-casamento",  "caminho": "/convites-de-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "lembrancas-de-casamento","caminho": "/lembrancas-de-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "florista-casamento",     "caminho": "/florista-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "carros-casamento",       "caminho": "/carros-casamento/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "animacao-festa",         "caminho": "/animacao-festa/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "beleza-noivas",          "caminho": "/beleza-noivas/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "celebrante",             "caminho": "/celebrante/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "cabine-de-fotos",        "caminho": "/cabine-de-fotos/rio-grande-do-norte/natal"},
-                     {"categoria_origem": "bebidas-casamento",      "caminho": "/bebidas-casamento/rio-grande-do-norte/natal"}
-                   ]'::jsonb,
-                  true)
- where s.slug = 'casamentos_com_br';
-
-
 -- O mapa da categoria da fonte → categoria do CRM.
 -- Só o que é evidente. `cabine-de-fotos` não entra: cabine é serviço de foto para
 -- uns e brinquedo de festa para outros, e chutar aqui contamina o funil inteiro
@@ -1633,7 +1600,7 @@ declare
   n_out  int;  n_sup  int;  n_eq int;  s_eq text;
   n_nos int; n_rot_err int; n_ans int;
   n_cad int; n_pas int; n_cad_ruim text;
-  n_rad int; n_map int; n_map_google int;
+  n_map int; n_map_google int;
 begin
   select count(*) into n_cat  from public.categories;
   select count(*) into n_pipe from public.pipelines;
@@ -1657,12 +1624,10 @@ begin
   select count(*) into n_ans
     from public.interaction_outcomes o
    where o.requires_answer and 'ligacao'::app.interaction_surface = any (o.surfaces);
-  -- Radar (bloco 3b): catálogo de listagens e mapa de categorias. Vieram da
-  -- migração 20260904001802, que os escrevia ANTES de as fontes existirem e
-  -- por isso não escrevia nada — sem erro. Esta contagem é o barulho que
-  -- faltava.
-  select coalesce(jsonb_array_length(s.config -> 'collector' -> 'catalogo'), 0) into n_rad
-    from public.sources s where s.slug = 'casamentos_com_br';
+  -- Mapa de categorias do Casamentos (bloco 3b). Veio da migração
+  -- 20260904001802, que o escrevia ANTES de as fontes existirem e por isso não
+  -- escrevia nada — sem erro. Esta contagem é o barulho que faltava. A do
+  -- catálogo de listagens saiu em 25/09/2026, com o próprio catálogo.
   select count(*) into n_map
     from public.source_category_map m
     join public.sources s on s.id = m.source_id
@@ -1708,7 +1673,6 @@ begin
   if n_out <> 34 then raise exception 'seed: esperados 34 desfechos de interação, encontrados %', n_out; end if;
   if n_sup > 8   then raise exception 'seed: superfície com % desfechos ativos (máximo 8, RF-MET-06)', n_sup; end if;
   if n_eq <> 4   then raise exception 'seed: esperadas 4 equivalências de etapa, encontradas %', n_eq; end if;
-  if n_rad < 18  then raise exception 'seed: catálogo do Radar com % listagens (esperadas 18, R03 §2.1, bloco 3b)', n_rad; end if;
   if n_map < 23  then raise exception 'seed: mapa de categorias do Radar com % linhas (esperadas ≥ 23, bloco 3b)', n_map; end if;
   if n_map_google <> 12 then raise exception 'seed: mapa de categorias do Google Maps com % linhas (esperadas 12, ADR-12)', n_map_google; end if;
   if n_cad <> 5  then raise exception 'seed: esperadas 5 cadências, encontradas % (bloco 12d)', n_cad; end if;
@@ -1751,7 +1715,7 @@ begin
     raise warning 'seed: há etapas órfãs (posição negativa) que não constam mais da seed';
   end if;
 
-  raise notice 'seed ok (Radar): % listagens no catálogo do Casamentos.com.br e % categorias mapeadas', n_rad, n_map;
+  raise notice 'seed ok (Radar): % categorias do Casamentos.com.br mapeadas', n_map;
   raise notice 'seed ok (cadências): % cadências e % passos, todos com desfecho e modelo existentes', n_cad, n_pas;
   raise notice 'seed ok (ligação): roteiro captacao_v1 com % nós, sem erro estrutural, e % desfechos comerciais de ligação', n_nos, n_ans;
   raise notice 'seed ok: % cidades, % categorias, % fontes, % feriados em % e % em %, % funis (fornecedor %, ativacao %, produtor % etapas), % motivos de perda, % desfechos de interação (máximo % por superfície), % modelos de mensagem',

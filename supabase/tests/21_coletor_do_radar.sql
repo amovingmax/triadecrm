@@ -2,7 +2,7 @@
 -- pgTAP — O coletor do Radar (migração 20260904001802)
 --   public.esteira_fila_enfileirar / esteira_fila_ler / esteira_fila_concluir
 --   · public.esteira_fila_falhar · public.esteira_estado_lote
---   · app.e_o_worker · app.can_write · sources.config.collector.catalogo
+--   · app.e_o_worker · app.can_write
 --   · public.source_category_map
 --
 -- O que este arquivo tem de provar, e por quê:
@@ -27,7 +27,7 @@
 -- operação real dentro. Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(36);
+select plan(33);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -203,27 +203,13 @@ select pg_temp.sair();
 
 
 -- =====================================================================
--- 5. O catálogo de coleta e o mapa de categoria são dados
+-- 5. O mapa de categoria é dado
+--
+-- As três asserções do `config->collector->catalogo` saíram em 25/09/2026: o
+-- catálogo era instrução de coleta, e a migração 20260925140000 o apagou. O MAPA
+-- fica, e passa a valer por si — é ele que decide se uma linha importada vira
+-- categoria ou vai para a Revisão.
 -- =====================================================================
-select cmp_ok(
-  (select jsonb_array_length(s.config -> 'collector' -> 'catalogo')
-     from public.sources s where s.slug = 'casamentos_com_br'),
-  '>=', 18, 'catálogo: as 18 listagens de Natal do R03 §2.1 estão em sources.config');
-
--- Todo caminho do catálogo é uma listagem categoria × cidade, e nenhum cai nos
--- prefixos que o robots.txt da fonte proíbe (R03 §2.1: /json/, /emp-*.php,
--- /busc-*.php, /apps/empresas/). O worker confere o robots de novo a cada
--- corrida; isto aqui impede que um caminho proibido seja CADASTRADO.
-select is(
-  (select count(*)::int
-     from public.sources s,
-          jsonb_array_elements(s.config -> 'collector' -> 'catalogo') e
-    where s.slug = 'casamentos_com_br'
-      and (e ->> 'caminho' !~ '^/[a-z0-9-]+/rio-grande-do-norte/natal$'
-        or e ->> 'caminho' ~ '^/(json|apps/empresas)/'
-        or e ->> 'caminho' ~ '^/(emp|busc)-')),
-  0, 'catálogo: todo caminho é listagem categoria × cidade e nenhum é proibido pelo robots');
-
 select is(
   (select c.slug from public.source_category_map m
      join public.categories c on c.id = m.category_id
@@ -243,16 +229,6 @@ select is(
     where m.source_id = pg_temp.fonte('casamentos_com_br')
       and m.category_source = 'cabine-de-fotos'),
   0, 'mapa: cabine de fotos fica sem mapa DE PROPÓSITO — quem revisa escolhe (regra da 001600)');
-
-select is(
-  (select count(*)::int
-     from public.sources s,
-          jsonb_array_elements(s.config -> 'collector' -> 'catalogo') e
-    where s.slug = 'casamentos_com_br'
-      and not exists (select 1 from public.source_category_map m
-                       where m.source_id = s.id
-                         and m.category_source = e ->> 'categoria_origem')),
-  1, 'mapa: exatamente uma categoria do catálogo fica sem mapa, e é a cabine de fotos');
 
 select * from finish();
 rollback;

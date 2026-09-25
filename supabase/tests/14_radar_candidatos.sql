@@ -4,7 +4,7 @@
 --   public.supplier_candidates · app.supplier_candidates_normalize
 --   · app.cpf_is_valid · app.ddd_da_regiao · public.radar_criar_candidato
 --   · public.radar_fila · public.radar_revisar_candidato
---   · public.radar_alternar_fonte · public.radar_resumo
+--   · public.radar_resumo
 --
 -- O que estes testes garantem, em uma frase cada:
 --   * CPF nunca é persistido, nem grudado no nome de MEI (ADR-09, RF-RAD-16);
@@ -17,7 +17,7 @@
 -- Roda em transação e desfaz tudo. Nada depende de contagem absoluta da seed.
 -- =====================================================================
 begin;
-select plan(69);
+select plan(65);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -328,22 +328,13 @@ select pg_temp.entrar('a0000000-0000-4000-8000-00000000e001', 'gestor');
 
 
 -- =====================================================================
--- 10. Ligar e desligar fonte (RF-RAD-01)
+-- 10. O resumo do topo
+--
+-- O bloco "Ligar e desligar fonte" saiu em 25/09/2026, junto com a função que
+-- ele media: ligar fonte era o botão do catálogo, e o catálogo saiu da tela
+-- (migração 20260925140000). Quatro asserções a menos, daí o plan(65).
+-- Esta roda na sessão de `gestor` aberta acima, e `app.can_write()` cobre gestor.
 -- =====================================================================
-select ok((public.radar_alternar_fonte(pg_temp.fonte('google_places'), false) ->> 'ok')::boolean,
-          'gestor desliga uma fonte');
-select is(
-  (public.radar_alternar_fonte(pg_temp.fonte('google_places'), true) ->> 'reason'),
-  'robots_nao_avaliado', 'fonte sem robots.txt avaliado não pode ser ligada');
-select ok((public.radar_alternar_fonte(pg_temp.fonte('casamentos_com_br'), true) ->> 'ok')::boolean,
-          'fonte com robots avaliado e termos registrados liga');
-
-select pg_temp.sair();
-select pg_temp.entrar('a0000000-0000-4000-8000-00000000e002', 'sdr');
-select throws_ok(
-  format($$ select public.radar_alternar_fonte(%s, false) $$, pg_temp.fonte('casamentos_com_br')),
-  '42501', null, 'sdr não liga nem desliga fonte');
-
 select ok((public.radar_resumo() ->> 'novos')::int >= 0, 'radar_resumo devolve a contagem da fila');
 select pg_temp.sair();
 
