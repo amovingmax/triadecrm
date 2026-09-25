@@ -111,7 +111,23 @@ A Meta só deixa assinar as mensagens do WhatsApp pelo painel do app.
    - URL de retorno: `https://toqdjcajyrowutunczhr.supabase.co/functions/v1/wa-webhook`
    - Token de verificação: o valor de `META_WA_VERIFY_TOKEN` do `.env` (gerado na Parte 2)
    - *Verificar e salvar*. Se der erro, a Parte 2 não terminou.
-3. Em **Campos do webhook**, *Gerenciar* → assinar **`messages`**.
+3. Em **Campos do webhook**, *Gerenciar* → assinar **quatro** campos:
+
+   | Campo | Para quê |
+   |---|---|
+   | `messages` | tudo o que chega: mensagem, recibo de entrega e eco |
+   | `phone_number_quality_update` | a nota do número caindo (`FLAGGED`) e o tier novo |
+   | `account_update` | restrição, violação e banimento da conta |
+   | `business_capability_update` | quantas conversas por dia a Meta libera |
+
+   Os três últimos entraram em 25/09/2026, com o freio da Fase 3. **Não há como
+   assiná-los por API**: `POST /{waba}/subscribed_apps` assina a app na conta e
+   aceita só o endereço de retorno; quais campos ela recebe é desta tela. Sem
+   eles o CRM não fica sabendo de restrição, banimento nem mudança de tier — e
+   o teto da Meta, em `app.wa_teto_da_meta`, continua nulo (o que significa "não
+   sei", e não "pode").
+
+   O `--conectar` da Parte 4 confere e diz, pelo nome, o que ainda falta.
 
 ## Parte 4 — o motor no Fly.io e a conexão do número
 

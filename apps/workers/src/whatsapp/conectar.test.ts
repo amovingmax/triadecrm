@@ -125,12 +125,16 @@ describe('workers wa --conectar', () => {
     const conta = await duble.conta();
     expect(conta.registros).toHaveLength(0);
     expect(conta.assinaturasDaWaba).toEqual([{ waba_id: '777', override_callback_uri: null }]);
+    // Os três campos de saúde do número entram aqui desde 25/09/2026: este é o
+    // único endereço da Graph que aceita `fields`. Na Meta de verdade ele é
+    // recusado para WhatsApp — e é por isso que o ramo do override grita o que
+    // falta assinar à mão.
     expect(conta.assinaturasDoApp).toEqual([
       {
         app_id: '4242',
         object: 'whatsapp_business_account',
         callback_url: 'https://projeto.supabase.co/functions/v1/wa-webhook',
-        fields: 'messages',
+        fields: 'messages,phone_number_quality_update,account_update,business_capability_update',
       },
     ]);
 
@@ -207,6 +211,13 @@ describe('workers wa --conectar', () => {
     expect(codigo).toBe(0);
     expect(saida).toContain('✓ 4/6');
     expect(saida).toContain('override na WABA');
+    // O override aponta o ENDEREÇO, e nada mais. Quais campos chegam nele é do
+    // painel do app — e um passo verde que não assinou nada seria pior que
+    // passo nenhum. Ele diz, pelo nome, o que falta.
+    expect(saida).toContain('phone_number_quality_update');
+    expect(saida).toContain('account_update');
+    expect(saida).toContain('business_capability_update');
+    expect(saida).toContain('o teto da Meta continua nulo');
     const conta = await duble.conta();
     expect(conta.assinaturasDaWaba).toContainEqual({
       waba_id: '777',

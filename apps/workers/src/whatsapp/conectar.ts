@@ -84,6 +84,27 @@ export function configDaConexao(
 // O número na Meta
 // ---------------------------------------------------------------------------
 
+/**
+ * Os campos de webhook de que a Fase 3 depende, além de `messages`.
+ *
+ * NÃO SE ASSINAM POR `subscribed_apps`. `POST /{waba}/subscribed_apps` assina a
+ * APP na WABA e aceita só `override_callback_uri` e `verify_token`; QUAIS
+ * campos ela recebe é configuração do painel do app (WhatsApp → Configuração →
+ * Webhooks). `POST /{app-id}/subscriptions` aceita `fields`, e é por isso que
+ * eles vão lá — mas a referência da Graph recusa esse endpoint para WhatsApp
+ * (está escrito no passo 4, e o dublê reproduz a recusa). Quando a recusa
+ * acontece, o `--conectar` diz, pelo nome, o que ficou faltando assinar à mão:
+ * um passo verde que não assinou nada seria pior que passo nenhum.
+ */
+export const CAMPOS_DE_SAUDE_ESPERADOS = [
+  'phone_number_quality_update',
+  'account_update',
+  'business_capability_update',
+] as const;
+
+/** Tudo o que o CRM precisa receber da Meta. */
+export const CAMPOS_DO_WEBHOOK = ['messages', ...CAMPOS_DE_SAUDE_ESPERADOS] as const;
+
 export const CAMPOS_DO_NUMERO =
   'display_phone_number,verified_name,quality_rating,code_verification_status,name_status,status,platform_type,throughput';
 
@@ -256,12 +277,12 @@ export async function conectarNumero(ctx: ContextoDaConexao): Promise<number> {
       object: 'whatsapp_business_account',
       callback_url: config.callbackUrl,
       verify_token: config.verifyToken,
-      fields: 'messages',
+      fields: CAMPOS_DO_WEBHOOK.join(','),
     },
     { formulario: true, semBearer: true },
   );
   if (doApp.ok) {
-    ok(4, `Webhook do app apontado para ${config.callbackUrl} (campo messages).`);
+    ok(4, `Webhook do app apontado para ${config.callbackUrl} (campos ${CAMPOS_DO_WEBHOOK.join(', ')}).`);
   } else {
     // A referência da Graph API diz que `/{app-id}/subscriptions` não aceita
     // WhatsApp ("configure pelo painel do app"). O caminho oficial que sobra
@@ -271,9 +292,15 @@ export async function conectarNumero(ctx: ContextoDaConexao): Promise<number> {
       verify_token: config.verifyToken,
     });
     if (override.ok) {
+      // O override aponta o ENDEREÇO, e nada mais: quais campos chegam nele
+      // continua sendo do painel. Dizer só "confira o messages" deixaria o CRM
+      // cego para restrição, banimento e mudança de tier sem ninguém perceber
+      // — e a cegueira só aparece no dia em que a Meta cortar.
       ok(
         4,
-        `Webhook da conta apontado para ${config.callbackUrl} por override na WABA (a assinatura pelo app foi recusada: ${doApp.codigo}). Confira no painel do app, em WhatsApp → Configuração, se o campo "messages" está assinado.`,
+        `Webhook da conta apontado para ${config.callbackUrl} por override na WABA (a assinatura pelo app foi recusada: ${doApp.codigo}). ` +
+          `FALTA ASSINAR À MÃO, no painel do app (WhatsApp → Configuração → Webhooks): ${CAMPOS_DO_WEBHOOK.join(', ')}. ` +
+          `Sem ${CAMPOS_DE_SAUDE_ESPERADOS.join(', ')} o CRM não fica sabendo de restrição, banimento nem mudança de tier, e o teto da Meta continua nulo.`,
       );
     } else {
       nao(
