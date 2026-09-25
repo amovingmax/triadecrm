@@ -3302,3 +3302,42 @@ A conferência passa a usar `app.is_suppressed_target(v_org, v_contato)`, o **me
 **Suíte depois da correção:** pgTAP **3.028 asserções em 69 arquivos**, `pnpm db:lint` sem nenhum apontamento nas funções desta fase, `pnpm db:types` sem diferença (a assinatura não mudou), lint e typecheck verdes, 814 testes do web, 363 dos workers, 276 dos prompts, 105 do schema.
 
 **Ressalva registrada, sem mudança de código.** `enviarPeloResend` devolve `sem_chave` quando `notificacoes.email.ativo` é `true` e não há `RESEND_API_KEY`, e o consumidor manda esse caso para a fila — cinco tentativas até a dead-letter. A mensagem do commit `ec0a35b` dá a entender que ele seria arquivado como configuração. Fica como está, de propósito: `ativo = false` é escolha, chave ausente com aviso ligado é acidente, e acidente em produção deve chegar à dead-letter, onde alguém pode reprocessá-lo depois de pôr a chave. Em máquina local e no CI o worker-wa não consome esta fila.
+
+---
+
+## Importar sem fila — primeira leva (25/09/2026)
+
+O Rafael arrastou o CSV de 20 fotógrafos do Google Maps e recebeu **0 fichas e 19 cartões de fila**. Escreveu: *"ta bem tosco e poluido… to achando mtt complexo, tendo que aprovar? escolher categoria? nam, melhore tudo isso"*. O desenho está em `docs/superpowers/specs/2026-09-25-importar-sem-fila-design.md`, e o plano de execução em `docs/superpowers/plans/2026-09-25-importar-sem-fila.md`.
+
+A ideia central: **o CRM parava de perguntar por linha e passa a perguntar por nome de categoria, uma vez, guardando a resposta.**
+
+### Tarefa 0 — O placar
+
+`scripts/placar-importacao.sql`: roda `public.importacao_previa` contra os **dois CSV de verdade** de `listas/` (40 linhas), dentro de uma transação, com `rollback` no fim. Nenhuma linha fica no banco. É ele que mede cada tarefa seguinte — "eu acho que melhorou" deixa de ser resposta aceitável.
+
+Ele monta, em SQL, o mesmo objeto de dez campos que `linhaParaObjeto` monta no navegador. A trava contra divergir em silêncio são duas asserções novas em `apps/web/src/components/importacao/mapeamento.test.ts`: `sugerirMapa` casa **exatamente 10 campos, todos por nome exato**, e nas três disputas de coluna do CSV do Maps ganha a certa (`link` vence `reviews_link`, `cid` vence `place_id`, `address` vence `complete_address`). Se elas ficarem vermelhas, o placar está medindo outra coisa que não a tela.
+
+Os dois CSV viraram fixture do web (`fixtures/maps-natal-fotografo.csv` e `maps-natal-buffet-36.csv`). O `maps-natal-buffet.csv` antigo fica: é exportação de 29 colunas, com BOM e sem `cid` — é ela que prova que a regra não está grudada no formato de hoje.
+
+**Linha de base medida:** fotógrafo 10 · buffet 3 = **13 das 40** viram parceiro sem ninguém responder nada, com a origem escolhida certa. Com a origem errada (o que o Rafael viu na tela), **0**.
+
+### Tarefa 1 — O mapa de categorias perde o til e ganha seis nomes
+
+Migração `20261001090000_o_crm_aprende_a_falar_google.sql`. Duas causas, as duas no mesmo lugar:
+
+- **O mapa era curto.** O Google devolveu 16 nomes de categoria nos dois arquivos; o mapa da fonte tinha 12 chaves e **3** casaram. Entram seis, contadas nome por nome: `buffet infantil` (6 linhas), `buffet de casamento` (4), `serviço de catering` (3), `estúdio fotográfico` (2), `estúdio de fotografia` (1), `local para eventos` (1). Ficam **de fora**, e é escolha: impressões fotográficas, loja de artigos para fotografia, loja de presentes, restaurante self-service, companhia de produção de filmes, serviços para festas infantis e centro de diversões infantil — cada um cabe em dois ou três destinos, e palpite aqui contamina o funil, a meta e o relatório de déficit.
+- **O mapa casava string crua.** Os dois leitores vivos comparavam `lower(trim(...))`, sem `unaccent`: `"Salao de festas"` sem til não casaria com a chave `'salão de festas'`. Não aconteceu por sorte. Agora os dois comparam `app.chave_catalogo` do lado da linha, e **toda chave gravada** está nessa forma.
+
+**Um CHECK, e não um índice único sobre a expressão.** O desenho pediu `create unique index … (app.chave_catalogo(category_source))`. `app.chave_catalogo` é declarada `immutable` mas chama `extensions.unaccent(text)`, que é `stable` — e o repositório já decidiu essa questão uma vez: o comentário de `app.search_name` (`20260904000100:328-330`) diz que é por isso que aquele valor é materializado em coluna e indexado na coluna, nunca por expressão. Com toda chave normalizada, a **PK `(source_id, category_source)` já recusa a segunda grafia**; o `CHECK` garante a forma. De quebra, a leitura volta a ser igualdade sobre a PK.
+
+Antes de normalizar, a migração **falha de propósito** se duas grafias da mesma chave apontarem para categorias diferentes: isso é decisão humana, e não cabe num `limit 1`.
+
+**Efeito colateral medido e assumido:** as 23 chaves do Casamentos perderam o hífen (`espaco-casamento` → `espaco casamento`). O casamento não muda, porque o leitor normaliza o lado da captura pela mesma função; quem dependia da grafia era o pgTAP 21, corrigido com o porquê escrito.
+
+Duas chaves a mais no retorno de `app.importacao_normalizar`, ainda sem leitor: `site` (pré-requisito da tarefa 8 — hoje a prévia não sonda domínio e a gravação sonda, e por isso as duas *Show Fotografias* mudam de decisão entre as duas telas) e `categoria_origem`, o texto **cru** da categoria, que é o que a tela de resolver vai agrupar e o que o cartão da fila vai mostrar.
+
+A seed é espelho exato da migração, e o auto-teste virou **piso** (`< 18`) e não igualdade: a tela de resolver categorias vai escrever nessa mesma tabela, e um `<> 18` transformaria cada categoria aprendida numa falha de `db:reset` em produção.
+
+**Medido, com o placar:** fotógrafo 10 → **13**; buffet 3 → **17**. Total **13 → 30 das 40**. Os nomes de categoria que o CRM não conhece caíram de 13 para **7**.
+
+pgTAP novo: `76_o_crm_fala_google.sql` (10 asserções), escrito vermelho antes da migração. Nenhuma conta linha absoluta de tabela compartilhada — a tabela vai receber escrita da equipe.

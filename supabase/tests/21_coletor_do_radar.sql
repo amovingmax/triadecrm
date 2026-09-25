@@ -209,6 +209,13 @@ select pg_temp.sair();
 -- catálogo era instrução de coleta, e a migração 20260925140000 o apagou. O MAPA
 -- fica, e passa a valer por si — é ele que decide se uma linha importada vira
 -- categoria ou vai para a Revisão.
+--
+-- A CHAVE PERDEU O HÍFEN em 25/09/2026 (migração 20261001090000): toda chave do
+-- mapa é gravada na forma de `app.chave_catalogo` — sem acento, sem caixa, sem
+-- pontuação —, e um CHECK na tabela recusa qualquer outra. 'espaco-casamento'
+-- virou 'espaco casamento'. O casamento não mudou: o leitor normaliza o lado da
+-- captura pela mesma função. Quem depende da grafia antiga é este teste, e é
+-- por isso que ele está escrito com a forma nova.
 -- =====================================================================
 select is(
   (select c.slug from public.source_category_map m
@@ -221,13 +228,13 @@ select is(
   (select c.slug from public.source_category_map m
      join public.categories c on c.id = m.category_id
     where m.source_id = pg_temp.fonte('casamentos_com_br')
-      and m.category_source = 'espaco-casamento'),
+      and m.category_source = 'espaco casamento'),
   'locais_saloes_chacaras_hoteis', 'mapa: espaço de casamento vira "Locais"');
 
 select is(
   (select count(*)::int from public.source_category_map m
     where m.source_id = pg_temp.fonte('casamentos_com_br')
-      and m.category_source = 'cabine-de-fotos'),
+      and m.category_source = app.chave_catalogo('cabine-de-fotos')),
   0, 'mapa: cabine de fotos fica sem mapa DE PROPÓSITO — quem revisa escolhe (regra da 001600)');
 
 select * from finish();

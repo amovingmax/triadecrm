@@ -94,8 +94,11 @@ values (966, 'c66_maps', 'C66 Maps (pgTAP)', 'import', 'https://www.google.com/m
         '{"collector": {"kind": "externo", "phase": "mvp", "enabled": false},
           "entrada_por_arquivo": true}'::jsonb);
 
+-- `app.chave_catalogo` na chave desde 25/09/2026 (migração 20261001090000):
+-- a tabela tem CHECK de forma e recusa parêntese, acento e caixa. O leitor
+-- normaliza o lado da linha pela mesma função, então o casamento não muda.
 insert into public.source_category_map (source_id, category_source, category_id)
-select 966, m.chave, c.id
+select 966, app.chave_catalogo(m.chave), c.id
   from (values
           ('buffet', 'buffet_adulto_corporativo'),
           -- A chave que PROVA a ordem: este rótulo casa por trigrama com
@@ -742,6 +745,12 @@ select is(
 
 -- =====================================================================
 -- O mapa categoria-do-Maps → categoria do CRM (§3.3): só o que é evidente
+--
+-- Eram 12 em 24/09/2026. Viraram 18 em 25/09, com o de-para medido nos dois CSV
+-- de `listas/` (migração 20261001090000), e a chave perdeu o acento: a tabela
+-- tem CHECK de forma e os dois leitores comparam por `app.chave_catalogo`.
+-- Esta asserção é igualdade de propósito: uma chave a mais aqui é uma decisão
+-- de curadoria, e decisão de curadoria não entra sem alguém escrever por quê.
 -- =====================================================================
 select is(
   (select jsonb_object_agg(m.category_source, c.slug)
@@ -752,16 +761,22 @@ select is(
   '{"dj": "djs_bandas_musicos",
     "buffet": "buffet_adulto_corporativo",
     "confeitaria": "doces_bolos_confeitaria",
+    "fotografo": "fotografia_video",
     "floricultura": "decoracao_flores",
-    "fotógrafo": "fotografia_video",
-    "salão de festas": "locais_saloes_chacaras_hoteis",
-    "serviço de buffet": "buffet_adulto_corporativo",
-    "locação de tendas": "tendas_estruturas_palcos",
-    "espaço para eventos": "locais_saloes_chacaras_hoteis",
+    "buffet infantil": "buffet_infantil_casa_de_festas",
+    "salao de festas": "locais_saloes_chacaras_hoteis",
+    "servico de buffet": "buffet_adulto_corporativo",
+    "locacao de tendas": "tendas_estruturas_palcos",
+    "local para eventos": "locais_saloes_chacaras_hoteis",
+    "espaco para eventos": "locais_saloes_chacaras_hoteis",
+    "servico de catering": "buffet_adulto_corporativo",
+    "estudio fotografico": "fotografia_video",
+    "buffet de casamento": "buffet_adulto_corporativo",
     "aluguel de brinquedos": "locacao_brinquedos_inflaveis",
-    "serviço de fotografia": "fotografia_video",
+    "servico de fotografia": "fotografia_video",
+    "estudio de fotografia": "fotografia_video",
     "casa de festas infantis": "buffet_infantil_casa_de_festas"}'::jsonb,
-  'as 12 categorias que o Maps devolve em Natal caem na categoria certa do CRM, e só elas');
+  'as 18 categorias do Maps caem na categoria certa do CRM, todas na forma de app.chave_catalogo, e só elas');
 
 -- =====================================================================
 -- O seletor de origem da tela de importação (§3.2 item 7)

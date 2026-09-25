@@ -239,8 +239,13 @@ update public.sources
 -- uns e brinquedo de festa para outros, e chutar aqui contamina o funil inteiro
 -- sem que ninguém tenha decidido. Sem mapa, `category_id` chega nulo e a fila de
 -- revisão pergunta — que é o comportamento que a 001600 desenhou.
+--
+-- A chave passa por `app.chave_catalogo` desde 25/09/2026 (migração
+-- 20261001090000): 'espaco-casamento' fica gravado 'espaco casamento'. O hífen
+-- era grafia do slug do Casamentos, não conteúdo — e o leitor normaliza o lado
+-- da captura do mesmo jeito, então o casamento continua igual.
 insert into public.source_category_map (source_id, category_source, category_id)
-select s.id, m.categoria_origem, c.id
+select s.id, app.chave_catalogo(m.categoria_origem), c.id
   from public.sources s
   join (values
           ('cerimonialista',          'cerimonialistas_assessorias'),
@@ -278,13 +283,16 @@ on conflict (source_id, category_source) do update
 -- `supabase db reset`, as migrações rodam ANTES deste arquivo e o insert de lá
 -- não acha `public.categories` para casar. Mesmo motivo do bloco acima.
 --
--- A chave vai em minúscula e COM acento: quem lê é
--- `lower(trim(v_p ->> 'categoria_origem'))`, sem `unaccent`.
+-- A chave vai na forma de `app.chave_catalogo`: sem acento, sem caixa e sem
+-- pontuação. Desde 25/09/2026 (migração 20261001090000) é essa a forma que os
+-- dois leitores vivos comparam, e um CHECK na tabela recusa qualquer outra —
+-- com isso a PK (source_id, category_source) já impede que 'salão de festas' e
+-- 'salao de festas' virem dois destinos para o mesmo nome.
 -- Só o evidente entra. "serviços para casamento", "loja de presentes" e as
 -- outras categorias soltas do Maps ficam de fora e vão para a Revisão com o
 -- motivo escrito — palpite aqui contamina o funil inteiro.
 insert into public.source_category_map (source_id, category_source, category_id)
-select s.id, m.categoria_origem, c.id
+select s.id, app.chave_catalogo(m.categoria_origem), c.id
   from public.sources s
   join (values
           ('buffet',                  'buffet_adulto_corporativo'),
@@ -298,7 +306,16 @@ select s.id, m.categoria_origem, c.id
           ('confeitaria',             'doces_bolos_confeitaria'),
           ('floricultura',            'decoracao_flores'),
           ('dj',                      'djs_bandas_musicos'),
-          ('locação de tendas',       'tendas_estruturas_palcos')
+          ('locação de tendas',       'tendas_estruturas_palcos'),
+          -- As seis de 25/09/2026, contadas nome por nome nos dois CSV de
+          -- listas/. Mesma ordem da migração 20261001090000 — as duas listas
+          -- têm de sair iguais.
+          ('buffet infantil',         'buffet_infantil_casa_de_festas'),
+          ('buffet de casamento',     'buffet_adulto_corporativo'),
+          ('serviço de catering',     'buffet_adulto_corporativo'),
+          ('estúdio fotográfico',     'fotografia_video'),
+          ('estúdio de fotografia',   'fotografia_video'),
+          ('local para eventos',      'locais_saloes_chacaras_hoteis')
        ) as m(categoria_origem, categoria_crm) on true
   join public.categories c on c.slug = m.categoria_crm
  where s.slug = 'google_maps_raspado'
@@ -1674,7 +1691,11 @@ begin
   if n_sup > 8   then raise exception 'seed: superfície com % desfechos ativos (máximo 8, RF-MET-06)', n_sup; end if;
   if n_eq <> 4   then raise exception 'seed: esperadas 4 equivalências de etapa, encontradas %', n_eq; end if;
   if n_map < 23  then raise exception 'seed: mapa de categorias do Radar com % linhas (esperadas ≥ 23, bloco 3b)', n_map; end if;
-  if n_map_google <> 12 then raise exception 'seed: mapa de categorias do Google Maps com % linhas (esperadas 12, ADR-12)', n_map_google; end if;
+  -- Piso, e não igualdade, e é de propósito: a tela de resolver categorias
+  -- (25/09/2026) dá à equipe uma porta para ensinar nomes novos, gravados
+  -- nesta mesma tabela. Um `<> 18` transformaria cada categoria aprendida numa
+  -- falha de `db:reset` em produção. Mesmo critério do `n_map < 23` acima.
+  if n_map_google < 18 then raise exception 'seed: mapa de categorias do Google Maps com % linhas (esperadas ao menos 18, ADR-12 + de-para de 25/09/2026)', n_map_google; end if;
   if n_cad <> 5  then raise exception 'seed: esperadas 5 cadências, encontradas % (bloco 12d)', n_cad; end if;
   if n_pas <> 19 then raise exception 'seed: esperados 19 passos de cadência, encontrados % (bloco 12d)', n_pas; end if;
   if n_cad_ruim is not null then
