@@ -7729,6 +7729,15 @@ export type Database = {
           ritmo_necessario: number
         }[]
       }
+      ia_adiar_trabalho: {
+        Args: {
+          p_chave: string
+          p_motivo?: string
+          p_payload: Json
+          p_purpose: string
+        }
+        Returns: Json
+      }
       ia_alvo_suprimido: {
         Args: { p_payload: Json; p_purpose: string }
         Returns: Json

@@ -82,7 +82,7 @@ import {
   leadIdCurto,
   type ContextoDaIa,
 } from './execucao';
-import { enfileirarTrabalho } from './fila';
+import { adiarTrabalho, enfileirarTrabalho } from './fila';
 
 import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
 
@@ -1098,7 +1098,69 @@ export async function tratarTrabalho(
     return { proposito, feito: false, motivo: 'alvo_suprimido' };
   }
 
-  return TRABALHOS[proposito](contexto, payload);
+  // ------------------------------------------------------------------------
+  // O QUE O FREIO RECUSA NÃO SE PERDE (Fase 3 do pivô)
+  // ------------------------------------------------------------------------
+  // `app.ia_enfileirar` anota a dívida de quem PEDE um trabalho com o mês
+  // estourado. O que ficava descoberto é o trabalho que entrou na fila ANTES
+  // de o mês estourar: os workers consomem quando estão ligados (ADR-04), e
+  // entre o enfileiramento e a leitura pode passar meio dia. Sem a anotação,
+  // `eDeterministico` conclui a mensagem, a chave fica gasta em `ingest_dedup`
+  // e o resumo daquela ligação não acontece nunca mais — a perda em silêncio
+  // que `public.ia_trabalho_adiado` existe para impedir.
+  //
+  // `classificarEntrada` não chega aqui com este erro: ela o trata por dentro,
+  // escala a conversa e abre tarefa. Quem assume é gente, e gente não é dívida.
+  try {
+    return await TRABALHOS[proposito](contexto, payload);
+  } catch (erro) {
+    if (erro instanceof OrcamentoEsgotadoError) {
+      await anotarDividaDoOrcamento(contexto, proposito, payload, erro.motivo);
+    }
+    throw erro;
+  }
+}
+
+/**
+ * A dívida do que foi lido e não pôde ser feito.
+ *
+ * Nada aqui sobe: quem chama está no caminho de concluir uma mensagem da fila,
+ * e uma exceção faria a mesma recusa girar com backoff até a dead-letter. O
+ * pior caso é a dívida não ser anotada — e ela vira aviso no log, que é onde
+ * alguém a encontra.
+ */
+async function anotarDividaDoOrcamento(
+  contexto: ContextoDaIa,
+  proposito: PropositoConhecido,
+  payload: Record<string, unknown>,
+  motivo: string,
+): Promise<void> {
+  const chave = typeof payload.chave === 'string' ? payload.chave : '';
+  if (chave === '') {
+    // Sem chave não há dívida possível: a esteira recusa mensagem sem chave, e
+    // inventar uma criaria um trabalho que ninguém reconhece como repetido.
+    contexto.logger.warn('o freio recusou um trabalho sem chave: não há dívida a anotar', {
+      proposito,
+      motivo,
+    });
+    return;
+  }
+  try {
+    const anotada = await adiarTrabalho(contexto.cliente, proposito, chave, payload, motivo);
+    contexto.logger.warn('trabalho adiado pelo freio do orçamento', {
+      proposito,
+      chave,
+      motivo,
+      anotada,
+    });
+  } catch (erro) {
+    contexto.logger.error('não consegui anotar a dívida do orçamento: o trabalho pode se perder', {
+      proposito,
+      chave,
+      motivo,
+      erro: erro instanceof Error ? erro.message : String(erro),
+    });
+  }
 }
 
 /**

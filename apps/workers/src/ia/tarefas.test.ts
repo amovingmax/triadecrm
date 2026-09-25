@@ -4,7 +4,7 @@ import { bancoFalso, type LinhaFalsa, type TabelasFalsas } from './banco-de-test
 import { clienteDuble } from './duble';
 import { ErroDeterministico, eDeterministico, tratarTrabalho } from './tarefas';
 
-import { AlvoSuprimidoError, type ContextoDaIa } from './execucao';
+import { AlvoSuprimidoError, OrcamentoEsgotadoError, type ContextoDaIa } from './execucao';
 import type { LogFields, Logger } from '../lib/log';
 
 function loggerDeTeste(): { logger: Logger; linhas: { nivel: string; msg: string; campos: LogFields }[] } {
@@ -284,6 +284,67 @@ describe('2. resumir a ligação (R13 §3.2)', () => {
     // gente com o que o cron resolve sozinho.
     expect(banco.tabelas.tasks).toHaveLength(0);
     expect(linhas.some((l) => l.nivel === 'warn' && l.msg.includes('devendo'))).toBe(true);
+  });
+
+  it('resumo recusado DEPOIS de já estar na fila vira dívida anotada, não trabalho perdido', async () => {
+    // O caso que faltava: o trabalho entrou na fila com o mês barato e só foi
+    // lido depois de o mês estourar. Sem a dívida, `eDeterministico` conclui a
+    // mensagem, a chave fica gasta em `ingest_dedup` e o resumo daquela
+    // ligação não acontece nunca mais.
+    const banco = bancoFalso(tabelas(), {
+      rpcs: {
+        alvo_suprimido: () => false,
+        ia_pode_gastar: () => ({ pode: false, motivo: 'orcamento_esgotado' }),
+      },
+    });
+    const { logger } = loggerDeTeste();
+    const duble = clienteDuble();
+    const contexto: ContextoDaIa = { cliente: banco.cliente, modelo: duble, logger };
+
+    await expect(
+      tratarTrabalho(contexto, {
+        purpose: 'summarize_call',
+        chave: `attempt:${TENTATIVA}`,
+        attempt_id: TENTATIVA,
+      }),
+    ).rejects.toThrow(OrcamentoEsgotadoError);
+
+    // Nenhuma chamada paga, e a dívida foi anotada com a chave do trabalho.
+    expect(duble.chamadas).toHaveLength(0);
+    const adiados = banco.chamadasDeRpc.filter((c) => c.nome === 'ia_adiar_trabalho');
+    expect(adiados).toHaveLength(1);
+    expect(adiados[0]?.argumentos).toMatchObject({
+      p_purpose: 'summarize_call',
+      p_chave: `attempt:${TENTATIVA}`,
+      p_motivo: 'orcamento_esgotado',
+    });
+  });
+
+  it('a dívida que não consegue ser anotada não derruba a conclusão da fila', async () => {
+    // Derrubar aqui faria a mesma recusa girar com backoff até a dead-letter:
+    // a fila travada é pior que a dívida perdida, e a dívida perdida vira log.
+    const banco = bancoFalso(tabelas(), {
+      rpcs: {
+        alvo_suprimido: () => false,
+        ia_pode_gastar: () => ({ pode: false, motivo: 'orcamento_esgotado' }),
+        ia_adiar_trabalho: () => {
+          throw new Error('banco fora do ar');
+        },
+      },
+    });
+    const { logger, linhas } = loggerDeTeste();
+    const contexto: ContextoDaIa = { cliente: banco.cliente, modelo: clienteDuble(), logger };
+
+    // O erro que sobe continua sendo o do orçamento — o determinístico que a
+    // fila sabe concluir —, e não o do banco.
+    await expect(
+      tratarTrabalho(contexto, {
+        purpose: 'summarize_call',
+        chave: `attempt:${TENTATIVA}`,
+        attempt_id: TENTATIVA,
+      }),
+    ).rejects.toThrow(OrcamentoEsgotadoError);
+    expect(linhas.some((l) => l.nivel === 'error' && l.msg.includes('dívida'))).toBe(true);
   });
 });
 

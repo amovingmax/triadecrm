@@ -116,6 +116,40 @@ export async function enfileirarTrabalho(
   });
 }
 
+/**
+ * Anota como dívida o trabalho que o worker LEU da fila e o freio do orçamento
+ * recusou na hora de chamar o modelo.
+ *
+ * `enfileirarTrabalho` cobre o pedido NOVO: quem pede com o mês estourado leva
+ * `{enfileirado:false}` e a dívida nasce dentro de `app.ia_enfileirar`. O que
+ * esta função cobre é o outro caso, que ficava descoberto: o trabalho que
+ * entrou na fila ANTES de o mês estourar. Os workers consomem quando estão
+ * ligados (ADR-04), então entre o enfileiramento e a leitura pode passar meio
+ * dia — e o mês pode acabar nesse meio. Sem esta anotação, `eDeterministico`
+ * concluía a mensagem, a chave ficava gasta em `ingest_dedup` e o resumo
+ * daquela ligação não acontecia nunca mais.
+ *
+ * Erro aqui NÃO sobe: quem chama está no meio de concluir uma mensagem da
+ * fila, e derrubar a conclusão faria a mesma recusa girar com backoff até a
+ * dead-letter. A dívida perdida vira aviso no log, que é o pior caso — e é
+ * melhor que uma fila travada.
+ */
+export async function adiarTrabalho(
+  cliente: ClienteDoBanco,
+  proposito: string,
+  chave: string,
+  payload: Record<string, unknown>,
+  motivo: string,
+): Promise<boolean> {
+  const resposta = await rpc<{ adiado?: unknown }>(cliente, 'ia_adiar_trabalho', {
+    p_purpose: proposito,
+    p_payload: payload,
+    p_chave: chave,
+    p_motivo: motivo,
+  });
+  return (resposta ?? {}).adiado === true;
+}
+
 export async function lerFilaDaIa(
   cliente: ClienteDoBanco,
   quantidade = 1,
