@@ -32,7 +32,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(67);
+select plan(71);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -526,6 +526,80 @@ select is(app.reuniao_lembretes_da_vespera(), 0,
 select is(app.reuniao_por_extenso(timestamptz '2026-10-01 13:20:00+00'),
   'quinta-feira, 1º de outubro, às 10h20',
   'a frase que o modelo copia sai pronta do banco, no fuso de Natal');
+
+-- =====================================================================
+-- 14. O OPT-OUT, PELOS TRÊS CAMINHOS
+--
+-- O guardrail do CLAUDE.md não tem um caminho só, e a recusa precisa ser
+-- VERDITO, não exceção. Antes desta conferência `app.reuniao_gravar` lia
+-- `organizations.do_not_contact` na mão: os outros dois caminhos — o contato
+-- que pediu para sair e o telefone que caiu na `suppression_list` pela regra
+-- de palavras — só eram barrados lá adiante, pelo gatilho
+-- `app.tasks_guard_suppressed` na `tasks`-eco, LEVANTANDO EXCEÇÃO. Nada era
+-- gravado (a transação caía inteira), mas o robô recebia um 500 do PostgREST
+-- em vez de `motivo = 'suprimido'`, e a tela dizia "não deu para falar com o
+-- servidor" a quem tinha acabado de pedir para sair.
+--
+-- Cada caminho ganha org e conversa próprias: suprimir a ficha das asserções
+-- de cima seria medir a ordem do arquivo.
+-- =====================================================================
+-- Uma conversa com contato próprio: `app.reuniao_gravar` lê `conversations
+-- .contact_id`, e o caminho 2 não existe sem ele.
+create function pg_temp.nascer_conversa_com_contato(
+  p_org uuid, p_fone text, p_contato_sai boolean) returns uuid
+language plpgsql as $$
+declare v_ct uuid; v_id uuid;
+begin
+  insert into public.contacts (full_name, phone_e164, do_not_contact)
+  values ('Contato Pgtap74 ' || p_fone, p_fone, p_contato_sai) returning id into v_ct;
+  insert into public.conversations (peer_phone_e164, business_number, organization_id,
+                                    contact_id, assignee_id)
+  values (p_fone, '+5584900000074', p_org, v_ct, pg_temp.dono()) returning id into v_id;
+  return v_id;
+end $$;
+
+insert into fixt74(chave, id) values
+  ('org_dnc',   pg_temp.nascer_org('Buffet Pgtap74 Nao Contatar', pg_temp.dono())),
+  ('org_ctt',   pg_temp.nascer_org('Buffet Pgtap74 Contato Saiu', pg_temp.dono())),
+  ('org_lista', pg_temp.nascer_org('Buffet Pgtap74 Na Supressao', pg_temp.dono()));
+
+-- Caminho 1: a ficha inteira pediu para sair.
+update public.organizations set do_not_contact = true
+ where id = (select id from fixt74 where chave='org_dnc');
+select is(public.reuniao_marcar(
+    pg_temp.nascer_conversa_com_contato((select id from fixt74 where chave='org_dnc'),
+                                        '+5584988000751', false),
+    pg_temp.livre1()) ->> 'motivo',
+  'suprimido',
+  'ficha com do_not_contact recusa com suprimido');
+
+-- Caminho 2: o contato daquela conversa pediu para sair.
+select is(public.reuniao_marcar(
+    pg_temp.nascer_conversa_com_contato((select id from fixt74 where chave='org_ctt'),
+                                        '+5584988000752', true),
+    pg_temp.livre1()) ->> 'motivo',
+  'suprimido',
+  'contato com do_not_contact recusa com suprimido — e não com exceção da tasks-eco');
+
+-- Caminho 3: o telefone caiu na `suppression_list` pela regra de palavras.
+-- É o opt-out que o CLAUDE.md nomeia ("sair", "parar", "não quero") e o único
+-- que sobrevive a apagar a ficha.
+insert into public.suppression_list (hash, kind, reason)
+select app.sha256_hex(app.normalize_phone_br(o.phone_e164)), 'phone', 'pgTAP 74'
+  from public.organizations o where o.id = (select id from fixt74 where chave='org_lista');
+select is(public.reuniao_marcar(
+    pg_temp.nascer_conversa_com_contato((select id from fixt74 where chave='org_lista'),
+                                        '+5584988000753', false),
+    pg_temp.livre1()) ->> 'motivo',
+  'suprimido',
+  'telefone na suppression_list recusa com suprimido: o opt-out por regra vale em qualquer modo');
+
+-- E, nos três, NADA foi gravado: nem reunião, nem tarefa-eco.
+select is(
+  (select count(*)::int from public.reunioes r
+    where r.organization_id in (select id from fixt74
+                                 where chave in ('org_dnc','org_ctt','org_lista'))),
+  0, 'e nenhuma das três deixou reunião para trás');
 
 select * from finish();
 rollback;

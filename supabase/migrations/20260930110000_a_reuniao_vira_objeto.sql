@@ -514,8 +514,18 @@ begin
 
   -- Guardrail antes de tudo: marcar reunião para quem acabou de pedir para
   -- sair é pior do que responder.
-  if exists (select 1 from public.organizations o
-              where o.id = v_org and o.do_not_contact) then
+  --
+  -- E o árbitro é `app.is_suppressed_target`, o MESMO que `app.pode_tocar` usa
+  -- na ordem 1 — não um `organizations.do_not_contact` escrito de novo aqui.
+  -- Ler só aquela coluna deixava de fora os outros dois caminhos do opt-out: o
+  -- contato que pediu para sair (`contacts.do_not_contact`) e o telefone que
+  -- caiu na `suppression_list` pela regra de palavras. Nesses dois a reunião
+  -- não chegava a existir — o gatilho `app.tasks_guard_suppressed` derrubava a
+  -- transação na `tasks`-eco —, mas derrubava LEVANTANDO EXCEÇÃO: o robô
+  -- recebia um 500 do PostgREST em vez de `motivo = 'suprimido'`, e a tela
+  -- dizia "não deu para falar com o servidor" a quem pediu para sair. Uma
+  -- regra, um lugar (ADR-03), e a recusa na língua que quem chama entende.
+  if app.is_suppressed_target(v_org, v_contato) then
     return jsonb_build_object('ok', false, 'motivo', 'suprimido');
   end if;
 
