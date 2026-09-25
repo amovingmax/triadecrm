@@ -27,23 +27,51 @@ describe('chaveDaMensagem', () => {
 });
 
 describe('enfileirarTrabalho', () => {
-  it('põe a chave nos DOIS lugares que precisam dela', async () => {
-    const banco = bancoFalso({});
-    await enfileirarTrabalho(banco.cliente, 'summarize_call', 'attempt:xyz', { attempt_id: 'xyz' });
-
-    const chamada = banco.chamadasDeRpc[0];
-    expect(chamada?.nome).toBe('esteira_fila_enfileirar');
-    expect(chamada?.argumentos.p_queue).toBe('ai_jobs');
-    // O dedup vê "<propósito>:<chave>"…
-    expect(chamada?.argumentos.p_key).toBe('summarize_call:attempt:xyz');
-    // …e o consumidor vê a mesma chave dentro da mensagem.
-    expect(chamada?.argumentos.p_payload).toEqual({
+  it('passa pela porta que conhece o orçamento, e leva a chave no payload', async () => {
+    const banco = bancoFalso(
+      {},
+      { rpcs: { ia_fila_enfileirar: () => ({ enfileirado: true, msg_id: 7 }) } },
+    );
+    const r = await enfileirarTrabalho(banco.cliente, 'summarize_call', 'attempt:xyz', {
       attempt_id: 'xyz',
-      purpose: 'summarize_call',
-      chave: 'attempt:xyz',
     });
+    expect(r).toEqual({ enfileirado: true, msg_id: 7 });
+
+    const chamada = banco.chamadasDeRpc.at(-1);
+    // `esteira_fila_enfileirar` era a porta larga: pulava a lista de propósitos,
+    // o freio do orçamento e a anotação da dívida. Uma porta larga ao lado da
+    // estreita é o mesmo que não ter porta.
+    expect(chamada?.nome).toBe('ia_fila_enfileirar');
+    // `purpose` não vai mais no payload daqui: quem o põe é `app.ia_enfileirar`,
+    // com `jsonb_build_object('purpose', p_purpose) || payload`. Pôr nos dois
+    // lados seria duas fontes para o mesmo fato.
+    expect(chamada?.argumentos).toEqual({
+      p_purpose: 'summarize_call',
+      p_payload: { attempt_id: 'xyz', chave: 'attempt:xyz' },
+      p_key: 'attempt:xyz',
+    });
+    // E o consumidor continua reconstruindo exatamente a chave do dedup.
     expect(
-      chaveDaMensagem(mensagem(chamada?.argumentos.p_payload as Record<string, unknown>)),
-    ).toBe(chamada?.argumentos.p_key);
+      chaveDaMensagem(
+        mensagem({
+          ...(chamada?.argumentos.p_payload as Record<string, unknown>),
+          purpose: chamada?.argumentos.p_purpose,
+        }),
+      ),
+    ).toBe('summarize_call:attempt:xyz');
+  });
+
+  it('a recusa por orçamento volta como motivo, não como exceção', async () => {
+    const banco = bancoFalso(
+      {},
+      {
+        rpcs: {
+          ia_fila_enfileirar: () => ({ enfileirado: false, motivo: 'orcamento', adiado: true }),
+        },
+      },
+    );
+    await expect(
+      enfileirarTrabalho(banco.cliente, 'draft_followup', 'attempt:1', { attempt_id: '1' }),
+    ).resolves.toMatchObject({ enfileirado: false, motivo: 'orcamento' });
   });
 });

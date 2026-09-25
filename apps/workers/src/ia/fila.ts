@@ -27,6 +27,22 @@
  * Mensagem que chegar sem `chave` ainda é processada — cai em `msg:<msg_id>`,
  * como no coletor —, mas perde a proteção contra reprocessamento: uma chamada
  * ao modelo repetida é dinheiro gasto duas vezes.
+ *
+ * ## A segunda porta, que estava aberta (Fase 3 do pivô)
+ *
+ * Até 25/09/2026 `enfileirarTrabalho` chamava `public.esteira_fila_enfileirar`
+ * direto na fila `ai_jobs`. Funcionava, e pulava tudo o que `app.ia_enfileirar`
+ * guarda: a lista de propósitos, o freio do orçamento e a anotação da dívida.
+ * Enquanto o freio não existia isso era só uma assimetria; no dia em que ele
+ * passou a recusar, uma porta larga ao lado da estreita seria o mesmo que não
+ * ter freio nenhum — e as duas únicas chamadas que passam por aqui
+ * (`classify_inbound` depois da transcrição, `draft_followup` depois do resumo)
+ * são justamente as do caminho automático.
+ *
+ * Agora ela chama `public.ia_fila_enfileirar`, como `pedirTrabalhoDeIa` já
+ * fazia. Uma consequência a respeitar: o `purpose` deixa de ir no payload
+ * daqui, porque quem o põe é `app.ia_enfileirar`. A `chave` continua indo, e
+ * continua sendo o contrato de `chaveDaMensagem`.
  */
 import { createClient } from '@supabase/supabase-js';
 
@@ -71,25 +87,32 @@ async function rpc<T>(
 
 export type RespostaDeEnfileiramento =
   | { enfileirado: true; msg_id: number }
-  | { enfileirado: false; motivo: string };
+  | { enfileirado: false; motivo: string; detalhe?: string; adiado?: boolean };
 
 /**
- * Põe um trabalho na fila da IA com a chave nos dois lugares que precisam dela:
- * dentro do payload (para o consumidor) e no dedup (para a idempotência).
+ * Põe um trabalho na fila da IA pela porta que conhece o orçamento.
+ *
+ * A `chave` continua indo dentro do payload — é o contrato de
+ * `chaveDaMensagem` — e no dedup, que `app.ia_enfileirar` monta como
+ * `"<propósito>:<chave>"`. O `purpose` NÃO vai no payload daqui: quem o põe é
+ * `app.ia_enfileirar`, com `jsonb_build_object('purpose', p_purpose) ||
+ * payload`. Pôr nos dois lados seria duas fontes para o mesmo fato.
+ *
+ * A recusa por orçamento volta como `{enfileirado:false, motivo:'orcamento'}`,
+ * e não como exceção. Quem chama TEM de olhar: o trabalho fica anotado em
+ * `public.ia_trabalho_adiado` e volta pelo cron, mas quem estiver esperando
+ * resposta do outro lado não espera pelo cron.
  */
 export async function enfileirarTrabalho(
   cliente: ClienteDoBanco,
   proposito: string,
   chave: string,
   payload: Record<string, unknown>,
-  atrasoSegundos = 0,
 ): Promise<RespostaDeEnfileiramento> {
-  return rpc<RespostaDeEnfileiramento>(cliente, 'esteira_fila_enfileirar', {
-    p_queue: FILAS_DA_IA.trabalhos,
-    p_payload: { ...payload, purpose: proposito, chave },
-    p_key: `${proposito}:${chave}`,
-    p_batch_id: null,
-    p_delay: atrasoSegundos,
+  return rpc<RespostaDeEnfileiramento>(cliente, 'ia_fila_enfileirar', {
+    p_purpose: proposito,
+    p_payload: { ...payload, chave },
+    p_key: chave,
   });
 }
 

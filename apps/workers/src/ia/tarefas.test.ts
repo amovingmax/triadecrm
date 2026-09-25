@@ -228,12 +228,15 @@ describe('2. resumir a ligação (R13 §3.2)', () => {
     expect(resumo.no_de_virada).toBe('obj_comissao');
     expect(resumo.no_de_virada_por_regra).toBe('obj_comissao');
 
-    // O ciclo continua: liga, resume, ESCREVE.
-    const enfileirados = banco.chamadasDeRpc.filter((c) => c.nome === 'esteira_fila_enfileirar');
+    // O ciclo continua: liga, resume, ESCREVE. Desde 25/09/2026 o pedido passa
+    // por `ia_fila_enfileirar`, e não mais direto pela esteira: a porta larga
+    // pulava a lista de propósitos e o freio do orçamento. O `purpose` deixou
+    // de ir no payload porque quem o põe agora é `app.ia_enfileirar`.
+    const enfileirados = banco.chamadasDeRpc.filter((c) => c.nome === 'ia_fila_enfileirar');
     expect(enfileirados).toHaveLength(1);
-    expect(enfileirados[0]?.argumentos.p_key).toBe(`draft_followup:attempt:${TENTATIVA}`);
+    expect(enfileirados[0]?.argumentos.p_purpose).toBe('draft_followup');
+    expect(enfileirados[0]?.argumentos.p_key).toBe(`attempt:${TENTATIVA}`);
     expect(enfileirados[0]?.argumentos.p_payload).toMatchObject({
-      purpose: 'draft_followup',
       chave: `attempt:${TENTATIVA}`,
       attempt_id: TENTATIVA,
     });
