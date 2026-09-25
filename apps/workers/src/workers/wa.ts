@@ -72,6 +72,7 @@ import {
   sincronizarModelos,
   type SincronizacaoPeriodica,
 } from '../whatsapp/modelos-meta';
+import { criarSaudePeriodica, type SaudePeriodica } from '../whatsapp/saude';
 import { dormir } from '../lib/dormir';
 import { criarPulso } from '../lib/pulso';
 
@@ -169,6 +170,16 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
     );
   }
 
+  // A saúde do número tem instância PRÓPRIA: a dos modelos é `null` sem WABA
+  // configurada, e um número conectado sem WABA continua precisando ser
+  // vigiado. O que ela depende é do `phoneNumberId`.
+  const saude: SaudePeriodica = criarSaudePeriodica({
+    cliente,
+    graph,
+    phoneNumberId: env.META_WA_PHONE_NUMBER_ID,
+    logger,
+  });
+
   const contextoDaEntrada: ContextoDaEntrada = {
     cliente,
     graph,
@@ -212,8 +223,10 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
     for (;;) {
       if (parando) break;
 
-      // 0 · Os modelos na Meta, em segundo plano, quando der a hora.
+      // 0 · Os modelos na Meta e a saúde do número, em segundo plano, quando
+      //     der a hora. Nenhum dos dois derruba o laço.
       modelos?.talvezDisparar();
+      saude.talvezDisparar();
 
       // 1 · O que chegou. Sempre antes do que sai.
       const lidas = await consumirEntrada(
@@ -250,6 +263,7 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
     // `--uma-vez` deixa a passada dos modelos terminar; um sinal a interrompe
     // entre um modelo e outro.
     await modelos?.encerrar(parando);
+    await saude.encerrar(parando);
 
     logger.info('worker-wa encerrado', { ...entradas, ...saidas, falhas });
     await pulso.bater('parado', null, {
