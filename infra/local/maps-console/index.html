@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Raspagem · Tríade</title>
+    <!-- Embutido, e não um arquivo: um pedido a menos, e um 404 a menos no console. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2324705c'/%3E%3Cpath d='M16 7c-3.6 0-6.5 2.9-6.5 6.5 0 4.9 6.5 11.5 6.5 11.5s6.5-6.6 6.5-11.5C22.5 9.9 19.6 7 16 7zm0 9a2.5 2.5 0 110-5 2.5 2.5 0 010 5z' fill='%23fcfcfd'/%3E%3C/svg%3E"
+    />
+    <!--
+      A tela da raspagem, com a cara do Tríade.
+
+      Um arquivo só, sem download de fonte, sem CDN, sem framework: ela roda numa
+      máquina que pode estar sem internet no meio de uma rodada, e o que ela faz
+      cabe em duzentas linhas de JavaScript. As cores e os raios são os do CRM
+      (`apps/web/src/app/globals.css`), copiados de propósito — se o verde da
+      marca mudar lá, muda aqui à mão, e isso é mais honesto do que fingir que
+      esta página compartilha o tema.
+    -->
+    <style>
+      :root {
+        color-scheme: light dark;
+
+        /* A escala grafite do CRM. */
+        --grafite-25: #fcfcfd;
+        --grafite-50: #f7f7f8;
+        --grafite-100: #f1f1f3;
+        --grafite-200: #e4e4e8;
+        --grafite-300: #d3d3d8;
+        --grafite-400: #a1a1aa;
+        --grafite-450: #8a8a93;
+        --grafite-500: #6b6b73;
+        --grafite-600: #52525b;
+        --grafite-700: #3f3f46;
+        --grafite-800: #27272b;
+        --grafite-850: #1e1e21;
+        --grafite-900: #131316;
+
+        /* O verde da KOMUNE vive no cromo: botão, foco, link. Nunca no dado. */
+        --komune-500: #2e8c73;
+        --komune-600: #24705c;
+        --alerta: #a33a30;
+
+        --raio-interativo: 0.5rem;
+        --raio-container: 0.75rem;
+
+        --fundo: var(--grafite-50);
+        --cartao: var(--grafite-25);
+        --tinta: var(--grafite-700);
+        --esmaecido: var(--grafite-500);
+        --borda: var(--grafite-200);
+        --campo: var(--grafite-450);
+        --acao-texto: var(--grafite-25);
+
+        --fonte:
+          ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+          sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fundo: var(--grafite-900);
+          --cartao: var(--grafite-800);
+          --tinta: var(--grafite-300);
+          --esmaecido: var(--grafite-400);
+          --borda: var(--grafite-600);
+          --campo: var(--grafite-600);
+          --alerta: #d08b84;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 0 16px 96px;
+        background: var(--fundo);
+        color: var(--tinta);
+        font-family: var(--fonte);
+        font-size: 15px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .folha {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+
+      /* ---------------------------------------------------------------- */
+      /* Cabeçalho                                                         */
+      /* ---------------------------------------------------------------- */
+      header {
+        padding: 48px 0 32px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 38px);
+        letter-spacing: -0.02em;
+        font-weight: 600;
+      }
+
+      .subtitulo {
+        margin: 8px 0 0;
+        max-width: 62ch;
+        color: var(--esmaecido);
+      }
+
+      .onde-cai {
+        margin-top: 16px;
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid var(--borda);
+        border-radius: var(--raio-interativo);
+        background: var(--cartao);
+        font-size: 13px;
+        color: var(--esmaecido);
+      }
+
+      .onde-cai code {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        color: var(--tinta);
+      }
+
+      /* ---------------------------------------------------------------- */
+      /* Grade: o formulário à esquerda, o que está rodando à direita.     */
+      /* Não é um herói centralizado: esta tela é uma bancada de trabalho. */
+      /* ---------------------------------------------------------------- */
+      .bancada {
+        display: grid;
+        gap: 24px;
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+
+      @media (min-width: 900px) {
+        .bancada {
+          grid-template-columns: 380px 1fr;
+          gap: 32px;
+        }
+      }
+
+      .cartao {
+        background: var(--cartao);
+        border: 1px solid var(--borda);
+        border-radius: var(--raio-container);
+        padding: 24px;
+      }
+
+      h2 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      .ajuda {
+        margin: 0 0 20px;
+        font-size: 13px;
+        color: var(--esmaecido);
+      }
+
+      label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .dica {
+        font-weight: 400;
+        color: var(--esmaecido);
+      }
+
+      input[type='text'],
+      select {
+        width: 100%;
+        height: 44px;
+        padding: 0 12px;
+        border: 1px solid var(--campo);
+        border-radius: var(--raio-interativo);
+        background: var(--fundo);
+        color: var(--tinta);
+        font-family: inherit;
+        font-size: 15px;
+      }
+
+      select {
+        appearance: none;
+        background-image: linear-gradient(45deg, transparent 50%, var(--esmaecido) 50%),
+          linear-gradient(135deg, var(--esmaecido) 50%, transparent 50%);
+        background-position: calc(100% - 18px) 19px, calc(100% - 13px) 19px;
+        background-size: 5px 5px, 5px 5px;
+        background-repeat: no-repeat;
+        padding-right: 36px;
+      }
+
+      input[type='text']:focus-visible,
+      select:focus-visible,
+      button:focus-visible,
+      .lista-item a:focus-visible {
+        outline: 2px solid var(--komune-600);
+        outline-offset: 2px;
+      }
+
+      .campo + .campo {
+        margin-top: 16px;
+      }
+
+      .caixinha {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-top: 16px;
+        font-size: 14px;
+      }
+
+      .caixinha input {
+        width: 18px;
+        height: 18px;
+        margin: 2px 0 0;
+        accent-color: var(--komune-600);
+      }
+
+      .caixinha span {
+        color: var(--esmaecido);
+        font-size: 13px;
+      }
+
+      button.principal {
+        width: 100%;
+        height: 44px;
+        margin-top: 24px;
+        border: 0;
+        border-radius: var(--raio-interativo);
+        background: var(--komune-600);
+        color: var(--acao-texto);
+        font-family: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 120ms ease, transform 80ms ease;
+      }
+
+      button.principal:hover:not(:disabled) {
+        background: var(--komune-500);
+      }
+
+      button.principal:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+
+      button.principal:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .recado {
+        margin-top: 16px;
+        padding: 10px 12px;
+        border-radius: var(--raio-interativo);
+        border: 1px solid var(--borda);
+        font-size: 13px;
+      }
+
+      .recado[data-tom='erro'] {
+        border-color: var(--alerta);
+        color: var(--alerta);
+      }
+
+      /* ---------------------------------------------------------------- */
+      /* As buscas                                                         */
+      /* ---------------------------------------------------------------- */
+      .secao + .secao {
+        margin-top: 32px;
+      }
+
+      .titulo-da-secao {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .titulo-da-secao h2 {
+        margin: 0;
+      }
+
+      .conta {
+        font-size: 13px;
+        color: var(--esmaecido);
+      }
+
+      .lista {
+        border: 1px solid var(--borda);
+        border-radius: var(--raio-container);
+        background: var(--cartao);
+        overflow: hidden;
+      }
+
+      .lista-item {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 12px;
+        padding: 14px 16px;
+      }
+
+      .lista-item + .lista-item {
+        border-top: 1px solid var(--borda);
+      }
+
+      .lista-item .nome {
+        flex: 1 1 200px;
+        min-width: 0;
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lista-item .detalhe {
+        flex-basis: 100%;
+        font-size: 13px;
+        color: var(--esmaecido);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .arquivo {
+        font-family: var(--mono);
+        font-size: 12.5px;
+      }
+
+      .selo {
+        flex: 0 0 auto;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--borda);
+        font-size: 12px;
+        color: var(--esmaecido);
+        white-space: nowrap;
+      }
+
+      .selo[data-estado='pronto'] {
+        border-color: var(--komune-600);
+        color: var(--komune-600);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .selo[data-estado='pronto'] {
+          border-color: var(--komune-500);
+          color: var(--komune-500);
+        }
+      }
+
+      .selo[data-estado='rodando'] {
+        border-color: var(--campo);
+        color: var(--tinta);
+      }
+
+      .selo[data-estado='rodando']::before {
+        content: '';
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        margin-right: 6px;
+        border-radius: 999px;
+        background: currentColor;
+        animation: pulso 1.4s ease-in-out infinite;
+      }
+
+      @keyframes pulso {
+        0%,
+        100% {
+          opacity: 0.35;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .selo[data-estado='rodando']::before {
+          animation: none;
+        }
+        button.principal {
+          transition: none;
+        }
+      }
+
+      .selo[data-estado='falhou'] {
+        border-color: var(--alerta);
+        color: var(--alerta);
+      }
+
+      .vazio {
+        padding: 32px 16px;
+        text-align: center;
+        color: var(--esmaecido);
+        font-size: 14px;
+      }
+
+      .lista-item a {
+        color: var(--komune-600);
+        font-size: 13px;
+        text-decoration: none;
+        border-bottom: 1px solid transparent;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .lista-item a {
+          color: var(--komune-500);
+        }
+      }
+
+      .lista-item a:hover {
+        border-bottom-color: currentColor;
+      }
+
+      footer {
+        margin-top: 48px;
+        padding-top: 24px;
+        border-top: 1px solid var(--borda);
+        font-size: 12.5px;
+        color: var(--esmaecido);
+        max-width: 72ch;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="folha">
+      <header>
+        <h1>Raspagem do Google Maps</h1>
+        <p class="subtitulo">
+          Diga o que procurar e onde. O que voltar vira um arquivo com nome de gente, pronto
+          para arrastar em <strong>Importar</strong> no CRM.
+        </p>
+        <p class="onde-cai">
+          Os arquivos caem em <code id="pasta">~/Documents/Tríade/listas/</code>
+        </p>
+      </header>
+
+      <div class="bancada">
+        <!-- ---------------------------------------------------------- -->
+        <!-- O formulário                                                -->
+        <!-- ---------------------------------------------------------- -->
+        <form class="cartao" id="formulario">
+          <h2>Nova busca</h2>
+          <p class="ajuda">Uma categoria por vez traz resultado melhor do que várias juntas.</p>
+
+          <div class="campo">
+            <label for="oque">O que procurar</label>
+            <input
+              type="text"
+              id="oque"
+              name="oque"
+              placeholder="buffet infantil"
+              autocomplete="off"
+              required
+            />
+          </div>
+
+          <div class="campo">
+            <label for="onde">Onde <span class="dica">— cidade e estado</span></label>
+            <input
+              type="text"
+              id="onde"
+              name="onde"
+              value="Natal RN"
+              autocomplete="off"
+              required
+            />
+          </div>
+
+          <div class="campo">
+            <label for="quantos">Quantos lugares <span class="dica">— aproximado</span></label>
+            <select id="quantos" name="quantos">
+              <option value="1">até 20 — uma olhada rápida</option>
+              <option value="5" selected>até 100 — o de sempre</option>
+              <option value="15">até 300 — categoria inteira</option>
+              <option value="30">até 600 — o teto por rodada</option>
+            </select>
+          </div>
+
+          <label class="caixinha">
+            <input type="checkbox" id="email" name="email" />
+            <span>
+              Procurar e-mail no site de cada lugar. Traz mais contato e demora bem mais.
+            </span>
+          </label>
+
+          <button type="submit" class="principal" id="botao">Começar a busca</button>
+          <p class="recado" id="recado" hidden></p>
+        </form>
+
+        <!-- ---------------------------------------------------------- -->
+        <!-- O que está rodando e o que já saiu                          -->
+        <!-- ---------------------------------------------------------- -->
+        <div>
+          <section class="secao">
+            <div class="titulo-da-secao">
+              <h2>Buscas</h2>
+              <span class="conta" id="conta-buscas"></span>
+            </div>
+            <div class="lista" id="buscas">
+              <p class="vazio">Nenhuma busca ainda.</p>
+            </div>
+          </section>
+
+          <section class="secao">
+            <div class="titulo-da-secao">
+              <h2>Arquivos prontos</h2>
+              <span class="conta" id="conta-listas"></span>
+            </div>
+            <div class="lista" id="listas">
+              <p class="vazio">Assim que uma busca terminar, o arquivo aparece aqui.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <footer>
+        Raspar o Google Maps contraria os Termos de Serviço do Google. É decisão registrada do
+        Rafael em 24/09/2026 (ADR-12), com o risco escrito na própria linha da fonte no banco.
+        O limite de conduta é <strong>2 rodadas por semana, 600 lugares por rodada</strong>, só
+        Natal e região metropolitana, sem login e sem proxy. Deu bloqueio ou CAPTCHA: pare e
+        avise. E apague o arquivo da pasta depois de importar — enquanto ele existe, é uma base
+        de dados pessoais fora do CRM.
+      </footer>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const formulario = $('formulario');
+      const botao = $('botao');
+      const recado = $('recado');
+
+      /** Um recado curto embaixo do botão. `tom` é 'erro' ou nada. */
+      function dizer(texto, tom) {
+        recado.textContent = texto;
+        recado.hidden = !texto;
+        if (tom) recado.dataset.tom = tom;
+        else delete recado.dataset.tom;
+      }
+
+      /**
+       * O vocabulário do raspador em português, e o estado que a tela pinta.
+       * `working` e `pending` são os nomes dele; os outros aparecem em versões
+       * diferentes da imagem, então todos são tratados.
+       */
+      const ESTADOS = {
+        pending: ['na fila', 'rodando'],
+        working: ['buscando', 'rodando'],
+        ok: ['pronto', 'pronto'],
+        finished: ['pronto', 'pronto'],
+        done: ['pronto', 'pronto'],
+        completed: ['pronto', 'pronto'],
+        failed: ['falhou', 'falhou'],
+        error: ['falhou', 'falhou'],
+      };
+
+      function comoEsta(bruto) {
+        return ESTADOS[(bruto || '').toLowerCase()] ?? [bruto || 'desconhecido', 'rodando'];
+      }
+
+      const plural = (n, um, muitos) => `${n} ${n === 1 ? um : muitos}`;
+
+      async function buscarJson(caminho) {
+        const r = await fetch(caminho, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`${caminho} respondeu ${r.status}`);
+        return r.json();
+      }
+
+      function pintarBuscas(trabalhos) {
+        const alvo = $('buscas');
+        $('conta-buscas').textContent = trabalhos.length
+          ? plural(trabalhos.length, 'busca', 'buscas')
+          : '';
+        if (!trabalhos.length) {
+          alvo.innerHTML = '<p class="vazio">Nenhuma busca ainda.</p>';
+          return;
+        }
+        alvo.innerHTML = trabalhos
+          .map((t) => {
+            const [rotulo, estado] = comoEsta(t.Status);
+            const dados = t.Data || {};
+            const palavras = (dados.keywords || []).join(' · ');
+            const quando = (t.Date || '').slice(0, 16).replace('T', ' ');
+            return `
+              <div class="lista-item">
+                <span class="nome">${escapar(t.Name || palavras || 'sem nome')}</span>
+                <span class="selo" data-estado="${estado}">${escapar(rotulo)}</span>
+                <span class="detalhe">${escapar(palavras)} — ${escapar(quando)}</span>
+              </div>`;
+          })
+          .join('');
+      }
+
+      function pintarListas(arquivos) {
+        const alvo = $('listas');
+        $('conta-listas').textContent = arquivos.length
+          ? plural(arquivos.length, 'arquivo', 'arquivos')
+          : '';
+        if (!arquivos.length) {
+          alvo.innerHTML =
+            '<p class="vazio">Assim que uma busca terminar, o arquivo aparece aqui.</p>';
+          return;
+        }
+        alvo.innerHTML = arquivos
+          .map(
+            (a) => `
+              <div class="lista-item">
+                <span class="nome arquivo">${escapar(a.arquivo)}</span>
+                <span class="selo" data-estado="pronto">${plural(a.lugares, 'lugar', 'lugares')}</span>
+              </div>`,
+          )
+          .join('');
+      }
+
+      function escapar(t) {
+        return String(t ?? '').replace(
+          /[&<>"']/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+        );
+      }
+
+      let falhasSeguidas = 0;
+
+      async function atualizar() {
+        try {
+          const [trabalhos, arquivos] = await Promise.all([
+            buscarJson('/api/v1/jobs'),
+            buscarJson('/api/listas'),
+          ]);
+          pintarBuscas(Array.isArray(trabalhos) ? trabalhos : []);
+          pintarListas(Array.isArray(arquivos) ? arquivos : []);
+          if (falhasSeguidas) {
+            falhasSeguidas = 0;
+            dizer('');
+          }
+        } catch (e) {
+          // Uma falha é a rede piscando; três seguidas é o motor fora do ar, e aí
+          // vale dizer, porque a tela parada sem explicação parece tela quebrada.
+          if (++falhasSeguidas >= 3) {
+            dizer('O raspador não está respondendo. Confira se o contêiner está de pé.', 'erro');
+          }
+        }
+      }
+
+      formulario.addEventListener('submit', async (evento) => {
+        evento.preventDefault();
+        const oque = $('oque').value.trim();
+        const onde = $('onde').value.trim();
+        if (!oque || !onde) return;
+
+        botao.disabled = true;
+        botao.textContent = 'Começando…';
+        dizer('');
+
+        try {
+          const r = await fetch('/api/v1/jobs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: `${oque} ${onde}`,
+              keywords: [`${oque} em ${onde}`],
+              lang: 'pt',
+              zoom: 14,
+              depth: Number($('quantos').value),
+              email: $('email').checked,
+              max_time: 3600,
+            }),
+          });
+          if (!r.ok) throw new Error(`o raspador respondeu ${r.status}`);
+          dizer('Busca começada. Ela aparece na lista ao lado, e o arquivo vem sozinho.');
+          $('oque').value = '';
+          $('oque').focus();
+          atualizar();
+        } catch (e) {
+          dizer(`Não deu para começar: ${e.message}`, 'erro');
+        } finally {
+          botao.disabled = false;
+          botao.textContent = 'Começar a busca';
+        }
+      });
+
+      atualizar();
+      setInterval(atualizar, 3000);
+    </script>
+  </body>
+</html>

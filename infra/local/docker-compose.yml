@@ -8,7 +8,7 @@
 # O que NÃO roda aqui: recepção de webhook. Meta e Komune batem nas Edge Functions do
 # Supabase, que enfileiram em `pgmq`; estes contêineres só CONSOMEM fila. Por isso
 # nenhum serviço publica porta para a internet — os dois únicos `ports:` do arquivo
-# (Metabase e maps-scraper) ficam presos em 127.0.0.1. Administração pela Tailscale.
+# (Metabase e maps-console) ficam presos em 127.0.0.1. Administração pela Tailscale.
 # Passo a passo do zero: docs/operacao/maquina-do-luiz.md
 #
 # Perfis (ligue com COMPOSE_PROFILES no ./.env, ou --profile na linha de comando):
@@ -17,7 +17,8 @@
 #   rotas         osrm  (exige o grafo já preparado — veja o perfil osrm-preparo)
 #   osrm-preparo  osrm-preparo (tarefa única: extract → partition → customize)
 #   tunel         cloudflared (só se o Metabase precisar sair do tailnet)
-#   maps          maps-scraper (ADR-12; raspagem do Google Maps, tarefa de operador — não deixe ligado)
+#   maps          maps-console + maps-scraper (ADR-12; raspagem do Google Maps,
+#                 tarefa de operador — não deixe ligado)
 #
 # Segredos: `../../.env` (raiz do repo, gitignored) + `./.env` (só desta máquina, gitignored).
 # Modelo das variáveis desta pasta: ./.env.example. Nenhum valor de segredo neste arquivo.
@@ -441,10 +442,10 @@ services:
     # -web sobe a interface na 8080, -data-folder é onde ela grava o CSV de cada
     # tarefa, -c 1 é uma aba por vez.
     command: ['-web', '-data-folder', '/app/webdata', '-c', '1']
-    ports:
-      # Loopback do host, de propósito: nada de LAN, nada de internet, nada que o
-      # CRM alcance. Quem abre a interface é a pessoa sentada na máquina.
-      - '127.0.0.1:${MAPS_SCRAPER_PORT:-8080}:8080'
+    # SEM `ports:` de propósito, desde 25/09/2026. A interface que vem na imagem
+    # é de terceiro e não dá para mudar sem manter um garfo do projeto; quem fala
+    # com a pessoa é o `maps-console`, que é nosso e está na porta 8080. Este
+    # contêiner virou motor: alcançável só pela rede do Compose.
     volumes:
       - ./data/maps/saida:/app/webdata
     profiles: ['maps']
@@ -473,3 +474,49 @@ services:
     memswap_limit: ${MEM_MAPS_SCRAPER:-2g}
     cpus: 2.0
     pids_limit: 512
+
+  # -------------------------------------------------------------------------
+  # maps-console — a tela da raspagem, com a cara do Tríade.
+  #
+  # Três coisas, e só três: serve uma página nossa, repassa os pedidos dela para
+  # o `maps-scraper` (por isso o navegador fala com um endereço só, e não há
+  # CORS nem porta extra aberta) e COLHE — quando uma busca termina, copia o CSV
+  # de `data/maps/saida/<id>.csv` para `listas/<data>-<nome>.csv`, na raiz do
+  # repositório. É o que tira o arquivo de uma pasta de quatro níveis com nome
+  # de código e o põe onde uma pessoa acha.
+  #
+  # Python da imagem oficial, biblioteca padrão e nada mais: sobe em segundos e
+  # não tem dependência para atualizar por segurança. O código está montado como
+  # volume só de leitura — mexeu no arquivo, reinicia o contêiner e pronto.
+  # -------------------------------------------------------------------------
+  maps-console:
+    image: python:3.12-alpine
+    working_dir: /app
+    command: ['python', '-u', 'app.py']
+    environment:
+      RASPADOR_URL: http://maps-scraper:8080
+      WEBDATA_DIR: /webdata
+      LISTAS_DIR: /listas
+    ports:
+      # Loopback do host, de propósito: nada de LAN, nada de internet, nada que o
+      # CRM alcance. Quem abre a tela é a pessoa sentada na máquina.
+      - '127.0.0.1:${MAPS_CONSOLE_PORT:-8080}:8080'
+    volumes:
+      - ./maps-console:/app:ro
+      # O mesmo volume do raspador, só de leitura: daqui a gente só copia.
+      - ./data/maps/saida:/webdata:ro
+      # A pasta `listas/` na RAIZ do repositório, que é o pedido do Rafael de
+      # 25/09: "uma saída mais fácil e direcionada na raiz do projeto".
+      - ../../listas:/listas
+    depends_on:
+      - maps-scraper
+    profiles: ['maps']
+    restart: 'no'
+    init: true
+    stop_grace_period: 10s
+    logging: *logging
+    <<: *endurecimento
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: 0.5
+    pids_limit: 128

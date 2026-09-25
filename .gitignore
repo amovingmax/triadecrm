@@ -21,6 +21,10 @@ supabase/.temp/
 supabase/.branches/
 supabase/.env
 
+# As listas raspadas do Google Maps (ADR-12). Dado pessoal de terceiro: fica na
+# máquina de quem raspou, entra no CRM pela importação e é apagado depois.
+/listas/
+
 # infra local
 infra/local/data/*
 !infra/local/data/.gitkeep

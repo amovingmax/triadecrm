@@ -18,7 +18,8 @@ referência curta para quem desenvolve.
 | `osrm`           | `rotas`        | Matriz de tempos e ordem das visitas da tarde (RF-ROT-03)           | interna `5000`   |
 | `osrm-preparo`   | `osrm-preparo` | Tarefa única: `.osm.pbf` → grafo do OSRM                            | —                |
 | `cloudflared`    | `tunel`        | Opcional: Metabase fora do tailnet                                  | —                |
-| `maps-scraper`   | `maps`         | Lista de prospecção raspada do Google Maps (ADR-12)                 | `127.0.0.1:8080` |
+| `maps-console`   | `maps`         | A tela da raspagem, com a cara do Tríade (ADR-12)                   | `127.0.0.1:8080` |
+| `maps-scraper`   | `maps`         | O motor da raspagem; sem porta, só a tela fala com ele              | —                |
 
 **Nenhum serviço abre porta para a internet.** A recepção de webhook (Meta, Komune) fica nas
 Edge Functions do Supabase, que enfileiram em `pgmq`; aqui só se **consome** fila. Os dois
@@ -84,8 +85,10 @@ whisper): nada é instalado dentro do contêiner.
 - `data/metabase/` — banco interno do Metabase (H2). É o que se copia num backup.
 - `data/osrm/` — `.osm.pbf` do Rio Grande do Norte e o grafo gerado (~280 MB).
 - `data/whisper/` — cache do modelo (~500 MB no `small`), baixado na primeira transcrição.
-- `data/maps/saida/` — CSV de cada rodada do `maps-scraper`. **É base de dados pessoais**:
-  apague o arquivo assim que a importação terminar (passo 7 abaixo).
+- `data/maps/saida/` — o CSV cru de cada rodada, com nome de código. Quem olha é o
+  `maps-console`, que copia para `listas/` com nome legível.
+- `../../listas/` (raiz do repositório, gitignored) — é aqui que o arquivo pronto aparece.
+  **É base de dados pessoais**: apague assim que a importação terminar.
 
 ### Raspar o Google Maps (perfil `maps`, ADR-12)
 
@@ -114,20 +117,23 @@ vira decisão auditável em vez de cron silencioso.
 
 ```bash
 # 1. subir (só durante a rodada; o perfil NÃO entra no COMPOSE_PROFILES do .env)
-mkdir -p data/maps/saida
 docker compose -f docker-compose.yml --profile maps up -d
 open http://127.0.0.1:8080
 
-# 2. pedir ao Claude Code a consulta: categoria + cidade ("buffet infantil em Natal RN"),
-#    teto de 600 lugares, ritmo de 5 s
+# 2. na tela: o que procurar ("buffet infantil"), onde ("Natal RN"), quantos, e começar
 
-# 3. o kit escreve em ./data/maps/saida/, por exemplo:
-ls data/maps/saida
+# 3. o arquivo aparece sozinho na raiz do repositório, com nome legível:
+ls ../../listas
 
-# 7. terminada a importação, derrubar e APAGAR o arquivo
+# 4. terminada a importação, derrubar e APAGAR o arquivo
 docker compose -f docker-compose.yml --profile maps down
-rm data/maps/saida/*.csv
+rm ../../listas/*.csv
 ```
+
+A tela em `127.0.0.1:8080` é nossa (`maps-console/`): um Python da biblioteca padrão que
+serve uma página, repassa os pedidos ao raspador e copia o CSV pronto para `listas/`. A
+interface que vem na imagem do `gosom` não publica mais porta — ela é de terceiro e não dá
+para mudar sem manter um garfo do projeto.
 
 Entre os passos 3 e 7, no CRM: abrir `/importar`, escolher **Google Maps (raspagem local)**
 no seletor de origem, arrastar o CSV, conferir o mapa de colunas (a tela diz se cada acerto
