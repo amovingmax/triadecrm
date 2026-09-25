@@ -13,9 +13,14 @@
 --      transação de `public.tabular_tentativa`: um `raise` ali abortaria a
 --      tabulação da ligação que a pessoa acabou de registrar. A recusa volta
 --      como valor. Propósito desconhecido, esse sim, continua explodindo.
---   4. O MÊS QUE PULA DIRETO PARA O FREIO grava as duas linhas de alerta.
+--   4. A RECUSA NÃO PERDE TRABALHO. `app.ia_enfileirar_resumo` roda dentro da
+--      transação de `public.tabular_tentativa`, que COMMITA: recusar sem
+--      anotar faria o `summarize_call` daquela ligação nunca mais ser pedido,
+--      porque não existe cron que o repita. A recusa vira dívida anotada, e
+--      um cron a paga quando o mês voltar a caber.
+--   5. O MÊS QUE PULA DIRETO PARA O FREIO grava as duas linhas de alerta.
 --      Sem isso, o registro de "passamos de 80%" não existiria para esse mês.
---   5. O FREIO RECUSA POR EXCLUSÃO. Na linha de alerta param os 12 propósitos
+--   6. O FREIO RECUSA POR EXCLUSÃO. Na linha de alerta param os 12 propósitos
 --      que não são de atendimento; sobrevivem `classify_inbound` e
 --      `transcribe_audio`, que são os únicos que servem para entender quem
 --      escreveu agora. No teto inteiro param os 14. Os 12 são nomeados um a
@@ -24,7 +29,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(21);
+select plan(27);
 
 -- =====================================================================
 -- 1. O TETO, E AS DUAS LINHAS
@@ -105,6 +110,25 @@ select throws_ok(
   '22023', NULL,
   'propósito desconhecido continua EXPLODINDO: aquilo é erro de programação, não estado do mês');
 
+-- ---------- e a recusa vira dívida, não trabalho apagado ----------
+select has_table('public', 'ia_trabalho_adiado', 'a dívida do orçamento tem onde morar');
+
+select is(app.ia_enfileirar('summarize_call',
+            jsonb_build_object('attempt_id', '00000000-0000-4000-8000-000000000067'),
+            'attempt:pgtap67') ->> 'motivo', 'orcamento',
+  'a fila recusa o resumo da ligação');
+select is((select count(*)::int from public.ia_trabalho_adiado a
+            where a.chave = 'summarize_call:attempt:pgtap67'), 1,
+  'e o trabalho recusado fica ANOTADO: a tabulação commita, e o resumo não some com ela');
+
+select is(app.ia_enfileirar('summarize_call',
+            jsonb_build_object('attempt_id', '00000000-0000-4000-8000-000000000067'),
+            'attempt:pgtap67') ->> 'motivo', 'orcamento',
+  'pedir de novo continua sendo recusa');
+select is((select count(*)::int from public.ia_trabalho_adiado a
+            where a.chave = 'summarize_call:attempt:pgtap67'), 1,
+  'anotar duas vezes o mesmo trabalho continua sendo uma linha: a chave é a idempotência');
+
 -- =====================================================================
 -- 4. O ALERTA GRAVA AS DUAS LINHAS
 -- =====================================================================
@@ -144,6 +168,16 @@ select is((public.ia_orcamento_status() ->> 'freado')::boolean, true,
 select is((public.ia_orcamento_status() ->> 'parados')::int, 14,
   'e conta quantos propósitos o freio está recusando agora');
 select pg_temp.sair();
+
+-- =====================================================================
+-- 6. A DÍVIDA É PAGA SOZINHA
+-- =====================================================================
+-- Baixa o gasto do mês abaixo da linha e prova que o que ficou devendo volta.
+-- São três dívidas anotadas nesta transação: os dois `draft_reply` da mesma
+-- chave (uma linha) e o `summarize_call`.
+delete from public.ai_runs where prompt_version = 'pgtap67-gasto@v1';
+select is(app.ia_retomar_adiados(10), 2,
+  'com o mês folgado de novo, o cron reenfileira o que ficou devendo — e nada fica para trás');
 
 select * from finish();
 rollback;

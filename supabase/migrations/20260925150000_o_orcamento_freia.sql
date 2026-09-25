@@ -315,7 +315,106 @@ grant execute on function public.ia_pode_gastar(text) to service_role;
 
 
 -- ---------------------------------------------------------------------
--- 5. A fila pergunta ao freio antes de enfileirar
+-- 5. A dívida do orçamento
+-- ---------------------------------------------------------------------
+-- POR QUE ESTA TABELA EXISTE. `app.ia_enfileirar_resumo` roda DENTRO da
+-- transação de `public.tabular_tentativa`: quem acabou de registrar uma
+-- ligação commita a tabulação e, se o freio recusar, o `summarize_call`
+-- daquela tentativa NUNCA MAIS é pedido — não há cron que o repita. Recusar
+-- sem anotar não é "não gastar", é perder o trabalho em silêncio, que é pior
+-- que gastar: o gasto aparece na conta, a perda não aparece em lugar nenhum.
+--
+-- Os cinco chamadores de `app.ia_enfileirar`, conferidos um a um:
+--   `ia_enfileirar_analises` (cron */5) e `triar_candidato` (clique) refazem a
+--   chave sozinhos na passada seguinte — não perdem nada. `ia_enfileirar_pulso`
+--   perde o pulso daquele dia, e o de amanhã nasce. `ia_enfileirar_resumo` e os
+--   dois pedidos do worker (`classify_inbound` depois da transcrição,
+--   `draft_followup` depois do resumo) perdem para sempre.
+--
+-- A recusa continua sem `raise`. O que muda é que ela deixa rastro: a mesma
+-- transação que grava a tabulação grava a dívida, e um cron a paga quando o
+-- mês voltar a caber. A chave é a de `ingest_dedup` ("<propósito>:<chave>"),
+-- então anotar duas vezes o mesmo trabalho é uma linha só.
+create table if not exists public.ia_trabalho_adiado (
+  chave        text primary key,
+  purpose      text not null,
+  payload      jsonb not null default '{}'::jsonb,
+  chave_crua   text not null,
+  motivo       text not null,
+  tentativas   int  not null default 0,
+  adiado_em    timestamptz not null default now(),
+  retomado_em  timestamptz
+);
+comment on table public.ia_trabalho_adiado is
+  'O que o freio do orçamento recusou e não pode se perder (Fase 3 do pivô). A chave é a de ingest_dedup. Paga por app.ia_retomar_adiados, no cron ia_retomar_adiados.';
+create index if not exists ia_trabalho_adiado_pendentes_idx
+  on public.ia_trabalho_adiado (adiado_em) where retomado_em is null;
+
+alter table public.ia_trabalho_adiado enable row level security;
+drop policy if exists ia_trabalho_adiado_select on public.ia_trabalho_adiado;
+create policy ia_trabalho_adiado_select on public.ia_trabalho_adiado
+  for select to authenticated
+  using ((select app.role()) in ('admin'::app.user_role, 'gestor'::app.user_role,
+                                 'financeiro'::app.user_role));
+
+-- Paga a dívida, do mais antigo para o mais novo. Pergunta ao freio a cada
+-- linha, e não uma vez para o lote: o mês pode acabar no meio do lote, e
+-- reenfileirar o resto seria furar o próprio freio que acabou de fechar.
+create or replace function app.ia_retomar_adiados(p_limite int default 50)
+returns int
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r      public.ia_trabalho_adiado%rowtype;
+  v_res  jsonb;
+  v_n    int := 0;
+begin
+  for r in select * from public.ia_trabalho_adiado
+            where retomado_em is null
+            order by adiado_em
+            limit greatest(coalesce(p_limite, 50), 1)
+            for update skip locked loop
+    if not coalesce((app.ia_pode_gastar(r.purpose) ->> 'pode')::boolean, false) then
+      exit;
+    end if;
+    -- Chama `esteira_enfileirar` e não `ia_enfileirar`: a chave já vem pronta
+    -- (é a que foi anotada), e passar por `ia_enfileirar` de novo faria a
+    -- concatenação do propósito duas vezes.
+    v_res := app.esteira_enfileirar('ai_jobs',
+               jsonb_build_object('purpose', r.purpose) || coalesce(r.payload, '{}'::jsonb),
+               r.chave);
+    update public.ia_trabalho_adiado
+       set tentativas = tentativas + 1,
+           retomado_em = case when coalesce((v_res ->> 'enfileirado')::boolean, false)
+                              then now() else null end
+     where chave = r.chave;
+    if coalesce((v_res ->> 'enfileirado')::boolean, false) then
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  -- Dívida paga há mais de 30 dias não é dívida, é história de custo.
+  delete from public.ia_trabalho_adiado
+   where retomado_em is not null and retomado_em < now() - interval '30 days';
+  return v_n;
+end $$;
+comment on function app.ia_retomar_adiados(int) is
+  'Paga a dívida que o freio do orçamento deixou: reenfileira o que foi recusado, do mais antigo para o mais novo, perguntando ao freio a cada linha. Roda no cron ia_retomar_adiados, de 20 em 20 minutos.';
+revoke all on function app.ia_retomar_adiados(int) from public, anon, authenticated;
+grant execute on function app.ia_retomar_adiados(int) to service_role;
+
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('ia_retomar_adiados', '*/20 * * * *',
+                          $cron$select app.ia_retomar_adiados(50)$cron$);
+  end if;
+end $$;
+
+
+-- ---------------------------------------------------------------------
+-- 6. A fila pergunta ao freio antes de enfileirar
 -- ---------------------------------------------------------------------
 -- SEM `raise`, e isso é essencial: `app.ia_enfileirar_resumo` roda DENTRO da
 -- transação de `public.tabular_tentativa` (20260906000100:358). Uma exceção
@@ -346,8 +445,14 @@ begin
 
   v_freio := app.ia_pode_gastar(p_purpose);
   if not coalesce((v_freio ->> 'pode')::boolean, false) then
+    -- A recusa deixa rastro NA MESMA TRANSAÇÃO de quem chamou. Se ela abortar,
+    -- a dívida aborta junto — que é o certo: não houve trabalho a dever.
+    insert into public.ia_trabalho_adiado (chave, purpose, payload, chave_crua, motivo)
+    values (p_purpose || ':' || p_key, p_purpose, coalesce(p_payload, '{}'::jsonb),
+            p_key, coalesce(v_freio ->> 'motivo', 'orcamento'))
+    on conflict (chave) do nothing;
     return jsonb_build_object('enfileirado', false, 'motivo', 'orcamento',
-                              'detalhe', v_freio ->> 'motivo');
+                              'detalhe', v_freio ->> 'motivo', 'adiado', true);
   end if;
 
   return app.esteira_enfileirar('ai_jobs',
@@ -358,7 +463,7 @@ comment on function app.ia_enfileirar(text, jsonb, text) is
   'Porta única da fila de IA: confere a lista de propósitos (o CHECK de ai_runs protege a gravação; este if protege a FILA, que é onde o gasto nasce) e pergunta ao freio do orçamento. Recusa por orçamento volta como {enfileirado:false, motivo:"orcamento"}, nunca como exceção — roda dentro da transação de quem chamou.';
 
 -- ---------------------------------------------------------------------
--- 6. O painel diz o que está parado
+-- 7. O painel diz o que está parado
 -- ---------------------------------------------------------------------
 create or replace function public.ia_orcamento_status()
 returns jsonb
