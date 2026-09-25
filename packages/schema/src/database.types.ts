@@ -120,6 +120,14 @@ export type Database = {
       }
     }
     Functions: {
+      aberturas_do_dia: {
+        Args: {
+          p_channel: Database["app"]["Enums"]["channel"]
+          p_dia: string
+          p_numero?: string
+        }
+        Returns: number
+      }
       abrir_proximo_toque: { Args: { p_enrollment: string }; Returns: Json }
       agenda_dados_do_evento: { Args: { p_task_id: string }; Returns: Json }
       agenda_google_falhou: {
@@ -418,6 +426,7 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: Json
       }
+      ia_gasto_bloqueado_para: { Args: never; Returns: string[] }
       ia_gravar_ficha: {
         Args: {
           p_ai_run_id?: number
@@ -444,11 +453,13 @@ export type Database = {
         Args: { p_conversation: string; p_message: string }
         Returns: boolean
       }
+      ia_pode_gastar: { Args: { p_purpose: string }; Returns: Json }
       ia_prazo: { Args: { p_texto: string }; Returns: string }
       ia_pulso_entrada: {
         Args: { p_dia?: string; p_escopo?: string; p_user?: string }
         Returns: Json
       }
+      ia_retomar_adiados: { Args: { p_limite?: number }; Returns: number }
       ia_trabalho_suprimido: {
         Args: { p_payload: Json; p_purpose: string }
         Returns: Json
@@ -875,6 +886,18 @@ export type Database = {
         Returns: string
       }
       wa_bot_escolha: { Args: { p_texto: string }; Returns: Json }
+      wa_bot_falas: {
+        Args: { p_conversation_id: string; p_desde: string }
+        Returns: number
+      }
+      wa_bot_freiar: {
+        Args: { p_conversation_id: string; p_motivo: string }
+        Returns: Json
+      }
+      wa_bot_pode_falar: {
+        Args: { p_conversation_id: string; p_quando?: string }
+        Returns: Json
+      }
       wa_confirmacao_de_optout: {
         Args: { p_conversation_id: string }
         Returns: Json
@@ -912,6 +935,7 @@ export type Database = {
         Returns: Json
       }
       wa_modelo_da_meta: { Args: { p_template_id: number }; Returns: Json }
+      wa_modelo_humano: { Args: never; Returns: number }
       wa_motivo_de_recusa: {
         Args: {
           p_contact_id?: string
@@ -946,6 +970,7 @@ export type Database = {
         Returns: Json
       }
       wa_resposta_no_funil: { Args: { p_message_id: string }; Returns: Json }
+      wa_robo_teto: { Args: never; Returns: Json }
       wa_sucesso: {
         Args: {
           p_categoria?: string
@@ -955,6 +980,10 @@ export type Database = {
           p_wamid: string
         }
         Returns: boolean
+      }
+      wa_teto_da_meta: {
+        Args: { p_numero?: string; p_quando?: string }
+        Returns: Json
       }
       website_domain: { Args: { u: string }; Returns: string }
     }
@@ -3955,6 +3984,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_trabalho_adiado: {
+        Row: {
+          adiado_em: string
+          chave: string
+          chave_crua: string
+          motivo: string
+          payload: Json
+          purpose: string
+          retomado_em: string | null
+          tentativas: number
+        }
+        Insert: {
+          adiado_em?: string
+          chave: string
+          chave_crua: string
+          motivo: string
+          payload?: Json
+          purpose: string
+          retomado_em?: string | null
+          tentativas?: number
+        }
+        Update: {
+          adiado_em?: string
+          chave?: string
+          chave_crua?: string
+          motivo?: string
+          payload?: Json
+          purpose?: string
+          retomado_em?: string | null
+          tentativas?: number
+        }
+        Relationships: []
+      }
       import_batches: {
         Row: {
           can_undo_until: string
@@ -6854,6 +6916,57 @@ export type Database = {
         }
         Relationships: []
       }
+      wa_saude_numero: {
+        Row: {
+          banido: boolean
+          campo: string
+          conversas_por_dia: number | null
+          created_at: string
+          evento: string | null
+          id: number
+          limite_anterior: string | null
+          limite_atual: string | null
+          numero: string | null
+          ocorrido_em: string
+          origem: string
+          payload: Json
+          qualidade: string | null
+          restricoes: Json
+        }
+        Insert: {
+          banido?: boolean
+          campo: string
+          conversas_por_dia?: number | null
+          created_at?: string
+          evento?: string | null
+          id?: number
+          limite_anterior?: string | null
+          limite_atual?: string | null
+          numero?: string | null
+          ocorrido_em?: string
+          origem: string
+          payload?: Json
+          qualidade?: string | null
+          restricoes?: Json
+        }
+        Update: {
+          banido?: boolean
+          campo?: string
+          conversas_por_dia?: number | null
+          created_at?: string
+          evento?: string | null
+          id?: number
+          limite_anterior?: string | null
+          limite_atual?: string | null
+          numero?: string | null
+          ocorrido_em?: string
+          origem?: string
+          payload?: Json
+          qualidade?: string | null
+          restricoes?: Json
+        }
+        Relationships: []
+      }
       webhook_deliveries: {
         Row: {
           delivery_id: string
@@ -7320,6 +7433,17 @@ export type Database = {
           },
         ]
       }
+      wa_servico_do_mes: {
+        Row: {
+          conversas: number | null
+          mensagens_de_servico: number | null
+          mes: string | null
+          numero: string | null
+          primeira: string | null
+          ultima: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       abrir_reivindicacao: {
@@ -7641,6 +7765,7 @@ export type Database = {
       }
       ia_gravar_triagem: { Args: { p_vereditos: Json }; Returns: Json }
       ia_orcamento_status: { Args: never; Returns: Json }
+      ia_pode_gastar: { Args: { p_purpose: string }; Returns: Json }
       ia_pulso_entrada: {
         Args: { p_dia?: string; p_escopo?: string; p_user?: string }
         Returns: Json
@@ -8195,6 +8320,7 @@ export type Database = {
         }
         Returns: Json
       }
+      wa_freios_status: { Args: never; Returns: Json }
       wa_midia_registrar: {
         Args: { p_media_path: string; p_message_id: string }
         Returns: Json
@@ -8260,6 +8386,7 @@ export type Database = {
         Returns: boolean
       }
       wa_saude: { Args: never; Returns: Json }
+      wa_saude_registrar: { Args: { p_item: Json }; Returns: number }
       wa_status_registrar: {
         Args: {
           p_codigo?: string

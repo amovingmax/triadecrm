@@ -89,6 +89,14 @@ const RITMOS = [5, 10, 15, 20, 30, 45, 60] as const;
 /** Quantas linhas a lista desenha de cada vez. A seleção vale para todas. */
 const LINHAS_VISIVEIS = 150;
 
+/** A nota do número na Meta, dita como quem opera fala. */
+const QUALIDADE_EM_PT: Record<string, string> = {
+  GREEN: 'verde',
+  YELLOW: 'amarela',
+  RED: 'vermelha',
+  UNKNOWN: 'desconhecida',
+};
+
 const ROTULO_DA_ASSINATURA: Record<Assinatura, string> = {
   marca: 'em nome da Komune',
   eu: 'assinada por você',
@@ -640,8 +648,9 @@ export function NovoEnvio({
               <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <p>
                 Sempre ligadas: só de 8h às 17h45 em dia útil; ninguém que pediu para sair; ninguém que
-                recebeu mensagem nossa sem responder nas últimas 72 h; teto de primeiros contatos do dia; e a
-                campanha para sozinha se 3 pessoas ou mais (acima de 2%) pedirem para sair.
+                recebeu mensagem nossa sem responder nas últimas 72 h; teto de aberturas do dia (toda
+                conversa que a gente começa conta, inclusive recontato — é como a Meta conta); e a campanha
+                para sozinha se 3 pessoas ou mais (acima de 2%) pedirem para sair.
               </p>
             </div>
           </div>
@@ -726,10 +735,21 @@ export function NovoEnvio({
               <Linha rotulo="Custo na Meta" valor={custo === 0 ? 'grátis' : `≈ ${formatarReais(custo)}`} />
             ) : null}
           </dl>
+          {teto.data ? (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              <span className="numerico">{teto.data.teto}</span> aberturas por dia ·{' '}
+              <span className="numerico">{teto.data.usados}</span> usadas hoje ·{' '}
+              {teto.data.quemManda === 'meta'
+                ? `o teto é da Meta hoje${teto.data.qualidade ? ` — qualidade ${QUALIDADE_EM_PT[teto.data.qualidade] ?? teto.data.qualidade.toLowerCase()}` : ''}`
+                : 'o teto é nosso (aquecimento)'}
+              .
+            </p>
+          ) : null}
           {tetoSegura ? (
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Hoje ainda cabem <span className="numerico">{tetoLivre}</span> primeiros contatos (teto de{' '}
-              <span className="numerico">{teto.data?.teto}</span> por dia): o resto sai nos próximos dias úteis.
+              Hoje ainda cabem <span className="numerico">{tetoLivre}</span> aberturas: o resto sai nos
+              próximos dias úteis. Toda conversa que a gente começa conta aqui, inclusive recontato — é como a
+              Meta conta.
             </p>
           ) : null}
 

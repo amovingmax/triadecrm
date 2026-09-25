@@ -613,7 +613,8 @@ export const MOTIVOS_DE_RECUSA_DO_ENVIO: Record<string, string> = {
   organizacao_apagada: 'Esta ficha foi apagada da base. Nada sai para ela.',
   sem_janela_e_sem_template:
     'A janela de 24 h fechou. Fora dela só sai modelo aprovado pela Meta, não texto livre.',
-  teto_do_numero: 'O teto de primeiros contatos do dia acabou neste número. Amanhã abre de novo.',
+  teto_do_numero:
+    'O teto de aberturas do dia acabou neste número. Toda conversa que a gente começa conta aqui, inclusive recontato — é como a Meta conta. Amanhã abre de novo.',
   teto_iniciadas_dia: 'O número já mandou o máximo de mensagens do dia.',
   teto_iniciadas_hora: 'O número já mandou o máximo da hora. Tente daqui a pouco.',
   janela_fora_de_hora: 'Fora do horário de envio combinado.',
@@ -622,6 +623,16 @@ export const MOTIVOS_DE_RECUSA_DO_ENVIO: Record<string, string> = {
   janela_antes_da_abertura: 'Ainda não abriu o horário de envio de hoje.',
   janela_canal_sem_janela: 'Este canal não tem janela de envio configurada.',
   conversa_inexistente: 'Esta conversa não existe mais. Recarregue a página.',
+  // O que a META decidiu sobre a nossa conta (Fase 3 do pivô). Todos são
+  // espera, e nenhum é culpa do parceiro do outro lado.
+  conta_banida:
+    'A Meta desativou a nossa conta do WhatsApp. Nada sai por enquanto — avise quem cuida do Meta Business.',
+  meta_restringiu_entrada:
+    'A Meta restringiu este número: nem responder quem escreveu está saindo. É temporário e tem prazo.',
+  meta_restringiu_saida:
+    'A Meta restringiu as conversas que a gente começa neste número. Responder quem escreveu continua indo.',
+  qualidade_vermelha:
+    'A nota do nosso número na Meta está vermelha: nenhuma conversa nova sai até ela melhorar.',
   // As recusas da confirmação de opt-out (RF-CON-19), estreitada na migração
   // 20260905000300. A tela NÃO alcança nenhuma delas — a policy
   // `messages_insert` proíbe `optout_confirmation` e o gatilho só deriva a

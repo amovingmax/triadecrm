@@ -46,6 +46,7 @@ import {
   type BatidaDeWorker,
   type FilaDaEsteira,
   type SaudeDaEsteira,
+  type Freios,
 } from './tipos';
 
 /** Erro de permissão do Postgres, que na Admin é um estado da tela e não uma falha. */
@@ -839,5 +840,56 @@ export async function buscarSaudeDaEsteira(): Promise<SaudeDaEsteira | null> {
     capturas_por_expurgar: Number(bruto.capturas_por_expurgar) || 0,
     registros_por_resolver: Number(bruto.registros_por_resolver) || 0,
     ultimo_expurgo: texto(bruto.ultimo_expurgo),
+  };
+}
+
+/**
+ * Os três freios da Fase 3, numa pergunta só.
+ *
+ * `public.wa_freios_status()` recusa com 42501 quem não é admin, gestor nem
+ * financeiro. Isso não é erro de tela — é o papel certo vendo o que lhe cabe —,
+ * e por isso devolve `null`, como `buscarSaudeDaEsteira` já faz.
+ */
+export async function buscarFreios(): Promise<Freios | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('wa_freios_status');
+  if (error) {
+    if (/42501|Sem permissão|permission/i.test(error.message)) return null;
+    throw new Error(error.message);
+  }
+  const bruto = objeto(data);
+  const orc = objeto(bruto.orcamento);
+  const num = objeto(bruto.numero);
+  const rob = objeto(bruto.robo);
+  return {
+    orcamento: {
+      gasto_usd: Number(orc.gasto_usd) || 0,
+      orcamento_usd: Number(orc.orcamento_usd) || 0,
+      limite_de_alerta_usd: Number(orc.limite_de_alerta_usd) || 0,
+      linha_do_freio_usd: Number(orc.linha_do_freio_usd) || 0,
+      situacao: texto(orc.situacao) ?? 'ok',
+      propositos_parados: Array.isArray(orc.propositos_parados)
+        ? (orc.propositos_parados as string[])
+        : [],
+      adiados: Number(orc.adiados) || 0,
+    },
+    numero: {
+      teto_dia: num.teto_dia === null || num.teto_dia === undefined ? null : Number(num.teto_dia),
+      teto_nosso:
+        num.teto_nosso === null || num.teto_nosso === undefined ? null : Number(num.teto_nosso),
+      usados: Number(num.usados) || 0,
+      qualidade: texto(num.qualidade),
+      restrito_saida: num.restrito_saida === true,
+      restrito_entrada: num.restrito_entrada === true,
+      banido: num.banido === true,
+      ate: texto(num.ate),
+    },
+    robo: {
+      falas_por_conversa: Number(rob.falas_por_conversa) || 0,
+      fusivel_por_hora: Number(rob.fusivel_por_hora) || 0,
+      falas_na_ultima_hora: Number(rob.falas_na_ultima_hora) || 0,
+      ativo: rob.ativo === true,
+      freio: objeto(rob.freio) as { parado_em?: string; motivo?: string } | null,
+    },
   };
 }

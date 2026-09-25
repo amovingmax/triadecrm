@@ -98,12 +98,44 @@ export async function buscarCumprimentos(): Promise<Modelo[]> {
   return z.array(modeloSchema).parse(data ?? []);
 }
 
-export async function buscarTetoDeHoje(): Promise<{ teto: number; usados: number } | null> {
+export type TetoDeHoje = {
+  /** O menor entre o nosso e o da Meta: é este que vale. */
+  teto: number;
+  usados: number;
+  /** O aquecimento (RF-CON-10). */
+  tetoNosso: number | null;
+  /** O tier da Meta, dobrado pela nota do número. `null` é "não sei". */
+  tetoDaMeta: number | null;
+  qualidade: string | null;
+  quemManda: 'nos' | 'meta' | null;
+};
+
+export async function buscarTetoDeHoje(): Promise<TetoDeHoje | null> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc('envio_em_massa_teto');
   if (error) return null;
-  const r = z.object({ ok: z.boolean(), teto: z.number().optional(), usados: z.number().optional() }).parse(data);
-  return r.ok && r.teto !== undefined ? { teto: r.teto, usados: r.usados ?? 0 } : null;
+  // O `z.object` DESCARTA o que não está listado: campo novo no banco que não
+  // entre aqui simplesmente não chega à tela, e sem erro nenhum.
+  const r = z
+    .object({
+      ok: z.boolean(),
+      teto: z.number().optional(),
+      teto_nosso: z.number().optional(),
+      teto_da_meta: z.number().nullable().optional(),
+      qualidade: z.string().nullable().optional(),
+      quem_manda: z.enum(['nos', 'meta']).optional(),
+      usados: z.number().optional(),
+    })
+    .parse(data);
+  if (!r.ok || r.teto === undefined) return null;
+  return {
+    teto: r.teto,
+    usados: r.usados ?? 0,
+    tetoNosso: r.teto_nosso ?? null,
+    tetoDaMeta: r.teto_da_meta ?? null,
+    qualidade: r.qualidade ?? null,
+    quemManda: r.quem_manda ?? null,
+  };
 }
 
 export type ConfigDoEnvio = {

@@ -10,7 +10,9 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-import { buscarSaudeDaEsteira } from './dados';
+import { buscarFreios, buscarSaudeDaEsteira } from './dados';
+
+import type { Freios } from './tipos';
 
 /**
  * Ajustes → Atendimento (Fase 3, 22/09/2026).
@@ -65,6 +67,11 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
     queryFn: buscarSaudeDaEsteira,
     refetchInterval: 60_000,
   });
+  const freios = useQuery({
+    queryKey: ['admin', 'freios'],
+    queryFn: buscarFreios,
+    refetchInterval: 60_000,
+  });
   const recarregar = () => void clientes.invalidateQueries({ queryKey: ['admin', 'atendimento'] });
 
   const mudar = useMutation({
@@ -84,6 +91,11 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
 
   return (
     <div className="flex max-w-3xl flex-col gap-8">
+      {/* Os freios vêm ANTES dos interruptores porque é o que muda o
+          comportamento de tudo abaixo deles: não adianta ligar uma automação
+          que o orçamento já parou. */}
+      {freios.data ? <Freios3 f={freios.data} aoReligar={() => void freios.refetch()} /> : null}
+
       <section className="flex flex-col gap-3">
         <h2 className="font-heading text-base font-medium">O que o CRM faz sozinho</h2>
         <Interruptor
@@ -428,5 +440,164 @@ function Etiquetas({
         </form>
       ) : null}
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Os três freios da Fase 3
+// ---------------------------------------------------------------------------
+
+const QUALIDADE_EM_PT: Record<string, string> = {
+  GREEN: 'verde',
+  YELLOW: 'amarela',
+  RED: 'vermelha',
+  UNKNOWN: 'desconhecida',
+};
+
+function usd(v: number): string {
+  return `US$ ${v.toFixed(2).replace('.', ',')}`;
+}
+
+function Freios3({ f, aoReligar }: { f: Freios; aoReligar: () => void }) {
+  const freado = f.orcamento.situacao === 'freou';
+  const naLinha = f.orcamento.situacao === 'passou_de_80';
+  const quemManda =
+    f.numero.teto_dia !== null && f.numero.teto_nosso !== null && f.numero.teto_dia < f.numero.teto_nosso
+      ? 'meta'
+      : 'nos';
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="font-heading text-base font-medium">Os freios</h2>
+      <p className="text-xs text-muted-foreground">
+        Enquanto uma pessoa aprova cada mensagem, ela é o freio. Estes três existem para o dia em que
+        ninguém estiver olhando.
+      </p>
+
+      <Cartao
+        titulo="Orçamento de IA"
+        estado={freado ? 'ruim' : naLinha ? 'atencao' : 'ok'}
+        linha={`${usd(f.orcamento.gasto_usd)} de ${usd(f.orcamento.orcamento_usd)} · alerta em ${usd(
+          f.orcamento.limite_de_alerta_usd,
+        )}`}
+      >
+        {freado ? (
+          <>
+            O orçamento acabou: nenhuma chamada de IA está saindo. As mensagens que chegam viram tarefa, e o
+            que ficou devendo volta sozinho quando o mês virar.
+          </>
+        ) : naLinha ? (
+          <>
+            O orçamento passou da linha de alerta: só a classificação e a transcrição continuam rodando —{' '}
+            <span className="numerico">{f.orcamento.propositos_parados.length}</span> propósitos estão parados.
+          </>
+        ) : (
+          'Dentro do orçamento.'
+        )}
+        {f.orcamento.adiados > 0 ? (
+          <>
+            {' '}
+            <span className="numerico">{f.orcamento.adiados}</span> trabalhos estão anotados como dívida e
+            voltam sozinhos.
+          </>
+        ) : null}
+      </Cartao>
+
+      <Cartao
+        titulo="Número na Meta"
+        estado={
+          f.numero.banido || f.numero.qualidade === 'RED'
+            ? 'ruim'
+            : f.numero.restrito_saida || f.numero.restrito_entrada || f.numero.qualidade === 'YELLOW'
+              ? 'atencao'
+              : 'ok'
+        }
+        linha={
+          f.numero.qualidade === null && f.numero.teto_dia === null
+            ? 'Ainda não perguntamos à Meta como está o número'
+            : `Qualidade: ${QUALIDADE_EM_PT[f.numero.qualidade ?? ''] ?? 'desconhecida'} · Teto da Meta: ${
+                f.numero.teto_dia === null ? 'não sei' : `${f.numero.teto_dia}/dia`
+              } · Nosso: ${f.numero.teto_nosso ?? '?'}/dia · Quem manda hoje: ${
+                quemManda === 'meta' ? 'a Meta' : 'nós'
+              }`
+        }
+      >
+        {f.numero.banido ? (
+          'A Meta desativou a conta. Nada sai por enquanto.'
+        ) : f.numero.restrito_saida || f.numero.restrito_entrada ? (
+          <>
+            A Meta restringiu o número
+            {f.numero.ate ? ` até ${new Date(f.numero.ate).toLocaleString('pt-BR')}` : ' por prazo não informado'}
+            .
+          </>
+        ) : f.numero.qualidade === null && f.numero.teto_dia === null ? (
+          'O worker-wa pergunta de 30 em 30 minutos. Os campos de webhook precisam estar assinados no painel do app.'
+        ) : (
+          <>
+            <span className="numerico">{f.numero.usados}</span> aberturas usadas hoje. Toda conversa que a
+            gente começa conta aqui, inclusive recontato — é como a Meta conta.
+          </>
+        )}
+      </Cartao>
+
+      <Cartao
+        titulo="Teto de fala do robô"
+        estado={f.robo.freio !== null ? 'ruim' : 'ok'}
+        linha={`${f.robo.falas_por_conversa} falas por conversa em 24 h · ${f.robo.falas_na_ultima_hora} de ${f.robo.fusivel_por_hora} na última hora`}
+      >
+        {f.robo.freio !== null ? (
+          <span className="flex flex-wrap items-center gap-2">
+            <span>O fusível disparou ({f.robo.freio.motivo ?? 'sem motivo'}): o robô está mudo.</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const { error } = await createClient().rpc('wa_bot_ligar', { p_ativo: true });
+                if (error) toast.error('Não deu para religar.', { description: error.message });
+                else {
+                  toast.success('Religado — o freio foi apagado no mesmo gesto.');
+                  aoReligar();
+                }
+              }}
+            >
+              Religar o bot
+            </Button>
+          </span>
+        ) : f.robo.ativo ? (
+          'O robô está falando dentro do teto.'
+        ) : (
+          'O bot de entrada está desligado.'
+        )}
+      </Cartao>
+    </section>
+  );
+}
+
+function Cartao({
+  titulo,
+  linha,
+  estado,
+  children,
+}: {
+  titulo: string;
+  linha: string;
+  estado: 'ok' | 'atencao' | 'ruim';
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-lg border p-3',
+        estado === 'ruim'
+          ? 'border-destructive/40 bg-destructive/5'
+          : estado === 'atencao'
+            ? 'border-amber-500/40 bg-amber-500/5'
+            : 'border-border bg-muted/30',
+      )}
+    >
+      <p className="text-sm font-medium">{titulo}</p>
+      <p className="text-xs text-muted-foreground">{linha}</p>
+      <p className="mt-1 text-xs leading-relaxed">{children}</p>
+    </div>
   );
 }

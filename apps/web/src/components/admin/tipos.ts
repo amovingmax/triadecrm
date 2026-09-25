@@ -339,3 +339,40 @@ export type SaudeDaEsteira = {
   registros_por_resolver: number;
   ultimo_expurgo: string | null;
 };
+
+/**
+ * Os três freios da Fase 3, como `public.wa_freios_status()` os devolve.
+ *
+ * Eles existem porque, com o robô respondendo sozinho, não há ninguém olhando
+ * a conta nem a nota do número. Ficam no topo do painel de Atendimento — antes
+ * dos interruptores — porque é o que muda o comportamento de tudo abaixo deles.
+ */
+export type Freios = {
+  orcamento: {
+    gasto_usd: number;
+    orcamento_usd: number;
+    limite_de_alerta_usd: number;
+    linha_do_freio_usd: number;
+    situacao: string;
+    propositos_parados: string[];
+    adiados: number;
+  };
+  numero: {
+    /** `null` é "não sei", e "não sei" não vira nem permissão nem proibição. */
+    teto_dia: number | null;
+    teto_nosso: number | null;
+    usados: number;
+    qualidade: string | null;
+    restrito_saida: boolean;
+    restrito_entrada: boolean;
+    banido: boolean;
+    ate: string | null;
+  };
+  robo: {
+    falas_por_conversa: number;
+    fusivel_por_hora: number;
+    falas_na_ultima_hora: number;
+    ativo: boolean;
+    freio: { parado_em?: string; motivo?: string } | null;
+  };
+};

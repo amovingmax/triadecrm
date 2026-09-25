@@ -487,8 +487,11 @@ describe('fraseDaRecusaDoEnvio', () => {
   it('lê as três formas em que o banco recusa', () => {
     // As três frases são as dos `raise exception` da migração 20260905000200:
     // insert de mensagem, transição queued → sent, e insert de rascunho.
+    // "aberturas", e não "primeiros contatos", desde 25/09/2026: o teto passou
+    // a contar toda conversa que a empresa começa, recontato inclusive, que é
+    // como a Meta conta (migração 20260925170000).
     expect(fraseDaRecusaDoEnvio('Envio recusado: teto_do_numero (RF-CON-10)')).toContain(
-      'primeiros contatos do dia',
+      'aberturas do dia',
     );
     expect(
       fraseDaRecusaDoEnvio(
@@ -500,9 +503,27 @@ describe('fraseDaRecusaDoEnvio', () => {
     ).toContain('lista de supressão');
   });
 
+  it('o que a META decidiu sobre a nossa conta tem frase própria, e nenhuma culpa o parceiro', () => {
+    // Quatro motivos novos (Fase 3 do pivô). Todos são espera, e nenhum deles
+    // é sobre a pessoa do outro lado — dizer "este parceiro" aqui seria mentir
+    // sobre de quem é o problema.
+    expect(fraseDaRecusaDoEnvio('Envio recusado: conta_banida (RF-CON-10)')).toContain(
+      'desativou a nossa conta',
+    );
+    expect(fraseDaRecusaDoEnvio('Envio recusado: meta_restringiu_entrada (RF-CON-10)')).toContain(
+      'nem responder quem escreveu',
+    );
+    expect(fraseDaRecusaDoEnvio('Envio recusado: meta_restringiu_saida (RF-CON-10)')).toContain(
+      'Responder quem escreveu continua indo',
+    );
+    expect(fraseDaRecusaDoEnvio('Envio recusado: qualidade_vermelha (RF-CON-10)')).toContain(
+      'nota do nosso número',
+    );
+  });
+
   it('compara por igualdade: motivo que só CONTÉM um conhecido não vale', () => {
     // `teto_do_numero_novo` não é `teto_do_numero`. Com varredura por substring
-    // a tela mostraria a frase do teto de primeiros contatos para uma regra que
+    // a tela mostraria a frase do teto de aberturas para uma regra que
     // ninguém sabe qual é — e é assim que um aviso vira mentira sem ninguém ver.
     expect(fraseDaRecusaDoEnvio('Envio recusado: teto_do_numero_novo (RF-CON-10)')).toBeNull();
   });
