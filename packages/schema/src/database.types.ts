@@ -145,6 +145,7 @@ export type Database = {
         }[]
       }
       can_write: { Args: never; Returns: boolean }
+      categoria_por_radical: { Args: { p_nome: string }; Returns: number }
       chave_catalogo: { Args: { t: string }; Returns: string }
       cnpj_is_valid: { Args: { c: string }; Returns: boolean }
       compute_temperature: {
@@ -7850,6 +7851,10 @@ export type Database = {
         Returns: Json
       }
       importacao_lotes: { Args: { p_limit?: number }; Returns: Json }
+      importacao_mapear_categorias: {
+        Args: { p_pares: Json; p_source_id: number }
+        Returns: Json
+      }
       importacao_previa: { Args: { p_linhas: Json }; Returns: Json }
       iniciar_chamada: { Args: { p_item_id: string }; Returns: Json }
       integracao_segredo: { Args: { p_nome: string }; Returns: string }

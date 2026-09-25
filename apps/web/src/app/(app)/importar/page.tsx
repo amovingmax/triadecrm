@@ -42,7 +42,18 @@ export default async function Pagina() {
 
   // `sources_select` é `for select to authenticated using (true)`
   // (`20260904000500:96`): qualquer papel que chegue aqui lê o catálogo.
-  const { data } = await supabase.from('sources').select('id, slug, name, config').order('name');
+  const [{ data }, { data: cats }] = await Promise.all([
+    supabase.from('sources').select('id, slug, name, config').order('name'),
+    // O catálogo de categorias alimenta a tela de resolver os nomes que a fonte
+    // usou e o CRM não conhece. São 19 linhas, e `categories_select` é
+    // `to authenticated using (true)`: qualquer papel que chegue aqui lê.
+    supabase
+      .from('categories')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('position')
+      .order('name'),
+  ]);
 
   // O filtro é aqui, e não no PostgREST: `config->>entrada_por_arquivo` não é
   // coluna, e o cliente tipado não conhece caminho dentro de jsonb. São treze
@@ -56,6 +67,7 @@ export default async function Pagina() {
       podeImportar={podeCriarParceiro(sessao.papel)}
       podeDesfazer={podeDesfazerLote(sessao.papel)}
       origens={origens.length > 0 ? origens : [ORIGEM_PADRAO]}
+      categorias={(cats ?? []).map((c) => ({ id: c.id, nome: c.name }))}
     />
   );
 }

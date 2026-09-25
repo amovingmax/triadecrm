@@ -17,6 +17,7 @@ import {
   buscarLotes,
   desfazerLote,
   encerrarLote,
+  ensinarCategorias,
   fraseDoDesfazer,
   gravar,
   mensagemDoErro,
@@ -27,7 +28,14 @@ import {
   type PrazoDoDesfazer,
 } from './dados';
 import { ErroDaImportacao, EsqueletoDaPrevia, Progresso, SemLotes } from './estados';
-import { faltando, linhaParaObjeto, sugerirMapa, temConteudo, type Sugestao } from './mapeamento';
+import {
+  chave,
+  faltando,
+  linhaParaObjeto,
+  sugerirMapa,
+  temConteudo,
+  type Sugestao,
+} from './mapeamento';
 import { detectarOrigem, type OrigemDetectada } from './origem-detectada';
 import { PassoArquivo } from './passo-arquivo';
 import { PassoMapa, ReciboDasColunas } from './passo-mapa';
@@ -35,11 +43,16 @@ import { PassoPrevia } from './passo-previa';
 import type { PedidoAoLeitor, RespostaDoLeitor } from './planilha.worker';
 import { montarReciboDeLeitura } from './recibo-de-leitura';
 import { Recibo } from './recibo';
+import {
+  ResolverCategorias,
+  type RespostasDeCategoria,
+} from './resolver-categorias';
 import { SeletorDeOrigem } from './seletor-de-origem';
 import {
   fraseDaPrevia,
   fraseDeZero,
   ROTULO_DECISAO,
+  type CategoriaDoCatalogo,
   type LoteAnterior,
   type Mapa,
   type OrigemDeArquivo,
@@ -67,7 +80,7 @@ type Falha = { causa: string; comoResolver?: string } | null;
  *   · classificar e gravar → Postgres, em pedaços, com barra andando;
  *   · nesta função → o passo atual, o mapa de colunas e a tradução dos erros.
  */
-export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
+export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias }: {
   /** Papéis que escrevem na base. A autorização de verdade é o RLS. */
   podeImportar: boolean;
   /**
@@ -82,6 +95,8 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
    * Nunca vazia: a página garante a planilha como último recurso.
    */
   origens: readonly OrigemDeArquivo[];
+  /** As 19 categorias ativas, para a tela de resolver os nomes novos. */
+  categorias: readonly CategoriaDoCatalogo[];
 }) {
   const clienteDeConsultas = useQueryClient();
 
@@ -105,6 +120,22 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
   const [sugestao, setSugestao] = useState<Sugestao>({ mapa: {}, motivos: {} });
   const [previa, setPrevia] = useState<Previa | null>(null);
   const [recibo, setRecibo] = useState<TipoRecibo | null>(null);
+  /**
+   * Os nomes de categoria da FONTE que a pessoa mandou não importar.
+   *
+   * Ficam só aqui, e não no banco: "não importar estas linhas" é o mesmo que
+   * apagar as linhas do arquivo antes de mandar — elas não viram `raw_capture`,
+   * não viram candidato e não deixam rastro, porque nunca entraram. Escrever
+   * isso no de-para seria inventar uma categoria "lixo" que contaminaria toda
+   * lista futura daquela fonte.
+   */
+  const [naoImportar, setNaoImportar] = useState<readonly string[]>([]);
+  /**
+   * O que a pessoa foi buscar nesta lista. NÃO pré-marca nada: entra como
+   * primeira opção da lista suspensa de resolver, à frente da sugestão.
+   */
+  const [buscava, setBuscava] = useState<number | null>(null);
+  const [ensinando, setEnsinando] = useState(false);
 
   const [passoDaLeitura, setPassoDaLeitura] = useState<'lendo' | 'abrindo' | 'varrendo' | null>(null);
   const [andamento, setAndamento] = useState<{ rotulo: string; feitas: number; total: number } | null>(null);
@@ -143,10 +174,20 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
    * React ter aplicado `setPlanilha`/`setMapa`.
    */
   const montarLinhasDe = useCallback(
-    (planilha: PlanilhaLida, mapa: Mapa, nomeDaOrigem: string): LinhaCrua[] => {
+    (
+      planilha: PlanilhaLida,
+      mapa: Mapa,
+      nomeDaOrigem: string,
+      fora: readonly string[] = [],
+    ): LinhaCrua[] => {
+    const cortadas = new Set(fora.map((n) => chave(n)));
     const saida: LinhaCrua[] = [];
     planilha.linhas.forEach((valores, i) => {
       if (!temConteudo(valores, mapa)) return;
+      // "Não importar estas linhas": a linha nem sai do navegador. Não há
+      // raw_capture, não há candidato, não há rastro — porque ela nunca entrou.
+      const daColuna = mapa.categoria === undefined ? '' : (valores[mapa.categoria] ?? '');
+      if (cortadas.size > 0 && cortadas.has(chave(daColuna))) return;
       // +2: a linha 1 é o cabeçalho e a contagem da planilha começa em 1. Assim o
       // número que a prévia mostra é o número que a pessoa vê no Excel.
       //
@@ -163,15 +204,16 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
 
   const montarLinhas = useCallback((): LinhaCrua[] => {
     if (!planilha) return [];
-    return montarLinhasDe(planilha, mapa, nomeDaOrigem);
-  }, [montarLinhasDe, planilha, mapa, nomeDaOrigem]);
+    return montarLinhasDe(planilha, mapa, nomeDaOrigem, naoImportar);
+  }, [montarLinhasDe, planilha, mapa, nomeDaOrigem, naoImportar]);
 
   const conferirCom = useCallback(async (
     planilha: PlanilhaLida,
     mapa: Mapa,
     nomeDaOrigem: string,
+    fora: readonly string[] = [],
   ) => {
-    const linhas = montarLinhasDe(planilha, mapa, nomeDaOrigem);
+    const linhas = montarLinhasDe(planilha, mapa, nomeDaOrigem, fora);
     if (linhas.length === 0) {
       setFalha({
         causa: 'Nenhuma linha tem conteúdo nas colunas que você indicou.',
@@ -284,8 +326,8 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
 
   const conferir = useCallback(async () => {
     if (!planilha) return;
-    await conferirCom(planilha, mapa, nomeDaOrigem);
-  }, [conferirCom, planilha, mapa, nomeDaOrigem]);
+    await conferirCom(planilha, mapa, nomeDaOrigem, naoImportar);
+  }, [conferirCom, planilha, mapa, nomeDaOrigem, naoImportar]);
 
   const importar = useCallback(async () => {
     const linhas = montarLinhas();
@@ -342,6 +384,48 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
   }, [arquivo, clienteDeConsultas, montarLinhas, origemId]);
 
   /**
+   * As respostas da tela de resolver: ensina o que virou categoria, corta o que
+   * não entra, e REFAZ a prévia.
+   *
+   * A prévia é refeita porque é ela que diz quantas viram parceiro — e a
+   * resposta acabou de mudar isso. Mostrar a prévia velha ao lado das
+   * categorias novas seria a mesma mentira que a tarefa 3 tirou da tela.
+   */
+  const aplicarCategorias = useCallback(
+    async (respostas: RespostasDeCategoria) => {
+      if (!planilha) return;
+      const pares: Array<{ nome_na_fonte: string; categoria_id: number }> = [];
+      const fora: string[] = [...naoImportar];
+      for (const [nome, r] of Object.entries(respostas)) {
+        if (r.tipo === 'categoria') pares.push({ nome_na_fonte: nome, categoria_id: r.categoriaId });
+        else if (r.tipo === 'nao_importar' && !fora.includes(nome)) fora.push(nome);
+      }
+      setEnsinando(true);
+      try {
+        const gravadas = await ensinarCategorias(origemId, pares);
+        setNaoImportar(fora);
+        if (gravadas > 0) {
+          toast.success(
+            gravadas === 1
+              ? '1 nome de categoria aprendido. Na próxima lista eu não pergunto.'
+              : `${formatarNumero(gravadas)} nomes de categoria aprendidos. Na próxima lista eu não pergunto.`,
+          );
+        }
+        await conferirCom(planilha, mapa, nomeDaOrigem, fora);
+      } catch (erro) {
+        setFalha({
+          causa: mensagemDoErro(erro),
+          comoResolver:
+            'Nada foi gravado na base de parceiros: ensinar categoria só escreve no de-para da fonte.',
+        });
+      } finally {
+        setEnsinando(false);
+      }
+    },
+    [conferirCom, mapa, naoImportar, nomeDaOrigem, origemId, planilha],
+  );
+
+  /**
    * A escolha manual de origem vence a detecção — e, quando a prévia já está na
    * tela, ela é REFEITA: a origem decide qual mapa de categorias o banco
    * consulta, então a mesma lista com outra origem dá outro resultado. Mostrar
@@ -367,6 +451,8 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
     setMapa({});
     setFalha(null);
     setDeteccao(null);
+    setNaoImportar([]);
+    setBuscava(null);
     setOrigemEscolhidaAMao(false);
     setMenuDeOrigemAberto(false);
     setOrigemId(padrao?.id ?? 0);
@@ -493,6 +579,32 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
             <EsqueletoDaPrevia />
           ) : (
             <>
+              {/* A tela de resolver vem ANTES da prévia por linha: é ela que
+                  muda os números logo abaixo, e responder depois de ler 40
+                  linhas é ler duas vezes. */}
+              <ResolverCategorias
+                categoriasNovas={previa.categoriasNovas}
+                categorias={categorias}
+                buscava={buscava}
+                aoTrocarBuscava={setBuscava}
+                ocupado={ensinando || andamento !== null}
+                aoAplicar={(r) => void aplicarCategorias(r)}
+              />
+              {naoImportar.length > 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Fora desta importação, por sua escolha: {naoImportar.join(' · ')}.{' '}
+                  <button
+                    type="button"
+                    className="underline underline-offset-2"
+                    onClick={() => {
+                      setNaoImportar([]);
+                      if (planilha) void conferirCom(planilha, mapa, nomeDaOrigem, []);
+                    }}
+                  >
+                    Trazer de volta
+                  </button>
+                </p>
+              ) : null}
               <PassoPrevia previa={previa} aoVoltar={() => setEtapa('mapa')} />
               {/* A barra de gravar acompanha a rolagem porque a prévia é longa: sem
                   isso a pessoa lê 68 linhas e tem de voltar ao topo para agir. No

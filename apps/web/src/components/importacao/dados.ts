@@ -14,6 +14,7 @@ import { createClient } from '@/lib/supabase/client';
 import { formatarNumero } from '@/components/parceiros/formatos';
 
 import type {
+  CategoriaNova,
   Contagem,
   Decisao,
   LinhaDaPrevia,
@@ -86,6 +87,7 @@ type RespostaDoBanco = {
   reason?: string;
   contagem?: Contagem;
   linhas?: unknown[];
+  categorias_novas?: unknown[];
 };
 
 /**
@@ -135,6 +137,7 @@ export async function pedirPrevia(
   const supabase = createClient();
   let contagem: Contagem = {};
   const saida: LinhaDaPrevia[] = [];
+  const novas: CategoriaNova[] = [];
   let feitas = 0;
 
   for (const pedaco of pedacos(linhas, POR_PEDIDO_PREVIA)) {
@@ -143,11 +146,68 @@ export async function pedirPrevia(
     const r = conferir(data, error);
     contagem = somar(contagem, r.contagem ?? {});
     saida.push(...((r.linhas ?? []) as LinhaDaPrevia[]));
+    novas.push(...((r.categorias_novas ?? []) as CategoriaNova[]));
     feitas += pedaco.length;
     aoAndar?.(feitas, linhas.length);
   }
 
-  return { contagem, linhas: saida };
+  return { contagem, linhas: saida, categoriasNovas: juntarCategoriasNovas(novas) };
+}
+
+/**
+ * Junta os grupos que vieram de pedaços diferentes.
+ *
+ * O banco agrupa DENTRO da chamada, e a prévia vai em pedaços de 200 linhas.
+ * Sem esta junção, uma planilha de 600 linhas mostraria "Estúdio fotográfico"
+ * três vezes na tela de resolver — três perguntas para uma resposta só, que é
+ * exatamente o que esta tela existe para acabar.
+ */
+export function juntarCategoriasNovas(grupos: CategoriaNova[]): CategoriaNova[] {
+  const por = new Map<string, CategoriaNova>();
+  for (const g of grupos) {
+    const existente = por.get(g.nome_na_fonte);
+    if (!existente) {
+      por.set(g.nome_na_fonte, { ...g, exemplos: [...g.exemplos] });
+      continue;
+    }
+    existente.linhas += g.linhas;
+    // Três exemplos bastam: é o que cabe na linha da tabela sem empurrar a
+    // lista suspensa para fora da tela no celular.
+    for (const e of g.exemplos) {
+      if (existente.exemplos.length < 3 && !existente.exemplos.includes(e)) {
+        existente.exemplos.push(e);
+      }
+    }
+  }
+  // Primeiro o grupo que destrava mais linhas: é onde a resposta rende mais.
+  return [...por.values()].sort(
+    (a, b) => b.linhas - a.linhas || a.nome_na_fonte.localeCompare(b.nome_na_fonte, 'pt-BR'),
+  );
+}
+
+/**
+ * Ensina ao CRM o que um nome de categoria da fonte quer dizer.
+ *
+ * Escreve em `public.source_category_map` pela RPC `importacao_mapear_categorias`,
+ * que é `security definer`, exige `app.can_write()` e registra em `audit_log`
+ * quem ensinou o quê (decisão 1 do Rafael, 25/09/2026 — a Heloísa é `sdr` e
+ * sem isso ela importa, a fila enche, e ela não pode ensinar).
+ *
+ * Par sem categoria é "não sei" e o banco não grava nada: a linha vai para a
+ * fila, com o nome da fonte no cartão.
+ */
+export async function ensinarCategorias(
+  origemId: number,
+  pares: Array<{ nome_na_fonte: string; categoria_id: number | null }>,
+): Promise<number> {
+  if (pares.length === 0) return 0;
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('importacao_mapear_categorias', {
+    p_source_id: origemId,
+    p_pares: pares,
+  });
+  const r = conferir(data, error) as RespostaDoBanco & { gravadas?: number };
+  return r.gravadas ?? 0;
 }
 
 // ---------------------------------------------------------------------------

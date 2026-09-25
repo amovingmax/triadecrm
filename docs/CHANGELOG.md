@@ -3415,6 +3415,28 @@ Fotógrafo 10 → **13**; buffet 3 → **17**. Sobram 9 na fila (6 fotógrafo + 
 
 Vitest: `recibo-de-leitura.test.ts`, 10 asserções contra as fixtures reais.
 
+### Tarefa 6 — A pergunta passa a ser por categoria
+
+**É o coração do desenho.** Hoje o CRM pede uma decisão **por linha**: nas 40 linhas de `listas/` isso deu 36 cartões, um a um, sobre 13 nomes distintos de categoria. Ele passa a pedir uma decisão **por nome**, e a guardar a resposta. Na lista seguinte, zero.
+
+Migração `20261001120000_a_pergunta_passa_a_ser_por_categoria.sql`, três peças:
+
+**`app.categoria_por_radical`** — a sugestão que a queda difusa nunca soube dar. Medido: com o limiar de 0,55 de `app.importacao_categoria`, **nenhum** dos 16 nomes do Google chega lá (o melhor, "Buffet infantil", dá 0,516), e a resposta certa de "Buffet de casamento" pontua **0,243 — abaixo da errada**, porque o trigrama premia "infantil", que aparece duas vezes no nome comprido da categoria, e ignora "casamento", que é a única palavra que decide. O que funciona é casar **palavra**, não frase: radical de 6 letras do nome da fonte contra os do nome **e do slug** da categoria. Rodado contra os 7 nomes reais que sobraram: *Impressões fotográficas* e *Loja de artigos para fotografia* apontam para Fotografia e vídeo; *Loja de Presentes* e *Companhia de produção de filmes* não apontam para nada, **que é a resposta certa**. E empate é nulo: *Buffet de casamento* casa `buffet` com os dois buffets do catálogo, e escolher um ali põe infantil no funil de adulto.
+
+**`public.importacao_previa` devolve `categoria_origem` por linha e `categorias_novas` agrupado** — nome da fonte, quantas linhas dependem dele, até três empresas de exemplo e a sugestão. Nas 40 linhas reais: **7 perguntas** no lugar de 9 cartões, e cada uma com o nome das empresas ao lado. Essa coluna não é enfeite: *Loja de Presentes* é a PICMIMOS, que revela foto, e *Companhia de produção de filmes* é o Fabio Carneiro, fotógrafo. Sem ver a empresa, a pessoa descarta lead bom pelo rótulo do Google.
+
+**`public.importacao_mapear_categorias(int, jsonb)`** — a escrita no de-para, aberta a `app.can_write()` com `audit_log` de quem ensinou o quê (**decisão 1 do Rafael**). A RLS da tabela **não muda**: escrita direta continua exigindo gestor; quem abre é esta função, `security definer`. A chave é sempre gravada por `app.chave_catalogo`, então a segunda grafia **corrige** a regra em vez de virar uma segunda linha no mapa. Par sem categoria é "não sei" e **não escreve nada**.
+
+**Na tela** (`resolver-categorias.tsx`), três respostas por nome: uma categoria, *"não importar estas linhas"* ou *"não sei"* — e **"não sei" é o padrão**. A sugestão sobe ao topo da lista suspensa e **nunca vem marcada**: pré-marcar e deixar confirmar tudo num clique é o carimbo silencioso com outro nome. *"O que você foi buscar nesta lista?"* também não pré-marca; só entra como primeira opção.
+
+*"Não importar estas linhas"* fica **só no navegador** e não vira regra no banco: é o mesmo que apagar as linhas do arquivo antes de mandar — elas não viram `raw_capture`, não viram candidato e não deixam rastro, porque nunca entraram. Escrever isso no de-para inventaria uma categoria "lixo" que contaminaria toda lista futura daquela fonte. Há um "trazer de volta" ao lado.
+
+Aplicar **refaz a prévia**, porque é ela que diz quantas viram parceiro — e a resposta acabou de mudar isso.
+
+`juntarCategoriasNovas` no cliente: o banco agrupa **dentro** da chamada e `pedirPrevia` vai em pedaços de 200 linhas. Sem a junção, uma planilha de 600 linhas perguntaria "Estúdio fotográfico" três vezes.
+
+pgTAP `79_a_pergunta_por_categoria.sql` (16 asserções) e Vitest `categorias-novas.test.ts` (6). O `scripts/placar-importacao.sql` passou a imprimir `categorias_novas` da própria prévia — o `\echo` que agrupava em nulo saiu.
+
 ### Tarefa 8 — A prévia para de mentir
 
 Migração `20261001110000_a_previa_para_de_mentir.sql`, e os três defeitos vêm dos mesmos 40 registros de `listas/`:
@@ -3431,8 +3453,7 @@ pgTAP novo: `78_a_previa_para_de_mentir.sql` (9 asserções, escrito vermelho an
 
 ### O que ficou pendente
 
-- **A segunda leva (tarefas 5 a 7) continua aberta.** O recibo das 36 caixinhas, a tela de resolver categorias por nome (o coração: O(linhas) → O(nomes novos)) e o aprovar em lote. Plano em `docs/superpowers/plans/2026-09-25-importar-sem-fila.md`.
-- **O `\echo` das categorias desconhecidas no placar ainda agrupa em nulo.** `public.importacao_previa` não devolve `categoria_origem` por linha — isso entra na tarefa 6.2. `app.importacao_normalizar` já o devolve; falta só subir à saída da prévia. O bloco está marcado no script.
+- **Falta a tarefa 7 da segunda leva:** o aprovar em lote na fila (`radar_revisar_lote` + seleção múltipla), que é o que resolve os 155 presos em minutos. Plano em `docs/superpowers/plans/2026-09-25-importar-sem-fila.md`.
 - **Os dois nomes de fonte na seed** (`Planilha (importação)`, `Google Maps (raspagem local)`) continuam com o texto antigo: mudá-los é migração, não texto, e o placar procura a fonte pelo `slug`.
 - **Tarefas 9 e 10 (aprendizado e IA) estão atrás de um portão**: não começam sem um plano detalhado próprio. A Fase 4 (a IA escrevendo) não foi tocada.
 

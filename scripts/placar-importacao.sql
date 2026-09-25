@@ -85,8 +85,9 @@ select pg_temp.carregar('buffet');
 
 create temp table resultado on commit drop as
 select l.arquivo,
-       (p.previa -> 'contagem') as contagem,
-       p.previa -> 'linhas'     as linhas
+       (p.previa -> 'contagem')         as contagem,
+       p.previa -> 'linhas'             as linhas,
+       p.previa -> 'categorias_novas'   as previa_categorias
   from (select distinct arquivo from linhas_do_placar) l
   cross join lateral (
     select public.importacao_previa(
@@ -103,15 +104,16 @@ select arquivo,
        (contagem ->> 'erro')::int      as nao_entram
   from resultado order by arquivo;
 
-\echo '--- Os nomes de categoria que o CRM ainda não conhece (a partir da tarefa 1) ---'
--- `categoria_origem` por linha só existe depois da tarefa 1.4; até lá esta
--- consulta agrupa em nulo e os nomes se leem no próprio CSV.
-select j ->> 'categoria_origem' as categoria_da_fonte,
-       count(*)                 as linhas_paradas,
-       string_agg(j ->> 'nome', ' ; ') as empresas
-  from resultado r, lateral jsonb_array_elements(r.linhas) j
- where j ->> 'motivo' = 'categoria_desconhecida'
- group by 1 order by 2 desc, 1;
+\echo '--- O que a tela de resolver perguntaria: uma linha por NOME, não por linha ---'
+-- Isto é `categorias_novas` da própria prévia, que é o que a tela consome.
+-- Uma pergunta por nome; a sugestão por radical vem junto e NUNCA pré-marcada.
+select g ->> 'nome_na_fonte'          as nome_na_fonte,
+       (g ->> 'linhas')::int          as linhas_paradas,
+       coalesce(g ->> 'sugestao_nome', '—') as parece_ser,
+       (select string_agg(e #>> '{}', ' ; ')
+          from jsonb_array_elements(g -> 'exemplos') e) as empresas
+  from resultado r, lateral jsonb_array_elements(r.previa_categorias) g
+ order by 2 desc, 1;
 
 \echo '--- Linha a linha, o que a prévia promete ---'
 select r.arquivo, (j ->> 'linha')::int as linha, j ->> 'nome' as nome,

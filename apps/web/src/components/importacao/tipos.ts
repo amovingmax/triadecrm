@@ -228,12 +228,50 @@ export type LinhaDaPrevia = {
   etapa: string | null;
   responsavel: string | null;
   telefone: string | null;
+  /**
+   * O texto CRU da categoria, como a fonte escreveu.
+   *
+   * É o que a tela de resolver agrupa e o que o cartão da fila mostra. Sem ele
+   * a pergunta continuaria sendo por linha.
+   */
+  categoria_origem: string | null;
   avisos: string[];
 };
 
 export type Contagem = Partial<Record<Decisao, number>>;
 
-export type Previa = { contagem: Contagem; linhas: LinhaDaPrevia[] };
+/** Uma categoria do catálogo do CRM, para as listas suspensas da importação. */
+export type CategoriaDoCatalogo = { id: number; nome: string };
+
+/**
+ * Um nome de categoria que a fonte usou e o CRM não conhece.
+ *
+ * A unidade da pergunta mudou: era uma decisão por LINHA (36 cartões nas 40
+ * linhas de 25/09/2026), passa a ser uma por NOME (13), e a resposta fica
+ * gravada em `public.source_category_map` — na lista seguinte, zero.
+ */
+export type CategoriaNova = {
+  nome_na_fonte: string;
+  linhas: number;
+  /** Até três nomes de empresa. Não é enfeite: ver §3 abaixo. */
+  exemplos: string[];
+  /**
+   * A sugestão por radical de palavra. NUNCA vem marcada.
+   *
+   * Pré-marcar e deixar confirmar tudo num clique é o carimbo silencioso com
+   * outro nome: na lista do buffet ele transformaria "Restaurante
+   * self-service" em Buffet adulto, o funil erraria, a meta de déficit
+   * erraria, e alguém abriria conversa com o pitch errado.
+   */
+  sugestao_id: number | null;
+  sugestao_nome: string | null;
+};
+
+export type Previa = {
+  contagem: Contagem;
+  linhas: LinhaDaPrevia[];
+  categoriasNovas: CategoriaNova[];
+};
 
 export type LinhaGravada = {
   linha: number;
