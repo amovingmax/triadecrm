@@ -10,6 +10,8 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+import { buscarSaudeDaEsteira } from './dados';
+
 /**
  * Ajustes → Atendimento (Fase 3, 22/09/2026).
  *
@@ -49,9 +51,20 @@ async function configurar(p: Record<string, unknown>) {
   if (!(data as { ok?: boolean } | null)?.ok) throw new Error('O banco recusou a mudança.');
 }
 
+/** Nome de gente para os dois robôs que fazem o CRM falar. */
+const ROTULO_DO_ROBO: Record<'wa' | 'ai', string> = {
+  wa: 'WhatsApp (recebe e envia)',
+  ai: 'IA (classifica e rascunha)',
+};
+
 export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
   const clientes = useQueryClient();
   const consulta = useQuery({ queryKey: ['admin', 'atendimento'], queryFn: carregar });
+  const saude = useQuery({
+    queryKey: ['admin', 'saude-dos-workers'],
+    queryFn: buscarSaudeDaEsteira,
+    refetchInterval: 60_000,
+  });
   const recarregar = () => void clientes.invalidateQueries({ queryKey: ['admin', 'atendimento'] });
 
   const mudar = useMutation({
@@ -104,6 +117,53 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
 
       <RespostasProntas respostas={respostas} podeEditar={podeEditar} aoMudar={recarregar} />
       <Etiquetas etiquetas={etiquetas} podeEditar={podeEditar} aoMudar={recarregar} />
+
+      {/*
+        O robô está de pé? Uma linha, não um painel: worker, quando bateu ponto
+        pela última vez e o veredito do próprio banco. `vivo` vem de
+        `public.esteira_saude()` — batida nos últimos 2 minutos —, e a tela NÃO
+        recalcula isso. Só `wa` e `ai`: são os dois que fazem o CRM falar. O
+        `rotas` roda sob demanda e ficar parado é o normal dele, então uma
+        bolinha vermelha ali ensinaria a equipe a ignorar bolinha vermelha.
+      */}
+      <section className="border-t border-hairline pt-4">
+        <h2 className="font-heading text-base font-medium">Os robôs</h2>
+        {saude.isPending ? (
+          <p className="mt-2 text-sm text-muted-foreground">Carregando…</p>
+        ) : !saude.data ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            O seu acesso não lê a saúde dos robôs.
+          </p>
+        ) : (
+          <ul className="mt-2 flex flex-col gap-1">
+            {(['wa', 'ai'] as const).map((nome) => {
+              // Em `const` porque `saude.data` é `SaudeDaEsteira | null` e o
+              // TypeScript perde o estreitamento dentro do callback.
+              const batidas = saude.data?.workers ?? [];
+              const batida = batidas.find((w) => w.worker === nome);
+              return (
+                <li key={nome} className="flex items-center gap-2 text-sm">
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'size-2 rounded-full',
+                      batida?.vivo ? 'bg-emerald-600' : 'bg-muted-foreground/40',
+                    )}
+                  />
+                  <span className="font-medium">{ROTULO_DO_ROBO[nome]}</span>
+                  <span className="text-muted-foreground">
+                    {batida
+                      ? batida.vivo
+                        ? `de pé, bateu ponto há ${Math.max(0, Math.round(batida.ha_segundos))}s`
+                        : `parado há ${Math.max(0, Math.round(batida.ha_segundos / 60))} min`
+                      : 'nunca bateu ponto'}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

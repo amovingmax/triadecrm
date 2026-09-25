@@ -43,6 +43,9 @@ import {
   type MotivoDePerda,
   type ParceiroSemContato,
   type Permitido,
+  type BatidaDeWorker,
+  type FilaDaEsteira,
+  type SaudeDaEsteira,
 } from './tipos';
 
 /** Erro de permissão do Postgres, que na Admin é um estado da tela e não uma falha. */
@@ -797,4 +800,44 @@ export async function definirSetoresDaPessoa(pessoaId: string, setores: number[]
   if (!r?.ok) {
     throw new Error(r?.motivo === 'sem_permissao' ? 'Só admin e gestor mudam setores.' : 'O banco recusou.');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Saúde da esteira: os robôs estão de pé? (RF-ADM-07)
+// ---------------------------------------------------------------------------
+
+/** Leitura segura de um campo de `jsonb` livre, que chega aqui como `unknown`. */
+function objeto(valor: unknown): Record<string, unknown> {
+  return typeof valor === 'object' && valor !== null && !Array.isArray(valor)
+    ? (valor as Record<string, unknown>)
+    : {};
+}
+function texto(valor: unknown): string | null {
+  return typeof valor === 'string' && valor.trim() ? valor : null;
+}
+
+/**
+ * `public.esteira_saude()` recusa quem não escreve na base (`leitura`,
+ * `financeiro`) com 42501. Isso não é erro de tela: é o papel certo vendo o que
+ * lhe cabe. A função devolve `null` nesse caso, e o painel diz uma frase em vez
+ * de mostrar um alarme vermelho para quem não tem o que fazer com ele.
+ */
+export async function buscarSaudeDaEsteira(): Promise<SaudeDaEsteira | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('esteira_saude');
+  if (error) {
+    if (/42501|não lê a saúde|permission/i.test(error.message)) return null;
+    throw new Error(error.message);
+  }
+
+  const bruto = objeto(data);
+  return {
+    workers: Array.isArray(bruto.workers) ? (bruto.workers as BatidaDeWorker[]) : [],
+    filas: Array.isArray(bruto.filas) ? (bruto.filas as FilaDaEsteira[]) : [],
+    coletor_vivo: bruto.coletor_vivo === true,
+    lotes_rodando: Number(bruto.lotes_rodando) || 0,
+    capturas_por_expurgar: Number(bruto.capturas_por_expurgar) || 0,
+    registros_por_resolver: Number(bruto.registros_por_resolver) || 0,
+    ultimo_expurgo: texto(bruto.ultimo_expurgo),
+  };
 }

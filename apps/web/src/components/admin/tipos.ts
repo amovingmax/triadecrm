@@ -291,3 +291,51 @@ export function lgpdDaUrl(aba: Aba, valor: string | string[] | undefined): Secao
   }
   return 'supressao';
 }
+
+// ---------------------------------------------------------------------------
+// Saúde da esteira (RF-ADM-07; RPC `public.esteira_saude`)
+//
+// Vieram da tela do Radar em 25/09/2026, quando o painel do coletor foi
+// apagado. `public.esteira_saude()` devolve a batida de TODOS os workers, não
+// só a do coletor — e sem esta linha ninguém responderia "o robô do WhatsApp
+// está de pé?" justo quando ele passou a responder sozinho.
+//
+// `SaudeDaEsteira.coletor_vivo` vem junto porque a RPC ainda o devolve; nenhuma
+// tela o lê desde que o coletor saiu.
+// ---------------------------------------------------------------------------
+
+/** Uma batida de ponto de worker (`public.worker_heartbeats`). */
+export type BatidaDeWorker = {
+  worker: string;
+  instancia: string;
+  status: 'ok' | 'degradado' | 'parado';
+  fila: string | null;
+  versao: string | null;
+  host: string | null;
+  ultima_batida: string;
+  /** Segundos desde a última batida, contados pelo relógio do banco. */
+  ha_segundos: number;
+  /** O veredito do banco: batida nos últimos 2 minutos. A tela não recalcula isso. */
+  vivo: boolean;
+  processados: number;
+  falhas: number;
+};
+
+/** Profundidade de uma fila `pgmq` da esteira. */
+export type FilaDaEsteira = {
+  fila: string;
+  na_fila: number;
+  visiveis: number;
+  mais_antigo_segundos: number | null;
+  total_ja_enfileirado: number;
+};
+
+export type SaudeDaEsteira = {
+  workers: BatidaDeWorker[];
+  filas: FilaDaEsteira[];
+  coletor_vivo: boolean;
+  lotes_rodando: number;
+  capturas_por_expurgar: number;
+  registros_por_resolver: number;
+  ultimo_expurgo: string | null;
+};
