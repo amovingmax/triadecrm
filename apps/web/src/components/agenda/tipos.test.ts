@@ -4,16 +4,19 @@ import {
   agruparPorBairro,
   BAIRRO_SEM_NOME,
   blocosDoDia,
+  chaveDoCompromisso,
   consultaDoMapa,
   contarPorDia,
   diaDaSemana,
   diasDaSemana,
   ehFimDeSemana,
+  faixaDeHoras,
   horaEmNatal,
   inicioDaSemana,
   janelaDeDias,
   linkDoMapa,
   mapaPorNome,
+  naturezaDoCompromisso,
   numeroDoDia,
   proximoCompromisso,
   recortesDoCompromisso,
@@ -38,7 +41,14 @@ function compromisso(parcial: Partial<Compromisso> = {}): Compromisso {
     titulo: 'Reunião na data',
     quando: '2026-09-10T13:30:00.000Z',
     concluido: false,
-    google: null,
+    reuniaoId: null,
+    fim: null,
+    link: null,
+    local: null,
+    estado: null,
+    marcadaPeloRobo: false,
+    avisoEnviadoEm: null,
+    reuniaoCriadaEm: null,
     organizationId: 'org-1',
     organizacao: 'Buffet Sabor',
     bairro: 'Tirol',
@@ -233,5 +243,94 @@ describe('recortes do catálogo', () => {
       compromisso({ naoContatar: true }),
     );
     expect([...realizada, ...ausente, ...reagendar]).toEqual([]);
+  });
+});
+
+
+/**
+ * A reunião virou objeto do banco (ADR-15), e a tela lê a reunião — não o eco.
+ * O que estes testes seguram é a fronteira: quando a linha de `reunioes` manda,
+ * e quando a `meeting` antiga, sem objeto, continua sendo lida pela régua velha.
+ */
+describe('reunião e eco', () => {
+  it('a chave de lista prefere a reunião ao eco', () => {
+    expect(chaveDoCompromisso(compromisso({ reuniaoId: 'r1', taskId: 't1' }))).toBe('r1');
+  });
+
+  it('sem reunião, a chave continua sendo a da tarefa', () => {
+    expect(chaveDoCompromisso(compromisso({ reuniaoId: null, taskId: 't1' }))).toBe('t1');
+  });
+
+  it('"marcado" passa a querer dizer "tem linha em reunioes"', () => {
+    expect(
+      naturezaDoCompromisso({ reuniaoId: 'r1', tipo: 'reuniao', etapaId: null }, new Set()),
+    ).toBe('marcado');
+  });
+
+  it('a etapa que exige meeting_at continua classificando a `meeting` ANTIGA, sem reunião', () => {
+    expect(
+      naturezaDoCompromisso({ reuniaoId: null, tipo: 'reuniao', etapaId: 5 }, new Set([5])),
+    ).toBe('marcado');
+  });
+
+  it('e sem reunião nem etapa de hora marcada, é apresentação a combinar', () => {
+    expect(
+      naturezaDoCompromisso({ reuniaoId: null, tipo: 'reuniao', etapaId: 4 }, new Set([5])),
+    ).toBe('a_marcar');
+  });
+
+  it('visita é visita, com reunião ou sem', () => {
+    expect(
+      naturezaDoCompromisso({ reuniaoId: 'r1', tipo: 'visita', etapaId: 5 }, new Set([5])),
+    ).toBe('visita');
+  });
+
+  it('mostra 10h20–11h00, e não só o começo: é a primeira vez que o produto tem fim', () => {
+    expect(
+      faixaDeHoras({ quando: '2026-10-01T13:20:00.000Z', fim: '2026-10-01T14:00:00.000Z' }),
+    ).toBe('10h20–11h00');
+  });
+
+  it('sem fim, mostra só a hora — a `meeting` antiga não ganha fim inventado', () => {
+    expect(faixaDeHoras({ quando: '2026-10-01T13:20:00.000Z', fim: null })).toBe('10h20');
+  });
+});
+
+describe('a porta de remarcar é uma só', () => {
+  const catalogo: DesfechoCatalogo[] = [
+    {
+      slug: 'reu_reagendada',
+      label: 'Reagendada',
+      surfaces: ['reuniao'],
+      creates_task: true,
+      requires_meeting_at: true,
+      sort_order: 1,
+      is_active: true,
+      com_quem_default: null,
+      requires_note: false,
+      is_negative: false,
+    } as unknown as DesfechoCatalogo,
+    {
+      slug: 'reu_interessado',
+      label: 'Interessado',
+      surfaces: ['reuniao'],
+      creates_task: true,
+      requires_meeting_at: false,
+      sort_order: 2,
+      is_active: true,
+      com_quem_default: null,
+      requires_note: false,
+      is_negative: false,
+    } as unknown as DesfechoCatalogo,
+  ];
+
+  it('compromisso COM reunião não oferece "Reagendada" na folha: remarcar é o botão do cartão', () => {
+    expect(recortesDoCompromisso(catalogo, compromisso({ reuniaoId: 'r1' })).reagendar).toEqual([]);
+  });
+
+  it('compromisso SEM reunião continua oferecendo, porque é o único caminho que ele tem', () => {
+    expect(
+      recortesDoCompromisso(catalogo, compromisso({ reuniaoId: null })).reagendar.length,
+    ).toBeGreaterThan(0);
   });
 });

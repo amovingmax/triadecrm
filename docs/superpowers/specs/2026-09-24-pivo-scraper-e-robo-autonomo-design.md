@@ -826,9 +826,11 @@ Duas decisões que faltavam: **coorte fixa de 90 dias**, sem parâmetro novo (o 
 
 As duas falhas confirmadas são exatamente §5.2 e §5.3. Registrado aqui só para fechar o benchmark.
 
-### 7.7 Fase 4 — a agenda já está ligada no Google (item 7) — 0,5 dia
+### 7.7 ~~Fase 4 — a agenda já está ligada no Google (item 7)~~ — **REVOGADA em 25/09/2026 (ADR-15)**
 
-Está feito e ninguém percebeu: `agenda/google-dados.ts:16` declara o escopo `calendar.events`; `criarEventoNoGoogle(taskId)` (`:64`) chama `/api/agenda/evento`, que cria o bloco e devolve link do Meet quando não é visita (`route.ts:147`, `comMeet: !ehVisita`); `agenda_google_estado` e `agenda_google_desconectar` existem. Guia em `docs/operacao/ligar-a-agenda-do-google.md`. **Falta** que a Fase 4 chame a mesma rota com a tarefa que o robô criou. **Não faço** ler livre/ocupado: §8.5.
+Esta seção mandava a Fase 4 chamar `/api/agenda/evento` com a tarefa que o robô tivesse criado. **Essa rota não existe mais**, e nem o `google-dados.ts`, nem o escopo `calendar.events`, nem `agenda_google_estado`, nem o guia de operação: a emenda B.8 apagou tudo, com as duas tabelas, as nove funções em `app`, os nove invólucros em `public` e os segredos do Vault.
+
+O que a Fase 5 entregou no lugar, e é o que a Fase 4 chama: **`public.reuniao_horarios(conversation_id, limite)`** e **`public.reuniao_marcar(conversation_id, inicio, formato, observacao)`** — as duas únicas funções da fase com `grant` para `service_role` no caminho de escrita. A primeira devolve `quando_por_extenso` pronto; a segunda devolve `link`, `estado`, `precisa_confirmacao` e, quando recusa, `alternativas` no mesmo retorno. Ver seção B.
 
 ### 7.8 Fase 4 — o cartão anda quando a Komune avisa (item 1, segunda metade) — 0,5 dia
 
@@ -862,8 +864,8 @@ O dono do **negócio** já é fixo: `deals.owner_id` não muda, e o comentário 
 ### 8.4 Relatório mensal (item 11) — 1 dia, não 0,25. Sai da carona.
 O gerador é **semanal por dentro**: `public.relatorio_semanal_gerar(p_semana_inicio date)` (`20260905000700:852`) recebe uma segunda-feira; `app.relatorio_semanal_fatos` (`:307`) força `date_trunc('week')` e compara com os 7 dias anteriores (`:315–318`); `public.weekly_reports` tem `on conflict (semana_inicio)` (`:837`). Reaproveitável só `app.relatorio_semanal_numeros(p_de, p_ate)` (`:211`). E o ganho é pequeno: `relatorios/periodo.ts:29–30` já tem "Este mês" e "Mês passado", com CSV e XLSX. Falta o e-mail chegar sozinho no dia 1º. **Sem PDF**, aí e depois.
 
-### 8.5 Ler livre/ocupado no Google (item 7, o resto) — não vale a pena.
-Escopo novo, todo mundo reconsente, para evitar propor horário ocupado. Três horários fixos oferecidos pelo robô resolvem o mesmo caso com zero OAuth novo.
+### 8.5 ~~Ler livre/ocupado no Google (item 7, o resto)~~ — **SEM OBJETO desde 25/09/2026 (ADR-15)**
+A objeção continua válida e ficou irrelevante: não há mais o que ler no Google. O CRM calcula o próprio livre/ocupado em SQL, por `app.reuniao_horarios_livres` — dia útil, antecedência, horizonte, colisão com outra reunião, rota da tarde, tarefa de campo e teto diário. Nem OAuth novo, nem três horários fixos: a grade é de verdade e é a mesma para pessoa e robô.
 
 ### 8.6 Motor genérico de automação de etapa (RF-FUN-05) — não vale a pena.
 `stages.automations` é declarativo e o comentário da coluna (`20260904000300:298`) diz que "o motor chega no D5–D7". Não chegou, e fora dos tipos gerados nada lê a coluna. JSON como código dentro do banco, sem tipo, sem teste e sem stack trace — cinco gatilhos nomeados são mais fáceis de ler, testar e apagar.

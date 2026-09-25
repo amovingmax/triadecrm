@@ -17,8 +17,7 @@ import {
   type Feriado,
 } from '@/components/registro/tipos';
 
-import { concluirCompromisso } from './consultas';
-import { RECADO_DA_ROTA, remarcarNoGoogle } from './google-dados';
+import { concluirCompromisso, fecharReuniao } from './consultas';
 import { type Compromisso } from './tipos';
 
 /**
@@ -42,13 +41,16 @@ export type ResultadoDoDesfecho = {
   /** `false` quando o registro entrou mas a tarefa do compromisso não fechou. */
   compromissoFechado: boolean;
   /**
-   * Recado sobre o evento no Google, quando houve um para levar junto.
+   * Recado sobre a REUNIÃO, quando o desfecho não conseguiu fechá-la.
    *
-   * Nulo quer dizer "não havia evento" ou "foi remarcado sem ruído". Preenchido
-   * quer dizer que o registro entrou mas o Google ficou para trás, e isso PRECISA
-   * chegar à pessoa: o convite do fornecedor continua no horário velho.
+   * O campo `avisoDaAgenda` existia porque o evento do Google podia ficar para
+   * trás. O Google saiu; a falha não. Agora ela é nossa e é pior: uma reunião
+   * que não foi fechada continua VIVA em `public.reunioes` — segurando o
+   * horário na trava de colisão e contando no teto de 4 do dia. Apagar o campo
+   * seria trocar um aviso visível por um horário que some da grade sem ninguém
+   * saber por quê.
    */
-  avisoDaAgenda: string | null;
+  avisoDaReuniao: string | null;
 };
 
 export async function registrarDesfechoDoCompromisso(entrada: {
@@ -66,7 +68,7 @@ export async function registrarDesfechoDoCompromisso(entrada: {
       ok: false,
       frase: 'Não achei este parceiro na base. Recarregue a agenda e tente de novo.',
       compromissoFechado: false,
-      avisoDaAgenda: null,
+      avisoDaReuniao: null,
     };
   }
 
@@ -118,36 +120,40 @@ export async function registrarDesfechoDoCompromisso(entrada: {
         ok: false,
         frase: fraseDaRecusa(resultado),
         compromissoFechado: false,
-        avisoDaAgenda: null,
+        avisoDaReuniao: null,
       };
     }
 
     const fechou = await concluirCompromisso(compromisso.taskId);
 
     /**
-     * O evento do Google vai junto para a data nova.
+     * A REUNIÃO também fecha.
      *
-     * Só aqui, e não antes: `move_deal` acabou de inserir a tarefa nova, e é ela
-     * que o banco procura para receber o espelho. Antes do registro, ela não
-     * existe.
+     * Sem isto, `realizada` e `nao_compareceu` são estados que o CHECK aceita e
+     * que ninguém nunca escreve: a tarefa fecha e a linha em `reunioes` fica
+     * `marcada` para sempre, segurando o horário na trava de colisão, contando
+     * no teto de 4 do dia e aparecendo na Agenda como compromisso vivo de uma
+     * semana atrás.
      *
-     * Falhar aqui NÃO desfaz nada — o reagendamento está gravado. O que sobra é
-     * um evento no horário velho na agenda do fornecedor, e é justamente por ser
-     * invisível do nosso lado que o aviso sobe para a tela.
+     * Quem diz qual dos dois estados é o próprio catálogo: `ninguem` em
+     * `COM_QUEM_AFIRMADO_PELO_DESFECHO` quer dizer que não havia ninguém do
+     * outro lado. O resto da superfície é reunião que aconteceu.
+     *
+     * "Reagendada" não chega aqui para compromisso COM reunião:
+     * `recortesDoCompromisso` já não a oferece, e remarcar é o botão do cartão
+     * (`public.reuniao_remarcar`), que move a linha e o eco juntos.
+     *
+     * Falhar aqui NÃO desfaz nada — o registro está gravado.
      */
-    let avisoDaAgenda: string | null = null;
-    if (compromisso.google && extras.reuniaoEm) {
-      try {
-        const r = await remarcarNoGoogle(compromisso.taskId, extras.reuniaoEm);
-        if (!r.ok && r.motivo !== 'sem_espelho') {
-          avisoDaAgenda =
-            r.recado ??
-            RECADO_DA_ROTA[r.motivo ?? ''] ??
-            'O horário mudou aqui, mas o evento no Google continua no horário antigo.';
-        }
-      } catch {
-        avisoDaAgenda =
-          'O horário mudou aqui, mas não deu para falar com o Google: o evento continua no horário antigo.';
+    let avisoDaReuniao: string | null = null;
+    if (compromisso.reuniaoId) {
+      const fechouReuniao = await fecharReuniao(
+        compromisso.reuniaoId,
+        comQuem === 'ninguem' ? 'nao_compareceu' : 'realizada',
+      );
+      if (!fechouReuniao) {
+        avisoDaReuniao =
+          'O registro entrou, mas a reunião continua aberta na agenda: o horário segue ocupado. Feche-a pelo cartão.';
       }
     }
 
@@ -155,11 +161,11 @@ export async function registrarDesfechoDoCompromisso(entrada: {
       ok: true,
       frase: fraseDoRegistro(compromisso, resultado),
       compromissoFechado: fechou,
-      avisoDaAgenda,
+      avisoDaReuniao,
     };
   } catch (erro) {
     if (erro instanceof ErroDeRegistro) {
-      return { ok: false, frase: erro.message, compromissoFechado: false, avisoDaAgenda: null };
+      return { ok: false, frase: erro.message, compromissoFechado: false, avisoDaReuniao: null };
     }
     // ZodError de campo obrigatório que a folha deixou passar, ou defeito de programa.
     console.error('agenda: falha ao registrar o desfecho', erro);
@@ -167,7 +173,7 @@ export async function registrarDesfechoDoCompromisso(entrada: {
       ok: false,
       frase: 'Faltou algum campo obrigatório deste resultado. Confira e tente de novo.',
       compromissoFechado: false,
-      avisoDaAgenda: null,
+      avisoDaReuniao: null,
     };
   }
 }

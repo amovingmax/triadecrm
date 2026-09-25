@@ -6,9 +6,11 @@ import { type DesfechoCatalogo } from '@/components/registro/tipos';
 
 import { CartaoCompromisso } from './cartao-compromisso';
 import { VazioDoDia } from './estados';
+import { TiraDeLivres } from './tira-de-livres';
 import {
   agruparPorBairro,
   blocosDoDia,
+  chaveDoCompromisso,
   diaDoInstante,
   horaEmNatal,
   rotuloDiaPorExtenso,
@@ -34,6 +36,7 @@ export function ListaDoDia({
   itens,
   catalogo,
   aoPedirDesfecho,
+  aoMudarReuniao,
   proximo,
   semanaVazia,
   aoIrParaDia,
@@ -42,6 +45,8 @@ export function ListaDoDia({
   itens: readonly Compromisso[];
   catalogo: readonly DesfechoCatalogo[];
   aoPedirDesfecho: (pedido: PedidoDeDesfecho) => void;
+  /** Recarrega a agenda depois de confirmar, cancelar ou remarcar uma reunião. */
+  aoMudarReuniao: () => void;
   /** O próximo compromisso a partir deste dia, para o dia vazio ter saída. */
   proximo: Compromisso | null;
   /** `true` quando a semana inteira está sem compromisso aberto. */
@@ -52,7 +57,9 @@ export function ListaDoDia({
 
   if (marcados.length + visitas.length + aMarcar.length + concluidos.length === 0) {
     return (
-      <VazioDoDia
+      <>
+        <TiraDeLivres dia={dia} />
+        <VazioDoDia
         frase={
           proximo
             ? `O próximo é ${proximo.organizacao}, ${rotuloDiaPorExtenso(diaDoInstante(proximo.quando))}${
@@ -70,12 +77,17 @@ export function ListaDoDia({
               }
             : null
         }
-      />
+        />
+      </>
     );
   }
 
   return (
     <div className="flex flex-col gap-7">
+      {/* "O que o robô pode oferecer no meu nome hoje" — a mesma grade de
+          `app.reuniao_horarios_livres` que ele usa para oferecer. */}
+      <TiraDeLivres dia={dia} />
+
       {marcados.length > 0 ? (
         <Bloco
           icone={<Video className="size-4" aria-hidden="true" />}
@@ -86,10 +98,11 @@ export function ListaDoDia({
           <ul className="flex flex-col border-t border-hairline">
             {marcados.map((c) => (
               <CartaoCompromisso
-                key={c.taskId}
+                key={chaveDoCompromisso(c)}
                 compromisso={c}
                 catalogo={catalogo}
                 aoPedirDesfecho={aoPedirDesfecho}
+                aoMudarReuniao={aoMudarReuniao}
               />
             ))}
           </ul>
@@ -114,10 +127,11 @@ export function ListaDoDia({
                 <ul className="flex flex-col border-t border-hairline">
                   {grupo.itens.map((c) => (
                     <CartaoCompromisso
-                      key={c.taskId}
+                      key={chaveDoCompromisso(c)}
                       compromisso={c}
                       catalogo={catalogo}
                       aoPedirDesfecho={aoPedirDesfecho}
+                      aoMudarReuniao={aoMudarReuniao}
                     />
                   ))}
                 </ul>
@@ -143,10 +157,11 @@ export function ListaDoDia({
           <ul className="flex flex-col border-t border-hairline">
             {aMarcar.map((c) => (
               <CartaoCompromisso
-                key={c.taskId}
+                key={chaveDoCompromisso(c)}
                 compromisso={c}
                 catalogo={catalogo}
                 aoPedirDesfecho={aoPedirDesfecho}
+                aoMudarReuniao={aoMudarReuniao}
               />
             ))}
           </ul>
@@ -162,10 +177,11 @@ export function ListaDoDia({
           <ul className="flex flex-col border-t border-hairline">
             {concluidos.map((c) => (
               <CartaoCompromisso
-                key={c.taskId}
+                key={chaveDoCompromisso(c)}
                 compromisso={c}
                 catalogo={catalogo}
                 aoPedirDesfecho={aoPedirDesfecho}
+                aoMudarReuniao={aoMudarReuniao}
               />
             ))}
           </ul>

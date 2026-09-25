@@ -13,14 +13,28 @@ import {
  * Contrato da Agenda (PRD §7.5, RF-AGE-01 a RF-AGE-08 e RF-ROT-03/05).
  *
  * ===========================================================================
- * O QUE A AGENDA É, HOJE
+ * O QUE A AGENDA É, DESDE 25/09/2026 (ADR-15)
  * ===========================================================================
- * Não existe tabela de eventos no banco, e não deve existir: um compromisso já é uma
- * `public.tasks` de tipo `meeting` ou `visit` com `due_at`. Quem as cria é o próprio
- * catálogo de desfechos, pela `public.registrar_contato` — "Reunião marcada" produz a
- * tarefa `meeting` na data combinada, "Não estava / fechado" produz a `visit` de D+7.
- * A Agenda LÊ essas tarefas e devolve o desfecho pelo MESMO caminho. Nenhuma escrita
- * daqui inventa etapa, temperatura ou porta: tudo passa por `registrar_contato`.
+ * Existe tabela de reuniões no banco: `public.reunioes`, com começo, FIM, formato,
+ * lugar, estado e dono, e uma trava de sobreposição no índice. (A frase que estava
+ * aqui — "não existe tabela de eventos no banco, e não deve existir" — passou a ser
+ * falsa no dia em que o calendário saiu do Google e virou nosso.)
+ *
+ * A espinha, porém, continua sendo `public.tasks`: toda reunião nasce com uma
+ * `tasks` `meeting` de eco, na mesma transação, porque quatro lugares do sistema já
+ * contam `kind in ('meeting','visit')` — o pulso do dia, o dreno duas vezes e a tela
+ * das cadências — e passariam a mentir por omissão. Reunião e eco nascem e morrem
+ * juntos: quem cria escreve os dois, quem cancela cancela os dois.
+ *
+ * Então a Agenda LÊ as tarefas e as ENRIQUECE com a reunião, por `task_id` — que é
+ * exatamente o papel que o espelho do Google tinha antes. O resto continua igual: o
+ * desfecho volta pela `public.registrar_contato`, e nenhuma escrita daqui inventa
+ * etapa, temperatura ou porta.
+ *
+ * Fora do eco sobra um caso, e ele está escrito no CHANGELOG: o desfecho
+ * `lig_reuniao_marcada`, na tela de ligação, ainda cria `tasks` `meeting` sem linha
+ * em `reunioes`. A grade já não oferece horário por cima dela, mas ela não ganha
+ * cartão de reunião, nem trava, nem e-mail.
  *
  * ===========================================================================
  * A DISTINÇÃO QUE ESTA TELA NÃO PODE APAGAR
@@ -59,11 +73,25 @@ export type Compromisso = {
   /** `tasks.status = 'done'`: já registrado, fica no rodapé do dia. */
   concluido: boolean;
   /**
-   * O evento espelho no Google Agenda, quando existe
-   * (`public.compromissos_no_google`). Nulo quer dizer "ainda não foi para a
-   * agenda", e é o que decide entre o botão que CRIA e o link que ABRE.
+   * `public.reunioes.id`, quando esta tarefa é o eco de uma reunião de verdade.
+   * Nulo quer dizer "tarefa `meeting` antiga, sem objeto" — e é o que decide se o
+   * cartão oferece as ações de reunião.
    */
-  google: { meetUrl: string | null; linkHtml: string | null } | null;
+  reuniaoId: string | null;
+  /** `reunioes.fim` em ISO. Nulo na `meeting` antiga: fim não se inventa. */
+  fim: string | null;
+  /** A sala congelada na reunião, quando o formato é on-line. */
+  link: string | null;
+  /** O endereço combinado, quando o formato é presencial. */
+  local: string | null;
+  /** `reunioes.estado`. `a_confirmar` é a rampa: o fornecedor ainda não sabe. */
+  estado: string | null;
+  /** `reunioes.marcada_por = 'robo'`: o selo que a amostragem das primeiras semanas lê. */
+  marcadaPeloRobo: boolean;
+  /** `reunioes.aviso_enviado_em`. Nulo depois de 10 minutos quer dizer que o e-mail não saiu. */
+  avisoEnviadoEm: string | null;
+  /** `reunioes.criada_em`: é dela que se conta a folga antes de acusar o e-mail. */
+  reuniaoCriadaEm: string | null;
   organizationId: string;
   organizacao: string;
   bairro: string | null;
@@ -217,8 +245,50 @@ export function compararCompromissos(a: Compromisso, b: Compromisso): number {
   return (
     a.quando.localeCompare(b.quando) ||
     a.organizacao.localeCompare(b.organizacao, 'pt-BR') ||
-    a.taskId.localeCompare(b.taskId)
+    chaveDoCompromisso(a).localeCompare(chaveDoCompromisso(b))
   );
+}
+
+// ---------------------------------------------------------------------------
+// Reunião e eco: qual dos dois manda
+// ---------------------------------------------------------------------------
+
+/**
+ * A chave de lista. Prefere a reunião ao eco, porque a reunião é a verdade e o
+ * eco é o que o resto do sistema sabe ler.
+ */
+export function chaveDoCompromisso(c: Compromisso): string {
+  return c.reuniaoId ?? c.taskId;
+}
+
+/**
+ * "Marcado" passa a querer dizer "tem linha em `reunioes`".
+ *
+ * A régua antiga — etapa cujo `stages.required_fields` exige `meeting_at` —
+ * CONTINUA, e não por nostalgia: ela é o que ainda classifica corretamente a
+ * `meeting` antiga, a que o `lig_reuniao_marcada` cria sem objeto. Enquanto essa
+ * segunda porta existir, apagar a régua faria reunião de verdade cair em
+ * "a marcar".
+ */
+export function naturezaDoCompromisso(
+  c: Pick<Compromisso, 'reuniaoId' | 'tipo' | 'etapaId'>,
+  etapasQueMarcamHora: ReadonlySet<number>,
+): NaturezaDoCompromisso {
+  if (c.tipo === 'visita') return 'visita';
+  if (c.reuniaoId) return 'marcado';
+  return c.etapaId !== null && etapasQueMarcamHora.has(c.etapaId) ? 'marcado' : 'a_marcar';
+}
+
+/**
+ * "10h20–11h00" quando a reunião tem fim, "10h20" quando não tem.
+ *
+ * É a primeira vez que o produto tem fim para mostrar — e a `meeting` antiga não
+ * ganha um fim inventado só para a linha ficar bonita.
+ */
+export function faixaDeHoras(c: Pick<Compromisso, 'quando' | 'fim'>): string {
+  const comeco = horaEmNatal(c.quando).replace(':', 'h');
+  if (!c.fim) return comeco;
+  return `${comeco}–${horaEmNatal(c.fim).replace(':', 'h')}`;
 }
 
 export type BlocosDoDia = {
@@ -352,9 +422,15 @@ export function recortesDoCompromisso(
   const superficie = compromisso.tipo === 'visita' ? 'visita' : 'reuniao';
   const daSuperficie = desfechosOferecidos(catalogo, superficie, compromisso.naoContatar);
 
-  const reagendar = daSuperficie.filter((d) =>
-    (SLUGS_REUNIAO_AGENDADA as readonly string[]).includes(d.slug),
-  );
+  // A PORTA DE REMARCAR PASSA A SER UMA SÓ. Quando o compromisso tem reunião,
+  // remarcar é o botão do cartão (`public.reuniao_remarcar`), que move a linha e
+  // o eco juntos. Oferecer também "Reagendada" aqui produziria DUAS linhas para a
+  // mesma reunião: o desfecho cria, por `move_deal`, uma `tasks` nova, e
+  // `reuniao_remarcar` cria outra pelo eco. Compromisso SEM reunião continua
+  // oferecendo, porque é o único caminho que ele tem.
+  const reagendar = compromisso.reuniaoId
+    ? []
+    : daSuperficie.filter((d) => (SLUGS_REUNIAO_AGENDADA as readonly string[]).includes(d.slug));
   const ausente = daSuperficie.filter(
     (d) => comQuemPadrao(d) === 'ninguem' && !reagendar.includes(d),
   );

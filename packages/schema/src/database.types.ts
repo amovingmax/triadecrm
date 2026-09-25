@@ -9,39 +9,7 @@ export type Json =
 export type Database = {
   app: {
     Tables: {
-      agendas_do_google: {
-        Row: {
-          conectada_em: string
-          email_google: string
-          escopos: string[]
-          revogada_em: string | null
-          segredo_id: string
-          ultimo_erro: string | null
-          ultimo_erro_em: string | null
-          user_id: string
-        }
-        Insert: {
-          conectada_em?: string
-          email_google: string
-          escopos?: string[]
-          revogada_em?: string | null
-          segredo_id: string
-          ultimo_erro?: string | null
-          ultimo_erro_em?: string | null
-          user_id: string
-        }
-        Update: {
-          conectada_em?: string
-          email_google?: string
-          escopos?: string[]
-          revogada_em?: string | null
-          segredo_id?: string
-          ultimo_erro?: string | null
-          ultimo_erro_em?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Views: {
       deal_cards: {
@@ -129,25 +97,6 @@ export type Database = {
         Returns: number
       }
       abrir_proximo_toque: { Args: { p_enrollment: string }; Returns: Json }
-      agenda_dados_do_evento: { Args: { p_task_id: string }; Returns: Json }
-      agenda_google_falhou: {
-        Args: { p_erro: string; p_revogar: boolean; p_user_id: string }
-        Returns: undefined
-      }
-      agenda_google_guardar: {
-        Args: {
-          p_email_google: string
-          p_escopos: string[]
-          p_refresh_token: string
-          p_user_id: string
-        }
-        Returns: Json
-      }
-      agenda_google_token: { Args: { p_user_id: string }; Returns: string }
-      agenda_google_token_do_evento: {
-        Args: { p_task_id: string }
-        Returns: string
-      }
       ai_alerta_orcamento: { Args: never; Returns: Json }
       ai_custo: {
         Args: {
@@ -198,26 +147,6 @@ export type Database = {
       can_write: { Args: never; Returns: boolean }
       chave_catalogo: { Args: { t: string }; Returns: string }
       cnpj_is_valid: { Args: { c: string }; Returns: boolean }
-      compromisso_do_google_esquecer: {
-        Args: { p_task_id: string }
-        Returns: Json
-      }
-      compromisso_do_google_gravar: {
-        Args: {
-          p_agenda_id: string
-          p_criado_por: string
-          p_evento_id: string
-          p_link_html: string
-          p_meet_url: string
-          p_task_id: string
-        }
-        Returns: Json
-      }
-      compromisso_do_google_ler: { Args: { p_task_id: string }; Returns: Json }
-      compromisso_do_google_remanejar: {
-        Args: { p_novo_horario: string; p_task_antiga: string }
-        Returns: Json
-      }
       compute_temperature: {
         Args: {
           p_last_activity_at: string
@@ -2620,61 +2549,6 @@ export type Database = {
             foreignKeyName: "compromissos_da_conversa_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
-            referencedRelation: "tasks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      compromissos_no_google: {
-        Row: {
-          agenda_id: string
-          criado_em: string
-          criado_por: string | null
-          evento_id: string
-          link_html: string | null
-          meet_url: string | null
-          sincronizado_em: string
-          task_id: string
-        }
-        Insert: {
-          agenda_id?: string
-          criado_em?: string
-          criado_por?: string | null
-          evento_id: string
-          link_html?: string | null
-          meet_url?: string | null
-          sincronizado_em?: string
-          task_id: string
-        }
-        Update: {
-          agenda_id?: string
-          criado_em?: string
-          criado_por?: string | null
-          evento_id?: string
-          link_html?: string | null
-          meet_url?: string | null
-          sincronizado_em?: string
-          task_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "compromissos_no_google_criado_por_fkey"
-            columns: ["criado_por"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "compromissos_no_google_criado_por_fkey"
-            columns: ["criado_por"]
-            isOneToOne: false
-            referencedRelation: "team_directory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "compromissos_no_google_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: true
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
@@ -7692,27 +7566,6 @@ export type Database = {
         }
         Returns: Json
       }
-      agenda_dados_do_evento: { Args: { p_task_id: string }; Returns: Json }
-      agenda_google_desconectar: { Args: never; Returns: Json }
-      agenda_google_estado: { Args: never; Returns: Json }
-      agenda_google_falhou: {
-        Args: { p_erro: string; p_revogar: boolean; p_user_id: string }
-        Returns: undefined
-      }
-      agenda_google_guardar: {
-        Args: {
-          p_email_google: string
-          p_escopos: string[]
-          p_refresh_token: string
-          p_user_id: string
-        }
-        Returns: Json
-      }
-      agenda_google_token: { Args: { p_user_id: string }; Returns: string }
-      agenda_google_token_do_evento: {
-        Args: { p_task_id: string }
-        Returns: string
-      }
       alvo_suprimido: {
         Args: { p_contact_id?: string; p_organization_id: string }
         Returns: boolean
@@ -7729,26 +7582,6 @@ export type Database = {
       }
       cadencias_do_negocio: { Args: { p_deal_id: string }; Returns: Json }
       cadencias_visao: { Args: never; Returns: Json }
-      compromisso_do_google_esquecer: {
-        Args: { p_task_id: string }
-        Returns: Json
-      }
-      compromisso_do_google_gravar: {
-        Args: {
-          p_agenda_id: string
-          p_criado_por: string
-          p_evento_id: string
-          p_link_html: string
-          p_meet_url: string
-          p_task_id: string
-        }
-        Returns: Json
-      }
-      compromisso_do_google_ler: { Args: { p_task_id: string }; Returns: Json }
-      compromisso_do_google_remanejar: {
-        Args: { p_novo_horario: string; p_task_antiga: string }
-        Returns: Json
-      }
       criar_ficha_da_conversa: {
         Args: {
           p_category_id: number

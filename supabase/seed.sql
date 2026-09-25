@@ -476,7 +476,7 @@ from (values
    $j$[{"field":"meeting_at","label":"Data e hora da reunião","type":"timestamptz"},
        {"field":"meeting_format","label":"Formato","type":"enum","options":["meet","visita"]}]$j$,
    $j$[
-    {"trigger":{"type":"on_enter"},"action":{"type":"calendar_event","provider":"google","meet_when":"meet"},"note":"Evento no Google Calendar (pelo robô ou pela pessoa)"},
+    {"trigger":{"type":"on_enter"},"action":{"type":"calendar_event","provider":"crm","meet_when":"meet"},"note":"Reunião no calendário do CRM (public.reunioes), pelo robô ou pela pessoa"},
     {"trigger":{"type":"before_appointment","hours":24},"action":{"type":"send_template","template":"GEN-AGD-24H-*"}},
     {"trigger":{"type":"before_appointment","hours":1},"action":{"type":"send_template","template":"GEN-AGD-1H-*"}},
     {"trigger":{"type":"on_no_show","count":1},"action":{"type":"reschedule","within_hours":24,"templates":["GEN-AGD-NOSHOW-1","GEN-AGD-NOSHOW-2"]},"note":"Humano tenta ligar antes"},
@@ -614,7 +614,7 @@ from (values
    $j$[{"field":"meeting_at","label":"Data e hora da demonstração","type":"timestamptz"},
        {"field":"meeting_format","label":"Formato","type":"enum","options":["meet_manha","cafe_ou_visita_tarde","evento_demo_sabado"]}]$j$,
    $j$[
-    {"trigger":{"type":"on_enter"},"action":{"type":"calendar_event","provider":"google"},"note":"Google Calendar + lembretes"},
+    {"trigger":{"type":"on_enter"},"action":{"type":"calendar_event","provider":"crm"},"note":"Reunião no calendário do CRM + lembrete da véspera"},
     {"trigger":{"type":"before_appointment","hours":24},"action":{"type":"send_template","template":"GEN-AGD-24H-*"}},
     {"trigger":{"type":"before_appointment","hours":1},"action":{"type":"send_template","template":"GEN-AGD-1H-*"}},
     {"trigger":{"type":"on_no_show","count":1},"action":{"type":"reschedule","within_hours":24,"templates":["GEN-AGD-NOSHOW-1","GEN-AGD-NOSHOW-2"]}},

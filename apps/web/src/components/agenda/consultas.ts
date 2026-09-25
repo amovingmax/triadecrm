@@ -2,12 +2,13 @@
 
 import { createClient } from '@/lib/supabase/client';
 
-import { janelaDeDias, type Compromisso, type Dia, type NaturezaDoCompromisso } from './tipos';
+import { janelaDeDias, naturezaDoCompromisso, type Compromisso, type Dia } from './tipos';
 
 /**
  * De onde a Agenda tira os compromissos.
  *
- * Três consultas em paralelo, todas sob a RLS de quem entrou, sem RPC nova:
+ * A consulta das `tasks` vem primeiro, sozinha; depois três em paralelo, todas sob a
+ * RLS de quem entrou, sem RPC nova:
  *
  * 1. `tasks` de tipo `meeting` e `visit` com prazo dentro da semana. A política
  *    `tasks_select` já entrega só as da pessoa (`assignee_id`), mas o filtro vai
@@ -19,6 +20,16 @@ import { janelaDeDias, type Compromisso, type Dia, type NaturezaDoCompromisso } 
  *    `stage_id` que diz se a reunião tem hora combinada, e é o `deal_id` +
  *    `stage_id` que viajam como `p_deal_id` e `p_expected_stage_id` no registro,
  *    pegando duas pessoas mexendo no mesmo negócio.
+ * 4. `reunioes` das MESMAS tarefas, por `task_id` (ADR-15). Ela substituiu o espelho
+ *    do Google, e no mesmo papel: a `tasks` é a espinha, a reunião é a carne. Não é
+ *    segunda fonte de linhas — reunião e eco nascem e morrem juntos, e `Compromisso`
+ *    tem `taskId` obrigatório porque `concluirCompromisso` e o registro de desfecho
+ *    dependem dele.
+ *
+ *    A DIFERENÇA EM RELAÇÃO AO ESPELHO: falha aqui DERRUBA a semana. O espelho do
+ *    Google era enfeite, e o erro dele era engolido de propósito. Sem `reunioes` a
+ *    lista fica ERRADA, não incompleta: reunião de verdade apareceria como
+ *    apresentação a combinar, sem sala, sem fim e sem as ações do cartão.
  *
  * Nenhum texto do Postgres chega à tela: falha vira `ErroDaAgenda` com frase em
  * português, pela mesma tradução que a tela de registro usa.
@@ -61,6 +72,23 @@ type LinhaTarefa = {
   due_at: string | null;
   organization_id: string | null;
   deal_id: string | null;
+};
+
+const COLUNAS_REUNIAO =
+  'id, task_id, inicio, fim, formato, link, local, estado, marcada_por, aviso_enviado_em, criada_em' as const;
+
+type LinhaReuniao = {
+  id: string;
+  task_id: string | null;
+  inicio: string;
+  fim: string | null;
+  formato: string;
+  link: string | null;
+  local: string | null;
+  estado: string;
+  marcada_por: string;
+  aviso_enviado_em: string | null;
+  criada_em: string;
 };
 
 type LinhaNegocio = {
@@ -128,30 +156,32 @@ export async function buscarCompromissos(params: {
   const orgIds = [...new Set(linhas.map((t) => t.organization_id).filter((id) => id !== null))];
   const dealIds = [...new Set(linhas.map((t) => t.deal_id).filter((id) => id !== null))];
 
-  const [orgs, negocios, espelhos] = await Promise.all([
+  const [orgs, negocios, reuniao] = await Promise.all([
     supabase.from('organizations_view').select(COLUNAS_ORG).in('id', orgIds),
     buscarNegocios(supabase, dealIds),
-    // Os eventos já criados no Google, das tarefas desta janela. Uma ida só, e
-    // não uma por cartão: numa semana cheia isso seriam trinta requisições para
-    // decidir o rótulo de um botão.
+    // As reuniões das tarefas desta janela. Uma ida só, e não uma por cartão:
+    // numa semana cheia isso seriam trinta requisições para desenhar uma lista.
     supabase
-      .from('compromissos_no_google')
-      .select('task_id, meet_url, link_html')
-      .in('task_id', linhas.map((t) => t.id)),
+      .from('reunioes')
+      .select(COLUNAS_REUNIAO)
+      .eq('dono_id', params.usuarioId)
+      .in('estado', ['a_confirmar', 'marcada', 'confirmada', 'realizada', 'nao_compareceu'])
+      .in(
+        'task_id',
+        linhas.map((t) => t.id),
+      ),
   ]);
 
   if (orgs.error) throw erroDe(orgs.error.code, orgs.error);
+  // Ao contrário do espelho do Google, este erro NÃO é engolido: sem a reunião a
+  // lista fica errada, não incompleta.
+  if (reuniao.error) throw erroDe(reuniao.error.code, reuniao.error);
 
   const porOrg = new Map((orgs.data ?? []).map((o) => [o.id, o] as const));
-  // Erro aqui NÃO derruba a agenda: o espelho do Google é enfeite útil, e a lista
-  // do dia é o trabalho. Sem ele, os cartões oferecem criar o evento de novo — o
-  // que a rota recusa com `ja_tem_evento`, sem estragar nada.
   const porTarefa = new Map(
-    ((espelhos.error ? [] : (espelhos.data ?? [])) as {
-      task_id: string;
-      meet_url: string | null;
-      link_html: string | null;
-    }[]).map((g) => [g.task_id, g] as const),
+    ((reuniao.data ?? []) as unknown as LinhaReuniao[])
+      .filter((r) => r.task_id !== null)
+      .map((r) => [r.task_id as string, r] as const),
   );
   const porNegocio = new Map(negocios.map((d) => [d.id, d] as const));
   const agora = Date.now();
@@ -165,26 +195,29 @@ export async function buscarCompromissos(params: {
 
     const negocio = tarefa.deal_id ? porNegocio.get(tarefa.deal_id) : undefined;
     const ehVisita = tarefa.kind === 'visit';
-    const natureza: NaturezaDoCompromisso = ehVisita
-      ? 'visita'
-      : negocio && marcamHora.has(negocio.stage_id)
-        ? 'marcado'
-        : 'a_marcar';
+    const reuniaoDaTarefa = porTarefa.get(tarefa.id) ?? null;
+    const tipo = ehVisita ? ('visita' as const) : ('reuniao' as const);
+    const natureza = naturezaDoCompromisso(
+      { reuniaoId: reuniaoDaTarefa?.id ?? null, tipo, etapaId: negocio?.stage_id ?? null },
+      marcamHora,
+    );
 
     return [
       {
         taskId: tarefa.id,
         natureza,
-        tipo: ehVisita ? ('visita' as const) : ('reuniao' as const),
+        tipo,
         titulo: tarefa.title,
         quando: tarefa.due_at,
         concluido: tarefa.status === 'done',
-        google: porTarefa.has(tarefa.id)
-          ? {
-              meetUrl: porTarefa.get(tarefa.id)!.meet_url,
-              linkHtml: porTarefa.get(tarefa.id)!.link_html,
-            }
-          : null,
+        reuniaoId: reuniaoDaTarefa?.id ?? null,
+        fim: reuniaoDaTarefa?.fim ?? null,
+        link: reuniaoDaTarefa?.link ?? null,
+        local: reuniaoDaTarefa?.local ?? null,
+        estado: reuniaoDaTarefa?.estado ?? null,
+        marcadaPeloRobo: reuniaoDaTarefa?.marcada_por === 'robo',
+        avisoEnviadoEm: reuniaoDaTarefa?.aviso_enviado_em ?? null,
+        reuniaoCriadaEm: reuniaoDaTarefa?.criada_em ?? null,
         organizationId: tarefa.organization_id,
         organizacao: org.name,
         bairro: org.neighborhood,
@@ -220,4 +253,28 @@ export async function concluirCompromisso(taskId: string): Promise<boolean> {
   const supabase = createClient();
   const { error } = await supabase.from('tasks').update({ status: 'done' }).eq('id', taskId);
   return !error;
+}
+
+/**
+ * Fecha a REUNIÃO depois que o desfecho foi gravado.
+ *
+ * Irmã de `concluirCompromisso`, e não substituta dela: a tarefa é o eco que o
+ * pulso do dia e o dreno leem, e a reunião é a verdade. Fechar só a tarefa deixa
+ * a linha em `reunioes` viva para sempre — segurando o horário na trava de
+ * colisão e contando no teto de 4 do dia.
+ *
+ * Falhar aqui NÃO é falhar o registro: o registro está gravado. Devolve `false`
+ * e a tela avisa.
+ */
+export async function fecharReuniao(
+  reuniaoId: string,
+  estado: 'realizada' | 'nao_compareceu',
+): Promise<boolean> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('reuniao_desfecho', {
+    p_id: reuniaoId,
+    p_estado: estado,
+  });
+  if (error) return false;
+  return (data as { ok?: boolean } | null)?.ok === true;
 }

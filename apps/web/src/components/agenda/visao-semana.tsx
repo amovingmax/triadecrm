@@ -4,11 +4,12 @@ import { cn } from '@/lib/utils';
 import { BarraTermica } from '@/components/temperatura';
 
 import {
+  chaveDoCompromisso,
   compararCompromissos,
   diaDoInstante,
   diasDaSemana,
   ehFimDeSemana,
-  horaEmNatal,
+  faixaDeHoras,
   numeroDoDia,
   rotuloDiaPorExtenso,
   rotuloSemanaCurto,
@@ -84,7 +85,7 @@ export function VisaoDaSemana({
               <ul className="flex flex-col">
                 {doDia.map((c) => (
                   <li
-                    key={c.taskId}
+                    key={chaveDoCompromisso(c)}
                     className={cn(
                       'relative flex items-center gap-2 border-b border-hairline py-2 pr-2 pl-3 last:border-b-0',
                       c.concluido && 'opacity-60',
@@ -98,7 +99,7 @@ export function VisaoDaSemana({
                     />
                     {c.natureza === 'marcado' ? (
                       <span className="numerico shrink-0 text-xs font-medium">
-                        {horaEmNatal(c.quando)}
+                        {faixaDeHoras(c)}
                       </span>
                     ) : null}
                     <span className="min-w-0 truncate text-xs" title={c.organizacao}>

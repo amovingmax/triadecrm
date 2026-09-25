@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { SeletorDeAba } from '@/components/ui/abas';
 import { NotaRecolhida } from '@/components/ui/nota-recolhida';
 
-import { ConexaoDaAgendaGoogle } from './conexao-google';
 import { cn } from '@/lib/utils';
 import {
   EXTRAS_VAZIOS,
@@ -135,13 +134,15 @@ export function TelaAgenda({
       if (!resultado.compromissoFechado) {
         toast.warning('O resultado foi gravado, mas o compromisso continuou aberto na lista.');
       }
-      /* O evento no Google ficou para trás. É `warning` e não `error` porque o
-         registro entrou: o que falhou foi levar o horário junto. E precisa
-         aparecer, porque é a única falha desta tela que ninguém aqui veria — quem
-         vê é o fornecedor, com um convite para uma hora que não vale mais. */
-      if (resultado.avisoDaAgenda) {
-        toast.warning('O evento no Google não acompanhou.', {
-          description: resultado.avisoDaAgenda,
+      /* A reunião não fechou. É `warning` e não `error` porque o registro
+         entrou: o que falhou foi fechar o objeto. E precisa aparecer, porque é a
+         falha desta tela que ninguém veria — a linha continua viva em
+         `public.reunioes`, segurando o horário na trava de colisão e contando no
+         teto de 4 do dia, e o único sintoma seria um horário que some da grade
+         sem explicação. */
+      if (resultado.avisoDaReuniao) {
+        toast.warning('A reunião continua aberta.', {
+          description: resultado.avisoDaReuniao,
           duration: 12_000,
         });
       }
@@ -263,6 +264,7 @@ export function TelaAgenda({
             itens={doDia}
             catalogo={contexto.catalogo}
             aoPedirDesfecho={setPedido}
+            aoMudarReuniao={() => void clienteDeConsultas.invalidateQueries({ queryKey: ['agenda'] })}
             proximo={proximoCompromisso(itens, referenciaDoProximo)}
             semanaVazia={abertos === 0}
             aoIrParaDia={irParaDia}
@@ -270,16 +272,11 @@ export function TelaAgenda({
         )}
       </section>
 
-      {/* A conexão fica no PÉ da tela, não no topo: quem abre a Agenda vem ver o
-          dia, e uma faixa de configuração acima da lista empurraria o trabalho
-          para baixo da dobra todos os dias por causa de uma ação que se faz uma
-          vez. Na aba Rota ela não aparece — rota de visita não vira Meet. */}
-      {visao === 'rota' ? null : (
-        <>
-          <ConexaoDaAgendaGoogle />
-          <AindaNaoLigado />
-        </>
-      )}
+      {/* A faixa de conexão com o Google saiu com o calendário (ADR-15): não há
+          mais nada para configurar aqui — a sala de cada pessoa mora em Ajustes,
+          e o livre/ocupado é calculado pelo CRM. Na aba Rota a nota não aparece:
+          ela fala da lista do dia. */}
+      {visao === 'rota' ? null : <AindaNaoLigado />}
 
       <FolhaDesfecho
         pedido={pedido}
@@ -314,14 +311,11 @@ function AindaNaoLigado() {
     <NotaRecolhida titulo="O que ainda não está ligado">
       <ul className="flex flex-col gap-1.5">
         <li>
-          <span className="text-foreground">Horários livres do Google</span>: a tela ainda não
-          consulta a sua agenda para sugerir horário vago. Criar o evento, com link do Meet e
-          convite, já funciona — é o botão &quot;Pôr na agenda&quot; em cada compromisso.
-        </li>
-        <li>
-          <span className="text-foreground">Lembretes de 24 h e 1 h</span> e o aviso de falta de
-          confirmação: dependem do número oficial na Cloud API da Meta, que entra com o
-          módulo de Conversas.
+          <span className="text-foreground">Lembrete automático ao parceiro</span>, na véspera e
+          na hora: depende de a Meta aprovar os dois modelos de 24 h, que ainda estão
+          pendentes. Na véspera a janela de resposta livre já fechou, e o CRM não manda
+          texto livre fora dela. Enquanto isso, quem atende recebe uma tarefa às 17h do dia
+          anterior para confirmar por conta própria.
         </li>
         <li>
           <span className="text-foreground">Rota otimizada</span> por tempo de deslocamento já

@@ -13,14 +13,15 @@ import { supabaseUrl } from '@/lib/env';
  *    produção.
  * 2. **Toda rota que o usa autentica a pessoa antes**, com o cliente normal (que
  *    respeita a RLS), e só então age em nome dela. Este cliente é para alcançar o
- *    que a pessoa não pode alcançar sozinha — o refresh token no Vault —, não
- *    para pular a checagem de quem ela é.
+ *    que a pessoa não pode alcançar sozinha — o balde privado de mídias e a busca
+ *    de telefone —, não para pular a checagem de quem ela é.
  * 3. **A chave não tem prefixo `NEXT_PUBLIC_`**, de propósito: o Next só injeta no
  *    navegador o que tem esse prefixo.
  *
- * A chave vive em `SUPABASE_SERVICE_ROLE_KEY` na Vercel. Sem ela, as rotas da
- * agenda respondem "não configurado" em vez de estourar — o CRM inteiro não pode
- * cair porque a integração da agenda não foi configurada.
+ * A chave vive em `SUPABASE_SERVICE_ROLE_KEY` na Vercel. Quem a usa hoje é
+ * `/api/midia`, `/api/audio` e `/api/telefone/procurar`. Sem ela essas rotas
+ * respondem "não configurado" em vez de estourar — o CRM inteiro não pode cair
+ * porque uma rota de apoio não foi configurada.
  */
 import 'server-only';
 
@@ -32,8 +33,8 @@ export function criarClienteAdmin() {
   const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!chave) {
     throw new Error(
-      'SUPABASE_SERVICE_ROLE_KEY não definida. A integração com o Google Agenda precisa dela ' +
-        'para ler o token guardado no Vault.',
+      'SUPABASE_SERVICE_ROLE_KEY não definida. O balde privado de mídias e a busca de ' +
+        'telefone precisam dela para alcançar o que a pessoa logada não alcança.',
     );
   }
   return criarClienteSupabase(supabaseUrl(), chave, {

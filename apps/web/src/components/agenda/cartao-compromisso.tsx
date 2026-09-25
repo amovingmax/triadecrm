@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { BarraTermica, ChipTemperatura, DiasSemContato } from '@/components/temperatura';
 
 import {
-  horaEmNatal,
+  faixaDeHoras,
   linkDoMapa,
   recortesDoCompromisso,
   type Compromisso,
@@ -17,7 +17,7 @@ import {
 } from './tipos';
 import { type DesfechoCatalogo } from '@/components/registro/tipos';
 
-import { BotaoDoGoogle } from './botao-google-agenda';
+import { AcoesDaReuniao } from './acoes-da-reuniao';
 
 /**
  * Um compromisso na lista do dia.
@@ -37,10 +37,12 @@ export function CartaoCompromisso({
   compromisso,
   catalogo,
   aoPedirDesfecho,
+  aoMudarReuniao,
 }: {
   compromisso: Compromisso;
   catalogo: readonly DesfechoCatalogo[];
   aoPedirDesfecho: (pedido: PedidoDeDesfecho) => void;
+  aoMudarReuniao?: () => void;
 }) {
   const { realizada, ausente, reagendar } = recortesDoCompromisso(catalogo, compromisso);
   const ehVisita = compromisso.tipo === 'visita';
@@ -64,9 +66,12 @@ export function CartaoCompromisso({
         semRotulo
       />
 
+      {/* `10h20–11h00` quando a reunião tem fim — é a primeira vez que o produto
+          tem fim para mostrar. A `meeting` antiga, sem objeto, continua com só a
+          hora: fim não se inventa para a linha ficar bonita. */}
       {temHora ? (
-        <p className="w-12 shrink-0 pt-0.5">
-          <span className="numerico text-sm font-medium">{horaEmNatal(compromisso.quando)}</span>
+        <p className={cn('shrink-0 pt-0.5', compromisso.fim ? 'w-24' : 'w-12')}>
+          <span className="numerico text-sm font-medium">{faixaDeHoras(compromisso)}</span>
         </p>
       ) : null}
 
@@ -189,31 +194,15 @@ export function CartaoCompromisso({
               </Button>
             ) : null}
 
-            {/* Só onde há hora combinada de verdade. Pôr no calendário uma tarefa
-                "Marcar apresentação", cuja hora é prazo calculado e não hora
-                combinada com ninguém, encheria a agenda de compromissos falsos —
-                é a mesma distinção que o cabeçalho de `tipos.ts` protege.
+            {/* As ações da reunião de verdade (ADR-15): entrar na sala, remarcar,
+                cancelar, confirmar o horário enquanto a rampa está ligada, mais o
+                selo de quem marcou e o aviso de e-mail que não saiu.
 
-                A visita entra nessa conta, e é por isso que o `|| ehVisita` que
-                estava aqui saiu: a `visit` de D+7 nasce às 09:00 pela régua do
-                catálogo, e ninguém combinou 09:00 com o fornecedor. Uma terça com
-                cinco visitas virava cinco blocos de uma hora empilhados no mesmo
-                horário do Google Agenda de quem clicasse — e quem deixa de confiar
-                na agenda fica sem a única visão de agenda que tem. A aba Rota já
-                diz, na nota do rodapé, que bloco de visita no Google está fora do
-                MVP; era este botão que a desmentia.
-
-                Para a visita entrar aqui um dia falta o passo que não existe: uma
-                folha "a que horas você vai?" que grave o `due_at` da tarefa ANTES
-                de criar o evento. Enquanto ela não existe, é melhor não ter botão
-                do que ter um que inventa horário.
-
-                A segunda condição não é sobra: a visita que JÁ tem espelho no
-                Google (criada antes desta correção) continua com o botão, e nesse
-                estado ele não cria nada — abre o evento e oferece "Tirar da
-                agenda". Sem ela, esses eventos ficariam órfãos no calendário, sem
-                nenhum lugar no CRM de onde apagá-los. */}
-            {temHora || compromisso.google ? <BotaoDoGoogle compromisso={compromisso} /> : null}
+                Elas existem só quando há linha em `public.reunioes`. A `meeting`
+                antiga — a que o `lig_reuniao_marcada` ainda cria sem objeto — não
+                tem sala, nem fim, nem estado: dar a ela um botão "entrar na sala"
+                seria a tela prometendo o que o banco não tem. */}
+            <AcoesDaReuniao compromisso={compromisso} aoMudar={aoMudarReuniao ?? (() => {})} />
           </div>
         )}
       </div>
