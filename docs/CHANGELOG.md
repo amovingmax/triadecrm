@@ -3142,3 +3142,25 @@ Verificado, com o banco reconstruído do zero: pgTAP **2.976 asserções em 68 a
 **Nada desta fase foi a produção:** sem `supabase db push`, sem `vercel`, sem `git push`, sem uma única chamada à Graph com o token real.
 
 **O que esta fase NÃO fez, de propósito:** o árbitro de quem responde, intenção → texto pronto, os `GEN-SYS-*` por intenção e o fim do teto de duas falas do bot de entrada. Tudo Fase 4 — que agora nasce dentro de freios que já existem.
+
+#### Conferência da Fase 3 — o buraco que a dívida ainda não alcançava
+
+Conferida a Fase 3 commit a commit, com o banco reconstruído do zero. Suíte verde, `db:lint` sem apontamento novo, `db:types` sem diff, nada em produção, árvore limpa. O freio foi **provado a mão**, e não só lido: com US$ 61 de gasto num teto de 60, `app.ia_pode_gastar` recusa os 14 propósitos e `app.ia_enfileirar` devolve `{enfileirado:false, motivo:"orcamento"}` com a dívida anotada. Freio que só existe no comentário é o defeito que esta fase corrige.
+
+Um buraco sobreviveu, e é exatamente o da pergunta "o freio pode perder dado?".
+
+**`public.ia_trabalho_adiado` cobria o pedido NOVO, não o trabalho que já estava na fila.** `app.ia_enfileirar` anota a dívida de quem *pede* com o mês estourado. Mas o trabalho que entrou na fila **antes** de o mês estourar não era anotado por ninguém: os workers consomem quando estão ligados (ADR-04), então entre o enfileiramento e a leitura pode passar meio dia — e o mês pode acabar nesse meio. Quando acontecia, `executar()` levantava `OrcamentoEsgotadoError`, `eDeterministico` dizia que não adiantava repetir e `workers/ai.ts` **concluía** a mensagem. A partir daí não havia linha em `ia_trabalho_adiado` — o cron nunca ficava sabendo — e a chave continuava em `public.ingest_dedup` com `processed_at` preenchido, de modo que `app.esteira_enfileirar` respondia `ja_enfileirado` **para sempre**. O resumo daquela ligação não acontecia nunca mais: o caso que o cabeçalho da `20260925150000` nomeia como "perde para sempre", pela outra ponta. Atingia `summarize_call`, `transcribe_audio`, `draft_followup`, `analisar_conversa`, `pulso_do_dia` e `triar_candidato`; `classify_inbound` já estava coberto, porque `classificarEntrada` escala a conversa e abre tarefa.
+
+**Migração `20260925190000_a_divida_alcanca_o_que_ja_estava_na_fila.sql`:**
+
+- `public.ia_adiar_trabalho(purpose, payload, chave, motivo)` — a porta pela qual o worker anota a dívida do que leu e não pôde fazer, **apagando a chave gasta de `ingest_dedup`**. Sem apagá-la a dívida seria impagável: o cron tentaria de 20 em 20 minutos e ouviria `ja_enfileirado` até o fim dos tempos. É seguro porque a mensagem original é arquivada no instante seguinte e porque o freio ainda está fechado — o cron não reenfileira nada enquanto estiver.
+- `app.ia_retomar_adiados` deixa de `exit` na primeira linha recusada e passa a `continue`. Com dois degraus de freio, uma dívida de `draft_reply` na frente da fila segurava atrás dela um `classify_inbound` que o freio deixaria passar. A pergunta continua sendo feita **linha a linha**, que é o que o freio exige; o que muda é que a linha recusada não prende as outras. Dívida que volte como `ja_enfileirado` passa a ser marcada como paga, em vez de tentar para sempre uma coisa já feita.
+- `apps/workers/src/ia/fila.ts` ganha `adiarTrabalho`, e `tratarTrabalho` anota a dívida antes de deixar o erro subir. Erro na anotação **não** sobe: derrubar a conclusão faria a mesma recusa girar com backoff até a dead-letter, e fila travada é pior que dívida perdida — a dívida perdida vira `error` no log.
+
+**Nada disto afrouxa o freio:** não há uma única chamada a mais ao modelo. `app.ia_pode_gastar` continua sendo perguntada antes de cada reenfileiramento e antes de cada POST. O que muda é que o trabalho recusado volta a existir.
+
+**Teste `supabase/tests/71_a_divida_alcanca_a_fila.sql`**, com o buraco escrito como asserção: a chave gasta trava o reenfileiramento (é a prova de que a perda existia), a porta nova anota e destrava, com o mês ainda estourado o cron devolve **zero** — o freio continua freiando —, pago o mês o trabalho volta, e a dívida que o freio recusa não prende a de trás. Mais dois no `tarefas.test.ts`: a dívida anotada com a chave certa, e a anotação que falha sem derrubar a fila.
+
+Verificado, com o banco reconstruído do zero: pgTAP **2.988 asserções em 69 arquivos**, `pnpm db:lint` com os três apontamentos pré-existentes e nenhum novo (`app.ia_prazo`, `app.radar_pontuar`, `app.envio_um`), `pnpm db:types` sem diff depois do commit, lint, typecheck, **804 testes do web em 52 arquivos**, **337 dos workers em 21**, **276 dos prompts** e **105 do schema**. Os 36 do `wa-webhook` não foram rodados aqui: o Deno não está instalado nesta máquina, e nada de `supabase/functions/` foi tocado nesta conferência.
+
+**Nada foi a produção:** sem `supabase db push`, sem `vercel`, sem `git push`, sem chamada à Graph com token real.
