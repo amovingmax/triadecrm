@@ -3341,3 +3341,17 @@ A seed é espelho exato da migração, e o auto-teste virou **piso** (`< 18`) e 
 **Medido, com o placar:** fotógrafo 10 → **13**; buffet 3 → **17**. Total **13 → 30 das 40**. Os nomes de categoria que o CRM não conhece caíram de 13 para **7**.
 
 pgTAP novo: `76_o_crm_fala_google.sql` (10 asserções), escrito vermelho antes da migração. Nenhuma conta linha absoluta de tabela compartilhada — a tabela vai receber escrita da equipe.
+
+### Tarefa 2 — A tela reconhece o arquivo do Maps em vez de perguntar
+
+`apps/web/src/components/importacao/origem-detectada.ts`, novo. A regra: **`cid` presente E (`plus_code` OU `data_id`)** → `google_maps_raspado`; senão, planilha. São identificadores internos do Maps, e planilha escrita por gente não tem isso. Duas colunas e não uma, para meia coluna copiada do Maps não virar lote de raspagem.
+
+No passo do arquivo o seletor **some**: não há cabeçalho para afirmar coisa nenhuma, e um menu de dois itens aberto no errado foi o que zerou o lote. Ele reaparece no passo seguinte, já como **fato contestável** — *"Google Maps (raspagem local) — reconheci por cid, plus_code, data_id"*, com um `não é?` ao lado que abre o menu de sempre. A escolha manual vence a detecção e continua sendo o que fica gravado em `import_batches.source_id`.
+
+**A regra da coerência, que o desenho não tinha:** o que a tela afirma é o que ficou **escolhido**, não o que foi lido. Sem a fonte do Maps no catálogo, `detectarOrigem` cai em planilha e devolve `porque` vazio — senão a linha diria "Planilha — reconheci por cid, plus_code", o contrário do que está gravado no lote.
+
+Os textos do seletor mudaram junto (é a mesma tela): "De onde veio esta lista" → **"Que arquivo é este?"**, e a explicação passa a dizer a consequência — *"Marcar errado manda a lista inteira para a fila."*
+
+Fixtures: os dois CSV de `listas/` entraram como fixture do web. O `maps-natal-buffet.csv` antigo **fica**: é exportação de 29 colunas, com BOM e sem `data_id`, e é ela que prova que a regra não está grudada no formato de hoje — 8 asserções em `origem-detectada.test.ts`.
+
+**Prova de fato:** arrastando `listas/2026-09-25-fotografo-natal-rn.csv` sem tocar em nada, a origem já entra certa, e a prévia mostra **13 viram parceiro** em vez de 0. É a medida da tarefa 1 chegando à tela sem ninguém responder nada.

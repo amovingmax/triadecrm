@@ -28,6 +28,7 @@ import {
 } from './dados';
 import { ErroDaImportacao, EsqueletoDaPrevia, Progresso, SemLotes } from './estados';
 import { faltando, linhaParaObjeto, sugerirMapa, temConteudo, type Sugestao } from './mapeamento';
+import { detectarOrigem, type OrigemDetectada } from './origem-detectada';
 import { PassoArquivo } from './passo-arquivo';
 import { PassoMapa } from './passo-mapa';
 import { PassoPrevia } from './passo-previa';
@@ -81,10 +82,16 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
 }) {
   const clienteDeConsultas = useQueryClient();
 
-  // A planilha continua sendo o padrão: é o caso de todo dia, e mudar o padrão
-  // faria a equipe rotular a planilha-ponte de Google Maps por distração.
+  // A planilha é o padrão ANTES de haver arquivo, e só isso: assim que o
+  // cabeçalho é lido, quem decide é `detectarOrigem`. Errar aqui custou 19
+  // fichas em 25/09/2026, e o padrão era exatamente este.
   const padrao = origens.find((o) => o.slug === 'planilha') ?? origens[0];
   const [origemId, setOrigemId] = useState<number>(padrao?.id ?? 0);
+  const [deteccao, setDeteccao] = useState<OrigemDetectada | null>(null);
+  // A escolha manual vence a detecção, e continua vencendo se a pessoa trocar
+  // de coluna depois. Só trocar de arquivo zera as duas.
+  const [origemEscolhidaAMao, setOrigemEscolhidaAMao] = useState(false);
+  const [menuDeOrigemAberto, setMenuDeOrigemAberto] = useState(false);
   const escolhida = origens.find((o) => o.id === origemId) ?? padrao;
   const nomeDaOrigem = escolhida?.nome ?? '';
 
@@ -101,6 +108,13 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
   const [falha, setFalha] = useState<Falha>(null);
 
   const trabalhador = useRef<Worker | null>(null);
+  // O catálogo de fontes lido de dentro do `addEventListener` do worker, que é
+  // registrado uma vez só: sem o ref, `lerArquivoEscolhido` fecharia sobre o
+  // `origens` da primeira renderização.
+  const origensRef = useRef(origens);
+  useEffect(() => {
+    origensRef.current = origens;
+  }, [origens]);
 
   const lotes = useQuery({
     queryKey: ['importacao', 'lotes'],
@@ -123,6 +137,9 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
     setPlanilha(null);
     setPrevia(null);
     setRecibo(null);
+    setDeteccao(null);
+    setOrigemEscolhidaAMao(false);
+    setMenuDeOrigemAberto(false);
     setPassoDaLeitura('lendo');
 
     trabalhador.current?.terminate();
@@ -160,6 +177,15 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
         return;
       }
       const s = sugerirMapa(lida.cabecalho);
+      // A origem é DETECTADA depois de ler o arquivo, e só enquanto ninguém a
+      // corrigiu à mão. O CSV do Maps traz `cid`, `plus_code` e `data_id`, que
+      // planilha escrita por gente não tem.
+      // Aplicar sem condição é correto, e não descuido: `lerArquivoEscolhido`
+      // zera `origemEscolhidaAMao` antes de mandar o arquivo ao worker, e esta
+      // resposta vem depois. Arquivo novo, leitura nova.
+      const detectada = detectarOrigem(lida.cabecalho, origensRef.current);
+      setDeteccao(detectada);
+      if (detectada.origem) setOrigemId(detectada.origem.id);
       setPlanilha(lida);
       setSugestao(s);
       setMapa(s.mapa);
@@ -278,7 +304,11 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
     setRecibo(null);
     setMapa({});
     setFalha(null);
-  }, []);
+    setDeteccao(null);
+    setOrigemEscolhidaAMao(false);
+    setMenuDeOrigemAberto(false);
+    setOrigemId(padrao?.id ?? 0);
+  }, [padrao?.id]);
 
   const pendentes = faltando(mapa, nomeDaOrigem);
   const podeConferir = planilha !== null && pendentes.length === 0;
@@ -311,14 +341,12 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
         />
       ) : null}
 
+      {/* No passo do arquivo o seletor SOME: não há cabeçalho para afirmar
+          coisa nenhuma, e um menu de dois itens aberto no errado foi o que
+          zerou o lote dos fotógrafos. Ele reaparece no passo seguinte, já como
+          fato lido, com o "não é?" ao lado. */}
       {etapa === 'arquivo' ? (
         <>
-          <SeletorDeOrigem
-            origens={origens}
-            valor={origemId}
-            aoMudar={setOrigemId}
-            temColunaDeOrigem={false}
-          />
           <PassoArquivo
             aoEscolher={lerArquivoEscolhido}
             ocupado={passoDaLeitura !== null}
@@ -341,8 +369,14 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens }: {
           <SeletorDeOrigem
             origens={origens}
             valor={origemId}
-            aoMudar={setOrigemId}
+            aoMudar={(id) => {
+              setOrigemId(id);
+              setOrigemEscolhidaAMao(true);
+            }}
             temColunaDeOrigem={mapa.origem !== undefined}
+            deteccao={deteccao}
+            aberto={menuDeOrigemAberto || origemEscolhidaAMao}
+            aoAbrir={() => setMenuDeOrigemAberto(true)}
           />
           <PassoMapa
             planilha={planilha}
