@@ -197,3 +197,103 @@ begin
 end $$;
 comment on function app.ai_alerta_orcamento() is
   'Emite, uma vez por mês e por nível, o alerta de orçamento de IA: freou (o teto inteiro), passou_de_80 (o do PRD §10) e ritmo_acima (a projeção pelo ritmo, que é a que chega a tempo num orçamento pequeno). Cria tarefa para um admin e grava a linha em ai_budget_alerts. Idempotente por (mês, situação).';
+
+
+-- ---------------------------------------------------------------------
+-- 4. O freio: `app.ia_pode_gastar`
+-- ---------------------------------------------------------------------
+-- A REGRA É POR EXCLUSÃO, e é de propósito. Sobrevivem à linha de alerta
+-- apenas `classify_inbound` e `transcribe_audio` — os dois únicos propósitos
+-- que servem para entender quem escreveu AGORA. Todo o resto para. Escrita
+-- assim, a lista dos que param não existe em lugar nenhum: um propósito novo
+-- entra no lado seguro sozinho, sem ninguém se lembrar de acrescentá-lo.
+-- Escrita ao contrário (uma lista dos que param), o propósito novo nasceria
+-- livre, e o dia em que alguém esquecer é o dia em que o freio deixa de valer.
+--
+-- Os dois degraus:
+--   gasto >= linha de alerta (US$ 48)  → param os 12
+--   gasto >= linha do freio  (US$ 60)  → param todos, os 14
+--
+-- MORA NO POSTGRES, e não no worker: o teto é `app_settings`, e o freio tem
+-- de mudar junto com ele sem deploy (ADR-03).
+create or replace function app.ia_pode_gastar(p_purpose text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_estado jsonb := app.ai_gasto_do_mes(null);
+  v_gasto  numeric := (v_estado ->> 'gasto_usd')::numeric;
+  v_freio  numeric := (v_estado ->> 'linha_do_freio_usd')::numeric;
+  v_alerta numeric := (v_estado ->> 'limite_de_alerta_usd')::numeric;
+  v_pode   boolean;
+  v_motivo text;
+begin
+  if v_gasto >= v_freio then
+    v_pode := false;
+    v_motivo := 'orcamento_esgotado';
+  elsif v_gasto >= v_alerta
+        and p_purpose is distinct from 'classify_inbound'
+        and p_purpose is distinct from 'transcribe_audio' then
+    v_pode := false;
+    v_motivo := 'orcamento_na_linha_de_alerta';
+  else
+    v_pode := true;
+    v_motivo := null;
+  end if;
+
+  return jsonb_build_object(
+    'pode',                 v_pode,
+    'motivo',               v_motivo,
+    'purpose',              p_purpose,
+    'gasto_usd',            v_gasto,
+    'linha_de_alerta_usd',  v_alerta,
+    'teto_usd',             v_freio,
+    'situacao',             v_estado ->> 'situacao');
+end $$;
+comment on function app.ia_pode_gastar(text) is
+  'Diz se ainda dá para gastar com este propósito. Dois degraus: na linha de alerta (80% do teto) param os propósitos que não são de atendimento; no teto inteiro param todos. A regra é por EXCLUSÃO — sobrevivem ao primeiro degrau só classify_inbound e transcribe_audio —, para que um propósito novo nasça no lado seguro.';
+revoke all on function app.ia_pode_gastar(text) from public, anon, authenticated;
+grant execute on function app.ia_pode_gastar(text) to service_role;
+
+-- Quem são os que param na linha de alerta, hoje. Não é uma segunda lista:
+-- a função PERGUNTA à `ia_pode_gastar`, propósito a propósito. Existe para a
+-- tela poder dizer o que parou, e para o pgTAP poder nomeá-los um a um.
+create or replace function app.ia_gasto_bloqueado_para()
+returns text[]
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(array_agg(p order by p), array[]::text[])
+    from unnest(array['transcribe_audio', 'summarize_call', 'draft_followup', 'classify_inbound',
+                      'draft_reply', 'summarize_deal', 'next_action', 'digest',
+                      'extract_listing', 'assistant',
+                      'analisar_conversa', 'pulso_do_dia', 'perguntar_ao_crm',
+                      'triar_candidato']) as p
+   where not coalesce((app.ia_pode_gastar(p) ->> 'pode')::boolean, false)
+$$;
+comment on function app.ia_gasto_bloqueado_para() is
+  'Os propósitos que o freio está recusando neste instante, perguntados um a um a app.ia_pode_gastar. Para a tela dizer o que parou; nunca para decidir — quem decide é a ia_pode_gastar.';
+revoke all on function app.ia_gasto_bloqueado_para() from public, anon, authenticated;
+grant execute on function app.ia_gasto_bloqueado_para() to service_role;
+
+-- A casca para quem só alcança o schema `public`: o PostgREST não expõe
+-- `app`, e é por RPC que o worker pergunta. Mesmo motivo (e mesmo grant) de
+-- `public.ia_fila_enfileirar`.
+create or replace function public.ia_pode_gastar(p_purpose text)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select app.ia_pode_gastar(p_purpose)
+$$;
+comment on function public.ia_pode_gastar(text) is
+  'Casca de app.ia_pode_gastar para o worker-ai perguntar, antes de chamar o modelo, se ainda dá para gastar.';
+revoke all on function public.ia_pode_gastar(text) from public, anon, authenticated;
+grant execute on function public.ia_pode_gastar(text) to service_role;

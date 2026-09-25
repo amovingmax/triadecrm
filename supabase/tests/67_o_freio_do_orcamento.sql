@@ -9,11 +9,16 @@
 --   2. AS DUAS LINHAS SÃO DERIVADAS. Alerta = teto x fracao_alerta; freio =
 --      o teto inteiro. Ninguém escreve 48 em lugar nenhum. Se um dia alguém
 --      escrever, este arquivo acusa: há duas fontes para o mesmo fato.
+--   3. O FREIO RECUSA POR EXCLUSÃO. Na linha de alerta param os 12 propósitos
+--      que não são de atendimento; sobrevivem `classify_inbound` e
+--      `transcribe_audio`, que são os únicos que servem para entender quem
+--      escreveu agora. No teto inteiro param os 14. Os 12 são nomeados um a
+--      um de propósito: propósito novo que nasça livre derruba este arquivo.
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(4);
+select plan(13);
 
 -- =====================================================================
 -- 1. O TETO, E AS DUAS LINHAS
@@ -28,6 +33,59 @@ select is((app.ai_gasto_do_mes(null) ->> 'linha_do_freio_usd')::numeric, 60::num
           'a linha do freio é o teto inteiro');
 select is((app.ai_gasto_do_mes(null) ->> 'limite_de_alerta_usd')::numeric, 48::numeric,
           'a linha de alerta é 80% do teto, derivada e não escrita');
+
+-- =====================================================================
+-- 2. O FREIO, DEGRAU A DEGRAU
+-- =====================================================================
+-- ---------- o mês, zerado dentro da transação ----------
+-- Este banco tem operação real dentro, e `app.ia_pode_gastar` lê o mês
+-- CORRENTE. Medir delta não serve: o que se mede aqui é uma LINHA absoluta,
+-- e uma linha absoluta só se mede a partir de um zero conhecido. Zerar o mês
+-- dentro da transação que dá `rollback` é o mesmo recurso que o arquivo 24
+-- usa com as filas do pgmq.
+delete from public.ai_runs
+ where (created_at at time zone 'America/Fortaleza')::date
+       >= date_trunc('month', (now() at time zone 'America/Fortaleza')::date);
+
+-- O custo NÃO é escrito: `app.ai_runs_before_write` (20260905000200:238)
+-- recalcula `cost_usd` a partir dos tokens em TODO insert e ignora o que
+-- vier na coluna. O gasto se faz por TOKEN, e o modelo é fixado — com um
+-- `limit 1` em `ai_model_prices` o preço mudaria com a ordem das linhas.
+-- claude-sonnet-5: US$ 1 = 500.000 tokens de entrada (mesma conta do 24).
+create function pg_temp.gastar(p_usd numeric) returns void
+  language sql security definer set search_path = '' as $$
+  insert into public.ai_runs (purpose, model, prompt_version, tokens_in, tokens_out)
+  values ('digest', 'claude-sonnet-5', 'pgtap67-gasto@v1', round(p_usd * 500000)::int, 0)
+$$;
+
+select pg_temp.gastar(21);
+select ok((app.ia_pode_gastar('draft_reply') ->> 'pode')::boolean,
+  'com US$ 21 de 60, os 12 propósitos ainda passam');
+
+select pg_temp.gastar(28);                                   -- total US$ 49
+select ok(not (app.ia_pode_gastar('draft_reply') ->> 'pode')::boolean,
+  'com US$ 49 de 60, draft_reply para na linha de alerta');
+select is(app.ia_pode_gastar('draft_reply') ->> 'motivo', 'orcamento_na_linha_de_alerta',
+  'e o motivo diz qual das duas linhas foi');
+select ok((app.ia_pode_gastar('classify_inbound') ->> 'pode')::boolean,
+  'classify_inbound sobrevive à linha de alerta: é ele que entende quem escreveu agora');
+select ok((app.ia_pode_gastar('transcribe_audio') ->> 'pode')::boolean,
+  'transcribe_audio também sobrevive: o áudio que chegou tem de virar texto');
+
+-- Aqui, e não depois do teto: passada a linha do freio param os 14, e a
+-- partição deixaria de ser visível.
+select is(app.ia_gasto_bloqueado_para(), array['analisar_conversa','assistant','digest',
+          'draft_followup','draft_reply','extract_listing','next_action','perguntar_ao_crm',
+          'pulso_do_dia','summarize_call','summarize_deal','triar_candidato']::text[],
+  'os 12 que param na linha de alerta, nomeados um a um: propósito novo derruba este teste');
+
+select pg_temp.gastar(12);                                   -- total US$ 61
+select ok(not (app.ia_pode_gastar('classify_inbound') ->> 'pode')::boolean,
+  'com US$ 61 de 60, nem classify_inbound passa');
+select is(app.ia_pode_gastar('classify_inbound') ->> 'motivo', 'orcamento_esgotado',
+  'e o motivo é o teto, não a linha de alerta: são prazos diferentes');
+select is(array_length(app.ia_gasto_bloqueado_para(), 1), 14,
+  'passada a linha do freio, param os 14 — inclusive os dois do atendimento');
 
 select * from finish();
 rollback;
