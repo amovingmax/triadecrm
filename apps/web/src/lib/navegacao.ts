@@ -318,9 +318,10 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'a_base',
     // "Importar planilha" entrou na frase porque a rota `/importar` saiu do menu
     // e virou botão no cabeçalho desta tela. A palavra continua achável na
-    // paleta, e agora leva a quem tem o botão.
+    // paleta, e agora leva a quem tem o botão — e continua aqui depois de o
+    // botão virar "Trazer uma lista", porque é a palavra que a pessoa digita.
     descricao:
-      'Base de organizações e pessoas com busca global, filtros, criação rápida com dedup por telefone e o botão de importar planilha.',
+      'Base de organizações e pessoas com busca global, filtros, criação rápida com dedup por telefone e o botão de trazer uma lista para a base (importar planilha ou CSV).',
     posicaoNaBarra: 3,
   },
   {

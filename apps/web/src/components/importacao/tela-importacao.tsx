@@ -817,34 +817,32 @@ function ListaDeLotes({
           aoFechar={() => setConfirmando(null)}
           titulo="Desfazer esta importação?"
           perigo
-          rotuloConfirmar="Desfazer o lote"
+          rotuloConfirmar="Desfazer"
           descricao={
             <>
               <p>
                 {confirmando.lote.organizacoes > 0 ? (
                   <>
-                    O lote{' '}
                     <span className="font-medium text-foreground">{confirmando.lote.rotulo}</span>{' '}
-                    tem{' '}
+                    trouxe{' '}
                     <span className="numerico">
                       {formatarNumero(confirmando.lote.organizacoes)}
                     </span>{' '}
-                    {confirmando.lote.organizacoes === 1 ? 'ficha' : 'fichas'} na base. Saem as que
-                    ninguém tocou depois da importação; as que já têm conversa registrada, mudança
-                    de etapa, autorização ou ligação ficam de pé, e o CRM diz quantas foram.
+                    {confirmando.lote.organizacoes === 1 ? 'parceiro' : 'parceiros'} para a base.
+                    Saem os que ninguém tocou depois; os que já têm conversa registrada, mudança
+                    de etapa, autorização ou ligação ficam de pé, e o CRM diz quantos foram.
                   </>
                 ) : (
                   <>
-                    O lote{' '}
                     <span className="font-medium text-foreground">{confirmando.lote.rotulo}</span>{' '}
-                    não tem ficha na base para remover. O que sai são os candidatos que ele deixou
-                    na fila de Revisão.
+                    não criou parceiro nenhum na base. O que sai são os nomes que ela deixou
+                    esperando na Revisão.
                   </>
                 )}
               </p>
               <p>
-                Os candidatos que ainda não foram decididos somem da fila de Revisão junto. Para
-                trazer tudo de volta, só importando a planilha outra vez.
+                Os nomes que ainda não foram decididos somem da Revisão junto. Para trazer tudo de
+                volta, só mandando o arquivo outra vez.
               </p>
               <p>Das 48 horas do desfazer, {confirmando.prazo.frase}.</p>
             </>

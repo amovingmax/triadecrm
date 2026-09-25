@@ -10,7 +10,11 @@ import {
 import { createClient } from '@/lib/supabase/server';
 import { TelaImportacao } from '@/components/importacao/tela-importacao';
 
-export const metadata: Metadata = { title: 'Importar planilha' };
+// O título da aba diz a mesma coisa que o cabeçalho da tela ("Trazer uma lista
+// para a base", `tela-importacao.tsx`): o CSV do Google Maps não é planilha, e
+// a aba que continuava dizendo "Importar planilha" era a última sobra do nome
+// antigo no caminho.
+export const metadata: Metadata = { title: 'Trazer uma lista' };
 
 /**
  * Fonte "planilha" do catálogo, se por algum motivo a seed não tiver rodado.

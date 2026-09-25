@@ -122,7 +122,7 @@ export function TelaParceiros({
             cabeçalho); o de importar não tem versão de celular de propósito —
             escolher arquivo e mapear coluna é trabalho de mesa.
 
-            "Importar planilha" mora aqui porque a rota saiu do menu, e porque
+            O botão mora aqui porque a rota saiu do menu, e porque
             até 09/09/2026 esta tela não tinha UM link para `/importar`: os três
             únicos links vivos do produto estavam em painéis de Relatórios. Quem
             não usasse a paleta ⌘K chegava à importação pelo item da lateral ou
@@ -131,9 +131,14 @@ export function TelaParceiros({
         <div className="flex items-center gap-2">
           {podeImportar ? (
             <Button asChild variant="outline" className="toque hidden md:inline-flex">
+              {/* "Trazer uma lista", e não "Importar planilha": o que entra
+                  por aqui pode ser a planilha-ponte ou o CSV do Google Maps, e
+                  a tela do outro lado se chama "Trazer uma lista para a base".
+                  A palavra "planilha" continua achável na paleta ⌘K, pela
+                  descrição do item Parceiros em `navegacao.ts`. */}
               <Link href={HREF_IMPORTAR}>
                 <Upload aria-hidden="true" />
-                Importar planilha
+                Trazer uma lista
               </Link>
             </Button>
           ) : null}

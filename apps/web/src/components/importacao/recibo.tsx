@@ -142,14 +142,14 @@ export function Recibo({
           </>
         ) : (
           <>
-            Desfazer uma importação é de gestor. Peça a um gestor para desfazer este lote (
+            Desfazer uma importação é de gestor. Peça a um gestor para desfazer esta (
             <span className="font-medium text-foreground">{recibo.rotulo}</span>) antes de{' '}
             {recibo.desfazerAte ? (
               <span className="numerico">{formatarDataHora(recibo.desfazerAte)}</span>
             ) : (
               'o prazo de 48 h acabar'
             )}
-            . Depois disso é ficha por ficha.
+            . Depois disso é um parceiro de cada vez, na ficha dele.
           </>
         )}
       </p>

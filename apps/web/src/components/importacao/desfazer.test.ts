@@ -72,25 +72,39 @@ describe('§3.7 — o 403 do desfazer chega traduzido', () => {
 
 describe('§3.6 — a frase do recibo não inventa trabalho humano', () => {
   it('lote inteiro removido: diz só isso', () => {
-    expect(fraseDoDesfazer({ organizacoes: 33, preservadas: 0 })).toBe('33 fichas removidas.');
+    expect(fraseDoDesfazer({ organizacoes: 33, preservadas: 0 })).toBe('33 parceiros removidos.');
   });
 
-  it('uma ficha só: singular', () => {
-    expect(fraseDoDesfazer({ organizacoes: 1, preservadas: 0 })).toBe('1 ficha removida.');
+  it('um parceiro só: singular', () => {
+    expect(fraseDoDesfazer({ organizacoes: 1, preservadas: 0 })).toBe('1 parceiro removido.');
   });
 
   it('nada a remover não é culpa de ninguém', () => {
-    expect(fraseDoDesfazer({ organizacoes: 0, preservadas: 0 })).toMatch(/não tinha ficha/i);
+    expect(fraseDoDesfazer({ organizacoes: 0, preservadas: 0 })).toMatch(/não tinha parceiro/i);
   });
 
-  it('ficha preservada é explicada pelo que o banco de fato confere', () => {
+  it('parceiro preservado é explicado pelo que o banco de fato confere', () => {
     const frase = fraseDoDesfazer({ organizacoes: 2, preservadas: 3 });
-    expect(frase).toMatch(/2 fichas removidas/);
+    expect(frase).toMatch(/2 parceiros removidos/);
     expect(frase).toMatch(/3 ficaram de pé/);
     // A causa verdadeira, e não "alguém já trabalhou" — que era falso para toda
     // ficha recém-importada, porque quem a tocara era o próprio importador.
     expect(frase).toMatch(/etapa|autorização|ligação|conversa/i);
     expect(frase).not.toMatch(/alguém já trabalhou/i);
+  });
+
+  // O glossário de 25/09/2026: "ficha" vira "parceiro" e "lote" vira "esta
+  // importação". O desfazer foi o canto que ficou de fora na primeira passada.
+  it('nenhuma das quatro frases usa o vocabulário interno', () => {
+    const casos = [
+      { organizacoes: 0, preservadas: 0 },
+      { organizacoes: 0, preservadas: 3 },
+      { organizacoes: 2, preservadas: 0 },
+      { organizacoes: 2, preservadas: 3 },
+    ];
+    for (const caso of casos) {
+      expect(fraseDoDesfazer(caso)).not.toMatch(/\bfichas?\b|\blote\b/i);
+    }
   });
 
   it('nenhuma removida e todas presas: também não acusa ninguém', () => {

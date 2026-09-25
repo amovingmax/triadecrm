@@ -373,17 +373,18 @@ export function fraseDoDesfazer({
   organizacoes,
   preservadas,
 }: Pick<ResultadoDoDesfazer, 'organizacoes' | 'preservadas'>): string {
-  const fichas = (n: number) => `${formatarNumero(n)} ${n === 1 ? 'ficha' : 'fichas'}`;
+  const parceiros = (n: number) =>
+    `${formatarNumero(n)} ${n === 1 ? 'parceiro' : 'parceiros'}`;
 
   if (organizacoes === 0 && preservadas === 0) {
-    return 'Esse lote não tinha ficha para remover.';
+    return 'Essa importação não tinha parceiro na base para remover.';
   }
   if (organizacoes === 0) {
-    return `Nenhuma ficha removida: as ${formatarNumero(preservadas)} deste lote ${POR_QUE_FICA}.`;
+    return `Nenhum parceiro removido: os ${formatarNumero(preservadas)} desta importação ${POR_QUE_FICA}.`;
   }
-  const removidas = `${fichas(organizacoes)} ${organizacoes === 1 ? 'removida' : 'removidas'}.`;
-  if (preservadas === 0) return removidas;
-  return `${removidas} ${formatarNumero(preservadas)} ${
+  const removidos = `${parceiros(organizacoes)} ${organizacoes === 1 ? 'removido' : 'removidos'}.`;
+  if (preservadas === 0) return removidos;
+  return `${removidos} ${formatarNumero(preservadas)} ${
     preservadas === 1 ? 'ficou' : 'ficaram'
   } de pé porque ${POR_QUE_FICA}.`;
 }
@@ -395,13 +396,14 @@ export function fraseDoDesfazer({
 const RECUSA: Record<string, string> = {
   linhas_invalidas: 'O formato enviado ao servidor não estava certo. Recarregue a página.',
   lote_grande_demais: 'O pedaço enviado passou do teto do servidor. Recarregue a página.',
-  lote_inexistente: 'Esse lote não existe mais. Comece a importação de novo.',
-  lote_nao_e_planilha: 'Esse lote é de coleta, não de planilha.',
-  lote_encerrado: 'Esse lote já foi fechado. Comece uma importação nova.',
-  lote_sem_id: 'O servidor não devolveu o número do lote. Tente de novo.',
+  lote_inexistente: 'Essa importação não existe mais. Comece de novo.',
+  lote_nao_e_planilha: 'Isso não é uma lista trazida por arquivo: veio da coleta.',
+  lote_encerrado: 'Essa importação já foi fechada. Comece uma nova.',
+  lote_sem_id: 'O servidor não devolveu o número desta importação. Tente de novo.',
   origem_invalida: 'A origem escolhida não existe mais no catálogo de fontes.',
   origem_desabilitada: 'Essa fonte está desligada no catálogo.',
-  janela_de_48h_encerrada: 'Passaram as 48 horas do desfazer. Agora é ficha por ficha.',
+  janela_de_48h_encerrada:
+    'Passaram as 48 horas do desfazer. Agora é um parceiro de cada vez, na ficha dele.',
 };
 
 /** Nunca mostre código do Postgres a quem está importando planilha. */
