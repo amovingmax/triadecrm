@@ -219,3 +219,27 @@ export const ROTULO_DA_REGRA: Record<string, string> = {
   domain: 'mesmo site',
   name_trgm: 'nome muito parecido',
 };
+
+// ---------------------------------------------------------------------------
+// Retenção (PRD §10.6)
+// ---------------------------------------------------------------------------
+
+/**
+ * Candidato em "novo" é apagado aos 90 dias de `created_at` por
+ * `app.aplicar_retencao` (20260904001600), no cron das 04:00 de Fortaleza.
+ * Cada rodada deixa relatório em `public.retention_runs`.
+ *
+ * O número mora aqui em espelho, não em contrato: quem manda é o banco. Se um
+ * dia a regra mudar lá, esta constante mente — e é por isso que ela diz de onde
+ * veio, em vez de só existir.
+ */
+export const PRAZO_DE_RETENCAO_DIAS = 90;
+
+/** Quantos dias faltam para a retenção apagar este candidato. Nulo se a data não der. */
+export function diasAteSumir(criadoEm: string | null, agora: Date): number | null {
+  if (!criadoEm) return null;
+  const nascimento = new Date(criadoEm);
+  if (Number.isNaN(nascimento.getTime())) return null;
+  const vividos = Math.floor((agora.getTime() - nascimento.getTime()) / 86_400_000);
+  return Math.max(0, PRAZO_DE_RETENCAO_DIAS - vividos);
+}

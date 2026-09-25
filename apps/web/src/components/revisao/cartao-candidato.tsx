@@ -31,6 +31,7 @@ import type { AcaoDeRevisao } from './dados';
 const ALVO_INLINE = 'inline-flex min-h-11 items-center md:min-h-0';
 import { ProcurarTelefoneDoCandidato } from './procurar-telefone-do-candidato';
 import {
+  diasAteSumir,
   EXPLICACAO_DA_FAIXA,
   EXPLICACAO_DA_MARCA,
   ROTULO_DA_REGRA,
@@ -67,6 +68,9 @@ export function CartaoCandidato({
   aoDecidir: (acao: AcaoDeRevisao, organizacaoId?: string) => void;
 }) {
   const pendente = candidato.status === 'novo';
+  // Só candidato em "novo" expira: a retenção do PRD §10.6 não toca em aprovado,
+  // mesclado nem recusado.
+  const restam = pendente ? diasAteSumir(candidato.criado_em, new Date()) : null;
   const decideAgora = pendente && podeDecidir && !ocupado;
   const primeiraDuplicata = candidato.duplicatas[0];
 
@@ -182,6 +186,18 @@ export function CartaoCandidato({
           por {candidato.coletor} em{' '}
           <span className="numerico">{formatarData(candidato.criado_em)}</span>
         </span>
+        {/*
+          A retenção do PRD §10.6 apaga candidato em "novo" aos 90 dias. A única
+          forma de não perder um alvo é decidir. O aviso só aparece nos últimos
+          30 dias: se aparecesse sempre, seria moldura, e ninguém leria no dia em
+          que importa.
+        */}
+        {restam !== null && restam <= 30 ? (
+          <>
+            <Ponto />
+            <span>{restam === 0 ? 'Sai da fila hoje' : `Sai da fila em ${restam} dias`}</span>
+          </>
+        ) : null}
       </p>
 
       {/* Canais de contato */}
