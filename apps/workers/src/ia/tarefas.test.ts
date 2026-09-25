@@ -173,7 +173,7 @@ describe('1. transcrever o áudio recebido (R13, RF-CON-27)', () => {
     expect(resultado.detalhes?.destino).toBe('humano');
     expect(resultado.detalhes?.motivos).toContain('mvp_audio_sempre_humano');
     // E nada foi enfileirado para o classificador.
-    expect(banco.chamadasDeRpc.filter((c) => c.nome === 'esteira_fila_enfileirar')).toHaveLength(0);
+    expect(banco.chamadasDeRpc.filter((c) => c.nome === 'ia_fila_enfileirar')).toHaveLength(0);
   });
 
   it('mensagem que não existe é erro determinístico, não tentativa perdida', async () => {
@@ -258,6 +258,32 @@ describe('2. resumir a ligação (R13 §3.2)', () => {
     expect(resultado.motivo).toBe('caminho_vazio');
     expect(duble.chamadas).toHaveLength(0);
     expect(banco.tabelas.ai_runs).toHaveLength(0);
+  });
+  it('follow-up recusado pelo orçamento vira aviso, e NÃO vira tarefa', async () => {
+    const banco = bancoFalso(tabelas(), {
+      rpcs: {
+        alvo_suprimido: () => false,
+        ia_pode_gastar: () => ({ pode: true, motivo: null }),
+        ia_fila_enfileirar: () => ({ enfileirado: false, motivo: 'orcamento', adiado: true }),
+      },
+    });
+    const { logger, linhas } = loggerDeTeste();
+    const contexto: ContextoDaIa = { cliente: banco.cliente, modelo: clienteDuble(), logger };
+
+    const resultado = await tratarTrabalho(contexto, {
+      purpose: 'summarize_call',
+      chave: `attempt:${TENTATIVA}`,
+      attempt_id: TENTATIVA,
+    });
+
+    // O resumo foi gravado: ele já custou, e é o que a linha do tempo lê.
+    expect(resultado.feito).toBe(true);
+    expect(resultado.detalhes?.followup_enfileirado).toBe(false);
+    // Sem tarefa, de propósito: ninguém espera um follow-up em segundos, e ele
+    // está anotado em `ia_trabalho_adiado`. Tarefa aqui encheria a fila de
+    // gente com o que o cron resolve sozinho.
+    expect(banco.tabelas.tasks).toHaveLength(0);
+    expect(linhas.some((l) => l.nivel === 'warn' && l.msg.includes('devendo'))).toBe(true);
   });
 });
 
@@ -360,10 +386,14 @@ describe('3. redigir o follow-up (ADR-05, RF-CON-24)', () => {
 });
 
 describe('4. classificar a mensagem recebida (RF-CON-19, RF-CON-20)', () => {
-  function comTexto(texto: string, extras: LinhaFalsa = {}) {
+  function comTexto(
+    texto: string,
+    extras: LinhaFalsa = {},
+    opcoes: Parameters<typeof bancoFalso>[1] = {},
+  ) {
     const base = tabelas();
     Object.assign(base.messages?.[0] as LinhaFalsa, { type: 'text', body: texto }, extras);
-    const banco = bancoFalso(base);
+    const banco = bancoFalso(base, opcoes);
     const { logger, linhas } = loggerDeTeste();
     const duble = clienteDuble();
     return { banco, duble, linhas, contexto: { cliente: banco.cliente, modelo: duble, logger } };
@@ -407,6 +437,60 @@ describe('4. classificar a mensagem recebida (RF-CON-19, RF-CON-20)', () => {
     expect(resultado.detalhes?.escalar).toBe(true);
     expect(resultado.detalhes?.motivos).toContain('termo_de_alto_valor');
     expect(conversa.bot_paused).toBe(true);
+  });
+
+  it('orçamento esgotado não deixa a mensagem no silêncio: pausa a conversa e abre tarefa', async () => {
+    const { banco, contexto, duble, linhas } = comTexto('quanto custa para entrar?', {}, {
+      rpcs: {
+        alvo_suprimido: () => false,
+        ia_pode_gastar: () => ({ pode: false, motivo: 'orcamento_esgotado' }),
+      },
+    });
+
+    const resultado = await tratarTrabalho(contexto, {
+      purpose: 'classify_inbound',
+      chave: `msg:${MENSAGEM}`,
+      message_id: MENSAGEM,
+    });
+
+    // Nenhuma chamada paga, e a linha de ai_runs prova que o freio disparou.
+    expect(duble.chamadas).toHaveLength(0);
+    expect((banco.tabelas.ai_runs?.[0] as LinhaFalsa).status).toBe('bloqueado');
+    expect(resultado).toMatchObject({ proposito: 'classify_inbound', feito: false, motivo: 'orcamento' });
+
+    // A mensagem já está em `public.messages` desde o webhook e o texto fixo do
+    // bot de entrada é gatilho de banco: o que faltava era alguém ENTENDER o
+    // que foi dito, e sem orçamento quem entende é gente.
+    const conversa = banco.tabelas.conversations?.[0] as LinhaFalsa;
+    expect(conversa.bot_paused).toBe(true);
+    expect(conversa.status).toBe('aguardando_nos');
+
+    const tarefa = banco.tabelas.tasks?.at(-1) as LinhaFalsa;
+    expect(String(tarefa.title)).toContain('Orçamento de IA');
+    expect(tarefa.origin).toBe('system');
+    // Esta conversa não tem dono, e a tarefa nasce sem dono: cai na fila geral,
+    // que é o que `app.wa_bot_de_entrada` já faz. Sem dono é pior que com dono,
+    // e é muito melhor que não existir.
+    expect(tarefa.assignee_id).toBe(null);
+    expect(linhas.some((l) => l.nivel === 'warn' && l.msg.includes('orçamento'))).toBe(true);
+  });
+
+  it('e a tarefa vai para quem responde pela conversa, quando há alguém', async () => {
+    const { banco, contexto } = comTexto('quanto custa para entrar?', {}, {
+      rpcs: {
+        alvo_suprimido: () => false,
+        ia_pode_gastar: () => ({ pode: false, motivo: 'orcamento_esgotado' }),
+      },
+    });
+    (banco.tabelas.conversations?.[0] as LinhaFalsa).assignee_id = PERFIL;
+
+    await tratarTrabalho(contexto, {
+      purpose: 'classify_inbound',
+      chave: `msg:${MENSAGEM}`,
+      message_id: MENSAGEM,
+    });
+
+    expect((banco.tabelas.tasks?.at(-1) as LinhaFalsa).assignee_id).toBe(PERFIL);
   });
 
   it('mensagem sem texto nenhum não vira chamada', async () => {

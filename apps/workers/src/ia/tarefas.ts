@@ -72,6 +72,7 @@ import {
   gravarResumoDaLigacao,
   gravarTranscricao,
   gravarTriagem,
+  type ConversaDoFio,
 } from './banco';
 import {
   AlvoSuprimidoError,
@@ -263,9 +264,26 @@ async function transcrever(
   if (roteamento.destino === 'humano') {
     await escalarConversa(contexto.cliente, conversa.id);
   } else {
-    await enfileirarTrabalho(contexto.cliente, 'classify_inbound', `msg:${mensagem.id}`, {
+    // RAMO DORMENTE, e de propósito. Com `AUDIO_SEMPRE_HUMANO = true` (RF-CON-27)
+    // `decidirRoteamento` devolve sempre 'humano', então nada passa por aqui
+    // hoje. Ele existe escrito e tratado porque é a Fase 4 que vira a chave, e
+    // o dia de virá-la não é o dia de descobrir que a recusa da fila cai no
+    // silêncio.
+    const fila = await enfileirarTrabalho(contexto.cliente, 'classify_inbound', `msg:${mensagem.id}`, {
       message_id: mensagem.id,
     });
+    if (!fila.enfileirado) {
+      // O trabalho está anotado em `ia_trabalho_adiado` e volta pelo cron. O que
+      // NÃO pode esperar o cron é a pessoa: alguém mandou um áudio e está
+      // esperando resposta. A transcrição fica gravada — ela já custou, e
+      // jogá-la fora seria gastar duas vezes pelo mesmo áudio.
+      await escalarConversa(contexto.cliente, conversa.id);
+      await abrirTarefaDeOrcamento(contexto, conversa, mensagem.id);
+      contexto.logger.warn('a classificação ficou devendo: a conversa foi para gente', {
+        message_id: mensagem.id,
+        motivo: fila.enfileirado ? null : fila.motivo,
+      });
+    }
   }
 
   contexto.logger.info('áudio transcrito', {
@@ -411,6 +429,15 @@ async function resumirLigacao(
     `attempt:${tentativa.id}`,
     { attempt_id: tentativa.id },
   );
+  if (!enfileirado.enfileirado) {
+    // Sem tarefa, de propósito: ninguém está esperando um follow-up em
+    // segundos, e ele já está anotado em `ia_trabalho_adiado`. Abrir tarefa
+    // aqui seria encher a fila de gente com o que o cron resolve sozinho.
+    contexto.logger.warn('o follow-up ficou devendo e volta pelo cron', {
+      attempt_id: tentativa.id,
+      motivo: enfileirado.motivo,
+    });
+  }
 
   return {
     proposito: 'summarize_call',
@@ -575,20 +602,44 @@ async function classificarEntrada(
     conversa.telefone,
   );
 
-  const executada = await executar(
-    contexto,
-    classificarIntencaoV1,
-    {
-      leadId: leadIdCurto(ficha.organizationId),
-      canal: 'whatsapp',
-      mensagem: texto.slice(0, 4000),
-      resumoDaConversa: conversa.resumo === null ? null : conversa.resumo.slice(0, 2800),
-      ultimaIntencao: intencaoConhecida(conversa.ultimaIntencao),
-      jaRecebeuAudio: await jaRecebeuAudio(contexto.cliente, conversa.id),
-    },
-    contatoDoPrompt(ficha),
-    { organizationId: ficha.organizationId, contactId: ficha.contactId, conversationId: conversa.id },
-  );
+  let executada;
+  try {
+    executada = await executar(
+      contexto,
+      classificarIntencaoV1,
+      {
+        leadId: leadIdCurto(ficha.organizationId),
+        canal: 'whatsapp',
+        mensagem: texto.slice(0, 4000),
+        resumoDaConversa: conversa.resumo === null ? null : conversa.resumo.slice(0, 2800),
+        ultimaIntencao: intencaoConhecida(conversa.ultimaIntencao),
+        jaRecebeuAudio: await jaRecebeuAudio(contexto.cliente, conversa.id),
+      },
+      contatoDoPrompt(ficha),
+      { organizationId: ficha.organizationId, contactId: ficha.contactId, conversationId: conversa.id },
+    );
+  } catch (erro) {
+    if (!(erro instanceof OrcamentoEsgotadoError)) throw erro;
+    // A mensagem não some e não fica sem resposta: ela já está em
+    // `public.messages` desde o webhook, e o texto fixo do bot de entrada é
+    // gatilho de banco, não custa IA. O que falta é alguém entender o que foi
+    // dito — e quem entende, sem orçamento, é gente.
+    await escalarConversa(contexto.cliente, conversa.id);
+    const taskId = await abrirTarefaDeOrcamento(contexto, conversa, mensagem.id);
+    contexto.logger.warn('classificação bloqueada pelo orçamento: a conversa foi para gente', {
+      message_id: mensagem.id,
+      conversation_id: conversa.id,
+      ai_run_id: erro.aiRunId,
+      task_id: taskId,
+      motivo: erro.motivo,
+    });
+    return {
+      proposito: 'classify_inbound',
+      feito: false,
+      motivo: 'orcamento',
+      detalhes: { task_id: taskId, ai_run_id: erro.aiRunId },
+    };
+  }
 
   const decisao = decidirIntencao({
     mensagem: texto,
@@ -1192,6 +1243,45 @@ async function audioQueExiste(
   if (data !== null) return slug;
   contexto.logger.warn('o modelo sugeriu um áudio que não existe na biblioteca', { slug });
   return null;
+}
+
+/**
+ * "O orçamento acabou" vira trabalho para gente.
+ *
+ * A tarefa é como o Tríade fala com uma pessoa. Vai para quem responde pela
+ * conversa; sem dono, nasce sem dono e cai na fila geral — que é o que
+ * `app.wa_bot_de_entrada` já faz, e é melhor que não existir. Se nem isso der
+ * certo, a linha de `ai_runs` em `bloqueado` continua lá: perder o registro
+ * seria pior que perder o aviso.
+ */
+async function abrirTarefaDeOrcamento(
+  contexto: ContextoDaIa,
+  conversa: ConversaDoFio,
+  messageId: string,
+): Promise<string | null> {
+  const { data, error } = await contexto.cliente
+    .from('tasks')
+    .insert({
+      title: 'Orçamento de IA esgotado — responda à mão',
+      description:
+        `A mensagem ${messageId} chegou e o robô não pôde ler: o orçamento de IA do mês acabou. ` +
+        'A conversa está pausada e esperando alguém.',
+      kind: 'message',
+      due_at: new Date().toISOString(),
+      assignee_id: conversa.assigneeId,
+      organization_id: conversa.organizationId,
+      contact_id: conversa.contactId,
+      origin: 'system',
+      priority: 1,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    contexto.logger.warn('não deu para abrir a tarefa do orçamento', { erro: error.message });
+    return null;
+  }
+  return (data as { id: string }).id;
 }
 
 export type { MapaDePseudonimos };

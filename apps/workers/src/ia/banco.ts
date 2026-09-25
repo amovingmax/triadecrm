@@ -58,6 +58,13 @@ export interface ConversaDoFio {
   readonly confiancaAnterior: number | null;
   readonly roboPausado: boolean;
   readonly vip: boolean;
+  /**
+   * Quem responde por esta conversa. Existe desde 25/09/2026 para a tarefa de
+   * "o orçamento de IA acabou" nascer com dono em vez de cair na fila geral:
+   * há gente do outro lado esperando resposta, e fila geral é onde a pressa
+   * some.
+   */
+  readonly assigneeId: string | null;
 }
 
 export interface NoDaLigacao {
@@ -119,7 +126,7 @@ export async function buscarConversa(
   const { data, error } = await cliente
     .from('conversations')
     .select(
-      'id, organization_id, contact_id, peer_phone_e164, ai_summary, ai_intent, ai_confidence, bot_paused',
+      'id, organization_id, contact_id, peer_phone_e164, ai_summary, ai_intent, ai_confidence, bot_paused, assignee_id',
     )
     .eq('id', id)
     .maybeSingle();
@@ -150,6 +157,7 @@ export async function buscarConversa(
     confiancaAnterior: confianca === null || confianca === undefined ? null : Number(confianca),
     roboPausado: linha.bot_paused === true,
     vip,
+    assigneeId: texto(linha.assignee_id),
   };
 }
 
