@@ -144,6 +144,14 @@ select ok(app.payload_e_permitido('{"telefones":[{"numero":"84999990001","tipo":
 -- =====================================================================
 -- 3. O lote e a captura
 -- =====================================================================
+-- O Radar desligou em 25/09/2026 (migração 20260925130000) e
+-- `public.esteira_abrir_lote` recusa lote de coleta de fonte desligada. Este
+-- arquivo mede a ESTEIRA, não a política da fonte: religar aqui dentro, na
+-- transação do teste, é o que mantém as ~30 asserções seguintes (todas presas
+-- ao `pg_temp.ids`) medindo o que elas dizem medir. Roda FORA da sessão
+-- simulada, como 03_dedup.sql faz ao contrário para telelistas.
+update public.sources set is_enabled = true where slug = 'casamentos_com_br';
+
 select pg_temp.entrar('a0000000-0000-4000-8000-0000000f0002', 'gestor');
 select ok((public.esteira_abrir_lote('coleta', pg_temp.fonte('casamentos_com_br'),
                                      'pgTAP esteira') ->> 'ok')::boolean,

@@ -1,0 +1,54 @@
+-- =====================================================================
+-- O Radar para de coletar, e a fonte fica (Fase 2 do pivô, ADR-12)
+--
+-- POR QUE. A lista de prospecção passou a vir do CSV do Google Maps (Fase 1,
+-- migração 20260924130000). O coletor do Radar continua rodando para trazer
+-- nome SEM número: das 277 linhas na fila de revisão, 260 vieram do
+-- casamentos.com.br e ZERO têm telefone. Não é defeito do coletor — a fonte não
+-- publica o número (fica atrás de `emp-ShowTelefonoTrace.php`, em Disallow no
+-- robots.txt; R03 §2.1 fixou "não automatizar Ver telefone" como mitigação
+-- escrita). Em 17/09 a varredura de robots.txt fonte a fonte concluiu que não
+-- existe caminho de raspagem legal e barato para telefone.
+--
+-- POR QUE UM `update` E NÃO UM `delete`. A linha da fonte é a proveniência de
+-- cada um dos 277 candidatos (RF-RAD-05) e de cada `source_record` e
+-- `field_provenance` atrás deles. Apagar a linha arrebentaria a cadeia. E
+-- `is_enabled = false` já é o freio que o banco inteiro respeita:
+--   · `public.esteira_abrir_lote` recusa lote `kind='coleta'` com
+--     `origem_desabilitada` (20260904001600:1788) — e SÓ `kind='coleta'`: o
+--     `if p_kind = 'coleta' and not v_s.is_enabled` deixa o lote 'planilha'
+--     passar, que é por onde o CSV do Maps entra;
+--   · `public.radar_agendar_coleta` devolve `fonte_desligada` (20260917170000:60);
+--   · `public.radar_coletar_agora` devolve `origem_desabilitada` (20260908170000:88).
+--
+-- ESTE ARQUIVO É REVERSÍVEL, E DE PROPÓSITO. Voltar atrás é o mesmo `update`
+-- com `true` — enquanto o código do coletor existir. Quem fecha a porta é a
+-- migração 20260925140000, que apaga as funções e o catálogo de coleta.
+--
+-- SÃO CINCO FONTES, NÃO SETE. `instagram` e `google_places` FICAM LIGADAS.
+-- Aqui `is_enabled` quer dizer "vale como ORIGEM no CRM", e o estado do coletor
+-- automático mora em `config.collector.enabled` (o comentário da seed diz isso).
+-- Desligar uma origem tem três efeitos sem nenhuma relação com coleta:
+--   · `public.radar_criar_candidato` devolve `origem_desabilitada` (20260904001401:598);
+--   · `public.quick_create_organization` devolve o mesmo (20260904000600:254);
+--   · `apps/web/src/components/parceiros/catalogos.ts` filtra o select de
+--     origem do cadastro rápido por `is_enabled`.
+-- O Instagram, no MVP, é curadoria MANUAL (seed.sql, bloco 3): desligá-lo
+-- cortaria a mão de quem cadastra sem desligar robô nenhum — o coletor dele é
+-- `phase: v1, enabled: false` e nunca teve adaptador. `google_places` fica pelo
+-- mesmo motivo e mais um: é a busca de telefone por candidato que a Fase 1
+-- manteve (`apps/web/src/app/api/telefone/candidato/route.ts`), que mostra o
+-- número na tela sem gravar nada.
+--
+-- O QUE NÃO É AFETADO. `app.importacao_fonte` (20260904001820:203) casa por
+-- nome e por slug e NÃO olha `is_enabled` — a importação continua sabendo
+-- resolver "Solutudo" para `telelistas`. Desligar uma fonte não apaga a
+-- proveniência de quem já entrou por ela.
+--
+-- O ESPELHO NA SEED. `supabase/seed.sql` tem `is_enabled = excluded.is_enabled`
+-- no `on conflict do update`: sem virar o literal lá também, o próximo
+-- `supabase db reset` religa as cinco. O espelho entra no mesmo commit.
+-- =====================================================================
+update public.sources
+   set is_enabled = false
+ where slug in ('casamentos_com_br','base_cnpj','sympla_outgo','olx','telelistas');

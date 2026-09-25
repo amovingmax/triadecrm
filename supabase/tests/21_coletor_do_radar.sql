@@ -154,6 +154,12 @@ select pg_temp.sair();
 -- =====================================================================
 -- 4. O lote: abrir pelo worker e andar até concluído
 -- =====================================================================
+-- O Radar desligou em 25/09/2026 (migração 20260925130000), e
+-- `public.esteira_abrir_lote` recusa lote de coleta de fonte desligada. Este
+-- arquivo mede o COLETOR, não a política da fonte: religar dentro da transação
+-- do teste é o que mantém as asserções abaixo medindo o que elas dizem medir.
+update public.sources set is_enabled = true where slug = 'casamentos_com_br';
+
 select pg_temp.entrar_como_worker();
 
 create temporary table pg_temp_lote (id uuid) on commit drop;

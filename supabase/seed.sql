@@ -109,6 +109,13 @@ on conflict (slug) do update
 --    dispensa consentimento, não dispensa finalidade, transparência, minimização e opt-out.
 --    is_enabled = a fonte pode ser usada como origem no CRM; o estado do COLETOR
 --    automático fica em config.collector (phase mvp/v1, enabled).
+--    Desde 25/09/2026 (Fase 2 do pivô, ADR-12) as CINCO fontes de coleta nascem
+--    DESLIGADAS: casamentos_com_br, base_cnpj, sympla_outgo, olx e telelistas.
+--    O coletor do Radar saiu; a lista vem do CSV do Google Maps pela importação.
+--    `instagram` e `google_places` continuam LIGADAS de propósito: a primeira é
+--    curadoria manual e a segunda é a busca de telefone por candidato — as duas
+--    são origem de cadastro, não robô. A linha não é apagada porque os 277
+--    candidatos já colhidos apontam para ela (RF-RAD-05).
 --    kind 'referral' => Tier A+ no cadastro rápido (RF-BAS-15).
 --
 --    GetNinjas NÃO entra neste catálogo (CLAUDE.md: "GetNinjas está fora das fontes";
@@ -123,12 +130,12 @@ on conflict (slug) do update
 insert into public.sources (slug, name, kind, base_url, legal_basis, terms_notes, robots_ok, rate_limit_seconds, is_enabled, config) values
   ('casamentos_com_br', 'Casamentos.com.br', 'scrape', 'https://www.casamentos.com.br', 'legitimo_interesse',
    'Espinha dorsal do Radar (serviços e locais; ≈ 290 listagens / ≈ 270 únicos em Natal). Base legal: legítimo interesse sobre dados profissionais publicados pelo próprio fornecedor (art. 7º, IX e §4º). Termos (Condições Legais §2.3/§2.4) PROÍBEM cópia por robot/crawler e reprodução da base — risco contratual médio (3/5), litígio improvável para uso interno sem republicação. Mitigação adotada pelo PRD (RF-RAD-02; §13 item 10, a validar com o advogado): coleta automatizada em BAIXO VOLUME de dados factuais (≈ 20 páginas de listagem + ≈ 290 perfis), 1 requisição a cada 3–5 s, execução MENSAL, user-agent identificado, sem login. Só a whitelist de campos (nome, categoria, endereço/bairro/CEP, source_url; nota, nº de avaliações, preço "a partir de" e capacidade apenas como números para pontuação interna). Nunca fotos, textos descritivos ou avaliações; nunca automatizar "Ver telefone" (endpoints emp-*.php em Disallow) — telefone vem de CNPJ/Places/Instagram.',
-   true, 4.00, true,
+   true, 4.00, false,
    '{"collector": {"kind": "http", "phase": "mvp", "enabled": true, "schedule": "mensal", "max_pages_per_run": 320}, "fields_whitelist": ["name", "category", "address", "neighborhood", "cep", "source_url", "rating", "reviews_count", "price_from", "capacity"], "robots": "listagens e perfis permitidos; /json/, /emp-*.php, /busc-*.php bloqueados; GPTBot bloqueado"}'),
 
   ('base_cnpj', 'Receita Federal (CNPJ aberto)', 'import', 'https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/', 'legitimo_interesse',
    'Dados abertos oficiais (CSV mensal, ≈ 5–6 GB) filtrados fora do Postgres por UF = RN e município SIAFI 1761 (Natal), CNAEs de eventos do Apêndice B. Fonte mais completa e de menor risco (1–2/5): razão social, nome fantasia, CNAE, porte, situação, endereço, telefones cadastrais, e-mail, MEI, sócios. Regras: MEI/empresário individual é pessoa natural (flag is_natural_person) — remover o CPF do nome empresarial por regex antes de persistir; e-mail cadastral costuma ser do contador (não usar como canal); endereço residencial de MEI não é exibido. "Novos negócios" = data_inicio_atividade nos últimos 30–60 dias. Enriquecimento unitário por BrasilAPI/Minha Receita (RF-BAS-11, v1).',
-   true, 1.00, true,
+   true, 1.00, false,
    '{"collector": {"kind": "csv_import", "phase": "mvp", "enabled": true, "schedule": "mensal", "filters": {"uf": "RN", "municipio_siafi": "1761", "situacao": "02"}}, "cnaes": ["8230-0/01", "8230-0/02", "5620-1/02", "7420-0/01", "7420-0/04", "9001-9/02", "9001-9/06", "7739-0/03", "7729-2/02", "7721-7/00", "9329-8/01", "9329-8/99", "4923-0/01", "4923-0/02", "1091-1/02"], "cnaes_com_filtro_por_palavra": ["5611-2/01", "8299-7/99", "9602-5/01"]}'),
 
   ('google_places', 'Google Maps', 'api', 'https://places.googleapis.com/v1/', 'legitimo_interesse',
@@ -143,17 +150,17 @@ insert into public.sources (slug, name, kind, base_url, legal_basis, terms_notes
 
   ('sympla_outgo', 'Sympla / Outgo (produtores e organizadores)', 'scrape', 'https://www.sympla.com.br/eventos/natal-rn', 'legitimo_interesse',
    'Evento → página do produtor (nome, descrição, eventos passados/futuros, às vezes site/Instagram). No MVP a lista de produtores é MANUAL (organizadores recorrentes do Outgo/Sympla, R09 §D); o coletor automatizado (Playwright, SPA; baixo volume; 80–150 produtores/trimestre) fica para a v1, após avaliação formal de termos e robots. Dados de organizadores são de empresas/produtores em contexto comercial público; contato normalmente por formulário.',
-   null, 5.00, true,
+   null, 5.00, false,
    '{"collector": {"kind": "playwright", "phase": "v1", "enabled": false, "schedule": "trimestral"}, "manual_curation": true, "fields_whitelist": ["name", "description", "website", "instagram_handle", "events_count", "source_url"]}'),
 
   ('olx', 'OLX Serviços (Natal)', 'scrape', 'https://www.olx.com.br/servicos/estado-rn/rio-grande-do-norte/natal', 'legitimo_interesse',
    'Conector v1, baixo volume (Playwright): anúncios de serviços de eventos (recreação, decoração, "pegue e monte", churrasqueiro) filtrados por palavra-chave; ≈ 150–300 relevantes entre 2.450 anúncios. Contato só pelo chat da OLX (WhatsApp às vezes no texto do anúncio). Anti-bot agressivo em produção — volume mínimo e intervalo longo; avaliar robots.txt e termos antes de habilitar (RF-RAD-01). Muitos anunciantes são pessoas naturais: marcar is_natural_person.',
-   null, 10.00, true,
+   null, 10.00, false,
    '{"collector": {"kind": "playwright", "phase": "v1", "enabled": false, "schedule": "mensal"}, "keywords": ["buffet", "festa", "decoração", "brinquedo", "DJ", "som", "churrasqueiro", "cerimonial", "fotógrafo"], "fields_whitelist": ["name", "neighborhood", "category", "phone_from_text", "source_url"]}'),
 
   ('telelistas', 'TeleListas / GuiaMais / Organizando Eventos / Solutudo', 'scrape', 'https://www.telelistas.net', 'legitimo_interesse',
    'Diretórios telefônicos e guias comerciais: nome, endereço, bairro, telefone (público ou revelado por clique), categoria. Dados às vezes antigos (telefones de 8 dígitos precisam de confirmação). Uso: reconciliação barata de telefone e semente para infraestrutura, A&B e recreação (Organizando Eventos: 202 anúncios com telefone; Solutudo: 944 org. de eventos). Conector v1 (HTTP/Playwright, baixo volume); avaliar robots.txt e termos de cada guia antes de habilitar. Também é a origem de parte da lista-semente do R09 §B.',
-   null, 5.00, true,
+   null, 5.00, false,
    '{"collector": {"kind": "http", "phase": "v1", "enabled": false, "schedule": "trimestral"}, "sites": ["telelistas.net", "guiamais.com.br", "organizandoeventos.com.br", "solutudo.com.br"], "fields_whitelist": ["name", "address", "neighborhood", "phone", "category", "source_url"]}'),
 
   ('planilha', 'Planilha (importação)', 'import', null, 'legitimo_interesse',

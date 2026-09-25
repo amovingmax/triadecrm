@@ -286,7 +286,11 @@ select pg_temp.sair();
 -- dizendo "pode".
 select pg_temp.entrar('a0000000-0000-4000-8000-0000000d0001', 'admin');
 select public.radar_criar_candidato('DRENO PGTAP CANDIDATO',
-         (select id from public.sources order by id limit 1),
+         -- `order by id limit 1` pegava `casamentos_com_br`, que desligou em
+         -- 25/09/2026 — e `radar_criar_candidato` recusa origem desligada. Este
+         -- arquivo mede o DRENO relendo a lista de supressão, não política de
+         -- fonte: a origem certa aqui é a que uma pessoa usa na mão.
+         (select id from public.sources where slug = 'captura_campo'),
          (select id from public.categories order by id limit 1),
          '+5584900000811');
 select pg_temp.sair();

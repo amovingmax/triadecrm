@@ -3,7 +3,7 @@
 -- feriados, modelos de mensagem e controle de acesso (PRD §5, Apêndices C e F; R09 §E; R08 §2).
 -- =====================================================================
 begin;
-select plan(60);
+select plan(62);
 
 -- ---------- contagens ----------
 select is((select count(*)::int from public.cities),                              22, 'seed: 22 cidades');
@@ -16,6 +16,23 @@ select is((select count(*)::int from public.categories where "group" = 'producao
 -- decisão registrada, não trabalho de rotina, e é este número que obriga quem
 -- acrescenta uma a passar por aqui.
 select is((select count(*)::int from public.sources),                             13, 'seed: 13 origens/fontes, com "Chegou pelo WhatsApp" e o Google Maps raspado (GetNinjas não entra no catálogo)');
+
+-- O Radar parou de coletar (Fase 2 do pivô, 25/09/2026). O estado é
+-- `is_enabled = false` nas CINCO fontes de coleta, e não linha apagada: os 277
+-- candidatos já colhidos apontam para elas e o RF-RAD-05 exige a proveniência.
+select is(
+  (select count(*)::int from public.sources
+    where slug in ('casamentos_com_br','base_cnpj','sympla_outgo','olx','telelistas')
+      and is_enabled),
+  0, 'seed: nenhuma das cinco fontes de coleta está ligada');
+
+-- E são CINCO, não sete. Aqui `is_enabled` quer dizer "vale como ORIGEM no CRM":
+-- desligar o Instagram cortaria a mão de quem cadastra à mão, e desligar o
+-- google_places cortaria a busca de telefone por candidato da Fase 1.
+select is(
+  (select count(*)::int from public.sources
+    where slug in ('instagram','google_places') and is_enabled),
+  2, 'seed: instagram e google_places continuam ligados — são origem, não coletor');
 select is((select count(*)::int from public.holidays where extract(year from date) = 2026), 16, 'seed: 16 feriados em 2026');
 select is((select count(*)::int from public.holidays where extract(year from date) = 2027), 16, 'seed: 16 feriados em 2027 (cadências viram o ano)');
 select is((select count(*)::int from public.lost_reasons),                         9, 'seed: 9 motivos de perda (PRD §5.3)');

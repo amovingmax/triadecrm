@@ -43,6 +43,13 @@ create function pg_temp.fonte(p_slug text) returns int language sql stable as $$
   select id from public.sources where slug = p_slug
 $$;
 
+-- O Radar desligou em 25/09/2026 (migração 20260925130000), e
+-- `public.radar_agendar_coleta` recusa fonte desligada — que é justamente o que
+-- o bloco 2 abaixo mede, de propósito, com a `olx`. Este arquivo mede o
+-- AGENDAMENTO, não a política da fonte: religar `casamentos_com_br` dentro da
+-- transação do teste é o que mantém o caminho feliz medindo o que ele diz medir.
+update public.sources set is_enabled = true where slug = 'casamentos_com_br';
+
 -- ---------- 1. quem não pode ----------
 select pg_temp.entrar('a0000000-0000-4000-8000-00000000f542', 'sdr');
 select throws_ok(
