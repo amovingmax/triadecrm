@@ -183,7 +183,9 @@ declare
   v_freio    jsonb;
   v_fila     jsonb;
   v_enfileir int := 0;
-  i          int;
+  -- `i` NÃO é declarado: o `for i in 1..n` do plpgsql cria a própria variável,
+  -- e declarar uma com o mesmo nome deixa uma sombra que o `supabase db lint`
+  -- acusa — com razão, porque a de fora fica sempre nula.
 begin
   if nullif(current_setting('request.jwt.claims', true), '') is not null
      and not app.e_o_worker()
