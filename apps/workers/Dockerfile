@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.7
-# Imagem única dos workers do KOMUNE CRM (ingest | wa | ai | rotas). Node 22, multi-stage.
+# Imagem única dos workers do KOMUNE CRM (wa | ai | rotas). Node 22, multi-stage.
 #
 # Construir sempre a partir da RAIZ do repositório (o contexto precisa do workspace inteiro):
 #   docker build -f apps/workers/Dockerfile -t komune-crm/workers:local .
 # Executar um comando:
-#   docker run --rm --env-file .env komune-crm/workers:local ingest
+#   docker run --rm --env-file .env komune-crm/workers:local wa
 # Ou só com variável de ambiente (é assim que uma nuvem como o Fly.io roda a imagem):
 #   docker run --rm --env-file .env -e WORKER_COMANDO=wa komune-crm/workers:local
 # Conectar o número da Meta de ponta a ponta, uma vez:
@@ -55,5 +55,8 @@ COPY --from=build /repo/apps/workers/dist ./apps/workers/dist
 WORKDIR /app/apps/workers
 USER node
 ENTRYPOINT ["node", "dist/index.js"]
-# Sem CMD: sem comando na linha vale WORKER_COMANDO, e o padrão da imagem continua sendo ingest.
-ENV WORKER_COMANDO=ingest
+# Sem CMD e sem WORKER_COMANDO padrão desde 25/09/2026. A imagem tinha `ingest`
+# embutido, e o `ingest` saiu — um padrão apontando para comando inexistente faz
+# o contêiner morrer com "comando desconhecido" e ninguém entender por quê.
+# Hoje, quem sobe diz qual worker quer: `command:` no Compose, `WORKER_COMANDO`
+# no Fly. Sem nenhum dos dois, o processo para e explica, que é o certo.

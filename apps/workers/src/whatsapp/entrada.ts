@@ -363,7 +363,10 @@ async function guardarMidia(
           'Content-Type': meta.mime.split(';')[0]?.trim() ?? 'application/octet-stream',
           'x-upsert': 'true',
         },
-        body: bytes.bytes as unknown as BodyInit,
+        // `BodyInit` era um tipo global do `lib.dom`, que entrava de carona numa
+        // dependência do coletor; ele saiu em 25/09/2026 com o Chromium. O corpo
+        // continua sendo os mesmos bytes crus — `fetch` do Node aceita Uint8Array.
+        body: bytes.bytes as unknown as RequestInit['body'],
       },
     );
     if (!resposta.ok) {

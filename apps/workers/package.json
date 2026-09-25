@@ -2,7 +2,7 @@
   "name": "@komune/workers",
   "version": "0.1.0",
   "private": true,
-  "description": "Workers da máquina dedicada do KOMUNE CRM: uma imagem Docker, quatro comandos (ingest | wa | ai | rotas).",
+  "description": "Workers da máquina dedicada do KOMUNE CRM: uma imagem Docker, três comandos (wa | ai | rotas).",
   "type": "module",
   "scripts": {
     "dev": "node --env-file-if-exists=../../.env.local --import tsx src/index.ts",
@@ -17,9 +17,6 @@
     "@komune/prompts": "workspace:*",
     "@komune/schema": "workspace:*",
     "@supabase/supabase-js": "2.112.4",
-    "cheerio": "^1.2.0",
-    "crawlee": "3.15.3",
-    "playwright": "1.62.1",
     "zod": "catalog:"
   },
   "devDependencies": {

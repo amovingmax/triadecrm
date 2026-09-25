@@ -43,7 +43,7 @@ Outros comandos:
 | `pnpm db:test`                                              | testes pgTAP em `supabase/tests` (RLS por papel, funções)                                |
 | `pnpm db:seed-dev`                                          | carga de desenvolvimento (`scripts/seed-dev-5k.sql`, ~5 mil organizações) no banco local |
 | `pnpm db:stop`                                              | derruba a stack local                                                                    |
-| `pnpm --filter @komune/workers dev ingest`                  | roda um worker em dev (`ingest`, `wa` ou `ai`)                                           |
+| `pnpm --filter @komune/workers dev wa`                      | roda um worker em dev (`wa`, `ai` ou `rotas`)                                            |
 
 ### Entrar no app local sem passar pelo Google
 
@@ -94,7 +94,7 @@ node -e "const s=require('fs').readFileSync(0,'utf8');
 
 ```
 apps/web              Next.js 16 (App Router, PWA, mobile-first nas telas de campo)
-apps/workers          uma imagem Docker, três comandos: ingest | wa | ai
+apps/workers          uma imagem Docker, três comandos: wa | ai | rotas
 packages/schema       schemas zod + tipos gerados do banco (compartilhados por web, workers e Edge Functions)
 packages/prompts      prompts versionados + evals (D6)
 supabase/migrations   fonte da verdade do schema (RLS em toda tabela)

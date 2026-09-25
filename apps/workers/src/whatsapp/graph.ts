@@ -298,7 +298,7 @@ export class ClienteDaGraph {
     const form = new FormData();
     form.append('messaging_product', 'whatsapp');
     form.append('type', arquivo.mime);
-    form.append('file', new Blob([arquivo.bytes as unknown as BlobPart], { type: arquivo.mime }), arquivo.nome);
+    form.append('file', new Blob([arquivo.bytes], { type: arquivo.mime }), arquivo.nome);
 
     let resposta: Response;
     try {

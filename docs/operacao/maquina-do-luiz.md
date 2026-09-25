@@ -18,7 +18,6 @@ O que roda aqui:
 
 | Serviço          | O que faz                                                                       |
 | ---------------- | ------------------------------------------------------------------------------- |
-| `worker-ingest`  | Vasculha fontes públicas e planilhas atrás de fornecedores novos                 |
 | `worker-wa`      | Manda e recebe as mensagens de WhatsApp pela API oficial da Meta                 |
 | `worker-ai`      | Classifica respostas, escreve rascunhos e resumos com a IA                       |
 | `metabase`       | Painéis e relatórios                                                             |
@@ -240,7 +239,6 @@ SERVICE          STATUS
 faster-whisper   Up 3 minutes (healthy)
 metabase         Up 3 minutes (healthy)
 worker-ai        Up 3 minutes (healthy)
-worker-ingest    Up 3 minutes (healthy)
 worker-wa        Up 3 minutes (healthy)
 ```
 
@@ -309,7 +307,7 @@ Todos `(healthy)` (§8).
 O `docker compose ps` só mostra saudável/não saudável. Para ver **o motivo**:
 
 ```bash
-docker compose exec worker-ingest node /opt/healthchecks/worker-heartbeat.mjs ingest
+docker compose exec worker-wa node /opt/healthchecks/worker-heartbeat.mjs wa
 ```
 
 - Bom: `ok ingest/default: batida há 12s, status=ok, processados=0, falhas=0`
@@ -351,7 +349,7 @@ Quase todo problema cai num dos dois lados, e a resposta muda quem resolve. Rode
 ```bash
 cd ~/apps/triade/infra/local
 docker compose ps                                   # (1) os contêineres estão de pé?
-docker compose exec worker-ingest node /opt/healthchecks/worker-heartbeat.mjs ingest   # (2)
+docker compose exec worker-wa node /opt/healthchecks/worker-heartbeat.mjs wa   # (2)
 ```
 
 Leia assim:
@@ -430,7 +428,7 @@ recriar o contêiner. Use a opção 2 ou 3.
 cd ~/apps/triade/infra/local
 docker compose ps
 docker compose logs --tail=80 --timestamps
-docker compose exec worker-ingest node /opt/healthchecks/worker-heartbeat.mjs ingest
+docker compose exec worker-wa node /opt/healthchecks/worker-heartbeat.mjs wa
 ```
 
 > **Nunca** mande a saída de `docker compose config`: ela imprime o conteúdo dos arquivos de
@@ -532,11 +530,11 @@ docker compose logs -f <serviço>        # log ao vivo
 docker compose restart <serviço>        # reinicia um só
 docker compose up -d --force-recreate <serviço>   # recria (depois de mexer no .env)
 docker compose down && docker compose up -d       # tudo
-docker compose exec worker-ingest node /opt/healthchecks/worker-heartbeat.mjs ingest
+docker compose exec worker-wa node /opt/healthchecks/worker-heartbeat.mjs wa
 docker compose exec faster-whisper python3 /opt/healthchecks/whisper-transcreve.py
 ```
 
-Serviços: `worker-ingest` · `worker-wa` · `worker-ai` · `metabase` · `osrm` · `faster-whisper` · `cloudflared`
+Serviços: `worker-wa` · `worker-ai` · `worker-rotas` · `metabase` · `osrm` · `faster-whisper` · `cloudflared`
 
 **Quem chamar:** problema de máquina, rede, Docker ou Tailscale é seu. Chave, migração, fila
 parada ou comportamento errado do CRM é do **Matheus**. A tabela da §10.1 diz de quem é.

@@ -9,7 +9,6 @@ referência curta para quem desenvolve.
 
 | Serviço          | Perfil         | Para quê                                                            | Porta            |
 | ---------------- | -------------- | ------------------------------------------------------------------- | ---------------- |
-| `worker-ingest`  | `workers`      | Radar: scrapers, planilhas, base CNPJ (D4, RF-RAD)                  | —                |
 | `worker-wa`      | `workers`      | WhatsApp Cloud API: envios, cadências, áudios (D5, RF-CON)          | —                |
 | `worker-ai`      | `workers`      | Haiku 4.5 e Sonnet 5: classificação, rascunhos, Assistente (ADR-10) | —                |
 | `worker-rotas`   | `workers`      | Ordem das visitas da tarde no OSRM e geocodificação (RF-ROT)         | —                |
@@ -35,12 +34,12 @@ cp .env.example .env                     # ajustes só desta máquina (sem segre
 docker compose build                     # imagem dos workers (apps/workers/Dockerfile, contexto = raiz)
 docker compose up -d                     # perfis do COMPOSE_PROFILES do .env
 docker compose ps                        # STATUS mostra (healthy) / (unhealthy)
-docker compose logs -f worker-ingest
+docker compose logs -f worker-wa
 docker compose restart worker-wa         # reinicia um serviço só
 docker compose down                      # derruba (dados em ./data ficam)
 
 # Uma verificação de saúde, na mão, com a mensagem de erro por extenso:
-docker compose exec worker-ingest node /opt/healthchecks/worker-heartbeat.mjs ingest
+docker compose exec worker-wa node /opt/healthchecks/worker-heartbeat.mjs wa
 docker compose exec faster-whisper python3 /opt/healthchecks/whisper-transcreve.py
 ```
 

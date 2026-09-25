@@ -1,4 +1,31 @@
 # =============================================================================
+# worker-ingest no Fly.io — DESATIVADO em 25/09/2026, a destruir a partir de 03/10
+# =============================================================================
+#
+# O coletor do Radar saiu do código em 25/09/2026 (Fase 2 do pivô, ADR-12). Este
+# arquivo fica no repositório porque, enquanto o app existir na Fly, ele é o
+# único lugar onde estão escritos o nome, a região e o custo dele. E a imagem
+# que ele aponta já não tem o comando `ingest`: um deploy hoje subiria um
+# contêiner que para com "comando desconhecido".
+#
+# PASSO 1 — hoje, reversível:
+#   fly scale count 0 -a triade-worker-ingest
+# Reverter é `count 1`; o que estava na fila continua no banco, e o `pgmq`
+# devolve a mensagem quando o visibility timeout expira.
+#
+# PASSO 2 — NÃO ANTES DE 03/10/2026. São sete dias de operação real com a
+# Revisão já recebendo CSV do Maps; é essa semana que autoriza apagar. Contagem:
+# 25/09 é o dia 1, 02/10 é o sétimo, 03/10 é o oitavo.
+#   fly apps destroy triade-worker-ingest
+# Isso apaga também uma cópia da SUPABASE_SERVICE_ROLE_KEY, que é o melhor
+# motivo da lista. O custo — shared-cpu-1x 512 MB sem auto-stop, US$ 3,19/mês,
+# US$ 38 no ano — é o menor deles.
+#
+# PASSO 3 — no mesmo commit do passo 2, apague ESTE arquivo.
+# =============================================================================
+#
+# O QUE ELE FOI, ENQUANTO EXISTIU
+# =============================================================================
 # worker-ingest no Fly.io — o coletor do Radar (decisão de 17/09/2026)
 # =============================================================================
 #

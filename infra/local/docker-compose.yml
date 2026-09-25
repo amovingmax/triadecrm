@@ -13,7 +13,7 @@
 #
 # Perfis (ligue com COMPOSE_PROFILES no ./.env, ou --profile na linha de comando):
 #   (nenhum)      metabase, faster-whisper
-#   workers       worker-ingest, worker-wa, worker-ai, worker-rotas
+#   workers       worker-wa, worker-ai, worker-rotas
 #   rotas         osrm  (exige o grafo já preparado — veja o perfil osrm-preparo)
 #   osrm-preparo  osrm-preparo (tarefa única: extract → partition → customize)
 #   tunel         cloudflared (só se o Metabase precisar sair do tailnet)
@@ -83,32 +83,14 @@ x-worker: &worker
 
 services:
   # -------------------------------------------------------------------------
-  # Workers — uma imagem, quatro comandos (CLAUDE.md, ADR-04).
+  # Workers — uma imagem, três comandos (CLAUDE.md, ADR-04).
   #
   # Healthcheck: NÃO é "o processo está de pé". Um worker vivo sem rede, com chave errada
   # ou travado num laço engana qualquer verificação de processo e está parado para o CRM.
-  # O script pergunta ao Supabase o mesmo que a tela do Radar pergunta — "esse worker bateu
+  # O script pergunta ao Supabase o mesmo que Ajustes → Atendimento pergunta — "esse worker bateu
   # ponto nos últimos WORKER_HEARTBEAT_MAX_AGE_S segundos?" (public.worker_heartbeats) —,
   # então ele cobre processo + rede + credencial + trabalho de verdade, de uma vez.
   # -------------------------------------------------------------------------
-
-  # Radar: scrapers, planilhas e base CNPJ → esteira de ingestão (D4, RF-RAD, ADR-08).
-  worker-ingest:
-    <<: *worker
-    command: ['ingest']
-    mem_limit: ${MEM_WORKER_INGEST:-2g}
-    mem_reservation: 512m
-    memswap_limit: ${MEM_WORKER_INGEST:-2g}
-    cpus: 2.0
-    pids_limit: 512
-    # O Chromium do Crawlee/Playwright (D4) morre com os 64 MB de /dev/shm padrão do Docker.
-    shm_size: 512m
-    healthcheck:
-      test: ['CMD', 'node', '/opt/healthchecks/worker-heartbeat.mjs', 'ingest']
-      interval: 60s
-      timeout: 15s
-      retries: 3
-      start_period: 120s
 
   # WhatsApp: envios pela Cloud API da Meta, cadências e áudios (D5, RF-CON, ADR-06).
   worker-wa:
@@ -464,8 +446,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    # O Chromium morre com os 64 MB de /dev/shm padrão do Docker — mesmo motivo
-    # do worker-ingest.
+    # O Chromium morre com os 64 MB de /dev/shm padrão do Docker. Era o mesmo
+    # motivo do worker-ingest, que saiu em 25/09/2026 — hoje o único Chromium da
+    # máquina dedicada é este, o do raspador do Maps.
     shm_size: 512m
     tmpfs:
       - /tmp:size=512m,mode=1777

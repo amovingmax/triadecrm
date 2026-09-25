@@ -102,7 +102,7 @@ export async function transcrever(
   }
 
   const form = new FormData();
-  form.append('file', new Blob([audio.bytes as unknown as BlobPart], { type: audio.mime }), audio.nome);
+  form.append('file', new Blob([audio.bytes], { type: audio.mime }), audio.nome);
   form.append('model', config.modelo);
   form.append('language', 'pt');
   form.append('response_format', 'verbose_json');
