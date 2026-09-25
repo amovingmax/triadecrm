@@ -19,6 +19,8 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import type { AvisoDeReuniao } from './aviso-de-reuniao';
+
 export type ClienteDoBanco = SupabaseClient;
 
 export const FILA_ENTRADA = 'wa_inbound';
@@ -769,4 +771,73 @@ export async function lerConversasParaAviso(
     });
   }
   return mapa;
+}
+
+// ---------------------------------------------------------------------------
+// Avisos de reunião (ADR-15)
+//
+// A fila `reuniao_avisos` é lida por `public.reuniao_avisos_proximos`, que já
+// monta a linha inteira do e-mail — parceiro, dia e hora por extenso, formato,
+// sala, quem atende e o e-mail dele. Este trecho só traduz nomes de coluna em
+// nomes de campo: nenhuma regra mora aqui.
+// ---------------------------------------------------------------------------
+
+export const FILA_AVISOS_DE_REUNIAO = 'reuniao_avisos';
+
+export async function proximosAvisosDeReuniao(
+  cliente: ClienteDoBanco,
+  quantidade = 5,
+): Promise<AvisoDeReuniao[]> {
+  const linhas = await rpc<unknown>(cliente, 'reuniao_avisos_proximos', { p_qty: quantidade });
+  if (!Array.isArray(linhas)) return [];
+  return linhas.map((linha) => {
+    const l = objeto(linha);
+    return {
+      msgId: Number(l.msg_id),
+      chave: texto(l.chave) ?? '',
+      motivo: texto(l.motivo) ?? 'marcada',
+      reuniaoId: texto(l.reuniao_id) ?? '',
+      organizationId: texto(l.organization_id),
+      conversationId: texto(l.conversation_id),
+      parceiro: texto(l.parceiro),
+      quandoPorExtenso: texto(l.quando_por_extenso),
+      quandoCurto: texto(l.quando_curto),
+      formato: texto(l.formato) ?? 'online',
+      link: texto(l.link),
+      local: texto(l.local),
+      estado: texto(l.estado) ?? 'marcada',
+      marcadaPeloRobo: l.marcada_pelo_robo === true,
+      atende: texto(l.atende),
+      emailDoDono: texto(l.email_do_dono),
+    };
+  });
+}
+
+export async function concluirAvisoDeReuniao(
+  cliente: ClienteDoBanco,
+  msgId: number,
+  chave: string,
+): Promise<void> {
+  await concluir(cliente, FILA_AVISOS_DE_REUNIAO, msgId, chave);
+}
+
+export async function falharAvisoDeReuniao(
+  cliente: ClienteDoBanco,
+  msgId: number,
+  chave: string,
+  erro: string,
+): Promise<RespostaDeFalha> {
+  return falhar(cliente, FILA_AVISOS_DE_REUNIAO, msgId, chave, erro);
+}
+
+/**
+ * Marca `reunioes.aviso_enviado_em`. Enquanto estiver nulo, o cartão da Agenda
+ * diz que ninguém foi avisado por e-mail — fila silenciosa também é falha
+ * silenciosa.
+ */
+export async function marcarAvisoDeReuniaoEnviado(
+  cliente: ClienteDoBanco,
+  reuniaoId: string,
+): Promise<void> {
+  await rpc<boolean>(cliente, 'reuniao_aviso_enviado', { p_reuniao_id: reuniaoId });
 }

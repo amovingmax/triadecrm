@@ -47,6 +47,7 @@
  *   · `--sincronizar-modelos` só a passada dos modelos.
  */
 import { avisarPorEmail, type EntradaParaAviso } from '../whatsapp/aviso-por-email';
+import { avisarDasReunioes } from '../whatsapp/reuniao-avisos';
 import { ClienteDaGraph, VERSAO_PADRAO } from '../whatsapp/graph';
 import {
   contagensDaEntradaZeradas,
@@ -240,6 +241,14 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
       // 1b · Avisar o time. Um e-mail por lote: cinco mensagens em dez segundos
       //      são uma conversa, e cinco e-mails são ruído.
       await avisarDoQueChegou(contextoDaEntrada, env.RESEND_API_KEY);
+
+      // 1c · Reunião marcada: um e-mail por reunião. A reunião JÁ está
+      //      gravada e já foi confirmada ao parceiro quando isto roda — se o
+      //      Resend cair, a mensagem volta para a fila com backoff, tenta
+      //      cinco vezes e cai em `reuniao_avisos_dlq`. E, como fila
+      //      silenciosa também é falha silenciosa, `aviso_enviado_em`
+      //      continua nulo e o cartão na Agenda diz que ninguém foi avisado.
+      await avisarDasReunioes(cliente, env.RESEND_API_KEY, logger);
       if (parando) break;
 
       // 2 · O que a tela aprovou e ainda não estava na fila.

@@ -99,8 +99,86 @@ export function corpoDoAviso(entradas: readonly EntradaParaAviso[], urlDoCrm: st
 }
 
 /**
- * Manda o aviso. Nunca lança: aviso que derruba a fila de entrada é pior que
- * aviso que não chega — a mensagem do parceiro já está gravada quando isto roda.
+ * O cano do Resend, sozinho — assunto, corpo, destinatários.
+ *
+ * DUAS COISAS MUDAM NA EXTRAÇÃO, E AS DUAS SÃO OBRIGATÓRIAS.
+ *
+ * 1. `avisarPorEmail` engole o erro e devolve `false`, e para a fila de
+ *    ENTRADA isso está certo: aviso que derruba a fila é pior que aviso que
+ *    não chega. Para uma fila COM RETENTATIVA está errado — mensagem que
+ *    "deu certo" é arquivada, e as cinco tentativas prometidas nunca
+ *    acontecem. Então o resultado é discriminado.
+ *
+ * 2. E ele não é binário. "Aviso desligado" e "lista vazia" NÃO são falha:
+ *    são configuração, e devolver falha nesses casos manda TODA reunião para
+ *    `reuniao_avisos_dlq` em qualquer ambiente sem Resend — inclusive o
+ *    local. Por isso existe `motivo: 'desligado'`, que o consumidor CONCLUI
+ *    em vez de falhar, deixando `aviso_enviado_em` nulo (que é justamente o
+ *    que o cartão da Agenda já mostra).
+ *
+ * 5xx, 429 e erro de rede são transitórios. 4xx não é: chave errada, domínio
+ * não verificado e destinatário inválido não melhoram com repetição.
+ *
+ * `para` vem POR FORA da config porque o aviso de reunião soma o dono da
+ * reunião à lista do time, e a config é a lista do time.
+ */
+export type ResultadoDoEnvio =
+  | { ok: true }
+  | { ok: false; motivo: 'desligado' | 'sem_chave' | 'recusado'; transitorio: boolean };
+
+export async function enviarPeloResend(
+  assunto: string,
+  texto: string,
+  config: ConfiguracaoDoAviso,
+  para: readonly string[],
+  chave: string | undefined,
+  logger: Logger,
+  buscar: typeof fetch = fetch,
+): Promise<ResultadoDoEnvio> {
+  if (!config.ativo || para.length === 0) {
+    return { ok: false, motivo: 'desligado', transitorio: false };
+  }
+  if (!chave) {
+    logger.warn('aviso por e-mail ligado, mas sem RESEND_API_KEY: ninguém foi avisado', {
+      assunto,
+    });
+    return { ok: false, motivo: 'sem_chave', transitorio: false };
+  }
+  try {
+    const resposta = await buscar(RESEND, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${chave}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        from: config.de,
+        to: [...para],
+        ...(config.responderPara ? { reply_to: config.responderPara } : {}),
+        subject: assunto,
+        text: texto,
+      }),
+    });
+    if (!resposta.ok) {
+      logger.error('Resend recusou o e-mail', {
+        status: resposta.status,
+        corpo: (await resposta.text()).slice(0, 300),
+      });
+      return {
+        ok: false,
+        motivo: 'recusado',
+        transitorio: resposta.status >= 500 || resposta.status === 429,
+      };
+    }
+    logger.info('e-mail enviado', { assunto, para: para.length });
+    return { ok: true };
+  } catch (erro) {
+    logger.error('não deu para falar com o Resend', { erro: (erro as Error).message });
+    return { ok: false, motivo: 'recusado', transitorio: true };
+  }
+}
+
+/**
+ * Manda o aviso da fila de ENTRADA. Nunca lança, e continua devolvendo
+ * booleano: aviso que derruba a fila de entrada é pior que aviso que não
+ * chega — a mensagem do parceiro já está gravada quando isto roda.
  */
 export async function avisarPorEmail(
   entradas: readonly EntradaParaAviso[],
@@ -110,39 +188,14 @@ export async function avisarPorEmail(
   buscar: typeof fetch = fetch,
 ): Promise<boolean> {
   if (entradas.length === 0) return false;
-  if (!config.ativo || config.para.length === 0) return false;
-  if (!chave) {
-    logger.warn('aviso por e-mail ligado, mas sem RESEND_API_KEY: ninguém foi avisado', {
-      mensagens: entradas.length,
-    });
-    return false;
-  }
-  try {
-    const resposta = await buscar(RESEND, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${chave}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        from: config.de,
-        to: config.para,
-        ...(config.responderPara ? { reply_to: config.responderPara } : {}),
-        subject: assuntoDoAviso(entradas),
-        text: corpoDoAviso(entradas, config.urlDoCrm),
-      }),
-    });
-    if (!resposta.ok) {
-      logger.error('Resend recusou o aviso', {
-        status: resposta.status,
-        corpo: (await resposta.text()).slice(0, 300),
-      });
-      return false;
-    }
-    logger.info('time avisado por e-mail', {
-      mensagens: entradas.length,
-      para: config.para.length,
-    });
-    return true;
-  } catch (erro) {
-    logger.error('não deu para avisar por e-mail', { erro: (erro as Error).message });
-    return false;
-  }
+  const r = await enviarPeloResend(
+    assuntoDoAviso(entradas),
+    corpoDoAviso(entradas, config.urlDoCrm),
+    config,
+    config.para,
+    chave,
+    logger,
+    buscar,
+  );
+  return r.ok;
 }
