@@ -3164,3 +3164,127 @@ Um buraco sobreviveu, e é exatamente o da pergunta "o freio pode perder dado?".
 Verificado, com o banco reconstruído do zero: pgTAP **2.988 asserções em 69 arquivos**, `pnpm db:lint` com os três apontamentos pré-existentes e nenhum novo (`app.ia_prazo`, `app.radar_pontuar`, `app.envio_um`), `pnpm db:types` sem diff depois do commit, lint, typecheck, **804 testes do web em 52 arquivos**, **337 dos workers em 21**, **276 dos prompts** e **105 do schema**. Os 36 do `wa-webhook` não foram rodados aqui: o Deno não está instalado nesta máquina, e nada de `supabase/functions/` foi tocado nesta conferência.
 
 **Nada foi a produção:** sem `supabase db push`, sem `vercel`, sem `git push`, sem chamada à Graph com token real.
+
+---
+
+## Fase 5 — o calendário é do CRM, e a IA marca sozinha (25/09/2026)
+
+Base: ADR-15 e seção B da emenda de 25/09 em `docs/superpowers/specs/2026-09-24-pivo-scraper-e-robo-autonomo-design.md`, mais duas respostas do Rafael: **esta fase vem antes da Fase 4** (o texto livre), porque não depende de modelo nenhum; e **a IA marca com uma rampa** — na primeira semana alguém confirma com um clique antes de o fornecedor ver o horário.
+
+### Por que a reunião não cabia em `tasks`
+
+O CRM não tinha reunião. Tinha `public.tasks` com prazo, e é outra coisa: sem fim, sem lugar, sem lista de presença, e com `app.task_status` (`todo | doing | done | cancelled`) que não sabe dizer "remarcada" nem "não compareceu".
+
+O argumento que fecha a discussão é a trava. **Não dá para pôr restrição de colisão em `tasks`**: as nove "Marcar apresentação" de terça nascem todas às 09:00 pela régua do RF-MET-06 e recusariam umas às outras. A tabela que precisa proibir sobreposição é a tabela onde sobreposição é erro; em `tasks` ela é o dia normal.
+
+### A trava, e por que `[)`
+
+`reunioes_sem_colisao` é uma **restrição de exclusão GiST** sobre `(dono_id, durante)`, parcial em `estado in ('a_confirmar','marcada','confirmada')`. Ela não é uma checagem: é o índice recusando escrever. Não existe caminho que a contorne — nem por worker novo, nem por Edge Function, nem por alguém no SQL Editor. Um `select` que pergunta "está livre?" seguido de um `insert` é janela de corrida em qualquer linguagem, e daqui a pouco são dois worker-ai.
+
+O intervalo é `[inicio, fim)` de propósito: **encostar não é sobrepor**. A reunião que termina 11h00 deixa a de 11h10 entrar, e deixaria a de 11h00 em ponto. E ser parcial também é de propósito: reunião cancelada não segura o horário dela para sempre.
+
+`durante` é coluna **gerada e armazenada**, e não calculada na consulta, porque a restrição precisa de valor indexável — e o construtor `tstzrange(timestamptz, timestamptz, text)` é imutável. A extensão nova é `btree_gist`, a única que deixa `uuid with =` conviver com `tstzrange with &&` no mesmo índice; entrou em `extensions`, como `postgis` já tinha entrado.
+
+### A grade: nove começos, e por que 40 minutos
+
+Reunião de **40 min com 10 de intervalo** (ciclo de 50), na janela **9h30–17h20** que o Rafael deu. Os começos são 9h30 · 10h20 · 11h10 · 12h00 · 12h50 · 13h40 · 14h30 · 15h20 · 16h10. O de 17h00 fica de fora porque terminaria 17h40; os 30 minutos entre 16h50 e 17h20 são a folga que absorve a reunião que passa da hora.
+
+Os 40 não são gosto: o RF-AGE-01 pedia 30 e a rota do Google usava 45. É o único valor que fecha grade limpa dentro da janela, e 30 com 10 de intervalo daria 11 reuniões num dia — número que só existe no papel.
+
+**Almoço: nenhum, por ora.** A janela veio com precisão de minuto; abrir um buraco de meio-dia que ninguém pediu seria decidir pelo Rafael. O campo `pausa` existe para `{"de":"12:00","ate":"13:30"}` num `update` de uma linha, sem deploy.
+
+**Teto de 4 por pessoa por dia** — mais apertado do que os "4 por manhã + 4 por tarde" do PRD, de propósito: a grade atravessa os dois turnos. Robô que enche o dia de alguém com nove reuniões é robô que a equipe desliga na segunda semana.
+
+`app.reuniao_horarios_livres` corta um horário por seis motivos, na ordem de quem pergunta "por que não me ofereceram as 14h?": não é dia útil · cedo demais (3 h de antecedência) · longe demais (10 dias úteis) · colide com outra reunião viva · colide com a rota da tarde (a janela inteira de `rotas.planejador`, não parada a parada, porque `route_stops` não guarda quanto dura cada visita e calcular o fim da rota seria inventar número) · colide com tarefa de campo aberta. E, por último, o teto.
+
+A régua de dia útil saiu de dentro de `app.next_business_day` e virou `app.eh_dia_util(date)`, que as duas chamam — uma regra, dois usos (ADR-03).
+
+### A rampa, e a data que conta do dia da migração
+
+Pedido do Rafael: na primeira semana alguém confirma com um clique antes de o fornecedor ver o horário; **passada a semana sem correção, o clique sai sozinho**. É uma chave em `app_settings.agenda.reunioes.rampa`, com data de saída escrita — não um passo manual eterno.
+
+A data conta **do dia em que a migração rodou**, e não de um `2026-10-09` literal: data literal faria a rampa nascer vencida em todo banco criado depois dela, e o pgTAP ficaria vermelho sozinho no dia seguinte ao prazo.
+
+"Sem correção" é regra, não figura de linguagem: cancelar ou remarcar uma reunião do robô chama `app.reuniao_rampa_adiar()`, que empurra a data em `dias`. Depois do fim ela não ressuscita — senão a rampa nunca acaba.
+
+### A fila do aviso, e por que "desligado" não é falha
+
+`reuniao_avisos` (+ `reuniao_avisos_dlq`) nasce **antes** de `app.reuniao_gravar`, dentro do mesmo arquivo. `app.esteira_enfileirar` levanta exceção em fila que não está no catálogo, e a exceção não derrubaria só o aviso: derrubaria a transação inteira de quem marcou a reunião.
+
+O cano do Resend virou `enviarPeloResend`, com resultado discriminado. `avisarPorEmail` engolia o erro e devolvia `false` — e para a fila de **entrada** isso está certo, porque a mensagem do parceiro já está gravada. Para uma fila **com retentativa** está errado: mensagem que "deu certo" é arquivada, e as cinco tentativas prometidas nunca acontecem. 5xx, 429 e erro de rede são transitórios; 4xx não é, porque repetir não conserta chave errada nem domínio não verificado.
+
+**E "aviso desligado" não é falha, é configuração.** Com `notificacoes.email.ativo = false`, ou sem destinatário, a mensagem é **arquivada**. Sem essa distinção, toda reunião em qualquer máquina sem Resend — inclusive a local e o CI — queimaria cinco tentativas e cairia em `reuniao_avisos_dlq`. Fila que arquiva o que não tinha para onde ir é fila; fila que manda isso para a dead-letter é alarme que ninguém mais lê.
+
+**Se o e-mail falhar, a reunião fica marcada.** Sem discussão: ela já foi gravada e confirmada ao parceiro antes de o Resend entrar na história. O que acontece é `reunioes.aviso_enviado_em` continuar nulo — e o cartão na Agenda dizer que ninguém foi avisado.
+
+O e-mail vai para **quem atende** (`app.email_de`, lido de `auth.users`, só `service_role`) mais a lista do time, sem duplicar e sem diferenciar maiúsculas. Não leva o telefone do parceiro. O lead não recebe e-mail: ele falou e consentiu por WhatsApp.
+
+### A tela
+
+A `tasks` continua sendo a espinha e a `reunioes` passou a ser a carne, enriquecendo por `task_id` — exatamente o papel que o espelho do Google tinha. Com uma diferença: **falha ao ler `reunioes` derruba a semana**. O espelho era enfeite e o erro dele era engolido; sem a reunião a lista fica errada, não incompleta.
+
+O cartão mostra `10h20–11h00` (a primeira vez que o produto tem fim para mostrar), o selo **"marcada pelo robô"**, e as ações: entrar na sala, remarcar, cancelar e **confirmar o horário** enquanto a rampa está ligada, com a frase que diz o porquê. Sob o cabeçalho do dia, a tira de livres responde "o que o robô pode oferecer no meu nome hoje" — da mesma grade que ele usa, senão a pessoa marca por cima da rota e a grade vira ficção.
+
+**Remarcar passa a ser uma porta só.** A folha de desfecho deixou de oferecer "Reagendada" para compromisso com reunião: as duas juntas produziriam duas linhas para a mesma reunião.
+
+E o desfecho passou a **fechar a reunião** (`realizada` / `nao_compareceu`). Sem isso, esses dois estados eram aceitos pelo CHECK e nunca escritos por ninguém: a linha ficava `marcada` para sempre, segurando o horário na trava e contando no teto de 4 do dia.
+
+### A faxina do Google — e o passo que é do Rafael
+
+> **ANTES DO DEPLOY, e só enquanto os tokens ainda funcionam** — esta é a única ordem que não pode inverter:
+>
+> ```sql
+> select count(*) from public.compromissos_no_google g
+>   join public.tasks t on t.id = g.task_id
+>  where t.due_at > now() and t.status <> 'done';
+> ```
+>
+> Para cada uma dessas, chamar `/api/agenda/remover`. Reuniões passadas ficam onde estão. **Depois de a migração `20260930120000` rodar não há como fazer isso**: os refresh tokens terão sido destruídos, e cada fornecedor fica com um convite órfão na agenda dele.
+
+A migração apaga, nesta ordem: os **nove invólucros em `public`** (apagar só o lado `app` deixaria invólucros chamando função que não existe — erro em tempo de execução, invisível em migração), as **nove funções em `app`**, os **segredos do Vault** com nome `agenda_google:%` (`drop table app.agendas_do_google` leva o `segredo_id` e deixaria o segredo cifrado sem dono e sem quem o apague), as **duas tabelas**, e as automações que prometiam `"provider":"google"`.
+
+Saíram do repositório: `botao-google-agenda.tsx`, `conexao-google.tsx`, `google-dados.ts`, `lib/google/agenda.ts`, as quatro rotas de `api/agenda/`, o guia de operação e os testes 38 e 39.
+
+**Ficaram, e não podem sair por engano:** `SUPABASE_AUTH_GOOGLE_CLIENT_ID`/`SECRET` (é o **login** do CRM — apagar derruba a entrada de todo mundo), `GOOGLE_MAPS_API_KEY` (é a busca de telefone) e `SUPABASE_SERVICE_ROLE_KEY`, cujo comentário no `.env.example` foi reescrito junto: ele dizia que a chave existia "para ler o refresh token guardado no Vault", e esse Vault acabou de sair.
+
+As três migrações que criaram a agenda do Google (`20260908180000`, `20260909100000`, `20260909130000`) **não foram editadas**, e nunca serão: migração é história e é a fonte da verdade do schema. Elas continuam citando `agenda_google` para sempre, e é por isso que o `grep` de pronto exclui `migrations`.
+
+**Recado para o grupo:** a conexão morre sozinha do lado do CRM, mas a permissão registrada na conta Google de cada pessoa **não** morre. Cada uma que conectou entra em `myaccount.google.com/permissions` e remove o acesso do app; o Luiz tira o escopo `calendar.events` da tela de consentimento do cliente OAuth.
+
+### O que esta fase entrega para a Fase 4, e mais nada
+
+`public.reuniao_horarios(conversation_id, limite)` e `public.reuniao_marcar(conversation_id, inicio, formato, observacao)` — as duas únicas funções da fase com `grant` para `service_role` no caminho de escrita. A primeira devolve `quando_por_extenso` pronto: **o modelo nunca faz conta de data**; data calculada por modelo de linguagem é o erro que só aparece quando o parceiro não vem. A segunda devolve `link`, `estado`, `precisa_confirmacao` e, quando recusa, `alternativas` no mesmo retorno.
+
+Confirmar, cancelar, remarcar e dar desfecho são de gente nesta fase, de propósito, e os grants dizem isso: `service_role` está **revogado** nas quatro, porque todas recusam sem `auth.uid()` e grant que só devolve `sem_permissao` é porta pintada na parede.
+
+Nada de prompt de redação livre, validador de mundo fechado ou voz da casa: isso é Fase 4.
+
+### Verificado
+
+Banco reconstruído do zero: pgTAP **3.024 asserções em 69 arquivos** (2.988 − 36 dos testes 38 e 39 que saíram, + 67 do novo `74_a_reuniao.sql` e 5 do `75_a_agenda_sem_google.sql`). `pnpm db:lint` com os três apontamentos pré-existentes e nenhum novo (`app.ia_prazo`, `app.radar_pontuar`, `app.envio_um`). `pnpm db:types` regenerado e `pnpm typecheck` verde. Lint verde. **814 testes do web em 52 arquivos**, **363 dos workers em 24**, **276 dos prompts**, **105 do schema**. Os 36 do `wa-webhook` não foram rodados: o Deno não está nesta máquina, e nada de `supabase/functions/` foi tocado.
+
+O `grep` de pronto (excluindo `migrations`, `specs`, este CHANGELOG e o plano da fase, e filtrando `SUPABASE_AUTH_GOOGLE` por `grep -v`) não devolve nada. O teste 75 e o plano da fase citam os nomes mortos de propósito: um prova que eles sumiram, o outro é história, como este arquivo.
+
+**Nada foi a produção:** sem `supabase db push`, sem `vercel`, sem `git push`, sem uma chamada ao Google ou ao Resend com credencial real.
+
+### Homologação manual, no lugar do e2e
+
+`playwright` **está** em `apps/web/package.json`, mas é usado pelos scripts de screenshot: não há `playwright.config` nem pasta `e2e`, e `apps/web` roda `vitest run`. O caminho de tela foi verificado por Vitest sobre as funções puras, e o resto é roteiro manual, com `supabase start` local e o worker-wa em `--uma-vez`:
+
+1. marcar pela tela (`reuniao_marcar_pelo_negocio`, o único caminho que `authenticated` executa) e ver o cartão mostrar `10h20–11h00`;
+2. cancelar e remarcar pelo cartão, e ver que a folha de desfecho **não** oferece mais "Reagendada" para esse compromisso;
+3. registrar o desfecho e conferir, no banco, que `reunioes.estado` virou `realizada` — e que o horário voltou para a grade;
+4. uma reunião marcada pelo robô (via `service_role`), com o selo e o botão **Confirmar o horário** enquanto a rampa está ligada;
+5. a mesma reunião com o Resend falhando (5xx simulada), para ver o cartão dizer que ninguém foi avisado e a mensagem **voltar** para a fila (`select * from pgmq.metrics('reuniao_avisos')`);
+6. e com o aviso **desligado**, para ver a mensagem ser **arquivada** e `reuniao_avisos_dlq` continuar vazia;
+7. **a corrida de verdade**, que o pgTAP não consegue provar: duas sessões `psql` lado a lado, `begin` nas duas, `public.reuniao_marcar(...)` no mesmo horário do mesmo dono, `commit` na primeira — a segunda destrava e devolve `horario_tomado` com três alternativas. (No pgTAP isso não se prova: `dblink` de dentro da transação é deadlock que o Postgres não detecta, porque o detector enxerga locks e não sockets.)
+
+### Pendências
+
+- **A SALA DE CADA PESSOA É DECISÃO DO RAFAEL, E BLOQUEIA O MÓDULO.** `profiles.sala_url` nasce nula e `agenda.reunioes.sala_padrao` também. Enquanto as duas forem nulas, `app.reuniao_gravar` recusa toda reunião on-line com `sem_sala` — de propósito: melhor o robô dizer "já te confirmo" do que marcar uma reunião sem onde acontecer. Falta decidir **qual ferramenta de sala** a equipe usa e cada pessoa colar o link permanente em Ajustes (ou o Rafael definir uma sala padrão da casa).
+- **Cancelar os eventos futuros no Google antes do deploy** é passo do Rafael, e não pode inverter com a migração (comando acima).
+- **Lembrete automático ao lead** só quando `meta_status = 'approved'` aparecer em `GEN-AGD-24H-MEET` e `GEN-AGD-24H-VISITA`. Na véspera a janela de 24 h já fechou, e `app.pode_enviar` recusa texto livre fora dela, corretamente. Aprovação de template é prazo da Meta, não nosso. Enquanto isso, o dono recebe uma tarefa `priority = 1` às 17h do dia anterior.
+- **A segunda porta continua aberta:** o desfecho `lig_reuniao_marcada`, na tela de ligação, ainda cria `tasks` `meeting` **sem** linha em `reunioes`. A grade já não oferece horário por cima dela (é o sexto motivo de corte), então ninguém marca duas coisas na mesma hora; o que falta é o objeto — esse compromisso não ganha cartão de reunião, nem trava, nem e-mail.
+- **`dono_id` é `on delete restrict`:** apagar um perfil exige cancelar ou transferir as reuniões vivas antes. É assim de propósito — desligar gente é `is_active = false`, como o D1 decidiu.
+- **O CRM é o único calendário, e só sabe o que ele mesmo criou:** dentista, almoço e viagem não existem para ele (risco assumido no ADR-15). A mitigação é a grade curta, o teto de 4, a tarde bloqueada de quem tem rota e cancelar/remarcar a um clique.
+- Sem runner de e2e no repositório (ver acima).
