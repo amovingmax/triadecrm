@@ -58,6 +58,8 @@ export function CartaoCandidato({
   candidato,
   ocupado,
   podeDecidir,
+  marcado,
+  aoMarcar,
   aoDecidir,
 }: {
   candidato: CandidatoDaFila;
@@ -65,6 +67,16 @@ export function CartaoCandidato({
   ocupado: boolean;
   /** Papel que decide na fila (o RLS é quem manda de verdade). */
   podeDecidir: boolean;
+  /**
+   * Está marcado para o lote. `null` = este cartão não entra em lote nenhum.
+   *
+   * Quem não entra: nome já decidido, quem pediu para não ser procurado (o
+   * banco recusa, e oferecer a caixinha é prometer o que não acontece) e quem
+   * tem ficha parecida na base — ali a decisão é QUAL FICHA VENCE, e isso não
+   * se agrupa.
+   */
+  marcado: boolean | null;
+  aoMarcar: (marcado: boolean) => void;
   aoDecidir: (acao: AcaoDeRevisao, organizacaoId?: string) => void;
 }) {
   const pendente = candidato.status === 'novo';
@@ -109,6 +121,15 @@ export function CartaoCandidato({
     >
       {/* Nome e situação */}
       <header className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        {marcado === null ? null : (
+          <input
+            type="checkbox"
+            checked={marcado}
+            onChange={(e) => aoMarcar(e.target.checked)}
+            aria-label={`Marcar ${candidato.nome} para aprovar em lote`}
+            className="size-4 shrink-0 accent-foreground"
+          />
+        )}
         <h3 className="font-heading text-[15px] leading-tight font-medium tracking-tight">
           {candidato.nome}
         </h3>

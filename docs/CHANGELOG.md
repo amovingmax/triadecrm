@@ -3437,6 +3437,20 @@ Aplicar **refaz a prévia**, porque é ela que diz quantas viram parceiro — e 
 
 pgTAP `79_a_pergunta_por_categoria.sql` (16 asserções) e Vitest `categorias-novas.test.ts` (6). O `scripts/placar-importacao.sql` passou a imprimir `categorias_novas` da própria prévia — o `\echo` que agrupava em nulo saiu.
 
+### Tarefa 7 — Aprovar em lote o que não tem decisão dentro
+
+Migração `20261001130000`. Em 25/09 a fila tinha **155 nomes presos**, quase todos pelo mesmo punhado de rótulos do Google. Um a um são três cliques por nome — abrir, escolher entre 19, confirmar — vezes 155. Uma fila de 12 é trabalhada no mesmo dia; uma de 155 é ignorada, e aí as duplicatas de verdade morrem junto com o ruído.
+
+**A trava que faz isto ser seguro é não haver caminho novo de escrita.** `public.radar_revisar_lote(uuid[], int)` é um laço sobre `public.radar_revisar_candidato` — a **mesma** função que o cartão chama —, e não sobre `app.promover_candidato` direto. É ela que guarda o `app.can_write()`, a recusa de candidato `do_not_contact` (RF-RAD-09) e a máscara de ficha de carteira alheia. E `app.promover_candidato`, dentro do laço, reconfere a **supressão viva** a cada candidato. Uma entrada de `audit_log` por candidato, como sempre.
+
+**Subtransação por candidato:** sem o bloco `exception`, um único candidato que estourasse levaria os outros 199 junto, e quem apertou não saberia qual foi. Teto de 200. Id repetido na seleção é um trabalho só, e não um erro a relatar.
+
+**O que não entra no lote, e a ausência é o desenho:** mesclar (a decisão é *qual ficha vence*, e isso não se agrupa), "não contatar" (escreve em `suppression_list` e `consent_events`) e "recusar" (o banco exige motivo escrito, e motivo em lote seria motivo genérico). Os três continuam no cartão, um a um.
+
+**Na tela:** caixinha por cartão — só para quem pode entrar (nome em "novo", sem `do_not_contact` e **sem ficha parecida na base**) —, "marcar os N desta página", e o atalho que resolve os 155: **"os N de 'Impressões fotográficas'"**, montado do `categoria_na_fonte` que a tarefa 4 pôs na fila. A barra do lote nomeia o que vai acontecer — *"Aprovar 12 nomes em Fotografia e vídeo"* — e avisa **antes do clique** quantos não entram por não ter categoria, em vez de devolver "3 não passaram" sem explicação. O que não passa é nomeado no aviso, com o motivo de cada um.
+
+pgTAP `80_aprovar_em_lote.sql` (10 asserções), com a que o desenho pediu com estas palavras: **um suprimido no meio do lote não derruba o lote, e também não passa** — e continua intocado, em "novo", na fila.
+
 ### Tarefa 8 — A prévia para de mentir
 
 Migração `20261001110000_a_previa_para_de_mentir.sql`, e os três defeitos vêm dos mesmos 40 registros de `listas/`:
@@ -3453,7 +3467,7 @@ pgTAP novo: `78_a_previa_para_de_mentir.sql` (9 asserções, escrito vermelho an
 
 ### O que ficou pendente
 
-- **Falta a tarefa 7 da segunda leva:** o aprovar em lote na fila (`radar_revisar_lote` + seleção múltipla), que é o que resolve os 155 presos em minutos. Plano em `docs/superpowers/plans/2026-09-25-importar-sem-fila.md`.
+- **A segunda leva (tarefas 5 a 8) está inteira.** Falta a terceira: o aprendizado (tarefa 9) e a IA sugerindo categoria (tarefa 10), as duas atrás de um portão — não começam sem um plano detalhado próprio, e a decisão 2 do Rafael põe a IA depois da 6 e da 7, que acabaram de ficar de pé. Plano em `docs/superpowers/plans/2026-09-25-importar-sem-fila.md`.
 - **Os dois nomes de fonte na seed** (`Planilha (importação)`, `Google Maps (raspagem local)`) continuam com o texto antigo: mudá-los é migração, não texto, e o placar procura a fonte pelo `slug`.
 - **Tarefas 9 e 10 (aprendizado e IA) estão atrás de um portão**: não começam sem um plano detalhado próprio. A Fase 4 (a IA escrevendo) não foi tocada.
 

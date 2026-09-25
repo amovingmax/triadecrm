@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { formatarNumero } from '@/components/parceiros/formatos';
 
 import { BarraDaFila } from './barra-fila';
+import { BarraDeLote } from './barra-de-lote';
 import { CartaoCandidato } from './cartao-candidato';
 import { PedirLeituraDaIa } from './pedir-leitura-da-ia';
 import { PesosDaTriagem } from './pesos-da-triagem';
@@ -20,6 +21,7 @@ import {
   mensagemDoErro,
   MOTIVO_DA_REVISAO,
   revisarCandidato,
+  revisarLote,
   type AcaoDeRevisao,
 } from './dados';
 
@@ -73,6 +75,16 @@ export function TelaRevisao({
   const [filtros, setFiltros] = useState<FiltrosDaFila>(FILTROS_INICIAIS);
   const [folhaAberta, setFolhaAberta] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
+  /**
+   * Os nomes marcados para o lote, por id.
+   *
+   * Vive por `Set` e não por campo no candidato porque a fila é paginada e
+   * recarregada: a marcação tem de sobreviver a um `invalidateQueries`, e o
+   * que não estiver mais na página deixa de contar sozinho (ver `marcados`).
+   */
+  const [selecionados, setSelecionados] = useState<ReadonlySet<string>>(new Set());
+  const [categoriaDoLote, setCategoriaDoLote] = useState<number | null>(null);
+  const [lotando, setLotando] = useState(false);
   const [decisao, setDecisao] = useState<{
     candidato: CandidatoDaFila;
     acao: Exclude<AcaoDeRevisao, 'mesclar'>;
@@ -164,6 +176,90 @@ export function TelaRevisao({
   const recorte = temRecorteNaFila(filtros);
   const total = fila.data?.total ?? 0;
   const linhas = fila.data?.linhas ?? SEM_LINHAS;
+
+  /**
+   * Quem pode entrar no lote.
+   *
+   * Nome já decidido não entra; quem pediu para não ser procurado não entra (o
+   * banco recusa, e oferecer a caixinha seria prometer o que não acontece); e
+   * quem tem ficha parecida na base não entra, porque ali a decisão é QUAL
+   * FICHA VENCE — e isso não se agrupa.
+   */
+  const entraNoLote = useCallback(
+    (c: CandidatoDaFila) =>
+      podeDecidir && c.status === 'novo' && !c.nao_contatar && c.duplicatas.length === 0,
+    [podeDecidir],
+  );
+
+  /** Os marcados que ainda estão na página: o que saiu da lista sai da conta. */
+  const marcados = linhas.filter((c) => selecionados.has(c.id) && entraNoLote(c));
+
+  /**
+   * Os nomes de categoria da FONTE que se repetem nesta página, com dois ou
+   * mais nomes atrás. É o atalho que resolve os 155: eles estão parados pelo
+   * mesmo punhado de rótulos do Google, e não por 155 razões diferentes.
+   */
+  const gruposDaPagina = (() => {
+    const por = new Map<string, string[]>();
+    for (const c of linhas) {
+      if (!entraNoLote(c) || c.categoria_na_fonte === null) continue;
+      const atual = por.get(c.categoria_na_fonte);
+      if (atual) atual.push(c.id);
+      else por.set(c.categoria_na_fonte, [c.id]);
+    }
+    return [...por.entries()]
+      .filter(([, ids]) => ids.length > 1)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 4)
+      .map(([nome, ids]) => ({ nome, ids }));
+  })();
+
+  const marcar = useCallback((id: string, ligado: boolean) => {
+    setSelecionados((atual) => {
+      const novo = new Set(atual);
+      if (ligado) novo.add(id);
+      else novo.delete(id);
+      return novo;
+    });
+  }, []);
+
+  const aprovarLote = useCallback(async () => {
+    const ids = marcados
+      .filter((c) => categoriaDoLote !== null || c.categoria_id !== null)
+      .map((c) => c.id);
+    if (ids.length === 0) return;
+    setLotando(true);
+    try {
+      const r = await revisarLote({ ids, categoriaId: categoriaDoLote });
+      if (r.aprovados > 0) {
+        toast.success(
+          r.aprovados === 1
+            ? '1 nome virou parceiro.'
+            : `${formatarNumero(r.aprovados)} nomes viraram parceiro.`,
+        );
+      }
+      // O que não passou é nomeado, e não some numa contagem: "3 não passaram"
+      // sem dizer quais é o mesmo que não dizer nada.
+      if (r.recusados > 0) {
+        const quais = r.itens
+          .filter((i) => !i.ok)
+          .map((i) => `${i.nome ?? 'sem nome'} (${MOTIVO_DA_REVISAO[i.motivo ?? ''] ?? i.motivo})`)
+          .slice(0, 5)
+          .join('; ');
+        toast.error(
+          r.recusados === 1 ? '1 nome não passou.' : `${formatarNumero(r.recusados)} nomes não passaram.`,
+          { description: quais },
+        );
+      }
+      setSelecionados(new Set());
+      setCategoriaDoLote(null);
+      recarregar();
+    } catch (erro) {
+      toast.error('O lote não foi gravado.', { description: mensagemDoErro(erro) });
+    } finally {
+      setLotando(false);
+    }
+  }, [categoriaDoLote, marcados, recarregar]);
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const novos = resumo.data?.novos ?? null;
 
@@ -241,6 +337,54 @@ export function TelaRevisao({
               <FilaVazia aoCadastrar={podeDecidir ? () => setFolhaAberta(true) : null} />
             ) : (
               <>
+                {podeDecidir && linhas.some(entraNoLote) ? (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={
+                          marcados.length > 0 &&
+                          marcados.length === linhas.filter(entraNoLote).length
+                        }
+                        onChange={(e) =>
+                          setSelecionados((atual) => {
+                            const novo = new Set(atual);
+                            for (const c of linhas.filter(entraNoLote)) {
+                              if (e.target.checked) novo.add(c.id);
+                              else novo.delete(c.id);
+                            }
+                            return novo;
+                          })
+                        }
+                        aria-label="Marcar todos desta página que podem entrar em lote"
+                        className="size-4 accent-foreground"
+                      />
+                      Marcar os{' '}
+                      <span className="numerico">{linhas.filter(entraNoLote).length}</span> desta
+                      página
+                    </label>
+                    {/* Marcar por NOME DE CATEGORIA DA FONTE é o que resolve os
+                        155 presos: eles estão parados pelo mesmo punhado de
+                        rótulos do Google, e não por 155 razões diferentes. */}
+                    {gruposDaPagina.map((g) => (
+                      <button
+                        key={g.nome}
+                        type="button"
+                        className="text-sm underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                        onClick={() =>
+                          setSelecionados((atual) => {
+                            const novo = new Set(atual);
+                            for (const c of g.ids) novo.add(c);
+                            return novo;
+                          })
+                        }
+                      >
+                        os <span className="numerico">{g.ids.length}</span> de “{g.nome}”
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
                 {podeDecidir ? (
                   <p className="hidden py-2 text-xs text-muted-foreground md:block">
                     Com o cartão em foco (Tab): <Tecla>A</Tecla> aprova, <Tecla>M</Tecla> mescla com
@@ -256,6 +400,8 @@ export function TelaRevisao({
                         candidato={candidato}
                         ocupado={ocupado === candidato.id}
                         podeDecidir={podeDecidir}
+                        marcado={entraNoLote(candidato) ? selecionados.has(candidato.id) : null}
+                        aoMarcar={(ligado) => marcar(candidato.id, ligado)}
                         aoDecidir={(acao, organizacaoId) => decidir(candidato, acao, organizacaoId)}
                       />
                     </li>
@@ -264,6 +410,18 @@ export function TelaRevisao({
               </>
             )}
           </section>
+
+          {podeDecidir ? (
+            <BarraDeLote
+              marcados={marcados}
+              categorias={catalogos.categorias}
+              categoriaId={categoriaDoLote}
+              ocupado={lotando}
+              aoTrocarCategoria={setCategoriaDoLote}
+              aoAprovar={() => void aprovarLote()}
+              aoLimpar={() => setSelecionados(new Set())}
+            />
+          ) : null}
 
           {linhas.length > 0 && paginas > 1 ? (
             <Paginacao

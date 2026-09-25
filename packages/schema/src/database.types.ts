@@ -8064,6 +8064,10 @@ export type Database = {
         }
         Returns: Json
       }
+      radar_revisar_lote: {
+        Args: { p_category_id?: number; p_ids: string[] }
+        Returns: Json
+      }
       radar_triar_com_ia: { Args: never; Returns: Json }
       recusar_reivindicacao: {
         Args: { p_motivo?: string; p_token: string }

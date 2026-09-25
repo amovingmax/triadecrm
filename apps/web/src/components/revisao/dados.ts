@@ -161,6 +161,55 @@ export async function revisarCandidato(args: {
   return { ok: false, motivo: texto(r.reason) ?? 'desconhecido', organizacaoId };
 }
 
+/** O que voltou de um lote: a conta, e o motivo de cada um que não passou. */
+export type RespostaDoLote = {
+  aprovados: number;
+  recusados: number;
+  itens: Array<{ candidatoId: string; ok: boolean; motivo: string | null; nome: string | null }>;
+};
+
+/**
+ * Aprova em lote os nomes que não têm decisão dentro.
+ *
+ * O banco laça sobre `public.radar_revisar_candidato` — o MESMO caminho do
+ * cartão —, com subtransação por candidato e teto de 200. Não há caminho novo
+ * de escrita: a recusa de candidato `do_not_contact`, a máscara de carteira
+ * alheia e a reconferência da supressão viva continuam valendo, um a um, dentro
+ * do laço.
+ *
+ * Mesclar, "não contatar" e "recusar" NÃO passam por aqui, e é de propósito:
+ * a primeira é a decisão de qual ficha vence, e as outras duas escrevem
+ * supressão ou exigem motivo escrito.
+ */
+export async function revisarLote(args: {
+  ids: readonly string[];
+  categoriaId?: number | null;
+}): Promise<RespostaDoLote> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('radar_revisar_lote', {
+    p_ids: [...args.ids],
+    p_category_id: args.categoriaId ?? null,
+  });
+  if (error) throw new Error(error.message);
+
+  const r = objeto(data);
+  if (r.ok !== true) throw new Error(`recusado:${texto(r.reason) ?? 'desconhecido'}`);
+  const itens = Array.isArray(r.itens) ? r.itens : [];
+  return {
+    aprovados: typeof r.aprovados === 'number' ? r.aprovados : 0,
+    recusados: typeof r.recusados === 'number' ? r.recusados : 0,
+    itens: itens.map((i) => {
+      const o = objeto(i);
+      return {
+        candidatoId: texto(o.candidate_id) ?? '',
+        ok: o.ok === true,
+        motivo: texto(o.reason),
+        nome: texto(o.nome),
+      };
+    }),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tradução de erro e de motivo
 // ---------------------------------------------------------------------------
