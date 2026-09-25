@@ -44,7 +44,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(95);
+select plan(96);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -211,26 +211,40 @@ create function pg_temp.gastar(p_usd numeric) returns void
           (timestamp '2026-08-05 10:00') at time zone 'America/Fortaleza')
 $$;
 
+-- Os degraus abaixo foram REANCORADOS em 25/09/2026: o teto mensal de IA
+-- passou de US$ 25 para US$ 60 (migração 20260925150000). O que se mexeu foi
+-- a âncora, nunca o número do teto — teto que se abaixa para o teste passar
+-- deixa de ser teto. Agosto de 2026 continua tendo 21 dias úteis, dos quais
+-- 5 até o dia 7: a projeção é sempre `gasto x 4,2`.
 select pg_temp.gastar(1);
 select is(app.ai_gasto_do_mes(date '2026-08-07') ->> 'situacao', 'ok',
           'US$ 1 em 5 dias projeta US$ 4,20 no mês: dentro do orçamento');
 
-select pg_temp.gastar(8);   -- total US$ 9
-select is((app.ai_gasto_do_mes(date '2026-08-07') ->> 'projecao_do_mes_usd')::numeric, 37.80::numeric,
-          'US$ 9 em 5 dias projeta US$ 37,80 — o exemplo do documento de custos, agora medido');
+-- 14 em 5 dias úteis projeta 58,80 sobre 21 dias: ainda abaixo de 60.
+select pg_temp.gastar(13);  -- total US$ 14
+select is(app.ai_gasto_do_mes(date '2026-08-07') ->> 'situacao', 'ok',
+          'US$ 14 projeta US$ 58,80: apertado, e ainda dentro');
+
+-- 15 projeta 63,00 > 60: o alerta de RITMO dispara ANTES do acumulado.
+select pg_temp.gastar(1);   -- total US$ 15
+select is((app.ai_gasto_do_mes(date '2026-08-07') ->> 'projecao_do_mes_usd')::numeric, 63.00::numeric,
+          'US$ 15 em 5 dias projeta US$ 63,00 — o exemplo do documento de custos, reancorado no teto de 60');
 select is(app.ai_gasto_do_mes(date '2026-08-07') ->> 'situacao', 'ritmo_acima',
           'e a situação é ritmo_acima ANTES de o acumulado passar de 80%: é este o alerta que chega a tempo');
 select ok((app.ai_gasto_do_mes(date '2026-08-07') ->> 'gasto_usd')::numeric
           < (app.ai_gasto_do_mes(date '2026-08-07') ->> 'limite_de_alerta_usd')::numeric,
           'no mesmo instante, o alerta do PRD (80% do acumulado) ainda estaria calado');
 
-select pg_temp.gastar(12);  -- total US$ 21
+select pg_temp.gastar(34);  -- total US$ 49
 select is(app.ai_gasto_do_mes(date '2026-08-07') ->> 'situacao', 'passou_de_80',
-          'passado o acumulado de US$ 20, a situação vira passou_de_80');
+          'passado o acumulado de US$ 48, a situação vira passou_de_80');
 
 -- O alerta do mês corrente: emitido uma vez, e não uma por execução do cron.
+-- US$ 60 é o teto inteiro desde 25/09/2026: o mês corrente entra JÁ estourado,
+-- que é o estado em que `alertou` é verdade independente de quantos dias
+-- úteis do mês já correram.
 insert into public.ai_runs (purpose, model, prompt_version, tokens_in, tokens_out)
-values ('digest', 'claude-sonnet-5', 'resumo-ligacao@v1', 12000000, 0);
+values ('digest', 'claude-sonnet-5', 'resumo-ligacao@v1', 30000000, 0);
 select is(app.ai_alerta_orcamento() ->> 'alertou', 'true',
           'com o mês corrente estourado, o alerta é emitido');
 select is(app.ai_alerta_orcamento() ->> 'motivo', 'ja_alertado',
