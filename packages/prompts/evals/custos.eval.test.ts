@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CATALOGO,
+  type CATALOGO,
   CHAMADAS_POR_MES,
   FATOR_BATCH,
   LIMITE_DE_ALERTA_USD,
@@ -14,6 +14,7 @@ import {
   passouDoAlerta,
   projetar,
   promptVigente,
+  vigentes,
 } from '../src/index';
 
 /**
@@ -36,8 +37,11 @@ interface LinhaDaTabela {
 
 /** A mesma conta que o documento publica, feita a partir do primeiro exemplo de cada prompt. */
 function tabela(): readonly LinhaDaTabela[] {
-  return (Object.keys(CATALOGO) as (keyof typeof CATALOGO)[]).map((id) => {
-    const prompt = promptVigente(id);
+  // `vigentes()` e não `promptVigente(id)` num laço: com `id` de tipo união, o
+  // índice `CATALOGO[Id][VIGENTES[Id]]` devolve `unknown` — e isso só apareceu
+  // quando a triagem ganhou uma v2.
+  return vigentes().map((prompt) => {
+    const id = prompt.id as keyof typeof CATALOGO;
     const exemplo = prompt.exemplos[0];
     const tokensDaMensagem = estimarTokens(
       exemplo === undefined ? '' : prompt.montarMensagem(exemplo.entrada as never),
@@ -157,11 +161,16 @@ describe('preços e conta por chamada', () => {
         // catálogo, e precisa ser — a fila tem 277 nomes e recoleta todo mês.
         id: 'triagem-do-radar',
         modelo: 'claude-haiku-4-5',
-        tokensDeSistema: 315,
-        tokensDaMensagem: 191,
-        tokensDeSaida: 130,
-        semCache: 0.00116,
-        comCache: 0.00087,
+        // Subiu com a v2 (25/09/2026): o sistema ganhou a regra de copiar a
+        // categoria LETRA POR LETRA e a de o rótulo da fonte ser pista e não
+        // verdade, e o exemplo ganhou um quarto candidato — o caso em que o
+        // Google chama de "Loja de Presentes" uma empresa que revela fotos.
+        // Continua o prompt mais barato do catálogo, e precisa ser.
+        tokensDeSistema: 442,
+        tokensDaMensagem: 278,
+        tokensDeSaida: 185,
+        semCache: 0.00165,
+        comCache: 0.00125,
       },
       {
         id: 'resumo-ligacao',

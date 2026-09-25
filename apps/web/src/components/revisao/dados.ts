@@ -419,7 +419,13 @@ export async function repontuarORadar(): Promise<{ candidatos: number }> {
  * O banco enfileira com chave do dia: apertar duas vezes na mesma tarde não
  * gasta duas chamadas ao modelo.
  */
-export async function pedirLeituraDaIa(): Promise<{ enfileirado: boolean; esperando: number; motivo?: string }> {
+export async function pedirLeituraDaIa(): Promise<{
+  enfileirado: boolean;
+  esperando: number;
+  /** Quantas rodadas de 20 entraram na fila do worker. */
+  rodadas: number;
+  motivo?: string;
+}> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc('radar_triar_com_ia');
   if (error) {
@@ -433,6 +439,7 @@ export async function pedirLeituraDaIa(): Promise<{ enfileirado: boolean; espera
   return {
     enfileirado: r.enfileirado === true,
     esperando: Number(r.esperando) || 0,
+    rodadas: Number(r.rodadas) || 0,
     motivo: typeof r.motivo === 'string' ? r.motivo : undefined,
   };
 }

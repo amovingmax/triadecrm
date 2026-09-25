@@ -43,7 +43,7 @@ import {
   fichaDaConversaV1,
   followupLigacaoV1,
   pulsoDoDiaV1,
-  triagemDoRadarV1,
+  triagemDoRadarV2,
   reidratar,
   resumoLigacaoV1,
   transcricaoAudioV1,
@@ -973,9 +973,11 @@ const ALERTAS_DO_PULSO: readonly string[] = [
  * 2. **Id que o modelo inventou é descartado**, como no Pulso e na ficha. O
  *    banco ignora o que não existe, e aqui o número descartado vira log: se o
  *    modelo passar a devolver lixo, alguém vê antes de o lixo virar dado.
- * 3. **Lote de 30 e chave do dia.** 277 candidatos numa chamada seriam uma conta
- *    grande tomada por um clique; e pedir duas vezes na mesma tarde não gasta
- *    duas chamadas.
+ * 3. **Lote de 20, e a chave é da RODADA.** 277 candidatos numa chamada seriam
+ *    uma conta grande tomada por um clique. A chave era do DIA, e isso não eram
+ *    "8 lotes" para 155 candidatos: eram oito DIAS, porque a segunda chamada do
+ *    mesmo dia era recusada por idempotência, em silêncio (consertado em
+ *    25/09/2026, migração 20261001150000).
  */
 async function triarCandidatos(
   contexto: ContextoDaIa,
@@ -1007,7 +1009,7 @@ async function triarCandidatos(
 
   const executada = await executar(
     contexto,
-    triagemDoRadarV1,
+    triagemDoRadarV2,
     {
       oQueProcuramos: entrada.oQueProcuramos,
       categorias: entrada.categorias,
@@ -1025,7 +1027,9 @@ async function triarCandidatos(
     const id = porNumero.get(v.id);
     return id === undefined ? [] : [{ ...v, id }];
   });
-  const gravados = await gravarTriagem(contexto.cliente, vereditos);
+  // O `aiRunId` vai junto: sem ele a opinião da IA fica na ficha sem de onde
+  // ser conferida — qual modelo disse, quando, e por quanto.
+  const gravados = await gravarTriagem(contexto.cliente, vereditos, executada.aiRunId);
 
   contexto.logger.info('candidatos triados pela IA', {
     pedidos: pedidos.length,

@@ -13,6 +13,7 @@ import {
   promptVigente,
   selecionar,
   versaoDoPrompt,
+  vigentes,
 } from '../src/index';
 
 /**
@@ -128,7 +129,11 @@ describe('catálogo do Tríade', () => {
 
   it('toda versão vigente existe no catálogo', () => {
     for (const [id, versao] of Object.entries(VIGENTES)) {
-      const prompt = selecionar(CATALOGO, id as keyof typeof CATALOGO, versao);
+      const prompt = selecionar(
+        CATALOGO as Record<string, Record<number, { versao: number }>>,
+        id,
+        versao,
+      );
       expect(prompt.versao).toBe(versao);
     }
   });
@@ -147,9 +152,10 @@ describe('catálogo do Tríade', () => {
   });
 
   it('o tamanho do bloco estável acompanha o texto, sem número escrito à mão', () => {
-    for (const id of Object.keys(CATALOGO) as (keyof typeof CATALOGO)[]) {
-      const prompt = promptVigente(id);
-      expect(prompt.tokensDeSistema, id).toBe(estimarTokens(prompt.sistema));
+    // `vigentes()` e não `promptVigente(id)` num laço: com `id` de tipo união o
+    // índice `CATALOGO[Id][VIGENTES[Id]]` devolve `unknown`.
+    for (const prompt of vigentes()) {
+      expect(prompt.tokensDeSistema, prompt.id).toBe(estimarTokens(prompt.sistema));
     }
     for (const metadados of INVENTARIO) {
       expect(metadados.tokensDeSistema, metadados.id).toBeGreaterThan(0);
@@ -157,8 +163,8 @@ describe('catálogo do Tríade', () => {
   });
 
   it('todo campo declarado como texto existe no schema de entrada', () => {
-    for (const id of Object.keys(CATALOGO) as (keyof typeof CATALOGO)[]) {
-      const prompt = promptVigente(id);
+    for (const prompt of vigentes()) {
+      const id = prompt.id;
       const forma = z.toJSONSchema(prompt.entrada) as {
         properties?: Record<string, unknown>;
       };
@@ -169,8 +175,8 @@ describe('catálogo do Tríade', () => {
   });
 
   it('todo schema de saída vira JSON Schema para a saída estruturada', () => {
-    for (const id of Object.keys(CATALOGO) as (keyof typeof CATALOGO)[]) {
-      expect(esquemaDeSaida(promptVigente(id))['type'], id).toBe('object');
+    for (const prompt of vigentes()) {
+      expect(esquemaDeSaida(prompt)['type'], prompt.id).toBe('object');
     }
   });
 });

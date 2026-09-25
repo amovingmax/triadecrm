@@ -111,7 +111,18 @@ function Conteudo({
 }) {
   const idCategoria = useId();
   const idMotivo = useId();
-  const [categoriaId, setCategoriaId] = useState<number | null>(candidato.categoria_id);
+  /**
+   * Abre com o que já existe — e, quando não existe, com o que a IA sugeriu.
+   *
+   * A sugestão é OPINIÃO e não decisão (RF-RAD-11): ela não aprova nada, só
+   * muda o trabalho humano de *escolher entre 19* para *confirmar ou trocar*.
+   * A categoria do candidato vence sempre: onde alguém já decidiu, a IA não
+   * opina por cima.
+   */
+  const [categoriaId, setCategoriaId] = useState<number | null>(
+    candidato.categoria_id ?? candidato.ia_categoria_id,
+  );
+  const daIa = candidato.categoria_id === null && candidato.ia_categoria_id !== null;
   const [motivo, setMotivo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   /**
@@ -185,6 +196,15 @@ function Conteudo({
                 ))}
               </SelectContent>
             </Select>
+            {/* Quem preencheu tem de estar escrito. Uma caixa que já vem
+                preenchida sem dizer por quem é uma decisão tomada por ninguém. */}
+            {daIa ? (
+              <p className="text-sm text-muted-foreground">
+                A IA leu o nome e sugeriu <span className="text-foreground">{candidato.ia_categoria}</span>
+                {candidato.ia_porque ? `: ${candidato.ia_porque}` : '.'} Confira antes de criar — ela
+                opina, quem decide é você.
+              </p>
+            ) : null}
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">

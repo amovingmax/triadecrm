@@ -820,8 +820,13 @@ export async function entradaDaTriagem(
 export async function gravarTriagem(
   cliente: ClienteDoBanco,
   vereditos: unknown[],
+  /** A chamada que produziu estes vereditos, para a ficha poder conferir. */
+  aiRunId?: number | null,
 ): Promise<number> {
-  const { data, error } = await cliente.rpc('ia_gravar_triagem', { p_vereditos: vereditos });
+  const { data, error } = await cliente.rpc('ia_gravar_triagem', {
+    p_vereditos: vereditos,
+    p_ai_run_id: aiRunId ?? undefined,
+  });
   erroSe('ia_gravar_triagem', error);
   const bruto = (data ?? {}) as Record<string, unknown>;
   return Number(bruto.gravados) || 0;

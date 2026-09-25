@@ -194,6 +194,10 @@ export function TelaRevisao({
         void enviarDecisao(candidato, 'mesclar', { organizacaoId });
         return;
       }
+      // Com categoria própria, aprovar é um clique. Com sugestão da IA e sem
+      // categoria, o diálogo ABRE — preenchido, mas abre: uma sugestão que vira
+      // ficha sem ninguém olhar é a automação decidindo quem a empresa procura,
+      // e essa não é uma decisão de máquina (RF-RAD-11).
       if (acao === 'aprovar' && candidato.categoria_id !== null) {
         void enviarDecisao(candidato, 'aprovar');
         return;

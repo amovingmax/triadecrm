@@ -6684,8 +6684,10 @@ export type Database = {
           external_id: string | null
           flags: string[]
           ia_analisado_em: string | null
+          ia_categoria_id: number | null
           ia_confianca: number | null
           ia_porque: string | null
+          ia_run_id: number | null
           ia_veredito: string | null
           id: string
           import_batch_id: string | null
@@ -6729,8 +6731,10 @@ export type Database = {
           external_id?: string | null
           flags?: string[]
           ia_analisado_em?: string | null
+          ia_categoria_id?: number | null
           ia_confianca?: number | null
           ia_porque?: string | null
+          ia_run_id?: number | null
           ia_veredito?: string | null
           id?: string
           import_batch_id?: string | null
@@ -6774,8 +6778,10 @@ export type Database = {
           external_id?: string | null
           flags?: string[]
           ia_analisado_em?: string | null
+          ia_categoria_id?: number | null
           ia_confianca?: number | null
           ia_porque?: string | null
+          ia_run_id?: number | null
           ia_veredito?: string | null
           id?: string
           import_batch_id?: string | null
@@ -6832,6 +6838,20 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_candidates_ia_categoria_id_fkey"
+            columns: ["ia_categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_candidates_ia_run_id_fkey"
+            columns: ["ia_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_runs"
             referencedColumns: ["id"]
           },
           {
@@ -7905,7 +7925,10 @@ export type Database = {
         }
         Returns: string
       }
-      ia_gravar_triagem: { Args: { p_vereditos: Json }; Returns: Json }
+      ia_gravar_triagem: {
+        Args: { p_ai_run_id?: number; p_vereditos: Json }
+        Returns: Json
+      }
       ia_orcamento_status: { Args: never; Returns: Json }
       ia_pode_gastar: { Args: { p_purpose: string }; Returns: Json }
       ia_pulso_entrada: {
@@ -8101,6 +8124,8 @@ export type Database = {
           fonte: string
           fonte_id: number
           fonte_tipo: Database["app"]["Enums"]["source_kind"]
+          ia_categoria: string
+          ia_categoria_id: number
           ia_porque: string
           ia_veredito: string
           id: string

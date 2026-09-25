@@ -101,6 +101,16 @@ export type CandidatoDaFila = {
    */
   ia_veredito: 'sim' | 'nao' | 'incerto' | null;
   ia_porque: string | null;
+  /**
+   * A categoria que a IA sugeriu, já casada com o catálogo — e só quando casou
+   * EXATO por `app.chave_catalogo`.
+   *
+   * É OPINIÃO, e não decisão (RF-RAD-11): ela abre o diálogo já preenchida, e o
+   * trabalho humano sai de *escolher entre 19* e vira *confirmar ou trocar*.
+   * Nada vira ficha sozinho.
+   */
+  ia_categoria_id: number | null;
+  ia_categoria: string | null;
   coletado_em: string;
   coletor: string;
   criado_em: string;

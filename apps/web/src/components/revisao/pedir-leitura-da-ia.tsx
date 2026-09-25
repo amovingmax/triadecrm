@@ -21,8 +21,14 @@ import { pedirLeituraDaIa } from './dados';
  * veredito chega (o eco do banco cuida disso). Travar o botão num spinner de
  * trinta segundos seria fingir que a pessoa precisa ficar olhando.
  *
- * O lote é de 30 e a chave é do dia: apertar duas vezes na mesma tarde não gasta
- * duas chamadas ao modelo.
+ * O lote é de 20 por rodada, e um pedido enfileira quantas rodadas o que está
+ * esperando pedir, até 15 (300 nomes). A chave é da RODADA, e não do dia: com a
+ * chave do dia, 155 candidatos levavam oito DIAS, porque a segunda chamada da
+ * mesma tarde era recusada por idempotência, em silêncio.
+ *
+ * E o FREIO DO ORÇAMENTO é dito aqui, não engolido: acima de 80% do teto só
+ * passam o atendimento e a transcrição. Sem esta mensagem, quem clicasse ficaria
+ * esperando um veredito que nunca vem.
  */
 export function PedirLeituraDaIa({ className }: { className?: string }) {
   const clientes = useQueryClient();
@@ -34,10 +40,23 @@ export function PedirLeituraDaIa({ className }: { className?: string }) {
         toast.success('A IA já leu todos os nomes da fila.');
         return;
       }
+      if (r.motivo === 'orcamento_na_linha_de_alerta') {
+        toast.error('A IA não foi acionada: o orçamento do mês passou de 80%.', {
+          description:
+            'Acima dessa linha só o atendimento e a transcrição continuam. A leitura da fila volta no mês que vem, ou quando um admin subir o teto em Ajustes.',
+        });
+        return;
+      }
+      if (r.motivo === 'orcamento_esgotado') {
+        toast.error('A IA não foi acionada: o orçamento do mês acabou.', {
+          description: 'Nenhuma chamada sai até o mês virar ou o teto subir.',
+        });
+        return;
+      }
       toast.success('A IA foi acionada.', {
         description:
-          r.esperando > 30
-            ? `São ${r.esperando} candidatos esperando; ela lê 30 por vez. Os vereditos aparecem na fila em instantes.`
+          r.rodadas > 1
+            ? `São ${r.esperando} nomes esperando; ela lê 20 por vez, e ${r.rodadas} rodadas entraram na fila. Os vereditos aparecem em instantes.`
             : 'Os vereditos aparecem na fila em instantes.',
       });
       void clientes.invalidateQueries({ queryKey: ['radar'] });

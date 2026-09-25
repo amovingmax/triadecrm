@@ -39,12 +39,20 @@ export {
 } from './prompts/triagem-do-radar/v1';
 
 export {
+  type EntradaDaTriagemV2,
+  type SaidaDaTriagemV2,
+  triagemDoRadarV2,
+} from './prompts/triagem-do-radar/v2';
+
+export {
   CATALOGO,
   INVENTARIO,
   type IdDePrompt,
   VIGENTES,
   obterPrompt,
   promptVigente,
+  vigentes,
+  type PromptDeQualquerVersao,
 } from './catalogo';
 
 export {
