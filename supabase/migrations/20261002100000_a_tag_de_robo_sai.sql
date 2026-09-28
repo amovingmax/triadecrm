@@ -1,0 +1,47 @@
+-- =====================================================================
+-- A frase de transparência sai de uso
+-- =====================================================================
+-- Rafael, 28/09/2026: ele não quer aviso de que é robô. E isto é legítimo: a
+-- transparência era regra NOSSA (RF-CON-26), não da Meta.
+-- `docs/anexos/R04-whatsapp-automacao.md`, bullet "Automação/IA", registra que a
+-- Meta exige "caminhos de escalonamento rápidos, claros e diretos" para humano —
+-- e que a exigência de ANUNCIAR IA aparece em blog e "não localizei isso na
+-- política oficial". A saída é da Meta; o aviso era nosso.
+--
+-- E com o ADR-16 a pergunta quase desaparece: o que sai automático é UMA
+-- apresentação, não um diálogo.
+--
+-- HONESTIDADE SOBRE O ALCANCE DESTA MIGRAÇÃO: `GEN-SYS-TRANSPARENCIA` NUNCA FOI
+-- ENVIADA por caminho de código nenhum desde o D1 — nenhuma função a nomeia, e
+-- a conferência de hoje só a encontrou na seed e em documento. Então isto NÃO
+-- pode ser o que o Rafael viu no protótipo. O que existe hoje na tela é o rótulo
+-- INTERNO ("Texto fixo do robô", `apps/web/src/components/conversas/mensagem-do-fio.tsx`),
+-- que só o time vê. A pergunta foi feita a ele em 28/09 e está no CHANGELOG;
+-- esta migração faz a parte reversível e barata, e não presume a resposta.
+--
+-- O QUE SAI, e é uma linha:
+--   * GEN-SYS-TRANSPARENCIA vai a `is_active = false`. NADA É APAGADO: um clique
+--     em Ajustes → Catálogos → Modelos a traz de volta.
+--
+-- O QUE FICA, e por quê:
+--   * GEN-SYS-E-ROBO — a resposta HONESTA a quem PERGUNTA, escolhida por uma
+--     pessoa na caixa de resposta, nunca automática. O robô continua sem negar
+--     automação; ele só deixa de anunciá-la sem ser perguntado.
+--   * GEN-SYS-HUMANO (20260925180000) — a despedida do freio. É a saída, e fica.
+--   * GEN-SYS-AUSENCIA — não anuncia robô nenhum; diz o horário.
+--   * GEN-SYS-FORA-HORARIO — NÃO É TOCADA, e a razão é desconfortável: é a única
+--     mensagem do catálogo que ainda ensina a palavra HUMANO. Desativá-la junto
+--     apagaria, de carona, a menção à saída que a Meta exige. Ela já está inativa
+--     de fato (quem responde fora do horário é `app.ausencia_responder`, com
+--     GEN-SYS-AUSENCIA).
+--   * Os rótulos INTERNOS. O time precisa saber o que o CRM mandou sozinho.
+--
+-- A DÍVIDA, escrita e não resolvida: a palavra HUMANO é prometida por texto e
+-- não é tratada por CÓDIGO NENHUM. Quem ia criá-la era a Fase 4, cancelada hoje.
+-- Implementar `app.wa_pediu_humano` (espelho de `app.wa_parece_optout`) é decisão
+-- do Rafael, e está fora desta rodada.
+-- =====================================================================
+
+update public.message_templates
+   set is_active = false
+ where template_code = 'GEN-SYS-TRANSPARENCIA' and is_active;

@@ -1499,6 +1499,13 @@ update public.message_templates
                              'GEN-FUP-LIG-V1')
    and is_active;
 
+-- A frase de transparência sai de uso em 28/09/2026 (ADR-16, migração
+-- 20261002100000). Aqui, e não no bloco 10: o upsert de lá faz
+-- `do update set ... is_active = excluded.is_active` e a reativaria a cada
+-- `db reset`. Nada é apagado — um clique em Ajustes → Catálogos a traz de volta.
+update public.message_templates set is_active = false
+ where template_code = 'GEN-SYS-TRANSPARENCIA';
+
 -- O áudio do D+3 do onboarding. Nasce sem arquivo: é a Heloísa que grava.
 insert into public.audio_assets (slug, title, segment, context, is_active)
 values ('gen-onb-ajuda-1', 'Onboarding — quer que eu termine por você? (20 s)', 'GEN',
