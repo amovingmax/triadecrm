@@ -309,3 +309,64 @@ create trigger messages_s_introducao
 -- a estar incompleto. Migração não edita arquivo antigo: o texto novo vai aqui.
 comment on function app.messages_lead_automatico() is
   'Cria a ficha do desconhecido que escreveu (RF-CON-24). É o ÚLTIMO dos gatilhos de entrada de public.messages, que disparam em ordem de nome: a_freio_do_robo (freio), after_write (last_inbound_at, e por ele a janela de 24 h), bot_de_entrada (menu), ia_pendente, quem_responde_atende, resposta_ao_botao, resposta_no_funil, s_introducao (a introdução automática, ADR-16), x_ausencia (fora do horário) e zz_lead_automatico.';
+
+-- ---------------------------------------------------------------------
+-- 8. Ligar, desligar e reescrever o texto sem deploy
+-- ---------------------------------------------------------------------
+-- Recriada a partir da definição viva (20260922120000), com três mudanças
+-- marcadas `-- NOVO`. A assinatura NÃO muda, então `create or replace`
+-- substitui de verdade e os grants de lá continuam valendo.
+create or replace function public.atendimento_configurar(p jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_texto text := nullif(btrim(coalesce(p ->> 'texto_ausencia', '')), '');
+  v_intro text := nullif(btrim(coalesce(p ->> 'texto_introducao', '')), '');   -- NOVO
+  v_novo  jsonb := '{}'::jsonb;
+  k       text;
+begin
+  if auth.uid() is null or not app.is_manager() then
+    return jsonb_build_object('ok', false, 'motivo', 'sem_permissao');
+  end if;
+  -- NOVO: `introducao_ativa` no laço. Sem isto a função ignora a chave EM
+  -- SILÊNCIO, e o gestor clica no interruptor sem que nada aconteça.
+  foreach k in array array['lead_automatico', 'distribuicao_automatica',
+                           'ausencia_ativa', 'introducao_ativa'] loop
+    if p ? k then
+      if jsonb_typeof(p -> k) <> 'boolean' then
+        return jsonb_build_object('ok', false, 'motivo', 'valor_invalido', 'campo', k);
+      end if;
+      v_novo := v_novo || jsonb_build_object(k, p -> k);
+    end if;
+  end loop;
+  if v_texto is not null and length(v_texto) > 1000 then
+    return jsonb_build_object('ok', false, 'motivo', 'texto_longo_demais');
+  end if;
+  -- NOVO: a introdução não tem variável, e a recusa é da FUNÇÃO, não do bom
+  -- senso de quem digita. `app.wa_bot_dizer` copia o corpo cru: um `{{nome}}`
+  -- sairia literal no fio do fornecedor.
+  if v_intro is not null then
+    if length(v_intro) > 1000 then
+      return jsonb_build_object('ok', false, 'motivo', 'texto_longo_demais',
+                                'campo', 'texto_introducao');
+    end if;
+    if position('{{' in v_intro) > 0 then
+      return jsonb_build_object('ok', false, 'motivo', 'introducao_com_variavel');
+    end if;
+  end if;
+
+  update public.app_settings set value = value || v_novo, updated_by = auth.uid()
+   where key = 'atendimento';
+  if v_texto is not null then
+    update public.message_templates set body = v_texto where template_code = 'GEN-SYS-AUSENCIA';
+  end if;
+  if v_intro is not null then                                                  -- NOVO
+    update public.message_templates set body = v_intro where template_code = 'GEN-SYS-INTRO';
+  end if;
+  return jsonb_build_object('ok', true);
+end $$;
+comment on function public.atendimento_configurar(jsonb) is
+  'Ajustes → Atendimento: os quatro interruptores (lead automático, distribuição, ausência e introdução) e os dois textos automáticos. A introdução recusa variável porque o corpo dela é copiado cru para o fio (ADR-16).';

@@ -913,8 +913,11 @@ export type Database = {
         }
         Returns: Json
       }
+      wa_introduzir: { Args: { p_message_id: string }; Returns: Json }
       wa_modelo_da_meta: { Args: { p_template_id: number }; Returns: Json }
       wa_modelo_humano: { Args: never; Returns: number }
+      wa_modelo_introducao: { Args: never; Returns: number }
+      wa_modelos_de_cumprimento: { Args: never; Returns: number[] }
       wa_motivo_de_recusa: {
         Args: {
           p_contact_id?: string
@@ -950,6 +953,10 @@ export type Database = {
       }
       wa_resposta_no_funil: { Args: { p_message_id: string }; Returns: Json }
       wa_robo_teto: { Args: never; Returns: Json }
+      wa_so_o_cumprimento_saiu: {
+        Args: { p_ate?: string; p_conversation_id: string }
+        Returns: boolean
+      }
       wa_sucesso: {
         Args: {
           p_categoria?: string
@@ -2843,6 +2850,7 @@ export type Database = {
           ia_analisada_em: string | null
           ia_pendente_desde: string | null
           id: string
+          introducao_em: string | null
           last_inbound_at: string | null
           last_message_at: string | null
           last_outbound_at: string | null
@@ -2872,6 +2880,7 @@ export type Database = {
           ia_analisada_em?: string | null
           ia_pendente_desde?: string | null
           id?: string
+          introducao_em?: string | null
           last_inbound_at?: string | null
           last_message_at?: string | null
           last_outbound_at?: string | null
@@ -2901,6 +2910,7 @@ export type Database = {
           ia_analisada_em?: string | null
           ia_pendente_desde?: string | null
           id?: string
+          introducao_em?: string | null
           last_inbound_at?: string | null
           last_message_at?: string | null
           last_outbound_at?: string | null

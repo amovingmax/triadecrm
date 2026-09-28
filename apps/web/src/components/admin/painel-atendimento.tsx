@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 import { buscarFreios, buscarSaudeDaEsteira } from './dados';
+import { rotuloDaRecusaDoAtendimento } from './formatos';
 
 import type { Freios } from './tipos';
 
@@ -18,13 +19,16 @@ import type { Freios } from './tipos';
  * Ajustes → Atendimento (Fase 3, 22/09/2026).
  *
  * Tudo o que o CRM faz sozinho no WhatsApp, num lugar só, com um interruptor
- * por automação: lead automático, distribuição, fora do horário. Embaixo, as
- * listas que a equipe usa na caixa de resposta: respostas prontas e etiquetas.
+ * por automação: lead automático, distribuição, fora do horário e — desde
+ * 28/09/2026 (ADR-16) — a introdução automática. Embaixo, as listas que a
+ * equipe usa na caixa de resposta: respostas prontas e etiquetas.
  */
 type Config = {
   lead_automatico?: boolean;
   distribuicao_automatica?: boolean;
   ausencia_ativa?: boolean;
+  /** A introdução automática (ADR-16, 28/09/2026). */
+  introducao_ativa?: boolean;
 };
 type Resposta = { id: number; atalho: string; titulo: string; texto: string; ativo: boolean };
 type Etiqueta = { id: number; name: string; color: string | null };
@@ -35,13 +39,19 @@ async function carregar() {
   const supabase = createClient();
   const [config, modelo, respostas, etiquetas] = await Promise.all([
     supabase.from('app_settings').select('value').eq('key', 'atendimento').maybeSingle(),
-    supabase.from('message_templates').select('body').eq('template_code', 'GEN-SYS-AUSENCIA').maybeSingle(),
+    supabase
+      .from('message_templates')
+      .select('template_code, body')
+      .in('template_code', ['GEN-SYS-AUSENCIA', 'GEN-SYS-INTRO']),
     supabase.from('respostas_rapidas').select('id, atalho, titulo, texto, ativo').order('atalho'),
     supabase.from('tags').select('id, name, color').order('name'),
   ]);
+  const corpos = (modelo.data ?? []) as { template_code: string; body: string }[];
+  const corpo = (codigo: string) => corpos.find((t) => t.template_code === codigo)?.body ?? '';
   return {
     config: (config.data?.value ?? {}) as Config,
-    textoAusencia: (modelo.data?.body as string | undefined) ?? '',
+    textoAusencia: corpo('GEN-SYS-AUSENCIA'),
+    textoIntroducao: corpo('GEN-SYS-INTRO'),
     respostas: (respostas.data ?? []) as Resposta[],
     etiquetas: (etiquetas.data ?? []) as Etiqueta[],
   };
@@ -50,7 +60,8 @@ async function carregar() {
 async function configurar(p: Record<string, unknown>) {
   const { data, error } = await createClient().rpc('atendimento_configurar', { p });
   if (error) throw new Error(error.message);
-  if (!(data as { ok?: boolean } | null)?.ok) throw new Error('O banco recusou a mudança.');
+  const r = data as { ok?: boolean; motivo?: string } | null;
+  if (!r?.ok) throw new Error(rotuloDaRecusaDoAtendimento(r?.motivo));
 }
 
 /** Nome de gente para os dois robôs que fazem o CRM falar. */
@@ -87,7 +98,7 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
   if (consulta.isError || !consulta.data) {
     return <p className="text-sm text-destructive">Não deu para ler as configurações.</p>;
   }
-  const { config, textoAusencia, respostas, etiquetas } = consulta.data;
+  const { config, textoAusencia, textoIntroducao, respostas, etiquetas } = consulta.data;
 
   return (
     <div className="flex max-w-3xl flex-col gap-8">
@@ -123,7 +134,33 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
           aoMudar={(v) => mudar.mutate({ ausencia_ativa: v })}
         />
         {config.ausencia_ativa ? (
-          <TextoDaAusencia inicial={textoAusencia} podeEditar={podeEditar} aoSalvar={(t) => mudar.mutate({ texto_ausencia: t })} />
+          <TextoAutomatico
+            id="texto-ausencia"
+            rotulo="Texto do aviso"
+            inicial={textoAusencia}
+            podeEditar={podeEditar}
+            aoSalvar={(t) => mudar.mutate({ texto_ausencia: t })}
+          />
+        ) : null}
+        {/* A introdução (ADR-16, 28/09/2026). O interruptor vem por último
+            porque ele é o único que faz o CRM falar sozinho DENTRO do horário —
+            os outros três só organizam o que chega. */}
+        <Interruptor
+          id="introducao"
+          titulo="Apresentar a Komune quando o lead responder o cumprimento"
+          descricao="Sai uma vez por conversa, logo depois da primeira resposta, dentro do horário de atendimento. Não leva nome, para qualquer pessoa do time continuar a conversa."
+          ligado={config.introducao_ativa ?? false}
+          podeEditar={podeEditar}
+          aoMudar={(v) => mudar.mutate({ introducao_ativa: v })}
+        />
+        {config.introducao_ativa ? (
+          <TextoAutomatico
+            id="texto-introducao"
+            rotulo="Texto da apresentação (sem variável: sai exatamente assim)"
+            inicial={textoIntroducao}
+            podeEditar={podeEditar}
+            aoSalvar={(t) => mudar.mutate({ texto_introducao: t })}
+          />
         ) : null}
       </section>
 
@@ -228,11 +265,16 @@ function Interruptor({
   );
 }
 
-function TextoDaAusencia({
+/** O corpo de uma das duas mensagens que o CRM manda sozinho. */
+function TextoAutomatico({
+  id,
+  rotulo,
   inicial,
   podeEditar,
   aoSalvar,
 }: {
+  id: string;
+  rotulo: string;
   inicial: string;
   podeEditar: boolean;
   aoSalvar: (texto: string) => void;
@@ -240,14 +282,14 @@ function TextoDaAusencia({
   const [texto, setTexto] = useState(inicial);
   return (
     <div className="flex flex-col gap-2 pl-4">
-      <label htmlFor="texto-ausencia" className="text-xs text-muted-foreground">
-        Texto do aviso
+      <label htmlFor={id} className="text-xs text-muted-foreground">
+        {rotulo}
       </label>
       <textarea
-        id="texto-ausencia"
+        id={id}
         value={texto}
         maxLength={1000}
-        rows={3}
+        rows={4}
         disabled={!podeEditar}
         onChange={(e) => setTexto(e.target.value)}
         className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"

@@ -165,6 +165,24 @@ export function rotuloDoMotivoSuprimido(motivo: string | null): string {
   return motivo;
 }
 
+/**
+ * Por que o banco recusou uma mudança em Ajustes → Atendimento.
+ *
+ * `public.atendimento_configurar` devolve `{ok:false, motivo}` em vez de
+ * levantar exceção, e até 28/09/2026 a tela mostrava sempre a mesma frase. Com
+ * a introdução automática (ADR-16) isso deixou de servir: quem digita um
+ * `{{nome}}` precisa saber que o corpo da introdução é copiado CRU para o fio.
+ */
+export function rotuloDaRecusaDoAtendimento(motivo: string | null | undefined): string {
+  if (motivo === 'sem_permissao') return 'Só gestor e admin mudam o atendimento.';
+  if (motivo === 'valor_invalido') return 'Esse interruptor só aceita ligado ou desligado.';
+  if (motivo === 'texto_longo_demais') return 'O texto passa de 1.000 caracteres.';
+  if (motivo === 'introducao_com_variavel') {
+    return 'A introdução não aceita variável ({{…}}): ela sai com o texto exatamente como está escrito aqui.';
+  }
+  return 'O banco recusou a mudança.';
+}
+
 export function rotuloDoCanal(canal: string | null): string {
   if (!canal) return 'Sem canal';
   const canais: Record<string, string> = {
