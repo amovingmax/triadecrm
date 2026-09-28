@@ -3825,3 +3825,71 @@ lote de ligação e do registro, ou ela fica onde não é lista de trabalho?
    onde entrou", é outra coluna e outra rodada.
 
 **Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
+
+### 28/09/2026 — a conferência da rodada, e o defeito que ela achou
+
+Conferência independente dos 21 commits da rodada "a IA abre, a pessoa conversa".
+Tudo o que a rodada diz ter feito, ela fez: o gatilho `messages_s_introducao` está
+entre `messages_resposta_no_funil` e `messages_x_ausencia` (conferido em
+`pg_trigger`), `GEN-SYS-TRANSPARENCIA` está inativa na migração **e** na seed,
+`app.deal_cards` carrega `stage_name`/`stage_position`/`last_channel`, existe uma
+única `public.pipeline_board`, e não há prompt de redação, `bot_ai` novo nem
+rascunho em lugar nenhum das quatro migrações.
+
+**O defeito: a introdução prometia a janela de 24 h e não a conferia.**
+
+A 20261002090000 escreve no cabeçalho que a introdução sai "dentro da janela de
+24 h", e não pergunta isso em lugar nenhum. A promessa se apoiava num raciocínio
+que quase sempre vale — o gatilho só dispara com mensagem recebida, e mensagem
+recebida abre a janela.
+
+Quase não é sempre. `app.messages_after_write` grava `last_inbound_at =
+new.created_at`, e `public.wa_entrada_registrar` recebe em `p_quando` o carimbo
+**da Meta**: o instante em que o fornecedor escreveu, não o instante em que a
+gente soube. Worker que caiu, fila represada, webhook reenviado — a entrada chega
+com 30 h de atraso, `window_expires_at` nasce já vencida, e a introdução saía
+assim mesmo. Medido no banco local, antes da correção:
+
+```
+janela_de_24h_aberta = false · introduções = 1 · business_initiated = TRUE
+```
+
+Ou seja, a apresentação saía como mensagem **iniciada pela empresa**. Três
+consequências, nenhuma cosmética:
+
+1. `app.pode_enviar` passo 3 só pergunta se a linha **tem** template
+   (`p_tem_template`), nunca se o template está **aprovado**. `GEN-SYS-INTRO`
+   nasceu com `meta_status` vazio — nunca foi submetido. O que iria ao fio é uma
+   chamada de template que a Graph API recusa.
+2. Ela consome um slot dos tetos do RF-CON-10 (`teto_do_numero`,
+   `teto_iniciadas_dia`, `teto_iniciadas_hora`) — tetos que existem para proteger
+   o aquecimento do número — numa mensagem que não chega.
+3. É cobrada como conversa iniciada pela empresa, e a introdução foi desenhada
+   para ser de graça.
+
+Correção em `20261002130000_a_introducao_so_fala_dentro_da_janela.sql`: uma
+pergunta (`app.janela_de_24h_aberta`) **antes** do carimbo de `introducao_em`, com
+o motivo `fora_da_janela_de_24h`. Recusar antes do carimbo deixa a conversa
+intocada: quem escreveu há 30 h continua elegível se voltar a escrever dentro da
+janela. Não bastava confiar na porteira — `app.pode_enviar` deixa passar quem tem
+template de propósito, que é a regra certa para a **campanha**. A introdução não é
+campanha, é resposta; quem sabe disso é ela.
+
+**Três buracos de teste fechados** em `83_a_introducao_automatica.sql` (de 20 para
+27 asserções). Os três eram pedidos por escrito e nenhum estava provado:
+
+- **a janela de 24 h** — a entrada com carimbo velho, ponta a ponta. Revertendo só
+  a função no banco, estas três asserções ficam vermelhas; é o defeito acima, e o
+  teste morde.
+- **quem já pediu para sair** — o arquivo provava o opt-out *desta* mensagem
+  (`sair`), não o caso mais comum: ficha já em `do_not_contact`, que volta a
+  escrever hoje. Agora prova os dois.
+- **só depois da resposta** — cumprimento entregue, fornecedor calado, nada sai.
+  É o desenho do Rafael em uma linha, e não havia asserção nenhuma dele.
+
+Verificado: `supabase db reset` limpo, pgTAP **79 arquivos / 3.140 asserções**,
+`supabase db lint` sem apontamento novo (o ruído de PostGIS, `app.ia_prazo`,
+`app.radar_pontuar` e `app.envio_um` é anterior a esta rodada), `pnpm db:types` sem
+deriva, lint, typecheck e `pnpm test` verdes.
+
+**Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
