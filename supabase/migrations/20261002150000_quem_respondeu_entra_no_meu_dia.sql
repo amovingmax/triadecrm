@@ -85,6 +85,46 @@ stable
 security definer
 set search_path = ''
 as $$
+  -- QUEM O SETOR INDICA, RESOLVIDO UMA VEZ POR SETOR E NÃO POR CONVERSA.
+  -- `app.setor_quem_recebe` conta as conversas abertas de cada membro do setor
+  -- para achar o menos carregado, e por linha ela é a conta mais cara desta
+  -- função: medido em 28/09/2026, com um perfil desativado e 3.000 conversas
+  -- esperando, são 386 ms dos 912 ms da chamada inteira. E o dia em que ela é
+  -- chamada é justamente o pior: o pré-filtro abaixo deixa passar TODA conversa
+  -- de perfil desativado, para QUALQUER pessoa que abra o Meu dia — quem sai da
+  -- empresa leva a carteira inteira para a fila de quem fica. São três setores,
+  -- então aqui são três chamadas fixas (0,4 ms) em vez de uma por conversa.
+  -- `materialized` porque sem ele o planejador pode embutir o CTE e trazer a
+  -- chamada de volta para dentro do laço.
+  with quem_recebe as materialized (
+    select s.id as setor_id, app.setor_quem_recebe(s.id) as quem from public.setores s
+  ),
+  -- O PRÉ-FILTRO BARATO, NUM CTE MATERIALIZADO — e o `materialized` é o ponto.
+  -- `where` não é ordem de execução: o planejador ordena os filtros pelo custo
+  -- que ELE estima, e estimava `app.wa_motivo_de_recusa` (função definer, custo
+  -- padrão) como mais barata que este OR com subplano. Resultado medido em
+  -- 28/09/2026, com 3.000 conversas de OUTRA pessoa: o plano punha a supressão
+  -- na frente e pagava 3.000 chamadas dela para devolver ZERO linha — 236 ms em
+  -- toda abertura do Meu dia, de qualquer pessoa. Com a cerca, as quatro linhas
+  -- abaixo varrem a tabela em 0,3 ms e só as sobreviventes pagam a supressão e a
+  -- pergunta pelas mensagens.
+  --
+  -- O recorte é um SUPERCONJUNTO: `p_de_quem` só vale de verdade no WHERE de
+  -- fora, depois do coalesce, porque conversa de perfil desativado cai para quem
+  -- o setor indica e só então se sabe de quem ela é.
+  candidatas as materialized (
+    select c.id, c.assignee_id, c.setor_id, c.organization_id, c.contact_id,
+           c.peer_phone_e164, c.deal_id,
+           c.last_inbound_at, c.last_outbound_at, c.window_expires_at
+      from public.conversations c
+     where c.last_inbound_at is not null
+       and c.status <> 'resolvida'
+       and (c.snoozed_until is null or c.snoozed_until <= now())
+       and (p_de_quem is null
+            or c.assignee_id = p_de_quem
+            or not exists (select 1 from public.profiles p
+                            where p.id = c.assignee_id and p.is_active))
+  )
   -- UMA LINHA POR FICHA. Uma organização pode ter dois fios (dois telefones, ou
   -- WhatsApp e Instagram) e os dois devolvem o MESMO deal_id: sem o distinct on,
   -- a tela renderiza duas linhas idênticas com a mesma chave de React. Fica a
@@ -101,37 +141,24 @@ as $$
              -- empresa some, que é esta migração com outro nome.
              coalesce((select p.id from public.profiles p
                         where p.id = c.assignee_id and p.is_active),
-                      app.setor_quem_recebe(c.setor_id)) as de_quem,
+                      sa.quem) as de_quem,
              c.organization_id,
              coalesce(c.deal_id, app.wa_negocio_da_ficha(c.organization_id)) as deal_id,
              c.last_inbound_at   as desde,
              c.window_expires_at as janela_expira_em
-        from public.conversations c
-       where c.last_inbound_at is not null
-         and c.status <> 'resolvida'
-         and (c.snoozed_until is null or c.snoozed_until <= now())
-         -- PRÉ-FILTRO BARATO, e ele é a diferença entre abrir o Meu dia e varrer
-         -- a base. Esta função é `security definer`, e o planejador NÃO faz
-         -- inline de função SQL definer: sem esta linha, o `de_quem = v_alvo` de
-         -- public.meu_dia só valeria DEPOIS de avaliar wa_motivo_de_recusa,
-         -- setor_quem_recebe e wa_negocio_da_ficha para toda conversa do banco.
-         -- É um superconjunto (o coalesce exato é conferido no WHERE de fora),
-         -- e usa conversations_esperando_idx no caso comum.
-         and (p_de_quem is null
-              or c.assignee_id = p_de_quem
-              or not exists (select 1 from public.profiles p
-                              where p.id = c.assignee_id and p.is_active))
-         -- A ÚLTIMA PALAVRA É DO LEAD. As duas primeiras linhas respondem quase
-         -- tudo e são baratas; o `not exists` só roda no caso ambíguo.
-         --
-         -- `<` ESTRITO, e é a trava que impede a pessoa de atropelar o robô: a
-         -- introdução demora 8 a 14 s para SAIR, mas a linha dela nasce na mesma
-         -- transação da entrada e app.messages_after_write grava last_outbound_at
-         -- junto. Em teste os dois carimbos ficam iguais (wa_entrada_registrar
-         -- usa now()); em produção o carimbo da Meta é ANTERIOR, então a saída
-         -- fica maior. Nos dois casos a conversa fica de fora, que é a mesma
-         -- leitura do `>=` da regra (2) de app.wa_introduzir.
-         and (c.last_outbound_at is null
+        from candidatas c
+        left join quem_recebe sa on sa.setor_id = c.setor_id
+       -- A ÚLTIMA PALAVRA É DO LEAD. As duas primeiras linhas respondem quase
+       -- tudo e são baratas; o `not exists` só roda no caso ambíguo.
+       --
+       -- `<` ESTRITO, e é a trava que impede a pessoa de atropelar o robô: a
+       -- introdução demora 8 a 14 s para SAIR, mas a linha dela nasce na mesma
+       -- transação da entrada e app.messages_after_write grava last_outbound_at
+       -- junto. Em teste os dois carimbos ficam iguais (wa_entrada_registrar
+       -- usa now()); em produção o carimbo da Meta é ANTERIOR, então a saída
+       -- fica maior. Nos dois casos a conversa fica de fora, que é a mesma
+       -- leitura do `>=` da regra (2) de app.wa_introduzir.
+       where (c.last_outbound_at is null
               or c.last_outbound_at < c.last_inbound_at
               or not exists (
                    select 1 from public.messages x
@@ -171,11 +198,16 @@ revoke all on function app.conversas_esperando_gente(uuid) from public, anon, au
 -- definer e já confere quem pode ler a fila de quem.
 grant execute on function app.conversas_esperando_gente(uuid) to service_role;
 
--- O índice que o pré-filtro usa. Parcial porque conversa sem entrada nenhuma
--- (a que só levou cumprimento) nunca é resposta de ninguém.
-create index if not exists conversations_esperando_idx
-  on public.conversations (assignee_id, last_inbound_at)
-  where last_inbound_at is not null;
+-- SEM ÍNDICE NOVO, e isso foi medido antes de ser dito. A primeira versão desta
+-- migração criava `conversations_esperando_idx (assignee_id, last_inbound_at)`
+-- "para o pré-filtro usar". O plano (explain analyze, 28/09/2026) mostra que ele
+-- NUNCA é usado: o pré-filtro não é `assignee_id = alguém`, é esse OR com "ou o
+-- perfil do dono foi desativado", e o segundo ramo não tem caminho de índice —
+-- o planejador varre a tabela e pronto. A varredura custa 0,3 ms em 3.000
+-- conversas, porque as quatro condições são comparações de coluna. Índice que
+-- ninguém usa não é grátis: ele é reescrito em toda entrada e toda saída de
+-- mensagem, que é a tabela mais quente do CRM. Quem serve a caixa de entrada por
+-- atendente continua sendo `conversations_inbox_idx`.
 
 -- ---------------------------------------------------------------------
 -- 3. A fila do dia ganha o bloco 0
