@@ -1,0 +1,54 @@
+-- =====================================================================
+-- A distribuição automática sai
+--
+-- POR QUE
+-- Rafael, 28/09/2026: "não distribua automático, estamos com operadores
+-- reduzidos que nem logam às vezes". A distribuição foi desenhada em 21/09 para
+-- um time que abre o CRM todo dia: a conversa nova de quem não tem responsável
+-- na base caía com quem tivesse menos conversas abertas no setor. Com metade do
+-- time fora, ela deixou de dividir trabalho e passou a ESCONDER: a conversa
+-- ganha um nome, o nome não entra, e ninguém mais a procura, porque ela já
+-- "tem dono". É o mesmo defeito que a fila de quem respondeu veio consertar,
+-- com outro nome.
+--
+-- O QUE MUDA, EXATAMENTE
+-- Uma linha de `app_settings`. Conversa nova NÃO fica órfã: `assignee_id` é
+-- `not null` (20260905000200:613) e `app.conversations_before_write` (:675)
+-- continua preenchendo na cascata de sempre — dono da ficha,
+-- `inbox.responsavel_padrao`, primeiro perfil ativo admin/gestor/sdr. O que some
+-- é o degrau do setor, e o dono passa a ser quase sempre o mesmo perfil. Por si
+-- só isso não melhora nada: o conserto de verdade é a 20261002180000, que tira o
+-- filtro por dono da fila de quem respondeu. As duas sobem juntas de propósito.
+--
+-- POR QUE MIGRAÇÃO, E NÃO `supabase/seed.sql`
+-- `supabase/seed.sql` não tem `app_settings` — nenhuma ocorrência nas 1.751
+-- linhas dele. O padrão nasce em migração (20260922120000:22-27), com o
+-- `case when value ? 'chave'` que só preenche o que falta. Então o lugar onde o
+-- `db reset` decide o valor é aqui, e é aqui que ele vira `false`. Editar a seed
+-- não teria efeito nenhum.
+--
+-- O GATILHO FICA
+-- `app.conversations_a_distribuir` não é removido. Isto é uma chave em
+-- Ajustes → Atendimento, e apagar código para desligar comportamento é trocar um
+-- clique por um pull request — no dia em que o time voltar a ter gente, o Rafael
+-- religa sozinho (asserções 4 e 5 do teste 89).
+--
+-- O SEGUNDO LEITOR DA CHAVE, QUE NINGUÉM PEDIU PARA DESLIGAR
+-- `app.conversations_setor()` (20260922120000:101) consulta a MESMA chave para
+-- reencaminhar a conversa quando o menu do bot muda o setor. Com ela desligada,
+-- o menu continua MUDANDO o setor e deixa de REENCAMINHAR. Na prática de hoje
+-- isso é quase inócuo — com a fila de todos, quem pode atender vê a conversa de
+-- qualquer jeito —, mas é consequência não pedida, está medida na asserção 6 do
+-- teste 89 e vai como pergunta ao Rafael no CHANGELOG: separar em duas chaves,
+-- ou está bom assim?
+--
+-- IDEMPOTENTE: `value || '{...}'::jsonb` sobrescreve a chave e preserva o resto
+-- do objeto (setor_padrao, setor_por_intencao, ausencia_ativa, lead_automatico,
+-- introducao_ativa e o que mais estiver lá).
+--
+-- RF-CON-04 · ADR-17
+-- =====================================================================
+
+update public.app_settings
+   set value = value || '{"distribuicao_automatica": false}'::jsonb
+ where key = 'atendimento';
