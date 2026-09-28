@@ -3924,8 +3924,11 @@ notificar no navegador), o Rafael escolheu a primeira.
   reconhecer o aviso de fora do horário — ele é a única saída nossa que **não**
   conta como resposta. Se contasse, quem escreve 21h40 sumia e ninguém o via de
   manhã.
-- **Índice `conversations_esperando_idx`** `(assignee_id, last_inbound_at)`
-  parcial, usado pelo pré-filtro barato da função.
+- **Um pré-filtro barato com cerca** (`candidatas as materialized`), para a
+  pergunta cara (supressão, mensagens) só valer para as conversas que
+  interessam. A primeira versão criava um índice
+  `conversations_esperando_idx` em vez disso; a conferência mediu e ele saiu —
+  veja abaixo.
 - **`public.meu_dia` ganha o bloco 0**, no topo, com **teto de 15**.
 - **A tela**: bloco "Responderam e estão esperando", tipo `conversa_esperando`,
   título "Responder no WhatsApp" (ou "Responder quem escreveu de fora da base"),
@@ -4025,5 +4028,56 @@ Verificado: `supabase db reset` limpo, pgTAP **81 arquivos / 3.176 asserções**
 (novo `87_quem_respondeu_no_meu_dia.sql`, 27 asserções), `supabase db lint` sem
 apontamento novo, `pnpm db:types` sem deriva além das duas funções novas de `app`,
 lint, typecheck e `pnpm test` verdes (**881** no web, 363 nos workers).
+
+**Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
+
+### 28/09/2026 — a conferência da fila nova, com o plano na mão
+
+Reconferido o item de cima com `explain analyze` e 3.000 conversas no banco. A
+tela e a regra estavam certas — as 3.176 asserções continuam passando sem tocar
+em nenhuma delas. O que não estava era o **custo de abrir o Meu dia**, e os três
+achados moram todos no mesmo lugar: o pré-filtro que a função dizia ter.
+
+1. **`where` não é ordem de execução.** O planejador ordena os filtros pelo custo
+   que ele estima, e estimava `app.wa_motivo_de_recusa` (definer, custo padrão)
+   como mais barata que o OR com subplano do pré-filtro. O plano punha a
+   supressão na frente: **3.000 chamadas dela para devolver zero linha, 236 ms em
+   toda abertura do Meu dia, de qualquer pessoa**. O recorte barato virou um CTE
+   `candidatas as materialized` — a cerca que obriga a ordem. Mesmas linhas,
+   **236 ms → 0,7 ms**.
+2. **`app.setor_quem_recebe` era chamada por conversa**, e ela conta as conversas
+   abertas de cada membro do setor para achar o menos carregado. O dia em que ela
+   é chamada é o pior possível: quem é desativado deixa a carteira inteira passar
+   pelo pré-filtro, para todo mundo. Resolvida uma vez por setor (são três):
+   **1.169 ms → 253 ms**.
+3. **O índice `conversations_esperando_idx` nunca era usado.** O pré-filtro não é
+   `assignee_id = alguém`: é esse OR com "ou o perfil do dono foi desativado", e
+   o segundo ramo não tem caminho de índice. A varredura custa 0,3 ms em 3.000
+   conversas; o índice custava uma reescrita em toda mensagem que entra ou sai, na
+   tabela mais quente do CRM. Saiu. Quem serve a caixa de entrada por atendente
+   continua sendo `conversations_inbox_idx`.
+
+Também conferido, e está de pé: a conversa que respondeu e ninguém assumiu
+aparece; a que já foi respondida por gente some; a que está no intervalo da
+introdução automática não aparece; quem pediu SAIR não aparece — nem com ficha
+(`do_not_contact`) nem sem ela (só o telefone na `suppression_list`). O Meu dia de
+quem não tem conversa nenhuma continua abrindo pela reunião das próximas 3 h
+(asserção antiga do `14_metas_e_relatorios`), e os links do item novo levam a
+abas que existem (`?aba=responderam&org=…` abre a conversa mesmo quando ela não
+está no recorte da aba, porque a tela procura a conversa aberta em *todas*).
+
+#### O que fica anotado, sem virar tarefa hoje
+
+- **Conversa de canal que não é WhatsApp** leria "Responder no WhatsApp": hoje
+  não existe nenhuma (todo insert de `conversations` é dos caminhos `wa_*`), e
+  quando existir o título tem de perguntar o canal.
+- **Perfil desativado num setor sem ninguém ativo**: `app.setor_quem_recebe`
+  devolve nulo e a conversa não aparece na fila de ninguém. Não dá para acontecer
+  hoje (o setor padrão tem membros, e `conversations_before_write` recusa conversa
+  sem dono ativo), mas é o tipo de coisa que só aparece no dia.
+
+Verificado: `supabase db reset` limpo, pgTAP **81 arquivos / 3.176 asserções**,
+`supabase db lint` sem apontamento novo, `pnpm db:types` sem deriva, lint,
+typecheck e `pnpm test` verdes.
 
 **Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
