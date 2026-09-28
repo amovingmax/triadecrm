@@ -38,11 +38,17 @@ export type ItemDoDia = {
 };
 
 /**
- * Os nove motivos de entrada na fila, na ordem de urgência que a função do banco
- * numera de 1 a 9. Um `tipo` desconhecido (uma migração futura acrescenta um) cai
+ * Os dez motivos de entrada na fila, na ordem de urgência que a função do banco
+ * numera de 0 a 9. Um `tipo` desconhecido (uma migração futura acrescenta um) cai
  * em `outro` e a linha continua aparecendo, sem quebrar a tela.
+ *
+ * O zero é o único que não numeramos nós: `conversa_esperando` é alguém que
+ * respondeu no WhatsApp e está esperando gente (28/09/2026). Ele vem antes de
+ * tudo porque é o único item da fila cujo relógio é de OUTRA pessoa — a janela de
+ * 24 h fecha, e depois dela só sai modelo aprovado.
  */
 export const TIPOS_DE_ITEM = [
+  'conversa_esperando',
   'reuniao_proxima',
   'desfecho_pendente',
   'tarefa_atrasada',
@@ -77,7 +83,14 @@ export function ehTipoConhecido(valor: string): valor is TipoDeItem {
  * que passou da hora, 5-6 é o resto do dia, 7 e 8 são os dois buracos que o funil
  * abre sozinho, 9 é o futuro.
  */
-export type IdDoBloco = 'agora' | 'hoje' | 'sem_proxima_acao' | 'parados' | 'depois' | 'sistema';
+export type IdDoBloco =
+  | 'respondeu'
+  | 'agora'
+  | 'hoje'
+  | 'sem_proxima_acao'
+  | 'parados'
+  | 'depois'
+  | 'sistema';
 
 export type DefinicaoDeBloco = {
   id: IdDoBloco;
@@ -90,6 +103,13 @@ export type DefinicaoDeBloco = {
 };
 
 export const BLOCOS: readonly DefinicaoDeBloco[] = [
+  {
+    id: 'respondeu',
+    titulo: 'Responderam e estão esperando',
+    explicacao:
+      'Escreveram no WhatsApp e ninguém falou com eles desde então. A janela de 24 h corre.',
+    prioridades: [0],
+  },
   {
     id: 'agora',
     titulo: 'Agora',
@@ -138,6 +158,10 @@ export type BlocoPreenchido = DefinicaoDeBloco & { itens: ItemDoDia[] };
  * "pendentes" do cabeçalho: quem deve isso é o CRM, não a pessoa.
  */
 export function ehAvisoDoSistema(item: ItemDoDia): boolean {
+  // Quem escreveu de fora da base não tem ficha nem negócio, e sem esta linha
+  // seria confundido com um aviso do motor e escondido no bloco recolhido do
+  // fim — o mesmo sumiço que este item veio consertar.
+  if (item.tipo === 'conversa_esperando') return false;
   return item.organizacaoId === null && item.negocioId === null;
 }
 
@@ -201,6 +225,15 @@ export type Destino = {
  * não há para onde mandar, e um link morto é pior que texto.
  */
 export function destinoDoItem(item: ItemDoDia): Destino | null {
+  // A conversa é o único item que leva para fora do par ficha/funil: o trabalho
+  // é responder, e responder acontece em Conversas. É também o único que tem
+  // destino SEM ficha — quem escreveu de fora da base não tem para onde mais ir.
+  if (item.tipo === 'conversa_esperando') {
+    return item.organizacaoId
+      ? { href: `/conversas?aba=responderam&org=${item.organizacaoId}`, onde: 'a conversa' }
+      : { href: '/conversas?aba=fora', onde: 'quem escreveu de fora da base' };
+  }
+
   if (!item.organizacaoId) return null;
 
   if (item.tipo === 'desfecho_pendente') {

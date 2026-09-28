@@ -270,12 +270,14 @@ function Bloco({ bloco, deslocamento }: { bloco: BlocoPreenchido; deslocamento: 
 }
 
 /**
- * Chave estável da linha. Tarefa e negócio têm id; a interação sem resultado tem o
- * id da atividade. O índice só entra como desempate no caso que não tem nenhum dos
- * três, para o React não reciclar a linha errada.
+ * Chave estável da linha. O TIPO entra sempre, e não só no fallback: desde
+ * 28/09/2026 o mesmo negócio pode render duas linhas — a conversa que espera
+ * resposta e o cartão parado na etapa são itens diferentes da mesma empresa, e
+ * até então os dois devolviam a mesma chave. A organização entra depois do
+ * negócio porque a conversa de uma ficha sem negócio aberto não tem `negocioId`.
  */
 function chaveDoItem(item: ItemDoDia, ordem: number): string {
-  return item.tarefaId ?? item.atividadeId ?? item.negocioId ?? `${item.tipo}-${ordem}`;
+  return `${item.tipo}-${item.tarefaId ?? item.atividadeId ?? item.negocioId ?? item.organizacaoId ?? ordem}`;
 }
 
 /**
@@ -296,9 +298,15 @@ function NotaDoQueFalta({ cheia }: { cheia: boolean }) {
     <NotaRecolhida titulo="O que ainda não entra nesta fila">
       <ul className="flex list-disc flex-col gap-1 pl-4">
         <li>
-          Conversa de WhatsApp esperando resposta. O inbox oficial ainda não está ligado, então
-          &quot;o parceiro respondeu e está sem resposta há mais de 2 h&quot; não tem como ser
-          medido hoje.
+          A fila mostra no máximo <span className="numerico">15</span> conversas esperando resposta
+          por vez, para não empurrar as reuniões e as tarefas para fora da lista. O resto está em{' '}
+          <Link
+            href="/conversas?aba=responderam"
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            Conversas → Responderam
+          </Link>
+          .
         </li>
         <li>
           Link do Meet e rota otimizada das visitas. A reunião e a visita do dia já entram na fila,

@@ -41,14 +41,19 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
   // Sem esta condição, "Dead-letter ai_dlq: 1 mensagem morreu" aparecia duas
   // vezes, uma embaixo da outra, em toda linha sem organização.
   const acao = item.organizacao && item.titulo !== item.organizacao ? item.titulo : null;
-  // Nesses três motivos a explicação do banco carrega o que a linha não tem em
-  // lugar nenhum (a etapa em que empacou, o SLA, o que ficou faltando dizer).
-  const explicar =
+  // MOSTRAR O MOTIVO NÃO É A MESMA COISA QUE ESCONDER A ETAPA. Eram uma variável
+  // só porque, nos três motivos antigos, o motivo já NOMEAVA a etapa ("parado na
+  // etapa Contatado") e repeti-la gastava a largura do nome. O motivo da conversa
+  // não nomeia etapa nenhuma: ele conta quanto falta da janela de 24 h — o único
+  // dado da linha que a pessoa não deduz, e o que separa "responda hoje" de
+  // "responda agora". Os dois têm de caber juntos.
+  const motivoNomeiaEtapa =
     item.tipo === 'sem_proxima_acao' ||
     item.tipo === 'negocio_parado' ||
     item.tipo === 'desfecho_pendente';
   // E o motivo só entra quando diz algo que as duas linhas acima não disseram.
-  const motivoCru = explicar || !acao ? item.motivo : null;
+  const mostrarMotivo = motivoNomeiaEtapa || item.tipo === 'conversa_esperando' || !acao;
+  const motivoCru = mostrarMotivo ? item.motivo : null;
   const motivo = motivoCru && motivoCru !== nome && motivoCru !== acao ? motivoCru : null;
   const local = formatarLocal(item.bairro, null);
 
@@ -88,7 +93,7 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
               dado que decide. Continua saindo quando o motivo já a nomeou —
               repetir "Prospectado" duas vezes na mesma linha só gasta a largura
               que o nome precisa. */}
-          {item.etapa && !explicar ? <EtiquetaEtapa etapa={item.etapa} /> : null}
+          {item.etapa && !motivoNomeiaEtapa ? <EtiquetaEtapa etapa={item.etapa} /> : null}
           {local ? <span className="truncate">{local}</span> : null}
           {item.categoria ? <span className="truncate">{item.categoria}</span> : null}
         </p>

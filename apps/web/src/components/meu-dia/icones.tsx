@@ -29,6 +29,9 @@ export type NomeDoIcone = TipoDeItem | 'ligar' | 'escrever' | 'visitar' | 'agend
 
 export const ICONE_DO_ITEM: Record<NomeDoIcone, LucideIcon> = {
   ligar: Phone,
+  // A conversa esperando resposta é literalmente uma mensagem: o mesmo desenho
+  // de "escrever", que é o que `iconeDoItem` já devolve pelo verbo do título.
+  conversa_esperando: MessageCircle,
   escrever: MessageCircle,
   visitar: MapPin,
   agendar: CalendarClock,

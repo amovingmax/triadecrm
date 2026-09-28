@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { ICONE_DO_ITEM, iconeDoItem } from './icones';
 import {
   agruparFila,
   contarPendentesDeHoje,
   destinoDoItem,
+  ehAvisoDoSistema,
   metricasVisiveis,
   ressalvasDasMetricas,
   type ItemDoDia,
@@ -198,5 +200,48 @@ describe('avisos do sistema não são tarefa de carteira', () => {
 
   it('e não contam como pendência da pessoa', () => {
     expect(contarPendentesDeHoje([item({}), doSistema])).toBe(1);
+  });
+});
+
+/**
+ * O item que o Rafael pediu em 28/09/2026. O que estes testes travam é o que
+ * a tela promete: ele abre a fila, não é confundido com um aviso do motor, conta
+ * como pendência da pessoa e leva para onde o trabalho acontece — Conversas, e
+ * não a ficha.
+ */
+describe('quem respondeu entra no topo', () => {
+  const conversa = () =>
+    item({
+      prioridade: 0,
+      tipo: 'conversa_esperando',
+      titulo: 'Responder no WhatsApp',
+      motivo: 'A janela de 24 h fecha em 21 h',
+      tarefaId: null,
+      negocioId: null,
+    });
+
+  it('abre a fila num bloco próprio, antes de tudo', () => {
+    const blocos = agruparFila([item({ prioridade: 1, tipo: 'reuniao_proxima' }), conversa()]);
+    expect(blocos.map((b) => b.id)).toEqual(['respondeu', 'agora']);
+  });
+
+  it('conversa sem ficha NÃO é aviso do sistema', () => {
+    // Sem isto ela cairia no bloco recolhido do fim, que é onde vão os avisos do
+    // motor — e sumiria da vista exatamente como sumia antes.
+    expect(ehAvisoDoSistema({ ...conversa(), organizacaoId: null, organizacao: null })).toBe(false);
+  });
+
+  it('conta como pendente do dia', () => {
+    expect(contarPendentesDeHoje([conversa()])).toBe(1);
+  });
+
+  it('leva para a conversa, e para a aba de fora da base quando não há ficha', () => {
+    expect(destinoDoItem(conversa())?.href).toBe('/conversas?aba=responderam&org=org-1');
+    expect(destinoDoItem({ ...conversa(), organizacaoId: null })?.href).toBe('/conversas?aba=fora');
+  });
+
+  it('o ícone é o de escrever, pelo verbo do título', () => {
+    expect(iconeDoItem(conversa())).toBe('escrever');
+    expect(ICONE_DO_ITEM.conversa_esperando).toBeDefined();
   });
 });
