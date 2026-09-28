@@ -3637,3 +3637,38 @@ O mesmo de antes, sem novidade: os dois nomes de fonte na seed
 linha "reconheci por cid, plus_code", e "raspagem local" é palavra nossa; os 155
 já lidos pela IA não foram reprocessados; a Fase 4 não foi tocada. **Nada subiu
 para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
+
+---
+
+## 28/09/2026 — A IA para de conversar: ela abre, e a pessoa continua
+
+Rafael viu o protótipo da IA conversando e **recusou o desenho**: *"Achei as
+respostas muito ruins. Os contatos iniciais eu achei bom, mas o desenvolver e a
+tag com conteúdo por IA, eu não quero que isso aconteça."* O ADR-14 da emenda de
+25/09 está **abandonado**, a Fase 4 inteira caiu com ele (e nada dela havia sido
+construído — conferido: não há migração `20260929*`, nem `app.wa_quem_responde`,
+nem `public.intencoes`, nem `app.texto_automatico_valido`), e o **ADR-05 volta a
+valer inteiro**: nada que a IA escreva sai sem gente.
+
+### As telas que AINDA mostram temperatura, e por quê
+
+A varredura de hoje
+(`grep -rn "ChipTemperatura\|BarraTermica\|SemaforoTermico" apps/web/src`, fora
+de `components/temperatura/`) deixa **16 arquivos**, todos fora das quatro telas
+de trabalho:
+
+| arquivo | por quê continua |
+|---|---|
+| `app/(app)/parceiros/[id]/page.tsx` | é a **ficha**, onde mora o override manual de 1–3 estrelas |
+| `components/agenda/cartao-compromisso.tsx`, `tela-rota.tsx`, `visao-semana.tsx` | agenda e rota: a temperatura ordena a visita do dia |
+| `components/cadencias/resumo-manha.tsx`, `resumo-noite.tsx` | digests, que são relatório |
+| `components/ligacao/chamada-cabecalho.tsx`, `lote-lista.tsx`, `lote-montagem.tsx`, `lote-previa.tsx` | o lote de ligação é montado POR temperatura |
+| `components/registro/linha-alvo.tsx`, `passo-oque.tsx`, `recibo.tsx` | o registro de contato aplica temperatura pelo desfecho |
+| `components/relatorios/painel-base.tsx`, `painel-funil.tsx`, `painel-semana.tsx` | são os relatórios, e é lá que a escala mora agora |
+
+(`components/funis/etapa.tsx` e `components/funis/semaforo.tsx` aparecem no grep
+só em COMENTÁRIO: o `SemaforoTermico` foi apagado hoje, e o que sobrou é a nota
+histórica de que ele existiu.)
+
+**Pergunta ao Rafael:** a temperatura deve sair também da agenda, da rota, do
+lote de ligação e do registro, ou ela fica onde não é lista de trabalho?

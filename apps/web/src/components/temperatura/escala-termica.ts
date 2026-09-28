@@ -1,11 +1,21 @@
 import type { Temperature } from '@komune/schema';
 
 /**
- * A escala térmica é o sistema visual do produto (PRD §5.6): o banco calcula a
- * temperatura de cada negócio a partir da etapa, da última intenção e de quantos
- * dias faz que ninguém fala com a pessoa. Este arquivo é o mapa único
- * `temperatura -> { rótulo, cor, ordem }`; ninguém mais escreve "Quente" ou
- * `#c4472b` na mão.
+ * A escala térmica é a dimensão dos RELATÓRIOS e do override manual de 1–3
+ * estrelas. O banco calcula a temperatura de cada negócio a partir da etapa, da
+ * última intenção e de quantos dias faz que ninguém fala com a pessoa. Este
+ * arquivo é o mapa único `temperatura -> { rótulo, cor, ordem }`; ninguém mais
+ * escreve "Quente" ou `#c4472b` na mão.
+ *
+ * **DESDE 28/09/2026 ELA NÃO PINTA AS TELAS DE TRABALHO** (ADR-16). Até então
+ * este arquivo era "o sistema visual do produto (PRD §5.6)", e a cor aparecia no
+ * cartão do funil, na lista de parceiros, na lista de conversas e no Meu dia.
+ * Rafael: "o fato de só o lead responder e ele já virar morno não faz sentido e
+ * tá errado" — cada etapa tem uma temperatura colada na seed, e as 12 etapas do
+ * funil fornecedor apareciam nessas quatro telas como três cores. Quem ocupa o
+ * lugar é a etapa (`@/components/funis/etapa`). A escala continua inteira no
+ * banco e nos relatórios, e as variáveis de `globals.css` continuam servindo a
+ * eles.
  *
  * `ordem` acompanha a ordem de declaração do enum `app.temperature` no Postgres
  * (frio < morno < quente < cliente < cliente_ativo), que é a mesma usada pelo
