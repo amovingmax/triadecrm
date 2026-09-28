@@ -454,7 +454,7 @@ stateDiagram-v2
 - **`GEN-SYS-QUEM-SOMOS`** (resposta a "quem é você? / como pegou meu número?")
 > Justo perguntar. Sou a Heloísa, do comercial da Komune (komune.app / @komune.natal). A gente está montando a rede de fornecedores de eventos de Natal e encontrei seu contato no [Casamentos.com / seu Instagram / site], que é público. Se preferir não receber mais mensagens, é só me dizer que eu paro por aqui.
 
-- **`GEN-SYS-E-ROBO`** (resposta a "é robô?")
+- **`GEN-SYS-E-ROBO`** (resposta a "é robô?") — **continua em uso, e continua sendo escolha de gente** (ADR-16, 28/09/2026): ela sai quando alguém pergunta, nunca sozinha.
 > Tem um pouco de cada 🙂 As primeiras mensagens saem de um sistema pra eu conseguir responder rápido, mas quem fala com você sou eu, Heloísa — o áudio é minha voz e a reunião sou eu. Quer que eu te mande o áudio agora?
 
 - **`GEN-SYS-OPTOUT`** (resposta a "pare")
@@ -704,6 +704,8 @@ Ao escalar, o robô entrega ao humano: resumo de 3 linhas, intenção, temperatu
 - As mensagens saem em nome da Heloísa, de um número comercial da Komune com foto e nome reais ("Heloísa · Komune").
 - Se perguntarem se é robô: responder com verdade (`GEN-SYS-E-ROBO`). Mentir quebra o argumento de confiança e, se descoberto, vira print. Áudio e reunião são sempre humanos — é isso que torna a resposta verdadeira.
 - A abertura sempre diz **quem** (nome + empresa) e **de onde** veio o contato (origem) — exigência de transparência da LGPD para contato com base em legítimo interesse e dado manifestamente público.
+
+> **ALTERADO em 28/09/2026 (ADR-16).** A **mensagem automática de introdução** — a segunda da conversa, que sai sozinha quando o lead responde o cumprimento — **não leva nome de pessoa**, de propósito: o número é do time inteiro desde 14/09 e qualquer atendente continua a conversa sem o lead perceber troca. Ela leva a **Komune**, a finalidade, a origem em forma genérica, o SAIR e o link de privacidade. A resposta a "quem é você / onde pegou meu número?" continua sendo `GEN-SYS-QUEM-SOMOS`, com a fonte específica, a base legal (art. 7º, IX) e o e-mail do encarregado — e continua sendo mandada **por gente**. A frase `GEN-SYS-TRANSPARENCIA` está **fora de uso** desde 28/09/2026; `GEN-SYS-E-ROBO` continua, e continua sendo escolha de gente.
 
 ### 5.6 Volume, número e proteção contra bloqueio
 
