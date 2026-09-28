@@ -1799,3 +1799,103 @@ As outras dezessete continuam abertas, e as que travam o início da Fase 5 são 
 **10** (a sala da reunião — enquanto ela for nula, `reuniao_marcar` recusa com
 `sem_sala` e o módulo não sai do lugar) e a **17** (cancelar no Google os eventos
 futuros que o CRM criou, ANTES do deploy que apaga os tokens).
+
+---
+
+# Emenda de 28/09/2026 — a IA só abre a conversa
+
+## O que esta emenda revoga
+
+**O ADR-14 está ABANDONADO.** Rafael, 28/09/2026, depois de ver o protótipo:
+
+> "Achei as respostas muito ruins. Os contatos iniciais eu achei bom, mas o
+> desenvolver e a tag com conteúdo por IA, eu não quero que isso aconteça."
+
+Cai junto tudo o que dependia dele, e **nada disso chegou a existir em código**:
+o validador de mundo fechado (§A.d), a voz da casa destilada (§A.b), o prompt
+que escreve (§A.c), a amostragem diária (§A.f) e o afrouxamento autorizado do
+`app.messages_guard` para `bot_ai` sem revisor. Conferido em 28/09: não há
+migração `20260929*`, não há `app.wa_quem_responde`, não há `public.intencoes`,
+não há `public.atendimento_decisoes`, não há `app.texto_automatico_valido`.
+O ADR-13 já tinha sido revogado pelo ADR-14 e **não volta**: o robô não escolhe
+texto por intenção.
+
+**O ADR-05 volta a valer inteiro: nada que a IA escreva sai sem gente.** O ramo
+`bot_ai` do `app.messages_guard` (`20260925180000`) continua exigindo rascunho
+aprovado com `reviewed_by`, e essa exigência deixa de ter exceção prevista.
+
+## ADR-16 — A IA só abre a conversa
+
+| ADR | Decisão | Alternativas | Por quê |
+|---|---|---|---|
+| ADR-16 | **A IA abre, e só abre.** O cumprimento ("Bom dia!") sai pela campanha, como já sai. Se o lead responder qualquer coisa, UMA segunda mensagem — a introdução — sai sozinha, dentro da janela de 24 h, em texto fixo cadastrado e **sem nome de pessoa**, para que qualquer atendente continue sem o lead perceber troca. Da terceira mensagem em diante quem fala é gente, sempre. **Decisão de Rafael em 28/09/2026. Revoga o ADR-14 e restaura o ADR-05 por inteiro.** | (a) a IA redigindo (ADR-14, recusado hoje); (b) o robô escolhendo texto pronto por intenção (ADR-13); (c) nada automático depois do cumprimento | (a) foi visto e recusado, com a frase acima. (b) responde oito perguntas e emudece na nona, e o Rafael não pediu isso de volta. (c) é o de hoje, e o de hoje deixa quem responde a campanha **mudo até alguém abrir a caixa** — é o nosso maior volume. A introdução é a única mensagem em que não há nada a decidir: ela não responde ao que o lead escreveu, ela se apresenta |
+
+## RF-CON-12 alterado: a abertura de conteúdo deixa de levar nome
+
+Conferido hoje: o RF-CON-12 (PRD linha 339) exige "**nome real de quem envia** +
+Komune, finalidade, origem do contato, link curto do aviso de privacidade e
+saída fácil", em "≤ 8 linhas / ≈ 80 palavras".
+
+A decisão do Rafael tira o nome **de propósito**: "para que qualquer atendente
+possa continuar". O número é do time inteiro desde 14/09 (`docs/operacao/whatsapp-no-crm.md`),
+e um nome na apresentação só serve para o lead estranhar quando outra pessoa responder.
+
+**O RF-CON-12 fica assim, para a mensagem automática de introdução:** ela leva
+a Komune (não uma pessoa), a finalidade, a origem em forma genérica, o SAIR e o
+link de privacidade. **Não leva nome, e passa de 80 palavras.** As duas
+diferenças estão aqui escritas, não escondidas.
+
+**O que a introdução NÃO substitui:** a resposta a "quem é você / onde pegou meu
+número?" continua sendo `GEN-SYS-QUEM-SOMOS`, que tem `{{origem}}`,
+`{{source_url}}`, a base legal (art. 7º, IX) e o e-mail do encarregado, e que é
+mandada **por gente**. A introdução não é, e nunca foi, o documento de
+transparência do R06 C.3.
+
+## A tag de robô sai (RF-CON-26 alterado)
+
+Rafael não quer aviso de que é robô. **A regra era nossa, não da Meta:**
+`docs/anexos/R04-whatsapp-automacao.md`, bullet "Automação/IA", registra que a
+Meta exige "caminhos de escalonamento rápidos, claros e diretos" para humano —
+e que a exigência de *anunciar* IA "não localizei isso na política oficial",
+aparecendo em blog. **A saída é da Meta; o aviso era nosso.**
+
+E com o ADR-16 a pergunta quase desaparece: o que sai automático é uma
+apresentação, não um diálogo.
+
+- **Sai:** a frase de transparência (`GEN-SYS-TRANSPARENCIA`) e a obrigação de
+  enviá-la.
+- **Fica:** a resposta honesta quando ALGUÉM PERGUNTA (`GEN-SYS-E-ROBO`,
+  escolhida por uma pessoa, nunca automática); a saída para humano, que é a
+  caixa de entrada com responsável por conversa; e os rótulos INTERNOS ("Texto
+  fixo do robô" em `mensagem-do-fio.tsx`), que só o time vê.
+
+**RF-CON-26 fica assim:** o robô nunca afirma ser humano; se perguntado,
+responde com verdade; a frase automática de transparência **está revogada**;
+toda conversa tem uma pessoa responsável e visível.
+
+## A etapa vira a verdade (PRD §5.6 alterado)
+
+Reclamação do Rafael, e ela procede: "o fato de só o lead responder e ele já
+virar morno não faz sentido e tá errado". A etapa `respondeu` tem
+`temperature = 'morno'` colada na seed, e era a COR que aparecia no cartão, na
+lista e no relatório — as 12 etapas do funil fornecedor apareciam achatadas em
+três cores.
+
+**A etapa passa a ser o que a tela mostra.** A temperatura continua existindo no
+banco (relatórios, override manual de 1–3 estrelas, `needs_attention`, ordenação
+interna de `public.meu_dia`) e some das quatro telas de trabalho: cartão do
+funil, lista de parceiros, lista de conversas e Meu dia. Se a regra de banco
+deve ou não deixar de ler `stages.temperature` é a pergunta seguinte, e fica
+para o Rafael.
+
+## O canal é atributo do toque, não funil próprio
+
+Rafael confirmou em 28/09 o filtro de canal no mesmo funil, em vez de um funil
+separado para ligação. O motivo já estava decidido no R13 §3.1: o fornecedor que
+ignorou o WhatsApp e atendeu o telefone é **um lead, não dois**.
+
+**Limite escrito:** o filtro é por **canal do último toque**, não por "canal de
+origem". Um fornecedor tocado por telefone que depois responde no WhatsApp
+migra de `phone` para `whatsapp` — inclusive pela atividade automática que
+`app.wa_resposta_no_funil` grava. Se o Rafael quiser "por onde ele entrou", é
+outra coluna e outra rodada.
