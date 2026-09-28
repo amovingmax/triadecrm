@@ -105,8 +105,13 @@ export type ItemConversa = {
   categoria: string | null;
   bairro: string | null;
   cidade: string | null;
+  /**
+   * Deixou de ser MOSTRADA em 28/09/2026 (ADR-16): quem ocupa o lugar dela na
+   * lista e no cabeçalho é a `etapa`. Continua no tipo porque `precisaAtencao`
+   * depende dela e os relatórios leem a mesma origem.
+   */
   temperatura: Temperature;
-  /** `deals.needs_attention`: engrossa a barra térmica e pesa os dias. */
+  /** `deals.needs_attention`: pesa os dias sem contato (a barra térmica saiu). */
   precisaAtencao: boolean;
   /** Já vem mascarado do banco para sdr e embaixador (RF-BAS-14). */
   telefone: string | null;

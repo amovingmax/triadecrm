@@ -6,7 +6,8 @@ import { ChevronRight, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Etiqueta } from '@/components/etiqueta';
-import { BarraTermica, DiasSemContato } from '@/components/temperatura';
+import { EtiquetaEtapa } from '@/components/funis/etapa';
+import { DiasSemContato } from '@/components/temperatura';
 
 import { local } from './formatos';
 import { ICONE_CANAL } from './icones';
@@ -94,13 +95,6 @@ function Linha({
           selecionado && 'bg-muted',
         )}
       >
-        <BarraTermica
-          temperatura={item.temperatura}
-          needsAttention={item.precisaAtencao}
-          posicao="absoluta"
-          semRotulo
-        />
-
         <span className="min-w-0 flex-1 space-y-1">
           <span className="flex items-baseline gap-2">
             <span
@@ -161,6 +155,14 @@ function Linha({
               </span>
             ) : null}
             <ChipDaJanela estado={janela} />
+            {/* A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026, ADR-16). Ela vem aqui,
+                na linha da prévia, e não na borda esquerda onde ficava a barra
+                térmica: uma palavra diz o que uma cor não dizia — "Respondeu" e
+                "Em conversa" eram o mesmo morno. */}
+            <EtiquetaEtapa
+              etapa={item.etapa}
+              className="h-4 shrink-0 border-0 bg-transparent px-0 text-[10px] font-normal text-muted-foreground"
+            />
           </span>
 
           {/* AS ETIQUETAS, com a cor que o gestor escolheu: é o que separa um

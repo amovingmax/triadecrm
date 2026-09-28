@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatarProximaAcao } from '@/components/parceiros/formatos';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
-import { ChipTemperatura, definicaoTemperatura, DiasSemContato } from '@/components/temperatura';
+import { DiasSemContato } from '@/components/temperatura';
 
 import { marcarComoLida } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
@@ -252,19 +252,16 @@ export function Conversa({
                 frase truncada, e os selos voltam inteiros a partir de `sm`. */}
             <p className="truncate text-xs text-muted-foreground sm:hidden">
               {[
-                definicaoTemperatura(item.temperatura).rotulo,
+                // A temperatura saiu desta linha em 28/09/2026 (ADR-16): a etapa,
+                // que já estava ao lado dela, é o que passou a valer.
                 item.etapa,
+                item.funil,
                 fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null,
               ]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
             <p className="mt-0.5 hidden flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground sm:flex">
-              <ChipTemperatura
-                temperatura={item.temperatura}
-                esfriando={item.precisaAtencao}
-                className="text-[11px]"
-              />
               {item.etapa ? (
                 <Badge variant="pilula" className="h-5 px-2 text-[11px] font-normal">
                   {item.etapa}
