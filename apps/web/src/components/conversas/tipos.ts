@@ -68,6 +68,27 @@ export const ROTULO_AUTOR: Record<AutorTipo, string> = {
   system: 'sistema',
 };
 
+/**
+ * O mesmo `author_kind`, com as palavras que a pessoa lê EM CIMA DO BALÃO — e,
+ * desde 28/09/2026, também na aba Automáticas. Separado do `ROTULO_AUTOR` acima
+ * porque aquele completa uma frase na linha do tempo ("registrado por pessoa do
+ * time") e este é um título sozinho.
+ *
+ * `system` ganhou nome nesta data. Ele é o que o BANCO monta — hoje, a
+ * confirmação de opt-out (`GEN-SYS-OPTOUT`) — e caía em "Alguém do time", o que
+ * é falso: não houve alguém. Uma pessoa que abre a aba Automáticas e depois abre
+ * a conversa tem de ler a mesma palavra nos dois lugares, senão aprende duas
+ * vezes a mesma coisa.
+ *
+ * `human` fica de fora de propósito: quem escreveu tem nome, e o nome é melhor
+ * que o rótulo.
+ */
+export const ROTULO_DO_ROBO: Record<Exclude<AutorTipo, 'human'>, string> = {
+  bot_fixed: 'Texto fixo do robô',
+  bot_ai: 'Rascunho da IA',
+  system: 'Confirmação automática',
+};
+
 // ---------------------------------------------------------------------------
 // A conversa (uma linha da lista da esquerda)
 // ---------------------------------------------------------------------------
@@ -247,9 +268,26 @@ export const ROTULO_JANELA: Record<JanelaSemContato, string> = {
  * resposta. Uma fila e uma etapa respondem perguntas diferentes: "quem eu
  * atendo agora?" e "onde este negócio está?".
  */
-export type AbaDaEsquerda = 'conversas' | 'responderam' | 'aprovar' | 'fora';
+/**
+ * `automaticas` (28/09/2026) não é uma quinta lista de conversas: é o que o CRM
+ * mandou SOZINHO, por mensagem e não por fio. Mora aqui, e não em Relatórios,
+ * porque a pergunta do Rafael é diária e toda linha tem uma ação — abrir e
+ * assumir. Relatórios é o grupo "Controle", de coisa semanal, e Ajustes é só de
+ * admin e gestor, enquanto quem precisa flagrar "o robô falou e ninguém
+ * assumiu" é quem atende, inclusive sdr.
+ *
+ * Fica POR ÚLTIMO na lista de propósito: a ordem das abas é memória de mão, e
+ * uma aba nova no meio move as quatro que o time já sabe onde estão.
+ */
+export type AbaDaEsquerda = 'conversas' | 'responderam' | 'aprovar' | 'fora' | 'automaticas';
 
-const ABAS: readonly AbaDaEsquerda[] = ['conversas', 'responderam', 'aprovar', 'fora'];
+const ABAS: readonly AbaDaEsquerda[] = [
+  'conversas',
+  'responderam',
+  'aprovar',
+  'fora',
+  'automaticas',
+];
 
 export function ehAbaDaEsquerda(v: string): v is AbaDaEsquerda {
   return (ABAS as readonly string[]).includes(v);

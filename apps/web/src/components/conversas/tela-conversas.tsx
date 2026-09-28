@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils';
 import { SeletorDeAba } from '@/components/ui/abas';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
+import { FeedAutomaticas } from './automaticas';
+import { carregarAutomaticas, CHAVE_AUTOMATICAS } from './automaticas-dados';
 import { Conversa } from './conversa';
 import { carregarConversas, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { useEcoDasConversas, type EstadoDoEco, type EventoDoEco } from './eco-do-banco';
@@ -94,6 +96,16 @@ export function TelaConversas({
   const [foraId, setForaId] = useState<string | null>(null);
 
   const consulta = useQuery({ queryKey: CHAVE_CONVERSAS, queryFn: carregarConversas });
+
+  // O feed do que saiu sozinho é uma RPC própria, por MENSAGEM, e só é buscada
+  // quando a aba está aberta: ela lê `public.messages` num intervalo de sete
+  // dias, e pagar isso em toda abertura da tela de Conversas seria cobrar de
+  // todo mundo uma pergunta que quase ninguém está fazendo naquele momento.
+  const automaticas = useQuery({
+    queryKey: CHAVE_AUTOMATICAS,
+    queryFn: carregarAutomaticas,
+    enabled: aba === 'automaticas',
+  });
 
   const todos = useMemo<ItemConversa[]>(() => {
     if (!consulta.data) return [];
@@ -325,7 +337,12 @@ export function TelaConversas({
       >
         {/* Lista. No celular ela some quando uma conversa está aberta (não é `hidden`:
             é não renderizar, para os cartões não trafegarem à toa no 4G da rua). */}
-        {telaCheia ? null : (
+        {/* A aba "Automáticas" ocupa a LARGURA TODA, e isso não é uma classe:
+            a coluna da esquerda é renderizada sempre que não é `telaCheia`, então
+            é a condição que muda. O feed é por mensagem e não por parceiro — uma
+            lista de parceiros ao lado dele não responderia pergunta nenhuma, e
+            roubaria 20rem do texto que saiu. */}
+        {telaCheia || aba === 'automaticas' ? null : (
           <section
             aria-label={
               aba === 'aprovar'
@@ -406,7 +423,38 @@ export function TelaConversas({
         )}
 
         {/* Conversa. No celular só existe quando alguém escolheu. */}
-        {aba === 'fora' ? (
+        {aba === 'automaticas' ? (
+          <section
+            aria-label="O que o CRM mandou sozinho"
+            className="min-h-0 min-w-0 md:col-span-2 md:overflow-y-auto"
+          >
+            {automaticas.isPending ? (
+              <EsqueletoLista />
+            ) : automaticas.isError ? (
+              <ErroDaTela
+                causa={mensagemDoErro(automaticas.error)}
+                aoTentar={() => void automaticas.refetch()}
+              />
+            ) : (
+              <FeedAutomaticas
+                linhas={automaticas.data ?? []}
+                aoAbrir={({ organizacaoId, conversaId }) => {
+                  // A ficha manda: a conversa dela abre na aba "Conversas", que é
+                  // onde o fio inteiro está. Sem ficha, o destino é a aba "Fora da
+                  // base", pelo id do FIO — o mesmo caminho que `fora-da-base.tsx`
+                  // já usa, e o único que existe para quem não é parceiro.
+                  if (organizacaoId) {
+                    setAba('conversas');
+                    setEscolhidoId(organizacaoId);
+                  } else if (conversaId) {
+                    setAba('fora');
+                    setForaId(conversaId);
+                  }
+                }}
+              />
+            )}
+          </section>
+        ) : aba === 'fora' ? (
           ehCelular && !foraId ? null : (
             <section
               aria-label="Conversa de número fora da base"
@@ -537,6 +585,10 @@ function Abas({
           { id: 'responderam', rotulo: 'Responderam', contagem: esperando },
           { id: 'aprovar', rotulo: 'Aprovar', contagem: naFila },
           { id: 'fora', rotulo: 'Fora da base', contagem: foraDaBase },
+          // SEM CONTAGEM, de propósito: um número aqui diria "trabalho parado",
+          // e o feed não é fila — a maior parte das automáticas não pede nada de
+          // ninguém. Quem cobra ação é o Meu dia e a aba "Responderam".
+          { id: 'automaticas', rotulo: 'Automáticas' },
         ]}
       />
 

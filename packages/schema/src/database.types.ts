@@ -8029,6 +8029,25 @@ export type Database = {
         }
         Returns: Json
       }
+      mensagens_automaticas: {
+        Args: { p_ate?: string; p_desde?: string; p_limite?: number }
+        Returns: {
+          atendente: string
+          autor: string
+          conversation_id: string
+          corpo: string
+          entrega: string
+          erro: string
+          gente_falou_em: string
+          message_id: string
+          modelo: string
+          organizacao: string
+          organization_id: string
+          quando: string
+          respondeu_em: string
+          rotulo: string
+        }[]
+      }
       meu_dia: {
         Args: { p_limite?: number; p_user_id?: string }
         Returns: {

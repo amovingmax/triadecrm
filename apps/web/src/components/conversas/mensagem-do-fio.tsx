@@ -10,7 +10,7 @@ import { urlDaMidia } from './acoes';
 import { VirarTarefa } from './virar-tarefa';
 import { dataHoraCompleta, hora } from './formatos';
 import { entregaDaMensagem, separarAssinatura } from './mensagens';
-import { ROTULO_TIPO_MENSAGEM, type MensagemDoFio } from './tipos';
+import { ROTULO_DO_ROBO, ROTULO_TIPO_MENSAGEM, type MensagemDoFio } from './tipos';
 
 /**
  * Uma mensagem dentro da conversa — um balão de verdade.
@@ -142,15 +142,24 @@ export function Mensagem({
 function Quem({ mensagem }: { mensagem: MensagemDoFio }) {
   const daIa = mensagem.autorTipo === 'bot_ai';
   const doRobo = mensagem.autorTipo === 'bot_fixed';
+  // `system` é o que o BANCO monta sozinho — hoje, a confirmação de opt-out
+  // (`GEN-SYS-OPTOUT`). Ele caía em "Alguém do time", e isso é falso: não houve
+  // alguém. Ganhou nome em 28/09/2026 junto com a aba Automáticas, que usa estas
+  // mesmas três palavras — se a tela nova e o fio chamassem a mesma coisa por
+  // nomes diferentes, a pessoa teria de aprender duas vezes.
+  const doSistema = mensagem.autorTipo === 'system';
   if (mensagem.entrada) return null;
 
-  const quem = daIa ? 'Rascunho da IA' : doRobo ? 'Texto fixo do robô' : (mensagem.autor ?? 'Alguém do time');
+  const quem =
+    mensagem.autorTipo === 'human'
+      ? (mensagem.autor ?? 'Alguém do time')
+      : ROTULO_DO_ROBO[mensagem.autorTipo];
 
   return (
     <p className="mb-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
       {daIa ? (
         <Sparkles className="size-3" aria-hidden="true" />
-      ) : doRobo ? (
+      ) : doRobo || doSistema ? (
         <Bot className="size-3" aria-hidden="true" />
       ) : null}
       <span className="font-medium text-foreground">{quem}</span>

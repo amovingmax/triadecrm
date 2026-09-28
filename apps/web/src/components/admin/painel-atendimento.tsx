@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -109,6 +110,20 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
 
       <section className="flex flex-col gap-3">
         <h2 className="font-heading text-base font-medium">O que o CRM faz sozinho</h2>
+        {/* O interruptor diz o que o CRM PODE fazer; o link diz o que ele FEZ.
+            Um interruptor sem consequência visível é um interruptor que ninguém
+            audita — e a pergunta do Rafael em 28/09/2026 foi exatamente essa. O
+            destino é Conversas, e não uma tela aqui, porque quem precisa flagrar
+            "o robô falou e ninguém assumiu" é quem atende, inclusive sdr, e
+            Ajustes é só de admin e gestor. */}
+        <p className="text-xs text-muted-foreground">
+          Para ver o que saiu sozinho de verdade — e se o lead respondeu e alguém assumiu —,
+          abra{' '}
+          <Link href="/conversas?aba=automaticas" className="underline underline-offset-2">
+            Conversas → Automáticas
+          </Link>
+          .
+        </p>
         <Interruptor
           id="lead-automatico"
           titulo="Lead automático"
