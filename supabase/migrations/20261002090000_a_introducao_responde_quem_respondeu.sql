@@ -125,3 +125,139 @@ grant execute on function app.wa_modelo_introducao() to authenticated, service_r
 alter table public.conversations add column if not exists introducao_em timestamptz;
 comment on column public.conversations.introducao_em is
   'Quando a introdução automática saiu nesta conversa (ADR-16). Uma por conversa, para sempre: o `where introducao_em is null` do update é a tranca que serializa duas entradas no mesmo instante.';
+
+-- ---------------------------------------------------------------------
+-- 5. A função pura
+-- ---------------------------------------------------------------------
+-- PURA: não escreve, e responde uma pergunta só.
+--
+-- `>= 1`, NÃO `= 1`. A pergunta é "TUDO o que saiu foi cumprimento?", não "saiu
+-- um?". A campanha de recontato existe (20260925170000 fala em 3.000 fichas já
+-- tocadas): um fornecedor que levou "Bom dia!" em duas levas tem DUAS saídas, as
+-- duas cumprimentos, e é justamente ele que merece a apresentação quando enfim
+-- responde. O `>= 1` continua excluindo a conversa que o lead começou (zero
+-- saídas), que é caso do menu, não da introdução.
+--
+-- O `coalesce` externo existe porque `bool_and` sobre um `template_id` nulo
+-- devolve NULL, e NULL aqui deixaria a introdução sair numa conversa em que
+-- gente já escreveu texto livre.
+create or replace function app.wa_so_o_cumprimento_saiu(p_conversation_id uuid,
+                                                        p_ate timestamptz default now())
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(count(*) >= 1
+                  and bool_and(m.template_id = any (app.wa_modelos_de_cumprimento())), false)
+    from public.messages m
+   where m.conversation_id = p_conversation_id
+     and m.direction = 'out'::app.msg_direction
+     and m.status <> 'failed'::app.msg_status
+     and m.created_at <= p_ate
+$$;
+comment on function app.wa_so_o_cumprimento_saiu(uuid, timestamptz) is
+  'Todo envio nosso nesta conversa até um instante foi cumprimento (GEN-ABR-OLA-*), e houve pelo menos um? É a pergunta que decide se a introdução automática entra. Qualquer saída que não seja cumprimento quer dizer que a conversa já tem dono; nenhuma saída quer dizer que foi o lead que começou.';
+revoke all on function app.wa_so_o_cumprimento_saiu(uuid, timestamptz) from public, anon;
+grant execute on function app.wa_so_o_cumprimento_saiu(uuid, timestamptz) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------
+-- 6. A função que age
+-- ---------------------------------------------------------------------
+create or replace function app.wa_introduzir(p_message_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m       public.messages%rowtype;
+  c       public.conversations%rowtype;
+  v_trava uuid;
+  v_msg   uuid;
+begin
+  if not app.atendimento_liga('introducao_ativa') then
+    return jsonb_build_object('introduziu', false, 'motivo', 'desligada');
+  end if;
+  if app.wa_modelo_introducao() is null then
+    return jsonb_build_object('introduziu', false, 'motivo', 'sem_modelo');
+  end if;
+
+  select * into m from public.messages where id = p_message_id;
+  if not found or m.direction <> 'in'::app.msg_direction
+     or m.type <> 'text'::app.msg_type
+     or nullif(btrim(coalesce(m.body, '')), '') is null then
+    -- Áudio, imagem e mídia não abrem a introdução: o áudio tem caminho próprio
+    -- (RF-CON-27) e o toque de botão tem `app.envio_resposta_ao_botao`.
+    return jsonb_build_object('introduziu', false, 'motivo', 'nao_e_texto_de_entrada');
+  end if;
+
+  select * into c from public.conversations where id = m.conversation_id;
+  if c.bot_paused then
+    return jsonb_build_object('introduziu', false, 'motivo', 'bot_pausado');
+  end if;
+  -- Quem se despede não recebe apresentação. Espelho de `app.wa_parece_optout`
+  -- (20260916110000), e ele é necessário AQUI: quando este gatilho roda, o
+  -- worker ainda não gravou a supressão (entrada.ts vem depois do insert).
+  if app.wa_parece_optout(coalesce(m.body, '')) then
+    return jsonb_build_object('introduziu', false, 'motivo', 'parece_optout');
+  end if;
+  if app.wa_motivo_de_recusa(c.organization_id, c.contact_id, c.peer_phone_e164) is not null then
+    return jsonb_build_object('introduziu', false, 'motivo', 'contato_suprimido');
+  end if;
+
+  -- (0) DENTRO DO HORÁRIO, E SÓ. Fora dele quem responde é a ausência, e ela se
+  --     calaria diante da introdução (20260922120000). Uma apresentação
+  --     comercial às 22h40 de domingo, sem ninguém para continuar, é pior que o
+  --     silêncio que ela veio resolver. `p_respondeu => true` porque, por
+  --     definição, esta pessoa acabou de escrever.
+  if not coalesce((app.janela_do_canal(c.channel, now(), true) ->> 'aberta')::boolean, false) then
+    return jsonb_build_object('introduziu', false, 'motivo', 'fora_do_horario');
+  end if;
+
+  -- (1) TODO ENVIO NOSSO FOI CUMPRIMENTO, e houve pelo menos um.
+  if not app.wa_so_o_cumprimento_saiu(c.id, m.created_at) then
+    return jsonb_build_object('introduziu', false, 'motivo', 'a_conversa_ja_tem_dono');
+  end if;
+
+  -- (2) NINGUÉM RESPONDEU A ESTA ENTRADA — nem gente, nem outro automatismo.
+  --     Mesma pergunta que `app.ausencia_responder` faz. É o que impede a
+  --     introdução de falar por cima do menu, do link do botão, da despedida do
+  --     freio ou de um atendente que abriu a caixa no mesmo minuto, sem precisar
+  --     nomear nenhum dos quatro. `>=` e não `>`: dentro de uma transação
+  --     `now()` é constante, então a saída de um gatilho vizinho carrega o MESMO
+  --     created_at da entrada que a provocou.
+  if exists (select 1 from public.messages x
+              where x.conversation_id = c.id
+                and x.direction = 'out'::app.msg_direction
+                and x.created_at >= m.created_at) then
+    return jsonb_build_object('introduziu', false, 'motivo', 'ja_respondida');
+  end if;
+
+  -- (3) UMA POR CONVERSA. O `where introducao_em is null` é a tranca: duas
+  --     entradas no mesmo instante são duas transações, e o lock desta linha
+  --     serializa as duas. A segunda vê o carimbo e volta.
+  update public.conversations
+     set introducao_em = now(), updated_at = now()
+   where id = c.id and introducao_em is null
+  returning id into v_trava;
+  if v_trava is null then
+    return jsonb_build_object('introduziu', false, 'motivo', 'ja_introduzida');
+  end if;
+
+  v_msg := app.wa_bot_dizer(c.id, 'GEN-SYS-INTRO');
+  if v_msg is null then
+    -- `wa_bot_dizer` devolve NULL (com warning) quando o modelo sumiu ou foi
+    -- desativado entre a conferência e o envio. Devolver o carimbo, senão a
+    -- conversa fica marcada como introduzida sem nunca ter sido. (Quando o
+    -- `messages_guard` RECUSA, ele levanta exceção e a subtransação do gatilho
+    -- desfaz este update junto — outro caminho, mesmo desfecho.)
+    update public.conversations set introducao_em = null where id = c.id;
+    return jsonb_build_object('introduziu', false, 'motivo', 'modelo_sumiu');
+  end if;
+  return jsonb_build_object('introduziu', true, 'message_id', v_msg);
+end $$;
+comment on function app.wa_introduzir(uuid) is
+  'A introdução automática (ADR-16): quando chega a primeira mensagem de texto do lead numa conversa em que tudo o que saiu foi cumprimento, apresenta a Komune UMA vez, sem nome, dentro da janela de 24 h e dentro do horário. Opt-out, contato suprimido, bot pausado, fora do horário, conversa que já tem dono e resposta de qualquer outro automatismo passam batido.';
+revoke all on function app.wa_introduzir(uuid) from public, anon, authenticated;
