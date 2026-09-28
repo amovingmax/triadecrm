@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BotOff, ChevronDown, ExternalLink, MessageSquarePlus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { iniciaisDe } from '@/lib/auth/session';
+import { iniciaisDe } from '@/lib/iniciais';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

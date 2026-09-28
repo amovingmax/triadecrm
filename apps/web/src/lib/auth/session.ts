@@ -8,6 +8,12 @@ import { redirect } from 'next/navigation';
 
 import { type AppRole, roleFromClaims } from '@/lib/auth/role';
 import { createClient } from '@/lib/supabase/server';
+// Reexportada para quem já a importava daqui. Ela MORA em `lib/iniciais`
+// porque este arquivo é de servidor (`next/headers`) e os balões da
+// conversa, que são de cliente, também precisam dela.
+import { iniciaisDe } from '@/lib/iniciais';
+
+export { iniciaisDe };
 
 export type Sessao = {
   id: string;
@@ -20,16 +26,6 @@ export type Sessao = {
 
 function texto(valor: unknown): string | null {
   return typeof valor === 'string' && valor.trim() ? valor.trim() : null;
-}
-
-/** "Heloísa Andrade" → "HA"; "heloisa@komune.app.br" → "H". */
-export function iniciaisDe(nome: string): string {
-  const partes = nome
-    .split(/[\s@._-]+/)
-    .filter(Boolean)
-    .slice(0, 2);
-  const letras = partes.map((p) => p.charAt(0).toUpperCase()).join('');
-  return letras || '?';
 }
 
 /** Sessão atual ou null quando não há usuário autenticado. */

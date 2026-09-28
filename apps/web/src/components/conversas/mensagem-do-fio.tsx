@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { AudioLines, BadgeCheck, Ban, Bot, FileText, Hourglass, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { iniciaisDe } from '@/lib/auth/session';
+import { iniciaisDe } from '@/lib/iniciais';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 

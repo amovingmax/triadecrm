@@ -4413,3 +4413,19 @@ O que mudou agora:
   em ambiente de teste, então este desenho foi escrito sem screenshot. Quem
   confere é o Rafael, na tela, e isto está escrito aqui porque duas rodadas já
   passaram com "continua feio" e a causa pode ser exatamente essa.
+
+#### O build quebrou, e o que isso ensinou
+
+O primeiro deploy deste desenho FALHOU, depois de lint, typecheck e 1.654 testes
+passarem. Causa: o retrato importava `iniciaisDe` de `lib/auth/session.ts`, que
+importa `lib/supabase/server`, que importa `next/headers`. Isso faz dele um
+módulo de SERVIDOR, e os balões da conversa são componentes de cliente — o
+`next build` recusou arrastar `next/headers` para o pacote do navegador.
+
+A função virou `lib/iniciais.ts`, pura e sem dependência, e `session.ts` a
+reexporta para quem já a importava de lá.
+
+O que fica: **nenhuma das três verificações de sempre compila para o
+navegador.** `pnpm build` passa a ser obrigatório antes de qualquer deploy —
+descobrir isto pelo Vercel custou um deploy morto e mais uma rodada de espera do
+Rafael.
