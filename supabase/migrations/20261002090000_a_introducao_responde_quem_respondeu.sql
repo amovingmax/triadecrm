@@ -261,3 +261,51 @@ end $$;
 comment on function app.wa_introduzir(uuid) is
   'A introdução automática (ADR-16): quando chega a primeira mensagem de texto do lead numa conversa em que tudo o que saiu foi cumprimento, apresenta a Komune UMA vez, sem nome, dentro da janela de 24 h e dentro do horário. Opt-out, contato suprimido, bot pausado, fora do horário, conversa que já tem dono e resposta de qualquer outro automatismo passam batido.';
 revoke all on function app.wa_introduzir(uuid) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- 7. O gatilho, e o lugar dele na fila
+-- ---------------------------------------------------------------------
+create or replace function app.messages_introducao()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    perform app.wa_introduzir(new.id);
+  exception when others then
+    -- A mensagem que chegou vale mais que a resposta automática dela. Mesma
+    -- escolha de `messages_bot_de_entrada` e `messages_x_ausencia`. O rollback
+    -- da subtransação desfaz o carimbo de `introducao_em` junto, e a introdução
+    -- é tentada de novo na próxima entrada do lead.
+    raise warning 'wa_introduzir(%): %', new.id, sqlerrm;
+  end;
+  return null;
+end $$;
+revoke all on function app.messages_introducao() from public, anon, authenticated;
+
+-- O `s` é escolhido, não sorteado. Gatilhos AFTER disparam em ordem de nome:
+--   a_freio_do_robo     → pingue-pongue e fusível; pode pausar a conversa, e a
+--                          introdução vê `bot_paused` e a despedida.
+--   after_write         → escreve `last_inbound_at`; o UPDATE dele dispara
+--                          `app.conversations_before_write`, que é QUEM recalcula
+--                          `window_expires_at` (20260905000400). A janela de
+--                          24 h depende dessa cadeia, então ela vem antes.
+--   bot_de_entrada, resposta_ao_botao → os dois que PODEM responder. Vêm antes,
+--                          e a regra (2) da função os enxerga.
+--   s_introducao          ← aqui
+--   x_ausencia          → vê a introdução pelo próprio `exists` dele. Com a
+--                          regra (0) a introdução não sai fora do horário, então
+--                          na prática os dois nunca disputam a mesma entrada.
+--   zz_lead_automatico  → continua por último, criando a ficha.
+drop trigger if exists messages_s_introducao on public.messages;
+create trigger messages_s_introducao
+  after insert on public.messages
+  for each row when (new.direction = 'in'::app.msg_direction)
+  execute function app.messages_introducao();
+
+-- O comentário de `20260922110000` cita a ordem dos gatilhos pelo nome e passa
+-- a estar incompleto. Migração não edita arquivo antigo: o texto novo vai aqui.
+comment on function app.messages_lead_automatico() is
+  'Cria a ficha do desconhecido que escreveu (RF-CON-24). É o ÚLTIMO dos gatilhos de entrada de public.messages, que disparam em ordem de nome: a_freio_do_robo (freio), after_write (last_inbound_at, e por ele a janela de 24 h), bot_de_entrada (menu), ia_pendente, quem_responde_atende, resposta_ao_botao, resposta_no_funil, s_introducao (a introdução automática, ADR-16), x_ausencia (fora do horário) e zz_lead_automatico.';
