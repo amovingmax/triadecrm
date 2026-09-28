@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Bot, ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -71,7 +72,15 @@ export function FeedAutomaticas({
           Os últimos <span className="numerico">{DIAS_DO_FEED}</span> dias: a introdução
           automática, o menu do bot, o aviso de fora do horário, os rascunhos da IA aprovados
           e as confirmações de saída. O cumprimento das campanhas não está aqui — ele é
-          assinado por quem disparou e mora em Campanhas.
+          assinado por quem disparou e mora em{' '}
+          {/* O LINK, e não só o nome da tela. A frase já dizia onde estava o
+              cumprimento da campanha; quem lê isto está justamente procurando por
+              ele, e fazer a pessoa achar o menu depois de ler onde é são dois
+              passos para uma resposta que já está na mão. */}
+          <Link href="/envios" className="underline underline-offset-2 hover:text-foreground">
+            Envios
+          </Link>
+          .
         </p>
 
         {/* O PLACAR — a segunda pergunta do Rafael ("como tá esse processo?"),

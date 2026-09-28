@@ -373,6 +373,7 @@ describe('montarFio', () => {
     contact_id: null,
     channel: 'whatsapp',
     peer_phone_e164: '+5584999880011',
+    peer_nome: null,
     business_number: '+5584999990000',
     assignee_id: HELOISA,
     setor_id: null,

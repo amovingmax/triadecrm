@@ -244,52 +244,34 @@ export function Conversa({
           </Button>
 
           <div className="min-w-0 flex-1">
-            <h2 className="truncate font-heading text-base leading-tight font-semibold tracking-tight">
+            <h2 className="truncate font-heading text-base leading-tight font-semibold tracking-tight md:text-lg">
               {item.nome}
             </h2>
-            {/* NO CELULAR, UMA LINHA. A pilha de selos ocupava três linhas em
-                390 px — metade do que sobrava para a conversa. Aqui ela vira uma
-                frase truncada, e os selos voltam inteiros a partir de `sm`. */}
-            <p className="truncate text-xs text-muted-foreground sm:hidden">
+            {/* UMA FRASE, EM TODA LARGURA. Eram cinco pílulas no desktop e uma
+                frase no celular dizendo as MESMAS coisas — etapa, funil, setor,
+                estado —, cada uma com moldura, altura e espaçamento próprios.
+                Pílula é para o que é exceção; isto aqui é o contexto fixo da
+                conversa, e contexto fixo lê-se melhor como texto corrido.
+                (28/09/2026: "ta mtt feio e pequeno, pode compor mais espaço".) */}
+            <p className="truncate text-xs text-muted-foreground md:text-[13px]">
               {[
                 // A temperatura saiu desta linha em 28/09/2026 (ADR-16): a etapa,
                 // que já estava ao lado dela, é o que passou a valer.
                 item.etapa,
                 item.funil,
+                setorDoFio,
                 fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null,
               ]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
-            <p className="mt-0.5 hidden flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground sm:flex">
-              {item.etapa ? (
-                <Badge variant="pilula" className="h-5 px-2 text-[11px] font-normal">
-                  {item.etapa}
-                  {item.funil ? (
-                    <span className="text-muted-foreground"> · {item.funil}</span>
-                  ) : null}
-                </Badge>
-              ) : null}
+            {/* E SÓ O QUE É EXCEÇÃO CONTINUA PÍLULA: quem pediu para não ser
+                contatado, o robô calado, e as etiquetas — que não são rótulo, são
+                o botão de etiquetar. */}
+            <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
               {item.naoContatar ? (
                 <Badge variant="pilula" className="h-5 px-2 text-[11px] font-normal">
                   não contatar
-                </Badge>
-              ) : null}
-              {setorDoFio ? (
-                <Badge variant="pilula" className="h-5 px-2 text-[11px] font-normal">
-                  {setorDoFio}
-                </Badge>
-              ) : null}
-              <EtiquetasDoParceiro organizacaoId={item.id} podeEditar={Boolean(eu?.podeEscrever)} />
-              {/* O estado do fio ("esperando a gente") só aparece com largura de
-                  sobra: no celular a faixa da janela, logo abaixo, já diz o que
-                  dá para fazer agora — e três selos empilhados comem a conversa. */}
-              {fio ? (
-                <Badge
-                  variant="pilula"
-                  className="hidden h-5 px-2 text-[11px] font-normal sm:inline-flex"
-                >
-                  {ROTULO_ESTADO_DO_FIO[fio.estado]}
                 </Badge>
               ) : null}
               {fio?.roboPausado ? (
@@ -298,6 +280,7 @@ export function Conversa({
                   robô pausado
                 </Badge>
               ) : null}
+              <EtiquetasDoParceiro organizacaoId={item.id} podeEditar={Boolean(eu?.podeEscrever)} />
             </p>
           </div>
 
@@ -336,9 +319,11 @@ export function Conversa({
         {fio ? <FaixaDaJanela estado={janela} className="border-t border-hairline" /> : null}
       </header>
 
-      {/* A coluna de leitura fica em 48rem: numa tela de 1440 o painel tem mais de
-          1.100px, e uma nota de visita esticada nessa largura vira uma linha de 200
-          caracteres, que ninguém lê.
+      {/* A coluna de leitura fica em 56rem. Era 48, e com o balão limitado a 34rem
+          dentro dela a conversa aparecia pequena no meio de uma tela vazia. 56rem
+          ainda é largura de leitura — o que não pode é a linha de texto correr os
+          1.100px do painel de uma tela de 1440, porque aí ninguém acha o começo da
+          linha seguinte.
 
           A FICHA ROLA JUNTO, e o cabeçalho ficou só com o nome e as ações. Ela
           estava fixa; com o rodapé do inbox embaixo (relógio + rascunho), os dois
@@ -365,7 +350,7 @@ export function Conversa({
         </button>
         <dl
           className={cn(
-            'mx-auto max-w-3xl flex-wrap items-baseline gap-x-4 gap-y-1 pb-1 text-[11px] text-muted-foreground sm:flex',
+            'mx-auto max-w-4xl flex-wrap items-baseline gap-x-4 gap-y-1 pb-1 text-[11px] text-muted-foreground sm:flex',
             fichaAberta ? 'flex' : 'hidden',
           )}
         >
@@ -412,9 +397,9 @@ export function Conversa({
         {/* A leitura da IA entra ENTRE a ficha e a conversa, e não num painel à
             parte: ela fala sobre o que está logo abaixo, e a evidência de cada
             sinal é uma mensagem daquela mesma coluna. Fechada, é uma linha. */}
-        {fio ? <LeituraDaIa fioId={fio.id} className="mx-auto mt-2.5 max-w-3xl" /> : null}
+        {fio ? <LeituraDaIa fioId={fio.id} className="mx-auto mt-2.5 max-w-4xl" /> : null}
 
-        <AvisoWhatsapp meta={meta} compacto className="mx-auto my-4 max-w-3xl" />
+        <AvisoWhatsapp meta={meta} compacto className="mx-auto my-4 max-w-4xl" />
 
         {consulta.isPending ? (
           <EsqueletoLinha />
@@ -426,8 +411,8 @@ export function Conversa({
         ) : dias.length === 0 ? (
           <SemHistorico organizacaoId={item.id} />
         ) : (
-          <div className="mx-auto max-w-3xl">
-            <LinhaDoTempo dias={dias} />
+          <div className="mx-auto max-w-4xl">
+            <LinhaDoTempo dias={dias} nomeDoParceiro={item.nome} />
           </div>
         )}
 
@@ -444,7 +429,7 @@ export function Conversa({
               rascunho={rascunho}
               fio={fio}
               organizacaoId={item.id}
-              className="mx-auto mt-4 max-w-3xl"
+              className="mx-auto mt-4 max-w-4xl"
             />
           </div>
         ) : null}
@@ -456,7 +441,7 @@ export function Conversa({
           janela e mesmo assim espremia a conversa contra o cabeçalho, porque o
           painel é menor que a janela. */}
       <div className="max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-3 py-2.5 md:px-5 md:py-3">
-        <div className="mx-auto max-w-3xl space-y-3">
+        <div className="mx-auto max-w-4xl space-y-3">
           {/* O relógio da janela virou a FAIXA do cabeçalho (`FaixaDaJanela`): a hora
               está sempre à vista e não custa mais três linhas em cima da caixa de
               escrever. O cartão inteiro só volta quando a janela está APERTADA — aí

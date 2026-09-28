@@ -99,7 +99,7 @@ function Linha({
           <span className="flex items-baseline gap-2">
             <span
               className={cn(
-                'min-w-0 flex-1 truncate text-sm',
+                'min-w-0 flex-1 truncate text-sm xl:text-[15px]',
                 item.naoLidas > 0 ? 'font-semibold' : 'font-medium',
               )}
             >
@@ -164,6 +164,17 @@ function Linha({
               className="h-4 shrink-0 border-0 bg-transparent px-0 text-[10px] font-normal text-muted-foreground"
             />
           </span>
+
+          {/* ONDE E O QUÊ — só onde há largura. Em 28/09/2026 a coluna passou de
+              20rem para 23 (27 no xl), e o que estava escondido no `title` porque
+              "custava 40 px por linha" cabe de novo: numa tela larga a lista não
+              disputa mais espaço com a conversa. Em telas menores continua no
+              tooltip, que é onde ele não custa altura nenhuma. */}
+          {rodape ? (
+            <span className="hidden truncate text-[11px] text-muted-foreground xl:block">
+              {rodape}
+            </span>
+          ) : null}
 
           {/* AS ETIQUETAS, com a cor que o gestor escolheu: é o que separa um
               fundador de um contato qualquer antes de abrir a conversa. Duas, e o

@@ -331,7 +331,12 @@ export function TelaConversas({
       <div
         className={cn(
           'grid min-h-0 flex-1 border-t border-hairline',
-          'md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:overflow-hidden',
+          // A lista era 20rem em qualquer tela: o nome do parceiro truncava no
+          // meio e a prévia da conversa cabia em cinco palavras. Numa tela de
+          // 1440 sobrava largura de sobra do outro lado — a conversa não fica
+          // melhor com 1.100 px do que com 900. Então a lista cresce com a tela.
+          'md:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] md:overflow-hidden',
+          'xl:grid-cols-[minmax(0,27rem)_minmax(0,1fr)]',
           telaCheia && 'overflow-hidden',
         )}
       >

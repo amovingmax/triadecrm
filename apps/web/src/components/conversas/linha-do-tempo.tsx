@@ -26,7 +26,14 @@ import { ROTULO_AUTOR, type DiaDaLinha, type EventoDaLinha } from './tipos';
  * Sem cor cromática: o desenho e o peso da fonte fazem a hierarquia. Cor nesta
  * interface é temperatura, e um evento passado não tem temperatura.
  */
-export function LinhaDoTempo({ dias }: { dias: DiaDaLinha[] }) {
+export function LinhaDoTempo({
+  dias,
+  nomeDoParceiro = null,
+}: {
+  dias: DiaDaLinha[];
+  /** Vai até o balão recebido: é o nome que aparece em cima dele. */
+  nomeDoParceiro?: string | null;
+}) {
   return (
     <div className="flex flex-col gap-5">
       {dias.map((dia) => (
@@ -39,6 +46,7 @@ export function LinhaDoTempo({ dias }: { dias: DiaDaLinha[] }) {
                 evento={evento}
                 anterior={dia.eventos[i - 1]}
                 seguinte={dia.eventos[i + 1]}
+                nomeDoParceiro={nomeDoParceiro}
               />
             ))}
           </ol>
@@ -69,10 +77,12 @@ function Evento({
   evento,
   anterior,
   seguinte,
+  nomeDoParceiro,
 }: {
   evento: EventoDaLinha;
   anterior?: EventoDaLinha;
   seguinte?: EventoDaLinha;
+  nomeDoParceiro: string | null;
 }) {
   // A mensagem é balão, e o balão não tem trilho: o lado já diz quem falou, e os
   // 44 px do trilho eram a diferença entre ler a conversa e espremê-la no celular.
@@ -88,6 +98,7 @@ function Evento({
           mensagem={evento.mensagem}
           agrupada={mesmoBloco(anterior, evento)}
           fechaGrupo={!mesmoBloco(evento, seguinte)}
+          nomeDoParceiro={nomeDoParceiro}
         />
       </li>
     );

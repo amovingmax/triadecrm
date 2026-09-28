@@ -53,6 +53,7 @@ export type FioCru = {
   contact_id: string | null;
   channel: string;
   peer_phone_e164: string;
+  peer_nome: string | null;
   business_number: string;
   assignee_id: string;
   setor_id: number | null;
@@ -526,6 +527,7 @@ export function montarFio(cru: FioCru, nomeDaPessoa: Map<string, string>): FioDa
     organizacaoId: cru.organization_id,
     canal: (CANAIS.includes(cru.channel) ? cru.channel : 'whatsapp') as FioDaConversa['canal'],
     telefoneParceiro: cru.peer_phone_e164,
+    nomeDoPerfil: cru.peer_nome?.trim() || null,
     numeroDaEmpresa: cru.business_number,
     responsavelId: cru.assignee_id,
     responsavel: nomeDaPessoa.get(cru.assignee_id) ?? null,

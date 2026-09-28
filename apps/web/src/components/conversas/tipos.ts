@@ -583,6 +583,13 @@ export type FioDaConversa = {
   canal: Channel;
   /** Número do parceiro, em E.164. Vem cru do banco: o inbox não mascara o fio. */
   telefoneParceiro: string;
+  /**
+   * O nome que a pessoa pôs no PRÓPRIO WhatsApp, como a Meta o manda em toda
+   * mensagem recebida (`contacts[].profile.name`). Não é o nome da ficha: é como
+   * ela se chama. Serve de nome de exibição quando a ficha ainda não tem um
+   * (ver `nomeExibido` em `formatos.ts`).
+   */
+  nomeDoPerfil: string | null;
   /** O número da KOMUNE que fala neste fio (RF-CON-01). */
   numeroDaEmpresa: string;
   responsavelId: string;

@@ -43,7 +43,7 @@ const COLUNAS_ATIVIDADE =
  * restringe a quem é dono do fio.
  */
 const COLUNAS_FIO =
-  'id, organization_id, contact_id, channel, peer_phone_e164, business_number, assignee_id, setor_id, status, bot_paused, last_message_at, last_inbound_at, last_outbound_at, window_expires_at, unread_count, ai_summary, ai_intent, ai_confidence';
+  'id, organization_id, contact_id, channel, peer_phone_e164, peer_nome, business_number, assignee_id, setor_id, status, bot_paused, last_message_at, last_inbound_at, last_outbound_at, window_expires_at, unread_count, ai_summary, ai_intent, ai_confidence';
 
 /** Colunas da mensagem. `body` pode ser null: a retenção dos 12 meses o apaga. */
 const COLUNAS_MENSAGEM =

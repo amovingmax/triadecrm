@@ -53,12 +53,15 @@ export function Mensagem({
   mensagem,
   agrupada = false,
   fechaGrupo = true,
+  nomeDoParceiro = null,
 }: {
   mensagem: MensagemDoFio;
   /** Vem logo depois de outra do mesmo autor: sem nome em cima, colada na anterior. */
   agrupada?: boolean;
   /** É a última do bloco: só ela mostra hora e entrega. */
   fechaGrupo?: boolean;
+  /** Como se chama quem está do outro lado — o nome em cima do balão recebido. */
+  nomeDoParceiro?: string | null;
 }) {
   const entrega = entregaDaMensagem(mensagem);
   const semTexto = mensagem.texto === null;
@@ -72,11 +75,16 @@ export function Mensagem({
         fechaGrupo ? 'pb-3' : 'pb-0.5',
       )}
     >
-      {agrupada ? null : <Quem mensagem={mensagem} />}
+      {agrupada ? null : <Quem mensagem={mensagem} nomeDoParceiro={nomeDoParceiro} />}
 
       <div
         className={cn(
-          'min-w-0 max-w-[85%] space-y-2 px-3.5 py-2.5 text-[15px] leading-relaxed md:max-w-[34rem]',
+          // 28/09/2026: o balão tinha 34rem de teto dentro de uma coluna de 48rem
+          // — texto pequeno, apertado, e meia tela vazia do lado ("ta mtt feio e
+          // pequeno", Rafael). Agora ele acompanha a coluna de leitura, que é a
+          // largura em que se lê sem cansar, e respira por dentro.
+          'min-w-0 max-w-[88%] space-y-2 px-4 py-3 text-[15px] leading-relaxed',
+          'md:max-w-[40rem] md:text-base',
           // O canto reto é o "rabinho" do balão: fica no lado de quem falou, e só
           // no último do bloco — no meio do bloco todos os cantos são redondos.
           'rounded-2xl',
@@ -134,12 +142,23 @@ export function Mensagem({
 /**
  * Quem escreveu, em cima do balão e só quando acrescenta.
  *
- * "O parceiro" em toda mensagem recebida era uma etiqueta repetida numa tela em
- * que o lado do balão já diz isso. Sobra o que muda: a IA, o robô, e o nome de
- * quem do time escreveu — porque o número é de todos e saber quem falou por
- * último é a pergunta de quem entra na conversa agora.
+ * De um lado a IA, o robô e o nome de quem do time escreveu — porque o número é
+ * de todos e saber quem falou por último é a pergunta de quem entra na conversa
+ * agora. Do outro, o nome do parceiro.
+ *
+ * O recebido ficou SEM nome por um tempo, com o argumento de que o lado do balão
+ * já diz quem falou. Diz de quem NÃO é; não diz de quem é. Numa tela em que três
+ * pessoas do time revezam no mesmo número e a conversa é lida do meio, "Buffet
+ * Aurora" em cima do balão é o que fecha a conta — e é o nome que a pessoa pôs
+ * no próprio WhatsApp, não o número (28/09/2026).
  */
-function Quem({ mensagem }: { mensagem: MensagemDoFio }) {
+function Quem({
+  mensagem,
+  nomeDoParceiro,
+}: {
+  mensagem: MensagemDoFio;
+  nomeDoParceiro: string | null;
+}) {
   const daIa = mensagem.autorTipo === 'bot_ai';
   const doRobo = mensagem.autorTipo === 'bot_fixed';
   // `system` é o que o BANCO monta sozinho — hoje, a confirmação de opt-out
@@ -148,16 +167,16 @@ function Quem({ mensagem }: { mensagem: MensagemDoFio }) {
   // mesmas três palavras — se a tela nova e o fio chamassem a mesma coisa por
   // nomes diferentes, a pessoa teria de aprender duas vezes.
   const doSistema = mensagem.autorTipo === 'system';
-  if (mensagem.entrada) return null;
 
-  const quem =
-    mensagem.autorTipo === 'human'
+  const quem = mensagem.entrada
+    ? (nomeDoParceiro?.trim() || 'O parceiro')
+    : mensagem.autorTipo === 'human'
       ? (mensagem.autor ?? 'Alguém do time')
       : ROTULO_DO_ROBO[mensagem.autorTipo];
 
   return (
-    <p className="mb-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
-      {daIa ? (
+    <p className="mb-1 flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
+      {mensagem.entrada ? null : daIa ? (
         <Sparkles className="size-3" aria-hidden="true" />
       ) : doRobo || doSistema ? (
         <Bot className="size-3" aria-hidden="true" />

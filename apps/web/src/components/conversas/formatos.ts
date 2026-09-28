@@ -118,3 +118,28 @@ export function numero(n: number): string {
 export function contagemDeInteracoes(n: number): { numero: string; palavra: string } {
   return { numero: NUMERO.format(n), palavra: n === 1 ? ' interação' : ' interações' };
 }
+
+/**
+ * O rótulo que o banco dá a uma ficha nascida de uma mensagem sem nome nenhum:
+ * "Contato do WhatsApp (84) 99999-8801" (ver `app.lead_automatico`). Não é um
+ * nome — é a ausência de um.
+ */
+const FICHA_SEM_NOME = /^Contato do WhatsApp\b/i;
+
+/**
+ * Com que nome esta pessoa aparece na tela.
+ *
+ * O nome da ficha vence sempre que existe de verdade: quem cadastrou "Buffet
+ * Aurora" quis aquele nome, e o apelido do WhatsApp ("aurora buffet 24h ⭐") não
+ * o substitui. Mas quando a ficha nasceu de uma mensagem e ficou com o número no
+ * lugar do nome, o nome do perfil é a única coisa humana que se sabe — e é
+ * melhor do que o número em toda tela onde alguém procura uma conversa.
+ *
+ * Isto é EXIBIÇÃO, não cadastro: nada aqui renomeia a ficha. Quem renomeia é
+ * gente, na ficha.
+ */
+export function nomeExibido(nomeDaFicha: string, nomeDoPerfil: string | null): string {
+  const perfil = nomeDoPerfil?.trim();
+  if (!perfil) return nomeDaFicha;
+  return FICHA_SEM_NOME.test(nomeDaFicha.trim()) ? perfil : nomeDaFicha;
+}

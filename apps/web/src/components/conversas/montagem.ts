@@ -20,7 +20,7 @@ import {
   type FiltrosConversas,
   type ItemConversa,
 } from './tipos';
-import { chaveDoDia } from './formatos';
+import { chaveDoDia, nomeExibido } from './formatos';
 import {
   montarFio,
   montarMensagens,
@@ -276,7 +276,10 @@ export function montarConversas({
 
     return {
       id: o.id,
-      nome: o.name,
+      // O nome do perfil do WhatsApp entra QUANDO a ficha não tem nome — é o
+      // que tira "Contato do WhatsApp (84) 9..." da lista sem renomear ficha
+      // nenhuma (ver `nomeExibido`).
+      nome: nomeExibido(o.name, fioCru?.peer_nome ?? null),
       categoria: o.primary_category_name,
       bairro: o.neighborhood,
       cidade: o.city_name,

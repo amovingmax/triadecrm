@@ -4265,3 +4265,61 @@ Verificado: `supabase db reset` limpo, pgTAP **85 arquivos / 3.206 asserções**
 `pnpm test` verdes (**893 testes no web**, partida 881).
 
 **Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
+
+### 28/09/2026 — a conversa ganha espaço, e o nome de quem está do outro lado
+
+Rafael, com o print da tela aberta: *"ta vendo essa parte toda? vamos pivotear o
+designer, ta mtt feio e pequeno, pode compor mais espaço (...) deixando o visual
+mais clean, deixando claro quem é quem, e colocando o nome do fornecedor ou
+produtor inves do numero"*. Junto veio um componente de chat pronto, com
+`use-stick-to-bottom`.
+
+**A biblioteca não entrou, e isso é decisão.** O fio já cola no fim sozinho
+(`conversa.tsx:174-195`): quando a pessoa está no fim, mensagem nova rola junto;
+quando ela subiu para ler, não rola. Trocar código que funciona, e que está
+testado, por uma dependência nova não melhora nada que se veja na tela.
+
+O que estava feio de verdade era outra coisa, e é o que mudou:
+
+- **A lista da esquerda** era 20rem em qualquer tela — o nome do parceiro
+  truncava no meio. Agora é 23rem, e 27rem a partir de `xl`. Nessa largura o
+  bairro e a categoria, que estavam escondidos no `title` desde que custavam
+  40 px por linha, voltam a aparecer como linha (só no `xl`, onde a lista não
+  disputa espaço com a conversa).
+- **O cabeçalho da conversa** tinha cinco pílulas no desktop (etapa+funil,
+  setor, etiquetas, estado do fio, robô pausado) e, no celular, uma frase
+  dizendo as mesmas coisas. Agora é uma frase só, em toda largura — etapa ·
+  funil · setor · estado —, e pílula ficou sendo o que é exceção: "não
+  contatar", "robô pausado" e o botão de etiquetar.
+- **A coluna de leitura** passou de 48rem para 56rem, e o balão de 34rem para
+  40rem, com mais ar por dentro (`px-4 py-3`) e `text-base` no desktop. Era
+  daí que vinha o "pequeno": um balão de 34rem no meio de um painel de 1.100 px.
+- **Quem é quem**: a linha de autoria em cima do balão só existia do nosso
+  lado. O argumento era que o lado do balão já diz quem falou — mas ele diz de
+  quem NÃO é, não de quem é. Agora a mensagem recebida também traz o nome em
+  cima, e o nome é o do WhatsApp da pessoa.
+
+**O nome no lugar do número.** `conversations.peer_nome` (migração
+`20261002160000`) chega à tela: `nomeExibido()` troca o rótulo
+"Contato do WhatsApp (84) 9…" pelo nome do perfil quando a ficha não tem nome
+próprio, e **nunca** o contrário — "Buffet Aurora" cadastrado por gente vence
+"aurora buffet 24h ⭐" do WhatsApp. É exibição, não cadastro: nenhuma ficha é
+renomeada. 6 testes Vitest novos (`nome-exibido.test.ts`).
+
+**O cumprimento de campanha continua fora da aba Automáticas.** Eu tinha dito ao
+Rafael que o incluiria; ao mexer, li o motivo escrito na própria migração
+(`20261002190000`) e ele se sustenta: aquele "Bom dia!" é assinado por quem
+disparou, tem tela própria em `/envios`, e incluí-lo faria a coluna
+`gente_falou_em` contar um disparo automático como "alguém assumiu". O que
+faltava era o caminho: a frase que já explicava onde ele mora agora é link.
+
+- Tocado: `tela-conversas.tsx`, `conversa.tsx`, `lista-conversas.tsx`,
+  `mensagem-do-fio.tsx`, `linha-do-tempo.tsx`, `automaticas.tsx`, `dados.ts`,
+  `mensagens.ts`, `tipos.ts`, `formatos.ts`, `montagem.ts`.
+- Verificado: lint, typecheck e testes verdes (web 902, workers 363,
+  prompts 284, schema 105).
+- Pendente: `supabase db push` das migrações de 02/10 e deploy na Vercel com
+  `--force` (7 commits acumulados).
+- Decisão humana: `inbox.responsavel_padrao` continua nulo (o fallback é o admin
+  ativo mais antigo); `agenda.reunioes.sala_padrao` também, então `reuniao_marcar`
+  ainda recusa com `sem_sala`.
