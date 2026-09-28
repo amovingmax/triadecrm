@@ -4081,3 +4081,172 @@ Verificado: `supabase db reset` limpo, pgTAP **81 arquivos / 3.176 asserções**
 typecheck e `pnpm test` verdes.
 
 **Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
+
+### 28/09/2026 — ninguém distribui, a fila é de quem abrir, e o que saiu sozinho ganha tela
+
+**ADR-17 — "a fila de quem respondeu é de quem abrir; ninguém distribui".**
+Rafael, nas palavras dele: *"onde e como vemos as mensagens que foram enviadas
+automáticas? como tá esse processo? deixe isso organizado, e não distribua
+automático, estamos com operadores reduzidos que nem logam às vezes"*.
+
+Três movimentos numa rodada só, e o do meio é o que impede o primeiro de piorar
+a vida.
+
+#### (A) A distribuição automática sai — `20261002170000`
+
+`app_settings.atendimento.distribuicao_automatica` passa a nascer `false`.
+**Conversa nova não fica órfã:** `assignee_id` é `not null` e
+`app.conversations_before_write` continua preenchendo na cascata de sempre (dono
+da ficha → `inbox.responsavel_padrao` → primeiro perfil ativo admin/gestor/sdr).
+O que some é o degrau do setor, e o dono passa a ser quase sempre o mesmo perfil
+— por isso (B) sobe junto. Nenhuma tela quebra: nenhuma consulta trata
+`assignee_id` como opcional.
+
+O gatilho `app.conversations_a_distribuir` **fica**: isto é uma chave em
+Ajustes → Atendimento, e apagar código para desligar comportamento é trocar um
+clique por um pull request.
+
+#### (B) A fila de quem respondeu vira de quem abrir — `20261002180000`
+
+`app.conversas_esperando_gente` deixa de ser filtrada por dono para quem pode
+atender, e `public.meu_dia` ganha a coluna `atendente`.
+
+**Quem pode atender, e por que o critério é o banco e não uma lista de gosto:**
+responder é `insert` em `public.messages`, e `messages_insert` exige
+`app.can_write()` **e** o mesmo recorte de `conversations_select`. Então:
+
+- **admin, gestor, sdr** → fila inteira. `app.sees_all()` já os deixava ler toda
+  conversa e `can_write()` já os deixava responder.
+- **embaixador** → só as conversas **endereçadas a ele**, como hoje. Isso **não é
+  "a carteira dele"**: uma conversa de uma ficha da carteira, endereçada a outra
+  pessoa, não entra. O teste 90 mede os dois casos, para o comentário não
+  prometer o que o SQL não faz.
+- **leitura e financeiro** → nada. `can_write()` é falso para eles; pôr item na
+  fila de quem o banco vai recusar é mandar trabalhar e depois dizer não.
+
+O papel que decide é o de **quem a fila é**, não o de quem pergunta: o gestor que
+abre a fila de um embaixador vê a fila do embaixador.
+
+**O que evita duas pessoas na mesma conversa é o que já existia.** Sem lock, sem
+reserva: `conversas_esperando_gente` exige que a última palavra seja do lead, e
+quem responde vira a última palavra nossa — a conversa sai da fila **de todo
+mundo** no mesmo instante. Medido na asserção 6 do teste 90.
+
+**Um defeito que só apareceu agora:** `distinct on (q.de_quem, …)` deduplicava
+*dentro de cada pessoa*, porque o `where p_de_quem` roda antes. Sem filtro, dois
+fios da mesma ficha com donos diferentes renderiam duas linhas. `de_quem` saiu
+da chave.
+
+A asserção 22 do teste 87 foi **revirada, não apagada**: ela fixava por escrito a
+fila por dono, e quem ler o arquivo daqui a um ano precisa saber que ela já foi
+assim. As asserções 18–21 e 23–25, que dependem de o bloco 0 passar a ser global,
+foram reconferidas rodando — e passaram sem mudança.
+
+#### (C) A aba "Automáticas" em Conversas — `20261002190000`
+
+`public.mensagens_automaticas(p_desde, p_ate, p_limite)` + aba nova em
+`/conversas`, e um link de uma linha em Ajustes → Atendimento. Mora em Conversas
+porque a pergunta do Rafael é **diária** (Relatórios é o grupo "Controle", de
+coisa semanal) e porque quem precisa flagrar "o robô falou e ninguém assumiu" é
+quem atende, **inclusive sdr** (Ajustes é só de admin e gestor).
+
+**O recorte é `direction = 'out' and author_kind <> 'human'`**, e não
+`in ('bot_fixed','bot_ai')` como o pedido dizia: a confirmação de opt-out é
+`system`, e é justamente a que mais precisa ser auditável — ela é a prova de que
+o guardrail do CLAUDE.md funcionou.
+
+**O que aconteceu depois, em duas colunas e não num rótulo:** `respondeu_em` (a
+primeira entrada do lead **depois daquela mensagem**) e `gente_falou_em` (a
+primeira saída de gente depois dela). Duas, porque um rótulo único perderia o
+caso que importa — *respondeu e ninguém falou*. E as duas têm a **mesma forma**:
+`respondeu_em` poderia ser `conversations.last_inbound_at`, que já está na linha
+e sai de graça, e seria errado — aquela é a última entrada da conversa inteira e
+marcaria "respondeu" em toda automática antiga de conversa viva, com um carimbo
+que pode ser resposta a outra coisa dita três dias depois.
+
+A aba **não tem contador**: um número ali diria "trabalho parado", e o feed não é
+fila. Quem cobra ação é o Meu dia e a aba "Responderam".
+
+De quebra, `system` ganhou nome no balão da conversa (**"Confirmação
+automática"**): ele caía em "Alguém do time", e não houve alguém. As três
+palavras passaram a morar num lugar só (`ROTULO_DO_ROBO`), para o feed e o fio
+não ensinarem a mesma coisa duas vezes.
+
+#### Onde o enunciado do dia estava errado, e foi medido
+
+- **O `sdr` NÃO tem RLS estreita em `conversations`.** `app.sees_all()` inclui
+  `admin, gestor, sdr, leitura, financeiro`. Quem é estreito é o **embaixador**.
+- **Conversa sem dono não existe.** `assignee_id` é `not null` desde
+  `20260905000200:613`; desligar a distribuição muda *qual* dono, não *se há*.
+- **`supabase/seed.sql` não tem `app_settings`** — o padrão nasce em migração
+  (`20260922120000:22-27`), e é por isso que (A) é uma migração e não uma edição
+  da seed. Editar a seed não teria efeito nenhum.
+- **O cumprimento da campanha é `human`**, assinado por quem disparou
+  (`wa_enviar_modelo`), e a confirmação de opt-out é `system` — o recorte do
+  pedido pegaria o contrário do que ele queria.
+
+#### Os números
+
+- **A consequência de (A) que ninguém pediu:** `app.conversations_setor()` lê a
+  **mesma chave**. Com ela desligada, o menu do bot continua **mudando o setor** da
+  conversa e deixa de **reencaminhá-la** para alguém desse setor. Medido na
+  asserção 6 do teste 89, em vez de descoberto por acidente daqui a três meses.
+- **O custo de (B):** a chamada sem filtro passou a ser paga por todo
+  admin/gestor/sdr em toda abertura do Meu dia. `explain analyze` com **3.000
+  conversas esperando: 112 ms**, bem abaixo da linha (~600 ms) em que a mitigação
+  entraria. **A mitigação não entrou**, e nenhum índice novo foi criado — a
+  `20261002150000:201-210` já mediu que o pré-filtro não tem caminho de índice.
+- **Os volumes por tipo não deram para medir localmente:** `public.messages` está
+  **vazia** no banco de desenvolvimento (nem `seed.sql` nem `scripts/seed-dev-5k.sql`
+  criam mensagem ou conversa). A consulta abaixo é para alguém rodar em produção:
+
+```sql
+select coalesce(t.template_code, '(texto sem modelo)') as saida,
+       m.author_kind,
+       count(*)                                        as mandadas,
+       count(*) filter (where m.status = 'failed')     as falharam,
+       count(*) filter (where exists (
+         select 1 from public.messages i
+          where i.conversation_id = m.conversation_id
+            and i.direction = 'in' and i.created_at > m.created_at)) as responderam,
+       count(*) filter (where exists (
+         select 1 from public.messages g
+          where g.conversation_id = m.conversation_id
+            and g.direction = 'out' and g.author_kind = 'human'
+            and g.created_at > m.created_at))          as alguem_assumiu
+  from public.messages m
+  left join public.message_templates t on t.id = m.template_id
+ where m.direction = 'out' and m.author_kind <> 'human'
+   and m.created_at >= now() - interval '30 days'
+ group by 1, 2 order by 3 desc;
+```
+
+#### O que precisa de decisão humana
+
+1. **`app_settings['inbox.responsavel_padrao'].profile_id` está `null`.** Com a
+   distribuição desligada, o fallback é "o admin ativo mais antigo". Deve ser o
+   Rafael, ou apontar alguém? É um `update` de uma linha, sem deploy.
+2. **A chave também governa o menu do bot.** `app.conversations_setor` parou de
+   reencaminhar por setor. Quer isso separado em duas chaves, ou está bom assim?
+3. **O cumprimento da campanha ficou fora da aba Automáticas**, porque é `human` e
+   já tem tela em `/envios` com `respondeu` por item. Isto é desvio do enunciado,
+   assumido: quer ver os dois no mesmo lugar?
+4. **O embaixador continua vendo só as conversas endereçadas a ele**, não a
+   carteira inteira. Decisão consciente; alargar exigiria um segundo recorte
+   dentro da função.
+
+#### O que continua pendente
+
+- **Produção precisa do `distribuicao_automatica: false` aplicado.** Nesta rodada
+  nada foi para lá.
+- Os volumes por tipo, até alguém rodar a consulta acima em produção.
+- Adiadas por decisão do Rafael: **tarefa por conversa** e **notificação de
+  navegador**.
+
+Verificado: `supabase db reset` limpo, pgTAP **85 arquivos / 3.206 asserções**
+(partida: 82 / 3.185 — o enunciado dizia 81 / 3.176 porque mediu antes do
+`88_o_nome_do_perfil.sql`), `supabase db lint` sem apontamento novo,
+`pnpm db:types` sem deriva além das duas funções tocadas, lint, typecheck e
+`pnpm test` verdes (**893 testes no web**, partida 881).
+
+**Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
