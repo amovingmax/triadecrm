@@ -449,7 +449,7 @@ select is(
 select is(
   (select count(*)::int from jsonb_object_keys(
      pg_temp.cartao(public.pipeline_board(pg_temp.funil('fornecedor'), true), 'contatado'))),
-  22, 'quadro: o cartão tem as 22 chaves do contrato (CartaoQuadro)');
+  25, 'quadro: o cartão tem as 25 chaves do contrato (CartaoQuadro) — 22 até 27/09/2026, mais stage_name, stage_position e last_channel desde o ADR-16');
 select is(
   (select count(*)::int from jsonb_object_keys(
      pg_temp.cartao(public.pipeline_board(pg_temp.funil('fornecedor'), true), 'contatado')) k
