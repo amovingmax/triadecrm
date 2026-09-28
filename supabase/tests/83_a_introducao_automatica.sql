@@ -12,12 +12,20 @@
 --   3. SAÍDA SEM `template_id` (texto livre de gente) não conta como
 --      cumprimento — e o `coalesce` externo existe porque `bool_and` sobre
 --      nulo devolve NULL, que deixaria a introdução passar.
+--   4. A INTRODUÇÃO SAI SOZINHA, PELO GATILHO, UMA VEZ POR CONVERSA — e SEM
+--      NOME. O sem-nome é o pedido do Rafael em forma de teste: qualquer
+--      atendente continua a conversa sem o lead perceber troca de pessoa.
+--   5. OS AUTOMATISMOS NÃO SE ATROPELAM. Fora do horário a introdução se cala
+--      e quem fala é a AUSÊNCIA, sozinha — se a introdução saísse ali, a
+--      ausência veria a saída e se calaria (20260922120000), e o lead de
+--      domingo à noite ficaria com uma oferta comercial e nenhum aviso de que
+--      ninguém responde agora.
 --
 -- NENHUMA asserção conta linha absoluta em tabela compartilhada.
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(5);
+select plan(20);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -144,6 +152,15 @@ begin
   perform pg_temp.sair();
 end $$;
 
+create function pg_temp.chegou_audio(p_tel text) returns void language plpgsql as $$
+begin
+  perform pg_temp.worker();
+  perform public.wa_entrada_registrar('wamid.pgtap83.audio.' || md5(p_tel),
+                                      app.wa_numero_padrao(), p_tel, 'audio', null,
+                                      'media83', 'audio/ogg', now());
+  perform pg_temp.sair();
+end $$;
+
 -- O atendente já respondeu. Responde POR MODELO (e não por texto livre) porque
 -- a conversa ainda não tem entrada nenhuma: fora da janela de 24 h a porteira
 -- exige template (RF-CON-18), e o que a asserção precisa é só que a saída NÃO
@@ -211,6 +228,135 @@ select ok(not app.wa_so_o_cumprimento_saiu(pg_temp.caso('sem_saida'), now()),
 
 select ok(not app.wa_so_o_cumprimento_saiu(pg_temp.caso('texto_livre'), now()),
   'saída sem template_id não conta como cumprimento: coalesce fecha o nulo do bool_and');
+
+-- ---------- leituras ----------
+create function pg_temp.introducoes(p_nome text) returns int language sql stable as $$
+  select count(*)::int from public.messages m
+   where m.conversation_id = pg_temp.caso(p_nome)
+     and m.template_id = app.wa_modelo_introducao()
+$$;
+create function pg_temp.corpo_da_introducao(p_nome text) returns text language sql stable as $$
+  select m.body from public.messages m
+   where m.conversation_id = pg_temp.caso(p_nome)
+     and m.template_id = app.wa_modelo_introducao()
+   order by m.created_at limit 1
+$$;
+create function pg_temp.autor_da_introducao(p_nome text) returns text language sql stable as $$
+  select m.author_kind from public.messages m
+   where m.conversation_id = pg_temp.caso(p_nome)
+     and m.template_id = app.wa_modelo_introducao()
+   order by m.created_at limit 1
+$$;
+create function pg_temp.ausencias(p_nome text) returns int language sql stable as $$
+  select count(*)::int from public.messages m
+   join public.message_templates t on t.id = m.template_id
+   where m.conversation_id = pg_temp.caso(p_nome) and t.template_code = 'GEN-SYS-AUSENCIA'
+$$;
+create function pg_temp.ultima_entrada(p_tel text) returns uuid language sql stable as $$
+  select m.id from public.messages m join public.conversations c on c.id = m.conversation_id
+   where c.peer_phone_e164 = p_tel and m.direction = 'in'::app.msg_direction
+   order by m.created_at desc, m.id desc limit 1
+$$;
+
+-- =====================================================================
+-- 2. O caminho feliz: o gatilho, e só o insert da entrada
+-- =====================================================================
+insert into pg_temp.casos values ('feliz', pg_temp.conversa_com_cumprimento('+5584999998310'));
+
+select lives_ok($$ select pg_temp.chegou('+5584999998310', 'bom dia, tudo bem?') $$,
+  'a entrada do lead grava sem erro');
+
+select is(pg_temp.introducoes('feliz'), 1,
+  'a introdução saiu sozinha, pelo gatilho, uma vez');
+
+select is(pg_temp.autor_da_introducao('feliz'), 'bot_fixed',
+  'a introdução é bot_fixed com template: é isso que o messages_guard aceita sem rascunho');
+
+-- =====================================================================
+-- 3. O pedido do Rafael em forma de teste
+-- =====================================================================
+select ok(pg_temp.corpo_da_introducao('feliz') !~ '^\*[^*]+:\*',
+  'A INTRODUÇÃO NÃO TEM NOME: app.messages_nome_do_atendente não assina bot_fixed com template');
+
+select ok((select body from public.message_templates where template_code = 'GEN-SYS-INTRO')
+          not like '%{{%',
+  'a introdução não tem variável: wa_bot_dizer copia o corpo cru e um {{nome}} sairia literal');
+
+-- =====================================================================
+-- 4. As recusas, uma asserção cada
+-- =====================================================================
+-- UMA POR CONVERSA. O motivo é `a_conversa_ja_tem_dono`, e não `ja_introduzida`:
+-- a regra (1) vem antes da (3), e a PRÓPRIA introdução já é uma saída que não é
+-- cumprimento — ela virou o dono da conversa. O carimbo `introducao_em` continua
+-- existindo porque ele resolve outra coisa: DUAS entradas ao mesmo tempo, em
+-- transações diferentes, em que nenhuma enxerga a saída da outra. Esse caminho
+-- não se alcança num teste de uma linha do tempo só, e por isso está escrito
+-- aqui em vez de asseverado com uma fixture que fingisse concorrência.
+select pg_temp.chegou('+5584999998310', 'pode explicar sim');
+select is(app.wa_introduzir(pg_temp.ultima_entrada('+5584999998310')) ->> 'motivo',
+  'a_conversa_ja_tem_dono',
+  'segunda resposta do lead: a introdução já saiu e agora ELA é o dono da conversa');
+select is(pg_temp.introducoes('feliz'), 1,
+  'lead que responde duas vezes seguidas recebe UMA introdução, e só uma');
+
+-- Reaproveita a conversa do caso 3 (o cumprimento e a resposta por modelo já
+-- estão lá): criar outra com o mesmo telefone esbarraria no índice único de
+-- `organizations.phone_e164`, que é o dedup do PRD e não uma chateação do teste.
+insert into pg_temp.casos values ('apos_humano', pg_temp.caso('resposta_humana'));
+select pg_temp.chegou('+5584999998303', 'oi, vi sua mensagem');
+select is(app.wa_introduzir(pg_temp.ultima_entrada('+5584999998303')) ->> 'motivo',
+  'a_conversa_ja_tem_dono',
+  'atendente já respondeu: a introdução não fala por cima dele');
+
+insert into pg_temp.casos values ('optout', pg_temp.conversa_com_cumprimento('+5584999998311'));
+select pg_temp.chegou('+5584999998311', 'sair');
+select is(app.wa_introduzir(pg_temp.ultima_entrada('+5584999998311')) ->> 'motivo', 'parece_optout',
+  'quem escreve SAIR recebe a confirmação do RF-CON-19, não uma apresentação');
+
+insert into pg_temp.casos values ('audio', pg_temp.conversa_com_cumprimento('+5584999998312'));
+select pg_temp.chegou_audio('+5584999998312');
+select is(app.wa_introduzir(pg_temp.ultima_entrada('+5584999998312')) ->> 'motivo',
+  'nao_e_texto_de_entrada',
+  'áudio recebido vai para gente (RF-CON-27), não para a apresentação automática');
+
+-- A chave, pela RPC do gestor: é ela que a tela chama.
+insert into pg_temp.casos values ('desligada', pg_temp.conversa_com_cumprimento('+5584999998313'));
+select pg_temp.entrar(pg_temp.quem_assina(), 'gestor');
+select public.atendimento_configurar('{"introducao_ativa": false}');
+select pg_temp.sair();
+select pg_temp.chegou('+5584999998313', 'bom dia');
+select is(app.wa_introduzir(pg_temp.ultima_entrada('+5584999998313')) ->> 'motivo', 'desligada',
+  'a chave em app_settings desliga sem deploy');
+select pg_temp.entrar(pg_temp.quem_assina(), 'gestor');
+select public.atendimento_configurar('{"introducao_ativa": true}');
+select pg_temp.sair();
+
+-- =====================================================================
+-- 5. Os automatismos não se atropelam
+-- =====================================================================
+-- FORA DO HORÁRIO a introdução se cala e a AUSÊNCIA fala. É a correção de
+-- 28/09: se a introdução saísse aqui, a ausência veria a saída e se calaria, e
+-- o lead ficaria com uma oferta comercial e nenhum aviso de que ninguém
+-- responde agora.
+insert into pg_temp.casos values ('fora_do_horario', pg_temp.conversa_com_cumprimento('+5584999998314'));
+update pg_temp.relogio set aberto = false;
+select pg_temp.chegou('+5584999998314', 'oi, ainda tem vaga?');
+select is(pg_temp.introducoes('fora_do_horario'), 0,
+  'fora do horário a introdução NÃO sai');
+select is(pg_temp.ausencias('fora_do_horario'), 1,
+  'e quem fala fora do horário continua sendo a ausência, sozinha');
+update pg_temp.relogio set aberto = true;
+
+-- Conversa que o lead começou: não houve cumprimento, então não é da introdução.
+insert into pg_temp.casos values ('lead_comecou', pg_temp.conversa_nova('+5584999998315'));
+select pg_temp.chegou('+5584999998315', 'oi, quero saber sobre a plataforma');
+select is(pg_temp.introducoes('lead_comecou'), 0,
+  'conversa que o lead começou é do menu, não da introdução: não houve cumprimento');
+
+-- Recontato, ponta a ponta: duas levas de campanha continuam sendo "só cumprimento".
+select pg_temp.chegou('+5584999998302', 'agora sim, me explica');
+select is(pg_temp.introducoes('recontato'), 1,
+  'RECONTATO: quem levou dois "Bom dia!" e respondeu recebe a apresentação');
 
 select * from finish();
 rollback;
