@@ -357,6 +357,7 @@ Deno.test('BSUID com telefone: a mensagem sai com os dois', () => {
   const m = so(itens, 'mensagem')[0];
   assertEquals(m.de, '+5584988776655');
   assertEquals(m.de_user_id, 'BR.13491208655302741918');
+  assertEquals(m.nome_do_perfil, 'Marcos');
 });
 
 Deno.test('BSUID SEM telefone: a mensagem NÃO é descartada — segue com de = null', () => {
@@ -414,4 +415,79 @@ Deno.test('recibo com recipient_user_id e sem recipient_id: continua valendo pel
   const r = so(itens, 'recibo')[0];
   assertEquals(r.chave, 'status:wamid.Z:read');
   assertEquals(r.para_user_id, 'BR.999');
+});
+
+// ---- o nome do perfil (28/09/2026) ------------------------------------------
+// A Meta manda `contacts[].profile.name` em toda mensagem recebida, e até esta
+// data o extrator o ignorava: por isso 193 conversas em produção apareciam como
+// "Contato do WhatsApp (11) 5128-5383".
+
+Deno.test('nome do perfil: casa pelo wa_id e vem na mensagem', () => {
+  const { itens } = extrairDaMeta(
+    envelope({
+      metadata: METADADOS,
+      contacts: [{ profile: { name: 'Buffet Sabor do Sol' }, wa_id: '5584988776655' }],
+      messages: [
+        {
+          from: '5584988776655',
+          id: 'wamid.NOME.1',
+          timestamp: '1757030000',
+          type: 'text',
+          text: { body: 'bom dia' },
+        },
+      ],
+    }),
+  );
+  assertEquals(so(itens, 'mensagem')[0].nome_do_perfil, 'Buffet Sabor do Sol');
+});
+
+Deno.test('nome do perfil: casa pelo BSUID quando a Meta omitiu o telefone', () => {
+  const { itens } = extrairDaMeta(
+    envelope({
+      metadata: METADADOS,
+      contacts: [{ profile: { name: 'Marcos Som' }, user_id: 'BR.777' }],
+      messages: [
+        { from_user_id: 'BR.777', id: 'wamid.NOME.2', timestamp: '1757030000', type: 'text', text: { body: 'oi' } },
+      ],
+    }),
+  );
+  assertEquals(so(itens, 'mensagem')[0].nome_do_perfil, 'Marcos Som');
+});
+
+Deno.test('nome do perfil: contato de OUTRA pessoa não empresta o nome', () => {
+  const { itens } = extrairDaMeta(
+    envelope({
+      metadata: METADADOS,
+      contacts: [{ profile: { name: 'Fulano' }, wa_id: '5584900000000' }],
+      messages: [
+        { from: '5584988776655', id: 'wamid.NOME.3', timestamp: '1757030000', type: 'text', text: { body: 'oi' } },
+      ],
+    }),
+  );
+  assertEquals(so(itens, 'mensagem')[0].nome_do_perfil, null);
+});
+
+Deno.test('nome do perfil: em branco vira nulo, e nunca string vazia', () => {
+  const { itens } = extrairDaMeta(
+    envelope({
+      metadata: METADADOS,
+      contacts: [{ profile: { name: '   ' }, wa_id: '5584988776655' }],
+      messages: [
+        { from: '5584988776655', id: 'wamid.NOME.4', timestamp: '1757030000', type: 'text', text: { body: 'oi' } },
+      ],
+    }),
+  );
+  assertEquals(so(itens, 'mensagem')[0].nome_do_perfil, null);
+});
+
+Deno.test('nome do perfil: sem contacts, a mensagem segue sem nome', () => {
+  const { itens } = extrairDaMeta(
+    envelope({
+      metadata: METADADOS,
+      messages: [
+        { from: '5584988776655', id: 'wamid.NOME.5', timestamp: '1757030000', type: 'text', text: { body: 'oi' } },
+      ],
+    }),
+  );
+  assertEquals(so(itens, 'mensagem')[0].nome_do_perfil, null);
 });

@@ -60,6 +60,16 @@ export type ItemDaMeta =
       de: string | null;
       /** O BSUID (`from_user_id`). Nulo em webhook anterior a abril de 2026. */
       de_user_id: string | null;
+      /**
+       * O nome que a pessoa pôs no perfil do WhatsApp, que a Meta manda em
+       * `value.contacts[].profile.name` em TODA mensagem recebida.
+       *
+       * Até 28/09/2026 ele era descartado, e por isso 193 conversas apareciam no
+       * CRM como "Contato do WhatsApp (11) 5128-5383": o nome vinha junto e a
+       * gente jogava fora. É nome PÚBLICO de perfil, escolhido pela própria
+       * pessoa — não é dado que a gente foi buscar em lugar nenhum.
+       */
+      nome_do_perfil: string | null;
       numero_da_empresa: string;
       phone_number_id: string | null;
       tipo_da_mensagem: string;
@@ -208,6 +218,28 @@ function telefoneDoContato(contatos: unknown[], userId: string | null): string |
   return null;
 }
 
+/**
+ * O nome de perfil de quem mandou, segundo `value.contacts[]`.
+ *
+ * A Meta casa o contato pelo `wa_id` (o telefone sem `+`) e, desde 2026, também
+ * pelo `user_id` de quem adotou nome de usuário. Procura pelos dois, nessa
+ * ordem, e NÃO inventa: contato ausente ou perfil sem nome devolve nulo.
+ */
+function nomeDoContato(contatos: unknown[], telefone: string | null, userId: string | null): string | null {
+  for (const bruto of contatos) {
+    const c = objeto(bruto);
+    if (!c) continue;
+    const casaPeloTelefone = telefone !== null && e164(c.wa_id) === telefone;
+    const casaPeloUserId = userId !== null && texto(c.user_id) === userId;
+    if (!casaPeloTelefone && !casaPeloUserId) continue;
+    const nome = texto(objeto(c.profile)?.name);
+    // Nome de perfil vem como a pessoa digitou: corta espaço em volta e recusa
+    // o vazio, para não gravar " " como nome de ninguém.
+    return nome === null ? null : (nome.trim() || null);
+  }
+  return null;
+}
+
 /** Campos de `changes[].field` que este adaptador reconhece como "nossos". */
 const CAMPO_DE_MENSAGENS = 'messages';
 
@@ -313,6 +345,7 @@ export function extrairDaMeta(payload: unknown): Extracao {
           wamid,
           de,
           de_user_id: deUserId,
+          nome_do_perfil: nomeDoContato(lista(valor.contacts), de, deUserId),
           numero_da_empresa: numeroDaEmpresa,
           phone_number_id: phoneNumberId,
           tipo_da_mensagem: c.tipo,

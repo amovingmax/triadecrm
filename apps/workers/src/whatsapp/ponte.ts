@@ -163,6 +163,12 @@ export async function registrarEntrada(
     de: string | null;
     /** O BSUID de quem escreveu (`from_user_id`). */
     deUserId: string | null;
+    /**
+     * O nome do perfil do WhatsApp de quem escreveu, que a Meta manda em toda
+     * entrada. É ele que evita a conversa aparecer como "Contato do WhatsApp
+     * (11) 5128-5383" no CRM.
+     */
+    nomeDoPerfil: string | null;
     tipo: string;
     corpo: string | null;
     mediaId: string | null;
@@ -181,6 +187,7 @@ export async function registrarEntrada(
       p_media_mime: argumentos.mediaMime,
       p_occurred_at: argumentos.ocorridoEm,
       p_peer_user_id: argumentos.deUserId,
+      p_peer_name: argumentos.nomeDoPerfil,
     }),
   );
 }

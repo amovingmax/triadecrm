@@ -250,6 +250,7 @@ async function tratarMensagem(
     numeroDaEmpresa: numero,
     de,
     deUserId,
+    nomeDoPerfil: texto(item.nome_do_perfil),
     tipo: tipoDaMensagem,
     corpo,
     mediaId: texto(item.media_id),

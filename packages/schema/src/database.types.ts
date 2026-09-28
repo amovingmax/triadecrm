@@ -957,6 +957,7 @@ export type Database = {
           p_media_id?: string
           p_media_mime?: string
           p_occurred_at?: string
+          p_peer_nome?: string
           p_peer_phone: string
           p_peer_user_id?: string
           p_type?: Database["app"]["Enums"]["msg_type"]
@@ -2868,6 +2869,7 @@ export type Database = {
           last_message_at: string | null
           last_outbound_at: string | null
           organization_id: string | null
+          peer_nome: string | null
           peer_phone_e164: string
           peer_user_id: string | null
           setor_id: number | null
@@ -2898,6 +2900,7 @@ export type Database = {
           last_message_at?: string | null
           last_outbound_at?: string | null
           organization_id?: string | null
+          peer_nome?: string | null
           peer_phone_e164: string
           peer_user_id?: string | null
           setor_id?: number | null
@@ -2928,6 +2931,7 @@ export type Database = {
           last_message_at?: string | null
           last_outbound_at?: string | null
           organization_id?: string | null
+          peer_nome?: string | null
           peer_phone_e164?: string
           peer_user_id?: string | null
           setor_id?: number | null
@@ -8579,6 +8583,7 @@ export type Database = {
           p_media_id?: string
           p_media_mime?: string
           p_occurred_at?: string
+          p_peer_name?: string
           p_peer_phone: string
           p_peer_user_id?: string
           p_type?: string
