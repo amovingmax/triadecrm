@@ -24,7 +24,12 @@ import { numero } from './formatos';
 import { ConversaForaDaBase, ListaForaDaBase } from './fora-da-base';
 import { conversasForaDaBase } from './fora-da-base-dados';
 import { ListaConversas } from './lista-conversas';
-import { aplicarFiltros, montarConversas, type CatalogosConversas } from './montagem';
+import {
+  aplicarFiltros,
+  filaDeQuemRespondeu,
+  montarConversas,
+  type CatalogosConversas,
+} from './montagem';
 import {
   contarFiltros,
   ESCOPOS,
@@ -134,7 +139,19 @@ export function TelaConversas({
   const fila = useMemo(() => contarFila(paraAprovar), [paraAprovar]);
   const maisUrgente = useMemo(() => tempoDoMaisUrgente(paraAprovar), [paraAprovar]);
 
-  const daAba = aba === 'aprovar' ? paraAprovar : itens;
+  /**
+   * A FILA DE QUEM RESPONDEU (28/09/2026, ADR-16). Como a de aprovação, ela NÃO
+   * passa pelo recorte da lista: é a pergunta "quem está esperando há mais
+   * tempo?", e um filtro de canal esquecido ligado esconderia justamente o
+   * fornecedor que respondeu por outro caminho.
+   *
+   * Limite honesto, e igual ao das outras abas: `todos` é montado no cliente a
+   * partir de leituras com teto (`conversas/dados.ts`), então esta contagem é a
+   * contagem DO QUE FOI CARREGADO, como a de "Aprovar" e a de "Fora da base".
+   */
+  const responderam = useMemo(() => filaDeQuemRespondeu(todos), [todos]);
+
+  const daAba = aba === 'aprovar' ? paraAprovar : aba === 'responderam' ? responderam : itens;
   const foraDaBase = useMemo(() => conversasForaDaBase(consulta.data?.fios ?? []), [consulta.data]);
   const foraAberta =
     aba === 'fora'
@@ -271,6 +288,7 @@ export function TelaConversas({
               aba={aba}
               aoTrocar={setAba}
               naFila={fila.total}
+              esperando={responderam.length}
               foraDaBase={foraDaBase.length}
               comAviso={fila.comAviso}
               maisUrgente={maisUrgente}
@@ -342,6 +360,19 @@ export function TelaConversas({
                 selecionadoId={foraAberta?.id ?? null}
                 aoEscolher={setForaId}
               />
+            ) : aba === 'responderam' ? (
+              responderam.length === 0 ? (
+                <p className="px-4 py-8 text-sm text-muted-foreground">
+                  Ninguém está esperando resposta. Quando um fornecedor escrever, ele aparece
+                  aqui primeiro.
+                </p>
+              ) : (
+                <ListaConversas
+                  itens={responderam}
+                  selecionadoId={aberta?.id ?? null}
+                  aoEscolher={setEscolhidoId}
+                />
+              )
             ) : aba === 'aprovar' ? (
               paraAprovar.length === 0 ? (
                 <FilaVazia temFio={temFio} />
@@ -477,6 +508,7 @@ function Abas({
   aba,
   aoTrocar,
   naFila,
+  esperando,
   foraDaBase,
   comAviso,
   maisUrgente,
@@ -484,6 +516,8 @@ function Abas({
   aba: AbaDaEsquerda;
   aoTrocar: (aba: AbaDaEsquerda) => void;
   naFila: number;
+  /** Quantos escreveram e estão esperando resposta — a contagem do que foi carregado. */
+  esperando: number;
   /** Conversas de números que não são ficha. */
   foraDaBase: number;
   comAviso: number;
@@ -500,6 +534,7 @@ function Abas({
         rolavel
         itens={[
           { id: 'conversas', rotulo: 'Conversas' },
+          { id: 'responderam', rotulo: 'Responderam', contagem: esperando },
           { id: 'aprovar', rotulo: 'Aprovar', contagem: naFila },
           { id: 'fora', rotulo: 'Fora da base', contagem: foraDaBase },
         ]}

@@ -8,6 +8,8 @@ import {
   diasDesde,
   ehInteracao,
   escolherNegocio,
+  esperandoResposta,
+  filaDeQuemRespondeu,
   momentoDaLista,
   montarConversas,
   montarLinhaDoTempo,
@@ -19,7 +21,7 @@ import {
   type OrganizacaoCrua,
 } from './montagem';
 import type { FioCru, MensagemCrua, RascunhoCru } from './mensagens';
-import { FILTROS_VAZIOS } from './tipos';
+import { FILTROS_VAZIOS, type FioDaConversa, type ItemConversa } from './tipos';
 
 /**
  * O que estes testes protegem: a ORDEM da lista e a HONESTIDADE das linhas.
@@ -818,5 +820,99 @@ describe('mensagens seguidas do mesmo autor viram um bloco', () => {
     const ligacao = evento({ id: 'a1', genero: 'atividade', mensagem: null });
     expect(mesmoBloco(a, ligacao)).toBe(false);
     expect(mesmoBloco(ligacao, a)).toBe(false);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// A fila de quem respondeu (28/09/2026, ADR-16)
+// ---------------------------------------------------------------------------
+
+/**
+ * Rafael pediu um "funil de respostas". Ele não é um funil: é a fila de quem
+ * escreveu e está esperando, ordenada por quem espera há MAIS tempo — o
+ * contrário da lista de conversas, que responde "o que aconteceu agora?".
+ */
+function fioDaLista(parcial: Partial<FioDaConversa> = {}): FioDaConversa {
+  return {
+    id: 'f1',
+    organizacaoId: 'o1',
+    canal: 'whatsapp',
+    telefoneParceiro: '+5584999880011',
+    numeroDaEmpresa: '+5584999990000',
+    responsavelId: HELOISA,
+    responsavel: 'Heloísa',
+    setorId: null,
+    estado: 'aguardando_nos',
+    roboPausado: false,
+    naoLidas: 0,
+    ultimaEm: null,
+    ultimaEntradaEm: '2026-09-27T10:00:00Z',
+    janelaExpiraEm: null,
+    intencao: null,
+    confianca: null,
+    resumo: null,
+    ...parcial,
+  };
+}
+
+function itemDaLista(parcial: Partial<ItemConversa> & { id: string }): ItemConversa {
+  return {
+    nome: 'Buffet Aurora',
+    categoria: null,
+    bairro: null,
+    cidade: null,
+    temperatura: 'frio',
+    precisaAtencao: false,
+    telefone: null,
+    telefoneMascarado: false,
+    naoContatar: false,
+    etapa: 'Respondeu',
+    funil: 'Captação de fornecedores',
+    responsavelId: null,
+    responsavel: null,
+    leituraDaIa: null,
+    etiquetas: [],
+    ultimaEm: null,
+    diasSemContato: null,
+    resumo: null,
+    ultimoCanal: null,
+    canais: [],
+    quemFalou: [],
+    interacoes: 0,
+    fio: fioDaLista(),
+    naoLidas: 0,
+    rascunhoPendente: null,
+    ...parcial,
+  };
+}
+
+describe('a fila de quem respondeu', () => {
+  it('traz quem espera há mais tempo primeiro', () => {
+    const a = itemDaLista({ id: 'a', fio: fioDaLista({ ultimaEntradaEm: '2026-09-27T10:00:00Z' }) });
+    const b = itemDaLista({ id: 'b', fio: fioDaLista({ ultimaEntradaEm: '2026-09-25T10:00:00Z' }) });
+    expect(filaDeQuemRespondeu([a, b]).map((i) => i.id)).toEqual(['b', 'a']);
+  });
+
+  it('quem já foi respondido sai da fila', () => {
+    const i = itemDaLista({ id: 'x', fio: fioDaLista({ estado: 'aguardando_parceiro' }) });
+    expect(esperandoResposta(i)).toBe(false);
+    expect(filaDeQuemRespondeu([i])).toHaveLength(0);
+  });
+
+  it('quem pediu para não ser contatado não entra na fila', () => {
+    const i = itemDaLista({ id: 'x', naoContatar: true });
+    expect(filaDeQuemRespondeu([i])).toHaveLength(0);
+  });
+
+  it('ficha sem fio de WhatsApp não entra: não há o que responder', () => {
+    expect(filaDeQuemRespondeu([itemDaLista({ id: 'x', fio: null })])).toHaveLength(0);
+  });
+
+  it('fio sem última entrada não quebra a ordenação', () => {
+    const semData = itemDaLista({ id: 'x', fio: fioDaLista({ ultimaEntradaEm: null }) });
+    const comData = itemDaLista({ id: 'y', fio: fioDaLista({ ultimaEntradaEm: '2026-09-25T10:00:00Z' }) });
+    expect(() => filaDeQuemRespondeu([semData, comData])).not.toThrow();
+    expect(filaDeQuemRespondeu([semData, comData])).toHaveLength(2);
   });
 });

@@ -239,7 +239,21 @@ export const ROTULO_JANELA: Record<JanelaSemContato, string> = {
  * `fora` é a terceira pergunta ("quem escreveu e não é ficha?"): a conversa de um número
  * que não está na base nasce sem organização, e a lista por parceiro não tem onde pô-la.
  */
-export type AbaDaEsquerda = 'conversas' | 'aprovar' | 'fora';
+/**
+ * `responderam` é o "funil de respostas" que o Rafael pediu em 28/09/2026, e
+ * ele NÃO é um funil: é a lista de quem escreveu e está esperando resposta,
+ * ordenada por quem espera há mais tempo. A etapa do funil continua sendo a
+ * `respondeu`, que `app.wa_resposta_no_funil` já carimba sozinha na primeira
+ * resposta. Uma fila e uma etapa respondem perguntas diferentes: "quem eu
+ * atendo agora?" e "onde este negócio está?".
+ */
+export type AbaDaEsquerda = 'conversas' | 'responderam' | 'aprovar' | 'fora';
+
+const ABAS: readonly AbaDaEsquerda[] = ['conversas', 'responderam', 'aprovar', 'fora'];
+
+export function ehAbaDaEsquerda(v: string): v is AbaDaEsquerda {
+  return (ABAS as readonly string[]).includes(v);
+}
 
 export type FiltrosConversas = {
   /** Texto livre sobre o nome, a categoria e o bairro do parceiro. */
@@ -340,7 +354,7 @@ export function estadoDaUrl(params: Record<string, string | string[] | undefined
       janela: ehJanela(janela) ? janela : 'qualquer',
     },
     organizacaoId: texto('org') || null,
-    aba: texto('aba') === 'aprovar' ? 'aprovar' : texto('aba') === 'fora' ? 'fora' : 'conversas',
+    aba: ehAbaDaEsquerda(texto('aba')) ? texto('aba') as AbaDaEsquerda : 'conversas',
   };
 }
 

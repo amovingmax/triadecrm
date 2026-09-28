@@ -377,6 +377,38 @@ export function ordenarConversas(itens: ItemConversa[]): ItemConversa[] {
 }
 
 // ---------------------------------------------------------------------------
+// A fila de quem respondeu (28/09/2026, ADR-16)
+// ---------------------------------------------------------------------------
+
+/**
+ * `conversations.status = 'aguardando_nos'` JÁ É a fila: `app.messages_after_write`
+ * e `app.wa_resposta_no_funil` a alimentam a cada entrada do lead. O que faltava
+ * era a tela. Isto aqui é só o recorte, puro e testável.
+ *
+ * Quem pediu para não ser contatado fica de fora mesmo esperando: a resposta a
+ * ele não é uma mensagem, é parar (RF-CON-19).
+ */
+export function esperandoResposta(item: ItemConversa): boolean {
+  if (item.fio === null) return false;
+  if (item.naoContatar) return false;
+  return item.fio.estado === 'aguardando_nos';
+}
+
+/**
+ * Quem espera há mais tempo primeiro — o contrário da lista normal, e de
+ * propósito: a lista de conversas responde "o que aconteceu agora?", e esta
+ * responde "quem está esperando há mais tempo?". Ordenar as duas igual faria a
+ * segunda ser uma cópia da primeira.
+ */
+export function filaDeQuemRespondeu(itens: ItemConversa[]): ItemConversa[] {
+  return itens
+    .filter(esperandoResposta)
+    .sort((a, b) =>
+      (a.fio?.ultimaEntradaEm ?? '').localeCompare(b.fio?.ultimaEntradaEm ?? ''),
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Os filtros
 // ---------------------------------------------------------------------------
 
