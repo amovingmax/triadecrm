@@ -171,6 +171,17 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
+      conversas_esperando_gente: {
+        Args: { p_de_quem?: string }
+        Returns: {
+          conversation_id: string
+          de_quem: string
+          deal_id: string
+          desde: string
+          janela_expira_em: string
+          organization_id: string
+        }[]
+      }
       corpo_fixo_de_optout: { Args: { p_body: string }; Returns: string }
       cpf_is_valid: { Args: { c: string }; Returns: boolean }
       data_pt: { Args: { p_data: string }; Returns: string }
@@ -915,6 +926,7 @@ export type Database = {
         Returns: Json
       }
       wa_introduzir: { Args: { p_message_id: string }; Returns: Json }
+      wa_modelo_ausencia: { Args: never; Returns: number }
       wa_modelo_da_meta: { Args: { p_template_id: number }; Returns: Json }
       wa_modelo_humano: { Args: never; Returns: number }
       wa_modelo_introducao: { Args: never; Returns: number }
