@@ -854,6 +854,7 @@ export type Database = {
         }
         Returns: string
       }
+      wa_atraso_do_envio: { Args: { p_message_id: string }; Returns: number }
       wa_avancar_negocio: {
         Args: { p_de: string[]; p_deal_id: string; p_para: string }
         Returns: boolean
