@@ -3650,6 +3650,111 @@ construído — conferido: não há migração `20260929*`, nem `app.wa_quem_res
 nem `public.intencoes`, nem `app.texto_automatico_valido`), e o **ADR-05 volta a
 valer inteiro**: nada que a IA escreva sai sem gente.
 
+### O que foi entregue
+
+**A emenda (só documento).** `docs/superpowers/specs/2026-09-24-…-design.md` ganha a
+**Emenda de 28/09/2026**: ADR-14 abandonado com a frase dele, ADR-05 restaurado
+por inteiro, **ADR-16** ("a IA abre, e só abre"), RF-CON-12 alterado (a
+introdução **não leva nome** e **passa de 80 palavras** — as duas diferenças
+estão escritas, não escondidas), RF-CON-26 alterado (a frase automática de
+transparência está revogada; a saída para humano fica), §5.6 alterada (a etapa
+vira o que a tela mostra) e o limite do filtro de canal. O PRD ganha três marcas
+`> **ALTERADO em 28/09/2026**` nas linhas do RF-CON-12, do RF-CON-26 e da §5.6 —
+o CLAUDE.md manda avisar quando PRD e código divergem, e a emenda é o aviso.
+
+**A introdução automática** (`20261002090000`). A campanha manda o cumprimento;
+se o lead responder qualquer coisa, UMA segunda mensagem sai sozinha, dentro da
+janela de 24 h, em texto fixo (`GEN-SYS-INTRO`) e **sem nome**. Sem nome é
+ESTRUTURAL, não disciplina: `app.wa_bot_dizer` insere `bot_fixed` com
+`template_id` e `app.messages_nome_do_atendente` pula exatamente essas duas
+condições. O `app.messages_guard` **não foi tocado**.
+
+As recusas são nomeadas, uma a uma: `desligada`, `sem_modelo`,
+`nao_e_texto_de_entrada`, `bot_pausado`, `parece_optout`, `contato_suprimido`,
+`fora_do_horario`, `a_conversa_ja_tem_dono`, `ja_respondida`, `ja_introduzida`,
+`modelo_sumiu`.
+
+O gatilho é `messages_s_introducao`, e o `s` é escolhido: depois de
+`after_write` (a janela precisa estar aberta — quem escreve `last_inbound_at` é
+ele, e quem deriva `window_expires_at` é `app.conversations_before_write`, no
+UPDATE que ele provoca), depois dos três que podem responder (freio, menu,
+botão), antes de `x_ausencia` e `zz_lead_automatico`.
+
+**Três coisas que o plano errava e o código corrigiu:**
+
+1. `count(*) = 1` mataria a introdução no **recontato**. A campanha de recontato
+   existe: quem levou "Bom dia!" em duas levas tem DUAS saídas, as duas
+   cumprimentos, e é justamente ele que merece a apresentação quando enfim
+   responde. A pergunta virou `count(*) >= 1 and bool_and(...)`.
+2. `app.wa_so_o_cumprimento_saiu` é **STABLE**, e função STABLE enxerga o
+   snapshot do INÍCIO da instrução. Montar a fixture dentro do mesmo
+   `select ok(...)` deixava a pergunta olhando para um banco sem as linhas —
+   vermelho por artefato, não por defeito. As conversas do teste nascem cada uma
+   na sua instrução.
+3. A segunda entrada do lead é recusada com **`a_conversa_ja_tem_dono`**, e não
+   `ja_introduzida`: a regra (1) vem antes da (3), e a própria introdução já é
+   uma saída que não é cumprimento. O carimbo `introducao_em` continua existindo
+   porque resolve OUTRA coisa — duas entradas ao mesmo tempo, em transações que
+   não se enxergam.
+
+**Fora do horário a introdução se cala, e isso foi decisão minha, não dele.**
+`app.ausencia_responder` se cala diante de QUALQUER saída com
+`created_at >= m.created_at`: se a introdução saísse às 22h40 de domingo, ela
+não conviveria com a ausência — ela a CANCELARIA, e o lead ficaria com uma
+oferta comercial e nenhum aviso de que ninguém responde até segunda. Está no
+teste 83, com a ausência falando sozinha.
+
+**O gestor liga, desliga e reescreve pela tela.** `public.atendimento_configurar`
+aprende `introducao_ativa` e `texto_introducao`, e **recusa variável**
+(`introducao_com_variavel`): `app.wa_bot_dizer` copia o corpo CRU, e um `{{nome}}`
+sairia literal no fio do fornecedor. A recusa do banco deixou de virar sempre a
+mesma frase genérica na tela.
+
+**A frase de transparência sai de uso** (`20261002100000`), espelhada no
+`seed.sql` DEPOIS do bloco 10 — o upsert de lá faz
+`do update set … is_active = excluded.is_active` e a reativaria a cada
+`db reset`. Nada é apagado. Ficam `GEN-SYS-E-ROBO` (a resposta honesta a quem
+PERGUNTA, escolhida por gente), `GEN-SYS-HUMANO` (a despedida do freio) e os
+rótulos INTERNOS que só o time vê.
+
+**A etapa vira a verdade.** `app.deal_cards` passa a carregar `stage_name`,
+`stage_position` e `last_channel`; nasce `funis/etapa.tsx` com `EtiquetaEtapa` e
+`BarraEtapa`. A temperatura sai das **quatro** telas de trabalho: cartão do
+funil (barra neutra, com o denominador vindo do FUNIL — fornecedor 9, ativação
+6, produtor 11, conferido na seed), lista de parceiros (a coluna "Etapa" herda o
+lugar da "Temperatura", que era a única visível em toda largura), lista de
+conversas e Meu dia. `SemaforoTermico` foi apagado no mesmo gesto: sem
+consumidor, ele seria código morto que o lint não pega porque está exportado.
+A ordenação interna de `public.meu_dia` continua lendo `temperature`, e não foi
+tocada.
+
+**O canal é atributo do toque** (`20261002110000` e `…120000`).
+`deals.last_channel`, mantida pelo mesmo gatilho que mantém `last_activity_at`,
+com backfill de uma varredura. `public.pipeline_board` ganha `p_canal` — e a
+assinatura antiga é **DERRUBADA** antes: `create or replace` com um parâmetro a
+mais criaria uma SEGUNDA função, e a chamada por nome de argumento da tela faria
+o PostgREST devolver *function is not unique*. O quadro pararia de abrir, e não
+no filtro: na primeira abertura. O teste 11 passou a exigir que exista **uma
+só**.
+
+**A aba "Responderam"** na caixa de entrada.
+`conversations.status = 'aguardando_nos'` já era a fila; faltava a tela. Ordena
+por quem espera há MAIS tempo — o contrário da lista de conversas, e de
+propósito.
+
+### Os números
+
+| | antes | depois |
+|---|---|---|
+| pgTAP | 3.101 asserções em 76 arquivos | **3.133 em 79** (`83_`, `84_`, `85_`) |
+| web | 856 testes | **873** |
+| workers | 363 | 363 |
+| prompts / schema | 284 / 105 | 284 / 105 |
+
+`pnpm db:reset && pnpm db:lint && pnpm db:test && pnpm db:types` e
+`pnpm lint && pnpm typecheck && pnpm test` verdes, com `git status` limpo em
+`supabase/seed.sql` e em `packages/schema/src/database.types.ts` depois do reset.
+
 ### As telas que AINDA mostram temperatura, e por quê
 
 A varredura de hoje
@@ -3672,3 +3777,51 @@ histórica de que ele existiu.)
 
 **Pergunta ao Rafael:** a temperatura deve sair também da agenda, da rota, do
 lote de ligação e do registro, ou ela fica onde não é lista de trabalho?
+
+### O que continua pendente
+
+- A **regra de banco** não foi tocada: `stages.temperature` continua alimentando
+  `app.compute_temperature`, e a temperatura continua sendo calculada e gravada.
+  Só parou de aparecer nas quatro telas de trabalho.
+- `GEN-SYS-FORA-HORARIO` continua ativa e continua prometendo a palavra HUMANO.
+  Não foi tocada de propósito: é a única mensagem do catálogo que ainda ensina a
+  saída que a Meta exige, e desativá-la de carona apagaria justamente isso.
+- O rótulo INTERNO "Texto fixo do robô" (`conversas/mensagem-do-fio.tsx`) **não
+  foi mexido**: sem a resposta do Rafael, o time precisa continuar sabendo o que
+  o CRM mandou sozinho.
+- A tag de temperatura do DESFECHO (`ultimo-contato.ts`), que pinta a última
+  interação na lista de parceiros, é outro sistema e continua onde estava.
+
+### O que precisa de decisão humana, nesta ordem
+
+1. **Qual tag o Rafael viu?** Conferido hoje: `GEN-SYS-TRANSPARENCIA` **nunca foi
+   enviada por caminho de código nenhum desde o D1** — nenhuma função do banco a
+   nomeia, e o teste `84_` agora guarda isso. Então ela **não pode** ser o que ele
+   viu no protótipo. O que existe hoje na tela é o rótulo **interno** "Texto fixo
+   do robô", com ícone de robô, que o time vê na caixa de entrada e o fornecedor
+   não. Desativei a frase — reversível num clique em Ajustes → Catálogos →
+   Modelos — e **não** mexi no rótulo. Ele quer (a) só a frase, (b) só o rótulo,
+   ou (c) os dois?
+2. **A introdução fora do horário.** Está desligada fora do expediente, e essa
+   foi **minha** decisão, não a dele: se ela saísse, cancelaria a mensagem de
+   ausência e o lead de domingo à noite receberia uma oferta sem ninguém para
+   continuar. Se ele quiser resposta imediata sempre, é uma linha — e aí a
+   ausência precisa ser reescrita para conviver.
+3. **O TEXTO da introdução precisa dele.** Ele passa de 80 palavras e não leva
+   nome, e as duas coisas contrariam a letra do RF-CON-12 (a emenda registra as
+   duas). O texto está editável em Ajustes → Atendimento, sem deploy. **Nada
+   disso vai ao ar antes de ele escrever ou aprovar essa mensagem.**
+4. **A palavra HUMANO** é prometida por texto e não é tratada por código nenhum.
+   Quem ia criá-la era a Fase 4, cancelada hoje. `app.wa_pediu_humano` (espelho
+   de `app.wa_parece_optout`) é decisão dele.
+5. **`GEN-SYS-MENU-1`, a resposta rápida `custo` e `GEN-OBJ-TAXA-INFO` dizem "não
+   tem mensalidade"**, que `base-conhecimento.ts` registra como **falso** desde
+   08/09 (existe taxa mensal do escrow, em revisão). A introdução nova já evita a
+   frase; esses três não.
+6. **A temperatura deve sair também** da agenda, da rota, do lote de ligação e do
+   registro, ou fica onde não é lista de trabalho?
+7. **O filtro de canal é "último toque", não "origem".** A primeira resposta no
+   WhatsApp reescreve o canal de quem foi tocado por telefone. Se ele quiser "por
+   onde entrou", é outra coluna e outra rodada.
+
+**Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
