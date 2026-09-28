@@ -30,6 +30,10 @@ type Config = {
   ausencia_ativa?: boolean;
   /** A introdução automática (ADR-16, 28/09/2026). */
   introducao_ativa?: boolean;
+  /** O cumprimento automático para quem é aprovado no Radar do Google Maps (28/09/2026). */
+  cumprimento_automatico?: boolean;
+  /** Quantos cumprimentos por hora o lote da casa tenta. O teto do dia manda acima disto. */
+  cumprimento_por_hora?: number;
 };
 type Resposta = { id: number; atalho: string; titulo: string; texto: string; ativo: boolean };
 type Etiqueta = { id: number; name: string; color: string | null };
@@ -157,9 +161,31 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
             aoSalvar={(t) => mudar.mutate({ texto_ausencia: t })}
           />
         ) : null}
-        {/* A introdução (ADR-16, 28/09/2026). O interruptor vem por último
-            porque ele é o único que faz o CRM falar sozinho DENTRO do horário —
-            os outros três só organizam o que chega. */}
+        {/* O CUMPRIMENTO AUTOMÁTICO (28/09/2026). Este e o de baixo são os dois
+            que fazem o CRM ABRIR conversa sozinho, e por isso vêm no fim e na
+            ordem em que acontecem: primeiro o "Bom dia!", depois a apresentação
+            para quem responder. Os outros três só organizam o que chega.
+
+            Este é o único da tela que fala com quem NUNCA falou com a gente. O
+            texto embaixo diz isso com todas as letras porque ligar um botão que
+            manda WhatsApp para desconhecido não pode parecer ligar uma luz. */}
+        <Interruptor
+          id="cumprimento-automatico"
+          titulo="Mandar o cumprimento a quem eu aprovar no Google Maps"
+          descricao="Aprovou no Radar → o CRM manda “Bom dia!”, “Boa tarde!” ou “Boa noite!” sozinho, sem assinatura de ninguém. Só dentro do horário, nunca domingo nem feriado, respeitando o teto do dia. Quem responder recebe a apresentação logo em seguida."
+          ligado={config.cumprimento_automatico ?? false}
+          podeEditar={podeEditar}
+          aoMudar={(v) => mudar.mutate({ cumprimento_automatico: v })}
+        />
+        {config.cumprimento_automatico ? (
+          <Ritmo
+            valor={config.cumprimento_por_hora ?? 6}
+            podeEditar={podeEditar}
+            aoMudar={(n) => mudar.mutate({ cumprimento_por_hora: String(n) })}
+          />
+        ) : null}
+
+        {/* A introdução (ADR-16, 28/09/2026). */}
         <Interruptor
           id="introducao"
           titulo="Apresentar a Komune quando o lead responder o cumprimento"
@@ -229,6 +255,52 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * O ritmo do cumprimento automático — o freio de quem acabou de ligar isto.
+ *
+ * Não é o teto: o teto do dia é do banco (`app.wa_teto_da_meta`) e manda acima
+ * de qualquer número daqui. Este é só a VELOCIDADE dentro do dia, e existe
+ * porque despejar quarenta cumprimentos às 8h01 é o que derruba a nota de um
+ * número novo. Quem muda aqui muda também o lote que já está rodando.
+ */
+function Ritmo({
+  valor,
+  podeEditar,
+  aoMudar,
+}: {
+  valor: number;
+  podeEditar: boolean;
+  aoMudar: (n: number) => void;
+}) {
+  const OPCOES = [
+    { n: 2, rotulo: 'Devagar — 2 por hora' },
+    { n: 6, rotulo: 'Normal — 6 por hora' },
+    { n: 12, rotulo: 'Rápido — 12 por hora' },
+    { n: 20, rotulo: 'Muito rápido — 20 por hora' },
+  ];
+  return (
+    <label className="flex flex-wrap items-center gap-2 pl-1 text-sm">
+      <span className="text-muted-foreground">Ritmo:</span>
+      <select
+        value={valor}
+        disabled={!podeEditar}
+        onChange={(e) => aoMudar(Number(e.target.value))}
+        className="h-9 rounded-md border border-hairline bg-background px-2 text-sm disabled:opacity-60"
+      >
+        {OPCOES.map((o) => (
+          <option key={o.n} value={o.n}>
+            {o.rotulo}
+          </option>
+        ))}
+        {OPCOES.every((o) => o.n !== valor) ? <option value={valor}>{valor} por hora</option> : null}
+      </select>
+      <span className="text-xs text-muted-foreground">
+        O teto do dia manda acima disto — isto só espalha os envios pelo dia.
+      </span>
+    </label>
   );
 }
 

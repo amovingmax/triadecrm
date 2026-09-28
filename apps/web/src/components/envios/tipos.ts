@@ -122,7 +122,13 @@ export type RegraDaVariavel =
   | { fixo: string };
 
 export type TipoDoEnvio = 'modelo' | 'texto';
-export type Assinatura = 'marca' | 'eu' | 'responsavel' | 'revezar';
+/**
+ * Quem assina cada mensagem do lote. `komune` é o lote DA CASA (28/09/2026): o
+ * cumprimento automático do Google Maps não tem assinante nenhum — sai como
+ * robô, com `sent_by` nulo. Não se escolhe na tela de criar envio; quem o cria
+ * é o banco, quando o gestor liga o cumprimento automático em Ajustes.
+ */
+export type Assinatura = 'marca' | 'eu' | 'responsavel' | 'revezar' | 'komune';
 
 /** O que acontece quando alguém toca num botão de resposta. */
 export type AcaoDoBotao =
@@ -193,7 +199,7 @@ export const envioSchema = z.object({
   criado_por: z.string().nullable(),
   modelo: z.string().nullable(),
   contagem: contagemSchema,
-  assinatura: z.enum(['marca', 'eu', 'responsavel', 'revezar']).optional().catch(undefined),
+  assinatura: z.enum(['marca', 'eu', 'responsavel', 'revezar', 'komune']).optional().catch(undefined),
 });
 export type Envio = z.infer<typeof envioSchema>;
 

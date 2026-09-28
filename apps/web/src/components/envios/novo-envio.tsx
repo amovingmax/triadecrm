@@ -102,6 +102,10 @@ const ROTULO_DA_ASSINATURA: Record<Assinatura, string> = {
   eu: 'assinada por você',
   responsavel: 'assinada pelo responsável',
   revezar: 'dividida entre atendentes',
+  // Não aparece no formulário de criar envio (o lote da casa é criado pelo
+  // banco), mas o mapa é total: sem esta linha o rótulo viria vazio no dia em
+  // que alguém reusar este objeto para mostrar um lote existente.
+  komune: 'sem assinatura, em nome da Komune',
 };
 
 function temAtendente(corpo: string): boolean {

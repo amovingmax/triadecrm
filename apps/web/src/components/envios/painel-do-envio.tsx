@@ -105,7 +105,10 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
               ) : null}
             </div>
 
-            <Itens itens={detalhe.data?.itens ?? []} daMarca={envio.assinatura === 'marca'} />
+            <Itens
+              itens={detalhe.data?.itens ?? []}
+              daMarca={envio.assinatura === 'marca' || envio.assinatura === 'komune'}
+            />
           </div>
         ) : null}
       </SheetContent>

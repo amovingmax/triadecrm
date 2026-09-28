@@ -4323,3 +4323,60 @@ faltava era o caminho: a frase que já explicava onde ele mora agora é link.
 - Decisão humana: `inbox.responsavel_padrao` continua nulo (o fallback é o admin
   ativo mais antigo); `agenda.reunioes.sala_padrao` também, então `reuniao_marcar`
   ainda recusa com `sem_sala`.
+
+### 28/09/2026 — o "Bom dia!" sai sozinho para quem foi aprovado no Google Maps
+
+Rafael, depois de eu explicar errado como o fluxo funcionava: *"vc n entendeu,
+todo mundo que for aprovado do scrapper do google maps, é para ser enviado o bom
+dia automaticamente, ou boa tarde...e etc, se a pessoa responder o bom dia, ai a
+IA novamente após ja ter mandado o bom dia, responde com a introdução, se a
+introdução obtiver resposta, ai continua com humano"*.
+
+Dos três elos, dois já existiam (introdução em `20261002090000`, fila de quem
+respondeu em `20261002180000`). Faltava o primeiro: aprovar no Radar e o
+cumprimento sair sem ninguém clicar em Envios.
+
+**Não nasceu máquina nova.** O disparo em lote já tem ritmo por hora com
+intervalo sorteado, espera quando bate no teto ou fecha a janela, cortesia de
+72 h, parada automática em 3+ pedidos de saída acima de 2% (RF-CON-10) e a
+porteira conferindo supressão, horário, domingo, feriado e teto do dia.
+Duplicar qualquer uma dessas regras seria criar uma segunda verdade. O lote
+ganhou duas coisas e nada mais:
+
+- **`assinatura = 'komune'`** — o lote sem crachá. Rafael: *"n sai do cracha de
+  ninguem, sai no da komune sem id"*. A mensagem sai `author_kind = 'bot_fixed'`
+  com `sent_by` nulo, como a introdução já fazia. Não é contabilidade: ninguém
+  clicou, então atribuí-la a uma pessoa seria mentira, e a conversa cairia no
+  "Meu dia" de quem não decidiu nada sobre ela. (A conversa continua tendo dono,
+  que RF-CON-04 exige — dono da conversa e autor da mensagem são coisas
+  diferentes.)
+- **`continuo`** — o lote que não acaba. O comum congela a lista e se conclui
+  quando ela termina; este espera quem for aprovado depois.
+
+O gatilho é o **nascimento da ficha com origem `google_maps_raspado`**, que é o
+instante da aprovação: candidato reprovado não vira ficha. Planilha e cadastro à
+mão ficam de fora, por decisão do Rafael hoje.
+
+**Sai desligado** (`atendimento.cumprimento_automatico = false`), com
+interruptor e ritmo em Ajustes → Atendimento. Isto manda WhatsApp para gente que
+nunca falou com a gente: quem liga é uma pessoa, olhando.
+
+Uma coisa que o banco recusou, e com razão: o teste tentou abrir a janela de
+horário de 0h às 24h para não depender do relógio, e o CHECK
+`channel_windows_teto_legal` barrou (R06 §3.4 — seg–sex 8h–19h, sáb 9h–13h,
+domingo nunca). O teste passou a abrir a janela do jeito real, com uma mensagem
+recebida; em troca, ele não afirma nada sobre `is_first_contact` (essa regra é
+do arquivo 70).
+
+- Migração: `20261002200000_o_bom_dia_sai_sozinho.sql`.
+- pgTAP: `92_o_bom_dia_sai_sozinho.sql`, 20 asserções (desligado não enfileira,
+  ligado enfileira, só Google Maps, `do_not_contact` fora, mensagem sem crachá,
+  modelo com variável recusado, contínuo espera e comum conclui, um contínuo só,
+  e o interruptor chegando mesmo na chave).
+- Web: interruptor e ritmo em `painel-atendimento.tsx`; `envios/` aprendeu a
+  assinatura `komune`.
+- Verificado: pgTAP 3.226, `db lint` sem apontamento novo, lint, typecheck e
+  testes verdes (web 902, workers 363, prompts 284, schema 105).
+- Pendente: ninguém ligou a chave ainda — o fluxo só roda de ponta a ponta
+  depois disso.
+- Decisão humana: com que ritmo começar (o padrão é 6/h) e em que dia ligar.
