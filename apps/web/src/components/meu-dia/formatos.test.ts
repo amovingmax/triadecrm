@@ -30,6 +30,7 @@ function item(parcial: Partial<ItemDoDia>): ItemDoDia {
     temperatura: 'morno',
     funil: null,
     etapa: null,
+    atendente: null,
     ...parcial,
   };
 }

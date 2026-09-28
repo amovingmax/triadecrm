@@ -36,6 +36,7 @@ function item(parcial: Partial<ItemDoDia>): ItemDoDia {
     temperatura: 'quente',
     funil: 'Captação de fornecedor',
     etapa: 'Em conversa',
+    atendente: null,
     ...parcial,
   };
 }
@@ -180,6 +181,7 @@ describe('avisos do sistema não são tarefa de carteira', () => {
     categoria: null,
     temperatura: null,
     funil: null,
+    atendente: null,
     ...parcial,
   });
 

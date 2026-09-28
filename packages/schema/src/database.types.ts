@@ -8033,6 +8033,7 @@ export type Database = {
         Args: { p_limite?: number; p_user_id?: string }
         Returns: {
           activity_id: string
+          atendente: string
           atraso_horas: number
           bairro: string
           categoria: string

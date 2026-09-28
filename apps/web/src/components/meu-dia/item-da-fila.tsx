@@ -93,6 +93,16 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
               dado que decide. Continua saindo quando o motivo já a nomeou —
               repetir "Prospectado" duas vezes na mesma linha só gasta a largura
               que o nome precisa. */}
+          {/* A QUEM A CONVERSA APONTA (28/09/2026, ADR-17). A fila de quem
+              respondeu deixou de ser filtrada por dono, então a linha pode ser
+              de outra pessoa — e esconder isso seria mentir por omissão. O banco
+              só manda o nome quando ele ACRESCENTA: na minha própria fila a
+              coluna vem nula, porque "endereçada a mim" em toda linha é um
+              rótulo que a pessoa aprende a não ler. Não é um aviso para parar:
+              quem responde primeiro tira a conversa da fila de todos. */}
+          {item.atendente ? (
+            <span className="truncate">Endereçada a {item.atendente}</span>
+          ) : null}
           {item.etapa && !motivoNomeiaEtapa ? <EtiquetaEtapa etapa={item.etapa} /> : null}
           {local ? <span className="truncate">{local}</span> : null}
           {item.categoria ? <span className="truncate">{item.categoria}</span> : null}

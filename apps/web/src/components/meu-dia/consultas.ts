@@ -15,7 +15,7 @@ import { ehTipoConhecido, type ItemDoDia, type MetricaDoDia, type TipoDeItem } f
 export const LIMITE_DA_FILA = 60;
 
 /** Uma linha crua de `public.meu_dia`. O tipo gerado declara tudo não-nulo; não é. */
-type LinhaDaFila = {
+export type LinhaDaFila = {
   prioridade: number | null;
   tipo: string | null;
   motivo: string | null;
@@ -32,6 +32,8 @@ type LinhaDaFila = {
   temperatura: string | null;
   funil: string | null;
   etapa: string | null;
+  /** Opcional no tipo cru de propósito: uma RPC velha em cache não a devolve. */
+  atendente?: string | null;
 };
 
 type LinhaDeMetrica = {
@@ -53,13 +55,16 @@ function numero(valor: number | string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function buscarFilaDoDia(): Promise<ItemDoDia[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc('meu_dia', { p_limite: LIMITE_DA_FILA });
-  if (error) throw new ErroDoDia(error.message, error.code);
-
-  const linhas = (data ?? []) as unknown as LinhaDaFila[];
-  return linhas.map((linha) => ({
+/**
+ * A fronteira, numa função pura e exportada: é AQUI que a mentira do tipo gerado
+ * (tudo não-nulo) vira campo honestamente opcional, e é aqui que uma coluna nova
+ * pode faltar. `atendente` chegou em 28/09/2026 (ADR-17), e uma aba aberta desde
+ * antes do deploy chama a RPC antiga — a linha volta sem o campo, e `?? null` é
+ * o que impede isso de virar `undefined` na tela. Separada de `buscarFilaDoDia`
+ * para poder ser medida sem inventar um cliente do Supabase.
+ */
+export function itemDaLinha(linha: LinhaDaFila): ItemDoDia {
+  return {
     prioridade: linha.prioridade ?? 9,
     tipo: tipoDaLinha(linha.tipo),
     motivo: linha.motivo ?? 'Sem motivo registrado',
@@ -76,7 +81,17 @@ export async function buscarFilaDoDia(): Promise<ItemDoDia[]> {
     temperatura: linha.temperatura as ItemDoDia['temperatura'],
     funil: linha.funil,
     etapa: linha.etapa,
-  }));
+    atendente: linha.atendente ?? null,
+  };
+}
+
+export async function buscarFilaDoDia(): Promise<ItemDoDia[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('meu_dia', { p_limite: LIMITE_DA_FILA });
+  if (error) throw new ErroDoDia(error.message, error.code);
+
+  const linhas = (data ?? []) as unknown as LinhaDaFila[];
+  return linhas.map(itemDaLinha);
 }
 
 function tipoDaLinha(valor: string | null): TipoDeItem {

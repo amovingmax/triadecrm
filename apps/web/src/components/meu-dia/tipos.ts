@@ -35,6 +35,14 @@ export type ItemDoDia = {
   temperatura: Temperatura | null;
   funil: string | null;
   etapa: string | null;
+  /**
+   * O primeiro nome de quem a conversa aponta, e `null` quando ela já é minha
+   * (28/09/2026, ADR-17). Só o item `conversa_esperando` o preenche: a fila de
+   * quem respondeu deixou de ser filtrada por dono, então a linha precisa dizer
+   * a quem ela está endereçada. Nulo em toda outra linha, porque lá a pergunta
+   * não existe — tarefa e negócio da minha fila já são meus por definição.
+   */
+  atendente: string | null;
 };
 
 /**

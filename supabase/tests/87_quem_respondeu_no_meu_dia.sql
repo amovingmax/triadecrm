@@ -336,11 +336,19 @@ select ok((select min(ord) from ordenada where tipo = 'reuniao_proxima')
   'a reunião em 2 h vem depois: o relógio dela é nosso e o da conversa é de outra pessoa');
 select pg_temp.sair();
 
--- 22 · não é fila de todo mundo
+-- 22 · REVIRADA em 28/09/2026 (ADR-17, migração 20261002180000). Ela dizia
+-- "não é fila de todo mundo", e a premissa caiu com o pedido do Rafael: com
+-- operadores reduzidos que nem logam, o item preso a um nome é um item
+-- invisível. Fica aqui a troca de verdade, e não o apagamento dela — quem ler
+-- este arquivo daqui a um ano precisa saber que a fila JÁ foi por dono.
+--
+-- O que evita duas pessoas na mesma conversa deixou de ser o recorte por dono:
+-- é a conversa sair da fila de TODOS assim que alguém responde (asserção 6 do
+-- teste 90). Sem lock, sem reserva.
 select pg_temp.entrar(pg_temp.gestor(), 'gestor');
-select is((select count(*)::int from public.meu_dia(pg_temp.gestor(), 300)
-            where tipo = 'conversa_esperando'), 0,
-  'o item NÃO aparece na fila de quem não atende a conversa: cinco pessoas na mesma conversa é a caixa compartilhada que assignee_id resolveu');
+select ok((select count(*)::int from public.meu_dia(pg_temp.gestor(), 300)
+            where tipo = 'conversa_esperando') > 0,
+  'o item aparece para quem PODE atender, ainda que a conversa aponte para outra pessoa — e a coluna atendente diz para quem ela aponta');
 select pg_temp.sair();
 
 -- 24 e 25 · o teto de 15, e o que ele protege
