@@ -848,6 +848,7 @@ function fioDaLista(parcial: Partial<FioDaConversa> = {}): FioDaConversa {
     naoLidas: 0,
     ultimaEm: null,
     ultimaEntradaEm: '2026-09-27T10:00:00Z',
+    ultimaSaidaEm: null,
     janelaExpiraEm: null,
     intencao: null,
     confianca: null,
@@ -894,10 +895,48 @@ describe('a fila de quem respondeu', () => {
     expect(filaDeQuemRespondeu([a, b]).map((i) => i.id)).toEqual(['b', 'a']);
   });
 
-  it('quem já foi respondido sai da fila', () => {
-    const i = itemDaLista({ id: 'x', fio: fioDaLista({ estado: 'aguardando_parceiro' }) });
+  it('a conversa de campanha entra mesmo com o status parado em aguardando_parceiro', () => {
+    // O defeito que esvaziava esta aba: `conversations.status` não é mantido, e a
+    // conversa que a campanha abriu continua 'aguardando_parceiro' depois que o
+    // lead responde. Quem responde a pergunta são os carimbos.
+    const i = itemDaLista({
+      id: 'x',
+      fio: fioDaLista({
+        estado: 'aguardando_parceiro',
+        ultimaSaidaEm: '2026-09-27T08:00:00Z',
+        ultimaEntradaEm: '2026-09-27T10:00:00Z',
+      }),
+    });
+    expect(esperandoResposta(i)).toBe(true);
+  });
+
+  it('quem já foi respondido sai da fila, mesmo com o status parado', () => {
+    const i = itemDaLista({
+      id: 'x',
+      fio: fioDaLista({
+        estado: 'aguardando_nos',
+        ultimaEntradaEm: '2026-09-27T10:00:00Z',
+        ultimaSaidaEm: '2026-09-27T11:00:00Z',
+      }),
+    });
     expect(esperandoResposta(i)).toBe(false);
     expect(filaDeQuemRespondeu([i])).toHaveLength(0);
+  });
+
+  it('empate quer dizer respondido: é a introdução, que nasce junto com a entrada', () => {
+    const i = itemDaLista({
+      id: 'x',
+      fio: fioDaLista({
+        ultimaEntradaEm: '2026-09-27T10:00:00Z',
+        ultimaSaidaEm: '2026-09-27T10:00:00Z',
+      }),
+    });
+    expect(esperandoResposta(i)).toBe(false);
+  });
+
+  it('conversa dada por resolvida não espera ninguém', () => {
+    const i = itemDaLista({ id: 'x', fio: fioDaLista({ estado: 'resolvida' }) });
+    expect(esperandoResposta(i)).toBe(false);
   });
 
   it('quem pediu para não ser contatado não entra na fila', () => {
@@ -909,10 +948,10 @@ describe('a fila de quem respondeu', () => {
     expect(filaDeQuemRespondeu([itemDaLista({ id: 'x', fio: null })])).toHaveLength(0);
   });
 
-  it('fio sem última entrada não quebra a ordenação', () => {
+  it('fio sem entrada nenhuma não entra: ninguém respondeu, então ninguém espera', () => {
     const semData = itemDaLista({ id: 'x', fio: fioDaLista({ ultimaEntradaEm: null }) });
     const comData = itemDaLista({ id: 'y', fio: fioDaLista({ ultimaEntradaEm: '2026-09-25T10:00:00Z' }) });
     expect(() => filaDeQuemRespondeu([semData, comData])).not.toThrow();
-    expect(filaDeQuemRespondeu([semData, comData])).toHaveLength(2);
+    expect(filaDeQuemRespondeu([semData, comData]).map((i) => i.id)).toEqual(['y']);
   });
 });

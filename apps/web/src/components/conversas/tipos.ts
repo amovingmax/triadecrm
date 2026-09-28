@@ -556,6 +556,8 @@ export type FioDaConversa = {
   naoLidas: number;
   ultimaEm: string | null;
   ultimaEntradaEm: string | null;
+  /** A última vez que NÓS falamos. É ela que diz se a última palavra foi do parceiro. */
+  ultimaSaidaEm: string | null;
   janelaExpiraEm: string | null;
   /** O que a IA entendeu da última mensagem recebida (uma das 25 intenções do R08). */
   intencao: string | null;

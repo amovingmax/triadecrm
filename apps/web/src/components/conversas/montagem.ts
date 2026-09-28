@@ -381,17 +381,36 @@ export function ordenarConversas(itens: ItemConversa[]): ItemConversa[] {
 // ---------------------------------------------------------------------------
 
 /**
- * `conversations.status = 'aguardando_nos'` JÁ É a fila: `app.messages_after_write`
- * e `app.wa_resposta_no_funil` a alimentam a cada entrada do lead. O que faltava
- * era a tela. Isto aqui é só o recorte, puro e testável.
+ * A MESMA pergunta que `app.conversas_esperando_gente` faz no banco: a última
+ * palavra da conversa é do parceiro?
  *
- * Quem pediu para não ser contatado fica de fora mesmo esperando: a resposta a
- * ele não é uma mensagem, é parar (RF-CON-19).
+ * Perguntava pelo `status` até 28/09/2026, e estava errado — não por descuido,
+ * mas porque a coluna não é mantida: `app.messages_after_write` só troca o status
+ * na entrada quando ele era 'resolvida'. A conversa de campanha nasce
+ * 'aguardando_parceiro' (`public.wa_enviar_modelo`) e CONTINUA assim depois que o
+ * lead responde. Esta aba ficava vazia justo para o maior volume que o CRM tem —
+ * e foi por isso que ninguém era avisado.
+ *
+ * Empate quer dizer respondido: a introdução automática (ADR-16) nasce na mesma
+ * transação da entrada e carrega o mesmo carimbo.
+ *
+ * TRÊS DIFERENÇAS PARA O BANCO, todas deliberadas. (1) Aqui a supressão é só o
+ * `naoContatar` do item; o banco usa `app.wa_motivo_de_recusa`, que enxerga a
+ * lista de supressão e o telefone — o Meu dia MANDA AGIR e tem de ser o mais
+ * restrito, enquanto esta aba é caixa de entrada, e ver o fio é como alguém
+ * descobre que a pessoa pediu para sair. (2) O navegador não tem as mensagens em
+ * mão, então a ausência automática e a saída presa na fila contam como resposta;
+ * a diferença só faz a lista do Meu dia ficar MAIOR. (3) Conversa adiada não é
+ * filtrada aqui, porque `FioDaConversa` não carrega `snoozed_until`.
  */
 export function esperandoResposta(item: ItemConversa): boolean {
   if (item.fio === null) return false;
   if (item.naoContatar) return false;
-  return item.fio.estado === 'aguardando_nos';
+  if (item.fio.estado === 'resolvida') return false;
+  const entrada = item.fio.ultimaEntradaEm;
+  if (entrada === null) return false;
+  const saida = item.fio.ultimaSaidaEm;
+  return saida === null || saida < entrada;
 }
 
 /**

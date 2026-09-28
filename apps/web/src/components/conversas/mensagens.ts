@@ -537,6 +537,7 @@ export function montarFio(cru: FioCru, nomeDaPessoa: Map<string, string>): FioDa
     naoLidas: cru.unread_count,
     ultimaEm: cru.last_message_at,
     ultimaEntradaEm: cru.last_inbound_at,
+    ultimaSaidaEm: cru.last_outbound_at,
     janelaExpiraEm: cru.window_expires_at,
     intencao: cru.ai_intent,
     confianca: cru.ai_confidence,
