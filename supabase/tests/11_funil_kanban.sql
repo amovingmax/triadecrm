@@ -13,7 +13,7 @@
 -- recortado por responsável, por organização ou pelo próprio negócio de teste.
 -- =====================================================================
 begin;
-select plan(79);
+select plan(80);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -105,9 +105,16 @@ insert into public.deals (id, organization_id, pipeline_id, stage_id, owner_id) 
 -- =====================================================================
 -- 1. Superfície: as três funções existem e a projeção do cartão é interna
 -- =====================================================================
+-- O 8º parâmetro, `p_canal`, entrou em 28/09/2026 (ADR-16). A assinatura antiga
+-- foi DERRUBADA na mesma migração, e de propósito: duas sobrecargas fariam o
+-- PostgREST devolver "function is not unique" para a chamada por nome de
+-- argumento da tela, e o quadro inteiro pararia de abrir.
 select has_function('public', 'pipeline_board',
-  array['integer','boolean','uuid','text','integer','integer','integer'],
+  array['integer','boolean','uuid','text','integer','integer','integer','app.channel'],
   'pipeline_board existe com a assinatura do contrato');
+select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = 'pipeline_board'), 1,
+  'e existe UMA só: sobrecarga aqui é "function is not unique" na cara de quem abre o funil');
 select has_function('public', 'move_deal',
   array['uuid','integer','integer','text','jsonb','jsonb'],
   'move_deal existe com a assinatura do contrato');

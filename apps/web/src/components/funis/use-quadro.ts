@@ -68,6 +68,7 @@ export function useQuadro(filtros: FiltrosQuadro, funilId: number | null) {
         p_stage_id: filtros.etapaId,
         p_limit_per_stage: CARTOES_POR_ETAPA,
         p_offset: 0,
+        p_canal: filtros.canal,
       }),
     // Trocar de funil ou digitar na busca mantém o quadro anterior na tela, apagado,
     // em vez de piscar em branco: a pessoa continua vendo onde estava.
@@ -324,6 +325,7 @@ export function useCarregarMais(filtros: FiltrosQuadro, funilId: number | null) 
         p_stage_id: etapaId,
         p_limit_per_stage: CARTOES_POR_ETAPA,
         p_offset: carregados,
+        p_canal: filtros.canal,
       }),
     onSuccess: (pagina, { etapaId }) => {
       setAviso(null);

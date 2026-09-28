@@ -1,5 +1,7 @@
 import type { ActivityType, Channel, MsgStatus, MsgType, Temperature } from '@komune/schema';
 
+import { ehCanal } from '@/lib/canais';
+
 /**
  * Contrato da tela de Conversas (PRD §7.4, RF-CON-05/06/12; anexo R04).
  *
@@ -39,25 +41,10 @@ import type { ActivityType, Channel, MsgStatus, MsgType, Temperature } from '@ko
 // Rótulos dos enums do banco
 // ---------------------------------------------------------------------------
 
-/** Ordem dos canais na barra de filtros: a frequência de quem está na rua. */
-export const CANAIS_EM_ORDEM = [
-  'phone',
-  'presencial',
-  'whatsapp',
-  'instagram',
-  'email',
-  'other',
-] as const satisfies readonly Channel[];
-
-/** `app.channel` em pt-BR. */
-export const ROTULO_CANAL: Record<Channel, string> = {
-  whatsapp: 'WhatsApp',
-  instagram: 'Instagram',
-  email: 'E-mail',
-  phone: 'Telefone',
-  presencial: 'Presencial',
-  other: 'Outro',
-};
+// Os canais moraram aqui até 28/09/2026. Saíram para `@/lib/canais` quando o
+// quadro do funil ganhou o mesmo filtro (ADR-16): dois donos, um arquivo só.
+// Reexportados para não quebrar quem já importava daqui.
+export { CANAIS_EM_ORDEM, ROTULO_CANAL } from '@/lib/canais';
 
 /** `app.activity_type` em pt-BR. */
 export const ROTULO_TIPO: Record<ActivityType, string> = {
@@ -327,9 +314,6 @@ function ehJanela(v: string): v is JanelaSemContato {
   return v in ROTULO_JANELA;
 }
 
-function ehCanal(v: string): v is Channel {
-  return v in ROTULO_CANAL;
-}
 
 /** Lê o recorte, a aba e a conversa aberta da query string (de `searchParams`). */
 export function estadoDaUrl(params: Record<string, string | string[] | undefined>): {

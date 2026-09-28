@@ -3,6 +3,8 @@
 import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react';
 import Link from 'next/link';
 
+import { ICONE_CANAL } from '@/components/conversas/icones';
+import { ROTULO_CANAL } from '@/lib/canais';
 import { DiasSemContato } from '@/components/temperatura';
 import { cn } from '@/lib/utils';
 
@@ -26,7 +28,8 @@ import type { CartaoQuadro } from './tipos';
  *   borda esquerda   `BarraEtapa`: quão longe no funil, em tinta neutra
  *   linha 1          nome do parceiro, e à direita os dias sem contato em IBM Plex Mono
  *   linha 2          categoria e bairro/cidade
- *   linha 3          quando o prazo da etapa estourou, a pastilha "Parado há N d"
+ *   linha 3          a pastilha "Parado há N d" (quando o prazo da etapa estourou),
+ *                    e à direita o ícone do canal do último toque e os dias sem contato
  *   linha 4          `SemaforoProximaAcao` (silhueta + prazo) e o responsável
  *
  * Cinco informações do requisito (nome, categoria, local, responsável, etapa), mais
@@ -114,6 +117,10 @@ export function CartaoNegocio({
   const destino = href === undefined ? `/parceiros/${cartao.organization_id}` : href;
   const categoriaELocal = formatarCategoriaELocal(cartao);
   const parado = cartao.is_rotting ? formatarParado(cartao.days_in_stage) : null;
+  // O canal do ÚLTIMO TOQUE (28/09/2026, ADR-16). Ícone e nada mais: é o que
+  // permite varrer a coluna e ver "este aqui foi por telefone" sem gastar
+  // palavra — e é o mesmo dado do filtro de canal da barra de cima.
+  const IconeDoCanal = cartao.last_channel ? ICONE_CANAL[cartao.last_channel] : null;
 
   return (
     <article
@@ -190,7 +197,15 @@ export function CartaoNegocio({
             </span>
           ) : null}
         </span>
-        <DiasSemContato dias={cartao.days_since_contact} className="shrink-0" />
+        <span className="flex shrink-0 items-center gap-1.5">
+          {IconeDoCanal && cartao.last_channel ? (
+            <IconeDoCanal
+              className="size-3.5 text-muted-foreground"
+              aria-label={`Último toque por ${ROTULO_CANAL[cartao.last_channel]}`}
+            />
+          ) : null}
+          <DiasSemContato dias={cartao.days_since_contact} />
+        </span>
       </div>
 
       <div className="flex items-center justify-between gap-2">

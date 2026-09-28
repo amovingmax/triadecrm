@@ -8070,6 +8070,7 @@ export type Database = {
       origem_dos_dados: { Args: { p_organization_id: string }; Returns: Json }
       pipeline_board: {
         Args: {
+          p_canal?: Database["app"]["Enums"]["channel"]
           p_limit_per_stage?: number
           p_offset?: number
           p_only_mine?: boolean

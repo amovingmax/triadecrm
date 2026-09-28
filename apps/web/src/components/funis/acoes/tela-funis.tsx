@@ -152,8 +152,10 @@ export function TelaFunis({ filtrosIniciais }: { filtrosIniciais: FiltrosQuadro 
           <FiltrosDoQuadro
             q={filtros.q}
             apenasMeus={filtros.apenasMeus}
+            canal={filtros.canal}
             aoBuscar={(q) => setFiltros((atual) => ({ ...atual, q }))}
             aoTrocarDono={(apenasMeus) => setFiltros((atual) => ({ ...atual, apenasMeus }))}
+            aoTrocarCanal={(canal) => setFiltros((atual) => ({ ...atual, canal }))}
           />
         ) : null}
       </header>

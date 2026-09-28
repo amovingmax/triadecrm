@@ -108,6 +108,7 @@ export async function carregarQuadro(pedido: PedidoQuadro): Promise<Quadro> {
     p_stage_id: p.p_stage_id ?? undefined,
     p_limit_per_stage: p.p_limit_per_stage,
     p_offset: p.p_offset,
+    p_canal: p.p_canal ?? undefined,
   });
 
   if (error) throw error;

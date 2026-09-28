@@ -8,6 +8,8 @@ import {
   type Temperature,
 } from '@komune/schema';
 
+import { ehCanal } from '@/lib/canais';
+
 /**
  * Contrato do funil kanban (RF-FUN-01/02/03/04/08; PRD §5.3, §5.5 e §5.6).
  *
@@ -457,6 +459,12 @@ export const pedidoQuadroSchema = z.object({
   p_limit_per_stage: z.number().int().min(1).max(200).default(40),
   /** Paginação dentro de uma etapa; só faz sentido junto de `p_stage_id`. */
   p_offset: z.number().int().min(0).default(0),
+  /**
+   * Recorte por canal do ÚLTIMO TOQUE (`deals.last_channel`), 28/09/2026.
+   * É FILTRO, e não funil próprio: o fornecedor que ignorou o WhatsApp e atendeu
+   * o telefone é um lead, não dois (R13 §3.1, ADR-16).
+   */
+  p_canal: z.enum(Constants.app.Enums.channel).nullish(),
 });
 export type PedidoQuadro = z.infer<typeof pedidoQuadroSchema>;
 
@@ -475,6 +483,11 @@ export type FiltrosQuadro = {
   q: string;
   /** No celular, a etapa aberta; no desktop, um recorte opcional. */
   etapaId: number | null;
+  /**
+   * Canal do ÚLTIMO TOQUE (28/09/2026, ADR-16). "Me mostra só quem veio por
+   * WhatsApp" sem partir o lead em dois funis.
+   */
+  canal: Channel | null;
 };
 
 export const FILTROS_QUADRO_PADRAO: FiltrosQuadro = {
@@ -482,6 +495,7 @@ export const FILTROS_QUADRO_PADRAO: FiltrosQuadro = {
   apenasMeus: false,
   q: '',
   etapaId: null,
+  canal: null,
 };
 
 /** Lê os filtros da query string (no servidor, a partir de `searchParams`). */
@@ -497,12 +511,14 @@ export function filtrosQuadroDaUrl(
     return Number.isFinite(n) && n > 0 ? n : null;
   };
   const funil = texto('funil');
+  const canal = texto('canal');
 
   return {
     funil: ehFunilDoQuadro(funil) ? funil : FUNIL_PADRAO,
     apenasMeus: texto('meus') === '1',
     q: texto('q'),
     etapaId: inteiro('etapa'),
+    canal: ehCanal(canal) ? canal : null,
   };
 }
 
@@ -513,16 +529,22 @@ export function urlDosFiltrosQuadro(f: FiltrosQuadro): string {
   if (f.apenasMeus) p.set('meus', '1');
   if (f.q.trim()) p.set('q', f.q.trim());
   if (f.etapaId) p.set('etapa', String(f.etapaId));
+  if (f.canal) p.set('canal', f.canal);
   const busca = p.toString();
   return busca ? `?${busca}` : '';
 }
 
 /** Há algum recorte ligado? Separa "a etapa está vazia" de "o filtro não achou nada". */
 export function temRecorteNoQuadro(f: FiltrosQuadro): boolean {
-  return f.apenasMeus || f.q.trim() !== '';
+  return f.apenasMeus || f.q.trim() !== '' || f.canal !== null;
+}
+
+/** Quantos recortes estão ligados: o número na pílula de filtros. */
+export function contarRecortesDoQuadro(f: FiltrosQuadro): number {
+  return [f.apenasMeus || null, f.q.trim() || null, f.canal].filter(Boolean).length;
 }
 
 /** Chave de cache do TanStack Query: muda quando qualquer recorte muda. */
 export function chaveDoQuadro(f: FiltrosQuadro) {
-  return ['funil-quadro', f.funil, f.apenasMeus, f.q.trim(), f.etapaId] as const;
+  return ['funil-quadro', f.funil, f.apenasMeus, f.q.trim(), f.etapaId, f.canal] as const;
 }

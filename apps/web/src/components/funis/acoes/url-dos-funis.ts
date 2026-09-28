@@ -11,6 +11,8 @@
  * A escrita é a do contrato, sem mudança: `urlDosFiltrosQuadro` já grava qualquer
  * slug diferente do padrão.
  */
+import { ROTULO_CANAL } from '@/lib/canais';
+
 import { filtrosQuadroDaUrl, type FiltrosQuadro } from '../tipos';
 
 /** O slug do funil que só existe no seletor, nunca no quadro. */
@@ -32,6 +34,7 @@ export function descreverRecorte(filtros: FiltrosQuadro): string {
   const partes: string[] = [];
   if (filtros.q.trim()) partes.push(`a busca "${filtros.q.trim()}"`);
   if (filtros.apenasMeus) partes.push('só os seus negócios');
+  if (filtros.canal) partes.push(`o canal ${ROTULO_CANAL[filtros.canal]}`);
 
   if (partes.length === 0) return 'Nenhum negócio entra no recorte atual.';
   if (partes.length === 1) return `Nada bate com ${partes[0]}.`;
