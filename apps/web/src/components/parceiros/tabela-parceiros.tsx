@@ -5,7 +5,7 @@ import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-tab
 
 import { cn } from '@/lib/utils';
 import { RevelarLista, useRevelarLinha } from '@/components/movimento';
-import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
+import { EtiquetaEtapa } from '@/components/funis/etapa';
 
 import { formatarLocal, formatarTelefone } from './formatos';
 import { ProximaAcao } from './proxima-acao';
@@ -68,13 +68,11 @@ const CLASSES: Record<string, string> = {
   // linha de baixo (canal · quando · tentativa · quem) cabem em 240px sem cortar.
   dias: 'w-60',
   telefone: 'w-44',
-  // w-36 e não w-40: sem `esfriando` o chip mede 42px; com, 127px. Os 144px cobrem
-  // o pior caso — o sinal de esfriamento não pode nascer truncado.
-  temperatura: 'w-36',
+  // A etapa é SEMPRE visível desde 28/09/2026: ela herdou o lugar da coluna
+  // "Temperatura" (ADR-16). w-44 e não w-40 porque o nome mais longo do catálogo
+  // — "Apresentação realizada" — não pode nascer truncado.
+  etapa: 'w-44',
   responsavel: 'hidden w-36 2xl:table-cell',
-  // A etapa entra já no `xl`: a 1440px (o notebook do time) sobravam 200px de
-  // mesa vazia à direita, e etapa é a coluna que mais se procura das três.
-  etapa: 'hidden w-40 xl:table-cell',
   proxima: 'hidden w-32 2xl:table-cell',
 };
 
@@ -121,27 +119,19 @@ const colunas = coluna.columns([
       return <span className="numerico text-[0.8125rem]">{formatarTelefone(valor)}</span>;
     },
   }),
-  // Coluna própria, SEMPRE visível: cinco matizes num traço de 3px não sobrevivem a
-  // deuteranopia (no claro o par quente/cliente mede 1,35:1 entre si), então o
-  // rótulo textual é o reforço que não depende de matiz.
-  coluna.accessor('temperature', {
-    id: 'temperatura',
-    header: 'Temperatura',
-    cell: ({ row }) => (
-      <ChipTemperatura
-        temperatura={row.original.temperature}
-        esfriando={row.original.needs_attention}
-      />
-    ),
+  // A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026, ADR-16). Até hoje esta posição
+  // — a única que a tabela mostra em toda largura — era a coluna "Temperatura",
+  // e a etapa só aparecia a partir do `xl`. Rafael: "o fato de só o lead
+  // responder e ele já virar morno não faz sentido e tá errado". As 12 etapas do
+  // funil apareciam aqui como três cores; agora aparecem como as 12 que são.
+  coluna.accessor('stage', {
+    id: 'etapa',
+    header: 'Etapa',
+    cell: ({ getValue }) => <EtiquetaEtapa etapa={getValue()} />,
   }),
   coluna.accessor('owner', {
     id: 'responsavel',
     header: 'Responsável',
-    cell: ({ getValue }) => <Texto valor={getValue()} />,
-  }),
-  coluna.accessor('stage', {
-    id: 'etapa',
-    header: 'Etapa',
     cell: ({ getValue }) => <Texto valor={getValue()} />,
   }),
   coluna.accessor('next_action_at', {
@@ -234,10 +224,7 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
 function ColunasEscondidas() {
   return (
     <p className="pb-2 text-xs text-muted-foreground 2xl:hidden">
-      Nesta largura de tela,{' '}
-      <span className="xl:hidden">responsável, etapa e próxima ação</span>
-      <span className="hidden xl:inline">responsável e próxima ação</span> só aparecem na ficha do
-      parceiro.
+      Nesta largura de tela, responsável e próxima ação só aparecem na ficha do parceiro.
     </p>
   );
 }
@@ -276,14 +263,6 @@ function CelulaNome({ linha }: { linha: LinhaParceiro }) {
 
   return (
     <div className="relative flex h-14 items-center">
-      {/* `semRotulo`: a coluna Temperatura já anuncia o rótulo nesta mesma linha,
-          e sem isso o leitor de tela leria a temperatura duas vezes por parceiro. */}
-      <BarraTermica
-        temperatura={linha.temperature}
-        needsAttention={linha.needs_attention}
-        posicao="absoluta"
-        semRotulo
-      />
       <Link
         href={`/parceiros/${linha.id}`}
         className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 rounded-lg py-1.5 pr-3 pl-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"

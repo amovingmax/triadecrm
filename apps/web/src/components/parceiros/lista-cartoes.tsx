@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
 import { RevelarLista, useRevelarLinha } from '@/components/movimento';
-import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
+import { EtiquetaEtapa } from '@/components/funis/etapa';
 
 import { formatarLocal, formatarTelefone } from './formatos';
 import type { LinhaParceiro } from './tipos';
@@ -71,18 +71,9 @@ function Cartao({ linha, indice }: { linha: LinhaParceiro; indice: number }) {
         href={`/parceiros/${linha.id}`}
         className="relative flex min-h-16 items-center gap-3 py-2.5 pr-3 pl-4 outline-none active:bg-muted/60 focus-visible:bg-muted/60"
       >
-        {/* `semRotulo`: o ChipTemperatura logo abaixo já anuncia a temperatura e o
-            esfriamento em texto, e o leitor de tela não pode lê-los duas vezes. */}
-        <BarraTermica
-          temperatura={linha.temperature}
-          needsAttention={linha.needs_attention}
-          posicao="absoluta"
-          semRotulo
-        />
-
         {/* Três linhas, um assunto por linha — a mesma anatomia da tabela:
 
-              nome ................................ temperatura
+              nome ...................................... etapa
               categoria · bairro ................... WhatsApp
               [o que o contato deu] quando · tentativa
 
@@ -92,15 +83,11 @@ function Cartao({ linha, indice }: { linha: LinhaParceiro; indice: number }) {
             estão a um toque, na ficha — e no desktop também só aparecem no 2xl. */}
         <div className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1">
           <p className="truncate font-medium">{linha.name}</p>
-          {/* O rótulo da temperatura fica no canto da primeira linha: cor sozinha,
-              num traço de 3px, não sobrevive a daltonismo, e este é o cartão que o
-              time lê no sol, com uma mão só. */}
-          <ChipTemperatura
-            temperatura={linha.temperature}
-            esfriando={linha.needs_attention}
-            comDescricao={false}
-            className="justify-self-end"
-          />
+          {/* A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026, ADR-16). A cor sumiu do
+              canto: ela achatava as 12 etapas do funil em três matizes, e num
+              traço de 3px não sobrevivia a daltonismo de todo jeito. O que fica é
+              a palavra — que é o que o time lê no sol, com uma mão só. */}
+          <EtiquetaEtapa etapa={linha.stage} className="justify-self-end" />
 
           <p className="truncate text-xs text-muted-foreground">
             {[linha.primary_category, local || null].filter(Boolean).join(' · ') || '-'}
