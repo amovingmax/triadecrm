@@ -5,11 +5,12 @@ import { cn } from '@/lib/utils';
  * Cartão em carregamento. Existe para a coluna do quadro não pular de altura quando
  * a página de cartões chega: o esqueleto tem exatamente a mesma caixa do
  * `CartaoNegocio` (76px mínimos, quatro linhas, o mesmo raio e a mesma hairline),
- * inclusive a faixa de 3px na borda esquerda onde entrará a barra térmica.
+ * inclusive a faixa da borda esquerda onde entrará a `BarraEtapa`.
  *
- * Sem cor de temperatura de propósito: antes da resposta do banco não se sabe o
- * calor, e chutar um `frio` cinza-azulado pintaria a coluna inteira de uma
- * temperatura que talvez nem exista ali.
+ * Sem preenchimento de propósito: antes da resposta do banco não se sabe em que
+ * etapa o negócio está, e chutar uma altura pintaria a coluna inteira com um
+ * progresso que talvez nem exista ali. (Até 28/09/2026 essa faixa era a barra
+ * térmica, e o argumento era o mesmo.)
  */
 export function CartaoEsqueleto({ className }: { className?: string }) {
   return (

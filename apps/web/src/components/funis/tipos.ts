@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { Constants, type DealStatus, type OrgKind, type Temperature } from '@komune/schema';
+import {
+  Constants,
+  type Channel,
+  type DealStatus,
+  type OrgKind,
+  type Temperature,
+} from '@komune/schema';
 
 /**
  * Contrato do funil kanban (RF-FUN-01/02/03/04/08; PRD §5.3, §5.5 e §5.6).
@@ -155,9 +161,20 @@ export type CartaoQuadro = {
   owner_id: string | null;
   /** Nome do responsável (`team_directory`); `null` = cartão sem dono, do bolo comum. */
   owner_name: string | null;
+  /**
+   * Continua no tipo, e a RPC continua devolvendo: os relatórios leem a mesma
+   * origem e `needs_attention` deriva dela. **Deixou de ser mostrada no cartão
+   * em 28/09/2026 (ADR-16)** — quem ocupa o lugar dela é a etapa.
+   */
   temperature: Temperature;
-  /** Esfriamento além do prazo do PRD §5.6: liga o pulso da barra térmica. */
+  /** Esfriamento além do prazo do PRD §5.6: ainda pesa os dias sem contato. */
   needs_attention: boolean;
+  /** Nome da etapa, como o banco a chama. Vem para o cartão desde 28/09/2026. */
+  stage_name: string;
+  /** Posição da etapa no funil (1..N de trabalho; 90/98/99 de saída). */
+  stage_position: number;
+  /** Canal do último toque (`deals.last_channel`); `null` enquanto ninguém tocou. */
+  last_channel: Channel | null;
   status: DealStatus;
   tier: 'A+' | 'A' | 'B' | 'C' | null;
   score: number | null;

@@ -1,132 +1,39 @@
-import {
-  definicaoTemperatura,
-  TEMPERATURAS_EM_ORDEM,
-  type Temperatura,
-} from '@/components/temperatura';
 import { cn } from '@/lib/utils';
 
 import { formatarPrazoProximaAcao } from './cartao-formatos';
 import { SEMAFORO_PROXIMA_ACAO, type EstadoProximaAcao } from './tipos';
 
 /**
- * Os dois semáforos do cartão do funil (RF-FUN-02).
+ * O semáforo da próxima ação, no cartão do funil (RF-FUN-03).
  *
- * A regra que governa os dois é a mesma, e é o motivo de este arquivo existir em vez
- * de um punhado de `<span>` dentro do cartão: **nenhum estado pode depender só de
- * cor.** A Heloísa lê esta coluna no celular, na rua, no sol de Natal, e uma parte
- * das pessoas não separa vermelho de verde. Então cada semáforo carrega três canais
- * ao mesmo tempo: forma, texto e (só o térmico) cor.
+ * Este arquivo já teve DOIS semáforos. O `SemaforoTermico` — medidor de cinco
+ * talos mais a palavra "Frio/Morno/Quente" — foi apagado em 28/09/2026 junto com
+ * a temperatura no cartão (ADR-16): as 12 etapas do funil apareciam na tela como
+ * três cores, e Rafael recusou isso com todas as letras ("o fato de só o lead
+ * responder e ele já virar morno não faz sentido e tá errado"). Quem ocupa a
+ * borda esquerda do cartão agora é a `BarraEtapa`, em `etapa.tsx`. A escala
+ * térmica continua viva, e continua pintando os relatórios.
  *
- * ---------------------------------------------------------------------------
- * 1. `SemaforoTermico` — quanto o negócio está quente
- * ---------------------------------------------------------------------------
- * Cinco talos de altura crescente, preenchidos até a posição da temperatura atual,
- * mais o rótulo escrito ao lado. É medidor de sinal, não bolinha: quem enxerga cor
- * lê a cor; quem não enxerga conta os talos cheios (1 de 5 é frio, 5 de 5 é cliente
- * ativo) ou simplesmente lê "Frio". A ordem dos talos é a ordem do enum
- * `app.temperature` no Postgres, que é a mesma de `ESCALA_TERMICA`.
- *
- * A cor sai inteira da escala térmica (`cor` para o talo cheio, `-texto` para a
- * palavra): a escala é a única cromia da interface e este arquivo não inventa
- * nenhuma. O que separa cheio de vazio é a ALTURA, e não um cinza de trilho: medido
- * no navegador, `--border` dava 1,94:1 no escuro e 1,23:1 no claro, longe dos 3:1 que
- * a WCAG 1.4.11 pede de objeto gráfico, e o "de cinco" sumia no sol. O degrau vazio é
- * um toco de 3px em `--muted-foreground` (5,71:1 e 5,06:1) e o cheio vai de 6px a
- * 14px na cor da temperatura (pior par medido: 3,88:1).
- *
- * Ele não substitui a `BarraTermica` da borda esquerda do cartão: aquela é o que se
- * vê varrendo a coluna com o olho, esta é o que se lê ao parar num cartão. É o mesmo
- * par barra + rótulo que a lista de parceiros já usa.
+ * A regra que sobrou é a mesma que governava os dois, e é o motivo de este
+ * arquivo existir em vez de um punhado de `<span>` dentro do cartão: **nenhum
+ * estado pode depender só de cor.** A Heloísa lê esta coluna no celular, na rua,
+ * no sol de Natal, e uma parte das pessoas não separa vermelho de verde.
  *
  * ---------------------------------------------------------------------------
- * 2. `SemaforoProximaAcao` — se alguém vai fazer alguma coisa, e quando
+ * `SemaforoProximaAcao` — se alguém vai fazer alguma coisa, e quando
  * ---------------------------------------------------------------------------
  * Este é ACROMÁTICO de propósito, e não por descuido. O semáforo de trânsito pedia
  * verde, amarelo e vermelho, e é exatamente o que não pode acontecer aqui: verde já
- * significa "fechou" e vermelho já significa "quente" na mesma tela, no mesmo cartão,
- * a dois centímetros de distância. Um cartão vermelho de atraso ao lado de uma barra
- * vermelha de temperatura ensinaria a pessoa a desconfiar da cor. Então o estado vem
- * de **silhueta** (quatro desenhos que se distinguem a 12px), de **peso** (o vencido
- * e o sem-ação ficam em tinta cheia e 500; o agendado fica esmaecido) e do **texto**
- * do prazo, que está sempre lá.
+ * significa "fechou" em outras telas do produto, e vermelho já significa "quente" na
+ * escala térmica dos relatórios. Então o estado vem de **silhueta** (quatro desenhos
+ * que se distinguem a 12px), de **peso** (o vencido e o sem-ação ficam em tinta cheia
+ * e 500; o agendado fica esmaecido) e do **texto** do prazo, que está sempre lá.
  *
  *   anel cortado  Sem próxima ação   o "!" do RF-FUN-03: nada marcado
  *   disco cheio   Hoje, 09:00        é hoje, resolve hoje
  *   anel vazado   Em 3d              está agendada, pode seguir
  *   triângulo     Atrasada 4d        venceu e ninguém fez
  */
-
-/* ==========================================================================
-   Semáforo térmico
-   ========================================================================== */
-
-export function SemaforoTermico({
-  temperatura,
-  needsAttention = false,
-  semRotulo = false,
-  className,
-}: {
-  temperatura: Temperatura | string | null | undefined;
-  /** `deals.needs_attention`: entra na descrição acessível, não na cor. */
-  needsAttention?: boolean;
-  /** Esconde a palavra e deixa só o medidor (use quando a linha já diz a temperatura). */
-  semRotulo?: boolean;
-  className?: string;
-}) {
-  const definicao = definicaoTemperatura(temperatura);
-
-  const descricao = needsAttention
-    ? `Temperatura: ${definicao.rotulo}. Esfriando por falta de contato. ${definicao.descricao}`
-    : `Temperatura: ${definicao.rotulo}. ${definicao.descricao}`;
-
-  return (
-    <span title={descricao} className={cn('inline-flex shrink-0 items-center gap-1.5', className)}>
-      {/* `data-temperatura` fica no medidor, e não no invólucro, porque é assim que os
-          scripts de medida acham a cor pintada: eles leem o primeiro <span> de dentro,
-          que aqui é o primeiro talo cheio. É a mesma convenção da BarraTermica. */}
-      <span
-        data-temperatura={definicao.valor}
-        aria-hidden="true"
-        className="flex items-end gap-[2px]"
-      >
-        {TEMPERATURAS_EM_ORDEM.map((degrau, indice) => {
-          const cheio = degrau.ordem <= definicao.ordem;
-          return (
-            <span
-              key={degrau.valor}
-              className="w-[3px] rounded-[1px]"
-              style={{
-                // O degrau vazio é um toco de 3px, e não um talo inteiro em cinza-claro.
-                // A primeira versão pintava o trilho com `--border`, que mede 1,94:1 no
-                // escuro e 1,23:1 no claro: abaixo dos 3:1 da WCAG 1.4.11, ou seja, o
-                // "de cinco" simplesmente não aparecia no sol. Trocar por um cinza forte
-                // o bastante criava o problema oposto, porque `--input` e o azul de
-                // `frio` são quase o mesmo pixel num traço de 3px. Então quem separa
-                // cheio de vazio é a ALTURA (6px contra 3px já no primeiro degrau), e a
-                // cor do toco fica em `--muted-foreground`, que passa em 5,71:1 no
-                // escuro e 5,06:1 no claro.
-                height: cheio ? `${6 + indice * 2}px` : '3px',
-                backgroundColor: cheio ? definicao.cor : 'var(--muted-foreground)',
-              }}
-            />
-          );
-        })}
-      </span>
-      {semRotulo ? null : (
-        <span
-          aria-hidden="true"
-          className="text-xs font-medium"
-          // `-texto` é a variante da escala medida em pelo menos 4,5:1 sobre fundo,
-          // cartão e muted; a `cor` cheia serviria de marca, mas não de texto.
-          style={{ color: definicao.corTexto }}
-        >
-          {definicao.rotulo}
-        </span>
-      )}
-      <span className="sr-only">{descricao}</span>
-    </span>
-  );
-}
 
 /* ==========================================================================
    Semáforo da próxima ação

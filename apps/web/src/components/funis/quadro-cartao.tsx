@@ -87,12 +87,15 @@ function BotaoMover({ onClick }: { onClick: () => void }) {
 export function CartaoArrastavel({
   cartao,
   etapaId,
+  etapasDeTrabalho,
   emVoo = false,
   podeMover,
   aoMover,
 }: {
   cartao: CartaoQuadro;
   etapaId: number;
+  /** Denominador da barra de etapa: quantas etapas de trabalho este funil tem. */
+  etapasDeTrabalho: number;
   /** O banco ainda não respondeu sobre este cartão: fica apagado e sem toque. */
   emVoo?: boolean;
   /** `app.can_write()`, lido do banco por `public.meu_papel()`. */
@@ -118,6 +121,7 @@ export function CartaoArrastavel({
     <CartaoNegocio
       ref={setNodeRef}
       cartao={cartao}
+      etapasDeTrabalho={etapasDeTrabalho}
       {...listeners}
       // O cartão continua no lugar, apagado, enquanto o fantasma segue o ponteiro:
       // sumir com ele encolheria a coluna e o alvo pularia debaixo da mão.
@@ -144,10 +148,17 @@ export function CartaoArrastavel({
 }
 
 /** O cartão que acompanha o ponteiro (e o foco do teclado) durante o arraste. */
-export function CartaoEmVoo({ cartao }: { cartao: CartaoQuadro }) {
+export function CartaoEmVoo({
+  cartao,
+  etapasDeTrabalho,
+}: {
+  cartao: CartaoQuadro;
+  etapasDeTrabalho: number;
+}) {
   return (
     <CartaoNegocio
       cartao={cartao}
+      etapasDeTrabalho={etapasDeTrabalho}
       href={null}
       arrastando
       className="w-72 rotate-1 cursor-grabbing"

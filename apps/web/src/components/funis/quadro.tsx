@@ -155,6 +155,12 @@ export function Quadro({
   aoTrocarEtapa: (etapaId: number) => void;
 }) {
   const etapas = quadro.stages;
+  /**
+   * O denominador da barra de etapa do cartão (28/09/2026, ADR-16). Vem do FUNIL,
+   * e nunca de constante: fornecedor tem 9 etapas de trabalho, ativação 6 e
+   * produtor 11. `etapaEhDeSaida` já é quem separa trabalho de destino.
+   */
+  const etapasDeTrabalho = etapas.filter((e) => !etapaEhDeSaida(e)).length;
   const movimento = useMoverCartao(filtros);
   const paginacao = useCarregarMais(filtros, funilId);
 
@@ -229,6 +235,7 @@ export function Quadro({
         <TrilhaDeEtapas etapas={etapas} etapaAtivaId={aberta.id} aoEscolher={aoTrocarEtapa} />
         <ListaDaEtapa
           etapa={aberta}
+          etapasDeTrabalho={etapasDeTrabalho}
           emVoo={movimento.cartaoEmVoo}
           podeMover={podeMover}
           carregando={paginacao.etapaCarregando === aberta.id}
@@ -264,6 +271,7 @@ export function Quadro({
           key={cartao.deal_id}
           cartao={cartao}
           etapaId={etapa.id}
+          etapasDeTrabalho={etapasDeTrabalho}
           emVoo={movimento.cartaoEmVoo === cartao.deal_id}
           podeMover={podeMover}
           aoMover={() => aoAbrirMover({ cartao, etapaAtualId: etapa.id })}
@@ -314,7 +322,9 @@ export function Quadro({
         </div>
 
         <DragOverlay modifiers={[restrictToWindowEdges]} dropAnimation={null}>
-          {cartaoArrastado ? <CartaoEmVoo cartao={cartaoArrastado} /> : null}
+          {cartaoArrastado ? (
+            <CartaoEmVoo cartao={cartaoArrastado} etapasDeTrabalho={etapasDeTrabalho} />
+          ) : null}
         </DragOverlay>
       </DndContext>
     </div>
@@ -324,6 +334,7 @@ export function Quadro({
 /** Lista vertical da etapa aberta no celular, em largura cheia. */
 function ListaDaEtapa({
   etapa,
+  etapasDeTrabalho,
   emVoo,
   podeMover,
   carregando,
@@ -331,6 +342,7 @@ function ListaDaEtapa({
   aoAbrirMover,
 }: {
   etapa: EtapaQuadro;
+  etapasDeTrabalho: number;
   emVoo: string | null;
   podeMover: boolean;
   carregando: boolean;
@@ -346,6 +358,7 @@ function ListaDaEtapa({
           key={cartao.deal_id}
           cartao={cartao}
           etapaId={etapa.id}
+          etapasDeTrabalho={etapasDeTrabalho}
           emVoo={emVoo === cartao.deal_id}
           podeMover={podeMover}
           aoMover={() => aoAbrirMover({ cartao, etapaAtualId: etapa.id })}

@@ -3128,6 +3128,7 @@ export type Database = {
           id: string
           import_batch_id: string | null
           last_activity_at: string | null
+          last_channel: Database["app"]["Enums"]["channel"] | null
           last_intent: string | null
           last_intent_at: string | null
           lost_at: string | null
@@ -3159,6 +3160,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           last_activity_at?: string | null
+          last_channel?: Database["app"]["Enums"]["channel"] | null
           last_intent?: string | null
           last_intent_at?: string | null
           lost_at?: string | null
@@ -3190,6 +3192,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           last_activity_at?: string | null
+          last_channel?: Database["app"]["Enums"]["channel"] | null
           last_intent?: string | null
           last_intent_at?: string | null
           lost_at?: string | null

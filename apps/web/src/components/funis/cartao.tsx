@@ -3,7 +3,7 @@
 import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react';
 import Link from 'next/link';
 
-import { BarraTermica, DiasSemContato } from '@/components/temperatura';
+import { DiasSemContato } from '@/components/temperatura';
 import { cn } from '@/lib/utils';
 
 import {
@@ -11,7 +11,8 @@ import {
   formatarParado,
   rotuloResponsavel,
 } from './cartao-formatos';
-import { SemaforoProximaAcao, SemaforoTermico } from './semaforo';
+import { BarraEtapa } from './etapa';
+import { SemaforoProximaAcao } from './semaforo';
 import type { CartaoQuadro } from './tipos';
 
 /**
@@ -22,32 +23,31 @@ import type { CartaoQuadro } from './tipos';
  * ---------------------------------------------------------------------------
  * O que o cartão diz, em ordem de leitura
  * ---------------------------------------------------------------------------
- *   borda esquerda   `BarraTermica`: a temperatura em cor cheia, engrossada e pulsando
- *                    quando o negócio está esfriando (`needs_attention`)
+ *   borda esquerda   `BarraEtapa`: quão longe no funil, em tinta neutra
  *   linha 1          nome do parceiro, e à direita os dias sem contato em IBM Plex Mono
  *   linha 2          categoria e bairro/cidade
- *   linha 3          `SemaforoTermico` (medidor de cinco talos + a palavra) e, quando o
- *                    prazo da etapa estourou, a pastilha "Parado há N d"
+ *   linha 3          quando o prazo da etapa estourou, a pastilha "Parado há N d"
  *   linha 4          `SemaforoProximaAcao` (silhueta + prazo) e o responsável
  *
- * Cinco informações do requisito (nome, categoria, local, responsável, temperatura),
- * mais os três sinais que decidem o que fazer agora: há quanto tempo ninguém fala com
- * a pessoa, se a próxima ação existe e venceu, e se o cartão empacou na etapa.
+ * Cinco informações do requisito (nome, categoria, local, responsável, etapa), mais
+ * os três sinais que decidem o que fazer agora: há quanto tempo ninguém fala com a
+ * pessoa, se a próxima ação existe e venceu, e se o cartão empacou na etapa.
  *
  * ---------------------------------------------------------------------------
  * Quatro decisões que valem a pena estar escritas
  * ---------------------------------------------------------------------------
  *
- * 1. **Nada é só cor.** A temperatura vem em barra colorida MAIS medidor contável
- *    MAIS palavra; a próxima ação é acromática e se distingue por silhueta, peso e
- *    texto; "parado" é hachura mais pastilha escrita. O detalhe está em `semaforo.tsx`.
+ * 1. **Nada é cor.** A TEMPERATURA SAIU DO CARTÃO EM 28/09/2026 (ADR-16): a etapa é a
+ *    verdade, e a etapa é a própria coluna em que o cartão vive. A barra da esquerda
+ *    passou a ser acromática e diz só quão longe no funil o negócio está. A próxima
+ *    ação continua se distinguindo por silhueta, peso e texto, e "parado" por véu
+ *    mais pastilha escrita. Rafael: "o fato de só o lead responder e ele já virar
+ *    morno não faz sentido e tá errado" — e a cor era a projeção de 12 etapas em 3.
  *
- * 2. **"Parado" é hachura, não fundo vermelho.** O PRD pede fundo de alerta, e o
- *    caminho óbvio seria a brasa do `--destructive`, que neste sistema é literalmente
- *    a mesma cor de `quente`. Um cartão pintado de vermelho ao lado de uma barra
- *    vermelha de temperatura destrói a única cromia que a interface tem. Então o
- *    alerta é textura: hachura diagonal em tinta a 8%, que lê como "riscado, travado"
- *    sem gastar matiz nenhum, e a pastilha diz em português o que aconteceu.
+ * 2. **"Parado" não é fundo vermelho.** O PRD pede fundo de alerta, e o caminho óbvio
+ *    seria a brasa do `--destructive`, que neste sistema é literalmente a mesma cor de
+ *    `quente` na escala térmica dos relatórios. Então o alerta é véu, não matiz, e a
+ *    pastilha diz em português o que aconteceu.
  *
  * 3. **O cartão inteiro é o alvo de toque.** O link do nome se estica por cima do
  *    cartão com `after:inset-0`, então a área tocável é o retângulo todo, com no
@@ -80,6 +80,12 @@ const VEU_PARADO = 'color-mix(in oklab, var(--foreground) 5%, transparent)';
 export type PropsCartaoNegocio = {
   cartao: CartaoQuadro;
   /**
+   * Quantas etapas de TRABALHO o funil tem — o denominador da barra da esquerda.
+   * É prop, e nunca constante: fornecedor tem 9, ativação 6 e produtor 11. Quem
+   * sabe é o quadro, que já carrega a lista de etapas.
+   */
+  etapasDeTrabalho: number;
+  /**
    * Para onde o toque leva. O padrão é a ficha do parceiro (RF-FUN-06); passe `null`
    * para desligar o link e deixar o cartão só arrastável.
    */
@@ -95,6 +101,7 @@ export type PropsCartaoNegocio = {
 
 export function CartaoNegocio({
   cartao,
+  etapasDeTrabalho,
   href,
   acoes,
   arrastando = false,
@@ -125,14 +132,11 @@ export function CartaoNegocio({
       style={{ ...(parado ? { backgroundColor: VEU_PARADO } : null), ...style }}
       {...resto}
     >
-      {/* `semRotulo`: o SemaforoTermico logo abaixo já anuncia a temperatura em texto,
-          e o leitor de tela não pode lê-la duas vezes no mesmo cartão. */}
-      <BarraTermica
-        temperatura={cartao.temperature}
-        needsAttention={cartao.needs_attention}
-        posicao="absoluta"
-        semRotulo
-      />
+      {/* A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026). O NOME não vem: o cartão já
+          vive dentro da coluna da própria etapa, no desktop e na trilha do celular,
+          e escrevê-lo aqui gastaria uma linha repetindo o cabeçalho. O que a coluna
+          não diz é quão longe no funil — e é isso que a barra diz. */}
+      <BarraEtapa posicao={cartao.stage_position} total={etapasDeTrabalho} />
 
       <div className="flex items-start justify-between gap-2">
         <h3 className="min-w-0 flex-1 truncate text-sm leading-5 font-medium">
@@ -167,14 +171,10 @@ export function CartaoNegocio({
       {/* Os dias sem contato vêm nesta linha, e não ao lado do nome: numa coluna de
           kanban com 300px, "sem contato" (o valor de quase todo alvo novo) roubava uns
           70px justamente do nome do parceiro, que é o que a pessoa procura varrendo a
-          coluna. Aqui eles dividem a linha com a temperatura, que é a outra metade da
-          mesma pergunta: quão quente está, e há quanto tempo ninguém fala com ele. */}
+          coluna. Desde 28/09/2026 a linha é só deles e da pastilha "Parado": o
+          medidor térmico saiu com a temperatura. */}
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <SemaforoTermico
-            temperatura={cartao.temperature}
-            needsAttention={cartao.needs_attention}
-          />
           {parado ? (
             <span
               title={parado.descricao}
