@@ -6,7 +6,7 @@ import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatarLocal } from '@/components/parceiros/formatos';
 import { useRevelarLinha } from '@/components/movimento';
-import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
+import { EtiquetaEtapa } from '@/components/funis/etapa';
 
 import { formatarQuando, quandoEmTexto } from './formatos';
 import { ICONE_DO_ITEM, iconeDoItem } from './icones';
@@ -16,11 +16,11 @@ import { destinoDoItem, type ItemDoDia } from './tipos';
  * Uma linha da fila. É a unidade que a Heloísa lê com o polegar, na rua, e o desenho
  * responde a três perguntas nessa ordem: com QUEM, o QUE fazer, e PARA QUANDO.
  *
- *   barra esquerda  temperatura do negócio (só quando existe negócio)
+ *   barra esquerda  nenhuma: a barra térmica saiu em 28/09/2026 (ADR-16)
  *   linha 1         nome do parceiro           · à direita, o prazo em IBM Plex Mono
  *   linha 2         a ação: título da tarefa ou a próxima ação combinada
  *   linha 3         o motivo, quando ele diz algo que as outras linhas não dizem
- *   linha 4         temperatura escrita, etapa e bairro
+ *   linha 4         etapa, bairro e categoria
  *
  * O item inteiro é o alvo de toque — 76px de altura mínima, bem acima dos 44px —, e
  * o destino muda com o motivo: quem está sem resultado registrado vai para o
@@ -56,14 +56,10 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
 
   const miolo = (
     <>
-      {item.temperatura ? (
-        <BarraTermica temperatura={item.temperatura} posicao="absoluta" semRotulo />
-      ) : null}
-
       {/* O ÍCONE DO MOTIVO: reunião, tarefa, próxima ação, negócio parado. Ele diz
           antes da leitura o que aquela linha é — e quando o prazo já venceu, ele
           veste o tom de alerta, que é o único lugar da fila onde a cor significa
-          urgência e não temperatura. */}
+          urgência. */}
       <span
         aria-hidden="true"
         className={cn(
@@ -74,8 +70,8 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
         <Icone className="size-4.5" />
       </span>
 
-      {/* Em tela larga, quem é o parceiro fica à esquerda e o CONTEXTO (temperatura,
-          etapa, bairro, categoria) vai para a direita, antes do prazo: a linha
+      {/* Em tela larga, quem é o parceiro fica à esquerda e o CONTEXTO (etapa,
+          bairro, categoria) vai para a direita, antes do prazo: a linha
           ocupava um terço da largura e deixava metade da tela vazia, com três
           andares de texto amontoados na margem esquerda. No celular ele volta a
           empilhar, que é onde empilhar faz sentido. */}
@@ -87,12 +83,12 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
         </div>
 
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground md:mt-0 md:max-w-[45%] md:shrink-0 md:justify-end">
-          {item.temperatura ? (
-            <ChipTemperatura temperatura={item.temperatura} comDescricao={false} />
-          ) : null}
-          {/* A etapa sai daqui quando o motivo já a nomeou: repetir "Prospectado"
-              duas vezes na mesma linha só gasta a largura que o nome precisa. */}
-          {item.etapa && !explicar ? <span className="truncate">{item.etapa}</span> : null}
+          {/* A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026, ADR-16), e agora em
+              etiqueta: ela era a palavra mais apagada da linha e passou a ser o
+              dado que decide. Continua saindo quando o motivo já a nomeou —
+              repetir "Prospectado" duas vezes na mesma linha só gasta a largura
+              que o nome precisa. */}
+          {item.etapa && !explicar ? <EtiquetaEtapa etapa={item.etapa} /> : null}
           {local ? <span className="truncate">{local}</span> : null}
           {item.categoria ? <span className="truncate">{item.categoria}</span> : null}
         </p>
@@ -141,7 +137,7 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
         >
           {miolo}
           {/* Sem `aria-label` no link: um rótulo aqui APAGARIA todo o conteúdo da
-              linha para quem usa leitor de tela (temperatura, motivo, prazo). O
+              linha para quem usa leitor de tela (etapa, motivo, prazo). O
               destino entra como um acréscimo no fim, depois do que já foi lido. */}
           <span className="sr-only">Abrir {destino.onde}.</span>
         </Link>

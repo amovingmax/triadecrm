@@ -27,6 +27,11 @@ export type ItemDoDia = {
   organizacao: string | null;
   bairro: string | null;
   categoria: string | null;
+  /**
+   * Deixou de ser MOSTRADA em 28/09/2026 (ADR-16). Fica no tipo, e a RPC
+   * continua devolvendo, porque `public.meu_dia` a usa na ORDENAÇÃO INTERNA da
+   * fila (20260905000100): tirar daqui mudaria a ordem em que o time trabalha.
+   */
   temperatura: Temperatura | null;
   funil: string | null;
   etapa: string | null;
