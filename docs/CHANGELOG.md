@@ -3893,3 +3893,137 @@ Verificado: `supabase db reset` limpo, pgTAP **79 arquivos / 3.140 asserções**
 deriva, lint, typecheck e `pnpm test` verdes.
 
 **Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
+
+### 28/09/2026 — quem respondeu entra no Meu dia, no topo
+
+**A pergunta do Rafael:** *"como o atendente saberá que é pra alguém assumir a
+conversa?"*. Medido no banco, a resposta era: não saberia.
+
+O fluxo que subiu hoje funciona até certo ponto — a campanha manda "Bom dia!", o
+lead responde, `app.wa_resposta_no_funil` leva o negócio para **Respondeu** e a
+introdução automática sai sozinha 8 a 14 s depois. Daí em diante quem fala tem de
+ser gente. Só que `public.meu_dia`, a fila em que o time começa o dia, é feita de
+TAREFA e de NEGÓCIO e não lê `conversations` (zero ocorrências no corpo da
+função). A conversa fica sem tarefa e **sem dono de propósito** — é ela sem saída
+nossa que deixa a introdução sair (a recusa `a_conversa_ja_tem_dono` de
+`app.wa_introduzir`) —, e o único aviso era um badge de não lida numa tela que
+ninguém precisa abrir. Disparar muito e atender só quem responde quebrava aí.
+
+Entre três saídas apresentadas (pôr no Meu dia; distribuir e criar tarefa;
+notificar no navegador), o Rafael escolheu a primeira.
+
+#### O que entrou
+
+- **`app.conversas_esperando_gente(p_de_quem uuid)`** (migração
+  `20261002150000`): a definição ÚNICA de "respondeu e ninguém assumiu". Ela
+  pergunta pela última MENSAGEM, não pelo `status`. Uma linha por ficha
+  (`distinct on`), com a pessoa a quem a conversa já está endereçada
+  (`conversations.assignee_id`, caindo para `app.setor_quem_recebe` quando esse
+  perfil foi desativado). **Nada é escrito.**
+- **`app.wa_modelo_ausencia()`**: o id de `GEN-SYS-AUSENCIA`, para poder
+  reconhecer o aviso de fora do horário — ele é a única saída nossa que **não**
+  conta como resposta. Se contasse, quem escreve 21h40 sumia e ninguém o via de
+  manhã.
+- **Índice `conversations_esperando_idx`** `(assignee_id, last_inbound_at)`
+  parcial, usado pelo pré-filtro barato da função.
+- **`public.meu_dia` ganha o bloco 0**, no topo, com **teto de 15**.
+- **A tela**: bloco "Responderam e estão esperando", tipo `conversa_esperando`,
+  título "Responder no WhatsApp" (ou "Responder quem escreveu de fora da base"),
+  motivo contando quanto falta da janela de 24 h, ícone de mensagem, e o toque
+  levando para `/conversas?aba=responderam&org=…`.
+- **A aba "Responderam"** passa a fazer a mesma pergunta em TypeScript.
+
+#### Os quatro defeitos que a tarefa encontrou pelo caminho
+
+1. **`conversations.status` não é mantido.** Na entrada,
+   `app.messages_after_write` faz apenas `case when status = 'resolvida' then
+   'aguardando_nos' else status end`. A conversa de campanha nasce
+   `'aguardando_parceiro'` (`public.wa_enviar_modelo`) e continua assim depois que
+   o lead responde — então a aba "Responderam", que perguntava pelo status, estava
+   vazia **justo para o maior volume que o CRM tem**. As duas primeiras asserções
+   do pgTAP novo medem esse defeito e passavam antes do conserto.
+2. **`app.is_suppressed_target` é cego ao telefone.** Ele só olha
+   `organizations` e `contacts`, e devolve `false` quando os dois são nulos — que
+   é exatamente a conversa de quem escreveu de fora da base, a que esta fila
+   estreou. Quem pediu SAIR e não tem ficha entraria na lista de trabalho. A fila
+   usa `app.wa_motivo_de_recusa`, que enxerga o número (`numero_suprimido`).
+3. **A chave do React colidia.** `chaveDoItem` era
+   `tarefaId ?? atividadeId ?? negocioId ?? …`: o mesmo negócio rendendo duas
+   linhas (a conversa esperando e o cartão parado) devolvia a mesma chave. O tipo
+   passou a entrar sempre, e a organização entrou como penúltimo recurso, porque
+   conversa de ficha sem negócio aberto não tem `negocioId`.
+4. **A nota de rodapé dizia o contrário.** `NotaDoQueFalta` afirmava, em produção,
+   que "conversa de WhatsApp esperando resposta" não tinha como ser medida. Agora
+   ela conta o teto de 15 e manda o resto para a aba.
+
+E um quinto, menor: mostrar o motivo e esconder a etiqueta de etapa eram a mesma
+variável em `item-da-fila.tsx`. Nos três motivos antigos o motivo já nomeava a
+etapa; o da conversa não nomeia nenhuma — ele conta quanto falta da janela. Os
+dois passaram a caber juntos.
+
+#### De quem é o item, por extenso — e o risco
+
+O item é **de uma pessoa só: a que a conversa já aponta**
+(`conversations.assignee_id`, o "Atendendo" da tela de Conversas). Não é "de todo
+mundo" porque cinco pessoas abrindo a mesma conversa é a caixa compartilhada que
+`assignee_id` já resolveu; não é "do setor" porque setor é endereço para rotear,
+não para cobrar. `public.meu_dia` passa a ter **dois conceitos de posse**
+convivendo de propósito: `app.deal_cards.owner_id` ("Responsável") no bloco de
+negócios e `conversations.assignee_id` ("Atendendo") no bloco novo — a mesma
+distinção que a tela de Conversas já faz por nome.
+
+**O risco, dito:** `app.messages_quem_responde_atende` passa a conversa para quem
+mandou a última mensagem nossa, e o cumprimento da campanha é nosso. Como quase
+toda ficha do Radar está sem `owner_id`, a conversa de campanha aponta para **quem
+disparou**. Num dia de 3.000 disparos e 200 respostas, isso vira 200 itens de uma
+pessoa só. É por isso que o bloco tem teto de 15 — e é exatamente o número que
+faltava para escolher entre distribuir e notificar com um dado em vez de um
+palpite.
+
+#### Por que no topo, e por que com teto
+
+Todo o resto do Meu dia é trabalho que **nós** agendamos: tarefa, próxima ação,
+SLA. O custo de mais uma hora é nosso e é elástico. A conversa que respondeu é o
+único item cujo relógio é de **outra pessoa**, e são dois: a janela de 24 h, depois
+da qual só sai modelo aprovado (RF-CON-18), e alguém com o telefone na mão agora.
+Acima até da reunião em 3 h, que tem hora reservada dos dois lados e não evapora.
+
+O teto de 15 existe porque `LIMITE_DA_FILA` é 60 e a ordenação começa pela
+prioridade: sem ele, um dia de muitas respostas empurraria para fora da tela toda
+reunião, tarefa vencida e negócio parado. O Meu dia deixaria de ser o Meu dia no
+dia em que mais precisa ser.
+
+#### O que NÃO foi feito, de propósito
+
+- **Não distribui conversa e não cria tarefa** — a segunda opção, adiada pelo
+  Rafael até se saber quem atende o quê.
+- **Não notifica no navegador** — a terceira opção, adiada.
+- **Não dá dono a conversa nenhuma.** `public.meu_dia` continua só leitura, e a
+  asserção 27 do pgTAP novo trava isso com um retrato tirado **antes** da leitura.
+  É a conversa sem saída nossa que deixa a introdução automática sair.
+
+#### O que continua pendente
+
+- **`app.messages_after_write` não mantém `conversations.status`.** Consertar é uma
+  migração de uma linha e é tentador, mas é mudança de comportamento no caminho
+  quente da entrada, com efeito em `conversations_inbox_idx`, nas abas de Conversas
+  e em `app.envio_publico`. Vale, e vale sozinha, com os seus próprios testes.
+  Enquanto não vem, nem o Meu dia nem a aba "Responderam" dependem daquela coluna.
+- **`status = 'robo'`** é estado morto: nenhuma linha do banco escreve esse valor.
+  Fica registrado para quem for limpar o `check` um dia.
+
+#### O que precisa de decisão humana
+
+1. **Distribuir a conversa e criar tarefa** (a segunda opção): por setor ou
+   revezando? O risco nomeado é cair para quem está de folga. O número que falta
+   para decidir é quantos itens `conversa_esperando` uma pessoa acumula por dia —
+   e é justamente o que este item passa a medir.
+2. **Aviso no navegador** (a terceira opção): resolve quem está online, não resolve
+   quem abre depois. Faz sentido depois da distribuição, não antes.
+
+Verificado: `supabase db reset` limpo, pgTAP **81 arquivos / 3.176 asserções**
+(novo `87_quem_respondeu_no_meu_dia.sql`, 27 asserções), `supabase db lint` sem
+apontamento novo, `pnpm db:types` sem deriva além das duas funções novas de `app`,
+lint, typecheck e `pnpm test` verdes (**881** no web, 363 nos workers).
+
+**Nada subiu para produção:** sem `supabase db push`, sem `vercel`, sem `git push`.
