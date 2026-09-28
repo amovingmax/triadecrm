@@ -61,9 +61,12 @@ function SeparadorDeDia({ iso }: { iso: string }) {
   const { palavra, numero, completo } = rotuloDoDia(iso);
 
   return (
-    <div className="flex justify-center">
+    // GRUDADO NO TOPO. Numa conversa de três meses, rolar para o meio deixava a
+    // pessoa sem saber de que dia era aquilo — o separador tinha passado
+    // trezentos pixels acima. `z-10` porque os balões rolam por baixo dele.
+    <div className="sticky top-0 z-10 flex justify-center py-1">
       <span
-        className="rounded-full bg-muted px-3 py-1 text-[11px] text-muted-foreground"
+        className="rounded-full border border-hairline bg-background/90 px-3 py-1 text-[11px] text-muted-foreground backdrop-blur-sm"
         title={completo}
       >
         {palavra}

@@ -4380,3 +4380,36 @@ do arquivo 70).
 - Pendente: ninguém ligou a chave ainda — o fluxo só roda de ponta a ponta
   depois disso.
 - Decisão humana: com que ritmo começar (o padrão é 6/h) e em que dia ligar.
+
+### 28/09/2026 — o redesenho da conversa, agora de verdade
+
+Rafael, depois do deploy anterior: *"e o visual? manteve o mesmo, falei pra vc
+mudar"*. Ele tinha razão. A primeira leva alargou a coluna de 20 para 23rem,
+subiu o balão de 34 para 40rem e trocou cinco pílulas por uma linha de texto —
+melhorias reais, mas *ajuste*, não o pivô de design que ele pediu. A parte que
+importava continuava igual: os dois lados da conversa com o mesmo peso visual.
+
+O que mudou agora:
+
+- **Avatar por bloco**, na coluna de quem falou. "Quem é quem" era uma linha de
+  11 px; virou uma bolinha reconhecível de relance. Numa conversa em que
+  revezam o fornecedor, três pessoas do time, o robô e a IA, o lado do balão
+  separa dois grupos e mais nada — o círculo separa os cinco. O robô e a IA
+  levam **ícone, não iniciais**: dar-lhes letras seria a máquina se fantasiando
+  de pessoa, o contrário do que o Rafael pediu em 28/09.
+- **O que nós mandamos é verde sólido** (`bg-primary` com `text-primary-foreground`).
+  Era `bg-primary/20`: no tema escuro o véu de 20% caía quase no mesmo cinza da
+  recebida. A queixa de "não dá para ver quem é quem" era literalmente isso. A
+  recebida ganhou borda em vez de fundo mais claro, para não competir.
+- **Texto de 16 px em toda largura** (era 15, e 16 só no desktop).
+- **Separador de dia grudado no topo**: numa conversa de três meses, rolar para
+  o meio deixava a pessoa sem saber de que dia era aquilo.
+- **Retrato também no cabeçalho**, e o nome em 18 px em toda largura.
+
+- Tocado: `mensagem-do-fio.tsx`, `linha-do-tempo.tsx`, `conversa.tsx`.
+- Verificado: lint, typecheck e testes verdes (web 902, workers 363,
+  prompts 284, schema 105).
+- Não verificado: **não vi a tela**. O login local é OAuth do Google e não roda
+  em ambiente de teste, então este desenho foi escrito sem screenshot. Quem
+  confere é o Rafael, na tela, e isto está escrito aqui porque duas rodadas já
+  passaram com "continua feio" e a causa pode ser exatamente essa.

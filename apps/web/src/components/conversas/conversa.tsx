@@ -6,6 +6,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BotOff, ChevronDown, ExternalLink, MessageSquarePlus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { iniciaisDe } from '@/lib/auth/session';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatarProximaAcao } from '@/components/parceiros/formatos';
@@ -243,8 +245,17 @@ export function Conversa({
             <span className="sr-only">Voltar para a lista de conversas</span>
           </Button>
 
+          {/* O RETRATO TAMBÉM AQUI. Mesma bolinha que aparece nos balões: é o
+              que liga o cabeçalho ao fio e dá ao painel um ponto de âncora à
+              esquerda, em vez de começar em texto solto. */}
+          <Avatar className="size-10 shrink-0">
+            <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
+              {iniciaisDe(item.nome)}
+            </AvatarFallback>
+          </Avatar>
+
           <div className="min-w-0 flex-1">
-            <h2 className="truncate font-heading text-base leading-tight font-semibold tracking-tight md:text-lg">
+            <h2 className="truncate font-heading text-lg leading-tight font-semibold tracking-tight">
               {item.nome}
             </h2>
             {/* UMA FRASE, EM TODA LARGURA. Eram cinco pílulas no desktop e uma

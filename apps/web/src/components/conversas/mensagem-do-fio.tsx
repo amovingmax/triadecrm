@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { AudioLines, BadgeCheck, Ban, Bot, FileText, Hourglass, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { iniciaisDe } from '@/lib/auth/session';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 import { urlDaMidia } from './acoes';
 import { VirarTarefa } from './virar-tarefa';
@@ -67,33 +69,59 @@ export function Mensagem({
   const semTexto = mensagem.texto === null;
   const entrada = mensagem.entrada;
 
+  // ===========================================================================
+  // 28/09/2026 — O REDESENHO QUE O RAFAEL PEDIU DE VERDADE
+  // ===========================================================================
+  // "vamos pivotear o designer, ta mtt feio e pequeno, pode compor mais espaço
+  // (...) deixando o visual mais clean, deixando claro quem é quem". A primeira
+  // tentativa foi tímida — alargou a coluna e aumentou o balão —, e ele
+  // respondeu "manteve o mesmo". O que faltava era o desenho, não o tamanho:
+  //
+  //   * AVATAR por bloco, na coluna de quem falou. "Quem é quem" deixa de ser
+  //     uma linha de texto de 11 px e passa a ser reconhecível de relance, que
+  //     é como se lê uma conversa.
+  //   * COR DE VERDADE no que nós mandamos: `bg-primary` sólido no lugar do
+  //     véu de 20%, que no tema escuro era quase o mesmo cinza da recebida —
+  //     os dois lados pareciam iguais, e era esse o "não dá pra ver quem é".
+  //   * TIPO MAIOR em toda largura (16 px, não 15), e mais ar por dentro.
   return (
     <div
       className={cn(
-        'group flex w-full flex-col',
-        entrada ? 'items-start' : 'items-end',
-        fechaGrupo ? 'pb-3' : 'pb-0.5',
+        'group flex w-full items-end gap-2',
+        entrada ? 'flex-row' : 'flex-row-reverse',
+        fechaGrupo ? 'pb-4' : 'pb-1',
       )}
     >
+      {/* O avatar só no ÚLTIMO do bloco, e um espaço do mesmo tamanho nos
+          outros: é o que alinha a coluna sem repetir a mesma bolinha cinco
+          vezes numa sequência de cinco mensagens. */}
+      {fechaGrupo ? (
+        <Retrato mensagem={mensagem} nomeDoParceiro={nomeDoParceiro} />
+      ) : (
+        <span className="size-8 shrink-0" aria-hidden="true" />
+      )}
+
+      <div className={cn('flex min-w-0 flex-col', entrada ? 'items-start' : 'items-end')}>
       {agrupada ? null : <Quem mensagem={mensagem} nomeDoParceiro={nomeDoParceiro} />}
 
       <div
         className={cn(
-          // 28/09/2026: o balão tinha 34rem de teto dentro de uma coluna de 48rem
-          // — texto pequeno, apertado, e meia tela vazia do lado ("ta mtt feio e
-          // pequeno", Rafael). Agora ele acompanha a coluna de leitura, que é a
-          // largura em que se lê sem cansar, e respira por dentro.
-          'min-w-0 max-w-[88%] space-y-2 px-4 py-3 text-[15px] leading-relaxed',
-          'md:max-w-[40rem] md:text-base',
+          'min-w-0 max-w-[85%] space-y-2 px-4 py-3 text-base leading-relaxed',
+          'md:max-w-[38rem]',
           // O canto reto é o "rabinho" do balão: fica no lado de quem falou, e só
           // no último do bloco — no meio do bloco todos os cantos são redondos.
           'rounded-2xl',
           // O cinza da recebida muda de degrau com o tema: no claro o cartão é
           // quase branco (some no fundo da página) e quem separa é o `muted`; no
           // escuro é o contrário — o `muted` encosta no fundo e o cartão destaca.
+          // O QUE NÓS MANDAMOS É VERDE SÓLIDO. Era `bg-primary/20`: no tema
+          // escuro o véu de 20% caía quase no mesmo cinza da recebida, e os dois
+          // lados da conversa ficavam com o mesmo peso — a queixa de "não dá
+          // para ver quem é quem" era literalmente isso. A recebida ganhou
+          // borda em vez de fundo mais claro, para não competir.
           entrada
-            ? cn('bg-muted text-foreground dark:bg-card', fechaGrupo && 'rounded-bl-md')
-            : cn('bg-primary/20 text-foreground', fechaGrupo && 'rounded-br-md'),
+            ? cn('border border-hairline bg-card text-foreground', fechaGrupo && 'rounded-bl-md')
+            : cn('bg-primary text-primary-foreground', fechaGrupo && 'rounded-br-md'),
         )}
       >
         {mensagem.tipo === 'audio' ? <Audio mensagem={mensagem} /> : null}
@@ -107,7 +135,7 @@ export function Mensagem({
       {fechaGrupo ? (
         <p
           className={cn(
-            'mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-[11px] text-muted-foreground',
+            'mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground',
             entrada ? 'justify-start' : 'flex-row-reverse',
           )}
         >
@@ -135,7 +163,70 @@ export function Mensagem({
           ) : null}
         </p>
       ) : null}
+      </div>
     </div>
+  );
+}
+
+/**
+ * O retrato de quem falou: duas letras num círculo, na coluna do lado dele.
+ *
+ * Não é enfeite. Numa conversa em que revezam o fornecedor, três pessoas do
+ * time, o robô e a IA, o lado do balão distingue dois grupos — nós e eles — e
+ * mais nada. O círculo distingue os cinco, e distingue antes de alguém ler.
+ *
+ * O robô e a IA têm ícone em vez de letra: eles não são gente, e dar iniciais a
+ * eles seria exatamente a "tagzinha de IA" que o Rafael recusou — ao contrário,
+ * na verdade: seria a máquina se fantasiando de pessoa.
+ */
+function Retrato({
+  mensagem,
+  nomeDoParceiro,
+}: {
+  mensagem: MensagemDoFio;
+  nomeDoParceiro: string | null;
+}) {
+  // Guardar o tipo NUMA CONSTANTE é o que deixa o TypeScript saber, lá embaixo,
+  // que `ROTULO_DO_ROBO` tem chave para ele: `mensagem.autorTipo` volta a ser o
+  // tipo largo dentro do JSX.
+  const robo =
+    mensagem.autorTipo === 'bot_ai' ||
+    mensagem.autorTipo === 'bot_fixed' ||
+    mensagem.autorTipo === 'system'
+      ? mensagem.autorTipo
+      : null;
+
+  if (!mensagem.entrada && robo !== null) {
+    return (
+      <span
+        className="flex size-8 shrink-0 items-center justify-center rounded-full border border-hairline bg-muted text-muted-foreground"
+        title={ROTULO_DO_ROBO[robo]}
+      >
+        {robo === 'bot_ai' ? (
+          <Sparkles className="size-4" aria-hidden="true" />
+        ) : (
+          <Bot className="size-4" aria-hidden="true" />
+        )}
+        <span className="sr-only">{ROTULO_DO_ROBO[robo]}</span>
+      </span>
+    );
+  }
+
+  const nome = mensagem.entrada
+    ? (nomeDoParceiro?.trim() || 'Parceiro')
+    : (mensagem.autor ?? 'Time');
+
+  return (
+    <Avatar className="size-8 shrink-0" title={nome}>
+      <AvatarFallback
+        className={cn(
+          'text-[11px] font-medium',
+          mensagem.entrada ? 'bg-muted text-muted-foreground' : 'bg-primary/15 text-primary',
+        )}
+      >
+        {iniciaisDe(nome)}
+      </AvatarFallback>
+    </Avatar>
   );
 }
 
