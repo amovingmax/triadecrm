@@ -15,6 +15,15 @@ import { ErroDaConversa } from './acoes';
 /** Sete dias, que é o que cabe numa tela e o horizonte da pergunta diária. */
 export const DIAS_DO_FEED = 7;
 
+/**
+ * O teto de linhas do feed — o mesmo `p_limite` que a RPC recebe.
+ *
+ * Exportado porque o placar do cabeçalho conta as linhas CARREGADAS, e no dia em
+ * que elas baterem no teto o texto tem de dizer isso. Um placar que diz "200
+ * saíram" numa semana de 900 não é resumo, é número errado.
+ */
+export const LIMITE_DO_FEED = 200;
+
 export const CHAVE_AUTOMATICAS = ['conversas', 'automaticas', DIAS_DO_FEED] as const;
 
 /** Uma linha crua da RPC. O tipo gerado declara tudo não-nulo; não é. */
@@ -44,7 +53,7 @@ export async function carregarAutomaticas(): Promise<AutomaticaCrua[]> {
   // que a pessoa abriu a tela para ver.
   const { data, error } = await supabase.rpc('mensagens_automaticas', {
     p_desde: desde,
-    p_limite: 200,
+    p_limite: LIMITE_DO_FEED,
   });
   if (error) {
     throw new ErroDaConversa('Não deu para ler o que o CRM mandou sozinho.', true, error);

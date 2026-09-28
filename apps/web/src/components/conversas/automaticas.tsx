@@ -6,8 +6,13 @@ import { cn } from '@/lib/utils';
 import { useRevelarLinha } from '@/components/movimento';
 
 import type { AutomaticaCrua } from './automaticas-dados';
-import { DIAS_DO_FEED } from './automaticas-dados';
-import { ROTULO_DO_MODELO, resumoDoQueAconteceu, rotuloDoAutor } from './automaticas-formatos';
+import { DIAS_DO_FEED, LIMITE_DO_FEED } from './automaticas-dados';
+import {
+  ROTULO_DO_MODELO,
+  placarDoFeed,
+  resumoDoQueAconteceu,
+  rotuloDoAutor,
+} from './automaticas-formatos';
 import { dataHoraCompleta, hora, rotuloDoDia } from './formatos';
 
 /**
@@ -30,9 +35,15 @@ import { dataHoraCompleta, hora, rotuloDoDia } from './formatos';
  * o fluxo novo parando no terceiro passo: a campanha manda "Bom dia!", o lead
  * responde, a introdução sai — e ninguém assume.
  *
- * NÃO É UMA FILA. Por isso a aba não tem contador: um número aqui diria
+ * NÃO É UMA FILA. Por isso a aba não tem contador: um número no rótulo diria
  * "trabalho parado", e a maior parte destas linhas não pede nada de ninguém.
  * Quem cobra ação é o Meu dia e a aba "Responderam".
+ *
+ * O PLACAR DO CABEÇALHO é outra coisa, e é a segunda pergunta do Rafael: "como
+ * tá esse processo?". Ele descreve o período inteiro antes da rolagem — quantas
+ * saíram, quantas tiveram resposta, quantas estão esperando alguém — porque
+ * contar pastilha por pastilha em até 200 linhas não é leitura, é trabalho. Ele
+ * mora DENTRO da tela, e não na aba, justamente para não virar cobrança.
  *
  * O cumprimento da campanha não está aqui: ele é `human`, assinado por quem
  * disparou, e mora em /envios. O cabeçalho diz isso, porque quem não achar o
@@ -46,6 +57,12 @@ export function FeedAutomaticas({
   /** Abre a conversa daquela mensagem: por ficha quando há, senão pelo fio. */
   aoAbrir: (destino: { organizacaoId: string | null; conversaId: string | null }) => void;
 }) {
+  const placar = placarDoFeed(linhas);
+  // NO TETO, o placar deixa de falar do período e passa a falar das linhas que
+  // couberam. Dizer "200 saíram" numa semana de 900 não é resumo, é número
+  // errado — e é o tipo de erro que ninguém percebe, porque o número existe.
+  const noTeto = linhas.length >= LIMITE_DO_FEED;
+
   return (
     <div className="flex min-h-0 flex-col">
       <div className="border-b border-hairline px-4 py-3">
@@ -56,6 +73,40 @@ export function FeedAutomaticas({
           e as confirmações de saída. O cumprimento das campanhas não está aqui — ele é
           assinado por quem disparou e mora em Campanhas.
         </p>
+
+        {/* O PLACAR — a segunda pergunta do Rafael ("como tá esse processo?"),
+            respondida antes da rolagem. A lista sozinha só a responde se a
+            pessoa contar pastilha por pastilha, e o feed vai até
+            LIMITE_DO_FEED linhas.
+
+            NÃO É UM CONTADOR DE FILA: por isso ele mora DENTRO da tela e não na
+            aba. O único número com peso é "esperando alguém", que é o mesmo caso
+            que a pastilha pinta de alerta; os outros são volume e desfecho. */}
+        {linhas.length > 0 ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {noTeto ? 'Nas ' : ''}
+            <span className="numerico text-foreground">{placar.sairam}</span>{' '}
+            {noTeto ? 'mais recentes' : placar.sairam === 1 ? 'saiu' : 'saíram'} ·{' '}
+            <span className="numerico text-foreground">{placar.responderam}</span>{' '}
+            {placar.responderam === 1 ? 'teve resposta' : 'tiveram resposta'}
+            {placar.esperando > 0 ? (
+              <>
+                {' '}
+                ·{' '}
+                <span className="font-medium text-destructive-texto">
+                  <span className="numerico">{placar.esperando}</span> esperando alguém
+                </span>
+              </>
+            ) : null}
+            {placar.naoSairam > 0 ? (
+              <>
+                {' '}
+                · <span className="numerico">{placar.naoSairam}</span>{' '}
+                {placar.naoSairam === 1 ? 'não saiu' : 'não saíram'}
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </div>
 
       {linhas.length === 0 ? (

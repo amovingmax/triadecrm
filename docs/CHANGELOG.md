@@ -4167,6 +4167,21 @@ que pode ser resposta a outra coisa dita três dias depois.
 A aba **não tem contador**: um número ali diria "trabalho parado", e o feed não é
 fila. Quem cobra ação é o Meu dia e a aba "Responderam".
 
+**Um placar no cabeçalho, acrescentado na conferência** (`placarDoFeed`): a
+lista respondia bem à primeira pergunta do Rafael ("onde e como vemos as
+mensagens que foram enviadas automáticas?") e deixava a segunda — **"como tá
+esse processo?"** — para quem contasse pastilha por pastilha em até 200 linhas.
+Agora o cabeçalho abre com *"10 saíram · 5 tiveram resposta · 3 esperando alguém
+· 1 não saiu"*. Ele **conta o que a pastilha decidiu** (chama
+`resumoDoQueAconteceu` linha a linha) em vez de reimplementar a regra: se
+contasse por conta própria, o dia em que a ordem mudasse — a entrega falhada vem
+**antes** das duas colunas — o número e a pastilha passariam a dizer coisas
+diferentes na mesma tela. Só "esperando alguém" tem peso, porque é o mesmo caso
+que a pastilha pinta de alerta. No teto de 200 o texto troca para *"Nas 200 mais
+recentes"*: dizer "200 saíram" numa semana de 900 seria um número errado que
+ninguém percebe, porque o número existe. O placar mora **dentro** da tela e não
+na aba — é descrição do período, não cobrança.
+
 De quebra, `system` ganhou nome no balão da conversa (**"Confirmação
 automática"**): ele caía em "Alguém do time", e não houve alguém. As três
 palavras passaram a morar num lugar só (`ROTULO_DO_ROBO`), para o feed e o fio

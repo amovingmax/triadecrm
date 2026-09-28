@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resumoDoQueAconteceu, ROTULO_DO_MODELO } from './automaticas-formatos';
+import { placarDoFeed, resumoDoQueAconteceu, ROTULO_DO_MODELO } from './automaticas-formatos';
 import { ehAbaDaEsquerda, urlDoEstado, FILTROS_VAZIOS } from './tipos';
 
 /**
@@ -86,5 +86,49 @@ describe('ROTULO_DO_MODELO', () => {
 
   it('devolve undefined para um modelo que ele não conhece, e a tela cai no nome do banco', () => {
     expect(ROTULO_DO_MODELO['GEN-SYS-QUALQUER-COISA-NOVA']).toBeUndefined();
+  });
+});
+
+describe('placarDoFeed', () => {
+  // Rafael perguntou DUAS coisas: "onde e como vemos as mensagens que foram
+  // enviadas automáticas?" — a lista responde — e "como tá esse processo?", que
+  // a lista só responde se a pessoa contar pastilha por pastilha. Com o teto de
+  // 200 linhas do feed isso não é leitura, é trabalho. O placar responde a
+  // segunda pergunta antes da rolagem.
+  const linha = (entrega: string | null, respondeuEm: string | null, genteFalouEm: string | null) =>
+    ({
+      entrega,
+      respondeu_em: respondeuEm,
+      gente_falou_em: genteFalouEm,
+    }) as Parameters<typeof placarDoFeed>[0][number];
+
+  it('conta as quatro coisas que a pessoa quer saber antes de rolar', () => {
+    const p = placarDoFeed([
+      linha('sent', '2026-09-28T12:01:00-03:00', null), // respondeu, ninguém falou
+      linha('sent', '2026-09-28T12:01:00-03:00', '2026-09-28T12:05:00-03:00'), // assumida
+      linha('sent', null, null), // ninguém respondeu
+      linha('failed', null, null), // não saiu
+      linha('sent', null, '2026-09-28T12:05:00-03:00'), // alguém assumiu sozinho
+    ]);
+    expect(p.sairam).toBe(5);
+    expect(p.responderam).toBe(2);
+    expect(p.esperando).toBe(1);
+    expect(p.naoSairam).toBe(1);
+  });
+
+  // O placar NÃO reimplementa a regra: ele conta o que `resumoDoQueAconteceu`
+  // decidiu. Se contasse por conta própria, o dia em que a regra mudasse (a
+  // entrega falhada vindo antes das duas colunas, por exemplo) o número e a
+  // pastilha passariam a dizer coisas diferentes na mesma tela — e aí ninguém
+  // acredita em nenhum dos dois.
+  it('a mensagem que não saiu não conta como respondida, igual à pastilha', () => {
+    const p = placarDoFeed([linha('failed', '2026-09-28T12:01:00-03:00', null)]);
+    expect(p.naoSairam).toBe(1);
+    expect(p.responderam).toBe(0);
+    expect(p.esperando).toBe(0);
+  });
+
+  it('feed vazio não inventa número', () => {
+    expect(placarDoFeed([])).toEqual({ sairam: 0, responderam: 0, esperando: 0, naoSairam: 0 });
   });
 });

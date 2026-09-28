@@ -71,3 +71,48 @@ export function resumoDoQueAconteceu({
   if (genteFalouEm) return { texto: 'Alguém assumiu o fio', alerta: false };
   return { texto: 'Ninguém respondeu', alerta: false };
 }
+
+/**
+ * O PLACAR DO PERÍODO — a resposta à segunda pergunta do Rafael.
+ *
+ * Ele perguntou duas coisas: "onde e como vemos as mensagens que foram enviadas
+ * automáticas?", que a lista responde, e **"como tá esse processo?"**, que a
+ * lista só responde se a pessoa contar pastilha por pastilha. Com o teto de 200
+ * linhas do feed isso não é leitura, é trabalho — e a pergunta dele é sobre o
+ * fluxo inteiro, não sobre uma linha.
+ *
+ * CONTA O QUE A PASTILHA DECIDIU, e não por conta própria. Se o placar
+ * reimplementasse a regra, o dia em que `resumoDoQueAconteceu` mudasse (a
+ * entrega falhada vindo antes das duas colunas, que é justamente a ordem que
+ * importa) o número e a pastilha passariam a dizer coisas diferentes na mesma
+ * tela — e aí ninguém acredita em nenhum dos dois.
+ *
+ * `esperando` é o único número com peso na tela: é o mesmo caso que a pastilha
+ * pinta de alerta, e o único que pede alguém. `sairam` é o volume, `responderam`
+ * é o que o fluxo colheu e `naoSairam` só aparece quando existe.
+ */
+export function placarDoFeed(
+  linhas: readonly {
+    entrega: string | null;
+    respondeu_em: string | null;
+    gente_falou_em: string | null;
+  }[],
+): { sairam: number; responderam: number; esperando: number; naoSairam: number } {
+  let responderam = 0;
+  let esperando = 0;
+  let naoSairam = 0;
+  for (const l of linhas) {
+    const { texto } = resumoDoQueAconteceu({
+      entrega: l.entrega,
+      respondeuEm: l.respondeu_em,
+      genteFalouEm: l.gente_falou_em,
+    });
+    if (texto === 'Não saiu') naoSairam += 1;
+    if (texto === 'Respondeu e ninguém falou ainda') {
+      responderam += 1;
+      esperando += 1;
+    }
+    if (texto === 'Respondeu, e alguém assumiu') responderam += 1;
+  }
+  return { sairam: linhas.length, responderam, esperando, naoSairam };
+}
