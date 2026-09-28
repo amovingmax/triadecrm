@@ -25,7 +25,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(20);
+select plan(27);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -357,6 +357,84 @@ select is(pg_temp.introducoes('lead_comecou'), 0,
 select pg_temp.chegou('+5584999998302', 'agora sim, me explica');
 select is(pg_temp.introducoes('recontato'), 1,
   'RECONTATO: quem levou dois "Bom dia!" e respondeu recebe a apresentação');
+
+-- =====================================================================
+-- 6. A JANELA DE 24 H É PERGUNTADA, NÃO PRESUMIDA (28/09/2026)
+-- =====================================================================
+-- O gatilho só dispara com mensagem RECEBIDA, e mensagem recebida abre a
+-- janela — foi esse raciocínio que fez a 20261002090000 prometer "dentro da
+-- janela de 24 h" sem conferir nada. Ele quase sempre vale.
+--
+-- Quase não é sempre. `app.messages_after_write` grava `last_inbound_at =
+-- new.created_at`, e `public.wa_entrada_registrar` recebe o carimbo DA META em
+-- `p_quando`: o instante em que o fornecedor escreveu, não o instante em que a
+-- gente soube. Worker que caiu, fila represada, webhook reenviado — a entrada
+-- chega com 30 h, `window_expires_at` nasce vencida, e antes da 20261002130000
+-- a introdução saía assim mesmo, como mensagem INICIADA PELA EMPRESA: cobrada,
+-- contada nos tetos do RF-CON-10 e recusada pela Meta, porque `GEN-SYS-INTRO`
+-- nunca foi submetido (`meta_status` vazio).
+--
+-- O cumprimento vem ANTES da entrada de propósito: com ele depois, a regra (1)
+-- responderia `a_conversa_ja_tem_dono` e esconderia justamente o que se prova
+-- aqui.
+create function pg_temp.conversa_com_entrada_velha() returns uuid language plpgsql as $$
+declare v_conv uuid;
+begin
+  v_conv := pg_temp.conversa_nova('+5584999998316');
+  perform pg_temp.saiu_cumprimento(v_conv, now() - interval '40 hours');
+  perform pg_temp.chegou('+5584999998316', 'bom dia, me explica', now() - interval '30 hours');
+  return v_conv;
+end $$;
+insert into pg_temp.casos values ('janela_vencida', pg_temp.conversa_com_entrada_velha());
+
+select ok(not app.janela_de_24h_aberta(pg_temp.caso('janela_vencida'), now()),
+  'a entrada de 30 h atrás nasce com a janela de 24 h JÁ VENCIDA');
+
+select is(pg_temp.introducoes('janela_vencida'), 0,
+  'janela vencida: a introdução NÃO sai — ela é resposta de graça, não template iniciado pela empresa');
+
+select is(app.wa_introduzir(pg_temp.ultima_entrada('+5584999998316')) ->> 'motivo',
+  'fora_da_janela_de_24h',
+  'e a recusa é nomeada pela janela, não pela conversa ter dono: a pergunta vem antes do carimbo');
+
+-- O CUMPRIMENTO da campanha É `business_initiated`, e está certo que seja: ele
+-- abre a conversa e é para isso que os tetos existem. O que não pode existir é
+-- saída DEPOIS da entrada velha — essa seria a introdução, gastando um segundo
+-- slot numa mensagem que a Meta recusaria.
+select is((select count(*)::int from public.messages m
+            where m.conversation_id = pg_temp.caso('janela_vencida')
+              and m.direction = 'out'::app.msg_direction
+              and m.created_at >= now() - interval '30 hours'), 0,
+  'nada saiu depois da entrada velha: nenhum slot a mais dos tetos do RF-CON-10 foi gasto');
+
+-- =====================================================================
+-- 7. QUEM JÁ PEDIU PARA SAIR NÃO RECEBE APRESENTAÇÃO
+-- =====================================================================
+-- `pg_temp.chegou('sair')` prova o opt-out DESTA mensagem. Este é o outro caso,
+-- e é o mais comum: quem se despediu ONTEM, já tem `do_not_contact` na ficha, e
+-- volta a escrever hoje ("mudei de ideia?", "quem é?"). A resposta a ele é de
+-- gente, nunca uma oferta automática.
+insert into pg_temp.casos values ('suprimido', pg_temp.conversa_com_cumprimento('+5584999998317'));
+update public.organizations set do_not_contact = true
+ where id = (select organization_id from public.conversations
+              where id = pg_temp.caso('suprimido'));
+select pg_temp.chegou('+5584999998317', 'oi, quem é?');
+
+select is(pg_temp.introducoes('suprimido'), 0,
+  'ficha em do_not_contact: nenhuma introdução, em nenhum modo (guardrail de opt-out do PRD)');
+select is(app.wa_introduzir(pg_temp.ultima_entrada('+5584999998317')) ->> 'motivo',
+  'contato_suprimido',
+  'e a recusa vem de app.wa_motivo_de_recusa, a mesma que barra o envio na entrega');
+
+-- =====================================================================
+-- 8. SÓ DEPOIS DA RESPOSTA
+-- =====================================================================
+-- A campanha manda o cumprimento e o fornecedor se cala. Não sai nada. É o
+-- desenho do Rafael em uma linha: "se ele não responder, não sai nada".
+insert into pg_temp.casos values ('calado', pg_temp.conversa_com_cumprimento('+5584999998318'));
+select is(pg_temp.introducoes('calado'), 0,
+  'quem levou o cumprimento e não respondeu não recebe a introdução: ela é resposta, não segunda investida');
+
 
 select * from finish();
 rollback;
