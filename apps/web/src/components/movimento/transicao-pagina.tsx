@@ -1,9 +1,10 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { motion } from 'motion/react';
 
-import { DESLOCAMENTO_ENTRADA, useMovimento } from './usar-movimento';
+import { cn } from '@/lib/utils';
+
+
 
 /**
  * Troca de página dentro do app: opacidade mais 2px de subida. A justificativa é
@@ -21,19 +22,15 @@ export function TransicaoPagina({
   className?: string;
 }) {
   const caminho = usePathname();
-  const { reduzido, transicaoPagina } = useMovimento();
-
-  if (reduzido) return <div className={className}>{children}</div>;
-
+  // `key` no caminho remonta a div a cada troca de página, e é isso que faz a
+  // animação de CSS rodar de novo. Nada mais depende de estado do cliente: o
+  // HTML do servidor e o do navegador são idênticos, e a entrada é toda do CSS
+  // (`entrada-pagina`, em `globals.css`, com o porquê de ter saído do
+  // `motion`). Até 29/09/2026 isto deixava o CRM em branco para quem usa
+  // "reduzir movimento".
   return (
-    <motion.div
-      key={caminho}
-      className={className}
-      initial={{ opacity: 0, y: DESLOCAMENTO_ENTRADA / 2 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={transicaoPagina}
-    >
+    <div key={caminho} className={cn('entrada-pagina', className)}>
       {children}
-    </motion.div>
+    </div>
   );
 }

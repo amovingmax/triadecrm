@@ -345,7 +345,10 @@ function Interruptor({
         onClick={() => aoMudar(!ligado)}
         className={cn(
           'relative mt-1 h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50',
-          ligado ? 'bg-primary' : 'bg-muted-foreground/30',
+          // Ligado é MENTA (29/09/2026): o interruptor ligado era tinta, e um
+          // painel de cinco interruptores pretos lia como cinco "desligados"
+          // de relance. Menta é o "sim" da interface.
+          ligado ? 'bg-menta' : 'bg-muted-foreground/30',
         )}
       >
         <span className="sr-only">{ligado ? 'Ligado' : 'Desligado'}</span>

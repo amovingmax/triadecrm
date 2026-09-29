@@ -5028,3 +5028,81 @@ Parceiros e Relatórios.
 
 - Tocado: `funis/coluna.tsx`, `parceiros/tabela-parceiros.tsx`.
 - Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.
+
+### 29/09/2026 — a tela em branco para quem reduz o movimento, e a primeira rodada vista de verdade
+
+Rafael, com três prints (Revisão, Cadências, Admin): *"vc piorou o 'Meu dia'
+retorno a uma alteração, quero mais presença do verde no CRM em geral, os leads
+no funil ta muito poluido, melhore a tela de revisão também, ta feia e poluida,
+vc ta omitindo muitas telas, faça com atenção e evite muita informação junta,
+quero algo clean e organizado"*.
+
+#### O que mudou no método
+
+Até aqui eu desenhava as telas sem vê-las — o login é OAuth do Google e não roda
+em teste —, e os três defeitos reais desta semana (o balão, os botões sem fundo,
+o verde na lateral) foram achados pelo Rafael em print. Agora existe uma
+**conferência visual local**: uma conta de teste só no Supabase local
+(`visual@teste.local`, papel admin, nunca em produção), a sessão gerada no
+formato exato do `@supabase/ssr`, o servidor de desenvolvimento e um navegador
+de teste fotografando cada tela antes de subir, com a carga de 5 mil parceiros
+(`pnpm db:seed-dev`) e candidatos de teste na Revisão.
+
+Um cuidado aprendido no caminho: **navegador em aba de fundo pausa animação**.
+As primeiras fotos saíram desbotadas por isso, e uma delas me fez achar que a
+correção não tinha funcionado. Toda conferência passou a trazer a aba para a
+frente antes de medir.
+
+#### O defeito grave que a conferência achou
+
+**Com "reduzir movimento" ligado no sistema, o CRM abria em branco** — só o
+trilho e o cabeçalho, em todas as telas. Não era desta rodada: estava em
+produção desde que a transição de página nasceu.
+
+A causa: o servidor não conhece a preferência de movimento, então renderizava a
+página com `style="opacity:0"` esperando a animação. No navegador, com o
+movimento reduzido, o componente trocava para uma `<div>` comum, e o React
+hidratava por cima sem limpar o estilo — hidratação não conserta atributo
+divergente. A página ficava com opacidade zero para sempre.
+
+Conferido com a aba na frente, nos dois sentidos: o código antigo com movimento
+reduzido deixa `opacity:0` preso; o novo mostra as seis telas medidas, com e
+sem a preferência. A entrada de página saiu do `motion` para uma animação de
+**CSS** (`entrada-pagina`): a invisibilidade só existe no primeiro quadro, e
+animação de CSS sempre termina — se o JavaScript atrasar, falhar ou o sistema
+pedir menos movimento, `both` leva o elemento à opacidade 1. O conteúdo nunca
+mais depende de um script para aparecer. O último quadro é `transform: none`
+porque ancestral com `transform` vira bloco de contenção de todo `position:
+fixed`, e diálogo e folha passariam a se posicionar pela página.
+
+#### O que o Rafael pediu
+
+- **Meu dia** voltou ao que era antes dos três cartões de atenção (`git revert`
+  do commit que os trouxe).
+- **O cartão do funil** foi de quatro linhas e seis sinais para **três linhas e
+  um sinal**. Saíram: a moldura da nota comercial, o segundo número de dias
+  ("Parado há 56d" E "53d" para a mesma pergunta), o ícone do canal, a próxima
+  ação cortada no meio e o nome inteiro do dono (virou iniciais num disco). E o
+  véu cinza dos parados — num funil onde metade está parada, o quadro inteiro
+  ficava com cara de sujo. O sinal que sobra é um só: parado há quanto tempo,
+  em coral, ou, se não está parado, quando é o próximo passo.
+- **A Revisão** virou um cartão por nome, em duas colunas: quem é à esquerda,
+  a decisão à direita. A linha de contexto perdeu "Planilha (importação)" e "por
+  Fulano em 25/09" (foram para o `title` do nome — proveniência não decide se o
+  nome vira parceiro). O aviso de "sem contato" aparecia **duas vezes**, com a
+  mesma frase; agora aparece uma. Os três botões largos viraram um ("Virar
+  parceiro", em menta) e dois discos com nome no rótulo acessível. A frase dos
+  atalhos de teclado nasce fechada.
+- **Mais verde**, onde ele faz sentido e aparece em toda tela: o **item ativo
+  do trilho** (disco de menta com o glifo em tinta), a **aba ativa**, os
+  **interruptores ligados** e o **"Virar parceiro"**. A menta ganhou uma
+  variante de botão própria em vez de ser escrita por cima da cor padrão, onde
+  ela só vencia pela ordem em que o Tailwind emite as classes.
+
+- Tocado: `movimento/transicao-pagina.tsx`, `globals.css`, `funis/cartao.tsx`,
+  `revisao/cartao-candidato.tsx`, `revisao/tela-revisao.tsx`, `ui/abas.tsx`,
+  `ui/button.tsx`, `admin/painel-atendimento.tsx`.
+- Verificado: typecheck, lint, 921 testes, build com o comando da Vercel, e
+  **fotografado** — Funis, Revisão e a transição de página, antes e depois.
+- Ainda não visto nem arrumado: Cadências, Admin, Agenda, Metas, Ligar,
+  Registrar, Campanhas. É a próxima leva, com a mesma conferência.

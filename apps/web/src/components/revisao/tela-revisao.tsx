@@ -419,15 +419,26 @@ export function TelaRevisao({
                   </div>
                 ) : null}
 
+                {/* OS ATALHOS NASCEM FECHADOS (29/09/2026). Eram uma linha fixa em
+                    cima da fila, lida uma vez e paga todo dia — "evite muita
+                    informação junta". Quem quer os atalhos abre; quem já sabe
+                    não carrega a frase. */}
                 {podeDecidir ? (
-                  <p className="hidden py-2 text-xs text-muted-foreground md:block">
-                    Com o cartão em foco (Tab): <Tecla>A</Tecla> aprova, <Tecla>M</Tecla> mescla com
-                    a primeira sugestão, <Tecla>R</Tecla> recusa, <Tecla>N</Tecla> marca não
-                    contatar.
-                  </p>
+                  <details className="group hidden text-xs text-muted-foreground md:block">
+                    <summary className="w-fit cursor-pointer list-none py-1 underline-offset-4 hover:text-foreground hover:underline">
+                      Atalhos de teclado
+                    </summary>
+                    <p className="pt-1">
+                      Com o cartão em foco (Tab): <Tecla>A</Tecla> aprova, <Tecla>M</Tecla> mescla
+                      com a primeira sugestão, <Tecla>R</Tecla> recusa, <Tecla>N</Tecla> marca não
+                      contatar.
+                    </p>
+                  </details>
                 ) : null}
 
-                <ul className="flex flex-col">
+                {/* 12px entre cartões: cada nome é uma decisão, e decisão colada
+                    em decisão vira uma pilha que se lê como um bloco só. */}
+                <ul className="flex flex-col gap-3">
                   {linhas.map((candidato) => (
                     <li key={candidato.id}>
                       <CartaoCandidato

@@ -3,9 +3,7 @@
 import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react';
 import Link from 'next/link';
 
-import { ICONE_CANAL } from '@/components/conversas/icones';
-import { ROTULO_CANAL } from '@/lib/canais';
-import { DiasSemContato } from '@/components/temperatura';
+import { iniciaisDe } from '@/lib/iniciais';
 import { cn } from '@/lib/utils';
 
 import {
@@ -13,7 +11,6 @@ import {
   formatarParado,
   rotuloResponsavel,
 } from './cartao-formatos';
-import { BarraEtapa } from './etapa';
 import { SemaforoProximaAcao } from './semaforo';
 import type { CartaoQuadro } from './tipos';
 
@@ -68,17 +65,6 @@ import type { CartaoQuadro } from './tipos';
  * do número abre a ficha e revela lá, com registro.
  */
 
-/**
- * O cartão parado ganha um VÉU, não mais a hachura diagonal (23/09/2026).
- *
- * A hachura em 8% funcionava num cartão; num quadro real ela pega metade da
- * coluna — em 4.387 negócios, 1.677 estão parados — e a tela inteira vira um
- * rachurado que briga com o texto de todo cartão. "Tá muito feio" (Rafael) é
- * isto. O que carrega o significado continua sendo a pastilha escrita ("Parado
- * há 56d"); o fundo só precisa marcar que aquele retângulo é diferente, e um
- * véu uniforme de 5% faz isso sem riscar o nome do parceiro.
- */
-const VEU_PARADO = 'color-mix(in oklab, var(--foreground) 5%, transparent)';
 
 export type PropsCartaoNegocio = {
   cartao: CartaoQuadro;
@@ -104,7 +90,10 @@ export type PropsCartaoNegocio = {
 
 export function CartaoNegocio({
   cartao,
-  etapasDeTrabalho,
+  // Continua no tipo porque o quadro inteiro ainda o passa, mas o cartão limpo
+  // (29/09/2026) não desenha mais a barra de progresso que o usava: a coluna
+  // onde o cartão mora já diz em que ponto do funil ele está.
+  etapasDeTrabalho: _etapasDeTrabalho,
   href,
   acoes,
   arrastando = false,
@@ -117,10 +106,29 @@ export function CartaoNegocio({
   const destino = href === undefined ? `/parceiros/${cartao.organization_id}` : href;
   const categoriaELocal = formatarCategoriaELocal(cartao);
   const parado = cartao.is_rotting ? formatarParado(cartao.days_in_stage) : null;
-  // O canal do ÚLTIMO TOQUE (28/09/2026, ADR-16). Ícone e nada mais: é o que
-  // permite varrer a coluna e ver "este aqui foi por telefone" sem gastar
-  // palavra — e é o mesmo dado do filtro de canal da barra de cima.
-  const IconeDoCanal = cartao.last_channel ? ICONE_CANAL[cartao.last_channel] : null;
+  // ===========================================================================
+  // O CARTÃO LIMPO (29/09/2026)
+  // ===========================================================================
+  // Rafael, com o quadro aberto: "os leads no funil ta muito poluido (...) evite
+  // muita informação junta, quero algo clean e organizado". O cartão tinha
+  // QUATRO linhas e seis sinais: nota comercial com borda, categoria e local,
+  // a pastilha "Parado há 56d" E um segundo "53d" de dias sem contato (dois
+  // números de dias para a mesma pergunta), o ícone do canal, a próxima ação
+  // cortada no meio ("Primeiro...") e o nome inteiro do dono. Os parados ainda
+  // ganhavam um véu cinza, e num funil onde metade está parada o quadro inteiro
+  // ficava com cara de sujo.
+  //
+  // Sobram TRÊS linhas e UM sinal de tempo:
+  //   1. quem é (o nome, e a nota comercial como letra discreta);
+  //   2. o que é e onde (categoria · bairro);
+  //   3. quem cuida (as iniciais num disco) e O QUE IMPORTA AGORA — se está
+  //      parado, há quanto tempo, em coral; se não está, quando é o próximo
+  //      passo. Nunca os dois: é essa escolha que faz o cartão ser lido de
+  //      relance em vez de lido.
+  //
+  // O que saiu não sumiu: a próxima ação por extenso, o canal e os dias sem
+  // contato estão na ficha, a um clique, que é onde se lê com calma.
+  const iniciais = cartao.owner_name ? iniciaisDe(cartao.owner_name) : null;
 
   return (
     <article
@@ -128,7 +136,7 @@ export function CartaoNegocio({
       data-parado={cartao.is_rotting ? '' : undefined}
       data-arrastando={arrastando ? '' : undefined}
       className={cn(
-        'group/cartao relative flex min-h-[76px] w-full flex-col gap-1.5 sombra-base rounded-xl bg-card py-2.5 pr-3 pl-4',
+        'group/cartao relative flex w-full flex-col gap-3 rounded-xl bg-card p-4',
         'transition-shadow focus-within:ring-2 focus-within:ring-ring',
         arrastando ? 'sombra-base-forte' : 'sombra-base',
         // O fantasma é a silhueta do cartão que saiu do lugar; é o único ponto do
@@ -136,104 +144,83 @@ export function CartaoNegocio({
         fantasma && 'opacity-40',
         className,
       )}
-      style={{ ...(parado ? { backgroundColor: VEU_PARADO } : null), ...style }}
+      style={style}
       {...resto}
     >
-      {/* A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026). O NOME não vem: o cartão já
-          vive dentro da coluna da própria etapa, no desktop e na trilha do celular,
-          e escrevê-lo aqui gastaria uma linha repetindo o cabeçalho. O que a coluna
-          não diz é quão longe no funil — e é isso que a barra diz. */}
-      <BarraEtapa posicao={cartao.stage_position} total={etapasDeTrabalho} />
-
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="min-w-0 flex-1 truncate text-sm leading-5 font-medium">
-          {destino ? (
-            // Link esticado: o retângulo inteiro do cartão vira alvo de toque, sem
-            // envolver os botões do rodapé, que sobem de camada.
-            <Link
-              href={destino}
-              className="rounded-xl outline-none after:absolute after:inset-0 after:rounded-xl"
-            >
-              {cartao.organization_name}
-            </Link>
-          ) : (
-            cartao.organization_name
-          )}
-        </h3>
-
-        {cartao.tier ? (
-          <span
-            title={`Prioridade comercial ${cartao.tier}.`}
-            className="numerico shrink-0 rounded-lg border border-hairline px-1.5 py-px text-[0.6875rem] text-muted-foreground"
-          >
-            {cartao.tier}
-          </span>
-        ) : null}
-      </div>
-
-      <p className="truncate text-xs text-muted-foreground">
-        {categoriaELocal || 'Categoria não informada'}
-      </p>
-
-      {/* Os dias sem contato vêm nesta linha, e não ao lado do nome: numa coluna de
-          kanban com 300px, "sem contato" (o valor de quase todo alvo novo) roubava uns
-          70px justamente do nome do parceiro, que é o que a pessoa procura varrendo a
-          coluna. Desde 28/09/2026 a linha é só deles e da pastilha "Parado": o
-          medidor térmico saiu com a temperatura. */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          {parado ? (
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="min-w-0 flex-1 truncate text-[15px] leading-5 font-semibold tracking-[-0.01em]">
+            {destino ? (
+              // Link esticado: o retângulo inteiro do cartão vira alvo de toque,
+              // sem envolver os botões do canto, que sobem de camada.
+              <Link
+                href={destino}
+                className="rounded-xl outline-none after:absolute after:inset-0 after:rounded-xl"
+              >
+                {cartao.organization_name}
+              </Link>
+            ) : (
+              cartao.organization_name
+            )}
+          </h3>
+          {/* A nota comercial como LETRA, sem moldura: com borda ela era o
+              segundo objeto mais chamativo do cartão, e é só um desempate. */}
+          {cartao.tier ? (
             <span
-              title={parado.descricao}
-              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-hairline bg-muted px-1.5 py-px text-[0.6875rem] font-medium text-foreground"
+              title={`Prioridade comercial ${cartao.tier}.`}
+              className="numerico shrink-0 text-xs font-medium text-muted-foreground"
             >
-              <PausaParada />
-              {/* Tudo num filho só: o `gap-1` do flex separaria "11" de "d". */}
-              <span>
-                {parado.rotulo}
-                {parado.numero ? <span className="numerico">{parado.numero}</span> : null}
-                {parado.unidade ? <span className="text-[0.8em]">{parado.unidade}</span> : null}
-              </span>
+              {cartao.tier}
             </span>
           ) : null}
-        </span>
-        <span className="flex shrink-0 items-center gap-1.5">
-          {IconeDoCanal && cartao.last_channel ? (
-            <IconeDoCanal
-              className="size-3.5 text-muted-foreground"
-              aria-label={`Último toque por ${ROTULO_CANAL[cartao.last_channel]}`}
-            />
-          ) : null}
-          <DiasSemContato dias={cartao.days_since_contact} />
-        </span>
+        </div>
+        <p className="truncate text-[13px] text-muted-foreground">
+          {categoriaELocal || 'Categoria não informada'}
+        </p>
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <SemaforoProximaAcao estado={cartao.next_action_state} quando={cartao.next_action_at} />
-          {cartao.next_action ? (
-            <span className="truncate text-xs text-muted-foreground">{cartao.next_action}</span>
-          ) : null}
-        </span>
-
+        {/* Quem cuida, em DISCO: o nome inteiro ("Heloísa Cavalcanti") comia um
+            terço da linha para dizer o que duas letras dizem. O nome completo
+            continua no `title`. */}
         <span
-          className="max-w-28 shrink-0 truncate text-xs text-muted-foreground"
           title={
             cartao.owner_name
               ? `Responsável: ${cartao.owner_name}.`
               : 'Negócio do bolo comum: quem mover assume.'
           }
+          className={cn(
+            'flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold',
+            iniciais ? 'bg-muted text-foreground' : 'border border-dashed border-input text-muted-foreground',
+          )}
         >
-          {rotuloResponsavel(cartao.owner_name)}
+          {iniciais ?? '?'}
+          <span className="sr-only">{rotuloResponsavel(cartao.owner_name)}</span>
         </span>
+
+        {parado ? (
+          // PARADO vence a próxima ação: é o sinal que pede alguém agora.
+          <span
+            title={parado.descricao}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive-texto"
+          >
+            <PausaParada />
+            <span>
+              {parado.rotulo}
+              {parado.numero ? <span className="numerico">{parado.numero}</span> : null}
+              {parado.unidade ? <span className="text-[0.85em]">{parado.unidade}</span> : null}
+            </span>
+          </span>
+        ) : (
+          <SemaforoProximaAcao estado={cartao.next_action_state} quando={cartao.next_action_at} />
+        )}
       </div>
 
-      {/* A alça de arraste (e, no celular, o botão de mover) fica no CANTO, não numa
-          linha própria: "Mover" escrito em cada cartão era uma linha de 28 px repetida
-          coluna abaixo para dizer o que o cursor já diz ao passar por cima.
-          z-10: precisa ficar acima do link esticado, senão o toque abriria a ficha. */}
+      {/* A alça de arraste (e, no celular, o botão de mover) fica no CANTO, não
+          numa linha própria. z-10: precisa ficar acima do link esticado, senão o
+          toque abriria a ficha. */}
       {acoes ? (
-        <div className="relative z-10 flex items-center gap-2 pt-1 md:absolute md:top-1.5 md:right-1.5 md:pt-0">
+        <div className="relative z-10 flex items-center gap-2 md:absolute md:top-2 md:right-2">
           {acoes}
         </div>
       ) : null}

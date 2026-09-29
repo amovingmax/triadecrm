@@ -38,6 +38,14 @@ const buttonVariants = cva(
         destructive:
           'bg-destructive/10 text-destructive-texto hover:border-destructive focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/10 dark:focus-visible:ring-destructive/40',
         link: 'text-primary underline-offset-4 hover:underline',
+        // O "SIM" DA TELA em menta (29/09/2026, "quero mais presença do verde").
+        // Variante própria, e não `bg-menta` escrito por cima do `default`: por
+        // cima, a menta só vence a tinta pela ordem em que o Tailwind emite as
+        // classes — o tipo de coisa que funciona até o dia em que não funciona.
+        // Tinta sobre menta: 14,6:1. Sem `hover` de cor: escurecer a menta a
+        // deixa verde-musgo, e o sistema pede que o hover só mexa na forma.
+        menta:
+          'bg-menta text-foreground hover:brightness-95 active:not-aria-[haspopup]:scale-[0.98]',
       },
       size: {
         default:

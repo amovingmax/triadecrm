@@ -108,228 +108,276 @@ export function CartaoCandidato({
     }
   }
 
+  // ===========================================================================
+  // O CARTÃO LIMPO (29/09/2026)
+  // ===========================================================================
+  // Rafael, com a fila aberta: "melhore a tela de revisão também, ta feia e
+  // poluida (...) evite muita informação junta, quero algo clean e organizado".
+  //
+  // O que poluía, medido no print dele:
+  //   * uma linha de contexto com QUATRO fatos — categoria, bairro, "Planilha
+  //     (importação)" e "por Fulano em 25/09/2026". Os dois últimos dizem de onde
+  //     o nome veio, e isso não ajuda a decidir se ele vira parceiro;
+  //   * no nome sem contato, o MESMO aviso duas vezes: "Sem telefone, @, site ou
+  //     CNPJ. Virar parceiro cria a ficha..." e, logo abaixo, a marca da higiene
+  //     "Sem canal de contato. Não há telefone... Virar parceiro cria a ficha...";
+  //   * três botões largos em toda linha, e a lista como uma pilha comprida
+  //     separada por filete.
+  //
+  // Agora cada nome é um CARTÃO com duas colunas: à esquerda quem é (o nome, uma
+  // linha de o-que-e-onde, uma linha de contato), à direita a decisão. De onde
+  // veio e quem importou foram para o `title` do nome — continuam a um passar de
+  // mouse, que é onde dado de proveniência mora. O aviso de "sem contato" aparece
+  // UMA vez, na linha de contato, que é onde a ausência é notada.
+  const semContato =
+    !candidato.telefone && !candidato.instagram && !candidato.site && !candidato.cnpj;
+  // A marca "sem_contato" da higiene diz o mesmo que a linha de contato vazia:
+  // mostrar as duas era repetir a frase inteira dois centímetros abaixo.
+  const marcas = candidato.sinalizacoes.filter((m) => !(semContato && m === 'sem_contato'));
+  const proveniencia = `${candidato.fonte} · por ${candidato.coletor} em ${formatarData(candidato.criado_em)}`;
+  const local = formatarLocal(candidato.bairro, candidato.cidade);
+
   return (
     <article
       tabIndex={pendente ? 0 : -1}
       onKeyDown={aoTeclar}
       aria-label={`Candidato ${candidato.nome}`}
       className={cn(
-        'flex flex-col gap-3 border-b border-hairline py-4 outline-none',
-        'focus-visible:rounded-lg focus-visible:ring-3 focus-visible:ring-ring/50',
+        'sombra-base flex flex-col gap-3 rounded-xl bg-card p-4 outline-none sm:p-5',
+        'focus-visible:ring-3 focus-visible:ring-ring/50',
         ocupado && 'pointer-events-none opacity-60',
       )}
     >
-      {/* Nome e situação */}
-      <header className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        {marcado === null ? null : (
-          <input
-            type="checkbox"
-            checked={marcado}
-            onChange={(e) => aoMarcar(e.target.checked)}
-            aria-label={`Marcar ${candidato.nome} para aprovar em lote`}
-            className="size-4 shrink-0 accent-foreground"
-          />
-        )}
-        <h3 className="font-heading text-[15px] leading-tight font-medium tracking-tight">
-          {candidato.nome}
-        </h3>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        {/* ------------------------------------------------ quem é */}
+        <div className="flex min-w-0 flex-1 gap-3">
+          {marcado === null ? null : (
+            <input
+              type="checkbox"
+              checked={marcado}
+              onChange={(e) => aoMarcar(e.target.checked)}
+              aria-label={`Marcar ${candidato.nome} para aprovar em lote`}
+              className="mt-1 size-4 shrink-0 accent-foreground"
+            />
+          )}
 
-        {/* A FAIXA DA TRIAGEM, ao lado do nome.
-            Ela responde a pergunta que a fila de 277 candidatos criou — "por
-            onde eu começo?" — e responde no lugar onde a pessoa já está olhando.
-            Sem cor: a escala térmica é a única cromia do dado, e faixa de
-            triagem não é temperatura. O `title` carrega o porquê, porque
-            pontuação que não se explica é pontuação que a equipe ignora. */}
-        {pendente && candidato.faixa ? (
-          <Badge
-            variant="pilula"
-            className="gap-1 font-normal"
-            title={EXPLICACAO_DA_FAIXA[candidato.faixa]}
-          >
-            <span className="font-medium">{candidato.faixa}</span>
-            {candidato.pontuacao === null ? null : (
-              <span className="numerico text-muted-foreground">{candidato.pontuacao}</span>
-            )}
-          </Badge>
-        ) : null}
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <h3
+                className="min-w-0 font-heading text-base leading-snug font-semibold tracking-[-0.01em]"
+                title={proveniencia}
+              >
+                {candidato.nome}
+              </h3>
+              {/* A faixa como LETRA e número, sem moldura: é desempate, não
+                  manchete. O porquê continua no `title`. */}
+              {pendente && candidato.faixa ? (
+                <span
+                  className="numerico shrink-0 text-xs text-muted-foreground"
+                  title={EXPLICACAO_DA_FAIXA[candidato.faixa]}
+                >
+                  <span className="font-semibold text-foreground">{candidato.faixa}</span>
+                  {candidato.pontuacao === null ? null : <> {candidato.pontuacao}</>}
+                </span>
+              ) : null}
+              {candidato.nao_contatar ? (
+                <Badge variant="destructive" className="gap-1">
+                  <CircleSlash aria-hidden="true" />
+                  Não contatar
+                </Badge>
+              ) : null}
+              {!pendente ? (
+                <Badge variant="pilula" className="font-normal">
+                  {ROTULO_SITUACAO[candidato.status]}
+                </Badge>
+              ) : null}
+            </div>
 
-        {candidato.nao_contatar ? (
-          <Badge variant="destructive" className="gap-1">
-            <CircleSlash aria-hidden="true" />
-            Não contatar
-          </Badge>
-        ) : null}
+            {/* O QUE É E ONDE — uma linha só. */}
+            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+              {candidato.categoria ? (
+                <span className="text-foreground">{candidato.categoria}</span>
+              ) : (
+                // Sem categoria, o que ajuda é o RÓTULO DA FONTE: sem ele a pessoa
+                // adivinha entre 19 opções. É o único caso em que ele aparece.
+                <span>
+                  <span className="font-medium text-destructive-texto">Sem categoria</span>
+                  {candidato.categoria_na_fonte ? (
+                    <> · a fonte chamou de “{candidato.categoria_na_fonte}”</>
+                  ) : null}
+                </span>
+              )}
+              {local ? (
+                <>
+                  <Ponto />
+                  <span>{local}</span>
+                </>
+              ) : null}
+              {candidato.source_url ? (
+                <a
+                  href={candidato.source_url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title={`Abrir em ${candidato.fonte}`}
+                  aria-label={`Abrir em ${candidato.fonte}`}
+                  className={ALVO_INLINE + ' text-muted-foreground hover:text-foreground'}
+                >
+                  <ExternalLink className="size-3.5" aria-hidden="true" />
+                </a>
+              ) : null}
+              {/* A retenção (PRD §10.6) só aparece nos últimos 30 dias: se
+                  aparecesse sempre, seria moldura. */}
+              {restam !== null && restam <= 30 ? (
+                <>
+                  <Ponto />
+                  <span className="text-destructive-texto">
+                    {restam === 0 ? 'Sai da fila hoje' : `Sai da fila em ${restam} dias`}
+                  </span>
+                </>
+              ) : null}
+            </p>
 
-        {!pendente ? (
-          <Badge variant="pilula" className="font-normal">
-            {ROTULO_SITUACAO[candidato.status]}
-          </Badge>
-        ) : null}
+            {/* CONTATO — ou a ausência dele, dita UMA vez. */}
+            <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+              {candidato.telefone ? (
+                <Dado icone={<Phone className="size-3.5" aria-hidden="true" />} rotulo="Telefone">
+                  <span className="numerico">{formatarTelefone(candidato.telefone)}</span>
+                </Dado>
+              ) : null}
+              {candidato.instagram ? (
+                <Dado icone={<AtSign className="size-3.5" aria-hidden="true" />} rotulo="Instagram">
+                  <a
+                    href={`https://instagram.com/${candidato.instagram}`}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className={ALVO_INLINE + ' underline underline-offset-4'}
+                  >
+                    {candidato.instagram}
+                  </a>
+                </Dado>
+              ) : null}
+              {candidato.site ? (
+                <Dado icone={<Globe className="size-3.5" aria-hidden="true" />} rotulo="Site">
+                  {candidato.site}
+                </Dado>
+              ) : null}
+              {candidato.cnpj ? (
+                <Dado icone={<Building2 className="size-3.5" aria-hidden="true" />} rotulo="CNPJ">
+                  <span className="numerico">{candidato.cnpj}</span>
+                </Dado>
+              ) : null}
+              {semContato ? (
+                <li className="flex items-center gap-1.5 text-destructive-texto">
+                  <TriangleAlert className="size-3.5" aria-hidden="true" />
+                  Sem canal de contato
+                </li>
+              ) : null}
+              {/* A IA vira uma PASTILHA, não uma frase: é opinião, e o porquê
+                  continua no `title` para quem quiser conferir. */}
+              {candidato.ia_veredito ? (
+                <li
+                  title={candidato.ia_porque ?? undefined}
+                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground"
+                >
+                  <Sparkles className="size-3" aria-hidden="true" />
+                  {candidato.ia_veredito === 'sim'
+                    ? 'IA: é fornecedor'
+                    : candidato.ia_veredito === 'nao'
+                      ? 'IA: não é fornecedor'
+                      : 'IA: não soube dizer'}
+                </li>
+              ) : null}
+            </ul>
 
-        {candidato.organizacao_id ? (
+            {pendente && podeDecidir && !candidato.telefone && !candidato.nao_contatar ? (
+              <div className="pt-1">
+                <ProcurarTelefoneDoCandidato candidatoId={candidato.id} />
+              </div>
+            ) : null}
+
+            {candidato.observacao ? (
+              <p className="max-w-prose text-sm text-muted-foreground">{candidato.observacao}</p>
+            ) : null}
+
+            {marcas.length > 0 ? (
+              <ul className="flex flex-col gap-1">
+                {marcas.map((marca) => {
+                  const nota = EXPLICACAO_DA_MARCA[marca];
+                  return (
+                    <li key={marca} className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                      <span>
+                        <span className="font-medium text-foreground">{nota?.rotulo ?? marca}</span>{' '}
+                        {nota?.explicacao ?? 'Confira este dado antes de decidir.'}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </div>
+        </div>
+
+        {/* ------------------------------------------------ a decisão */}
+        {pendente && podeDecidir ? (
+          <div className="flex shrink-0 items-center gap-2 lg:pl-4">
+            {/* VIRAR PARCEIRO É MENTA: é o "sim" desta tela, e a única ação que
+                faz a base crescer. As outras duas viram discos com nome no
+                `title` e no rótulo acessível — três botões largos por linha eram
+                metade da poluição. */}
+            <Button
+              variant="menta"
+              onClick={() => aoDecidir('aprovar')}
+              disabled={ocupado || candidato.nao_contatar}
+              className="toque h-11 px-4 md:h-9"
+            >
+              <Check aria-hidden="true" />
+              Virar parceiro
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={() => aoDecidir('recusar')}
+              disabled={ocupado}
+              title="Descartar este nome"
+              aria-label="Descartar este nome"
+              className="toque size-11 md:size-9"
+            >
+              <X aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => aoDecidir('nao_contatar')}
+              disabled={ocupado}
+              title="Nunca procurar: a empresa pediu para não ser contatada"
+              aria-label="Nunca procurar"
+              className="toque size-11 text-muted-foreground md:size-9"
+            >
+              <CircleSlash aria-hidden="true" />
+            </Button>
+          </div>
+        ) : candidato.organizacao_id ? (
           <Link
             href={`/parceiros/${candidato.organizacao_id}`}
-            className={
-              ALVO_INLINE + ' gap-1 text-xs underline underline-offset-4 hover:text-foreground'
-            }
+            className={ALVO_INLINE + ' shrink-0 gap-1 text-sm underline underline-offset-4'}
           >
             Abrir a ficha
-            <ExternalLink className="size-3" aria-hidden="true" />
+            <ExternalLink className="size-3.5" aria-hidden="true" />
           </Link>
         ) : null}
-      </header>
+      </div>
 
-      {/* De onde veio e o que se sabe */}
-      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-        <span className="text-foreground">
-          {candidato.categoria ?? 'Escolha a categoria'}
-        </span>
-        {/* O rótulo da fonte, quando o CRM não conhece a categoria. Sem ele a
-            pessoa adivinha entre 19 opções, e foi por isso que 155 nomes
-            ficaram parados na fila em vez de serem decididos por grupo. */}
-        {candidato.categoria === null && candidato.categoria_na_fonte ? (
-          <span className="text-muted-foreground">
-            {' · '}a fonte chamou de “{candidato.categoria_na_fonte}”
-          </span>
-        ) : null}
-        {formatarLocal(candidato.bairro, candidato.cidade) ? (
-          <>
-            <Ponto />
-            <span>{formatarLocal(candidato.bairro, candidato.cidade)}</span>
-          </>
-        ) : null}
-        <Ponto />
-        {candidato.source_url ? (
-          <a
-            href={candidato.source_url}
-            target="_blank"
-            rel="noreferrer noopener"
-            className={ALVO_INLINE + ' gap-1 underline underline-offset-4 hover:text-foreground'}
-          >
-            {candidato.fonte}
-            <ExternalLink className="size-3" aria-hidden="true" />
-          </a>
-        ) : (
-          <span>{candidato.fonte}</span>
-        )}
-        <Ponto />
-        <span>
-          por {candidato.coletor} em{' '}
-          <span className="numerico">{formatarData(candidato.criado_em)}</span>
-        </span>
-        {/*
-          A retenção do PRD §10.6 apaga candidato em "novo" aos 90 dias. A única
-          forma de não perder um alvo é decidir. O aviso só aparece nos últimos
-          30 dias: se aparecesse sempre, seria moldura, e ninguém leria no dia em
-          que importa.
-        */}
-        {restam !== null && restam <= 30 ? (
-          <>
-            <Ponto />
-            <span>{restam === 0 ? 'Sai da fila hoje' : `Sai da fila em ${restam} dias`}</span>
-          </>
-        ) : null}
-      </p>
-
-      {/* Canais de contato */}
-      <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
-        {candidato.telefone ? (
-          <Dado icone={<Phone className="size-3.5" aria-hidden="true" />} rotulo="Telefone">
-            <span className="numerico">{formatarTelefone(candidato.telefone)}</span>
-          </Dado>
-        ) : null}
-        {candidato.instagram ? (
-          <Dado icone={<AtSign className="size-3.5" aria-hidden="true" />} rotulo="Instagram">
-            <a
-              href={`https://instagram.com/${candidato.instagram}`}
-              target="_blank"
-              rel="noreferrer noopener"
-              className={ALVO_INLINE + ' underline underline-offset-4'}
-            >
-              {candidato.instagram}
-            </a>
-          </Dado>
-        ) : null}
-        {candidato.site ? (
-          <Dado icone={<Globe className="size-3.5" aria-hidden="true" />} rotulo="Site">
-            {candidato.site}
-          </Dado>
-        ) : null}
-        {candidato.cnpj ? (
-          <Dado icone={<Building2 className="size-3.5" aria-hidden="true" />} rotulo="CNPJ">
-            <span className="numerico">{candidato.cnpj}</span>
-          </Dado>
-        ) : null}
-        {!candidato.telefone && !candidato.instagram && !candidato.site && !candidato.cnpj ? (
-          <li className="text-muted-foreground">
-            Sem telefone, @, site ou CNPJ. Virar parceiro cria a ficha, mas ninguém consegue falar
-            com ele ainda.
-          </li>
-        ) : null}
-      </ul>
-
-      {/* O QUE A IA ACHOU DO NOME.
-          Vem em itálico e esmaecido, como na lista de Conversas e pelo mesmo
-          motivo: o resto do cartão é FATO (a fonte publicou isto), esta linha é
-          OPINIÃO (uma máquina leu o nome e achou). Dar a ambos a mesma
-          tipografia seria dar à opinião o peso do fato — e aqui a opinião pode
-          estar errada sobre um fornecedor de verdade. */}
-      {candidato.ia_veredito ? (
-        <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground italic">
-          <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-          <span>
-            <span className="font-medium not-italic">
-              {candidato.ia_veredito === 'sim'
-                ? 'A IA acha que é fornecedor de evento'
-                : candidato.ia_veredito === 'nao'
-                  ? 'A IA acha que NÃO é fornecedor de evento'
-                  : 'A IA não soube dizer pelo nome'}
-            </span>
-            {candidato.ia_porque ? <> · {candidato.ia_porque}</> : null}
-          </span>
+      {candidato.nao_contatar && pendente ? (
+        <p className="text-xs text-muted-foreground">
+          Esta empresa pediu para não ser procurada. Não dá para virar parceiro.
         </p>
       ) : null}
 
-      {/* SEM TELEFONE, A BUSCA FICA AQUI — na hora da decisão, não depois dela.
-          A fila tinha 277 candidatos e UM telefone, e "existe número público
-          para este nome?" é parte de decidir se vale aprovar, não consequência
-          de ter aprovado. Só aparece para quem decide, e só em quem ainda não
-          tem número. */}
-      {pendente && podeDecidir && !candidato.telefone && !candidato.nao_contatar ? (
-        <ProcurarTelefoneDoCandidato candidatoId={candidato.id} />
-      ) : null}
-
-      {candidato.observacao ? (
-        <p className="max-w-prose text-sm text-muted-foreground">{candidato.observacao}</p>
-      ) : null}
-
-      {/* O que a higiene de entrada marcou (RF-RAD-16) */}
-      {candidato.sinalizacoes.length > 0 ? (
-        <ul className="flex flex-col gap-1.5">
-          {candidato.sinalizacoes.map((marca) => {
-            const nota = EXPLICACAO_DA_MARCA[marca];
-            return (
-              <li key={marca} className="flex items-start gap-2 text-xs">
-                <TriangleAlert
-                  className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <span className="text-muted-foreground">
-                  <span className="font-medium text-foreground">{nota?.rotulo ?? marca}</span>{' '}
-                  {nota?.explicacao ?? 'Confira este dado antes de decidir.'}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-
-      {/* Duplicatas sugeridas por app.find_org_matches */}
+      {/* Fichas parecidas: aqui a decisão é QUAL FICHA VENCE, e ela ganha a
+          superfície de linha, dentro do cartão. */}
       {candidato.duplicatas.length > 0 ? (
-        <section
-          aria-label="Fichas parecidas na base"
-          className="rounded-lg border border-hairline bg-muted/40 p-3"
-        >
+        <section aria-label="Fichas parecidas na base" className="rounded-lg bg-muted/50 p-3">
           <p className="text-xs font-medium">
             {candidato.duplicatas.length === 1
               ? 'Pode ser um parceiro que você já tem'
@@ -362,44 +410,6 @@ export function CartaoCandidato({
             ))}
           </ul>
         </section>
-      ) : null}
-
-      {/* A decisão */}
-      {pendente && podeDecidir ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            onClick={() => aoDecidir('aprovar')}
-            disabled={ocupado || candidato.nao_contatar}
-            className="toque h-11 md:h-8"
-          >
-            <Check aria-hidden="true" />
-            Virar parceiro
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => aoDecidir('recusar')}
-            disabled={ocupado}
-            className="toque h-11 md:h-8"
-          >
-            <X aria-hidden="true" />
-            Descartar este nome
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => aoDecidir('nao_contatar')}
-            disabled={ocupado}
-            className="toque h-11 text-muted-foreground md:h-8"
-          >
-            <CircleSlash aria-hidden="true" />
-            Nunca procurar
-          </Button>
-
-          {candidato.nao_contatar ? (
-            <p className="text-xs text-muted-foreground">
-              Esta empresa pediu para não ser procurada. Não dá para virar parceiro.
-            </p>
-          ) : null}
-        </div>
       ) : null}
 
       {!pendente && candidato.motivo_da_revisao ? (

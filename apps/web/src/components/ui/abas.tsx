@@ -64,7 +64,7 @@ export function SeletorDeAba<T extends string>({
       role="tablist"
       aria-label={rotulo}
       className={cn(
-        'flex gap-1 rounded-lg bg-muted/60 p-1 md:w-fit',
+        'flex gap-1 rounded-full bg-card p-1 sombra-base md:w-fit',
         rolavel ? '-mx-1 overflow-x-auto md:mx-0' : 'w-full',
       )}
     >
@@ -78,12 +78,18 @@ export function SeletorDeAba<T extends string>({
             aria-selected={selecionado}
             onClick={() => aoTrocar(item.id)}
             className={cn(
-              'toque h-11 rounded-md px-4 text-sm font-medium transition-colors md:h-8',
+              'toque h-11 rounded-full px-4 text-sm font-medium transition-colors md:h-8',
               rolavel ? 'shrink-0 whitespace-nowrap' : 'flex-1 md:flex-none',
               'focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
+              // A ABA ATIVA É MENTA (29/09/2026). Rafael: "quero mais presença
+              // do verde no CRM em geral". A aba ativa é o lugar certo para isso:
+              // aparece em quase toda tela, é UMA por grupo, e diz "você está
+              // aqui" — que é exatamente o papel de um acento. Era um branco
+              // sobre cinza a 1,1:1, que se via pelo sombreado e mais nada.
+              // Tinta sobre menta: 14,6:1.
               selecionado
-                ? 'bg-background text-foreground sombra-base'
-                : 'text-muted-foreground hover:text-foreground',
+                ? 'bg-menta text-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
             {item.rotulo}

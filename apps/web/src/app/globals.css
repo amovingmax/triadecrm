@@ -414,8 +414,11 @@
      sistema. Era um realce de 1,20:1 que "se nota sem virar bloco"; num trilho
      sem rótulo isso não basta — o ativo é a única coisa que diz onde a pessoa
      está, e precisa se ver de relance. 17,3:1. */
-  --sidebar-accent: var(--grafite-900);
-  --sidebar-accent-foreground: var(--grafite-25);
+  /* O ativo do trilho é MENTA, com o glifo em tinta (29/09/2026): "quero mais
+     presença do verde". É o elemento que aparece em TODA tela e diz onde a
+     pessoa está — o lugar natural do acento. 14,6:1 do glifo sobre o disco. */
+  --sidebar-accent: var(--komune-400);
+  --sidebar-accent-foreground: var(--grafite-900);
   --sidebar-border: var(--hairline);
   --sidebar-ring: var(--grafite-900);
 }
@@ -695,6 +698,38 @@
 
 @utility revelar-linha {
   animation: revelar-linha 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* A ENTRADA DE PÁGINA, em CSS e não em JavaScript (29/09/2026).
+   ---------------------------------------------------------------------------
+   Ela era um `motion.div` com `initial={{ opacity: 0 }}`, e isso deixava o CRM
+   INTEIRO EM BRANCO para quem liga "reduzir movimento" no sistema: o servidor
+   mandava o HTML com `opacity:0` esperando a animação, e com o movimento
+   reduzido o `motion` não anima — a página ficava no estado inicial, invisível.
+
+   Em CSS isso não tem como acontecer. A invisibilidade só existe no PRIMEIRO
+   QUADRO da animação, e animação de CSS sempre termina: se o JavaScript
+   atrasar, falhar, ou o sistema pedir menos movimento (a regra do fim deste
+   arquivo encurta tudo para 0,01 ms), `both` leva o elemento ao último quadro
+   — opacidade 1. O conteúdo nunca depende de um script para aparecer.
+
+   O último quadro é `transform: none`, e isso importa: um ancestral com
+   `transform` vira o bloco de contenção de todo `position: fixed` dentro dele,
+   e diálogo, folha e cabeçalho grudado passariam a se posicionar pela página
+   em vez de pela janela. */
+@utility entrada-pagina {
+  animation: entrada-pagina 180ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes entrada-pagina {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ---------------------------------------------------------------------------
