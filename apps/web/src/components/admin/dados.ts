@@ -857,6 +857,18 @@ export async function buscarFreios(): Promise<Freios | null> {
     if (/42501|Sem permissão|permission/i.test(error.message)) return null;
     throw new Error(error.message);
   }
+  return montarFreios(data);
+}
+
+/**
+ * O JSON da RPC virando os três cartões — SEPARADA da busca, e exportada, para
+ * poder ser testada sem navegador e sem banco.
+ *
+ * Ela nasceu em 29/09/2026 de um defeito que nenhuma das três verificações de
+ * sempre pegaria: o cartão do robô acendia vermelho toda vez. Enquanto o
+ * mapeamento morava dentro do `await`, não havia onde escrever o teste.
+ */
+export function montarFreios(data: unknown): Freios {
   const bruto = objeto(data);
   const orc = objeto(bruto.orcamento);
   const num = objeto(bruto.numero);
@@ -889,7 +901,17 @@ export async function buscarFreios(): Promise<Freios | null> {
       fusivel_por_hora: Number(rob.fusivel_por_hora) || 0,
       falas_na_ultima_hora: Number(rob.falas_na_ultima_hora) || 0,
       ativo: rob.ativo === true,
-      freio: objeto(rob.freio) as { parado_em?: string; motivo?: string } | null,
+      // `objeto()` devolve `{}` para nulo, e `{}` não é `null`: com ele, o
+      // cartão do teto de fala acendia VERMELHO em toda abertura da tela —
+      // "O fusível disparou (sem motivo): o robô está mudo" — com o robô ativo
+      // e o fusível intacto no banco. Rafael abriu Ajustes em 29/09/2026 e viu
+      // exatamente isso. Alarme que toca sempre é alarme que ninguém escuta, e
+      // o botão ao lado dele ("Religar o bot") convidava a mexer no que não
+      // estava quebrado. Aqui nulo tem de continuar nulo.
+      freio:
+        rob.freio === null || rob.freio === undefined
+          ? null
+          : (objeto(rob.freio) as { parado_em?: string; motivo?: string }),
     },
   };
 }

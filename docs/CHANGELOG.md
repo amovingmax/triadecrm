@@ -4568,3 +4568,44 @@ interruptores e o ritmo do cumprimento) — a lição de ontem aplicada no mesmo
 - pgTAP: 86 vai a 17 (troca aceita, variável recusada, texto longo recusado
   nomeando o campo, e o recusado não encostando no modelo); suíte em 3.241.
 - Verificado: lint, typecheck, testes (web 908) e `pnpm build`.
+
+### 29/09/2026 — o alarme que tocava sempre, e a tela de Ajustes encolhendo
+
+Rafael mandou três prints de Ajustes → Atendimento com uma frase: *"ta muito
+complexo as telas desse CRM"*. No primeiro print havia outra coisa, que ele não
+mencionou e que era pior.
+
+**O alarme falso.** O cartão "Teto de fala do robô" estava VERMELHO: *"O fusível
+disparou (sem motivo): o robô está mudo"*, com um botão "Religar o bot" ao lado.
+No banco, `whatsapp.bot_de_entrada` tinha `ativo: true` e `freio: null` — nada
+havia acontecido. A causa: o mapeamento passava `freio` por um ajudante que
+devolve `{}` para nulo, e a tela acende o alarme quando `freio !== null`. `{}`
+nunca é null, então o alarme tocava **em toda abertura da tela**, inclusive num
+banco recém-criado.
+
+Isso é pior que feio: alarme que toca sempre é alarme que ninguém escuta, e o
+botão ao lado convidava a mexer no que não estava quebrado. O mapeamento saiu de
+dentro do `await` e virou `montarFreios`, exportada e pura — enquanto morava lá,
+não havia onde escrever o teste. Cinco asserções novas, e a primeira é o caso
+"nada errado".
+
+**E a tela encolheu, sem perder nada:**
+
+- **Os freios** viraram uma linha ("Os freios · tudo certo") que abre com um
+  clique. São monitoramento, e ocupavam a tela inteira antes do primeiro
+  interruptor, todo dia — inclusive nos dias em que os três estão verdes, que é
+  a esmagadora maioria. No dia em que um aperta, a seção **nasce aberta** e o
+  resumo diz que apertou.
+- **Os textos automáticos** (aviso de ausência, "Tudo bem?", apresentação) nascem
+  fechados, com a primeira linha à mostra no resumo. Eram três caixas de texto
+  sempre abertas — uma delas com a apresentação inteira — enchendo a tela de
+  parede antes de qualquer interruptor. Texto é para mudar de vez em quando;
+  interruptor é para olhar todo dia.
+- **As descrições dos cinco interruptores** foram para uma linha cada. A do
+  cumprimento automático tinha quatro.
+
+- Tocado: `painel-atendimento.tsx`, `dados.ts` (montarFreios), `freios.test.ts`.
+- Verificado: lint, typecheck, testes (web 913) e `pnpm build`.
+- Pendente: "Respostas prontas" e "Etiquetas" continuam nesta aba, e são
+  catálogos — a aba Catálogos existe ao lado. Mover é o próximo corte óbvio, e
+  não foi feito hoje porque mexe em duas abas e o Rafael não pediu.

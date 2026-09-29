@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
+import { ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -133,7 +133,7 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
         <Interruptor
           id="lead-automatico"
           titulo="Lead automático"
-          descricao="Quem escreve pela primeira vez vira parceiro e card no funil de captação, na etapa Respondeu."
+          descricao="Quem escreve pela primeira vez vira parceiro e card no funil."
           ligado={config.lead_automatico ?? false}
           podeEditar={podeEditar}
           aoMudar={(v) => mudar.mutate({ lead_automatico: v })}
@@ -141,7 +141,7 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
         <Interruptor
           id="distribuicao"
           titulo="Distribuir conversas novas"
-          descricao="Conversa de quem não tem responsável cai com quem tem menos conversas abertas no setor."
+          descricao="Conversa sem dono cai com quem tem menos conversas abertas."
           ligado={config.distribuicao_automatica ?? false}
           podeEditar={podeEditar}
           aoMudar={(v) => mudar.mutate({ distribuicao_automatica: v })}
@@ -149,7 +149,7 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
         <Interruptor
           id="ausencia"
           titulo="Responder fora do horário"
-          descricao="Fora de segunda a sexta, 8h às 17h45, quem escreve recebe um aviso. No máximo um a cada 12 h por conversa."
+          descricao="Fora de 8h–17h45, quem escreve recebe um aviso. No máximo um a cada 12 h."
           ligado={config.ausencia_ativa ?? false}
           podeEditar={podeEditar}
           aoMudar={(v) => mudar.mutate({ ausencia_ativa: v })}
@@ -174,7 +174,7 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
         <Interruptor
           id="cumprimento-automatico"
           titulo="Mandar o cumprimento a quem eu aprovar no Google Maps"
-          descricao="Aprovou no Radar → o CRM manda “Bom dia!”, “Boa tarde!” ou “Boa noite!” sozinho, sem assinatura de ninguém. Só dentro do horário, nunca domingo nem feriado, respeitando o teto do dia. Quem responder recebe a apresentação logo em seguida."
+          descricao="Aprovou no Radar → sai “Bom dia!” sozinho, dentro do horário e do teto do dia."
           ligado={config.cumprimento_automatico ?? false}
           podeEditar={podeEditar}
           aoMudar={(v) => mudar.mutate({ cumprimento_automatico: v })}
@@ -191,7 +191,7 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
         <Interruptor
           id="introducao"
           titulo="Apresentar a Komune quando o lead responder o cumprimento"
-          descricao="Quem responder o cumprimento recebe um “Tudo bem?” em 3 a 6 s e a apresentação 15 a 20 s depois. Uma vez por conversa, dentro do horário, sem nome — para qualquer pessoa do time continuar."
+          descricao="Quem responder recebe “Tudo bem?” e, 15 s depois, a apresentação. Sem nome."
           ligado={config.introducao_ativa ?? false}
           podeEditar={podeEditar}
           aoMudar={(v) => mudar.mutate({ introducao_ativa: v })}
@@ -381,9 +381,26 @@ function TextoAutomatico({
   aoSalvar: (texto: string) => void;
 }) {
   const [texto, setTexto] = useState(inicial);
+  // NASCE FECHADO (29/09/2026). Rafael, com o print de Ajustes: "ta muito
+  // complexo as telas desse CRM". Duas caixas de texto sempre abertas — uma
+  // delas com a apresentação inteira — enchiam a tela de parede antes de
+  // qualquer interruptor. O texto é para MUDAR de vez em quando; o interruptor
+  // é para olhar todo dia. Quem nasce aberto é o que se olha todo dia.
+  //
+  // `<details>` nativo: abre sem JavaScript e o Ctrl+F acha o texto mesmo
+  // fechado (mesma razão de `NotaRecolhida`).
   return (
-    <div className="flex flex-col gap-2 pl-4">
-      <label htmlFor={id} className="text-xs text-muted-foreground">
+    <details className="group pl-4">
+      <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+        <ChevronRight
+          className="size-3.5 shrink-0 transition-transform group-open:rotate-90"
+          aria-hidden="true"
+        />
+        {rotulo}
+        <span className="truncate text-muted-foreground/70">— “{primeiraLinha(inicial)}”</span>
+      </summary>
+      <div className="flex flex-col gap-2 pt-2">
+      <label htmlFor={id} className="sr-only">
         {rotulo}
       </label>
       <textarea
@@ -402,8 +419,15 @@ function TextoAutomatico({
           </Button>
         </div>
       ) : null}
-    </div>
+      </div>
+    </details>
   );
+}
+
+/** A primeira linha do texto, curta, para o resumo do `<summary>`. */
+function primeiraLinha(texto: string): string {
+  const linha = texto.trim().split('\n')[0]?.trim() ?? '';
+  return linha.length > 60 ? `${linha.slice(0, 60)}…` : linha;
 }
 
 function RespostasProntas({
@@ -609,10 +633,36 @@ function Freios3({ f, aoReligar }: { f: Freios; aoReligar: () => void }) {
       ? 'meta'
       : 'nos';
 
+  // ABRE SOZINHO SÓ QUANDO HÁ O QUE OLHAR (29/09/2026). Rafael: "ta muito
+  // complexo as telas desse CRM". Os três freios são MONITORAMENTO, e ocupavam
+  // a tela inteira antes do primeiro interruptor — todo dia, inclusive nos dias
+  // em que os três estão verdes, que é a esmagadora maioria. Agora, em dia de
+  // paz, eles são uma linha; no dia em que um deles aperta, a seção nasce
+  // aberta e o resumo diz qual, porque aí ela é a primeira coisa a ler.
+  const apertou = naLinha || f.orcamento.situacao === 'parou'
+    || f.numero.banido || f.numero.restrito_saida || f.numero.restrito_entrada
+    || f.robo.freio !== null;
+
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="font-heading text-base font-medium">Os freios</h2>
-      <p className="text-xs text-muted-foreground">
+    <details open={apertou} className="group flex flex-col gap-3">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5">
+        <ChevronRight
+          className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
+          aria-hidden="true"
+        />
+        <h2 className="font-heading text-base font-medium">Os freios</h2>
+        <span
+          className={cn(
+            'rounded-full px-2 py-0.5 text-xs',
+            apertou
+              ? 'bg-destructive/15 font-medium text-destructive-texto'
+              : 'bg-muted text-muted-foreground',
+          )}
+        >
+          {apertou ? 'um deles apertou' : 'tudo certo'}
+        </span>
+      </summary>
+      <p className="pt-3 text-xs text-muted-foreground">
         Enquanto uma pessoa aprova cada mensagem, ela é o freio. Estes três existem para o dia em que
         ninguém estiver olhando.
       </p>
@@ -712,7 +762,7 @@ function Freios3({ f, aoReligar }: { f: Freios; aoReligar: () => void }) {
           'O bot de entrada está desligado.'
         )}
       </Cartao>
-    </section>
+    </details>
   );
 }
 
