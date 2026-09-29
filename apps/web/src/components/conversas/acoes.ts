@@ -241,6 +241,32 @@ export async function marcarComoLida(fioId: string): Promise<void> {
   if (error) levantar(error.code, error);
 }
 
+/**
+ * Tira a conversa da lista, ou traz de volta (29/09/2026).
+ *
+ * Rafael pediu "apagar o chat" e, perguntado entre sumir da lista e apagar do
+ * banco, escolheu arquivar. Nada é destruído: o fio inteiro continua, e
+ * mensagem nova do parceiro desarquiva sozinha (gatilho no banco). Quem decide
+ * se esta pessoa PODE é a RPC, que repete o recorte de `conversations_select`.
+ */
+export async function arquivarConversa(fioId: string, arquivar: boolean): Promise<void> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('conversa_arquivar', {
+    p_conversation_id: fioId,
+    p_arquivar: arquivar,
+  });
+  if (error) levantar(error.code, error);
+  const r = data as { ok?: boolean; motivo?: string } | null;
+  if (!r?.ok) {
+    throw new ErroDaConversa(
+      r?.motivo === 'sem_permissao'
+        ? 'Você não pode arquivar esta conversa.'
+        : 'Não deu para arquivar a conversa.',
+      false,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // O áudio recebido
 // ---------------------------------------------------------------------------

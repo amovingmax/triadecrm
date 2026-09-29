@@ -21,7 +21,13 @@ import {
   type OrganizacaoCrua,
 } from './montagem';
 import type { FioCru, MensagemCrua, RascunhoCru } from './mensagens';
-import { FILTROS_VAZIOS, type FioDaConversa, type ItemConversa } from './tipos';
+import {
+  contarFiltros,
+  FILTROS_VAZIOS,
+  temRecorte,
+  type FioDaConversa,
+  type ItemConversa,
+} from './tipos';
 
 /**
  * O que estes testes protegem: a ORDEM da lista e a HONESTIDADE das linhas.
@@ -420,6 +426,7 @@ function fio(parcial: Partial<FioCru> & { id: string; organization_id: string })
     channel: 'whatsapp',
     peer_phone_e164: '+5584999880011',
     peer_nome: null,
+    arquivada_em: null,
     business_number: '+5584999990000',
     assignee_id: HELOISA,
     setor_id: null,
@@ -841,6 +848,7 @@ function fioDaLista(parcial: Partial<FioDaConversa> = {}): FioDaConversa {
     canal: 'whatsapp',
     telefoneParceiro: '+5584999880011',
     nomeDoPerfil: null,
+    arquivadaEm: null,
     numeroDaEmpresa: '+5584999990000',
     responsavelId: HELOISA,
     responsavel: 'Heloísa',
@@ -889,6 +897,40 @@ function itemDaLista(parcial: Partial<ItemConversa> & { id: string }): ItemConve
     ...parcial,
   };
 }
+
+
+describe('aplicarFiltros: as arquivadas', () => {
+  // Rafael pediu "apagar o chat" em 29/09/2026 e escolheu ARQUIVAR, entre sumir
+  // da lista e apagar do banco. O que a lista faz com isso é este bloco.
+  const comFio = (arquivadaEm: string | null) =>
+    itemDaLista({ id: 'o1', fio: fioDaLista({ arquivadaEm }) });
+
+  it('a arquivada sai da lista', () => {
+    const r = aplicarFiltros([comFio('2026-09-29T12:00:00-03:00')], FILTROS_VAZIOS);
+    expect(r).toHaveLength(0);
+  });
+
+  it('e volta quando se pede para ver as arquivadas', () => {
+    const r = aplicarFiltros([comFio('2026-09-29T12:00:00-03:00')], {
+      ...FILTROS_VAZIOS,
+      arquivadas: true,
+    });
+    expect(r).toHaveLength(1);
+  });
+
+  it('parceiro sem conversa nenhuma continua na lista: ele não está arquivado, está sem fio', () => {
+    const r = aplicarFiltros([itemDaLista({ id: 'o2', fio: null })], FILTROS_VAZIOS);
+    expect(r).toHaveLength(1);
+  });
+
+  it('"ver arquivadas" conta como recorte, senão a tela diria que a base está vazia', () => {
+    expect(temRecorte({ ...FILTROS_VAZIOS, arquivadas: true })).toBe(true);
+  });
+
+  it('mas NÃO entra no contador de filtros: é a porta do arquivo, não um recorte do trabalho', () => {
+    expect(contarFiltros({ ...FILTROS_VAZIOS, arquivadas: true })).toBe(0);
+  });
+});
 
 describe('a fila de quem respondeu', () => {
   it('traz quem espera há mais tempo primeiro', () => {

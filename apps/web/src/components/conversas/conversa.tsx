@@ -2,8 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BotOff, ChevronDown, ExternalLink, MessageSquarePlus } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowLeft,
+  BotOff,
+  ChevronDown,
+  ExternalLink,
+  MessageSquarePlus,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { iniciaisDe } from '@/lib/iniciais';
@@ -14,7 +23,7 @@ import { formatarProximaAcao } from '@/components/parceiros/formatos';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { DiasSemContato } from '@/components/temperatura';
 
-import { marcarComoLida } from './acoes';
+import { arquivarConversa, marcarComoLida } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
 import { EtiquetasDoParceiro } from './etiquetas-do-parceiro';
@@ -34,7 +43,12 @@ import {
   type CatalogosConversas,
 } from './montagem';
 import { CaixaDeResposta } from './responder';
-import { ROTULO_ESTADO_DO_FIO, type DependenciasDaMeta, type ItemConversa } from './tipos';
+import {
+  ROTULO_ESTADO_DO_FIO,
+  type DependenciasDaMeta,
+  type FioDaConversa,
+  type ItemConversa,
+} from './tipos';
 
 /**
  * A coluna da direita: quem é o parceiro, a conversa inteira, e o que dá para
@@ -316,6 +330,7 @@ export function Conversa({
                 <span className="sr-only sm:hidden">Registrar contato</span>
               </Link>
             </Button>
+            {fio && eu?.podeEscrever ? <Arquivar fio={fio} /> : null}
             <Button asChild variant="ghost" size="icon" className="toque size-9">
               <Link href={`/parceiros/${item.id}`} title="Abrir a ficha do parceiro">
                 <ExternalLink aria-hidden="true" />
@@ -491,6 +506,53 @@ export function Conversa({
  * marcação da lista de definições é o que faz um leitor de tela ler "Onde:
  * Capim Macio, Natal" em vez de duas frases soltas.
  */
+/**
+ * Arquivar e desarquivar — o "apagar o chat" que o Rafael pediu em 29/09/2026.
+ *
+ * É um ícone, e não um botão com texto, por uma razão de proporção: quem abre
+ * uma conversa vai responder, não arrumar a lista. Arquivar acontece uma vez na
+ * vida de cada fio, e um botão largo para isso empurraria "Assumir" — que é a
+ * ação do dia — para fora da linha no celular.
+ *
+ * SEM CONFIRMAÇÃO, e isso é decisão: nada é destruído, o próprio botão desfaz,
+ * e a conversa volta sozinha se o parceiro escrever. Diálogo de confirmação
+ * para o que se desfaz num clique é imposto que ninguém lê.
+ */
+function Arquivar({ fio }: { fio: FioDaConversa }) {
+  const clientes = useQueryClient();
+  const arquivada = fio.arquivadaEm !== null;
+  const acao = useMutation({
+    mutationFn: () => arquivarConversa(fio.id, !arquivada),
+    onSuccess: () => {
+      void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
+      toast.success(
+        arquivada ? 'Conversa de volta na lista.' : 'Conversa arquivada.',
+        arquivada
+          ? undefined
+          : {
+              description: 'Ela volta sozinha se o parceiro escrever.',
+              action: { label: 'Desfazer', onClick: () => acao.mutate() },
+            },
+      );
+    },
+    onError: (e) => toast.error(mensagemDoErro(e)),
+  });
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="toque size-9"
+      disabled={acao.isPending}
+      onClick={() => acao.mutate()}
+      title={arquivada ? 'Trazer de volta para a lista' : 'Arquivar: tira da lista, não apaga nada'}
+    >
+      {arquivada ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
+      <span className="sr-only">{arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</span>
+    </Button>
+  );
+}
+
 function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
     // `div` entre `dl` e o par é HTML5 válido e é o que mantém rótulo e valor

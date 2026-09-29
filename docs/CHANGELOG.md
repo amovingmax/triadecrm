@@ -4631,3 +4631,54 @@ seção. A aba Atendimento passou de quatro consultas para duas em toda visita.
 - Nota de ambiente: o disco da máquina encheu no meio desta tarefa (100%). Os
   caches de build (`.next`) e um cache de atualizador de 833 MB saíram; sobrou
   1,7 GB. Vale um olho, porque `pnpm build` precisa de espaço.
+
+### 29/09/2026 — arquivar a conversa (o "apagar o chat")
+
+Rafael: *"crie a funcionalidade de apagar o chat"*. Perguntei o que "apagar"
+devia fazer — sumir da lista (com volta) ou sair do banco (sem volta) — e ele
+escolheu **arquivar**.
+
+Duas coisas que valiam para qualquer versão e que ele soube antes de escolher:
+apagar no CRM não apaga no WhatsApp do fornecedor, que continua com tudo no
+celular; e uma conversa apagada volta vazia se a pessoa escrever, deixando quem
+atender respondendo por cima de um contexto invisível.
+
+**Arquivar não destrói nada**, e a conversa **volta sozinha** quando o parceiro
+escreve — gatilho próprio (`messages_desarquiva`), e não uma linha dentro de
+`app.messages_after_write`, que já faz seis coisas e é a função mais quente do
+banco. Sem essa volta automática, arquivar seria uma armadilha silenciosa:
+alguém arruma a lista na terça, o fornecedor responde na quinta, e ninguém vê.
+Saída NOSSA não desarquiva: quem traz a conversa de volta é a pessoa, não nós.
+
+Quem arquiva é qualquer um que escreve, sobre conversa que enxerga (o mesmo
+recorte de `conversations_select`, repetido na RPC). Não é privilégio de admin:
+arquivar não destrói nada e se desfaz num clique — exigir admin faria a lista
+suja continuar suja.
+
+Na tela: um ícone no cabeçalho da conversa, sem diálogo de confirmação (o que se
+desfaz num clique não pede imposto que ninguém lê), com "Desfazer" no aviso; e
+um botão "Ver arquivadas" nos filtros, que conta como recorte (senão a tela
+diria "a base está vazia") mas fica fora do contador de filtros, por ser a porta
+do arquivo e não um recorte do trabalho.
+
+- Migração: `20261002250000_arquivar_a_conversa.sql` (coluna, índice parcial,
+  RPC e gatilho).
+- pgTAP: `93_arquivar_a_conversa.sql`, 11 asserções — **escrito e não rodado**
+  (ver abaixo).
+- Web: `arquivarConversa`, o botão, o filtro, e 5 testes Vitest novos (918).
+- Verificado: lint, typecheck, Vitest e `pnpm build`.
+
+#### Bloqueado: o disco da máquina
+
+`pnpm db:test` não rodou. O disco chegou a **497 MB livres de 228 GB** e o
+OrbStack não sobe sem espaço, então não há Postgres local. Limpei o que era
+cache de desenvolvimento (Homebrew, metadados do pnpm, `.next`, `pnpm store
+prune` — 1,4 GB) e o espaço foi consumido de novo em minutos.
+
+O consumo está medido: **36 GB são do próprio OrbStack**
+(`~/Library/Group Containers/HUAQ24HBR6.dev.orbstack`), que é a máquina virtual
+do Docker — imagens e volumes acumulados, tudo reconstruível com
+`supabase start` + `pnpm db:reset`. O resto do disco é dado do Rafael (185 GB no
+volume de dados).
+
+**A migração NÃO foi para produção**, e não vai enquanto o pgTAP não rodar.

@@ -25,6 +25,7 @@ function fio(parcial: Partial<FioCru>): FioCru {
     channel: 'whatsapp',
     peer_phone_e164: '+5584999994698',
     peer_nome: null,
+    arquivada_em: null,
     business_number: '+5584999318888',
     assignee_id: 'u',
     setor_id: null,

@@ -454,6 +454,13 @@ export function aplicarFiltros(
   const busca = normalizar(f.q);
 
   return itens.filter((item) => {
+    // ARQUIVADA SAI DA LISTA (29/09/2026). Primeiro de todos os recortes porque
+    // é o mais forte: quem arquivou disse "não tenho o que fazer aqui agora", e
+    // nenhum outro filtro deve trazer a conversa de volta por acidente. O que a
+    // traz de volta é a pessoa escrever (gatilho no banco) ou alguém marcar
+    // "mostrar arquivadas".
+    if (!f.arquivadas && item.fio?.arquivadaEm != null) return false;
+
     // "Minhas" e "Meu setor" perguntam pelo FIO de WhatsApp: parceiro sem
     // conversa não tem quem atenda nem setor, e sai desses dois recortes.
     if (f.escopo === 'minhas' && (quem.euId === null || item.fio?.responsavelId !== quem.euId)) {

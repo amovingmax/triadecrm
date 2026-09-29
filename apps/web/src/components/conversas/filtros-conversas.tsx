@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { Archive, Search, SlidersHorizontal, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -129,6 +129,21 @@ export function FiltrosDaConversa({
             opcoes={JANELAS_EM_ORDEM.map((j) => ({ valor: j, rotulo: ROTULO_JANELA[j] }))}
             aoMudar={(v) => aoMudar({ janela: v ?? 'qualquer' })}
           />
+          {/* AS ARQUIVADAS (29/09/2026). Um botão que liga e desliga, e não um
+              seletor com duas opções: a pergunta tem uma resposta só na
+              esmagadora maioria dos dias ("não, some com elas"), e um seletor
+              obrigaria a pessoa a ler duas opções para escolher a de sempre.
+              Ele não entra no contador de filtros por não ser um recorte do
+              trabalho — é a porta do arquivo. */}
+          <Button
+            variant={filtros.arquivadas ? 'secondary' : 'outline'}
+            onClick={() => aoMudar({ arquivadas: !filtros.arquivadas })}
+            aria-pressed={filtros.arquivadas}
+            className="toque h-11 w-full justify-start md:h-8 md:w-auto"
+          >
+            <Archive aria-hidden="true" />
+            {filtros.arquivadas ? 'Mostrando as arquivadas' : 'Ver arquivadas'}
+          </Button>
         </div>
 
         {limpavel ? (

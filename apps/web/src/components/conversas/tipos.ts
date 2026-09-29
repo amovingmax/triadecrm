@@ -317,6 +317,12 @@ export type FiltrosConversas = {
   escopo: EscopoDaLista;
   canal: Channel | null;
   janela: JanelaSemContato;
+  /**
+   * Mostrar as arquivadas (29/09/2026). Fora do contador de "Filtros" e falso
+   * por padrão: arquivar existe para tirar da frente, e um recorte que a pessoa
+   * precisa lembrar de desligar não tira nada da frente.
+   */
+  arquivadas: boolean;
 };
 
 /** Minhas · Meu setor · Todas. */
@@ -334,6 +340,7 @@ export const FILTROS_VAZIOS: FiltrosConversas = {
   escopo: 'todas',
   canal: null,
   janela: 'qualquer',
+  arquivadas: false,
 };
 
 /** Há algum recorte ligado? Separa "a base está vazia" de "o filtro não achou nada". */
@@ -344,7 +351,10 @@ export function temRecorte(f: FiltrosConversas): boolean {
     f.atendenteId !== null ||
     f.escopo !== 'todas' ||
     f.canal !== null ||
-    f.janela !== 'qualquer'
+    f.janela !== 'qualquer' ||
+    // "Mostrar arquivadas" É um recorte: sem ele aqui, a tela diria "a base está
+    // vazia" quando na verdade só não há nada ARQUIVADO para mostrar.
+    f.arquivadas
   );
 }
 
@@ -390,6 +400,7 @@ export function estadoDaUrl(params: Record<string, string | string[] | undefined
       escopo: ESCOPOS.some((e) => e.id === texto('ver')) ? (texto('ver') as EscopoDaLista) : 'todas',
       canal: ehCanal(canal) ? canal : null,
       janela: ehJanela(janela) ? janela : 'qualquer',
+      arquivadas: texto('arquivadas') === '1',
     },
     organizacaoId: texto('org') || null,
     aba: ehAbaDaEsquerda(texto('aba')) ? texto('aba') as AbaDaEsquerda : 'conversas',
@@ -409,6 +420,7 @@ export function urlDoEstado(
   if (f.escopo !== 'todas') p.set('ver', f.escopo);
   if (f.canal) p.set('canal', f.canal);
   if (f.janela !== 'qualquer') p.set('janela', f.janela);
+  if (f.arquivadas) p.set('arquivadas', '1');
   if (aba !== 'conversas') p.set('aba', aba);
   if (organizacaoId) p.set('org', organizacaoId);
   const busca = p.toString();
@@ -590,6 +602,15 @@ export type FioDaConversa = {
    * (ver `nomeExibido` em `formatos.ts`).
    */
   nomeDoPerfil: string | null;
+  /**
+   * Quando alguém tirou esta conversa da lista (29/09/2026), ou null.
+   *
+   * Arquivar NÃO apaga: o fio inteiro continua, e mensagem nova do parceiro
+   * desarquiva sozinha (gatilho `messages_desarquiva`). Rafael escolheu isto
+   * quando pediu "apagar o chat" e eu perguntei entre sumir da lista e apagar
+   * do banco.
+   */
+  arquivadaEm: string | null;
   /** O número da KOMUNE que fala neste fio (RF-CON-01). */
   numeroDaEmpresa: string;
   responsavelId: string;
