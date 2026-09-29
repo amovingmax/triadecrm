@@ -22,7 +22,12 @@ import { type Sessao } from '@/lib/auth/session';
  */
 export function Header({ sessao }: { sessao: Sessao }) {
   return (
-    <header className="superficie-vidro sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 px-3 md:px-6">
+    // 72px no desktop (Tríade Design System, 29/09/2026): a mesma altura do
+    // quadrado da marca no trilho, para o cabeçalho e o trilho começarem na
+    // mesma linha. No celular fica em 56px, porque lá cada pixel de altura sai
+    // da lista. `superficie-vidro` já é a tela a 82% com desfoque, que é o que
+    // o sistema pede para o cabeçalho grudado.
+    <header className="superficie-vidro sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 px-3 md:h-[72px] md:px-5">
       <Link
         href="/meu-dia"
         className="toque -ml-1.5 inline-flex h-11 min-w-11 items-center justify-center md:hidden"

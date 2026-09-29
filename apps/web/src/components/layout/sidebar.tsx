@@ -1,21 +1,36 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { ChevronDown } from 'lucide-react';
 
 import { NavLink } from '@/components/layout/nav-link';
-import { Logo } from '@/components/logo';
+import { MarcaTriade } from '@/components/logo';
 import { type AppRole } from '@/lib/auth/role';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
 import { navegacaoDaLateral } from '@/lib/navegacao';
-import { cn } from '@/lib/utils';
 
 /**
- * Lateral do desktop (md+): estreita e de pouco peso, porque a tela pertence à
- * lista. Ícone mais rótulo, altura de linha de 32px, sem cartão e sem sombra. No
- * celular a navegação vive na barra inferior.
+ * O TRILHO do desktop (md+): 72px, só ícones. No celular a navegação continua na
+ * barra inferior, com rótulo, porque lá o dedo não tem `title`.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE O RÓTULO SAIU, E O QUE FICOU NO LUGAR DELE (29/09/2026)
+ * ---------------------------------------------------------------------------
+ * O Tríade Design System pede um trilho de 72px. Adotá-lo ao pé da letra
+ * desfaria o que esta lateral resolveu em 08/09: doze itens em fila indiana não
+ * diziam nada sobre si mesmos, e foram o agrupamento e o rótulo que consertaram.
+ *
+ * O que ficou, e é o que impede a volta daquele problema:
+ *   1. O NOME continua existindo, no `title` e no rótulo acessível de cada
+ *      ícone (`nav-link.tsx`, variante "trilho").
+ *   2. OS GRUPOS continuam existindo, agora como um fio de 24px entre eles. A
+ *      distância que antes era um cabeçalho de 11px virou espaço em branco, que
+ *      é o que um trilho tem para dizer "isto é outra coisa".
+ *   3. "Mais" deixou de ser um menu que abre: num trilho de 72px um acordeão é
+ *      uma gaveta dentro de uma gaveta. Os itens dele vão para o PÉ do trilho,
+ *      depois do fio — a mesma ideia do `mt-auto` de antes, com menos cliques.
+ *
+ * O contador é o único ponto de cor do trilho, e é a menta: sem rótulo, o número
+ * é o que diz onde há trabalho parado sem que ninguém precise ler.
  *
  * ---------------------------------------------------------------------------
  * OS TRÊS GRUPOS, E O REALCE QUE NÃO GASTA COR
@@ -52,57 +67,50 @@ import { cn } from '@/lib/utils';
  */
 export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFilas }) {
   const { principais, mais } = navegacaoDaLateral(papel);
-  const pathname = usePathname();
-  // "Mais" nasce aberto quando a tela atual mora nele: um item aceso escondido
-  // num menu fechado é a pessoa sem saber onde está.
-  const estouNoMais = mais.some((i) => pathname === i.href || pathname.startsWith(`${i.href}/`));
-  const [maisAberto, setMaisAberto] = useState(estouNoMais);
-
   return (
-    <aside className="sticky top-0 hidden h-dvh w-52 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
-      <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border px-3">
-        <Link href="/meu-dia" className="toque" aria-label="Tríade, ir para Meu dia">
-          <Logo className="text-[15px]" />
-        </Link>
-      </div>
+    <aside className="sticky top-0 hidden h-dvh w-[72px] shrink-0 flex-col items-center gap-1.5 border-r border-sidebar-border bg-sidebar py-4 text-sidebar-foreground md:flex">
+      {/* A marca num quadrado de canto macio, e não numa pílula: ela é a única
+          coisa do trilho que não navega entre módulos. */}
+      <Link
+        href="/meu-dia"
+        aria-label="Tríade, ir para Meu dia"
+        title="Tríade"
+        className="mb-2.5 flex size-10 shrink-0 items-center justify-center"
+      >
+        {/* A própria marca já é a chapa de canto macio (`rect rx=112` com
+            `fill-primary`), então ela NÃO ganha um segundo fundo em volta: no
+            desenho novo o `--primary` é a tinta, e a marca vira o quadrado preto
+            que o sistema pede, sem nenhuma moldura extra. */}
+        <MarcaTriade className="size-10" />
+      </Link>
 
-      <nav aria-label="Navegação principal" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-2">
+      <nav
+        aria-label="Navegação principal"
+        className="flex flex-1 flex-col items-center gap-1.5 overflow-y-auto"
+      >
         {principais.map((item) => (
           <NavLink
             key={item.href}
             item={item}
-            variante="lateral"
+            variante="trilho"
             contagem={item.fila ? (filas[item.fila] ?? null) : null}
           />
         ))}
 
         {mais.length > 0 ? (
-          <div className="mt-3 border-t border-sidebar-border pt-2">
-            <button
-              type="button"
-              aria-expanded={maisAberto || estouNoMais}
-              onClick={() => setMaisAberto((v) => !v)}
-              className="toque flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[13px] text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-            >
-              Mais
-              <ChevronDown
-                aria-hidden="true"
-                className={cn('size-4 transition-transform', (maisAberto || estouNoMais) && 'rotate-180')}
+          <>
+            {/* O fio que era o cabeçalho do grupo. Uma linha só no trilho
+                inteiro: se houvesse três, nenhuma significaria nada. */}
+            <span aria-hidden="true" className="my-2 h-px w-8 shrink-0 bg-sidebar-border" />
+            {mais.map((item) => (
+              <NavLink
+                key={item.href}
+                item={item}
+                variante="trilho"
+                contagem={item.fila ? (filas[item.fila] ?? null) : null}
               />
-            </button>
-            {maisAberto || estouNoMais ? (
-              <div className="mt-0.5 flex flex-col gap-0.5">
-                {mais.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    item={item}
-                    variante="lateral"
-                    contagem={item.fila ? (filas[item.fila] ?? null) : null}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
+            ))}
+          </>
         ) : null}
       </nav>
     </aside>

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 type Props = {
   item: ItemNavegacao;
-  variante: 'lateral' | 'inferior' | 'menu';
+  variante: 'lateral' | 'trilho' | 'inferior' | 'menu';
   onNavegar?: () => void;
   /**
    * Quanta coisa está parada esperando nesta tela. `null` quando o item não conta
@@ -59,6 +59,54 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
   const ativo = estaAtivo(pathname, item.href);
   const Icone = item.icone;
   const numero = contagem !== null && contagem > 0 ? contagem : null;
+
+  // ---------------------------------------------------------------------------
+  // O TRILHO DE 72px (Tríade Design System, 29/09/2026)
+  // ---------------------------------------------------------------------------
+  // O sistema pede um trilho só de ícones no lugar da lateral com rótulo. Adotar
+  // isso ao pé da letra desfaria o que a lateral resolveu em 08/09/2026: doze
+  // itens em fila indiana não diziam nada sobre si mesmos ("muitas abas e pouco
+  // direcionamento", Rafael), e foram o AGRUPAMENTO e o RÓTULO que consertaram.
+  //
+  // O empate se resolve pela regra do próprio sistema — a referência vence na
+  // aparência, o repositório vence no significado. Então:
+  //   · a APARÊNCIA é a do sistema: disco de 44px, ícone de 18px, tinta cheia
+  //     no ativo, contador em menta;
+  //   · o SIGNIFICADO fica: o nome vive no `title` e no rótulo acessível, e os
+  //     grupos viram um fio de separação no trilho (ver `sidebar.tsx`).
+  //
+  // O `title` é o que devolve o rótulo a quem não decorou treze ícones, e o
+  // `aria-label` é o que faz o leitor de tela anunciar o módulo em vez de "link".
+  if (variante === 'trilho') {
+    return (
+      <Link
+        href={item.href}
+        aria-current={ativo ? 'page' : undefined}
+        aria-label={item.rotulo}
+        title={item.rotulo}
+        onClick={onNavegar}
+        className={cn(
+          'relative flex size-11 shrink-0 items-center justify-center rounded-full transition-colors',
+          ativo
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-sidebar-muted-foreground hover:bg-muted hover:text-sidebar-foreground',
+        )}
+      >
+        <Icone className="size-[18px]" aria-hidden="true" strokeWidth={1.75} />
+        {numero !== null ? (
+          // A MENTA, e é o único lugar do trilho com cor. Ela existe aqui porque
+          // um trilho sem rótulo precisa de um sinal que se veja sem ler: o
+          // número é o que diz em qual módulo há trabalho parado agora.
+          <span
+            aria-label={`${numero} esperando`}
+            className="numerico absolute top-0.5 right-0 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-menta px-1 text-[10px] leading-none font-semibold text-foreground"
+          >
+            {numero > 99 ? '99+' : numero}
+          </span>
+        ) : null}
+      </Link>
+    );
+  }
 
   if (variante === 'inferior') {
     return (

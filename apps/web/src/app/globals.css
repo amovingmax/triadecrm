@@ -42,6 +42,12 @@
      usa esta variante, medida em 4,5:1 sobre fundo, cartão, muted e sobre o
      próprio preenchimento a 10%. É a mesma regra da escala térmica. */
   --color-destructive-texto: var(--destructive-texto);
+  /* A MENTA como classe do Tailwind (`bg-menta`, `text-menta-texto`): o acento
+     único do Tríade Design System. Fora do mapa do shadcn de propósito — ela não
+     é `--accent`, que ali é o realce neutro de item de menu. */
+  --color-menta: var(--menta);
+  --color-menta-fundo: var(--menta-fundo);
+  --color-menta-texto: var(--menta-texto);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

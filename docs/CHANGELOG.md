@@ -4745,3 +4745,43 @@ e `#7a7a7a`. É o "repo wins on a11y" do próprio sistema.
 - Próximas fases: a casca (trilho de 72px + cabeçalho de 72px), os cartões
   (branco, 24px, ação circular no canto) e os componentes novos do sistema
   (KpiFigure, SegmentedMeter, BarrasSemana, Breadcrumb).
+
+### 29/09/2026 — Design System, fase 2: o trilho e o cabeçalho
+
+Rafael aprovou a direção no protótipo (*"ficou bem melhor a id visual e mais
+clean, gostei"*), depois de pedir que o desenho passasse por protótipo antes da
+produção. O protótipo das cinco telas está em
+`claude.ai/artifact/8w7fBPjUFW5MVWXDP3MbPt`.
+
+Antes disso, um defeito meu que ele viu no print antes de mim: com
+`--radius-md` valendo pílula, todo canto escrito `rounded-br-md` virava um
+quarto de círculo de 9999px, e o rabinho do balão do WhatsApp comeu metade da
+mensagem. Pílula é para o objeto inteiro que se aperta, nunca para um canto
+solto. O degrau pequeno voltou a ser 10px (`--raio-chip`).
+
+**A lateral virou o trilho de 72px.** Adotá-lo ao pé da letra desfaria o que a
+lateral resolveu em 08/09: doze itens em fila indiana não diziam nada sobre si
+mesmos (*"muitas abas e pouco direcionamento"*), e foram o agrupamento e o
+rótulo que consertaram. Pela regra do próprio sistema — a referência vence na
+aparência, o repositório vence no significado —, ficou:
+
+- a **aparência** é a do sistema: disco de 44px, ícone de 18px em traço 1,75,
+  tinta cheia no ativo, marca em quadrado de canto macio no topo;
+- o **nome** continua existindo, no `title` e no rótulo acessível de cada ícone;
+- os **grupos** continuam existindo, como um fio de 24px entre eles;
+- **"Mais" deixou de ser acordeão**: num trilho de 72px um menu que abre é uma
+  gaveta dentro de uma gaveta. Os itens dele vão para o pé do trilho, depois do
+  fio — a mesma ideia do `mt-auto` de antes, com menos cliques.
+
+O contador é o único ponto de cor do trilho, e é a **menta**: sem rótulo, o
+número é o que diz onde há trabalho parado sem ninguém precisar ler.
+
+O cabeçalho foi para **72px no desktop** (a mesma altura do quadrado da marca, os
+dois começando na mesma linha) e ficou em 56px no celular, onde altura sai da
+lista.
+
+- Tocado: `sidebar.tsx`, `nav-link.tsx` (variante "trilho"), `header.tsx`,
+  `globals.css` (`--raio-chip`, a menta como cor do Tailwind).
+- Verificado: lint, typecheck, `pnpm build` e 918 testes.
+- Próxima fase: os cartões (branco, 24px, ação circular no canto), as linhas de
+  lista a 16px, e as telas que o protótipo desenhou.
