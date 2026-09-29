@@ -148,8 +148,16 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
     <RevelarLista>
       <ColunasEscondidas />
 
-      {/* O contêiner rola na horizontal; a página nunca rola. */}
-      <div className="relative w-full overflow-x-auto" style={SOMBRA_DE_ROLAGEM}>
+      {/* O contêiner rola na horizontal; a página nunca rola.
+          E ele é um CARTÃO (29/09/2026, Design System): a tabela ficava direto
+          sobre a página, com as linhas encostando na borda da tela. No desenho
+          novo a página é cinza e a tabela é conteúdo, logo mora no branco.
+          `px-1` em vez de padding cheio porque as células já têm o seu, e um
+          padding duplo empurraria a primeira coluna para o meio do cartão. */}
+      <div
+        className="sombra-base relative w-full overflow-x-auto rounded-xl bg-card px-1 py-1"
+        style={SOMBRA_DE_ROLAGEM}
+      >
         <table className="w-full table-fixed border-collapse text-sm">
           <thead>
             {tabela.getHeaderGroups().map((grupo) => (
@@ -164,7 +172,7 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
                       // rótulo que crescesse sangraria por cima da coluna vizinha.
                       'h-9 truncate px-3 text-left align-middle text-xs font-medium text-muted-foreground',
                       cabecalho.column.id === 'nome' &&
-                        'sticky left-0 z-20 border-r border-hairline bg-background pl-4',
+                        'sticky left-0 z-20 border-r border-hairline bg-card pl-4',
                       CLASSES[cabecalho.column.id],
                     )}
                   >
@@ -190,7 +198,7 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
                       celula.column.id === 'nome' &&
                         // Fundo opaco para o conteúdo passar por baixo, e o mesmo
                         // resultado do hover da linha (muted a 50% sobre o fundo).
-                        'sticky left-0 z-10 border-r border-hairline bg-background p-0 group-hover/linha:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]',
+                        'sticky left-0 z-10 border-r border-hairline bg-card p-0 group-hover/linha:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]',
                       CLASSES[celula.column.id],
                     )}
                   >

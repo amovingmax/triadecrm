@@ -4995,3 +4995,36 @@ real. Um número inventado num cartão de 40px é pior do que não ter o cartão
 
 - Tocado: `meu-dia/resumo-do-dia.tsx`, `meu-dia/tela-meu-dia.tsx`.
 - Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.
+
+### 29/09/2026 — Design System, fase 3: Funis e Parceiros (as cinco telas fechadas)
+
+**Funis.** A coluna deixou de ser caixa. Ela era um retângulo cinza com borda e
+cabeçalho separado por filete — um contêiner dentro do contêiner, com os cartões
+brancos nadando dentro. No protótipo a coluna é transparente: o que existe são o
+título, uma **barra de 3px** e os cartões. A caixa não desenhava nada que o
+agrupamento já não dissesse.
+
+A barra diz a natureza da etapa sem gastar palavra: tinta cheia na etapa de
+saída (o negócio fechou ou morreu ali), cinza no resto.
+
+Duas correções minhas no caminho, e as duas de significado, não de estilo:
+
+1. **A menta quase virou cor de enfeite.** A primeira versão pintava de menta
+   toda etapa com cartão — num quadro de doze etapas, o acento aparecendo dez
+   vezes. O acento do sistema é UM por tela; um acento que se repete é só mais
+   uma cor. Saiu.
+2. **A área de soltura ficou invisível.** Quem dizia "pode soltar aqui" durante
+   o arrasto era a borda da coluna; tirei a caixa e levei a dica junto. Voltou
+   como contorno **tracejado**, que é a gramática de alvo, e só durante o
+   arrasto — parado, o quadro segue sem moldura.
+
+**Parceiros.** A tabela ficava direto sobre a página, com as linhas encostando
+na borda da tela. Virou cartão branco. A coluna grudada (o nome, que não rola na
+horizontal) teve o fundo trocado de `--background` para `--card`: sobre o cartão
+branco, o cinza da página vazaria por baixo dela.
+
+Com isso fecham as cinco telas do protótipo: Meu dia, Conversas, Funis,
+Parceiros e Relatórios.
+
+- Tocado: `funis/coluna.tsx`, `parceiros/tabela-parceiros.tsx`.
+- Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.

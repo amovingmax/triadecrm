@@ -100,21 +100,48 @@ export function Coluna({
       data-sobre={isOver ? '' : undefined}
       className={cn(
         LARGURA,
-        'flex max-h-[calc(100dvh-19rem)] min-h-80 shrink-0 flex-col rounded-xl border border-hairline transition-colors',
-        etapaEhDeSaida(etapa) ? 'bg-muted/20' : 'bg-muted/40',
-        arrastando && 'border-input',
-        isOver && 'border-ring bg-accent/60',
+        // A COLUNA DEIXOU DE SER CAIXA (29/09/2026, Design System). Ela era um
+        // retângulo cinza com borda e um cabeçalho separado por filete: um
+        // contêiner dentro do contêiner, com os cartões brancos nadando dentro.
+        // No protótipo a coluna é TRANSPARENTE — o que existe são o título, uma
+        // barra de 3px e os cartões. A caixa não desenhava nada que o
+        // agrupamento já não dissesse.
+        'flex max-h-[calc(100dvh-19rem)] min-h-80 shrink-0 flex-col rounded-xl transition-colors',
+        // ENQUANTO SE ARRASTA, a coluna precisa dizer "pode soltar aqui". Antes
+        // quem dizia era a borda dela; sem caixa, a dica sumiu junto — e uma
+        // área de soltura invisível é pior que uma caixa feia. Volta como
+        // contorno TRACEJADO, que é a gramática de "alvo", e só durante o
+        // arrasto: parado, o quadro continua sem moldura.
+        arrastando && 'border border-dashed border-input',
+        isOver && 'border-solid border-foreground bg-muted/60',
       )}
     >
-      <header className="flex items-center gap-2 border-b border-hairline px-3 py-2">
-        <IconeDaEtapa etapa={etapa} />
-        <h3 className="min-w-0 flex-1 truncate text-sm font-medium" title={etapa.name}>
-          {etapa.name}
-        </h3>
-        <ContagemDaEtapa total={etapa.total} />
+      <header className="flex flex-col gap-2 px-1 pt-1 pb-2">
+        <div className="flex items-center gap-2">
+          <IconeDaEtapa etapa={etapa} />
+          <h3 className="min-w-0 flex-1 truncate text-sm font-semibold" title={etapa.name}>
+            {etapa.name}
+          </h3>
+          <ContagemDaEtapa total={etapa.total} />
+        </div>
+        {/* A BARRA DE 3px, no lugar do filete do cabeçalho: ela diz de que
+            NATUREZA é a etapa sem gastar uma palavra. Tinta cheia na etapa de
+            saída (o negócio fechou ou morreu ali), cinza no resto.
+
+            SEM MENTA aqui, e isso é decisão. A primeira versão pintava de menta
+            toda etapa com cartão — o que, num quadro de doze etapas, é o acento
+            aparecendo dez vezes. O acento do sistema é UM por tela; um acento
+            que se repete é só mais uma cor. */}
+        <span
+          aria-hidden="true"
+          className={cn(
+            'h-[3px] w-full rounded-full',
+            etapaEhDeSaida(etapa) ? 'bg-foreground' : 'bg-border',
+          )}
+        />
       </header>
 
-      <div className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto p-2">
+      <div className="flex min-h-24 flex-1 flex-col gap-2.5 overflow-y-auto px-1 pb-2">
         {children}
 
         {etapa.total === 0 ? (
