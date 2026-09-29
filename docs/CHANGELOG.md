@@ -4429,3 +4429,36 @@ O que fica: **nenhuma das três verificações de sempre compila para o
 navegador.** `pnpm build` passa a ser obrigatório antes de qualquer deploy —
 descobrir isto pelo Vercel custou um deploy morto e mais uma rodada de espera do
 Rafael.
+
+### 29/09/2026 — o cumprimento reconhece o Google pelo que ele é, não pela etiqueta
+
+Rafael: *"cade? eu aprovei alguns agora em revisão, cade as mensagens
+automaticas?"*. Não saiu nenhuma, e o defeito era meu, de ontem.
+
+**O erro.** O gatilho de `20261002200000` perguntava se a ficha nasceu com a
+ORIGEM `google_maps_raspado`. Mas o CSV do Google Maps entra pela importação de
+planilha desde `20260924130000`, e a ficha aprovada sai com `source_id` da
+**planilha**. As seis fichas aprovadas hoje ao meio-dia tinham todas o
+`place_id` do Google e origem 8.
+
+Eu conferi a etiqueta em vez do fato. A etiqueta diz por qual porta a linha
+entrou; o fato não: `place_id` é o identificador que o próprio Google dá ao
+lugar, e nada além de coleta do Google o preenche. A pergunta passou a ser essa,
+e a origem continua valendo para o dia em que o scraper gravar direto.
+
+**As seis foram recuperadas.** Elas foram aprovadas com o interruptor já ligado
+(a chave virou em 28/09 17:21), então havia promessa. O recorte da recuperação é
+exatamente `created_at >= o instante em que a chave foi ligada` — o que foi
+aprovado antes disso nunca teve promessa, e enfileirar seria mandar mensagem que
+ninguém pediu. Entram na FILA, não no ar: quem decide cada envio continua sendo
+a porteira e o ritmo de 2 por hora.
+
+**Por que o teste não pegou.** O arquivo 92 provava "planilha não entra" com uma
+ficha de planilha SEM `place_id` — que é o caso que não acontece. Faltava o caso
+real: planilha COM `place_id`. Agora ele existe, e mais um provando que o
+`place_id` não vence o pedido de não ser contatado.
+
+- Migração: `20261002210000_o_cumprimento_reconhece_o_maps.sql`.
+- pgTAP: 92 vai a 22 asserções; suíte em 3.228.
+- Verificado: `db lint` sem apontamento novo.
+- Sem mudança no web — nada para subir na Vercel.

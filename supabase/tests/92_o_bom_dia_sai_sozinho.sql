@@ -7,8 +7,11 @@
 --      ninguém apertar botão: o padrão tem de ser o silêncio.
 --   2. LIGADO, A APROVAÇÃO ENFILEIRA. E o lote que nasce é o da casa — sem
 --      criador, sem assinante, contínuo.
---   3. SÓ O GOOGLE MAPS. Ficha de planilha não entra (decisão do Rafael,
---      28/09/2026), e quem pediu para não ser contatado também não.
+--   3. SÓ O GOOGLE. E o que define isso é o `place_id`, não a origem: o CSV do
+--      Maps entra pela IMPORTAÇÃO e a ficha aprovada sai com origem `planilha`.
+--      Perguntar pela origem foi o defeito de 29/09/2026 — o Rafael aprovou seis
+--      fichas e não saiu cumprimento nenhum. Planilha SEM place_id continua
+--      fora, e quem pediu para não ser contatado também.
 --   4. A MENSAGEM NÃO TEM DONO. `author_kind = 'bot_fixed'` e `sent_by` nulo —
 --      "n sai do cracha de ninguem, sai no da komune sem id".
 --   5. MODELO COM VARIÁVEL É RECUSADO, porque não há quem preencha
@@ -23,7 +26,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(20);
+select plan(22);
 
 -- ---------- o ambiente ----------
 insert into public.allowed_users (email, role, note)
@@ -100,7 +103,23 @@ select ok((select assinante_id is null from public.envios_em_massa_itens
 insert into public.organizations (name, phone_e164, source_id, collector)
 values ('Buffet da Planilha', '+5584900008903', pg_temp.fonte('planilha'), 'pgtap89');
 select is(pg_temp.na_fila((select id from public.organizations where phone_e164 = '+5584900008903')), 0,
-  'ficha de planilha não entra: a regra é só do scraper do Google Maps');
+  'planilha sem place_id não entra: não veio do Google');
+
+-- O CASO QUE FALTAVA, e que custou um dia: o CSV do Google Maps entra pela
+-- importação, então a ficha nasce com origem PLANILHA e `place_id` do Google.
+-- É ela que tem de entrar — foi a que o Rafael aprovou seis vezes sem receber
+-- cumprimento nenhum.
+insert into public.organizations (name, phone_e164, source_id, collector, place_id)
+values ('Fotógrafo do CSV do Maps', '+5584900008905', pg_temp.fonte('planilha'),
+        'pgtap89', '17033486945782332418');
+select is(pg_temp.na_fila((select id from public.organizations where phone_e164 = '+5584900008905')), 1,
+  'ficha com place_id do Google entra, mesmo tendo entrado pela porta da planilha');
+
+insert into public.organizations (name, phone_e164, source_id, collector, place_id, do_not_contact)
+values ('Fotógrafo do Maps que pediu para sair', '+5584900008906', pg_temp.fonte('planilha'),
+        'pgtap89', '10699415778523803709', true);
+select is(pg_temp.na_fila((select id from public.organizations where phone_e164 = '+5584900008906')), 0,
+  'e o place_id não vence o pedido de não ser contatado');
 
 insert into public.organizations (name, phone_e164, source_id, collector, do_not_contact)
 values ('Buffet Que Pediu Para Sair', '+5584900008904', pg_temp.fonte('google_maps_raspado'),
