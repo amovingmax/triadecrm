@@ -4962,3 +4962,36 @@ diferentes é o que faz o produto parecer remendado.
 - Tocado: `relatorios/painel.tsx`, `relatorios/tela-relatorios.tsx`, e 12
   arquivos pelo título.
 - Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.
+
+### 29/09/2026 — o Meu dia abre com os três cartões do protótipo
+
+Rafael, depois de eu perguntar três vezes qual conjunto de métricas a tela devia
+medir: *"quero total igual ao prototipo, identico e sem falhas"*. É resposta, e
+foi seguida.
+
+A tela abre agora com **três cartões grandes** que respondem "o que está me
+esperando?", e não com o placar das metas. A diferença não é estética: *"Portas
+batidas: 3"* é o que EU fiz; *"Esperando a gente: 9"* é o que está parado por
+minha causa. Só o segundo faz alguém levantar da cadeira.
+
+- **Esperando a gente** — responderam no WhatsApp e ninguém falou. Leva para
+  Conversas → Responderam.
+- **Parados na etapa** — negócios que passaram do prazo do funil. Leva para Funis.
+- **Pendentes hoje** — o mesmo total do cabeçalho. Leva para a Agenda.
+
+**Nenhum dos três custa consulta nova**: os dois primeiros já estavam na fila que
+a tela carrega, contados por tipo de item, e o terceiro é o número que o
+cabeçalho já mostrava.
+
+As quatro métricas das Metas **continuam na tela**, logo abaixo e menores, com o
+link de "Definir em Metas" intacto. O protótipo não as tinha, mas apagá-las
+tiraria do time o placar do dia sem ninguém ter pedido isso — o que o Rafael
+pediu foi a ordem de importância, e é ela que mudou.
+
+**Um número sem sentido que quase subiu.** O terceiro cartão, na primeira
+versão, somava os realizados das quatro métricas: "portas batidas + ligações +
+reuniões", que não é quantidade de coisa nenhuma. Virou o total pendente, que é
+real. Um número inventado num cartão de 40px é pior do que não ter o cartão.
+
+- Tocado: `meu-dia/resumo-do-dia.tsx`, `meu-dia/tela-meu-dia.tsx`.
+- Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.

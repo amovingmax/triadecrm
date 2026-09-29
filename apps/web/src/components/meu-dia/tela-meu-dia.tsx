@@ -169,6 +169,9 @@ export function TelaMeuDia({
           metricas={resumo.data ?? []}
           carregando={resumo.isPending}
           podeDefinirMeta={podeDefinirMeta}
+          esperando={itens.filter((i) => i.tipo === 'conversa_esperando').length}
+          parados={itens.filter((i) => i.tipo === 'negocio_parado').length}
+          pendentes={pendentes}
         />
       )}
 
