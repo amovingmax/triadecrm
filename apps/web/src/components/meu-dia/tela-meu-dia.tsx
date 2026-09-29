@@ -104,7 +104,12 @@ export function TelaMeuDia({
           tamanhos de tela. */}
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">
+          {/* Trilha e título no degrau do sistema (29/09/2026): 32px em peso
+              400 com tracking de -0.02em. O `font-semibold text-2xl` de antes
+              era um título de seção com cara de página; o sistema separa os dois
+              pelo PESO — título grande é leve, ênfase é que é pesada. */}
+          <p className="text-xs text-muted-foreground">Início · Meu dia</p>
+          <h1 className="mt-1 font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
             {saudacao}
             {nome ? `, ${nome}` : ''}.
           </h1>
@@ -238,8 +243,15 @@ function Bloco({ bloco, deslocamento }: { bloco: BlocoPreenchido; deslocamento: 
 
   const molde = 'flex w-full items-center gap-2 pb-1.5 text-left';
 
+  // O BLOCO VIROU CARTÃO (29/09/2026). Ele era um título solto com uma lista
+  // embaixo, direto sobre a página: no desenho novo a página é cinza e tudo que
+  // é conteúdo mora num cartão branco. Sem isso a fila ficava boiando, que foi o
+  // que o Rafael viu ao comparar com o protótipo.
   return (
-    <section aria-labelledby={idDoTitulo} className="flex flex-col">
+    <section
+      aria-labelledby={idDoTitulo}
+      className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-4 sm:p-5"
+    >
       {recolhivel ? (
         <button
           type="button"

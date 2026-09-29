@@ -4860,3 +4860,26 @@ Primeira tela reescrita no desenho novo, e é a do print que o Rafael mandou.
   `meu-dia/item-da-fila.tsx`, `meu-dia/tela-meu-dia.tsx`.
 - Verificado: typecheck, lint, 921 testes e o build de `apps/web` com o mesmo
   comando da Vercel.
+
+#### E a diferença que sobrou entre o Meu dia e o protótipo
+
+Rafael: *"meu dia n ficou igual ao prototipo não"*. Verdade, e faltou eu separar
+duas coisas antes de codar: o protótipo tem a FORMA (que ele aprovou) e o
+CONTEÚDO (que eu inventei com dados de exemplo).
+
+Os três cartões que desenhei — "Esperando a gente", "Primeiros contatos", "Sem
+contato" — **não existem no produto**. O Meu dia real mede Portas batidas,
+Portas abertas, Ligações e Reuniões, que vêm das Metas. Trocar isso é decisão de
+produto, não de design, e fica com ele.
+
+O que era forma, e era erro meu, foi consertado:
+
+- **A fila estava solta na página.** No desenho novo a página é cinza e todo
+  conteúdo mora num cartão branco; sem isso ela boiava. Cada bloco virou cartão.
+- **O pulso estava entre dois filetes** — lia como divisória entre duas coisas
+  em vez de uma coisa. Virou cartão.
+- **A saudação estava em 24px `semibold`**, que é um título de seção com cara de
+  página. Foi para os 32px em peso 400 do sistema, com a trilha "Início · Meu
+  dia" em cima: no sistema, título grande é LEVE, e o peso fica para a ênfase.
+
+- Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.

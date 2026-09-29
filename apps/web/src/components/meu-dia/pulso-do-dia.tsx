@@ -51,7 +51,10 @@ export function PulsoDoDia({ className }: { className?: string }) {
   return (
     <section
       aria-label="Pulso do dia"
-      className={cn('flex flex-col gap-2 border-y border-hairline py-3', className)}
+      // Cartão, e não uma faixa entre dois filetes (29/09/2026): a página é
+      // cinza e tudo que é conteúdo mora no branco. Entre filetes, o pulso lia
+      // como uma divisória entre duas coisas em vez de uma coisa.
+      className={cn('sombra-base flex flex-col gap-2 rounded-xl bg-card p-4 sm:p-5', className)}
     >
       <header className="flex items-baseline gap-2">
         <Sparkles className="size-3.5 shrink-0 self-center text-muted-foreground" aria-hidden="true" />
