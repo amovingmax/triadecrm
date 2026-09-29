@@ -108,7 +108,7 @@ export function CartaoPessoa({
             que aquele zero é do papel, já leu o zero como resultado da pessoa. Sem
             cor e sem ícone de alarme — é um fato de configuração, não um erro dela. */}
         {ficaEmZero ? (
-          <p className="rounded-lg border border-hairline bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
             {ficaEmZero}
           </p>
         ) : null}
@@ -152,7 +152,7 @@ function Conteudo({
   return (
     <>
       {destaque ? (
-        <Destaque linha={destaque} podeDefinir={podeDefinir} aoDefinirMeta={aoDefinirMeta} />
+        <Destaque linha={destaque} />
       ) : null}
 
       {comMeta.length > 0 ? (
@@ -168,13 +168,13 @@ function Conteudo({
         </ul>
       ) : null}
 
-      {/* Aberto por padrão quando NADA tem meta: nesse caso a lista de realizados é o
-          único conteúdo do cartão, e escondê-la deixaria um cartão vazio na tela. */}
+      {/* FECHADO SEMPRE (29/09/2026). Abria sozinho quando nada tinha meta — e
+          nada tinha meta, então cada um dos cinco cartões desenhava nove linhas de
+          zero, e a tela virava um muro de números iguais. Rafael: "evite muita
+          informação junta". O cartão não fica vazio: o número grande de portas
+          abertas continua em cima, e a lista está a um toque. */}
       {semMeta.length > 0 ? (
-        <details
-          open={comMeta.length === 0 && destaque?.meta == null}
-          className="group/detalhes border-t border-hairline pt-2"
-        >
+        <details className="group/detalhes border-t border-hairline pt-2">
           <summary className="toque flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground md:min-h-8">
             <ChevronDown
               className="size-4 transition-transform group-open/detalhes:rotate-180"
@@ -202,29 +202,23 @@ function Conteudo({
 }
 
 /** Portas abertas: o número grande do cartão, em mono, com a barra embaixo. */
-function Destaque({
-  linha,
-  podeDefinir,
-  aoDefinirMeta,
-}: {
-  linha: LinhaProgresso;
-  podeDefinir: boolean;
-  aoDefinirMeta: (metrica: string) => void;
-}) {
+function Destaque({ linha }: { linha: LinhaProgresso }) {
   const situacao = situacaoDaLinha(linha);
   const feito = linha.realizado ?? 0;
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <p className="text-xs tracking-wide text-muted-foreground uppercase">
+        <p className="text-xs text-muted-foreground">
           {linha.metrica_rotulo}
         </p>
         {ehProxy(linha) ? <ChipProxy /> : null}
       </div>
 
       <p className="flex items-baseline gap-2 leading-none">
-        <span className="numerico text-5xl font-semibold">{formatarNumero(feito)}</span>
+        <span className="numerico text-[40px] font-medium tracking-[-0.03em]">
+          {formatarNumero(feito)}
+        </span>
         {linha.meta !== null ? (
           <span className="text-lg text-muted-foreground">
             de <span className="numerico">{formatarNumero(linha.meta)}</span>
@@ -253,16 +247,9 @@ function Destaque({
         </p>
       )}
 
-      {situacao === 'sem_meta' && podeDefinir ? (
-        <Button
-          variant="outline"
-          onClick={() => aoDefinirMeta(linha.metrica)}
-          className="toque h-11 self-start md:h-8"
-        >
-          <Target aria-hidden="true" />
-          Definir {linha.metrica_rotulo.toLowerCase()}
-        </Button>
-      ) : null}
+      {/* O botão "Definir portas abertas" que morava aqui saiu (29/09/2026): era
+          o segundo "Definir" do mesmo cartão, a um palmo do "Definir meta" do
+          cabeçalho, que abre a mesma folha. */}
     </div>
   );
 }

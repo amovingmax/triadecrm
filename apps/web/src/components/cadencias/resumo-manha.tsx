@@ -159,8 +159,8 @@ export function BlocoDaManha({ resumo, nome }: { resumo: ResumoDoDia; nome: stri
         </ul>
       </Secao>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="flex items-center gap-2 font-heading text-sm font-medium">
+      <section className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5">
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
           <Target className="size-4 text-muted-foreground" aria-hidden="true" />
           Meta de hoje
         </h2>
@@ -178,7 +178,7 @@ export function BlocoDaManha({ resumo, nome }: { resumo: ResumoDoDia; nome: stri
             {comMeta.map((meta) => (
               <li
                 key={meta.metrica}
-                className="flex items-baseline gap-1.5 rounded-lg border border-hairline bg-card px-3 py-2 text-sm"
+                className="flex items-baseline gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm"
               >
                 <span className="numerico font-medium">{meta.realizado ?? 0}</span>
                 <span className="text-muted-foreground">
@@ -208,8 +208,11 @@ export function Secao({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-1">
-      <h2 className="flex items-center gap-2 font-heading text-sm font-medium">
+    // Cada seção num CARTÃO (29/09/2026): eram títulos soltos sobre o cinza da
+    // tela, com as linhas coladas no fundo, e o resumo lia como um documento
+    // corrido. No cartão, cada pergunta (agenda, fila, régua, meta) tem o seu lugar.
+    <section className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5">
+      <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
         <span className="text-muted-foreground">{icone}</span>
         {titulo}
         {quantos > 0 ? <span className="numerico text-muted-foreground">{quantos}</span> : null}

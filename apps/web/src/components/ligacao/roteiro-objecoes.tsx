@@ -51,7 +51,7 @@ export function ObjecoesLaterais({
       className="sticky top-4 hidden max-h-[calc(100dvh-6rem)] w-56 shrink-0 flex-col gap-2 overflow-y-auto lg:flex"
       aria-label="Objeções"
     >
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <p className="text-xs font-medium text-muted-foreground">
         Se ele disser
       </p>
       {objecoes.map((no) => (

@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Moon, RotateCw, Sunrise } from 'lucide-react';
+import { Info, Moon, RotateCw, Sunrise } from 'lucide-react';
 
 import { LEITURA } from '@/lib/larguras';
 import { cn } from '@/lib/utils';
@@ -161,7 +161,10 @@ function SeletorDeMomento({
     <div
       role="group"
       aria-label="Momento do resumo"
-      className="flex w-full gap-1 rounded-lg border border-hairline bg-card p-1 sm:w-fit"
+      // O mesmo desenho do `SeletorDeAba` (pílula branca, a escolha em menta):
+      // era o último seletor do CRM com a escolha em tinta preta, que é a cor
+      // do botão de ação — e escolher manhã ou noite não é uma ação.
+      className="sombra-base flex w-full gap-1 rounded-full bg-card p-1 sm:w-fit"
     >
       {MOMENTOS.map((m) => {
         const ativo = m === momento;
@@ -172,9 +175,9 @@ function SeletorDeMomento({
             onClick={() => aoEscolher(m)}
             aria-pressed={ativo}
             className={cn(
-              'toque flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm transition-colors sm:min-h-9 sm:flex-none',
+              'toque flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-colors sm:min-h-8 sm:flex-none',
               ativo
-                ? 'acao-gradiente font-medium'
+                ? 'bg-menta text-menta-tinta'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
@@ -189,25 +192,27 @@ function SeletorDeMomento({
   );
 }
 
-/** A primeira linha da tela: este resumo não foi enviado a ninguém. */
+/**
+ * Se este resumo saiu por WhatsApp ou existe só aqui.
+ *
+ * UMA LINHA, SEM CAIXA (29/09/2026). Era uma faixa branca com borda e duas
+ * orações ("não é enviado... enquanto o número aprovado na Meta não estiver
+ * ligado... abra a tela para vê-lo") logo abaixo do seletor: a mesma altura de
+ * um cartão para uma informação de rodapé.
+ */
 function AvisoDaEntrega({ resumo }: { resumo: { entrega: { horario_manha: string; horario_noite: string; envio_automatico: boolean; worker_whatsapp_ativo: boolean } } }) {
-  if (resumo.entrega.envio_automatico && resumo.entrega.worker_whatsapp_ativo) {
-    return (
-      <p className="rounded-lg border border-hairline bg-card px-4 py-2.5 text-sm text-muted-foreground">
-        Este resumo sai por WhatsApp às{' '}
-        <span className="numerico">{resumo.entrega.horario_manha}</span> e às{' '}
-        <span className="numerico">{resumo.entrega.horario_noite}</span>.
-      </p>
-    );
-  }
-
+  const sai = resumo.entrega.envio_automatico && resumo.entrega.worker_whatsapp_ativo;
   return (
-    <p className="rounded-lg border border-hairline bg-card px-4 py-2.5 text-sm text-muted-foreground">
-      Este resumo <strong className="font-medium text-foreground">não é enviado</strong>. Ele
-      deveria chegar por WhatsApp às{' '}
-      <span className="numerico">{resumo.entrega.horario_manha}</span> e às{' '}
-      <span className="numerico">{resumo.entrega.horario_noite}</span>; enquanto o número aprovado
-      na Meta não estiver ligado, ele existe só aqui — abra a tela para vê-lo.
+    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Info className="size-3.5 shrink-0" aria-hidden="true" />
+      {sai ? (
+        <span>
+          Sai por WhatsApp às <span className="numerico">{resumo.entrega.horario_manha}</span> e às{' '}
+          <span className="numerico">{resumo.entrega.horario_noite}</span>.
+        </span>
+      ) : (
+        <span>Ainda não sai por WhatsApp: por enquanto, o resumo existe só nesta tela.</span>
+      )}
     </p>
   );
 }

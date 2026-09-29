@@ -65,7 +65,9 @@ export function TelaAdmin({
             você entra como {ROTULO_PAPEL[sessao.papel]}
           </Badge>
         </div>
-        <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{descricao}</p>
+        {/* `90ch` e não `max-w-prose` (65ch): a descrição da aba é uma frase só, e
+            em 65ch ela quebrava no meio ("...lista de / permitidos"). */}
+        <p className="-mt-2 max-w-[90ch] text-sm text-muted-foreground">{descricao}</p>
       </header>
 
       <SeletorDeAba

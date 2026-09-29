@@ -15,8 +15,7 @@ import { LEITURA } from '@/lib/larguras';
 import { type AppRole } from '@/lib/auth/role';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
+import { ChipTemperatura } from '@/components/temperatura';
 import { TransicaoPagina } from '@/components/movimento';
 import { hrefDoFunil, type ItemDoDia } from '@/components/meu-dia/tipos';
 import {
@@ -130,19 +129,13 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
       </Button>
 
       {/* -------------------------------------------------- cabeçalho */}
-      <header className="relative flex flex-col gap-3 pl-4">
-        {/* O rótulo da temperatura está visível no chip logo abaixo, então a barra
-            não repete a informação para o leitor de tela. */}
-        <BarraTermica
-          temperatura={ficha.temperatura}
-          needsAttention={principal?.precisaAtencao ?? false}
-          posicao="absoluta"
-          semRotulo
-        />
-
+      {/* Sem a barra térmica de 3px na borda (29/09/2026): a temperatura já está
+          escrita no chip ao lado do nome, e a barra era a segunda cor do mesmo
+          dado, logo no topo da ficha. */}
+      <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">{ficha.nome}</h1>
-            <ChipTemperatura
+          <ChipTemperatura
             temperatura={ficha.temperatura}
             esfriando={principal?.precisaAtencao ?? false}
           />
@@ -279,147 +272,152 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
         ) : null}
       </nav>
 
-      <Separator />
+      {/* ------------------------------------------------------------------
+          OS DADOS EM CARTÕES (29/09/2026)
+          ------------------------------------------------------------------
+          A ficha era uma coluna só, com as seções separadas por filetes sobre o
+          cinza da tela — a única tela do CRM sem superfície nenhuma. Agora cada
+          pergunta tem o seu cartão: Contato e Negócios à esquerda, o
+          Pré-cadastro à direita, lado a lado a partir de 1024px. */}
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-5">
+          {/* ---------------------------------------------- campos */}
+          <section className="sombra-base flex flex-col gap-4 rounded-xl bg-card p-5">
+            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Contato e origem</h2>
+              <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                <Linha rotulo="WhatsApp">
+                  <TelefoneRevelavel
+                    organizationId={ficha.id}
+                    telefone={ficha.telefone}
+                    mascarado={ficha.telefoneMascarado}
+                    whatsapp={conectado && podeEscrever ? 'crm' : 'externo'}
+                  />
+                </Linha>
 
-      {/* -------------------------------------------------- campos */}
-      <section>
-        <h2 className="sr-only">Dados de contato e proveniência</h2>
-        {/* Três colunas no `lg`: com duas, dentro de max-w-4xl, cada par rótulo/valor
-            recebia 432px para valores de ~95px ("Não informado"), e WhatsApp e
-            Instagram ficavam a 464px um do outro na mesma linha. A ~288px o par cabe
-            no campo de visão e ainda sobra espaço para o telefone mascarado mais o
-            botão Revelar. */}
-        <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Linha rotulo="WhatsApp">
-            <TelefoneRevelavel
-              organizationId={ficha.id}
-              telefone={ficha.telefone}
-              mascarado={ficha.telefoneMascarado}
-              whatsapp={conectado && podeEscrever ? 'crm' : 'externo'}
-            />
-          </Linha>
+                <Linha rotulo="Instagram">
+                  {ficha.instagram ? (
+                    <a
+                      href={`https://instagram.com/${ficha.instagram}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={LINK_VALOR}
+                    >
+                      {`@${ficha.instagram}`}
+                    </a>
+                  ) : (
+                    <Ausente />
+                  )}
+                </Linha>
 
-          <Linha rotulo="Instagram">
-            {ficha.instagram ? (
-              <a
-                href={`https://instagram.com/${ficha.instagram}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={LINK_VALOR}
-              >
-                {`@${ficha.instagram}`}
-              </a>
+                <Linha rotulo="Site">
+                  {ficha.site ? (
+                    <a
+                      href={ficha.site}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(LINK_VALOR, 'break-all')}
+                    >
+                      {ficha.site.replace(/^https?:\/\/(www\.)?/, '')}
+                      <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+                    </a>
+                  ) : (
+                    <Ausente />
+                  )}
+                </Linha>
+
+                <Linha rotulo="E-mail">
+                  {ficha.email ? (
+                    <a href={`mailto:${ficha.email}`} className={cn(LINK_VALOR, 'break-all')}>
+                      {ficha.email}
+                    </a>
+                  ) : (
+                    <Ausente />
+                  )}
+                </Linha>
+
+                <Linha rotulo="CNPJ">
+                  {ficha.cnpj ? (
+                    <span className="numerico">{formatarCnpj(ficha.cnpj)}</span>
+                  ) : ficha.pessoaFisica ? (
+                    <span className="text-muted-foreground">Pessoa física (MEI ou autônomo)</span>
+                  ) : (
+                    <Ausente />
+                  )}
+                </Linha>
+
+                <Linha rotulo="Endereço">
+                  {ficha.endereco ? <span>{ficha.endereco}</span> : <Ausente />}
+                </Linha>
+
+                {/* Proveniência: RF-BAS-10 exige origem, quando e quem coletou. */}
+                <Linha rotulo="Origem">
+                  {ficha.origem ? (
+                    ficha.origemUrl ? (
+                      <a
+                        href={ficha.origemUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={LINK_VALOR}
+                      >
+                        {ficha.origem}
+                        <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+                      </a>
+                    ) : (
+                      <span>{ficha.origem}</span>
+                    )
+                  ) : (
+                    <Ausente />
+                  )}
+                </Linha>
+
+                <Linha rotulo="Coletado em">
+                  <span>
+                    <span className="numerico">{formatarData(ficha.coletadoEm)}</span>
+                    <span className="text-muted-foreground"> por {ficha.coletadoPor}</span>
+                  </span>
+                </Linha>
+              </dl>
+
+            {ficha.descricao ? (
+              <p className="max-w-prose border-t border-hairline pt-4 text-sm text-muted-foreground">
+                {ficha.descricao}
+              </p>
+            ) : null}
+          </section>
+
+          {/* ---------------------------------------------- negócios */}
+          <section className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-5">
+            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
+              Negócios{' '}
+              <span className="numerico font-normal text-muted-foreground">
+                ({ficha.negocios.length})
+              </span>
+            </h2>
+
+            {ficha.negocios.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Este parceiro ainda não está em nenhum funil.
+              </p>
             ) : (
-              <Ausente />
+              <ul className="flex flex-col gap-2">
+                {ficha.negocios.map((negocio) => (
+                  <CartaoNegocio key={negocio.id} negocio={negocio} />
+                ))}
+              </ul>
             )}
-          </Linha>
+          </section>
+        </div>
 
-          <Linha rotulo="Site">
-            {ficha.site ? (
-              <a
-                href={ficha.site}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(LINK_VALOR, 'break-all')}
-              >
-                {ficha.site.replace(/^https?:\/\/(www\.)?/, '')}
-                <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
-              </a>
-            ) : (
-              <Ausente />
-            )}
-          </Linha>
-
-          <Linha rotulo="E-mail">
-            {ficha.email ? (
-              <a href={`mailto:${ficha.email}`} className={cn(LINK_VALOR, 'break-all')}>
-                {ficha.email}
-              </a>
-            ) : (
-              <Ausente />
-            )}
-          </Linha>
-
-          <Linha rotulo="CNPJ">
-            {ficha.cnpj ? (
-              <span className="numerico">{formatarCnpj(ficha.cnpj)}</span>
-            ) : ficha.pessoaFisica ? (
-              <span className="text-muted-foreground">Pessoa física (MEI ou autônomo)</span>
-            ) : (
-              <Ausente />
-            )}
-          </Linha>
-
-          <Linha rotulo="Endereço">
-            {ficha.endereco ? <span>{ficha.endereco}</span> : <Ausente />}
-          </Linha>
-
-          {/* Proveniência: RF-BAS-10 exige origem, quando e quem coletou. */}
-          <Linha rotulo="Origem">
-            {ficha.origem ? (
-              ficha.origemUrl ? (
-                <a
-                  href={ficha.origemUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={LINK_VALOR}
-                >
-                  {ficha.origem}
-                  <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
-                </a>
-              ) : (
-                <span>{ficha.origem}</span>
-              )
-            ) : (
-              <Ausente />
-            )}
-          </Linha>
-
-          <Linha rotulo="Coletado em">
-            <span>
-              <span className="numerico">{formatarData(ficha.coletadoEm)}</span>
-              <span className="text-muted-foreground"> por {ficha.coletadoPor}</span>
-            </span>
-          </Linha>
-        </dl>
-      </section>
-
-      {ficha.descricao ? (
-        <p className="max-w-prose text-sm text-muted-foreground">{ficha.descricao}</p>
-      ) : null}
-
-      <Separator />
-
-      {/* -------------------------------------------------- negócios */}
-      <section className="flex flex-col gap-3">
-        <h2 className="font-heading text-base font-medium">
-          Negócios <span className="numerico text-muted-foreground">({ficha.negocios.length})</span>
-        </h2>
-
-        {ficha.negocios.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Este parceiro ainda não está em nenhum funil.
-          </p>
-        ) : (
-          <ul className="flex flex-col border-t border-hairline">
-            {ficha.negocios.map((negocio) => (
-              <CartaoNegocio key={negocio.id} negocio={negocio} />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <Separator />
-
-      {/* -------------------------------------------------- pré-cadastro na Komune */}
-      {/* Depois dos negócios de propósito: o pré-cadastro é o que vem DEPOIS de o
-          negócio andar, e a escada dele (rascunho, autorização, link) só faz
-          sentido para quem já leu em que pé a conversa está. */}
-      <PainelPreCadastro
-        organizationId={ficha.id}
-        papel={sessao.papel}
-        naoContatar={ficha.naoContatar}
-      />
+        {/* ------------------------------------------------ pré-cadastro na Komune */}
+        {/* Depois dos negócios de propósito: o pré-cadastro é o que vem DEPOIS de o
+            negócio andar, e a escada dele (rascunho, autorização, link) só faz
+            sentido para quem já leu em que pé a conversa está. */}
+        <PainelPreCadastro
+          organizationId={ficha.id}
+          papel={sessao.papel}
+          naoContatar={ficha.naoContatar}
+        />
+      </div>
 
       {/* Aqui terminavam dois quadros tracejados que anunciavam a Linha do tempo e a
           Conversa como coisas que ainda iam chegar. As duas existem hoje, inteiras, na
@@ -439,8 +437,9 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
  *    temperatura do negócio era dada só por um traço de 3px. No modo claro, com
  *    deuteranopia, morno (#b37a1f) e quente (#c4472b) caem a 1,24:1 entre si: no
  *    traço são o mesmo pixel, e são justamente as duas leituras que mudam o
- *    comportamento em campo. Agora o chip abre a linha, como na tabela e no cartão,
- *    e a barra passa a `semRotulo` para não anunciar a temperatura duas vezes;
+ *    comportamento em campo. Agora o chip abre a linha, como na tabela e no cartão.
+ *    Desde 29/09/2026 a barra saiu de vez e a linha virou uma superfície dentro do
+ *    cartão "Negócios", como as linhas do Meu dia;
  * 2. o "haltere": com `flex-1` à esquerda numa linha de 896px, a próxima ação era
  *    empurrada contra a borda direita e ficava a ~486px do texto a que pertence, sem
  *    nenhuma coluna com que se alinhar (a ficha costuma ter um negócio só). Ela
@@ -451,14 +450,7 @@ function CartaoNegocio({ negocio }: { negocio: NegocioDaFicha }) {
   const dias = diasDesde(negocio.ultimoContatoEm);
 
   return (
-    <li className="relative flex flex-col gap-1 border-b border-hairline py-3 pl-4">
-      <BarraTermica
-        temperatura={negocio.temperatura}
-        needsAttention={negocio.precisaAtencao}
-        posicao="absoluta"
-        semRotulo
-      />
-
+    <li className="flex flex-col gap-1 rounded-lg bg-muted/45 px-4 py-3">
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         <ChipTemperatura
           temperatura={negocio.temperatura}

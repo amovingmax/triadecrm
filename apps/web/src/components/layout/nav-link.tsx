@@ -99,7 +99,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
           // número é o que diz em qual módulo há trabalho parado agora.
           <span
             aria-label={`${numero} esperando`}
-            className="numerico absolute top-0.5 right-0 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-menta px-1 text-[10px] leading-none font-semibold text-foreground"
+            className="numerico absolute top-0.5 right-0 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-menta px-1 text-[10px] leading-none font-semibold text-menta-tinta"
           >
             {numero > 99 ? '99+' : numero}
           </span>
@@ -115,19 +115,23 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
         aria-current={ativo ? 'page' : undefined}
         className={cn(
           'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-4 transition-colors',
-          ativo
-            ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-            : 'text-sidebar-muted-foreground',
+          ativo ? 'font-medium text-foreground' : 'text-sidebar-muted-foreground',
         )}
       >
+        {/* A PÍLULA MENTA ATRÁS DO ÍCONE (29/09/2026), e não a fatia inteira
+            pintada com um fio preto em cima. Com a menta como acento, a fatia
+            cheia virava um bloco verde de 65x64px no pé de toda tela do celular
+            — o objeto mais forte da interface, para dizer só "você está aqui".
+            A pílula é o mesmo recado do disco do trilho no desktop. */}
         <span
           aria-hidden="true"
           className={cn(
-            'absolute inset-x-3 top-0 h-0.5 bg-sidebar-primary',
-            ativo ? 'opacity-100' : 'opacity-0',
+            'flex h-7 w-12 items-center justify-center rounded-full transition-colors',
+            ativo && 'bg-menta text-menta-tinta',
           )}
-        />
-        <Icone className={cn('size-5', ativo && 'stroke-[2.25]')} aria-hidden="true" />
+        >
+          <Icone className={cn('size-5', ativo && 'stroke-[2.25]')} />
+        </span>
         <span className="truncate">{item.rotulo}</span>
       </Link>
     );

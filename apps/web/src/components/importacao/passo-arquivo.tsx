@@ -57,12 +57,14 @@ export function PassoArquivo({
       onDragLeave={() => setSobre(false)}
       onDrop={soltar}
       className={cn(
-        'flex cursor-pointer flex-col items-center gap-3 rounded-xl border border-dashed border-hairline px-6 py-10 text-center transition-colors',
-        sobre && 'border-ring bg-muted/60',
+        // Cartão branco com o tracejado POR DENTRO: o tracejado é o desenho de
+        // "solte aqui" e fica, mas a área agora tem a superfície das outras telas.
+        'flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border bg-card px-6 py-10 text-center transition-colors',
+        sobre && 'border-menta bg-menta-fundo',
         ocupado && 'pointer-events-none opacity-60',
       )}
     >
-      <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+      <span className="flex size-10 items-center justify-center rounded-full bg-muted text-foreground">
         {ocupado ? (
           <FileSpreadsheet className="size-5 animate-pulse" aria-hidden="true" />
         ) : (

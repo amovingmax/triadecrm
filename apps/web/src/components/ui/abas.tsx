@@ -88,7 +88,7 @@ export function SeletorDeAba<T extends string>({
               // sobre cinza a 1,1:1, que se via pelo sombreado e mais nada.
               // Tinta sobre menta: 14,6:1.
               selecionado
-                ? 'bg-menta text-foreground'
+                ? 'bg-menta text-menta-tinta'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >

@@ -27,7 +27,10 @@ function Moldura({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-14 text-center">
+    // CARTÃO BRANCO, e não moldura tracejada (29/09/2026): o tracejado é o
+    // desenho de "solte o arquivo aqui", e em Ligar não há nada para soltar. É
+    // o mesmo vazio das Cadências e das Campanhas.
+    <div className="sombra-base flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-14 text-center">
       <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         {icone}
       </span>
@@ -46,7 +49,7 @@ export function EsqueletoDosLotes() {
     <div aria-busy="true" aria-live="polite" className="grid gap-3 lg:grid-cols-2">
       <span className="sr-only">Carregando os lotes de ligação.</span>
       {Array.from({ length: 2 }, (_, cartao) => (
-        <div key={cartao} className="space-y-3 rounded-xl border p-4">
+        <div key={cartao} className="sombra-base space-y-3 rounded-xl bg-card p-5">
           <div className="flex items-center justify-between gap-2">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-5 w-16 rounded-full" />

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, NotebookPen, PhoneOff, Timer } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { BarraTermica, ChipTemperatura, DiasSemContato } from '@/components/temperatura';
+import { DiasSemContato } from '@/components/temperatura';
 import { RevelarItem, RevelarLista } from '@/components/movimento';
 
 import { formatarQuando } from './formatos';
@@ -14,7 +14,6 @@ import {
   SUPERFICIES_DO_REGISTRO,
   type AlvoDoRegistro,
   type DesfechoCatalogo,
-  type EtapaAlvo,
   type Superficie,
 } from './tipos';
 
@@ -42,7 +41,6 @@ export function PassoOQue({
   superficie,
   aoTrocarSuperficie,
   catalogo,
-  etapasAlvo,
   aoEscolher,
   aoVoltar,
 }: {
@@ -50,18 +48,17 @@ export function PassoOQue({
   superficie: Superficie;
   aoTrocarSuperficie: (s: Superficie) => void;
   catalogo: readonly DesfechoCatalogo[];
-  etapasAlvo: readonly EtapaAlvo[];
   aoEscolher: (desfecho: DesfechoCatalogo) => void;
   aoVoltar: () => void;
 }) {
   const desfechos = desfechosOferecidos(catalogo, superficie, alvo.naoContatar);
 
   return (
-    <div className="-mx-4 flex flex-col md:mx-0">
+    <div className="flex flex-col gap-4">
       <Cabecalho alvo={alvo} aoVoltar={aoVoltar} />
 
       {alvo.naoContatar || alvo.cooldownAte || alvo.bloqueado ? (
-        <div className="flex flex-col gap-1.5 px-4 pt-3">
+        <div className="flex flex-col gap-1.5">
           {alvo.naoContatar ? (
             <Aviso
               icone={<PhoneOff className="size-3.5" aria-hidden="true" />}
@@ -86,10 +83,13 @@ export function PassoOQue({
         </div>
       ) : null}
 
-      {/* Grade de 3 (e de 5 no desktop), não `flex-wrap`: com 390px os cinco chips
-          não cabem numa linha, e o wrap deixava "Reunião" sozinha na segunda. A grade
-          dá 3 + 2 com larguras iguais, que é o que o polegar lê como um teclado. */}
-      <fieldset className="grid grid-cols-3 gap-2 px-4 pt-4 pb-3 sm:grid-cols-5">
+      {/* Grade de 3 no celular, não `flex-wrap`: com 390px os cinco chips não cabem
+          numa linha, e o wrap deixava "Reunião" sozinha na segunda. A grade dá 3 + 2
+          com larguras iguais, que é o que o polegar lê como um teclado. No desktop
+          vira a pílula segmentada das outras telas, com a escolha em MENTA
+          (29/09/2026): era o último seletor do CRM com a escolha em tinta preta,
+          a cor do botão de ação. */}
+      <fieldset className="sombra-base grid grid-cols-3 gap-1 rounded-[1.375rem] bg-card p-1 sm:flex sm:w-fit sm:rounded-full">
         <legend className="sr-only">Por onde foi o contato</legend>
         {SUPERFICIES_DO_REGISTRO.map((s) => {
           const ativo = s === superficie;
@@ -100,10 +100,10 @@ export function PassoOQue({
               aria-pressed={ativo}
               onClick={() => aoTrocarSuperficie(s)}
               className={cn(
-                'toque inline-flex h-11 items-center justify-center rounded-lg px-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                'toque inline-flex h-11 items-center justify-center rounded-full px-4 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:h-9',
                 ativo
-                  ? 'acao-gradiente'
-                  : 'border border-hairline bg-card/50 text-muted-foreground hover:text-foreground',
+                  ? 'bg-menta text-menta-tinta'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
             >
               {ROTULOS_SUPERFICIE[s]}
@@ -117,13 +117,14 @@ export function PassoOQue({
       ) : (
         <>
           <RevelarLista>
-            <ul className="corpo-tabela flex flex-col border-t border-hairline">
+            <ul
+              aria-label="Como foi"
+              className="corpo-tabela sombra-base flex flex-col gap-2 rounded-xl bg-card p-4 sm:p-5"
+            >
               {desfechos.map((desfecho, indice) => (
                 <RevelarItem key={desfecho.id} indice={indice}>
                   <LinhaDesfecho
                     desfecho={desfecho}
-                    etapasAlvo={etapasAlvo}
-                    pipelineDoAlvo={alvo.pipelineId}
                     aoEscolher={aoEscolher}
                   />
                 </RevelarItem>
@@ -131,7 +132,7 @@ export function PassoOQue({
             </ul>
           </RevelarLista>
           {alvo.naoContatar ? (
-            <div className="flex flex-col items-start gap-2 border-t border-hairline px-4 py-4">
+            <div className="flex flex-col items-start gap-2">
               <p className="text-sm text-muted-foreground">
                 Os outros resultados deste canal sumiram porque criariam tarefa em cima de quem
                 pediu para sair. Foi outra coisa? Anote na ficha.
@@ -150,7 +151,7 @@ function LinkDaFicha({ alvo }: { alvo: AlvoDoRegistro }) {
   return (
     <Link
       href={`/parceiros/${alvo.id}`}
-      className="toque inline-flex h-11 items-center gap-2 rounded-lg border border-hairline px-3.5 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="toque inline-flex h-11 items-center gap-2 rounded-full border border-hairline bg-card px-4 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <NotebookPen className="size-4" aria-hidden="true" />
       Abrir a ficha de {alvo.nome}
@@ -168,7 +169,7 @@ function LinkDaFicha({ alvo }: { alvo: AlvoDoRegistro }) {
  */
 function NadaARegistrar({ alvo, superficie }: { alvo: AlvoDoRegistro; superficie: Superficie }) {
   return (
-    <div className="flex flex-col items-start gap-3 border-t border-hairline px-4 py-6">
+    <div className="sombra-base flex flex-col items-start gap-3 rounded-xl bg-card p-5">
       <p className="text-sm">
         Nada a registrar por {ROTULOS_SUPERFICIE[superficie].toLowerCase()} com quem pediu para
         parar.
@@ -186,30 +187,31 @@ function NadaARegistrar({ alvo, superficie }: { alvo: AlvoDoRegistro; superficie
 /**
  * O cabeçalho fica GRUDADO no topo enquanto ela rola os desfechos: com o polegar
  * sobre a lista, é ele que garante que o registro está indo para o parceiro certo.
+ *
+ * Gruda logo abaixo da barra do topo, que tem 56px no celular e 72px no desktop —
+ * com `top-14` só, no desktop ele entrava 16px por baixo dela.
+ *
+ * Sem barra e sem pastilha de temperatura (29/09/2026): pelo Tríade Design System
+ * a escala térmica mora nos relatórios e na ficha. O nome e a etapa dizem quem é.
  */
 function Cabecalho({ alvo, aoVoltar }: { alvo: AlvoDoRegistro; aoVoltar: () => void }) {
   return (
-    <div className="superficie-vidro sticky top-14 z-10 flex items-center gap-2 py-2.5 pr-4 pl-1">
+    <div className="sticky top-14 z-10 -mx-4 flex items-center gap-3 bg-background/90 px-4 py-2 backdrop-blur-md md:top-[72px] md:mx-0 md:px-0">
       <button
         type="button"
         onClick={aoVoltar}
-        className="toque flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="toque flex size-11 shrink-0 items-center justify-center rounded-full border border-hairline bg-card text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 md:size-10"
       >
-        <ArrowLeft className="size-5" aria-hidden="true" />
+        <ArrowLeft className="size-4" aria-hidden="true" />
         <span className="sr-only">Trocar de parceiro</span>
       </button>
-      <BarraTermica
-        temperatura={alvo.temperatura}
-        needsAttention={alvo.precisaAtencao}
-        className="h-9"
-        semRotulo
-      />
-      <div className="min-w-0 flex-1 pl-1">
-        <p className="truncate font-medium">{alvo.nome}</p>
-        <p className="flex items-center gap-2 truncate text-xs text-muted-foreground">
-          <ChipTemperatura temperatura={alvo.temperatura} comDescricao={false} />
-          {alvo.etapa ? <span className="truncate">{alvo.etapa}</span> : null}
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-heading text-2xl leading-tight font-normal tracking-[-0.02em]">
+          {alvo.nome}
         </p>
+        {alvo.etapa ? (
+          <p className="truncate text-sm text-muted-foreground">{alvo.etapa}</p>
+        ) : null}
       </div>
       <DiasSemContato dias={alvo.diasSemContato} className="shrink-0" />
     </div>
@@ -236,10 +238,10 @@ function Aviso({
   return (
     <p
       className={cn(
-        'flex items-start gap-2 rounded-lg border px-3 py-2 text-xs',
+        'flex items-start gap-2 rounded-xl px-4 py-3 text-xs',
         atencao
-          ? 'border-destructive/40 bg-destructive/10 text-muted-foreground'
-          : 'border-hairline bg-card/50 text-muted-foreground',
+          ? 'bg-destructive/10 text-muted-foreground'
+          : 'bg-card text-muted-foreground sombra-base',
       )}
     >
       <span
@@ -257,47 +259,37 @@ function Aviso({
 
 /**
  * Uma linha de desfecho: 56px de alvo, o nome do banco como rótulo e, embaixo, o que
- * o catálogo já decidiu que vem depois (a próxima ação). À direita, a temperatura que
- * o desfecho declara — é a previsão do pagamento, e é o que ensina a escala sem
- * nenhuma tela de ajuda.
+ * o catálogo já decidiu que vem depois (a próxima ação).
+ *
+ * A PASTILHA DE TEMPERATURA SAIU DA LINHA EM 29/09/2026. Ela pintava "Quente" e
+ * "Frio" ao lado de metade dos resultados — a previsão do que o desfecho faria com
+ * a temperatura. Com a ADR-16 a etapa é a verdade do negócio, e pelo Tríade Design
+ * System a escala térmica mora nos relatórios e na ficha: aqui ela era o sinal mais
+ * colorido de uma tela cuja pergunta é só "como foi?". O recibo, logo depois do
+ * toque, continua dizendo o que mudou.
  */
 function LinhaDesfecho({
   desfecho,
-  etapasAlvo,
-  pipelineDoAlvo,
   aoEscolher,
 }: {
   desfecho: DesfechoCatalogo;
-  etapasAlvo: readonly EtapaAlvo[];
-  pipelineDoAlvo: number | null;
   aoEscolher: (d: DesfechoCatalogo) => void;
 }) {
-  const destino =
-    desfecho.target_stage_slug === null
-      ? null
-      : (etapasAlvo.find(
-          (e) =>
-            e.slug === desfecho.target_stage_slug &&
-            (pipelineDoAlvo === null || e.pipelineId === pipelineDoAlvo),
-        ) ?? null);
-  const temperatura = desfecho.sets_temperature ?? destino?.temperatura ?? null;
-
   return (
-    <li className="border-b border-hairline last:border-b-0">
+    <li>
       <button
         type="button"
         onClick={() => aoEscolher(desfecho)}
-        className="toque flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left outline-none active:bg-muted/60 focus-visible:bg-muted/60"
+        className="toque flex min-h-14 w-full items-center gap-3 rounded-lg bg-muted/45 px-4 py-2.5 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 active:bg-muted"
       >
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">{desfecho.name}</span>
+          <span className="block truncate text-[15px] font-medium">{desfecho.name}</span>
           {desfecho.next_action_label ? (
             <span className="block truncate text-xs text-muted-foreground">
               {desfecho.next_action_label}
             </span>
           ) : null}
         </span>
-        {temperatura ? <ChipTemperatura temperatura={temperatura} comDescricao={false} /> : null}
       </button>
     </li>
   );

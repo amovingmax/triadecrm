@@ -6,7 +6,7 @@ import { Check, MapPin, PhoneOff, SquarePen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BarraTermica, ChipTemperatura, DiasSemContato } from '@/components/temperatura';
+import { DiasSemContato } from '@/components/temperatura';
 
 import {
   faixaDeHoras,
@@ -22,9 +22,14 @@ import { AcoesDaReuniao } from './acoes-da-reuniao';
 /**
  * Um compromisso na lista do dia.
  *
- * A leitura, em ordem: barra térmica na borda, hora (só quando é hora combinada de
- * verdade — ver o cabeçalho de `tipos.ts`), nome do parceiro ligando para a ficha,
- * categoria e bairro, etapa do funil, e a fileira de ações.
+ * A leitura, em ordem: hora (só quando é hora combinada de verdade — ver o cabeçalho
+ * de `tipos.ts`), nome do parceiro ligando para a ficha, categoria e bairro, etapa do
+ * funil, e a fileira de ações.
+ *
+ * SEM TEMPERATURA DESDE 29/09/2026: nem a barra na borda, nem o chip. Pelo Tríade
+ * Design System a escala térmica mora nos relatórios e na ficha, e na agenda ela
+ * era a terceira cor de uma linha que só precisa dizer quem, quando e o que fazer.
+ * A linha virou uma superfície dentro do cartão do bloco, como as do Meu dia.
  *
  * As ações são as do catálogo, recortadas por `recortesDoCompromisso`. Nenhuma delas
  * escreve etapa por conta própria: todas abrem a folha de desfecho, que grava pela
@@ -55,16 +60,10 @@ export function CartaoCompromisso({
   return (
     <li
       className={cn(
-        'relative flex items-start gap-3 border-b border-hairline py-3 pl-4',
+        'flex items-start gap-3 rounded-lg bg-muted/45 px-4 py-3',
         compromisso.concluido && 'opacity-70',
       )}
     >
-      <BarraTermica
-        temperatura={compromisso.temperatura}
-        needsAttention={compromisso.precisaAtencao}
-        posicao="absoluta"
-        semRotulo
-      />
 
       {/* `10h20–11h00` quando a reunião tem fim — é a primeira vez que o produto
           tem fim para mostrar. A `meeting` antiga, sem objeto, continua com só a
@@ -79,7 +78,7 @@ export function CartaoCompromisso({
         <div className="flex items-start justify-between gap-3">
           <Link
             href={`/parceiros/${compromisso.organizationId}`}
-            className="truncate font-medium tracking-tight outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="truncate text-[15px] font-medium tracking-tight outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {compromisso.organizacao}
           </Link>
@@ -93,10 +92,6 @@ export function CartaoCompromisso({
         </p>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <ChipTemperatura
-            temperatura={compromisso.temperatura}
-            esfriando={compromisso.precisaAtencao}
-          />
           {/* O rótulo é o TIPO da tarefa (reunião ou visita), não a natureza: depois
               do registro a etapa muda e "a marcar" viraria uma contradição em cima de
               um compromisso que já aconteceu. Quem diz a natureza é o cabeçalho do

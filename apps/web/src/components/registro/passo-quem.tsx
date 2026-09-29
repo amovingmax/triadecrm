@@ -60,12 +60,28 @@ export function PassoQuem({
   const carregando = buscando ? resultados.isPending : sugestoes.isPending;
 
   return (
-    <div className="-mx-4 flex flex-col md:mx-0">
-      <div className="flex flex-col gap-3 px-4 md:px-0">
-        <p className="text-lg font-medium">O que aconteceu agora?</p>
+    <div className="flex flex-col gap-5">
+      {/* O TÍTULO NA ESCALA DAS OUTRAS TELAS (29/09/2026). A pergunta era um
+          parágrafo de 18px, e o Registrar — o item mais usado do menu depois do
+          Meu dia — era a única tela sem título de página. */}
+      <header>
+        <p className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
+          O que aconteceu agora?
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Escolha com quem foi. Depois, o canal e o resultado.
+        </p>
+      </header>
+
+      {/* A busca e a lista num CARTÃO só: são a mesma pergunta ("com quem?"),
+          e soltas no cinza da tela a lista parecia outra coisa. */}
+      <section
+        aria-label="Com quem foi"
+        className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-4 sm:p-5"
+      >
         <label className="relative flex items-center">
           <Search
-            className="pointer-events-none absolute left-3 size-4 text-muted-foreground"
+            className="pointer-events-none absolute left-3.5 size-4 text-muted-foreground"
             aria-hidden="true"
           />
           <span className="sr-only">Buscar parceiro por nome, telefone, @instagram ou bairro</span>
@@ -75,50 +91,50 @@ export function PassoQuem({
             placeholder="Buscar parceiro"
             enterKeyHint="search"
             autoComplete="off"
-            className="h-12 pl-9 text-base"
+            className="h-12 pl-10 text-base"
           />
           {buscando && resultados.isFetching ? (
             <Loader2
-              className="absolute right-3 size-4 animate-spin text-muted-foreground"
+              className="absolute right-3.5 size-4 animate-spin text-muted-foreground"
               aria-hidden="true"
             />
           ) : null}
         </label>
-      </div>
 
-      <TituloDoGrupo>{tituloDaLista(buscando, lista)}</TituloDoGrupo>
+        <TituloDoGrupo>{tituloDaLista(buscando, lista)}</TituloDoGrupo>
 
-      {carregando ? (
-        <p className="px-4 py-6 text-sm text-muted-foreground">Carregando…</p>
-      ) : lista.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-muted-foreground">
-          {buscando
-            ? 'Nenhum parceiro com esse nome, telefone ou @.'
-            : 'Nenhum parceiro na sua carteira ainda. Busque pelo nome.'}
-        </p>
-      ) : (
-        <RevelarLista>
-          <ul className="corpo-tabela flex flex-col border-t border-hairline">
-            {lista.map((alvo, indice) => (
-              <RevelarItem key={alvo.id} indice={indice}>
-                <LinhaAlvo alvo={alvo} aoEscolher={aoEscolher} />
-              </RevelarItem>
-            ))}
-          </ul>
-        </RevelarLista>
-      )}
+        {carregando ? (
+          <p className="py-4 text-sm text-muted-foreground">Carregando…</p>
+        ) : lista.length === 0 ? (
+          <p className="py-4 text-sm text-muted-foreground">
+            {buscando
+              ? 'Nenhum parceiro com esse nome, telefone ou @.'
+              : 'Nenhum parceiro na sua carteira ainda. Busque pelo nome.'}
+          </p>
+        ) : (
+          <RevelarLista>
+            <ul className="corpo-tabela flex flex-col gap-2">
+              {lista.map((alvo, indice) => (
+                <RevelarItem key={alvo.id} indice={indice}>
+                  <LinhaAlvo alvo={alvo} aoEscolher={aoEscolher} />
+                </RevelarItem>
+              ))}
+            </ul>
+          </RevelarLista>
+        )}
 
-      {/* Cadastro rápido (RF-BAS-15) mora na tela de Parceiros e termina abrindo a
-          ficha nova — por isso aqui é um link para o contrato que já existe
-          (`HREF_NOVO_PARCEIRO`), e não a mesma folha embutida: montá-la aqui
-          duplicaria o fluxo e mandaria a pessoa para dois lugares diferentes. */}
-      <Link
-        href={HREF_NOVO_PARCEIRO}
-        className="toque flex min-h-14 items-center gap-3 border-t border-hairline px-4 text-sm font-medium active:bg-muted/60"
-      >
-        <UserPlus className="size-4 text-muted-foreground" aria-hidden="true" />
-        Não achei, cadastrar rápido
-      </Link>
+        {/* Cadastro rápido (RF-BAS-15) mora na tela de Parceiros e termina abrindo a
+            ficha nova — por isso aqui é um link para o contrato que já existe
+            (`HREF_NOVO_PARCEIRO`), e não a mesma folha embutida: montá-la aqui
+            duplicaria o fluxo e mandaria a pessoa para dois lugares diferentes. */}
+        <Link
+          href={HREF_NOVO_PARCEIRO}
+          className="toque flex min-h-12 items-center gap-3 rounded-lg px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted"
+        >
+          <UserPlus className="size-4" aria-hidden="true" />
+          Não achei, cadastrar rápido
+        </Link>
+      </section>
     </div>
   );
 }

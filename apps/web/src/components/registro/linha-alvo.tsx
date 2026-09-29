@@ -3,17 +3,19 @@
 import { ChevronRight, PhoneOff, Timer } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { BarraTermica, DiasSemContato } from '@/components/temperatura';
+import { DiasSemContato } from '@/components/temperatura';
 
 import { formatarQuando } from './formatos';
 import type { SugestaoDeAlvo } from './tipos';
 
 /**
- * Uma linha da escolha do parceiro: barra térmica, nome, onde fica, dias sem contato.
+ * Uma linha da escolha do parceiro: nome, onde fica, dias sem contato.
  *
- * É a mesma leitura de relance da lista de Parceiros (cor à esquerda, número em mono
- * à direita), num alvo de toque de 64px — bem acima dos 44px mínimos, porque este é
- * o toque que ela dá andando.
+ * Um alvo de toque de 64px — bem acima dos 44px mínimos, porque este é o toque que
+ * ela dá andando. A BARRA TÉRMICA SAIU DA LINHA EM 29/09/2026: pelo Tríade Design
+ * System a escala térmica mora só nos relatórios e na ficha, e aqui ela pintava
+ * uma lista de oito buffets de ouro, vermelho e azul sem que a cor mudasse a
+ * escolha de ninguém. A linha agora é uma superfície, como as do Meu dia.
  *
  * A linha diz duas coisas a mais que a lista de Parceiros não precisa dizer, e as
  * duas mudam o que ela vai fazer no passo seguinte: a janela de recontato ainda
@@ -31,20 +33,14 @@ export function LinhaAlvo({
   const local = [alvo.bairro, alvo.categoria].filter(Boolean).join(' · ');
 
   return (
-    <li className="border-b border-hairline last:border-b-0">
+    <li>
       <button
         type="button"
         onClick={() => aoEscolher(alvo)}
-        className="toque relative flex min-h-16 w-full items-center gap-3 py-2.5 pr-2 pl-4 text-left outline-none active:bg-muted/60 focus-visible:bg-muted/60"
+        className="toque flex min-h-16 w-full items-center gap-3 rounded-lg bg-muted/45 py-2.5 pr-3 pl-4 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 active:bg-muted"
       >
-        <BarraTermica
-          temperatura={alvo.temperatura}
-          needsAttention={alvo.precisaAtencao}
-          posicao="absoluta"
-        />
-
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{alvo.nome}</p>
+          <p className="truncate text-[15px] font-medium">{alvo.nome}</p>
           {alvo.motivo ? (
             <p className="truncate text-[0.8125rem] text-foreground">{alvo.motivo}</p>
           ) : null}
@@ -82,12 +78,7 @@ export function TituloDoGrupo({
   className?: string;
 }) {
   return (
-    <h2
-      className={cn(
-        'px-4 pt-4 pb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase',
-        className,
-      )}
-    >
+    <h2 className={cn('pt-1 text-xs font-medium text-muted-foreground', className)}>
       {children}
     </h2>
   );

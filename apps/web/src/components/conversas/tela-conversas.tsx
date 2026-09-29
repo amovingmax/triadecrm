@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -11,7 +12,7 @@ import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 import { FeedAutomaticas } from './automaticas';
 import { carregarAutomaticas, carregarMarcoZero, CHAVE_AUTOMATICAS } from './automaticas-dados';
 import { Conversa } from './conversa';
-import { carregarConversas, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
+import { carregarConversas, CHAVE_CONVERSAS, mensagemDoErro, TETO_ORGANIZACOES } from './dados';
 import { useEcoDasConversas, type EstadoDoEco, type EventoDoEco } from './eco-do-banco';
 import {
   ErroDaTela,
@@ -328,9 +329,18 @@ export function TelaConversas({
           </div>
 
           {consulta.data?.cortada ? (
+            // Uma frase para quem usa, e não o recado de engenharia que estava aqui
+            // ("o histórico precisa virar consulta paginada no banco"): quem lê
+            // precisa saber que a lista não é tudo e como achar o resto. A busca
+            // DESTA tela filtra só o que já foi lido; quem busca na base inteira é
+            // a tela de Parceiros, e a ficha abre a conversa com `?org=`.
             <p className="text-xs text-muted-foreground">
-              A base passou do que esta tela lê de uma vez, então a lista está cortada. Avise no
-              grupo do time: o histórico precisa virar consulta paginada no banco.
+              A lista mostra os primeiros {TETO_ORGANIZACOES} parceiros. Para abrir outro, procure
+              em{' '}
+              <Link href="/parceiros" className="underline underline-offset-4 hover:text-foreground">
+                Parceiros
+              </Link>{' '}
+              e use &ldquo;Abrir a conversa&rdquo; na ficha.
             </p>
           ) : null}
         </>

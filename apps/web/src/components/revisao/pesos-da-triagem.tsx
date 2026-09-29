@@ -171,7 +171,7 @@ function Formulario({
 
         <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-4">
             <section className="space-y-3">
-              <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              <h3 className="text-xs font-medium text-muted-foreground">
                 Quanto vale cada sinal
               </h3>
               <Numero
@@ -210,7 +210,7 @@ function Formulario({
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              <h3 className="text-xs font-medium text-muted-foreground">
                 A partir de quando conta
               </h3>
               <Numero
@@ -231,7 +231,7 @@ function Formulario({
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              <h3 className="text-xs font-medium text-muted-foreground">
                 Onde ficam as faixas
               </h3>
               <Numero
@@ -253,7 +253,7 @@ function Formulario({
             </section>
 
             <section className="space-y-2">
-              <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              <h3 className="text-xs font-medium text-muted-foreground">
                 Categorias prioritárias
               </h3>
               <Marcadores
@@ -269,7 +269,7 @@ function Formulario({
             </section>
 
             <section className="space-y-2">
-              <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              <h3 className="text-xs font-medium text-muted-foreground">
                 Cidades-alvo
               </h3>
               <Marcadores

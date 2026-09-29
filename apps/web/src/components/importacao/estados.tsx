@@ -1,6 +1,6 @@
 'use client';
 
-import { FileSpreadsheet, RotateCw, TriangleAlert } from 'lucide-react';
+import { RotateCw, TriangleAlert } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -35,24 +35,6 @@ export function EsqueletoDaPrevia() {
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-/** Nenhum lote importado ainda: o que é esta tela e por onde começar. */
-export function SemLotes() {
-  return (
-    <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-        <FileSpreadsheet className="size-5" aria-hidden="true" />
-      </span>
-      <div className="space-y-1">
-        <p className="font-heading font-medium">Nenhuma planilha importada ainda</p>
-        <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
-          Escolha o arquivo acima. O CRM lê as colunas sozinho e mostra o que vai acontecer com
-          cada linha. Nada é gravado antes de você mandar.
-        </p>
-      </div>
     </div>
   );
 }

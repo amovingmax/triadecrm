@@ -45,7 +45,7 @@ const buttonVariants = cva(
         // Tinta sobre menta: 14,6:1. Sem `hover` de cor: escurecer a menta a
         // deixa verde-musgo, e o sistema pede que o hover só mexa na forma.
         menta:
-          'bg-menta text-foreground hover:brightness-95 active:not-aria-[haspopup]:scale-[0.98]',
+          'bg-menta text-menta-tinta hover:brightness-95 active:not-aria-[haspopup]:scale-[0.98]',
       },
       size: {
         default:

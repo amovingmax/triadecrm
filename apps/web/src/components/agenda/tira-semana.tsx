@@ -96,10 +96,11 @@ export function TiraDaSemana({
               }`}
               onClick={() => aoEscolherDia(dia)}
               className={cn(
-                'toque flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-lg border text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-                ativo
-                  ? 'acao-gradiente border-transparent'
-                  : 'border-hairline bg-card/50 hover:bg-muted',
+                'toque flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-[1.125rem] text-xs outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
+                // O dia escolhido em MENTA (29/09/2026), como a aba ativa logo acima:
+                // "você está aqui" tem uma cor só no CRM. Era a tinta preta do botão
+                // de ação, e a tira abria a tela com um bloco preto no meio.
+                ativo ? 'bg-menta font-medium text-menta-tinta' : 'sombra-base bg-card hover:bg-muted',
                 !ativo && ehFimDeSemana(dia) && 'text-muted-foreground',
               )}
             >

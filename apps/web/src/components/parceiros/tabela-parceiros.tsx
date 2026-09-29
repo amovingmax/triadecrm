@@ -232,7 +232,7 @@ export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
 function ColunasEscondidas() {
   return (
     <p className="pb-2 text-xs text-muted-foreground 2xl:hidden">
-      Nesta largura de tela, responsável e próxima ação só aparecem na ficha do parceiro.
+      Responsável e próxima ação estão na ficha de cada parceiro.
     </p>
   );
 }

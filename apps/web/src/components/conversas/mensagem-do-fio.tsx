@@ -422,7 +422,7 @@ function Audio({ mensagem }: { mensagem: MensagemDoFio }) {
 function Transcricao({ texto }: { texto: string }) {
   return (
     <div className="rounded-lg border border-dashed border-hairline bg-background/40 px-2.5 py-2">
-      <p className="mb-1 flex items-center gap-1.5 text-[10px] tracking-wide text-muted-foreground uppercase">
+      <p className="mb-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
         <AudioLines className="size-3" aria-hidden="true" />
         transcrição automática, ninguém conferiu
       </p>

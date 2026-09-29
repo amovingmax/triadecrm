@@ -1,7 +1,6 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { BarraTermica } from '@/components/temperatura';
 
 import {
   chaveDoCompromisso,
@@ -57,7 +56,7 @@ export function VisaoDaSemana({
           <section
             key={dia}
             className={cn(
-              'flex min-w-0 flex-col sombra-base rounded-xl bg-card/40 md:min-h-40',
+              'flex min-w-0 flex-col sombra-base rounded-xl bg-card md:min-h-40',
               ehFimDeSemana(dia) && doDia.length === 0 && 'opacity-60',
             )}
           >
@@ -87,16 +86,10 @@ export function VisaoDaSemana({
                   <li
                     key={chaveDoCompromisso(c)}
                     className={cn(
-                      'relative flex items-center gap-2 border-b border-hairline py-2 pr-2 pl-3 last:border-b-0',
+                      'flex items-center gap-2 border-b border-hairline px-2.5 py-2 last:border-b-0',
                       c.concluido && 'opacity-60',
                     )}
                   >
-                    <BarraTermica
-                      temperatura={c.temperatura}
-                      needsAttention={c.precisaAtencao}
-                      posicao="absoluta"
-                      semRotulo
-                    />
                     {c.natureza === 'marcado' ? (
                       <span className="numerico shrink-0 text-xs font-medium">
                         {faixaDeHoras(c)}

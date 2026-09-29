@@ -35,14 +35,19 @@ export function TelaEnvios({ catalogos }: { catalogos: Catalogos }) {
   });
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-6 md:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{montando ? 'Nova campanha' : 'Campanhas'}</h1>
+    // A MESMA COLUNA E O MESMO TÍTULO DAS OUTRAS TELAS (29/09/2026). Campanhas
+    // era a única com casca própria — `max-w-6xl` centralizado e padding de novo,
+    // por dentro do padding da casca — e com título de 24px em negrito: trocar
+    // de tela para cá fazia o título pular 112px para a direita e mudar de peso.
+    <div className="flex w-full flex-col gap-5">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
+            {montando ? 'Nova campanha' : 'Campanhas'}
+          </h1>
           {!montando ? (
-            <p className="text-sm text-muted-foreground">
-              Um cumprimento para muitos parceiros, aos poucos e com parada automática se começarem a
-              bloquear. Quem responder cai nas Conversas, com 24 h para conversar livre.
+            <p className="max-w-[90ch] text-sm text-muted-foreground">
+              Um cumprimento para muitos parceiros, aos poucos e com parada automática.
             </p>
           ) : null}
         </div>
@@ -70,11 +75,17 @@ export function TelaEnvios({ catalogos }: { catalogos: Catalogos }) {
           {envios.error instanceof ErroDoEnvio ? fraseDaRecusa(envios.error.motivo) : 'Não deu para ler as campanhas.'}
         </p>
       ) : (envios.data ?? []).length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-hairline py-14 text-center">
-          <Megaphone className="size-8 text-muted-foreground" aria-hidden="true" />
-          <p className="max-w-sm text-sm text-muted-foreground">
-            Nenhuma campanha ainda. Escolha para quem e a mensagem, e o CRM cuida do resto.
-          </p>
+        <div className="sombra-base flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-14 text-center">
+          <span className="flex size-10 items-center justify-center rounded-full bg-muted text-foreground">
+            <Megaphone className="size-5" aria-hidden="true" strokeWidth={1.75} />
+          </span>
+          <div className="space-y-1">
+            <p className="font-medium">Nenhuma campanha ainda.</p>
+            <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+              Escolha para quem e a mensagem, e o CRM cuida do resto. Quem responder cai nas
+              Conversas.
+            </p>
+          </div>
           <Button className="toque h-11 md:h-9" onClick={() => setMontando(true)}>
             <Plus aria-hidden="true" />
             Montar a primeira campanha
@@ -110,7 +121,7 @@ function CartaoDoEnvio({ envio, aoAbrir }: { envio: Envio; aoAbrir: () => void }
     <button
       type="button"
       onClick={aoAbrir}
-      className="w-full space-y-3 rounded-2xl border border-hairline bg-card p-4 text-left transition-colors hover:border-primary/40"
+      className="sombra-base w-full space-y-3 rounded-xl bg-card p-5 text-left transition-shadow hover:sombra-base-forte"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -123,8 +134,10 @@ function CartaoDoEnvio({ envio, aoAbrir }: { envio: Envio; aoAbrir: () => void }
           {STATUS_DO_ENVIO[envio.status]}
         </span>
       </div>
+      {/* O andamento em MENTA, como a barra dos tetos nas Cadências: é o acento
+          do sistema dizendo "quanto já andou". */}
       <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-label={`${Math.round(p * 100)}% decidido`}>
-        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${p * 100}%` }} />
+        <div className="h-full rounded-full bg-menta transition-all" style={{ width: `${p * 100}%` }} />
       </div>
       <Numeros c={envio.contagem} compacto />
       {envio.status === 'parado' && envio.motivo_parada ? (

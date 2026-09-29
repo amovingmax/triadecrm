@@ -226,7 +226,7 @@ function Detalhe({
 function Bloco({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="text-[11px] tracking-wide text-muted-foreground uppercase">{titulo}</h3>
+      <h3 className="text-[11px] text-muted-foreground">{titulo}</h3>
       {children}
     </div>
   );

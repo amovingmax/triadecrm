@@ -50,8 +50,26 @@
  * invente uma terceira — a terceira é como as quatro nasceram.
  */
 
-/** Coluna de leitura: lista, formulário, fila. Ancorada à esquerda. */
-export const LEITURA = 'w-full max-w-4xl';
+/**
+ * Coluna de leitura: lista, formulário, fila.
+ *
+ * DESDE 29/09/2026 ELA OCUPA A LARGURA INTEIRA, como `TRABALHO`. Era
+ * `max-w-4xl` ancorada à esquerda, e num monitor largo sobrava metade da tela
+ * vazia à direita — Cadências, Registrar e Ligar pareciam telas pela metade.
+ * Rafael, sobre o Meu dia, e depois sobre o resto: "a tela é composta por
+ * inteira e centralizada (...) vc ta omitindo muitas telas".
+ *
+ * As duas razões do teto (linha longa cansa o olho; título no mesmo lugar em
+ * toda tela) continuam verdadeiras, e continuam atendidas por outros meios: a
+ * casca centraliza tudo em 1400px, e PROSA que precisar de medida tem teto
+ * próprio no parágrafo (`max-w-prose`, `max-w-[90ch]`), que é onde a largura
+ * machuca de verdade. Cartão, lista e tabela não sofrem com largura.
+ *
+ * A constante continua existindo, separada de `TRABALHO`, para a intenção de
+ * cada tela seguir escrita no código — se um dia a leitura voltar a ter teto,
+ * é uma linha.
+ */
+export const LEITURA = 'w-full';
 
 /**
  * Superfície de trabalho: tabela, quadro, inbox. Sem teto próprio — quem limita

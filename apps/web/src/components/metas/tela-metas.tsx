@@ -143,7 +143,7 @@ export function TelaMetas({
       ? 'Nenhuma meta definida para você neste período: os números abaixo são o seu realizado. Quem define a meta é o gestor.'
       : 'Você vê a sua própria meta. O acompanhamento do time e a definição dos alvos ficam com o gestor.'
     : semNenhumaMeta
-      ? 'Nenhuma meta definida para este período. Os números abaixo são o realizado; use "Definir meta" no cartão da pessoa para dar um alvo a ele.'
+      ? 'Nenhuma meta neste período: os números abaixo são o realizado. Para dar um alvo, use "Definir meta" no cartão da pessoa.'
       : null;
 
   // As linhas de quem a folha vai editar, sem valor de reserva. Antes daqui saía
@@ -210,9 +210,12 @@ export function TelaMetas({
         />
       </header>
 
+      {/* Uma LINHA, e não uma faixa com borda (29/09/2026): é um lembrete sobre
+          os cartões logo abaixo, e na faixa ele tinha o peso de um cartão. */}
       {aviso ? (
-        <p className="rounded-xl border border-hairline bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          {aviso}
+        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+          <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+          <span>{aviso}</span>
         </p>
       ) : null}
 
@@ -224,7 +227,7 @@ export function TelaMetas({
       {erroGeral ? (
         <section
           aria-label="Metas por pessoa"
-          className="flex max-w-2xl flex-col items-start gap-3 rounded-xl border border-hairline px-4 py-8"
+          className="sombra-base flex max-w-2xl flex-col items-start gap-3 rounded-xl bg-card p-5"
         >
           <p className="font-heading font-medium">Não deu para carregar as metas</p>
           <p className="text-sm text-muted-foreground">

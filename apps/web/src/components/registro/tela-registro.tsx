@@ -584,7 +584,6 @@ export function TelaRegistro({
         superficie={superficie}
         aoTrocarSuperficie={trocarSuperficie}
         catalogo={contexto.catalogo}
-        etapasAlvo={contexto.etapasAlvo}
         aoEscolher={escolherDesfecho}
         aoVoltar={() => {
           setUrlValendo(false);

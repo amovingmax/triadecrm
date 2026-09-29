@@ -27,7 +27,7 @@ import {
   type LinhaCrua,
   type PrazoDoDesfazer,
 } from './dados';
-import { ErroDaImportacao, EsqueletoDaPrevia, Progresso, SemLotes } from './estados';
+import { ErroDaImportacao, EsqueletoDaPrevia, Progresso } from './estados';
 import {
   faltando,
   montarLinhasDaPlanilha,
@@ -742,11 +742,18 @@ function ListaDeLotes({
       <div aria-busy="true" className="h-24 animate-pulse rounded-xl bg-muted/60" aria-label="Carregando as importações anteriores" />
     );
   }
-  if (!lotes || lotes.length === 0) return <SemLotes />;
+  // Sem importação anterior, NADA aqui (29/09/2026). Havia um segundo estado vazio
+  // logo abaixo da área de arquivo — ícone, título e parágrafo — repetindo o que a
+  // própria área já diz ("escolha o arquivo... nada é gravado antes"). Duas caixas
+  // dizendo a mesma coisa é exatamente o "muita informação junta" do Rafael.
+  if (!lotes || lotes.length === 0) return null;
 
   return (
-    <section aria-labelledby="lotes" className="flex flex-col gap-2">
-      <h2 id="lotes" className="font-heading font-medium tracking-tight">
+    <section
+      aria-labelledby="lotes"
+      className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5"
+    >
+      <h2 id="lotes" className="text-[15px] font-semibold tracking-[-0.01em]">
         O que você já trouxe
       </h2>
       <ul className="border-t border-hairline">

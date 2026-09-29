@@ -3,6 +3,7 @@
 import { CalendarClock, Footprints, Route, Video } from 'lucide-react';
 
 import { type DesfechoCatalogo } from '@/components/registro/tipos';
+import { NotaRecolhida } from '@/components/ui/nota-recolhida';
 
 import { CartaoCompromisso } from './cartao-compromisso';
 import { VazioDoDia } from './estados';
@@ -83,7 +84,7 @@ export function ListaDoDia({
   }
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-4">
       {/* "O que o robô pode oferecer no meu nome hoje" — a mesma grade de
           `app.reuniao_horarios_livres` que ele usa para oferecer. */}
       <TiraDeLivres dia={dia} />
@@ -95,7 +96,7 @@ export function ListaDoDia({
           contagem={marcados.length}
           nota="Reuniões cuja data e hora foram combinadas com o parceiro e estão gravadas no funil."
         >
-          <ul className="flex flex-col border-t border-hairline">
+          <ul className="flex flex-col gap-2">
             {marcados.map((c) => (
               <CartaoCompromisso
                 key={chaveDoCompromisso(c)}
@@ -124,7 +125,7 @@ export function ListaDoDia({
                   {grupo.bairro}
                   <span className="numerico">{grupo.itens.length}</span>
                 </h3>
-                <ul className="flex flex-col border-t border-hairline">
+                <ul className="flex flex-col gap-2">
                   {grupo.itens.map((c) => (
                     <CartaoCompromisso
                       key={chaveDoCompromisso(c)}
@@ -137,12 +138,12 @@ export function ListaDoDia({
                 </ul>
               </section>
             ))}
-            <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
-              A ordem dentro do bairro é a do relógio. A rota otimizada (ordem por tempo de
-              deslocamento e um link único do Maps com as paradas) chega depois: ela depende da
-              geocodificação dos endereços, e hoje nenhuma organização da base tem coordenada nem
-              endereço gravado. Por isso o botão do Maps busca pelo nome do parceiro e pelo bairro.
-            </p>
+            <NotaRecolhida titulo="Por que a ordem é a do relógio">
+              A rota otimizada (ordem por tempo de deslocamento e um link único do Maps com as
+              paradas) depende da geocodificação dos endereços, e hoje nenhuma organização da base
+              tem coordenada nem endereço gravado. Por isso o botão do Maps busca pelo nome do
+              parceiro e pelo bairro.
+            </NotaRecolhida>
           </div>
         </Bloco>
       ) : null}
@@ -154,7 +155,7 @@ export function ListaDoDia({
           contagem={aMarcar.length}
           nota="Ainda não têm hora combinada: o prazo caiu neste dia. Ligue ou mande mensagem para combinar a data, e o compromisso passa a valer."
         >
-          <ul className="flex flex-col border-t border-hairline">
+          <ul className="flex flex-col gap-2">
             {aMarcar.map((c) => (
               <CartaoCompromisso
                 key={chaveDoCompromisso(c)}
@@ -174,7 +175,7 @@ export function ListaDoDia({
           contagem={concluidos.length}
           nota="O resultado já foi gravado e o funil já reagiu."
         >
-          <ul className="flex flex-col border-t border-hairline">
+          <ul className="flex flex-col gap-2">
             {concluidos.map((c) => (
               <CartaoCompromisso
                 key={chaveDoCompromisso(c)}
@@ -207,14 +208,16 @@ function Bloco({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-2">
+    // Cada bloco num CARTÃO (29/09/2026): eram títulos de 14px soltos sobre o
+    // cinza, e com três blocos no dia a lista parecia uma coisa só.
+    <section className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-5">
       <header className="flex flex-col gap-0.5">
-        <h2 className="flex items-center gap-2 font-heading text-sm font-medium">
-          {icone}
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
+          <span className="text-muted-foreground">{icone}</span>
           {titulo}
-          <span className="numerico text-muted-foreground">{contagem}</span>
+          <span className="numerico font-normal text-muted-foreground">{contagem}</span>
         </h2>
-        <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">{nota}</p>
+        <p className="max-w-[90ch] text-xs leading-relaxed text-muted-foreground">{nota}</p>
       </header>
       {children}
     </section>

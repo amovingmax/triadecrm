@@ -148,8 +148,8 @@ function Moldura({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+    <div className="sombra-base flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-14 text-center">
+      <span className="flex size-10 items-center justify-center rounded-full bg-muted text-foreground">
         {icone}
       </span>
       <div className="space-y-1">

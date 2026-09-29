@@ -45,11 +45,15 @@ export function SeletorDePainel({
           const ativo = definicao.chave === painel;
           return (
             <li key={definicao.chave}>
+              {/* A leitura escolhida em MENTA (29/09/2026), como a aba ativa de
+                  toda tela: era o cinza do botão secundário, igual ao do período
+                  logo abaixo, e as duas escolhas não se distinguiam. O período
+                  continua em cinza — é o filtro, não o lugar. */}
               <Button
-                variant={ativo ? 'secondary' : 'ghost'}
+                variant={ativo ? 'menta' : 'ghost'}
                 aria-pressed={ativo}
                 onClick={() => aoTrocar(definicao.chave)}
-                className={cn('toque h-11 px-3 md:h-8', ativo && 'font-semibold')}
+                className="toque h-11 px-4 md:h-8"
               >
                 {definicao.rotulo}
               </Button>

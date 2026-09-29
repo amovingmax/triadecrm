@@ -15,31 +15,34 @@ import { Skeleton } from '@/components/ui/skeleton';
  * folha de mover do funil.
  */
 
-/** Espera no formato final: o cartão da cadência com a lista de passos por baixo. */
+/** Espera no formato final: os quatro tetos e o cartão da cadência com a trilha. */
 export function EsqueletoDasCadencias() {
   return (
-    <div aria-busy="true" aria-live="polite" className="flex flex-col gap-4">
+    <div aria-busy="true" aria-live="polite" className="flex flex-col gap-5">
       <span className="sr-only">Carregando as cadências.</span>
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <li key={i} className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-5">
+            <Skeleton className="h-7 w-24 rounded-full" />
+            <Skeleton className="h-10 w-16" />
+            <Skeleton className="h-1.5 w-full rounded-full" />
+          </li>
+        ))}
+      </ul>
       {Array.from({ length: 3 }, (_, i) => (
-        <div key={i} className="sombra-base rounded-xl bg-card">
-          <div className="flex items-start justify-between gap-3 border-b border-hairline px-4 py-3">
+        <div key={i} className="sombra-base flex flex-col gap-4 rounded-xl bg-card p-5">
+          <div className="flex items-start justify-between gap-3">
             <div className="flex flex-1 flex-col gap-2">
               <Skeleton className="h-5 w-52" />
-              <Skeleton className="h-3 w-64" />
+              <Skeleton className="h-3 w-72" />
             </div>
-            <Skeleton className="h-9 w-24 rounded-lg" />
+            <Skeleton className="h-9 w-28 rounded-full" />
           </div>
-          <ul className="flex flex-col">
-            {Array.from({ length: 3 }, (_, j) => (
-              <li key={j} className="flex items-start gap-3 border-b border-hairline px-4 py-3 last:border-b-0">
-                <Skeleton className="size-7 rounded-lg" />
-                <div className="flex flex-1 flex-col gap-2">
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-3 w-72" />
-                </div>
-              </li>
+          <div className="flex gap-3">
+            {Array.from({ length: 4 }, (_, j) => (
+              <Skeleton key={j} className="h-8 w-24 rounded-full" />
             ))}
-          </ul>
+          </div>
         </div>
       ))}
     </div>
@@ -51,10 +54,10 @@ export function EsqueletoDoResumo() {
   return (
     <div aria-busy="true" aria-live="polite" className="flex flex-col gap-5">
       <span className="sr-only">Carregando o resumo do dia.</span>
-      <Skeleton className="h-16 w-full rounded-xl" />
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <Skeleton className="h-4 w-80" />
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
-          <li key={i} className="flex flex-col gap-2 rounded-lg border border-hairline bg-card px-3 py-2.5">
+          <li key={i} className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5">
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-6 w-10" />
           </li>
@@ -98,23 +101,25 @@ export function NinguemEmCadencia({
   /** `app.pode_matricular()`, lido do banco. */
   podeMatricular: boolean;
 }) {
+  // UMA LINHA, e não um cartão de 290px com ícone, título e parágrafo
+  // (29/09/2026): o vazio é um aviso sobre as réguas logo abaixo, e não o
+  // assunto da tela. O que ele precisa dizer cabe numa frase e num botão.
   return (
-    <div className="flex flex-col items-center gap-3 sombra-base rounded-xl bg-card px-6 py-10 text-center">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-        <Route className="size-5" aria-hidden="true" />
+    <div className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-4 sm:flex-row sm:items-center sm:gap-4">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+        <Route className="size-4" aria-hidden="true" strokeWidth={1.75} />
       </span>
-      <div className="space-y-1">
-        <p className="font-heading font-medium">Nenhuma organização está em cadência.</p>
-        <p className="mx-auto max-w-md text-sm text-muted-foreground">
-          <span className="numerico">{quantasLigadas}</span>{' '}
-          {quantasLigadas === 1 ? 'régua aceita' : 'réguas aceitam'} matrícula, mas ninguém foi
-          matriculado ainda — então nenhum toque vai nascer hoje.{' '}
-          {podeMatricular
-            ? 'Use “Matricular” no cartão da régua, ou mova um cartão de etapa no funil: a folha de mover oferece a régua que faz sentido para aquela etapa.'
-            : 'Quem matricula é admin, gestor ou SDR — peça a quem tem o papel.'}
-        </p>
-      </div>
-      <Button asChild variant="outline" className="toque h-11 md:h-9">
+      <p className="min-w-0 flex-1 text-sm">
+        <span className="font-medium">Ninguém está em cadência ainda.</span>{' '}
+        <span className="text-muted-foreground">
+          {quantasLigadas === 0
+            ? 'Nenhuma régua aceita matrícula agora.'
+            : podeMatricular
+              ? 'Use “Matricular” numa régua abaixo, ou mova um cartão de etapa no funil.'
+              : 'Quem matricula é admin, gestor ou SDR.'}
+        </span>
+      </p>
+      <Button asChild variant="outline" className="toque h-11 shrink-0 self-start sm:self-auto md:h-9">
         <Link href="/funis">
           <SquareKanban aria-hidden="true" />
           Abrir o funil
@@ -135,8 +140,8 @@ export function ErroDaTela({
   aoTentar: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+    <div className="sombra-base flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-14 text-center">
+      <span className="flex size-10 items-center justify-center rounded-full bg-muted text-foreground">
         <RotateCw className="size-5" aria-hidden="true" />
       </span>
       <div className="space-y-1">

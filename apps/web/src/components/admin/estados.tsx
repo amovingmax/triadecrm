@@ -1,6 +1,6 @@
 'use client';
 
-import { CircleAlert, Info, Lock, RotateCw, SearchX } from 'lucide-react';
+import { ChevronRight, CircleAlert, Info, Lock, RotateCw, SearchX } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -51,13 +51,15 @@ export function CabecalhoDeSecao({
   return (
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 space-y-1">
-        <h2 className="font-heading text-base font-semibold tracking-tight">
+        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
           {titulo}
           {contagem ? (
             <span className="ml-2 text-sm font-normal text-muted-foreground">{contagem}</span>
           ) : null}
         </h2>
-        <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{descricao}</p>
+        {/* 90ch, e não `max-w-prose`: com a tela na largura inteira, 65ch fazia
+            uma frase de duas linhas virar três, encostada à esquerda. */}
+        <p className="max-w-[90ch] text-sm leading-relaxed text-muted-foreground">{descricao}</p>
       </div>
       {acao}
     </header>
@@ -77,6 +79,31 @@ export function Aviso({
   children: React.ReactNode;
   tom?: 'nota' | 'atencao';
 }) {
+  // A NOTA COM TÍTULO NASCE FECHADA (29/09/2026). "Como alguém entra no
+  // Tríade", "Por que aqui não tem telefone", "O que entra no arquivo": são
+  // explicações que se leem uma vez, e abertas elas abriam cada aba da Admin com
+  // um parágrafo cinza antes do que a pessoa veio fazer. Rafael, olhando a tela:
+  // "evite muita informação junta". Fechada, a nota vira uma linha com o título,
+  // e o `<details>` nativo abre sem JavaScript e entra no Ctrl+F. O aviso de
+  // ATENÇÃO continua aberto: ele é o que a pessoa precisa ver antes de mexer.
+  if (tom === 'nota' && titulo) {
+    return (
+      <details className="group text-sm">
+        <summary className="flex min-h-9 w-fit cursor-pointer list-none items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground">
+          <Info className="size-4 shrink-0" aria-hidden="true" />
+          <span className="font-medium">{titulo}</span>
+          <ChevronRight
+            className="size-3.5 shrink-0 transition-transform group-open:rotate-90"
+            aria-hidden="true"
+          />
+        </summary>
+        <div className="mt-1 max-w-prose pl-[1.375rem] leading-relaxed text-muted-foreground [&_strong]:text-foreground">
+          {children}
+        </div>
+      </details>
+    );
+  }
+
   const Icone = tom === 'atencao' ? CircleAlert : Info;
   return (
     <div
@@ -141,7 +168,10 @@ export function ListaAdmin<T>({
   const secundarias = colunas.filter((c) => c !== principal);
 
   return (
-    <>
+    // A LISTA NUM CARTÃO (29/09/2026), como a tabela de Parceiros: solta no
+    // cinza da tela, a tabela da Admin era a única lista do CRM sem superfície,
+    // e as linhas pareciam continuar pela página afora.
+    <div className="sombra-base rounded-xl bg-card px-4 py-1 md:px-5 md:py-2">
       {/* Desktop: tabela densa, separada por hairline (nunca borda cheia). */}
       <div className="hidden overflow-x-auto md:block">
         <table className="corpo-tabela w-full table-fixed text-sm">
@@ -210,7 +240,7 @@ export function ListaAdmin<T>({
           </li>
         ))}
       </ul>
-    </>
+    </div>
   );
 }
 
@@ -218,7 +248,7 @@ export function ListaAdmin<T>({
 export function EsqueletoLista({ linhas = 8, colunas = 4 }: { linhas?: number; colunas?: number }) {
   const larguras = ['w-40', 'w-24', 'w-32', 'w-20', 'w-36', 'w-28'];
   return (
-    <div aria-busy="true" aria-live="polite">
+    <div aria-busy="true" aria-live="polite" className="sombra-base rounded-xl bg-card px-4 py-1 md:px-5 md:py-2">
       <span className="sr-only">Carregando.</span>
       <div className="hidden md:block">
         <div className="flex gap-3 border-b border-hairline py-2">
@@ -259,8 +289,10 @@ function Moldura({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+    // Em CARTÃO (29/09/2026), como o vazio das outras telas: solto no cinza,
+    // o vazio da Admin flutuava entre duas seções e parecia pertencer às duas.
+    <div className="sombra-base flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-12 text-center">
+      <span className="flex size-10 items-center justify-center rounded-full bg-muted text-foreground">
         {icone}
       </span>
       <div className="space-y-1">

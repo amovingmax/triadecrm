@@ -172,8 +172,8 @@ export function FilaVazia({
  */
 export function NadaParaHoje({ quantosDepois }: { quantosDepois: number }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-hairline bg-card px-4 py-3">
-      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+    <div className="sombra-base flex items-start gap-3 rounded-xl bg-card p-4">
+      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-menta-fundo text-menta-texto">
         <CheckCheck className="size-4" aria-hidden="true" />
       </span>
       <div className="min-w-0">
@@ -219,8 +219,10 @@ function Moldura({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+    // Em CARTÃO (29/09/2026), como o vazio de todas as outras telas: solto no
+    // cinza, a fila vazia parecia um buraco no meio do Meu dia.
+    <div className="sombra-base flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-14 text-center">
+      <span className="flex size-10 items-center justify-center rounded-full bg-muted text-foreground">
         {icone}
       </span>
       <div className="space-y-1">

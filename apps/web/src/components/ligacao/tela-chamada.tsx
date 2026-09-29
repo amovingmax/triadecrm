@@ -764,7 +764,7 @@ export function TelaChamada({
           <>
             {noParaLer ? (
               <div className="rounded-xl border border-dashed border-hairline p-4 sm:p-5">
-                <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
                   A primeira fala
                 </p>
                 <RoteiroNo

@@ -88,23 +88,20 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
           <SheetTrigger
             className={cn(
               'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-4 transition-colors',
-              algumSecundarioAtivo
-                ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                : 'text-sidebar-muted-foreground',
+              algumSecundarioAtivo ? 'font-medium text-foreground' : 'text-sidebar-muted-foreground',
             )}
             aria-label="Mais áreas do CRM"
           >
+            {/* A mesma pílula menta dos outros itens (ver `nav-link.tsx`). */}
             <span
               aria-hidden="true"
               className={cn(
-                'absolute inset-x-3 top-0 h-0.5 bg-sidebar-primary',
-                algumSecundarioAtivo ? 'opacity-100' : 'opacity-0',
+                'flex h-7 w-12 items-center justify-center rounded-full transition-colors',
+                algumSecundarioAtivo && 'bg-menta text-menta-tinta',
               )}
-            />
-            <Ellipsis
-              className={cn('size-5', algumSecundarioAtivo && 'stroke-[2.25]')}
-              aria-hidden="true"
-            />
+            >
+              <Ellipsis className={cn('size-5', algumSecundarioAtivo && 'stroke-[2.25]')} />
+            </span>
             <span>Mais</span>
           </SheetTrigger>
 

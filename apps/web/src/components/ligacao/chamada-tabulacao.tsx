@@ -121,7 +121,7 @@ export function ChamadaTabulacao({
 
       {!atendeu ? (
         <>
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <p className="text-xs font-medium text-muted-foreground">
             Não falei com ninguém
           </p>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
@@ -177,7 +177,7 @@ export function ChamadaTabulacao({
         <>
           {abertos ? (
             <>
-              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              <p className="text-xs font-medium text-muted-foreground">
                 O que ficou combinado
               </p>
               <ListaComercial desfechos={comerciais} gravando={gravando} aoDesfecho={aoDesfecho} />
@@ -283,7 +283,7 @@ function ComQuemFalou({
       <p
         aria-live="polite"
         className={cn(
-          'text-xs font-medium tracking-wide uppercase',
+          'text-xs font-medium',
           cobrando ? 'text-destructive-texto' : 'text-muted-foreground',
         )}
       >

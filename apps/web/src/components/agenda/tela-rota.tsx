@@ -20,7 +20,6 @@ import { NotaRecolhida } from '@/components/ui/nota-recolhida';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BarraTermica, ChipTemperatura } from '@/components/temperatura';
 
 import { ErroDaAgenda } from './consultas';
 import { ErroDaAgendaNaTela } from './estados';
@@ -130,7 +129,7 @@ export function TelaRota({ usuarioId, dia, hoje }: { usuarioId: string; dia: Dia
       {paradas.length > 0 ? (
         <ListaDeParadas paradas={paradas} />
       ) : status === 'pronta' ? (
-        <p className="rounded-lg border border-hairline p-4 text-sm text-muted-foreground">
+        <p className="sombra-base rounded-xl bg-card p-5 text-sm text-muted-foreground">
           A rota foi calculada e ficou sem parada nenhuma: no momento do cálculo, nenhuma das
           visitas do dia ainda podia entrar.
         </p>
@@ -168,10 +167,10 @@ function CabecalhoDaRota({
   const origemConfirmada = rota.config?.origem?.confirmada === true;
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-hairline p-4">
+    <section className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 font-heading text-lg font-semibold tracking-tight">
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
             <Route className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             Rota da tarde
           </h2>
@@ -262,8 +261,8 @@ function NaFila({ rota }: { rota: RotaDoDia }) {
   return (
     <section
       className={cn(
-        'flex items-start gap-3 rounded-lg border border-hairline p-4',
-        !dePe && 'border-dashed',
+        'flex items-start gap-3 rounded-xl p-5',
+        dePe ? 'sombra-base bg-card' : 'bg-muted/60',
       )}
     >
       <Compass
@@ -302,7 +301,7 @@ function NaFila({ rota }: { rota: RotaDoDia }) {
 
 function Falhou({ rota }: { rota: RotaDoDia }) {
   return (
-    <section className="flex items-start gap-3 rounded-lg border border-hairline border-dashed p-4">
+    <section className="flex items-start gap-3 rounded-xl bg-muted/60 p-5">
       <AlertTriangle className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <div className="flex flex-col gap-1">
         <p className="text-sm font-medium">A rota não saiu.</p>
@@ -393,11 +392,10 @@ function CartaoDaParada({
   return (
     <article
       className={cn(
-        'relative flex flex-col gap-2.5 rounded-lg border border-hairline p-4 pl-5',
+        'sombra-base flex flex-col gap-2.5 rounded-xl bg-card p-5',
         !parada.ainda_vale && 'opacity-60',
       )}
     >
-      <BarraTermica temperatura={parada.temperatura} posicao="absoluta" semRotulo />
 
       <div className="flex items-start gap-3">
         <span
@@ -428,7 +426,6 @@ function CartaoDaParada({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <ChipTemperatura temperatura={parada.temperatura} />
         {parada.etapa ? (
           <span className="truncate text-xs text-muted-foreground">{parada.etapa}</span>
         ) : null}
@@ -589,9 +586,9 @@ function AindaNaoLigado({ rota }: { rota: RotaDoDia }) {
 function EsqueletoDaRota() {
   return (
     <div className="flex flex-col gap-4" aria-hidden="true">
-      <div className="h-28 animate-pulse rounded-lg border border-hairline" />
-      <div className="h-32 animate-pulse rounded-lg border border-hairline" />
-      <div className="h-32 animate-pulse rounded-lg border border-hairline" />
+      <div className="sombra-base h-28 animate-pulse rounded-xl bg-card" />
+      <div className="sombra-base h-32 animate-pulse rounded-xl bg-card" />
+      <div className="sombra-base h-32 animate-pulse rounded-xl bg-card" />
     </div>
   );
 }

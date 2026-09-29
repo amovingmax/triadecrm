@@ -48,6 +48,10 @@
   --color-menta: var(--menta);
   --color-menta-fundo: var(--menta-fundo);
   --color-menta-texto: var(--menta-texto);
+  /* A tinta que vai POR CIMA da menta cheia: sempre a tinta escura, nos dois
+     temas. `text-foreground` servia no claro e virava branco no escuro — branco
+     sobre menta mede 1,1:1 e a aba ativa sumia. */
+  --color-menta-tinta: var(--menta-tinta);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -309,6 +313,7 @@
   --menta: var(--komune-400);
   --menta-fundo: var(--komune-100);
   --menta-texto: var(--komune-700);
+  --menta-tinta: #111110;
   /* Destrutivo reaproveita a brasa: é o mesmo alarme, e evita uma sexta cor.
      `--destructive` é a marca gráfica (preenchimento, borda, anel, ícone) e cumpre
      os 3:1 da WCAG 1.4.11; para TEXTO existe `--destructive-texto`, porque a brasa
@@ -474,6 +479,7 @@
   --menta: var(--komune-400);
   --menta-fundo: rgb(120 252 144 / 0.14);
   --menta-texto: var(--komune-400);
+  --menta-tinta: #111110;
   --destructive: var(--coral-400);
   --destructive-texto: #ff8a78;
   --border: #2a2a2a;
@@ -512,7 +518,9 @@
   --sidebar-muted-foreground: #a3a3a2;
   --sidebar-primary: #ffffff;
   --sidebar-primary-foreground: var(--grafite-900);
-  --sidebar-accent: #ffffff;
+  /* Menta também no escuro (29/09/2026): "a menta é a MESMA nos dois temas", e
+     o trilho era o único lugar em que o ativo trocava de cor com o tema. */
+  --sidebar-accent: var(--komune-400);
   --sidebar-accent-foreground: var(--grafite-900);
   --sidebar-border: var(--hairline);
   --sidebar-ring: #ffffff;

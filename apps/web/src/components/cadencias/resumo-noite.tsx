@@ -31,19 +31,19 @@ export function BlocoDaNoite({ resumo, nome }: { resumo: ResumoDoDia; nome: stri
 
       {feitas.length > 0 ? (
         <section className="flex flex-col gap-2">
-          <h2 className="flex items-center gap-2 font-heading text-sm font-medium">
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
             <Sparkles className="size-4 text-muted-foreground" aria-hidden="true" />
             Contadores do dia
           </h2>
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {feitas.map((metrica) => (
               <li
                 key={metrica.metrica}
-                className="flex flex-col gap-1 rounded-lg border border-hairline bg-card px-3 py-2.5"
+                className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5"
               >
-                <p className="truncate text-xs text-muted-foreground">{metrica.rotulo}</p>
+                <p className="truncate text-[13px] text-muted-foreground">{metrica.rotulo}</p>
                 <p className="flex items-baseline gap-1.5">
-                  <span className="numerico text-2xl leading-none font-medium">
+                  <span className="numerico text-[40px] leading-none font-medium tracking-[-0.03em]">
                     {metrica.realizado ?? 0}
                   </span>
                   {metrica.meta !== null ? (
@@ -112,8 +112,8 @@ function Feito({ resumo, nome }: { resumo: ResumoDoDia; nome: string }) {
   );
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="flex items-center gap-2 font-heading text-sm font-medium">
+    <section className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5">
+      <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
         <Sparkles className="size-4 text-muted-foreground" aria-hidden="true" />
         Feito hoje
       </h2>
@@ -183,8 +183,8 @@ function Feito({ resumo, nome }: { resumo: ResumoDoDia; nome: string }) {
  */
 function SemRegistro({ nome }: { nome: string }) {
   return (
-    <section className="flex flex-col gap-2 sombra-base rounded-xl bg-card px-4 py-3.5">
-      <h2 className="flex items-center gap-2 font-heading text-sm font-medium">
+    <section className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5">
+      <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
         <CircleHelp className="size-4 text-muted-foreground" aria-hidden="true" />
         Nenhum registro hoje
       </h2>

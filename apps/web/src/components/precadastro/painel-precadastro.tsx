@@ -322,11 +322,11 @@ export function PainelPreCadastro({
   );
 }
 
-/** A seção, com o mesmo desenho das outras seções da ficha. */
+/** A seção, com o mesmo desenho das outras seções da ficha: um cartão (29/09/2026). */
 function Moldura({ children }: { children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="font-heading text-base font-medium">Pré-cadastro na Komune</h2>
+    <section className="sombra-base flex min-w-0 flex-col gap-4 rounded-xl bg-card p-5">
+      <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Pré-cadastro na Komune</h2>
       {children}
     </section>
   );

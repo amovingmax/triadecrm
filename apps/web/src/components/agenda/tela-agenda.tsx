@@ -234,13 +234,10 @@ export function TelaAgenda({
               ? `Rota da tarde de ${rotuloDiaPorExtenso(dia)}`
               : rotuloDiaPorExtenso(dia)
         }
-        className={cn(
-          'border-t border-hairline pt-4',
-          consulta.isPlaceholderData && 'pointer-events-none opacity-60',
-        )}
+        className={cn(consulta.isPlaceholderData && 'pointer-events-none opacity-60')}
       >
         {visao === 'dia' ? (
-          <h2 className="pb-3 text-sm font-medium first-letter:uppercase">
+          <h2 className="pb-3 text-[15px] font-semibold tracking-[-0.01em] first-letter:uppercase">
             {rotuloDiaPorExtenso(dia)}
             {dia === hoje ? <span className="text-muted-foreground"> · hoje</span> : null}
           </h2>

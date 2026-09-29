@@ -11,8 +11,9 @@ import { PERIODOS, type Periodo } from './periodo';
  * Dia, semana e mês (RF-MET-02), mais o passo para trás e para a frente.
  *
  * Segmentado feito com botões e `aria-pressed`, e não com abas: não há painel por
- * aba, o que muda é o recorte da mesma tela. O botão ativo usa peso e a superfície
- * `secondary` — nada de cor, que aqui significaria temperatura.
+ * aba, o que muda é o recorte da mesma tela. O desenho é o do `SeletorDeAba`
+ * (pílula branca, a escolha em MENTA) desde 29/09/2026 — era o último segmentado
+ * do CRM ainda em cinza sobre cinza.
  */
 export function SeletorPeriodo({
   periodo,
@@ -34,7 +35,7 @@ export function SeletorPeriodo({
       <div
         role="group"
         aria-label="Período da meta"
-        className="flex items-center gap-1 rounded-lg bg-muted p-1"
+        className="sombra-base flex items-center gap-1 rounded-full bg-card p-1"
       >
         {PERIODOS.map((opcao) => {
           const ativo = opcao.valor === periodo;
@@ -46,11 +47,11 @@ export function SeletorPeriodo({
               onClick={() => aoTrocarPeriodo(opcao.valor)}
               className={cn(
                 // 44px no celular (o polegar da Heloísa na rua), 36px no desktop.
-                'toque min-h-11 rounded-md px-3 text-sm transition-colors outline-none md:min-h-9',
+                'toque min-h-11 rounded-full px-4 text-sm font-medium transition-colors outline-none md:min-h-8',
                 'focus-visible:ring-3 focus-visible:ring-ring/50',
                 ativo
-                  ? 'bg-background font-medium text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground',
+                  ? 'bg-menta text-menta-tinta'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
             >
               {opcao.rotulo}

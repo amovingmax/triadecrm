@@ -124,7 +124,6 @@ export function TelaCadencias({ podeLigarDesligar }: { podeLigarDesligar: boolea
         />
       ) : (
         <>
-          <AvisoDoEnvio visao={visao.data} />
           <TetosDoDia visao={visao.data} />
 
           {dentro === 0 ? (
@@ -143,6 +142,10 @@ export function TelaCadencias({ podeLigarDesligar }: { podeLigarDesligar: boolea
               />
             ))}
           </section>
+
+          {/* A explicação do que a máquina faz sozinha abria a tela, num cartão
+              próprio. Desceu para o pé, fechada (29/09/2026): ver `AvisoDoEnvio`. */}
+          <AvisoDoEnvio visao={visao.data} />
         </>
       )}
 

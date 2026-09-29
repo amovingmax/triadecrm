@@ -295,7 +295,7 @@ export function NovoEnvio({
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start">
-      <div className="min-w-0 divide-y divide-hairline rounded-2xl border border-hairline bg-card">
+      <div className="sombra-base min-w-0 divide-y divide-hairline rounded-xl bg-card">
         {/* ------------------------------ Para quem ------------------------------ */}
         <section aria-labelledby="bloco-publico" className="space-y-3 p-4 md:p-5">
           <h2 id="bloco-publico" className="text-sm font-semibold">
@@ -663,7 +663,7 @@ export function NovoEnvio({
 
       {/* ------------------------- Como chega e enviar ------------------------- */}
       <aside className="space-y-4 lg:sticky lg:top-20">
-        <section aria-labelledby="bloco-previa" className="space-y-2 rounded-2xl border border-hairline bg-card p-4">
+        <section aria-labelledby="bloco-previa" className="sombra-base space-y-2 rounded-xl bg-card p-5">
           <div className="flex items-center justify-between gap-2">
             <h2 id="bloco-previa" className="text-sm font-semibold">
               Como chega
@@ -718,7 +718,7 @@ export function NovoEnvio({
           )}
         </section>
 
-        <section aria-labelledby="bloco-enviar" className="space-y-3 rounded-2xl border border-hairline bg-card p-4">
+        <section aria-labelledby="bloco-enviar" className="sombra-base space-y-3 rounded-xl bg-card p-5">
           <h2 id="bloco-enviar" className="sr-only">
             Enviar
           </h2>

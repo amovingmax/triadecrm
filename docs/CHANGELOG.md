@@ -5106,3 +5106,74 @@ fixed`, e diálogo e folha passariam a se posicionar pela página.
   **fotografado** — Funis, Revisão e a transição de página, antes e depois.
 - Ainda não visto nem arrumado: Cadências, Admin, Agenda, Metas, Ligar,
   Registrar, Campanhas. É a próxima leva, com a mesma conferência.
+
+### 29/09/2026 — As telas que faltavam, limpas e na largura inteira
+
+Pedido do Rafael, com Revisão, Cadências e Admin na mão: "vc ta omitindo muitas
+telas, faça com atenção e evite muita informação junta, quero algo clean e
+organizado". Esta é a leva que a entrada anterior deixou anotada — e mais o
+que apareceu no caminho, cada tela fotografada antes e depois no ambiente local.
+
+#### A regra que mudou para todas
+
+- **A coluna de leitura ocupa a largura inteira.** `LEITURA` era `max-w-4xl`
+  ancorada à esquerda e deixava meia tela vazia em Cadências, Registrar, Ligar,
+  Admin e na ficha do parceiro. Agora é a mesma largura das outras telas; o que
+  precisa de medida de leitura (parágrafo) tem teto no próprio parágrafo.
+- **Todo vazio é um cartão.** Havia três desenhos para "não tem nada aqui"
+  (moldura tracejada, cartão branco e texto solto no cinza). Sobrou um: cartão
+  branco com o ícone num disco. O tracejado ficou só onde ele quer dizer "solte
+  o arquivo aqui", no Importar.
+- **Temperatura só nos relatórios e na ficha**, como o Tríade Design System
+  manda. Saíram a barra e o chip de cor das linhas do Registrar, da Agenda (dia,
+  semana e rota) e do cabeçalho da ficha.
+- **Explicação que se lê uma vez nasce fechada.** "Como a cadência funciona",
+  "Como alguém entra no Tríade", "Por que aqui não tem telefone" e parecidas
+  viraram uma linha que abre com um clique.
+- **Verde onde se escolhe algo.** A escolha ativa é menta em todo seletor que
+  ainda não era: período das Metas, manhã/noite do Resumo, canal do Registrar,
+  dia da Agenda, leitura dos Relatórios e a barra de baixo do celular (agora uma
+  pílula atrás do ícone, e não um bloco verde inteiro). As barras de progresso
+  dos tetos e das campanhas também são menta.
+- **Corrigido no escuro:** texto sobre a menta era `text-foreground`, que no tema
+  escuro é branco — a aba ativa ficava branca sobre verde (1,1:1) e sumia. Nasceu
+  o token `--menta-tinta` (a tinta escura, nos dois temas) e toda menta cheia usa
+  ele. O item ativo do trilho também passou a ser menta no escuro (era branco).
+
+#### Tela a tela
+
+- **Cadências:** de 3.300px para 1.500px. A explicação saiu do topo e foi para
+  o pé, fechada. Os tetos por canal viraram quatro cartões com barra. Cada régua
+  mostra, fechada, só o nome, se aceita matrícula e a **trilha** dos canais em
+  ordem (a pílula fica verde onde houver gente parada); o detalhe de cada passo
+  está em "Ver os passos". O vazio virou uma linha com o botão.
+- **Resumo do dia:** cada seção num cartão; o aviso de entrega virou uma linha.
+- **Registrar:** título na escala das outras telas, busca e lista num cartão,
+  linhas como superfície. No passo 2, o cabeçalho com o nome grande e o canal na
+  pílula segmentada; os resultados num cartão, sem o chip "Quente/Frio".
+- **Ligar e Campanhas:** vazio em cartão; Campanhas deixou de ter casca própria
+  (`max-w-6xl` e título de 24px em negrito) e começa onde as outras começam.
+- **Admin:** as listas das quatro abas num cartão; descrições sem quebrar no
+  meio; notas explicativas fechadas.
+- **Metas:** o seletor de período em pílula verde; as nove métricas sem meta
+  nascem fechadas (eram cinco cartões com nove linhas de zero cada); saiu o
+  segundo botão "Definir portas abertas", que abria a mesma folha do "Definir
+  meta" a um palmo dele.
+- **Ficha do parceiro:** em cartões — Contato e origem, Negócios e Pré-cadastro
+  —, lado a lado a partir de 1024px.
+- **Agenda:** cada bloco do dia num cartão, o dia escolhido em verde, a nota da
+  rota fechada, e a aba Rota com cartões no lugar das molduras.
+- **Importar:** saiu o segundo vazio ("Nenhuma planilha importada ainda"), que
+  repetia o que a área de arquivo já diz.
+- **Meu dia:** só o vazio da fila virou cartão; o resto ficou como o Rafael
+  pediu de volta.
+- **Conversas e Parceiros:** os dois avisos técnicos viraram frase de quem usa.
+  O das Conversas agora diz o caminho que funciona para abrir quem está fora
+  dos 500 primeiros (a busca da tela só filtra o que já foi lido).
+- **Maiúsculas:** saíram os rótulos em CAIXA ALTA de dez componentes.
+
+- Verificado: typecheck, lint, 921 testes, build com o comando da Vercel, e
+  fotografado no claro e no escuro, no desktop (1440px) e no celular (390px).
+- Não mexido de propósito: as telas internas da ligação (a temperatura ali é o
+  critério do lote, não enfeite) e o recibo do Registrar, que conta o que mudou
+  na temperatura — mudar isso é decisão de produto, não de desenho.

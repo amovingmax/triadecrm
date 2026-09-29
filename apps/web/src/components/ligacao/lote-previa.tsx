@@ -312,7 +312,7 @@ export function PainelDaPrevia({
       className={cn('flex flex-col gap-4 rounded-xl border bg-card/50 p-4', className)}
     >
       <div>
-        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <p className="text-xs font-medium text-muted-foreground">
           Prévia do lote
         </p>
         <p className="mt-1 flex items-baseline gap-2">
