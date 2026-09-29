@@ -4941,3 +4941,24 @@ borda ali é a forma, não a separação.
 
 - Tocado: `conversas/tela-conversas.tsx` e 16 arquivos pelo padrão de painel.
 - Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.
+
+### 29/09/2026 — Design System, fase 3: Relatórios e os títulos de todas as telas
+
+**Relatórios.** A faixa de leituras era uma grade colada por filete de 1px —
+seis números dividindo uma caixa, que é desenho de tabela. Virou **um cartão por
+leitura**, com a figura em 28px (o degrau de figura pequena do sistema): em 20px
+o número empatava com o rótulo, e num painel de seis leituras é o número que a
+pessoa varre. A barra de recorte, que ficava entre dois filetes, virou cartão:
+ela é o controle que decide todos os números abaixo, não uma divisória.
+
+**Os títulos de página, nas doze telas.** `text-2xl font-semibold` virou os
+**32px em peso 400** do sistema, com a trilha ("Início · Relatórios") em cima.
+No sistema, título grande é LEVE — a ênfase vem do peso, e um título pesado
+compete com o conteúdo. Vale para Parceiros, Funis, Agenda, Metas, Revisão,
+Cadências, Ligar, Admin, Importação e a ficha do parceiro, além do Meu dia e do
+Relatórios que já tinham sido feitos: duas telas com o mesmo título em tamanhos
+diferentes é o que faz o produto parecer remendado.
+
+- Tocado: `relatorios/painel.tsx`, `relatorios/tela-relatorios.tsx`, e 12
+  arquivos pelo título.
+- Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.

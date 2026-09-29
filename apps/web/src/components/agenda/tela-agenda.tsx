@@ -187,7 +187,7 @@ export function TelaAgenda({
     <div className="flex w-full flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">Agenda</h1>
+          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Agenda</h1>
           <p className="text-sm text-muted-foreground">
             {consulta.isPending ? (
               'Carregando a semana...'

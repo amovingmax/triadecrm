@@ -170,16 +170,29 @@ export function TirasDeResumo({
   colunas?: 4 | 6;
 }) {
   return (
+    // CARTÕES SEPARADOS, e não uma grade colada por filete de 1px
+    // (29/09/2026, Design System). O `gap-px` sobre `bg-hairline` desenhava uma
+    // tabela: seis números dividindo uma caixa. Cada número é uma leitura, e no
+    // sistema cada leitura tem o seu cartão branco.
     <dl
       className={cn(
-        'grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-hairline',
+        'grid grid-cols-2 gap-3',
         colunas === 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-3 lg:grid-cols-6',
       )}
     >
       {itens.map((item) => (
-        <div key={item.chave} className="flex flex-col gap-0.5 bg-card px-3 py-2.5" title={item.ajuda}>
+        <div
+          key={item.chave}
+          className="sombra-base flex flex-col gap-1 rounded-xl bg-card px-4 py-3.5"
+          title={item.ajuda}
+        >
           <dt className="text-xs leading-tight text-muted-foreground">{item.rotulo}</dt>
-          <dd className="numerico text-xl leading-tight font-medium">{item.valor}</dd>
+          {/* 28px: o degrau de figura pequena do sistema. Em 20px o número
+              empatava com o rótulo, e num painel de seis leituras é o número que
+              a pessoa varre. */}
+          <dd className="numerico text-[28px] leading-none font-medium tracking-[-0.02em]">
+            {item.valor}
+          </dd>
           {item.apoio ? (
             <p className="text-[11px] leading-tight text-muted-foreground">{item.apoio}</p>
           ) : null}

@@ -647,7 +647,7 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
 function Cabecalho() {
   return (
     <header>
-      <h1 className="font-heading text-2xl font-semibold tracking-tight">
+      <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
         Trazer uma lista para a base
       </h1>
       <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">

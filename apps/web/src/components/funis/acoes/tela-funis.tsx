@@ -120,7 +120,7 @@ export function TelaFunis({ filtrosIniciais }: { filtrosIniciais: FiltrosQuadro 
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-heading text-2xl font-semibold tracking-tight">Funis</h1>
+            <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Funis</h1>
             <p className="text-sm text-muted-foreground">
               {quadro.isPending || funis.isPending ? (
                 'Carregando o quadro...'

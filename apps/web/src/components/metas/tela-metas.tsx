@@ -171,7 +171,7 @@ export function TelaMetas({
     <div className="flex w-full flex-col gap-4">
       <header className="flex flex-col gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">Metas</h1>
+          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Metas</h1>
           <p className="text-sm text-muted-foreground">
             {rotulo.map((parte, i) => (
               <span key={i} className={parte.mono ? 'numerico' : undefined}>

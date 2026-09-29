@@ -68,7 +68,13 @@ export function TelaRelatorios({
   return (
     <div className="flex w-full flex-col gap-5">
       <header className="flex flex-col gap-1">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Relatórios</h1>
+        {/* Título no degrau do sistema: 32px em peso leve, com a trilha em
+            cima. Igual ao Meu dia — duas telas com o mesmo título em tamanhos
+            diferentes é o que faz o produto parecer remendado. */}
+        <p className="text-xs text-muted-foreground">Início · Relatórios</p>
+        <h1 className="mt-1 font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
+          Relatórios
+        </h1>
         {/* No celular esta frase gastava cinco linhas antes do primeiro número, e o
             painel logo abaixo já diz o que aquela leitura responde. Ela fica onde há
             espaço para ela. */}
@@ -78,7 +84,10 @@ export function TelaRelatorios({
         </p>
       </header>
 
-      <div className="flex flex-col gap-3 border-y border-hairline py-3">
+      {/* A barra de recorte vira CARTÃO (29/09/2026): entre dois filetes ela lia
+          como divisória, e o que ela é de fato é o controle da tela — o que
+          decide todos os números abaixo. */}
+      <div className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-4">
         <SeletorDePainel painel={painel} aoTrocar={setPainel} />
         {/* A leitura da semana tem recorte próprio (a semana civil) e seletor
             próprio: a barra de 7/30 dias ali não mudaria número nenhum. */}

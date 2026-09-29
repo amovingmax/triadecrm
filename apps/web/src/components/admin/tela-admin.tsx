@@ -60,7 +60,7 @@ export function TelaAdmin({
     <div className="flex w-full flex-col gap-6">
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">Admin</h1>
+          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Admin</h1>
           <Badge variant="pilula" className="h-6 gap-1.5 px-2.5 text-[11px] font-normal">
             você entra como {ROTULO_PAPEL[sessao.papel]}
           </Badge>

@@ -23,7 +23,7 @@ export function AreaRestrita({ papel }: { papel: AppRole }) {
   return (
     <section className={cn(LEITURA, 'flex flex-col gap-4')}>
       <header className="flex flex-col gap-2">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Admin</h1>
+        <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Admin</h1>
         <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
           Esta parte é de quem administra o CRM.
           <Badge variant="pilula" className="h-6 gap-1.5 px-2.5 text-[11px] font-normal">
