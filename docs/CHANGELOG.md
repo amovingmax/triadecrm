@@ -4783,5 +4783,22 @@ lista.
 - Tocado: `sidebar.tsx`, `nav-link.tsx` (variante "trilho"), `header.tsx`,
   `globals.css` (`--raio-chip`, a menta como cor do Tailwind).
 - Verificado: lint, typecheck, `pnpm build` e 918 testes.
+#### E o verde que sobrou na casca
+
+Rafael, com o print da tela dele: *"minha tela atual ta diferente do prototipo
+com o visual geral diferente"*. Duas causas, e as duas verdadeiras:
+
+1. Ele estava vendo a **fase 1**; o trilho é a fase 2, commitada e ainda não
+   publicada.
+2. Mas o print mostrava um defeito de verdade: a pílula do "Meu dia" ainda
+   **esverdeada**. Os tokens `--sidebar-*` não tinham entrado na fase 1, e a
+   casca continuava sendo o grafite puxado 42% para o verde da marca, com o
+   item ativo em `--komune-800`.
+
+A casca deixou de ser chapa: o trilho é a própria tela, e o item ativo é
+**tinta cheia** com o glifo quase branco. Era um realce de 1,20:1 que "se nota
+sem virar bloco" — num trilho SEM RÓTULO isso não basta, porque o ativo passou a
+ser a única coisa que diz onde a pessoa está. Agora mede 17,3:1.
+
 - Próxima fase: os cartões (branco, 24px, ação circular no canto), as linhas de
   lista a 16px, e as telas que o protótipo desenhou.

@@ -384,29 +384,27 @@
      acima do fundo da página: separa a navegação do conteúdo por valor, não por
      cor. O azul-céu que estava aqui era a única superfície cromática da interface
      e puxava o olho para a navegação, que é o que menos importa na tela. */
-  /* A lateral é a maior superfície de cromo do produto: é nela que a marca
-     aparece sem nunca encostar num dado. O tom é o grafite-100 puxado para o
-     verde — chapado o bastante para separar da página, claro o bastante para o
-     texto grafite continuar em 8,7:1. */
-  --sidebar: #e6eeec; /* grafite-100 puxado 42% para o komune-100 */
-  --sidebar-foreground: var(--grafite-700); /* 8,7:1 sobre a lateral */
-  /* Item inativo. Valor próprio, e não o grafite-500 do resto da interface:
-     aquele cai para 3,97:1 no realce de passagem. Este mede 5,87:1 na lateral,
-     4,98:1 no realce e 6,19:1 na barra inferior. */
-  --sidebar-muted-foreground: #5c5c64;
-  --sidebar-primary: var(--komune-600);
+  /* A CASCA DEIXOU DE SER CHAPA (29/09/2026, Tríade Design System). Ela era o
+     grafite puxado 42% para o verde da marca — a maior superfície de cromo do
+     produto, e a que dizia de quem era o CRM. No desenho novo quem faz esse
+     trabalho é a TINTA: o trilho é a mesma tela da página, e o que se destaca é
+     o disco preto do módulo em que a pessoa está.
+
+     Rafael viu o resto do verde no print de 29/09: a pílula do "Meu dia" ainda
+     estava esverdeada porque estes tokens não tinham entrado na fase 1. */
+  --sidebar: var(--background); /* o trilho é a própria tela: sem chapa */
+  --sidebar-foreground: var(--grafite-900);
+  --sidebar-muted-foreground: var(--grafite-500); /* 5,1:1 sobre a tela */
+  --sidebar-primary: var(--grafite-900);
   --sidebar-primary-foreground: var(--grafite-25);
-  /* Item ativo: tinta a 8% sobre a própria base, um fundo de 1,20:1 que se nota
-     sem virar bloco. O que marca o ativo é o peso mais a marca de 2px em tinta;
-     cor cromática, na interface, só significa temperatura. */
-  --sidebar-accent: #c7dad5; /* a lateral com 16% do verde da marca por cima */
-  /* O item ativo FALA em verde: é o único lugar do cromo onde a cor carrega
-     informação ("você está aqui"), e verde escuro sobre o realce claro mede
-     7,4:1 — folgado para os 4,5:1 do texto normal. */
-  --sidebar-accent-foreground: var(--komune-800);
-  /* A casca é separada do conteúdo pela mesma linha translúcida do cabeçalho. */
+  /* Item ativo: TINTA CHEIA com o glifo quase branco, que é o disco preto do
+     sistema. Era um realce de 1,20:1 que "se nota sem virar bloco"; num trilho
+     sem rótulo isso não basta — o ativo é a única coisa que diz onde a pessoa
+     está, e precisa se ver de relance. 17,3:1. */
+  --sidebar-accent: var(--grafite-900);
+  --sidebar-accent-foreground: var(--grafite-25);
   --sidebar-border: var(--hairline);
-  --sidebar-ring: var(--komune-600);
+  --sidebar-ring: var(--grafite-900);
 }
 
 /* ---------------------------------------------------------------------------
@@ -489,15 +487,17 @@
 
   /* No escuro a casca é o #1e293b do Ocean Breeze (o `card` do tema), um degrau
      acima do fundo: a mesma leitura do claro, com os papéis invertidos. */
-  --sidebar: var(--grafite-800);
-  --sidebar-foreground: var(--grafite-300); /* 9,93:1 sobre a lateral */
-  --sidebar-muted-foreground: var(--grafite-400); /* 5,71:1 na lateral, 5,04:1 no realce */
-  --sidebar-primary: var(--komune-500);
-  --sidebar-primary-foreground: var(--grafite-25);
-  --sidebar-accent: color-mix(in oklab, #ffffff 8%, var(--sidebar));
-  --sidebar-accent-foreground: var(--grafite-25); /* 11,73:1 sobre o item ativo */
+  /* O escuro espelha o claro: o trilho é a própria tela, e o ativo é o branco
+     com o glifo em tinta — a mesma inversão do botão de ação. */
+  --sidebar: var(--background);
+  --sidebar-foreground: #f4f4f3;
+  --sidebar-muted-foreground: #a3a3a2;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: var(--grafite-900);
+  --sidebar-accent: #ffffff;
+  --sidebar-accent-foreground: var(--grafite-900);
   --sidebar-border: var(--hairline);
-  --sidebar-ring: var(--grafite-400);
+  --sidebar-ring: #ffffff;
 }
 
 @layer base {
