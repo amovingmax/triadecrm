@@ -22,8 +22,14 @@ const buttonVariants = cva(
         // `--input` é branco translúcido; aqui pintaria 30% de um cinza claro.
         outline:
           'border-input bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground',
+        // A HAIRLINE É O QUE FAZ A FORMA EXISTIR. O preenchimento macio do
+        // secundário mede pouco mais de 1,2:1 contra o fundo e contra o cartão —
+        // é o ponto dele ser macio —, e sem contorno o botão vira texto solto no
+        // ar. Foi o que o Rafael viu em 29/09: "botões ficando na mesma
+        // tonalidade". A linha translúcida dá a borda sem transformar o botão
+        // num bloco, que é o que o `outline` já faz com a borda cheia.
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
+          'border-hairline bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
         ghost:
           'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50',
         // Mesma regra do Badge: preenchimento em brasa cheia (gráfico), texto em

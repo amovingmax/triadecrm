@@ -4802,3 +4802,38 @@ ser a única coisa que diz onde a pessoa está. Agora mede 17,3:1.
 
 - Próxima fase: os cartões (branco, 24px, ação circular no canto), as linhas de
   lista a 16px, e as telas que o protótipo desenhou.
+
+### 29/09/2026 — o botão de enviar estava sem fundo, e o CSS não reclamou
+
+Rafael, ao mandar seguir para a fase 3: *"ja veja e se atente aos botões nessa
+mudança, como botões de enviar ficando na mesma tonalidade e bugando"*. Ele
+estava certo, e o defeito era pior do que "tonalidade parecida".
+
+**`background-image: #111110` não é CSS válido.** Quando a ação deixou de ser
+gradiente e virou tinta chapada, o token `--acao-gradiente` passou a valer um
+hex, mas a utilidade que o consome continuou escrevendo `background-image:
+var(--acao-gradiente)`. `background-image` só aceita gradiente ou url: o
+navegador descarta a declaração inteira, em silêncio. **Todo botão primário do
+CRM ficou sem fundo**, transparente por cima do que estivesse atrás — o de
+enviar mensagem incluído.
+
+Enquanto o valor era um `linear-gradient()` a declaração valia; no minuto em que
+virou um hex ela parou de valer, e **nenhuma das quatro verificações notou**:
+CSS inválido não quebra lint, nem typecheck, nem build, nem os 918 testes. Quem
+pegou foi um olho humano num print.
+
+Agora existe um teste (`globals-fundo.test.ts`, 3 asserções) que lê o
+`globals.css` e exige: todo token pintado com `background-image` é mesmo um
+gradiente, e a ação, que é uma cor, é pintada com `background-color`. Conferido
+reintroduzindo o defeito — o teste falha nas duas asserções.
+
+**E o botão secundário, que a auditoria achou de quebra.** `--secondary` era o
+mesmo `--grafite-100` do `--muted`: com a paleta nova isso mede **1,05:1** contra
+o fundo da página e 1,13:1 contra o cartão. O botão sumia nas duas superfícies.
+Subiu para `--grafite-200` (1,18 e 1,27) e ganhou **hairline** — o preenchimento
+macio é o ponto do secundário, então quem termina a forma é o contorno, não mais
+preenchimento.
+
+- Tocado: `globals.css` (a utilidade, `--secondary` nos dois temas),
+  `ui/button.tsx`, `globals-fundo.test.ts` (novo).
+- Verificado: lint, typecheck, `pnpm build` e 921 testes.

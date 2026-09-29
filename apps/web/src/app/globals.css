@@ -285,7 +285,16 @@
      pílula preta da referência; a menta fica para o acento único da tela. */
   --primary: var(--grafite-900);
   --primary-foreground: var(--grafite-25);
-  --secondary: var(--grafite-100);
+  /* O BOTÃO SECUNDÁRIO PRECISA DE UM DEGRAU SÓ DELE (29/09/2026).
+     `--secondary` era o mesmo `--grafite-100` do `--muted`, e com a paleta nova
+     isso mede 1,05:1 contra o fundo da página e 1,13:1 contra o cartão: o botão
+     desaparece nas duas superfícies, e o que sobra é o texto solto no ar.
+     `--grafite-200` sobe para 1,18 e 1,27 — pouco, e de propósito, porque o
+     preenchimento macio é o ponto do secundário. Quem termina o trabalho é a
+     hairline que o botão ganhou (ver `ui/button.tsx`): 1,38:1 de contorno é o
+     que faz a forma existir sem o botão virar um bloco.
+     O texto continua com folga enorme (12:1). */
+  --secondary: var(--grafite-200);
   --secondary-foreground: var(--grafite-800);
   --muted: var(--grafite-100);
   --muted-hover: var(--grafite-150);
@@ -356,8 +365,12 @@
   /* CHAPADO, a partir de 29/09/2026. O sistema é explícito: "Backgrounds: flat.
      No gradients". O gradiente existia para dar volume ao botão sem sombra; no
      desenho novo o volume vem da FORMA (pílula) e do contraste da tinta cheia,
-     que é mais forte que qualquer queda de luz. O nome fica porque `@utility
-     acao-gradiente` e o login o leem. */
+     que é mais forte que qualquer queda de luz.
+
+     O NOME virou mentira, e fica: trinta arquivos leem `acao-gradiente`, e
+     renomear seria um segundo pivô que não muda um pixel. O que ele entrega
+     agora é uma COR, e quem a consome tem de usar `background-color` — usar
+     `background-image` com um hex descarta a declaração inteira. */
   --acao-gradiente: var(--grafite-900);
   --acao-texto: var(--grafite-25);
 
@@ -443,7 +456,9 @@
      exato da pílula preta do claro. O verde da marca saiu junto com ele. */
   --primary: #ffffff;
   --primary-foreground: var(--grafite-900);
-  --secondary: var(--grafite-800);
+  /* Mesma conta do claro, do outro lado: o grafite-800 media 1,11:1 contra o
+     cartão do escuro. O 750 abre para 1,25 e mantém o texto em 12,3:1. */
+  --secondary: var(--grafite-750);
   --secondary-foreground: #f4f4f3;
   --muted: var(--grafite-800);
   --muted-hover: #2e2e2e;
@@ -545,8 +560,22 @@
    do Button do shadcn e serve para qualquer superfície de ação fora dele.
    Usa a propriedade `scale` (não `transform`), então compõe com o
    `translate-y-px` que o botão já aplica no toque. */
+/* `background-COLOR`, e não `background-image` (29/09/2026).
+   ---------------------------------------------------------------------------
+   Quando a ação deixou de ser gradiente e virou tinta chapada, este arquivo
+   continuou entregando a cor por `background-image` — e `background-image:
+   #111110` NÃO É CSS VÁLIDO: a declaração é descartada e o botão fica sem fundo
+   nenhum, transparente por cima do que estiver atrás.
+
+   Rafael viu na hora: "botões de enviar ficando na mesma tonalidade e bugando".
+   Eram TODOS os botões primários do CRM, o de enviar mensagem incluído, e não
+   só os de enviar — enquanto o valor era um `linear-gradient()` a declaração
+   valia, e no minuto em que virou um hex ela parou de valer em silêncio.
+
+   Nenhuma das quatro verificações pegaria: CSS inválido não quebra build, não
+   quebra tipo e não quebra teste. Quem pegou foi um olho humano num print. */
 @utility acao-gradiente {
-  background-image: var(--acao-gradiente);
+  background-color: var(--acao-gradiente);
   color: var(--acao-texto);
   transition:
     scale 150ms ease-out,
