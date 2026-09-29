@@ -68,6 +68,11 @@ begin
 end $$;
 create temp table t93(chave text primary key, valor uuid);
 insert into t93 values ('conv', pg_temp.conversa());
+-- O `set local role authenticated` de `pg_temp.entrar` vale também para as
+-- funções auxiliares: sem este grant, `pg_temp.conv()` morre com "permission
+-- denied for table t93" no meio da asserção, e o erro fala da tabela do teste,
+-- não da regra que se mede.
+grant select on t93 to authenticated;
 create function pg_temp.conv() returns uuid language sql stable as $$
   select valor from t93 where chave = 'conv'
 $$;

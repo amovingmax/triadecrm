@@ -4668,17 +4668,29 @@ do arquivo e não um recorte do trabalho.
 - Web: `arquivarConversa`, o botão, o filtro, e 5 testes Vitest novos (918).
 - Verificado: lint, typecheck, Vitest e `pnpm build`.
 
-#### Bloqueado: o disco da máquina
+#### O disco travou a tarefa, e o que foi feito
 
-`pnpm db:test` não rodou. O disco chegou a **497 MB livres de 228 GB** e o
-OrbStack não sobe sem espaço, então não há Postgres local. Limpei o que era
-cache de desenvolvimento (Homebrew, metadados do pnpm, `.next`, `pnpm store
-prune` — 1,4 GB) e o espaço foi consumido de novo em minutos.
+Por algumas horas `pnpm db:test` não rodou: o disco chegou a **497 MB livres de
+228 GB** e o OrbStack não sobe sem espaço, então não havia Postgres local.
+Limpar cache de desenvolvimento (Homebrew, metadados do pnpm, `.next`,
+`pnpm store prune`) devolveu 1,4 GB que sumiram em minutos.
 
-O consumo está medido: **36 GB são do próprio OrbStack**
-(`~/Library/Group Containers/HUAQ24HBR6.dev.orbstack`), que é a máquina virtual
-do Docker — imagens e volumes acumulados, tudo reconstruível com
-`supabase start` + `pnpm db:reset`. O resto do disco é dado do Rafael (185 GB no
-volume de dados).
+A medição apontou o responsável: **36 GB do próprio OrbStack**
+(`~/Library/Group Containers/HUAQ24HBR6.dev.orbstack`) — a máquina virtual do
+Docker, com imagens e volumes acumulados. Isso é ambiente, não dado de ninguém,
+e se reconstrói com `supabase start` + `pnpm db:reset`. Rafael autorizou, a
+pasta saiu, e o disco foi de 497 MB para **37 GB livres**. O ambiente voltou
+inteiro em dois comandos.
 
-**A migração NÃO foi para produção**, e não vai enquanto o pgTAP não rodar.
+Nada do Rafael foi tocado: os 9,5 GB do app Claude, os 7 GB do Chrome e os
+3,5 GB do WhatsApp continuam onde estavam. 36 GB já resolviam com folga, e
+apagar mais seria gratuito.
+
+Um detalhe do TESTE, e não da regra, apareceu ao rodar: `pg_temp.entrar` faz
+`set local role authenticated`, e a tabela temporária do arquivo não tinha grant
+para esse papel — o teste morria com "permission denied for table t93" no meio
+da asserção, falando da tabela do teste em vez da regra medida. Um `grant
+select` resolveu.
+
+- Verificado agora: **pgTAP 3.252** (87 arquivos), `db lint` sem apontamento
+  novo, lint, typecheck, Vitest (918) e `pnpm build`.
