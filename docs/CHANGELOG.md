@@ -4883,3 +4883,35 @@ O que era forma, e era erro meu, foi consertado:
   dia" em cima: no sistema, título grande é LEVE, e o peso fica para a ênfase.
 
 - Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.
+
+### 29/09/2026 — a tela inteira, centralizada (fidelidade ao protótipo)
+
+Rafael, com o print: *"continua diferente, quero fidelidade ao prototipo (...) a
+tela é composta por inteira e centralizada, em produção ta assim, quero
+fidelidade total ao prototipo"*.
+
+A diferença era uma só, e grande: **`LEITURA`**. O Meu dia vivia numa coluna de
+896px ancorada à ESQUERDA, e num monitor largo sobrava um terço de tela vazia à
+direita. Era decisão documentada em `lib/larguras.ts` — texto acima de ~90
+caracteres custa o retorno do olho, e o título no mesmo lugar em toda tela faz o
+produto parecer montado. As duas razões continuam verdadeiras; o que mudou é que
+o Rafael vê o vazio todo dia e o protótipo que ele aprovou usa a largura inteira.
+
+A troca não joga fora o que o teto protegia: a **prosa** do pulso ganhou teto
+próprio (`max-w-[90ch]`), que é onde a largura realmente machucava. O resto da
+tela é cartão e linha com colunas, que não sofre.
+
+Junto:
+
+- **As linhas do pulso viraram superfície**, como as da fila. Eram três frases
+  separadas por filete, e numa tela larga isso vira texto solto dentro de um
+  cartão — foi o "essa parte de ia ali ta feia".
+- **A casca foi para 1400px** (era 1440) com margem de 20px: o sistema desenha
+  num quadro de 1440 com 20 de margem, e o que sobra é exatamente 1400.
+
+- Tocado: `meu-dia/tela-meu-dia.tsx`, `meu-dia/pulso-do-dia.tsx`,
+  `layout/app-shell.tsx`.
+- Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.
+- Em aberto, e é decisão de produto: os três cartões do protótipo ("Esperando a
+  gente", "Primeiros contatos", "Sem contato") não existem no Meu dia, que mede
+  as quatro métricas das Metas. Nenhum ajuste de design fecha essa diferença.

@@ -40,12 +40,15 @@ export function AppShell({
 
         <main
           id="conteudo"
-          className="flex-1 px-4 pt-6 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-6 md:pt-8 md:pb-8"
+          className="flex-1 px-4 pt-4 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-5 md:pt-3 md:pb-8"
         >
           {/* Coluna centralizada com teto: cada tela ainda escolhe a própria medida de
               leitura, mas nenhuma fica grudada na barra lateral com um terço de vazio
               à direita, e nenhuma tabela se estica por 2500px num monitor ultrawide. */}
-          <div className="mx-auto w-full max-w-[1440px]">
+          {/* 1400px e não 1440 (Tríade Design System): o sistema desenha num
+              quadro de 1440 com 20px de margem de cada lado, e o conteúdo que
+              sobra é exatamente 1400. */}
+          <div className="mx-auto w-full max-w-[1400px]">
             <TransicaoPagina>{children}</TransicaoPagina>
           </div>
         </main>

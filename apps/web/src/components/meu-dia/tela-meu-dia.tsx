@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, RotateCw } from 'lucide-react';
 
 import { NotaRecolhida } from '@/components/ui/nota-recolhida';
-import { LEITURA } from '@/lib/larguras';
+import { TRABALHO } from '@/lib/larguras';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { RevelarLista } from '@/components/movimento';
@@ -97,7 +97,17 @@ export function TelaMeuDia({
     // o teto, em 1440px o prazo de cada linha fica a mais de um palmo do nome do
     // parceiro e a barra de meta vira um traço de 400px por causa de um número de
     // um dígito. Esta tela é uma fila que se lê de cima para baixo, não uma tabela.
-    <div className={cn(LEITURA, 'flex flex-col gap-5')}>
+    // TRABALHO, e não LEITURA (29/09/2026). A coluna de 896px ancorada à
+    // esquerda era uma decisão documentada — texto acima de ~90 caracteres custa
+    // o retorno do olho, e o título no mesmo lugar em toda tela faz o produto
+    // parecer montado. Rafael pediu o contrário, com o print na mão: "a tela é
+    // composta por inteira e centralizada (...) quero fidelidade total ao
+    // protótipo", e um terço da tela vazio à direita é o que ele vê todo dia.
+    //
+    // O que o teto protegia continua protegido onde importa: a PROSA do pulso
+    // tem teto próprio (`max-w-[90ch]`, ver `pulso-do-dia.tsx`). O resto desta
+    // tela é cartão e linha com colunas, que não sofre com largura.
+    <div className={cn(TRABALHO, 'flex flex-col gap-4')}>
       {/* Sem `flex-wrap`: em 390px o botão quebrava para uma linha inteira só dele,
           encostado à esquerda, empurrando o resumo para baixo da dobra. Ele é uma
           ação secundária e o lugar dela é o canto, ao lado do título, nos dois

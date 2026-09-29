@@ -72,7 +72,7 @@ export function PulsoDoDia({ className }: { className?: string }) {
           dizem o que fazer — e ocupava a primeira tela inteira do CRM, todo dia.
           A análise continua aqui, inteira, fechada: quem quer o contexto abre. */}
       {prioridades.length > 0 ? (
-        <ul className="flex flex-col">
+        <ul className="flex flex-col gap-1.5">
           {prioridades.map((p, indice) => (
             <Prioridade key={`${p.leadId}-${indice}`} prioridade={p} />
           ))}
@@ -148,17 +148,24 @@ function Prioridade({ prioridade }: { prioridade: PrioridadeDoPulso }) {
   );
 
   return (
-    <li className="border-t border-hairline first:border-t-0">
+    // Linha com SUPERFÍCIE, como as da fila (29/09/2026): eram três frases
+    // separadas por filete, que numa tela larga viram três linhas de texto
+    // soltas dentro de um cartão. `max-w-[90ch]` é o teto de prosa que a coluna
+    // de leitura dava de graça e que a largura inteira tirou.
+    <li>
       {link ? (
         <Link
           href={link}
           title={prioridade.porque}
-          className="toque flex min-h-11 items-center gap-2 py-1.5 text-sm hover:bg-muted/40 sm:min-h-9"
+          className="toque flex min-h-11 max-w-[90ch] items-center gap-2 rounded-lg bg-muted/45 px-3 py-2 text-sm transition-colors hover:bg-muted sm:min-h-9"
         >
           {corpo}
         </Link>
       ) : (
-        <span className="flex min-h-9 items-center gap-2 py-1.5 text-sm" title={prioridade.porque}>
+        <span
+          className="flex min-h-9 max-w-[90ch] items-center gap-2 rounded-lg bg-muted/45 px-3 py-2 text-sm"
+          title={prioridade.porque}
+        >
           {corpo}
         </span>
       )}
