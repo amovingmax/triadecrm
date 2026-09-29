@@ -4543,3 +4543,28 @@ achar.**
 - Verificado: lint, typecheck, testes, `pnpm build` e `db lint`.
 - Pendente: o texto do "Tudo bem?" ainda não é editável em Ajustes (o da
   ausência e o da introdução são). Se o Rafael quiser mexer, hoje é migração.
+
+### 29/09/2026 — o "Tudo bem?" se edita na tela
+
+Rafael: *"coloque"*. Os textos da ausência e da introdução já se mudavam em
+Ajustes → Atendimento; o "Tudo bem?", que nasceu uma hora antes, só por
+migração. Mensagem que o CRM manda em nome da casa tem de ser editável por quem
+responde por ela.
+
+A regra que importa é a mesma da introdução: `app.wa_bot_dizer` copia o corpo
+CRU para o fio, então um `{{nome}}` salvo ali sairia literal no WhatsApp do
+fornecedor — e quem recusa é a função, não o bom senso de quem digita. O teto é
+200 e não 1000: esta é a mensagem curta do meio, e mil caracteres aqui já não
+seriam um "tudo bem".
+
+Os dois campos aparecem juntos, na ordem em que a pessoa do outro lado os lê, e
+o texto do interruptor passou a contar o fluxo inteiro ("recebe um 'Tudo bem?'
+em 3 a 6 s e a apresentação 15 a 20 s depois").
+
+**Recriada a partir da definição viva** (`20261002200000`, com os cinco
+interruptores e o ritmo do cumprimento) — a lição de ontem aplicada no mesmo dia.
+
+- Migração: `20261002240000_o_tudo_bem_se_edita_na_tela.sql`.
+- pgTAP: 86 vai a 17 (troca aceita, variável recusada, texto longo recusado
+  nomeando o campo, e o recusado não encostando no modelo); suíte em 3.241.
+- Verificado: lint, typecheck, testes (web 908) e `pnpm build`.

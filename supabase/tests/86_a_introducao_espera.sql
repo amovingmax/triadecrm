@@ -18,7 +18,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(13);
+select plan(17);
 
 -- Uma pessoa de fixture, pelo caminho do login de verdade (RF-ADM-01): o banco
 -- recém-resetado não tem perfil nenhum, e `conversations` exige dono (RF-CON-04).
@@ -193,6 +193,46 @@ select ok(
       and body ilike '%Google Maps%'
      from public.message_templates where template_code = 'GEN-SYS-INTRO'),
   'a introdução diz para quem é grátis, diz de onde veio o contato, e não manda responder SAIR');
+
+-- =====================================================================
+-- 6. OS DOIS TEXTOS SE EDITAM NA TELA (migração 20261002240000)
+-- =====================================================================
+-- Rafael pediu o "Tudo bem?" editável em Ajustes. A regra que importa é a mesma
+-- da introdução: `app.wa_bot_dizer` copia o corpo CRU para o fio, então um
+-- `{{nome}}` salvo aqui sairia literal no WhatsApp do fornecedor. Quem recusa é
+-- a FUNÇÃO, não o bom senso de quem digita.
+create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', p_uid, 'role', 'authenticated',
+                      'app_metadata', json_build_object('app_role', p_papel))::text, true);
+  execute 'set local role authenticated';
+end $$;
+create function pg_temp.sair() returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', '', true);
+  execute 'reset role';
+end $$;
+
+select pg_temp.entrar('a0000000-0000-4000-8000-000000008601'::uuid, 'gestor');
+
+select is(public.atendimento_configurar('{"texto_tudo_bem": "Tudo certo por aí?"}'::jsonb) ->> 'ok',
+  'true', 'o gestor troca o texto do "Tudo bem?" pela tela');
+
+select is(public.atendimento_configurar('{"texto_tudo_bem": "Oi {{nome}}, tudo bem?"}'::jsonb) ->> 'motivo',
+  'tudo_bem_com_variavel',
+  'e variável é recusada: o corpo é copiado cru, e {{nome}} sairia literal no fio do fornecedor');
+
+select is(public.atendimento_configurar(
+    jsonb_build_object('texto_tudo_bem', repeat('a', 201))) ->> 'campo',
+  'texto_tudo_bem',
+  'texto longo demais é recusado nomeando o campo — a mensagem do meio é curta por definição');
+
+select pg_temp.sair();
+
+select is((select body from public.message_templates where template_code = 'GEN-SYS-TUDOBEM'),
+  'Tudo certo por aí?',
+  'o que foi aceito ficou gravado, e o que foi recusado não encostou no modelo');
 
 select * from finish();
 rollback;

@@ -47,7 +47,7 @@ async function carregar() {
     supabase
       .from('message_templates')
       .select('template_code, body')
-      .in('template_code', ['GEN-SYS-AUSENCIA', 'GEN-SYS-INTRO']),
+      .in('template_code', ['GEN-SYS-AUSENCIA', 'GEN-SYS-INTRO', 'GEN-SYS-TUDOBEM']),
     supabase.from('respostas_rapidas').select('id, atalho, titulo, texto, ativo').order('atalho'),
     supabase.from('tags').select('id, name, color').order('name'),
   ]);
@@ -57,6 +57,7 @@ async function carregar() {
     config: (config.data?.value ?? {}) as Config,
     textoAusencia: corpo('GEN-SYS-AUSENCIA'),
     textoIntroducao: corpo('GEN-SYS-INTRO'),
+    textoTudoBem: corpo('GEN-SYS-TUDOBEM'),
     respostas: (respostas.data ?? []) as Resposta[],
     etiquetas: (etiquetas.data ?? []) as Etiqueta[],
   };
@@ -103,7 +104,8 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
   if (consulta.isError || !consulta.data) {
     return <p className="text-sm text-destructive">Não deu para ler as configurações.</p>;
   }
-  const { config, textoAusencia, textoIntroducao, respostas, etiquetas } = consulta.data;
+  const { config, textoAusencia, textoIntroducao, textoTudoBem, respostas, etiquetas } =
+    consulta.data;
 
   return (
     <div className="flex max-w-3xl flex-col gap-8">
@@ -189,15 +191,27 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
         <Interruptor
           id="introducao"
           titulo="Apresentar a Komune quando o lead responder o cumprimento"
-          descricao="Sai uma vez por conversa, logo depois da primeira resposta, dentro do horário de atendimento. Não leva nome, para qualquer pessoa do time continuar a conversa."
+          descricao="Quem responder o cumprimento recebe um “Tudo bem?” em 3 a 6 s e a apresentação 15 a 20 s depois. Uma vez por conversa, dentro do horário, sem nome — para qualquer pessoa do time continuar."
           ligado={config.introducao_ativa ?? false}
           podeEditar={podeEditar}
           aoMudar={(v) => mudar.mutate({ introducao_ativa: v })}
         />
+        {/* OS DOIS TEXTOS DO MESMO FLUXO, na ordem em que a pessoa os lê. O
+            "Tudo bem?" é a ponte: ele existe para a apresentação não chegar
+            como um panfleto em cima de um "oi". */}
+        {config.introducao_ativa ? (
+          <TextoAutomatico
+            id="texto-tudo-bem"
+            rotulo='Texto da ponte — sai 3 a 6 s depois da resposta (sem variável)'
+            inicial={textoTudoBem}
+            podeEditar={podeEditar}
+            aoSalvar={(t) => mudar.mutate({ texto_tudo_bem: t })}
+          />
+        ) : null}
         {config.introducao_ativa ? (
           <TextoAutomatico
             id="texto-introducao"
-            rotulo="Texto da apresentação (sem variável: sai exatamente assim)"
+            rotulo="Texto da apresentação — sai 15 a 20 s depois (sem variável: sai exatamente assim)"
             inicial={textoIntroducao}
             podeEditar={podeEditar}
             aoSalvar={(t) => mudar.mutate({ texto_introducao: t })}
