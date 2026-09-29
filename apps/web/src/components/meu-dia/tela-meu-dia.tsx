@@ -260,7 +260,9 @@ function Bloco({ bloco, deslocamento }: { bloco: BlocoPreenchido; deslocamento: 
         </h2>
       )}
 
-      <ul id={idDaLista} hidden={!aberto} className="flex flex-col gap-0.5">
+      {/* 8px entre as linhas, e não 2: com fundo próprio (29/09/2026) elas são
+          superfícies, e superfície colada em superfície vira um bloco só. */}
+      <ul id={idDaLista} hidden={!aberto} className="flex flex-col gap-2">
         {bloco.itens.map((item, ordem) => (
           <ItemDaFila key={chaveDoItem(item, ordem)} item={item} indice={deslocamento + ordem} />
         ))}

@@ -68,8 +68,12 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
       <span
         aria-hidden="true"
         className={cn(
-          'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full',
-          quando.atencao ? 'bg-destructive/15 text-destructive-texto' : 'bg-muted text-muted-foreground',
+          // `bg-card` e não `bg-muted`: a linha agora É muted, e um disco muted
+          // sobre linha muted é um disco invisível. O branco do cartão recorta.
+          'mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full',
+          quando.atencao
+            ? 'bg-destructive/15 text-destructive-texto'
+            : 'bg-card text-muted-foreground',
         )}
       >
         <Icone className="size-4.5" />
@@ -137,8 +141,14 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
 
   // A linha virou CARTÃO: cantos arredondados, fundo no hover e um respiro entre
   // uma e outra, no lugar do filete cinza que ligava tudo num bloco só de texto.
+  //
+  // 29/09/2026 (Tríade Design System): o fundo deixou de ser só no hover. O
+  // sistema desenha a linha dentro do cartão como uma SUPERFÍCIE própria — cinza
+  // de 16px sobre o branco —, e é o que faz a fila parecer uma lista de coisas
+  // em vez de texto empilhado. O raio desce de 24 para 16: 24px é o cartão que
+  // contém, 16px é a linha que mora dentro dele.
   const molde =
-    'relative flex min-h-[72px] items-start gap-3 rounded-xl py-2.5 pr-3 pl-4 transition-colors';
+    'relative flex min-h-[72px] items-start gap-3 rounded-lg bg-muted/45 py-3 pr-3 pl-3.5 transition-colors';
 
   return (
     <li {...revelar} className={revelar.className}>
@@ -147,7 +157,7 @@ export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }
           href={destino.href}
           className={cn(
             molde,
-            'outline-none active:bg-muted/60 focus-visible:bg-muted/60 md:hover:bg-muted/50',
+            'outline-none active:bg-muted focus-visible:bg-muted md:hover:bg-muted',
           )}
         >
           {miolo}

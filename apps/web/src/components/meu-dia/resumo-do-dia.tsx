@@ -74,7 +74,12 @@ export function ResumoDoDia({
 
   return (
     <section aria-label="Resumo do dia" className="flex flex-col gap-3">
-      <ul className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border border-hairline bg-card px-4 py-3 sm:grid-cols-4 sm:gap-x-4">
+      {/* CARTÃO POR MÉTRICA, e não uma faixa dividida por filetes (29/09/2026,
+          Tríade Design System). A faixa punha quatro números numa caixa só,
+          separados por linha vertical — desenho de tabela, não de painel. O
+          sistema pede um cartão branco por unidade de informação, e é o que faz
+          cada número ter o seu lugar em vez de dividir um. */}
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {visiveis.map((metrica) => (
           <CartaoDeMetrica key={metrica.metrica} metrica={metrica} />
         ))}
@@ -154,24 +159,33 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
       // ainda não sabe passa o mouse — ou abre "Ressalvas destes números", logo
       // abaixo, que é onde a explicação longa mora de verdade.
       title={definicao ? `${metrica.rotulo}: ${definicao}` : metrica.rotulo}
-      className="flex flex-col gap-1.5 sm:border-l sm:border-hairline sm:pl-4 sm:first:border-l-0 sm:first:pl-0"
+      className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5"
     >
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {Icone ? <Icone className="size-3.5 shrink-0" aria-hidden="true" /> : null}
+      <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
+        {/* O ícone num DISCO, como todo ícone do sistema. Solto, ele flutuava ao
+            lado do rótulo; no disco vira um objeto do cartão. */}
+        {Icone ? (
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+            <Icone className="size-3.5" aria-hidden="true" strokeWidth={1.75} />
+          </span>
+        ) : null}
         <span className="truncate">{metrica.rotulo}</span>
       </p>
 
       <p className="flex items-baseline gap-1.5">
+        {/* 40px, que é o degrau de FIGURA do sistema: o número é a razão de o
+            cartão existir, e em 30px ele dividia peso com o rótulo. A meta ao
+            lado fica na tinta esmaecida, como os decimais da referência. */}
         <span
           className={cn(
-            'numerico text-3xl leading-none font-semibold',
+            'numerico text-[40px] leading-none font-medium tracking-[-0.03em]',
             realizado === 0 && 'text-muted-foreground',
           )}
         >
           {realizado}
         </span>
         {meta !== null ? (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             de <span className="numerico">{meta}</span>
           </span>
         ) : null}
@@ -215,15 +229,12 @@ function EsqueletoDoResumo() {
   return (
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">Carregando o resumo do dia.</span>
-      <ul className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border border-hairline bg-card px-4 py-3 sm:grid-cols-4 sm:gap-x-4">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
-          <li
-            key={i}
-            className="flex flex-col gap-2 sm:border-l sm:border-hairline sm:pl-4 sm:first:border-l-0 sm:first:pl-0"
-          >
-            <Skeleton className="h-3 w-20" />
-            <Skeleton className="h-6 w-10" />
-            <Skeleton className="h-1 w-full" />
+          <li key={i} className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5">
+            <Skeleton className="h-7 w-24 rounded-full" />
+            <Skeleton className="h-9 w-14" />
+            <Skeleton className="h-1.5 w-full rounded-full" />
           </li>
         ))}
       </ul>

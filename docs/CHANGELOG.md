@@ -4837,3 +4837,26 @@ preenchimento.
 - Tocado: `globals.css` (a utilidade, `--secondary` nos dois temas),
   `ui/button.tsx`, `globals-fundo.test.ts` (novo).
 - Verificado: lint, typecheck, `pnpm build` e 921 testes.
+
+### 29/09/2026 — Design System, fase 3: Meu dia
+
+Primeira tela reescrita no desenho novo, e é a do print que o Rafael mandou.
+
+- **A faixa de métricas virou quatro cartões.** Ela punha "Portas batidas ·
+  Portas abertas · Ligações · Reuniões" numa caixa só, separados por filete
+  vertical: desenho de tabela, não de painel. Agora é um cartão branco por
+  número, com o ícone num disco e a figura em 40px — o degrau de FIGURA do
+  sistema. Em 30px o número dividia peso com o rótulo; ele é a razão de o
+  cartão existir.
+- **As linhas da fila ganharam superfície própria.** Eram texto empilhado com
+  fundo só no hover; agora são a linha cinza de 16px sobre o branco que o
+  sistema desenha, com 8px entre uma e outra (superfície colada em superfície
+  vira um bloco só). O raio é 16 e não 24: 24px é o cartão que contém, 16px é a
+  linha que mora dentro dele.
+- **O disco do ícone virou branco.** Era `bg-muted` — e com a linha agora muted,
+  um disco muted sobre linha muted é um disco invisível.
+
+- Tocado: `meu-dia/resumo-do-dia.tsx` (e o esqueleto, no mesmo formato),
+  `meu-dia/item-da-fila.tsx`, `meu-dia/tela-meu-dia.tsx`.
+- Verificado: typecheck, lint, 921 testes e o build de `apps/web` com o mesmo
+  comando da Vercel.
