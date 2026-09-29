@@ -4462,3 +4462,34 @@ real: planilha COM `place_id`. Agora ele existe, e mais um provando que o
 - pgTAP: 92 vai a 22 asserções; suíte em 3.228.
 - Verificado: `db lint` sem apontamento novo.
 - Sem mudança no web — nada para subir na Vercel.
+
+### 29/09/2026 — o feed das Automáticas tem marco zero (e não um DELETE)
+
+Rafael: *"limpe as mensagens automaticas da tela, as anteriores, pois funcionava
+da maneira errada"*. Ele tem razão sobre o que estava lá: das oito linhas, sete
+eram de 22–24/09 — o menu do bot de entrada e o aviso de fora do horário, o
+jeito que ele recusou. Misturadas com o cumprimento que começou hoje, faziam o
+placar responder a pergunta errada.
+
+**Mas não se apaga mensagem que foi entregue.** As sete saíram de verdade e
+estão no WhatsApp das pessoas, quatro com status `read`. Apagar as linhas
+limparia a tela e faria a conversa do CRM mentir: quem abrisse aquele fio para
+responder não veria o que a Komune disse, e responderia por cima de um contexto
+que existe do outro lado. O fio é o registro do que aconteceu, não a opinião de
+hoje sobre o que devia ter acontecido — e `audit_log` e a retenção do PRD §10.6
+valem para mensagem enviada.
+
+Então o que mudou foi a JANELA: `app_settings.automaticas.marco_zero`, aplicado
+como **piso** pela RPC. Pedir mais que o marco continua valendo; a data só
+levanta o chão. Pôr `null` devolve as sete.
+
+**E a tela diz de onde conta.** Feed que corta em silêncio mente por omissão:
+"2 saíram nos últimos 7 dias" é falso quando ele só olha os últimos dois. O
+cabeçalho agora traz "Contando a partir de 29/09/2026. O que saiu antes disso
+continua no fio de cada parceiro — só não entra neste placar."
+
+- Migração: `20261002220000_o_feed_das_automaticas_tem_marco_zero.sql`.
+- pgTAP: 91 vai a 11 asserções (o marco como piso, o marco no futuro esvaziando,
+  e a volta ao estado anterior provando que nada foi apagado); suíte em 3.231.
+- Web: `carregarMarcoZero`, `dataCurta`, a frase no cabeçalho do feed.
+- Verificado: lint, typecheck, testes (web 902, workers 363) e **`pnpm build`**.

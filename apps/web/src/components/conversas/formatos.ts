@@ -52,6 +52,11 @@ export function hora(iso: string): string {
   return HORA.format(new Date(iso));
 }
 
+/** "29/09/2026" — só a data, para quando a hora não decide nada. */
+export function dataCurta(iso: string): string {
+  return DIA_MES_ANO.format(new Date(iso));
+}
+
 /** "04/09/2026, 14:59" para `title` e leitor de tela. */
 export function dataHoraCompleta(iso: string): string {
   return `${DIA_MES_ANO.format(new Date(iso))}, ${HORA.format(new Date(iso))}`;

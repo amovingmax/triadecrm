@@ -30,7 +30,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(8);
+select plan(11);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -203,6 +203,30 @@ select pg_temp.entrar(pg_temp.embaixador(), 'embaixador');
 select is((select count(*)::int from public.mensagens_automaticas()), 0,
   'o embaixador não lê o que a RLS não lhe mostra: definer é para poder fazer o join com conversations, não para furar conversations_select — que a função repete por escrito');
 select pg_temp.sair();
+
+-- =====================================================================
+-- 9 · O MARCO ZERO É PISO, NÃO FILTRO (migração 20261002220000)
+-- =====================================================================
+-- Rafael, 29/09/2026: "limpe as mensagens automaticas da tela, as anteriores,
+-- pois funcionava da maneira errada". O corte é uma DATA, e não um DELETE: as
+-- mensagens saíram de verdade e continuam no fio do parceiro. O que muda é de
+-- onde o feed conta.
+-- O número de linhas é do que este arquivo montou lá em cima; o que se afirma
+-- aqui é o EFEITO do marco sobre ele, não o número.
+create temp table t91 as select count(*)::int as n from public.mensagens_automaticas();
+select ok((select n from t91) > 0,
+  'sem marco, o feed mostra o que saiu sozinho no período');
+
+update public.app_settings
+   set value = jsonb_build_object('marco_zero', (now() + interval '1 hour')::text)
+ where key = 'automaticas';
+select is((select count(*)::int from public.mensagens_automaticas()), 0,
+  'marco no futuro esvazia o feed: é ele que manda, e não o período pedido');
+
+update public.app_settings set value = jsonb_build_object('marco_zero', null)
+ where key = 'automaticas';
+select is((select count(*)::int from public.mensagens_automaticas()), (select n from t91),
+  'e tirar a data devolve tudo — as mensagens nunca foram apagadas, só saíram do placar');
 
 select * from finish();
 rollback;

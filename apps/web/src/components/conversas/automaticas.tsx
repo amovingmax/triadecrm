@@ -14,7 +14,7 @@ import {
   resumoDoQueAconteceu,
   rotuloDoAutor,
 } from './automaticas-formatos';
-import { dataHoraCompleta, hora, rotuloDoDia } from './formatos';
+import { dataCurta, dataHoraCompleta, hora, rotuloDoDia } from './formatos';
 
 /**
  * A aba "Automáticas": o que o CRM mandou SOZINHO nos últimos sete dias.
@@ -52,9 +52,12 @@ import { dataHoraCompleta, hora, rotuloDoDia } from './formatos';
  */
 export function FeedAutomaticas({
   linhas,
+  marcoZero = null,
   aoAbrir,
 }: {
   linhas: readonly AutomaticaCrua[];
+  /** A data em que o feed passa a contar, quando há uma (ver `carregarMarcoZero`). */
+  marcoZero?: string | null;
   /** Abre a conversa daquela mensagem: por ficha quando há, senão pelo fio. */
   aoAbrir: (destino: { organizacaoId: string | null; conversaId: string | null }) => void;
 }) {
@@ -69,9 +72,9 @@ export function FeedAutomaticas({
       <div className="border-b border-hairline px-4 py-3">
         <h2 className="font-heading text-base font-medium">O que o CRM mandou sozinho</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Os últimos <span className="numerico">{DIAS_DO_FEED}</span> dias: a introdução
-          automática, o menu do bot, o aviso de fora do horário, os rascunhos da IA aprovados
-          e as confirmações de saída. O cumprimento das campanhas não está aqui — ele é
+          Os últimos <span className="numerico">{DIAS_DO_FEED}</span> dias: o cumprimento
+          automático, a introdução, o menu do bot, o aviso de fora do horário, os rascunhos da
+          IA aprovados e as confirmações de saída. O cumprimento das campanhas não está aqui — ele é
           assinado por quem disparou e mora em{' '}
           {/* O LINK, e não só o nome da tela. A frase já dizia onde estava o
               cumprimento da campanha; quem lê isto está justamente procurando por
@@ -82,6 +85,20 @@ export function FeedAutomaticas({
           </Link>
           .
         </p>
+
+        {/* A DATA DE CORTE, dita. Rafael pediu em 29/09/2026 para tirar da tela o
+            menu do bot e o aviso de ausência de 22–24/09 ("funcionava da maneira
+            errada"), e o corte é uma data em `app_settings`, não um DELETE: as
+            mensagens saíram de verdade e continuam no fio do parceiro, que é o
+            registro do que aconteceu. Mas um feed que corta em silêncio mente
+            por omissão — "2 saíram nos últimos 7 dias" é falso quando ele só
+            olha os últimos dois. Então a tela diz de onde conta. */}
+        {marcoZero ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Contando a partir de <span className="numerico">{dataCurta(marcoZero)}</span>. O que
+            saiu antes disso continua no fio de cada parceiro — só não entra neste placar.
+          </p>
+        ) : null}
 
         {/* O PLACAR — a segunda pergunta do Rafael ("como tá esse processo?"),
             respondida antes da rolagem. A lista sozinha só a responde se a

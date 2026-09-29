@@ -9,7 +9,7 @@ import { SeletorDeAba } from '@/components/ui/abas';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
 import { FeedAutomaticas } from './automaticas';
-import { carregarAutomaticas, CHAVE_AUTOMATICAS } from './automaticas-dados';
+import { carregarAutomaticas, carregarMarcoZero, CHAVE_AUTOMATICAS } from './automaticas-dados';
 import { Conversa } from './conversa';
 import { carregarConversas, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { useEcoDasConversas, type EstadoDoEco, type EventoDoEco } from './eco-do-banco';
@@ -105,6 +105,14 @@ export function TelaConversas({
     queryKey: CHAVE_AUTOMATICAS,
     queryFn: carregarAutomaticas,
     enabled: aba === 'automaticas',
+  });
+  // A data de corte do feed, para a tela poder DIZER de onde ela conta. Consulta
+  // separada e barata (uma linha de `app_settings`), e o feed não espera por ela.
+  const marcoZero = useQuery({
+    queryKey: ['conversas', 'automaticas', 'marco-zero'],
+    queryFn: carregarMarcoZero,
+    enabled: aba === 'automaticas',
+    staleTime: 5 * 60 * 1000,
   });
 
   const todos = useMemo<ItemConversa[]>(() => {
@@ -443,6 +451,7 @@ export function TelaConversas({
             ) : (
               <FeedAutomaticas
                 linhas={automaticas.data ?? []}
+                marcoZero={marcoZero.data ?? null}
                 aoAbrir={({ organizacaoId, conversaId }) => {
                   // A ficha manda: a conversa dela abre na aba "Conversas", que é
                   // onde o fio inteiro está. Sem ficha, o destino é a aba "Fora da

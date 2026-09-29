@@ -44,6 +44,28 @@ export type AutomaticaCrua = {
   atendente: string | null;
 };
 
+/**
+ * A data em que o feed passa a contar (`app_settings.automaticas.marco_zero`).
+ *
+ * Ela é LIDA pela tela, e não só aplicada pelo banco, porque um feed que corta
+ * em silêncio mente por omissão: "3 saíram nos últimos 7 dias" é falso quando o
+ * que a função devolve começa anteontem. A tela diz a data; o placar continua
+ * contando o que a tela mostra.
+ */
+export async function carregarMarcoZero(): Promise<string | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'automaticas')
+    .maybeSingle();
+  // Falha aqui não pode derrubar o feed: sem a data a tela mostra o que sempre
+  // mostrou, que é o comportamento de antes desta linha existir.
+  if (error) return null;
+  const valor = (data?.value ?? null) as { marco_zero?: string | null } | null;
+  return valor?.marco_zero?.trim() || null;
+}
+
 export async function carregarAutomaticas(): Promise<AutomaticaCrua[]> {
   const supabase = createClient();
   const desde = new Date(Date.now() - DIAS_DO_FEED * 24 * 60 * 60 * 1000).toISOString();
