@@ -91,7 +91,7 @@ export function SecaoRespostasProntas({ podeEditar }: { podeEditar: boolean }) {
           Na caixa de resposta das Conversas, digite <code>/</code> e escolha. O texto entra na hora.
         </p>
       </div>
-      <ul className="divide-y divide-hairline rounded-xl border border-hairline bg-card">
+      <ul className="divide-y divide-hairline sombra-base rounded-xl bg-card">
         {respostas.map((r) => (
           <li key={r.id} className="flex items-start gap-3 px-4 py-2.5 text-sm">
             <code className="shrink-0 text-primary">/{r.atalho}</code>

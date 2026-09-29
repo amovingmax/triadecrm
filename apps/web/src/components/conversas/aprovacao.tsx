@@ -149,7 +149,7 @@ export function CartaoDeAprovacao({
   return (
     <section
       aria-label="Rascunho da IA esperando aprovação"
-      className={cn('space-y-3 rounded-xl border border-hairline bg-card/60 p-3 md:p-4', className)}
+      className={cn('space-y-3 sombra-base rounded-xl bg-card/60 p-3 md:p-4', className)}
     >
       <header className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <Sparkles className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

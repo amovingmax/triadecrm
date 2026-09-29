@@ -57,7 +57,7 @@ export function VisaoDaSemana({
           <section
             key={dia}
             className={cn(
-              'flex min-w-0 flex-col rounded-xl border border-hairline bg-card/40 md:min-h-40',
+              'flex min-w-0 flex-col sombra-base rounded-xl bg-card/40 md:min-h-40',
               ehFimDeSemana(dia) && doDia.length === 0 && 'opacity-60',
             )}
           >

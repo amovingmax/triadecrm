@@ -338,7 +338,11 @@ export function TelaConversas({
 
       <div
         className={cn(
-          'grid min-h-0 flex-1 border-t border-hairline',
+          // DOIS CARTÕES SOBRE A TELA CINZA (29/09/2026, Design System), e não
+          // duas colunas de uma grade com filete entre elas. A lista e o fio são
+          // duas coisas, e cada uma mora no seu branco — é o que o protótipo
+          // desenha e o que separa "painel" de "tabela de duas colunas".
+          'grid min-h-0 flex-1 gap-3 md:gap-4',
           // A lista era 20rem em qualquer tela: o nome do parceiro truncava no
           // meio e a prévia da conversa cabia em cinco palavras. Numa tela de
           // 1440 sobrava largura de sobra do outro lado — a conversa não fica
@@ -365,7 +369,9 @@ export function TelaConversas({
             // `min-w-0`: sem ele o item de grade assume `min-width: auto` e cresce até o
             // conteúdo, e em 390px a lista nascia com 484px de largura (o "hoje" e o
             // chevron caíam fora da tela). É a mesma armadilha do flex.
-            className="min-h-0 min-w-0 md:overflow-y-auto md:border-r md:border-hairline"
+            // `min-w-0`: sem ele o item de grade assume `min-width: auto` e
+            // cresce até o conteúdo, e em 390px a lista nascia com 484px.
+            className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-y-auto"
           >
             {aba === 'conversas' && !consulta.isPending ? (
               <div className="sticky top-0 z-10 border-b border-hairline bg-background px-3 py-2">
@@ -439,7 +445,7 @@ export function TelaConversas({
         {aba === 'automaticas' ? (
           <section
             aria-label="O que o CRM mandou sozinho"
-            className="min-h-0 min-w-0 md:col-span-2 md:overflow-y-auto"
+            className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:col-span-2 md:overflow-y-auto"
           >
             {automaticas.isPending ? (
               <EsqueletoLista />
@@ -472,7 +478,7 @@ export function TelaConversas({
           ehCelular && !foraId ? null : (
             <section
               aria-label="Conversa de número fora da base"
-              className="min-h-0 min-w-0 md:overflow-hidden"
+              className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden"
             >
               {foraAberta ? (
                 <ConversaForaDaBase
@@ -494,7 +500,7 @@ export function TelaConversas({
         ) : ehCelular && !aberta ? null : (
           <section
             aria-label="Conversa com o parceiro"
-            className="min-h-0 min-w-0 md:overflow-hidden"
+            className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden"
           >
             {consulta.isPending ? null : aberta ? (
               <Conversa

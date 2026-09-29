@@ -21,7 +21,7 @@ export function EsqueletoDasCadencias() {
     <div aria-busy="true" aria-live="polite" className="flex flex-col gap-4">
       <span className="sr-only">Carregando as cadências.</span>
       {Array.from({ length: 3 }, (_, i) => (
-        <div key={i} className="rounded-xl border border-hairline bg-card">
+        <div key={i} className="sombra-base rounded-xl bg-card">
           <div className="flex items-start justify-between gap-3 border-b border-hairline px-4 py-3">
             <div className="flex flex-1 flex-col gap-2">
               <Skeleton className="h-5 w-52" />
@@ -99,7 +99,7 @@ export function NinguemEmCadencia({
   podeMatricular: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-hairline bg-card px-6 py-10 text-center">
+    <div className="flex flex-col items-center gap-3 sombra-base rounded-xl bg-card px-6 py-10 text-center">
       <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <Route className="size-5" aria-hidden="true" />
       </span>

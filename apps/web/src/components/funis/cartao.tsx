@@ -128,7 +128,7 @@ export function CartaoNegocio({
       data-parado={cartao.is_rotting ? '' : undefined}
       data-arrastando={arrastando ? '' : undefined}
       className={cn(
-        'group/cartao relative flex min-h-[76px] w-full flex-col gap-1.5 rounded-xl border border-hairline bg-card py-2.5 pr-3 pl-4',
+        'group/cartao relative flex min-h-[76px] w-full flex-col gap-1.5 sombra-base rounded-xl bg-card py-2.5 pr-3 pl-4',
         'transition-shadow focus-within:ring-2 focus-within:ring-ring',
         arrastando ? 'sombra-base-forte' : 'sombra-base',
         // O fantasma é a silhueta do cartão que saiu do lugar; é o único ponto do

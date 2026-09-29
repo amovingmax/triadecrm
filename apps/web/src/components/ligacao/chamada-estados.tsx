@@ -27,7 +27,7 @@ export function EsqueletoDaChamada() {
         <Skeleton className="h-4 w-52" />
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-hairline bg-card p-5">
+      <div className="flex flex-col gap-3 sombra-base rounded-xl bg-card p-5">
         <Skeleton className="h-9 w-64" />
         <div className="flex flex-col gap-2 sm:flex-row">
           <Skeleton className="h-12 flex-1" />
@@ -180,7 +180,7 @@ function Moldura({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-hairline bg-card px-6 py-14 text-center">
+    <div className="flex flex-col items-center gap-3 sombra-base rounded-xl bg-card px-6 py-14 text-center">
       <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
         {icone}
       </span>

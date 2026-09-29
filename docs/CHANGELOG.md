@@ -4915,3 +4915,29 @@ Junto:
 - Em aberto, e é decisão de produto: os três cartões do protótipo ("Esperando a
   gente", "Primeiros contatos", "Sem contato") não existem no Meu dia, que mede
   as quatro métricas das Metas. Nenhum ajuste de design fecha essa diferença.
+
+### 29/09/2026 — Design System, fase 3: as outras telas
+
+Rafael: *"continue"*. Sem resposta sobre qual conjunto de métricas o Meu dia
+deve medir, ele fica medindo o que mede hoje — trocar isso sem a decisão dele
+seria eu escolhendo por ele.
+
+**Conversas.** A lista e o fio eram duas colunas de uma grade separadas por um
+filete; viraram **dois cartões brancos** sobre a tela cinza, com 16px entre
+eles. É o que o protótipo desenha, e é o que separa "painel" de "tabela de duas
+colunas". Vale para as três colunas da tela: lista, fio, e o painel de largura
+inteira das Automáticas.
+
+**O padrão de painel do produto inteiro.** `rounded-xl border border-hairline
+bg-card` aparecia em 18 lugares — cartão do funil, painéis de Relatórios, avisos
+de cadência, painel de envios, os dois catálogos de Ajustes. Todos passaram para
+`sombra-base rounded-xl bg-card`: **sem borda**, com a sombra de 6% que o sistema
+pede. No desenho novo quem separa o cartão do fundo é o branco contra o
+`#F6F6F6`, não um contorno; borda em cima de branco sobre cinza desenha duas
+vezes a mesma separação.
+
+Os chips e as pílulas pequenas ficaram como estavam: eles usam `rounded-lg` e a
+borda ali é a forma, não a separação.
+
+- Tocado: `conversas/tela-conversas.tsx` e 16 arquivos pelo padrão de painel.
+- Verificado: typecheck, lint, 921 testes e o build com o comando da Vercel.

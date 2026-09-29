@@ -17,7 +17,7 @@ export function CartaoEsqueleto({ className }: { className?: string }) {
     <div
       aria-hidden="true"
       className={cn(
-        'relative flex min-h-[76px] w-full flex-col gap-2 rounded-xl border border-hairline bg-card py-3 pr-3 pl-4',
+        'relative flex min-h-[76px] w-full flex-col gap-2 sombra-base rounded-xl bg-card py-3 pr-3 pl-4',
         className,
       )}
     >

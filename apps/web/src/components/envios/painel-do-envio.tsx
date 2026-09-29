@@ -181,7 +181,7 @@ const ROTULO_DA_MENSAGEM: Record<string, string> = {
 
 function Itens({ itens, daMarca }: { itens: ItemDoEnvio[]; daMarca: boolean }) {
   return (
-    <ul className="divide-y divide-hairline rounded-xl border border-hairline bg-card">
+    <ul className="divide-y divide-hairline sombra-base rounded-xl bg-card">
       {itens.map((i) => (
         <li key={i.posicao} className="flex items-start gap-3 px-3 py-2 text-sm">
           <span className="min-w-0 flex-1">

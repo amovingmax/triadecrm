@@ -50,7 +50,7 @@ export function AvisoWhatsapp({
   return (
     <aside
       className={cn(
-        'flex gap-3 rounded-xl border border-hairline bg-card/50 px-3 py-2.5',
+        'flex gap-3 sombra-base rounded-xl bg-card/50 px-3 py-2.5',
         className,
       )}
     >

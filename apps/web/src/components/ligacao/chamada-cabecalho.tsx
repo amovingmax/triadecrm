@@ -146,7 +146,7 @@ export function ChamadaCabecalho({
       {/* O número, em corpo de cartaz. */}
       <div
         className={cn(
-          'flex flex-col gap-3 rounded-xl border border-hairline bg-card sm:p-5',
+          'flex flex-col gap-3 sombra-base rounded-xl bg-card sm:p-5',
           emChamada ? 'px-3 py-2 sm:py-5' : 'p-4',
         )}
       >

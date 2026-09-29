@@ -149,7 +149,7 @@ function Blocos({ dados }: { dados: Awaited<ReturnType<typeof carregarAtendiment
 
 function Bloco({ titulo, vazio, children }: { titulo: string; vazio: string | null; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-hairline bg-card p-4">
+    <section className="sombra-base rounded-xl bg-card p-4">
       <h3 className="mb-3 text-sm font-medium">{titulo}</h3>
       {vazio ? <p className="text-sm text-muted-foreground">{vazio}</p> : children}
     </section>

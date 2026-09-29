@@ -183,7 +183,7 @@ function Feito({ resumo, nome }: { resumo: ResumoDoDia; nome: string }) {
  */
 function SemRegistro({ nome }: { nome: string }) {
   return (
-    <section className="flex flex-col gap-2 rounded-xl border border-hairline bg-card px-4 py-3.5">
+    <section className="flex flex-col gap-2 sombra-base rounded-xl bg-card px-4 py-3.5">
       <h2 className="flex items-center gap-2 font-heading text-sm font-medium">
         <CircleHelp className="size-4 text-muted-foreground" aria-hidden="true" />
         Nenhum registro hoje

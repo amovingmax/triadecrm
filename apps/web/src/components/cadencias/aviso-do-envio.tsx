@@ -35,7 +35,7 @@ export function AvisoDoEnvio({ visao }: { visao: VisaoDasCadencias }) {
   return (
     <section
       aria-label="O que a cadência faz sozinha"
-      className="flex flex-col gap-2.5 rounded-xl border border-hairline bg-card px-4 py-3.5"
+      className="flex flex-col gap-2.5 sombra-base rounded-xl bg-card px-4 py-3.5"
     >
       <h2 className="font-heading text-sm font-medium">A cadência agenda. Quem manda é gente.</h2>
 

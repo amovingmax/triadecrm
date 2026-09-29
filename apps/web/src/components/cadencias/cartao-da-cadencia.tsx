@@ -84,7 +84,7 @@ export function CartaoDaCadencia({
     <article
       id={`cadencia-${cadencia.slug}`}
       className={cn(
-        'scroll-mt-20 overflow-hidden rounded-xl border border-hairline bg-card',
+        'scroll-mt-20 overflow-hidden sombra-base rounded-xl bg-card',
         !cadencia.ativa && 'opacity-75',
       )}
     >

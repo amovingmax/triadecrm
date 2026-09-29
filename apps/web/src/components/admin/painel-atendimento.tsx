@@ -329,7 +329,7 @@ function Interruptor({
   aoMudar: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-hairline bg-card px-4 py-3">
+    <div className="flex items-start justify-between gap-4 sombra-base rounded-xl bg-card px-4 py-3">
       <div>
         <label htmlFor={id} className="text-sm font-medium">
           {titulo}
