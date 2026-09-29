@@ -4493,3 +4493,53 @@ continua no fio de cada parceiro — só não entra neste placar."
   e a volta ao estado anterior provando que nada foi apagado); suíte em 3.231.
 - Web: `carregarMarcoZero`, `dataCurta`, a frase no cabeçalho do feed.
 - Verificado: lint, typecheck, testes (web 902, workers 363) e **`pnpm build`**.
+
+### 29/09/2026 — o "Tudo bem?" antes da introdução, e um cartão por conversa
+
+Rafael, com o print da aba Automáticas: *"o funcionamento ta incorreto, dizendo
+que não respondeu, mas alem de ta ocupando espaço, listando uma em cima da
+outra (...) vamos precisar mudar a resposta, pra humanizar mais, pois ficou
+estranho, depois que a pessoa responder, o robo mandará um tudo bem? e depois a
+introdução após uns 15 a 20 segundos"*. Três coisas, e as três eram a mesma
+conversa.
+
+**1. A conversa ganhou um tempo.** Estava estranho porque estava: a pessoa
+respondia "Boa tarde!" com um "oi" e levava de volta, oito segundos depois,
+cinco linhas de proposta comercial. Agora são três tempos — "Boa tarde!" na
+aprovação, **"Tudo bem?" 3 a 6 s depois de ela responder**, e a introdução
+**15 a 20 s** depois. As duas nascem na mesma transação; quem as separa é
+`app.wa_atraso_do_envio`, que passou a ter uma faixa por modelo.
+
+O "Tudo bem?" não sai instantâneo de propósito: resposta imediata é o que
+denuncia máquina. Três a seis segundos é o tempo de ver a notificação e digitar
+duas palavras.
+
+**2. "Dizendo que não respondeu" era verdade, e era contradição.** A introdução
+das 12h15 dizia "Ninguém respondeu" porque ninguém tinha respondido *a ela* —
+tinha dez segundos de vida. O cumprimento das 12h12, logo abaixo, dizia
+"Respondeu". As duas corretas, e juntas ilegíveis. Agora o feed agrupa por
+conversa e o desfecho é UM, tirado da mensagem **mais antiga** do grupo, porque
+é ela que enxerga a conversa inteira: *desde que o robô começou a falar com esta
+pessoa, ela respondeu? alguém nosso assumiu?*
+
+**3. O espaço.** Três mensagens ao mesmo parceiro custavam três linhas de 76px.
+Agora custam um cartão, com o nome do parceiro no lugar do código do modelo — o
+template virou linha miúda, que é onde ele é consulta. E o placar passou a dizer
+os dois números ("6 saíram para 2 parceiros"): só o volume faria parecer seis
+pessoas; só os parceiros esconderia o volume que a Meta cobra.
+
+**Um erro meu no caminho, que o teste pegou.** Reconstruí `app.wa_introduzir` a
+partir de `20261002090000` — a PRIMEIRA definição dela —, e com isso perdi a
+checagem de janela de 24 h que `20261002130000` tinha acrescentado. O arquivo 83
+falhou na hora, com a introdução voltando a sair com a janela vencida. Refiz a
+partir da definição viva. A lição já estava escrita no repositório e eu não a
+segui: **recriar função é a partir da última definição, não da mais fácil de
+achar.**
+
+- Migração: `20261002230000_o_tudo_bem_vem_antes.sql`.
+- pgTAP: 83 vai a 29, 86 a 13; suíte em 3.237.
+- Web: `agruparPorConversa`, `placarDoFeed` por parceiro, `CartaoDaConversa`;
+  6 testes Vitest novos (web em 908).
+- Verificado: lint, typecheck, testes, `pnpm build` e `db lint`.
+- Pendente: o texto do "Tudo bem?" ainda não é editável em Ajustes (o da
+  ausência e o da introdução são). Se o Rafael quiser mexer, hoje é migração.

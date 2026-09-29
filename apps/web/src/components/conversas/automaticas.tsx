@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { Bot, ChevronRight } from 'lucide-react';
 
@@ -10,9 +11,10 @@ import type { AutomaticaCrua } from './automaticas-dados';
 import { DIAS_DO_FEED, LIMITE_DO_FEED } from './automaticas-dados';
 import {
   ROTULO_DO_MODELO,
+  agruparPorConversa,
   placarDoFeed,
-  resumoDoQueAconteceu,
   rotuloDoAutor,
+  type GrupoAutomatico,
 } from './automaticas-formatos';
 import { dataCurta, dataHoraCompleta, hora, rotuloDoDia } from './formatos';
 
@@ -61,7 +63,9 @@ export function FeedAutomaticas({
   /** Abre a conversa daquela mensagem: por ficha quando há, senão pelo fio. */
   aoAbrir: (destino: { organizacaoId: string | null; conversaId: string | null }) => void;
 }) {
-  const placar = placarDoFeed(linhas);
+  // UM CARTÃO POR CONVERSA (29/09/2026). Ver `agruparPorConversa` para o porquê.
+  const grupos = useMemo(() => agruparPorConversa(linhas), [linhas]);
+  const placar = placarDoFeed(grupos);
   // NO TETO, o placar deixa de falar do período e passa a falar das linhas que
   // couberam. Dizer "200 saíram" numa semana de 900 não é resumo, é número
   // errado — e é o tipo de erro que ninguém percebe, porque o número existe.
@@ -112,9 +116,14 @@ export function FeedAutomaticas({
           <p className="mt-2 text-xs text-muted-foreground">
             {noTeto ? 'Nas ' : ''}
             <span className="numerico text-foreground">{placar.sairam}</span>{' '}
-            {noTeto ? 'mais recentes' : placar.sairam === 1 ? 'saiu' : 'saíram'} ·{' '}
+            {noTeto ? 'mais recentes' : placar.sairam === 1 ? 'saiu' : 'saíram'}{' '}
+            {/* OS DOIS NÚMEROS, e não um. O fluxo manda três mensagens à mesma
+                pessoa: dizer só "6 saíram" faz parecer seis parceiros, e dizer
+                só "2 parceiros" esconde o volume que a Meta cobra. */}
+            para <span className="numerico text-foreground">{placar.parceiros}</span>{' '}
+            {placar.parceiros === 1 ? 'parceiro' : 'parceiros'} ·{' '}
             <span className="numerico text-foreground">{placar.responderam}</span>{' '}
-            {placar.responderam === 1 ? 'teve resposta' : 'tiveram resposta'}
+            {placar.responderam === 1 ? 'respondeu' : 'responderam'}
             {placar.esperando > 0 ? (
               <>
                 {' '}
@@ -142,13 +151,8 @@ export function FeedAutomaticas({
         </p>
       ) : (
         <ul className="px-2 py-2">
-          {linhas.map((linha, i) => (
-            <LinhaAutomatica
-              key={linha.message_id ?? `${i}`}
-              linha={linha}
-              indice={i}
-              aoAbrir={aoAbrir}
-            />
+          {grupos.map((grupo, i) => (
+            <CartaoDaConversa key={grupo.chave} grupo={grupo} indice={i} aoAbrir={aoAbrir} />
           ))}
         </ul>
       )}
@@ -156,41 +160,37 @@ export function FeedAutomaticas({
   );
 }
 
-function LinhaAutomatica({
-  linha,
+/**
+ * Um cartão por conversa: quem é, o que aconteceu, e as mensagens que saíram.
+ *
+ * O desenho segue o do fio: a bolinha do robô à esquerda, o nome do parceiro em
+ * cima (e não o código do modelo, que é detalhe de quem programou), o desfecho
+ * UMA vez, e as mensagens embaixo, cada uma com o seu rótulo e a sua hora. Três
+ * mensagens da mesma pessoa passaram a custar um cartão, e não três.
+ */
+function CartaoDaConversa({
+  grupo,
   indice,
   aoAbrir,
 }: {
-  linha: AutomaticaCrua;
+  grupo: GrupoAutomatico;
   indice: number;
   aoAbrir: (destino: { organizacaoId: string | null; conversaId: string | null }) => void;
 }) {
   const revelar = useRevelarLinha(indice);
-  const desfecho = resumoDoQueAconteceu({
-    entrega: linha.entrega,
-    respondeuEm: linha.respondeu_em,
-    genteFalouEm: linha.gente_falou_em,
-  });
-  // O rótulo do FLUXO na frente do nome do banco: "GEN-SYS-INTRO" não diz nada
-  // para quem atende. Um modelo que o mapa não conhece cai no nome do banco, e
-  // um texto livre da IA não tem modelo nenhum — aí sobra quem escreveu.
-  const oQue =
-    (linha.modelo ? ROTULO_DO_MODELO[linha.modelo] : undefined) ??
-    linha.rotulo ??
-    rotuloDoAutor(linha.autor);
-  // Quem escreveu de fora da base não tem ficha, e a linha não pode ficar sem
+  // Quem escreveu de fora da base não tem ficha, e o cartão não pode ficar sem
   // dizer para quem a mensagem foi.
-  const paraQuem = linha.organizacao ?? 'Número fora da base';
-  const dia = linha.quando ? rotuloDoDia(linha.quando) : null;
+  const paraQuem = grupo.organizacao ?? 'Número fora da base';
+  const dia = grupo.quando ? rotuloDoDia(grupo.quando) : null;
 
   return (
     <li {...revelar} className={revelar.className}>
       <button
         type="button"
         onClick={() =>
-          aoAbrir({ organizacaoId: linha.organization_id, conversaId: linha.conversation_id })
+          aoAbrir({ organizacaoId: grupo.organizationId, conversaId: grupo.conversationId })
         }
-        className="flex w-full min-h-[76px] items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors outline-none active:bg-muted/60 focus-visible:bg-muted/60 md:hover:bg-muted/50"
+        className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors outline-none active:bg-muted/60 focus-visible:bg-muted/60 md:hover:bg-muted/50"
       >
         <span
           aria-hidden="true"
@@ -199,12 +199,15 @@ function LinhaAutomatica({
           <Bot className="size-4.5" />
         </span>
 
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span className="flex min-w-0 items-baseline gap-2">
-            <span className="min-w-0 flex-1 truncate font-medium">{oQue}</span>
-            {linha.quando ? (
+            {/* O NOME DO PARCEIRO NO LUGAR DO MODELO. Quem abre esta tela
+                pergunta "com quem o CRM falou", não "qual template saiu" — o
+                template vira uma linha miúda embaixo, onde ele é consulta. */}
+            <span className="min-w-0 flex-1 truncate font-medium">{paraQuem}</span>
+            {grupo.quando ? (
               <span
-                title={dataHoraCompleta(linha.quando)}
+                title={dataHoraCompleta(grupo.quando)}
                 className="shrink-0 text-xs text-muted-foreground"
               >
                 {dia && dia.palavra !== 'hoje' ? (
@@ -213,44 +216,67 @@ function LinhaAutomatica({
                     {dia.numero ? <span className="numerico">{dia.numero}</span> : null}{' '}
                   </>
                 ) : null}
-                <span className="numerico">{hora(linha.quando)}</span>
+                <span className="numerico">{hora(grupo.quando)}</span>
               </span>
             ) : null}
           </span>
 
-          <span className="truncate text-[0.8125rem] text-muted-foreground">{paraQuem}</span>
+          {/* AS MENSAGENS, da mais antiga para a mais nova: é a ordem em que a
+              pessoa do outro lado leu, e ler de trás para a frente uma conversa
+              de três linhas não ajuda ninguém. */}
+          <span className="flex flex-col gap-1">
+            {[...grupo.mensagens].reverse().map((m, i) => (
+              <span key={m.message_id ?? `${i}`} className="flex min-w-0 items-baseline gap-2">
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {(m.modelo ? ROTULO_DO_MODELO[m.modelo] : undefined) ??
+                    m.rotulo ??
+                    rotuloDoAutor(m.autor)}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-foreground/80">
+                  {m.corpo}
+                </span>
+                {m.quando ? (
+                  <span
+                    className="numerico shrink-0 text-xs text-muted-foreground"
+                    title={dataHoraCompleta(m.quando)}
+                  >
+                    {hora(m.quando)}
+                  </span>
+                ) : null}
+              </span>
+            ))}
+          </span>
 
-          {linha.corpo ? (
-            <span className="line-clamp-2 text-[0.8125rem] text-foreground/80">{linha.corpo}</span>
-          ) : null}
+          <span className="flex flex-wrap items-center gap-2">
+            {/* UM DESFECHO, DA CONVERSA INTEIRA. Por mensagem, o mesmo parceiro
+                aparecia dizendo "Respondeu" numa linha e "Ninguém respondeu" na
+                de baixo — as duas verdadeiras, e juntas uma contradição.
 
-          <span className="mt-1 flex flex-wrap items-center gap-2">
-            {/* O TOM DE ALERTA SÓ NO CASO QUE PEDE AÇÃO. Pintar a linha mais
-                comum da tela ("ninguém respondeu", que é o desfecho normal)
-                ensinaria a pessoa a ignorar a cor em três dias. */}
+                O TOM DE ALERTA SÓ NO CASO QUE PEDE AÇÃO: pintar o desfecho mais
+                comum da tela ensinaria a pessoa a ignorar a cor em três dias. */}
             <span
               className={cn(
                 'inline-flex items-center rounded-full px-2 py-0.5 text-xs',
-                desfecho.alerta
+                grupo.desfecho.alerta
                   ? 'bg-destructive/15 font-medium text-destructive-texto'
                   : 'bg-muted text-muted-foreground',
               )}
             >
-              {desfecho.texto}
+              {grupo.desfecho.texto}
             </span>
-            {/* Quem atende a conversa: é para essa pessoa que o item aponta, e
-                quem abrir daqui vai encontrá-la no cabeçalho da conversa. */}
-            {linha.atendente ? (
+            {grupo.atendente ? (
               <span className="text-xs text-muted-foreground">
-                Endereçada a {linha.atendente}
+                Endereçada a {grupo.atendente}
               </span>
             ) : null}
-            {linha.erro ? (
-              <span className="truncate text-xs text-muted-foreground">{linha.erro}</span>
+            {grupo.erro ? (
+              <span className="truncate text-xs text-muted-foreground">{grupo.erro}</span>
             ) : null}
           </span>
         </span>
 
+        {/* O chevron diz que o cartão LEVA para a conversa: quem vê "esperando
+            alguém" precisa de um clique, não de uma segunda tela para procurar. */}
         <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </button>
     </li>

@@ -25,7 +25,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(27);
+select plan(29);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -435,6 +435,26 @@ insert into pg_temp.casos values ('calado', pg_temp.conversa_com_cumprimento('+5
 select is(pg_temp.introducoes('calado'), 0,
   'quem levou o cumprimento e não respondeu não recebe a introdução: ela é resposta, não segunda investida');
 
+
+-- =====================================================================
+-- 7. O "TUDO BEM?" VEM JUNTO (29/09/2026)
+-- =====================================================================
+-- Rafael: "depois que a pessoa responder, o robo mandará um tudo bem? e depois
+-- a introdução após uns 15 a 20 segundos". As duas nascem na MESMA transação —
+-- quem as separa no tempo é `app.wa_atraso_do_envio`, provado no arquivo 86.
+-- Aqui se prova que o gatilho manda as duas, e uma vez só.
+select is((select count(*)::int from public.messages m
+            where m.conversation_id = pg_temp.caso('feliz')
+              and m.template_id = (select id from public.message_templates
+                                    where template_code = 'GEN-SYS-TUDOBEM')), 1,
+  'o "Tudo bem?" sai junto com a introdução, e uma vez só');
+
+select ok((select min(m.created_at) filter (where t.template_code = 'GEN-SYS-TUDOBEM')
+                <= min(m.created_at) filter (where t.template_code = 'GEN-SYS-INTRO')
+             from public.messages m
+             join public.message_templates t on t.id = m.template_id
+            where m.conversation_id = pg_temp.caso('feliz')),
+  'e nasce antes dela na fila: a ordem do fio é a ordem em que a pessoa vai ler');
 
 select * from finish();
 rollback;

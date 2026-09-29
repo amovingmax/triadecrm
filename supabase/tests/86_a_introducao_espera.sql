@@ -6,7 +6,10 @@
 --      confirmação de opt-out saem com atraso zero. Segurar resposta humana por
 --      dez segundos seria mentira ao contrário.
 --   2. O ATRASO CAI DENTRO DA FAIXA sorteada, e a faixa vem de `app_settings` —
---      quem mexe é o gestor, sem deploy.
+--      quem mexe é o gestor, sem deploy. Desde 29/09/2026 são DUAS faixas: o
+--      "Tudo bem?" (3 a 6 s) e a introdução (15 a 20 s). Rafael: "depois que a
+--      pessoa responder, o robo mandará um tudo bem? e depois a introdução após
+--      uns 15 a 20 segundos".
 --   3. O QUE JÁ PASSOU É DESCONTADO. A mensagem nasce quando o lead responde e
 --      só é varrida segundos depois; o que a pessoa do outro lado sente é o
 --      tempo total, então a fila segura o que FALTA, e nunca menos que zero.
@@ -15,7 +18,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(9);
+select plan(13);
 
 -- Uma pessoa de fixture, pelo caminho do login de verdade (RF-ADM-01): o banco
 -- recém-resetado não tem perfil nenhum, e `conversations` exige dono (RF-CON-04).
@@ -115,14 +118,29 @@ select is(app.wa_atraso_do_envio(pg_temp.saida(pg_temp.conv(), 'GEN-SYS-HUMANO')
 -- =====================================================================
 -- 2. A introdução espera, e dentro da faixa
 -- =====================================================================
--- A faixa semeada é 8 a 14. Com a mensagem recém-nascida, o atraso é o sorteio
+-- A faixa semeada é 15 a 20. Com a mensagem recém-nascida, o atraso é o sorteio
 -- inteiro. Dez chamadas: todas dentro da faixa, e é a faixa que se afirma —
 -- afirmar um número seria afirmar o resultado de um sorteio.
 select ok(
-  (select bool_and(d between 8 and 14)
+  (select bool_and(d between 15 and 20)
      from (select app.wa_atraso_do_envio(pg_temp.saida(pg_temp.conv(), 'GEN-SYS-INTRO')) as d
              from generate_series(1, 10)) s),
-  'a introdução espera algo entre 8 e 14 segundos');
+  'a introdução espera algo entre 15 e 20 segundos');
+
+-- E o "Tudo bem?" tem faixa PRÓPRIA, mais curta: ele é a resposta rápida que
+-- vem antes da proposta. Zero seria pior que 15 — resposta instantânea é o que
+-- denuncia máquina.
+select ok(
+  (select bool_and(d between 3 and 6)
+     from (select app.wa_atraso_do_envio(pg_temp.saida(pg_temp.conv(), 'GEN-SYS-TUDOBEM')) as d
+             from generate_series(1, 10)) s),
+  'o "Tudo bem?" espera algo entre 3 e 6 segundos, e não sai instantâneo');
+
+select ok(
+  (select app.wa_atraso_do_envio(pg_temp.saida(pg_temp.conv(), 'GEN-SYS-TUDOBEM'))
+        < (select min(d) from (select app.wa_atraso_do_envio(
+             pg_temp.saida(pg_temp.conv(), 'GEN-SYS-INTRO')) as d from generate_series(1,5)) s)),
+  'e o "Tudo bem?" sempre chega ANTES da introdução: as faixas não se cruzam');
 
 -- E sorteia mesmo: em trinta chamadas sai mais de um valor. (A chance de trinta
 -- sorteios em sete valores darem todos o mesmo é 7 × (1/7)^30 — não acontece.)
@@ -136,10 +154,10 @@ select ok(
 -- 3. O que já passou é descontado
 -- =====================================================================
 select ok(
-  (select bool_and(d between 0 and 8)
+  (select bool_and(d between 9 and 14)
      from (select app.wa_atraso_do_envio(pg_temp.saida(pg_temp.conv(), 'GEN-SYS-INTRO', 6)) as d
              from generate_series(1, 10)) s),
-  'seis segundos já passados saem da conta: o que falta é no máximo 8');
+  'seis segundos já passados saem da conta: sobra entre 9 e 14 da faixa de 15 a 20');
 
 select is(app.wa_atraso_do_envio(pg_temp.saida(pg_temp.conv(), 'GEN-SYS-INTRO', 60)), 0,
   'mensagem velha não espera mais nada, e nunca devolve negativo');
@@ -159,6 +177,15 @@ select is(app.wa_atraso_do_envio(pg_temp.saida(pg_temp.conv(), 'GEN-SYS-INTRO'))
 -- A frase "100% gratuito" foi trocada por "a divulgação de vocês nele é
 -- gratuita" de propósito (ver o cabeçalho da migração). Esta asserção existe
 -- para que a troca não volte atrás sem alguém reparar.
+-- E o texto do "Tudo bem?" é o que o Rafael pediu: duas palavras, sem nome,
+-- sem variável (o corpo é copiado cru para o fio).
+select is((select body from public.message_templates where template_code = 'GEN-SYS-TUDOBEM'),
+  'Tudo bem?', 'o "Tudo bem?" é exatamente isso, e nada mais');
+select ok(
+  (select position('{{' in body) = 0 and is_active
+     from public.message_templates where template_code = 'GEN-SYS-TUDOBEM'),
+  'e está ativo e sem variável: `wa_bot_dizer` copia o corpo cru para o fio');
+
 select ok(
   (select body not ilike '%100%gratuito%'
       and body ilike '%divulgação de vocês nele é gratuita%'
