@@ -4694,3 +4694,54 @@ select` resolveu.
 
 - Verificado agora: **pgTAP 3.252** (87 arquivos), `db lint` sem apontamento
   novo, lint, typecheck, Vitest (918) e `pnpm build`.
+
+### 29/09/2026 — Tríade Design System, fase 1: a base
+
+Rafael: *"vamos fazer um pivote no design e estrutura do CRM, vai manter as
+funcionalidades e o nome, mas adapte para Tríade Design System"*, com a pasta em
+`~/Downloads`.
+
+O sistema é uma skill de agente completa: tokens, 40 componentes, cinco telas de
+UI kit e 18 boards de referência. E foi gerado a partir DESTE repositório — os
+nomes semânticos dos tokens batem com os de `globals.css`, o que torna a troca
+cirúrgica: mudam os valores, não a estrutura.
+
+Ele mesmo dá a regra do empate, e ela foi usada duas vezes hoje: *"the reference
+wins on look (shape, palette, type) and the repo wins on meaning (copy, a11y)"*.
+
+**O que mudou nesta fase:**
+
+- **Fonte**: Geist → **Plus Jakarta Sans** (300–600), Geist Mono fica nos
+  números. Servidas **da pasta** (`next/font/local`), não do Google: o sistema
+  já traz os `woff2` variáveis com os `unicode-range` certos, e o build da
+  Vercel quebrou em 28/09 baixando fonte do Google com cache corrompido.
+- **Paleta**: o grafite azulado do Ocean Breeze saiu. Agora é **tinta quente
+  #111110 sobre tela #F6F6F6**, com cartão **branco de verdade**. O verde da
+  KOMUNE (#24705c) deu lugar à **menta #78FC90** como acento único. A regra de
+  território de 17/09 continua inteira: o acento vive no cromo, e a escala
+  térmica segue sendo a única cor dentro do dado.
+- **Ação**: era gradiente verde, virou **tinta chapada** (branco no escuro). O
+  sistema é explícito: *"Backgrounds: flat. No gradients"*. O volume passa a vir
+  da forma e do contraste, não da queda de luz.
+- **Forma**: dois raios viraram **três**. Pílula no que se aperta, 16px na linha
+  e na área de texto, 24px no que contém. `--radius-lg` é o degrau que NÃO virou
+  pílula, de propósito: `rounded-lg` veste o botão E a área de texto de quatro
+  linhas, e área de texto em pílula é ilegível. Botão e campo viram pílula pela
+  classe, escrita neles.
+- **Destrutivo** ganhou cor própria (coral) e deixou de dividir a brasa com o
+  "quente" térmico. Um fornecedor quente é boa notícia; apagar não é.
+
+**As duas correções de acessibilidade.** O `contraste.test.ts` do repositório
+mede a borda de campo contra QUATRO superfícies, e o valor do sistema passa só
+na mais fácil: `#8e8e8e` dá 3,28:1 sobre branco e 2,75:1 sobre a pílula em
+hover. No escuro, `#5c5c5c` dá 3,05:1 sobre o painel e 2,03:1 sobre o hover. Os
+dois desceram (claro) e subiram (escuro) até passar na PIOR superfície: `#858585`
+e `#7a7a7a`. É o "repo wins on a11y" do próprio sistema.
+
+- Tocado: `globals.css`, `layout.tsx`, `ui/button.tsx`, `ui/input.tsx`,
+  `app/fontes/*.woff2` (4 arquivos, 87 KB).
+- Verificado: lint, typecheck, `pnpm build` e 918 testes — incluindo as 16
+  asserções de contraste, que são a prova de que a paleta nova é legível.
+- Próximas fases: a casca (trilho de 72px + cabeçalho de 72px), os cartões
+  (branco, 24px, ação circular no canto) e os componentes novos do sistema
+  (KpiFigure, SegmentedMeter, BarrasSemana, Breadcrumb).

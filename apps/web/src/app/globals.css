@@ -102,13 +102,17 @@
   --color-grafite-900: var(--grafite-900);
   --color-grafite-950: var(--grafite-950);
 
-  /* Um raio só: 8px em tudo que se toca, 12px em tudo que contém.
-     A escala do shadcn (sm..4xl) é achatada nesses dois valores de propósito:
-     sem isso o botão (rounded-lg), o chip (rounded-4xl) e o cartão (rounded-xl)
-     desenhariam três curvas diferentes na mesma tela. */
+  /* TRÊS raios, e não mais dois (Tríade Design System, 29/09/2026): pílula no
+     que se aperta, 16px na linha e na área de texto, 24px no que contém.
+
+     `--radius-lg` é o degrau que NÃO virou pílula, e isso é decisão: `rounded-lg`
+     veste tanto o botão quanto a área de texto de quatro linhas, e uma área de
+     texto em formato de pílula é ilegível. Botão e campo viram pílula pela
+     classe `rounded-full`, escrita neles (ver `ui/button.tsx` e `ui/input.tsx`);
+     todo o resto que usa `rounded-lg` ganha os 16px da linha. */
   --radius-sm: var(--raio-interativo);
   --radius-md: var(--raio-interativo);
-  --radius-lg: var(--raio-interativo);
+  --radius-lg: var(--raio-linha);
   --radius-xl: var(--raio-container);
   --radius-2xl: var(--raio-container);
   --radius-3xl: var(--raio-container);
@@ -124,8 +128,8 @@
    -------------------------------------------------------------------------- */
 :root {
   --font-sans:
-    var(--font-geist), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+    var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
   --font-mono:
     var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', 'Courier New', monospace;
@@ -136,8 +140,14 @@
    Contêiner (cartão, folha, diálogo) = 12px. A barra térmica não tem raio.
    -------------------------------------------------------------------------- */
 :root {
-  --raio-interativo: 0.5rem;
-  --raio-container: 0.75rem;
+  /* Tríade Design System (29/09/2026): "tudo que se aperta é uma PÍLULA ou um
+     CÍRCULO; contêiner é macio". Botão, campo, chip e aba viram pílula; cartão
+     vai a 24px; a linha dentro do cartão, a 16px. A barra térmica continua sem
+     raio — ela é marca gráfica, não objeto. */
+  --raio-interativo: 9999px;
+  --raio-container: 1.5rem; /* 24px */
+  --raio-linha: 1rem; /* 16px: linha de lista dentro do cartão, área de texto */
+  --raio-painel: 2rem; /* 32px: painel escuro de destaque */
   /* Compatibilidade: componentes e o sonner ainda leem --radius direto. */
   --radius: var(--raio-interativo);
 }
@@ -150,51 +160,75 @@
    puro: o cartão para em #fdfeff, um traço de azul acima do fundo da página.
    -------------------------------------------------------------------------- */
 :root {
-  --grafite-25: #fcfcfd; /* cartão e popover: quase branco, nunca #fff (mata a profundidade) */
-  --grafite-50: #f7f7f8; /* fundo da página: neutro de verdade, sem tingimento azul */
-  --grafite-100: #f1f1f3; /* muted / secondary / accent do tema */
-  --grafite-200: #e4e4e8; /* borda forte do tema */
-  --grafite-300: #d3d3d8; /* tinta do modo escuro (foreground do tema) */
-  --grafite-400: #a1a1aa;
-  --grafite-450: #8a8a93; /* borda de campo: 3:1 contra o fundo nos dois modos */
-  --grafite-500: #6b6b73; /* texto esmaecido do claro (o #6b7280 do tema, 1 ponto mais fundo) */
-  --grafite-600: #52525b; /* borda forte do escuro (border do tema) */
-  --grafite-700: #3f3f46; /* tinta do modo claro (foreground do tema) */
-  --grafite-750: #333338; /* secondary do escuro (do tema) */
-  --grafite-800: #27272b; /* cartão do escuro (card do tema) */
-  --grafite-850: #1e1e21; /* muted do escuro (do tema) */
-  --grafite-900: #131316; /* fundo do escuro (background do tema) e ação em tinta no claro */
-  --grafite-950: #0c0c0e; /* tinta mais funda: texto da ação clara, sombra */
+  /* --------------------------------------------------------------------------
+     A RAMPA DE TINTA — Tríade Design System (29/09/2026)
+     --------------------------------------------------------------------------
+     Rafael mandou o sistema de design e pediu o pivô: "vai manter as
+     funcionalidades e o nome, mas adapte para Tríade Design System".
+
+     O que muda: a base deixa de ser o grafite azulado do Ocean Breeze e passa a
+     ser uma TINTA QUENTE quase preta (#111110) sobre tela cinza-claro (#F6F6F6),
+     com cartão branco de verdade. A rampa é neutra-quente: nada de matiz azul.
+
+     Os nomes `--grafite-*` ficam porque 645 linhas deste arquivo e dezenas de
+     componentes os leem; trocá-los seria um segundo pivô, de mexer em tudo sem
+     mudar nada na tela. O que trocou foram os VALORES. */
+  --grafite-25: #ffffff; /* cartão e popover: branco de verdade (o sistema pede) */
+  --grafite-50: #f6f6f6; /* fundo da página */
+  --grafite-100: #f1f1f1; /* pílula e linha dentro do cartão */
+  --grafite-150: #ebebeb; /* pílula em hover */
+  --grafite-200: #e4e4e4; /* borda */
+  --grafite-300: #d4d4d4; /* borda forte, grade de gráfico */
+  --grafite-400: #bdbdbd; /* decimais esmaecidos, glifo desabilitado */
+  /* Borda de campo. O sistema pede #8e8e8e e diz "3:1 on white" — e é verdade
+     sobre branco (3,28:1). Só que o nosso campo também se assenta sobre o fundo
+     da página (3,03:1), sobre o `muted` (2,90:1) e sobre a pílula em hover
+     (2,75:1), e o arquivo `contraste.test.ts` mede os quatro. Dois reprovam.
+     O próprio sistema resolve o empate: "the reference wins on look (shape,
+     palette, type) and the repo wins on meaning (copy, a11y)". Então o tom
+     desce um degrau até passar na PIOR superfície, e não na mais fácil: em
+     #858585 o pior caso é 3,09:1. */
+  --grafite-450: #858585;
+  --grafite-500: #6b6b6a; /* texto esmaecido do claro: 5,1:1 sobre #F6F6F6 */
+  --grafite-600: #6b6b6a;
+  --grafite-700: #3d3d3c;
+  --grafite-750: #2e2e2e;
+  --grafite-800: #252525; /* pílula escura */
+  --grafite-850: #1c1c1c; /* cartão do escuro */
+  --grafite-900: #111110; /* A TINTA: texto, botão primário, pílula ativa, tooltip */
+  --grafite-950: #050505; /* painel escuro de destaque */
 
   /* --------------------------------------------------------------------------
-     O VERDE DA KOMUNE — a cor do CROMO, decidida em 17/09/2026.
+     A MENTA — o único acento (#78FC90)
      --------------------------------------------------------------------------
-     Até aqui a interface inteira era grafite, e estava escrito aqui que a ação
-     seria "TINTA, nunca cor: o verde do tema seria lido como cliente". O
-     raciocínio tinha um furo e o Rafael achou pelo uso: sem cor nenhuma, o CRM
-     ficou sem dono — parece um template, não a ferramenta da KOMUNE.
-     A correção mantém o que o raciocínio protegia, com uma regra de território
-     em vez de uma proibição de matiz:
-       · o VERDE DA MARCA vive no CROMO — a lateral, o botão de ação, o anel de
-         foco, o link. Coisas que são a moldura do trabalho.
-       · a ESCALA TÉRMICA continua sendo a única cor DENTRO do dado — a linha da
-         lista, o chip do parceiro, a barra do funil.
-     O verde de "cliente" (#1a9a49) é mais claro e mais saturado que o da marca
-     (#24705c), e os dois nunca dividem a mesma vizinhança: um é chapa de fundo e
-     moldura, o outro é ponto e chip sobre cartão. Quem aprendeu que verde é
-     "fechou" continua certo, porque no lugar onde essa pergunta se faz nada
-     mudou. Fonte da paleta: `admin/src/app/globals.css` do komune-app — é a
-     mesma marca, e inventar um segundo verde seria ter duas. */
-  --komune-50: #eef6f3;
-  --komune-100: #d6ebe3;
-  --komune-200: #aed8c8;
-  --komune-300: #7cbda8;
-  --komune-400: #4a9d85; /* foco no escuro: 5,7:1 contra o fundo grafite-900 */
-  --komune-500: #2e8c73;
-  --komune-600: #24705c; /* a ação nos dois temas: 6,0:1 com texto quase branco */
-  --komune-700: #1d5a4a;
-  --komune-800: #17453a;
+     Substitui o verde da KOMUNE (#24705c) no CROMO, e a regra de território de
+     17/09/2026 continua valendo palavra por palavra: o acento vive na moldura
+     (destaque, contador, foco de atenção) e a ESCALA TÉRMICA continua sendo a
+     única cor DENTRO do dado.
+
+     Uma diferença que o sistema faz questão: a menta é clara demais para ser
+     texto sobre branco. Onde ela precisa FALAR, usa-se `--menta-700` (4,7:1
+     sobre o menta-100); onde ela precisa APARECER — preenchimento de barra,
+     contador de não lidas, disco de marca — usa-se a menta cheia com tinta em
+     cima. Nunca menta como cor de texto sobre a tela.
+
+     Os nomes `--komune-*` ficam pelo mesmo motivo dos `--grafite-*`. */
+  --komune-50: #effff2;
+  --komune-100: #dcfee3;
+  --komune-200: #b8fdc5;
+  --komune-300: #99fcab;
+  --komune-400: #78fc90; /* A MENTA: preenchimento, barra destacada, disco ativo */
+  --komune-500: #4fe56d;
+  --komune-600: #22b847;
+  --komune-700: #16863a; /* menta como TEXTO sobre claro */
+  --komune-800: #10652c;
   --komune-900: #0f2f28;
+
+  /* Coral: delta negativo e destrutivo (o sistema separa do "quente" térmico). */
+  --coral-100: #ffe7e3;
+  --coral-400: #ff6a55;
+  --coral-600: #d63b23;
+  --coral-700: #b3301c;
 
   /* Escala térmica: as cinco cores cromáticas de toda a interface.
      `cor` é a marca (barra, ponto) e precisa de 3:1 contra a superfície
@@ -228,33 +262,48 @@
      dado. O fundo da página ganha um traço de verde — 3% sobre o grafite, o
      suficiente para a página não ser cinza de template e pouco o bastante para
      o chip térmico não mudar de leitura em cima dele. */
-  --background: #f2f6f5; /* grafite-50 puxado 55% para o komune-50 */
-  --foreground: var(--grafite-700);
+  --background: var(--grafite-50); /* #F6F6F6, a tela do sistema */
+  --foreground: var(--grafite-900); /* a tinta #111110 */
   --card: var(--grafite-25);
-  --card-foreground: var(--grafite-700);
+  --card-foreground: var(--grafite-900);
   --popover: var(--grafite-25);
-  --popover-foreground: var(--grafite-700);
-  --primary: var(--komune-600);
+  --popover-foreground: var(--grafite-900);
+  /* A AÇÃO É TINTA, não mais o verde da marca. No sistema, o botão cheio é a
+     pílula preta da referência; a menta fica para o acento único da tela. */
+  --primary: var(--grafite-900);
   --primary-foreground: var(--grafite-25);
   --secondary: var(--grafite-100);
   --secondary-foreground: var(--grafite-800);
   --muted: var(--grafite-100);
+  --muted-hover: var(--grafite-150);
   --muted-foreground: var(--grafite-500);
+  /* `--accent` do shadcn é o realce de item de menu e de lista, e continua
+     neutro: a MENTA não é isso. Ela tem nome próprio embaixo. */
   --accent: var(--grafite-100);
   --accent-foreground: var(--grafite-900);
+  /* A menta, com os três papéis separados: preenchimento, fundo suave e texto.
+     Menta como TEXTO só existe em `--menta-texto`: a menta cheia sobre branco
+     mede 1,4:1 e some. */
+  --menta: var(--komune-400);
+  --menta-fundo: var(--komune-100);
+  --menta-texto: var(--komune-700);
   /* Destrutivo reaproveita a brasa: é o mesmo alarme, e evita uma sexta cor.
      `--destructive` é a marca gráfica (preenchimento, borda, anel, ícone) e cumpre
      os 3:1 da WCAG 1.4.11; para TEXTO existe `--destructive-texto`, porque a brasa
      cheia sobre um preenchimento a 10% para em 3,99:1 e reprovaria os 4,5:1. */
-  --destructive: var(--quente);
-  --destructive-texto: var(--quente-texto);
+  /* O destrutivo ganhou cor PRÓPRIA (o coral do sistema) e deixou de dividir a
+     brasa com o "quente" térmico. Eram a mesma cor para evitar uma sexta; o
+     sistema separa, e com razão: um fornecedor quente é uma boa notícia, e
+     apagar não é. */
+  --destructive: var(--coral-600);
+  --destructive-texto: var(--coral-700);
   /* Borda forte: campo, divisória de seção, contorno de cartão. */
   --border: var(--grafite-200);
   /* A borda do campo é o único limite visível do controle: 3:1 contra o fundo. */
   --input: var(--grafite-450);
   /* O anel de foco é a marca também: quem navega por teclado vê a cor da casa,
      e o verde a 6:1 contra o fundo passa folgado dos 3:1 da WCAG 1.4.11. */
-  --ring: var(--komune-600);
+  --ring: var(--grafite-900); /* o foco é tinta: 1px de borda + anel de 12% */
   /* Hairline: linha de tabela, borda do cabeçalho, borda da pílula e da casca.
      Borda cheia numa tabela densa vira grade e cansa; a linha translúcida separa
      sem desenhar.
@@ -277,7 +326,7 @@
      o separador do modo claro, ~1,75x a separação do escuro e ainda a metade do
      caminho até virar grade. O escuro fica nos 8%: ele já separa mais, e não é o
      tema que a Heloísa abre na rua. */
-  --hairline: rgb(0 0 0 / 0.14);
+  --hairline: rgb(17 17 16 / 0.08); /* o sistema pede a linha mais fina que a nossa */
   /* Véu do diálogo e da folha. Tingido pela base como as sombras: preto puro está
      fora da paleta, e o véu precisa valer sozinho, sem depender do backdrop-filter. */
   --veu: color-mix(in oklab, var(--grafite-900) 25%, transparent);
@@ -291,12 +340,12 @@
      grafite claro. Em #24705c → #2e8c73 o pior pixel do botão fica em 4,9:1 com
      o texto quase branco, acima dos 4,5:1 do texto normal (o botão do login usa
      16px e conta como texto normal). */
-  --acao-gradiente: linear-gradient(
-    to bottom,
-    var(--komune-700),
-    var(--komune-600),
-    var(--komune-500)
-  );
+  /* CHAPADO, a partir de 29/09/2026. O sistema é explícito: "Backgrounds: flat.
+     No gradients". O gradiente existia para dar volume ao botão sem sombra; no
+     desenho novo o volume vem da FORMA (pílula) e do contraste da tinta cheia,
+     que é mais forte que qualquer queda de luz. O nome fica porque `@utility
+     acao-gradiente` e o login o leem. */
+  --acao-gradiente: var(--grafite-900);
   --acao-texto: var(--grafite-25);
 
   /* Título em gradiente: só no login (espalhar isso pelo app vira clichê). */
@@ -304,8 +353,11 @@
   /* Brilho do herói: gradiente radial em CSS, sem imagem externa e sem cromia. */
   --brilho-cor: color-mix(in oklab, var(--grafite-400) 26%, transparent);
   /* Sombra tingida pela base, nunca preta pura. */
-  --sombra-cor: color-mix(in oklab, var(--grafite-900) 12%, transparent);
-  --sombra-cor-forte: color-mix(in oklab, var(--grafite-900) 18%, transparent);
+  /* Quase planas (o sistema: "Elevation: near-flat"). O cartão perde a sombra
+     de cartão e ganha um fio de 3%; quem separa o cartão do fundo agora é o
+     branco contra o #F6F6F6, não a sombra. */
+  --sombra-cor: color-mix(in oklab, var(--grafite-900) 6%, transparent);
+  --sombra-cor-forte: color-mix(in oklab, var(--grafite-900) 14%, transparent);
 
   /* Gráficos: rampa neutra. Cor cromática em relatório voltaria a competir
      com a escala térmica; quando o gráfico for POR temperatura, use --frio e cia. */
@@ -369,40 +421,47 @@
   --cliente-ativo-texto: #10b981; /* 5,77:1 sobre o cartão, 5,02:1 sobre o chip */
 
   /* A rampa é a mesma dos dois lados; o que inverte é o papel de cada degrau. */
-  --background: var(--grafite-900);
-  --foreground: var(--grafite-300);
-  --card: var(--grafite-800);
-  --card-foreground: var(--grafite-300);
-  --popover: var(--grafite-800);
-  --popover-foreground: var(--grafite-300);
-  /* No escuro a ação segue verde, com o texto quase branco (6,0:1). O que muda é
-     o ANEL: o #24705c mede 3,08:1 contra o fundo grafite-900, e 3:1 sem folga
-     nenhuma é o mesmo que não ter — o foco sobe para o verde claro, em 5,7:1. */
-  --primary: var(--komune-600);
-  --primary-foreground: var(--grafite-25);
-  --secondary: var(--grafite-750);
-  --secondary-foreground: var(--grafite-300);
-  --muted: var(--grafite-850);
-  --muted-foreground: var(--grafite-400);
-  --accent: var(--grafite-700);
-  --accent-foreground: var(--grafite-300);
-  --destructive: var(--quente);
-  --destructive-texto: var(--quente-texto);
-  --border: var(--grafite-600);
-  --input: var(--grafite-450);
-  --ring: var(--grafite-300);
+  /* O escuro do sistema: painel #050505, cartão #1c1c1c, tinta quase branca. */
+  --background: var(--grafite-950);
+  --foreground: #f4f4f3;
+  --card: var(--grafite-850);
+  --card-foreground: #f4f4f3;
+  --popover: var(--grafite-850);
+  --popover-foreground: #f4f4f3;
+  /* No escuro a ação INVERTE: pílula branca com tinta em cima, que é o espelho
+     exato da pílula preta do claro. O verde da marca saiu junto com ele. */
+  --primary: #ffffff;
+  --primary-foreground: var(--grafite-900);
+  --secondary: var(--grafite-800);
+  --secondary-foreground: #f4f4f3;
+  --muted: var(--grafite-800);
+  --muted-hover: #2e2e2e;
+  --muted-foreground: #a3a3a2;
+  --accent: var(--grafite-800);
+  --accent-foreground: #f4f4f3;
+  /* A menta é a MESMA nos dois temas: ela é o acento da marca, e mudar de tom
+     com o tema faria dela mais uma cor de interface. O que muda é o fundo
+     suave, que no escuro é a própria menta a 14%. */
+  --menta: var(--komune-400);
+  --menta-fundo: rgb(120 252 144 / 0.14);
+  --menta-texto: var(--komune-400);
+  --destructive: var(--coral-400);
+  --destructive-texto: #ff8a78;
+  --border: #2a2a2a;
+  /* Mesma conta do claro, do outro lado: o #5c5c5c do sistema passa sobre o
+     painel (#050505, 3,05:1) e reprova sobre o cartão (2,55), o muted (2,29) e
+     a pílula em hover (2,03). O tom sobe até o pior caso passar: #7a7a7a dá
+     3,16:1 na pior superfície. */
+  --input: #7a7a7a;
+  --ring: #ffffff;
   --hairline: rgb(255 255 255 / 0.08);
   --veu: color-mix(in oklab, var(--grafite-950) 45%, transparent);
 
   /* Ação: o gradiente branco do template, com texto quase preto.
      Pior pixel (parada de 60% sobre o cartão): 8,04:1. */
-  --acao-gradiente: linear-gradient(
-    to bottom,
-    #ffffff,
-    rgb(255 255 255 / 0.95),
-    rgb(255 255 255 / 0.6)
-  );
-  --acao-texto: var(--grafite-950);
+  /* Chapado também aqui, pelo mesmo motivo do claro. */
+  --acao-gradiente: #ffffff;
+  --acao-texto: var(--grafite-900);
 
   --titulo-gradiente: linear-gradient(to bottom, #ffffff, rgb(255 255 255 / 0.6));
   --brilho-cor: color-mix(in oklab, var(--grafite-300) 12%, transparent);

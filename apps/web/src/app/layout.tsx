@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 
 import './globals.css';
 
@@ -9,30 +9,38 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { appUrl } from '@/lib/env';
 
 /**
- * Geist na interface, Geist Mono em todo número.
+ * Plus Jakarta Sans na interface, Geist Mono em todo número
+ * (Tríade Design System, 29/09/2026).
  *
- * Poppins saiu em 08/09/2026: é uma geométrica de marca, desenhada para título
- * curto e respiro. Numa tela densa, com tabela de 100 linhas e rótulo de 11px,
- * ela fica larga, perde legibilidade nos tamanhos pequenos e dá ar de material
- * de marketing a uma ferramenta de trabalho.
+ * A troca veio com o sistema de design que o Rafael mandou. Plus Jakarta Sans é
+ * uma grotesca humanista com terminais levemente arredondados: mais presença que
+ * a Geist nos títulos, e altura de x suficiente para aguentar 12px numa célula
+ * de tabela — que é o que uma ferramenta de uso diário precisa. O par Mono fica:
+ * número e código continuam com esqueleto próprio, e telefone alinha embaixo de
+ * telefone.
  *
- * Geist é grotesca neutra com altura de x generosa: aguenta 12px numa célula de
- * tabela e some do caminho, que é o que uma ferramenta de uso diário precisa.
- * O par Mono é da mesma família, então número e texto compartilham o esqueleto —
- * telefone alinhado embaixo de telefone sem parecer outro tipo de coisa.
+ * Ênfase continua vindo do PESO da mesma família (300 a 600), nunca de uma
+ * segunda família.
  *
- * Ênfase continua vindo do peso da MESMA família, nunca de uma segunda.
+ * SERVIDAS DA PASTA, e não do `next/font/google`. Duas razões, e a segunda doeu:
+ * o sistema já traz os arquivos variáveis com os `unicode-range` certos, e o
+ * build da Vercel quebrou em 28/09/2026 baixando fonte do Google com cache
+ * corrompido. Arquivo no repositório não depende de rede em tempo de build.
  */
-const geist = Geist({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-geist',
+const jakarta = localFont({
+  src: [
+    { path: './fontes/PlusJakartaSans-latin.woff2', weight: '300 600', style: 'normal' },
+    { path: './fontes/PlusJakartaSans-latin-ext.woff2', weight: '300 600', style: 'normal' },
+  ],
+  variable: '--font-jakarta',
   display: 'swap',
 });
 
-const geistMono = Geist_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
+const geistMono = localFont({
+  src: [
+    { path: './fontes/GeistMono-latin.woff2', weight: '400 500', style: 'normal' },
+    { path: './fontes/GeistMono-latin-ext.woff2', weight: '400 500', style: 'normal' },
+  ],
   variable: '--font-geist-mono',
   display: 'swap',
 });
@@ -89,7 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // no <html> antes da hidratação.
     <html
       lang="pt-BR"
-      className={`${geist.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${jakarta.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
