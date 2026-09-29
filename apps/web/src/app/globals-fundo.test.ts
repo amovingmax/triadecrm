@@ -29,7 +29,13 @@ const FUNCOES_DE_IMAGEM = /^(linear-gradient|radial-gradient|conic-gradient|repe
 /** Os valores de `:root` e `.dark`, achatados: o nome do token para o valor cru. */
 function tokens(): Map<string, string> {
   const mapa = new Map<string, string>();
-  for (const [, nome, valor] of CSS.matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)) {
+  for (const achado of CSS.matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)) {
+    // Índice explícito, e não desestruturação: com `noUncheckedIndexedAccess`
+    // ligado, `const [, nome, valor] of …` chega como `string | undefined` e o
+    // `tsc` do build da Vercel recusa. (Custou um deploy morto em 29/09/2026.)
+    const nome = achado[1];
+    const valor = achado[2];
+    if (nome === undefined || valor === undefined) continue;
     // O primeiro valor vence: é o do tema claro, e é o que se mede aqui. O
     // escuro é o mesmo formato por construção (os dois saem do mesmo bloco).
     if (!mapa.has(nome)) mapa.set(nome, valor.trim());
@@ -39,7 +45,9 @@ function tokens(): Map<string, string> {
 
 /** Cada `background-image: var(--x)` do arquivo, com o token que ele consome. */
 function fundosDeImagem(): string[] {
-  return [...CSS.matchAll(/background-image:\s*var\((--[a-z0-9-]+)\)/g)].map((m) => m[1]!);
+  return [...CSS.matchAll(/background-image:\s*var\((--[a-z0-9-]+)\)/g)]
+    .map((m) => m[1])
+    .filter((n): n is string => n !== undefined);
 }
 
 describe('background-image no globals.css', () => {
@@ -52,10 +60,10 @@ describe('background-image no globals.css', () => {
   it('todo token pintado com background-image é mesmo um gradiente', () => {
     const t = tokens();
     for (const nome of fundosDeImagem()) {
-      const valor = t.get(nome);
-      expect(valor, `${nome} não existe em :root`).toBeDefined();
+      const valor = t.get(nome) ?? '';
+      expect(valor, `${nome} não existe em :root`).not.toBe('');
       expect(
-        FUNCOES_DE_IMAGEM.test(valor!),
+        FUNCOES_DE_IMAGEM.test(valor),
         `${nome} vale "${valor}" e é pintado com background-image, que descarta a declaração em silêncio. Use background-color.`,
       ).toBe(true);
     }
