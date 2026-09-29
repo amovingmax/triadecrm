@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import {
-  ArrowUpRight,
   BadgeCheck,
   CalendarCheck,
   ClipboardList,
@@ -53,20 +52,11 @@ export function ResumoDoDia({
   metricas,
   carregando,
   podeDefinirMeta,
-  esperando,
-  parados,
-  pendentes,
 }: {
   metricas: readonly MetricaDoDia[];
   carregando: boolean;
   /** Gestor e admin definem meta (é o que a RLS de `goals` permite); os demais só leem. */
   podeDefinirMeta: boolean;
-  /** Quantos responderam no WhatsApp e ninguém falou (o relógio de outra pessoa). */
-  esperando: number;
-  /** Quantos negócios estão parados na etapa além do SLA. */
-  parados: number;
-  /** O total pendente de hoje — o mesmo número que o cabeçalho já mostra. */
-  pendentes: number;
 }) {
   if (carregando) return <EsqueletoDoResumo />;
 
@@ -84,48 +74,11 @@ export function ResumoDoDia({
 
   return (
     <section aria-label="Resumo do dia" className="flex flex-col gap-3">
-      {/* OS DOIS QUE FAZEM ALGUÉM AGIR VÊM PRIMEIRO (29/09/2026).
-          ---------------------------------------------------------------------
-          Rafael pediu fidelidade ao protótipo, e o protótipo abre o Meu dia com
-          cartões que respondem "o que está me esperando?" — não com o placar das
-          metas. A diferença não é estética: "Portas batidas: 3" é o que EU fiz;
-          "Esperando a gente: 9" é o que está parado por minha causa. Só o
-          segundo faz alguém levantar da cadeira.
-
-          Os dois números novos não custam consulta: eles já estão na fila que a
-          tela carrega, contados por tipo de item. As metas ficam logo abaixo,
-          menores — continuam existindo, e continuam linkando para Metas. */}
-      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <CartaoDeAtencao
-          rotulo="Esperando a gente"
-          apoio="Responderam e ninguém falou"
-          valor={esperando}
-          unidade={esperando === 1 ? 'conversa' : 'conversas'}
-          alerta={esperando > 0}
-          href="/conversas?aba=responderam"
-        />
-        <CartaoDeAtencao
-          rotulo="Parados na etapa"
-          apoio="Passaram do prazo do funil"
-          valor={parados}
-          unidade={parados === 1 ? 'negócio' : 'negócios'}
-          alerta={parados > 0}
-          href="/funis"
-        />
-        {/* O MESMO número do cabeçalho, e é de propósito: somar as métricas
-            aqui daria "portas batidas + ligações + reuniões", que não é
-            quantidade de nada. Um número inventado num cartão grande é pior que
-            não ter o cartão. */}
-        <CartaoDeAtencao
-          rotulo="Pendentes hoje"
-          apoio="Tarefas, reuniões e próximas ações"
-          valor={pendentes}
-          unidade={pendentes === 1 ? 'item' : 'itens'}
-          alerta={false}
-          href="/agenda"
-        />
-      </ul>
-
+      {/* CARTÃO POR MÉTRICA, e não uma faixa dividida por filetes (29/09/2026,
+          Tríade Design System). A faixa punha quatro números numa caixa só,
+          separados por linha vertical — desenho de tabela, não de painel. O
+          sistema pede um cartão branco por unidade de informação, e é o que faz
+          cada número ter o seu lugar em vez de dividir um. */}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {visiveis.map((metrica) => (
           <CartaoDeMetrica key={metrica.metrica} metrica={metrica} />
@@ -267,62 +220,6 @@ function CartaoDeMetrica({ metrica }: { metrica: MetricaDoDia }) {
 
       {/* A definição só existe como `title` do cartão: ver a nota acima. */}
       <span className="sr-only">{definicao}</span>
-    </li>
-  );
-}
-
-/**
- * Um dos três cartões do topo: o número que faz alguém agir.
- *
- * `alerta` NÃO pinta o cartão inteiro de vermelho — pinta só o número e a
- * pastilha. Um cartão inteiro em brasa é um alarme, e alarme que aparece todo
- * dia (sempre há alguém esperando) é alarme que ninguém escuta. O que muda é a
- * TINTA DO NÚMERO, que é o que a pessoa varre.
- */
-function CartaoDeAtencao({
-  rotulo,
-  apoio,
-  valor,
-  unidade,
-  alerta,
-  href,
-}: {
-  rotulo: string;
-  apoio: string;
-  valor: number;
-  unidade: string;
-  alerta: boolean;
-  href: string;
-}) {
-  return (
-    <li className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-heading text-[17px] leading-tight font-medium tracking-[-0.01em]">
-            {rotulo}
-          </p>
-          <p className="mt-1 text-[13px] text-muted-foreground">{apoio}</p>
-        </div>
-        {/* O disco de "abrir" no canto, que é a ação do cartão no sistema. */}
-        <Link
-          href={href}
-          aria-label={`Abrir ${rotulo}`}
-          className="toque flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-muted-hover"
-        >
-          <ArrowUpRight className="size-4" aria-hidden="true" strokeWidth={1.75} />
-        </Link>
-      </div>
-      <p className="flex items-baseline gap-2">
-        <span
-          className={cn(
-            'numerico text-[40px] leading-none font-medium tracking-[-0.03em]',
-            valor === 0 ? 'text-muted-foreground' : alerta ? 'text-destructive-texto' : '',
-          )}
-        >
-          {valor}
-        </span>
-        <span className="text-sm text-muted-foreground">{unidade}</span>
-      </p>
     </li>
   );
 }
