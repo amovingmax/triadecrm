@@ -5177,3 +5177,26 @@ que apareceu no caminho, cada tela fotografada antes e depois no ambiente local.
 - Não mexido de propósito: as telas internas da ligação (a temperatura ali é o
   critério do lote, não enfeite) e o recibo do Registrar, que conta o que mudou
   na temperatura — mudar isso é decisão de produto, não de desenho.
+
+### 30/09/2026 — O menu da esquerda abre com o mouse
+
+Pedido do Rafael: "adicione um expandir menu ali, na hora que passar o mouse
+em cima". Com o mouse sobre o trilho de ícones, ele cresce para 240px e mostra
+o nome de cada módulo e a marca "Tríade".
+
+- **Abre por cima da página**, com sombra, sem empurrar o conteúdo: o trilho
+  continua ocupando 72px; quem cresce é um painel por cima.
+- **Espera 150ms para abrir e 100ms para fechar**, para não piscar quando o
+  mouse só atravessa o trilho a caminho de outra coisa.
+- **Abre também no teclado** (Tab), e só com foco de teclado: o clique do mouse
+  não deixa o menu preso aberto depois de navegar. No tablet, sem mouse, o
+  trilho fica fechado como antes.
+- O nome de cada item agora é texto de verdade dentro do link (antes era só
+  `title`), então o leitor de tela anuncia o módulo pelo próprio nome.
+- O contador sobre o item ativo virou tinta sobre menta, para não sumir no
+  fundo verde.
+
+- Tocado: `layout/sidebar.tsx`, `layout/nav-link.tsx`.
+- Verificado: lint, typecheck, 921 testes, build com o comando da Vercel, e
+  medido num navegador local: fechado 72px, com o mouse 240px, passando rápido
+  continua 72px, com Tab 240px; fotografado no claro e no escuro.

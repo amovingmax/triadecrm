@@ -69,41 +69,63 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
   // direcionamento", Rafael), e foram o AGRUPAMENTO e o RÓTULO que consertaram.
   //
   // O empate se resolve pela regra do próprio sistema — a referência vence na
-  // aparência, o repositório vence no significado. Então:
-  //   · a APARÊNCIA é a do sistema: disco de 44px, ícone de 18px, tinta cheia
-  //     no ativo, contador em menta;
-  //   · o SIGNIFICADO fica: o nome vive no `title` e no rótulo acessível, e os
-  //     grupos viram um fio de separação no trilho (ver `sidebar.tsx`).
+  // aparência, o repositório vence no significado. Então a APARÊNCIA é a do
+  // sistema (disco de 44px, ícone de 18px, menta no ativo) e o SIGNIFICADO fica:
   //
-  // O `title` é o que devolve o rótulo a quem não decorou treze ícones, e o
-  // `aria-label` é o que faz o leitor de tela anunciar o módulo em vez de "link".
+  // O RÓTULO VOLTA QUANDO O MOUSE PASSA (30/09/2026). Rafael: "adicione um
+  // expandir menu ali, na hora que passar o mouse em cima". O item é uma linha
+  // — disco do ícone mais o nome —, e o trilho fechado mostra só o disco; o nome
+  // está sempre no documento (é ele que dá nome ao link para o leitor de tela),
+  // e só aparece quando o trilho abre (`sidebar.tsx`). Por isso saíram o `title`
+  // e o `aria-label`: o primeiro virava um segundo rótulo flutuando ao lado do
+  // rótulo de verdade, e o segundo repetia o texto que o link já tem.
   if (variante === 'trilho') {
     return (
       <Link
         href={item.href}
         aria-current={ativo ? 'page' : undefined}
-        aria-label={item.rotulo}
-        title={item.rotulo}
         onClick={onNavegar}
         className={cn(
-          'relative flex size-11 shrink-0 items-center justify-center rounded-full transition-colors',
+          // Fechado, a linha tem os 44px do trilho e o `rounded-full` a faz um
+          // disco; aberto, a mesma linha vira uma pílula com o nome dentro.
+          'relative flex h-11 w-full shrink-0 items-center gap-3 overflow-hidden rounded-full pr-4 transition-colors',
+          'outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
           ativo
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
             : 'text-sidebar-muted-foreground hover:bg-muted hover:text-sidebar-foreground',
         )}
       >
-        <Icone className="size-[18px]" aria-hidden="true" strokeWidth={1.75} />
-        {numero !== null ? (
-          // A MENTA, e é o único lugar do trilho com cor. Ela existe aqui porque
-          // um trilho sem rótulo precisa de um sinal que se veja sem ler: o
-          // número é o que diz em qual módulo há trabalho parado agora.
-          <span
-            aria-label={`${numero} esperando`}
-            className="numerico absolute top-0.5 right-0 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-menta px-1 text-[10px] leading-none font-semibold text-menta-tinta"
-          >
-            {numero > 99 ? '99+' : numero}
-          </span>
-        ) : null}
+        <span className="relative flex size-11 shrink-0 items-center justify-center">
+          <Icone className="size-[18px]" aria-hidden="true" strokeWidth={1.75} />
+          {numero !== null ? (
+            // A MENTA, e é o único lugar do trilho fechado com cor. Ela existe
+            // aqui porque o trilho sem rótulo precisa de um sinal que se veja sem
+            // ler: o número é o que diz em qual módulo há trabalho parado agora.
+            // No ativo o fundo já é menta, e a contagem vira tinta para não sumir.
+            <span
+              aria-label={`${numero} esperando`}
+              className={cn(
+                'numerico absolute top-0.5 right-0 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold',
+                ativo ? 'bg-menta-tinta text-menta' : 'bg-menta text-menta-tinta',
+              )}
+            >
+              {numero > 99 ? '99+' : numero}
+            </span>
+          ) : null}
+        </span>
+        {/* O nome: invisível com o trilho fechado, aparece quando ele abre. A
+            demora de entrada acompanha a do trilho, para o texto não surgir
+            antes de haver espaço para ele. */}
+        <span
+          className={cn(
+            'truncate text-sm font-medium whitespace-nowrap opacity-0 transition-opacity duration-150',
+            'group-hover/trilho:opacity-100 group-hover/trilho:delay-150',
+            'group-has-[:focus-visible]/trilho:opacity-100',
+            'motion-reduce:transition-none',
+          )}
+        >
+          {item.rotulo}
+        </span>
       </Link>
     );
   }
