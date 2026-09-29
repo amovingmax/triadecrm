@@ -61,6 +61,7 @@ import {
   rotuloDoSegmento,
   rotuloDoSilencio,
 } from './formatos';
+import { SecaoEtiquetas, SecaoRespostasProntas } from './catalogo-do-atendimento';
 import {
   ROTULO_CATALOGO,
   SECOES_CATALOGO,
@@ -190,6 +191,11 @@ export function PainelCatalogos({
     motivos: dados.motivos.length,
     desfechos: dados.desfechos.length,
     modelos: dados.modelos.length,
+    // As duas que vieram de Atendimento carregam sozinhas, quando abertas —
+    // como o de-para. Contá-las aqui obrigaria esta consulta a buscar duas
+    // listas que quase ninguém abre, em toda visita à aba.
+    respostas: 0,
+    etiquetas: 0,
   };
 
   return (
@@ -202,7 +208,10 @@ export function PainelCatalogos({
           id,
           rotulo: ROTULO_CATALOGO[id],
           // O de-para carrega sozinho quando é aberto, e não tem contagem aqui.
-          contagem: id === 'de_para' ? undefined : contagens[id],
+          contagem:
+            id === 'de_para' || id === 'respostas' || id === 'etiquetas'
+              ? undefined
+              : contagens[id],
         }))}
       />
 
@@ -276,6 +285,12 @@ export function PainelCatalogos({
           }
         />
       ) : null}
+
+      {/* As duas que vieram de Atendimento em 29/09/2026. Elas buscam os
+          próprios dados, por isso não recebem `dados` — e por isso também só
+          custam consulta quando alguém abre a seção. */}
+      {secao === 'respostas' ? <SecaoRespostasProntas podeEditar={podeEsquecer} /> : null}
+      {secao === 'etiquetas' ? <SecaoEtiquetas podeEditar={podeEsquecer} /> : null}
 
       <DialogoConfirmar
         aberto={desfechoEmDuvida !== null}

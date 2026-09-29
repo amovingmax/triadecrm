@@ -3,13 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 import { buscarFreios, buscarSaudeDaEsteira } from './dados';
 import { rotuloDaRecusaDoAtendimento } from './formatos';
@@ -35,21 +34,18 @@ type Config = {
   /** Quantos cumprimentos por hora o lote da casa tenta. O teto do dia manda acima disto. */
   cumprimento_por_hora?: number;
 };
-type Resposta = { id: number; atalho: string; titulo: string; texto: string; ativo: boolean };
-type Etiqueta = { id: number; name: string; color: string | null };
-
-const CORES = ['#24705c', '#2563eb', '#7c3aed', '#db2777', '#d97706', '#64748b'];
 
 async function carregar() {
   const supabase = createClient();
-  const [config, modelo, respostas, etiquetas] = await Promise.all([
+  // Duas consultas, e não quatro: as respostas prontas e as etiquetas saíram
+  // desta aba em 29/09/2026 e agora carregam sozinhas, na aba Catálogos, só
+  // quando alguém abre a seção delas.
+  const [config, modelo] = await Promise.all([
     supabase.from('app_settings').select('value').eq('key', 'atendimento').maybeSingle(),
     supabase
       .from('message_templates')
       .select('template_code, body')
       .in('template_code', ['GEN-SYS-AUSENCIA', 'GEN-SYS-INTRO', 'GEN-SYS-TUDOBEM']),
-    supabase.from('respostas_rapidas').select('id, atalho, titulo, texto, ativo').order('atalho'),
-    supabase.from('tags').select('id, name, color').order('name'),
   ]);
   const corpos = (modelo.data ?? []) as { template_code: string; body: string }[];
   const corpo = (codigo: string) => corpos.find((t) => t.template_code === codigo)?.body ?? '';
@@ -58,8 +54,6 @@ async function carregar() {
     textoAusencia: corpo('GEN-SYS-AUSENCIA'),
     textoIntroducao: corpo('GEN-SYS-INTRO'),
     textoTudoBem: corpo('GEN-SYS-TUDOBEM'),
-    respostas: (respostas.data ?? []) as Resposta[],
-    etiquetas: (etiquetas.data ?? []) as Etiqueta[],
   };
 }
 
@@ -104,8 +98,7 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
   if (consulta.isError || !consulta.data) {
     return <p className="text-sm text-destructive">Não deu para ler as configurações.</p>;
   }
-  const { config, textoAusencia, textoIntroducao, textoTudoBem, respostas, etiquetas } =
-    consulta.data;
+  const { config, textoAusencia, textoIntroducao, textoTudoBem } = consulta.data;
 
   return (
     <div className="flex max-w-3xl flex-col gap-8">
@@ -219,8 +212,10 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
         ) : null}
       </section>
 
-      <RespostasProntas respostas={respostas} podeEditar={podeEditar} aoMudar={recarregar} />
-      <Etiquetas etiquetas={etiquetas} podeEditar={podeEditar} aoMudar={recarregar} />
+      {/* As respostas prontas e as etiquetas saíram desta aba em 29/09/2026:
+          são CATÁLOGOS, e a aba Catálogos existe ao lado. Atendimento é sobre o
+          que o CRM faz sozinho; resposta pronta é o que uma pessoa digita, e
+          etiqueta é o que uma pessoa põe na ficha. */}
 
       {/*
         O robô está de pé? Uma linha, não um painel: worker, quando bateu ponto
@@ -428,186 +423,6 @@ function TextoAutomatico({
 function primeiraLinha(texto: string): string {
   const linha = texto.trim().split('\n')[0]?.trim() ?? '';
   return linha.length > 60 ? `${linha.slice(0, 60)}…` : linha;
-}
-
-function RespostasProntas({
-  respostas,
-  podeEditar,
-  aoMudar,
-}: {
-  respostas: Resposta[];
-  podeEditar: boolean;
-  aoMudar: () => void;
-}) {
-  const [atalho, setAtalho] = useState('');
-  const [titulo, setTitulo] = useState('');
-  const [texto, setTexto] = useState('');
-
-  const criar = useMutation({
-    mutationFn: async () => {
-      const { error } = await createClient()
-        .from('respostas_rapidas')
-        .insert({ atalho: atalho.trim().toLowerCase().replace(/^\//, ''), titulo: titulo.trim(), texto: texto.trim() });
-      if (error) throw new Error(error.code === '23505' ? 'Já existe um atalho com esse nome.' : 'Use só letras minúsculas, números e hífen no atalho.');
-    },
-    onSuccess: () => {
-      setAtalho('');
-      setTitulo('');
-      setTexto('');
-      toast.success('Resposta pronta criada.');
-      aoMudar();
-    },
-    onError: (e: Error) => toast.error('Não criou.', { description: e.message }),
-  });
-  const apagar = useMutation({
-    mutationFn: async (id: number) => {
-      const { error } = await createClient().from('respostas_rapidas').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: aoMudar,
-  });
-
-  return (
-    <section className="flex flex-col gap-3">
-      <div>
-        <h2 className="font-heading text-base font-medium">Respostas prontas</h2>
-        <p className="text-sm text-muted-foreground">
-          Na caixa de resposta das Conversas, digite <code>/</code> e escolha. O texto entra na hora.
-        </p>
-      </div>
-      <ul className="divide-y divide-hairline rounded-xl border border-hairline bg-card">
-        {respostas.map((r) => (
-          <li key={r.id} className="flex items-start gap-3 px-4 py-2.5 text-sm">
-            <code className="shrink-0 text-primary">/{r.atalho}</code>
-            <span className="min-w-0 flex-1">
-              <span className="font-medium">{r.titulo}</span>
-              <span className="block truncate text-xs text-muted-foreground">{r.texto}</span>
-            </span>
-            {podeEditar ? (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Apagar /${r.atalho}`}
-                onClick={() => apagar.mutate(r.id)}
-              >
-                <Trash2 aria-hidden="true" />
-              </Button>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-      {podeEditar ? (
-        <form
-          className="grid gap-2 sm:grid-cols-[9rem_12rem_minmax(0,1fr)_auto] sm:items-start"
-          onSubmit={(e) => {
-            e.preventDefault();
-            criar.mutate();
-          }}
-        >
-          <Input aria-label="Atalho" placeholder="/preco" value={atalho} maxLength={31} onChange={(e) => setAtalho(e.target.value)} className="h-11 md:h-9" />
-          <Input aria-label="Nome" placeholder="Nome" value={titulo} maxLength={60} onChange={(e) => setTitulo(e.target.value)} className="h-11 md:h-9" />
-          <Input aria-label="Texto" placeholder="O texto que entra na mensagem" value={texto} maxLength={1000} onChange={(e) => setTexto(e.target.value)} className="h-11 md:h-9" />
-          <Button type="submit" className="toque h-11 md:h-9" disabled={!atalho.trim() || !titulo.trim() || !texto.trim() || criar.isPending}>
-            <Plus aria-hidden="true" />
-            Criar
-          </Button>
-        </form>
-      ) : null}
-    </section>
-  );
-}
-
-function Etiquetas({
-  etiquetas,
-  podeEditar,
-  aoMudar,
-}: {
-  etiquetas: Etiqueta[];
-  podeEditar: boolean;
-  aoMudar: () => void;
-}) {
-  const [nome, setNome] = useState('');
-  const [cor, setCor] = useState(CORES[0] ?? '#24705c');
-  const criar = useMutation({
-    mutationFn: async () => {
-      const { error } = await createClient().from('tags').insert({ name: nome.trim().toLowerCase(), color: cor });
-      if (error) throw new Error(error.code === '23505' ? 'Essa etiqueta já existe.' : error.message);
-    },
-    onSuccess: () => {
-      setNome('');
-      aoMudar();
-    },
-    onError: (e: Error) => toast.error('Não criou.', { description: e.message }),
-  });
-  const apagar = useMutation({
-    mutationFn: async (id: number) => {
-      const { error } = await createClient().from('tags').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: aoMudar,
-    onError: () => toast.error('Não apagou: a etiqueta ainda está em uso.'),
-  });
-
-  return (
-    <section className="flex flex-col gap-3">
-      <div>
-        <h2 className="font-heading text-base font-medium">Etiquetas</h2>
-        <p className="text-sm text-muted-foreground">
-          Marcam o parceiro. Aparecem no topo da conversa, e qualquer pessoa do time põe e tira.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {etiquetas.map((e) => (
-          <span
-            key={e.id}
-            className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-card py-1 pr-1 pl-2.5 text-sm"
-          >
-            <span className="size-2.5 rounded-full" style={{ background: e.color ?? '#64748b' }} aria-hidden="true" />
-            {e.name}
-            {podeEditar ? (
-              <button
-                type="button"
-                aria-label={`Apagar a etiqueta ${e.name}`}
-                onClick={() => apagar.mutate(e.id)}
-                className="rounded-full p-1 text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="size-3.5" aria-hidden="true" />
-              </button>
-            ) : null}
-          </span>
-        ))}
-      </div>
-      {podeEditar ? (
-        <form
-          className="flex flex-wrap items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (nome.trim()) criar.mutate();
-          }}
-        >
-          <Input aria-label="Nome da etiqueta" placeholder="Nova etiqueta" value={nome} maxLength={40} onChange={(e) => setNome(e.target.value)} className="h-11 w-48 md:h-9" />
-          <span className="flex items-center gap-1" role="radiogroup" aria-label="Cor">
-            {CORES.map((c) => (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={cor === c}
-                aria-label={`Cor ${c}`}
-                onClick={() => setCor(c)}
-                className={cn('size-7 rounded-full border-2', cor === c ? 'border-foreground' : 'border-transparent')}
-                style={{ background: c }}
-              />
-            ))}
-          </span>
-          <Button type="submit" className="toque h-11 md:h-9" disabled={!nome.trim() || criar.isPending}>
-            <Plus aria-hidden="true" />
-            Criar
-          </Button>
-        </form>
-      ) : null}
-    </section>
-  );
 }
 
 // ---------------------------------------------------------------------------

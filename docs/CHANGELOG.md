@@ -4609,3 +4609,25 @@ não havia onde escrever o teste. Cinco asserções novas, e a primeira é o cas
 - Pendente: "Respostas prontas" e "Etiquetas" continuam nesta aba, e são
   catálogos — a aba Catálogos existe ao lado. Mover é o próximo corte óbvio, e
   não foi feito hoje porque mexe em duas abas e o Rafael não pediu.
+
+### 29/09/2026 — as respostas prontas e as etiquetas foram para Catálogos
+
+Rafael: *"S"*, à pergunta se eu movia as duas listas que sobraram na aba
+Atendimento. Elas eram metade daquela tela e não têm nada a ver com o que a aba
+promete: Atendimento é sobre o que o CRM faz **sozinho** — os interruptores, os
+textos automáticos, os freios. Resposta pronta é o que uma pessoa digita com
+`/atalho` na caixa da conversa; etiqueta é o que uma pessoa põe na ficha. São
+catálogos, e a aba Catálogos existia ao lado com seis seções.
+
+As duas viraram `catalogo-do-atendimento.tsx` e **buscam os próprios dados**, em
+vez de receber por prop. Duas consequências, e a segunda não era o objetivo mas
+é a que mais vale: mudaram de aba sem que nenhum dos dois painéis precisasse
+saber o que o outro carrega, e agora só custam consulta quando alguém abre a
+seção. A aba Atendimento passou de quatro consultas para duas em toda visita.
+
+- Tocado: `catalogo-do-atendimento.tsx` (novo), `painel-atendimento.tsx`,
+  `painel-catalogos.tsx`, `tipos.ts` (duas seções e as descrições das abas).
+- Verificado: lint, typecheck, testes (web 913) e `pnpm build`.
+- Nota de ambiente: o disco da máquina encheu no meio desta tarefa (100%). Os
+  caches de build (`.next`) e um cache de atualizador de 833 MB saíram; sobrou
+  1,7 GB. Vale um olho, porque `pnpm build` precisa de espaço.

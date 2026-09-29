@@ -20,12 +20,13 @@ export const ABAS: readonly { id: Aba; rotulo: string; descricao: string }[] = [
     id: 'atendimento',
     rotulo: 'Atendimento',
     descricao:
-      'O que o CRM faz sozinho no WhatsApp (lead automático, distribuição, fora do horário), as respostas prontas e as etiquetas.',
+      'O que o CRM faz sozinho no WhatsApp: os interruptores, os textos automáticos e os freios.',
   },
   {
     id: 'catalogos',
     rotulo: 'Catálogos',
-    descricao: 'As listas que o CRM usa para classificar, agendar e decidir sozinho.',
+    descricao:
+      'As listas do CRM: categorias, cidades, feriados, motivos, desfechos, modelos, respostas prontas e etiquetas.',
   },
   {
     id: 'lgpd',
@@ -43,7 +44,11 @@ export type SecaoCatalogo =
   | 'feriados'
   | 'motivos'
   | 'desfechos'
-  | 'modelos';
+  | 'modelos'
+  /** O que uma PESSOA digita com /atalho na caixa da conversa (29/09/2026). */
+  | 'respostas'
+  /** O que uma pessoa põe na ficha do parceiro. */
+  | 'etiquetas';
 
 export const SECOES_CATALOGO: readonly SecaoCatalogo[] = [
   'categorias',
@@ -53,6 +58,8 @@ export const SECOES_CATALOGO: readonly SecaoCatalogo[] = [
   'motivos',
   'desfechos',
   'modelos',
+  'respostas',
+  'etiquetas',
 ];
 
 export const ROTULO_CATALOGO: Record<SecaoCatalogo, string> = {
@@ -63,6 +70,8 @@ export const ROTULO_CATALOGO: Record<SecaoCatalogo, string> = {
   motivos: 'Motivos de perda',
   desfechos: 'Desfechos',
   modelos: 'Modelos de mensagem',
+  respostas: 'Respostas prontas',
+  etiquetas: 'Etiquetas',
 };
 
 /** Seções da aba de LGPD. */
