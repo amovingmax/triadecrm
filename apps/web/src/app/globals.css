@@ -110,8 +110,8 @@
      texto em formato de pílula é ilegível. Botão e campo viram pílula pela
      classe `rounded-full`, escrita neles (ver `ui/button.tsx` e `ui/input.tsx`);
      todo o resto que usa `rounded-lg` ganha os 16px da linha. */
-  --radius-sm: var(--raio-interativo);
-  --radius-md: var(--raio-interativo);
+  --radius-sm: var(--raio-chip);
+  --radius-md: var(--raio-chip);
   --radius-lg: var(--raio-linha);
   --radius-xl: var(--raio-container);
   --radius-2xl: var(--raio-container);
@@ -145,6 +145,13 @@
      vai a 24px; a linha dentro do cartão, a 16px. A barra térmica continua sem
      raio — ela é marca gráfica, não objeto. */
   --raio-interativo: 9999px;
+  /* O DEGRAU PEQUENO, e por que ele existe (29/09/2026, meia hora depois de eu
+     quebrar isto em produção). Com `--radius-md` valendo pílula, TODO canto
+     escrito `rounded-br-md` virava um quarto de círculo de 9999px: o "rabinho"
+     do balão do WhatsApp comeu metade da mensagem, e o Rafael viu no print
+     antes de eu ver. Pílula é para o objeto INTEIRO que se aperta, nunca para
+     um canto solto — esse é o degrau de 10px do sistema (`--radius-sm`). */
+  --raio-chip: 0.625rem; /* 10px */
   --raio-container: 1.5rem; /* 24px */
   --raio-linha: 1rem; /* 16px: linha de lista dentro do cartão, área de texto */
   --raio-painel: 2rem; /* 32px: painel escuro de destaque */
