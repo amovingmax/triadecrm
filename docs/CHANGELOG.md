@@ -5200,3 +5200,231 @@ o nome de cada módulo e a marca "Tríade".
 - Verificado: lint, typecheck, 921 testes, build com o comando da Vercel, e
   medido num navegador local: fechado 72px, com o mouse 240px, passando rápido
   continua 72px, com Tab 240px; fotografado no claro e no escuro.
+
+### 30/09/2026 — Meu dia em abas, hierarquia e marcar pela Agenda, sobre a `main` (RF-MET-03, RF-AGE-01, RF-AGE-07)
+
+As funcionalidades da `Teste-Janio` foram trazidas para cima da `main`, sem levar o
+modelo antigo de Agenda. Quem executou foi o plano de
+`docs/operacao/levar-teste-janio-para-a-main.md`, e ele fica só na pasta da
+`Teste-Janio`. A branch nova é `meu-dia-e-equipe`, criada a partir da `origin/main`
+4dfd494. Os blocos A–D não têm migração. A migração que existe é a de "marcar para a equipe", no fim desta entrada.
+
+**Bloco A, a hierarquia.** Três arquivos novos: `lib/auth/hierarquia.ts`
+(`acompanhaEquipe`, `pessoasAcompanhadas`, `pessoaPedida`), `lib/auth/equipe.ts` e o
+teste. O admin acompanha gestor, SDR e embaixador; o gestor acompanha SDR e
+embaixador.
+- **Metas:** a lista de pessoas passa a seguir essa regra.
+- **Agenda:** ganhou a visão da equipe.
+  - Seletor "De quem é a agenda" e `?pessoa=`, que o servidor valida.
+  - A agenda de outra pessoa é só leitura: não tem "Novo compromisso" nem desfecho,
+    e a rota não oferece "Montar". Os livres mostrados são os dessa pessoa.
+
+**Bloco B, o Meu dia.**
+- Três abas: Para fazer, Feito hoje e Próximos dias. "Agora" virou "Urgente", e
+  "Ainda hoje" virou "Até o fim do dia".
+- O Feito hoje tem quatro categorias, redesenhado no Design System novo.
+- "De quem é o dia" para gestor e admin, só leitura.
+- "Responderam e estão esperando" continua no topo de Para fazer.
+- No dia de outra pessoa, a fila de quem respondeu some e aparece uma linha
+  explicando. O motivo: essa fila é de todos, e a `meu_dia` escolhe o bloco pelo papel
+  da pessoa, não pelo de quem abre a tela. A exceção é o embaixador, que tem fila
+  própria e a vê em só leitura.
+
+**Bloco C, as cores do resultado.**
+- O cartão da Agenda pinta o resultado: verde deu certo (com troféu quando o
+  parceiro autorizou), coral não deu, âmbar mudou de data. A visão da semana mostra o
+  mesmo sinal num ícone.
+- A reunião que é a nova data de outra (`reunioes.remarcada_de`) ganha o selo
+  "Reagendada".
+- Opção A do plano, sem banco. O resultado é o último registro da mesma pessoa para o
+  mesmo parceiro até o `tasks.completed_at`, que é o momento em que a Agenda fecha a
+  tarefa (`escolherResultado`).
+  - Isso acerta mesmo quando o resultado é registrado antes do dia marcado. Esse caso
+    apareceu no teste na tela, e a regra "do dia do compromisso" que o plano previa
+    não o pegava.
+
+**Bloco D, marcar pela Agenda.**
+- Botão "Novo compromisso", com o autocompletar de parceiro que veio da `Teste-Janio`.
+- **Reunião:** escolhe o horário na grade do robô (`reuniao_livres`) e grava por
+  `reuniao_marcar_pelo_negocio`.
+  - A reunião cai na agenda de quem é dono do negócio, e a folha diz quem é.
+  - Se o horário for tomado no caminho, a folha mostra as alternativas que a função
+    devolve.
+  - Parceiro sem negócio: a folha leva à ficha.
+  - A grade de outra pessoa só é lida por gestor ou admin (regra da
+    `reuniao_livres`). Para os outros papéis a folha explica de quem é o negócio, em
+    vez de mostrar uma grade vazia.
+- **Visita:** cria a tarefa `visit` com dia e hora.
+- **Cancelar reunião:** agora pede o motivo, que vai para `reuniao_cancelar`.
+
+**`next.config.ts`:** `allowedDevOrigins: ['127.0.0.1']` e `devIndicators: false`.
+
+**Verificado:**
+- lint, typecheck, 994 testes do web e as outras suítes, tudo verde.
+- Seção 6 do plano: nada da `main` apagado. As linhas removidas são a
+  reestruturação em abas.
+- Conferido num navegador local contra o Supabase local:
+  - a SDR marca duas reuniões, cancela uma com motivo e registra "Realizada,
+    autorizou" (faixa verde com troféu);
+  - o gestor abre a agenda e o dia da SDR em só leitura;
+  - 1280 px e 390 px, sem erro no console.
+
+**Marcar para si, ou para a equipe** (pedido do usuário no mesmo dia): uma migração,
+`20261003090000_marcar_para_a_equipe`, aplicada SÓ no banco local.
+
+- **Regra nova:** o compromisso nasce na agenda de QUEM MARCA.
+  - Antes, a reunião marcada por gente seguia a regra do robô (dono = dono do
+    negócio), e o gestor não conseguia marcar para si num parceiro da carteira da
+    SDR.
+  - Gestor e admin escolhem, em "Para quem", alguém que acompanham. A hierarquia
+    agora também é do banco (`app.acompanha`, `app.pode_marcar_para`), e não só da
+    tela.
+  - Com outra pessoa escolhida, a folha mostra uma faixa âmbar ("Você está marcando
+    na agenda de …, e não na sua"). Os horários livres são os dessa pessoa, e o botão
+    diz o nome dela.
+  - Na agenda de quem ele acompanha, o gestor continua vendo "Novo compromisso", já
+    com essa pessoa escolhida. Os cartões continuam só leitura.
+- **Portas novas:** `public.reuniao_marcar_na_agenda` e `public.visita_marcar`.
+  - A visita ocupa `agenda.reunioes.duracao_visita_min` (padrão 45 minutos).
+  - Ela é recusada (`horario_ocupado`) em cima de reunião viva ou de outra tarefa de
+    campo, e a resposta diz com o quê bateu.
+  - Usa o mesmo advisory lock de (pessoa, dia) da reunião.
+- **Aviso a quem recebe:** tabela `public.agenda_avisos`, com RLS (cada um lê os
+  seus, e quem marcou lê os que mandou; ninguém escreve direto).
+  - O aviso aparece no topo da Agenda e do Meu dia até "Ok, vi"
+    (`agenda_avisos_vistos`).
+  - A reunião continua mandando o e-mail de sempre ao dono. Nada mudou no worker.
+- **O robô não mudou:** `app.reuniao_gravar` ganhou a versão de 9 argumentos
+  (`p_dono`), com o corpo de 20260930110000 copiado. A de 8 argumentos, a única que
+  `public.reuniao_marcar` chama, só repassa com `p_dono = null`, que cai na regra
+  antiga.
+- **Remarcar:** `public.reuniao_remarcar` agora mantém `r.dono_id`. Antes, a reunião
+  que o gestor marcou para si iria para o dono do negócio na primeira remarcação.
+- `reuniao_marcar_pelo_negocio` fica, sem uso na tela.
+- `database.types.ts`: só as entradas novas, à mão. O gerador local escreve outro
+  formato e faria um diff de 700 linhas de ruído.
+- **Verificado:**
+  - pgTAP 94 (37 asserções na primeira versão): o robô continua no dono do negócio; padrão é quem
+    marca; a hierarquia é conferida no banco; avisos; conflito de visita e borda de
+    45 minutos; o remarcar mantém a agenda; RLS dos avisos; nenhuma mensagem nova e
+    nada na fila `wa_outbound`.
+  - A suíte inteira do banco (88 arquivos, 3.289 asserções), lint, typecheck e 994
+    testes do web.
+  - No navegador:
+    - o gestor marca para si e para a SDR;
+    - a visita em cima da reunião é recusada;
+    - a SDR vê e dispensa o aviso;
+    - a SDR não vê "Para quem".
+- **Precisa de decisão:**
+  - Com migração, o PR deixa de ser "sem banco". Revisão do Matheus, e aplicação no
+    remoto combinada com o Luiz (ADR-02).
+  - O e-mail de reunião não diz QUEM marcou quando foi outra pessoa. Mudar isso é no
+    worker (`aviso-de-reuniao.ts`), que ficou de fora de propósito.
+
+**Revisão geral (code review, nível alto), e o que foi corrigido:**
+- **Aviso velho:** o aviso não sumia quando a reunião era cancelada ou remarcada.
+  - Agora `AvisosRecebidos` lê o estado vivo da reunião ou da tarefa e mostra a hora
+    atual.
+  - `reuniao_remarcar` avisa o dono quando quem remarca é outra pessoa.
+- **Remarcar para quem saiu do time:** o remarcar mantinha o dono mesmo inativo.
+  Agora, dono inativo faz a reunião voltar ao dono do negócio.
+- **O gestor não desfazia o próprio engano:** na agenda de quem acompanha, ele agora
+  remarca e cancela reuniões. O desfecho continua só com o dono.
+  - A folha de remarcar mostrava a grade de quem estava logado. Agora mostra a do
+    dono (`Compromisso.responsavelId`).
+- **A cor do resultado só via os registros do dono da agenda.** Com
+  `tasks.completed_at`, agora vale o registro de qualquer pessoa. Sem ele, só o do
+  dono, como antes.
+- **Erro que ficava depois de trocar o dia:** o conflito da visita continuava na tela
+  depois da troca de dia. A `key` agora inclui o dia.
+- **Meu dia lia a `team_directory` duas vezes.** `pessoasAcompanhadas` agora devolve
+  o papel, e a segunda leitura saiu.
+- **A Agenda tinha uma ida à rede a mais:** os registros do resultado agora vão no
+  mesmo `Promise.all`.
+- pgTAP 94 com 40 asserções: acrescentados o remarcar da agenda da SDR pelo gestor
+  (aviso novo) e o dono inativo. Suíte do banco, lint, typecheck e testes verdes.
+- **Apontados e não mexidos:**
+  - A tela copia em TypeScript a regra de papel da `meu_dia` para esconder a fila de
+    quem respondeu no dia de outra pessoa. O lugar certo é a própria `meu_dia`, que é
+    do caminho do WhatsApp.
+  - O mapa de tom para ícone e cor está duplicado entre o cartão e a semana, e o
+    classificador está duplicado entre a Agenda e o Feito hoje (um teste mantém os
+    dois iguais).
+
+**Decisões do usuário sobre a revisão (30/09/2026):**
+- **Sábado, domingo e feriado estão completamente bloqueados para visita.**
+  - `visita_marcar` recusa com `dia_nao_util`, pelo mesmo `app.eh_dia_util` que a
+    grade da reunião usa. Só é chamado, não alterado.
+  - A folha avisa assim que o dia é escolhido e não oferece o botão de marcar.
+  - pgTAP 94 com 43 asserções: sábado, domingo e feriado.
+  - A hora do dia continua livre.
+- **A grade da reunião continua tratando a visita como um instante.** Decisão do
+  usuário: deixar como está, porque mexer mudaria o que o robô do WhatsApp oferece.
+- **Regra do usuário: "não quero que mude nada do funcionamento do WhatsApp".**
+  - Conferido: nenhum arquivo em `apps/workers` nem em `supabase/functions` mudou.
+  - A migração não toca `pode_enviar`, `messages_guard`, `wa_proximos`, a fila
+    `wa_outbound`, `conversations` nem `messages`.
+  - A única função que o robô alcança, `app.reuniao_gravar` de 8 argumentos, só
+    repassa. O pgTAP 74 inteiro e o 94 provam que o robô marca igual e que nada sai
+    no WhatsApp.
+
+**Ficou de fora, e precisa de decisão:**
+- Itens 4 e 8 do plano, porque só existem com banco: hora de fim e local da visita, e
+  "o parceiro confirmou presença". Recomendação do plano: um segundo PR, com migração
+  revisada pelo Matheus e pelo Luiz.
+- Opção B do resultado (ligar o registro à reunião), só se a opção A errar na prática.
+- Pendentes de 28/09 que continuam: o vermelho de "Negativos" e a hierarquia como regra
+  de tela, não do banco.
+
+### 30/09/2026 — O Pulso do dia organizado no Meu dia (RF-MET-03)
+
+O card do Pulso (o "Resumo do dia" que a IA escreve às 18h30) ficava solto: a lista
+ocupava metade da largura, e o resumo era um parágrafo corrido atrás de "Ler o resumo
+do dia". O desenho novo usou a skill `ui-ux-pro-max` (linha de 65–75 caracteres,
+texto legível, divulgação progressiva, estado de hover) e os tokens do Design System.
+
+- **Manchete:** o título da IA é o título do card, com "PULSO DO DIA · ontem" em
+  cima e o ícone em menta, o mesmo dos avisos. Se o Pulso tiver mais de dois dias,
+  aparece o selo "é o último que saiu".
+- **O que não pode passar:** as prioridades agrupadas por prazo (Hoje, Amanhã, Esta
+  semana), com a contagem de cada grupo. Cada linha traz o parceiro em cima e a ação
+  embaixo, e a linha inteira é o link. O porquê vai no `title` e para o leitor de tela.
+- **Resumo do dia:** painel ao lado, no `lg`, e embaixo no celular.
+  - O primeiro parágrafo fica à vista, com teto de linha (`max-w-prose`). No celular
+    ele é cortado em quatro linhas.
+  - O resto abre em "Ler o resumo completo", um botão com `aria-expanded`.
+  - Os riscos ficam SEMPRE visíveis, em "Atenção".
+- **Rodapé:** "Escrito pela IA sobre as conversas do dia. Confira na conversa antes de
+  agir."
+- `agruparPorPrazo` foi para `pulso-formatos.ts`, com teste em `pulso.test.ts`.
+- **Conferido:** num navegador local, a 1440 px e a 390 px, no claro e no escuro; o
+  teclado abre e fecha o resumo. Lint, typecheck e testes verdes.
+- **Só no banco local:** uma linha de amostra em `public.pulso_do_dia` (dia 29/09,
+  escopo `equipe`), para ver o card sem o worker de IA. Não há gatilho na tabela; o
+  único job, `ia_pulso_do_dia`, só enfileira para o worker, que não roda aqui. Para
+  tirar: `delete from public.pulso_do_dia where conteudo->>'prompt_version' like
+  '%amostra local%'`.
+- Nada de WhatsApp, banco de produção ou worker foi tocado.
+
+### 30/09/2026 — Conferência antes de subir: banco do zero e build de produção
+
+- **Banco do zero:** `supabase db reset --local` aplicou todas as migrações da `main` e
+  a `20261003090000_marcar_para_a_equipe` sem erro, na ordem.
+  - Os 88 arquivos pgTAP (3.295 asserções) passaram nesse banco limpo.
+  - Os dados de teste locais foram salvos antes e restaurados depois; as 111 tabelas
+    de `public` e `auth` voltaram com as mesmas contagens.
+- **Volta do banco testada:** `supabase/snippets/2026-09-30_reverter_marcar_para_a_equipe.sql`
+  aplicado no banco local e revertido.
+  - Com a volta aplicada: as funções novas e `agenda_avisos` sumiram; a gravação do robô
+    voltou ao corpo original; a migração voltou a constar como pendente; os 87 pgTAP da
+    `main` passaram (o 94, da funcionalidade, falhou como devia).
+  - Com a migração reaplicada: os 88 passaram, e as contagens das 111 tabelas bateram.
+- Roteiro para subir: `docs/operacao/subir-meu-dia-e-equipe.md` (backup, conferência,
+  `db push`, merge, conferência em produção e como voltar).
+- **Build de produção:** `NEXT_DIST_DIR=.next-conferencia pnpm --filter web build`,
+  o mesmo comando da Vercel, numa pasta separada para não derrubar o `pnpm dev`.
+  Compilou sem aviso e sem erro. A pasta foi apagada depois.
+  - A rota `/auth/dev` aparece no build local só porque o arquivo existe nesta máquina
+    (fora do git). Ela não vai para a Vercel e responde 404 fora de `next dev`.
+- Nada foi enviado ao GitHub nem ao Supabase de produção.
+

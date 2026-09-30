@@ -41,6 +41,9 @@ export function ListaDoDia({
   proximo,
   semanaVazia,
   aoIrParaDia,
+  pessoaId,
+  somenteLeitura = false,
+  podeMexerNaReuniao = !somenteLeitura,
 }: {
   dia: Dia;
   itens: readonly Compromisso[];
@@ -53,13 +56,19 @@ export function ListaDoDia({
   /** `true` quando a semana inteira está sem compromisso aberto. */
   semanaVazia: boolean;
   aoIrParaDia: (dia: Dia) => void;
+  /** De quem é a agenda: os livres da tira são os dessa pessoa. */
+  pessoaId?: string;
+  /** Agenda de outra pessoa (visão da equipe): os cartões não oferecem ação. */
+  somenteLeitura?: boolean;
+  /** Remarcar e cancelar a reunião, mesmo na agenda de outra pessoa (quem a acompanha). */
+  podeMexerNaReuniao?: boolean;
 }) {
   const { marcados, visitas, aMarcar, concluidos } = blocosDoDia(itens);
 
   if (marcados.length + visitas.length + aMarcar.length + concluidos.length === 0) {
     return (
       <>
-        <TiraDeLivres dia={dia} />
+        <TiraDeLivres dia={dia} donoId={pessoaId} />
         <VazioDoDia
         frase={
           proximo
@@ -87,7 +96,7 @@ export function ListaDoDia({
     <div className="flex flex-col gap-4">
       {/* "O que o robô pode oferecer no meu nome hoje" — a mesma grade de
           `app.reuniao_horarios_livres` que ele usa para oferecer. */}
-      <TiraDeLivres dia={dia} />
+      <TiraDeLivres dia={dia} donoId={pessoaId} />
 
       {marcados.length > 0 ? (
         <Bloco
@@ -104,6 +113,8 @@ export function ListaDoDia({
                 catalogo={catalogo}
                 aoPedirDesfecho={aoPedirDesfecho}
                 aoMudarReuniao={aoMudarReuniao}
+                somenteLeitura={somenteLeitura}
+                podeMexerNaReuniao={podeMexerNaReuniao}
               />
             ))}
           </ul>
@@ -133,6 +144,8 @@ export function ListaDoDia({
                       catalogo={catalogo}
                       aoPedirDesfecho={aoPedirDesfecho}
                       aoMudarReuniao={aoMudarReuniao}
+                      somenteLeitura={somenteLeitura}
+                      podeMexerNaReuniao={podeMexerNaReuniao}
                     />
                   ))}
                 </ul>
@@ -163,6 +176,8 @@ export function ListaDoDia({
                 catalogo={catalogo}
                 aoPedirDesfecho={aoPedirDesfecho}
                 aoMudarReuniao={aoMudarReuniao}
+                somenteLeitura={somenteLeitura}
+                podeMexerNaReuniao={podeMexerNaReuniao}
               />
             ))}
           </ul>
@@ -183,6 +198,8 @@ export function ListaDoDia({
                 catalogo={catalogo}
                 aoPedirDesfecho={aoPedirDesfecho}
                 aoMudarReuniao={aoMudarReuniao}
+                somenteLeitura={somenteLeitura}
+                podeMexerNaReuniao={podeMexerNaReuniao}
               />
             ))}
           </ul>

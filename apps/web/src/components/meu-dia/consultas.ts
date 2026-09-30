@@ -1,14 +1,17 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { janelaDeDias } from '@/components/agenda/tipos';
 
+import type { RegistroDoDia } from './feito';
 import { ehTipoConhecido, type ItemDoDia, type MetricaDoDia, type TipoDeItem } from './tipos';
 
 /**
  * As duas leituras da tela, ambas em funções `security definer` do banco:
  * `public.meu_dia` (a fila) e `public.goal_progress` (meta × realizado do dia).
- * Nenhuma das duas aceita parâmetro de pessoa aqui: sem `p_user_id`, cada uma
- * devolve a fila e as metas de quem está autenticado, que é o contrato de "meu" dia.
+ * Sem `p_user_id`, cada uma devolve a fila e as metas de quem está autenticado, que
+ * é o contrato de "meu" dia. Com ele, o dia de quem o gestor ou o admin escolheu no
+ * seletor (`lib/auth/hierarquia.ts`).
  */
 
 /** Teto da fila. O banco corta em 300; 60 já é mais do que cabe num dia de trabalho. */
@@ -85,9 +88,21 @@ export function itemDaLinha(linha: LinhaDaFila): ItemDoDia {
   };
 }
 
-export async function buscarFilaDoDia(): Promise<ItemDoDia[]> {
+/**
+ * `pessoaId` só vai quando o gestor ou o admin abre o dia de outra pessoa; para o
+ * próprio dia a chamada continua sem ele, exatamente como antes. A função do banco
+ * recusa outra pessoa para quem não é gestor nem admin (42501).
+ *
+ * Atenção ao bloco de quem respondeu no dia de outra pessoa: a `meu_dia` recorta
+ * pelo papel de QUEM A FILA É, e para admin, gestor e sdr ele é a fila de todos,
+ * e não a dessa pessoa (ver `alcanceDeQuemRespondeu` em `tipos.ts`).
+ */
+export async function buscarFilaDoDia(pessoaId?: string): Promise<ItemDoDia[]> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('meu_dia', { p_limite: LIMITE_DA_FILA });
+  const { data, error } = await supabase.rpc('meu_dia', {
+    p_limite: LIMITE_DA_FILA,
+    ...(pessoaId ? { p_user_id: pessoaId } : {}),
+  });
   if (error) throw new ErroDoDia(error.message, error.code);
 
   const linhas = (data ?? []) as unknown as LinhaDaFila[];
@@ -98,9 +113,12 @@ function tipoDaLinha(valor: string | null): TipoDeItem {
   return valor && ehTipoConhecido(valor) ? valor : 'outro';
 }
 
-export async function buscarResumoDoDia(): Promise<MetricaDoDia[]> {
+export async function buscarResumoDoDia(pessoaId?: string): Promise<MetricaDoDia[]> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('goal_progress', { p_period: 'day' });
+  const { data, error } = await supabase.rpc('goal_progress', {
+    p_period: 'day',
+    ...(pessoaId ? { p_user_id: pessoaId } : {}),
+  });
   if (error) throw new ErroDoDia(error.message, error.code);
 
   const linhas = (data ?? []) as unknown as LinhaDeMetrica[];
@@ -160,6 +178,87 @@ export async function contarCandidatosAguardandoRevisao(): Promise<number | null
     .eq('status', 'novo');
   if (error) return null;
   return count ?? 0;
+}
+
+/** Teto do "Feito hoje". Um dia cheio de campo passa de 40 registros; 200 é folga. */
+const LIMITE_DO_FEITO = 200;
+
+type LinhaDeAtividade = {
+  id: string;
+  occurred_at: string;
+  organization_id: string | null;
+  interaction_outcomes: RegistroDoDia['desfecho'] | null;
+};
+
+type LinhaDeParceiro = {
+  id: string | null;
+  name: string | null;
+  neighborhood: string | null;
+  primary_category_name: string | null;
+};
+
+/**
+ * O que a pessoa registrou hoje (em `America/Fortaleza`), com resultado.
+ *
+ * Duas leituras sob a RLS de quem entrou, sem RPC nova:
+ *
+ * 1. `activities` da pessoa do dia (`user_id`) com `outcome_id` preenchido, com o
+ *    desfecho embutido pela chave estrangeira. A política `activities_select` já deixa
+ *    o `sdr` ler; o filtro por `user_id` é o que faz deste o "meu" dia — ou o dia de
+ *    quem o gestor escolheu no seletor, que enxerga tudo por `app.sees_all()`.
+ * 2. `organizations_view`, e não `organizations`, pelo mesmo motivo da Agenda: a
+ *    `sdr` não lê a tabela base, e a view aplica `app.org_is_visible`.
+ */
+export async function buscarFeitoHoje(usuarioId: string, hoje: string): Promise<RegistroDoDia[]> {
+  const supabase = createClient();
+  // `hoje` vem do servidor, o mesmo do cabeçalho e do "Amanhã" dos próximos dias:
+  // calculado aqui, uma aba aberta depois da meia-noite misturava dois dias na tela.
+  const { de, ate } = janelaDeDias(hoje, hoje);
+
+  const { data, error } = await supabase
+    .from('activities')
+    .select(
+      'id, occurred_at, organization_id, interaction_outcomes(slug, name, surfaces, target_stage_slug, sets_temperature)',
+    )
+    .eq('user_id', usuarioId)
+    .not('outcome_id', 'is', null)
+    .gte('occurred_at', de)
+    .lt('occurred_at', ate)
+    .order('occurred_at', { ascending: false })
+    .limit(LIMITE_DO_FEITO);
+  if (error) throw new ErroDoDia(error.message, error.code);
+
+  const linhas = ((data ?? []) as unknown as LinhaDeAtividade[]).filter(
+    (linha) => linha.interaction_outcomes !== null,
+  );
+  const orgIds = [
+    ...new Set(linhas.map((linha) => linha.organization_id).filter((id) => id !== null)),
+  ];
+
+  const parceiros = new Map<string, LinhaDeParceiro>();
+  if (orgIds.length > 0) {
+    const resposta = await supabase
+      .from('organizations_view')
+      .select('id, name, neighborhood, primary_category_name')
+      .in('id', orgIds);
+    if (resposta.error) throw new ErroDoDia(resposta.error.message, resposta.error.code);
+    for (const parceiro of (resposta.data ?? []) as LinhaDeParceiro[]) {
+      if (parceiro.id) parceiros.set(parceiro.id, parceiro);
+    }
+  }
+
+  return linhas.map((linha) => {
+    const parceiro = linha.organization_id ? parceiros.get(linha.organization_id) : undefined;
+    return {
+      atividadeId: linha.id,
+      quando: linha.occurred_at,
+      organizacaoId: linha.organization_id,
+      organizacao: parceiro?.name ?? null,
+      bairro: parceiro?.neighborhood ?? null,
+      categoriaDoParceiro: parceiro?.primary_category_name ?? null,
+      desfecho: linha.interaction_outcomes as RegistroDoDia['desfecho'],
+    };
+  });
 }
 
 /** Erro do banco com o código preservado, para a tela traduzir em vez de exibir cru. */

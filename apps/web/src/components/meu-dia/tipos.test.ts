@@ -2,10 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import { ICONE_DO_ITEM, iconeDoItem } from './icones';
 import {
+  abaDaUrl,
   agruparFila,
+  agruparPorDia,
+  alcanceDeQuemRespondeu,
+  BLOCOS,
+  blocosParaFazer,
   contarPendentesDeHoje,
   destinoDoItem,
   ehAvisoDoSistema,
+  ehDosProximos,
+  filaVisivel,
   metricasVisiveis,
   ressalvasDasMetricas,
   type ItemDoDia,
@@ -245,5 +252,176 @@ describe('quem respondeu entra no topo', () => {
   it('o ícone é o de escrever, pelo verbo do título', () => {
     expect(iconeDoItem(conversa())).toBe('escrever');
     expect(ICONE_DO_ITEM.conversa_esperando).toBeDefined();
+  });
+});
+
+describe('as três abas', () => {
+  it('"Para fazer" é a fila sem o bloco do futuro, e o aviso do sistema continua no fim', () => {
+    const blocos = agruparFila([
+      item({ prioridade: 3 }),
+      item({ prioridade: 9, tipo: 'tarefa_futura' }),
+      item({ organizacaoId: null, negocioId: null, titulo: 'Dead-letter ai_dlq' }),
+    ]);
+    expect(blocosParaFazer(blocos).map((b) => b.id)).toEqual(['agora', 'sistema']);
+  });
+
+  it('"Para fazer" continua abrindo com quem respondeu e está esperando', () => {
+    const blocos = agruparFila([
+      item({ prioridade: 1, tipo: 'reuniao_proxima' }),
+      item({ prioridade: 9, tipo: 'tarefa_futura' }),
+      item({ prioridade: 0, tipo: 'conversa_esperando', titulo: 'Responder no WhatsApp' }),
+    ]);
+    const paraFazer = blocosParaFazer(blocos);
+    expect(paraFazer.map((b) => b.id)).toEqual(['respondeu', 'agora']);
+    expect(paraFazer[0]?.titulo).toBe('Responderam e estão esperando');
+  });
+
+  it('os blocos de hoje se chamam "Urgente" e "Até o fim do dia"', () => {
+    const titulo = (id: string) => BLOCOS.find((b) => b.id === id)?.titulo;
+    expect(titulo('agora')).toBe('Urgente');
+    expect(titulo('hoje')).toBe('Até o fim do dia');
+  });
+
+  it('"Próximos dias" agrupa por dia em ordem de data e deixa o sem data por último', () => {
+    const diaDe = (iso: string) => iso.slice(0, 10);
+    // A ordem em que a `meu_dia` devolveu a base local: 29/09, 02/10, 30/09, 01/10.
+    const dias = agruparPorDia(
+      [
+        item({ titulo: 'a', quando: '2026-09-29T09:00:00-03:00' }),
+        item({ titulo: 'sem', quando: null }),
+        item({ titulo: 'd', quando: '2026-10-02T10:00:00-03:00' }),
+        item({ titulo: 'b', quando: '2026-09-30T15:00:00-03:00' }),
+        item({ titulo: 'c', quando: '2026-10-01T10:00:00-03:00' }),
+        item({ titulo: 'a2', quando: '2026-09-29T08:00:00-03:00' }),
+      ],
+      diaDe,
+    );
+    expect(dias.map((d) => [d.dia, d.itens.map((i) => i.titulo)])).toEqual([
+      ['2026-09-29', ['a2', 'a']],
+      ['2026-09-30', ['b']],
+      ['2026-10-01', ['c']],
+      ['2026-10-02', ['d']],
+      [null, ['sem']],
+    ]);
+  });
+
+  it('a aba da URL só aceita as três, e o resto abre em "Para fazer"', () => {
+    expect(abaDaUrl('feito')).toBe('feito');
+    expect(abaDaUrl('proximos')).toBe('proximos');
+    expect(abaDaUrl('qualquer')).toBe('fazer');
+    expect(abaDaUrl(['feito'])).toBe('fazer');
+    expect(abaDaUrl(undefined)).toBe('fazer');
+  });
+});
+
+/**
+ * NENHUMA LINHA DA `meu_dia` SOME ENTRE AS ABAS.
+ *
+ * Com a fila partida em "Para fazer" e "Próximos dias", o risco novo é uma prioridade
+ * cair no vão entre as duas: estar fora dos blocos de hoje E fora do futuro. A tabela
+ * abaixo é o que `public.meu_dia` devolve hoje (20261002180000, blocos 0 a 9: a
+ * conversa esperando, a reunião próxima, o desfecho pendente, as tarefas por prazo e
+ * o negócio pelo motivo mais urgente). Uma prioridade nova na função tem de entrar
+ * aqui e num bloco de `BLOCOS` — é o que o segundo teste cobra.
+ */
+describe('toda prioridade da meu_dia tem aba', () => {
+  const DA_MEU_DIA = [
+    [0, 'conversa_esperando', '2026-09-30T08:00:00-03:00'],
+    [1, 'reuniao_proxima', '2026-09-30T10:00:00-03:00'],
+    [2, 'desfecho_pendente', '2026-09-29T15:00:00-03:00'],
+    [3, 'tarefa_atrasada', '2026-09-28T09:00:00-03:00'],
+    [4, 'proxima_acao_atrasada', '2026-09-27T09:00:00-03:00'],
+    [5, 'tarefa_hoje', '2026-09-30T17:00:00-03:00'],
+    [6, 'proxima_acao_hoje', '2026-09-30T18:00:00-03:00'],
+    [7, 'sem_proxima_acao', null],
+    [8, 'negocio_parado', '2026-10-05T09:00:00-03:00'],
+    [9, 'tarefa_futura', '2026-10-02T09:00:00-03:00'],
+    [9, 'tarefa_sem_data', null],
+  ] as const;
+
+  const onde = (linha: ItemDoDia) => {
+    const naFazer = blocosParaFazer(agruparFila([linha])).some((b) => b.itens.includes(linha));
+    const nosProximos = ehDosProximos(linha);
+    return { naFazer, nosProximos };
+  };
+
+  it('cada linha cai em exatamente uma das duas abas', () => {
+    for (const [prioridade, tipo, quando] of DA_MEU_DIA) {
+      for (const comParceiro of [true, false]) {
+        const linha = item({
+          prioridade,
+          tipo,
+          quando,
+          // Sem parceiro e sem negócio vira aviso do sistema, que mora em "Para fazer".
+          ...(comParceiro ? {} : { organizacaoId: null, organizacao: null, negocioId: null }),
+        });
+        const { naFazer, nosProximos } = onde(linha);
+        expect({
+          prioridade,
+          tipo,
+          comParceiro,
+          abas: Number(naFazer) + Number(nosProximos),
+        }).toEqual({ prioridade, tipo, comParceiro, abas: 1 });
+      }
+    }
+  });
+
+  it('as faixas de BLOCOS cobrem 0 a 9 sem repetir nenhuma', () => {
+    const faixas = BLOCOS.flatMap((b) => b.prioridades);
+    expect([...faixas].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const daFuncao = [...new Set(DA_MEU_DIA.map(([prioridade]) => prioridade))];
+    expect(daFuncao.every((p) => faixas.includes(p))).toBe(true);
+  });
+});
+
+describe('dia de outra pessoa', () => {
+  it('toda linha leva só à ficha: registrar ou mover gravaria no nome de quem olha', () => {
+    for (const tipo of ['desfecho_pendente', 'sem_proxima_acao', 'negocio_parado'] as const) {
+      expect(destinoDoItem(item({ tipo }), { somenteLeitura: true })).toEqual({
+        href: '/parceiros/org-1',
+        onde: 'a ficha do parceiro',
+      });
+    }
+    expect(destinoDoItem(item({ tipo: 'desfecho_pendente' }))?.href).toBe('/registrar?org=org-1');
+  });
+
+  it('a conversa do embaixador também leva à ficha, e a de fora da base não vira link', () => {
+    const conversa = item({ prioridade: 0, tipo: 'conversa_esperando' });
+    expect(destinoDoItem(conversa, { somenteLeitura: true })?.href).toBe('/parceiros/org-1');
+    expect(
+      destinoDoItem({ ...conversa, organizacaoId: null }, { somenteLeitura: true }),
+    ).toBeNull();
+  });
+
+  it('o bloco de quem respondeu segue o papel da pessoa do dia, como a meu_dia', () => {
+    expect(alcanceDeQuemRespondeu('admin')).toBe('todos');
+    expect(alcanceDeQuemRespondeu('gestor')).toBe('todos');
+    expect(alcanceDeQuemRespondeu('sdr')).toBe('todos');
+    expect(alcanceDeQuemRespondeu('embaixador')).toBe('propria');
+    expect(alcanceDeQuemRespondeu('leitura')).toBe('nenhuma');
+    expect(alcanceDeQuemRespondeu(null)).toBe('nenhuma');
+  });
+
+  it('a fila comum de quem respondeu some do dia de outra pessoa, e só dela', () => {
+    const fila = [
+      item({ prioridade: 0, tipo: 'conversa_esperando' }),
+      item({ prioridade: 3, tipo: 'tarefa_atrasada' }),
+    ];
+    const tipos = (itens: readonly ItemDoDia[]) => itens.map((i) => i.tipo);
+
+    // O próprio dia: tudo o que o banco devolveu, qualquer que seja o papel.
+    expect(tipos(filaVisivel(fila, { doProprio: true, alcance: 'todos' }))).toEqual([
+      'conversa_esperando',
+      'tarefa_atrasada',
+    ]);
+    // O dia de uma SDR aberto pelo gestor: a fila de todos não é dela.
+    expect(tipos(filaVisivel(fila, { doProprio: false, alcance: 'todos' }))).toEqual([
+      'tarefa_atrasada',
+    ]);
+    // O dia de um embaixador: as conversas vieram endereçadas a ele, e ficam.
+    expect(tipos(filaVisivel(fila, { doProprio: false, alcance: 'propria' }))).toEqual([
+      'conversa_esperando',
+      'tarefa_atrasada',
+    ]);
   });
 });

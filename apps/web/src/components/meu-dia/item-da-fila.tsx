@@ -30,10 +30,22 @@ import { destinoDoItem, type ItemDoDia } from './tipos';
  *
  * Interação sem alvo resolvido (acontece quando a atividade não tem organização nem
  * negócio) não vira link: não há para onde ir, e um link morto é pior que texto.
+ *
+ * No dia de outra pessoa (`somenteLeitura`), toda linha leva à ficha: registrar ou
+ * mover dali gravaria no nome de quem está olhando.
  */
-export function ItemDaFila({ item, indice }: { item: ItemDoDia; indice: number }) {
+export function ItemDaFila({
+  item,
+  indice,
+  somenteLeitura = false,
+}: {
+  item: ItemDoDia;
+  indice: number;
+  /** Dia de outra pessoa: a linha leva só à ficha (ver `destinoDoItem`). */
+  somenteLeitura?: boolean;
+}) {
   const revelar = useRevelarLinha(indice);
-  const destino = destinoDoItem(item);
+  const destino = destinoDoItem(item, { somenteLeitura });
   const quando = formatarQuando(item);
 
   const nome = item.organizacao ?? item.titulo;

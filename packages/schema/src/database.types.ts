@@ -97,6 +97,7 @@ export type Database = {
         Returns: number
       }
       abrir_proximo_toque: { Args: { p_enrollment: string }; Returns: Json }
+      acompanha: { Args: { p_alvo: string }; Returns: boolean }
       ai_alerta_orcamento: { Args: never; Returns: Json }
       ai_custo: {
         Args: {
@@ -576,6 +577,7 @@ export type Database = {
         }
         Returns: Json
       }
+      pode_marcar_para: { Args: { p_alvo: string }; Returns: boolean }
       pode_matricular: { Args: never; Returns: boolean }
       pode_tocar: {
         Args: {
@@ -739,19 +741,34 @@ export type Database = {
         Returns: Json
       }
       reuniao_config: { Args: never; Returns: Json }
-      reuniao_gravar: {
-        Args: {
-          p_conversation_id: string
-          p_deal_id: string
-          p_formato: string
-          p_inicio: string
-          p_local: string
-          p_observacao: string
-          p_por: string
-          p_por_id: string
-        }
-        Returns: Json
-      }
+      reuniao_gravar:
+        | {
+            Args: {
+              p_conversation_id: string
+              p_deal_id: string
+              p_formato: string
+              p_inicio: string
+              p_local: string
+              p_observacao: string
+              p_por: string
+              p_por_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_conversation_id: string
+              p_deal_id: string
+              p_dono: string
+              p_formato: string
+              p_inicio: string
+              p_local: string
+              p_observacao: string
+              p_por: string
+              p_por_id: string
+            }
+            Returns: Json
+          }
       reuniao_horarios_livres: {
         Args: { p_ate: string; p_de: string; p_dono: string; p_limite?: number }
         Returns: {
@@ -1225,6 +1242,88 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agenda_avisos: {
+        Row: {
+          criado_em: string
+          dono_id: string
+          id: string
+          marcado_por: string
+          quando: string
+          reuniao_id: string | null
+          task_id: string | null
+          tipo: string
+          titulo: string
+          visto_em: string | null
+        }
+        Insert: {
+          criado_em?: string
+          dono_id: string
+          id?: string
+          marcado_por: string
+          quando: string
+          reuniao_id?: string | null
+          task_id?: string | null
+          tipo: string
+          titulo: string
+          visto_em?: string | null
+        }
+        Update: {
+          criado_em?: string
+          dono_id?: string
+          id?: string
+          marcado_por?: string
+          quando?: string
+          reuniao_id?: string | null
+          task_id?: string | null
+          tipo?: string
+          titulo?: string
+          visto_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_avisos_dono_id_fkey"
+            columns: ["dono_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_avisos_dono_id_fkey"
+            columns: ["dono_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_avisos_marcado_por_fkey"
+            columns: ["marcado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_avisos_marcado_por_fkey"
+            columns: ["marcado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_avisos_reuniao_id_fkey"
+            columns: ["reuniao_id"]
+            isOneToOne: false
+            referencedRelation: "reunioes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_avisos_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -7688,6 +7787,7 @@ export type Database = {
         }
         Returns: Json
       }
+      agenda_avisos_vistos: { Args: { p_ids?: string[] }; Returns: number }
       alvo_suprimido: {
         Args: { p_contact_id?: string; p_organization_id: string }
         Returns: boolean
@@ -8448,6 +8548,17 @@ export type Database = {
         }
         Returns: Json
       }
+      reuniao_marcar_na_agenda: {
+        Args: {
+          p_deal_id: string
+          p_dono?: string
+          p_formato?: string
+          p_inicio: string
+          p_local?: string
+          p_observacao?: string
+        }
+        Returns: Json
+      }
       reuniao_marcar_pelo_negocio: {
         Args: {
           p_deal_id: string
@@ -8580,6 +8691,15 @@ export type Database = {
       }
       virar_tarefa: {
         Args: { p_message_id: string; p_quando?: string; p_titulo?: string }
+        Returns: Json
+      }
+      visita_marcar: {
+        Args: {
+          p_deal_id?: string
+          p_dono?: string
+          p_inicio: string
+          p_organization_id: string
+        }
         Returns: Json
       }
       wa_bot_ligar: { Args: { p_ativo: boolean }; Returns: Json }

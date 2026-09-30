@@ -1,8 +1,24 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { prepararConsulta } from '@/components/parceiros/busca';
+import { hidratarAlvos } from '@/components/registro/alvos';
+import {
+  COLUNAS_DESFECHO,
+  type DesfechoCatalogo,
+  type SugestaoDeAlvo,
+} from '@/components/registro/tipos';
 
-import { janelaDeDias, naturezaDoCompromisso, type Compromisso, type Dia } from './tipos';
+import { escaparCuringas, normalizarBusca, ordenarCandidatos } from './autocompletar';
+import {
+  escolherResultado,
+  janelaDeDias,
+  naturezaDoCompromisso,
+  resultadoDoDesfecho,
+  type Compromisso,
+  type Dia,
+  type RegistroComDesfecho,
+} from './tipos';
 
 /**
  * De onde a Agenda tira os compromissos.
@@ -10,9 +26,10 @@ import { janelaDeDias, naturezaDoCompromisso, type Compromisso, type Dia } from 
  * A consulta das `tasks` vem primeiro, sozinha; depois três em paralelo, todas sob a
  * RLS de quem entrou, sem RPC nova:
  *
- * 1. `tasks` de tipo `meeting` e `visit` com prazo dentro da semana. A política
- *    `tasks_select` já entrega só as da pessoa (`assignee_id`), mas o filtro vai
- *    explícito para a consulta continuar certa se a política mudar.
+ * 1. `tasks` de tipo `meeting` e `visit` com prazo dentro da semana, da pessoa cuja
+ *    agenda está aberta (`assignee_id`). É a própria pessoa, ou — na visão da equipe,
+ *    só para admin e gestor — quem ela escolheu; a política `tasks_select`
+ *    (`sees_all()`) é que deixa ler a agenda de outra pessoa.
  * 2. `organizations_view`, e não `organizations`: a política `organizations_select` é
  *    `is_manager() or reads_base_pii()`, e a Heloísa é `sdr`, que não é nenhum dos
  *    dois. A view aplica `app.org_is_visible` e mascara o telefone (RF-BAS-14).
@@ -30,6 +47,10 @@ import { janelaDeDias, naturezaDoCompromisso, type Compromisso, type Dia } from 
  *    Google era enfeite, e o erro dele era engolido de propósito. Sem `reunioes` a
  *    lista fica ERRADA, não incompleta: reunião de verdade apareceria como
  *    apresentação a combinar, sem sala, sem fim e sem as ações do cartão.
+ * 5. Depois, e só para o que já foi fechado: os registros com desfecho que a MESMA
+ *    pessoa fez para os MESMOS parceiros perto de quando cada tarefa foi fechada. É
+ *    deles que sai o resultado pintado no cartão (`escolherResultado`). Falha aqui é
+ *    engolida: o cartão fica sem a cor, e a semana continua certa.
  *
  * Nenhum texto do Postgres chega à tela: falha vira `ErroDaAgenda` com frase em
  * português, pela mesma tradução que a tela de registro usa.
@@ -58,7 +79,8 @@ function erroDe(codigo: string | null | undefined, causa: unknown): ErroDaAgenda
   }
 }
 
-const COLUNAS_TAREFA = 'id, title, kind, status, due_at, organization_id, deal_id' as const;
+const COLUNAS_TAREFA =
+  'id, title, kind, status, due_at, organization_id, deal_id, completed_at' as const;
 const COLUNAS_ORG =
   'id, name, neighborhood, city_name, address, primary_category_name, temperature, do_not_contact' as const;
 const COLUNAS_NEGOCIO =
@@ -72,10 +94,11 @@ type LinhaTarefa = {
   due_at: string | null;
   organization_id: string | null;
   deal_id: string | null;
+  completed_at: string | null;
 };
 
 const COLUNAS_REUNIAO =
-  'id, task_id, inicio, fim, formato, link, local, estado, marcada_por, aviso_enviado_em, criada_em' as const;
+  'id, task_id, inicio, fim, formato, link, local, estado, marcada_por, aviso_enviado_em, criada_em, remarcada_de' as const;
 
 type LinhaReuniao = {
   id: string;
@@ -89,6 +112,7 @@ type LinhaReuniao = {
   marcada_por: string;
   aviso_enviado_em: string | null;
   criada_em: string;
+  remarcada_de: string | null;
 };
 
 type LinhaNegocio = {
@@ -128,10 +152,13 @@ async function buscarNegocios(
 }
 
 export async function buscarCompromissos(params: {
+  /** De quem é a agenda aberta: quem entrou, ou a pessoa escolhida na visão da equipe. */
   usuarioId: string;
   primeiroDia: Dia;
   ultimoDia: Dia;
   etapasComHoraMarcada: readonly number[];
+  /** O catálogo de desfechos: é dele que sai o resultado de cada compromisso fechado. */
+  catalogo: readonly DesfechoCatalogo[];
 }): Promise<Compromisso[]> {
   const supabase = createClient();
   const { de, ate } = janelaDeDias(params.primeiroDia, params.ultimoDia);
@@ -156,7 +183,9 @@ export async function buscarCompromissos(params: {
   const orgIds = [...new Set(linhas.map((t) => t.organization_id).filter((id) => id !== null))];
   const dealIds = [...new Set(linhas.map((t) => t.deal_id).filter((id) => id !== null))];
 
-  const [orgs, negocios, reuniao] = await Promise.all([
+  const fechadas = linhas.filter((t) => t.status === 'done');
+
+  const [orgs, negocios, reuniao, registros] = await Promise.all([
     supabase.from('organizations_view').select(COLUNAS_ORG).in('id', orgIds),
     buscarNegocios(supabase, dealIds),
     // As reuniões das tarefas desta janela. Uma ida só, e não uma por cartão:
@@ -170,6 +199,18 @@ export async function buscarCompromissos(params: {
         'task_id',
         linhas.map((t) => t.id),
       ),
+    // Os registros que dão a cor aos cartões já fechados: só dependem das
+    // tarefas, então vão na mesma leva.
+    buscarRegistrosDasFechadas(supabase, {
+      orgIds: [...new Set(fechadas.flatMap((t) => t.organization_id ?? []))],
+      // Um dia antes do fechamento mais antigo (ou do começo da semana): é a
+      // janela de `escolherResultado`.
+      desde: new Date(
+        Math.min(Date.parse(de), ...fechadas.map((t) => Date.parse(t.completed_at ?? de))) -
+          86_400_000,
+      ).toISOString(),
+      catalogo: params.catalogo,
+    }),
   ]);
 
   if (orgs.error) throw erroDe(orgs.error.code, orgs.error);
@@ -232,9 +273,136 @@ export async function buscarCompromissos(params: {
         etapaId: negocio?.stage_id ?? null,
         diasSemContato: diasDesde(negocio?.last_activity_at ?? null, agora),
         naoContatar: org.do_not_contact,
+        resultado: resultadoDaTarefa(tarefa, tipo, registros, params.usuarioId),
+        reagendada: reuniaoDaTarefa?.remarcada_de != null,
+        responsavelId: params.usuarioId,
       } satisfies Compromisso,
     ];
   });
+}
+
+type RegistroDeQuem = RegistroComDesfecho & { autorId: string | null };
+
+type RegistrosDasFechadas = {
+  porOrg: Map<string, RegistroDeQuem[]>;
+  desfechos: Map<number, DesfechoCatalogo>;
+};
+
+/**
+ * Os registros com desfecho para os parceiros dos compromissos fechados — de
+ * QUALQUER pessoa, porque o gestor também registra o resultado da visita da SDR —,
+ * e os desfechos que eles citam. O catálogo da tela só traz desfecho ativo: um
+ * registro com desfecho que o gestor desativou depois (RF-ADM-02) perderia a cor,
+ * então esses vêm pelo id.
+ */
+async function buscarRegistrosDasFechadas(
+  supabase: ReturnType<typeof createClient>,
+  p: {
+    orgIds: readonly string[];
+    desde: string;
+    catalogo: readonly DesfechoCatalogo[];
+  },
+): Promise<RegistrosDasFechadas> {
+  const desfechos = new Map(p.catalogo.map((d) => [d.id, d] as const));
+  const vazio = { porOrg: new Map<string, RegistroDeQuem[]>(), desfechos };
+  if (p.orgIds.length === 0) return vazio;
+
+  const { data, error } = await supabase
+    .from('activities')
+    .select('organization_id, created_at, outcome_id, user_id')
+    .in('organization_id', [...p.orgIds])
+    .not('outcome_id', 'is', null)
+    .gte('created_at', p.desde);
+  if (error || !data) return vazio;
+
+  const porOrg = new Map<string, RegistroDeQuem[]>();
+  for (const linha of data) {
+    if (!linha.organization_id || linha.outcome_id === null) continue;
+    const lista = porOrg.get(linha.organization_id) ?? [];
+    lista.push({
+      registradoEm: linha.created_at,
+      desfechoId: linha.outcome_id,
+      autorId: linha.user_id,
+    });
+    porOrg.set(linha.organization_id, lista);
+  }
+
+  const faltando = [
+    ...new Set(data.flatMap((l) => (l.outcome_id !== null && !desfechos.has(l.outcome_id) ? [l.outcome_id] : []))),
+  ];
+  if (faltando.length > 0) {
+    const antigos = await supabase
+      .from('interaction_outcomes')
+      .select(COLUNAS_DESFECHO)
+      .in('id', faltando);
+    for (const d of (antigos.data ?? []) as DesfechoCatalogo[]) desfechos.set(d.id, d);
+  }
+  return { porOrg, desfechos };
+}
+
+function resultadoDaTarefa(
+  tarefa: LinhaTarefa,
+  tipo: Compromisso['tipo'],
+  registros: RegistrosDasFechadas,
+  pessoaId: string,
+): Compromisso['resultado'] {
+  if (tarefa.status !== 'done' || !tarefa.organization_id || !tarefa.due_at) return null;
+  const doParceiro = registros.porOrg.get(tarefa.organization_id) ?? [];
+  // Com o carimbo de fechamento, o registro de quem fechou — seja quem for. Sem
+  // ele, a regra do dia é frouxa demais para aceitar o registro de outra pessoa
+  // (a ligação do gestor no mesmo dia pintaria a visita da SDR), e só vale o dela.
+  const escolhido = escolherResultado(
+    { quando: tarefa.due_at, fechadoEm: tarefa.completed_at },
+    tarefa.completed_at ? doParceiro : doParceiro.filter((r) => r.autorId === pessoaId),
+  );
+  const desfecho = escolhido ? registros.desfechos.get(escolhido.desfechoId) : undefined;
+  return desfecho ? resultadoDoDesfecho(desfecho, tipo) : null;
+}
+
+/** Quantos parceiros o autocompletar da folha de novo compromisso mostra. */
+export const MAX_NO_AUTOCOMPLETAR = 8;
+
+/**
+ * O autocompletar de parceiro da folha de novo compromisso.
+ *
+ * Duas buscas em paralelo, sob a RLS de quem entrou: a `search_organizations` (que
+ * acha por telefone, @, CNPJ e bairro) e um `ilike` no `search_name` da
+ * `organizations_view` (que acha o trecho no meio do nome: "buf" em "Anne Vieira
+ * Buffet"). `ordenarCandidatos` junta as duas sem repetir, e `hidratarAlvos` — a
+ * mesma do Registrar contato — devolve cada parceiro com negócio, etapa e opt-out.
+ */
+export async function buscarParceirosParaAgenda(texto: string): Promise<SugestaoDeAlvo[]> {
+  const termo = normalizarBusca(texto);
+  if (!termo) return [];
+  const supabase = createClient();
+  const consultaDaRpc = prepararConsulta(texto);
+
+  const [daRpc, doTrecho] = await Promise.all([
+    consultaDaRpc
+      ? supabase.rpc('search_organizations', { q: consultaDaRpc, p_limit: MAX_NO_AUTOCOMPLETAR })
+      : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from('organizations_view')
+      .select('id, name')
+      .ilike('search_name', `%${escaparCuringas(termo)}%`)
+      .order('name')
+      .limit(30),
+  ]);
+  if (daRpc.error && doTrecho.error) throw erroDe(doTrecho.error.code, doTrecho.error);
+
+  const nomes = (linhas: unknown) =>
+    ((linhas ?? []) as { id: string; name: string | null }[]).map((l) => ({
+      id: l.id,
+      nome: l.name ?? '',
+    }));
+  const ids = ordenarCandidatos(
+    termo,
+    daRpc.error ? [] : nomes(daRpc.data),
+    doTrecho.error ? [] : nomes(doTrecho.data),
+    MAX_NO_AUTOCOMPLETAR,
+  );
+  const alvos = await hidratarAlvos(ids);
+  return alvos.map((alvo) => ({ ...alvo, origem: 'busca' as const, motivo: null }));
 }
 
 /**

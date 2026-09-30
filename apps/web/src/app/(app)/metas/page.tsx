@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
+import { carregarPessoasAcompanhadas } from '@/lib/auth/equipe';
 import { requireSession } from '@/lib/auth/session';
-import { createClient } from '@/lib/supabase/server';
 import { hojeEmNatal } from '@/components/metas/periodo';
 import { TelaMetas } from '@/components/metas/tela-metas';
 import { PAPEIS_QUE_DEFINEM_META, type Pessoa } from '@/components/metas/tipos';
@@ -28,22 +28,12 @@ export default async function Pagina() {
   const sessao = await requireSession();
   const podeDefinir = PAPEIS_QUE_DEFINEM_META.includes(sessao.papel);
 
-  let pessoas: Pessoa[] = [{ id: sessao.id, nome: sessao.nome }];
-
-  if (podeDefinir) {
-    const supabase = await createClient();
-    // `team_directory` é a view sem PII com os nomes do time (a mesma dos filtros
-    // de Parceiros). Ordem alfabética: a tela acompanha, não classifica.
-    const { data } = await supabase
-      .from('team_directory')
-      .select('id, full_name')
-      .eq('is_active', true)
-      .order('full_name');
-
-    if (data && data.length > 0) {
-      pessoas = data.map((linha) => ({ id: linha.id, nome: linha.full_name }));
-    }
-  }
+  // A própria pessoa e quem ela acompanha pela hierarquia (`lib/auth/hierarquia.ts`):
+  // o admin vê gestor, SDR e embaixador; o gestor, SDR e embaixador. Depois da
+  // própria pessoa, ordem alfabética: a tela acompanha, não classifica.
+  const pessoas: Pessoa[] = podeDefinir
+    ? await carregarPessoasAcompanhadas(sessao)
+    : [{ id: sessao.id, nome: sessao.nome }];
 
   return (
     <TelaMetas pessoas={pessoas} euId={sessao.id} podeDefinir={podeDefinir} hoje={hojeEmNatal()} />

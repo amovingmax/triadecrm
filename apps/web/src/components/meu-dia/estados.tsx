@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import {
+  CalendarDays,
   CheckCheck,
   ListChecks,
   PhoneOutgoing,
@@ -14,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * Os três jeitos de a fila não ter linhas para mostrar, mais a espera.
+ * Os jeitos de a fila não ter linhas para mostrar, mais a espera.
  *
  * "Não tem nada para hoje" e "não deu para carregar" são situações opostas e a saída
  * de cada uma é diferente: a primeira é uma boa notícia e pede a próxima ação útil; a
@@ -169,24 +170,78 @@ export function FilaVazia({
 /**
  * Existe fila, mas tudo o que sobrou tem data à frente: hoje está limpo. Vale o
  * mesmo alívio, em tom menor, e sem esconder o que vem depois.
+ *
+ * Desde que o futuro ganhou aba própria ("Próximos dias"), "logo abaixo" deixou de
+ * ser verdade: o que vem depois está na outra aba. O botão leva até lá, e some
+ * quando não há nada marcado à frente — um botão para uma aba vazia é um convite
+ * para um lugar onde não há nada.
  */
-export function NadaParaHoje({ quantosDepois }: { quantosDepois: number }) {
+export function NadaParaHoje({
+  quantosDepois,
+  aoVerProximos,
+}: {
+  quantosDepois: number;
+  aoVerProximos: () => void;
+}) {
   return (
     <div className="sombra-base flex items-start gap-3 rounded-xl bg-card p-4">
       <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-menta-fundo text-menta-texto">
         <CheckCheck className="size-4" aria-hidden="true" />
       </span>
-      <div className="min-w-0">
-        <p className="font-medium">Hoje está limpo.</p>
-        <p className="text-sm text-muted-foreground">
-          Nada vencido e nada marcado para hoje. Há{' '}
-          <span className="numerico">{quantosDepois}</span>
-          {quantosDepois === 1
-            ? ' compromisso com data à frente, logo abaixo.'
-            : ' compromissos com data à frente, logo abaixo.'}
-        </p>
+      <div className="flex min-w-0 flex-col items-start gap-2">
+        <div>
+          <p className="font-medium">Hoje está limpo.</p>
+          <p className="text-sm text-muted-foreground">
+            Nada vencido e nada marcado para hoje.
+            {quantosDepois > 0 ? (
+              <>
+                {' '}
+                Há <span className="numerico">{quantosDepois}</span>
+                {quantosDepois === 1
+                  ? ' compromisso com data à frente.'
+                  : ' compromissos com data à frente.'}
+              </>
+            ) : null}
+          </p>
+        </div>
+        {quantosDepois > 0 ? (
+          <Button variant="outline" onClick={aoVerProximos} className="toque h-11 md:h-8">
+            <CalendarDays aria-hidden="true" />
+            Ver os próximos dias
+          </Button>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * A aba "Próximos dias" sem nada marcado. Quando a fila veio cheia, o vazio pode ser
+ * só o futuro que não coube — aí quem fala é o aviso do corte (`FuturoCortado`), e
+ * não este.
+ */
+export function SemProximos() {
+  return (
+    <Moldura
+      icone={<CalendarDays className="size-5" aria-hidden="true" />}
+      titulo="Nada marcado para os próximos dias"
+      texto="O que for combinado com data à frente aparece aqui, separado por dia."
+    />
+  );
+}
+
+/**
+ * A fila de outra pessoa (gestor ou admin pelo seletor "De quem é o dia") voltou
+ * vazia. Sem os caminhos de `FilaVazia`: eles são para quem está com a fila vazia
+ * puxar trabalho, e quem está olhando não é essa pessoa.
+ */
+export function FilaVaziaDeOutraPessoa({ nome }: { nome: string | null }) {
+  return (
+    <Moldura
+      icone={<CalendarDays className="size-5" aria-hidden="true" />}
+      titulo={nome ? `A fila de ${nome} está vazia` : 'A fila está vazia'}
+      texto="Nada vencido, nada para hoje e nada com data à frente."
+    />
   );
 }
 
@@ -195,7 +250,7 @@ export function ErroDaFila({ causa, aoTentar }: { causa: string; aoTentar: () =>
   return (
     <Moldura
       icone={<RotateCw className="size-5" aria-hidden="true" />}
-      titulo="Não deu para carregar a sua fila"
+      titulo="Não deu para carregar a fila"
       texto={`${causa} Tente de novo; se continuar, avise no grupo do time.`}
     >
       <Button variant="outline" onClick={aoTentar} className="toque h-11 md:h-9">
@@ -206,7 +261,11 @@ export function ErroDaFila({ causa, aoTentar }: { causa: string; aoTentar: () =>
   );
 }
 
-function Moldura({
+/**
+ * O cartão de todo estado vazio e de erro do Meu dia, exportado para o "Feito hoje"
+ * (`feito-hoje.tsx`) falar com a mesma voz e a mesma forma das outras duas abas.
+ */
+export function Moldura({
   icone,
   titulo,
   texto,
@@ -216,7 +275,8 @@ function Moldura({
   titulo: string;
   /** Nó, e não string: o número de negócios sem dono precisa da IBM Plex Mono. */
   texto: React.ReactNode;
-  children: React.ReactNode;
+  /** A saída do estado, quando há uma; o vazio de outra pessoa não tem. */
+  children?: React.ReactNode;
 }) {
   return (
     // Em CARTÃO (29/09/2026), como o vazio de todas as outras telas: solto no

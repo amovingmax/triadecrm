@@ -10,6 +10,7 @@ import {
   diaDaSemana,
   diasDaSemana,
   ehFimDeSemana,
+  escolherResultado,
   faixaDeHoras,
   horaEmNatal,
   inicioDaSemana,
@@ -20,6 +21,7 @@ import {
   numeroDoDia,
   proximoCompromisso,
   recortesDoCompromisso,
+  resultadoDoDesfecho,
   rotuloDaSemana,
   rotuloSemanaCurto,
   somarDias,
@@ -63,6 +65,9 @@ function compromisso(parcial: Partial<Compromisso> = {}): Compromisso {
     etapaId: 8,
     diasSemContato: 3,
     naoContatar: false,
+    resultado: null,
+    reagendada: false,
+    responsavelId: 'pessoa-1',
     ...parcial,
   };
 }
@@ -332,5 +337,173 @@ describe('a porta de remarcar é uma só', () => {
     expect(
       recortesDoCompromisso(catalogo, compromisso({ reuniaoId: null })).reagendar.length,
     ).toBeGreaterThan(0);
+  });
+});
+describe('o resultado do compromisso (cor do cartão)', () => {
+  function desfecho(parcial: Partial<DesfechoCatalogo>): DesfechoCatalogo {
+    return {
+      id: 1,
+      slug: 'reu_interessado',
+      name: 'Realizada, interessado',
+      surfaces: ['reuniao'],
+      position: 1,
+      cooldown_days: 0,
+      can_reactivate: true,
+      next_action_kind: null,
+      next_action_label: null,
+      next_action_offset_days: 0,
+      target_stage_slug: 'apresentacao_realizada',
+      sets_temperature: 'quente',
+      requires_lost_reason: false,
+      counts_as: 'aberta',
+      ...parcial,
+    } as DesfechoCatalogo;
+  }
+
+  it('autorizou é sucesso com troféu, e a frase "Parceiro autorizou"', () => {
+    const r = resultadoDoDesfecho(
+      desfecho({
+        slug: 'reu_autorizou',
+        name: 'Realizada, autorizou',
+        target_stage_slug: 'autorizou',
+      }),
+      'reuniao',
+    );
+    expect(r).toEqual({
+      tom: 'sucesso',
+      rotulo: 'Parceiro autorizou',
+      desfecho: 'Realizada, autorizou',
+      trofeu: true,
+    });
+  });
+
+  it('interessado é sucesso, sem troféu: o troféu é só da autorização', () => {
+    expect(resultadoDoDesfecho(desfecho({}), 'reuniao')).toEqual({
+      tom: 'sucesso',
+      rotulo: 'Realizada, interessado',
+      desfecho: 'Realizada, interessado',
+      trofeu: false,
+    });
+    expect(
+      resultadoDoDesfecho(
+        desfecho({
+          slug: 'vis_decisor_interessado',
+          name: 'Decisor interessado',
+          surfaces: ['visita'],
+          target_stage_slug: 'em_conversa',
+        }),
+        'visita',
+      ),
+    ).toMatchObject({ tom: 'sucesso', rotulo: 'Decisor interessado', trofeu: false });
+  });
+
+  it('"agora não" é adiado, com o nome do catálogo', () => {
+    expect(
+      resultadoDoDesfecho(
+        desfecho({
+          slug: 'vis_decisor_agora_nao',
+          name: 'Decisor, agora não',
+          surfaces: ['visita'],
+          target_stage_slug: 'nutricao',
+          sets_temperature: 'frio',
+        }),
+        'visita',
+      ),
+    ).toMatchObject({ tom: 'adiado', rotulo: 'Decisor, agora não', trofeu: false });
+  });
+
+  it('no-show é ausência: "Parceiro não compareceu" na reunião, "não estava" na visita', () => {
+    expect(
+      resultadoDoDesfecho(
+        desfecho({ slug: 'reu_no_show', name: 'No-show', target_stage_slug: null }),
+        'reuniao',
+      ),
+    ).toMatchObject({ tom: 'ausente', rotulo: 'Parceiro não compareceu' });
+    expect(
+      resultadoDoDesfecho(
+        desfecho({ slug: 'vis_nao_estava', name: 'Não estava / fechado', surfaces: ['visita'] }),
+        'visita',
+      ),
+    ).toMatchObject({ tom: 'ausente', rotulo: 'Parceiro não estava' });
+  });
+
+  it('reagendada tem o tom próprio, e perdido é perda', () => {
+    expect(
+      resultadoDoDesfecho(desfecho({ slug: 'reu_reagendada', name: 'Reagendada' }), 'reuniao'),
+    ).toMatchObject({ tom: 'reagendado', rotulo: 'Reagendada' });
+    expect(
+      resultadoDoDesfecho(
+        desfecho({ slug: 'reu_nao', name: 'Realizada, não', target_stage_slug: 'perdido' }),
+        'reuniao',
+      ),
+    ).toMatchObject({ tom: 'perda', rotulo: 'Parceiro recusou' });
+  });
+
+  it('o resto é neutro, com o nome do catálogo — inclusive desfecho novo do gestor', () => {
+    // Mesma etapa e mesma temperatura do "interessado": só o slug separa os dois.
+    expect(
+      resultadoDoDesfecho(
+        desfecho({ slug: 'reu_objecao', name: 'Realizada, com objeção' }),
+        'reuniao',
+      ),
+    ).toMatchObject({ tom: 'neutro', rotulo: 'Realizada, com objeção' });
+    expect(
+      resultadoDoDesfecho(
+        desfecho({
+          slug: 'reu_novo_do_gestor',
+          name: 'Cadastro na hora',
+          target_stage_slug: 'cadastro_em_andamento',
+        }),
+        'reuniao',
+      ),
+    ).toMatchObject({ tom: 'sucesso', rotulo: 'Cadastro na hora' });
+  });
+});
+
+describe('de qual registro sai o resultado (opção A, sem banco)', () => {
+  // Reunião às 10h30 de quinta, 10/09, em Natal.
+  const quando = '2026-09-10T13:30:00.000Z';
+  const r = (registradoEm: string, desfechoId: number) => ({ registradoEm, desfechoId });
+
+  it('fechada pela Agenda: vale o último registro até o fechamento, mesmo antes do dia', () => {
+    // Registrado na quarta (véspera) e fechado segundos depois; a ligação de sexta não conta.
+    expect(
+      escolherResultado({ quando, fechadoEm: '2026-09-09T15:00:02.000Z' }, [
+        r('2026-09-09T11:00:00.000Z', 1),
+        r('2026-09-09T15:00:01.000Z', 2),
+        r('2026-09-11T12:00:00.000Z', 3),
+      ]),
+    ).toEqual(r('2026-09-09T15:00:01.000Z', 2));
+  });
+
+  it('fechada, mas sem registro perto do fechamento: sem resultado, e não um chute', () => {
+    expect(
+      escolherResultado({ quando, fechadoEm: '2026-09-10T15:00:00.000Z' }, [
+        r('2026-09-01T12:00:00.000Z', 1),
+      ]),
+    ).toBeNull();
+  });
+
+  it('sem fechamento: vale o mais recente do dia — não a ligação que confirmou', () => {
+    expect(
+      escolherResultado({ quando, fechadoEm: null }, [
+        r('2026-09-10T11:00:00.000Z', 1),
+        r('2026-09-10T14:20:00.000Z', 2),
+      ]),
+    ).toEqual(r('2026-09-10T14:20:00.000Z', 2));
+  });
+
+  it('sem fechamento e sem registro no dia: o primeiro depois dele; o dia é o de Natal', () => {
+    expect(
+      escolherResultado({ quando, fechadoEm: null }, [
+        r('2026-09-12T12:00:00.000Z', 3),
+        r('2026-09-11T12:00:00.000Z', 4),
+      ]),
+    ).toEqual(r('2026-09-11T12:00:00.000Z', 4));
+    // 01:30 UTC de sexta = 22:30 de quinta em Natal: ainda é o dia do compromisso.
+    expect(
+      escolherResultado({ quando, fechadoEm: null }, [r('2026-09-11T01:30:00.000Z', 5)]),
+    ).toEqual(r('2026-09-11T01:30:00.000Z', 5));
+    expect(escolherResultado({ quando, fechadoEm: null }, [])).toBeNull();
   });
 });

@@ -35,9 +35,16 @@ export function chaveDaRota(usuarioId: string, dia: string) {
   return ['rota', usuarioId, dia] as const;
 }
 
-export async function buscarRotaDoDia(dia: string): Promise<RotaDoDia> {
+/**
+ * `pessoaId` só vai quando a agenda aberta é de OUTRA pessoa (visão da equipe); a
+ * RPC confere quem pode ver a rota de quem.
+ */
+export async function buscarRotaDoDia(dia: string, pessoaId?: string): Promise<RotaDoDia> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('rota_do_dia', { p_dia: dia });
+  const { data, error } = await supabase.rpc('rota_do_dia', {
+    p_dia: dia,
+    ...(pessoaId ? { p_assignee: pessoaId } : {}),
+  });
   if (error) throw erroDe(error.code, error);
   return data as unknown as RotaDoDia;
 }

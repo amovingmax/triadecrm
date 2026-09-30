@@ -4,6 +4,7 @@ import {
   comQuemPadrao,
   desfechosOferecidos,
   diaEmFortaleza,
+  ehInteresse,
   instanteEmFortaleza,
   SLUGS_REUNIAO_AGENDADA,
   type DesfechoCatalogo,
@@ -108,7 +109,150 @@ export type Compromisso = {
   diasSemContato: number | null;
   /** `organizations.do_not_contact`: a folha de desfecho corta o que criaria tarefa. */
   naoContatar: boolean;
+  /**
+   * O que aconteceu, quando o compromisso já foi registrado. Sai do registro que a
+   * mesma pessoa fez para o mesmo parceiro no dia do compromisso (`escolherResultado`):
+   * nem a `tasks` nem a `activities` guardam a que compromisso o registro pertence.
+   * Nulo no que está aberto e no que foi fechado sem registro com desfecho.
+   */
+  resultado: ResultadoDoCompromisso | null;
+  /** `reunioes.remarcada_de` preenchido: esta reunião é a nova data de outra. */
+  reagendada: boolean;
+  /**
+   * `tasks.assignee_id`: de quem é a agenda em que o compromisso está. É a grade
+   * DESSA pessoa que a folha de remarcar mostra — na visão da equipe, quem remarca
+   * não é o dono.
+   */
+  responsavelId: string;
 };
+
+/**
+ * Como a tela pinta o resultado de um compromisso. O TOM sai do catálogo, e não de
+ * uma lista de slugs, pelo mesmo motivo de `recortesDoCompromisso`: o gestor edita
+ * o catálogo (RF-ADM-02).
+ *
+ *   sucesso     o parceiro autorizou, começou o cadastro (etapa de destino
+ *               `autorizou` ou `cadastro_em_andamento`) ou saiu interessado
+ *               (`SLUGS_INTERESSE`, a única exceção por slug — ver lá o porquê)
+ *   ausente     não havia ninguém do outro lado (no-show, "não estava")
+ *   perda       o desfecho leva o negócio a Perdido
+ *   adiado      "agora não": o desfecho leva o negócio a Nutrição
+ *   reagendado  um dos `SLUGS_REUNIAO_AGENDADA` ("Reagendada")
+ *   neutro      o resto: aconteceu, e o funil seguiu (com objeção, falei com funcionário…)
+ *
+ * O "Feito hoje" do Meu dia (`meu-dia/feito.ts`) lê os mesmos desfechos e tem de
+ * concordar com estes tons; um teste de lá confere isso desfecho a desfecho.
+ */
+export type TomDoResultado = 'sucesso' | 'ausente' | 'perda' | 'adiado' | 'reagendado' | 'neutro';
+
+export type ResultadoDoCompromisso = {
+  tom: TomDoResultado;
+  /** A frase grande do cartão: "Parceiro autorizou", "Parceiro não compareceu"… */
+  rotulo: string;
+  /** O nome do desfecho no catálogo, para a linha de baixo. */
+  desfecho: string;
+  /** O parceiro autorizou (etapa de destino `autorizou`): o cartão ganha o troféu. */
+  trofeu: boolean;
+};
+
+const ETAPAS_DE_SUCESSO = ['autorizou', 'cadastro_em_andamento'];
+
+export function resultadoDoDesfecho(
+  desfecho: DesfechoCatalogo,
+  tipo: Compromisso['tipo'],
+): ResultadoDoCompromisso {
+  const base = { desfecho: desfecho.name, trofeu: false };
+  if ((SLUGS_REUNIAO_AGENDADA as readonly string[]).includes(desfecho.slug)) {
+    return { ...base, tom: 'reagendado', rotulo: 'Reagendada' };
+  }
+  if (comQuemPadrao(desfecho) === 'ninguem') {
+    return {
+      ...base,
+      tom: 'ausente',
+      rotulo: tipo === 'visita' ? 'Parceiro não estava' : 'Parceiro não compareceu',
+    };
+  }
+  if (desfecho.target_stage_slug === 'perdido') {
+    return {
+      ...base,
+      tom: 'perda',
+      rotulo: tipo === 'visita' ? desfecho.name : 'Parceiro recusou',
+    };
+  }
+  if (desfecho.target_stage_slug === 'nutricao') {
+    return { ...base, tom: 'adiado', rotulo: desfecho.name };
+  }
+  if (desfecho.target_stage_slug === 'autorizou') {
+    return { ...base, tom: 'sucesso', rotulo: 'Parceiro autorizou', trofeu: true };
+  }
+  if (
+    (desfecho.target_stage_slug && ETAPAS_DE_SUCESSO.includes(desfecho.target_stage_slug)) ||
+    ehInteresse(desfecho)
+  ) {
+    return { ...base, tom: 'sucesso', rotulo: desfecho.name };
+  }
+  return { ...base, tom: 'neutro', rotulo: desfecho.name };
+}
+
+/** Um registro com desfecho, do jeito que `escolherResultado` precisa dele. */
+export type RegistroComDesfecho = {
+  /** `activities.created_at`: o relógio do banco na hora em que o registro entrou. */
+  registradoEm: string;
+  desfechoId: number;
+};
+
+/** Até quanto tempo antes de fechar a tarefa um registro ainda conta como o desfecho dela. */
+const JANELA_DO_FECHAMENTO_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Qual registro é o resultado de um compromisso já fechado — sem banco novo: a
+ * `activities` não guarda a que tarefa pertence (opção A do plano de 28/09).
+ *
+ * Entre os registros da MESMA pessoa para o MESMO parceiro:
+ *
+ *   1. Com `tasks.completed_at`: o último registro que entrou ATÉ o fechamento. O
+ *      desfecho pela Agenda grava o registro e, logo em seguida, fecha a tarefa
+ *      (`concluirCompromisso`), e os dois carimbos são do relógio do banco. Isso
+ *      acerta mesmo quando o resultado é registrado antes do dia marcado, e ignora
+ *      a ligação que veio depois.
+ *   2. Sem ele: o mais recente feito no dia do compromisso (em Natal) e, na falta,
+ *      o primeiro depois desse dia.
+ *
+ * Erra num caso só, e raro: dois compromissos com o mesmo parceiro fechados no mesmo
+ * minuto. Se isso aparecer na prática, a saída é a opção B do plano (uma coluna que
+ * liga o registro à reunião).
+ */
+export function escolherResultado(
+  compromisso: { quando: string; fechadoEm: string | null },
+  registros: readonly RegistroComDesfecho[],
+): RegistroComDesfecho | null {
+  // Comparação pelo instante, nunca pelo texto: o banco devolve `+00:00` e
+  // `instanteEmFortaleza` escreve `-03:00`.
+  const ms = (iso: string) => Date.parse(iso);
+  const maisRecente = (lista: readonly RegistroComDesfecho[]) =>
+    lista.length === 0
+      ? null
+      : lista.reduce((a, b) => (ms(b.registradoEm) > ms(a.registradoEm) ? b : a));
+
+  if (compromisso.fechadoEm) {
+    const fechou = ms(compromisso.fechadoEm);
+    return maisRecente(
+      registros.filter((r) => {
+        const quando = ms(r.registradoEm);
+        // Um minuto de folga: dois relógios do mesmo banco, em duas chamadas.
+        return quando <= fechou + 60_000 && quando >= fechou - JANELA_DO_FECHAMENTO_MS;
+      }),
+    );
+  }
+
+  const dia = diaDoInstante(compromisso.quando);
+  const noDia = maisRecente(registros.filter((r) => diaDoInstante(r.registradoEm) === dia));
+  if (noDia) return noDia;
+  const inicioDoDia = ms(instanteEmFortaleza(dia, 0));
+  const depois = registros.filter((r) => ms(r.registradoEm) >= inicioDoDia);
+  if (depois.length === 0) return null;
+  return depois.reduce((a, b) => (ms(b.registradoEm) < ms(a.registradoEm) ? b : a));
+}
 
 export type NaturezaDoCompromisso = 'marcado' | 'visita' | 'a_marcar';
 

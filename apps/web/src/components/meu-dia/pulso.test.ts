@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  agruparPorPrazo,
   deQuandoE,
   diasDesde,
   linkDaPrioridade,
@@ -83,5 +84,27 @@ describe('o link da prioridade', () => {
 
   it('e some quando não há para onde ir', () => {
     expect(linkDaPrioridade(prioridade('hoje', null))).toBeNull();
+  });
+});
+
+describe('as prioridades agrupadas por prazo, na tela', () => {
+  it('um grupo por prazo, na ordem, sem repetir o prazo em cada linha', () => {
+    const grupos = agruparPorPrazo(
+      ordenarPrioridades([
+        prioridade('esta_semana', 'org-1'),
+        prioridade('hoje', 'org-2'),
+        prioridade('amanha', 'org-3'),
+        prioridade('hoje', 'org-4'),
+      ]),
+    );
+    expect(grupos.map((g) => [g.urgencia, g.itens.length])).toEqual([
+      ['hoje', 2],
+      ['amanha', 1],
+      ['esta_semana', 1],
+    ]);
+  });
+
+  it('sem prioridade, sem grupo', () => {
+    expect(agruparPorPrazo([])).toEqual([]);
   });
 });

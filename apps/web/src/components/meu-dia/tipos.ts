@@ -1,3 +1,4 @@
+import type { AppRole } from '@/lib/auth/role';
 import type { Temperatura } from '@/components/temperatura';
 
 /**
@@ -120,13 +121,13 @@ export const BLOCOS: readonly DefinicaoDeBloco[] = [
   },
   {
     id: 'agora',
-    titulo: 'Agora',
+    titulo: 'Urgente',
     explicacao: 'Passou da hora, ou acontece em menos de três horas.',
     prioridades: [1, 2, 3, 4],
   },
   {
     id: 'hoje',
-    titulo: 'Ainda hoje',
+    titulo: 'Até o fim do dia',
     explicacao: 'Tem prazo para hoje e ainda não venceu.',
     prioridades: [5, 6],
   },
@@ -194,12 +195,137 @@ export function agruparFila(itens: readonly ItemDoDia[]): BlocoPreenchido[] {
   return doSistema.length > 0 ? [...blocos, { ...BLOCO_DO_SISTEMA, itens: doSistema }] : blocos;
 }
 
+// ---------------------------------------------------------------------------
+// As três abas
+// ---------------------------------------------------------------------------
+
+/**
+ * O Meu dia em três abas, como o RF-MET-03 descreve (Inbox / Feito / Futuro):
+ *
+ *   fazer     a fila de hoje: tudo menos o bloco do futuro — e quem respondeu no
+ *             WhatsApp continua abrindo a aba, no topo
+ *   feito     o que a pessoa registrou hoje, separado por como foi (`feito.ts`)
+ *   proximos  o bloco do futuro, agrupado por dia
+ *
+ * Antes era uma lista só, com "Depois de hoje" no fim. Quem abria a tela lia os
+ * blocos como se fossem o dia dela, e o futuro — que é plano, não dívida — disputava
+ * a rolagem com o que vence hoje.
+ */
+export type AbaDoDia = 'fazer' | 'feito' | 'proximos';
+
+export const ABAS_DO_DIA: readonly AbaDoDia[] = ['fazer', 'feito', 'proximos'];
+
+export function abaDaUrl(valor: string | string[] | undefined): AbaDoDia {
+  return typeof valor === 'string' && (ABAS_DO_DIA as readonly string[]).includes(valor)
+    ? (valor as AbaDoDia)
+    : 'fazer';
+}
+
+/** O único bloco que sai de "Para fazer": o futuro, que tem aba própria. */
+const BLOCO_DOS_PROXIMOS: IdDoBloco = 'depois';
+
+/**
+ * Os blocos da aba "Para fazer": a fila sem o futuro, na ordem de `agruparFila`.
+ *
+ * O filtro é por EXCLUSÃO de propósito, e é o que mantém "Responderam e estão
+ * esperando" (prioridade 0) no topo desta aba: um filtro que listasse os blocos
+ * de hoje teria de lembrar dele, e um bloco novo que a `meu_dia` ganhar entra aqui
+ * sozinho em vez de sumir das duas abas.
+ */
+export function blocosParaFazer(blocos: readonly BlocoPreenchido[]): BlocoPreenchido[] {
+  return blocos.filter((bloco) => bloco.id !== BLOCO_DOS_PROXIMOS);
+}
+
+/** As prioridades que vão para a aba "Próximos dias", e não para "Para fazer". */
+export const PRIORIDADES_DOS_PROXIMOS: readonly number[] =
+  BLOCOS.find((bloco) => bloco.id === BLOCO_DOS_PROXIMOS)?.prioridades ?? [];
+
+/** O item vai para "Próximos dias": tem data à frente e não é aviso do motor. */
+export function ehDosProximos(item: ItemDoDia): boolean {
+  return PRIORIDADES_DOS_PROXIMOS.includes(item.prioridade) && !ehAvisoDoSistema(item);
+}
+
+export type DiaDaFila = {
+  /** `YYYY-MM-DD` em Natal, ou `null` para o que não tem data. */
+  dia: string | null;
+  itens: ItemDoDia[];
+};
+
+/**
+ * O futuro agrupado por dia, em ordem de data e hora. A ordem é feita aqui porque a
+ * faixa 9 da `public.meu_dia` não sai por data (medido: 29/09, 02/10, 30/09, 01/10),
+ * e "próximos dias" se lê como agenda. `diaDe` é injetado para o teste não depender
+ * do fuso da máquina.
+ */
+export function agruparPorDia(
+  itens: readonly ItemDoDia[],
+  diaDe: (iso: string) => string,
+): DiaDaFila[] {
+  const dias: DiaDaFila[] = [];
+  const porHora = [...itens].sort((a, b) => (a.quando ?? '').localeCompare(b.quando ?? ''));
+  for (const item of porHora) {
+    const dia = item.quando ? diaDe(item.quando) : null;
+    const grupo = dias.find((existente) => existente.dia === dia);
+    if (grupo) grupo.itens.push(item);
+    else dias.push({ dia, itens: [item] });
+  }
+  // `YYYY-MM-DD` se ordena como texto. Sem data vai para o fim: é o que menos tem
+  // hora para acontecer.
+  const comData = dias
+    .filter((d): d is DiaDaFila & { dia: string } => d.dia !== null)
+    .sort((a, b) => a.dia.localeCompare(b.dia));
+  return [...comData, ...dias.filter((d) => d.dia === null)];
+}
+
+// ---------------------------------------------------------------------------
+// O dia de outra pessoa
+// ---------------------------------------------------------------------------
+
+/**
+ * De quem é o bloco "Responderam e estão esperando" que a `public.meu_dia` devolve
+ * para uma pessoa. Espelha, em TypeScript, o recorte da própria função
+ * (20261002180000, "QUEM PODE ATENDER VÊ A FILA INTEIRA"), que decide pelo papel
+ * de QUEM A FILA É, e não de quem pergunta:
+ *
+ *   admin, gestor, sdr   'todos'   a fila COMUM: toda conversa esperando, de quem
+ *                                  quer que seja (ADR-17, 28/09/2026)
+ *   embaixador           'propria' só as conversas endereçadas a ele
+ *   leitura, financeiro,
+ *   bot, desconhecido    'nenhuma' não recebem o item (não podem responder)
+ *
+ * A tela só precisa disto no dia de OUTRA pessoa: no gestor que abre o dia de uma
+ * SDR, o bloco que chega é a fila de todos — inclusive as conversas endereçadas ao
+ * próprio gestor —, e mostrá-lo como "o dia da Heloísa" seria atribuir a ela uma
+ * fila que é do time. Mexeu no recorte da função, mexe aqui.
+ */
+export type AlcanceDeQuemRespondeu = 'todos' | 'propria' | 'nenhuma';
+
+export function alcanceDeQuemRespondeu(papel: AppRole | null): AlcanceDeQuemRespondeu {
+  if (papel === 'admin' || papel === 'gestor' || papel === 'sdr') return 'todos';
+  if (papel === 'embaixador') return 'propria';
+  return 'nenhuma';
+}
+
+/**
+ * A fila como a tela a mostra. No próprio dia, exatamente o que o banco devolveu.
+ * No dia de outra pessoa, sem as conversas quando elas não são dessa pessoa: a
+ * fila de quem respondeu é de todos e aparece no dia de quem abre a tela — a tela
+ * diz isso numa linha, no lugar do bloco.
+ */
+export function filaVisivel(
+  itens: readonly ItemDoDia[],
+  { doProprio, alcance }: { doProprio: boolean; alcance: AlcanceDeQuemRespondeu },
+): readonly ItemDoDia[] {
+  if (doProprio || alcance === 'propria') return itens;
+  return itens.filter((item) => item.tipo !== 'conversa_esperando');
+}
+
 /**
  * Quantos itens não têm data à frente: o que venceu, o que vence hoje, o negócio sem
  * próximo passo e o negócio parado na etapa. É o número que a pessoa realmente deve,
  * e é o do cabeçalho da tela.
  *
- * Ele é de propósito MAIOR que o do bloco "Agora", que conta só a primeira das quatro
+ * Ele é de propósito MAIOR que o do bloco "Urgente", que conta só a primeira das quatro
  * faixas. Por isso o cabeçalho fala em "pendentes" e não em "para agora": enquanto os
  * dois se chamavam a mesma coisa, a tela mostrava dois números com o mesmo nome e
  * contas diferentes, um por cima do outro.
@@ -232,7 +358,24 @@ export type Destino = {
  * Item sem organização (interação registrada sem alvo resolvido) não vira link:
  * não há para onde mandar, e um link morto é pior que texto.
  */
-export function destinoDoItem(item: ItemDoDia): Destino | null {
+export function destinoDoItem(
+  item: ItemDoDia,
+  { somenteLeitura = false }: { somenteLeitura?: boolean } = {},
+): Destino | null {
+  // No dia de OUTRA pessoa (gestor ou admin olhando pelo seletor), a linha só leva à
+  // ficha. Registrar ou mover a partir daqui gravaria no nome de quem está olhando:
+  // a pendência da dona continuaria na fila dela, e a meta e o "Feito hoje" de quem
+  // olha levariam o crédito. É a mesma regra da Agenda, que é só leitura na visão
+  // da equipe. Vale também para a conversa (só chega aqui a do embaixador, que é
+  // dele): responder por esta linha passaria o atendimento para quem olha
+  // (`app.messages_quem_responde_atende`). Quem escreveu de fora da base não tem
+  // ficha, e por isso fica sem link.
+  if (somenteLeitura) {
+    return item.organizacaoId
+      ? { href: `/parceiros/${item.organizacaoId}`, onde: 'a ficha do parceiro' }
+      : null;
+  }
+
   // A conversa é o único item que leva para fora do par ficha/funil: o trabalho
   // é responder, e responder acontece em Conversas. É também o único que tem
   // destino SEM ficha — quem escreveu de fora da base não tem para onde mais ir.

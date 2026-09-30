@@ -48,7 +48,18 @@ export function SeletorDeAba<T extends string>({
   rotulo,
   rolavel = false,
 }: {
-  itens: readonly { id: T; rotulo: string; contagem?: number | null; sufixo?: string }[];
+  itens: readonly {
+    id: T;
+    rotulo: string;
+    /**
+     * O nome no celular, quando o inteiro não cabe na terça parte de 390px ao lado da
+     * contagem ("Próximos dias 4" quebrava em duas linhas). Do `md` para cima vale o
+     * `rotulo`.
+     */
+    rotuloCurto?: string;
+    contagem?: number | null;
+    sufixo?: string;
+  }[];
   ativo: T;
   aoTrocar: (id: T) => void;
   rotulo: string;
@@ -78,8 +89,11 @@ export function SeletorDeAba<T extends string>({
             aria-selected={selecionado}
             onClick={() => aoTrocar(item.id)}
             className={cn(
-              'toque h-11 rounded-full px-4 text-sm font-medium transition-colors md:h-8',
-              rolavel ? 'shrink-0 whitespace-nowrap' : 'flex-1 md:flex-none',
+              'toque h-11 rounded-full text-sm font-medium whitespace-nowrap transition-colors md:h-8',
+              // Aba que divide a largura por igual já centraliza o nome: no celular o
+              // respiro lateral só roubava a largura de que o nome e a contagem
+              // precisam para caber numa linha.
+              rolavel ? 'shrink-0 px-4' : 'flex-1 px-2 md:flex-none md:px-4',
               'focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
               // A ABA ATIVA É MENTA (29/09/2026). Rafael: "quero mais presença
               // do verde no CRM em geral". A aba ativa é o lugar certo para isso:
@@ -92,7 +106,14 @@ export function SeletorDeAba<T extends string>({
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
-            {item.rotulo}
+            {item.rotuloCurto ? (
+              <>
+                <span className="md:hidden">{item.rotuloCurto}</span>
+                <span className="hidden md:inline">{item.rotulo}</span>
+              </>
+            ) : (
+              item.rotulo
+            )}
             {/* Anotação em voz baixa ao lado do nome — hoje só o "(v1)" dos funis
                 que ainda não têm quadro. Fica esmaecida porque não é o nome. */}
             {item.sufixo ? (

@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
 
+import { carregarPessoasAcompanhadas } from '@/lib/auth/equipe';
+import { pessoaPedida } from '@/lib/auth/hierarquia';
 import { requireSession } from '@/lib/auth/session';
+import { hojeEmNatal } from '@/components/agenda/tipos';
 import { dataPorExtenso, primeiroNome, saudacaoDoDia } from '@/components/meu-dia/formatos';
-import { TelaMeuDia } from '@/components/meu-dia/tela-meu-dia';
+import { TelaMeuDia, type PessoaDoSeletor } from '@/components/meu-dia/tela-meu-dia';
+import { abaDaUrl } from '@/components/meu-dia/tipos';
 
 export const metadata: Metadata = { title: 'Meu dia' };
 
@@ -18,9 +22,19 @@ export const metadata: Metadata = { title: 'Meu dia' };
  * A fila e o resumo são buscados no cliente, com TanStack Query, porque mudam o dia
  * inteiro — a pessoa registra um contato e volta para cá esperando a fila menor.
  */
-export default async function Pagina() {
-  const sessao = await requireSession();
+export default async function Pagina({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [sessao, params] = await Promise.all([requireSession(), searchParams]);
   const agora = new Date();
+  // Admin e gestor escolhem de quem é o dia (`lib/auth/hierarquia.ts`); para os
+  // outros papéis a lista é só a própria pessoa e nem vai ao banco.
+  // O papel vem junto, na mesma leitura da `team_directory`: a tela usa para saber
+  // se o bloco "Responderam e estão esperando" da `meu_dia` é a fila de todos
+  // (admin, gestor e sdr) ou a da pessoa (embaixador) — `alcanceDeQuemRespondeu`.
+  const pessoas: PessoaDoSeletor[] = await carregarPessoasAcompanhadas(sessao);
 
   return (
     <TelaMeuDia
@@ -28,6 +42,11 @@ export default async function Pagina() {
       saudacao={saudacaoDoDia(agora)}
       data={dataPorExtenso(agora)}
       podeDefinirMeta={sessao.papel === 'admin' || sessao.papel === 'gestor'}
+      usuarioId={sessao.id}
+      hoje={hojeEmNatal(agora)}
+      abaInicial={abaDaUrl(params.aba)}
+      pessoas={pessoas}
+      pessoaInicial={pessoaPedida(params.pessoa, pessoas, sessao.id)}
     />
   );
 }

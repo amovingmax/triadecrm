@@ -1,5 +1,7 @@
 'use client';
 
+import { CalendarClock, Check, CircleCheck, CirclePause, CircleX, Trophy, UserX } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 
 import {
@@ -87,7 +89,7 @@ export function VisaoDaSemana({
                     key={chaveDoCompromisso(c)}
                     className={cn(
                       'flex items-center gap-2 border-b border-hairline px-2.5 py-2 last:border-b-0',
-                      c.concluido && 'opacity-60',
+                      c.concluido && !c.resultado && 'opacity-60',
                     )}
                   >
                     {c.natureza === 'marcado' ? (
@@ -98,6 +100,7 @@ export function VisaoDaSemana({
                     <span className="min-w-0 truncate text-xs" title={c.organizacao}>
                       {c.organizacao}
                     </span>
+                    <SinalDoCompromisso compromisso={c} />
                   </li>
                 ))}
               </ul>
@@ -107,4 +110,34 @@ export function VisaoDaSemana({
       })}
     </div>
   );
+}
+
+/** O resultado (ou o reagendamento) de relance: um ícone na cor do cartão do dia. */
+function SinalDoCompromisso({ compromisso: c }: { compromisso: Compromisso }) {
+  const classe = 'ml-auto size-3.5 shrink-0';
+  if (c.concluido && c.resultado) {
+    const rotulo = c.resultado.rotulo;
+    switch (c.resultado.tom) {
+      case 'sucesso':
+        return c.resultado.trofeu ? (
+          <Trophy className={cn(classe, 'text-cliente')} aria-label={rotulo} />
+        ) : (
+          <CircleCheck className={cn(classe, 'text-cliente')} aria-label={rotulo} />
+        );
+      case 'ausente':
+        return <UserX className={cn(classe, 'text-destructive')} aria-label={rotulo} />;
+      case 'perda':
+        return <CircleX className={cn(classe, 'text-destructive')} aria-label={rotulo} />;
+      case 'adiado':
+        return <CirclePause className={cn(classe, 'text-destructive')} aria-label={rotulo} />;
+      case 'reagendado':
+        return <CalendarClock className={cn(classe, 'text-morno')} aria-label={rotulo} />;
+      default:
+        return <Check className={cn(classe, 'text-muted-foreground')} aria-label={rotulo} />;
+    }
+  }
+  if (c.reagendada && !c.concluido) {
+    return <CalendarClock className={cn(classe, 'text-morno')} aria-label="Reagendada" />;
+  }
+  return null;
 }

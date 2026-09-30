@@ -68,3 +68,19 @@ export function linkDaPrioridade(prioridade: PrioridadeDoPulso): string | null {
   if (prioridade.organizationId !== null) return `/conversas?org=${prioridade.organizationId}`;
   return null;
 }
+
+export type GrupoDePrazo = {
+  urgencia: PrioridadeDoPulso['urgencia'];
+  itens: PrioridadeDoPulso[];
+};
+
+/** As prioridades já ordenadas, em grupos consecutivos do mesmo prazo. */
+export function agruparPorPrazo(prioridades: readonly PrioridadeDoPulso[]): GrupoDePrazo[] {
+  const grupos: GrupoDePrazo[] = [];
+  for (const p of prioridades) {
+    const ultimo = grupos.at(-1);
+    if (ultimo && ultimo.urgencia === p.urgencia) ultimo.itens.push(p);
+    else grupos.push({ urgencia: p.urgencia, itens: [p] });
+  }
+  return grupos;
+}

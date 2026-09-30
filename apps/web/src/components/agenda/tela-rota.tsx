@@ -61,12 +61,24 @@ import { horaEmNatal, rotuloDiaPorExtenso, type Dia } from './tipos';
  *    coordenada e precisão incerta aparecem embaixo, com o motivo. Sumir em
  *    silêncio é como se perde a confiança de quem usa a ferramenta na rua.
  */
-export function TelaRota({ usuarioId, dia, hoje }: { usuarioId: string; dia: Dia; hoje: Dia }) {
+export function TelaRota({
+  usuarioId,
+  pessoaId = usuarioId,
+  dia,
+  hoje,
+}: {
+  usuarioId: string;
+  /** De quem é a agenda aberta. Diferente de `usuarioId` = visão da equipe, só leitura. */
+  pessoaId?: string;
+  dia: Dia;
+  hoje: Dia;
+}) {
   const clienteDeConsultas = useQueryClient();
+  const deOutraPessoa = pessoaId !== usuarioId;
 
   const consulta = useQuery({
-    queryKey: chaveDaRota(usuarioId, dia),
-    queryFn: () => buscarRotaDoDia(dia),
+    queryKey: chaveDaRota(pessoaId, dia),
+    queryFn: () => buscarRotaDoDia(dia, deOutraPessoa ? pessoaId : undefined),
     // Enquanto o pedido está na fila, a tela olha de novo a cada 2 s: quem
     // responde é um worker noutra máquina, e não há evento vindo dali.
     refetchInterval: (consulta) =>
@@ -120,7 +132,7 @@ export function TelaRota({ usuarioId, dia, hoje }: { usuarioId: string; dia: Dia
         hoje={hoje}
         elegiveis={elegiveis.length}
         pedindo={pedido.isPending}
-        aoMontar={montar}
+        aoMontar={deOutraPessoa ? null : montar}
       />
 
       {status === 'enfileirada' ? <NaFila rota={rota} /> : null}
@@ -159,7 +171,8 @@ function CabecalhoDaRota({
   hoje: Dia;
   elegiveis: number;
   pedindo: boolean;
-  aoMontar: () => void;
+  /** `null` na rota de outra pessoa: quem monta é ela. */
+  aoMontar: (() => void) | null;
 }) {
   const plano = rota.plano;
   const pronta = plano?.status === 'pronta' && rota.paradas.length > 0;
@@ -180,15 +193,17 @@ function CabecalhoDaRota({
           </p>
         </div>
 
-        <Button
-          size="lg"
-          className="toque h-11 md:h-9"
-          onClick={aoMontar}
-          disabled={pedindo || elegiveis === 0}
-        >
-          <RefreshCw className={cn(pedindo && 'animate-spin')} aria-hidden="true" />
-          {plano ? 'Refazer a rota' : 'Montar a rota'}
-        </Button>
+        {aoMontar ? (
+          <Button
+            size="lg"
+            className="toque h-11 md:h-9"
+            onClick={aoMontar}
+            disabled={pedindo || elegiveis === 0}
+          >
+            <RefreshCw className={cn(pedindo && 'animate-spin')} aria-hidden="true" />
+            {plano ? 'Refazer a rota' : 'Montar a rota'}
+          </Button>
+        ) : null}
       </div>
 
       {pronta && plano ? (

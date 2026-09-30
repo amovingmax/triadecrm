@@ -1,7 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { Check, MapPin, PhoneOff, SquarePen } from 'lucide-react';
+import {
+  CalendarClock,
+  Check,
+  CircleCheck,
+  CirclePause,
+  CircleX,
+  MapPin,
+  PhoneOff,
+  SquarePen,
+  Trophy,
+  UserX,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +25,7 @@ import {
   recortesDoCompromisso,
   type Compromisso,
   type PedidoDeDesfecho,
+  type TomDoResultado,
 } from './tipos';
 import { type DesfechoCatalogo } from '@/components/registro/tipos';
 
@@ -37,17 +49,30 @@ import { AcoesDaReuniao } from './acoes-da-reuniao';
  * cartão DIZ quando a busca é pelo nome porque não há endereço cadastrado.
  *
  * Alvo de toque: 44px no celular (`h-11`), 32px no desktop, como no resto do produto.
+ *
+ * Depois do registro, o cartão diz COMO foi, em cor: verde deu certo (com troféu
+ * quando o parceiro autorizou), vermelho não deu, âmbar mudou de data. É a única
+ * cor da linha, e é a que responde à pergunta de quem olha a semana que passou.
+ *
+ * `somenteLeitura` é a agenda de outra pessoa (visão da equipe, admin e gestor):
+ * sem desfecho — o resultado é de quem estava lá. Com `podeMexerNaReuniao`, quem
+ * acompanha essa pessoa ainda remarca e cancela a reunião: é assim que o gestor
+ * desfaz o engano de ter marcado no horário errado para a SDR.
  */
 export function CartaoCompromisso({
   compromisso,
   catalogo,
   aoPedirDesfecho,
   aoMudarReuniao,
+  somenteLeitura = false,
+  podeMexerNaReuniao = !somenteLeitura,
 }: {
   compromisso: Compromisso;
   catalogo: readonly DesfechoCatalogo[];
   aoPedirDesfecho: (pedido: PedidoDeDesfecho) => void;
   aoMudarReuniao?: () => void;
+  somenteLeitura?: boolean;
+  podeMexerNaReuniao?: boolean;
 }) {
   const { realizada, ausente, reagendar } = recortesDoCompromisso(catalogo, compromisso);
   const ehVisita = compromisso.tipo === 'visita';
@@ -61,7 +86,7 @@ export function CartaoCompromisso({
     <li
       className={cn(
         'flex items-start gap-3 rounded-lg bg-muted/45 px-4 py-3',
-        compromisso.concluido && 'opacity-70',
+        compromisso.concluido && !compromisso.resultado && 'opacity-70',
       )}
     >
 
@@ -99,6 +124,14 @@ export function CartaoCompromisso({
           <Badge variant="pilula" className="font-normal">
             {ehVisita ? 'Visita' : 'Reunião'}
           </Badge>
+          {/* A reunião que é a nova data de outra (`reunioes.remarcada_de`). Âmbar
+              pelo mesmo motivo do resultado "Reagendada": mudou de data. */}
+          {compromisso.reagendada && !compromisso.concluido ? (
+            <Badge variant="pilula" className="gap-1 bg-morno-fundo font-normal text-morno-texto">
+              <CalendarClock className="size-3" aria-hidden="true" />
+              Reagendada
+            </Badge>
+          ) : null}
           {compromisso.etapa ? (
             <span className="truncate text-xs text-muted-foreground">{compromisso.etapa}</span>
           ) : null}
@@ -113,10 +146,28 @@ export function CartaoCompromisso({
         ) : null}
 
         {compromisso.concluido ? (
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Check className="size-3.5 shrink-0" aria-hidden="true" />
-            Já registrado.
-          </p>
+          compromisso.resultado ? (
+            <FaixaDoResultado resultado={compromisso.resultado} />
+          ) : (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Check className="size-3.5 shrink-0" aria-hidden="true" />
+              Já registrado.
+            </p>
+          )
+        ) : somenteLeitura ? (
+          <div className="flex flex-wrap items-center gap-2 pt-1 empty:hidden">
+            {ehVisita ? (
+              <Button asChild variant="outline" size="lg" className="toque h-11 md:h-9">
+                <a href={linkDoMapa(compromisso)} target="_blank" rel="noopener noreferrer">
+                  <MapPin aria-hidden="true" />
+                  Google Maps
+                </a>
+              </Button>
+            ) : null}
+            {podeMexerNaReuniao ? (
+              <AcoesDaReuniao compromisso={compromisso} aoMudar={aoMudarReuniao ?? (() => {})} />
+            ) : null}
+          </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {compromisso.natureza === 'a_marcar' ? (
@@ -202,5 +253,41 @@ export function CartaoCompromisso({
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * As cores de cada resultado. Verde é "deu certo" (o verde de "publicado" da escala
+ * do produto), coral é "não deu" (o do destrutivo: recusou, agora não, não
+ * apareceu), âmbar é "mudou de data".
+ */
+const ESTILO_DO_TOM: Record<
+  TomDoResultado,
+  { caixa: string; Icone: React.ComponentType<{ className?: string }> }
+> = {
+  sucesso: { caixa: 'bg-cliente-fundo text-cliente-texto', Icone: CircleCheck },
+  ausente: { caixa: 'bg-destructive/10 text-destructive-texto', Icone: UserX },
+  perda: { caixa: 'bg-destructive/10 text-destructive-texto', Icone: CircleX },
+  adiado: { caixa: 'bg-destructive/10 text-destructive-texto', Icone: CirclePause },
+  reagendado: { caixa: 'bg-morno-fundo text-morno-texto', Icone: CalendarClock },
+  neutro: { caixa: 'bg-card text-foreground', Icone: Check },
+};
+
+/** O que aconteceu, grande o bastante para ler de relance na lista do dia. */
+function FaixaDoResultado({ resultado }: { resultado: NonNullable<Compromisso['resultado']> }) {
+  const { caixa, Icone } = ESTILO_DO_TOM[resultado.tom];
+  return (
+    <div role="status" className={cn('mt-1 flex items-start gap-2.5 rounded-lg px-3 py-2.5', caixa)}>
+      <Icone className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-sm font-semibold">
+          {resultado.rotulo}
+          {resultado.trofeu ? <Trophy className="size-4 shrink-0" aria-hidden="true" /> : null}
+        </p>
+        {resultado.desfecho !== resultado.rotulo ? (
+          <p className="text-xs opacity-90">{resultado.desfecho}</p>
+        ) : null}
+      </div>
+    </div>
   );
 }

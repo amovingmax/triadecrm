@@ -91,6 +91,7 @@ import {
   Target,
 } from 'lucide-react';
 
+import { acompanhaEquipe } from '@/lib/auth/hierarquia';
 import { type AppRole } from '@/lib/auth/role';
 
 /** A que grupo da lateral o item pertence. A ordem aqui é a ordem na tela. */
@@ -229,7 +230,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: Sun,
     grupo: 'todo_dia',
     descricao:
-      'A fila do dia em cinco blocos: Agora, Ainda hoje, Sem próxima ação, Parados na etapa e Depois de hoje, mais o resumo do dia e o quanto falta da meta.',
+      'O dia em três abas: Para fazer (quem respondeu, urgente, até o fim do dia, sem próxima ação, parados), Feito hoje separado por como foi, e Próximos dias; mais o resumo do dia e o quanto falta da meta.',
     posicaoNaBarra: 1,
   },
   {
@@ -404,6 +405,20 @@ export function podeCriarParceiro(papel: AppRole): boolean {
 /** Papéis que importam planilha. Mesmo conjunto de quem cria, pela mesma razão. */
 export function podeImportarPlanilha(papel: AppRole): boolean {
   return PAPEIS_QUE_ESCREVEM.includes(papel);
+}
+
+/** Papéis que marcam compromisso na agenda. Espelho de `app.can_write()`, que a RPC confere. */
+export function podeMarcarCompromisso(papel: AppRole): boolean {
+  return PAPEIS_QUE_ESCREVEM.includes(papel);
+}
+
+/**
+ * Quem escolhe de quem é a agenda que está vendo. A RLS de `tasks` e `reunioes` deixa
+ * mais papéis verem tudo, mas a visão da equipe é decisão de produto para quem
+ * acompanha alguém pela hierarquia (`lib/auth/hierarquia.ts`): admin e gestor.
+ */
+export function veAgendaDaEquipe(papel: AppRole): boolean {
+  return acompanhaEquipe(papel);
 }
 
 /**

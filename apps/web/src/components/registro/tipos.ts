@@ -331,6 +331,23 @@ export const SLUGS_REUNIAO_AGENDADA = ['lig_reuniao_marcada', 'reu_reagendada'] 
  */
 export const SLUG_AUTORIZACAO = 'reu_autorizou' as const;
 
+/**
+ * Os desfechos em que o parceiro saiu interessado. É por slug porque o catálogo não
+ * tem outro jeito de separá-los: "Realizada, interessado" e "Realizada, com objeção"
+ * levam à mesma etapa com a mesma temperatura. Pintam de verde o cartão da Agenda e
+ * contam como positivos no "Feito hoje". Desfecho de interesse que o gestor criar
+ * fica neutro até entrar aqui — cinza nunca mente; verde numa objeção mentiria.
+ */
+export const SLUGS_INTERESSE = [
+  'lig_interessado',
+  'vis_decisor_interessado',
+  'reu_interessado',
+] as const;
+
+export function ehInteresse(desfecho: Pick<DesfechoCatalogo, 'slug'>): boolean {
+  return (SLUGS_INTERESSE as readonly string[]).includes(desfecho.slug);
+}
+
 export type ExtraDoDesfecho = 'motivo_perda' | 'reuniao' | 'autorizacao' | 'confirmar_optout';
 
 /**

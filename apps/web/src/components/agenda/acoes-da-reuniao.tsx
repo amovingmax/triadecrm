@@ -24,6 +24,7 @@ import {
   remarcarReuniao,
   type HorarioLivre,
 } from './acoes-reuniao';
+import { DialogoCancelar } from './dialogo-cancelar';
 import { diaDoInstante, type Compromisso } from './tipos';
 
 /**
@@ -39,7 +40,7 @@ import { diaDoInstante, type Compromisso } from './tipos';
  *    porquê, porque um botão "confirmar" sem motivo é um botão que ninguém
  *    aperta: o fornecedor ainda NÃO sabe o horário;
  *  · **Remarcar**, que abre a folha com os livres da MESMA grade do robô;
- *  · **Cancelar**, com confirmação.
+ *  · **Cancelar**, pedindo o motivo (`dialogo-cancelar.tsx`).
  *
  * Mais dois sinais que não são enfeite: o selo "marcada pelo robô", que é o que
  * permite ler a amostragem das primeiras semanas sem abrir cada conversa, e o
@@ -70,6 +71,7 @@ export function AcoesDaReuniao({
   const ehCelular = useEhCelular();
   const [trabalhando, setTrabalhando] = useState(false);
   const [folhaAberta, setFolhaAberta] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
   const [livres, setLivres] = useState<HorarioLivre[] | null>(null);
 
   const reuniaoId = compromisso.reuniaoId;
@@ -99,7 +101,9 @@ export function AcoesDaReuniao({
   async function abrirFolha() {
     setFolhaAberta(true);
     setLivres(null);
-    setLivres(await livresDoDia(diaDoInstante(compromisso.quando)));
+    // A grade do DONO da reunião, e não a de quem está remarcando: na visão da
+    // equipe é o gestor mexendo na agenda da SDR.
+    setLivres(await livresDoDia(diaDoInstante(compromisso.quando), compromisso.responsavelId));
   }
 
   return (
@@ -139,10 +143,7 @@ export function AcoesDaReuniao({
             size="lg"
             className="toque h-11 md:h-9"
             disabled={trabalhando}
-            onClick={() => {
-              if (!window.confirm('Cancelar esta reunião? O time é avisado por e-mail.')) return;
-              void comRecado(() => cancelarReuniao(reuniaoId), 'Reunião cancelada.');
-            }}
+            onClick={() => setCancelando(true)}
           >
             <X aria-hidden="true" />
             Cancelar
@@ -179,6 +180,19 @@ export function AcoesDaReuniao({
           avisado por e-mail.
         </p>
       ) : null}
+
+      <DialogoCancelar
+        compromisso={cancelando ? compromisso : null}
+        gravando={trabalhando}
+        aoConfirmar={(motivo) =>
+          void comRecado(async () => {
+            const r = await cancelarReuniao(reuniaoId, motivo);
+            if (r.ok) setCancelando(false);
+            return r;
+          }, 'Reunião cancelada.')
+        }
+        aoFechar={() => setCancelando(false)}
+      />
 
       <Sheet open={folhaAberta} onOpenChange={(aberta) => !trabalhando && setFolhaAberta(aberta)}>
         <SheetContent

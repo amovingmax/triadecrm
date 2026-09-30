@@ -2,10 +2,18 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { SeletorDeAba } from '@/components/ui/abas';
 import { NotaRecolhida } from '@/components/ui/nota-recolhida';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 import { cn } from '@/lib/utils';
 import {
@@ -19,7 +27,9 @@ import { instanteEmFortaleza, type DesfechoCatalogo } from '@/components/registr
 import { buscarCompromissos, chaveDaAgenda, ErroDaAgenda } from './consultas';
 import { type ContextoDaAgenda } from './dados';
 import { ErroDaAgendaNaTela, EsqueletoAgenda } from './estados';
+import { AvisosRecebidos } from './avisos-recebidos';
 import { FolhaDesfecho } from './folha-desfecho';
+import { BotaoNovoCompromisso, FolhaNovoCompromisso } from './folha-novo-compromisso';
 import { ListaDoDia } from './lista-dia';
 import { registrarDesfechoDoCompromisso } from './registrar-desfecho';
 import { TelaRota } from './tela-rota';
@@ -51,14 +61,21 @@ import { VisaoDaSemana } from './visao-semana';
  *    e "Reagendar" gravam pela `public.registrar_contato`, a mesma da tela de campo,
  *    com desfechos do mesmo catálogo. A agenda não tem regra de funil.
  *
- * 3. **O dia e a visão moram na URL** (`?dia=`, `?visao=`), por `replaceState`: um
- *    link de "a quinta da Heloísa" pode ser mandado no grupo, e voltar do parceiro
- *    traz o mesmo dia. Sem entrada nova no histórico a cada toque na tira.
+ * 3. **O dia, a visão e a pessoa moram na URL** (`?dia=`, `?visao=`, `?pessoa=`), por
+ *    `replaceState`: um link de "a quinta da Heloísa" pode ser mandado no grupo, e
+ *    voltar do parceiro traz o mesmo dia. Sem entrada nova no histórico a cada toque.
+ *
+ * Marcar pela Agenda ("Novo compromisso") e as ações dos cartões são da PRÓPRIA
+ * agenda: na de outra pessoa — a visão da equipe, só para admin e gestor, pela
+ * hierarquia — a tela é só leitura.
  */
 const SEM_ITENS: Compromisso[] = [];
 
 export function TelaAgenda({
   usuarioId,
+  podeMarcar,
+  comEquipe,
+  pessoaInicial,
   contexto,
   hoje,
   agoraIso,
@@ -66,6 +83,12 @@ export function TelaAgenda({
   visaoInicial,
 }: {
   usuarioId: string;
+  /** O papel escreve (`app.can_write()`): pode marcar na própria agenda. */
+  podeMarcar: boolean;
+  /** Admin ou gestor: escolhe de quem é a agenda aberta. */
+  comEquipe: boolean;
+  /** De quem é a agenda ao abrir: a própria pessoa, ou `?pessoa=` validado no servidor. */
+  pessoaInicial: string;
   contexto: ContextoDaAgenda;
   /** Hoje em `America/Fortaleza`, resolvido no servidor: data durante a renderização é impura. */
   hoje: Dia;
@@ -75,6 +98,9 @@ export function TelaAgenda({
 }) {
   const [dia, setDia] = useState<Dia>(diaInicial);
   const [visao, setVisao] = useState<Visao>(visaoInicial);
+  const [pessoa, setPessoa] = useState<string>(pessoaInicial);
+  const daPropriaPessoa = pessoa === usuarioId;
+  const [marcando, setMarcando] = useState(false);
   const [pedido, setPedido] = useState<PedidoDeDesfecho | null>(null);
   const [pendente, setPendente] = useState<{
     compromisso: Compromisso;
@@ -86,25 +112,29 @@ export function TelaAgenda({
   const fim = somarDias(inicio, 6);
 
   useEffect(() => {
-    const alvo = `${window.location.pathname}?dia=${dia}${visao === 'dia' ? '' : `&visao=${visao}`}`;
+    const alvo = `${window.location.pathname}?dia=${dia}${visao === 'dia' ? '' : `&visao=${visao}`}${
+      daPropriaPessoa ? '' : `&pessoa=${pessoa}`
+    }`;
     if (alvo !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', alvo);
     }
-  }, [dia, visao]);
+  }, [dia, visao, pessoa, daPropriaPessoa]);
 
   const consulta = useQuery({
-    queryKey: chaveDaAgenda(usuarioId, inicio, fim),
+    queryKey: chaveDaAgenda(pessoa, inicio, fim),
     queryFn: () =>
       buscarCompromissos({
-        usuarioId,
+        usuarioId: pessoa,
         primeiroDia: inicio,
         ultimoDia: fim,
         etapasComHoraMarcada: contexto.etapasComHoraMarcada,
+        catalogo: contexto.catalogo,
       }),
     placeholderData: keepPreviousData,
   });
 
   const itens = consulta.data ?? SEM_ITENS;
+  const nomeDaPessoa = contexto.pessoas.find((p) => p.id === pessoa)?.nome ?? null;
   const doDia = itens.filter((c) => diaDoInstante(c.quando) === dia);
   const contagem = contarPorDia(itens);
   const abertos = itens.filter((c) => !c.concluido).length;
@@ -200,21 +230,55 @@ export function TelaAgenda({
           </p>
         </div>
 
-        {/* Era um segmentado com contorno e a opção ativa em `acao-gradiente` — o
-            mesmo tratamento do botão de AÇÃO PRINCIPAL do produto, gasto aqui
-            para dizer qual das três visões está aberta. Escolher visão não é a
-            ação principal de tela nenhuma. */}
-        <SeletorDeAba
-          rotulo="Como ver a agenda"
-          ativo={visao}
-          aoTrocar={setVisao}
-          itens={[
-            { id: 'dia', rotulo: 'Dia' },
-            { id: 'semana', rotulo: 'Semana' },
-            { id: 'rota', rotulo: 'Rota' },
-          ]}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {comEquipe && contexto.pessoas.length > 1 ? (
+            <Select value={pessoa} onValueChange={setPessoa}>
+              <SelectTrigger className="h-11 min-w-44 md:h-9" aria-label="De quem é a agenda">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {contexto.pessoas.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.id === usuarioId ? `${p.nome} (você)` : p.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+          {/* Na própria agenda, ou na de quem se acompanha: aí a folha já abre com
+              "Para quem" nessa pessoa. Os cartões dela continuam só leitura. */}
+          {podeMarcar && (daPropriaPessoa || comEquipe) ? (
+            <BotaoNovoCompromisso aoClicar={() => setMarcando(true)} />
+          ) : null}
+
+          {/* Era um segmentado com contorno e a opção ativa em `acao-gradiente` — o
+              mesmo tratamento do botão de AÇÃO PRINCIPAL do produto, gasto aqui
+              para dizer qual das três visões está aberta. Escolher visão não é a
+              ação principal de tela nenhuma. */}
+          <SeletorDeAba
+            rotulo="Como ver a agenda"
+            ativo={visao}
+            aoTrocar={setVisao}
+            itens={[
+              { id: 'dia', rotulo: 'Dia' },
+              { id: 'semana', rotulo: 'Semana' },
+              { id: 'rota', rotulo: 'Rota' },
+            ]}
+          />
+        </div>
       </header>
+
+      {daPropriaPessoa ? <AvisosRecebidos usuarioId={usuarioId} aoIrParaDia={irParaDia} /> : null}
+
+      {daPropriaPessoa ? null : (
+        <p className="sombra-base flex items-center gap-2 rounded-xl bg-card px-4 py-3 text-sm">
+          <Eye className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span>
+            Agenda de <span className="font-medium">{nomeDaPessoa ?? 'outra pessoa'}</span> · só
+            leitura
+          </span>
+        </p>
+      )}
 
       <TiraDaSemana
         inicio={inicio}
@@ -254,7 +318,7 @@ export function TelaAgenda({
         ) : visao === 'semana' ? (
           <VisaoDaSemana inicio={inicio} itens={itens} hoje={hoje} aoIrParaDia={irParaDia} />
         ) : visao === 'rota' ? (
-          <TelaRota usuarioId={usuarioId} dia={dia} hoje={hoje} />
+          <TelaRota usuarioId={usuarioId} pessoaId={pessoa} dia={dia} hoje={hoje} />
         ) : (
           <ListaDoDia
             dia={dia}
@@ -265,6 +329,9 @@ export function TelaAgenda({
             proximo={proximoCompromisso(itens, referenciaDoProximo)}
             semanaVazia={abertos === 0}
             aoIrParaDia={irParaDia}
+            pessoaId={pessoa}
+            somenteLeitura={!daPropriaPessoa}
+            podeMexerNaReuniao={podeMarcar && (daPropriaPessoa || comEquipe)}
           />
         )}
       </section>
@@ -274,6 +341,26 @@ export function TelaAgenda({
           e o livre/ocupado é calculado pelo CRM. Na aba Rota a nota não aparece:
           ela fala da lista do dia. */}
       {visao === 'rota' ? null : <AindaNaoLigado />}
+
+      <FolhaNovoCompromisso
+        aberta={marcando}
+        usuarioId={usuarioId}
+        pessoas={comEquipe ? contexto.pessoas : []}
+        paraInicial={pessoa}
+        feriados={contexto.feriados}
+        diaInicial={dia}
+        hoje={hoje}
+        aoFechar={() => setMarcando(false)}
+        aoMarcar={(diaMarcado, donoId) => {
+          setMarcando(false);
+          // A tela vai até o que acabou de ser marcado — o dia e a agenda de quem
+          // recebeu —, senão quem marcou para a equipe não vê o que fez.
+          setDia(diaMarcado);
+          setVisao('dia');
+          setPessoa(donoId);
+          void clienteDeConsultas.invalidateQueries({ queryKey: ['agenda'] });
+        }}
+      />
 
       <FolhaDesfecho
         pedido={pedido}

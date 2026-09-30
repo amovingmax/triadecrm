@@ -23,13 +23,13 @@ import { type Dia } from './tipos';
  * passado não ganham uma faixa dizendo "nenhum horário", que seria ruído em
  * quatro dias de cada sete.
  */
-export function TiraDeLivres({ dia }: { dia: Dia }) {
+export function TiraDeLivres({ dia, donoId }: { dia: Dia; donoId?: string }) {
   // Pela mesma porta do resto da tela (TanStack Query), e não por `useEffect`
   // com `setState`: a tira troca de dia a cada clique na tira da semana, e
   // buscar de novo o dia de ontem a cada volta é ida à rede que não muda nada.
   const consulta = useQuery({
-    queryKey: ['agenda', 'livres', dia],
-    queryFn: () => livresDoDia(dia),
+    queryKey: ['agenda', 'livres', dia, donoId ?? null],
+    queryFn: () => livresDoDia(dia, donoId),
     staleTime: 60_000,
   });
 
