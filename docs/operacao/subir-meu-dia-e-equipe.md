@@ -26,10 +26,12 @@ Revisão de parceiros, Edge Functions. Nenhum arquivo em `apps/workers` nem em
 
 ## 0. Antes de tudo: anotar o ponto de volta
 
-1. Na Vercel, em **Deployments**, anote o deploy marcado **Production · Current**. Em
-   30/09/2026 ele era o do commit `4dfd494` ("O menu da esquerda abre com o mouse e mostra o
-   nome de cada módulo"). É esse deploy que se promove se for preciso voltar.
-2. A `meu-dia-e-equipe` nasceu desse mesmo `4dfd494`. Se a `main` tiver andado desde então,
+1. Na Vercel, em **Deployments**, anote o deploy marcado **Production · Current** NO DIA DA
+   SUBIDA, e confira que o commit dele é o topo da `main`. É esse deploy que se promove se
+   for preciso voltar. (A `main` anda: em 30/09 o topo passou de `4dfd494` para `8c647e8`,
+   "Importar lista vira um passo a passo". Promover um deploy mais velho que o topo desfaz
+   também o que outras pessoas subiram.)
+2. A `meu-dia-e-equipe` já contém a `main` até `8c647e8`. Se a `main` tiver andado de novo,
    faça `git merge origin/main` na branch, rode `pnpm lint && pnpm typecheck && pnpm test` e
    `supabase test db --local`, e só siga com tudo verde.
 
