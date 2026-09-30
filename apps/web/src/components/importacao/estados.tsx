@@ -16,22 +16,26 @@ import { Skeleton } from '@/components/ui/skeleton';
 /** Espera da prévia, com o desenho das contagens e das primeiras linhas. */
 export function EsqueletoDaPrevia() {
   return (
-    <div aria-busy="true" aria-live="polite" className="flex flex-col gap-4">
-      <p className="sr-only">Conferindo a planilha contra a base.</p>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className="flex flex-col gap-2 rounded-xl border border-hairline p-3">
-            <Skeleton className="h-7 w-12" />
-            <Skeleton className="h-3.5 w-24" />
-          </div>
+    <div
+      aria-busy="true"
+      aria-live="polite"
+      className="sombra-base flex flex-col gap-5 rounded-xl bg-card p-4 sm:p-5"
+    >
+      <p className="sr-only">Conferindo a lista contra a base.</p>
+      <div className="flex items-center justify-between gap-4">
+        <Skeleton className="h-6 w-80 max-w-full" />
+        <Skeleton className="h-10 w-36 rounded-full" />
+      </div>
+      <div className="flex gap-2">
+        {['w-36', 'w-32', 'w-28'].map((largura) => (
+          <Skeleton key={largura} className={`h-9 ${largura} rounded-full`} />
         ))}
       </div>
-      <ul className="flex flex-col">
-        {['w-52', 'w-40', 'w-64', 'w-44', 'w-56'].map((largura, i) => (
-          <li key={i} className="flex items-center gap-3 border-b border-hairline py-3">
-            <Skeleton className="h-4 w-8" />
+      <ul className="flex flex-col gap-2">
+        {['w-52', 'w-40', 'w-64', 'w-44'].map((largura, i) => (
+          <li key={i} className="flex flex-col gap-2 rounded-lg bg-muted/45 px-4 py-3">
             <Skeleton className={`h-4 ${largura}`} />
-            <Skeleton className="ml-auto h-5 w-24 rounded-full" />
+            <Skeleton className="h-3 w-72 max-w-full" />
           </li>
         ))}
       </ul>
@@ -54,10 +58,10 @@ export function ErroDaImportacao({
   return (
     <div
       role="alert"
-      className="flex flex-col items-start gap-3 rounded-xl border border-hairline bg-destructive/5 p-4"
+      className="flex flex-col items-start gap-3 rounded-xl bg-destructive/5 p-4 sm:p-5"
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive-texto">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive-texto">
           <TriangleAlert className="size-4" aria-hidden="true" />
         </span>
         <div className="space-y-1">
@@ -93,9 +97,9 @@ export function Progresso({
 }) {
   const pct = total > 0 ? Math.min(100, Math.round((feitas / total) * 100)) : 0;
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-4 sm:p-5">
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="text-muted-foreground">{rotulo}</span>
+        <span className="font-medium">{rotulo}</span>
         <span className="numerico text-xs text-muted-foreground">
           {feitas} de {total}
         </span>
@@ -109,7 +113,7 @@ export function Progresso({
         className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
       >
         <div
-          className="h-full rounded-full bg-foreground/70 transition-[width] duration-200 ease-out"
+          className="h-full rounded-full bg-menta transition-[width] duration-200 ease-out"
           style={{ width: `${pct}%` }}
         />
       </div>

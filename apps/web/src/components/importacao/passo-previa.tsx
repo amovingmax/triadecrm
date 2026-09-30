@@ -2,25 +2,26 @@
 
 import { useMemo, useState } from 'react';
 import {
+  ArrowLeft,
   CircleSlash,
   Copy,
-  CornerDownRight,
   Plus,
   RotateCcw,
   SearchCheck,
   TriangleAlert,
+  Upload,
   type LucideIcon,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { SeletorDeAba } from '@/components/ui/abas';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatarNumero } from '@/components/parceiros/formatos';
 
+import { totalDe } from './dados';
 import {
-  EXPLICACAO_DECISAO,
   ORDEM_DAS_DECISOES,
-  ROTULO_DECISAO,
   textoDoAviso,
   textoDoMotivo,
   type Decisao,
@@ -50,19 +51,80 @@ const PRIMEIRAS = 8;
  */
 const TETO_VISIVEL = 300;
 
+/** Os nomes das abas: curtos, e ditos do ponto de vista de quem importa. */
+const ABA: Record<Decisao, string> = {
+  entra: 'Novos parceiros',
+  duplicata: 'Já estão na base',
+  revisao: 'Sem categoria',
+  nao_contatar: 'Pediram para parar',
+  repetida: 'Já importadas',
+  erro: 'Com problema',
+};
+
+/** Uma linha por grupo, e só uma: o porquê longo mora em `EXPLICACAO_DECISAO`. */
+const O_QUE_ACONTECE: Record<Decisao, string> = {
+  entra: 'Entram agora na base e no funil, na primeira etapa, com você como responsável.',
+  duplicata:
+    'Nada é sobrescrito: vão para a Revisão com o parceiro parecido apontado, para juntar ou descartar.',
+  revisao: 'Vão para a Revisão, para você escolher a categoria.',
+  nao_contatar: 'Já tinham pedido para parar de receber. Não entram.',
+  repetida: 'Vieram numa importação anterior, ou repetidas no arquivo. Nada é criado de novo.',
+  erro: 'Sem nome, ou sem nenhum contato. Corrija no arquivo e importe de novo.',
+};
+
+/** A frase do topo: quantas entram, quantas vão para a Revisão, quantas não entram. */
+function resumoDaPrevia(contagem: Previa['contagem']): string {
+  const entra = contagem.entra ?? 0;
+  const fila = (contagem.duplicata ?? 0) + (contagem.revisao ?? 0);
+  const fora = (contagem.nao_contatar ?? 0) + (contagem.repetida ?? 0) + (contagem.erro ?? 0);
+  const partes = [
+    entra === 0
+      ? 'Nenhuma vira parceiro agora'
+      : `${formatarNumero(entra)} ${entra === 1 ? 'entra agora como parceiro' : 'entram agora como parceiros'}`,
+  ];
+  if (fila > 0) partes.push(`${formatarNumero(fila)} ${fila === 1 ? 'vai' : 'vão'} para a Revisão`);
+  if (fora > 0) partes.push(`${formatarNumero(fora)} não ${fora === 1 ? 'entra' : 'entram'}`);
+  return `${partes.join(', ')}.`;
+}
+
 /**
- * Passo 3: a prévia.
+ * O passo 3 da importação: conferir e importar.
  *
- * O que esta tela precisa responder, nesta ordem: quantas entram, quantas já
- * existem — E DE QUEM —, e quantas vão para revisão. O nome da ficha duplicada
- * não é detalhe: sem ele a pessoa lê "12 duplicatas" e não tem o que decidir; com
- * ele, ela reconhece "ah, o Jôsy Buffet a gente já cadastrou" e segue.
+ * O QUE ERA, E POR QUE MUDOU (30/09/2026). A conferência era a última metade
+ * de uma pilha: quatro cartões de contagem, depois TODOS os grupos um embaixo
+ * do outro (cada um com título, parágrafo e oito linhas), e uma barra de
+ * "Gravar estas 20 linhas" grudada no pé da tela, por cima da própria lista,
+ * com a frase "5 viram parceiro agora. As outras 15 não somem: 6 param na fila
+ * porque já estão na base e 9 param na fila esperando categoria". Rafael: "to
+ * entendendo nada".
  *
- * Cor: nenhuma. A escala térmica é a única cromia do produto (direção visual), e
- * pintar "entra" de verde competiria com ela. Aqui quem separa os grupos é o
- * ícone, a contagem em mono e a ordem.
+ * Agora é UM cartão:
+ *   1. em cima, a resposta em uma frase ("5 entram agora como parceiros, 15 vão
+ *      para a Revisão") e o botão de importar, ao lado dela — a pessoa decide
+ *      sem rolar, e não há mais barra fixa cobrindo nada;
+ *   2. embaixo, um grupo de cada vez, em abas com a contagem. Quem quer
+ *      conferir as duplicatas abre a aba delas; quem confia importa.
+ *
+ * O nome do parceiro que a linha duplica continua na linha: sem ele a pessoa lê
+ * "6 já estão na base" e não tem o que decidir.
  */
-export function PassoPrevia({ previa, aoVoltar }: { previa: Previa; aoVoltar: () => void }) {
+export function PassoPrevia({
+  previa,
+  ocupado,
+  aoImportar,
+  aoVoltar,
+  foraPorEscolha,
+  aoTrazerDeVolta,
+}: {
+  previa: Previa;
+  ocupado: boolean;
+  aoImportar: () => void;
+  /** Volta ao passo das categorias, quando ele existiu. */
+  aoVoltar?: () => void;
+  /** Nomes de categoria que a pessoa mandou não importar. */
+  foraPorEscolha: readonly string[];
+  aoTrazerDeVolta: () => void;
+}) {
   const grupos = useMemo(() => {
     const mapa = new Map<Decisao, LinhaDaPrevia[]>();
     for (const linha of previa.linhas) {
@@ -76,95 +138,117 @@ export function PassoPrevia({ previa, aoVoltar }: { previa: Previa; aoVoltar: ()
     }));
   }, [previa.linhas]);
 
+  const [aba, setAba] = useState<Decisao | null>(null);
+  const ativa = grupos.find((g) => g.decisao === aba) ?? grupos[0] ?? null;
+  const IconeAtivo = ativa ? ICONE[ativa.decisao] : null;
+  const total = totalDe(previa.contagem);
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        {ORDEM_DAS_DECISOES.filter((d) => (previa.contagem[d] ?? 0) > 0).map((decisao) => {
-          const Icone = ICONE[decisao];
-          return (
-            <div
-              key={decisao}
-              className="flex flex-col gap-1 rounded-xl border border-hairline p-3"
-            >
-              <span className="numerico text-2xl leading-none font-semibold">
-                {formatarNumero(previa.contagem[decisao] ?? 0)}
-              </span>
-              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Icone className="size-3.5 shrink-0" aria-hidden="true" />
-                {ROTULO_DECISAO[decisao]}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+    <section
+      aria-labelledby="conferir-titulo"
+      className="sombra-base flex flex-col gap-5 rounded-xl bg-card p-4 sm:p-5"
+    >
+      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 id="conferir-titulo" className="text-lg font-semibold tracking-[-0.01em]">
+            {resumoDaPrevia(previa.contagem)}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Confira abaixo, empresa por empresa. Nada é gravado antes de você importar.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {aoVoltar ? (
+            <Button variant="ghost" onClick={aoVoltar} disabled={ocupado} className="toque h-11 md:h-10">
+              <ArrowLeft aria-hidden="true" />
+              Categorias
+            </Button>
+          ) : null}
+          <Button
+            variant="menta"
+            onClick={aoImportar}
+            disabled={ocupado || total === 0}
+            className="toque h-11 md:h-10 md:px-5"
+          >
+            <Upload aria-hidden="true" />
+            Importar lista
+          </Button>
+        </div>
+      </header>
 
-      <div className="flex flex-col gap-6">
-        {grupos.map(({ decisao, linhas }) => (
-          <Grupo key={decisao} decisao={decisao} linhas={linhas} />
-        ))}
-      </div>
+      {foraPorEscolha.length > 0 ? (
+        <p className="text-[13px] text-muted-foreground">
+          Você tirou desta importação: {foraPorEscolha.join(' · ')}.{' '}
+          <button
+            type="button"
+            className="toque underline underline-offset-4 hover:text-foreground"
+            onClick={aoTrazerDeVolta}
+          >
+            Trazer de volta
+          </button>
+        </p>
+      ) : null}
 
-      <div>
-        <Button variant="ghost" onClick={aoVoltar} className="toque h-11 md:h-9">
-          <CornerDownRight className="rotate-180" aria-hidden="true" />
-          Ajustar as colunas
-        </Button>
-      </div>
-    </div>
+      {ativa ? (
+        <div className="flex flex-col gap-3">
+          <SeletorDeAba
+            rotulo="O que acontece com cada empresa"
+            rolavel
+            itens={grupos.map((g) => ({
+              id: g.decisao,
+              rotulo: ABA[g.decisao],
+              contagem: g.linhas.length,
+            }))}
+            ativo={ativa.decisao}
+            aoTrocar={(id) => setAba(id)}
+          />
+          <p className="flex items-start gap-2 text-[13px] text-muted-foreground">
+            {IconeAtivo ? <IconeAtivo className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /> : null}
+            <span>{O_QUE_ACONTECE[ativa.decisao]}</span>
+          </p>
+          <Grupo key={ativa.decisao} linhas={ativa.linhas} />
+        </div>
+      ) : null}
+    </section>
   );
 }
 
-function Grupo({ decisao, linhas }: { decisao: Decisao; linhas: LinhaDaPrevia[] }) {
+/**
+ * O aviso que repete o motivo da linha não vai à tela: "A categoria não bate com
+ * nenhuma do catálogo" e, logo embaixo, a pílula "Categoria não reconhecida" são
+ * a mesma frase duas vezes.
+ */
+function avisosQueDizemAlgoANovo(linha: LinhaDaPrevia): string[] {
+  return linha.avisos.filter((aviso) => !(linha.motivo && aviso === linha.motivo));
+}
+
+function Grupo({ linhas }: { linhas: LinhaDaPrevia[] }) {
   const [tudo, setTudo] = useState(false);
-  const Icone = ICONE[decisao];
   const mostradas = linhas.slice(0, tudo ? TETO_VISIVEL : PRIMEIRAS);
   const escondidas = tudo ? Math.max(0, linhas.length - TETO_VISIVEL) : 0;
 
   return (
-    <section aria-labelledby={`grupo-${decisao}`} className="flex flex-col gap-2">
-      <div>
-        <h3
-          id={`grupo-${decisao}`}
-          className="flex items-center gap-2 font-heading font-medium tracking-tight"
-        >
-          <Icone className="size-4 text-muted-foreground" aria-hidden="true" />
-          {ROTULO_DECISAO[decisao]}
-          <span className="numerico text-sm font-normal text-muted-foreground">
-            {formatarNumero(linhas.length)}
-          </span>
-        </h3>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {EXPLICACAO_DECISAO[decisao]}
-        </p>
-      </div>
-
-      <ul className="border-t border-hairline">
+    <div className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2">
         {mostradas.map((linha) => (
           <li
             key={`${linha.linha}-${linha.nome ?? ''}`}
-            className="flex flex-col gap-1 border-b border-hairline py-2.5 md:flex-row md:items-baseline md:gap-3"
+            className="flex items-start gap-3 rounded-lg bg-muted/45 px-4 py-3"
           >
-            <span
-              className="numerico shrink-0 text-xs text-muted-foreground"
-              title={`Linha ${linha.linha} da planilha`}
-            >
-              {linha.linha}
-            </span>
-
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">
+              <p className="truncate text-[15px] font-medium">
                 {linha.nome ?? <span className="text-muted-foreground">Linha sem nome</span>}
               </p>
 
-              <p className="text-sm text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 {[linha.categoria, linha.cidade, linha.telefone].filter(Boolean).join(' · ') ||
                   'Sem categoria, cidade ou telefone reconhecidos'}
               </p>
 
               {/* O nome de quem a linha duplica. É o dado que faz a pessoa decidir. */}
               {linha.duplicata ? (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Já existe como </span>
+                <p className="text-[13px]">
+                  <span className="text-muted-foreground">Parece com </span>
                   <span className="font-medium">{linha.duplicata.nome}</span>
                   <span className="text-muted-foreground">
                     {' '}
@@ -174,12 +258,12 @@ function Grupo({ decisao, linhas }: { decisao: Decisao; linhas: LinhaDaPrevia[] 
               ) : null}
 
               {textoDoMotivo(linha.motivo) && !linha.duplicata ? (
-                <p className="text-sm text-muted-foreground">{textoDoMotivo(linha.motivo)}</p>
+                <p className="text-[13px] text-muted-foreground">{textoDoMotivo(linha.motivo)}</p>
               ) : null}
 
-              {linha.avisos.length > 0 ? (
-                <ul className="mt-1 flex flex-wrap gap-1">
-                  {linha.avisos.map((aviso) => (
+              {avisosQueDizemAlgoANovo(linha).length > 0 ? (
+                <ul className="mt-1.5 flex flex-wrap gap-1">
+                  {avisosQueDizemAlgoANovo(linha).map((aviso) => (
                     <li key={aviso}>
                       <Badge
                         variant={aviso === 'cpf_descartado' ? 'destructive' : 'outline'}
@@ -192,35 +276,41 @@ function Grupo({ decisao, linhas }: { decisao: Decisao; linhas: LinhaDaPrevia[] 
                 </ul>
               ) : null}
             </div>
+            <span
+              className="numerico shrink-0 pt-0.5 text-xs text-muted-foreground"
+              title="A linha desta empresa no arquivo"
+            >
+              linha {linha.linha}
+            </span>
           </li>
         ))}
       </ul>
 
       {escondidas > 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Mostrando as primeiras <span className="numerico">{formatarNumero(TETO_VISIVEL)}</span>{' '}
-          de <span className="numerico">{formatarNumero(linhas.length)}</span>. As outras seguem a
-          mesma regra; para conferir uma a uma, abra a planilha.
+        <p className="text-[13px] text-muted-foreground">
+          Mostrando as primeiras <span className="numerico">{formatarNumero(TETO_VISIVEL)}</span> de{' '}
+          <span className="numerico">{formatarNumero(linhas.length)}</span>. As outras seguem a
+          mesma regra.
         </p>
       ) : null}
 
       {linhas.length > PRIMEIRAS ? (
         <div>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => setTudo((v) => !v)}
-            className="toque h-11 md:h-8"
+            className="toque h-11 md:h-9"
           >
             {tudo
-              ? 'Mostrar só as primeiras'
+              ? 'Mostrar menos'
               : linhas.length > TETO_VISIVEL
-                ? `Ver ${formatarNumero(TETO_VISIVEL)} linhas deste grupo`
-                : `Ver as ${formatarNumero(linhas.length)} linhas deste grupo`}
+                ? `Ver ${formatarNumero(TETO_VISIVEL)} empresas`
+                : `Ver as ${formatarNumero(linhas.length)} empresas`}
           </Button>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }
 

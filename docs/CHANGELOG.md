@@ -5201,6 +5201,45 @@ o nome de cada módulo e a marca "Tríade".
   medido num navegador local: fechado 72px, com o mouse 240px, passando rápido
   continua 72px, com Tab 240px; fotografado no claro e no escuro.
 
+### 30/09/2026 — Importar lista virou um passo a passo
+
+Pedido do Rafael, com três fotos da tela: "melhore por completo o design dessa
+tela de importa, to entendendo nada e ta muito ruim e com bastante confusão".
+A tela empilhava tudo de uma vez: o arquivo, a origem ("reconheci por cid,
+plus_code, data_id, não é?"), o recibo das colunas com jargão ("o place_id da
+Places API não é o cid do Maps (ADR-12)"), duas perguntas sobre categoria, um
+botão "Aplicar às 0 linhas", quatro contagens, todos os grupos um embaixo do
+outro e uma barra fixa de "Gravar estas 20 linhas" cobrindo a própria lista.
+
+Agora são **quatro passos à vista**: Arquivo, Categorias, Conferir e Pronto.
+
+- **Arquivo:** a área de soltar o arquivo e as importações anteriores. Depois de
+  lido, o arquivo vira uma linha só (nome, linhas e origem, com "trocar"), e o
+  que o CRM leu das colunas fica atrás de um "ver", em português de quem usa.
+- **Categorias** (só quando a lista traz nome de categoria que o CRM não
+  conhece): uma pergunta, "Qual é a categoria destas empresas?", uma linha por
+  nome com as empresas à vista e um botão "Continuar". Saíram a pergunta "O que
+  você foi buscar nesta lista?" e o botão "Aplicar". O que ficar em "decidir
+  depois" vai para a Revisão.
+- **Conferir:** a resposta numa frase ("15 entram agora como parceiros, 4 vão
+  para a Revisão, 1 não entra") com o botão **Importar lista** ao lado dela, e
+  as empresas separadas em abas (Novos parceiros, Já estão na base, Sem
+  categoria...). Sem barra fixa por cima da lista.
+- **Pronto:** o resultado com as saídas (ver os parceiros, abrir a Revisão,
+  importar outra). O desfazer virou uma linha discreta no pé.
+- O passo das colunas continua existindo só quando falta coluna obrigatória ou
+  quando o CRM adivinhou uma coluna por nome parecido — agora com a pergunta
+  como título e a grade aberta quando falta coluna.
+
+- Tocado: `importacao/tela-importacao.tsx`, `passos.tsx` (novo),
+  `cartao-do-arquivo.tsx` (novo, no lugar de `seletor-de-origem.tsx`),
+  `resolver-categorias.tsx`, `passo-previa.tsx`, `passo-mapa.tsx`, `recibo.tsx`,
+  `estados.tsx`, `recibo-de-leitura.ts` (frases das colunas ignoradas).
+- Verificado: typecheck, lint, 921 testes, build com o comando da Vercel, e o
+  fluxo inteiro rodado num navegador local com o CSV de fotógrafos do Maps —
+  arquivo, categoria respondida, conferência, troca de aba, importação e tela de
+  pronto —, no desktop e no celular.
+
 ### 30/09/2026 — Meu dia em abas, hierarquia e marcar pela Agenda, sobre a `main` (RF-MET-03, RF-AGE-01, RF-AGE-07)
 
 As funcionalidades da `Teste-Janio` foram trazidas para cima da `main`, sem levar o

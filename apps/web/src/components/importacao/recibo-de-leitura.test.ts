@@ -60,7 +60,9 @@ describe('o recibo do CSV do Maps', () => {
   it('a coluna place_id do arquivo é ignorada COM motivo: ela não é o cid', () => {
     const p = recibo.ignoradas.find((i) => i.titulo === 'place_id');
     expect(p).toBeDefined();
-    expect(p?.motivo).toContain('ADR-12');
+    // A frase diz que o CRM guardou o identificador certo, sem jargão (30/09/2026).
+    expect(p?.motivo).toContain('coluna cid');
+    expect(p?.motivo).not.toContain('ADR');
     // As três disputas de coluna do arquivo do Maps, todas com o porquê à vista.
     expect(recibo.ignoradas.filter((i) => i.motivo).map((i) => i.titulo).sort()).toEqual([
       'complete_address',
