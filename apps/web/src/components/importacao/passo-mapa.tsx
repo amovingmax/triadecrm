@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Check, TriangleAlert } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -14,12 +14,7 @@ import {
 } from '@/components/ui/select';
 
 import type { Sugestao } from './mapeamento';
-import {
-  montarReciboDeLeitura,
-  rotuloComRessalva,
-  type ColunaLida,
-  type ReciboDeLeitura,
-} from './recibo-de-leitura';
+import { montarReciboDeLeitura, type ColunaLida } from './recibo-de-leitura';
 import {
   ehObrigatorio,
   rotuloDoCampo,
@@ -82,26 +77,36 @@ export function PassoMapa({
     aoMudar(novo);
   };
 
-  return (
-    <div className="flex flex-col gap-4">
-      <ReciboDasColunas planilha={planilha} recibo={recibo} />
+  // UM CARTÃO COM UMA PERGUNTA (30/09/2026). O passo abria com o recibo inteiro
+  // ("O CRM leu 10 colunas das 36", a lista das lidas e das ignoradas) antes de
+  // dizer o que precisava da pessoa. Agora o título É a pergunta, e o recibo
+  // mora no cartão do arquivo, atrás de um "ver". Quando falta coluna
+  // obrigatória, a grade inteira já nasce aberta: escondida atrás de "ver as
+  // colunas", a pessoa não achava onde responder.
+  const faltaColuna = recibo.pendentes.length > 0;
 
-      {recibo.pendentes.length > 0 ? (
-        <p className="max-w-prose text-sm text-muted-foreground">
-          Sem {recibo.pendentes.map(rotuloDoCampo).join(' e ')} o CRM não consegue criar o parceiro.
-          Indique {recibo.pendentes.length === 1 ? 'a coluna' : 'as colunas'} abaixo para seguir.
+  return (
+    <section
+      aria-labelledby="colunas-titulo"
+      className="sombra-base flex flex-col gap-4 rounded-xl bg-card p-4 sm:p-5"
+    >
+      <header className="flex flex-col gap-1">
+        <h2 id="colunas-titulo" className="text-lg font-semibold tracking-[-0.01em]">
+          {faltaColuna
+            ? `Qual coluna tem ${recibo.pendentes.map(rotuloDoCampo).join(' e ').toLowerCase()}?`
+            : 'Confira as colunas que o CRM adivinhou'}
+        </h2>
+        <p className="max-w-[90ch] text-sm text-muted-foreground">
+          {faltaColuna
+            ? 'Sem essa informação o CRM não consegue criar o parceiro. Escolha a coluna certa na lista abaixo.'
+            : 'Elas foram reconhecidas por um nome parecido, e não igual. Se alguma estiver errada, troque.'}
         </p>
-      ) : null}
+      </header>
 
       {/* Só as colunas em dúvida ficam à vista. Quem quiser mexer no resto abre
           a grade inteira, que continua inteira. */}
       {recibo.chutadas.length > 0 ? (
         <Colunas
-          titulo={
-            recibo.chutadas.length === 1
-              ? 'Uma coluna que eu chutei — confira'
-              : `${recibo.chutadas.length} colunas que eu chutei — confira`
-          }
           indices={recibo.chutadas.map((c) => c.indice)}
           planilha={planilha}
           mapa={mapa}
@@ -110,11 +115,16 @@ export function PassoMapa({
         />
       ) : null}
 
-      <details className="rounded-xl border border-hairline">
-        <summary className="toque cursor-pointer list-none px-3 py-3 text-sm font-medium md:py-2">
-          Ver as <span className="numerico">{recibo.totalDeColunas}</span> colunas do arquivo
+      <details open={faltaColuna} className="group/colunas border-t border-hairline pt-2">
+        <summary className="toque flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground sm:min-h-8">
+          <ChevronRight
+            className="size-3.5 shrink-0 transition-transform group-open/colunas:rotate-90"
+            aria-hidden="true"
+          />
+          {faltaColuna ? 'Todas as' : 'Ver todas as'}{' '}
+          <span className="numerico">{recibo.totalDeColunas}</span> colunas do arquivo
         </summary>
-        <div className="border-t border-hairline p-3">
+        <div className="mt-2">
           <Colunas
             indices={planilha.cabecalho.map((_, i) => i)}
             planilha={planilha}
@@ -126,96 +136,13 @@ export function PassoMapa({
       </details>
 
       {planilha.cortadas > 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[13px] text-muted-foreground">
           A planilha tem mais linhas do que o CRM lê de uma vez:{' '}
           <span className="numerico">{planilha.cortadas}</span> ficaram de fora. Divida o arquivo e
           importe em duas partes.
         </p>
       ) : null}
-    </div>
-  );
-}
-
-/**
- * O recibo, sozinho.
- *
- * Aparece no passo do mapa e de novo junto da prévia — porque quando não há
- * dúvida o passo do mapa nem acontece, e a pessoa precisa ver o que foi lido
- * antes de gravar.
- */
-export function ReciboDasColunas({
-  planilha,
-  recibo,
-}: {
-  planilha: PlanilhaLida;
-  recibo: ReciboDeLeitura;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h2 className="font-heading text-lg font-semibold tracking-tight">
-            O CRM leu <span className="numerico">{recibo.lidas.length}</span>{' '}
-            {recibo.lidas.length === 1 ? 'coluna' : 'colunas'}
-            {recibo.totalDeColunas > recibo.lidas.length ? (
-              <>
-                {' '}
-                das <span className="numerico">{recibo.totalDeColunas}</span>
-              </>
-            ) : null}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Aba <span className="font-medium text-foreground">{planilha.aba}</span> ·{' '}
-            <span className="numerico">{planilha.linhas.length}</span>{' '}
-            {planilha.linhas.length === 1 ? 'linha' : 'linhas'}
-          </p>
-        </div>
-        {recibo.precisaPerguntar ? (
-          <Badge variant="destructive" className="h-auto py-1">
-            <TriangleAlert aria-hidden="true" />
-            {recibo.pendentes.length > 0 ? 'Falta uma coluna' : 'Confira o que eu chutei'}
-          </Badge>
-        ) : (
-          <Badge variant="pilula" className="h-auto py-1">
-            <Check aria-hidden="true" />
-            Nada em dúvida
-          </Badge>
-        )}
-      </div>
-
-      <p className="max-w-prose text-sm leading-relaxed">
-        {recibo.lidas.map(rotuloComRessalva).join(' · ')}
-      </p>
-
-      {/* Pular linha em silêncio é como a pessoa passa vinte minutos procurando
-          uma coluna que o CRM decidiu que não existia. */}
-      {planilha.tituloIgnorado.length > 0 ? (
-        <p className="max-w-prose text-sm text-muted-foreground">
-          {planilha.tituloIgnorado.length === 1
-            ? 'A primeira linha foi lida como título e não como cabeçalho:'
-            : 'As primeiras linhas foram lidas como título e não como cabeçalho:'}{' '}
-          <span className="text-foreground">
-            {planilha.tituloIgnorado.map((l) => `“${l}”`).join('; ')}
-          </span>
-          . O cabeçalho é a primeira linha com duas ou mais células preenchidas.
-        </p>
-      ) : null}
-
-      {/* As colunas que o CRM não usa e que TÊM um porquê que vale dizer. Sem
-          esta linha, quem confere vê a coluna `place_id` ignorada e conclui que
-          o CRM perdeu o identificador do lugar. */}
-      {recibo.ignoradas.some((i) => i.motivo) ? (
-        <ul className="max-w-prose text-sm text-muted-foreground">
-          {recibo.ignoradas
-            .filter((i) => i.motivo)
-            .map((i) => (
-              <li key={i.indice}>
-                <span className="font-medium text-foreground">{i.titulo}</span>: {i.motivo}
-              </li>
-            ))}
-        </ul>
-      ) : null}
-    </div>
+    </section>
   );
 }
 
@@ -262,7 +189,7 @@ function Colunas({
             <li
               key={`${titulo}-${indice}`}
               className={cn(
-                'flex flex-col gap-2 rounded-xl border border-hairline p-3',
+                'flex flex-col gap-2 rounded-lg bg-muted/45 p-3',
                 campo === undefined && 'opacity-70',
               )}
             >
@@ -276,15 +203,15 @@ function Colunas({
                   </p>
                 </div>
                 {conferir ? (
-                  <Badge variant="outline" className="shrink-0">
-                    Chutei — confira
+                  <Badge variant="outline" className="shrink-0 bg-card">
+                    Confira
                   </Badge>
                 ) : null}
               </div>
 
               <Select value={campo ?? IGNORAR} onValueChange={(v) => aoEscolher(indice, v)}>
                 <SelectTrigger
-                  className="toque h-11 w-full md:h-9"
+                  className="toque h-11 w-full bg-card md:h-9"
                   aria-label={`Campo da coluna ${titulo || indice + 1}`}
                 >
                   <SelectValue />

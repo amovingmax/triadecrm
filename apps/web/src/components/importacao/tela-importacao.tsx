@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Undo2, Upload } from 'lucide-react';
+import { ArrowRight, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -23,7 +23,6 @@ import {
   mensagemDoErro,
   pedirPrevia,
   prazoDoDesfazer,
-  totalDe,
   type LinhaCrua,
   type PrazoDoDesfazer,
 } from './dados';
@@ -35,9 +34,11 @@ import {
   type Sugestao,
 } from './mapeamento';
 import { detectarOrigem, type OrigemDetectada } from './origem-detectada';
+import { CartaoDoArquivo } from './cartao-do-arquivo';
 import { PassoArquivo } from './passo-arquivo';
-import { PassoMapa, ReciboDasColunas } from './passo-mapa';
+import { PassoMapa } from './passo-mapa';
 import { PassoPrevia } from './passo-previa';
+import { Passos, type PassoDaImportacao } from './passos';
 import type { PedidoAoLeitor, RespostaDoLeitor } from './planilha.worker';
 import { montarReciboDeLeitura } from './recibo-de-leitura';
 import { Recibo } from './recibo';
@@ -45,9 +46,7 @@ import {
   ResolverCategorias,
   type RespostasDeCategoria,
 } from './resolver-categorias';
-import { SeletorDeOrigem } from './seletor-de-origem';
 import {
-  fraseDaPrevia,
   fraseDeZero,
   ROTULO_DECISAO,
   type CategoriaDoCatalogo,
@@ -129,10 +128,13 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
    */
   const [naoImportar, setNaoImportar] = useState<readonly string[]>([]);
   /**
-   * O que a pessoa foi buscar nesta lista. NÃO pré-marca nada: entra como
-   * primeira opção da lista suspensa de resolver, à frente da sugestão.
+   * O passo das categorias já foi respondido (ou pulado) para esta prévia.
+   *
+   * É ele que separa o passo 2 do passo 3 (30/09/2026): com categoria nova na
+   * lista, a pergunta vem ANTES da conferência, numa tela própria; respondida,
+   * a conferência aparece já com as contagens certas.
    */
-  const [buscava, setBuscava] = useState<number | null>(null);
+  const [categoriasFeitas, setCategoriasFeitas] = useState(false);
   const [ensinando, setEnsinando] = useState(false);
 
   const [passoDaLeitura, setPassoDaLeitura] = useState<'lendo' | 'abrindo' | 'varrendo' | null>(null);
@@ -234,6 +236,7 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
     setDeteccao(null);
     setOrigemEscolhidaAMao(false);
     setMenuDeOrigemAberto(false);
+    setCategoriasFeitas(false);
     setPassoDaLeitura('lendo');
 
     trabalhador.current?.terminate();
@@ -392,6 +395,9 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
       try {
         const gravadas = await ensinarCategorias(origemId, pares);
         setNaoImportar(fora);
+        // Antes de refazer a conferência: com a prévia zerada enquanto ela é
+        // refeita, o indicador voltaria ao passo 1 por um instante.
+        setCategoriasFeitas(true);
         if (gravadas > 0) {
           toast.success(
             gravadas === 1
@@ -411,6 +417,22 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
       }
     },
     [conferirCom, mapa, naoImportar, nomeDaOrigem, origemId, planilha],
+  );
+
+  /**
+   * O "Continuar" do passo das categorias. Sem nenhuma resposta, só segue: o
+   * que ficou em "decidir depois" vai para a Revisão, e não há nada a ensinar.
+   */
+  const continuarDasCategorias = useCallback(
+    async (respostas: RespostasDeCategoria) => {
+      const algumaResposta = Object.values(respostas).some((r) => r.tipo !== 'nao_sei');
+      if (!algumaResposta) {
+        setCategoriasFeitas(true);
+        return;
+      }
+      await aplicarCategorias(respostas);
+    },
+    [aplicarCategorias],
   );
 
   /**
@@ -434,6 +456,8 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
       setOrigemEscolhidaAMao(true);
       if (etapa !== 'previa' || !planilha) return;
       const nome = origens.find((o) => o.id === id)?.nome ?? '';
+      // Outra origem, outro mapa de categorias: a pergunta pode mudar.
+      setCategoriasFeitas(false);
       void conferirCom(planilha, mapa, nome, naoImportar);
     },
     [conferirCom, etapa, mapa, naoImportar, origens, planilha],
@@ -449,7 +473,7 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
     setFalha(null);
     setDeteccao(null);
     setNaoImportar([]);
-    setBuscava(null);
+    setCategoriasFeitas(false);
     setOrigemEscolhidaAMao(false);
     setMenuDeOrigemAberto(false);
     setOrigemId(padrao?.id ?? 0);
@@ -466,18 +490,28 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
           titulo="O seu acesso não traz listas para a base"
           causa="Quem traz gente de fora para dentro da base é gestor ou SDR."
           comoResolver="Fale com um gestor se você precisa disso."
-
         />
       </div>
     );
   }
 
-  // TRABALHO, e não LEITURA: o passo do mapa mostra a prévia da planilha, que é uma
-  // tabela de quantas colunas o arquivo tiver. Numa coluna de 896px ela rolaria de
-  // lado justamente onde a pessoa precisa comparar cabeçalho com conteúdo.
+  // Em que passo a pessoa está. Enquanto a conferência da primeira leitura não
+  // volta, ela ainda está no passo do arquivo (é o arquivo que está sendo lido).
+  const passo: PassoDaImportacao =
+    etapa === 'recibo'
+      ? 'pronto'
+      : etapa !== 'previa' || (previa === null && !categoriasFeitas)
+        ? 'arquivo'
+        : previa !== null && previa.categoriasNovas.length > 0 && !categoriasFeitas
+          ? 'categorias'
+          : 'conferir';
+
+  // TRABALHO, e não LEITURA: o passo das colunas mostra a grade do arquivo, de
+  // quantas colunas ele tiver.
   return (
-    <div className={cn(TRABALHO, 'flex flex-col gap-6')}>
+    <div className={cn(TRABALHO, 'flex flex-col gap-5')}>
       <Cabecalho />
+      <Passos atual={passo} />
 
       {falha ? (
         <ErroDaImportacao
@@ -487,10 +521,6 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
         />
       ) : null}
 
-      {/* No passo do arquivo o seletor SOME: não há cabeçalho para afirmar
-          coisa nenhuma, e um menu de dois itens aberto no errado foi o que
-          zerou o lote dos fotógrafos. Ele reaparece no passo seguinte, já como
-          fato lido, com o "não é?" ao lado. */}
       {etapa === 'arquivo' ? (
         <>
           <PassoArquivo
@@ -509,18 +539,31 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
         </>
       ) : null}
 
+      {/* O arquivo, numa linha, em todo passo depois do primeiro: é a
+          referência de "do que estamos falando" enquanto a pessoa decide. */}
+      {planilha && (etapa === 'mapa' || etapa === 'previa') ? (
+        <CartaoDoArquivo
+          arquivo={arquivo}
+          planilha={planilha}
+          origens={origens}
+          origemId={origemId}
+          aoMudarOrigem={trocarOrigem}
+          deteccao={deteccao}
+          temColunaDeOrigem={mapa.origem !== undefined}
+          menuAberto={menuDeOrigemAberto || origemEscolhidaAMao}
+          aoAbrirMenu={() => setMenuDeOrigemAberto(true)}
+          recibo={
+            etapa === 'previa'
+              ? montarReciboDeLeitura(planilha, mapa, sugestao, nomeDaOrigem)
+              : null
+          }
+          aoTrocarArquivo={recomecar}
+          aoAjustarColunas={etapa === 'previa' ? () => setEtapa('mapa') : undefined}
+        />
+      ) : null}
+
       {etapa === 'mapa' && planilha ? (
         <>
-          <ArquivoEscolhido arquivo={arquivo} planilha={planilha} aoTrocar={recomecar} />
-          <SeletorDeOrigem
-            origens={origens}
-            valor={origemId}
-            aoMudar={trocarOrigem}
-            temColunaDeOrigem={mapa.origem !== undefined}
-            deteccao={deteccao}
-            aberto={menuDeOrigemAberto || origemEscolhidaAMao}
-            aoAbrir={() => setMenuDeOrigemAberto(true)}
-          />
           <PassoMapa
             planilha={planilha}
             mapa={mapa}
@@ -530,15 +573,17 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
           />
           <div className="flex flex-wrap items-center gap-3">
             <Button
+              variant="menta"
               disabled={!podeConferir}
               onClick={() => void conferir()}
-              className="toque h-11 md:h-9"
+              className="toque h-11 md:h-10 md:px-5"
             >
-              Ver o que vai acontecer
+              Continuar
+              <ArrowRight aria-hidden="true" />
             </Button>
             {pendentes.length > 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Indique as colunas obrigatórias para continuar.
+              <p className="text-[13px] text-muted-foreground">
+                Escolha a coluna que falta para continuar.
               </p>
             ) : null}
           </div>
@@ -546,87 +591,32 @@ export function TelaImportacao({ podeImportar, podeDesfazer, origens, categorias
       ) : null}
 
       {etapa === 'previa' ? (
-        <>
-          {planilha ? (
-            <>
-              <ArquivoEscolhido arquivo={arquivo} planilha={planilha} aoTrocar={recomecar} />
-              {/* A linha do arquivo e o recibo aparecem AQUI também, e não só no
-                  passo do mapa: quando não há nada em dúvida o passo do mapa
-                  nem acontece, e o que o CRM leu (e de onde ele acha que a
-                  lista veio) não pode ficar sem ser dito antes de gravar. */}
-              <SeletorDeOrigem
-                origens={origens}
-                valor={origemId}
-                aoMudar={trocarOrigem}
-                temColunaDeOrigem={mapa.origem !== undefined}
-                deteccao={deteccao}
-                aberto={menuDeOrigemAberto || origemEscolhidaAMao}
-                aoAbrir={() => setMenuDeOrigemAberto(true)}
-              />
-              <ReciboDasColunas
-                planilha={planilha}
-                recibo={montarReciboDeLeitura(planilha, mapa, sugestao, nomeDaOrigem)}
-              />
-            </>
-          ) : null}
-
-          {andamento ? <Progresso {...andamento} /> : null}
-
-          {previa === null ? (
-            <EsqueletoDaPrevia />
-          ) : (
-            <>
-              {/* A tela de resolver vem ANTES da prévia por linha: é ela que
-                  muda os números logo abaixo, e responder depois de ler 40
-                  linhas é ler duas vezes. */}
-              <ResolverCategorias
-                categoriasNovas={previa.categoriasNovas}
-                categorias={categorias}
-                buscava={buscava}
-                aoTrocarBuscava={setBuscava}
-                ocupado={ensinando || andamento !== null}
-                aoAplicar={(r) => void aplicarCategorias(r)}
-              />
-              {naoImportar.length > 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Fora desta importação, por sua escolha: {naoImportar.join(' · ')}.{' '}
-                  <button
-                    type="button"
-                    className="underline underline-offset-2"
-                    onClick={() => {
-                      setNaoImportar([]);
-                      if (planilha) void conferirCom(planilha, mapa, nomeDaOrigem, []);
-                    }}
-                  >
-                    Trazer de volta
-                  </button>
-                </p>
-              ) : null}
-              <PassoPrevia previa={previa} aoVoltar={() => setEtapa('mapa')} />
-              {/* A barra de gravar acompanha a rolagem porque a prévia é longa: sem
-                  isso a pessoa lê 68 linhas e tem de voltar ao topo para agir. No
-                  celular ela para ACIMA da barra de navegação da casca — senão o
-                  botão principal ficaria debaixo do menu. */}
-              <div className="sticky bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior))] -mx-4 flex flex-wrap items-center gap-3 border-t border-hairline bg-background/95 px-4 py-3 backdrop-blur md:mx-0 md:bottom-0 md:rounded-xl md:border md:px-4">
-                <Button
-                  disabled={andamento !== null}
-                  onClick={() => void importar()}
-                  className="toque h-11 md:h-9"
-                >
-                  <Upload aria-hidden="true" />
-                  Gravar {totalDe(previa.contagem) === 1 ? 'esta' : 'estas'}{' '}
-                  {formatarNumero(totalDe(previa.contagem))}{' '}
-                  {totalDe(previa.contagem) === 1 ? 'linha' : 'linhas'}
-                </Button>
-                {/* O botão conta LINHAS, e não parceiros, porque é isso que ele
-                    faz: cada uma das linhas vira raw_capture → source_record →
-                    supplier_candidate (20260904001820:876-885), que é o que
-                    sustenta o ADR-08. Quantas viram parceiro vai na frase. */}
-                <p className="text-sm text-muted-foreground">{fraseDaPrevia(previa.contagem)}</p>
-              </div>
-            </>
-          )}
-        </>
+        andamento ? (
+          <Progresso {...andamento} />
+        ) : previa === null ? (
+          <EsqueletoDaPrevia />
+        ) : passo === 'categorias' ? (
+          <ResolverCategorias
+            categoriasNovas={previa.categoriasNovas}
+            categorias={categorias}
+            ocupado={ensinando}
+            aoContinuar={(respostas) => void continuarDasCategorias(respostas)}
+          />
+        ) : (
+          <PassoPrevia
+            previa={previa}
+            ocupado={ensinando}
+            aoImportar={() => void importar()}
+            aoVoltar={
+              previa.categoriasNovas.length > 0 ? () => setCategoriasFeitas(false) : undefined
+            }
+            foraPorEscolha={naoImportar}
+            aoTrazerDeVolta={() => {
+              setNaoImportar([]);
+              if (planilha) void conferirCom(planilha, mapa, nomeDaOrigem, []);
+            }}
+          />
+        )
       ) : null}
 
       {etapa === 'recibo' && recibo ? (
@@ -648,38 +638,12 @@ function Cabecalho() {
   return (
     <header>
       <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
-        Trazer uma lista para a base
+        Importar lista
       </h1>
-      <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        Você vê tudo antes de gravar, e nada que já está na base é sobrescrito.
+      <p className="max-w-[90ch] text-sm text-muted-foreground">
+        Do Google Maps ou de uma planilha. Nada é gravado antes de você conferir.
       </p>
     </header>
-  );
-}
-
-function ArquivoEscolhido({
-  arquivo,
-  planilha,
-  aoTrocar,
-}: {
-  arquivo: File | null;
-  planilha: PlanilhaLida;
-  aoTrocar: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-hairline p-3">
-      <FileSpreadsheet className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{arquivo?.name ?? planilha.aba}</p>
-        <p className="text-sm text-muted-foreground">
-          Aba {planilha.aba} · <span className="numerico">{planilha.linhas.length}</span>{' '}
-          {planilha.linhas.length === 1 ? 'linha' : 'linhas'}
-        </p>
-      </div>
-      <Button variant="ghost" onClick={aoTrocar} className="toque h-11 md:h-9">
-        Trocar arquivo
-      </Button>
-    </div>
   );
 }
 
@@ -754,7 +718,7 @@ function ListaDeLotes({
       className="sombra-base flex flex-col gap-2 rounded-xl bg-card p-5"
     >
       <h2 id="lotes" className="text-[15px] font-semibold tracking-[-0.01em]">
-        O que você já trouxe
+        Importações anteriores
       </h2>
       <ul className="border-t border-hairline">
         {lotes.map((lote) => {

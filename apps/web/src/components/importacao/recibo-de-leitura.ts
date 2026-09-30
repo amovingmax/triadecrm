@@ -77,10 +77,15 @@ export type ReciboDeLeitura = {
  * a identidade estável do lugar no Maps. Sem esta linha, quem confere vê a
  * coluna `place_id` ignorada e conclui que o CRM perdeu o identificador.
  */
+//
+// EM PORTUGUÊS DE QUEM USA (30/09/2026). As frases diziam "o place_id da Places
+// API não é o cid do Maps (ADR-12)" — verdade para quem escreveu o código, grego
+// para quem importa a lista. O porquê técnico continua neste comentário; a tela
+// diz o que a pessoa precisa saber: o CRM não perdeu nada.
 const PORQUE_IGNORADA: Record<string, string> = {
-  'place id': 'o place_id da Places API não é o cid do Maps (ADR-12) — o CRM leu a coluna cid',
-  'reviews link': 'o link das avaliações; o CRM guardou o link do lugar, da coluna link',
-  'complete address': 'endereço repetido; o CRM leu a coluna address',
+  'place id': 'outro código do Google para o mesmo lugar; o CRM já guardou o da coluna cid',
+  'reviews link': 'é o link das avaliações; o CRM guardou o link do lugar',
+  'complete address': 'é o endereço repetido; o CRM já leu o endereço',
 };
 
 export function montarReciboDeLeitura(

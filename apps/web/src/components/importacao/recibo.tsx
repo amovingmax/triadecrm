@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, Undo2 } from 'lucide-react';
+import { ArrowRight, Check, Undo2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -64,28 +64,32 @@ export function Recibo({
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <h2 className="font-heading text-lg font-semibold tracking-tight">
-          {criados === 0
-            ? 'Pronto — nenhuma virou parceiro ainda'
-            : `Pronto: ${formatarNumero(criados)} ${criados === 1 ? 'virou parceiro' : 'viraram parceiro'}`}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          De <span className="font-medium text-foreground">{recibo.rotulo}</span>
-          {recibo.desfazerAte ? (
-            <>
-              {' · dá para desfazer até '}
-              <span className="numerico">{formatarDataHora(recibo.desfazerAte)}</span>
-            </>
-          ) : null}
-        </p>
+    // O fim da importação, num cartão (30/09/2026): o resultado em uma frase
+    // grande com o disco de menta, as contagens em pílula e as três saídas.
+    // O desfazer desceu para uma linha discreta no pé — ele é a exceção, e
+    // como botão vermelho do lado de "Ver os parceiros" competia com o caminho
+    // normal.
+    <section className="sombra-base flex flex-col gap-5 rounded-xl bg-card p-5 sm:p-6">
+      <div className="flex items-start gap-4">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-menta text-menta-tinta">
+          <Check className="size-5" aria-hidden="true" strokeWidth={2} />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-[-0.01em]">
+            {criados === 0
+              ? 'Pronto. Nenhuma virou parceiro ainda'
+              : `Pronto: ${formatarNumero(criados)} ${criados === 1 ? 'novo parceiro' : 'novos parceiros'}`}
+          </h2>
+          <p className="truncate text-sm text-muted-foreground" title={recibo.rotulo}>
+            {recibo.rotulo}
+          </p>
+        </div>
       </div>
 
       <ul className="flex flex-wrap gap-2">
         {ORDEM_DAS_DECISOES.filter((d) => (recibo.contagem[d] ?? 0) > 0).map((decisao) => (
           <li key={decisao}>
-            <Badge variant="pilula" className="h-auto py-1">
+            <Badge variant="pilula" className="h-auto gap-1.5 px-3 py-1 text-[13px]">
               <span className="numerico font-semibold">
                 {formatarNumero(recibo.contagem[decisao] ?? 0)}
               </span>
@@ -96,7 +100,7 @@ export function Recibo({
       </ul>
 
       <div className="flex flex-wrap gap-2">
-        <Button asChild className="toque h-11 md:h-9">
+        <Button asChild className="toque h-11 md:h-10">
           <Link href="/parceiros">
             Ver os parceiros
             <ArrowRight aria-hidden="true" />
@@ -104,55 +108,58 @@ export function Recibo({
         </Button>
 
         {paraDecidir > 0 ? (
-          <Button asChild variant="outline" className="toque h-11 md:h-9">
+          <Button asChild variant="outline" className="toque h-11 md:h-10">
             <Link href="/revisao">
-              Escolher a categoria{' '}
-              {paraDecidir === 1
-                ? 'da que parou'
-                : `das ${formatarNumero(paraDecidir)} que pararam`}{' '}
-              na fila
+              Abrir a Revisão ({formatarNumero(paraDecidir)})
               <ArrowRight aria-hidden="true" />
             </Link>
           </Button>
         ) : null}
 
-        <Button variant="ghost" onClick={aoRecomecar} className="toque h-11 md:h-9">
-          Trazer outra lista
+        <Button variant="ghost" onClick={aoRecomecar} className="toque h-11 md:h-10">
+          Importar outra lista
         </Button>
+      </div>
 
+      <div className="flex flex-col gap-2 border-t border-hairline pt-4 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <p>
+          {podeDesfazer ? (
+            <>
+              Errou o arquivo? Dá para desfazer
+              {recibo.desfazerAte ? (
+                <>
+                  {' até '}
+                  <span className="numerico">{formatarDataHora(recibo.desfazerAte)}</span>
+                </>
+              ) : null}
+              . Sai só o que ninguém mexeu depois.
+            </>
+          ) : (
+            <>
+              Errou o arquivo? Peça a um gestor para desfazer
+              {recibo.desfazerAte ? (
+                <>
+                  {' até '}
+                  <span className="numerico">{formatarDataHora(recibo.desfazerAte)}</span>
+                </>
+              ) : null}
+              .
+            </>
+          )}
+        </p>
         {podeDesfazer ? (
           <Button
-            variant="destructive"
+            variant="ghost"
+            size="sm"
             disabled={desfazendo}
             onClick={() => void desfazer()}
-            className="toque h-11 md:h-9"
+            className="toque h-11 shrink-0 text-destructive-texto hover:text-destructive-texto md:h-8"
           >
             <Undo2 aria-hidden="true" />
             {desfazendo ? 'Desfazendo...' : 'Desfazer esta importação'}
           </Button>
         ) : null}
       </div>
-
-      <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        {podeDesfazer ? (
-          <>
-            Desfazer tira só os parceiros que esta importação criou e ninguém tocou depois. Quem
-            já tem conversa, mudança de etapa, autorização ou ligação fica de pé — o CRM diz
-            quantos.
-          </>
-        ) : (
-          <>
-            Desfazer uma importação é de gestor. Peça a um gestor para desfazer esta (
-            <span className="font-medium text-foreground">{recibo.rotulo}</span>) antes de{' '}
-            {recibo.desfazerAte ? (
-              <span className="numerico">{formatarDataHora(recibo.desfazerAte)}</span>
-            ) : (
-              'o prazo de 48 h acabar'
-            )}
-            . Depois disso é um parceiro de cada vez, na ficha dele.
-          </>
-        )}
-      </p>
-    </div>
+    </section>
   );
 }
