@@ -9,11 +9,15 @@
 --   5. Quem pede para sair recebe o opt-out, nunca um menu.
 --   6. O bot fala no máximo duas vezes por conversa.
 --   7. Só gestor liga e desliga.
+--   8. CLIENTE NÃO RECEBE MENU (01/10/2026, migração 20261003110000): o menu é
+--      para parceiro. Por isso os números dos casos 1 a 5 são PARCEIROS — fichas
+--      criadas antes de eles escreverem —, e o caso 8 prova o silêncio para quem
+--      não é ficha.
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(19);
+select plan(21);
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -55,6 +59,12 @@ insert into auth.users (id, email, raw_user_meta_data) values
 
 update public.app_settings set value = jsonb_set(value, '{numero_padrao}', '"+5584999994700"')
  where key = 'whatsapp.envio';
+
+-- Os casos 1 a 5 são de PARCEIROS: desde 01/10/2026 o menu não fala com quem
+-- não é ficha (caso 8).
+insert into public.organizations (name, phone_e164, source_id)
+select 'B47 Parceiro ' || n, '+558498888470' || n, (select id from public.sources where slug = 'planilha')
+  from unnest(array['1', '2', '3', '4']) n;
 
 
 -- =====================================================================
@@ -156,6 +166,17 @@ reset role;
 select is(pg_temp.estado('+5584988884705'), 'conversa_humana/-/-',
   'conversa que nós começamos não vira robô no meio do assunto');
 select is(pg_temp.n_saidas('+5584988884705'), 1, 'e nada automático sai nela');
+
+
+-- =====================================================================
+-- 8 · cliente (número que não é ficha) não recebe resposta automática
+-- =====================================================================
+set role service_role;
+select public.wa_entrada_registrar('wamid.B47.10', '+5584999994700', '+5584988884706', 'text', 'Oi, boa tarde');
+reset role;
+select is(pg_temp.n_saidas('+5584988884706'), 0,
+  'cliente que escreve primeiro não recebe menu: quem responde é gente, na aba Clientes');
+select is(pg_temp.estado('+5584988884706'), '-/-/-', 'e a conversa nem entra no bot');
 
 
 -- =====================================================================

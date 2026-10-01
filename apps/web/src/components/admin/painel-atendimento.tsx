@@ -142,7 +142,7 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
         <Interruptor
           id="ausencia"
           titulo="Responder fora do horário"
-          descricao="Fora de 8h–17h45, quem escreve recebe um aviso. No máximo um a cada 12 h."
+          descricao="Fora de 8h–17h45, o parceiro que escreve recebe um aviso. Cliente não recebe. No máximo um a cada 12 h."
           ligado={config.ausencia_ativa ?? false}
           podeEditar={podeEditar}
           aoMudar={(v) => mudar.mutate({ ausencia_ativa: v })}

@@ -11,7 +11,7 @@
 --   5. VIRAR TAREFA: a mensagem vira tarefa minha, para o próximo dia útil.
 -- =====================================================================
 begin;
-select plan(17);
+select plan(18);
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -116,9 +116,19 @@ update public.app_settings set value = value || '{"distribuicao_automatica": tru
 -- =====================================================================
 -- 2. Fora do horário
 -- =====================================================================
-select is(pg_temp.ausencias('+5584999996101'), 1, 'quem escreve fora do horário recebe o aviso');
-select pg_temp.chega('wamid.h61.4', '+5584999996101', 'Alô?');
-select is(pg_temp.ausencias('+5584999996101'), 1, 'e só uma vez a cada 12 h, por mais que escreva');
+-- O aviso é para PARCEIRO desde 01/10/2026 (migração 20261003110000): cliente,
+-- que é o número sem ficha, é respondido por gente na aba Clientes. Por isso os
+-- números dos casos abaixo viram fichas antes de escrever.
+insert into public.organizations (name, phone_e164, source_id, owner_id)
+select 'H61 Parceiro ' || n, '+558499999610' || n, (select id from public.sources where slug = 'planilha'),
+       pg_temp.p('01')
+  from unnest(array['5', '6', '7', '8', '9']) n;
+select is(pg_temp.ausencias('+5584999996101'), 0,
+  'cliente (número sem ficha) não recebe o aviso: resposta automática é só para parceiro');
+select pg_temp.chega('wamid.h61.9', '+5584999996109', 'Oi, boa noite');
+select is(pg_temp.ausencias('+5584999996109'), 1, 'o parceiro que escreve fora do horário recebe o aviso');
+select pg_temp.chega('wamid.h61.4', '+5584999996109', 'Alô?');
+select is(pg_temp.ausencias('+5584999996109'), 1, 'e só uma vez a cada 12 h, por mais que escreva');
 
 update pg_temp.relogio set aberto = true;
 select pg_temp.chega('wamid.h61.5', '+5584999996105', 'Bom dia');

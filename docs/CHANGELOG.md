@@ -5499,3 +5499,26 @@ texto livre sem escolher uma opção do menu de entrada vira parceiro sozinho �
 inclusive cliente. Hoje ele está desligado em produção (é por isso que os
 clientes caem nesta aba). Se for ligado, vale mudar a regra para criar parceiro
 só quando a pessoa escolher "Quero ser fornecedor ou parceiro".
+
+### 01/10/2026 — Cliente não recebe resposta automática
+
+Pedido do Rafael: "tire a resposta automatica quando a conversa vier de
+clientes". Conversa de cliente é a conversa sem ficha (a aba Clientes).
+
+- **Três automações se calam para quem não é parceiro:** o menu de entrada
+  ("responda com o número: 1 - Quero ser fornecedor..."), o aviso de fora do
+  horário e a apresentação ("Tudo bem?" e o texto da Komune). A apresentação
+  entrou junto porque, com a aba Clientes, o "Bom dia!" também reabre conversa
+  de cliente, e ela iria atrás dele.
+- **Para parceiro nada muda:** menu, aviso e apresentação continuam nas mesmas
+  condições.
+- Efeito colateral desejado: com o menu calado para cliente, o "Lead
+  automático" (desligado hoje) não transforma cliente em parceiro enquanto o
+  menu estiver ligado. Cliente vira parceiro só pelo botão "Virar parceiro".
+- Banco: `20261003110000_cliente_nao_recebe_resposta_automatica.sql`, refazendo
+  as três funções a partir da última definição, com uma condição a mais. Ajustes:
+  o texto de "Responder fora do horário" diz que é só para parceiro.
+- Testes: pgTAP `96_cliente_sem_resposta_automatica.sql` (5); `47` e `61`
+  passam a provar o menu e o aviso com parceiro, mais o silêncio para cliente.
+  Suíte inteira num banco local zerado: 3.316 testes. Site: typecheck, lint,
+  996 testes e build.
