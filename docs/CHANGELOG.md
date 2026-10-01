@@ -5522,3 +5522,53 @@ clientes". Conversa de cliente é a conversa sem ficha (a aba Clientes).
   passam a provar o menu e o aviso com parceiro, mais o silêncio para cliente.
   Suíte inteira num banco local zerado: 3.316 testes. Site: typecheck, lint,
   996 testes e build.
+
+### 01/10/2026 — A sala de reunião deixa de ser obrigatória para quem marca pela tela (RF-AGE-01)
+
+Defeito visto em produção pelo gestor: marcar uma reunião on-line para si mesmo
+terminava em "Quem atende ainda não cadastrou a sala de reunião em Ajustes", e
+em seguida "Nenhum horário livre neste dia". Decisão do Janio ao ver a correção:
+"O link para o meet não precisa ser obrigatório".
+
+- **A causa:** o banco exigia a sala de quem atende (`profiles.sala_url`, ou a
+  sala padrão da casa) para toda reunião on-line, e o texto mandava cadastrar em
+  Ajustes. Ajustes nunca teve esse campo, e SDR nem entra lá. Ninguém conseguia
+  cadastrar a sala pela tela. No banco local funcionava porque os usuários de
+  teste foram criados já com sala.
+- **Pessoa marca sem sala.** Pela Agenda e pela ficha, a reunião on-line nasce
+  sem link quando não há sala da pessoa nem sala padrão. O cartão fica sem o
+  botão "Entrar na sala", e o e-mail ao dono diz "(sem link — abra o CRM)".
+- **O robô não mudou.** Sem sala de quem atende ele continua recusando com
+  `sem_sala` e passando a conversa para uma pessoa. Nenhuma mensagem de WhatsApp
+  muda.
+- **O campo da sala existe, e é opcional:** na folha "Novo compromisso", em
+  Reunião → On-line. Quem quiser cola o link uma vez; a folha mostra a sala
+  salva e deixa trocar. Na agenda de outra pessoa a folha só mostra a sala dela,
+  ou diz que a reunião vai sem link.
+- **Recusa sem alternativa não esvazia mais a grade.** Depois de uma recusa, a
+  folha dizia "Nenhum horário livre neste dia" com o dia livre.
+- Banco: `20261003120000_a_sala_deixa_de_ser_obrigatoria.sql`. Afrouxa
+  `reunioes_lugar_chk` (on-line sem link passa; presencial continua exigindo
+  endereço) e refaz `app.reuniao_gravar` de 9 argumentos a partir da última
+  definição, com a recusa `sem_sala` valendo só para `p_por = 'robo'`. Volta em
+  `supabase/snippets/2026-10-01_reverter_sala_opcional.sql`, testada numa
+  transação.
+- Tela: `agenda/sala.ts` e `agenda/sala.test.ts` (novos),
+  `agenda/folha-novo-compromisso.tsx`, `agenda/acoes-reuniao.ts` e três comentários.
+- Testes: pgTAP `97_a_sala_deixa_de_ser_obrigatoria.sql` (18): robô igual,
+  pessoa sem sala, quem tem sala, presencial, remarcar e WhatsApp intocado.
+  Site: typecheck, lint e Vitest (1.000 no site, 4 novos). Na tela, com o
+  Chrome: gestor sem sala marca a reunião; com a sala salva, ela vai na reunião.
+- Suíte pgTAP inteira num banco local zerado, subido como o CI sobe: 3.334 de
+  3.334, em 91 arquivos.
+
+**Pendente:** não está em produção. Falta commit, envio, aplicar a migração em
+produção e deploy. A ordem importa: a migração antes do site.
+
+**Precisa de decisão humana:**
+- Isto muda uma regra do ADR-15 ("sem sala, não marca"), que passa a valer só
+  para o robô. O PRD (RF-AGE-01) ainda descreve a sala como parte do on-line.
+- Quem cadastra a sala libera o robô para marcar reunião on-line na própria
+  agenda. É a regra de sempre, mas muda o que acontece no WhatsApp dessa pessoa.
+- Qual ferramenta de sala a equipe usa (pendência antiga do Rafael), e se a casa
+  deve ter uma sala padrão (`agenda.reunioes.sala_padrao`).

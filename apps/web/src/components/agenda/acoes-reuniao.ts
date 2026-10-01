@@ -26,7 +26,7 @@ const RECADO: Record<string, string> = {
   ja_fechada: 'Esta reunião já foi fechada.',
   horario_indisponivel: 'Esse horário não está mais livre.',
   horario_tomado: 'Esse horário acabou de ser ocupado.',
-  sem_sala: 'Quem atende ainda não cadastrou a sala de reunião em Ajustes.',
+  sem_sala: 'Quem atende ainda não cadastrou a sala de reunião.',
   suprimido: 'Este parceiro pediu para não ser contatado.',
   negocio_invisivel: 'Seu perfil não vê o negócio deste parceiro.',
   negocio_nao_existe: 'O negócio deste parceiro não existe mais. Recarregue a agenda.',

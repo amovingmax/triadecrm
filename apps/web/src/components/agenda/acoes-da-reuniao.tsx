@@ -33,8 +33,8 @@ import { diaDoInstante, type Compromisso } from './tipos';
  *
  * O botão do Google Agenda que ficava aqui saiu com o calendário. No lugar:
  *
- *  · **Entrar na sala**, com o link CONGELADO na reunião (trocar a sala em
- *    Ajustes não retroage, e é assim de propósito: a sala que o parceiro
+ *  · **Entrar na sala**, com o link CONGELADO na reunião (trocar a sala
+ *    depois não retroage, e é assim de propósito: a sala que o parceiro
  *    recebeu por WhatsApp é a que vale);
  *  · **Confirmar o horário**, enquanto a rampa está ligada. A frase diz o
  *    porquê, porque um botão "confirmar" sem motivo é um botão que ninguém
@@ -114,8 +114,8 @@ export function AcoesDaReuniao({
         </Badge>
       ) : null}
 
-      {/* O link só existe quando o formato é on-line: `reunioes_lugar_chk`
-          garante sala para on-line e endereço para presencial, e nunca os dois. */}
+      {/* O link só existe quando o formato é on-line, e nem sempre: quem marca
+          pela tela sem ter sala cadastrada deixa a reunião sem link. */}
       {compromisso.link ? (
         <Button asChild variant="outline" size="lg" className="toque h-11 md:h-9">
           <a href={compromisso.link} target="_blank" rel="noopener noreferrer">

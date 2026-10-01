@@ -337,9 +337,9 @@ export function TelaAgenda({
       </section>
 
       {/* A faixa de conexão com o Google saiu com o calendário (ADR-15): não há
-          mais nada para configurar aqui — a sala de cada pessoa mora em Ajustes,
-          e o livre/ocupado é calculado pelo CRM. Na aba Rota a nota não aparece:
-          ela fala da lista do dia. */}
+          mais nada para configurar aqui — a sala de cada pessoa mora na folha de
+          Novo compromisso (`sala.ts`), e o livre/ocupado é calculado pelo CRM. Na
+          aba Rota a nota não aparece: ela fala da lista do dia. */}
       {visao === 'rota' ? null : <AindaNaoLigado />}
 
       <FolhaNovoCompromisso
