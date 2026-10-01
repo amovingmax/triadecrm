@@ -180,7 +180,7 @@ function CartaoDaConversa({
   const revelar = useRevelarLinha(indice);
   // Quem escreveu de fora da base não tem ficha, e o cartão não pode ficar sem
   // dizer para quem a mensagem foi.
-  const paraQuem = grupo.organizacao ?? 'Número fora da base';
+  const paraQuem = grupo.organizacao ?? 'Cliente (não é parceiro)';
   const dia = grupo.quando ? rotuloDoDia(grupo.quando) : null;
 
   return (

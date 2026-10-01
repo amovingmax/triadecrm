@@ -29,8 +29,22 @@ import {
   VARIAVEL_DO_ATENDENTE,
   type PreviaDoEnvio,
 } from './envio-de-modelo';
+import { chaveDasMensagensDoFio } from './fora-da-base-dados';
 import { fraseDaRecusaDoEnvio, MOTIVOS_DE_RECUSA_DO_ENVIO } from './mensagens';
 import { esquecerPedidoDeModelo, lerPedidoDeModelo } from './pedido-de-modelo';
+
+/**
+ * Para onde vai o modelo: uma FICHA (o caminho de sempre, que conta o primeiro
+ * contato no funil) ou uma CONVERSA SEM FICHA — cliente, curioso, quem não é
+ * lead (01/10/2026). A caixa é a mesma; o banco tem uma função para cada.
+ */
+export type DestinoDoModelo =
+  | { tipo: 'ficha'; organizacaoId: string }
+  | { tipo: 'conversa'; conversaId: string };
+
+function idDoDestino(destino: DestinoDoModelo): string {
+  return destino.tipo === 'ficha' ? destino.organizacaoId : destino.conversaId;
+}
 
 /**
  * Mandar WhatsApp pelo CRM com um modelo aprovado pela Meta.
@@ -56,15 +70,16 @@ import { esquecerPedidoDeModelo, lerPedidoDeModelo } from './pedido-de-modelo';
  * modelo já escolhido (resumo, confirmação ou "tentei te ligar").
  */
 export function EnviarModelo({
-  organizacaoId,
+  destino,
   className,
 }: {
-  organizacaoId: string;
+  destino: DestinoDoModelo;
   className?: string;
 }) {
+  const organizacaoId = destino.tipo === 'ficha' ? destino.organizacaoId : null;
   const previa = useQuery({
-    queryKey: chaveDaPrevia(organizacaoId),
-    queryFn: () => carregarPrevia(organizacaoId),
+    queryKey: chaveDaPrevia(idDoDestino(destino)),
+    queryFn: () => carregarPrevia(destino),
     staleTime: 30_000,
   });
 
@@ -103,7 +118,7 @@ export function EnviarModelo({
         <p className="text-xs leading-relaxed text-muted-foreground">
           {fraseDoBloqueio(p.bloqueio, MOTIVOS_DE_RECUSA_DO_ENVIO)}
         </p>
-        {p.bloqueio.motivo === 'ficha_sem_whatsapp' ? (
+        {organizacaoId === null ? null : p.bloqueio.motivo === 'ficha_sem_whatsapp' ? (
           <Button asChild variant="outline" className="toque h-11 md:h-9">
             <Link href={`/parceiros/${organizacaoId}`}>Abrir a ficha</Link>
           </Button>
@@ -118,7 +133,7 @@ export function EnviarModelo({
     return (
       <Moldura className={className}>
         <SemCumprimento janelaAberta={p.janela_24h_aberta} />
-        <RegistrarPorTelefone organizacaoId={organizacaoId} />
+        {organizacaoId === null ? null : <RegistrarPorTelefone organizacaoId={organizacaoId} />}
       </Moldura>
     );
   }
@@ -126,12 +141,12 @@ export function EnviarModelo({
   if (p.sem_resposta_desde && !p.janela_24h_aberta) {
     return (
       <EsperandoResposta desde={p.sem_resposta_desde} className={className}>
-        <Formulario previa={p} organizacaoId={organizacaoId} />
+        <Formulario previa={p} destino={destino} />
       </EsperandoResposta>
     );
   }
 
-  return <Formulario previa={p} organizacaoId={organizacaoId} className={className} />;
+  return <Formulario previa={p} destino={destino} className={className} />;
 }
 
 /**
@@ -167,17 +182,19 @@ function EsperandoResposta({
 
 function Formulario({
   previa,
-  organizacaoId,
+  destino,
   className,
 }: {
   previa: PreviaDoEnvio;
-  organizacaoId: string;
+  destino: DestinoDoModelo;
   className?: string;
 }) {
   const clientes = useQueryClient();
+  const organizacaoId = destino.tipo === 'ficha' ? destino.organizacaoId : null;
   // Veio do recibo da ligação ("Mandar a confirmação no WhatsApp"): o modelo já vem
   // escolhido e o dia, a hora e o formato, preenchidos. A pessoa ainda revê e envia.
-  const [pedido] = useState(() => lerPedidoDeModelo(organizacaoId));
+  // Só existe para ficha: ligação é com parceiro.
+  const [pedido] = useState(() => (organizacaoId ? lerPedidoDeModelo(organizacaoId) : null));
   const modeloDoRecibo = pedido
     ? (previa.modelos.find((m) => m.codigo === pedido.codigo) ?? null)
     : null;
@@ -204,7 +221,7 @@ function Formulario({
   const assinaComNome = modelo?.variaveis.includes(VARIAVEL_DO_ATENDENTE) ?? false;
 
   const enviar = useMutation({
-    mutationFn: () => enviarModelo(organizacaoId, modelo!.id, valores),
+    mutationFn: () => enviarModelo(destino, modelo!.id, valores),
     onSuccess: (r) => {
       setDigitados({});
       if (pedido) esquecerPedidoDeModelo();
@@ -214,15 +231,20 @@ function Formulario({
           : 'Sai pelo número da KOMUNE em instantes.',
       });
       void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
-      void clientes.invalidateQueries({ queryKey: chaveDaLinha(organizacaoId) });
-      void clientes.invalidateQueries({ queryKey: chaveDaPrevia(organizacaoId) });
+      void clientes.invalidateQueries({
+        queryKey:
+          destino.tipo === 'ficha'
+            ? chaveDaLinha(destino.organizacaoId)
+            : chaveDasMensagensDoFio(destino.conversaId),
+      });
+      void clientes.invalidateQueries({ queryKey: chaveDaPrevia(idDoDestino(destino)) });
     },
     onError: (erro) => {
       toast.error('A mensagem não saiu.', {
         description:
           erro instanceof ErroDaConversa ? erro.message : 'Tente de novo em alguns segundos.',
       });
-      void clientes.invalidateQueries({ queryKey: chaveDaPrevia(organizacaoId) });
+      void clientes.invalidateQueries({ queryKey: chaveDaPrevia(idDoDestino(destino)) });
     },
   });
 
@@ -230,7 +252,7 @@ function Formulario({
     return (
       <Moldura className={className}>
         <SemCumprimento janelaAberta={previa.janela_24h_aberta} />
-        <RegistrarPorTelefone organizacaoId={organizacaoId} />
+        {organizacaoId === null ? null : <RegistrarPorTelefone organizacaoId={organizacaoId} />}
       </Moldura>
     );
   }
@@ -372,15 +394,18 @@ function tituloDoBloqueio(motivo: string): string {
   return 'Agora não dá para mandar';
 }
 
-export function chaveDaPrevia(organizacaoId: string) {
-  return ['conversas', 'previa-envio', organizacaoId] as const;
+export function chaveDaPrevia(id: string) {
+  return ['conversas', 'previa-envio', id] as const;
 }
 
-async function carregarPrevia(organizacaoId: string): Promise<PreviaDoEnvio> {
+async function carregarPrevia(destino: DestinoDoModelo): Promise<PreviaDoEnvio> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('wa_preparar_envio', {
-    p_organization_id: organizacaoId,
-  });
+  const { data, error } =
+    destino.tipo === 'ficha'
+      ? await supabase.rpc('wa_preparar_envio', { p_organization_id: destino.organizacaoId })
+      : await supabase.rpc('wa_preparar_envio_na_conversa', {
+          p_conversation_id: destino.conversaId,
+        });
   if (error) {
     if (error.code === '42501') {
       throw new ErroDaConversa('Seu perfil não pode mandar mensagem.', false, error);
@@ -399,16 +424,23 @@ async function carregarPrevia(organizacaoId: string): Promise<PreviaDoEnvio> {
 }
 
 async function enviarModelo(
-  organizacaoId: string,
+  destino: DestinoDoModelo,
   modeloId: number,
   valores: Record<string, string>,
 ) {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('wa_enviar_modelo', {
-    p_organization_id: organizacaoId,
-    p_template_id: modeloId,
-    p_parametros: valores,
-  });
+  const { data, error } =
+    destino.tipo === 'ficha'
+      ? await supabase.rpc('wa_enviar_modelo', {
+          p_organization_id: destino.organizacaoId,
+          p_template_id: modeloId,
+          p_parametros: valores,
+        })
+      : await supabase.rpc('wa_enviar_modelo_na_conversa', {
+          p_conversation_id: destino.conversaId,
+          p_template_id: modeloId,
+          p_parametros: valores,
+        });
   if (error) {
     const frase = fraseDaRecusaDoEnvio(error.message);
     if (frase) throw new ErroDaConversa(frase, false, error);

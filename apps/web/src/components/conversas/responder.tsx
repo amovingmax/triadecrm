@@ -101,7 +101,8 @@ export function CaixaDeResposta({
 
   // Sem conversa, ou com a janela de 24 h fechada, só modelo aprovado atravessa —
   // e é a mesma caixa para os dois (migração 20260914100000).
-  if (!fio) return <EnviarModelo organizacaoId={organizacaoId} className={className} />;
+  if (!fio)
+    return <EnviarModelo destino={{ tipo: 'ficha', organizacaoId }} className={className} />;
 
   if (recolhida && !aberta) {
     return (
@@ -117,9 +118,9 @@ export function CaixaDeResposta({
   }
 
   return podeEscreverLivre(janela) ? (
-    <TextoLivre fio={fio} organizacaoId={organizacaoId} className={className} />
+    <TextoLivre fioId={fio.id} atualizar={[chaveDaLinha(organizacaoId)]} className={className} />
   ) : (
-    <EnviarModelo organizacaoId={organizacaoId} className={className} />
+    <EnviarModelo destino={{ tipo: 'ficha', organizacaoId }} className={className} />
   );
 }
 
@@ -164,14 +165,21 @@ function PediuParaSair({
 /** Até onde a caixa cresce sozinha: dez linhas, e daí em diante ela rola. */
 const ALTURA_MAXIMA = 220;
 
-/** Janela aberta: texto livre, que é o que a Meta permite e não cobra. */
-function TextoLivre({
-  fio,
-  organizacaoId,
+/**
+ * Janela aberta: texto livre, que é o que a Meta permite e não cobra.
+ *
+ * Exportada e sem ficha nas props desde 01/10/2026: a conversa de quem NÃO é
+ * parceiro (cliente, curioso) usa a mesma caixa, na aba Clientes. Quem chama
+ * diz quais leituras refazer depois do envio.
+ */
+export function TextoLivre({
+  fioId,
+  atualizar = [],
   className,
 }: {
-  fio: FioDaConversa;
-  organizacaoId: string;
+  fioId: string;
+  /** Chaves de consulta a refazer depois do envio, além da lista de conversas. */
+  atualizar?: readonly (readonly unknown[])[];
   className?: string;
 }) {
   const clientes = useQueryClient();
@@ -192,14 +200,14 @@ function TextoLivre({
   const sugestoes = digitando === null ? [] : respostasQueBatem(respostas.data ?? [], digitando);
 
   const enviar = useMutation({
-    mutationFn: () => responder({ fioId: fio.id, texto: texto.trim() }),
+    mutationFn: () => responder({ fioId, texto: texto.trim() }),
     onSuccess: () => {
       setTexto('');
       toast.success('Mensagem na fila do WhatsApp.', {
         description: 'Sai pelo número da KOMUNE em instantes.',
       });
       void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
-      void clientes.invalidateQueries({ queryKey: chaveDaLinha(organizacaoId) });
+      for (const chave of atualizar) void clientes.invalidateQueries({ queryKey: chave });
     },
     onError: (erro) => {
       toast.error('A mensagem não entrou na fila.', {
@@ -239,7 +247,7 @@ function TextoLivre({
       }}
     >
       <label htmlFor="resposta" className="sr-only">
-        Escrever para o parceiro
+        Escrever a resposta
       </label>
       {sugestoes.length > 0 ? (
         <ul
@@ -284,7 +292,7 @@ function TextoLivre({
         />
         {/* Gravar fica ao lado de Enviar porque são a mesma decisão: como mandar
             isto. Dentro da janela de 24 h os dois valem. */}
-        <GravarAudio key={fio.id} fioId={fio.id} />
+        <GravarAudio key={fioId} fioId={fioId} />
         <Button
           type="submit"
           size="icon"

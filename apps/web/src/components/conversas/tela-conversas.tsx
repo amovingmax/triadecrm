@@ -487,7 +487,7 @@ export function TelaConversas({
         ) : aba === 'fora' ? (
           ehCelular && !foraId ? null : (
             <section
-              aria-label="Conversa de número fora da base"
+              aria-label="Conversa com cliente"
               className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden"
             >
               {foraAberta ? (
@@ -614,7 +614,9 @@ function Abas({
           { id: 'conversas', rotulo: 'Conversas' },
           { id: 'responderam', rotulo: 'Responderam', contagem: esperando },
           { id: 'aprovar', rotulo: 'Aprovar', contagem: naFila },
-          { id: 'fora', rotulo: 'Fora da base', contagem: foraDaBase },
+          // "Clientes", e não "Fora da base" (01/10/2026): é o nome do que chega
+          // aqui na prática — gente que escreveu e não é lead.
+          { id: 'fora', rotulo: 'Clientes', contagem: foraDaBase },
           // SEM CONTAGEM, de propósito: um número aqui diria "trabalho parado",
           // e o feed não é fila — a maior parte das automáticas não pede nada de
           // ninguém. Quem cobra ação é o Meu dia e a aba "Responderam".

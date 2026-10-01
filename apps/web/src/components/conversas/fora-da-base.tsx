@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Link2, Phone, UserPlus } from 'lucide-react';
+import { Archive, ArrowLeft, Link2, Phone, UserPlus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
+import { iniciaisDe } from '@/lib/iniciais';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,8 +20,9 @@ import {
 import { buscarAlvos } from '@/components/registro/alvos';
 import { DEBOUNCE_BUSCA_MS, type SugestaoDeAlvo } from '@/components/registro/tipos';
 
-import { ErroDaConversa } from './acoes';
-import { CHAVE_CONVERSAS } from './dados';
+import { arquivarConversa, ErroDaConversa } from './acoes';
+import { CHAVE_CONVERSAS, mensagemDoErro } from './dados';
+import { EnviarModelo } from './enviar-modelo';
 import {
   carregarMensagensDoFio,
   chaveDasMensagensDoFio,
@@ -31,16 +33,40 @@ import {
   type ResultadoDaFicha,
 } from './fora-da-base-dados';
 import { rotuloDoDia } from './formatos';
+import { Janela24h } from './janela-24h';
 import { Mensagem } from './mensagem-do-fio';
-import { montarMensagens, type FioCru } from './mensagens';
+import {
+  estadoDaJanela,
+  JANELA_APERTADA_MIN,
+  montarMensagens,
+  podeEscreverLivre,
+  type FioCru,
+} from './mensagens';
 import type { CatalogosConversas } from './montagem';
+import { TextoLivre } from './responder';
 
 /**
- * A aba "Fora da base": quem escreveu para o número da KOMUNE e não é ficha.
+ * O nome que a pessoa deixou no perfil do WhatsApp, ou o final do número.
  *
- * À esquerda, uma linha por conversa (o final do número e a última mensagem). À
- * direita, as mensagens e as duas saídas — ligar a uma ficha que já existe ou criar a
- * ficha. Ligada, a conversa sai daqui e abre na aba Conversas, na ficha.
+ * O nome do perfil é o que o time reconhece ("Maria Souza"), e é o que o
+ * próprio WhatsApp mostra no celular. O número inteiro não aparece: a base lê
+ * telefone mascarado (RF-BAS-14), e responder não precisa dele.
+ */
+export function nomeDoCliente(fio: FioCru): string {
+  return fio.peer_nome?.trim() || `Número ${finalDoNumero(fio.peer_phone_e164)}`;
+}
+
+/**
+ * A aba "Clientes" (era "Fora da base"): quem escreveu para o número da KOMUNE
+ * e não é parceiro.
+ *
+ * O QUE MUDOU EM 01/10/2026. Rafael: "adeque o crm pra responder clientes
+ * normais, oq vem 'fora da base' em conversas, vem pessoas q n são leads". O
+ * número vive só na Cloud API desde 14/09, então cliente da plataforma e
+ * curioso também chegam aqui — e a aba só sabia fazer deles uma ficha. Agora a
+ * conversa se RESPONDE aqui mesmo, sem virar parceiro nem entrar em funil; e
+ * "virar parceiro" continua a um botão, para o fornecedor que escreveu antes de
+ * estar na base.
  */
 export function ListaForaDaBase({
   fios,
@@ -54,51 +80,62 @@ export function ListaForaDaBase({
   if (fios.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
-        <p className="font-heading font-medium">Ninguém de fora da base escreveu</p>
+        <p className="font-medium">Nenhum cliente esperando</p>
         <p className="max-w-xs text-sm text-muted-foreground">
-          Quando um número que não é ficha mandar mensagem para a KOMUNE, a conversa aparece aqui
-          para você criar a ficha ou ligar a uma que já existe.
+          Quem escrever para a KOMUNE e não for parceiro aparece aqui: cliente da plataforma,
+          curioso ou fornecedor que ainda não está na base.
         </p>
       </div>
     );
   }
   return (
-    <ul className="flex flex-col">
+    <ul className="flex flex-col gap-1 p-2">
       {fios.map((fio) => {
         const selecionado = fio.id === selecionadoId;
+        const nome = fio.peer_nome?.trim();
         return (
-          <li key={fio.id} className="border-b border-hairline last:border-b-0">
+          <li key={fio.id}>
             <button
               type="button"
               onClick={() => aoEscolher(fio.id)}
               aria-current={selecionado ? 'true' : undefined}
               className={cn(
-                'flex min-h-[4.25rem] w-full items-center gap-3 px-4 py-3 text-left outline-none',
-                'hover:bg-muted/50 focus-visible:bg-muted/60',
+                'flex min-h-16 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors',
+                'hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50',
                 selecionado && 'bg-muted',
               )}
             >
-              <Phone className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="min-w-0 flex-1 space-y-1">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
+                {nome ? iniciaisDe(nome) : <Phone className="size-4" aria-hidden="true" />}
+              </span>
+              <span className="min-w-0 flex-1">
                 <span
                   className={cn(
-                    'block truncate text-sm',
+                    'block truncate text-[15px]',
                     fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
                   )}
                 >
-                  Número {finalDoNumero(fio.peer_phone_e164)}
+                  {nomeDoCliente(fio)}
                 </span>
-                <span className="block truncate text-xs text-muted-foreground">
+                <span className="block truncate text-[13px] text-muted-foreground">
+                  {nome ? finalDoNumero(fio.peer_phone_e164) : 'sem nome no perfil'}
                   {fio.unread_count > 0
-                    ? `${fio.unread_count} ${fio.unread_count === 1 ? 'mensagem por ler' : 'mensagens por ler'}`
-                    : 'Sem ficha'}
+                    ? ` · ${fio.unread_count} ${fio.unread_count === 1 ? 'por ler' : 'por ler'}`
+                    : ''}
                 </span>
               </span>
-              {fio.last_message_at ? (
-                <span className="numerico shrink-0 text-xs text-muted-foreground">
-                  {rotuloDoDia(fio.last_message_at).palavra}
-                </span>
-              ) : null}
+              <span className="flex shrink-0 flex-col items-end gap-1">
+                {fio.last_message_at ? (
+                  <span className="numerico text-xs text-muted-foreground">
+                    {rotuloDoDia(fio.last_message_at).palavra}
+                  </span>
+                ) : null}
+                {fio.unread_count > 0 ? (
+                  <span className="numerico inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-menta px-1.5 text-[11px] font-semibold text-menta-tinta">
+                    {fio.unread_count}
+                  </span>
+                ) : null}
+              </span>
             </button>
           </li>
         );
@@ -127,11 +164,14 @@ export function ConversaForaDaBase({
     queryKey: chaveDasMensagensDoFio(fio.id),
     queryFn: () => carregarMensagensDoFio(fio.id),
   });
+  const [virando, setVirando] = useState(false);
   const [modo, setModo] = useState<'criar' | 'ligar'>('criar');
+  const janela = estadoDaJanela(fio.window_expires_at);
+  const nome = fio.peer_nome?.trim();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex items-center gap-2 border-b border-hairline px-4 py-3">
+      <header className="flex items-center gap-3 border-b border-hairline px-4 py-3">
         <Button
           type="button"
           variant="ghost"
@@ -142,15 +182,86 @@ export function ConversaForaDaBase({
         >
           <ArrowLeft aria-hidden="true" />
         </Button>
-        <div className="min-w-0">
-          <p className="truncate font-heading font-medium">
-            Número {finalDoNumero(fio.peer_phone_e164)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Escreveu para a KOMUNE e ainda não é ficha.
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
+          {nome ? iniciaisDe(nome) : <Phone className="size-4" aria-hidden="true" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-semibold">{nomeDoCliente(fio)}</p>
+          <p className="truncate text-[13px] text-muted-foreground">
+            {nome ? `${finalDoNumero(fio.peer_phone_e164)} · ` : ''}não é parceiro
           </p>
         </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {virando ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="toque h-11 md:h-8"
+              onClick={() => setVirando(true)}
+              title="É fornecedor, produtor ou cerimonialista? Leve para a base."
+            >
+              <UserPlus aria-hidden="true" />
+              <span className="hidden sm:inline">Virar parceiro</span>
+              <span className="sr-only sm:hidden">Virar parceiro</span>
+            </Button>
+          )}
+          <ArquivarCliente fio={fio} />
+        </div>
       </header>
+
+      {/* "Virar parceiro" é a exceção: quem escreve aqui quase sempre é cliente,
+          e cliente se responde, não se cadastra. O formulário só abre a pedido. */}
+      {virando ? (
+        <section
+          aria-label="Levar para a base de parceiros"
+          className="space-y-3 border-b border-hairline bg-muted/30 px-4 py-4"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Levar para a base de parceiros</p>
+              <p className="text-xs text-muted-foreground">
+                Só para fornecedor, produtor ou cerimonialista. Cliente se responde aqui mesmo.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="toque size-9 shrink-0"
+              onClick={() => setVirando(false)}
+            >
+              <X aria-hidden="true" />
+              <span className="sr-only">Fechar</span>
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={modo === 'criar' ? 'default' : 'outline'}
+              className="toque h-11 md:h-9"
+              onClick={() => setModo('criar')}
+            >
+              <UserPlus aria-hidden="true" />
+              Criar parceiro
+            </Button>
+            <Button
+              type="button"
+              variant={modo === 'ligar' ? 'default' : 'outline'}
+              className="toque h-11 md:h-9"
+              onClick={() => setModo('ligar')}
+            >
+              <Link2 aria-hidden="true" />
+              Ligar a um que já existe
+            </Button>
+          </div>
+          {modo === 'criar' ? (
+            <CriarFicha fio={fio} catalogos={catalogos} aoLigar={aoLigar} />
+          ) : (
+            <LigarFicha fio={fio} aoLigar={aoLigar} />
+          )}
+        </section>
+      ) : null}
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-4">
         {mensagens.isPending ? (
@@ -162,43 +273,65 @@ export function ConversaForaDaBase({
               : 'Não deu para ler as mensagens.'}
           </p>
         ) : (
+          // O nome do cliente em cima do balão dele: sem isto, a mensagem de quem
+          // não é parceiro aparecia assinada "O parceiro".
           montarMensagens(mensagens.data, nomeDaPessoa).map((m) => (
-            <Mensagem key={m.id} mensagem={m} />
+            <Mensagem key={m.id} mensagem={m} nomeDoParceiro={nome || 'Cliente'} />
           ))
         )}
       </div>
 
-      <section
-        aria-label="Criar ou ligar a ficha"
-        className="space-y-3 border-t border-hairline px-4 py-4"
-      >
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant={modo === 'criar' ? 'default' : 'outline'}
-            className="toque h-11 md:h-9"
-            onClick={() => setModo('criar')}
-          >
-            <UserPlus aria-hidden="true" />
-            Criar ficha
-          </Button>
-          <Button
-            type="button"
-            variant={modo === 'ligar' ? 'default' : 'outline'}
-            className="toque h-11 md:h-9"
-            onClick={() => setModo('ligar')}
-          >
-            <Link2 aria-hidden="true" />
-            Ligar a uma ficha
-          </Button>
-        </div>
-        {modo === 'criar' ? (
-          <CriarFicha fio={fio} catalogos={catalogos} aoLigar={aoLigar} />
+      {/* A caixa de resposta, como em qualquer conversa: dentro das 24 h desde a
+          última mensagem da pessoa, texto livre; depois disso o WhatsApp só
+          deixa abrir com um modelo aprovado (o cumprimento do período). */}
+      <div className="max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-3 py-2.5 md:px-5 md:py-3">
+        {janela.situacao === 'aberta' && janela.restanteMin <= JANELA_APERTADA_MIN ? (
+          <Janela24h estado={janela} />
+        ) : null}
+        {podeEscreverLivre(janela) ? (
+          <TextoLivre fioId={fio.id} atualizar={[chaveDasMensagensDoFio(fio.id)]} />
         ) : (
-          <LigarFicha fio={fio} aoLigar={aoLigar} />
+          <EnviarModelo destino={{ tipo: 'conversa', conversaId: fio.id }} />
         )}
-      </section>
+      </div>
     </div>
+  );
+}
+
+/**
+ * Arquivar: tira da lista e não apaga nada. Atendeu o cliente, arquiva — e se
+ * ele escrever de novo, a conversa volta sozinha (`messages_desarquiva`).
+ */
+function ArquivarCliente({ fio }: { fio: FioCru }) {
+  const clientes = useQueryClient();
+  const acao = useMutation({
+    mutationFn: (arquivar: boolean) => arquivarConversa(fio.id, arquivar),
+    onSuccess: (_r, arquivar) => {
+      void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
+      if (arquivar) {
+        toast.success('Conversa arquivada.', {
+          description: 'Ela volta sozinha se a pessoa escrever.',
+          action: { label: 'Desfazer', onClick: () => acao.mutate(false) },
+        });
+      } else {
+        toast.success('Conversa de volta na lista.');
+      }
+    },
+    onError: (e) => toast.error(mensagemDoErro(e)),
+  });
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="toque size-9"
+      disabled={acao.isPending}
+      onClick={() => acao.mutate(true)}
+      title="Arquivar: tira da lista, não apaga nada"
+    >
+      <Archive aria-hidden="true" />
+      <span className="sr-only">Arquivar conversa</span>
+    </Button>
   );
 }
 
@@ -240,7 +373,7 @@ function CriarFicha({
     mutationFn: () =>
       criarFichaDaConversa({ fioId: fio.id, nome, categoriaId: categoriaId ?? 0, tipo }),
     onSuccess: (r) => {
-      if (!depois(r, 'Ficha criada. A conversa agora está nela.')) setRecusa(r);
+      if (!depois(r, 'Parceiro criado. A conversa agora está na ficha dele.')) setRecusa(r);
     },
     onError: (erro) =>
       toast.error(erro instanceof ErroDaConversa ? erro.message : 'Não deu para criar a ficha.'),
@@ -248,7 +381,7 @@ function CriarFicha({
   const ligarAExistente = useMutation({
     mutationFn: (organizacaoId: string) => vincularConversa(fio.id, organizacaoId),
     onSuccess: (r) => {
-      if (!depois(r, 'Conversa ligada à ficha que já existia.')) setRecusa(r);
+      if (!depois(r, 'Conversa ligada ao parceiro que já existia.')) setRecusa(r);
     },
   });
 
@@ -330,7 +463,7 @@ function CriarFicha({
 
       <div className="sm:col-span-2">
         <Button type="submit" className="toque h-11 md:h-9" disabled={!pode}>
-          {criar.isPending ? 'Criando...' : 'Criar ficha com este número'}
+          {criar.isPending ? 'Criando...' : 'Criar parceiro com este número'}
         </Button>
       </div>
     </form>
@@ -365,7 +498,7 @@ function LigarFicha({ fio, aoLigar }: { fio: FioCru; aoLigar: (organizacaoId: st
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={`busca-${fio.id}`}>Procurar a ficha</Label>
+      <Label htmlFor={`busca-${fio.id}`}>Procurar o parceiro</Label>
       <Input
         id={`busca-${fio.id}`}
         value={texto}

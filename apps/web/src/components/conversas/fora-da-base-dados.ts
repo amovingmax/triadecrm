@@ -17,7 +17,9 @@ import type { FioCru, MensagemCrua } from './mensagens';
 
 export function conversasForaDaBase(fios: readonly FioCru[]): FioCru[] {
   return fios
-    .filter((f) => f.organization_id === null)
+    // Arquivada sai da lista (01/10/2026): atendido o cliente, ele some daqui, e
+    // volta sozinho se escrever de novo (`messages_desarquiva`).
+    .filter((f) => f.organization_id === null && f.arquivada_em === null)
     .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''));
 }
 

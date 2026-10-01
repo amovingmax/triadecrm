@@ -5466,4 +5466,36 @@ texto legível, divulgação progressiva, estado de hover) e os tokens do Design
   - A rota `/auth/dev` aparece no build local só porque o arquivo existe nesta máquina
     (fora do git). Ela não vai para a Vercel e responde 404 fora de `next dev`.
 - Nada foi enviado ao GitHub nem ao Supabase de produção.
+### 01/10/2026 — Responder clientes pelo CRM (a aba "Fora da base" vira "Clientes")
 
+Pedido do Rafael: "adeque o crm pra responder clientes normais, oq vem 'fora da
+base' em conversas, vem pessoas q n são leads, e como unificamos o wpp no crm, só
+conseguimos responder por ali". Desde 14/09 o número da KOMUNE vive só na Cloud
+API, então cliente da plataforma e curioso também chegam ao CRM — sem ficha. A
+aba só sabia transformar a pessoa em parceiro; não havia onde responder.
+
+- **A aba se chama "Clientes"** e mostra o nome que a pessoa deixou no perfil
+  do WhatsApp (com o final do número), em vez de "Número terminado em 4698".
+- **A conversa se responde ali mesmo**, sem virar parceiro e sem entrar em
+  funil: texto livre, áudio e respostas prontas dentro das 24 h desde a última
+  mensagem da pessoa; depois disso, o cumprimento do período ("Bom dia!") para
+  reabrir, como já acontece com parceiro. Cada mensagem sai assinada com o
+  primeiro nome de quem enviou.
+- **Arquivar** tira o cliente atendido da lista (volta sozinho se ele escrever).
+- **"Virar parceiro"** continua existindo, num botão: é para o fornecedor que
+  escreveu antes de estar na base, e não abre mais por padrão.
+- **Banco** (`20261003100000_responder_quem_nao_e_parceiro.sql`): duas funções
+  novas, `wa_preparar_envio_na_conversa` e `wa_enviar_modelo_na_conversa`, o
+  caminho de fora da janela de 24 h para conversa sem ficha. Elas não criam
+  ficha nem negócio, não deixam enxergar conversa que a pessoa não vê, e
+  recusam conversa com ficha (essa tem o caminho dela). Dentro da janela, o
+  texto livre sem ficha já passava pela porteira do banco; faltava a tela.
+- pgTAP `95_responder_quem_nao_e_parceiro.sql` (13 testes). Suíte inteira num
+  banco local zerado: 3.308 testes, todos passando. Typecheck, lint, 996 testes
+  do site e build com o comando da Vercel.
+
+**Precisa de decisão humana:** com o **Lead automático** ligado, quem escreve
+texto livre sem escolher uma opção do menu de entrada vira parceiro sozinho —
+inclusive cliente. Hoje ele está desligado em produção (é por isso que os
+clientes caem nesta aba). Se for ligado, vale mudar a regra para criar parceiro
+só quando a pessoa escolher "Quero ser fornecedor ou parceiro".
