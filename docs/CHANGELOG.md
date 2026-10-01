@@ -5562,8 +5562,11 @@ em seguida "Nenhum horário livre neste dia". Decisão do Janio ao ver a correç
 - Suíte pgTAP inteira num banco local zerado, subido como o CI sobe: 3.334 de
   3.334, em 91 arquivos.
 
-**Pendente:** não está em produção. Falta commit, envio, aplicar a migração em
-produção e deploy. A ordem importa: a migração antes do site.
+**Em produção:** a migração `20261003120000` foi aplicada em 01/10/2026 pelo
+Janio, e o erro da sala deixou de aparecer com o site que já estava no ar.
+
+**Pendente:** o deploy do site, que traz o campo opcional da sala e a correção
+do "Nenhum horário livre". Entra no próximo deploy feito a partir da `main`.
 
 **Precisa de decisão humana:**
 - Isto muda uma regra do ADR-15 ("sem sala, não marca"), que passa a valer só
