@@ -1,6 +1,7 @@
+import { escolherNegocio, type NegocioCru } from '@/components/conversas/montagem';
 import { createClient } from '@/lib/supabase/client';
 
-import { type ConversaComResposta } from './regra';
+import { type ConversaComResposta, type FichaDoAviso } from './regra';
 
 /**
  * As leituras do aviso de resposta. SÓ leituras.
@@ -137,22 +138,63 @@ export async function lerUltimasMensagens(
   return ultimas;
 }
 
-/** Os nomes das fichas, só quando há o que avisar. Falha vira mapa vazio: o aviso sai sem nome. */
-export async function lerNomesDasFichas(ids: readonly string[]): Promise<Map<string, string>> {
-  const nomes = new Map<string, string>();
-  if (ids.length === 0) return nomes;
+type NegocioDoAviso = Pick<NegocioCru, 'status' | 'updated_at'> & {
+  organization_id: string;
+  stages: { name: string | null } | null;
+};
 
+/**
+ * O que o cartão diz de cada parceiro: o nome, a categoria e a etapa do funil.
+ * Só quando há o que avisar, e só para as fichas que vão virar cartão.
+ *
+ * Duas leituras em paralelo, sob a mesma RLS da tela. A etapa é a do negócio em
+ * foco, escolhido por `escolherNegocio` — a mesma escolha da lista de Conversas,
+ * para o cartão não dizer "Respondeu" de um parceiro que a lista mostra em
+ * "Autorizou". Cada leitura falha sozinha: sem a ficha o cartão sai sem nome e
+ * sem categoria; sem os negócios, sem etapa.
+ */
+export async function lerFichasDoAviso(ids: readonly string[]): Promise<Map<string, FichaDoAviso>> {
+  const fichas = new Map<string, FichaDoAviso>();
+  if (ids.length === 0) return fichas;
+
+  const unicos = [...new Set(ids)];
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from('organizations_view')
-    .select('id, name')
-    .in('id', [...new Set(ids)]);
+  const [organizacoes, negocios] = await Promise.all([
+    supabase.from('organizations_view').select('id, name, primary_category_name').in('id', unicos),
+    supabase
+      .from('deals')
+      .select('organization_id, status, updated_at, stages(name)')
+      .in('organization_id', unicos),
+  ]);
 
-  if (error) return nomes;
-  for (const linha of (data ?? []) as { id: string | null; name: string | null }[]) {
-    if (linha.id && linha.name) nomes.set(linha.id, linha.name);
+  const porOrganizacao = new Map<string, NegocioDoAviso[]>();
+  if (!negocios.error) {
+    for (const negocio of (negocios.data ?? []) as unknown as NegocioDoAviso[]) {
+      const lista = porOrganizacao.get(negocio.organization_id) ?? [];
+      lista.push(negocio);
+      porOrganizacao.set(negocio.organization_id, lista);
+    }
   }
-  return nomes;
+
+  const linhas = organizacoes.error
+    ? []
+    : ((organizacoes.data ?? []) as {
+        id: string | null;
+        name: string | null;
+        primary_category_name: string | null;
+      }[]);
+  const porId = new Map(linhas.flatMap((o) => (o.id ? [[o.id, o] as const] : [])));
+
+  for (const id of unicos) {
+    const organizacao = porId.get(id);
+    const emFoco = escolherNegocio(porOrganizacao.get(id) ?? []);
+    fichas.set(id, {
+      nome: organizacao?.name ?? null,
+      categoria: organizacao?.primary_category_name ?? null,
+      etapa: emFoco?.stages?.name ?? null,
+    });
+  }
+  return fichas;
 }
 
 /**

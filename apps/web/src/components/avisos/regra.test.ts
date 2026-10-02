@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   aindaNaoAbertas,
   chegaramAgora,
+  contextoDoAviso,
   destinoDoAviso,
   ehParaMim,
   maisRecente,
@@ -13,8 +14,10 @@ import {
   recebeAvisos,
   respostasParaMim,
   rotuloDasRespostas,
+  seloDoAviso,
   semOQueOPisoCobre,
   textoDoAviso,
+  tipoDoAviso,
   ultimaChegada,
   type ConversaComResposta,
   type QuemSouEu,
@@ -321,6 +324,61 @@ describe('o texto da notificação do sistema', () => {
     const texto = textoDoAviso(['A', 'B', 'C', 'D', 'E']);
     expect(texto.titulo).toBe('5 conversas com mensagem nova');
     expect(texto.corpo).toBe('A, B, C e mais 2.');
+  });
+});
+
+describe('parceiro ou cliente no cartão', () => {
+  const parceiro = conversa({ organizacaoId: 'org-1' });
+  const cliente = conversa({
+    organizacaoId: null,
+    nomeDoPerfil: 'Carla Cliente',
+    telefone: '+5584900000002',
+  });
+
+  it('quem tem ficha é parceiro; quem não tem é cliente', () => {
+    expect(tipoDoAviso(parceiro)).toBe('parceiro');
+    expect(tipoDoAviso(cliente)).toBe('cliente');
+  });
+
+  it('o selo diz quem escreveu, e continua dizendo que é mensagem', () => {
+    expect(seloDoAviso('parceiro')).toBe('Mensagem de parceiro');
+    expect(seloDoAviso('cliente')).toBe('Mensagem de cliente');
+  });
+
+  it('o parceiro leva a categoria e a etapa do funil', () => {
+    const ficha = {
+      nome: 'Jôsy Buffet',
+      categoria: 'Buffet adulto/corporativo',
+      etapa: 'Autorizou',
+    };
+    expect(contextoDoAviso(parceiro, ficha)).toEqual({
+      texto: 'Buffet adulto/corporativo',
+      destaque: 'Autorizou',
+    });
+  });
+
+  it('parceiro sem negócio, ou com a leitura falhando, não inventa etapa', () => {
+    expect(contextoDoAviso(parceiro, { nome: 'X', categoria: 'DJs', etapa: null })).toEqual({
+      texto: 'DJs',
+      destaque: null,
+    });
+    expect(contextoDoAviso(parceiro, null)).toEqual({ texto: null, destaque: null });
+  });
+
+  it('o cliente diz que é cliente do app e mostra só o fim do número', () => {
+    const contexto = contextoDoAviso(cliente, null);
+    expect(contexto).toEqual({ texto: 'Cliente do app', destaque: 'final 0002' });
+    // RF-BAS-14: o telefone inteiro nunca aparece no aviso.
+    expect(JSON.stringify(contexto)).not.toContain('84900000002');
+  });
+
+  it('cliente sem nome no perfil não repete o número: o nome do cartão já é ele', () => {
+    const semNome = conversa({
+      organizacaoId: null,
+      nomeDoPerfil: null,
+      telefone: '+5584900000002',
+    });
+    expect(contextoDoAviso(semNome, null)).toEqual({ texto: 'Cliente do app', destaque: null });
   });
 });
 

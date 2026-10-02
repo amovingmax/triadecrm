@@ -50,10 +50,22 @@ A primeira versão usava o aviso flutuante padrão do CRM, uma linha pequena no 
 
 O cartão fica no canto de cima, à direita no desktop e de ponta a ponta no celular. Ele diz, nesta ordem:
 
-1. **Que é mensagem nova**: faixa em menta na borda e o selo "Nova mensagem", com a hora.
-2. **De quem**: o nome em destaque, com as iniciais e o selo do WhatsApp.
+1. **Que é mensagem nova, e de quem**: faixa em menta na borda e o selo "Mensagem de parceiro" ou "Mensagem de cliente", com a hora.
+2. **Quem é**: o nome em destaque, com as iniciais, e uma linha de contexto logo abaixo.
 3. **O quê**: o começo do texto, em até duas linhas. Sem texto, diz o que chegou ("Mensagem de áudio", "Imagem", "Documento").
 4. **O que fazer**: o botão Responder, que abre a conversa.
+
+**Parceiro ou cliente** (Janio, 02/10/2026: "poderíamos fazer uma identidade visual nas notificações para clientes e parceiros?"). O cartão diz quem escreveu por três sinais, sem cor nova: a menta continua sendo o único acento e a cromia do produto continua térmica.
+
+| Sinal | Parceiro | Cliente |
+|---|---|---|
+| Selo | "Mensagem de parceiro" | "Mensagem de cliente" |
+| Avatar | Quadrado de canto macio, com uma loja no ombro | Redondo, com uma pessoa no ombro |
+| Linha sob o nome | Categoria e etapa do funil ("Buffet adulto/corporativo · Autorizou") | "Cliente do app · final 0002" |
+
+A etapa é a do negócio em foco, escolhido pela mesma função da lista de Conversas (`escolherNegocio`), para o cartão e a lista nunca discordarem. A categoria se corta se for longa; a etapa fica sempre inteira. Do cliente aparece só o fim do número, e nem isso quando ele não tem nome no perfil (o nome do cartão já é "Número terminado em 0002"). O selo manteve a palavra "mensagem": o cartão nasceu para deixar claro que chegou mensagem.
+
+Isso pede uma leitura a mais, só quando um cartão vai aparecer: os negócios das fichas avisadas, com o nome da etapa. Continua sendo só leitura.
 
 Como ele se comporta:
 
@@ -101,7 +113,7 @@ Novo, em `apps/web/src/components/avisos/`:
 | Arquivo | O que tem |
 |---|---|
 | `regra.ts`, `regra.test.ts` | A regra, o texto, a prévia, o destino e o marco. Puro, com Vitest. |
-| `dados.ts` | As cinco leituras. Nenhuma escrita. |
+| `dados.ts` | As leituras (conversas, última chegada, última mensagem, ficha com categoria e etapa, pessoas ativas). Nenhuma escrita. |
 | `preferencias.ts` | Silenciado, piso, conversas abertas e convite dispensado, em `localStorage`, com chave por pessoa. |
 | `marca-de-nova.tsx` | A faixa e o selo "Nova" das linhas da lista. |
 | `aviso-do-navegador.ts` | Casca fina da Notification API. |

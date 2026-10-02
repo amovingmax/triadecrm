@@ -1,6 +1,6 @@
 'use client';
 
-import { BellRing, MessageCircle, Phone, X } from 'lucide-react';
+import { BellRing, Phone, Store, UserRound, X } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { hora } from '@/components/conversas/formatos';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 
 import { avisarDaPermissao } from './convite-de-avisos';
 import { useAvisos, type CartaoDeAviso } from './provedor-avisos';
+import { seloDoAviso } from './regra';
 
 /**
  * A pilha de avisos: os cartões "Nova mensagem" no canto de cima da tela.
@@ -27,6 +28,19 @@ import { useAvisos, type CartaoDeAviso } from './provedor-avisos';
  * única cor da casca), DE QUEM (o nome em destaque), O QUÊ (o começo do texto) e
  * o que fazer (Responder). É o que um aplicativo de mensagens mostra, e é o que
  * o time já sabe ler.
+ *
+ * ===========================================================================
+ * PARCEIRO OU CLIENTE (02/10/2026)
+ * ===========================================================================
+ * Janio: "poderíamos fazer uma identidade visual nas notificações para clientes
+ * e parceiros?". O cartão diz quem escreveu por três sinais, sem cor nova — a
+ * menta continua sendo o único acento, e a cromia do produto continua térmica:
+ *   - o SELO diz "Mensagem de parceiro" ou "Mensagem de cliente";
+ *   - o AVATAR do parceiro é um quadrado de canto macio com uma loja no ombro
+ *     (é uma empresa); o do cliente é redondo, com uma pessoa;
+ *   - a LINHA SOB O NOME traz a categoria e a etapa do parceiro, ou "Cliente do
+ *     app" e o fim do número.
+ * A regra de cada texto está em `regra.ts` (`seloDoAviso`, `contextoDoAviso`).
  *
  * ===========================================================================
  * COMO ELE SE COMPORTA
@@ -230,6 +244,9 @@ function Cartao({
   }, [contando, aoDispensar, cartao.chegouEm]);
 
   const semNome = cartao.nome.startsWith('Número ');
+  const ehParceiro = cartao.tipo === 'parceiro';
+  const IconeDoTipo = ehParceiro ? Store : UserRound;
+  const { texto: contexto, destaque } = cartao.contexto;
 
   return (
     <Moldura
@@ -244,12 +261,24 @@ function Cartao({
       onBlur={() => setSegurando(false)}
     >
       <div className="flex items-start gap-3 py-3.5 pr-2 pl-5">
-        <span className="relative mt-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold">
+        {/* O FORMATO diz quem é antes de qualquer leitura: quadrado de canto
+            macio é empresa (parceiro), redondo é gente (cliente). */}
+        <span
+          className={cn(
+            // O contorno é o que faz o formato aparecer: o `bg-muted` sozinho se
+            // confunde com o fundo do cartão no tema escuro.
+            'relative mt-0.5 flex size-12 shrink-0 items-center justify-center bg-foreground/[0.07] text-sm font-semibold ring-1 ring-foreground/20',
+            // `rounded-md` (10px), e não `rounded-xl`: no Tríade o `xl` vale 24px,
+            // e num avatar de 48px isso é um círculo — o parceiro sairia igual
+            // ao cliente.
+            ehParceiro ? 'rounded-md' : 'rounded-full',
+          )}
+        >
           {semNome ? <Phone className="size-4.5" aria-hidden="true" /> : iniciaisDe(cartao.nome)}
-          {/* O selo do canal no ombro do avatar, para fora dele: diz "WhatsApp"
-              sem gastar uma linha e sem cobrir as iniciais. */}
-          <span className="absolute -right-1 -bottom-1 flex size-[18px] items-center justify-center rounded-full bg-menta text-menta-tinta ring-2 ring-popover">
-            <MessageCircle className="size-2.5" aria-hidden="true" strokeWidth={2.75} />
+          {/* O mesmo recado no ombro do avatar, para fora dele e sem cobrir as
+              iniciais: a loja do parceiro, a pessoa do cliente. */}
+          <span className="absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-full bg-menta text-menta-tinta ring-2 ring-popover">
+            <IconeDoTipo className="size-3" aria-hidden="true" strokeWidth={2.5} />
           </span>
         </span>
 
@@ -262,13 +291,31 @@ function Cartao({
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-menta-tinta opacity-60 motion-reduce:hidden" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-menta-tinta" />
               </span>
-              Nova mensagem
+              {seloDoAviso(cartao.tipo)}
             </span>
             <span className="numerico text-xs text-muted-foreground">{hora(cartao.chegouEm)}</span>
           </p>
           <p className="mt-1 truncate text-[15px] leading-snug font-semibold">{cartao.nome}</p>
+          {/* Quem é, numa linha: a categoria se corta, a etapa (ou o fim do
+              número) fica sempre inteira. Some quando não se sabe nada. */}
+          {contexto || destaque ? (
+            <p className="flex items-center gap-1.5 text-xs leading-snug text-muted-foreground">
+              {contexto ? <span className="min-w-0 truncate">{contexto}</span> : null}
+              {contexto && destaque ? <span aria-hidden="true">·</span> : null}
+              {destaque ? (
+                <span
+                  className={cn(
+                    'shrink-0',
+                    ehParceiro ? 'font-medium text-foreground' : 'numerico',
+                  )}
+                >
+                  {destaque}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
           {cartao.previa ? (
-            <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-muted-foreground">
+            <p className="mt-1 line-clamp-2 text-sm leading-snug text-foreground/90">
               {cartao.previa}
             </p>
           ) : null}

@@ -5613,8 +5613,9 @@ essa mensagem deve chegar para a aba de conversas em 'todos'". Desenho em
 `docs/superpowers/specs/2026-10-01-avisos-de-resposta-design.md`.
 
 **Feito em 01/10 e no ar desde 02/10/2026, 12:00, a pedido do Janio, em cima da
-`main` do dia (`8e9c134`). Só o site muda. Sem migração. O último item da lista
-(cliente avisa todos os operadores) ainda não subiu.**
+`main` do dia (`8e9c134`). Só o site muda. Sem migração. O fim da lista
+(cliente avisa todos os operadores, e o cartão que diz se é parceiro ou
+cliente) ainda não subiu.**
 
 - **De quem é o aviso.** Conversa em que alguém do time já escreveu: só quem
   atende. Conversa em que ninguém escreveu ainda (cliente novo, resposta ao
@@ -5724,6 +5725,31 @@ essa mensagem deve chegar para a aba de conversas em 'todos'". Desenho em
     atendida pelo gestor avisa também a SDR, com cartão; parceiro atendido pela
     SDR não avisa o gestor; a SDR abre a cliente e o número dela cai, o do
     gestor não; fila de saída do WhatsApp vazia.
+- **02/10, o cartão diz se é parceiro ou cliente** (ainda fora de produção).
+  Janio: "poderíamos fazer uma identidade visual nas notificações para clientes
+  e parceiros?", e escolheu, das seis sugestões, o selo, o avatar e a linha de
+  contexto "no pop-up de notificação".
+  - Selo: "Mensagem de parceiro" ou "Mensagem de cliente" (era "Nova mensagem").
+  - Avatar: quadrado de canto macio com uma loja para o parceiro; redondo com
+    uma pessoa para o cliente. Saiu o selo do WhatsApp do ombro do avatar.
+  - Linha sob o nome: categoria e etapa do funil do parceiro; "Cliente do app"
+    e o fim do número do cliente. O telefone inteiro continua fora (RF-BAS-14).
+  - Sem cor nova. A lista, a marca "Nova" e a notificação do navegador não
+    mudaram.
+  - Uma leitura a mais, só quando um cartão aparece: os negócios das fichas
+    avisadas, com o nome da etapa. A etapa sai de `escolherNegocio`, a mesma
+    escolha da lista de Conversas (a função passou a aceitar só status e data).
+  - Arquivos: `avisos/regra.ts` (`tipoDoAviso`, `seloDoAviso`,
+    `contextoDoAviso`), `dados.ts` (`lerFichasDoAviso` no lugar de
+    `lerNomesDasFichas`), `provedor-avisos.tsx`, `pilha-de-avisos.tsx` e
+    `conversas/montagem.ts`.
+  - Testes: Vitest 1.064 no site (6 novos), lint, typecheck e build. No Chrome,
+    contra o Supabase local, 17 conferências: selo, categoria, etapa igual à do
+    banco, formato do avatar medido pelo canto, telefone ausente, três cartões
+    e "Mais 1", Responder abrindo a conversa certa, celular em 390 px e fila de
+    saída do WhatsApp vazia. A prova pegou dois defeitos de desenho, corrigidos
+    antes do commit: o avatar sumia no tema escuro, e `rounded-xl` (24px no
+    Tríade) deixava o avatar do parceiro redondo como o do cliente.
 
 **Não foi conferido:** embaixador, leitura e financeiro na tela (não há usuário
 de teste desses papéis no banco local; a regra deles está no Vitest); aba

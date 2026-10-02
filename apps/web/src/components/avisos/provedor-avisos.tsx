@@ -27,7 +27,7 @@ import {
 import {
   ANTES_DE_TUDO,
   lerConversasComResposta,
-  lerNomesDasFichas,
+  lerFichasDoAviso,
   lerPessoasAtivas,
   lerUltimaChegada,
   lerUltimasMensagens,
@@ -47,6 +47,7 @@ import {
 import {
   aindaNaoAbertas,
   chegaramAgora,
+  contextoDoAviso,
   destinoDoAviso,
   maisRecente,
   marcaDoAviso,
@@ -56,7 +57,10 @@ import {
   recebeAvisos,
   respostasParaMim,
   textoDoAviso,
+  tipoDoAviso,
+  type ContextoDoAviso,
   type ConversaComResposta,
+  type TipoDoAviso,
 } from './regra';
 
 /**
@@ -113,7 +117,11 @@ import {
 export interface CartaoDeAviso {
   readonly conversaId: string;
   readonly organizacaoId: string | null;
+  /** Parceiro (tem ficha) ou cliente: decide o selo e o avatar do cartão. */
+  readonly tipo: TipoDoAviso;
   readonly nome: string;
+  /** A linha sob o nome: categoria e etapa do parceiro, ou "Cliente do app". */
+  readonly contexto: ContextoDoAviso;
   /** O começo da mensagem, ou o que chegou no lugar de texto. `null` = não se sabe. */
   readonly previa: string | null;
   readonly chegouEm: string;
@@ -308,19 +316,19 @@ export function ProvedorDeAvisos({
       if (estaSilenciado(usuarioId)) return;
 
       const fichas = novas.flatMap((c) => (c.organizacaoId ? [c.organizacaoId] : []));
-      const [nomesDasFichas, ultimas] = await Promise.all([
-        lerNomesDasFichas(fichas),
+      const [fichasDoAviso, ultimas] = await Promise.all([
+        lerFichasDoAviso(fichas),
         lerUltimasMensagens(novas.map((c) => c.conversaId)),
       ]);
       const novos = novas.map((c): CartaoDeAviso => {
         const ultima = ultimas.get(c.conversaId);
+        const ficha = c.organizacaoId ? (fichasDoAviso.get(c.organizacaoId) ?? null) : null;
         return {
           conversaId: c.conversaId,
           organizacaoId: c.organizacaoId,
-          nome: nomeDoAviso(
-            c,
-            c.organizacaoId ? (nomesDasFichas.get(c.organizacaoId) ?? null) : null,
-          ),
+          tipo: tipoDoAviso(c),
+          nome: nomeDoAviso(c, ficha?.nome ?? null),
+          contexto: contextoDoAviso(c, ficha),
           previa: previaDaMensagem(ultima?.tipo ?? null, ultima?.corpo ?? null),
           chegouEm: c.chegouEm,
         };

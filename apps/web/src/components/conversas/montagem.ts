@@ -316,15 +316,21 @@ export function montarConversas({
  * conversa precisa da mesma escolha que a lista fez, senão as duas discordariam
  * sobre a etapa e a próxima ação do mesmo parceiro.
  */
-export function escolherNegocio(negocios: NegocioCru[]): NegocioCru | null {
-  let escolhido: NegocioCru | null = null;
+export function escolherNegocio<N extends NegocioParaEscolha>(negocios: readonly N[]): N | null {
+  let escolhido: N | null = null;
   for (const d of negocios) {
     if (!escolhido || melhorNegocio(d, escolhido)) escolhido = d;
   }
   return escolhido;
 }
 
-function melhorNegocio(candidato: NegocioCru, atual: NegocioCru): boolean {
+/**
+ * O que a escolha olha de um negócio. O cartão de aviso (`components/avisos`)
+ * lê só isto, e precisa chegar à MESMA etapa que a lista mostra.
+ */
+type NegocioParaEscolha = Pick<NegocioCru, 'status' | 'updated_at'>;
+
+function melhorNegocio(candidato: NegocioParaEscolha, atual: NegocioParaEscolha): boolean {
   const abertoCandidato = candidato.status === 'open';
   const abertoAtual = atual.status === 'open';
   if (abertoCandidato !== abertoAtual) return abertoCandidato;
@@ -425,9 +431,7 @@ export function esperandoResposta(item: ItemConversa): boolean {
 export function filaDeQuemRespondeu(itens: ItemConversa[]): ItemConversa[] {
   return itens
     .filter(esperandoResposta)
-    .sort((a, b) =>
-      (a.fio?.ultimaEntradaEm ?? '').localeCompare(b.fio?.ultimaEntradaEm ?? ''),
-    );
+    .sort((a, b) => (a.fio?.ultimaEntradaEm ?? '').localeCompare(b.fio?.ultimaEntradaEm ?? ''));
 }
 
 // ---------------------------------------------------------------------------
@@ -750,24 +754,24 @@ export function montarLinhaDoTempo({
   const daAtividade = atividades
     .filter((a) => !(a.message_id && idsDasMensagens.has(a.message_id)))
     .map((a): EventoDaLinha => {
-    const interacao = ehInteracao(a);
-    return {
-      id: `atividade:${a.id}`,
-      genero: interacao ? 'interacao' : 'origem',
-      em: a.occurred_at,
-      titulo: interacao ? ROTULO_TIPO[a.type] : 'Entrou na base',
-      desfecho: a.outcome_id !== null ? (nomeDoDesfecho.get(a.outcome_id) ?? null) : null,
-      detalhe: a.body?.trim() || null,
-      canal: a.channel,
-      tipo: a.type,
-      autor: a.user_id ? (nomeDaPessoa.get(a.user_id) ?? null) : null,
-      autorTipo: autorTipo(a.author_kind),
-      comQuem: comQuemLegivel(a.metadata),
-      duracaoMin: a.duration_min,
-      portaAberta: boleanoDoMeta(a.metadata, 'door_opened'),
-      mensagem: null,
-    };
-  });
+      const interacao = ehInteracao(a);
+      return {
+        id: `atividade:${a.id}`,
+        genero: interacao ? 'interacao' : 'origem',
+        em: a.occurred_at,
+        titulo: interacao ? ROTULO_TIPO[a.type] : 'Entrou na base',
+        desfecho: a.outcome_id !== null ? (nomeDoDesfecho.get(a.outcome_id) ?? null) : null,
+        detalhe: a.body?.trim() || null,
+        canal: a.channel,
+        tipo: a.type,
+        autor: a.user_id ? (nomeDaPessoa.get(a.user_id) ?? null) : null,
+        autorTipo: autorTipo(a.author_kind),
+        comQuem: comQuemLegivel(a.metadata),
+        duracaoMin: a.duration_min,
+        portaAberta: boleanoDoMeta(a.metadata, 'door_opened'),
+        mensagem: null,
+      };
+    });
 
   const daEtapa = historico.map((h): EventoDaLinha => {
     const de = h.from_stage_id !== null ? etapaPorId.get(h.from_stage_id) : undefined;

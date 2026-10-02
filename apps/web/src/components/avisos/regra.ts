@@ -252,6 +252,73 @@ export function nomeDoAviso(conversa: ConversaComResposta, nomeDaFicha: string |
   return nome;
 }
 
+/**
+ * Parceiro ou cliente: quem escreveu.
+ *
+ * ===========================================================================
+ * A IDENTIDADE DO CARTÃO (02/10/2026)
+ * ===========================================================================
+ * Janio: "poderíamos fazer uma identidade visual nas notificações para clientes
+ * e parceiros?". Os dois pedem respostas diferentes — o parceiro está num funil,
+ * com alguém conduzindo; o cliente é quem comprou ingresso e tem uma dúvida — e
+ * o cartão era idêntico para os dois. Agora ele diz quem é por três sinais, e
+ * nenhum deles é cor (a única cromia do produto continua sendo a térmica):
+ *   1. o SELO: "Mensagem de parceiro" ou "Mensagem de cliente";
+ *   2. o AVATAR: quadrado com loja para a empresa, redondo com pessoa para gente;
+ *   3. a LINHA DE CONTEXTO: categoria e etapa do parceiro; para o cliente, que é
+ *      cliente do app e o fim do número.
+ */
+export type TipoDoAviso = 'parceiro' | 'cliente';
+
+export function tipoDoAviso(conversa: Pick<ConversaComResposta, 'organizacaoId'>): TipoDoAviso {
+  return conversa.organizacaoId === null ? 'cliente' : 'parceiro';
+}
+
+/**
+ * O selo do cartão. Mantém a palavra "mensagem": o cartão nasceu para deixar
+ * "muito claro que tem uma nova mensagem", e só "PARCEIRO" não diria isso.
+ */
+export function seloDoAviso(tipo: TipoDoAviso): string {
+  return tipo === 'parceiro' ? 'Mensagem de parceiro' : 'Mensagem de cliente';
+}
+
+/**
+ * A linha sob o nome. `texto` pode ser longo e se corta; `destaque` é curto e
+ * fica sempre inteiro — é a etapa do parceiro, que diz como responder.
+ */
+export interface ContextoDoAviso {
+  readonly texto: string | null;
+  readonly destaque: string | null;
+}
+
+/** O que se sabe do parceiro na hora do aviso. `null` em tudo = a leitura falhou. */
+export interface FichaDoAviso {
+  readonly nome: string | null;
+  readonly categoria: string | null;
+  readonly etapa: string | null;
+}
+
+export function contextoDoAviso(
+  conversa: ConversaComResposta,
+  ficha: FichaDoAviso | null,
+): ContextoDoAviso {
+  if (tipoDoAviso(conversa) === 'parceiro') {
+    return {
+      texto: ficha?.categoria?.trim() || null,
+      destaque: ficha?.etapa?.trim() || null,
+    };
+  }
+
+  // O fim do número só quando o nome não é ele: sem nome no perfil o cartão já
+  // se chama "Número terminado em 0002", e repetir embaixo não diz nada.
+  const digitos = conversa.telefone.replace(/\D/g, '');
+  const temNome = Boolean(conversa.nomeDoPerfil?.trim());
+  return {
+    texto: 'Cliente do app',
+    destaque: temNome && digitos.length >= 4 ? `final ${digitos.slice(-4)}` : null,
+  };
+}
+
 const LISTA = new Intl.ListFormat('pt-BR', { style: 'long', type: 'conjunction' });
 
 /** Quantos nomes cabem no corpo do aviso antes de virar "e mais N". */
