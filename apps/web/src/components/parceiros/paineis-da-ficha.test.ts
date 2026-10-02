@@ -489,7 +489,7 @@ function leitura(parcial: Partial<LeituraCruaDaFicha> = {}): LeituraCruaDaFicha 
     score_intencao: 72,
     sentimento: 'positivo',
     sinais: [{ tipo: 'informou_data', polaridade: 'positivo', forca: 'forte' }],
-    objecoes: ['valor da taxa'],
+    objecoes: ['preco'],
     alertas: [],
     proxima_acao: 'Confirmar a reunião e levar a tabela de taxas.',
     dados_insuficientes: false,
@@ -515,8 +515,19 @@ describe('a leitura da IA na ficha', () => {
     expect(l?.etiquetas).toEqual([
       { rotulo: 'Intenção', valor: 'perguntou a taxa' },
       { rotulo: 'Sentimento', valor: 'positivo' },
-      { rotulo: 'Objeção', valor: 'valor da taxa' },
+      { rotulo: 'Objeção', valor: 'preço' },
     ]);
+  });
+
+  it('a objeção vem no vocabulário do prompt e vai para a tela com acento', () => {
+    const l = montarLeituraDaFicha(leitura({ objecoes: ['confianca', 'concorrente'] }));
+    expect(l?.etiquetas.filter((e) => e.rotulo === 'Objeção').map((e) => e.valor)).toEqual([
+      'confiança',
+      'concorrente',
+    ]);
+    // Valor que a tela não conhece aparece como veio, em vez de sumir.
+    const nova = montarLeituraDaFicha(leitura({ objecoes: ['logistica'] }));
+    expect(nova?.etiquetas.find((e) => e.rotulo === 'Objeção')?.valor).toBe('logistica');
   });
 
   it('intenção que a tela não conhece cai na faixa da nota, nunca em caixa alta', () => {

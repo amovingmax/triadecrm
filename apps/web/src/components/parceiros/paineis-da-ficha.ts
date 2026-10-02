@@ -495,6 +495,20 @@ const ROTULO_DO_SENTIMENTO: Record<string, string> = {
   negativo: 'negativo',
 };
 
+/**
+ * As objeções que o prompt devolve são uma lista fechada, em vocabulário de banco
+ * (`ficha-da-conversa@v1`: preco, data, prazo, confianca, concorrente, outro). Na
+ * tela vão em português de gente; o que não estiver aqui aparece como veio.
+ */
+const ROTULO_DA_OBJECAO: Record<string, string> = {
+  preco: 'preço',
+  data: 'data',
+  prazo: 'prazo',
+  confianca: 'confiança',
+  concorrente: 'concorrente',
+  outro: 'outra',
+};
+
 /** Depois disto sem reanálise, a leitura conta como velha (o debounce é de 10 min). */
 const FOLGA_DA_LEITURA_MS = 30 * 60_000;
 
@@ -523,7 +537,7 @@ export function montarLeituraDaFicha(
   if (sentimento) etiquetas.push({ rotulo: 'Sentimento', valor: sentimento });
   for (const objecao of (crua.objecoes ?? []).slice(0, 2)) {
     const texto = limpo(objecao);
-    if (texto) etiquetas.push({ rotulo: 'Objeção', valor: texto });
+    if (texto) etiquetas.push({ rotulo: 'Objeção', valor: ROTULO_DA_OBJECAO[texto] ?? texto });
   }
   for (const alerta of (crua.alertas ?? []).slice(0, 2)) {
     if (limpo(alerta)) etiquetas.push({ rotulo: 'Alerta', valor: rotuloDoAlerta(alerta) });
