@@ -93,13 +93,7 @@ export function ehTipoConhecido(valor: string): valor is TipoDeItem {
  * abre sozinho, 9 é o futuro.
  */
 export type IdDoBloco =
-  | 'respondeu'
-  | 'agora'
-  | 'hoje'
-  | 'sem_proxima_acao'
-  | 'parados'
-  | 'depois'
-  | 'sistema';
+  'respondeu' | 'agora' | 'hoje' | 'sem_proxima_acao' | 'parados' | 'depois' | 'sistema';
 
 export type DefinicaoDeBloco = {
   id: IdDoBloco;
@@ -275,6 +269,101 @@ export function agruparPorDia(
     .filter((d): d is DiaDaFila & { dia: string } => d.dia !== null)
     .sort((a, b) => a.dia.localeCompare(b.dia));
   return [...comData, ...dias.filter((d) => d.dia === null)];
+}
+
+// ---------------------------------------------------------------------------
+// "Próximos dias" lidos por conta própria
+// ---------------------------------------------------------------------------
+
+/**
+ * A aba "Próximos dias" deixou de sair da fila (02/10/2026).
+ *
+ * A `public.meu_dia` devolve no máximo `LIMITE_DA_FILA` linhas, ordenadas por
+ * urgência, e o futuro é a ÚLTIMA faixa. Com 60 pendências ou mais — o caso de
+ * quem responde por muitos negócios — nenhum compromisso futuro cabia no corte:
+ * Janio marcava uma reunião para segunda e ela não aparecia aqui (medido no
+ * banco de teste: 63 pendências antes de 3 reuniões futuras). A tela avisava do
+ * corte ("os compromissos mais distantes podem não estar aqui"), mas avisar não
+ * é mostrar, e o pedido foi: "é obrigatório que apareça".
+ *
+ * Então a aba lê as tarefas abertas da pessoa direto de `tasks`, sem teto ligado
+ * ao tamanho da fila, e monta as MESMAS linhas que a faixa 9 da função montaria.
+ * É a regra dela, repetida aqui:
+ *
+ *   - entra a tarefa `todo` ou `doing` sem prazo, ou com prazo DEPOIS de hoje
+ *     (dia de calendário em Natal — o recorte por data é feito na consulta);
+ *   - não entra a de parceiro apagado (a `organizations_view` não o devolve) nem
+ *     a de parceiro que pediu para não ser contatado.
+ *
+ * O que NÃO dá para repetir no navegador: a supressão por CONTATO
+ * (`app.is_suppressed_target` com `contact_id`), que só o banco enxerga. Uma
+ * tarefa assim pode aparecer aqui como plano; no dia dela, a fila de "Para
+ * fazer" — que continua saindo da função — não a entrega. Mexeu na faixa 9 da
+ * `public.meu_dia`, mexe aqui.
+ */
+export type TarefaFutura = {
+  id: string;
+  title: string;
+  due_at: string | null;
+  deal_id: string | null;
+  organization_id: string | null;
+};
+
+export type ParceiroDaTarefa = {
+  id: string;
+  name: string | null;
+  neighborhood: string | null;
+  primary_category_name: string | null;
+  do_not_contact: boolean | null;
+};
+
+export type NegocioDaTarefa = {
+  id: string;
+  temperature: Temperatura | null;
+  funil: string | null;
+  etapa: string | null;
+};
+
+export function montarProximosDias(entrada: {
+  tarefas: readonly TarefaFutura[];
+  parceiros: readonly ParceiroDaTarefa[];
+  negocios: readonly NegocioDaTarefa[];
+}): ItemDoDia[] {
+  const parceiroPorId = new Map(entrada.parceiros.map((p) => [p.id, p]));
+  const negocioPorId = new Map(entrada.negocios.map((n) => [n.id, n]));
+
+  return entrada.tarefas
+    .flatMap((tarefa): ItemDoDia[] => {
+      const parceiro = tarefa.organization_id ? parceiroPorId.get(tarefa.organization_id) : null;
+      // Tem parceiro, mas a view não o devolveu: foi apagado (ou não é de quem
+      // lê). A função do banco também não o entregaria.
+      if (tarefa.organization_id && !parceiro) return [];
+      if (parceiro?.do_not_contact) return [];
+      const negocio = tarefa.deal_id ? negocioPorId.get(tarefa.deal_id) : null;
+
+      return [
+        {
+          prioridade: PRIORIDADES_DOS_PROXIMOS[0] ?? 9,
+          tipo: tarefa.due_at ? 'tarefa_futura' : 'tarefa_sem_data',
+          motivo: tarefa.due_at ? 'Tarefa agendada' : 'Tarefa sem prazo',
+          titulo: tarefa.title,
+          quando: tarefa.due_at,
+          atrasoHoras: null,
+          tarefaId: tarefa.id,
+          atividadeId: null,
+          negocioId: tarefa.deal_id,
+          organizacaoId: tarefa.organization_id,
+          organizacao: parceiro?.name ?? null,
+          bairro: parceiro?.neighborhood ?? null,
+          categoria: parceiro?.primary_category_name ?? null,
+          temperatura: negocio?.temperature ?? null,
+          funil: negocio?.funil ?? null,
+          etapa: negocio?.etapa ?? null,
+          atendente: null,
+        },
+      ];
+    })
+    .filter(ehDosProximos);
 }
 
 // ---------------------------------------------------------------------------

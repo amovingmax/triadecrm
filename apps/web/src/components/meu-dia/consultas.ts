@@ -4,7 +4,16 @@ import { createClient } from '@/lib/supabase/client';
 import { janelaDeDias } from '@/components/agenda/tipos';
 
 import type { RegistroDoDia } from './feito';
-import { ehTipoConhecido, type ItemDoDia, type MetricaDoDia, type TipoDeItem } from './tipos';
+import {
+  ehTipoConhecido,
+  montarProximosDias,
+  type ItemDoDia,
+  type MetricaDoDia,
+  type NegocioDaTarefa,
+  type ParceiroDaTarefa,
+  type TarefaFutura,
+  type TipoDeItem,
+} from './tipos';
 
 /**
  * As duas leituras da tela, ambas em funções `security definer` do banco:
@@ -178,6 +187,94 @@ export async function contarCandidatosAguardandoRevisao(): Promise<number | null
     .eq('status', 'novo');
   if (error) return null;
   return count ?? 0;
+}
+
+/**
+ * Teto dos "Próximos dias". É folga, e não corte de trabalho: 300 compromissos à
+ * frente de uma pessoa só é mais do que a agenda dela comporta em dois meses.
+ */
+export const LIMITE_DOS_PROXIMOS = 300;
+
+const COLUNAS_DA_TAREFA_FUTURA = 'id, title, due_at, deal_id, organization_id' as const;
+
+type LinhaDeNegocioDaTarefa = {
+  id: string;
+  temperature: NegocioDaTarefa['temperature'];
+  stages: { name: string } | { name: string }[] | null;
+  pipelines: { name: string } | { name: string }[] | null;
+};
+
+/** O PostgREST devolve o embed como objeto ou como lista de um, conforme a relação. */
+function nomeDoEmbed(valor: { name: string } | { name: string }[] | null): string | null {
+  const um = Array.isArray(valor) ? valor[0] : valor;
+  return um?.name ?? null;
+}
+
+/**
+ * Os compromissos à frente de uma pessoa, lidos direto de `tasks` — e não da
+ * fila, cujo teto os deixava de fora (ver `montarProximosDias` em `tipos.ts`).
+ *
+ * Só `select`, sob a RLS de quem entrou: `tasks_select` deixa cada um ler as
+ * suas, e admin, gestor e sdr lerem as de quem acompanham. Duas consultas de
+ * tarefa (com prazo depois de hoje, e sem prazo) e, só se houver tarefa, os
+ * parceiros e os negócios delas.
+ */
+export async function buscarProximosDias(usuarioId: string, hoje: string): Promise<ItemDoDia[]> {
+  const supabase = createClient();
+  // 00:00 de amanhã em Natal: "depois de hoje" é dia de calendário, como na função.
+  const { ate: amanha } = janelaDeDias(hoje, hoje);
+
+  const abertas = () =>
+    supabase
+      .from('tasks')
+      .select(COLUNAS_DA_TAREFA_FUTURA)
+      .eq('assignee_id', usuarioId)
+      .in('status', ['todo', 'doing']);
+
+  const [comPrazo, semPrazo] = await Promise.all([
+    abertas().gte('due_at', amanha).order('due_at').limit(LIMITE_DOS_PROXIMOS),
+    abertas().is('due_at', null).order('created_at').limit(LIMITE_DOS_PROXIMOS),
+  ]);
+  const erro = comPrazo.error ?? semPrazo.error;
+  if (erro) throw new ErroDoDia(erro.message, erro.code);
+
+  const tarefas = [...(comPrazo.data ?? []), ...(semPrazo.data ?? [])] as unknown as TarefaFutura[];
+  if (tarefas.length === 0) return [];
+
+  const orgIds = [...new Set(tarefas.flatMap((t) => t.organization_id ?? []))];
+  const dealIds = [...new Set(tarefas.flatMap((t) => t.deal_id ?? []))];
+
+  const [parceiros, negocios] = await Promise.all([
+    orgIds.length > 0
+      ? supabase
+          .from('organizations_view')
+          .select('id, name, neighborhood, primary_category_name, do_not_contact')
+          .in('id', orgIds)
+      : { data: [], error: null },
+    dealIds.length > 0
+      ? supabase
+          .from('deals')
+          .select('id, temperature, stages(name), pipelines(name)')
+          .in('id', dealIds)
+      : { data: [], error: null },
+  ]);
+  // Sem os parceiros não dá para saber quem saiu da base: falha a aba inteira.
+  if (parceiros.error) throw new ErroDoDia(parceiros.error.message, parceiros.error.code);
+  // O negócio só enfeita a linha (funil e etapa): se não vier, ela sai sem eles.
+  const linhasDeNegocio = negocios.error
+    ? []
+    : ((negocios.data ?? []) as unknown as LinhaDeNegocioDaTarefa[]);
+
+  return montarProximosDias({
+    tarefas,
+    parceiros: (parceiros.data ?? []) as unknown as ParceiroDaTarefa[],
+    negocios: linhasDeNegocio.map((n) => ({
+      id: n.id,
+      temperature: n.temperature,
+      funil: nomeDoEmbed(n.pipelines),
+      etapa: nomeDoEmbed(n.stages),
+    })),
+  });
 }
 
 /** Teto do "Feito hoje". Um dia cheio de campo passa de 40 registros; 200 é folga. */

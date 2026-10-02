@@ -24,6 +24,7 @@ import { diaDoInstante, rotuloDiaPorExtenso, somarDias } from '@/components/agen
 import {
   buscarFeitoHoje,
   buscarFilaDoDia,
+  buscarProximosDias,
   buscarResumoDoDia,
   contarCandidatosAguardandoRevisao,
   contarNegociosSemResponsavel,
@@ -167,6 +168,16 @@ export function TelaMeuDia({
     refetchOnMount: 'always',
   });
 
+  // Os próximos dias têm leitura PRÓPRIA, e não saem mais da fila: a fila tem teto
+  // de 60 linhas e o futuro é a última faixa dela, então quem tinha 60 pendências
+  // não via nenhum compromisso marcado (ver `montarProximosDias`). Sempre de novo ao
+  // abrir a tela, como o "Feito hoje": quem marca na Agenda e volta espera ver.
+  const futuros = useQuery({
+    queryKey: ['meu-dia', 'proximos', pessoa, hoje],
+    queryFn: () => buscarProximosDias(pessoa, hoje),
+    refetchOnMount: 'always',
+  });
+
   const itens = fila.data ?? SEM_ITENS;
   // No dia de outra pessoa, sem a fila comum de quem respondeu (ver `filaVisivel`).
   const visiveis = filaVisivel(itens, { doProprio, alcance });
@@ -195,16 +206,20 @@ export function TelaMeuDia({
 
   const blocos = blocosParaFazer(agruparFila(visiveis));
   const pendentes = contarPendentesDeHoje(visiveis);
-  const proximos = visiveis.filter(ehDosProximos);
+  // O teto vale para o que o BANCO devolveu, e não para o que sobrou na tela.
+  const cheia = itens.length >= LIMITE_DA_FILA;
+  // Se a leitura própria falhar, vale o que a fila trouxe do futuro — e aí, com a
+  // fila cheia, o aviso do corte volta, porque o corte voltou a existir.
+  const proximos = futuros.isSuccess ? futuros.data : visiveis.filter(ehDosProximos);
+  const proximosPodemFaltar = !futuros.isSuccess && cheia;
   const diasProximos = agruparPorDia(proximos, diaDoInstante);
   const categorias = agruparFeitoHoje(feito.data ?? SEM_REGISTROS);
   const feitas = contarPessoas(categorias);
-  // O teto vale para o que o BANCO devolveu, e não para o que sobrou na tela.
-  const cheia = itens.length >= LIMITE_DA_FILA;
   // As conversas que ficaram de fora no dia de outra pessoa: só para a linha que
   // explica onde elas estão.
   const conversasDeTodos = itens.length - visiveis.length;
-  const atualizando = fila.isFetching || resumo.isFetching || feito.isFetching;
+  const atualizando =
+    fila.isFetching || resumo.isFetching || feito.isFetching || futuros.isFetching;
 
   return (
     // Coluna de leitura, ancorada na goteira esquerda como o resto do produto. Sem
@@ -318,7 +333,8 @@ export function TelaMeuDia({
             id: 'proximos',
             rotulo: 'Próximos dias',
             rotuloCurto: 'Próximos',
-            contagem: fila.isSuccess ? proximos.length : null,
+            contagem:
+              futuros.isPending || (futuros.isError && !fila.isSuccess) ? null : proximos.length,
           },
         ]}
       />
@@ -350,7 +366,43 @@ export function TelaMeuDia({
             />
           ) : null}
 
-          {fila.isPending ? (
+          {aba === 'proximos' ? (
+            // A aba do futuro responde pela leitura dela, e não pela da fila: um
+            // erro na fila não esconde a agenda, e a fila vazia não quer dizer
+            // que não há nada marcado.
+            futuros.isPending || (futuros.isError && fila.isPending) ? (
+              <EsqueletoDaFila />
+            ) : futuros.isError && fila.isError ? (
+              <ErroDaFila
+                causa={mensagemDoErro(futuros.error)}
+                aoTentar={() => {
+                  void futuros.refetch();
+                  void fila.refetch();
+                }}
+              />
+            ) : diasProximos.length === 0 ? (
+              proximosPodemFaltar ? (
+                <FuturoCortado />
+              ) : (
+                <SemProximos />
+              )
+            ) : (
+              <RevelarLista>
+                {proximosPodemFaltar ? <FuturoCortado /> : null}
+                {diasProximos.map((dia, ordem) => (
+                  <DiaDosProximos
+                    key={dia.dia ?? 'sem-data'}
+                    dia={dia}
+                    somenteLeitura={!doProprio}
+                    amanha={somarDias(hoje, 1)}
+                    deslocamento={diasProximos
+                      .slice(0, ordem)
+                      .reduce((total, anterior) => total + anterior.itens.length, 0)}
+                  />
+                ))}
+              </RevelarLista>
+            )
+          ) : fila.isPending ? (
             <EsqueletoDaFila />
           ) : fila.isError ? (
             <ErroDaFila causa={mensagemDoErro(fila.error)} aoTentar={() => void fila.refetch()} />
@@ -364,7 +416,7 @@ export function TelaMeuDia({
             ) : (
               <FilaVaziaDeOutraPessoa nome={nomeDaPessoa} />
             )
-          ) : aba === 'fazer' ? (
+          ) : (
             <>
               {pendentes === 0 ? (
                 <NadaParaHoje
@@ -385,27 +437,6 @@ export function TelaMeuDia({
                 ))}
               </RevelarLista>
             </>
-          ) : diasProximos.length === 0 ? (
-            cheia ? (
-              <FuturoCortado />
-            ) : (
-              <SemProximos />
-            )
-          ) : (
-            <RevelarLista>
-              {cheia ? <FuturoCortado /> : null}
-              {diasProximos.map((dia, ordem) => (
-                <DiaDosProximos
-                  key={dia.dia ?? 'sem-data'}
-                  dia={dia}
-                  somenteLeitura={!doProprio}
-                  amanha={somarDias(hoje, 1)}
-                  deslocamento={diasProximos
-                    .slice(0, ordem)
-                    .reduce((total, anterior) => total + anterior.itens.length, 0)}
-                />
-              ))}
-            </RevelarLista>
           )}
         </section>
       )}
@@ -473,9 +504,12 @@ function DiaDosProximos({
 
 /**
  * A fila vem da `public.meu_dia` com teto de `LIMITE_DA_FILA` itens, ordenada por
- * urgência, e o futuro é a última faixa: num dia cheio é ele que fica de fora. Sem
- * este aviso, "Próximos · 5" parecia a semana inteira quando eram só os cinco que
- * couberam.
+ * urgência, e o futuro é a última faixa: num dia cheio é ele que fica de fora.
+ *
+ * Desde 02/10/2026 a aba lê os compromissos por conta própria (`buscarProximosDias`)
+ * e este aviso só aparece no RECUO: quando essa leitura falha e a tela mostra o
+ * que a fila trouxe. Aí o corte volta a existir, e "Próximos · 5" pareceria a
+ * semana inteira quando eram só os cinco que couberam.
  */
 function FuturoCortado() {
   return (
@@ -671,12 +705,12 @@ function NotaDoQueFalta({ cheia }: { cheia: boolean }) {
         </li>
         <li>
           Link do Meet e rota otimizada das visitas. A reunião e a visita do dia já entram na fila,
-          vindas da Agenda; o que falta é o Google Calendar conectado e a
-          geocodificação dos endereços.
+          vindas da Agenda; o que falta é o Google Calendar conectado e a geocodificação dos
+          endereços.
         </li>
         <li>
-          Candidato esperando revisão. Ele só vira alvo de contato depois de aprovado, então
-          nunca entra aqui — a fila de decisão fica em{' '}
+          Candidato esperando revisão. Ele só vira alvo de contato depois de aprovado, então nunca
+          entra aqui — a fila de decisão fica em{' '}
           <Link href="/revisao" className="underline underline-offset-4 hover:text-foreground">
             Revisão
           </Link>

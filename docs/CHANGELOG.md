@@ -6070,3 +6070,80 @@ financeiro e embaixador; parceiro com mais de cinco passos.
 
 **Fica para depois:** o bloco "Pessoas", que é funcionalidade nova e a única
 parte que grava.
+
+### 02/10/2026 — Meu dia: todo compromisso marcado aparece em "Próximos dias" (RF-MET-03)
+
+Pedido do Janio: "quando eu crio qualquer tipo de compromisso ele não aparece lá
+no Meu dia, no campo de Próximos dias, e é obrigatório que apareça".
+
+**Na branch local `ficha-do-parceiro`, num commit só dele, fora de produção. Só o
+site; só leitura.**
+
+**A causa.** A aba saía da fila do dia. A `public.meu_dia` devolve no máximo 60
+linhas (`LIMITE_DA_FILA`), ordenadas por urgência, e o futuro é a última faixa
+(prioridade 9). Quem tem 60 pendências ou mais antes dele não recebia nenhum
+compromisso futuro. Medido no banco de teste, com o gestor: 9 conversas
+esperando + 10 tarefas vencidas + 44 próximas ações vencidas = 63 linhas antes
+das 3 reuniões marcadas para a semana seguinte; com o teto de 60, zero
+compromissos chegavam à tela. A tela já avisava do corte ("os compromissos mais
+distantes podem não estar aqui"), mas avisar não é mostrar.
+
+**A correção.** A aba "Próximos dias" passou a ter leitura própria
+(`buscarProximosDias`): lê de `tasks` as tarefas abertas da pessoa com prazo
+depois de hoje (dia de calendário em Natal) e as sem prazo, e monta as mesmas
+linhas que a faixa 9 da função montaria (`montarProximosDias`, pura e com
+teste). Sem teto ligado ao tamanho da fila; o teto próprio é de 300
+compromissos.
+
+- Vale para tudo que vira tarefa da pessoa: reunião (`reuniao_marcar_na_agenda`),
+  visita (`visita_marcar`), retorno, mensagem a enviar.
+- Relê ao abrir a tela, como o "Feito hoje": quem marca na Agenda e volta vê.
+- O número da aba é o da leitura nova.
+- No dia de outra pessoa (gestor ou admin pelo seletor), lê os compromissos
+  dela, sob a mesma RLS de `tasks`.
+- Fora ficam, como na função: tarefa de parceiro apagado, de parceiro que pediu
+  para não ser contatado e aviso do motor (sem parceiro e sem negócio).
+- Se a leitura nova falhar, a aba volta a mostrar o que a fila trouxe, com o
+  aviso do corte. O aviso só aparece nesse recuo.
+- **"Para fazer" não mudou**: continua saindo da `public.meu_dia`, com as 60
+  linhas e a ordem do banco.
+
+Arquivos, em `apps/web/src/components/meu-dia/`: `tipos.ts` (a regra),
+`consultas.ts` (a leitura), `tela-meu-dia.tsx` e `tipos.test.ts`. Nada em
+`supabase/`, `apps/workers/` nem `packages/`: sem migração, a função do banco
+não mudou.
+
+Testes: Vitest 1.153 no site (8 novos), lint, typecheck e build. No Chrome,
+contra o Supabase local, 17 conferências: com a fila do gestor cheia (60
+linhas), a aba mostra os 6 compromissos futuros que o banco tem, incluindo uma
+visita e uma reunião marcadas pelas mesmas funções que a Agenda chama e uma
+tarefa de retorno; agrupados por dia; o dia da SDR aberto pelo gestor e pela
+própria SDR; 390 px; e a conferência de que abrir a aba não grava nada (tarefas,
+mensagens e fila de saída do WhatsApp iguais antes e depois).
+
+**Dados de teste criados no banco LOCAL:** visita na Potiban (06/10 15:00),
+reunião com a Natal Cocktails (07/10 10:20) e a tarefa "Enviar a tabela de
+taxas" na Goettems Decor (08/10), todas do gestor de teste.
+
+**Não foi conferido:** marcar pela folha da Agenda clicando na tela (as funções
+foram chamadas direto, com a sessão do gestor); embaixador, leitura e
+financeiro; mais de 300 compromissos.
+
+**Limites conhecidos:**
+- A regra da faixa 9 agora existe em dois lugares (a função do banco e
+  `montarProximosDias`). Mexeu numa, mexe na outra.
+- A supressão por contato (`app.is_suppressed_target` com `contact_id`) só o
+  banco enxerga: uma tarefa assim pode aparecer como plano em "Próximos dias" e
+  não ser entregue em "Para fazer" no dia. A de parceiro inteiro suprimido já
+  fica fora.
+- O mesmo teto de 60 ainda pode cortar o fim de "Para fazer" (no banco de teste,
+  3 das 44 próximas ações vencidas ficam fora). A tela já diz isso no rodapé.
+
+**Precisa de decisão humana:**
+- O conserto de raiz é no banco: a `public.meu_dia` separar o teto do futuro do
+  teto das pendências (ou ganhar um parâmetro só para o futuro). Pede migração
+  em produção, e por isso não foi feito aqui. Decidir com o Matheus se vale.
+- Cada linha de "Próximos dias" mostra o dia ("05/10") e não a hora, embora o
+  dia já esteja no título do grupo. Trocar pela hora (09:30) é pequeno e deixa a
+  aba legível como agenda; não foi feito porque a linha é a mesma de "Para
+  fazer".

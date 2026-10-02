@@ -5,6 +5,7 @@ import {
   abaDaUrl,
   agruparFila,
   agruparPorDia,
+  montarProximosDias,
   alcanceDeQuemRespondeu,
   BLOCOS,
   blocosParaFazer,
@@ -422,6 +423,139 @@ describe('dia de outra pessoa', () => {
     expect(tipos(filaVisivel(fila, { doProprio: false, alcance: 'propria' }))).toEqual([
       'conversa_esperando',
       'tarefa_atrasada',
+    ]);
+  });
+});
+
+describe('os próximos dias lidos por conta própria', () => {
+  /**
+   * O defeito que estes testes guardam: a aba saía da fila, que tem teto de 60
+   * linhas e deixa o futuro por último. Quem tinha 60 pendências marcava uma
+   * reunião e não a via aqui. Agora as linhas nascem das tarefas, e têm de ser as
+   * MESMAS que a faixa 9 da `public.meu_dia` montaria.
+   */
+  const PARCEIRO = {
+    id: 'o1',
+    name: 'Abracadabra Festas',
+    neighborhood: 'Tirol',
+    primary_category_name: 'Buffet infantil',
+    do_not_contact: false,
+  };
+  const NEGOCIO = {
+    id: 'd1',
+    temperature: 'quente' as const,
+    funil: 'Captação de fornecedor',
+    etapa: 'Reunião marcada',
+  };
+  const tarefa = (
+    parcial: Partial<Parameters<typeof montarProximosDias>[0]['tarefas'][number]>,
+  ) => ({
+    id: 't1',
+    title: 'Reunião com Abracadabra Festas',
+    due_at: '2026-10-05T12:30:00+00:00',
+    deal_id: 'd1',
+    organization_id: 'o1',
+    ...parcial,
+  });
+
+  it('a tarefa com data à frente vira a mesma linha que a fila montaria', () => {
+    const [linha] = montarProximosDias({
+      tarefas: [tarefa({})],
+      parceiros: [PARCEIRO],
+      negocios: [NEGOCIO],
+    });
+    expect(linha).toEqual({
+      prioridade: 9,
+      tipo: 'tarefa_futura',
+      motivo: 'Tarefa agendada',
+      titulo: 'Reunião com Abracadabra Festas',
+      quando: '2026-10-05T12:30:00+00:00',
+      atrasoHoras: null,
+      tarefaId: 't1',
+      atividadeId: null,
+      negocioId: 'd1',
+      organizacaoId: 'o1',
+      organizacao: 'Abracadabra Festas',
+      bairro: 'Tirol',
+      categoria: 'Buffet infantil',
+      temperatura: 'quente',
+      funil: 'Captação de fornecedor',
+      etapa: 'Reunião marcada',
+      atendente: null,
+    });
+    expect(ehDosProximos(linha as ItemDoDia)).toBe(true);
+  });
+
+  it('não há teto: setenta compromissos entram os setenta', () => {
+    const tarefas = Array.from({ length: 70 }, (_, i) => tarefa({ id: `t${i}` }));
+    expect(
+      montarProximosDias({ tarefas, parceiros: [PARCEIRO], negocios: [NEGOCIO] }),
+    ).toHaveLength(70);
+  });
+
+  it('tarefa sem prazo entra como "sem data"', () => {
+    const [linha] = montarProximosDias({
+      tarefas: [tarefa({ due_at: null })],
+      parceiros: [PARCEIRO],
+      negocios: [],
+    });
+    expect(linha).toMatchObject({
+      tipo: 'tarefa_sem_data',
+      motivo: 'Tarefa sem prazo',
+      quando: null,
+    });
+  });
+
+  it('parceiro que pediu para não ser contatado não aparece', () => {
+    expect(
+      montarProximosDias({
+        tarefas: [tarefa({})],
+        parceiros: [{ ...PARCEIRO, do_not_contact: true }],
+        negocios: [NEGOCIO],
+      }),
+    ).toEqual([]);
+  });
+
+  it('parceiro apagado (a view não o devolve) não aparece', () => {
+    expect(
+      montarProximosDias({ tarefas: [tarefa({})], parceiros: [], negocios: [NEGOCIO] }),
+    ).toEqual([]);
+  });
+
+  it('aviso do motor, sem parceiro e sem negócio, não é compromisso', () => {
+    expect(
+      montarProximosDias({
+        tarefas: [tarefa({ organization_id: null, deal_id: null, title: 'Dead-letter ai_dlq' })],
+        parceiros: [],
+        negocios: [],
+      }),
+    ).toEqual([]);
+  });
+
+  it('sem o negócio a linha sai, só sem funil e etapa', () => {
+    const [linha] = montarProximosDias({
+      tarefas: [tarefa({})],
+      parceiros: [PARCEIRO],
+      negocios: [],
+    });
+    expect(linha).toMatchObject({ organizacao: 'Abracadabra Festas', funil: null, etapa: null });
+  });
+
+  it('agrupa por dia como o resto da aba', () => {
+    const itens = montarProximosDias({
+      tarefas: [
+        tarefa({ id: 'b', due_at: '2026-10-06T16:40:00+00:00' }),
+        tarefa({ id: 'a', due_at: '2026-10-05T12:30:00+00:00' }),
+        tarefa({ id: 'c', due_at: null }),
+      ],
+      parceiros: [PARCEIRO],
+      negocios: [NEGOCIO],
+    });
+    const dias = agruparPorDia(itens, (iso) => iso.slice(0, 10));
+    expect(dias.map((d) => [d.dia, d.itens.map((i) => i.tarefaId)])).toEqual([
+      ['2026-10-05', ['a']],
+      ['2026-10-06', ['b']],
+      [null, ['c']],
     ]);
   });
 });
