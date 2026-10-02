@@ -6265,8 +6265,18 @@ Pedido do Janio, depois de testar no localhost: "do jeito que está no localhost
 tudo que eu testei, pode subir para a main". E, diante da opção de abrir um PR:
 "eu quero somente enviar para a main, eu não preciso enviar PR".
 
-**Na `main` desde 02/10/2026, 16:59. Ainda NÃO em produção:** o site só muda com
-o deploy pela Vercel, que é manual e não foi feito.
+**Na `main` desde 02/10/2026, 16:59, e NO AR desde 02/10/2026, 17:04** (deploy
+`triade-pc7pxjsem`, feito da `main` em `3a23682` a pedido do Janio: "eu quero
+subir essa versão pro ar"). Para voltar atrás, o deploy anterior é o
+`triade-p0h9ctlon` (a versão das 14:09).
+
+Antes do deploy foi conferido que não há migração nova entre a versão anterior
+e esta, e que as duas únicas leituras que o site ainda não fazia
+(`organizations_view.reviews_count` e o nome do funil pelo embed de `deals`)
+existem desde as migrações de 04/09. Depois dele: o deploy está `Ready` como
+produção, `/login` responde 200, `/parceiros` e `/meu-dia` mandam para o login,
+e os registros do deploy não mostram erro. **Não foi conferido com alguém
+logado em produção** (o login é pelo Google).
 
 A primeira tentativa de envio foi recusada pela trava de segurança do Claude
 Code (o gancho desta máquina diz "a main só muda por PR revisado"); os commits
@@ -6275,8 +6285,7 @@ direto, sem PR. Foi sem revisão de outra pessoa.
 
 As quatro entradas de 02/10/2026 acima (ficha do parceiro, entregas 1 e 2;
 "Próximos dias" do Meu dia; verificação e correções) entraram juntas. Onde elas
-dizem "na branch local, fora de produção", leia-se: **na `main`, ainda fora de
-produção**.
+dizem "na branch local, fora de produção", leia-se: **na `main` e em produção**.
 
 Só o site (`apps/web`) e `docs/`. Nenhuma migração, nada em `supabase/`,
 `apps/workers/` nem `packages/`: o banco de produção e o caminho do WhatsApp não
