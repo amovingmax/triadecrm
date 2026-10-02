@@ -119,6 +119,12 @@ export type ItemDeAtividade = {
   detalhe: string | null;
   /** O detalhe é fala de alguém: a tela põe entre aspas. */
   citacao: boolean;
+  /**
+   * Houve contato de fato: mensagem que chegou, mensagem que SAIU, ligação ou
+   * visita registrada. Não vale a mensagem que a Meta recusou, a mudança de
+   * etapa nem o registro do sistema. É o que o "último contato" do cabeçalho lê.
+   */
+  contato: boolean;
   em: string;
 };
 
@@ -177,18 +183,35 @@ function daMensagem(evento: EventoDaLinha): ItemDeAtividade | null {
     titulo,
     detalhe,
     citacao: temFala,
+    // A que falhou não chegou a ninguém: aparece na lista, mas não é contato.
+    contato: m.entrada || m.status !== 'failed',
     em: evento.em,
   };
 }
 
-function daInteracao(evento: EventoDaLinha): ItemDeAtividade {
+/**
+ * Registro do sistema e criação da ficha, com até esta distância, são o mesmo
+ * ato: o import grava os dois na mesma transação.
+ */
+const ENTRADA_NA_BASE_MS = 5 * 60_000;
+
+function daInteracao(evento: EventoDaLinha, criadaEm: number | null): ItemDeAtividade {
   if (evento.genero === 'origem') {
+    // NEM TODO REGISTRO DO SISTEMA É A ENTRADA NA BASE. O motor também grava
+    // "Candidato do Radar mesclado nesta ficha", "Conversa de um número fora da
+    // base ligada a esta ficha", "Lead criado sozinho". Chamar todos de "Entrou
+    // na base" punha essa frase, com a data de hoje, no topo da atividade de um
+    // parceiro que está na base há um mês. Só é entrada o registro que nasceu
+    // junto com a ficha; o resto se chama pelo que é.
+    const ehEntrada =
+      criadaEm !== null && Math.abs(Date.parse(evento.em) - criadaEm) <= ENTRADA_NA_BASE_MS;
     return {
       id: evento.id,
       tipo: 'origem',
-      titulo: 'Entrou na base',
+      titulo: ehEntrada ? 'Entrou na base' : 'Registro do sistema',
       detalhe: evento.detalhe ? encurtar(evento.detalhe) : null,
       citacao: false,
+      contato: false,
       em: evento.em,
     };
   }
@@ -202,6 +225,7 @@ function daInteracao(evento: EventoDaLinha): ItemDeAtividade {
     titulo: evento.desfecho ? `${superficie} · ${evento.desfecho}` : superficie,
     detalhe: evento.detalhe ? encurtar(evento.detalhe) : autor ? `por ${autor}` : null,
     citacao: false,
+    contato: true,
     em: evento.em,
   };
 }
@@ -226,9 +250,13 @@ export function montarAtividade(
     desfechos: { id: number; nome: string }[];
     /** O nome de cada etapa, por id. */
     etapas: ReadonlyMap<number, string>;
+    /** `organizations.created_at`: é com ele que se reconhece a entrada na base. */
+    criadaEm?: string | null;
   },
   limite: number = LINHAS_DE_ATIVIDADE,
 ): Atividade {
+  const criadaEm = entrada.criadaEm ? Date.parse(entrada.criadaEm) : NaN;
+  const instanteDaCriacao = Number.isNaN(criadaEm) ? null : criadaEm;
   const eventos = montarLinhaDoTempo({
     atividades: entrada.atividades,
     historico: [],
@@ -239,9 +267,11 @@ export function montarAtividade(
   const itens: ItemDeAtividade[] = [];
   const origens: number[] = [];
   for (const evento of eventos) {
-    if (evento.genero === 'origem') origens.push(Date.parse(evento.em));
-    const item = evento.genero === 'mensagem' ? daMensagem(evento) : daInteracao(evento);
-    if (item) itens.push(item);
+    const item =
+      evento.genero === 'mensagem' ? daMensagem(evento) : daInteracao(evento, instanteDaCriacao);
+    if (!item) continue;
+    if (item.titulo === 'Entrou na base') origens.push(Date.parse(evento.em));
+    itens.push(item);
   }
 
   for (const h of entrada.historico) {
@@ -257,6 +287,7 @@ export function montarAtividade(
         titulo: 'Entrou no funil',
         detalhe: para,
         citacao: false,
+        contato: false,
         em: h.changed_at,
       });
       continue;
@@ -268,6 +299,7 @@ export function montarAtividade(
       titulo: 'Mudou de etapa',
       detalhe: `${de} → ${para}`,
       citacao: false,
+      contato: false,
       em: h.changed_at,
     });
   }
@@ -296,8 +328,8 @@ export function oQueFoiOUltimoContato(
   atividade: Atividade | null,
   ultimoContatoEm: string | null | undefined,
 ): { texto: string; hora: string } | null {
-  if (!atividade || !ultimoContatoEm) return null;
-  const item = atividade.itens.find((i) => i.tipo !== 'etapa' && i.tipo !== 'origem');
+  if (!ultimoContatoEm) return null;
+  const item = contatoMaisRecente(atividade);
   if (!item) return null;
   if (diasDeDiferenca(new Date(item.em), new Date(ultimoContatoEm)) !== 0) return null;
 
@@ -308,6 +340,15 @@ export function oQueFoiOUltimoContato(
         ? 'mensagem enviada'
         : (item.titulo.split(' · ')[0] ?? item.titulo).toLowerCase();
   return { texto, hora: HORA.format(new Date(item.em)) };
+}
+
+/**
+ * O contato mais recente que a atividade mostra — o primeiro da lista que é
+ * contato de fato (ver `ItemDeAtividade.contato`). `null` quando a atividade não
+ * carregou ou não tem nenhum.
+ */
+export function contatoMaisRecente(atividade: Atividade | null): ItemDeAtividade | null {
+  return atividade?.itens.find((i) => i.contato) ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -430,7 +471,17 @@ export function montarProximosPassos(
         titulo: t.title,
         apoio: [ROTULO_DA_TAREFA[t.kind] ?? 'Tarefa', dono].filter(Boolean).join(' · '),
         quando: t.due_at ? quando(t.due_at, agora, false) : null,
-        selo: dias === null ? null : dias < 0 ? 'atrasada' : dias === 0 ? 'vence hoje' : null,
+        // Pela HORA, e não pelo dia: tarefa das 09:00 vista às 15:00 já venceu,
+        // e é assim que o Meu dia a chama ("vencida há 6 h"). "Vence hoje" fica
+        // para a que ainda tem hora pela frente.
+        selo:
+          !t.due_at || dias === null
+            ? null
+            : Date.parse(t.due_at) < agora.getTime()
+              ? 'atrasada'
+              : dias === 0
+                ? 'vence hoje'
+                : null,
         sala: null,
         presencial: false,
       };
@@ -540,7 +591,12 @@ export function montarLeituraDaFicha(
     if (texto) etiquetas.push({ rotulo: 'Objeção', valor: ROTULO_DA_OBJECAO[texto] ?? texto });
   }
   for (const alerta of (crua.alertas ?? []).slice(0, 2)) {
-    if (limpo(alerta)) etiquetas.push({ rotulo: 'Alerta', valor: rotuloDoAlerta(alerta) });
+    if (!limpo(alerta)) continue;
+    const valor = rotuloDoAlerta(alerta);
+    // "Intenção pronto para fechar" e "Alerta pronto para fechar", lado a lado,
+    // dizem a mesma coisa duas vezes: o alerta só entra quando acrescenta.
+    if (etiquetas.some((e) => e.valor === valor)) continue;
+    etiquetas.push({ rotulo: 'Alerta', valor });
   }
 
   const analisada = crua.analisada_em ? Date.parse(crua.analisada_em) : NaN;

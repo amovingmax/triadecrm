@@ -6147,3 +6147,114 @@ financeiro; mais de 300 compromissos.
   dia já esteja no título do grupo. Trocar pela hora (09:30) é pequeno e deixa a
   aba legível como agenda; não foi feito porque a linha é a mesma de "Para
   fazer".
+
+### 02/10/2026 — Verificação das telas novas (ficha do parceiro e "Próximos dias") e as correções que ela trouxe
+
+Pedido do Janio: "faça o teste local e verifique se as funcionalidades novas
+estão adequadas e bem implementadas".
+
+**Na branch local `ficha-do-parceiro`, fora de produção. Só o site.**
+
+Duas frentes: uma revisão de código independente (outra sessão, só leitura, sem
+conhecer as conclusões de quem implementou) e uma bateria no Chrome contra o
+Supabase local cobrindo o que as provas anteriores tinham deixado de fora. A
+revisão trouxe 15 achados; nenhum em WhatsApp, banco ou permissão, e 13 viraram
+correção. Os outros dois ficaram documentados (abaixo).
+
+**Corrigido na ficha do parceiro**
+
+- **Conversa arquivada contava como "Sem conversa".** Arquivar tira a conversa
+  da lista, não apaga nada, e a janela de 24 h continua correndo. A ficha
+  filtrava as arquivadas e dizia "nenhuma mensagem trocada ainda" para quem
+  tinha respondido uma hora antes. Agora a arquivada conta.
+- **Envio que a Meta recusou virava "último contato".**
+  `conversations.last_message_at` sobe em toda saída inserida, inclusive a que
+  falha depois. O último contato passou a ser o mais recente entre o registro do
+  negócio, a última mensagem do PARCEIRO (`last_inbound_at`) e o último contato
+  de fato da atividade, que sabe qual envio falhou.
+- **Erro ao ler a conversa virava "nenhuma mensagem trocada ainda".** Agora o
+  cabeçalho diz "Não carregou".
+- **Todo registro do sistema aparecia como "Entrou na base"**, inclusive
+  "Candidato do Radar mesclado nesta ficha" de hoje, num parceiro de um mês. Só
+  é entrada o registro que nasceu junto com a ficha (até 5 min de
+  `organizations.created_at`); o resto se chama "Registro do sistema".
+- **Tarefa de hoje com a hora já passada dizia "vence hoje".** Agora é
+  "atrasada", como no Meu dia, e a linha traz o prazo ("prazo ontem").
+- **A régua contava dias em blocos de 24 h** e o "último contato" ao lado em dias
+  de calendário. Os dois agora contam dia de calendário em Natal.
+- **Leitura da IA e janela do WhatsApp podiam ser de conversas diferentes** num
+  parceiro com dois números. A leitura agora é a da mesma conversa do cabeçalho.
+- **Telefone editado:** a linha continuava mostrando o número antigo enquanto
+  "Copiar" copiava o novo (o estado do componente não acompanhava a edição).
+- "Sem responsável" vinha com a legenda "responde por este parceiro"; o cartão
+  de negócios dizia "último contato há 0 dias"; o alerta repetia a intenção
+  ("Intenção pronto para fechar" e "Alerta pronto para fechar"); "Abrir a
+  conversa" aparecia sem haver conversa; o cartão que falhava perdia a posição
+  no celular. Todos corrigidos.
+
+**Corrigido no Meu dia ("Próximos dias")**
+
+- **Compromisso do embaixador em parceiro que não é dele sumia.** A aba lê a
+  `organizations_view`, que para o embaixador só devolve os parceiros dele; a
+  função do banco não tem esse filtro. Para quem não vê a base inteira, a linha
+  agora fica, com o título da tarefa e sem os dados do parceiro. Para os demais
+  papéis, parceiro que a view não devolve continua sendo parceiro apagado.
+- **App aberto de um dia para o outro** mostrava as tarefas de hoje como
+  "Amanhã": o corte usava o dia em que a tela foi aberta. Agora usa o mais
+  adiantado entre esse e o do relógio (`hojeParaOCorte`).
+- Ordem estável entre tarefas no mesmo horário (desempate por `id`) e leitura de
+  parceiros e negócios em lotes de 100 ids, para a URL não estourar.
+
+**O que a bateria conferiu, além das correções** (157 conferências no Chrome, em
+cinco roteiros; a única que não passa é um aviso de console do React na página
+"não encontrado", que já existia: `notFound()` e o layout não mudaram):
+
+- papéis **leitura** e **financeiro**: a ficha abre sem "Registrar contato", sem
+  "Editar", sem botões "+ campo" e sem criar rascunho; os três painéis carregam;
+- **embaixador**: parceiro alheio dá 404; no dele, vê a tarefa dele e não a
+  visita do gestor (RLS de `tasks`); telefone mascarado, sem copiar, e abrir a
+  ficha não registra revelação;
+- parceiro **sem negócio**, com **dois negócios**, com **mais de cinco passos**,
+  **reunião presencial**, **tarefa sem prazo**, ligação registrada com desfecho;
+- **um painel que falha não derruba a ficha** (tirando por um instante a
+  permissão de leitura de `reunioes` no banco local, e devolvendo);
+- **marcar uma visita clicando na folha da Agenda** e vê-la em "Próximos dias";
+  "Atualizar" traz compromisso novo sem recarregar;
+- a aba mostra o mesmo número de compromissos que a faixa 9 da `public.meu_dia`
+  para SDR e embaixador;
+- a ficha responde em cerca de 200 ms no servidor local (mediana de 5);
+- nenhum botão ou link sem nome; um `h1` só.
+
+Vitest 1.161 no site (8 novos nesta rodada), lint, typecheck e build.
+
+**Ficou documentado, sem correção**
+
+- A lista de supressão por telefone, CNPJ ou @ (`app.is_suppressed_target`) só o
+  banco enxerga. "Próximos dias" só vê `do_not_contact`, que o opt-out marca
+  junto. Tarefa de quem está na lista sem essa marca pode aparecer como plano e
+  não ser entregue em "Para fazer" no dia. No banco local não há nenhuma.
+- Falha ao ler `stages` faz a régua sumir e a etapa virar a palavra "Etapa" (já
+  era assim antes da ficha nova).
+
+**Achados fora do escopo, para decidir**
+
+- **O cartão de aviso cobre os botões do canto superior direito.** A pilha de
+  avisos ("Nova mensagem", convite para ativar avisos) fica em cima de
+  "Registrar contato" e do "⋯" da ficha, e do "Novo compromisso" da Agenda,
+  enquanto está na tela (12 s por mensagem; o convite, até ser dispensado). Já
+  está em produção desde a entrega dos avisos; a ficha nova pôs as ações
+  principais justamente ali.
+- **No celular a ficha ficou mais comprida:** de cerca de 1.500 px (entrega 1)
+  para 2.380 px numa ficha vazia e 3.320 px numa cheia com rascunho de
+  pré-cadastro. A ordem no celular põe leitura da IA, passos e atividade antes
+  do contato.
+- **A leitura da IA não pôde ser testada de verdade:** não há chave de IA neste
+  computador e o módulo está desligado no banco local. O que se viu foram
+  leituras escritas à mão. O acerto da nota só se mede com o módulo ligado.
+
+**Dados de teste criados no banco LOCAL nesta rodada:** usuários
+`leitura.teste`, `financeiro.teste` e `embaixador.teste@teste.local`; o parceiro
+"Teste Sem Negócio Eventos"; um segundo negócio, seis tarefas, uma reunião
+presencial e uma ligação na Jôsy Buffet; a Potiban passou para o embaixador de
+teste; duas visitas na Goettems; um envio que falhou e um registro do sistema na
+DJ Done; e tarefas avulsas na Abracadabra.

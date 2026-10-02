@@ -69,7 +69,7 @@ async function lerAtividade(
   organizacaoId: string,
   pessoas: { id: string; nome: string }[],
 ): Promise<Atividade> {
-  const [atividades, mensagens, negocios, desfechos, etapas] = await Promise.all([
+  const [atividades, mensagens, negocios, desfechos, etapas, parceiro] = await Promise.all([
     supabase
       .from('activities')
       .select(COLUNAS_ATIVIDADE)
@@ -85,6 +85,9 @@ async function lerAtividade(
     supabase.from('deals').select('id').eq('organization_id', organizacaoId),
     supabase.from('interaction_outcomes').select('id, name'),
     supabase.from('stages').select('id, name'),
+    // Quando a ficha nasceu: é o que separa "Entrou na base" dos outros
+    // registros do sistema. Se não vier, nenhum registro é chamado de entrada.
+    supabase.from('organizations_view').select('created_at').eq('id', organizacaoId).maybeSingle(),
   ]);
 
   const erro =
@@ -109,6 +112,7 @@ async function lerAtividade(
     pessoas,
     desfechos: (desfechos.data ?? []).map((d) => ({ id: d.id as number, nome: d.name as string })),
     etapas: new Map((etapas.data ?? []).map((e) => [e.id as number, e.name as string])),
+    criadaEm: (parceiro.data?.created_at as string | null | undefined) ?? null,
   });
 }
 
@@ -149,29 +153,38 @@ async function lerLeitura(
   supabase: Cliente,
   organizacaoId: string,
 ): Promise<NonNullable<PaineisDaFicha['leitura']>> {
-  const [ficha, ajuste] = await Promise.all([
-    // A leitura mais recente entre as conversas do parceiro (quase sempre há uma
-    // só). A hora da última mensagem dele vem junto, para dizer se a leitura
-    // ficou para trás.
+  const [conversas, ajuste] = await Promise.all([
+    // A MESMA conversa do cabeçalho (`ficha.ts`): a mais recente do parceiro.
+    // Parceiro com dois números tem duas conversas; lendo a leitura "mais
+    // recente de qualquer uma", a janela do cabeçalho era de uma conversa e a
+    // nota da IA de outra, sem a tela dizer.
     supabase
-      .from('ficha_da_conversa')
-      .select(
-        'resumo, intencao, score_intencao, sentimento, sinais, objecoes, alertas, proxima_acao, dados_insuficientes, analisada_em, conversations(last_inbound_at)',
-      )
+      .from('conversations')
+      .select('id, last_inbound_at')
       .eq('organization_id', organizacaoId)
-      .order('analisada_em', { ascending: false, nullsFirst: false })
+      .order('last_message_at', { ascending: false, nullsFirst: false })
       .limit(1),
     supabase.from('app_settings').select('value').eq('key', 'ia.crm_inteligente').maybeSingle(),
   ]);
+  if (conversas.error) throw new Error(conversas.error.message);
 
+  const conversa = (conversas.data?.[0] ?? null) as {
+    id: string;
+    last_inbound_at: string | null;
+  } | null;
+
+  const ficha = conversa
+    ? await supabase
+        .from('ficha_da_conversa')
+        .select(
+          'resumo, intencao, score_intencao, sentimento, sinais, objecoes, alertas, proxima_acao, dados_insuficientes, analisada_em',
+        )
+        .eq('conversation_id', conversa.id)
+        .maybeSingle()
+    : { data: null, error: null };
   if (ficha.error) throw new Error(ficha.error.message);
 
-  const linha = (ficha.data?.[0] ?? null) as
-    (LeituraCruaDaFicha & { conversations: unknown }) | null;
-  // O PostgREST devolve o embed como objeto ou como lista de um, conforme a relação.
-  const conversa = (
-    Array.isArray(linha?.conversations) ? linha.conversations[0] : linha?.conversations
-  ) as { last_inbound_at?: string | null } | null | undefined;
+  const linha = (ficha.data ?? null) as LeituraCruaDaFicha | null;
 
   // O ajuste é só para escolher a frase do cartão vazio: falhar aqui não é erro.
   const modulos = (ajuste.data?.value as { modulos?: { ficha?: unknown } } | null)?.modulos;

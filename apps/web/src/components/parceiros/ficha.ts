@@ -88,6 +88,11 @@ export type Ficha = {
    * papel vê-la, que para a ficha dá no mesmo.
    */
   conversa: ConversaDaFicha | null;
+  /**
+   * A leitura da conversa FALHOU. É diferente de não haver conversa: sem isto, um
+   * erro de rede virava a afirmação "nenhuma mensagem trocada ainda".
+   */
+  conversaFalhou: boolean;
 };
 
 /**
@@ -137,12 +142,16 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     supabase.from('team_directory').select('id, full_name, role'),
     // A conversa mais recente, só para LER o estado do WhatsApp (janela de 24 h,
     // por ler, quem atende). A ficha não escreve em `conversations` nem fala com
-    // a Meta; se a leitura falhar, o cabeçalho diz "Sem conversa" e a ficha abre.
+    // a Meta; se a leitura falhar, o cabeçalho diz que não carregou e a ficha abre.
+    //
+    // A ARQUIVADA TAMBÉM CONTA. Arquivar tira a conversa da lista de quem
+    // atende, não apaga nada: a janela de 24 h continua correndo e as mensagens
+    // continuam lá. Filtrando as arquivadas, a ficha dizia "nenhuma mensagem
+    // trocada ainda" para um parceiro que tinha respondido uma hora antes.
     supabase
       .from('conversations')
-      .select('window_expires_at, unread_count, assignee_id, last_message_at')
+      .select('window_expires_at, unread_count, assignee_id, last_inbound_at')
       .eq('organization_id', id)
-      .is('arquivada_em', null)
       .order('last_message_at', { ascending: false, nullsFirst: false })
       .limit(1),
   ]);
@@ -175,7 +184,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
         janelaExpiraEm: fio.window_expires_at,
         porLer: fio.unread_count,
         atendente: nomeDoTime.get(fio.assignee_id) ?? null,
-        ultimaMensagemEm: fio.last_message_at,
+        ultimaEntradaEm: fio.last_inbound_at,
       }
     : null;
 
@@ -224,6 +233,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     avaliacoes: org.reviews_count,
     etapasPorFunil,
     conversa,
+    conversaFalhou: Boolean(conversas.error),
     negocios: (negocios.data ?? []).map((d) => ({
       id: d.id,
       funil: funilPorId.get(d.pipeline_id) ?? 'Funil',

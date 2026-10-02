@@ -27,7 +27,6 @@ import { TransicaoPagina } from '@/components/movimento';
 import { hrefDoFunil, type ItemDoDia } from '@/components/meu-dia/tipos';
 import {
   carregarFicha,
-  diasDesde,
   ROTULO_STATUS,
   type Ficha,
   type NegocioDaFicha,
@@ -41,13 +40,18 @@ import {
 } from '@/components/parceiros/ficha-paineis';
 import { ReguaDoFunil } from '@/components/parceiros/ficha-regua';
 import {
+  diasDeDiferenca,
   formatarData,
   formatarLocal,
   formatarNumero,
   formatarProximaAcao,
   ROTULO_TIPO,
 } from '@/components/parceiros/formatos';
-import { oQueFoiOUltimoContato, type Passo } from '@/components/parceiros/paineis-da-ficha';
+import {
+  contatoMaisRecente,
+  oQueFoiOUltimoContato,
+  type Passo,
+} from '@/components/parceiros/paineis-da-ficha';
 import {
   carregarPaineis,
   type PaineisDaFicha,
@@ -303,13 +307,14 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
           <LeituraDaIaNaFicha
             dados={paineis.leitura}
-            temConversa={ficha.conversa !== null}
+            temConversa={ficha.conversa !== null || ficha.conversaFalhou}
             className="order-1 lg:order-none"
           />
 
           <AtividadeDaFicha
             atividade={paineis.atividade}
             organizationId={ficha.id}
+            temConversa={ficha.conversa !== null || ficha.conversaFalhou}
             className="order-3 lg:order-none"
           />
 
@@ -417,7 +422,11 @@ function ApoioDaRegua({
   negocio: NegocioDaFicha;
   regua: NonNullable<ReturnType<typeof montarRegua>>;
 }) {
-  const dias = diasDesde(negocio.naEtapaDesde);
+  // Dias de CALENDÁRIO em Natal, como o "último contato" ao lado: quem entrou na
+  // etapa ontem às 18h está nela "há 1 dia" às 10h de hoje, e não "desde hoje".
+  const dias = negocio.naEtapaDesde
+    ? Math.max(0, diasDeDiferenca(new Date(negocio.naEtapaDesde), new Date()))
+    : null;
   const haDias =
     dias === null ? null : dias === 0 ? (
       'desde hoje'
@@ -479,15 +488,22 @@ function Numeros({
   paineis: PaineisDaFicha;
 }) {
   const proxima = formatarProximaAcao(principal?.proximaAcaoEm);
-  // O mais recente entre o registro do negócio e a última mensagem da conversa:
-  // o negócio não anota cada mensagem, e a ficha dizia "Ontem" com mensagem de hoje.
-  const ultimoContatoEm = ultimoContatoDaFicha(
+  // O mais recente entre o registro do negócio, a última mensagem que o parceiro
+  // mandou e o último contato que a atividade mostra: o negócio não anota cada
+  // mensagem, e a ficha dizia "Ontem" com mensagem de hoje. Mensagem que a Meta
+  // recusou não entra (ver `ultimoContatoDaFicha`).
+  const ultimoContatoEm = ultimoContatoDaFicha([
     principal?.ultimoContatoEm,
-    ficha.conversa?.ultimaMensagemEm,
-  );
+    ficha.conversa?.ultimaEntradaEm,
+    contatoMaisRecente(paineis.atividade)?.em,
+  ]);
   const contato = ultimoContatoPorExtenso(ultimoContatoEm);
   const oQueFoi = oQueFoiOUltimoContato(paineis.atividade, ultimoContatoEm);
-  const whatsapp = estadoDoWhatsapp({ naoContatar: ficha.naoContatar, conversa: ficha.conversa });
+  const whatsapp = estadoDoWhatsapp({
+    naoContatar: ficha.naoContatar,
+    conversa: ficha.conversa,
+    falhou: ficha.conversaFalhou,
+  });
   const responsavel = principal?.responsavel ?? ficha.responsavel;
   const papelBruto = principal?.responsavel ? principal.responsavelPapel : ficha.responsavelPapel;
   const papel = isAppRole(papelBruto) ? ROTULO_PAPEL[papelBruto] : null;
@@ -587,7 +603,7 @@ function Numeros({
       </Numero>
 
       <Numero rotulo="WhatsApp">
-        <Valor>{whatsapp.titulo}</Valor>
+        <Valor apagado={ficha.conversa === null && !ficha.naoContatar}>{whatsapp.titulo}</Valor>
         <Apoio>
           {whatsapp.apoio.map((parte, i) =>
             parte.numerico ? (
@@ -618,7 +634,9 @@ function Numeros({
         <Apoio>
           {papel && responsavel ? `${papel}${SEPARADOR}` : null}
           {atendente === null
-            ? 'responde por este parceiro'
+            ? responsavel
+              ? 'responde por este parceiro'
+              : 'ninguém responde por este parceiro ainda'
             : atendente === responsavel
               ? 'atende a conversa'
               : `quem atende a conversa: ${atendente}`}
@@ -846,7 +864,8 @@ function LinhaDeContato({
  *    pé está o negócio" e onde o celular já a jogava de qualquer jeito.
  */
 function CartaoNegocio({ negocio }: { negocio: NegocioDaFicha }) {
-  const dias = diasDesde(negocio.ultimoContatoEm);
+  // "Hoje", "ontem", "há 5 dias": a mesma fala do cabeçalho, e não "há 0 dias".
+  const contato = negocio.ultimoContatoEm ? ultimoContatoPorExtenso(negocio.ultimoContatoEm) : null;
 
   return (
     <li className="flex flex-col gap-1 rounded-lg bg-muted/45 px-4 py-3">
@@ -870,12 +889,8 @@ function CartaoNegocio({ negocio }: { negocio: NegocioDaFicha }) {
       </p>
       <p className="text-xs text-muted-foreground">
         {negocio.tier ? `prioridade ${negocio.tier}, ` : ''}
-        {dias !== null ? (
-          <>
-            {'último contato há '}
-            <span className="numerico">{dias}</span>
-            {dias === 1 ? ' dia' : ' dias'}
-          </>
+        {contato ? (
+          <span className="numerico">último contato {contato.texto.toLowerCase()}</span>
         ) : (
           'sem contato registrado'
         )}

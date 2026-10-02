@@ -116,24 +116,25 @@ describe('o último contato, do jeito que se fala', () => {
   });
 });
 
-describe('o último contato é o mais recente entre o negócio e a conversa', () => {
+describe('o último contato é o mais recente entre o negócio, a conversa e a atividade', () => {
   it('mensagem depois do último registro do negócio vale a mensagem', () => {
-    expect(ultimoContatoDaFicha('2026-10-01T19:58:00Z', '2026-10-02T15:14:00Z')).toBe(
+    expect(ultimoContatoDaFicha(['2026-10-01T19:58:00Z', '2026-10-02T15:14:00Z'])).toBe(
       '2026-10-02T15:14:00Z',
     );
   });
 
   it('ligação registrada depois da última mensagem vale a ligação', () => {
-    expect(ultimoContatoDaFicha('2026-10-02T17:00:00Z', '2026-10-01T15:14:00Z')).toBe(
+    expect(ultimoContatoDaFicha(['2026-10-02T17:00:00Z', '2026-10-01T15:14:00Z', null])).toBe(
       '2026-10-02T17:00:00Z',
     );
   });
 
-  it('com um lado só, vale o que existe; sem nenhum, não inventa', () => {
-    expect(ultimoContatoDaFicha(null, '2026-10-02T15:14:00Z')).toBe('2026-10-02T15:14:00Z');
-    expect(ultimoContatoDaFicha('2026-10-02T15:14:00Z', undefined)).toBe('2026-10-02T15:14:00Z');
-    expect(ultimoContatoDaFicha(null, null)).toBeNull();
-    expect(ultimoContatoDaFicha('data quebrada', null)).toBeNull();
+  it('com uma data só, vale o que existe; sem nenhuma, não inventa', () => {
+    expect(ultimoContatoDaFicha([null, '2026-10-02T15:14:00Z'])).toBe('2026-10-02T15:14:00Z');
+    expect(ultimoContatoDaFicha(['2026-10-02T15:14:00Z', undefined])).toBe('2026-10-02T15:14:00Z');
+    expect(ultimoContatoDaFicha([null, null, undefined])).toBeNull();
+    expect(ultimoContatoDaFicha(['data quebrada'])).toBeNull();
+    expect(ultimoContatoDaFicha([])).toBeNull();
   });
 });
 
@@ -145,7 +146,7 @@ describe('o estado do WhatsApp', () => {
     janelaExpiraEm,
     porLer,
     atendente: 'Heloísa',
-    ultimaMensagemEm: null,
+    ultimaEntradaEm: null,
   });
 
   it('janela aberta diz quantas horas faltam', () => {
@@ -181,6 +182,12 @@ describe('o estado do WhatsApp', () => {
     );
     expect(texto(estado)).toBe('por mais 10 h · 2 por ler');
     expect(estado.apoio.filter((p) => p.numerico).map((p) => p.texto)).toEqual(['10', '2']);
+  });
+
+  it('erro ao ler a conversa não vira "nenhuma mensagem trocada"', () => {
+    const estado = estadoDoWhatsapp({ naoContatar: false, conversa: null, falhou: true }, AGORA);
+    expect(estado.titulo).toBe('Não carregou');
+    expect(texto(estado)).not.toContain('nenhuma mensagem');
   });
 
   it('sem conversa nenhuma, diz isso', () => {

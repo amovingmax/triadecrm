@@ -44,8 +44,16 @@ export function TelefoneRevelavel({
    */
   whatsapp?: 'externo' | 'crm' | 'nenhum';
 }) {
-  const [revelado, setRevelado] = useState<string | null>(mascarado ? null : telefone);
+  // O número revelado vale só para a máscara que o revelou. Guardado sozinho, ele
+  // sobrevivia à troca do telefone na folha de edição: a linha continuava
+  // mostrando o número antigo enquanto "Copiar" já copiava o novo.
+  const [revelacao, setRevelacao] = useState<{ de: string | null; numero: string } | null>(null);
   const [revelando, setRevelando] = useState(false);
+  const revelado = mascarado
+    ? revelacao && revelacao.de === telefone
+      ? revelacao.numero
+      : null
+    : telefone;
 
   // Ficha sem telefone não é um beco: 34 das 100 fichas em produção estão assim,
   // e um terço da base parada por falta de número é o maior buraco de alcance que
@@ -72,13 +80,13 @@ export function TelefoneRevelavel({
       return;
     }
 
-    setRevelado(data);
+    setRevelacao({ de: telefone, numero: data });
     toast.success('Telefone revelado.', { description: 'A revelação ficou registrada.' });
   }
 
   // Copiar só o número que já está à vista: para quem recebe a máscara, o botão
   // nasce depois de "Revelar", e copiar não é uma segunda revelação.
-  const paraCopiar = mascarado ? revelado : telefone;
+  const paraCopiar = revelado;
   async function copiar(numero: string) {
     try {
       await navigator.clipboard.writeText(numero);

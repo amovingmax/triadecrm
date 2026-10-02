@@ -110,21 +110,22 @@ export function ultimoContatoPorExtenso(
 
 /**
  * Quando foi, de fato, o último contato: o mais recente entre o do negócio
- * (`deals.last_activity_at`) e a última mensagem da conversa.
+ * (`deals.last_activity_at`), a última mensagem que o parceiro mandou e o
+ * último contato que a atividade da ficha mostra.
  *
  * O negócio só anota o contato quando nasce uma ATIVIDADE — a primeira resposta
  * do parceiro, uma ligação registrada. As mensagens seguintes da mesma conversa
  * não mexem nele, e a ficha dizia "Ontem" para quem tinha escrito há dez minutos.
+ *
+ * `conversations.last_message_at` NÃO entra, de propósito: ele sobe em toda
+ * mensagem de saída inserida, inclusive a que a Meta recusa depois. Usá-lo
+ * faria de um envio que falhou o "último contato" de quem não recebeu nada. A
+ * saída que de fato saiu vem da atividade, que sabe qual falhou.
  */
-export function ultimoContatoDaFicha(
-  doNegocio: string | null | undefined,
-  daConversa: string | null | undefined,
-): string | null {
-  const datas = [doNegocio, daConversa].filter(
-    (iso): iso is string => !!iso && !Number.isNaN(Date.parse(iso)),
-  );
-  if (datas.length === 0) return null;
-  return datas.reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a));
+export function ultimoContatoDaFicha(datas: readonly (string | null | undefined)[]): string | null {
+  const validas = datas.filter((iso): iso is string => !!iso && !Number.isNaN(Date.parse(iso)));
+  if (validas.length === 0) return null;
+  return validas.reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a));
 }
 
 // ---------------------------------------------------------------------------
@@ -139,8 +140,8 @@ export type ConversaDaFicha = {
   porLer: number;
   /** Quem atende a conversa, pelo nome. */
   atendente: string | null;
-  /** `conversations.last_message_at`: a última mensagem, de qualquer dos lados. */
-  ultimaMensagemEm: string | null;
+  /** `conversations.last_inbound_at`: a última mensagem que o PARCEIRO mandou. */
+  ultimaEntradaEm: string | null;
 };
 
 export type EstadoDoWhatsapp = {
@@ -161,11 +162,21 @@ export type EstadoDoWhatsapp = {
  * sair, o estado da janela é irrelevante — nada sai.
  */
 export function estadoDoWhatsapp(
-  entrada: { naoContatar: boolean; conversa: ConversaDaFicha | null },
+  entrada: {
+    naoContatar: boolean;
+    conversa: ConversaDaFicha | null;
+    /** A leitura da conversa deu erro: não se sabe se há conversa. */
+    falhou?: boolean;
+  },
   agora: Date = new Date(),
 ): EstadoDoWhatsapp {
   if (entrada.naoContatar) {
     return { titulo: 'Não contatar', apoio: [{ texto: 'pediu para não receber mensagens' }] };
+  }
+  // Erro de leitura não é "sem conversa": dizer que nada foi trocado, sem saber,
+  // é a afirmação errada que faz alguém mandar um primeiro contato repetido.
+  if (entrada.falhou) {
+    return { titulo: 'Não carregou', apoio: [{ texto: 'recarregue para ver a janela' }] };
   }
   const conversa = entrada.conversa;
   if (!conversa) {

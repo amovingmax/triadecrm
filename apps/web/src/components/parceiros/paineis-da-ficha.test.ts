@@ -8,6 +8,7 @@ import {
   contagemDosPassos,
   montarAtividade,
   montarLeituraDaFicha,
+  contatoMaisRecente,
   montarProximosPassos,
   oQueFoiOUltimoContato,
   quando,
@@ -173,6 +174,7 @@ describe('a atividade do parceiro', () => {
           body: 'Importado de planilha',
         }),
       ],
+      criadaEm: '2026-09-30T15:52:00Z',
     });
 
     expect(itens.map((i) => [i.tipo, i.titulo, i.detalhe])).toEqual([
@@ -244,15 +246,51 @@ describe('a atividade do parceiro', () => {
       to_stage_id: 12,
       changed_at: '2026-09-30T15:52:34Z',
     });
+    const criadaEm = '2026-09-30T15:52:34Z';
     expect(
-      montar({ atividades: [origem], historico: [entrou] }).itens.map((i) => i.titulo),
+      montar({ atividades: [origem], historico: [entrou], criadaEm }).itens.map((i) => i.titulo),
     ).toEqual(['Entrou na base']);
     // Entrou no funil dias depois de entrar na base: aí é notícia.
     const depois = { ...entrou, changed_at: '2026-10-01T12:00:00Z' };
-    expect(montar({ atividades: [origem], historico: [depois] }).itens[0]).toMatchObject({
+    expect(montar({ atividades: [origem], historico: [depois], criadaEm }).itens[0]).toMatchObject({
       titulo: 'Entrou no funil',
       detalhe: 'Prospectado',
     });
+  });
+
+  it('registro do sistema que não nasceu com a ficha não é "Entrou na base"', () => {
+    // O motor também grava "Candidato do Radar mesclado nesta ficha" e parecidos.
+    // Um mês depois da entrada, isso não pode aparecer como "Entrou na base · hoje".
+    const mescla = atividade({
+      id: 'a-mescla',
+      type: 'system',
+      channel: null,
+      user_id: null,
+      occurred_at: '2026-10-02T14:00:00Z',
+      body: 'Candidato do Radar mesclado nesta ficha',
+    });
+    const [item] = montar({ atividades: [mescla], criadaEm: '2026-09-01T12:00:00Z' }).itens;
+    expect(item).toMatchObject({
+      titulo: 'Registro do sistema',
+      detalhe: 'Candidato do Radar mesclado nesta ficha',
+      contato: false,
+    });
+    // Sem saber quando a ficha nasceu, nenhum registro é chamado de entrada.
+    expect(montar({ atividades: [mescla] }).itens[0]?.titulo).toBe('Registro do sistema');
+  });
+
+  it('mensagem que a Meta recusou aparece na lista, mas não é contato', () => {
+    const falhou = { ...SAIDA_DA_HELOISA, id: 'm-falhou', status: 'failed' };
+    const antiga = mensagem({ id: 'm-antiga', created_at: '2026-09-28T15:00:00Z' });
+    const atividadeComFalha = montar({ mensagens: [falhou, antiga] });
+    expect(atividadeComFalha.itens[0]).toMatchObject({
+      titulo: 'Mensagem não entregue',
+      contato: false,
+    });
+    // O contato mais recente é a mensagem recebida dias antes, e não o envio que falhou.
+    expect(contatoMaisRecente(atividadeComFalha)?.id).toBe('mensagem:m-antiga');
+    expect(oQueFoiOUltimoContato(atividadeComFalha, '2026-10-01T19:58:05Z')).toBeNull();
+    expect(contatoMaisRecente(null)).toBeNull();
   });
 
   it('no mesmo segundo, a mudança de etapa fica acima do que a causou', () => {
@@ -435,6 +473,25 @@ describe('os próximos passos', () => {
     });
   });
 
+  it('tarefa de hoje cuja hora já passou está atrasada, e não "vence hoje"', () => {
+    // AGORA são 15:00 em Natal. A das 09:00 já venceu; a das 17:00 ainda vence.
+    const p = montarProximosPassos(
+      {
+        reunioes: [],
+        tarefas: [
+          tarefa({ id: 'manha', title: 'Da manhã', due_at: '2026-10-02T12:00:00Z' }),
+          tarefa({ id: 'tarde', title: 'Da tarde', due_at: '2026-10-02T20:00:00Z' }),
+        ],
+        pessoas: NOMES,
+      },
+      AGORA,
+    );
+    expect(p.passos.map((x) => [x.titulo, x.selo])).toEqual([
+      ['Da manhã', 'atrasada'],
+      ['Da tarde', 'vence hoje'],
+    ]);
+  });
+
   it('tarefa atrasada, sem prazo e já feita', () => {
     const p = montarProximosPassos(
       {
@@ -533,6 +590,18 @@ describe('a leitura da IA na ficha', () => {
   it('intenção que a tela não conhece cai na faixa da nota, nunca em caixa alta', () => {
     const l = montarLeituraDaFicha(leitura({ intencao: 'INTENCAO_NOVA' }));
     expect(l?.etiquetas[0]).toEqual({ rotulo: 'Intenção', valor: 'engajado' });
+  });
+
+  it('alerta que repete a intenção não entra duas vezes', () => {
+    const l = montarLeituraDaFicha(
+      leitura({ intencao: 'PRONTO_PARA_FECHAR', alertas: ['pronto_para_fechar', 'risco_perda'] }),
+    );
+    expect(l?.etiquetas.map((e) => `${e.rotulo} ${e.valor}`)).toEqual([
+      'Intenção pronto para fechar',
+      'Sentimento positivo',
+      'Objeção preço',
+      'Alerta risco de perder',
+    ]);
   });
 
   it('alerta vira etiqueta, com o rótulo de gente', () => {

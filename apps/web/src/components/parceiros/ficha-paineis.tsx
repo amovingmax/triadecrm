@@ -86,9 +86,11 @@ function Data({ quando: q }: { quando: Quando }) {
   );
 }
 
-function NaoCarregou({ titulo }: { titulo: string }) {
+function NaoCarregou({ titulo, className }: { titulo: string; className?: string }) {
   return (
-    <section className={CARTAO}>
+    // O `className` carrega a ordem do cartão no celular: sem ele, o cartão que
+    // falhou pulava para o topo da coluna.
+    <section className={cn(CARTAO, className)}>
       <h2 className={TITULO}>{titulo}</h2>
       <p className="text-sm text-muted-foreground">
         Não deu para carregar agora. Recarregue a página para tentar de novo.
@@ -118,7 +120,7 @@ export function LeituraDaIaNaFicha({
   temConversa: boolean;
   className?: string;
 }) {
-  if (dados === null) return <NaoCarregou titulo="Leitura da IA" />;
+  if (dados === null) return <NaoCarregou titulo="Leitura da IA" className={className} />;
   const { leitura, moduloLigado } = dados;
 
   const cabecalho = (aoLado?: React.ReactNode) => (
@@ -271,26 +273,31 @@ const ICONE_DA_ATIVIDADE: Record<TipoDeAtividade, LucideIcon> = {
 export function AtividadeDaFicha({
   atividade,
   organizationId,
+  temConversa,
   className,
 }: {
   atividade: Atividade | null;
   organizationId: string;
+  /** Sem conversa, o link "Abrir a conversa" levaria a uma tela vazia. */
+  temConversa: boolean;
   className?: string;
 }) {
-  if (atividade === null) return <NaoCarregou titulo="Atividade" />;
+  if (atividade === null) return <NaoCarregou titulo="Atividade" className={className} />;
   const agora = new Date();
 
   return (
     <section className={cn(CARTAO, className)}>
       <div className="flex items-center justify-between gap-3">
         <h2 className={TITULO}>Atividade</h2>
-        <Link
-          href={`/conversas?org=${organizationId}`}
-          className="toque inline-flex min-h-11 items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline md:min-h-0"
-        >
-          Abrir a conversa
-          <ArrowRight className="size-4" aria-hidden="true" />
-        </Link>
+        {temConversa ? (
+          <Link
+            href={`/conversas?org=${organizationId}`}
+            className="toque inline-flex min-h-11 items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline md:min-h-0"
+          >
+            Abrir a conversa
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
+        ) : null}
       </div>
 
       {atividade.itens.length === 0 ? (
@@ -371,7 +378,7 @@ export function ProximosPassosDaFicha({
   passos: ProximosPassos | null;
   className?: string;
 }) {
-  if (passos === null) return <NaoCarregou titulo="Próximos passos" />;
+  if (passos === null) return <NaoCarregou titulo="Próximos passos" className={className} />;
   const contagem = contagemDosPassos(passos);
 
   return (
@@ -427,7 +434,17 @@ function LinhaDePasso({ passo }: { passo: Passo }) {
               {passo.apoio ? ` · ${passo.apoio}` : null}
             </>
           ) : (
-            passo.apoio
+            <>
+              {passo.apoio}
+              {/* Na atrasada o selo ocupa o lugar do prazo: a data vem para cá,
+                  senão "atrasada" não diz desde quando. */}
+              {passo.selo === 'atrasada' && passo.quando ? (
+                <>
+                  {' · prazo '}
+                  <Data quando={passo.quando} />
+                </>
+              ) : null}
+            </>
           )}
         </p>
       </div>
