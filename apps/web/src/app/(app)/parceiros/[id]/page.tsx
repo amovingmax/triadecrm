@@ -19,7 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import { iniciaisDe } from '@/lib/iniciais';
 import { LEITURA } from '@/lib/larguras';
-import { type AppRole } from '@/lib/auth/role';
+import { isAppRole, ROTULO_PAPEL, type AppRole } from '@/lib/auth/role';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChipTemperatura } from '@/components/temperatura';
@@ -33,7 +33,12 @@ import {
   type NegocioDaFicha,
 } from '@/components/parceiros/ficha';
 import { AcoesDaFicha } from '@/components/parceiros/ficha-acoes';
-import { CompletarAFicha, EdicaoDaFicha } from '@/components/parceiros/ficha-edicao';
+import { CompletarAFicha, EdicaoDaFicha, EditarContato } from '@/components/parceiros/ficha-edicao';
+import {
+  AtividadeDaFicha,
+  LeituraDaIaNaFicha,
+  ProximosPassosDaFicha,
+} from '@/components/parceiros/ficha-paineis';
 import { ReguaDoFunil } from '@/components/parceiros/ficha-regua';
 import {
   formatarData,
@@ -42,6 +47,11 @@ import {
   formatarProximaAcao,
   ROTULO_TIPO,
 } from '@/components/parceiros/formatos';
+import { oQueFoiOUltimoContato, type Passo } from '@/components/parceiros/paineis-da-ficha';
+import {
+  carregarPaineis,
+  type PaineisDaFicha,
+} from '@/components/parceiros/paineis-da-ficha-dados';
 import { ProximaAcao } from '@/components/parceiros/proxima-acao';
 import { carregarCatalogos } from '@/components/parceiros/catalogos';
 import {
@@ -49,6 +59,7 @@ import {
   estadoDoWhatsapp,
   montarRegua,
   presencaPublica,
+  ultimoContatoDaFicha,
   ultimoContatoPorExtenso,
 } from '@/components/parceiros/resumo-da-ficha';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
@@ -115,9 +126,15 @@ export async function generateMetadata({
  *      cabeçalho e de novo no cartão "Negócios". Com um negócio só, o cartão
  *      some: tudo o que ele dizia está na régua. Com dois ou mais, ele volta.
  *   4. O PRÉ-CADASTRO NÃO OCUPA O QUE NÃO COMEÇOU (`painel-precadastro.tsx`).
+ *   5. O QUE SE VIA EM OUTROS TRÊS MÓDULOS, AQUI (entrega 2). A leitura da IA
+ *      sobre a conversa, a atividade recente e os próximos passos entram como
+ *      três painéis (`ficha-paineis.tsx`), e a próxima reunião sobe para o
+ *      primeiro número do cabeçalho. Nenhum deles grava: as ações continuam em
+ *      Conversas, na Agenda e no Meu dia, e os painéis levam até lá.
  *
- * As regras do que cada bloco diz estão em `resumo-da-ficha.ts`, com teste. A
- * página só lê: nada aqui escreve no banco nem fala com a Meta.
+ * As regras do que cada bloco diz estão em `resumo-da-ficha.ts` e em
+ * `paineis-da-ficha.ts`, com teste. A página só lê: nada aqui escreve no banco,
+ * fala com a Meta ou chama a IA.
  *
  * As saídas continuam sendo o motivo de a ficha não ser um beco: oito lugares do
  * CRM apontam para cá (a fila do dia, o quadro dos funis, a busca global, a
@@ -130,11 +147,14 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
   // categorias e das 22 cidades para montar os dois seletores, e buscá-los só ao
   // abrir a folha deixaria os campos vazios por meio segundo — tempo suficiente
   // para alguém salvar sem cidade achando que a ficha não tinha uma.
-  const [ficha, sessao, catalogos, conectado] = await Promise.all([
+  const [ficha, sessao, catalogos, conectado, paineis] = await Promise.all([
     carregarFicha(id),
     requireSession(),
     carregarCatalogos(),
     whatsappConectado(),
+    // Os três painéis vêm na mesma ida. Cada um falha sozinho: se um não
+    // carregar, o cartão dele avisa e o resto da ficha abre.
+    carregarPaineis(id),
   ]);
   if (!ficha) notFound();
 
@@ -247,28 +267,57 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
 
         <div className="h-px bg-hairline" aria-hidden="true" />
 
-        <Numeros ficha={ficha} principal={principal} />
+        <Numeros ficha={ficha} principal={principal} paineis={paineis} />
       </header>
 
-      {/* ------------------------------------------------------------ o corpo */}
-      <div className="grid items-start gap-5 lg:grid-cols-2">
-        <Contato ficha={ficha} whatsappPeloCrm={conectado && podeEscrever} />
+      {/* ------------------------------------------------------------ o corpo
+          Duas colunas no desktop: à esquerda o que é do parceiro e o que está
+          marcado (contato, próximos passos, pré-cadastro); à direita o que foi
+          dito (a leitura da IA e a atividade), que pede mais largura.
 
-        <div className="flex min-w-0 flex-col gap-5">
+          No celular as colunas se desfazem (`contents`) e a ordem é a de quem
+          vai falar com o parceiro agora: o que a IA leu, o que está marcado, o
+          que foi dito por último — e só então o cadastro. */}
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
+          <Contato
+            ficha={ficha}
+            whatsappPeloCrm={conectado && podeEscrever}
+            className="order-4 lg:order-none"
+          />
+
+          <ProximosPassosDaFicha passos={paineis.passos} className="order-2 lg:order-none" />
+
           {/* O pré-cadastro é o que vem DEPOIS de o negócio andar: a escada dele
               (rascunho, autorização, link) só faz sentido para quem já leu em
               que pé a conversa está. Enquanto não começou, ocupa uma linha. */}
-          <PainelPreCadastro
+          <div className="order-5 min-w-0 lg:order-none">
+            <PainelPreCadastro
+              organizationId={ficha.id}
+              papel={sessao.papel}
+              naoContatar={ficha.naoContatar}
+            />
+          </div>
+        </div>
+
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
+          <LeituraDaIaNaFicha
+            dados={paineis.leitura}
+            temConversa={ficha.conversa !== null}
+            className="order-1 lg:order-none"
+          />
+
+          <AtividadeDaFicha
+            atividade={paineis.atividade}
             organizationId={ficha.id}
-            papel={sessao.papel}
-            naoContatar={ficha.naoContatar}
+            className="order-3 lg:order-none"
           />
 
           {/* Com um negócio só, a régua do cabeçalho já disse tudo. A lista volta
               quando há mais de um: aí o cabeçalho mostra o principal, e os outros
               não podem sumir. */}
           {ficha.negocios.length > 1 ? (
-            <section className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-5">
+            <section className="sombra-base order-6 flex min-w-0 flex-col gap-3 rounded-xl bg-card p-5 lg:order-none">
               <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
                 Negócios{' '}
                 <span className="numerico font-normal text-muted-foreground">
@@ -284,9 +333,6 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
           ) : null}
         </div>
       </div>
-
-      {/* A linha do tempo e a conversa moram na tela de Conversas, e é para lá
-          que "Conversar" leva. */}
     </TransicaoPagina>
   );
 
@@ -423,17 +469,73 @@ function ApoioDaRegua({
  * Os quatro números de quem vai falar com o parceiro agora. Quatro colunas com
  * um fio entre elas no desktop; dois por linha no celular.
  */
-function Numeros({ ficha, principal }: { ficha: Ficha; principal: NegocioDaFicha | null }) {
+function Numeros({
+  ficha,
+  principal,
+  paineis,
+}: {
+  ficha: Ficha;
+  principal: NegocioDaFicha | null;
+  paineis: PaineisDaFicha;
+}) {
   const proxima = formatarProximaAcao(principal?.proximaAcaoEm);
-  const contato = ultimoContatoPorExtenso(principal?.ultimoContatoEm);
+  // O mais recente entre o registro do negócio e a última mensagem da conversa:
+  // o negócio não anota cada mensagem, e a ficha dizia "Ontem" com mensagem de hoje.
+  const ultimoContatoEm = ultimoContatoDaFicha(
+    principal?.ultimoContatoEm,
+    ficha.conversa?.ultimaMensagemEm,
+  );
+  const contato = ultimoContatoPorExtenso(ultimoContatoEm);
+  const oQueFoi = oQueFoiOUltimoContato(paineis.atividade, ultimoContatoEm);
   const whatsapp = estadoDoWhatsapp({ naoContatar: ficha.naoContatar, conversa: ficha.conversa });
   const responsavel = principal?.responsavel ?? ficha.responsavel;
+  const papelBruto = principal?.responsavel ? principal.responsavelPapel : ficha.responsavelPapel;
+  const papel = isAppRole(papelBruto) ? ROTULO_PAPEL[papelBruto] : null;
   const atendente = ficha.conversa?.atendente ?? null;
+  // A reunião marcada é mais concreta que a "próxima ação" escrita no negócio:
+  // tem dia, hora e dono. Quando existe, é ela que abre o cabeçalho.
+  const reuniao: Passo | null = paineis.passos?.proximaReuniao ?? null;
 
   return (
     <dl className="grid grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-4 md:gap-0 md:divide-x md:divide-hairline">
-      <Numero rotulo="Próxima ação">
-        {principal?.proximaAcao ? (
+      <Numero
+        rotulo={
+          reuniao ? (
+            // No celular a coluna tem 160 px: "Próximo compromisso" quebrava em
+            // duas linhas e desalinhava o valor do vizinho.
+            <>
+              <span className="md:hidden">Compromisso</span>
+              <span className="hidden md:inline">Próximo compromisso</span>
+            </>
+          ) : (
+            'Próxima ação'
+          )
+        }
+      >
+        {reuniao ? (
+          <>
+            <Valor>
+              <span
+                aria-hidden="true"
+                className="size-2 shrink-0 rounded-full bg-menta ring-4 ring-menta/20"
+              />
+              <span className="min-w-0 break-words md:truncate">{reuniao.titulo}</span>
+            </Valor>
+            <Apoio>
+              {reuniao.quando ? (
+                <span title={reuniao.quando.texto}>
+                  {reuniao.quando.palavra}
+                  {reuniao.quando.data ? (
+                    <span className="numerico">{reuniao.quando.data}</span>
+                  ) : null}
+                  {' às '}
+                  <span className="numerico">{reuniao.quando.hora}</span>
+                </span>
+              ) : null}
+              {reuniao.selo ? `${SEPARADOR}${reuniao.selo}` : null}
+            </Apoio>
+          </>
+        ) : principal?.proximaAcao ? (
           <>
             <Valor>
               {/* O único ponto de cor do cabeçalho: é o que pede para alguém agir. */}
@@ -472,8 +574,12 @@ function Numeros({ ficha, principal }: { ficha: Ficha; principal: NegocioDaFicha
       <Numero rotulo="Último contato">
         <Valor apagado={contato.texto === 'Sem registro'}>{contato.texto}</Valor>
         <Apoio>
-          {principal?.ultimoContatoEm ? (
-            <span className="numerico">{formatarData(principal.ultimoContatoEm)}</span>
+          {oQueFoi ? (
+            <>
+              {oQueFoi.texto} às <span className="numerico">{oQueFoi.hora}</span>
+            </>
+          ) : ultimoContatoEm ? (
+            <span className="numerico">{formatarData(ultimoContatoEm)}</span>
           ) : (
             'nenhum contato registrado'
           )}
@@ -510,6 +616,7 @@ function Numeros({ ficha, principal }: { ficha: Ficha; principal: NegocioDaFicha
           <Valor apagado>Sem responsável</Valor>
         )}
         <Apoio>
+          {papel && responsavel ? `${papel}${SEPARADOR}` : null}
           {atendente === null
             ? 'responde por este parceiro'
             : atendente === responsavel
@@ -521,7 +628,7 @@ function Numeros({ ficha, principal }: { ficha: Ficha; principal: NegocioDaFicha
   );
 }
 
-function Numero({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+function Numero({ rotulo, children }: { rotulo: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 md:px-7 md:first:pl-0 md:last:pr-0">
       <dt className="text-[11px] leading-4 font-semibold tracking-[0.07em] text-muted-foreground uppercase">
@@ -557,13 +664,29 @@ function Apoio({ children }: { children: React.ReactNode }) {
  * entrega o número mascarado, e ver o número inteiro é uma ação registrada em
  * `pii_access_log` (RF-BAS-14, RF-ADM-03). O desenho novo não muda isso.
  */
-function Contato({ ficha, whatsappPeloCrm }: { ficha: Ficha; whatsappPeloCrm: boolean }) {
+function Contato({
+  ficha,
+  whatsappPeloCrm,
+  className,
+}: {
+  ficha: Ficha;
+  whatsappPeloCrm: boolean;
+  className?: string;
+}) {
   const lugar = formatarLocal(ficha.bairro, ficha.cidade);
   const faltam = camposQueFaltam(ficha);
 
   return (
-    <section className="sombra-base flex min-w-0 flex-col gap-4 rounded-xl bg-card p-5 md:p-6">
-      <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Contato</h2>
+    <section
+      className={cn(
+        'sombra-base flex min-w-0 flex-col gap-4 rounded-xl bg-card p-5 md:p-6',
+        className,
+      )}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Contato</h2>
+        <EditarContato />
+      </div>
 
       <ul className="flex flex-col gap-3.5">
         <LinhaDeContato icone={Phone} rotulo="WhatsApp">

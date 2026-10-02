@@ -5959,3 +5959,114 @@ funcionalidade nova e a única parte que grava.
 - Parceiro em dois funis: o cabeçalho mostra a régua do negócio principal (o
   aberto mais recente) e os demais ficam no cartão "Negócios". Confirmar.
 - "Conversar" virou a ação de destaque, no lugar de "Registrar contato".
+
+### 02/10/2026 — A ficha do parceiro, redesenhada (entrega 2 de 2): leitura da IA, atividade e próximos passos (RF-BAS-01 a 06)
+
+Pedido do Janio, vendo a entrega 1 no localhost ao lado da maquete aprovada: "e
+cadê a leitura da IA com o dashboard de 0-100 com a sugestão, a seção de
+atividade, próximos passos... Quero que fique igual o print que você me enviou".
+
+**Na branch local `ficha-do-parceiro`, fora de produção. Só o site; só leitura.**
+
+- **Leitura da IA.** Um cartão com a nota de 0 a 100 num medidor em arco, o
+  resumo da conversa, as etiquetas (intenção, sentimento, objeções, alertas) e a
+  sugestão do próximo passo, com a hora em que foi atualizada. A ficha **não
+  chama a IA**: mostra a linha que o worker já gravou em `ficha_da_conversa`, a
+  mesma que aparece dentro da conversa, com os mesmos rótulos. Sem 👍/👎 na
+  ficha (é a única escrita daquele bloco, e continua só na conversa).
+  - Se o parceiro escreveu mais de 30 min depois da leitura, o cartão avisa que
+    ela não considera as últimas mensagens.
+  - Sem leitura, o cartão encolhe para uma frase que diz por quê: não há
+    conversa, a conversa é curta demais, o módulo está desligado
+    (`ia.crm_inteligente.modulos.ficha`) ou a leitura ainda não rodou.
+- **Atividade.** As cinco últimas coisas que aconteceram com o parceiro, da mais
+  nova para a mais antiga: mensagem recebida, resposta de quem atendeu (sem a
+  assinatura `*Nome:*` crua), ligação ou visita registrada com o desfecho,
+  mudança de etapa ("Prospectado → Reunião marcada") e a entrada na base. Usa
+  `montarLinhaDoTempo`, a mesma função da tela de Conversas, então a atividade
+  que espelha uma mensagem não aparece duas vezes. "Abrir a conversa" leva ao
+  histórico inteiro.
+- **Próximos passos.** As reuniões de pé (`reunioes` em `a_confirmar`, `marcada`
+  ou `confirmada`) e as tarefas abertas do parceiro, com a contagem no canto
+  ("2 reuniões · 1 tarefa"). **Só lista**: a única saída é o link "Abrir a
+  sala" da reunião on-line. Concluir tarefa e registrar o resultado continuam
+  na Agenda e no Meu dia.
+  - A tarefa que é o eco de uma reunião (`reunioes.task_id`, ADR-15) não entra,
+    para a mesma reunião não aparecer duas vezes.
+  - Reunião que já passou e continua "marcada" aparece como "aguarda
+    resultado"; tarefa com prazo vencido, como "atrasada"; a de hoje, "vence
+    hoje".
+  - Cada um vê o que a RLS já deixa: `tasks_select` (admin, gestor, sdr,
+    leitura e financeiro veem todas; embaixador, as suas) e `reunioes_select`.
+- **Cabeçalho.** O primeiro número vira "Próximo compromisso" quando há reunião
+  futura (formato, dia e hora); sem reunião, continua "Próxima ação", a do
+  negócio. O responsável ganhou o papel ("SDR · atende a conversa").
+- **"Último contato" passou a olhar a conversa.** `deals.last_activity_at` só
+  anda quando nasce uma atividade (a primeira resposta, uma ligação
+  registrada); as mensagens seguintes não mexem nele, e a ficha dizia "Ontem"
+  para quem tinha escrito há dez minutos. Agora vale o mais recente entre o
+  negócio e `conversations.last_message_at`, e a linha de apoio diz o que foi:
+  "mensagem recebida às 15:34". **Só a ficha mudou**: a lista de parceiros e o
+  funil continuam lendo `last_activity_at`.
+- **Disposição.** No computador, duas colunas: contato, próximos passos e
+  pré-cadastro à esquerda; leitura da IA e atividade à direita, como na maquete.
+  No celular, uma coluna na ordem de quem vai falar com o parceiro: leitura da
+  IA, próximos passos, atividade, contato, pré-cadastro.
+- "Editar" no canto do cartão de contato, abrindo a mesma folha do menu "⋯".
+- **Cada painel falha sozinho.** Se a leitura de um deles der erro, o cartão
+  dele diz "não deu para carregar" e o resto da ficha abre.
+
+**A menta entrou na nota da IA.** `conversas/leitura-da-ia.tsx` diz que a leitura
+da IA é "sem cor", para não ser confundida com a temperatura. Na ficha, o arco
+da nota, a sugestão e o que chegou do parceiro usam a menta, que é o acento da
+casa e não a escala térmica; o chip de temperatura continua sendo o único lugar
+com cor de temperatura. Foi o que a maquete aprovada mostrava e o que o Janio
+pediu para manter igual.
+
+Arquivos, todos em `apps/web/src`: `components/parceiros/paineis-da-ficha.ts` e
+`.test.ts` (as regras, puras), `paineis-da-ficha-dados.ts` (a leitura, no
+servidor, só `select`), `ficha-paineis.tsx` (os três cartões); `ficha.ts` (papel
+do responsável e última mensagem da conversa), `resumo-da-ficha.ts` e `.test.ts`
+(`ultimoContatoDaFicha`), `ficha-edicao.tsx` (`EditarContato`) e
+`app/(app)/parceiros/[id]/page.tsx`. Nada em `supabase/`, `apps/workers/` nem
+`packages/`; nenhum arquivo de `components/conversas/` mudou.
+
+Testes: Vitest 1.145 no site (37 novos: datas por extenso, atividade, próximos
+passos, leitura da IA, último contato), lint, typecheck e build. No Chrome,
+contra o Supabase local, 43 conferências com gestor e SDR, no computador e em
+390 px: nota, sugestão e etiquetas iguais às do banco; arco preenchendo a
+fração da nota; atividade em ordem e sem assinatura crua; contagem e horários
+dos próximos passos batendo com o banco; leitura desatualizada, ficha sem
+leitura e ficha sem conversa; ordem dos cartões no celular; e a conferência de
+que a ficha só leu — mensagens, conversas, fichas, tarefas, reuniões, leituras,
+`feedback_da_ia`, `ai_runs`, `pii_access_log` e a fila de saída do WhatsApp
+iguais antes e depois. Tema claro conferido por foto.
+
+**Dados de teste criados no banco LOCAL para a conferência** (não existem em
+produção): três linhas em `ficha_da_conversa` com `prompt_version =
+'teste-local'` (Abracadabra Festas 72, Jôsy Buffet 88, Accord 34, esta de
+propósito desatualizada) e uma mensagem de entrada simulada na Abracadabra.
+
+**Não foi conferido:** leitura gerada de verdade pelo worker de IA (no local o
+módulo está desligado e as três leituras foram escritas à mão); reunião
+presencial e tarefa sem prazo na tela (só em teste de unidade); papéis leitura,
+financeiro e embaixador; parceiro com mais de cinco passos.
+
+**Precisa de decisão humana:**
+- **A leitura da IA só aparece em produção se o módulo estiver ligado**
+  (`ia.crm_inteligente.modulos.ficha`). No banco local ele está desligado, que é
+  como o módulo nasce. Desligado, toda ficha mostra o cartão vazio com a frase
+  "A leitura da IA está desligada". Ligar é decisão do Rafael: gera custo de IA
+  (Claude Haiku, dentro do orçamento de `ia.orcamento`), não de WhatsApp.
+- A nota da IA em menta, contra a regra "sem cor" da leitura dentro da conversa
+  (acima). Confirmar com o Rafael, ou voltar o arco para tinta neutra.
+- "Último contato" da ficha agora difere do da lista de parceiros quando há
+  mensagem mais nova que a última atividade. Decidir se a lista e o funil devem
+  seguir a mesma regra (isso seria no banco, e não foi feito).
+- Com a entrega 2, a pendência "qual das três é o próximo compromisso" foi
+  resolvida assim: a próxima reunião futura; sem ela, a próxima ação do negócio.
+  Tarefa não sobe para o cabeçalho. Confirmar.
+- Continua valendo: tela nova, aval do Rafael antes de subir.
+
+**Fica para depois:** o bloco "Pessoas", que é funcionalidade nova e a única
+parte que grava.

@@ -60,6 +60,24 @@ export function useEditarFicha(): Abrir | null {
 }
 
 /**
+ * "Editar", no canto do cartão de contato: a mesma folha do menu "⋯", aberta de
+ * onde o dado está. Para quem só lê, não aparece.
+ */
+export function EditarContato() {
+  const abrir = useEditarFicha();
+  if (!abrir) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => abrir()}
+      className="toque -my-2 inline-flex min-h-11 items-center text-[13px] text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-0"
+    >
+      Editar
+    </button>
+  );
+}
+
+/**
  * O que falta na ficha, como botões: "+ Instagram", "+ Site".
  *
  * O cartão de contato tinha uma linha "Não informado" por campo vazio. Aqui a

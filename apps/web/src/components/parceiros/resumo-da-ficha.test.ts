@@ -5,6 +5,7 @@ import {
   estadoDoWhatsapp,
   montarRegua,
   presencaPublica,
+  ultimoContatoDaFicha,
   ultimoContatoPorExtenso,
   type EtapaDoFunil,
 } from './resumo-da-ficha';
@@ -115,6 +116,27 @@ describe('o último contato, do jeito que se fala', () => {
   });
 });
 
+describe('o último contato é o mais recente entre o negócio e a conversa', () => {
+  it('mensagem depois do último registro do negócio vale a mensagem', () => {
+    expect(ultimoContatoDaFicha('2026-10-01T19:58:00Z', '2026-10-02T15:14:00Z')).toBe(
+      '2026-10-02T15:14:00Z',
+    );
+  });
+
+  it('ligação registrada depois da última mensagem vale a ligação', () => {
+    expect(ultimoContatoDaFicha('2026-10-02T17:00:00Z', '2026-10-01T15:14:00Z')).toBe(
+      '2026-10-02T17:00:00Z',
+    );
+  });
+
+  it('com um lado só, vale o que existe; sem nenhum, não inventa', () => {
+    expect(ultimoContatoDaFicha(null, '2026-10-02T15:14:00Z')).toBe('2026-10-02T15:14:00Z');
+    expect(ultimoContatoDaFicha('2026-10-02T15:14:00Z', undefined)).toBe('2026-10-02T15:14:00Z');
+    expect(ultimoContatoDaFicha(null, null)).toBeNull();
+    expect(ultimoContatoDaFicha('data quebrada', null)).toBeNull();
+  });
+});
+
 describe('o estado do WhatsApp', () => {
   const AGORA = new Date('2026-10-02T18:00:00Z');
   const daqui = (min: number) => new Date(AGORA.getTime() + min * 60_000).toISOString();
@@ -123,6 +145,7 @@ describe('o estado do WhatsApp', () => {
     janelaExpiraEm,
     porLer,
     atendente: 'Heloísa',
+    ultimaMensagemEm: null,
   });
 
   it('janela aberta diz quantas horas faltam', () => {

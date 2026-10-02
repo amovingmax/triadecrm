@@ -24,6 +24,8 @@ export type NegocioDaFicha = {
   temperatura: Temperature;
   precisaAtencao: boolean;
   responsavel: string | null;
+  /** `team_directory.role` de quem responde: "sdr", "gestor". */
+  responsavelPapel: string | null;
   proximaAcao: string | null;
   proximaAcaoEm: string | null;
   ultimoContatoEm: string | null;
@@ -57,6 +59,7 @@ export type Ficha = {
   temperaturaManual: number | null;
   temperaturaMotivo: string | null;
   responsavel: string | null;
+  responsavelPapel: string | null;
   categorias: string[];
   categoriaPrimaria: string | null;
   origem: string | null;
@@ -131,13 +134,13 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     org.source_id
       ? supabase.from('sources').select('name').eq('id', org.source_id).maybeSingle()
       : Promise.resolve({ data: null }),
-    supabase.from('team_directory').select('id, full_name'),
+    supabase.from('team_directory').select('id, full_name, role'),
     // A conversa mais recente, só para LER o estado do WhatsApp (janela de 24 h,
     // por ler, quem atende). A ficha não escreve em `conversations` nem fala com
     // a Meta; se a leitura falhar, o cabeçalho diz "Sem conversa" e a ficha abre.
     supabase
       .from('conversations')
-      .select('window_expires_at, unread_count, assignee_id')
+      .select('window_expires_at, unread_count, assignee_id, last_message_at')
       .eq('organization_id', id)
       .is('arquivada_em', null)
       .order('last_message_at', { ascending: false, nullsFirst: false })
@@ -145,6 +148,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
   ]);
 
   const nomeDoTime = new Map((time.data ?? []).map((p) => [p.id, p.full_name]));
+  const papelDoTime = new Map((time.data ?? []).map((p) => [p.id, p.role as string | null]));
 
   // As etapas do FUNIL inteiro, e não só as dos negócios: a régua do cabeçalho
   // desenha o caminho todo. Continua uma consulta só, agora pelo funil.
@@ -171,6 +175,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
         janelaExpiraEm: fio.window_expires_at,
         porLer: fio.unread_count,
         atendente: nomeDoTime.get(fio.assignee_id) ?? null,
+        ultimaMensagemEm: fio.last_message_at,
       }
     : null;
 
@@ -204,6 +209,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     temperaturaManual: org.temperature_override,
     temperaturaMotivo: org.temperature_override_reason,
     responsavel: org.owner_id ? (nomeDoTime.get(org.owner_id) ?? null) : null,
+    responsavelPapel: org.owner_id ? (papelDoTime.get(org.owner_id) ?? null) : null,
     categorias: listaDeCategorias.map((c) => c.nome),
     categoriaPrimaria: org.primary_category_name,
     origem: origem.data?.name ?? null,
@@ -228,6 +234,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
       temperatura: d.temperature,
       precisaAtencao: d.needs_attention,
       responsavel: d.owner_id ? (nomeDoTime.get(d.owner_id) ?? null) : null,
+      responsavelPapel: d.owner_id ? (papelDoTime.get(d.owner_id) ?? null) : null,
       proximaAcao: d.next_action,
       proximaAcaoEm: d.next_action_at,
       ultimoContatoEm: d.last_activity_at,

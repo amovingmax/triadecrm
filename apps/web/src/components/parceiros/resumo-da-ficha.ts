@@ -108,6 +108,25 @@ export function ultimoContatoPorExtenso(
   return { texto: `Há ${dias} dias`, numero: String(dias) };
 }
 
+/**
+ * Quando foi, de fato, o último contato: o mais recente entre o do negócio
+ * (`deals.last_activity_at`) e a última mensagem da conversa.
+ *
+ * O negócio só anota o contato quando nasce uma ATIVIDADE — a primeira resposta
+ * do parceiro, uma ligação registrada. As mensagens seguintes da mesma conversa
+ * não mexem nele, e a ficha dizia "Ontem" para quem tinha escrito há dez minutos.
+ */
+export function ultimoContatoDaFicha(
+  doNegocio: string | null | undefined,
+  daConversa: string | null | undefined,
+): string | null {
+  const datas = [doNegocio, daConversa].filter(
+    (iso): iso is string => !!iso && !Number.isNaN(Date.parse(iso)),
+  );
+  if (datas.length === 0) return null;
+  return datas.reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a));
+}
+
 // ---------------------------------------------------------------------------
 // O estado do WhatsApp
 // ---------------------------------------------------------------------------
@@ -120,6 +139,8 @@ export type ConversaDaFicha = {
   porLer: number;
   /** Quem atende a conversa, pelo nome. */
   atendente: string | null;
+  /** `conversations.last_message_at`: a última mensagem, de qualquer dos lados. */
+  ultimaMensagemEm: string | null;
 };
 
 export type EstadoDoWhatsapp = {
