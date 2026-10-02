@@ -14,10 +14,13 @@ Pedido e decisões: Janio, 01/10/2026. RF-CON-04 (resposta não pode cair onde n
 
 | Situação da conversa | Quem é avisado |
 |---|---|
-| Alguém do time já escreveu ou gravou áudio nela | Só quem atende (`conversations.assignee_id`) |
-| Ninguém escreveu ainda | Admin, gestor e SDR; o embaixador só se a conversa aponta para ele |
-| Quem atende foi desativado | Conta como "ninguém escreveu" |
+| **Parceiro**, e alguém do time já escreveu ou gravou áudio nela | Só quem atende (`conversations.assignee_id`) |
+| **Parceiro**, e ninguém escreveu ainda | Admin, gestor e SDR; o embaixador só se a conversa aponta para ele |
+| **Parceiro**, e quem atende foi desativado | Conta como "ninguém escreveu" |
+| **Cliente** (quem não é ficha, a aba "Clientes") | Admin, gestor e SDR, sempre, tenha alguém respondido ou não; o embaixador só se a conversa aponta para ele |
 | Papel leitura ou financeiro | Nunca: não respondem conversa |
+
+**O cliente é de todos os operadores** (Janio, 02/10/2026, depois de ver em produção): "a mensagem chegou somente para quem está assumindo a conversa, e isto é o certo [...] agora quero a mesma situação para a aba de 'clientes' (que são as pessoas que usam o app), sendo que essa aba deve ter a notificação exibida para todos os operadores". O parceiro tem alguém conduzindo a captação; o cliente é atendimento, e responde quem estiver na frente do CRM. Cada operador deixa de ver a conversa do cliente como nova quando ele mesmo a abre: a resposta de um colega não a tira do número dos outros.
 
 "Alguém escreveu" é uma mensagem de saída com `origin = 'crm'`, `author_kind` em `human` ou `bot_ai`, `type` diferente de `template` e `status` diferente de `failed`. É o mesmo critério do gatilho `app.messages_quem_responde_atende`, menos os modelos: o cumprimento de abertura e o de campanha abrem a conversa, não a atendem. Por isso a resposta a uma campanha avisa todos que atendem, e não só quem disparou.
 

@@ -5612,9 +5612,9 @@ um pop-up mais profissional e que seja muito claro que tem uma nova mensagem. E
 essa mensagem deve chegar para a aba de conversas em 'todos'". Desenho em
 `docs/superpowers/specs/2026-10-01-avisos-de-resposta-design.md`.
 
-**Feito em 01/10 e enviado ao GitHub em 02/10/2026, a pedido do Janio, em cima
-da `main` do dia (`8e9c134`). Só o site muda: entra no próximo deploy feito a
-partir da `main`. Sem migração.**
+**Feito em 01/10 e no ar desde 02/10/2026, 12:00, a pedido do Janio, em cima da
+`main` do dia (`8e9c134`). Só o site muda. Sem migração. O último item da lista
+(cliente avisa todos os operadores) ainda não subiu.**
 
 - **De quem é o aviso.** Conversa em que alguém do time já escreveu: só quem
   atende. Conversa em que ninguém escreveu ainda (cliente novo, resposta ao
@@ -5704,6 +5704,26 @@ partir da `main`. Sem migração.**
     recarga, uma conversa já aberta voltava a contar no clique seguinte.
   - Limite novo: o número não cai sozinho. Conversa que ninguém respondeu e
     que a pessoa nunca abre conta até sair das 50 mais recentes.
+- **02/10, 12:00, no ar.** A `main` foi para `ec02193` e o site foi publicado
+  pela CLI (deploy `triade-m0zas3mz8`), a pedido do Janio. Ponto de volta: o
+  deploy `triade-qw9oqvfl5`, das 09:39. Sem migração.
+- **02/10, o cliente avisa todos os operadores** (ainda fora de produção).
+  Janio, depois de ver no ar: "a mensagem chegou somente para quem está
+  assumindo a conversa, e isto é o certo [...] agora quero a mesma situação
+  para a aba de 'clientes' (que são as pessoas que usam o app), sendo que essa
+  aba deve ter a notificação exibida para todos os operadores".
+  - Parceiro: nada muda. Atendido, avisa só quem atende.
+  - Cliente (quem não é ficha): toda mensagem avisa admin, gestor e SDR, mesmo
+    depois de um colega ter respondido. Número, cartão, notificação do
+    navegador e marca "Nova" valem para todos eles. Cada operador deixa de ver
+    a conversa como nova quando ELE a abre; a resposta de um colega não a tira
+    do número dos outros.
+  - Uma linha em `avisos/regra.ts` (`ehParaMim`). Continua só leitura.
+  - Testes: Vitest 1.058 no site (3 novos), lint, typecheck e build. No Chrome,
+    gestor e SDR lado a lado contra o Supabase local, 13 conferências: cliente
+    atendida pelo gestor avisa também a SDR, com cartão; parceiro atendido pela
+    SDR não avisa o gestor; a SDR abre a cliente e o número dela cai, o do
+    gestor não; fila de saída do WhatsApp vazia.
 
 **Não foi conferido:** embaixador, leitura e financeiro na tela (não há usuário
 de teste desses papéis no banco local; a regra deles está no Vitest); aba

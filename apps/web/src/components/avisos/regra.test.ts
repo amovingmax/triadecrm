@@ -108,6 +108,33 @@ describe('de quem é o aviso', () => {
     expect(ehParaMim(c, { id: 'leitor-1', papel: 'leitura' }, TODOS_ATIVOS)).toBe(false);
   });
 
+  it('cliente (quem não é ficha) avisa todos os operadores, mesmo com alguém já respondendo', () => {
+    const cliente = conversa({ organizacaoId: null, responsavelId: 'sdr-1', alguemEscreveu: true });
+    expect(ehParaMim(cliente, SDR, TODOS_ATIVOS)).toBe(true);
+    expect(ehParaMim(cliente, GESTOR, TODOS_ATIVOS)).toBe(true);
+    expect(ehParaMim(cliente, ADMIN, TODOS_ATIVOS)).toBe(true);
+    // Sem a lista de ativos a resposta é a mesma: a regra do cliente não depende dela.
+    expect(ehParaMim(cliente, GESTOR, null)).toBe(true);
+  });
+
+  it('o parceiro continua sendo só de quem atende: a regra do cliente não vaza para ele', () => {
+    const parceiro = conversa({
+      organizacaoId: 'org-1',
+      responsavelId: 'sdr-1',
+      alguemEscreveu: true,
+    });
+    expect(ehParaMim(parceiro, SDR, TODOS_ATIVOS)).toBe(true);
+    expect(ehParaMim(parceiro, GESTOR, TODOS_ATIVOS)).toBe(false);
+    expect(ehParaMim(parceiro, ADMIN, TODOS_ATIVOS)).toBe(false);
+  });
+
+  it('cliente não avisa embaixador de outro, nem leitura, nem financeiro', () => {
+    const cliente = conversa({ organizacaoId: null, responsavelId: 'sdr-1', alguemEscreveu: true });
+    expect(ehParaMim(cliente, EMBAIXADOR, TODOS_ATIVOS)).toBe(false);
+    expect(ehParaMim(cliente, { id: 'leitor-1', papel: 'leitura' }, TODOS_ATIVOS)).toBe(false);
+    expect(ehParaMim(cliente, { id: 'fin-1', papel: 'financeiro' }, TODOS_ATIVOS)).toBe(false);
+  });
+
   it('filtra a lista inteira pela mesma regra', () => {
     const lista = [
       conversa({ conversaId: 'a', responsavelId: 'sdr-1', alguemEscreveu: true }),

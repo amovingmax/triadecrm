@@ -28,6 +28,22 @@ import { type AppRole } from '@/lib/auth/role';
  * saiu da empresa é aviso que ninguém recebe.
  *
  * ===========================================================================
+ * O CLIENTE É DE TODOS OS OPERADORES (02/10/2026)
+ * ===========================================================================
+ * As duas linhas acima valem para o PARCEIRO, que tem ficha, funil e alguém
+ * conduzindo a captação. Janio, depois de ver em produção: "a mensagem chegou
+ * somente para quem está assumindo a conversa, e isto é o certo [...] agora
+ * quero a mesma situação para a aba de 'clientes' (que são as pessoas que usam
+ * o app), sendo que essa aba deve ter a notificação exibida para todos os
+ * operadores".
+ *
+ * Quem não é ficha (`organizacaoId === null`) é atendimento, não captação: quem
+ * escreve é o comprador de ingresso com uma dúvida, e quem responde é quem
+ * estiver na frente do CRM. Por isso toda mensagem de cliente avisa admin,
+ * gestor e sdr, mesmo depois de um colega já ter respondido àquela conversa.
+ * Cada operador deixa de vê-la como nova quando ELE a abre.
+ *
+ * ===========================================================================
  * POR QUE AQUI, E NÃO NO BANCO
  * ===========================================================================
  * Isto é regra de TELA, não de segurança: a RLS de `conversations` e `messages`
@@ -87,6 +103,9 @@ export function ehParaMim(
 ): boolean {
   if (!recebeAvisos(eu.papel)) return false;
   if (conversa.responsavelId === eu.id) return true;
+
+  // Cliente: de todos os operadores, tenha alguém respondido ou não.
+  if (conversa.organizacaoId === null) return PAPEIS_DA_FILA_INTEIRA.includes(eu.papel);
 
   const responsavelAtivo = ativos === null || ativos.has(conversa.responsavelId);
   if (conversa.alguemEscreveu && responsavelAtivo) return false;
