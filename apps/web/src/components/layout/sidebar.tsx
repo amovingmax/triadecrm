@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 
+import { useAvisos } from '@/components/avisos/provedor-avisos';
 import { NavLink } from '@/components/layout/nav-link';
 import { MarcaTriade } from '@/components/logo';
 import { type AppRole } from '@/lib/auth/role';
 import { cn } from '@/lib/utils';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
-import { navegacaoDaLateral } from '@/lib/navegacao';
+import { contagemDoItem, navegacaoDaLateral } from '@/lib/navegacao';
 
 /**
  * O TRILHO do desktop (md+): 72px, só ícones. No celular a navegação continua na
@@ -82,13 +83,17 @@ import { navegacaoDaLateral } from '@/lib/navegacao';
  * O NÚMERO É A METADE QUE DIRECIONA
  * ---------------------------------------------------------------------------
  * Agrupar diz para que serve cada tela. O número diz em qual delas tem trabalho
- * parado AGORA — que é a pergunta que a pessoa faz de manhã. A contagem chega
- * pronta do servidor (`lib/filas-do-menu.ts`), então nada pisca aqui durante a
- * navegação, e só dois itens contam: Revisão (candidato esperando decisão) e
- * Conversas (rascunho esperando aprovação). Ver a regra inteira em `navegacao.ts`.
+ * parado AGORA — que é a pergunta que a pessoa faz de manhã. Só dois itens
+ * contam, e cada um vem de um lugar:
+ *   - Revisão (candidato esperando decisão) chega pronta do servidor
+ *     (`lib/filas-do-menu.ts`), então nada pisca durante a navegação;
+ *   - Conversas (resposta nova para esta pessoa) vem do aviso de resposta
+ *     (`components/avisos`), que escuta o banco e muda o número sozinho.
+ * Ver a regra inteira em `navegacao.ts`.
  */
 export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFilas }) {
   const { principais, mais } = navegacaoDaLateral(papel);
+  const { respostasNovas } = useAvisos();
   return (
     // O LUGAR do trilho: 72px no fluxo, sempre. `z-40` para o painel aberto
     // passar por cima do cabeçalho (z-30), e por baixo de diálogos e folhas (z-50).
@@ -130,7 +135,7 @@ export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFi
               key={item.href}
               item={item}
               variante="trilho"
-              contagem={item.fila ? (filas[item.fila] ?? null) : null}
+              contagem={contagemDoItem(item, filas, respostasNovas)}
             />
           ))}
 
@@ -145,7 +150,7 @@ export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFi
                   key={item.href}
                   item={item}
                   variante="trilho"
-                  contagem={item.fila ? (filas[item.fila] ?? null) : null}
+                  contagem={contagemDoItem(item, filas, respostasNovas)}
                 />
               ))}
             </>

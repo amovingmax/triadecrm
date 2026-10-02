@@ -40,10 +40,16 @@
  *   Quem CONFIGURA nunca mostra número.
  *
  * É por isso que Revisão e Conversas contam, e Cadências, Metas, Relatórios e
- * Ajustes não contam nunca — nem quando teriam o que contar. A contagem chega
- * pronta do servidor (`lib/filas-do-menu.ts`), no mesmo `layout` que já busca a
- * sessão: sem consulta no cliente, sem estado de carregamento piscando na
- * lateral a cada troca de tela.
+ * Ajustes não contam nunca — nem quando teriam o que contar. A contagem da
+ * Revisão chega pronta do servidor (`lib/filas-do-menu.ts`), no mesmo `layout`
+ * que já busca a sessão: sem consulta no cliente, sem estado de carregamento
+ * piscando na lateral a cada troca de tela.
+ *
+ * A de Conversas é a exceção, e por necessidade (01/10/2026): ela conta as
+ * respostas novas PARA ESTA PESSOA, sobe quando alguém responde e zera quando a
+ * pessoa abre a tela. Um número que só mudasse na recarga da página diria
+ * "ninguém respondeu" a quem está há uma hora no funil. Quem o mantém vivo é o
+ * aviso de resposta (`components/avisos`), que escuta o banco.
  *
  * ---------------------------------------------------------------------------
  * DUAS COISAS QUE JÁ CUSTARAM CARO
@@ -104,7 +110,7 @@ export type ChaveDeGrupo = 'todo_dia' | 'a_base' | 'controle';
  * dado: é a metade de baixo da regra. Um número em Ajustes ou em Cadências diria
  * "tem trabalho parado aí" sobre uma tela onde nada espera por ninguém.
  */
-export type ChaveDeFila = 'candidatos' | 'rascunhos';
+export type ChaveDeFila = 'candidatos' | 'respostas';
 
 export type ItemNavegacao = {
   href: string;
@@ -270,9 +276,11 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     descricao:
       'O histórico de cada parceiro, a fila de aprovação dos rascunhos da IA e o relógio da janela de 24 h do WhatsApp.',
     posicaoNaBarra: 5,
-    // Rascunho pendente é trabalho parado de verdade: ele expira, e a mensagem
-    // que expira é uma conversa que a pessoa não teve.
-    fila: 'rascunhos',
+    // Resposta nova para esta pessoa: alguém escreveu e espera por ela. Até
+    // 01/10/2026 o número aqui era o de rascunhos da IA pendentes; eles continuam
+    // na aba "Aprovar", dentro da tela. Somar os dois misturaria "chegou
+    // resposta" com "tem rascunho", e o número não zeraria ao abrir.
+    fila: 'respostas',
   },
   {
     // Decisão do Rafael, 21/09/2026. Só admin e gestor: um lote mal montado
@@ -432,6 +440,23 @@ const PAPEIS_QUE_LEEM_TELEFONE: readonly AppRole[] = ['admin', 'gestor', 'leitur
 
 export function leTelefoneCompleto(papel: AppRole): boolean {
   return PAPEIS_QUE_LEEM_TELEFONE.includes(papel);
+}
+
+/**
+ * O número de um item do menu, venha de onde vier.
+ *
+ * `filas` é o que o servidor contou (`lib/filas-do-menu.ts`); `respostasNovas` é
+ * o que o aviso de resposta mantém vivo no navegador. Item sem `fila` não mostra
+ * número nunca, nem quando haveria o que contar.
+ */
+export function contagemDoItem(
+  item: ItemNavegacao,
+  filas: Partial<Record<ChaveDeFila, number | null>>,
+  respostasNovas: number | null,
+): number | null {
+  if (!item.fila) return null;
+  if (item.fila === 'respostas') return respostasNovas;
+  return filas[item.fila] ?? null;
 }
 
 /** Itens visíveis para um papel. */

@@ -8,6 +8,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 
 import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
+import { chaveDasMensagensDoFio } from './fora-da-base-dados';
 import { chaveDaLeitura } from './leitura-da-ia-dados';
 
 /**
@@ -251,6 +252,13 @@ export function useEcoDasConversas({
     }
     for (const fioId of pendencia.fios) {
       void clientes.invalidateQueries({ queryKey: chaveDaLeitura(fioId) });
+      // A conversa de quem não é ficha é indexada pelo FIO, e ficava de fora
+      // daqui: a mensagem do cliente chegava e a conversa aberta dele não se
+      // mexia até alguém recarregar. Pesou em 01/10/2026, quando o cliente passou
+      // a abrir também na aba "Conversas" e o cartão de aviso deixou de anunciar
+      // a conversa que está aberta — sem isto, a mensagem não aparecia em lugar
+      // nenhum. Invalidar uma chave que ninguém está lendo não custa nada.
+      void clientes.invalidateQueries({ queryKey: chaveDasMensagensDoFio(fioId) });
     }
 
     const deFora = pendencia.respostas.filter((r) => r.organizacaoId !== abertaAgora.current);

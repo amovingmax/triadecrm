@@ -1,3 +1,5 @@
+import { PilhaDeAvisos } from '@/components/avisos/pilha-de-avisos';
+import { ProvedorDeAvisos } from '@/components/avisos/provedor-avisos';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Header } from '@/components/layout/header';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -20,6 +22,11 @@ import { type ContagemDasFilas } from '@/lib/filas-do-menu';
  * que separam irmãos dentro da própria página, e o bloco "Parceiros / 100 parceiros
  * na base" lia como uma segunda faixa do cabeçalho. Três degraus: 24px no celular e
  * 32px no desktop na fronteira, 16px entre irmãos, 8px dentro de um grupo.
+ *
+ * `ProvedorDeAvisos` envolve a casca inteira porque o aviso de resposta vale em
+ * qualquer tela: é ele que mantém vivo o número ao lado de Conversas e que avisa
+ * quem está no funil de que alguém respondeu (`components/avisos`). Os cartões
+ * "Nova mensagem" saem por `PilhaDeAvisos`, no canto de cima.
  */
 export function AppShell({
   sessao,
@@ -32,29 +39,32 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh bg-background">
-      <Sidebar papel={sessao.papel} filas={filas} />
+    <ProvedorDeAvisos usuarioId={sessao.id} papel={sessao.papel}>
+      <div className="flex min-h-dvh bg-background">
+        <Sidebar papel={sessao.papel} filas={filas} />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Header sessao={sessao} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Header sessao={sessao} />
 
-        <main
-          id="conteudo"
-          className="flex-1 px-4 pt-4 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-5 md:pt-3 md:pb-8"
-        >
-          {/* Coluna centralizada com teto: cada tela ainda escolhe a própria medida de
+          <main
+            id="conteudo"
+            className="flex-1 px-4 pt-4 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-5 md:pt-3 md:pb-8"
+          >
+            {/* Coluna centralizada com teto: cada tela ainda escolhe a própria medida de
               leitura, mas nenhuma fica grudada na barra lateral com um terço de vazio
               à direita, e nenhuma tabela se estica por 2500px num monitor ultrawide. */}
-          {/* 1400px e não 1440 (Tríade Design System): o sistema desenha num
+            {/* 1400px e não 1440 (Tríade Design System): o sistema desenha num
               quadro de 1440 com 20px de margem de cada lado, e o conteúdo que
               sobra é exatamente 1400. */}
-          <div className="mx-auto w-full max-w-[1400px]">
-            <TransicaoPagina>{children}</TransicaoPagina>
-          </div>
-        </main>
-      </div>
+            <div className="mx-auto w-full max-w-[1400px]">
+              <TransicaoPagina>{children}</TransicaoPagina>
+            </div>
+          </main>
+        </div>
 
-      <BottomNav papel={sessao.papel} filas={filas} />
-    </div>
+        <BottomNav papel={sessao.papel} filas={filas} />
+        <PilhaDeAvisos />
+      </div>
+    </ProvedorDeAvisos>
   );
 }

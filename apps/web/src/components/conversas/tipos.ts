@@ -382,6 +382,8 @@ export function estadoDaUrl(params: Record<string, string | string[] | undefined
   filtros: FiltrosConversas;
   organizacaoId: string | null;
   aba: AbaDaEsquerda;
+  /** A conversa de quem não é ficha (`?cliente=<id da conversa>`). */
+  clienteId: string | null;
 } {
   const texto = (chave: string): string => {
     const v = params[chave];
@@ -404,6 +406,7 @@ export function estadoDaUrl(params: Record<string, string | string[] | undefined
     },
     organizacaoId: texto('org') || null,
     aba: ehAbaDaEsquerda(texto('aba')) ? texto('aba') as AbaDaEsquerda : 'conversas',
+    clienteId: texto('cliente') || null,
   };
 }
 
@@ -412,6 +415,8 @@ export function urlDoEstado(
   f: FiltrosConversas,
   organizacaoId: string | null,
   aba: AbaDaEsquerda = 'conversas',
+  /** Quem não é ficha não tem `org`: o endereço carrega a conversa dele. */
+  clienteId: string | null = null,
 ): string {
   const p = new URLSearchParams();
   if (f.q.trim()) p.set('q', f.q.trim());
@@ -423,6 +428,7 @@ export function urlDoEstado(
   if (f.arquivadas) p.set('arquivadas', '1');
   if (aba !== 'conversas') p.set('aba', aba);
   if (organizacaoId) p.set('org', organizacaoId);
+  else if (clienteId) p.set('cliente', clienteId);
   const busca = p.toString();
   return busca ? `?${busca}` : '';
 }

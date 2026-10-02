@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   barraDoCelular,
+  contagemDoItem,
   estaAtivo,
   GRUPOS,
   HREF_IMPORTAR,
@@ -87,6 +88,24 @@ describe('NAVEGACAO', () => {
     for (const item of controle) expect(item.fila).toBeUndefined();
   });
 
+  it('o número de Conversas é o de respostas novas, e o da Revisão vem do servidor', () => {
+    // Desde 01/10/2026 Conversas não conta mais rascunho da IA: conta resposta
+    // nova para esta pessoa, que o aviso de resposta mantém vivo no navegador. O
+    // servidor nunca preenche essa fila — se preenchesse, o número só mudaria na
+    // recarga da página.
+    const conversas = NAVEGACAO.find((item) => item.href === '/conversas');
+    const revisao = NAVEGACAO.find((item) => item.href === '/revisao');
+    const metas = NAVEGACAO.find((item) => item.href === '/metas');
+    if (!conversas || !revisao || !metas) throw new Error('item de menu sumiu');
+
+    expect(conversas.fila).toBe('respostas');
+    expect(contagemDoItem(conversas, { candidatos: 12 }, 3)).toBe(3);
+    expect(contagemDoItem(conversas, { candidatos: 12 }, null)).toBeNull();
+    expect(contagemDoItem(revisao, { candidatos: 12 }, 3)).toBe(12);
+    expect(contagemDoItem(revisao, {}, 3)).toBeNull();
+    expect(contagemDoItem(metas, { candidatos: 12 }, 3)).toBeNull();
+  });
+
   it('a Revisão saiu de "A base" e foi para "Todo dia"', () => {
     // A régua está no próprio arquivo: "A base" é "para achar alguém e para
     // organizar, não para produzir contato". Depois da Fase 1 é na Revisão que o
@@ -136,7 +155,14 @@ describe('navegacaoAgrupada', () => {
   });
 
   it('não devolve grupo que ficaria vazio para o papel', () => {
-    for (const papel of ['admin', 'gestor', 'sdr', 'embaixador', 'leitura', 'financeiro'] as const) {
+    for (const papel of [
+      'admin',
+      'gestor',
+      'sdr',
+      'embaixador',
+      'leitura',
+      'financeiro',
+    ] as const) {
       for (const bloco of navegacaoAgrupada(papel)) {
         expect(bloco.itens.length).toBeGreaterThan(0);
       }

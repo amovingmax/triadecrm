@@ -518,6 +518,100 @@ export function aplicarFiltros(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Os clientes na lista (01/10/2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Uma linha da lista de Conversas: um parceiro, ou alguém que escreveu e não é
+ * ficha nenhuma.
+ *
+ * Até 01/10/2026 a lista era só de parceiros, e quem não é parceiro morava
+ * apenas na aba "Clientes". Pedido do Janio: "essa mensagem deve chegar para a
+ * aba de conversas em 'todos'". "Todas" que não mostra todas as conversas é uma
+ * palavra mentindo — quem atende olha ali para saber quem escreveu, e a mensagem
+ * do cliente ficava atrás de outra aba. A aba "Clientes" continua existindo: é o
+ * recorte só deles.
+ */
+export type LinhaDaLista =
+  | { readonly tipo: 'parceiro'; readonly item: ItemConversa }
+  | { readonly tipo: 'cliente'; readonly fio: FioCru };
+
+/**
+ * Os mesmos recortes de `aplicarFiltros`, para quem não tem ficha.
+ *
+ * Cliente só tem o fio de WhatsApp, então cada filtro pergunta por ele: "Minhas"
+ * e "Atendendo" olham `assignee_id`, "Meu setor" olha `setor_id`, e a busca olha
+ * o nome do perfil e o fim do número. O filtro de "dias sem contato" é sobre a
+ * prospecção de parceiros — com ele ligado, cliente sai da lista.
+ */
+export function filtrarClientes(
+  fios: readonly FioCru[],
+  f: FiltrosConversas,
+  quem: QuemVe = { euId: null, meusSetores: [] },
+): FioCru[] {
+  const busca = normalizar(f.q);
+
+  return fios.filter((fio) => {
+    if (fio.organization_id !== null) return false;
+    if (!f.arquivadas && fio.arquivada_em !== null) return false;
+
+    if (f.escopo === 'minhas' && (quem.euId === null || fio.assignee_id !== quem.euId)) {
+      return false;
+    }
+    if (
+      f.escopo === 'setor' &&
+      (fio.setor_id === null || !quem.meusSetores.includes(fio.setor_id))
+    ) {
+      return false;
+    }
+
+    if (busca) {
+      const alvo = normalizar(`${fio.peer_nome ?? ''} ${fio.peer_phone_e164.slice(-4)}`);
+      if (!alvo.includes(busca)) return false;
+    }
+
+    if (f.responsavelId !== null && fio.assignee_id !== f.responsavelId) return false;
+    if (f.atendenteId !== null && fio.assignee_id !== f.atendenteId) return false;
+    if (f.canal !== null && f.canal !== fio.channel) return false;
+    if (f.janela !== 'qualquer') return false;
+
+    return true;
+  });
+}
+
+/**
+ * Parceiros e clientes numa lista só, na ordem de `ordenarConversas`: quem tem
+ * mensagem por ler primeiro, depois quem falou por último. O cliente entra pelo
+ * instante da última mensagem do fio — ele não tem outra interação.
+ */
+export function juntarNaLista(
+  itens: readonly ItemConversa[],
+  clientes: readonly FioCru[],
+): LinhaDaLista[] {
+  const linhas: LinhaDaLista[] = [
+    ...itens.map((item): LinhaDaLista => ({ tipo: 'parceiro', item })),
+    ...clientes.map((fio): LinhaDaLista => ({ tipo: 'cliente', fio })),
+  ];
+  if (clientes.length === 0) return linhas;
+
+  const porLer = (l: LinhaDaLista) =>
+    l.tipo === 'parceiro' ? l.item.naoLidas : l.fio.unread_count;
+  const momento = (l: LinhaDaLista) =>
+    l.tipo === 'parceiro' ? momentoDaLista(l.item) : l.fio.last_message_at;
+  const nome = (l: LinhaDaLista) => (l.tipo === 'parceiro' ? l.item.nome : (l.fio.peer_nome ?? ''));
+
+  return linhas.sort((a, b) => {
+    if (porLer(a) > 0 !== porLer(b) > 0) return porLer(a) > 0 ? -1 : 1;
+    const ma = momento(a);
+    const mb = momento(b);
+    if (ma && mb) return mb.localeCompare(ma);
+    if (ma) return -1;
+    if (mb) return 1;
+    return nome(a).localeCompare(nome(b), 'pt-BR');
+  });
+}
+
 export function cabeNaJanela(dias: number | null, janela: FiltrosConversas['janela']): boolean {
   switch (janela) {
     case 'qualquer':

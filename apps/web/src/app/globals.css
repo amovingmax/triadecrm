@@ -769,6 +769,18 @@
   border-color: color-mix(in oklab, var(--destructive) 40%, var(--border));
 }
 
+/* A linha do cartão "Nova mensagem" que mostra quanto tempo ele ainda fica na
+   tela (components/avisos/pilha-de-avisos.tsx). É decoração: quem tira o cartão
+   é o relógio do componente, e com movimento reduzido a linha nem é desenhada. */
+@keyframes aviso-esvazia {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
 /* Rede de segurança: mesmo se um componente esquecer o useReducedMotion,
    quem pediu menos movimento no sistema não recebe animação nenhuma. */
 @media (prefers-reduced-motion: reduce) {

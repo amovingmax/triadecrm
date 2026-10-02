@@ -1,8 +1,10 @@
 'use client';
 
-import { ChevronDown, LogOut } from 'lucide-react';
+import { Bell, BellOff, ChevronDown, LogOut } from 'lucide-react';
 import { useRef, useState } from 'react';
 
+import { avisarDaPermissao } from '@/components/avisos/convite-de-avisos';
+import { useAvisos } from '@/components/avisos/provedor-avisos';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,12 +48,37 @@ import { type Sessao } from '@/lib/auth/session';
  * por pessoa já impede que o próximo LEIA aquilo; a limpeza daqui impede que fique.
  * Quando ainda há registro guardado, a saída para para avisar: apagar trabalho sem
  * dizer é o mesmo defeito, do outro lado.
+ *
+ * **O aviso de resposta se silencia aqui.** Ele nasce ligado; quem não quer ser
+ * interrompido cala a notificação e o aviso na tela por este item, e o número ao
+ * lado de Conversas continua contando. A escolha é desta pessoa neste navegador
+ * (`components/avisos/preferencias.ts`). O item só existe para quem é avisado:
+ * leitura e financeiro não respondem conversa e não o veem.
  */
 export function UserMenu({ sessao }: { sessao: Sessao }) {
   const formSair = useRef<HTMLFormElement>(null);
   const rotuloPapel = ROTULO_PAPEL[sessao.papel];
   const [naoSubiram, setNaoSubiram] = useState<readonly RegistroNaFila[]>([]);
   const [avisando, setAvisando] = useState(false);
+  const avisos = useAvisos();
+
+  // Três estados, um item. Ligar também pede a permissão do navegador quando ela
+  // ainda não foi dada: o clique no menu é o gesto que o navegador exige.
+  const faltaPermissao = !avisos.silenciado && avisos.permissao === 'a_pedir';
+  const rotuloDosAvisos = avisos.silenciado
+    ? 'Ativar avisos de resposta'
+    : faltaPermissao
+      ? 'Ativar avisos neste navegador'
+      : 'Silenciar avisos de resposta';
+
+  function mudarAvisos() {
+    if (avisos.silenciado || faltaPermissao) {
+      avisos.silenciar(false);
+      if (avisos.permissao === 'a_pedir') void avisos.pedirPermissao().then(avisarDaPermissao);
+      return;
+    }
+    avisos.silenciar(true);
+  }
 
   function sair() {
     limparFilaAoSair(sessao.id);
@@ -121,6 +148,24 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
             </span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {avisos.recebe ? (
+            <>
+              <DropdownMenuItem className="min-h-11 md:min-h-0" onSelect={mudarAvisos}>
+                {avisos.silenciado || faltaPermissao ? (
+                  <Bell aria-hidden="true" />
+                ) : (
+                  <BellOff aria-hidden="true" />
+                )}
+                {rotuloDosAvisos}
+              </DropdownMenuItem>
+              {!avisos.silenciado && avisos.permissao === 'bloqueada' ? (
+                <p className="px-2 pb-1.5 text-xs leading-snug text-muted-foreground">
+                  O navegador bloqueou as notificações: o aviso aparece só dentro do CRM.
+                </p>
+              ) : null}
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           <DropdownMenuItem className="min-h-11 md:min-h-0" onSelect={pedirParaSair}>
             <LogOut aria-hidden="true" />
             Sair
@@ -167,7 +212,6 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </>
   );
 }

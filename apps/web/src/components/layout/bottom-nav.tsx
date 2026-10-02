@@ -4,6 +4,7 @@ import { Ellipsis } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
+import { useAvisos } from '@/components/avisos/provedor-avisos';
 import { NavLink } from '@/components/layout/nav-link';
 import {
   Sheet,
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/sheet';
 import { type AppRole } from '@/lib/auth/role';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
-import { barraDoCelular, estaAtivo, GRUPOS, type ItemNavegacao } from '@/lib/navegacao';
+import { barraDoCelular, contagemDoItem, estaAtivo, GRUPOS } from '@/lib/navegacao';
 import { cn } from '@/lib/utils';
 
 /**
@@ -67,7 +68,7 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
     itens: secundarios.filter((item) => item.grupo === grupo.chave),
   })).filter((bloco) => bloco.itens.length > 0);
 
-  const contagemDe = (chave: ItemNavegacao['fila']) => (chave ? (filas[chave] ?? null) : null);
+  const { respostasNovas } = useAvisos();
 
   return (
     <nav
@@ -80,7 +81,7 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
             key={item.href}
             item={item}
             variante="inferior"
-            contagem={contagemDe(item.fila)}
+            contagem={contagemDoItem(item, filas, respostasNovas)}
           />
         ))}
 
@@ -88,7 +89,9 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
           <SheetTrigger
             className={cn(
               'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-4 transition-colors',
-              algumSecundarioAtivo ? 'font-medium text-foreground' : 'text-sidebar-muted-foreground',
+              algumSecundarioAtivo
+                ? 'font-medium text-foreground'
+                : 'text-sidebar-muted-foreground',
             )}
             aria-label="Mais áreas do CRM"
           >
@@ -125,9 +128,7 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
                     <h3 id={`folha-${grupo.chave}`} className="text-sm font-medium">
                       {grupo.titulo}
                     </h3>
-                    <p className="text-xs leading-snug text-muted-foreground">
-                      {grupo.explicacao}
-                    </p>
+                    <p className="text-xs leading-snug text-muted-foreground">{grupo.explicacao}</p>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     {doGrupo.map((item) => (
@@ -135,7 +136,7 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
                         key={item.href}
                         item={item}
                         variante="menu"
-                        contagem={contagemDe(item.fila)}
+                        contagem={contagemDoItem(item, filas, respostasNovas)}
                         onNavegar={() => setAberto(false)}
                       />
                     ))}

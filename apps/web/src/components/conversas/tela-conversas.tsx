@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
+import { useAcoesDosAvisos } from '@/components/avisos/provedor-avisos';
 import { SeletorDeAba } from '@/components/ui/abas';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
@@ -13,7 +13,7 @@ import { FeedAutomaticas } from './automaticas';
 import { carregarAutomaticas, carregarMarcoZero, CHAVE_AUTOMATICAS } from './automaticas-dados';
 import { Conversa } from './conversa';
 import { carregarConversas, CHAVE_CONVERSAS, mensagemDoErro, TETO_ORGANIZACOES } from './dados';
-import { useEcoDasConversas, type EstadoDoEco, type EventoDoEco } from './eco-do-banco';
+import { useEcoDasConversas, type EstadoDoEco } from './eco-do-banco';
 import {
   ErroDaTela,
   EsqueletoLista,
@@ -30,6 +30,8 @@ import { ListaConversas } from './lista-conversas';
 import {
   aplicarFiltros,
   filaDeQuemRespondeu,
+  filtrarClientes,
+  juntarNaLista,
   montarConversas,
   type CatalogosConversas,
 } from './montagem';
@@ -75,17 +77,34 @@ import {
  * O recorte e a conversa aberta vivem na URL por `replaceState` (sem entrada nova no
  * histórico, sem volta ao servidor): um link de "olha a conversa da Neuma Leão" pode
  * ser mandado no grupo, e voltar da tela de registro traz a mesma conversa aberta.
+ *
+ * ===========================================================================
+ * QUEM NÃO É PARCEIRO APARECE EM "TODAS" (01/10/2026)
+ * ===========================================================================
+ * A lista da aba "Conversas" era só de parceiros, e quem escrevia sem ser ficha
+ * ficava apenas na aba "Clientes". Janio: "essa mensagem deve chegar para a aba
+ * de conversas em 'todos'". Agora os clientes entram na mesma lista, na mesma
+ * ordem (por ler primeiro, depois o mais recente), e a conversa deles abre ao
+ * lado como abre na aba "Clientes" — que continua existindo, como o recorte só
+ * deles. `foraId` é a conversa de cliente aberta nas duas abas.
+ *
+ * O aviso de quem respondeu saiu daqui: quem avisa é a casca
+ * (`components/avisos`), em qualquer tela e só a quem atende. Esta tela só conta
+ * a ela qual conversa está aberta e como abrir outra sem navegar.
  */
 export function TelaConversas({
   catalogos,
   filtrosIniciais,
   organizacaoInicial,
+  clienteInicial,
   abaInicial,
 }: {
   catalogos: CatalogosConversas;
   filtrosIniciais: FiltrosConversas;
   /** Veio de `?org=<id>`: abre esta conversa já na entrada. */
   organizacaoInicial: string | null;
+  /** Veio de `?cliente=<id da conversa>`: abre a conversa de quem não é ficha. */
+  clienteInicial: string | null;
   /** Veio de `?aba=aprovar`: entra direto na fila do ADR-05. */
   abaInicial: AbaDaEsquerda;
 }) {
@@ -93,8 +112,12 @@ export function TelaConversas({
   const [filtros, setFiltros] = useState<FiltrosConversas>(filtrosIniciais);
   const [escolhidoId, setEscolhidoId] = useState<string | null>(organizacaoInicial);
   const [aba, setAba] = useState<AbaDaEsquerda>(abaInicial);
-  /** A conversa aberta na aba "Fora da base" (id da conversa, não da ficha). */
-  const [foraId, setForaId] = useState<string | null>(null);
+  /**
+   * A conversa de cliente aberta (id da conversa, não da ficha). Vale na aba
+   * "Clientes" e, desde 01/10/2026, na aba "Conversas", onde o cliente também
+   * aparece.
+   */
+  const [foraId, setForaId] = useState<string | null>(clienteInicial);
 
   const consulta = useQuery({ queryKey: CHAVE_CONVERSAS, queryFn: carregarConversas });
 
@@ -140,6 +163,8 @@ export function TelaConversas({
     [consulta.data],
   );
   const itens = useMemo(() => aplicarFiltros(todos, filtros, quem), [todos, filtros, quem]);
+  // Quem escreveu e não é ficha: a aba "Clientes" inteira, e parte da lista de Conversas.
+  const foraDaBase = useMemo(() => conversasForaDaBase(consulta.data?.fios ?? []), [consulta.data]);
   const porEscopo = useMemo(
     () =>
       // "Todas" não leva número: é a lista inteira, e o número dela já está no
@@ -147,9 +172,12 @@ export function TelaConversas({
       ESCOPOS.map((e) => ({
         ...e,
         contagem:
-          e.id === 'todas' ? null : aplicarFiltros(todos, { ...filtros, escopo: e.id }, quem).length,
+          e.id === 'todas'
+            ? null
+            : aplicarFiltros(todos, { ...filtros, escopo: e.id }, quem).length +
+              filtrarClientes(foraDaBase, { ...filtros, escopo: e.id }, quem).length,
       })),
-    [todos, filtros, quem],
+    [todos, foraDaBase, filtros, quem],
   );
 
   // A fila de aprovação NÃO passa pelo recorte da lista: ela é a fila do ADR-05
@@ -173,69 +201,75 @@ export function TelaConversas({
   const responderam = useMemo(() => filaDeQuemRespondeu(todos), [todos]);
 
   const daAba = aba === 'aprovar' ? paraAprovar : aba === 'responderam' ? responderam : itens;
-  const foraDaBase = useMemo(() => conversasForaDaBase(consulta.data?.fios ?? []), [consulta.data]);
+  // Os clientes que cabem no recorte da lista de Conversas ("Minhas", busca...).
+  const clientesNaLista = useMemo(
+    () => filtrarClientes(foraDaBase, filtros, quem),
+    [foraDaBase, filtros, quem],
+  );
+
+  // O cliente escolhido é procurado em TODOS os clientes, não no recorte — a
+  // mesma regra da conversa de parceiro, logo abaixo.
+  const clienteEscolhido = foraId ? (foraDaBase.find((f) => f.id === foraId) ?? null) : null;
+  // Sem escolha nenhuma, o desktop abre a primeira linha da lista. Na aba
+  // "Conversas" ela pode ser um cliente: é quem acabou de escrever.
+  const primeiraLinha =
+    aba === 'conversas' ? (juntarNaLista(itens, clientesNaLista)[0] ?? null) : null;
+  const semEscolha = escolhidoId === null && clienteEscolhido === null && !ehCelular;
   const foraAberta =
     aba === 'fora'
-      ? (foraDaBase.find((f) => f.id === foraId) ?? (ehCelular ? null : (foraDaBase[0] ?? null)))
-      : null;
+      ? (clienteEscolhido ?? (ehCelular ? null : (foraDaBase[0] ?? null)))
+      : aba === 'conversas'
+        ? (clienteEscolhido ??
+          (semEscolha && primeiraLinha?.tipo === 'cliente' ? primeiraLinha.fio : null))
+        : null;
 
   // Sem escolha explícita, o desktop abre a primeira da lista. É derivação, não efeito:
   // um `setState` dentro de `useEffect` aqui reordenaria a tela depois de pintá-la.
-  const abertaId = escolhidoId ?? (ehCelular ? null : (daAba[0]?.id ?? null));
+  // Com um cliente aberto, nenhuma conversa de parceiro está aberta.
+  const abertaId = foraAberta ? null : (escolhidoId ?? (ehCelular ? null : (daAba[0]?.id ?? null)));
 
   // A conversa aberta é procurada em TODOS, não no recorte: mudar o filtro não pode
   // fechar na cara da pessoa a conversa que ela está lendo.
   const aberta = abertaId ? (todos.find((i) => i.id === abertaId) ?? null) : null;
 
+  // Parceiro e cliente não ficam abertos ao mesmo tempo: escolher um fecha o outro.
+  const escolherParceiro = useCallback((organizacaoId: string) => {
+    setForaId(null);
+    setEscolhidoId(organizacaoId);
+  }, []);
+  const escolherCliente = useCallback((conversaId: string) => {
+    setEscolhidoId(null);
+    setForaId(conversaId);
+  }, []);
+
   useEffect(() => {
-    const alvo = `${window.location.pathname}${urlDoEstado(filtros, escolhidoId, aba)}`;
+    const alvo = `${window.location.pathname}${urlDoEstado(filtros, escolhidoId, aba, foraId)}`;
     if (alvo !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', alvo);
     }
-  }, [filtros, escolhidoId, aba]);
+  }, [filtros, escolhidoId, aba, foraId]);
 
-  // O AVISO DE QUEM RESPONDEU.
-  //
-  // Só para conversa que NÃO está aberta: quem responde na conversa em que a
-  // pessoa está olhando já aparece na tela — avisar seria contar o que ela
-  // acabou de ver. O nome vem da lista já carregada; conversa nova ainda não
-  // tem nome aqui, e aí o aviso diz o que sabe em vez de inventar.
-  const nomePorId = useRef(new Map<string, string>());
+  // O AVISO DE QUEM RESPONDEU SAIU DAQUI (01/10/2026). Quem avisa é a casca
+  // (`components/avisos`): em qualquer tela, só a quem atende, com o cartão
+  // "Nova mensagem". Esta tela conta a ela duas coisas — qual conversa está
+  // aberta, para o cartão não anunciar o que a pessoa está lendo, e como abrir
+  // outra sem navegar, porque o estado daqui mora no cliente.
+  const { olharConversa, registrarAbridor } = useAcoesDosAvisos();
+  const conversaAbertaId = foraAberta?.id ?? aberta?.fio?.id ?? null;
   useEffect(() => {
-    nomePorId.current = new Map(todos.map((i) => [i.id, i.nome]));
-  }, [todos]);
+    olharConversa(conversaAbertaId);
+    return () => olharConversa(null);
+  }, [conversaAbertaId, olharConversa]);
+  useEffect(() => {
+    registrarAbridor(({ conversaId, organizacaoId }) => {
+      setAba('conversas');
+      if (organizacaoId) escolherParceiro(organizacaoId);
+      else escolherCliente(conversaId);
+    });
+    return () => registrarAbridor(null);
+  }, [registrarAbridor, escolherParceiro, escolherCliente]);
 
-  const aoResponderem = useCallback((respostas: EventoDoEco[]) => {
-    const nomes = [
-      ...new Set(
-        respostas
-          .map((r) => (r.organizacaoId === null ? null : nomePorId.current.get(r.organizacaoId)))
-          .filter((n): n is string => n !== undefined && n !== null),
-      ),
-    ];
-    const primeira = respostas[0];
-    const abrir =
-      nomes.length === 1 && primeira?.organizacaoId
-        ? {
-            label: 'Abrir',
-            onClick: () => {
-              setAba('conversas');
-              setEscolhidoId(primeira.organizacaoId);
-            },
-          }
-        : undefined;
-
-    toast.success(
-      nomes.length === 1
-        ? `${nomes[0]} respondeu.`
-        : respostas.length === 1
-          ? 'Chegou uma mensagem nova.'
-          : `Chegaram ${respostas.length} mensagens novas.`,
-      { description: 'A lista já está atualizada.', action: abrir },
-    );
-  }, []);
-
-  const eco = useEcoDasConversas({ organizacaoAberta: aberta?.id ?? null, aoResponderem });
+  const eco = useEcoDasConversas({ organizacaoAberta: aberta?.id ?? null });
 
   const mudar = useCallback((parcial: Partial<FiltrosConversas>) => {
     setFiltros((atual) => ({ ...atual, ...parcial }));
@@ -243,16 +277,19 @@ export function TelaConversas({
 
   const limpar = useCallback(() => setFiltros(FILTROS_VAZIOS), []);
   const voltar = useCallback(() => setEscolhidoId(null), []);
+  const nadaNaLista = itens.length + clientesNaLista.length === 0;
 
   const recorte = temRecorte(filtros);
   const soBusca = recorte && contarFiltros(filtros) === 0;
   const comContato = todos.filter((i) => i.ultimaEm !== null).length;
-  const porLer = todos.reduce((soma, i) => soma + i.naoLidas, 0);
+  const porLer =
+    todos.reduce((soma, i) => soma + i.naoLidas, 0) +
+    foraDaBase.reduce((soma, f) => soma + f.unread_count, 0);
   const meta = consulta.data?.meta ?? null;
   const temFio = todos.some((i) => i.fio !== null);
 
   // No celular, conversa aberta é tela cheia: cabeçalho e filtros saem de cena.
-  const telaCheia = ehCelular && (aba === 'fora' ? foraId !== null : aberta !== null);
+  const telaCheia = ehCelular && (foraAberta !== null || aberta !== null);
 
   return (
     <div
@@ -280,8 +317,9 @@ export function TelaConversas({
                 'Carregando o histórico...'
               ) : recorte ? (
                 <>
-                  <span className="numerico">{numero(itens.length)}</span>
-                  {itens.length === 1 ? ' parceiro' : ' parceiros'} com esse filtro
+                  <span className="numerico">{numero(itens.length + clientesNaLista.length)}</span>
+                  {itens.length + clientesNaLista.length === 1 ? ' conversa' : ' conversas'} com
+                  esse filtro
                 </>
               ) : porLer > 0 || fila.total > 0 ? (
                 <>
@@ -337,7 +375,10 @@ export function TelaConversas({
             <p className="text-xs text-muted-foreground">
               A lista mostra os primeiros {TETO_ORGANIZACOES} parceiros. Para abrir outro, procure
               em{' '}
-              <Link href="/parceiros" className="underline underline-offset-4 hover:text-foreground">
+              <Link
+                href="/parceiros"
+                className="underline underline-offset-4 hover:text-foreground"
+              >
                 Parceiros
               </Link>{' '}
               e use &ldquo;Abrir a conversa&rdquo; na ficha.
@@ -409,14 +450,14 @@ export function TelaConversas({
             ) : aba === 'responderam' ? (
               responderam.length === 0 ? (
                 <p className="px-4 py-8 text-sm text-muted-foreground">
-                  Ninguém está esperando resposta. Quando um fornecedor escrever, ele aparece
-                  aqui primeiro.
+                  Ninguém está esperando resposta. Quando um fornecedor escrever, ele aparece aqui
+                  primeiro.
                 </p>
               ) : (
                 <ListaConversas
                   itens={responderam}
                   selecionadoId={aberta?.id ?? null}
-                  aoEscolher={setEscolhidoId}
+                  aoEscolher={escolherParceiro}
                 />
               )
             ) : aba === 'aprovar' ? (
@@ -426,26 +467,29 @@ export function TelaConversas({
                 <FilaDeAprovacao
                   itens={paraAprovar}
                   selecionadoId={aberta?.id ?? null}
-                  aoEscolher={setEscolhidoId}
+                  aoEscolher={escolherParceiro}
                 />
               )
             ) : filtros.escopo === 'setor' && quem.meusSetores.length === 0 ? (
               <p className="px-4 py-8 text-sm text-muted-foreground">
                 Você ainda não está em nenhum setor. Um gestor coloca você em Ajustes → Pessoas.
               </p>
-            ) : itens.length === 0 && recorte ? (
+            ) : nadaNaLista && recorte ? (
               <VazioPorFiltro
                 descricao={descreverRecorte(filtros, catalogos)}
                 soBusca={soBusca}
                 aoLimpar={limpar}
               />
-            ) : itens.length === 0 ? (
+            ) : nadaNaLista ? (
               <VazioDeVerdade />
             ) : (
               <ListaConversas
                 itens={itens}
                 selecionadoId={aberta?.id ?? null}
-                aoEscolher={setEscolhidoId}
+                aoEscolher={escolherParceiro}
+                clientes={clientesNaLista}
+                clienteSelecionadoId={foraAberta?.id ?? null}
+                aoEscolherCliente={escolherCliente}
               />
             )}
           </section>
@@ -475,7 +519,7 @@ export function TelaConversas({
                   // já usa, e o único que existe para quem não é parceiro.
                   if (organizacaoId) {
                     setAba('conversas');
-                    setEscolhidoId(organizacaoId);
+                    escolherParceiro(organizacaoId);
                   } else if (conversaId) {
                     setAba('fora');
                     setForaId(conversaId);
@@ -484,8 +528,8 @@ export function TelaConversas({
               />
             )}
           </section>
-        ) : aba === 'fora' ? (
-          ehCelular && !foraId ? null : (
+        ) : aba === 'fora' || foraAberta ? (
+          ehCelular && !foraAberta ? null : (
             <section
               aria-label="Conversa com cliente"
               className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden"
@@ -497,9 +541,8 @@ export function TelaConversas({
                   catalogos={catalogos}
                   aoVoltar={() => setForaId(null)}
                   aoLigar={(organizacaoId) => {
-                    setForaId(null);
                     setAba('conversas');
-                    setEscolhidoId(organizacaoId);
+                    escolherParceiro(organizacaoId);
                   }}
                 />
               ) : consulta.isPending ? null : (

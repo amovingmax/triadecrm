@@ -129,7 +129,7 @@ export function contagemDeInteracoes(n: number): { numero: string; palavra: stri
  * "Contato do WhatsApp (84) 99999-8801" (ver `app.lead_automatico`). Não é um
  * nome — é a ausência de um.
  */
-const FICHA_SEM_NOME = /^Contato do WhatsApp\b/i;
+export const FICHA_SEM_NOME = /^Contato do WhatsApp\b/i;
 
 /**
  * Com que nome esta pessoa aparece na tela.

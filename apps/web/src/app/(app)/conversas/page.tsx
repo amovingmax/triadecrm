@@ -37,13 +37,14 @@ export default async function Pagina({
     searchParams,
   ]);
 
-  const { filtros, organizacaoId, aba } = estadoDaUrl(params);
+  const { filtros, organizacaoId, aba, clienteId } = estadoDaUrl(params);
 
   return (
     <TelaConversas
       catalogos={catalogos}
       filtrosIniciais={filtros}
       organizacaoInicial={organizacaoId}
+      clienteInicial={clienteId}
       abaInicial={aba}
     />
   );

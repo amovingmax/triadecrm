@@ -9,10 +9,12 @@ import { Etiqueta } from '@/components/etiqueta';
 import { EtiquetaEtapa } from '@/components/funis/etapa';
 import { DiasSemContato } from '@/components/temperatura';
 
-import { local } from './formatos';
+import { finalDoNumero } from './fora-da-base-dados';
+import { local, rotuloDoDia } from './formatos';
 import { ICONE_CANAL } from './icones';
 import { ChipDaJanela } from './janela-24h';
-import { estadoDaJanela } from './mensagens';
+import { estadoDaJanela, type FioCru } from './mensagens';
+import { juntarNaLista } from './montagem';
 import { ROTULO_CANAL, type ItemConversa } from './tipos';
 
 /**
@@ -27,6 +29,11 @@ import { ROTULO_CANAL, type ItemConversa } from './tipos';
  * Cada item é um `<button>`, não um link: a conversa abre ao lado, na mesma tela, e o
  * endereço acompanha por `replaceState` (ver `tela-conversas.tsx`). O alvo tem 76px de
  * altura, bem acima dos 44px mínimos, e o item selecionado leva `aria-current`.
+ *
+ * QUEM NÃO É PARCEIRO TAMBÉM APARECE AQUI (01/10/2026), quando a tela passa
+ * `clientes`: a lista "Todas" que só mostrava parceiros escondia a mensagem do
+ * cliente atrás de outra aba. A linha dele é a mesma gramática, com menos coisa:
+ * nome do WhatsApp, por ler, o dia, e "cliente" onde o parceiro tem a etapa.
  */
 /** Abaixo disto a nota da IA não muda decisão nenhuma, e vira ruído na linha. */
 const NOTA_QUE_VALE = 50;
@@ -35,22 +42,131 @@ export function ListaConversas({
   itens,
   selecionadoId,
   aoEscolher,
+  clientes = [],
+  clienteSelecionadoId = null,
+  aoEscolherCliente,
 }: {
   itens: ItemConversa[];
   selecionadoId: string | null;
   aoEscolher: (id: string) => void;
+  /** Quem escreveu e não é ficha. Só a lista de Conversas passa; as filas, não. */
+  clientes?: FioCru[];
+  /** O id da CONVERSA do cliente aberto — ele não tem ficha. */
+  clienteSelecionadoId?: string | null;
+  aoEscolherCliente?: (conversaId: string) => void;
 }) {
   return (
     <ul className="corpo-tabela flex flex-col">
-      {itens.map((item) => (
-        <Linha
-          key={item.id}
-          item={item}
-          selecionado={item.id === selecionadoId}
-          aoEscolher={aoEscolher}
-        />
-      ))}
+      {juntarNaLista(itens, clientes).map((linha) =>
+        linha.tipo === 'parceiro' ? (
+          <Linha
+            key={linha.item.id}
+            item={linha.item}
+            selecionado={linha.item.id === selecionadoId}
+            aoEscolher={aoEscolher}
+          />
+        ) : (
+          <LinhaDeCliente
+            key={linha.fio.id}
+            fio={linha.fio}
+            selecionado={linha.fio.id === clienteSelecionadoId}
+            aoEscolher={aoEscolherCliente}
+          />
+        ),
+      )}
     </ul>
+  );
+}
+
+/** "hoje", "ontem", "seg, 29/09" ou "29/09": o dia da última mensagem. */
+function quando(iso: string): string {
+  const dia = rotuloDoDia(iso);
+  return `${dia.palavra}${dia.numero ?? ''}`;
+}
+
+/**
+ * A linha de quem não é parceiro. Mesmas medidas da `Linha`, para as duas se
+ * alinharem na mesma lista; o que ela não tem (etapa, bairro, etiquetas, conselho
+ * da IA) simplesmente não aparece.
+ */
+function LinhaDeCliente({
+  fio,
+  selecionado,
+  aoEscolher,
+}: {
+  fio: FioCru;
+  selecionado: boolean;
+  aoEscolher?: (conversaId: string) => void;
+}) {
+  const Icone = ICONE_CANAL.whatsapp;
+  const nome = fio.peer_nome?.trim();
+  const alvo = useRef<HTMLLIElement>(null);
+  const janela = estadoDaJanela(fio.window_expires_at);
+
+  useEffect(() => {
+    if (selecionado) alvo.current?.scrollIntoView({ block: 'nearest' });
+  }, [selecionado]);
+
+  return (
+    <li ref={alvo} className="border-b border-hairline last:border-b-0">
+      <button
+        type="button"
+        onClick={() => aoEscolher?.(fio.id)}
+        aria-current={selecionado ? 'true' : undefined}
+        className={cn(
+          'relative flex min-h-[4rem] w-full items-center gap-3 py-2.5 pr-3 pl-4 text-left outline-none',
+          'hover:bg-muted/50 focus-visible:bg-muted/60',
+          selecionado && 'bg-muted',
+        )}
+      >
+        <span className="min-w-0 flex-1 space-y-1">
+          <span className="flex items-baseline gap-2">
+            <span
+              className={cn(
+                'min-w-0 flex-1 truncate text-sm xl:text-[15px]',
+                fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
+              )}
+            >
+              {nome || `Número ${finalDoNumero(fio.peer_phone_e164)}`}
+            </span>
+            {fio.unread_count > 0 ? (
+              <span
+                className="numerico inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
+                title={`${fio.unread_count} mensagem(ns) por ler`}
+              >
+                {fio.unread_count}
+              </span>
+            ) : null}
+            {fio.last_message_at ? (
+              <span className="numerico shrink-0 text-xs text-muted-foreground">
+                {quando(fio.last_message_at)}
+              </span>
+            ) : null}
+          </span>
+
+          <span className="flex items-center gap-1.5">
+            <Icone
+              className="size-3.5 shrink-0 text-muted-foreground"
+              aria-label={ROTULO_CANAL.whatsapp}
+            />
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              {nome ? finalDoNumero(fio.peer_phone_e164) : 'sem nome no perfil'}
+            </span>
+            <ChipDaJanela estado={janela} />
+            {/* Onde o parceiro tem a etapa, o cliente diz o que é: é esta palavra
+                que explica por que a linha não tem funil nem bairro. */}
+            <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
+              cliente
+            </Badge>
+          </span>
+        </span>
+
+        <ChevronRight
+          className="size-4 shrink-0 text-muted-foreground md:hidden"
+          aria-hidden="true"
+        />
+      </button>
+    </li>
   );
 }
 

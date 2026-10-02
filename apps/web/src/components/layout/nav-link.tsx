@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { rotuloDasRespostas } from '@/components/avisos/regra';
 import { type ItemNavegacao, estaAtivo } from '@/lib/navegacao';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +60,14 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
   const ativo = estaAtivo(pathname, item.href);
   const Icone = item.icone;
   const numero = contagem !== null && contagem > 0 ? contagem : null;
+  // O que o leitor de tela diz do número. Em Conversas ele é resposta nova para
+  // esta pessoa; nos outros, trabalho parado na fila.
+  const rotuloDoNumero =
+    numero === null
+      ? undefined
+      : item.fila === 'respostas'
+        ? rotuloDasRespostas(numero)
+        : `${numero} esperando`;
 
   // ---------------------------------------------------------------------------
   // O TRILHO DE 72px (Tríade Design System, 29/09/2026)
@@ -103,7 +112,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
             // ler: o número é o que diz em qual módulo há trabalho parado agora.
             // No ativo o fundo já é menta, e a contagem vira tinta para não sumir.
             <span
-              aria-label={`${numero} esperando`}
+              aria-label={rotuloDoNumero}
               className={cn(
                 'numerico absolute top-0.5 right-0 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold',
                 ativo ? 'bg-menta-tinta text-menta' : 'bg-menta text-menta-tinta',
@@ -154,6 +163,22 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
         >
           <Icone className={cn('size-5', ativo && 'stroke-[2.25]')} />
         </span>
+        {numero !== null ? (
+          // O NÚMERO NA BARRA DO CELULAR (01/10/2026). A barra recebia a
+          // contagem e não a desenhava: no celular, que é onde o time atende em
+          // campo, Conversas nunca dizia que alguém tinha respondido. Fica no
+          // ombro da pílula do ícone, com a mesma menta do trilho do desktop, e
+          // fora do `aria-hidden` dela para o leitor de tela dizer o número.
+          <span
+            aria-label={rotuloDoNumero}
+            className={cn(
+              'numerico absolute top-1.5 left-1/2 ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold',
+              ativo ? 'bg-menta-tinta text-menta' : 'bg-menta text-menta-tinta',
+            )}
+          >
+            {numero > 99 ? '99+' : numero}
+          </span>
+        ) : null}
         <span className="truncate">{item.rotulo}</span>
       </Link>
     );
@@ -178,7 +203,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
             <span className="truncate">{item.rotulo}</span>
             {numero !== null ? (
               <span
-                aria-label={`${numero} esperando`}
+                aria-label={rotuloDoNumero}
                 className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[11px] leading-none font-medium tabular-nums text-accent-foreground"
               >
                 {numero > 99 ? '99+' : numero}
@@ -237,7 +262,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
         // vermelho aqui seria a única cromia da lateral, e cromia neste produto
         // significa temperatura — não urgência.
         <span
-          aria-label={`${numero} esperando`}
+          aria-label={rotuloDoNumero}
           className={cn(
             'ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[11px] leading-none font-medium tabular-nums',
             ativo

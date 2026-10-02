@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { type ChaveDeFila } from '@/lib/navegacao';
 
 /**
- * As filas que o menu conta, e por que só estas duas.
+ * As filas que o menu conta, e por que só estas.
  *
  * ---------------------------------------------------------------------------
  * A REGRA
@@ -18,9 +18,12 @@ import { type ChaveDeFila } from '@/lib/navegacao';
  *   linha parou numa pessoa. Sem o número, ninguém abre a Revisão por vontade
  *   própria — abre-se *porque* alguém lembrou que ela existe, o que é o oposto
  *   de direcionamento.
- * - `rascunhos` — rascunho da IA aguardando aprovação. Conta porque **expira**:
- *   um rascunho vencido é uma conversa que não aconteceu, e o custo do atraso é
- *   real, não estético.
+ * - `respostas` — resposta nova para esta pessoa, em Conversas. NÃO é contada
+ *   aqui: ela muda a cada mensagem que chega e zera quando a pessoa abre a tela,
+ *   e um número contado no servidor só mudaria na recarga da página. Quem a
+ *   mantém é o aviso de resposta (`components/avisos/provedor-avisos.tsx`). Até
+ *   01/10/2026 o número de Conversas era o de rascunhos da IA pendentes; eles
+ *   seguem na aba "Aprovar" da própria tela.
  *
  * E por isso Metas, Relatórios, Cadências e Ajustes NÃO contam, mesmo tendo o que
  * contar. São telas de configuração e de leitura: nada ali espera por ninguém, e
@@ -34,14 +37,14 @@ import { type ChaveDeFila } from '@/lib/navegacao';
  * pagaria com um estado de carregamento piscando na lateral a cada troca de tela,
  * que é exatamente o tipo de ruído que a passada de layout acabou de remover.
  *
- * Aqui são dois `count: 'exact', head: true`: o Postgres conta pelo índice e não
- * devolve linha nenhuma. Rodam em paralelo, no mesmo `layout` que já espera pela
- * sessão, então não acrescentam uma ida à rede em série.
+ * Aqui é um `count: 'exact', head: true`: o Postgres conta pelo índice e não
+ * devolve linha nenhuma. Roda em paralelo com a sessão, no mesmo `layout`, então
+ * não acrescenta uma ida à rede em série.
  *
  * ---------------------------------------------------------------------------
  * A RLS DECIDE, E O ERRO NÃO DERRUBA A CASCA
  * ---------------------------------------------------------------------------
- * As duas consultas passam pelo cliente normal, com a RLS ligada. Para quem não
+ * A consulta passa pelo cliente normal, com a RLS ligada. Para quem não
  * enxerga a tabela, a contagem volta zero — e o item nem aparece no menu, porque
  * `papeis` já o escondeu antes. Se a consulta falhar por qualquer motivo, a
  * contagem é `null` e o item simplesmente não mostra número: a barra lateral
@@ -52,19 +55,12 @@ export type ContagemDasFilas = Partial<Record<ChaveDeFila, number | null>>;
 export async function contarFilasDoMenu(): Promise<ContagemDasFilas> {
   const supabase = await createClient();
 
-  const [candidatos, rascunhos] = await Promise.all([
-    supabase
-      .from('supplier_candidates')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'novo'),
-    supabase
-      .from('message_drafts')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pendente'),
-  ]);
+  const candidatos = await supabase
+    .from('supplier_candidates')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'novo');
 
   return {
     candidatos: candidatos.error ? null : (candidatos.count ?? null),
-    rascunhos: rascunhos.error ? null : (rascunhos.count ?? null),
   };
 }

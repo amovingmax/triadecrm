@@ -87,4 +87,12 @@ describe('a aba na URL', () => {
     expect(estadoDaUrl({ aba: 'fora' }).aba).toBe('fora');
     expect(urlDoEstado(FILTROS_VAZIOS, null, 'fora')).toBe('?aba=fora');
   });
+
+  it('?cliente=<conversa> abre a conversa de quem não é ficha, e volta para a URL', () => {
+    expect(estadoDaUrl({ cliente: 'fio-9' }).clienteId).toBe('fio-9');
+    expect(estadoDaUrl({}).clienteId).toBeNull();
+    expect(urlDoEstado(FILTROS_VAZIOS, null, 'conversas', 'fio-9')).toBe('?cliente=fio-9');
+    // Com uma ficha aberta, quem vale é ela: as duas não ficam abertas juntas.
+    expect(urlDoEstado(FILTROS_VAZIOS, 'org-1', 'conversas', 'fio-9')).toBe('?org=org-1');
+  });
 });

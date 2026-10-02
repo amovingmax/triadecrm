@@ -10,6 +10,8 @@ import {
   escolherNegocio,
   esperandoResposta,
   filaDeQuemRespondeu,
+  filtrarClientes,
+  juntarNaLista,
   momentoDaLista,
   montarConversas,
   montarLinhaDoTempo,
@@ -420,7 +422,7 @@ describe('agruparPorDia', () => {
 // O inbox: as mensagens na mesma coluna, e o que elas mudam na lista
 // ---------------------------------------------------------------------------
 
-function fio(parcial: Partial<FioCru> & { id: string; organization_id: string }): FioCru {
+function fio(parcial: Partial<FioCru> & { id: string; organization_id: string | null }): FioCru {
   return {
     contact_id: null,
     channel: 'whatsapp',
@@ -997,5 +999,120 @@ describe('a fila de quem respondeu', () => {
     const comData = itemDaLista({ id: 'y', fio: fioDaLista({ ultimaEntradaEm: '2026-09-25T10:00:00Z' }) });
     expect(() => filaDeQuemRespondeu([semData, comData])).not.toThrow();
     expect(filaDeQuemRespondeu([semData, comData]).map((i) => i.id)).toEqual(['y']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Os clientes na lista de Conversas (01/10/2026)
+// ---------------------------------------------------------------------------
+
+describe('clientes na lista "Todas"', () => {
+  const OUTRA_PESSOA = 'd0000000-0000-4000-8000-000000000d02';
+  const carla = fio({
+    id: 'fio-carla',
+    organization_id: null,
+    peer_nome: 'Carla Cliente',
+    peer_phone_e164: '+5584900000002',
+    last_message_at: '2026-10-01T17:05:00+00:00',
+    unread_count: 2,
+  });
+  const jorge = fio({
+    id: 'fio-jorge',
+    organization_id: null,
+    peer_nome: 'Jorge',
+    assignee_id: OUTRA_PESSOA,
+    setor_id: 7,
+    last_message_at: '2026-09-30T10:00:00+00:00',
+  });
+  const quem = { euId: HELOISA, meusSetores: [7] };
+
+  it('em "Todas" entram todos os que não são ficha', () => {
+    expect(filtrarClientes([carla, jorge], FILTROS_VAZIOS).map((f) => f.id)).toEqual([
+      'fio-carla',
+      'fio-jorge',
+    ]);
+  });
+
+  it('conversa de ficha não é cliente', () => {
+    const deFicha = fio({ id: 'fio-ficha', organization_id: 'org-1' });
+    expect(filtrarClientes([deFicha, carla], FILTROS_VAZIOS).map((f) => f.id)).toEqual([
+      'fio-carla',
+    ]);
+  });
+
+  it('"Minhas" fica com o que eu atendo, e "Meu setor" com o do meu setor', () => {
+    expect(
+      filtrarClientes([carla, jorge], { ...FILTROS_VAZIOS, escopo: 'minhas' }, quem).map(
+        (f) => f.id,
+      ),
+    ).toEqual(['fio-carla']);
+    expect(
+      filtrarClientes([carla, jorge], { ...FILTROS_VAZIOS, escopo: 'setor' }, quem).map(
+        (f) => f.id,
+      ),
+    ).toEqual(['fio-jorge']);
+  });
+
+  it('a busca acha pelo nome do WhatsApp e pelo fim do número', () => {
+    expect(
+      filtrarClientes([carla, jorge], { ...FILTROS_VAZIOS, q: 'carla' }).map((f) => f.id),
+    ).toEqual(['fio-carla']);
+    expect(
+      filtrarClientes([carla, jorge], { ...FILTROS_VAZIOS, q: '0002' }).map((f) => f.id),
+    ).toEqual(['fio-carla']);
+  });
+
+  it('arquivado sai, e volta com "mostrar arquivadas"', () => {
+    const arquivado = fio({
+      id: 'fio-arq',
+      organization_id: null,
+      arquivada_em: '2026-10-01T12:00:00+00:00',
+    });
+    expect(filtrarClientes([arquivado], FILTROS_VAZIOS)).toEqual([]);
+    expect(filtrarClientes([arquivado], { ...FILTROS_VAZIOS, arquivadas: true })).toHaveLength(1);
+  });
+
+  it('o filtro de dias sem contato é de prospecção: com ele, cliente sai', () => {
+    expect(filtrarClientes([carla], { ...FILTROS_VAZIOS, janela: 'mais7' })).toEqual([]);
+  });
+
+  it('cliente com mensagem por ler sobe para o topo, junto dos parceiros', () => {
+    const [parceiro] = montarConversas({
+      organizacoes: [organizacao('org-1', 'Buffet Aurora')],
+      atividades: [],
+      negocios: [],
+      catalogos: CATALOGOS,
+      fios: [
+        fio({
+          id: 'fio-aurora',
+          organization_id: 'org-1',
+          last_message_at: '2026-10-01T18:00:00+00:00',
+        }),
+      ],
+    });
+    if (!parceiro) throw new Error('a ficha não virou item');
+
+    const linhas = juntarNaLista([parceiro], [jorge, carla]);
+    expect(linhas.map((l) => (l.tipo === 'parceiro' ? l.item.id : l.fio.id))).toEqual([
+      // por ler primeiro, mesmo sendo mais antiga que a do parceiro
+      'fio-carla',
+      'org-1',
+      'fio-jorge',
+    ]);
+  });
+
+  it('sem cliente nenhum, a ordem dos parceiros não é tocada', () => {
+    const itens = montarConversas({
+      organizacoes: [
+        organizacao('org-1', 'Zélia'),
+        organizacao('org-2', 'Abel'),
+      ],
+      atividades: [],
+      negocios: [],
+      catalogos: CATALOGOS,
+    });
+    expect(juntarNaLista(itens, []).map((l) => (l.tipo === 'parceiro' ? l.item.id : ''))).toEqual(
+      itens.map((i) => i.id),
+    );
   });
 });

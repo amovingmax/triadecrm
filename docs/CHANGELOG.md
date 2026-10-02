@@ -5602,3 +5602,101 @@ baixava da Meta o ÁUDIO, porque o áudio precisava de transcrição.
   `entrada.test.ts` (foto, vídeo, balde recusando) e `midias-atrasadas.test.ts`
   (4). Suíte do banco num banco local zerado: 3.343; worker: 370; site: 1.000 e
   build. Conferido no navegador local com foto, vídeo e PDF guardados.
+
+### 01/10/2026 — Aviso de mensagem nova, número em Conversas e clientes em "Todas" (RF-CON-04, RF-AST-08)
+
+Pedidos do Janio, em duas rodadas. Primeiro: notificação do navegador quando um
+parceiro ou cliente responde, ligada por padrão e com opção de silenciar, e um
+número ao lado do ícone de Conversas. Depois de ver funcionando: "deve aparecer
+um pop-up mais profissional e que seja muito claro que tem uma nova mensagem. E
+essa mensagem deve chegar para a aba de conversas em 'todos'". Desenho em
+`docs/superpowers/specs/2026-10-01-avisos-de-resposta-design.md`.
+
+**Feito em 01/10 e enviado ao GitHub em 02/10/2026, a pedido do Janio, em cima
+da `main` do dia (`8e9c134`). Só o site muda: entra no próximo deploy feito a
+partir da `main`. Sem migração.**
+
+- **De quem é o aviso.** Conversa em que alguém do time já escreveu: só quem
+  atende. Conversa em que ninguém escreveu ainda (cliente novo, resposta ao
+  "Bom dia" automático, resposta a modelo ou campanha): admin, gestor e SDR, até
+  alguém responder. Quem atende desativado conta como ninguém. Leitura e
+  financeiro nunca são avisados.
+- **O número de Conversas é de cada pessoa e muda sozinho.** Conta as conversas
+  com mensagem nova desde a última vez que a pessoa abriu Conversas, e zera ao
+  abrir. Passa a aparecer também na barra inferior do celular, que recebia a
+  contagem e não a desenhava.
+- **O número deixa de contar rascunhos da IA.** Eles continuam na aba "Aprovar".
+- **O cartão "Nova mensagem"**, no canto de cima da tela: faixa e selo em menta,
+  o nome de quem escreveu, o começo do texto e o botão Responder. Some sozinho
+  em 12 s, e só conta o tempo com a pessoa olhando; o mouse em cima para o
+  relógio. Três cartões no desktop, um no celular, e o resto vira uma linha de
+  resumo. Vale em todas as telas; em Conversas, só não avisa a conversa que está
+  aberta.
+- **A notificação do navegador**, com o CRM em aba escondida ou janela sem foco.
+  Diz "Nova mensagem de Fulano", sem o texto da mensagem e sem telefone. Clicar
+  abre a conversa.
+- **Silenciar** no menu do usuário. Silenciado, o número continua contando. A
+  escolha é por pessoa, neste navegador.
+- **Permissão do navegador** pedida uma vez, por um cartão da mesma pilha;
+  dispensado, não volta, e dá para ligar depois pelo menu do usuário.
+- **Clientes em Conversas → "Todas".** Quem escreve sem ser ficha aparece na
+  lista de Conversas junto dos parceiros, na mesma ordem (por ler primeiro,
+  depois o mais recente), com a palavra "cliente" na linha. "Minhas", "Meu
+  setor" e a busca valem para eles. A conversa abre ao lado, com a mesma caixa
+  de resposta da aba "Clientes", e o endereço guarda o cliente aberto
+  (`?cliente=`). A aba "Clientes" continua existindo.
+- **A conversa aberta do cliente se atualiza sozinha.** O eco da tela não
+  invalidava a consulta das mensagens de quem não é ficha: a mensagem chegava e
+  a conversa aberta não se mexia até recarregar.
+- **O aviso "X respondeu" que a tela de Conversas dava saiu.** Quem avisa é a
+  casca, com o cartão, e só a quem atende. Antes a tela avisava de toda resposta,
+  de qualquer conversa, a quem estivesse nela.
+- **Regra do usuário: nada do funcionamento do WhatsApp muda.** Conferido:
+  `git diff --stat origin/main -- supabase apps/workers packages` vazio. Sem
+  migração. O aviso só lê `conversations`, `messages`, `organizations_view` e
+  `team_directory`; não escreve em tabela nenhuma e não zera o "por ler". A caixa
+  de resposta do cliente em "Todas" é o mesmo componente da aba "Clientes".
+- Tela: pasta nova `apps/web/src/components/avisos/` (regra, dados,
+  preferências, notificação, provedor e pilha de cartões); `layout/app-shell.tsx`,
+  `sidebar.tsx`, `bottom-nav.tsx`, `nav-link.tsx`, `user-menu.tsx`;
+  `lib/navegacao.ts` (`fila: 'respostas'`) e `lib/filas-do-menu.ts` (sai a
+  contagem de rascunhos); em Conversas, `tela-conversas.tsx`,
+  `lista-conversas.tsx`, `montagem.ts`, `tipos.ts`, `eco-do-banco.ts` e a página.
+- Testes: Vitest 1.045 no site (45 novos: a regra, os carimbos, o texto, a
+  prévia, o destino, o número do menu, os clientes na lista e o endereço), lint,
+  typecheck e build de produção; os testes de workers e pacotes seguem passando
+  sem mudança. Na tela, com o Chrome contra o Supabase local, gestor e SDR lado
+  a lado: 31 conferências — convite fora da caixa de resposta, cliente em
+  "Todas" e em "Minhas", conversa aberta não avisa e se atualiza, cartão com
+  prévia, Responder abrindo a conversa certa com e sem navegação, conversa
+  atendida avisando só quem atende, notificação do sistema sem o texto, cartão
+  que espera fora de vista e some em 12 s, silenciar, celular em 390 px, tema
+  claro e fila de saída do WhatsApp vazia.
+
+**Não foi conferido:** embaixador, leitura e financeiro na tela (não há usuário
+de teste desses papéis no banco local; a regra deles está no Vitest); aba
+escondida por mais de 10 minutos num navegador de verdade; iPhone e Android.
+
+**Limites conhecidos:** no celular não há notificação do sistema (exige service
+worker), valem o número e o cartão; com o CRM fechado não há aviso, continua o
+e-mail; o "visto" é por navegador; o número para em 50; o "por ler" do cliente
+não zera ao abrir a conversa (já era assim na aba "Clientes"); a aba
+"Responderam" continua só com parceiros.
+
+**Efeito no Supabase:** cada aba do CRM aberta passa a manter uma conexão de
+Realtime (antes, só a tela de Conversas), mais uma leitura pequena a cada 90 s.
+
+**Precisa de decisão humana.** O Janio pediu a subida em 02/10/2026, ciente dos
+pontos abaixo; nenhum deles tem o aval do Rafael registrado aqui:
+- **Rafael adiou a notificação de navegador em 28/09/2026** (ADR-17, entrada
+  "quem respondeu entra no Meu dia"). Esta entrega reverte esse adiamento.
+- **O RF-AST-08 restringe o alarme a dois gatilhos** (resposta sem retorno há
+  mais de 2 h e reunião em 3 h) e diz que nenhum terceiro entra sem decisão do
+  Rafael. Este aviso é imediato, a cada mensagem: é uma mudança em relação ao PRD.
+- **A aba "Clientes" nasceu em 01/10, a pedido do Rafael, como lugar separado.**
+  Mostrar os clientes também em "Todas" muda o que ele vai encontrar na lista.
+- Resposta a campanha em massa avisa todos que atendem, e não só quem disparou.
+  Confirmar que é o desejado.
+- Conferir no painel do Supabase o plano, o limite de gastos e o uso de
+  Realtime no dia do deploy e uma semana depois (a pendência "Free ou Pro"
+  segue aberta desde o D1).
