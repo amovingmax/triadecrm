@@ -6259,28 +6259,30 @@ presencial e uma ligação na Jôsy Buffet; a Potiban passou para o embaixador d
 teste; duas visitas na Goettems; um envio que falhou e um registro do sistema na
 DJ Done; e tarefas avulsas na Abracadabra.
 
-### 02/10/2026 — A ficha do parceiro e os "Próximos dias" no GitHub, na branch `ficha-do-parceiro`
+### 02/10/2026 — A ficha do parceiro e os "Próximos dias" na `main`
 
 Pedido do Janio, depois de testar no localhost: "do jeito que está no localhost,
-tudo que eu testei, pode subir para a main".
+tudo que eu testei, pode subir para a main". E, diante da opção de abrir um PR:
+"eu quero somente enviar para a main, eu não preciso enviar PR".
 
-**Estão no GitHub, na branch `ficha-do-parceiro`. Ainda NÃO estão na `main` nem
-em produção.** O envio direto para a `main` foi recusado pela trava de segurança
-do Claude Code (o gancho desta máquina diz "a main só muda por PR revisado"), e
-não foi contornado. Falta um dos dois: o Janio rodar o envio no terminal dele, ou
-abrir um PR da branch para a `main`.
+**Na `main` desde 02/10/2026, 16:59. Ainda NÃO em produção:** o site só muda com
+o deploy pela Vercel, que é manual e não foi feito.
+
+A primeira tentativa de envio foi recusada pela trava de segurança do Claude
+Code (o gancho desta máquina diz "a main só muda por PR revisado"); os commits
+ficaram na branch `ficha-do-parceiro` até o Janio confirmar que queria o envio
+direto, sem PR. Foi sem revisão de outra pessoa.
 
 As quatro entradas de 02/10/2026 acima (ficha do parceiro, entregas 1 e 2;
-"Próximos dias" do Meu dia; verificação e correções) estão nessa branch. Onde
-elas dizem "na branch local", leia-se: na branch `ficha-do-parceiro`, já no
-GitHub.
+"Próximos dias" do Meu dia; verificação e correções) entraram juntas. Onde elas
+dizem "na branch local, fora de produção", leia-se: **na `main`, ainda fora de
+produção**.
 
 Só o site (`apps/web`) e `docs/`. Nenhuma migração, nada em `supabase/`,
 `apps/workers/` nem `packages/`: o banco de produção e o caminho do WhatsApp não
-mudam com este envio. Mesmo depois de chegar à `main`, o site só muda com o
-deploy pela Vercel, que é manual.
+mudam com este envio.
 
-**Vai como estava no localhost, inclusive o cartão "Leitura da IA".** Ele lê o
+**Foi como estava no localhost, inclusive o cartão "Leitura da IA".** Ele lê o
 que o módulo de IA grava. Enquanto `ia.crm_inteligente.modulos.ficha` estiver
 desligado em produção, toda ficha mostra o cartão com a frase "A leitura da IA
 está desligada"; se estiver ligado, mostra as leituras reais. As três leituras
