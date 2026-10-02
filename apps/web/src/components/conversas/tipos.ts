@@ -1,5 +1,6 @@
 import type { ActivityType, Channel, MsgStatus, MsgType, Temperature } from '@komune/schema';
 
+import { type AppRole } from '@/lib/auth/role';
 import { ehCanal } from '@/lib/canais';
 
 /**
@@ -333,6 +334,28 @@ export const ESCOPOS: readonly { id: EscopoDaLista; rotulo: string }[] = [
   { id: 'todas', rotulo: 'Todas' },
 ];
 
+/**
+ * Com que recorte a tela de Conversas ABRE (02/10/2026).
+ *
+ * Abria sempre em "Todas". Janio: "quero que quando a gente abra a aba de
+ * conversa a inicialização padrão seja no campo 'Minhas' [...] toda vez que
+ * alguém vai abrir a aba de conversa seja redirecionado para o campo de
+ * conversas dela por padrão". Quem atende começa pelo que é seu.
+ *
+ * Leitura e financeiro não atendem conversa nenhuma (espelho de
+ * `app.can_write()`): para eles "Minhas" seria uma lista vazia para sempre, e
+ * a tela continua abrindo em "Todas".
+ *
+ * Isto é o padrão da ENTRADA, não um filtro que prende: o endereço guarda a
+ * escolha (`?ver=todas`), e "Limpar filtros" continua levando a "Todas"
+ * (`FILTROS_VAZIOS`), que é o que "sem filtro nenhum" quer dizer.
+ */
+const PAPEIS_QUE_ATENDEM: readonly AppRole[] = ['admin', 'gestor', 'sdr', 'embaixador'];
+
+export function escopoInicialDe(papel: AppRole): EscopoDaLista {
+  return PAPEIS_QUE_ATENDEM.includes(papel) ? 'minhas' : 'todas';
+}
+
 export const FILTROS_VAZIOS: FiltrosConversas = {
   q: '',
   responsavelId: null,
@@ -377,8 +400,14 @@ function ehJanela(v: string): v is JanelaSemContato {
 }
 
 
-/** Lê o recorte, a aba e a conversa aberta da query string (de `searchParams`). */
-export function estadoDaUrl(params: Record<string, string | string[] | undefined>): {
+/**
+ * Lê o recorte, a aba e a conversa aberta da query string (de `searchParams`).
+ * `escopoPadrao` é o recorte de quem chega sem `?ver=` (`escopoInicialDe`).
+ */
+export function estadoDaUrl(
+  params: Record<string, string | string[] | undefined>,
+  escopoPadrao: EscopoDaLista = 'todas',
+): {
   filtros: FiltrosConversas;
   organizacaoId: string | null;
   aba: AbaDaEsquerda;
@@ -399,7 +428,9 @@ export function estadoDaUrl(params: Record<string, string | string[] | undefined
       q: texto('q'),
       responsavelId: texto('responsavel') || null,
       atendenteId: texto('atendente') || null,
-      escopo: ESCOPOS.some((e) => e.id === texto('ver')) ? (texto('ver') as EscopoDaLista) : 'todas',
+      escopo: ESCOPOS.some((e) => e.id === texto('ver'))
+        ? (texto('ver') as EscopoDaLista)
+        : escopoPadrao,
       canal: ehCanal(canal) ? canal : null,
       janela: ehJanela(janela) ? janela : 'qualquer',
       arquivadas: texto('arquivadas') === '1',
@@ -417,12 +448,14 @@ export function urlDoEstado(
   aba: AbaDaEsquerda = 'conversas',
   /** Quem não é ficha não tem `org`: o endereço carrega a conversa dele. */
   clienteId: string | null = null,
+  /** O recorte que a leitura assume sem `?ver=`: é ele que o endereço omite. */
+  escopoPadrao: EscopoDaLista = 'todas',
 ): string {
   const p = new URLSearchParams();
   if (f.q.trim()) p.set('q', f.q.trim());
   if (f.responsavelId) p.set('responsavel', f.responsavelId);
   if (f.atendenteId) p.set('atendente', f.atendenteId);
-  if (f.escopo !== 'todas') p.set('ver', f.escopo);
+  if (f.escopo !== escopoPadrao) p.set('ver', f.escopo);
   if (f.canal) p.set('canal', f.canal);
   if (f.janela !== 'qualquer') p.set('janela', f.janela);
   if (f.arquivadas) p.set('arquivadas', '1');

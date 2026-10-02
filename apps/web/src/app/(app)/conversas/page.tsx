@@ -4,7 +4,7 @@ import { requireSession } from '@/lib/auth/session';
 import { carregarCatalogos } from '@/components/conversas/catalogos';
 import { TelaConversas } from '@/components/conversas/tela-conversas';
 import { ProvedorDoTextoDigitado } from '@/components/conversas/texto-digitado';
-import { estadoDaUrl } from '@/components/conversas/tipos';
+import { escopoInicialDe, estadoDaUrl } from '@/components/conversas/tipos';
 
 export const metadata: Metadata = { title: 'Conversas' };
 
@@ -38,7 +38,9 @@ export default async function Pagina({
     searchParams,
   ]);
 
-  const { filtros, organizacaoId, aba, clienteId } = estadoDaUrl(params);
+  // Quem atende abre em "Minhas"; leitura e financeiro, em "Todas".
+  const escopoInicial = escopoInicialDe(sessao.papel);
+  const { filtros, organizacaoId, aba, clienteId } = estadoDaUrl(params, escopoInicial);
 
   return (
     // Quem está digitando: o texto por enviar de cada conversa fica guardado no
@@ -47,6 +49,7 @@ export default async function Pagina({
       <TelaConversas
         catalogos={catalogos}
         filtrosIniciais={filtros}
+        escopoInicial={escopoInicial}
         organizacaoInicial={organizacaoId}
         clienteInicial={clienteId}
         abaInicial={aba}

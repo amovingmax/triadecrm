@@ -7,7 +7,7 @@ import {
   MOTIVOS_DA_FICHA,
 } from './fora-da-base-dados';
 import type { FioCru } from './mensagens';
-import { estadoDaUrl, urlDoEstado, FILTROS_VAZIOS } from './tipos';
+import { escopoInicialDe, estadoDaUrl, urlDoEstado, FILTROS_VAZIOS } from './tipos';
 
 /**
  * A aba "Fora da base" (migração 20260915130000): quem escreveu e não é ficha.
@@ -94,5 +94,54 @@ describe('a aba na URL', () => {
     expect(urlDoEstado(FILTROS_VAZIOS, null, 'conversas', 'fio-9')).toBe('?cliente=fio-9');
     // Com uma ficha aberta, quem vale é ela: as duas não ficam abertas juntas.
     expect(urlDoEstado(FILTROS_VAZIOS, 'org-1', 'conversas', 'fio-9')).toBe('?org=org-1');
+  });
+});
+
+describe('com que recorte a tela de Conversas abre', () => {
+  it('quem atende abre em "Minhas"', () => {
+    expect(escopoInicialDe('admin')).toBe('minhas');
+    expect(escopoInicialDe('gestor')).toBe('minhas');
+    expect(escopoInicialDe('sdr')).toBe('minhas');
+    expect(escopoInicialDe('embaixador')).toBe('minhas');
+  });
+
+  it('leitura e financeiro não atendem ninguém: abrem em "Todas"', () => {
+    expect(escopoInicialDe('leitura')).toBe('todas');
+    expect(escopoInicialDe('financeiro')).toBe('todas');
+  });
+
+  it('sem `?ver=`, vale o padrão de quem abriu', () => {
+    expect(estadoDaUrl({}, 'minhas').filtros.escopo).toBe('minhas');
+    expect(estadoDaUrl({}, 'todas').filtros.escopo).toBe('todas');
+    // Um link direto para uma conversa também não traz `ver`.
+    expect(estadoDaUrl({ org: 'org-1' }, 'minhas').filtros.escopo).toBe('minhas');
+  });
+
+  it('a escolha da pessoa vence o padrão, e valor estranho cai nele', () => {
+    expect(estadoDaUrl({ ver: 'todas' }, 'minhas').filtros.escopo).toBe('todas');
+    expect(estadoDaUrl({ ver: 'setor' }, 'minhas').filtros.escopo).toBe('setor');
+    expect(estadoDaUrl({ ver: 'qualquer-coisa' }, 'minhas').filtros.escopo).toBe('minhas');
+  });
+
+  it('o endereço omite o padrão e guarda só a escolha diferente', () => {
+    const minhas = { ...FILTROS_VAZIOS, escopo: 'minhas' as const };
+    const todas = { ...FILTROS_VAZIOS, escopo: 'todas' as const };
+    expect(urlDoEstado(minhas, null, 'conversas', null, 'minhas')).toBe('');
+    expect(urlDoEstado(todas, null, 'conversas', null, 'minhas')).toBe('?ver=todas');
+    // Para quem abre em "Todas" (leitura), nada muda em relação a antes.
+    expect(urlDoEstado(todas, null, 'conversas', null, 'todas')).toBe('');
+    expect(urlDoEstado(minhas, null, 'conversas', null, 'todas')).toBe('?ver=minhas');
+  });
+
+  it('ida e volta: o que o endereço guarda é o que a leitura devolve', () => {
+    for (const escopo of ['minhas', 'setor', 'todas'] as const) {
+      const url = urlDoEstado({ ...FILTROS_VAZIOS, escopo }, null, 'conversas', null, 'minhas');
+      const params = Object.fromEntries(new URLSearchParams(url));
+      expect(estadoDaUrl(params, 'minhas').filtros.escopo).toBe(escopo);
+    }
+  });
+
+  it('"Limpar filtros" continua levando a "Todas"', () => {
+    expect(FILTROS_VAZIOS.escopo).toBe('todas');
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FilterX, MessagesSquare, Plus, RotateCw, SearchX, Users } from 'lucide-react';
+import { FilterX, Inbox, MessagesSquare, Plus, RotateCw, SearchX, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -87,6 +87,26 @@ export function VazioPorFiltro({
       <Button variant="outline" onClick={aoLimpar} className="toque h-11 md:h-9">
         <FilterX aria-hidden="true" />
         {soBusca ? 'Limpar a busca' : 'Limpar filtros'}
+      </Button>
+    </Moldura>
+  );
+}
+
+/**
+ * "Minhas" está vazia, sem filtro nenhum ligado: a pessoa não atende ninguém
+ * agora. A tela abre em "Minhas" desde 02/10/2026, então esta é a primeira
+ * coisa que vê quem ainda não assumiu conversa — e a saída é mostrar todas.
+ */
+export function SemConversasMinhas({ aoVerTodas }: { aoVerTodas: () => void }) {
+  return (
+    <Moldura
+      icone={<Inbox className="size-5" aria-hidden="true" />}
+      titulo="Nenhuma conversa com você agora"
+      texto="Aqui ficam as conversas que você está atendendo. Quem escreveu e ainda não tem ninguém respondendo está em Todas."
+    >
+      <Button variant="outline" onClick={aoVerTodas} className="toque h-11 md:h-9">
+        <MessagesSquare aria-hidden="true" />
+        Ver todas
       </Button>
     </Moldura>
   );

@@ -5829,3 +5829,47 @@ guardados. O texto fica no aparelho até ser enviado, apagado ou vencer.
 **Precisa de decisão humana:** a tela passa a usar "Rascunho" para duas coisas
 (o texto da pessoa e o da IA, este último no cabeçalho "rascunhos esperando
 você"). Se confundir o time, trocar uma das palavras.
+
+### 02/10/2026 — Conversas abre em "Minhas"
+
+Pedido do Janio: "hoje quando abrimos a aba de conversas está indo diretamente
+para o campo de 'Todas', eu quero que [...] a inicialização padrão seja no
+campo 'Minhas'. A ideia é que toda vez que alguém vai abrir a aba de conversa
+seja redirecionado para o campo de conversas dela por padrão".
+
+**Na branch local `avisos-de-resposta`, fora de produção.**
+
+- **Quem atende abre em "Minhas"**: admin, gestor, SDR e embaixador. Vale pelo
+  menu, pela barra do celular e por link direto (`?org=`, `?cliente=`): a
+  conversa do link abre do mesmo jeito, mesmo sendo de um colega, e a lista
+  fica em "Minhas".
+- **Leitura e financeiro continuam abrindo em "Todas"**: não atendem conversa
+  nenhuma, e "Minhas" seria uma lista vazia para sempre.
+- **A escolha fica no endereço.** `/conversas` sozinho é "Minhas"; quem troca
+  para "Todas" ou "Meu setor" ganha `?ver=todas` / `?ver=setor`, e recarregar
+  mantém. Voltar pelo menu abre de novo em "Minhas".
+- **"Minhas" vazia tem saída.** Quem ainda não atende ninguém vê "Nenhuma
+  conversa com você agora" e o botão "Ver todas", em vez de "nenhuma conversa
+  com esses filtros" sem ter filtrado nada. "Limpar filtros" continua levando a
+  "Todas".
+- As abas "Responderam", "Aprovar", "Clientes" e "Automáticas" não mudam: nunca
+  passaram pelo recorte.
+- Arquivos: `conversas/tipos.ts` (`escopoInicialDe`, e `estadoDaUrl` /
+  `urlDoEstado` recebem o recorte padrão), `tela-conversas.tsx`, `estados.tsx`
+  (`SemConversasMinhas`) e `app/(app)/conversas/page.tsx`. Só o site.
+- Testes: Vitest 1.085 no site (7 novos), lint, typecheck e build. No Chrome,
+  contra o Supabase local, 14 conferências com gestor e SDR: abre em "Minhas"
+  só com as conversas de cada um, a escolha "Todas" sobrevive à recarga, o menu
+  volta a "Minhas", link direto abre a conversa de um colega, e a lista vazia
+  leva a "Todas".
+
+**Precisa de decisão humana:**
+- **Quem escreve e ainda não tem ninguém atendendo não aparece em "Minhas".**
+  O número ao lado de Conversas e a marca "Nova" contam essas conversas (e toda
+  mensagem de cliente), mas elas estão em "Todas", "Responderam" e "Clientes".
+  Quem clica no número pode cair numa lista sem nenhuma das conversas que ele
+  contou. O cartão "Nova mensagem" leva direto à conversa, e o texto da lista
+  vazia aponta para "Todas"; se não bastar, o caminho é um número de novas ao
+  lado de "Todas" no seletor.
+- A fila do setor (spec do atendimento por responsável) nasceu com "Todas" na
+  entrada. Confirmar com o Rafael que "Minhas" é a entrada desejada para o time.

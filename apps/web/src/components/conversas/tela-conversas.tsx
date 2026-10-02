@@ -18,6 +18,7 @@ import {
   ErroDaTela,
   EsqueletoLista,
   NenhumaEscolhida,
+  SemConversasMinhas,
   VazioDeVerdade,
   VazioPorFiltro,
 } from './estados';
@@ -44,6 +45,7 @@ import {
   temRecorte,
   urlDoEstado,
   type AbaDaEsquerda,
+  type EscopoDaLista,
   type FiltrosConversas,
   type ItemConversa,
 } from './tipos';
@@ -98,9 +100,16 @@ export function TelaConversas({
   organizacaoInicial,
   clienteInicial,
   abaInicial,
+  escopoInicial,
 }: {
   catalogos: CatalogosConversas;
   filtrosIniciais: FiltrosConversas;
+  /**
+   * O recorte com que a tela abre para esta pessoa ("Minhas" para quem atende).
+   * O endereço omite o padrão: `/conversas` sozinho é "Minhas", e só a escolha
+   * diferente aparece (`?ver=todas`).
+   */
+  escopoInicial: EscopoDaLista;
   /** Veio de `?org=<id>`: abre esta conversa já na entrada. */
   organizacaoInicial: string | null;
   /** Veio de `?cliente=<id da conversa>`: abre a conversa de quem não é ficha. */
@@ -243,11 +252,11 @@ export function TelaConversas({
   }, []);
 
   useEffect(() => {
-    const alvo = `${window.location.pathname}${urlDoEstado(filtros, escolhidoId, aba, foraId)}`;
+    const alvo = `${window.location.pathname}${urlDoEstado(filtros, escolhidoId, aba, foraId, escopoInicial)}`;
     if (alvo !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', alvo);
     }
-  }, [filtros, escolhidoId, aba, foraId]);
+  }, [filtros, escolhidoId, aba, foraId, escopoInicial]);
 
   // O AVISO DE QUEM RESPONDEU SAIU DAQUI (01/10/2026). Quem avisa é a casca
   // (`components/avisos`): em qualquer tela, só a quem atende, com o cartão
@@ -287,6 +296,8 @@ export function TelaConversas({
 
   const recorte = temRecorte(filtros);
   const soBusca = recorte && contarFiltros(filtros) === 0;
+  // "Minhas" e mais nada: nem busca, nem filtro, nem arquivadas.
+  const soMinhas = filtros.escopo === 'minhas' && !temRecorte({ ...filtros, escopo: 'todas' });
   const comContato = todos.filter((i) => i.ultimaEm !== null).length;
   const porLer =
     todos.reduce((soma, i) => soma + i.naoLidas, 0) +
@@ -480,6 +491,10 @@ export function TelaConversas({
               <p className="px-4 py-8 text-sm text-muted-foreground">
                 Você ainda não está em nenhum setor. Um gestor coloca você em Ajustes → Pessoas.
               </p>
+            ) : nadaNaLista && soMinhas ? (
+              // A tela abre em "Minhas", e quem ainda não atende ninguém cairia
+              // em "nenhuma conversa com esses filtros" sem ter filtrado nada.
+              <SemConversasMinhas aoVerTodas={() => mudar({ escopo: 'todas' })} />
             ) : nadaNaLista && recorte ? (
               <VazioPorFiltro
                 descricao={descreverRecorte(filtros, catalogos)}
