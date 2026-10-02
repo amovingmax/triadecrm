@@ -97,7 +97,11 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
         className={cn(
           // Fechado, a linha tem os 44px do trilho e o `rounded-full` a faz um
           // disco; aberto, a mesma linha vira uma pílula com o nome dentro.
-          'relative flex h-11 w-full shrink-0 items-center gap-3 overflow-hidden rounded-full pr-4 transition-colors',
+          //
+          // Sem `overflow-hidden` aqui (02/10/2026): ele cortava o número pela
+          // curva do disco, e o "5" de Conversas aparecia pela metade. Quem
+          // precisa de corte é só o nome, e ele já se corta sozinho (`truncate`).
+          'relative flex h-11 w-full shrink-0 items-center gap-3 rounded-full pr-4 transition-colors',
           'outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
           ativo
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
@@ -111,10 +115,13 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
             // aqui porque o trilho sem rótulo precisa de um sinal que se veja sem
             // ler: o número é o que diz em qual módulo há trabalho parado agora.
             // No ativo o fundo já é menta, e a contagem vira tinta para não sumir.
+            // O anel na cor do trilho solta o número do ícone e da borda do disco.
+            // `right-0.5`, e não `right-0`: o trilho tem 1px de fio à direita, o
+            // disco do ícone passa 1px da linha, e a navegação cortava esse pixel.
             <span
               aria-label={rotuloDoNumero}
               className={cn(
-                'numerico absolute top-0.5 right-0 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold',
+                'numerico absolute top-0.5 right-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] leading-none font-semibold ring-2 ring-sidebar',
                 ativo ? 'bg-menta-tinta text-menta' : 'bg-menta text-menta-tinta',
               )}
             >
@@ -127,7 +134,9 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
             antes de haver espaço para ele. */}
         <span
           className={cn(
-            'truncate text-sm font-medium whitespace-nowrap opacity-0 transition-opacity duration-150',
+            // `min-w-0`: com o trilho fechado o nome encolhe até zero em vez de
+            // vazar para fora do disco, agora que a linha não corta mais nada.
+            'min-w-0 truncate text-sm font-medium whitespace-nowrap opacity-0 transition-opacity duration-150',
             'group-hover/trilho:opacity-100 group-hover/trilho:delay-150',
             'group-has-[:focus-visible]/trilho:opacity-100',
             'motion-reduce:transition-none',

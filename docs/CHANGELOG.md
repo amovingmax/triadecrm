@@ -5672,6 +5672,12 @@ partir da `main`. Sem migração.**
   atendida avisando só quem atende, notificação do sistema sem o texto, cartão
   que espera fora de vista e some em 12 s, silenciar, celular em 390 px, tema
   claro e fila de saída do WhatsApp vazia.
+- **02/10, o número do trilho aparecia cortado** (Janio, com a foto do "5" pela
+  metade). O disco do ícone cortava pela curva tudo o que passava dele, e a
+  navegação cortava mais 1px. A linha do trilho deixou de cortar (só o nome se
+  corta), e o número ganhou 18px, um anel na cor do trilho e 2px de folga da
+  borda. Vale também para o número de Revisão. Conferido no Chrome com "6",
+  "12" e "99+", trilho fechado e aberto (`layout/nav-link.tsx`).
 
 **Não foi conferido:** embaixador, leitura e financeiro na tela (não há usuário
 de teste desses papéis no banco local; a regra deles está no Vitest); aba
