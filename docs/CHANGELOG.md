@@ -5615,7 +5615,8 @@ essa mensagem deve chegar para a aba de conversas em 'todos'". Desenho em
 **Feito em 01/10 e no ar desde 02/10/2026, 12:00, a pedido do Janio, em cima da
 `main` do dia (`8e9c134`). Só o site muda. Sem migração. O fim da lista
 (cliente avisa todos os operadores, e o cartão que diz se é parceiro ou
-cliente) ainda não subiu.**
+cliente) subiu no mesmo dia, às 14:09 (`main` em `98dab24`, deploy
+`triade-p0h9ctlon`).**
 
 - **De quem é o aviso.** Conversa em que alguém do time já escreveu: só quem
   atende. Conversa em que ninguém escreveu ainda (cliente novo, resposta ao
@@ -5708,7 +5709,7 @@ cliente) ainda não subiu.**
 - **02/10, 12:00, no ar.** A `main` foi para `ec02193` e o site foi publicado
   pela CLI (deploy `triade-m0zas3mz8`), a pedido do Janio. Ponto de volta: o
   deploy `triade-qw9oqvfl5`, das 09:39. Sem migração.
-- **02/10, o cliente avisa todos os operadores** (ainda fora de produção).
+- **02/10, o cliente avisa todos os operadores** (no ar desde 02/10, 14:09).
   Janio, depois de ver no ar: "a mensagem chegou somente para quem está
   assumindo a conversa, e isto é o certo [...] agora quero a mesma situação
   para a aba de 'clientes' (que são as pessoas que usam o app), sendo que essa
@@ -5725,7 +5726,7 @@ cliente) ainda não subiu.**
     atendida pelo gestor avisa também a SDR, com cartão; parceiro atendido pela
     SDR não avisa o gestor; a SDR abre a cliente e o número dela cai, o do
     gestor não; fila de saída do WhatsApp vazia.
-- **02/10, o cartão diz se é parceiro ou cliente** (ainda fora de produção).
+- **02/10, o cartão diz se é parceiro ou cliente** (no ar desde 02/10, 14:09).
   Janio: "poderíamos fazer uma identidade visual nas notificações para clientes
   e parceiros?", e escolheu, das seis sugestões, o selo, o avatar e a linha de
   contexto "no pop-up de notificação".
@@ -5787,7 +5788,7 @@ rascunho ela apaga se clicarmos em outra conversa [...] quero que quando eu saia
 de uma conversa a mensagem rascunho que eu escrevi não seja apagada". E a
 pergunta: "isso mexe com o banco de dados?". Não mexe.
 
-**Na branch local `avisos-de-resposta`, fora de produção.**
+**No ar desde 02/10/2026, 14:09 (`main` em `98dab24`, deploy `triade-p0h9ctlon`).**
 
 - **O que muda.** O texto da caixa de resposta passa a ser guardado por
   conversa. Trocar de conversa, mudar de aba ou recarregar a página não o apaga:
@@ -5837,7 +5838,7 @@ para o campo de 'Todas', eu quero que [...] a inicialização padrão seja no
 campo 'Minhas'. A ideia é que toda vez que alguém vai abrir a aba de conversa
 seja redirecionado para o campo de conversas dela por padrão".
 
-**Na branch local `avisos-de-resposta`, fora de produção.**
+**No ar desde 02/10/2026, 14:09 (`main` em `98dab24`, deploy `triade-p0h9ctlon`).**
 
 - **Quem atende abre em "Minhas"**: admin, gestor, SDR e embaixador. Vale pelo
   menu, pela barra do celular e por link direto (`?org=`, `?cliente=`): a
@@ -5873,3 +5874,88 @@ seja redirecionado para o campo de conversas dela por padrão".
   lado de "Todas" no seletor.
 - A fila do setor (spec do atendimento por responsável) nasceu com "Todas" na
   entrada. Confirmar com o Rafael que "Minhas" é a entrada desejada para o time.
+
+### 02/10/2026 — A ficha do parceiro, redesenhada (entrega 1 de 2) (RF-BAS-01 a 06, RF-BAS-10, RF-BAS-14)
+
+Pedido do Janio: "dá uma olhada como está o detalhamento dos parceiros e me diz
+como podemos melhorar para deixar as informações mais limpas e fáceis de
+enxergar", e depois, vendo a primeira maquete: "gostaria de algo mais premium,
+mais profissional e mais direto". As maquetes foram aprovadas por ele antes da
+implementação, em duas entregas.
+
+**Na branch local `ficha-do-parceiro`, fora de produção. Só o site; só leitura.**
+
+O que a ficha tinha de errado: o cartão de contato quase todo "Não informado"
+(5 de 8 campos na ficha de teste), a situação do parceiro numa frase em letra
+pequena, temperatura, etapa e último contato escritos duas vezes, a próxima ação
+no fim do cartão "Negócios", o pré-cadastro ocupando metade da tela sem ter
+começado e, no celular, 1.944 px de página com o que importa na terceira tela.
+
+- **Um cabeçalho só.** Avatar com as iniciais, nome, temperatura, tipo,
+  categoria e lugar, e as saídas à direita: "Conversar" em destaque, "Registrar
+  contato" e o menu "⋯" com "Ver no funil" e "Editar ficha" (eram quatro botões
+  do mesmo peso, empilhados no celular).
+- **A régua do funil.** O caminho inteiro em traços, com o que ficou para trás,
+  a etapa atual em destaque e, ao lado, "etapa 5 de 9 · há 2 dias · próxima:
+  Apresentação realizada". Sem cor: a cromia continua sendo só a térmica.
+  Parceiro em Nutrição, Perdido ou Opt-out aparece como "fora do funil", com a
+  régua apagada — não se sabe até onde ele foi antes de sair.
+- **Quatro números.** Próxima ação (com o único ponto de cor do cabeçalho),
+  último contato ("Hoje", "Ontem", "Há 5 dias", no lugar de "há 0 dias"), estado
+  do WhatsApp e responsável.
+- **Estado do WhatsApp.** "Janela aberta · por mais 21 h · 2 por ler", "Janela
+  fechando", "Janela fechada · só modelo aprovado", "Sem resposta ainda", "Sem
+  conversa" ou "Não contatar". Lê `conversations` (janela, por ler, quem
+  atende); não escreve nada e não fala com a Meta.
+- **Presença pública** sob o nome: nota, número de avaliações e Instagram,
+  quando existem.
+- **Contato em linhas**, só com o que existe. O que falta vira botões "+
+  Instagram", "+ Site", "+ E-mail", "+ CNPJ", "+ Endereço", que abrem a folha de
+  edição já no campo. Para quem só lê, vira uma frase. A proveniência do
+  RF-BAS-10 (origem, quando e quem coletou) continua, numa linha.
+- **O telefone continua sendo o `TelefoneRevelavel`** (máscara por papel e
+  revelação registrada, RF-BAS-14). Ganhou um botão de copiar, que só aparece
+  com o número à vista.
+- **Sem repetição.** Com um negócio só, o cartão "Negócios" some; com dois ou
+  mais, volta.
+- **Pré-cadastro compacto** enquanto não há rascunho: os três passos em
+  miniatura, o botão e a frase que explica o botão. A escada completa fica em
+  "Como funciona o pré-cadastro" e volta inteira quando o rascunho existe.
+- A folha "Editar ficha" passou a poder ser aberta por quem a chama (`aberta`,
+  `aoMudar`, `campoInicial`); sem esses três, continua com o próprio botão.
+
+Arquivos: `app/(app)/parceiros/[id]/page.tsx`; em `components/parceiros/`,
+`resumo-da-ficha.ts` e `.test.ts` (as regras, puras), `ficha-acoes.tsx`,
+`ficha-edicao.tsx`, `ficha-regua.tsx` (novos), `ficha.ts` (lê nota, etapas do
+funil e a conversa), `folha-editar-ficha.tsx` e `telefone-revelavel.tsx`; e
+`precadastro/painel-precadastro.tsx`. Nada em `supabase/`, `apps/workers/` nem
+`packages/`.
+
+Testes: Vitest 1.108 no site (23 novos: régua, último contato, estado do
+WhatsApp, o que falta e presença pública), lint, typecheck e build. No Chrome,
+contra o Supabase local, 32 conferências com gestor e SDR, no computador e em
+390 px: régua e estado do WhatsApp batendo com o banco, "+ Site" abrindo a
+edição no campo certo, menu "⋯", copiar o número, nota e avaliações, parceiro
+perdido, telefone mascarado para a SDR sem botão de copiar, e a conferência de
+que a ficha só leu (nenhuma mensagem, conversa, ficha ou revelação gravada, fila
+de saída do WhatsApp vazia). No celular a página foi de 1.944 para cerca de
+1.500 px, com os quatro números na primeira tela.
+
+**Não foi conferido:** parceiro sem negócio nenhum e parceiro com dois negócios
+(não há nenhum dos dois no banco local); papel de leitura, financeiro e
+embaixador (não há usuário de teste); tema claro; o número da KOMUNE conectado
+(no local ele não está, então o botão diz "Abrir a conversa" e a linha do
+telefone mostra "Abrir no WhatsApp").
+
+**Fica para a entrega 2:** atividade, leitura da IA e próximos passos (reunião e
+tarefas, só lista). **Fica para depois:** o bloco "Pessoas", que é
+funcionalidade nova e a única parte que grava.
+
+**Precisa de decisão humana:**
+- É uma tela nova, não um ajuste: aval do Rafael antes de subir.
+- "Próxima ação" no cabeçalho é a do negócio (`deals.next_action`). Quando a
+  entrega 2 trouxer reuniões e tarefas, decidir qual das três é "o próximo
+  compromisso".
+- Parceiro em dois funis: o cabeçalho mostra a régua do negócio principal (o
+  aberto mais recente) e os demais ficam no cartão "Negócios". Confirmar.
+- "Conversar" virou a ação de destaque, no lugar de "Registrar contato".

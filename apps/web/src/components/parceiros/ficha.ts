@@ -2,6 +2,8 @@ import type { OrgKind, Temperature } from '@komune/schema';
 
 import { createClient } from '@/lib/supabase/server';
 
+import type { ConversaDaFicha, EtapaDoFunil } from './resumo-da-ficha';
+
 /**
  * Leitura da ficha do parceiro, no servidor.
  *
@@ -14,6 +16,9 @@ import { createClient } from '@/lib/supabase/server';
 export type NegocioDaFicha = {
   id: string;
   funil: string;
+  /** O id do funil e o da etapa: é com eles que a régua do cabeçalho se monta. */
+  funilId: number;
+  etapaId: number;
   etapa: string;
   status: string;
   temperatura: Temperature;
@@ -63,6 +68,23 @@ export type Ficha = {
   naoContatar: boolean;
   descricao: string | null;
   negocios: NegocioDaFicha[];
+  /**
+   * A nota e o número de avaliações que a coleta trouxe. Vazios na maior parte
+   * da base: a ficha só mostra a linha quando existem.
+   */
+  nota: number | null;
+  avaliacoes: number | null;
+  /**
+   * Todas as etapas de cada funil em que o parceiro tem negócio, por id do
+   * funil. A régua do cabeçalho precisa do caminho inteiro, não só da etapa atual.
+   */
+  etapasPorFunil: Record<number, EtapaDoFunil[]>;
+  /**
+   * A conversa de WhatsApp mais recente do parceiro: janela de 24 h, por ler e
+   * quem atende. `null` quando não há conversa — ou quando a RLS não deixa este
+   * papel vê-la, que para a ficha dá no mesmo.
+   */
+  conversa: ConversaDaFicha | null;
 };
 
 /**
@@ -77,7 +99,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     // Uma string literal só: o supabase-js deduz o tipo do retorno a partir dela, e
     // uma concatenação em tempo de execução apagaria essa dedução.
     .select(
-      'id, name, legal_name, kind, cnpj, phone_e164, phone_is_masked, email, instagram_handle, website, city_id, city_name, neighborhood, address, temperature, temperature_override, temperature_override_reason, owner_id, source_id, source_url, collected_at, collector, is_natural_person, vip, do_not_contact, description, primary_category_name',
+      'id, name, legal_name, kind, cnpj, phone_e164, phone_is_masked, email, instagram_handle, website, city_id, city_name, neighborhood, address, temperature, temperature_override, temperature_override_reason, owner_id, source_id, source_url, collected_at, collector, is_natural_person, vip, do_not_contact, description, primary_category_name, rating, reviews_count',
     )
     .eq('id', id)
     .maybeSingle();
@@ -94,7 +116,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
   }
   if (!org) return null;
 
-  const [categorias, negocios, origem, time] = await Promise.all([
+  const [categorias, negocios, origem, time, conversas] = await Promise.all([
     supabase
       .from('organization_categories')
       .select('is_primary, category_id, categories(name)')
@@ -110,18 +132,47 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
       ? supabase.from('sources').select('name').eq('id', org.source_id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from('team_directory').select('id, full_name'),
+    // A conversa mais recente, só para LER o estado do WhatsApp (janela de 24 h,
+    // por ler, quem atende). A ficha não escreve em `conversations` nem fala com
+    // a Meta; se a leitura falhar, o cabeçalho diz "Sem conversa" e a ficha abre.
+    supabase
+      .from('conversations')
+      .select('window_expires_at, unread_count, assignee_id')
+      .eq('organization_id', id)
+      .is('arquivada_em', null)
+      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .limit(1),
   ]);
 
   const nomeDoTime = new Map((time.data ?? []).map((p) => [p.id, p.full_name]));
 
-  const idsDeEtapa = [...new Set((negocios.data ?? []).map((d) => d.stage_id))];
-  const { data: etapas } = idsDeEtapa.length
-    ? await supabase.from('stages').select('id, name, pipeline_id').in('id', idsDeEtapa)
+  // As etapas do FUNIL inteiro, e não só as dos negócios: a régua do cabeçalho
+  // desenha o caminho todo. Continua uma consulta só, agora pelo funil.
+  const idsDeFunil = [...new Set((negocios.data ?? []).map((d) => d.pipeline_id))];
+  const { data: etapas } = idsDeFunil.length
+    ? await supabase
+        .from('stages')
+        .select('id, name, pipeline_id, position')
+        .in('pipeline_id', idsDeFunil)
+        .order('position')
     : { data: [] };
   const { data: funis } = await supabase.from('pipelines').select('id, name');
 
   const etapaPorId = new Map((etapas ?? []).map((e) => [e.id, e.name]));
   const funilPorId = new Map((funis ?? []).map((f) => [f.id, f.name]));
+  const etapasPorFunil: Record<number, EtapaDoFunil[]> = {};
+  for (const e of etapas ?? []) {
+    (etapasPorFunil[e.pipeline_id] ??= []).push({ id: e.id, nome: e.name, posicao: e.position });
+  }
+
+  const fio = conversas.error ? null : (conversas.data?.[0] ?? null);
+  const conversa: ConversaDaFicha | null = fio
+    ? {
+        janelaExpiraEm: fio.window_expires_at,
+        porLer: fio.unread_count,
+        atendente: nomeDoTime.get(fio.assignee_id) ?? null,
+      }
+    : null;
 
   const listaDeCategorias = (categorias.data ?? [])
     // O PostgREST devolve o embed como lista mesmo quando a relação é para um só.
@@ -138,8 +189,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     nome: org.name,
     razaoSocial: org.legal_name,
     cidadeId: org.city_id,
-    categoriaId:
-      (categorias.data ?? []).find((c) => c.is_primary)?.category_id ?? null,
+    categoriaId: (categorias.data ?? []).find((c) => c.is_primary)?.category_id ?? null,
     tipo: org.kind,
     cnpj: org.cnpj,
     telefone: org.phone_e164,
@@ -164,9 +214,15 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
     vip: org.vip,
     naoContatar: org.do_not_contact,
     descricao: org.description,
+    nota: org.rating,
+    avaliacoes: org.reviews_count,
+    etapasPorFunil,
+    conversa,
     negocios: (negocios.data ?? []).map((d) => ({
       id: d.id,
       funil: funilPorId.get(d.pipeline_id) ?? 'Funil',
+      funilId: d.pipeline_id,
+      etapaId: d.stage_id,
       etapa: etapaPorId.get(d.stage_id) ?? 'Etapa',
       status: d.status,
       temperatura: d.temperature,

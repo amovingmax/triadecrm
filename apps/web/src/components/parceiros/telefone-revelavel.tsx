@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Eye, MessageCircle } from 'lucide-react';
+import { Copy, Eye, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { createClient } from '@/lib/supabase/client';
@@ -76,9 +76,36 @@ export function TelefoneRevelavel({
     toast.success('Telefone revelado.', { description: 'A revelação ficou registrada.' });
   }
 
+  // Copiar só o número que já está à vista: para quem recebe a máscara, o botão
+  // nasce depois de "Revelar", e copiar não é uma segunda revelação.
+  const paraCopiar = mascarado ? revelado : telefone;
+  async function copiar(numero: string) {
+    try {
+      await navigator.clipboard.writeText(numero);
+      toast.success('Número copiado.');
+    } catch {
+      toast.error('O navegador não deixou copiar.', {
+        description: 'Selecione o número na tela e copie à mão.',
+      });
+    }
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="numerico">{formatarTelefone(visivel)}</span>
+
+      {paraCopiar ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => void copiar(paraCopiar)}
+          className="toque size-11 text-muted-foreground md:size-7"
+          aria-label="Copiar o número"
+          title="Copiar o número"
+        >
+          <Copy aria-hidden="true" />
+        </Button>
+      ) : null}
 
       {mascarado && !revelado ? (
         <Button

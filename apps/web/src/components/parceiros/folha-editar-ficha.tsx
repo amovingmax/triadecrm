@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pencil } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
@@ -70,7 +70,18 @@ import type { Catalogos } from './tipos';
  * mesma transação da ficha. Se a segunda falhar, a ficha fica salva e a
  * categoria não, e a tela precisa dizer isso em vez de fingir que deu tudo
  * certo. É o que o bloco no fim faz.
+ *
+ * ---------------------------------------------------------------------------
+ * QUEM ABRE A FOLHA (02/10/2026)
+ * ---------------------------------------------------------------------------
+ * Ela nasceu com o próprio botão "Editar ficha". Na ficha nova há mais de uma
+ * porta — o menu "⋯" do cabeçalho e os botões "+ Instagram", "+ Site" do
+ * cartão de contato —, então quem chama pode CONTROLAR a folha (`aberta` e
+ * `aoMudar`) e dizer em que campo ela abre (`campoInicial`). Sem esses três, ela
+ * continua desenhando o seu botão, como sempre.
  */
+
+export type ValoresDaFicha = Valores;
 
 type Valores = {
   name: string;
@@ -127,13 +138,27 @@ function ouNulo(v: string): string | null {
 export function FolhaEditarFicha({
   ficha,
   catalogos,
+  aberta: abertaPorFora,
+  aoMudar,
+  campoInicial = null,
 }: {
   ficha: FichaParaEditar;
   catalogos: Catalogos;
+  /** Com este valor a folha é controlada por quem chama, e não desenha botão. */
+  aberta?: boolean;
+  aoMudar?: (aberta: boolean) => void;
+  /** O campo que recebe o foco ao abrir: quem clicou em "+ Site" quer o Site. */
+  campoInicial?: keyof Valores | null;
 }) {
   const router = useRouter();
   const id = useId();
-  const [aberta, setAberta] = useState(false);
+  const [abertaPorDentro, setAbertaPorDentro] = useState(false);
+  const controlada = abertaPorFora !== undefined;
+  const aberta = controlada ? abertaPorFora : abertaPorDentro;
+  const setAberta = (valor: boolean) => {
+    if (controlada) aoMudar?.(valor);
+    else setAbertaPorDentro(valor);
+  };
   const [salvando, setSalvando] = useState(false);
 
   const form = useForm<Valores>({
@@ -155,6 +180,15 @@ export function FolhaEditarFicha({
       category_id: ficha.categoriaId ? String(ficha.categoriaId) : '',
     },
   });
+
+  // O foco vai para o campo pedido depois que a folha entra: antes disso o
+  // campo ainda não está na tela, e o foco se perderia.
+  const { setFocus } = form;
+  useEffect(() => {
+    if (!aberta || campoInicial === null) return;
+    const espera = window.setTimeout(() => setFocus(campoInicial), 250);
+    return () => window.clearTimeout(espera);
+  }, [aberta, campoInicial, setFocus]);
 
   async function salvar(v: Valores) {
     if (v.name.trim() === '') {
@@ -219,19 +253,21 @@ export function FolhaEditarFicha({
 
   return (
     <Sheet open={aberta} onOpenChange={setAberta}>
-      <SheetTrigger asChild>
-        <Button variant="outline" className="toque h-11 md:h-9">
-          <Pencil aria-hidden="true" />
-          Editar ficha
-        </Button>
-      </SheetTrigger>
+      {controlada ? null : (
+        <SheetTrigger asChild>
+          <Button variant="outline" className="toque h-11 md:h-9">
+            <Pencil aria-hidden="true" />
+            Editar ficha
+          </Button>
+        </SheetTrigger>
+      )}
 
       <SheetContent side="right" className="w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>Editar {ficha.name}</SheetTitle>
           <SheetDescription>
-            O telefone, o CNPJ e o @instagram passam pela mesma conferência do cadastro: se já
-            forem de outra ficha, o banco recusa e diz qual.
+            O telefone, o CNPJ e o @instagram passam pela mesma conferência do cadastro: se já forem
+            de outra ficha, o banco recusa e diz qual.
           </SheetDescription>
         </SheetHeader>
 
@@ -259,7 +295,7 @@ export function FolhaEditarFicha({
             <Input
               id={`${id}-tel`}
               inputMode="tel"
-              placeholder={ficha.telefoneMascarado ? ficha.telefone ?? '' : '(84) 99999-0000'}
+              placeholder={ficha.telefoneMascarado ? (ficha.telefone ?? '') : '(84) 99999-0000'}
               className="h-11 md:h-9"
               {...form.register('phone_e164')}
             />

@@ -3,14 +3,21 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   ArrowLeft,
+  AtSign,
   ExternalLink,
-  MessageCircle,
-  PhoneOutgoing,
+  FileText,
+  Globe,
+  IdCard,
+  Mail,
+  MapPin,
+  Phone,
   ShieldAlert,
-  SquareKanban,
+  Star,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { iniciaisDe } from '@/lib/iniciais';
 import { LEITURA } from '@/lib/larguras';
 import { type AppRole } from '@/lib/auth/role';
 import { Badge } from '@/components/ui/badge';
@@ -22,12 +29,28 @@ import {
   carregarFicha,
   diasDesde,
   ROTULO_STATUS,
+  type Ficha,
   type NegocioDaFicha,
 } from '@/components/parceiros/ficha';
-import { formatarData, formatarLocal, ROTULO_TIPO } from '@/components/parceiros/formatos';
+import { AcoesDaFicha } from '@/components/parceiros/ficha-acoes';
+import { CompletarAFicha, EdicaoDaFicha } from '@/components/parceiros/ficha-edicao';
+import { ReguaDoFunil } from '@/components/parceiros/ficha-regua';
+import {
+  formatarData,
+  formatarLocal,
+  formatarNumero,
+  formatarProximaAcao,
+  ROTULO_TIPO,
+} from '@/components/parceiros/formatos';
 import { ProximaAcao } from '@/components/parceiros/proxima-acao';
 import { carregarCatalogos } from '@/components/parceiros/catalogos';
-import { FolhaEditarFicha } from '@/components/parceiros/folha-editar-ficha';
+import {
+  camposQueFaltam,
+  estadoDoWhatsapp,
+  montarRegua,
+  presencaPublica,
+  ultimoContatoPorExtenso,
+} from '@/components/parceiros/resumo-da-ficha';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { PainelPreCadastro } from '@/components/precadastro/painel-precadastro';
 import { requireSession } from '@/lib/auth/session';
@@ -61,9 +84,6 @@ const LINK_VALOR =
  */
 const ESCREVEM: readonly AppRole[] = ['admin', 'gestor', 'sdr', 'embaixador'];
 
-/** Botão de saída da ficha: 44px de alvo no celular, 36 no desktop. */
-const SAIDA = 'toque h-11 w-full sm:h-9 sm:w-auto';
-
 export async function generateMetadata({
   params,
 }: {
@@ -76,17 +96,33 @@ export async function generateMetadata({
 /**
  * Ficha do parceiro (RF-BAS-01 a 06, RF-BAS-10, RF-BAS-14).
  *
- * Ordem de leitura pensada para quem abre isto no carro, antes de entrar na loja:
- * quem é (cabeçalho com temperatura, etapa e há quantos dias), como falar (telefone,
- * @, site), o que fazer agora (as saídas), de onde veio (proveniência, exigência do
- * RF-BAS-10) e em que pé está o negócio.
+ * ===========================================================================
+ * A FICHA NOVA (02/10/2026)
+ * ===========================================================================
+ * A ordem de leitura continua a de quem abre isto no carro, antes de entrar na
+ * loja — quem é, em que pé está, como falar, de onde veio. O que mudou é onde
+ * cada resposta mora. Janio: "está bem organizado, mas gostaria de algo mais
+ * premium, mais profissional e mais direto".
  *
- * As saídas logo abaixo do cabeçalho não são enfeite: oito lugares do CRM apontam
- * para cá — a fila do dia, o quadro dos funis, a busca global, a Revisão, a agenda —, e
- * até aqui a ficha era um beco. Quem chegava por "reunião em 2 h" lia o que precisava
- * e então tinha que decorar o nome do parceiro e procurá-lo de novo em outro módulo
- * para registrar o que aconteceu. Registrar, conversar e mover no funil são as três
- * coisas que se faz depois de ler uma ficha, e agora as três estão a um toque.
+ *   1. UM CABEÇALHO SÓ. Identidade, ações, a régua do funil e os quatro
+ *      números de quem vai falar com o parceiro agora: a próxima ação, o último
+ *      contato, o estado do WhatsApp e o responsável. Era um título, uma frase
+ *      em letra pequena e quatro botões do mesmo peso.
+ *   2. O CONTATO MOSTRA O QUE EXISTE. O cartão tinha oito campos e, na maior
+ *      parte das fichas, cinco "Não informado". Agora o que falta é uma linha de
+ *      botões "+ Instagram", "+ Site", que já abrem a edição no campo certo.
+ *   3. NADA SE REPETE. Temperatura, etapa e último contato apareciam no
+ *      cabeçalho e de novo no cartão "Negócios". Com um negócio só, o cartão
+ *      some: tudo o que ele dizia está na régua. Com dois ou mais, ele volta.
+ *   4. O PRÉ-CADASTRO NÃO OCUPA O QUE NÃO COMEÇOU (`painel-precadastro.tsx`).
+ *
+ * As regras do que cada bloco diz estão em `resumo-da-ficha.ts`, com teste. A
+ * página só lê: nada aqui escreve no banco nem fala com a Meta.
+ *
+ * As saídas continuam sendo o motivo de a ficha não ser um beco: oito lugares do
+ * CRM apontam para cá (a fila do dia, o quadro dos funis, a busca global, a
+ * Revisão, a agenda), e quem chega precisa registrar, conversar ou mover no
+ * funil sem decorar o nome do parceiro para procurá-lo em outro módulo.
  */
 export default async function Pagina({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -103,24 +139,17 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
   if (!ficha) notFound();
 
   const principal = ficha.negocios.find((n) => n.status === 'open') ?? ficha.negocios[0] ?? null;
-  const diasNaEtapa = principal ? diasDesde(principal.naEtapaDesde) : null;
-  const diasSemContato = principal ? diasDesde(principal.ultimoContatoEm) : null;
   const podeEscrever = ESCREVEM.includes(sessao.papel);
+  const regua = principal
+    ? montarRegua(ficha.etapasPorFunil[principal.funilId] ?? [], principal.etapaId)
+    : null;
 
-  return (
+  const pagina = (
     // Sem `mx-auto`: centrada, a ficha começava em x=385 enquanto a lista, o cabeçalho
     // do app e a busca global começam em x=232, e o mesmo clique movia o conteúdo 153px
-    // para dentro. A largura de leitura continua limitada em 896px; o que muda é que a
-    // coluna nasce na mesma margem de todas as outras telas.
-    //
-    // Este comentário existia desde 09/09 e estava mentindo: eu escrevi a justificativa
-    // e deixei o `mx-auto` na classe. Medido em produção, o título da ficha estava em
-    // x=385 contra x=232 da lista — exatamente o salto que o texto acima diz ter
-    // matado. A régua agora é a constante, não a prosa.
-    <TransicaoPagina className={cn(LEITURA, 'flex flex-col gap-6')}>
-      {/* 44px de alvo no celular (era 36), 28 no desktop: esta e o "Revelar" eram os
-          dois únicos controles de toque da ficha, e os dois estavam abaixo do mínimo
-          enquanto a lista e a barra inferior já cumpriam 44 e 64. */}
+    // para dentro. A régua é a constante `LEITURA`, não a prosa.
+    <TransicaoPagina className={cn(LEITURA, 'flex flex-col gap-5')}>
+      {/* 44px de alvo no celular, 28 no desktop. */}
       <Button asChild variant="ghost" size="sm" className="toque -ml-2 h-11 w-fit md:h-7">
         <Link href="/parceiros">
           <ArrowLeft aria-hidden="true" />
@@ -128,303 +157,550 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
         </Link>
       </Button>
 
-      {/* -------------------------------------------------- cabeçalho */}
-      {/* Sem a barra térmica de 3px na borda (29/09/2026): a temperatura já está
-          escrita no chip ao lado do nome, e a barra era a segunda cor do mesmo
-          dado, logo no topo da ficha. */}
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">{ficha.nome}</h1>
-          <ChipTemperatura
-            temperatura={ficha.temperatura}
-            esfriando={principal?.precisaAtencao ?? false}
+      {/* ------------------------------------------------------------ cabeçalho */}
+      <header className="sombra-base flex flex-col gap-5 rounded-xl bg-card p-5 md:gap-6 md:p-7">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+          <div className="flex min-w-0 items-start gap-4 md:items-center">
+            {/* Quadrado de canto macio: é uma empresa, como no cartão de aviso. */}
+            <span
+              aria-hidden="true"
+              className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.07] text-base font-semibold ring-1 ring-foreground/15 md:size-[60px] md:text-lg"
+            >
+              {iniciaisDe(ficha.nome)}
+            </span>
+
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h1 className="font-heading text-2xl leading-tight font-normal tracking-[-0.02em] md:text-[30px]">
+                  {ficha.nome}
+                </h1>
+                <ChipTemperatura
+                  temperatura={ficha.temperatura}
+                  esfriando={principal?.precisaAtencao ?? false}
+                />
+                {ficha.vip ? <Badge variant="outline">VIP</Badge> : null}
+                {ficha.naoContatar ? (
+                  <Badge variant="destructive">
+                    <ShieldAlert aria-hidden="true" />
+                    Não contatar
+                  </Badge>
+                ) : null}
+              </div>
+
+              {/* TEXTO CORRIDO, e não um `flex` com o ponto como item próprio: como
+                  item de flex o "·" podia terminar a linha sozinho, e terminava no
+                  celular. `unir()` cola o ponto ao termo SEGUINTE. */}
+              <p className="text-sm text-muted-foreground">
+                {unir(
+                  ROTULO_TIPO[ficha.tipo] ?? ficha.tipo,
+                  ficha.categorias.join(', '),
+                  formatarLocal(ficha.bairro, ficha.cidade),
+                )}
+              </p>
+
+              <PresencaPublica ficha={ficha} />
+
+              {ficha.temperaturaManual ? (
+                <p className="text-xs text-muted-foreground">
+                  Temperatura definida à mão: {ficha.temperaturaMotivo}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="md:ml-auto md:shrink-0">
+            <AcoesDaFicha
+              organizationId={ficha.id}
+              podeEscrever={podeEscrever}
+              conversaNoCrm={conectado && podeEscrever}
+              // A URL sai de `hrefDoFunil`, a mesma da fila do dia: é ela que sabe
+              // traduzir o NOME do funil no slug que o quadro usa. O `as` é estreito
+              // de propósito — a função lê só `funil` e `organizacao`.
+              hrefDoFunil={
+                principal
+                  ? hrefDoFunil({ funil: principal.funil, organizacao: ficha.nome } as ItemDoDia)
+                  : null
+              }
+            />
+          </div>
+        </div>
+
+        {principal && regua ? (
+          <ReguaDoFunil
+            regua={regua}
+            funil={principal.funil}
+            etapa={principal.etapa}
+            apoio={<ApoioDaRegua negocio={principal} regua={regua} />}
           />
-          {ficha.vip ? <Badge variant="outline">VIP</Badge> : null}
-          {ficha.naoContatar ? (
-            <Badge variant="destructive">
-              <ShieldAlert aria-hidden="true" />
-              Não contatar
-            </Badge>
-          ) : null}
-        </div>
-
-        {/* Duas linhas, um ponto médio em cada: encadear quatro numa faixa só vira
-            corrente sem hierarquia, e a ficha tem largura de sobra.
-
-            Cada linha é TEXTO CORRIDO, e não um `flex` com o ponto como item próprio.
-            Como item de flex o "·" podia terminar a linha sozinho, e terminava: no
-            celular lia-se "Fornecedor ·" numa linha e a categoria na seguinte. Aqui o
-            separador é `unir()`, que cola o ponto ao termo SEGUINTE com espaço
-            inquebrável, então ele viaja com o que apresenta e não pode ser o último
-            caractere de uma linha. */}
-        <div className="flex flex-col gap-0.5 text-sm text-muted-foreground">
-          <p>{unir(ROTULO_TIPO[ficha.tipo] ?? ficha.tipo, ficha.categorias.join(', '))}</p>
-          {formatarLocal(ficha.bairro, ficha.cidade) || ficha.responsavel ? (
-            <p>
-              {unir(
-                formatarLocal(ficha.bairro, ficha.cidade),
-                ficha.responsavel ? `Responsável: ${ficha.responsavel}` : '',
-              )}
-            </p>
-          ) : null}
-        </div>
-
-        {principal ? (
+        ) : principal ? (
           <p className="text-sm">
             <span className="font-medium">{principal.etapa}</span>
             <span className="text-muted-foreground">
-              {diasNaEtapa !== null ? (
-                <>
-                  {' '}
-                  há <span className="numerico">{diasNaEtapa}</span>
-                  {diasNaEtapa === 1 ? ' dia' : ' dias'}
-                </>
-              ) : null}
-              {diasSemContato !== null ? (
-                <>
-                  , último contato há <span className="numerico">{diasSemContato}</span>
-                  {diasSemContato === 1 ? ' dia' : ' dias'}
-                </>
-              ) : (
-                ', sem contato registrado'
-              )}
+              {' '}
+              {SEPARADOR}
+              {principal.funil}
             </span>
           </p>
         ) : (
           <p className="text-sm text-muted-foreground">Sem negócio aberto em nenhum funil.</p>
         )}
 
-        {ficha.temperaturaManual ? (
-          <p className="text-xs text-muted-foreground">
-            Temperatura definida à mão: {ficha.temperaturaMotivo}
-          </p>
-        ) : null}
+        <div className="h-px bg-hairline" aria-hidden="true" />
+
+        <Numeros ficha={ficha} principal={principal} />
       </header>
 
-      {/* -------------------------------------------------- saídas */}
-      {/* Empilhadas e largas no celular, lado a lado no desktop: na calçada o polegar
-          não acerta três alvos de 36px encostados um no outro. */}
-      <nav aria-label="O que fazer com este parceiro" className="flex flex-col gap-2 sm:flex-row">
-        {/* Papel de leitura não vê este: o `app.can_write()` recusaria a gravação no
-            fim do fluxo, depois de a pessoa ter escolhido parceiro, canal e desfecho. */}
-        {podeEscrever ? (
-          <Button asChild className={SAIDA}>
-            <Link href={`/registrar?org=${ficha.id}`}>
-              <PhoneOutgoing aria-hidden="true" />
-              Registrar contato
-            </Link>
-          </Button>
-        ) : null}
-
-        {/* Ler a conversa é leitura: cabe a qualquer papel. A tela de conversas abre
-            direto neste parceiro com `?org=`, e é lá que moram a linha do tempo e o
-            histórico do WhatsApp. */}
-        <Button asChild variant="outline" className={SAIDA}>
-          <Link href={`/conversas?org=${ficha.id}`}>
-            <MessageCircle aria-hidden="true" />
-            {conectado && podeEscrever ? 'Conversar no WhatsApp' : 'Abrir a conversa'}
-          </Link>
-        </Button>
-
-        {/* Sem negócio não há coluna para onde ir, e a seção "Negócios" logo abaixo já
-            diz isso com todas as letras — um botão aqui só levaria ao quadro vazio.
-
-            A URL sai de `hrefDoFunil`, a mesma da fila do dia: é ela que sabe traduzir
-            o NOME do funil no slug que o quadro usa. Copiar a montagem para cá é o que
-            faria os dois lugares divergirem no dia em que um terceiro funil entrar. O
-            `as` é estreito de propósito — a função lê só `funil` e `organizacao`, e o
-            resto do `ItemDoDia` é da fila do dia, não existe aqui. */}
-        {principal ? (
-          <Button asChild variant="outline" className={SAIDA}>
-            <Link
-              href={hrefDoFunil({ funil: principal.funil, organizacao: ficha.nome } as ItemDoDia)}
-            >
-              <SquareKanban aria-hidden="true" />
-              Ver no funil
-            </Link>
-          </Button>
-        ) : null}
-
-        {/* Editar fica com quem escreve, pelo mesmo motivo de "Registrar contato":
-            o gatilho `INSTEAD OF` da view recusaria a gravação com `app.can_write()`
-            no fim, depois de a pessoa ter preenchido o formulário inteiro. Quem só
-            lê continua vendo a ficha, e não vê um botão que sempre erra. */}
-        {podeEscrever ? (
-          <FolhaEditarFicha
-            catalogos={catalogos}
-            ficha={{
-              id: ficha.id,
-              name: ficha.nome,
-              legalName: ficha.razaoSocial,
-              telefone: ficha.telefone,
-              telefoneMascarado: ficha.telefoneMascarado,
-              email: ficha.email,
-              instagram: ficha.instagram,
-              site: ficha.site,
-              cnpj: ficha.cnpj,
-              bairro: ficha.bairro,
-              endereco: ficha.endereco,
-              descricao: ficha.descricao,
-              cidadeId: ficha.cidadeId,
-              categoriaId: ficha.categoriaId,
-            }}
-          />
-        ) : null}
-      </nav>
-
-      {/* ------------------------------------------------------------------
-          OS DADOS EM CARTÕES (29/09/2026)
-          ------------------------------------------------------------------
-          A ficha era uma coluna só, com as seções separadas por filetes sobre o
-          cinza da tela — a única tela do CRM sem superfície nenhuma. Agora cada
-          pergunta tem o seu cartão: Contato e Negócios à esquerda, o
-          Pré-cadastro à direita, lado a lado a partir de 1024px. */}
+      {/* ------------------------------------------------------------ o corpo */}
       <div className="grid items-start gap-5 lg:grid-cols-2">
+        <Contato ficha={ficha} whatsappPeloCrm={conectado && podeEscrever} />
+
         <div className="flex min-w-0 flex-col gap-5">
-          {/* ---------------------------------------------- campos */}
-          <section className="sombra-base flex flex-col gap-4 rounded-xl bg-card p-5">
-            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Contato e origem</h2>
-              <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                <Linha rotulo="WhatsApp">
-                  <TelefoneRevelavel
-                    organizationId={ficha.id}
-                    telefone={ficha.telefone}
-                    mascarado={ficha.telefoneMascarado}
-                    whatsapp={conectado && podeEscrever ? 'crm' : 'externo'}
-                  />
-                </Linha>
+          {/* O pré-cadastro é o que vem DEPOIS de o negócio andar: a escada dele
+              (rascunho, autorização, link) só faz sentido para quem já leu em
+              que pé a conversa está. Enquanto não começou, ocupa uma linha. */}
+          <PainelPreCadastro
+            organizationId={ficha.id}
+            papel={sessao.papel}
+            naoContatar={ficha.naoContatar}
+          />
 
-                <Linha rotulo="Instagram">
-                  {ficha.instagram ? (
-                    <a
-                      href={`https://instagram.com/${ficha.instagram}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={LINK_VALOR}
-                    >
-                      {`@${ficha.instagram}`}
-                    </a>
-                  ) : (
-                    <Ausente />
-                  )}
-                </Linha>
-
-                <Linha rotulo="Site">
-                  {ficha.site ? (
-                    <a
-                      href={ficha.site}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={cn(LINK_VALOR, 'break-all')}
-                    >
-                      {ficha.site.replace(/^https?:\/\/(www\.)?/, '')}
-                      <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
-                    </a>
-                  ) : (
-                    <Ausente />
-                  )}
-                </Linha>
-
-                <Linha rotulo="E-mail">
-                  {ficha.email ? (
-                    <a href={`mailto:${ficha.email}`} className={cn(LINK_VALOR, 'break-all')}>
-                      {ficha.email}
-                    </a>
-                  ) : (
-                    <Ausente />
-                  )}
-                </Linha>
-
-                <Linha rotulo="CNPJ">
-                  {ficha.cnpj ? (
-                    <span className="numerico">{formatarCnpj(ficha.cnpj)}</span>
-                  ) : ficha.pessoaFisica ? (
-                    <span className="text-muted-foreground">Pessoa física (MEI ou autônomo)</span>
-                  ) : (
-                    <Ausente />
-                  )}
-                </Linha>
-
-                <Linha rotulo="Endereço">
-                  {ficha.endereco ? <span>{ficha.endereco}</span> : <Ausente />}
-                </Linha>
-
-                {/* Proveniência: RF-BAS-10 exige origem, quando e quem coletou. */}
-                <Linha rotulo="Origem">
-                  {ficha.origem ? (
-                    ficha.origemUrl ? (
-                      <a
-                        href={ficha.origemUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={LINK_VALOR}
-                      >
-                        {ficha.origem}
-                        <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
-                      </a>
-                    ) : (
-                      <span>{ficha.origem}</span>
-                    )
-                  ) : (
-                    <Ausente />
-                  )}
-                </Linha>
-
-                <Linha rotulo="Coletado em">
-                  <span>
-                    <span className="numerico">{formatarData(ficha.coletadoEm)}</span>
-                    <span className="text-muted-foreground"> por {ficha.coletadoPor}</span>
-                  </span>
-                </Linha>
-              </dl>
-
-            {ficha.descricao ? (
-              <p className="max-w-prose border-t border-hairline pt-4 text-sm text-muted-foreground">
-                {ficha.descricao}
-              </p>
-            ) : null}
-          </section>
-
-          {/* ---------------------------------------------- negócios */}
-          <section className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-5">
-            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
-              Negócios{' '}
-              <span className="numerico font-normal text-muted-foreground">
-                ({ficha.negocios.length})
-              </span>
-            </h2>
-
-            {ficha.negocios.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Este parceiro ainda não está em nenhum funil.
-              </p>
-            ) : (
+          {/* Com um negócio só, a régua do cabeçalho já disse tudo. A lista volta
+              quando há mais de um: aí o cabeçalho mostra o principal, e os outros
+              não podem sumir. */}
+          {ficha.negocios.length > 1 ? (
+            <section className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-5">
+              <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
+                Negócios{' '}
+                <span className="numerico font-normal text-muted-foreground">
+                  ({ficha.negocios.length})
+                </span>
+              </h2>
               <ul className="flex flex-col gap-2">
                 {ficha.negocios.map((negocio) => (
                   <CartaoNegocio key={negocio.id} negocio={negocio} />
                 ))}
               </ul>
-            )}
-          </section>
+            </section>
+          ) : null}
         </div>
-
-        {/* ------------------------------------------------ pré-cadastro na Komune */}
-        {/* Depois dos negócios de propósito: o pré-cadastro é o que vem DEPOIS de o
-            negócio andar, e a escada dele (rascunho, autorização, link) só faz
-            sentido para quem já leu em que pé a conversa está. */}
-        <PainelPreCadastro
-          organizationId={ficha.id}
-          papel={sessao.papel}
-          naoContatar={ficha.naoContatar}
-        />
       </div>
 
-      {/* Aqui terminavam dois quadros tracejados que anunciavam a Linha do tempo e a
-          Conversa como coisas que ainda iam chegar. As duas existem hoje, inteiras, na
-          tela de conversas, e é para lá que o botão "Abrir a conversa" leva. Anunciar
-          como futuro o que já está pronto ensina o time a não procurar: quem lê aquilo
-          para de ir atrás do histórico e passa a perguntar no grupo. */}
+      {/* A linha do tempo e a conversa moram na tela de Conversas, e é para lá
+          que "Conversar" leva. */}
     </TransicaoPagina>
+  );
+
+  // Editar fica com quem escreve: o gatilho `INSTEAD OF` da view recusaria a
+  // gravação com `app.can_write()` no fim, depois de a pessoa ter preenchido o
+  // formulário inteiro. Sem o provedor, o menu não oferece "Editar ficha" e o
+  // que falta na ficha vira frase, não botão.
+  return podeEscrever ? (
+    <EdicaoDaFicha
+      catalogos={catalogos}
+      ficha={{
+        id: ficha.id,
+        name: ficha.nome,
+        legalName: ficha.razaoSocial,
+        telefone: ficha.telefone,
+        telefoneMascarado: ficha.telefoneMascarado,
+        email: ficha.email,
+        instagram: ficha.instagram,
+        site: ficha.site,
+        cnpj: ficha.cnpj,
+        bairro: ficha.bairro,
+        endereco: ficha.endereco,
+        descricao: ficha.descricao,
+        cidadeId: ficha.cidadeId,
+        categoriaId: ficha.categoriaId,
+      }}
+    >
+      {pagina}
+    </EdicaoDaFicha>
+  ) : (
+    pagina
+  );
+}
+
+/** A nota, as avaliações e o Instagram sob o nome. Some quando não há nenhum dos três. */
+function PresencaPublica({ ficha }: { ficha: Ficha }) {
+  const presenca = presencaPublica({ nota: ficha.nota, avaliacoes: ficha.avaliacoes });
+  if (!presenca && !ficha.instagram) return null;
+
+  return (
+    <p className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] text-muted-foreground">
+      {presenca ? (
+        <span className="inline-flex items-center gap-1.5">
+          {presenca.nota ? (
+            <>
+              <Star className="size-3.5 fill-current text-foreground" aria-hidden="true" />
+              <span className="numerico font-semibold text-foreground">{presenca.nota}</span>
+            </>
+          ) : null}
+          {presenca.avaliacoes ? (
+            <span>
+              <span className="numerico">{formatarNumero(presenca.avaliacoes)}</span>
+              {presenca.avaliacoes === 1 ? ' avaliação' : ' avaliações'}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+      {ficha.instagram ? (
+        <a
+          href={`https://instagram.com/${ficha.instagram}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 underline-offset-4 hover:text-foreground hover:underline"
+        >
+          <AtSign className="size-3.5" aria-hidden="true" />
+          {ficha.instagram}
+        </a>
+      ) : null}
+    </p>
+  );
+}
+
+/**
+ * A linha à direita da régua: onde o parceiro está no caminho, há quanto tempo e
+ * o que vem depois. No celular fica só o essencial; o resto não cabe ao lado do
+ * nome da etapa.
+ */
+function ApoioDaRegua({
+  negocio,
+  regua,
+}: {
+  negocio: NegocioDaFicha;
+  regua: NonNullable<ReturnType<typeof montarRegua>>;
+}) {
+  const dias = diasDesde(negocio.naEtapaDesde);
+  const haDias =
+    dias === null ? null : dias === 0 ? (
+      'desde hoje'
+    ) : (
+      <>
+        há <span className="numerico">{dias}</span>
+        {dias === 1 ? ' dia' : ' dias'}
+      </>
+    );
+
+  return (
+    <>
+      {/* O status só quando não é o normal ("Em aberto" é o que se espera) e
+          quando a régua ainda vale: fora dela, "fora do funil: Perdido" já diz
+          tudo, e o status na frente escreveria "Perdido" duas vezes. */}
+      {negocio.status !== 'open' && !regua.fora ? (
+        <>
+          <span className="font-medium text-foreground">
+            {ROTULO_STATUS[negocio.status] ?? negocio.status}
+          </span>
+          {SEPARADOR}
+        </>
+      ) : null}
+      {regua.fora ? (
+        <span className="font-medium text-foreground md:font-normal md:text-muted-foreground">
+          fora do funil<span className="hidden md:inline">: {regua.fora}</span>
+        </span>
+      ) : (
+        <>
+          etapa <span className="numerico">{regua.posicao}</span> de{' '}
+          <span className="numerico">{regua.total}</span>
+        </>
+      )}
+      {haDias ? (
+        <>
+          {SEPARADOR}
+          {haDias}
+        </>
+      ) : null}
+      <span className="hidden md:inline">
+        {regua.proxima ? `${SEPARADOR}próxima: ${regua.proxima}` : null}
+        {negocio.tier ? `${SEPARADOR}prioridade ${negocio.tier}` : null}
+      </span>
+    </>
+  );
+}
+
+/**
+ * Os quatro números de quem vai falar com o parceiro agora. Quatro colunas com
+ * um fio entre elas no desktop; dois por linha no celular.
+ */
+function Numeros({ ficha, principal }: { ficha: Ficha; principal: NegocioDaFicha | null }) {
+  const proxima = formatarProximaAcao(principal?.proximaAcaoEm);
+  const contato = ultimoContatoPorExtenso(principal?.ultimoContatoEm);
+  const whatsapp = estadoDoWhatsapp({ naoContatar: ficha.naoContatar, conversa: ficha.conversa });
+  const responsavel = principal?.responsavel ?? ficha.responsavel;
+  const atendente = ficha.conversa?.atendente ?? null;
+
+  return (
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-4 md:gap-0 md:divide-x md:divide-hairline">
+      <Numero rotulo="Próxima ação">
+        {principal?.proximaAcao ? (
+          <>
+            <Valor>
+              {/* O único ponto de cor do cabeçalho: é o que pede para alguém agir. */}
+              <span
+                aria-hidden="true"
+                className="size-2 shrink-0 rounded-full bg-menta ring-4 ring-menta/20"
+              />
+              <span className="min-w-0 break-words md:truncate">{principal.proximaAcao}</span>
+            </Valor>
+            <Apoio>
+              {proxima ? (
+                <>
+                  <ProximaAcao iso={principal.proximaAcaoEm} />
+                  {SEPARADOR}
+                  <span className="numerico">{proxima.detalhe}</span>
+                </>
+              ) : (
+                'sem data marcada'
+              )}
+            </Apoio>
+          </>
+        ) : (
+          <>
+            <Valor apagado>Nenhuma marcada</Valor>
+            <Apoio>
+              {!principal
+                ? 'sem negócio em funil'
+                : principal.status === 'won' || principal.status === 'lost'
+                  ? 'negócio encerrado'
+                  : 'defina o próximo passo no funil'}
+            </Apoio>
+          </>
+        )}
+      </Numero>
+
+      <Numero rotulo="Último contato">
+        <Valor apagado={contato.texto === 'Sem registro'}>{contato.texto}</Valor>
+        <Apoio>
+          {principal?.ultimoContatoEm ? (
+            <span className="numerico">{formatarData(principal.ultimoContatoEm)}</span>
+          ) : (
+            'nenhum contato registrado'
+          )}
+        </Apoio>
+      </Numero>
+
+      <Numero rotulo="WhatsApp">
+        <Valor>{whatsapp.titulo}</Valor>
+        <Apoio>
+          {whatsapp.apoio.map((parte, i) =>
+            parte.numerico ? (
+              <span key={i} className="numerico">
+                {parte.texto}
+              </span>
+            ) : (
+              parte.texto
+            ),
+          )}
+        </Apoio>
+      </Numero>
+
+      <Numero rotulo="Responsável">
+        {responsavel ? (
+          <Valor>
+            <span
+              aria-hidden="true"
+              className="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-foreground/15 text-[11px] font-semibold"
+            >
+              {iniciaisDe(responsavel)}
+            </span>
+            <span className="min-w-0 break-words md:truncate">{responsavel}</span>
+          </Valor>
+        ) : (
+          <Valor apagado>Sem responsável</Valor>
+        )}
+        <Apoio>
+          {atendente === null
+            ? 'responde por este parceiro'
+            : atendente === responsavel
+              ? 'atende a conversa'
+              : `quem atende a conversa: ${atendente}`}
+        </Apoio>
+      </Numero>
+    </dl>
+  );
+}
+
+function Numero({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1 md:px-7 md:first:pl-0 md:last:pr-0">
+      <dt className="text-[11px] leading-4 font-semibold tracking-[0.07em] text-muted-foreground uppercase">
+        {rotulo}
+      </dt>
+      <dd className="flex min-w-0 flex-col gap-1">{children}</dd>
+    </div>
+  );
+}
+
+function Valor({ children, apagado = false }: { children: React.ReactNode; apagado?: boolean }) {
+  return (
+    <span
+      className={cn(
+        'flex min-w-0 items-center gap-2.5 text-[17px] leading-snug font-semibold tracking-[-0.015em] md:text-xl',
+        apagado && 'font-medium text-muted-foreground',
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function Apoio({ children }: { children: React.ReactNode }) {
+  return <span className="text-[13px] leading-snug text-muted-foreground">{children}</span>;
+}
+
+/**
+ * O cartão de contato: uma linha por dado que EXISTE, com o ícone dizendo o que
+ * é. O que falta vira a fila de botões no fim (`CompletarAFicha`).
+ *
+ * O telefone continua sendo o `TelefoneRevelavel`: para sdr e embaixador o banco
+ * entrega o número mascarado, e ver o número inteiro é uma ação registrada em
+ * `pii_access_log` (RF-BAS-14, RF-ADM-03). O desenho novo não muda isso.
+ */
+function Contato({ ficha, whatsappPeloCrm }: { ficha: Ficha; whatsappPeloCrm: boolean }) {
+  const lugar = formatarLocal(ficha.bairro, ficha.cidade);
+  const faltam = camposQueFaltam(ficha);
+
+  return (
+    <section className="sombra-base flex min-w-0 flex-col gap-4 rounded-xl bg-card p-5 md:p-6">
+      <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Contato</h2>
+
+      <ul className="flex flex-col gap-3.5">
+        <LinhaDeContato icone={Phone} rotulo="WhatsApp">
+          <TelefoneRevelavel
+            organizationId={ficha.id}
+            telefone={ficha.telefone}
+            mascarado={ficha.telefoneMascarado}
+            // Com o número da KOMUNE conectado, "Conversar" já está no cabeçalho;
+            // repetir o botão aqui seria a mesma saída duas vezes.
+            whatsapp={whatsappPeloCrm ? 'nenhum' : 'externo'}
+          />
+        </LinhaDeContato>
+
+        {ficha.instagram ? (
+          <LinhaDeContato icone={AtSign} rotulo="Instagram">
+            <a
+              href={`https://instagram.com/${ficha.instagram}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={LINK_VALOR}
+            >
+              {`@${ficha.instagram}`}
+            </a>
+          </LinhaDeContato>
+        ) : null}
+
+        {ficha.site ? (
+          <LinhaDeContato icone={Globe} rotulo="Site">
+            <a
+              href={ficha.site}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(LINK_VALOR, 'break-all')}
+            >
+              {ficha.site.replace(/^https?:\/\/(www\.)?/, '')}
+              <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+            </a>
+          </LinhaDeContato>
+        ) : null}
+
+        {ficha.email ? (
+          <LinhaDeContato icone={Mail} rotulo="E-mail">
+            <a href={`mailto:${ficha.email}`} className={cn(LINK_VALOR, 'break-all')}>
+              {ficha.email}
+            </a>
+          </LinhaDeContato>
+        ) : null}
+
+        {ficha.cnpj || ficha.pessoaFisica ? (
+          <LinhaDeContato icone={IdCard} rotulo="CNPJ">
+            {ficha.cnpj ? (
+              <span className="numerico">{formatarCnpj(ficha.cnpj)}</span>
+            ) : (
+              <span className="text-muted-foreground">Pessoa física (MEI ou autônomo)</span>
+            )}
+          </LinhaDeContato>
+        ) : null}
+
+        {lugar || ficha.endereco ? (
+          // Com endereço, ele é o valor e o bairro vira o apoio. Sem ele, o valor
+          // é o bairro e a cidade — e chamá-los de "Endereço" esconderia que o
+          // endereço é justamente o que falta ("+ Endereço", logo abaixo).
+          <LinhaDeContato
+            icone={MapPin}
+            rotulo={ficha.endereco ? lugar || 'Endereço' : 'Bairro e cidade'}
+          >
+            {ficha.endereco ?? lugar}
+          </LinhaDeContato>
+        ) : null}
+      </ul>
+
+      {faltam.length > 0 ? (
+        <div className="border-t border-hairline pt-4">
+          <CompletarAFicha faltam={faltam} />
+        </div>
+      ) : null}
+
+      {/* Proveniência: o RF-BAS-10 exige a origem, quando e quem coletou. As três
+          continuam aqui, numa linha só. TEXTO CORRIDO, e não `flex`: como item de
+          flex o trecho "· coletado em" descia sozinho no celular e a linha
+          começava pelo ponto. */}
+      <p className="border-t border-hairline pt-4 text-[13px] leading-relaxed text-muted-foreground">
+        <FileText className="mr-1.5 inline size-3.5 align-[-2px]" aria-hidden="true" />
+        {ficha.origem ? (
+          ficha.origemUrl ? (
+            <a
+              href={ficha.origemUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground underline underline-offset-4"
+            >
+              {ficha.origem}
+              <ExternalLink className="ml-1 inline size-3 align-[-1px]" aria-hidden="true" />
+            </a>
+          ) : (
+            <span className="text-foreground">{ficha.origem}</span>
+          )
+        ) : (
+          'Origem não informada'
+        )}
+        {SEPARADOR}coletado em <span className="numerico">{formatarData(ficha.coletadoEm)}</span>{' '}
+        por {ficha.coletadoPor}
+      </p>
+
+      {ficha.descricao ? (
+        <p className="max-w-prose border-t border-hairline pt-4 text-sm text-muted-foreground">
+          {ficha.descricao}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function LinhaDeContato({
+  icone: Icone,
+  rotulo,
+  children,
+}: {
+  icone: LucideIcon;
+  rotulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <li className="flex min-w-0 items-start gap-3.5">
+      <span
+        aria-hidden="true"
+        className="flex size-[38px] shrink-0 items-center justify-center rounded-lg bg-foreground/[0.07] text-muted-foreground"
+      >
+        <Icone className="size-[17px]" strokeWidth={1.75} />
+      </span>
+      {/* O valor em cima, o rótulo embaixo: quem procura o telefone lê o número,
+          não a palavra "WhatsApp". */}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="text-[15px] leading-snug">{children}</div>
+        <p className="text-[12.5px] leading-snug text-muted-foreground">{rotulo}</p>
+      </div>
+    </li>
   );
 }
 
@@ -496,19 +772,6 @@ function CartaoNegocio({ negocio }: { negocio: NegocioDaFicha }) {
       ) : null}
     </li>
   );
-}
-
-function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-xs text-muted-foreground">{rotulo}</dt>
-      <dd className="text-sm">{children}</dd>
-    </div>
-  );
-}
-
-function Ausente() {
-  return <span className="text-muted-foreground">Não informado</span>;
 }
 
 /** 12.345.678/0001-95 */

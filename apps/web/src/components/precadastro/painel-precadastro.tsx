@@ -2,15 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Check,
-  Copy,
-  ExternalLink,
-  FilePlus2,
-  Link2,
-  Lock,
-  ShieldCheck,
-} from 'lucide-react';
+import { Check, Copy, ExternalLink, FilePlus2, Link2, Lock, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -55,6 +47,13 @@ const ESCREVEM: readonly AppRole[] = ['admin', 'gestor', 'sdr', 'embaixador'];
  * O TOKEN APARECE UMA VEZ SÓ. O banco guarda apenas o sha256, então recarregar a
  * ficha não traz o endereço de volta — o painel diz isso na hora em que mostra o
  * link, e diz de novo quando existe um link ativo cujo endereço já não temos.
+ *
+ * ENQUANTO NÃO COMEÇOU, ELE É PEQUENO (02/10/2026). Sem rascunho, a escada
+ * inteira — três degraus, cada um com um parágrafo — ocupava metade da ficha
+ * para dizer "nada aconteceu ainda", que é o estado de quase todo parceiro. Agora
+ * esse estado é uma linha: os três passos em miniatura, o botão e a frase que
+ * explica o botão. A escada completa continua a um toque ("Como funciona") e
+ * volta sozinha, inteira, assim que o rascunho existe.
  */
 export function PainelPreCadastro({
   organizationId,
@@ -92,9 +91,10 @@ export function PainelPreCadastro({
       });
       void clienteDeConsultas.invalidateQueries({ queryKey: chaveDoPreCadastro(organizationId) });
     },
-    onError: (erro) => toast.error('Não deu para criar o rascunho.', {
-      description: mensagemDoErro(erro),
-    }),
+    onError: (erro) =>
+      toast.error('Não deu para criar o rascunho.', {
+        description: mensagemDoErro(erro),
+      }),
   });
 
   const emissao = useMutation({
@@ -111,9 +111,10 @@ export function PainelPreCadastro({
       });
       void clienteDeConsultas.invalidateQueries({ queryKey: chaveDoPreCadastro(organizationId) });
     },
-    onError: (erro) => toast.error('Não deu para emitir o link.', {
-      description: mensagemDoErro(erro),
-    }),
+    onError: (erro) =>
+      toast.error('Não deu para emitir o link.', {
+        description: mensagemDoErro(erro),
+      }),
   });
 
   async function copiar(url: string) {
@@ -144,6 +145,89 @@ export function PainelPreCadastro({
   const p = consulta.data;
   const emitir = podeEmitirLink(p) && podeEscrever && !naoContatar;
 
+  const escada = (
+    <ol className="flex flex-col border-t border-hairline">
+      <Degrau
+        numero={1}
+        titulo="Rascunho do perfil"
+        cumprido={p.existe}
+        detalhe={
+          p.existe
+            ? p.origem
+              ? `Privado: ninguém vê. Montado com o que já está na ficha. Origem: ${p.origem}.`
+              : 'Privado: ninguém vê. Montado com o que já está na ficha.'
+            : 'Ainda não existe. O rascunho leva só o factual da ficha: nome, categoria, cidade, bairro, site e @. Sem foto, sem descrição e sem telefone.'
+        }
+      />
+      <Degrau
+        numero={2}
+        titulo="Autorização do fornecedor"
+        cumprido={p.temAutorizacao}
+        detalhe={
+          p.temAutorizacao
+            ? 'Registrada em consent_events. O link pode sair.'
+            : 'Este degrau não é nosso. Peça a autorização na conversa (é a segunda mensagem, nunca a primeira) e registre a resposta. Sem ela, nenhum link é emitido.'
+        }
+      />
+      <Degrau
+        numero={3}
+        titulo="Link de reivindicação"
+        cumprido={p.reivindicadoEm !== null}
+        detalhe={detalheDoLink(p)}
+      />
+    </ol>
+  );
+
+  // Sem rascunho: o painel em uma linha (ver o comentário do componente).
+  if (!p.existe) {
+    return (
+      <Moldura selo={<Badge variant="pilula">{ROTULO_SITUACAO[p.situacao]}</Badge>}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <ol
+            aria-label="Os três passos do pré-cadastro"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground"
+          >
+            {['Rascunho', 'Autorização', 'Link'].map((passo, i) => (
+              <li key={passo} className="inline-flex items-center gap-2">
+                {i > 0 ? <span aria-hidden="true" className="h-px w-4 bg-foreground/20" /> : null}
+                <span
+                  aria-hidden="true"
+                  className="numerico flex size-[18px] items-center justify-center rounded-full border border-foreground/25 text-[10.5px] font-semibold"
+                >
+                  {i + 1}
+                </span>
+                {passo}
+              </li>
+            ))}
+          </ol>
+          <Button
+            variant="outline"
+            onClick={() => criacao.mutate()}
+            disabled={criacao.isPending || !podeEscrever || naoContatar}
+            className="toque h-11 shrink-0 md:h-9"
+          >
+            <FilePlus2 aria-hidden="true" />
+            {criacao.isPending ? 'Criando...' : 'Criar rascunho'}
+          </Button>
+        </div>
+
+        {/* A frase fica: botão sem explicação é a pior tela para quem está na
+            rua, e é ela que diz por que ele está apagado para quem só lê ou
+            para o parceiro que pediu para sair. */}
+        <p className="max-w-prose text-xs text-muted-foreground">
+          {porQueNaoDaParaAgir(p, { podeEscrever, naoContatar })}
+        </p>
+
+        <details className="group">
+          <summary className="toque flex min-h-11 cursor-pointer list-none items-center text-sm text-muted-foreground underline underline-offset-4 md:min-h-0">
+            Como funciona o pré-cadastro
+          </summary>
+          <div className="mt-3">{escada}</div>
+        </details>
+      </Moldura>
+    );
+  }
+
   return (
     <Moldura>
       {/* ------------------------------------------------ estado, de relance */}
@@ -167,36 +251,7 @@ export function PainelPreCadastro({
       </div>
 
       {/* ------------------------------------------------ a escada */}
-      <ol className="flex flex-col border-t border-hairline">
-        <Degrau
-          numero={1}
-          titulo="Rascunho do perfil"
-          cumprido={p.existe}
-          detalhe={
-            p.existe
-              ? p.origem
-                ? `Privado: ninguém vê. Montado com o que já está na ficha. Origem: ${p.origem}.`
-                : 'Privado: ninguém vê. Montado com o que já está na ficha.'
-              : 'Ainda não existe. O rascunho leva só o factual da ficha: nome, categoria, cidade, bairro, site e @. Sem foto, sem descrição e sem telefone.'
-          }
-        />
-        <Degrau
-          numero={2}
-          titulo="Autorização do fornecedor"
-          cumprido={p.temAutorizacao}
-          detalhe={
-            p.temAutorizacao
-              ? 'Registrada em consent_events. O link pode sair.'
-              : 'Este degrau não é nosso. Peça a autorização na conversa (é a segunda mensagem, nunca a primeira) e registre a resposta. Sem ela, nenhum link é emitido.'
-          }
-        />
-        <Degrau
-          numero={3}
-          titulo="Link de reivindicação"
-          cumprido={p.reivindicadoEm !== null}
-          detalhe={detalheDoLink(p)}
-        />
-      </ol>
+      {escada}
 
       {/* ------------------------------------------------ o que vai no rascunho */}
       {p.existe && p.rascunho.length > 0 ? (
@@ -275,10 +330,12 @@ export function PainelPreCadastro({
           )}
         </div>
 
-        <p className="max-w-prose text-xs text-muted-foreground">{porQueNaoDaParaAgir(p, {
-          podeEscrever,
-          naoContatar,
-        })}</p>
+        <p className="max-w-prose text-xs text-muted-foreground">
+          {porQueNaoDaParaAgir(p, {
+            podeEscrever,
+            naoContatar,
+          })}
+        </p>
 
         {/* Onde ficava o aviso de "o termo não passou pelo Dennis": o termo
             que ele descrevia era o da página /c/<token> do próprio CRM, que saiu
@@ -323,10 +380,13 @@ export function PainelPreCadastro({
 }
 
 /** A seção, com o mesmo desenho das outras seções da ficha: um cartão (29/09/2026). */
-function Moldura({ children }: { children: React.ReactNode }) {
+function Moldura({ children, selo }: { children: React.ReactNode; selo?: React.ReactNode }) {
   return (
-    <section className="sombra-base flex min-w-0 flex-col gap-4 rounded-xl bg-card p-5">
-      <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Pré-cadastro na Komune</h2>
+    <section className="sombra-base flex min-w-0 flex-col gap-4 rounded-xl bg-card p-5 md:p-6">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Pré-cadastro na Komune</h2>
+        {selo}
+      </div>
       {children}
     </section>
   );
