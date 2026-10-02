@@ -17,6 +17,7 @@ import { ICONE_CANAL } from './icones';
 import { ChipDaJanela } from './janela-24h';
 import { estadoDaJanela, type FioCru } from './mensagens';
 import { juntarNaLista } from './montagem';
+import { previaDoDigitado, useTextosDigitados } from './texto-digitado';
 import { ROTULO_CANAL, type ItemConversa } from './tipos';
 
 /**
@@ -41,6 +42,12 @@ import { ROTULO_CANAL, type ItemConversa } from './tipos';
  * abriu leva a faixa e o selo em menta, e perde os dois quando ela abre. Quem
  * sabe quais são é a casca (`components/avisos`), a mesma que põe o número ao
  * lado de Conversas — por isso os dois andam juntos: cinco marcadas, número 5.
+ *
+ * "RASCUNHO:" NA LINHA (02/10/2026): quem começou a escrever numa conversa e
+ * saiu dela vê, no lugar da prévia, "Rascunho:" e o começo do que digitou —
+ * como no WhatsApp. É o texto da PESSOA (`texto-digitado.ts`), não o rascunho da
+ * IA, que continua sendo o selo "aprovar". A conversa aberta não mostra: o texto
+ * dela já está à vista, na caixa.
  */
 /** Abaixo disto a nota da IA não muda decisão nenhuma, e vira ruído na linha. */
 const NOTA_QUE_VALE = 50;
@@ -63,6 +70,10 @@ export function ListaConversas({
   aoEscolherCliente?: (conversaId: string) => void;
 }) {
   const novas = useConversasNovas();
+  const digitados = useTextosDigitados();
+  /** O que a linha mostra depois de "Rascunho:", ou `null`. */
+  const rascunhoDe = (fioId: string | null | undefined, selecionado: boolean): string | null =>
+    selecionado || !fioId ? null : previaDoDigitado(digitados.get(fioId)?.texto);
   return (
     <ul className="corpo-tabela flex flex-col">
       {juntarNaLista(itens, clientes).map((linha) =>
@@ -72,6 +83,7 @@ export function ListaConversas({
             item={linha.item}
             selecionado={linha.item.id === selecionadoId}
             nova={linha.item.fio ? novas.has(linha.item.fio.id) : false}
+            rascunho={rascunhoDe(linha.item.fio?.id, linha.item.id === selecionadoId)}
             aoEscolher={aoEscolher}
           />
         ) : (
@@ -80,11 +92,26 @@ export function ListaConversas({
             fio={linha.fio}
             selecionado={linha.fio.id === clienteSelecionadoId}
             nova={novas.has(linha.fio.id)}
+            rascunho={rascunhoDe(linha.fio.id, linha.fio.id === clienteSelecionadoId)}
             aoEscolher={aoEscolherCliente}
           />
         ),
       )}
     </ul>
+  );
+}
+
+/**
+ * "Rascunho: É assim que deveri…": o que a pessoa digitou e não enviou, no lugar
+ * da prévia da linha. O rótulo vai na tinta de texto da menta (`menta-texto`),
+ * e não na menta cheia — a cheia é clara demais para ser lida como letra.
+ */
+export function PreviaDoRascunho({ texto, className }: { texto: string; className?: string }) {
+  return (
+    <span className={cn('min-w-0 flex-1 truncate text-xs', className)}>
+      <span className="font-medium text-menta-texto">Rascunho:</span>{' '}
+      <span className="text-muted-foreground">{texto}</span>
+    </span>
   );
 }
 
@@ -103,12 +130,15 @@ function LinhaDeCliente({
   fio,
   selecionado,
   nova,
+  rascunho,
   aoEscolher,
 }: {
   fio: FioCru;
   selecionado: boolean;
   /** Tem mensagem que esta pessoa ainda não abriu. */
   nova: boolean;
+  /** O começo do que a pessoa digitou aqui e não enviou. */
+  rascunho: string | null;
   aoEscolher?: (conversaId: string) => void;
 }) {
   const Icone = ICONE_CANAL.whatsapp;
@@ -164,9 +194,13 @@ function LinhaDeCliente({
               className="size-3.5 shrink-0 text-muted-foreground"
               aria-label={ROTULO_CANAL.whatsapp}
             />
-            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-              {nome ? finalDoNumero(fio.peer_phone_e164) : 'sem nome no perfil'}
-            </span>
+            {rascunho ? (
+              <PreviaDoRascunho texto={rascunho} />
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                {nome ? finalDoNumero(fio.peer_phone_e164) : 'sem nome no perfil'}
+              </span>
+            )}
             <ChipDaJanela estado={janela} />
             {/* Onde o parceiro tem a etapa, o cliente diz o que é: é esta palavra
                 que explica por que a linha não tem funil nem bairro. */}
@@ -189,12 +223,15 @@ function Linha({
   item,
   selecionado,
   nova,
+  rascunho,
   aoEscolher,
 }: {
   item: ItemConversa;
   selecionado: boolean;
   /** Tem mensagem que esta pessoa ainda não abriu. */
   nova: boolean;
+  /** O começo do que a pessoa digitou aqui e não enviou. */
+  rascunho: string | null;
   aoEscolher: (id: string) => void;
 }) {
   const Icone = item.ultimoCanal ? ICONE_CANAL[item.ultimoCanal] : null;
@@ -269,14 +306,18 @@ function Linha({
                 aria-label={item.ultimoCanal ? ROTULO_CANAL[item.ultimoCanal] : undefined}
               />
             ) : null}
-            <span
-              className={cn(
-                'min-w-0 flex-1 truncate text-xs',
-                item.resumo ? 'text-foreground' : 'text-muted-foreground',
-              )}
-            >
-              {item.resumo ?? 'Nenhum contato registrado'}
-            </span>
+            {rascunho ? (
+              <PreviaDoRascunho texto={rascunho} />
+            ) : (
+              <span
+                className={cn(
+                  'min-w-0 flex-1 truncate text-xs',
+                  item.resumo ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {item.resumo ?? 'Nenhum contato registrado'}
+              </span>
+            )}
             {item.naoContatar ? (
               <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
                 não contatar

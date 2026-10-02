@@ -5778,3 +5778,54 @@ pontos abaixo; nenhum deles tem o aval do Rafael registrado aqui:
 - Conferir no painel do Supabase o plano, o limite de gastos e o uso de
   Realtime no dia do deploy e uma semana depois (a pendência "Free ou Pro"
   segue aberta desde o D1).
+
+### 02/10/2026 — O texto digitado não some ao trocar de conversa ("Rascunho:" na lista)
+
+Pedido do Janio, com um print do WhatsApp mostrando "Rascunho: É assim que
+deveri…": "quando estamos conversando com um cliente e escrevemos uma mensagem
+rascunho ela apaga se clicarmos em outra conversa [...] quero que quando eu saia
+de uma conversa a mensagem rascunho que eu escrevi não seja apagada". E a
+pergunta: "isso mexe com o banco de dados?". Não mexe.
+
+**Na branch local `avisos-de-resposta`, fora de produção.**
+
+- **O que muda.** O texto da caixa de resposta passa a ser guardado por
+  conversa. Trocar de conversa, mudar de aba ou recarregar a página não o apaga:
+  ele volta à caixa quando a pessoa reabre a conversa. Vale para parceiro e para
+  cliente.
+- **"Rascunho:" na lista.** A conversa com texto por enviar mostra, no lugar da
+  prévia, "Rascunho:" e o começo do texto, na lista de Conversas e na aba
+  "Clientes". A conversa aberta não mostra: o texto dela já está na caixa.
+- **Não é o rascunho da IA.** O que a IA redige e alguém aprova continua sendo
+  o selo "aprovar" e a aba "Aprovar". No código isto se chama "texto digitado"
+  (`conversas/texto-digitado.ts`), para os dois não se confundirem.
+- **Onde fica.** No navegador de quem digitou (`localStorage`, chave por pessoa:
+  `komune.conversas.digitado.v1`). Sem banco, sem migração. Até 100 textos, e o
+  que ficar 30 dias sem ser mexido some. Não atravessa aparelhos.
+- **O envio não mudou.** Sai pelo mesmo `responder`, com o mesmo texto aparado.
+  A diferença é quando o texto é esquecido: logo depois de a fila aceitar, e de
+  dentro do próprio envio. Se ficasse no `onSuccess` da caixa, quem trocasse de
+  conversa enquanto envia veria o texto já enviado voltar como rascunho, e
+  poderia mandar a mesma mensagem duas vezes. Envio recusado mantém o texto,
+  como sempre.
+- Com um rascunho da IA esperando, a caixa nasce recolhida num botão; agora ela
+  nasce aberta se a pessoa já tinha texto digitado ali.
+- Arquivos: `conversas/texto-digitado.ts` e `.test.ts` (novos), `responder.tsx`,
+  `lista-conversas.tsx`, `fora-da-base.tsx` e `app/(app)/conversas/page.tsx`
+  (diz à tela quem está digitando). Nada em `supabase/`, `apps/workers/` nem
+  `packages/`.
+- Testes: Vitest 1.078 no site (14 novos), lint, typecheck e build. No Chrome,
+  contra o Supabase local, 24 conferências: "Rascunho:" ao sair da conversa,
+  texto sem vazar para outra conversa, dois rascunhos ao mesmo tempo, volta à
+  caixa, recarga, aba "Clientes", envio recusado mantendo o texto, envio aceito
+  com um pedido só e o texto certo, e troca de conversa durante o envio sem o
+  texto voltar. O envio foi interceptado no navegador: a prova não gravou
+  mensagem nenhuma e a fila de saída do WhatsApp ficou vazia.
+
+**Limites conhecidos:** o texto é por navegador; quem digita no computador não o
+encontra no celular. Áudio em gravação e modelo em preenchimento não são
+guardados. O texto fica no aparelho até ser enviado, apagado ou vencer.
+
+**Precisa de decisão humana:** a tela passa a usar "Rascunho" para duas coisas
+(o texto da pessoa e o da IA, este último no cabeçalho "rascunhos esperando
+você"). Se confundir o time, trocar uma das palavras.

@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { requireSession } from '@/lib/auth/session';
 import { carregarCatalogos } from '@/components/conversas/catalogos';
 import { TelaConversas } from '@/components/conversas/tela-conversas';
+import { ProvedorDoTextoDigitado } from '@/components/conversas/texto-digitado';
 import { estadoDaUrl } from '@/components/conversas/tipos';
 
 export const metadata: Metadata = { title: 'Conversas' };
@@ -31,7 +32,7 @@ export default async function Pagina({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [, catalogos, params] = await Promise.all([
+  const [sessao, catalogos, params] = await Promise.all([
     requireSession(),
     carregarCatalogos(),
     searchParams,
@@ -40,12 +41,16 @@ export default async function Pagina({
   const { filtros, organizacaoId, aba, clienteId } = estadoDaUrl(params);
 
   return (
-    <TelaConversas
-      catalogos={catalogos}
-      filtrosIniciais={filtros}
-      organizacaoInicial={organizacaoId}
-      clienteInicial={clienteId}
-      abaInicial={aba}
-    />
+    // Quem está digitando: o texto por enviar de cada conversa fica guardado no
+    // navegador com a chave desta pessoa (`texto-digitado.ts`).
+    <ProvedorDoTextoDigitado dono={sessao.id}>
+      <TelaConversas
+        catalogos={catalogos}
+        filtrosIniciais={filtros}
+        organizacaoInicial={organizacaoId}
+        clienteInicial={clienteId}
+        abaInicial={aba}
+      />
+    </ProvedorDoTextoDigitado>
   );
 }

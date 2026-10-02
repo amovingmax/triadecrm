@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ import {
   respostasQueBatem,
   type RespostaPronta,
 } from './respostas-prontas';
+import { DonoDoTextoDigitado, esquecerTextoDigitado, useTextoDigitado } from './texto-digitado';
 
 /**
  * O teto da Cloud API para uma mensagem de texto. É o único limite que existe de
@@ -96,6 +97,10 @@ export function CaixaDeResposta({
   className?: string;
 }) {
   const [aberta, setAberta] = useState(false);
+  // Quem já tinha começado a escrever encontra a caixa aberta, com o texto: um
+  // botão "Prefiro escrever" por cima do que a pessoa digitou o esconderia.
+  const [digitado] = useTextoDigitado(fio?.id ?? null);
+  const temDigitado = digitado.trim().length > 0;
 
   if (naoContatar) return <PediuParaSair organizacaoId={organizacaoId} className={className} />;
 
@@ -104,7 +109,7 @@ export function CaixaDeResposta({
   if (!fio)
     return <EnviarModelo destino={{ tipo: 'ficha', organizacaoId }} className={className} />;
 
-  if (recolhida && !aberta) {
+  if (recolhida && !aberta && !temDigitado) {
     return (
       <Button
         variant="outline"
@@ -183,7 +188,13 @@ export function TextoLivre({
   className?: string;
 }) {
   const clientes = useQueryClient();
-  const [texto, setTexto] = useState('');
+  // O TEXTO SOBREVIVE À TROCA DE CONVERSA (02/10/2026). Era um `useState`, e a
+  // conversa é remontada a cada troca: clicar em outra apagava o que estava
+  // escrito. Agora ele mora em `texto-digitado.ts`, por conversa, no navegador
+  // de quem digitou — volta à caixa na reabertura, e a lista mostra "Rascunho:".
+  // O que é ENVIADO não mudou: o mesmo `responder`, com o mesmo texto aparado.
+  const dono = useContext(DonoDoTextoDigitado);
+  const [texto, setTexto] = useTextoDigitado(fioId);
   const respostas = useQuery({
     queryKey: ['conversas', 'respostas-prontas'],
     queryFn: async (): Promise<RespostaPronta[]> => {
@@ -200,9 +211,16 @@ export function TextoLivre({
   const sugestoes = digitando === null ? [] : respostasQueBatem(respostas.data ?? [], digitando);
 
   const enviar = useMutation({
-    mutationFn: () => responder({ fioId, texto: texto.trim() }),
+    // O texto enviado é esquecido AQUI, logo depois de a fila aceitar, e não no
+    // `onSuccess`: se a pessoa trocar de conversa enquanto envia, a caixa sai da
+    // tela, e um texto que ficasse guardado voltaria como rascunho de uma
+    // mensagem que já foi — convite a mandá-la duas vezes. Se a fila recusar, o
+    // texto fica onde está, como sempre ficou.
+    mutationFn: async (envio: { fioId: string; texto: string }) => {
+      await responder(envio);
+      esquecerTextoDigitado(dono, envio.fioId);
+    },
     onSuccess: () => {
-      setTexto('');
       toast.success('Mensagem na fila do WhatsApp.', {
         description: 'Sai pelo número da KOMUNE em instantes.',
       });
@@ -243,7 +261,7 @@ export function TextoLivre({
       className={cn('space-y-1.5', className)}
       onSubmit={(e) => {
         e.preventDefault();
-        if (pode) enviar.mutate();
+        if (pode) enviar.mutate({ fioId, texto: limpo });
       }}
     >
       <label htmlFor="resposta" className="sr-only">
@@ -284,7 +302,7 @@ export function TextoLivre({
             if (e.key !== 'Enter' || e.shiftKey) return;
             if (window.matchMedia?.('(pointer: coarse)').matches) return;
             e.preventDefault();
-            if (pode) enviar.mutate();
+            if (pode) enviar.mutate({ fioId, texto: limpo });
           }}
           rows={1}
           placeholder="Mensagem"
@@ -328,5 +346,4 @@ export function TextoLivre({
       ) : null}
     </form>
   );
-
 }

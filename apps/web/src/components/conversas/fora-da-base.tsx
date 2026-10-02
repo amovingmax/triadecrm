@@ -35,6 +35,7 @@ import {
   type ResultadoDaFicha,
 } from './fora-da-base-dados';
 import { rotuloDoDia } from './formatos';
+import { PreviaDoRascunho } from './lista-conversas';
 import { Janela24h } from './janela-24h';
 import { Mensagem } from './mensagem-do-fio';
 import {
@@ -46,6 +47,7 @@ import {
 } from './mensagens';
 import type { CatalogosConversas } from './montagem';
 import { TextoLivre } from './responder';
+import { previaDoDigitado, useTextosDigitados } from './texto-digitado';
 
 /**
  * O nome que a pessoa deixou no perfil do WhatsApp, ou o final do número.
@@ -82,6 +84,9 @@ export function ListaForaDaBase({
   // As conversas que esta pessoa ainda não abriu: a mesma marca da lista de
   // Conversas, e o mesmo número do menu (`components/avisos`).
   const novas = useConversasNovas();
+  // O que a pessoa digitou e não enviou: "Rascunho:" na linha, como na lista de
+  // Conversas (`texto-digitado.ts`).
+  const digitados = useTextosDigitados();
   if (fios.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
@@ -99,6 +104,7 @@ export function ListaForaDaBase({
         const selecionado = fio.id === selecionadoId;
         const nome = fio.peer_nome?.trim();
         const nova = novas.has(fio.id);
+        const rascunho = selecionado ? null : previaDoDigitado(digitados.get(fio.id)?.texto);
         return (
           <li key={fio.id}>
             <button
@@ -126,12 +132,16 @@ export function ListaForaDaBase({
                   </span>
                   {nova ? <MarcaDeNova /> : null}
                 </span>
-                <span className="block truncate text-[13px] text-muted-foreground">
-                  {nome ? finalDoNumero(fio.peer_phone_e164) : 'sem nome no perfil'}
-                  {fio.unread_count > 0
-                    ? ` · ${fio.unread_count} ${fio.unread_count === 1 ? 'por ler' : 'por ler'}`
-                    : ''}
-                </span>
+                {rascunho ? (
+                  <PreviaDoRascunho texto={rascunho} className="block text-[13px]" />
+                ) : (
+                  <span className="block truncate text-[13px] text-muted-foreground">
+                    {nome ? finalDoNumero(fio.peer_phone_e164) : 'sem nome no perfil'}
+                    {fio.unread_count > 0
+                      ? ` · ${fio.unread_count} ${fio.unread_count === 1 ? 'por ler' : 'por ler'}`
+                      : ''}
+                  </span>
+                )}
               </span>
               <span className="flex shrink-0 flex-col items-end gap-1">
                 {fio.last_message_at ? (
