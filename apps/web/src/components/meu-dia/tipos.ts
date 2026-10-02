@@ -292,14 +292,25 @@ export function agruparPorDia(
  *
  *   - entra a tarefa `todo` ou `doing` sem prazo, ou com prazo DEPOIS de hoje
  *     (dia de calendário em Natal — o recorte por data é feito na consulta);
- *   - não entra a de parceiro apagado (a `organizations_view` não o devolve) nem
- *     a de parceiro que pediu para não ser contatado.
+ *   - não entra a de parceiro apagado nem a de parceiro que pediu para não ser
+ *     contatado.
  *
- * O que NÃO dá para repetir no navegador: a supressão por CONTATO
- * (`app.is_suppressed_target` com `contact_id`), que só o banco enxerga. Uma
- * tarefa assim pode aparecer aqui como plano; no dia dela, a fila de "Para
- * fazer" — que continua saindo da função — não a entrega. Mexeu na faixa 9 da
- * `public.meu_dia`, mexe aqui.
+ * PARCEIRO QUE A VIEW NÃO DEVOLVE. A função do banco é `security definer` e lê
+ * `organizations` direto; aqui a leitura é pela `organizations_view`, que esconde
+ * o apagado E o que quem lê não pode ver. Para admin, gestor, sdr, leitura e
+ * financeiro (`app.sees_all`) "não veio" quer dizer "foi apagado", e a tarefa
+ * sai. Para o EMBAIXADOR, "não veio" também acontece com o parceiro que não é
+ * dele — e o gestor pode marcar para ele uma reunião num parceiro de outra
+ * pessoa. Descartar ali esconderia justamente o compromisso que esta aba existe
+ * para mostrar; então, para quem não vê tudo (`parceiroForaDaVista: 'mantem'`),
+ * a linha fica, com o título da tarefa e sem os dados do parceiro.
+ *
+ * O que NÃO dá para repetir no navegador: a lista de supressão
+ * (`app.is_suppressed_target`: telefone, CNPJ ou @ suprimidos, por parceiro ou
+ * por contato), que só o banco enxerga. Aqui só se vê `do_not_contact`, que o
+ * opt-out marca junto. Uma tarefa de quem está na lista sem essa marca pode
+ * aparecer como plano; no dia dela, a fila de "Para fazer" — que continua saindo
+ * da função — não a entrega. Mexeu na faixa 9 da `public.meu_dia`, mexe aqui.
  */
 export type TarefaFutura = {
   id: string;
@@ -324,10 +335,30 @@ export type NegocioDaTarefa = {
   etapa: string | null;
 };
 
+/**
+ * O dia que vale como "hoje" para o corte dos próximos dias: o mais adiantado
+ * entre o que o servidor mandou ao abrir a tela e o do relógio de agora.
+ *
+ * A fila de "Para fazer" usa o `now()` do banco. Com o app aberto desde ontem, o
+ * `hoje` da tela ainda é ontem, e cortando por ele as tarefas de hoje apareciam
+ * aqui, sob "Amanhã", ao mesmo tempo em que a fila as mostrava em "Para fazer".
+ * O relógio do aparelho atrasado não puxa o corte para trás. `YYYY-MM-DD` se
+ * compara como texto.
+ */
+export function hojeParaOCorte(daTela: string, deAgora: string): string {
+  return deAgora > daTela ? deAgora : daTela;
+}
+
 export function montarProximosDias(entrada: {
   tarefas: readonly TarefaFutura[];
   parceiros: readonly ParceiroDaTarefa[];
   negocios: readonly NegocioDaTarefa[];
+  /**
+   * O que fazer com a tarefa cujo parceiro a view não devolveu: `descarta` para
+   * quem vê a base inteira (o parceiro foi apagado), `mantem` para quem não vê
+   * (pode só não ser dele). Sem dizer, descarta.
+   */
+  parceiroForaDaVista?: 'descarta' | 'mantem';
 }): ItemDoDia[] {
   const parceiroPorId = new Map(entrada.parceiros.map((p) => [p.id, p]));
   const negocioPorId = new Map(entrada.negocios.map((n) => [n.id, n]));
@@ -335,9 +366,10 @@ export function montarProximosDias(entrada: {
   return entrada.tarefas
     .flatMap((tarefa): ItemDoDia[] => {
       const parceiro = tarefa.organization_id ? parceiroPorId.get(tarefa.organization_id) : null;
-      // Tem parceiro, mas a view não o devolveu: foi apagado (ou não é de quem
-      // lê). A função do banco também não o entregaria.
-      if (tarefa.organization_id && !parceiro) return [];
+      // Tem parceiro, mas a view não o devolveu: foi apagado, ou não é de quem lê.
+      if (tarefa.organization_id && !parceiro && entrada.parceiroForaDaVista !== 'mantem') {
+        return [];
+      }
       if (parceiro?.do_not_contact) return [];
       const negocio = tarefa.deal_id ? negocioPorId.get(tarefa.deal_id) : null;
 

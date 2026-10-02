@@ -1,11 +1,12 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
-import { janelaDeDias } from '@/components/agenda/tipos';
+import { hojeEmNatal, janelaDeDias } from '@/components/agenda/tipos';
 
 import type { RegistroDoDia } from './feito';
 import {
   ehTipoConhecido,
+  hojeParaOCorte,
   montarProximosDias,
   type ItemDoDia,
   type MetricaDoDia,
@@ -195,6 +196,19 @@ export async function contarCandidatosAguardandoRevisao(): Promise<number | null
  */
 export const LIMITE_DOS_PROXIMOS = 300;
 
+/**
+ * Quantos ids vão por consulta. O filtro `in` viaja na URL, e 600 uuids são uns
+ * 22 KB de endereço — acima do que um gateway costuma aceitar. Em lotes de 100
+ * cada URL fica em torno de 4 KB.
+ */
+const IDS_POR_LOTE = 100;
+
+function emLotes<T>(itens: readonly T[], tamanho: number): T[][] {
+  const lotes: T[][] = [];
+  for (let i = 0; i < itens.length; i += tamanho) lotes.push(itens.slice(i, i + tamanho));
+  return lotes;
+}
+
 const COLUNAS_DA_TAREFA_FUTURA = 'id, title, due_at, deal_id, organization_id' as const;
 
 type LinhaDeNegocioDaTarefa = {
@@ -219,10 +233,19 @@ function nomeDoEmbed(valor: { name: string } | { name: string }[] | null): strin
  * tarefa (com prazo depois de hoje, e sem prazo) e, só se houver tarefa, os
  * parceiros e os negócios delas.
  */
-export async function buscarProximosDias(usuarioId: string, hoje: string): Promise<ItemDoDia[]> {
+export async function buscarProximosDias(
+  usuarioId: string,
+  hoje: string,
+  /** Quem LÊ enxerga a base inteira (`app.sees_all`)? O embaixador não. */
+  leitorVeTudo: boolean,
+): Promise<ItemDoDia[]> {
   const supabase = createClient();
   // 00:00 de amanhã em Natal: "depois de hoje" é dia de calendário, como na função.
-  const { ate: amanha } = janelaDeDias(hoje, hoje);
+  //
+  // O dia é o de AGORA, e não só o que o servidor mandou ao abrir a tela (ver
+  // `hojeParaOCorte`): app aberto desde ontem não traz as tarefas de hoje para cá.
+  const diaDoCorte = hojeParaOCorte(hoje, hojeEmNatal());
+  const { ate: amanha } = janelaDeDias(diaDoCorte, diaDoCorte);
 
   const abertas = () =>
     supabase
@@ -232,8 +255,10 @@ export async function buscarProximosDias(usuarioId: string, hoje: string): Promi
       .in('status', ['todo', 'doing']);
 
   const [comPrazo, semPrazo] = await Promise.all([
-    abertas().gte('due_at', amanha).order('due_at').limit(LIMITE_DOS_PROXIMOS),
-    abertas().is('due_at', null).order('created_at').limit(LIMITE_DOS_PROXIMOS),
+    // O `id` desempata: duas tarefas no mesmo horário (a régua de cadência cria
+    // várias às 09:00) trocavam de lugar entre uma recarga e outra.
+    abertas().gte('due_at', amanha).order('due_at').order('id').limit(LIMITE_DOS_PROXIMOS),
+    abertas().is('due_at', null).order('created_at').order('id').limit(LIMITE_DOS_PROXIMOS),
   ]);
   const erro = comPrazo.error ?? semPrazo.error;
   if (erro) throw new ErroDoDia(erro.message, erro.code);
@@ -245,29 +270,36 @@ export async function buscarProximosDias(usuarioId: string, hoje: string): Promi
   const dealIds = [...new Set(tarefas.flatMap((t) => t.deal_id ?? []))];
 
   const [parceiros, negocios] = await Promise.all([
-    orgIds.length > 0
-      ? supabase
+    Promise.all(
+      emLotes(orgIds, IDS_POR_LOTE).map((lote) =>
+        supabase
           .from('organizations_view')
           .select('id, name, neighborhood, primary_category_name, do_not_contact')
-          .in('id', orgIds)
-      : { data: [], error: null },
-    dealIds.length > 0
-      ? supabase
+          .in('id', lote),
+      ),
+    ),
+    Promise.all(
+      emLotes(dealIds, IDS_POR_LOTE).map((lote) =>
+        supabase
           .from('deals')
           .select('id, temperature, stages(name), pipelines(name)')
-          .in('id', dealIds)
-      : { data: [], error: null },
+          .in('id', lote),
+      ),
+    ),
   ]);
   // Sem os parceiros não dá para saber quem saiu da base: falha a aba inteira.
-  if (parceiros.error) throw new ErroDoDia(parceiros.error.message, parceiros.error.code);
-  // O negócio só enfeita a linha (funil e etapa): se não vier, ela sai sem eles.
-  const linhasDeNegocio = negocios.error
-    ? []
-    : ((negocios.data ?? []) as unknown as LinhaDeNegocioDaTarefa[]);
+  const erroDeParceiro = parceiros.find((r) => r.error)?.error;
+  if (erroDeParceiro) throw new ErroDoDia(erroDeParceiro.message, erroDeParceiro.code);
+  // O negócio só enfeita a linha (funil e etapa): o lote que não vier deixa as
+  // linhas dele sem os dois.
+  const linhasDeNegocio = negocios.flatMap((r) =>
+    r.error ? [] : ((r.data ?? []) as unknown as LinhaDeNegocioDaTarefa[]),
+  );
 
   return montarProximosDias({
     tarefas,
-    parceiros: (parceiros.data ?? []) as unknown as ParceiroDaTarefa[],
+    parceiroForaDaVista: leitorVeTudo ? 'descarta' : 'mantem',
+    parceiros: parceiros.flatMap((r) => (r.data ?? []) as unknown as ParceiroDaTarefa[]),
     negocios: linhasDeNegocio.map((n) => ({
       id: n.id,
       temperature: n.temperature,

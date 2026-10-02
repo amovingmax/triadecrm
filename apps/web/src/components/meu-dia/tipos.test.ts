@@ -5,6 +5,7 @@ import {
   abaDaUrl,
   agruparFila,
   agruparPorDia,
+  hojeParaOCorte,
   montarProximosDias,
   alcanceDeQuemRespondeu,
   BLOCOS,
@@ -520,6 +521,45 @@ describe('os próximos dias lidos por conta própria', () => {
     expect(
       montarProximosDias({ tarefas: [tarefa({})], parceiros: [], negocios: [NEGOCIO] }),
     ).toEqual([]);
+  });
+
+  it('para quem não vê a base inteira, parceiro fora da vista não esconde o compromisso', () => {
+    // O gestor marca para o embaixador uma reunião num parceiro que é de outra
+    // pessoa. A view não devolve o parceiro, mas o compromisso é dele e tem de
+    // aparecer: sem os dados do parceiro, com o título da tarefa.
+    const [linha] = montarProximosDias({
+      tarefas: [tarefa({})],
+      parceiros: [],
+      negocios: [],
+      parceiroForaDaVista: 'mantem',
+    });
+    expect(linha).toMatchObject({
+      titulo: 'Reunião com Abracadabra Festas',
+      organizacaoId: 'o1',
+      organizacao: null,
+      tipo: 'tarefa_futura',
+    });
+    // Parceiro que pediu para não ser contatado continua fora, para todo mundo.
+    expect(
+      montarProximosDias({
+        tarefas: [tarefa({})],
+        parceiros: [{ ...PARCEIRO, do_not_contact: true }],
+        negocios: [],
+        parceiroForaDaVista: 'mantem',
+      }),
+    ).toEqual([]);
+  });
+
+  it('app aberto desde ontem: o corte é o dia de hoje, e não o da tela', () => {
+    // A tela abriu em 01/10 e ficou aberta; agora é 02/10. Cortando por 01/10, as
+    // tarefas de 02/10 apareceriam aqui como "Amanhã".
+    expect(hojeParaOCorte('2026-10-01', '2026-10-02')).toBe('2026-10-02');
+    // Tela aberta hoje: o mesmo dia.
+    expect(hojeParaOCorte('2026-10-02', '2026-10-02')).toBe('2026-10-02');
+    // Relógio do aparelho atrasado não puxa o corte para trás.
+    expect(hojeParaOCorte('2026-10-02', '2026-09-30')).toBe('2026-10-02');
+    // Virada de mês e de ano se comparam certo como texto.
+    expect(hojeParaOCorte('2026-12-31', '2027-01-01')).toBe('2027-01-01');
   });
 
   it('aviso do motor, sem parceiro e sem negócio, não é compromisso', () => {

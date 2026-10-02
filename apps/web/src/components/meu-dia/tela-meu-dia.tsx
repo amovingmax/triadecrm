@@ -168,13 +168,19 @@ export function TelaMeuDia({
     refetchOnMount: 'always',
   });
 
+  // Quem está lendo enxerga a base inteira? É o `app.sees_all()` do banco, e só o
+  // embaixador fica de fora: para ele, parceiro que a view não devolve pode ser
+  // só um parceiro que não é dele (ver `montarProximosDias`).
+  const papelDeQuemEntrou = pessoas.find((p) => p.id === usuarioId)?.papel ?? null;
+  const leitorVeTudo = papelDeQuemEntrou !== null && papelDeQuemEntrou !== 'embaixador';
+
   // Os próximos dias têm leitura PRÓPRIA, e não saem mais da fila: a fila tem teto
   // de 60 linhas e o futuro é a última faixa dela, então quem tinha 60 pendências
   // não via nenhum compromisso marcado (ver `montarProximosDias`). Sempre de novo ao
   // abrir a tela, como o "Feito hoje": quem marca na Agenda e volta espera ver.
   const futuros = useQuery({
     queryKey: ['meu-dia', 'proximos', pessoa, hoje],
-    queryFn: () => buscarProximosDias(pessoa, hoje),
+    queryFn: () => buscarProximosDias(pessoa, hoje, leitorVeTudo),
     refetchOnMount: 'always',
   });
 
