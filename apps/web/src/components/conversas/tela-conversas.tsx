@@ -254,12 +254,18 @@ export function TelaConversas({
   // "Nova mensagem". Esta tela conta a ela duas coisas — qual conversa está
   // aberta, para o cartão não anunciar o que a pessoa está lendo, e como abrir
   // outra sem navegar, porque o estado daqui mora no cliente.
+  //
+  // E conta se foi a PESSOA quem abriu (02/10/2026): só aí a conversa deixa de
+  // ser nova e sai do número do menu. A que o desktop abre sozinho, por ser a
+  // primeira da lista, continua marcada — é a mesma régua do "por ler"
+  // (`escolhaExplicita`, mais abaixo).
   const { olharConversa, registrarAbridor } = useAcoesDosAvisos();
   const conversaAbertaId = foraAberta?.id ?? aberta?.fio?.id ?? null;
+  const abertaPorEscolha = foraAberta ? clienteEscolhido !== null : escolhidoId !== null;
   useEffect(() => {
-    olharConversa(conversaAbertaId);
+    olharConversa(conversaAbertaId, abertaPorEscolha);
     return () => olharConversa(null);
-  }, [conversaAbertaId, olharConversa]);
+  }, [conversaAbertaId, abertaPorEscolha, olharConversa]);
   useEffect(() => {
     registrarAbridor(({ conversaId, organizacaoId }) => {
       setAba('conversas');

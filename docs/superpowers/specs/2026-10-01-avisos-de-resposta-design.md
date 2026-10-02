@@ -27,13 +27,19 @@ A regra está em `apps/web/src/components/avisos/regra.ts`, em funções puras. 
 
 ## 2. O número ao lado de Conversas
 
-Conta as conversas com mensagem nova para esta pessoa desde a última vez que ela olhou a tela de Conversas. Zera ao abrir Conversas.
+Conta as conversas com mensagem nova para esta pessoa que ela ainda não abriu. Cai conversa a conversa: abriu uma, sai de 5 para 4.
+
+A primeira versão zerava tudo ao entrar na tela de Conversas. Janio, 02/10/2026: "ele não deve desaparecer todo de uma vez assim que eu abro a aba de conversas, ele deve ir verificando uma por uma".
 
 - Aparece no trilho do desktop, na folha "Mais" e na barra inferior do celular. A barra do celular recebia a contagem e não a desenhava.
-- Muda sozinho: sobe quando chega mensagem e cai quando um colega responde a conversa.
+- Muda sozinho: sobe quando chega mensagem e cai quando a pessoa abre a conversa ou quando um colega a responde.
+- **A marca "Nova" na lista.** Cada conversa que conta no número leva, na lista de Conversas e na aba "Clientes", uma faixa e um selo "Nova" em menta. Os dois saem quando a pessoa abre a conversa. Número e marcas andam juntos: cinco marcadas, número 5.
+- **Abrir é escolher.** Conta o clique na lista, o botão Responder do cartão e o link direto. A conversa que o desktop abre sozinho, por ser a primeira da lista, continua marcada: é a mesma régua com que a tela zera o "por ler".
+- **Mensagem nova numa conversa já aberta volta a contar**, a menos que a pessoa esteja com ela aberta e à vista.
+- **Não é o "por ler".** O número branco da linha conta mensagens e é do time inteiro (`conversations.unread_count`). A marca "Nova" é de cada pessoa e fica só no navegador dela.
 - **Deixa de contar rascunhos da IA.** Eles continuam na aba "Aprovar" da tela. Somar os dois misturaria "chegou mensagem" com "tem rascunho", e o número não zeraria ao abrir.
 
-O marco de "até onde vi" é sempre um carimbo do banco (`last_inbound_at`), nunca o relógio do aparelho. Um computador adiantado marcaria "visto" no futuro e calaria as mensagens seguintes.
+O que foi aberto fica guardado no navegador, por pessoa: para cada conversa, a chegada que estava lá quando ela foi aberta. Um piso (a chegada abaixo da qual nada conta) só anda sobre o que já foi aberto, para a leitura e o registro não crescerem sem fim. Os dois são sempre carimbos do banco (`last_inbound_at`), nunca o relógio do aparelho. Um computador adiantado marcaria "aberta" no futuro e calaria as mensagens seguintes.
 
 ## 3. O cartão "Nova mensagem"
 
@@ -93,7 +99,8 @@ Novo, em `apps/web/src/components/avisos/`:
 |---|---|
 | `regra.ts`, `regra.test.ts` | A regra, o texto, a prévia, o destino e o marco. Puro, com Vitest. |
 | `dados.ts` | As cinco leituras. Nenhuma escrita. |
-| `preferencias.ts` | Silenciado, visto e convite dispensado, em `localStorage`, com chave por pessoa. |
+| `preferencias.ts` | Silenciado, piso, conversas abertas e convite dispensado, em `localStorage`, com chave por pessoa. |
+| `marca-de-nova.tsx` | A faixa e o selo "Nova" das linhas da lista. |
 | `aviso-do-navegador.ts` | Casca fina da Notification API. |
 | `provedor-avisos.tsx` | O canal, a sondagem, os cartões e a decisão de avisar. |
 | `pilha-de-avisos.tsx` | Os cartões "Nova mensagem" e o convite de permissão. |
@@ -101,7 +108,7 @@ Novo, em `apps/web/src/components/avisos/`:
 
 Alterado na casca: `layout/app-shell.tsx`, `sidebar.tsx`, `bottom-nav.tsx`, `nav-link.tsx`, `user-menu.tsx`, `lib/navegacao.ts`, `lib/filas-do-menu.ts`, `app/(app)/layout.tsx` e uma animação em `app/globals.css`.
 
-Alterado em Conversas: `tela-conversas.tsx`, `lista-conversas.tsx`, `montagem.ts` (`filtrarClientes`, `juntarNaLista`), `tipos.ts` (`?cliente=`), `eco-do-banco.ts` (uma invalidação a mais), `formatos.ts` (uma exportação) e `app/(app)/conversas/page.tsx`.
+Alterado em Conversas: `tela-conversas.tsx`, `lista-conversas.tsx`, `fora-da-base.tsx` (a marca "Nova"), `montagem.ts` (`filtrarClientes`, `juntarNaLista`), `tipos.ts` (`?cliente=`), `eco-do-banco.ts` (uma invalidação a mais), `formatos.ts` (uma exportação) e `app/(app)/conversas/page.tsx`.
 
 ## 7. O que não interfere
 
@@ -117,7 +124,8 @@ Efeito colateral, só no Supabase: cada aba do CRM aberta passa a manter uma con
 
 - **Celular.** Chrome no Android e Safari no iPhone só mostram notificação do sistema a partir de um service worker. Lá valem o número na barra e o cartão.
 - **CRM fechado.** Sem aviso, por escolha: exigiria push, com um disparo no instante em que a mensagem é gravada, que é o caminho de entrada do WhatsApp. Continua valendo o e-mail do worker-wa.
-- **"Visto" é por navegador.** Abrir Conversas no computador não zera o número no celular. Levar isso para o banco pede migração.
+- **"Aberta" é por navegador.** Abrir uma conversa no computador não tira a marca dela no celular. Levar isso para o banco pede migração.
+- **O número não cai sozinho.** Conversa que ninguém respondeu e que a pessoa nunca abre continua contando, até sair das 50 mais recentes.
 - **Teto de 50.** Quem ficou muito tempo sem abrir Conversas vê no máximo 50.
 - **Opt-out.** A mensagem de quem pede para sair também avisa: a regra não consulta a supressão.
 - **O "por ler" do cliente não zera ao abrir a conversa.** Já era assim na aba "Clientes": a tela só zera o de parceiro, e só para quem atende ou é gestor. Com o cliente em "Todas", o número fica mais à vista. Corrigir é uma escrita em `conversations`, fora desta entrega.

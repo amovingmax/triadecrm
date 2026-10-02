@@ -5678,6 +5678,32 @@ partir da `main`. Sem migração.**
   corta), e o número ganhou 18px, um anel na cor do trilho e 2px de folga da
   borda. Vale também para o número de Revisão. Conferido no Chrome com "6",
   "12" e "99+", trilho fechado e aberto (`layout/nav-link.tsx`).
+- **02/10, o número cai conversa a conversa, e a lista marca o que é novo.**
+  Janio: "assim que eu abro a aba de conversa o número de novas mensagens some
+  [...] ele deve ir verificando uma por uma, caso eu abra uma mensagem ele sai
+  de 5 e vai pra 4", e "quero que todas as novas mensagens apareçam com uma
+  tag/identidade visual [...] assim que for aberta essa tag deve sair".
+  - Entrar na tela de Conversas não zera mais nada. Cada conversa conta até a
+    pessoa abri-la: clique na lista, botão Responder do cartão ou link direto.
+    A que o desktop abre sozinho por ser a primeira da lista continua contando
+    (a mesma régua do "por ler", `escolhaExplicita`).
+  - As conversas que contam levam na lista uma faixa e o selo "Nova" em menta,
+    em Conversas e na aba "Clientes". Saem ao abrir. Mensagem nova numa conversa
+    já aberta devolve a marca, a menos que ela esteja aberta e à vista.
+  - O que foi aberto fica no navegador, por pessoa (`komune.avisos.abertas.v1`:
+    id da conversa e carimbo de hora). Continua sem escrita no banco.
+  - Arquivos: `avisos/regra.ts` (`aindaNaoAbertas`, `pisoPossivel`,
+    `semOQueOPisoCobre`), `preferencias.ts`, `provedor-avisos.tsx`,
+    `marca-de-nova.tsx` (novo), `conversas/lista-conversas.tsx`,
+    `fora-da-base.tsx` e `tela-conversas.tsx`.
+  - Testes: Vitest 1.055 no site (10 novos), lint, typecheck e build. No Chrome,
+    contra o Supabase local, 24 conferências: 6 → 5 → 4 ao abrir, recarga
+    mantendo o número, conversa reaberta por mensagem nova, cartão Responder,
+    aba "Clientes", número igual às linhas marcadas e fila de saída do WhatsApp
+    vazia. A prova pegou um defeito, corrigido antes do commit: depois de uma
+    recarga, uma conversa já aberta voltava a contar no clique seguinte.
+  - Limite novo: o número não cai sozinho. Conversa que ninguém respondeu e
+    que a pessoa nunca abre conta até sair das 50 mais recentes.
 
 **Não foi conferido:** embaixador, leitura e financeiro na tela (não há usuário
 de teste desses papéis no banco local; a regra deles está no Vitest); aba
@@ -5685,7 +5711,7 @@ escondida por mais de 10 minutos num navegador de verdade; iPhone e Android.
 
 **Limites conhecidos:** no celular não há notificação do sistema (exige service
 worker), valem o número e o cartão; com o CRM fechado não há aviso, continua o
-e-mail; o "visto" é por navegador; o número para em 50; o "por ler" do cliente
+e-mail; o "aberta" é por navegador; o número para em 50; o "por ler" do cliente
 não zera ao abrir a conversa (já era assim na aba "Clientes"); a aba
 "Responderam" continua só com parceiros.
 

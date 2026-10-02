@@ -46,8 +46,9 @@
  * piscando na lateral a cada troca de tela.
  *
  * A de Conversas é a exceção, e por necessidade (01/10/2026): ela conta as
- * respostas novas PARA ESTA PESSOA, sobe quando alguém responde e zera quando a
- * pessoa abre a tela. Um número que só mudasse na recarga da página diria
+ * respostas novas PARA ESTA PESSOA, sobe quando alguém responde e cai conversa a
+ * conversa, conforme a pessoa abre cada uma (02/10/2026; antes zerava ao entrar
+ * na tela). Um número que só mudasse na recarga da página diria
  * "ninguém respondeu" a quem está há uma hora no funil. Quem o mantém vivo é o
  * aviso de resposta (`components/avisos`), que escuta o banco.
  *
@@ -279,7 +280,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     // Resposta nova para esta pessoa: alguém escreveu e espera por ela. Até
     // 01/10/2026 o número aqui era o de rascunhos da IA pendentes; eles continuam
     // na aba "Aprovar", dentro da tela. Somar os dois misturaria "chegou
-    // resposta" com "tem rascunho", e o número não zeraria ao abrir.
+    // resposta" com "tem rascunho", e o número não cairia ao abrir a conversa.
     fila: 'respostas',
   },
   {

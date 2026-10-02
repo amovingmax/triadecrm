@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { ChevronRight, Sparkles } from 'lucide-react';
 
+import { FaixaDeNova, MarcaDeNova } from '@/components/avisos/marca-de-nova';
+import { useConversasNovas } from '@/components/avisos/provedor-avisos';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Etiqueta } from '@/components/etiqueta';
@@ -34,6 +36,11 @@ import { ROTULO_CANAL, type ItemConversa } from './tipos';
  * `clientes`: a lista "Todas" que só mostrava parceiros escondia a mensagem do
  * cliente atrás de outra aba. A linha dele é a mesma gramática, com menos coisa:
  * nome do WhatsApp, por ler, o dia, e "cliente" onde o parceiro tem a etapa.
+ *
+ * A MARCA "NOVA" (02/10/2026): a conversa com mensagem que ESTA pessoa ainda não
+ * abriu leva a faixa e o selo em menta, e perde os dois quando ela abre. Quem
+ * sabe quais são é a casca (`components/avisos`), a mesma que põe o número ao
+ * lado de Conversas — por isso os dois andam juntos: cinco marcadas, número 5.
  */
 /** Abaixo disto a nota da IA não muda decisão nenhuma, e vira ruído na linha. */
 const NOTA_QUE_VALE = 50;
@@ -55,6 +62,7 @@ export function ListaConversas({
   clienteSelecionadoId?: string | null;
   aoEscolherCliente?: (conversaId: string) => void;
 }) {
+  const novas = useConversasNovas();
   return (
     <ul className="corpo-tabela flex flex-col">
       {juntarNaLista(itens, clientes).map((linha) =>
@@ -63,6 +71,7 @@ export function ListaConversas({
             key={linha.item.id}
             item={linha.item}
             selecionado={linha.item.id === selecionadoId}
+            nova={linha.item.fio ? novas.has(linha.item.fio.id) : false}
             aoEscolher={aoEscolher}
           />
         ) : (
@@ -70,6 +79,7 @@ export function ListaConversas({
             key={linha.fio.id}
             fio={linha.fio}
             selecionado={linha.fio.id === clienteSelecionadoId}
+            nova={novas.has(linha.fio.id)}
             aoEscolher={aoEscolherCliente}
           />
         ),
@@ -92,10 +102,13 @@ function quando(iso: string): string {
 function LinhaDeCliente({
   fio,
   selecionado,
+  nova,
   aoEscolher,
 }: {
   fio: FioCru;
   selecionado: boolean;
+  /** Tem mensagem que esta pessoa ainda não abriu. */
+  nova: boolean;
   aoEscolher?: (conversaId: string) => void;
 }) {
   const Icone = ICONE_CANAL.whatsapp;
@@ -119,16 +132,18 @@ function LinhaDeCliente({
           selecionado && 'bg-muted',
         )}
       >
+        {nova ? <FaixaDeNova /> : null}
         <span className="min-w-0 flex-1 space-y-1">
           <span className="flex items-baseline gap-2">
             <span
               className={cn(
                 'min-w-0 flex-1 truncate text-sm xl:text-[15px]',
-                fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
+                nova || fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
               )}
             >
               {nome || `Número ${finalDoNumero(fio.peer_phone_e164)}`}
             </span>
+            {nova ? <MarcaDeNova className="self-center" /> : null}
             {fio.unread_count > 0 ? (
               <span
                 className="numerico inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
@@ -173,10 +188,13 @@ function LinhaDeCliente({
 function Linha({
   item,
   selecionado,
+  nova,
   aoEscolher,
 }: {
   item: ItemConversa;
   selecionado: boolean;
+  /** Tem mensagem que esta pessoa ainda não abriu. */
+  nova: boolean;
   aoEscolher: (id: string) => void;
 }) {
   const Icone = item.ultimoCanal ? ICONE_CANAL[item.ultimoCanal] : null;
@@ -211,16 +229,18 @@ function Linha({
           selecionado && 'bg-muted',
         )}
       >
+        {nova ? <FaixaDeNova /> : null}
         <span className="min-w-0 flex-1 space-y-1">
           <span className="flex items-baseline gap-2">
             <span
               className={cn(
                 'min-w-0 flex-1 truncate text-sm xl:text-[15px]',
-                item.naoLidas > 0 ? 'font-semibold' : 'font-medium',
+                nova || item.naoLidas > 0 ? 'font-semibold' : 'font-medium',
               )}
             >
               {item.nome}
             </span>
+            {nova ? <MarcaDeNova className="self-center" /> : null}
             {/* Por ler vai no verde da ação, e não no branco: é o único número da
                 linha que pede para alguém fazer alguma coisa. */}
             {item.naoLidas > 0 ? (

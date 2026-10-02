@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  aindaNaoAbertas,
   chegaramAgora,
   destinoDoAviso,
   ehParaMim,
   maisRecente,
   marcaDoAviso,
   nomeDoAviso,
+  pisoPossivel,
   previaDaMensagem,
   recebeAvisos,
   respostasParaMim,
   rotuloDasRespostas,
+  semOQueOPisoCobre,
   textoDoAviso,
   ultimaChegada,
   type ConversaComResposta,
@@ -152,6 +155,74 @@ describe('os carimbos do banco', () => {
         conversa({ chegouEm: '2026-10-01T13:00:00+00:00' }),
       ]),
     ).toBe('2026-10-01T14:05:00+00:00');
+  });
+});
+
+describe('o que ainda não abri', () => {
+  const as14 = conversa({ conversaId: 'a', chegouEm: '2026-10-02T14:00:00+00:00' });
+  const as15 = conversa({ conversaId: 'b', chegouEm: '2026-10-02T15:00:00+00:00' });
+  const as16 = conversa({ conversaId: 'c', chegouEm: '2026-10-02T16:00:00+00:00' });
+
+  it('sem nenhuma aberta, todas contam: entrar na tela não zera o número', () => {
+    expect(aindaNaoAbertas([as14, as15, as16], new Map())).toEqual([as14, as15, as16]);
+  });
+
+  it('abrir uma tira só ela: de três para duas', () => {
+    const abertas = new Map([['b', '2026-10-02T15:00:00+00:00']]);
+    expect(aindaNaoAbertas([as14, as15, as16], abertas)).toEqual([as14, as16]);
+  });
+
+  it('mensagem nova numa conversa já aberta volta a contar', () => {
+    const abertas = new Map([['b', '2026-10-02T14:30:00+00:00']]);
+    expect(aindaNaoAbertas([as15], abertas)).toEqual([as15]);
+  });
+
+  it('carimbo igual com casas decimais diferentes ainda é a mesma chegada', () => {
+    const abertas = new Map([['b', '2026-10-02T15:00:00.000000+00:00']]);
+    expect(aindaNaoAbertas([as15], abertas)).toEqual([]);
+  });
+});
+
+describe('até onde o piso anda', () => {
+  const as14 = conversa({ conversaId: 'a', chegouEm: '2026-10-02T14:00:00+00:00' });
+  const as15 = conversa({ conversaId: 'b', chegouEm: '2026-10-02T15:00:00+00:00' });
+  const as16 = conversa({ conversaId: 'c', chegouEm: '2026-10-02T16:00:00+00:00' });
+
+  it('nada por abrir: vai até a última chegada', () => {
+    expect(pisoPossivel([as14, as15, as16], [])).toBe(as16.chegouEm);
+  });
+
+  it('nada lido e nada por abrir: não há para onde andar', () => {
+    expect(pisoPossivel([], [])).toBeNull();
+  });
+
+  it('para antes da mais antiga por abrir, nunca em cima dela', () => {
+    expect(pisoPossivel([as14, as15, as16], [as15, as16])).toBe(as14.chegouEm);
+  });
+
+  it('a mais antiga de todas ainda por abrir: o piso fica onde está', () => {
+    expect(pisoPossivel([as14, as15, as16], [as14])).toBeNull();
+  });
+
+  it('o registro perde o que o piso já cobre e guarda o que está depois dele', () => {
+    const abertas = new Map([
+      ['a', '2026-10-02T14:00:00+00:00'],
+      ['c', '2026-10-02T16:00:00+00:00'],
+    ]);
+    expect(semOQueOPisoCobre(abertas, '2026-10-02T15:00:00+00:00')).toEqual(
+      new Map([['c', '2026-10-02T16:00:00+00:00']]),
+    );
+  });
+
+  it('andar o piso não muda o que conta: a aberta some da leitura, a por abrir fica', () => {
+    const abertas = new Map([['a', as14.chegouEm]]);
+    const antes = aindaNaoAbertas([as14, as15, as16], abertas);
+    const piso = pisoPossivel([as14, as15, as16], antes);
+    expect(piso).toBe(as14.chegouEm);
+    // A próxima leitura só traz o que chegou depois do piso.
+    const lidas = [as15, as16];
+    const depois = aindaNaoAbertas(lidas, semOQueOPisoCobre(abertas, piso as string));
+    expect(depois).toEqual(antes);
   });
 });
 

@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArrowLeft, Link2, Phone, UserPlus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { MarcaDeNova } from '@/components/avisos/marca-de-nova';
+import { useConversasNovas } from '@/components/avisos/provedor-avisos';
 import { cn } from '@/lib/utils';
 import { iniciaisDe } from '@/lib/iniciais';
 import { Button } from '@/components/ui/button';
@@ -77,6 +79,9 @@ export function ListaForaDaBase({
   selecionadoId: string | null;
   aoEscolher: (id: string) => void;
 }) {
+  // As conversas que esta pessoa ainda não abriu: a mesma marca da lista de
+  // Conversas, e o mesmo número do menu (`components/avisos`).
+  const novas = useConversasNovas();
   if (fios.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
@@ -93,6 +98,7 @@ export function ListaForaDaBase({
       {fios.map((fio) => {
         const selecionado = fio.id === selecionadoId;
         const nome = fio.peer_nome?.trim();
+        const nova = novas.has(fio.id);
         return (
           <li key={fio.id}>
             <button
@@ -109,13 +115,16 @@ export function ListaForaDaBase({
                 {nome ? iniciaisDe(nome) : <Phone className="size-4" aria-hidden="true" />}
               </span>
               <span className="min-w-0 flex-1">
-                <span
-                  className={cn(
-                    'block truncate text-[15px]',
-                    fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
-                  )}
-                >
-                  {nomeDoCliente(fio)}
+                <span className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'min-w-0 truncate text-[15px]',
+                      nova || fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
+                    )}
+                  >
+                    {nomeDoCliente(fio)}
+                  </span>
+                  {nova ? <MarcaDeNova /> : null}
                 </span>
                 <span className="block truncate text-[13px] text-muted-foreground">
                   {nome ? finalDoNumero(fio.peer_phone_e164) : 'sem nome no perfil'}

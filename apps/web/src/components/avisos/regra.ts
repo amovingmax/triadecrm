@@ -116,8 +116,8 @@ export function maisRecente(a: string, b: string): number {
 }
 
 /**
- * A chegada mais recente da lista: é até onde a pessoa "viu" quando está olhando
- * a tela de Conversas.
+ * A chegada mais recente da lista: é para onde o piso anda quando não sobra
+ * nenhuma conversa por abrir.
  *
  * O marco é sempre um carimbo DO BANCO, nunca o relógio do aparelho. Um
  * computador dois minutos adiantado marcaria "visto" no futuro e calaria as
@@ -129,6 +129,74 @@ export function ultimaChegada(conversas: readonly ConversaComResposta[]): string
     if (ultima === null || maisRecente(c.chegouEm, ultima) > 0) ultima = c.chegouEm;
   }
   return ultima;
+}
+
+/**
+ * As conversas minhas que ainda não abri: chegou mensagem depois da última vez
+ * que abri cada uma. São elas que o número ao lado de Conversas conta e que a
+ * lista marca com "Nova".
+ *
+ * ===========================================================================
+ * POR QUE CONVERSA A CONVERSA (02/10/2026)
+ * ===========================================================================
+ * A primeira versão zerava tudo quando a pessoa entrava na tela de Conversas.
+ * Janio: "ele não deve desaparecer todo de uma vez assim que eu abro a aba de
+ * conversas, ele deve ir verificando uma por uma, caso eu abra uma mensagem ele
+ * sai de 5 e vai pra 4". Ver a lista não é ler a conversa: com cinco esperando,
+ * o número zerado dizia que não havia mais nada a fazer.
+ *
+ * `abertas` guarda, por conversa, a chegada que estava lá quando a pessoa a
+ * abriu. Mensagem nova na mesma conversa tem carimbo maior, e ela volta a contar.
+ */
+export function aindaNaoAbertas(
+  minhas: readonly ConversaComResposta[],
+  abertas: ReadonlyMap<string, string>,
+): ConversaComResposta[] {
+  return minhas.filter((c) => {
+    const abertaAte = abertas.get(c.conversaId);
+    return abertaAte === undefined || maisRecente(c.chegouEm, abertaAte) > 0;
+  });
+}
+
+/**
+ * Até onde o piso pode andar sem engolir conversa por abrir.
+ *
+ * O piso é o carimbo abaixo do qual a conferência nem lê (`visto`, no aparelho).
+ * Ele não anda mais quando a pessoa entra na tela; anda quando o que ficou para
+ * trás já foi aberto. Sem isso a leitura traria para sempre as mesmas conversas
+ * já abertas, e o registro do que foi aberto cresceria sem fim.
+ *
+ *   - Nada por abrir → o piso vai até a última chegada lida.
+ *   - Há por abrir   → o piso vai até a chegada mais recente que seja ANTERIOR à
+ *                      mais antiga por abrir. O que está antes dela ou não é meu,
+ *                      ou já abri.
+ *
+ * `null` = não há para onde andar.
+ */
+export function pisoPossivel(
+  conversas: readonly ConversaComResposta[],
+  porAbrir: readonly ConversaComResposta[],
+): string | null {
+  let maisAntiga: string | null = null;
+  for (const c of porAbrir) {
+    if (maisAntiga === null || maisRecente(c.chegouEm, maisAntiga) < 0) maisAntiga = c.chegouEm;
+  }
+  if (maisAntiga === null) return ultimaChegada(conversas);
+
+  const corte = maisAntiga;
+  return ultimaChegada(conversas.filter((c) => maisRecente(c.chegouEm, corte) < 0));
+}
+
+/** O registro do que foi aberto, sem o que o piso já cobre. */
+export function semOQueOPisoCobre(
+  abertas: ReadonlyMap<string, string>,
+  piso: string,
+): Map<string, string> {
+  const restam = new Map<string, string>();
+  for (const [conversaId, abertaAte] of abertas) {
+    if (maisRecente(abertaAte, piso) > 0) restam.set(conversaId, abertaAte);
+  }
+  return restam;
 }
 
 /**

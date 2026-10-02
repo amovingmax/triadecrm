@@ -33,23 +33,29 @@ import {
   lerUltimasMensagens,
 } from './dados';
 import {
+  chaveDasAbertas,
   chaveDoVisto,
   estaSilenciado,
   gravarVistoAte,
+  lerAbertas,
   lerVistoAte,
+  marcarAberta,
+  podarAbertas,
   useConviteDispensado,
   useSilenciado,
 } from './preferencias';
 import {
+  aindaNaoAbertas,
   chegaramAgora,
   destinoDoAviso,
+  maisRecente,
   marcaDoAviso,
   nomeDoAviso,
+  pisoPossivel,
   previaDaMensagem,
   recebeAvisos,
   respostasParaMim,
   textoDoAviso,
-  ultimaChegada,
   type ConversaComResposta,
 } from './regra';
 
@@ -85,10 +91,16 @@ import {
  *    uma lista pesada. Aqui a aba escondida é exatamente o caso que importa, e a
  *    consulta é mínima: se o socket cair, o aviso atrasa um minuto e meio em vez
  *    de não vir.
- * 4. **Na tela de Conversas, olhando, tudo está visto** — o marco anda até a
- *    última chegada e o número fica zerado. O cartão continua aparecendo para as
- *    OUTRAS conversas; só a que está aberta não avisa, porque a mensagem dela já
- *    entrou na tela diante da pessoa.
+ * 4. **O número cai conversa a conversa, e não ao entrar na tela** (02/10/2026).
+ *    Janio: "ele não deve desaparecer todo de uma vez assim que eu abro a aba de
+ *    conversas... caso eu abra uma mensagem ele sai de 5 e vai pra 4". Ver a
+ *    lista não é ler a conversa. Cada conversa conta, e leva a marca "Nova" na
+ *    lista, até a pessoa ABRI-LA — por escolha: um clique na lista, o botão
+ *    Responder do cartão ou um link. A que o desktop abre sozinho por ser a
+ *    primeira da lista não conta como aberta; é a mesma regra com que a tela
+ *    zera o "por ler" (`conversa.tsx`, `escolhaExplicita`).
+ *    O cartão continua aparecendo para as OUTRAS conversas; a que está na tela
+ *    não avisa, porque a mensagem dela já entrou diante da pessoa.
  * 5. **A primeira leitura não avisa ninguém.** Ela mostra o número do que já
  *    esperava e estabelece a linha de base; recarregar a página não anuncia de
  *    novo o que estava lá.
@@ -114,7 +126,10 @@ export interface AlvoDaConversa {
 }
 
 interface Avisos {
-  /** Conversas com mensagem nova para esta pessoa. `null` enquanto não se sabe. */
+  /**
+   * Conversas com mensagem nova para esta pessoa, que ela ainda não abriu.
+   * `null` enquanto não se sabe.
+   */
   readonly respostasNovas: number | null;
   /** O papel desta pessoa é avisado? Leitura e financeiro não são. */
   readonly recebe: boolean;
@@ -137,8 +152,12 @@ interface Avisos {
  * estável: a tela é pesada, e não deve repintar a cada cartão que entra ou sai.
  */
 interface AcoesDosAvisos {
-  /** Qual conversa está aberta diante da pessoa (id da conversa), ou `null`. */
-  readonly olharConversa: (conversaId: string | null) => void;
+  /**
+   * Qual conversa está aberta diante da pessoa (id da conversa), ou `null`.
+   * `porEscolha` diz se foi ela quem abriu; a que o desktop abre sozinho por ser
+   * a primeira da lista não deixa de ser nova.
+   */
+  readonly olharConversa: (conversaId: string | null, porEscolha?: boolean) => void;
   /** A tela montada sabe abrir uma conversa sem navegar; `null` ao desmontar. */
   readonly registrarAbridor: (abrir: ((alvo: AlvoDaConversa) => void) | null) => void;
 }
@@ -163,8 +182,11 @@ const SEM_ACOES: AcoesDosAvisos = {
   registrarAbridor: () => undefined,
 };
 
+const SEM_NOVAS: ReadonlySet<string> = new Set();
+
 const Contexto = createContext<Avisos>(SEM_AVISOS);
 const ContextoDeAcoes = createContext<AcoesDosAvisos>(SEM_ACOES);
+const ContextoDasNovas = createContext<ReadonlySet<string>>(SEM_NOVAS);
 
 export function useAvisos(): Avisos {
   return useContext(Contexto);
@@ -172,6 +194,19 @@ export function useAvisos(): Avisos {
 
 export function useAcoesDosAvisos(): AcoesDosAvisos {
   return useContext(ContextoDeAcoes);
+}
+
+/**
+ * Os ids das conversas com mensagem nova que esta pessoa ainda não abriu: é o
+ * que a lista marca com "Nova". Num contexto à parte, e o conjunto só troca de
+ * identidade quando muda de conteúdo — quem repinta é a lista, não a tela.
+ */
+export function useConversasNovas(): ReadonlySet<string> {
+  return useContext(ContextoDasNovas);
+}
+
+function mesmoConjunto(a: ReadonlySet<string>, b: readonly string[]): boolean {
+  return a.size === b.length && b.every((id) => a.has(id));
 }
 
 /** Quantos cartões a casca guarda. A pilha mostra menos e resume o resto. */
@@ -192,6 +227,7 @@ export function ProvedorDeAvisos({
   const emConversas = estaAtivo(rota, '/conversas');
 
   const [respostasNovas, setRespostasNovas] = useState<number | null>(null);
+  const [novasIds, setNovasIds] = useState<ReadonlySet<string>>(SEM_NOVAS);
   const [cartoes, setCartoes] = useState<readonly CartaoDeAviso[]>([]);
   const [silenciado, silenciar] = useSilenciado(usuarioId);
   const [conviteDispensado, dispensarConvite] = useConviteDispensado(usuarioId);
@@ -213,14 +249,43 @@ export function ProvedorDeAvisos({
   const lendo = useRef(false);
   const deNovo = useRef(false);
   const relogio = useRef<number | null>(null);
+  /** As conversas minhas da última leitura: é delas que sai o número. */
+  const minhasAgora = useRef<readonly ConversaComResposta[] | null>(null);
   /** O que a tela de Conversas contou: a conversa aberta e como abrir outra. */
   const conversaAberta = useRef<string | null>(null);
+  /** A mesma conversa, só quando foi a pessoa quem a abriu. */
+  const abertaPorEscolha = useRef<string | null>(null);
   const abridor = useRef<((alvo: AlvoDaConversa) => void) | null>(null);
 
   const dispensarCartao = useCallback((conversaId: string) => {
     setCartoes((atuais) => atuais.filter((c) => c.conversaId !== conversaId));
   }, []);
   const dispensarTodos = useCallback(() => setCartoes([]), []);
+
+  /** Refaz o número e as marcas "Nova" a partir da última leitura e do que foi aberto. */
+  const publicar = useCallback((): readonly ConversaComResposta[] => {
+    const minhas = minhasAgora.current;
+    if (minhas === null) return [];
+    const porAbrir = aindaNaoAbertas(minhas, lerAbertas(usuarioId));
+    const ids = porAbrir.map((c) => c.conversaId);
+    setRespostasNovas(porAbrir.length);
+    setNovasIds((atuais) => (mesmoConjunto(atuais, ids) ? atuais : new Set(ids)));
+    return porAbrir;
+  }, [usuarioId]);
+
+  /**
+   * A conversa que a pessoa abriu deixa de ser nova — se ela está olhando: na
+   * tela de Conversas, com a aba à vista e a janela em foco. O CRM num segundo
+   * monitor, com a pessoa digitando em outro programa, não está sendo olhado.
+   */
+  const marcarAConversaAberta = useCallback((): boolean => {
+    const conversaId = abertaPorEscolha.current;
+    if (conversaId === null) return false;
+    if (!emConversasAgora.current || document.hidden || !document.hasFocus()) return false;
+    const chegouEm = minhasAgora.current?.find((c) => c.conversaId === conversaId)?.chegouEm;
+    if (chegouEm === undefined) return false;
+    return marcarAberta(usuarioId, conversaId, chegouEm);
+  }, [usuarioId]);
 
   const abrir = useCallback((alvos: readonly AlvoDaConversa[]) => {
     const unico = alvos.length === 1 ? alvos[0] : undefined;
@@ -299,11 +364,6 @@ export function ProvedorDeAvisos({
     }
 
     const umaVez = async () => {
-      // Olhando = na tela de Conversas, com a aba à vista e a janela em foco. O
-      // CRM aberto num segundo monitor enquanto a pessoa digita em outro programa
-      // não está sendo olhado.
-      const olhando = emConversasAgora.current && !document.hidden && document.hasFocus();
-
       let desde = lerVistoAte(usuarioId);
       if (desde === null) {
         // Primeira vez neste navegador: o que já estava lá não é novidade.
@@ -318,19 +378,29 @@ export function ProvedorDeAvisos({
 
       const minhas = respostasParaMim(conversas, { id: usuarioId, papel }, ativos.current);
       let novas = chegaramAgora(conhecidas.current, minhas);
+      conhecidas.current = new Map(minhas.map((c) => [c.conversaId, c.chegouEm]));
+      minhasAgora.current = minhas;
 
-      if (olhando) {
-        // A lista está diante da pessoa: tudo até aqui está visto, e o número
-        // zera. O cartão ainda vale para as conversas que não estão abertas.
-        const ultima = ultimaChegada(conversas);
-        if (ultima !== null) gravarVistoAte(usuarioId, ultima);
-        conhecidas.current = new Map();
-        setRespostasNovas(0);
-        novas = novas.filter((c) => c.conversaId !== conversaAberta.current);
-      } else {
-        conhecidas.current = new Map(minhas.map((c) => [c.conversaId, c.chegouEm]));
-        setRespostasNovas(minhas.length);
+      // A conversa que a pessoa abriu e está olhando segue aberta: a mensagem
+      // que chega nela não a faz voltar a contar.
+      marcarAConversaAberta();
+      const porAbrir = publicar();
+
+      // O piso só anda sobre o que já foi aberto (ver `pisoPossivel`). O que ele
+      // cobre sai do registro das abertas E da lista em memória, juntos: ficar
+      // na lista sem estar no registro faria a conversa já aberta voltar a
+      // contar no próximo clique, até a leitura seguinte.
+      const piso = pisoPossivel(conversas, porAbrir);
+      if (piso !== null) {
+        gravarVistoAte(usuarioId, piso);
+        podarAbertas(usuarioId, piso);
+        minhasAgora.current = minhas.filter((c) => maisRecente(c.chegouEm, piso) > 0);
       }
+
+      // O cartão não anuncia a conversa que está na tela, diante da pessoa —
+      // aberta por ela ou pelo desktop.
+      const olhando = emConversasAgora.current && !document.hidden && document.hasFocus();
+      if (olhando) novas = novas.filter((c) => c.conversaId !== conversaAberta.current);
 
       if (novas.length > 0) await avisar(novas);
     };
@@ -344,7 +414,7 @@ export function ProvedorDeAvisos({
     } finally {
       lendo.current = false;
     }
-  }, [recebe, usuarioId, papel, avisar]);
+  }, [recebe, usuarioId, papel, avisar, publicar, marcarAConversaAberta]);
 
   // ---------- 1. o socket acorda, a sondagem garante ----------
   useEffect(() => {
@@ -401,13 +471,13 @@ export function ProvedorDeAvisos({
     };
   }, [recebe, conferir]);
 
-  // ---------- 2. entrar em Conversas, ou sair dela, muda o que está visto ----------
+  // ---------- 2. entrar em Conversas, ou sair dela, muda o que está sendo olhado ----------
   useEffect(() => {
     emConversasAgora.current = emConversas;
     void conferir();
   }, [emConversas, conferir]);
 
-  // ---------- 3. voltar para a aba ou para a janela, e o "visto" de outra aba ----------
+  // ---------- 3. voltar para a aba ou para a janela, e o que outra aba abriu ----------
   useEffect(() => {
     if (!recebe) return;
 
@@ -415,7 +485,9 @@ export function ProvedorDeAvisos({
       if (!document.hidden) void conferir();
     };
     const aoGuardar = (evento: StorageEvent) => {
-      if (evento.key === chaveDoVisto(usuarioId)) void conferir();
+      // Outra aba abriu uma conversa: o número cai aqui também, sem ir ao banco.
+      if (evento.key === chaveDasAbertas(usuarioId)) publicar();
+      else if (evento.key === chaveDoVisto(usuarioId)) void conferir();
     };
     document.addEventListener('visibilitychange', aoVoltar);
     window.addEventListener('focus', aoVoltar);
@@ -425,22 +497,26 @@ export function ProvedorDeAvisos({
       window.removeEventListener('focus', aoVoltar);
       window.removeEventListener('storage', aoGuardar);
     };
-  }, [recebe, usuarioId, conferir]);
+  }, [recebe, usuarioId, conferir, publicar]);
 
   const pedirPermissao = useCallback(() => pedirAoNavegador(), []);
 
   const acoes = useMemo<AcoesDosAvisos>(
     () => ({
-      olharConversa: (conversaId) => {
+      olharConversa: (conversaId, porEscolha = false) => {
         conversaAberta.current = conversaId;
+        abertaPorEscolha.current = porEscolha ? conversaId : null;
         // Abriu a conversa, o cartão dela perdeu o sentido.
         if (conversaId !== null) dispensarCartao(conversaId);
+        // E, aberta por escolha, ela deixa de ser nova na hora, sem esperar a
+        // próxima leitura: o número cai e a marca some no mesmo clique.
+        if (marcarAConversaAberta()) publicar();
       },
       registrarAbridor: (abrirNaTela) => {
         abridor.current = abrirNaTela;
       },
     }),
-    [dispensarCartao],
+    [dispensarCartao, marcarAConversaAberta, publicar],
   );
 
   const valor = useMemo<Avisos>(
@@ -476,7 +552,9 @@ export function ProvedorDeAvisos({
 
   return (
     <ContextoDeAcoes.Provider value={acoes}>
-      <Contexto.Provider value={valor}>{children}</Contexto.Provider>
+      <ContextoDasNovas.Provider value={recebe ? novasIds : SEM_NOVAS}>
+        <Contexto.Provider value={valor}>{children}</Contexto.Provider>
+      </ContextoDasNovas.Provider>
     </ContextoDeAcoes.Provider>
   );
 }

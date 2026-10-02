@@ -19,7 +19,7 @@ import { type ChaveDeFila } from '@/lib/navegacao';
  *   própria — abre-se *porque* alguém lembrou que ela existe, o que é o oposto
  *   de direcionamento.
  * - `respostas` — resposta nova para esta pessoa, em Conversas. NÃO é contada
- *   aqui: ela muda a cada mensagem que chega e zera quando a pessoa abre a tela,
+ *   aqui: ela muda a cada mensagem que chega e cai quando a pessoa abre a conversa,
  *   e um número contado no servidor só mudaria na recarga da página. Quem a
  *   mantém é o aviso de resposta (`components/avisos/provedor-avisos.tsx`). Até
  *   01/10/2026 o número de Conversas era o de rascunhos da IA pendentes; eles
