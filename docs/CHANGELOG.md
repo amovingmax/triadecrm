@@ -5575,3 +5575,30 @@ do "Nenhum horário livre". Entra no próximo deploy feito a partir da `main`.
   agenda. É a regra de sempre, mas muda o que acontece no WhatsApp dessa pessoa.
 - Qual ferramenta de sala a equipe usa (pendência antiga do Rafael), e se a casa
   deve ter uma sala padrão (`agenda.reunioes.sala_padrao`).
+### 02/10/2026 — O CRM recebe foto, vídeo e documento
+
+Pedido do Rafael, com a foto de um balão que dizia "Imagem sem arquivo
+guardado: o CRM não baixou esta mídia da Meta": "coloque pro crm aceitar imagens
+e videos".
+
+O balde `mensagens` já aceitava foto, vídeo e PDF, e o banco já guardava o
+`media_id` de toda mídia recebida. Quem não buscava era o worker-wa: ele só
+baixava da Meta o ÁUDIO, porque o áudio precisava de transcrição.
+
+- **Worker:** foto, vídeo e documento são baixados na chegada e guardados no
+  balde privado, como o áudio. A legenda continua indo para a classificação.
+- **Recuperação:** o que chegou sem arquivo (até hoje, ou com o worker parado)
+  é buscado de novo na Meta, dez por vez, na subida do worker e a cada dez
+  minutos, enquanto a Meta guarda o arquivo (até 30 dias). Três falhas e a
+  mídia sai da fila. Banco: `20261003130000_a_foto_e_o_video_chegam_inteiros.sql`
+  (`wa_midias_sem_arquivo`, `wa_midia_falhou` e a tabela `midia_tentativas`,
+  com RLS; só o worker chama).
+- **Conversa:** a foto aparece no balão (um toque abre em tamanho real numa aba
+  nova), o vídeo ganha player e o documento ganha o botão "Abrir o PDF". A
+  legenda fica embaixo. Sem arquivo, o balão diz que o CRM tenta buscar de novo.
+- Limites que continuam: até 20 MB por arquivo, e documento só PDF (o balde não
+  aceita Word nem planilha). Figurinha continua chegando como aviso do WhatsApp.
+- Testes: pgTAP `98_a_foto_e_o_video_chegam_inteiros.sql` (9); worker com
+  `entrada.test.ts` (foto, vídeo, balde recusando) e `midias-atrasadas.test.ts`
+  (4). Suíte do banco num banco local zerado: 3.343; worker: 370; site: 1.000 e
+  build. Conferido no navegador local com foto, vídeo e PDF guardados.

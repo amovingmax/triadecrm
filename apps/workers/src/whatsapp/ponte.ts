@@ -316,6 +316,42 @@ export async function registrarMidia(
   });
 }
 
+/** Uma mídia recebida que ficou sem arquivo no balde (migração 20261003130000). */
+export interface MidiaSemArquivo {
+  messageId: string;
+  conversationId: string;
+  mediaId: string;
+  tipo: string;
+}
+
+/** A fila de recuperação: mídias recebidas sem arquivo, dos últimos 30 dias. */
+export async function lerMidiasSemArquivo(
+  cliente: ClienteDoBanco,
+  limite: number,
+): Promise<MidiaSemArquivo[]> {
+  const linhas = await rpc<unknown>(cliente, 'wa_midias_sem_arquivo', { p_limite: limite });
+  if (!Array.isArray(linhas)) return [];
+  const saida: MidiaSemArquivo[] = [];
+  for (const bruta of linhas) {
+    const l = objeto(bruta);
+    const messageId = texto(l.message_id);
+    const conversationId = texto(l.conversation_id);
+    const mediaId = texto(l.media_id);
+    if (messageId === null || conversationId === null || mediaId === null) continue;
+    saida.push({ messageId, conversationId, mediaId, tipo: texto(l.tipo) ?? 'image' });
+  }
+  return saida;
+}
+
+/** Anota a tentativa que não deu: na terceira, a mídia sai da fila de recuperação. */
+export async function registrarFalhaDeMidia(
+  cliente: ClienteDoBanco,
+  messageId: string,
+  motivo: string,
+): Promise<void> {
+  await rpc<unknown>(cliente, 'wa_midia_falhou', { p_message_id: messageId, p_motivo: motivo });
+}
+
 export async function pedirTrabalhoDeIa(
   cliente: ClienteDoBanco,
   proposito: string,

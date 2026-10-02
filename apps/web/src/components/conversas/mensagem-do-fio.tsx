@@ -1,7 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AudioLines, BadgeCheck, Ban, Bot, FileText, Hourglass, Sparkles } from 'lucide-react';
+import {
+  AudioLines,
+  BadgeCheck,
+  Ban,
+  Bot,
+  FileText,
+  Film,
+  Hourglass,
+  ImageIcon,
+  Sparkles,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { iniciaisDe } from '@/lib/iniciais';
@@ -125,10 +135,13 @@ export function Mensagem({
         )}
       >
         {mensagem.tipo === 'audio' ? <Audio mensagem={mensagem} /> : null}
+        {mensagem.tipo === 'image' ? <Foto mensagem={mensagem} /> : null}
+        {mensagem.tipo === 'video' ? <Video mensagem={mensagem} /> : null}
+        {mensagem.tipo === 'document' ? <Documento mensagem={mensagem} /> : null}
 
         {mensagem.texto ? <Texto texto={mensagem.texto} /> : null}
 
-        {mensagem.tipo !== 'audio' && semTexto ? <SemCorpo mensagem={mensagem} /> : null}
+        {!TIPOS_COM_ARQUIVO.has(mensagem.tipo) && semTexto ? <SemCorpo mensagem={mensagem} /> : null}
 
       </div>
 
@@ -342,31 +355,45 @@ function SemCorpo({ mensagem }: { mensagem: MensagemDoFio }) {
 
 type EstadoDoArquivo = 'procurando' | 'pronto' | 'ausente';
 
-function Audio({ mensagem }: { mensagem: MensagemDoFio }) {
-  // O que identifica o áudio para o servidor é a MENSAGEM, não o caminho do
-  // arquivo (ver `urlDaMidia`). `midiaCaminho` continua valendo para saber se há
-  // arquivo guardado: sem ele, nem vale a ida ao servidor.
+/** Os tipos que trazem um arquivo para mostrar no balão (02/10/2026). */
+const TIPOS_COM_ARQUIVO: ReadonlySet<string> = new Set(['audio', 'image', 'video', 'document']);
+
+/**
+ * A URL assinada do arquivo de uma mensagem.
+ *
+ * O que identifica o arquivo para o servidor é a MENSAGEM, não o caminho (ver
+ * `urlDaMidia`). `midiaCaminho` continua valendo para saber se há arquivo
+ * guardado: sem ele, nem vale a ida ao servidor.
+ *
+ * A URL vale cinco minutos (`/api/midia`). Quem fica mais tempo com a conversa
+ * aberta e dá play num vídeo pega uma URL vencida — por isso `renovar()`, que o
+ * player chama no erro, uma vez.
+ */
+function useArquivoDaMensagem(mensagem: MensagemDoFio): {
+  estado: EstadoDoArquivo;
+  url: string | null;
+  renovar: () => void;
+} {
   const caminho = mensagem.midiaCaminho;
   const messageId = mensagem.id;
-  // A resposta guarda O CAMINHO que ela responde. Sem isso, trocar de conversa
-  // mostraria por um instante a URL assinada do áudio anterior — que é um áudio
-  // de outra pessoa.
-  const [assinada, setAssinada] = useState<{ caminho: string; url: string | null } | null>(null);
+  const [vez, setVez] = useState(0);
+  // A resposta guarda O CAMINHO e a VEZ que ela responde. Sem isso, trocar de
+  // conversa mostraria por um instante o arquivo anterior — de outra pessoa.
+  const [assinada, setAssinada] = useState<{ chave: string; url: string | null } | null>(null);
+  const chave = `${caminho ?? ''}#${vez}`;
 
   useEffect(() => {
     if (!caminho) return;
     let vivo = true;
     void urlDaMidia(messageId).then((url) => {
-      if (vivo) setAssinada({ caminho, url });
+      if (vivo) setAssinada({ chave, url });
     });
     return () => {
       vivo = false;
     };
-  }, [caminho, messageId]);
+  }, [caminho, messageId, chave]);
 
-  // Derivado, não guardado: um `setEstado('ausente')` dentro do efeito faria
-  // uma repintura em cascata só para dizer o que já dá para saber aqui.
-  const resposta = assinada?.caminho === caminho ? assinada : null;
+  const resposta = assinada?.chave === chave ? assinada : null;
   const estado: EstadoDoArquivo = !caminho
     ? 'ausente'
     : resposta === null
@@ -374,7 +401,119 @@ function Audio({ mensagem }: { mensagem: MensagemDoFio }) {
       : resposta.url
         ? 'pronto'
         : 'ausente';
-  const url = resposta?.url ?? null;
+  return { estado, url: resposta?.url ?? null, renovar: () => setVez((v) => (v < 2 ? v + 1 : v)) };
+}
+
+/**
+ * Abre o arquivo numa aba nova com uma URL RECÉM-ASSINADA. A do balão pode ter
+ * vencido (cinco minutos); a aba é aberta antes do pedido para o navegador não
+ * tratar como janela não solicitada.
+ */
+async function abrirArquivo(messageId: string): Promise<void> {
+  const aba = window.open('', '_blank');
+  const url = await urlDaMidia(messageId);
+  if (aba === null) return;
+  if (url) {
+    aba.opener = null;
+    aba.location.href = url;
+  } else {
+    aba.close();
+  }
+}
+
+/**
+ * Sem arquivo guardado. Diz o que aconteceu e o que vai acontecer: o worker tenta
+ * buscar de novo na Meta o que chegou nos últimos 30 dias (`midias-atrasadas.ts`).
+ */
+function ArquivoAusente({ rotulo, icone }: { rotulo: string; icone: React.ReactNode }) {
+  return (
+    <p className="flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+      <span className="mt-0.5 shrink-0">{icone}</span>
+      <span>
+        {rotulo} ainda sem arquivo no CRM. O CRM busca de novo na Meta o que chegou nos últimos 30
+        dias; depois disso, só pedindo para a pessoa mandar outra vez.
+      </span>
+    </p>
+  );
+}
+
+/** A foto, no balão. Um toque abre em tamanho real numa aba nova. */
+function Foto({ mensagem }: { mensagem: MensagemDoFio }) {
+  const { estado, url, renovar } = useArquivoDaMensagem(mensagem);
+  if (estado === 'ausente') {
+    return <ArquivoAusente rotulo="Foto" icone={<ImageIcon className="size-3.5" aria-hidden="true" />} />;
+  }
+  if (estado === 'procurando' || !url) {
+    return <div className="h-48 w-64 max-w-full animate-pulse rounded-xl bg-muted" aria-label="Carregando a foto" />;
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => void abrirArquivo(mensagem.id)}
+      className="block overflow-hidden rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      title="Abrir a foto em tamanho real"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- URL assinada e temporária do Storage: o otimizador do Next guardaria uma cópia de algo que tem de expirar. */}
+      <img
+        src={url}
+        alt={mensagem.entrada ? 'Foto recebida' : 'Foto enviada'}
+        loading="lazy"
+        onError={renovar}
+        className="max-h-80 w-auto max-w-full object-cover"
+      />
+    </button>
+  );
+}
+
+/** O vídeo, com o player do navegador. `preload="metadata"`: só a capa e a duração. */
+function Video({ mensagem }: { mensagem: MensagemDoFio }) {
+  const { estado, url, renovar } = useArquivoDaMensagem(mensagem);
+  if (estado === 'ausente') {
+    return <ArquivoAusente rotulo="Vídeo" icone={<Film className="size-3.5" aria-hidden="true" />} />;
+  }
+  if (estado === 'procurando' || !url) {
+    return <div className="h-48 w-72 max-w-full animate-pulse rounded-xl bg-muted" aria-label="Carregando o vídeo" />;
+  }
+  return (
+    <video
+      controls
+      preload="metadata"
+      playsInline
+      src={url}
+      onError={renovar}
+      className="max-h-80 w-full max-w-md rounded-xl bg-black"
+      aria-label={mensagem.entrada ? 'Vídeo recebido' : 'Vídeo enviado'}
+    />
+  );
+}
+
+/** O documento: um botão que abre o arquivo numa aba nova. */
+function Documento({ mensagem }: { mensagem: MensagemDoFio }) {
+  const { estado } = useArquivoDaMensagem(mensagem);
+  if (estado === 'ausente') {
+    return <ArquivoAusente rotulo="Documento" icone={<FileText className="size-3.5" aria-hidden="true" />} />;
+  }
+  const pdf = (mensagem.midiaTipo ?? '').includes('pdf');
+  return (
+    <button
+      type="button"
+      disabled={estado === 'procurando'}
+      onClick={() => void abrirArquivo(mensagem.id)}
+      className={cn(
+        'flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
+        mensagem.entrada
+          ? 'border-hairline bg-muted/50 hover:bg-muted'
+          : 'border-primary-foreground/20 bg-primary-foreground/10 hover:bg-primary-foreground/20',
+      )}
+    >
+      <FileText className="size-4 shrink-0" aria-hidden="true" />
+      {estado === 'procurando' ? 'Procurando o arquivo...' : pdf ? 'Abrir o PDF' : 'Abrir o documento'}
+    </button>
+  );
+}
+
+function Audio({ mensagem }: { mensagem: MensagemDoFio }) {
+  const { estado, url } = useArquivoDaMensagem(mensagem);
 
   return (
     <div className="space-y-2">

@@ -11,7 +11,7 @@
  * O banco entra como dublê: um objeto com `rpc` que grava o que foi chamado, na
  * ordem. Nenhuma rede, nenhum Supabase.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { contagensDaEntradaZeradas, extensaoDoMime, tratarEntrada } from './entrada';
 import { createLogger } from '../lib/log';
@@ -218,6 +218,76 @@ describe('áudio (RF-CON-27, R13)', () => {
     expect(c.midias_baixadas).toBe(0);
     expect(chamadas.some((x) => x.nome === 'wa_midia_registrar')).toBe(false);
     expect(c.transcricoes_pedidas).toBe(1);
+  });
+});
+
+describe('foto, vídeo e documento (02/10/2026)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function contextoComBalde(cliente: ClienteDoBanco, mime: string): ContextoDaEntrada {
+    return {
+      ...contexto(cliente, 'mensagens'),
+      graph: {
+        midia: vi.fn(async () => ({ ok: true as const, url: 'http://x/1', mime })),
+        baixar: vi.fn(async () => ({ ok: true as const, bytes: new Uint8Array([1, 2, 3]), mime })),
+      } as unknown as ClienteDaGraph,
+    };
+  }
+
+  it('a foto é baixada, guardada no balde e registrada, e a legenda segue para a classificação', async () => {
+    const subidas: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        subidas.push(url);
+        return new Response('{}', { status: 200 });
+      }),
+    );
+    const { cliente, chamadas } = bancoFalso();
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(
+      contextoComBalde(cliente, 'image/jpeg'),
+      { ...MENSAGEM, tipo_da_mensagem: 'image', texto: 'olha o local', media_id: '77' },
+      c,
+    );
+    expect(subidas).toHaveLength(1);
+    expect(subidas[0]).toContain('/storage/v1/object/mensagens/');
+    expect(subidas[0]).toMatch(/\.jpg$/);
+    const registro = chamadas.find((x) => x.nome === 'wa_midia_registrar');
+    expect(registro?.args.p_media_path).toMatch(/^22222222-2222-4222-8222-222222222222\/.+\.jpg$/);
+    expect(c.midias_baixadas).toBe(1);
+    // A legenda é texto: segue para a classificação, como qualquer mensagem.
+    expect(c.classificacoes_pedidas).toBe(1);
+    expect(c.transcricoes_pedidas).toBe(0);
+  });
+
+  it('o vídeo também, com a extensão certa', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
+    const { cliente, chamadas } = bancoFalso();
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(
+      contextoComBalde(cliente, 'video/mp4'),
+      { ...MENSAGEM, tipo_da_mensagem: 'video', texto: null, media_id: '78' },
+      c,
+    );
+    expect(chamadas.find((x) => x.nome === 'wa_midia_registrar')?.args.p_media_path).toMatch(/\.mp4$/);
+    expect(c.midias_baixadas).toBe(1);
+  });
+
+  it('se o balde recusar, a mensagem continua gravada e nada é registrado como guardado', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('grande demais', { status: 413 })));
+    const { cliente, chamadas } = bancoFalso();
+    const c = contagensDaEntradaZeradas();
+    await tratarEntrada(
+      contextoComBalde(cliente, 'video/mp4'),
+      { ...MENSAGEM, tipo_da_mensagem: 'video', texto: null, media_id: '79' },
+      c,
+    );
+    expect(chamadas[0]?.nome).toBe('wa_entrada_registrar');
+    expect(chamadas.some((x) => x.nome === 'wa_midia_registrar')).toBe(false);
+    expect(c.midias_baixadas).toBe(0);
   });
 });
 

@@ -56,6 +56,16 @@ import type { Logger } from '../lib/log';
 /** Tipos de mensagem cujo conteúdo é voz. `audio` cobre a nota de voz (PTT). */
 const TIPOS_DE_VOZ: ReadonlySet<string> = new Set(['audio', 'voice']);
 
+/**
+ * Tipos de mensagem cujo conteúdo é um ARQUIVO para guardar (02/10/2026).
+ *
+ * Até esta data só o áudio era baixado, porque só ele precisava de
+ * transcrição — e a foto chegava ao CRM como "Imagem sem arquivo guardado".
+ * Rafael: "coloque pro crm aceitar imagens e videos". O balde `mensagens` já
+ * aceitava foto, vídeo e PDF; faltava buscar.
+ */
+const TIPOS_DE_ARQUIVO: ReadonlySet<string> = new Set(['image', 'video', 'document']);
+
 export interface ContextoDaEntrada {
   cliente: ClienteDoBanco;
   /**
@@ -324,8 +334,21 @@ async function tratarMensagem(
     return;
   }
 
-  // 3 · Áudio: baixar agora (a URL da Meta expira) e pedir a transcrição.
   const mediaId = texto(item.media_id);
+
+  // 3a · Foto, vídeo e documento: baixar agora, pela mesma razão do áudio — a
+  //      URL da Meta vale minutos. Não encerra o tratamento: a legenda, quando
+  //      existe, é texto e segue para a classificação lá embaixo. Se o download
+  //      falhar, a passada de recuperação (`midias-atrasadas.ts`) tenta de novo.
+  if (TIPOS_DE_ARQUIVO.has(tipoDaMensagem) && mediaId !== null) {
+    const caminho = await guardarMidia(ctx, { mediaId, messageId, conversationId });
+    if (caminho !== null) {
+      contagens.midias_baixadas += 1;
+      await registrarMidia(ctx.cliente, messageId, caminho);
+    }
+  }
+
+  // 3 · Áudio: baixar agora (a URL da Meta expira) e pedir a transcrição.
   if (TIPOS_DE_VOZ.has(tipoDaMensagem) && mediaId !== null) {
     const caminho = await guardarMidia(ctx, { mediaId, messageId, conversationId });
     if (caminho !== null) {
@@ -375,7 +398,7 @@ async function tratarMensagem(
  * O caminho é `<conversa>/<mensagem>.<ext>`: agrupa por fio, que é como a
  * retenção do PRD §10.6 apaga (365 dias, metadados preservados).
  */
-async function guardarMidia(
+export async function guardarMidia(
   ctx: ContextoDaEntrada,
   argumentos: { mediaId: string; messageId: string; conversationId: string },
 ): Promise<string | null> {

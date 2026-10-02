@@ -47,6 +47,7 @@
  *   · `--sincronizar-modelos` só a passada dos modelos.
  */
 import { avisarPorEmail, type EntradaParaAviso } from '../whatsapp/aviso-por-email';
+import { recuperarMidias } from '../whatsapp/midias-atrasadas';
 import { avisarDasReunioes } from '../whatsapp/reuniao-avisos';
 import { ClienteDaGraph, VERSAO_PADRAO } from '../whatsapp/graph';
 import {
@@ -88,6 +89,13 @@ const LOTE_DE_SAIDA = 5;
 
 /** O balde privado das mídias recebidas (migração 20260905000201). */
 const BALDE_DE_MIDIAS = 'mensagens';
+
+/**
+ * A passada de recuperação das mídias sem arquivo (`whatsapp/midias-atrasadas.ts`):
+ * na subida e a cada dez minutos. Dez por passada, então um atraso de dias se
+ * resolve em algumas voltas sem tomar o lugar da entrada e da saída.
+ */
+const INTERVALO_DA_RECUPERACAO_MS = 10 * 60_000;
 
 export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
   const { env, logger, opcoes } = ctx;
@@ -219,6 +227,7 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
   process.on('SIGTERM', () => pedirParada('SIGTERM'));
 
   let falhas = 0;
+  let proximaRecuperacao = 0;
 
   try {
     for (;;) {
@@ -249,6 +258,20 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
       //      silenciosa também é falha silenciosa, `aviso_enviado_em`
       //      continua nulo e o cartão na Agenda diz que ninguém foi avisado.
       await avisarDasReunioes(cliente, env.RESEND_API_KEY, logger);
+
+      // 1d · Mídia que chegou sem arquivo — antes de 02/10/2026 só o áudio era
+      //      baixado, e o que chega com o worker parado também fica sem: buscar
+      //      de novo na Meta enquanto ela guarda o arquivo. Falha só vira log.
+      if (Date.now() >= proximaRecuperacao) {
+        proximaRecuperacao = Date.now() + INTERVALO_DA_RECUPERACAO_MS;
+        try {
+          await recuperarMidias(contextoDaEntrada);
+        } catch (erro) {
+          logger.warn('a recuperação de mídias falhou', {
+            erro: erro instanceof Error ? erro.message : String(erro),
+          });
+        }
+      }
       if (parando) break;
 
       // 2 · O que a tela aprovou e ainda não estava na fila.
