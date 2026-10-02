@@ -6258,3 +6258,31 @@ Vitest 1.161 no site (8 novos nesta rodada), lint, typecheck e build.
 presencial e uma ligação na Jôsy Buffet; a Potiban passou para o embaixador de
 teste; duas visitas na Goettems; um envio que falhou e um registro do sistema na
 DJ Done; e tarefas avulsas na Abracadabra.
+
+### 02/10/2026 — A ficha do parceiro e os "Próximos dias" foram para a `main`
+
+Pedido do Janio, depois de testar no localhost: "do jeito que está no localhost,
+tudo que eu testei, pode subir para a main".
+
+As quatro entradas de 02/10/2026 acima (ficha do parceiro, entregas 1 e 2;
+"Próximos dias" do Meu dia; verificação e correções) estão na `main` desde
+02/10/2026, por volta das 17:00. Onde elas dizem "na branch local, fora de
+produção", leia-se: **na `main`, ainda fora de produção**. O site só muda com o
+deploy pela Vercel, que é manual e não foi feito.
+
+Só o site (`apps/web`) e `docs/`. Nenhuma migração, nada em `supabase/`,
+`apps/workers/` nem `packages/`: o banco de produção e o caminho do WhatsApp não
+mudam com este envio.
+
+**Foi como estava no localhost, inclusive o cartão "Leitura da IA".** Ele lê o
+que o módulo de IA grava. Enquanto `ia.crm_inteligente.modulos.ficha` estiver
+desligado em produção, toda ficha mostra o cartão com a frase "A leitura da IA
+está desligada"; se estiver ligado, mostra as leituras reais. As três leituras
+de exemplo do localhost foram escritas à mão no banco de teste e não existem em
+produção.
+
+**Decisões que continuam em aberto** (nenhuma impede o envio para a `main`):
+manter, trocar por regras ou tirar o cartão da leitura da IA; o aval do Rafael
+para a tela nova; o cartão de aviso que cobre os botões do canto superior
+direito; visita contar como "próximo compromisso" no cabeçalho; mensagem
+automática contar como "último contato".
