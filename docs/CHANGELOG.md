@@ -6353,4 +6353,8 @@ ela) e 8 com uma de cliente.
   rascunho aprovado pela fila "Aprovar", sem abrir a conversa, só zera o número
   na próxima vez que alguém abrir a conversa.
 
-**Na branch local `nova-ate-responder`, fora da `main` e de produção.**
+**Publicado em 05/10/2026**, a pedido do Janio ("Pode publicar!"), depois de
+testar no localhost ("Deu certo! A intenção era justamente essa, somente quando
+uma pessoa responder o cliente ou parceiro sumir a notificação de mensagem
+nova"). Foi direto para a `main`, sem PR, como na publicação de 02/10. Para
+voltar atrás, o deploy anterior é o `triade-pc7pxjsem` (02/10, 17:04).
