@@ -6302,3 +6302,55 @@ produção.
 da leitura da IA; o aval do Rafael para a tela nova; o cartão de aviso que cobre
 os botões do canto superior direito; visita contar como "próximo compromisso" no
 cabeçalho; mensagem automática contar como "último contato".
+
+### 05/10/2026 — Conversas: a marca "Nova" só sai quando alguém do time responde
+
+Pedido do Janio, com o print da aba Todas: "se eu clicar na conversa somente
+para ler o que foi falado, a notificação e a identidade visual já somem, o que
+não é o ideal. O correto seria sair somente quando alguém mandasse um 'Bom dia'
+ou alguma mensagem, feito isso essa mensagem iria para a aba de conversas daquele
+operador que respondeu".
+
+**O que mudou.**
+- A marca "Nova" (selo e faixa em menta), o número ao lado de Conversas e o
+  "por ler" (o número branco da linha) **não saem mais ao abrir** a conversa.
+  Saem quando sai uma resposta do time nela: texto ou áudio de alguém, ou
+  rascunho da IA aprovado por alguém. Resposta automática, modelo e envio que
+  falhou não contam.
+- Com a resposta, a marca some para todos os avisados, e a conversa passa a ser
+  de quem respondeu e vai para as "Minhas" dessa pessoa. Isso já era feito pelo
+  banco (`app.messages_quem_responde_atende`); nada mudou ali.
+- Mensagem nova depois da resposta traz a marca de volta, só para quem atende
+  (parceiro) ou para todos os operadores (cliente), como antes.
+- O cartão "Nova mensagem" continua sumindo ao abrir a conversa: ele é aviso de
+  chegada, e a pessoa já está olhando.
+- O "por ler" do cliente (aba Clientes) nunca zerava; agora zera com a resposta.
+
+**Como.** Só o site. `avisos/regra.ts` ganhou `semResposta`, e a leitura do
+aviso passou a trazer quando foi a última resposta do time (a mesma consulta, a
+mesma mensagem embutida, agora ordenada). O registro do que foi "aberto" no
+navegador (`komune.avisos.abertas.v1`) deixou de existir. O "por ler" é zerado
+pela tela da conversa ao ver a resposta (`conversas/por-ler.ts`), com a mesma
+escrita de antes (`marcarComoLida`), só em outro momento. O teto da leitura subiu
+de 50 para 200 conversas, porque a marca agora dura até a resposta; leitura
+cheia não move o piso, para não engolir quem espera.
+
+**WhatsApp.** Nada em `supabase/`, `apps/workers/` nem `packages/`. Nenhum
+envio, modelo, confirmação de leitura ou chamada à Meta a mais. Sem migração.
+
+**Verificado.** Lint, typecheck e testes (site 1170, com 11 testes novos e 4
+reescritos). No navegador, com Supabase local, gestor e SDR ao mesmo tempo: 14
+conferências com uma conversa de parceiro (abrir para ler mantém marca, número
+e "por ler", inclusive depois de recarregar; a resposta da SDR tira tudo dos
+dois, zera o "por ler" e passa a conversa para ela; mensagem nova volta só para
+ela) e 8 com uma de cliente.
+
+**Limites.**
+- Quem já tinha aberto uma conversa sem responder, antes desta versão, pode não
+  vê-la marcada de novo: o marco do navegador já tinha passado dela. O "por ler"
+  dessas conversas continua aparecendo.
+- O "por ler" zera quando a resposta aparece numa tela com a conversa aberta. Um
+  rascunho aprovado pela fila "Aprovar", sem abrir a conversa, só zera o número
+  na próxima vez que alguém abrir a conversa.
+
+**Na branch local `nova-ate-responder`, fora da `main` e de produção.**

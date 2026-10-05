@@ -46,6 +46,7 @@ import {
   type FioCru,
 } from './mensagens';
 import type { CatalogosConversas } from './montagem';
+import { useZerarPorLerAoResponder } from './por-ler';
 import { TextoLivre } from './responder';
 import { previaDoDigitado, useTextosDigitados } from './texto-digitado';
 
@@ -81,7 +82,7 @@ export function ListaForaDaBase({
   selecionadoId: string | null;
   aoEscolher: (id: string) => void;
 }) {
-  // As conversas que esta pessoa ainda não abriu: a mesma marca da lista de
+  // As conversas com mensagem ainda sem resposta: a mesma marca da lista de
   // Conversas, e o mesmo número do menu (`components/avisos`).
   const novas = useConversasNovas();
   // O que a pessoa digitou e não enviou: "Rascunho:" na linha, como na lista de
@@ -183,6 +184,8 @@ export function ConversaForaDaBase({
     queryKey: chaveDasMensagensDoFio(fio.id),
     queryFn: () => carregarMensagensDoFio(fio.id),
   });
+  // O "por ler" do cliente zera quando alguém do time responde (`por-ler.ts`).
+  useZerarPorLerAoResponder(fio.id, fio.unread_count, mensagens.data);
   const [virando, setVirando] = useState(false);
   const [modo, setModo] = useState<'criar' | 'ligar'>('criar');
   const janela = estadoDaJanela(fio.window_expires_at);

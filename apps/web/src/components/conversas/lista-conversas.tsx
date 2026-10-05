@@ -38,8 +38,9 @@ import { ROTULO_CANAL, type ItemConversa } from './tipos';
  * cliente atrás de outra aba. A linha dele é a mesma gramática, com menos coisa:
  * nome do WhatsApp, por ler, o dia, e "cliente" onde o parceiro tem a etapa.
  *
- * A MARCA "NOVA" (02/10/2026): a conversa com mensagem que ESTA pessoa ainda não
- * abriu leva a faixa e o selo em menta, e perde os dois quando ela abre. Quem
+ * A MARCA "NOVA" (02/10/2026): a conversa com mensagem que ninguém do time
+ * respondeu leva a faixa e o selo em menta, e perde os dois quando sai a
+ * resposta — abrir só para ler não tira (05/10/2026). Quem
  * sabe quais são é a casca (`components/avisos`), a mesma que põe o número ao
  * lado de Conversas — por isso os dois andam juntos: cinco marcadas, número 5.
  *
@@ -135,7 +136,7 @@ function LinhaDeCliente({
 }: {
   fio: FioCru;
   selecionado: boolean;
-  /** Tem mensagem que esta pessoa ainda não abriu. */
+  /** Tem mensagem para esta pessoa que ninguém do time respondeu ainda. */
   nova: boolean;
   /** O começo do que a pessoa digitou aqui e não enviou. */
   rascunho: string | null;
@@ -228,7 +229,7 @@ function Linha({
 }: {
   item: ItemConversa;
   selecionado: boolean;
-  /** Tem mensagem que esta pessoa ainda não abriu. */
+  /** Tem mensagem para esta pessoa que ninguém do time respondeu ainda. */
   nova: boolean;
   /** O começo do que a pessoa digitou aqui e não enviou. */
   rascunho: string | null;

@@ -264,17 +264,14 @@ export function TelaConversas({
   // aberta, para o cartão não anunciar o que a pessoa está lendo, e como abrir
   // outra sem navegar, porque o estado daqui mora no cliente.
   //
-  // E conta se foi a PESSOA quem abriu (02/10/2026): só aí a conversa deixa de
-  // ser nova e sai do número do menu. A que o desktop abre sozinho, por ser a
-  // primeira da lista, continua marcada — é a mesma régua do "por ler"
-  // (`escolhaExplicita`, mais abaixo).
+  // Abrir NÃO tira a marca "Nova" nem o número do menu (05/10/2026): só a
+  // resposta de alguém do time tira. Ver `semResposta`, em `avisos/regra.ts`.
   const { olharConversa, registrarAbridor } = useAcoesDosAvisos();
   const conversaAbertaId = foraAberta?.id ?? aberta?.fio?.id ?? null;
-  const abertaPorEscolha = foraAberta ? clienteEscolhido !== null : escolhidoId !== null;
   useEffect(() => {
-    olharConversa(conversaAbertaId, abertaPorEscolha);
+    olharConversa(conversaAbertaId);
     return () => olharConversa(null);
-  }, [conversaAbertaId, abertaPorEscolha, olharConversa]);
+  }, [conversaAbertaId, olharConversa]);
   useEffect(() => {
     registrarAbridor(({ conversaId, organizacaoId }) => {
       setAba('conversas');
@@ -584,7 +581,6 @@ export function TelaConversas({
                 setores={consulta.data?.setores ?? []}
                 meta={meta}
                 aoVoltar={voltar}
-                escolhaExplicita={escolhidoId !== null}
               />
             ) : (
               <NenhumaEscolhida meta={meta} />
