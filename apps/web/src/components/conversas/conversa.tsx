@@ -28,7 +28,6 @@ import { AssumirConversa, useEu } from './assumir-conversa';
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
 import { EtiquetasDoParceiro } from './etiquetas-do-parceiro';
 import { AvisoWhatsapp } from './aviso-whatsapp';
-import { CartaoDeAprovacao } from './aprovacao';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { ErroDaTela, EsqueletoLinha } from './estados';
 import { contagemDeInteracoes, local } from './formatos';
@@ -36,7 +35,7 @@ import { FaixaDaJanela, Janela24h, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { LinhaDoTempo } from './linha-do-tempo';
-import { JANELA_APERTADA_MIN, montarFio, montarRascunho, ordenarFila } from './mensagens';
+import { JANELA_APERTADA_MIN, montarFio } from './mensagens';
 import {
   agruparPorDia,
   escolherNegocio,
@@ -64,8 +63,9 @@ import {
  *    ficha) e a próxima ação combinada.
  * 2. **A conversa**, que rola — mensagens, ligações, visitas e mudanças de etapa
  *    na MESMA coluna cronológica.
- * 3. **O rodapé, que não rola** — o relógio da janela de 24 h e, embaixo dele, o
- *    rascunho esperando aprovação OU a caixa de resposta.
+ * 3. **O rodapé, que não rola** — o relógio da janela de 24 h e a caixa de
+ *    resposta. O rascunho da IA saiu daqui em 06/10/2026 ("a IA não vai me dizer
+ *    o que escreve"): quem escreve é quem atende.
  *
  * O rodapé é fixo de propósito. O relógio da janela decide o que pode sair, e
  * uma informação que decide não pode depender de a pessoa ter rolado até o fim:
@@ -121,12 +121,6 @@ export function Conversa({
     return escolhido ? montarFio(escolhido, nomeDaPessoa) : item.fio;
   }, [consulta.data, item.fio, nomeDaPessoa]);
 
-  const rascunho = useMemo(() => {
-    const crus = (consulta.data?.rascunhos ?? []).filter((r) => r.status === 'pendente');
-    if (crus.length === 0) return item.rascunhoPendente;
-    return ordenarFila(crus.map(montarRascunho))[0] ?? null;
-  }, [consulta.data, item.rascunhoPendente]);
-
   const janela = useJanela(fio?.janelaExpiraEm ?? null);
 
   const dias = useMemo(() => {
@@ -157,14 +151,9 @@ export function Conversa({
   //
   // No fim, onde está a mensagem de agora: a coluna é cronológica ascendente, e
   // abrir no topo faria rolar cinco meses de histórico toda vez que alguém
-  // escrevesse. Com um rascunho esperando, abre no COMEÇO DO RASCUNHO — porque
-  // aí o que a pessoa precisa ler primeiro é o que a IA entendeu e o que o
-  // validador disse, não os três botões no pé do cartão. Em 390 px a diferença
-  // é entre ver a decisão e ver só o "Aprovar".
+  // escrevesse.
   const rolagem = useRef<HTMLDivElement>(null);
-  const alvoDoRascunho = useRef<HTMLDivElement>(null);
   const quantosEventos = dias.reduce((soma, dia) => soma + dia.eventos.length, 0);
-  const rascunhoId = rascunho?.id ?? null;
 
   // QUEM ESTÁ LENDO O HISTÓRICO NÃO É PUXADO PARA O FIM.
   //
@@ -191,15 +180,10 @@ export function Conversa({
     conversaAnterior.current = item.id;
     if (trocouDeConversa) coladoNoFim.current = true;
 
-    const cartao = alvoDoRascunho.current;
-    if (cartao) {
-      caixa.scrollTop = Math.max(0, cartao.offsetTop - caixa.offsetTop - 12);
-      return;
-    }
     if (quantosEventos > 0 && (trocouDeConversa || coladoNoFim.current)) {
       caixa.scrollTop = caixa.scrollHeight;
     }
-  }, [item.id, quantosEventos, rascunhoId]);
+  }, [item.id, quantosEventos]);
 
   const negocio = consulta.data ? escolherNegocio(consulta.data.negocios) : null;
   const proxima = formatarProximaAcao(negocio?.next_action_at);
@@ -431,24 +415,6 @@ export function Conversa({
             <LinhaDoTempo dias={dias} nomeDoParceiro={item.nome} />
           </div>
         )}
-
-        {/* O rascunho fica no FIM DA CONVERSA, não num painel fixo embaixo.
-            Duas razões, e a segunda só apareceu depois de medir: (1) é onde ele
-            está de verdade — a IA escreveu isto em resposta à mensagem logo
-            acima, e lê-lo colado nela é o que deixa julgar se a resposta serve;
-            (2) preso no rodapé, o cartão comia metade do painel e a conversa —
-            a razão da tela — ficava com duzentos pixels. Como a conversa abre
-            no fim, o cartão aparece sem ninguém rolar. */}
-        {rascunho ? (
-          <div ref={alvoDoRascunho}>
-            <CartaoDeAprovacao
-              rascunho={rascunho}
-              fio={fio}
-              organizacaoId={item.id}
-              className="mx-auto mt-4 max-w-4xl"
-            />
-          </div>
-        ) : null}
       </div>
 
       {/* O rodapé não rola com a conversa: o relógio decide o que pode sair, e
@@ -482,7 +448,6 @@ export function Conversa({
             janela={janela}
             organizacaoId={item.id}
             naoContatar={item.naoContatar}
-            recolhida={rascunho !== null}
           />
         </div>
       </div>

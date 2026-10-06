@@ -502,7 +502,7 @@ export function destinoDoItem(
   // destino SEM ficha — quem escreveu de fora da base não tem para onde mais ir.
   if (item.tipo === 'conversa_esperando') {
     return item.organizacaoId
-      ? { href: `/conversas?aba=responderam&org=${item.organizacaoId}`, onde: 'a conversa' }
+      ? { href: `/conversas?org=${item.organizacaoId}`, onde: 'a conversa' }
       : { href: '/conversas?aba=fora', onde: 'quem escreveu de fora da base' };
   }
 

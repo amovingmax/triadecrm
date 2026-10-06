@@ -445,13 +445,13 @@ describe('para onde o aviso leva', () => {
     ).toBe('/conversas?aba=fora');
   });
 
-  it('várias misturadas abrem a aba Responderam', () => {
+  it('várias misturadas abrem a lista de Conversas', () => {
     expect(
       destinoDoAviso([
         conversa({ conversaId: 'a', organizacaoId: 'org-1' }),
         conversa({ conversaId: 'b', organizacaoId: null }),
       ]),
-    ).toBe('/conversas?aba=responderam');
+    ).toBe('/conversas');
   });
 });
 

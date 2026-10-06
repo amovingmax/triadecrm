@@ -404,7 +404,7 @@ export function destinoDoAviso(
       : `/conversas?cliente=${primeira.conversaId}`;
   }
   if (novas.every((c) => c.organizacaoId === null)) return '/conversas?aba=fora';
-  return '/conversas?aba=responderam';
+  return '/conversas';
 }
 
 /**
