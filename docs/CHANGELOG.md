@@ -6522,3 +6522,28 @@ delas precisa continuar em Conversas, Agenda e Funis tem de virar gestor antes**
    junto.
 4. Revisão com os dois botões de aprovar, e a troca de nome de "Parceiros".
 5. Atualizar o PRD: o pivô muda decisões fechadas (cinco papéis, cadências no MVP).
+
+### 06/10/2026 — O pivô (partes 1 e 2) e o "por ler ao abrir" no ar
+
+**Em produção desde 06/10/2026, 16:34:** migração `20261006120000` aplicada
+(`public.ligacoes_do_dia`) e site publicado na Vercel com `--force`, a partir da
+branch `pivo-do-crm` (commit `4dec2e6`), nesta ordem. Conferido em produção, só
+lendo: a função responde com os dados reais (no dia, duas pessoas tinham ligado).
+
+Subiu junto, feito na hora de publicar: **conversa que está no nome de quem só
+liga avisa a gestão inteira.** Em produção havia 11 conversas atendidas por um
+SDR; como o SDR deixou de ser avisado e continuava contando como "responsável
+ativo", a resposta do parceiro nessas conversas não avisaria ninguém
+(`lerPessoasAtivas` passa a trazer só quem atende; RF-CON-04).
+
+**Atenção de quem opera:**
+- Os três SDRs de produção passaram a ver só Ligar e Meu dia. Quem precisa de
+  Conversas, Funis e Agenda tem de virar gestor (Ajustes → Pessoas, só admin
+  troca) e **sair e entrar de novo** para o papel novo valer.
+- **A `main` não tem o pivô.** O site no ar saiu da branch `pivo-do-crm`; um
+  deploy feito a partir da `main` tira o pivô do ar. Juntar na `main` é decisão
+  pendente.
+
+**Não subiu porque ainda não está feito:** lote imposto pela gestão, trava no
+banco para o SDR, apagar Campanhas e Cadências (o bom-dia automático segue
+disparando) e os dois botões de aprovar na Revisão.
