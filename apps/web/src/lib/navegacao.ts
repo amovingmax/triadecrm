@@ -15,8 +15,8 @@
  * (Isso valeu até o PIVÔ DE 06/10/2026, que apagou de verdade: Campanhas e
  * Cadências deixaram de existir no produto, e Registrar saiu do menu — a tela
  * continua, e chega-se a ela pelo botão "Registrar contato" da conversa, da
- * ligação e da ficha. No mesmo dia os papéis viraram três, e o SDR passou a ver
- * só o que é do trabalho dele: Meu dia, Conversas, Ligar, Agenda, Funis e Metas.)
+ * ligação e da ficha. No mesmo dia os papéis viraram três, e o SDR virou QUEM
+ * LIGA — gente contratada por diária —, com duas telas: Ligar e Meu dia.)
  *
  * O critério do grupo é a NATUREZA DO TRABALHO, que é literalmente o que ele
  * pediu para distinguir:
@@ -211,9 +211,9 @@ const PAPEIS_DO_CRM: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
  * Admin e gestor: quem cuida da BASE — a lista de parceiros, a fila de Revisão,
  * a importação, os relatórios e os ajustes.
  *
- * O SDR ficou de fora de tudo isso no pivô: o trabalho dele é ligar e conversar
- * com quem já é dele. Ele continua abrindo a FICHA de um parceiro (`/parceiros/[id]`)
- * a partir da conversa, do funil ou do Meu dia; o que saiu foi a lista.
+ * O SDR ficou de fora de tudo isso no pivô, e também de Conversas, Agenda,
+ * Funis e Metas: ele é quem liga. O lote chega pronto, montado pela gestão, e o
+ * dia dele se confere em Meu dia (`components/ligacoes-do-dia`).
  */
 const PAPEIS_QUE_GERENCIAM: readonly AppRole[] = ['admin', 'gestor'];
 
@@ -258,6 +258,8 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     descricao:
       'O histórico de cada parceiro, a fila de aprovação dos rascunhos da IA e o relógio da janela de 24 h do WhatsApp.',
     posicaoNaBarra: 5,
+    // O WhatsApp é da gestão: quem liga não responde mensagem.
+    papeis: PAPEIS_QUE_GERENCIAM,
     // Resposta nova para esta pessoa: alguém escreveu e espera por ela. Até
     // 01/10/2026 o número aqui era o de rascunhos da IA pendentes; eles continuam
     // na aba "Aprovar", dentro da tela. Somar os dois misturaria "chegou
@@ -271,6 +273,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'todo_dia',
     descricao:
       'Reuniões em vídeo pela manhã, rota de visitas à tarde com link do Google Maps e lembretes.',
+    papeis: PAPEIS_QUE_GERENCIAM,
   },
 
   {
@@ -303,7 +306,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     descricao:
       'Base de organizações e pessoas com busca global, filtros, criação rápida com dedup por telefone e o botão de trazer uma lista para a base (importar planilha ou CSV).',
     posicaoNaBarra: 3,
-    // A LISTA é de quem cuida da base. O SDR chega à ficha pela conversa.
+    // A lista é de quem cuida da base.
     papeis: PAPEIS_QUE_GERENCIAM,
   },
   {
@@ -315,6 +318,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     descricao:
       'Kanban dos funis de captação e de produtores, cartão com semáforo, próxima ação obrigatória e motivos de perda.',
     posicaoNaBarra: 4,
+    papeis: PAPEIS_QUE_GERENCIAM,
   },
   // -------------------------------------------------------------------------
   // Controle
@@ -326,6 +330,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'controle',
     descricao:
       'Meta e realizado por pessoa e por período, o quanto falta e a que ritmo, com as métricas que ainda não são medíveis marcadas como tal.',
+    papeis: PAPEIS_QUE_GERENCIAM,
   },
   {
     href: '/relatorios',
@@ -434,9 +439,8 @@ export function navegacaoPara(papel: AppRole): ItemNavegacao[] {
  * Os itens de um papel, já repartidos nos três grupos e na ordem da tela.
  *
  * Grupo que ficaria vazio para um papel não é devolvido: um cabeçalho "A base"
- * sozinho, sem item embaixo, é pior do que a ausência do grupo. O SDR chega
- * perto: perde Parceiros (sobra Funis em "A base") e fica só com Metas em
- * "Controle".
+ * sozinho, sem item embaixo, é pior do que a ausência do grupo. É o caso do
+ * SDR, que só tem "Todo dia" (Meu dia e Ligar).
  */
 export function navegacaoAgrupada(
   papel: AppRole,

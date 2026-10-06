@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { requireSession } from '@/lib/auth/session';
+import { requireRole } from '@/lib/auth/session';
 import { ProvedorConsultas } from '@/components/consultas/provedor-consultas';
 import { TelaFunis } from '@/components/funis/acoes/tela-funis';
 import { lerFiltrosDoQuadro } from '@/components/funis/acoes/url-dos-funis';
@@ -24,7 +24,8 @@ export default async function Pagina({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [, params] = await Promise.all([requireSession(), searchParams]);
+  // Tela da gestão desde o pivô de 06/10/2026: quem liga vê só Ligar e Meu dia.
+  const [, params] = await Promise.all([requireRole('admin', 'gestor'), searchParams]);
 
   return (
     <ProvedorConsultas>

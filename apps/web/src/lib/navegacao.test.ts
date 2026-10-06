@@ -36,13 +36,10 @@ describe('NAVEGACAO', () => {
     ]);
   });
 
-  it('o SDR fica com quatro fatias: a lista de Parceiros não é dele', () => {
-    expect(barraDoCelular('sdr').fatias.map((item) => item.rotulo)).toEqual([
-      'Meu dia',
-      'Ligar',
-      'Funis',
-      'Conversas',
-    ]);
+  it('quem liga fica com duas fatias, e nada em "Mais"', () => {
+    const barra = barraDoCelular('sdr');
+    expect(barra.fatias.map((item) => item.rotulo)).toEqual(['Meu dia', 'Ligar']);
+    expect(barra.emMais).toEqual([]);
   });
 
   it('Campanhas e Cadências deixaram de existir, e Registrar saiu do menu (pivô de 06/10/2026)', () => {
@@ -160,15 +157,8 @@ describe('navegacaoPara', () => {
     expect(rotulos('leitura')).not.toContain('Ajustes');
   });
 
-  it('o SDR vê o que é do trabalho dele, e nada da gestão da base (pivô de 06/10/2026)', () => {
-    expect(navegacaoPara('sdr').map((item) => item.rotulo)).toEqual([
-      'Meu dia',
-      'Ligar',
-      'Conversas',
-      'Agenda',
-      'Funis',
-      'Metas',
-    ]);
+  it('quem liga vê duas telas: Meu dia e Ligar (pivô de 06/10/2026)', () => {
+    expect(navegacaoPara('sdr').map((item) => item.rotulo)).toEqual(['Meu dia', 'Ligar']);
   });
 
   it('admin e gestor veem tudo o que sobrou', () => {
@@ -219,16 +209,25 @@ describe('navegacaoAgrupada', () => {
     }
   });
 
-  it('nunca oferece ao SDR um item que a rota ejetaria', () => {
-    // O SDR é quem mais perde: sem a lista de Parceiros, sem Revisão, sem
-    // Relatórios e sem Ajustes — as quatro rotas têm `requireRole` de admin e
-    // gestor. Ainda assim sobra item para ele nos três grupos.
+  it('nunca oferece a quem liga um item que a rota ejetaria', () => {
+    // Tudo o que é da gestão tem `requireRole` de admin e gestor no servidor:
+    // Conversas, Agenda, Funis, Metas, a lista de Parceiros, Revisão, Relatórios
+    // e Ajustes. Sobra um grupo só, e os outros dois nem aparecem.
     const sdr = navegacaoAgrupada('sdr');
     const rotulos = sdr.flatMap((b) => b.itens.map((i) => i.rotulo));
-    for (const fechado of ['Parceiros', 'Revisão', 'Relatórios', 'Ajustes']) {
+    for (const fechado of [
+      'Conversas',
+      'Agenda',
+      'Funis',
+      'Metas',
+      'Parceiros',
+      'Revisão',
+      'Relatórios',
+      'Ajustes',
+    ]) {
       expect(rotulos).not.toContain(fechado);
     }
-    expect(sdr.map((b) => b.grupo.chave)).toEqual(['todo_dia', 'a_base', 'controle']);
+    expect(sdr.map((b) => b.grupo.chave)).toEqual(['todo_dia']);
   });
 });
 
@@ -296,12 +295,7 @@ describe('navegacaoDaLateral (Fase 1)', () => {
 
   it('quem não vê um principal fica com menos à vista, e o "Mais" não ganha nada', () => {
     const sdr = navegacaoDaLateral('sdr');
-    expect(sdr.principais.map((i) => i.href)).toEqual([
-      '/meu-dia',
-      '/conversas',
-      '/ligar',
-      '/funis',
-    ]);
-    expect(sdr.mais.map((i) => i.href)).toEqual(['/agenda', '/metas']);
+    expect(sdr.principais.map((i) => i.href)).toEqual(['/meu-dia', '/ligar']);
+    expect(sdr.mais).toEqual([]);
   });
 });

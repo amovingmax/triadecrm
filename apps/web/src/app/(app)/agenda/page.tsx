@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { requireSession } from '@/lib/auth/session';
+import { requireRole } from '@/lib/auth/session';
 import { podeMarcarCompromisso, veAgendaDaEquipe } from '@/lib/navegacao';
 import { carregarContextoDaAgenda } from '@/components/agenda/dados';
 import { TelaAgenda } from '@/components/agenda/tela-agenda';
@@ -29,7 +29,8 @@ export default async function Pagina({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [sessao, params] = await Promise.all([requireSession(), searchParams]);
+  // Tela da gestão desde o pivô de 06/10/2026: quem liga vê só Ligar e Meu dia.
+  const [sessao, params] = await Promise.all([requireRole('admin', 'gestor'), searchParams]);
   const comEquipe = veAgendaDaEquipe(sessao.papel);
   const contexto = await carregarContextoDaAgenda(comEquipe ? { equipeDe: sessao } : {});
 

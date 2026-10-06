@@ -55,6 +55,7 @@ export type Coluna<L> = {
 
 /** Os painéis da tela, na ordem da barra. */
 export type ChavePainel =
+  | 'ligacoes'
   | 'atendimento'
   | 'semana'
   | 'funil'
@@ -74,6 +75,15 @@ export type DefinicaoPainel = {
 };
 
 export const PAINEIS: readonly DefinicaoPainel[] = [
+  {
+    // O primeiro, e o que abre: desde o pivô de 06/10/2026 a pergunta de todo
+    // dia é "o que cada pessoa que ligou fez hoje?".
+    chave: 'ligacoes',
+    rotulo: 'Ligações do dia',
+    titulo: 'O dia de quem ligou',
+    descricao:
+      'Quem ligou no dia e o que cada pessoa fez: ligações, quantas atenderam, tempo falado, reuniões marcadas e a lista ligação a ligação.',
+  },
   {
     chave: 'atendimento',
     rotulo: 'Atendimento',
@@ -137,7 +147,7 @@ export const PAINEIS: readonly DefinicaoPainel[] = [
 export function painelDaUrl(valor: string | string[] | undefined): ChavePainel {
   const bruto = Array.isArray(valor) ? valor[0] : valor;
   const achado = PAINEIS.find((p) => p.chave === bruto);
-  return achado?.chave ?? 'atendimento';
+  return achado?.chave ?? 'ligacoes';
 }
 
 /**
@@ -146,5 +156,6 @@ export function painelDaUrl(valor: string | string[] | undefined): ChavePainel {
  * controle que não muda nada na tela.
  */
 export function painelUsaPeriodo(chave: ChavePainel): boolean {
-  return chave !== 'semana';
+  // "Ligações do dia" é recortado por UM dia, com passo próprio, pela mesma razão.
+  return chave !== 'semana' && chave !== 'ligacoes';
 }

@@ -85,67 +85,73 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
           />
         ))}
 
-        <Sheet open={aberto} onOpenChange={setAberto}>
-          <SheetTrigger
-            className={cn(
-              'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-4 transition-colors',
-              algumSecundarioAtivo
-                ? 'font-medium text-foreground'
-                : 'text-sidebar-muted-foreground',
-            )}
-            aria-label="Mais áreas do CRM"
-          >
-            {/* A mesma pílula menta dos outros itens (ver `nav-link.tsx`). */}
-            <span
-              aria-hidden="true"
+        {/* Sem nada para guardar, não há "Mais": quem liga tem duas telas, e um
+            botão que abre uma folha vazia é uma porta para lugar nenhum. */}
+        {secundarios.length === 0 ? null : (
+          <Sheet open={aberto} onOpenChange={setAberto}>
+            <SheetTrigger
               className={cn(
-                'flex h-7 w-12 items-center justify-center rounded-full transition-colors',
-                algumSecundarioAtivo && 'bg-menta text-menta-tinta',
+                'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-4 transition-colors',
+                algumSecundarioAtivo
+                  ? 'font-medium text-foreground'
+                  : 'text-sidebar-muted-foreground',
               )}
+              aria-label="Mais áreas do CRM"
             >
-              <Ellipsis className={cn('size-5', algumSecundarioAtivo && 'stroke-[2.25]')} />
-            </span>
-            <span>Mais</span>
-          </SheetTrigger>
+              {/* A mesma pílula menta dos outros itens (ver `nav-link.tsx`). */}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'flex h-7 w-12 items-center justify-center rounded-full transition-colors',
+                  algumSecundarioAtivo && 'bg-menta text-menta-tinta',
+                )}
+              >
+                <Ellipsis className={cn('size-5', algumSecundarioAtivo && 'stroke-[2.25]')} />
+              </span>
+              <span>Mais</span>
+            </SheetTrigger>
 
-          {/* Teto de 80svh com rolagem própria: a folha é `h-auto` e cresce com o
+            {/* Teto de 80svh com rolagem própria: a folha é `h-auto` e cresce com o
               conteúdo. Desde que cada linha passou a trazer a descrição do módulo,
               oito módulos secundários passam de 500px, e num aparelho de 667px de
               altura a folha sairia pelo topo levando junto os últimos itens. `svh`
               e não `vh` porque a barra do navegador do celular entra na conta. */}
-          <SheetContent
-            side="bottom"
-            className="max-h-[80svh] gap-3 overflow-y-auto rounded-t-xl pb-[calc(var(--area-segura-inferior)+0.75rem)]"
-          >
-            <SheetHeader className="pb-1">
-              <SheetTitle>Mais áreas</SheetTitle>
-              <SheetDescription>Os módulos que não cabem na barra.</SheetDescription>
-            </SheetHeader>
-            <div className="flex flex-col gap-4 px-2">
-              {gruposDaFolha.map(({ grupo, itens: doGrupo }) => (
-                <section key={grupo.chave} aria-labelledby={`folha-${grupo.chave}`}>
-                  <div className="px-3 pb-2">
-                    <h3 id={`folha-${grupo.chave}`} className="text-sm font-medium">
-                      {grupo.titulo}
-                    </h3>
-                    <p className="text-xs leading-snug text-muted-foreground">{grupo.explicacao}</p>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    {doGrupo.map((item) => (
-                      <NavLink
-                        key={item.href}
-                        item={item}
-                        variante="menu"
-                        contagem={contagemDoItem(item, filas, respostasNovas)}
-                        onNavegar={() => setAberto(false)}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </SheetContent>
-        </Sheet>
+            <SheetContent
+              side="bottom"
+              className="max-h-[80svh] gap-3 overflow-y-auto rounded-t-xl pb-[calc(var(--area-segura-inferior)+0.75rem)]"
+            >
+              <SheetHeader className="pb-1">
+                <SheetTitle>Mais áreas</SheetTitle>
+                <SheetDescription>Os módulos que não cabem na barra.</SheetDescription>
+              </SheetHeader>
+              <div className="flex flex-col gap-4 px-2">
+                {gruposDaFolha.map(({ grupo, itens: doGrupo }) => (
+                  <section key={grupo.chave} aria-labelledby={`folha-${grupo.chave}`}>
+                    <div className="px-3 pb-2">
+                      <h3 id={`folha-${grupo.chave}`} className="text-sm font-medium">
+                        {grupo.titulo}
+                      </h3>
+                      <p className="text-xs leading-snug text-muted-foreground">
+                        {grupo.explicacao}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {doGrupo.map((item) => (
+                        <NavLink
+                          key={item.href}
+                          item={item}
+                          variante="menu"
+                          contagem={contagemDoItem(item, filas, respostasNovas)}
+                          onNavegar={() => setAberto(false)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
     </nav>
   );

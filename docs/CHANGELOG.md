@@ -6465,3 +6465,60 @@ chamar a função direto passa. A trava de verdade (RLS e funções) é a parte 
 nova chega a um SDR que só vê o que é dele; quem vira dono do lead aprovado; de
 onde sai a lista de ligação; o que é exatamente a "mensagem automática" do botão
 de aprovar; e até onde vai a troca de nome de "Parceiros" para "Prospectado".
+
+### 06/10/2026 — Pivô do CRM, parte 2: o dia de quem ligou (RF-MET-01, RF-REL-01)
+
+A proposta do CRM ficou curta, nas palavras de quem decidiu: somos cinco, não dá
+para correr atrás de fornecedor um a um; a gestão enche a base de contatos,
+gente contratada por diária liga, e a gestão precisa de "um relatório exato e
+bem usual sobre tudo que ocorreu para cada pessoa que ligou nesse dia". Quem liga
+vê o próprio dia, "mais clean e menos poluído". O lote de ligação é montado e
+imposto pela gestão, que também pode ligar.
+
+Com isso o SDR passou a ser **quem liga**, e esta entrega muda a parte 1:
+
+- **Quem liga vê duas telas: Ligar e Meu dia.** Conversas, Agenda, Funis e Metas
+  passaram a ser da gestão (menu e guarda no servidor). O WhatsApp fica com admin
+  e gestor: o aviso de mensagem nova deixou de ir para o SDR.
+- **Meu dia de quem liga** (`components/ligacoes-do-dia`): quatro números
+  (ligações, quantas atenderam, tempo falado, reuniões marcadas), como cada
+  ligação terminou e a lista na ordem em que foram feitas, com hora, para quem,
+  duração e a anotação. Passo de dia para ver os anteriores, e o botão de
+  continuar ligando.
+- **Relatórios → "Ligações do dia"**, agora o primeiro painel e o que abre: uma
+  linha por pessoa que ligou no dia, com o resumo do time em cima. Tocar no nome
+  abre o dia dela embaixo — a MESMA peça que ela vê no próprio Meu dia. Os dois
+  níveis descem em CSV.
+- **Banco** (migração `20261006120000`): `public.ligacoes_do_dia(dia, pessoa)`,
+  uma função só para as duas telas. A gestão pergunta por qualquer pessoa (ou por
+  todas); quem liga só vê o próprio dia. Lê `call_attempts`, que é a linha que a
+  telefonia pelo navegador vai preencher — o relatório não muda quando ela
+  chegar, só a duração e o "atendeu" deixam de ser declarados. A ligação que
+  começou e não foi tabulada aparece como "sem resultado", e o que a pessoa
+  registrou fora da tela de Ligar aparece à parte.
+- No celular, o botão "Mais" some quando não há o que guardar nele.
+- Testes: pgTAP `100_o_dia_de_quem_ligou.sql` (27), `formatos.test.ts` do módulo
+  novo, e os testes do menu e dos avisos reescritos. Site: typecheck, lint e
+  1.193 testes. Banco: 94 arquivos pgTAP; passa tudo menos `74_a_reuniao.sql`
+  #18, que já falhava e não tem relação (compara uma data com o dia em que o
+  banco local foi criado).
+- Conferido no navegador contra o banco local: como quem liga (menu com dois
+  itens, o dia batendo com as ligações lançadas, as telas da gestão recusando) e
+  como gestor (o painel abrindo primeiro, a linha por pessoa e o dia de uma delas).
+
+**Antes de ir ao ar — importante:** em produção há três pessoas com o papel SDR.
+Quando esta branch for publicada, elas passam a ver só Ligar e Meu dia. **Quem
+delas precisa continuar em Conversas, Agenda e Funis tem de virar gestor antes**
+(Ajustes → Pessoas).
+
+**Pendente:**
+1. **Lote imposto:** hoje quem liga ainda monta o próprio lote. A gestão montar
+   e atribuir mexe no módulo de ligação, o mesmo da branch da telefonia; fica
+   para depois de aquela branch subir, para as duas não redefinirem a mesma função.
+2. **Trava no banco:** as guardas desta entrega são de tela. No banco o SDR ainda
+   lê a base inteira e ainda passa nas funções da Revisão.
+3. Apagar Campanhas, Cadências e o "Resumo do dia" (telas, funções, tabelas,
+   rotinas e dados). O bom-dia automático roda sobre as tabelas de campanha e sai
+   junto.
+4. Revisão com os dois botões de aprovar, e a troca de nome de "Parceiros".
+5. Atualizar o PRD: o pivô muda decisões fechadas (cinco papéis, cadências no MVP).
