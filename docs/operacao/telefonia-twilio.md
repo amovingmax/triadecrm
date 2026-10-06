@@ -44,18 +44,137 @@ CRM lê o estado em voice_calls; o resultado é dado na tela de ligar (tabular_c
 - **Sem gravação.** Nada grava voz. Ligar a gravação depende de decisão do Dennis (base legal,
   aviso, retenção, quem ouve).
 
+## Custos, número e limites da conta
+
+Preços da página de voz da Twilio para o Brasil, consultada em 06/10/2026. São em dólar e podem
+mudar; confira a página antes de decidir.
+
+### Quanto custa
+
+Não há taxa de adesão nem plano mensal: paga-se o aluguel do número e os minutos falados.
+
+| Item | Preço |
+| --- | --- |
+| Criar a conta | grátis |
+| Número local brasileiro | US$ 4,25 por mês |
+| Trecho do navegador até a Twilio ("Browser/app") | US$ 0,0040 por minuto |
+| Trecho da Twilio até um celular ("Mobile calls") | US$ 0,0663 por minuto |
+| Trecho da Twilio até um fixo ("Local calls") | US$ 0,0310 por minuto |
+
+Toda ligação do CRM paga **os dois trechos somados**, porque a voz sai do navegador pela internet
+e a Twilio completa a chamada pela rede telefônica:
+
+- para celular: **US$ 0,0703 por minuto** (0,0040 + 0,0663);
+- para fixo: **US$ 0,0350 por minuto** (0,0040 + 0,0310).
+
+A Twilio aplica o preço certo sozinha, pelo número discado. A tarifa por minuto é a mesma para
+qualquer volume. As linhas "To receive calls", "SIP interface" e "BYOC trunking" da tabela não se
+aplicam: o CRM só faz chamadas, pelo navegador.
+
+Exemplo, com premissas que podem ser trocadas (40 ligações por dia por operador, 22 dias úteis,
+40% atendidas, 3 minutos cada, todas para celular): cerca de 1.056 minutos, ou **US$ 74 por
+operador por mês**, mais os US$ 4,25 do número. Com cinco operadores, perto de US$ 375 por mês.
+A conta geral é: minutos falados no mês × 0,0703, mais 4,25.
+
+Fora da conta da Twilio: câmbio e IOF (a cobrança é em dólar, no cartão) e a recarga inicial da
+conta pré-paga, cujo valor mínimo não aparece na página de preços. Não é esperado custo novo de
+Supabase ou Vercel, mas isso não foi medido. Não foi confirmado na página que chamada não
+atendida fica sem cobrança, embora seja o usual.
+
+### Um número para todos
+
+O CRM usa **um único número de saída** (`TWILIO_PHONE_NUMBER`) para todos os operadores. O número
+não é uma linha: é a identificação que aparece para o parceiro. Cada ligação é independente
+dentro da Twilio, então vários operadores falam ao mesmo tempo com parceiros diferentes pelo
+mesmo número, sem misturar áudio.
+
+O que evita conflito, do lado do CRM:
+
+- cada operador recebe a própria credencial (`crm_<id do usuário>`);
+- cada ligação tem o próprio registro em `voice_calls`, e os avisos da Twilio chegam amarrados a ela;
+- a trava de uma ligação por vez é **por pessoa**, não por conta;
+- a reserva do módulo de ligação impede dois operadores de ligar para o mesmo parceiro;
+- histórico e metas ficam por pessoa.
+
+Um número por operador é possível (US$ 4,25 por mês cada) e pediria uma mudança pequena no CRM:
+guardar o número de cada pessoa e usá-lo ao discar. Vale considerar se o volume de retornos
+crescer ou se o número único começar a ser marcado como spam pelas operadoras.
+
+### Ligações simultâneas: o perfil de empresa
+
+A Twilio limita as chamadas simultâneas da conta conforme o cadastro:
+
+| Situação da conta | Chamadas simultâneas |
+| --- | --- |
+| Conta de teste | até 5 (com restrições de teste, como só ligar para números verificados) |
+| Conta paga sem perfil aprovado | até 2 |
+| Conta paga com perfil de pessoa física | até 3 |
+| Conta paga com perfil de empresa aprovado | sem limite |
+
+Para o time inteiro ligar ao mesmo tempo, a conta precisa do **perfil de empresa aprovado**
+(no painel, "Business Primary Customer Profile"). Ser empresa não basta: é preciso enviar o
+cadastro (CNPJ, endereço, responsável) e esperar a aprovação, que leva dias e não tem prazo
+garantido. São praticamente os mesmos documentos do número brasileiro; envie os dois juntos, no
+primeiro dia.
+
+Até a aprovação, valide com **uma pessoa só**. Não foi confirmado se cada ligação do CRM conta
+como uma ou como duas chamadas nesse limite (ela tem o trecho do navegador e o do telefone), e
+com limite de 2 isso pode significar uma pessoa por vez. Há também um limite de ritmo, de uma
+chamada nova por segundo por conta, que operadores clicando à mão não devem atingir.
+
+### Só fazemos chamadas
+
+O CRM não recebe ligações, e nada precisa ser contratado ou desligado para isso. A consequência é
+o retorno: o parceiro que ligar de volta ouve uma mensagem genérica de erro da Twilio, em inglês.
+
+Recomendado: configurar no painel da Twilio, no próprio número, uma mensagem curta em português
+("Você recebeu uma ligação da KOMUNE. Fale com a gente pelo WhatsApp."). Não mexe no CRM e custa
+US$ 0,01 por minuto de quem ligar. A alternativa é encaminhar o retorno para um telefone da
+KOMUNE.
+
+### Dois números na mesma plataforma
+
+O número de voz (Twilio) e o número do WhatsApp (Meta) são serviços separados e não interferem um
+no outro. O operador não escolhe número: mensagem sai pelo do WhatsApp, ligação sai pelo de voz, e
+a linha do tempo da ficha junta os dois. **A telefonia não altera nada do WhatsApp.**
+
+Para o parceiro, a KOMUNE passa a aparecer por dois números. Para reduzir a confusão: escolher um
+número de voz com DDD 84, avisar pelo WhatsApp antes de ligar quando houver conversa aberta, e
+configurar a mensagem de retorno acima.
+
+Em aberto: a Twilio permite ligar mostrando um número que não é dela, depois de uma chamada de
+verificação. Se isso valer para números brasileiros, o parceiro veria o próprio número do
+WhatsApp chamando e o número novo poderia nem ser necessário. Não foi confirmado, e nenhum teste
+deve ser feito com o número do WhatsApp sem o aval do Rafael.
+
+### A conferir antes de comprar o número
+
+- **Prefixo 0303 (Dennis).** A Anatel tem regra de que telemarketing ativo use números 0303, e a
+  Twilio lista tarifa própria para essa origem (US$ 0,0620 por minuto). Falta definir se a
+  prospecção da KOMUNE se enquadra; isso muda o tipo de número a comprar.
+- **Documentação (Luiz).** Empresa registrada no Brasil com CNPJ válido, comprovante de identidade
+  da empresa e comprovante de endereço brasileiro.
+
+Fontes:
+[preços de voz no Brasil](https://www.twilio.com/en-us/voice/pricing/br),
+[exigências regulatórias no Brasil](https://www.twilio.com/en-us/guidelines/br/regulatory),
+[limites de chamadas](https://support.twilio.com/hc/en-us/articles/223180028-How-Fast-Can-I-Place-or-Receive-Phone-Calls-with-Twilio),
+[limites da conta de teste](https://support.twilio.com/hc/en-us/articles/360036052753-Twilio-Free-Trial-Limitations).
+
 ## O que criar no Twilio
 
 1. **Conta** e, nela, um **número brasileiro com voz**. O Twilio pede documentação da empresa
    para número do Brasil (regulatory bundle); a aprovação leva dias.
-2. **API Key** (Account → API keys → Create, tipo Standard). Guarde o SID (`SK…`) e o segredo,
+2. **Perfil de empresa** (Business Primary Customer Profile), enviado junto com os documentos do
+   número. Sem ele aprovado, a conta fica limitada a 2 chamadas simultâneas (ver acima).
+3. **API Key** (Account → API keys → Create, tipo Standard). Guarde o SID (`SK…`) e o segredo,
    que só aparece uma vez.
-3. **TwiML App** (Voice → TwiML Apps → Create):
+4. **TwiML App** (Voice → TwiML Apps → Create):
    - Voice Request URL: `https://<ref-do-projeto>.supabase.co/functions/v1/voz-twiml`, método `POST`.
    - Guarde o SID (`AP…`).
    - O aviso de estado não é configurado aqui: o CRM manda a URL em cada chamada.
-4. **Voice → Settings → Geo permissions**: deixe marcado só **Brasil**.
-5. Recomendado: em Billing, um alerta de gasto e recarga automática desligada no começo.
+5. **Voice → Settings → Geo permissions**: deixe marcado só **Brasil**.
+6. Recomendado: em Billing, um alerta de gasto e recarga automática desligada no começo.
 
 ## O que configurar no Supabase
 
