@@ -6613,3 +6613,8 @@ cancelar** (ele continua, com botão próprio), e **a tela de lote é da gestão
 Conferido no banco: as três funções existem, o gatilho do bom-dia pergunta pelo
 pedido, e a fila do bom-dia segue agendada, a 6 por hora, vazia (20 já enviadas).
 A `main` continua sem o pivô, e os três SDRs de produção continuam SDR.
+
+**Na `main` desde 06/10/2026:** a branch `pivo-do-crm` foi juntada na `main` do
+GitHub, a pedido. A `main` não tinha andado desde a abertura da branch, então o
+que está nela é exatamente o que já estava no ar: não houve novo deploy. A partir
+daqui, publicar pela `main` mantém o pivô.
