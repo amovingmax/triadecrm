@@ -24,7 +24,9 @@ import { type AppRole } from '@/lib/auth/role';
  *    respondeu é de quem abrir" (ADR-17).
  *
  * Responsável desativado conta como "ninguém escreveu": aviso endereçado a quem
- * saiu da empresa é aviso que ninguém recebe.
+ * saiu da empresa é aviso que ninguém recebe. O mesmo vale para o responsável
+ * que não atende mais (o SDR, desde 06/10/2026): `ativos` só traz quem está
+ * ativo E atende (`lerPessoasAtivas`, em `dados.ts`).
  *
  * ===========================================================================
  * O CLIENTE É DE TODOS OS OPERADORES (02/10/2026)

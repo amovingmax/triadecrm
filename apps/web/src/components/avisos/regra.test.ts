@@ -104,6 +104,17 @@ describe('de quem é o aviso', () => {
     expect(ehParaMim(c, EMBAIXADOR, TODOS_ATIVOS)).toBe(false);
   });
 
+  it('conversa que ficou no nome de quem só liga avisa a gestão inteira', () => {
+    // Em 06/10/2026 havia conversas em produção atendidas por um SDR. Ele deixou
+    // de ser avisado; sem esta regra, a resposta do parceiro não avisaria ninguém.
+    // `lerPessoasAtivas` só devolve quem atende, então o SDR fica fora de `ativos`.
+    const quemAtende = new Set(['gestor-1', 'gestor-2', 'admin-1']);
+    const c = conversa({ responsavelId: 'sdr-1', alguemEscreveu: true });
+    expect(ehParaMim(c, GESTOR, quemAtende)).toBe(true);
+    expect(ehParaMim(c, ADMIN, quemAtende)).toBe(true);
+    expect(ehParaMim(c, SDR, quemAtende)).toBe(false);
+  });
+
   it('sem a lista de ativos, o responsável vale como ativo', () => {
     // Falha de rede não pode virar aviso de tudo para todo mundo.
     const c = conversa({ responsavelId: 'gestor-2', alguemEscreveu: true });
