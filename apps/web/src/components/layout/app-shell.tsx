@@ -3,9 +3,11 @@ import { ProvedorDeAvisos } from '@/components/avisos/provedor-avisos';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Header } from '@/components/layout/header';
 import { Sidebar } from '@/components/layout/sidebar';
+import { ProvedorDoSoftphone } from '@/components/ligacao/voz-provedor';
 import { TransicaoPagina } from '@/components/movimento';
 import { type Sessao } from '@/lib/auth/session';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
+import { podeCriarParceiro } from '@/lib/navegacao';
 
 /**
  * Casca da área autenticada, responsiva e mobile-first (PRD §8):
@@ -27,6 +29,10 @@ import { type ContagemDasFilas } from '@/lib/filas-do-menu';
  * qualquer tela: é ele que mantém vivo o número ao lado de Conversas e que avisa
  * quem está no funil de que alguém respondeu (`components/avisos`). Os cartões
  * "Nova mensagem" saem por `PilhaDeAvisos`, no canto de cima.
+ *
+ * `ProvedorDoSoftphone` também envolve tudo, pelo mesmo motivo: a ligação feita pelo
+ * navegador tem de sobreviver à troca de tela, e o painel dela fica no canto de baixo
+ * (`components/ligacao/voz-provedor.tsx`). Com a telefonia desligada ele não desenha nada.
  */
 export function AppShell({
   sessao,
@@ -40,31 +46,33 @@ export function AppShell({
 }) {
   return (
     <ProvedorDeAvisos usuarioId={sessao.id} papel={sessao.papel}>
-      <div className="flex min-h-dvh bg-background">
-        <Sidebar papel={sessao.papel} filas={filas} />
+      <ProvedorDoSoftphone podeLigar={podeCriarParceiro(sessao.papel)}>
+        <div className="flex min-h-dvh bg-background">
+          <Sidebar papel={sessao.papel} filas={filas} />
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <Header sessao={sessao} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Header sessao={sessao} />
 
-          <main
-            id="conteudo"
-            className="flex-1 px-4 pt-4 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-5 md:pt-3 md:pb-8"
-          >
-            {/* Coluna centralizada com teto: cada tela ainda escolhe a própria medida de
+            <main
+              id="conteudo"
+              className="flex-1 px-4 pt-4 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-5 md:pt-3 md:pb-8"
+            >
+              {/* Coluna centralizada com teto: cada tela ainda escolhe a própria medida de
               leitura, mas nenhuma fica grudada na barra lateral com um terço de vazio
               à direita, e nenhuma tabela se estica por 2500px num monitor ultrawide. */}
-            {/* 1400px e não 1440 (Tríade Design System): o sistema desenha num
+              {/* 1400px e não 1440 (Tríade Design System): o sistema desenha num
               quadro de 1440 com 20px de margem de cada lado, e o conteúdo que
               sobra é exatamente 1400. */}
-            <div className="mx-auto w-full max-w-[1400px]">
-              <TransicaoPagina>{children}</TransicaoPagina>
-            </div>
-          </main>
-        </div>
+              <div className="mx-auto w-full max-w-[1400px]">
+                <TransicaoPagina>{children}</TransicaoPagina>
+              </div>
+            </main>
+          </div>
 
-        <BottomNav papel={sessao.papel} filas={filas} />
-        <PilhaDeAvisos />
-      </div>
+          <BottomNav papel={sessao.papel} filas={filas} />
+          <PilhaDeAvisos />
+        </div>
+      </ProvedorDoSoftphone>
     </ProvedorDeAvisos>
   );
 }

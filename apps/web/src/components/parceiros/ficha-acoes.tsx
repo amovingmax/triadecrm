@@ -11,6 +11,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+import { BotaoLigar } from '@/components/ligacao/voz-botao-ligar';
+
 import { useEditarFicha } from './ficha-edicao';
 
 /**
@@ -23,17 +25,24 @@ import { useEditarFicha } from './ficha-edicao';
  *     é para lá que apontam o histórico e o WhatsApp.
  *   - REGISTRAR CONTATO fica ao lado, só para quem escreve: o banco recusaria a
  *     gravação do papel de leitura no fim do fluxo (`app.can_write()`).
+ *   - LIGAR aparece só com a telefonia ligada (`voz.telefonia`) e para quem escreve:
+ *     a chamada sai do navegador e o resultado é registrado no painel da ligação.
  *   - "⋯" guarda o que se faz de vez em quando: ver no funil e editar a ficha.
  *
  * No celular os dois primeiros dividem a largura e o menu fica na ponta.
  */
 export function AcoesDaFicha({
   organizationId,
+  nome,
+  temTelefone,
   podeEscrever,
   conversaNoCrm,
   hrefDoFunil,
 }: {
   organizationId: string;
+  nome: string;
+  /** A ficha tem telefone (inteiro ou mascarado): sem ele não há para onde ligar. */
+  temTelefone: boolean;
   podeEscrever: boolean;
   /** O número da KOMUNE está conectado e a pessoa pode escrever por ele. */
   conversaNoCrm: boolean;
@@ -60,6 +69,10 @@ export function AcoesDaFicha({
             <span className="hidden sm:inline">Registrar contato</span>
           </Link>
         </Button>
+      ) : null}
+
+      {podeEscrever ? (
+        <BotaoLigar organizationId={organizationId} nome={nome} temTelefone={temTelefone} />
       ) : null}
 
       {temMenu ? (

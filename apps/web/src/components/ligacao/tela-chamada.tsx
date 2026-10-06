@@ -29,6 +29,7 @@ import {
 import { ChamadaRecibo } from './chamada-recibo';
 import { mensagemDeDepois, type MensagemDeDepois } from './depois-da-ligacao';
 import { criarProvedorManual } from './chamada-provedor';
+import { useSoftphone } from './voz-provedor';
 import {
   devolverItem,
   ErroDaLigacao,
@@ -202,6 +203,12 @@ export function TelaChamada({
   const janela = montado ? janelaDeLigacao(new Date(), contexto.feriados) : null;
 
   const provedor = useMemo(() => criarProvedorManual(), []);
+  /**
+   * O segundo adaptador (R13 §3.4): com a telefonia ligada, a chamada sai do navegador.
+   * A tentativa continua sendo aberta e fechada pelas mesmas RPCs (`iniciar_chamada`,
+   * `tabular_chamada`); o softphone só leva a voz e mostra a linha no painel do canto.
+   */
+  const softphone = useSoftphone();
 
   /**
    * A data que a tela propõe enquanto nada foi combinado: a próxima abertura da janela
@@ -308,8 +315,9 @@ export function TelaChamada({
   // ---------------------------------------------------------------------------
   // Discar
   // ---------------------------------------------------------------------------
-  async function ligar() {
+  async function ligar(peloNavegador = false) {
     if (!item || chamada || abrindo) return;
+    if (peloNavegador && softphone.ocupado) return;
     setAbrindo(true);
     try {
       const aberta = await provedor.iniciarChamada({ telefone: item.telefone, itemId: item.id });
@@ -317,6 +325,14 @@ export function TelaChamada({
       setClientKey(crypto.randomUUID());
       setPercurso(estadoAoDiscar(entrada));
       setSegundos(0);
+      if (peloNavegador) {
+        // O número não vai junto: o banco disca o da reserva desta tentativa.
+        void softphone.ligar({
+          organizationId: item.organizationId,
+          nome: item.nome,
+          attemptId: aberta.id,
+        });
+      }
     } catch (erro) {
       toast.error(
         erro instanceof ErroDaLigacao
@@ -481,6 +497,8 @@ export function TelaChamada({
           pediuParaNaoLigar: optout,
         });
 
+        // Tabular com a linha ainda aberta é desligar: o resultado já foi decidido.
+        if (softphone.emCurso?.alvo.attemptId === chamada.id) softphone.desligar();
         await provedor.encerrar(chamada.id, resultado);
         const resposta = await tabularChamada(pedido);
 
@@ -536,6 +554,7 @@ export function TelaChamada({
       item,
       provedor,
       segundos,
+      softphone,
       variante,
     ],
   );
@@ -758,15 +777,15 @@ export function TelaChamada({
           segundos={segundos}
           abrindo={abrindo}
           aoLigar={() => void ligar()}
+          aoLigarPeloNavegador={softphone.disponivel ? () => void ligar(true) : undefined}
+          navegadorOcupado={softphone.ocupado}
         />
 
         {passo === 'discar' ? (
           <>
             {noParaLer ? (
               <div className="rounded-xl border border-dashed border-hairline p-4 sm:p-5">
-                <p className="mb-2 text-xs font-medium text-muted-foreground">
-                  A primeira fala
-                </p>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">A primeira fala</p>
                 <RoteiroNo
                   roteiro={roteiro}
                   no={noParaLer}

@@ -1,0 +1,14 @@
+-- ===========================================================================
+-- TRÍADE — o Twilio entra na lista de provedores de telefonia (R13 §3.4 e §8.1)
+--
+-- A migração 20260904001300 deixou `app.call_provider` com um valor só, `manual`,
+-- e escreveu o motivo: "o dia em que houver discador, ele entra aqui". É hoje.
+--
+-- Fica sozinha neste arquivo porque valor novo de enum não pode ser USADO na
+-- mesma transação em que nasce; a tabela e as funções vêm na migração seguinte.
+--
+-- COMO DESFAZER: o Postgres não remove valor de enum. Desfazer a telefonia é
+-- desfazer a migração seguinte (o roteiro está no cabeçalho dela); o valor
+-- `twilio` sobra no tipo sem linha nenhuma que o use, e não atrapalha nada.
+-- ===========================================================================
+alter type app.call_provider add value if not exists 'twilio';

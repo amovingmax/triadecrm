@@ -478,3 +478,15 @@ verify_jwt = false
 
 [functions.export-lgpd]
 verify_jwt = false
+
+# Ligação pelo navegador (softphone). `voz-token` é chamada pelo CRM, com a sessão
+# de quem está logado. As outras duas são chamadas pelo Twilio, sem JWT do
+# Supabase: quem confere é a assinatura X-Twilio-Signature dentro da função.
+[functions.voz-token]
+verify_jwt = true
+
+[functions.voz-twiml]
+verify_jwt = false
+
+[functions.voz-status]
+verify_jwt = false

@@ -235,6 +235,8 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
           <div className="md:ml-auto md:shrink-0">
             <AcoesDaFicha
               organizationId={ficha.id}
+              nome={ficha.nome}
+              temTelefone={Boolean(ficha.telefone)}
               podeEscrever={podeEscrever}
               conversaNoCrm={conectado && podeEscrever}
               // A URL sai de `hrefDoFunil`, a mesma da fila do dia: é ela que sabe
