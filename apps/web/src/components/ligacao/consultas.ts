@@ -550,6 +550,7 @@ export async function carregarLotes(): Promise<LoteNaLista[]> {
       .select(
         'id, nome, owner_id, status, pipeline_id, temperature_origin, script_id, script_version, order_mode, max_attempts, target_calls, starts_on, ends_on, total, pending, talked, created_at',
       )
+      .eq('avulso', false)
       .order('created_at', { ascending: false })
       .limit(TETO_DE_LOTES),
     supabase.from('pipelines').select('id, name'),

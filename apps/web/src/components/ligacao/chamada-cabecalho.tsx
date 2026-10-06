@@ -40,6 +40,7 @@ export function ChamadaCabecalho({
   aoLigar,
   aoLigarPeloNavegador,
   navegadorOcupado = false,
+  estadoDaLinha,
 }: {
   item: ItemDoLote;
   maxTentativas: number;
@@ -56,6 +57,11 @@ export function ChamadaCabecalho({
   aoLigarPeloNavegador?: () => void;
   /** Já existe ligação pelo navegador em curso (ou resultado por registrar). */
   navegadorOcupado?: boolean;
+  /**
+   * O estado que o provedor informou (Chamando, Tocando, Em ligação...), quando a chamada
+   * saiu pelo navegador. Sem ele vale o "Em chamada" do modo manual.
+   */
+  estadoDaLinha?: string;
 }) {
   const [copiado, setCopiado] = useState(false);
 
@@ -196,7 +202,7 @@ export function ChamadaCabecalho({
                   lê por leitor: o ponto vermelho e o cronômetro correndo já dizem a
                   mesma coisa, e as duas palavras eram o que espremia o número na linha
                   de 390 px. */}
-              <span className="max-sm:sr-only">Em chamada</span>
+              <span className="max-sm:sr-only">{estadoDaLinha ?? 'Em chamada'}</span>
               <span className="numerico text-lg" aria-label={`${segundos} segundos de chamada`}>
                 {cronometro(segundos)}
               </span>

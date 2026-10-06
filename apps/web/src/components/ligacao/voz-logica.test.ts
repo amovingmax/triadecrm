@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { Constants } from '@komune/schema';
 
+import { cronometro } from './chamada-cabecalho';
 import {
   classificarFalha,
   codigoParaDiagnostico,
   duracaoLegivel,
   ESTADOS_DA_LINHA,
   estadoAoDesligar,
+  avisoDaFalha,
+  avisoDaRecusa,
+  AVISO_DA_RECUSA,
   FRASE_DA_FALHA,
-  fraseDaRecusa,
+  TITULO_DA_FALHA,
   juntarEstados,
   linhaFoiAtendida,
   linhaViva,
@@ -90,10 +94,13 @@ describe('da linha para a tabulação', () => {
 });
 
 describe('o relógio', () => {
-  it('formata como o painel mostra', () => {
-    expect(relogioDaLigacao(207)).toBe('00:03:27');
-    expect(relogioDaLigacao(3725)).toBe('01:02:05');
-    expect(relogioDaLigacao(-4)).toBe('00:00:00');
+  it('formata como o visor de um telefone, igual ao cronômetro da tela de ligar', () => {
+    expect(relogioDaLigacao(207)).toBe('03:27');
+    expect(relogioDaLigacao(3725)).toBe('1:02:05');
+    expect(relogioDaLigacao(-4)).toBe('00:00');
+    for (const s of [0, 59, 60, 599, 3599, 3600, 7325]) {
+      expect(relogioDaLigacao(s)).toBe(cronometro(s));
+    }
   });
 
   it('conta do atendimento, não do clique', () => {
@@ -134,9 +141,29 @@ describe('o que dizer quando deu errado', () => {
     for (const frase of Object.values(FRASE_DA_FALHA)) {
       expect(frase).not.toMatch(/\d{4,}|twilio/i);
     }
-    expect(fraseDaRecusa('fora_da_janela')).toMatch(/horário/);
-    expect(fraseDaRecusa('motivo_que_nao_existe')).toBe(FRASE_DA_FALHA.falha_na_telefonia);
-    expect(fraseDaRecusa(null)).toBe(FRASE_DA_FALHA.falha_na_telefonia);
+    for (const aviso of Object.values(AVISO_DA_RECUSA)) {
+      expect(aviso.titulo + aviso.frase).not.toMatch(/\d{4,}|twilio/i);
+    }
+  });
+
+  it('cada falha tem um título curto, que é o que se lê primeiro', () => {
+    expect(TITULO_DA_FALHA.microfone_bloqueado).toBe('Microfone bloqueado');
+    expect(TITULO_DA_FALHA.numero_invalido).toBe('Telefone inválido');
+    expect(avisoDaFalha('sem_conexao')).toEqual({
+      titulo: 'Sem conexão',
+      frase: FRASE_DA_FALHA.sem_conexao,
+    });
+    for (const titulo of Object.values(TITULO_DA_FALHA))
+      expect(titulo.length).toBeLessThanOrEqual(28);
+  });
+
+  it('a recusa do banco vira título e frase, e diz com quem está o parceiro', () => {
+    expect(avisoDaRecusa('fora_da_janela').titulo).toBe('Fora do horário');
+    expect(avisoDaRecusa('numero_invalido').titulo).toBe('Telefone inválido');
+    expect(avisoDaRecusa('reservado_em_outro_lote', { dono: 'Heloísa' }).frase).toMatch(/Heloísa/);
+    expect(avisoDaRecusa('ja_no_seu_lote', { loteNome: 'Buffets' }).frase).toMatch(/Buffets/);
+    expect(avisoDaRecusa('motivo_que_nao_existe')).toEqual(avisoDaFalha('falha_na_telefonia'));
+    expect(avisoDaRecusa(null)).toEqual(avisoDaFalha('falha_na_telefonia'));
   });
 
   it('o código vai para o diagnóstico, curto', () => {

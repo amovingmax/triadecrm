@@ -16,18 +16,18 @@ import { iniciaisDe } from '@/lib/iniciais';
 import { Button } from '@/components/ui/button';
 
 import {
+  avisoDaFalha,
+  avisoDaRecusa,
   classificarFalha,
   codigoParaDiagnostico,
   estadoAoDesligar,
-  FRASE_DA_FALHA,
-  fraseDaRecusa,
   juntarEstados,
   linhaFoiAtendida,
   linhaViva,
   relogioDaLigacao,
-  resultadoSugerido,
   ROTULO_DA_LINHA,
   segundosDeConversa,
+  type AvisoDeVoz,
   type EstadoDaLinha,
 } from './voz-logica';
 import {
@@ -43,30 +43,30 @@ import {
   pedirMicrofone,
   type LigacaoNoNavegador,
 } from './voz-softphone';
-import { TabulacaoDaLigacao } from './voz-tabulacao';
 
 /**
  * A ligação pelo navegador, para a casca inteira.
  *
  * Mora na casca (`AppShell`), e não na ficha, por um motivo só: a ligação tem de
- * sobreviver à navegação. Quem liga da ficha e vai olhar o funil no meio da conversa
- * continua falando, com o painel no canto.
+ * sobreviver à navegação. Quem está numa ligação e vai olhar o funil no meio da conversa
+ * continua falando, com o painel no alto da tela.
  *
  * UMA LIGAÇÃO POR VEZ, em três camadas — nenhuma confia na outra:
  *   1. `trava` (ref, síncrona): o segundo clique no mesmo instante nem começa;
  *   2. `ocupado`: enquanto houver painel aberto, os botões "Ligar" ficam desligados;
  *   3. o índice único de `voice_calls`: outra aba, outro aparelho, não passam.
  *
- * QUEM TABULA. A ligação AVULSA (ficha) é tabulada aqui, no próprio painel. A do LOTE
- * é tabulada na tela do lote, que já tem roteiro e barra de resultado; para ela o
- * painel só mostra a linha, silencia e desliga.
+ * QUEM TABULA. Ninguém aqui. Toda ligação pelo navegador é de uma TENTATIVA do módulo
+ * de ligação (`call_attempts`): a do lote de turno e a da ficha, que monta um lote de
+ * um contato (`montar_lote_avulso`) e abre a mesma tela. Roteiro, respostas e resultado
+ * ficam naquela tela; o painel só mostra a linha, silencia e desliga.
  */
 
 export type AlvoDaLigacao = {
   organizationId: string;
   nome: string;
-  /** Presente quando a ligação é de um lote: a tentativa aberta por `iniciar_chamada`. */
-  attemptId?: string;
+  /** A tentativa aberta por `iniciar_chamada`. O banco disca o número reservado para ela. */
+  attemptId: string;
 };
 
 type LigacaoEmCurso = {
@@ -78,10 +78,8 @@ type LigacaoEmCurso = {
   encerradaEm: string | null;
   mudo: boolean;
   reconectando: boolean;
-  /** Frase pronta quando algo deu errado. */
-  aviso: string | null;
-  /** O provedor chegou a ser acionado: houve tentativa de verdade, e ela pede registro. */
-  discou: boolean;
+  /** Título e frase prontos quando algo deu errado. */
+  aviso: AvisoDeVoz | null;
   /**
    * Outra ligação desta pessoa que o banco ainda dá como em curso (outra aba, ou uma
    * que ficou para trás). Ela pode encerrá-la daqui, em vez de esperar a limpeza.
@@ -92,10 +90,19 @@ type LigacaoEmCurso = {
 type Softphone = {
   /** A telefonia está ligada e o papel de quem está logado pode ligar. */
   disponivel: boolean;
-  /** Há ligação em curso ou resultado por registrar. */
+  /** Há ligação em curso (ou um aviso de falha ainda na tela). */
   ocupado: boolean;
-  /** O alvo da ligação em curso, para a tela saber se é a dela. */
-  emCurso: { alvo: AlvoDaLigacao; estado: EstadoDaLinha } | null;
+  /**
+   * A última ligação feita por este navegador — em curso ou já encerrada. Fica depois
+   * de o painel sair, porque a tela de ligar ainda precisa dela para mostrar o estado
+   * da linha e gravar a duração da CONVERSA (do atendimento ao fim), e não a do clique.
+   */
+  ultima: {
+    alvo: AlvoDaLigacao;
+    estado: EstadoDaLinha;
+    atendidaEm: string | null;
+    encerradaEm: string | null;
+  } | null;
   ligar(alvo: AlvoDaLigacao): Promise<boolean>;
   desligar(): void;
 };
@@ -106,7 +113,7 @@ const Contexto = createContext<Softphone | null>(null);
 const SEM_SOFTPHONE: Softphone = {
   disponivel: false,
   ocupado: false,
-  emCurso: null,
+  ultima: null,
   ligar: async () => false,
   desligar: () => undefined,
 };
@@ -124,7 +131,7 @@ const ESPERA_DO_AVISO_FINAL_MS = 2000;
  * não saiu do navegador (rede, credencial, provedor fora do ar) e não vai sair.
  */
 const LIMITE_SEM_RESPOSTA_MS = 20_000;
-/** Ligação de lote encerrada sem erro: o painel sai sozinho. */
+/** Ligação encerrada sem erro: o painel sai sozinho. */
 const PAINEL_SOME_EM_MS = 3000;
 
 export function ProvedorDoSoftphone({
@@ -137,6 +144,8 @@ export function ProvedorDoSoftphone({
 }) {
   const [ligada, setLigada] = useState(false);
   const [ligacao, setLigacao] = useState<LigacaoEmCurso | null>(null);
+  /** O painel está na tela. O dado da ligação fica mesmo depois de ele sair. */
+  const [painel, setPainel] = useState(false);
   const [, setTique] = useState(0);
   const trava = useRef(false);
   const noNavegador = useRef<LigacaoNoNavegador | null>(null);
@@ -160,10 +169,10 @@ export function ProvedorDoSoftphone({
     falha.current = null;
     trava.current = false;
     idNoPainel.current = null;
-    setLigacao(null);
+    setPainel(false);
   }, []);
 
-  const falhar = useCallback((aviso: string) => {
+  const falhar = useCallback((aviso: AvisoDeVoz) => {
     setLigacao((atual) =>
       atual
         ? { ...atual, estado: estadoAoDesligar(atual.estado, true), aviso, reconectando: false }
@@ -176,6 +185,7 @@ export function ProvedorDoSoftphone({
       if (trava.current) return false;
       trava.current = true;
       falha.current = null;
+      setPainel(true);
       setLigacao({
         id: null,
         alvo,
@@ -185,7 +195,6 @@ export function ProvedorDoSoftphone({
         mudo: false,
         reconectando: false,
         aviso: null,
-        discou: false,
         presa: null,
       });
 
@@ -194,16 +203,14 @@ export function ProvedorDoSoftphone({
         await pedirMicrofone();
       } catch (erro) {
         const e = erro as { name?: string };
-        falhar(FRASE_DA_FALHA[classificarFalha({ nome: e?.name ?? null })]);
+        falhar(avisoDaFalha(classificarFalha({ nome: e?.name ?? null })));
         return false;
       }
 
       // 2. O banco abre a chamada — e é ele que aplica as travas.
-      const abertura = await abrirLigacaoDeVoz(
-        alvo.attemptId ? { attemptId: alvo.attemptId } : { organizationId: alvo.organizationId },
-      );
+      const abertura = await abrirLigacaoDeVoz({ attemptId: alvo.attemptId });
       if (!abertura.ok) {
-        falhar(fraseDaRecusa(abertura.motivo));
+        falhar(avisoDaRecusa(abertura.motivo));
         const presa = abertura.motivo === 'ja_em_ligacao' ? (abertura.ligacao_id ?? null) : null;
         if (presa) setLigacao((atual) => (atual ? { ...atual, presa } : atual));
         return false;
@@ -218,7 +225,7 @@ export function ProvedorDoSoftphone({
           aoConectar: () =>
             setLigacao((atual) =>
               atual && atual.id === id
-                ? { ...atual, discou: true, estado: juntarEstados(atual.estado, 'chamando') }
+                ? { ...atual, estado: juntarEstados(atual.estado, 'chamando') }
                 : atual,
             ),
           aoErro: (erro) => {
@@ -238,7 +245,7 @@ export function ProvedorDoSoftphone({
                     estado: estadoAoDesligar(atual.estado, erro !== null),
                     encerradaEm: atual.encerradaEm ?? new Date().toISOString(),
                     reconectando: false,
-                    aviso: erro ? FRASE_DA_FALHA[classificarFalha(erro)] : atual.aviso,
+                    aviso: erro ? avisoDaFalha(classificarFalha(erro)) : atual.aviso,
                   }
                 : atual,
             );
@@ -279,8 +286,8 @@ export function ProvedorDoSoftphone({
         descartarAparelho();
         falhar(
           erro instanceof ErroDeCredencial
-            ? fraseDaRecusa(erro.motivo)
-            : FRASE_DA_FALHA[classificarFalha(tecnico)],
+            ? avisoDaRecusa(erro.motivo)
+            : avisoDaFalha(classificarFalha(tecnico)),
         );
         return false;
       }
@@ -295,8 +302,9 @@ export function ProvedorDoSoftphone({
     }
     // Ainda conectando: não há o que desligar no navegador, só a chamada no banco.
     setLigacao((atual) => {
-      if (atual?.id && linhaViva(atual.estado)) void encerrarLigacaoDeVoz(atual.id);
-      return atual;
+      if (!atual || !linhaViva(atual.estado)) return atual;
+      if (atual.id) void encerrarLigacaoDeVoz(atual.id);
+      return { ...atual, estado: estadoAoDesligar(atual.estado, false) };
     });
     dispensar();
   }, [dispensar]);
@@ -322,8 +330,6 @@ export function ProvedorDoSoftphone({
           atual && atual.id === idVivo
             ? {
                 ...atual,
-                // O banco só sai de "preparando" quando o provedor pediu o número.
-                discou: atual.discou || lida.estado !== 'preparando',
                 estado: juntarEstados(atual.estado, lida.estado),
                 atendidaEm: lida.atendidaEm ?? atual.atendidaEm,
                 encerradaEm: lida.encerradaEm ?? atual.encerradaEm,
@@ -345,7 +351,7 @@ export function ProvedorDoSoftphone({
         noNavegador.current.desligar();
       } else {
         void encerrarLigacaoDeVoz(idEsperando, { falha: true, codigo: 'sem_resposta_do_provedor' });
-        falhar(FRASE_DA_FALHA.sem_conexao);
+        falhar(avisoDaFalha('sem_conexao'));
       }
     }, LIMITE_SEM_RESPOSTA_MS);
     return () => window.clearTimeout(limite);
@@ -359,12 +365,9 @@ export function ProvedorDoSoftphone({
     return () => window.clearInterval(relogio);
   }, [emConversa]);
 
-  // Ligação de lote que terminou sem erro: quem tabula é a tela do lote.
+  // Terminou sem erro: o resultado é dado na tela de ligar, e o painel sai da frente.
   const someSozinho =
-    ligacao !== null &&
-    !linhaViva(ligacao.estado) &&
-    ligacao.alvo.attemptId !== undefined &&
-    ligacao.aviso === null;
+    painel && ligacao !== null && !linhaViva(ligacao.estado) && ligacao.aviso === null;
   useEffect(() => {
     if (!someSozinho) return;
     const espera = window.setTimeout(dispensar, PAINEL_SOME_EM_MS);
@@ -374,18 +377,25 @@ export function ProvedorDoSoftphone({
   const valor = useMemo<Softphone>(
     () => ({
       disponivel: podeLigar && ligada,
-      ocupado: ligacao !== null,
-      emCurso: ligacao ? { alvo: ligacao.alvo, estado: ligacao.estado } : null,
+      ocupado: painel,
+      ultima: ligacao
+        ? {
+            alvo: ligacao.alvo,
+            estado: ligacao.estado,
+            atendidaEm: ligacao.atendidaEm,
+            encerradaEm: ligacao.encerradaEm,
+          }
+        : null,
       ligar,
       desligar,
     }),
-    [podeLigar, ligada, ligacao, ligar, desligar],
+    [podeLigar, ligada, ligacao, painel, ligar, desligar],
   );
 
   return (
     <Contexto.Provider value={valor}>
       {children}
-      {ligacao ? (
+      {painel && ligacao ? (
         <PainelDaLigacao
           ligacao={ligacao}
           aoDesligar={desligar}
@@ -397,6 +407,12 @@ export function ProvedorDoSoftphone({
   );
 }
 
+/**
+ * O painel é uma faixa no ALTO da tela, e não um cartão no canto de baixo: embaixo ficam
+ * a barra de resultado da tela de ligar e a navegação do celular, e um cartão ali
+ * cobria o último botão de resultado (medido em 1280×900). No desktop ela ocupa o meio
+ * do cabeçalho, que é vazio; no celular fica logo abaixo dele.
+ */
 function PainelDaLigacao({
   ligacao,
   aoDesligar,
@@ -411,26 +427,23 @@ function PainelDaLigacao({
   const viva = linhaViva(ligacao.estado);
   const segundos = segundosDeConversa(ligacao.atendidaEm, ligacao.encerradaEm, new Date());
   const atendida = linhaFoiAtendida(ligacao.estado, ligacao.atendidaEm);
-  const avulsa = ligacao.alvo.attemptId === undefined;
-  // Só há o que registrar quando o provedor chegou a discar.
-  const tabular = !viva && avulsa && ligacao.discou && ligacao.id !== null;
 
   return (
     <section
       role="dialog"
       aria-label={`Ligação para ${ligacao.alvo.nome}`}
-      className="sombra-base-forte fixed right-3 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+0.75rem)] left-3 z-50 flex max-h-[80dvh] flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-4 text-card-foreground sm:left-auto sm:w-88 md:bottom-4"
+      className="sombra-base-forte fixed inset-x-3 top-[3.75rem] z-50 flex flex-col gap-2 rounded-xl border border-border bg-card px-3 py-2 text-card-foreground md:inset-x-auto md:top-2 md:left-1/2 md:w-[26rem] md:-translate-x-1/2"
     >
-      <header className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         <span
           aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium"
         >
           {iniciaisDe(ligacao.alvo.nome)}
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{ligacao.alvo.nome}</p>
-          <p aria-live="polite" className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-sm font-medium">{ligacao.alvo.nome}</p>
+          <p aria-live="polite" className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span
               aria-hidden="true"
               className={cn(
@@ -445,12 +458,39 @@ function PainelDaLigacao({
             {ligacao.reconectando ? 'Reconectando...' : ROTULO_DA_LINHA[ligacao.estado]}
           </p>
         </div>
+
         {atendida ? (
-          <span className="numerico text-lg" aria-label={`${segundos} segundos de conversa`}>
+          <span className="numerico text-base" aria-label={`${segundos} segundos de conversa`}>
             {relogioDaLigacao(segundos)}
           </span>
         ) : null}
-        {!viva && !tabular ? (
+
+        {viva ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="toque h-9 shrink-0"
+              onClick={aoAlternarMudo}
+              disabled={ligacao.id === null}
+              aria-pressed={ligacao.mudo}
+            >
+              {ligacao.mudo ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />}
+              {ligacao.mudo ? 'Reativar som' : 'Silenciar'}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="toque h-9 shrink-0"
+              onClick={aoDesligar}
+            >
+              <PhoneOff aria-hidden="true" />
+              Desligar
+            </Button>
+          </>
+        ) : (
           <Button
             type="button"
             variant="ghost"
@@ -461,20 +501,21 @@ function PainelDaLigacao({
           >
             <X aria-hidden="true" />
           </Button>
-        ) : null}
-      </header>
+        )}
+      </div>
 
       {ligacao.aviso ? (
-        <p role="alert" className="text-sm text-destructive-texto">
-          {ligacao.aviso}
-        </p>
+        <div role="alert" className="flex flex-col gap-0.5 pb-1 text-sm">
+          <p className="font-medium text-destructive-texto">{ligacao.aviso.titulo}</p>
+          <p className="text-muted-foreground">{ligacao.aviso.frase}</p>
+        </div>
       ) : null}
 
       {ligacao.presa ? (
         <Button
           type="button"
           variant="outline"
-          className="toque h-11"
+          className="toque mb-1 h-10"
           onClick={() => {
             const presa = ligacao.presa;
             if (presa) void encerrarLigacaoDeVoz(presa).then(aoDispensar);
@@ -483,45 +524,6 @@ function PainelDaLigacao({
           <PhoneOff aria-hidden="true" />
           Encerrar a ligação anterior
         </Button>
-      ) : null}
-
-      {viva ? (
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="toque h-11 flex-1"
-            onClick={aoAlternarMudo}
-            disabled={ligacao.id === null}
-            aria-pressed={ligacao.mudo}
-          >
-            {ligacao.mudo ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />}
-            {ligacao.mudo ? 'Reativar som' : 'Silenciar'}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            className="toque h-11 flex-1"
-            onClick={aoDesligar}
-            disabled={ligacao.id === null}
-          >
-            <PhoneOff aria-hidden="true" />
-            Desligar
-          </Button>
-        </div>
-      ) : null}
-
-      {tabular && ligacao.id ? (
-        <TabulacaoDaLigacao
-          key={ligacao.id}
-          ligacaoId={ligacao.id}
-          organizationId={ligacao.alvo.organizationId}
-          atendida={atendida}
-          sugestao={resultadoSugerido(ligacao.estado)}
-          duracaoSeg={segundos}
-          aoGravar={aoDispensar}
-          aoAdiar={aoDispensar}
-        />
       ) : null}
     </section>
   );

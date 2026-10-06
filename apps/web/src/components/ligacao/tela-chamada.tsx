@@ -29,6 +29,7 @@ import {
 import { ChamadaRecibo } from './chamada-recibo';
 import { mensagemDeDepois, type MensagemDeDepois } from './depois-da-ligacao';
 import { criarProvedorManual } from './chamada-provedor';
+import { ROTULO_DA_LINHA, segundosDeConversa } from './voz-logica';
 import { useSoftphone } from './voz-provedor';
 import {
   devolverItem,
@@ -101,6 +102,8 @@ export function TelaChamada({
   roteiroConhecido,
   contexto,
   quemLiga,
+  daFicha = false,
+  discarAoAbrir = false,
   aoSair,
   aoMontarOutro,
 }: {
@@ -117,6 +120,14 @@ export function TelaChamada({
   contexto: ContextoDaLigacao;
   /** Nome de quem está ligando: entra no `[eu]` da fala de abertura. */
   quemLiga: string;
+  /**
+   * A ligação veio do botão Ligar da ficha: o lote tem um contato só. Nada muda no
+   * roteiro nem na tabulação; muda o fim — depois do recibo volta-se à ficha, em vez de
+   * puxar "o próximo" de uma fila que não tem próximo.
+   */
+  daFicha?: boolean;
+  /** Começar a chamada pelo navegador assim que o contato estiver na tela. */
+  discarAoAbrir?: boolean;
   aoSair: () => void;
   aoMontarOutro: () => void;
 }) {
@@ -268,6 +279,23 @@ export function TelaChamada({
     return () => window.clearInterval(id);
   }, [iniciadaEm]);
 
+  /**
+   * Esta chamada saiu pelo navegador? Então quem sabe da linha é o provedor: o
+   * cabeçalho mostra o estado dela (Chamando, Tocando, Em ligação) e o relógio conta a
+   * CONVERSA, do atendimento ao fim — que é também a duração que vai para o banco. No
+   * modo manual nada muda: o relógio corre desde o toque em "Ligar", porque ninguém
+   * além de quem ligou sabe quando atenderam.
+   */
+  const daVoz =
+    chamada && softphone.ultima?.alvo.attemptId === chamada.id ? softphone.ultima : null;
+  // A chamada que FALHOU antes de alguém atender não tocou em telefone nenhum (microfone
+  // negado, telefonia fora do ar). A pessoa ainda pode discar do aparelho, com o número
+  // que está na tela — e aí o relógio volta a ser o dela.
+  const voz = daVoz && !(daVoz.estado === 'falha' && daVoz.atendidaEm === null) ? daVoz : null;
+  const segundosDaChamada = voz
+    ? segundosDeConversa(voz.atendidaEm, voz.encerradaEm, new Date())
+    : segundos;
+
   /** Limpa tudo que pertence à ligação anterior e puxa o próximo da fila. */
   const irParaOProximo = useCallback(() => {
     setChamada(null);
@@ -289,6 +317,12 @@ export function TelaChamada({
     setCiclo((c) => c + 1);
   }, []);
 
+  /** Ligação da ficha não tem próximo: gravado o resultado, volta-se à ficha. */
+  const depoisDoRecibo = useCallback(() => {
+    if (daFicha) aoSair();
+    else irParaOProximo();
+  }, [daFicha, aoSair, irParaOProximo]);
+
   // O recibo some sozinho e traz o próximo contato: é o "encerrar-e-próxima" do
   // R13 §7.6, e é o ganho de produtividade real do módulo.
   //
@@ -302,13 +336,13 @@ export function TelaChamada({
       const resta = prazo - Date.now();
       if (resta <= 0) {
         window.clearInterval(id);
-        irParaOProximo();
+        depoisDoRecibo();
       } else {
         setRestaMs(resta);
       }
     }, 100);
     return () => window.clearInterval(id);
-  }, [recibo, reciboPausado, irParaOProximo]);
+  }, [recibo, reciboPausado, depoisDoRecibo]);
 
   const pausarRecibo = useCallback(() => setReciboPausado(true), []);
 
@@ -343,6 +377,27 @@ export function TelaChamada({
       setAbrindo(false);
     }
   }
+
+  // Veio do botão Ligar da ficha: o clique já foi dado lá, então a chamada começa
+  // assim que o contato e o softphone estiverem prontos. Uma vez só — se a pessoa
+  // desligar e ficar na tela, discar de novo é decisão dela, no botão.
+  const discouAoAbrir = useRef(false);
+  const prontoParaDiscar =
+    discarAoAbrir &&
+    item !== null &&
+    chamada === null &&
+    !abrindo &&
+    recibo === null &&
+    softphone.disponivel &&
+    !softphone.ocupado &&
+    janela?.aberta === true;
+  useEffect(() => {
+    if (!prontoParaDiscar || discouAoAbrir.current) return;
+    discouAoAbrir.current = true;
+    void ligar(true);
+    // `ligar` é recriada a cada desenho; quem decide quando discar é `prontoParaDiscar`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prontoParaDiscar]);
 
   /**
    * "Não era esse": manda o contato para o FIM do turno e traz o próximo.
@@ -479,7 +534,7 @@ export function TelaChamada({
           outcomeId: desfecho?.id ?? null,
           comQuem: comQuemGravado,
           caminhoScript: caminho,
-          duracaoSeg: duracaoParaGravar(segundos),
+          duracaoSeg: duracaoParaGravar(segundosDaChamada),
           observacao: null,
           capturas,
           /**
@@ -498,7 +553,7 @@ export function TelaChamada({
         });
 
         // Tabular com a linha ainda aberta é desligar: o resultado já foi decidido.
-        if (softphone.emCurso?.alvo.attemptId === chamada.id) softphone.desligar();
+        if (softphone.ocupado && voz) softphone.desligar();
         await provedor.encerrar(chamada.id, resultado);
         const resposta = await tabularChamada(pedido);
 
@@ -553,8 +608,9 @@ export function TelaChamada({
       gravando,
       item,
       provedor,
-      segundos,
+      segundosDaChamada,
       softphone,
+      voz,
       variante,
     ],
   );
@@ -663,7 +719,7 @@ export function TelaChamada({
           restaMs={restaMs}
           pausado={reciboPausado}
           aoPausar={pausarRecibo}
-          aoProximo={irParaOProximo}
+          aoProximo={depoisDoRecibo}
         />
       </div>
     );
@@ -674,7 +730,12 @@ export function TelaChamada({
     return (
       <div className={LEITURA}>
         <Topo lote={lote} restantes={null} fechaEm={null} aoSair={sair} />
-        {recusa.motivo === 'fila_vazia' && pulados.length > 0 ? (
+        {recusa.motivo === 'fila_vazia' && daFicha ? (
+          // O lote da ficha tem um contato só. Fila vazia aqui é a ligação já feita
+          // (ou o lote que venceu), e "montar outro lote" não é conselho para quem
+          // veio de uma ficha.
+          <LigacaoDaFichaEncerrada aoVoltar={sair} />
+        ) : recusa.motivo === 'fila_vazia' && pulados.length > 0 ? (
           // A fila só "acabou" porque os pulados estão reservados com ela. Dizer
           // "acabou" aqui seria mentira, e mandar montar outro lote seria pior ainda.
           // Vem antes da espera de propósito: os pulados são reserva de 30 minutos e
@@ -774,7 +835,8 @@ export function TelaChamada({
           maxTentativas={lote.maxTentativas}
           janela={janela}
           chamada={chamada}
-          segundos={segundos}
+          segundos={segundosDaChamada}
+          estadoDaLinha={voz ? ROTULO_DA_LINHA[voz.estado] : undefined}
           abrindo={abrindo}
           aoLigar={() => void ligar()}
           aoLigarPeloNavegador={softphone.disponivel ? () => void ligar(true) : undefined}
@@ -1046,6 +1108,26 @@ function FilaEsperandoOIntervalo({
       <p>
         Não monte outro lote por causa disto: o lote novo reserva contatos da base para substituir
         quem volta hoje mesmo.
+      </p>
+    </Recado>
+  );
+}
+
+/** O lote de um contato da ficha já foi ligado (ou venceu): não há fila para seguir. */
+function LigacaoDaFichaEncerrada({ aoVoltar }: { aoVoltar: () => void }) {
+  return (
+    <Recado
+      icone={<PhoneOff className="size-5" aria-hidden="true" />}
+      titulo="Esta ligação já foi encerrada"
+      acoes={
+        <Button type="button" onClick={aoVoltar}>
+          Voltar à ficha
+        </Button>
+      }
+    >
+      <p>
+        O resultado está na linha do tempo do parceiro. Para ligar de novo, use o botão Ligar da
+        ficha.
       </p>
     </Recado>
   );

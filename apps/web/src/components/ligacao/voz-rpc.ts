@@ -13,8 +13,8 @@ import { ehEstadoDaLinha, type EstadoDaLinha } from './voz-logica';
  * Mesma regra de `chamada-rpc.ts`: nenhum texto do Postgres chega à tela. Recusa
  * prevista volta nomeada (`{ok:false, motivo}`) e quem a traduz é `fraseDaRecusa`.
  *
- * O TELEFONE NÃO PASSA POR AQUI. A tela manda o parceiro ou a tentativa do lote; o
- * banco escolhe o número e o entrega ao provedor. Nenhuma função deste arquivo
+ * O TELEFONE NÃO PASSA POR AQUI. A tela manda a tentativa do lote; o banco disca o
+ * número reservado para ela e o entrega ao provedor. Nenhuma função deste arquivo
  * devolve número, e `voice_calls.to_number` nem é legível por quem está logado.
  */
 
@@ -61,22 +61,47 @@ export async function telefoniaLigada(): Promise<boolean> {
   );
 }
 
-/** Abre a chamada no banco. Um dos dois alvos, nunca os dois. */
-export async function abrirLigacaoDeVoz(
-  alvo: { organizationId: string } | { attemptId: string },
-): Promise<AberturaDeVoz> {
+/** Abre no banco a chamada da tentativa `attemptId` (aberta por `iniciar_chamada`). */
+export async function abrirLigacaoDeVoz(alvo: { attemptId: string }): Promise<AberturaDeVoz> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc(
-    'voz_abrir_ligacao',
-    'attemptId' in alvo
-      ? { p_attempt_id: alvo.attemptId }
-      : { p_organization_id: alvo.organizationId },
-  );
+  const { data, error } = await supabase.rpc('voz_abrir_ligacao', {
+    p_attempt_id: alvo.attemptId,
+  });
   if (error) {
     console.error('[voz] abrir', error);
     return { ok: false, motivo: error.code === '42501' ? 'sem_permissao' : 'falha' };
   }
   const lido = aberturaSchema.safeParse(data);
+  return lido.success ? lido.data : { ok: false, motivo: 'falha' };
+}
+
+const loteAvulsoSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), lote_id: z.string().uuid() }),
+  z.object({
+    ok: z.literal(false),
+    motivo: z.string(),
+    dono: z.string().nullable().optional(),
+    lote_id: z.string().uuid().nullable().optional(),
+    lote_nome: z.string().nullable().optional(),
+  }),
+]);
+
+export type LoteAvulso = z.infer<typeof loteAvulsoSchema>;
+
+/**
+ * O "Ligar" da ficha: monta (ou reaproveita) o lote de um contato deste parceiro. Quem
+ * liga de verdade é a tela de ligar do módulo, aberta com o id que volta daqui.
+ */
+export async function montarLoteAvulso(organizationId: string): Promise<LoteAvulso> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('montar_lote_avulso', {
+    p_organization_id: organizationId,
+  });
+  if (error) {
+    console.error('[voz] lote avulso', error);
+    return { ok: false, motivo: error.code === '42501' ? 'sem_permissao' : 'falha' };
+  }
+  const lido = loteAvulsoSchema.safeParse(data);
   return lido.success ? lido.data : { ok: false, motivo: 'falha' };
 }
 

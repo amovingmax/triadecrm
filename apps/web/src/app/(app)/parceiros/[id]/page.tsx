@@ -235,7 +235,6 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
           <div className="md:ml-auto md:shrink-0">
             <AcoesDaFicha
               organizationId={ficha.id}
-              nome={ficha.nome}
               temTelefone={Boolean(ficha.telefone)}
               podeEscrever={podeEscrever}
               conversaNoCrm={conectado && podeEscrever}

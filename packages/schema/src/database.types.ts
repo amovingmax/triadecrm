@@ -2360,6 +2360,7 @@ export type Database = {
       }
       call_batches: {
         Row: {
+          avulso: boolean
           created_at: string
           ends_on: string
           id: string
@@ -2382,6 +2383,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avulso?: boolean
           created_at?: string
           ends_on: string
           id?: string
@@ -2404,6 +2406,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avulso?: boolean
           created_at?: string
           ends_on?: string
           id?: string
@@ -8367,6 +8370,10 @@ export type Database = {
       }
       meu_papel: { Args: never; Returns: Json }
       modelo_whatsapp_criar: { Args: { p: Json }; Returns: Json }
+      montar_lote_avulso: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       montar_lote: {
         Args: {
           p_categoria_ids?: number[]

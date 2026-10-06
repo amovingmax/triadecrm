@@ -26,21 +26,19 @@ import { useEditarFicha } from './ficha-edicao';
  *   - REGISTRAR CONTATO fica ao lado, só para quem escreve: o banco recusaria a
  *     gravação do papel de leitura no fim do fluxo (`app.can_write()`).
  *   - LIGAR aparece só com a telefonia ligada (`voz.telefonia`) e para quem escreve:
- *     a chamada sai do navegador e o resultado é registrado no painel da ligação.
+ *     abre a tela de ligar com o roteiro, para este parceiro, e a chamada sai do navegador.
  *   - "⋯" guarda o que se faz de vez em quando: ver no funil e editar a ficha.
  *
  * No celular os dois primeiros dividem a largura e o menu fica na ponta.
  */
 export function AcoesDaFicha({
   organizationId,
-  nome,
   temTelefone,
   podeEscrever,
   conversaNoCrm,
   hrefDoFunil,
 }: {
   organizationId: string;
-  nome: string;
   /** A ficha tem telefone (inteiro ou mascarado): sem ele não há para onde ligar. */
   temTelefone: boolean;
   podeEscrever: boolean;
@@ -72,7 +70,7 @@ export function AcoesDaFicha({
       ) : null}
 
       {podeEscrever ? (
-        <BotaoLigar organizationId={organizationId} nome={nome} temTelefone={temTelefone} />
+        <BotaoLigar organizationId={organizationId} temTelefone={temTelefone} />
       ) : null}
 
       {temMenu ? (

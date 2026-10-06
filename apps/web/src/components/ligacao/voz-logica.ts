@@ -107,11 +107,16 @@ export function linhaFoiAtendida(estado: EstadoDaLinha, atendidaEm: string | nul
 // 3. O relógio
 // ---------------------------------------------------------------------------
 
-/** `00:03:27`. Relógio de parede, como em `chamada-maquina.ts`: aba que dormiu não atrasa. */
+/**
+ * `03:27`, e `1:02:05` depois de uma hora — o formato do visor de um telefone, e o
+ * mesmo do cronômetro da tela de ligar (`cronometro`, em `chamada-cabecalho.tsx`).
+ */
 export function relogioDaLigacao(segundos: number): string {
   const s = Math.max(0, Math.floor(segundos));
   const doisDigitos = (n: number) => String(n).padStart(2, '0');
-  return `${doisDigitos(Math.floor(s / 3600))}:${doisDigitos(Math.floor((s % 3600) / 60))}:${doisDigitos(s % 60)}`;
+  const h = Math.floor(s / 3600);
+  const resto = `${doisDigitos(Math.floor((s % 3600) / 60))}:${doisDigitos(s % 60)}`;
+  return h > 0 ? `${h}:${resto}` : resto;
 }
 
 /** Segundos de conversa: do atendimento até agora (ou até o fim, quando já acabou). */
@@ -150,6 +155,16 @@ export type FalhaDeVoz =
   | 'credencial'
   | 'falha_na_telefonia';
 
+/** O nome curto do que deu errado: é o que a pessoa lê primeiro. */
+export const TITULO_DA_FALHA: Record<FalhaDeVoz, string> = {
+  microfone_bloqueado: 'Microfone bloqueado',
+  sem_microfone: 'Microfone não encontrado',
+  numero_invalido: 'Telefone inválido',
+  sem_conexao: 'Sem conexão',
+  credencial: 'Telefone não preparado',
+  falha_na_telefonia: 'Falha na ligação',
+};
+
 export const FRASE_DA_FALHA: Record<FalhaDeVoz, string> = {
   microfone_bloqueado:
     'Não foi possível acessar seu microfone. Autorize o acesso nas configurações do navegador.',
@@ -160,24 +175,82 @@ export const FRASE_DA_FALHA: Record<FalhaDeVoz, string> = {
   falha_na_telefonia: 'Não foi possível completar esta ligação. Tente novamente.',
 };
 
-/** O que `voz_abrir_ligacao` recusa, em frase. */
-export const FRASE_DA_RECUSA: Record<string, string> = {
-  sem_permissao: 'Seu perfil não faz ligações pelo CRM.',
-  telefonia_desligada:
-    'A ligação pelo navegador está desligada. Use o telefone e registre o contato.',
-  ja_em_ligacao: 'Você já tem uma ligação em andamento. Encerre-a antes de começar outra.',
-  chamada_ja_encerrada: 'Esta chamada já foi encerrada. Puxe o próximo da fila.',
-  parceiro_inexistente: 'Parceiro não encontrado.',
-  sem_telefone: 'Este parceiro não tem telefone cadastrado.',
-  numero_invalido: FRASE_DA_FALHA.numero_invalido,
-  fora_da_janela: 'Fora do horário permitido para ligações. Volte na próxima janela.',
-  contato_suprimido: 'Este contato pediu para não ser procurado.',
-  integracao_nao_configurada:
-    'A telefonia ainda não está configurada. Avise quem administra o CRM.',
+/** Aviso pronto para a tela: título curto e a frase que diz o que fazer. */
+export type AvisoDeVoz = { titulo: string; frase: string };
+
+export function avisoDaFalha(falha: FalhaDeVoz): AvisoDeVoz {
+  return { titulo: TITULO_DA_FALHA[falha], frase: FRASE_DA_FALHA[falha] };
+}
+
+/**
+ * O que o banco recusa (`voz_abrir_ligacao`, `montar_lote_avulso`) e o que a
+ * credencial recusa (`voz-token`), com título e frase.
+ */
+export const AVISO_DA_RECUSA: Record<string, AvisoDeVoz> = {
+  sem_permissao: { titulo: 'Sem permissão', frase: 'Seu perfil não faz ligações pelo CRM.' },
+  telefonia_desligada: {
+    titulo: 'Telefonia desligada',
+    frase: 'A ligação pelo navegador está desligada. Use o telefone e registre o contato.',
+  },
+  ja_em_ligacao: {
+    titulo: 'Ligação em andamento',
+    frase: 'Você já tem uma ligação em andamento. Encerre-a antes de começar outra.',
+  },
+  chamada_ja_encerrada: {
+    titulo: 'Chamada encerrada',
+    frase: 'Esta chamada já foi encerrada. Puxe o próximo da fila.',
+  },
+  parceiro_inexistente: { titulo: 'Parceiro não encontrado', frase: 'Esta ficha não existe mais.' },
+  sem_telefone: {
+    titulo: 'Sem telefone',
+    frase: 'Este parceiro não tem telefone cadastrado.',
+  },
+  numero_invalido: avisoDaFalha('numero_invalido'),
+  fora_da_janela: {
+    titulo: 'Fora do horário',
+    frase: 'Ligações só de segunda a sexta, das 9h às 20h, e sábado, das 10h às 13h.',
+  },
+  contato_suprimido: {
+    titulo: 'Não ligar',
+    frase: 'Este contato pediu para não ser procurado.',
+  },
+  reservado_em_outro_lote: {
+    titulo: 'Em outro lote',
+    frase: 'Este parceiro está no lote de ligação de outra pessoa.',
+  },
+  ja_no_seu_lote: {
+    titulo: 'Já está no seu lote',
+    frase: 'Este parceiro já está num lote seu. Ligue por lá, na ordem da fila.',
+  },
+  sem_negocio_aberto: {
+    titulo: 'Sem negócio aberto',
+    frase: 'Este parceiro não está em nenhum funil. Registre o contato pela tela Registrar.',
+  },
+  roteiro_invalido: {
+    titulo: 'Sem roteiro publicado',
+    frase: 'Não há roteiro de ligação publicado. Avise quem administra o CRM.',
+  },
+  integracao_nao_configurada: {
+    titulo: 'Telefonia não configurada',
+    frase: 'A telefonia ainda não está configurada. Avise quem administra o CRM.',
+  },
 };
 
-export function fraseDaRecusa(motivo: string | null | undefined): string {
-  return (motivo && FRASE_DA_RECUSA[motivo]) || FRASE_DA_FALHA.falha_na_telefonia;
+export function avisoDaRecusa(
+  motivo: string | null | undefined,
+  detalhes: { dono?: string | null; loteNome?: string | null } = {},
+): AvisoDeVoz {
+  const aviso = (motivo && AVISO_DA_RECUSA[motivo]) || avisoDaFalha('falha_na_telefonia');
+  if (motivo === 'reservado_em_outro_lote' && detalhes.dono) {
+    return { ...aviso, frase: `Este parceiro está no lote de ligação de ${detalhes.dono}.` };
+  }
+  if (motivo === 'ja_no_seu_lote' && detalhes.loteNome) {
+    return {
+      ...aviso,
+      frase: `Este parceiro já está no seu lote "${detalhes.loteNome}". Ligue por lá, na ordem da fila.`,
+    };
+  }
+  return aviso;
 }
 
 /**
