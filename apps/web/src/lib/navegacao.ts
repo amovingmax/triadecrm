@@ -233,11 +233,13 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
   },
   {
     href: '/ligar',
-    rotulo: 'Ligar',
+    // "Lotes", e não mais "Ligar" (06/10/2026): é onde a gestão monta o lote de
+    // cada pessoa, e onde quem liga encontra o que montaram para ela.
+    rotulo: 'Lotes',
     icone: PhoneCall,
     grupo: 'todo_dia',
     descricao:
-      'Prospecção ativa por ligação: lote com fila reservada na montagem, roteiro em árvore, tabulação em dois eixos e opt-out quando o parceiro pede para parar.',
+      'Ligar para os prospectados: a gestão monta o lote e escolhe quem liga; roteiro de apoio, resultado de cada ligação e opt-out quando pedem para parar.',
     // `papeis` NOVO, e conserta uma ejeção que existia desde o D5: o item
     // aparecia para leitura e financeiro, a rota não tinha guarda de servidor
     // nenhuma, e a pessoa montava um lote inteiro para descobrir no fim que a
@@ -296,7 +298,9 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
   {
     href: '/parceiros',
     principal: true,
-    rotulo: 'Parceiros',
+    // "Prospectados", e não mais "Parceiros" (06/10/2026): é para onde vai quem
+    // foi aprovado na Revisão, e de onde saem os lotes de ligação.
+    rotulo: 'Prospectados',
     icone: Handshake,
     grupo: 'a_base',
     // "Importar planilha" entrou na frase porque a rota `/importar` saiu do menu

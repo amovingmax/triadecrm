@@ -6,7 +6,7 @@ import { carregarCatalogos } from '@/components/parceiros/catalogos';
 import { TelaParceiros } from '@/components/parceiros/tela-parceiros';
 import { filtrosDaUrl } from '@/components/parceiros/tipos';
 
-export const metadata: Metadata = { title: 'Parceiros' };
+export const metadata: Metadata = { title: 'Prospectados' };
 
 /**
  * Lista de parceiros (RF-BAS-12, RF-BAS-14, RF-BAS-15).

@@ -62,9 +62,12 @@ import { ChipTemperatura } from '@/components/temperatura';
 import {
   CHAVE_FUNIS_DE_LIGACAO,
   CHAVE_LOTES,
+  CHAVE_QUEM_LIGA,
   CHAVE_ROTEIROS,
+  atribuirLote,
   carregarBaseDaMontagem,
   carregarFunisDeLigacao,
+  carregarQuemLiga,
   carregarRoteirosPublicados,
   chaveDaBase,
   exclusoesEmFrases,
@@ -90,6 +93,7 @@ import {
   ROTULOS_ORDEM,
   TAMANHO_MAXIMO_DO_LOTE,
   TAMANHO_PADRAO_DO_LOTE,
+  type MontarLote,
   type OrdemDaFila,
 } from './tipos';
 
@@ -299,6 +303,18 @@ function FormularioDeMontagem({ aoFechar }: { aoFechar: () => void }) {
   );
   const [recusa, setRecusa] = useState<string | null>(null);
 
+  // PARA QUEM É O LOTE (pivô de 06/10/2026). A gestão monta para ela mesma ou
+  // para quem vai ligar. `null` é "para mim", que é como o lote já nasce.
+  const quemLiga = useQuery({
+    queryKey: CHAVE_QUEM_LIGA,
+    queryFn: carregarQuemLiga,
+    staleTime: 5 * 60_000,
+  });
+  const [paraQuemId, setParaQuemId] = useState<string | null>(null);
+  const paraQuem = (quemLiga.data ?? []).find((p) => p.id === paraQuemId && !p.souEu) ?? null;
+  /** Quem ficou com o lote montado: `null` = quem montou; `entregue` falso = o banco recusou passar. */
+  const [destino, setDestino] = useState<{ nome: string; entregue: boolean } | null>(null);
+
   // O primeiro funil e o primeiro roteiro entram sozinhos: são dois toques que a
   // pessoa daria em 100% das vezes, e a base tem um roteiro publicado só. A escolha
   // é DERIVADA, não copiada para o estado num efeito: escrever o padrão em `useState`
@@ -327,10 +343,19 @@ function FormularioDeMontagem({ aoFechar }: { aoFechar: () => void }) {
   const nomeFinal = nomeEditado ? nome : nomeSugerido(funilAtual, temperaturas);
 
   const montagem = useMutation({
-    mutationFn: montarLote,
-    onSuccess: (resultado) => {
+    // Monta no nome de quem clicou e, se o lote é de outra pessoa, passa para
+    // ela em seguida (ver `atribuirLote`). Se passar falhar, o lote EXISTE e os
+    // contatos estão reservados: o recibo diz com quem ele ficou.
+    mutationFn: async (entrada: MontarLote) => {
+      const resultado = await montarLote(entrada);
+      if (!resultado.montado || paraQuem === null) return { resultado, destino: null };
+      const entregue = await atribuirLote(resultado.lote_id, paraQuem.id).catch(() => false);
+      return { resultado, destino: { nome: paraQuem.nome, entregue } };
+    },
+    onSuccess: ({ resultado, destino: ficouCom }) => {
       if (resultado.montado) {
         setResumo(resultado);
+        setDestino(ficouCom);
         setRecusa(null);
         void cliente.invalidateQueries({ queryKey: CHAVE_LOTES });
         void cliente.invalidateQueries({ queryKey: chaveDaBase(pipelineId) });
@@ -362,8 +387,10 @@ function FormularioDeMontagem({ aoFechar }: { aoFechar: () => void }) {
     return (
       <ReciboDaMontagem
         resumo={resumo}
+        destino={destino}
         aoFechar={() => {
           setResumo(null);
+          setDestino(null);
           aoFechar();
         }}
       />
@@ -379,6 +406,27 @@ function FormularioDeMontagem({ aoFechar }: { aoFechar: () => void }) {
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4">
         <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="flex min-w-0 flex-col gap-5 md:col-start-1 md:row-start-1">
+            <Bloco rotulo="Para quem é o lote" dica="Quem vai ligar para estes contatos.">
+              <div className="flex flex-wrap gap-2">
+                {(quemLiga.data ?? []).map((pessoa) => (
+                  <Pastilha
+                    key={pessoa.id}
+                    ativa={pessoa.souEu ? paraQuem === null : pessoa.id === paraQuem?.id}
+                    aoAlternar={() => setParaQuemId(pessoa.souEu ? null : pessoa.id)}
+                  >
+                    {pessoa.souEu ? 'Para mim' : pessoa.nome}
+                  </Pastilha>
+                ))}
+                {quemLiga.isPending ? (
+                  <p className="text-sm text-muted-foreground">Carregando o time...</p>
+                ) : quemLiga.isError ? (
+                  <p className="text-sm text-muted-foreground">
+                    Não deu para ler o time; o lote fica no seu nome.
+                  </p>
+                ) : null}
+              </div>
+            </Bloco>
+
             <Bloco rotulo="Funil" dica="Um lote não mistura funis: funil único é roteiro único.">
               <div className="flex flex-wrap gap-2">
                 {(funis.data ?? []).map((funil) => (
@@ -978,11 +1026,16 @@ function diaCurto(dia: string): string {
  */
 function ReciboDaMontagem({
   resumo,
+  destino,
   aoFechar,
 }: {
   resumo: Extract<ResultadoDaMontagem, { montado: true }>;
+  /** Para quem o lote foi montado; `null` = para quem montou. */
+  destino: { nome: string; entregue: boolean } | null;
   aoFechar: () => void;
 }) {
+  // No nome de quem os contatos ficaram reservados, dito como a frase precisa.
+  const noNome = destino?.entregue ? `no nome de ${destino.nome}` : 'no seu nome';
   const excluidos = exclusoesEmFrases(resumo.excluidos);
   const ate = resumo.termina_em ? diaCurto(resumo.termina_em) : null;
   const pedido = resumo.termina_em_pedido ? diaCurto(resumo.termina_em_pedido) : null;
@@ -1006,17 +1059,27 @@ function ReciboDaMontagem({
           <p className="mt-2 text-sm text-muted-foreground">
             {ate ? (
               <>
-                Reservados no seu nome até <span className="numerico text-foreground">{ate}</span>:
+                Reservados {noNome} até <span className="numerico text-foreground">{ate}</span>:
                 eles somem da montagem de todo mundo até lá, ou até o lote acabar. Para devolvê-los
                 antes, encerre o lote na lista.
               </>
             ) : (
               <>
-                Esses contatos estão reservados no seu nome: eles somem da montagem de todo mundo
-                até o lote acabar ou ser encerrado.
+                Esses contatos estão reservados {noNome}: eles somem da montagem de todo mundo até o
+                lote acabar ou ser encerrado.
               </>
             )}
           </p>
+          {destino && !destino.entregue ? (
+            <p className="mt-2 text-sm text-destructive-texto">
+              O lote foi montado, mas não deu para passá-lo para {destino.nome}: ele ficou no seu
+              nome. Encerre e monte de novo, ou ligue você.
+            </p>
+          ) : destino ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {destino.nome} já encontra este lote em Lotes, pronto para ligar.
+            </p>
+          ) : null}
           {esticou ? (
             <p className="mt-2 text-sm text-muted-foreground">
               Você pediu até <span className="numerico">{pedido}</span>.{' '}

@@ -479,6 +479,62 @@ export async function montarLote(entrada: MontarLote): Promise<ResultadoDaMontag
   return analisado.data;
 }
 
+// ---------------------------------------------------------------------------
+// De quem é o lote (pivô de 06/10/2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Quem pode receber um lote: gente ativa de um dos três papéis.
+ *
+ * A gestão monta o lote e diz quem vai ligar — ela mesma ou um SDR. A lista vem
+ * da `team_directory`, que não tem PII e é legível por todo autenticado.
+ */
+export type QuemLiga = { id: string; nome: string; papel: string; souEu: boolean };
+
+export const CHAVE_QUEM_LIGA = ['ligacao', 'quem-liga'] as const;
+
+const PAPEIS_QUE_RECEBEM_LOTE: readonly string[] = ['admin', 'gestor', 'sdr'];
+
+export async function carregarQuemLiga(): Promise<QuemLiga[]> {
+  const supabase = createClient();
+  const [sessao, time] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from('team_directory').select('id, full_name, role').eq('is_active', true),
+  ]);
+  if (time.error) throw time.error;
+  const meuId = sessao.data.user?.id ?? null;
+
+  return (
+    ((time.data ?? []) as { id: string | null; full_name: string | null; role: string | null }[])
+      .filter((p) => p.id !== null && p.role !== null && PAPEIS_QUE_RECEBEM_LOTE.includes(p.role))
+      .map((p) => ({
+        id: p.id as string,
+        nome: p.full_name?.trim() || 'Sem nome',
+        papel: p.role as string,
+        souEu: p.id === meuId,
+      }))
+      // Quem monta vem primeiro: "para mim" é o caso que não pede escolha.
+      .sort((a, b) => Number(b.souEu) - Number(a.souEu) || a.nome.localeCompare(b.nome, 'pt-BR'))
+  );
+}
+
+/**
+ * Passa o lote para quem vai ligar. `false` = o banco recusou, e o lote continua
+ * no nome de quem montou — a tela diz isso em vez de fingir que entregou.
+ *
+ * É uma chamada à parte, e não um parâmetro do `montar_lote`, de propósito: ver
+ * o cabeçalho da migração `20261006130000`.
+ */
+export async function atribuirLote(loteId: string, pessoaId: string): Promise<boolean> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('lote_atribuir', {
+    p_batch_id: loteId,
+    p_para: pessoaId,
+  });
+  if (error) throw error;
+  return (data as { ok?: boolean } | null)?.ok === true;
+}
+
 /** Os motivos de exclusão que o banco devolveu, já como frases da tela. */
 export function exclusoesEmFrases(
   excluidos: Record<string, number>,

@@ -104,7 +104,7 @@ export function TelaParceiros({
     <div className="flex w-full flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Parceiros</h1>
+          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Prospectados</h1>
           <p className="text-sm text-muted-foreground">
             {consulta.isPending ? (
               'Carregando a base...'

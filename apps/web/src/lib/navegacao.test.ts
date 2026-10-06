@@ -17,7 +17,7 @@ import {
 } from '@/lib/navegacao';
 
 describe('NAVEGACAO', () => {
-  it('tem os 5 módulos de uso diário na barra do celular, com Ligar onde era o Registrar', () => {
+  it('tem os 5 módulos de uso diário na barra do celular, com Lotes onde era o Registrar', () => {
     // Registrar saiu do menu no pivô de 06/10/2026 (a tela continua, pelo botão
     // "Registrar contato"); a fatia dele ficou com Ligar, que virou metade do
     // trabalho do SDR. Cinco fatias mais "Mais" cabem em 390px com o alvo de
@@ -29,8 +29,8 @@ describe('NAVEGACAO', () => {
     // já sabe achar. Este teste é o que trava as duas ordens em critérios separados.
     expect(barraDoCelular('admin').fatias.map((item) => item.rotulo)).toEqual([
       'Meu dia',
-      'Ligar',
-      'Parceiros',
+      'Lotes',
+      'Prospectados',
       'Funis',
       'Conversas',
     ]);
@@ -38,7 +38,7 @@ describe('NAVEGACAO', () => {
 
   it('quem liga fica com duas fatias, e nada em "Mais"', () => {
     const barra = barraDoCelular('sdr');
-    expect(barra.fatias.map((item) => item.rotulo)).toEqual(['Meu dia', 'Ligar']);
+    expect(barra.fatias.map((item) => item.rotulo)).toEqual(['Meu dia', 'Lotes']);
     expect(barra.emMais).toEqual([]);
   });
 
@@ -158,18 +158,18 @@ describe('navegacaoPara', () => {
   });
 
   it('quem liga vê duas telas: Meu dia e Ligar (pivô de 06/10/2026)', () => {
-    expect(navegacaoPara('sdr').map((item) => item.rotulo)).toEqual(['Meu dia', 'Ligar']);
+    expect(navegacaoPara('sdr').map((item) => item.rotulo)).toEqual(['Meu dia', 'Lotes']);
   });
 
   it('admin e gestor veem tudo o que sobrou', () => {
     for (const papel of ['admin', 'gestor'] as const) {
       expect(navegacaoPara(papel).map((item) => item.rotulo)).toEqual([
         'Meu dia',
-        'Ligar',
+        'Lotes',
         'Conversas',
         'Agenda',
         'Revisão',
-        'Parceiros',
+        'Prospectados',
         'Funis',
         'Metas',
         'Relatórios',
@@ -220,7 +220,7 @@ describe('navegacaoAgrupada', () => {
       'Agenda',
       'Funis',
       'Metas',
-      'Parceiros',
+      'Prospectados',
       'Revisão',
       'Relatórios',
       'Ajustes',

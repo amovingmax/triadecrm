@@ -9,8 +9,11 @@
  * São duas pessoas ligando da mesma base de 100 organizações. O lote da Heloísa
  * segura os contatos dele — eles somem da montagem do Matheus, e a prévia diz
  * "reservado em outro lote". Esconder o lote alheio deixaria essa subtração sem
- * explicação. Por isso todo lote visível aparece, com o nome de quem montou, e só o
- * dono vê as ações de encerrar.
+ * explicação. Por isso todo lote visível aparece, com o nome de quem vai ligar.
+ *
+ * Desde o pivô de 06/10/2026 quem monta o lote é a gestão (para ela mesma ou
+ * para quem liga): só admin e gestor veem todos os lotes e a ação de encerrar;
+ * quem só liga vê os que montaram para ela (`lote-tela.tsx`).
  *
  * ---------------------------------------------------------------------------
  * Encerrar não é apagar
@@ -81,14 +84,21 @@ export function CartaoDoLote({
   lote,
   aoEncerrar,
   encerrando,
+  gestao = false,
 }: {
   lote: LoteNaLista;
   aoEncerrar: (lote: LoteNaLista) => void;
   encerrando: boolean;
+  /**
+   * Admin e gestor montam o lote de todo mundo, e por isso só eles encerram —
+   * o próprio e o dos outros. Quem só liga recebe o lote pronto: encerrá-lo
+   * devolveria à base os contatos que a gestão escolheu para ela (06/10/2026).
+   */
+  gestao?: boolean;
 }) {
   const [confirmando, setConfirmando] = useState(false);
   const aberto = lote.status === 'ativo' || lote.status === 'pausado';
-  const podeEncerrar = aberto && lote.ehMeu;
+  const podeEncerrar = aberto && gestao;
 
   return (
     <article
@@ -200,10 +210,12 @@ export function ListaDeLotes({
   lotes,
   aoEncerrar,
   encerrandoId,
+  gestao = false,
 }: {
   lotes: readonly LoteNaLista[];
   aoEncerrar: (lote: LoteNaLista) => void;
   encerrandoId: string | null;
+  gestao?: boolean;
 }) {
   return (
     <div className="grid gap-3 lg:grid-cols-2">
@@ -213,6 +225,7 @@ export function ListaDeLotes({
           lote={lote}
           aoEncerrar={aoEncerrar}
           encerrando={encerrandoId === lote.id}
+          gestao={gestao}
         />
       ))}
     </div>
