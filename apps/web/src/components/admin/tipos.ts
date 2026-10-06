@@ -92,29 +92,25 @@ export const ROTULO_LGPD: Record<SecaoLgpd, string> = {
 };
 
 /**
- * Papéis que podem ser atribuídos na tela.
+ * Papéis que podem ser atribuídos na tela: os três que existem desde o pivô de
+ * 06/10/2026. Embaixador, leitura e financeiro saíram — ninguém os tinha em
+ * produção — e continuam só no enum do banco.
  *
  * `bot` fica de fora de propósito: é a identidade dos workers (service role restrito
  * por RLS, RF-ADM-01) e não pertence a uma pessoa. Dar `bot` a alguém no dropdown
  * seria conceder um papel que não foi desenhado para ter dono.
  */
-export const PAPEIS_ATRIBUIVEIS: readonly AppRole[] = [
-  'admin',
-  'gestor',
-  'sdr',
-  'embaixador',
-  'leitura',
-  'financeiro',
-];
+export const PAPEIS_ATRIBUIVEIS: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
 
 /** Uma linha em português para cada papel, para a pessoa saber o que está concedendo. */
 export const O_QUE_O_PAPEL_FAZ: Record<AppRole, string> = {
   admin: 'Tudo, inclusive papéis, auditoria e exportação.',
-  gestor: 'Gerencia a base, os catálogos e as metas; lê telefone sem revelar.',
-  sdr: 'Trabalha a carteira em campo; telefone só pelo botão que fica registrado.',
-  embaixador: 'Vê apenas os parceiros que indicou; sem telefone completo e sem exportar.',
-  leitura: 'Só lê. Não cria, não move e não envia.',
-  financeiro: 'Leitura com telefone de base, para conciliação.',
+  gestor:
+    'Gerencia a base, a Revisão, os catálogos e as metas; aprova e traz gente para a base; lê telefone sem revelar.',
+  sdr: 'Liga e conversa no WhatsApp com quem é dele; marca reunião e edita a ficha. Não aprova nem importa.',
+  embaixador: 'Papel desativado em 06/10/2026.',
+  leitura: 'Papel desativado em 06/10/2026: sem acesso.',
+  financeiro: 'Papel desativado em 06/10/2026.',
   bot: 'Identidade dos workers. Não é dada a pessoas.',
 };
 

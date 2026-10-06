@@ -25,10 +25,7 @@ export default async function Pagina({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [, params] = await Promise.all([
-    requireRole('admin', 'gestor', 'sdr', 'leitura', 'financeiro'),
-    searchParams,
-  ]);
+  const [, params] = await Promise.all([requireRole('admin', 'gestor'), searchParams]);
 
   return (
     <ProvedorConsultas>

@@ -17,11 +17,11 @@ import {
 } from '@/lib/navegacao';
 
 describe('NAVEGACAO', () => {
-  it('tem os 5 módulos de uso diário na barra do celular, com Registrar entre eles', () => {
-    // Registrar entrou em 09/09/2026: é a tela onde o trabalho vira dado — cria a
-    // temperatura, a próxima ação e a meta — e era a única do produto fora da
-    // navegação, alcançável só por link de outra tela. Cinco fatias mais "Mais"
-    // cabem em 390px com o alvo de toque de 44px; a sexta não caberia.
+  it('tem os 5 módulos de uso diário na barra do celular, com Ligar onde era o Registrar', () => {
+    // Registrar saiu do menu no pivô de 06/10/2026 (a tela continua, pelo botão
+    // "Registrar contato"); a fatia dele ficou com Ligar, que virou metade do
+    // trabalho do SDR. Cinco fatias mais "Mais" cabem em 390px com o alvo de
+    // toque de 44px; a sexta não caberia.
     //
     // A ORDEM é a do polegar, e é por isso que ela está escrita num campo próprio:
     // agrupar a lateral por natureza do trabalho teria empurrado Conversas para a
@@ -29,11 +29,27 @@ describe('NAVEGACAO', () => {
     // já sabe achar. Este teste é o que trava as duas ordens em critérios separados.
     expect(barraDoCelular('admin').fatias.map((item) => item.rotulo)).toEqual([
       'Meu dia',
-      'Registrar',
+      'Ligar',
       'Parceiros',
       'Funis',
       'Conversas',
     ]);
+  });
+
+  it('o SDR fica com quatro fatias: a lista de Parceiros não é dele', () => {
+    expect(barraDoCelular('sdr').fatias.map((item) => item.rotulo)).toEqual([
+      'Meu dia',
+      'Ligar',
+      'Funis',
+      'Conversas',
+    ]);
+  });
+
+  it('Campanhas e Cadências deixaram de existir, e Registrar saiu do menu (pivô de 06/10/2026)', () => {
+    const hrefs = NAVEGACAO.map((item) => item.href);
+    expect(hrefs).not.toContain('/envios');
+    expect(hrefs).not.toContain('/cadencias');
+    expect(hrefs).not.toContain('/registrar');
   });
 
   it('não repete posição na barra, e nenhuma passa de cinco', () => {
@@ -120,7 +136,7 @@ describe('NAVEGACAO', () => {
     // Era uma ejeção: leitura e financeiro viam o item, entravam, montavam o lote
     // e só descobriam a recusa quando `registrar_contato` devolvia sem_permissao.
     const ligar = NAVEGACAO.find((item) => item.href === '/ligar');
-    expect(ligar?.papeis).toEqual(['admin', 'gestor', 'sdr', 'embaixador']);
+    expect(ligar?.papeis).toEqual(['admin', 'gestor', 'sdr']);
   });
 
   it('tirou Importar do menu sem tirar a rota do produto', () => {
@@ -142,6 +158,40 @@ describe('navegacaoPara', () => {
     expect(rotulos('gestor')).toContain('Ajustes');
     expect(rotulos('sdr')).not.toContain('Ajustes');
     expect(rotulos('leitura')).not.toContain('Ajustes');
+  });
+
+  it('o SDR vê o que é do trabalho dele, e nada da gestão da base (pivô de 06/10/2026)', () => {
+    expect(navegacaoPara('sdr').map((item) => item.rotulo)).toEqual([
+      'Meu dia',
+      'Ligar',
+      'Conversas',
+      'Agenda',
+      'Funis',
+      'Metas',
+    ]);
+  });
+
+  it('admin e gestor veem tudo o que sobrou', () => {
+    for (const papel of ['admin', 'gestor'] as const) {
+      expect(navegacaoPara(papel).map((item) => item.rotulo)).toEqual([
+        'Meu dia',
+        'Ligar',
+        'Conversas',
+        'Agenda',
+        'Revisão',
+        'Parceiros',
+        'Funis',
+        'Metas',
+        'Relatórios',
+        'Ajustes',
+      ]);
+    }
+  });
+
+  it('papel que não existe mais não vê menu nenhum', () => {
+    for (const papel of ['embaixador', 'leitura', 'financeiro', 'bot'] as const) {
+      expect(navegacaoPara(papel)).toEqual([]);
+    }
   });
 });
 
@@ -169,21 +219,16 @@ describe('navegacaoAgrupada', () => {
     }
   });
 
-  it('nunca oferece a leitura e ao financeiro um item que a rota ejetaria', () => {
-    // O embaixador é o caso que mais perde: sem Relatórios (requireRole no
-    // servidor) e sem Ajustes. Ainda assim sobra grupo para ele em "Controle".
-    const embaixador = navegacaoAgrupada('embaixador');
-    const rotulos = embaixador.flatMap((b) => b.itens.map((i) => i.rotulo));
-    expect(rotulos).not.toContain('Relatórios');
-    expect(rotulos).not.toContain('Ajustes');
-    expect(embaixador.map((b) => b.grupo.chave)).toContain('controle');
-
-    for (const papel of ['leitura', 'financeiro'] as const) {
-      const deles = navegacaoPara(papel).map((i) => i.href);
-      expect(deles).not.toContain('/ligar');
-      expect(deles).not.toContain('/registrar');
-      expect(deles).not.toContain('/revisao');
+  it('nunca oferece ao SDR um item que a rota ejetaria', () => {
+    // O SDR é quem mais perde: sem a lista de Parceiros, sem Revisão, sem
+    // Relatórios e sem Ajustes — as quatro rotas têm `requireRole` de admin e
+    // gestor. Ainda assim sobra item para ele nos três grupos.
+    const sdr = navegacaoAgrupada('sdr');
+    const rotulos = sdr.flatMap((b) => b.itens.map((i) => i.rotulo));
+    for (const fechado of ['Parceiros', 'Revisão', 'Relatórios', 'Ajustes']) {
+      expect(rotulos).not.toContain(fechado);
     }
+    expect(sdr.map((b) => b.grupo.chave)).toEqual(['todo_dia', 'a_base', 'controle']);
   });
 });
 
@@ -201,10 +246,12 @@ describe('estaAtivo', () => {
 });
 
 describe('podeCriarParceiro e podeImportarPlanilha', () => {
-  it('oferecem a ação a quem escreve e escondem de quem só lê', () => {
+  it('só admin e gestor põem gente na base; o SDR não adiciona lead', () => {
     for (const pode of [podeCriarParceiro, podeImportarPlanilha]) {
-      expect(pode('sdr')).toBe(true);
-      expect(pode('embaixador')).toBe(true);
+      expect(pode('admin')).toBe(true);
+      expect(pode('gestor')).toBe(true);
+      expect(pode('sdr')).toBe(false);
+      expect(pode('embaixador')).toBe(false);
       expect(pode('leitura')).toBe(false);
       expect(pode('financeiro')).toBe(false);
       expect(pode('bot')).toBe(false);
@@ -217,16 +264,15 @@ describe('podeCriarParceiro e podeImportarPlanilha', () => {
 });
 
 describe('leTelefoneCompleto', () => {
-  it('espelha app.reads_base_pii, que não é o mesmo conjunto de quem cria', () => {
+  it('só admin e gestor leem o telefone inteiro; o SDR revela pelo botão', () => {
     expect(leTelefoneCompleto('admin')).toBe(true);
     expect(leTelefoneCompleto('gestor')).toBe(true);
-    expect(leTelefoneCompleto('leitura')).toBe(true);
-    expect(leTelefoneCompleto('financeiro')).toBe(true);
-    // Criam parceiro e veem o telefone mascarado: é para eles que o vazio explica
-    // por que buscar por um trecho do número não acha nada (RF-BAS-14).
+    // Vê o telefone mascarado: é para ele que o vazio explica por que buscar por
+    // um trecho do número não acha nada (RF-BAS-14).
     expect(leTelefoneCompleto('sdr')).toBe(false);
-    expect(leTelefoneCompleto('embaixador')).toBe(false);
-    expect(leTelefoneCompleto('bot')).toBe(false);
+    for (const papel of ['embaixador', 'leitura', 'financeiro', 'bot'] as const) {
+      expect(leTelefoneCompleto(papel)).toBe(false);
+    }
   });
 });
 
@@ -235,9 +281,9 @@ describe('navegacaoDaLateral (Fase 1)', () => {
     expect(navegacaoDaLateral('admin').principais.map((i) => i.href)).toEqual([
       '/meu-dia',
       '/conversas',
+      '/ligar',
       '/funis',
       '/parceiros',
-      '/envios',
       '/relatorios',
     ]);
   });
@@ -250,7 +296,12 @@ describe('navegacaoDaLateral (Fase 1)', () => {
 
   it('quem não vê um principal fica com menos à vista, e o "Mais" não ganha nada', () => {
     const sdr = navegacaoDaLateral('sdr');
-    expect(sdr.principais.map((i) => i.href)).not.toContain('/envios');
-    expect(sdr.mais.map((i) => i.href)).not.toContain('/envios');
+    expect(sdr.principais.map((i) => i.href)).toEqual([
+      '/meu-dia',
+      '/conversas',
+      '/ligar',
+      '/funis',
+    ]);
+    expect(sdr.mais.map((i) => i.href)).toEqual(['/agenda', '/metas']);
   });
 });

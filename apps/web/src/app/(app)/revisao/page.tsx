@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { requireSession } from '@/lib/auth/session';
+import { requireRole } from '@/lib/auth/session';
 import { podeCriarParceiro } from '@/lib/navegacao';
 import { carregarCatalogosDoRadar } from '@/components/revisao/catalogos';
 import { TelaRevisao } from '@/components/revisao/tela-revisao';
@@ -22,7 +22,11 @@ export const metadata: Metadata = { title: 'Revisão' };
  * criação e a decisão rodam no cliente, contra as funções do Postgres.
  */
 export default async function Pagina() {
-  const [sessao, catalogos] = await Promise.all([requireSession(), carregarCatalogosDoRadar()]);
+  // Só admin e gestor aprovam e põem gente na base (pivô de 06/10/2026).
+  const [sessao, catalogos] = await Promise.all([
+    requireRole('admin', 'gestor'),
+    carregarCatalogosDoRadar(),
+  ]);
 
   return (
     <TelaRevisao

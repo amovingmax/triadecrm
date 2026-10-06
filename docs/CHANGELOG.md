@@ -6420,3 +6420,48 @@ certa, na branch `pivo-do-crm`.
 **Pendente:** a tela nova só vai ao ar quando esta branch for publicada. Em
 produção hoje o site ainda segue a regra de 05/10 para o "por ler" (e chama o
 UPDATE antigo); o banco já tem a função e o gatilho.
+
+### 06/10/2026 — Pivô do CRM, parte 1: o menu, os três papéis e as telas da gestão (RF-ADM-01)
+
+Decisão de 06/10/2026: o CRM encolhe. Campanhas e Cadências deixam de existir,
+os papéis viram três (admin, gestor e SDR) e o SDR passa a cuidar só de ligação
+e de conversa no WhatsApp com quem é dele. Esta entrega é a parte que não
+dependia de mais nenhuma resposta; o resto está listado no fim.
+
+- **Menu:** saíram Campanhas, Cadências e Registrar. Registrar continua existindo
+  como tela, e chega-se a ela pelo botão "Registrar contato" da conversa, da
+  ligação e da ficha. Ligar virou item sempre à vista e herdou, no celular, a
+  fatia que era do Registrar.
+- **SDR vê:** Meu dia, Ligar, Conversas, Agenda, Funis e Metas. **Não vê mais:**
+  a lista de Parceiros, a Revisão, a importação e os Relatórios — as quatro rotas
+  passaram a recusar no servidor quem não é admin nem gestor (`requireRole`). A
+  FICHA de um parceiro (`/parceiros/[id]`) continua abrindo para o SDR.
+- **Papéis que se pode dar a alguém** (Ajustes → Pessoas): só admin, gestor e
+  SDR. Embaixador, leitura e financeiro saíram da lista; ninguém os tinha em
+  produção. Continuam no enum do banco, e quem chegar com um deles não vê menu.
+- **Só admin e gestor** criam parceiro pelo cadastro rápido e importam planilha
+  (`podeCriarParceiro`, `podeImportarPlanilha`).
+- Testes: `navegacao.test.ts` reescrito para o pivô. Site: typecheck, lint e
+  1.174 testes.
+
+**O que esta parte NÃO faz, e é importante saber:** a trava ainda é só de tela.
+No banco o SDR continua enxergando tudo e podendo aprovar na Revisão — quem
+chamar a função direto passa. A trava de verdade (RLS e funções) é a parte 2.
+
+**Pendente (parte 2 em diante), nesta ordem:**
+1. Banco: SDR só vê as conversas e os parceiros dele; Revisão e importação só
+   para admin e gestor; os três papéis antigos sem acesso.
+2. Apagar Campanhas, Cadências e o "Resumo do dia" de `/cadencias/resumo`:
+   telas, funções, tabelas, rotinas e dados.
+3. Revisão com dois botões: "aprovar e mandar mensagem" e "aprovar e subir para
+   a base".
+4. Links que ainda levam o SDR a telas que ele não abre mais ("Novo parceiro" no
+   Registrar e na Agenda, "Ir para a Revisão" no Meu dia, "voltar para Parceiros"
+   na ficha).
+5. Atualizar `CLAUDE.md` e o PRD: o pivô muda decisões fechadas (cinco papéis,
+   cadências no MVP).
+
+**Precisa de decisão humana** (perguntas feitas em 06/10): como uma conversa
+nova chega a um SDR que só vê o que é dele; quem vira dono do lead aprovado; de
+onde sai a lista de ligação; o que é exatamente a "mensagem automática" do botão
+de aprovar; e até onde vai a troca de nome de "Parceiros" para "Prospectado".
