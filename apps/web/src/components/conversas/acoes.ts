@@ -224,21 +224,24 @@ export async function responder({ fioId, texto }: Resposta): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Zera o contador de não lidas do fio.
+ * Zera o contador de não lidas do fio. Devolve se o banco aceitou.
  *
- * Chamada só quando a pessoa ESCOLHEU a conversa, nunca na abertura automática
- * do desktop (que mostra a primeira da lista sem ninguém pedir). Zerar ali
- * apagaria o "por ler" de uma conversa que ninguém olhou — e "por ler" que some
- * sozinho é pior do que não existir.
+ * QUANDO chamar é decisão de `leitura-do-fio.ts` (a pessoa escolheu a conversa
+ * e a janela está na frente dela); aqui é só a porta.
+ *
+ * É uma RPC, e não mais um UPDATE direto, desde 06/10/2026. A política de
+ * update de `conversations` só deixa escrever o gestor ou quem está atendendo;
+ * para o resto do time o UPDATE casava zero linhas e voltava SEM erro — o "por
+ * ler" ficava lá e a tela achava que tinha marcado. Quem decide se esta pessoa
+ * pode é `public.conversa_marcar_lida`, com o recorte de `conversations_select`.
  */
-export async function marcarComoLida(fioId: string): Promise<void> {
+export async function marcarComoLida(fioId: string): Promise<boolean> {
   const supabase = createClient();
-  const { error } = await supabase
-    .from('conversations')
-    .update({ unread_count: 0 })
-    .eq('id', fioId)
-    .gt('unread_count', 0);
+  const { data, error } = await supabase.rpc('conversa_marcar_lida', {
+    p_conversation_id: fioId,
+  });
   if (error) levantar(error.code, error);
+  return (data as { ok?: boolean } | null)?.ok === true;
 }
 
 /**

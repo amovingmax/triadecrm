@@ -6379,3 +6379,44 @@ Entrou na `main` em 06/10/2026, a pedido do Rafael, junto com a entrada abaixo.
 - publicar sempre a partir da `main` do GitHub atualizada: a publicação de 05/10 saiu de uma cópia três dias atrasada.
 
 **Mesmo dia: a `nova-ate-responder` entra na `main`** (a marca "Nova" e o "por ler" só saem com a resposta do time; entrada de 05/10, acima). Pedido do Rafael. Juntou sem conflito de código com a alteração do nome e do número; as duas mexem em `fora-da-base.tsx`, `lista-conversas.tsx` e `avisos/regra.ts`.
+
+### 06/10/2026 — O "por ler" sai ao abrir; a marca "Nova" continua até a resposta (RF-CON-04, RF-CON-05)
+
+Em 05/10 o "por ler" passou a sair só com a resposta do time, junto com a marca
+"Nova" e o número do menu. Em 06/10 veio o pedido contrário ("eu to visualizando
+as mensagens do povo, mas n ta contabilizando que ta sendo visualizada") e,
+perguntado entre as duas regras, a decisão foi **"sai ao abrir"**. As duas
+convivem, porque são sinais diferentes:
+
+- **"por ler"** responde "alguém já viu?". Sai quando a pessoa abre a conversa
+  pela lista, e a cada mensagem nova que chega com a conversa aberta e a janela
+  do CRM em foco (com a janela em outro programa, fica por ler até voltar).
+  Responder também zera, agora pelo banco.
+- **A marca "Nova" e o número ao lado de Conversas** respondem "alguém já
+  respondeu?" e **não mudaram**: continuam até sair uma resposta do time. Quem
+  abre só para conferir tira o "por ler", e a conversa segue marcada.
+
+O que mudou por baixo:
+
+- **Banco (migração `20261006100000`, em produção desde 06/10):** função
+  `public.conversa_marcar_lida`, para quem enxerga a conversa e escreve — o
+  UPDATE direto de antes era recusado em silêncio para quem não era gestor nem o
+  atendente. Gatilho `messages_quem_responde_leu`: texto, áudio ou mídia de gente
+  zera o contador; modelo e robô não. A migração também zerou 8 conversas já
+  respondidas (45 mensagens); ficaram 20 conversas com 59 por ler.
+- **Tela:** `leitura-do-fio.ts` no lugar de `por-ler.ts`, nas duas conversas
+  (parceiro e cliente). A conversa que o desktop abre sozinho não zera — o
+  contador é do time —, mas clicar, rolar ou digitar dentro dela vale como
+  escolha e a prende no lugar.
+- Testes: pgTAP `99_quem_abre_a_conversa_leu.sql` (17) e
+  `leitura-do-fio.test.ts`. Site: typecheck, lint e 1.169 testes.
+
+**Como isto chegou aqui:** a primeira versão foi feita em 06/10 numa máquina cuja
+`main` estava 21 commits atrás do GitHub, e o site publicado de lá às 10:07 saiu
+sem a ficha do parceiro, os "Próximos dias" e os avisos; o deploy das 10:19, da
+`main` do GitHub, devolveu tudo. Este commit refaz a mudança em cima da `main`
+certa, na branch `pivo-do-crm`.
+
+**Pendente:** a tela nova só vai ao ar quando esta branch for publicada. Em
+produção hoje o site ainda segue a regra de 05/10 para o "por ler" (e chama o
+UPDATE antigo); o banco já tem a função e o gatilho.

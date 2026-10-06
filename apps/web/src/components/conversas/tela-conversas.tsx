@@ -266,6 +266,7 @@ export function TelaConversas({
   //
   // Abrir NÃO tira a marca "Nova" nem o número do menu (05/10/2026): só a
   // resposta de alguém do time tira. Ver `semResposta`, em `avisos/regra.ts`.
+  // O "por ler" é outra coisa e sai ao abrir (06/10/2026, `leitura-do-fio.ts`).
   const { olharConversa, registrarAbridor } = useAcoesDosAvisos();
   const conversaAbertaId = foraAberta?.id ?? aberta?.fio?.id ?? null;
   useEffect(() => {
@@ -289,6 +290,24 @@ export function TelaConversas({
 
   const limpar = useCallback(() => setFiltros(FILTROS_VAZIOS), []);
   const voltar = useCallback(() => setEscolhidoId(null), []);
+
+  // MEXER NA CONVERSA É ESCOLHÊ-LA (06/10/2026).
+  //
+  // O desktop abre a primeira da lista sem ninguém pedir, e essa abertura não
+  // zera o "por ler" (ver `leitura-do-fio.ts`): o contador é do time, e zerar
+  // ali faria cada pessoa que entra na tela apagar o sinal da conversa do topo.
+  // Só que a linha dela já aparece marcada na lista, e ninguém clica no que
+  // parece escolhido. Clicar, rolar ou digitar dentro da conversa passa a valer
+  // como a escolha — e a prende no lugar, em vez de a tela trocar de conversa
+  // quando outra pessoa escreve e sobe para o topo.
+  const abertaAgoraId = aberta?.id ?? null;
+  const escolherAberta = useCallback(() => {
+    if (abertaAgoraId !== null && abertaAgoraId !== escolhidoId) escolherParceiro(abertaAgoraId);
+  }, [abertaAgoraId, escolhidoId, escolherParceiro]);
+  const foraAbertaId = foraAberta?.id ?? null;
+  const escolherForaAberta = useCallback(() => {
+    if (foraAbertaId !== null && foraAbertaId !== foraId) escolherCliente(foraAbertaId);
+  }, [foraAbertaId, foraId, escolherCliente]);
   const nadaNaLista = itens.length + clientesNaLista.length === 0;
 
   const recorte = temRecorte(filtros);
@@ -551,12 +570,16 @@ export function TelaConversas({
             <section
               aria-label="Conversa com cliente"
               className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden"
+              onPointerDownCapture={escolherForaAberta}
+              onKeyDownCapture={escolherForaAberta}
+              onWheelCapture={escolherForaAberta}
             >
               {foraAberta ? (
                 <ConversaForaDaBase
                   key={foraAberta.id}
                   fio={foraAberta}
                   catalogos={catalogos}
+                  escolhaExplicita={foraAberta.id === foraId}
                   aoVoltar={() => setForaId(null)}
                   aoLigar={(organizacaoId) => {
                     setAba('conversas');
@@ -572,6 +595,9 @@ export function TelaConversas({
           <section
             aria-label="Conversa com o parceiro"
             className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden"
+            onPointerDownCapture={escolherAberta}
+            onKeyDownCapture={escolherAberta}
+            onWheelCapture={escolherAberta}
           >
             {consulta.isPending ? null : aberta ? (
               <Conversa
@@ -581,6 +607,7 @@ export function TelaConversas({
                 setores={consulta.data?.setores ?? []}
                 meta={meta}
                 aoVoltar={voltar}
+                escolhaExplicita={escolhidoId !== null}
               />
             ) : (
               <NenhumaEscolhida meta={meta} />

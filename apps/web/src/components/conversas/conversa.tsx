@@ -34,6 +34,7 @@ import { ErroDaTela, EsqueletoLinha } from './estados';
 import { contagemDeInteracoes, local } from './formatos';
 import { FaixaDaJanela, Janela24h, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
+import { useLeituraDoFio } from './leitura-do-fio';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { JANELA_APERTADA_MIN, montarFio, montarRascunho, ordenarFila } from './mensagens';
 import {
@@ -42,7 +43,6 @@ import {
   montarLinhaDoTempo,
   type CatalogosConversas,
 } from './montagem';
-import { useZerarPorLerAoResponder } from './por-ler';
 import { CaixaDeResposta } from './responder';
 import {
   ROTULO_ESTADO_DO_FIO,
@@ -86,6 +86,7 @@ export function Conversa({
   setores,
   meta,
   aoVoltar,
+  escolhaExplicita,
 }: {
   item: ItemConversa;
   catalogos: CatalogosConversas;
@@ -95,6 +96,8 @@ export function Conversa({
   meta: DependenciasDaMeta | null;
   /** Só o celular usa: lá a conversa OCUPA a tela e precisa devolver para a lista. */
   aoVoltar: () => void;
+  /** A pessoa ESCOLHEU esta conversa; a que o desktop abre sozinho não conta como lida. */
+  escolhaExplicita: boolean;
 }) {
   const consulta = useQuery({
     queryKey: chaveDaLinha(item.id),
@@ -138,14 +141,17 @@ export function Conversa({
     );
   }, [consulta.data, catalogos]);
 
-  // O "por ler" zera quando sai a resposta, e não quando a conversa abre
-  // (05/10/2026): ler não é atender. Ver `por-ler.ts`.
-  const fioId = fio?.id ?? null;
-  const mensagensDoFio = useMemo(
-    () => consulta.data?.mensagens.filter((m) => m.conversation_id === fioId),
-    [consulta.data, fioId],
-  );
-  useZerarPorLerAoResponder(fioId, fio?.naoLidas ?? 0, mensagensDoFio);
+  // O "por ler" zera ao abrir a conversa e a cada mensagem que chega com ela na
+  // frente da pessoa (06/10/2026, ver `leitura-do-fio.ts`). A marca "Nova" e o
+  // número do menu são outra pergunta — "alguém respondeu?" — e continuam saindo
+  // só com a resposta do time (`semResposta`, em `avisos/regra.ts`). O fio é o
+  // da LISTA (`item.fio`): é ele que pinta o número ao lado do nome.
+  useLeituraDoFio({
+    fioId: item.fio?.id ?? null,
+    naoLidas: item.naoLidas,
+    ultimaEntradaEm: item.fio?.ultimaEntradaEm ?? null,
+    escolhida: escolhaExplicita,
+  });
 
   // ONDE A CONVERSA ABRE.
   //
