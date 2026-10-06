@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, MessageCircle, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -52,7 +52,8 @@ export function BarraDeLote({
   categoriaId: number | null;
   ocupado: boolean;
   aoTrocarCategoria: (id: number | null) => void;
-  aoAprovar: () => void;
+  /** `comMensagem` = o botão que também põe a mensagem automática na fila. */
+  aoAprovar: (comMensagem: boolean) => void;
   aoLimpar: () => void;
 }) {
   const semCategoria = useMemo(
@@ -103,14 +104,25 @@ export function BarraDeLote({
         </SelectContent>
       </Select>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           disabled={ocupado || passariam <= 0}
-          onClick={aoAprovar}
+          onClick={() => aoAprovar(true)}
+          title="Cria as fichas e põe a mensagem automática de cada uma na fila. Elas saem aos poucos."
+          className="toque h-11 md:h-9"
+        >
+          <MessageCircle aria-hidden="true" />
+          Aprovar <span className="numerico">{formatarNumero(passariam)}</span> e mandar mensagem
+        </Button>
+        <Button
+          variant="outline"
+          disabled={ocupado || passariam <= 0}
+          onClick={() => aoAprovar(false)}
+          title="Cria as fichas em Prospectados, sem mensagem."
           className="toque h-11 md:h-9"
         >
           <Check aria-hidden="true" />
-          Aprovar <span className="numerico">{formatarNumero(passariam)}</span>{' '}
+          Só aprovar <span className="numerico">{formatarNumero(passariam)}</span>{' '}
           {passariam === 1 ? 'nome' : 'nomes'}
           {nomeDaCategoria ? ` em ${nomeDaCategoria}` : ''}
         </Button>

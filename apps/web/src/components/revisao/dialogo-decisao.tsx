@@ -260,7 +260,7 @@ function Conteudo({
           {ocupado
             ? 'Salvando...'
             : acao === 'aprovar'
-              ? 'Criar o parceiro'
+              ? 'Aprovar'
               : acao === 'recusar'
                 ? 'Descartar'
                 : 'Marcar não contatar'}

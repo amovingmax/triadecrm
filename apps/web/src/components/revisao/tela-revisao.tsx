@@ -19,6 +19,7 @@ import {
   buscarResumo,
   chaveDaFila,
   mensagemDoErro,
+  fraseDaMensagemAutomatica,
   MOTIVO_DA_REVISAO,
   irmasPeloRotulo,
   revisarCandidato,
@@ -89,6 +90,8 @@ export function TelaRevisao({
   const [decisao, setDecisao] = useState<{
     candidato: CandidatoDaFila;
     acao: Exclude<AcaoDeRevisao, 'mesclar'>;
+    /** Veio do botão "Aprovar e mandar mensagem": o diálogo confirma com ela. */
+    comMensagem: boolean;
   } | null>(null);
 
   const resumo = useQuery({ queryKey: ['radar', 'resumo'], queryFn: buscarResumo });
@@ -137,6 +140,7 @@ export function TelaRevisao({
         categoriaId?: number | null;
         motivo?: string | null;
         aprenderAgora?: boolean;
+        comMensagem?: boolean;
       } = {},
     ) => {
       setOcupado(candidato.id);
@@ -148,6 +152,7 @@ export function TelaRevisao({
           categoriaId: extra.categoriaId ?? candidato.categoria_id,
           motivo: extra.motivo ?? null,
           aprenderAgora: extra.aprenderAgora ?? false,
+          comMensagem: extra.comMensagem ?? false,
         });
 
         if (!resposta.ok) {
@@ -160,16 +165,26 @@ export function TelaRevisao({
         setDecisao(null);
         if (resposta.situacao === 'aprovado') {
           const juntos = resposta.irmasAprovadas ?? 0;
-          toast.success(
+          const mensagem = fraseDaMensagemAutomatica(resposta.mensagem);
+          const titulo =
             juntos > 0
-              ? `${candidato.nome} e mais ${formatarNumero(juntos)} viraram parceiro.`
-              : `${candidato.nome} virou parceiro.`,
-            {
-              description: resposta.virouRegra
-                ? `Entraram no funil com "Primeiro contato" no próximo dia útil. E o CRM passou a reconhecer “${candidato.categoria_na_fonte}” sozinho.`
-                : `${candidato.nome} entrou no funil com "Primeiro contato" marcado para o próximo dia útil.`,
-            },
-          );
+              ? `${candidato.nome} e mais ${formatarNumero(juntos)} foram aprovados.`
+              : `${candidato.nome} foi aprovado.`;
+          // Sem mensagem, o destino é Prospectados; com mensagem, a frase conta
+          // se ela entrou na fila — "aprovado" e "foi procurado" são fatos diferentes.
+          const destino = mensagem
+            ? mensagem.texto
+            : juntos > 0
+              ? 'Estão em Prospectados, prontos para entrar num lote de ligação.'
+              : 'Está em Prospectados, pronto para entrar num lote de ligação.';
+          const aprendeu = resposta.virouRegra
+            ? ` E o CRM passou a reconhecer “${candidato.categoria_na_fonte}” sozinho.`
+            : '';
+          if (mensagem && !mensagem.saiu) {
+            toast.warning(titulo, { description: destino + aprendeu });
+          } else {
+            toast.success(titulo, { description: destino + aprendeu });
+          }
         } else if (resposta.situacao === 'mesclado') {
           toast.success('Mesclado com a ficha existente.', {
             description: 'Só os campos que estavam vazios foram completados.',
@@ -189,7 +204,12 @@ export function TelaRevisao({
 
   /** O cartão pediu uma ação: umas exigem uma pergunta antes, outras não. */
   const decidir = useCallback(
-    (candidato: CandidatoDaFila, acao: AcaoDeRevisao, organizacaoId?: string) => {
+    (
+      candidato: CandidatoDaFila,
+      acao: AcaoDeRevisao,
+      organizacaoId?: string,
+      comMensagem = false,
+    ) => {
       if (acao === 'mesclar' && organizacaoId) {
         void enviarDecisao(candidato, 'mesclar', { organizacaoId });
         return;
@@ -199,10 +219,12 @@ export function TelaRevisao({
       // ficha sem ninguém olhar é a automação decidindo quem a empresa procura,
       // e essa não é uma decisão de máquina (RF-RAD-11).
       if (acao === 'aprovar' && candidato.categoria_id !== null) {
-        void enviarDecisao(candidato, 'aprovar');
+        void enviarDecisao(candidato, 'aprovar', { comMensagem });
         return;
       }
-      if (acao !== 'mesclar') setDecisao({ candidato, acao });
+      if (acao !== 'mesclar') {
+        setDecisao({ candidato, acao, comMensagem: acao === 'aprovar' && comMensagem });
+      }
     },
     [enviarDecisao],
   );
@@ -257,20 +279,25 @@ export function TelaRevisao({
     });
   }, []);
 
-  const aprovarLote = useCallback(async () => {
+  const aprovarLote = useCallback(async (comMensagem: boolean) => {
     const ids = marcados
       .filter((c) => categoriaDoLote !== null || c.categoria_id !== null)
       .map((c) => c.id);
     if (ids.length === 0) return;
     setLotando(true);
     try {
-      const r = await revisarLote({ ids, categoriaId: categoriaDoLote });
+      const r = await revisarLote({ ids, categoriaId: categoriaDoLote, comMensagem });
       if (r.aprovados > 0) {
-        toast.success(
+        const titulo =
           r.aprovados === 1
-            ? '1 nome virou parceiro.'
-            : `${formatarNumero(r.aprovados)} nomes viraram parceiro.`,
-        );
+            ? '1 nome foi aprovado.'
+            : `${formatarNumero(r.aprovados)} nomes foram aprovados.`;
+        const mensagem = fraseDaMensagemAutomatica(r.mensagem);
+        const destino = mensagem
+          ? mensagem.texto
+          : 'Estão em Prospectados, prontos para entrar num lote de ligação.';
+        if (mensagem && !mensagem.saiu) toast.warning(titulo, { description: destino });
+        else toast.success(titulo, { description: destino });
       }
       // O que não passou é nomeado, e não some numa contagem: "3 não passaram"
       // sem dizer quais é o mesmo que não dizer nada.
@@ -447,7 +474,9 @@ export function TelaRevisao({
                         podeDecidir={podeDecidir}
                         marcado={entraNoLote(candidato) ? selecionados.has(candidato.id) : null}
                         aoMarcar={(ligado) => marcar(candidato.id, ligado)}
-                        aoDecidir={(acao, organizacaoId) => decidir(candidato, acao, organizacaoId)}
+                        aoDecidir={(acao, organizacaoId, comMensagem) =>
+                          decidir(candidato, acao, organizacaoId, comMensagem)
+                        }
                       />
                     </li>
                   ))}
@@ -463,7 +492,7 @@ export function TelaRevisao({
               categoriaId={categoriaDoLote}
               ocupado={lotando}
               aoTrocarCategoria={setCategoriaDoLote}
-              aoAprovar={() => void aprovarLote()}
+              aoAprovar={(comMensagem) => void aprovarLote(comMensagem)}
               aoLimpar={() => setSelecionados(new Set())}
             />
           ) : null}
@@ -510,6 +539,7 @@ export function TelaRevisao({
                 categoriaId,
                 motivo,
                 aprenderAgora,
+                comMensagem: decisao.comMensagem,
               });
             }}
           />
