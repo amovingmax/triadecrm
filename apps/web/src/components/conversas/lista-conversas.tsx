@@ -9,9 +9,10 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Etiqueta } from '@/components/etiqueta';
 import { EtiquetaEtapa } from '@/components/funis/etapa';
+import { formatarTelefone } from '@/components/parceiros/formatos';
 import { DiasSemContato } from '@/components/temperatura';
 
-import { finalDoNumero } from './fora-da-base-dados';
+import { nomeDoCliente } from './fora-da-base-dados';
 import { local, rotuloDoDia } from './formatos';
 import { ICONE_CANAL } from './icones';
 import { ChipDaJanela } from './janela-24h';
@@ -171,7 +172,7 @@ function LinhaDeCliente({
                 nova || fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
               )}
             >
-              {nome || `Número ${finalDoNumero(fio.peer_phone_e164)}`}
+              {nomeDoCliente(fio)}
             </span>
             {nova ? <MarcaDeNova className="self-center" /> : null}
             {fio.unread_count > 0 ? (
@@ -198,7 +199,7 @@ function LinhaDeCliente({
               <PreviaDoRascunho texto={rascunho} />
             ) : (
               <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                {nome ? finalDoNumero(fio.peer_phone_e164) : 'sem nome no perfil'}
+                {nome ? formatarTelefone(fio.peer_phone_e164) : 'sem nome no perfil'}
               </span>
             )}
             <ChipDaJanela estado={janela} />

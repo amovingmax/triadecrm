@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   conversasForaDaBase,
-  finalDoNumero,
   fraseDoResultado,
   MOTIVOS_DA_FICHA,
+  nomeDoCliente,
 } from './fora-da-base-dados';
 import type { FioCru } from './mensagens';
 import { escopoInicialDe, estadoDaUrl, urlDoEstado, FILTROS_VAZIOS } from './tipos';
@@ -13,7 +13,7 @@ import { escopoInicialDe, estadoDaUrl, urlDoEstado, FILTROS_VAZIOS } from './tip
  * A aba "Fora da base" (migração 20260915130000): quem escreveu e não é ficha.
  *
  *  1. Só a conversa SEM ficha entra, a mais recente em cima.
- *  2. O número não aparece inteiro (RF-BAS-14): o banco usa o da conversa.
+ *  2. Aparece o nome do perfil do WhatsApp; sem ele, o número inteiro.
  *  3. Toda recusa do banco tem frase, e a aba sobrevive ao link.
  */
 
@@ -55,10 +55,18 @@ describe('conversasForaDaBase', () => {
   });
 });
 
-describe('finalDoNumero', () => {
-  it('mostra só os quatro últimos dígitos', () => {
-    expect(finalDoNumero('+5584999994698')).toBe('terminado em 4698');
-    expect(finalDoNumero('')).toBe('sem número');
+describe('nomeDoCliente', () => {
+  it('o nome do perfil, quando a pessoa deixou um', () => {
+    expect(nomeDoCliente(fio({ peer_nome: ' Maria Souza ' }))).toBe('Maria Souza');
+  });
+
+  it('sem nome, o número inteiro — não "terminado em 4698"', () => {
+    expect(nomeDoCliente(fio({}))).toBe('+55 84 99999-4698');
+    expect(nomeDoCliente(fio({ peer_nome: '   ' }))).toBe('+55 84 99999-4698');
+  });
+
+  it('número de fora do Brasil aparece como chegou', () => {
+    expect(nomeDoCliente(fio({ peer_phone_e164: '+351912345678' }))).toBe('+351912345678');
   });
 });
 

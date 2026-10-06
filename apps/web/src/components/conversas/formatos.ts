@@ -140,11 +140,14 @@ export const FICHA_SEM_NOME = /^Contato do WhatsApp\b/i;
  * lugar do nome, o nome do perfil é a única coisa humana que se sabe — e é
  * melhor do que o número em toda tela onde alguém procura uma conversa.
  *
+ * Sem nome de perfil, a ficha sem nome aparece só como o número inteiro:
+ * "Contato do WhatsApp (84) 9…" cortava o número na lista (05/10/2026).
+ *
  * Isto é EXIBIÇÃO, não cadastro: nada aqui renomeia a ficha. Quem renomeia é
  * gente, na ficha.
  */
 export function nomeExibido(nomeDaFicha: string, nomeDoPerfil: string | null): string {
-  const perfil = nomeDoPerfil?.trim();
-  if (!perfil) return nomeDaFicha;
-  return FICHA_SEM_NOME.test(nomeDaFicha.trim()) ? perfil : nomeDaFicha;
+  const ficha = nomeDaFicha.trim();
+  if (!FICHA_SEM_NOME.test(ficha)) return nomeDaFicha;
+  return nomeDoPerfil?.trim() || ficha.replace(FICHA_SEM_NOME, '').trim() || nomeDaFicha;
 }

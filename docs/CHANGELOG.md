@@ -6291,3 +6291,23 @@ produção.
 da leitura da IA; o aval do Rafael para a tela nova; o cartão de aviso que cobre
 os botões do canto superior direito; visita contar como "próximo compromisso" no
 cabeçalho; mensagem automática contar como "último contato".
+
+## 06/10/2026 — Conversas: o nome, e sem nome o número inteiro; e a produção volta a ter tudo
+
+**O que aconteceu.** Em 05/10, às 14:05, uma publicação feita pelo CLI de outra máquina saiu de uma cópia antiga da `main` (`8e9c134`, 02/10 de manhã) com uma alteração que nunca foi commitada. A alteração entrou no ar, mas a produção perdeu o que a `main` tinha recebido depois: avisos de resposta, rascunho do texto digitado, Conversas abrindo em "Minhas", a ficha do parceiro redesenhada e a correção de "Próximos dias". O código da alteração só existia na Vercel; foi recuperado de lá e juntado à `main`.
+
+**A alteração** (pedido do Rafael em 05/10: "quero o nome, e quando n tiver, o numero completo"; `conversas/formatos.ts`, `fora-da-base-dados.ts`, `fora-da-base.tsx`, `lista-conversas.tsx`, `lib/iniciais.ts`):
+- quem não é parceiro aparece pelo nome do perfil do WhatsApp e, sem nome, pelo número inteiro, no lugar de "Número terminado em 4698";
+- a ficha sem nome aparece só pelo número: "Contato do WhatsApp (84) 9…" cortava o número na lista;
+- número não vira inicial no círculo do avatar ("(9" virava inicial; agora é "?").
+
+**Ajustes para caber na `main` de hoje:**
+- a lista de Conversas da `main` (aba "Todas", com os clientes) também usava "terminado em"; passou a seguir a mesma regra;
+- o aviso de "Nova mensagem" **continua sem o número inteiro** ("Número terminado em 8801"): a notificação aparece por cima de qualquer tela, inclusive numa reunião compartilhada (RF-BAS-14).
+
+**Verificado:** 1.166 testes do web (e os de workers, schema e prompts), lint, typecheck, Prettier e build verdes.
+
+**Decisão humana:**
+- o número inteiro de quem não é parceiro fica visível para todo papel que abre Conversas. O RF-BAS-14 pede telefone mascarado na base; aqui vale o pedido de 05/10. Confirmar com o Dennis (LGPD) se fica assim;
+- a branch `nova-ate-responder` (a marca "Nova" só sai com a resposta do time) **não** está na `main` nem no ar, embora o CHANGELOG dela diga que foi;
+- publicar sempre a partir da `main` do GitHub atualizada: a publicação de 05/10 saiu de uma cópia três dias atrasada.

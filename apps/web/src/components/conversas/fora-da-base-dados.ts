@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/client';
+import { formatarTelefone } from '@/components/parceiros/formatos';
 
 import { ErroDaConversa } from './acoes';
 import type { FioCru, MensagemCrua } from './mensagens';
@@ -16,21 +17,24 @@ import type { FioCru, MensagemCrua } from './mensagens';
  */
 
 export function conversasForaDaBase(fios: readonly FioCru[]): FioCru[] {
-  return fios
-    // Arquivada sai da lista (01/10/2026): atendido o cliente, ele some daqui, e
-    // volta sozinho se escrever de novo (`messages_desarquiva`).
-    .filter((f) => f.organization_id === null && f.arquivada_em === null)
-    .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''));
+  return (
+    fios
+      // Arquivada sai da lista (01/10/2026): atendido o cliente, ele some daqui, e
+      // volta sozinho se escrever de novo (`messages_desarquiva`).
+      .filter((f) => f.organization_id === null && f.arquivada_em === null)
+      .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''))
+  );
 }
 
 /**
- * "terminado em 4698". O número inteiro não aparece: quem liga lê telefone mascarado
- * na base (RF-BAS-14), e para criar ou ligar a ficha o banco usa o número da própria
- * conversa, sem ele passar pela tela.
+ * O nome que a pessoa deixou no perfil do WhatsApp, ou o número inteiro.
+ *
+ * Até 05/10/2026 a aba mostrava "Número terminado em 4698". Rafael: "quero o
+ * nome, e quando n tiver, o numero completo". O fio já chegava com o número
+ * cru (o inbox não mascara o fio); só a tela o cortava.
  */
-export function finalDoNumero(e164: string): string {
-  const digitos = e164.replace(/\D/g, '');
-  return digitos.length >= 4 ? `terminado em ${digitos.slice(-4)}` : 'sem número';
+export function nomeDoCliente(fio: Pick<FioCru, 'peer_nome' | 'peer_phone_e164'>): string {
+  return fio.peer_nome?.trim() || formatarTelefone(fio.peer_phone_e164) || 'sem número';
 }
 
 export const CHAVE_FORA_DA_BASE = ['conversas', 'fora-da-base'] as const;

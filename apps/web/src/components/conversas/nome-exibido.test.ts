@@ -26,16 +26,18 @@ describe('nomeExibido', () => {
     expect(nomeExibido('Buffet Aurora', 'aurora buffet 24h ⭐')).toBe('Buffet Aurora');
   });
 
-  it('sem nome de perfil, o rótulo com o número continua — não vira vazio', () => {
-    expect(nomeExibido('Contato do WhatsApp (84) 99999-8801', null)).toBe(
-      'Contato do WhatsApp (84) 99999-8801',
-    );
+  it('sem nome de perfil, aparece o número inteiro, sem o rótulo na frente', () => {
+    // Rafael, 05/10/2026: "quando n tiver, o numero completo". Com o rótulo, a
+    // lista cortava em "Contato do WhatsApp (84) 9…".
+    expect(nomeExibido('Contato do WhatsApp (84) 99999-8801', null)).toBe('(84) 99999-8801');
   });
 
   it('nome de perfil só com espaço não conta como nome', () => {
-    expect(nomeExibido('Contato do WhatsApp (84) 99999-8801', '   ')).toBe(
-      'Contato do WhatsApp (84) 99999-8801',
-    );
+    expect(nomeExibido('Contato do WhatsApp (84) 99999-8801', '   ')).toBe('(84) 99999-8801');
+  });
+
+  it('o rótulo sem número nenhum não vira vazio', () => {
+    expect(nomeExibido('Contato do WhatsApp', null)).toBe('Contato do WhatsApp');
   });
 
   it('a ficha que COMEÇA com o rótulo é a mesma coisa que o rótulo', () => {

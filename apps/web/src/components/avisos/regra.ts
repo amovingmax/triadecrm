@@ -1,5 +1,4 @@
-import { FICHA_SEM_NOME, nomeExibido } from '@/components/conversas/formatos';
-import { finalDoNumero } from '@/components/conversas/fora-da-base-dados';
+import { FICHA_SEM_NOME } from '@/components/conversas/formatos';
 import { type AppRole } from '@/lib/auth/role';
 
 /**
@@ -243,11 +242,14 @@ export function chegaramAgora(
  */
 export function nomeDoAviso(conversa: ConversaComResposta, nomeDaFicha: string | null): string {
   const perfil = conversa.nomeDoPerfil?.trim() || null;
-  const nome = nomeDaFicha?.trim() ? nomeExibido(nomeDaFicha.trim(), perfil) : perfil;
+  const ficha = nomeDaFicha?.trim() || null;
   // A ficha nascida de uma mensagem se chama "Contato do WhatsApp (84) 9…": o
-  // rótulo carrega o número, e é exatamente o que não pode ir para o aviso.
-  if (nome === null || FICHA_SEM_NOME.test(nome)) {
-    return `Número ${finalDoNumero(conversa.telefone)}`;
+  // rótulo carrega o número, e é exatamente o que não pode ir para o aviso. Na
+  // lista de Conversas ela aparece pelo número inteiro (05/10/2026); aqui, não.
+  const nome = ficha && !FICHA_SEM_NOME.test(ficha) ? ficha : perfil;
+  if (nome === null) {
+    const digitos = conversa.telefone.replace(/\D/g, '');
+    return digitos.length >= 4 ? `Número terminado em ${digitos.slice(-4)}` : 'Número sem número';
   }
   return nome;
 }

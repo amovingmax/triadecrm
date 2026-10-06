@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatarTelefone } from '@/components/parceiros/formatos';
 import { buscarAlvos } from '@/components/registro/alvos';
 import { DEBOUNCE_BUSCA_MS, type SugestaoDeAlvo } from '@/components/registro/tipos';
 
@@ -29,8 +30,8 @@ import {
   carregarMensagensDoFio,
   chaveDasMensagensDoFio,
   criarFichaDaConversa,
-  finalDoNumero,
   fraseDoResultado,
+  nomeDoCliente,
   vincularConversa,
   type ResultadoDaFicha,
 } from './fora-da-base-dados';
@@ -48,17 +49,6 @@ import {
 import type { CatalogosConversas } from './montagem';
 import { TextoLivre } from './responder';
 import { previaDoDigitado, useTextosDigitados } from './texto-digitado';
-
-/**
- * O nome que a pessoa deixou no perfil do WhatsApp, ou o final do número.
- *
- * O nome do perfil é o que o time reconhece ("Maria Souza"), e é o que o
- * próprio WhatsApp mostra no celular. O número inteiro não aparece: a base lê
- * telefone mascarado (RF-BAS-14), e responder não precisa dele.
- */
-export function nomeDoCliente(fio: FioCru): string {
-  return fio.peer_nome?.trim() || `Número ${finalDoNumero(fio.peer_phone_e164)}`;
-}
 
 /**
  * A aba "Clientes" (era "Fora da base"): quem escreveu para o número da KOMUNE
@@ -136,7 +126,7 @@ export function ListaForaDaBase({
                   <PreviaDoRascunho texto={rascunho} className="block text-[13px]" />
                 ) : (
                   <span className="block truncate text-[13px] text-muted-foreground">
-                    {nome ? finalDoNumero(fio.peer_phone_e164) : 'sem nome no perfil'}
+                    {nome ? formatarTelefone(fio.peer_phone_e164) : 'sem nome no perfil'}
                     {fio.unread_count > 0
                       ? ` · ${fio.unread_count} ${fio.unread_count === 1 ? 'por ler' : 'por ler'}`
                       : ''}
@@ -207,7 +197,7 @@ export function ConversaForaDaBase({
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-semibold">{nomeDoCliente(fio)}</p>
           <p className="truncate text-[13px] text-muted-foreground">
-            {nome ? `${finalDoNumero(fio.peer_phone_e164)} · ` : ''}não é parceiro
+            {nome ? `${formatarTelefone(fio.peer_phone_e164)} · ` : ''}não é parceiro
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">

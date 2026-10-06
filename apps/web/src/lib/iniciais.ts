@@ -11,11 +11,14 @@
  * navegador.
  *
  * Função pura, sem dependência: serve aos dois lados.
+ *
+ * Só conta pedaço que começa com letra: quem não tem nome aparece pelo número
+ * ("(84) 99999-8801"), e "(9" não é inicial de ninguém — vira "?".
  */
 export function iniciaisDe(nome: string): string {
   const partes = nome
     .split(/[\s@._-]+/)
-    .filter(Boolean)
+    .filter((p) => /^\p{L}/u.test(p))
     .slice(0, 2);
   const letras = partes.map((p) => p.charAt(0).toUpperCase()).join('');
   return letras || '?';
