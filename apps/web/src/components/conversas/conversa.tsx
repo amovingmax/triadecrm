@@ -23,7 +23,7 @@ import { formatarProximaAcao } from '@/components/parceiros/formatos';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { DiasSemContato } from '@/components/temperatura';
 
-import { arquivarConversa, marcarComoLida } from './acoes';
+import { arquivarConversa } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
 import { EtiquetasDoParceiro } from './etiquetas-do-parceiro';
@@ -42,6 +42,7 @@ import {
   montarLinhaDoTempo,
   type CatalogosConversas,
 } from './montagem';
+import { useZerarPorLerAoResponder } from './por-ler';
 import { CaixaDeResposta } from './responder';
 import {
   ROTULO_ESTADO_DO_FIO,
@@ -85,7 +86,6 @@ export function Conversa({
   setores,
   meta,
   aoVoltar,
-  escolhaExplicita,
 }: {
   item: ItemConversa;
   catalogos: CatalogosConversas;
@@ -95,14 +95,7 @@ export function Conversa({
   meta: DependenciasDaMeta | null;
   /** Só o celular usa: lá a conversa OCUPA a tela e precisa devolver para a lista. */
   aoVoltar: () => void;
-  /**
-   * A pessoa ESCOLHEU esta conversa (ou o desktop a abriu sozinho, na primeira
-   * da lista). Só a escolha zera o "por ler": limpar o contador de uma conversa
-   * que ninguém pediu para ver seria apagar o único sinal de que ela existe.
-   */
-  escolhaExplicita: boolean;
 }) {
-  const clientes = useQueryClient();
   const consulta = useQuery({
     queryKey: chaveDaLinha(item.id),
     queryFn: () => carregarLinhaDoParceiro(item.id),
@@ -145,24 +138,14 @@ export function Conversa({
     );
   }, [consulta.data, catalogos]);
 
-  // Zera o "por ler" uma vez por fio. O `ref` é o que impede o efeito de
-  // disparar de novo a cada repintura (e no modo estrito do React, duas vezes
-  // seguidas na montagem).
-  const jaMarcado = useRef<string | null>(null);
+  // O "por ler" zera quando sai a resposta, e não quando a conversa abre
+  // (05/10/2026): ler não é atender. Ver `por-ler.ts`.
   const fioId = fio?.id ?? null;
-  const naoLidas = fio?.naoLidas ?? 0;
-  useEffect(() => {
-    if (!escolhaExplicita || !fioId || naoLidas === 0) return;
-    if (jaMarcado.current === fioId) return;
-    jaMarcado.current = fioId;
-    void marcarComoLida(fioId)
-      .then(() => {
-        void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
-      })
-      // Falhar aqui não atrapalha ninguém: o contador continua como estava e a
-      // pessoa lê a conversa do mesmo jeito. Barulho por isso seria ruído.
-      .catch(() => undefined);
-  }, [escolhaExplicita, fioId, naoLidas, clientes]);
+  const mensagensDoFio = useMemo(
+    () => consulta.data?.mensagens.filter((m) => m.conversation_id === fioId),
+    [consulta.data, fioId],
+  );
+  useZerarPorLerAoResponder(fioId, fio?.naoLidas ?? 0, mensagensDoFio);
 
   // ONDE A CONVERSA ABRE.
   //
@@ -243,7 +226,8 @@ export function Conversa({
       : (fio.responsavel ?? 'sem nome na base')
     : null;
   const podeAssumir = Boolean(fio && eu?.podeEscrever && fio.responsavelId !== eu.id);
-  const setorDoFio = fio?.setorId != null ? (setores.find((s) => s.id === fio.setorId)?.nome ?? null) : null;
+  const setorDoFio =
+    fio?.setorId != null ? (setores.find((s) => s.id === fio.setorId)?.nome ?? null) : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">

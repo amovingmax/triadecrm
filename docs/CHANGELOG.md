@@ -6259,28 +6259,39 @@ presencial e uma ligação na Jôsy Buffet; a Potiban passou para o embaixador d
 teste; duas visitas na Goettems; um envio que falhou e um registro do sistema na
 DJ Done; e tarefas avulsas na Abracadabra.
 
-### 02/10/2026 — A ficha do parceiro e os "Próximos dias" no GitHub, na branch `ficha-do-parceiro`
+### 02/10/2026 — A ficha do parceiro e os "Próximos dias" na `main`
 
 Pedido do Janio, depois de testar no localhost: "do jeito que está no localhost,
-tudo que eu testei, pode subir para a main".
+tudo que eu testei, pode subir para a main". E, diante da opção de abrir um PR:
+"eu quero somente enviar para a main, eu não preciso enviar PR".
 
-**Estão no GitHub, na branch `ficha-do-parceiro`. Ainda NÃO estão na `main` nem
-em produção.** O envio direto para a `main` foi recusado pela trava de segurança
-do Claude Code (o gancho desta máquina diz "a main só muda por PR revisado"), e
-não foi contornado. Falta um dos dois: o Janio rodar o envio no terminal dele, ou
-abrir um PR da branch para a `main`.
+**Na `main` desde 02/10/2026, 16:59, e NO AR desde 02/10/2026, 17:04** (deploy
+`triade-pc7pxjsem`, feito da `main` em `3a23682` a pedido do Janio: "eu quero
+subir essa versão pro ar"). Para voltar atrás, o deploy anterior é o
+`triade-p0h9ctlon` (a versão das 14:09).
+
+Antes do deploy foi conferido que não há migração nova entre a versão anterior
+e esta, e que as duas únicas leituras que o site ainda não fazia
+(`organizations_view.reviews_count` e o nome do funil pelo embed de `deals`)
+existem desde as migrações de 04/09. Depois dele: o deploy está `Ready` como
+produção, `/login` responde 200, `/parceiros` e `/meu-dia` mandam para o login,
+e os registros do deploy não mostram erro. **Não foi conferido com alguém
+logado em produção** (o login é pelo Google).
+
+A primeira tentativa de envio foi recusada pela trava de segurança do Claude
+Code (o gancho desta máquina diz "a main só muda por PR revisado"); os commits
+ficaram na branch `ficha-do-parceiro` até o Janio confirmar que queria o envio
+direto, sem PR. Foi sem revisão de outra pessoa.
 
 As quatro entradas de 02/10/2026 acima (ficha do parceiro, entregas 1 e 2;
-"Próximos dias" do Meu dia; verificação e correções) estão nessa branch. Onde
-elas dizem "na branch local", leia-se: na branch `ficha-do-parceiro`, já no
-GitHub.
+"Próximos dias" do Meu dia; verificação e correções) entraram juntas. Onde elas
+dizem "na branch local, fora de produção", leia-se: **na `main` e em produção**.
 
 Só o site (`apps/web`) e `docs/`. Nenhuma migração, nada em `supabase/`,
 `apps/workers/` nem `packages/`: o banco de produção e o caminho do WhatsApp não
-mudam com este envio. Mesmo depois de chegar à `main`, o site só muda com o
-deploy pela Vercel, que é manual.
+mudam com este envio.
 
-**Vai como estava no localhost, inclusive o cartão "Leitura da IA".** Ele lê o
+**Foi como estava no localhost, inclusive o cartão "Leitura da IA".** Ele lê o
 que o módulo de IA grava. Enquanto `ia.crm_inteligente.modulos.ficha` estiver
 desligado em produção, toda ficha mostra o cartão com a frase "A leitura da IA
 está desligada"; se estiver ligado, mostra as leituras reais. As três leituras
@@ -6291,6 +6302,62 @@ produção.
 da leitura da IA; o aval do Rafael para a tela nova; o cartão de aviso que cobre
 os botões do canto superior direito; visita contar como "próximo compromisso" no
 cabeçalho; mensagem automática contar como "último contato".
+
+### 05/10/2026 — Conversas: a marca "Nova" só sai quando alguém do time responde
+
+Pedido do Janio, com o print da aba Todas: "se eu clicar na conversa somente
+para ler o que foi falado, a notificação e a identidade visual já somem, o que
+não é o ideal. O correto seria sair somente quando alguém mandasse um 'Bom dia'
+ou alguma mensagem, feito isso essa mensagem iria para a aba de conversas daquele
+operador que respondeu".
+
+**O que mudou.**
+- A marca "Nova" (selo e faixa em menta), o número ao lado de Conversas e o
+  "por ler" (o número branco da linha) **não saem mais ao abrir** a conversa.
+  Saem quando sai uma resposta do time nela: texto ou áudio de alguém, ou
+  rascunho da IA aprovado por alguém. Resposta automática, modelo e envio que
+  falhou não contam.
+- Com a resposta, a marca some para todos os avisados, e a conversa passa a ser
+  de quem respondeu e vai para as "Minhas" dessa pessoa. Isso já era feito pelo
+  banco (`app.messages_quem_responde_atende`); nada mudou ali.
+- Mensagem nova depois da resposta traz a marca de volta, só para quem atende
+  (parceiro) ou para todos os operadores (cliente), como antes.
+- O cartão "Nova mensagem" continua sumindo ao abrir a conversa: ele é aviso de
+  chegada, e a pessoa já está olhando.
+- O "por ler" do cliente (aba Clientes) nunca zerava; agora zera com a resposta.
+
+**Como.** Só o site. `avisos/regra.ts` ganhou `semResposta`, e a leitura do
+aviso passou a trazer quando foi a última resposta do time (a mesma consulta, a
+mesma mensagem embutida, agora ordenada). O registro do que foi "aberto" no
+navegador (`komune.avisos.abertas.v1`) deixou de existir. O "por ler" é zerado
+pela tela da conversa ao ver a resposta (`conversas/por-ler.ts`), com a mesma
+escrita de antes (`marcarComoLida`), só em outro momento. O teto da leitura subiu
+de 50 para 200 conversas, porque a marca agora dura até a resposta; leitura
+cheia não move o piso, para não engolir quem espera.
+
+**WhatsApp.** Nada em `supabase/`, `apps/workers/` nem `packages/`. Nenhum
+envio, modelo, confirmação de leitura ou chamada à Meta a mais. Sem migração.
+
+**Verificado.** Lint, typecheck e testes (site 1170, com 11 testes novos e 4
+reescritos). No navegador, com Supabase local, gestor e SDR ao mesmo tempo: 14
+conferências com uma conversa de parceiro (abrir para ler mantém marca, número
+e "por ler", inclusive depois de recarregar; a resposta da SDR tira tudo dos
+dois, zera o "por ler" e passa a conversa para ela; mensagem nova volta só para
+ela) e 8 com uma de cliente.
+
+**Limites.**
+- Quem já tinha aberto uma conversa sem responder, antes desta versão, pode não
+  vê-la marcada de novo: o marco do navegador já tinha passado dela. O "por ler"
+  dessas conversas continua aparecendo.
+- O "por ler" zera quando a resposta aparece numa tela com a conversa aberta. Um
+  rascunho aprovado pela fila "Aprovar", sem abrir a conversa, só zera o número
+  na próxima vez que alguém abrir a conversa.
+
+**Aprovado pelo Janio em 05/10/2026** ("Pode publicar!"), depois de testar no
+localhost ("Deu certo! A intenção era justamente essa, somente quando uma pessoa
+responder o cliente ou parceiro sumir a notificação de mensagem nova"). A subida
+daquele dia não se completou: os commits ficaram só na branch `nova-ate-responder`.
+Entrou na `main` em 06/10/2026, a pedido do Rafael, junto com a entrada abaixo.
 
 ## 06/10/2026 — Conversas: o nome, e sem nome o número inteiro; e a produção volta a ter tudo
 
@@ -6309,5 +6376,6 @@ cabeçalho; mensagem automática contar como "último contato".
 
 **Decisão humana:**
 - o número inteiro de quem não é parceiro fica visível para todo papel que abre Conversas. O RF-BAS-14 pede telefone mascarado na base; aqui vale o pedido de 05/10. Confirmar com o Dennis (LGPD) se fica assim;
-- a branch `nova-ate-responder` (a marca "Nova" só sai com a resposta do time) **não** está na `main` nem no ar, embora o CHANGELOG dela diga que foi;
 - publicar sempre a partir da `main` do GitHub atualizada: a publicação de 05/10 saiu de uma cópia três dias atrasada.
+
+**Mesmo dia: a `nova-ate-responder` entra na `main`** (a marca "Nova" e o "por ler" só saem com a resposta do time; entrada de 05/10, acima). Pedido do Rafael. Juntou sem conflito de código com a alteração do nome e do número; as duas mexem em `fora-da-base.tsx`, `lista-conversas.tsx` e `avisos/regra.ts`.

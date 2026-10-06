@@ -40,7 +40,8 @@ import { type AppRole } from '@/lib/auth/role';
  * escreve é o comprador de ingresso com uma dúvida, e quem responde é quem
  * estiver na frente do CRM. Por isso toda mensagem de cliente avisa admin,
  * gestor e sdr, mesmo depois de um colega já ter respondido àquela conversa.
- * Cada operador deixa de vê-la como nova quando ELE a abre.
+ * Ela deixa de ser nova para todos quando alguém do time responde (ver
+ * `semResposta`).
  *
  * ===========================================================================
  * POR QUE AQUI, E NÃO NO BANCO
@@ -66,6 +67,11 @@ export interface ConversaComResposta {
   readonly telefone: string;
   /** Alguém do time já escreveu ou gravou áudio aqui (modelo não conta). */
   readonly alguemEscreveu: boolean;
+  /**
+   * Quando alguém do time escreveu aqui pela última vez, pelo mesmo critério de
+   * `alguemEscreveu`. `null` = ninguém escreveu ainda.
+   */
+  readonly respondidaEm: string | null;
 }
 
 export interface QuemSouEu {
@@ -150,71 +156,67 @@ export function ultimaChegada(conversas: readonly ConversaComResposta[]): string
 }
 
 /**
- * As conversas minhas que ainda não abri: chegou mensagem depois da última vez
- * que abri cada uma. São elas que o número ao lado de Conversas conta e que a
- * lista marca com "Nova".
+ * As conversas minhas que ainda esperam resposta: chegou mensagem depois da
+ * última vez que alguém do time escreveu nelas. São elas que o número ao lado de
+ * Conversas conta e que a lista marca com "Nova".
  *
  * ===========================================================================
- * POR QUE CONVERSA A CONVERSA (02/10/2026)
+ * SÓ A RESPOSTA TIRA A MARCA (05/10/2026)
  * ===========================================================================
- * A primeira versão zerava tudo quando a pessoa entrava na tela de Conversas.
- * Janio: "ele não deve desaparecer todo de uma vez assim que eu abro a aba de
- * conversas, ele deve ir verificando uma por uma, caso eu abra uma mensagem ele
- * sai de 5 e vai pra 4". Ver a lista não é ler a conversa: com cinco esperando,
- * o número zerado dizia que não havia mais nada a fazer.
+ * Até aqui a marca saía quando a pessoa ABRIA a conversa. Janio: "se eu clicar
+ * na conversa somente para ler o que foi falado, a notificação e a identidade
+ * visual já somem, o que não é o ideal. O correto seria sair somente quando
+ * alguém mandasse um 'Bom dia' ou alguma mensagem". Ler não é atender: quem abre
+ * para conferir e fecha deixava a conversa com cara de resolvida, e o cliente
+ * esperando.
  *
- * `abertas` guarda, por conversa, a chegada que estava lá quando a pessoa a
- * abriu. Mensagem nova na mesma conversa tem carimbo maior, e ela volta a contar.
+ * Agora a marca fica até sair uma resposta do time — escrita ou áudio de gente,
+ * ou rascunho da IA aprovado por gente (`alguemEscreveu`). Resposta automática,
+ * modelo e envio que falhou não contam. Quem respondeu passa a atender a
+ * conversa (`app.messages_quem_responde_atende`), e ela vai para as "Minhas"
+ * dessa pessoa.
+ *
+ * Empate conta como respondida: a resposta nunca nasce antes da mensagem que
+ * ela responde, e o carimbo igual só aparece por arredondamento.
  */
-export function aindaNaoAbertas(
-  minhas: readonly ConversaComResposta[],
-  abertas: ReadonlyMap<string, string>,
-): ConversaComResposta[] {
-  return minhas.filter((c) => {
-    const abertaAte = abertas.get(c.conversaId);
-    return abertaAte === undefined || maisRecente(c.chegouEm, abertaAte) > 0;
-  });
+export function semResposta(minhas: readonly ConversaComResposta[]): ConversaComResposta[] {
+  return minhas.filter(
+    (c) => c.respondidaEm === null || maisRecente(c.chegouEm, c.respondidaEm) > 0,
+  );
 }
 
 /**
- * Até onde o piso pode andar sem engolir conversa por abrir.
+ * Até onde o piso pode andar sem engolir conversa à espera de resposta.
  *
  * O piso é o carimbo abaixo do qual a conferência nem lê (`visto`, no aparelho).
- * Ele não anda mais quando a pessoa entra na tela; anda quando o que ficou para
- * trás já foi aberto. Sem isso a leitura traria para sempre as mesmas conversas
- * já abertas, e o registro do que foi aberto cresceria sem fim.
+ * Ele não anda quando a pessoa entra na tela nem quando abre uma conversa; anda
+ * quando o que ficou para trás já foi respondido. Sem isso a leitura traria para
+ * sempre as mesmas conversas já resolvidas.
  *
- *   - Nada por abrir → o piso vai até a última chegada lida.
- *   - Há por abrir   → o piso vai até a chegada mais recente que seja ANTERIOR à
- *                      mais antiga por abrir. O que está antes dela ou não é meu,
- *                      ou já abri.
+ *   - Nada à espera → o piso vai até a última chegada lida.
+ *   - Há à espera   → o piso vai até a chegada mais recente que seja ANTERIOR à
+ *                     mais antiga à espera. O que está antes dela ou não é meu,
+ *                     ou já foi respondido.
+ *   - Leitura cheia → o piso fica onde está. A leitura traz só as mais recentes
+ *                     (`TETO_DE_RESPOSTAS`); andar sobre ela engoliria, sem
+ *                     ninguém ver, a conversa à espera que ficou abaixo do teto.
  *
  * `null` = não há para onde andar.
  */
 export function pisoPossivel(
   conversas: readonly ConversaComResposta[],
-  porAbrir: readonly ConversaComResposta[],
+  aEspera: readonly ConversaComResposta[],
+  leituraCheia = false,
 ): string | null {
+  if (leituraCheia) return null;
   let maisAntiga: string | null = null;
-  for (const c of porAbrir) {
+  for (const c of aEspera) {
     if (maisAntiga === null || maisRecente(c.chegouEm, maisAntiga) < 0) maisAntiga = c.chegouEm;
   }
   if (maisAntiga === null) return ultimaChegada(conversas);
 
   const corte = maisAntiga;
   return ultimaChegada(conversas.filter((c) => maisRecente(c.chegouEm, corte) < 0));
-}
-
-/** O registro do que foi aberto, sem o que o piso já cobre. */
-export function semOQueOPisoCobre(
-  abertas: ReadonlyMap<string, string>,
-  piso: string,
-): Map<string, string> {
-  const restam = new Map<string, string>();
-  for (const [conversaId, abertaAte] of abertas) {
-    if (maisRecente(abertaAte, piso) > 0) restam.set(conversaId, abertaAte);
-  }
-  return restam;
 }
 
 /**

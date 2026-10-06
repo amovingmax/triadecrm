@@ -8,12 +8,16 @@ import { type ConversaComResposta, type FichaDoAviso } from './regra';
  *
  * Nada aqui escreve no banco: nem em `messages`, nem em `conversations`, nem na
  * fila de saída. O aviso observa o que o worker-wa já gravou e não muda o estado
- * de conversa nenhuma — nem o "por ler" (`unread_count`), que continua sendo
- * zerado só por quem abre a conversa na tela.
+ * de conversa nenhuma — nem o "por ler" (`unread_count`), que é a tela da
+ * conversa quem zera, depois que alguém do time responde.
  */
 
-/** Quantas conversas a conferência traz. Quem ficou duas semanas fora vê "50", não "312". */
-export const TETO_DE_RESPOSTAS = 50;
+/**
+ * Quantas conversas a conferência traz. A conversa só sai da conta quando alguém
+ * responde, então a janela de leitura cobre dias, e não minutos: o teto tem
+ * folga para isso. Bater nele trava o piso (ver `pisoPossivel`).
+ */
+export const TETO_DE_RESPOSTAS = 200;
 
 /** O marco de quem nunca abriu o CRM num banco sem conversa nenhuma. */
 export const ANTES_DE_TUDO = '1970-01-01T00:00:00+00:00';
@@ -25,29 +29,32 @@ interface LinhaCrua {
   last_inbound_at: string | null;
   peer_nome: string | null;
   peer_phone_e164: string;
-  messages: { id: string }[] | null;
+  messages: { created_at: string }[] | null;
 }
 
 /**
  * As conversas em que chegou mensagem depois de `desde`, com a resposta à
- * pergunta "alguém do time já escreveu aqui?".
+ * pergunta "quando alguém do time escreveu aqui pela última vez?".
  *
  * UMA ida ao banco. A mensagem embutida é filtrada e limitada a uma por conversa
- * — o que importa é se existe, não quantas são —, e sai pelo índice
- * `messages_conv_idx`. O filtro é o de `app.messages_quem_responde_atende`
- * (saída do CRM escrita por gente ou aprovada por gente), menos os modelos: o
- * cumprimento de abertura e o de campanha abrem a conversa, não a atendem.
+ * — a mais recente, que é a que diz se a última entrada já foi respondida —, e
+ * sai pelo índice `messages_conv_idx`. O filtro é o de
+ * `app.messages_quem_responde_atende` (saída do CRM escrita por gente ou
+ * aprovada por gente), menos os modelos: o cumprimento de abertura e o de
+ * campanha abrem a conversa, não a atendem.
+ *
+ * `cheia` diz que a leitura bateu no teto: pode haver mais, abaixo dele.
  *
  * `null` é falha de rede, e não "nada chegou": quem chama mantém o que tinha.
  */
 export async function lerConversasComResposta(
   desde: string,
-): Promise<ConversaComResposta[] | null> {
+): Promise<{ conversas: ConversaComResposta[]; cheia: boolean } | null> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('conversations')
     .select(
-      'id, organization_id, assignee_id, last_inbound_at, peer_nome, peer_phone_e164, messages(id)',
+      'id, organization_id, assignee_id, last_inbound_at, peer_nome, peer_phone_e164, messages(created_at)',
     )
     .gt('last_inbound_at', desde)
     .eq('messages.direction', 'out')
@@ -55,23 +62,30 @@ export async function lerConversasComResposta(
     .in('messages.author_kind', ['human', 'bot_ai'])
     .neq('messages.type', 'template')
     .neq('messages.status', 'failed')
+    .order('created_at', { referencedTable: 'messages', ascending: false })
     .limit(1, { referencedTable: 'messages' })
     .order('last_inbound_at', { ascending: false })
     .limit(TETO_DE_RESPOSTAS);
 
   if (error) return null;
 
-  return ((data ?? []) as LinhaCrua[])
+  const linhas = (data ?? []) as LinhaCrua[];
+  const conversas = linhas
     .filter((linha) => linha.last_inbound_at !== null)
-    .map((linha) => ({
-      conversaId: linha.id,
-      organizacaoId: linha.organization_id,
-      responsavelId: linha.assignee_id,
-      chegouEm: linha.last_inbound_at as string,
-      nomeDoPerfil: linha.peer_nome,
-      telefone: linha.peer_phone_e164,
-      alguemEscreveu: (linha.messages?.length ?? 0) > 0,
-    }));
+    .map((linha): ConversaComResposta => {
+      const respondidaEm = linha.messages?.[0]?.created_at ?? null;
+      return {
+        conversaId: linha.id,
+        organizacaoId: linha.organization_id,
+        responsavelId: linha.assignee_id,
+        chegouEm: linha.last_inbound_at as string,
+        nomeDoPerfil: linha.peer_nome,
+        telefone: linha.peer_phone_e164,
+        alguemEscreveu: respondidaEm !== null,
+        respondidaEm,
+      };
+    });
+  return { conversas, cheia: linhas.length >= TETO_DE_RESPOSTAS };
 }
 
 /**
