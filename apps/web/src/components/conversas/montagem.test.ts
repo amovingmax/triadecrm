@@ -5,8 +5,10 @@ import {
   agruparPorDia,
   aplicarFiltros,
   cabeNaJanela,
+  contatosDeConsultoria,
   diasDesde,
   ehInteracao,
+  emCaptacao,
   escolherNegocio,
   esperandoResposta,
   filaDeQuemRespondeu,
@@ -763,7 +765,9 @@ describe('Minhas, Meu setor e Todas (Fase 1)', () => {
   });
   const quem = { euId: HELOISA, meusSetores: [2] };
   const ids = (escopo: 'minhas' | 'setor' | 'todas') =>
-    aplicarFiltros(itens, { ...FILTROS_VAZIOS, escopo }, quem).map((i) => i.id).sort();
+    aplicarFiltros(itens, { ...FILTROS_VAZIOS, escopo }, quem)
+      .map((i) => i.id)
+      .sort();
 
   it('"Minhas" são as conversas que eu atendo', () => {
     expect(ids('minhas')).toEqual(['o1']);
@@ -833,7 +837,6 @@ describe('mensagens seguidas do mesmo autor viram um bloco', () => {
   });
 });
 
-
 // ---------------------------------------------------------------------------
 // A fila de quem respondeu (28/09/2026, ADR-16)
 // ---------------------------------------------------------------------------
@@ -876,6 +879,7 @@ function itemDaLista(parcial: Partial<ItemConversa> & { id: string }): ItemConve
     bairro: null,
     cidade: null,
     temperatura: 'frio',
+    fechou: false,
     precisaAtencao: false,
     telefone: null,
     telefoneMascarado: false,
@@ -899,7 +903,6 @@ function itemDaLista(parcial: Partial<ItemConversa> & { id: string }): ItemConve
     ...parcial,
   };
 }
-
 
 describe('aplicarFiltros: as arquivadas', () => {
   // Rafael pediu "apagar o chat" em 29/09/2026 e escolheu ARQUIVAR, entre sumir
@@ -936,8 +939,14 @@ describe('aplicarFiltros: as arquivadas', () => {
 
 describe('a fila de quem respondeu', () => {
   it('traz quem espera há mais tempo primeiro', () => {
-    const a = itemDaLista({ id: 'a', fio: fioDaLista({ ultimaEntradaEm: '2026-09-27T10:00:00Z' }) });
-    const b = itemDaLista({ id: 'b', fio: fioDaLista({ ultimaEntradaEm: '2026-09-25T10:00:00Z' }) });
+    const a = itemDaLista({
+      id: 'a',
+      fio: fioDaLista({ ultimaEntradaEm: '2026-09-27T10:00:00Z' }),
+    });
+    const b = itemDaLista({
+      id: 'b',
+      fio: fioDaLista({ ultimaEntradaEm: '2026-09-25T10:00:00Z' }),
+    });
     expect(filaDeQuemRespondeu([a, b]).map((i) => i.id)).toEqual(['b', 'a']);
   });
 
@@ -996,7 +1005,10 @@ describe('a fila de quem respondeu', () => {
 
   it('fio sem entrada nenhuma não entra: ninguém respondeu, então ninguém espera', () => {
     const semData = itemDaLista({ id: 'x', fio: fioDaLista({ ultimaEntradaEm: null }) });
-    const comData = itemDaLista({ id: 'y', fio: fioDaLista({ ultimaEntradaEm: '2026-09-25T10:00:00Z' }) });
+    const comData = itemDaLista({
+      id: 'y',
+      fio: fioDaLista({ ultimaEntradaEm: '2026-09-25T10:00:00Z' }),
+    });
     expect(() => filaDeQuemRespondeu([semData, comData])).not.toThrow();
     expect(filaDeQuemRespondeu([semData, comData]).map((i) => i.id)).toEqual(['y']);
   });
@@ -1103,10 +1115,7 @@ describe('clientes na lista "Todas"', () => {
 
   it('sem cliente nenhum, a ordem dos parceiros não é tocada', () => {
     const itens = montarConversas({
-      organizacoes: [
-        organizacao('org-1', 'Zélia'),
-        organizacao('org-2', 'Abel'),
-      ],
+      organizacoes: [organizacao('org-1', 'Zélia'), organizacao('org-2', 'Abel')],
       atividades: [],
       negocios: [],
       catalogos: CATALOGOS,
@@ -1114,5 +1123,47 @@ describe('clientes na lista "Todas"', () => {
     expect(juntarNaLista(itens, []).map((l) => (l.tipo === 'parceiro' ? l.item.id : ''))).toEqual(
       itens.map((i) => i.id),
     );
+  });
+});
+
+describe('quem fechou vai para a Consultoria (pivô de 06/10/2026)', () => {
+  const agora = new Date('2026-10-06T12:00:00Z');
+  const itens = montarConversas({
+    organizacoes: [
+      organizacao('captando', 'Buffet em Conversa'),
+      organizacao('ganhou', 'Decor que Fechou'),
+      { ...organizacao('cliente', 'Som que já é Cliente'), temperature: 'cliente' },
+      organizacao('ganhou-e-abriu-outro', 'Foto com Dois Negócios'),
+    ],
+    atividades: [],
+    negocios: [
+      negocio({ id: 'd1', organization_id: 'captando', status: 'open' }),
+      negocio({ id: 'd2', organization_id: 'ganhou', status: 'won' }),
+      // Ganhou um negócio e abriu outro depois: o negócio em foco é o aberto, e
+      // o parceiro continua sendo de casa.
+      negocio({ id: 'd3', organization_id: 'ganhou-e-abriu-outro', status: 'won' }),
+      negocio({
+        id: 'd4',
+        organization_id: 'ganhou-e-abriu-outro',
+        status: 'open',
+        updated_at: '2026-10-05T12:00:00Z',
+      }),
+    ],
+    catalogos: CATALOGOS,
+    agora,
+  });
+  const ids = (lista: { id: string }[]) => lista.map((i) => i.id).sort();
+
+  it('fechou quem tem negócio ganho, ou quem a etapa já trata como cliente', () => {
+    expect(ids(contatosDeConsultoria(itens))).toEqual([
+      'cliente',
+      'ganhou',
+      'ganhou-e-abriu-outro',
+    ]);
+  });
+
+  it('e some da lista de captação: as duas abas não repetem ninguém', () => {
+    expect(ids(emCaptacao(itens))).toEqual(['captando']);
+    expect(emCaptacao(itens).length + contatosDeConsultoria(itens).length).toBe(itens.length);
   });
 });

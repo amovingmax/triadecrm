@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { requireSession } from '@/lib/auth/session';
+import { requireRole } from '@/lib/auth/session';
 import { podeCriarParceiro } from '@/lib/navegacao';
 import {
   ehEntradaPorArquivo,
@@ -42,7 +42,8 @@ const ORIGEM_PADRAO: OrigemDeArquivo = {
  * acontece no cliente, contra as funções do Postgres.
  */
 export default async function Pagina() {
-  const [sessao, supabase] = await Promise.all([requireSession(), createClient()]);
+  // Só admin e gestor trazem lista para a base (pivô de 06/10/2026).
+  const [sessao, supabase] = await Promise.all([requireRole('admin', 'gestor'), createClient()]);
 
   // `sources_select` é `for select to authenticated using (true)`
   // (`20260904000500:96`): qualquer papel que chegue aqui lê o catálogo.

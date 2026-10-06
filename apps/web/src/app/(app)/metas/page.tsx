@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { carregarPessoasAcompanhadas } from '@/lib/auth/equipe';
-import { requireSession } from '@/lib/auth/session';
+import { requireRole } from '@/lib/auth/session';
 import { hojeEmNatal } from '@/components/metas/periodo';
 import { TelaMetas } from '@/components/metas/tela-metas';
 import { PAPEIS_QUE_DEFINEM_META, type Pessoa } from '@/components/metas/tipos';
@@ -25,7 +25,8 @@ export const metadata: Metadata = { title: 'Metas' };
  * meia-noite, e o fuso é sempre America/Fortaleza (CLAUDE.md).
  */
 export default async function Pagina() {
-  const sessao = await requireSession();
+  // Tela da gestão desde o pivô de 06/10/2026: quem liga vê só Ligar e Meu dia.
+  const sessao = await requireRole('admin', 'gestor');
   const podeDefinir = PAPEIS_QUE_DEFINEM_META.includes(sessao.papel);
 
   // A própria pessoa e quem ela acompanha pela hierarquia (`lib/auth/hierarquia.ts`):

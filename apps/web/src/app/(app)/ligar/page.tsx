@@ -4,7 +4,7 @@ import { requireRole } from '@/lib/auth/session';
 import { PAPEIS_QUE_LIGAM } from '@/components/ligacao/chamada-contexto';
 import { TelaDeLotes } from '@/components/ligacao/lote-tela';
 
-export const metadata: Metadata = { title: 'Ligar' };
+export const metadata: Metadata = { title: 'Lotes' };
 
 /**
  * Prospecção ativa por ligação (R13) — a metade em que se MONTA o lote.
@@ -34,7 +34,10 @@ export default async function Pagina({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [, params] = await Promise.all([requireRole(...PAPEIS_QUE_LIGAM), searchParams]);
+  const [sessao, params] = await Promise.all([requireRole(...PAPEIS_QUE_LIGAM), searchParams]);
+  // Quem monta o lote é a gestão, para ela mesma ou para quem vai ligar (pivô de
+  // 06/10/2026). Quem só liga encontra aqui os lotes que montaram para ela.
+  const podeMontar = sessao.papel === 'admin' || sessao.papel === 'gestor';
 
-  return <TelaDeLotes podeMontar abrirMontagem={params.montar === '1'} />;
+  return <TelaDeLotes podeMontar={podeMontar} abrirMontagem={params.montar === '1'} />;
 }

@@ -7,11 +7,12 @@
 --      ninguém apertar botão: o padrão tem de ser o silêncio.
 --   2. LIGADO, A APROVAÇÃO ENFILEIRA. E o lote que nasce é o da casa — sem
 --      criador, sem assinante, contínuo.
---   3. SÓ O GOOGLE. E o que define isso é o `place_id`, não a origem: o CSV do
---      Maps entra pela IMPORTAÇÃO e a ficha aprovada sai com origem `planilha`.
---      Perguntar pela origem foi o defeito de 29/09/2026 — o Rafael aprovou seis
---      fichas e não saiu cumprimento nenhum. Planilha SEM place_id continua
---      fora, e quem pediu para não ser contatado também.
+--   3. A ORIGEM DEIXOU DE SER PERGUNTA (06/10/2026). Até ali só ficha do Google
+--      entrava, porque o envio era automático e não podia escolher sozinho quem
+--      procurar. Agora a mensagem sai A PEDIDO de quem aprova (migração
+--      20261006140000), e quem pede já escolheu: entra a do Google, a da
+--      planilha e qualquer outra. Quem pediu para não ser contatado continua
+--      fora. Que SEM pedido nada entra, quem prova é o 102.
 --   4. A MENSAGEM NÃO TEM DONO. `author_kind = 'bot_fixed'` e `sent_by` nulo —
 --      "n sai do cracha de ninguem, sai no da komune sem id".
 --   5. MODELO COM VARIÁVEL É RECUSADO, porque não há quem preencha
@@ -67,13 +68,19 @@ create function pg_temp.lote() returns public.envios_em_massa language sql stabl
   select * from public.envios_em_massa where continuo limit 1
 $$;
 
+-- O PEDIDO DO BOTÃO vale para o arquivo inteiro: desde 06/10/2026 a ficha só
+-- entra na fila quando quem aprova pede (`app.cumprimento_pedido`, ligado pelas
+-- funções `radar_revisar_*_com_mensagem`). Aqui ele fica ligado porque este
+-- arquivo prova a MÁQUINA do cumprimento; a regra do pedido tem arquivo próprio.
+select set_config('app.cumprimento_pedido', 'sim', true);
+
 -- =====================================================================
 -- 1. Desligado é desligado
 -- =====================================================================
 insert into public.organizations (name, phone_e164, source_id, collector)
 values ('Buffet Desligado', '+5584900008901', pg_temp.fonte('google_maps_raspado'), 'pgtap89');
 select is(pg_temp.na_fila((select id from public.organizations where phone_e164 = '+5584900008901')), 0,
-  'com a chave desligada, ficha do Google Maps não entra em fila nenhuma');
+  'com a chave desligada, nem a pedido a ficha entra em fila nenhuma');
 select is((select count(*)::int from public.envios_em_massa where continuo), 0,
   'e nem sequer cria o lote contínuo');
 
@@ -98,12 +105,12 @@ select ok((select assinante_id is null from public.envios_em_massa_itens
   'o item da fila também não tem assinante');
 
 -- =====================================================================
--- 3. Só o Google Maps, e só quem pode ser contatado
+-- 3. De qualquer origem, e só quem pode ser contatado
 -- =====================================================================
 insert into public.organizations (name, phone_e164, source_id, collector)
 values ('Buffet da Planilha', '+5584900008903', pg_temp.fonte('planilha'), 'pgtap89');
-select is(pg_temp.na_fila((select id from public.organizations where phone_e164 = '+5584900008903')), 0,
-  'planilha sem place_id não entra: não veio do Google');
+select is(pg_temp.na_fila((select id from public.organizations where phone_e164 = '+5584900008903')), 1,
+  'a pedido, a origem não é pergunta: planilha sem place_id também entra');
 
 -- O CASO QUE FALTAVA, e que custou um dia: o CSV do Google Maps entra pela
 -- importação, então a ficha nasce com origem PLANILHA e `place_id` do Google.

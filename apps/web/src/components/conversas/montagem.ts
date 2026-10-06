@@ -162,6 +162,12 @@ export function diasDesde(iso: string | null, agora: Date): number | null {
 // A lista da esquerda
 // ---------------------------------------------------------------------------
 
+/**
+ * As temperaturas que a ETAPA dá a quem já é cliente (PRD §5.6): cadastrado na
+ * plataforma, ou cadastrado e ativo. Não são calor de negociação, são estado.
+ */
+const TEMPERATURAS_DE_CLIENTE: readonly string[] = ['cliente', 'cliente_ativo'];
+
 /** Acumulador por organização, antes de virar `ItemConversa`. */
 type Acumulado = {
   ultima: AtividadeCrua | null;
@@ -252,9 +258,13 @@ export function montarConversas({
   // mais recente de todos. É a mesma escolha que a lista de Parceiros faz, para as
   // duas telas nunca discordarem sobre em que etapa o parceiro está.
   const negocioEmFoco = new Map<string, NegocioCru>();
+  // Quem tem ALGUM negócio ganho: o negócio em foco pode ser outro (um novo,
+  // aberto, no funil de produtores), e o parceiro continua sendo de casa.
+  const ganhou = new Set<string>();
   for (const d of negocios) {
     const atual = negocioEmFoco.get(d.organization_id);
     if (!atual || melhorNegocio(d, atual)) negocioEmFoco.set(d.organization_id, d);
+    if (d.status === 'won') ganhou.add(d.organization_id);
   }
 
   // Uma leitura por PARCEIRO, não por conversa: a lista é de parceiros, e um
@@ -284,6 +294,7 @@ export function montarConversas({
       bairro: o.neighborhood,
       cidade: o.city_name,
       temperatura: o.temperature,
+      fechou: ganhou.has(o.id) || TEMPERATURAS_DE_CLIENTE.includes(o.temperature),
       precisaAtencao: negocio?.needs_attention ?? false,
       telefone: o.phone_e164,
       telefoneMascarado: o.phone_is_masked ?? true,
@@ -428,6 +439,22 @@ export function esperandoResposta(item: ItemConversa): boolean {
  * responde "quem está esperando há mais tempo?". Ordenar as duas igual faria a
  * segunda ser uma cópia da primeira.
  */
+/**
+ * A aba "Consultoria" (06/10/2026): quem fechou com a gente, na ordem da lista.
+ *
+ * É o pós-venda. Quem está aqui NÃO aparece na lista de Conversas
+ * (`emCaptacao`): as duas respondem perguntas diferentes — "com quem eu ainda
+ * estou tentando fechar?" e "de quem eu já cuido?".
+ */
+export function contatosDeConsultoria(itens: readonly ItemConversa[]): ItemConversa[] {
+  return itens.filter((i) => i.fechou);
+}
+
+/** O contrário da consultoria: quem ainda está sendo captado. */
+export function emCaptacao(itens: readonly ItemConversa[]): ItemConversa[] {
+  return itens.filter((i) => !i.fechou);
+}
+
 export function filaDeQuemRespondeu(itens: ItemConversa[]): ItemConversa[] {
   return itens
     .filter(esperandoResposta)

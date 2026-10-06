@@ -38,6 +38,7 @@ import {
 import { rotuloDoDia } from './formatos';
 import { PreviaDoRascunho } from './lista-conversas';
 import { Janela24h } from './janela-24h';
+import { useLeituraDoFio } from './leitura-do-fio';
 import { Mensagem } from './mensagem-do-fio';
 import {
   estadoDaJanela,
@@ -47,7 +48,6 @@ import {
   type FioCru,
 } from './mensagens';
 import type { CatalogosConversas } from './montagem';
-import { useZerarPorLerAoResponder } from './por-ler';
 import { TextoLivre } from './responder';
 import { previaDoDigitado, useTextosDigitados } from './texto-digitado';
 
@@ -159,12 +159,15 @@ export function ConversaForaDaBase({
   catalogos,
   aoVoltar,
   aoLigar,
+  escolhaExplicita,
 }: {
   fio: FioCru;
   catalogos: CatalogosConversas;
   aoVoltar: () => void;
   /** A conversa virou ficha: a tela abre a ficha na aba Conversas. */
   aoLigar: (organizacaoId: string) => void;
+  /** A pessoa ESCOLHEU esta conversa; a que o desktop abre sozinho não conta como lida. */
+  escolhaExplicita: boolean;
 }) {
   const nomeDaPessoa = useMemo(
     () => new Map(catalogos.pessoas.map((p) => [p.id, p.nome])),
@@ -174,8 +177,14 @@ export function ConversaForaDaBase({
     queryKey: chaveDasMensagensDoFio(fio.id),
     queryFn: () => carregarMensagensDoFio(fio.id),
   });
-  // O "por ler" do cliente zera quando alguém do time responde (`por-ler.ts`).
-  useZerarPorLerAoResponder(fio.id, fio.unread_count, mensagens.data);
+  // O "por ler" zera ao abrir e a cada mensagem que chega com a conversa na
+  // frente da pessoa (06/10/2026); a marca "Nova" continua até a resposta.
+  useLeituraDoFio({
+    fioId: fio.id,
+    naoLidas: fio.unread_count,
+    ultimaEntradaEm: fio.last_inbound_at,
+    escolhida: escolhaExplicita,
+  });
   const [virando, setVirando] = useState(false);
   const [modo, setModo] = useState<'criar' | 'ligar'>('criar');
   const janela = estadoDaJanela(fio.window_expires_at);

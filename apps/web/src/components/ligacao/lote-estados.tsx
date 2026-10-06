@@ -105,7 +105,7 @@ export function SemLotes({ aoMontar, podeMontar }: { aoMontar: () => void; podeM
       texto={
         podeMontar
           ? 'Um lote é o trabalho do turno fechado antes de começar: um funil, uma temperatura de origem e um roteiro. Você monta uma vez, e depois só liga — sem escolher para quem.'
-          : 'Um lote é o trabalho do turno fechado antes de começar. Seu perfil não monta lote; peça a quem faz a captação para montar o de hoje.'
+          : 'Nenhum lote no seu nome ainda. Quem monta o lote é a gestão; assim que montarem o seu, ele aparece aqui e é só ligar.'
       }
     >
       {podeMontar ? (

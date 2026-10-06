@@ -66,7 +66,10 @@ export function TelaDeLotes({
 
   const abrirFolha = useCallback(() => setMontando(true), []);
 
-  const emAndamento = (lotes.data ?? []).filter(
+  // Quem só liga vê os lotes que a gestão montou PARA ELA (pivô de 06/10/2026). A
+  // gestão vê os de todo mundo: é ela que monta e que acompanha.
+  const visiveis = (lotes.data ?? []).filter((lote) => podeMontar || lote.ehMeu);
+  const emAndamento = visiveis.filter(
     (lote) => lote.status === 'ativo' || lote.status === 'pausado',
   );
   const esperando = emAndamento.reduce((soma, lote) => soma + lote.faltam, 0);
@@ -75,7 +78,7 @@ export function TelaDeLotes({
     <div className="flex w-full flex-col gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Ligar</h1>
+          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Lotes</h1>
           <p className="text-sm text-muted-foreground">
             {lotes.isPending ? (
               'Carregando os lotes...'
@@ -88,8 +91,10 @@ export function TelaDeLotes({
                 <span className="numerico">{emAndamento.length}</span>
                 {emAndamento.length === 1 ? ' lote' : ' lotes'}
               </>
+            ) : podeMontar ? (
+              'Nenhum contato na fila. Monte um lote para você ou para quem vai ligar.'
             ) : (
-              'Nenhum contato na fila. Monte o lote do turno para começar.'
+              'Nenhum contato na sua fila agora.'
             )}
           </p>
         </div>
@@ -106,17 +111,20 @@ export function TelaDeLotes({
         <EsqueletoDosLotes />
       ) : lotes.isError ? (
         <ErroDosLotes causa={lotes.error} aoTentar={() => void lotes.refetch()} />
-      ) : (lotes.data ?? []).length === 0 ? (
+      ) : visiveis.length === 0 ? (
         <SemLotes aoMontar={abrirFolha} podeMontar={podeMontar} />
       ) : (
         <ListaDeLotes
-          lotes={lotes.data ?? []}
+          lotes={visiveis}
           aoEncerrar={(lote) => encerramento.mutate(lote)}
           encerrandoId={encerramento.isPending ? (encerramento.variables?.id ?? null) : null}
+          gestao={podeMontar}
         />
       )}
 
-      <FolhaDeMontagem aberta={montando} aoFechar={() => setMontando(false)} />
+      {podeMontar ? (
+        <FolhaDeMontagem aberta={montando} aoFechar={() => setMontando(false)} />
+      ) : null}
     </div>
   );
 }

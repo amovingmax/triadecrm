@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { PainelLigacoesDoDia } from '@/components/ligacoes-do-dia/painel-do-time';
+
 import { BarraDePeriodo, SeletorDePainel } from './barra-recorte';
 import { PainelAtendimento } from './painel-atendimento';
 import { PainelBairros } from './painel-bairros';
@@ -123,6 +125,8 @@ function Painel({
   if (!painel) return null;
 
   switch (chave) {
+    case 'ligacoes':
+      return <PainelLigacoesDoDia painel={painel} />;
     case 'atendimento':
       return <PainelAtendimento painel={painel} periodo={periodo} />;
     case 'semana':

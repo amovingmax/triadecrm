@@ -140,8 +140,64 @@ export type RespostaDeRevisao =
       irmasAprovadas?: number;
       /** A escolha virou regra do de-para agora? */
       virouRegra?: boolean;
+      /** Só quando a aprovação pediu a mensagem automática (`comMensagem`). */
+      mensagem?: MensagemDaAprovacao;
     }
   | { ok: false; motivo: string; organizacaoId: string | null };
+
+/**
+ * O que aconteceu com a mensagem automática de uma aprovação "com mensagem"
+ * (migração `20261006140000`).
+ *
+ * `ligada` é a chave geral do cumprimento, em Ajustes → Atendimento; `naFila` é
+ * quantas fichas entraram na fila agora. Ligada e zero quer dizer que a fila não
+ * aceitou: o envio está pausado, ou a ficha não pode ser contatada.
+ */
+export type MensagemDaAprovacao = { ligada: boolean; naFila: number };
+
+/**
+ * O que dizer a quem clicou em "Aprovar e mandar mensagem". `null` = a
+ * aprovação não pediu mensagem.
+ *
+ * As três frases existem porque "aprovado" e "a mensagem vai sair" são fatos
+ * diferentes: quem aprova com a chave desligada precisa SABER que ninguém foi
+ * procurado, em vez de esperar uma resposta que não vem.
+ */
+export function fraseDaMensagemAutomatica(
+  mensagem: MensagemDaAprovacao | undefined,
+): { texto: string; saiu: boolean } | null {
+  if (!mensagem) return null;
+  if (!mensagem.ligada) {
+    return {
+      saiu: false,
+      texto:
+        'A mensagem automática está desligada em Ajustes → Atendimento: ninguém foi procurado.',
+    };
+  }
+  if (mensagem.naFila <= 0) {
+    return {
+      saiu: false,
+      texto:
+        'A mensagem não entrou na fila: o envio automático está pausado, ou o contato não pode receber.',
+    };
+  }
+  return {
+    saiu: true,
+    texto:
+      mensagem.naFila === 1
+        ? 'A mensagem automática entrou na fila e sai no próximo horário permitido. Quando o lead responder, ele aparece em Conversas.'
+        : `${mensagem.naFila} mensagens automáticas entraram na fila e saem aos poucos, no ritmo configurado. Quem responder aparece em Conversas.`,
+  };
+}
+
+function lerMensagem(valor: unknown): MensagemDaAprovacao | undefined {
+  if (valor === null || typeof valor !== 'object') return undefined;
+  const m = valor as Record<string, unknown>;
+  return {
+    ligada: m.ligada === true,
+    naFila: typeof m.na_fila === 'number' ? m.na_fila : 0,
+  };
+}
 
 export async function revisarCandidato(args: {
   candidatoId: string;
@@ -157,9 +213,17 @@ export async function revisarCandidato(args: {
    * mais que contagem — mas só quando é explícito, e por isso o padrão é falso.
    */
   aprenderAgora?: boolean;
+  /**
+   * O botão "Aprovar e mandar mensagem" (06/10/2026): além de criar a ficha, põe
+   * o cumprimento automático na fila, na mesma transação. Sem isto a ficha só
+   * vai para Prospectados. Só vale ao aprovar.
+   */
+  comMensagem?: boolean;
 }): Promise<RespostaDeRevisao> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('radar_revisar_candidato', {
+  const comMensagem = args.comMensagem === true && args.acao === 'aprovar';
+  const funcao = comMensagem ? 'radar_revisar_candidato_com_mensagem' : 'radar_revisar_candidato';
+  const { data, error } = await supabase.rpc(funcao, {
     p_candidate_id: args.candidatoId,
     p_acao: args.acao,
     p_organization_id: args.organizacaoId ?? null,
@@ -181,6 +245,7 @@ export async function revisarCandidato(args: {
       organizacaoId,
       irmasAprovadas: typeof irmas.aprovados === 'number' ? irmas.aprovados : 0,
       virouRegra: aprendizado.virou_regra === true,
+      mensagem: comMensagem ? lerMensagem(r.mensagem) : undefined,
     };
   }
   return { ok: false, motivo: texto(r.reason) ?? 'desconhecido', organizacaoId };
@@ -202,6 +267,8 @@ export type RespostaDoLote = {
   aprovados: number;
   recusados: number;
   itens: Array<{ candidatoId: string; ok: boolean; motivo: string | null; nome: string | null }>;
+  /** Só quando o lote pediu a mensagem automática. */
+  mensagem?: MensagemDaAprovacao;
 };
 
 /**
@@ -220,9 +287,13 @@ export type RespostaDoLote = {
 export async function revisarLote(args: {
   ids: readonly string[];
   categoriaId?: number | null;
+  /** O botão "aprovar e mandar mensagem" da barra de lote (ver `revisarCandidato`). */
+  comMensagem?: boolean;
 }): Promise<RespostaDoLote> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('radar_revisar_lote', {
+  const comMensagem = args.comMensagem === true;
+  const funcao = comMensagem ? 'radar_revisar_lote_com_mensagem' : 'radar_revisar_lote';
+  const { data, error } = await supabase.rpc(funcao, {
     p_ids: [...args.ids],
     p_category_id: args.categoriaId ?? null,
   });
@@ -243,6 +314,7 @@ export async function revisarLote(args: {
         nome: texto(o.nome),
       };
     }),
+    mensagem: comMensagem ? lerMensagem(r.mensagem) : undefined,
   };
 }
 

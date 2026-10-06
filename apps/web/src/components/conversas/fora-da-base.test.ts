@@ -96,6 +96,16 @@ describe('a aba na URL', () => {
     expect(urlDoEstado(FILTROS_VAZIOS, null, 'fora')).toBe('?aba=fora');
   });
 
+  it('?aba=consultoria abre na aba de quem fechou, e volta para a URL', () => {
+    expect(estadoDaUrl({ aba: 'consultoria' }).aba).toBe('consultoria');
+    expect(urlDoEstado(FILTROS_VAZIOS, null, 'consultoria')).toBe('?aba=consultoria');
+  });
+
+  it('endereço antigo das abas que saíram cai em Conversas (pivô de 06/10/2026)', () => {
+    expect(estadoDaUrl({ aba: 'responderam' }).aba).toBe('conversas');
+    expect(estadoDaUrl({ aba: 'aprovar' }).aba).toBe('conversas');
+  });
+
   it('?cliente=<conversa> abre a conversa de quem não é ficha, e volta para a URL', () => {
     expect(estadoDaUrl({ cliente: 'fio-9' }).clienteId).toBe('fio-9');
     expect(estadoDaUrl({}).clienteId).toBeNull();

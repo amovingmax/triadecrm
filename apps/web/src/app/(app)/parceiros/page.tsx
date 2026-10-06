@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 
-import { requireSession } from '@/lib/auth/session';
+import { requireRole } from '@/lib/auth/session';
 import { leTelefoneCompleto, podeCriarParceiro, podeImportarPlanilha } from '@/lib/navegacao';
 import { carregarCatalogos } from '@/components/parceiros/catalogos';
 import { TelaParceiros } from '@/components/parceiros/tela-parceiros';
 import { filtrosDaUrl } from '@/components/parceiros/tipos';
 
-export const metadata: Metadata = { title: 'Parceiros' };
+export const metadata: Metadata = { title: 'Prospectados' };
 
 /**
  * Lista de parceiros (RF-BAS-12, RF-BAS-14, RF-BAS-15).
@@ -25,7 +25,9 @@ export default async function Pagina({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [sessao, catalogos, params] = await Promise.all([
-    requireSession(),
+    // A LISTA é de quem cuida da base (pivô de 06/10/2026). O SDR abre a ficha
+    // pela conversa, pelo funil ou pelo Meu dia: `/parceiros/[id]` não tem esta guarda.
+    requireRole('admin', 'gestor'),
     carregarCatalogos(),
     searchParams,
   ]);

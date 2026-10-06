@@ -247,7 +247,7 @@ describe('quem respondeu entra no topo', () => {
   });
 
   it('leva para a conversa, e para a aba de fora da base quando não há ficha', () => {
-    expect(destinoDoItem(conversa())?.href).toBe('/conversas?aba=responderam&org=org-1');
+    expect(destinoDoItem(conversa())?.href).toBe('/conversas?org=org-1');
     expect(destinoDoItem({ ...conversa(), organizacaoId: null })?.href).toBe('/conversas?aba=fora');
   });
 

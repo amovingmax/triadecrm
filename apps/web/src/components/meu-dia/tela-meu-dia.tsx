@@ -701,10 +701,7 @@ function NotaDoQueFalta({ cheia }: { cheia: boolean }) {
         <li>
           A fila mostra no máximo <span className="numerico">15</span> conversas esperando resposta
           por vez, para não empurrar as reuniões e as tarefas para fora da lista. O resto está em{' '}
-          <Link
-            href="/conversas?aba=responderam"
-            className="underline underline-offset-4 hover:text-foreground"
-          >
+          <Link href="/conversas" className="underline underline-offset-4 hover:text-foreground">
             Conversas → Responderam
           </Link>
           .

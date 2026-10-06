@@ -22,7 +22,6 @@ import {
   VazioDeVerdade,
   VazioPorFiltro,
 } from './estados';
-import { contarFila, FilaDeAprovacao, FilaVazia, tempoDoMaisUrgente } from './fila-aprovacao';
 import { FiltrosDaConversa } from './filtros-conversas';
 import { numero } from './formatos';
 import { ConversaForaDaBase, ListaForaDaBase } from './fora-da-base';
@@ -30,7 +29,8 @@ import { conversasForaDaBase } from './fora-da-base-dados';
 import { ListaConversas } from './lista-conversas';
 import {
   aplicarFiltros,
-  filaDeQuemRespondeu,
+  contatosDeConsultoria,
+  emCaptacao,
   filtrarClientes,
   juntarNaLista,
   montarConversas,
@@ -114,7 +114,7 @@ export function TelaConversas({
   organizacaoInicial: string | null;
   /** Veio de `?cliente=<id da conversa>`: abre a conversa de quem não é ficha. */
   clienteInicial: string | null;
-  /** Veio de `?aba=aprovar`: entra direto na fila do ADR-05. */
+  /** Veio de `?aba=`: `consultoria`, `fora` ou `automaticas` abrem direto nela. */
   abaInicial: AbaDaEsquerda;
 }) {
   const ehCelular = useEhCelular();
@@ -171,7 +171,10 @@ export function TelaConversas({
     }),
     [consulta.data],
   );
-  const itens = useMemo(() => aplicarFiltros(todos, filtros, quem), [todos, filtros, quem]);
+  // Quem fechou saiu da lista de captação e mora na aba "Consultoria" (06/10/2026).
+  const captacao = useMemo(() => emCaptacao(todos), [todos]);
+  const consultoria = useMemo(() => contatosDeConsultoria(todos), [todos]);
+  const itens = useMemo(() => aplicarFiltros(captacao, filtros, quem), [captacao, filtros, quem]);
   // Quem escreveu e não é ficha: a aba "Clientes" inteira, e parte da lista de Conversas.
   const foraDaBase = useMemo(() => conversasForaDaBase(consulta.data?.fios ?? []), [consulta.data]);
   const porEscopo = useMemo(
@@ -183,33 +186,15 @@ export function TelaConversas({
         contagem:
           e.id === 'todas'
             ? null
-            : aplicarFiltros(todos, { ...filtros, escopo: e.id }, quem).length +
+            : aplicarFiltros(captacao, { ...filtros, escopo: e.id }, quem).length +
               filtrarClientes(foraDaBase, { ...filtros, escopo: e.id }, quem).length,
       })),
-    [todos, foraDaBase, filtros, quem],
+    [captacao, foraDaBase, filtros, quem],
   );
 
-  // A fila de aprovação NÃO passa pelo recorte da lista: ela é a fila do ADR-05
-  // inteira. Um rascunho escondido por um filtro de canal que alguém deixou
-  // ligado é um rascunho que expira sem ninguém ver — e o filtro é da OUTRA
-  // pergunta ("com quem eu falo agora?").
-  const paraAprovar = useMemo(() => todos.filter((i) => i.rascunhoPendente !== null), [todos]);
-  const fila = useMemo(() => contarFila(paraAprovar), [paraAprovar]);
-  const maisUrgente = useMemo(() => tempoDoMaisUrgente(paraAprovar), [paraAprovar]);
-
-  /**
-   * A FILA DE QUEM RESPONDEU (28/09/2026, ADR-16). Como a de aprovação, ela NÃO
-   * passa pelo recorte da lista: é a pergunta "quem está esperando há mais
-   * tempo?", e um filtro de canal esquecido ligado esconderia justamente o
-   * fornecedor que respondeu por outro caminho.
-   *
-   * Limite honesto, e igual ao das outras abas: `todos` é montado no cliente a
-   * partir de leituras com teto (`conversas/dados.ts`), então esta contagem é a
-   * contagem DO QUE FOI CARREGADO, como a de "Aprovar" e a de "Fora da base".
-   */
-  const responderam = useMemo(() => filaDeQuemRespondeu(todos), [todos]);
-
-  const daAba = aba === 'aprovar' ? paraAprovar : aba === 'responderam' ? responderam : itens;
+  // A aba "Consultoria" não passa pelo recorte da lista ("Minhas", busca, canal):
+  // é curta e é inteira, como a de Clientes.
+  const daAba = aba === 'consultoria' ? consultoria : itens;
   // Os clientes que cabem no recorte da lista de Conversas ("Minhas", busca...).
   const clientesNaLista = useMemo(
     () => filtrarClientes(foraDaBase, filtros, quem),
@@ -266,6 +251,7 @@ export function TelaConversas({
   //
   // Abrir NÃO tira a marca "Nova" nem o número do menu (05/10/2026): só a
   // resposta de alguém do time tira. Ver `semResposta`, em `avisos/regra.ts`.
+  // O "por ler" é outra coisa e sai ao abrir (06/10/2026, `leitura-do-fio.ts`).
   const { olharConversa, registrarAbridor } = useAcoesDosAvisos();
   const conversaAbertaId = foraAberta?.id ?? aberta?.fio?.id ?? null;
   useEffect(() => {
@@ -289,6 +275,24 @@ export function TelaConversas({
 
   const limpar = useCallback(() => setFiltros(FILTROS_VAZIOS), []);
   const voltar = useCallback(() => setEscolhidoId(null), []);
+
+  // MEXER NA CONVERSA É ESCOLHÊ-LA (06/10/2026).
+  //
+  // O desktop abre a primeira da lista sem ninguém pedir, e essa abertura não
+  // zera o "por ler" (ver `leitura-do-fio.ts`): o contador é do time, e zerar
+  // ali faria cada pessoa que entra na tela apagar o sinal da conversa do topo.
+  // Só que a linha dela já aparece marcada na lista, e ninguém clica no que
+  // parece escolhido. Clicar, rolar ou digitar dentro da conversa passa a valer
+  // como a escolha — e a prende no lugar, em vez de a tela trocar de conversa
+  // quando outra pessoa escreve e sobe para o topo.
+  const abertaAgoraId = aberta?.id ?? null;
+  const escolherAberta = useCallback(() => {
+    if (abertaAgoraId !== null && abertaAgoraId !== escolhidoId) escolherParceiro(abertaAgoraId);
+  }, [abertaAgoraId, escolhidoId, escolherParceiro]);
+  const foraAbertaId = foraAberta?.id ?? null;
+  const escolherForaAberta = useCallback(() => {
+    if (foraAbertaId !== null && foraAbertaId !== foraId) escolherCliente(foraAbertaId);
+  }, [foraAbertaId, foraId, escolherCliente]);
   const nadaNaLista = itens.length + clientesNaLista.length === 0;
 
   const recorte = temRecorte(filtros);
@@ -300,7 +304,6 @@ export function TelaConversas({
     todos.reduce((soma, i) => soma + i.naoLidas, 0) +
     foraDaBase.reduce((soma, f) => soma + f.unread_count, 0);
   const meta = consulta.data?.meta ?? null;
-  const temFio = todos.some((i) => i.fio !== null);
 
   // No celular, conversa aberta é tela cheia: cabeçalho e filtros saem de cena.
   const telaCheia = ehCelular && (foraAberta !== null || aberta !== null);
@@ -335,12 +338,10 @@ export function TelaConversas({
                   {itens.length + clientesNaLista.length === 1 ? ' conversa' : ' conversas'} com
                   esse filtro
                 </>
-              ) : porLer > 0 || fila.total > 0 ? (
+              ) : porLer > 0 ? (
                 <>
                   <span className="numerico">{numero(porLer)}</span>
-                  {porLer === 1 ? ' mensagem por ler' : ' mensagens por ler'},{' '}
-                  <span className="numerico">{numero(fila.total)}</span>
-                  {fila.total === 1 ? ' rascunho esperando você' : ' rascunhos esperando você'}
+                  {porLer === 1 ? ' mensagem por ler' : ' mensagens por ler'}
                 </>
               ) : (
                 <>
@@ -360,15 +361,12 @@ export function TelaConversas({
             <Abas
               aba={aba}
               aoTrocar={setAba}
-              naFila={fila.total}
-              esperando={responderam.length}
+              consultoria={consultoria.length}
               foraDaBase={foraDaBase.length}
-              comAviso={fila.comAviso}
-              maisUrgente={maisUrgente}
             />
 
-            {/* O recorte é da lista de conversas. Na fila de aprovação ele não
-                aparece porque não se aplica: lá a lista já é curta e é inteira. */}
+            {/* O recorte é da lista de conversas. Nas outras abas ele não aparece
+                porque não se aplica: lá a lista já é curta e é inteira. */}
             {aba === 'conversas' ? (
               <FiltrosDaConversa
                 filtros={filtros}
@@ -427,8 +425,8 @@ export function TelaConversas({
         {telaCheia || aba === 'automaticas' ? null : (
           <section
             aria-label={
-              aba === 'aprovar'
-                ? 'Rascunhos esperando aprovação'
+              aba === 'consultoria'
+                ? 'Quem fechou, por interação mais recente'
                 : 'Parceiros por interação mais recente'
             }
             // `min-w-0`: sem ele o item de grade assume `min-width: auto` e cresce até o
@@ -461,25 +459,15 @@ export function TelaConversas({
                 selecionadoId={foraAberta?.id ?? null}
                 aoEscolher={setForaId}
               />
-            ) : aba === 'responderam' ? (
-              responderam.length === 0 ? (
+            ) : aba === 'consultoria' ? (
+              consultoria.length === 0 ? (
                 <p className="px-4 py-8 text-sm text-muted-foreground">
-                  Ninguém está esperando resposta. Quando um fornecedor escrever, ele aparece aqui
-                  primeiro.
+                  Ninguém fechou ainda. Quando um negócio for ganho, a conversa desse parceiro sai
+                  da lista de Conversas e passa a aparecer aqui.
                 </p>
               ) : (
                 <ListaConversas
-                  itens={responderam}
-                  selecionadoId={aberta?.id ?? null}
-                  aoEscolher={escolherParceiro}
-                />
-              )
-            ) : aba === 'aprovar' ? (
-              paraAprovar.length === 0 ? (
-                <FilaVazia temFio={temFio} />
-              ) : (
-                <FilaDeAprovacao
-                  itens={paraAprovar}
+                  itens={consultoria}
                   selecionadoId={aberta?.id ?? null}
                   aoEscolher={escolherParceiro}
                 />
@@ -551,12 +539,16 @@ export function TelaConversas({
             <section
               aria-label="Conversa com cliente"
               className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden"
+              onPointerDownCapture={escolherForaAberta}
+              onKeyDownCapture={escolherForaAberta}
+              onWheelCapture={escolherForaAberta}
             >
               {foraAberta ? (
                 <ConversaForaDaBase
                   key={foraAberta.id}
                   fio={foraAberta}
                   catalogos={catalogos}
+                  escolhaExplicita={foraAberta.id === foraId}
                   aoVoltar={() => setForaId(null)}
                   aoLigar={(organizacaoId) => {
                     setAba('conversas');
@@ -572,6 +564,9 @@ export function TelaConversas({
           <section
             aria-label="Conversa com o parceiro"
             className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden"
+            onPointerDownCapture={escolherAberta}
+            onKeyDownCapture={escolherAberta}
+            onWheelCapture={escolherAberta}
           >
             {consulta.isPending ? null : aberta ? (
               <Conversa
@@ -581,6 +576,7 @@ export function TelaConversas({
                 setores={consulta.data?.setores ?? []}
                 meta={meta}
                 aoVoltar={voltar}
+                escolhaExplicita={escolhidoId !== null}
               />
             ) : (
               <NenhumaEscolhida meta={meta} />
@@ -645,66 +641,38 @@ function EstadoAoVivo({ estado }: { estado: EstadoDoEco }) {
 function Abas({
   aba,
   aoTrocar,
-  naFila,
-  esperando,
+  consultoria,
   foraDaBase,
-  comAviso,
-  maisUrgente,
 }: {
   aba: AbaDaEsquerda;
   aoTrocar: (aba: AbaDaEsquerda) => void;
-  naFila: number;
-  /** Quantos escreveram e estão esperando resposta — a contagem do que foi carregado. */
-  esperando: number;
+  /** Parceiros que já fecharam — a contagem do que foi carregado. */
+  consultoria: number;
   /** Conversas de números que não são ficha. */
   foraDaBase: number;
-  comAviso: number;
-  maisUrgente: { numero: string; unidade: string } | null;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <SeletorDeAba
-        rotulo="O que mostrar na lista"
-        ativo={aba}
-        aoTrocar={aoTrocar}
-        // Em 390 px "Fora da base" quebrava em duas linhas e a faixa das abas
-        // crescia; rolando de lado ela fica com a altura de uma linha só.
-        rolavel
-        itens={[
-          { id: 'conversas', rotulo: 'Conversas' },
-          { id: 'responderam', rotulo: 'Responderam', contagem: esperando },
-          { id: 'aprovar', rotulo: 'Aprovar', contagem: naFila },
-          // "Clientes", e não "Fora da base" (01/10/2026): é o nome do que chega
-          // aqui na prática — gente que escreveu e não é lead.
-          { id: 'fora', rotulo: 'Clientes', contagem: foraDaBase },
-          // SEM CONTAGEM, de propósito: um número aqui diria "trabalho parado",
-          // e o feed não é fila — a maior parte das automáticas não pede nada de
-          // ninguém. Quem cobra ação é o Meu dia e a aba "Responderam".
-          { id: 'automaticas', rotulo: 'Automáticas' },
-        ]}
-      />
-
-      {aba === 'aprovar' && naFila > 0 ? (
-        <p className="text-xs text-muted-foreground">
-          Nada sai sem uma pessoa aprovar.
-          {comAviso > 0 ? (
-            <>
-              {' '}
-              O validador de promessas apitou em{' '}
-              <span className="numerico">{numero(comAviso)}</span>
-              {comAviso === 1 ? ' deles' : ' deles'}.
-            </>
-          ) : null}
-          {maisUrgente ? (
-            <>
-              {' '}
-              O primeiro some em <span className="numerico">{maisUrgente.numero}</span>
-              {maisUrgente.unidade}.
-            </>
-          ) : null}
-        </p>
-      ) : null}
-    </div>
+    <SeletorDeAba
+      rotulo="O que mostrar na lista"
+      ativo={aba}
+      aoTrocar={aoTrocar}
+      // Em 390 px os rótulos quebravam em duas linhas e a faixa das abas
+      // crescia; rolando de lado ela fica com a altura de uma linha só.
+      rolavel
+      itens={[
+        { id: 'conversas', rotulo: 'Conversas' },
+        // Pós-venda (06/10/2026): quem fechou com a gente sai da lista de
+        // Conversas e vem para cá.
+        { id: 'consultoria', rotulo: 'Consultoria', contagem: consultoria },
+        // "Clientes", e não "Fora da base" (01/10/2026): é o nome do que chega
+        // aqui na prática — gente que escreveu e não é lead.
+        { id: 'fora', rotulo: 'Clientes', contagem: foraDaBase },
+        // SEM CONTAGEM, de propósito: um número aqui diria "trabalho parado",
+        // e o feed não é fila — a maior parte das automáticas não pede nada de
+        // ninguém.
+        { id: 'automaticas', rotulo: 'Automáticas' },
+      ]}
+    />
   );
 }
 

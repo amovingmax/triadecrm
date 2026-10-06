@@ -120,6 +120,11 @@ export type ItemConversa = {
    * depende dela e os relatórios leem a mesma origem.
    */
   temperatura: Temperature;
+  /**
+   * Fechou com a gente: tem negócio ganho, ou a etapa já o trata como cliente.
+   * É o que tira a conversa da lista de captação e a põe na aba "Consultoria".
+   */
+  fechou: boolean;
   /** `deals.needs_attention`: pesa os dias sem contato (a barra térmica saiu). */
   precisaAtencao: boolean;
   /** Já vem mascarado do banco para sdr e embaixador (RF-BAS-14). */
@@ -280,15 +285,23 @@ export const ROTULO_JANELA: Record<JanelaSemContato, string> = {
  * Fica POR ÚLTIMO na lista de propósito: a ordem das abas é memória de mão, e
  * uma aba nova no meio move as quatro que o time já sabe onde estão.
  */
-export type AbaDaEsquerda = 'conversas' | 'responderam' | 'aprovar' | 'fora' | 'automaticas';
+/**
+ * AS ABAS DEPOIS DO PIVÔ (06/10/2026).
+ *
+ * Saíram `responderam` e `aprovar`. A fila de aprovação era o lugar onde a IA
+ * propunha o texto e uma pessoa decidia; a decisão foi "a IA não vai me dizer o
+ * que escreve", e sem rascunho não há o que aprovar. A fila de quem respondeu
+ * saiu junto: quem espera resposta já vem primeiro na própria lista, com a marca
+ * "Nova". Endereço antigo com `?aba=responderam` ou `?aba=aprovar` cai em
+ * "Conversas".
+ *
+ * Entrou `consultoria`: quem FECHOU com a gente. É o pós-venda — a conversa
+ * deixa de ser captação e passa a ser acompanhamento —, e por isso sai da lista
+ * de Conversas e mora aqui (`ItemConversa.fechou`).
+ */
+export type AbaDaEsquerda = 'conversas' | 'consultoria' | 'fora' | 'automaticas';
 
-const ABAS: readonly AbaDaEsquerda[] = [
-  'conversas',
-  'responderam',
-  'aprovar',
-  'fora',
-  'automaticas',
-];
+const ABAS: readonly AbaDaEsquerda[] = ['conversas', 'consultoria', 'fora', 'automaticas'];
 
 export function ehAbaDaEsquerda(v: string): v is AbaDaEsquerda {
   return (ABAS as readonly string[]).includes(v);
@@ -399,7 +412,6 @@ function ehJanela(v: string): v is JanelaSemContato {
   return v in ROTULO_JANELA;
 }
 
-
 /**
  * Lê o recorte, a aba e a conversa aberta da query string (de `searchParams`).
  * `escopoPadrao` é o recorte de quem chega sem `?ver=` (`escopoInicialDe`).
@@ -436,7 +448,7 @@ export function estadoDaUrl(
       arquivadas: texto('arquivadas') === '1',
     },
     organizacaoId: texto('org') || null,
-    aba: ehAbaDaEsquerda(texto('aba')) ? texto('aba') as AbaDaEsquerda : 'conversas',
+    aba: ehAbaDaEsquerda(texto('aba')) ? (texto('aba') as AbaDaEsquerda) : 'conversas',
     clienteId: texto('cliente') || null,
   };
 }

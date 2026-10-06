@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Globe,
   Merge,
+  MessageCircle,
   Phone,
   Sparkles,
   TriangleAlert,
@@ -77,7 +78,8 @@ export function CartaoCandidato({
    */
   marcado: boolean | null;
   aoMarcar: (marcado: boolean) => void;
-  aoDecidir: (acao: AcaoDeRevisao, organizacaoId?: string) => void;
+  /** `comMensagem` só vale com `aprovar`: é o botão que também manda a mensagem automática. */
+  aoDecidir: (acao: AcaoDeRevisao, organizacaoId?: string, comMensagem?: boolean) => void;
 }) {
   const pendente = candidato.status === 'novo';
   // Só candidato em "novo" expira: a retenção do PRD §10.6 não toca em aprovado,
@@ -320,19 +322,33 @@ export function CartaoCandidato({
 
         {/* ------------------------------------------------ a decisão */}
         {pendente && podeDecidir ? (
-          <div className="flex shrink-0 items-center gap-2 lg:pl-4">
-            {/* VIRAR PARCEIRO É MENTA: é o "sim" desta tela, e a única ação que
-                faz a base crescer. As outras duas viram discos com nome no
-                `title` e no rótulo acessível — três botões largos por linha eram
-                metade da poluição. */}
+          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:pl-4">
+            {/* DOIS "SIM", E CADA UM É UM CAMINHO (pivô de 06/10/2026).
+                "Aprovar e mandar mensagem" cria a ficha e põe a mensagem
+                automática na fila: o lead aparece em Conversas quando responder.
+                "Só aprovar" leva para Prospectados, de onde sai o lote de ligação.
+                O primeiro é menta porque é o que procura alguém; a tecla "A"
+                continua sendo o segundo — atalho não manda mensagem. As outras
+                duas ações são discos com nome no `title` e no rótulo acessível. */}
             <Button
               variant="menta"
+              onClick={() => aoDecidir('aprovar', undefined, true)}
+              disabled={ocupado || candidato.nao_contatar}
+              title="Cria a ficha e põe a mensagem automática na fila. O lead aparece em Conversas quando responder."
+              className="toque h-11 px-4 md:h-9"
+            >
+              <MessageCircle aria-hidden="true" />
+              Aprovar e mandar mensagem
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => aoDecidir('aprovar')}
               disabled={ocupado || candidato.nao_contatar}
+              title="Cria a ficha em Prospectados, sem mensagem. De lá ela entra num lote de ligação."
               className="toque h-11 px-4 md:h-9"
             >
               <Check aria-hidden="true" />
-              Virar parceiro
+              Só aprovar
             </Button>
             <Button
               variant="secondary"

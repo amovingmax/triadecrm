@@ -18,13 +18,15 @@ import { type AppRole } from '@/lib/auth/role';
  * 1. **Alguém do time já escreveu nesta conversa** → o aviso é de quem atende
  *    (`conversations.assignee_id`), e só dele. É o mesmo dono que
  *    `app.messages_quem_responde_atende` grava quando alguém responde.
- * 2. **Ninguém escreveu ainda** (cliente novo, resposta ao "Bom dia" automático,
- *    resposta a cumprimento de modelo ou de campanha) → o aviso é de todos que
- *    atendem a fila inteira: admin, gestor e sdr. É o mesmo recorte de
- *    `public.meu_dia` desde o ADR-17: "a fila de quem respondeu é de quem abrir".
+ * 2. **Ninguém escreveu ainda** (cliente novo, resposta a um cumprimento de
+ *    modelo) → o aviso é de todos que atendem a fila inteira: admin e gestor
+ *    (o SDR saiu em 06/10/2026, quando passou a só ligar). "A fila de quem
+ *    respondeu é de quem abrir" (ADR-17).
  *
  * Responsável desativado conta como "ninguém escreveu": aviso endereçado a quem
- * saiu da empresa é aviso que ninguém recebe.
+ * saiu da empresa é aviso que ninguém recebe. O mesmo vale para o responsável
+ * que não atende mais (o SDR, desde 06/10/2026): `ativos` só traz quem está
+ * ativo E atende (`lerPessoasAtivas`, em `dados.ts`).
  *
  * ===========================================================================
  * O CLIENTE É DE TODOS OS OPERADORES (02/10/2026)
@@ -38,8 +40,8 @@ import { type AppRole } from '@/lib/auth/role';
  *
  * Quem não é ficha (`organizacaoId === null`) é atendimento, não captação: quem
  * escreve é o comprador de ingresso com uma dúvida, e quem responde é quem
- * estiver na frente do CRM. Por isso toda mensagem de cliente avisa admin,
- * gestor e sdr, mesmo depois de um colega já ter respondido àquela conversa.
+ * estiver na frente do CRM. Por isso toda mensagem de cliente avisa admin e
+ * gestor, mesmo depois de um colega já ter respondido àquela conversa.
  * Ela deixa de ser nova para todos quando alguém do time responde (ver
  * `semResposta`).
  *
@@ -80,17 +82,17 @@ export interface QuemSouEu {
 }
 
 /**
- * Espelho de `app.can_write()`. Quem não responde não é avisado: pôr um número
- * no menu de quem o banco vai recusar é mandar trabalhar e depois dizer não.
+ * Quem atende o WhatsApp: admin e gestor (pivô de 06/10/2026).
+ *
+ * Até ali a lista era a de `app.can_write()` e incluía o SDR. No pivô o SDR
+ * passou a ser quem LIGA — gente contratada por diária, sem a tela de Conversas.
+ * Quem não responde não é avisado: pôr um número no menu e um cartão na frente
+ * de quem não tem para onde ir é mandar trabalhar e depois dizer não.
  */
-const PAPEIS_QUE_RESPONDEM: readonly AppRole[] = ['admin', 'gestor', 'sdr', 'embaixador'];
+const PAPEIS_QUE_RESPONDEM: readonly AppRole[] = ['admin', 'gestor'];
 
-/**
- * Quem recebe a fila inteira em `public.meu_dia` (migração `20261002180000`). O
- * embaixador fica de fora: a leitura dele é estreita, e ele só é avisado do que
- * está endereçado a ele.
- */
-const PAPEIS_DA_FILA_INTEIRA: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
+/** Quem recebe a fila inteira de quem respondeu: os mesmos que atendem. */
+const PAPEIS_DA_FILA_INTEIRA: readonly AppRole[] = ['admin', 'gestor'];
 
 export function recebeAvisos(papel: AppRole): boolean {
   return PAPEIS_QUE_RESPONDEM.includes(papel);
@@ -402,7 +404,7 @@ export function destinoDoAviso(
       : `/conversas?cliente=${primeira.conversaId}`;
   }
   if (novas.every((c) => c.organizacaoId === null)) return '/conversas?aba=fora';
-  return '/conversas?aba=responderam';
+  return '/conversas';
 }
 
 /**

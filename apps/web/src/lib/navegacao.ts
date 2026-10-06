@@ -9,10 +9,14 @@
  * essas duas no controle administrativo". Ele não pediu menos telas — pediu que
  * a barra lateral DIGA para que serve cada uma antes do clique.
  *
- * A resposta é agrupar, e não apagar. Doze itens em três grupos nomeados leem-se
- * como três coisas, não como doze; e nenhuma tela precisa morrer para o menu
- * parar de competir consigo mesmo. Cadências, por exemplo, some da vista de quem
- * trabalha o dia inteiro sem deixar de existir para quem configura a régua.
+ * A resposta foi agrupar, e não apagar: itens em três grupos nomeados leem-se
+ * como três coisas, e o menu para de competir consigo mesmo.
+ *
+ * (Isso valeu até o PIVÔ DE 06/10/2026, que apagou de verdade: Campanhas e
+ * Cadências deixaram de existir no produto, e Registrar saiu do menu — a tela
+ * continua, e chega-se a ela pelo botão "Registrar contato" da conversa, da
+ * ligação e da ficha. No mesmo dia os papéis viraram três, e o SDR virou QUEM
+ * LIGA — gente contratada por diária —, com duas telas: Ligar e Meu dia.)
  *
  * O critério do grupo é a NATUREZA DO TRABALHO, que é literalmente o que ele
  * pediu para distinguir:
@@ -39,8 +43,8 @@
  *   **um número ao lado do item significa trabalho parado esperando por você.**
  *   Quem CONFIGURA nunca mostra número.
  *
- * É por isso que Revisão e Conversas contam, e Cadências, Metas, Relatórios e
- * Ajustes não contam nunca — nem quando teriam o que contar. A contagem da
+ * É por isso que Revisão e Conversas contam, e Metas, Relatórios e Ajustes não
+ * contam nunca — nem quando teriam o que contar. A contagem da
  * Revisão chega pronta do servidor (`lib/filas-do-menu.ts`), no mesmo `layout`
  * que já busca a sessão: sem consulta no cliente, sem estado de carregamento
  * piscando na lateral a cada troca de tela.
@@ -87,13 +91,10 @@ import {
   Handshake,
   ListChecks,
   type LucideIcon,
-  Megaphone,
   MessageCircle,
   PhoneCall,
-  Route,
   Settings,
   SquareKanban,
-  SquarePen,
   Sun,
   Target,
 } from 'lucide-react';
@@ -108,7 +109,7 @@ export type ChaveDeGrupo = 'todo_dia' | 'a_base' | 'controle';
  * Qual fila o item conta, quando conta.
  *
  * `null` (a maioria) significa "este item NUNCA mostra número". Não é ausência de
- * dado: é a metade de baixo da regra. Um número em Ajustes ou em Cadências diria
+ * dado: é a metade de baixo da regra. Um número em Ajustes ou em Metas diria
  * "tem trabalho parado aí" sobre uma tela onde nada espera por ninguém.
  */
 export type ChaveDeFila = 'candidatos' | 'respostas';
@@ -156,9 +157,9 @@ export type ItemNavegacao = {
 export const ORDEM_PRINCIPAL = [
   '/meu-dia',
   '/conversas',
+  '/ligar',
   '/funis',
   '/parceiros',
-  '/envios',
   '/relatorios',
 ] as const;
 
@@ -198,33 +199,23 @@ export const GRUPOS: readonly GrupoDeNavegacao[] = [
 ];
 
 /**
- * Espelho de `app.can_write()`: admin, gestor, sdr e embaixador.
- *
- * É o mesmo conjunto em vários lugares porque no banco é uma função só. Quem não
- * passa por ela não grava atividade, não cria organização e não revisa candidato
- * na Revisão: a `public.registrar_contato` devolve `motivo: 'sem_permissao'`, e a
- * política de select de `supplier_candidates` nem mostra a fila. Oferecer esses
- * módulos a `leitura` ou `financeiro` é prometer uma tela cujo único desfecho é a
- * recusa lá no fim.
+ * Os três papéis de gente que existem desde o pivô de 06/10/2026: admin, gestor
+ * e SDR. Embaixador, leitura e financeiro saíram (ninguém os tinha em produção);
+ * continuam no enum do banco, e quem ainda chegar com um deles não vê menu.
  *
  * Quem decide continua sendo o Postgres; isto só evita oferecer o que vai falhar.
  */
-const PAPEIS_QUE_ESCREVEM: readonly AppRole[] = ['admin', 'gestor', 'sdr', 'embaixador'];
+const PAPEIS_DO_CRM: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
 
 /**
- * Espelho de `app.sees_all()`: admin, gestor, sdr, leitura e financeiro.
+ * Admin e gestor: quem cuida da BASE — a lista de parceiros, a fila de Revisão,
+ * a importação, os relatórios e os ajustes.
  *
- * O embaixador fica de fora por desenho (RF-ADM-01: ele vê a própria carteira,
- * não o funil inteiro), e é exatamente a lista que `/relatorios` passa ao
- * `requireRole`.
+ * O SDR ficou de fora de tudo isso no pivô, e também de Conversas, Agenda,
+ * Funis e Metas: ele é quem liga. O lote chega pronto, montado pela gestão, e o
+ * dia dele se confere em Meu dia (`components/ligacoes-do-dia`).
  */
-const PAPEIS_QUE_VEEM_TUDO: readonly AppRole[] = [
-  'admin',
-  'gestor',
-  'sdr',
-  'leitura',
-  'financeiro',
-];
+const PAPEIS_QUE_GERENCIAM: readonly AppRole[] = ['admin', 'gestor'];
 
 export const NAVEGACAO: readonly ItemNavegacao[] = [
   // -------------------------------------------------------------------------
@@ -241,32 +232,24 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     posicaoNaBarra: 1,
   },
   {
-    // O único item em que se PRODUZ dado. Ficava fora da navegação até 09/09:
-    // seis módulos linkavam para cá, mas quem quisesse registrar um contato por
-    // vontade própria só achava a porta no estado vazio do Meu dia, que aparece
-    // justamente quando não há o que registrar.
-    href: '/registrar',
-    rotulo: 'Registrar',
-    icone: SquarePen,
-    grupo: 'todo_dia',
-    descricao:
-      'Três toques (parceiro, canal e desfecho) para o contato virar dado: temperatura, próxima ação e meta. Funciona sem rede, com 5 s para desfazer.',
-    posicaoNaBarra: 2,
-    papeis: PAPEIS_QUE_ESCREVEM,
-  },
-  {
     href: '/ligar',
-    rotulo: 'Ligar',
+    // "Lotes", e não mais "Ligar" (06/10/2026): é onde a gestão monta o lote de
+    // cada pessoa, e onde quem liga encontra o que montaram para ela.
+    rotulo: 'Lotes',
     icone: PhoneCall,
     grupo: 'todo_dia',
     descricao:
-      'Prospecção ativa por ligação: lote com fila reservada na montagem, roteiro em árvore, tabulação em dois eixos e opt-out quando o parceiro pede para parar.',
+      'Ligar para os prospectados: a gestão monta o lote e escolhe quem liga; roteiro de apoio, resultado de cada ligação e opt-out quando pedem para parar.',
     // `papeis` NOVO, e conserta uma ejeção que existia desde o D5: o item
     // aparecia para leitura e financeiro, a rota não tinha guarda de servidor
     // nenhuma, e a pessoa montava um lote inteiro para descobrir no fim que a
     // `registrar_contato` devolve `sem_permissao`. `PAPEIS_QUE_LIGAM`, em
     // `components/ligacao/chamada-contexto.ts`, já era este conjunto.
-    papeis: PAPEIS_QUE_ESCREVEM,
+    papeis: PAPEIS_DO_CRM,
+    // Desde o pivô de 06/10/2026 ligar é metade do trabalho do SDR: o item fica
+    // sempre à vista e herda, no celular, a fatia que era do Registrar.
+    principal: true,
+    posicaoNaBarra: 2,
   },
   {
     href: '/conversas',
@@ -277,23 +260,13 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     descricao:
       'O histórico de cada parceiro, a fila de aprovação dos rascunhos da IA e o relógio da janela de 24 h do WhatsApp.',
     posicaoNaBarra: 5,
+    // O WhatsApp é da gestão: quem liga não responde mensagem.
+    papeis: PAPEIS_QUE_GERENCIAM,
     // Resposta nova para esta pessoa: alguém escreveu e espera por ela. Até
     // 01/10/2026 o número aqui era o de rascunhos da IA pendentes; eles continuam
     // na aba "Aprovar", dentro da tela. Somar os dois misturaria "chegou
     // resposta" com "tem rascunho", e o número não cairia ao abrir a conversa.
     fila: 'respostas',
-  },
-  {
-    // Decisão do Rafael, 21/09/2026. Só admin e gestor: um lote mal montado
-    // derruba a nota do número de todo o time.
-    href: '/envios',
-    principal: true,
-    rotulo: 'Campanhas',
-    icone: Megaphone,
-    grupo: 'todo_dia',
-    descricao:
-      'Um cumprimento de WhatsApp para muitos parceiros, numa tela só: público por situação, etiqueta ou setor, e parada automática se começarem a bloquear.',
-    papeis: ['admin', 'gestor'],
   },
   {
     href: '/agenda',
@@ -302,6 +275,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'todo_dia',
     descricao:
       'Reuniões em vídeo pela manhã, rota de visitas à tarde com link do Google Maps e lembretes.',
+    papeis: PAPEIS_QUE_GERENCIAM,
   },
 
   {
@@ -311,7 +285,8 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'todo_dia',
     descricao:
       'A fila de quem ainda não é parceiro, de qualquer origem: cada nome com pontuação, o que a IA achou dele e as duplicatas já apontadas. Aprovar cria a ficha e o negócio no funil.',
-    papeis: PAPEIS_QUE_ESCREVEM,
+    // Só admin e gestor aprovam e põem gente na base (pivô de 06/10/2026).
+    papeis: PAPEIS_QUE_GERENCIAM,
     // A fila de revisão é o exemplo mais puro da regra: candidato que entrou e
     // não foi revisado é trabalho parado esperando uma pessoa decidir.
     fila: 'candidatos',
@@ -323,7 +298,9 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
   {
     href: '/parceiros',
     principal: true,
-    rotulo: 'Parceiros',
+    // "Prospectados", e não mais "Parceiros" (06/10/2026): é para onde vai quem
+    // foi aprovado na Revisão, e de onde saem os lotes de ligação.
+    rotulo: 'Prospectados',
     icone: Handshake,
     grupo: 'a_base',
     // "Importar planilha" entrou na frase porque a rota `/importar` saiu do menu
@@ -333,6 +310,8 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     descricao:
       'Base de organizações e pessoas com busca global, filtros, criação rápida com dedup por telefone e o botão de trazer uma lista para a base (importar planilha ou CSV).',
     posicaoNaBarra: 3,
+    // A lista é de quem cuida da base.
+    papeis: PAPEIS_QUE_GERENCIAM,
   },
   {
     href: '/funis',
@@ -343,18 +322,11 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     descricao:
       'Kanban dos funis de captação e de produtores, cartão com semáforo, próxima ação obrigatória e motivos de perda.',
     posicaoNaBarra: 4,
+    papeis: PAPEIS_QUE_GERENCIAM,
   },
   // -------------------------------------------------------------------------
   // Controle
   // -------------------------------------------------------------------------
-  {
-    href: '/cadencias',
-    rotulo: 'Cadências',
-    icone: Route,
-    grupo: 'controle',
-    descricao:
-      'Réguas de toque em ordem (canal, atraso, condição), quantas organizações param em cada passo e o resumo do dia das 07:30 e 18:00.',
-  },
   {
     href: '/metas',
     rotulo: 'Metas',
@@ -362,6 +334,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'controle',
     descricao:
       'Meta e realizado por pessoa e por período, o quanto falta e a que ritmo, com as métricas que ainda não são medíveis marcadas como tal.',
+    papeis: PAPEIS_QUE_GERENCIAM,
   },
   {
     href: '/relatorios',
@@ -370,7 +343,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: ChartColumn,
     grupo: 'controle',
     descricao: 'Relatório de segunda-feira (texto + XLSX), funil e atividades por pessoa.',
-    papeis: PAPEIS_QUE_VEEM_TUDO,
+    papeis: PAPEIS_QUE_GERENCIAM,
   },
   {
     // Era "Admin". "Ajustes" diz o que a tela faz; "Admin" dizia quem entra —
@@ -381,7 +354,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'controle',
     descricao:
       'Pessoas e papéis, os catálogos do CRM (categorias, feriados, motivos de perda, desfechos, modelos de mensagem) e as ferramentas de LGPD.',
-    papeis: ['admin', 'gestor'],
+    papeis: PAPEIS_QUE_GERENCIAM,
   },
 ];
 
@@ -406,19 +379,23 @@ export const HREF_NOVO_PARCEIRO = '/parceiros?novo=1';
  */
 export const HREF_IMPORTAR = '/importar';
 
-/** Papéis que criam parceiro. A autorização de verdade é o RLS; isto só evita oferecer o que vai falhar. */
+/**
+ * Quem põe gente na base pelo cadastro rápido, pela Revisão e pela importação:
+ * admin e gestor (pivô de 06/10/2026). O SDR não adiciona lead; a porta que ele
+ * tem é outra e mora na conversa — "Virar parceiro", em `conversas/fora-da-base.tsx`.
+ */
 export function podeCriarParceiro(papel: AppRole): boolean {
-  return PAPEIS_QUE_ESCREVEM.includes(papel);
+  return PAPEIS_QUE_GERENCIAM.includes(papel);
 }
 
 /** Papéis que importam planilha. Mesmo conjunto de quem cria, pela mesma razão. */
 export function podeImportarPlanilha(papel: AppRole): boolean {
-  return PAPEIS_QUE_ESCREVEM.includes(papel);
+  return PAPEIS_QUE_GERENCIAM.includes(papel);
 }
 
 /** Papéis que marcam compromisso na agenda. Espelho de `app.can_write()`, que a RPC confere. */
 export function podeMarcarCompromisso(papel: AppRole): boolean {
-  return PAPEIS_QUE_ESCREVEM.includes(papel);
+  return PAPEIS_DO_CRM.includes(papel);
 }
 
 /**
@@ -432,15 +409,11 @@ export function veAgendaDaEquipe(papel: AppRole): boolean {
 
 /**
  * Espelho de `app.reads_base_pii()`: papéis que leem o telefone inteiro na base.
- *
- * Não confunda com `podeCriarParceiro`: os conjuntos são diferentes de propósito
- * (sdr e embaixador criam e não leem PII; leitura e financeiro leem PII e não criam).
+ * O SDR vê o número mascarado e revela pelo botão, que fica registrado.
  * Serve só para explicar o resultado da busca; quem decide é o Postgres.
  */
-const PAPEIS_QUE_LEEM_TELEFONE: readonly AppRole[] = ['admin', 'gestor', 'leitura', 'financeiro'];
-
 export function leTelefoneCompleto(papel: AppRole): boolean {
-  return PAPEIS_QUE_LEEM_TELEFONE.includes(papel);
+  return PAPEIS_QUE_GERENCIAM.includes(papel);
 }
 
 /**
@@ -460,8 +433,9 @@ export function contagemDoItem(
   return filas[item.fila] ?? null;
 }
 
-/** Itens visíveis para um papel. */
+/** Itens visíveis para um papel. Papel que não existe mais não vê menu nenhum. */
 export function navegacaoPara(papel: AppRole): ItemNavegacao[] {
+  if (!PAPEIS_DO_CRM.includes(papel)) return [];
   return NAVEGACAO.filter((item) => !item.papeis || item.papeis.includes(papel));
 }
 
@@ -469,9 +443,8 @@ export function navegacaoPara(papel: AppRole): ItemNavegacao[] {
  * Os itens de um papel, já repartidos nos três grupos e na ordem da tela.
  *
  * Grupo que ficaria vazio para um papel não é devolvido: um cabeçalho "A base"
- * sozinho, sem item embaixo, é pior do que a ausência do grupo. Hoje isso não
- * acontece com nenhum dos seis papéis, mas o embaixador chega perto (perde
- * Relatórios e Ajustes, e sobra com Cadências e Metas em "Controle").
+ * sozinho, sem item embaixo, é pior do que a ausência do grupo. É o caso do
+ * SDR, que só tem "Todo dia" (Meu dia e Ligar).
  */
 export function navegacaoAgrupada(
   papel: AppRole,

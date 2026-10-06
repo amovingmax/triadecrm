@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { requireSession } from '@/lib/auth/session';
+import { requireRole } from '@/lib/auth/session';
 import { carregarCatalogos } from '@/components/conversas/catalogos';
 import { TelaConversas } from '@/components/conversas/tela-conversas';
 import { ProvedorDoTextoDigitado } from '@/components/conversas/texto-digitado';
@@ -33,7 +33,8 @@ export default async function Pagina({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [sessao, catalogos, params] = await Promise.all([
-    requireSession(),
+    // Tela da gestão desde o pivô de 06/10/2026: quem liga vê só Ligar e Meu dia.
+    requireRole('admin', 'gestor'),
     carregarCatalogos(),
     searchParams,
   ]);

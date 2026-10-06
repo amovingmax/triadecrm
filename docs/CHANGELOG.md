@@ -6379,3 +6379,242 @@ Entrou na `main` em 06/10/2026, a pedido do Rafael, junto com a entrada abaixo.
 - publicar sempre a partir da `main` do GitHub atualizada: a publicação de 05/10 saiu de uma cópia três dias atrasada.
 
 **Mesmo dia: a `nova-ate-responder` entra na `main`** (a marca "Nova" e o "por ler" só saem com a resposta do time; entrada de 05/10, acima). Pedido do Rafael. Juntou sem conflito de código com a alteração do nome e do número; as duas mexem em `fora-da-base.tsx`, `lista-conversas.tsx` e `avisos/regra.ts`.
+
+### 06/10/2026 — O "por ler" sai ao abrir; a marca "Nova" continua até a resposta (RF-CON-04, RF-CON-05)
+
+Em 05/10 o "por ler" passou a sair só com a resposta do time, junto com a marca
+"Nova" e o número do menu. Em 06/10 veio o pedido contrário ("eu to visualizando
+as mensagens do povo, mas n ta contabilizando que ta sendo visualizada") e,
+perguntado entre as duas regras, a decisão foi **"sai ao abrir"**. As duas
+convivem, porque são sinais diferentes:
+
+- **"por ler"** responde "alguém já viu?". Sai quando a pessoa abre a conversa
+  pela lista, e a cada mensagem nova que chega com a conversa aberta e a janela
+  do CRM em foco (com a janela em outro programa, fica por ler até voltar).
+  Responder também zera, agora pelo banco.
+- **A marca "Nova" e o número ao lado de Conversas** respondem "alguém já
+  respondeu?" e **não mudaram**: continuam até sair uma resposta do time. Quem
+  abre só para conferir tira o "por ler", e a conversa segue marcada.
+
+O que mudou por baixo:
+
+- **Banco (migração `20261006100000`, em produção desde 06/10):** função
+  `public.conversa_marcar_lida`, para quem enxerga a conversa e escreve — o
+  UPDATE direto de antes era recusado em silêncio para quem não era gestor nem o
+  atendente. Gatilho `messages_quem_responde_leu`: texto, áudio ou mídia de gente
+  zera o contador; modelo e robô não. A migração também zerou 8 conversas já
+  respondidas (45 mensagens); ficaram 20 conversas com 59 por ler.
+- **Tela:** `leitura-do-fio.ts` no lugar de `por-ler.ts`, nas duas conversas
+  (parceiro e cliente). A conversa que o desktop abre sozinho não zera — o
+  contador é do time —, mas clicar, rolar ou digitar dentro dela vale como
+  escolha e a prende no lugar.
+- Testes: pgTAP `99_quem_abre_a_conversa_leu.sql` (17) e
+  `leitura-do-fio.test.ts`. Site: typecheck, lint e 1.169 testes.
+
+**Como isto chegou aqui:** a primeira versão foi feita em 06/10 numa máquina cuja
+`main` estava 21 commits atrás do GitHub, e o site publicado de lá às 10:07 saiu
+sem a ficha do parceiro, os "Próximos dias" e os avisos; o deploy das 10:19, da
+`main` do GitHub, devolveu tudo. Este commit refaz a mudança em cima da `main`
+certa, na branch `pivo-do-crm`.
+
+**Pendente:** a tela nova só vai ao ar quando esta branch for publicada. Em
+produção hoje o site ainda segue a regra de 05/10 para o "por ler" (e chama o
+UPDATE antigo); o banco já tem a função e o gatilho.
+
+### 06/10/2026 — Pivô do CRM, parte 1: o menu, os três papéis e as telas da gestão (RF-ADM-01)
+
+Decisão de 06/10/2026: o CRM encolhe. Campanhas e Cadências deixam de existir,
+os papéis viram três (admin, gestor e SDR) e o SDR passa a cuidar só de ligação
+e de conversa no WhatsApp com quem é dele. Esta entrega é a parte que não
+dependia de mais nenhuma resposta; o resto está listado no fim.
+
+- **Menu:** saíram Campanhas, Cadências e Registrar. Registrar continua existindo
+  como tela, e chega-se a ela pelo botão "Registrar contato" da conversa, da
+  ligação e da ficha. Ligar virou item sempre à vista e herdou, no celular, a
+  fatia que era do Registrar.
+- **SDR vê:** Meu dia, Ligar, Conversas, Agenda, Funis e Metas. **Não vê mais:**
+  a lista de Parceiros, a Revisão, a importação e os Relatórios — as quatro rotas
+  passaram a recusar no servidor quem não é admin nem gestor (`requireRole`). A
+  FICHA de um parceiro (`/parceiros/[id]`) continua abrindo para o SDR.
+- **Papéis que se pode dar a alguém** (Ajustes → Pessoas): só admin, gestor e
+  SDR. Embaixador, leitura e financeiro saíram da lista; ninguém os tinha em
+  produção. Continuam no enum do banco, e quem chegar com um deles não vê menu.
+- **Só admin e gestor** criam parceiro pelo cadastro rápido e importam planilha
+  (`podeCriarParceiro`, `podeImportarPlanilha`).
+- Testes: `navegacao.test.ts` reescrito para o pivô. Site: typecheck, lint e
+  1.174 testes.
+
+**O que esta parte NÃO faz, e é importante saber:** a trava ainda é só de tela.
+No banco o SDR continua enxergando tudo e podendo aprovar na Revisão — quem
+chamar a função direto passa. A trava de verdade (RLS e funções) é a parte 2.
+
+**Pendente (parte 2 em diante), nesta ordem:**
+1. Banco: SDR só vê as conversas e os parceiros dele; Revisão e importação só
+   para admin e gestor; os três papéis antigos sem acesso.
+2. Apagar Campanhas, Cadências e o "Resumo do dia" de `/cadencias/resumo`:
+   telas, funções, tabelas, rotinas e dados.
+3. Revisão com dois botões: "aprovar e mandar mensagem" e "aprovar e subir para
+   a base".
+4. Links que ainda levam o SDR a telas que ele não abre mais ("Novo parceiro" no
+   Registrar e na Agenda, "Ir para a Revisão" no Meu dia, "voltar para Parceiros"
+   na ficha).
+5. Atualizar `CLAUDE.md` e o PRD: o pivô muda decisões fechadas (cinco papéis,
+   cadências no MVP).
+
+**Precisa de decisão humana** (perguntas feitas em 06/10): como uma conversa
+nova chega a um SDR que só vê o que é dele; quem vira dono do lead aprovado; de
+onde sai a lista de ligação; o que é exatamente a "mensagem automática" do botão
+de aprovar; e até onde vai a troca de nome de "Parceiros" para "Prospectado".
+
+### 06/10/2026 — Pivô do CRM, parte 2: o dia de quem ligou (RF-MET-01, RF-REL-01)
+
+A proposta do CRM ficou curta, nas palavras de quem decidiu: somos cinco, não dá
+para correr atrás de fornecedor um a um; a gestão enche a base de contatos,
+gente contratada por diária liga, e a gestão precisa de "um relatório exato e
+bem usual sobre tudo que ocorreu para cada pessoa que ligou nesse dia". Quem liga
+vê o próprio dia, "mais clean e menos poluído". O lote de ligação é montado e
+imposto pela gestão, que também pode ligar.
+
+Com isso o SDR passou a ser **quem liga**, e esta entrega muda a parte 1:
+
+- **Quem liga vê duas telas: Ligar e Meu dia.** Conversas, Agenda, Funis e Metas
+  passaram a ser da gestão (menu e guarda no servidor). O WhatsApp fica com admin
+  e gestor: o aviso de mensagem nova deixou de ir para o SDR.
+- **Meu dia de quem liga** (`components/ligacoes-do-dia`): quatro números
+  (ligações, quantas atenderam, tempo falado, reuniões marcadas), como cada
+  ligação terminou e a lista na ordem em que foram feitas, com hora, para quem,
+  duração e a anotação. Passo de dia para ver os anteriores, e o botão de
+  continuar ligando.
+- **Relatórios → "Ligações do dia"**, agora o primeiro painel e o que abre: uma
+  linha por pessoa que ligou no dia, com o resumo do time em cima. Tocar no nome
+  abre o dia dela embaixo — a MESMA peça que ela vê no próprio Meu dia. Os dois
+  níveis descem em CSV.
+- **Banco** (migração `20261006120000`): `public.ligacoes_do_dia(dia, pessoa)`,
+  uma função só para as duas telas. A gestão pergunta por qualquer pessoa (ou por
+  todas); quem liga só vê o próprio dia. Lê `call_attempts`, que é a linha que a
+  telefonia pelo navegador vai preencher — o relatório não muda quando ela
+  chegar, só a duração e o "atendeu" deixam de ser declarados. A ligação que
+  começou e não foi tabulada aparece como "sem resultado", e o que a pessoa
+  registrou fora da tela de Ligar aparece à parte.
+- No celular, o botão "Mais" some quando não há o que guardar nele.
+- Testes: pgTAP `100_o_dia_de_quem_ligou.sql` (27), `formatos.test.ts` do módulo
+  novo, e os testes do menu e dos avisos reescritos. Site: typecheck, lint e
+  1.193 testes. Banco: 94 arquivos pgTAP; passa tudo menos `74_a_reuniao.sql`
+  #18, que já falhava e não tem relação (compara uma data com o dia em que o
+  banco local foi criado).
+- Conferido no navegador contra o banco local: como quem liga (menu com dois
+  itens, o dia batendo com as ligações lançadas, as telas da gestão recusando) e
+  como gestor (o painel abrindo primeiro, a linha por pessoa e o dia de uma delas).
+
+**Antes de ir ao ar — importante:** em produção há três pessoas com o papel SDR.
+Quando esta branch for publicada, elas passam a ver só Ligar e Meu dia. **Quem
+delas precisa continuar em Conversas, Agenda e Funis tem de virar gestor antes**
+(Ajustes → Pessoas).
+
+**Pendente:**
+1. **Lote imposto:** hoje quem liga ainda monta o próprio lote. A gestão montar
+   e atribuir mexe no módulo de ligação, o mesmo da branch da telefonia; fica
+   para depois de aquela branch subir, para as duas não redefinirem a mesma função.
+2. **Trava no banco:** as guardas desta entrega são de tela. No banco o SDR ainda
+   lê a base inteira e ainda passa nas funções da Revisão.
+3. Apagar Campanhas, Cadências e o "Resumo do dia" (telas, funções, tabelas,
+   rotinas e dados). O bom-dia automático roda sobre as tabelas de campanha e sai
+   junto.
+4. Revisão com os dois botões de aprovar, e a troca de nome de "Parceiros".
+5. Atualizar o PRD: o pivô muda decisões fechadas (cinco papéis, cadências no MVP).
+
+### 06/10/2026 — O pivô (partes 1 e 2) e o "por ler ao abrir" no ar
+
+**Em produção desde 06/10/2026, 16:34:** migração `20261006120000` aplicada
+(`public.ligacoes_do_dia`) e site publicado na Vercel com `--force`, a partir da
+branch `pivo-do-crm` (commit `4dec2e6`), nesta ordem. Conferido em produção, só
+lendo: a função responde com os dados reais (no dia, duas pessoas tinham ligado).
+
+Subiu junto, feito na hora de publicar: **conversa que está no nome de quem só
+liga avisa a gestão inteira.** Em produção havia 11 conversas atendidas por um
+SDR; como o SDR deixou de ser avisado e continuava contando como "responsável
+ativo", a resposta do parceiro nessas conversas não avisaria ninguém
+(`lerPessoasAtivas` passa a trazer só quem atende; RF-CON-04).
+
+**Atenção de quem opera:**
+- Os três SDRs de produção passaram a ver só Ligar e Meu dia. Quem precisa de
+  Conversas, Funis e Agenda tem de virar gestor (Ajustes → Pessoas, só admin
+  troca) e **sair e entrar de novo** para o papel novo valer.
+- **A `main` não tem o pivô.** O site no ar saiu da branch `pivo-do-crm`; um
+  deploy feito a partir da `main` tira o pivô do ar. Juntar na `main` é decisão
+  pendente.
+
+**Não subiu porque ainda não está feito:** lote imposto pela gestão, trava no
+banco para o SDR, apagar Campanhas e Cadências (o bom-dia automático segue
+disparando) e os dois botões de aprovar na Revisão.
+
+### 06/10/2026 — Pivô do CRM, parte 3: os dois caminhos do lead (RF-RAD-11, RF-CON-02, RF-CON-04, RF-MET-01)
+
+O desenho que faltava, dito por quem decide:
+
+    Revisão → aprovar COM mensagem automática → Conversas → esperar o lead responder
+    Revisão → só aprovar → Prospectados → Lotes → montar o lote para alguém → ligar → relatório
+
+E duas correções ao que eu tinha entendido: **o bom-dia automático não é para
+cancelar** (ele continua, com botão próprio), e **a tela de lote é da gestão**.
+
+- **Revisão, dois botões.** "Aprovar e mandar mensagem" cria a ficha e põe a
+  mensagem automática na fila, na mesma transação; "Só aprovar" leva para
+  Prospectados, sem mensagem. Vale no cartão e na barra de lote. A tela diz o que
+  aconteceu com a mensagem: entrou na fila, está desligada em Ajustes, ou a fila
+  não aceitou. A tecla "A" continua sendo "só aprovar": atalho não manda mensagem.
+- **O bom-dia sai a pedido, não mais sozinho** (migração `20261006140000`). Até
+  aqui toda ficha do Google Maps entrava na fila ao nascer. Agora entra só quando
+  quem aprova pede — e, pedindo, a origem deixa de ser pergunta (planilha
+  também). A chave geral, o ritmo por hora, o horário, o teto do dia e o "não
+  contatar" continuam valendo. A fila é a mesma de antes: a TELA de Campanhas saiu
+  do menu, a máquina por baixo fica, porque o bom-dia roda nela.
+- **"Parceiros" virou "Prospectados"** (menu e título da tela). A palavra
+  "parceiro" dentro das telas não mudou.
+- **"Ligar" virou "Lotes".** Admin e gestor montam o lote para eles mesmos ou
+  para quem vai ligar: o formulário ganhou "Para quem é o lote", e
+  `public.lote_atribuir` passa o lote à pessoa (migração `20261006130000`). Quem
+  só liga vê os lotes montados para ela; não monta nem encerra. A gestão vê todos
+  e encerra qualquer um.
+- **Conversas:** saíram as abas "Responderam" e "Aprovar" e o cartão de rascunho
+  da IA dentro da conversa ("a IA não vai me dizer o que escreve"). Entrou a aba
+  **"Consultoria"**, o pós-venda: quem tem negócio ganho, ou que a etapa já trata
+  como cliente, sai da lista de Conversas e passa a morar nela.
+- Testes: pgTAP `101_a_gestao_monta_o_lote.sql` (13) e
+  `102_aprovar_com_ou_sem_mensagem.sql` (18); o `92_o_bom_dia_sai_sozinho.sql` foi
+  adaptado à regra do pedido. Site: typecheck, lint e 1.202 testes. Banco: 96
+  arquivos pgTAP, passa tudo menos `74_a_reuniao.sql` #18 (já falhava; compara uma
+  data com o dia em que o banco local foi criado).
+- Conferido no navegador contra o banco local, como gestor e como quem liga: os
+  dois botões (só a aprovada com mensagem entrou na fila), as fichas aparecendo
+  em Prospectados, as quatro abas de Conversas, e um lote montado pelo gestor
+  ficando no nome da pessoa escolhida.
+
+**Decisões minhas, para quem quiser rever:**
+- "Consultoria" tira o parceiro da lista de Conversas (as duas abas não repetem
+  ninguém). Se a ideia era ele aparecer nas duas, é uma linha.
+- O nome "Prospectados" entrou só no menu e no título; "Virar parceiro", "não é
+  parceiro" e o resto do vocabulário ficaram.
+- O roteiro continua obrigatório para montar um lote; "ajuda opcional" hoje quer
+  dizer que quem liga pode não segui-lo.
+
+**Pendente:**
+1. A IA ainda GERA rascunho por baixo (depois de ligação); só a tela deixou de
+   mostrar. Desligar a geração mexe no worker de IA.
+2. Trava no banco para o SDR: ele ainda lê a base inteira, ainda passa em
+   `montar_lote` e na aprovação simples. As guardas são de tela.
+3. Apagar Cadências e o "Resumo do dia" (telas, funções, tabelas e dados). De
+   Campanhas sai só a tela e o que é dela; a fila do bom-dia fica.
+4. Atualizar o PRD.
+
+**Em produção (06/10/2026, 17:27):** a parte 3 do pivô. Migrações
+`20261006130000` e `20261006140000` aplicadas e site publicado na Vercel com
+`--force`, a partir da branch `pivo-do-crm` (commit `4111ccc`), nesta ordem.
+Conferido no banco: as três funções existem, o gatilho do bom-dia pergunta pelo
+pedido, e a fila do bom-dia segue agendada, a 6 por hora, vazia (20 já enviadas).
+A `main` continua sem o pivô, e os três SDRs de produção continuam SDR.
+
+**Na `main` desde 06/10/2026:** a branch `pivo-do-crm` foi juntada na `main` do
+GitHub, a pedido. A `main` não tinha andado desde a abertura da branch, então o
+que está nela é exatamente o que já estava no ar: não houve novo deploy. A partir
+daqui, publicar pela `main` mantém o pivô.

@@ -35,11 +35,14 @@ import {
  */
 
 const GESTOR: QuemSouEu = { id: 'gestor-1', papel: 'gestor' };
+/** Outra pessoa da gestão: é ela que "atende" nos casos em que o GESTOR não atende. */
+const COLEGA: QuemSouEu = { id: 'gestor-2', papel: 'gestor' };
+/** Quem só liga (pivô de 06/10/2026): não vê Conversas, então não é avisado de WhatsApp. */
 const SDR: QuemSouEu = { id: 'sdr-1', papel: 'sdr' };
 const ADMIN: QuemSouEu = { id: 'admin-1', papel: 'admin' };
 const EMBAIXADOR: QuemSouEu = { id: 'emb-1', papel: 'embaixador' };
 
-const TODOS_ATIVOS = new Set(['gestor-1', 'sdr-1', 'admin-1', 'emb-1']);
+const TODOS_ATIVOS = new Set(['gestor-1', 'gestor-2', 'sdr-1', 'admin-1', 'emb-1']);
 
 function conversa(parcial: Partial<ConversaComResposta> = {}): ConversaComResposta {
   return {
@@ -56,14 +59,14 @@ function conversa(parcial: Partial<ConversaComResposta> = {}): ConversaComRespos
 }
 
 describe('quem recebe avisos', () => {
-  it('é quem pode responder: admin, gestor, sdr e embaixador', () => {
+  it('é quem atende o WhatsApp: admin e gestor', () => {
     expect(recebeAvisos('admin')).toBe(true);
     expect(recebeAvisos('gestor')).toBe(true);
-    expect(recebeAvisos('sdr')).toBe(true);
-    expect(recebeAvisos('embaixador')).toBe(true);
   });
 
-  it('leitura, financeiro e o robô nunca: não respondem, então nada espera por eles', () => {
+  it('quem só liga, os papéis desativados e o robô nunca: nada no WhatsApp espera por eles', () => {
+    expect(recebeAvisos('sdr')).toBe(false);
+    expect(recebeAvisos('embaixador')).toBe(false);
     expect(recebeAvisos('leitura')).toBe(false);
     expect(recebeAvisos('financeiro')).toBe(false);
     expect(recebeAvisos('bot')).toBe(false);
@@ -72,8 +75,8 @@ describe('quem recebe avisos', () => {
 
 describe('de quem é o aviso', () => {
   it('conversa em que alguém já escreveu é só de quem atende', () => {
-    const c = conversa({ responsavelId: 'sdr-1', alguemEscreveu: true });
-    expect(ehParaMim(c, SDR, TODOS_ATIVOS)).toBe(true);
+    const c = conversa({ responsavelId: 'gestor-2', alguemEscreveu: true });
+    expect(ehParaMim(c, COLEGA, TODOS_ATIVOS)).toBe(true);
     expect(ehParaMim(c, GESTOR, TODOS_ATIVOS)).toBe(false);
     expect(ehParaMim(c, ADMIN, TODOS_ATIVOS)).toBe(false);
   });
@@ -82,28 +85,41 @@ describe('de quem é o aviso', () => {
     const c = conversa({ responsavelId: 'admin-1', alguemEscreveu: false });
     expect(ehParaMim(c, ADMIN, TODOS_ATIVOS)).toBe(true);
     expect(ehParaMim(c, GESTOR, TODOS_ATIVOS)).toBe(true);
-    expect(ehParaMim(c, SDR, TODOS_ATIVOS)).toBe(true);
+    expect(ehParaMim(c, COLEGA, TODOS_ATIVOS)).toBe(true);
   });
 
-  it('o embaixador só é avisado do que está endereçado a ele', () => {
+  it('quem só liga não é avisado de WhatsApp, nem do que aponta para ele', () => {
     const deOutro = conversa({ responsavelId: 'admin-1', alguemEscreveu: false });
-    const dele = conversa({ responsavelId: 'emb-1', alguemEscreveu: false });
-    expect(ehParaMim(deOutro, EMBAIXADOR, TODOS_ATIVOS)).toBe(false);
-    expect(ehParaMim(dele, EMBAIXADOR, TODOS_ATIVOS)).toBe(true);
+    const dele = conversa({ responsavelId: 'sdr-1', alguemEscreveu: true });
+    const cliente = conversa({ organizacaoId: null, responsavelId: 'admin-1' });
+    expect(ehParaMim(deOutro, SDR, TODOS_ATIVOS)).toBe(false);
+    expect(ehParaMim(dele, SDR, TODOS_ATIVOS)).toBe(false);
+    expect(ehParaMim(cliente, SDR, TODOS_ATIVOS)).toBe(false);
   });
 
   it('responsável desativado conta como ninguém atendendo', () => {
     const c = conversa({ responsavelId: 'saiu-da-empresa', alguemEscreveu: true });
     expect(ehParaMim(c, GESTOR, TODOS_ATIVOS)).toBe(true);
-    expect(ehParaMim(c, SDR, TODOS_ATIVOS)).toBe(true);
+    expect(ehParaMim(c, COLEGA, TODOS_ATIVOS)).toBe(true);
     expect(ehParaMim(c, EMBAIXADOR, TODOS_ATIVOS)).toBe(false);
+  });
+
+  it('conversa que ficou no nome de quem só liga avisa a gestão inteira', () => {
+    // Em 06/10/2026 havia conversas em produção atendidas por um SDR. Ele deixou
+    // de ser avisado; sem esta regra, a resposta do parceiro não avisaria ninguém.
+    // `lerPessoasAtivas` só devolve quem atende, então o SDR fica fora de `ativos`.
+    const quemAtende = new Set(['gestor-1', 'gestor-2', 'admin-1']);
+    const c = conversa({ responsavelId: 'sdr-1', alguemEscreveu: true });
+    expect(ehParaMim(c, GESTOR, quemAtende)).toBe(true);
+    expect(ehParaMim(c, ADMIN, quemAtende)).toBe(true);
+    expect(ehParaMim(c, SDR, quemAtende)).toBe(false);
   });
 
   it('sem a lista de ativos, o responsável vale como ativo', () => {
     // Falha de rede não pode virar aviso de tudo para todo mundo.
-    const c = conversa({ responsavelId: 'sdr-1', alguemEscreveu: true });
+    const c = conversa({ responsavelId: 'gestor-2', alguemEscreveu: true });
     expect(ehParaMim(c, GESTOR, null)).toBe(false);
-    expect(ehParaMim(c, SDR, null)).toBe(true);
+    expect(ehParaMim(c, COLEGA, null)).toBe(true);
   });
 
   it('quem não responde não é avisado nem do que aponta para ele', () => {
@@ -112,8 +128,12 @@ describe('de quem é o aviso', () => {
   });
 
   it('cliente (quem não é ficha) avisa todos os operadores, mesmo com alguém já respondendo', () => {
-    const cliente = conversa({ organizacaoId: null, responsavelId: 'sdr-1', alguemEscreveu: true });
-    expect(ehParaMim(cliente, SDR, TODOS_ATIVOS)).toBe(true);
+    const cliente = conversa({
+      organizacaoId: null,
+      responsavelId: 'gestor-2',
+      alguemEscreveu: true,
+    });
+    expect(ehParaMim(cliente, COLEGA, TODOS_ATIVOS)).toBe(true);
     expect(ehParaMim(cliente, GESTOR, TODOS_ATIVOS)).toBe(true);
     expect(ehParaMim(cliente, ADMIN, TODOS_ATIVOS)).toBe(true);
     // Sem a lista de ativos a resposta é a mesma: a regra do cliente não depende dela.
@@ -123,16 +143,20 @@ describe('de quem é o aviso', () => {
   it('o parceiro continua sendo só de quem atende: a regra do cliente não vaza para ele', () => {
     const parceiro = conversa({
       organizacaoId: 'org-1',
-      responsavelId: 'sdr-1',
+      responsavelId: 'gestor-2',
       alguemEscreveu: true,
     });
-    expect(ehParaMim(parceiro, SDR, TODOS_ATIVOS)).toBe(true);
+    expect(ehParaMim(parceiro, COLEGA, TODOS_ATIVOS)).toBe(true);
     expect(ehParaMim(parceiro, GESTOR, TODOS_ATIVOS)).toBe(false);
     expect(ehParaMim(parceiro, ADMIN, TODOS_ATIVOS)).toBe(false);
   });
 
   it('cliente não avisa embaixador de outro, nem leitura, nem financeiro', () => {
-    const cliente = conversa({ organizacaoId: null, responsavelId: 'sdr-1', alguemEscreveu: true });
+    const cliente = conversa({
+      organizacaoId: null,
+      responsavelId: 'gestor-2',
+      alguemEscreveu: true,
+    });
     expect(ehParaMim(cliente, EMBAIXADOR, TODOS_ATIVOS)).toBe(false);
     expect(ehParaMim(cliente, { id: 'leitor-1', papel: 'leitura' }, TODOS_ATIVOS)).toBe(false);
     expect(ehParaMim(cliente, { id: 'fin-1', papel: 'financeiro' }, TODOS_ATIVOS)).toBe(false);
@@ -140,11 +164,14 @@ describe('de quem é o aviso', () => {
 
   it('filtra a lista inteira pela mesma regra', () => {
     const lista = [
-      conversa({ conversaId: 'a', responsavelId: 'sdr-1', alguemEscreveu: true }),
+      conversa({ conversaId: 'a', responsavelId: 'gestor-2', alguemEscreveu: true }),
       conversa({ conversaId: 'b', responsavelId: 'gestor-1', alguemEscreveu: true }),
       conversa({ conversaId: 'c', responsavelId: 'admin-1', alguemEscreveu: false }),
     ];
-    expect(respostasParaMim(lista, SDR, TODOS_ATIVOS).map((c) => c.conversaId)).toEqual(['a', 'c']);
+    expect(respostasParaMim(lista, COLEGA, TODOS_ATIVOS).map((c) => c.conversaId)).toEqual([
+      'a',
+      'c',
+    ]);
     expect(respostasParaMim(lista, GESTOR, TODOS_ATIVOS).map((c) => c.conversaId)).toEqual([
       'b',
       'c',
@@ -418,13 +445,13 @@ describe('para onde o aviso leva', () => {
     ).toBe('/conversas?aba=fora');
   });
 
-  it('várias misturadas abrem a aba Responderam', () => {
+  it('várias misturadas abrem a lista de Conversas', () => {
     expect(
       destinoDoAviso([
         conversa({ conversaId: 'a', organizacaoId: 'org-1' }),
         conversa({ conversaId: 'b', organizacaoId: null }),
       ]),
-    ).toBe('/conversas?aba=responderam');
+    ).toBe('/conversas');
   });
 });
 

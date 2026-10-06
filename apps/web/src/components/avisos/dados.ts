@@ -1,7 +1,8 @@
 import { escolherNegocio, type NegocioCru } from '@/components/conversas/montagem';
+import { isAppRole } from '@/lib/auth/role';
 import { createClient } from '@/lib/supabase/client';
 
-import { type ConversaComResposta, type FichaDoAviso } from './regra';
+import { recebeAvisos, type ConversaComResposta, type FichaDoAviso } from './regra';
 
 /**
  * As leituras do aviso de resposta. SÓ leituras.
@@ -212,16 +213,26 @@ export async function lerFichasDoAviso(ids: readonly string[]): Promise<Map<stri
 }
 
 /**
- * Quem está ativo no time. A view `team_directory` não tem PII e é legível por
- * todo autenticado. `null` é falha de rede (ver `ehParaMim`).
+ * Quem está ativo no time E atende o WhatsApp. A view `team_directory` não tem
+ * PII e é legível por todo autenticado. `null` é falha de rede (ver `ehParaMim`).
+ *
+ * "E atende" entrou no pivô de 06/10/2026. O SDR passou a só ligar e deixou de
+ * ser avisado; se ele continuasse contando como "responsável ativo", a conversa
+ * que ainda está no nome dele seria de alguém que não a vê — e a resposta do
+ * parceiro não avisaria ninguém. Fora desta lista, o responsável vale como
+ * ninguém atendendo, e o aviso vai para toda a gestão.
  */
 export async function lerPessoasAtivas(): Promise<Set<string> | null> {
   const supabase = createClient();
-  const { data, error } = await supabase.from('team_directory').select('id').eq('is_active', true);
+  const { data, error } = await supabase
+    .from('team_directory')
+    .select('id, role')
+    .eq('is_active', true);
 
   if (error) return null;
   return new Set(
-    ((data ?? []) as { id: string | null }[])
+    ((data ?? []) as { id: string | null; role: string | null }[])
+      .filter((linha) => isAppRole(linha.role) && recebeAvisos(linha.role))
       .map((linha) => linha.id)
       .filter((id): id is string => id !== null),
   );
