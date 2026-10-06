@@ -6606,3 +6606,10 @@ cancelar** (ele continua, com botão próprio), e **a tela de lote é da gestão
 3. Apagar Cadências e o "Resumo do dia" (telas, funções, tabelas e dados). De
    Campanhas sai só a tela e o que é dela; a fila do bom-dia fica.
 4. Atualizar o PRD.
+
+**Em produção (06/10/2026, 17:27):** a parte 3 do pivô. Migrações
+`20261006130000` e `20261006140000` aplicadas e site publicado na Vercel com
+`--force`, a partir da branch `pivo-do-crm` (commit `4111ccc`), nesta ordem.
+Conferido no banco: as três funções existem, o gatilho do bom-dia pergunta pelo
+pedido, e a fila do bom-dia segue agendada, a 6 por hora, vazia (20 já enviadas).
+A `main` continua sem o pivô, e os três SDRs de produção continuam SDR.
