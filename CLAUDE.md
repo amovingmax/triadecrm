@@ -33,9 +33,12 @@ Não releia tudo a cada tarefa: use a seção do PRD e o anexo do módulo.
 Decidido pelo time em 06/10/2026; detalhe e pendências no `docs/CHANGELOG.md` ("Pivô do CRM").
 
 - **A proposta ficou curta:** a gestão enche a base de fornecedores e produtores, gente contratada por diária liga (telefonia pelo navegador, com Twilio), e a gestão confere por pessoa e por dia o que cada um fez.
-- **Papéis: só admin, gestor e SDR.** Embaixador, leitura e financeiro saíram (continuam no enum do banco, sem uso). **SDR é quem liga:** vê Ligar e Meu dia, e nada mais. WhatsApp, funil, agenda, metas, base, Revisão, importação e relatórios são de admin e gestor.
-- **O lote de ligação é montado e imposto pela gestão**, que também pode ligar.
-- **Campanhas e Cadências deixam de existir** (telas, banco e dados), junto com o "Resumo do dia" de `/cadencias/resumo` e o bom-dia automático que roda sobre campanhas. Registrar saiu do menu e continua pelo botão "Registrar contato".
+- **Os dois caminhos do lead:** Revisão → *aprovar e mandar mensagem* → Conversas → esperar responder; ou Revisão → *só aprovar* → Prospectados → Lotes → montar o lote para alguém → ligar → relatório.
+- **Papéis: só admin, gestor e SDR.** Embaixador, leitura e financeiro saíram (continuam no enum do banco, sem uso). **SDR é quem liga:** vê Lotes e Meu dia, e nada mais. WhatsApp, funil, agenda, metas, base, Revisão, importação e relatórios são de admin e gestor.
+- **Lotes** (era "Ligar"): admin e gestor montam o lote para eles mesmos ou para quem liga (`public.lote_atribuir`). **Prospectados** é o nome da lista que se chamava "Parceiros".
+- **O bom-dia automático continua, mas a pedido:** só entra na fila pelo botão "aprovar e mandar mensagem" da Revisão (`radar_revisar_*_com_mensagem`). A tela de Campanhas saiu; a fila por baixo (`envios_em_massa`) fica, porque o bom-dia roda nela.
+- **Cadências deixam de existir** (telas, banco e dados), junto com o "Resumo do dia" de `/cadencias/resumo`. Registrar saiu do menu e continua pelo botão "Registrar contato".
+- **Conversas:** abas Conversas, Consultoria (pós-venda: quem fechou), Clientes e Automáticas. Não há mais fila de aprovação nem rascunho da IA na tela: "a IA não vai me dizer o que escreve".
 - **O relatório do dia por pessoa** é `public.ligacoes_do_dia` + `apps/web/src/components/ligacoes-do-dia`; é a mesma conta para quem liga e para a gestão.
 - **"por ler" sai ao abrir a conversa**; a marca "Nova" e o número do menu saem só com a resposta do time.
 

@@ -6547,3 +6547,62 @@ ativo", a resposta do parceiro nessas conversas não avisaria ninguém
 **Não subiu porque ainda não está feito:** lote imposto pela gestão, trava no
 banco para o SDR, apagar Campanhas e Cadências (o bom-dia automático segue
 disparando) e os dois botões de aprovar na Revisão.
+
+### 06/10/2026 — Pivô do CRM, parte 3: os dois caminhos do lead (RF-RAD-11, RF-CON-02, RF-CON-04, RF-MET-01)
+
+O desenho que faltava, dito por quem decide:
+
+    Revisão → aprovar COM mensagem automática → Conversas → esperar o lead responder
+    Revisão → só aprovar → Prospectados → Lotes → montar o lote para alguém → ligar → relatório
+
+E duas correções ao que eu tinha entendido: **o bom-dia automático não é para
+cancelar** (ele continua, com botão próprio), e **a tela de lote é da gestão**.
+
+- **Revisão, dois botões.** "Aprovar e mandar mensagem" cria a ficha e põe a
+  mensagem automática na fila, na mesma transação; "Só aprovar" leva para
+  Prospectados, sem mensagem. Vale no cartão e na barra de lote. A tela diz o que
+  aconteceu com a mensagem: entrou na fila, está desligada em Ajustes, ou a fila
+  não aceitou. A tecla "A" continua sendo "só aprovar": atalho não manda mensagem.
+- **O bom-dia sai a pedido, não mais sozinho** (migração `20261006140000`). Até
+  aqui toda ficha do Google Maps entrava na fila ao nascer. Agora entra só quando
+  quem aprova pede — e, pedindo, a origem deixa de ser pergunta (planilha
+  também). A chave geral, o ritmo por hora, o horário, o teto do dia e o "não
+  contatar" continuam valendo. A fila é a mesma de antes: a TELA de Campanhas saiu
+  do menu, a máquina por baixo fica, porque o bom-dia roda nela.
+- **"Parceiros" virou "Prospectados"** (menu e título da tela). A palavra
+  "parceiro" dentro das telas não mudou.
+- **"Ligar" virou "Lotes".** Admin e gestor montam o lote para eles mesmos ou
+  para quem vai ligar: o formulário ganhou "Para quem é o lote", e
+  `public.lote_atribuir` passa o lote à pessoa (migração `20261006130000`). Quem
+  só liga vê os lotes montados para ela; não monta nem encerra. A gestão vê todos
+  e encerra qualquer um.
+- **Conversas:** saíram as abas "Responderam" e "Aprovar" e o cartão de rascunho
+  da IA dentro da conversa ("a IA não vai me dizer o que escreve"). Entrou a aba
+  **"Consultoria"**, o pós-venda: quem tem negócio ganho, ou que a etapa já trata
+  como cliente, sai da lista de Conversas e passa a morar nela.
+- Testes: pgTAP `101_a_gestao_monta_o_lote.sql` (13) e
+  `102_aprovar_com_ou_sem_mensagem.sql` (18); o `92_o_bom_dia_sai_sozinho.sql` foi
+  adaptado à regra do pedido. Site: typecheck, lint e 1.202 testes. Banco: 96
+  arquivos pgTAP, passa tudo menos `74_a_reuniao.sql` #18 (já falhava; compara uma
+  data com o dia em que o banco local foi criado).
+- Conferido no navegador contra o banco local, como gestor e como quem liga: os
+  dois botões (só a aprovada com mensagem entrou na fila), as fichas aparecendo
+  em Prospectados, as quatro abas de Conversas, e um lote montado pelo gestor
+  ficando no nome da pessoa escolhida.
+
+**Decisões minhas, para quem quiser rever:**
+- "Consultoria" tira o parceiro da lista de Conversas (as duas abas não repetem
+  ninguém). Se a ideia era ele aparecer nas duas, é uma linha.
+- O nome "Prospectados" entrou só no menu e no título; "Virar parceiro", "não é
+  parceiro" e o resto do vocabulário ficaram.
+- O roteiro continua obrigatório para montar um lote; "ajuda opcional" hoje quer
+  dizer que quem liga pode não segui-lo.
+
+**Pendente:**
+1. A IA ainda GERA rascunho por baixo (depois de ligação); só a tela deixou de
+   mostrar. Desligar a geração mexe no worker de IA.
+2. Trava no banco para o SDR: ele ainda lê a base inteira, ainda passa em
+   `montar_lote` e na aprovação simples. As guardas são de tela.
+3. Apagar Cadências e o "Resumo do dia" (telas, funções, tabelas e dados). De
+   Campanhas sai só a tela e o que é dela; a fila do bom-dia fica.
+4. Atualizar o PRD.
