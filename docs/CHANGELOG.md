@@ -6832,3 +6832,9 @@ da máquina, `supabase migration list` mostra as duas migrações no remoto (e o
 Vercel. Não conferi as contagens de negócio movidos em produção: a leitura
 direta do banco foi barrada aqui. **A `main` do GitHub continua sem este
 trabalho**: publicar a partir dela tira a limpeza do funil do ar.
+
+**Na `main` desde 07/10/2026:** a branch `limpeza-do-funil` foi juntada na `main`
+do GitHub, a pedido. A `main` não tinha andado desde a abertura da branch, então
+o que está nela é exatamente o que já estava no ar desde as 11:14: não houve novo
+deploy. A partir daqui, publicar pela `main` mantém a limpeza do funil e as
+exclusões.
