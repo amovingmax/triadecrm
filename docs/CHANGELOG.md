@@ -6950,3 +6950,12 @@ celular, o botão fica em cada cartão.
 **Decisão minha, para quem quiser rever:** a limpeza é de uma vez só. A Revisão, a
 importação e o cadastro rápido continuam aceitando ficha sem número; se a regra deve
 ser "Prospectados só com número", é outra mudança, na entrada.
+
+**Subido (07/10/2026, ~15:30):** branch `prospectados-sem-numero-e-saudacao`
+enviada ao GitHub, `supabase db push` rodado (terminou com o erro de certificado do
+`pg-delta` de sempre, que nas subidas anteriores não impediu a migração) e o site
+publicado na Vercel. **Não conferido daqui:** a leitura do banco de produção é barrada
+nesta máquina, então nem a migração `20261007130000` registrada nem quantas fichas a
+limpeza tirou. A conferência é abrir Prospectados → Excluídos: se a limpeza rodou, as
+fichas sem número estão lá com o motivo "saiu na limpeza de Prospectados de
+07/10/2026". A `main` ainda não tem esta branch nem a `aviso-do-whatsapp`.
