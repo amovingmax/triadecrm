@@ -326,10 +326,20 @@ export const SLUGS_REUNIAO_AGENDADA = ['lig_reuniao_marcada', 'reu_reagendada'] 
 
 /**
  * O desfecho que produz autorização. Sem `consent_events` gravado, o pré-cadastro na
- * Komune não pode acontecer (guardrail do CLAUDE.md e `required_fields` da etapa
- * `autorizou`), então a evidência literal é pedida no ato, enquanto ela lembra a frase.
+ * Komune não pode acontecer (guardrail do CLAUDE.md), então a evidência literal é
+ * pedida no ato, enquanto ela lembra a frase.
+ *
+ * Desde 07/10/2026 este slug é também O JEITO de reconhecer a autorização na tela
+ * (o troféu da Agenda e do "Feito hoje"): a etapa `autorizou` saiu do funil, e o
+ * destino do desfecho passou a ser `cadastro_em_andamento` — o mesmo de "Cadastro
+ * iniciado na hora", que não é autorização nenhuma. A etapa de destino deixou de
+ * distinguir os dois; o desfecho distingue.
  */
 export const SLUG_AUTORIZACAO = 'reu_autorizou' as const;
+
+export function ehAutorizacao(desfecho: Pick<DesfechoCatalogo, 'slug'>): boolean {
+  return desfecho.slug === SLUG_AUTORIZACAO;
+}
 
 /**
  * Os desfechos em que o parceiro saiu interessado. É por slug porque o catálogo não
@@ -501,12 +511,15 @@ export function prazoSugerido(
 /**
  * As etapas de destino do catálogo, com a temperatura que a etapa carrega no funil
  * `fornecedor`. Vem do servidor junto com o catálogo (`stages` é legível por todos os
- * papéis) e existe por um motivo concreto: **5 dos 9 `target_stage_slug` não existem no
- * funil `produtor`** (`em_conversa`, `reuniao_marcada`, `apresentacao_realizada`,
- * `autorizou`, `cadastro_em_andamento`), que é a metade da base (50 cerimonialistas).
- * Nesses casos a RPC grava a atividade, NÃO move a etapa e devolve
- * `etapa_aplicada: false`; a tela diz "registrado — a etapa deste funil não muda por
- * este desfecho" em vez de mentir uma promoção que não houve.
+ * papéis) e existe por um motivo concreto: **3 dos `target_stage_slug` não existem com
+ * esse nome no funil `produtor`** (`reuniao_marcada`, `apresentacao_realizada`,
+ * `cadastro_em_andamento`), que é a metade da base (50 cerimonialistas). O banco os
+ * resolve por equivalência (`app.stage_for`); a previsão daqui não conhece a
+ * equivalência e, na dúvida, NÃO promete movimento — quem diz o que aconteceu é a
+ * resposta da RPC (`etapa_aplicada`), e a tela corrige o recibo por ela.
+ *
+ * (Eram 5 de 9 até 07/10/2026: `em_conversa` e `autorizou` saíram do funil. "Interessado"
+ * passou a levar a `respondeu`, que os dois funis têm.)
  */
 export type EtapaAlvo = {
   pipelineId: number;
@@ -540,11 +553,12 @@ export type PrevisaoRegistro = {
  * sendo a regra (PRD §5.6) e a previsão só copia a temperatura da etapa de destino,
  * que é a entrada que o desfecho move. Onde o catálogo declara `sets_temperature`
  * diferente da etapa — são exatamente três linhas, `lig_interessado`,
- * `vis_decisor_interessado` (declaram `quente`, mas `em_conversa` é `morno`) e
+ * `vis_decisor_interessado` (declaram `quente`, mas `respondeu` é `morno`) e
  * `lig_atendeu_retorna` (declara `morno` e não tem etapa alvo) — a previsão usa o
  * declarado, porque é o que a RPC vai produzir gravando `deals.last_intent`, que é a
  * outra entrada que a regra do banco já lê (o ramo `v_hot`/`v_warm`). Está medido: com
- * `stage = em_conversa` e `last_intent = 'interessado'`, a regra devolve `quente`.
+ * etapa morna e `last_intent = 'interessado'`, a regra devolve `quente`
+ * (`12_registro_de_contato.sql`).
  */
 export function preverRegistro(
   desfecho: DesfechoCatalogo,

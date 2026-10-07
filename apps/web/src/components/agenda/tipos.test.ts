@@ -365,7 +365,7 @@ describe('o resultado do compromisso (cor do cartão)', () => {
       desfecho({
         slug: 'reu_autorizou',
         name: 'Realizada, autorizou',
-        target_stage_slug: 'autorizou',
+        target_stage_slug: 'cadastro_em_andamento',
       }),
       'reuniao',
     );
@@ -375,6 +375,21 @@ describe('o resultado do compromisso (cor do cartão)', () => {
       desfecho: 'Realizada, autorizou',
       trofeu: true,
     });
+  });
+
+  it('o troféu é do DESFECHO, não da etapa: "Cadastro iniciado na hora" leva ao mesmo lugar e não ganha', () => {
+    // Desde 07/10/2026 os dois desfechos têm o mesmo destino (a etapa "Autorizou"
+    // saiu do funil). Decidir pela etapa daria troféu a quem não autorizou nada.
+    const r = resultadoDoDesfecho(
+      desfecho({
+        slug: 'vis_cadastro_iniciado',
+        name: 'Cadastro iniciado na hora',
+        surfaces: ['visita'],
+        target_stage_slug: 'cadastro_em_andamento',
+      }),
+      'visita',
+    );
+    expect(r).toMatchObject({ tom: 'sucesso', rotulo: 'Cadastro iniciado na hora', trofeu: false });
   });
 
   it('interessado é sucesso, sem troféu: o troféu é só da autorização', () => {
@@ -390,7 +405,7 @@ describe('o resultado do compromisso (cor do cartão)', () => {
           slug: 'vis_decisor_interessado',
           name: 'Decisor interessado',
           surfaces: ['visita'],
-          target_stage_slug: 'em_conversa',
+          target_stage_slug: 'respondeu',
         }),
         'visita',
       ),

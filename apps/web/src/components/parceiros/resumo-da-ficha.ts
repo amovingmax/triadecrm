@@ -33,7 +33,17 @@ import { diasDeDiferenca } from './formatos';
  */
 export const PRIMEIRA_POSICAO_DE_SAIDA = 90;
 
-export type EtapaDoFunil = { id: number; nome: string; posicao: number };
+export type EtapaDoFunil = {
+  id: number;
+  nome: string;
+  posicao: number;
+  /**
+   * A etapa de entrada do funil (`stages.is_entry`): "Prospectado", "Identificado".
+   * O negócio nasce nela, mas ela não é passo da régua — o funil começa no contato
+   * (07/10/2026). Ausente = não é.
+   */
+  entrada?: boolean;
+};
 
 export type PassoDaRegua = {
   id: number;
@@ -54,24 +64,42 @@ export type Regua = {
    * pintar metade dela afirmaria um progresso que ninguém mediu.
    */
   fora: string | null;
+  /**
+   * O parceiro ainda NÃO ENTROU no caminho: está na etapa de entrada, esperando o
+   * primeiro contato. A régua também fica apagada, mas a frase é outra ("ainda não
+   * contatado"), e aqui há próxima: a primeira etapa do funil.
+   */
+  antes: string | null;
 };
 
 /** `null` quando o funil não tem etapa de trabalho nenhuma, ou a etapa não é dele. */
 export function montarRegua(etapas: readonly EtapaDoFunil[], etapaAtualId: number): Regua | null {
   const atual = etapas.find((e) => e.id === etapaAtualId);
   const deTrabalho = etapas
-    .filter((e) => e.posicao < PRIMEIRA_POSICAO_DE_SAIDA)
+    .filter((e) => e.posicao < PRIMEIRA_POSICAO_DE_SAIDA && !e.entrada)
     .sort((a, b) => a.posicao - b.posicao);
   if (!atual || deTrabalho.length === 0) return null;
 
   const indice = deTrabalho.findIndex((e) => e.id === etapaAtualId);
   if (indice === -1) {
+    const apagada = deTrabalho.map((e): PassoDaRegua => ({ id: e.id, nome: e.nome, estado: 'a_fazer' }));
+    if (atual.entrada) {
+      return {
+        passos: apagada,
+        posicao: null,
+        total: deTrabalho.length,
+        proxima: deTrabalho[0]?.nome ?? null,
+        fora: null,
+        antes: atual.nome,
+      };
+    }
     return {
-      passos: deTrabalho.map((e) => ({ id: e.id, nome: e.nome, estado: 'a_fazer' })),
+      passos: apagada,
       posicao: null,
       total: deTrabalho.length,
       proxima: null,
       fora: atual.nome,
+      antes: null,
     };
   }
 
@@ -85,6 +113,7 @@ export function montarRegua(etapas: readonly EtapaDoFunil[], etapaAtualId: numbe
     total: deTrabalho.length,
     proxima: deTrabalho[indice + 1]?.nome ?? null,
     fora: null,
+    antes: null,
   };
 }
 

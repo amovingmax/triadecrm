@@ -44,7 +44,7 @@ function item(parcial: Partial<ItemDoDia>): ItemDoDia {
     categoria: 'Buffet',
     temperatura: 'quente',
     funil: 'Captação de fornecedor',
-    etapa: 'Em conversa',
+    etapa: 'Respondeu',
     atendente: null,
     ...parcial,
   };

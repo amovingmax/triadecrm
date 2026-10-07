@@ -30,7 +30,7 @@ import { ehCanal } from '@/lib/canais';
  *    tipos, funções, constantes, rótulos, comentários — é em pt-BR. É a mesma
  *    convenção de `components/parceiros/tipos.ts`.
  *
- * 2. **No celular não existe quadro.** Doze e catorze colunas não cabem em 390px, e
+ * 2. **No celular não existe quadro.** Nove e treze colunas não cabem em 390px, e
  *    arrastar cartão dentro de uma lista que rola verticalmente disputa o gesto de
  *    rolagem — justamente com quem está de pé, na rua, com uma mão só. Abaixo de
  *    `md` (768px) a tela é: uma trilha horizontal de etapas (nome + contagem, a atual
@@ -45,20 +45,30 @@ import { ehCanal } from '@/lib/canais';
  *    Publicado, no funil 1) são destino, não trabalho: no desktop entram recolhidas
  *    numa faixa estreita no fim do quadro, continuando a receber cartão arrastado.
  *    `etapaEhDeSaida` é a regra única — a UI não repete a lista de flags.
+ *
+ * 4. **O quadro começa no contato (07/10/2026).** "Prospectado" e "Identificado"
+ *    deixaram de ser coluna: quem ainda não foi contatado mora na lista de
+ *    Prospectados, e sobe para "Contatado" sozinho na primeira mensagem. "Em
+ *    conversa" e "Autorizou" saíram do funil. Nada disso é filtrado aqui: é
+ *    `public.pipeline_board` que não devolve essas etapas (migração
+ *    20261007100000), então a folha de mover também não as oferece.
  */
 
 // ---------------------------------------------------------------------------
 // Funis
 // ---------------------------------------------------------------------------
 
-export type FunilSlug = 'fornecedor' | 'ativacao' | 'produtor';
+export type FunilSlug = 'fornecedor' | 'produtor';
 
 /**
- * Os funis que o quadro do MVP abre. Ativação fica de fora de propósito: as etapas
- * dele são consequência de eventos da plataforma Komune (publicou, recebeu lead,
- * respondeu lead, contratou), não de ação manual do time — o PRD §6 coloca "Funil 2
- * automático por eventos da Komune" na v1, e hoje ele tem zero negócios. Um quadro
- * onde ninguém pode arrastar nada ensina a pessoa errada a coisa errada.
+ * Os funis que a tela conhece: os dois de captação.
+ *
+ * Ativação saiu da tela em 07/10/2026 (limpeza do funil, pedido do Rafael). Ele
+ * nunca foi quadro — as etapas dele são consequência de eventos da plataforma
+ * Komune, não de trabalho do time —, e a aba que existia mostrava só uma régua
+ * de contagens, todas zero. O funil continua no banco: o roteiro de ligação tem
+ * variante própria para ele (`components/ligacao`). Quem chegar com
+ * `?funil=ativacao` num link antigo cai no funil padrão.
  */
 export const FUNIS_NO_QUADRO: readonly FunilSlug[] = ['fornecedor', 'produtor'];
 
@@ -173,7 +183,11 @@ export type CartaoQuadro = {
   needs_attention: boolean;
   /** Nome da etapa, como o banco a chama. Vem para o cartão desde 28/09/2026. */
   stage_name: string;
-  /** Posição da etapa no funil (1..N de trabalho; 90/98/99 de saída). */
+  /**
+   * Posição da etapa no funil (1..N de trabalho; 90/98/99 de saída). Serve para
+   * ORDENAR, não para contar: há buracos na numeração (as etapas aposentadas
+   * continuam donas da posição delas no banco).
+   */
   stage_position: number;
   /** Canal do último toque (`deals.last_channel`); `null` enquanto ninguém tocou. */
   last_channel: Channel | null;

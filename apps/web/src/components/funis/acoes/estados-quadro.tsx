@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * Os jeitos de o quadro não ser um quadro: carregando, falhou, vazio de verdade,
- * vazio por filtro, e o funil de ativação — que não é nenhuma das quatro coisas.
+ * Os jeitos de o quadro não ser um quadro: carregando, falhou, vazio de verdade e
+ * vazio por filtro.
  *
  * Cada estado diz o que aconteceu E o que fazer. "Nenhum resultado" sem saída manda
  * a pessoa adivinhar; aqui o botão da saída está sempre na tela.
  */
-import { FilterX, RotateCw, SquareKanban, Workflow } from 'lucide-react';
+import Link from 'next/link';
+import { FilterX, RotateCw, SquareKanban } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import type { EtapaQuadro } from '../tipos';
 import { traduzirFalha } from './erros';
 
 function Moldura({
@@ -85,14 +85,24 @@ export function ErroDoQuadro({ causa, aoTentar }: { causa: unknown; aoTentar: ()
   );
 }
 
-/** O funil existe e está vazio: não há filtro a limpar, há negócio a criar. */
+/**
+ * O funil existe e está vazio: não há filtro a limpar, há contato a fazer.
+ *
+ * Desde 07/10/2026 "vazio" não quer dizer base vazia: quem foi aprovado e ainda
+ * não recebeu mensagem está em Prospectados, fora do quadro. A saída que o texto
+ * aponta é a que põe gente aqui — a primeira mensagem.
+ */
 export function QuadroVazio({ nomeDoFunil }: { nomeDoFunil: string }) {
   return (
     <Moldura
       icone={<SquareKanban className="size-5" aria-hidden="true" />}
-      titulo={`Nenhum negócio em ${nomeDoFunil}`}
-      texto="Cada parceiro cadastrado entra no funil automaticamente. Comece cadastrando um parceiro ou revisando os candidatos na Revisão."
-    />
+      titulo={`Ninguém em ${nomeDoFunil} ainda`}
+      texto="O funil começa em Contatado: o parceiro entra aqui quando recebe a primeira mensagem ou quando um contato registrado muda a etapa dele. Quem ainda não foi contatado está em Prospectados."
+    >
+      <Button asChild variant="outline" className="toque h-11 md:h-9">
+        <Link href="/parceiros">Abrir Prospectados</Link>
+      </Button>
+    </Moldura>
   );
 }
 
@@ -115,61 +125,5 @@ export function QuadroVazioPorFiltro({
         Limpar o recorte
       </Button>
     </Moldura>
-  );
-}
-
-/**
- * O funil de ativação (PRD §6, v1).
- *
- * Ele não é um quadro de trabalho: as etapas mudam quando a plataforma Komune avisa
- * que o fornecedor publicou, recebeu um lead, respondeu, contratou. Ninguém arrasta
- * nada aqui, e um quadro com doze colunas vazias e arrasto habilitado ensinaria o
- * contrário. Então a tela mostra o que ele É — a régua de etapas com a contagem real
- * do banco — e diz de onde virão os cartões.
- */
-export function PainelDeAtivacao({
-  etapas,
-  nomeDoFunil,
-}: {
-  etapas: EtapaQuadro[];
-  nomeDoFunil: string;
-}) {
-  const total = etapas.reduce((soma, etapa) => soma + etapa.total, 0);
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-start gap-3 rounded-xl border border-hairline bg-muted/40 p-4">
-        <Workflow aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-        <div className="space-y-1 text-sm">
-          <p className="font-medium">{nomeDoFunil} anda sozinho.</p>
-          <p className="text-muted-foreground">
-            As etapas mudam quando a plataforma Komune avisa que o fornecedor publicou o perfil,
-            recebeu um lead, respondeu e fechou a primeira contratação. Ninguém arrasta cartão aqui:
-            por isso a tela mostra a régua e não um quadro. A ligação com a plataforma entra depois
-            do MVP.
-          </p>
-        </div>
-      </div>
-
-      <ol className="flex flex-col overflow-hidden rounded-xl border border-hairline">
-        {etapas.map((etapa, indice) => (
-          <li
-            key={etapa.id}
-            className="flex items-center gap-3 border-b border-hairline px-3 py-3 last:border-b-0"
-          >
-            <span className="numerico w-5 shrink-0 text-xs text-muted-foreground">
-              {indice + 1}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{etapa.name}</span>
-            <span className="numerico shrink-0 text-sm text-muted-foreground">{etapa.total}</span>
-          </li>
-        ))}
-      </ol>
-
-      <p className="text-sm text-muted-foreground">
-        <span className="numerico">{total}</span>
-        {total === 1 ? ' negócio neste funil hoje.' : ' negócios neste funil hoje.'}
-      </p>
-    </div>
   );
 }

@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { requireRole } from '@/lib/auth/session';
 import { ProvedorConsultas } from '@/components/consultas/provedor-consultas';
 import { TelaFunis } from '@/components/funis/acoes/tela-funis';
-import { lerFiltrosDoQuadro } from '@/components/funis/acoes/url-dos-funis';
+import { filtrosQuadroDaUrl } from '@/components/funis/tipos';
 
 export const metadata: Metadata = { title: 'Funis' };
 
@@ -29,7 +29,7 @@ export default async function Pagina({
 
   return (
     <ProvedorConsultas>
-      <TelaFunis filtrosIniciais={lerFiltrosDoQuadro(params)} />
+      <TelaFunis filtrosIniciais={filtrosQuadroDaUrl(params)} />
     </ProvedorConsultas>
   );
 }

@@ -6,10 +6,8 @@
  * Três controles e nada mais. A tela é usada de pé, na rua, com uma mão: cada
  * seletor a mais é um toque a mais entre a Heloísa e o cartão que ela quer achar.
  *
- *  * **Seletor de funil** — os três que existem no banco. Ativação aparece porque
- *    existe e o time pergunta por ele; ao escolhê-lo a tela explica que ele é
- *    alimentado por eventos da plataforma (PRD §6, v1) em vez de mostrar um quadro
- *    onde ninguém pode arrastar nada.
+ *  * **Seletor de funil** — os dois de captação: fornecedor e produtor. A aba de
+ *    Ativação saiu em 07/10/2026; ela não abria quadro, só uma régua de contagens.
  *  * **Meus / Todos** — o filtro do RF-FUN-01. Fica ao lado da busca porque as duas
  *    respondem à mesma pergunta ("cadê o cartão?") e no celular precisam caber na
  *    mesma linha.
@@ -54,7 +52,7 @@ export function SeletorDeFunil({
   }
 
   return (
-    // No celular a trilha rola na horizontal em vez de quebrar em duas linhas: três
+    // No celular a trilha rola na horizontal em vez de quebrar em duas linhas: dois
     // nomes longos não cabem em 390px e empilhar empurraria o quadro para baixo da dobra.
     <SeletorDeAba
       rotulo="Funil"
@@ -64,11 +62,7 @@ export function SeletorDeFunil({
         const escolhido = funis.find((f) => f.slug === slug);
         if (escolhido) aoEscolher(escolhido);
       }}
-      itens={funis.map((funil) => ({
-        id: funil.slug,
-        rotulo: funil.nome,
-        sufixo: funil.noQuadro ? undefined : '(v1)',
-      }))}
+      itens={funis.map((funil) => ({ id: funil.slug, rotulo: funil.nome }))}
     />
   );
 }

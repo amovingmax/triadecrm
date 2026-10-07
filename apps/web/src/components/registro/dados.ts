@@ -52,9 +52,11 @@ export async function carregarContextoDoRegistro(): Promise<ContextoDoRegistro> 
       .eq('is_active', true)
       .order('position'),
     supabase.from('lost_reasons').select('id, slug, name').eq('is_active', true).order('position'),
+    // Sem as aposentadas (07/10/2026): nenhum desfecho aponta mais para elas.
     supabase
       .from('stages')
       .select('id, pipeline_id, slug, name, temperature, required_fields')
+      .is('retired_at', null)
       .order('position'),
     // Um ano de feriados basta: a espera mais longa do catálogo é de 90 dias.
     supabase.from('holidays').select('date').gte('date', hoje).order('date').limit(60),

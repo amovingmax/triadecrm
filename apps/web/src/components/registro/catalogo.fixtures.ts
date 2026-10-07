@@ -49,7 +49,7 @@ export const VIS_DECISOR_INTERESSADO = desfecho({
   position: 303,
   next_action_kind: 'meeting',
   next_action_label: 'Marcar apresentação ou link',
-  target_stage_slug: 'em_conversa',
+  target_stage_slug: 'respondeu',
   sets_temperature: 'quente',
   counts_as: 'aberta',
 });
@@ -107,7 +107,7 @@ export const REU_AUTORIZOU = desfecho({
   next_action_kind: 'message',
   next_action_label: 'Enviar link de cadastro',
   next_action_offset_days: 0,
-  target_stage_slug: 'autorizou',
+  target_stage_slug: 'cadastro_em_andamento',
   sets_temperature: 'quente',
   counts_as: 'aberta',
 });
@@ -171,19 +171,26 @@ export const CATALOGO_DE_TESTE: DesfechoCatalogo[] = [
 /** Etapas do funil `fornecedor` (pipeline 1) que o catálogo de teste alcança. */
 export const ETAPAS_FORNECEDOR = [
   { pipelineId: 1, slug: 'respondeu', nome: 'Respondeu', temperatura: 'morno' as const },
-  { pipelineId: 1, slug: 'em_conversa', nome: 'Em conversa', temperatura: 'morno' as const },
   {
     pipelineId: 1,
     slug: 'reuniao_marcada',
     nome: 'Reunião marcada',
     temperatura: 'quente' as const,
   },
-  { pipelineId: 1, slug: 'autorizou', nome: 'Autorizou', temperatura: 'quente' as const },
+  {
+    pipelineId: 1,
+    slug: 'cadastro_em_andamento',
+    nome: 'Cadastro em andamento',
+    temperatura: 'quente' as const,
+  },
   { pipelineId: 1, slug: 'nutricao', nome: 'Nutrição / dormente', temperatura: 'frio' as const },
   { pipelineId: 1, slug: 'perdido', nome: 'Perdido', temperatura: 'frio' as const },
   { pipelineId: 1, slug: 'optout', nome: 'Opt-out / não contatar', temperatura: 'frio' as const },
-  // O funil `produtor` NÃO tem `em_conversa`: é metade da base, e é o caso que a
-  // previsão precisa acertar sem mentir uma promoção que não vai acontecer.
+  // O funil `produtor` tem etapas próprias: `reuniao_marcada` e `cadastro_em_andamento`
+  // não existem nele com esse nome. É metade da base, e é o caso que a previsão precisa
+  // acertar sem mentir uma promoção que ela não sabe se vai acontecer. (Até 07/10/2026 o
+  // exemplo era `em_conversa`, que saiu do funil: "Interessado" agora leva a
+  // `respondeu`, que os dois funis têm.)
   { pipelineId: 3, slug: 'respondeu', nome: 'Respondeu', temperatura: 'morno' as const },
   { pipelineId: 3, slug: 'nutricao', nome: 'Nutrição / dormente', temperatura: 'frio' as const },
 ];

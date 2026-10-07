@@ -16,13 +16,15 @@
  * é cacheada (é `../use-quadro`), nem o que o `move_deal` aceita (é o Postgres).
  *
  * ---------------------------------------------------------------------------
- * Três funis no seletor, dois quadros
+ * Dois funis, e o quadro começa no contato (07/10/2026)
  * ---------------------------------------------------------------------------
- * O seletor mostra os três funis que existem no banco. Fornecedor e Produtor abrem
- * quadro. Ativação abre a régua de etapas com a contagem real e a explicação de que
- * ele anda por eventos da plataforma Komune (PRD §6, v1): esconder o funil faria o
- * time procurá-lo, e abrir um quadro de sete colunas onde ninguém pode arrastar nada
- * ensinaria a coisa errada.
+ * O seletor mostra os dois funis de captação: Fornecedor e Produtor. A aba de
+ * Ativação saiu — ela não abria quadro, só uma régua de contagens, todas zero.
+ *
+ * E o quadro deixou de ter a coluna de quem ainda não foi contatado
+ * ("Prospectado", "Identificado"): essa gente mora na lista de Prospectados, e
+ * sobe para "Contatado" sozinha na primeira mensagem enviada. Por isso o total do
+ * cabeçalho é o de quem JÁ está no funil, não o da base.
  *
  * ---------------------------------------------------------------------------
  * A URL é o estado
@@ -40,7 +42,6 @@ import { usePapel } from '@/components/cadencias/usar-papel';
 
 import {
   chaveDoQuadro,
-  ehFunilDoQuadro,
   FILTROS_QUADRO_PADRAO,
   temRecorteNoQuadro,
   urlDosFiltrosQuadro,
@@ -54,7 +55,6 @@ import { carregarFunisDisponiveis, CHAVE_FUNIS_DISPONIVEIS } from './consultas';
 import {
   ErroDoQuadro,
   EsqueletoQuadro,
-  PainelDeAtivacao,
   QuadroVazio,
   QuadroVazioPorFiltro,
 } from './estados-quadro';
@@ -92,7 +92,6 @@ export function TelaFunis({ filtrosIniciais }: { filtrosIniciais: FiltrosQuadro 
   );
 
   const quadro = useQuadro(filtros, funilAtual?.id ?? null);
-  const abreQuadro = ehFunilDoQuadro(filtros.funil);
 
   const trocarFunil = useCallback((slug: string) => {
     // Trocar de funil zera o recorte de etapa: id de etapa não atravessa funil.
@@ -124,8 +123,6 @@ export function TelaFunis({ filtrosIniciais }: { filtrosIniciais: FiltrosQuadro 
             <p className="text-sm text-muted-foreground">
               {quadro.isPending || funis.isPending ? (
                 'Carregando o quadro...'
-              ) : !abreQuadro ? (
-                'Este funil anda por eventos da plataforma Komune.'
               ) : (
                 <>
                   <span className="numerico">{total}</span>
@@ -148,16 +145,14 @@ export function TelaFunis({ filtrosIniciais }: { filtrosIniciais: FiltrosQuadro 
           aoEscolher={(funil) => trocarFunil(funil.slug)}
         />
 
-        {abreQuadro ? (
-          <FiltrosDoQuadro
-            q={filtros.q}
-            apenasMeus={filtros.apenasMeus}
-            canal={filtros.canal}
-            aoBuscar={(q) => setFiltros((atual) => ({ ...atual, q }))}
-            aoTrocarDono={(apenasMeus) => setFiltros((atual) => ({ ...atual, apenasMeus }))}
-            aoTrocarCanal={(canal) => setFiltros((atual) => ({ ...atual, canal }))}
-          />
-        ) : null}
+        <FiltrosDoQuadro
+          q={filtros.q}
+          apenasMeus={filtros.apenasMeus}
+          canal={filtros.canal}
+          aoBuscar={(q) => setFiltros((atual) => ({ ...atual, q }))}
+          aoTrocarDono={(apenasMeus) => setFiltros((atual) => ({ ...atual, apenasMeus }))}
+          aoTrocarCanal={(canal) => setFiltros((atual) => ({ ...atual, canal }))}
+        />
       </header>
 
       <section
@@ -175,11 +170,6 @@ export function TelaFunis({ filtrosIniciais }: { filtrosIniciais: FiltrosQuadro 
           <EsqueletoQuadro />
         ) : quadro.isError ? (
           <ErroDoQuadro causa={quadro.error} aoTentar={() => void quadro.refetch()} />
-        ) : !abreQuadro ? (
-          <PainelDeAtivacao
-            etapas={quadro.data.stages}
-            nomeDoFunil={funilAtual?.nome ?? quadro.data.pipeline.name}
-          />
         ) : total === 0 && comRecorte ? (
           <QuadroVazioPorFiltro
             descricao={descreverRecorte(filtros)}

@@ -106,12 +106,20 @@ describe('a previsão copia a regra do banco, não a reimplementa', () => {
     const previsao = preverRegistro(VIS_DECISOR_INTERESSADO, entrada);
     expect(previsao.temperatura).toBe('quente');
     expect(previsao.moveEtapa).toBe(true);
-    expect(previsao.etapaDestino?.nome).toBe('Em conversa');
+    expect(previsao.etapaDestino?.nome).toBe('Respondeu');
     expect(previsao.portaAberta).toBe(true);
   });
 
-  it('no funil produtor a etapa não existe, e a previsão não mente uma promoção', () => {
+  it('"Interessado" tem para onde ir também no funil produtor: Respondeu existe nos dois', () => {
+    // Até 07/10/2026 o destino era "Em conversa", que o produtor nunca teve.
     const previsao = preverRegistro(VIS_DECISOR_INTERESSADO, { ...entrada, pipelineId: 3 });
+    expect(previsao.moveEtapa).toBe(true);
+    expect(previsao.etapaDestino?.nome).toBe('Respondeu');
+    expect(previsao.temperatura).toBe('quente');
+  });
+
+  it('no funil produtor a etapa não existe, e a previsão não mente uma promoção', () => {
+    const previsao = preverRegistro(LIG_REUNIAO_MARCADA, { ...entrada, pipelineId: 3 });
     expect(previsao.moveEtapa).toBe(false);
     expect(previsao.etapaDestino).toBeNull();
     // A temperatura declarada pelo catálogo continua valendo: é `deals.last_intent`

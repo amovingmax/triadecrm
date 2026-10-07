@@ -27,6 +27,7 @@ import {
   ehFunilDoQuadro,
   moverNegocioSchema,
   pedidoQuadroSchema,
+  type FunilSlug,
   type ItemHistoricoEtapa,
   type PedidoMover,
   type PedidoQuadro,
@@ -40,27 +41,22 @@ export type MotivoDePerda = { id: number; nome: string };
 /** Um funil do CRM, do jeito que o seletor da página precisa. */
 export type FunilDisponivel = {
   id: number;
-  slug: string;
+  slug: FunilSlug;
   nome: string;
-  /**
-   * `false` para o funil de ativação: as etapas dele são consequência de eventos da
-   * plataforma Komune (publicou, recebeu lead, contratou), não de trabalho manual —
-   * o PRD §6 põe "Funil 2 automático por eventos da Komune" na v1. Ele aparece no
-   * seletor porque existe e o time pergunta por ele; o que não aparece é um quadro
-   * onde ninguém pode arrastar nada.
-   */
-  noQuadro: boolean;
 };
 
 /** Chave de cache do catálogo de funis. */
 export const CHAVE_FUNIS_DISPONIVEIS = ['funis-disponiveis'] as const;
 
 /**
- * Os funis do CRM, na ordem em que o seletor os mostra.
+ * Os funis que abrem quadro, na ordem em que o seletor os mostra.
  *
  * `pipeline_board` recebe `p_pipeline_id` (int) e a URL guarda o slug: alguém precisa
- * traduzir um no outro. São três linhas com leitura liberada a todo autenticado
+ * traduzir um no outro. São poucas linhas com leitura liberada a todo autenticado
  * (`pipelines_select`), cacheadas por uma hora — funil não nasce durante o expediente.
+ *
+ * O funil de ativação existe no banco e fica de fora daqui (07/10/2026): ver
+ * `FUNIS_NO_QUADRO`.
  */
 export async function carregarFunisDisponiveis(): Promise<FunilDisponivel[]> {
   const supabase = createClient();
@@ -71,12 +67,9 @@ export async function carregarFunisDisponiveis(): Promise<FunilDisponivel[]> {
 
   if (error) throw error;
 
-  return (data ?? []).map((funil) => ({
-    id: funil.id,
-    slug: funil.slug,
-    nome: funil.name,
-    noQuadro: ehFunilDoQuadro(funil.slug),
-  }));
+  return (data ?? []).flatMap((funil) =>
+    ehFunilDoQuadro(funil.slug) ? [{ id: funil.id, slug: funil.slug, nome: funil.name }] : [],
+  );
 }
 
 /** Chave de cache do catálogo de motivos de perda. */

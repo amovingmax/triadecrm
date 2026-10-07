@@ -190,7 +190,7 @@ describe('a resposta do banco', () => {
     task_id: 'c8c07aae-6aef-4ac1-9853-20c00c1f1a83',
     outcome_slug: 'vis_decisor_interessado',
     etapa_antes: 'Prospectado',
-    etapa_depois: 'Em conversa',
+    etapa_depois: 'Respondeu',
     etapa_aplicada: true,
     etapa_recusa: null,
     assumiu_negocio: true,

@@ -363,11 +363,11 @@ describe('parceiro ou cliente no cartão', () => {
     const ficha = {
       nome: 'Jôsy Buffet',
       categoria: 'Buffet adulto/corporativo',
-      etapa: 'Autorizou',
+      etapa: 'Cadastro em andamento',
     };
     expect(contextoDoAviso(parceiro, ficha)).toEqual({
       texto: 'Buffet adulto/corporativo',
-      destaque: 'Autorizou',
+      destaque: 'Cadastro em andamento',
     });
   });
 
