@@ -117,8 +117,9 @@ create function pg_temp.dia() returns date language sql stable as $$
   select d from dia74
 $$;
 
--- Um negócio em `em_conversa` (posição 4) e outro já em
--- `apresentacao_realizada` (posição 6), que é o que prova o "só para a frente".
+-- Um negócio em `respondeu` (posição 3; era `em_conversa`, que saiu do funil em
+-- 07/10/2026) e outro já em `apresentacao_realizada` (posição 6), que é o que
+-- prova o "só para a frente".
 create function pg_temp.nascer_deal(p_org uuid, p_slug text, p_dono uuid) returns uuid
 language plpgsql as $$
 declare v_id uuid;
@@ -131,7 +132,7 @@ begin
 end $$;
 
 insert into fixt74(chave, id) values
-  ('negocio',           pg_temp.nascer_deal(pg_temp.org(),  'em_conversa',            pg_temp.dono())),
+  ('negocio',           pg_temp.nascer_deal(pg_temp.org(),  'respondeu',              pg_temp.dono())),
   ('negocio_adiantado', pg_temp.nascer_deal(pg_temp.org2(), 'apresentacao_realizada', pg_temp.dono()));
 create function pg_temp.negocio() returns uuid language sql as $$
   select id from fixt74 where chave='negocio' $$;

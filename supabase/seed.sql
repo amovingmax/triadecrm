@@ -414,7 +414,8 @@ on conflict (name) do update
 --        em minutos (Respondeu: 15 min / 10 min) a coluna guarda 1 (granularidade) e o
 --        valor real fica em automations.
 --      * required_fields = [{"field","label",...}] exigidos para ENTRAR na etapa
---        (RF-FUN-04: Reunião marcada = data e formato; Autorizou = evidência; Perdido = motivo).
+--        (RF-FUN-04: Reunião marcada = data e formato; Perdido = motivo; a evidência da
+--        autorização é declarada em Cadastro em andamento e em Parceria aceita).
 --        `consent_kind` = o valor digitado VIRA `consent_events` (é a prova de LGPD que
 --        libera o pré-cadastro). `"required": false` = declarado só para virar prova
 --        quando vier; não barra a entrada. Quem lê: a tela, `public.move_deal` e o
@@ -428,6 +429,14 @@ on conflict (name) do update
 --        porque reabre por decisão humana com motivo após 90 dias (PRD §5.3).
 --      * Nutrição/dormente, Perdido e Opt-out (e Em risco) ficam nas posições 90/98/99 para
 --        não colidir com a ordem das etapas de trabalho.
+--      * O FUNIL COMEÇA NO CONTATO (07/10/2026, migração 20261007100000). Prospectado
+--        (fornecedor) e Identificado (produtor) são a ETAPA DE ENTRADA (`is_entry`,
+--        derivada do slug aqui embaixo): o negócio nasce nelas, mas elas não são coluna
+--        do quadro — quem ainda não foi contatado mora na lista de Prospectados. "Em
+--        conversa" e "Autorizou" saíram do funil fornecedor: a seed não as cria mais, e
+--        em produção elas continuam como linha aposentada (`retired_at`), pela história.
+--        As posições 4 e 7 ficam vagas DE PROPÓSITO: são as que as duas aposentadas
+--        ainda ocupam em produção, e a seed espelha a produção.
 -- =====================================================================
 insert into public.pipelines (slug, name, kind, position) values
   ('fornecedor', 'Captação de fornecedor',           'fornecedor', 1),
@@ -441,13 +450,16 @@ on conflict (slug) do update
 -- na seed fica com posição negativa (visível como órfã) em vez de ser apagada — deals apontam para ela.
 update public.stages set position = -position where position > 0;
 
-insert into public.stages (pipeline_id, slug, name, position, temperature, is_won, is_lost, is_dormant, is_optout, is_terminal, sla_hours, required_fields, automations)
+insert into public.stages (pipeline_id, slug, name, position, temperature, is_won, is_lost, is_dormant, is_optout, is_entry, is_terminal, sla_hours, required_fields, automations)
 select p.id, s.slug, s.name, s.position, s.temperature::app.temperature, s.is_won, s.is_lost,
        -- is_dormant e is_optout são derivados do slug (as duas etapas existem com o mesmo nome
        -- nos Funis 1 e 3): entrar em 'nutricao' põe o negócio em status 'nurturing' (Frio, PRD
        -- §5.6) e 'optout' é perda por regra, sem motivo da lista fechada (PRD §5.3).
        s.slug = 'nutricao' as is_dormant,
        s.slug = 'optout'   as is_optout,
+       -- A etapa de entrada de cada funil de captação (migração 20261007100000). O
+       -- "publicado" do funil de ativação não é: lá ninguém nasce por cadastro.
+       s.slug in ('prospectado', 'identificado') as is_entry,
        s.is_terminal, s.sla_hours,
        s.required_fields::jsonb, s.automations::jsonb
 from (values
@@ -477,16 +489,10 @@ from (values
     {"trigger":{"type":"on_intent","intents":["interessado"]},"action":{"type":"send_sequence","templates":["SYS-PRE-AUDIO","{SEG}-AUD-1","SYS-POS-AUDIO","GEN-SYS-PEDIDO-AUTORIZACAO"],"approval":"human"},"note":"Texto fixo + áudio da Heloísa + pedido de autorização do pré-cadastro como 2ª mensagem (RF-CON-21)"},
     {"trigger":{"type":"on_intent","intents":["*"]},"action":{"type":"draft_reply","approval":"human"},"note":"Demais intenções: resposta fixa ou IA, sempre como rascunho aprovado (RF-CON-22)"},
     {"trigger":{"type":"on_enter"},"action":{"type":"assign_conversation","to":"owner"},"note":"Conversa atribuída (RF-CON-04)"},
-    {"trigger":{"type":"on_enter"},"action":{"type":"create_task","kind":"message","assignee":"owner","sla_minutes":15},"note":"SLA humano: 15 min em horário comercial (sla_hours guarda 1 por granularidade)"}
-  ]$j$),
-
-  ('fornecedor', 'em_conversa', 'Em conversa', 4, 'morno', false, false, false, 24, '[]', $j$[
-    {"trigger":{"type":"on_enter"},"action":{"type":"send_template","template":"{SEG}-CTA-1","slots":{"manha":"meet","tarde":"visita_na_zona_do_dia"},"approval":"human"},"note":"CTA com 2 horários concretos em 24 h"},
-    {"trigger":{"type":"on_enter"},"action":{"type":"ai_fill_form","form":"space","fallback":"task_owner","blocks_scheduling":false},"note":"SPACE preenchido pela IA a partir da conversa ou tarefa obrigatória do responsável antes da reunião"},
-    {"trigger":{"type":"on_intent","intents":["agendamento_aceito"]},"action":{"type":"move_stage","to":"reuniao_marcada"}},
-    {"trigger":{"type":"on_intent","intents":["autoriza_pre_cadastro"]},"action":{"type":"move_stage","to":"autorizou"},"note":"Caminho curto sem reunião (RF-CON-21)"},
-    {"trigger":{"type":"on_idle","days":7},"action":{"type":"alert","to":"owner","set_temperature":"morno","task":"reengajar"},"note":"7 dias sem contato → alerta e volta a Morno (PRD §5.6)"},
-    {"trigger":{"type":"on_idle","days":14},"action":{"type":"move_stage","to":"nutricao"}}
+    {"trigger":{"type":"on_enter"},"action":{"type":"create_task","kind":"message","assignee":"owner","sla_minutes":15},"note":"SLA humano: 15 min em horário comercial (sla_hours guarda 1 por granularidade)"},
+    {"trigger":{"type":"on_intent","intents":["agendamento_aceito"]},"action":{"type":"move_stage","to":"reuniao_marcada"},"note":"Veio de \"Em conversa\", que saiu do funil em 07/10/2026: a conversa inteira acontece em Respondeu"},
+    {"trigger":{"type":"on_intent","intents":["autoriza_pre_cadastro"]},"action":{"type":"move_stage","to":"cadastro_em_andamento"},"note":"Caminho curto sem reunião (RF-CON-21)"},
+    {"trigger":{"type":"on_idle","days":14},"action":{"type":"move_stage","to":"nutricao"},"note":"14 dias sem contato → dormente"}
   ]$j$),
 
   ('fornecedor', 'reuniao_marcada', 'Reunião marcada', 5, 'quente', false, false, false, 24,
@@ -497,7 +503,7 @@ from (values
     {"trigger":{"type":"before_appointment","hours":24},"action":{"type":"send_template","template":"GEN-AGD-24H-*"}},
     {"trigger":{"type":"before_appointment","hours":1},"action":{"type":"send_template","template":"GEN-AGD-1H-*"}},
     {"trigger":{"type":"on_no_show","count":1},"action":{"type":"reschedule","within_hours":24,"templates":["GEN-AGD-NOSHOW-1","GEN-AGD-NOSHOW-2"]},"note":"Humano tenta ligar antes"},
-    {"trigger":{"type":"on_no_show","count":2},"action":{"type":"move_stage","to":"em_conversa","note_required":true},"note":"2º no-show → humano liga; volta a Em conversa com nota"},
+    {"trigger":{"type":"on_no_show","count":2},"action":{"type":"move_stage","to":"respondeu","note_required":true},"note":"2º no-show → humano liga; volta a Respondeu com nota"},
     {"trigger":{"type":"on_no_show","count":3},"action":{"type":"move_stage","to":"nutricao","reason":"no-show recorrente"}},
     {"trigger":{"type":"on_appointment_done"},"action":{"type":"move_stage","to":"apresentacao_realizada"}}
   ]$j$),
@@ -510,20 +516,18 @@ from (values
     {"trigger":{"type":"on_idle","days":5},"action":{"type":"alert","level":"vermelho","to":"owner"}}
   ]$j$),
 
-  ('fornecedor', 'autorizou', 'Autorizou', 7, 'quente', false, false, false, 72,
-   $j$[{"field":"authorization_evidence","label":"O que ele autorizou, com as palavras dele (a frase, a data e por onde veio)","consent_kind":"data_use_authorized"}]$j$,
+  -- A evidência da autorização mora AQUI desde 07/10/2026 (a etapa "Autorizou" saiu
+  -- do funil). `"required": false` pelo mesmo motivo de "Parceria aceita", mais
+  -- abaixo: dois desfechos chegam a esta etapa — "Realizada, autorizou", que traz a
+  -- frase (e `registrar_contato` a exige), e "Cadastro iniciado na hora", de visita,
+  -- que não colhe frase nenhuma. Quando vem, vira `consent_events`; quando não vem, a
+  -- etapa não barra — quem barra o pré-cadastro é `gerar_link_de_reivindicacao` e
+  -- `komune_push`, com `sem_autorizacao`.
+  ('fornecedor', 'cadastro_em_andamento', 'Cadastro em andamento', 8, 'quente', false, false, false, 72,
+   $j$[{"field":"authorization_evidence","label":"O que ele autorizou, com as palavras dele (a frase, a data e por onde veio)","consent_kind":"data_use_authorized","required":false}]$j$,
    $j$[
-    {"trigger":{"type":"on_enter"},"action":{"type":"pre_registration_upsert","edge_function":"crm-pre-registration"},"note":"Cria/atualiza o rascunho na Komune SÓ com autorização em consent_events (guardrail)"},
-    {"trigger":{"type":"on_enter"},"action":{"type":"send_claim_link","channel":"whatsapp","code_channel":"email","template":"GEN-SYS-AVISO-PRECADASTRO"},"note":"Link único de reivindicação + código (v1: código pelo WhatsApp)"},
-    {"trigger":{"type":"after_enter","hours":24},"action":{"type":"task_with_text","template":"GEN-ONB-D1-NAO-ABRIU"},"note":"MVP: lembretes como tarefas humanas com texto pronto (RF-CON-16)"},
-    {"trigger":{"type":"after_enter","hours":72},"action":{"type":"task_with_text","template":"GEN-ONB-D3","audio":"cobranca_cadastro_1"}},
-    {"trigger":{"type":"after_enter","days":7},"action":{"type":"create_task","kind":"call","assignee":"owner"},"note":"Ligação ou visita em 7 dias"},
-    {"trigger":{"type":"after_enter","days":20},"action":{"type":"task_with_text","template":"GEN-ONB-D14"},"note":"Aviso final antes da expiração do rascunho"},
-    {"trigger":{"type":"after_enter","days":30},"action":{"type":"expire_draft"},"note":"Rascunho não reivindicado expira em D+30 (PRD §10.6)"},
-    {"trigger":{"type":"on_platform_event","event":"claimed"},"action":{"type":"move_stage","to":"cadastro_em_andamento"}}
-  ]$j$),
-
-  ('fornecedor', 'cadastro_em_andamento', 'Cadastro em andamento', 8, 'quente', false, false, false, 72, '[]', $j$[
+    {"trigger":{"type":"on_enter"},"action":{"type":"pre_registration_upsert","edge_function":"crm-pre-registration"},"note":"Cria/atualiza o rascunho na Komune SÓ com autorização em consent_events (guardrail). Veio de \"Autorizou\""},
+    {"trigger":{"type":"on_enter"},"action":{"type":"send_claim_link","channel":"whatsapp","code_channel":"email","template":"GEN-SYS-AVISO-PRECADASTRO"},"note":"Link único de reivindicação + código (v1: código pelo WhatsApp). Veio de \"Autorizou\""},
     {"trigger":{"type":"on_enter"},"action":{"type":"start_cadence","cadence":"onboarding","mode":"tarefa_humana","steps":[{"day":1,"template":"GEN-ONB-D1"},{"day":3,"template":"GEN-ONB-D3"},{"day":7,"template":"GEN-ONB-D7"},{"day":14,"template":"GEN-ONB-D14"}]},"note":"Perturbar com educação: cita o campo que falta, lido da plataforma"},
     {"trigger":{"type":"on_platform_event","event":"stuck_step"},"action":{"type":"task_with_text","template":"GEN-ONB-TRAVOU"}},
     {"trigger":{"type":"on_idle","days":3},"action":{"type":"flag_stuck","label":"perturbar"}},
@@ -646,14 +650,15 @@ from (values
 
   -- A evidência da autorização também aqui (laudo §3.1): é para ESTA etapa que
   -- `app.stage_for` resolve o desfecho "Realizada, autorizou" no funil produtor
-  -- (stage_equivalences, migração 20260904001200), e sem `consent_kind` a frase
+  -- (`cadastro_em_andamento` → `parceria_aceita` em stage_equivalences), e sem
+  -- `consent_kind` a frase
   -- literal que a Heloísa é OBRIGADA a digitar era descartada em silêncio —
   -- metade da base chegava ao pré-cadastro com `sem_autorizacao` e ninguém
   -- sabia por quê.
-  --   `"required": false` porque "Parceria aceita" é o destino de dois slugs
-  --   canônicos: `autorizou` (traz a evidência) e `cadastro_em_andamento` (o
-  --   desfecho "Cadastro iniciado na hora" de uma visita, que não coleta frase
-  --   nenhuma). Exigir aqui deixaria esse chip intabulável no funil produtor.
+  --   `"required": false` porque "Parceria aceita" é o destino de dois desfechos:
+  --   "Realizada, autorizou" (traz a evidência) e "Cadastro iniciado na hora", de
+  --   uma visita, que não coleta frase nenhuma. Exigir aqui deixaria esse chip
+  --   intabulável no funil produtor.
   --   Quando a evidência vem, vira `consent_events`; quando não vem, a etapa
   --   não é barrada por isso — e quem barra o pré-cadastro continua sendo
   --   `gerar_link_de_reivindicacao`, `komune_push` e a cadência
@@ -722,6 +727,7 @@ on conflict (pipeline_id, slug) do update
       is_lost         = excluded.is_lost,
       is_dormant      = excluded.is_dormant,
       is_optout       = excluded.is_optout,
+      is_entry        = excluded.is_entry,
       is_terminal     = excluded.is_terminal,
       sla_hours       = excluded.sla_hours,
       required_fields = excluded.required_fields,
@@ -1287,21 +1293,21 @@ insert into public.interaction_outcomes
   ('lig_caixa_postal',       'Caixa postal',               '{ligacao}',      202, true,     1, true,  'call',      'Ligar D+1',                  1, null,                    null,     false, 'batida'),
   ('lig_numero_errado',      'Número errado',              '{ligacao}',      203, true, 36500, false, 'other',     'Buscar outro canal',         0, null,                    null,     false, 'nenhuma'),
   ('lig_atendeu_retorna',    'Atendeu, retorna depois',    '{ligacao}',      204, true,     2, true,  'call',      'Ligar na data combinada', null, null,                    'morno',  false, 'aberta'),
-  ('lig_interessado',        'Interessado',                '{ligacao}',      205, true,     0, true,  'meeting',   'Marcar apresentação',     null, 'em_conversa',           'quente', false, 'aberta'),
+  ('lig_interessado',        'Interessado',                '{ligacao}',      205, true,     0, true,  'meeting',   'Marcar apresentação',     null, 'respondeu',             'quente', false, 'aberta'),
   ('lig_agora_nao',          'Agora não',                  '{ligacao}',      206, true,    30, true,  'message',   'Reativar com gancho',       30, 'nutricao',              'frio',   false, 'aberta'),
   ('lig_sem_interesse',      'Sem interesse',              '{ligacao}',      207, true,    90, false, null,        null,                      null, 'perdido',               null,     true,  'aberta'),
   ('lig_reuniao_marcada',    'Reunião marcada',            '{ligacao}',      208, true,     0, true,  'meeting',   'Reunião na data',         null, 'reuniao_marcada',       'quente', false, 'aberta'),
   -- ---------- Visita (7) — templates de visita do R07 §5 ----------
   ('vis_nao_estava',         'Não estava / fechado',       '{visita}',       301, true,     7, true,  'visit',     'Visitar D+7 na zona',        7, null,                    null,     false, 'batida'),
   ('vis_funcionario',        'Falei com funcionário',      '{visita}',       302, true,     2, true,  'call',      'Ligar ao decisor D+2',       2, null,                    null,     false, 'batida'),
-  ('vis_decisor_interessado','Decisor interessado',        '{visita}',       303, true,     0, true,  'meeting',   'Marcar apresentação ou link', null, 'em_conversa',        'quente', false, 'aberta'),
+  ('vis_decisor_interessado','Decisor interessado',        '{visita}',       303, true,     0, true,  'meeting',   'Marcar apresentação ou link', null, 'respondeu',          'quente', false, 'aberta'),
   ('vis_decisor_agora_nao',  'Decisor, agora não',         '{visita}',       304, true,    30, true,  'message',   'Reativar com gancho',       30, 'nutricao',              'frio',   false, 'aberta'),
   ('vis_decisor_recusou',    'Decisor recusou',            '{visita}',       305, true,    90, false, null,        null,                      null, 'perdido',               null,     true,  'aberta'),
   ('vis_cadastro_iniciado',  'Cadastro iniciado na hora',  '{visita}',       306, true,     3, true,  'follow_up', 'Retomar o cadastro D+3',     3, 'cadastro_em_andamento', 'quente', false, 'aberta'),
   ('vis_sem_perfil',         'Sem perfil (fora do ICP)',   '{visita}',       307, true, 36500, false, null,        null,                      null, 'perdido',               null,     true,  'batida'),
   -- ---------- Reunião (6) ----------
   ('reu_interessado',        'Realizada, interessado',     '{reuniao}',      401, true,     0, true,  'message',   'Pedir autorização hoje',     0, 'apresentacao_realizada','quente', false, 'aberta'),
-  ('reu_autorizou',          'Realizada, autorizou',       '{reuniao}',      402, true,     0, true,  'message',   'Enviar link de cadastro',    0, 'autorizou',             'quente', false, 'aberta'),
+  ('reu_autorizou',          'Realizada, autorizou',       '{reuniao}',      402, true,     0, true,  'message',   'Enviar link de cadastro',    0, 'cadastro_em_andamento', 'quente', false, 'aberta'),
   ('reu_objecao',            'Realizada, com objeção',     '{reuniao}',      403, true,     1, true,  'follow_up', 'Follow-up D+1',              1, 'apresentacao_realizada','quente', false, 'aberta'),
   ('reu_nao',                'Realizada, não',             '{reuniao}',      404, true,    90, false, null,        null,                      null, 'perdido',               null,     true,  'aberta'),
   ('reu_no_show',            'No-show',                    '{reuniao}',      405, true,     1, true,  'meeting',   'Reagendar em 24 h',          1, null,                    null,     false, 'batida'),
@@ -1376,16 +1382,16 @@ update public.interaction_outcomes
 -- 12b. Equivalência de etapas entre funis (RF-FUN-12; PRD §5.3 ↔ §5.5)
 --
 --     `interaction_outcomes.target_stage_slug` é escrito no vocabulário do funil
---     FORNECEDOR (é o que a autoverificação do bloco 13 confere). Cinco desses
+--     FORNECEDOR (é o que a autoverificação do bloco 13 confere). Três desses
 --     destinos não existem no funil produtor, que tem etapas próprias — sem esta
---     tabela, os 8 desfechos que levam a Quente não moviam etapa nenhuma na metade
---     da base que é produtor ou cerimonialista. `app.stage_for` (migração 001200)
---     prefere sempre o slug literal e só cai aqui quando ele não existe no funil.
+--     tabela, os desfechos que levam a Quente não moviam etapa nenhuma na metade
+--     da base que é produtor ou cerimonialista. `app.stage_for` prefere sempre o
+--     slug literal e só cai aqui quando ele não existe no funil.
 --
---     em_conversa NÃO tem linha aqui de propósito: o funil produtor não tem etapa
---     equivalente (PRD §5.5 vai de "Respondeu" direto a "Demonstração marcada").
---     `lig_interessado` e `vis_decisor_interessado` esquentam nesse funil pela
---     intenção que declaram (`sets_temperature = quente`), não pela etapa.
+--     Eram quatro linhas até 07/10/2026: `autorizou` → `parceria_aceita` saiu junto
+--     com a etapa "Autorizou" (migração 20261007100000). E o caso `em_conversa`,
+--     que o funil produtor nunca teve, deixou de existir: "Interessado" agora leva
+--     a `respondeu`, que os dois funis têm.
 -- =====================================================================
 insert into public.stage_equivalences (pipeline_id, canonical_slug, stage_slug, note)
 select p.id, v.canonical_slug, v.stage_slug, v.note
@@ -1394,10 +1400,8 @@ select p.id, v.canonical_slug, v.stage_slug, v.note
      'PRD §5.3 linha 5 ↔ §5.5 linha 4: data e formato confirmados.'),
     ('produtor', 'apresentacao_realizada', 'demonstracao_realizada',
      'PRD §5.3 linha 6 ↔ §5.5 linha 5: encontro feito, resultado registrado.'),
-    ('produtor', 'autorizou',              'parceria_aceita',
-     'PRD §5.3 linha 7 ↔ §5.5 linha 6: o sim registrado.'),
     ('produtor', 'cadastro_em_andamento',  'parceria_aceita',
-     'PRD §5.5 linha 6: a automação de "Parceria aceita" é a criação assistida da conta.')
+     'PRD §5.5 linha 6: o sim registrado e a criação assistida da conta.')
   ) as v(pipeline, canonical_slug, stage_slug, note)
   join public.pipelines p on p.slug = v.pipeline
 on conflict (pipeline_id, canonical_slug) do update
@@ -1687,7 +1691,7 @@ begin
 
   if n_cat <> 19 then raise exception 'seed: esperadas 19 categorias, encontradas %', n_cat; end if;
   if n_pipe <> 3 then raise exception 'seed: esperados 3 funis, encontrados %', n_pipe; end if;
-  if n_forn < 12 then raise exception 'seed: funil fornecedor com % etapas (esperadas 12)', n_forn; end if;
+  if n_forn < 10 then raise exception 'seed: funil fornecedor com % etapas (esperadas 10)', n_forn; end if;
   if n_ativ < 7  then raise exception 'seed: funil ativacao com % etapas (esperadas 7)', n_ativ; end if;
   if n_prod < 14 then raise exception 'seed: funil produtor com % etapas (esperadas 14)', n_prod; end if;
   if n_hol  < 16 then raise exception 'seed: % feriados de % (esperados ao menos 16)', n_hol, ano; end if;
@@ -1696,7 +1700,7 @@ begin
   if n_lost <> 9 then raise exception 'seed: esperados 9 motivos de perda, encontrados %', n_lost; end if;
   if n_out <> 34 then raise exception 'seed: esperados 34 desfechos de interação, encontrados %', n_out; end if;
   if n_sup > 8   then raise exception 'seed: superfície com % desfechos ativos (máximo 8, RF-MET-06)', n_sup; end if;
-  if n_eq <> 4   then raise exception 'seed: esperadas 4 equivalências de etapa, encontradas %', n_eq; end if;
+  if n_eq <> 3   then raise exception 'seed: esperadas 3 equivalências de etapa, encontradas %', n_eq; end if;
   if n_map < 23  then raise exception 'seed: mapa de categorias do Radar com % linhas (esperadas ≥ 23, bloco 3b)', n_map; end if;
   -- Piso, e não igualdade, e é de propósito: a tela de resolver categorias
   -- (25/09/2026) dá à equipe uma porta para ensinar nomes novos, gravados
@@ -1727,12 +1731,11 @@ begin
     raise exception 'seed: desfecho com etapa de destino que não existe no funil fornecedor';
   end if;
   -- E no funil PRODUTOR: todo destino tem de resolver, direto ou por equivalência.
-  -- A única ausência aceita é `em_conversa`, que o PRD §5.5 não descreve; qualquer
-  -- outra é regressão do achado "metade da base nunca esquenta".
+  -- Sem exceção desde 07/10/2026 (a ausência aceita era `em_conversa`, que saiu do
+  -- catálogo); qualquer falta é regressão do achado "metade da base nunca esquenta".
   select string_agg(distinct o.target_stage_slug, ', ' order by o.target_stage_slug) into s_eq
     from public.interaction_outcomes o
    where o.is_active and o.target_stage_slug is not null
-     and o.target_stage_slug <> 'em_conversa'
      and not exists (select 1 from app.stage_for(
                        (select id from public.pipelines where slug = 'produtor'),
                        o.target_stage_slug));
@@ -1741,6 +1744,12 @@ begin
   end if;
   if exists (select 1 from public.stages where position < 0) then
     raise warning 'seed: há etapas órfãs (posição negativa) que não constam mais da seed';
+  end if;
+  -- Uma etapa de entrada por funil de captação: é nela que `quick_create_organization`
+  -- e `app.promover_candidato` fazem o negócio nascer (a primeira por posição).
+  if (select count(*) from public.stages s join public.pipelines p on p.id = s.pipeline_id
+       where s.is_entry and p.slug in ('fornecedor', 'produtor') and s.position = 1) <> 2 then
+    raise exception 'seed: cada funil de captação precisa de uma etapa de entrada na posição 1';
   end if;
 
   raise notice 'seed ok (Radar): % categorias do Casamentos.com.br mapeadas', n_map;

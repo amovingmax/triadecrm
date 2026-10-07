@@ -89,14 +89,14 @@ insert into auth.users (id, email, raw_user_meta_data) values
 insert into public.organizations (id, name, phone_e164, source_id) values
   (pg_temp.org('61'), 'W46 Buffet Prospectado', '+5584999994661', (select id from public.sources where slug = 'google_places')),
   (pg_temp.org('62'), 'W46 Sem Telefone',       null,             (select id from public.sources where slug = 'planilha')),
-  (pg_temp.org('63'), 'W46 Em Conversa',        '+5584999994663', (select id from public.sources where slug = 'google_places'));
+  (pg_temp.org('63'), 'W46 Reunião Marcada',    '+5584999994663', (select id from public.sources where slug = 'google_places'));
 insert into public.organization_categories (organization_id, category_id, is_primary)
 select o, (select id from public.categories where slug = 'buffet_adulto_corporativo'), true
   from unnest(array[pg_temp.org('61'), pg_temp.org('62'), pg_temp.org('63')]) o;
 insert into public.deals (organization_id, pipeline_id, stage_id) values
   (pg_temp.org('61'), (select id from public.pipelines where slug = 'fornecedor'), pg_temp.etapa('fornecedor', 'prospectado')),
   (pg_temp.org('62'), (select id from public.pipelines where slug = 'fornecedor'), pg_temp.etapa('fornecedor', 'prospectado')),
-  (pg_temp.org('63'), (select id from public.pipelines where slug = 'fornecedor'), pg_temp.etapa('fornecedor', 'em_conversa'));
+  (pg_temp.org('63'), (select id from public.pipelines where slug = 'fornecedor'), pg_temp.etapa('fornecedor', 'reuniao_marcada'));
 
 -- Fora de uso desde 22/09/2026 (só o cumprimento abre conversa); o teste reativa
 -- porque prova o mecanismo do envio, não o catálogo.
@@ -154,7 +154,7 @@ select is((select a.message_id from public.activities a join public.interaction_
           (select id from public.messages where wa_message_id = 'wamid.W46.A'),
   'C.1: amarrado à primeira mensagem que chegou');
 select is(pg_temp.etapa_da(pg_temp.org('61')), 'respondeu', 'C.1: o negócio vai para Respondeu');
-select is(pg_temp.etapa_da(pg_temp.org('63')), 'em_conversa', 'C.1: negócio já adiante não volta');
+select is(pg_temp.etapa_da(pg_temp.org('63')), 'reuniao_marcada', 'C.1: negócio já adiante não volta');
 select is(pg_temp.n_desfecho(pg_temp.org('63')::uuid, 'wa_respondeu'), 1, 'C.1: mas a resposta fica registrada');
 
 

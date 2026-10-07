@@ -79,7 +79,7 @@ declare v_id uuid;
 begin
   insert into public.deals (organization_id, pipeline_id, stage_id, owner_id)
   select p_org, 1, st.id, p_dono from public.stages st
-   where st.pipeline_id = 1 and st.slug = 'em_conversa'
+   where st.pipeline_id = 1 and st.slug = 'respondeu'
   returning id into v_id;
   return v_id;
 end $$;

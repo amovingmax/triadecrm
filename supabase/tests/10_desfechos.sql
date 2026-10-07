@@ -93,7 +93,7 @@ insert into public.deals (id, organization_id, pipeline_id, stage_id, owner_id) 
   ('d0000000-0000-4000-8000-000000001005', 'b0000000-0000-4000-8000-000000001005', pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor','prospectado'), 'a0000000-0000-4000-8000-000000001003'),
   ('d0000000-0000-4000-8000-000000001006', 'b0000000-0000-4000-8000-000000001006', pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor','prospectado'), 'a0000000-0000-4000-8000-000000001003'),
   ('d0000000-0000-4000-8000-000000001008', 'b0000000-0000-4000-8000-000000001008', pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor','contatado'),   'a0000000-0000-4000-8000-000000001003'),
-  ('d0000000-0000-4000-8000-000000001009', 'b0000000-0000-4000-8000-000000001009', pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor','em_conversa'), 'a0000000-0000-4000-8000-000000001003'),
+  ('d0000000-0000-4000-8000-000000001009', 'b0000000-0000-4000-8000-000000001009', pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor','respondeu'),   'a0000000-0000-4000-8000-000000001003'),
   ('d0000000-0000-4000-8000-000000001011', 'b0000000-0000-4000-8000-000000001011', pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor','contatado'),   'a0000000-0000-4000-8000-000000001003'),
   ('d0000000-0000-4000-8000-000000001014', 'b0000000-0000-4000-8000-000000001014', pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor','contatado'),   'a0000000-0000-4000-8000-000000001003');
 
