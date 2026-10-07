@@ -166,8 +166,8 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
             manda WhatsApp para desconhecido não pode parecer ligar uma luz. */}
         <Interruptor
           id="cumprimento-automatico"
-          titulo="Mandar o cumprimento a quem eu aprovar no Google Maps"
-          descricao="Aprovou no Radar → sai “Bom dia!” sozinho, dentro do horário e do teto do dia."
+          titulo="Saudação inicial (“Bom dia!”, “Boa tarde!”)"
+          descricao="Liga os botões que a mandam: “Aprovar e mandar mensagem” na Revisão e o de Prospectados. Sai dentro do horário e do teto do dia."
           ligado={config.cumprimento_automatico ?? false}
           podeEditar={podeEditar}
           aoMudar={(v) => mudar.mutate({ cumprimento_automatico: v })}

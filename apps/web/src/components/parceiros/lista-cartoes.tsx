@@ -7,6 +7,7 @@ import { RevelarLista, useRevelarLinha } from '@/components/movimento';
 import { EtiquetaEtapa } from '@/components/funis/etapa';
 
 import { formatarLocal, formatarTelefone } from './formatos';
+import { BotaoSaudacao } from './saudacao-botoes';
 import type { LinhaParceiro } from './tipos';
 import { resumoDoContato, TagDoContato } from './ultimo-contato';
 
@@ -45,19 +46,43 @@ import { resumoDoContato, TagDoContato } from './ultimo-contato';
  * `last:border-b-0` casava com TODOS os cartões e a lista de 50 parceiros ficava sem
  * nenhuma fronteira (medido: `border-bottom-width: 0px` em todo `<li>`).
  */
-export function ListaCartoes({ linhas }: { linhas: LinhaParceiro[] }) {
+/**
+ * A saudação no celular (07/10/2026): só o botão da linha. Marcar vários de uma
+ * vez é trabalho de mesa, e mora na tabela.
+ */
+export type SaudacaoNoCartao = {
+  pedidos: ReadonlySet<string>;
+  ocupado: boolean;
+  pedirUm: (id: string) => void;
+};
+
+export function ListaCartoes({
+  linhas,
+  saudacao = null,
+}: {
+  linhas: LinhaParceiro[];
+  saudacao?: SaudacaoNoCartao | null;
+}) {
   return (
     <RevelarLista>
       <ul className="corpo-tabela flex flex-col">
         {linhas.map((linha, indice) => (
-          <Cartao key={linha.id} linha={linha} indice={indice} />
+          <Cartao key={linha.id} linha={linha} indice={indice} saudacao={saudacao} />
         ))}
       </ul>
     </RevelarLista>
   );
 }
 
-function Cartao({ linha, indice }: { linha: LinhaParceiro; indice: number }) {
+function Cartao({
+  linha,
+  indice,
+  saudacao,
+}: {
+  linha: LinhaParceiro;
+  indice: number;
+  saudacao: SaudacaoNoCartao | null;
+}) {
   const revelar = useRevelarLinha(indice);
   const local = formatarLocal(linha.neighborhood, linha.city);
   const contato = resumoDoContato(linha);
@@ -65,11 +90,11 @@ function Cartao({ linha, indice }: { linha: LinhaParceiro; indice: number }) {
   return (
     <li
       {...revelar}
-      className={cn('border-b border-hairline last:border-b-0', revelar.className)}
+      className={cn('flex items-center border-b border-hairline last:border-b-0', revelar.className)}
     >
       <Link
         href={`/parceiros/${linha.id}`}
-        className="relative flex min-h-16 items-center gap-3 py-2.5 pr-3 pl-4 outline-none active:bg-muted/60 focus-visible:bg-muted/60"
+        className="relative flex min-h-16 min-w-0 flex-1 items-center gap-3 py-2.5 pr-3 pl-4 outline-none active:bg-muted/60 focus-visible:bg-muted/60"
       >
         {/* Três linhas, um assunto por linha — a mesma anatomia da tabela:
 
@@ -117,6 +142,17 @@ function Cartao({ linha, indice }: { linha: LinhaParceiro; indice: number }) {
           </div>
         </div>
       </Link>
+      {/* Fora do link: botão dentro de link é toque ambíguo (abre a ficha ou
+          manda?), e o leitor de tela anuncia os dois como uma coisa só. */}
+      {saudacao && linha.phone ? (
+        <BotaoSaudacao
+          nome={linha.name}
+          pedido={saudacao.pedidos.has(linha.id)}
+          ocupado={saudacao.ocupado}
+          aoPedir={() => saudacao.pedirUm(linha.id)}
+          className="mr-2 size-11"
+        />
+      ) : null}
     </li>
   );
 }
