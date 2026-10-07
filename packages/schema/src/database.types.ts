@@ -1012,6 +1012,10 @@ export type Database = {
         Args: { p_numero?: string; p_quando?: string }
         Returns: Json
       }
+      wa_tipo_da_meta: {
+        Args: { p_type: string }
+        Returns: Database["app"]["Enums"]["msg_type"]
+      }
       website_domain: { Args: { u: string }; Returns: string }
     }
     Enums: {
@@ -4729,6 +4733,7 @@ export type Database = {
           status: Database["app"]["Enums"]["msg_status"]
           template_id: number | null
           template_params: Json
+          tipo_na_meta: string | null
           transcript: string | null
           type: Database["app"]["Enums"]["msg_type"]
           wa_message_id: string | null
@@ -4766,6 +4771,7 @@ export type Database = {
           status?: Database["app"]["Enums"]["msg_status"]
           template_id?: number | null
           template_params?: Json
+          tipo_na_meta?: string | null
           transcript?: string | null
           type?: Database["app"]["Enums"]["msg_type"]
           wa_message_id?: string | null
@@ -4803,6 +4809,7 @@ export type Database = {
           status?: Database["app"]["Enums"]["msg_status"]
           template_id?: number | null
           template_params?: Json
+          tipo_na_meta?: string | null
           transcript?: string | null
           type?: Database["app"]["Enums"]["msg_type"]
           wa_message_id?: string | null
