@@ -44,7 +44,7 @@ export function chaveDasMensagensDoFio(fioId: string) {
 }
 
 const COLUNAS_MENSAGEM =
-  'id, conversation_id, organization_id, direction, type, status, body, media_path, media_mime, transcript, template_id, draft_id, author_kind, sent_by, approved_by, is_first_contact, business_initiated, optout_confirmation, origin, error_code, error_detail, created_at, sent_at, delivered_at, read_at, failed_at';
+  'id, conversation_id, organization_id, direction, type, status, body, media_path, media_mime, tipo_na_meta, transcript, template_id, draft_id, author_kind, sent_by, approved_by, is_first_contact, business_initiated, optout_confirmation, origin, error_code, error_detail, created_at, sent_at, delivered_at, read_at, failed_at';
 
 export async function carregarMensagensDoFio(fioId: string): Promise<MensagemCrua[]> {
   const supabase = createClient();

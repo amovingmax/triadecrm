@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Plus, Upload } from 'lucide-react';
@@ -15,7 +15,8 @@ import { ErroDaLista, EsqueletoLista, VazioDeVerdade, VazioPorFiltro } from './e
 import { FolhaCadastroRapido } from './folha-cadastro-rapido';
 import { formatarNumero } from './formatos';
 import { ListaCartoes } from './lista-cartoes';
-import { TabelaParceiros } from './tabela-parceiros';
+import { BarraDaSelecao, useSaudacao } from './saudacao-botoes';
+import { TabelaParceiros, type SaudacaoNaTabela } from './tabela-parceiros';
 import { useEhCelular } from './usar-eh-celular';
 import {
   contarFiltros,
@@ -38,6 +39,7 @@ import {
  */
 /** Lista vazia estável, para não trocar a identidade de `data` a cada renderização. */
 const SEM_LINHAS: LinhaParceiro[] = [];
+const NINGUEM: ReadonlySet<string> = new Set();
 
 export function TelaParceiros({
   catalogos,
@@ -99,6 +101,51 @@ export function TelaParceiros({
   // os modelos da tabela, que dependem da identidade de `data`.
   const linhas = consulta.data?.linhas ?? SEM_LINHAS;
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+
+  // ---- A saudação (07/10/2026) ----
+  // Quem cria parceiro é quem cuida da base, e é quem manda a saudação pela lista
+  // (a função do banco confere o mesmo: admin e gestor).
+  const podeSaudar = podeCriar;
+  const saudacao = useSaudacao();
+  // A marcação vale para o recorte em que foi feita: trocar de página, de filtro
+  // ou de busca começa do zero. Guardada junto da chave do recorte em vez de
+  // zerada num efeito — a marcação "velha" simplesmente deixa de valer.
+  const chaveDoRecorte = JSON.stringify(chaveDaBusca(filtros));
+  const [selecao, setSelecao] = useState<{ chave: string; ids: ReadonlySet<string> }>({
+    chave: '',
+    ids: NINGUEM,
+  });
+  const escolhidos = selecao.chave === chaveDoRecorte ? selecao.ids : NINGUEM;
+  const marcar = useCallback(
+    (ids: readonly string[], marcar: boolean | 'alternar') => {
+      setSelecao((atual) => {
+        const novo = new Set(atual.chave === chaveDoRecorte ? atual.ids : NINGUEM);
+        for (const id of ids) {
+          const fica = marcar === 'alternar' ? !novo.has(id) : marcar;
+          if (fica) novo.add(id);
+          else novo.delete(id);
+        }
+        return { chave: chaveDoRecorte, ids: novo };
+      });
+    },
+    [chaveDoRecorte],
+  );
+  const pedir = saudacao.pedir;
+  const saudacaoNaTabela = useMemo<SaudacaoNaTabela | null>(
+    () =>
+      podeSaudar
+        ? {
+            escolhidos,
+            alternar: (id) => marcar([id], 'alternar'),
+            marcarVarios: (ids, sim) => marcar(ids, sim),
+            marcaveis: linhas.filter((l) => l.phone).map((l) => l.id),
+            pedidos: saudacao.pedidos,
+            ocupado: saudacao.ocupado,
+            pedirUm: (id) => void pedir([id]),
+          }
+        : null,
+    [podeSaudar, escolhidos, marcar, linhas, saudacao.pedidos, saudacao.ocupado, pedir],
+  );
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -197,9 +244,19 @@ export function TelaParceiros({
         ) : linhas.length === 0 ? (
           <VazioDeVerdade aoCadastrar={podeCriar ? () => setFolhaAberta(true) : null} />
         ) : ehCelular ? (
-          <ListaCartoes linhas={linhas} />
+          <ListaCartoes linhas={linhas} saudacao={saudacaoNaTabela} />
         ) : (
-          <TabelaParceiros linhas={linhas} />
+          <>
+            {saudacaoNaTabela ? (
+              <BarraDaSelecao
+                quantos={escolhidos.size}
+                ocupado={saudacao.ocupado}
+                aoMandar={() => pedir([...escolhidos])}
+                aoLimpar={() => marcar([...escolhidos], false)}
+              />
+            ) : null}
+            <TabelaParceiros linhas={linhas} saudacao={saudacaoNaTabela} />
+          </>
         )}
       </section>
 

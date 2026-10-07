@@ -80,6 +80,8 @@ export type MensagemCrua = {
   body: string | null;
   media_path: string | null;
   media_mime: string | null;
+  /** O tipo como a Meta o mandou, quando difere de `type` (desde 07/10/2026). */
+  tipo_na_meta?: string | null;
   transcript: string | null;
   template_id: number | null;
   draft_id: string | null;
@@ -500,6 +502,7 @@ export function montarMensagens(
         texto: m.body?.trim() || null,
         midiaCaminho: m.media_path,
         midiaTipo: m.media_mime,
+        tipoNaMeta: m.tipo_na_meta?.trim() || null,
         transcricao: m.transcript?.trim() || null,
         autorTipo: AUTORES.includes(m.author_kind)
           ? (m.author_kind as MensagemDoFio['autorTipo'])

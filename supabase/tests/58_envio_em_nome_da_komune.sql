@@ -203,8 +203,12 @@ select is(pg_temp.v('link') #>> '{template_params,botao}', 'Criar meu perfil', '
 select pg_temp.worker();
 select public.wa_entrada_registrar('wamid.e58.2', '+5584999995800', '+5584999995801', 'button', 'Quero o convite');
 select pg_temp.sair();
+-- Só as que SAÍRAM: desde 07/10/2026 o toque no botão também é gravado como
+-- `interactive` (migração 20261007120000; antes virava `system`), e contar a
+-- conversa inteira somaria os dois toques recebidos ao link enviado.
 select is((select count(*)::int from public.messages m join public.conversations c on c.id = m.conversation_id
-            where c.peer_phone_e164 = '+5584999995801' and m.type = 'interactive'), 1,
+            where c.peer_phone_e164 = '+5584999995801' and m.type = 'interactive'
+              and m.direction = 'out'), 1,
   'tocar de novo não manda o link de novo');
 
 select pg_temp.worker();

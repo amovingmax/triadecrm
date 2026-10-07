@@ -1,5 +1,6 @@
 'use client';
 
+import { createContext, useContext } from 'react';
 import Link from 'next/link';
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 
@@ -9,8 +10,28 @@ import { EtiquetaEtapa } from '@/components/funis/etapa';
 
 import { formatarLocal, formatarTelefone } from './formatos';
 import { ProximaAcao } from './proxima-acao';
+import { BotaoSaudacao } from './saudacao-botoes';
 import type { LinhaParceiro } from './tipos';
 import { UltimoContato } from './ultimo-contato';
+
+/**
+ * A saudação na tabela (07/10/2026): a caixa de marcar ao lado do nome e o botão
+ * de mandar ao lado do WhatsApp. Chega por contexto porque as colunas são
+ * declaradas uma vez, fora do componente, e as células não recebem prop.
+ * Sem provedor (quem não manda saudação), nenhuma das duas coisas aparece.
+ */
+export type SaudacaoNaTabela = {
+  escolhidos: ReadonlySet<string>;
+  alternar: (id: string) => void;
+  marcarVarios: (ids: readonly string[], marcar: boolean) => void;
+  /** As linhas da página que podem ser marcadas: as que têm WhatsApp. */
+  marcaveis: readonly string[];
+  pedidos: ReadonlySet<string>;
+  ocupado: boolean;
+  pedirUm: (id: string) => void;
+};
+
+const ContextoDaSaudacao = createContext<SaudacaoNaTabela | null>(null);
 
 /**
  * A lista de parceiros no desktop.
@@ -67,7 +88,8 @@ const CLASSES: Record<string, string> = {
   // A tag do desfecho mais longa do catálogo ("Pediu contato no WhatsApp") e a
   // linha de baixo (canal · quando · tentativa · quem) cabem em 240px sem cortar.
   dias: 'w-60',
-  telefone: 'w-44',
+  // w-52 desde 07/10/2026: o botão da saudação mora ao lado do número.
+  telefone: 'w-52',
   // A etapa é SEMPRE visível desde 28/09/2026: ela herdou o lugar da coluna
   // "Temperatura" (ADR-16). w-44 e não w-40 porque o nome mais longo do catálogo
   // — "Apresentação realizada" — não pode nascer truncado.
@@ -99,7 +121,7 @@ const SOMBRA_DE_ROLAGEM: React.CSSProperties = {
 const colunas = coluna.columns([
   coluna.accessor('name', {
     id: 'nome',
-    header: 'Parceiro',
+    header: () => <CabecalhoNome />,
     cell: ({ row }) => <CelulaNome linha={row.original} />,
   }),
   // O que o último contato DEU, e não só há quantos dias. Ver `ultimo-contato.tsx`.
@@ -113,11 +135,7 @@ const colunas = coluna.columns([
   coluna.accessor('phone', {
     id: 'telefone',
     header: 'WhatsApp',
-    cell: ({ getValue }) => {
-      const valor = getValue();
-      if (!valor) return <Vazio />;
-      return <span className="numerico text-[0.8125rem]">{formatarTelefone(valor)}</span>;
-    },
+    cell: ({ row }) => <CelulaWhatsapp linha={row.original} />,
   }),
   // A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026, ADR-16). Até hoje esta posição
   // — a única que a tabela mostra em toda largura — era a coluna "Temperatura",
@@ -141,76 +159,84 @@ const colunas = coluna.columns([
   }),
 ]);
 
-export function TabelaParceiros({ linhas }: { linhas: LinhaParceiro[] }) {
+export function TabelaParceiros({
+  linhas,
+  saudacao = null,
+}: {
+  linhas: LinhaParceiro[];
+  saudacao?: SaudacaoNaTabela | null;
+}) {
   const tabela = useTable({ features: recursos, columns: colunas, data: linhas });
 
   return (
-    <RevelarLista>
-      <ColunasEscondidas />
+    <ContextoDaSaudacao.Provider value={saudacao}>
+      <RevelarLista>
+        <ColunasEscondidas />
 
-      {/* O contêiner rola na horizontal; a página nunca rola.
+        {/* O contêiner rola na horizontal; a página nunca rola.
           E ele é um CARTÃO (29/09/2026, Design System): a tabela ficava direto
           sobre a página, com as linhas encostando na borda da tela. No desenho
           novo a página é cinza e a tabela é conteúdo, logo mora no branco.
           `px-1` em vez de padding cheio porque as células já têm o seu, e um
           padding duplo empurraria a primeira coluna para o meio do cartão. */}
-      <div
-        className="sombra-base relative w-full overflow-x-auto rounded-xl bg-card px-1 py-1"
-        style={SOMBRA_DE_ROLAGEM}
-      >
-        <table className="w-full table-fixed border-collapse text-sm">
-          <thead>
-            {tabela.getHeaderGroups().map((grupo) => (
-              <tr key={grupo.id} className="border-b border-hairline">
-                {grupo.headers.map((cabecalho) => (
-                  <th
-                    key={cabecalho.id}
-                    scope="col"
-                    className={cn(
-                      // `truncate` é rede de segurança da troca de fonte: Poppins é
-                      // mais larga que a Geist anterior, e com `table-fixed` um
-                      // rótulo que crescesse sangraria por cima da coluna vizinha.
-                      'h-9 truncate px-3 text-left align-middle text-xs font-medium text-muted-foreground',
-                      cabecalho.column.id === 'nome' &&
-                        'sticky left-0 z-20 border-r border-hairline bg-card pl-4',
-                      CLASSES[cabecalho.column.id],
-                    )}
-                  >
-                    {cabecalho.isPlaceholder ? null : <tabela.FlexRender header={cabecalho} />}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {tabela.getRowModel().rows.map((linha, indice) => (
-              <Linha key={linha.id} indice={indice}>
-                {linha.getAllCells().map((celula) => (
-                  <td
-                    key={celula.id}
-                    className={cn(
-                      // 56px e não 36px. A tabela nasceu para uma linha por célula, e
-                      // a tag do contato com a linha de baixo ficava espremida rente ao
-                      // topo. Agora TODA linha tem a mesma anatomia — em cima o que
-                      // importa, embaixo o contexto —, e as células de uma linha só
-                      // (WhatsApp, temperatura) centralizam nessa mesma altura.
-                      'h-14 px-3 align-middle whitespace-nowrap',
-                      celula.column.id === 'nome' &&
-                        // Fundo opaco para o conteúdo passar por baixo, e o mesmo
-                        // resultado do hover da linha (muted a 50% sobre o fundo).
-                        'sticky left-0 z-10 border-r border-hairline bg-card p-0 group-hover/linha:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]',
-                      CLASSES[celula.column.id],
-                    )}
-                  >
-                    <tabela.FlexRender cell={celula} />
-                  </td>
-                ))}
-              </Linha>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </RevelarLista>
+        <div
+          className="sombra-base relative w-full overflow-x-auto rounded-xl bg-card px-1 py-1"
+          style={SOMBRA_DE_ROLAGEM}
+        >
+          <table className="w-full table-fixed border-collapse text-sm">
+            <thead>
+              {tabela.getHeaderGroups().map((grupo) => (
+                <tr key={grupo.id} className="border-b border-hairline">
+                  {grupo.headers.map((cabecalho) => (
+                    <th
+                      key={cabecalho.id}
+                      scope="col"
+                      className={cn(
+                        // `truncate` é rede de segurança da troca de fonte: Poppins é
+                        // mais larga que a Geist anterior, e com `table-fixed` um
+                        // rótulo que crescesse sangraria por cima da coluna vizinha.
+                        'h-9 truncate px-3 text-left align-middle text-xs font-medium text-muted-foreground',
+                        cabecalho.column.id === 'nome' &&
+                          'sticky left-0 z-20 border-r border-hairline bg-card pl-4',
+                        CLASSES[cabecalho.column.id],
+                      )}
+                    >
+                      {cabecalho.isPlaceholder ? null : <tabela.FlexRender header={cabecalho} />}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {tabela.getRowModel().rows.map((linha, indice) => (
+                <Linha key={linha.id} indice={indice}>
+                  {linha.getAllCells().map((celula) => (
+                    <td
+                      key={celula.id}
+                      className={cn(
+                        // 56px e não 36px. A tabela nasceu para uma linha por célula, e
+                        // a tag do contato com a linha de baixo ficava espremida rente ao
+                        // topo. Agora TODA linha tem a mesma anatomia — em cima o que
+                        // importa, embaixo o contexto —, e as células de uma linha só
+                        // (WhatsApp, temperatura) centralizam nessa mesma altura.
+                        'h-14 px-3 align-middle whitespace-nowrap',
+                        celula.column.id === 'nome' &&
+                          // Fundo opaco para o conteúdo passar por baixo, e o mesmo
+                          // resultado do hover da linha (muted a 50% sobre o fundo).
+                          'sticky left-0 z-10 border-r border-hairline bg-card p-0 group-hover/linha:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]',
+                        CLASSES[celula.column.id],
+                      )}
+                    >
+                      <tabela.FlexRender cell={celula} />
+                    </td>
+                  ))}
+                </Linha>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </RevelarLista>
+    </ContextoDaSaudacao.Provider>
   );
 }
 
@@ -268,12 +294,24 @@ function Linha({ indice, children }: { indice: number; children: React.ReactNode
 function CelulaNome({ linha }: { linha: LinhaParceiro }) {
   const onde = formatarLocal(linha.neighborhood, linha.city);
   const contexto = [linha.primary_category, onde].filter(Boolean).join(' · ');
+  const saudacao = useContext(ContextoDaSaudacao);
 
   return (
     <div className="relative flex h-14 items-center">
+      {saudacao ? (
+        <CaixaDeMarcar
+          marcada={saudacao.escolhidos.has(linha.id)}
+          habilitada={Boolean(linha.phone)}
+          rotulo={linha.phone ? `Marcar ${linha.name}` : `${linha.name} não tem WhatsApp`}
+          aoMudar={() => saudacao.alternar(linha.id)}
+        />
+      ) : null}
       <Link
         href={`/parceiros/${linha.id}`}
-        className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 rounded-lg py-1.5 pr-3 pl-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className={cn(
+          'flex min-w-0 flex-1 flex-col justify-center gap-0.5 rounded-lg py-1.5 pr-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+          saudacao ? 'pl-2' : 'pl-4',
+        )}
       >
         <span className="truncate font-medium" title={linha.name}>
           {linha.name}
@@ -285,6 +323,86 @@ function CelulaNome({ linha }: { linha: LinhaParceiro }) {
         ) : null}
       </Link>
     </div>
+  );
+}
+
+/** "Parceiro", e a caixa que marca as linhas com WhatsApp desta página. */
+function CabecalhoNome() {
+  const saudacao = useContext(ContextoDaSaudacao);
+  if (!saudacao) return 'Parceiro';
+  const marcadas = saudacao.marcaveis.filter((id) => saudacao.escolhidos.has(id)).length;
+  const todas = saudacao.marcaveis.length > 0 && marcadas === saudacao.marcaveis.length;
+  return (
+    <span className="flex items-center">
+      <CaixaDeMarcar
+        marcada={todas}
+        meia={marcadas > 0 && !todas}
+        habilitada={saudacao.marcaveis.length > 0}
+        rotulo="Marcar todos desta página que têm WhatsApp"
+        aoMudar={() => saudacao.marcarVarios(saudacao.marcaveis, !todas)}
+        noCabecalho
+      />
+      <span className="pl-2">Parceiro</span>
+    </span>
+  );
+}
+
+function CaixaDeMarcar({
+  marcada,
+  meia = false,
+  habilitada,
+  rotulo,
+  aoMudar,
+  noCabecalho = false,
+}: {
+  marcada: boolean;
+  meia?: boolean;
+  habilitada: boolean;
+  rotulo: string;
+  aoMudar: () => void;
+  noCabecalho?: boolean;
+}) {
+  return (
+    // O alvo é o rótulo inteiro (44px de altura), não só a caixa de 16px.
+    <label
+      className={cn(
+        'flex shrink-0 items-center justify-center',
+        noCabecalho ? 'h-9 w-6' : 'h-14 w-8 pl-3',
+        habilitada ? 'cursor-pointer' : 'cursor-not-allowed opacity-40',
+      )}
+      title={rotulo}
+    >
+      <input
+        type="checkbox"
+        checked={marcada}
+        ref={(el) => {
+          if (el) el.indeterminate = meia;
+        }}
+        disabled={!habilitada}
+        onChange={aoMudar}
+        aria-label={rotulo}
+        className="size-4 accent-[var(--foreground)]"
+      />
+    </label>
+  );
+}
+
+/** O número e, para quem manda, o botão da saudação ao lado. */
+function CelulaWhatsapp({ linha }: { linha: LinhaParceiro }) {
+  const saudacao = useContext(ContextoDaSaudacao);
+  if (!linha.phone) return <Vazio />;
+  return (
+    <span className="flex items-center gap-1">
+      <span className="numerico text-[0.8125rem]">{formatarTelefone(linha.phone)}</span>
+      {saudacao ? (
+        <BotaoSaudacao
+          nome={linha.name}
+          pedido={saudacao.pedidos.has(linha.id)}
+          ocupado={saudacao.ocupado}
+          aoPedir={() => saudacao.pedirUm(linha.id)}
+        />
+      ) : null}
+    </span>
   );
 }
 

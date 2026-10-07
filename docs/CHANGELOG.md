@@ -6838,3 +6838,130 @@ do GitHub, a pedido. A `main` não tinha andado desde a abertura da branch, ent�
 o que está nela é exatamente o que já estava no ar desde as 11:14: não houve novo
 deploy. A partir daqui, publicar pela `main` mantém a limpeza do funil e as
 exclusões.
+
+## 07/10/2026 — "Aviso do WhatsApp sem arquivo guardado": figurinha e o que a Meta não entrega (RF-CON-03, RF-CON-05)
+
+O Rafael mandou o print de uma conversa (uma pessoa fora da base, quatro mensagens
+seguidas às 13:58–13:59), cada uma dizendo "Aviso do WhatsApp sem arquivo
+guardado: o CRM não baixou esta mídia da Meta", e perguntou o que não carregava.
+
+**O que acontecia.** O CRM só conhecia nove tipos de mensagem. Qualquer outro tipo
+que a Meta mandasse virava "Aviso do WhatsApp" (`system`), e o tipo original se
+perdia: a **figurinha** (`sticker`, o mais comum), a resposta a botão de modelo
+(`button`), a localização, o cartão de contato e o que a Meta não entrega à API
+(`unsupported`: visualização única, enquete, evento, mensagem editada). A
+figurinha nunca era baixada, porque o worker só baixa foto, vídeo, documento e
+áudio. E a tela chamava tudo isso de "mídia que o CRM não baixou", até o que nunca
+foi mídia.
+
+**O que mudou** (migração `20261007120000`):
+- A figurinha entra como imagem (o balde já aceitava webp) e aparece no balão,
+  menor e sem corte, como no WhatsApp. A resposta a botão entra como botão, com o
+  texto.
+- O tipo como a Meta o mandou fica guardado (`messages.tipo_na_meta`) sempre que
+  difere do que o CRM gravou.
+- **O que já tinha chegado é reclassificado** pela carga crua guardada do webhook
+  (`webhook_deliveries`); a figurinha que não estiver lá é reconhecida pelo arquivo
+  webp. Figurinha dos últimos 30 dias vira imagem e entra na fila de recuperação de
+  mídias do worker, que a baixa na volta seguinte — **sem precisar republicar o
+  worker**.
+- A tela diz o que chegou: "Mensagem que a Meta não entrega ao CRM… peça para mandar
+  de novo como foto, vídeo ou texto", "Localização compartilhada", "Cartão de
+  contato compartilhado", ou o nome do tipo que o CRM ainda não conhece. "Não
+  baixou esta mídia" ficou só para mídia de verdade.
+- O worker-wa passa a baixar a figurinha já na chegada (`TIPOS_DE_ARQUIVO`). Isso
+  só vale depois de republicar o worker no Fly.io; até lá, a passada de
+  recuperação a traz uma volta depois.
+
+**O que eram as quatro mensagens da conversa do print:** não deu para conferir
+daqui (a leitura do banco de produção é barrada nesta máquina). O mais provável
+são figurinhas: quatro mensagens sem texto em um minuto. Depois de subir, se forem
+figurinhas, elas aparecem no balão; se forem `unsupported`, a frase nova explica.
+A migração escreve no fim quantas mensagens de cada tipo reclassificou.
+
+- Testes: pgTAP novo `105_o_que_a_meta_manda.sql` (14); no site, testes da frase
+  nova (`aviso-sem-conteudo.test.ts`) e do tipo original chegando ao balão. O
+  `58_envio_em_nome_da_komune.sql` passou a contar só o link ENVIADO: o toque no
+  botão agora também é `interactive`, e a contagem da conversa inteira o somava.
+  Banco recriado do zero: 99 arquivos, 3.530 testes, todos passam; site, worker,
+  lint e tipos verdes.
+- Ensaiado contra um banco com mensagens antigas já gravadas como `system` (em
+  transação, desfeita no fim): duas figurinhas viraram imagem e entraram na fila
+  de recuperação (uma achada na carga crua, outra pelo arquivo webp), a não
+  suportada e a localização ficaram como aviso, com o nome.
+
+**Pendente:**
+1. Localização e cartão de contato ainda não são mostrados (o webhook não guarda a
+   coordenada nem o número do contato). Mostrar pede mudar a função `wa-webhook`.
+2. Documento que não seja PDF (Word, Excel) continua sem arquivo: o balde só aceita
+   PDF entre os documentos.
+
+**No ar (07/10/2026, ~14:35):** a correção acima. A branch `aviso-do-whatsapp` foi
+enviada ao GitHub, a migração `20261007120000` está aplicada em produção e o site foi
+publicado. A `main` ainda não tem esta branch.
+
+## 07/10/2026 — Prospectados: quem não tem número sai, e a saudação ganha botão (RF-BAS-10, RF-CON-02, RF-CON-11)
+
+Pedido do Rafael: "quero que você limpe dos prospectados todos os contatos que
+tiverem sem número, e facilite naquela tela de prospectados um botão que envie de
+forma mais fácil a saudação inicial 'Boa tarde...'".
+
+**A limpeza** (migração `20261007130000`, que roda ao subir). "Sem número" é: sem
+telefone na ficha, sem telefone em pessoa de contato e sem conversa de WhatsApp. É a
+exclusão de hoje, não um apagamento: a ficha sai de Prospectados, do funil, dos lotes
+e do Meu dia; o pendente dela é encerrado (reunião, tarefa, fila de mensagem); o
+histórico fica; e cada uma aparece em **Prospectados → Excluídos** com o motivo "Sem
+telefone nem WhatsApp: saiu na limpeza de Prospectados de 07/10/2026", de onde se
+restaura. Cliente e quem tem pré-cadastro aberto ficam, como na exclusão manual. A
+migração escreve no fim quantas saíram e quantas ficaram, por motivo.
+- Para rodar sem sessão de usuário, a exclusão ganhou uma camada interna
+  (`app.parceiro_excluir_interno`, e `app.reuniao_cancelar_interno` para a reunião);
+  `public.parceiro_excluir` e `public.reuniao_cancelar` continuam com a mesma
+  assinatura e a mesma conferência de papel. A limpeza em si é
+  `app.limpar_sem_numero`, assinada pelo sistema na auditoria.
+
+**O botão da saudação.** Em Prospectados, cada linha com WhatsApp tem um botão de
+enviar ao lado do número: um clique põe a saudação na fila, a linha vira ✓ e o aviso
+traz **Desfazer**. Para vários de uma vez, marque as linhas (ou a página inteira pelo
+cabeçalho) e use **Mandar a saudação** na barra que aparece; ali há confirmação. No
+celular, o botão fica em cada cartão.
+- É a MESMA fila da saudação automática: "Bom dia!", "Boa tarde!" ou "Boa noite!"
+  conforme a hora em que a mensagem sai, no ritmo por hora de Ajustes, só no horário
+  de envio. Não sai tudo na hora.
+- O banco pula, e o aviso diz quantos e por quê: quem já conversa com a gente, já
+  recebeu a saudação, já está na fila, não tem WhatsApp ou pediu para não ser
+  contatado (`public.saudacao_enfileirar`). Desfazer tira da fila o que ainda não
+  saiu (`public.saudacao_desfazer`). Até 200 por pedido; só admin e gestor.
+- O interruptor da saudação em Ajustes → Atendimento continua sendo o disjuntor
+  geral: desligado, o botão avisa e nada entra na fila. O texto dele foi atualizado
+  ("Saudação inicial… liga os botões que a mandam: Revisão e Prospectados").
+
+- Testes: pgTAP novo `106_sem_numero_e_saudacao.sql` (24); no site,
+  `saudacao.test.ts`. Banco recriado do zero: 100 arquivos, 3.554 testes, todos
+  passam; site (1.241 testes), lint e tipos verdes.
+- Ensaiado contra um banco com fichas com e sem número (em transação, desfeita): saem
+  só as sem número nenhum (a reunião de uma delas é cancelada); ficam o cliente, a de
+  telefone na pessoa de contato e a que tem conversa.
+- Conferido no navegador contra o banco local, como gestor: os dois sem número fora
+  da lista e em Excluídos com o motivo; o botão de uma linha (aviso com Desfazer, a
+  linha vira ✓); duas marcadas, a barra, a confirmação e o aviso "na fila para 2
+  parceiros, 1 na frente".
+
+**Decisão minha, para quem quiser rever:** a limpeza é de uma vez só. A Revisão, a
+importação e o cadastro rápido continuam aceitando ficha sem número; se a regra deve
+ser "Prospectados só com número", é outra mudança, na entrada.
+
+**Subido (07/10/2026, ~15:30):** branch `prospectados-sem-numero-e-saudacao`
+enviada ao GitHub, `supabase db push` rodado (terminou com o erro de certificado do
+`pg-delta` de sempre, que nas subidas anteriores não impediu a migração) e o site
+publicado na Vercel. **Não conferido daqui:** a leitura do banco de produção é barrada
+nesta máquina, então nem a migração `20261007130000` registrada nem quantas fichas a
+limpeza tirou. A conferência é abrir Prospectados → Excluídos: se a limpeza rodou, as
+fichas sem número estão lá com o motivo "saiu na limpeza de Prospectados de
+07/10/2026". A `main` ainda não tem esta branch nem a `aviso-do-whatsapp`.
+
+**Na `main` desde 07/10/2026:** as branches `aviso-do-whatsapp` e
+`prospectados-sem-numero-e-saudacao` (a segunda contém a primeira) foram juntadas na
+`main` do GitHub, a pedido. A `main` não tinha andado, então o que está nela é o que já
+estava no ar: não houve novo deploy. A partir daqui, publicar pela `main` mantém a
+figurinha, a limpeza dos sem número e o botão da saudação.

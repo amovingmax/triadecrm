@@ -512,6 +512,7 @@ export type Database = {
       }
       lead_automatico: { Args: { p_conversation_id: string }; Returns: Json }
       lgpd_dossie: { Args: { p_organization_id: string }; Returns: Json }
+      limpar_sem_numero: { Args: { p_motivo: string }; Returns: Json }
       lista_da_base: { Args: { p_base: Json }; Returns: string }
       lista_de_etapas: { Args: { p_lista: Json }; Returns: string }
       mask_phone: { Args: { p: string }; Returns: string }
@@ -558,6 +559,10 @@ export type Database = {
       outcome_for_call_result: {
         Args: { p_result: Database["app"]["Enums"]["call_result"] }
         Returns: string
+      }
+      parceiro_excluir_interno: {
+        Args: { p_motivo: string; p_organization_id: string; p_por: string }
+        Returns: Json
       }
       payload_e_permitido: { Args: { p: Json }; Returns: boolean }
       payload_hash: { Args: { p: Json }; Returns: string }
@@ -744,6 +749,10 @@ export type Database = {
       relatorio_semanal_texto: { Args: { p_fatos: Json }; Returns: string }
       resolver_source_record: {
         Args: { p_source_record_id: string }
+        Returns: Json
+      }
+      reuniao_cancelar_interno: {
+        Args: { p_id: string; p_motivo?: string }
         Returns: Json
       }
       reuniao_config: { Args: never; Returns: Json }
@@ -1011,6 +1020,10 @@ export type Database = {
       wa_teto_da_meta: {
         Args: { p_numero?: string; p_quando?: string }
         Returns: Json
+      }
+      wa_tipo_da_meta: {
+        Args: { p_type: string }
+        Returns: Database["app"]["Enums"]["msg_type"]
       }
       website_domain: { Args: { u: string }; Returns: string }
     }
@@ -4729,6 +4742,7 @@ export type Database = {
           status: Database["app"]["Enums"]["msg_status"]
           template_id: number | null
           template_params: Json
+          tipo_na_meta: string | null
           transcript: string | null
           type: Database["app"]["Enums"]["msg_type"]
           wa_message_id: string | null
@@ -4766,6 +4780,7 @@ export type Database = {
           status?: Database["app"]["Enums"]["msg_status"]
           template_id?: number | null
           template_params?: Json
+          tipo_na_meta?: string | null
           transcript?: string | null
           type?: Database["app"]["Enums"]["msg_type"]
           wa_message_id?: string | null
@@ -4803,6 +4818,7 @@ export type Database = {
           status?: Database["app"]["Enums"]["msg_status"]
           template_id?: number | null
           template_params?: Json
+          tipo_na_meta?: string | null
           transcript?: string | null
           type?: Database["app"]["Enums"]["msg_type"]
           wa_message_id?: string | null
@@ -8735,6 +8751,14 @@ export type Database = {
         Returns: Json
       }
       rota_proximas: { Args: { p_qty?: number }; Returns: Json }
+      saudacao_desfazer: {
+        Args: { p_organization_ids: string[] }
+        Returns: Json
+      }
+      saudacao_enfileirar: {
+        Args: { p_organization_ids: string[] }
+        Returns: Json
+      }
       search_organizations: {
         Args: {
           p_category_id?: number
