@@ -6959,3 +6959,9 @@ nesta máquina, então nem a migração `20261007130000` registrada nem quantas 
 limpeza tirou. A conferência é abrir Prospectados → Excluídos: se a limpeza rodou, as
 fichas sem número estão lá com o motivo "saiu na limpeza de Prospectados de
 07/10/2026". A `main` ainda não tem esta branch nem a `aviso-do-whatsapp`.
+
+**Na `main` desde 07/10/2026:** as branches `aviso-do-whatsapp` e
+`prospectados-sem-numero-e-saudacao` (a segunda contém a primeira) foram juntadas na
+`main` do GitHub, a pedido. A `main` não tinha andado, então o que está nela é o que já
+estava no ar: não houve novo deploy. A partir daqui, publicar pela `main` mantém a
+figurinha, a limpeza dos sem número e o botão da saudação.
