@@ -63,8 +63,13 @@ const TIPOS_DE_VOZ: ReadonlySet<string> = new Set(['audio', 'voice']);
  * transcrição — e a foto chegava ao CRM como "Imagem sem arquivo guardado".
  * Rafael: "coloque pro crm aceitar imagens e videos". O balde `mensagens` já
  * aceitava foto, vídeo e PDF; faltava buscar.
+ *
+ * `sticker` entrou em 07/10/2026: a figurinha é uma imagem webp, o banco a grava
+ * como `image` (`app.wa_tipo_da_meta`) e o balde aceita webp. O tipo aqui é o
+ * da Meta, cru, que é o que vem na fila. Sem esta linha a figurinha só chegava
+ * pela passada de recuperação, uma volta depois.
  */
-const TIPOS_DE_ARQUIVO: ReadonlySet<string> = new Set(['image', 'video', 'document']);
+const TIPOS_DE_ARQUIVO: ReadonlySet<string> = new Set(['image', 'video', 'document', 'sticker']);
 
 export interface ContextoDaEntrada {
   cliente: ClienteDoBanco;

@@ -120,6 +120,7 @@ function mensagem(parcial: Partial<MensagemDoFio> = {}): MensagemDoFio {
     texto: 'oi',
     midiaCaminho: null,
     midiaTipo: null,
+    tipoNaMeta: null,
     transcricao: null,
     autorTipo: 'human',
     autor: 'Heloísa Cavalcanti',
@@ -342,6 +343,16 @@ describe('montarMensagens', () => {
     expect(m?.status).toBe('queued');
     expect(m?.autorTipo).toBe('system');
     expect(m?.origem).toBe('crm');
+  });
+
+  it('o tipo original da Meta chega ao balão: a figurinha é uma imagem que sabe que é figurinha', () => {
+    const [figurinha, antiga] = montarMensagens(
+      [crua({ id: 'f', type: 'image', tipo_na_meta: 'sticker' }), crua({ id: 'g' })],
+      NOMES,
+    );
+    expect(figurinha).toMatchObject({ tipo: 'image', tipoNaMeta: 'sticker' });
+    // Linha de antes da coluna (ou consulta que não a pede): nulo, sem quebrar.
+    expect(antiga?.tipoNaMeta).toBeNull();
   });
 
   it('texto e transcrição em branco viram null, não string vazia', () => {

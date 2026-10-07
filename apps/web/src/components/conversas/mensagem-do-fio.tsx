@@ -22,7 +22,7 @@ import { urlDaMidia } from './acoes';
 import { VirarTarefa } from './virar-tarefa';
 import { dataHoraCompleta, hora } from './formatos';
 import { entregaDaMensagem, separarAssinatura } from './mensagens';
-import { ROTULO_DO_ROBO, ROTULO_TIPO_MENSAGEM, type MensagemDoFio } from './tipos';
+import { avisoSemConteudo, ROTULO_DO_ROBO, type MensagemDoFio } from './tipos';
 
 /**
  * Uma mensagem dentro da conversa — um balão de verdade.
@@ -331,20 +331,15 @@ function Selos({ mensagem }: { mensagem: MensagemDoFio }) {
 /**
  * Mensagem sem corpo — que não é o mesmo que mensagem vazia.
  *
- * Duas causas, e as duas precisam ser ditas: ou é mídia que ninguém baixou
- * ainda, ou é a retenção de 12 meses (PRD §10.6), que apaga o texto e mantém a
- * linha. Escrever só "(sem conteúdo)" faria parecer defeito.
+ * A frase sai de `avisoSemConteudo`: retenção de 12 meses, mensagem que a Meta
+ * não entrega à API, localização, cartão de contato. Mídia sem arquivo NÃO passa
+ * por aqui: foto, vídeo, áudio e documento têm o aviso deles (`ArquivoAusente`).
  */
 function SemCorpo({ mensagem }: { mensagem: MensagemDoFio }) {
-  const midia = mensagem.tipo !== 'text' && mensagem.tipo !== 'template';
   return (
     <p className="flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
       <FileText className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-      <span>
-        {midia
-          ? `${ROTULO_TIPO_MENSAGEM[mensagem.tipo]} sem arquivo guardado: o CRM não baixou esta mídia da Meta.`
-          : 'O texto desta mensagem foi apagado pela retenção de 12 meses; a linha fica como registro.'}
-      </span>
+      <span>{avisoSemConteudo(mensagem)}</span>
     </p>
   );
 }
@@ -437,14 +432,42 @@ function ArquivoAusente({ rotulo, icone }: { rotulo: string; icone: React.ReactN
   );
 }
 
-/** A foto, no balão. Um toque abre em tamanho real numa aba nova. */
+/**
+ * A foto, no balão. Um toque abre em tamanho real numa aba nova.
+ *
+ * A FIGURINHA também é desenhada aqui (07/10/2026): é uma imagem webp, e a Meta
+ * a manda como `sticker`, que o banco grava como `image` com `tipoNaMeta`. Ela
+ * sai menor e sem corte, do jeito que aparece no WhatsApp.
+ */
 function Foto({ mensagem }: { mensagem: MensagemDoFio }) {
   const { estado, url, renovar } = useArquivoDaMensagem(mensagem);
+  const figurinha = mensagem.tipoNaMeta === 'sticker';
+  const nome = figurinha ? 'Figurinha' : 'Foto';
   if (estado === 'ausente') {
-    return <ArquivoAusente rotulo="Foto" icone={<ImageIcon className="size-3.5" aria-hidden="true" />} />;
+    return <ArquivoAusente rotulo={nome} icone={<ImageIcon className="size-3.5" aria-hidden="true" />} />;
   }
   if (estado === 'procurando' || !url) {
-    return <div className="h-48 w-64 max-w-full animate-pulse rounded-xl bg-muted" aria-label="Carregando a foto" />;
+    return (
+      <div
+        className={cn(
+          'max-w-full animate-pulse rounded-xl bg-muted',
+          figurinha ? 'size-32' : 'h-48 w-64',
+        )}
+        aria-label={`Carregando a ${nome.toLowerCase()}`}
+      />
+    );
+  }
+  if (figurinha) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- URL assinada e temporária do Storage: o otimizador do Next guardaria uma cópia de algo que tem de expirar.
+      <img
+        src={url}
+        alt={mensagem.entrada ? 'Figurinha recebida' : 'Figurinha enviada'}
+        loading="lazy"
+        onError={renovar}
+        className="size-32 object-contain"
+      />
+    );
   }
   return (
     <button

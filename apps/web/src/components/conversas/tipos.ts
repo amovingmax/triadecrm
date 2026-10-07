@@ -516,6 +516,44 @@ export const ROTULO_TIPO_MENSAGEM: Record<MsgType, string> = {
   system: 'Aviso do WhatsApp',
 };
 
+/**
+ * O que dizer de uma mensagem que chegou sem texto e sem arquivo a mostrar.
+ *
+ * Até 07/10/2026 a tela escrevia "<tipo> sem arquivo guardado: o CRM não baixou
+ * esta mídia da Meta" para TODO tipo que não fosse texto — e o tipo mais comum
+ * nessa situação era "Aviso do WhatsApp", que não é mídia nenhuma: era a
+ * figurinha (hoje baixada como foto) ou o que a Meta simplesmente não entrega
+ * à API. O Rafael viu quatro seguidas e perguntou o que não estava carregando.
+ *
+ * A frase diz o que chegou e, quando há, o que fazer. Texto e modelo sem corpo
+ * continuam sendo o caso da retenção de 12 meses (PRD §10.6).
+ */
+export function avisoSemConteudo(
+  mensagem: Pick<MensagemDoFio, 'tipo' | 'tipoNaMeta'>,
+): string {
+  if (mensagem.tipo === 'text' || mensagem.tipo === 'template') {
+    return 'O texto desta mensagem foi apagado pela retenção de 12 meses; a linha fica como registro.';
+  }
+  if (mensagem.tipo === 'reaction') return 'Reação sem emoji: a pessoa tirou a reação.';
+  if (mensagem.tipo === 'interactive') return 'Resposta a botões, sem o texto da opção.';
+
+  switch (mensagem.tipoNaMeta) {
+    case 'unsupported':
+      return 'Mensagem que a Meta não entrega ao CRM: ela só abre no celular (visualização única, enquete, evento ou mensagem editada). Se precisar do conteúdo, peça para a pessoa mandar de novo como foto, vídeo ou texto.';
+    case 'location':
+      return 'Localização compartilhada. O CRM ainda não mostra o mapa: se precisar, peça o endereço por escrito.';
+    case 'contacts':
+      return 'Cartão de contato compartilhado. O CRM ainda não mostra o cartão: se precisar, peça o nome e o número por escrito.';
+    case 'sticker':
+      return 'Figurinha.';
+    case null:
+    case undefined:
+      return 'Mensagem sem conteúdo que o CRM saiba mostrar. O que a Meta mandou não trazia texto nem arquivo.';
+    default:
+      return `Mensagem do tipo "${mensagem.tipoNaMeta}", que o CRM ainda não sabe mostrar.`;
+  }
+}
+
 /** `messages.origin`: quem pediu esta linha. */
 export type OrigemDaMensagem = 'crm' | 'echo' | 'import';
 
@@ -569,6 +607,12 @@ export type MensagemDoFio = {
   /** Caminho do arquivo no Storage privado; `null` enquanto ninguém baixou a mídia. */
   midiaCaminho: string | null;
   midiaTipo: string | null;
+  /**
+   * O tipo como a Meta o mandou, quando o CRM gravou outro (`messages.tipo_na_meta`,
+   * 07/10/2026): "sticker" numa `image`, "unsupported" ou "location" num `system`.
+   * É o que deixa a tela dizer o que chegou em vez de "mídia não baixada".
+   */
+  tipoNaMeta: string | null;
   /** Transcrição de máquina (faster-whisper local, RF-CON-27). Nunca conferida por gente. */
   transcricao: string | null;
   autorTipo: AutorTipo;
