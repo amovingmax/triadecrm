@@ -258,6 +258,25 @@ describe('a atividade do parceiro', () => {
     });
   });
 
+  it('nascer na etapa de entrada não é entrar no funil: o funil começa no contato', () => {
+    // 07/10/2026: "Prospectado" deixou de ser coluna. Com a etapa marcada como
+    // de entrada, a linha diz onde a ficha está de fato.
+    const nasceu = etapa({
+      id: 1,
+      from_stage_id: null,
+      to_stage_id: 12,
+      changed_at: '2026-10-01T12:00:00Z',
+    });
+    expect(
+      montar({ historico: [nasceu], etapasDeEntrada: new Set([12]) }).itens[0],
+    ).toMatchObject({ titulo: 'Entrou em Prospectados', detalhe: 'Ainda não contatado' });
+    // E quando sai dela, é uma mudança de etapa como outra qualquer.
+    const subiu = etapa({ id: 2, from_stage_id: 12, to_stage_id: 13, changed_at: '2026-10-02T12:00:00Z' });
+    expect(
+      montar({ historico: [subiu, nasceu], etapasDeEntrada: new Set([12]) }).itens[0]?.titulo,
+    ).toBe('Mudou de etapa');
+  });
+
   it('registro do sistema que não nasceu com a ficha não é "Entrou na base"', () => {
     // O motor também grava "Candidato do Radar mesclado nesta ficha" e parecidos.
     // Um mês depois da entrada, isso não pode aparecer como "Entrou na base · hoje".
@@ -396,6 +415,23 @@ describe('os próximos passos', () => {
     expect(p.passos[1]).toMatchObject({ apoio: 'Tarefa · Heloísa', selo: 'vence hoje' });
     expect(p.passos[2]?.quando?.texto).toBe('qua, 07/10');
     expect(contagemDosPassos(p)).toBe('1 reunião · 2 tarefas');
+  });
+
+  it('só a tarefa leva o id que o botão de excluir usa; a reunião sai pela Agenda', () => {
+    const p = montarProximosPassos(
+      {
+        reunioes: [reuniao({ id: 'r1' })],
+        tarefas: [tarefa({ id: 't1' })],
+        pessoas: NOMES,
+      },
+      AGORA,
+    );
+    // O id cru de `tasks`, e não o `tarefa:t1` da chave da lista: é o que
+    // `public.tarefa_excluir` recebe.
+    expect(p.passos.map((x) => [x.tipo, x.tarefaId])).toEqual([
+      ['reuniao', null],
+      ['tarefa', 't1'],
+    ]);
   });
 
   it('a tarefa que é o eco de uma reunião não lista a reunião duas vezes', () => {

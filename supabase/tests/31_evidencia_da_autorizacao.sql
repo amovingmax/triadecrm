@@ -12,11 +12,19 @@
 -- EXIGE era descartada em silêncio, e o pré-cadastro recusava depois com
 -- `sem_autorizacao` sem dizer que a prova nunca existiu.
 --
+-- 07/10/2026 (migração 20261007100000): a etapa "Autorizou" SAIU do funil
+-- fornecedor. A frase passou a virar prova em "Cadastro em andamento", que a
+-- declara como "Parceria aceita" já declarava: com `consent_kind` e
+-- `"required": false`. O que este arquivo trava continua igual — a frase que a
+-- tela exige não pode ser descartada em silêncio, em funil nenhum — e o §5
+-- segue exercitando a regra do gatilho para o catálogo que declarar a prova
+-- como OBRIGATÓRIA, que é código vivo mesmo sem etapa que o use hoje.
+--
 -- Roda em transação e desfaz tudo. Toda contagem é DELTA: o banco tem operação
 -- dentro e nada aqui depende de número absoluto de tabela compartilhada.
 -- =====================================================================
 begin;
-select plan(26);
+select plan(28);
 
 -- 08/09/2026: emitir link passou a exigir endereço configurado
 -- (`app_settings[precadastro.link].modelo`, migração 20260908120000). Sem ele,
@@ -72,11 +80,13 @@ insert into auth.users (id, email, raw_user_meta_data) values
 --   33 produtor  → "Cadastro iniciado na hora", que não colhe frase nenhuma
 --   34 fornecedor→ o PATCH direto do §3.9
 --   35 fornecedor→ o move_deal do §3.9 (não pode ter regredido)
+--   36 fornecedor→ "Cadastro iniciado na hora" no funil que agora divide a etapa
+--                  com a autorização (07/10/2026)
 insert into public.organizations (id, name, phone_e164, neighborhood, source_id)
 select ('c0000000-0000-4000-8000-0000000031' || lpad(i::text, 2, '0'))::uuid,
        'EV Parceiro ' || i, '+558499999' || lpad((3100 + i)::text, 4, '0'), 'Tirol',
        (select id from public.sources where slug = 'captura_campo')
-  from generate_series(1, 5) i;
+  from generate_series(1, 6) i;
 
 insert into public.deals (id, organization_id, pipeline_id, stage_id) values
   ('e0000000-0000-4000-8000-000000003101', 'c0000000-0000-4000-8000-000000003101',
@@ -88,6 +98,8 @@ insert into public.deals (id, organization_id, pipeline_id, stage_id) values
   ('e0000000-0000-4000-8000-000000003104', 'c0000000-0000-4000-8000-000000003104',
      pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor', 'respondeu')),
   ('e0000000-0000-4000-8000-000000003105', 'c0000000-0000-4000-8000-000000003105',
+     pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor', 'respondeu')),
+  ('e0000000-0000-4000-8000-000000003106', 'c0000000-0000-4000-8000-000000003106',
      pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor', 'respondeu'));
 
 -- =====================================================================
@@ -97,9 +109,10 @@ select ok(
   exists (select 1 from public.stages s
             join public.pipelines p on p.id = s.pipeline_id,
           lateral jsonb_array_elements(s.required_fields) e
-           where p.slug = 'fornecedor' and s.slug = 'autorizou'
-             and e.value ->> 'consent_kind' = 'data_use_authorized'),
-  '§3.1: "Autorizou" (fornecedor) declara consent_kind = data_use_authorized');
+           where p.slug = 'fornecedor' and s.slug = 'cadastro_em_andamento'
+             and e.value ->> 'consent_kind' = 'data_use_authorized'
+             and (e.value ->> 'required')::boolean is false),
+  '§3.1: "Cadastro em andamento" (fornecedor) declara consent_kind = data_use_authorized, sem barrar a entrada');
 
 select ok(
   exists (select 1 from public.stages s
@@ -109,15 +122,27 @@ select ok(
              and e.value ->> 'consent_kind' = 'data_use_authorized'),
   '§3.1: "Parceria aceita" (produtor) TAMBÉM declara consent_kind — era aqui que a prova sumia');
 
--- A varredura da família: qualquer funil cuja resolução de "autorizou" não
--- declare a prova volta a ser o mesmo defeito. Não é uma etapa: é a regra.
+-- A varredura da família: qualquer funil em que o destino de "Realizada,
+-- autorizou" não declare a prova volta a ser o mesmo defeito. Não é uma etapa: é
+-- a regra — e por isso a pergunta parte do DESFECHO, seja qual for o slug que
+-- ele aponta hoje.
 select is(
   (select count(*)::int
      from public.pipelines p
-     cross join lateral app.stage_for(p.id, 'autorizou') s
+     cross join lateral app.stage_for(
+       p.id, (select o.target_stage_slug from public.interaction_outcomes o
+               where o.slug = 'reu_autorizou')) s
     where not exists (select 1 from jsonb_array_elements(s.required_fields) e
                        where e.value ->> 'consent_kind' = 'data_use_authorized')),
-  0, '§3.1: nenhum funil resolve "autorizou" para uma etapa que não declara a prova');
+  0, '§3.1: em nenhum funil "Realizada, autorizou" leva a uma etapa que não declara a prova');
+select is(
+  (select count(*)::int
+     from public.pipelines p
+     cross join lateral app.stage_for(
+       p.id, (select o.target_stage_slug from public.interaction_outcomes o
+               where o.slug = 'reu_autorizou')) s
+    where p.slug in ('fornecedor', 'produtor')),
+  2, '§3.1: e o desfecho TEM destino nos dois funis de captação (a varredura acima não passa por vazio)');
 
 select is(
   (select count(*)::int from public.stages s, lateral jsonb_array_elements(s.required_fields) e
@@ -190,8 +215,8 @@ select public.registrar_contato(
          'Pode cadastrar meu buffet lá, sim — WhatsApp, 05/09') as res;
 select pg_temp.sair();
 
-select is(pg_temp.etapa_de('e0000000-0000-4000-8000-000000003102'), 'autorizou',
-  '§3.1 fornecedor: o negócio entra em "Autorizou"');
+select is(pg_temp.etapa_de('e0000000-0000-4000-8000-000000003102'), 'cadastro_em_andamento',
+  '§3.1 fornecedor: o negócio entra em "Cadastro em andamento" (era "Autorizou", que saiu do funil)');
 select is(pg_temp.n_consent('c0000000-0000-4000-8000-000000003102')
           - (select n from pg_temp.antes where org = 'c0000000-0000-4000-8000-000000003102'),
   1, '§3.1 fornecedor: uma linha em consent_events');
@@ -219,26 +244,48 @@ select is(pg_temp.n_consent('c0000000-0000-4000-8000-000000003103')
           - (select n from pg_temp.antes where org = 'c0000000-0000-4000-8000-000000003103'),
   0, '§3.1: e sem frase digitada não se inventa consentimento nenhum');
 
+-- 4b. E no funil FORNECEDOR, que desde 07/10/2026 recebe os dois desfechos na
+--     mesma etapa: "Cadastro iniciado na hora" não pode ter ficado intabulável.
+select pg_temp.entrar('a0000000-0000-4000-8000-000000003101', 'admin');
+create table pg_temp.r_vis_forn as
+select public.registrar_contato(
+         gen_random_uuid(), 'c0000000-0000-4000-8000-000000003106',
+         pg_temp.desfecho('vis_cadastro_iniciado'), 'decisor',
+         'e0000000-0000-4000-8000-000000003106', null, now(),
+         'pgTAP §3.1 colateral no fornecedor', null, null, null, null, null) as res;
+select pg_temp.sair();
+select is(pg_temp.etapa_de('e0000000-0000-4000-8000-000000003106'), 'cadastro_em_andamento',
+  '§3.1 fornecedor: "Cadastro iniciado na hora" move sem frase (o campo não barra)');
+
 -- =====================================================================
 -- 5. O gatilho: um UPDATE direto não burla a etapa (§3.9)
 -- =====================================================================
+-- Nenhuma etapa da seed declara mais a prova como OBRIGATÓRIA (a que declarava
+-- era "Autorizou"). A regra continua no gatilho e no `move_deal`, e vale para o
+-- catálogo que a declarar: este bloco liga a exigência em "Cadastro em
+-- andamento" dentro da transação do teste, para o código não ficar sem prova.
+update public.stages s
+   set required_fields = '[{"field":"authorization_evidence","label":"O que ele autorizou, com as palavras dele","consent_kind":"data_use_authorized"}]'::jsonb
+  from public.pipelines p
+ where p.id = s.pipeline_id and p.slug = 'fornecedor' and s.slug = 'cadastro_em_andamento';
+
 select throws_ok(
   $$update public.deals set stage_id = (select s.id from public.stages s
        join public.pipelines p on p.id = s.pipeline_id
-      where p.slug = 'fornecedor' and s.slug = 'autorizou')
+      where p.slug = 'fornecedor' and s.slug = 'cadastro_em_andamento')
      where id = 'e0000000-0000-4000-8000-000000003104'$$,
   '23514',
   null,
-  '§3.9: PATCH direto para "Autorizou" sem prova em consent_events é recusado pelo gatilho');
+  '§3.9: PATCH direto para etapa que EXIGE a prova, sem prova em consent_events, é recusado pelo gatilho');
 select is(pg_temp.etapa_de('e0000000-0000-4000-8000-000000003104'), 'respondeu',
   '§3.9: e o cartão não se mexeu');
 
 insert into public.consent_events (kind, organization_id, channel, evidence_text)
 values ('data_use_authorized', 'c0000000-0000-4000-8000-000000003104', 'whatsapp',
         'pgTAP §3.9: autorizou por áudio');
-update public.deals set stage_id = pg_temp.etapa('fornecedor', 'autorizou')
+update public.deals set stage_id = pg_temp.etapa('fornecedor', 'cadastro_em_andamento')
  where id = 'e0000000-0000-4000-8000-000000003104';
-select is(pg_temp.etapa_de('e0000000-0000-4000-8000-000000003104'), 'autorizou',
+select is(pg_temp.etapa_de('e0000000-0000-4000-8000-000000003104'), 'cadastro_em_andamento',
   '§3.9: com a prova gravada, o mesmo UPDATE passa');
 
 select throws_ok(
@@ -272,7 +319,7 @@ select is(
 create table pg_temp.antes105 as select pg_temp.n_consent('c0000000-0000-4000-8000-000000003105') as n;
 select is(
   (public.move_deal('e0000000-0000-4000-8000-000000003105',
-                    pg_temp.etapa('fornecedor', 'autorizou'), null, null,
+                    pg_temp.etapa('fornecedor', 'cadastro_em_andamento'), null, null,
                     jsonb_build_object('authorization_evidence', 'pode cadastrar sim, autorizo'),
                     jsonb_build_object('kind', 'message', 'label', 'Enviar link de cadastro',
                                        'at', now() + interval '1 day')) ->> 'ok'),

@@ -81,6 +81,42 @@ describe('a régua do funil', () => {
     expect(regua?.passos.every((p) => p.estado === 'a_fazer')).toBe(true);
   });
 
+  // 07/10/2026: o funil começa no contato. "Prospectado" é a etapa de ENTRADA —
+  // o negócio nasce nela, mas ela não é passo da régua.
+  describe('com a etapa de entrada marcada', () => {
+    const FUNIL: EtapaDoFunil[] = CAPTACAO.map((e) => (e.id === 11 ? { ...e, entrada: true } : e));
+
+    it('a régua começa em Contatado: a entrada não é passo', () => {
+      const regua = montarRegua(FUNIL, 13);
+      expect(regua?.passos.map((p) => p.nome)).toEqual([
+        'Contatado',
+        'Respondeu',
+        'Reunião marcada',
+        'Publicado (ganho)',
+      ]);
+      expect(regua?.total).toBe(4);
+      // "Respondeu" é a etapa 2 de 4, e não mais a 3 de 5.
+      expect(regua?.posicao).toBe(2);
+      expect(regua?.antes).toBeNull();
+    });
+
+    it('quem ainda está na entrada tem a régua apagada, e a próxima é a primeira do funil', () => {
+      const regua = montarRegua(FUNIL, 11);
+      expect(regua?.antes).toBe('Prospectado');
+      expect(regua?.fora).toBeNull();
+      expect(regua?.posicao).toBeNull();
+      expect(regua?.proxima).toBe('Contatado');
+      expect(regua?.passos.every((p) => p.estado === 'a_fazer')).toBe(true);
+    });
+
+    it('"ainda não entrou" e "saiu do funil" são coisas diferentes', () => {
+      const perdido = montarRegua(FUNIL, 98);
+      expect(perdido?.fora).toBe('Perdido');
+      expect(perdido?.antes).toBeNull();
+      expect(perdido?.proxima).toBeNull();
+    });
+  });
+
   it('etapa que não é do funil, ou funil sem etapa de trabalho, não tem régua', () => {
     expect(montarRegua(CAPTACAO, 777)).toBeNull();
     expect(montarRegua([{ id: 98, nome: 'Perdido', posicao: 98 }], 98)).toBeNull();

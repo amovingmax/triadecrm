@@ -45,7 +45,7 @@ create function pg_temp.etapa(p_funil text, p_slug text) returns int language sq
 $$;
 insert into public.deals (id, organization_id, pipeline_id, stage_id) values
   ('d0000000-0000-4000-8000-000000000501', 'b0000000-0000-4000-8000-000000000501',
-   (select id from public.pipelines where slug = 'fornecedor'), pg_temp.etapa('fornecedor', 'em_conversa')),
+   (select id from public.pipelines where slug = 'fornecedor'), pg_temp.etapa('fornecedor', 'respondeu')),
   ('d0000000-0000-4000-8000-000000000502', 'b0000000-0000-4000-8000-000000000502',
    (select id from public.pipelines where slug = 'fornecedor'), pg_temp.etapa('fornecedor', 'contatado'));
 

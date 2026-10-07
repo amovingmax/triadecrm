@@ -4,6 +4,7 @@ import {
   comQuemPadrao,
   desfechosOferecidos,
   diaEmFortaleza,
+  ehAutorizacao,
   ehInteresse,
   instanteEmFortaleza,
   SLUGS_REUNIAO_AGENDADA,
@@ -131,9 +132,9 @@ export type Compromisso = {
  * uma lista de slugs, pelo mesmo motivo de `recortesDoCompromisso`: o gestor edita
  * o catálogo (RF-ADM-02).
  *
- *   sucesso     o parceiro autorizou, começou o cadastro (etapa de destino
- *               `autorizou` ou `cadastro_em_andamento`) ou saiu interessado
- *               (`SLUGS_INTERESSE`, a única exceção por slug — ver lá o porquê)
+ *   sucesso     o parceiro autorizou (`SLUG_AUTORIZACAO`), começou o cadastro
+ *               (etapa de destino `cadastro_em_andamento`) ou saiu interessado
+ *               (`SLUGS_INTERESSE`) — as duas exceções por slug; ver lá o porquê
  *   ausente     não havia ninguém do outro lado (no-show, "não estava")
  *   perda       o desfecho leva o negócio a Perdido
  *   adiado      "agora não": o desfecho leva o negócio a Nutrição
@@ -151,11 +152,11 @@ export type ResultadoDoCompromisso = {
   rotulo: string;
   /** O nome do desfecho no catálogo, para a linha de baixo. */
   desfecho: string;
-  /** O parceiro autorizou (etapa de destino `autorizou`): o cartão ganha o troféu. */
+  /** O parceiro autorizou (desfecho `reu_autorizou`): o cartão ganha o troféu. */
   trofeu: boolean;
 };
 
-const ETAPAS_DE_SUCESSO = ['autorizou', 'cadastro_em_andamento'];
+const ETAPAS_DE_SUCESSO = ['cadastro_em_andamento'];
 
 export function resultadoDoDesfecho(
   desfecho: DesfechoCatalogo,
@@ -182,7 +183,7 @@ export function resultadoDoDesfecho(
   if (desfecho.target_stage_slug === 'nutricao') {
     return { ...base, tom: 'adiado', rotulo: desfecho.name };
   }
-  if (desfecho.target_stage_slug === 'autorizou') {
+  if (ehAutorizacao(desfecho)) {
     return { ...base, tom: 'sucesso', rotulo: 'Parceiro autorizou', trofeu: true };
   }
   if (

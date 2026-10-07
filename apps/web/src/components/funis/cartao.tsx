@@ -70,8 +70,8 @@ export type PropsCartaoNegocio = {
   cartao: CartaoQuadro;
   /**
    * Quantas etapas de TRABALHO o funil tem — o denominador da barra da esquerda.
-   * É prop, e nunca constante: fornecedor tem 9, ativação 6 e produtor 11. Quem
-   * sabe é o quadro, que já carrega a lista de etapas.
+   * É prop, e nunca constante: cada funil tem a sua quantidade. Quem sabe é o
+   * quadro, que já carrega a lista de etapas.
    */
   etapasDeTrabalho: number;
   /**

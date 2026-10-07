@@ -1,33 +1,13 @@
 /**
- * Os filtros do quadro na query string.
+ * A frase do estado vazio do quadro, a partir do recorte ligado.
  *
- * A leitura reaproveita `filtrosQuadroDaUrl` do contrato e acrescenta uma linha: o
- * contrato reconhece só os funis QUE ABREM QUADRO (`ehFunilDoQuadro`), e por isso
- * `?funil=ativacao` cairia de volta em fornecedor. A página tem um seletor com os
- * três funis — ativação inclusive, porque ele existe no banco e o time pergunta por
- * ele — então ela precisa saber ler o terceiro. O que ela mostra para ativação não é
- * um quadro (isso continua valendo): é a régua de etapas com a contagem real.
- *
- * A escrita é a do contrato, sem mudança: `urlDosFiltrosQuadro` já grava qualquer
- * slug diferente do padrão.
+ * (Até 07/10/2026 este arquivo também lia `?funil=ativacao`, o funil que o
+ * seletor mostrava sem abrir quadro. A aba saiu, e a leitura da URL voltou a ser
+ * só a do contrato: `filtrosQuadroDaUrl`, em `../tipos`.)
  */
 import { ROTULO_CANAL } from '@/lib/canais';
 
-import { filtrosQuadroDaUrl, type FiltrosQuadro } from '../tipos';
-
-/** O slug do funil que só existe no seletor, nunca no quadro. */
-const FUNIL_SEM_QUADRO = 'ativacao';
-
-export function lerFiltrosDoQuadro(
-  params: Record<string, string | string[] | undefined>,
-): FiltrosQuadro {
-  const base = filtrosQuadroDaUrl(params);
-  const bruto = params.funil;
-  if (typeof bruto === 'string' && bruto === FUNIL_SEM_QUADRO) {
-    return { ...base, funil: FUNIL_SEM_QUADRO };
-  }
-  return base;
-}
+import type { FiltrosQuadro } from '../tipos';
 
 /** Frase que descreve o recorte ligado, para o estado vazio não ser genérico. */
 export function descreverRecorte(filtros: FiltrosQuadro): string {

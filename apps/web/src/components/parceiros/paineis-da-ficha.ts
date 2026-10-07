@@ -250,6 +250,12 @@ export function montarAtividade(
     desfechos: { id: number; nome: string }[];
     /** O nome de cada etapa, por id. */
     etapas: ReadonlyMap<number, string>;
+    /**
+     * As etapas de ENTRADA (`stages.is_entry`): "Prospectado", "Identificado". Quem
+     * nasce nelas ainda não entrou no funil — o funil começa no contato
+     * (07/10/2026) —, e a linha não pode dizer que entrou.
+     */
+    etapasDeEntrada?: ReadonlySet<number>;
     /** `organizations.created_at`: é com ele que se reconhece a entrada na base. */
     criadaEm?: string | null;
   },
@@ -281,11 +287,15 @@ export function montarAtividade(
       // quem lê: "Entrou na base" já contou.
       const quandoFoi = Date.parse(h.changed_at);
       if (origens.some((o) => Math.abs(o - quandoFoi) <= MESMO_ATO_MS)) continue;
+      // Nascer na etapa de entrada não é entrar no funil: é entrar na lista de
+      // quem ainda vai ser contatado. O cabeçalho da ficha diz "ainda não
+      // contatado", e esta linha não pode dizer o contrário logo abaixo.
+      const naEntrada = entrada.etapasDeEntrada?.has(h.to_stage_id) ?? false;
       itens.push({
         id: `etapa:${h.id}`,
         tipo: 'etapa',
-        titulo: 'Entrou no funil',
-        detalhe: para,
+        titulo: naEntrada ? 'Entrou em Prospectados' : 'Entrou no funil',
+        detalhe: naEntrada ? 'Ainda não contatado' : para,
         citacao: false,
         contato: false,
         em: h.changed_at,
@@ -401,6 +411,12 @@ export type Passo = {
   sala: string | null;
   /** Reunião no endereço do parceiro, e não numa sala on-line. */
   presencial: boolean;
+  /**
+   * O id da tarefa em `tasks`, quando a linha é uma tarefa: é o que o botão de
+   * excluir manda para `public.tarefa_excluir` (07/10/2026). `null` na reunião,
+   * que não se exclui daqui.
+   */
+  tarefaId: string | null;
 };
 
 export type ProximosPassos = {
@@ -419,8 +435,9 @@ export const LINHAS_DE_PASSOS = 5;
 /**
  * O que está marcado com este parceiro: as reuniões de pé e as tarefas abertas.
  *
- * SÓ LISTA. Concluir tarefa, confirmar ou remarcar reunião continuam na Agenda e
- * no Meu dia, que é onde o desfecho é registrado com as regras dele.
+ * QUASE SÓ LISTA. Concluir tarefa, confirmar ou remarcar reunião continuam na
+ * Agenda e no Meu dia, que é onde o desfecho é registrado com as regras dele. A
+ * exceção, desde 07/10/2026, é EXCLUIR uma tarefa aberta (`tarefaId`).
  *
  * A tarefa que é só o "eco" de uma reunião (`reunioes.task_id`, ADR-15) não
  * entra: listaria a mesma reunião duas vezes.
@@ -455,6 +472,7 @@ export function montarProximosPassos(
         selo: passou ? 'aguarda resultado' : r.estado === 'a_confirmar' ? 'a confirmar' : null,
         sala: online && !passou && r.link ? r.link : null,
         presencial: !online,
+        tarefaId: null,
         futura: Date.parse(r.inicio) >= agora.getTime(),
       };
     });
@@ -484,6 +502,7 @@ export function montarProximosPassos(
                 : null,
         sala: null,
         presencial: false,
+        tarefaId: t.id,
       };
     });
 

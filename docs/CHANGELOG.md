@@ -6618,3 +6618,223 @@ A `main` continua sem o pivô, e os três SDRs de produção continuam SDR.
 GitHub, a pedido. A `main` não tinha andado desde a abertura da branch, então o
 que está nela é exatamente o que já estava no ar: não houve novo deploy. A partir
 daqui, publicar pela `main` mantém o pivô.
+
+## 07/10/2026 — Limpeza do funil: o quadro começa em Contatado (RF-FUN-01, RF-FUN-04, RF-FUN-08, RF-FUN-12, RF-REL-10)
+
+Pedido do Rafael: "tire o funil de prospectado, pois essa parte a gente já tem
+uma tabela própria; o primeiro funil vai ser Contatado, que a partir da primeira
+mensagem que a gente mandar a pessoa já sobe para lá; tire Em conversa e deixe
+apenas Respondeu; retire Autorizou. Faça as mesmas remoções nos outros funis, com
+as que se parecem (prospectado = identificado). Tire a aba de ativação."
+
+Branch `limpeza-do-funil`, aberta da `main` (`2722519`). **Nada disto está em
+produção nem na `main`.**
+
+**Como os funis ficaram**
+
+- **Fornecedor:** Contatado → Respondeu → Reunião marcada → Apresentação realizada
+  → Cadastro em andamento → Publicado (ganho), mais Nutrição, Perdido e Opt-out.
+- **Produtor:** igual a antes, sem a coluna Identificado. Ele nunca teve "Em
+  conversa", e o "sim" dele é Parceria aceita, que fica.
+- **Ativação:** saiu da tela de Funis. Era uma aba que não abria quadro, só uma
+  régua de contagens, todas zero.
+
+**O que "tirar" quis dizer, em cada caso** (migração `20261007100000`)
+
+- **Prospectado e Identificado viraram a etapa de entrada** (`stages.is_entry`).
+  O negócio continua nascendo nelas — é dele que saem o lote de ligação, a próxima
+  ação e o Meu dia —, mas elas deixam de ser coluna: quem ainda não foi contatado
+  mora na lista de Prospectados. A subida para Contatado na primeira mensagem já
+  existia (`app.wa_envio_no_funil`, a de quem clica e a do bom-dia) e não mudou.
+- **Em conversa e Autorizou foram aposentadas** (`stages.retired_at`). Quem estava
+  em Em conversa vai para Respondeu; quem estava em Autorizou, para Cadastro em
+  andamento, com o motivo escrito no histórico de etapas. A linha não é apagada: o
+  histórico aponta para ela, e a linha do tempo da ficha continua dizendo "de
+  Respondeu para Em conversa" em quem passou por lá.
+- `app.aposentar_etapa(funil, etapa, sucessora)` faz isso e é o que a migração
+  chama; etapa aposentada não recebe negócio (o gatilho `app.deals_before_write`
+  recusa), e `app.stage_for` nunca resolve para uma.
+- **A frase da autorização** passa a virar prova (`consent_events`) em Cadastro em
+  andamento, como campo opcional — igual a Parceria aceita no produtor. "Realizada,
+  autorizou" continua exigindo a frase e passa a levar a Cadastro em andamento;
+  "Interessado" (ligação e visita) passa a levar a Respondeu, **inclusive no funil
+  produtor**, onde antes o contato era gravado e a etapa não andava.
+- **"Autorizações" no relatório de segunda** passa a contar o fato
+  (`consent_events`, um por parceiro na semana), e não a passagem pela etapa — que
+  ficaria em zero para sempre.
+- O quadro (`pipeline_board`), o relatório de funil (`relatorio_funil`), a lista de
+  etapas que a IA pode sugerir (`app.ia_entrada_da_ficha`) e a leitura da coluna
+  "Etapa" da planilha (`app.importacao_etapa`) deixam de ver a entrada e as
+  aposentadas.
+
+**Na tela**
+
+- Funis: dois funis no seletor; a primeira coluna é Contatado; o total do cabeçalho
+  é o de quem já está no funil. Quadro vazio explica isso e leva a Prospectados.
+- Ficha do parceiro: a régua começa em Contatado. Quem ainda está em Prospectado
+  aparece como "ainda não contatado", com a régua apagada e "próxima: Contatado";
+  e a linha do tempo dele diz "Entrou em Prospectados", não "Entrou no funil".
+- Prospectados: o filtro de etapa perdeu as aposentadas e o funil de ativação;
+  "Prospectado" e "Identificado" continuam nele (é ali que se procura quem falta
+  contatar).
+- O troféu de autorização (Agenda e "Feito hoje") passa a ser do desfecho
+  "Realizada, autorizou", e não da etapa de destino — senão "Cadastro iniciado na
+  hora", que agora leva à mesma etapa, ganharia troféu sem autorização nenhuma.
+
+**Onde entra quem vai para a Consultoria (Conversas)** — não mudou, e fica
+registrado porque foi perguntado: a aba mostra quem tem negócio **ganho** ou cuja
+etapa já é de cliente. Na prática: em Funis, mover o cartão para **Publicado
+(ganho)** no funil de fornecedor; no de produtor, de **Evento criado no app** em
+diante. A regra é `fechou`, em `components/conversas/montagem.ts`.
+
+- Testes: pgTAP novo `103_o_funil_comeca_no_contato.sql` (39); 14 arquivos
+  ajustados ao funil novo (`04`, `06`, `08`, `10`, `11`, `12`, `14`, `17`, `28`,
+  `31`, `46`, `74`, `94`, `97`). No site, fixtures do catálogo de desfechos
+  atualizadas e testes novos da régua e do troféu.
+- Ensaiado contra um banco com as etapas antigas e negócios dentro (em transação,
+  desfeita no fim): 1 negócio de Em conversa para Respondeu, 1 de Autorizou para
+  Cadastro em andamento, histórico com o motivo, e reaplicar não muda nada.
+- Conferido no navegador contra o banco local, como gestor: as duas abas, a
+  primeira coluna em Contatado, o prospectado de teste fora do quadro e da conta,
+  o link antigo `?funil=ativacao` caindo no funil de fornecedor, e a régua da
+  ficha nos dois casos (em Prospectado e em Respondeu, "etapa 2 de 6").
+
+**Decisões minhas, para quem quiser rever:**
+- As posições 4 e 7 do funil fornecedor ficam vagas, na seed e em produção: são as
+  das duas etapas aposentadas. Renumerar não muda nada na tela e mexeria em oito
+  funções que comparam posição.
+- **Ligação que ninguém atende não sobe o negócio para Contatado** — já era assim
+  (o desfecho não tem etapa de destino), mas antes a pessoa aparecia na coluna
+  Prospectado e agora não aparece no quadro; fica em Prospectados, com o resultado
+  da ligação na lista. Se a primeira ligação também deve subir, é pouca coisa.
+- `move_deal` não foi reescrito: quem tentar mover para uma etapa aposentada (só
+  acontece com aba antiga aberta) recebe o erro do gatilho, não uma recusa com
+  nome. Depois do deploy, pedir recarga forçada.
+
+**Pendente:**
+1. O roteiro de ligação e a tela de Lotes ainda oferecem o funil de Ativação (não
+   mexi no módulo de ligação, que está sendo trabalhado em outra branch).
+2. Os exemplos dentro dos prompts (`packages/prompts`, ficha da conversa e pulso
+   do dia) ainda citam "Em conversa" como nome de etapa. São exemplos; a lista de
+   verdade vem do banco. Trocar pede nova versão do prompt e rodar os evals.
+3. O PRD §5.3 ainda descreve as 12 etapas.
+
+## 07/10/2026 — Excluir sem apagar: o parceiro, o compromisso da agenda e a próxima ação (RF-BAS-10, RF-AGE-05, RF-ADM-03)
+
+Pedido do Rafael: "trabalhe bem sobre as funcionalidades de exclusão. Em várias
+abas não tem isso — como excluir uma agenda, excluir algum parceiro."
+
+O levantamento, tela por tela, mostrou onde doía: **a ficha do parceiro não tinha
+como sair da base** (a coluna de exclusão existe desde o D1 e toda leitura já a
+respeita, mas nenhuma função a escrevia — e a importação, passadas as 48 h do
+desfazer, mandava "agora é um parceiro de cada vez, na ficha dele"); e **na Agenda
+só a reunião tinha "cancelar"**: visita e compromisso sem reunião ficavam para
+sempre, e a única saída era registrar um "não estava" que não era verdade.
+
+**Excluir não é apagar** (migração `20261007110000`). Apagar a linha de um parceiro
+é impossível para quase todo mundo que já foi tocado (consentimento é
+append-only) e, onde é possível, leva junto mensagens, ligações e reuniões.
+Excluir é tirar de circulação, de um jeito que se desfaz:
+
+- **Parceiro** — `public.parceiro_excluir(id, motivo)`, admin e gestor, motivo
+  obrigatório. A ficha sai de Prospectados, do funil, dos lotes, de Conversas e do
+  Meu dia. Na mesma transação: reuniões marcadas são canceladas (com o aviso ao
+  time), tarefas e cadências são encerradas, a vaga na fila do bom-dia é cancelada
+  e a conversa é desligada da ficha e arquivada. Fica gravado quem excluiu, quando
+  e por quê.
+  - **A conversa é desligada por um motivo concreto:** sem isso, se a pessoa
+    escrevesse de novo, a mensagem cairia num fio preso a uma ficha que nenhuma
+    tela mostra. Desligada, ela reaparece em "Fora da base".
+  - **Quem não se exclui por aqui:** quem já é cliente (negócio ganho, cadastro
+    concluído ou publicado) e quem tem pré-cadastro em andamento na Komune.
+  - **O que excluir não faz:** não tira ninguém da lista de quem pediu para não ser
+    contatado, e não é a eliminação da LGPD — os dados continuam no banco.
+- **Restaurar** — `public.parceiro_restaurar(id)`. Voltam a ficha, o negócio na
+  etapa em que estava e a conversa. O que foi cancelado não volta. Se o parceiro
+  foi recadastrado enquanto estava fora (mesmo telefone, CNPJ, @ ou lugar do
+  Google), a recusa diz qual é a outra ficha.
+- **Compromisso e próxima ação** — `public.tarefa_excluir(id, motivo)`: gestão,
+  quem faz ou quem criou. A tarefa fica cancelada (Agenda e Meu dia já não a
+  mostram), a próxima ação do negócio passa para a seguinte, a parada sai da rota
+  do dia e a exclusão vai para a auditoria. Se a tarefa for o eco de uma reunião
+  de pé, o que acontece é o cancelamento da reunião.
+
+**Na tela**
+
+- Ficha do parceiro → menu "⋯" → **Excluir parceiro**: diálogo que conta a
+  consequência, pede o motivo e, depois, aviso com **Desfazer**.
+- Prospectados → **Excluídos** (link ao lado da contagem): quem saiu, quem
+  excluiu, quando e por quê, com busca por nome e **Restaurar**.
+- O link antigo de uma ficha excluída deixou de dar "Erro 404" para a gestão: a
+  tela diz que o parceiro foi excluído, por quem, quando e por quê, e restaura
+  dali. Para os outros papéis continua o 404 (a política de leitura não lhes
+  mostra ficha excluída).
+- Agenda: **Excluir** nas visitas e nos compromissos sem reunião (a reunião
+  continua saindo pelo "Cancelar" dela, que pede o motivo e avisa o time). Vale
+  também na agenda de quem a pessoa acompanha.
+- Ficha → Próximos passos: lixeira em cada tarefa aberta.
+- **Confirmação onde se apagava no clique:** remover meta, apagar resposta pronta e
+  apagar etiqueta. A da etiqueta avisa o que ninguém dizia — ela sai de todos os
+  parceiros que a têm — e o aviso de erro parou de falar de uma trava "em uso" que
+  nunca existiu.
+- Um diálogo só para as exclusões novas (`components/exclusao/dialogo-excluir`):
+  diz o que some, o que é levado junto e como se desfaz, em vez de "tem certeza?".
+- Auditoria (Ajustes → LGPD): as ações novas aparecem com nome ("Excluiu o
+  parceiro", "Restaurou o parceiro", "Excluiu da agenda").
+
+- Testes: pgTAP novo `104_excluir_sem_apagar.sql` (51); no site, testes dos textos
+  de recusa e do recibo da exclusão.
+- Verificado, com o banco recriado do zero (`supabase db reset`, as duas migrações
+  e a seed nova): pgTAP **98 arquivos, 3.516 testes, todos passam**; `pnpm lint`,
+  `pnpm typecheck` e `pnpm test` verdes nos quatro pacotes (site: 74 arquivos,
+  1.226 testes). O `supabase db lint` segue com os dois apontamentos que já
+  existiam (`app.ia_prazo` e `app.radar_pontuar`); nada novo.
+- Conferido no navegador contra o banco local, como gestor: excluir uma tarefa
+  pelos próximos passos; o "Excluir" da visita na Agenda; excluir o parceiro pela
+  ficha (sem motivo, não deixa; com motivo, sai, e o aviso conta "1 tarefa
+  cancelada" com Desfazer); ele some do funil e da Agenda; aparece em Excluídos
+  com motivo, data e autor; restaurar devolve o cartão à mesma coluna; e a
+  confirmação da etiqueta em Ajustes.
+
+**Para subir:** o banco antes do site — as telas novas chamam as funções e leem as
+colunas das migrações `20261007100000` e `20261007110000`. Depois do deploy,
+pedir recarga forçada (Ctrl+Shift+R): aba antiga ainda mostra as colunas que
+saíram.
+
+**O que continua sem excluir, e por quê** (do levantamento; não foi feito agora):
+1. **Registro de contato lançado errado** — depois que o recibo fecha não há como
+   corrigir nem desfazer. Desfazer de verdade exige estornar o que o registro
+   moveu (etapa, tarefa, janela de recontato); pede desenho próprio.
+2. **Lotes de ligação** — dá para encerrar, não para excluir nem tirar um contato
+   pela lista. É do módulo de ligação, em outra branch.
+3. **Revisão** — não há desfazer de decisão. Para "aprovei errado", o caminho passa
+   a ser excluir a ficha criada.
+4. **Rota do dia** — não se exclui a rota inteira (a parada sai quando a visita é
+   excluída).
+5. **Envios** — a tela saiu do menu; o cancelar dela ainda usa a confirmação do
+   navegador.
+6. **Pessoas de contato e notas na ficha** — não existem como tela; não há o que
+   excluir.
+7. **Eliminação por pedido de titular (LGPD)** — não tem tela. Excluir não a
+   substitui.
+
+**Decisão minha, para quem quiser rever:** com o lead automático ligado, um
+parceiro excluído que escreve de novo vira uma ficha nova (é o que o CRM faz com
+qualquer número fora da base). Restaurar a antiga depois disso é recusado, e a
+recusa aponta para a nova.
+
+**Em produção (07/10/2026, 11:14):** a limpeza do funil e as exclusões. O
+Rafael rodou os três passos na ordem: push da branch `limpeza-do-funil`
+(`7356ae3`), `supabase db push` (migrações `20261007100000` e `20261007110000`)
+e `vercel deploy --prod --force`. Conferido daqui: o GitHub tem o mesmo commit
+da máquina, `supabase migration list` mostra as duas migrações no remoto (e o
+`--dry-run` diz que o banco está em dia), e o deploy de 11:14 está pronto na
+Vercel. Não conferi as contagens de negócio movidos em produção: a leitura
+direta do banco foi barrada aqui. **A `main` do GitHub continua sem este
+trabalho**: publicar a partir dela tira a limpeza do funil do ar.
+
+**Na `main` desde 07/10/2026:** a branch `limpeza-do-funil` foi juntada na `main`
+do GitHub, a pedido. A `main` não tinha andado desde a abertura da branch, então
+o que está nela é exatamente o que já estava no ar desde as 11:14: não houve novo
+deploy. A partir daqui, publicar pela `main` mantém a limpeza do funil e as
+exclusões.

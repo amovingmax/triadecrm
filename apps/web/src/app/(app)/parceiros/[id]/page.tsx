@@ -27,11 +27,13 @@ import { TransicaoPagina } from '@/components/movimento';
 import { hrefDoFunil, type ItemDoDia } from '@/components/meu-dia/tipos';
 import {
   carregarFicha,
+  carregarFichaExcluida,
   ROTULO_STATUS,
   type Ficha,
   type NegocioDaFicha,
 } from '@/components/parceiros/ficha';
 import { AcoesDaFicha } from '@/components/parceiros/ficha-acoes';
+import { FichaExcluida } from '@/components/parceiros/ficha-excluida';
 import { CompletarAFicha, EdicaoDaFicha, EditarContato } from '@/components/parceiros/ficha-edicao';
 import {
   AtividadeDaFicha,
@@ -69,6 +71,7 @@ import {
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { PainelPreCadastro } from '@/components/precadastro/painel-precadastro';
 import { requireSession } from '@/lib/auth/session';
+import { podeExcluirParceiro } from '@/lib/navegacao';
 import { whatsappConectado } from '@/components/conversas/whatsapp-conectado';
 
 /**
@@ -160,7 +163,18 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
     // carregar, o cartão dele avisa e o resto da ficha abre.
     carregarPaineis(id),
   ]);
-  if (!ficha) notFound();
+  if (!ficha) {
+    // A ficha pode não estar na base porque foi EXCLUÍDA (07/10/2026), e isso
+    // não é "endereço errado". Quem pode restaurar vê o que houve; para os
+    // outros a política de leitura devolve nada, e o 404 continua valendo.
+    const excluida = podeExcluirParceiro(sessao.papel) ? await carregarFichaExcluida(id) : null;
+    if (!excluida) notFound();
+    return (
+      <TransicaoPagina className={cn(LEITURA, 'flex flex-col gap-5 pt-6')}>
+        <FichaExcluida ficha={excluida} />
+      </TransicaoPagina>
+    );
+  }
 
   const principal = ficha.negocios.find((n) => n.status === 'open') ?? ficha.negocios[0] ?? null;
   const podeEscrever = ESCREVEM.includes(sessao.papel);
@@ -234,6 +248,8 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
 
           <div className="md:ml-auto md:shrink-0">
             <AcoesDaFicha
+              nome={ficha.nome}
+              podeExcluir={podeExcluirParceiro(sessao.papel)}
               organizationId={ficha.id}
               podeEscrever={podeEscrever}
               conversaNoCrm={conectado && podeEscrever}
@@ -290,7 +306,11 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
             className="order-4 lg:order-none"
           />
 
-          <ProximosPassosDaFicha passos={paineis.passos} className="order-2 lg:order-none" />
+          <ProximosPassosDaFicha
+            passos={paineis.passos}
+            podeExcluir={podeEscrever}
+            className="order-2 lg:order-none"
+          />
 
           {/* O pré-cadastro é o que vem DEPOIS de o negócio andar: a escada dele
               (rascunho, autorização, link) só faz sentido para quem já leu em
@@ -453,6 +473,12 @@ function ApoioDaRegua({
       {regua.fora ? (
         <span className="font-medium text-foreground md:font-normal md:text-muted-foreground">
           fora do funil<span className="hidden md:inline">: {regua.fora}</span>
+        </span>
+      ) : regua.antes ? (
+        // Quem está na etapa de entrada ainda não foi contatado: o funil começa
+        // em "Contatado" (07/10/2026), e "etapa 0 de 6" não diria nada a ninguém.
+        <span className="font-medium text-foreground md:font-normal md:text-muted-foreground">
+          ainda não contatado
         </span>
       ) : (
         <>

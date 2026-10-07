@@ -9,7 +9,7 @@ import type {
  *
  * Por que este arquivo existe: o comportamento padrão do `KeyboardSensor` move o
  * cartão 25 pixels por seta. Numa lista isso funciona; num quadro de doze colunas de
- * 288px, chegar de "Prospectado" a "Perdido" custaria mais de cem toques na seta, e a
+ * 288px, chegar de "Contatado" a "Perdido" custaria mais de cem toques na seta, e a
  * coluna certa só seria atingida por sorte. Aqui a seta anda de COLUNA em COLUNA: um
  * toque, uma etapa, na ordem em que elas aparecem na tela (`position` do banco, a
  * mesma que ordena o quadro). Sem isto o quadro é inacessível a quem não usa o mouse

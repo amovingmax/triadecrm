@@ -42,6 +42,16 @@ Decidido pelo time em 06/10/2026; detalhe e pendências no `docs/CHANGELOG.md` (
 - **O relatório do dia por pessoa** é `public.ligacoes_do_dia` + `apps/web/src/components/ligacoes-do-dia`; é a mesma conta para quem liga e para a gestão.
 - **"por ler" sai ao abrir a conversa**; a marca "Nova" e o número do menu saem só com a resposta do time.
 
+## Limpeza do funil e exclusões, de 07/10/2026 (vale sobre o PRD §5.3)
+
+Detalhe e pendências no `docs/CHANGELOG.md` (as duas entradas de 07/10/2026).
+
+- **O funil começa em Contatado.** Fornecedor: Contatado → Respondeu → Reunião marcada → Apresentação realizada → Cadastro em andamento → Publicado. "Em conversa" e "Autorizou" saíram; no produtor saiu só a coluna Identificado. O funil de Ativação saiu da tela de Funis (continua no banco, por causa do roteiro de ligação).
+- **Etapa de entrada (`stages.is_entry`): Prospectado e Identificado.** O negócio nasce nelas e elas não são coluna: quem ainda não foi contatado mora na lista de Prospectados e sobe para Contatado na primeira mensagem (`app.wa_envio_no_funil`).
+- **Etapa aposentada (`stages.retired_at`):** não recebe negócio, não aparece em quadro, relatório nem lista de escolha, e a linha fica pela história. Nunca apague uma etapa nem escreva o slug dela em código novo; para tirar outra, use `app.aposentar_etapa(funil, etapa, sucessora)`.
+- **A autorização é o fato, não a etapa:** a frase vira `consent_events` ao entrar em Cadastro em andamento (campo opcional); relatórios contam `consent_events`; na tela, o que reconhece a autorização é o desfecho `reu_autorizou`.
+- **Excluir não é `DELETE`.** Parceiro: `public.parceiro_excluir` / `public.parceiro_restaurar` (admin e gestor; `organizations.deleted_at`, com motivo), lista em `/parceiros/excluidos`. Tarefa, visita e compromisso: `public.tarefa_excluir` (vira `cancelled`). Reunião: `public.reuniao_cancelar`. Exclusão nova na tela usa `components/exclusao/dialogo-excluir`, que conta a consequência em vez de perguntar "tem certeza?".
+
 ## Estrutura do monorepo (pnpm workspaces; criar assim no D1)
 
 ```

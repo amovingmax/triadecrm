@@ -13,7 +13,7 @@
 -- recortado por responsável, por organização ou pelo próprio negócio de teste.
 -- =====================================================================
 begin;
-select plan(80);
+select plan(83);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -209,12 +209,12 @@ select is((select changed_by_name from public.deal_stage_timeline('d0000000-0000
 -- Recusa por concorrência e por etapa igual.
 select is(
   (public.move_deal('d0000000-0000-4000-8000-000000000901',
-                    pg_temp.etapa('fornecedor', 'em_conversa'),
+                    pg_temp.etapa('fornecedor', 'apresentacao_realizada'),
                     pg_temp.etapa('fornecedor', 'prospectado'), null, null, pg_temp.acao(1)) ->> 'reason'),
   'etapa_mudou', 'concorrência: etapa esperada diferente da real é recusada');
 select is(
   ((public.move_deal('d0000000-0000-4000-8000-000000000901',
-                     pg_temp.etapa('fornecedor', 'em_conversa'),
+                     pg_temp.etapa('fornecedor', 'apresentacao_realizada'),
                      pg_temp.etapa('fornecedor', 'prospectado')) -> 'current_stage_id')::int),
   pg_temp.etapa('fornecedor', 'respondeu'), 'concorrência: devolve a etapa real do cartão');
 select is(
@@ -268,12 +268,15 @@ select is((select temperature::text from public.deals where id = 'd0000000-0000-
   'quente', 'temperatura: etapa quente esquenta o negócio');
 
 -- Evidência de autorização vira prova em consent_events (guardrail do pré-cadastro).
+-- A etapa "Autorizou" saiu do funil em 07/10/2026 (migração 20261007100000): a
+-- frase agora entra junto com "Cadastro em andamento", que a declara como campo
+-- opcional com `consent_kind`.
 select is(
   (public.move_deal('d0000000-0000-4000-8000-000000000901',
-                    pg_temp.etapa('fornecedor', 'autorizou'), null, null,
+                    pg_temp.etapa('fornecedor', 'cadastro_em_andamento'), null, null,
                     jsonb_build_object('authorization_evidence', 'pode cadastrar sim, autorizo'),
                     pg_temp.acao(1, 'Enviar link de reivindicação')) ->> 'ok'),
-  'true', 'RF-FUN-04: autorizou com evidência é aceito');
+  'true', 'RF-FUN-04: cadastro em andamento com a evidência da autorização é aceito');
 select is(
   (select count(*)::int from public.consent_events
     where organization_id = 'b0000000-0000-4000-8000-000000000901' and kind = 'data_use_authorized'),
@@ -369,16 +372,20 @@ select is(pg_temp.total_etapa(public.pipeline_board(pg_temp.funil('fornecedor'),
 
 -- embaixador: só a própria carteira, no quadro e no movimento.
 select pg_temp.entrar('a0000000-0000-4000-8000-000000000905', 'embaixador');
+-- O negócio dele ainda está em "Prospectado", a etapa de entrada: fora do quadro
+-- (07/10/2026). Entra na conta quando sobe para "Contatado".
 select is(pg_temp.soma_totais(public.pipeline_board(pg_temp.funil('fornecedor'))),
-  1, 'embaixador: o quadro traz só a carteira dele');
-select is(
-  (pg_temp.cartao(public.pipeline_board(pg_temp.funil('fornecedor')), 'prospectado') ->> 'organization_name'),
-  'Kanban Doces Celeste', 'embaixador: o cartão do quadro é o dele');
+  0, 'o funil começa no contato: quem está em Prospectado não entra na conta do quadro');
 select is(
   (public.move_deal('d0000000-0000-4000-8000-000000000903',
                     pg_temp.etapa('fornecedor', 'contatado'),
                     null, 'visita combinada', null, pg_temp.acao(1)) ->> 'ok'),
   'true', 'embaixador: move negócio da própria carteira');
+select is(pg_temp.soma_totais(public.pipeline_board(pg_temp.funil('fornecedor'))),
+  1, 'embaixador: o quadro traz só a carteira dele');
+select is(
+  (pg_temp.cartao(public.pipeline_board(pg_temp.funil('fornecedor')), 'contatado') ->> 'organization_name'),
+  'Kanban Doces Celeste', 'embaixador: o cartão do quadro é o dele');
 select is(
   (public.move_deal('d0000000-0000-4000-8000-000000000901',
                     pg_temp.etapa('fornecedor', 'contatado'), null, null, null, pg_temp.acao(1)) ->> 'reason'),
@@ -421,7 +428,7 @@ select is((select owner_id from public.deals where id = 'd0000000-0000-4000-8000
 select pg_temp.entrar('a0000000-0000-4000-8000-000000000901', 'admin');
 select is(
   (public.move_deal('d0000000-0000-4000-8000-000000000903',
-                    pg_temp.etapa('fornecedor', 'em_conversa'), null, null, null, pg_temp.acao(1)) ->> 'ok'),
+                    pg_temp.etapa('fornecedor', 'apresentacao_realizada'), null, null, null, pg_temp.acao(1)) ->> 'ok'),
   'true', 'admin: move qualquer negócio');
 
 -- anon: nada.
@@ -446,10 +453,20 @@ select throws_ok(
 -- =====================================================================
 select is(
   (select jsonb_array_length(public.pipeline_board(pg_temp.funil('fornecedor')) -> 'stages')),
-  12, 'quadro: o funil de fornecedor tem 12 colunas');
+  9, 'quadro: o funil de fornecedor tem 9 colunas (das 10 etapas, Prospectado é entrada e não é coluna)');
 select is(
   (select jsonb_array_length(public.pipeline_board(pg_temp.funil('produtor')) -> 'stages')),
-  14, 'quadro: o funil de produtor tem 14 colunas');
+  13, 'quadro: o funil de produtor tem 13 colunas (das 14 etapas, Identificado é entrada e não é coluna)');
+select is(
+  (select count(*)::int
+     from jsonb_array_elements(public.pipeline_board(pg_temp.funil('fornecedor')) -> 'stages') s
+    where s ->> 'slug' in ('prospectado', 'em_conversa', 'autorizou')),
+  0, 'quadro: Prospectado, Em conversa e Autorizou não são coluna');
+select is(
+  (select s ->> 'slug'
+     from jsonb_array_elements(public.pipeline_board(pg_temp.funil('fornecedor')) -> 'stages') s
+    order by (s ->> 'position')::int limit 1),
+  'contatado', 'quadro: a primeira coluna é Contatado');
 select is(
   (select public.pipeline_board(pg_temp.funil('fornecedor')) -> 'pipeline' ->> 'slug'),
   'fornecedor', 'quadro: identifica o funil');
@@ -470,7 +487,7 @@ select is(pg_temp.total_etapa(
   1, 'quadro: busca por nome do parceiro dentro do quadro');
 select is(pg_temp.cartoes(
     public.pipeline_board(pg_temp.funil('fornecedor'), true, null, null,
-                          pg_temp.etapa('fornecedor', 'contatado')), 'prospectado'),
+                          pg_temp.etapa('fornecedor', 'contatado')), 'respondeu'),
   0, 'quadro: com p_stage_id só a etapa pedida devolve cartões (modo celular)');
 select is(pg_temp.cartoes(
     public.pipeline_board(pg_temp.funil('fornecedor'), true, null, null,

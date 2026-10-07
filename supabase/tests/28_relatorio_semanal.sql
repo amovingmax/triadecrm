@@ -179,13 +179,13 @@ values
    pg_temp.etapa('fornecedor','reuniao_marcada'),       'a2800000-0000-4000-8000-000000002802', pg_temp.dia(1, 16)),
   ('d2800000-0000-4000-8000-000000002802', pg_temp.etapa('fornecedor','prospectado'),
    pg_temp.etapa('fornecedor','reuniao_marcada'),       'a2800000-0000-4000-8000-000000002802', pg_temp.dia(2, 16)),
-  ('d2800000-0000-4000-8000-000000002803', pg_temp.etapa('fornecedor','em_conversa'),
-   pg_temp.etapa('fornecedor','autorizou'),             'a2800000-0000-4000-8000-000000002802', pg_temp.dia(2, 17)),
-  ('d2800000-0000-4000-8000-000000002804', pg_temp.etapa('fornecedor','autorizou'),
+  ('d2800000-0000-4000-8000-000000002803', pg_temp.etapa('fornecedor','respondeu'),
+   pg_temp.etapa('fornecedor','apresentacao_realizada'),'a2800000-0000-4000-8000-000000002802', pg_temp.dia(2, 17)),
+  ('d2800000-0000-4000-8000-000000002804', pg_temp.etapa('fornecedor','apresentacao_realizada'),
    pg_temp.etapa('fornecedor','cadastro_em_andamento'), 'a2800000-0000-4000-8000-000000002802', pg_temp.dia(3, 16)),
   ('d2800000-0000-4000-8000-000000002805', pg_temp.etapa('fornecedor','cadastro_em_andamento'),
    pg_temp.etapa('fornecedor','publicado'),             'a2800000-0000-4000-8000-000000002802', pg_temp.dia(4, 16)),
-  ('d2800000-0000-4000-8000-000000002806', pg_temp.etapa('fornecedor','em_conversa'),
+  ('d2800000-0000-4000-8000-000000002806', pg_temp.etapa('fornecedor','respondeu'),
    pg_temp.etapa('fornecedor','nutricao'),              'a2800000-0000-4000-8000-000000002802', pg_temp.dia(4, 17)),
   ('d2800000-0000-4000-8000-000000002807', pg_temp.etapa('fornecedor','contatado'),
    pg_temp.etapa('fornecedor','perdido'),               'a2800000-0000-4000-8000-000000002802', pg_temp.dia(5, 17));
@@ -195,6 +195,14 @@ values
 insert into public.consent_events (kind, organization_id, channel, occurred_at, evidence_text)
 values ('contact_optout', 'c2800000-0000-4000-8000-000000002807', 'whatsapp',
         pg_temp.dia(3, 9), 'pgTAP: pediu para sair');
+-- E uma autorização. Desde 07/10/2026 (migração 20261007100000) "autorizações" é
+-- o FATO gravado em consent_events, e não mais a passagem pela etapa "Autorizou",
+-- que saiu do funil. Duas vezes o mesmo parceiro conta uma.
+insert into public.consent_events (kind, organization_id, channel, occurred_at, evidence_text)
+values ('data_use_authorized', 'c2800000-0000-4000-8000-000000002803', 'phone',
+        pg_temp.dia(2, 17), 'pgTAP: pode cadastrar, autorizo'),
+       ('data_use_authorized', 'c2800000-0000-4000-8000-000000002803', 'whatsapp',
+        pg_temp.dia(3, 10), 'pgTAP: confirmo, pode cadastrar');
 
 insert into public.tasks (title, kind, status, due_at, assignee_id, organization_id, completed_at)
 values ('RS retornar ligação', 'call', 'done', pg_temp.dia(2, 12),
@@ -231,7 +239,7 @@ select is(pg_temp.delta('reunioes_realizadas'), 1,
   'reuniões realizadas: a reunião com desfecho conta, o no-show não');
 select is(pg_temp.delta('reunioes_marcadas'), 2,
   'reuniões marcadas: as duas entradas em Reunião marcada');
-select is(pg_temp.delta('autorizacoes'), 1, 'autorizações: a entrada em Autorizou');
+select is(pg_temp.delta('autorizacoes'), 1, 'autorizações: o parceiro que autorizou na semana (consent_events), contado uma vez');
 select is(pg_temp.delta('cadastros_iniciados'), 1, 'cadastros iniciados: a entrada em Cadastro em andamento');
 select is(pg_temp.delta('publicados'), 1, 'publicados: o negócio ganho no funil de fornecedor');
 select is(pg_temp.delta('avancos'), 5,

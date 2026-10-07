@@ -14,9 +14,15 @@ import { cn } from '@/lib/utils';
  * da tela, e uma barra NEUTRA de progresso onde ela é (o cartão já vive dentro
  * da coluna da própria etapa — escrever o nome ali repetiria o cabeçalho).
  *
- * O TOTAL É PARÂMETRO, e nunca constante: fornecedor tem 9 etapas de trabalho,
- * ativação 6 e produtor 11 (conferido no bloco de `stages` da seed). Um número
- * cravado aqui encheria a barra errado em dois dos três quadros.
+ * O TOTAL É PARÂMETRO, e nunca constante: cada funil tem a sua quantidade de
+ * etapas de trabalho (bloco de `stages` da seed), e ela muda — mudou em
+ * 07/10/2026, quando "Em conversa" e "Autorizou" saíram. Um número cravado aqui
+ * encheria a barra errado.
+ *
+ * (A barra não é desenhada desde o cartão limpo de 29/09/2026. Se voltar: a
+ * POSIÇÃO do banco tem buracos — as etapas aposentadas continuam donas da delas
+ * —, então quem a religar deve contar pelo índice na lista de etapas do quadro,
+ * e não por `stage_position / total`.)
  *
  * A barra é acromática de propósito. A única cromia do produto continua sendo a
  * escala térmica, que segue existindo nos relatórios: um segundo sistema de cor

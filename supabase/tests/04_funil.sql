@@ -92,7 +92,7 @@ select is((select stage_change_reason from public.deals where id = 'd0000000-000
 select is((select reason from public.deal_stage_history where deal_id = 'd0000000-0000-4000-8000-000000000301' order by id desc limit 1), null,
   'histórico: sem motivo quando a mudança não informou');
 select set_config('app.stage_reason', 'automação de teste', true);
-update public.deals set stage_id = pg_temp.etapa('fornecedor', 'em_conversa') where id = 'd0000000-0000-4000-8000-000000000301';
+update public.deals set stage_id = pg_temp.etapa('fornecedor', 'apresentacao_realizada') where id = 'd0000000-0000-4000-8000-000000000301';
 select is((select reason from public.deal_stage_history where deal_id = 'd0000000-0000-4000-8000-000000000301' order by id desc limit 1), 'automação de teste',
   'histórico: motivo vindo de current_setting(app.stage_reason) (automações)');
 select set_config('app.stage_reason', '', true);

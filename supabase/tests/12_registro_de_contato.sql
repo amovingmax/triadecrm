@@ -123,7 +123,7 @@ select is((select slug from app.stage_for(pg_temp.funil('produtor'), 'reuniao_ma
 select is((select slug from app.stage_for(pg_temp.funil('produtor'), 'respondeu')),
   'respondeu', 'stage_for: o slug literal tem precedência sobre a equivalência');
 select is((select count(*)::int from app.stage_for(pg_temp.funil('produtor'), 'em_conversa')),
-  0, 'stage_for: "Em conversa" não tem equivalente no funil produtor (PRD §5.5) e a resolução é vazia');
+  0, 'stage_for: slug que nenhum funil tem mais ("Em conversa" saiu em 07/10/2026) resolve vazio, sem erro');
 
 -- =====================================================================
 -- 3. ACHADO 1 — os 8 desfechos que levam a Quente, no funil PRODUTOR
@@ -185,18 +185,21 @@ select is((select etapa from pg_temp.res where slug = 'reu_autorizou'),
   'parceria_aceita', 'produtor: "Realizada, autorizou" vira "Parceria aceita"');
 select is((select etapa from pg_temp.res where slug = 'vis_cadastro_iniciado'),
   'parceria_aceita', 'produtor: "Cadastro iniciado na hora" vira "Parceria aceita"');
+-- "Interessado" levava a "Em conversa", que o funil produtor nunca teve: o contato
+-- era gravado e a etapa não andava. Desde 07/10/2026 o destino é "Respondeu", que os
+-- dois funis têm — e o negócio sai da etapa de entrada ("Identificado").
 select is((select etapa from pg_temp.res where slug = 'lig_interessado'),
-  'identificado', 'produtor: "Interessado" não move etapa (não há "Em conversa" no funil)');
+  'respondeu', 'produtor: "Interessado" leva a Respondeu (o destino deixou de ser uma etapa que o funil não tem)');
 select is((select recusa from pg_temp.res where slug = 'lig_interessado'),
-  'etapa_fora_do_funil', 'produtor: e a recusa da etapa é dita, não escondida');
+  null, 'produtor: e não há mais recusa de etapa a dizer');
 select is((select etapa from pg_temp.res where slug = 'vis_decisor_interessado'),
-  'identificado', 'produtor: "Decisor interessado" também não move etapa');
+  'respondeu', 'produtor: "Decisor interessado" também leva a Respondeu');
 select is((select recusa from pg_temp.res where slug = 'vis_decisor_interessado'),
-  'etapa_fora_do_funil', 'produtor: recusa dita para "Decisor interessado"');
--- Sem etapa, o quente vem da INTENÇÃO declarada pelo desfecho (PRD §5.6).
+  null, 'produtor: sem recusa para "Decisor interessado"');
+-- Respondeu é morno; o quente vem da INTENÇÃO declarada pelo desfecho (PRD §5.6).
 select is((select d.last_intent from public.deals d
             join pg_temp.res r on r.deal = d.id where r.slug = 'lig_interessado'),
-  'interessado', 'achado 1: sem etapa equivalente, quem esquenta é a intenção declarada');
+  'interessado', 'achado 1: quem esquenta é a intenção declarada, não a etapa');
 select isnt((select task from pg_temp.res where slug = 'lig_interessado'), null,
   'achado 1: e a próxima ação continua virando tarefa (RF-FUN-03)');
 select is((select count(*)::int from public.deals d
@@ -221,8 +224,8 @@ select lives_ok($$
 $$, 'fornecedor: "Atendeu, retorna depois" registra sem erro');
 select pg_temp.sair();
 
-select is(pg_temp.etapa_de('e0000000-0000-4000-8000-000000000911'), 'em_conversa',
-  'fornecedor: "Interessado" continua indo para "Em conversa"');
+select is(pg_temp.etapa_de('e0000000-0000-4000-8000-000000000911'), 'respondeu',
+  'fornecedor: "Interessado" vai para "Respondeu" (era "Em conversa", que saiu do funil em 07/10/2026)');
 select is(pg_temp.temp_de('e0000000-0000-4000-8000-000000000911'), 'quente',
   'fornecedor: e continua deixando o negócio quente');
 select is(pg_temp.temp_de('e0000000-0000-4000-8000-000000000912'), 'morno',
@@ -338,12 +341,12 @@ select throws_ok($$
   select id, 'em_conversa', 'etapa_que_nao_existe' from public.pipelines where slug = 'produtor'
 $$, '23503', null, 'stage_equivalences: a etapa de destino tem de existir naquele funil');
 select is((select count(*)::int from public.stage_equivalences e
-            join public.pipelines p on p.id = e.pipeline_id where p.slug = 'produtor'), 4,
-  'seed: as quatro equivalências do funil produtor estão cadastradas');
+            join public.pipelines p on p.id = e.pipeline_id where p.slug = 'produtor'), 3,
+  'seed: as três equivalências do funil produtor estão cadastradas (a de "autorizou" saiu com a etapa)');
 select is((select count(*)::int from public.stage_equivalences e
             join public.pipelines p on p.id = e.pipeline_id
            where p.slug = 'produtor' and e.canonical_slug = 'em_conversa'), 0,
-  'seed: "Em conversa" continua sem equivalência inventada (PRD §5.5)');
+  'seed: "Em conversa" continua sem equivalência — nenhum desfecho fala mais esse slug');
 
 -- =====================================================================
 -- 7. O guardrail vale também quando p_organization_id e p_deal_id DISCORDAM

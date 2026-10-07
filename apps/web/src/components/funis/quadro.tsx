@@ -53,7 +53,7 @@ import {
  * 2. **Arrastar tem de funcionar sem mouse.** O `KeyboardSensor` entra com um
  *    `coordinateGetter` que anda de coluna em coluna (quadro-teclado.ts) e com avisos
  *    de leitor de tela em pt-BR. O padrão do dnd-kit anda 25px por seta: num quadro de
- *    doze colunas de 288px, chegar de "Prospectado" a "Perdido" custaria mais de cem
+ *    doze colunas de 288px, chegar de "Contatado" a "Perdido" custaria mais de cem
  *    toques. Sem isso a tela principal do produto é inacessível.
  *
  * 3. **Soltar numa etapa que exige dados NÃO tenta mover.** Se a etapa de destino pede
@@ -157,8 +157,9 @@ export function Quadro({
   const etapas = quadro.stages;
   /**
    * O denominador da barra de etapa do cartão (28/09/2026, ADR-16). Vem do FUNIL,
-   * e nunca de constante: fornecedor tem 9 etapas de trabalho, ativação 6 e
-   * produtor 11. `etapaEhDeSaida` já é quem separa trabalho de destino.
+   * e nunca de constante: cada funil tem a sua quantidade de etapas de trabalho,
+   * e ela muda (mudou em 07/10/2026). `etapaEhDeSaida` já é quem separa trabalho
+   * de destino.
    */
   const etapasDeTrabalho = etapas.filter((e) => !etapaEhDeSaida(e)).length;
   const movimento = useMoverCartao(filtros);

@@ -1,4 +1,4 @@
-import { ehInteresse, type DesfechoCatalogo } from '@/components/registro/tipos';
+import { ehAutorizacao, ehInteresse, type DesfechoCatalogo } from '@/components/registro/tipos';
 
 /**
  * O "Feito hoje" do Meu dia: cada parceiro com quem a pessoa registrou um resultado
@@ -94,7 +94,9 @@ const SLUG_REAGENDADA = 'reu_reagendada';
  */
 export function comoFoi(desfecho: DesfechoLido): { categoria: ComoFoi; trofeu: boolean } {
   const etapa = desfecho.target_stage_slug;
-  if (etapa === 'autorizou') return { categoria: 'positivo', trofeu: true };
+  // Pelo desfecho, e não pela etapa de destino: "Autorizou" saiu do funil em
+  // 07/10/2026 (ver `SLUG_AUTORIZACAO`).
+  if (ehAutorizacao(desfecho)) return { categoria: 'positivo', trofeu: true };
   if (desfecho.sets_temperature === 'morno') return { categoria: 'em_contato', trofeu: false };
   if (etapa && ETAPAS_NEGATIVAS.includes(etapa)) return { categoria: 'negativo', trofeu: false };
   if (desfecho.slug === SLUG_REAGENDADA) return { categoria: 'em_contato', trofeu: false };

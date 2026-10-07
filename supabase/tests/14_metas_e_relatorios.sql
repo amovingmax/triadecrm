@@ -394,9 +394,14 @@ select lives_ok($$select * from public.relatorio_funil()$$,
 
 select pg_temp.entrar('a1400000-0000-4000-8000-000000001401', 'gestor');
 
-select ok((select bool_and(conversao_etapa <= 100)
+-- `coalesce(..., true)`: os cinco negócios deste arquivo nascem e ficam em
+-- "Prospectado", a etapa de entrada, que saiu das linhas do relatório em
+-- 07/10/2026 — então aqui não sobra conversão nenhuma para conferir, e
+-- `bool_and` de nada é NULL. O caso com gente andando (e pulando etapa) é do
+-- 103_o_funil_comeca_no_contato.sql.
+select ok(coalesce((select bool_and(conversao_etapa <= 100)
              from public.relatorio_funil(date '2020-01-01', current_date)
-            where conversao_etapa is not null),
+            where conversao_etapa is not null), true),
   'relatório: nenhuma conversão etapa a etapa passa de 100%, mesmo com etapa pulada');
 select ok((select bool_and(conversao_acumulada <= 100)
              from public.relatorio_funil(date '2020-01-01', current_date)

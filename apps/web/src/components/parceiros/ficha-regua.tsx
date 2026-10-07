@@ -57,7 +57,9 @@ export function ReguaDoFunil({
         aria-label={
           regua.fora
             ? `Fora do funil: ${regua.fora}`
-            : `Etapa ${regua.posicao} de ${regua.total}: ${etapa}`
+            : regua.antes
+              ? `Ainda não entrou no funil: ${regua.antes}`
+              : `Etapa ${regua.posicao} de ${regua.total}: ${etapa}`
         }
       >
         {regua.passos.map((passo) => (

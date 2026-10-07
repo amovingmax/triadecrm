@@ -3,7 +3,7 @@
 -- feriados, modelos de mensagem e controle de acesso (PRD §5, Apêndices C e F; R09 §E; R08 §2).
 -- =====================================================================
 begin;
-select plan(62);
+select plan(65);
 
 -- ---------- contagens ----------
 select is((select count(*)::int from public.cities),                              22, 'seed: 22 cidades');
@@ -38,7 +38,7 @@ select is((select count(*)::int from public.holidays where extract(year from dat
 select is((select count(*)::int from public.lost_reasons),                         9, 'seed: 9 motivos de perda (PRD §5.3)');
 select is((select count(*)::int from public.tags),                                 4, 'seed: 4 etiquetas');
 select is((select count(*)::int from public.pipelines),                            3, 'seed: 3 funis');
-select is((select count(*)::int from public.stages s join public.pipelines p on p.id = s.pipeline_id where p.slug = 'fornecedor'), 12, 'seed: 12 etapas no funil de fornecedor');
+select is((select count(*)::int from public.stages s join public.pipelines p on p.id = s.pipeline_id where p.slug = 'fornecedor'), 10, 'seed: 10 etapas no funil de fornecedor (Em conversa e Autorizou saíram em 07/10/2026)');
 select is((select count(*)::int from public.stages s join public.pipelines p on p.id = s.pipeline_id where p.slug = 'ativacao'),    7, 'seed: 7 etapas no funil de ativação');
 select is((select count(*)::int from public.stages s join public.pipelines p on p.id = s.pipeline_id where p.slug = 'produtor'),   14, 'seed: 14 etapas no funil de produtor');
 select is((select count(*)::int from public.stages where position < 0),            0, 'seed: nenhuma etapa órfã (posição negativa)');
@@ -100,10 +100,20 @@ select results_eq($$select slug, kind::text from public.pipelines order by posit
   'seed: funis fornecedor, ativação e produtor na ordem');
 select results_eq(
   $$select s.slug, s.temperature::text from public.stages s join public.pipelines p on p.id = s.pipeline_id where p.slug = 'fornecedor' and s.position between 1 and 9 order by s.position$$,
-  $$values ('prospectado'::text, 'frio'::text), ('contatado', 'frio'), ('respondeu', 'morno'), ('em_conversa', 'morno'),
-           ('reuniao_marcada', 'quente'), ('apresentacao_realizada', 'quente'), ('autorizou', 'quente'), ('cadastro_em_andamento', 'quente'),
+  $$values ('prospectado'::text, 'frio'::text), ('contatado', 'frio'), ('respondeu', 'morno'),
+           ('reuniao_marcada', 'quente'), ('apresentacao_realizada', 'quente'), ('cadastro_em_andamento', 'quente'),
            ('publicado', 'cliente')$$,
-  'seed: etapas 1–9 do Funil 1 com a temperatura do PRD §5.6');
+  'seed: etapas do Funil 1 (posições 1–9, com as vagas de Em conversa e Autorizou) com a temperatura do PRD §5.6');
+-- O funil começa no contato (migração 20261007100000): a etapa de entrada existe,
+-- é onde o negócio nasce, e é a única de cada funil de captação.
+select results_eq(
+  $$select p.slug, s.slug from public.stages s join public.pipelines p on p.id = s.pipeline_id where s.is_entry order by p.position$$,
+  $$values ('fornecedor'::text, 'prospectado'::text), ('produtor', 'identificado')$$,
+  'seed: Prospectado e Identificado são as etapas de entrada, e só elas');
+select is((select count(*)::int from public.stages where retired_at is not null), 0,
+  'seed: banco novo não tem etapa aposentada (em produção, Em conversa e Autorizou ficam como linha)');
+select is((select count(*)::int from public.stages where slug in ('em_conversa', 'autorizou')), 0,
+  'seed: Em conversa e Autorizou não são mais criadas');
 select results_eq(
   $$select s.is_won, s.is_lost, s.is_terminal from public.stages s join public.pipelines p on p.id = s.pipeline_id where p.slug = 'fornecedor' and s.slug = 'publicado'$$,
   $$values (true, false, true)$$, 'seed: Publicado é ganho e terminal');

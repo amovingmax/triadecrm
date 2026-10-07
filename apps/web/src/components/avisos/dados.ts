@@ -165,7 +165,7 @@ type NegocioDoAviso = Pick<NegocioCru, 'status' | 'updated_at'> & {
  * Duas leituras em paralelo, sob a mesma RLS da tela. A etapa é a do negócio em
  * foco, escolhido por `escolherNegocio` — a mesma escolha da lista de Conversas,
  * para o cartão não dizer "Respondeu" de um parceiro que a lista mostra em
- * "Autorizou". Cada leitura falha sozinha: sem a ficha o cartão sai sem nome e
+ * "Reunião marcada". Cada leitura falha sozinha: sem a ficha o cartão sai sem nome e
  * sem categoria; sem os negócios, sem etapa.
  */
 export async function lerFichasDoAviso(ids: readonly string[]): Promise<Map<string, FichaDoAviso>> {

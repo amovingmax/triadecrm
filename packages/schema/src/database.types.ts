@@ -112,6 +112,10 @@ export type Database = {
       }
       ai_gasto_do_mes: { Args: { p_ref?: string }; Returns: Json }
       aplicar_retencao: { Args: never; Returns: Json }
+      aposentar_etapa: {
+        Args: { p_etapa: string; p_funil: string; p_sucessora: string }
+        Returns: number
+      }
       atendimento_liga: { Args: { p_chave: string }; Returns: boolean }
       ausencia_responder: { Args: { p_message_id: string }; Returns: Json }
       business_days: { Args: { p_ate: string; p_de: string }; Returns: number }
@@ -185,6 +189,8 @@ export type Database = {
       }
       corpo_fixo_de_optout: { Args: { p_body: string }; Returns: string }
       cpf_is_valid: { Args: { c: string }; Returns: boolean }
+      cumprimento_lote: { Args: never; Returns: string }
+      cumprimento_na_fila: { Args: never; Returns: number }
       data_pt: { Args: { p_data: string }; Returns: string }
       ddd_br_valido: { Args: { p: string }; Returns: boolean }
       ddd_da_regiao: { Args: { p_phone: string }; Returns: boolean }
@@ -943,6 +949,10 @@ export type Database = {
         Returns: Json
       }
       wa_introduzir: { Args: { p_message_id: string }; Returns: Json }
+      wa_komune_abrir: {
+        Args: { p_organization_id: string; p_template_id: number }
+        Returns: Json
+      }
       wa_modelo_ausencia: { Args: never; Returns: number }
       wa_modelo_da_meta: { Args: { p_template_id: number }; Returns: Json }
       wa_modelo_humano: { Args: never; Returns: number }
@@ -2951,6 +2961,8 @@ export type Database = {
           ai_confidence: number | null
           ai_intent: string | null
           ai_summary: string | null
+          arquivada_em: string | null
+          arquivada_por: string | null
           assignee_id: string
           bot_estado: string | null
           bot_opcao: string | null
@@ -2982,6 +2994,8 @@ export type Database = {
           ai_confidence?: number | null
           ai_intent?: string | null
           ai_summary?: string | null
+          arquivada_em?: string | null
+          arquivada_por?: string | null
           assignee_id: string
           bot_estado?: string | null
           bot_opcao?: string | null
@@ -3013,6 +3027,8 @@ export type Database = {
           ai_confidence?: number | null
           ai_intent?: string | null
           ai_summary?: string | null
+          arquivada_em?: string | null
+          arquivada_por?: string | null
           assignee_id?: string
           bot_estado?: string | null
           bot_opcao?: string | null
@@ -3041,6 +3057,20 @@ export type Database = {
           window_expires_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_arquivada_por_fkey"
+            columns: ["arquivada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_arquivada_por_fkey"
+            columns: ["arquivada_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_assignee_id_fkey"
             columns: ["assignee_id"]
@@ -3420,8 +3450,9 @@ export type Database = {
           atualizado_em: string
           concluido_em: string | null
           contar_desde: string
+          continuo: boolean
           criado_em: string
-          criado_por: string
+          criado_por: string | null
           filtro: Json
           id: string
           inicio: string
@@ -3443,8 +3474,9 @@ export type Database = {
           atualizado_em?: string
           concluido_em?: string | null
           contar_desde?: string
+          continuo?: boolean
           criado_em?: string
-          criado_por: string
+          criado_por?: string | null
           filtro?: Json
           id?: string
           inicio?: string
@@ -3466,8 +3498,9 @@ export type Database = {
           atualizado_em?: string
           concluido_em?: string | null
           contar_desde?: string
+          continuo?: boolean
           criado_em?: string
-          criado_por?: string
+          criado_por?: string | null
           filtro?: Json
           id?: string
           inicio?: string
@@ -3508,7 +3541,7 @@ export type Database = {
       }
       envios_em_massa_itens: {
         Row: {
-          assinante_id: string
+          assinante_id: string | null
           botao_em: string | null
           botao_tocado: string | null
           clicou_em: string | null
@@ -3524,7 +3557,7 @@ export type Database = {
           status: string
         }
         Insert: {
-          assinante_id: string
+          assinante_id?: string | null
           botao_em?: string | null
           botao_tocado?: string | null
           clicou_em?: string | null
@@ -3540,7 +3573,7 @@ export type Database = {
           status?: string
         }
         Update: {
-          assinante_id?: string
+          assinante_id?: string | null
           botao_em?: string | null
           botao_tocado?: string | null
           clicou_em?: string | null
@@ -4882,6 +4915,35 @@ export type Database = {
           },
         ]
       }
+      midia_tentativas: {
+        Row: {
+          message_id: string
+          motivo: string | null
+          tentativas: number
+          ultima_em: string
+        }
+        Insert: {
+          message_id: string
+          motivo?: string | null
+          tentativas?: number
+          ultima_em?: string
+        }
+        Update: {
+          message_id?: string
+          motivo?: string | null
+          tentativas?: number
+          ultima_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "midia_tentativas_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_categories: {
         Row: {
           category_id: number
@@ -5026,6 +5088,8 @@ export type Database = {
           created_at: string
           custom: Json
           deleted_at: string | null
+          deleted_by: string | null
+          deleted_reason: string | null
           description: string | null
           do_not_contact: boolean
           email: string | null
@@ -5074,6 +5138,8 @@ export type Database = {
           created_at?: string
           custom?: Json
           deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_reason?: string | null
           description?: string | null
           do_not_contact?: boolean
           email?: string | null
@@ -5122,6 +5188,8 @@ export type Database = {
           created_at?: string
           custom?: Json
           deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_reason?: string | null
           description?: string | null
           do_not_contact?: boolean
           email?: string | null
@@ -5166,6 +5234,20 @@ export type Database = {
             columns: ["city_id"]
             isOneToOne: false
             referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizations_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizations_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
             referencedColumns: ["id"]
           },
           {
@@ -6644,6 +6726,7 @@ export type Database = {
           created_at: string
           id: number
           is_dormant: boolean
+          is_entry: boolean
           is_lost: boolean
           is_optout: boolean
           is_terminal: boolean
@@ -6652,6 +6735,7 @@ export type Database = {
           pipeline_id: number
           position: number
           required_fields: Json
+          retired_at: string | null
           sla_hours: number | null
           slug: string
           temperature: Database["app"]["Enums"]["temperature"]
@@ -6661,6 +6745,7 @@ export type Database = {
           created_at?: string
           id?: number
           is_dormant?: boolean
+          is_entry?: boolean
           is_lost?: boolean
           is_optout?: boolean
           is_terminal?: boolean
@@ -6669,6 +6754,7 @@ export type Database = {
           pipeline_id: number
           position: number
           required_fields?: Json
+          retired_at?: string | null
           sla_hours?: number | null
           slug: string
           temperature?: Database["app"]["Enums"]["temperature"]
@@ -6678,6 +6764,7 @@ export type Database = {
           created_at?: string
           id?: number
           is_dormant?: boolean
+          is_entry?: boolean
           is_lost?: boolean
           is_optout?: boolean
           is_terminal?: boolean
@@ -6686,6 +6773,7 @@ export type Database = {
           pipeline_id?: number
           position?: number
           required_fields?: Json
+          retired_at?: string | null
           sla_hours?: number | null
           slug?: string
           temperature?: Database["app"]["Enums"]["temperature"]
@@ -7804,6 +7892,14 @@ export type Database = {
       }
       cadencias_do_negocio: { Args: { p_deal_id: string }; Returns: Json }
       cadencias_visao: { Args: never; Returns: Json }
+      conversa_arquivar: {
+        Args: { p_arquivar?: boolean; p_conversation_id: string }
+        Returns: Json
+      }
+      conversa_marcar_lida: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
       criar_ficha_da_conversa: {
         Args: {
           p_category_id: number
@@ -8106,8 +8202,16 @@ export type Database = {
         Args: { p_delivery_id: string; p_payload: Json }
         Returns: Json
       }
+      ligacoes_do_dia: {
+        Args: { p_dia?: string; p_pessoa?: string }
+        Returns: Json
+      }
       ligar_cadencia: {
         Args: { p_ativa: boolean; p_slug: string }
+        Returns: Json
+      }
+      lote_atribuir: {
+        Args: { p_batch_id: string; p_para: string }
         Returns: Json
       }
       marcar_nao_ligar_mais: {
@@ -8205,6 +8309,25 @@ export type Database = {
         Returns: Json
       }
       origem_dos_dados: { Args: { p_organization_id: string }; Returns: Json }
+      parceiro_excluir: {
+        Args: { p_motivo: string; p_organization_id: string }
+        Returns: Json
+      }
+      parceiro_restaurar: { Args: { p_organization_id: string }; Returns: Json }
+      parceiros_excluidos: {
+        Args: { p_limite?: number; p_q?: string }
+        Returns: {
+          bairro: string
+          categoria: string
+          cidade: string
+          excluido_em: string
+          excluido_por: string
+          id: string
+          motivo: string
+          nome: string
+          tipo: Database["app"]["Enums"]["org_kind"]
+        }[]
+      }
       pipeline_board: {
         Args: {
           p_canal?: Database["app"]["Enums"]["channel"]
@@ -8317,7 +8440,22 @@ export type Database = {
         }
         Returns: Json
       }
+      radar_revisar_candidato_com_mensagem: {
+        Args: {
+          p_acao: string
+          p_aprender_agora?: boolean
+          p_candidate_id: string
+          p_category_id?: number
+          p_organization_id?: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       radar_revisar_lote: {
+        Args: { p_category_id?: number; p_ids: string[] }
+        Returns: Json
+      }
+      radar_revisar_lote_com_mensagem: {
         Args: { p_category_id?: number; p_ids: string[] }
         Returns: Json
       }
@@ -8676,6 +8814,10 @@ export type Database = {
         }
         Returns: Json
       }
+      tarefa_excluir: {
+        Args: { p_motivo?: string; p_task_id: string }
+        Returns: Json
+      }
       transferir_conversa: {
         Args: {
           p_conversation_id: string
@@ -8739,10 +8881,31 @@ export type Database = {
         }
         Returns: Json
       }
+      wa_enviar_modelo_na_conversa: {
+        Args: {
+          p_conversation_id: string
+          p_parametros?: Json
+          p_template_id: number
+        }
+        Returns: Json
+      }
       wa_freios_status: { Args: never; Returns: Json }
+      wa_midia_falhou: {
+        Args: { p_message_id: string; p_motivo?: string }
+        Returns: Json
+      }
       wa_midia_registrar: {
         Args: { p_media_path: string; p_message_id: string }
         Returns: Json
+      }
+      wa_midias_sem_arquivo: {
+        Args: { p_limite?: number }
+        Returns: {
+          conversation_id: string
+          media_id: string
+          message_id: string
+          tipo: string
+        }[]
       }
       wa_modelo_meta_registrar: {
         Args: {
@@ -8774,6 +8937,10 @@ export type Database = {
         Returns: Json
       }
       wa_preparar_envio: { Args: { p_organization_id: string }; Returns: Json }
+      wa_preparar_envio_na_conversa: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
       wa_saida_enfileirar_pendentes: { Args: { p_qty?: number }; Returns: Json }
       wa_saida_falha: {
         Args: {

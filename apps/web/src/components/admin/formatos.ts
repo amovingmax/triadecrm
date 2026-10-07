@@ -134,11 +134,24 @@ export function rotuloDaTabela(tabela: string): string {
   return NOME_DA_TABELA[tabela] ?? tabela;
 }
 
+/**
+ * As ações com nome próprio, gravadas pelas funções (e não pelo gatilho
+ * `app.audit`, que só conhece INSERT, UPDATE e DELETE). Sem a linha aqui a
+ * auditoria mostra o nome cru, em maiúsculas, no meio de uma frase.
+ */
+const ACAO_COM_NOME: Record<string, string> = {
+  EXCLUIR_PARCEIRO: 'Excluiu o parceiro',
+  RESTAURAR_PARCEIRO: 'Restaurou o parceiro',
+  EXCLUIR_COMPROMISSO: 'Excluiu da agenda',
+  ESQUECER_CATEGORIA: 'Esqueceu a categoria aprendida',
+  ENCERRAR_CADENCIA: 'Encerrou a cadência',
+};
+
 export function rotuloDaAcao(acao: string): string {
   if (acao === 'INSERT') return 'Criou';
   if (acao === 'UPDATE') return 'Alterou';
   if (acao === 'DELETE') return 'Apagou';
-  return acao;
+  return ACAO_COM_NOME[acao] ?? acao;
 }
 
 /** Ações do registro de acesso a telefone (`pii_access_log.action`). */

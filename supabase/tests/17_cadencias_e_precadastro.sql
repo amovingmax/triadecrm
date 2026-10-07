@@ -371,11 +371,11 @@ select ('e0000000-0000-4000-8000-00000000ca' || x.n)::uuid, pg_temp.org(x.n),
     ('31','contatado',   null, null),
     ('32','contatado',   null, null),
     ('33','contatado',   null, 'd0000000-0000-4000-8000-0000000ca002'::uuid),
-    ('41','autorizou',   null, null),
-    ('42','autorizou',   null, null),
-    ('43','autorizou',   null, null),
-    ('44','autorizou',   null, null),
-    ('45','autorizou',   null, null)
+    ('41','cadastro_em_andamento', null, null),
+    ('42','cadastro_em_andamento', null, null),
+    ('43','cadastro_em_andamento', null, null),
+    ('44','cadastro_em_andamento', null, null),
+    ('45','cadastro_em_andamento', null, null)
   ) as x(n, etapa, dono, contato);
 
 
