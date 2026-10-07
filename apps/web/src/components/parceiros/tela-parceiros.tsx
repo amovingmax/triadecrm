@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Plus, Upload } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { HREF_IMPORTAR } from '@/lib/navegacao';
+import { HREF_EXCLUIDOS, HREF_IMPORTAR } from '@/lib/navegacao';
 import { Button } from '@/components/ui/button';
 
 import { BarraFiltros } from './barra-filtros';
@@ -115,6 +115,21 @@ export function TelaParceiros({
                 {!recorte ? ' na base' : soBusca ? ' com essa busca' : ' com esse filtro'}
               </>
             )}
+            {/* A porta de volta de quem foi excluído (07/10/2026). Fica aqui, em
+                letra pequena, e não entre os botões: é para onde se vai de vez
+                em quando, atrás de uma ficha que saiu por engano. Só para quem
+                exclui — e quem exclui é quem cria. */}
+            {podeCriar ? (
+              <>
+                {' · '}
+                <Link
+                  href={HREF_EXCLUIDOS}
+                  className="underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  Excluídos
+                </Link>
+              </>
+            ) : null}
           </p>
         </div>
 

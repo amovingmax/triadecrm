@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
+import { ExcluirPasso } from './excluir-passo';
 import {
   arcoDaNota,
   contagemDosPassos,
@@ -368,14 +369,19 @@ function LinhaDeAtividade({
 /**
  * O que está marcado com o parceiro: reuniões de pé e tarefas abertas.
  *
- * SÓ LISTA. A única ação é abrir a sala da reunião, que é um link. Concluir
- * tarefa e registrar o resultado da reunião continuam na Agenda e no Meu dia.
+ * QUASE SÓ LISTA. Abrir a sala da reunião é um link; concluir tarefa e registrar
+ * o resultado da reunião continuam na Agenda e no Meu dia. Desde 07/10/2026 dá
+ * para EXCLUIR uma tarefa aberta daqui (`excluir-passo.tsx`), para quem escreve:
+ * quem decide se pode é o banco (gestão, quem faz ou quem criou).
  */
 export function ProximosPassosDaFicha({
   passos,
+  podeExcluir = false,
   className,
 }: {
   passos: ProximosPassos | null;
+  /** Mostra o botão de excluir nas tarefas. A reunião não tem: sai pela Agenda. */
+  podeExcluir?: boolean;
   className?: string;
 }) {
   if (passos === null) return <NaoCarregou titulo="Próximos passos" className={className} />;
@@ -395,7 +401,7 @@ export function ProximosPassosDaFicha({
       ) : (
         <ul className="flex flex-col">
           {passos.passos.map((passo) => (
-            <LinhaDePasso key={passo.id} passo={passo} />
+            <LinhaDePasso key={passo.id} passo={passo} podeExcluir={podeExcluir} />
           ))}
         </ul>
       )}
@@ -413,7 +419,7 @@ export function ProximosPassosDaFicha({
   );
 }
 
-function LinhaDePasso({ passo }: { passo: Passo }) {
+function LinhaDePasso({ passo, podeExcluir }: { passo: Passo; podeExcluir: boolean }) {
   const reuniao = passo.tipo === 'reuniao';
   // Na reunião a hora é a informação; na tarefa o prazo fica à direita, onde o
   // olho procura "para quando".
@@ -470,6 +476,10 @@ function LinhaDePasso({ passo }: { passo: Passo }) {
         <span className="shrink-0 text-[12.5px] whitespace-nowrap text-muted-foreground">
           <Data quando={passo.quando} />
         </span>
+      ) : null}
+
+      {podeExcluir && passo.tarefaId ? (
+        <ExcluirPasso tarefaId={passo.tarefaId} titulo={passo.titulo} />
       ) : null}
     </li>
   );

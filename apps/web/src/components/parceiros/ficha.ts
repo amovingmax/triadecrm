@@ -2,6 +2,7 @@ import type { OrgKind, Temperature } from '@komune/schema';
 
 import { createClient } from '@/lib/supabase/server';
 
+import type { FichaExcluidaLida } from './ficha-excluida';
 import type { ConversaDaFicha, EtapaDoFunil } from './resumo-da-ficha';
 
 /**
@@ -96,6 +97,40 @@ export type Ficha = {
 };
 
 /**
+ * A ficha que SAIU da base (`public.parceiro_excluir`, 07/10/2026): o bastante
+ * para a página dizer o que houve em vez de "página não encontrada".
+ *
+ * Lê a tabela, e não a `organizations_view` — a view esconde quem está excluído,
+ * que é o ponto dela. Quem decide se a linha aparece é a política
+ * `organizations_select`: só admin e gestor leem ficha excluída. Para os outros
+ * papéis isto devolve `null`, e a página segue para o 404 de sempre.
+ */
+export async function carregarFichaExcluida(id: string): Promise<FichaExcluidaLida | null> {
+  const supabase = await createClient();
+  const { data: org, error } = await supabase
+    .from('organizations')
+    .select('id, name, deleted_at, deleted_by, deleted_reason')
+    .eq('id', id)
+    .not('deleted_at', 'is', null)
+    .maybeSingle();
+  // Falha aqui não vale uma tela de erro: o caminho normal já decidiu que a
+  // ficha não está na base, e sem esta leitura a página só perde o aviso.
+  if (error || !org || !org.deleted_at) return null;
+
+  const { data: quem } = org.deleted_by
+    ? await supabase.from('team_directory').select('full_name').eq('id', org.deleted_by).maybeSingle()
+    : { data: null };
+
+  return {
+    id: org.id,
+    nome: org.name,
+    excluidaEm: org.deleted_at,
+    excluidaPor: quem?.full_name ?? null,
+    motivo: org.deleted_reason,
+  };
+}
+
+/**
  * `null` significa uma coisa só: a linha não está lá — não existe, ou está fora do que
  * a RLS deixa este papel ver, que para quem olha dá no mesmo. Falha de leitura lança.
  */
@@ -161,12 +196,15 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
 
   // As etapas do FUNIL inteiro, e não só as dos negócios: a régua do cabeçalho
   // desenha o caminho todo. Continua uma consulta só, agora pelo funil.
+  // Sem as aposentadas (07/10/2026): "Em conversa" e "Autorizou" não são mais
+  // passo de régua nenhuma, e nenhum negócio está nelas.
   const idsDeFunil = [...new Set((negocios.data ?? []).map((d) => d.pipeline_id))];
   const { data: etapas } = idsDeFunil.length
     ? await supabase
         .from('stages')
-        .select('id, name, pipeline_id, position')
+        .select('id, name, pipeline_id, position, is_entry')
         .in('pipeline_id', idsDeFunil)
+        .is('retired_at', null)
         .order('position')
     : { data: [] };
   const { data: funis } = await supabase.from('pipelines').select('id, name');
@@ -175,7 +213,12 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
   const funilPorId = new Map((funis ?? []).map((f) => [f.id, f.name]));
   const etapasPorFunil: Record<number, EtapaDoFunil[]> = {};
   for (const e of etapas ?? []) {
-    (etapasPorFunil[e.pipeline_id] ??= []).push({ id: e.id, nome: e.name, posicao: e.position });
+    (etapasPorFunil[e.pipeline_id] ??= []).push({
+      id: e.id,
+      nome: e.name,
+      posicao: e.position,
+      entrada: e.is_entry,
+    });
   }
 
   const fio = conversas.error ? null : (conversas.data?.[0] ?? null);

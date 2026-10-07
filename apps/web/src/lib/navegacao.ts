@@ -284,7 +284,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: ListChecks,
     grupo: 'todo_dia',
     descricao:
-      'A fila de quem ainda não é parceiro, de qualquer origem: cada nome com pontuação, o que a IA achou dele e as duplicatas já apontadas. Aprovar cria a ficha e o negócio no funil.',
+      'A fila de quem ainda não é parceiro, de qualquer origem: cada nome com pontuação, o que a IA achou dele e as duplicatas já apontadas. Aprovar cria a ficha em Prospectados; ela entra no funil na primeira mensagem.',
     // Só admin e gestor aprovam e põem gente na base (pivô de 06/10/2026).
     papeis: PAPEIS_QUE_GERENCIAM,
     // A fila de revisão é o exemplo mais puro da regra: candidato que entrou e
@@ -308,7 +308,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     // paleta, e agora leva a quem tem o botão — e continua aqui depois de o
     // botão virar "Trazer uma lista", porque é a palavra que a pessoa digita.
     descricao:
-      'Base de organizações e pessoas com busca global, filtros, criação rápida com dedup por telefone e o botão de trazer uma lista para a base (importar planilha ou CSV).',
+      'Base de organizações e pessoas com busca global, filtros, criação rápida com dedup por telefone, o botão de trazer uma lista para a base (importar planilha ou CSV) e os parceiros excluídos, para restaurar.',
     posicaoNaBarra: 3,
     // A lista é de quem cuida da base.
     papeis: PAPEIS_QUE_GERENCIAM,
@@ -320,7 +320,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: SquareKanban,
     grupo: 'a_base',
     descricao:
-      'Kanban dos funis de captação e de produtores, cartão com semáforo, próxima ação obrigatória e motivos de perda.',
+      'Kanban dos funis de fornecedores e de produtores, a partir de Contatado: cartão com semáforo, próxima ação obrigatória e motivos de perda. Quem ainda não foi contatado está em Prospectados.',
     posicaoNaBarra: 4,
     papeis: PAPEIS_QUE_GERENCIAM,
   },
@@ -387,6 +387,18 @@ export const HREF_IMPORTAR = '/importar';
 export function podeCriarParceiro(papel: AppRole): boolean {
   return PAPEIS_QUE_GERENCIAM.includes(papel);
 }
+
+/**
+ * Quem tira um parceiro da base e quem o devolve (07/10/2026): admin e gestor,
+ * os mesmos que o põem lá. Espelho de `app.is_manager()`, que
+ * `public.parceiro_excluir` e `public.parceiro_restaurar` conferem.
+ */
+export function podeExcluirParceiro(papel: AppRole): boolean {
+  return PAPEIS_QUE_GERENCIAM.includes(papel);
+}
+
+/** Rota da lista de parceiros excluídos, de onde se restaura. */
+export const HREF_EXCLUIDOS = '/parceiros/excluidos';
 
 /** Papéis que importam planilha. Mesmo conjunto de quem cria, pela mesma razão. */
 export function podeImportarPlanilha(papel: AppRole): boolean {

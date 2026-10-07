@@ -25,6 +25,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { DialogoConfirmar } from '@/components/admin/confirmar';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
 import { mensagemDoErro, removerMeta, salvarMeta } from './dados';
@@ -150,6 +151,9 @@ function Formulario({
   const idNota = useId();
   const [falha, setFalha] = useState<string | null>(null);
   const [removendo, setRemovendo] = useState(false);
+  // Remover pergunta antes (07/10/2026): o botão vermelho apagava a meta no
+  // clique, ao lado de "Cancelar", e a meta é o que o Assistente cobra.
+  const [confirmandoRemocao, setConfirmandoRemocao] = useState(false);
 
   // Só o que o banco sabe medir entra no seletor: oferecer "Respostas recebidas"
   // antes de o inbox existir seria combinar uma meta que ninguém consegue apurar.
@@ -210,6 +214,7 @@ function Formulario({
       setFalha(mensagemDoErro(erro));
     } finally {
       setRemovendo(false);
+      setConfirmandoRemocao(false);
     }
   }
 
@@ -311,7 +316,7 @@ function Formulario({
           <Button
             type="button"
             variant="destructive"
-            onClick={() => void remover()}
+            onClick={() => setConfirmandoRemocao(true)}
             disabled={salvando || removendo}
             className="toque ml-auto h-11 md:h-9"
           >
@@ -320,6 +325,28 @@ function Formulario({
           </Button>
         ) : null}
       </div>
+
+      <DialogoConfirmar
+        aberto={confirmandoRemocao}
+        aoFechar={() => setConfirmandoRemocao(false)}
+        titulo="Remover esta meta?"
+        descricao={
+          <>
+            <p>
+              {linhaEscolhida?.metrica_rotulo ?? 'A meta'} de {pessoa.nome} deixa de ter alvo
+              neste período, e o Assistente para de cobrar por ela.
+            </p>
+            <p>
+              O que já foi feito continua contado. Para só pausar a cobrança, salve a meta com
+              alvo zero em vez de remover.
+            </p>
+          </>
+        }
+        rotuloConfirmar="Remover meta"
+        perigo
+        ocupado={removendo}
+        aoConfirmar={() => void remover()}
+      />
     </form>
   );
 }

@@ -10,6 +10,8 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+import { DialogoConfirmar } from './confirmar';
+
 /**
  * Respostas prontas e etiquetas — os dois CATÁLOGOS que moravam em Atendimento.
  *
@@ -22,6 +24,12 @@ import { Input } from '@/components/ui/input';
  *
  * Cada uma busca os próprios dados, em vez de receber por prop: assim mudaram de
  * aba sem que nenhum dos dois painéis precise saber o que o outro carrega.
+ *
+ * APAGAR PERGUNTA ANTES (07/10/2026). As duas lixeiras apagavam no clique, sem
+ * confirmação — e são as duas únicas exclusões do Ajustes que não têm volta: a
+ * linha sai do banco. A da etiqueta, pior, sai junto de TODOS os parceiros que
+ * a tinham (`organization_tags` cascateia), e o aviso de erro dizia o contrário
+ * ("ainda está em uso"), descrevendo uma trava que nunca existiu.
  */
 
 type Resposta = { id: number; atalho: string; titulo: string; texto: string; ativo: boolean };
@@ -75,12 +83,18 @@ export function SecaoRespostasProntas({ podeEditar }: { podeEditar: boolean }) {
     },
     onError: (e: Error) => toast.error('Não criou.', { description: e.message }),
   });
+  const [paraApagar, setParaApagar] = useState<Resposta | null>(null);
   const apagar = useMutation({
     mutationFn: async (id: number) => {
       const { error } = await createClient().from('respostas_rapidas').delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
-    onSuccess: aoMudar,
+    onSuccess: () => {
+      setParaApagar(null);
+      toast.success('Resposta pronta apagada.');
+      aoMudar();
+    },
+    onError: () => toast.error('Não apagou.', { description: 'Tente de novo.' }),
   });
 
   return (
@@ -104,7 +118,7 @@ export function SecaoRespostasProntas({ podeEditar }: { podeEditar: boolean }) {
                 variant="ghost"
                 size="icon-sm"
                 aria-label={`Apagar /${r.atalho}`}
-                onClick={() => apagar.mutate(r.id)}
+                onClick={() => setParaApagar(r)}
               >
                 <Trash2 aria-hidden="true" />
               </Button>
@@ -129,6 +143,25 @@ export function SecaoRespostasProntas({ podeEditar }: { podeEditar: boolean }) {
           </Button>
         </form>
       ) : null}
+
+      <DialogoConfirmar
+        aberto={paraApagar !== null}
+        aoFechar={() => setParaApagar(null)}
+        titulo={paraApagar ? `Apagar /${paraApagar.atalho}?` : ''}
+        descricao={
+          <>
+            <p>
+              “{paraApagar?.titulo}” some da lista de respostas prontas de todo o time. Quem
+              digitar <code>/{paraApagar?.atalho}</code> na conversa não encontra mais nada.
+            </p>
+            <p>As mensagens já enviadas com ela não mudam. Não dá para desfazer: é criar de novo.</p>
+          </>
+        }
+        rotuloConfirmar="Apagar resposta"
+        perigo
+        ocupado={apagar.isPending}
+        aoConfirmar={() => paraApagar && apagar.mutate(paraApagar.id)}
+      />
     </section>
   );
 }
@@ -151,13 +184,20 @@ export function SecaoEtiquetas({ podeEditar }: { podeEditar: boolean }) {
     },
     onError: (e: Error) => toast.error('Não criou.', { description: e.message }),
   });
+  const [paraApagar, setParaApagar] = useState<Etiqueta | null>(null);
   const apagar = useMutation({
     mutationFn: async (id: number) => {
       const { error } = await createClient().from('tags').delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
-    onSuccess: aoMudar,
-    onError: () => toast.error('Não apagou: a etiqueta ainda está em uso.'),
+    onSuccess: () => {
+      setParaApagar(null);
+      toast.success('Etiqueta apagada.');
+      aoMudar();
+    },
+    // Não existe trava de "em uso": apagar tira a etiqueta de quem a tinha. Se
+    // falhou, foi a rede ou a permissão.
+    onError: () => toast.error('Não apagou.', { description: 'Tente de novo.' }),
   });
 
   return (
@@ -180,7 +220,7 @@ export function SecaoEtiquetas({ podeEditar }: { podeEditar: boolean }) {
               <button
                 type="button"
                 aria-label={`Apagar a etiqueta ${e.name}`}
-                onClick={() => apagar.mutate(e.id)}
+                onClick={() => setParaApagar(e)}
                 className="rounded-full p-1 text-muted-foreground hover:text-destructive"
               >
                 <Trash2 className="size-3.5" aria-hidden="true" />
@@ -218,6 +258,28 @@ export function SecaoEtiquetas({ podeEditar }: { podeEditar: boolean }) {
           </Button>
         </form>
       ) : null}
+
+      <DialogoConfirmar
+        aberto={paraApagar !== null}
+        aoFechar={() => setParaApagar(null)}
+        titulo={paraApagar ? `Apagar a etiqueta “${paraApagar.name}”?` : ''}
+        descricao={
+          <>
+            <p>
+              Ela sai de <strong>todos os parceiros</strong> que a têm, e some do topo das
+              conversas deles.
+            </p>
+            <p>
+              Não dá para desfazer: criar outra com o mesmo nome não devolve a marca a quem a
+              tinha.
+            </p>
+          </>
+        }
+        rotuloConfirmar="Apagar etiqueta"
+        perigo
+        ocupado={apagar.isPending}
+        aoConfirmar={() => paraApagar && apagar.mutate(paraApagar.id)}
+      />
     </section>
   );
 }

@@ -84,7 +84,7 @@ async function lerAtividade(
       .limit(TETO_POR_FONTE),
     supabase.from('deals').select('id').eq('organization_id', organizacaoId),
     supabase.from('interaction_outcomes').select('id, name'),
-    supabase.from('stages').select('id, name'),
+    supabase.from('stages').select('id, name, is_entry'),
     // Quando a ficha nasceu: é o que separa "Entrou na base" dos outros
     // registros do sistema. Se não vier, nenhum registro é chamado de entrada.
     supabase.from('organizations_view').select('created_at').eq('id', organizacaoId).maybeSingle(),
@@ -112,6 +112,9 @@ async function lerAtividade(
     pessoas,
     desfechos: (desfechos.data ?? []).map((d) => ({ id: d.id as number, nome: d.name as string })),
     etapas: new Map((etapas.data ?? []).map((e) => [e.id as number, e.name as string])),
+    etapasDeEntrada: new Set(
+      (etapas.data ?? []).filter((e) => e.is_entry === true).map((e) => e.id as number),
+    ),
     criadaEm: (parceiro.data?.created_at as string | null | undefined) ?? null,
   });
 }

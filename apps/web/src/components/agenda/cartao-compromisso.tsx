@@ -30,6 +30,7 @@ import {
 import { type DesfechoCatalogo } from '@/components/registro/tipos';
 
 import { AcoesDaReuniao } from './acoes-da-reuniao';
+import { ExcluirCompromisso } from './excluir-compromisso';
 
 /**
  * Um compromisso na lista do dia.
@@ -58,6 +59,11 @@ import { AcoesDaReuniao } from './acoes-da-reuniao';
  * sem desfecho — o resultado é de quem estava lá. Com `podeMexerNaReuniao`, quem
  * acompanha essa pessoa ainda remarca e cancela a reunião: é assim que o gestor
  * desfaz o engano de ter marcado no horário errado para a SDR.
+ *
+ * EXCLUIR (07/10/2026): o compromisso sem reunião — a visita, a tarefa de marcar —
+ * ganhou saída, no fim da fileira (`excluir-compromisso.tsx`). A reunião de
+ * verdade continua saindo pelo "Cancelar" dela. Vale a mesma régua de quem
+ * mexe na reunião: a própria pessoa, e quem a acompanha.
  */
 export function CartaoCompromisso({
   compromisso,
@@ -167,6 +173,9 @@ export function CartaoCompromisso({
             {podeMexerNaReuniao ? (
               <AcoesDaReuniao compromisso={compromisso} aoMudar={aoMudarReuniao ?? (() => {})} />
             ) : null}
+            {podeMexerNaReuniao && !compromisso.reuniaoId ? (
+              <ExcluirCompromisso compromisso={compromisso} aoMudar={aoMudarReuniao ?? (() => {})} />
+            ) : null}
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -249,6 +258,12 @@ export function CartaoCompromisso({
                 tem sala, nem fim, nem estado: dar a ela um botão "entrar na sala"
                 seria a tela prometendo o que o banco não tem. */}
             <AcoesDaReuniao compromisso={compromisso} aoMudar={aoMudarReuniao ?? (() => {})} />
+
+            {/* Quem não tem reunião por trás sai por aqui. No fim da fileira e em
+                tinta fraca: é a saída do engano, não uma das respostas do dia. */}
+            {!compromisso.reuniaoId ? (
+              <ExcluirCompromisso compromisso={compromisso} aoMudar={aoMudarReuniao ?? (() => {})} />
+            ) : null}
           </div>
         )}
       </div>
