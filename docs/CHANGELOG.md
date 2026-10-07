@@ -6991,3 +6991,7 @@ baixadas 1, falhas 0"); o print foi tirado nesses seis minutos.
 **Não conferido:** se as quatro figurinhas da Di (do primeiro print) foram baixadas.
 Elas não apareceram na passada que vi; ou já tinham sido baixadas antes do trecho de
 registro que alcanço, ou falharam três vezes e saíram da fila. Abrir a conversa diz.
+
+**Na `main` desde 07/10/2026:** a branch `figurinha-na-chegada` foi juntada na `main`
+do GitHub, a pedido. A `main` não tinha andado, então o que está nela é o que já estava
+no ar: não houve novo deploy.
