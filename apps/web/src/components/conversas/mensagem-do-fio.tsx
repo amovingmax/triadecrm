@@ -417,16 +417,22 @@ async function abrirArquivo(messageId: string): Promise<void> {
 }
 
 /**
- * Sem arquivo guardado. Diz o que aconteceu e o que vai acontecer: o worker tenta
- * buscar de novo na Meta o que chegou nos últimos 30 dias (`midias-atrasadas.ts`).
+ * Sem arquivo guardado. Diz o que aconteceu e o que vai acontecer: o worker busca
+ * na Meta, a cada 10 minutos, o que chegou sem arquivo (`midias-atrasadas.ts`), e
+ * o balão troca sozinho quando ele chega — a tela escuta a mensagem.
+ *
+ * Até 07/10/2026 a frase falava dos 30 dias e de pedir para a pessoa mandar de
+ * novo, e era isso que aparecia nos minutos entre a chegada de uma figurinha e a
+ * passada seguinte: o Rafael viu e achou que ela não ia carregar nunca.
  */
 function ArquivoAusente({ rotulo, icone }: { rotulo: string; icone: React.ReactNode }) {
   return (
     <p className="flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
       <span className="mt-0.5 shrink-0">{icone}</span>
       <span>
-        {rotulo} ainda sem arquivo no CRM. O CRM busca de novo na Meta o que chegou nos últimos 30
-        dias; depois disso, só pedindo para a pessoa mandar outra vez.
+        {rotulo} ainda sem arquivo no CRM. Ele busca na Meta a cada 10 minutos, e aparece aqui
+        sozinho. Se continuar assim, a Meta não entregou o arquivo: peça para a pessoa mandar de
+        novo.
       </span>
     </p>
   );

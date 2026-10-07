@@ -6965,3 +6965,33 @@ fichas sem número estão lá com o motivo "saiu na limpeza de Prospectados de
 `main` do GitHub, a pedido. A `main` não tinha andado, então o que está nela é o que já
 estava no ar: não houve novo deploy. A partir daqui, publicar pela `main` mantém a
 figurinha, a limpeza dos sem número e o botão da saudação.
+
+## 07/10/2026 — A figurinha chega na hora (RF-CON-05)
+
+O Rafael mandou o print de uma figurinha da Algodão Mágico com "Figurinha ainda sem
+arquivo no CRM… depois disso, só pedindo para a pessoa mandar outra vez".
+
+**O que era.** A reclassificação da tarde funcionou (o CRM já sabia que era
+figurinha), mas o worker-wa no ar era o de 02/10, que não baixava figurinha na
+chegada: quem a trazia era a passada de recuperação, a cada 10 minutos. O registro
+do worker mostra a figurinha chegando às 15:51 e sendo baixada às 15:57 ("vistas 1,
+baixadas 1, falhas 0"); o print foi tirado nesses seis minutos.
+
+**O que mudou.**
+- worker-wa republicado no Fly.io (v13, 07/10 16:00): baixa a figurinha já na
+  chegada. Desde a v12 (02/10) o único código do worker que mudou era essa linha.
+  Conferido no registro: número com qualidade GREEN, mensagens saindo.
+- A frase dos minutos de espera não fala mais em 30 dias nem em pedir de novo: "Ele
+  busca na Meta a cada 10 minutos, e aparece aqui sozinho. Se continuar assim, a
+  Meta não entregou o arquivo: peça para a pessoa mandar de novo." O balão troca
+  sozinho quando o arquivo chega (a tela escuta a mensagem).
+- Site publicado na Vercel a partir da branch `figurinha-na-chegada`. A `main` ainda
+  não tem este commit.
+
+**Não conferido:** se as quatro figurinhas da Di (do primeiro print) foram baixadas.
+Elas não apareceram na passada que vi; ou já tinham sido baixadas antes do trecho de
+registro que alcanço, ou falharam três vezes e saíram da fila. Abrir a conversa diz.
+
+**Na `main` desde 07/10/2026:** a branch `figurinha-na-chegada` foi juntada na `main`
+do GitHub, a pedido. A `main` não tinha andado, então o que está nela é o que já estava
+no ar: não houve novo deploy.
