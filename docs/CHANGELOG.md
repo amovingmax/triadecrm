@@ -6822,3 +6822,13 @@ saíram.
 parceiro excluído que escreve de novo vira uma ficha nova (é o que o CRM faz com
 qualquer número fora da base). Restaurar a antiga depois disso é recusado, e a
 recusa aponta para a nova.
+
+**Em produção (07/10/2026, 11:14):** a limpeza do funil e as exclusões. O
+Rafael rodou os três passos na ordem: push da branch `limpeza-do-funil`
+(`7356ae3`), `supabase db push` (migrações `20261007100000` e `20261007110000`)
+e `vercel deploy --prod --force`. Conferido daqui: o GitHub tem o mesmo commit
+da máquina, `supabase migration list` mostra as duas migrações no remoto (e o
+`--dry-run` diz que o banco está em dia), e o deploy de 11:14 está pronto na
+Vercel. Não conferi as contagens de negócio movidos em produção: a leitura
+direta do banco foi barrada aqui. **A `main` do GitHub continua sem este
+trabalho**: publicar a partir dela tira a limpeza do funil do ar.
