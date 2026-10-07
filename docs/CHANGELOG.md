@@ -6838,3 +6838,60 @@ do GitHub, a pedido. A `main` não tinha andado desde a abertura da branch, ent�
 o que está nela é exatamente o que já estava no ar desde as 11:14: não houve novo
 deploy. A partir daqui, publicar pela `main` mantém a limpeza do funil e as
 exclusões.
+
+## 07/10/2026 — "Aviso do WhatsApp sem arquivo guardado": figurinha e o que a Meta não entrega (RF-CON-03, RF-CON-05)
+
+O Rafael mandou o print de uma conversa (uma pessoa fora da base, quatro mensagens
+seguidas às 13:58–13:59), cada uma dizendo "Aviso do WhatsApp sem arquivo
+guardado: o CRM não baixou esta mídia da Meta", e perguntou o que não carregava.
+
+**O que acontecia.** O CRM só conhecia nove tipos de mensagem. Qualquer outro tipo
+que a Meta mandasse virava "Aviso do WhatsApp" (`system`), e o tipo original se
+perdia: a **figurinha** (`sticker`, o mais comum), a resposta a botão de modelo
+(`button`), a localização, o cartão de contato e o que a Meta não entrega à API
+(`unsupported`: visualização única, enquete, evento, mensagem editada). A
+figurinha nunca era baixada, porque o worker só baixa foto, vídeo, documento e
+áudio. E a tela chamava tudo isso de "mídia que o CRM não baixou", até o que nunca
+foi mídia.
+
+**O que mudou** (migração `20261007120000`):
+- A figurinha entra como imagem (o balde já aceitava webp) e aparece no balão,
+  menor e sem corte, como no WhatsApp. A resposta a botão entra como botão, com o
+  texto.
+- O tipo como a Meta o mandou fica guardado (`messages.tipo_na_meta`) sempre que
+  difere do que o CRM gravou.
+- **O que já tinha chegado é reclassificado** pela carga crua guardada do webhook
+  (`webhook_deliveries`); a figurinha que não estiver lá é reconhecida pelo arquivo
+  webp. Figurinha dos últimos 30 dias vira imagem e entra na fila de recuperação de
+  mídias do worker, que a baixa na volta seguinte — **sem precisar republicar o
+  worker**.
+- A tela diz o que chegou: "Mensagem que a Meta não entrega ao CRM… peça para mandar
+  de novo como foto, vídeo ou texto", "Localização compartilhada", "Cartão de
+  contato compartilhado", ou o nome do tipo que o CRM ainda não conhece. "Não
+  baixou esta mídia" ficou só para mídia de verdade.
+- O worker-wa passa a baixar a figurinha já na chegada (`TIPOS_DE_ARQUIVO`). Isso
+  só vale depois de republicar o worker no Fly.io; até lá, a passada de
+  recuperação a traz uma volta depois.
+
+**O que eram as quatro mensagens da conversa do print:** não deu para conferir
+daqui (a leitura do banco de produção é barrada nesta máquina). O mais provável
+são figurinhas: quatro mensagens sem texto em um minuto. Depois de subir, se forem
+figurinhas, elas aparecem no balão; se forem `unsupported`, a frase nova explica.
+A migração escreve no fim quantas mensagens de cada tipo reclassificou.
+
+- Testes: pgTAP novo `105_o_que_a_meta_manda.sql` (14); no site, testes da frase
+  nova (`aviso-sem-conteudo.test.ts`) e do tipo original chegando ao balão. O
+  `58_envio_em_nome_da_komune.sql` passou a contar só o link ENVIADO: o toque no
+  botão agora também é `interactive`, e a contagem da conversa inteira o somava.
+  Banco recriado do zero: 99 arquivos, 3.530 testes, todos passam; site, worker,
+  lint e tipos verdes.
+- Ensaiado contra um banco com mensagens antigas já gravadas como `system` (em
+  transação, desfeita no fim): duas figurinhas viraram imagem e entraram na fila
+  de recuperação (uma achada na carga crua, outra pelo arquivo webp), a não
+  suportada e a localização ficaram como aviso, com o nome.
+
+**Pendente:**
+1. Localização e cartão de contato ainda não são mostrados (o webhook não guarda a
+   coordenada nem o número do contato). Mostrar pede mudar a função `wa-webhook`.
+2. Documento que não seja PDF (Word, Excel) continua sem arquivo: o balde só aceita
+   PDF entre os documentos.
