@@ -6895,3 +6895,58 @@ A migração escreve no fim quantas mensagens de cada tipo reclassificou.
    coordenada nem o número do contato). Mostrar pede mudar a função `wa-webhook`.
 2. Documento que não seja PDF (Word, Excel) continua sem arquivo: o balde só aceita
    PDF entre os documentos.
+
+**No ar (07/10/2026, ~14:35):** a correção acima. A branch `aviso-do-whatsapp` foi
+enviada ao GitHub, a migração `20261007120000` está aplicada em produção e o site foi
+publicado. A `main` ainda não tem esta branch.
+
+## 07/10/2026 — Prospectados: quem não tem número sai, e a saudação ganha botão (RF-BAS-10, RF-CON-02, RF-CON-11)
+
+Pedido do Rafael: "quero que você limpe dos prospectados todos os contatos que
+tiverem sem número, e facilite naquela tela de prospectados um botão que envie de
+forma mais fácil a saudação inicial 'Boa tarde...'".
+
+**A limpeza** (migração `20261007130000`, que roda ao subir). "Sem número" é: sem
+telefone na ficha, sem telefone em pessoa de contato e sem conversa de WhatsApp. É a
+exclusão de hoje, não um apagamento: a ficha sai de Prospectados, do funil, dos lotes
+e do Meu dia; o pendente dela é encerrado (reunião, tarefa, fila de mensagem); o
+histórico fica; e cada uma aparece em **Prospectados → Excluídos** com o motivo "Sem
+telefone nem WhatsApp: saiu na limpeza de Prospectados de 07/10/2026", de onde se
+restaura. Cliente e quem tem pré-cadastro aberto ficam, como na exclusão manual. A
+migração escreve no fim quantas saíram e quantas ficaram, por motivo.
+- Para rodar sem sessão de usuário, a exclusão ganhou uma camada interna
+  (`app.parceiro_excluir_interno`, e `app.reuniao_cancelar_interno` para a reunião);
+  `public.parceiro_excluir` e `public.reuniao_cancelar` continuam com a mesma
+  assinatura e a mesma conferência de papel. A limpeza em si é
+  `app.limpar_sem_numero`, assinada pelo sistema na auditoria.
+
+**O botão da saudação.** Em Prospectados, cada linha com WhatsApp tem um botão de
+enviar ao lado do número: um clique põe a saudação na fila, a linha vira ✓ e o aviso
+traz **Desfazer**. Para vários de uma vez, marque as linhas (ou a página inteira pelo
+cabeçalho) e use **Mandar a saudação** na barra que aparece; ali há confirmação. No
+celular, o botão fica em cada cartão.
+- É a MESMA fila da saudação automática: "Bom dia!", "Boa tarde!" ou "Boa noite!"
+  conforme a hora em que a mensagem sai, no ritmo por hora de Ajustes, só no horário
+  de envio. Não sai tudo na hora.
+- O banco pula, e o aviso diz quantos e por quê: quem já conversa com a gente, já
+  recebeu a saudação, já está na fila, não tem WhatsApp ou pediu para não ser
+  contatado (`public.saudacao_enfileirar`). Desfazer tira da fila o que ainda não
+  saiu (`public.saudacao_desfazer`). Até 200 por pedido; só admin e gestor.
+- O interruptor da saudação em Ajustes → Atendimento continua sendo o disjuntor
+  geral: desligado, o botão avisa e nada entra na fila. O texto dele foi atualizado
+  ("Saudação inicial… liga os botões que a mandam: Revisão e Prospectados").
+
+- Testes: pgTAP novo `106_sem_numero_e_saudacao.sql` (24); no site,
+  `saudacao.test.ts`. Banco recriado do zero: 100 arquivos, 3.554 testes, todos
+  passam; site (1.241 testes), lint e tipos verdes.
+- Ensaiado contra um banco com fichas com e sem número (em transação, desfeita): saem
+  só as sem número nenhum (a reunião de uma delas é cancelada); ficam o cliente, a de
+  telefone na pessoa de contato e a que tem conversa.
+- Conferido no navegador contra o banco local, como gestor: os dois sem número fora
+  da lista e em Excluídos com o motivo; o botão de uma linha (aviso com Desfazer, a
+  linha vira ✓); duas marcadas, a barra, a confirmação e o aviso "na fila para 2
+  parceiros, 1 na frente".
+
+**Decisão minha, para quem quiser rever:** a limpeza é de uma vez só. A Revisão, a
+importação e o cadastro rápido continuam aceitando ficha sem número; se a regra deve
+ser "Prospectados só com número", é outra mudança, na entrada.
