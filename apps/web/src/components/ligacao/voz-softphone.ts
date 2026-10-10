@@ -47,11 +47,16 @@ function lerErro(erro: unknown): { nome: string | null; codigo: number | null } 
 }
 
 async function criarAparelho(): Promise<Device> {
-  const [{ Device: Aparelho }, token] = await Promise.all([
+  const [{ Device: Aparelho, Call: Chamada }, token] = await Promise.all([
     import('@twilio/voice-sdk'),
     pedirCredencial(),
   ]);
   const novo = new Aparelho(token, {
+    // A voz entra pela borda de São Paulo, a mais perto de Natal; se ela falhar, o
+    // SDK escolhe a próxima pela latência.
+    edge: ['sao-paulo', 'roaming'],
+    // Opus aguenta perda de pacote e Wi‑Fi instável melhor que o PCMU padrão.
+    codecPreferences: [Chamada.Codec.Opus, Chamada.Codec.PCMU],
     // Fechar a aba no meio de uma ligação pede confirmação.
     closeProtection: 'Há uma ligação em andamento. Sair desta página encerra a chamada.',
     // Avisa 60 s antes de a credencial vencer.
