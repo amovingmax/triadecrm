@@ -6995,3 +6995,46 @@ registro que alcanço, ou falharam três vezes e saíram da fila. Abrir a conver
 **Na `main` desde 07/10/2026:** a branch `figurinha-na-chegada` foi juntada na `main`
 do GitHub, a pedido. A `main` não tinha andado, então o que está nela é o que já estava
 no ar: não houve novo deploy.
+## 06/10/2026 — A ligação sai pelo navegador (telefonia Twilio; R13 §3.4 e §8.1; RF-CON-11, RF-CON-18, RF-BAS-14, RF-FUN-12, RF-MET-01)
+
+Pedido do Rafael, com um PRD de telefonia colado na conversa (click-to-call com Twilio Programmable Voice). **Fora do PRD do produto**: até aqui o registro era "não há telefonia no produto" e o fornecedor estava pendente (R13 §8.1). Branch local `telefonia-twilio`; nada foi para a `main`, para o GitHub nem para produção. **A telefonia nasce desligada** (`app_settings['voz.telefonia'].ativa = false`): aplicar as migrações não muda a tela nem gera custo.
+
+**O que mudou em relação ao PRD colado** (decidido com o Rafael antes de escrever):
+- **Dentro do módulo de ligação que já existe**, e não em paralelo. O Twilio é o segundo adaptador do R13 §3.4 (`app.call_provider` ganha `twilio`). Não há tabela `calls`, lista de resultados nem histórico novos: o desfecho continua saindo de `tabular_chamada` e `registrar_contato`, então etapa, temperatura, próxima ação, linha do tempo e metas não mudam.
+- **Edge Functions no lugar do "backend Node"**: `voz-token`, `voz-twiml`, `voz-status`. A web na Vercel não guarda segredo de servidor; os do Twilio ficam nos Secrets do Supabase.
+- **As travas do modo manual valem**: papel que escreve, janela de horário, supressão. O PRD colado não as citava.
+- **O registro técnico fica numa tabela irmã**, `voice_calls`, e não em colunas de `call_attempts` (o que eu tinha proposto): `call_attempts` é legível inteira por quem está logado, e o número discado não pode ser. Também é o que permite a ligação avulsa da ficha sem tornar `item_id`/`batch_id` opcionais.
+
+**Entregue.**
+- **Banco** (`20261006090000`, `20261006090100`): `public.voice_calls` (estado da linha, horários, duração medida pelo provedor, código de erro, `recording_enabled = false`) e `public.voice_call_events` (cada aviso uma vez só; é o log e a chave de idempotência). `voz_abrir_ligacao` aplica as travas, escolhe o número (ficha ou reserva do lote) e **não o devolve**: ligar não revela telefone. Índice único parcial garante uma ligação em curso por pessoa. `voz_twiml_autorizar` e `voz_registrar_evento` só para `service_role`; a primeira refaz as travas (opt-out que chega entre abrir e discar não disca), a segunda nunca deixa o estado voltar. `app.voz_fechar_orfas` (pg_cron, 10 min) transforma em atividade com desfecho pendente a ligação avulsa que ninguém tabulou em 30 min. Só números +55.
+- **Edge Functions**: `voz-token` emite credencial de 1 h, só de saída, com a identidade que o Postgres devolve (`crm_<user_id>`); `voz-twiml` e `voz-status` conferem `X-Twilio-Signature` em tempo constante antes de qualquer leitura e recusam fechado sem segredo. Sem SDK do Twilio no servidor (`_compartilhado/twilio.ts`). `voz-status` escreve direto no banco, sem fila (ADR-04): é uma escrita idempotente que a tela acompanha ao vivo, e os workers podem estar desligados.
+- **Tela**: `@twilio/voice-sdk` carregado só quando alguém liga. `ProvedorDoSoftphone` na casca (a ligação sobrevive à troca de tela) com painel no canto: nome, estado, cronômetro, Silenciar, Desligar. Botão **Ligar** na ficha, com resultado e observações no próprio painel (os mesmos desfechos da `/registrar`, mesma folha de extras do lote). Na fila, **Ligar pelo navegador** ao lado de **Ligar do aparelho**. Erros em frase, nunca código.
+- **Documentação**: `docs/operacao/telefonia-twilio.md` e as oito `TWILIO_*` no `.env.example`. Dublê em `supabase/functions/_dubles/twilio-duble.mjs`.
+
+**Verificado.** pgTAP `96_a_ligacao_sai_pelo_navegador.sql` (51 asserções); 11 testes Deno (a assinatura bate com o exemplo publicado pelo Twilio); 19 testes Vitest da lógica; typecheck e lint verdes; 1.953 testes Vitest do monorepo verdes. Ponta a ponta local contra o dublê: credencial, abrir, segunda ligação recusada, identidade errada → `<Hangup/>`, estados, aviso repetido sem efeito, aviso falso → 403, nenhum segredo ou telefone no log. No navegador (Chrome): microfone negado, clique duplo (uma chamada só) e provedor recusando a credencial.
+
+**Não verificado.** **Nenhuma chamada real foi feita**: não há conta Twilio. Áudio, toque no celular, cronômetro em conversa e os eventos do SDK em chamada de verdade (`ringing`/`accept` com `answerOnBridge`) só se confirmam com a conta. Sem teste Playwright no repositório para o painel. A suíte pgTAP inteira tem 6 arquivos vermelhos no banco local (14, 48, 50, 62, 74, 90), todos por dado e data do banco local, nenhum da telefonia; não rodei `db reset` para não apagar o banco de trabalho.
+
+**Pendente.**
+- Conta Twilio, número brasileiro (exige documentação da empresa), API Key e TwiML App; depois os Secrets, `db push`, deploy das três funções e ligar a chave. Roteiro no guia.
+- Na fila, a tentativa é aberta antes de o navegador conectar: se o microfone for negado, a tentativa já contou. O contato continua na tela para ligar do aparelho.
+- Tela de administração para ligar e desligar a telefonia (hoje é um `update` em `app_settings`).
+- Fase 2 do PRD colado: seleção de microfone e saída de som, permissões próprias de voz (hoje vale `app.can_write()`), gravação.
+- Os testes Deno das Edge Functions não rodam no CI (os que já existiam também não).
+
+**Decisão humana.**
+- **Rafael**: confirmar o Twilio como fornecedor (custo por minuto em dólar; o R13 §8.1 pedia cotação) e registrar a telefonia no PRD do produto.
+- **Dennis**: retenção de `voice_calls` (guarda o número discado e os horários; não entrou na regra do PRD §10.6) e qualquer passo em direção a gravar chamadas.
+- **Luiz**: quem cria a conta, o número e os Secrets.
+
+**Mesmo dia: a ligação da ficha passa a usar o roteiro** (pedido do Rafael depois de ver a primeira versão: "o mesmo padrão do que já temos ao ligar para o parceiro", e mensagens de falha com nome claro). Commit seguinte, na mesma branch.
+
+- **Um padrão só.** O botão **Ligar** da ficha deixou de ter painel e resultado próprios. Ele monta um **lote de um contato** (`public.montar_lote_avulso`, migração `20261006090200`, coluna `call_batches.avulso`) e abre a tela de ligar do módulo, com a chamada começando sozinha (`/ligar/<lote>?org=…&discar=1`). Roteiro, respostas como botões, tabulação em dois eixos, recibo e resumo da IA são os mesmos, porque é a mesma tela; depois do recibo volta-se à ficha. O lote avulso fica fora das listas de lotes e é encerrado sozinho quando termina, vence ou é abandonado por 2 h (`app.encerrar_lotes_avulsos`, pg_cron). Removido `voz-tabulacao.tsx`.
+- **A reserva vale para a ficha.** Parceiro no lote de outra pessoa não é ligado por fora (o aviso diz com quem está); no lote de turno de quem clicou, o aviso aponta o lote. O que **não** vale na ficha: cooldown de recontato e filtro de temperatura, como na tela Registrar.
+- **Falhas com título e frase**: Microfone bloqueado, Microfone não encontrado, Telefone inválido, Sem conexão, Fora do horário, Não ligar, Em outro lote, Telefonia não configurada.
+- **Painel** virou uma faixa no alto da tela (no canto de baixo cobria o último botão de resultado). Relógio no formato do telefone (`03:27`), o mesmo do cronômetro da tela de ligar.
+- **Estado e duração vêm do provedor** quando a chamada sai pelo navegador: o cabeçalho da tela de ligar mostra Chamando/Tocando/Em ligação e conta a conversa a partir do atendimento, e é essa duração que vai para `tabular_chamada`. No modo manual, e quando a chamada pelo navegador falha antes de tocar, continua o relógio desde o clique.
+- **Verificado:** pgTAP `97_ligar_da_ficha_com_roteiro.sql` (24 asserções) e os testes antigos do módulo de ligação (13, 15, 44) verdes; Vitest, typecheck e lint verdes; no Chrome, ficha → tela com roteiro → discagem automática → falha com título e frase, e clique duplo sem lote nem aviso duplicado. **Continua sem chamada real.**
+- **Pendente / atenção:** `voz_abrir_ligacao(p_organization_id)` e `app.voz_fechar_orfas` (ligação sem tentativa) ficaram no banco sem uso pela tela; remover ou manter é decisão para quando houver chamada real. Relatórios por lote passam a ter lotes de um contato (`avulso = true`): conferir se algum relatório precisa ignorá-los. Parceiro sem negócio aberto não liga pela ficha (o roteiro depende do funil).
+
+**Mesmo dia: custos, número e limites da conta documentados** em `docs/operacao/telefonia-twilio.md` (seção "Custos, número e limites da conta"), a pedido do Rafael: tarifa por minuto com os dois trechos somados (US$ 0,0703 para celular), número único para todos os operadores, perfil de empresa aprovado como condição para ligações simultâneas sem limite, operação só de saída com mensagem de retorno, e convivência com o número do WhatsApp. Preços consultados em 06/10/2026. **Decisão humana:** prefixo 0303 (Dennis); quem envia o perfil de empresa e os documentos do número (Luiz).

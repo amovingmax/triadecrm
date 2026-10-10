@@ -898,6 +898,8 @@ export type Database = {
         Returns: string
       }
       wa_atraso_do_envio: { Args: { p_message_id: string }; Returns: number }
+      voz_ativa: { Args: never; Returns: boolean }
+      voz_fechar_orfas: { Args: never; Returns: number }
       wa_avancar_negocio: {
         Args: { p_de: string[]; p_deal_id: string; p_para: string }
         Returns: boolean
@@ -1041,7 +1043,7 @@ export type Database = {
       call_batch_status: "rascunho" | "ativo" | "pausado" | "encerrado"
       call_item_status: "fila" | "em_andamento" | "concluido" | "devolvido"
       call_order: "prioridade" | "mais_parado" | "aleatorio"
-      call_provider: "manual"
+      call_provider: "manual" | "twilio"
       call_result:
         | "atendida_humano"
         | "nao_atendeu"
@@ -1144,6 +1146,16 @@ export type Database = {
         | "leitura"
         | "financeiro"
         | "bot"
+      voice_call_status:
+        | "preparando"
+        | "chamando"
+        | "tocando"
+        | "em_ligacao"
+        | "finalizada"
+        | "nao_atendida"
+        | "ocupado"
+        | "falha"
+        | "cancelada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2371,6 +2383,7 @@ export type Database = {
       }
       call_batches: {
         Row: {
+          avulso: boolean
           created_at: string
           ends_on: string
           id: string
@@ -2393,6 +2406,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avulso?: boolean
           created_at?: string
           ends_on: string
           id?: string
@@ -2415,6 +2429,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avulso?: boolean
           created_at?: string
           ends_on?: string
           id?: string
@@ -7343,6 +7358,189 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_call_events: {
+        Row: {
+          call_id: string
+          error_code: string | null
+          event: string
+          event_at: string | null
+          id: number
+          provider_call_sid: string
+          received_at: string
+        }
+        Insert: {
+          call_id: string
+          error_code?: string | null
+          event: string
+          event_at?: string | null
+          id?: never
+          provider_call_sid: string
+          received_at?: string
+        }
+        Update: {
+          call_id?: string
+          error_code?: string | null
+          event?: string
+          event_at?: string | null
+          id?: never
+          provider_call_sid?: string
+          received_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_call_events_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "voice_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_calls: {
+        Row: {
+          activity_id: string | null
+          atendida_em: string | null
+          attempt_id: string | null
+          contact_id: string | null
+          created_at: string
+          direction: string
+          duracao_seg: number | null
+          encerrada_em: string | null
+          encerrada_por: string | null
+          error_code: string | null
+          from_number: string | null
+          id: string
+          iniciada_em: string
+          organization_id: string
+          provedor: Database["app"]["Enums"]["call_provider"]
+          provider_call_sid: string | null
+          provider_parent_sid: string | null
+          recording_enabled: boolean
+          recording_url: string | null
+          status: Database["app"]["Enums"]["voice_call_status"]
+          to_number: string
+          tocou_em: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id?: string | null
+          atendida_em?: string | null
+          attempt_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          direction?: string
+          duracao_seg?: number | null
+          encerrada_em?: string | null
+          encerrada_por?: string | null
+          error_code?: string | null
+          from_number?: string | null
+          id?: string
+          iniciada_em?: string
+          organization_id: string
+          provedor: Database["app"]["Enums"]["call_provider"]
+          provider_call_sid?: string | null
+          provider_parent_sid?: string | null
+          recording_enabled?: boolean
+          recording_url?: string | null
+          status?: Database["app"]["Enums"]["voice_call_status"]
+          to_number: string
+          tocou_em?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string | null
+          atendida_em?: string | null
+          attempt_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          direction?: string
+          duracao_seg?: number | null
+          encerrada_em?: string | null
+          encerrada_por?: string | null
+          error_code?: string | null
+          from_number?: string | null
+          id?: string
+          iniciada_em?: string
+          organization_id?: string
+          provedor?: Database["app"]["Enums"]["call_provider"]
+          provider_call_sid?: string | null
+          provider_parent_sid?: string | null
+          recording_enabled?: boolean
+          recording_url?: string | null
+          status?: Database["app"]["Enums"]["voice_call_status"]
+          to_number?: string
+          tocou_em?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_calls_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_calls_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "call_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_calls_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "v_call_script_steps"
+            referencedColumns: ["attempt_id"]
+          },
+          {
+            foreignKeyName: "voice_calls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_calls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_calls_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_calls_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_calls_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_calls_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wa_saude_numero: {
         Row: {
           banido: boolean
@@ -8292,6 +8490,10 @@ export type Database = {
       }
       meu_papel: { Args: never; Returns: Json }
       modelo_whatsapp_criar: { Args: { p: Json }; Returns: Json }
+      montar_lote_avulso: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       montar_lote: {
         Args: {
           p_categoria_ids?: number[]
@@ -8868,6 +9070,40 @@ export type Database = {
         }
         Returns: Json
       }
+      voz_abrir_ligacao: {
+        Args: { p_attempt_id?: string; p_organization_id?: string }
+        Returns: Json
+      }
+      voz_encerrar_ligacao: {
+        Args: { p_call_id: string; p_codigo?: string; p_falha?: boolean }
+        Returns: Json
+      }
+      voz_pode_ligar: { Args: never; Returns: Json }
+      voz_registrar_evento: {
+        Args: {
+          p_call_id: string
+          p_call_sid: string
+          p_duracao_seg?: number
+          p_em?: string
+          p_error_code?: string
+          p_estado: string
+          p_parent_sid: string
+        }
+        Returns: Json
+      }
+      voz_twiml_autorizar: {
+        Args: {
+          p_call_id: string
+          p_identidade: string
+          p_origem?: string
+          p_parent_sid: string
+        }
+        Returns: Json
+      }
+      voz_vincular_atividade: {
+        Args: { p_activity_id: string; p_call_id: string }
+        Returns: Json
+      }
       wa_bot_ligar: { Args: { p_ativo: boolean }; Returns: Json }
       wa_eco_registrar: {
         Args: {
@@ -9156,7 +9392,7 @@ export const Constants = {
       call_batch_status: ["rascunho", "ativo", "pausado", "encerrado"],
       call_item_status: ["fila", "em_andamento", "concluido", "devolvido"],
       call_order: ["prioridade", "mais_parado", "aleatorio"],
-      call_provider: ["manual"],
+      call_provider: ["manual", "twilio"],
       call_result: [
         "atendida_humano",
         "nao_atendeu",
@@ -9255,6 +9491,17 @@ export const Constants = {
         "leitura",
         "financeiro",
         "bot",
+      ],
+      voice_call_status: [
+        "preparando",
+        "chamando",
+        "tocando",
+        "em_ligacao",
+        "finalizada",
+        "nao_atendida",
+        "ocupado",
+        "falha",
+        "cancelada",
       ],
     },
   },

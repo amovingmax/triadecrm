@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Copy, Phone, PhoneCall, TriangleAlert } from 'lucide-react';
+import { Check, Copy, Headset, Phone, PhoneCall, TriangleAlert } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,9 @@ export function ChamadaCabecalho({
   segundos,
   abrindo,
   aoLigar,
+  aoLigarPeloNavegador,
+  navegadorOcupado = false,
+  estadoDaLinha,
 }: {
   item: ItemDoLote;
   maxTentativas: number;
@@ -47,6 +50,18 @@ export function ChamadaCabecalho({
   abrindo: boolean;
   /** `abreDiscador` diz se o `tel:` do aparelho deve ser aberto junto. */
   aoLigar: (abreDiscador: boolean) => void;
+  /**
+   * Presente quando a telefonia está ligada: a chamada sai do navegador e vira o
+   * botão principal. O `tel:` continua ao lado, para quem prefere o aparelho.
+   */
+  aoLigarPeloNavegador?: () => void;
+  /** Já existe ligação pelo navegador em curso (ou resultado por registrar). */
+  navegadorOcupado?: boolean;
+  /**
+   * O estado que o provedor informou (Chamando, Tocando, Em ligação...), quando a chamada
+   * saiu pelo navegador. Sem ele vale o "Em chamada" do modo manual.
+   */
+  estadoDaLinha?: string;
 }) {
   const [copiado, setCopiado] = useState(false);
 
@@ -187,7 +202,7 @@ export function ChamadaCabecalho({
                   lê por leitor: o ponto vermelho e o cronômetro correndo já dizem a
                   mesma coisa, e as duas palavras eram o que espremia o número na linha
                   de 390 px. */}
-              <span className="max-sm:sr-only">Em chamada</span>
+              <span className="max-sm:sr-only">{estadoDaLinha ?? 'Em chamada'}</span>
               <span className="numerico text-lg" aria-label={`${segundos} segundos de chamada`}>
                 {cronometro(segundos)}
               </span>
@@ -197,11 +212,27 @@ export function ChamadaCabecalho({
 
         {chamada ? null : (
           <div className="flex flex-col gap-2 sm:flex-row">
+            {aoLigarPeloNavegador ? (
+              <Button
+                type="button"
+                className="h-12 shrink-0 sm:flex-1 text-base"
+                disabled={!podeDiscar || navegadorOcupado}
+                onClick={aoLigarPeloNavegador}
+              >
+                <Headset aria-hidden="true" />
+                Ligar pelo navegador
+              </Button>
+            ) : null}
+
             {podeDiscar ? (
-              <Button asChild className="h-12 shrink-0 sm:flex-1 text-base">
+              <Button
+                asChild
+                variant={aoLigarPeloNavegador ? 'outline' : 'default'}
+                className="h-12 shrink-0 sm:flex-1 text-base"
+              >
                 <a href={linkDoDiscador(item.telefone)} onClick={() => aoLigar(true)}>
                   <PhoneCall aria-hidden="true" />
-                  Ligar
+                  {aoLigarPeloNavegador ? 'Ligar do aparelho' : 'Ligar'}
                 </a>
               </Button>
             ) : (

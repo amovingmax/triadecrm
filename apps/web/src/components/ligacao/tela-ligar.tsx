@@ -28,11 +28,17 @@ export function TelaLigar({
   contexto,
   quemLiga,
   loteId,
+  daFicha = null,
+  discarAoAbrir = false,
 }: {
   contexto: ContextoDaLigacao;
   /** Nome de quem está ligando: entra no `[eu]` da fala de abertura. */
   quemLiga: string;
   loteId: string;
+  /** Id do parceiro quando a ligação veio do botão Ligar da ficha: é para lá que se volta. */
+  daFicha?: string | null;
+  /** Começar a chamada pelo navegador assim que o contato estiver na tela. */
+  discarAoAbrir?: boolean;
 }) {
   const router = useRouter();
   const doServidor = contexto.lotes.find((l) => l.id === loteId);
@@ -79,7 +85,7 @@ export function TelaLigar({
                 'Não encontramos este lote. Volte e escolha um da lista.'
           }
           aoTentarDeNovo={null}
-          aoVoltar={() => router.push('/ligar')}
+          aoVoltar={() => router.push(daFicha ? `/parceiros/${daFicha}` : '/ligar')}
         />
       </div>
     );
@@ -98,7 +104,9 @@ export function TelaLigar({
       }
       contexto={contexto}
       quemLiga={quemLiga}
-      aoSair={() => router.push('/ligar')}
+      daFicha={daFicha !== null}
+      discarAoAbrir={discarAoAbrir}
+      aoSair={() => router.push(daFicha ? `/parceiros/${daFicha}` : '/ligar')}
       aoMontarOutro={() => router.push('/ligar?montar=1')}
     />
   );

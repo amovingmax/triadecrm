@@ -30,6 +30,8 @@ import {
 } from '@/components/exclusao/acoes';
 import { DialogoExcluir } from '@/components/exclusao/dialogo-excluir';
 
+import { BotaoLigar } from '@/components/ligacao/voz-botao-ligar';
+
 import { useEditarFicha } from './ficha-edicao';
 
 /**
@@ -42,6 +44,8 @@ import { useEditarFicha } from './ficha-edicao';
  *     é para lá que apontam o histórico e o WhatsApp.
  *   - REGISTRAR CONTATO fica ao lado, só para quem escreve: o banco recusaria a
  *     gravação do papel de leitura no fim do fluxo (`app.can_write()`).
+ *   - LIGAR aparece só com a telefonia ligada (`voz.telefonia`) e para quem escreve:
+ *     abre a tela de ligar com o roteiro, para este parceiro, e a chamada sai do navegador.
  *   - "⋯" guarda o que se faz de vez em quando: ver no funil, editar a ficha e,
  *     desde 07/10/2026, EXCLUIR o parceiro.
  *
@@ -62,6 +66,7 @@ import { useEditarFicha } from './ficha-edicao';
 export function AcoesDaFicha({
   organizationId,
   nome,
+  temTelefone,
   podeEscrever,
   podeExcluir,
   conversaNoCrm,
@@ -70,6 +75,8 @@ export function AcoesDaFicha({
   organizationId: string;
   /** O nome do parceiro, para o diálogo de exclusão dizer de quem se trata. */
   nome: string;
+  /** A ficha tem telefone (inteiro ou mascarado): sem ele não há para onde ligar. */
+  temTelefone: boolean;
   podeEscrever: boolean;
   /** Admin e gestor (`podeExcluirParceiro`). Quem decide é o banco. */
   podeExcluir: boolean;
@@ -131,6 +138,10 @@ export function AcoesDaFicha({
             <span className="hidden sm:inline">Registrar contato</span>
           </Link>
         </Button>
+      ) : null}
+
+      {podeEscrever ? (
+        <BotaoLigar organizationId={organizationId} temTelefone={temTelefone} />
       ) : null}
 
       {temMenu ? (

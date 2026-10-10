@@ -66,6 +66,8 @@ export async function carregarContextoDaLigacao(): Promise<ContextoDaLigacao> {
       supabase
         .from('call_batches')
         .select(COLUNAS_DO_LOTE)
+        // O lote de um contato do botão Ligar da ficha não é um turno de trabalho.
+        .eq('avulso', false)
         .neq('status', 'encerrado')
         .gte('ends_on', hoje)
         .order('created_at', { ascending: false })

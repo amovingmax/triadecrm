@@ -251,6 +251,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
               nome={ficha.nome}
               podeExcluir={podeExcluirParceiro(sessao.papel)}
               organizationId={ficha.id}
+              temTelefone={Boolean(ficha.telefone)}
               podeEscrever={podeEscrever}
               conversaNoCrm={conectado && podeEscrever}
               // A URL sai de `hrefDoFunil`, a mesma da fila do dia: é ela que sabe
