@@ -3,9 +3,27 @@
 Como ligar, configurar, testar e desligar a ligação feita de dentro do CRM. A pessoa clica em
 **Ligar**, fala pelo microfone do computador, e o telefone do parceiro toca como uma ligação comum.
 
-Estado em 06/10/2026: código pronto e testado contra um dublê do Twilio. **Ainda não foi feita
-nenhuma chamada real**, porque não existe conta. A telefonia nasce **desligada**; aplicar as
-migrações não muda nada na tela.
+Estado em 10/10/2026: conta da KOMUNE criada e aprovada, número **(84) 2298-0098** comprado, e
+ligações reais feitas pelo CRM local (navegador → Twilio → celular, com conversa nos dois sentidos).
+A telefonia nasce **desligada**; aplicar as migrações não muda nada na tela.
+
+### A conta da KOMUNE
+
+Os itens abaixo estão no painel da Twilio, pelo nome. Nenhum identificador da conta (SID) vai
+para o repositório: o GitHub os trata como credencial e recusa o envio. Os valores ficam nos
+Secrets do Supabase e no gerenciador de senhas.
+
+| Item | O que é |
+| --- | --- |
+| Conta | região US1, plano pago (Full access) |
+| Perfil de empresa | Business Primary Customer Profile, Komune LTDA, aprovado em 09/10/2026 |
+| Cadastro do número | "Komune - CALL VOICE", aprovado |
+| Número | **+55 84 2298-0098**, "KOMUNE CRM - voz" |
+| Retorno | TwiML Bin "Triade - Retorno de Ligação": voz Polly.Camila dita o WhatsApp da KOMUNE |
+| TwiML App de produção | "Triade - Ligação pelo CRM" → `https://toqdjcajyrowutunczhr.supabase.co/functions/v1/voz-twiml` |
+| TwiML App de teste local | "Triade - teste local" → endereço do túnel do dia |
+| API Key | "CRM Triade" (Standard) |
+| Geo permissions | só Brasil |
 
 ## Como funciona
 
@@ -127,10 +145,10 @@ chamada nova por segundo por conta, que operadores clicando à mão não devem a
 O CRM não recebe ligações, e nada precisa ser contratado ou desligado para isso. A consequência é
 o retorno: o parceiro que ligar de volta ouve uma mensagem genérica de erro da Twilio, em inglês.
 
-Recomendado: configurar no painel da Twilio, no próprio número, uma mensagem curta em português
-("Você recebeu uma ligação da KOMUNE. Fale com a gente pelo WhatsApp."). Não mexe no CRM e custa
-US$ 0,01 por minuto de quem ligar. A alternativa é encaminhar o retorno para um telefone da
-KOMUNE.
+Configurado em 09/10: o número responde com o TwiML Bin "Triade - Retorno de Ligação", que diz que
+o número não recebe ligações e dita duas vezes o WhatsApp da KOMUNE. Não mexe no CRM e custa
+US$ 0,01 por minuto de quem ligar. A alternativa, se um dia fizer falta, é encaminhar o retorno
+para um telefone da KOMUNE.
 
 ### Dois números na mesma plataforma
 
@@ -142,18 +160,23 @@ Para o parceiro, a KOMUNE passa a aparecer por dois números. Para reduzir a con
 número de voz com DDD 84, avisar pelo WhatsApp antes de ligar quando houver conversa aberta, e
 configurar a mensagem de retorno acima.
 
-Em aberto: a Twilio permite ligar mostrando um número que não é dela, depois de uma chamada de
-verificação. Se isso valer para números brasileiros, o parceiro veria o próprio número do
-WhatsApp chamando e o número novo poderia nem ser necessário. Não foi confirmado, e nenhum teste
-deve ser feito com o número do WhatsApp sem o aval do Rafael.
+Mostrar o número do WhatsApp nas ligações não é possível: a orientação de voz da Twilio para o
+Brasil proíbe ligar com número brasileiro que não seja dela. O número de voz próprio é obrigatório.
 
-### A conferir antes de comprar o número
+### Decidido antes da compra (09/10/2026)
 
-- **Prefixo 0303 (Dennis).** A Anatel tem regra de que telemarketing ativo use números 0303, e a
-  Twilio lista tarifa própria para essa origem (US$ 0,0620 por minuto). Falta definir se a
-  prospecção da KOMUNE se enquadra; isso muda o tipo de número a comprar.
-- **Documentação (Luiz).** Empresa registrada no Brasil com CNPJ válido, comprovante de identidade
-  da empresa e comprovante de endereço brasileiro.
+- **Sem 0303.** A Anatel revogou em 07/08/2025 a obrigação do prefixo 0303 para telemarketing;
+  ele ficou opcional, e a regra nova (autenticação de chamada) vale para quem passa de 500 mil
+  ligações por mês. O Rafael escolheu número local comum com DDD 84. A página de orientação da
+  Twilio ainda descreve o 0303 como obrigatório (desatualizada).
+- **Documentação usada:** cartão CNPJ (comprovante de inscrição da Receita) e contrato de aluguel
+  em nome da empresa, como "Rent receipt".
+- **Rótulo errado:** a Twilio rotula o DDD 84 como "Paraíba". É erro de cadastro dela; o parceiro
+  vê só o número, e o 84 é do Rio Grande do Norte.
+- **A tela de compra do console travou** na etapa de endereço ("Please select an address to
+  proceed" com endereço válido selecionado). O número foi comprado pela API
+  (`POST /IncomingPhoneNumbers` com `BundleSid` e `AddressSid` do cadastro aprovado). O endereço
+  do cadastro precisa ter **Natal** no campo cidade: o autocompletar põe "Ponta Negra" ali.
 
 Fontes:
 [preços de voz no Brasil](https://www.twilio.com/en-us/voice/pricing/br),
@@ -174,7 +197,10 @@ Fontes:
    - Guarde o SID (`AP…`).
    - O aviso de estado não é configurado aqui: o CRM manda a URL em cada chamada.
 5. **Voice → Settings → Geo permissions**: deixe marcado só **Brasil**.
-6. Recomendado: em Billing, um alerta de gasto e recarga automática desligada no começo.
+6. Recomendado: em Billing, um alerta de gasto. A conta começou com US$ 20 e recarga automática
+   "Low" (abaixo de US$ 10 volta para US$ 20); **antes de o time ligar para parceiros, subir para
+   algo como "abaixo de US$ 50, volta para US$ 150"**. Saldo zerado derruba as ligações de todo o
+   time de uma vez e, se durar, pode levar à suspensão do número.
 
 ## O que configurar no Supabase
 
@@ -262,6 +288,28 @@ node supabase/functions/_dubles/twilio-duble.mjs falso  <id da ligação> <perna
 
 Para o Twilio de verdade alcançar a máquina local é preciso um túnel HTTPS para a porta 54321 e
 as duas URLs `TWILIO_*_URL` apontando para ele.
+
+## Como testar no local com a conta de verdade
+
+Foi assim que a primeira ligação real saiu, em 10/10. A Twilio precisa alcançar `voz-twiml` e
+`voz-status`, então o Supabase local ganha um endereço público por um túnel da Cloudflare.
+
+1. `supabase start` e um "porteiro" na porta 8787 que só repassa `POST` para esses dois caminhos
+   e devolve 404 para todo o resto. **Nunca aponte o túnel direto para a 54321**: o local usa as
+   chaves de demonstração públicas do Supabase, e o REST inteiro ficaria aberto.
+2. `caffeinate -i ~/cloudflared tunnel --url http://127.0.0.1:8787` (o `caffeinate` impede o Mac
+   de dormir; com o Mac dormindo o túnel cai e a tela mostra "Sem conexão", erro 31005). O
+   endereço muda a cada abertura.
+3. TwiML App "Triade - teste local" apontando para `https://<túnel>/functions/v1/voz-twiml`.
+4. `supabase/functions/.env` com os valores reais e as duas URLs (`TWILIO_TWIML_URL`,
+   `TWILIO_STATUS_CALLBACK_URL`) no endereço do túnel; depois
+   `supabase functions serve --env-file supabase/functions/.env`.
+5. Um parceiro de teste com o celular de alguém do time e negócio aberto; o banco local tem
+   parceiros reais, então nunca use um deles.
+
+A janela de horário vale no local também (banco e tela). Para testar fora dela, troque a faixa
+do dia em `app.call_window_hours` e em `JANELA_DE_LIGACAO` (`components/ligacao/tipos.ts`) e
+desfaça logo depois.
 
 ## Onde está cada parte
 

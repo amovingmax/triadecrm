@@ -7038,3 +7038,30 @@ Pedido do Rafael, com um PRD de telefonia colado na conversa (click-to-call com 
 - **Pendente / atenção:** `voz_abrir_ligacao(p_organization_id)` e `app.voz_fechar_orfas` (ligação sem tentativa) ficaram no banco sem uso pela tela; remover ou manter é decisão para quando houver chamada real. Relatórios por lote passam a ter lotes de um contato (`avulso = true`): conferir se algum relatório precisa ignorá-los. Parceiro sem negócio aberto não liga pela ficha (o roteiro depende do funil).
 
 **Mesmo dia: custos, número e limites da conta documentados** em `docs/operacao/telefonia-twilio.md` (seção "Custos, número e limites da conta"), a pedido do Rafael: tarifa por minuto com os dois trechos somados (US$ 0,0703 para celular), número único para todos os operadores, perfil de empresa aprovado como condição para ligações simultâneas sem limite, operação só de saída com mensagem de retorno, e convivência com o número do WhatsApp. Preços consultados em 06/10/2026. **Decisão humana:** prefixo 0303 (Dennis); quem envia o perfil de empresa e os documentos do número (Luiz).
+
+## 10/10/2026 — A telefonia ganha conta, número e a primeira ligação real; vai para a main (R13 §3.4; RF-CON-11, RF-CON-18)
+
+Pedido do Rafael: "colocar função de ligar pelo CRM usando nosso navegador", com todos os operadores ligando ao mesmo tempo. O código era o de 06/10; o que faltava era a conta. Guia atualizado em `docs/operacao/telefonia-twilio.md` (seções "A conta da KOMUNE", "Decidido antes da compra" e "Como testar no local com a conta de verdade").
+
+**Entregue.**
+- **Conta Twilio da KOMUNE** (Full access, US1), **perfil de empresa aprovado** (libera ligações simultâneas sem teto) e **cadastro regulatório aprovado** ("Komune - CALL VOICE").
+- **Número (84) 2298-0098**, comprado pela API porque a tela de compra do console travava na etapa de endereço. Geo permissions só Brasil. Quem liga de volta ouve a voz Polly.Camila ditando o WhatsApp da KOMUNE (TwiML Bin).
+- **Dois TwiML Apps:** produção (`…/functions/v1/voz-twiml` do `komune-crm`) e teste local (túnel).
+- **Primeira ligação real pelo CRM**, no local: navegador → Twilio → celular, conversa nos dois sentidos, cronômetro e troca de aba sem cair. Registros em `voice_calls` com duração do provedor.
+- **Áudio:** o softphone entra pela borda `sao-paulo` (roaming de reserva) e prefere Opus, depois de um primeiro teste com interferência.
+- **Main:** a branch foi juntada à main de 07/10. As migrações viraram `20261010090000`, `…090100` e `…090200`, para rodar depois das oito que a main já tinha; o Ligar e o Excluir da ficha convivem.
+
+**Verificado.** Banco novo com todas as migrações na ordem: sem erro; pgTAP inteiro com 3.615 asserções, 96 e 97 (telefonia) verdes. Falharam 104 (`excluir_sem_apagar`, teste 27), 70 (`teto_de_fala_do_robo`) e 90 (`a_fila_e_de_quem_abrir`, "janela_dia_sem_janela"), **iguais num banco só com a main**: dependem do dia e da hora em que rodam (sábado). Typecheck e lint verdes; 2.021 testes Vitest. Nenhum arquivo do caminho do WhatsApp mudou.
+
+**Decisões (Rafael, 09/10).** Sem prefixo 0303 (a Anatel revogou a obrigação em 07/08/2025); número local com DDD 84; comprar só depois da aprovação; o número do WhatsApp não entra (a Twilio também não permite usá-lo como origem).
+
+**Pendente.**
+- Publicar (migrações, três funções de voz, site), cadastrar os seis Secrets no Supabase e ligar `voz.telefonia` em produção; primeira ligação real em produção com um parceiro de teste.
+- **Antes de o time ligar para parceiros:** subir a recarga automática (hoje "Low", abaixo de US$ 10 volta a US$ 20) e criar alerta de gasto.
+- Os testes 104, 70 e 90 que dependem do dia: corrigir nas respectivas áreas.
+- `app.encerrar_lotes_avulsos` não aparece em `database.types.ts` (rotina do agendador, sem uso na tela); some na próxima geração de tipos.
+- Sem medição de qualidade pela API: o resumo do Voice Insights responde 404 sem os recursos avançados (pagos).
+
+**Decisão humana.**
+- **Dennis:** retenção de `voice_calls` (guarda número discado e horários) e qualquer passo em direção a gravar ligações.
+- **Rafael:** registrar a telefonia no PRD do produto; se o número único for marcado como spam pelas operadoras, considerar um número por operador (US$ 4,25/mês cada).
