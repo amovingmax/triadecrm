@@ -7078,7 +7078,7 @@ Pedido de 13/10: "melhorar os scripts das falas para as pessoas, deixando mais n
   - no máximo um aviso a cada 72 h.
   - **Disparo:** o gatilho `call_attempts_aviso` roda na tabulação "Não atendeu", "Caixa postal" ou "Ocupado" e põe o item no lote da casa do dia ("Aviso de ligação não atendida — DD/MM", `envios_em_massa.finalidade = 'ligacao_nao_atendida'`, sem crachá). Erro no aviso nunca desfaz a tabulação.
   - **Esteira:** a mesma do "Bom dia!" automático, sem regra nova de envio. Valem supressão, horário do WhatsApp, domingo, feriado, tetos, a cortesia de 72 h e a parada automática por opt-out.
-  - **Modelos:** três, `GEN-LIG-PERDIDA-MANHA/TARDE/NOITE` (marketing, sem variável), terminando em "Se preferir não receber mensagens, é só responder SAIR." (pedido no mesmo dia, para cumprir o RF-CON-12; a palavra SAIR já leva à supressão). `app.modelo_da_hora` passou a trocar qualquer família MANHA/TARDE/NOITE, então a saudação é a da hora do envio. O texto é o pedido, com "Aqui é da Komune", porque a ligação vem do número de voz e o WhatsApp de outro.
+  - **Modelos:** três, `GEN-LIG-PERDIDA-MANHA/TARDE/NOITE` (marketing, sem variável). O "Se preferir não receber mensagens, é só responder SAIR." chegou a entrar e saiu no mesmo dia, por decisão de quem pediu: o aviso fica curto. A palavra SAIR (e "parar", "não quero", "remover") continua levando à supressão. `app.modelo_da_hora` passou a trocar qualquer família MANHA/TARDE/NOITE, então a saudação é a da hora do envio. O texto é o pedido, com "Aqui é da Komune", porque a ligação vem do número de voz e o WhatsApp de outro.
   - **Travas:** nada entra na fila até a Meta aprovar os três modelos. Aviso que esperou mais de 3 dias é cancelado (`aviso_ligacao_vencer`, pg_cron às 07:50). Lote pausado ou parado segura os próximos. A chave geral é `app_settings['voz.aviso_nao_atendeu'].ativo`, que nasce ligada.
   - **Tela:** o recibo da ligação mostra a situação do aviso: na fila, enviado, cancelado ou o motivo de não haver aviso. O botão **Não avisar** chama `aviso_ligacao_cancelar`, só para quem ligou e para a gestão, com auditoria `CANCELAR_AVISO_LIGACAO`. O botão manual "tentei te ligar" (`GEN-FUP-LIG-V1`) saiu do recibo, para não haver duas mensagens pela mesma ligação.
 - `database.types.ts`: as colunas e funções novas, mais `app.encerrar_lotes_avulsos`, pendente desde 10/10.
@@ -7098,7 +7098,7 @@ Pedido de 13/10: "melhorar os scripts das falas para as pessoas, deixando mais n
 - Não há chave na tela de Ajustes para o aviso; hoje se liga e desliga por SQL.
 
 **Decisão humana.**
-- **Dennis / R06 (RF-CON-12):** o "responder SAIR" entrou no aviso. Origem do contato e link de privacidade ficaram de fora para a mensagem continuar curta; confirmar se basta.
+- **Dennis / R06 (RF-CON-12):** o aviso vai sem "responda SAIR", sem origem do contato e sem link de privacidade, por decisão de quem pediu (mensagem curta e amigável). Para quem nunca falou com a Komune, ele pode ser a primeira mensagem com conteúdo; registrar o aceite desse desvio.
 
 ### 13/10/2026 — A cadência de voz perde o "tentei te ligar" (RF-CON-13, RF-CON-18)
 
@@ -7109,7 +7109,6 @@ Decisão do mesmo dia: "Tirar o passo 3 da sequência. O que deve acontecer é s
   - **Quem está no meio da sequência:** a tarefa pendente do passo removido é cancelada, e o toque fica como pulado. A matrícula que já passou do passo 2 desce uma posição, então o próximo toque é o Instagram.
   - **O passo removido:** é apagado se ninguém o usou. Se já tem histórico, fica na posição 12, marcado "Fora de uso", e o motor nunca chega lá.
 - `seed.sql`: os quatro passos, a descrição nova e a autoverificação com 18 passos.
-- Também foi para o aviso: "Se preferir não receber mensagens, é só responder SAIR." no fim das três mensagens (commit anterior).
 
 **Verificado.**
 - Banco novo: pgTAP inteiro verde, 3.659 asserções. O `17` ganhou 2 asserções (os quatro canais da cadência e o teto de toques), e as referências ao Instagram foram para a posição 3.
