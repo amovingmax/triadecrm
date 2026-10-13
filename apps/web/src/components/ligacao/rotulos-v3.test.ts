@@ -9,10 +9,9 @@ import { noSchema } from './tipos';
  * mostra a primeira frase da RESPOSTA ("Mando sim, com o passo a passo."), e quem está
  * com o telefone no ouvido não acha a objeção que acabou de ouvir.
  */
-const CAMINHO =
-  '../../../../../supabase/migrations/20260915100000_o_roteiro_ganha_os_tres_funis.sql';
+const CAMINHO = '../../../../../supabase/migrations/20261013100000_o_roteiro_fica_mais_humano.sql';
 
-describe('a gaveta do roteiro v3', () => {
+describe('a gaveta do roteiro publicado', () => {
   it('toda objeção tem rótulo próprio, e não o começo da resposta', () => {
     const sql = readFileSync(new URL(CAMINHO, import.meta.url), 'utf8');
     const bruto = /\$roteiro\$([\s\S]*?)\$roteiro\$/.exec(sql)?.[1] ?? '[]';

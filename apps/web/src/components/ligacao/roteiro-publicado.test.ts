@@ -44,8 +44,7 @@ import {
  *    a casa decidiu que nunca saem.
  */
 
-const CAMINHO =
-  '../../../../../supabase/migrations/20260915100000_o_roteiro_ganha_os_tres_funis.sql';
+const CAMINHO = '../../../../../supabase/migrations/20261013100000_o_roteiro_fica_mais_humano.sql';
 
 function arvorePublicada(): NoRoteiro[] {
   const sql = readFileSync(new URL(CAMINHO, import.meta.url), 'utf8');
@@ -58,8 +57,8 @@ const NOS = arvorePublicada();
 const ROTEIRO = roteiroSchema.parse({
   id: '00000000-0000-4000-8000-000000000000',
   slug: 'captacao_v1',
-  nome: 'Ligação — fornecedor, produtor e ativação (v3)',
-  versao: 3,
+  nome: 'Ligação — fornecedor, produtor e ativação (v4)',
+  versao: 4,
   nos: NOS,
 });
 

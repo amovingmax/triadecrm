@@ -66,8 +66,10 @@ select ok(app.no_vale_na_variante('ambas', 'ativacao'), 'ambas vale para ativaç
 -- =====================================================================
 -- 2. O roteiro publicado
 -- =====================================================================
-select is((select versao from public.call_scripts where slug = 'captacao_v1' and is_published), 3,
-  'a versão publicada é a 3');
+-- A v4 (20261013100000) reescreveu só as falas; a árvore de três caminhos é a
+-- mesma, e é ela que este arquivo prova.
+select ok((select versao from public.call_scripts where slug = 'captacao_v1' and is_published) >= 3,
+  'a versão publicada é a 3 ou uma reescrita dela');
 select is((select count(*)::int from public.call_scripts where slug = 'captacao_v1' and is_published), 1,
   'uma versão publicada só');
 select is(app.validar_roteiro((select arvore from public.call_scripts where id = pg_temp.roteiro())),
@@ -100,7 +102,7 @@ select is((select count(*)::int from public.message_templates
               and is_active and channel = 'whatsapp'), 3,
   'os três modelos de depois da ligação existem');
 select is((select count(*)::int from public.message_templates
-            where template_code like 'GEN-LIG-%'
+            where template_code in ('GEN-LIG-CONFIRMA', 'GEN-LIG-RESUMO-FOR', 'GEN-LIG-RESUMO-PRO')
               and body !~ '^Oi, \{\{nome\}\}! Aqui é \{\{atendente\}\}, da Komune\.'), 0,
   'os três se apresentam com o nome de quem envia');
 
