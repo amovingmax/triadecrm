@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Download } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Download, Pencil } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { rotuloDiaCurto, type Dia } from '@/components/agenda/tipos';
@@ -21,6 +21,8 @@ import {
   rotuloDoResultado,
   taxaDeAtendimento,
 } from './formatos';
+import { podeCorrigir } from './correcao';
+import { DialogoCorrigirLigacao } from './corrigir-ligacao';
 import type { LigacaoDoDia, PessoaDoDia } from './tipos';
 
 /**
@@ -33,7 +35,21 @@ import type { LigacaoDoDia, PessoaDoDia } from './tipos';
  * para aqui: sem meta, sem funil, sem fila. O que a pessoa fez, na ordem em que
  * fez.
  */
-export function DiaDaPessoa({ pessoa, dia }: { pessoa: PessoaDoDia; dia: Dia }) {
+export function DiaDaPessoa({
+  pessoa,
+  dia,
+  corrige = false,
+}: {
+  pessoa: PessoaDoDia;
+  dia: Dia;
+  /**
+   * Quem está olhando pode corrigir o resultado destas ligações (13/10/2026)? A
+   * gestão sempre; quem ligou, só no próprio dia de hoje. A regra de verdade é a
+   * de `public.ligacao_corrigir`; aqui só se esconde o botão que o banco recusaria.
+   */
+  corrige?: boolean;
+}) {
+  const [corrigindo, setCorrigindo] = useState<LigacaoDoDia | null>(null);
   const taxa = taxaDeAtendimento(pessoa);
   const periodo = jornada(pessoa);
   const lista = useMemo(() => pessoa.lista ?? [], [pessoa.lista]);
@@ -75,6 +91,35 @@ export function DiaDaPessoa({ pessoa, dia }: { pessoa: PessoaDoDia; dia: Dia }) 
       },
     ],
     [],
+  );
+
+  // A coluna do botão só existe na tela: o CSV sai das `colunas` de cima.
+  const colunasDaTela = useMemo<Coluna<LigacaoDoDia>[]>(
+    () =>
+      corrige
+        ? [
+            ...colunas,
+            {
+              chave: 'corrigir',
+              rotulo: 'Corrigir',
+              ajuda: 'Lançou o resultado errado? Corrija aqui, com o motivo.',
+              texto: () => '',
+              celula: (l) =>
+                podeCorrigir(l, corrige) ? (
+                  <Button
+                    variant="ghost"
+                    className="toque h-11 px-2 text-muted-foreground md:h-8"
+                    aria-label={`Corrigir o resultado da ligação para ${l.organizacao ?? 'parceiro sem nome'}`}
+                    onClick={() => setCorrigindo(l)}
+                  >
+                    <Pencil aria-hidden="true" />
+                    Corrigir
+                  </Button>
+                ) : null,
+            },
+          ]
+        : colunas,
+    [colunas, corrige],
   );
 
   const resumo = [
@@ -175,12 +220,14 @@ export function DiaDaPessoa({ pessoa, dia }: { pessoa: PessoaDoDia; dia: Dia }) 
           </div>
           <TabelaRelatorio
             rotulo={`Ligações de ${pessoa.nome ?? 'pessoa'} em ${rotuloDiaCurto(dia)}`}
-            colunas={colunas}
+            colunas={colunasDaTela}
             linhas={lista}
             chaveDaLinha={(l) => l.id}
           />
         </section>
       ) : null}
+
+      <DialogoCorrigirLigacao ligacao={corrigindo} aoFechar={() => setCorrigindo(null)} />
     </div>
   );
 }

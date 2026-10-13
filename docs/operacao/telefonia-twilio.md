@@ -170,7 +170,8 @@ tem o botão **Não avisar**. Regras:
 - **custa**: fora da janela de 24 h é modelo pago da Meta (`GEN-LIG-PERDIDA-*`, categoria
   marketing) e conta no teto diário de conversas abertas;
 - nada sai até a Meta aprovar os três modelos. O worker-wa os submete sozinho;
-- desligar: `update app_settings set value = value || '{"ativo": false}' where key = 'voz.aviso_nao_atendeu';`.
+- desligar: **Ajustes → Ligações → "Aviso no WhatsApp para quem não atendeu"** (admin e gestor;
+  desde 13/10/2026). A chave só impede avisos novos: o que já está na fila continua.
   Pausar o lote do dia em Envios também segura os próximos, até alguém retomar.
 
 Para o parceiro, a KOMUNE passa a aparecer por dois números. Para reduzir a confusão: escolher um
@@ -243,13 +244,10 @@ Depois:
 1. Aplicar as migrações `20261010090000`, `20261010090100` e `20261010090200`.
 2. Publicar as funções `voz-token`, `voz-twiml` e `voz-status` (as duas últimas com
    `verify_jwt = false`, já declarado em `supabase/config.toml`).
-3. Ligar a chave (gestor ou admin, pelo SQL Editor):
+3. Ligar a chave (gestor ou admin): **Ajustes → Ligações → "Ligação pelo navegador"** (desde
+   13/10/2026; antes era um `update` em `app_settings`, que continua valendo).
 
-   ```sql
-   update public.app_settings set value = '{"ativa": true}' where key = 'voz.telefonia';
-   ```
-
-   Para desligar, o mesmo comando com `false`. O botão **Ligar** some e o CRM volta ao modo
+   Para desligar, a mesma chave. O botão **Ligar** some e o CRM volta ao modo
    manual (`tel:`); nenhum dado é perdido.
 
 ## Como testar uma chamada real

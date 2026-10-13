@@ -23,10 +23,18 @@
  * base — quem devolve é o gatilho `call_batches_on_close`, não esta tela. Por isso a
  * confirmação diz o número: "devolve 7 contatos à base" é uma consequência; "tem
  * certeza?" é uma pergunta sem informação.
+ *
+ * ---------------------------------------------------------------------------
+ * Contatos e Excluir (13/10/2026)
+ * ---------------------------------------------------------------------------
+ * A gestão ganhou duas ações no cartão. "Contatos" abre quem está no lote e deixa
+ * tirar da fila quem entrou por engano (`lote-contatos.tsx`). "Excluir" tira o
+ * lote da lista, com motivo: a fila volta para a base, e as ligações já feitas
+ * continuam no relatório do dia — excluir não é apagar (`public.lote_excluir`).
  */
 import { useState } from 'react';
 import Link from 'next/link';
-import { PhoneOutgoing, SquareCheckBig } from 'lucide-react';
+import { PhoneOutgoing, SquareCheckBig, Trash2, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -40,10 +48,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DialogoExcluir } from '@/components/exclusao/dialogo-excluir';
 import { ChipTemperatura } from '@/components/temperatura';
 
 import { type LoteNaLista } from './consultas';
 import { BarraDaFila, NumerosDoLote } from './fila-progresso';
+import { ContatosDoLote } from './lote-contatos';
 import { ROTULOS_ORDEM, ROTULOS_STATUS_LOTE, type StatusDoLote } from './tipos';
 
 const TOM_DO_STATUS: Record<StatusDoLote, 'default' | 'secondary' | 'outline' | 'pilula'> = {
@@ -84,11 +94,16 @@ export function CartaoDoLote({
   lote,
   aoEncerrar,
   encerrando,
+  aoExcluir,
+  excluindo,
   gestao = false,
 }: {
   lote: LoteNaLista;
   aoEncerrar: (lote: LoteNaLista) => void;
   encerrando: boolean;
+  /** Chamado com o motivo; quem fecha o diálogo é o `excluindo` voltar a `false`. */
+  aoExcluir: (lote: LoteNaLista, motivo: string) => void;
+  excluindo: boolean;
   /**
    * Admin e gestor montam o lote de todo mundo, e por isso só eles encerram —
    * o próprio e o dos outros. Quem só liga recebe o lote pronto: encerrá-lo
@@ -97,6 +112,8 @@ export function CartaoDoLote({
   gestao?: boolean;
 }) {
   const [confirmando, setConfirmando] = useState(false);
+  const [vendoContatos, setVendoContatos] = useState(false);
+  const [excluindoAberto, setExcluindoAberto] = useState(false);
   const aberto = lote.status === 'ativo' || lote.status === 'pausado';
   const podeEncerrar = aberto && gestao;
 
@@ -166,7 +183,69 @@ export function CartaoDoLote({
             {encerrando ? 'Encerrando...' : 'Encerrar'}
           </Button>
         ) : null}
+
+        {gestao ? (
+          <>
+            <Button
+              variant="ghost"
+              className="toque h-11 md:h-9"
+              onClick={() => setVendoContatos(true)}
+            >
+              <Users aria-hidden="true" />
+              Contatos
+            </Button>
+            <Button
+              variant="ghost"
+              className="toque ml-auto h-11 text-muted-foreground md:h-9"
+              onClick={() => setExcluindoAberto(true)}
+              disabled={excluindo}
+            >
+              <Trash2 aria-hidden="true" />
+              Excluir
+            </Button>
+          </>
+        ) : null}
       </footer>
+
+      {gestao ? (
+        <>
+          <ContatosDoLote
+            lote={lote}
+            aberto={vendoContatos}
+            aoFechar={() => setVendoContatos(false)}
+          />
+          <DialogoExcluir
+            aberto={excluindoAberto}
+            aoFechar={() => setExcluindoAberto(false)}
+            titulo={`Excluir “${lote.nome}”?`}
+            descricao={
+              <>
+                <p>
+                  O lote sai desta lista.{' '}
+                  {aberto && lote.faltam > 0 ? (
+                    <>
+                      Os <span className="numerico">{lote.faltam}</span> que ainda estão na fila
+                      voltam para a base e podem entrar em outro lote.
+                    </>
+                  ) : (
+                    'Não há ninguém na fila dele.'
+                  )}
+                </p>
+                <p>
+                  {lote.feitos > 0
+                    ? 'As ligações já feitas neste lote não se perdem: continuam na ficha de cada parceiro e no relatório do dia de quem ligou.'
+                    : 'Ninguém foi ligado por este lote ainda.'}
+                </p>
+              </>
+            }
+            rotuloConfirmar="Excluir lote"
+            motivo="obrigatorio"
+            exemploDeMotivo="Montei com o funil errado"
+            ocupado={excluindo}
+            aoConfirmar={(motivo) => aoExcluir(lote, motivo)}
+          />
+        </>
+      ) : null}
 
       <Dialog open={confirmando} onOpenChange={setConfirmando}>
         <DialogContent className="sm:max-w-md">
@@ -210,11 +289,15 @@ export function ListaDeLotes({
   lotes,
   aoEncerrar,
   encerrandoId,
+  aoExcluir,
+  excluindoId,
   gestao = false,
 }: {
   lotes: readonly LoteNaLista[];
   aoEncerrar: (lote: LoteNaLista) => void;
   encerrandoId: string | null;
+  aoExcluir: (lote: LoteNaLista, motivo: string) => void;
+  excluindoId: string | null;
   gestao?: boolean;
 }) {
   return (
@@ -225,6 +308,8 @@ export function ListaDeLotes({
           lote={lote}
           aoEncerrar={aoEncerrar}
           encerrando={encerrandoId === lote.id}
+          aoExcluir={aoExcluir}
+          excluindo={excluindoId === lote.id}
           gestao={gestao}
         />
       ))}

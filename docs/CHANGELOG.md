@@ -7162,3 +7162,53 @@ Pedido: "Quando o parceiro responder a mensagem e tiver interesse em continuar a
 **Pendente / decisão humana.**
 - Vale só para quem respondeu ao aviso de ligação. Estender para qualquer primeira resposta de parceiro é uma linha na função, se o Rafael quiser.
 - A lista de recusas é curta e de propósito: uma resposta ambígua ("agora não dá") fica Quente, e quem atende ajusta pela ficha.
+
+## 13/10/2026 — As chaves da voz em Ajustes, tirar do lote, excluir o lote e corrigir o resultado da ligação (RF-ADM-02, RF-ADM-03, RF-BAS-10, RF-FUN-12, RF-FUN-13, RF-MET-01, RF-REL-01, RF-CON-18)
+
+Pedido de 13/10: fechar "os controles que hoje são SQL" (as três pendências de 06, 07 e 13/10), com uma condição: **todos devem ter permissão para fazer ligações para parceiros**. Branch local `ajustes-de-voz-lotes-e-correcao`, a partir da `ligacao-roteiro-e-aviso`. Nada foi para a `main`, para o GitHub nem para produção.
+
+**Quem liga não mudou, e agora está provado.** Admin, gestor e SDR abrem e tabulam ligação, com a telefonia ligada ou desligada (pgTAP 109, seção A). Nenhuma função nova entra no caminho de `iniciar_chamada`, `tabular_chamada` ou da telefonia. O que é só da gestão é mexer nas chaves, tirar contato do lote e excluir lote.
+
+**Entregue.**
+- **Ajustes → Ligações** (`20261013130000`, `admin/painel-ligacoes.tsx`). Aba nova com as duas chaves: "Ligação pelo navegador" (`voz.telefonia.ativa`) e "Aviso no WhatsApp para quem não atendeu" (`voz.aviso_nao_atendeu.ativo`). Grava por `public.voz_configurar`, só admin e gestor. Cada chave diz o que acontece ligada e desligada, inclusive o custo. A do aviso só impede avisos novos; o que já está na fila continua.
+- **Lotes: Contatos e Excluir** (`20261013140000`, `ligacao/lote-contatos.tsx`, `lote-gestao.ts`). No cartão do lote, para a gestão:
+  - **Contatos** lista quem está no lote, com a situação e o último resultado, e o botão **Tirar do lote** para quem ainda está na fila (`public.lote_tirar_contato`). Quem está em ligação ou já foi ligado não sai por ali.
+  - **Excluir** tira o lote da lista, com motivo obrigatório (`public.lote_excluir`). Não apaga linha: marca `call_batches.deleted_at`, encerra e devolve a fila à base. **As ligações feitas no lote continuam no relatório do dia** e na ficha. Recusa enquanto alguém está em ligação nele.
+  - Auditoria: `TIRAR_DO_LOTE` e `EXCLUIR_LOTE`.
+- **Corrigir o resultado de uma ligação** (`20261013150000`, `ligacoes-do-dia/corrigir-ligacao.tsx`, `correcao.ts`). Botão **Corrigir** em cada linha da lista de ligações do dia, no Meu dia de quem liga e em Relatórios → Ligações do dia.
+  - **Quem corrige:** quem ligou, no mesmo dia (admin, gestor ou SDR); admin e gestor, qualquer ligação de qualquer dia.
+  - **O que `public.ligacao_corrigir` faz**, numa transação: estorna o que o resultado errado mexeu (a etapa volta se o negócio ainda está onde o registro o pôs; a próxima ação que ele criou é cancelada; a intenção sai; o recontato e as portas saem com o desfecho) e lança o resultado certo por `registrar_contato`, na hora em que a ligação aconteceu. Não há segunda cópia da regra de etapa e temperatura.
+  - **Rastro:** o registro antigo vira nota do sistema na ficha ("Resultado da ligação corrigido por …: era X, passou a Y. Motivo: …"), e a correção entra em `audit_log` como `CORRIGIR_RESULTADO`. O motivo é obrigatório.
+  - **A ligação continua de quem ligou:** quando a gestão corrige, o registro novo, a tarefa e o negócio assumido ficam no nome de quem fez a ligação. No relatório do dia a ligação muda de coluna, não de dono.
+  - **Nenhuma mensagem sai por correção.** O gatilho do aviso só dispara quando o resultado sai de vazio. Corrigir "não atendeu" para "atendeu" tira da fila o aviso que ainda não saiu.
+  - O lugar do contato na fila do lote é refeito pela regra da tabulação (volta à fila se o resultado certo pede nova tentativa; sai dela se não pede).
+- `database.types.ts` ajustado à mão (as três colunas do lote e as cinco funções); `pnpm db:types` com a CLI atual reescreve o arquivo inteiro em outro formato.
+- Guia `docs/operacao/telefonia-twilio.md` e `CLAUDE.md` apontam para as chaves e para as funções novas.
+
+**O que a correção não faz, de propósito.**
+- Ligação sem resultado não se corrige: tabula-se na tela de ligar.
+- "Reunião marcada" não entra nem sai por aqui: marca-se e cancela-se pela Agenda. A recusa diz isso.
+- Pedido de "não ligar" nunca é desfeito pela correção (guardrail de opt-out).
+- Só ligações (o que tem linha em `call_attempts`). Registro de WhatsApp, visita ou reunião lançado errado pela tela Registrar continua sem conserto.
+
+**Verificado.**
+- pgTAP `109_chaves_da_voz_lotes_e_correcao.sql`, 49 asserções verdes: chaves só da gestão; os três papéis ligando com a telefonia ligada e desligada; tirar e excluir só da gestão; o lote excluído mantém a ligação no dia de quem ligou; correção por quem ligou e pela gestão; etapa voltando; tarefa cancelada; registro antigo virando nota; clique repetido sem duplicar; recusas (outra pessoa, outro dia, mesmo resultado, reunião, sem motivo, sem motivo de perda).
+- Vizinhos verdes no banco local: 96, 97, 101, 107.
+- Suíte inteira no banco local de trabalho: falham 08, 13 (48-49), 14, 24, 48, 68, 74, 90, 100 e 103. O 13 foi refeito num banco restaurado do backup de antes das migrações e falha igual; o 100 falha porque há ligações reais de hoje no banco local. **Os outros não foram refeitos um a um**; são os arquivos que dependem de dado e data do banco local, já registrados em 06 e 10/10. Não rodei em banco novo.
+- Vitest do site: 1.279 testes (novos: `correcao.test.ts`, `lote-gestao.test.ts`). Lint e typecheck verdes.
+- Pela API local, com sessão de gestor e de SDR: as consultas da tela (desfechos, motivos de perda, lotes sem os excluídos, chaves) e as cinco funções respondem, com as recusas certas para o SDR.
+- As telas `/admin?aba=ligacoes`, `/ligar`, `/relatorios` e `/meu-dia` abrem no localhost.
+
+**Não verificado.** **Não cliquei nos diálogos no navegador**: não há navegador nesta sessão. Abrir "Contatos", tirar um contato, excluir um lote e corrigir um resultado pela tela ficam para o teste no localhost. Sem Playwright para estas telas.
+
+**Pendente.**
+- Publicar: as três migrações e o site, quando pedirem.
+- A lista de ligações do dia não marca qual linha foi corrigida; o rastro está na ficha e na auditoria.
+- Lote excluído não tem tela de restaurar nem lista de excluídos.
+- Correção de registro que não é ligação (tela Registrar).
+
+**Decisão minha, para quem quiser rever.**
+- Quem ligou só corrige no mesmo dia; depois, só a gestão. É o que mantém o relatório de ontem estável para quem já conferiu.
+- Excluir lote exige motivo; tirar um contato não exige nem pede confirmação (volta para a base na hora e pode entrar em outro lote).
+- Backup do banco local antes das migrações: `~/triadecrm-backups/local-antes-dos-ajustes-de-voz-2026-10-13.dump`.
+

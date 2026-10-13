@@ -8,7 +8,7 @@
  */
 import type { AppRole } from '@/lib/auth/role';
 
-export type Aba = 'pessoas' | 'atendimento' | 'catalogos' | 'lgpd';
+export type Aba = 'pessoas' | 'atendimento' | 'ligacoes' | 'catalogos' | 'lgpd';
 
 export const ABAS: readonly { id: Aba; rotulo: string; descricao: string }[] = [
   {
@@ -21,6 +21,12 @@ export const ABAS: readonly { id: Aba; rotulo: string; descricao: string }[] = [
     rotulo: 'Atendimento',
     descricao:
       'O que o CRM faz sozinho no WhatsApp: os interruptores, os textos automáticos e os freios.',
+  },
+  {
+    id: 'ligacoes',
+    rotulo: 'Ligações',
+    descricao:
+      'Por onde a ligação sai e o que acontece quando ninguém atende. Ligar continua sendo de todo mundo.',
   },
   {
     id: 'catalogos',

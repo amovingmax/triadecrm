@@ -10,6 +10,7 @@ import { SeletorDeAba } from './abas';
 import { PainelCatalogos } from './painel-catalogos';
 import { PainelLgpd } from './painel-lgpd';
 import { PainelAtendimento } from './painel-atendimento';
+import { PainelLigacoes } from './painel-ligacoes';
 import { PainelPessoas } from './painel-pessoas';
 import { ABAS, type Aba, type SecaoCatalogo, type SecaoLgpd } from './tipos';
 
@@ -60,7 +61,9 @@ export function TelaAdmin({
     <div className="flex w-full flex-col gap-6">
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Admin</h1>
+          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
+            Admin
+          </h1>
           <Badge variant="pilula" className="h-6 gap-1.5 px-2.5 text-[11px] font-normal">
             você entra como {ROTULO_PAPEL[sessao.papel]}
           </Badge>
@@ -80,6 +83,9 @@ export function TelaAdmin({
       {aba === 'pessoas' ? <PainelPessoas sessao={sessao} /> : null}
       {aba === 'atendimento' ? (
         <PainelAtendimento podeEditar={sessao.papel === 'admin' || sessao.papel === 'gestor'} />
+      ) : null}
+      {aba === 'ligacoes' ? (
+        <PainelLigacoes podeEditar={sessao.papel === 'admin' || sessao.papel === 'gestor'} />
       ) : null}
       {aba === 'catalogos' ? (
         <PainelCatalogos

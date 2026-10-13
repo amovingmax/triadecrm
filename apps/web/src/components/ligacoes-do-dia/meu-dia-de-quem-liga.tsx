@@ -77,7 +77,7 @@ export function MeuDiaDeQuemLiga({
         />
       ) : eu ? (
         <>
-          <DiaDaPessoa pessoa={eu} dia={dia} />
+          <DiaDaPessoa pessoa={eu} dia={dia} corrige={dia === hoje} />
           {eu.ligacoes === 0 ? (
             <p className="text-sm text-muted-foreground">
               {dia === hoje

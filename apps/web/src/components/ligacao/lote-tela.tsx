@@ -29,6 +29,7 @@ import { traduzirFalha } from '@/components/funis/acoes/erros';
 
 import { CHAVE_LOTES, carregarLotes, encerrarLote, type LoteNaLista } from './consultas';
 import { ErroDosLotes, EsqueletoDosLotes, SemLotes } from './lote-estados';
+import { avisoDaExclusaoDoLote, excluirLote, recadoDoLote } from './lote-gestao';
 import { ListaDeLotes } from './lote-lista';
 import { FolhaDeMontagem } from './lote-montagem';
 
@@ -64,6 +65,22 @@ export function TelaDeLotes({
     },
   });
 
+  // Excluir tira o lote da lista (o cartão some com a recarga, e o diálogo com ele).
+  // A recusa do banco vem como resultado, não como erro: o aviso diz o porquê.
+  const exclusao = useMutation({
+    mutationFn: ({ lote, motivo }: { lote: LoteNaLista; motivo: string }) =>
+      excluirLote(lote.id, motivo),
+    onSuccess: (resultado) => {
+      if (!resultado.ok) {
+        toast.error('O lote não foi excluído.', { description: recadoDoLote(resultado.motivo) });
+        return;
+      }
+      toast.success(avisoDaExclusaoDoLote(resultado.devolvidos));
+      void cliente.invalidateQueries({ queryKey: CHAVE_LOTES });
+      void cliente.invalidateQueries({ queryKey: ['ligacao', 'base-da-montagem'] });
+    },
+  });
+
   const abrirFolha = useCallback(() => setMontando(true), []);
 
   // Quem só liga vê os lotes que a gestão montou PARA ELA (pivô de 06/10/2026). A
@@ -78,7 +95,9 @@ export function TelaDeLotes({
     <div className="flex w-full flex-col gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Lotes</h1>
+          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
+            Lotes
+          </h1>
           <p className="text-sm text-muted-foreground">
             {lotes.isPending ? (
               'Carregando os lotes...'
@@ -118,6 +137,8 @@ export function TelaDeLotes({
           lotes={visiveis}
           aoEncerrar={(lote) => encerramento.mutate(lote)}
           encerrandoId={encerramento.isPending ? (encerramento.variables?.id ?? null) : null}
+          aoExcluir={(lote, motivo) => exclusao.mutate({ lote, motivo })}
+          excluindoId={exclusao.isPending ? (exclusao.variables?.lote.id ?? null) : null}
           gestao={podeMontar}
         />
       )}

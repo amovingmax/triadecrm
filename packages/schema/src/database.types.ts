@@ -2404,6 +2404,9 @@ export type Database = {
         Row: {
           avulso: boolean
           created_at: string
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           ends_on: string
           id: string
           max_attempts: number
@@ -2427,6 +2430,9 @@ export type Database = {
         Insert: {
           avulso?: boolean
           created_at?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           ends_on: string
           id?: string
           max_attempts?: number
@@ -2450,6 +2456,9 @@ export type Database = {
         Update: {
           avulso?: boolean
           created_at?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           ends_on?: string
           id?: string
           max_attempts?: number
@@ -8457,6 +8466,18 @@ export type Database = {
         Args: { p_delivery_id: string; p_payload: Json }
         Returns: Json
       }
+      ligacao_corrigir: {
+        Args: {
+          p_attempt_id: string
+          p_client_key: string
+          p_lost_reason_id?: number
+          p_motivo?: string
+          p_observacao?: string
+          p_outcome_id?: number
+          p_resultado: Database["app"]["Enums"]["call_result"]
+        }
+        Returns: Json
+      }
       ligacoes_do_dia: {
         Args: { p_dia?: string; p_pessoa?: string }
         Returns: Json
@@ -8467,6 +8488,15 @@ export type Database = {
       }
       lote_atribuir: {
         Args: { p_batch_id: string; p_para: string }
+        Returns: Json
+      }
+      lote_contatos: { Args: { p_batch_id: string }; Returns: Json }
+      lote_excluir: {
+        Args: { p_batch_id: string; p_motivo: string }
+        Returns: Json
+      }
+      lote_tirar_contato: {
+        Args: { p_item_id: string; p_motivo?: string }
         Returns: Json
       }
       marcar_nao_ligar_mais: {
@@ -9141,6 +9171,7 @@ export type Database = {
         }
         Returns: Json
       }
+      voz_configurar: { Args: { p: Json }; Returns: Json }
       voz_vincular_atividade: {
         Args: { p_activity_id: string; p_call_id: string }
         Returns: Json

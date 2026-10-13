@@ -313,7 +313,7 @@ function Ritmo({
   );
 }
 
-function Interruptor({
+export function Interruptor({
   id,
   titulo,
   descricao,

@@ -244,7 +244,7 @@ export function PainelLigacoesDoDia({ painel }: { painel: DefinicaoPainel }) {
               aoTentar={() => void detalhe.refetch()}
             />
           ) : aberta ? (
-            <DiaDaPessoa pessoa={aberta} dia={dia} />
+            <DiaDaPessoa pessoa={aberta} dia={dia} corrige />
           ) : null}
         </section>
       ) : null}
