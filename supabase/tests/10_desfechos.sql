@@ -157,8 +157,8 @@ select pg_temp.sair();
 
 -- sdr: lê tudo, não escreve nada
 select pg_temp.entrar('a0000000-0000-4000-8000-000000001003', 'sdr');
-select is((select count(*)::int from public.interaction_outcomes where slug like 'wa\_%'), 7,
-  'sdr: lê o catálogo (os 7 chips de WhatsApp)');
+select is((select count(*)::int from public.interaction_outcomes where slug like 'wa\_%'), 8,
+  'sdr: lê o catálogo (os 8 chips de WhatsApp, com o "Interessado" de 13/10/2026)');
 select throws_ok(
   $$insert into public.interaction_outcomes (slug, name, surfaces)
       values ('tst_sdr', 'SDR', array['visita']::app.interaction_surface[])$$,
@@ -270,10 +270,10 @@ select results_eq(
   $$select s::text, count(*)::int from (
       select unnest(surfaces) as s from public.interaction_outcomes where is_active
     ) t group by s order by s::text$$,
-  $$values ('instagram_dm'::text, 6), ('ligacao', 8), ('reuniao', 6), ('visita', 7), ('whatsapp', 7)$$,
-  'teto: a lista da §3 distribui 34 chips em 5 superfícies, nenhuma acima de 8');
-select is((select count(*)::int from public.interaction_outcomes where is_active), 34,
-  'teto: a lista da §3 tem 34 desfechos ativos');
+  $$values ('instagram_dm'::text, 6), ('ligacao', 8), ('reuniao', 6), ('visita', 7), ('whatsapp', 8)$$,
+  'teto: a lista da §3 (mais o "Interessado" do WhatsApp, 13/10/2026) distribui 35 chips em 5 superfícies, nenhuma acima de 8');
+select is((select count(*)::int from public.interaction_outcomes where is_active), 35,
+  'teto: a lista da §3 mais o "Interessado" do WhatsApp tem 35 desfechos ativos');
 select is(
   (select count(*)::int from public.interaction_outcomes where length(trim(name)) > 28),
   0, 'teto: todo rótulo de chip cabe em 28 caracteres');
@@ -286,12 +286,12 @@ select lives_ok(
 select is(
   (select count(*)::int from public.interaction_outcomes
     where is_active and 'whatsapp'::app.interaction_surface = any (surfaces)),
-  9, 'teto: com os dois chips extras o WhatsApp fica com 9 ativos (lacuna registrada)');
+  10, 'teto: com os dois chips extras o WhatsApp fica com 10 ativos (lacuna registrada)');
 delete from public.interaction_outcomes where slug in ('tst_wa_oitavo', 'tst_wa_nono');
 select is(
   (select count(*)::int from public.interaction_outcomes
     where is_active and 'whatsapp'::app.interaction_surface = any (surfaces)),
-  7, 'teto: removidos os extras, o WhatsApp volta aos 7 chips ativos');
+  8, 'teto: removidos os extras, o WhatsApp volta aos 8 chips ativos');
 
 -- =====================================================================
 -- 5. Desfecho fora da superfície é recusado (spec §6, item 3)
@@ -768,8 +768,8 @@ select is(
 -- =====================================================================
 -- 12. Seed do catálogo (spec §6, item 9)
 -- =====================================================================
-select is((select count(*)::int from public.interaction_outcomes), 34,
-  'seed: o catálogo tem exatamente os 34 desfechos da §3');
+select is((select count(*)::int from public.interaction_outcomes), 35,
+  'seed: o catálogo tem os 34 desfechos da §3 e o "Interessado" do WhatsApp (13/10/2026)');
 select set_eq(
   $$select slug from public.interaction_outcomes$$,
   $$values ('wa_sem_resposta'::text),('wa_respondeu'),('wa_nao_e_a_pessoa'),('wa_agora_nao'),('wa_nao_firme'),
@@ -778,8 +778,9 @@ select set_eq(
            ('vis_nao_estava'),('vis_funcionario'),('vis_decisor_interessado'),('vis_decisor_agora_nao'),
            ('vis_decisor_recusou'),('vis_cadastro_iniciado'),('vis_sem_perfil'),('reu_interessado'),('reu_autorizou'),
            ('reu_objecao'),('reu_nao'),('reu_no_show'),('reu_reagendada'),('dm_sem_resposta'),('dm_respondeu'),
-           ('dm_pediu_whatsapp'),('dm_nao_e_a_pessoa'),('dm_perfil_inativo'),('dm_optout')$$,
-  'seed: os 34 slugs da §3 estão semeados, sem sobra nem falta');
+           ('dm_pediu_whatsapp'),('dm_nao_e_a_pessoa'),('dm_perfil_inativo'),('dm_optout'),
+           ('wa_interessado')$$,
+  'seed: os 34 slugs da §3 e o wa_interessado estão semeados, sem sobra nem falta');
 select is((select count(*)::int from public.interaction_outcomes where not is_active), 0,
   'seed: todo desfecho semeado nasce ativo');
 select is(

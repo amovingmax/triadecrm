@@ -33,6 +33,7 @@ import { ErroDaTela, EsqueletoLinha } from './estados';
 import { contagemDeInteracoes, local } from './formatos';
 import { FaixaDaJanela, Janela24h, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
+import { QualificarPelaConversa } from './qualificar';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { JANELA_APERTADA_MIN, montarFio } from './mensagens';
@@ -435,6 +436,10 @@ export function Conversa({
               selo lá em cima informa, mas informar não impede ninguém de digitar
               uma mensagem inteira e só descobrir na hora de enviar que o parceiro
               tinha pedido para sair. Quem decide continua sendo o banco. */}
+          {/* Respondeu ao aviso de ligação e a IA leu interesse: um clique qualifica
+              (Respondeu, Quente). Mora no rodapé, que não rola: a conversa abre no
+              fim, e lá em cima o cartão ficava fora da vista. */}
+          {fio ? <QualificarPelaConversa fioId={fio.id} nome={item.nome} /> : null}
           {fio ? (
             <AvisoDeQuemAtende
               fioId={fio.id}

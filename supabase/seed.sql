@@ -1280,7 +1280,7 @@ insert into public.interaction_outcomes
   (slug, name, surfaces, position, is_active, cooldown_days, can_reactivate,
    next_action_kind, next_action_label, next_action_offset_days,
    target_stage_slug, sets_temperature, requires_lost_reason, counts_as) values
-  -- ---------- WhatsApp (7) — o desfecho descreve a PORTA; o que foi dito é a intenção do Apêndice C ----------
+  -- ---------- WhatsApp (8) — o desfecho descreve a PORTA; o que foi dito é a intenção do Apêndice C ----------
   ('wa_sem_resposta',        'Enviado, sem resposta',      '{whatsapp}',     101, true,     3, true,  'follow_up', 'Follow-up D+3',              3, null,                    null,     false, 'batida'),
   ('wa_respondeu',           'Respondeu',                  '{whatsapp}',     102, true,     0, true,  'message',   'Responder em 15 min',        0, 'respondeu',             'morno',  false, 'aberta'),
   ('wa_nao_e_a_pessoa',      'Não é a pessoa',             '{whatsapp}',     103, true,     0, true,  'other',     'Achar o decisor',            0, null,                    null,     false, 'batida'),
@@ -1288,6 +1288,8 @@ insert into public.interaction_outcomes
   ('wa_nao_firme',           'Não, definitivo',            '{whatsapp}',     105, true,    90, false, null,        null,                      null, 'perdido',               null,     true,  'aberta'),
   ('wa_numero_invalido',     'Número inválido',            '{whatsapp}',     106, true, 36500, false, 'other',     'Buscar outro canal',         0, null,                    null,     false, 'nenhuma'),
   ('wa_optout',              'Pediu para parar',           '{whatsapp}',     107, true, 36500, false, null,        null,                      null, 'optout',                'frio',   false, 'nenhuma'),
+  -- Qualificado pela conversa (13/10/2026, migração 20261013120000): o 8º, teto do RF-MET-06.
+  ('wa_interessado',         'Interessado',                '{whatsapp}',     108, true,     0, true,  'meeting',   'Marcar apresentação',        0, 'respondeu',             'quente', false, 'aberta'),
   -- ---------- Ligação (8) — chips do formulário de 20 s (RF-MET-06); régua 1+1 do RF-CON-13 ----------
   ('lig_nao_atendeu',        'Não atendeu',                '{ligacao}',      201, true,     1, true,  'call',      'Ligar D+1 (última)',         1, null,                    null,     false, 'batida'),
   ('lig_caixa_postal',       'Caixa postal',               '{ligacao}',      202, true,     1, true,  'call',      'Ligar D+1',                  1, null,                    null,     false, 'batida'),
@@ -1698,7 +1700,7 @@ begin
   if n_hol1 < 16 then raise exception 'seed: % feriados de % (esperados ao menos 16; cadências viram o ano)', n_hol1, ano + 1; end if;
   if n_tpl < 40  then raise exception 'seed: % modelos de mensagem (esperados ≥ 40)', n_tpl; end if;
   if n_lost <> 9 then raise exception 'seed: esperados 9 motivos de perda, encontrados %', n_lost; end if;
-  if n_out <> 34 then raise exception 'seed: esperados 34 desfechos de interação, encontrados %', n_out; end if;
+  if n_out <> 35 then raise exception 'seed: esperados 35 desfechos de interação, encontrados %', n_out; end if;
   if n_sup > 8   then raise exception 'seed: superfície com % desfechos ativos (máximo 8, RF-MET-06)', n_sup; end if;
   if n_eq <> 3   then raise exception 'seed: esperadas 3 equivalências de etapa, encontradas %', n_eq; end if;
   if n_map < 23  then raise exception 'seed: mapa de categorias do Radar com % linhas (esperadas ≥ 23, bloco 3b)', n_map; end if;

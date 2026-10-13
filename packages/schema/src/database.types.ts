@@ -118,6 +118,10 @@ export type Database = {
       }
       atendimento_liga: { Args: { p_chave: string }; Returns: boolean }
       ausencia_responder: { Args: { p_message_id: string }; Returns: Json }
+      aviso_da_conversa: {
+        Args: { p_ate?: string; p_conversation_id: string }
+        Returns: Database["public"]["Tables"]["messages"]["Row"]
+      }
       aviso_ligacao_ativo: { Args: never; Returns: boolean }
       aviso_ligacao_enfileirar: {
         Args: { p_attempt_id: string }
@@ -454,6 +458,7 @@ export type Database = {
         Args: { p_dia: string; p_hora: number }
         Returns: string
       }
+      intencao_de_interesse: { Args: { p_intencao: string }; Returns: boolean }
       interaction_surface: {
         Args: {
           p_channel: Database["app"]["Enums"]["channel"]
@@ -662,6 +667,10 @@ export type Database = {
           p_respondeu?: boolean
         }
         Returns: string
+      }
+      qualificacao_da_conversa: {
+        Args: { p_conversation_id: string }
+        Returns: Json
       }
       radar_pontuar: {
         Args: {
@@ -1016,6 +1025,7 @@ export type Database = {
         }
         Returns: Json
       }
+      wa_resposta_ao_aviso: { Args: { p_message_id: string }; Returns: Json }
       wa_resposta_no_funil: { Args: { p_message_id: string }; Returns: Json }
       wa_robo_teto: { Args: never; Returns: Json }
       wa_so_o_cumprimento_saiu: {
@@ -8599,6 +8609,22 @@ export type Database = {
         Returns: Json
       }
       proximo_da_fila: { Args: { p_lote_id: string }; Returns: Json }
+      qualificacao_sugerida: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
+      qualificacoes_sugeridas: {
+        Args: never
+        Returns: {
+          conversation_id: string
+          intencao: string
+          organization_id: string
+        }[]
+      }
+      qualificar_pela_conversa: {
+        Args: { p_client_key: string; p_conversation_id: string }
+        Returns: Json
+      }
       quick_create_organization: {
         Args: {
           p_category_id: number
