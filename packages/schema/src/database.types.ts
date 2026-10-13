@@ -458,7 +458,6 @@ export type Database = {
         Args: { p_dia: string; p_hora: number }
         Returns: string
       }
-      intencao_de_interesse: { Args: { p_intencao: string }; Returns: boolean }
       interaction_surface: {
         Args: {
           p_channel: Database["app"]["Enums"]["channel"]
@@ -668,10 +667,7 @@ export type Database = {
         }
         Returns: string
       }
-      qualificacao_da_conversa: {
-        Args: { p_conversation_id: string }
-        Returns: Json
-      }
+      recusa_clara: { Args: { p_texto: string }; Returns: boolean }
       radar_pontuar: {
         Args: {
           p_cand: Database["public"]["Tables"]["supplier_candidates"]["Row"]
@@ -8609,22 +8605,6 @@ export type Database = {
         Returns: Json
       }
       proximo_da_fila: { Args: { p_lote_id: string }; Returns: Json }
-      qualificacao_sugerida: {
-        Args: { p_conversation_id: string }
-        Returns: Json
-      }
-      qualificacoes_sugeridas: {
-        Args: never
-        Returns: {
-          conversation_id: string
-          intencao: string
-          organization_id: string
-        }[]
-      }
-      qualificar_pela_conversa: {
-        Args: { p_client_key: string; p_conversation_id: string }
-        Returns: Json
-      }
       quick_create_organization: {
         Args: {
           p_category_id: number

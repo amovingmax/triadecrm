@@ -10,7 +10,6 @@ import { EtiquetaEtapa } from '@/components/funis/etapa';
 
 import { formatarQuando, quandoEmTexto } from './formatos';
 import { ICONE_DO_ITEM, iconeDoItem } from './icones';
-import { SeloDeInteresse, useInteresseSugerido } from './interesse';
 import { destinoDoItem, type ItemDoDia } from './tipos';
 
 /**
@@ -47,12 +46,6 @@ export function ItemDaFila({
 }) {
   const revelar = useRevelarLinha(indice);
   const destino = destinoDoItem(item, { somenteLeitura });
-  // Respondeu ao aviso de ligação e a IA leu interesse: o selo diz que a conversa
-  // tem um "Qualificar" esperando (20261013120000).
-  const interesse = useInteresseSugerido(
-    item.organizacaoId,
-    item.tipo === 'conversa_esperando' && !somenteLeitura,
-  );
   const quando = formatarQuando(item);
 
   const nome = item.organizacao ?? item.titulo;
@@ -105,10 +98,7 @@ export function ItemDaFila({
           empilhar, que é onde empilhar faz sentido. */}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 md:flex-row md:items-center md:gap-4">
         <div className="min-w-0 flex-1">
-          <p className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-medium">{nome}</span>
-            {interesse ? <SeloDeInteresse /> : null}
-          </p>
+          <p className="truncate font-medium">{nome}</p>
           {acao ? <p className="truncate text-[0.8125rem]">{acao}</p> : null}
           {motivo ? <p className="text-xs text-muted-foreground">{motivo}</p> : null}
         </div>
@@ -126,7 +116,9 @@ export function ItemDaFila({
               coluna vem nula, porque "endereçada a mim" em toda linha é um
               rótulo que a pessoa aprende a não ler. Não é um aviso para parar:
               quem responde primeiro tira a conversa da fila de todos. */}
-          {item.atendente ? <span className="truncate">Endereçada a {item.atendente}</span> : null}
+          {item.atendente ? (
+            <span className="truncate">Endereçada a {item.atendente}</span>
+          ) : null}
           {item.etapa && !motivoNomeiaEtapa ? <EtiquetaEtapa etapa={item.etapa} /> : null}
           {local ? <span className="truncate">{local}</span> : null}
           {item.categoria ? <span className="truncate">{item.categoria}</span> : null}

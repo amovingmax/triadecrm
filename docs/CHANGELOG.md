@@ -7134,34 +7134,31 @@ Pedido: "uma identidade visual mais chamativa [...] que deixe mais perceptível 
 
 **Verificado.** Lint, typecheck e Vitest verdes (1.268 no site); pgTAP 107 verde. No navegador, no localhost, temas escuro e claro: cartão "Na fila", depois "Enviando" quando a fila andou, e a notificação no contato seguinte, sem erro no console. Um erro foi achado e corrigido nesse teste: o acompanhante na casca não tinha provedor de consultas e derrubava a página.
 
-### 13/10/2026 — Quem responde ao aviso de ligação entra no funil, e o interesse é qualificado (RF-FUN-01, RF-FUN-04, RF-CON-05, RF-CON-08, RF-MET-06)
+### 13/10/2026 — Quem responde ao aviso de ligação é qualificado no funil (RF-FUN-01, RF-FUN-04, RF-CON-05, RF-CON-08)
 
 Pedido: "Quando o parceiro responder a mensagem e tiver interesse em continuar a conversa, esse parceiro seja qualificado no nosso funil." Decisões do mesmo dia, de quem pediu:
 - **Qualificado** é Respondeu + Quente, sem etapa nova. O funil foi enxugado em 07/10, e o PRD §5.6 já chama de Quente quem declarou interesse.
-- **A IA sugere, uma pessoa confirma** (ADR-05).
+- **Nada que gere custo extra:** "Apenas qualifique o parceiro caso ele responda." Responder ao aviso já é o sinal. A primeira versão, com a IA sugerindo e uma pessoa confirmando, saiu antes de ser publicada, porque a leitura da IA é paga por mensagem.
 
-**Entregue** (`20261013120000_quem_responde_ao_aviso_entra_no_funil.sql`).
-- **A resposta ao aviso vai para Respondeu.** Antes, só a primeira mensagem da conversa inteira movia o negócio; quem já tinha conversado e respondia ao "Tentamos entrar em contato" não andava.
-  - O gatilho novo `messages_resposta_no_funil_aviso` (`app.wa_resposta_ao_aviso`) cobre esse caso: primeira resposta até 7 dias depois do aviso.
-  - O registro é o mesmo de sempre ("Respondeu", assinado por quem atende), e o negócio só anda para a frente, a partir de Prospectado, Identificado ou Contatado.
-  - Não grava mensagem de saída, e um erro nele nunca derruba a mensagem recebida.
-- **A sugestão.** A IA já lê cada mensagem recebida (`classify_inbound` → `conversations.ai_intent`). `public.qualificacao_sugerida` e `public.qualificacoes_sugeridas` dizem quando vale qualificar:
-  - houve resposta ao aviso;
-  - a leitura é de interesse (as intenções quentes do R08, mais "quer entender melhor" e "pediu material") com confiança ≥ 0,7;
-  - o negócio está até Respondeu e ainda não é Quente.
-- **O clique.** `public.qualificar_pela_conversa` registra o desfecho novo **"Interessado" do WhatsApp** (`wa_interessado`, o 8º da superfície, que é o teto do RF-MET-06) pelo `registrar_contato`: Respondeu, Quente, próxima ação "Marcar apresentação" hoje, em nome de quem clicou. É idempotente. O mesmo desfecho aparece no Registrar, para quem qualifica sem a IA.
-- **Tela, nas Conversas.** Cartão "Respondeu ao aviso e {o que a IA leu}", com selo "Sugestão da IA", **Qualificar** e **Agora não** (este último guardado só no navegador). O cartão segue o padrão da casa, com faixa, disco e selo em menta. Fica no rodapé fixo, acima da caixa de resposta: no topo, com a conversa aberta no fim, ele ficava fora da vista. Depois do clique aparece a notificação "Qualificado no funil".
-- **Tela, no Meu dia** (gestão): selo **INTERESSE** na linha "Responder no WhatsApp" quando há sugestão aberta. A linha já leva à conversa.
-- `seed.sql` (desfecho e autoverificação com 35), `database.types.ts` e o pgTAP `10` ajustados ao desfecho novo.
+**Entregue** (`20261013120000_quem_responde_ao_aviso_entra_no_funil.sql`, corrigida no lugar, ainda não publicada).
+- O gatilho novo `messages_resposta_no_funil_aviso` (`app.wa_resposta_ao_aviso`) olha a **primeira resposta até 7 dias depois do aviso**:
+  - registra "Respondeu" (assinado por quem atende), salvo quando é a primeira mensagem da conversa inteira, que já é registrada por `app.wa_resposta_no_funil`;
+  - leva o negócio para Respondeu, só para a frente, a partir de Prospectado, Identificado ou Contatado. Antes, quem já tinha conversado e respondia ao "Tentamos entrar em contato" não andava;
+  - deixa o negócio **Quente** pela intenção declarada (`deals.last_intent = 'interessado'`). É a mesma entrada que o `registrar_contato` usa para a regra de temperatura do PRD §5.6. Vale só para negócio de captação em Respondeu; quem já está mais adiante não é mexido.
+- **Não esquentam:**
+  - quem pede para sair (`app.wa_parece_optout`, as palavras do opt-out);
+  - quem recusa com todas as letras (`app.recusa_clara`: "não tenho interesse", "número errado", "não, obrigado"…), que fica em Respondeu, porque respondeu, mas não vira Quente.
+- **Sem IA, sem tela nova, sem tarefa nova.** Não grava mensagem de saída, e um erro nele nunca derruba a mensagem recebida.
+- `database.types.ts` ajustado.
 
-**Verificado.**
-- Novo `108_quem_responde_ao_aviso_entra_no_funil` (19 asserções); suíte inteira verde num banco novo (3.678); lint, typecheck e Vitest verdes.
-- No localhost, pelo navegador, com a Mesas e Festas respondendo "Oi! Tenho interesse sim, podem me ligar amanhã?":
-  - o negócio foi de Prospectado para Respondeu, e nenhuma mensagem saiu;
-  - com a leitura "INTERESSADO" (posta à mão, porque a IA não roda no local), apareceram o cartão na conversa e o selo no Meu dia;
-  - o clique deixou Quente e "Interessado", com "Marcar apresentação" hoje;
-  - nenhum erro no console.
+**Verificado.** Novo `108_quem_responde_ao_aviso_entra_no_funil` com 17 asserções:
+- resposta com conversa anterior: Respondeu e Quente;
+- resposta como primeira mensagem: o mesmo, com registro único;
+- a segunda mensagem não registra de novo;
+- recusa não esquenta; "SAIR" não qualifica;
+- sem aviso, nada muda; nenhuma saída;
+- as funções da sugestão não existem.
 
 **Pendente / decisão humana.**
-- **A sugestão depende da IA lendo as mensagens em produção** (worker-ai com `ANTHROPIC_API_KEY`, pendente no CHANGELOG). Sem ela não há cartão, mas a resposta ainda vai para Respondeu e o "Interessado" pode ser registrado à mão no Registrar. Confirmar com o Luiz se o worker-ai está de pé.
-- A sugestão vale só para quem respondeu ao aviso de ligação. Estender para qualquer conversa de parceiro é uma linha na função, se o Rafael quiser.
+- Vale só para quem respondeu ao aviso de ligação. Estender para qualquer primeira resposta de parceiro é uma linha na função, se o Rafael quiser.
+- A lista de recusas é curta e de propósito: uma resposta ambígua ("agora não dá") fica Quente, e quem atende ajusta pela ficha.
