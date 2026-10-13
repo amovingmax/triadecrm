@@ -58,9 +58,11 @@ const SEM_AVISO: Record<string, string> = {
 export function fraseDoAviso(s: SituacaoDoAviso): FraseDoAviso | null {
   switch (s.situacao) {
     case 'pendente':
+      // Sem a saudação: ela é a da hora do ENVIO, e ligação perdida às 18h é avisada
+      // às 8h do dia seguinte, com "Bom dia".
       return {
         texto:
-          'Aviso no WhatsApp na fila: "tudo bem? Tentamos entrar em contato com você…". Sai no horário do WhatsApp.',
+          'Aviso no WhatsApp na fila: "Tentamos entrar em contato com você por telefone…". Sai no horário do WhatsApp.',
         podeCancelar: true,
       };
     case 'enviada':
