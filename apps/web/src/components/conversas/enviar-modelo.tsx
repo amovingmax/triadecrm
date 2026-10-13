@@ -67,7 +67,7 @@ function idDoDestino(destino: DestinoDoModelo): string {
  * noite." A caixa manda o cumprimento do período com um clique — no primeiro
  * contato e na retomada — e o que se quer dizer vai em texto livre quando a
  * pessoa responder. A exceção é o recibo da ligação, que chega com o seu
- * modelo já escolhido (resumo, confirmação ou "tentei te ligar").
+ * modelo já escolhido (resumo ou confirmação).
  */
 export function EnviarModelo({
   destino,

@@ -71,7 +71,7 @@ export function ChamadaRecibo({
   resultado: Extract<ResultadoTabulacao, { tabulado: true }>;
   /** O que a tabulação REALMENTE gravou em `metadata.com_quem`. */
   comQuemGravado: ComQuem;
-  /** A mensagem que a ligação pede no WhatsApp (confirmação, resumo, "tentei te ligar"). */
+  /** A mensagem que a ligação pede no WhatsApp (confirmação ou resumo). */
   whatsapp?: MensagemDeDepois | null;
   /** A tentativa não atendida cujo aviso no WhatsApp o recibo mostra (e deixa cancelar). */
   avisoDaTentativa?: string | null;

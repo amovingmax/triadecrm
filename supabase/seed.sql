@@ -1524,9 +1524,9 @@ insert into public.cadences
   (slug, name, pipeline_slug, max_touches, limite_dias, end_stage_slug,
    requires_gancho, requires_authorization, entry_note, description)
 values
-  ('voz_primeiro', 'Primeiro contato por voz', 'fornecedor', 5, 14, 'nutricao', false, false,
+  ('voz_primeiro', 'Primeiro contato por voz', 'fornecedor', 4, 14, 'nutricao', false, false,
    'Negócio em Prospectado ou Contatado, organização com telefone, não suprimida.',
-   'A cadência-padrão da operação depois da virada de 04/09: ligação primeiro, WhatsApp como apoio (R13). Uma única mensagem iniciada por nós, e ela cabe folgado na régua 1+1 do RF-CON-13 porque a abertura foi por voz.'),
+   'A cadência-padrão da operação depois da virada de 04/09: ligação primeiro (R13). Desde 13/10/2026 o WhatsApp não é passo da cadência: quem não atende recebe o aviso automático de ligação não atendida, logo depois de cada ligação.'),
   ('retomar_conversa', 'Retomar morno parado', 'fornecedor', 3, 14, 'nutricao', false, false,
    'Entra por desfecho: lig_atendeu_retorna, reu_objecao, wa_respondeu sem próximo passo.',
    'RF-CON-14. Cada toque com motivo novo; nunca dois no mesmo dia — garantido pela regra de um pendente.'),
@@ -1556,13 +1556,11 @@ select c.id, p.pos, p.canal::app.channel, p.tarefa::app.task_kind, p.dias, p.de,
      'Ligar de novo — 2ª e última tentativa', null, null,
      '{"ultimo_desfecho_em": ["lig_nao_atendeu", "lig_caixa_postal"]}', '{}',
      'Se atendeu, a cadência encerra e quem manda é o desfecho', false),
-    ('voz_primeiro', 3, 'whatsapp', 'message', 3, 'passo_anterior',
-     'Mandar "tentei te ligar" (assistido)', 'GEN-FUP-LIG-V1', null,
-     '{"tem_telefone": true, "sem_resposta": true}', '{}',
-     'A ÚNICA mensagem iniciada por nós nesta cadência (RF-CON-12, RF-CON-13)', false),
-    ('voz_primeiro', 4, 'instagram', 'message', 7, 'matricula',
+    -- O "tentei te ligar" pelo WhatsApp saiu em 13/10/2026: quem não atende
+    -- recebe o aviso automático (migrações 20261013090000 e 20261013110000).
+    ('voz_primeiro', 3, 'instagram', 'message', 7, 'matricula',
      'DM no Instagram', null, null, '{"tem_instagram": true}', '{A+,A}', null, false),
-    ('voz_primeiro', 5, 'presencial', 'visit', 7, 'matricula',
+    ('voz_primeiro', 4, 'presencial', 'visit', 7, 'matricula',
      'Visita na rota da zona', null, null, '{"bairro_geocodificado": true}', '{A+,A}',
      'D+7 a D+10, na zona da rota do dia', true),
 
@@ -1710,7 +1708,7 @@ begin
   -- falha de `db:reset` em produção. Mesmo critério do `n_map < 23` acima.
   if n_map_google < 18 then raise exception 'seed: mapa de categorias do Google Maps com % linhas (esperadas ao menos 18, ADR-12 + de-para de 25/09/2026)', n_map_google; end if;
   if n_cad <> 5  then raise exception 'seed: esperadas 5 cadências, encontradas % (bloco 12d)', n_cad; end if;
-  if n_pas <> 19 then raise exception 'seed: esperados 19 passos de cadência, encontrados % (bloco 12d)', n_pas; end if;
+  if n_pas <> 18 then raise exception 'seed: esperados 18 passos de cadência, encontrados % (bloco 12d)', n_pas; end if;
   if n_cad_ruim is not null then
     raise exception 'seed: passo de cadência cita desfecho fora do catálogo: %', n_cad_ruim;
   end if;

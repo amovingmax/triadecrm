@@ -7099,4 +7099,22 @@ Pedido de 13/10: "melhorar os scripts das falas para as pessoas, deixando mais n
 
 **Decisão humana.**
 - **Dennis / R06 (RF-CON-12):** o "responder SAIR" entrou no aviso. Origem do contato e link de privacidade ficaram de fora para a mensagem continuar curta; confirmar se basta.
-- **Rafael:** a cadência `voz_primeiro` ainda tem o passo "Mandar tentei te ligar (assistido)". A cortesia de 72 h impede a segunda mensagem, mas a tarefa continua aparecendo. Decidir se o passo sai.
+
+### 13/10/2026 — A cadência de voz perde o "tentei te ligar" (RF-CON-13, RF-CON-18)
+
+Decisão do mesmo dia: "Tirar o passo 3 da sequência. O que deve acontecer é ser possível mandar uma mensagem automática, caso o parceiro ou cliente não atenda a ligação." A mensagem automática é o aviso de ligação não atendida (acima).
+
+**Entregue.**
+- `20261013110000_a_cadencia_de_voz_perde_o_tentei_te_ligar.sql`. A cadência "Primeiro contato por voz" passa a ser 1 Ligar · 2 Ligar de novo · 3 DM no Instagram · 4 Visita (`max_touches` 4). Os passos seguintes subiram uma posição, porque o motor encerra na primeira posição que falta.
+  - **Quem está no meio da sequência:** a tarefa pendente do passo removido é cancelada, e o toque fica como pulado. A matrícula que já passou do passo 2 desce uma posição, então o próximo toque é o Instagram.
+  - **O passo removido:** é apagado se ninguém o usou. Se já tem histórico, fica na posição 12, marcado "Fora de uso", e o motor nunca chega lá.
+- `seed.sql`: os quatro passos, a descrição nova e a autoverificação com 18 passos.
+- Também foi para o aviso: "Se preferir não receber mensagens, é só responder SAIR." no fim das três mensagens (commit anterior).
+
+**Verificado.**
+- Banco novo: pgTAP inteiro verde, 3.659 asserções. O `17` ganhou 2 asserções (os quatro canais da cadência e o teto de toques), e as referências ao Instagram foram para a posição 3.
+- Cenário de produção simulado no banco local, numa transação desfeita: matrícula com tarefa pendente no passo 3 e matrícula com histórico nele. A tarefa foi cancelada, as posições desceram e o passo ficou "Fora de uso".
+- Vitest do site: 1.267 testes.
+
+**Limite.** "Cliente" no CRM é quem escreveu para o WhatsApp e não tem ficha (aba Clientes). Para ele não existe ligação pelo CRM: o Ligar e os lotes exigem ficha de parceiro. O aviso cobre toda ligação feita pelo CRM, inclusive para parceiros que já estão na plataforma (funil de ativação).
+

@@ -58,7 +58,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(229);
+select plan(231);
 
 -- 08/09/2026: emitir link passou a exigir endereço configurado
 -- (`app_settings[precadastro.link].modelo`, migração 20260908120000). Sem ele,
@@ -448,8 +448,8 @@ values ('f0000000-0000-4000-8000-00000000ca23', pg_temp.cad('voz_primeiro'), pg_
         'e0000000-0000-4000-8000-00000000ca23', 'ativa');
 insert into public.cadence_touches (enrollment_id, step_id, organization_id, channel, "position",
                                     status, due_at)
-values ('f0000000-0000-4000-8000-00000000ca23', pg_temp.passo('voz_primeiro', 4), pg_temp.org('23'),
-        'instagram', 4, 'pendente', '2027-03-09 10:00-03'::timestamptz);
+values ('f0000000-0000-4000-8000-00000000ca23', pg_temp.passo('voz_primeiro', 3), pg_temp.org('23'),
+        'instagram', 3, 'pendente', '2027-03-09 10:00-03'::timestamptz);
 select is(app.toques_do_dia('instagram', '2027-03-09'::date), 1,
           'e o toque daquele dia conta contra o teto do dia');
 select is(app.pode_tocar(pg_temp.org('24'), null, 'instagram',
@@ -517,7 +517,7 @@ select is(pg_temp.delta('tarefas', pg_temp.n_tarefas()), 1,
 select throws_ok(
   format($$insert into public.cadence_touches
              (enrollment_id, step_id, organization_id, channel, "position", status, due_at)
-           values (%L, %s, %L, 'whatsapp', 3, 'pendente', now())$$,
+           values (%L, %s, %L, 'instagram', 3, 'pendente', now())$$,
          (pg_temp.matricula(pg_temp.org('11'))).id, pg_temp.passo('voz_primeiro', 3),
          pg_temp.org('11')),
   '23505', null,
@@ -1198,6 +1198,16 @@ select is(pg_temp.delta('matriculas', pg_temp.n_matriculas()),
             where e.organization_id in (select id from public.organizations
                                          where name like 'CAD %')),
           'toda matrícula criada aqui é deste arquivo: nenhuma contagem absoluta em tabela compartilhada');
+
+-- 13/10/2026: o "tentei te ligar" saiu da cadência de voz (20261013110000);
+-- quem não atende recebe o aviso automático de ligação não atendida.
+select is((select string_agg(s.channel::text, ',' order by s."position")
+             from public.cadence_steps s
+            where s.cadence_id = pg_temp.cad('voz_primeiro')),
+          'phone,phone,instagram,presencial',
+          'voz_primeiro: ligar, ligar de novo, Instagram e visita — sem passo de WhatsApp');
+select is((select max_touches from public.cadences where slug = 'voz_primeiro')::int, 4,
+          'e o teto de toques acompanha os quatro passos');
 
 select * from finish();
 rollback;
