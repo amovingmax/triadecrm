@@ -42,6 +42,10 @@
 -- da casa não tem quem preencha `{{atendente}}` (`wa_komune_abrir` recusa). O
 -- "Aqui é da Komune" está porque a ligação vem de um número (o fixo 84) e o
 -- WhatsApp de outro: sem ele, a pessoa não sabe quem tentou falar.
+-- O "Se preferir não receber mensagens, é só responder SAIR." foi pedido no
+-- mesmo dia: para quem nunca falou com a Komune este aviso pode ser a primeira
+-- mensagem com conteúdo, e a saída fácil é obrigação do RF-CON-12. A palavra
+-- SAIR já leva à supressão pela regra de opt-out da entrada.
 --
 -- O worker-wa submete os três à Meta sozinho (`public.wa_modelos_para_meta`).
 -- ATÉ A META APROVAR OS TRÊS, NENHUM AVISO ENTRA NA FILA: o recibo diz
@@ -65,15 +69,15 @@ insert into public.message_templates
 values
   ('GEN-LIG-PERDIDA-MANHA', 'Tentamos ligar — manhã', 'whatsapp', 'marketing', 'GEN',
    'followup', 'gen_lig_perdida_manha_v1', 'pending', 'pt_BR',
-   'Bom dia, tudo bem? Aqui é da Komune. Tentamos entrar em contato com você por telefone. Assim que possível, podemos retornar o contato?',
+   'Bom dia, tudo bem? Aqui é da Komune. Tentamos entrar em contato com você por telefone. Assim que possível, podemos retornar o contato? Se preferir não receber mensagens, é só responder SAIR.',
    true),
   ('GEN-LIG-PERDIDA-TARDE', 'Tentamos ligar — tarde', 'whatsapp', 'marketing', 'GEN',
    'followup', 'gen_lig_perdida_tarde_v1', 'pending', 'pt_BR',
-   'Boa tarde, tudo bem? Aqui é da Komune. Tentamos entrar em contato com você por telefone. Assim que possível, podemos retornar o contato?',
+   'Boa tarde, tudo bem? Aqui é da Komune. Tentamos entrar em contato com você por telefone. Assim que possível, podemos retornar o contato? Se preferir não receber mensagens, é só responder SAIR.',
    true),
   ('GEN-LIG-PERDIDA-NOITE', 'Tentamos ligar — noite', 'whatsapp', 'marketing', 'GEN',
    'followup', 'gen_lig_perdida_noite_v1', 'pending', 'pt_BR',
-   'Boa noite, tudo bem? Aqui é da Komune. Tentamos entrar em contato com você por telefone. Assim que possível, podemos retornar o contato?',
+   'Boa noite, tudo bem? Aqui é da Komune. Tentamos entrar em contato com você por telefone. Assim que possível, podemos retornar o contato? Se preferir não receber mensagens, é só responder SAIR.',
    true)
 on conflict (template_code) do nothing;
 

@@ -119,7 +119,7 @@ select is((select count(*)::int from public.message_templates
               and category = 'marketing' and cardinality(app.modelo_variaveis(body)) = 0), 3,
   'três modelos ativos, sem variável (o lote da casa não tem quem preencha)');
 select is((select body from public.message_templates where template_code = 'GEN-LIG-PERDIDA-TARDE'),
-  'Boa tarde, tudo bem? Aqui é da Komune. Tentamos entrar em contato com você por telefone. Assim que possível, podemos retornar o contato?',
+  'Boa tarde, tudo bem? Aqui é da Komune. Tentamos entrar em contato com você por telefone. Assim que possível, podemos retornar o contato? Se preferir não receber mensagens, é só responder SAIR.',
   'o texto pedido, com a Komune dizendo quem é');
 select is((select template_code from public.message_templates
             where id = app.modelo_da_hora(

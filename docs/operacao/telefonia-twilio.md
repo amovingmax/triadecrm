@@ -159,7 +159,7 @@ a linha do tempo da ficha junta os dois. O caminho de envio e recebimento do Wha
 **Desde 13/10/2026, ligação não atendida gera um aviso no WhatsApp.** Quando a tabulação é
 "Não atendeu", "Caixa postal" ou "Ocupado", o banco põe na fila uma mensagem da Komune:
 "Bom dia/Boa tarde/Boa noite, tudo bem? Aqui é da Komune. Tentamos entrar em contato com você por
-telefone. Assim que possível, podemos retornar o contato?". O recibo da ligação mostra o aviso e
+telefone. Assim que possível, podemos retornar o contato? Se preferir não receber mensagens, é só responder SAIR.". O recibo da ligação mostra o aviso e
 tem o botão **Não avisar**. Regras:
 
 - sai pelo lote da casa em Envios ("Aviso de ligação não atendida — DD/MM"), com as mesmas travas
