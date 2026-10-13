@@ -17,6 +17,7 @@ import {
 } from '@/components/registro/tipos';
 
 import { cn } from '@/lib/utils';
+import { AvisoNoWhatsapp } from './aviso-no-recibo';
 import type { MensagemDeDepois } from './depois-da-ligacao';
 import {
   ESPERA_ANTES_DO_PROXIMO_MS,
@@ -56,6 +57,7 @@ export function ChamadaRecibo({
   resultado,
   comQuemGravado,
   whatsapp = null,
+  avisoDaTentativa = null,
   restaMs,
   pausado,
   aoPausar,
@@ -71,6 +73,8 @@ export function ChamadaRecibo({
   comQuemGravado: ComQuem;
   /** A mensagem que a ligação pede no WhatsApp (confirmação, resumo, "tentei te ligar"). */
   whatsapp?: MensagemDeDepois | null;
+  /** A tentativa não atendida cujo aviso no WhatsApp o recibo mostra (e deixa cancelar). */
+  avisoDaTentativa?: string | null;
   restaMs: number;
   /** A contagem parou porque a pessoa tocou em alguma coisa aqui. */
   pausado: boolean;
@@ -187,6 +191,8 @@ export function ChamadaRecibo({
           {whatsapp.rotulo}
         </Button>
       ) : null}
+
+      {avisoDaTentativa ? <AvisoNoWhatsapp tentativaId={avisoDaTentativa} /> : null}
 
       {desfecho && resultado.activity_id && perguntaComQuem(desfecho) ? (
         <fieldset className="flex flex-col gap-2">

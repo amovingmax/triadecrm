@@ -1500,7 +1500,9 @@ update public.message_templates
    and template_code not like 'GEN-SYS-%'
    and template_code not in ('GEN-ABR-OLA-MANHA', 'GEN-ABR-OLA-TARDE', 'GEN-ABR-OLA-NOITE',
                              'GEN-LIG-CONFIRMA', 'GEN-LIG-RESUMO-FOR', 'GEN-LIG-RESUMO-PRO',
-                             'GEN-FUP-LIG-V1')
+                             'GEN-FUP-LIG-V1',
+                             -- o aviso de ligação não atendida (20261013090000)
+                             'GEN-LIG-PERDIDA-MANHA', 'GEN-LIG-PERDIDA-TARDE', 'GEN-LIG-PERDIDA-NOITE')
    and is_active;
 
 -- A frase de transparência sai de uso em 28/09/2026 (ADR-16, migração

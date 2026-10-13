@@ -7,7 +7,6 @@ import {
   MODELO_CONFIRMACAO,
   MODELO_RESUMO_FORNECEDOR,
   MODELO_RESUMO_PRODUTOR,
-  MODELO_TENTEI_LIGAR,
   mensagemDeDepois,
 } from './depois-da-ligacao';
 import { horaFalada, horarioFalado } from './roteiro-texto';
@@ -200,16 +199,11 @@ describe('a mensagem de depois da ligação', () => {
     );
   });
 
-  it('"tentei te ligar" só para fornecedor, que é a proposta que ele fala', () => {
-    expect(mensagemDeDepois({ ...base, resultado: 'nao_atendeu' })?.codigo).toBe(
-      MODELO_TENTEI_LIGAR,
-    );
-    expect(
-      mensagemDeDepois({ ...base, resultado: 'caixa_postal', variante: 'produtor' }),
-    ).toBeNull();
-    expect(
-      mensagemDeDepois({ ...base, resultado: 'nao_atendeu', variante: 'ativacao' }),
-    ).toBeNull();
+  it('quem não atendeu não tem botão: o aviso no WhatsApp sai sozinho (20261013090000)', () => {
+    for (const variante of ['fornecedor', 'produtor', 'ativacao'] as const) {
+      expect(mensagemDeDepois({ ...base, variante, resultado: 'nao_atendeu' })).toBeNull();
+      expect(mensagemDeDepois({ ...base, variante, resultado: 'caixa_postal' })).toBeNull();
+    }
     expect(mensagemDeDepois({ ...base, resultado: 'numero_invalido' })).toBeNull();
   });
 

@@ -7,13 +7,18 @@ import type { ResultadoTecnico, VarianteRoteiro } from './tipos';
 /**
  * A mensagem de WhatsApp que a ligação pede depois de gravada.
  *
- * O script do Rafael termina sempre num WhatsApp: a confirmação de quem marcou, o
- * resumo de quem pediu "me manda por lá", e o "tentei te ligar" de quem não atendeu.
- * O recibo oferece o botão; esta função decide QUAL modelo e com que valores, a partir
- * do que a ligação gravou — nunca de um palpite da tela.
+ * O script do Rafael termina sempre num WhatsApp: a confirmação de quem marcou e o
+ * resumo de quem pediu "me manda por lá". O recibo oferece o botão; esta função
+ * decide QUAL modelo e com que valores, a partir do que a ligação gravou — nunca de
+ * um palpite da tela.
  *
- * Os modelos são os da migração 20260915100000 (e o `GEN-FUP-LIG-V1`, que já existia).
- * `nome`, `empresa`, `origem` e `atendente` a caixa de envio preenche sozinha.
+ * Quem NÃO atendeu não tem botão aqui desde 13/10/2026: o aviso "tentamos entrar em
+ * contato" sai sozinho, posto na fila pelo banco na tabulação (migração
+ * 20261013090000, `AvisoNoWhatsapp` no recibo). Um botão a mais mandaria duas
+ * mensagens para a mesma ligação perdida.
+ *
+ * Os modelos são os da migração 20260915100000. `nome`, `empresa`, `origem` e
+ * `atendente` a caixa de envio preenche sozinha.
  */
 export type MensagemDeDepois = {
   codigo: string;
@@ -25,7 +30,6 @@ export type MensagemDeDepois = {
 export const MODELO_CONFIRMACAO = 'GEN-LIG-CONFIRMA';
 export const MODELO_RESUMO_FORNECEDOR = 'GEN-LIG-RESUMO-FOR';
 export const MODELO_RESUMO_PRODUTOR = 'GEN-LIG-RESUMO-PRO';
-export const MODELO_TENTEI_LIGAR = 'GEN-FUP-LIG-V1';
 
 /** Os fins do roteiro em que a pessoa pediu o material pelo WhatsApp. */
 const FINS_COM_MATERIAL = ['fim_material', 'fim_agora_nao_material'];
@@ -51,14 +55,6 @@ export function mensagemDeDepois(ligacao: {
 }): MensagemDeDepois | null {
   const { variante, resultado, desfechoSlug, caminho, reuniaoEm, reuniaoFormato } = ligacao;
 
-  if (resultado === 'nao_atendeu' || resultado === 'caixa_postal') {
-    // O "tentei te ligar" fala a proposta do fornecedor ("você paga uma taxa quando
-    // fecha"): para produtor ele diria o contrário do que é verdade, e para parceiro
-    // da ativação seria pitch para quem já está dentro.
-    return variante === 'fornecedor'
-      ? { codigo: MODELO_TENTEI_LIGAR, rotulo: 'Mandar "tentei te ligar" no WhatsApp', valores: {} }
-      : null;
-  }
   if (resultado !== 'atendida_humano') return null;
 
   if (desfechoSlug === 'lig_reuniao_marcada' && reuniaoEm) {

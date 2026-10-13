@@ -118,6 +118,18 @@ export type Database = {
       }
       atendimento_liga: { Args: { p_chave: string }; Returns: boolean }
       ausencia_responder: { Args: { p_message_id: string }; Returns: Json }
+      aviso_ligacao_ativo: { Args: never; Returns: boolean }
+      aviso_ligacao_enfileirar: {
+        Args: { p_attempt_id: string }
+        Returns: Json
+      }
+      aviso_ligacao_lote: { Args: never; Returns: string }
+      aviso_ligacao_motivo: { Args: { p_attempt_id: string }; Returns: string }
+      aviso_ligacao_pede: {
+        Args: { p_resultado: Database["app"]["Enums"]["call_result"] }
+        Returns: boolean
+      }
+      aviso_ligacao_vencer: { Args: never; Returns: number }
       business_days: { Args: { p_ate: string; p_de: string }; Returns: number }
       cadencias_agendar: { Args: never; Returns: number }
       cadencias_encerrar_silencio: { Args: never; Returns: number }
@@ -208,6 +220,7 @@ export type Database = {
       e_o_worker: { Args: never; Returns: boolean }
       eh_dia_util: { Args: { p_dia: string }; Returns: boolean }
       email_de: { Args: { p_user_id: string }; Returns: string }
+      encerrar_lotes_avulsos: { Args: never; Returns: number }
       encerrar_matricula: {
         Args: {
           p_enrollment: string
@@ -3482,6 +3495,7 @@ export type Database = {
           criado_em: string
           criado_por: string | null
           filtro: Json
+          finalidade: string | null
           id: string
           inicio: string
           link_destino: string | null
@@ -3506,6 +3520,7 @@ export type Database = {
           criado_em?: string
           criado_por?: string | null
           filtro?: Json
+          finalidade?: string | null
           id?: string
           inicio?: string
           link_destino?: string | null
@@ -3530,6 +3545,7 @@ export type Database = {
           criado_em?: string
           criado_por?: string | null
           filtro?: Json
+          finalidade?: string | null
           id?: string
           inicio?: string
           link_destino?: string | null
@@ -3572,6 +3588,7 @@ export type Database = {
           assinante_id: string | null
           botao_em: string | null
           botao_tocado: string | null
+          call_attempt_id: string | null
           clicou_em: string | null
           codigo: string
           envio_id: string
@@ -3588,6 +3605,7 @@ export type Database = {
           assinante_id?: string | null
           botao_em?: string | null
           botao_tocado?: string | null
+          call_attempt_id?: string | null
           clicou_em?: string | null
           codigo?: string
           envio_id: string
@@ -3604,6 +3622,7 @@ export type Database = {
           assinante_id?: string | null
           botao_em?: string | null
           botao_tocado?: string | null
+          call_attempt_id?: string | null
           clicou_em?: string | null
           codigo?: string
           envio_id?: string
@@ -3630,6 +3649,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "team_directory"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envios_em_massa_itens_call_attempt_id_fkey"
+            columns: ["call_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "call_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envios_em_massa_itens_call_attempt_id_fkey"
+            columns: ["call_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "v_call_script_steps"
+            referencedColumns: ["attempt_id"]
           },
           {
             foreignKeyName: "envios_em_massa_itens_envio_id_fkey"
@@ -8100,6 +8133,8 @@ export type Database = {
       }
       assumir_conversa: { Args: { p_conversation_id: string }; Returns: Json }
       atendimento_configurar: { Args: { p: Json }; Returns: Json }
+      aviso_ligacao_cancelar: { Args: { p_attempt_id: string }; Returns: Json }
+      aviso_ligacao_situacao: { Args: { p_attempt_id: string }; Returns: Json }
       cadencia_do_parceiro: {
         Args: { p_organization_id: string }
         Returns: Json

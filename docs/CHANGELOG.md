@@ -7065,3 +7065,38 @@ Pedido do Rafael: "colocar função de ligar pelo CRM usando nosso navegador", c
 **Decisão humana.**
 - **Dennis:** retenção de `voice_calls` (guarda número discado e horários) e qualquer passo em direção a gravar ligações.
 - **Rafael:** registrar a telefonia no PRD do produto; se o número único for marcado como spam pelas operadoras, considerar um número por operador (US$ 4,25/mês cada).
+
+## 13/10/2026 — Roteiro de ligação mais humano (v4) e aviso no WhatsApp para quem não atende (R13 §3.2; RF-CON-02, RF-CON-10, RF-CON-11, RF-CON-18, RF-FUN-12)
+
+Pedido de 13/10: "melhorar os scripts das falas para as pessoas, deixando mais natural e humano" e, "caso a pessoa não atenda a chamada", mandar no WhatsApp uma mensagem "amigável e informativa", sem tom de cobrança: "Saudação conforme o horário, tudo bem? Tentamos entrar em contato com você, assim que possível podemos retornar o contato?".
+
+**Entregue.**
+- **Roteiro `captacao_v1` versão 4** (`20261013100000_o_roteiro_fica_mais_humano.sql`). Só as falas mudaram; a árvore da v3 continua nó por nó (mesmos ids, saídas, rótulos e variantes), e o "em qual frase desligam" segue comparável. As frases agora são faladas, não lidas: curtas, com "tá", "pra", "né", "viu?" e "rapidinho". Acolhem antes de responder ("Entendo", "Claro", "Poxa, liguei em hora ruim, né?"). A abertura se apresenta como gente daqui ("sou da Komune, aqui de Natal"). Quem pede para sair ouve "ninguém da Komune vai te ligar nem escrever de novo". A nota da abertura diz que o roteiro é guia, não texto decorado. Continua tudo o que a casa decidiu: origem e "tiro da lista" logo depois da abertura (R06); "de graça" e "não tem mensalidade", sem percentual, ao fornecedor; 5% depois da entrega ao produtor; nenhuma promessa de exclusividade, volume ou de apagar contato; nada de gênero presumido. A v3 sai de publicação e continua servindo os lotes montados com ela.
+- **Aviso no WhatsApp para quem não atendeu** (`20261013090000_quem_nao_atendeu_recebe_um_aviso.sql`). Decisões de quem pediu, no mesmo dia:
+  - sai sozinho, com opção de cancelar;
+  - custo aceito;
+  - no máximo um aviso a cada 72 h.
+  - **Disparo:** o gatilho `call_attempts_aviso` roda na tabulação "Não atendeu", "Caixa postal" ou "Ocupado" e põe o item no lote da casa do dia ("Aviso de ligação não atendida — DD/MM", `envios_em_massa.finalidade = 'ligacao_nao_atendida'`, sem crachá). Erro no aviso nunca desfaz a tabulação.
+  - **Esteira:** a mesma do "Bom dia!" automático, sem regra nova de envio. Valem supressão, horário do WhatsApp, domingo, feriado, tetos, a cortesia de 72 h e a parada automática por opt-out.
+  - **Modelos:** três, `GEN-LIG-PERDIDA-MANHA/TARDE/NOITE` (marketing, sem variável). `app.modelo_da_hora` passou a trocar qualquer família MANHA/TARDE/NOITE, então a saudação é a da hora do envio. O texto é o pedido, com "Aqui é da Komune", porque a ligação vem do número de voz e o WhatsApp de outro.
+  - **Travas:** nada entra na fila até a Meta aprovar os três modelos. Aviso que esperou mais de 3 dias é cancelado (`aviso_ligacao_vencer`, pg_cron às 07:50). Lote pausado ou parado segura os próximos. A chave geral é `app_settings['voz.aviso_nao_atendeu'].ativo`, que nasce ligada.
+  - **Tela:** o recibo da ligação mostra a situação do aviso: na fila, enviado, cancelado ou o motivo de não haver aviso. O botão **Não avisar** chama `aviso_ligacao_cancelar`, só para quem ligou e para a gestão, com auditoria `CANCELAR_AVISO_LIGACAO`. O botão manual "tentei te ligar" (`GEN-FUP-LIG-V1`) saiu do recibo, para não haver duas mensagens pela mesma ligação.
+- `database.types.ts`: as colunas e funções novas, mais `app.encerrar_lotes_avulsos`, pendente desde 10/10.
+- Guia `docs/operacao/telefonia-twilio.md`: seção sobre o aviso (regras, custo, como desligar).
+
+**Verificado.**
+- **Banco novo e isolado** (todas as migrações e o seed): pgTAP inteiro verde, 3.657 asserções em 103 arquivos.
+  - Novo `107_quem_nao_atendeu_recebe_um_aviso` (28 asserções). Cobre os modelos e o do período; nada entra antes da aprovação da Meta; não atendeu e ocupado entram na fila, atendeu não; sem duplicar; opt-out; chave desligada; lote pausado; Não avisar, com permissão e auditoria; vencimento; e nenhuma mensagem gravada fora do lote.
+  - `44` e `65` foram ajustados à v4 e aos três modelos novos.
+- **Lint, typecheck e Vitest:** verdes, com 2.026 testes. O `roteiro-publicado.test.ts` agora lê a v4.
+- **Banco local (localhost):** recebeu as migrações da main que faltavam e as duas novas sem `db reset`. Backup antes em `~/triadecrm-backups/local-antes-do-aviso-2026-10-13.dump`.
+- **Caminho do WhatsApp:** `saida.ts`, `graph.ts`, `entrada.ts`, `wa-webhook`, `pode_enviar`, `messages_guard`, `wa_proximos`, `envio_um`, `envios_em_massa_rodar` e `wa_komune_abrir` não mudaram.
+
+**Pendente.**
+- Publicar (as duas migrações e o site). Depois disso, o worker-wa submete os três modelos à Meta. Acompanhar a aprovação; até lá, o recibo diz "a mensagem ainda espera a aprovação da Meta".
+- Ler a v4 em voz alta com a Heloísa e a Bárbara (RF-ADM-02) antes do primeiro turno com ela. Ajuste de palavra é uma v5 com a mesma árvore.
+- Não há chave na tela de Ajustes para o aviso; hoje se liga e desliga por SQL.
+
+**Decisão humana.**
+- **Dennis / R06 (RF-CON-12):** a primeira mensagem COM conteúdo deveria levar origem do contato, aviso de privacidade e "responda SAIR". O aviso pedido é curto e amigável e não leva esses itens. Para quem nunca falou com a Komune, ele pode ser a primeira mensagem com conteúdo. Decidir se acrescenta "Se preferir não receber mensagens, é só responder SAIR" (a supressão por palavra já funciona).
+- **Rafael:** a cadência `voz_primeiro` ainda tem o passo "Mandar tentei te ligar (assistido)". A cortesia de 72 h impede a segunda mensagem, mas a tarefa continua aparecendo. Decidir se o passo sai.

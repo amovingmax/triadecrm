@@ -27,6 +27,7 @@ import {
   type ExtrasDaChamada,
 } from './chamada-extras';
 import { ChamadaRecibo } from './chamada-recibo';
+import { resultadoPedeAviso } from './aviso-no-whatsapp';
 import { mensagemDeDepois, type MensagemDeDepois } from './depois-da-ligacao';
 import { criarProvedorManual } from './chamada-provedor';
 import { ROTULO_DA_LINHA, segundosDeConversa } from './voz-logica';
@@ -199,6 +200,7 @@ export function TelaChamada({
     resultado: Extract<ResultadoTabulacao, { tabulado: true }>;
     comQuem: ComQuem;
     whatsapp: MensagemDeDepois | null;
+    avisoDaTentativa: string | null;
   } | null>(null);
   const [restaMs, setRestaMs] = useState(ESPERA_ANTES_DO_PROXIMO_MS);
   const [reciboPausado, setReciboPausado] = useState(false);
@@ -578,6 +580,7 @@ export function TelaChamada({
             reuniaoEm: extras.reuniaoEm,
             reuniaoFormato: extras.reuniaoFormato,
           }),
+          avisoDaTentativa: resultadoPedeAviso(resultado) ? chamada.id : null,
         });
         setRestaMs(ESPERA_ANTES_DO_PROXIMO_MS);
         setReciboPausado(false);
@@ -716,6 +719,7 @@ export function TelaChamada({
           resultado={recibo.resultado}
           comQuemGravado={recibo.comQuem}
           whatsapp={recibo.whatsapp}
+          avisoDaTentativa={recibo.avisoDaTentativa}
           restaMs={restaMs}
           pausado={reciboPausado}
           aoPausar={pausarRecibo}

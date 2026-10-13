@@ -58,8 +58,9 @@ select is(
            and template_code not like 'GEN-SYS-%' and is_active
          order by template_code collate "C"),
   array['GEN-ABR-OLA-MANHA', 'GEN-ABR-OLA-NOITE', 'GEN-ABR-OLA-TARDE', 'GEN-FUP-LIG-V1',
-        'GEN-LIG-CONFIRMA', 'GEN-LIG-RESUMO-FOR', 'GEN-LIG-RESUMO-PRO'],
-  'fora da janela, só o cumprimento e os quatro de depois da ligação ficam em uso');
+        'GEN-LIG-CONFIRMA', 'GEN-LIG-PERDIDA-MANHA', 'GEN-LIG-PERDIDA-NOITE',
+        'GEN-LIG-PERDIDA-TARDE', 'GEN-LIG-RESUMO-FOR', 'GEN-LIG-RESUMO-PRO'],
+  'fora da janela, só o cumprimento, os quatro de depois da ligação e o aviso de ligação não atendida (13/10/2026) ficam em uso');
 select is((select count(*)::int from public.message_templates
             where template_code in ('AEB-ABR-A', 'GEN-FUP-D3-V1', 'ENV-CONVITE-FUNDADOR')
               and not is_active), 3,

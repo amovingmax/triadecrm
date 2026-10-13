@@ -154,7 +154,24 @@ para um telefone da KOMUNE.
 
 O número de voz (Twilio) e o número do WhatsApp (Meta) são serviços separados e não interferem um
 no outro. O operador não escolhe número: mensagem sai pelo do WhatsApp, ligação sai pelo de voz, e
-a linha do tempo da ficha junta os dois. **A telefonia não altera nada do WhatsApp.**
+a linha do tempo da ficha junta os dois. O caminho de envio e recebimento do WhatsApp não mudou.
+
+**Desde 13/10/2026, ligação não atendida gera um aviso no WhatsApp.** Quando a tabulação é
+"Não atendeu", "Caixa postal" ou "Ocupado", o banco põe na fila uma mensagem da Komune:
+"Bom dia/Boa tarde/Boa noite, tudo bem? Aqui é da Komune. Tentamos entrar em contato com você por
+telefone. Assim que possível, podemos retornar o contato?". O recibo da ligação mostra o aviso e
+tem o botão **Não avisar**. Regras:
+
+- sai pelo lote da casa em Envios ("Aviso de ligação não atendida — DD/MM"), com as mesmas travas
+  do "Bom dia!" automático: supressão, horário do WhatsApp (seg–sex 8h–17h45), domingo, feriado e
+  tetos do dia. Ligação perdida depois das 17h45 é avisada na manhã seguinte, com "Bom dia";
+- no máximo um aviso a cada 72 h para a mesma pessoa: se já mandamos mensagem e ela não respondeu,
+  não sai outro. Aviso que esperou mais de 3 dias é cancelado;
+- **custa**: fora da janela de 24 h é modelo pago da Meta (`GEN-LIG-PERDIDA-*`, categoria
+  marketing) e conta no teto diário de conversas abertas;
+- nada sai até a Meta aprovar os três modelos. O worker-wa os submete sozinho;
+- desligar: `update app_settings set value = value || '{"ativo": false}' where key = 'voz.aviso_nao_atendeu';`.
+  Pausar o lote do dia em Envios também segura os próximos, até alguém retomar.
 
 Para o parceiro, a KOMUNE passa a aparecer por dois números. Para reduzir a confusão: escolher um
 número de voz com DDD 84, avisar pelo WhatsApp antes de ligar quando houver conversa aberta, e
