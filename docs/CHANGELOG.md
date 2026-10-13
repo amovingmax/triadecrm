@@ -7117,3 +7117,19 @@ Decisão do mesmo dia: "Tirar o passo 3 da sequência. O que deve acontecer é s
 
 **Limite.** "Cliente" no CRM é quem escreveu para o WhatsApp e não tem ficha (aba Clientes). Para ele não existe ligação pelo CRM: o Ligar e os lotes exigem ficha de parceiro. O aviso cobre toda ligação feita pelo CRM, inclusive para parceiros que já estão na plataforma (funil de ativação).
 
+
+### 13/10/2026 — O aviso no WhatsApp ganha cartão próprio no recibo da ligação
+
+Pedido: "uma identidade visual mais chamativa [...] que deixe mais perceptível que foi enviada a mensagem ao WhatsApp, e que não fuja do padrão do CRM".
+
+**Entregue.**
+- **Cartão do aviso** no recibo (`ligacao/aviso-no-recibo.tsx`), feito só com peças que o CRM já usa:
+  - a faixa e o disco em menta do cartão "Nova mensagem";
+  - o selo em maiúsculas da marca "Nova", que anda sozinho: Na fila → Enviando → Enviado → Entregue → Lido. A tela pergunta a cada 5 s enquanto a situação ainda muda;
+  - a mensagem no balão de saída da tela de Conversas, com o texto de verdade;
+  - os botões "Não avisar" e "Ver na conversa";
+  - cinza com o motivo quando não há aviso, vermelho quando o WhatsApp recusa.
+- **Notificação depois do recibo:** "Aviso enviado no WhatsApp · {parceiro}", com "Ver", quando a mensagem sai depois de quem ligou já ter seguido para o próximo contato ou para outra tela. Quem acompanha é a casca do app (`AcompanhanteDeAvisos`, com provedor de consultas próprio). Ela desiste em silêncio se o aviso for cancelado ou ficar esperando o horário do WhatsApp.
+- `public.aviso_ligacao_situacao` devolve também o texto, a entrega (`messages.status`), a hora e a organização. A migração 20261013090000, ainda não publicada, foi corrigida no lugar.
+
+**Verificado.** Lint, typecheck e Vitest verdes (1.268 no site); pgTAP 107 verde. No navegador, no localhost, temas escuro e claro: cartão "Na fila", depois "Enviando" quando a fila andou, e a notificação no contato seguinte, sem erro no console. Um erro foi achado e corrigido nesse teste: o acompanhante na casca não tinha provedor de consultas e derrubava a página.

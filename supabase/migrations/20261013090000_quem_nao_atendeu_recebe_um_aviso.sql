@@ -407,12 +407,16 @@ as $$
 declare
   v_uid  uuid := auth.uid();
   v_dono uuid;
+  v_org  uuid;
   i      public.envios_em_massa_itens%rowtype;
+  m      public.messages%rowtype;
+  v_txt  text;
 begin
   if v_uid is null then
     raise exception 'Usuário não autenticado' using errcode = '42501';
   end if;
-  select user_id into v_dono from public.call_attempts where id = p_attempt_id;
+  select user_id, organization_id into v_dono, v_org
+    from public.call_attempts where id = p_attempt_id;
   if v_dono is null then
     return jsonb_build_object('ok', false, 'motivo', 'tentativa_inexistente');
   end if;
@@ -423,13 +427,28 @@ begin
   select * into i from public.envios_em_massa_itens
    where call_attempt_id = p_attempt_id order by id desc limit 1;
   if found then
-    return jsonb_build_object('ok', true, 'situacao', i.status, 'motivo', i.motivo);
+    -- O texto de verdade: o da mensagem, quando ela já existe; antes disso, o do
+    -- modelo do período de AGORA (a saudação pode mudar até a hora do envio).
+    if i.message_id is not null then
+      select * into m from public.messages where id = i.message_id;
+      v_txt := m.body;
+    else
+      select t.body into v_txt
+        from public.envios_em_massa e
+        join public.message_templates t on t.id = app.modelo_da_hora(e.modelo_id)
+       where e.id = i.envio_id;
+    end if;
+    return jsonb_build_object('ok', true, 'situacao', i.status, 'motivo', i.motivo,
+                              'texto', v_txt, 'entrega', m.status::text,
+                              'enviada_em', coalesce(m.sent_at, m.created_at),
+                              'organization_id', v_org);
   end if;
   return jsonb_build_object('ok', true, 'situacao', 'sem_aviso',
-                            'motivo', app.aviso_ligacao_motivo(p_attempt_id));
+                            'motivo', app.aviso_ligacao_motivo(p_attempt_id),
+                            'organization_id', v_org);
 end $$;
 comment on function public.aviso_ligacao_situacao(uuid) is
-  'O que aconteceu com o aviso no WhatsApp desta ligação: pendente (na fila), enviada, pulada, cancelada, ou sem_aviso com o motivo. Quem ligou e a gestão.';
+  'O que aconteceu com o aviso no WhatsApp desta ligação: pendente (na fila), enviada, pulada, cancelada, ou sem_aviso com o motivo; e, quando há aviso, o texto, a entrega da mensagem (queued, sent, delivered, read, failed) e a hora. Quem ligou e a gestão.';
 revoke all on function public.aviso_ligacao_situacao(uuid) from public, anon;
 grant execute on function public.aviso_ligacao_situacao(uuid) to authenticated;
 

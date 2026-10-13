@@ -27,6 +27,7 @@ import {
   type ExtrasDaChamada,
 } from './chamada-extras';
 import { ChamadaRecibo } from './chamada-recibo';
+import { acompanharAviso } from './aviso-no-recibo';
 import { resultadoPedeAviso } from './aviso-no-whatsapp';
 import { mensagemDeDepois, type MensagemDeDepois } from './depois-da-ligacao';
 import { criarProvedorManual } from './chamada-provedor';
@@ -321,9 +322,12 @@ export function TelaChamada({
 
   /** Ligação da ficha não tem próximo: gravado o resultado, volta-se à ficha. */
   const depoisDoRecibo = useCallback(() => {
+    // O aviso no WhatsApp desta ligação pode ainda estar na fila: a casca fica de
+    // olho e avisa quando ele sair, em qualquer tela.
+    if (recibo?.avisoDaTentativa) acompanharAviso(recibo.avisoDaTentativa, recibo.item.nome);
     if (daFicha) aoSair();
     else irParaOProximo();
-  }, [daFicha, aoSair, irParaOProximo]);
+  }, [daFicha, aoSair, irParaOProximo, recibo]);
 
   // O recibo some sozinho e traz o próximo contato: é o "encerrar-e-próxima" do
   // R13 §7.6, e é o ganho de produtividade real do módulo.

@@ -3,6 +3,7 @@ import { ProvedorDeAvisos } from '@/components/avisos/provedor-avisos';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Header } from '@/components/layout/header';
 import { Sidebar } from '@/components/layout/sidebar';
+import { AcompanhanteDeAvisos } from '@/components/ligacao/aviso-no-recibo';
 import { ProvedorDoSoftphone } from '@/components/ligacao/voz-provedor';
 import { TransicaoPagina } from '@/components/movimento';
 import { type Sessao } from '@/lib/auth/session';
@@ -71,6 +72,9 @@ export function AppShell({
 
           <BottomNav papel={sessao.papel} filas={filas} />
           <PilhaDeAvisos />
+          {/* O aviso no WhatsApp de quem não atendeu sai até um minuto depois do
+          recibo; quem ligou já está em outro contato (ou outra tela). */}
+          <AcompanhanteDeAvisos />
         </div>
       </ProvedorDoSoftphone>
     </ProvedorDeAvisos>

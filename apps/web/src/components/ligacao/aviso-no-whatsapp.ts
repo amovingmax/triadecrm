@@ -29,57 +29,132 @@ export const situacaoDoAvisoSchema = z.object({
   ok: z.literal(true),
   situacao: z.enum(['pendente', 'enviada', 'pulada', 'cancelada', 'sem_aviso']),
   motivo: z.string().nullable().optional(),
+  /** O texto que sai (ou saiu). Antes do envio, o do período de agora. */
+  texto: z.string().nullable().optional(),
+  /** A entrega da mensagem no WhatsApp, quando ela já existe (`app.msg_status`). */
+  entrega: z
+    .enum(['queued', 'sent', 'delivered', 'read', 'failed', 'received'])
+    .nullable()
+    .optional(),
+  enviada_em: z.string().nullable().optional(),
+  organization_id: z.string().nullable().optional(),
 });
 export type SituacaoDoAviso = z.infer<typeof situacaoDoAvisoSchema>;
 
-export type FraseDoAviso = {
-  texto: string;
+/**
+ * O tom do cartão, no vocabulário da casa: `destaque` é a menta (faixa, disco e
+ * selo, como o cartão "Nova mensagem"); `falha` é o vermelho de erro; `neutro` é o
+ * cinza de quem não precisa agir.
+ */
+export type TomDoAviso = 'destaque' | 'falha' | 'neutro';
+
+export type EstadoDoAviso = {
+  tom: TomDoAviso;
+  /** O selo em maiúsculas ao lado do título: em que pé está. */
+  selo: string;
+  titulo: string;
+  detalhe: string;
+  /** Mostra a prévia da mensagem no balão de saída. */
+  balao: boolean;
   /** Ainda dá para tirar da fila. */
   podeCancelar: boolean;
+  /** A mensagem existe e pode ser vista na conversa. */
+  naConversa: boolean;
+  /** Ainda vai mudar: a tela pergunta de novo. */
+  andando: boolean;
 };
 
-/** Por que o aviso não entrou na fila, dito para quem acabou de ligar. */
-const SEM_AVISO: Record<string, string> = {
-  modelo_aguardando_meta: 'Sem aviso no WhatsApp: a mensagem ainda espera a aprovação da Meta.',
-  mensagem_recente_sem_resposta:
-    'Sem aviso no WhatsApp: já mandamos mensagem nas últimas 72 h e a pessoa não respondeu.',
-  ja_na_fila: 'O aviso no WhatsApp já está na fila, por outra ligação.',
-  ja_avisado_hoje: 'Esta pessoa já foi avisada hoje no WhatsApp.',
-  nao_contatar: 'Sem aviso no WhatsApp: a pessoa pediu para não ser contatada.',
-  sem_whatsapp: 'Sem aviso no WhatsApp: a ficha não tem número de WhatsApp.',
-  aviso_pausado: 'Sem aviso no WhatsApp: os avisos estão pausados em Envios.',
-  whatsapp_nao_configurado: 'Sem aviso no WhatsApp: o número da Komune não está configurado.',
+/** Por que o aviso não saiu, dito para quem acabou de ligar. */
+const POR_QUE_NAO: Record<string, string> = {
+  modelo_aguardando_meta: 'A mensagem ainda espera a aprovação da Meta.',
+  mensagem_recente_sem_resposta: 'Já mandamos mensagem nas últimas 72 h e a pessoa não respondeu.',
+  ja_na_fila: 'Já tem um aviso na fila para esta pessoa, de outra ligação.',
+  ja_avisado_hoje: 'Esta pessoa já foi avisada hoje.',
+  nao_contatar: 'A pessoa pediu para não ser contatada.',
+  ficha_sem_whatsapp: 'A ficha não tem número de WhatsApp.',
+  sem_whatsapp: 'A ficha não tem número de WhatsApp.',
+  aviso_pausado: 'Os avisos estão pausados em Envios.',
+  whatsapp_nao_configurado: 'O número de WhatsApp da Komune não está configurado.',
+};
+
+/** A entrega no WhatsApp, no selo: o mesmo vocabulário da tela de Conversas. */
+const SELO_DA_ENTREGA: Record<string, string> = {
+  queued: 'Enviando',
+  sent: 'Enviado',
+  delivered: 'Entregue',
+  read: 'Lido',
 };
 
 /**
- * A frase do recibo. Nulo quando não há nada a dizer: chave desligada, ligação
- * atendida, ligação antiga — situações em que ninguém esperava aviso.
+ * O cartão do aviso no recibo da ligação. Nulo quando não há nada a dizer: chave
+ * desligada, ligação atendida, ligação antiga — situações em que ninguém esperava
+ * aviso.
  */
-export function fraseDoAviso(s: SituacaoDoAviso): FraseDoAviso | null {
+export function estadoDoAviso(
+  s: SituacaoDoAviso,
+  saiuAs: string | null = null,
+): EstadoDoAviso | null {
+  const base = { balao: false, podeCancelar: false, naConversa: false, andando: false };
   switch (s.situacao) {
     case 'pendente':
-      // Sem a saudação: ela é a da hora do ENVIO, e ligação perdida às 18h é avisada
-      // às 8h do dia seguinte, com "Bom dia".
       return {
-        texto:
-          'Aviso no WhatsApp na fila: "Tentamos entrar em contato com você por telefone…". Sai no horário do WhatsApp.',
+        ...base,
+        tom: 'destaque',
+        selo: 'Na fila',
+        titulo: 'Aviso no WhatsApp a caminho',
+        detalhe: 'Sai pelo número da Komune no horário do WhatsApp (seg a sex, 8h às 17h45).',
+        balao: true,
         podeCancelar: true,
+        andando: true,
       };
     case 'enviada':
-      return { texto: 'Aviso enviado no WhatsApp.', podeCancelar: false };
+      if (s.entrega === 'failed') {
+        return {
+          ...base,
+          tom: 'falha',
+          selo: 'Não saiu',
+          titulo: 'O aviso no WhatsApp não saiu',
+          detalhe: 'O WhatsApp recusou o envio. O motivo está na conversa.',
+          naConversa: true,
+        };
+      }
+      return {
+        ...base,
+        tom: 'destaque',
+        selo: SELO_DA_ENTREGA[s.entrega ?? 'queued'] ?? 'Enviado',
+        titulo: 'Aviso enviado no WhatsApp',
+        detalhe:
+          s.entrega === 'queued' || !s.entrega
+            ? 'Saindo agora pelo número da Komune.'
+            : `Saiu pelo número da Komune${saiuAs ? ` às ${saiuAs}` : ''}. Já está na conversa.`,
+        balao: true,
+        naConversa: true,
+        andando: s.entrega !== 'read',
+      };
     case 'cancelada':
-      return s.motivo === 'aviso_vencido'
-        ? { texto: 'O aviso esperou demais e foi cancelado.', podeCancelar: false }
-        : { texto: 'Aviso cancelado: nada vai para o WhatsApp.', podeCancelar: false };
+      return {
+        ...base,
+        tom: 'neutro',
+        selo: 'Cancelado',
+        titulo: 'Aviso cancelado',
+        detalhe:
+          s.motivo === 'aviso_vencido'
+            ? 'Esperou mais de 3 dias na fila e não saiu.'
+            : 'Nada vai para o WhatsApp.',
+      };
     case 'pulada':
       return {
-        texto:
-          s.motivo && SEM_AVISO[s.motivo] ? SEM_AVISO[s.motivo]! : 'O aviso no WhatsApp não saiu.',
-        podeCancelar: false,
+        ...base,
+        tom: 'neutro',
+        selo: 'Não enviado',
+        titulo: 'O aviso no WhatsApp não saiu',
+        detalhe: (s.motivo && POR_QUE_NAO[s.motivo]) || 'A regra de envio do WhatsApp não deixou.',
       };
     case 'sem_aviso': {
-      const texto = s.motivo ? SEM_AVISO[s.motivo] : undefined;
-      return texto ? { texto, podeCancelar: false } : null;
+      const detalhe = s.motivo ? POR_QUE_NAO[s.motivo] : undefined;
+      return detalhe
+        ? { ...base, tom: 'neutro', selo: 'Sem aviso', titulo: 'Sem aviso no WhatsApp', detalhe }
+        : null;
     }
   }
 }
