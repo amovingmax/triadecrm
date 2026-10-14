@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Check, Send, X } from 'lucide-react';
+import { Check, Headset, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -133,11 +133,14 @@ export function BarraDaSelecao({
   quantos,
   ocupado,
   aoMandar,
+  aoConsultoria,
   aoLimpar,
 }: {
   quantos: number;
   ocupado: boolean;
   aoMandar: () => Promise<boolean>;
+  /** Manda os marcados para a aba Consultoria de Conversas (14/10/2026). */
+  aoConsultoria?: () => Promise<boolean>;
   aoLimpar: () => void;
 }) {
   const [confirmando, setConfirmando] = useState(false);
@@ -163,6 +166,17 @@ export function BarraDaSelecao({
           <Send aria-hidden="true" />
           Mandar a saudação
         </Button>
+        {aoConsultoria ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="toque h-9"
+            onClick={() => void aoConsultoria()}
+          >
+            <Headset aria-hidden="true" />
+            Mandar para a Consultoria
+          </Button>
+        ) : null}
         <Button variant="ghost" size="sm" className="toque h-9" onClick={aoLimpar}>
           <X aria-hidden="true" />
           Desmarcar

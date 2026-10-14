@@ -15,8 +15,9 @@ import { ErroDaLista, EsqueletoLista, VazioDeVerdade, VazioPorFiltro } from './e
 import { FolhaCadastroRapido } from './folha-cadastro-rapido';
 import { formatarNumero } from './formatos';
 import { ListaCartoes } from './lista-cartoes';
+import { useConsultoria } from './consultoria-botoes';
 import { BarraDaSelecao, useSaudacao } from './saudacao-botoes';
-import { TabelaParceiros, type SaudacaoNaTabela } from './tabela-parceiros';
+import { TabelaParceiros, type AcoesNaTabela, type SaudacaoNaTabela } from './tabela-parceiros';
 import { useEhCelular } from './usar-eh-celular';
 import {
   contarFiltros,
@@ -147,11 +148,30 @@ export function TelaParceiros({
     [podeSaudar, escolhidos, marcar, linhas, saudacao.pedidos, saudacao.ocupado, pedir],
   );
 
+  // ---- A etapa e a Consultoria na linha (14/10/2026) ----
+  // Também de quem cuida da base (admin e gestor); o banco confere o mesmo.
+  const consultoria = useConsultoria(podeCriar);
+  const marcarConsultoria = consultoria.marcar;
+  const acoesNaTabela = useMemo<AcoesNaTabela | null>(
+    () =>
+      podeCriar
+        ? {
+            naConsultoria: consultoria.naConsultoria,
+            marcarConsultoria: (id, sim) => void marcarConsultoria([id], sim),
+            aoMudarEtapa: () =>
+              void clienteDeConsultas.invalidateQueries({ queryKey: ['parceiros'] }),
+          }
+        : null,
+    [podeCriar, consultoria.naConsultoria, marcarConsultoria, clienteDeConsultas],
+  );
+
   return (
     <div className="flex w-full flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Prospectados</h1>
+          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
+            Prospectados
+          </h1>
           <p className="text-sm text-muted-foreground">
             {consulta.isPending ? (
               'Carregando a base...'
@@ -252,10 +272,11 @@ export function TelaParceiros({
                 quantos={escolhidos.size}
                 ocupado={saudacao.ocupado}
                 aoMandar={() => pedir([...escolhidos])}
+                aoConsultoria={() => marcarConsultoria([...escolhidos], true)}
                 aoLimpar={() => marcar([...escolhidos], false)}
               />
             ) : null}
-            <TabelaParceiros linhas={linhas} saudacao={saudacaoNaTabela} />
+            <TabelaParceiros linhas={linhas} saudacao={saudacaoNaTabela} acoes={acoesNaTabela} />
           </>
         )}
       </section>

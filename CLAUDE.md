@@ -52,6 +52,14 @@ Detalhe e pendências no `docs/CHANGELOG.md` (as duas entradas de 07/10/2026).
 - **A autorização é o fato, não a etapa:** a frase vira `consent_events` ao entrar em Cadastro em andamento (campo opcional); relatórios contam `consent_events`; na tela, o que reconhece a autorização é o desfecho `reu_autorizou`.
 - **Excluir não é `DELETE`.** Parceiro: `public.parceiro_excluir` / `public.parceiro_restaurar` (admin e gestor; `organizations.deleted_at`, com motivo), lista em `/parceiros/excluidos`. Tarefa, visita e compromisso: `public.tarefa_excluir` (vira `cancelled`). Reunião: `public.reuniao_cancelar`. Lote de ligação: `public.lote_excluir` (`call_batches.deleted_at`, com motivo; as ligações feitas continuam no relatório) e `public.lote_tirar_contato`. Resultado de ligação lançado errado: `public.ligacao_corrigir` (estorna e lança de novo; o registro antigo vira nota do sistema). Exclusão nova na tela usa `components/exclusao/dialogo-excluir`, que conta a consequência em vez de perguntar "tem certeza?".
 
+## Funil recomeçado e Consultoria por botão, de 14/10/2026
+
+Detalhe no `docs/CHANGELOG.md` (entrada de 14/10/2026).
+
+- **O quadro foi esvaziado:** todo negócio aberto dos funis de captação voltou à etapa de entrada (`app.esvaziar_quadro`), e as fichas de teste foram excluídas. A etapa agora muda também fora do quadro, em Prospectados e no cabeçalho da conversa (`components/funis/mudar-etapa`), sempre pela folha de mover do Funis.
+- **Consultoria é marca, não etapa:** a aba Consultoria de Conversas mostra quem tem negócio ganho, temperatura de cliente **ou** linha em `public.consultoria` (posta e tirada por `public.consultoria_marcar`, botão em Prospectados). A marca não mexe na etapa nem conta como publicado.
+- **Respondeu tem SLA de 24 h** (era 1 h): as respostas ao bom-dia e ao aviso de ligação entram lá sozinhas e sem dono.
+
 ## Estrutura do monorepo (pnpm workspaces; criar assim no D1)
 
 ```

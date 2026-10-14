@@ -7212,3 +7212,34 @@ Pedido de 13/10: fechar "os controles que hoje são SQL" (as três pendências d
 - Excluir lote exige motivo; tirar um contato não exige nem pede confirmação (volta para a base na hora e pode entrar em outro lote).
 - Backup do banco local antes das migrações: `~/triadecrm-backups/local-antes-dos-ajustes-de-voz-2026-10-13.dump`.
 
+
+## 14/10/2026 — O funil recomeça, a etapa muda fora do quadro e a Consultoria ganha botão (RF-FUN-01, RF-FUN-02, RF-FUN-08, RF-BAS-10, RF-CON-05)
+
+O pedido, com o print do quadro (120 negócios em Captação de fornecedor, 90 em Respondeu, quase todos "Parado há 5d", sem dono): "limpe esses funis, deixe a opção de selecionar em que etapa do funil o lead está na aba de conversas e na aba de prospectados, coloque um botão que eu consiga direcionar leads em prospectados para a aba de consultorias em conversas, não sei como isso tá funcionando". Perguntado o que "limpar" queria dizer, a resposta foi as quatro opções; para a Consultoria, a marca própria.
+
+**Por que Respondeu enchia.** Duas regras movem o negócio sozinhas para Respondeu, sem dono: a resposta ao "Bom dia!" da saudação e a resposta ao aviso de ligação perdida (13/10). E o SLA de Respondeu era de 1 hora (o "responda em 15 minutos" do PRD, guardado em horas): com dezenas de respostas por dia, a coluna inteira nascia "Parado".
+
+**Como a Consultoria funcionava.** A aba Consultoria de Conversas mostrava só quem fechou: negócio ganho ou temperatura de cliente — na prática, "Publicado" no funil de fornecedor. Não havia como pôr alguém lá sem fechar o negócio.
+
+**Entregue.**
+- Migração `20261014100000_o_funil_recomeca_e_a_consultoria_tem_botao.sql`:
+  - SLA de Respondeu passa a 24 h nos funis de fornecedor e produtor (também na `seed.sql`).
+  - **Fichas de teste saem**, pela exclusão de sempre (dá para restaurar em Prospectados → Excluídos): "Matheus Rondon" e toda ficha com a palavra "teste" no nome (`app.limpar_fichas_de_teste`; "Contestação" não conta).
+  - **O quadro esvazia**: todo negócio aberto dos dois funis de captação volta à etapa de entrada (Prospectado / Identificado) e sai do quadro, com o motivo no histórico (`app.esvaziar_quadro`). Ganho, perdido, opt-out e nutrição ficam onde estão. A migração escreve no aviso quantos saíram e de que etapa.
+  - **A marca da Consultoria**: tabela `public.consultoria` (uma linha por parceiro; só a gestão lê) e `public.consultoria_marcar(ids, sim)` (admin e gestor, até 200 por vez, auditado como `MANDAR_PARA_CONSULTORIA` / `TIRAR_DA_CONSULTORIA`). Não mexe na etapa e não conta como publicado em relatório nem em meta.
+- **Mudar a etapa fora do quadro** (`components/funis/mudar-etapa.tsx` e `mudar-etapa-dados.ts`): a etapa vira botão; o clique abre a mesma folha de mover do Funis, com tudo o que ela já cobra (data e formato para Reunião marcada, motivo para Perdido, próxima ação) e o `move_deal` por trás. A etapa de entrada fica na lista: é por ela que se devolve alguém a Prospectados.
+  - Em **Prospectados** (tabela do desktop), na coluna Etapa, para admin e gestor.
+  - No **cabeçalho da conversa**, para quem escreve; a etapa sai da frase de contexto e vira o primeiro item da linha de pílulas.
+- **Botão da Consultoria em Prospectados**: na coluna Etapa, ao lado do seletor — um fone quando o parceiro não está na Consultoria, a pílula "Consultoria" quando está (o mesmo clique tira). E "Mandar para a Consultoria" na barra dos marcados, para vários de uma vez. O aviso traz "Desfazer".
+- **Conversas** lê a marca: `fechou` passa a ser negócio ganho, temperatura de cliente **ou** marca da Consultoria (`montarConversas({ emConsultoria })`).
+
+**Verificado.**
+- pgTAP `110_o_funil_recomeca_e_a_consultoria.sql` (20 asserções): SLA dos dois funis; fichas de teste excluídas e "Contestação" não; negócios abertos voltando à entrada e ganho/perdido/nutrição/excluído intactos; motivo no histórico; quadro vazio; marcar, não duplicar, tirar; SDR recusado.
+- Banco local recriado do zero (`supabase db reset --local`) e **suíte inteira verde: 106 arquivos, 3.745 asserções**.
+- Vitest (`consultoria.test.ts`, `mudar-etapa-dados.test.ts`, caso novo em `montagem.test.ts`), lint e typecheck verdes.
+
+**Não verificado.** Não cliquei no seletor nem no botão no navegador.
+
+**Pendente.**
+- No celular, a lista de Prospectados continua só mostrando a etapa (sem seletor nem botão da Consultoria).
+- Prospectados não filtra por "na Consultoria".

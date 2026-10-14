@@ -121,7 +121,8 @@ export type ItemConversa = {
    */
   temperatura: Temperature;
   /**
-   * Fechou com a gente: tem negócio ganho, ou a etapa já o trata como cliente.
+   * Fechou com a gente: tem negócio ganho, a etapa já o trata como cliente, ou a
+   * gestão o mandou para a Consultoria pelo botão de Prospectados (14/10/2026).
    * É o que tira a conversa da lista de captação e a põe na aba "Consultoria".
    */
   fechou: boolean;

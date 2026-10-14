@@ -410,9 +410,10 @@ on conflict (name) do update
 --      * temperature = temperatura derivada da etapa (PRD §5.6). Perdido/Opt-out usam
 --        'frio' porque o enum não tem "—" (app.compute_temperature devolve frio para lost).
 --        "Recorrente" do Funil 3 usa 'cliente_ativo' (não há valor próprio no enum).
---      * sla_hours = coluna "SLA (vira parado)" convertida para horas. Onde o SLA real é
---        em minutos (Respondeu: 15 min / 10 min) a coluna guarda 1 (granularidade) e o
---        valor real fica em automations.
+--      * sla_hours = coluna "SLA (vira parado)" convertida para horas. Respondeu guarda 24
+--        desde 14/10/2026 (era 1, a granularidade dos "15 min / 10 min" do PRD, que fica
+--        em automations): com o bom-dia e o aviso de ligação trazendo dezenas de
+--        respostas por dia, a coluna nascia inteira "Parado" (migração 20261014100000).
 --      * required_fields = [{"field","label",...}] exigidos para ENTRAR na etapa
 --        (RF-FUN-04: Reunião marcada = data e formato; Perdido = motivo; a evidência da
 --        autorização é declarada em Cadastro em andamento e em Parceria aceita).
@@ -483,7 +484,7 @@ from (values
     {"trigger":{"type":"on_idle","days":14},"action":{"type":"move_stage","to":"nutricao"},"note":"14 dias sem resposta → dormente"}
   ]$j$),
 
-  ('fornecedor', 'respondeu', 'Respondeu', 3, 'morno', false, false, false, 1, '[]', $j$[
+  ('fornecedor', 'respondeu', 'Respondeu', 3, 'morno', false, false, false, 24, '[]', $j$[
     {"trigger":{"type":"on_enter"},"action":{"type":"auto_ack","within_minutes":1},"note":"Robô acusa recebimento em ≤ 1 min"},
     {"trigger":{"type":"on_inbound"},"action":{"type":"classify_intent","model":"haiku","optout_rule_first":true},"note":"Regra determinística de opt-out antes da IA; 25 intenções do Apêndice C (RF-CON-19)"},
     {"trigger":{"type":"on_intent","intents":["interessado"]},"action":{"type":"send_sequence","templates":["SYS-PRE-AUDIO","{SEG}-AUD-1","SYS-POS-AUDIO","GEN-SYS-PEDIDO-AUTORIZACAO"],"approval":"human"},"note":"Texto fixo + áudio da Heloísa + pedido de autorização do pré-cadastro como 2ª mensagem (RF-CON-21)"},
@@ -625,7 +626,7 @@ from (values
     {"trigger":{"type":"on_idle","days":14},"action":{"type":"move_stage","to":"nutricao"}}
   ]$j$),
 
-  ('produtor', 'respondeu', 'Respondeu', 3, 'morno', false, false, false, 1, '[]', $j$[
+  ('produtor', 'respondeu', 'Respondeu', 3, 'morno', false, false, false, 24, '[]', $j$[
     {"trigger":{"type":"on_inbound"},"action":{"type":"classify_intent","model":"haiku","optout_rule_first":true}},
     {"trigger":{"type":"on_intent","intents":["interessado"]},"action":{"type":"send_sequence","templates":["SYS-PRE-AUDIO","{SEG}-AUD-1","SYS-POS-AUDIO"],"approval":"human"},"note":"Áudio da Heloísa ou da Bárbara"},
     {"trigger":{"type":"on_enter"},"action":{"type":"create_task","kind":"message","assignee":"owner","sla_minutes":10},"note":"SLA humano ≤ 10 min (sla_hours guarda 1 por granularidade)"}
