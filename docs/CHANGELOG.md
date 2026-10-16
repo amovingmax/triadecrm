@@ -7240,6 +7240,8 @@ O pedido, com o print do quadro (120 negócios em Captação de fornecedor, 90 e
 
 **Não verificado.** Não cliquei no seletor nem no botão no navegador.
 
+**Publicado.** A migração foi rodada à mão antes de 16/10 (os números da limpeza ficaram no terminal de quem rodou); o site subiu em 16/10, junto com a foto e o vídeo.
+
 **Pendente.**
 - No celular, a lista de Prospectados continua só mostrando a etapa (sem seletor nem botão da Consultoria).
 - Prospectados não filtra por "na Consultoria".
@@ -7279,6 +7281,12 @@ O pedido: "implemente a ferramenta pra eu conseguir enviar fotos e vídeos pelo 
 **Não verificado.** O envio de verdade para a Meta: não há credencial aqui, e o dublê da Graph não tem a rota de upload. A foto e o vídeo chegando num celular ficam para o primeiro envio em produção.
 
 **Pendente.**
-- Publicar: a migração (`supabase db push`), o site e o worker (`flyctl deploy`); o worker precisa subir para foto e vídeo saírem. A migração de 14/10 (`20261014100000`, branch `funil-recomeca-e-consultoria`) ainda não foi publicada: se ela subir **depois** desta, o `db push` vai pedir `--include-all`, por ser mais antiga.
+- Testar o primeiro envio real (foto e vídeo para um número do time) e conferir no celular.
 - Arquivo que sobe e não vira mensagem (aba fechada no meio do envio) fica no balde sem dono. É raro e pequeno; a limpeza fica para quando a retenção de mídia de saída for decidida.
 - Documento (PDF) não está incluído; a Cloud API aceita, e o caminho é o mesmo se pedirem.
+
+**Publicado em 16/10/2026**, do branch `midia-de-saida` (que traz junto o trabalho de 14/10), na ordem banco → worker → site. O worker foi antes do site para nenhuma foto encontrar o worker antigo, que mandaria só a legenda como texto:
+- banco: migração `20261016100000` (`db push`; a de 14/10 já estava em produção, rodada à mão);
+- worker-wa: versão 14 no Fly, rodando e falando com a Meta;
+- site: Vercel, produção.
+- A main não foi tocada.
