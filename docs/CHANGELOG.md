@@ -7243,3 +7243,42 @@ O pedido, com o print do quadro (120 negócios em Captação de fornecedor, 90 e
 **Pendente.**
 - No celular, a lista de Prospectados continua só mostrando a etapa (sem seletor nem botão da Consultoria).
 - Prospectados não filtra por "na Consultoria".
+
+## 16/10/2026 — Foto e vídeo saem pelo WhatsApp do CRM (RF-CON-05, RF-CON-10, RF-CON-11)
+
+O pedido: "implemente a ferramenta pra eu conseguir enviar fotos e vídeos pelo CRM". Desenho aprovado no mesmo dia, com a escolha de **vídeo só em MP4, sem converter**.
+
+**Como era.** Do CRM saíam texto, modelo e áudio gravado. Foto e vídeo só chegavam: a conversa os mostrava, mas não havia como mandar.
+
+**Entregue.**
+- **Na tela** (`components/conversas/enviar-midia.tsx` e `enviar-midia-dados.ts`): o clipe ao lado do microfone, colar um print (Ctrl+V) na caixa ou arrastar o arquivo para cima dela. Tudo cai numa prévia com miniaturas, legenda opcional, "Cancelar" e "Enviar". Até 10 arquivos por vez; cada um vira uma mensagem, e a legenda vai na primeira. Como o áudio, só existe com a janela de 24 h aberta. A caixa ganhou `key` pela conversa nos dois lugares em que é montada, para a foto escolhida numa conversa nunca esperar na prévia de outra.
+- **A foto vira JPEG no navegador:** reduzida a 2048 px no maior lado, com fundo branco e qualidade que desce até caber nos 5 MB da Meta. Isso também tira os dados da câmera, inclusive a localização. O PNG pequeno (print de tela) vai como está. HEIC só abre onde o navegador sabe abrir (Safari); no Chrome a recusa diz para mandar em JPEG.
+- **O vídeo** vai só em MP4/3GP de até 16 MB. O .mov do iPhone é recusado na tela com a frase "exporte em MP4". Não há conversão: o worker-wa tem 1 CPU compartilhada e 512 MB, e converter levaria mais que os 120 s de `visibility timeout` da fila, com risco de a mensagem sair duas vezes.
+- **O arquivo sobe direto do navegador para o balde** (`mensagens`), porque a Vercel não aceita corpo acima de 4,5 MB:
+  - `POST /api/midia-de-saida/autorizar` confere a sessão, a conversa, o tipo e o tamanho, escolhe o caminho (`<conversa>/saida/<instante>-<sufixo>.<ext>`) e devolve uma autorização de uso único (`createSignedUploadUrl`);
+  - o navegador sobe com `uploadToSignedUrl`;
+  - `POST /api/midia-de-saida/enviar` confere que o caminho é daquela conversa, que o arquivo chegou com o tipo e o tamanho certos (`info()` do balde) e grava a mensagem **com a sessão de quem enviou** (a policy `messages_insert` decide). Se a mensagem é recusada, o arquivo sai do balde.
+  - Regras compartilhadas em `lib/midia-de-saida.ts`.
+- **Worker** (`whatsapp/midia-de-saida.ts`, `saida.ts`, `graph.ts`): foto e vídeo viram `media id` na hora da entrega, como o áudio. Foto: JPEG ou PNG até 5 MB. Vídeo: MP4/3GP até 16 MB, e o `ffprobe` (que já vem no pacote do ffmpeg da imagem) confere H.264 e AAC. Recusa nomeada: `video_de_codec_recusado`, `foto_de_tipo_recusado`, `midia_fora_da_janela` etc. Balde que não responde devolve a mensagem para a fila (`midia_nao_lido`). A legenda vai como `caption`.
+- **Migração `20261016100000_a_foto_e_o_video_saem_do_crm.sql`:** a assinatura `*Nome:*` passa a valer também para a legenda da foto e do vídeo (a regra é "cada mensagem assinada com o primeiro nome de quem envia"). Sem legenda, a mensagem continua sem corpo. Nada mais mudou no banco: a policy, o lote de saída e o balde já aceitavam esses tipos.
+- Guia `docs/operacao/whatsapp-no-crm.md` com a seção de foto e vídeo e duas linhas na tabela de problemas.
+
+**Verificado.**
+- pgTAP `111_a_foto_e_o_video_saem_do_crm.sql` (9 asserções): a gestão grava foto e vídeo com a própria sessão; a legenda sai assinada e o vídeo sem legenda fica sem corpo; os dois entram na fila e o lote leva arquivo e tipo; o balde aceita os formatos. Suíte inteira em banco novo: **106 arquivos, 3.734 asserções, verde**.
+- Vitest do worker: **388 testes** (novos: `midia-de-saida.test.ts`, casos de foto e vídeo em `saida.test.ts` e `graph.test.ts`). Vitest do site: **1.293** (novo: `lib/midia-de-saida.test.ts`). Lint e typecheck verdes nos dois.
+- Na imagem do worker (`node:22-alpine` + `ffmpeg`): o `ffprobe` existe e lê `h264`/`aac` e `hevc` no formato que o código espera.
+- No balde local: a autorização de uso único sobe, não serve duas vezes, e `info()` devolve tipo e tamanho; sem autorização, ou com tipo fora da lista, o balde recusa. **Achado:** para Blob/File a biblioteca do Supabase ignora o `contentType` e usa o tipo do próprio arquivo, então o arquivo é reembalado com o tipo certo antes de subir.
+- **Prova no navegador, contra o Supabase local**, com uma gestora de teste:
+  - escolhidos uma foto 4000×3000, um MP4 e um .mov; o .mov foi recusado com a frase certa;
+  - "Enviar 2" deu "1 foto e 1 vídeo na fila do WhatsApp";
+  - a foto chegou ao balde em JPEG 2048×1536 (143 KB; o original tinha 699 KB), e a legenda chegou como `*Paula:*` + texto;
+  - a varredura do worker enfileirou as duas mensagens, e `wa_saida_proximos` as entregou com tipo, legenda e janela aberta;
+  - a conversa mostra a foto e o vídeo enviados.
+  - Tudo da prova foi apagado depois.
+
+**Não verificado.** O envio de verdade para a Meta: não há credencial aqui, e o dublê da Graph não tem a rota de upload. A foto e o vídeo chegando num celular ficam para o primeiro envio em produção.
+
+**Pendente.**
+- Publicar: a migração (`supabase db push`), o site e o worker (`flyctl deploy`); o worker precisa subir para foto e vídeo saírem. A migração de 14/10 (`20261014100000`, branch `funil-recomeca-e-consultoria`) ainda não foi publicada: se ela subir **depois** desta, o `db push` vai pedir `--include-all`, por ser mais antiga.
+- Arquivo que sobe e não vira mensagem (aba fechada no meio do envio) fica no balde sem dono. É raro e pequeno; a limpeza fica para quando a retenção de mídia de saída for decidida.
+- Documento (PDF) não está incluído; a Cloud API aceita, e o caminho é o mesmo se pedirem.

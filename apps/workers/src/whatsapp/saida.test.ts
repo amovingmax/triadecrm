@@ -166,6 +166,30 @@ describe('a forma do envio', () => {
     expect(f.ok === false && f.codigo).toBe('audio_sem_arquivo');
   });
 
+  it('foto dentro da janela sai como imagem, com a legenda (16/10/2026)', () => {
+    const f = formaDoEnvio(
+      item({ tipo: 'image', media_path: 'c/saida/1.jpg', media_mime: 'image/jpeg', corpo: 'O cardápio' }),
+    );
+    expect(f).toEqual({
+      ok: true,
+      envio: { tipo: 'imagem', para: '+5584988776655', legenda: 'O cardápio' },
+    });
+  });
+
+  it('vídeo sem legenda sai sem legenda', () => {
+    const f = formaDoEnvio(
+      item({ tipo: 'video', media_path: 'c/saida/1.mp4', media_mime: 'video/mp4', corpo: null }),
+    );
+    expect(f).toEqual({ ok: true, envio: { tipo: 'video', para: '+5584988776655' } });
+  });
+
+  it('foto e vídeo fora da janela, ou sem arquivo, não saem', () => {
+    const fora = formaDoEnvio(item({ tipo: 'image', media_path: 'c/saida/1.jpg', janela_aberta: false }));
+    expect(fora.ok === false && fora.codigo).toBe('midia_fora_da_janela');
+    const semArquivo = formaDoEnvio(item({ tipo: 'video', media_path: null }));
+    expect(semArquivo.ok === false && semArquivo.codigo).toBe('midia_sem_arquivo');
+  });
+
   it('mensagem sem corpo dentro da janela não vira mensagem vazia', () => {
     const f = formaDoEnvio(item({ corpo: null }));
     expect(f.ok === false && f.codigo).toBe('mensagem_sem_corpo');
@@ -336,6 +360,97 @@ describe('o dreno da fila de saída', () => {
     expect(c.mortos).toBe(1);
     expect(c.adiados).toBe(1);
     expect(c.enviados).toBe(0);
+  });
+});
+
+describe('a foto e o vídeo no dreno (16/10/2026)', () => {
+  /** Banco falso com o balde: devolve o arquivo pedido, ou falha. */
+  function bancoComBalde(lote: { itens: unknown[] }, arquivo: Uint8Array | null) {
+    const base = bancoFalso(lote);
+    const baixados: string[] = [];
+    const cliente = {
+      ...base.cliente,
+      rpc: base.cliente.rpc,
+      storage: {
+        from: () => ({
+          download: async (caminho: string) => {
+            baixados.push(caminho);
+            return arquivo
+              ? { data: new Blob([arquivo]), error: null }
+              : { data: null, error: { message: 'sumiu' } };
+          },
+        }),
+      },
+    } as unknown as ClienteDoBanco;
+    return { cliente, chamadas: base.chamadas, baixados };
+  }
+
+  function graphQueSobe() {
+    const subidas: { mime: string; nome: string }[] = [];
+    const enviados: unknown[] = [];
+    const graph = {
+      subirMidia: vi.fn(async (a: { mime: string; nome: string }) => {
+        subidas.push({ mime: a.mime, nome: a.nome });
+        return { ok: true, mediaId: 'midia-1' };
+      }),
+      enviar: vi.fn(async (envio: unknown) => {
+        enviados.push(envio);
+        return { ok: true, wamid: 'wamid.FOTO' };
+      }),
+    } as unknown as ClienteDaGraph;
+    return { graph, subidas, enviados };
+  }
+
+  it('a foto do balde vira media id e sai com a legenda', async () => {
+    const foto = item({
+      tipo: 'image',
+      media_path: 'c/saida/1.jpg',
+      media_mime: 'image/jpeg',
+      corpo: 'O cardápio',
+    });
+    const { cliente, chamadas, baixados } = bancoComBalde({ itens: [foto] }, new Uint8Array([1, 2, 3]));
+    const { graph, subidas, enviados } = graphQueSobe();
+    const c = contagensDaSaidaZeradas();
+    await drenarSaida(contexto(cliente, graph), 5, c);
+
+    expect(baixados).toEqual(['c/saida/1.jpg']);
+    expect(subidas).toEqual([{ mime: 'image/jpeg', nome: 'foto.jpg' }]);
+    expect(enviados).toEqual([
+      { tipo: 'imagem', para: '+5584988776655', legenda: 'O cardápio', mediaId: 'midia-1' },
+    ]);
+    expect(c.enviados).toBe(1);
+    expect(chamadas.find((x) => x.nome === 'wa_saida_sucesso')?.args.p_wamid).toBe('wamid.FOTO');
+  });
+
+  it('o vídeo em HEVC morre de vez, com o motivo, sem gastar envio na Meta', async () => {
+    const video = item({ tipo: 'video', media_path: 'c/saida/1.mp4', media_mime: 'video/mp4' });
+    const { cliente, chamadas } = bancoComBalde({ itens: [video] }, new Uint8Array([1]));
+    const { graph, subidas, enviados } = graphQueSobe();
+    const c = contagensDaSaidaZeradas();
+    await drenarSaida(
+      { ...contexto(cliente, graph), sondarVideo: async () => ({ video: 'hevc', audio: 'aac' }) },
+      5,
+      c,
+    );
+
+    expect(subidas).toEqual([]);
+    expect(enviados).toEqual([]);
+    expect(c.falhados).toBe(1);
+    const morte = chamadas.find((x) => x.nome === 'wa_saida_falha_definitiva');
+    expect(morte?.args.p_codigo).toBe('video_de_codec_recusado');
+    expect(String(morte?.args.p_erro)).toMatch(/H\.264/);
+  });
+
+  it('balde que não responde devolve a mensagem para a fila', async () => {
+    const foto = item({ tipo: 'image', media_path: 'c/saida/1.jpg', media_mime: 'image/jpeg' });
+    const { cliente, chamadas } = bancoComBalde({ itens: [foto] }, null);
+    const { graph } = graphQueSobe();
+    const c = contagensDaSaidaZeradas();
+    await drenarSaida(contexto(cliente, graph), 5, c);
+
+    const falha = chamadas.find((x) => x.nome === 'wa_saida_falha');
+    expect(falha?.args.p_codigo).toBe('midia_nao_lido');
+    expect(chamadas.some((x) => x.nome === 'wa_saida_falha_definitiva')).toBe(false);
   });
 });
 

@@ -269,6 +269,22 @@ describe('o corpo do POST', () => {
     expect(p.type).toBe('audio');
     expect(p.audio).toEqual({ id: '123456789', voice: true });
   });
+
+  it('FOTO e VÍDEO saem pelo media id, com a legenda embaixo (16/10/2026)', () => {
+    const foto = ClienteDaGraph.payloadDoEnvio({
+      tipo: 'imagem',
+      para: '+5584988776655',
+      mediaId: '42',
+      legenda: '  O cardápio  ',
+    });
+    expect(foto.type).toBe('image');
+    expect(foto.image).toEqual({ id: '42', caption: 'O cardápio' });
+
+    const video = ClienteDaGraph.payloadDoEnvio({ tipo: 'video', para: '+5584988776655', mediaId: '43' });
+    expect(video.type).toBe('video');
+    // Legenda vazia não vai: a Meta recusa `caption: ""`.
+    expect(video.video).toEqual({ id: '43' });
+  });
 });
 
 describe('o wamid da resposta', () => {

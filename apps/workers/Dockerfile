@@ -45,6 +45,9 @@ ENV NODE_ENV=production \
 # o Opus lá dentro sai igual, sem recodificar —, mas precisa do binário aqui.
 # São ~35 MB na imagem; sem ele o worker recusa o áudio dizendo que falta ffmpeg,
 # em vez de culpar o arquivo de quem gravou (ver whatsapp/audio-de-saida.ts).
+# O mesmo pacote traz o `ffprobe`, que confere os codecs do vídeo que sai do CRM
+# (H.264 e AAC) antes de subir para a Meta — desde 16/10/2026, em
+# whatsapp/midia-de-saida.ts. Vídeo não é convertido aqui: a máquina é pequena.
 RUN apk add --no-cache ffmpeg
 WORKDIR /app
 # Mantém o layout do workspace para os symlinks do pnpm continuarem válidos.
