@@ -24,7 +24,5 @@ export default async function Pagina({
   // Tela da gestão desde o pivô de 06/10/2026: quem liga vê só Ligar e Meu dia.
   const [, params] = await Promise.all([requireRole('admin', 'gestor'), searchParams]);
 
-  return (
-    <TelaFunis filtrosIniciais={filtrosQuadroDaUrl(params)} />
-  );
+  return <TelaFunis filtrosIniciais={filtrosQuadroDaUrl(params)} />;
 }
