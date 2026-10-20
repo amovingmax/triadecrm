@@ -186,6 +186,7 @@ export function montarConversas({
   leituras = [],
   etiquetas = [],
   etiquetasDoParceiro = [],
+  emConsultoria = [],
   agora = new Date(),
 }: {
   organizacoes: OrganizacaoCrua[];
@@ -201,6 +202,8 @@ export function montarConversas({
   /** O catálogo de etiquetas e quem tem qual: a lista mostra as do parceiro. */
   etiquetas?: EtiquetaDoParceiro[];
   etiquetasDoParceiro?: { organization_id: string; tag_id: number }[];
+  /** Quem foi mandado para a Consultoria pelo botão (14/10/2026). */
+  emConsultoria?: readonly string[];
   agora?: Date;
 }): ItemConversa[] {
   const nomeDaPessoa = new Map(catalogos.pessoas.map((p) => [p.id, p.nome]));
@@ -276,6 +279,10 @@ export function montarConversas({
     leituraPorOrganizacao.set(l.organization_id, l);
   }
 
+  // A marca da Consultoria (14/10/2026): quem a gestão mandou para lá pelo botão
+  // de Prospectados, sem fechar negócio nem mexer na etapa.
+  const naConsultoria = new Set(emConsultoria);
+
   const itens = organizacoes.map((o): ItemConversa => {
     const acumulado = porOrganizacao.get(o.id);
     const ultima = acumulado?.ultima ?? null;
@@ -294,7 +301,10 @@ export function montarConversas({
       bairro: o.neighborhood,
       cidade: o.city_name,
       temperatura: o.temperature,
-      fechou: ganhou.has(o.id) || TEMPERATURAS_DE_CLIENTE.includes(o.temperature),
+      fechou:
+        ganhou.has(o.id) ||
+        TEMPERATURAS_DE_CLIENTE.includes(o.temperature) ||
+        naConsultoria.has(o.id),
       precisaAtencao: negocio?.needs_attention ?? false,
       telefone: o.phone_e164,
       telefoneMascarado: o.phone_is_masked ?? true,

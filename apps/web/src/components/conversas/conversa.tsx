@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { formatarProximaAcao } from '@/components/parceiros/formatos';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { DiasSemContato } from '@/components/temperatura';
+import { MudarEtapa } from '@/components/funis/mudar-etapa';
 
 import { arquivarConversa } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
@@ -238,6 +239,12 @@ export function Conversa({
   const podeAssumir = Boolean(fio && eu?.podeEscrever && fio.responsavelId !== eu.id);
   const setorDoFio =
     fio?.setorId != null ? (setores.find((s) => s.id === fio.setorId)?.nome ?? null) : null;
+  // A ETAPA É BOTÃO (14/10/2026): "deixe a opção de selecionar em que etapa do
+  // funil o lead está na aba de conversas". Quem escreve muda a etapa daqui, pela
+  // mesma folha do Funis; quem não escreve continua lendo a etapa na frase.
+  const mudaEtapa = Boolean(eu?.podeEscrever && item.etapa);
+  const clientes = useQueryClient();
+  const aoMudarEtapa = () => void clientes.invalidateQueries({ queryKey: ['conversas'] });
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -276,7 +283,7 @@ export function Conversa({
               {[
                 // A temperatura saiu desta linha em 28/09/2026 (ADR-16): a etapa,
                 // que já estava ao lado dela, é o que passou a valer.
-                item.etapa,
+                mudaEtapa ? null : item.etapa,
                 item.funil,
                 setorDoFio,
                 fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null,
@@ -288,6 +295,15 @@ export function Conversa({
                 contatado, o robô calado, e as etiquetas — que não são rótulo, são
                 o botão de etiquetar. */}
             <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+              {mudaEtapa ? (
+                <MudarEtapa
+                  organizacaoId={item.id}
+                  nome={item.nome}
+                  etapa={item.etapa}
+                  aoMudar={aoMudarEtapa}
+                  className="h-5 text-[11px] text-foreground"
+                />
+              ) : null}
               {item.naoContatar ? (
                 <Badge variant="pilula" className="h-5 px-2 text-[11px] font-normal">
                   não contatar

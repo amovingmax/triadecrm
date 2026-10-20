@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { ErroDaConversa, responder } from './acoes';
 import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
 import { EnviarModelo } from './enviar-modelo';
+import { BotaoDaMidia, PainelDaMidia, useMidiaEscolhida } from './enviar-midia';
+import { arquivosDaTransferencia } from './enviar-midia-dados';
 import { GravarAudio } from './gravar-audio';
 import { podeEscreverLivre } from './mensagens';
 import {
@@ -123,7 +125,14 @@ export function CaixaDeResposta({
   }
 
   return podeEscreverLivre(janela) ? (
-    <TextoLivre fioId={fio.id} atualizar={[chaveDaLinha(organizacaoId)]} className={className} />
+    // `key` pela conversa: a foto escolhida numa conversa nunca fica esperando na
+    // prévia de outra (16/10/2026).
+    <TextoLivre
+      key={fio.id}
+      fioId={fio.id}
+      atualizar={[chaveDaLinha(organizacaoId)]}
+      className={className}
+    />
   ) : (
     <EnviarModelo destino={{ tipo: 'ficha', organizacaoId }} className={className} />
   );
@@ -235,6 +244,15 @@ export function TextoLivre({
     },
   });
 
+  // Foto e vídeo (16/10/2026): o que foi escolhido, colado ou arrastado espera
+  // na prévia, em cima da caixa, até alguém mandar ou cancelar.
+  const midia = useMidiaEscolhida();
+  const [arrastando, setArrastando] = useState(false);
+  const depoisDaMidia = () => {
+    void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
+    for (const chave of atualizar) void clientes.invalidateQueries({ queryKey: chave });
+  };
+
   const limpo = texto.trim();
   // O teto de 300 de `LIMITES_PADRAO` é do ROBÔ (RF-CON-24): ele existe para a
   // resposta automática não virar um texto de vendas. Aplicá-lo a uma pessoa que
@@ -287,15 +305,46 @@ export function TextoLivre({
         </ul>
       ) : null}
 
+      {midia.itens.length > 0 ? (
+        <PainelDaMidia fioId={fioId} midia={midia} aoEnviar={depoisDaMidia} />
+      ) : null}
+
       {/* Uma caixa só: o texto, o microfone e o enviar na mesma moldura, como em
           qualquer aplicativo de conversa. O botão inteiro numa linha própria
-          custava 56 px de tela e uma varredura de olho a mais. */}
-      <div className="flex items-end gap-1 rounded-2xl border border-input bg-card/60 py-1 pr-1 pl-2 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/40">
+          custava 56 px de tela e uma varredura de olho a mais.
+
+          Arrastar foto ou vídeo para cima dela também vale (16/10/2026). */}
+      <div
+        className={cn(
+          'flex items-end gap-1 rounded-2xl border border-input bg-card/60 py-1 pr-1 pl-2 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/40',
+          arrastando && 'border-ring ring-3 ring-ring/40',
+        )}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes('Files')) return;
+          e.preventDefault();
+          setArrastando(true);
+        }}
+        onDragLeave={() => setArrastando(false)}
+        onDrop={(e) => {
+          setArrastando(false);
+          const arquivos = arquivosDaTransferencia(e.dataTransfer);
+          if (arquivos.length === 0) return;
+          e.preventDefault();
+          midia.escolher(arquivos);
+        }}
+      >
         <textarea
           id="resposta"
           ref={caixa}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
+          onPaste={(e) => {
+            // Colar um print (Ctrl+V) leva à prévia; colar texto continua texto.
+            const arquivos = arquivosDaTransferencia(e.clipboardData);
+            if (arquivos.length === 0) return;
+            e.preventDefault();
+            midia.escolher(arquivos);
+          }}
           onKeyDown={(e) => {
             // Enter manda no computador; no celular o Enter do teclado é quebra
             // de linha, e enviar ali seria mandar metade da frase toda vez.
@@ -309,7 +358,8 @@ export function TextoLivre({
           className="min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground"
         />
         {/* Gravar fica ao lado de Enviar porque são a mesma decisão: como mandar
-            isto. Dentro da janela de 24 h os dois valem. */}
+            isto. Dentro da janela de 24 h os dois valem — e o clipe também. */}
+        <BotaoDaMidia aoEscolher={midia.escolher} />
         <GravarAudio key={fioId} fioId={fioId} />
         <Button
           type="submit"

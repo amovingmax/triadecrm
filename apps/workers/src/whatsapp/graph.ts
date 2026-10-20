@@ -81,7 +81,12 @@ export type Envio =
    * a resposta automática ao botão de um envio em massa).
    */
   | (Destino & { tipo: 'link'; corpo: string; rotulo: string; url: string })
-  | (Destino & { tipo: 'audio'; mediaId?: string; link?: string });
+  | (Destino & { tipo: 'audio'; mediaId?: string; link?: string })
+  /**
+   * Foto e vídeo escolhidos na tela (16/10/2026). Como o áudio, o arquivo vira
+   * `mediaId` no instante da entrega; a legenda é o texto que vai embaixo.
+   */
+  | (Destino & { tipo: 'imagem' | 'video'; mediaId?: string; legenda?: string });
 
 /** A Graph API recusou, ou não respondeu. Mesma forma para envio e para conta. */
 export interface FalhaDaGraph {
@@ -238,6 +243,16 @@ export class ClienteDaGraph {
           // fixo em vez de condicional.
           audio: envio.mediaId ? { id: envio.mediaId, voice: true } : { link: envio.link },
         };
+      case 'imagem':
+      case 'video': {
+        // A Meta põe a legenda embaixo da foto e do vídeo, e o teto dela é de
+        // 1.024 caracteres. Legenda vazia não vai: `caption: ""` é recusado.
+        const legenda = envio.legenda?.trim();
+        const midia = { id: envio.mediaId, ...(legenda ? { caption: legenda.slice(0, 1024) } : {}) };
+        return envio.tipo === 'imagem'
+          ? { ...base, type: 'image', image: midia }
+          : { ...base, type: 'video', video: midia };
+      }
     }
   }
 

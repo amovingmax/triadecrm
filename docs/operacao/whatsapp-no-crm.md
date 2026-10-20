@@ -183,6 +183,15 @@ Os 42 modelos vão para a aprovação da Meta. Se algum voltar recusado, o motiv
   de cada pessoa. Para desligar a assinatura:
   `update app_settings set value = jsonb_set(value, '{assinar_com_nome}', 'false') where key = 'whatsapp.envio';`
 
+- **Foto e vídeo (16/10/2026).** O clipe ao lado do microfone, colar um print (Ctrl+V) ou
+  arrastar o arquivo para a caixa: tudo cai numa prévia com legenda opcional, e nada sai sem
+  passar por ela. Como o áudio, só dentro da janela de 24 h. Foto: qualquer uma que o
+  navegador abra vira JPEG reduzido (até 2048 px), sem os dados da câmera nem a localização;
+  o print em PNG vai como está. Vídeo: só MP4 de até 16 MB, com H.264 e AAC — o .mov do
+  iPhone é recusado na tela, e o MP4 em HEVC falha no motor dizendo para exportar em H.264.
+  A legenda sai com o primeiro nome em negrito, como o texto. Até 10 arquivos de uma vez;
+  cada um vira uma mensagem, e a legenda vai na primeira.
+
 - **Modelos.** Desde 22/09/2026, fora da janela de 24 h a conversa só abre com o cumprimento:
   “Bom dia!”, “Boa tarde!” ou “Boa noite!”, escolhido pelo relógio de Natal — na conversa e
   nas campanhas. Quando a pessoa responde, o resto vai em texto livre. A exceção é o recibo
@@ -209,6 +218,8 @@ Os 42 modelos vão para a aprovação da Meta. Se algum voltar recusado, o motiv
 | Mensagem sai mas a resposta do parceiro não aparece | o campo `messages` não foi assinado na Parte 3 |
 | Mensagem fica "na fila" para sempre | motor parado (`fly status --app triade-worker-wa`) ou fora do horário de envio |
 | Mensagem falha com 131026 | o número do parceiro não tem WhatsApp |
+| Vídeo falha com `video_de_codec_recusado` | o MP4 está em HEVC (ou o som não é AAC): exportar em MP4 H.264 e mandar de novo |
+| Foto ou vídeo falha com `midia_recusado_pela_meta` | ler `messages.error_detail`: a Meta diz por que recusou o arquivo |
 | Mensagem falha com 131049 | a Meta segurou por excesso de mensagens de marketing para essa pessoa; tente outro dia |
 | Todos os modelos recusados | ler o motivo em `message_templates.meta_rejection_reason` e ajustar o texto no `seed.sql`/migração, subindo a versão |
 

@@ -1166,4 +1166,17 @@ describe('quem fechou vai para a Consultoria (pivô de 06/10/2026)', () => {
     expect(ids(emCaptacao(itens))).toEqual(['captando']);
     expect(emCaptacao(itens).length + contatosDeConsultoria(itens).length).toBe(itens.length);
   });
+
+  it('quem a gestão mandou pelo botão também está lá, sem negócio ganho (14/10/2026)', () => {
+    const comMarca = montarConversas({
+      organizacoes: [organizacao('captando', 'Buffet em Conversa')],
+      atividades: [],
+      negocios: [negocio({ id: 'd1', organization_id: 'captando', status: 'open' })],
+      emConsultoria: ['captando'],
+      catalogos: CATALOGOS,
+      agora,
+    });
+    expect(ids(contatosDeConsultoria(comMarca))).toEqual(['captando']);
+    expect(emCaptacao(comMarca)).toEqual([]);
+  });
 });

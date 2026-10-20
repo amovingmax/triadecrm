@@ -19,9 +19,9 @@ import { supabaseUrl } from '@/lib/env';
  *    navegador o que tem esse prefixo.
  *
  * A chave vive em `SUPABASE_SERVICE_ROLE_KEY` na Vercel. Quem a usa hoje é
- * `/api/midia`, `/api/audio` e `/api/telefone/procurar`. Sem ela essas rotas
- * respondem "não configurado" em vez de estourar — o CRM inteiro não pode cair
- * porque uma rota de apoio não foi configurada.
+ * `/api/midia`, `/api/audio`, `/api/midia-de-saida/*` e `/api/telefone/procurar`.
+ * Sem ela essas rotas respondem "não configurado" em vez de estourar — o CRM
+ * inteiro não pode cair porque uma rota de apoio não foi configurada.
  */
 import 'server-only';
 

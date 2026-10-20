@@ -7,6 +7,9 @@ import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-tab
 import { cn } from '@/lib/utils';
 import { RevelarLista, useRevelarLinha } from '@/components/movimento';
 import { EtiquetaEtapa } from '@/components/funis/etapa';
+import { MudarEtapa } from '@/components/funis/mudar-etapa';
+
+import { BotaoConsultoria } from './consultoria-botoes';
 
 import { formatarLocal, formatarTelefone } from './formatos';
 import { ProximaAcao } from './proxima-acao';
@@ -32,6 +35,19 @@ export type SaudacaoNaTabela = {
 };
 
 const ContextoDaSaudacao = createContext<SaudacaoNaTabela | null>(null);
+
+/**
+ * A etapa e a Consultoria na linha (14/10/2026): o seletor de etapa (a folha do
+ * Funis) e o botão que manda o parceiro para a aba Consultoria de Conversas. Pelo
+ * mesmo caminho da saudação: sem provedor, a coluna volta a ser só a etiqueta.
+ */
+export type AcoesNaTabela = {
+  naConsultoria: ReadonlySet<string>;
+  marcarConsultoria: (id: string, sim: boolean) => void;
+  aoMudarEtapa: () => void;
+};
+
+const ContextoDasAcoes = createContext<AcoesNaTabela | null>(null);
 
 /**
  * A lista de parceiros no desktop.
@@ -92,8 +108,9 @@ const CLASSES: Record<string, string> = {
   telefone: 'w-52',
   // A etapa é SEMPRE visível desde 28/09/2026: ela herdou o lugar da coluna
   // "Temperatura" (ADR-16). w-44 e não w-40 porque o nome mais longo do catálogo
-  // — "Apresentação realizada" — não pode nascer truncado.
-  etapa: 'w-44',
+  // — "Apresentação realizada" — não pode nascer truncado. w-60 desde 14/10/2026:
+  // o botão da Consultoria mora ao lado da etapa.
+  etapa: 'w-60',
   responsavel: 'hidden w-36 2xl:table-cell',
   proxima: 'hidden w-32 2xl:table-cell',
 };
@@ -145,7 +162,7 @@ const colunas = coluna.columns([
   coluna.accessor('stage', {
     id: 'etapa',
     header: 'Etapa',
-    cell: ({ getValue }) => <EtiquetaEtapa etapa={getValue()} />,
+    cell: ({ row }) => <CelulaEtapa linha={row.original} />,
   }),
   coluna.accessor('owner', {
     id: 'responsavel',
@@ -162,81 +179,85 @@ const colunas = coluna.columns([
 export function TabelaParceiros({
   linhas,
   saudacao = null,
+  acoes = null,
 }: {
   linhas: LinhaParceiro[];
   saudacao?: SaudacaoNaTabela | null;
+  acoes?: AcoesNaTabela | null;
 }) {
   const tabela = useTable({ features: recursos, columns: colunas, data: linhas });
 
   return (
-    <ContextoDaSaudacao.Provider value={saudacao}>
-      <RevelarLista>
-        <ColunasEscondidas />
+    <ContextoDasAcoes.Provider value={acoes}>
+      <ContextoDaSaudacao.Provider value={saudacao}>
+        <RevelarLista>
+          <ColunasEscondidas />
 
-        {/* O contêiner rola na horizontal; a página nunca rola.
+          {/* O contêiner rola na horizontal; a página nunca rola.
           E ele é um CARTÃO (29/09/2026, Design System): a tabela ficava direto
           sobre a página, com as linhas encostando na borda da tela. No desenho
           novo a página é cinza e a tabela é conteúdo, logo mora no branco.
           `px-1` em vez de padding cheio porque as células já têm o seu, e um
           padding duplo empurraria a primeira coluna para o meio do cartão. */}
-        <div
-          className="sombra-base relative w-full overflow-x-auto rounded-xl bg-card px-1 py-1"
-          style={SOMBRA_DE_ROLAGEM}
-        >
-          <table className="w-full table-fixed border-collapse text-sm">
-            <thead>
-              {tabela.getHeaderGroups().map((grupo) => (
-                <tr key={grupo.id} className="border-b border-hairline">
-                  {grupo.headers.map((cabecalho) => (
-                    <th
-                      key={cabecalho.id}
-                      scope="col"
-                      className={cn(
-                        // `truncate` é rede de segurança da troca de fonte: Poppins é
-                        // mais larga que a Geist anterior, e com `table-fixed` um
-                        // rótulo que crescesse sangraria por cima da coluna vizinha.
-                        'h-9 truncate px-3 text-left align-middle text-xs font-medium text-muted-foreground',
-                        cabecalho.column.id === 'nome' &&
-                          'sticky left-0 z-20 border-r border-hairline bg-card pl-4',
-                        CLASSES[cabecalho.column.id],
-                      )}
-                    >
-                      {cabecalho.isPlaceholder ? null : <tabela.FlexRender header={cabecalho} />}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {tabela.getRowModel().rows.map((linha, indice) => (
-                <Linha key={linha.id} indice={indice}>
-                  {linha.getAllCells().map((celula) => (
-                    <td
-                      key={celula.id}
-                      className={cn(
-                        // 56px e não 36px. A tabela nasceu para uma linha por célula, e
-                        // a tag do contato com a linha de baixo ficava espremida rente ao
-                        // topo. Agora TODA linha tem a mesma anatomia — em cima o que
-                        // importa, embaixo o contexto —, e as células de uma linha só
-                        // (WhatsApp, temperatura) centralizam nessa mesma altura.
-                        'h-14 px-3 align-middle whitespace-nowrap',
-                        celula.column.id === 'nome' &&
-                          // Fundo opaco para o conteúdo passar por baixo, e o mesmo
-                          // resultado do hover da linha (muted a 50% sobre o fundo).
-                          'sticky left-0 z-10 border-r border-hairline bg-card p-0 group-hover/linha:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]',
-                        CLASSES[celula.column.id],
-                      )}
-                    >
-                      <tabela.FlexRender cell={celula} />
-                    </td>
-                  ))}
-                </Linha>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </RevelarLista>
-    </ContextoDaSaudacao.Provider>
+          <div
+            className="sombra-base relative w-full overflow-x-auto rounded-xl bg-card px-1 py-1"
+            style={SOMBRA_DE_ROLAGEM}
+          >
+            <table className="w-full table-fixed border-collapse text-sm">
+              <thead>
+                {tabela.getHeaderGroups().map((grupo) => (
+                  <tr key={grupo.id} className="border-b border-hairline">
+                    {grupo.headers.map((cabecalho) => (
+                      <th
+                        key={cabecalho.id}
+                        scope="col"
+                        className={cn(
+                          // `truncate` é rede de segurança da troca de fonte: Poppins é
+                          // mais larga que a Geist anterior, e com `table-fixed` um
+                          // rótulo que crescesse sangraria por cima da coluna vizinha.
+                          'h-9 truncate px-3 text-left align-middle text-xs font-medium text-muted-foreground',
+                          cabecalho.column.id === 'nome' &&
+                            'sticky left-0 z-20 border-r border-hairline bg-card pl-4',
+                          CLASSES[cabecalho.column.id],
+                        )}
+                      >
+                        {cabecalho.isPlaceholder ? null : <tabela.FlexRender header={cabecalho} />}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody>
+                {tabela.getRowModel().rows.map((linha, indice) => (
+                  <Linha key={linha.id} indice={indice}>
+                    {linha.getAllCells().map((celula) => (
+                      <td
+                        key={celula.id}
+                        className={cn(
+                          // 56px e não 36px. A tabela nasceu para uma linha por célula, e
+                          // a tag do contato com a linha de baixo ficava espremida rente ao
+                          // topo. Agora TODA linha tem a mesma anatomia — em cima o que
+                          // importa, embaixo o contexto —, e as células de uma linha só
+                          // (WhatsApp, temperatura) centralizam nessa mesma altura.
+                          'h-14 px-3 align-middle whitespace-nowrap',
+                          celula.column.id === 'nome' &&
+                            // Fundo opaco para o conteúdo passar por baixo, e o mesmo
+                            // resultado do hover da linha (muted a 50% sobre o fundo).
+                            'sticky left-0 z-10 border-r border-hairline bg-card p-0 group-hover/linha:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]',
+                          CLASSES[celula.column.id],
+                        )}
+                      >
+                        <tabela.FlexRender cell={celula} />
+                      </td>
+                    ))}
+                  </Linha>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </RevelarLista>
+      </ContextoDaSaudacao.Provider>
+    </ContextoDasAcoes.Provider>
   );
 }
 
@@ -402,6 +423,35 @@ function CelulaWhatsapp({ linha }: { linha: LinhaParceiro }) {
           aoPedir={() => saudacao.pedirUm(linha.id)}
         />
       ) : null}
+    </span>
+  );
+}
+
+/**
+ * A etapa como botão (abre a folha de mover do Funis) e, ao lado, a Consultoria.
+ * Sem negócio não há o que mover: fica a etiqueta "Sem etapa".
+ */
+function CelulaEtapa({ linha }: { linha: LinhaParceiro }) {
+  const acoes = useContext(ContextoDasAcoes);
+  if (!acoes) return <EtiquetaEtapa etapa={linha.stage} />;
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      {linha.stage ? (
+        <MudarEtapa
+          organizacaoId={linha.id}
+          nome={linha.name}
+          etapa={linha.stage}
+          aoMudar={acoes.aoMudarEtapa}
+          className="min-w-0 shrink"
+        />
+      ) : (
+        <EtiquetaEtapa etapa={null} className="min-w-0 shrink" />
+      )}
+      <BotaoConsultoria
+        nome={linha.name}
+        marcado={acoes.naConsultoria.has(linha.id)}
+        aoMudar={(sim) => acoes.marcarConsultoria(linha.id, sim)}
+      />
     </span>
   );
 }

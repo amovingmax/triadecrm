@@ -93,6 +93,11 @@ export type BaseDasConversas = {
   etiquetas: EtiquetaDoParceiro[];
   /** Quem tem qual etiqueta. */
   etiquetasDoParceiro: { organization_id: string; tag_id: number }[];
+  /**
+   * Quem foi mandado para a Consultoria pelo botão (`public.consultoria`,
+   * 14/10/2026), além de quem tem negócio ganho.
+   */
+  emConsultoria: string[];
   meusSetores: number[];
   euId: string | null;
 };
@@ -111,8 +116,20 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
   const { data: sessao } = await supabase.auth.getSession();
   const euId = sessao.session?.user.id ?? null;
 
-  const [organizacoes, atividades, negocios, fios, rascunhos, leituras, meta, setores, meus, etiquetas, etiquetasDoParceiro] =
-    await Promise.all([
+  const [
+    organizacoes,
+    atividades,
+    negocios,
+    fios,
+    rascunhos,
+    leituras,
+    meta,
+    setores,
+    meus,
+    etiquetas,
+    etiquetasDoParceiro,
+    consultoria,
+  ] = await Promise.all([
     supabase
       .from('organizations_view')
       .select(
@@ -153,7 +170,11 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
     // As etiquetas do parceiro, para a LISTA mostrar de relance: são elas que
     // dizem "fundador" antes de alguém abrir a conversa.
     supabase.from('tags').select('id, name, color').order('name'),
-    supabase.from('organization_tags').select('organization_id, tag_id').limit(TETO_ORGANIZACOES * 3),
+    supabase
+      .from('organization_tags')
+      .select('organization_id, tag_id')
+      .limit(TETO_ORGANIZACOES * 3),
+    supabase.from('consultoria').select('organization_id').limit(TETO_ORGANIZACOES),
   ]);
 
   const erro =
@@ -177,6 +198,8 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
     setores: setores.data ?? [],
     etiquetas: (etiquetas.data ?? []).map((t) => ({ id: t.id, nome: t.name, cor: t.color })),
     etiquetasDoParceiro: etiquetasDoParceiro.data ?? [],
+    // Acréscimo, como as etiquetas: sem ela a lista abre igual, só sem a marca.
+    emConsultoria: (consultoria.data ?? []).map((c) => c.organization_id),
     meusSetores: (meus.data ?? []).map((m) => m.setor_id),
     euId,
   };

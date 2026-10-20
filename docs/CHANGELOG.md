@@ -7213,6 +7213,84 @@ Pedido de 13/10: fechar "os controles que hoje são SQL" (as três pendências d
 - Backup do banco local antes das migrações: `~/triadecrm-backups/local-antes-dos-ajustes-de-voz-2026-10-13.dump`.
 
 
+## 14/10/2026 — O funil recomeça, a etapa muda fora do quadro e a Consultoria ganha botão (RF-FUN-01, RF-FUN-02, RF-FUN-08, RF-BAS-10, RF-CON-05)
+
+O pedido, com o print do quadro (120 negócios em Captação de fornecedor, 90 em Respondeu, quase todos "Parado há 5d", sem dono): "limpe esses funis, deixe a opção de selecionar em que etapa do funil o lead está na aba de conversas e na aba de prospectados, coloque um botão que eu consiga direcionar leads em prospectados para a aba de consultorias em conversas, não sei como isso tá funcionando". Perguntado o que "limpar" queria dizer, a resposta foi as quatro opções; para a Consultoria, a marca própria.
+
+**Por que Respondeu enchia.** Duas regras movem o negócio sozinhas para Respondeu, sem dono: a resposta ao "Bom dia!" da saudação e a resposta ao aviso de ligação perdida (13/10). E o SLA de Respondeu era de 1 hora (o "responda em 15 minutos" do PRD, guardado em horas): com dezenas de respostas por dia, a coluna inteira nascia "Parado".
+
+**Como a Consultoria funcionava.** A aba Consultoria de Conversas mostrava só quem fechou: negócio ganho ou temperatura de cliente — na prática, "Publicado" no funil de fornecedor. Não havia como pôr alguém lá sem fechar o negócio.
+
+**Entregue.**
+- Migração `20261014100000_o_funil_recomeca_e_a_consultoria_tem_botao.sql`:
+  - SLA de Respondeu passa a 24 h nos funis de fornecedor e produtor (também na `seed.sql`).
+  - **Fichas de teste saem**, pela exclusão de sempre (dá para restaurar em Prospectados → Excluídos): "Matheus Rondon" e toda ficha com a palavra "teste" no nome (`app.limpar_fichas_de_teste`; "Contestação" não conta).
+  - **O quadro esvazia**: todo negócio aberto dos dois funis de captação volta à etapa de entrada (Prospectado / Identificado) e sai do quadro, com o motivo no histórico (`app.esvaziar_quadro`). Ganho, perdido, opt-out e nutrição ficam onde estão. A migração escreve no aviso quantos saíram e de que etapa.
+  - **A marca da Consultoria**: tabela `public.consultoria` (uma linha por parceiro; só a gestão lê) e `public.consultoria_marcar(ids, sim)` (admin e gestor, até 200 por vez, auditado como `MANDAR_PARA_CONSULTORIA` / `TIRAR_DA_CONSULTORIA`). Não mexe na etapa e não conta como publicado em relatório nem em meta.
+- **Mudar a etapa fora do quadro** (`components/funis/mudar-etapa.tsx` e `mudar-etapa-dados.ts`): a etapa vira botão; o clique abre a mesma folha de mover do Funis, com tudo o que ela já cobra (data e formato para Reunião marcada, motivo para Perdido, próxima ação) e o `move_deal` por trás. A etapa de entrada fica na lista: é por ela que se devolve alguém a Prospectados.
+  - Em **Prospectados** (tabela do desktop), na coluna Etapa, para admin e gestor.
+  - No **cabeçalho da conversa**, para quem escreve; a etapa sai da frase de contexto e vira o primeiro item da linha de pílulas.
+- **Botão da Consultoria em Prospectados**: na coluna Etapa, ao lado do seletor — um fone quando o parceiro não está na Consultoria, a pílula "Consultoria" quando está (o mesmo clique tira). E "Mandar para a Consultoria" na barra dos marcados, para vários de uma vez. O aviso traz "Desfazer".
+- **Conversas** lê a marca: `fechou` passa a ser negócio ganho, temperatura de cliente **ou** marca da Consultoria (`montarConversas({ emConsultoria })`).
+
+**Verificado.**
+- pgTAP `110_o_funil_recomeca_e_a_consultoria.sql` (20 asserções): SLA dos dois funis; fichas de teste excluídas e "Contestação" não; negócios abertos voltando à entrada e ganho/perdido/nutrição/excluído intactos; motivo no histórico; quadro vazio; marcar, não duplicar, tirar; SDR recusado.
+- Banco local recriado do zero (`supabase db reset --local`) e **suíte inteira verde: 106 arquivos, 3.745 asserções**.
+- Vitest (`consultoria.test.ts`, `mudar-etapa-dados.test.ts`, caso novo em `montagem.test.ts`), lint e typecheck verdes.
+
+**Não verificado.** Não cliquei no seletor nem no botão no navegador.
+
+**Publicado.** A migração foi rodada à mão antes de 16/10 (os números da limpeza ficaram no terminal de quem rodou); o site subiu em 16/10, junto com a foto e o vídeo.
+
+**Pendente.**
+- No celular, a lista de Prospectados continua só mostrando a etapa (sem seletor nem botão da Consultoria).
+- Prospectados não filtra por "na Consultoria".
+
+## 16/10/2026 — Foto e vídeo saem pelo WhatsApp do CRM (RF-CON-05, RF-CON-10, RF-CON-11)
+
+O pedido: "implemente a ferramenta pra eu conseguir enviar fotos e vídeos pelo CRM". Desenho aprovado no mesmo dia, com a escolha de **vídeo só em MP4, sem converter**.
+
+**Como era.** Do CRM saíam texto, modelo e áudio gravado. Foto e vídeo só chegavam: a conversa os mostrava, mas não havia como mandar.
+
+**Entregue.**
+- **Na tela** (`components/conversas/enviar-midia.tsx` e `enviar-midia-dados.ts`): o clipe ao lado do microfone, colar um print (Ctrl+V) na caixa ou arrastar o arquivo para cima dela. Tudo cai numa prévia com miniaturas, legenda opcional, "Cancelar" e "Enviar". Até 10 arquivos por vez; cada um vira uma mensagem, e a legenda vai na primeira. Como o áudio, só existe com a janela de 24 h aberta. A caixa ganhou `key` pela conversa nos dois lugares em que é montada, para a foto escolhida numa conversa nunca esperar na prévia de outra.
+- **A foto vira JPEG no navegador:** reduzida a 2048 px no maior lado, com fundo branco e qualidade que desce até caber nos 5 MB da Meta. Isso também tira os dados da câmera, inclusive a localização. O PNG pequeno (print de tela) vai como está. HEIC só abre onde o navegador sabe abrir (Safari); no Chrome a recusa diz para mandar em JPEG.
+- **O vídeo** vai só em MP4/3GP de até 16 MB. O .mov do iPhone é recusado na tela com a frase "exporte em MP4". Não há conversão: o worker-wa tem 1 CPU compartilhada e 512 MB, e converter levaria mais que os 120 s de `visibility timeout` da fila, com risco de a mensagem sair duas vezes.
+- **O arquivo sobe direto do navegador para o balde** (`mensagens`), porque a Vercel não aceita corpo acima de 4,5 MB:
+  - `POST /api/midia-de-saida/autorizar` confere a sessão, a conversa, o tipo e o tamanho, escolhe o caminho (`<conversa>/saida/<instante>-<sufixo>.<ext>`) e devolve uma autorização de uso único (`createSignedUploadUrl`);
+  - o navegador sobe com `uploadToSignedUrl`;
+  - `POST /api/midia-de-saida/enviar` confere que o caminho é daquela conversa, que o arquivo chegou com o tipo e o tamanho certos (`info()` do balde) e grava a mensagem **com a sessão de quem enviou** (a policy `messages_insert` decide). Se a mensagem é recusada, o arquivo sai do balde.
+  - Regras compartilhadas em `lib/midia-de-saida.ts`.
+- **Worker** (`whatsapp/midia-de-saida.ts`, `saida.ts`, `graph.ts`): foto e vídeo viram `media id` na hora da entrega, como o áudio. Foto: JPEG ou PNG até 5 MB. Vídeo: MP4/3GP até 16 MB, e o `ffprobe` (que já vem no pacote do ffmpeg da imagem) confere H.264 e AAC. Recusa nomeada: `video_de_codec_recusado`, `foto_de_tipo_recusado`, `midia_fora_da_janela` etc. Balde que não responde devolve a mensagem para a fila (`midia_nao_lido`). A legenda vai como `caption`.
+- **Migração `20261016100000_a_foto_e_o_video_saem_do_crm.sql`:** a assinatura `*Nome:*` passa a valer também para a legenda da foto e do vídeo (a regra é "cada mensagem assinada com o primeiro nome de quem envia"). Sem legenda, a mensagem continua sem corpo. Nada mais mudou no banco: a policy, o lote de saída e o balde já aceitavam esses tipos.
+- Guia `docs/operacao/whatsapp-no-crm.md` com a seção de foto e vídeo e duas linhas na tabela de problemas.
+
+**Verificado.**
+- pgTAP `111_a_foto_e_o_video_saem_do_crm.sql` (9 asserções): a gestão grava foto e vídeo com a própria sessão; a legenda sai assinada e o vídeo sem legenda fica sem corpo; os dois entram na fila e o lote leva arquivo e tipo; o balde aceita os formatos. Suíte inteira em banco novo: **106 arquivos, 3.734 asserções, verde**.
+- Vitest do worker: **388 testes** (novos: `midia-de-saida.test.ts`, casos de foto e vídeo em `saida.test.ts` e `graph.test.ts`). Vitest do site: **1.293** (novo: `lib/midia-de-saida.test.ts`). Lint e typecheck verdes nos dois.
+- Na imagem do worker (`node:22-alpine` + `ffmpeg`): o `ffprobe` existe e lê `h264`/`aac` e `hevc` no formato que o código espera.
+- No balde local: a autorização de uso único sobe, não serve duas vezes, e `info()` devolve tipo e tamanho; sem autorização, ou com tipo fora da lista, o balde recusa. **Achado:** para Blob/File a biblioteca do Supabase ignora o `contentType` e usa o tipo do próprio arquivo, então o arquivo é reembalado com o tipo certo antes de subir.
+- **Prova no navegador, contra o Supabase local**, com uma gestora de teste:
+  - escolhidos uma foto 4000×3000, um MP4 e um .mov; o .mov foi recusado com a frase certa;
+  - "Enviar 2" deu "1 foto e 1 vídeo na fila do WhatsApp";
+  - a foto chegou ao balde em JPEG 2048×1536 (143 KB; o original tinha 699 KB), e a legenda chegou como `*Paula:*` + texto;
+  - a varredura do worker enfileirou as duas mensagens, e `wa_saida_proximos` as entregou com tipo, legenda e janela aberta;
+  - a conversa mostra a foto e o vídeo enviados.
+  - Tudo da prova foi apagado depois.
+
+**Não verificado.** O envio de verdade para a Meta: não há credencial aqui, e o dublê da Graph não tem a rota de upload. A foto e o vídeo chegando num celular ficam para o primeiro envio em produção.
+
+**Pendente.**
+- Testar o primeiro envio real (foto e vídeo para um número do time) e conferir no celular.
+- Arquivo que sobe e não vira mensagem (aba fechada no meio do envio) fica no balde sem dono. É raro e pequeno; a limpeza fica para quando a retenção de mídia de saída for decidida.
+- Documento (PDF) não está incluído; a Cloud API aceita, e o caminho é o mesmo se pedirem.
+
+**Publicado em 16/10/2026**, do branch `midia-de-saida` (que traz junto o trabalho de 14/10), na ordem banco → worker → site. O worker foi antes do site para nenhuma foto encontrar o worker antigo, que mandaria só a legenda como texto:
+- banco: migração `20261016100000` (`db push`; a de 14/10 já estava em produção, rodada à mão);
+- worker-wa: versão 14 no Fly, rodando e falando com a Meta;
+- site: Vercel, produção.
+- A main não foi tocada.
+
 ## 20/10/2026 — A conversa abre na última mensagem (RF-CON-05)
 
 **Entregue.** Ao abrir uma conversa, a tela vai para o fim e fica lá enquanto fotos, áudios e a leitura da IA terminam de carregar. Antes ela rolava uma vez só, quando o histórico chegava; as fotos (`loading="lazy"`) carregavam depois e empurravam o fim para baixo, e a conversa abria parada algumas mensagens antes da última. Um `ResizeObserver` no conteúdo de `components/conversas/conversa.tsx` acompanha o crescimento só enquanto a pessoa está no fim; quem subiu para ler o histórico não é puxado.

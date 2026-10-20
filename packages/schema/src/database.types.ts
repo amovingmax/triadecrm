@@ -121,6 +121,12 @@ export type Database = {
       aviso_da_conversa: {
         Args: { p_ate?: string; p_conversation_id: string }
         Returns: Database["public"]["Tables"]["messages"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       aviso_ligacao_ativo: { Args: never; Returns: boolean }
       aviso_ligacao_enfileirar: {
@@ -332,6 +338,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      esvaziar_quadro: { Args: { p_motivo: string }; Returns: Json }
       expirar_reservas: { Args: never; Returns: number }
       ficha_para_busca_de_telefone: {
         Args: { p_organization_id: string }
@@ -529,6 +536,7 @@ export type Database = {
       }
       lead_automatico: { Args: { p_conversation_id: string }; Returns: Json }
       lgpd_dossie: { Args: { p_organization_id: string }; Returns: Json }
+      limpar_fichas_de_teste: { Args: { p_motivo: string }; Returns: Json }
       limpar_sem_numero: { Args: { p_motivo: string }; Returns: Json }
       lista_da_base: { Args: { p_base: Json }; Returns: string }
       lista_de_etapas: { Args: { p_lista: Json }; Returns: string }
@@ -667,7 +675,6 @@ export type Database = {
         }
         Returns: string
       }
-      recusa_clara: { Args: { p_texto: string }; Returns: boolean }
       radar_pontuar: {
         Args: {
           p_cand: Database["public"]["Tables"]["supplier_candidates"]["Row"]
@@ -677,6 +684,7 @@ export type Database = {
       rascunhos_expirar: { Args: never; Returns: Json }
       reads_base_pii: { Args: never; Returns: boolean }
       recompute_temperatures: { Args: never; Returns: number }
+      recusa_clara: { Args: { p_texto: string }; Returns: boolean }
       recusa_de_matricula: {
         Args: {
           p_cadence_slug: string
@@ -915,9 +923,9 @@ export type Database = {
         }
         Returns: string
       }
-      wa_atraso_do_envio: { Args: { p_message_id: string }; Returns: number }
       voz_ativa: { Args: never; Returns: boolean }
       voz_fechar_orfas: { Args: never; Returns: number }
+      wa_atraso_do_envio: { Args: { p_message_id: string }; Returns: number }
       wa_avancar_negocio: {
         Args: { p_de: string[]; p_deal_id: string; p_para: string }
         Returns: boolean
@@ -2481,6 +2489,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "call_batches_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_batches_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "call_batches_owner_id_fkey"
             columns: ["owner_id"]
             isOneToOne: false
@@ -2834,6 +2856,53 @@ export type Database = {
           {
             foreignKeyName: "consent_events_recorded_by_fkey"
             columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consultoria: {
+        Row: {
+          desde: string
+          organization_id: string
+          por: string | null
+        }
+        Insert: {
+          desde?: string
+          organization_id: string
+          por?: string | null
+        }
+        Update: {
+          desde?: string
+          organization_id?: string
+          por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consultoria_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consultoria_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consultoria_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consultoria_por_fkey"
+            columns: ["por"]
             isOneToOne: false
             referencedRelation: "team_directory"
             referencedColumns: ["id"]
@@ -8156,6 +8225,10 @@ export type Database = {
       }
       cadencias_do_negocio: { Args: { p_deal_id: string }; Returns: Json }
       cadencias_visao: { Args: never; Returns: Json }
+      consultoria_marcar: {
+        Args: { p_organization_ids: string[]; p_sim: boolean }
+        Returns: Json
+      }
       conversa_arquivar: {
         Args: { p_arquivar?: boolean; p_conversation_id: string }
         Returns: Json
@@ -8561,10 +8634,6 @@ export type Database = {
       }
       meu_papel: { Args: never; Returns: Json }
       modelo_whatsapp_criar: { Args: { p: Json }; Returns: Json }
-      montar_lote_avulso: {
-        Args: { p_organization_id: string }
-        Returns: Json
-      }
       montar_lote: {
         Args: {
           p_categoria_ids?: number[]
@@ -8582,6 +8651,7 @@ export type Database = {
         }
         Returns: Json
       }
+      montar_lote_avulso: { Args: { p_organization_id: string }; Returns: Json }
       move_deal: {
         Args: {
           p_deal_id: string
@@ -9145,6 +9215,7 @@ export type Database = {
         Args: { p_attempt_id?: string; p_organization_id?: string }
         Returns: Json
       }
+      voz_configurar: { Args: { p: Json }; Returns: Json }
       voz_encerrar_ligacao: {
         Args: { p_call_id: string; p_codigo?: string; p_falha?: boolean }
         Returns: Json
@@ -9171,7 +9242,6 @@ export type Database = {
         }
         Returns: Json
       }
-      voz_configurar: { Args: { p: Json }; Returns: Json }
       voz_vincular_atividade: {
         Args: { p_activity_id: string; p_call_id: string }
         Returns: Json

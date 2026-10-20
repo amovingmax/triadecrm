@@ -310,7 +310,7 @@ export function ConversaForaDaBase({
           <Janela24h estado={janela} />
         ) : null}
         {podeEscreverLivre(janela) ? (
-          <TextoLivre fioId={fio.id} atualizar={[chaveDasMensagensDoFio(fio.id)]} />
+          <TextoLivre key={fio.id} fioId={fio.id} atualizar={[chaveDasMensagensDoFio(fio.id)]} />
         ) : (
           <EnviarModelo destino={{ tipo: 'conversa', conversaId: fio.id }} />
         )}

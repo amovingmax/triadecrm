@@ -159,6 +159,7 @@ export function TelaConversas({
       leituras: consulta.data.leituras,
       etiquetas: consulta.data.etiquetas,
       etiquetasDoParceiro: consulta.data.etiquetasDoParceiro,
+      emConsultoria: consulta.data.emConsultoria,
       catalogos,
     });
   }, [consulta.data, catalogos]);
