@@ -1,11 +1,10 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, type CSSProperties } from 'react';
-import { motion } from 'motion/react';
 
 import { cn } from '@/lib/utils';
 
-import { DESLOCAMENTO_ENTRADA, ESCALONAMENTO, useMovimento } from './usar-movimento';
+import { ESCALONAMENTO, useMovimento } from './usar-movimento';
 
 /**
  * Entrada escalonada da lista. A justificativa: quando a busca devolve resultados,
@@ -89,18 +88,13 @@ export function RevelarItem({
 
   if (!anima) return <div className={className}>{children}</div>;
 
+  // A mesma entrada da linha da tabela (`revelar-linha`, 4px e 220ms), em CSS.
   return (
-    <motion.div
-      className={cn(className)}
-      initial={{ opacity: 0, y: DESLOCAMENTO_ENTRADA }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: ESCALONAMENTO.duracao,
-        delay: indice * ESCALONAMENTO.atrasoPorItem,
-        ease: [0.22, 0.61, 0.36, 1],
-      }}
+    <div
+      className={cn('revelar-linha', className)}
+      style={{ animationDelay: `${Math.round(indice * ESCALONAMENTO.atrasoPorItem * 1000)}ms` }}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }

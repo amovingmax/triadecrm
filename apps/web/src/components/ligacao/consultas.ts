@@ -31,7 +31,7 @@
  * dele, e um teste falha se alguém acrescentar um motivo sem dizer de que lado ele
  * está (laudo §3.12a).
  */
-import { z } from 'zod';
+import * as z from 'zod';
 
 import { type OrgKind, type Temperature } from '@komune/schema';
 

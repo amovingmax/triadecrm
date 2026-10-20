@@ -13,7 +13,7 @@
  * para que o erro apareça NO CAMPO, e não num aviso solto. Toda regra abaixo tem a
  * sua gêmea na migração `20260904000900_funil_kanban.sql`.
  */
-import { z } from 'zod';
+import * as z from 'zod';
 
 import {
   camposFaltando,

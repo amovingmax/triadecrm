@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 import { baseComoTexto } from '../../nucleo/base-conhecimento';
 import { MODELOS, definirPrompt } from '../../nucleo/versionamento';

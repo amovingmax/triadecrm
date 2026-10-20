@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 /**
  * O dia de quem ligou: o que `public.ligacoes_do_dia` devolve (migração

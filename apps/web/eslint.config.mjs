@@ -29,6 +29,17 @@ export default defineConfig([
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
       ],
+      // `import { z } from 'zod'` puxa o objeto `z` inteiro, com os ~40 idiomas de
+      // mensagem de erro, para TODA página (20/10/2026). Como namespace, o
+      // empacotador leva só o que é usado.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "ImportDeclaration[source.value='zod'][importKind!='type'] > ImportSpecifier[imported.name='z'][importKind!='type']",
+          message: "Use `import * as z from 'zod'`: o `{ z }` leva o zod inteiro para o navegador.",
+        },
+      ],
     },
   },
   // Desliga regras de estilo que conflitam com o Prettier (sempre por último).

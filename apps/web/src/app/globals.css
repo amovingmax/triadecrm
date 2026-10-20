@@ -728,6 +728,42 @@
   animation: revelar-linha 220ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
+/* O conteúdo das folhas (mover etapa, cadastro rápido, candidato da Revisão)
+   entra 8px abaixo e assenta. Era a mola do `motion` (rigidez 260, amortecimento
+   30): com amortecimento de 0,93 do crítico ela não quica e assenta em ~270ms, e
+   esta curva desenha o mesmo caminho sem levar a biblioteca para a página
+   (20/10/2026). `backwards` pelo motivo da entrada de página, logo abaixo. */
+@keyframes entrada-folha {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility entrada-folha {
+  animation: entrada-folha 300ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+/* A barra do recibo de registro cresce da esquerda, na cor nova (era `motion`,
+   com a mesma duração e a mesma curva). */
+@keyframes crescer-barra {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@utility crescer-barra {
+  transform-origin: left center;
+  animation: crescer-barra 450ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
 /* A ENTRADA DE PÁGINA, em CSS e não em JavaScript (29/09/2026).
    ---------------------------------------------------------------------------
    Ela era um `motion.div` com `initial={{ opacity: 0 }}`, e isso deixava o CRM

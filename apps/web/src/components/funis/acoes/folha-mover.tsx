@@ -40,7 +40,6 @@
 import { useId, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ArrowRight, CalendarClock, Check, Loader2 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { Controller, useForm, useWatch, type FieldErrors } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -61,7 +60,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { useMovimento } from '@/components/movimento';
 import { EscolherCadencia } from '@/components/cadencias/escolher-cadencia';
 
 import {
@@ -231,7 +229,6 @@ function Formulario({
   /** O banco aceitou: a folha troca para o painel da régua com o nome da etapa. */
   aoMoverParaEtapa: (nomeDaEtapa: string) => void;
 }) {
-  const { mola } = useMovimento();
   const idBase = useId();
   const [falha, setFalha] = useState<string | null>(null);
   // Aberta quando ninguém escolheu ainda (botão do cartão); fechada quando a etapa já
@@ -355,12 +352,9 @@ function Formulario({
   }
 
   return (
-    <motion.form
+    <form
       onSubmit={form.handleSubmit(enviar, aoBarrarEnvio)}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={mola}
-      className="flex flex-col gap-5 px-4 pb-4"
+      className="entrada-folha flex flex-col gap-5 px-4 pb-4"
       noValidate
     >
       {/* ---------- destino ---------- */}
@@ -615,7 +609,7 @@ function Formulario({
           )}
         </Button>
       </div>
-    </motion.form>
+    </form>
   );
 }
 

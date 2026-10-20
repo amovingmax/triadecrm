@@ -8,7 +8,7 @@
  * Onde o banco for mais permissivo, o comentário diz por que o schema aperta.
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 
 import { Constants } from './database.types';
 import { cnpjIsValid, normalizeCnpj, normalizeInstagram, normalizePhoneBr } from './normalizadores';
