@@ -7329,4 +7329,4 @@ O pedido: "implemente a ferramenta pra eu conseguir enviar fotos e vídeos pelo 
 
 **Verificado no localhost, com o Chrome automático.** Carla Cliente (38 mensagens, foto por último), pela aba Clientes e pela lista, em 1440×900, 1280×720 e 390×844: 0 px do fim aos 0,3 s, 1 s, 2,5 s e 5 s. Parceiro (Natal Cocktails, Accord, Mesas e Festas): 0 px. Nas duas telas, quem sobe para ler e recebe mensagem fica parado, e quem está no fim acompanha. Lint, typecheck e os 1.299 testes do web.
 
-**Pendente.** Publicar depois do teste do usuário no localhost.
+**Publicado em 20/10/2026**, a pedido do usuário, a partir de cópia limpa do commit; volta: `triade-c2thq26o6`.
