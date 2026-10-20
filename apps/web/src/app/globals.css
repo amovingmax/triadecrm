@@ -4,6 +4,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* A CONVERSA NO DESENHO DO CELULAR (20/10/2026): cabeçalho de uma linha com a
+   folha no "⋯", a faixa das 24 h em cima da caixa e o "Assumir" ao lado dela.
+   Vale no CELULAR (tela abaixo de 768 px) e no TABLET quando o painel da
+   conversa fica estreito (toque e painel abaixo de 42rem). No COMPUTADOR — mouse
+   ou touchpad — a conversa continua com o desenho de antes em qualquer largura:
+   "se for para pc continuar do jeito que já estava". Sem o tipo de ponteiro, um
+   notebook de 1024 px caía no desenho do celular, porque lá o painel também tem
+   menos de 42rem. */
+@custom-variant conversa-estreita {
+  @media (width < 48rem) {
+    @slot;
+  }
+  @media (width >= 48rem) and (pointer: coarse) {
+    @container (width < 42rem) {
+      @slot;
+    }
+  }
+}
+
 /* ============================================================================
    SISTEMA VISUAL DO KOMUNE CRM, repaginação Ocean Breeze
    Decisão-mãe: a única cor cromática da interface é a ESCALA TÉRMICA do negócio

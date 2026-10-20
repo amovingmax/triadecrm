@@ -50,7 +50,9 @@ export function EscolhaMultipla<T extends string | number>({
           variant="outline"
           className={cn(
             'toque h-11 shrink-0 md:h-8',
-            compacto && 'md:h-6 md:px-2 md:text-xs',
+            // No topo da conversa ele divide a linha com a etapa e os selos, e tem a
+            // altura deles (32px no celular); fora dali é um campo de 44px.
+            compacto && 'h-8 px-2.5 text-xs md:h-6 md:px-2',
             marcados.length > 0 && 'border-primary/50 bg-primary/5 text-foreground',
           )}
         >

@@ -7,6 +7,8 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { useAcoesDosAvisos } from '@/components/avisos/provedor-avisos';
 import { SeletorDeAba } from '@/components/ui/abas';
+
+import { useAreaVisivel } from './area-visivel';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
 import { FeedAutomaticas } from './automaticas';
@@ -308,19 +310,23 @@ export function TelaConversas({
 
   // No celular, conversa aberta é tela cheia: cabeçalho e filtros saem de cena.
   const telaCheia = ehCelular && (foraAberta !== null || aberta !== null);
+  const areaVisivel = useAreaVisivel(telaCheia);
+  // A conversa aberta no celular é uma camada da área visível inteira, por cima
+  // do cabeçalho do CRM e da barra de baixo (ver `area-visivel.ts`). `h-dvh` é só
+  // o primeiro quadro, antes de a área visível ser medida.
+  const camadaDoCelular = telaCheia
+    ? 'fixed inset-x-0 top-0 z-40 h-dvh rounded-none bg-background pt-[env(safe-area-inset-top)] shadow-none'
+    : null;
 
   return (
     <div
       className={cn(
         'flex w-full flex-col gap-4 md:h-[calc(100dvh-7.5rem)]',
-        // No celular, conversa aberta é tela cheia DE VERDADE: altura fixa,
-        // rolagem por dentro, caixa de resposta encostada na barra inferior. Sem
-        // isto a página inteira é que rola, a caixa de resposta fica no fim de
-        // uma página de três metros e a conversa não abre na última mensagem —
-        // que é o único lugar onde ela deveria abrir. A conta é a casca:
-        // cabeçalho de 3,5rem + 1,5rem de respiro em cima + 5rem da barra
-        // inferior com o respiro de baixo.
-        telaCheia && 'h-[calc(100dvh-10rem-var(--area-segura-inferior))]',
+        // Piso de altura para o celular DEITADO (844x390), que já cai no layout
+        // de tela larga: sem ele o painel ficava com 270px, o cabeçalho da
+        // conversa e a caixa de resposta comiam tudo e a área das mensagens
+        // tinha altura zero (20/10/2026). Com o piso, quem rola é a página.
+        'md:min-h-[30rem]',
       )}
     >
       {telaCheia ? null : (
@@ -357,8 +363,10 @@ export function TelaConversas({
           {/* Abas e busca dividem a MESMA faixa no desktop. Empilhadas, elas e o
               título somavam 200 px antes da primeira conversa — numa tela em que o
               conteúdo é a lista. No celular continuam uma embaixo da outra, porque
-              lá a busca precisa da largura inteira. */}
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
+              lá a busca precisa da largura inteira. No tablet em pé também: as
+              abas e a busca de 26rem somam mais que os 656px que sobram ao lado
+              da lateral, e o botão de filtros saía pela borda (20/10/2026). */}
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
             <Abas
               aba={aba}
               aoTrocar={setAba}
@@ -374,7 +382,7 @@ export function TelaConversas({
                 pessoas={catalogos.pessoas}
                 aoMudar={mudar}
                 aoLimpar={limpar}
-                className="md:w-[26rem]"
+                className="lg:w-[26rem]"
               />
             ) : null}
           </div>
@@ -412,6 +420,11 @@ export function TelaConversas({
           // 1440 sobrava largura de sobra do outro lado — a conversa não fica
           // melhor com 1.100 px do que com 900. Então a lista cresce com a tela.
           'md:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] md:overflow-hidden',
+          // No TABLET em pé (768, toque) a lista de 23rem deixava a conversa com
+          // 270px: o nome do contato virava "C." e o telefone "+..". Lá a lista
+          // fica com 18rem, e a conversa com a largura de um celular. No
+          // computador, mesmo numa janela estreita, a lista continua como era.
+          'md:max-lg:pointer-coarse:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]',
           'xl:grid-cols-[minmax(0,27rem)_minmax(0,1fr)]',
           telaCheia && 'overflow-hidden',
         )}
@@ -539,7 +552,11 @@ export function TelaConversas({
           ehCelular && !foraAberta ? null : (
             <section
               aria-label="Conversa com cliente"
-              className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden"
+              className={cn(
+                'sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden',
+                camadaDoCelular,
+              )}
+              style={areaVisivel}
               onPointerDownCapture={escolherForaAberta}
               onKeyDownCapture={escolherForaAberta}
               onWheelCapture={escolherForaAberta}
@@ -564,7 +581,11 @@ export function TelaConversas({
         ) : ehCelular && !aberta ? null : (
           <section
             aria-label="Conversa com o parceiro"
-            className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden"
+            className={cn(
+              'sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden',
+              camadaDoCelular,
+            )}
+            style={areaVisivel}
             onPointerDownCapture={escolherAberta}
             onKeyDownCapture={escolherAberta}
             onWheelCapture={escolherAberta}

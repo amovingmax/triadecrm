@@ -4,7 +4,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { BellOff, NotebookPen, PenLine, SendHorizontal } from 'lucide-react';
+import { BellOff, NotebookPen, PenLine, SendHorizontal, Zap } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -180,6 +180,13 @@ function PediuParaSair({
 const ALTURA_MAXIMA = 220;
 
 /**
+ * Uma ferramenta da fileira de baixo, no celular: pílula de 40 px com ícone e
+ * nome. No computador ela volta a ser só o ícone dentro da moldura.
+ */
+const FERRAMENTA =
+  'toque inline-flex items-center max-md:h-10 max-md:w-auto max-md:gap-1.5 max-md:rounded-full max-md:border max-md:border-hairline max-md:bg-card max-md:px-3.5 max-md:text-[13px] max-md:font-normal max-md:text-foreground max-md:[&_svg]:size-4';
+
+/**
  * Janela aberta: texto livre, que é o que a Meta permite e não cobra.
  *
  * Exportada e sem ficha nas props desde 01/10/2026: a conversa de quem NÃO é
@@ -309,15 +316,27 @@ export function TextoLivre({
         <PainelDaMidia fioId={fioId} midia={midia} aoEnviar={depoisDaMidia} />
       ) : null}
 
-      {/* Uma caixa só: o texto, o microfone e o enviar na mesma moldura, como em
-          qualquer aplicativo de conversa. O botão inteiro numa linha própria
-          custava 56 px de tela e uma varredura de olho a mais.
+      {/* DOIS DESENHOS, UMA MARCAÇÃO SÓ (20/10/2026).
 
-          Arrastar foto ou vídeo para cima dela também vale (16/10/2026). */}
+          Computador: uma caixa só — o texto, o clipe, o microfone e o enviar na
+          mesma moldura, como em qualquer aplicativo de conversa.
+
+          Celular (protótipo D, escolhido pelo usuário): a caixa de texto ocupa a
+          largura e CRESCE PARA BAIXO, linha a linha; o enviar fica ao lado dela,
+          redondo; e as ferramentas (respostas prontas, foto ou vídeo, áudio) vão
+          para uma fileira embaixo, com nome. Antes os três ícones moravam dentro
+          da moldura e a frase se espremia numa coluna estreita.
+
+          É uma marcação só porque o gravador de áudio tem estado (gravando,
+          ouvindo antes de mandar): dois gravadores, um escondido, dariam dois
+          relógios. No computador os invólucros do celular viram `contents` e os
+          filhos caem direto na moldura.
+
+          Arrastar foto ou vídeo para cima da caixa também vale (16/10/2026). */}
       <div
         className={cn(
-          'flex items-end gap-1 rounded-2xl border border-input bg-card/60 py-1 pr-1 pl-2 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/40',
-          arrastando && 'border-ring ring-3 ring-ring/40',
+          'flex flex-col gap-2 md:flex-row md:items-end md:gap-1 md:rounded-2xl md:border md:border-input md:bg-card/60 md:py-1 md:pr-1 md:pl-2 md:transition-colors md:focus-within:border-ring md:focus-within:ring-3 md:focus-within:ring-ring/40',
+          arrastando && 'rounded-2xl ring-3 ring-ring/40 md:border-ring',
         )}
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes('Files')) return;
@@ -333,43 +352,78 @@ export function TextoLivre({
           midia.escolher(arquivos);
         }}
       >
-        <textarea
-          id="resposta"
-          ref={caixa}
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          onPaste={(e) => {
-            // Colar um print (Ctrl+V) leva à prévia; colar texto continua texto.
-            const arquivos = arquivosDaTransferencia(e.clipboardData);
-            if (arquivos.length === 0) return;
-            e.preventDefault();
-            midia.escolher(arquivos);
-          }}
-          onKeyDown={(e) => {
-            // Enter manda no computador; no celular o Enter do teclado é quebra
-            // de linha, e enviar ali seria mandar metade da frase toda vez.
-            if (e.key !== 'Enter' || e.shiftKey) return;
-            if (window.matchMedia?.('(pointer: coarse)').matches) return;
-            e.preventDefault();
-            if (pode) enviar.mutate({ fioId, texto: limpo });
-          }}
-          rows={1}
-          placeholder="Mensagem"
-          className="min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground"
-        />
-        {/* Gravar fica ao lado de Enviar porque são a mesma decisão: como mandar
-            isto. Dentro da janela de 24 h os dois valem — e o clipe também. */}
-        <BotaoDaMidia aoEscolher={midia.escolher} />
-        <GravarAudio key={fioId} fioId={fioId} />
-        <Button
-          type="submit"
-          size="icon"
-          className="toque size-10 shrink-0 rounded-full md:size-9"
-          disabled={!pode}
-        >
-          <SendHorizontal aria-hidden="true" />
-          <span className="sr-only">Enviar pelo WhatsApp</span>
-        </Button>
+        <div className="flex items-end gap-2 md:contents">
+          <div className="flex min-w-0 flex-1 rounded-[20px] border border-input bg-card/60 px-3.5 py-1.5 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/40 md:contents">
+            <textarea
+              id="resposta"
+              ref={caixa}
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              onPaste={(e) => {
+                // Colar um print (Ctrl+V) leva à prévia; colar texto continua texto.
+                const arquivos = arquivosDaTransferencia(e.clipboardData);
+                if (arquivos.length === 0) return;
+                e.preventDefault();
+                midia.escolher(arquivos);
+              }}
+              onKeyDown={(e) => {
+                // Enter manda no computador; no celular o Enter do teclado é quebra
+                // de linha, e enviar ali seria mandar metade da frase toda vez.
+                if (e.key !== 'Enter' || e.shiftKey) return;
+                if (window.matchMedia?.('(pointer: coarse)').matches) return;
+                e.preventDefault();
+                if (pode) enviar.mutate({ fioId, texto: limpo });
+              }}
+              rows={1}
+              placeholder="Mensagem"
+              // 16px no celular: com menos que isso o Safari do iPhone dá zoom na
+              // página inteira ao tocar na caixa, e quem responde tem de desfazer o
+              // zoom com dois dedos a cada mensagem (20/10/2026).
+              className="min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-base leading-relaxed outline-none placeholder:text-muted-foreground max-md:max-h-[calc(var(--altura-visivel,100svh)*0.3)] md:text-[15px]"
+            />
+          </div>
+          <Button
+            type="submit"
+            size="icon"
+            className="toque size-12 shrink-0 rounded-full max-md:bg-menta max-md:text-menta-tinta max-md:hover:bg-menta/90 md:order-last md:size-9"
+            disabled={!pode}
+          >
+            <SendHorizontal aria-hidden="true" />
+            <span className="sr-only">Enviar pelo WhatsApp</span>
+          </Button>
+        </div>
+
+        {/* A fileira das ferramentas no celular. Gravar fica perto de Enviar no
+            computador porque são a mesma decisão: como mandar isto. Dentro da
+            janela de 24 h os três valem. */}
+        <div className="flex flex-wrap items-center gap-1.5 md:contents">
+          {(respostas.data ?? []).length > 0 ? (
+            <button
+              type="button"
+              onClick={() => {
+                // Abre a mesma lista do "/": a barra entra no fim do texto, e a
+                // escolha troca a barra pela resposta.
+                setTexto(texto.length === 0 || /\s$/.test(texto) ? `${texto}/` : `${texto} /`);
+                caixa.current?.focus();
+              }}
+              className={cn(
+                FERRAMENTA,
+                'outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden',
+              )}
+            >
+              <Zap aria-hidden="true" />
+              Respostas prontas
+            </button>
+          ) : null}
+          <BotaoDaMidia aoEscolher={midia.escolher} rotulo="Anexo" className={FERRAMENTA} />
+          <GravarAudio
+            key={fioId}
+            fioId={fioId}
+            rotulo="Áudio"
+            classeDoBotao={FERRAMENTA}
+            className="max-md:w-full"
+          />
+        </div>
       </div>
 
       {/* Com a caixa vazia, a dica dos atalhos — e só no computador, onde há

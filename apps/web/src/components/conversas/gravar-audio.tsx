@@ -31,7 +31,19 @@ const TETO_SEGUNDOS = 120;
 
 type Estado = 'parado' | 'gravando' | 'revisando';
 
-export function GravarAudio({ fioId, className }: { fioId: string; className?: string }) {
+export function GravarAudio({
+  fioId,
+  rotulo,
+  classeDoBotao,
+  className,
+}: {
+  fioId: string;
+  /** O nome à vista no celular, onde o botão vira pílula na fileira de ferramentas. */
+  rotulo?: string;
+  /** A classe do botão parado; `className` continua valendo para gravando e ouvindo. */
+  classeDoBotao?: string;
+  className?: string;
+}) {
   const clientes = useQueryClient();
   const [estado, setEstado] = useState<Estado>('parado');
   const [segundos, setSegundos] = useState(0);
@@ -197,11 +209,16 @@ export function GravarAudio({ fioId, className }: { fioId: string; className?: s
       type="button"
       variant="ghost"
       size="icon"
-      className={cn('toque size-11 md:size-9', className)}
+      className={cn('toque size-11 md:size-9', classeDoBotao ?? className)}
       onClick={() => void comecar()}
       title="Gravar um áudio"
     >
       <Mic aria-hidden="true" />
+      {rotulo ? (
+        <span aria-hidden="true" className="md:hidden">
+          {rotulo}
+        </span>
+      ) : null}
       <span className="sr-only">Gravar um áudio</span>
     </Button>
   );

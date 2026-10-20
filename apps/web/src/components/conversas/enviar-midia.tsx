@@ -113,9 +113,12 @@ export type Midia = ReturnType<typeof useMidiaEscolhida>;
 /** O clipe: abre o seletor de arquivos do sistema. */
 export function BotaoDaMidia({
   aoEscolher,
+  rotulo,
   className,
 }: {
   aoEscolher: (arquivos: File[]) => void;
+  /** O nome à vista no celular, onde o botão vira pílula na fileira de ferramentas. */
+  rotulo?: string;
   className?: string;
 }) {
   const entrada = useRef<HTMLInputElement>(null);
@@ -146,6 +149,11 @@ export function BotaoDaMidia({
         title="Mandar foto ou vídeo"
       >
         <Paperclip aria-hidden="true" />
+        {rotulo ? (
+          <span aria-hidden="true" className="md:hidden">
+            {rotulo}
+          </span>
+        ) : null}
         <span className="sr-only">Mandar foto ou vídeo</span>
       </Button>
     </>
@@ -279,7 +287,7 @@ export function PainelDaMidia({
         }}
         disabled={enviando !== null}
         placeholder={total > 1 ? 'Legenda (vai na primeira)' : 'Legenda (opcional)'}
-        className="h-9 w-full rounded-lg border border-input bg-transparent px-2 text-[15px] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+        className="h-9 w-full rounded-lg border border-input bg-transparent px-2 text-base md:text-[15px] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2">

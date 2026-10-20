@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArrowLeft, Link2, Phone, UserPlus, X } from 'lucide-react';
+import { Archive, ArrowLeft, ChevronDown, Ellipsis, Link2, Phone, UserPlus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { MarcaDeNova } from '@/components/avisos/marca-de-nova';
@@ -19,6 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { formatarTelefone } from '@/components/parceiros/formatos';
 import { buscarAlvos } from '@/components/registro/alvos';
 import { DEBOUNCE_BUSCA_MS, type SugestaoDeAlvo } from '@/components/registro/tipos';
@@ -37,7 +44,7 @@ import {
 } from './fora-da-base-dados';
 import { rotuloDoDia } from './formatos';
 import { PreviaDoRascunho } from './lista-conversas';
-import { Janela24h } from './janela-24h';
+import { FaixaDaJanela, Janela24h } from './janela-24h';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { Mensagem } from './mensagem-do-fio';
 import {
@@ -190,49 +197,146 @@ export function ConversaForaDaBase({
   const { rolagem, conteudo, aoRolar } = useRolagemNoFim(fio.id, mensagens.data?.length ?? 0);
   const [virando, setVirando] = useState(false);
   const [modo, setModo] = useState<'criar' | 'ligar'>('criar');
+  // A folha do desenho do celular (protótipo A, 20/10/2026), como na conversa de parceiro.
+  const [folha, setFolha] = useState(false);
   const janela = estadoDaJanela(fio.window_expires_at);
   const nome = fio.peer_nome?.trim();
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex items-center gap-3 border-b border-hairline px-4 py-3">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="toque md:hidden"
-          onClick={aoVoltar}
-          aria-label="Voltar para a lista"
-        >
-          <ArrowLeft aria-hidden="true" />
-        </Button>
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
-          {nome ? iniciaisDe(nome) : <Phone className="size-4" aria-hidden="true" />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold">{nomeDoCliente(fio)}</p>
-          <p className="truncate text-[13px] text-muted-foreground">
-            {nome ? `${formatarTelefone(fio.peer_phone_e164)} · ` : ''}não é parceiro
-          </p>
+    <div className="@container flex h-full min-h-0 flex-col">
+      {/* Um cabeçalho por aparelho, como o do parceiro (`conversa.tsx`).
+          Celular, e tablet com o painel estreito: UMA LINHA (protótipo A,
+          20/10/2026) — voltar, o retrato, o nome com o telefone embaixo e o "⋯";
+          o nome e o "⋯" abrem a folha com o telefone e as ações. Computador:
+          tudo numa linha, como antes. */}
+      <header className="@container border-b border-hairline">
+        <div className="hidden h-16 items-center gap-1 pr-1.5 pl-1 md:pl-3 conversa-estreita:flex">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="toque size-11 shrink-0 md:hidden"
+            onClick={aoVoltar}
+            aria-label="Voltar para a lista"
+          >
+            <ArrowLeft aria-hidden="true" />
+          </Button>
+          <button
+            type="button"
+            onClick={() => setFolha(true)}
+            aria-haspopup="dialog"
+            className="toque flex h-14 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 text-left outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
+              {nome ? iniciaisDe(nome) : <Phone className="size-4" aria-hidden="true" />}
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-[17px] leading-tight font-semibold">
+                {nomeDoCliente(fio)}
+              </span>
+              <span className="flex min-w-0 items-center gap-1 text-[12.5px] text-muted-foreground">
+                <span className="truncate">
+                  {nome ? `${formatarTelefone(fio.peer_phone_e164)} · ` : ''}não é parceiro
+                </span>
+                <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
+              </span>
+            </span>
+            <span className="sr-only">: ver o telefone e as ações</span>
+          </button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="toque size-11 shrink-0"
+            onClick={() => setFolha(true)}
+            aria-label="Mais: telefone e ações"
+          >
+            <Ellipsis aria-hidden="true" />
+          </Button>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {virando ? null : (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="toque h-11 md:h-8"
-              onClick={() => setVirando(true)}
-              title="É fornecedor, produtor ou cerimonialista? Leve para a base."
-            >
-              <UserPlus aria-hidden="true" />
-              <span className="hidden sm:inline">Virar parceiro</span>
-              <span className="sr-only sm:hidden">Virar parceiro</span>
-            </Button>
-          )}
-          <ArquivarCliente fio={fio} />
+
+        <div className="flex items-center gap-3 px-4 py-3 conversa-estreita:hidden">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
+            {nome ? iniciaisDe(nome) : <Phone className="size-4" aria-hidden="true" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-semibold">{nomeDoCliente(fio)}</p>
+            <p className="truncate text-[13px] text-muted-foreground">
+              {nome ? `${formatarTelefone(fio.peer_phone_e164)} · ` : ''}não é parceiro
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            {virando ? null : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="toque h-8"
+                onClick={() => setVirando(true)}
+                title="É fornecedor, produtor ou cerimonialista? Leve para a base."
+              >
+                <UserPlus aria-hidden="true" />
+                Virar parceiro
+              </Button>
+            )}
+            <ArquivarCliente fio={fio} />
+          </div>
         </div>
       </header>
+
+      <Sheet open={folha} onOpenChange={setFolha}>
+        <SheetContent
+          side="bottom"
+          className="max-h-[88svh] gap-5 overflow-y-auto rounded-t-2xl px-4 pt-4 pb-[calc(var(--area-segura-inferior)+1.25rem)]"
+        >
+          <SheetHeader className="flex-row items-center gap-3 p-0 pr-12 text-left">
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground">
+              {nome ? iniciaisDe(nome) : <Phone className="size-5" aria-hidden="true" />}
+            </span>
+            <div className="min-w-0">
+              <SheetTitle className="text-lg leading-tight">{nomeDoCliente(fio)}</SheetTitle>
+              <SheetDescription className="text-[13px]">
+                Não é parceiro: quem escreve aqui quase sempre é cliente.
+              </SheetDescription>
+            </div>
+          </SheetHeader>
+
+          <section aria-label="Ações" className="flex flex-col gap-2">
+            <h3 className="text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">
+              Ações
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              {virando ? null : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={ACAO_DA_FOLHA}
+                  onClick={() => {
+                    setFolha(false);
+                    setVirando(true);
+                  }}
+                >
+                  <UserPlus aria-hidden="true" />
+                  Virar parceiro
+                </Button>
+              )}
+              <ArquivarCliente fio={fio} comNome className={ACAO_DA_FOLHA} />
+            </div>
+          </section>
+
+          <section aria-label="Contato" className="flex flex-col gap-1">
+            <h3 className="text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">
+              Contato
+            </h3>
+            <dl className="flex flex-col text-sm">
+              <div className="flex items-baseline justify-between gap-4 py-2.5">
+                <dt className="text-muted-foreground">WhatsApp</dt>
+                <dd className="numerico text-right">{formatarTelefone(fio.peer_phone_e164)}</dd>
+              </div>
+            </dl>
+          </section>
+        </SheetContent>
+      </Sheet>
 
       {/* "Virar parceiro" é a exceção: quem escreve aqui quase sempre é cliente,
           e cliente se responde, não se cadastra. O formulário só abre a pedido. */}
@@ -310,7 +414,14 @@ export function ConversaForaDaBase({
       {/* A caixa de resposta, como em qualquer conversa: dentro das 24 h desde a
           última mensagem da pessoa, texto livre; depois disso o WhatsApp só
           deixa abrir com um modelo aprovado (o cumprimento do período). */}
-      <div className="max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-3 py-2.5 md:px-5 md:py-3">
+      {/* No desenho do celular a faixa das 24 h fica em cima da caixa, como na
+          conversa de parceiro; no celular o rodapé cresce até 60% e respeita a
+          barrinha do iPhone. */}
+      <FaixaDaJanela
+        estado={janela}
+        className="hidden border-t border-hairline conversa-estreita:flex"
+      />
+      <div className="max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-3 py-2.5 max-md:max-h-[60%] max-md:pb-[calc(0.625rem+var(--folga-inferior,0px))] md:px-5 md:py-3 conversa-estreita:border-t-0 conversa-estreita:pt-1">
         {janela.situacao === 'aberta' && janela.restanteMin <= JANELA_APERTADA_MIN ? (
           <Janela24h estado={janela} />
         ) : null}
@@ -328,7 +439,16 @@ export function ConversaForaDaBase({
  * Arquivar: tira da lista e não apaga nada. Atendeu o cliente, arquiva — e se
  * ele escrever de novo, a conversa volta sozinha (`messages_desarquiva`).
  */
-function ArquivarCliente({ fio }: { fio: FioCru }) {
+function ArquivarCliente({
+  fio,
+  comNome = false,
+  className,
+}: {
+  fio: FioCru;
+  /** Na folha do celular: botão inteiro, com o nome da ação. */
+  comNome?: boolean;
+  className?: string;
+}) {
   const clientes = useQueryClient();
   const acao = useMutation({
     mutationFn: (arquivar: boolean) => arquivarConversa(fio.id, arquivar),
@@ -345,12 +465,26 @@ function ArquivarCliente({ fio }: { fio: FioCru }) {
     },
     onError: (e) => toast.error(mensagemDoErro(e)),
   });
+  if (comNome) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        className={className}
+        disabled={acao.isPending}
+        onClick={() => acao.mutate(true)}
+      >
+        <Archive aria-hidden="true" />
+        Arquivar
+      </Button>
+    );
+  }
   return (
     <Button
       type="button"
       variant="ghost"
       size="icon"
-      className="toque size-9"
+      className={cn('toque size-11 md:size-9', className)}
       disabled={acao.isPending}
       onClick={() => acao.mutate(true)}
       title="Arquivar: tira da lista, não apaga nada"
@@ -360,6 +494,10 @@ function ArquivarCliente({ fio }: { fio: FioCru }) {
     </Button>
   );
 }
+
+/** Uma ação da folha do celular: bloco de 56 px, ícone e nome (como em `conversa.tsx`). */
+const ACAO_DA_FOLHA =
+  'toque h-14 w-full justify-start gap-2.5 rounded-xl px-4 text-[15px] font-medium md:h-14';
 
 const TIPOS = [
   { id: 'fornecedor', rotulo: 'Fornecedor' },

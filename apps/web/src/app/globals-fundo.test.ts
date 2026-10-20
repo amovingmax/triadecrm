@@ -103,3 +103,24 @@ describe('animações de entrada no globals.css', () => {
     });
   }
 });
+
+/**
+ * O desenho da conversa do celular não pode chegar ao computador (20/10/2026: "se
+ * for para pc continuar do jeito que já estava"). Acima de 768 px ele só vale com
+ * toque; sem a condição do ponteiro, um notebook de 1024 px caía no desenho do
+ * celular, porque lá o painel da conversa também tem menos de 42rem.
+ */
+describe('variante conversa-estreita no globals.css', () => {
+  const variante = CSS.match(/@custom-variant conversa-estreita\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+
+  it('vale em toda tela de celular', () => {
+    expect(variante, '@custom-variant conversa-estreita não encontrada').toMatch(
+      /@media \(width < 48rem\)\s*\{\s*@slot;/,
+    );
+  });
+
+  it('acima do celular, só em aparelho de toque', () => {
+    expect(variante).toMatch(/@media \(width >= 48rem\) and \(pointer: coarse\)\s*\{\s*@container/);
+    expect(variante.match(/@media/g)).toHaveLength(2);
+  });
+});

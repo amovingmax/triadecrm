@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   BotOff,
   ChevronDown,
+  Ellipsis,
   ExternalLink,
   MessageSquarePlus,
 } from 'lucide-react';
@@ -19,6 +20,13 @@ import { iniciaisDe } from '@/lib/iniciais';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { formatarProximaAcao } from '@/components/parceiros/formatos';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { DiasSemContato } from '@/components/temperatura';
@@ -173,9 +181,10 @@ export function Conversa({
   // parceiro" é a pergunta de toda conversa, e não só quando difere do dono: o
   // campo aparece sempre que existe fio, e diz "você" quando é você.
   const eu = useEu();
-  // A ficha (onde, categoria, dono, telefone) é consulta de canto de olho: no
-  // celular ela nasce recolhida atrás de uma linha, e no desktop continua à vista.
-  const [fichaAberta, setFichaAberta] = useState(false);
+  // A FOLHA DE DETALHES do desenho do celular (protótipo A, escolhido em
+  // 20/10/2026): etapa, selos, etiquetas, ações e a ficha moram atrás do nome e
+  // do "⋯", e a tela fica para a conversa.
+  const [folha, setFolha] = useState(false);
   const atendendo = fio
     ? fio.responsavelId && fio.responsavelId === eu?.id
       ? 'você'
@@ -191,83 +200,205 @@ export function Conversa({
   const clientes = useQueryClient();
   const aoMudarEtapa = () => void clientes.invalidateQueries({ queryKey: ['conversas'] });
 
+  // A frase de contexto do cabeçalho do computador e do topo da folha.
+  const contexto = [
+    // A temperatura saiu desta linha em 28/09/2026 (ADR-16): a etapa, que já
+    // estava ao lado dela, é o que passou a valer.
+    mudaEtapa ? null : item.etapa,
+    item.funil,
+    setorDoFio,
+    fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  // O que o cabeçalho de UMA LINHA diz embaixo do nome: a etapa e só as exceções.
+  // O resto está a um toque, na folha.
+  const resumo =
+    [
+      item.etapa,
+      item.naoContatar ? 'não contatar' : null,
+      fio?.roboPausado ? 'robô pausado' : null,
+      fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || item.funil;
+
+  // E SÓ O QUE É EXCEÇÃO É PÍLULA: quem pediu para não ser contatado, o robô
+  // calado, e as etiquetas — que não são rótulo, são o botão de etiquetar. Na
+  // folha as pílulas são de dedo (36 px); no computador, de mouse.
+  const selos = (naFolha: boolean) => (
+    <>
+      {mudaEtapa ? (
+        <MudarEtapa
+          organizacaoId={item.id}
+          nome={item.nome}
+          etapa={item.etapa}
+          aoMudar={aoMudarEtapa}
+          className={
+            naFolha ? 'h-9 px-3 text-sm text-foreground' : 'h-5 text-[11px] text-foreground'
+          }
+        />
+      ) : null}
+      {item.naoContatar ? (
+        <Badge
+          variant="pilula"
+          className={naFolha ? 'h-9 px-3 text-sm font-normal' : 'h-5 px-2 text-[11px] font-normal'}
+        >
+          não contatar
+        </Badge>
+      ) : null}
+      {fio?.roboPausado ? (
+        <Badge
+          variant="pilula"
+          className={
+            naFolha
+              ? 'h-9 gap-1.5 px-3 text-sm font-normal'
+              : 'h-5 gap-1 px-2 text-[11px] font-normal'
+          }
+        >
+          <BotOff className="size-3" aria-hidden="true" />
+          robô pausado
+        </Badge>
+      ) : null}
+      <EtiquetasDoParceiro organizacaoId={item.id} podeEditar={Boolean(eu?.podeEscrever)} />
+    </>
+  );
+
+  // A ficha em campos: numa linha que quebra, no fio (a partir de 640 px); em
+  // lista, na folha do celular. O telefone continua atrás da mesma RPC auditada.
+  const campos = (variante: 'linha' | 'folha') => (
+    <>
+      <Campo variante={variante} rotulo="Onde">
+        {onde || 'sem endereço na base'}
+      </Campo>
+      <Campo variante={variante} rotulo="Categoria">
+        {item.categoria ?? 'sem categoria'}
+      </Campo>
+      <Campo variante={variante} rotulo="Responsável">
+        {item.responsavel ?? 'sem dono'}
+      </Campo>
+      {atendendo ? (
+        <Campo variante={variante} rotulo="Atendendo">
+          {atendendo}
+        </Campo>
+      ) : null}
+      <Campo variante={variante} rotulo="Último contato">
+        <DiasSemContato dias={item.diasSemContato} atencao={item.precisaAtencao} />
+        <span>
+          (<span className="numerico">{contagem.numero}</span>
+          {contagem.palavra})
+        </span>
+      </Campo>
+      <Campo variante={variante} rotulo="Telefone">
+        <TelefoneRevelavel
+          organizationId={item.id}
+          telefone={item.telefone}
+          mascarado={item.telefoneMascarado}
+          whatsapp={meta?.numeroConfigurado ? 'nenhum' : 'externo'}
+        />
+      </Campo>
+      {negocio?.next_action || proxima ? (
+        <Campo variante={variante} rotulo="Próxima ação">
+          <span className={cn('truncate', proxima?.atrasada && 'font-medium')}>
+            {negocio?.next_action ?? 'combinada'}
+          </span>
+          {proxima ? (
+            <span className="shrink-0 text-muted-foreground" title={proxima.detalhe}>
+              {proxima.prefixo.trim()}
+              {proxima.numero ? (
+                <>
+                  {' '}
+                  <span className="numerico">{proxima.numero}</span>
+                </>
+              ) : null}
+              {proxima.sufixo}
+            </span>
+          ) : null}
+        </Campo>
+      ) : null}
+    </>
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex flex-col border-b border-hairline">
-        <div className="flex items-center gap-2 px-3 py-2 md:px-5 md:py-3">
+    // `@container` no painel inteiro: no tablet, o desenho do celular vale quando
+    // o PAINEL é estreito, e não a tela (`conversa-estreita`, em `globals.css`).
+    <div className="@container flex h-full min-h-0 flex-col">
+      {/* DOIS CABEÇALHOS, UM POR APARELHO (`conversa-estreita`, em `globals.css`).
+
+          Celular, e tablet com o painel estreito: UMA LINHA, do protótipo A
+          escolhido em 20/10/2026 — voltar, o retrato, o nome com a etapa e as
+          exceções embaixo, e o "⋯". O nome e o "⋯" abrem a folha com tudo o que
+          o cabeçalho mostrava: etapa, selos, etiquetas, ações e a ficha. Em três
+          andares sobravam ~300 px para as mensagens num iPhone; numa linha, o dobro.
+
+          Computador: o de sempre — o retrato, o nome com a frase e os selos
+          embaixo, e as ações na mesma linha, à direita. */}
+      <header className="@container flex flex-col border-b border-hairline">
+        <div className="hidden h-16 items-center gap-1 pr-1.5 pl-1 md:pl-3 conversa-estreita:flex">
           <Button
             variant="ghost"
             size="icon"
             onClick={aoVoltar}
-            className="toque -ml-2 size-11 shrink-0 md:hidden"
+            className="toque size-11 shrink-0 md:hidden"
           >
             <ArrowLeft aria-hidden="true" />
             <span className="sr-only">Voltar para a lista de conversas</span>
           </Button>
+          <button
+            type="button"
+            onClick={() => setFolha(true)}
+            aria-haspopup="dialog"
+            className="toque flex h-14 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 text-left outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            {/* O RETRATO TAMBÉM AQUI. Mesma bolinha que aparece nos balões: é o
+                que liga o cabeçalho ao fio. */}
+            <Avatar className="size-10 shrink-0">
+              <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
+                {iniciaisDe(item.nome)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate font-heading text-[17px] leading-tight font-semibold tracking-tight">
+                {item.nome}
+              </span>
+              <span className="flex min-w-0 items-center gap-1 text-[12.5px] text-muted-foreground">
+                <span className="truncate">{resumo}</span>
+                <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
+              </span>
+            </span>
+            <span className="sr-only">: ver a etapa, as etiquetas, as ações e a ficha</span>
+          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="toque size-11 shrink-0"
+            onClick={() => setFolha(true)}
+            aria-label="Mais: etapa, etiquetas, ações e ficha"
+          >
+            <Ellipsis aria-hidden="true" />
+          </Button>
+        </div>
 
-          {/* O RETRATO TAMBÉM AQUI. Mesma bolinha que aparece nos balões: é o
-              que liga o cabeçalho ao fio e dá ao painel um ponto de âncora à
-              esquerda, em vez de começar em texto solto. */}
+        <div className="flex items-center gap-2 px-5 py-3 conversa-estreita:hidden">
           <Avatar className="size-10 shrink-0">
             <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
               {iniciaisDe(item.nome)}
             </AvatarFallback>
           </Avatar>
-
           <div className="min-w-0 flex-1">
             <h2 className="truncate font-heading text-lg leading-tight font-semibold tracking-tight">
               {item.nome}
             </h2>
-            {/* UMA FRASE, EM TODA LARGURA. Eram cinco pílulas no desktop e uma
-                frase no celular dizendo as MESMAS coisas — etapa, funil, setor,
-                estado —, cada uma com moldura, altura e espaçamento próprios.
-                Pílula é para o que é exceção; isto aqui é o contexto fixo da
-                conversa, e contexto fixo lê-se melhor como texto corrido.
+            {/* UMA FRASE, EM TODA LARGURA: o contexto fixo da conversa (etapa,
+                funil, setor, estado) lê-se melhor como texto corrido.
                 (28/09/2026: "ta mtt feio e pequeno, pode compor mais espaço".) */}
-            <p className="truncate text-xs text-muted-foreground md:text-[13px]">
-              {[
-                // A temperatura saiu desta linha em 28/09/2026 (ADR-16): a etapa,
-                // que já estava ao lado dela, é o que passou a valer.
-                mudaEtapa ? null : item.etapa,
-                item.funil,
-                setorDoFio,
-                fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-            {/* E SÓ O QUE É EXCEÇÃO CONTINUA PÍLULA: quem pediu para não ser
-                contatado, o robô calado, e as etiquetas — que não são rótulo, são
-                o botão de etiquetar. */}
+            <p className="truncate text-xs text-muted-foreground md:text-[13px]">{contexto}</p>
             <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
-              {mudaEtapa ? (
-                <MudarEtapa
-                  organizacaoId={item.id}
-                  nome={item.nome}
-                  etapa={item.etapa}
-                  aoMudar={aoMudarEtapa}
-                  className="h-5 text-[11px] text-foreground"
-                />
-              ) : null}
-              {item.naoContatar ? (
-                <Badge variant="pilula" className="h-5 px-2 text-[11px] font-normal">
-                  não contatar
-                </Badge>
-              ) : null}
-              {fio?.roboPausado ? (
-                <Badge variant="pilula" className="h-5 gap-1 px-2 text-[11px] font-normal">
-                  <BotOff className="size-3" aria-hidden="true" />
-                  robô pausado
-                </Badge>
-              ) : null}
-              <EtiquetasDoParceiro organizacaoId={item.id} podeEditar={Boolean(eu?.podeEscrever)} />
+              {selos(false)}
             </p>
           </div>
-
-          {/* As ações ficam na MESMA linha do nome, alinhadas à direita. Elas eram
-              dois botões inteiros numa faixa própria: 64 px do painel gastos em toda
-              conversa para duas ações que a pessoa usa uma vez por visita, e que
-              empurravam a mensagem de hoje para fora da tela. */}
+          {/* As ações na MESMA linha do nome (eram uma faixa própria de 64 px,
+              gasta em toda conversa para ações de uma vez por visita). */}
           <div className="flex shrink-0 items-center gap-1.5">
             {podeAssumir && fio ? <AssumirConversa fioId={fio.id} organizacaoId={item.id} /> : null}
             {fio && eu?.podeEscrever ? (
@@ -281,8 +412,7 @@ export function Conversa({
             <Button asChild variant="outline" size="sm" className="toque h-9">
               <Link href={`/registrar?org=${item.id}`}>
                 <MessageSquarePlus aria-hidden="true" />
-                <span className="hidden sm:inline">Registrar contato</span>
-                <span className="sr-only sm:hidden">Registrar contato</span>
+                Registrar contato
               </Link>
             </Button>
             {fio && eu?.podeEscrever ? <Arquivar fio={fio} /> : null}
@@ -295,10 +425,86 @@ export function Conversa({
           </div>
         </div>
 
-        {/* A faixa da janela de 24 h: a única coisa desta tela que muda sozinha e
-            decide o que pode sair. Fica colada no cabeçalho, com 2 px de barra. */}
-        {fio ? <FaixaDaJanela estado={janela} className="border-t border-hairline" /> : null}
+        {/* A faixa da janela de 24 h: no computador, colada no cabeçalho; no
+            desenho do celular ela desce para cima da caixa de escrever, que é
+            onde a hora decide alguma coisa. */}
+        {fio ? (
+          <FaixaDaJanela
+            estado={janela}
+            className="border-t border-hairline conversa-estreita:hidden"
+          />
+        ) : null}
       </header>
+
+      <Sheet open={folha} onOpenChange={setFolha}>
+        <SheetContent
+          side="bottom"
+          className="@container max-h-[88svh] gap-5 overflow-y-auto rounded-t-2xl px-4 pt-4 pb-[calc(var(--area-segura-inferior)+1.25rem)]"
+        >
+          <SheetHeader className="flex-row items-center gap-3 p-0 pr-12 text-left">
+            <Avatar className="size-12 shrink-0">
+              <AvatarFallback className="bg-muted text-sm font-medium text-muted-foreground">
+                {iniciaisDe(item.nome)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <SheetTitle className="font-heading text-lg leading-tight">{item.nome}</SheetTitle>
+              <SheetDescription className="text-[13px]">
+                {[item.funil, setorDoFio, fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </SheetDescription>
+            </div>
+          </SheetHeader>
+
+          <section aria-label="Em que pé está" className="flex flex-col gap-2">
+            <h3 className={ROTULO_DA_FOLHA}>Em que pé está</h3>
+            <div className="flex flex-wrap items-center gap-1.5">{selos(true)}</div>
+          </section>
+
+          <section aria-label="Ações" className="flex flex-col gap-2">
+            <h3 className={ROTULO_DA_FOLHA}>Ações</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {podeAssumir && fio ? (
+                <AssumirConversa
+                  fioId={fio.id}
+                  organizacaoId={item.id}
+                  className={cn(ACAO_DA_FOLHA, 'col-span-2')}
+                />
+              ) : null}
+              {fio && eu?.podeEscrever ? (
+                <TransferirConversa
+                  fioId={fio.id}
+                  organizacaoId={item.id}
+                  pessoas={catalogos.pessoas}
+                  setores={setores}
+                  className={ACAO_DA_FOLHA}
+                />
+              ) : null}
+              <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
+                <Link href={`/registrar?org=${item.id}`}>
+                  <MessageSquarePlus aria-hidden="true" />
+                  Registrar contato
+                </Link>
+              </Button>
+              {fio && eu?.podeEscrever ? (
+                <Arquivar fio={fio} comNome className={ACAO_DA_FOLHA} />
+              ) : null}
+              <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
+                <Link href={`/parceiros/${item.id}`}>
+                  <ExternalLink aria-hidden="true" />
+                  Abrir a ficha
+                </Link>
+              </Button>
+            </div>
+          </section>
+
+          <section aria-label="Ficha" className="flex flex-col gap-1">
+            <h3 className={ROTULO_DA_FOLHA}>Ficha</h3>
+            <dl className="flex flex-col">{campos('folha')}</dl>
+          </section>
+        </SheetContent>
+      </Sheet>
 
       {/* A coluna de leitura fica em 56rem. Era 48, e com o balão limitado a 34rem
           dentro dela a conversa aparecia pequena no meio de uma tela vazia. 56rem
@@ -313,67 +519,11 @@ export function Conversa({
           não decisão: podem sair de vista quando a pessoa desce para ler. */}
       <div ref={rolagem} onScroll={aoRolar} className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
         <div ref={conteudo}>
-          {/* A ficha em UMA LINHA que quebra, e não numa grade de seis campos.
-            A grade custava 200 px do painel; com o rodapé do inbox embaixo, esses
-            200 px eram a conversa inteira. Onde, categoria, dono e último contato
-            são consulta de canto de olho — quem precisa do resto abre a ficha. O
-            telefone continua atrás da mesma RPC auditada. */}
-          <button
-            type="button"
-            aria-expanded={fichaAberta}
-            onClick={() => setFichaAberta((v) => !v)}
-            className="toque -ml-1 mb-1 flex min-h-9 items-center gap-1 px-1 text-[11px] text-muted-foreground sm:hidden"
-          >
-            Ficha do parceiro
-            <ChevronDown
-              className={cn('size-3.5 transition-transform', fichaAberta && 'rotate-180')}
-              aria-hidden="true"
-            />
-          </button>
-          <dl
-            className={cn(
-              'mx-auto max-w-4xl flex-wrap items-baseline gap-x-4 gap-y-1 pb-1 text-[11px] text-muted-foreground sm:flex',
-              fichaAberta ? 'flex' : 'hidden',
-            )}
-          >
-            <Campo rotulo="Onde">{onde || 'sem endereço na base'}</Campo>
-            <Campo rotulo="Categoria">{item.categoria ?? 'sem categoria'}</Campo>
-            <Campo rotulo="Responsável">{item.responsavel ?? 'sem dono'}</Campo>
-            {atendendo ? <Campo rotulo="Atendendo">{atendendo}</Campo> : null}
-            <Campo rotulo="Último contato">
-              <DiasSemContato dias={item.diasSemContato} atencao={item.precisaAtencao} />
-              <span>
-                (<span className="numerico">{contagem.numero}</span>
-                {contagem.palavra})
-              </span>
-            </Campo>
-            <Campo rotulo="Telefone">
-              <TelefoneRevelavel
-                organizationId={item.id}
-                telefone={item.telefone}
-                mascarado={item.telefoneMascarado}
-                whatsapp={meta?.numeroConfigurado ? 'nenhum' : 'externo'}
-              />
-            </Campo>
-            {negocio?.next_action || proxima ? (
-              <Campo rotulo="Próxima ação">
-                <span className={cn('truncate', proxima?.atrasada && 'font-medium')}>
-                  {negocio?.next_action ?? 'combinada'}
-                </span>
-                {proxima ? (
-                  <span className="shrink-0 text-muted-foreground" title={proxima.detalhe}>
-                    {proxima.prefixo.trim()}
-                    {proxima.numero ? (
-                      <>
-                        {' '}
-                        <span className="numerico">{proxima.numero}</span>
-                      </>
-                    ) : null}
-                    {proxima.sufixo}
-                  </span>
-                ) : null}
-              </Campo>
-            ) : null}
+          {/* A ficha em UMA LINHA que quebra, e não numa grade de seis campos:
+            onde, categoria, dono e último contato são consulta de canto de olho.
+            No celular ela mora na folha do cabeçalho (20/10/2026). */}
+          <dl className="mx-auto hidden max-w-4xl flex-wrap items-baseline gap-x-4 gap-y-1 pb-1 text-[11px] text-muted-foreground sm:flex">
+            {campos('linha')}
           </dl>
 
           {/* A leitura da IA entra ENTRE a ficha e a conversa, e não num painel à
@@ -405,7 +555,20 @@ export function Conversa({
           O teto é 45% DO PAINEL, não da tela (`dvh`) — com `dvh` ele cabia na
           janela e mesmo assim espremia a conversa contra o cabeçalho, porque o
           painel é menor que a janela. */}
-      <div className="max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-3 py-2.5 md:px-5 md:py-3">
+      {fio ? (
+        <FaixaDaJanela
+          estado={janela}
+          className="hidden border-t border-hairline conversa-estreita:flex"
+        />
+      ) : null}
+      {/* No celular o rodapé cresce até 60% (a caixa cresce para baixo, linha a
+          linha) e respeita a barrinha do iPhone — zero com o teclado aberto. */}
+      <div
+        className={cn(
+          'max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-3 py-2.5 max-md:max-h-[60%] max-md:pb-[calc(0.625rem+var(--folga-inferior,0px))] md:px-5 md:py-3',
+          fio && 'conversa-estreita:border-t-0 conversa-estreita:pt-1',
+        )}
+      >
         <div className="mx-auto max-w-4xl space-y-3">
           {/* O relógio da janela virou a FAIXA do cabeçalho (`FaixaDaJanela`): a hora
               está sempre à vista e não custa mais três linhas em cima da caixa de
@@ -424,6 +587,15 @@ export function Conversa({
               atendente={fio.responsavel}
               paraMim={fio.responsavelId === eu?.id}
               nomeDaPessoa={nomeDaPessoa}
+            />
+          ) : null}
+          {/* No desenho do celular o "Assumir" fica aqui, ao lado de quem atende
+              — é a ação do dia, e não pode morar só dentro da folha. */}
+          {podeAssumir && fio ? (
+            <AssumirConversa
+              fioId={fio.id}
+              organizacaoId={item.id}
+              className="hidden w-full conversa-estreita:inline-flex"
             />
           ) : null}
           <CaixaDeResposta
@@ -456,7 +628,16 @@ export function Conversa({
  * e a conversa volta sozinha se o parceiro escrever. Diálogo de confirmação
  * para o que se desfaz num clique é imposto que ninguém lê.
  */
-function Arquivar({ fio }: { fio: FioDaConversa }) {
+function Arquivar({
+  fio,
+  comNome = false,
+  className,
+}: {
+  fio: FioDaConversa;
+  /** Na folha do celular: botão inteiro, com o nome da ação. */
+  comNome?: boolean;
+  className?: string;
+}) {
   const clientes = useQueryClient();
   const arquivada = fio.arquivadaEm !== null;
   const acao = useMutation({
@@ -476,22 +657,63 @@ function Arquivar({ fio }: { fio: FioDaConversa }) {
     onError: (e) => toast.error(mensagemDoErro(e)),
   });
 
+  const rotulo = arquivada ? 'Desarquivar conversa' : 'Arquivar conversa';
+  if (comNome) {
+    return (
+      <Button
+        variant="outline"
+        className={className}
+        disabled={acao.isPending}
+        onClick={() => acao.mutate()}
+      >
+        {arquivada ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
+        {arquivada ? 'Desarquivar' : 'Arquivar'}
+      </Button>
+    );
+  }
   return (
     <Button
       variant="ghost"
       size="icon"
-      className="toque size-9"
+      className={cn('toque size-11 md:size-9', className)}
       disabled={acao.isPending}
       onClick={() => acao.mutate()}
       title={arquivada ? 'Trazer de volta para a lista' : 'Arquivar: tira da lista, não apaga nada'}
     >
       {arquivada ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
-      <span className="sr-only">{arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</span>
+      <span className="sr-only">{rotulo}</span>
     </Button>
   );
 }
 
-function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+/** O rótulo de cada bloco da folha do celular. */
+const ROTULO_DA_FOLHA =
+  'text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase';
+
+/** Uma ação da folha do celular: bloco de 56 px, ícone e nome, em duas colunas. */
+const ACAO_DA_FOLHA =
+  'toque h-14 w-full justify-start gap-2.5 rounded-xl px-4 text-[15px] font-medium md:h-14';
+
+function Campo({
+  rotulo,
+  children,
+  variante = 'linha',
+}: {
+  rotulo: string;
+  children: React.ReactNode;
+  /** `folha`: um campo por linha, rótulo à esquerda e valor à direita, na folha do celular. */
+  variante?: 'linha' | 'folha';
+}) {
+  if (variante === 'folha') {
+    return (
+      <div className="flex min-w-0 items-baseline justify-between gap-4 border-t border-hairline py-2.5 text-sm first:border-t-0">
+        <dt className="shrink-0 text-muted-foreground">{rotulo}</dt>
+        <dd className="flex min-w-0 flex-wrap items-baseline justify-end gap-1 text-right text-foreground">
+          {children}
+        </dd>
+      </div>
+    );
+  }
   return (
     // `div` entre `dl` e o par é HTML5 válido e é o que mantém rótulo e valor
     // juntos quando a linha quebra: sem ele, em 390 px o "Categoria:" ficava no

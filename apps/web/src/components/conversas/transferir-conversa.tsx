@@ -77,8 +77,9 @@ export function TransferirConversa({
         onClick={() => setAberta(true)}
       >
         <ArrowRightLeft aria-hidden="true" />
-        <span className="hidden sm:inline">Transferir</span>
-        <span className="sr-only sm:hidden">Transferir</span>
+        {/* Pela largura do cabeçalho da conversa (`@container`), não da tela. */}
+        <span className="hidden @xs:inline">Transferir</span>
+        <span className="sr-only @xs:hidden">Transferir</span>
       </Button>
       {aberta ? (
         <Folha
@@ -198,7 +199,7 @@ function Folha({
               rows={3}
               onChange={(e) => setNota(e.target.value)}
               placeholder="Ex.: quer a segunda via do boleto de setembro"
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             />
           </div>
         </div>
