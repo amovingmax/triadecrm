@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Check, CheckCheck, Clock, MessageCircle, SquareArrowOutUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { ProvedorConsultas } from '@/components/consultas/provedor-consultas';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -312,9 +311,9 @@ function assinar(ouvir: () => void) {
 const NINGUEM: readonly Acompanhado[] = [];
 
 /**
- * Na casca do app: um acompanhante sem tela para cada aviso em andamento. A casca
- * fica FORA dos provedores de consulta (cada área do app monta o seu), então ele
- * traz o próprio — sem isso, `useQuery` derrubava a página inteira.
+ * Na casca do app: um acompanhante sem tela para cada aviso em andamento. Usa o
+ * cache de consultas da área autenticada, o mesmo do recibo da ligação: a mesma
+ * tentativa não é perguntada duas vezes a cada 5 s.
  */
 export function AcompanhanteDeAvisos() {
   const lista = useSyncExternalStore(
@@ -325,7 +324,7 @@ export function AcompanhanteDeAvisos() {
   const aoTerminar = useCallback((tentativaId: string) => largar(tentativaId), []);
   if (lista.length === 0) return null;
   return (
-    <ProvedorConsultas>
+    <>
       {lista.map((a) => (
         <AcompanharAviso
           key={a.tentativaId}
@@ -335,6 +334,6 @@ export function AcompanhanteDeAvisos() {
           aoTerminar={aoTerminar}
         />
       ))}
-    </ProvedorConsultas>
+    </>
   );
 }

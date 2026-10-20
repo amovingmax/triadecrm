@@ -5,7 +5,6 @@ import { podeMarcarCompromisso, veAgendaDaEquipe } from '@/lib/navegacao';
 import { carregarContextoDaAgenda } from '@/components/agenda/dados';
 import { TelaAgenda } from '@/components/agenda/tela-agenda';
 import { hojeEmNatal, type Dia, type Visao } from '@/components/agenda/tipos';
-import { ProvedorConsultas } from '@/components/consultas/provedor-consultas';
 
 export const metadata: Metadata = { title: 'Agenda' };
 
@@ -41,19 +40,17 @@ export default async function Pagina({
     comEquipe && pedida && contexto.pessoas.some((p) => p.id === pedida) ? pedida : sessao.id;
 
   return (
-    <ProvedorConsultas>
-      <TelaAgenda
-        usuarioId={sessao.id}
-        podeMarcar={podeMarcarCompromisso(sessao.papel)}
-        comEquipe={comEquipe}
-        pessoaInicial={pessoaInicial}
-        contexto={contexto}
-        hoje={hoje}
-        agoraIso={agora.toISOString()}
-        diaInicial={diaDaUrl(params.dia) ?? hoje}
-        visaoInicial={visaoDaUrl(params.visao)}
-      />
-    </ProvedorConsultas>
+    <TelaAgenda
+      usuarioId={sessao.id}
+      podeMarcar={podeMarcarCompromisso(sessao.papel)}
+      comEquipe={comEquipe}
+      pessoaInicial={pessoaInicial}
+      contexto={contexto}
+      hoje={hoje}
+      agoraIso={agora.toISOString()}
+      diaInicial={diaDaUrl(params.dia) ?? hoje}
+      visaoInicial={visaoDaUrl(params.visao)}
+    />
   );
 }
 
