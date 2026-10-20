@@ -644,13 +644,17 @@
   }
 }
 
-/* Pílula de eyebrow e chip de estado: borda fina, cartão a 50%, desfoque leve. */
+/* Pílula de eyebrow e chip de estado: borda fina, cartão a 50%.
+   Sem `backdrop-filter` desde 20/10/2026. A pílula está em toda linha da lista e em
+   todo balão da conversa, sempre sobre fundo liso (a linha, o cartão, o balão ou o
+   cabeçalho, que já é vidro): desfocar um fundo liso não muda um pixel, mas cada
+   pílula com desfoque virava uma camada que o celular recalcula a cada quadro de
+   rolagem. Vidro de verdade continua onde há conteúdo passando por baixo: o
+   cabeçalho, a barra de baixo e o separador de dia da conversa. */
 @utility pilula {
   border-radius: 9999px;
   border: 1px solid var(--hairline);
   background-color: color-mix(in oklab, var(--card) 50%, transparent);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
 }
 
 /* Título em gradiente. SÓ no login: espalhar pelo app vira clichê e atrapalha a
