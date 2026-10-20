@@ -51,9 +51,16 @@ export function ProvedorConsultas({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * Para a consulta que NÃO é dado da base e por isso não envelhece com a troca de
+ * tela: uma URL assinada vale os minutos dela, em qualquer página. Vai em `meta`.
+ */
+export const SOBREVIVE_A_NAVEGACAO = { sobreviveANavegacao: true } as const;
+
+/**
  * A cada troca de caminho, o cache inteiro vira "vencido", sem buscar nada naquela
  * hora (`refetchType: 'none'`): quem montar na tela nova busca por cima do que já
- * está desenhado, e o que ninguém está olhando não custa nada.
+ * está desenhado, e o que ninguém está olhando não custa nada. Só fica de fora o
+ * que leva `SOBREVIVE_A_NAVEGACAO`.
  *
  * `useLayoutEffect`, e não `useEffect`, por causa da ORDEM: os efeitos de layout de
  * um commit rodam todos antes dos efeitos passivos, e é num efeito passivo que cada
@@ -63,7 +70,10 @@ export function ProvedorConsultas({ children }: { children: React.ReactNode }) {
 function MarcarVelhoAoNavegar({ cliente }: { cliente: QueryClient }) {
   const caminho = usePathname();
   useLayoutEffect(() => {
-    void cliente.invalidateQueries({ refetchType: 'none' });
+    void cliente.invalidateQueries({
+      refetchType: 'none',
+      predicate: (consulta) => consulta.meta?.sobreviveANavegacao !== true,
+    });
   }, [cliente, caminho]);
   return null;
 }
