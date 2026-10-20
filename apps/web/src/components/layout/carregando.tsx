@@ -1,18 +1,20 @@
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * O que aparece entre o toque e a tela nova (os `loading.tsx` da área autenticada).
+ * O que aparece entre o toque e a página, nas páginas cujo SERVIDOR demora: a ficha
+ * do parceiro (`parceiros/[id]/loading.tsx`) e o lote de ligação
+ * (`ligar/[id]/loading.tsx`). Até 20/10/2026 não havia nenhum, e o toque deixava a
+ * tela velha parada até o servidor terminar a página nova inteira.
  *
- * Até 20/10/2026 não havia nenhum. Sem ele o Next 16 não pré-carrega rota dinâmica
- * (e todas as do CRM são, porque leem a sessão), então o toque no menu deixava a
- * tela velha parada até o servidor terminar a página nova inteira. No celular, com
- * 4G, era um segundo ou mais sem resposta nenhuma, e a pessoa tocava de novo.
+ * SÓ NESSAS DUAS, e foi medido. Um `loading.tsx` na área inteira deu retorno na hora
+ * em todas as telas, mas ATRASOU o conteúdo das que o servidor entrega rápido (o
+ * Meu dia, Conversas): depois de mostrar um esqueleto, o React segura a troca por
+ * pelo menos 300 ms, para não piscar. Nas telas rápidas o retorno ao toque vem do
+ * próprio item do menu (`nav-link.tsx`, `useLinkStatus`), que não segura nada.
  *
- * Com a fronteira, o Next pré-carrega a casca até aqui enquanto o link está na
- * tela, e o toque troca na hora para esta forma. Ela é parada, como todo esqueleto
- * do CRM (`ui/skeleton.tsx`), e tem o desenho comum às telas: o título de 32px e
- * linhas de lista. A própria tela assume em seguida, com o esqueleto dela ou já com
- * o que o cache tinha.
+ * As formas são paradas, como todo esqueleto do CRM (`ui/skeleton.tsx`): o título
+ * de 32px e linhas de lista, ou o desenho da ficha. A própria tela assume em
+ * seguida, com o esqueleto dela ou já com o que o cache tinha.
  */
 export function CarregandoTela() {
   const larguras = ['w-56', 'w-40', 'w-64', 'w-48', 'w-36', 'w-52', 'w-44', 'w-60'];

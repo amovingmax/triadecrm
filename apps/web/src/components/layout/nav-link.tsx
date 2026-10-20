@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { rotuloDasRespostas } from '@/components/avisos/regra';
@@ -115,7 +115,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
             : 'text-sidebar-muted-foreground hover:bg-muted hover:text-sidebar-foreground',
         )}
       >
-        <span className="relative flex size-11 shrink-0 items-center justify-center">
+        <DiscoDoIcone ativo={ativo}>
           <Icone className="size-[18px]" aria-hidden="true" strokeWidth={1.75} />
           {numero !== null ? (
             // A MENTA, e é o único lugar do trilho fechado com cor. Ela existe
@@ -135,7 +135,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
               {numero > 99 ? '99+' : numero}
             </span>
           ) : null}
-        </span>
+        </DiscoDoIcone>
         {/* O nome: invisível com o trilho fechado, aparece quando ele abre. A
             demora de entrada acompanha a do trilho, para o texto não surgir
             antes de haver espaço para ele. */}
@@ -170,15 +170,9 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
             cheia virava um bloco verde de 65x64px no pé de toda tela do celular
             — o objeto mais forte da interface, para dizer só "você está aqui".
             A pílula é o mesmo recado do disco do trilho no desktop. */}
-        <span
-          aria-hidden="true"
-          className={cn(
-            'flex h-7 w-12 items-center justify-center rounded-full transition-colors',
-            ativo && 'bg-menta text-menta-tinta',
-          )}
-        >
+        <PilulaDoIcone ativo={ativo}>
           <Icone className={cn('size-5', ativo && 'stroke-[2.25]')} />
-        </span>
+        </PilulaDoIcone>
         {numero !== null ? (
           // O NÚMERO NA BARRA DO CELULAR (01/10/2026). A barra recebia a
           // contagem e não a desenhava: no celular, que é onde o time atende em
@@ -290,5 +284,47 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
         </span>
       ) : null}
     </Link>
+  );
+}
+
+/*
+ * O TOQUE RESPONDE NA HORA (20/10/2026). A troca de tela espera o servidor, e no
+ * 4G isso é meio segundo ou mais com a tela velha parada — a pessoa tocava de novo.
+ * Enquanto a navegação deste link está pendente (`useLinkStatus`), o item já se
+ * acende: a pílula do ícone em menta clara na barra de baixo, o disco do ícone com
+ * o fundo do "passar o mouse" no trilho. Mesmo tamanho e mesmo lugar do estado
+ * ativo, então nada se desloca; e sem laço de animação, que o sistema só admite na
+ * barra térmica.
+ *
+ * É um retorno ao toque, e não uma tela de carregamento por cima: um `loading.tsx`
+ * na área inteira foi medido e atrasava o conteúdo das telas rápidas — o React
+ * segura a troca por 300 ms depois de mostrar um esqueleto, para não piscar.
+ */
+function PilulaDoIcone({ ativo, children }: { ativo: boolean; children: React.ReactNode }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'flex h-7 w-12 items-center justify-center rounded-full transition-colors',
+        ativo ? 'bg-menta text-menta-tinta' : pending && 'bg-menta/40 text-foreground',
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function DiscoDoIcone({ ativo, children }: { ativo: boolean; children: React.ReactNode }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      className={cn(
+        'relative flex size-11 shrink-0 items-center justify-center rounded-full transition-colors',
+        !ativo && pending && 'bg-muted text-sidebar-foreground',
+      )}
+    >
+      {children}
+    </span>
   );
 }
