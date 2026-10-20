@@ -87,7 +87,7 @@ export function TelaExcluidos() {
       <header className="flex flex-col gap-3">
         <Link
           href="/parceiros"
-          className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="toque inline-flex min-h-11 w-fit items-center gap-1 text-sm text-muted-foreground outline-none md:min-h-0 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
           Prospectados

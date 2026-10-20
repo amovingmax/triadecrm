@@ -151,7 +151,7 @@ function Conteudo({
             placeholder={exemploDeMotivo}
             aria-invalid={erro !== null}
             aria-describedby={erro ? `${id}-erro` : undefined}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           />
           {erro ? (
             <p id={`${id}-erro`} className="text-xs text-destructive-texto">

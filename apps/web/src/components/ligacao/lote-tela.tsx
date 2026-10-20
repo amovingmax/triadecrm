@@ -95,7 +95,7 @@ export function TelaDeLotes({
     <div className="flex w-full flex-col gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
+          <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em] break-words">
             Lotes
           </h1>
           <p className="text-sm text-muted-foreground">

@@ -426,12 +426,16 @@ function LinhaDePasso({ passo, podeExcluir }: { passo: Passo; podeExcluir: boole
   const prazoADireita = !reuniao && passo.quando !== null;
 
   return (
-    <li className="flex min-w-0 items-center gap-3.5 border-t border-hairline py-3 first:border-t-0 first:pt-0 last:pb-0">
+    // A linha QUEBRA quando o selo e a lixeira não cabem ao lado do título: o
+    // título tem piso de 8,5rem e o resto desce, à direita. Sem isso, num
+    // celular de 320 sobravam 65px para o texto e "Reunião" saía partida em
+    // "Reuniã / o" (20/10/2026).
+    <li className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2 border-t border-hairline py-3 first:border-t-0 first:pt-0 last:pb-0">
       <Ladrilho
         icone={reuniao ? (passo.presencial ? MapPin : Video) : ListChecks}
         destaque={reuniao && passo.selo !== 'aguarda resultado'}
       />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-[8.5rem] flex-1 flex-col gap-0.5">
         <p className="text-[15px] leading-snug font-medium break-words">{passo.titulo}</p>
         <p className="text-[12.5px] leading-snug text-muted-foreground">
           {reuniao && passo.quando ? (
@@ -455,32 +459,34 @@ function LinhaDePasso({ passo, podeExcluir }: { passo: Passo; podeExcluir: boole
         </p>
       </div>
 
-      {passo.sala ? (
-        <Button
-          asChild
-          variant="outline"
-          className="toque h-11 shrink-0 px-3.5 text-[13.5px] md:h-[34px]"
-        >
-          <a href={passo.sala} target="_blank" rel="noopener noreferrer">
-            Abrir a sala
-          </a>
-        </Button>
-      ) : passo.selo ? (
-        <span
-          className="shrink-0 rounded-full bg-foreground/10 px-2.5 py-0.5 text-[12.5px] font-medium whitespace-nowrap"
-          title={prazoADireita && passo.quando ? passo.quando.texto : undefined}
-        >
-          {passo.selo}
-        </span>
-      ) : prazoADireita && passo.quando ? (
-        <span className="shrink-0 text-[12.5px] whitespace-nowrap text-muted-foreground">
-          <Data quando={passo.quando} />
-        </span>
-      ) : null}
+      <div className="ml-auto flex shrink-0 items-center gap-3.5">
+        {passo.sala ? (
+          <Button
+            asChild
+            variant="outline"
+            className="toque h-11 shrink-0 px-3.5 text-[13.5px] md:h-[34px]"
+          >
+            <a href={passo.sala} target="_blank" rel="noopener noreferrer">
+              Abrir a sala
+            </a>
+          </Button>
+        ) : passo.selo ? (
+          <span
+            className="shrink-0 rounded-full bg-foreground/10 px-2.5 py-0.5 text-[12.5px] font-medium whitespace-nowrap"
+            title={prazoADireita && passo.quando ? passo.quando.texto : undefined}
+          >
+            {passo.selo}
+          </span>
+        ) : prazoADireita && passo.quando ? (
+          <span className="shrink-0 text-[12.5px] whitespace-nowrap text-muted-foreground">
+            <Data quando={passo.quando} />
+          </span>
+        ) : null}
 
-      {podeExcluir && passo.tarefaId ? (
-        <ExcluirPasso tarefaId={passo.tarefaId} titulo={passo.titulo} />
-      ) : null}
+        {podeExcluir && passo.tarefaId ? (
+          <ExcluirPasso tarefaId={passo.tarefaId} titulo={passo.titulo} />
+        ) : null}
+      </div>
     </li>
   );
 }

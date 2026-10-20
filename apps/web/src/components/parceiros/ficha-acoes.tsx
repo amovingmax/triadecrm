@@ -122,7 +122,10 @@ export function AcoesDaFicha({
   }
 
   return (
-    <nav aria-label="O que fazer com este parceiro" className="flex items-center gap-2">
+    // `flex-wrap`: com a telefonia ligada são quatro botões (Conversar,
+    // Registrar, Ligar e o menu), e numa linha só eles passavam da borda do
+    // celular e arrastavam a página para o lado (20/10/2026).
+    <nav aria-label="O que fazer com este parceiro" className="flex flex-wrap items-center gap-2">
       <Button asChild className="toque h-11 flex-1 px-4 sm:flex-none md:h-10">
         <Link href={`/conversas?org=${organizationId}`}>
           <MessageCircle aria-hidden="true" />

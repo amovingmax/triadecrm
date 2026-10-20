@@ -78,7 +78,7 @@ export function PassoDoDia({
               aoTrocar(e.target.value);
             }
           }}
-          className="toque h-11 rounded-lg border border-input bg-background px-3 text-sm md:h-9"
+          className="toque h-11 rounded-lg border border-input bg-background px-3 text-base md:h-9 md:text-sm"
         />
       </div>
     </div>

@@ -94,7 +94,7 @@ export function TelaEnvios({ catalogos }: { catalogos: Catalogos }) {
       ) : (
         <ul className="grid gap-3 md:grid-cols-2">
           {(envios.data ?? []).map((e) => (
-            <li key={e.id}>
+            <li key={e.id} className="min-w-0">
               <CartaoDoEnvio envio={e} aoAbrir={() => setAberto(e.id)} />
             </li>
           ))}

@@ -31,9 +31,8 @@ import { cn } from '@/lib/utils';
  * se alcança de dentro de outra tela não é de campo.
  *
  * Cinco itens mais "Mais" são seis fatias de `flex-1`. Em 390px isso dá 65px por
- * fatia, ainda acima do alvo de 44px, e os rótulos mais longos ("Parceiros",
- * "Conversas") ficam no limite do `truncate`. Seis fatias é o preço de a tela de
- * registro existir na navegação, e é mais barato que a ausência dela.
+ * fatia, ainda acima do alvo de 44px. Nenhuma fatia fica mais estreita que o próprio
+ * rótulo, que aparece inteiro: a regra está em `nav-link.tsx`.
  *
  * A ORDEM DAQUI NÃO É A DA LATERAL, e isso é decisão, não descuido. A lateral
  * agrupa por natureza do trabalho; a barra ordena por frequência do polegar, e
@@ -91,7 +90,7 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
           <Sheet open={aberto} onOpenChange={setAberto}>
             <SheetTrigger
               className={cn(
-                'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-4 transition-colors',
+                'toque relative flex min-w-max flex-1 flex-col items-center justify-center gap-1 text-[clamp(10px,3.25vw,11px)] leading-4 transition-colors',
                 algumSecundarioAtivo
                   ? 'font-medium text-foreground'
                   : 'text-sidebar-muted-foreground',

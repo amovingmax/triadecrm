@@ -133,7 +133,7 @@ export function FiltrosDoQuadro({
         aria-label="Filtrar o funil pelo canal do último toque"
         title="O canal do último toque com o negócio, não o canal em que ele entrou."
         onChange={(e) => aoTrocarCanal((e.target.value || null) as Channel | null)}
-        className="toque h-11 shrink-0 rounded-lg border border-input bg-background px-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-8"
+        className="toque h-11 shrink-0 rounded-lg border border-input bg-background px-2 text-base focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-8 md:text-sm"
       >
         <option value="">Todos os canais</option>
         {CANAIS_EM_ORDEM.map((c) => (

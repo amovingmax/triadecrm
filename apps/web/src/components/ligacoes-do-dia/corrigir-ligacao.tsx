@@ -190,7 +190,7 @@ function Conteudo({ ligacao, aoFechar }: { ligacao: LigacaoDoDia; aoFechar: () =
                   setMotivoDePerda(e.target.value === '' ? null : Number(e.target.value));
                   setErro(null);
                 }}
-                className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-9"
+                className="h-11 w-full rounded-lg border border-input bg-background px-3 text-base md:text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-9"
               >
                 <option value="">Escolha…</option>
                 {opcoes.data.motivosDePerda.map((m) => (
@@ -220,7 +220,7 @@ function Conteudo({ ligacao, aoFechar }: { ligacao: LigacaoDoDia; aoFechar: () =
           placeholder="Cliquei no botão errado"
           aria-invalid={erro !== null}
           aria-describedby={erro ? `${id}-erro` : undefined}
-          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         />
         {erro ? (
           <p id={`${id}-erro`} role="alert" className="text-xs text-destructive-texto">

@@ -52,7 +52,7 @@ export function MeuDiaDeQuemLiga({
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground">Início · Meu dia</p>
-          <h1 className="mt-1 font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
+          <h1 className="mt-1 font-heading text-[32px] leading-tight font-normal tracking-[-0.02em] break-words">
             {saudacao}, {nome}
           </h1>
         </div>

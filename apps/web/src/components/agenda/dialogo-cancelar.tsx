@@ -104,7 +104,7 @@ function Conteudo({
           }}
           placeholder="Ex.: o parceiro pediu para deixar para o mês que vem"
           aria-invalid={erro !== null}
-          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         />
         {erro ? <p className="text-xs text-destructive-texto">{erro}</p> : null}
       </div>

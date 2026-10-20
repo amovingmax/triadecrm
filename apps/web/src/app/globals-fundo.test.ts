@@ -79,3 +79,27 @@ describe('background-image no globals.css', () => {
     expect(CSS).not.toContain('background-image: var(--acao-gradiente)');
   });
 });
+
+/**
+ * Animação de entrada não pode deixar `transform` aplicado depois de terminar.
+ *
+ * NASCEU DE UM DEFEITO MEDIDO, em 20/10/2026. A entrada de página terminava em
+ * `transform: none` com `animation-fill-mode: both`, e o Chrome guarda o último
+ * quadro como `matrix(1, 0, 0, 1, 0, 0)` — que não é `none`. Qualquer `transform`
+ * diferente de `none` faz o elemento virar o bloco de contenção de todo
+ * `position: fixed` dentro dele: o botão "+" de Prospectados e o da Revisão, que
+ * deviam flutuar sobre a barra inferior do celular, ficavam parados no fim da
+ * lista, 4.600 px abaixo de onde o polegar está.
+ *
+ * `backwards` cobre o atraso e o primeiro quadro (a invisibilidade que a entrada
+ * precisa) e, no fim, devolve o elemento ao estilo dele — sem transform nenhum.
+ */
+describe('animações de entrada no globals.css', () => {
+  for (const nome of ['entrada-pagina', 'revelar-linha']) {
+    it(`${nome} não segura o último quadro`, () => {
+      const regra = CSS.match(new RegExp(`@utility ${nome}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+      expect(regra, `@utility ${nome} não encontrada`).toContain(`animation: ${nome}`);
+      expect(regra).not.toMatch(/\b(both|forwards)\b/);
+    });
+  }
+});

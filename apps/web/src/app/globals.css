@@ -692,7 +692,8 @@
 }
 
 /* Entrada escalonada das linhas: os primeiros resultados chegam primeiro.
-   Só transform e opacity; o delay vem inline, e some depois do primeiro paint. */
+   Só transform e opacity; o delay vem inline, e some depois do primeiro paint.
+   `backwards` pelo mesmo motivo da entrada de página, logo abaixo. */
 @keyframes revelar-linha {
   from {
     opacity: 0;
@@ -705,7 +706,7 @@
 }
 
 @utility revelar-linha {
-  animation: revelar-linha 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: revelar-linha 220ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 /* A ENTRADA DE PÁGINA, em CSS e não em JavaScript (29/09/2026).
@@ -718,15 +719,19 @@
    Em CSS isso não tem como acontecer. A invisibilidade só existe no PRIMEIRO
    QUADRO da animação, e animação de CSS sempre termina: se o JavaScript
    atrasar, falhar, ou o sistema pedir menos movimento (a regra do fim deste
-   arquivo encurta tudo para 0,01 ms), `both` leva o elemento ao último quadro
-   — opacidade 1. O conteúdo nunca depende de um script para aparecer.
+   arquivo encurta tudo para 0,01 ms), a animação acaba e o elemento volta ao
+   próprio estilo — opacidade 1. O conteúdo nunca depende de um script para
+   aparecer.
 
-   O último quadro é `transform: none`, e isso importa: um ancestral com
-   `transform` vira o bloco de contenção de todo `position: fixed` dentro dele,
-   e diálogo, folha e cabeçalho grudado passariam a se posicionar pela página
-   em vez de pela janela. */
+   `backwards`, e não `both` (20/10/2026): um ancestral com `transform` vira o
+   bloco de contenção de todo `position: fixed` dentro dele. O último quadro
+   escrito como `transform: none` não basta — com `both` o Chrome o segura como
+   `matrix(1, 0, 0, 1, 0, 0)`, que não é `none`, e o botão "+" de Prospectados e
+   o da Revisão ficavam parados no fim da lista em vez de flutuar sobre a barra
+   do celular. `backwards` aplica o primeiro quadro no atraso e, no fim, solta o
+   elemento. A regra está em `globals-fundo.test.ts`. */
 @utility entrada-pagina {
-  animation: entrada-pagina 180ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: entrada-pagina 180ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 @keyframes entrada-pagina {

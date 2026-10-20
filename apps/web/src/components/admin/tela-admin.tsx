@@ -75,6 +75,8 @@ export function TelaAdmin({
 
       <SeletorDeAba
         rotulo="Partes da administração"
+        // Cinco nomes não cabem em 390px: a faixa rola de lado, como a dos funis.
+        rolavel
         itens={ABAS.map((item) => ({ id: item.id, rotulo: item.rotulo }))}
         ativo={aba}
         aoTrocar={trocarAba}

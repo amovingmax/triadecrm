@@ -297,7 +297,7 @@ function Ritmo({
         value={valor}
         disabled={!podeEditar}
         onChange={(e) => aoMudar(Number(e.target.value))}
-        className="h-9 rounded-md border border-hairline bg-background px-2 text-sm disabled:opacity-60"
+        className="h-9 rounded-md border border-hairline bg-background px-2 text-base md:text-sm disabled:opacity-60"
       >
         {OPCOES.map((o) => (
           <option key={o.n} value={o.n}>
@@ -408,7 +408,7 @@ function TextoAutomatico({
         rows={4}
         disabled={!podeEditar}
         onChange={(e) => setTexto(e.target.value)}
-        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       />
       {podeEditar && texto.trim() !== inicial.trim() ? (
         <div>

@@ -76,7 +76,10 @@ export function SeletorDeAba<T extends string>({
       aria-label={rotulo}
       className={cn(
         'flex gap-1 rounded-full bg-card p-1 sombra-base md:w-fit',
-        rolavel ? '-mx-1 overflow-x-auto md:mx-0' : 'w-full',
+        // A faixa que divide a largura também rola quando os nomes não cabem: sem
+        // isso eles empurravam a PÁGINA inteira para o lado (a Admin estourava
+        // 110px num celular de 320, 20/10/2026). Quando cabem, nada muda.
+        rolavel ? '-mx-1 overflow-x-auto md:mx-0' : 'w-full overflow-x-auto',
       )}
     >
       {itens.map((item) => {

@@ -184,7 +184,12 @@ export function ChamadaCabecalho({
           <p
             className={cn(
               'numerico leading-none font-semibold tracking-tight select-all sm:text-4xl',
-              emChamada ? 'min-w-0 text-lg sm:text-4xl' : 'text-3xl',
+              // Fora da chamada o corpo acompanha a tela até os 30px: num
+              // celular de 320 o número não cabia em 30px e quebrava no hífen,
+              // "98701-" numa linha e "9052" na outra (20/10/2026).
+              emChamada
+                ? 'min-w-0 text-lg sm:text-4xl'
+                : 'text-[clamp(1.25rem,7.5vw,1.875rem)] whitespace-nowrap',
             )}
           >
             {telefoneLegivel(item.telefone)}

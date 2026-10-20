@@ -37,7 +37,12 @@ export function ReguaDoFunil({
       {/* No celular são duas linhas: o nome do funil sozinho em cima (ao lado do
           apoio ele quebrava em dois), e embaixo a etapa com o apoio. No desktop,
           uma linha só: o funil à esquerda, o apoio à direita. */}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-0.5">
+      {/* `minmax(min-content, 1fr)` e não `minmax(0, 1fr)`: com zero de piso, um
+          apoio comprido ("Ainda não contatado · desde hoje") espremia a coluna
+          da etapa até nada, e o nome dela era desenhado POR CIMA do apoio
+          (20/10/2026). Agora a etapa guarda a palavra mais longa e quem quebra
+          linha é o apoio. */}
+      <div className="grid grid-cols-[minmax(min-content,1fr)_auto] items-baseline gap-x-4 gap-y-0.5">
         <p className="col-span-2 text-[11px] leading-4 font-semibold tracking-[0.07em] text-muted-foreground uppercase md:col-span-1">
           {funil}
         </p>

@@ -254,7 +254,7 @@ export function TelaMeuDia({
               era um título de seção com cara de página; o sistema separa os dois
               pelo PESO — título grande é leve, ênfase é que é pesada. */}
           <p className="text-xs text-muted-foreground">Início · Meu dia</p>
-          <h1 className="mt-1 font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
+          <h1 className="mt-1 font-heading text-[32px] leading-tight font-normal tracking-[-0.02em] break-words">
             {saudacao}
             {nome ? `, ${nome}` : ''}.
           </h1>

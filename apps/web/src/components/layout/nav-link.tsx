@@ -39,8 +39,15 @@ type Props = {
  * O inativo usa `--sidebar-muted-foreground`, medido contra o azul da casca; o
  * `--muted-foreground` do conteúdo pararia em 4,45:1 sobre ele.
  *
- * Na barra inferior o rótulo tem `truncate` (`overflow: hidden`), então a caixa da
- * linha precisa caber a tinta inteira: `leading-4` (16px) para os 16px que a Poppins
+ * Na barra inferior o rótulo aparece INTEIRO (20/10/2026: "deve permanecer como
+ * Prospectados"). As fatias dividem a largura por igual enquanto cabe (`flex-1`), mas
+ * nenhuma fica mais estreita que o próprio rótulo (`min-w-max`): "Prospectados"
+ * (75px a 11px) toma a sobra de "Lotes" e "Funis", que só precisam da pílula de 48px.
+ * Abaixo de ~340px a letra desce até 10,4px (`clamp`), e os seis itens somam 317px
+ * num celular de 320. Antes eram seis fatias iguais e o nome saía "Prosp…" em
+ * qualquer celular.
+ *
+ * A caixa da linha precisa caber a tinta inteira: `leading-4` (16px) para os 16px que a Poppins
  * ocupa a 11px, nunca `leading-none` (11px). Isso deixou de ser precaução no dia em
  * que "Registrar" entrou na barra: o "g" é o primeiro descendente ali, e com
  * `leading-none` a perna dele seria cortada. "Relatórios" e "Agência", se um dia
@@ -154,7 +161,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
         href={item.href}
         aria-current={ativo ? 'page' : undefined}
         className={cn(
-          'toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-4 transition-colors',
+          'toque relative flex min-w-max flex-1 flex-col items-center justify-center gap-1 text-[clamp(10px,3.25vw,11px)] leading-4 transition-colors',
           ativo ? 'font-medium text-foreground' : 'text-sidebar-muted-foreground',
         )}
       >
@@ -188,7 +195,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
             {numero > 99 ? '99+' : numero}
           </span>
         ) : null}
-        <span className="truncate">{item.rotulo}</span>
+        <span className="whitespace-nowrap">{item.rotulo}</span>
       </Link>
     );
   }
