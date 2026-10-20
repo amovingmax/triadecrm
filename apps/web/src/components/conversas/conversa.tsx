@@ -80,6 +80,17 @@ import {
  */
 /** Quantos pixels do fim ainda contam como "está no fim". */
 const FOLGA_DO_FIM = 120;
+/** Quanto tempo depois de um gesto a rolagem ainda é da pessoa (cobre a inércia do toque). */
+const JANELA_DO_GESTO_MS = 1500;
+const TECLAS_QUE_ROLAM = new Set([
+  'ArrowUp',
+  'ArrowDown',
+  'PageUp',
+  'PageDown',
+  'Home',
+  'End',
+  ' ',
+]);
 
 export function Conversa({
   item,
@@ -166,11 +177,48 @@ export function Conversa({
   // A régua é onde ela ESTAVA antes de a mensagem chegar, medida durante a
   // rolagem: perto do fim, acompanha; lendo o começo de agosto, fica onde está.
   // Trocar de conversa sempre abre no fim, porque aí a pessoa pediu outra coisa.
+  //
+  // SÓ CONTA A ROLAGEM QUE A PESSOA FEZ. O navegador também rola sozinho: quando
+  // uma foto termina de carregar e cresce, ele ajusta a posição para segurar o
+  // que estava na tela (scroll anchoring), e esse `scroll` chegava aqui como se
+  // alguém tivesse subido para ler — a conversa abria com a foto cortada e a
+  // legenda escondida, e não descia mais (20/10/2026, em produção). Por isso a
+  // régua só se move logo depois de um gesto: roda, toque, tecla ou a barra.
   const coladoNoFim = useRef(true);
+  // Começa sem gesto nenhum: com 0, o primeiro segundo e meio depois de abrir a
+  // página (`performance.now()` conta dali) passava por gesto da pessoa.
+  const gestoEm = useRef(Number.NEGATIVE_INFINITY);
   const aoRolar = useCallback(() => {
     const caixa = rolagem.current;
     if (!caixa) return;
+    if (performance.now() - gestoEm.current > JANELA_DO_GESTO_MS) return;
     coladoNoFim.current = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < FOLGA_DO_FIM;
+  }, []);
+
+  useEffect(() => {
+    const caixa = rolagem.current;
+    if (!caixa) return;
+    const marcar = () => {
+      gestoEm.current = performance.now();
+    };
+    // As teclas que rolam chegam ao `body`, não à caixa: a coluna não recebe foco.
+    // Quem digita na resposta não está rolando a conversa.
+    const tecla = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null;
+      if (alvo?.closest('input, textarea, [contenteditable="true"]')) return;
+      if (TECLAS_QUE_ROLAM.has(e.key)) marcar();
+    };
+    const opcoes = { passive: true } as const;
+    for (const tipo of ['wheel', 'touchstart', 'touchmove', 'touchend', 'pointerdown'] as const) {
+      caixa.addEventListener(tipo, marcar, opcoes);
+    }
+    document.addEventListener('keydown', tecla);
+    return () => {
+      for (const tipo of ['wheel', 'touchstart', 'touchmove', 'touchend', 'pointerdown'] as const) {
+        caixa.removeEventListener(tipo, marcar);
+      }
+      document.removeEventListener('keydown', tecla);
+    };
   }, []);
 
   const conversaAnterior = useRef<string | null>(null);
@@ -194,6 +242,10 @@ export function Conversa({
   // última (20/10/2026: "sempre que abrir, ir para a parte de baixo"). Enquanto
   // a pessoa estiver no fim, a tela acompanha o conteúdo que cresce; se ela
   // subiu para ler, `coladoNoFim` já é falso e nada a puxa.
+  //
+  // E a JANELA também encolhe: o aviso de quem atende e o relógio da janela
+  // chegam depois e roubam altura da coluna. Encolher a caixa não dispara
+  // `scroll`, então ela é observada junto com o conteúdo.
   const conteudo = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const caixa = rolagem.current;
@@ -203,6 +255,7 @@ export function Conversa({
       if (coladoNoFim.current) caixa.scrollTop = caixa.scrollHeight;
     });
     observador.observe(dentro);
+    observador.observe(caixa);
     return () => observador.disconnect();
   }, []);
 

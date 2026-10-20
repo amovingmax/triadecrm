@@ -7302,3 +7302,17 @@ O pedido: "implemente a ferramenta pra eu conseguir enviar fotos e vídeos pelo 
 **A main alcançou o ar.** Produção rodava desde 16/10 a branch `midia-de-saida` (com a `funil-recomeca-e-consultoria` dentro), publicada pelo CLI sem passar pela main. As duas foram juntadas à main em `d1e2b94`; as migrações `20261014100000` e `20261016100000` já estavam no banco de produção. Conferido: lint, typecheck, testes (web, workers, schema, prompts), build, e pgTAP num Supabase limpo à parte (107 arquivos, 3.754 testes). As outras 13 branches do GitHub já estavam contidas na main.
 
 **Publicado em 20/10/2026 ~10h.** Deploy `triade-38n3pjycf` a partir de uma cópia limpa do commit `d1e2b94` (sem `.env` local). Volta: `triade-eto1mjb62`.
+
+## 20/10/2026 (tarde) — A rolagem não descia em produção: a correção de verdade (RF-CON-05)
+
+**O que o usuário viu.** Depois da publicação da manhã, a conversa ainda abria parada antes da última mensagem.
+
+**A causa, medida e não suposta.** Gravando cada mudança de rolagem num Chrome automático (Playwright) ao abrir uma conversa com foto: a coluna ia para o fim; a foto, ao carregar, crescia 320 px; o navegador ajustava sozinho a posição para segurar o que estava na tela (*scroll anchoring*), e esse `scroll` era lido como "a pessoa subiu para ler". Daí em diante nada puxava para o fim, e a conversa ficava 128 px antes do fim, com a foto cortada e a legenda escondida. A primeira tentativa (observar também a caixa, que encolhe quando o aviso de quem atende aparece) ficou, mas não resolvia isto.
+
+**Entregue** (`components/conversas/conversa.tsx`).
+- A régua de "está no fim" só muda logo depois de um gesto da pessoa (roda, toque, tecla de rolagem fora da caixa de resposta, ou a barra), numa janela de 1,5 s que cobre a inércia do toque. Rolagens do próprio navegador não contam mais.
+- A caixa da conversa é observada junto com o conteúdo: o aviso de quem atende e o relógio da janela, que chegam depois, não escondem mais a última mensagem.
+
+**Verificado no localhost, com o Chrome automático.** Abrindo por endereço e clicando na lista, em 1440×900, 1280×720 e 390×844: falta 0 px até o fim aos 0,3 s, 1 s, 2,5 s e 5 s (antes: 128 px na conversa com foto, em 1440×900). Quem sobe para ler e recebe mensagem fica parado; quem está no fim acompanha. Lint, typecheck e os 1.299 testes do web.
+
+**Pendente.** Publicar depois do teste do usuário no localhost.
