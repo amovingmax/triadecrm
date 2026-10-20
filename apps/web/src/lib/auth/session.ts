@@ -5,6 +5,7 @@
  * (RF-ADM-01). Nome e avatar vêm do `user_metadata` preenchido pelo Google no login.
  */
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 
 import { type AppRole, roleFromClaims } from '@/lib/auth/role';
 import { createClient } from '@/lib/supabase/server';
@@ -28,8 +29,16 @@ function texto(valor: unknown): string | null {
   return typeof valor === 'string' && valor.trim() ? valor.trim() : null;
 }
 
-/** Sessão atual ou null quando não há usuário autenticado. */
-export async function getSession(): Promise<Sessao | null> {
+/**
+ * Sessão atual ou null quando não há usuário autenticado.
+ *
+ * Memorizada por requisição (`cache` do React, 20/10/2026): o layout da área
+ * autenticada e a página pedem a sessão na mesma renderização (`requireSession`,
+ * `requireRole`), e cada pedido criava um cliente e validava o JWT de novo.
+ */
+export const getSession = cache(lerSessao);
+
+async function lerSessao(): Promise<Sessao | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
   if (error || !data?.claims) return null;

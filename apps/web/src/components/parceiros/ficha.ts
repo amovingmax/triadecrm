@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import type { OrgKind, Temperature } from '@komune/schema';
 
 import { createClient } from '@/lib/supabase/server';
@@ -118,7 +119,11 @@ export async function carregarFichaExcluida(id: string): Promise<FichaExcluidaLi
   if (error || !org || !org.deleted_at) return null;
 
   const { data: quem } = org.deleted_by
-    ? await supabase.from('team_directory').select('full_name').eq('id', org.deleted_by).maybeSingle()
+    ? await supabase
+        .from('team_directory')
+        .select('full_name')
+        .eq('id', org.deleted_by)
+        .maybeSingle()
     : { data: null };
 
   return {
@@ -133,8 +138,15 @@ export async function carregarFichaExcluida(id: string): Promise<FichaExcluidaLi
 /**
  * `null` significa uma coisa só: a linha não está lá — não existe, ou está fora do que
  * a RLS deixa este papel ver, que para quem olha dá no mesmo. Falha de leitura lança.
+ *
+ * Memorizada por requisição (`cache` do React, 20/10/2026): o título da aba
+ * (`generateMetadata`) e a página pedem a mesma ficha, e cada um fazia a leitura
+ * inteira. As RPCs e leituras do Supabase não entram na memorização automática do
+ * Next, que só vale para `fetch` GET.
  */
-export async function carregarFicha(id: string): Promise<Ficha | null> {
+export const carregarFicha = cache(lerFicha);
+
+async function lerFicha(id: string): Promise<Ficha | null> {
   const supabase = await createClient();
 
   const { data: org, error } = await supabase
@@ -159,7 +171,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
   }
   if (!org) return null;
 
-  const [categorias, negocios, origem, time, conversas] = await Promise.all([
+  const [categorias, negocios, origem, time, conversas, funisLidos] = await Promise.all([
     supabase
       .from('organization_categories')
       .select('is_primary, category_id, categories(name)')
@@ -189,6 +201,9 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
       .eq('organization_id', id)
       .order('last_message_at', { ascending: false, nullsFirst: false })
       .limit(1),
+    // Os nomes dos funis não dependem de nada daqui: vêm na mesma ida, e não numa
+    // ida a mais no fim, em série (20/10/2026).
+    supabase.from('pipelines').select('id, name'),
   ]);
 
   const nomeDoTime = new Map((time.data ?? []).map((p) => [p.id, p.full_name]));
@@ -207,7 +222,7 @@ export async function carregarFicha(id: string): Promise<Ficha | null> {
         .is('retired_at', null)
         .order('position')
     : { data: [] };
-  const { data: funis } = await supabase.from('pipelines').select('id, name');
+  const funis = funisLidos.data;
 
   const etapaPorId = new Map((etapas ?? []).map((e) => [e.id, e.name]));
   const funilPorId = new Map((funis ?? []).map((f) => [f.id, f.name]));
