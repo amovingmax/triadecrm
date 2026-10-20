@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
 import { chaveDasMensagensDoFio } from './fora-da-base-dados';
 import { chaveDaLeitura } from './leitura-da-ia-dados';
+import { ESPERA_DA_RAJADA_MS, RITMO_SEM_ECO_MS, RITMO_VIGIANDO_MS } from './ritmo-do-eco';
 
 /**
  * O eco do banco: a tela se atualiza sozinha quando o parceiro responde.
@@ -58,11 +59,7 @@ import { chaveDaLeitura } from './leitura-da-ia-dados';
  */
 
 /** As tabelas publicadas no Realtime (migração `20260917150000`). */
-export type TabelaDoEco =
-  | 'messages'
-  | 'conversations'
-  | 'message_drafts'
-  | 'ficha_da_conversa';
+export type TabelaDoEco = 'messages' | 'conversations' | 'message_drafts' | 'ficha_da_conversa';
 
 export interface EventoDoEco {
   readonly tabela: TabelaDoEco;
@@ -80,25 +77,8 @@ export interface EventoDoEco {
  */
 export type EstadoDoEco = 'ligando' | 'ao_vivo' | 'sem_eco';
 
-/** Quanto tempo juntar eventos antes de buscar. Rajada vira uma busca só. */
-export const ESPERA_DA_RAJADA_MS = 400;
-
-/** Ritmo da sondagem quando não há eco. Barata o bastante para ser frequente. */
-export const RITMO_SEM_ECO_MS = 20_000;
-
-/**
- * Ritmo da MESMA sondagem enquanto o eco está de pé.
- *
- * Ela não some quando o socket sobe, e a razão é um modo de falha real: "ao
- * vivo" quer dizer que o canal assinou, não que os eventos estão chegando. Se a
- * publicação sumir numa migração futura, ou se o socket ficar aberto e surdo, a
- * tela diria "ao vivo" e estaria morta — em silêncio, que é a pior forma.
- *
- * A noventa segundos ela custa duas consultas minúsculas por minuto e meio, e é
- * o que garante que o atraso máximo da tela seja um minuto e meio em vez de
- * infinito.
- */
-export const RITMO_VIGIANDO_MS = 90_000;
+// Os ritmos moram em `ritmo-do-eco.ts` (o aviso de resposta, na casca, usa os mesmos).
+export { ESPERA_DA_RAJADA_MS, RITMO_SEM_ECO_MS, RITMO_VIGIANDO_MS };
 
 interface RegistroCru {
   readonly id?: unknown;

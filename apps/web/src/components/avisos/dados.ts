@@ -1,4 +1,5 @@
-import { escolherNegocio, type NegocioCru } from '@/components/conversas/montagem';
+import { escolherNegocio } from '@/components/conversas/escolher-negocio';
+import type { NegocioCru } from '@/components/conversas/montagem';
 import { isAppRole } from '@/lib/auth/role';
 import { createClient } from '@/lib/supabase/client';
 
