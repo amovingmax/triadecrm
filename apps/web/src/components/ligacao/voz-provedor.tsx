@@ -326,16 +326,23 @@ export function ProvedorDoSoftphone({
         if (!lida) return;
         // O provedor já encerrou e o navegador ainda não percebeu: desliga aqui.
         if (!linhaViva(lida.estado)) noNavegador.current?.desligar();
-        setLigacao((atual) =>
-          atual && atual.id === idVivo
-            ? {
-                ...atual,
-                estado: juntarEstados(atual.estado, lida.estado),
-                atendidaEm: lida.atendidaEm ?? atual.atendidaEm,
-                encerradaEm: lida.encerradaEm ?? atual.encerradaEm,
-              }
-            : atual,
-        );
+        setLigacao((atual) => {
+          if (!atual || atual.id !== idVivo) return atual;
+          const estado = juntarEstados(atual.estado, lida.estado);
+          const atendidaEm = lida.atendidaEm ?? atual.atendidaEm;
+          const encerradaEm = lida.encerradaEm ?? atual.encerradaEm;
+          // Nada mudou: o MESMO objeto. Um novo a cada leitura (de 1,5 em 1,5 s)
+          // trocava o valor do contexto e redesenhava a tela de chamada inteira
+          // durante toda a ligação (20/10/2026).
+          if (
+            estado === atual.estado &&
+            atendidaEm === atual.atendidaEm &&
+            encerradaEm === atual.encerradaEm
+          ) {
+            return atual;
+          }
+          return { ...atual, estado, atendidaEm, encerradaEm };
+        });
       });
     }, INTERVALO_DA_LINHA_MS);
     return () => window.clearInterval(relogio);
