@@ -7297,6 +7297,8 @@ O pedido: "implemente a ferramenta pra eu conseguir enviar fotos e vídeos pelo 
 
 **Verificado.** Lint e typecheck do web.
 
-**Não verificado.** Não abri no navegador: o Supabase local estava desligado (Docker parado).
+**Verificado depois.** No localhost, com mensagens simuladas de texto, foto e figurinha chegando de duas pessoas: a conversa abre no fim e quem lê o histórico não é puxado (conferido pelo usuário).
 
-**Pendente.** Publicar, quando pedirem.
+**A main alcançou o ar.** Produção rodava desde 16/10 a branch `midia-de-saida` (com a `funil-recomeca-e-consultoria` dentro), publicada pelo CLI sem passar pela main. As duas foram juntadas à main em `d1e2b94`; as migrações `20261014100000` e `20261016100000` já estavam no banco de produção. Conferido: lint, typecheck, testes (web, workers, schema, prompts), build, e pgTAP num Supabase limpo à parte (107 arquivos, 3.754 testes). As outras 13 branches do GitHub já estavam contidas na main.
+
+**Publicado em 20/10/2026 ~10h.** Deploy `triade-38n3pjycf` a partir de uma cópia limpa do commit `d1e2b94` (sem `.env` local). Volta: `triade-eto1mjb62`.
