@@ -185,6 +185,26 @@ export function Conversa({
     }
   }, [item.id, quantosEventos]);
 
+  // O FIM ANDA DEPOIS QUE A CONVERSA ABRE.
+  //
+  // Rolar uma vez quando o histórico chega não bastava: as fotos carregam
+  // depois (`loading="lazy"`), a leitura da IA e os áudios também, e cada um
+  // empurra o fim para baixo — a conversa abria parada umas mensagens antes da
+  // última (20/10/2026: "sempre que abrir, ir para a parte de baixo"). Enquanto
+  // a pessoa estiver no fim, a tela acompanha o conteúdo que cresce; se ela
+  // subiu para ler, `coladoNoFim` já é falso e nada a puxa.
+  const conteudo = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const caixa = rolagem.current;
+    const dentro = conteudo.current;
+    if (!caixa || !dentro || typeof ResizeObserver === 'undefined') return;
+    const observador = new ResizeObserver(() => {
+      if (coladoNoFim.current) caixa.scrollTop = caixa.scrollHeight;
+    });
+    observador.observe(dentro);
+    return () => observador.disconnect();
+  }, []);
+
   const negocio = consulta.data ? escolherNegocio(consulta.data.negocios) : null;
   const proxima = formatarProximaAcao(negocio?.next_action_at);
   const onde = local(item.bairro, item.cidade);
@@ -331,90 +351,92 @@ export function Conversa({
           da tela — sobrava com trinta pixels. Endereço e categoria são consulta,
           não decisão: podem sair de vista quando a pessoa desce para ler. */}
       <div ref={rolagem} onScroll={aoRolar} className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
-        {/* A ficha em UMA LINHA que quebra, e não numa grade de seis campos.
+        <div ref={conteudo}>
+          {/* A ficha em UMA LINHA que quebra, e não numa grade de seis campos.
             A grade custava 200 px do painel; com o rodapé do inbox embaixo, esses
             200 px eram a conversa inteira. Onde, categoria, dono e último contato
             são consulta de canto de olho — quem precisa do resto abre a ficha. O
             telefone continua atrás da mesma RPC auditada. */}
-        <button
-          type="button"
-          aria-expanded={fichaAberta}
-          onClick={() => setFichaAberta((v) => !v)}
-          className="toque -ml-1 mb-1 flex min-h-9 items-center gap-1 px-1 text-[11px] text-muted-foreground sm:hidden"
-        >
-          Ficha do parceiro
-          <ChevronDown
-            className={cn('size-3.5 transition-transform', fichaAberta && 'rotate-180')}
-            aria-hidden="true"
-          />
-        </button>
-        <dl
-          className={cn(
-            'mx-auto max-w-4xl flex-wrap items-baseline gap-x-4 gap-y-1 pb-1 text-[11px] text-muted-foreground sm:flex',
-            fichaAberta ? 'flex' : 'hidden',
-          )}
-        >
-          <Campo rotulo="Onde">{onde || 'sem endereço na base'}</Campo>
-          <Campo rotulo="Categoria">{item.categoria ?? 'sem categoria'}</Campo>
-          <Campo rotulo="Responsável">{item.responsavel ?? 'sem dono'}</Campo>
-          {atendendo ? <Campo rotulo="Atendendo">{atendendo}</Campo> : null}
-          <Campo rotulo="Último contato">
-            <DiasSemContato dias={item.diasSemContato} atencao={item.precisaAtencao} />
-            <span>
-              (<span className="numerico">{contagem.numero}</span>
-              {contagem.palavra})
-            </span>
-          </Campo>
-          <Campo rotulo="Telefone">
-            <TelefoneRevelavel
-              organizationId={item.id}
-              telefone={item.telefone}
-              mascarado={item.telefoneMascarado}
-              whatsapp={meta?.numeroConfigurado ? 'nenhum' : 'externo'}
+          <button
+            type="button"
+            aria-expanded={fichaAberta}
+            onClick={() => setFichaAberta((v) => !v)}
+            className="toque -ml-1 mb-1 flex min-h-9 items-center gap-1 px-1 text-[11px] text-muted-foreground sm:hidden"
+          >
+            Ficha do parceiro
+            <ChevronDown
+              className={cn('size-3.5 transition-transform', fichaAberta && 'rotate-180')}
+              aria-hidden="true"
             />
-          </Campo>
-          {negocio?.next_action || proxima ? (
-            <Campo rotulo="Próxima ação">
-              <span className={cn('truncate', proxima?.atrasada && 'font-medium')}>
-                {negocio?.next_action ?? 'combinada'}
+          </button>
+          <dl
+            className={cn(
+              'mx-auto max-w-4xl flex-wrap items-baseline gap-x-4 gap-y-1 pb-1 text-[11px] text-muted-foreground sm:flex',
+              fichaAberta ? 'flex' : 'hidden',
+            )}
+          >
+            <Campo rotulo="Onde">{onde || 'sem endereço na base'}</Campo>
+            <Campo rotulo="Categoria">{item.categoria ?? 'sem categoria'}</Campo>
+            <Campo rotulo="Responsável">{item.responsavel ?? 'sem dono'}</Campo>
+            {atendendo ? <Campo rotulo="Atendendo">{atendendo}</Campo> : null}
+            <Campo rotulo="Último contato">
+              <DiasSemContato dias={item.diasSemContato} atencao={item.precisaAtencao} />
+              <span>
+                (<span className="numerico">{contagem.numero}</span>
+                {contagem.palavra})
               </span>
-              {proxima ? (
-                <span className="shrink-0 text-muted-foreground" title={proxima.detalhe}>
-                  {proxima.prefixo.trim()}
-                  {proxima.numero ? (
-                    <>
-                      {' '}
-                      <span className="numerico">{proxima.numero}</span>
-                    </>
-                  ) : null}
-                  {proxima.sufixo}
-                </span>
-              ) : null}
             </Campo>
-          ) : null}
-        </dl>
+            <Campo rotulo="Telefone">
+              <TelefoneRevelavel
+                organizationId={item.id}
+                telefone={item.telefone}
+                mascarado={item.telefoneMascarado}
+                whatsapp={meta?.numeroConfigurado ? 'nenhum' : 'externo'}
+              />
+            </Campo>
+            {negocio?.next_action || proxima ? (
+              <Campo rotulo="Próxima ação">
+                <span className={cn('truncate', proxima?.atrasada && 'font-medium')}>
+                  {negocio?.next_action ?? 'combinada'}
+                </span>
+                {proxima ? (
+                  <span className="shrink-0 text-muted-foreground" title={proxima.detalhe}>
+                    {proxima.prefixo.trim()}
+                    {proxima.numero ? (
+                      <>
+                        {' '}
+                        <span className="numerico">{proxima.numero}</span>
+                      </>
+                    ) : null}
+                    {proxima.sufixo}
+                  </span>
+                ) : null}
+              </Campo>
+            ) : null}
+          </dl>
 
-        {/* A leitura da IA entra ENTRE a ficha e a conversa, e não num painel à
+          {/* A leitura da IA entra ENTRE a ficha e a conversa, e não num painel à
             parte: ela fala sobre o que está logo abaixo, e a evidência de cada
             sinal é uma mensagem daquela mesma coluna. Fechada, é uma linha. */}
-        {fio ? <LeituraDaIa fioId={fio.id} className="mx-auto mt-2.5 max-w-4xl" /> : null}
+          {fio ? <LeituraDaIa fioId={fio.id} className="mx-auto mt-2.5 max-w-4xl" /> : null}
 
-        <AvisoWhatsapp meta={meta} compacto className="mx-auto my-4 max-w-4xl" />
+          <AvisoWhatsapp meta={meta} compacto className="mx-auto my-4 max-w-4xl" />
 
-        {consulta.isPending ? (
-          <EsqueletoLinha />
-        ) : consulta.isError ? (
-          <ErroDaTela
-            causa={mensagemDoErro(consulta.error)}
-            aoTentar={() => void consulta.refetch()}
-          />
-        ) : dias.length === 0 ? (
-          <SemHistorico organizacaoId={item.id} />
-        ) : (
-          <div className="mx-auto max-w-4xl">
-            <LinhaDoTempo dias={dias} nomeDoParceiro={item.nome} />
-          </div>
-        )}
+          {consulta.isPending ? (
+            <EsqueletoLinha />
+          ) : consulta.isError ? (
+            <ErroDaTela
+              causa={mensagemDoErro(consulta.error)}
+              aoTentar={() => void consulta.refetch()}
+            />
+          ) : dias.length === 0 ? (
+            <SemHistorico organizacaoId={item.id} />
+          ) : (
+            <div className="mx-auto max-w-4xl">
+              <LinhaDoTempo dias={dias} nomeDoParceiro={item.nome} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* O rodapé não rola com a conversa: o relógio decide o que pode sair, e

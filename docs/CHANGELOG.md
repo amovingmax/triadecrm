@@ -7212,3 +7212,13 @@ Pedido de 13/10: fechar "os controles que hoje são SQL" (as três pendências d
 - Excluir lote exige motivo; tirar um contato não exige nem pede confirmação (volta para a base na hora e pode entrar em outro lote).
 - Backup do banco local antes das migrações: `~/triadecrm-backups/local-antes-dos-ajustes-de-voz-2026-10-13.dump`.
 
+
+## 20/10/2026 — A conversa abre na última mensagem (RF-CON-05)
+
+**Entregue.** Ao abrir uma conversa, a tela vai para o fim e fica lá enquanto fotos, áudios e a leitura da IA terminam de carregar. Antes ela rolava uma vez só, quando o histórico chegava; as fotos (`loading="lazy"`) carregavam depois e empurravam o fim para baixo, e a conversa abria parada algumas mensagens antes da última. Um `ResizeObserver` no conteúdo de `components/conversas/conversa.tsx` acompanha o crescimento só enquanto a pessoa está no fim; quem subiu para ler o histórico não é puxado.
+
+**Verificado.** Lint e typecheck do web.
+
+**Não verificado.** Não abri no navegador: o Supabase local estava desligado (Docker parado).
+
+**Pendente.** Publicar, quando pedirem.
