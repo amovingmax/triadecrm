@@ -49,6 +49,7 @@ import {
 } from './mensagens';
 import type { CatalogosConversas } from './montagem';
 import { TextoLivre } from './responder';
+import { useRolagemNoFim } from './rolagem-no-fim';
 import { previaDoDigitado, useTextosDigitados } from './texto-digitado';
 
 /**
@@ -185,6 +186,8 @@ export function ConversaForaDaBase({
     ultimaEntradaEm: fio.last_inbound_at,
     escolhida: escolhaExplicita,
   });
+  // Abre no fim, como a conversa de parceiro (ver `rolagem-no-fim.ts`).
+  const { rolagem, conteudo, aoRolar } = useRolagemNoFim(fio.id, mensagens.data?.length ?? 0);
   const [virando, setVirando] = useState(false);
   const [modo, setModo] = useState<'criar' | 'ligar'>('criar');
   const janela = estadoDaJanela(fio.window_expires_at);
@@ -284,22 +287,24 @@ export function ConversaForaDaBase({
         </section>
       ) : null}
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-4">
-        {mensagens.isPending ? (
-          <p className="text-sm text-muted-foreground">Carregando as mensagens...</p>
-        ) : mensagens.isError ? (
-          <p className="text-sm text-muted-foreground">
-            {mensagens.error instanceof ErroDaConversa
-              ? mensagens.error.message
-              : 'Não deu para ler as mensagens.'}
-          </p>
-        ) : (
-          // O nome do cliente em cima do balão dele: sem isto, a mensagem de quem
-          // não é parceiro aparecia assinada "O parceiro".
-          montarMensagens(mensagens.data, nomeDaPessoa).map((m) => (
-            <Mensagem key={m.id} mensagem={m} nomeDoParceiro={nome || 'Cliente'} />
-          ))
-        )}
+      <div ref={rolagem} onScroll={aoRolar} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div ref={conteudo} className="space-y-2">
+          {mensagens.isPending ? (
+            <p className="text-sm text-muted-foreground">Carregando as mensagens...</p>
+          ) : mensagens.isError ? (
+            <p className="text-sm text-muted-foreground">
+              {mensagens.error instanceof ErroDaConversa
+                ? mensagens.error.message
+                : 'Não deu para ler as mensagens.'}
+            </p>
+          ) : (
+            // O nome do cliente em cima do balão dele: sem isto, a mensagem de quem
+            // não é parceiro aparecia assinada "O parceiro".
+            montarMensagens(mensagens.data, nomeDaPessoa).map((m) => (
+              <Mensagem key={m.id} mensagem={m} nomeDoParceiro={nome || 'Cliente'} />
+            ))
+          )}
+        </div>
       </div>
 
       {/* A caixa de resposta, como em qualquer conversa: dentro das 24 h desde a

@@ -7316,3 +7316,17 @@ O pedido: "implemente a ferramenta pra eu conseguir enviar fotos e vídeos pelo 
 **Verificado no localhost, com o Chrome automático.** Abrindo por endereço e clicando na lista, em 1440×900, 1280×720 e 390×844: falta 0 px até o fim aos 0,3 s, 1 s, 2,5 s e 5 s (antes: 128 px na conversa com foto, em 1440×900). Quem sobe para ler e recebe mensagem fica parado; quem está no fim acompanha. Lint, typecheck e os 1.299 testes do web.
 
 **Testado pelo usuário no localhost** com texto, foto, figurinha e áudio chegando ("deu certo"). Publicado em 20/10/2026 à tarde, a partir de cópia limpa do commit; volta: `triade-38n3pjycf`.
+
+## 20/10/2026 (fim da tarde) — A conversa de cliente também abre no fim (RF-CON-05)
+
+**O que o usuário viu.** Depois da segunda publicação, no computador e com recarga forçada: "abre lá no começo".
+
+**A causa.** Há duas telas de conversa: a do parceiro (`conversa.tsx`) e a do cliente ou número fora da base (`fora-da-base.tsx`, aba Clientes e clientes na lista de Conversas). A regra de abrir no fim só existia na primeira; a segunda nunca rolou. Medido no localhost: Carla Cliente abria a 4.089 px do fim na versão do ar.
+
+**Entregue.**
+- `components/conversas/rolagem-no-fim.ts` (`useRolagemNoFim`): a regra inteira (abrir no fim, acompanhar o fim só enquanto a pessoa está nele, só contar rolagem feita por gesto, observar conteúdo e caixa) numa peça só, usada pelas duas telas.
+- A conversa de cliente passa a ler as 200 mensagens MAIS RECENTES (eram as 200 primeiras, que cortavam as de agora numa conversa longa), exibidas da mais antiga para a mais nova.
+
+**Verificado no localhost, com o Chrome automático.** Carla Cliente (38 mensagens, foto por último), pela aba Clientes e pela lista, em 1440×900, 1280×720 e 390×844: 0 px do fim aos 0,3 s, 1 s, 2,5 s e 5 s. Parceiro (Natal Cocktails, Accord, Mesas e Festas): 0 px. Nas duas telas, quem sobe para ler e recebe mensagem fica parado, e quem está no fim acompanha. Lint, typecheck e os 1.299 testes do web.
+
+**Pendente.** Publicar depois do teste do usuário no localhost.

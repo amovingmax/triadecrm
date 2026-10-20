@@ -46,18 +46,23 @@ export function chaveDasMensagensDoFio(fioId: string) {
 const COLUNAS_MENSAGEM =
   'id, conversation_id, organization_id, direction, type, status, body, media_path, media_mime, tipo_na_meta, transcript, template_id, draft_id, author_kind, sent_by, approved_by, is_first_contact, business_initiated, optout_confirmation, origin, error_code, error_detail, created_at, sent_at, delivered_at, read_at, failed_at';
 
+/**
+ * As 200 mensagens MAIS RECENTES, em ordem de conversa (a mais antiga em cima).
+ * Pedir as 200 primeiras em ordem crescente cortava justamente as de agora numa
+ * conversa longa — e a tela abre no fim, onde elas deveriam estar (20/10/2026).
+ */
 export async function carregarMensagensDoFio(fioId: string): Promise<MensagemCrua[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('messages')
     .select(COLUNAS_MENSAGEM)
     .eq('conversation_id', fioId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(200);
   if (error) {
     throw new ErroDaConversa('Não deu para ler as mensagens desta conversa.', true, error);
   }
-  return (data ?? []) as MensagemCrua[];
+  return ((data ?? []) as MensagemCrua[]).reverse();
 }
 
 const resultadoSchema = z.object({

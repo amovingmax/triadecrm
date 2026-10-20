@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -44,6 +44,7 @@ import {
   type CatalogosConversas,
 } from './montagem';
 import { CaixaDeResposta } from './responder';
+import { useRolagemNoFim } from './rolagem-no-fim';
 import {
   ROTULO_ESTADO_DO_FIO,
   type DependenciasDaMeta,
@@ -78,20 +79,6 @@ import {
  * segunda porta para `registrar_contato`, com outra previsão de temperatura e
  * outra fila offline.
  */
-/** Quantos pixels do fim ainda contam como "está no fim". */
-const FOLGA_DO_FIM = 120;
-/** Quanto tempo depois de um gesto a rolagem ainda é da pessoa (cobre a inércia do toque). */
-const JANELA_DO_GESTO_MS = 1500;
-const TECLAS_QUE_ROLAM = new Set([
-  'ArrowUp',
-  'ArrowDown',
-  'PageUp',
-  'PageDown',
-  'Home',
-  'End',
-  ' ',
-]);
-
 export function Conversa({
   item,
   catalogos,
@@ -159,105 +146,10 @@ export function Conversa({
     escolhida: escolhaExplicita,
   });
 
-  // ONDE A CONVERSA ABRE.
-  //
-  // No fim, onde está a mensagem de agora: a coluna é cronológica ascendente, e
-  // abrir no topo faria rolar cinco meses de histórico toda vez que alguém
-  // escrevesse.
-  const rolagem = useRef<HTMLDivElement>(null);
+  // Abre no fim e acompanha o fim enquanto a pessoa estiver nele; quem subiu
+  // para ler o histórico não é puxado (ver `rolagem-no-fim.ts`).
   const quantosEventos = dias.reduce((soma, dia) => soma + dia.eventos.length, 0);
-
-  // QUEM ESTÁ LENDO O HISTÓRICO NÃO É PUXADO PARA O FIM.
-  //
-  // Enquanto a tela só se atualizava quando alguém recarregava, saltar para a
-  // última mensagem a cada mudança era sempre certo. Com o eco do banco, chega
-  // mensagem enquanto a pessoa lê — e rolar a tela debaixo de quem está lendo é
-  // a forma mais rápida de fazer alguém desistir de ler.
-  //
-  // A régua é onde ela ESTAVA antes de a mensagem chegar, medida durante a
-  // rolagem: perto do fim, acompanha; lendo o começo de agosto, fica onde está.
-  // Trocar de conversa sempre abre no fim, porque aí a pessoa pediu outra coisa.
-  //
-  // SÓ CONTA A ROLAGEM QUE A PESSOA FEZ. O navegador também rola sozinho: quando
-  // uma foto termina de carregar e cresce, ele ajusta a posição para segurar o
-  // que estava na tela (scroll anchoring), e esse `scroll` chegava aqui como se
-  // alguém tivesse subido para ler — a conversa abria com a foto cortada e a
-  // legenda escondida, e não descia mais (20/10/2026, em produção). Por isso a
-  // régua só se move logo depois de um gesto: roda, toque, tecla ou a barra.
-  const coladoNoFim = useRef(true);
-  // Começa sem gesto nenhum: com 0, o primeiro segundo e meio depois de abrir a
-  // página (`performance.now()` conta dali) passava por gesto da pessoa.
-  const gestoEm = useRef(Number.NEGATIVE_INFINITY);
-  const aoRolar = useCallback(() => {
-    const caixa = rolagem.current;
-    if (!caixa) return;
-    if (performance.now() - gestoEm.current > JANELA_DO_GESTO_MS) return;
-    coladoNoFim.current = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < FOLGA_DO_FIM;
-  }, []);
-
-  useEffect(() => {
-    const caixa = rolagem.current;
-    if (!caixa) return;
-    const marcar = () => {
-      gestoEm.current = performance.now();
-    };
-    // As teclas que rolam chegam ao `body`, não à caixa: a coluna não recebe foco.
-    // Quem digita na resposta não está rolando a conversa.
-    const tecla = (e: KeyboardEvent) => {
-      const alvo = e.target as HTMLElement | null;
-      if (alvo?.closest('input, textarea, [contenteditable="true"]')) return;
-      if (TECLAS_QUE_ROLAM.has(e.key)) marcar();
-    };
-    const opcoes = { passive: true } as const;
-    for (const tipo of ['wheel', 'touchstart', 'touchmove', 'touchend', 'pointerdown'] as const) {
-      caixa.addEventListener(tipo, marcar, opcoes);
-    }
-    document.addEventListener('keydown', tecla);
-    return () => {
-      for (const tipo of ['wheel', 'touchstart', 'touchmove', 'touchend', 'pointerdown'] as const) {
-        caixa.removeEventListener(tipo, marcar);
-      }
-      document.removeEventListener('keydown', tecla);
-    };
-  }, []);
-
-  const conversaAnterior = useRef<string | null>(null);
-  useEffect(() => {
-    const caixa = rolagem.current;
-    if (!caixa) return;
-    const trocouDeConversa = conversaAnterior.current !== item.id;
-    conversaAnterior.current = item.id;
-    if (trocouDeConversa) coladoNoFim.current = true;
-
-    if (quantosEventos > 0 && (trocouDeConversa || coladoNoFim.current)) {
-      caixa.scrollTop = caixa.scrollHeight;
-    }
-  }, [item.id, quantosEventos]);
-
-  // O FIM ANDA DEPOIS QUE A CONVERSA ABRE.
-  //
-  // Rolar uma vez quando o histórico chega não bastava: as fotos carregam
-  // depois (`loading="lazy"`), a leitura da IA e os áudios também, e cada um
-  // empurra o fim para baixo — a conversa abria parada umas mensagens antes da
-  // última (20/10/2026: "sempre que abrir, ir para a parte de baixo"). Enquanto
-  // a pessoa estiver no fim, a tela acompanha o conteúdo que cresce; se ela
-  // subiu para ler, `coladoNoFim` já é falso e nada a puxa.
-  //
-  // E a JANELA também encolhe: o aviso de quem atende e o relógio da janela
-  // chegam depois e roubam altura da coluna. Encolher a caixa não dispara
-  // `scroll`, então ela é observada junto com o conteúdo.
-  const conteudo = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const caixa = rolagem.current;
-    const dentro = conteudo.current;
-    if (!caixa || !dentro || typeof ResizeObserver === 'undefined') return;
-    const observador = new ResizeObserver(() => {
-      if (coladoNoFim.current) caixa.scrollTop = caixa.scrollHeight;
-    });
-    observador.observe(dentro);
-    observador.observe(caixa);
-    return () => observador.disconnect();
-  }, []);
+  const { rolagem, conteudo, aoRolar } = useRolagemNoFim(item.id, quantosEventos);
 
   const negocio = consulta.data ? escolherNegocio(consulta.data.negocios) : null;
   const proxima = formatarProximaAcao(negocio?.next_action_at);
