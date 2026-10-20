@@ -69,6 +69,8 @@ export interface EventoDoEco {
   readonly organizacaoId: string | null;
   /** `true` só para mensagem NOVA vinda do parceiro. É o que merece aviso. */
   readonly respostaDoParceiro: boolean;
+  /** O registro é novo (INSERT). Em `messages`, o contrário é recibo ou transcrição. */
+  readonly novo: boolean;
 }
 
 /**
@@ -115,12 +117,13 @@ export function lerEvento(
     conversaId,
     organizacaoId,
     respostaDoParceiro: tabela === 'messages' && ehInsercao && r.direction === 'in',
+    novo: ehInsercao,
   };
 }
 
 /** O que juntar enquanto a rajada não termina (ou enquanto a aba está escondida). */
 export interface Pendencia {
-  /** A lista sempre precisa: ordem, prévia e "por ler" mudam com qualquer evento. */
+  /** A lista: ordem, prévia e "por ler" mudam com quase todo evento (ver `somarAoPendente`). */
   lista: boolean;
   /** As linhas do tempo abertas que precisam ser buscadas de novo. */
   readonly organizacoes: Set<string>;
@@ -142,7 +145,16 @@ export function somarAoPendente(pendencia: Pendencia, evento: EventoDoEco): Pend
   // que ninguém estava vendo. Deixou de ser verdade no dia em que a lista passou
   // a mostrar a próxima ação: agora um resumo novo MUDA o que está na tela, e não
   // recarregar seria deixar o conselho velho no lugar onde se decide.
-  pendencia.lista = true;
+  //
+  // A EXCEÇÃO É A MENSAGEM QUE JÁ EXISTIA (20/10/2026). Cada mensagem enviada
+  // volta três vezes como UPDATE em `messages` (enviado, entregue, lido), e cada
+  // volta recarregava a lista inteira — as dezesseis consultas, em toda aba de
+  // Conversas aberta, só para mudar o tique da conversa aberta. A lista não lê
+  // `messages`, e no banco o UPDATE de mensagem não mexe em outra tabela (os
+  // gatilhos que tocam `conversations` e `activities` são todos de INSERT). Então
+  // o recibo atualiza a conversa aberta e deixa a lista quieta; mensagem NOVA e
+  // qualquer evento das outras tabelas continuam recarregando tudo.
+  if (evento.tabela !== 'messages' || evento.novo) pendencia.lista = true;
   if (evento.organizacaoId !== null) pendencia.organizacoes.add(evento.organizacaoId);
   if (evento.conversaId !== null) pendencia.fios.add(evento.conversaId);
   if (evento.respostaDoParceiro) pendencia.respostas.push(evento);

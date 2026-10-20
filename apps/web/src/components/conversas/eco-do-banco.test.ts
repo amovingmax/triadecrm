@@ -28,6 +28,7 @@ describe('ler o evento', () => {
       conversaId: 'fio-1',
       organizacaoId: 'org-1',
       respostaDoParceiro: false,
+      novo: false,
     });
   });
 
@@ -79,6 +80,7 @@ describe('juntar a rajada', () => {
     conversaId: 'f',
     organizacaoId: org,
     respostaDoParceiro: true,
+    novo: true,
   });
 
   it('cinco eventos viram uma busca da lista e uma por parceiro', () => {
@@ -91,6 +93,7 @@ describe('juntar a rajada', () => {
       conversaId: 'f',
       organizacaoId: 'org-1',
       respostaDoParceiro: false,
+      novo: false,
     });
 
     expect(pendencia.lista).toBe(true);
@@ -109,13 +112,14 @@ describe('juntar a rajada', () => {
       conversaId: 'fio-7',
       organizacaoId: 'org-7',
       respostaDoParceiro: false,
+      novo: false,
     });
     expect(pendencia.lista).toBe(true);
     expect([...pendencia.organizacoes]).toEqual(['org-7']);
     expect([...pendencia.fios]).toEqual(['fio-7']);
   });
 
-  it('qualquer evento recarrega a lista: ordem, prévia e "por ler" mudam com todos', () => {
+  it('mensagem nova recarrega a lista: ordem, prévia e "por ler" mudam com ela', () => {
     const pendencia = pendenciaVazia();
     expect(pendencia.lista).toBe(false);
     somarAoPendente(pendencia, {
@@ -123,9 +127,40 @@ describe('juntar a rajada', () => {
       conversaId: 'f',
       organizacaoId: null,
       respostaDoParceiro: false,
+      novo: true,
     });
     expect(pendencia.lista).toBe(true);
     expect(pendencia.organizacoes.size).toBe(0);
+  });
+
+  it('o recibo (UPDATE em `messages`) atualiza a conversa aberta e não a lista', () => {
+    // Enviado, entregue e lido voltam como UPDATE na mesma linha. A lista não lê
+    // `messages` e nenhum gatilho de UPDATE de mensagem mexe em outra tabela:
+    // recarregar as dezesseis consultas da lista por um tique era o desperdício.
+    const pendencia = pendenciaVazia();
+    somarAoPendente(pendencia, {
+      tabela: 'messages',
+      conversaId: 'fio-3',
+      organizacaoId: 'org-3',
+      respostaDoParceiro: false,
+      novo: false,
+    });
+    expect(pendencia.lista).toBe(false);
+    expect([...pendencia.organizacoes]).toEqual(['org-3']);
+    expect([...pendencia.fios]).toEqual(['fio-3']);
+    expect(pendencia.respostas).toHaveLength(0);
+  });
+
+  it('o mesmo UPDATE em `conversations` continua recarregando a lista', () => {
+    const pendencia = pendenciaVazia();
+    somarAoPendente(pendencia, {
+      tabela: 'conversations',
+      conversaId: 'fio-3',
+      organizacaoId: 'org-3',
+      respostaDoParceiro: false,
+      novo: false,
+    });
+    expect(pendencia.lista).toBe(true);
   });
 });
 
