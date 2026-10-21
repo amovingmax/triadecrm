@@ -6,6 +6,7 @@ import './globals.css';
 import { ProvedorTema } from '@/components/tema/provedor-tema';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { EMPRESA } from '@/lib/empresa';
 import { appUrl } from '@/lib/env';
 
 /**
@@ -48,17 +49,16 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl()),
   title: {
-    default: 'Tríade',
-    template: '%s · Tríade',
+    default: EMPRESA.tituloDoApp,
+    template: `%s · ${EMPRESA.tituloDoApp}`,
   },
-  description:
-    'CRM de captação da KOMUNE: parceiros, Revisão, funis, conversas de WhatsApp, agenda, metas e relatórios.',
-  applicationName: 'Tríade',
+  description: EMPRESA.descricaoDoApp,
+  applicationName: EMPRESA.tituloDoApp,
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Tríade',
+    title: EMPRESA.tituloDoApp,
   },
   icons: {
     icon: [

@@ -3,6 +3,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { EMPRESA } from '@/lib/empresa';
+
 import { carregarFontes, chaveDoRelatorio } from './dados';
 import { LinkNoTexto } from './estados';
 import { formatarInteiro, formatarPercentual, rotuloDoTipoDeFonte } from './formatos';
@@ -150,7 +152,7 @@ export function PainelFontes({ painel, periodo }: { painel: DefinicaoPainel; per
       {
         chave: 'pct_autorizaram',
         rotulo: '% autorizaram',
-        ajuda: 'Autorização registrada em consent_events: é o que libera o pré-cadastro na Komune.',
+        ajuda: `Autorização registrada em consent_events: é o que libera o pré-cadastro na ${EMPRESA.nome}.`,
         numero: true,
         texto: (l) => formatarPercentual(l.pct_autorizaram) ?? '',
         celula: (l) => formatarPercentual(l.pct_autorizaram) ?? <SemDado motivo="nenhum alvo no período" />,

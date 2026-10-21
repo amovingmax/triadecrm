@@ -4,6 +4,7 @@ import { motion, type Transition } from 'motion/react';
 
 import { useMovimento } from '@/components/movimento';
 import { MarcaTriade } from '@/components/logo';
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 
 import { BotaoGoogle } from './botao-google';
@@ -131,7 +132,7 @@ export function TelaLogin({ next, aviso }: { next: string; aviso: AvisoAcesso | 
           {...entrada(2)}
           className="mt-5 max-w-[32ch] text-base text-balance text-grafite-600 sm:text-lg dark:text-grafite-400"
         >
-          CRM de captação da Komune.
+          {EMPRESA.descricaoDoLogin}
         </motion.p>
       </section>
 
@@ -184,8 +185,8 @@ export function TelaLogin({ next, aviso }: { next: string; aviso: AvisoAcesso | 
               {...entrada(4)}
               className="mt-4 text-sm text-grafite-500 dark:text-grafite-450"
             >
-              Entre com a sua conta Google. Se o seu acesso ainda não foi liberado, peça a
-              Rafael, Luiz ou Matheus.
+              Entre com a sua conta Google. Se o seu acesso ainda não foi liberado, peça a{' '}
+              {EMPRESA.admins.ou}.
             </motion.p>
           )}
         </div>

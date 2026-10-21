@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { iniciaisDe } from '@/lib/iniciais';
 import { LEITURA } from '@/lib/larguras';
@@ -315,14 +316,17 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
 
           {/* O pré-cadastro é o que vem DEPOIS de o negócio andar: a escada dele
               (rascunho, autorização, link) só faz sentido para quem já leu em
-              que pé a conversa está. Enquanto não começou, ocupa uma linha. */}
-          <div className="order-5 min-w-0 lg:order-none">
-            <PainelPreCadastro
-              organizationId={ficha.id}
-              papel={sessao.papel}
-              naoContatar={ficha.naoContatar}
-            />
-          </div>
+              que pé a conversa está. Enquanto não começou, ocupa uma linha. Só
+              existe onde há plataforma Komune; sem ela, o cartão nem busca nada. */}
+          {EMPRESA.modulos.plataformaKomune ? (
+            <div className="order-5 min-w-0 lg:order-none">
+              <PainelPreCadastro
+                organizationId={ficha.id}
+                papel={sessao.papel}
+                naoContatar={ficha.naoContatar}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">

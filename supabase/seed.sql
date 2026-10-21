@@ -1759,3 +1759,11 @@ begin
   raise notice 'seed ok: % cidades, % categorias, % fontes, % feriados em % e % em %, % funis (fornecedor %, ativacao %, produtor % etapas), % motivos de perda, % desfechos de interação (máximo % por superfície), % modelos de mensagem',
     n_city, n_cat, n_src, n_hol, ano, n_hol1, ano + 1, n_pipe, n_forn, n_ativ, n_prod, n_lost, n_out, n_sup, n_tpl;
 end $$;
+
+-- =====================================================================
+-- 14. Identidade do banco (migração 20261022090000). Este seed é o da KOMUNE e só
+--     roda no banco local e no CI (`supabase db reset`); em produção, a identidade
+--     da KOMUNE é gravada uma vez por `scripts/publicar-banco.mjs komune identidade`.
+--     O `true` confirma que um banco já com parceiros é mesmo o da KOMUNE.
+-- =====================================================================
+select app.definir_identidade('komune', true);

@@ -25,6 +25,8 @@ import 'server-only';
  * razão de estar.
  */
 
+import { EMPRESA } from '@/lib/empresa';
+
 const URL_BUSCA = 'https://places.googleapis.com/v1/places:searchText';
 
 /**
@@ -163,10 +165,8 @@ function motivoDoErro(status: number, googleStatus?: string): MotivoDoPlaces {
 }
 
 export const RECADO_DO_PLACES: Record<MotivoDoPlaces, string> = {
-  nao_configurado:
-    'A busca no Google ainda não foi configurada no servidor. Fale com Luiz ou Matheus.',
-  chave_recusada:
-    'O Google recusou a chave da Komune — ela pode estar sem a API de Places habilitada ou restrita a outro domínio.',
+  nao_configurado: `A busca no Google ainda não foi configurada no servidor. Fale com ${EMPRESA.admins.tecnicos}.`,
+  chave_recusada: `O Google recusou a chave da ${EMPRESA.nome} — ela pode estar sem a API de Places habilitada ou restrita a outro domínio.`,
   limite_do_google: 'A cota de buscas do mês acabou, ou o Google recusou por excesso de uso.',
   google_fora: 'Não deu para alcançar o Google agora. Tente de novo em instantes.',
   resposta_inesperada: 'O Google respondeu de um jeito que o CRM não entendeu.',

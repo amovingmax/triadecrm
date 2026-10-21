@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { FileCheck2, Phone, SendHorizontal } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -227,8 +228,8 @@ function Formulario({
       if (pedido) esquecerPedidoDeModelo();
       toast.success('Mensagem na fila do WhatsApp.', {
         description: r.primeiro_contato
-          ? 'Sai pelo número da KOMUNE em instantes e conta como primeiro contato de hoje.'
-          : 'Sai pelo número da KOMUNE em instantes.',
+          ? `Sai pelo número da ${EMPRESA.nomeDoNumero} em instantes e conta como primeiro contato de hoje.`
+          : `Sai pelo número da ${EMPRESA.nomeDoNumero} em instantes.`,
       });
       void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
       void clientes.invalidateQueries({
@@ -385,7 +386,8 @@ function RegistrarPorTelefone({ organizacaoId }: { organizacaoId: string }) {
 }
 
 function tituloDoBloqueio(motivo: string): string {
-  if (motivo === 'whatsapp_nao_configurado') return 'O WhatsApp da KOMUNE ainda não está conectado';
+  if (motivo === 'whatsapp_nao_configurado')
+    return `O WhatsApp da ${EMPRESA.nomeDoNumero} ainda não está conectado`;
   if (motivo === 'ficha_sem_whatsapp') return 'Esta ficha não tem WhatsApp';
   if (motivo === 'contato_suprimido' || motivo === 'numero_suprimido')
     return 'Pediu para não receber';

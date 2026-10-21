@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Paperclip, Play, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -222,7 +223,7 @@ export function PainelDaMidia({
       ]
         .filter(Boolean)
         .join(' e ') + ' na fila do WhatsApp.',
-      { description: 'Sai pelo número da KOMUNE em instantes.' },
+      { description: `Sai pelo número da ${EMPRESA.nomeDoNumero} em instantes.` },
     );
   }
 

@@ -528,6 +528,9 @@ export function destinoDoItem(
 const SLUG_POR_FUNIL: Record<string, string> = {
   'Captação de fornecedor': 'fornecedor',
   'Produtor e cerimonialista': 'produtor',
+  // Imova Imobiliária (seed supabase/empresas/imova): os mesmos slugs, outros nomes.
+  'Captação de imóveis': 'fornecedor',
+  Clientes: 'produtor',
 };
 
 export function hrefDoFunil(item: ItemDoDia): string {

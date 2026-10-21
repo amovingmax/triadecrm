@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Download, Upload } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { Button } from '@/components/ui/button';
 import {
   ChipTemperatura,
@@ -116,7 +117,7 @@ export function PainelBase({ painel, periodo }: { painel: DefinicaoPainel; perio
         chave: 'clientes',
         rotulo: 'Clientes',
         valor: formatarInteiro(clientes),
-        apoio: 'fecharam com a Komune',
+        apoio: `fecharam com a ${EMPRESA.nome}`,
       },
       {
         chave: 'quentes_negocios',

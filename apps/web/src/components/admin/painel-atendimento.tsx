@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -183,7 +184,7 @@ export function PainelAtendimento({ podeEditar }: { podeEditar: boolean }) {
         {/* A introdução (ADR-16, 28/09/2026). */}
         <Interruptor
           id="introducao"
-          titulo="Apresentar a Komune quando o lead responder o cumprimento"
+          titulo={`Apresentar a ${EMPRESA.nome} quando o lead responder o cumprimento`}
           descricao="Quem responder recebe “Tudo bem?” e, 15 s depois, a apresentação. Sem nome."
           ligado={config.introducao_ativa ?? false}
           podeEditar={podeEditar}

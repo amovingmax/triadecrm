@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, Info, RotateCw } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { formatarNumero } from '@/components/parceiros/formatos';
@@ -305,7 +306,8 @@ export function TelaMetas({
  */
 function ComoContamos({ linhas }: { linhas: LinhaProgresso[] }) {
   const pendentes = linhas.filter((l) => !l.mensuravel);
-  const proxies = linhas.filter(ehProxy);
+  // O aviso de proxy fala da plataforma Komune: sem ela, não há o que avisar.
+  const proxies = EMPRESA.modulos.plataformaKomune ? linhas.filter(ehProxy) : [];
 
   return (
     <section className="flex flex-col gap-3 border-t border-hairline pt-4">

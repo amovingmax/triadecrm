@@ -1,4 +1,5 @@
 import { formatarNumero } from '@/components/parceiros/formatos';
+import { EMPRESA } from '@/lib/empresa';
 
 /**
  * Formatação dos números dos relatórios. Reaproveita `formatarNumero` da tela de
@@ -94,7 +95,7 @@ export const ROTULO_GRUPO: Record<string, string> = {
 
 export function rotuloDoGrupo(valor: string | null | undefined): string {
   if (!valor) return '';
-  return ROTULO_GRUPO[valor] ?? valor;
+  return EMPRESA.gruposDeCategoria[valor] ?? ROTULO_GRUPO[valor] ?? valor;
 }
 
 /** Minutos em linguagem de gente: "8 min", "1 h 20 min", "2 dias". */

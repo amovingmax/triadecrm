@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Mic, Square, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -101,7 +102,7 @@ export function GravarAudio({
     onSuccess: () => {
       descartar();
       toast.success('Áudio na fila do WhatsApp.', {
-        description: 'Sai pelo número da KOMUNE em instantes.',
+        description: `Sai pelo número da ${EMPRESA.nomeDoNumero} em instantes.`,
       });
       void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
       void clientes.invalidateQueries({ queryKey: chaveDaLinha(fioId) });

@@ -2,6 +2,7 @@
 
 import { ChevronRight, CircleAlert, Info, Lock, RotateCw, SearchX } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -354,7 +355,7 @@ export function PainelRestrito({ registro }: { registro: string }) {
       texto={
         <>
           {registro} é visível apenas para quem tem o papel <strong>Admin</strong>. Se você precisa
-          dessa informação, peça a Rafael, Luiz ou Matheus.
+          dessa informação, peça a {EMPRESA.admins.ou}.
         </>
       }
     />

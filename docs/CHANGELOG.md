@@ -7601,3 +7601,80 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - **Limite do banco local:** tem pouco dado (103 parceiros, 25 conversas), então as telas que dependem de volume ficam otimistas nos tempos.
 
 **Decisão humana:** onde guardar o backup da KOMUNE (máquina do Luiz?).
+
+## 22/10/2026 — Duas empresas no mesmo CRM: KOMUNE e Imova Imobiliária (branch `multiempresa`; etapa 2 do plano)
+
+**O pedido.** O mesmo CRM para uma segunda empresa, a Imova Imobiliária: "os dados de cada uma das empresas devem ser independentes, eles devem ter as funcionalidades básicas semelhantes, e deve ter como mudar de uma empresa para outra por módulos". Exigência: nada da KOMUNE pode ser alterado, e "uma pessoa subir comando do banco para o projeto errado não deve acontecer". Decisões do usuário em 21/10:
+- mesmas telas, com os dados próprios da Imova (opção A);
+- dois funis provisórios;
+- sem Twilio e sem pré-cadastro em plataforma;
+- WhatsApp e Radar automático depois;
+- primeiros acessos `contato@imovaimobiliaria.com.br` e `contato@komune.app.br` (teste, sai depois);
+- aparência atual com o nome da Imova.
+
+**Arquitetura.** Multi-tenant no modelo silo: um código, uma instalação por empresa (projeto Supabase, deploy na Vercel e endereço próprios). Trocar de empresa é abrir o endereço da outra pelo seletor. O banco da Imova (`imova-crm`, `kkqadgxvmzulcamuakzk`, Convívia, São Paulo) foi criado vazio pelo usuário em 21/10. Passo a passo em `docs/operacao/multiempresa.md`.
+
+**Entregue** (worktree `../triadecrm-multiempresa`, sobre a `linha-de-base`; nada publicado):
+- **Trava de identidade** (`20261022090000`):
+  - `app.identidade` guarda uma linha só, imutável (UPDATE, DELETE e TRUNCATE recusados);
+  - `app.definir_identidade(empresa, confirmação)` recusa outra empresa e recusa banco com parceiros sem confirmação;
+  - `app.exigir_empresa(empresa)` aborta no banco de outra empresa;
+  - `public.empresa_do_banco()` deixa o site e os workers conferirem.
+  - pgTAP `112` (17 testes). O seed local da KOMUNE grava "komune" no fim.
+- **Textos do banco** (`20261022100000`): `app.empresa_texto(chave)` lê `app_settings['empresa']`; sem a linha, devolve os textos de sempre da KOMUNE. `app.lgpd_dossie` lê dela o controlador, o canal do titular, a "Plataforma Komune" e o e-mail dos direitos.
+  - Na KOMUNE, 103 de 103 arquivos da LGPD saíram idênticos à função antiga.
+  - Na Imova: "Imova Imobiliária", `contato@imovaimobiliaria.com.br`, sem a Plataforma Komune.
+  - pgTAP `113`.
+- **`scripts/publicar-banco.mjs`**, o único caminho para o banco de produção de uma empresa:
+  - lê o projeto de `supabase/empresas.json`, e não do `supabase link`;
+  - exige que o `DATABASE_URL` de `.env.<empresa>` contenha o projeto daquela empresa;
+  - confere a identidade e pede o nome da empresa digitado;
+  - recusa levar à KOMUNE migração que ainda não está na Imova;
+  - roda o seed numa transação só, pelo `psql` da imagem do Postgres;
+  - comandos `conferir`, `migrar`, `semear` e `identidade`, com `--local` para ensaio.
+- **Seed da Imova** (`supabase/empresas/imova/seed.sql`): começa por `app.definir_identidade('imova')`. Traz:
+  - cidades e feriados de Natal/RN;
+  - 7 categorias: 5 de imóvel no grupo `servicos` (Proprietário) e Comprador e Locatário no grupo `producao` (Cliente);
+  - origens só manuais;
+  - 7 motivos de perda;
+  - funis "Captação de imóveis" (`fornecedor`) e "Clientes" (`produtor`), com os slugs que as automações conhecem;
+  - os 34 desfechos e as 3 equivalências;
+  - o roteiro `imova_v1` publicado (o `captacao_v1` sai de publicação);
+  - os dois acessos.
+
+  Desliga o que as migrações deixam com cara de KOMUNE: menu automático do WhatsApp, apresentação, ausência, lead automático, aviso de não atendeu, e-mail de aviso, links da plataforma, respostas rápidas e modelos que falam da Komune. Termina com autoverificação.
+- **Cadastro das empresas** (`packages/schema/src/empresas.ts`): nome, título do app ("Tríade · Imova"), login, quem é admin, rótulos dos tipos (Proprietário/Cliente), rótulos de grupo, frases de origem da ligação e módulos (`plataformaKomune`, `ia`). Teste guarda os textos da KOMUNE letra por letra. O site lê em `apps/web/src/lib/empresa.ts`, com `NEXT_PUBLIC_EMPRESA` vazia igual à KOMUNE.
+- **Telas:** cerca de 40 arquivos trocaram "Komune/KOMUNE", os admins e os rótulos de tipo pelo cadastro. Na Imova somem:
+  - o cartão de pré-cadastro;
+  - o filtro "Cadastrado na Komune";
+  - os avisos da plataforma em Metas e Relatórios;
+  - o botão "Ler com a IA".
+
+  O Meu dia reconhece os nomes de funil da Imova.
+- **Seletor de empresa** (`components/layout/seletor-de-empresa.tsx`): aparece só com duas empresas em `NEXT_PUBLIC_EMPRESAS_LINKS`.
+- **Conferência ao abrir** (`lib/conferir-empresa.ts`, no layout da área logada): banco de outra empresa mostra "O CRM não abriu, por segurança". Só recusa com certeza; banco sem identidade, função ausente ou falha de rede deixam passar.
+
+**Verificado no computador:**
+- **Migrações:** um segundo Supabase local vazio (`~/triadecrm-imova-local`, portas 563xx) recebeu as 159 migrações do zero, sem erro, pelo `publicar-banco migrar`, e o seed pelo `semear`. A autoverificação passou e o seed pode rodar de novo.
+- **Seed da Imova no banco da KOMUNE, de propósito:** recusado antes de a KOMUNE ter identidade ("já tem parceiros") e depois ("é da empresa komune"). Os funis da KOMUNE ficaram intactos.
+- **KOMUNE:** a branch comparada à `main` no ar deu 88 de 88 telas iguais (`comparar-versoes.mjs`, gestor e SDR, PC e celular).
+- **Imova:** 12 telas e a ficha sem "Komune", "Heloísa", "Rafael", "Matheus", "buffet" ou "cerimonial". Títulos "· Tríade · Imova", aviso "O número de WhatsApp da Imova Imobiliária ainda não foi conectado". Os contatos caem no funil certo (proprietário → Captação de imóveis, cliente → Clientes).
+- **Site da Imova ligado ao banco da KOMUNE:** bloqueado.
+- **Seletor:** leva da KOMUNE à Imova.
+- **Testes:** lint e tipos; web 1.321 testes; `schema` 109; pgTAP 19, 111, 112 e 113.
+
+**Não mexe** em produção, no banco remoto, no WhatsApp (nenhum arquivo do caminho de envio e entrada nem dos workers), nas funções do login nem na Twilio.
+
+**Pendente:**
+- **Etapa 3, a Imova em produção:** com pedido, pelo `docs/operacao/multiempresa.md`. Inclui ensaiar as chaves no formato novo do Supabase, que o `imova-crm` já usa.
+- **WhatsApp da Imova:** o portfólio na Meta espera a desativação de uma conta.
+  - O e-mail de aviso dos workers ainda diz "WhatsApp da Komune".
+  - A Edge Function `export-lgpd` tem texto e nome de arquivo da Komune.
+  - A aba Clientes de Conversas fala de "cliente da plataforma".
+- **Textos menores na Imova:** exemplos com buffet e casamento nos campos, ajuda de Ajustes com nomes da equipe da KOMUNE, mensagens do login no banco ("KOMUNE CRM", não aparecem na tela), fuso e mapa "de Natal" (a Imova é de Natal).
+- **Backup da KOMUNE fora do Supabase:** precisa de OK.
+
+**Decisão humana:**
+- o endereço definitivo da Imova;
+- o horário de atendimento dela;
+- o roteiro de ligação e os funis definitivos.

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { MarcaDeNova } from '@/components/avisos/marca-de-nova';
 import { useConversasNovas } from '@/components/avisos/provedor-avisos';
+import { EMPRESA, TIPOS_EM_USO, TIPOS_POR_EXTENSO } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { iniciaisDe } from '@/lib/iniciais';
 import { Button } from '@/components/ui/button';
@@ -91,8 +92,8 @@ export function ListaForaDaBase({
       <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
         <p className="font-medium">Nenhum cliente esperando</p>
         <p className="max-w-xs text-sm text-muted-foreground">
-          Quem escrever para a KOMUNE e não for parceiro aparece aqui: cliente da plataforma,
-          curioso ou fornecedor que ainda não está na base.
+          Quem escrever para a {EMPRESA.nomeDoNumero} e não for parceiro aparece aqui: cliente da
+          plataforma, curioso ou fornecedor que ainda não está na base.
         </p>
       </div>
     );
@@ -273,7 +274,7 @@ export function ConversaForaDaBase({
                 size="sm"
                 className="toque h-8"
                 onClick={() => setVirando(true)}
-                title="É fornecedor, produtor ou cerimonialista? Leve para a base."
+                title={`É ${TIPOS_POR_EXTENSO}? Leve para a base.`}
               >
                 <UserPlus aria-hidden="true" />
                 Virar parceiro
@@ -349,7 +350,7 @@ export function ConversaForaDaBase({
             <div>
               <p className="text-sm font-medium">Levar para a base de parceiros</p>
               <p className="text-xs text-muted-foreground">
-                Só para fornecedor, produtor ou cerimonialista. Cliente se responde aqui mesmo.
+                Só para {TIPOS_POR_EXTENSO}. Cliente se responde aqui mesmo.
               </p>
             </div>
             <Button
@@ -499,11 +500,8 @@ function ArquivarCliente({
 const ACAO_DA_FOLHA =
   'toque h-14 w-full justify-start gap-2.5 rounded-xl px-4 text-[15px] font-medium md:h-14';
 
-const TIPOS = [
-  { id: 'fornecedor', rotulo: 'Fornecedor' },
-  { id: 'produtor', rotulo: 'Produtor' },
-  { id: 'cerimonialista', rotulo: 'Cerimonialista' },
-] as const;
+/** Fornecedor, produtor e cerimonialista, só os que a empresa usa e com o rótulo dela. */
+const TIPOS = TIPOS_EM_USO;
 
 function useDepoisDeLigar(aoLigar: (organizacaoId: string) => void) {
   const clientes = useQueryClient();

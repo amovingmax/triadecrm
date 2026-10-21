@@ -5,6 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { formatarNumero } from '@/components/parceiros/formatos';
@@ -356,7 +357,9 @@ export function TelaRevisao({
           {/* Pedir leitura da IA e mexer nos pesos da triagem são de admin e
               gestor. O banco recusa de todo jeito — este `if` existe para não
               oferecer um botão que sempre erra. */}
-          {podeAjustarTriagem ? <PedirLeituraDaIa className="hidden md:inline-flex" /> : null}
+          {podeAjustarTriagem && EMPRESA.modulos.ia ? (
+            <PedirLeituraDaIa className="hidden md:inline-flex" />
+          ) : null}
           {podeAjustarTriagem ? (
             <PesosDaTriagem catalogos={catalogos} className="hidden md:inline-flex" />
           ) : null}

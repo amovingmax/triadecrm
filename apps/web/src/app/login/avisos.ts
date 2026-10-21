@@ -6,6 +6,8 @@
  * travessão, como manda o guia de cópia.
  */
 
+import { UM_ADMIN } from '@/lib/empresa';
+
 export type ChaveAviso =
   'nao-autorizado' | 'sem-perfil' | 'desativado' | 'provedor' | 'callback' | 'sessao';
 
@@ -28,8 +30,7 @@ export const AVISOS: Record<ChaveAviso, AvisoAcesso> = {
   // com o e-mail @komune.app.br" era mandá-la tentar uma porta que não existe.
   'nao-autorizado': {
     titulo: 'Esse e-mail não tem acesso ao CRM.',
-    saida:
-      'O acesso é liberado um a um. Peça a um admin (Rafael, Luiz ou Matheus) para incluir este e-mail na lista, ou entre com a conta que já foi liberada para você.',
+    saida: `O acesso é liberado um a um. Peça a ${UM_ADMIN} para incluir este e-mail na lista, ou entre com a conta que já foi liberada para você.`,
     grave: true,
     rotuloBotao: 'Entrar com outra conta',
   },
@@ -37,14 +38,13 @@ export const AVISOS: Record<ChaveAviso, AvisoAcesso> = {
   // quando não existe linha em profiles: o Google autentica, o CRM não libera.
   'sem-perfil': {
     titulo: 'Sua conta Google funcionou, mas ela ainda não tem perfil no CRM.',
-    saida:
-      'Peça a um admin (Rafael, Luiz ou Matheus) para criar o seu acesso, depois entre de novo.',
+    saida: `Peça a ${UM_ADMIN} para criar o seu acesso, depois entre de novo.`,
     grave: true,
     rotuloBotao: 'Entrar com outra conta',
   },
   desativado: {
     titulo: 'Seu acesso ao CRM está desativado.',
-    saida: 'Fale com um admin (Rafael, Luiz ou Matheus) para reativar o seu perfil.',
+    saida: `Fale com ${UM_ADMIN} para reativar o seu perfil.`,
     grave: true,
     rotuloBotao: 'Entrar com outra conta',
   },

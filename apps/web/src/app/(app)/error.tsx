@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { RotateCw, TriangleAlert } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { UM_ADMIN } from '@/lib/empresa';
 
 /**
  * Limite de erro da área autenticada.
@@ -77,8 +78,7 @@ export default function ErroDaArea({
         <h1 className="font-heading text-lg font-semibold">Não deu para carregar esta tela.</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
           A falha é do CRM, não de algo que você tenha feito. Tente de novo — muitas vezes é só a
-          conexão caindo por um instante. Se voltar a acontecer, avise um admin (Rafael, Luiz ou
-          Matheus).
+          conexão caindo por um instante. Se voltar a acontecer, avise {UM_ADMIN}.
         </p>
       </div>
 

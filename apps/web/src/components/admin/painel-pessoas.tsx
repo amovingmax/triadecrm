@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { ROTULO_PAPEL, type AppRole } from '@/lib/auth/role';
 import { type Sessao } from '@/lib/auth/session';
+import { ADMINS_TEM_NOME, EMPRESA } from '@/lib/empresa';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -337,7 +338,10 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
           <Aviso tom="atencao">
             <p>
               Há <strong>um único admin ativo</strong> no CRM. Se essa conta cair, ninguém promove
-              ninguém. O combinado é ter três: Rafael, Luiz e Matheus.
+              ninguém.{' '}
+              {ADMINS_TEM_NOME
+                ? `O combinado é ter três: ${EMPRESA.admins.e}.`
+                : 'O combinado é ter mais de um.'}
             </p>
           </Aviso>
         ) : null}
@@ -399,7 +403,7 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
               <Contagem n={permitidos.data.permitidos.length} rotulo="e-mails" />
             ) : undefined
           }
-          descricao="E-mails que podem entrar mesmo sem ser do domínio da Komune. Entrar na lista não cria a pessoa: ela nasce no CRM no primeiro login com Google."
+          descricao={`E-mails que podem entrar mesmo sem ser do domínio da ${EMPRESA.nome}. Entrar na lista não cria a pessoa: ela nasce no CRM no primeiro login com Google.`}
         />
         {!ehAdmin ? (
           <PainelRestrito registro="A lista de permitidos" />

@@ -1,0 +1,66 @@
+# Duas empresas no mesmo CRM (KOMUNE e Imova Imobiliária)
+
+O Tríade serve duas empresas com o **mesmo código** e **uma instalação por empresa**: banco, logins, arquivos, WhatsApp e endereço próprios (modelo silo). Trocar de empresa é abrir o endereço da outra, pelo seletor no topo do CRM.
+
+| | KOMUNE | Imova Imobiliária |
+|---|---|---|
+| Projeto Supabase | `komune-crm` (`toqdjcajyrowutunczhr`) | `imova-crm` (`kkqadgxvmzulcamuakzk`) |
+| Endereço | `ir.komune.app.br` | a definir (Vercel; depois `crm.imovaimobiliaria.com.br`) |
+| `NEXT_PUBLIC_EMPRESA` | (vazia = komune) | `imova` |
+| Dados iniciais | já existiam | `supabase/empresas/imova/seed.sql` |
+
+## O que muda de uma empresa para a outra, e onde
+
+- **Texto de tela, rótulos e módulos:** `packages/schema/src/empresas.ts`. Para a KOMUNE, os textos de sempre (um teste guarda isso). O site lê a empresa em `apps/web/src/lib/empresa.ts`.
+- **Dados** (funis, categorias, motivos de perda, roteiro de ligação, modelos, configurações): o banco de cada uma, pelo seed da empresa.
+- **Textos que o próprio banco escreve** (arquivo da LGPD): `app.empresa_texto`, lido de `app_settings['empresa']`.
+- **Regra para migrações novas:** a migração roda nos dois bancos. Dado de empresa entra pelo seed da empresa, nunca pela migração.
+
+## As travas contra o projeto errado
+
+1. **Cada banco sabe de quem é.** `app.identidade` guarda uma linha, gravada uma vez e imutável. Todo seed e script de empresa começa por `app.exigir_empresa('<empresa>')`.
+2. **O site confere, ao abrir.** Banco de outra empresa = "O CRM não abriu, por segurança" (`lib/conferir-empresa.ts`).
+3. **Banco de produção só se mexe por `scripts/publicar-banco.mjs`.** Ele:
+   - pega o projeto em `supabase/empresas.json`, e não no `supabase link` do terminal;
+   - confere a identidade antes de qualquer coisa;
+   - pede para digitar o nome da empresa;
+   - só leva uma migração à KOMUNE depois de ela estar na Imova;
+   - roda o seed numa transação só.
+4. **Só a conta `amovingmax` publica.**
+
+## Montar a Imova em produção (etapa 3, só com pedido)
+
+**Antes, na KOMUNE (uma vez):**
+1. Backup do `komune-crm`.
+2. Levar à produção as migrações `20261022090000` e `20261022100000`. Primeiro na Imova, depois na KOMUNE, pelo `publicar-banco migrar`.
+3. `node scripts/publicar-banco.mjs komune identidade` grava "komune" no banco da KOMUNE.
+
+**O banco da Imova:**
+1. Criar `.env.imova` na raiz, fora do git, com `DATABASE_URL=` a conexão "Session pooler" do `imova-crm` (painel → Connect).
+2. `node scripts/publicar-banco.mjs imova migrar`: a estrutura inteira, num banco vazio.
+3. `node scripts/publicar-banco.mjs imova semear`: identidade, funis, catálogos, roteiro e acessos. A autoverificação no fim aborta se faltar algo.
+4. No painel do `imova-crm`:
+   - **Authentication → Hooks:** ligar o *Custom Access Token* com `public.custom_access_token_hook`.
+   - **Authentication → Providers → Google:** o mesmo cliente do Google da KOMUNE serve, acrescentando o endereço da Imova nas URLs de retorno.
+   - **URL Configuration:** `site_url` e as URLs de redirecionamento da Imova.
+5. **Chaves:** projeto novo só tem as chaves no formato novo (`sb_publishable_…`, `sb_secret_…`). O site usa a *publishable* como `NEXT_PUBLIC_SUPABASE_ANON_KEY` e a *secret* como `SUPABASE_SERVICE_ROLE_KEY`. Conferir no ensaio que tudo funciona com elas antes de liberar.
+
+**O site da Imova:**
+1. **Projeto novo na Vercel** (por exemplo `triade-imova`): mesmo repositório, pasta `apps/web`, região `gru1`.
+2. **Variáveis de produção:**
+   - `NEXT_PUBLIC_EMPRESA=imova`
+   - `NEXT_PUBLIC_SUPABASE_URL` e as duas chaves do `imova-crm`
+   - `NEXT_PUBLIC_APP_URL`
+   - `NEXT_PUBLIC_EMPRESAS_LINKS=komune=https://ir.komune.app.br;imova=<endereço da Imova>`
+3. **Na KOMUNE:** a mesma `NEXT_PUBLIC_EMPRESAS_LINKS`, para o seletor aparecer, e publicar de novo.
+4. **Conferir:**
+   - o login entra só com os e-mails permitidos;
+   - nada da KOMUNE aparece;
+   - `comparar-versoes.mjs` dá a KOMUNE igual à linha de base.
+
+**Fica para depois, cada um com o seu passo:** WhatsApp da Imova (portfólio na Meta, worker próprio, modelos e textos da Imova), Twilio, IA.
+
+## Ensaio local
+
+- **Banco da Imova:** um segundo Supabase local (`~/triadecrm-imova-local`, portas 563xx, `project_id = imova-crm-local`). Ele nasce vazio e recebe `publicar-banco imova migrar --local` e `semear --local`.
+- **Site da Imova:** um build com `NEXT_PUBLIC_EMPRESA=imova` e o Supabase em `http://127.0.0.1:56321`, servido em `127.0.0.1` (a KOMUNE fica em `localhost`, para os logins não se misturarem no navegador).

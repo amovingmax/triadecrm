@@ -1,0 +1,18 @@
+{
+  "_leia": "Cada empresa do Tríade e o projeto Supabase que é dela. É a fonte que scripts/publicar-banco.mjs usa para saber em que projeto um comando pode rodar. Os códigos de projeto não são segredo; senhas ficam em .env.<empresa>, fora do git. 'ordem' é a ordem de publicação: a primeira recebe cada migração antes das outras.",
+  "ordem": ["imova", "komune"],
+  "empresas": {
+    "imova": {
+      "nome": "Imova Imobiliária",
+      "projeto": "kkqadgxvmzulcamuakzk",
+      "seed": "supabase/empresas/imova/seed.sql",
+      "local": "postgresql://postgres:postgres@127.0.0.1:56322/postgres?sslmode=disable"
+    },
+    "komune": {
+      "nome": "KOMUNE",
+      "projeto": "toqdjcajyrowutunczhr",
+      "seed": null,
+      "local": "postgresql://postgres:postgres@127.0.0.1:54322/postgres?sslmode=disable"
+    }
+  }
+}

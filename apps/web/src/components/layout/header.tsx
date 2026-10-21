@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { PaletaComandos } from '@/components/layout/paleta-comandos';
+import { SeletorDeEmpresa } from '@/components/layout/seletor-de-empresa';
 import { UserMenu } from '@/components/layout/user-menu';
 import { Logo } from '@/components/logo';
 import { AlternadorTema } from '@/components/tema/alternador-tema';
@@ -41,6 +42,7 @@ export function Header({ sessao }: { sessao: Sessao }) {
       <PaletaComandos papel={sessao.papel} />
 
       <div className="ml-auto flex items-center gap-1">
+        <SeletorDeEmpresa />
         <AlternadorTema />
         <UserMenu sessao={sessao} />
       </div>

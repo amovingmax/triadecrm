@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ShieldCheck } from 'lucide-react';
 
 import { ROTULO_PAPEL, type AppRole } from '@/lib/auth/role';
+import { ADMINS_TEM_NOME, EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { LEITURA } from '@/lib/larguras';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +46,8 @@ export function AreaRestrita({ papel }: { papel: AppRole }) {
       <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
         Nada disso muda o seu trabalho do dia: o que você registra continua valendo e aparecendo nas
         suas telas. Se precisar de alguma coisa daqui (tirar um acesso, incluir um feriado, atender
-        a um pedido de titular), fale com Rafael, Luiz ou Matheus, que são os admins.
+        a um pedido de titular), fale com {EMPRESA.admins.ou}
+        {ADMINS_TEM_NOME ? ', que são os admins' : ''}.
       </p>
 
       <div>

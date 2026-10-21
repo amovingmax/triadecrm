@@ -12,6 +12,8 @@
  */
 import { TIMEZONE } from '@komune/schema';
 
+import { EMPRESA, UM_ADMIN } from '@/lib/empresa';
+
 const DATA = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: '2-digit',
@@ -242,7 +244,7 @@ export function rotuloDoGrupo(grupo: string): string {
     recreacao: 'Recreação',
     producao: 'Produção',
   };
-  return mapa[grupo] ?? grupo;
+  return EMPRESA.gruposDeCategoria[grupo] ?? mapa[grupo] ?? grupo;
 }
 
 export function rotuloDaPrioridade(prioridade: number): string {
@@ -495,7 +497,7 @@ export function mensagemDoErro(erro: unknown): string {
   const texto = erro instanceof Error ? erro.message : String(erro ?? '');
 
   if (/row-level security|permission denied|42501|not authorized/i.test(texto)) {
-    return 'Seu acesso não alcança este registro. Peça a um admin (Rafael, Luiz ou Matheus).';
+    return `Seu acesso não alcança este registro. Peça a ${UM_ADMIN}.`;
   }
   if (/jwt|session|autenticad/i.test(texto)) {
     return 'A sua sessão expirou. Entre de novo para continuar.';

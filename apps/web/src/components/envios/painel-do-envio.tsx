@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pause, Play, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -187,11 +188,11 @@ function Itens({ itens, daMarca }: { itens: ItemDoEnvio[]; daMarca: boolean }) {
           <span className="min-w-0 flex-1">
             <span className="font-medium">{i.nome}</span>
             <span className="block text-xs text-muted-foreground">
-              {daMarca ? 'em nome da Komune' : i.assinante ? `assina ${i.assinante}` : null}
+              {daMarca ? `em nome da ${EMPRESA.nome}` : i.assinante ? `assina ${i.assinante}` : null}
               {i.status === 'enviada' && i.mensagem ? ` · ${ROTULO_DA_MENSAGEM[i.mensagem] ?? i.mensagem}` : null}
               {i.botao_tocado ? ` · tocou em “${i.botao_tocado}”` : null}
               {i.clicou ? ' · clicou no link' : null}
-              {i.cadastrou ? ' · cadastrou-se na Komune' : null}
+              {EMPRESA.modulos.plataformaKomune && i.cadastrou ? ` · cadastrou-se na ${EMPRESA.nome}` : null}
               {i.respondeu && !i.botao_tocado ? ' · respondeu' : null}
             </span>
             {i.status === 'pulada' ? (

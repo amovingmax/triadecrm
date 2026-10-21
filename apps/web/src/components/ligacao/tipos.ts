@@ -6,6 +6,7 @@ import {
   type Feriado,
   diaEmFortaleza,
 } from '@/components/registro/tipos';
+import { EMPRESA } from '@/lib/empresa';
 import { type OrgKind, type Temperature } from '@komune/schema';
 
 /**
@@ -359,7 +360,7 @@ export const MENSAGENS_DE_EXCLUSAO: Record<MotivoDeExclusao, string> = {
   em_janela_de_recontato: 'em janela de recontato',
   reservado_em_outro_lote: 'já reservado em outro lote',
   sem_negocio_aberto: 'sem negócio aberto no funil',
-  etapa_sem_ligacao: 'já contratam pela Komune',
+  etapa_sem_ligacao: `já contratam pela ${EMPRESA.nome}`,
   temperatura_diferente: 'temperatura diferente da origem do lote',
 };
 
@@ -666,7 +667,7 @@ export const ETAPAS_SEM_LIGACAO_DE_ATIVACAO = ['primeira_contratacao', 'recorren
  * Origem desconhecida cai em `ORIGEM_PADRAO`. Nunca em vazio: pular o aviso de origem é
  * a única parte do roteiro que não é escolha de redação.
  */
-export const FRASE_DE_ORIGEM: Readonly<Record<string, string>> = {
+const FRASE_DE_ORIGEM_DA_KOMUNE: Readonly<Record<string, string>> = {
   casamentos_com_br: 'no Casamentos.com',
   google_places: 'no Google, procurando fornecedor de evento aqui em Natal',
   instagram: 'no Instagram de vocês',
@@ -675,12 +676,17 @@ export const FRASE_DE_ORIGEM: Readonly<Record<string, string>> = {
   telelistas: 'numa lista de fornecedores de evento de Natal',
   planilha: 'numa lista de fornecedores de evento aqui de Natal',
   base_cnpj: 'no cadastro público de empresas de evento de Natal',
-  contato_pessoal: 'com uma pessoa aqui da Komune, que me passou o contato de vocês',
+  contato_pessoal: `com uma pessoa aqui da ${EMPRESA.nome}, que me passou o contato de vocês`,
   indicacao: 'por indicação de outro fornecedor que já trabalha com a gente',
   captura_campo: 'num evento aqui em Natal, onde vocês estavam trabalhando',
 };
 
-export const ORIGEM_PADRAO = 'numa lista pública de fornecedores de evento aqui de Natal';
+/** A empresa com frases próprias (empresas.ts) fala as dela; sem elas, as de cima. */
+export const FRASE_DE_ORIGEM: Readonly<Record<string, string>> =
+  EMPRESA.origens?.porFonte ?? FRASE_DE_ORIGEM_DA_KOMUNE;
+
+export const ORIGEM_PADRAO =
+  EMPRESA.origens?.padrao ?? 'numa lista pública de fornecedores de evento aqui de Natal';
 
 export function fraseDeOrigem(slug: string): string {
   return FRASE_DE_ORIGEM[slug] ?? ORIGEM_PADRAO;

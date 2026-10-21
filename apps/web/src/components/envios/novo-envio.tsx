@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -98,14 +99,14 @@ const QUALIDADE_EM_PT: Record<string, string> = {
 };
 
 const ROTULO_DA_ASSINATURA: Record<Assinatura, string> = {
-  marca: 'em nome da Komune',
+  marca: `em nome da ${EMPRESA.nome}`,
   eu: 'assinada por você',
   responsavel: 'assinada pelo responsável',
   revezar: 'dividida entre atendentes',
   // Não aparece no formulário de criar envio (o lote da casa é criado pelo
   // banco), mas o mapa é total: sem esta linha o rótulo viria vazio no dia em
   // que alguém reusar este objeto para mostrar um lote existente.
-  komune: 'sem assinatura, em nome da Komune',
+  komune: `sem assinatura, em nome da ${EMPRESA.nome}`,
 };
 
 function temAtendente(corpo: string): boolean {
@@ -585,7 +586,9 @@ export function NovoEnvio({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="marca">Em nome da Komune (sem nome de atendente)</SelectItem>
+                    <SelectItem value="marca">
+                      Em nome da {EMPRESA.nome} (sem nome de atendente)
+                    </SelectItem>
                     <SelectItem value="eu">Eu</SelectItem>
                     <SelectItem value="responsavel">O responsável de cada parceiro</SelectItem>
                     <SelectItem value="revezar">Dividir entre atendentes</SelectItem>
@@ -608,7 +611,7 @@ export function NovoEnvio({
                   )}
                 >
                   {conflitoDeAssinatura
-                    ? 'O modelo escolhido diz o nome de quem envia. Em nome da Komune, escolha um modelo sem nome de atendente.'
+                    ? `O modelo escolhido diz o nome de quem envia. Em nome da ${EMPRESA.nome}, escolha um modelo sem nome de atendente.`
                     : assinatura === 'marca'
                       ? 'As respostas caem nas Conversas do responsável de cada parceiro (ou de quem montou a campanha).'
                       : 'As respostas caem nas Conversas de quem assinou.'}
@@ -700,7 +703,7 @@ export function NovoEnvio({
                   {pessoas.find((p) => p.organization_id === itemVisto.organization_id)?.nome}
                 </span>
                 {assinatura === 'marca'
-                  ? ' · em nome da Komune'
+                  ? ` · em nome da ${EMPRESA.nome}`
                   : itemVisto.assinante
                     ? ` · assinada por ${itemVisto.assinante}`
                     : null}
@@ -1076,7 +1079,7 @@ function ListaDoPublico({
                 </span>
                 <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                   {ROTULO_DA_SITUACAO[p.situacao] ?? p.situacao}
-                  {p.cadastrado_komune ? ' · na Komune' : ''}
+                  {EMPRESA.modulos.plataformaKomune && p.cadastrado_komune ? ` · na ${EMPRESA.nome}` : ''}
                 </span>
               </label>
             </li>

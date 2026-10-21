@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Copy, ExternalLink, FilePlus2, Link2, Lock, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import type { AppRole } from '@/lib/auth/role';
 import { Badge } from '@/components/ui/badge';
@@ -245,7 +246,7 @@ export function PainelPreCadastro({
         {p.publicado ? (
           <Badge variant="pilula">
             <Check aria-hidden="true" />
-            Publicado na Komune
+            Publicado na {EMPRESA.nome}
           </Badge>
         ) : null}
       </div>
@@ -384,7 +385,9 @@ function Moldura({ children, selo }: { children: React.ReactNode; selo?: React.R
   return (
     <section className="sombra-base flex min-w-0 flex-col gap-4 rounded-xl bg-card p-5 md:p-6">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Pré-cadastro na Komune</h2>
+        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
+          Pré-cadastro na {EMPRESA.nome}
+        </h2>
         {selo}
       </div>
       {children}
@@ -470,7 +473,7 @@ function porQueNaoDaParaAgir(
     return 'Criar o rascunho não avisa ninguém e não publica nada: ele nasce privado e invisível, e é o que o fornecedor vai ver quando abrir o link.';
   }
   if (p.reivindicadoEm) {
-    return 'O perfil já foi reivindicado. O que vier daqui em diante acontece na conta do fornecedor, dentro da Komune.';
+    return `O perfil já foi reivindicado. O que vier daqui em diante acontece na conta do fornecedor, dentro da ${EMPRESA.nome}.`;
   }
   if (p.recusadoEm) {
     return 'O fornecedor recusou o perfil. Nada mais é emitido, e o contato está suprimido.';

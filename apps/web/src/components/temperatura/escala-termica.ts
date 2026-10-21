@@ -1,5 +1,7 @@
 import type { Temperature } from '@komune/schema';
 
+import { EMPRESA } from '@/lib/empresa';
+
 /**
  * A escala térmica é a dimensão dos RELATÓRIOS e do override manual de 1–3
  * estrelas. O banco calcula a temperatura de cada negócio a partir da etapa, da
@@ -74,7 +76,7 @@ export const ESCALA_TERMICA: Record<Temperatura, DefinicaoTemperatura> = {
   cliente: {
     valor: 'cliente',
     rotulo: 'Cliente',
-    descricao: 'Fechou com a Komune e está em cadastro ou publicação.',
+    descricao: `Fechou com a ${EMPRESA.nome} e está em cadastro ou publicação.`,
     cor: 'var(--cliente)',
     corTexto: 'var(--cliente-texto)',
     corFundo: 'var(--cliente-fundo)',

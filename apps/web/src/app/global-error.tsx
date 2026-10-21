@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 
+import { EMPRESA, UM_ADMIN } from '@/lib/empresa';
+
 import './globals.css';
 
 /** A mesma chave que o `ProvedorTema` passa ao next-themes. */
@@ -79,7 +81,7 @@ export default function ErroGlobal({
       <body className="flex min-h-full flex-col bg-background text-foreground">
         {/* `metadata` não existe em componente de cliente; o título entra pelo
             elemento, que o React hoisteia para o <head>. */}
-        <title>Não deu para carregar · Tríade</title>
+        <title>{`Não deu para carregar · ${EMPRESA.tituloDoApp}`}</title>
 
         <main
           role="alert"
@@ -88,8 +90,7 @@ export default function ErroGlobal({
           <h1 className="font-heading text-lg font-semibold">Não deu para carregar esta tela.</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
             A falha é do CRM, não de algo que você tenha feito. Tente de novo — muitas vezes é só a
-            conexão caindo por um instante. Se voltar a acontecer, avise um admin (Rafael, Luiz ou
-            Matheus).
+            conexão caindo por um instante. Se voltar a acontecer, avise {UM_ADMIN}.
           </p>
 
           {/* Botões escritos à mão: o `Button` de @/components/ui é um componente a

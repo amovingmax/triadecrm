@@ -1,5 +1,7 @@
 import * as z from 'zod';
 
+import { EMPRESA } from '@/lib/empresa';
+
 import type { ResultadoTecnico } from './tipos';
 
 /**
@@ -74,7 +76,7 @@ const POR_QUE_NAO: Record<string, string> = {
   ficha_sem_whatsapp: 'A ficha não tem número de WhatsApp.',
   sem_whatsapp: 'A ficha não tem número de WhatsApp.',
   aviso_pausado: 'Os avisos estão pausados em Envios.',
-  whatsapp_nao_configurado: 'O número de WhatsApp da Komune não está configurado.',
+  whatsapp_nao_configurado: `O número de WhatsApp da ${EMPRESA.nome} não está configurado.`,
 };
 
 /** A entrega no WhatsApp, no selo: o mesmo vocabulário da tela de Conversas. */
@@ -102,7 +104,7 @@ export function estadoDoAviso(
         tom: 'destaque',
         selo: 'Na fila',
         titulo: 'Aviso no WhatsApp a caminho',
-        detalhe: 'Sai pelo número da Komune no horário do WhatsApp (seg a sex, 8h às 17h45).',
+        detalhe: `Sai pelo número da ${EMPRESA.nome} no horário do WhatsApp (seg a sex, 8h às 17h45).`,
         balao: true,
         podeCancelar: true,
         andando: true,
@@ -125,8 +127,8 @@ export function estadoDoAviso(
         titulo: 'Aviso enviado no WhatsApp',
         detalhe:
           s.entrega === 'queued' || !s.entrega
-            ? 'Saindo agora pelo número da Komune.'
-            : `Saiu pelo número da Komune${saiuAs ? ` às ${saiuAs}` : ''}. Já está na conversa.`,
+            ? `Saindo agora pelo número da ${EMPRESA.nome}.`
+            : `Saiu pelo número da ${EMPRESA.nome}${saiuAs ? ` às ${saiuAs}` : ''}. Já está na conversa.`,
         balao: true,
         naConversa: true,
         andando: s.entrega !== 'read',

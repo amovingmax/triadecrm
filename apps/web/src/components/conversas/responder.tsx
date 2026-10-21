@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { BellOff, NotebookPen, PenLine, SendHorizontal, Zap } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -238,7 +239,7 @@ export function TextoLivre({
     },
     onSuccess: () => {
       toast.success('Mensagem na fila do WhatsApp.', {
-        description: 'Sai pelo número da KOMUNE em instantes.',
+        description: `Sai pelo número da ${EMPRESA.nomeDoNumero} em instantes.`,
       });
       void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
       for (const chave of atualizar) void clientes.invalidateQueries({ queryKey: chave });

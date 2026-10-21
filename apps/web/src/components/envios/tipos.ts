@@ -1,5 +1,7 @@
 import * as z from 'zod';
 
+import { EMPRESA, TIPOS_EM_USO } from '@/lib/empresa';
+
 /**
  * O vocabulário dos envios em massa (migração `20260921100000_envios_em_massa`).
  *
@@ -11,7 +13,7 @@ import * as z from 'zod';
 // O público
 // ---------------------------------------------------------------------------
 
-export const SITUACOES = [
+const TODAS_AS_SITUACOES = [
   { valor: 'nunca_contatado', rotulo: 'Nunca contatado', dica: 'Nunca recebeu mensagem nossa.' },
   { valor: 'sem_resposta', rotulo: 'Não respondeu', dica: 'Recebeu e nunca respondeu.' },
   { valor: 'ja_conversou', rotulo: 'Já conversou', dica: 'Respondeu alguma vez.' },
@@ -22,20 +24,24 @@ export const SITUACOES = [
   },
   {
     valor: 'cadastrado_komune',
-    rotulo: 'Cadastrado na Komune',
+    rotulo: `Cadastrado na ${EMPRESA.nome}`,
     dica: 'Já tem perfil na plataforma.',
   },
 ] as const;
-export type Situacao = (typeof SITUACOES)[number]['valor'];
+export type Situacao = (typeof TODAS_AS_SITUACOES)[number]['valor'];
 
-export const TIPOS_DE_PARCEIRO = [
-  { valor: 'fornecedor', rotulo: 'Fornecedor' },
-  { valor: 'produtor', rotulo: 'Produtor' },
-  { valor: 'cerimonialista', rotulo: 'Cerimonialista' },
+/** "Cadastrado na Komune" só existe onde a plataforma Komune está ligada. */
+export const SITUACOES = TODAS_AS_SITUACOES.filter(
+  (s) => s.valor !== 'cadastrado_komune' || EMPRESA.modulos.plataformaKomune,
+);
+
+/** Os três de captação vêm da empresa (só os que ela usa, com o rótulo dela). */
+export const TIPOS_DE_PARCEIRO: readonly { valor: string; rotulo: string }[] = [
+  ...TIPOS_EM_USO.map((t) => ({ valor: t.id, rotulo: t.rotulo })),
   { valor: 'espaco', rotulo: 'Espaço' },
   { valor: 'empresa', rotulo: 'Empresa' },
   { valor: 'outro', rotulo: 'Outro' },
-] as const;
+];
 
 export const TEMPERATURAS = [
   { valor: 'frio', rotulo: 'Frio' },

@@ -1,5 +1,6 @@
 import { Hourglass, MessageSquareDashed, Radio } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 
 import { dataHoraCompleta } from './formatos';
@@ -82,7 +83,7 @@ export function faltasDoWhatsapp(meta: DependenciasDaMeta): string[] {
   const faltas: string[] = [];
   if (!meta.numeroConfigurado) {
     faltas.push(
-      'O número de WhatsApp da KOMUNE ainda não foi conectado ao CRM. Enquanto isso, nada sai e nada chega por aqui.',
+      `O número de WhatsApp da ${EMPRESA.nomeDoNumero} ainda não foi conectado ao CRM. Enquanto isso, nada sai e nada chega por aqui.`,
     );
   }
   if (meta.worker.estado !== 'ok') {

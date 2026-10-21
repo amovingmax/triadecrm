@@ -3,6 +3,7 @@
 import { useId } from 'react';
 import { ChevronDown, Pencil, RotateCw, Target } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import type { AppRole } from '@/lib/auth/role';
 import { Badge } from '@/components/ui/badge';
@@ -341,9 +342,11 @@ function LinhaMetrica({
 /**
  * O número existe, mas a fonte da verdade é outra. O banco escreve isso em
  * `goal_progress.fonte` ("PROXY: ... a integração ainda não está ligada") e a tela
- * repete, em vez de deixar o número passar por definitivo.
+ * repete, em vez de deixar o número passar por definitivo. Só onde a plataforma
+ * Komune existe: sem ela, não há outra fonte da verdade a anunciar.
  */
 function ChipProxy() {
+  if (!EMPRESA.modulos.plataformaKomune) return null;
   return (
     <Badge
       variant="pilula"

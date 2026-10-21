@@ -1,5 +1,7 @@
 import { formatPhoneBr, TIMEZONE } from '@komune/schema';
 
+import { EMPRESA } from '@/lib/empresa';
+
 /**
  * Formatação da tela de Parceiros. Sem travessão em nenhum texto visível, e todo
  * número sai pronto para o utilitário `numerico` (IBM Plex Mono com tabular-nums).
@@ -128,11 +130,15 @@ export function formatarLocal(
   return [bairro, cidade].filter(Boolean).join(', ');
 }
 
-/** Rótulo do tipo de organização (enum `app.org_kind`). */
+/**
+ * Rótulo do tipo de organização (enum `app.org_kind`). Os três de captação vêm da
+ * empresa; o que ela não usa (`null`) mantém o nome de sempre, para um valor que já
+ * está no banco continuar aparecendo com nome.
+ */
 export const ROTULO_TIPO: Record<string, string> = {
-  fornecedor: 'Fornecedor',
-  produtor: 'Produtor',
-  cerimonialista: 'Cerimonialista',
+  fornecedor: EMPRESA.tipos.fornecedor ?? 'Fornecedor',
+  produtor: EMPRESA.tipos.produtor ?? 'Produtor',
+  cerimonialista: EMPRESA.tipos.cerimonialista ?? 'Cerimonialista',
   espaco: 'Espaço',
   empresa: 'Empresa',
   outro: 'Outro',

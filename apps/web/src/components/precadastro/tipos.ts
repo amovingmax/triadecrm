@@ -8,6 +8,8 @@
  * que a Heloísa perde no meio da rua.
  */
 
+import { EMPRESA } from '@/lib/empresa';
+
 /** Valores do enum `app.prereg_status`. */
 export const SITUACOES_DO_PRECADASTRO = [
   'pending',
@@ -29,7 +31,7 @@ export const ROTULO_SITUACAO: Record<SituacaoDoPreCadastro, string> = {
   link_sent: 'Link enviado',
   in_progress: 'Cadastro em andamento',
   completed: 'Cadastro completo',
-  published: 'Publicado na Komune',
+  published: `Publicado na ${EMPRESA.nome}`,
   rejected: 'Recusado pelo fornecedor',
   expired: 'Apagado por prazo',
 };
@@ -170,7 +172,7 @@ export const ROTULO_EVENTO: Record<string, string> = {
   data_authorization_granted: 'Uso dos dados autorizado',
   expiry_reminder_sent: 'Aviso de expiração enviado',
   pre_registration_purged: 'Dados do rascunho apagados',
-  published: 'Perfil publicado na Komune',
+  published: `Perfil publicado na ${EMPRESA.nome}`,
   publish_requested: 'Publicação solicitada',
   returned: 'Devolvido pela curadoria',
 };

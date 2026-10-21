@@ -8,6 +8,8 @@ import {
   type Responde,
 } from '@komune/prompts';
 
+import { EMPRESA } from '@/lib/empresa';
+
 import {
   ROTULO_ENTREGA,
   type EstadoDaJanela,
@@ -237,8 +239,8 @@ const RECADO_DO_ERRO: Record<string, string> = {
   '132000': 'o modelo tem um número de variáveis diferente do que a Meta aprovou.',
   '132001': 'este modelo não existe mais na Meta, ou está com outro nome.',
   '132005': 'o texto do modelo passou do tamanho que a Meta aceita.',
-  '131031': 'a conta do WhatsApp da Komune está bloqueada ou restrita na Meta.',
-  '133010': 'o número da Komune não está registrado na Cloud API.',
+  '131031': `a conta do WhatsApp da ${EMPRESA.nome} está bloqueada ou restrita na Meta.`,
+  '133010': `o número da ${EMPRESA.nome} não está registrado na Cloud API.`,
 };
 
 /** A frase da recusa: a nossa quando o código é conhecido, a da Meta quando não é. */
@@ -667,8 +669,7 @@ export const MOTIVOS_DE_RECUSA_DO_ENVIO: Record<string, string> = {
   janela_dia_sem_janela: 'Hoje não tem janela de envio configurada para este canal.',
   // O envio a partir da ficha (`wa_preparar_envio` e `wa_enviar_modelo`,
   // migração 20260914100000).
-  whatsapp_nao_configurado:
-    'O número de WhatsApp da KOMUNE ainda não foi conectado ao CRM. Enquanto isso, nada sai por aqui.',
+  whatsapp_nao_configurado: `O número de WhatsApp da ${EMPRESA.nomeDoNumero} ainda não foi conectado ao CRM. Enquanto isso, nada sai por aqui.`,
   ficha_sem_whatsapp:
     'Esta ficha não tem WhatsApp cadastrado. Cadastre o número na ficha primeiro.',
   modelo_inexistente: 'Este modelo foi desativado. Recarregue e escolha outro.',

@@ -1,3 +1,5 @@
+import { EMPRESA } from '@/lib/empresa';
+
 import {
   CAMPOS_DA_FICHA,
   type CampoDaFicha,
@@ -110,8 +112,7 @@ const RECUSAS_DO_LOTE: Record<string, string> = {
   assinatura_invalida: 'Escolha quem assina.',
   atendente_invalido: 'Um dos atendentes escolhidos não está ativo ou não pode enviar.',
   envio_inexistente: 'Esta campanha não existe mais. Atualize a tela.',
-  modelo_tem_atendente:
-    'Este modelo diz "aqui é {{atendente}}". Em nome da Komune, escolha um modelo sem nome de atendente.',
+  modelo_tem_atendente: `Este modelo diz "aqui é {{atendente}}". Em nome da ${EMPRESA.nome}, escolha um modelo sem nome de atendente.`,
   acoes_invalidas: 'Confira o que acontece em cada botão: o link precisa de texto e de rótulo.',
   destino_invalido: 'O destino do link precisa começar com https://.',
   nome_invalido_modelo: 'Dê ao modelo um nome de 3 a 80 letras.',

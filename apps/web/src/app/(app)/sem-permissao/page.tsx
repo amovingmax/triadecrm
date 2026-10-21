@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROTULO_PAPEL } from '@/lib/auth/role';
 import { requireSession } from '@/lib/auth/session';
+import { UM_ADMIN } from '@/lib/empresa';
 import { LEITURA } from '@/lib/larguras';
 
 export const metadata: Metadata = { title: 'Sem permissão' };
@@ -24,7 +25,7 @@ export default async function PaginaSemPermissao() {
           </CardTitle>
           <CardDescription>
             Seu papel <Badge variant="pilula">{ROTULO_PAPEL[sessao.papel]}</Badge> não dá acesso a
-            esta área. Se precisar dela, peça a um admin (Rafael, Luiz ou Matheus).
+            esta área. Se precisar dela, peça a {UM_ADMIN}.
           </CardDescription>
         </CardHeader>
         <CardContent>

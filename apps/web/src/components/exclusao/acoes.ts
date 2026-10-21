@@ -9,6 +9,7 @@
  * motivo }`, e a frase que a pessoa lê sai de `recadoDaExclusao`. Nada do
  * Postgres chega à tela — é a regra do `funis/acoes/erros.ts`, valendo aqui.
  */
+import { EMPRESA } from '@/lib/empresa';
 import { createClient } from '@/lib/supabase/client';
 
 // ---------------------------------------------------------------------------
@@ -54,10 +55,8 @@ const RECADO: Record<string, string> = {
   sem_permissao: 'Seu perfil não pode fazer isso. Excluir e restaurar é de admin e gestor.',
   nao_encontrado: 'Este parceiro não está mais na base. Recarregue a página.',
   motivo_obrigatorio: 'Escreva o motivo da exclusão.',
-  ja_e_cliente:
-    'Este parceiro já é cliente da Komune. Quem está publicado ou fechou negócio não se exclui pelo CRM.',
-  pre_cadastro_em_andamento:
-    'Este parceiro tem um pré-cadastro em andamento na Komune. Espere ele concluir ou expirar antes de excluir.',
+  ja_e_cliente: `Este parceiro já é cliente da ${EMPRESA.nome}. Quem está publicado ou fechou negócio não se exclui pelo CRM.`,
+  pre_cadastro_em_andamento: `Este parceiro tem um pré-cadastro em andamento na ${EMPRESA.nome}. Espere ele concluir ou expirar antes de excluir.`,
   anonimizado: 'Os dados deste parceiro foram eliminados. Não há o que restaurar.',
   duplicado: 'Este parceiro foi cadastrado de novo enquanto estava excluído.',
   nao_encontrada: 'Este compromisso não existe mais. Recarregue a página.',

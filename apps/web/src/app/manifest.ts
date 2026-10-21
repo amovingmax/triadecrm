@@ -1,12 +1,13 @@
 import type { MetadataRoute } from 'next';
 
+import { EMPRESA } from '@/lib/empresa';
+
 /** Manifest da PWA (PRD §8: instalável no celular, mobile-first nas telas de campo). Servido em /manifest.webmanifest. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Tríade',
-    short_name: 'Tríade',
-    description:
-      'CRM de captação da KOMUNE: parceiros, Revisão, funis, conversas de WhatsApp, agenda, metas e relatórios.',
+    name: EMPRESA.tituloDoApp,
+    short_name: EMPRESA.tituloDoApp,
+    description: EMPRESA.descricaoDoApp,
     lang: 'pt-BR',
     dir: 'ltr',
     id: '/',

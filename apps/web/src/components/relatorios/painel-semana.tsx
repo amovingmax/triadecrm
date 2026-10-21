@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, CircleAlert, Copy, RotateCw } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -93,7 +94,7 @@ export function PainelSemana({
             <span className="truncate font-medium" title={l.ajuda}>
               {l.rotulo}
             </span>
-            {l.proxy ? (
+            {EMPRESA.modulos.plataformaKomune && l.proxy ? (
               <Badge
                 variant="pilula"
                 className="h-5 shrink-0 px-2 text-[10px] font-normal"

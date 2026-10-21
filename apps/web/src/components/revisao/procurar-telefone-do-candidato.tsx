@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Phone, Search } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -45,7 +46,7 @@ const RECADO: Record<string, string> = {
   consulta_falhou: 'Não deu para ler este nome agora.',
   nao_contatar: 'Esta empresa pediu para não ser procurada.',
   ja_tem_telefone: 'Esta empresa já tem telefone.',
-  nao_configurado: 'A busca no Google ainda não foi configurada no servidor. Fale com Luiz ou Matheus.',
+  nao_configurado: `A busca no Google ainda não foi configurada no servidor. Fale com ${EMPRESA.admins.tecnicos}.`,
 };
 
 export function ProcurarTelefoneDoCandidato({

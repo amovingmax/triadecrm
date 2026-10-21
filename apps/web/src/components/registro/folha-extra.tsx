@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 import { Check } from 'lucide-react';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -206,12 +207,12 @@ export function FolhaExtra({
                 onChange={(e) =>
                   setValores((v) => ({ ...v, autorizacaoEvidencia: e.target.value }))
                 }
-                placeholder="Pode cadastrar meu buffet na Komune, mando as fotos amanhã."
+                placeholder={`Pode cadastrar meu buffet na ${EMPRESA.nome}, mando as fotos amanhã.`}
                 className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
               />
               <p className="text-xs text-muted-foreground">
                 Com as palavras dele. É essa frase que vira a autorização registrada, e sem ela o
-                pré-cadastro na Komune não pode acontecer.
+                pré-cadastro na {EMPRESA.nome} não pode acontecer.
               </p>
             </div>
           ) : null}

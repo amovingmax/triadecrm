@@ -20,6 +20,10 @@
       "types": "./src/schemas.ts",
       "default": "./src/schemas.ts"
     },
+    "./empresas": {
+      "types": "./src/empresas.ts",
+      "default": "./src/empresas.ts"
+    },
     "./database.types": {
       "types": "./src/database.types.ts",
       "default": "./src/database.types.ts"

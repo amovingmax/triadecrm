@@ -7,6 +7,7 @@ import { normalizePhoneBr } from '@komune/schema';
 import { MessageCircle, Phone, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { EMPRESA } from '@/lib/empresa';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,8 +57,7 @@ type Lugar = {
 
 const RECADO: Record<string, string> = {
   sem_sessao: 'A sua sessão expirou. Entre de novo.',
-  nao_configurado:
-    'A busca no Google ainda não foi configurada no servidor. Fale com Luiz ou Matheus.',
+  nao_configurado: `A busca no Google ainda não foi configurada no servidor. Fale com ${EMPRESA.admins.tecnicos}.`,
   ficha_invisivel: 'Você não tem acesso a essa ficha.',
   ficha_ja_tem_telefone: 'Essa ficha já tem telefone.',
   nao_contatar: 'Esse contato pediu para não ser procurado.',
