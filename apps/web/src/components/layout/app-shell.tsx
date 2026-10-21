@@ -1,7 +1,9 @@
 import { PilhaDeAvisos } from '@/components/avisos/pilha-de-avisos';
+import { AdiantarDados } from '@/components/consultas/adiantar-dados';
 import { ProvedorDeAvisos } from '@/components/avisos/provedor-avisos';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Header } from '@/components/layout/header';
+import { RetornoDoToque } from '@/components/layout/retorno-do-toque';
 import { Sidebar } from '@/components/layout/sidebar';
 import { AcompanhanteDeAvisos } from '@/components/ligacao/aviso-no-recibo';
 import { podeLigar } from '@/components/ligacao/chamada-contexto';
@@ -9,6 +11,7 @@ import { ProvedorDoSoftphone } from '@/components/ligacao/voz-provedor';
 import { TransicaoPagina } from '@/components/movimento';
 import { type Sessao } from '@/lib/auth/session';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
+import { navegacaoPara } from '@/lib/navegacao';
 
 /**
  * Casca da área autenticada, responsiva e mobile-first (PRD §8):
@@ -18,7 +21,10 @@ import { type ContagemDasFilas } from '@/lib/filas-do-menu';
  * alvo de toque de 44px (docs/design/sistema-visual.md, "Alvos de toque").
  *
  * A troca de rota entra por `TransicaoPagina` (opacidade mais 2px): confirma que a
- * navegação aconteceu quando uma lista dá lugar a outra lista parecida.
+ * navegação aconteceu quando uma lista dá lugar a outra lista parecida. Até a tela nova
+ * entrar, o link tocado esmaece (`RetornoDoToque`); as telas do menu já vêm adiantadas
+ * — a página e o código pelo `nav-link.tsx`, os dados por `AdiantarDados` — e entram
+ * antes de o esmaecer começar.
  *
  * O espaço acima do conteúdo é o maior da pilha de propósito: é a única fronteira
  * entre dois níveis (casca e página). Com os 20px antigos ele empatava com os 16px
@@ -78,6 +84,13 @@ export function AppShell({
           {/* O aviso no WhatsApp de quem não atendeu sai até um minuto depois do
           recibo; quem ligou já está em outro contato (ou outra tela). */}
           <AcompanhanteDeAvisos />
+          {/* O link tocado esmaece até a tela nova entrar, em qualquer tela. */}
+          <RetornoDoToque />
+          {/* Com o aparelho ocioso, as telas do menu buscam os dados antes do toque. */}
+          <AdiantarDados
+            papel={sessao.papel}
+            telas={navegacaoPara(sessao.papel).map((item) => item.href)}
+          />
         </div>
       </ProvedorDoSoftphone>
     </ProvedorDeAvisos>

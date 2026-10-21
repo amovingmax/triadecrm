@@ -159,7 +159,10 @@ export function CartaoDoLote({
       <footer className="flex flex-wrap items-center gap-2 border-t pt-3">
         {aberto && lote.faltam > 0 ? (
           <Button asChild className="toque h-11 md:h-9">
-            <Link href={`/ligar/${lote.id}`}>
+            {/* Adiantada (`prefetch`): a página do lote no servidor é só a sessão e o
+                contexto da telefonia — o lote e o próximo contato a tela busca ao abrir —,
+                então guardá-la não mostra nada velho e o toque abre na hora. */}
+            <Link href={`/ligar/${lote.id}`} prefetch>
               <PhoneOutgoing aria-hidden="true" />
               Abrir e ligar
             </Link>

@@ -55,10 +55,14 @@ import {
  * contagem e os cartões só da etapa aberta (é o `p_stage_id` do contrato). No
  * desktop ele é nulo e cada coluna vem com os primeiros `CARTOES_POR_ETAPA`.
  */
-export function useQuadro(filtros: FiltrosQuadro, funilId: number | null) {
-  return useQuery({
+/**
+ * A consulta do quadro, uma só para a tela (`useQuadro`) e para o adiantamento dos
+ * dados (`consultas/adiantadores.ts`): se as duas divergissem na chave, o que foi
+ * buscado antes do toque nunca seria encontrado.
+ */
+export function consultaDoQuadro(filtros: FiltrosQuadro, funilId: number | null) {
+  return {
     queryKey: chaveDoQuadro(filtros),
-    enabled: funilId !== null,
     queryFn: () =>
       carregarQuadro({
         p_pipeline_id: funilId ?? 0,
@@ -70,6 +74,13 @@ export function useQuadro(filtros: FiltrosQuadro, funilId: number | null) {
         p_offset: 0,
         p_canal: filtros.canal,
       }),
+  };
+}
+
+export function useQuadro(filtros: FiltrosQuadro, funilId: number | null) {
+  return useQuery({
+    ...consultaDoQuadro(filtros, funilId),
+    enabled: funilId !== null,
     // Trocar de funil ou digitar na busca mantém o quadro anterior na tela, apagado,
     // em vez de piscar em branco: a pessoa continua vendo onde estava.
     placeholderData: keepPreviousData,

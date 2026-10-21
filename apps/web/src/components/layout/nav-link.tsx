@@ -62,6 +62,21 @@ type Props = {
  * empurraria os últimos para fora da tela. A frase inteira continua indo para a
  * busca da paleta, que não depende do que está visível.
  */
+/*
+ * A TELA JÁ ESTÁ AQUI QUANDO O DEDO CHEGA (21/10/2026). Toda tela do CRM é dinâmica
+ * (depende de quem está logado), e o Next não adianta tela dinâmica por conta própria:
+ * cada toque pedia a página ao servidor, esperava, e só então baixava o código da tela
+ * nova — idas em série antes de ela começar a se desenhar. Com `prefetch`, o Next busca
+ * a página e o código de cada item do menu assim que o item fica visível, guarda por
+ * 5 minutos (`staleTimes.static`) e busca de novo quando vence. O toque passa a abrir o
+ * que já está no aparelho.
+ *
+ * Os DADOS da tela não vêm daí: cada tela continua buscando os seus ao abrir, pelo cache
+ * de consultas (`consultas/provedor-consultas.tsx`), então nada aparece velho. O que o
+ * adiantamento guarda é a casca da página — a sessão e os catálogos dela.
+ */
+const ADIANTAR_A_TELA = true;
+
 export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
   const pathname = usePathname();
   const ativo = estaAtivo(pathname, item.href);
@@ -99,6 +114,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
     return (
       <Link
         href={item.href}
+        prefetch={ADIANTAR_A_TELA}
         aria-current={ativo ? 'page' : undefined}
         onClick={onNavegar}
         className={cn(
@@ -159,6 +175,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
     return (
       <Link
         href={item.href}
+        prefetch={ADIANTAR_A_TELA}
         aria-current={ativo ? 'page' : undefined}
         className={cn(
           'toque relative flex min-w-max flex-1 flex-col items-center justify-center gap-1 text-[clamp(10px,3.25vw,11px)] leading-4 transition-colors',
@@ -198,6 +215,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
     return (
       <Link
         href={item.href}
+        prefetch={ADIANTAR_A_TELA}
         aria-current={ativo ? 'page' : undefined}
         onClick={onNavegar}
         className={cn(
@@ -245,6 +263,7 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
   return (
     <Link
       href={item.href}
+      prefetch={ADIANTAR_A_TELA}
       aria-current={ativo ? 'page' : undefined}
       onClick={onNavegar}
       className={cn(
@@ -298,7 +317,9 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
  *
  * É um retorno ao toque, e não uma tela de carregamento por cima: um `loading.tsx`
  * na área inteira foi medido e atrasava o conteúdo das telas rápidas — o React
- * segura a troca por 300 ms depois de mostrar um esqueleto, para não piscar.
+ * segura a troca por 300 ms depois de mostrar um esqueleto, para não piscar. Desde
+ * 21/10/2026 não há `loading.tsx` em lugar nenhum (saíram os da ficha e do lote, pelo
+ * mesmo motivo), e o toque nos outros links responde por `retorno-do-toque.tsx`.
  */
 function PilulaDoIcone({ ativo, children }: { ativo: boolean; children: React.ReactNode }) {
   const { pending } = useLinkStatus();

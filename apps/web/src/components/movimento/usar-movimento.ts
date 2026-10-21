@@ -16,14 +16,19 @@ import { useState } from 'react';
  * biblioteca inteira (39 KB comprimidos) para toda página do CRM.
  */
 
-/** Entrada escalonada da lista: os primeiros resultados chegam primeiro. */
+/**
+ * Entrada escalonada da lista: os primeiros resultados chegam primeiro.
+ *
+ * Encurtada em 21/10/2026 (eram 15 ms, 24 linhas e 220 ms): a lista inteira assenta
+ * em ~150 ms, e cada linha já nasce legível (`revelar-linha`, em `globals.css`).
+ */
 export const ESCALONAMENTO = {
-  /** 15ms entre uma linha e a seguinte. */
-  atrasoPorItem: 0.015,
-  /** Acima de 24 linhas o escalonamento vira espera; da 25 em diante todas entram juntas. */
-  maximoItens: 24,
+  /** 4ms entre uma linha e a seguinte. */
+  atrasoPorItem: 0.004,
+  /** Acima de 8 linhas o escalonamento vira espera; da 9ª em diante todas entram juntas. */
+  maximoItens: 8,
   /** Duração da entrada de cada linha (a mesma do `revelar-linha` do CSS). */
-  duracao: 0.22,
+  duracao: 0.12,
 } as const;
 
 const CONSULTA = '(prefers-reduced-motion: reduce)';

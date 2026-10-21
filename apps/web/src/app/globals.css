@@ -716,10 +716,17 @@
 
 /* Entrada escalonada das linhas: os primeiros resultados chegam primeiro.
    Só transform e opacity; o delay vem inline, e some depois do primeiro paint.
-   `backwards` pelo mesmo motivo da entrada de página, logo abaixo. */
+   `backwards` pelo mesmo motivo da entrada de página, logo abaixo.
+
+   Desde 21/10/2026 a linha nasce LEGÍVEL (60% de opacidade, não zero) e assenta em
+   120 ms, 4 ms depois da anterior (`ESCALONAMENTO`, em `movimento/usar-movimento.ts`):
+   a lista inteira está assentada ~150 ms depois de os dados chegarem. Era do zero em
+   220 ms, 15 ms entre uma e outra, e a 10ª linha de Prospectados só terminava de
+   aparecer ~370 ms depois — a cada abertura da tela, quando o pedido era "eu clique e
+   a tela abra instantaneamente". A ordem ainda se vê; a espera, não. */
 @keyframes revelar-linha {
   from {
-    opacity: 0;
+    opacity: 0.6;
     transform: translateY(4px);
   }
   to {
@@ -729,7 +736,7 @@
 }
 
 @utility revelar-linha {
-  animation: revelar-linha 220ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  animation: revelar-linha 120ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 /* O conteúdo das folhas (mover etapa, cadastro rápido, candidato da Revisão)
@@ -788,14 +795,19 @@
    `matrix(1, 0, 0, 1, 0, 0)`, que não é `none`, e o botão "+" de Prospectados e
    o da Revisão ficavam parados no fim da lista em vez de flutuar sobre a barra
    do celular. `backwards` aplica o primeiro quadro no atraso e, no fim, solta o
-   elemento. A regra está em `globals-fundo.test.ts`. */
+   elemento. A regra está em `globals-fundo.test.ts`.
+
+   Desde 21/10/2026 a página nova nasce já visível (60% de opacidade) e assenta em
+   120 ms; eram 180 ms a partir do zero, e o conteúdo que já estava pronto ficava
+   ~100 ms sem dar para ler. A troca continua sendo vista — é o recado da animação —,
+   só não atrasa mais a leitura. */
 @utility entrada-pagina {
-  animation: entrada-pagina 180ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  animation: entrada-pagina 120ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 @keyframes entrada-pagina {
   from {
-    opacity: 0;
+    opacity: 0.6;
     transform: translateY(2px);
   }
   to {
@@ -843,6 +855,15 @@
   to {
     transform: scaleX(0);
   }
+}
+
+/* O link tocado, enquanto a tela nova não entra (`layout/retorno-do-toque.tsx`).
+   Fora de @layer para vencer o `transition-colors` e a opacidade dos utilitários do
+   próprio link. Os 60 ms de espera são o tempo da tela adiantada: ela abre antes, e
+   nada pisca. Ao soltar não há transição — a tela nova já está ali. */
+[data-indo] {
+  opacity: 0.55;
+  transition: opacity 120ms ease-out 60ms;
 }
 
 /* Rede de segurança: mesmo se um componente esquecer o useReducedMotion,

@@ -1117,7 +1117,8 @@ function ReciboDaMontagem({
 
       <footer className="flex items-center gap-2 border-t bg-popover px-4 pt-3 pb-4">
         <Button asChild className="toque h-12 flex-1 md:h-10">
-          <Link href={`/ligar/${resumo.lote_id}`}>
+          {/* Adiantada, como o "Abrir e ligar" da lista (`lote-lista.tsx`). */}
+          <Link href={`/ligar/${resumo.lote_id}`} prefetch>
             <PhoneOutgoing aria-hidden="true" />
             Abrir e ligar
           </Link>
