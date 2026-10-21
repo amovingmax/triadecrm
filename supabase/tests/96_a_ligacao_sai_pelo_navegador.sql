@@ -243,12 +243,18 @@ select throws_ok(
   '23505', null, 'e o índice segura quem escrever por fora da função');
 
 -- RLS e colunas
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): a
+-- política é `is_manager() or a própria`, então a outra SDR vê a chamada. A trava
+-- continua provada com quem não tem esse poder (leitura). Uma asserção só, para o
+-- plano não mudar.
 do $$
-declare v_n int; v_erro text := 'nenhum';
+declare v_n int; v_n2 int; v_erro text := 'nenhum';
 begin
-  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a2', 'sdr');
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a3', 'leitura');
   select count(*) into v_n from public.voice_calls where id = pg_temp.ligacao('um');
-  insert into pg_temp.r values ('rls_outro', to_jsonb(v_n));
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a2', 'sdr');
+  select count(*) into v_n2 from public.voice_calls where id = pg_temp.ligacao('um');
+  insert into pg_temp.r values ('rls_outro', jsonb_build_object('leitura', v_n, 'sdr2', v_n2));
   perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a1', 'sdr');
   select count(*) into v_n from public.voice_calls where id = pg_temp.ligacao('um');
   insert into pg_temp.r values ('rls_dono', to_jsonb(v_n));
@@ -259,8 +265,8 @@ begin
   insert into pg_temp.r values ('coluna', to_jsonb(v_erro));
 end $$;
 select pg_temp.sair();
-select is((select valor #>> '{}' from pg_temp.r where chave = 'rls_outro'), '0',
-  'outra pessoa não vê a chamada');
+select is((select valor from pg_temp.r where chave = 'rls_outro'), '{"leitura": 0, "sdr2": 1}'::jsonb,
+  'outra pessoa sem o poder da gestão (leitura) não vê a chamada; a outra SDR vê (poder do gestor desde 21/10/2026)');
 select is((select valor #>> '{}' from pg_temp.r where chave = 'rls_dono'), '1', 'quem ligou vê a sua');
 select is((select valor #>> '{}' from pg_temp.r where chave = 'coluna'), '42501',
   'mas nem quem ligou lê o número pela tabela');

@@ -209,16 +209,24 @@ export const GRUPOS: readonly GrupoDeNavegacao[] = [
 export const PAPEIS_DO_CRM: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
 
 /**
- * Admin e gestor: Ajustes, e o que no banco é `app.is_manager()` — mensagem
- * automática pela base, Consultoria, excluir e restaurar parceiro, lote e meta
- * para outra pessoa.
+ * Admin e gestor: só Ajustes. No banco é `app.admin_ou_gestor()`.
  *
  * O SDR ficou de fora de todas as telas da gestão no pivô de 06/10/2026 (ele era
- * só quem liga). Em 20/10/2026 voltou a entrar em todas, menos Ajustes, e a
- * trabalhar nelas com o que o banco já deixava (`app.can_write()`): atender,
- * cadastrar, importar, aprovar na Revisão, mover os negócios dele.
+ * só quem liga). Em 20/10/2026 voltou a entrar em todas, menos Ajustes, e em
+ * 21/10/2026 passou a ter nelas o mesmo poder do gestor (`temPoderDeGestao`).
  */
 const PAPEIS_QUE_GERENCIAM: readonly AppRole[] = ['admin', 'gestor'];
+
+/**
+ * Espelho de `app.is_manager()`: o poder da gestão no dia a dia — mensagem
+ * automática pela base, Consultoria, excluir e restaurar parceiro, desfazer
+ * importação, pesos e leitura da IA na Revisão, relatório da semana, lote e meta
+ * para outra pessoa. Desde 21/10/2026 é de admin, gestor e SDR ("o SDR é igual ao
+ * gestor, menos Ajustes"); o que sobra só para admin e gestor é `PAPEIS_QUE_GERENCIAM`.
+ */
+export function temPoderDeGestao(papel: AppRole): boolean {
+  return PAPEIS_DO_CRM.includes(papel);
+}
 
 export const NAVEGACAO: readonly ItemNavegacao[] = [
   // -------------------------------------------------------------------------
@@ -396,26 +404,26 @@ export function podeCriarParceiro(papel: AppRole): boolean {
 
 /**
  * Quem manda mensagem automática pela base: a saudação da lista de Prospectados e o
- * "aprovar e mandar mensagem" da Revisão. Admin e gestor: espelho de
- * `app.is_manager()`, que `saudacao_enfileirar` e `radar_revisar_*_com_mensagem`
- * conferem. É envio de WhatsApp em lote, com custo na Meta.
+ * "aprovar e mandar mensagem" da Revisão. Espelho de `app.is_manager()`, que
+ * `saudacao_enfileirar` e `radar_revisar_*_com_mensagem` conferem. É envio de
+ * WhatsApp em lote, com custo na Meta; desde 21/10/2026 o SDR também manda.
  */
 export function podeMandarMensagemAutomatica(papel: AppRole): boolean {
-  return PAPEIS_QUE_GERENCIAM.includes(papel);
+  return temPoderDeGestao(papel);
 }
 
 /** Quem põe e tira a marca de Consultoria. Espelho de `consultoria_marcar` (`app.is_manager()`). */
 export function podeMarcarConsultoria(papel: AppRole): boolean {
-  return PAPEIS_QUE_GERENCIAM.includes(papel);
+  return temPoderDeGestao(papel);
 }
 
 /**
- * Quem tira um parceiro da base e quem o devolve (07/10/2026): admin e gestor,
- * os mesmos que o põem lá. Espelho de `app.is_manager()`, que
- * `public.parceiro_excluir` e `public.parceiro_restaurar` conferem.
+ * Quem tira um parceiro da base e quem o devolve (07/10/2026): os mesmos que o
+ * põem lá. Espelho de `app.is_manager()`, que `public.parceiro_excluir` e
+ * `public.parceiro_restaurar` conferem.
  */
 export function podeExcluirParceiro(papel: AppRole): boolean {
-  return PAPEIS_QUE_GERENCIAM.includes(papel);
+  return temPoderDeGestao(papel);
 }
 
 /** Rota da lista de parceiros excluídos, de onde se restaura. */
@@ -434,7 +442,7 @@ export function podeMarcarCompromisso(papel: AppRole): boolean {
 /**
  * Quem escolhe de quem é a agenda que está vendo. A RLS de `tasks` e `reunioes` deixa
  * mais papéis verem tudo, mas a visão da equipe é decisão de produto para quem
- * acompanha alguém pela hierarquia (`lib/auth/hierarquia.ts`): admin e gestor.
+ * acompanha alguém pela hierarquia (`lib/auth/hierarquia.ts`): admin, gestor e SDR.
  */
 export function veAgendaDaEquipe(papel: AppRole): boolean {
   return acompanhaEquipe(papel);

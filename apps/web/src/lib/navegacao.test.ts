@@ -17,6 +17,7 @@ import {
   podeImportarPlanilha,
   podeMandarMensagemAutomatica,
   podeMarcarConsultoria,
+  temPoderDeGestao,
 } from '@/lib/navegacao';
 
 describe('NAVEGACAO', () => {
@@ -262,14 +263,22 @@ describe('podeCriarParceiro e podeImportarPlanilha', () => {
     }
   });
 
-  it('mensagem automática, Consultoria e exclusão continuam só de admin e gestor', () => {
+  it('mensagem automática, Consultoria e exclusão: admin, gestor e SDR', () => {
     // Espelho de `app.is_manager()` em `saudacao_enfileirar`,
     // `radar_revisar_*_com_mensagem`, `consultoria_marcar` e `parceiro_excluir`.
-    for (const pode of [podeMandarMensagemAutomatica, podeMarcarConsultoria, podeExcluirParceiro]) {
+    // Desde 21/10/2026 o SDR tem o poder do gestor; os papéis antigos, não.
+    for (const pode of [
+      temPoderDeGestao,
+      podeMandarMensagemAutomatica,
+      podeMarcarConsultoria,
+      podeExcluirParceiro,
+    ]) {
       expect(pode('admin')).toBe(true);
       expect(pode('gestor')).toBe(true);
-      expect(pode('sdr')).toBe(false);
+      expect(pode('sdr')).toBe(true);
+      expect(pode('embaixador')).toBe(false);
       expect(pode('leitura')).toBe(false);
+      expect(pode('financeiro')).toBe(false);
     }
   });
 

@@ -38,13 +38,14 @@ function linha(
 }
 
 describe('§3.7 — quem desfaz um lote', () => {
-  it('só admin e gestor: é o espelho de app.is_manager()', () => {
+  it('admin, gestor e SDR: é o espelho de app.is_manager()', () => {
     expect(podeDesfazerLote('admin')).toBe(true);
     expect(podeDesfazerLote('gestor')).toBe(true);
+    // A Heloísa é sdr: importava e não desfazia. Desde 21/10/2026, desfaz.
+    expect(podeDesfazerLote('sdr')).toBe(true);
   });
 
-  it('quem importa e não desfaz: a Heloísa é sdr', () => {
-    expect(podeDesfazerLote('sdr')).toBe(false);
+  it('os papéis antigos não desfazem', () => {
     expect(podeDesfazerLote('embaixador')).toBe(false);
     expect(podeDesfazerLote('leitura')).toBe(false);
     expect(podeDesfazerLote('financeiro')).toBe(false);

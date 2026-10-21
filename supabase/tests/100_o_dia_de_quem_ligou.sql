@@ -9,25 +9,29 @@
 --      falado, contatos e reuniões, tirados de public.call_attempts;
 --   2. O DIA É O DE NATAL: a ligação das 23:30 de ontem não entra em hoje;
 --   3. A GESTÃO VÊ TODOS, e a lista ligação a ligação só vem pedindo UMA pessoa;
---   4. QUEM LIGA SÓ VÊ O PRÓPRIO DIA — pedir o de outro é recusado;
+--   4. QUEM LIGA VÊ O TIME, COMO A GESTÃO — desde 21/10/2026 o SDR tem o poder
+--      do gestor; quem não é dos três papéis (o embaixador) é recusado ao
+--      pedir o dia de outro;
 --   5. QUEM NÃO LIGOU aparece zerado quando perguntam por ele, e não some;
 --   6. PAPEL FORA DOS TRÊS não vê nada.
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(27);
+select plan(28);
 
 insert into public.allowed_users (email, role, note) values
   ('d100.g@teste.local', 'gestor', 'pgTAP 100'),
   ('d100.a@teste.local', 'sdr', 'pgTAP 100'),
   ('d100.b@teste.local', 'sdr', 'pgTAP 100'),
-  ('d100.l@teste.local', 'leitura', 'pgTAP 100');
+  ('d100.l@teste.local', 'leitura', 'pgTAP 100'),
+  ('d100.e@teste.local', 'embaixador', 'pgTAP 100');
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a0000000-0000-4000-8000-000000010001'::uuid, 'd100.g@teste.local', '{"full_name":"Gil Gestor"}'),
   ('a0000000-0000-4000-8000-000000010002'::uuid, 'd100.a@teste.local', '{"full_name":"Ana Freela"}'),
   ('a0000000-0000-4000-8000-000000010003'::uuid, 'd100.b@teste.local', '{"full_name":"Bia Freela"}'),
-  ('a0000000-0000-4000-8000-000000010004'::uuid, 'd100.l@teste.local', '{"full_name":"Leo Leitura"}');
+  ('a0000000-0000-4000-8000-000000010004'::uuid, 'd100.l@teste.local', '{"full_name":"Leo Leitura"}'),
+  ('a0000000-0000-4000-8000-000000010005'::uuid, 'd100.e@teste.local', '{"full_name":"Eva Embaixadora"}');
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -229,19 +233,31 @@ select is((pg_temp.pessoa('gil', pg_temp.gil()) ->> 'ligacoes')::int, 0,
 select is(pg_temp.pessoa('gil', pg_temp.gil()) -> 'lista', '[]'::jsonb, 'com a lista vazia');
 
 -- =====================================================================
--- 4. Quem liga só vê o próprio dia
+-- 4. Quem liga vê o time, como a gestão
 -- =====================================================================
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000):
+-- `ligacoes_do_dia` entra no ramo de `app.is_manager()` e devolve ao SDR o mesmo
+-- que à gestão — o time inteiro sem pedir ninguém (sem a lista ligação a
+-- ligação), e o dia de outra pessoa quando pedido. A recusa de pedir o de outro
+-- segue provada com quem não é dos três papéis (o embaixador).
 select pg_temp.entrar(pg_temp.ana(), 'sdr');
-insert into r100 values ('da_ana', public.ligacoes_do_dia(pg_temp.hoje(), null));
+insert into r100 values
+  ('da_ana',       public.ligacoes_do_dia(pg_temp.hoje(), null)),
+  ('ana_pede_bia', public.ligacoes_do_dia(pg_temp.hoje(), pg_temp.bia())),
+  ('ana_por_ela',  public.ligacoes_do_dia(pg_temp.hoje(), pg_temp.ana()));
+select pg_temp.sair();
+select is(jsonb_array_length(pg_temp.pessoa('ana_pede_bia', pg_temp.bia()) -> 'lista'), 1,
+  'a Ana pede o dia da Bia e recebe, com a lista dela (poder do gestor desde 21/10/2026)');
+select pg_temp.entrar('a0000000-0000-4000-8000-000000010005'::uuid, 'embaixador');
 select throws_ok(
   $$ select public.ligacoes_do_dia(pg_temp.hoje(), pg_temp.bia()) $$,
-  '42501', 'Você só vê as suas próprias ligações',
-  'a Ana pede o dia da Bia e é recusada');
+  '42501', 'Sem permissão para ver as ligações do dia',
+  'o embaixador pede o dia da Bia e é recusado');
 select pg_temp.sair();
-select is(jsonb_array_length(pg_temp.r('da_ana') -> 'pessoas'), 1,
-  'sem pedir ninguém, quem liga recebe só o PRÓPRIO dia — nunca o do time');
-select is(jsonb_array_length(pg_temp.pessoa('da_ana', pg_temp.ana()) -> 'lista'), 5,
-  'e já com a lista dela, que é o "meu dia" de quem liga');
+select is(jsonb_array_length(pg_temp.r('da_ana') -> 'pessoas'), 2,
+  'sem pedir ninguém, quem liga recebe o dia do time, como a gestão (desde 21/10/2026)');
+select is(jsonb_array_length(pg_temp.pessoa('ana_por_ela', pg_temp.ana()) -> 'lista'), 5,
+  'pedindo o próprio dia, vem a lista dela, que é o "meu dia" de quem liga');
 
 -- =====================================================================
 -- 6. Papel fora dos três não vê nada

@@ -40,8 +40,13 @@ describe('quem acompanha quem', () => {
     expect(lista.map((p) => p.id)).toEqual(['janio', 'emb', 'gustavo', 'heloisa']);
   });
 
+  it('o SDR vê o mesmo que o gestor: as outras SDRs e o embaixador (desde 21/10/2026)', () => {
+    const lista = pessoasAcompanhadas({ id: 'heloisa', nome: 'Heloísa', papel: 'sdr' }, TIME);
+    expect(lista.map((p) => p.id)).toEqual(['heloisa', 'emb', 'gustavo']);
+  });
+
   it('quem não acompanha ninguém vê só a si mesmo', () => {
-    for (const papel of ['sdr', 'embaixador', 'leitura', 'financeiro', 'bot'] as const) {
+    for (const papel of ['embaixador', 'leitura', 'financeiro', 'bot'] as const) {
       expect(acompanhaEquipe(papel)).toBe(false);
       expect(pessoasAcompanhadas({ id: 'eu', nome: 'Eu', papel }, TIME)).toEqual([
         { id: 'eu', nome: 'Eu', papel },
@@ -49,8 +54,8 @@ describe('quem acompanha quem', () => {
     }
   });
 
-  it('só admin e gestor ligam o seletor de pessoa', () => {
-    expect(APP_ROLES.filter(acompanhaEquipe)).toEqual(['admin', 'gestor']);
+  it('admin, gestor e SDR ligam o seletor de pessoa', () => {
+    expect(APP_ROLES.filter(acompanhaEquipe)).toEqual(['admin', 'gestor', 'sdr']);
   });
 
   it('`?pessoa=` fora da lista abre o dia de quem entrou', () => {

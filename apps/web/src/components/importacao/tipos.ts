@@ -11,13 +11,13 @@ import type { AppRole } from '@/lib/auth/role';
 /**
  * Espelho de `app.is_manager()`: quem desfaz um lote de importação (RF-BAS-17).
  *
- * Não é o mesmo conjunto de quem IMPORTA (`podeCriarParceiro`, que inclui sdr e
- * embaixador), e essa diferença era o §3.7 do laudo: a Heloísa é sdr, importava,
- * via o botão "Desfazer este lote", apertava e levava um 42501 traduzido como "o
- * servidor não respondeu como esperado". Quem decide continua sendo o Postgres;
- * isto só evita oferecer um botão que já se sabe que vai ser recusado.
+ * Foi só de admin e gestor, e essa diferença para quem importa era o §3.7 do
+ * laudo: a Heloísa é sdr, importava, via o botão "Desfazer este lote", apertava e
+ * levava um 42501. Desde 21/10/2026 o SDR também desfaz. Quem decide continua
+ * sendo o Postgres; isto só evita oferecer um botão que já se sabe que vai ser
+ * recusado.
  */
-const PAPEIS_QUE_DESFAZEM: readonly AppRole[] = ['admin', 'gestor'];
+const PAPEIS_QUE_DESFAZEM: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
 
 export function podeDesfazerLote(papel: AppRole): boolean {
   return PAPEIS_QUE_DESFAZEM.includes(papel);

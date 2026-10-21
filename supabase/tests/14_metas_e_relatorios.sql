@@ -6,8 +6,10 @@
 --   · app.portas e app.portas_contadas (os dois tetos do RF-MET-01)
 --
 -- O que este arquivo prova, além do caminho feliz:
---   1) meta é dado sensível: sdr lê a própria e não a do colega, e não escreve
---      meta nenhuma (RF-MET-02 / RF-ADM-01);
+--   1) meta é ato de gestão: quem não é da gestão (embaixador) não lê a meta de
+--      ninguém e não escreve meta nenhuma (RF-MET-02 / RF-ADM-01). Até 21/10/2026
+--      quem ficava de fora era o sdr; desde a migração 20261021090000 o sdr tem
+--      o poder do gestor e define, lê e corrige a meta de qualquer um;
 --   2) os tetos antimanipulação do RF-MET-01 valem de verdade — 1 porta batida
 --      por alvo por dia e 1 porta aberta por alvo a cada 30 dias;
 --   3) a fila do "Meu dia" sai ordenada por urgência e NÃO oferece toque em alvo
@@ -19,7 +21,7 @@
 -- Roda em transação e desfaz tudo. Nada depende de contagem absoluta da seed.
 -- =====================================================================
 begin;
-select plan(73);
+select plan(77);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -257,26 +259,47 @@ select throws_ok(
       values ('doors_opened', 'day', current_date, 9)$$,
   '23514', null, 'goals: meta sem pessoa e sem time é recusada');
 
+-- A meta do embaixador, definida pelo gestor, é a linha que ele enxerga e tenta
+-- mexer logo abaixo. O id fica fora do padrão '...140%' que a asserção "não lê
+-- meta de ninguém" usa.
+insert into public.goals (id, user_id, metric, period, period_start, target)
+values ('21400000-0000-4000-8000-000000001410',
+        'a1400000-0000-4000-8000-000000001404', 'doors_opened', 'day', current_date, 2);
+
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): define,
+-- lê e corrige a meta de qualquer um. A meta que ele define aqui é SEMANAL e do
+-- colega, para não mudar a meta do dia que a seção 4 confere. A recusa passou a
+-- ser provada com o embaixador, logo abaixo.
 select pg_temp.entrar('a1400000-0000-4000-8000-000000001402', 'sdr');
-select throws_ok(
-  $$insert into public.goals (user_id, metric, period, period_start, target)
-      values ('a1400000-0000-4000-8000-000000001402', 'visits_done', 'day', current_date, 99)$$,
-  '42501', null, 'goals: sdr NÃO define a própria meta (meta é ato de gestão)');
+select lives_ok(
+  $$insert into public.goals (id, user_id, metric, period, period_start, target)
+      values ('21400000-0000-4000-8000-000000001404',
+              'a1400000-0000-4000-8000-000000001403', 'visits_done', 'week', current_date, 99)$$,
+  'goals: o SDR também define meta, inclusive a do colega (poder do gestor desde 21/10/2026)');
 select is((select count(*)::int from public.goals
             where id in ('21400000-0000-4000-8000-000000001401', '21400000-0000-4000-8000-000000001402')),
   2, 'goals: sdr lê as próprias metas');
 select is((select count(*)::int from public.goals where id = '21400000-0000-4000-8000-000000001403'),
-  0, 'goals: sdr NÃO lê a meta do colega');
-select lives_ok(
-  $$update public.goals set target = 1 where id = '21400000-0000-4000-8000-000000001401'$$,
-  'goals: o UPDATE do sdr não estoura — a política de escrita simplesmente não alcança linha nenhuma');
-select is((select target from public.goals where id = '21400000-0000-4000-8000-000000001401'),
-  3, 'goals: e a meta continua sendo a que o gestor definiu');
+  1, 'goals: o SDR também lê a meta do colega (poder do gestor desde 21/10/2026)');
+select results_eq(
+  $$with u as (update public.goals set target = 98 where id = '21400000-0000-4000-8000-000000001404' returning 1)
+    select count(*)::int from u$$,
+  $$values (1)$$,
+  'goals: o SDR também corrige a meta do colega (poder do gestor desde 21/10/2026)');
 
 select pg_temp.entrar('a1400000-0000-4000-8000-000000001404', 'embaixador');
 select is((select count(*)::int from public.goals
             where id::text like '21400000-0000-4000-8000-00000000140%'),
   0, 'goals: embaixador não lê meta de ninguém');
+select throws_ok(
+  $$insert into public.goals (user_id, metric, period, period_start, target)
+      values ('a1400000-0000-4000-8000-000000001404', 'visits_done', 'day', current_date, 99)$$,
+  '42501', null, 'goals: embaixador NÃO define a própria meta (meta é ato de gestão)');
+select lives_ok(
+  $$update public.goals set target = 1 where id = '21400000-0000-4000-8000-000000001410'$$,
+  'goals: o UPDATE do embaixador não estoura — a política de escrita simplesmente não alcança linha nenhuma');
+select is((select target from public.goals where id = '21400000-0000-4000-8000-000000001410'),
+  2, 'goals: e a meta continua sendo a que o gestor definiu');
 
 select pg_temp.entrar('a1400000-0000-4000-8000-000000001401', 'gestor');
 select is((select count(*)::int from public.goals
@@ -322,9 +345,16 @@ select ok((select fonte from public.goal_progress() where metrica = 'published')
 select ok((select dias_uteis_total from public.goal_progress(null, 'month') limit 1) between 19 and 23,
   'goal_progress: o mês tem entre 19 e 23 dias úteis');
 
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): lê a
+-- meta de outra pessoa. A recusa passou a ser provada com o embaixador.
+select lives_ok(
+  $$select * from public.goal_progress('a1400000-0000-4000-8000-000000001403')$$,
+  'goal_progress: o SDR também lê a meta de outra pessoa (poder do gestor desde 21/10/2026)');
+
+select pg_temp.entrar('a1400000-0000-4000-8000-000000001404', 'embaixador');
 select throws_ok(
   $$select * from public.goal_progress('a1400000-0000-4000-8000-000000001403')$$,
-  '42501', null, 'goal_progress: sdr não lê a meta de outra pessoa');
+  '42501', null, 'goal_progress: embaixador não lê a meta de outra pessoa');
 
 select pg_temp.entrar('a1400000-0000-4000-8000-000000001401', 'gestor');
 select is((select realizado from public.goal_progress('a1400000-0000-4000-8000-000000001403')
@@ -360,9 +390,16 @@ select ok((select bool_and(prioridade = sorted) from (
              select prioridade, max(prioridade) over (order by rn) as sorted
                from (select prioridade, row_number() over () as rn from public.meu_dia(null, 300)) x) y),
   'meu_dia: a fila já vem ordenada por prioridade');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): lê a
+-- fila de outra pessoa. A recusa passou a ser provada com o embaixador.
+select lives_ok(
+  $$select * from public.meu_dia('a1400000-0000-4000-8000-000000001403')$$,
+  'meu_dia: o SDR também lê a fila de outra pessoa (poder do gestor desde 21/10/2026)');
+
+select pg_temp.entrar('a1400000-0000-4000-8000-000000001404', 'embaixador');
 select throws_ok(
   $$select * from public.meu_dia('a1400000-0000-4000-8000-000000001403')$$,
-  '42501', null, 'meu_dia: sdr não lê a fila de outra pessoa');
+  '42501', null, 'meu_dia: embaixador não lê a fila de outra pessoa');
 
 select pg_temp.entrar('a1400000-0000-4000-8000-000000001401', 'gestor');
 select lives_ok(

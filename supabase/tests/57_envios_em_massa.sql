@@ -5,7 +5,9 @@
 -- amplamente personalizável" (Rafael, 21/09/2026).
 --
 -- O que este arquivo prova:
---   1. SÓ ADMIN E GESTOR montam lote, e só eles leem os lotes.
+--   1. SÓ A GESTÃO monta lote, e só ela lê os lotes: admin, gestor e, desde
+--      21/10/2026, o SDR, que tem o poder do gestor (migração 20261021090000).
+--      O embaixador continua fora.
 --   2. O PÚBLICO diz a situação de cada ficha e por que alguém ficaria de fora.
 --   3. CRIAR recusa o que não pode dar certo: variável sem regra, modelo que a
 --      Meta não aprovou, público vazio.
@@ -23,7 +25,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(38);
+select plan(42);
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -39,6 +41,7 @@ begin
 end $$;
 create function pg_temp.gestor() returns uuid language sql as $$ select 'a0000000-0000-4000-8000-00000000e571'::uuid $$;
 create function pg_temp.sdr()    returns uuid language sql as $$ select 'a0000000-0000-4000-8000-00000000e572'::uuid $$;
+create function pg_temp.embaixador() returns uuid language sql as $$ select 'a0000000-0000-4000-8000-00000000e573'::uuid $$;
 create function pg_temp.org(p_n text) returns uuid language sql as $$
   select ('c0000000-0000-4000-8000-00000000e5' || p_n)::uuid
 $$;
@@ -80,10 +83,12 @@ $$;
 
 insert into public.allowed_users (email, role, note) values
   ('e57.gestor@teste.local', 'gestor', 'pgTAP envios em massa'),
-  ('e57.sdr@teste.local',    'sdr',    'pgTAP envios em massa');
+  ('e57.sdr@teste.local',    'sdr',    'pgTAP envios em massa'),
+  ('e57.embaixador@teste.local', 'embaixador', 'pgTAP envios em massa');
 insert into auth.users (id, email, raw_user_meta_data) values
   (pg_temp.gestor(), 'e57.gestor@teste.local', '{"full_name":"Gilda Gestora"}'),
-  (pg_temp.sdr(),    'e57.sdr@teste.local',    '{"full_name":"Saulo Sdr"}');
+  (pg_temp.sdr(),    'e57.sdr@teste.local',    '{"full_name":"Saulo Sdr"}'),
+  (pg_temp.embaixador(), 'e57.embaixador@teste.local', '{"full_name":"Elias Embaixador"}');
 
 update public.app_settings
    set value = jsonb_set(value, '{numero_padrao}', '"+5584999995700"') where key = 'whatsapp.envio';
@@ -121,11 +126,23 @@ insert into public.organization_contacts (organization_id, contact_id, is_primar
 -- =====================================================================
 -- 1. Quem monta
 -- =====================================================================
-select pg_temp.entrar(pg_temp.sdr(), 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- continua sem montar lote é o embaixador.
+select pg_temp.entrar(pg_temp.embaixador(), 'embaixador');
 select is(public.envio_em_massa_criar(jsonb_build_object('nome', 'x', 'assinatura', 'eu')) ->> 'motivo', 'sem_permissao',
-  'SDR não monta lote: um lote mal feito derruba o número de todo mundo');
+  'embaixador não monta lote: um lote mal feito derruba o número de todo mundo');
 select throws_ok($$ select * from public.envio_em_massa_publico('{}') $$, '42501', NULL,
   'nem consulta o público');
+select pg_temp.sair();
+
+-- O SDR passa da porta. Um lote sem nome prova a permissão sem criar lote
+-- nenhum: a recusa é pelo nome, não pelo papel.
+select pg_temp.entrar(pg_temp.sdr(), 'sdr');
+select is(public.envio_em_massa_criar(jsonb_build_object('nome', '', 'assinatura', 'eu')) ->> 'motivo', 'nome_invalido',
+  'o SDR também monta lote: passa da permissão e para no nome (poder do gestor desde 21/10/2026)');
+select ok(exists (select 1 from public.envio_em_massa_publico('{"busca":"E57"}') p
+                   where p ->> 'organization_id' = pg_temp.org('01')::text),
+  'e consulta o público');
 select pg_temp.sair();
 
 -- =====================================================================
@@ -282,10 +299,23 @@ select is((pg_temp.item((pg_temp.v('parada') ->> 'id')::uuid, pg_temp.org('06'))
 -- =====================================================================
 -- 10. Pausar, retomar, cancelar
 -- =====================================================================
-select pg_temp.entrar(pg_temp.sdr(), 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- continua sem mexer em lote é o embaixador.
+select pg_temp.entrar(pg_temp.embaixador(), 'embaixador');
 select is(public.envio_em_massa_mudar((pg_temp.v('parada') ->> 'id')::uuid, 'retomar') ->> 'motivo',
-  'sem_permissao', 'SDR não retoma lote parado');
+  'sem_permissao', 'embaixador não retoma lote parado');
 select is((select count(*)::int from public.envios_em_massa), 0, 'e não enxerga lote nenhum');
+select pg_temp.sair();
+
+-- O SDR enxerga o lote e mexe nele como o gestor. Para o retomar logo abaixo
+-- continuar sendo o do gestor, o SDR pede o que o lote parado não aceita: a
+-- recusa vem do estado, não do papel.
+select pg_temp.entrar(pg_temp.sdr(), 'sdr');
+select is((select count(*)::int from public.envios_em_massa
+            where id = (pg_temp.v('parada') ->> 'id')::uuid), 1,
+  'o SDR enxerga o lote (poder do gestor desde 21/10/2026)');
+select is(public.envio_em_massa_mudar((pg_temp.v('parada') ->> 'id')::uuid, 'pausar') ->> 'motivo',
+  'acao_invalida_no_estado', 'e passa da permissão para mexer nele: pausar um lote parado é recusado pelo estado');
 select pg_temp.sair();
 
 select pg_temp.entrar(pg_temp.gestor(), 'gestor');

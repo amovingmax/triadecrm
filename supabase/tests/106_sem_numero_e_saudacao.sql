@@ -8,12 +8,12 @@
 --   2. A EXCLUSÃO MANUAL continua igual depois de ganhar a camada interna;
 --   3. O BOTÃO DA SAUDAÇÃO põe na fila só quem pode receber, e diz por que
 --      pulou os outros; respeita o interruptor; não repete; desfaz;
---   4. SÓ A GESTÃO usa os dois.
+--   4. SÓ A GESTÃO usa os dois (e, desde 21/10/2026, o SDR; o embaixador, não).
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(24);
+select plan(26);
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -29,6 +29,7 @@ begin
 end $$;
 create function pg_temp.gil() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-000000010601'::uuid $$;
 create function pg_temp.ana() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-000000010602'::uuid $$;
+create function pg_temp.edu() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-000000010603'::uuid $$;
 create function pg_temp.org(p text) returns uuid language sql immutable as $$
   select ('c0000000-0000-4000-8000-0000000106' || p)::uuid
 $$;
@@ -41,10 +42,12 @@ create function pg_temp.na_fila(p text) returns text language sql security defin
 $$;
 
 insert into public.allowed_users (email, role, note) values
-  ('s106.g@teste.local', 'gestor', 'pgTAP 106'), ('s106.a@teste.local', 'sdr', 'pgTAP 106');
+  ('s106.g@teste.local', 'gestor', 'pgTAP 106'), ('s106.a@teste.local', 'sdr', 'pgTAP 106'),
+  ('s106.e@teste.local', 'embaixador', 'pgTAP 106');
 insert into auth.users (id, email, raw_user_meta_data) values
   (pg_temp.gil(), 's106.g@teste.local', '{"full_name":"Gil Gestor"}'),
-  (pg_temp.ana(), 's106.a@teste.local', '{"full_name":"Ana Freela"}');
+  (pg_temp.ana(), 's106.a@teste.local', '{"full_name":"Ana Freela"}'),
+  (pg_temp.edu(), 's106.e@teste.local', '{"full_name":"Edu Embaixador"}');
 
 update public.app_settings set value = jsonb_set(value, '{numero_padrao}', '"+5584999910600"')
  where key = 'whatsapp.envio';
@@ -107,9 +110,15 @@ select is((select actor_role from public.audit_log
 -- =====================================================================
 -- 2. A exclusão manual depois da camada interna
 -- =====================================================================
-select pg_temp.entrar(pg_temp.ana(), 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- continua sem excluir é o embaixador. O SDR só para na ficha que não existe,
+-- para o parceiro 01 seguir na base até a saudação.
+select pg_temp.entrar(pg_temp.edu(), 'embaixador');
 select is(public.parceiro_excluir(pg_temp.org('01'), 'teste') ->> 'motivo', 'sem_permissao',
-  'quem liga continua sem excluir');
+  'o embaixador continua sem excluir');
+select pg_temp.entrar(pg_temp.ana(), 'sdr');
+select is(public.parceiro_excluir('00000000-0000-4000-8000-000000000106', 'teste') ->> 'motivo',
+  'nao_encontrado', 'o SDR exclui como a gestão (desde 21/10/2026): a recusa é só da ficha que não existe');
 select pg_temp.entrar(pg_temp.gil(), 'gestor');
 select is(public.parceiro_restaurar(pg_temp.org('02')) ->> 'ok', 'true',
   'quem saiu na limpeza volta pelo Restaurar');
@@ -145,11 +154,17 @@ select is(public.saudacao_enfileirar(array[pg_temp.org('03')]) ->> 'motivo', 'sa
   'com o interruptor de Ajustes desligado, nada entra na fila');
 
 -- =====================================================================
--- 4. Só a gestão
+-- 4. Só a gestão (e o SDR)
 -- =====================================================================
-select pg_temp.entrar(pg_temp.ana(), 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- não manda é o embaixador. O SDR passa da trava e só o interruptor, ainda
+-- desligado, o segura (nada entra na fila).
+select pg_temp.entrar(pg_temp.edu(), 'embaixador');
 select is(public.saudacao_enfileirar(array[pg_temp.org('03')]) ->> 'motivo', 'sem_permissao',
-  'quem liga não manda saudação pela lista');
+  'o embaixador não manda saudação pela lista');
+select pg_temp.entrar(pg_temp.ana(), 'sdr');
+select is(public.saudacao_enfileirar(array[pg_temp.org('03')]) ->> 'motivo', 'saudacao_desligada',
+  'o SDR manda, como a gestão (poder do gestor desde 21/10/2026): só o interruptor desligado o segura');
 select throws_ok($$select app.limpar_sem_numero('x')$$, '42501', null,
   'a limpeza não é superfície de API');
 select pg_temp.sair();

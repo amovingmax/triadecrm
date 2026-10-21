@@ -4,11 +4,14 @@
 --
 -- Este arquivo prova:
 --
---   A. AS CHAVES são da gestão, e TODO MUNDO LIGA: admin, gestor e SDR abrem
---      e tabulam uma ligação, com a telefonia ligada ou desligada;
---   B. O LOTE: só a gestão tira um contato da fila e exclui o lote; excluir
---      devolve a fila à base e NÃO perde a ligação já feita no relatório;
---   C. A CORREÇÃO: quem ligou corrige no dia, a gestão corrige sempre; a
+--   A. AS CHAVES são da gestão (admin e gestor: são de Ajustes), e TODO MUNDO
+--      LIGA: admin, gestor e SDR abrem e tabulam uma ligação, com a telefonia
+--      ligada ou desligada;
+--   B. O LOTE: só a gestão (e, desde 21/10/2026, o SDR) tira um contato da
+--      fila e exclui o lote; excluir devolve a fila à base e NÃO perde a
+--      ligação já feita no relatório;
+--   C. A CORREÇÃO: quem ligou corrige no dia, a gestão (e, desde 21/10/2026,
+--      o SDR) corrige sempre; a
 --      etapa volta, a tarefa do resultado errado é cancelada, o registro
 --      antigo vira nota, a ligação continua de quem ligou e o relatório do
 --      dia muda de coluna. Reunião e pedido de saída não passam por aqui.
@@ -16,7 +19,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(49);
+select plan(53);
 
 create table pg_temp.r (chave text primary key, valor jsonb);
 grant select, insert, update on pg_temp.r to authenticated, service_role;
@@ -37,6 +40,7 @@ create function pg_temp.adm() returns uuid language sql immutable as $$ select '
 create function pg_temp.ges() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-0000000109a1'::uuid $$;
 create function pg_temp.sdr() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-0000000109a2'::uuid $$;
 create function pg_temp.sdr2() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-0000000109a3'::uuid $$;
+create function pg_temp.emb() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-0000000109a4'::uuid $$;
 create function pg_temp.org(p_n int) returns uuid language sql immutable as $$
   select ('c0000000-0000-4000-8000-0000001090' || lpad(p_n::text, 2, '0'))::uuid
 $$;
@@ -111,12 +115,14 @@ insert into public.allowed_users (email, role, note) values
   ('c109.adm@teste.local',  'admin',  'pgTAP 109'),
   ('c109.ges@teste.local',  'gestor', 'pgTAP 109'),
   ('c109.sdr@teste.local',  'sdr',    'pgTAP 109'),
-  ('c109.sdr2@teste.local', 'sdr',    'pgTAP 109');
+  ('c109.sdr2@teste.local', 'sdr',    'pgTAP 109'),
+  ('c109.emb@teste.local',  'embaixador', 'pgTAP 109');
 insert into auth.users (id, email, raw_user_meta_data) values
   (pg_temp.adm(),  'c109.adm@teste.local',  '{"full_name":"Ada Admin"}'),
   (pg_temp.ges(),  'c109.ges@teste.local',  '{"full_name":"Gil Gestor"}'),
   (pg_temp.sdr(),  'c109.sdr@teste.local',  '{"full_name":"Ana Freela"}'),
-  (pg_temp.sdr2(), 'c109.sdr2@teste.local', '{"full_name":"Bia Freela"}');
+  (pg_temp.sdr2(), 'c109.sdr2@teste.local', '{"full_name":"Bia Freela"}'),
+  (pg_temp.emb(),  'c109.emb@teste.local',  '{"full_name":"Edu Embaixador"}');
 
 update public.app_settings
    set value = value || '{"lead_automatico": false, "cumprimento_automatico": false}'::jsonb
@@ -213,13 +219,21 @@ language sql stable security definer set search_path = '' as $$
    where i.id = (select (valor ->> 'id')::uuid from pg_temp.r where chave = 'item' || p_n)
 $$;
 
-select pg_temp.entrar(pg_temp.sdr(), 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- não mexe no lote é o embaixador. O SDR passa da trava e só para no item e no
+-- lote que não existem, para o lote do teste seguir inteiro até o gestor.
+select pg_temp.entrar(pg_temp.emb(), 'embaixador');
 select is(public.lote_tirar_contato((pg_temp.v('item4', 'id'))::uuid) ->> 'motivo', 'sem_permissao',
-  'quem só liga não tira contato do lote, nem do lote que é dela');
+  'o embaixador não tira contato do lote');
 select is(public.lote_excluir((pg_temp.v('lote', 'id'))::uuid, 'montei errado') ->> 'motivo',
   'sem_permissao', 'nem exclui o lote');
+select pg_temp.entrar(pg_temp.sdr(), 'sdr');
+select is(public.lote_tirar_contato(gen_random_uuid()) ->> 'motivo', 'item_inexistente',
+  'o SDR tira contato do lote, como a gestão (poder do gestor desde 21/10/2026)');
+select is(public.lote_excluir(gen_random_uuid(), 'montei errado') ->> 'motivo', 'lote_inexistente',
+  'e exclui o lote');
 select is(jsonb_array_length(public.lote_contatos((pg_temp.v('lote', 'id'))::uuid) -> 'contatos'), 3,
-  'mas vê quem está no lote que é dela');
+  'e vê quem está no lote que é dela');
 select pg_temp.sair();
 
 select pg_temp.entrar(pg_temp.ges(), 'gestor');
@@ -261,8 +275,13 @@ select is(pg_temp.item(5) || '/' || pg_temp.item(6), 'devolvido/devolvido',
 select pg_temp.ligar('c1', pg_temp.org(1), 'nao_atendeu', pg_temp.sdr(), 'sdr');
 select is(pg_temp.etapa(pg_temp.org(1)), 'prospectado', 'não atendeu não tira ninguém de Prospectado');
 
-select is(pg_temp.corrigir('x', 'c1', pg_temp.sdr2(), 'sdr', 'atendida_humano', 'lig_interessado', 'engano'),
-  'de_outra_pessoa', 'quem só liga não corrige a ligação de outra pessoa');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- não corrige a ligação de outra pessoa é o embaixador. O SDR passa dessa trava
+-- e só para no motivo em branco (nada é corrigido).
+select is(pg_temp.corrigir('x', 'c1', pg_temp.emb(), 'embaixador', 'atendida_humano', 'lig_interessado', 'engano'),
+  'de_outra_pessoa', 'o embaixador não corrige a ligação de outra pessoa');
+select is(pg_temp.corrigir('x', 'c1', pg_temp.sdr2(), 'sdr', 'atendida_humano', 'lig_interessado', ' '),
+  'motivo_obrigatorio', 'o SDR corrige a ligação de outra pessoa, como a gestão (poder do gestor desde 21/10/2026)');
 select is(pg_temp.corrigir('x', 'c1', pg_temp.sdr(), 'sdr', 'atendida_humano', 'lig_interessado', ' '),
   'motivo_obrigatorio', 'a correção pede o motivo');
 select is(pg_temp.corrigir('x', 'c1', pg_temp.sdr(), 'sdr', 'nao_atendeu', null, 'engano'),
@@ -318,10 +337,22 @@ select is((select count(*)::int from public.audit_log l
   'e a correção fica na auditoria, no nome de quem corrigiu');
 
 -- Ligação de ontem: quem ligou já não corrige sozinha.
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): a
+-- regra vale para quem liga sem ser da gestão, e é provada com uma ligação de
+-- ontem do embaixador. O SDR passa da trava do dia e só para no motivo em branco.
 update public.call_attempts set iniciada_em = iniciada_em - interval '1 day'
  where id = (pg_temp.v('c2', 'attempt_id'))::uuid;
-select is(pg_temp.corrigir('x', 'c2', pg_temp.sdr(), 'sdr', 'caixa_postal', null, 'era caixa postal'),
+with nova as (
+  insert into public.call_attempts (item_id, batch_id, organization_id, user_id, iniciada_em,
+                                    encerrada_em, duracao_seg, resultado)
+  values ((pg_temp.v('item6', 'id'))::uuid, (pg_temp.v('lote', 'id'))::uuid, pg_temp.org(6), pg_temp.emb(),
+          now() - interval '1 day', now() - interval '1 day' + interval '1 minute', 0, 'nao_atendeu')
+  returning id)
+insert into pg_temp.r select 'c_emb', jsonb_build_object('attempt_id', id) from nova;
+select is(pg_temp.corrigir('x', 'c_emb', pg_temp.emb(), 'embaixador', 'caixa_postal', null, 'era caixa postal'),
   'de_outro_dia', 'no dia seguinte, quem ligou pede a correção à gestão');
+select is(pg_temp.corrigir('x', 'c2', pg_temp.sdr(), 'sdr', 'caixa_postal', null, ' '),
+  'motivo_obrigatorio', 'o SDR corrige a ligação de ontem, como a gestão (poder do gestor desde 21/10/2026)');
 
 -- Nenhuma mensagem sai por causa de correção.
 select ok(pg_get_triggerdef((select oid from pg_trigger where tgname = 'call_attempts_aviso'))

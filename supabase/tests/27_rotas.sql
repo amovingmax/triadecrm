@@ -28,7 +28,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(57);
+select plan(59);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -83,11 +83,13 @@ delete from pgmq.q_rotas_jobs;
 insert into public.allowed_users (email, role, note) values
   ('rt.sdr@teste.local', 'sdr', 'pgTAP rotas'),
   ('rt.outra@teste.local', 'sdr', 'pgTAP rotas'),
-  ('rt.gestor@teste.local', 'gestor', 'pgTAP rotas');
+  ('rt.gestor@teste.local', 'gestor', 'pgTAP rotas'),
+  ('rt.embaixador@teste.local', 'embaixador', 'pgTAP rotas');
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a0000000-0000-4000-8000-0000000e0001', 'rt.sdr@teste.local',   '{"full_name":"SDR Rota"}'),
   ('a0000000-0000-4000-8000-0000000e0002', 'rt.outra@teste.local', '{"full_name":"Outra SDR"}'),
-  ('a0000000-0000-4000-8000-0000000e0003', 'rt.gestor@teste.local','{"full_name":"Gestor Rota"}');
+  ('a0000000-0000-4000-8000-0000000e0003', 'rt.gestor@teste.local','{"full_name":"Gestor Rota"}'),
+  ('a0000000-0000-4000-8000-0000000e0004', 'rt.embaixador@teste.local','{"full_name":"Embaixador Rota"}');
 
 -- =====================================================================
 -- PARTE A — A PRECISÃO SAI DO QUE O OSM RESPONDEU
@@ -356,16 +358,30 @@ select is(pg_temp.delta('planos', pg_temp.n_planos()), 1,
 -- =====================================================================
 -- PARTE E — QUEM PODE VER E PEDIR
 -- =====================================================================
-select pg_temp.entrar('a0000000-0000-4000-8000-0000000e0002', 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- continua sem ler nem montar a rota de outra pessoa é o embaixador.
+select pg_temp.entrar('a0000000-0000-4000-8000-0000000e0004', 'embaixador');
 select throws_ok(
   $$ select public.rota_do_dia(null, 'a0000000-0000-4000-8000-0000000e0001') $$,
-  '42501', null, 'uma SDR não lê a rota de outra pessoa');
+  '42501', null, 'o embaixador não lê a rota de outra pessoa');
 select throws_ok(
   $$ select public.rota_montar(null, 'a0000000-0000-4000-8000-0000000e0001') $$,
   '42501', null, 'nem monta a rota de outra pessoa');
+select pg_temp.sair();
+
+select pg_temp.entrar('a0000000-0000-4000-8000-0000000e0002', 'sdr');
+select is(public.rota_do_dia(pg_temp.dia(), 'a0000000-0000-4000-8000-0000000e0001')
+            -> 'plano' ->> 'status',
+          'pronta', 'a outra SDR também lê a rota de outra pessoa (poder do gestor desde 21/10/2026)');
+-- Montar para outra pessoa é pedido de verdade (remonta o plano e apaga as
+-- paradas); para provar a permissão sem mexer no plano do resto do arquivo, o
+-- pedido vai para quem não tem visita: passa da porta e para em "sem_alvos".
+select is(public.rota_montar(pg_temp.dia(), 'a0000000-0000-4000-8000-0000000e0004') ->> 'motivo',
+          'sem_alvos', 'e também monta a rota de outra pessoa: passa da permissão (poder do gestor desde 21/10/2026)');
 -- A RLS de `route_plans` é a MESMA de `tasks` (`app.sees_all()`, que inclui
 -- sdr): quem enxerga a tarefa de visita enxerga a rota feita com ela. O que a
--- RPC barra é PEDIR ou LER a rota de outra pessoa como se fosse a própria —
+-- RPC barra, para quem não é da gestão (desde 21/10/2026, o embaixador; o SDR
+-- passou a ter o poder do gestor), é PEDIR ou LER a rota de outra pessoa como se fosse a própria —
 -- exatamente o recorte de `public.meu_dia`.
 select is((select count(*)::int from public.route_plans
             where assignee_id = 'a0000000-0000-4000-8000-0000000e0001'),

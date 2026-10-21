@@ -7410,3 +7410,21 @@ Verificado: Meu dia, Lotes, Agenda, Revisão, Prospectados, ficha, excluídos, F
 **Precisa de decisão humana.** Quais das ações que continuam da gestão o SDR também deve ter (cada uma pede mudar uma função do banco); se o Meu dia do SDR deve virar o completo; e se o conserto do telefone do navegador deve subir antes, sozinho, já que hoje o SDR não liga pelo navegador em produção. O PRD ainda descreve os cinco papéis antigos.
 
 **Não publicado.** Branch local `sdr-acesso`, sem push, sem merge e sem deploy.
+
+## 21/10/2026 — O SDR é igual ao gestor, menos Ajustes (RF-ADM-01)
+
+**O pedido.** "A tela do SDR deve ser idêntica à tela do gestor, à tela do admin [...] A única diferença é que ele não vai conseguir entrar na aba de ajustes [...] os SDRs têm que ter a capacidade de ligar pelo navegador." Perguntado sobre os botões que eram só da gestão (alguns com custo), o usuário escolheu "Tudo igual ao gestor". Na mesma branch `sdr-acesso`, sem push.
+
+**Entregue.**
+- **Banco** (`20261021090000_o_sdr_tem_o_poder_do_gestor.sql`): `app.is_manager()`, o poder da gestão no dia a dia, passa a incluir o SDR. Com isso o SDR monta e atribui lote para outra pessoa, mexe no que é de outra pessoa (negócio, tarefa, conversa, tentativa), exclui e restaura parceiro, marca Consultoria, manda mensagem automática pela base (saudação e "aprovar e mandar mensagem", com custo na Meta), define meta, vê o dia, a meta, as ligações e a rota de outra pessoa, gera o relatório da semana e desfaz importação. "Ler com a IA" e a repontuação da Revisão (`radar_triar_com_ia`, `radar_repontuar`) e a hierarquia (`app.acompanha`: o SDR acompanha os outros SDRs, como o gestor) também abriram.
+- **O que fica só com admin e gestor** ganha nome próprio, `app.admin_ou_gestor()` (o que `is_manager` era até ontem), em 75 políticas e 9 funções geradas das definições em vigor: Ajustes (catálogos, `app_settings` fora dos pesos da triagem, atendimento, telefonia, robô de entrada, setores de uma pessoa, de-para de categorias, exportação LGPD), a tabela-base de `organizations` e `contacts` (o telefone inteiro: o SDR continua vendo o número mascarado e revelando pelo botão, com registro) e os registros de operação e LGPD.
+- **Telas:** o Meu dia do SDR passa a ser o mesmo do gestor (Para fazer, Feito hoje, Próximos dias, meta e seletor de pessoa); o "dia de quem liga" (`meu-dia-de-quem-liga.tsx`) saiu. Os botões que estavam escondidos aparecem: saudação e "Aprovar e mandar mensagem", Consultoria, Excluídos e excluir na ficha, desfazer importação, "Ler com a IA" e pesos da triagem, gerar o relatório da semana, montar lote, definir meta, agenda e dia da equipe. Um espelho só no código, `temPoderDeGestao` (`lib/navegacao.ts`).
+- **Ligar pelo navegador:** admin, gestor e SDR (o conserto `fdab0dd`, desta branch, e o teste da branch `sdr-liga`).
+
+**Não mexe no WhatsApp.** O caminho de envio (`app.pode_enviar`, `messages_guard`, `app.envio_um`, `app.wa_*`, `saida.ts`, `graph.ts`) não usa `is_manager` e não foi tocado. O que muda é quem pode apertar os botões que já punham mensagem na fila. O teste novo prova que excluir, restaurar, Consultoria, negócio, meta e pesos não põem nada na fila de saída.
+
+**Verificado no localhost:3002.** Comparação no navegador, tela por tela (17 rotas, gestor e SDR, botões e links visíveis): as únicas diferenças são o link de Ajustes, o nome no menu da pessoa, o que depende dos dados de cada um (fila do Meu dia, conversas "Minhas") e "Copiar o número" no lugar de "Revelar" (telefone mascarado para o SDR). Em `/admin` o SDR vê a área restrita. Nenhum erro de JavaScript.
+
+**Limite conhecido.** A ficha de um parceiro excluído, aberta por link, mostra ao gestor o aviso "foi excluído por…" e ao SDR a página de não encontrado: o aviso lê a tabela-base, que continua da gestão. A lista de Excluídos, com o "Restaurar", é igual para os dois. As mensagens de recusa de algumas funções ainda dizem "só gestor ou admin"; hoje só os papéis antigos as recebem.
+
+**Não publicado.** Branch local `sdr-acesso`, sem push, sem merge e sem deploy. Para subir: `db push` das migrações `20261020200000` e `20261021090000` e o deploy da web, com pedido do usuário.

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
-import { PAPEIS_DO_CRM } from '@/lib/navegacao';
+import { PAPEIS_DO_CRM, temPoderDeGestao } from '@/lib/navegacao';
 import { ProvedorConsultas } from '@/components/consultas/provedor-consultas';
 import { hojeEmNatal, periodoDaUrl, semanaDaUrl } from '@/components/relatorios/periodo';
 import { TelaRelatorios } from '@/components/relatorios/tela-relatorios';
@@ -35,8 +35,8 @@ export default async function Pagina({
         painelInicial={painelDaUrl(params.painel)}
         periodoInicial={periodoDaUrl(params, hojeEmNatal())}
         semanaInicial={semanaDaUrl(params.semana)}
-        // `relatorio_semanal_gerar` é de admin e gestor (`app.is_manager()`).
-        podeGerarSemana={sessao.papel === 'admin' || sessao.papel === 'gestor'}
+        // `relatorio_semanal_gerar` confere `app.is_manager()`: admin, gestor e SDR.
+        podeGerarSemana={temPoderDeGestao(sessao.papel)}
       />
     </ProvedorConsultas>
   );

@@ -5,7 +5,9 @@
 -- contabilizando que ta sendo visualizada". Este arquivo prova:
 --
 --   1. O FURO QUE EXISTIA: o UPDATE direto de quem não atende a conversa não
---      muda nada e não dá erro — o "por ler" ficava lá em silêncio;
+--      muda nada e não dá erro — o "por ler" ficava lá em silêncio. Desde
+--      21/10/2026 o SDR tem o poder do gestor e passa na política de update;
+--      o furo segue provado com quem enxerga sem ser da gestão nem atender;
 --   2. QUEM ENXERGA E ESCREVE, MARCA: a função zera para o SDR que não é o
 --      atendente, e chamar de novo não quebra nada;
 --   3. LIDA NÃO É PARA SEMPRE: mensagem nova volta a contar;
@@ -17,7 +19,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(17);
+select plan(18);
 
 insert into public.allowed_users (email, role, note) values
   ('h99.g@teste.local', 'gestor', 'pgTAP 99'),
@@ -95,14 +97,31 @@ select is(pg_temp.por_ler(), 2, 'duas mensagens chegaram, duas por ler');
 -- =====================================================================
 -- 1. O furo que existia
 -- =====================================================================
-select pg_temp.entrar('a0000000-0000-4000-8000-000000009902'::uuid, 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): a
+-- política de update (`is_manager() or atendente`) passa a casar a linha dele. O
+-- furo continua para quem enxerga a conversa sem ser da gestão nem atender
+-- (aqui, a leitura); o SDR é conferido com um UPDATE que não muda nada, para o
+-- "por ler" chegar intacto à função do bloco 2.
+select pg_temp.entrar('a0000000-0000-4000-8000-000000009904'::uuid, 'leitura');
 select lives_ok(
   $$ update public.conversations set unread_count = 0
       where id = pg_temp.conv() and unread_count > 0 $$,
-  'o caminho antigo: o UPDATE direto do SDR que não atende a conversa não dá erro');
+  'o caminho antigo: o UPDATE direto de quem enxerga e não atende a conversa (leitura) não dá erro');
 select pg_temp.sair();
 select is(pg_temp.por_ler(), 2,
   'E NÃO MUDA NADA: a política de update casa zero linhas, e o "por ler" ficava lá em silêncio');
+
+create function pg_temp.linhas_do_update_direto() returns int language plpgsql as $$
+declare v_n int;
+begin
+  update public.conversations set unread_count = unread_count where id = pg_temp.conv();
+  get diagnostics v_n = row_count;
+  return v_n;
+end $$;
+select pg_temp.entrar('a0000000-0000-4000-8000-000000009902'::uuid, 'sdr');
+select is(pg_temp.linhas_do_update_direto(), 1,
+  'o SDR que não atende já passa na política de update (poder do gestor desde 21/10/2026); a tela segue marcando pela função');
+select pg_temp.sair();
 
 -- =====================================================================
 -- 2. Quem enxerga e escreve, marca

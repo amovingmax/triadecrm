@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
-import { PAPEIS_DO_CRM, podeCriarParceiro, podeMandarMensagemAutomatica } from '@/lib/navegacao';
+import {
+  PAPEIS_DO_CRM,
+  podeCriarParceiro,
+  podeMandarMensagemAutomatica,
+  temPoderDeGestao,
+} from '@/lib/navegacao';
 import { carregarCatalogosDoRadar } from '@/components/revisao/catalogos';
 import { TelaRevisao } from '@/components/revisao/tela-revisao';
 
@@ -33,7 +38,7 @@ export default async function Pagina() {
       catalogos={catalogos}
       podeDecidir={podeCriarParceiro(sessao.papel)}
       podeMandarMensagem={podeMandarMensagemAutomatica(sessao.papel)}
-      podeAjustarTriagem={sessao.papel === 'admin' || sessao.papel === 'gestor'}
+      podeAjustarTriagem={temPoderDeGestao(sessao.papel)}
     />
   );
 }

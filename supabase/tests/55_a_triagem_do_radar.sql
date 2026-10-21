@@ -12,19 +12,22 @@
 --      baixa (RF-RAD-08: quem vira parceiro é decisão humana).
 --   4. Candidato novo nasce pontuado, senão a coleta de segunda entraria no fim
 --      da fila por omissão.
---   5. Só admin e gestor repontuam.
+--   5. Só a gestão repontua: admin, gestor e, desde 21/10/2026, o SDR, que tem
+--      o poder do gestor (migração 20261021090000). O embaixador continua fora.
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(11);
+select plan(12);
 
 insert into public.allowed_users (email, role, note) values
   ('f55.admin@teste.local', 'admin', 'pgTAP triagem'),
-  ('f55.sdr@teste.local', 'sdr', 'pgTAP triagem');
+  ('f55.sdr@teste.local', 'sdr', 'pgTAP triagem'),
+  ('f55.embaixador@teste.local', 'embaixador', 'pgTAP triagem');
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a0000000-0000-4000-8000-00000000f551', 'f55.admin@teste.local', '{"full_name":"Admin F55"}'),
-  ('a0000000-0000-4000-8000-00000000f552', 'f55.sdr@teste.local', '{"full_name":"Sdr F55"}');
+  ('a0000000-0000-4000-8000-00000000f552', 'f55.sdr@teste.local', '{"full_name":"Sdr F55"}'),
+  ('a0000000-0000-4000-8000-00000000f553', 'f55.embaixador@teste.local', '{"full_name":"Embaixador F55"}');
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -99,9 +102,18 @@ select lives_ok($$ select public.radar_repontuar() $$,
   'e repontuar de novo com o peso de volta funciona');
 
 -- ---------- 4. quem pode repontuar ----------
-select pg_temp.entrar('a0000000-0000-4000-8000-00000000f552', 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- continua recusado é o embaixador.
+select pg_temp.entrar('a0000000-0000-4000-8000-00000000f553', 'embaixador');
 select throws_ok($$ select public.radar_repontuar() $$, '42501', NULL,
-  'SDR não repontua: mexer no peso muda a ordem do trabalho de todo mundo');
+  'embaixador não repontua: mexer no peso muda a ordem do trabalho de todo mundo');
+select pg_temp.sair();
+
+-- Os pesos já voltaram ao que eram: repontuar aqui recalcula as mesmas notas,
+-- e nada do que vem depois muda.
+select pg_temp.entrar('a0000000-0000-4000-8000-00000000f552', 'sdr');
+select is(public.radar_repontuar() ->> 'ok', 'true',
+  'o SDR também repontua a fila (poder do gestor desde 21/10/2026)');
 select pg_temp.sair();
 
 -- ---------- 5. o porquê é parte da resposta ----------

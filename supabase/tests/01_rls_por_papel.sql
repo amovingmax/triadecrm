@@ -4,7 +4,7 @@
 -- leitura permitida/negada e escrita permitida/negada. Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(66);
+select plan(67);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -160,7 +160,8 @@ select throws_ok(
   'financeiro: cadastro rápido negado');
 
 -- =====================================================================
--- sdr: não lê a tabela base (telefone completo); lê e edita pela view (mascarado)
+-- sdr: não lê a tabela base (telefone completo); lê e edita pela view (mascarado),
+-- inclusive o que é de outro responsável (poder do gestor desde 21/10/2026)
 -- =====================================================================
 select pg_temp.entrar('a0000000-0000-4000-8000-000000000003', 'sdr');
 select results_eq(
@@ -194,10 +195,14 @@ select is(
   (select name from public.organizations_view where id = 'b0000000-0000-4000-8000-000000000002'),
   'Teste RLS Org SDR (editada)',
   'sdr: edição pela view persistiu');
-select throws_ok(
-  $$update public.organizations_view set name = 'x' where id = 'b0000000-0000-4000-8000-000000000001'$$,
-  '42501', null,
-  'sdr: não edita organização de outro responsável');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): edita pela
+-- view a organização de outro responsável. Mexe só na descrição, para o nome que o
+-- bloco do embaixador procura continuar o mesmo. Quem continua barrado é o embaixador
+-- (a view nem mostra a organização alheia) e a leitura (não escreve), provados nos
+-- blocos deles.
+select lives_ok(
+  $$update public.organizations_view set description = 'editada pelo SDR' where id = 'b0000000-0000-4000-8000-000000000001'$$,
+  'sdr: também edita organização de outro responsável pela view (poder do gestor desde 21/10/2026)');
 select results_eq(
   $$select count(*)::int from public.pii_access_log$$, $$values (0)$$,
   'sdr: não lê o pii_access_log');
@@ -210,10 +215,13 @@ select throws_ok(
 select results_eq(
   $$select count(*)::int from public.deals$$, $$select pg_temp.total_negocios()$$,
   'sdr: vê todos os negócios do funil');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): a política
+-- deals_update passa a alcançar o negócio alheio. O embaixador continua sem alcançar
+-- (asserção no bloco dele).
 select results_eq(
   $$with u as (update public.deals set next_action = 'x' where id = 'd0000000-0000-4000-8000-000000000001' returning 1) select count(*)::int from u$$,
-  $$values (0)$$,
-  'sdr: não altera negócio de outro responsável (0 linhas)');
+  $$values (1)$$,
+  'sdr: também altera negócio de outro responsável (poder do gestor desde 21/10/2026)');
 select throws_ok(
   $$update public.profiles set role = 'admin' where id = 'a0000000-0000-4000-8000-000000000003'$$, '42501', null,
   'sdr: não muda o próprio papel (profiles_guard)');
@@ -269,6 +277,12 @@ select results_eq(
   $$with u as (update public.organizations_view set name = 'x' where id = 'b0000000-0000-4000-8000-000000000002' returning 1) select count(*)::int from u$$,
   $$values (0)$$,
   'embaixador: não edita organização alheia (a view nem a mostra: 0 linhas)');
+-- O que o SDR deixou de provar em 21/10/2026 (ele tem o poder do gestor desde a
+-- migração 20261021090000): quem não é da gestão não altera o negócio alheio.
+select results_eq(
+  $$with u as (update public.deals set next_action = 'x' where id = 'd0000000-0000-4000-8000-000000000002' returning 1) select count(*)::int from u$$,
+  $$values (0)$$,
+  'embaixador: não altera negócio de outro responsável (0 linhas)');
 select lives_ok(
   $$insert into public.organizations_view (name, phone_e164, source_id, owner_id) values ('Teste RLS Criada Embaixador', '84 99999-0041', (select id from public.sources where slug = 'captura_campo'), 'a0000000-0000-4000-8000-000000000005')$$,
   'embaixador: cria organização pela view');

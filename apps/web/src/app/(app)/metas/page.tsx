@@ -16,8 +16,8 @@ export const metadata: Metadata = { title: 'Metas' };
  * podem aparecer e que dia é hoje em Natal.
  *
  * A lista de pessoas depende do papel, e isso espelha o que o Postgres já faz:
- * `public.goal_progress` recusa a meta de outra pessoa para quem não é gestor nem
- * admin ("Só gestor ou admin lê a meta de outra pessoa", 42501). Pedir e receber o
+ * `public.goal_progress` recusa a meta de outra pessoa para quem não passa em
+ * `app.is_manager()` (admin, gestor e, desde 21/10/2026, SDR). Pedir e receber o
  * erro funcionaria, mas encheria a tela de cartões vermelhos por desenho — então a
  * tela só monta o que a RLS deixa passar.
  *
@@ -31,7 +31,7 @@ export default async function Pagina() {
   const podeDefinir = PAPEIS_QUE_DEFINEM_META.includes(sessao.papel);
 
   // A própria pessoa e quem ela acompanha pela hierarquia (`lib/auth/hierarquia.ts`):
-  // o admin vê gestor, SDR e embaixador; o gestor, SDR e embaixador. Depois da
+  // o admin vê gestor, SDR e embaixador; o gestor e o SDR, SDR e embaixador. Depois da
   // própria pessoa, ordem alfabética: a tela acompanha, não classifica.
   const pessoas: Pessoa[] = podeDefinir
     ? await carregarPessoasAcompanhadas(sessao)
