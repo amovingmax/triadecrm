@@ -76,11 +76,20 @@ export async function abrirLigacaoDeVoz(alvo: { attemptId: string }): Promise<Ab
 }
 
 const loteAvulsoSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), lote_id: z.string().uuid() }),
+  z.object({
+    ok: z.literal(true),
+    lote_id: z.string().uuid(),
+    // O parceiro esperava na fila de um lote e saiu dela para esta ligação (21/10/2026).
+    tirado_de: z
+      .object({ lote_nome: z.string(), dono: z.string().nullable(), e_seu: z.boolean() })
+      .nullable()
+      .optional(),
+  }),
   z.object({
     ok: z.literal(false),
     motivo: z.string(),
     dono: z.string().nullable().optional(),
+    e_voce: z.boolean().nullable().optional(),
     lote_id: z.string().uuid().nullable().optional(),
     lote_nome: z.string().nullable().optional(),
   }),

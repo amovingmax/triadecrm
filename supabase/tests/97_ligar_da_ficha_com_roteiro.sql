@@ -7,8 +7,11 @@
 --   1. O "Ligar" da ficha monta um lote de UM contato, marcado como avulso,
 --      e o segundo clique reaproveita o mesmo lote.
 --   2. As travas valem: papel, telefone, supressão, janela, negócio aberto.
---   3. A RESERVA vale: parceiro no lote de outra pessoa não é ligado por
---      fora; no lote de turno de quem clicou, a resposta aponta o lote.
+--   3. A RESERVA vale para quem está na ligação: com alguém na tela de ligar
+--      com o parceiro, a ficha não liga por cima. Parceiro ESPERANDO na fila de
+--      um lote sai dela para a ligação pela ficha (desde 21/10/2026, migração
+--      20261021110000): da própria fila, para quem liga; da fila de outra pessoa,
+--      para quem tem o poder da gestão — o embaixador, não.
 --   4. O caminho inteiro é o do módulo: puxar, abrir a chamada, discar pelo
 --      navegador com o número da reserva, tabular — e a ligação vira
 --      atividade.
@@ -17,7 +20,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(24);
+select plan(29);
 
 create table pg_temp.r (chave text primary key, valor jsonb);
 grant select, insert on pg_temp.r to authenticated, service_role;
@@ -56,11 +59,13 @@ $$;
 insert into public.allowed_users (email, role, note) values
   ('c97.sdr@teste.local',     'sdr',     'pgTAP ligar da ficha'),
   ('c97.sdr2@teste.local',    'sdr',     'pgTAP ligar da ficha'),
-  ('c97.leitura@teste.local', 'leitura', 'pgTAP ligar da ficha');
+  ('c97.leitura@teste.local', 'leitura', 'pgTAP ligar da ficha'),
+  ('c97.emb@teste.local',     'embaixador', 'pgTAP ligar da ficha');
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a0000000-0000-4000-8000-0000000097a1', 'c97.sdr@teste.local',     '{"full_name":"SDR Ficha"}'),
   ('a0000000-0000-4000-8000-0000000097a2', 'c97.sdr2@teste.local',    '{"full_name":"SDR Ficha Dois"}'),
-  ('a0000000-0000-4000-8000-0000000097a3', 'c97.leitura@teste.local', '{"full_name":"Leitura Ficha"}');
+  ('a0000000-0000-4000-8000-0000000097a3', 'c97.leitura@teste.local', '{"full_name":"Leitura Ficha"}'),
+  ('a0000000-0000-4000-8000-0000000097a4', 'c97.emb@teste.local',     '{"full_name":"Embaixador Ficha"}');
 
 insert into public.categories (id, slug, name, "group", priority, position)
 values (997, 'c97_teste', 'Categoria de teste do ligar da ficha', 'servicos', 2, 997);
@@ -78,6 +83,8 @@ select o.id, (select id from public.pipelines where slug = 'fornecedor'),
          where p.slug = 'fornecedor' and s.slug = 'prospectado')
   from public.organizations o where o.name like 'C97 Buffet %' and o.id <> pg_temp.org(7);
 update public.organizations set do_not_contact = true where id = pg_temp.org(6);
+-- o 8 é da carteira do embaixador (é o que ele enxerga)
+update public.organizations set owner_id = 'a0000000-0000-4000-8000-0000000097a4' where id = pg_temp.org(8);
 
 delete from public.holidays where date = pg_temp.hoje();
 delete from public.app_settings where key = 'voz.telefonia';
@@ -154,8 +161,8 @@ select is(pg_temp.v('bis', 'lote_id'), pg_temp.v('um', 'lote_id'),
   'o segundo clique reaproveita o mesmo lote');
 select is(pg_temp.itens_vivos(pg_temp.org(1)), 1, 'e não duplica a reserva');
 select is(pg_temp.v('outro', 'motivo') || '/' || pg_temp.v('outro', 'dono'),
-          'reservado_em_outro_lote/SDR Ficha',
-  'outra pessoa não liga por fora, e a recusa diz com quem está');
+          'em_ligacao_agora/SDR Ficha',
+  'quem acabou de abrir a ligação pela ficha segura o parceiro: a outra pessoa não liga por cima, e a recusa diz quem está');
 
 -- ligou e não tabulou: o próximo clique fecha o lote velho e monta outro
 do $$
@@ -166,9 +173,15 @@ begin
   insert into pg_temp.r values ('velho', v);
   v_item := (public.proximo_da_fila((v ->> 'lote_id')::uuid) -> 'item' ->> 'id')::uuid;
   perform public.iniciar_chamada(v_item);
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000097a2', 'sdr');
+  insert into pg_temp.r values ('durante', public.montar_lote_avulso(pg_temp.org(3)));
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000097a1', 'sdr');
   insert into pg_temp.r values ('novo', public.montar_lote_avulso(pg_temp.org(3)));
 end $$;
 select pg_temp.sair();
+select is(pg_temp.v('durante', 'motivo') || '/' || pg_temp.v('durante', 'dono'),
+          'em_ligacao_agora/SDR Ficha',
+  'com a chamada aberta, ninguém liga para o mesmo parceiro pela ficha');
 select ok(pg_temp.v('novo', 'ok') = 'true' and pg_temp.v('novo', 'lote_id') <> pg_temp.v('velho', 'lote_id'),
   'ligação abandonada sem tabular: o próximo clique monta um lote novo');
 select is((pg_temp.lote(pg_temp.v('velho', 'lote_id')::uuid)).status::text, 'encerrado',
@@ -186,11 +199,28 @@ begin
          array[997], 'prioridade', 10, 3, 20, null, pg_temp.hoje(), pg_temp.hoje());
   insert into pg_temp.r values ('turno', v);
   insert into pg_temp.r values ('no_turno', public.montar_lote_avulso(pg_temp.org(2)));
+  -- a outra SDR, com o poder da gestão, liga pela ficha para quem está na fila dela
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000097a1', 'sdr');
+  insert into pg_temp.r values ('de_outra', public.montar_lote_avulso(pg_temp.org(4)));
+  -- o embaixador, não: o 8 é da carteira dele, mas está na fila da SDR
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000097a4', 'embaixador');
+  insert into pg_temp.r values ('embaixador', public.montar_lote_avulso(pg_temp.org(8)));
 end $$;
 select pg_temp.sair();
-select is(pg_temp.v('no_turno', 'motivo') || '/' || pg_temp.v('no_turno', 'lote_id'),
-          'ja_no_seu_lote/' || pg_temp.v('turno', 'lote_id'),
-  'parceiro no lote de turno de quem clicou: a resposta aponta o lote');
+select is(pg_temp.v('no_turno', 'ok') || '/' || (select valor #>> '{tirado_de,lote_nome}' from pg_temp.r where chave = 'no_turno')
+          || '/' || (select valor #>> '{tirado_de,e_seu}' from pg_temp.r where chave = 'no_turno'),
+          'true/C97 turno/true',
+  'parceiro na fila do lote de turno de quem clicou: a ficha liga, e diz de que lote ele saiu');
+select is((select i.status::text from public.call_batch_items i
+            where i.batch_id = pg_temp.v('turno', 'lote_id')::uuid and i.organization_id = pg_temp.org(2)),
+          'devolvido', 'e ele sai da fila do turno');
+select is(pg_temp.itens_vivos(pg_temp.org(2)), 1, 'sobrando só a reserva da ligação pela ficha');
+select is(pg_temp.v('de_outra', 'ok') || '/' || (select valor #>> '{tirado_de,dono}' from pg_temp.r where chave = 'de_outra'),
+          'true/SDR Ficha Dois',
+  'na fila de outra pessoa: quem tem o poder da gestão liga, e o aviso diz de quem era o lote');
+select is(pg_temp.v('embaixador', 'motivo') || '/' || pg_temp.v('embaixador', 'dono'),
+          'reservado_em_outro_lote/SDR Ficha Dois',
+  'o embaixador, sem o poder da gestão, não tira da fila de outra pessoa');
 
 
 -- =====================================================================

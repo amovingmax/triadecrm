@@ -218,6 +218,10 @@ export const AVISO_DA_RECUSA: Record<string, AvisoDeVoz> = {
     titulo: 'Em outro lote',
     frase: 'Este parceiro está no lote de ligação de outra pessoa.',
   },
+  em_ligacao_agora: {
+    titulo: 'Em ligação agora',
+    frase: 'Alguém está com este parceiro na tela de ligar agora. Tente daqui a pouco.',
+  },
   ja_no_seu_lote: {
     titulo: 'Já está no seu lote',
     frase: 'Este parceiro já está num lote seu. Ligue por lá, na ordem da fila.',
@@ -238,9 +242,21 @@ export const AVISO_DA_RECUSA: Record<string, AvisoDeVoz> = {
 
 export function avisoDaRecusa(
   motivo: string | null | undefined,
-  detalhes: { dono?: string | null; loteNome?: string | null } = {},
+  detalhes: { dono?: string | null; loteNome?: string | null; eVoce?: boolean | null } = {},
 ): AvisoDeVoz {
   const aviso = (motivo && AVISO_DA_RECUSA[motivo]) || avisoDaFalha('falha_na_telefonia');
+  if (motivo === 'em_ligacao_agora' && detalhes.eVoce) {
+    return {
+      ...aviso,
+      frase: 'Você já está com este parceiro na tela de ligar, em outra aba ou no seu lote.',
+    };
+  }
+  if (motivo === 'em_ligacao_agora' && detalhes.dono) {
+    return {
+      ...aviso,
+      frase: `${detalhes.dono} está com este parceiro na tela de ligar agora. Tente daqui a pouco.`,
+    };
+  }
   if (motivo === 'reservado_em_outro_lote' && detalhes.dono) {
     return { ...aviso, frase: `Este parceiro está no lote de ligação de ${detalhes.dono}.` };
   }
@@ -251,6 +267,23 @@ export function avisoDaRecusa(
     };
   }
   return aviso;
+}
+
+/**
+ * O aviso de quando o "Ligar" da ficha tira o parceiro da fila de um lote para ligar
+ * agora (`montar_lote_avulso`, 21/10/2026): de que lote ele saiu, e de quem era.
+ */
+export function avisoDeQuemSaiuDoLote(tirado: {
+  lote_nome: string;
+  dono: string | null;
+  e_seu: boolean;
+}): AvisoDeVoz {
+  return {
+    titulo: `Saiu do lote "${tirado.lote_nome}"`,
+    frase: tirado.e_seu
+      ? 'Estava na fila do seu lote. A ligação é por aqui agora.'
+      : `Estava na fila de ${tirado.dono ?? 'outra pessoa'}. A ligação é sua agora.`,
+  };
 }
 
 /**

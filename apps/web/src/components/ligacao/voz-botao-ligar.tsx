@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
-import { avisoDaRecusa } from './voz-logica';
+import { avisoDaRecusa, avisoDeQuemSaiuDoLote } from './voz-logica';
 import { useSoftphone } from './voz-provedor';
 import { montarLoteAvulso } from './voz-rpc';
 
@@ -49,7 +49,11 @@ export function BotaoLigar({
     if (!lote.ok) {
       trava.current = false;
       setAbrindo(false);
-      const aviso = avisoDaRecusa(lote.motivo, { dono: lote.dono, loteNome: lote.lote_nome });
+      const aviso = avisoDaRecusa(lote.motivo, {
+        dono: lote.dono,
+        loteNome: lote.lote_nome,
+        eVoce: lote.e_voce,
+      });
       toast.error(aviso.titulo, {
         description: aviso.frase,
         // O padrão (4 s) some antes de a pessoa ler por que a ligação não saiu.
@@ -60,6 +64,12 @@ export function BotaoLigar({
             : undefined,
       });
       return;
+    }
+    // O parceiro esperava na fila de um lote e saiu dela para esta ligação: quem liga
+    // precisa saber, porque o lote de origem fica com um a menos.
+    if (lote.tirado_de) {
+      const saiu = avisoDeQuemSaiuDoLote(lote.tirado_de);
+      toast.info(saiu.titulo, { description: saiu.frase, duration: 8_000 });
     }
     // Sem `setAbrindo(false)`: o botão fica travado até a tela de ligar assumir.
     router.push(`/ligar/${lote.lote_id}?org=${organizationId}&discar=1`);
