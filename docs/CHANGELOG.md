@@ -7492,3 +7492,13 @@ Verificado: Meu dia, Lotes, Agenda, Revisão, Prospectados, ficha, excluídos, F
 **Verificado.** pgTAP `97` com 29 asserções (cinco novas falham com a função antiga). Lint, typecheck e 1.309 testes do web. No navegador, PC (3002) e celular (3004), como SDR e como gestor: o toque em "Ligar" na ficha da Abracadabra, que está na fila do lote do SDR, abre a tela de ligar com o contato e o aviso de que lote ele saiu. O início da chamada ficou bloqueado no teste, e o banco local voltou ao que era. Nenhum gatilho de `call_batch_items` ou `call_batches` mexe com mensagem.
 
 **Observação.** No PC, o cartão "Avisos de mensagem neste navegador" (Ativar avisos / Agora não) e o "Nova mensagem" aparecem no canto de cima, à direita, em cima dos botões da ficha, inclusive o "Ligar", até a pessoa fechá-los.
+
+## 21/10/2026 — As duas juntas, para testar: `velocidade` + `sdr-acesso` (branch `completo`)
+
+**O pedido.** "Juntar tudo isso e montar uma versão no localhost para as duas versões [PC e celular], para eu testar. NÃO SUBA NADA PARA O AR AGORA."
+
+**Feito.** Branch local `completo` (worktree `../triadecrm-completo`), da main `da2a47b`, com a `velocidade` e depois a `sdr-acesso` juntadas por merge. Quatro conflitos, todos de encaixe: `funis/page.tsx` e `relatorios/page.tsx` (a velocidade tirou o `ProvedorConsultas` de cada página, porque o cache passou a ser um só no layout; a sdr-acesso trocou o papel de quem entra e o "gerar a semana"), `parceiros/excluidos/page.tsx` (comentário) e este CHANGELOG (as entradas das duas, na ordem). As seis migrações (três de cada) não se tocam.
+
+**Verificado.** Lint, typecheck e os testes do web (1.311), do `schema` (105) e do `prompts` (284). pgTAP: as mesmas falhas de antes da junção, presas a dados e ao relógio do banco local. Servida em build de produção (`next start`), porque o `next dev` compila cada tela no primeiro acesso e esconderia a velocidade. No PC, em 17 telas, o SDR tem os mesmos botões que o gestor, menos Ajustes, sem erro de JavaScript. No celular emulado, o Meu dia e o lote abrem com o "Ligar pelo navegador". Pela ficha, o "Ligar" tira o parceiro da fila do lote e abre a tela de ligar, no PC e no celular, como SDR e como gestor. No teste, o início da chamada ficou bloqueado e o banco voltou ao que era.
+
+**Não publicado.** Sem push, sem merge na main, sem `db push` e sem deploy, como pedido.
