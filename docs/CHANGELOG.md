@@ -7735,8 +7735,16 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - **Testes:** lint e tipos OK; 1.325 testes do site (4 novos); sem erro de página.
 - **Sem a variável de links,** caso da KOMUNE no ar hoje: não há consulta nova, coluna nova nem botão. Ela fica como está até ser republicada com o seletor.
 
-**Pendente (produção, só com pedido):**
-- migração `20261022110000`, primeiro na Imova e depois na KOMUNE, pelo `publicar-banco`;
-- republicar a Imova;
-- na KOMUNE, junto com o seletor ("Pode republicar a KOMUNE com o seletor");
-- depois, o admin de cada empresa marca quem trabalha nas duas. Hoje, na Imova, o botão aparece para os 2 usuários; com esta versão, só para quem for marcado.
+**Em produção (21/10/2026, com pedido do usuário: "Foi aprovado, coloque no ar"):**
+- **`main`:** `9a8da42`, fast-forward de `ba52968`.
+- **Backup da KOMUNE antes:** `~/triadecrm-backups/komune-producao-2026-10-21-antes-do-seletor-por-pessoa`, com a mesma conferência do anterior.
+- **Migração `20261022110000`:** primeiro na Imova (conferidos RLS, 3 políticas, 2 gatilhos e as permissões), depois na KOMUNE.
+  - Contagem antes × depois na KOMUNE: nenhuma tabela perdeu linha. Mudaram a tabela nova (vazia), `schema_migrations` (+1) e uma saúde do número.
+- **Imova republicada** de uma cópia limpa (`imova-mts8a3x42`): `/login` 200, telas internas → login, `/auth/dev` 404.
+- **Site da KOMUNE intocado:** continua em `triade-5jll2hsyh`.
+
+**Pendente:**
+- **Site da KOMUNE com o seletor e a coluna "Também acessa":** pedido próprio, "Pode republicar a KOMUNE com o seletor".
+- **Marcações:**
+  - na Imova, o admin marca quem trabalha nas duas, como o `contato@komune.app.br`, depois do primeiro login dele lá;
+  - na KOMUNE, depois da republicação.
