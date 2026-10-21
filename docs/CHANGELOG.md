@@ -7428,3 +7428,19 @@ Verificado: Meu dia, Lotes, Agenda, Revisão, Prospectados, ficha, excluídos, F
 **Limite conhecido.** A ficha de um parceiro excluído, aberta por link, mostra ao gestor o aviso "foi excluído por…" e ao SDR a página de não encontrado: o aviso lê a tabela-base, que continua da gestão. A lista de Excluídos, com o "Restaurar", é igual para os dois. As mensagens de recusa de algumas funções ainda dizem "só gestor ou admin"; hoje só os papéis antigos as recebem.
 
 **Não publicado.** Branch local `sdr-acesso`, sem push, sem merge e sem deploy. Para subir: `db push` das migrações `20261020200000` e `20261021090000` e o deploy da web, com pedido do usuário.
+
+## 21/10/2026 (manhã) — A ficha liga mesmo com o parceiro num lote (R13 §3.1)
+
+**O pedido.** "Deve ser permitido que eu consiga ligar para o fornecedor pela própria ficha dele [...] como eu já estava conseguindo fazer", no PC e no celular.
+
+**O que acontecia.** O "Ligar" da ficha aparecia, mas recusava quase sempre: parceiro na fila de um lote era "Já está no seu lote, ligue por lá, na ordem da fila" para quem montou o lote, e "Em outro lote" para os outros. Com a base distribuída em lotes, a ficha quase nunca ligava. Reproduzido no navegador, no PC e no celular, como SDR e como gestor.
+
+**Entregue** (`20261021110000_a_ficha_liga_mesmo_com_o_parceiro_num_lote.sql`, `public.montar_lote_avulso`):
+- **Parceiro esperando na fila de um lote:** sai dela para a ligação pela ficha (item `devolvido`, com nota e `audit_log` `TIRAR_DO_LOTE`, como `lote_tirar_contato`), e a tela de ligar abre com o roteiro de sempre. A resposta diz de que lote ele saiu, e a ficha avisa: "Saiu do lote X: estava na fila do seu lote" ou "estava na fila de Fulano".
+- **Da fila de outra pessoa:** com o poder da gestão (`app.is_manager()`: admin, gestor e SDR). O embaixador, papel antigo, continua com "Em outro lote".
+- **Alguém com o parceiro na tela de ligar agora** (chamada aberta, ou o lote avulso que outra pessoa acabou de abrir pela ficha): a recusa é `em_ligacao_agora`, com o nome de quem está. É o que a reserva sempre protegeu: duas pessoas na mesma ligação.
+- O contato tirado não volta ao lote depois: a ligação conta para quem ligou, e o lote de origem fica com um a menos na fila.
+
+**Verificado.** pgTAP `97` com 29 asserções (cinco novas falham com a função antiga). Lint, typecheck e 1.309 testes do web. No navegador, PC (3002) e celular (3004), como SDR e como gestor: o toque em "Ligar" na ficha da Abracadabra, que está na fila do lote do SDR, abre a tela de ligar com o contato e o aviso de que lote ele saiu. O início da chamada ficou bloqueado no teste, e o banco local voltou ao que era. Nenhum gatilho de `call_batch_items` ou `call_batches` mexe com mensagem.
+
+**Observação.** No PC, o cartão "Avisos de mensagem neste navegador" (Ativar avisos / Agora não) e o "Nova mensagem" aparecem no canto de cima, à direita, em cima dos botões da ficha, inclusive o "Ligar", até a pessoa fechá-los.
