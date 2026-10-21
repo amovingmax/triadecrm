@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
+import { PAPEIS_DO_CRM } from '@/lib/navegacao';
 import { carregarCatalogos } from '@/components/conversas/catalogos';
 import { TelaConversas } from '@/components/conversas/tela-conversas';
 import { ProvedorDoTextoDigitado } from '@/components/conversas/texto-digitado';
@@ -33,8 +34,8 @@ export default async function Pagina({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [sessao, catalogos, params] = await Promise.all([
-    // Tela da gestão desde o pivô de 06/10/2026: quem liga vê só Ligar e Meu dia.
-    requireRole('admin', 'gestor'),
+    // Admin, gestor e SDR (de 06/10 a 20/10/2026 foi só a gestão). Os papéis antigos ficam fora.
+    requireRole(...PAPEIS_DO_CRM),
     carregarCatalogos(),
     searchParams,
   ]);

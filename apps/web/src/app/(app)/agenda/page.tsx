@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
-import { podeMarcarCompromisso, veAgendaDaEquipe } from '@/lib/navegacao';
+import { PAPEIS_DO_CRM, podeMarcarCompromisso, veAgendaDaEquipe } from '@/lib/navegacao';
 import { carregarContextoDaAgenda } from '@/components/agenda/dados';
 import { TelaAgenda } from '@/components/agenda/tela-agenda';
 import { hojeEmNatal, type Dia, type Visao } from '@/components/agenda/tipos';
@@ -29,8 +29,8 @@ export default async function Pagina({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  // Tela da gestão desde o pivô de 06/10/2026: quem liga vê só Ligar e Meu dia.
-  const [sessao, params] = await Promise.all([requireRole('admin', 'gestor'), searchParams]);
+  // Admin, gestor e SDR (de 06/10 a 20/10/2026 foi só a gestão). Os papéis antigos ficam fora.
+  const [sessao, params] = await Promise.all([requireRole(...PAPEIS_DO_CRM), searchParams]);
   const comEquipe = veAgendaDaEquipe(sessao.papel);
   const contexto = await carregarContextoDaAgenda(comEquipe ? { equipeDe: sessao } : {});
 

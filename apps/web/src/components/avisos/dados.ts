@@ -216,11 +216,11 @@ export async function lerFichasDoAviso(ids: readonly string[]): Promise<Map<stri
  * Quem está ativo no time E atende o WhatsApp. A view `team_directory` não tem
  * PII e é legível por todo autenticado. `null` é falha de rede (ver `ehParaMim`).
  *
- * "E atende" entrou no pivô de 06/10/2026. O SDR passou a só ligar e deixou de
- * ser avisado; se ele continuasse contando como "responsável ativo", a conversa
- * que ainda está no nome dele seria de alguém que não a vê — e a resposta do
- * parceiro não avisaria ninguém. Fora desta lista, o responsável vale como
- * ninguém atendendo, e o aviso vai para toda a gestão.
+ * "E atende" entrou no pivô de 06/10/2026, quando o SDR deixou de ver Conversas:
+ * se ele continuasse contando como "responsável ativo", a conversa que ainda
+ * estava no nome dele seria de alguém que não a vê, e a resposta do parceiro não
+ * avisaria ninguém. Fora desta lista, o responsável vale como ninguém atendendo,
+ * e o aviso vai para todos que atendem. Desde 20/10/2026 o SDR atende de novo.
  */
 export async function lerPessoasAtivas(): Promise<Set<string> | null> {
   const supabase = createClient();

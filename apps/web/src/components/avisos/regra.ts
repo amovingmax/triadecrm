@@ -82,17 +82,21 @@ export interface QuemSouEu {
 }
 
 /**
- * Quem atende o WhatsApp: admin e gestor (pivô de 06/10/2026).
+ * Quem atende o WhatsApp: admin, gestor e SDR.
  *
- * Até ali a lista era a de `app.can_write()` e incluía o SDR. No pivô o SDR
- * passou a ser quem LIGA — gente contratada por diária, sem a tela de Conversas.
- * Quem não responde não é avisado: pôr um número no menu e um cartão na frente
- * de quem não tem para onde ir é mandar trabalhar e depois dizer não.
+ * É a lista de `app.can_write()` sem o embaixador. Do pivô de 06/10/2026 a
+ * 20/10/2026 foi só admin e gestor: o SDR era só quem liga e não tinha a tela de
+ * Conversas, e quem não responde não é avisado (pôr um número no menu e um cartão
+ * na frente de quem não tem para onde ir é mandar trabalhar e depois dizer não).
+ * Em 20/10/2026 o SDR voltou a atender, e com isso voltou a ser avisado.
  */
-const PAPEIS_QUE_RESPONDEM: readonly AppRole[] = ['admin', 'gestor'];
+const PAPEIS_QUE_RESPONDEM: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
 
-/** Quem recebe a fila inteira de quem respondeu: os mesmos que atendem. */
-const PAPEIS_DA_FILA_INTEIRA: readonly AppRole[] = ['admin', 'gestor'];
+/**
+ * Quem recebe a fila inteira de quem respondeu: os mesmos que atendem. É a mesma
+ * regra do bloco "Responderam e estão esperando" do Meu dia (`alcanceDeQuemRespondeu`).
+ */
+const PAPEIS_DA_FILA_INTEIRA: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
 
 export function recebeAvisos(papel: AppRole): boolean {
   return PAPEIS_QUE_RESPONDEM.includes(papel);

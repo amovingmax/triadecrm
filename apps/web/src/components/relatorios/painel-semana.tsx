@@ -49,11 +49,14 @@ export function PainelSemana({
   painel,
   semana: semanaEscolhida,
   aoTrocarSemana: setSemanaEscolhida,
+  podeGerar,
 }: {
   painel: DefinicaoPainel;
   /** A semana pedida na URL. Nulo abre na semana fechada mais recente. */
   semana: string | null;
   aoTrocarSemana: (semana: string) => void;
+  /** Gerar e refazer: admin e gestor (`relatorio_semanal_gerar`). O SDR só lê. */
+  podeGerar: boolean;
 }) {
   const clienteDeConsultas = useQueryClient();
 
@@ -196,7 +199,7 @@ export function PainelSemana({
           semana={semanaEscolhida}
           gerando={geracao.isPending}
           erro={geracao.isError ? mensagemDoErro(geracao.error) : null}
-          aoGerar={() => geracao.mutate(semanaEscolhida)}
+          aoGerar={podeGerar ? () => geracao.mutate(semanaEscolhida) : null}
         />
       </section>
     );
@@ -226,7 +229,7 @@ export function PainelSemana({
             <Procedencia
               relatorio={relatorio}
               gerando={geracao.isPending}
-              aoRegerar={() => geracao.mutate(relatorio.semanaInicio)}
+              aoRegerar={podeGerar ? () => geracao.mutate(relatorio.semanaInicio) : null}
             />
             {/* Na tela larga o texto fica à esquerda, no seu comprimento de prosa,
                 e as três coisas que merecem atenção ficam ao lado, na altura dele:
@@ -316,7 +319,8 @@ function Procedencia({
 }: {
   relatorio: RelatorioDaSemana;
   gerando: boolean;
-  aoRegerar: () => void;
+  /** `null` para quem não refaz (o SDR): o botão não aparece. */
+  aoRegerar: (() => void) | null;
 }) {
   return (
     <div className="flex flex-col gap-2 border-y border-hairline py-3">
@@ -327,15 +331,17 @@ function Procedencia({
             : `Gerado a pedido${relatorio.geradoPorNome ? ` de ${relatorio.geradoPorNome}` : ''}`}
           , em <span className="numerico">{relatorio.fatos.gerado_em}</span>.
         </p>
-        <Button
-          variant="ghost"
-          onClick={aoRegerar}
-          disabled={gerando}
-          className="toque h-11 md:h-8"
-        >
-          <RotateCw aria-hidden="true" className={cn(gerando && 'animate-spin')} />
-          {gerando ? 'Refazendo…' : 'Refazer com os dados de agora'}
-        </Button>
+        {aoRegerar ? (
+          <Button
+            variant="ghost"
+            onClick={aoRegerar}
+            disabled={gerando}
+            className="toque h-11 md:h-8"
+          >
+            <RotateCw aria-hidden="true" className={cn(gerando && 'animate-spin')} />
+            {gerando ? 'Refazendo…' : 'Refazer com os dados de agora'}
+          </Button>
+        ) : null}
       </div>
 
       {relatorio.parcial ? (
@@ -520,7 +526,8 @@ function SemRelatorio({
   semana: string | null;
   gerando: boolean;
   erro: string | null;
-  aoGerar: () => void;
+  /** `null` para quem não gera (o SDR): no lugar do botão, a quem pedir. */
+  aoGerar: (() => void) | null;
 }) {
   return (
     <div className="flex flex-col items-start gap-3 px-1 py-10">
@@ -536,14 +543,26 @@ function SemRelatorio({
           : 'A segunda desta semana passou sem o relatório ser gerado, ou ela é anterior ao dia em que o job foi ligado. Gerar agora usa os dados que existem hoje.'}
       </p>
       {erro ? <p className="max-w-prose text-sm text-muted-foreground">{erro}</p> : null}
-      <Button variant="outline" onClick={aoGerar} disabled={gerando} className="toque h-11 md:h-9">
-        <RotateCw aria-hidden="true" className={cn(gerando && 'animate-spin')} />
-        {gerando ? 'Gerando…' : 'Gerar agora'}
-      </Button>
-      <NotaDeAlcance>
-        Gerar aqui grava o mesmo relatório que o job da segunda gravaria, com os dados de agora.
-        Nada é enviado a ninguém: a entrega automática depende de um canal que o CRM ainda não tem.
-      </NotaDeAlcance>
+      {aoGerar ? (
+        <>
+          <Button
+            variant="outline"
+            onClick={aoGerar}
+            disabled={gerando}
+            className="toque h-11 md:h-9"
+          >
+            <RotateCw aria-hidden="true" className={cn(gerando && 'animate-spin')} />
+            {gerando ? 'Gerando…' : 'Gerar agora'}
+          </Button>
+          <NotaDeAlcance>
+            Gerar aqui grava o mesmo relatório que o job da segunda gravaria, com os dados de agora.
+            Nada é enviado a ninguém: a entrega automática depende de um canal que o CRM ainda não
+            tem.
+          </NotaDeAlcance>
+        </>
+      ) : (
+        <NotaDeAlcance>Quem gera o relatório antes da segunda é a gestão.</NotaDeAlcance>
+      )}
     </div>
   );
 }

@@ -36,11 +36,14 @@ export function TelaRelatorios({
   painelInicial,
   periodoInicial,
   semanaInicial,
+  podeGerarSemana,
 }: {
   painelInicial: ChavePainel;
   periodoInicial: Periodo;
   /** A segunda-feira pedida na URL, quando o link veio do relatório de segunda. */
   semanaInicial: string | null;
+  /** Gerar e refazer o relatório da semana: admin e gestor. O SDR lê o que já foi gerado. */
+  podeGerarSemana: boolean;
 }) {
   const [painel, setPainel] = useState<ChavePainel>(painelInicial);
   const [periodo, setPeriodo] = useState<Periodo>(periodoInicial);
@@ -104,6 +107,7 @@ export function TelaRelatorios({
           periodo={periodoAplicado}
           semana={semana}
           aoTrocarSemana={setSemana}
+          podeGerarSemana={podeGerarSemana}
         />
       ) : null}
     </div>
@@ -115,11 +119,13 @@ function Painel({
   periodo,
   semana,
   aoTrocarSemana,
+  podeGerarSemana,
 }: {
   chave: ChavePainel;
   periodo: Periodo;
   semana: string | null;
   aoTrocarSemana: (semana: string) => void;
+  podeGerarSemana: boolean;
 }) {
   const painel = PAINEIS.find((item) => item.chave === chave);
   if (!painel) return null;
@@ -130,7 +136,14 @@ function Painel({
     case 'atendimento':
       return <PainelAtendimento painel={painel} periodo={periodo} />;
     case 'semana':
-      return <PainelSemana painel={painel} semana={semana} aoTrocarSemana={aoTrocarSemana} />;
+      return (
+        <PainelSemana
+          painel={painel}
+          semana={semana}
+          aoTrocarSemana={aoTrocarSemana}
+          podeGerar={podeGerarSemana}
+        />
+      );
     case 'funil':
       return <PainelFunil painel={painel} periodo={periodo} />;
     case 'categorias':

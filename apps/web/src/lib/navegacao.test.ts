@@ -13,7 +13,10 @@ import {
   navegacaoDaLateral,
   navegacaoPara,
   podeCriarParceiro,
+  podeExcluirParceiro,
   podeImportarPlanilha,
+  podeMandarMensagemAutomatica,
+  podeMarcarConsultoria,
 } from '@/lib/navegacao';
 
 describe('NAVEGACAO', () => {
@@ -36,10 +39,14 @@ describe('NAVEGACAO', () => {
     ]);
   });
 
-  it('quem liga fica com duas fatias, e nada em "Mais"', () => {
-    const barra = barraDoCelular('sdr');
-    expect(barra.fatias.map((item) => item.rotulo)).toEqual(['Meu dia', 'Lotes']);
-    expect(barra.emMais).toEqual([]);
+  it('o SDR tem as mesmas cinco fatias, e o "Mais" dele só não tem Ajustes (20/10/2026)', () => {
+    // De 06/10 a 20/10/2026 o SDR ficou com duas fatias (Meu dia e Lotes).
+    const sdr = barraDoCelular('sdr');
+    const admin = barraDoCelular('admin');
+    expect(sdr.fatias.map((item) => item.rotulo)).toEqual(admin.fatias.map((item) => item.rotulo));
+    expect(sdr.emMais.map((item) => item.rotulo)).toEqual(
+      admin.emMais.map((item) => item.rotulo).filter((rotulo) => rotulo !== 'Ajustes'),
+    );
   });
 
   it('Campanhas e Cadências deixaram de existir, e Registrar saiu do menu (pivô de 06/10/2026)', () => {
@@ -157,8 +164,18 @@ describe('navegacaoPara', () => {
     expect(rotulos('leitura')).not.toContain('Ajustes');
   });
 
-  it('quem liga vê duas telas: Meu dia e Ligar (pivô de 06/10/2026)', () => {
-    expect(navegacaoPara('sdr').map((item) => item.rotulo)).toEqual(['Meu dia', 'Lotes']);
+  it('o SDR vê tudo, menos Ajustes (20/10/2026; de 06/10 a 20/10 eram só Meu dia e Lotes)', () => {
+    expect(navegacaoPara('sdr').map((item) => item.rotulo)).toEqual([
+      'Meu dia',
+      'Lotes',
+      'Conversas',
+      'Agenda',
+      'Revisão',
+      'Prospectados',
+      'Funis',
+      'Metas',
+      'Relatórios',
+    ]);
   });
 
   it('admin e gestor veem tudo o que sobrou', () => {
@@ -209,25 +226,13 @@ describe('navegacaoAgrupada', () => {
     }
   });
 
-  it('nunca oferece a quem liga um item que a rota ejetaria', () => {
-    // Tudo o que é da gestão tem `requireRole` de admin e gestor no servidor:
-    // Conversas, Agenda, Funis, Metas, a lista de Parceiros, Revisão, Relatórios
-    // e Ajustes. Sobra um grupo só, e os outros dois nem aparecem.
+  it('nunca oferece ao SDR o item que a rota ejetaria: Ajustes', () => {
+    // As telas que abrem para o SDR têm `requireRole(...PAPEIS_DO_CRM)` no
+    // servidor; Ajustes mostra a área restrita a quem não é admin nem gestor.
     const sdr = navegacaoAgrupada('sdr');
     const rotulos = sdr.flatMap((b) => b.itens.map((i) => i.rotulo));
-    for (const fechado of [
-      'Conversas',
-      'Agenda',
-      'Funis',
-      'Metas',
-      'Prospectados',
-      'Revisão',
-      'Relatórios',
-      'Ajustes',
-    ]) {
-      expect(rotulos).not.toContain(fechado);
-    }
-    expect(sdr.map((b) => b.grupo.chave)).toEqual(['todo_dia']);
+    expect(rotulos).not.toContain('Ajustes');
+    expect(sdr.map((b) => b.grupo.chave)).toEqual(['todo_dia', 'a_base', 'controle']);
   });
 });
 
@@ -245,15 +250,26 @@ describe('estaAtivo', () => {
 });
 
 describe('podeCriarParceiro e podeImportarPlanilha', () => {
-  it('só admin e gestor põem gente na base; o SDR não adiciona lead', () => {
+  it('admin, gestor e SDR põem gente na base (o SDR de novo desde 20/10/2026)', () => {
     for (const pode of [podeCriarParceiro, podeImportarPlanilha]) {
       expect(pode('admin')).toBe(true);
       expect(pode('gestor')).toBe(true);
-      expect(pode('sdr')).toBe(false);
+      expect(pode('sdr')).toBe(true);
       expect(pode('embaixador')).toBe(false);
       expect(pode('leitura')).toBe(false);
       expect(pode('financeiro')).toBe(false);
       expect(pode('bot')).toBe(false);
+    }
+  });
+
+  it('mensagem automática, Consultoria e exclusão continuam só de admin e gestor', () => {
+    // Espelho de `app.is_manager()` em `saudacao_enfileirar`,
+    // `radar_revisar_*_com_mensagem`, `consultoria_marcar` e `parceiro_excluir`.
+    for (const pode of [podeMandarMensagemAutomatica, podeMarcarConsultoria, podeExcluirParceiro]) {
+      expect(pode('admin')).toBe(true);
+      expect(pode('gestor')).toBe(true);
+      expect(pode('sdr')).toBe(false);
+      expect(pode('leitura')).toBe(false);
     }
   });
 
@@ -293,9 +309,12 @@ describe('navegacaoDaLateral (Fase 1)', () => {
     expect(mais.map((i) => i.href)).toContain('/revisao');
   });
 
-  it('quem não vê um principal fica com menos à vista, e o "Mais" não ganha nada', () => {
+  it('o SDR tem os mesmos principais, e o "Mais" dele só não tem Ajustes', () => {
     const sdr = navegacaoDaLateral('sdr');
-    expect(sdr.principais.map((i) => i.href)).toEqual(['/meu-dia', '/ligar']);
-    expect(sdr.mais).toEqual([]);
+    const admin = navegacaoDaLateral('admin');
+    expect(sdr.principais.map((i) => i.href)).toEqual(admin.principais.map((i) => i.href));
+    expect(sdr.mais.map((i) => i.href)).toEqual(
+      admin.mais.map((i) => i.href).filter((href) => href !== '/admin'),
+    );
   });
 });

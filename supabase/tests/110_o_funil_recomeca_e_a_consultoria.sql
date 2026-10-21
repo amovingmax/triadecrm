@@ -5,12 +5,13 @@
 --   2. as fichas de teste saem pela exclusão de sempre (reversível);
 --   3. o quadro esvazia: todo negócio ABERTO volta à etapa de entrada, com o
 --      motivo no histórico; ganho, perdido e nutrição ficam;
---   4. a Consultoria é uma marca: põe, tira, não mexe na etapa, só a gestão.
+--   4. a Consultoria é uma marca: põe, tira, não mexe na etapa, só a gestão
+--      marca, e quem vê a base (o SDR também, desde 20/10/2026) lê.
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(20);
+select plan(22);
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -123,6 +124,13 @@ select is((public.consultoria_marcar(array[pg_temp.org('07')], false) ->> 'mudar
 select pg_temp.entrar(pg_temp.ana(), 'sdr');
 select is(public.consultoria_marcar(array[pg_temp.org('01')], false) ->> 'motivo', 'sem_permissao',
   'quem liga não mexe na Consultoria');
+-- 20261020200000: o SDR voltou a ver Conversas, e a aba Consultoria lê a tabela.
+select is((select count(*)::int from public.consultoria where organization_id = pg_temp.org('01')), 1,
+  'mas o SDR LÊ a marca (a aba Consultoria de Conversas não vem vazia para ele)');
+select pg_temp.sair();
+select pg_temp.entrar(gen_random_uuid(), 'embaixador');
+select is((select count(*)::int from public.consultoria), 0,
+  'quem não vê a base não lê a marca');
 select pg_temp.sair();
 
 select * from finish();

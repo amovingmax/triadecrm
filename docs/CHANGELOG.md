@@ -7383,3 +7383,30 @@ Verificado: Meu dia, Lotes, Agenda, Revisão, Prospectados, ficha, excluídos, F
 **Limites conhecidos.** Um computador com a janela abaixo de 768 px recebe o desenho do celular, como o resto do CRM sempre fez nessa largura. Numa janela de computador entre 768 e 1023 px, o cabeçalho de antes continua apertado ("D..", "C..."), como era.
 
 **Publicado em 20/10/2026 ~14h50**, a pedido do usuário, com a auditoria de responsividade: deploy `triade-iauu7gid7` (commit `d0fcb64`, cópia limpa; volta: `triade-q3xe8toq9`). Antes de publicar, o ar estava no commit da main (`1f2463b`), sem código de outra máquina. Conferido no CSS servido em produção: a regra do aparelho (`(min-width:48rem) and (pointer:coarse)` com o painel abaixo de 42rem) e as classes `conversa-estreita`. Falta o primeiro uso num celular de verdade (o login é só Google, então a tela de produção não foi aberta pelo navegador automático).
+
+## 20/10/2026 (noite) — O SDR volta a entrar em todas as telas, menos Ajustes (RF-ADM-01)
+
+**O pedido.** "O SDR só não pode ter acesso à aba de ajustes." Confirmado com o usuário: o SDR passa a ver tudo menos Ajustes (desfaz a regra de 06/10, em que ele só via Meu dia e Lotes), numa branch nova a partir da main (`sdr-acesso`, worktree `../triadecrm-sdr-acesso`), sem push.
+
+**Entregue.**
+- **Menu** (lateral, barra de baixo, "Mais" e paleta ⌘K): o SDR vê Conversas, Agenda, Revisão, Prospectados, Funis, Metas e Relatórios, além de Meu dia e Lotes. Ajustes continua só para admin e gestor (`lib/navegacao.ts`).
+- **Telas:** as oito rotas aceitam o SDR no servidor (`requireRole(...PAPEIS_DO_CRM)`); os papéis antigos continuam fora. `/admin` continua mostrando a área restrita, e `/parceiros/excluidos` continua da gestão.
+- **O que o SDR faz nelas é o que o banco já deixava** (`app.can_write()`; nenhuma função mudou): atender e responder conversas, cadastrar parceiro, trazer lista, aprovar na Revisão com "Só aprovar" e cadastrar nome, mudar a etapa dos negócios dele e dos sem dono (`move_deal` sempre conferiu isso), marcar compromisso na própria agenda, ler as metas dele e os relatórios.
+- **Avisos de resposta:** o SDR volta a receber o cartão "Nova mensagem" e o número de Conversas, como antes do pivô (`components/avisos/regra.ts`), com a mesma regra da fila de quem respondeu do Meu dia.
+- **Consultoria:** a aba de Conversas lia `public.consultoria`, que só a gestão lia; para o SDR ela viria vazia. A migração `20261020200000_o_sdr_le_a_consultoria.sql` libera a leitura para quem vê a base (`app.sees_all()`). Pôr e tirar continua só da gestão.
+
+**Continua só de admin e gestor** (o banco recusa ao SDR com `app.is_manager()`; os botões somem para ele em vez de dar erro): saudação pela lista e "Aprovar e mandar mensagem" (WhatsApp automático, com custo na Meta); marcar Consultoria; excluir e restaurar parceiro, e a lista de excluídos; desfazer importação; "Ler com a IA" e pesos da triagem; gerar e refazer o relatório da semana; montar lote para outra pessoa; meta, dia e rota de outra pessoa; o telefone completo (LGPD: o SDR revela pelo botão, com registro).
+
+**Defeito corrigido de passagem (está na main e em produção).** O telefone do navegador (Twilio) era ligado por `podeCriarParceiro`, que desde o pivô de 06/10 é só da gestão: o SDR, que é quem liga, não recebia o telefone do navegador (`components/layout/app-shell.tsx`, desde 10/10). Agora a chave é `podeLigar`, espelho do `voz_pode_ligar` do banco.
+
+**Sem mudança, de propósito.** O Meu dia do SDR continua o "dia de quem liga" (o que fez hoje e onde continua), sem meta e sem a fila de quem respondeu; essa fila ele passa a ver em Conversas e nos avisos.
+
+**Não mexe no WhatsApp.** Nenhum arquivo do caminho de envio e entrada foi tocado. O banco nunca recusou envio por papel (`app.pode_enviar` e `app.messages_guard` não olham papel); o que muda é quem chega à tela.
+
+**Verificado no localhost:3002.** Lint, typecheck e 1.305 testes do web (os de menu e de avisos reescritos para a regra nova). pgTAP: as mesmas falhas da main no banco local (relógio e dados locais), e duas asserções novas no `110` (o SDR lê a marca de Consultoria; quem não vê a base não lê), conferidas contra a regra antiga (falha) e a nova (passa). No navegador: como SDR no PC, as oito telas abrem, Ajustes mostra a área restrita, excluídos dá "sem permissão", Prospectados tem "Novo parceiro", "Trazer uma lista" e a mudança de etapa e não tem Excluídos, Consultoria nem saudação, a Revisão tem "Só aprovar" e não tem "Aprovar e mandar mensagem", "Ler com a IA" nem pesos, a conversa abre com a caixa de resposta e Relatórios não tem "Gerar agora"; no celular, as cinco fatias e o "Mais" sem Ajustes. Como gestor, nada sumiu (Excluídos, Consultoria, etapa, "Aprovar e mandar mensagem", "Ler com a IA", Ajustes). Nenhum erro de JavaScript. O candidato de teste foi apagado.
+
+**Banco local.** A migração foi aplicada pelo psql, sem registrar versão em `supabase_migrations`; pode rodar de novo sem efeito.
+
+**Precisa de decisão humana.** Quais das ações que continuam da gestão o SDR também deve ter (cada uma pede mudar uma função do banco); se o Meu dia do SDR deve virar o completo; e se o conserto do telefone do navegador deve subir antes, sozinho, já que hoje o SDR não liga pelo navegador em produção. O PRD ainda descreve os cinco papéis antigos.
+
+**Não publicado.** Branch local `sdr-acesso`, sem push, sem merge e sem deploy.

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
-import { podeCriarParceiro } from '@/lib/navegacao';
+import { PAPEIS_DO_CRM, podeCriarParceiro } from '@/lib/navegacao';
 import {
   ehEntradaPorArquivo,
   podeDesfazerLote,
@@ -42,8 +42,8 @@ const ORIGEM_PADRAO: OrigemDeArquivo = {
  * acontece no cliente, contra as funções do Postgres.
  */
 export default async function Pagina() {
-  // Só admin e gestor trazem lista para a base (pivô de 06/10/2026).
-  const [sessao, supabase] = await Promise.all([requireRole('admin', 'gestor'), createClient()]);
+  // Admin, gestor e SDR (de 06/10 a 20/10/2026 foi só a gestão). Os papéis antigos ficam fora.
+  const [sessao, supabase] = await Promise.all([requireRole(...PAPEIS_DO_CRM), createClient()]);
 
   // `sources_select` é `for select to authenticated using (true)`
   // (`20260904000500:96`): qualquer papel que chegue aqui lê o catálogo.
