@@ -5,7 +5,8 @@ O Tríade serve duas empresas com o **mesmo código** e **uma instalação por e
 | | KOMUNE | Imova Imobiliária |
 |---|---|---|
 | Projeto Supabase | `komune-crm` (`toqdjcajyrowutunczhr`) | `imova-crm` (`kkqadgxvmzulcamuakzk`) |
-| Endereço | `triade-crm-tawny.vercel.app` (o `ir.komune.app.br` só serve os links `/r/`) | a definir (Vercel; depois `crm.imovaimobiliaria.com.br`) |
+| Projeto Vercel | `triade-crm` | `imova-crm` (`prj_I50Imfx69Ugc6DoqqPGvEcfCt5eb`) |
+| Endereço | `triade-crm-tawny.vercel.app` (o `ir.komune.app.br` só serve os links `/r/`); `komune-crm.vercel.app` previsto | `imova-crm.vercel.app` (depois, talvez `crm.imovaimobiliaria.com.br`) |
 | `NEXT_PUBLIC_EMPRESA` | (vazia = komune) | `imova` |
 | Dados iniciais | já existiam | `supabase/empresas/imova/seed.sql` |
 
@@ -45,13 +46,15 @@ O Tríade serve duas empresas com o **mesmo código** e **uma instalação por e
 
 **Chaves:** projeto novo só tem as chaves no formato novo (`sb_publishable_…`, `sb_secret_…`). O site usa a *publishable* como `NEXT_PUBLIC_SUPABASE_ANON_KEY` e a *secret* como `SUPABASE_SERVICE_ROLE_KEY`. Conferir no ensaio que tudo funciona com elas antes de liberar.
 
-**O site da Imova:**
-1. **Projeto novo na Vercel** (por exemplo `triade-imova`): mesmo repositório, pasta `apps/web`, região `gru1`.
+**O site da Imova, feito em 21/10/2026:**
+1. **Projeto `imova-crm` na Vercel**, criado pela CLI e igual ao `triade-crm`: pasta `apps/web`, Node 24.x, sem Git (publica só pela CLI, de uma cópia limpa da `main`), região `gru1` pelo `apps/web/vercel.json`.
 2. **Variáveis de produção:**
    - `NEXT_PUBLIC_EMPRESA=imova`
    - `NEXT_PUBLIC_SUPABASE_URL` e as duas chaves do `imova-crm`
    - `NEXT_PUBLIC_APP_URL`
-   - `NEXT_PUBLIC_EMPRESAS_LINKS=komune=https://triade-crm-tawny.vercel.app;imova=<endereço da Imova>`
+   - `NEXT_PUBLIC_EMPRESAS_LINKS=komune=https://triade-crm-tawny.vercel.app;imova=https://imova-crm.vercel.app`
+   - As chaves são as do formato novo (`sb_publishable_`, `sb_secret_`, esta como *Sensitive*), só em Production. O `imova-crm` também tem as legadas, que não são usadas.
+   - Sem `GOOGLE_MAPS_API_KEY`: a da KOMUNE cobraria na conta da KOMUNE.
 3. **Na KOMUNE:** a mesma `NEXT_PUBLIC_EMPRESAS_LINKS`, para o seletor aparecer, e publicar de novo.
 4. **Conferir:**
    - o login entra só com os e-mails permitidos;

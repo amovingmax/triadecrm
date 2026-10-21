@@ -7684,8 +7684,17 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
   - Contagem antes × depois: nenhuma tabela perdeu linha. Mudaram `app.identidade` (nova, 1 linha), `schema_migrations` (+2) e o uso normal (1 token, 2 auditorias, 1 saúde do número).
   - Arquivo da LGPD: hash dos 316 dossiês, sem o carimbo de hora, idêntico antes e depois (`23b369a6…`). A função é `stable`: só lê.
 
+**Site da Imova em produção (21/10/2026, com pedido do usuário):** `main` em `4c749e3` (fast-forward de `c4b08eb`). Projeto `imova-crm` na Vercel, igual ao `triade-crm`, publicado de uma cópia limpa da `main` em **https://imova-crm.vercel.app** (deploy `imova-bcjyp4s3y`).
+- Conferido:
+  - `/login` 200 com "Entrar · Tríade · Imova", servido de `gru1`;
+  - telas internas → login;
+  - `/auth/dev` 404;
+  - o botão do Google leva ao `kkqadgxvmzulcamuakzk.supabase.co`, e nenhum outro banco é consultado.
+- A KOMUNE não foi tocada: o deploy no ar continua `triade-5jll2hsyh`, antes e depois.
+
 **Pendente:**
-- **Site da Imova e seletor da KOMUNE na Vercel**, e o login da Imova no painel do Supabase (gancho do token, Google e URLs), pelo `docs/operacao/multiempresa.md`. Inclui conferir as chaves no formato novo do Supabase, que o `imova-crm` já usa.
+- **Login da Imova no painel do Supabase** (gancho do token, Google e URLs) e no Google Cloud (URL de retorno da Imova), pelo usuário, com o segredo do Google fora do chat. Depois, testar e-mail autorizado e não autorizado, e as chaves no formato novo com a sessão aberta.
+- **Seletor na KOMUNE:** `NEXT_PUBLIC_EMPRESAS_LINKS` no `triade-crm`, o endereço `komune-crm.vercel.app` e republicar. Só com o pedido "Pode republicar a KOMUNE com o seletor".
 - **WhatsApp da Imova:** o portfólio na Meta espera a desativação de uma conta.
   - O e-mail de aviso dos workers ainda diz "WhatsApp da Komune".
   - A Edge Function `export-lgpd` tem texto e nome de arquivo da Komune.
