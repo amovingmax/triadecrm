@@ -7562,3 +7562,42 @@ Até a animação de entrada terminar: Prospectados 770 → 745 → **231** ms e
 **Volta, se precisar.** Web: promover de novo o `triade-iauu7gid7`. Banco: cada migração traz o "COMO DESFAZER" no cabeçalho.
 
 **Pendente.** A primeira ligação real pelo navegador em produção (a recarga da Twilio estava pendente) e a conferência do usuário no celular.
+
+## 21/10/2026 (noite) — Linha de base: comparar versões e medir velocidade (branch `linha-de-base`; PRD §8)
+
+**O pedido.** "Pode começar a etapa 0" do plano de duas empresas no mesmo CRM (KOMUNE e Imova, cada uma com banco e WhatsApp próprios): proteger e medir antes de mexer. A etapa de velocidade já tinha sido feita e publicada por outra sessão (entradas acima). Daqui só faltava guardar as ferramentas: as que mediram aquela etapa estavam numa pasta temporária, com portas, ids e a rota `/auth/dev` fixos.
+
+**Entregue** (worktree `../triadecrm-linha-de-base`, sem commit):
+- **`apps/web/scripts/comparar-versoes.mjs`**:
+  - abre 22 telas em duas versões, como gestor e SDR, no PC (1440×900) e no celular (390×844, toque), com as versões intercaladas tela a tela no mesmo banco local;
+  - **reprova** (código 1) diferença de endereço, status, menu ou erro novo (JavaScript, console, resposta ≥ 400);
+  - manda **para conferir** diferença de texto (o relógio é descontado) ou de foto (acima de 0,5% dos pixels), com a foto marcada em vermelho;
+  - `lado-a-lado --a <url> [--b <url>]` e `comparar <pastaA> <pastaB>`.
+- **`apps/web/scripts/medir-velocidade.mjs`**: o percurso de toque da etapa de velocidade (Prospectados, ficha, Conversas, Lotes, lote e Meu dia), com 4G e CPU 4×. Mede a resposta ao toque e o conteúdo pronto. Com `--b`, alterna as rodadas entre as versões. A telefonia é bloqueada antes de sair.
+- **`apps/web/scripts/banco-local.mjs`**: ids reais de ficha, lote e conversa, lidos do banco local (só leitura).
+- **`docs/operacao/comparar-versoes.md`**: o passo a passo (referência numa cópia limpa do commit no ar, porta 3200; versão nova na 3201) e como ler o relatório.
+
+As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora do git.
+
+**Linha de base da `main` no ar** (`c4b08eb`, deploy `triade-5jll2hsyh`), guardada fora do repositório:
+- **Telas:** `~/triadecrm-capturas/2026-10-21-main-c4b08eb`, 88 telas, 15 MB. Comparada consigo mesma em duas portas, deu 88 de 88 iguais, sem ruído. Nenhuma tela caiu no login. Nenhum erro de JavaScript, aviso de console ou resposta com erro.
+- **Tempos:** `~/triadecrm-medicoes/2026-10-21-main-c4b08eb`, medianas de 4 rodadas, 4G e CPU 4×:
+  - Prospectados 163 ms; ficha 539 ms; Conversas 139 ms; Lotes 72–84 ms; lote 444–448 ms; Meu dia de volta 103–117 ms;
+  - 1ª abertura 977–982 ms;
+  - resposta ao toque de 15 a 26 ms em todos os toques.
+
+  São os mesmos números que a etapa de velocidade publicou para a versão nova, o que confirma que a medição é a mesma.
+
+**Verificado:**
+- **Controle com defeitos plantados:** linha de texto e foto trocada no Funis, Metas caindo no login, erro de JavaScript na Revisão. Os quatro foram acusados (código 1); sem os defeitos, código 0.
+- **Testes do web:** lint, typecheck e 1.318 testes.
+
+**Não mexe** em produção, no banco remoto, no WhatsApp nem em código de tela. Só roteiros, guia e este registro.
+
+**Pendente:**
+- **Backup do banco da KOMUNE fora do Supabase:** lê a produção, inclusive dados pessoais, e precisa de OK e de um lugar para guardar.
+- **Levar a branch à `main`,** com pedido.
+- **A comparação no CI,** um dia: hoje ela precisa de dois builds e do banco local.
+- **Limite do banco local:** tem pouco dado (103 parceiros, 25 conversas), então as telas que dependem de volume ficam otimistas nos tempos.
+
+**Decisão humana:** onde guardar o backup da KOMUNE (máquina do Luiz?).
