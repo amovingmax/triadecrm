@@ -7602,7 +7602,7 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 
 **Decisão humana:** onde guardar o backup da KOMUNE (máquina do Luiz?).
 
-## 22/10/2026 — Duas empresas no mesmo CRM: KOMUNE e Imova Imobiliária (branch `multiempresa`; etapa 2 do plano)
+## 21/10/2026 — Duas empresas no mesmo CRM: KOMUNE e Imova Imobiliária (branch `multiempresa`; etapas 2 e 3 do plano)
 
 **O pedido.** O mesmo CRM para uma segunda empresa, a Imova Imobiliária: "os dados de cada uma das empresas devem ser independentes, eles devem ter as funcionalidades básicas semelhantes, e deve ter como mudar de uma empresa para outra por módulos". Exigência: nada da KOMUNE pode ser alterado, e "uma pessoa subir comando do banco para o projeto errado não deve acontecer". Decisões do usuário em 21/10:
 - mesmas telas, com os dados próprios da Imova (opção A);
@@ -7614,7 +7614,7 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 
 **Arquitetura.** Multi-tenant no modelo silo: um código, uma instalação por empresa (projeto Supabase, deploy na Vercel e endereço próprios). Trocar de empresa é abrir o endereço da outra pelo seletor. O banco da Imova (`imova-crm`, `kkqadgxvmzulcamuakzk`, Convívia, São Paulo) foi criado vazio pelo usuário em 21/10. Passo a passo em `docs/operacao/multiempresa.md`.
 
-**Entregue** (worktree `../triadecrm-multiempresa`, sobre a `linha-de-base`; nada publicado):
+**Entregue** (branch `multiempresa`, sobre a `linha-de-base`):
 - **Trava de identidade** (`20261022090000`):
   - `app.identidade` guarda uma linha só, imutável (UPDATE, DELETE e TRUNCATE recusados);
   - `app.definir_identidade(empresa, confirmação)` recusa outra empresa e recusa banco com parceiros sem confirmação;
@@ -7626,11 +7626,13 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
   - Na Imova: "Imova Imobiliária", `contato@imovaimobiliaria.com.br`, sem a Plataforma Komune.
   - pgTAP `113`.
 - **`scripts/publicar-banco.mjs`**, o único caminho para o banco de produção de uma empresa:
-  - lê o projeto de `supabase/empresas.json`, e não do `supabase link`;
-  - exige que o `DATABASE_URL` de `.env.<empresa>` contenha o projeto daquela empresa;
+  - lê o projeto de `supabase/empresas.json` e passa à CLI como `--linked --project-ref <código>`, que vale por cima do `supabase link` do terminal (conferido: de uma pasta linkada à KOMUNE, o código da Imova vai à Imova). Usa o login da CLI: sem senha de banco e sem `.env`;
   - confere a identidade e pede o nome da empresa digitado;
   - recusa levar à KOMUNE migração que ainda não está na Imova;
-  - roda o seed numa transação só, pelo `psql` da imagem do Postgres;
+  - roda o seed tudo ou nada: no remoto por `supabase db query -f` (um erro desfaz o arquivo inteiro, conferido no projeto vazio da Imova), no local pelo `psql` da imagem do Postgres;
+  - num projeto novo, antes da primeira migração, iguala o padrão de permissões ao da KOMUNE (`supabase/empresas/projeto-novo.sql`, abaixo);
+  - no `db push`, dá à sessão o search_path do `postgres` (`PGOPTIONS`), abaixo;
+  - aceita uma única vez o banco anterior à trava (a KOMUNE), quando a leva traz a `20261022090000`;
   - comandos `conferir`, `migrar`, `semear` e `identidade`, com `--local` para ensaio.
 - **Seed da Imova** (`supabase/empresas/imova/seed.sql`): começa por `app.definir_identidade('imova')`. Traz:
   - cidades e feriados de Natal/RN;
@@ -7663,16 +7665,33 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - **Seletor:** leva da KOMUNE à Imova.
 - **Testes:** lint e tipos; web 1.321 testes; `schema` 109; pgTAP 19, 111, 112 e 113.
 
-**Não mexe** em produção, no banco remoto, no WhatsApp (nenhum arquivo do caminho de envio e entrada nem dos workers), nas funções do login nem na Twilio.
+**Não mexe** no WhatsApp (nenhum arquivo do caminho de envio e entrada nem dos workers), nas Edge Functions, nas funções do login nem na Twilio.
+
+**Banco em produção (21/10/2026, à noite, com pedido do usuário: "faça tudo garantindo que nada será perdido"):**
+- **Backup da KOMUNE antes de tudo** (`~/triadecrm-backups/komune-producao-2026-10-21-antes-da-imova`, só o usuário lê; disco com FileVault):
+  - `supabase db dump` de estrutura, dados (`--use-copy`) e papéis;
+  - o histórico das 158 migrações;
+  - contagem de linhas das 125 tabelas, antes e depois;
+  - `LEIA-ME.txt` com como restaurar.
+  
+  As linhas dentro de `dados.sql` bateram com a contagem do banco, tabela por tabela; `audit_log` e `wa_saude_numero` tinham uma a mais, porque o CRM seguiu em uso. Os arquivos do Storage não entram: a mudança não os toca.
+- **Imova primeiro** (`imova-crm`): 160 migrações, seed, identidade "imova".
+  - A estrutura saiu igual à da KOMUNE (`supabase db dump` dos dois, comparados). Diferenças: só as duas migrações novas; aspas da versão do Postgres (17.11 × 17.6); e o `pg_net`, que a KOMUNE tem desde a criação do projeto e só serve ao push para a plataforma Komune, desligado na Imova.
+  - Dois tropeços, corrigidos no comando e sem efeito, porque cada migração é tudo ou nada e o banco estava vazio:
+    - projeto criado com "expor tabelas novas" desligado nasce sem `EXECUTE` padrão para `authenticated`/`service_role` nas funções novas, padrão que a KOMUNE e o local têm. Daí o `projeto-novo.sql`;
+    - o papel temporário da CLI (`cli_login_postgres`) não tem `extensions` no search_path, e a `20260904001401` usa `citext` sem esquema. Daí o `PGOPTIONS`. O Supabase não deixa alterar o papel.
+- **Depois a KOMUNE** (`komune-crm`): `20261022090000` e `20261022100000`, e a identidade "komune".
+  - Contagem antes × depois: nenhuma tabela perdeu linha. Mudaram `app.identidade` (nova, 1 linha), `schema_migrations` (+2) e o uso normal (1 token, 2 auditorias, 1 saúde do número).
+  - Arquivo da LGPD: hash dos 316 dossiês, sem o carimbo de hora, idêntico antes e depois (`23b369a6…`). A função é `stable`: só lê.
 
 **Pendente:**
-- **Etapa 3, a Imova em produção:** com pedido, pelo `docs/operacao/multiempresa.md`. Inclui ensaiar as chaves no formato novo do Supabase, que o `imova-crm` já usa.
+- **Site da Imova e seletor da KOMUNE na Vercel**, e o login da Imova no painel do Supabase (gancho do token, Google e URLs), pelo `docs/operacao/multiempresa.md`. Inclui conferir as chaves no formato novo do Supabase, que o `imova-crm` já usa.
 - **WhatsApp da Imova:** o portfólio na Meta espera a desativação de uma conta.
   - O e-mail de aviso dos workers ainda diz "WhatsApp da Komune".
   - A Edge Function `export-lgpd` tem texto e nome de arquivo da Komune.
   - A aba Clientes de Conversas fala de "cliente da plataforma".
 - **Textos menores na Imova:** exemplos com buffet e casamento nos campos, ajuda de Ajustes com nomes da equipe da KOMUNE, mensagens do login no banco ("KOMUNE CRM", não aparecem na tela), fuso e mapa "de Natal" (a Imova é de Natal).
-- **Backup da KOMUNE fora do Supabase:** precisa de OK.
+- **Segunda cópia do backup** num lugar que só a gestão acessa (o Luiz cuida dos backups).
 
 **Decisão humana:**
 - o endereço definitivo da Imova;

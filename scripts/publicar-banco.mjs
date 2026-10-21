@@ -5,15 +5,15 @@
  * Existe porque "uma pessoa subir comando do banco para o projeto errado não deve
  * acontecer" (usuário, 21/10/2026). Um `supabase db push` solto vai para o projeto que
  * estiver linkado no terminal — e este repositório costuma estar linkado à KOMUNE. Aqui,
- * o projeto vem de `supabase/empresas.json`, pela empresa que você digita, e nada roda
- * antes de três conferências:
+ * o projeto vem de `supabase/empresas.json`, pela empresa que você digita, e vai para a
+ * CLI como `--linked --project-ref <código>`: o código fixo vale por cima do link do
+ * terminal, e o acesso é o da conta logada na CLI (sem senha de banco, sem `.env`).
+ * Nada roda antes de duas conferências:
  *
- *   1. o endereço do banco (em `.env.<empresa>`, fora do git) é do projeto daquela
- *      empresa — o código do projeto tem de estar nele;
- *   2. o banco diz que é daquela empresa (`public.empresa_do_banco()`, gravada pela
+ *   1. o banco diz que é daquela empresa (`public.empresa_do_banco()`, gravada pela
  *      migração 20261022090000); outra empresa, ou banco com dados e sem identidade,
  *      aborta;
- *   3. a ordem: uma migração só chega a uma empresa depois de estar nas que vêm antes
+ *   2. a ordem: uma migração só chega a uma empresa depois de estar nas que vêm antes
  *      em `ordem` (a Imova vai na frente; se algo der errado, aparece lá).
  *
  * E pede para digitar o nome da empresa antes de gravar (ou `--confirmar <empresa>`
@@ -28,13 +28,15 @@
  * ensaiar tudo no computador antes.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CADASTRO = JSON.parse(readFileSync(join(RAIZ, 'supabase/empresas.json'), 'utf8'));
+/** A migração que cria `app.identidade` e as funções da trava. */
+const MIGRACAO_DA_IDENTIDADE = '20261022090000';
 
 function parar(mensagem) {
   console.error(`\n✋ ${mensagem}\nNada foi feito.`);
@@ -56,29 +58,20 @@ function supabase(args) {
   }
 }
 
-/** Lê o `.env.<empresa>` da raiz (fora do git) e devolve o DATABASE_URL dele. */
-function enderecoDoBanco(empresa, local) {
-  const dados = CADASTRO.empresas[empresa];
-  if (local) return dados.local;
-  const arquivo = join(RAIZ, `.env.${empresa}`);
-  if (!existsSync(arquivo)) {
-    parar(`Falta ${arquivo} com DATABASE_URL=<conexão do projeto ${dados.projeto}> (painel do Supabase → Connect → Session pooler).`);
-  }
-  const linha = readFileSync(arquivo, 'utf8').split('\n').find((l) => l.startsWith('DATABASE_URL='));
-  const url = linha?.slice('DATABASE_URL='.length).trim().replace(/^["']|["']$/g, '');
-  if (!url) parar(`${arquivo} não tem DATABASE_URL.`);
-  if (!url.includes(`postgres.${dados.projeto}@`) && !url.includes(`db.${dados.projeto}.supabase.co`)) {
-    parar(`O DATABASE_URL de ${arquivo} não é do projeto ${dados.projeto} (${dados.nome}).`);
-  }
-  return url;
+/**
+ * Para onde a CLI aponta. Remoto: o projeto da empresa pelo código fixo — a CLI só aceita
+ * `--project-ref` junto com `--linked`, e aí ele vale por cima do link do terminal
+ * (conferido em 21/10/2026). Local: o endereço do `supabase start` daquela empresa.
+ */
+function alvo(empresa, local) {
+  return local
+    ? ['--db-url', CADASTRO.empresas[empresa].local]
+    : ['--linked', '--project-ref', CADASTRO.empresas[empresa].projeto];
 }
 
-/** Consulta só de leitura. Remoto vai pela API de gestão (sem senha); local, pelo endereço. */
+/** Consulta só de leitura. */
 function consultar(empresa, local, sql) {
-  const alvo = local
-    ? ['--db-url', CADASTRO.empresas[empresa].local]
-    : ['--project-ref', CADASTRO.empresas[empresa].projeto];
-  const bruto = supabase(['db', 'query', ...alvo, sql, '--output-format', 'json']);
+  const bruto = supabase(['db', 'query', ...alvo(empresa, local), sql, '--output-format', 'json']);
   return JSON.parse(bruto.slice(bruto.indexOf('{'))).rows;
 }
 
@@ -113,14 +106,23 @@ function migracoesDoRepositorio() {
 }
 
 /**
- * Roda um arquivo SQL inteiro (vários comandos, blocos `do`) parando no primeiro erro.
- * A CLI do Supabase só roda um comando por vez, e o Mac não tem `psql`: ele vem da
- * mesma imagem do Postgres que o `supabase start` usa, num contêiner descartável.
+ * Roda um arquivo SQL inteiro (vários comandos, blocos `do`), tudo ou nada.
+ *
+ * Remoto: `supabase db query -f` pelo projeto da empresa, que roda o arquivo como um
+ * bloco só — um erro em qualquer comando desfaz todos (conferido no projeto vazio da
+ * Imova em 21/10/2026).
+ *
+ * Local: a CLI com `--db-url` só roda um comando por vez, e o Mac não tem `psql`: ele vem
+ * da mesma imagem do Postgres que o `supabase start` usa, num contêiner descartável.
  * Do contêiner, o 127.0.0.1 do Mac é `host.docker.internal`.
  */
-function rodarArquivoSql(url, arquivo) {
+function rodarArquivoSql(empresa, local, arquivo) {
+  if (!local) {
+    supabase(['db', 'query', ...alvo(empresa, false), '-f', arquivo]);
+    return;
+  }
   const imagem = process.env.PSQL_IMAGE ?? 'public.ecr.aws/supabase/postgres:17.6.1.171';
-  const doConteiner = url.replace('@127.0.0.1:', '@host.docker.internal:');
+  const doConteiner = CADASTRO.empresas[empresa].local.replace('@127.0.0.1:', '@host.docker.internal:');
   try {
     execFileSync(
       'docker',
@@ -189,19 +191,23 @@ async function principal() {
     if (atual === empresa) return console.log('Identidade: já gravada. Nada a fazer.');
     if (atual) parar(`Este banco diz que é da empresa "${atual}".`);
     await confirmar(empresa, opcoes);
-    supabase(['db', 'query', '--db-url', enderecoDoBanco(empresa, opcoes.local), `select app.definir_identidade('${empresa}', true)`]);
+    supabase(['db', 'query', ...alvo(empresa, opcoes.local), `select app.definir_identidade('${empresa}', true)`]);
     return exigirIdentidade(empresa, opcoes.local);
   }
 
   if (comando === 'migrar') {
     const atual = identidade(empresa, opcoes.local);
+    const aplicadas = migracoesAplicadas(empresa, opcoes.local);
+    const pendentes = migracoesDoRepositorio().filter((v) => !aplicadas.has(v));
     if (atual == null && CADASTRO.empresas[empresa].seed && bancoVazio(empresa, opcoes.local)) {
       console.log(`Identidade: banco novo e vazio da ${empresa}. Recebe a estrutura agora; depois rode "semear".`);
+    } else if (atual === undefined && pendentes.includes(MIGRACAO_DA_IDENTIDADE)) {
+      // Banco que já existia antes da trava (a KOMUNE): a função que grava a identidade
+      // chega nesta leva. Uma vez só; depois dela, toda migração exige a identidade.
+      console.log(`Identidade: banco anterior à trava. Recebe a trava agora; depois rode "identidade".`);
     } else {
       exigirIdentidade(empresa, opcoes.local);
     }
-    const aplicadas = migracoesAplicadas(empresa, opcoes.local);
-    const pendentes = migracoesDoRepositorio().filter((v) => !aplicadas.has(v));
     if (!pendentes.length) return console.log('Nenhuma migração pendente.');
     const antes = CADASTRO.ordem.slice(0, CADASTRO.ordem.indexOf(empresa));
     for (const outra of antes) {
@@ -211,8 +217,17 @@ async function principal() {
     }
     console.log(`Vai aplicar ${pendentes.length} migração(ões): ${pendentes.join(', ')}`);
     await confirmar(empresa, opcoes);
-    const url = enderecoDoBanco(empresa, opcoes.local);
-    execFileSync('supabase', ['db', 'push', '--db-url', url, '--yes'], { cwd: RAIZ, stdio: 'inherit' });
+    if (aplicadas.size === 0) {
+      // Projeto novo: o padrão de permissões igual ao da KOMUNE antes da primeira tabela.
+      console.log('Projeto novo: igualando as permissões padrão às da KOMUNE (supabase/empresas/projeto-novo.sql).');
+      rodarArquivoSql(empresa, opcoes.local, join(RAIZ, 'supabase/empresas/projeto-novo.sql'));
+    }
+    // A CLI entra no projeto por um papel temporário (`cli_login_postgres`) que não tem o
+    // search_path do `postgres` ("$user", public, extensions). Migração antiga que usa tipo
+    // de extensão sem esquema (`citext` na 20260904001401) parava. Aqui a sessão recebe o
+    // mesmo search_path com que a KOMUNE foi migrada (medido em 21/10/2026, no projeto da Imova).
+    const env = { ...process.env, PGOPTIONS: '-c search_path="$user",public,extensions' };
+    execFileSync('supabase', ['db', 'push', ...alvo(empresa, opcoes.local), '--yes'], { cwd: RAIZ, stdio: 'inherit', env });
     if (atual === empresa) exigirIdentidade(empresa, opcoes.local);
     return console.log('✅ Migrações aplicadas.');
   }
@@ -225,7 +240,7 @@ async function principal() {
     if (atual && atual !== empresa) parar(`Este banco diz que é da empresa "${atual}".`);
     console.log(`Vai rodar ${seed}. Ele começa gravando ou exigindo a identidade "${empresa}".`);
     await confirmar(empresa, opcoes);
-    rodarArquivoSql(enderecoDoBanco(empresa, opcoes.local), join(RAIZ, seed));
+    rodarArquivoSql(empresa, opcoes.local, join(RAIZ, seed));
     exigirIdentidade(empresa, opcoes.local);
     return console.log('✅ Seed aplicado.');
   }
