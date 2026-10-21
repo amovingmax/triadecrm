@@ -42,8 +42,11 @@ const ContextoDaSaudacao = createContext<SaudacaoNaTabela | null>(null);
  * mesmo caminho da saudação: sem provedor, a coluna volta a ser só a etiqueta.
  */
 export type AcoesNaTabela = {
-  naConsultoria: ReadonlySet<string>;
-  marcarConsultoria: (id: string, sim: boolean) => void;
+  /** `null` para quem não marca Consultoria (o SDR): a etapa muda, a marca não aparece. */
+  consultoria: {
+    naConsultoria: ReadonlySet<string>;
+    marcar: (id: string, sim: boolean) => void;
+  } | null;
   aoMudarEtapa: () => void;
 };
 
@@ -447,11 +450,13 @@ function CelulaEtapa({ linha }: { linha: LinhaParceiro }) {
       ) : (
         <EtiquetaEtapa etapa={null} className="min-w-0 shrink" />
       )}
-      <BotaoConsultoria
-        nome={linha.name}
-        marcado={acoes.naConsultoria.has(linha.id)}
-        aoMudar={(sim) => acoes.marcarConsultoria(linha.id, sim)}
-      />
+      {acoes.consultoria ? (
+        <BotaoConsultoria
+          nome={linha.name}
+          marcado={acoes.consultoria.naConsultoria.has(linha.id)}
+          aoMudar={(sim) => acoes.consultoria?.marcar(linha.id, sim)}
+        />
+      ) : null}
     </span>
   );
 }

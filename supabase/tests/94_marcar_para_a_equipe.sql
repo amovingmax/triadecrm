@@ -8,8 +8,9 @@
 --   2. O PADRÃO É QUEM MARCA. O gestor que marca num parceiro da carteira da
 --      SDR fica com a reunião; o negócio continua da SDR.
 --   3. A HIERARQUIA É DO BANCO, não só da tela: gestor marca para SDR e
---      embaixador, não para outro gestor; admin marca para gestor; SDR só
---      para si.
+--      embaixador, não para outro gestor; admin marca para gestor; SDR, desde
+--      21/10/2026, como o gestor (para outra SDR, não para o gestor);
+--      embaixador só para si.
 --   4. QUEM RECEBE É AVISADA, e só quando outra pessoa marcou.
 --   5. A VISITA NÃO CAI EM CIMA de reunião viva nem de outra visita; encostar
 --      (começar quando a outra termina) não é sobrepor. E nunca em sábado,
@@ -22,7 +23,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(43);
+select plan(44);
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -58,7 +59,8 @@ insert into equipe94 values
   ('gestor',  pg_temp.contratar('Gervasio Pgtap94', 'gestor')),
   ('gestor2', pg_temp.contratar('Genoveva Pgtap94', 'gestor')),
   ('sdr',     pg_temp.contratar('Serafina Pgtap94', 'sdr')),
-  ('sdr2',    pg_temp.contratar('Sebastiao Pgtap94', 'sdr'));
+  ('sdr2',    pg_temp.contratar('Sebastiao Pgtap94', 'sdr')),
+  ('emb',     pg_temp.contratar('Emerenciana Pgtap94', 'embaixador'));
 grant select on equipe94 to authenticated;
 create function pg_temp.p(p_papel text) returns uuid language sql stable as $$
   select id from equipe94 where papel = p_papel $$;
@@ -179,19 +181,27 @@ select pg_temp.sair();
 select is((select (r ->> 'ok')::boolean from r94 where chave='admin_para_gestor'), true,
   'o admin marca para um gestor');
 
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): acompanha
+-- as outras SDRs, como o gestor, mas não o gestor. Quem continua só para si é o
+-- embaixador. A licença da SDR é conferida em `app.pode_marcar_para`, sem marcar
+-- nada, para não mudar a contagem de avisos do bloco 7.
 select pg_temp.entrar(pg_temp.p('sdr'), 'sdr');
 insert into r94 values ('sdr_para_gestor',
   public.reuniao_marcar_na_agenda(pg_temp.f('deal_c'), pg_temp.as('13:40'), 'online', null, null, pg_temp.p('gestor')));
-insert into r94 values ('sdr_para_sdr2',
+select is(app.pode_marcar_para(pg_temp.p('sdr2')), true,
+  'a SDR pode marcar para outra SDR, como o gestor (poder do gestor desde 21/10/2026)');
+select pg_temp.sair();
+select pg_temp.entrar(pg_temp.p('emb'), 'embaixador');
+insert into r94 values ('emb_para_sdr2',
   public.reuniao_marcar_na_agenda(pg_temp.f('deal_c'), pg_temp.as('13:40'), 'online', null, null, pg_temp.p('sdr2')));
-insert into r94 values ('visita_sdr_para_sdr2',
+insert into r94 values ('visita_emb_para_sdr2',
   public.visita_marcar(pg_temp.f('org_c'), pg_temp.as('08:00'), null, pg_temp.p('sdr2')));
 select pg_temp.sair();
 select is((select r ->> 'motivo' from r94 where chave='sdr_para_gestor'), 'nao_acompanha',
   'a SDR não marca para o gestor');
-select is((select r ->> 'motivo' from r94 where chave='sdr_para_sdr2'), 'nao_acompanha',
-  'nem para outra SDR');
-select is((select r ->> 'motivo' from r94 where chave='visita_sdr_para_sdr2'), 'nao_acompanha',
+select is((select r ->> 'motivo' from r94 where chave='emb_para_sdr2'), 'nao_acompanha',
+  'o embaixador não marca para uma SDR');
+select is((select r ->> 'motivo' from r94 where chave='visita_emb_para_sdr2'), 'nao_acompanha',
   'e a visita segue a mesma regra');
 
 -- ---------- 4. quem recebe é avisada ----------

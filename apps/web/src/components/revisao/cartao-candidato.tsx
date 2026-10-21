@@ -59,6 +59,7 @@ export function CartaoCandidato({
   candidato,
   ocupado,
   podeDecidir,
+  podeMandarMensagem,
   marcado,
   aoMarcar,
   aoDecidir,
@@ -68,6 +69,8 @@ export function CartaoCandidato({
   ocupado: boolean;
   /** Papel que decide na fila (o RLS é quem manda de verdade). */
   podeDecidir: boolean;
+  /** Mostra o "Aprovar e mandar mensagem" (admin e gestor; o SDR só aprova). */
+  podeMandarMensagem: boolean;
   /**
    * Está marcado para o lote. `null` = este cartão não entra em lote nenhum.
    *
@@ -330,16 +333,18 @@ export function CartaoCandidato({
                 O primeiro é menta porque é o que procura alguém; a tecla "A"
                 continua sendo o segundo — atalho não manda mensagem. As outras
                 duas ações são discos com nome no `title` e no rótulo acessível. */}
-            <Button
-              variant="menta"
-              onClick={() => aoDecidir('aprovar', undefined, true)}
-              disabled={ocupado || candidato.nao_contatar}
-              title="Cria a ficha e põe a mensagem automática na fila. O lead aparece em Conversas quando responder."
-              className="toque h-11 px-4 md:h-9"
-            >
-              <MessageCircle aria-hidden="true" />
-              Aprovar e mandar mensagem
-            </Button>
+            {podeMandarMensagem ? (
+              <Button
+                variant="menta"
+                onClick={() => aoDecidir('aprovar', undefined, true)}
+                disabled={ocupado || candidato.nao_contatar}
+                title="Cria a ficha e põe a mensagem automática na fila. O lead aparece em Conversas quando responder."
+                className="toque h-11 px-4 md:h-9"
+              >
+                <MessageCircle aria-hidden="true" />
+                Aprovar e mandar mensagem
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               onClick={() => aoDecidir('aprovar')}

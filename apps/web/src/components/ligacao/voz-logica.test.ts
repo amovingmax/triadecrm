@@ -10,6 +10,7 @@ import {
   estadoAoDesligar,
   avisoDaFalha,
   avisoDaRecusa,
+  avisoDeQuemSaiuDoLote,
   AVISO_DA_RECUSA,
   FRASE_DA_FALHA,
   TITULO_DA_FALHA,
@@ -162,8 +163,21 @@ describe('o que dizer quando deu errado', () => {
     expect(avisoDaRecusa('numero_invalido').titulo).toBe('Telefone inválido');
     expect(avisoDaRecusa('reservado_em_outro_lote', { dono: 'Heloísa' }).frase).toMatch(/Heloísa/);
     expect(avisoDaRecusa('ja_no_seu_lote', { loteNome: 'Buffets' }).frase).toMatch(/Buffets/);
+    expect(avisoDaRecusa('em_ligacao_agora', { dono: 'Bia' }).frase).toMatch(/^Bia está com/);
+    expect(avisoDaRecusa('em_ligacao_agora', { dono: 'Bia', eVoce: true }).frase).toMatch(/^Você/);
+    expect(avisoDaRecusa('em_ligacao_agora').titulo).toBe('Em ligação agora');
     expect(avisoDaRecusa('motivo_que_nao_existe')).toEqual(avisoDaFalha('falha_na_telefonia'));
     expect(avisoDaRecusa(null)).toEqual(avisoDaFalha('falha_na_telefonia'));
+  });
+
+  it('a ficha que tira o parceiro da fila diz de que lote ele saiu, e de quem', () => {
+    expect(avisoDeQuemSaiuDoLote({ lote_nome: 'Buffets', dono: 'Ana', e_seu: true })).toEqual({
+      titulo: 'Saiu do lote "Buffets"',
+      frase: 'Estava na fila do seu lote. A ligação é por aqui agora.',
+    });
+    expect(avisoDeQuemSaiuDoLote({ lote_nome: 'Buffets', dono: 'Bia', e_seu: false }).frase).toBe(
+      'Estava na fila de Bia. A ligação é sua agora.',
+    );
   });
 
   it('o código vai para o diagnóstico, curto', () => {

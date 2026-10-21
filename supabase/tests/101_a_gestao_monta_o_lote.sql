@@ -7,24 +7,27 @@
 --   1. O GESTOR PASSA O LOTE para quem vai ligar, e o lote aparece para ela;
 --   2. A RESERVA ACOMPANHA: os contatos continuam no lote, sem voltar à base;
 --   3. O DIA É DE QUEM LIGOU: a ligação feita no lote recebido conta para ela;
---   4. SÓ A GESTÃO ATRIBUI — o SDR não passa lote para ninguém, nem o dele;
+--   4. SÓ A GESTÃO ATRIBUI — e, desde 21/10/2026, o SDR, que tem o poder do
+--      gestor; o embaixador não passa lote para ninguém, nem para si;
 --   5. NÃO SE DÁ LOTE A QUEM NÃO EXISTE no time, nem lote já encerrado.
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(13);
+select plan(15);
 
 insert into public.allowed_users (email, role, note) values
   ('l101.g@teste.local', 'gestor', 'pgTAP 101'),
   ('l101.a@teste.local', 'sdr', 'pgTAP 101'),
   ('l101.b@teste.local', 'sdr', 'pgTAP 101'),
-  ('l101.x@teste.local', 'leitura', 'pgTAP 101');
+  ('l101.x@teste.local', 'leitura', 'pgTAP 101'),
+  ('l101.e@teste.local', 'embaixador', 'pgTAP 101');
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a0000000-0000-4000-8000-000000010101'::uuid, 'l101.g@teste.local', '{"full_name":"Gil Gestor"}'),
   ('a0000000-0000-4000-8000-000000010102'::uuid, 'l101.a@teste.local', '{"full_name":"Ana Freela"}'),
   ('a0000000-0000-4000-8000-000000010103'::uuid, 'l101.b@teste.local', '{"full_name":"Bia Freela"}'),
-  ('a0000000-0000-4000-8000-000000010104'::uuid, 'l101.x@teste.local', '{"full_name":"Xis Antigo"}');
+  ('a0000000-0000-4000-8000-000000010104'::uuid, 'l101.x@teste.local', '{"full_name":"Xis Antigo"}'),
+  ('a0000000-0000-4000-8000-000000010105'::uuid, 'l101.e@teste.local', '{"full_name":"Eva Embaixadora"}');
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -82,11 +85,20 @@ select is(pg_temp.dono(), pg_temp.gil(), 'o lote nasce no nome de quem montou');
 -- =====================================================================
 -- 4. Só a gestão atribui
 -- =====================================================================
-select pg_temp.entrar(pg_temp.ana(), 'sdr');
-select is(public.lote_atribuir(pg_temp.v('lote'), pg_temp.ana()) ->> 'motivo', 'sem_permissao',
-  'o SDR não puxa para si um lote que a gestão não lhe deu');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000) e
+-- atribui lote. A recusa segue provada com o embaixador, que escreve mas não é
+-- da gestão. A SDR passa o lote para a Bia; o bloco 1 o tira dela para a Ana.
+select pg_temp.entrar('a0000000-0000-4000-8000-000000010105'::uuid, 'embaixador');
+select is(public.lote_atribuir(pg_temp.v('lote'), 'a0000000-0000-4000-8000-000000010105'::uuid) ->> 'motivo',
+  'sem_permissao', 'o embaixador não puxa para si um lote que a gestão não lhe deu');
 select pg_temp.sair();
 select is(pg_temp.dono(), pg_temp.gil(), 'e o lote continua de quem era');
+
+select pg_temp.entrar(pg_temp.ana(), 'sdr');
+select is(public.lote_atribuir(pg_temp.v('lote'), pg_temp.bia()) ->> 'ok', 'true',
+  'a SDR passa o lote para outra SDR, como o gestor (poder do gestor desde 21/10/2026)');
+select pg_temp.sair();
+select is(pg_temp.dono(), pg_temp.bia(), 'e o lote passa a ser da Bia');
 
 -- =====================================================================
 -- 1. O gestor passa o lote para quem vai ligar

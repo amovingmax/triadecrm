@@ -40,8 +40,10 @@
 --   7. PRÉ-CADASTRO SEM AUTORIZAÇÃO NÃO SAI. Sem `consent_events` vigente não
 --      há link, não há cadência de onboarding — e a revogação posterior fecha a
 --      porta de novo.
---   8. RLS por papel em toda tabela nova, com a prova de aceite (IP, UA) atrás
---      de gestor e `anon` sem um único grant de tabela.
+--   8. RLS por papel em toda tabela nova, com a prova de aceite (IP, UA) só para
+--      admin e gestor (`app.admin_ou_gestor()`, migração 20261021090000; o SDR,
+--      que desde então tem o poder do gestor, escreve matrícula direto mas não lê
+--      a prova) e `anon` sem um único grant de tabela.
 --
 -- NENHUMA asserção conta linha absoluta em tabela compartilhada: este banco tem
 -- operação real dentro (100 organizações, ligações, lotes). Tudo é DELTA contra
@@ -58,7 +60,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(231);
+select plan(233);
 
 -- 08/09/2026: emitir link passou a exigir endereço configurado
 -- (`app_settings[precadastro.link].modelo`, migração 20260908120000). Sem ele,
@@ -1147,12 +1149,22 @@ select pg_temp.entrar('a0000000-0000-4000-8000-0000000ca003', 'sdr');
 select throws_ok(
   $$insert into public.cadences (slug, name) values ('inventada', 'Cadência inventada')$$,
   '42501', null, 'SDR não desenha cadência: isso é de gestor');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): escreve
+-- matrícula direto, como o gestor. A prova de aceite (IP e user-agent) é registro de
+-- LGPD e continua só de admin e gestor (`app.admin_ou_gestor()`). A recusa da
+-- matrícula direta passou a ser provada com o embaixador. A matrícula direta roda num bloco que estoura de propósito depois do
+-- insert: se a RLS recusasse, o erro seria 42501; o P0001 prova que o insert passou,
+-- e a exceção desfaz a linha, para a RPC logo abaixo matricular a mesma organização.
 select throws_ok(
-  format($$insert into public.cadence_enrollments (cadence_id, organization_id)
-           values (%s, %L)$$, pg_temp.cad('voz_primeiro'), pg_temp.org('24')),
-  '42501', null, 'SDR não escreve matrícula na mão — o caminho é a RPC');
+  format($$do $x$ begin
+             insert into public.cadence_enrollments (cadence_id, organization_id) values (%s, %L);
+             raise exception 'matrícula desfeita pelo pgTAP' using errcode = 'P0001';
+           end $x$
+         $$, pg_temp.cad('voz_primeiro'), pg_temp.org('24')),
+  'P0001', 'matrícula desfeita pelo pgTAP',
+  'o SDR também escreve matrícula direto, como o gestor (poder do gestor desde 21/10/2026)');
 select is((select count(*)::int from public.pre_registration_acceptances), 0,
-          'SDR também não lê a prova de aceite');
+          'SDR não lê a prova de aceite: IP e user-agent são registro de LGPD, da gestão');
 select ok((select count(*)::int from public.cadence_enrollments) >= 1,
           'mas SDR enxerga as matrículas da operação');
 select is(public.matricular_em_cadencia(pg_temp.org('24'), 'voz_primeiro') ->> 'ok', 'true',
@@ -1170,6 +1182,14 @@ select is((select count(*)::int from public.cadence_enrollments e
           0, 'embaixador só enxerga matrícula da carteira dele');
 select is((select count(*)::int from public.pre_registrations), 0,
           'e nenhum rascunho de organização que não é dele');
+-- O que o SDR deixou de provar em 21/10/2026: quem não é da gestão não escreve
+-- matrícula na mão.
+select throws_ok(
+  format($$insert into public.cadence_enrollments (cadence_id, organization_id)
+           values (%s, %L)$$, pg_temp.cad('voz_primeiro'), pg_temp.org('19')),
+  '42501', null, 'embaixador não escreve matrícula na mão, nem na carteira dele — o caminho é a RPC');
+select is((select count(*)::int from public.pre_registration_acceptances), 0,
+          'embaixador também não lê a prova de aceite');
 select pg_temp.sair();
 
 select ok(not has_table_privilege('anon', 'public.pre_registrations', 'select'),

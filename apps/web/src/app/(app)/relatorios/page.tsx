@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
+import { PAPEIS_DO_CRM, temPoderDeGestao } from '@/lib/navegacao';
 import { hojeEmNatal, periodoDaUrl, semanaDaUrl } from '@/components/relatorios/periodo';
 import { TelaRelatorios } from '@/components/relatorios/tela-relatorios';
 import { painelDaUrl } from '@/components/relatorios/tipos';
@@ -24,13 +25,16 @@ export default async function Pagina({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [, params] = await Promise.all([requireRole('admin', 'gestor'), searchParams]);
+  // Admin, gestor e SDR (de 06/10 a 20/10/2026 foi só a gestão). Os papéis antigos ficam fora.
+  const [sessao, params] = await Promise.all([requireRole(...PAPEIS_DO_CRM), searchParams]);
 
   return (
     <TelaRelatorios
       painelInicial={painelDaUrl(params.painel)}
       periodoInicial={periodoDaUrl(params, hojeEmNatal())}
       semanaInicial={semanaDaUrl(params.semana)}
+      // `relatorio_semanal_gerar` confere `app.is_manager()`: admin, gestor e SDR.
+      podeGerarSemana={temPoderDeGestao(sessao.papel)}
     />
   );
 }

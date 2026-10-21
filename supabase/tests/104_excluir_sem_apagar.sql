@@ -11,15 +11,17 @@
 --   3. RESTAURAR DEVOLVE a ficha, o negócio e a conversa — e recusa, dizendo
 --      qual ficha está no lugar, quando o parceiro foi recadastrado;
 --   4. QUEM NÃO SE EXCLUI: cliente e quem tem pré-cadastro em andamento;
---   5. SÓ A GESTÃO exclui e restaura, e sempre com motivo;
---   6. O COMPROMISSO: quem faz ou quem criou exclui o seu; a próxima ação do
+--   5. SÓ A GESTÃO (e, desde 21/10/2026, o SDR) exclui e restaura, e sempre
+--      com motivo;
+--   6. O COMPROMISSO: quem faz ou quem criou exclui o seu (e a gestão, o de
+--      qualquer um); a próxima ação do
 --      negócio passa para a seguinte; a parada sai da rota; e excluir o eco de
 --      uma reunião cancela a REUNIÃO.
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(51);
+select plan(54);
 
 -- ---------- utilitários ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -37,6 +39,7 @@ end $$;
 create function pg_temp.gil() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-000000010401'::uuid $$;
 create function pg_temp.ana() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-000000010402'::uuid $$;
 create function pg_temp.bia() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-000000010403'::uuid $$;
+create function pg_temp.caio() returns uuid language sql immutable as $$ select 'a0000000-0000-4000-8000-000000010404'::uuid $$;
 create function pg_temp.org(p text) returns uuid language sql immutable as $$
   select ('c0000000-0000-4000-8000-0000000104' || p)::uuid
 $$;
@@ -66,14 +69,19 @@ create function pg_temp.em(p_dias int, p_hora int) returns timestamptz language 
            + make_time(p_hora, 0, 0)) at time zone 'America/Fortaleza')
 $$;
 
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000):
+-- quem prova o que fica de fora da gestão é o embaixador (Ana e Caio); a Bia,
+-- SDR, prova o que o SDR passou a poder.
 insert into public.allowed_users (email, role, note) values
-  ('e104.g@teste.local', 'gestor', 'pgTAP 104'),
-  ('e104.a@teste.local', 'sdr',    'pgTAP 104'),
-  ('e104.b@teste.local', 'sdr',    'pgTAP 104');
+  ('e104.g@teste.local', 'gestor',     'pgTAP 104'),
+  ('e104.a@teste.local', 'embaixador', 'pgTAP 104'),
+  ('e104.b@teste.local', 'sdr',        'pgTAP 104'),
+  ('e104.c@teste.local', 'embaixador', 'pgTAP 104');
 insert into auth.users (id, email, raw_user_meta_data) values
-  (pg_temp.gil(), 'e104.g@teste.local', '{"full_name":"Gil Gestor"}'),
-  (pg_temp.ana(), 'e104.a@teste.local', '{"full_name":"Ana Freela"}'),
-  (pg_temp.bia(), 'e104.b@teste.local', '{"full_name":"Bia Freela"}');
+  (pg_temp.gil(),  'e104.g@teste.local', '{"full_name":"Gil Gestor"}'),
+  (pg_temp.ana(),  'e104.a@teste.local', '{"full_name":"Ana Embaixadora"}'),
+  (pg_temp.bia(),  'e104.b@teste.local', '{"full_name":"Bia Freela"}'),
+  (pg_temp.caio(), 'e104.c@teste.local', '{"full_name":"Caio Embaixador"}');
 
 -- ---------- parceiros ----------
 --   01  o que vai ser excluído e restaurado: negócio, tarefas, reunião, conversa, fila
@@ -139,11 +147,19 @@ select is((select organization_id from public.conversations where id = pg_temp.c
 -- =====================================================================
 -- 5. Só a gestão, e sempre com motivo  (antes de excluir de verdade)
 -- =====================================================================
-select pg_temp.entrar(pg_temp.ana(), 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- não exclui é o embaixador. O SDR passa da trava e só para na ficha que não
+-- existe, para não excluir o parceiro 01 antes da hora.
+select pg_temp.entrar(pg_temp.ana(), 'embaixador');
 select is(public.parceiro_excluir(pg_temp.org('01'), 'duplicado') ->> 'motivo', 'sem_permissao',
-  'quem liga não exclui parceiro');
+  'o embaixador não exclui parceiro');
 select throws_ok($$select * from public.parceiros_excluidos()$$, '42501', null,
   'nem vê a lista de excluídos');
+select pg_temp.entrar(pg_temp.bia(), 'sdr');
+select is(public.parceiro_excluir('00000000-0000-4000-8000-000000000104', 'teste') ->> 'motivo',
+  'nao_encontrado', 'o SDR também exclui (poder do gestor desde 21/10/2026): a recusa é só da ficha que não existe');
+select lives_ok($$select * from public.parceiros_excluidos()$$,
+  'e vê a lista de excluídos');
 select pg_temp.entrar(pg_temp.gil(), 'gestor');
 select is(public.parceiro_excluir(pg_temp.org('01'), '  ') ->> 'motivo', 'motivo_obrigatorio',
   'excluir sem dizer por quê é recusado');
@@ -295,7 +311,9 @@ select isnt((select deleted_at from public.organizations where id = pg_temp.org(
 --   22  follow-up do Gil, depois — a que vira a próxima
 --   23  ligação já concluída
 --   24  eco de uma reunião viva
+--   25  tarefa do Gil sem negócio, para o SDR excluir (não mexe na próxima ação)
 insert into public.tasks (id, title, kind, status, due_at, assignee_id, organization_id, deal_id, created_by) values
+  (pg_temp.tar('25'), 'Mandar o catálogo',    'follow_up', 'todo', pg_temp.em(2, 11), pg_temp.gil(), pg_temp.org('06'), null,              pg_temp.gil()),
   (pg_temp.tar('21'), 'Visita ao E104 6',     'visit',     'todo', pg_temp.em(1, 15), pg_temp.ana(), pg_temp.org('06'), pg_temp.neg('06'), pg_temp.gil()),
   (pg_temp.tar('22'), 'Retomar a conversa',   'follow_up', 'todo', pg_temp.em(5, 9),  pg_temp.gil(), pg_temp.org('06'), pg_temp.neg('06'), pg_temp.gil()),
   (pg_temp.tar('23'), 'Ligação feita',        'call',      'done', pg_temp.em(1, 9),  pg_temp.gil(), pg_temp.org('06'), pg_temp.neg('06'), pg_temp.gil()),
@@ -316,14 +334,20 @@ insert into public.route_stops (plan_id, position, task_id, organization_id, lat
 values ('d0000000-0000-4000-8000-000000010431', 1, pg_temp.tar('21'), pg_temp.org('06'),
         -5.81, -35.20, 'bairro', 600, 4200);
 
-select pg_temp.entrar(pg_temp.bia(), 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): a
+-- regra de "quem faz ou quem criou" é provada com o embaixador, e o SDR exclui
+-- o compromisso de outra pessoa, como a gestão.
+select pg_temp.entrar(pg_temp.caio(), 'embaixador');
 select is(public.tarefa_excluir(pg_temp.tar('21')) ->> 'motivo', 'sem_permissao',
   'quem não faz nem criou a tarefa não a exclui');
-select pg_temp.entrar(pg_temp.ana(), 'sdr');
+select pg_temp.entrar(pg_temp.ana(), 'embaixador');
 select is(public.tarefa_excluir(pg_temp.tar('21'), 'O parceiro desmarcou') ->> 'ok', 'true',
   'quem faz a visita a exclui da própria agenda');
 select is(public.tarefa_excluir(pg_temp.tar('21')) ->> 'ja_estava', 'true',
   'excluir de novo não faz nada');
+select pg_temp.entrar(pg_temp.bia(), 'sdr');
+select is(public.tarefa_excluir(pg_temp.tar('25'), 'Já mandei pelo WhatsApp') ->> 'ok', 'true',
+  'o SDR exclui o compromisso de outra pessoa (poder do gestor desde 21/10/2026)');
 select pg_temp.sair();
 select is(pg_temp.status_da(pg_temp.tar('21')), 'cancelled',
   'a tarefa não é apagada: fica cancelada, que a Agenda e o Meu dia não mostram');

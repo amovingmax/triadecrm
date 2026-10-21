@@ -13,7 +13,7 @@
 -- recortado por responsável, por organização ou pelo próprio negócio de teste.
 -- =====================================================================
 begin;
-select plan(83);
+select plan(84);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -83,7 +83,11 @@ insert into auth.users (id, email, raw_user_meta_data) values
 
 -- ---------- parceiros e negócios ----------
 -- O1 é do sdr1, O2 do sdr2, O3 do embaixador 1, O4 não tem dono (bolo comum).
+-- O5 é do sdr2 e existe só para o sdr1 mover a carteira alheia (21/10/2026), sem
+-- tocar nos negócios que o resto do arquivo acompanha.
 insert into public.organizations (id, name, phone_e164, neighborhood, source_id, owner_id) values
+  ('b0000000-0000-4000-8000-000000000905', 'Kanban Flores Épsilon', '+5584999990905', 'Lagoa Nova',
+     (select id from public.sources where slug = 'captura_campo'), 'a0000000-0000-4000-8000-000000000904'),
   ('b0000000-0000-4000-8000-000000000901', 'Kanban Buffet Aurora',   '+5584999990901', 'Tirol',
      (select id from public.sources where slug = 'captura_campo'), 'a0000000-0000-4000-8000-000000000903'),
   ('b0000000-0000-4000-8000-000000000902', 'Kanban Espaço Boreal',   '+5584999990902', 'Petrópolis',
@@ -100,7 +104,14 @@ insert into public.deals (id, organization_id, pipeline_id, stage_id, owner_id) 
   ('d0000000-0000-4000-8000-000000000903', 'b0000000-0000-4000-8000-000000000903',
      pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor', 'prospectado'), 'a0000000-0000-4000-8000-000000000905'),
   ('d0000000-0000-4000-8000-000000000904', 'b0000000-0000-4000-8000-000000000904',
-     pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor', 'prospectado'), null);
+     pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor', 'prospectado'), null),
+  ('d0000000-0000-4000-8000-000000000905', 'b0000000-0000-4000-8000-000000000905',
+     pg_temp.funil('fornecedor'), pg_temp.etapa('fornecedor', 'prospectado'), 'a0000000-0000-4000-8000-000000000904'),
+  -- Na organização do embaixador 1, mas de outro dono (sdr2), e no funil de produtor
+  -- para não entrar no quadro de fornecedor que o embaixador confere: ele enxerga o
+  -- negócio (org_is_mine) e não pode movê-lo.
+  ('d0000000-0000-4000-8000-000000000906', 'b0000000-0000-4000-8000-000000000903',
+     pg_temp.funil('produtor'), pg_temp.etapa('produtor', 'identificado'), 'a0000000-0000-4000-8000-000000000904');
 
 -- =====================================================================
 -- 1. Superfície: as três funções existem e a projeção do cartão é interna
@@ -361,11 +372,14 @@ select is((select assignee_id from public.tasks where deal_id = 'd0000000-0000-4
 -- =====================================================================
 -- 7. RLS por papel sobre as funções novas
 -- =====================================================================
--- sdr: vê tudo no quadro, mas não move a carteira alheia.
+-- sdr: vê tudo no quadro e move a carteira alheia. Desde 21/10/2026 o SDR tem o
+-- poder do gestor (migração 20261021090000); quem não move o que é de outro
+-- responsável passou a ser provado com o embaixador, logo abaixo. O negócio movido
+-- é o O5, para não mexer no O2 (opt-out) nem nos que o resto do arquivo acompanha.
 select is(
-  (public.move_deal('d0000000-0000-4000-8000-000000000902',
-                    pg_temp.etapa('fornecedor', 'contatado'), null, null, null, pg_temp.acao(1)) ->> 'reason'),
-  'sem_permissao', 'sdr: não move negócio de outro responsável (política deals_update mantida)');
+  (public.move_deal('d0000000-0000-4000-8000-000000000905',
+                    pg_temp.etapa('fornecedor', 'contatado'), null, 'cobrindo o colega', null, pg_temp.acao(1)) ->> 'ok'),
+  'true', 'sdr: também move negócio de outro responsável (poder do gestor desde 21/10/2026)');
 select is(pg_temp.total_etapa(public.pipeline_board(pg_temp.funil('fornecedor'), false,
                                                    'a0000000-0000-4000-8000-000000000904'), 'optout'),
   1, 'sdr: enxerga no quadro a carteira dos colegas (app.sees_all)');
@@ -390,6 +404,13 @@ select is(
   (public.move_deal('d0000000-0000-4000-8000-000000000901',
                     pg_temp.etapa('fornecedor', 'contatado'), null, null, null, pg_temp.acao(1)) ->> 'reason'),
   'negocio_nao_encontrado', 'embaixador: negócio fora da carteira nem aparece');
+-- O que o SDR deixou de provar em 21/10/2026: o negócio de outro dono na organização
+-- do embaixador aparece para ele, e a política deals_update (is_manager ou dono)
+-- continua barrando o movimento.
+select is(
+  (public.move_deal('d0000000-0000-4000-8000-000000000906',
+                    pg_temp.etapa('produtor', 'contatado'), null, null, null, pg_temp.acao(1)) ->> 'reason'),
+  'sem_permissao', 'embaixador: não move negócio de outro responsável, nem na organização dele (política deals_update mantida)');
 select is((select count(*)::int from public.deal_stage_timeline('d0000000-0000-4000-8000-000000000901')),
   0, 'embaixador: histórico de negócio alheio volta vazio (RLS de deal_stage_history)');
 select isnt((select count(*)::int from public.deal_stage_timeline('d0000000-0000-4000-8000-000000000903')),

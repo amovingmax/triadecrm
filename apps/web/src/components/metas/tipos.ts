@@ -44,12 +44,13 @@ export type Pessoa = { id: string; nome: string };
 
 /**
  * Espelho de `app.is_manager()`: quem define meta e lê a meta das outras pessoas.
+ * Admin, gestor e, desde 21/10/2026, o SDR.
  *
  * A autorização de verdade é a RLS de `public.goals` e a checagem dentro de
  * `public.goal_progress`; isto existe só para a tela não oferecer o que seria
  * negado — e para não montar cartão de gente que o banco não vai devolver.
  */
-export const PAPEIS_QUE_DEFINEM_META: readonly AppRole[] = ['admin', 'gestor'];
+export const PAPEIS_QUE_DEFINEM_META: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
 
 /**
  * Espelho de `app.can_write()`: quem o banco deixa registrar trabalho.

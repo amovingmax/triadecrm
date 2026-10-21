@@ -59,6 +59,7 @@ const SEM_LINHAS: CandidatoDaFila[] = [];
 export function TelaRevisao({
   catalogos,
   podeDecidir,
+  podeMandarMensagem,
   podeAjustarTriagem,
 }: {
   catalogos: CatalogosDoRadar;
@@ -70,6 +71,12 @@ export function TelaRevisao({
    * por isso é ele, e não `podeAjustarTriagem`, que responde por decidir na fila.
    */
   podeDecidir: boolean;
+  /**
+   * O "aprovar e mandar mensagem", no cartão e no lote: só admin e gestor, como
+   * `radar_revisar_*_com_mensagem` confere. O SDR decide na fila (desde 20/10/2026),
+   * mas só com o "Só aprovar".
+   */
+  podeMandarMensagem: boolean;
   /** Só gestor e admin ajustam os pesos da triagem e pedem leitura da IA. */
   podeAjustarTriagem: boolean;
 }) {
@@ -472,6 +479,7 @@ export function TelaRevisao({
                         candidato={candidato}
                         ocupado={ocupado === candidato.id}
                         podeDecidir={podeDecidir}
+                        podeMandarMensagem={podeMandarMensagem}
                         marcado={entraNoLote(candidato) ? selecionados.has(candidato.id) : null}
                         aoMarcar={(ligado) => marcar(candidato.id, ligado)}
                         aoDecidir={(acao, organizacaoId, comMensagem) =>
@@ -491,6 +499,7 @@ export function TelaRevisao({
               categorias={catalogos.categorias}
               categoriaId={categoriaDoLote}
               ocupado={lotando}
+              podeMandarMensagem={podeMandarMensagem}
               aoTrocarCategoria={setCategoriaDoLote}
               aoAprovar={(comMensagem) => void aprovarLote(comMensagem)}
               aoLimpar={() => setSelecionados(new Set())}

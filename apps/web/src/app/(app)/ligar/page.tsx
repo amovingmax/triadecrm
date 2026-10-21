@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
+import { temPoderDeGestao } from '@/lib/navegacao';
 import { PAPEIS_QUE_LIGAM } from '@/components/ligacao/chamada-contexto';
 import { TelaDeLotes } from '@/components/ligacao/lote-tela';
 
@@ -35,9 +36,10 @@ export default async function Pagina({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [sessao, params] = await Promise.all([requireRole(...PAPEIS_QUE_LIGAM), searchParams]);
-  // Quem monta o lote é a gestão, para ela mesma ou para quem vai ligar (pivô de
-  // 06/10/2026). Quem só liga encontra aqui os lotes que montaram para ela.
-  const podeMontar = sessao.papel === 'admin' || sessao.papel === 'gestor';
+  // Quem monta o lote, para si ou para outra pessoa: admin, gestor e, desde
+  // 21/10/2026, o SDR (no pivô de 06/10 ele só encontrava aqui os lotes que
+  // montavam para ele). O embaixador, papel antigo, continua só ligando.
+  const podeMontar = temPoderDeGestao(sessao.papel);
 
   return <TelaDeLotes podeMontar={podeMontar} abrirMontagem={params.montar === '1'} />;
 }

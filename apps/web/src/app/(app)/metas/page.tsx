@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { carregarPessoasAcompanhadas } from '@/lib/auth/equipe';
 import { requireRole } from '@/lib/auth/session';
+import { PAPEIS_DO_CRM } from '@/lib/navegacao';
 import { hojeEmNatal } from '@/components/metas/periodo';
 import { TelaMetas } from '@/components/metas/tela-metas';
 import { PAPEIS_QUE_DEFINEM_META, type Pessoa } from '@/components/metas/tipos';
@@ -15,8 +16,8 @@ export const metadata: Metadata = { title: 'Metas' };
  * podem aparecer e que dia é hoje em Natal.
  *
  * A lista de pessoas depende do papel, e isso espelha o que o Postgres já faz:
- * `public.goal_progress` recusa a meta de outra pessoa para quem não é gestor nem
- * admin ("Só gestor ou admin lê a meta de outra pessoa", 42501). Pedir e receber o
+ * `public.goal_progress` recusa a meta de outra pessoa para quem não passa em
+ * `app.is_manager()` (admin, gestor e, desde 21/10/2026, SDR). Pedir e receber o
  * erro funcionaria, mas encheria a tela de cartões vermelhos por desenho — então a
  * tela só monta o que a RLS deixa passar.
  *
@@ -25,12 +26,12 @@ export const metadata: Metadata = { title: 'Metas' };
  * meia-noite, e o fuso é sempre America/Fortaleza (CLAUDE.md).
  */
 export default async function Pagina() {
-  // Tela da gestão desde o pivô de 06/10/2026: quem liga vê só Ligar e Meu dia.
-  const sessao = await requireRole('admin', 'gestor');
+  // Admin, gestor e SDR (de 06/10 a 20/10/2026 foi só a gestão). Os papéis antigos ficam fora.
+  const sessao = await requireRole(...PAPEIS_DO_CRM);
   const podeDefinir = PAPEIS_QUE_DEFINEM_META.includes(sessao.papel);
 
   // A própria pessoa e quem ela acompanha pela hierarquia (`lib/auth/hierarquia.ts`):
-  // o admin vê gestor, SDR e embaixador; o gestor, SDR e embaixador. Depois da
+  // o admin vê gestor, SDR e embaixador; o gestor e o SDR, SDR e embaixador. Depois da
   // própria pessoa, ordem alfabética: a tela acompanha, não classifica.
   const pessoas: Pessoa[] = podeDefinir
     ? await carregarPessoasAcompanhadas(sessao)

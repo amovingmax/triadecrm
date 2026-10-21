@@ -3,9 +3,11 @@ import type { AppRole } from './role';
 /**
  * Quem acompanha o dia de quem: métricas (Meu dia, Metas) e agenda.
  *
- * A regra é de cima para baixo e só isso: o admin acompanha gestor, SDR e
- * embaixador; o gestor acompanha SDR e embaixador. Ninguém acompanha um par (gestor
- * não abre o dia de outro gestor) nem quem está acima.
+ * A regra é de cima para baixo: o admin acompanha gestor, SDR e embaixador; o
+ * gestor acompanha SDR e embaixador. Ninguém acompanha quem está acima, nem o
+ * gestor abre o dia de outro gestor. Desde 21/10/2026 o SDR acompanha o mesmo que
+ * o gestor ("o SDR é igual ao gestor, menos Ajustes"): os outros SDRs e o
+ * embaixador.
  *
  * Leitura e financeiro ficam de fora da lista de propósito: não têm agenda, não
  * registram contato e não têm meta de campo — no seletor seriam um nome que abre
@@ -13,13 +15,13 @@ import type { AppRole } from './role';
  *
  * É regra de TELA, não de segurança: a RLS de `activities` e `tasks` já deixa quem
  * enxerga tudo ler a base inteira (`app.sees_all()`), e `public.meu_dia` e
- * `public.goal_progress` aceitam outra pessoa para qualquer gestor ou admin. O que
- * esta regra decide é quem aparece para ser escolhido.
+ * `public.goal_progress` aceitam outra pessoa para admin, gestor e SDR
+ * (`app.is_manager()`). O que esta regra decide é quem aparece para ser escolhido.
  */
 const ACOMPANHA: Readonly<Record<AppRole, readonly AppRole[]>> = {
   admin: ['gestor', 'sdr', 'embaixador'],
   gestor: ['sdr', 'embaixador'],
-  sdr: [],
+  sdr: ['sdr', 'embaixador'],
   embaixador: [],
   leitura: [],
   financeiro: [],

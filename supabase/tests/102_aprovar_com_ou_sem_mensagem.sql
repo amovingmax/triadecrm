@@ -10,22 +10,25 @@
 --   3. O DISJUNTOR GERAL MANDA: com a chave desligada o botão aprova e avisa
 --      que a mensagem está desligada, em vez de fingir que mandou;
 --   4. EM LOTE É A MESMA REGRA, e a conta é do lote inteiro;
---   5. A MENSAGEM É DA GESTÃO: SDR não aprova com mensagem; e só ao APROVAR —
---      recusar "com mensagem" não existe;
+--   5. A MENSAGEM É DA GESTÃO (e, desde 21/10/2026, também do SDR): o
+--      embaixador não aprova com mensagem; e só ao APROVAR — recusar "com
+--      mensagem" não existe;
 --   6. FORA DA REVISÃO NINGUÉM RECEBE SOZINHO: ficha criada por outro caminho
 --      não entra na fila.
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(18);
+select plan(20);
 
 insert into public.allowed_users (email, role, note) values
   ('m102.g@teste.local', 'gestor', 'pgTAP 102'),
-  ('m102.s@teste.local', 'sdr', 'pgTAP 102');
+  ('m102.s@teste.local', 'sdr', 'pgTAP 102'),
+  ('m102.e@teste.local', 'embaixador', 'pgTAP 102');
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a0000000-0000-4000-8000-000000010201'::uuid, 'm102.g@teste.local', '{"full_name":"Gil Gestor"}'),
-  ('a0000000-0000-4000-8000-000000010202'::uuid, 'm102.s@teste.local', '{"full_name":"Sara Sdr"}');
+  ('a0000000-0000-4000-8000-000000010202'::uuid, 'm102.s@teste.local', '{"full_name":"Sara Sdr"}'),
+  ('a0000000-0000-4000-8000-000000010203'::uuid, 'm102.e@teste.local', '{"full_name":"Edu Embaixador"}');
 
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
 begin
@@ -141,11 +144,20 @@ update public.app_settings set value = value || '{"cumprimento_automatico": true
 -- =====================================================================
 -- 5. A mensagem é da gestão, e só ao aprovar
 -- =====================================================================
-select pg_temp.entrar('a0000000-0000-4000-8000-000000010202'::uuid, 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000):
+-- quem fica de fora é o embaixador. O SDR passa da trava e para só no
+-- candidato que não existe (nada é aprovado nem entra na fila).
+select pg_temp.entrar('a0000000-0000-4000-8000-000000010203'::uuid, 'embaixador');
 select is(public.radar_revisar_candidato_com_mensagem(gen_random_uuid(), 'aprovar') ->> 'reason',
-  'sem_permissao', 'SDR não aprova com mensagem');
+  'sem_permissao', 'embaixador não aprova com mensagem');
 select is(public.radar_revisar_lote_com_mensagem(array[gen_random_uuid()]) ->> 'reason',
   'sem_permissao', 'nem em lote');
+select pg_temp.sair();
+select pg_temp.entrar('a0000000-0000-4000-8000-000000010202'::uuid, 'sdr');
+select is(public.radar_revisar_candidato_com_mensagem(gen_random_uuid(), 'aprovar') ->> 'reason',
+  'candidato_inexistente', 'o SDR também aprova com mensagem (poder do gestor desde 21/10/2026)');
+select is(public.radar_revisar_lote_com_mensagem(array[gen_random_uuid()]) -> 'itens' -> 0 ->> 'reason',
+  'candidato_inexistente', 'e em lote também');
 select pg_temp.sair();
 select pg_temp.entrar(pg_temp.gil(), 'gestor');
 select is(public.radar_revisar_candidato_com_mensagem(gen_random_uuid(), 'recusar') ->> 'reason',

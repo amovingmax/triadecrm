@@ -16,7 +16,8 @@
  * Cadências deixaram de existir no produto, e Registrar saiu do menu — a tela
  * continua, e chega-se a ela pelo botão "Registrar contato" da conversa, da
  * ligação e da ficha. No mesmo dia os papéis viraram três, e o SDR virou QUEM
- * LIGA — gente contratada por diária —, com duas telas: Ligar e Meu dia.)
+ * LIGA — gente contratada por diária —, com duas telas: Ligar e Meu dia.
+ * Em 20/10/2026 o SDR voltou a entrar em todas as telas, menos Ajustes.)
  *
  * O critério do grupo é a NATUREZA DO TRABALHO, que é literalmente o que ele
  * pediu para distinguir:
@@ -205,17 +206,27 @@ export const GRUPOS: readonly GrupoDeNavegacao[] = [
  *
  * Quem decide continua sendo o Postgres; isto só evita oferecer o que vai falhar.
  */
-const PAPEIS_DO_CRM: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
+export const PAPEIS_DO_CRM: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
 
 /**
- * Admin e gestor: quem cuida da BASE — a lista de parceiros, a fila de Revisão,
- * a importação, os relatórios e os ajustes.
+ * Admin e gestor: só Ajustes. No banco é `app.admin_ou_gestor()`.
  *
- * O SDR ficou de fora de tudo isso no pivô, e também de Conversas, Agenda,
- * Funis e Metas: ele é quem liga. O lote chega pronto, montado pela gestão, e o
- * dia dele se confere em Meu dia (`components/ligacoes-do-dia`).
+ * O SDR ficou de fora de todas as telas da gestão no pivô de 06/10/2026 (ele era
+ * só quem liga). Em 20/10/2026 voltou a entrar em todas, menos Ajustes, e em
+ * 21/10/2026 passou a ter nelas o mesmo poder do gestor (`temPoderDeGestao`).
  */
 const PAPEIS_QUE_GERENCIAM: readonly AppRole[] = ['admin', 'gestor'];
+
+/**
+ * Espelho de `app.is_manager()`: o poder da gestão no dia a dia — mensagem
+ * automática pela base, Consultoria, excluir e restaurar parceiro, desfazer
+ * importação, pesos e leitura da IA na Revisão, relatório da semana, lote e meta
+ * para outra pessoa. Desde 21/10/2026 é de admin, gestor e SDR ("o SDR é igual ao
+ * gestor, menos Ajustes"); o que sobra só para admin e gestor é `PAPEIS_QUE_GERENCIAM`.
+ */
+export function temPoderDeGestao(papel: AppRole): boolean {
+  return PAPEIS_DO_CRM.includes(papel);
+}
 
 export const NAVEGACAO: readonly ItemNavegacao[] = [
   // -------------------------------------------------------------------------
@@ -260,8 +271,9 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     descricao:
       'O histórico de cada parceiro, a fila de aprovação dos rascunhos da IA e o relógio da janela de 24 h do WhatsApp.',
     posicaoNaBarra: 5,
-    // O WhatsApp é da gestão: quem liga não responde mensagem.
-    papeis: PAPEIS_QUE_GERENCIAM,
+    // Do pivô de 06/10/2026 a 20/10/2026 o WhatsApp foi só da gestão; o SDR voltou
+    // a atender as conversas dele.
+    papeis: PAPEIS_DO_CRM,
     // Resposta nova para esta pessoa: alguém escreveu e espera por ela. Até
     // 01/10/2026 o número aqui era o de rascunhos da IA pendentes; eles continuam
     // na aba "Aprovar", dentro da tela. Somar os dois misturaria "chegou
@@ -275,7 +287,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'todo_dia',
     descricao:
       'Reuniões em vídeo pela manhã, rota de visitas à tarde com link do Google Maps e lembretes.',
-    papeis: PAPEIS_QUE_GERENCIAM,
+    papeis: PAPEIS_DO_CRM,
   },
 
   {
@@ -285,8 +297,9 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'todo_dia',
     descricao:
       'A fila de quem ainda não é parceiro, de qualquer origem: cada nome com pontuação, o que a IA achou dele e as duplicatas já apontadas. Aprovar cria a ficha em Prospectados; ela entra no funil na primeira mensagem.',
-    // Só admin e gestor aprovam e põem gente na base (pivô de 06/10/2026).
-    papeis: PAPEIS_QUE_GERENCIAM,
+    // O SDR aprova também (de 06/10 a 20/10/2026 foi só a gestão). O "aprovar e
+    // mandar mensagem" continua da gestão: `podeMandarMensagemAutomatica`.
+    papeis: PAPEIS_DO_CRM,
     // A fila de revisão é o exemplo mais puro da regra: candidato que entrou e
     // não foi revisado é trabalho parado esperando uma pessoa decidir.
     fila: 'candidatos',
@@ -311,7 +324,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
       'Base de organizações e pessoas com busca global, filtros, criação rápida com dedup por telefone, o botão de trazer uma lista para a base (importar planilha ou CSV) e os parceiros excluídos, para restaurar.',
     posicaoNaBarra: 3,
     // A lista é de quem cuida da base.
-    papeis: PAPEIS_QUE_GERENCIAM,
+    papeis: PAPEIS_DO_CRM,
   },
   {
     href: '/funis',
@@ -322,7 +335,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     descricao:
       'Kanban dos funis de fornecedores e de produtores, a partir de Contatado: cartão com semáforo, próxima ação obrigatória e motivos de perda. Quem ainda não foi contatado está em Prospectados.',
     posicaoNaBarra: 4,
-    papeis: PAPEIS_QUE_GERENCIAM,
+    papeis: PAPEIS_DO_CRM,
   },
   // -------------------------------------------------------------------------
   // Controle
@@ -334,7 +347,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'controle',
     descricao:
       'Meta e realizado por pessoa e por período, o quanto falta e a que ritmo, com as métricas que ainda não são medíveis marcadas como tal.',
-    papeis: PAPEIS_QUE_GERENCIAM,
+    papeis: PAPEIS_DO_CRM,
   },
   {
     href: '/relatorios',
@@ -343,7 +356,7 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     icone: ChartColumn,
     grupo: 'controle',
     descricao: 'Relatório de segunda-feira (texto + XLSX), funil e atividades por pessoa.',
-    papeis: PAPEIS_QUE_GERENCIAM,
+    papeis: PAPEIS_DO_CRM,
   },
   {
     // Era "Admin". "Ajustes" diz o que a tela faz; "Admin" dizia quem entra —
@@ -380,21 +393,37 @@ export const HREF_NOVO_PARCEIRO = '/parceiros?novo=1';
 export const HREF_IMPORTAR = '/importar';
 
 /**
- * Quem põe gente na base pelo cadastro rápido, pela Revisão e pela importação:
- * admin e gestor (pivô de 06/10/2026). O SDR não adiciona lead; a porta que ele
- * tem é outra e mora na conversa — "Virar parceiro", em `conversas/fora-da-base.tsx`.
+ * Quem põe gente na base pelo cadastro rápido, pela Revisão e pela importação.
+ * Do pivô de 06/10/2026 a 20/10/2026 foram só admin e gestor; o SDR voltou a
+ * poder, como o banco sempre deixou (`quick_create_organization` e
+ * `radar_revisar_candidato` conferem `app.can_write()`).
  */
 export function podeCriarParceiro(papel: AppRole): boolean {
-  return PAPEIS_QUE_GERENCIAM.includes(papel);
+  return PAPEIS_DO_CRM.includes(papel);
 }
 
 /**
- * Quem tira um parceiro da base e quem o devolve (07/10/2026): admin e gestor,
- * os mesmos que o põem lá. Espelho de `app.is_manager()`, que
- * `public.parceiro_excluir` e `public.parceiro_restaurar` conferem.
+ * Quem manda mensagem automática pela base: a saudação da lista de Prospectados e o
+ * "aprovar e mandar mensagem" da Revisão. Espelho de `app.is_manager()`, que
+ * `saudacao_enfileirar` e `radar_revisar_*_com_mensagem` conferem. É envio de
+ * WhatsApp em lote, com custo na Meta; desde 21/10/2026 o SDR também manda.
+ */
+export function podeMandarMensagemAutomatica(papel: AppRole): boolean {
+  return temPoderDeGestao(papel);
+}
+
+/** Quem põe e tira a marca de Consultoria. Espelho de `consultoria_marcar` (`app.is_manager()`). */
+export function podeMarcarConsultoria(papel: AppRole): boolean {
+  return temPoderDeGestao(papel);
+}
+
+/**
+ * Quem tira um parceiro da base e quem o devolve (07/10/2026): os mesmos que o
+ * põem lá. Espelho de `app.is_manager()`, que `public.parceiro_excluir` e
+ * `public.parceiro_restaurar` conferem.
  */
 export function podeExcluirParceiro(papel: AppRole): boolean {
-  return PAPEIS_QUE_GERENCIAM.includes(papel);
+  return temPoderDeGestao(papel);
 }
 
 /** Rota da lista de parceiros excluídos, de onde se restaura. */
@@ -402,7 +431,7 @@ export const HREF_EXCLUIDOS = '/parceiros/excluidos';
 
 /** Papéis que importam planilha. Mesmo conjunto de quem cria, pela mesma razão. */
 export function podeImportarPlanilha(papel: AppRole): boolean {
-  return PAPEIS_QUE_GERENCIAM.includes(papel);
+  return PAPEIS_DO_CRM.includes(papel);
 }
 
 /** Papéis que marcam compromisso na agenda. Espelho de `app.can_write()`, que a RPC confere. */
@@ -413,7 +442,7 @@ export function podeMarcarCompromisso(papel: AppRole): boolean {
 /**
  * Quem escolhe de quem é a agenda que está vendo. A RLS de `tasks` e `reunioes` deixa
  * mais papéis verem tudo, mas a visão da equipe é decisão de produto para quem
- * acompanha alguém pela hierarquia (`lib/auth/hierarquia.ts`): admin e gestor.
+ * acompanha alguém pela hierarquia (`lib/auth/hierarquia.ts`): admin, gestor e SDR.
  */
 export function veAgendaDaEquipe(papel: AppRole): boolean {
   return acompanhaEquipe(papel);
@@ -455,8 +484,8 @@ export function navegacaoPara(papel: AppRole): ItemNavegacao[] {
  * Os itens de um papel, já repartidos nos três grupos e na ordem da tela.
  *
  * Grupo que ficaria vazio para um papel não é devolvido: um cabeçalho "A base"
- * sozinho, sem item embaixo, é pior do que a ausência do grupo. É o caso do
- * SDR, que só tem "Todo dia" (Meu dia e Ligar).
+ * sozinho, sem item embaixo, é pior do que a ausência do grupo. De 06/10 a
+ * 20/10/2026 era o caso do SDR, que só tinha "Todo dia" (Meu dia e Lotes).
  */
 export function navegacaoAgrupada(
   papel: AppRole,

@@ -38,7 +38,7 @@
 -- (pg_temp.n_*, o mesmo padrão de pg_temp.total_negocios em 01_rls_por_papel).
 -- =====================================================================
 begin;
-select plan(93);
+select plan(95);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -472,18 +472,36 @@ select is((select jsonb_array_length(valor -> 'roteiro' -> 'arvore') from pg_tem
             where r.slug = 'captacao_v1' and r.is_published),
   'a fila entrega o roteiro congelado do lote, inteiro');
 
--- Lote de outra pessoa: sdr enxerga (sees_all), mas não puxa.
+-- Lote de outra pessoa: quem não é da gestão não puxa. Desde 21/10/2026 o SDR tem o
+-- poder do gestor (migração 20261021090000) e puxa do lote do colega, como o gestor
+-- sempre pôde; a recusa passou a ser provada com o embaixador, que escreve mas não
+-- é da gestão.
 do $$
 declare v jsonb;
 begin
-  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000013a3', 'sdr');
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000013a5', 'embaixador');
   v := public.proximo_da_fila(((select valor ->> 'lote_id' from pg_temp.r where chave = 'lote1'))::uuid);
   execute 'reset role';
   insert into pg_temp.r values ('outro_dono', v);
 end $$;
 select pg_temp.sair();
 select is((select valor ->> 'motivo' from pg_temp.r where chave = 'outro_dono'), 'lote_de_outro_dono',
-  'ninguém puxa contato do lote de outra pessoa (R13 §3.1)');
+  'quem não é da gestão não puxa contato do lote de outra pessoa (R13 §3.1)');
+
+-- A Heloísa (sdr) puxa do lote do Matheus e devolve na mesma hora: o item volta
+-- para a fila e o resto do arquivo segue com o lote como estava.
+do $$
+declare v jsonb; v_dev jsonb;
+begin
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000013a3', 'sdr');
+  v := public.proximo_da_fila(((select valor ->> 'lote_id' from pg_temp.r where chave = 'lote1'))::uuid);
+  v_dev := public.devolver_item_do_lote((v -> 'item' ->> 'id')::uuid);
+  execute 'reset role';
+  insert into pg_temp.r values ('outro_dono_sdr', v), ('outro_dono_sdr_dev', v_dev);
+end $$;
+select pg_temp.sair();
+select is((select valor ->> 'ok' from pg_temp.r where chave = 'outro_dono_sdr'), 'true',
+  'o SDR também puxa contato do lote de outra pessoa (poder do gestor desde 21/10/2026)');
 
 -- ---------- opt-out DEPOIS da montagem ----------
 -- O item já está reservado; o guardrail tem de valer de novo na hora de puxar.
@@ -700,7 +718,8 @@ select is((select count(*)::int from public.call_batches), 0,
   'RLS: embaixador não enxerga lote de outra pessoa');
 select pg_temp.sair();
 
--- sdr enxerga os lotes do time (sees_all), mas não os altera.
+-- sdr enxerga os lotes do time (sees_all) e, desde 21/10/2026, também os altera:
+-- o SDR tem o poder do gestor (migração 20261021090000).
 select pg_temp.entrar('a0000000-0000-4000-8000-0000000013a3', 'sdr');
 -- sdr tem app.sees_all: o que ele enxerga é a base INTEIRA, e por isso a asserção
 -- compara com a base (lida fora da RLS), e não com os dois lotes deste arquivo.
@@ -708,15 +727,32 @@ select is((select count(*)::int from public.call_batches), pg_temp.n_lotes(),
   'RLS: sdr enxerga os lotes do time (app.sees_all)');
 select is(pg_temp.n_lotes(), (select n from pg_temp.base where chave = 'lotes') + 1,
   '...e este arquivo deixou UM lote a mais: a montagem da Heloísa não pegou ninguém e, desde a 20260904001500, não deixa lote vazio para trás (D7)');
+-- `note = note`: a política tem de alcançar as linhas, e nada muda nelas.
+select results_eq($$
+  with u as (
+    update public.call_batch_items set note = note
+     where batch_id in (select id from public.call_batches where nome = 'LIG lote do Matheus')
+    returning 1)
+  select count(*)::int from u
+$$, $$
+  select count(*)::int from public.call_batch_items
+   where batch_id in (select id from public.call_batches where nome = 'LIG lote do Matheus')
+$$, 'RLS: o SDR também altera o lote de outra pessoa (poder do gestor desde 21/10/2026)');
+select pg_temp.sair();
+
+-- Quem não é da gestão não altera o lote alheio: a prova passou do SDR para o
+-- embaixador em 21/10/2026.
 -- RLS de UPDATE não levanta exceção: ela simplesmente não encontra linha. O que
--- prova o guardrail é a linha continuar como estava.
+-- prova o guardrail é a linha continuar como estava, conferida FORA da RLS (o
+-- embaixador nem enxerga o lote, e contar com os olhos dele daria zero de graça).
+select pg_temp.entrar('a0000000-0000-4000-8000-0000000013a5', 'embaixador');
 select lives_ok($$
   update public.call_batch_items set note = 'invasão'
    where batch_id in (select id from public.call_batches where nome = 'LIG lote do Matheus')
-$$, 'RLS: o UPDATE no lote de outra pessoa não estoura...');
+$$, 'RLS: o UPDATE do embaixador no lote de outra pessoa não estoura...');
+select pg_temp.sair();
 select is((select count(*)::int from public.call_batch_items where note = 'invasão'), 0,
   '...e também não altera nenhuma linha (app.call_batch_is_mine)');
-select pg_temp.sair();
 
 -- anon não enxerga nada.
 select is((select count(*)::int from information_schema.role_table_grants

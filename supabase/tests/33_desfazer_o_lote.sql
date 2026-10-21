@@ -21,7 +21,9 @@
 --   · consentimento registrado continua prendendo a ficha;
 --   · nota de OUTRO lote de importação continua prendendo a ficha — o desfazer
 --     reconhece o próprio toque, não "qualquer toque de importação";
---   · quem não é gestor continua sem desfazer (42501), que é o servidor do §3.7.
+--   · quem não é da gestão continua sem desfazer (42501), que é o servidor do §3.7
+--     (desde 21/10/2026 o SDR tem o poder do gestor, migração 20261021090000, e
+--     quem fica de fora é o embaixador).
 --
 -- A ficha nasce pelo caminho REAL: `public.importacao_gravar`, a mesma RPC que
 -- a tela chama. Um teste que inserisse a organização à mão não veria a nota do
@@ -33,7 +35,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(16);
+select plan(17);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -70,8 +72,9 @@ end $$;
 
 create temp table equipe(papel text primary key, id uuid not null);
 insert into equipe(papel, id) values
-  ('gestor', pg_temp.contratar('Aristides Pgtap33', 'gestor')),
-  ('sdr',    pg_temp.contratar('Genoveva Pgtap33', 'sdr'));
+  ('gestor',     pg_temp.contratar('Aristides Pgtap33', 'gestor')),
+  ('sdr',        pg_temp.contratar('Genoveva Pgtap33', 'sdr')),
+  ('embaixador', pg_temp.contratar('Hermenegildo Pgtap33', 'embaixador'));
 create function pg_temp.quem(p text) returns uuid language sql as $$
   select id from equipe where papel = p
 $$;
@@ -153,13 +156,23 @@ insert into public.consent_events (organization_id, kind, channel, evidence_text
 values (pg_temp.ficha('Doroteia Pgtap33 Buffet'), 'contact_optin', 'whatsapp', 'pgTAP 33');
 
 -- =====================================================================
--- 3. §3.7 no servidor: quem não é gestor não desfaz
+-- 3. §3.7 no servidor: quem não é da gestão não desfaz
 -- =====================================================================
-select pg_temp.entrar(pg_temp.quem('sdr'), 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- continua recusado é o embaixador.
+select pg_temp.entrar(pg_temp.quem('embaixador'), 'embaixador');
 select throws_ok($$ select public.esteira_desfazer_lote(
                       (select v from ids where chave = 'lote')) $$,
                  '42501', null,
-                 'papel sdr não desfaz importação (é o 403 que a tela precisa traduzir)');
+                 'papel embaixador não desfaz importação (é o 403 que a tela precisa traduzir)');
+select pg_temp.sair();
+
+-- O SDR passa da porta. Para não desfazer o lote que a seção 4 desfaz como
+-- gestor, o pedido vai para um lote que não existe: a resposta é o motivo, não
+-- o 42501.
+select pg_temp.entrar(pg_temp.quem('sdr'), 'sdr');
+select is(public.esteira_desfazer_lote(gen_random_uuid()) ->> 'reason', 'lote_inexistente',
+          'o SDR também pode desfazer importação: passa da permissão (poder do gestor desde 21/10/2026)');
 select pg_temp.sair();
 
 -- =====================================================================

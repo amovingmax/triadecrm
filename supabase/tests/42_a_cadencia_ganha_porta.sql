@@ -33,7 +33,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(47);
+select plan(49);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -177,13 +177,19 @@ select is(public.meu_papel() ->> 'papel', 'leitura', 'leitura se reconhece');
 select is(public.meu_papel() ->> 'escreve', 'false',
           'e leitura NÃO escreve: é por isso que o kanban não pode ser arrastável para ela');
 select is(public.meu_papel() ->> 'matricula', 'false', 'nem matricula ninguém');
+select is(public.meu_papel() ->> 'gerencia', 'false', 'nem gerencia');
 select pg_temp.sair();
 
 select pg_temp.entrar('a0000000-0000-4000-8000-00000000d202', 'sdr');
 select is(public.meu_papel() ->> 'escreve', 'true', 'sdr escreve');
 select is(public.meu_papel() ->> 'matricula', 'true', 'e matricula (é o trabalho dela)');
-select is(public.meu_papel() ->> 'gerencia', 'false',
-          'mas não gerencia: ligar e desligar régua continua sendo de gestor');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000), e
+-- `gerencia` espelha `app.is_manager()`. Ligar e desligar régua é Ajustes e
+-- ficou com admin e gestor (`app.admin_ou_gestor()`): a RPC recusa por escrito.
+select is(public.meu_papel() ->> 'gerencia', 'true',
+          'e gerencia (poder do gestor desde 21/10/2026)');
+select is(public.ligar_cadencia('voz_primeiro', false) ->> 'motivo', 'sem_permissao',
+          'mas ligar e desligar régua continua sendo de admin e gestor: o SDR recebe sem_permissao');
 select pg_temp.sair();
 
 select pg_temp.entrar('a0000000-0000-4000-8000-00000000d201', 'gestor');

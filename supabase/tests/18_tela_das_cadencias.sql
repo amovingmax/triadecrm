@@ -32,7 +32,9 @@
 --      `length === 0` deduzido na tela.
 --
 --   7. O RESUMO DOS OUTROS É DE GESTOR. A pessoa lê o próprio; gestor e admin
---      leem o de qualquer um; `sdr` pedindo o de outro leva 42501.
+--      leem o de qualquer um; `embaixador` pedindo o de outro leva 42501.
+--      Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000)
+--      e também lê o resumo de outra pessoa.
 --
 -- NENHUMA asserção conta linha absoluta em tabela compartilhada: este banco
 -- tem operação real dentro (100 organizações, 47 tarefas, ligações). Tudo é
@@ -46,7 +48,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(72);
+select plan(73);
 
 -- ---------- utilitários de sessão (simulam o JWT do PostgREST) ----------
 create function pg_temp.entrar(p_uid uuid, p_papel text) returns void language plpgsql as $$
@@ -415,11 +417,21 @@ select is((pg_temp.res('vazio', '{feito,registros}') #>> '{}')::int, 0,
           'e o contador continua honesto: zero é zero');
 
 -- O resumo dos outros.
-select pg_temp.entrar('a0000000-0000-4000-8000-0000000fa003', 'sdr');
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): quem
+-- continua recusado ao pedir o resumo de outra pessoa é o embaixador.
+select pg_temp.entrar('a0000000-0000-4000-8000-0000000fa004', 'embaixador');
 select throws_ok(
-  $$ select public.resumo_do_dia('a0000000-0000-4000-8000-0000000fa004'::uuid, 'manha') $$,
-  '42501', null, 'sdr não lê o resumo de outra pessoa');
+  $$ select public.resumo_do_dia('a0000000-0000-4000-8000-0000000fa003'::uuid, 'manha') $$,
+  '42501', null, 'embaixador não lê o resumo de outra pessoa');
 select pg_temp.sair();
+
+select pg_temp.entrar('a0000000-0000-4000-8000-0000000fa003', 'sdr');
+insert into pg_temp.r values ('do_outro_sdr',
+  public.resumo_do_dia('a0000000-0000-4000-8000-0000000fa004'::uuid, 'manha'));
+select pg_temp.sair();
+select is(pg_temp.res('do_outro_sdr', '{pessoa,id}') #>> '{}',
+          'a0000000-0000-4000-8000-0000000fa004',
+          'o SDR também lê o resumo de outra pessoa (poder do gestor desde 21/10/2026)');
 
 select pg_temp.entrar('a0000000-0000-4000-8000-0000000fa002', 'gestor');
 insert into pg_temp.r values ('do_outro',

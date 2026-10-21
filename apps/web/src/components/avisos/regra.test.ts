@@ -59,13 +59,14 @@ function conversa(parcial: Partial<ConversaComResposta> = {}): ConversaComRespos
 }
 
 describe('quem recebe avisos', () => {
-  it('é quem atende o WhatsApp: admin e gestor', () => {
+  it('é quem atende o WhatsApp: admin, gestor e SDR', () => {
     expect(recebeAvisos('admin')).toBe(true);
     expect(recebeAvisos('gestor')).toBe(true);
+    // De 06/10 a 20/10/2026 o SDR só ligava e não era avisado; voltou a atender.
+    expect(recebeAvisos('sdr')).toBe(true);
   });
 
-  it('quem só liga, os papéis desativados e o robô nunca: nada no WhatsApp espera por eles', () => {
-    expect(recebeAvisos('sdr')).toBe(false);
+  it('os papéis desativados e o robô nunca: nada no WhatsApp espera por eles', () => {
     expect(recebeAvisos('embaixador')).toBe(false);
     expect(recebeAvisos('leitura')).toBe(false);
     expect(recebeAvisos('financeiro')).toBe(false);
@@ -88,13 +89,15 @@ describe('de quem é o aviso', () => {
     expect(ehParaMim(c, COLEGA, TODOS_ATIVOS)).toBe(true);
   });
 
-  it('quem só liga não é avisado de WhatsApp, nem do que aponta para ele', () => {
+  it('o SDR é avisado como quem atende: do que é dele, da fila sem resposta e dos clientes', () => {
     const deOutro = conversa({ responsavelId: 'admin-1', alguemEscreveu: false });
     const dele = conversa({ responsavelId: 'sdr-1', alguemEscreveu: true });
+    const deColegaQueJaEscreveu = conversa({ responsavelId: 'admin-1', alguemEscreveu: true });
     const cliente = conversa({ organizacaoId: null, responsavelId: 'admin-1' });
-    expect(ehParaMim(deOutro, SDR, TODOS_ATIVOS)).toBe(false);
-    expect(ehParaMim(dele, SDR, TODOS_ATIVOS)).toBe(false);
-    expect(ehParaMim(cliente, SDR, TODOS_ATIVOS)).toBe(false);
+    expect(ehParaMim(deOutro, SDR, TODOS_ATIVOS)).toBe(true);
+    expect(ehParaMim(dele, SDR, TODOS_ATIVOS)).toBe(true);
+    expect(ehParaMim(deColegaQueJaEscreveu, SDR, TODOS_ATIVOS)).toBe(false);
+    expect(ehParaMim(cliente, SDR, TODOS_ATIVOS)).toBe(true);
   });
 
   it('responsável desativado conta como ninguém atendendo', () => {
@@ -104,15 +107,23 @@ describe('de quem é o aviso', () => {
     expect(ehParaMim(c, EMBAIXADOR, TODOS_ATIVOS)).toBe(false);
   });
 
-  it('conversa que ficou no nome de quem só liga avisa a gestão inteira', () => {
-    // Em 06/10/2026 havia conversas em produção atendidas por um SDR. Ele deixou
-    // de ser avisado; sem esta regra, a resposta do parceiro não avisaria ninguém.
-    // `lerPessoasAtivas` só devolve quem atende, então o SDR fica fora de `ativos`.
+  it('conversa no nome de quem não está entre os que atendem avisa todos que atendem', () => {
+    // Em 06/10/2026 havia conversas em produção atendidas por um SDR, que deixou de
+    // ser avisado (voltou em 20/10/2026). `lerPessoasAtivas` só devolve quem atende:
+    // quem estiver fora de `ativos` vale como ninguém atendendo.
     const quemAtende = new Set(['gestor-1', 'gestor-2', 'admin-1']);
-    const c = conversa({ responsavelId: 'sdr-1', alguemEscreveu: true });
+    const c = conversa({ responsavelId: 'embaixador-1', alguemEscreveu: true });
     expect(ehParaMim(c, GESTOR, quemAtende)).toBe(true);
     expect(ehParaMim(c, ADMIN, quemAtende)).toBe(true);
-    expect(ehParaMim(c, SDR, quemAtende)).toBe(false);
+    expect(ehParaMim(c, SDR, quemAtende)).toBe(true);
+  });
+
+  it('conversa de um SDR ativo que já escreveu é só dele', () => {
+    const quemAtende = new Set(['gestor-1', 'admin-1', 'sdr-1']);
+    const c = conversa({ responsavelId: 'sdr-1', alguemEscreveu: true });
+    expect(ehParaMim(c, SDR, quemAtende)).toBe(true);
+    expect(ehParaMim(c, GESTOR, quemAtende)).toBe(false);
+    expect(ehParaMim(c, ADMIN, quemAtende)).toBe(false);
   });
 
   it('sem a lista de ativos, o responsável vale como ativo', () => {

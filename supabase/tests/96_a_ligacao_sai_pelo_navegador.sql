@@ -21,7 +21,7 @@
 -- transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(51);
+select plan(52);
 
 create table pg_temp.r (chave text primary key, valor jsonb);
 grant select, insert on pg_temp.r to authenticated, service_role;
@@ -188,6 +188,10 @@ begin
   insert into pg_temp.r values ('pode_leitura', public.voz_pode_ligar());
   perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a1', 'sdr');
   insert into pg_temp.r values ('pode_sdr', public.voz_pode_ligar());
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a2', 'gestor');
+  insert into pg_temp.r values ('pode_gestor', public.voz_pode_ligar());
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a2', 'admin');
+  insert into pg_temp.r values ('pode_admin', public.voz_pode_ligar());
 end $$;
 select pg_temp.sair();
 select is((select valor ->> 'motivo' from pg_temp.r where chave = 'pode_leitura'), 'sem_permissao',
@@ -195,6 +199,13 @@ select is((select valor ->> 'motivo' from pg_temp.r where chave = 'pode_leitura'
 select is((select valor ->> 'identidade' from pg_temp.r where chave = 'pode_sdr'),
           'crm_a0000000-0000-4000-8000-0000000096a1',
   'a identidade da credencial é o id de quem está logado');
+-- O SDR é quem mais liga, e a gestão continua ligando (20/10/2026: de 10/10 a
+-- 20/10 a tela não entregava o telefone ao SDR, embora o banco deixasse).
+select ok((select bool_and((valor ->> 'ok')::boolean) from pg_temp.r
+            where chave in ('pode_sdr', 'pode_gestor', 'pode_admin'))
+          and (select count(*) from pg_temp.r
+                where chave in ('pode_sdr', 'pode_gestor', 'pode_admin')) = 3,
+  'admin, gestor e SDR recebem a credencial do softphone');
 select ok(not has_function_privilege('anon', 'public.voz_pode_ligar()', 'execute'),
   'anônimo não pergunta');
 
@@ -243,12 +254,18 @@ select throws_ok(
   '23505', null, 'e o índice segura quem escrever por fora da função');
 
 -- RLS e colunas
+-- Desde 21/10/2026 o SDR tem o poder do gestor (migração 20261021090000): a
+-- política é `is_manager() or a própria`, então a outra SDR vê a chamada. A trava
+-- continua provada com quem não tem esse poder (leitura). Uma asserção só, para o
+-- plano não mudar.
 do $$
-declare v_n int; v_erro text := 'nenhum';
+declare v_n int; v_n2 int; v_erro text := 'nenhum';
 begin
-  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a2', 'sdr');
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a3', 'leitura');
   select count(*) into v_n from public.voice_calls where id = pg_temp.ligacao('um');
-  insert into pg_temp.r values ('rls_outro', to_jsonb(v_n));
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a2', 'sdr');
+  select count(*) into v_n2 from public.voice_calls where id = pg_temp.ligacao('um');
+  insert into pg_temp.r values ('rls_outro', jsonb_build_object('leitura', v_n, 'sdr2', v_n2));
   perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a1', 'sdr');
   select count(*) into v_n from public.voice_calls where id = pg_temp.ligacao('um');
   insert into pg_temp.r values ('rls_dono', to_jsonb(v_n));
@@ -259,8 +276,8 @@ begin
   insert into pg_temp.r values ('coluna', to_jsonb(v_erro));
 end $$;
 select pg_temp.sair();
-select is((select valor #>> '{}' from pg_temp.r where chave = 'rls_outro'), '0',
-  'outra pessoa não vê a chamada');
+select is((select valor from pg_temp.r where chave = 'rls_outro'), '{"leitura": 0, "sdr2": 1}'::jsonb,
+  'outra pessoa sem o poder da gestão (leitura) não vê a chamada; a outra SDR vê (poder do gestor desde 21/10/2026)');
 select is((select valor #>> '{}' from pg_temp.r where chave = 'rls_dono'), '1', 'quem ligou vê a sua');
 select is((select valor #>> '{}' from pg_temp.r where chave = 'coluna'), '42501',
   'mas nem quem ligou lê o número pela tabela');

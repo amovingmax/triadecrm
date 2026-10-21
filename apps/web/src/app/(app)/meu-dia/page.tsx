@@ -3,8 +3,8 @@ import type { Metadata } from 'next';
 import { carregarPessoasAcompanhadas } from '@/lib/auth/equipe';
 import { pessoaPedida } from '@/lib/auth/hierarquia';
 import { requireSession } from '@/lib/auth/session';
+import { temPoderDeGestao } from '@/lib/navegacao';
 import { hojeEmNatal } from '@/components/agenda/tipos';
-import { MeuDiaDeQuemLiga } from '@/components/ligacoes-do-dia/meu-dia-de-quem-liga';
 import { dataPorExtenso, primeiroNome, saudacaoDoDia } from '@/components/meu-dia/formatos';
 import { TelaMeuDia, type PessoaDoSeletor } from '@/components/meu-dia/tela-meu-dia';
 import { abaDaUrl } from '@/components/meu-dia/tipos';
@@ -31,20 +31,11 @@ export default async function Pagina({
   const [sessao, params] = await Promise.all([requireSession(), searchParams]);
   const agora = new Date();
 
-  // Quem liga tem outro Meu dia (pivô de 06/10/2026): o que ela fez hoje e onde
-  // continua, e mais nada. Fila de quem respondeu, meta e funil são da gestão.
-  if (sessao.papel === 'sdr') {
-    return (
-      <MeuDiaDeQuemLiga
-        usuarioId={sessao.id}
-        nome={primeiroNome(sessao.nome)}
-        saudacao={saudacaoDoDia(agora)}
-        hoje={hojeEmNatal(agora)}
-      />
-    );
-  }
-
-  // Admin e gestor escolhem de quem é o dia (`lib/auth/hierarquia.ts`); para os
+  // O mesmo Meu dia para admin, gestor e SDR. De 06/10 a 21/10/2026 o SDR tinha
+  // outro, só com o que ligou hoje e onde continuar; o que ele ligou continua no
+  // "Feito hoje" e em Relatórios → Ligações.
+  //
+  // Admin, gestor e SDR escolhem de quem é o dia (`lib/auth/hierarquia.ts`); para os
   // outros papéis a lista é só a própria pessoa e nem vai ao banco.
   // O papel vem junto, na mesma leitura da `team_directory`: a tela usa para saber
   // se o bloco "Responderam e estão esperando" da `meu_dia` é a fila de todos
@@ -56,7 +47,7 @@ export default async function Pagina({
       nome={primeiroNome(sessao.nome)}
       saudacao={saudacaoDoDia(agora)}
       data={dataPorExtenso(agora)}
-      podeDefinirMeta={sessao.papel === 'admin' || sessao.papel === 'gestor'}
+      podeDefinirMeta={temPoderDeGestao(sessao.papel)}
       usuarioId={sessao.id}
       hoje={hojeEmNatal(agora)}
       abaInicial={abaDaUrl(params.aba)}

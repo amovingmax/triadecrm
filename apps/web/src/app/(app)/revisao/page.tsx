@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
-import { podeCriarParceiro } from '@/lib/navegacao';
+import {
+  PAPEIS_DO_CRM,
+  podeCriarParceiro,
+  podeMandarMensagemAutomatica,
+  temPoderDeGestao,
+} from '@/lib/navegacao';
 import { carregarCatalogosDoRadar } from '@/components/revisao/catalogos';
 import { TelaRevisao } from '@/components/revisao/tela-revisao';
 
@@ -22,9 +27,9 @@ export const metadata: Metadata = { title: 'Revisão' };
  * criação e a decisão rodam no cliente, contra as funções do Postgres.
  */
 export default async function Pagina() {
-  // Só admin e gestor aprovam e põem gente na base (pivô de 06/10/2026).
+  // Admin, gestor e SDR (de 06/10 a 20/10/2026 foi só a gestão). Os papéis antigos ficam fora.
   const [sessao, catalogos] = await Promise.all([
-    requireRole('admin', 'gestor'),
+    requireRole(...PAPEIS_DO_CRM),
     carregarCatalogosDoRadar(),
   ]);
 
@@ -32,7 +37,8 @@ export default async function Pagina() {
     <TelaRevisao
       catalogos={catalogos}
       podeDecidir={podeCriarParceiro(sessao.papel)}
-      podeAjustarTriagem={sessao.papel === 'admin' || sessao.papel === 'gestor'}
+      podeMandarMensagem={podeMandarMensagemAutomatica(sessao.papel)}
+      podeAjustarTriagem={temPoderDeGestao(sessao.papel)}
     />
   );
 }

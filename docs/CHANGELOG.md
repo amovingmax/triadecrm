@@ -7431,3 +7431,64 @@ Verificado: Meu dia, Lotes, Agenda, Revisão, Prospectados, ficha, excluídos, F
 - **Código sem uso** (não pesa no navegador, é manutenção): `components/funis/cartao-esqueleto.tsx`, `components/ui/field.tsx` (+ `separator.tsx`), a variante `lateral` do `NavLink`, 48 exports sem uso (entre eles `aprovarRascunho`/`descartarRascunho`), `apps/web/cand.mjs`, `apps/web/pulso.mjs` (chama uma RPC que não existe) e `conversas-lista.png` na raiz. `shadcn` está nas dependências de produção e é a ferramenta de linha de comando.
 
 **Não publicado.** Branch local `velocidade`, sem push, sem merge e sem deploy, como pedido.
+
+## 20/10/2026 (noite) — O SDR volta a entrar em todas as telas, menos Ajustes (RF-ADM-01)
+
+**O pedido.** "O SDR só não pode ter acesso à aba de ajustes." Confirmado com o usuário: o SDR passa a ver tudo menos Ajustes (desfaz a regra de 06/10, em que ele só via Meu dia e Lotes), numa branch nova a partir da main (`sdr-acesso`, worktree `../triadecrm-sdr-acesso`), sem push.
+
+**Entregue.**
+- **Menu** (lateral, barra de baixo, "Mais" e paleta ⌘K): o SDR vê Conversas, Agenda, Revisão, Prospectados, Funis, Metas e Relatórios, além de Meu dia e Lotes. Ajustes continua só para admin e gestor (`lib/navegacao.ts`).
+- **Telas:** as oito rotas aceitam o SDR no servidor (`requireRole(...PAPEIS_DO_CRM)`); os papéis antigos continuam fora. `/admin` continua mostrando a área restrita, e `/parceiros/excluidos` continua da gestão.
+- **O que o SDR faz nelas é o que o banco já deixava** (`app.can_write()`; nenhuma função mudou): atender e responder conversas, cadastrar parceiro, trazer lista, aprovar na Revisão com "Só aprovar" e cadastrar nome, mudar a etapa dos negócios dele e dos sem dono (`move_deal` sempre conferiu isso), marcar compromisso na própria agenda, ler as metas dele e os relatórios.
+- **Avisos de resposta:** o SDR volta a receber o cartão "Nova mensagem" e o número de Conversas, como antes do pivô (`components/avisos/regra.ts`), com a mesma regra da fila de quem respondeu do Meu dia.
+- **Consultoria:** a aba de Conversas lia `public.consultoria`, que só a gestão lia; para o SDR ela viria vazia. A migração `20261020200000_o_sdr_le_a_consultoria.sql` libera a leitura para quem vê a base (`app.sees_all()`). Pôr e tirar continua só da gestão.
+
+**Continua só de admin e gestor** (o banco recusa ao SDR com `app.is_manager()`; os botões somem para ele em vez de dar erro): saudação pela lista e "Aprovar e mandar mensagem" (WhatsApp automático, com custo na Meta); marcar Consultoria; excluir e restaurar parceiro, e a lista de excluídos; desfazer importação; "Ler com a IA" e pesos da triagem; gerar e refazer o relatório da semana; montar lote para outra pessoa; meta, dia e rota de outra pessoa; o telefone completo (LGPD: o SDR revela pelo botão, com registro).
+
+**Defeito corrigido de passagem (está na main e em produção).** O telefone do navegador (Twilio) era ligado por `podeCriarParceiro`, que desde o pivô de 06/10 é só da gestão: o SDR, que é quem liga, não recebia o telefone do navegador (`components/layout/app-shell.tsx`, desde 10/10). Agora a chave é `podeLigar`, espelho do `voz_pode_ligar` do banco.
+
+**Sem mudança, de propósito.** O Meu dia do SDR continua o "dia de quem liga" (o que fez hoje e onde continua), sem meta e sem a fila de quem respondeu; essa fila ele passa a ver em Conversas e nos avisos.
+
+**Não mexe no WhatsApp.** Nenhum arquivo do caminho de envio e entrada foi tocado. O banco nunca recusou envio por papel (`app.pode_enviar` e `app.messages_guard` não olham papel); o que muda é quem chega à tela.
+
+**Verificado no localhost:3002.** Lint, typecheck e 1.305 testes do web (os de menu e de avisos reescritos para a regra nova). pgTAP: as mesmas falhas da main no banco local (relógio e dados locais), e duas asserções novas no `110` (o SDR lê a marca de Consultoria; quem não vê a base não lê), conferidas contra a regra antiga (falha) e a nova (passa). No navegador: como SDR no PC, as oito telas abrem, Ajustes mostra a área restrita, excluídos dá "sem permissão", Prospectados tem "Novo parceiro", "Trazer uma lista" e a mudança de etapa e não tem Excluídos, Consultoria nem saudação, a Revisão tem "Só aprovar" e não tem "Aprovar e mandar mensagem", "Ler com a IA" nem pesos, a conversa abre com a caixa de resposta e Relatórios não tem "Gerar agora"; no celular, as cinco fatias e o "Mais" sem Ajustes. Como gestor, nada sumiu (Excluídos, Consultoria, etapa, "Aprovar e mandar mensagem", "Ler com a IA", Ajustes). Nenhum erro de JavaScript. O candidato de teste foi apagado.
+
+**Banco local.** A migração foi aplicada pelo psql, sem registrar versão em `supabase_migrations`; pode rodar de novo sem efeito.
+
+**Precisa de decisão humana.** Quais das ações que continuam da gestão o SDR também deve ter (cada uma pede mudar uma função do banco); se o Meu dia do SDR deve virar o completo; e se o conserto do telefone do navegador deve subir antes, sozinho, já que hoje o SDR não liga pelo navegador em produção. O PRD ainda descreve os cinco papéis antigos.
+
+**Não publicado.** Branch local `sdr-acesso`, sem push, sem merge e sem deploy.
+
+## 21/10/2026 — O SDR é igual ao gestor, menos Ajustes (RF-ADM-01)
+
+**O pedido.** "A tela do SDR deve ser idêntica à tela do gestor, à tela do admin [...] A única diferença é que ele não vai conseguir entrar na aba de ajustes [...] os SDRs têm que ter a capacidade de ligar pelo navegador." Perguntado sobre os botões que eram só da gestão (alguns com custo), o usuário escolheu "Tudo igual ao gestor". Na mesma branch `sdr-acesso`, sem push.
+
+**Entregue.**
+- **Banco** (`20261021090000_o_sdr_tem_o_poder_do_gestor.sql`): `app.is_manager()`, o poder da gestão no dia a dia, passa a incluir o SDR. Com isso o SDR monta e atribui lote para outra pessoa, mexe no que é de outra pessoa (negócio, tarefa, conversa, tentativa), exclui e restaura parceiro, marca Consultoria, manda mensagem automática pela base (saudação e "aprovar e mandar mensagem", com custo na Meta), define meta, vê o dia, a meta, as ligações e a rota de outra pessoa, gera o relatório da semana e desfaz importação. "Ler com a IA" e a repontuação da Revisão (`radar_triar_com_ia`, `radar_repontuar`) e a hierarquia (`app.acompanha`: o SDR acompanha os outros SDRs, como o gestor) também abriram.
+- **O que fica só com admin e gestor** ganha nome próprio, `app.admin_ou_gestor()` (o que `is_manager` era até ontem), em 76 políticas e 9 funções geradas das definições em vigor: Ajustes (catálogos, `app_settings` fora dos pesos da triagem, atendimento, telefonia, robô de entrada, setores de uma pessoa, de-para de categorias, exportação LGPD), a tabela-base de `organizations` e `contacts` (o telefone inteiro: o SDR continua vendo o número mascarado e revelando pelo botão, com registro) e os registros de operação e LGPD (inclusive a prova de aceite do pré-cadastro, com IP e navegador).
+- **Telas:** o Meu dia do SDR passa a ser o mesmo do gestor (Para fazer, Feito hoje, Próximos dias, meta e seletor de pessoa); o "dia de quem liga" (`meu-dia-de-quem-liga.tsx`) saiu. Os botões que estavam escondidos aparecem: saudação e "Aprovar e mandar mensagem", Consultoria, Excluídos e excluir na ficha, desfazer importação, "Ler com a IA" e pesos da triagem, gerar o relatório da semana, montar lote, definir meta, agenda e dia da equipe. Um espelho só no código, `temPoderDeGestao` (`lib/navegacao.ts`).
+- **Ligar pelo navegador:** admin, gestor e SDR (o conserto `fdab0dd`, desta branch). Trazidos da branch `sdr-liga`: `chamada-contexto.test.ts` (os três papéis ligam; leitura e financeiro não) e, no pgTAP `96`, admin, gestor e SDR recebem a credencial do softphone.
+
+**Não mexe no WhatsApp.** O caminho de envio (`app.pode_enviar`, `messages_guard`, `app.envio_um`, `app.wa_*`, `saida.ts`, `graph.ts`) não usa `is_manager` e não foi tocado. O que muda é quem pode apertar os botões que já punham mensagem na fila. O teste novo prova que excluir, restaurar, Consultoria, negócio, meta e pesos não põem nada na fila de saída.
+
+**Verificado no localhost:3002.** Comparação no navegador, tela por tela (17 rotas, gestor e SDR, botões e links visíveis): as únicas diferenças são o link de Ajustes, o nome no menu da pessoa, o que depende dos dados de cada um (fila do Meu dia, conversas "Minhas") e "Copiar o número" no lugar de "Revelar" (telefone mascarado para o SDR). Em `/admin` o SDR vê a área restrita. Nenhum erro de JavaScript.
+
+**Limite conhecido.** A ficha de um parceiro excluído, aberta por link, mostra ao gestor o aviso "foi excluído por…" e ao SDR a página de não encontrado: o aviso lê a tabela-base, que continua da gestão. A lista de Excluídos, com o "Restaurar", é igual para os dois. As mensagens de recusa de algumas funções ainda dizem "só gestor ou admin"; hoje só os papéis antigos as recebem.
+
+**Não publicado.** Branch local `sdr-acesso`, sem push, sem merge e sem deploy. Para subir: `db push` das migrações `20261020200000` e `20261021090000` e o deploy da web, com pedido do usuário.
+
+## 21/10/2026 (manhã) — A ficha liga mesmo com o parceiro num lote (R13 §3.1)
+
+**O pedido.** "Deve ser permitido que eu consiga ligar para o fornecedor pela própria ficha dele [...] como eu já estava conseguindo fazer", no PC e no celular.
+
+**O que acontecia.** O "Ligar" da ficha aparecia, mas recusava quase sempre: parceiro na fila de um lote era "Já está no seu lote, ligue por lá, na ordem da fila" para quem montou o lote, e "Em outro lote" para os outros. Com a base distribuída em lotes, a ficha quase nunca ligava. Reproduzido no navegador, no PC e no celular, como SDR e como gestor.
+
+**Entregue** (`20261021110000_a_ficha_liga_mesmo_com_o_parceiro_num_lote.sql`, `public.montar_lote_avulso`):
+- **Parceiro esperando na fila de um lote:** sai dela para a ligação pela ficha (item `devolvido`, com nota e `audit_log` `TIRAR_DO_LOTE`, como `lote_tirar_contato`), e a tela de ligar abre com o roteiro de sempre. A resposta diz de que lote ele saiu, e a ficha avisa: "Saiu do lote X: estava na fila do seu lote" ou "estava na fila de Fulano".
+- **Da fila de outra pessoa:** com o poder da gestão (`app.is_manager()`: admin, gestor e SDR). O embaixador, papel antigo, continua com "Em outro lote".
+- **Alguém com o parceiro na tela de ligar agora** (chamada aberta, ou o lote avulso que outra pessoa acabou de abrir pela ficha): a recusa é `em_ligacao_agora`, com o nome de quem está. É o que a reserva sempre protegeu: duas pessoas na mesma ligação.
+- O contato tirado não volta ao lote depois: a ligação conta para quem ligou, e o lote de origem fica com um a menos na fila.
+
+**Verificado.** pgTAP `97` com 29 asserções (cinco novas falham com a função antiga). Lint, typecheck e 1.309 testes do web. No navegador, PC (3002) e celular (3004), como SDR e como gestor: o toque em "Ligar" na ficha da Abracadabra, que está na fila do lote do SDR, abre a tela de ligar com o contato e o aviso de que lote ele saiu. O início da chamada ficou bloqueado no teste, e o banco local voltou ao que era. Nenhum gatilho de `call_batch_items` ou `call_batches` mexe com mensagem.
+
+**Observação.** No PC, o cartão "Avisos de mensagem neste navegador" (Ativar avisos / Agora não) e o "Nova mensagem" aparecem no canto de cima, à direita, em cima dos botões da ficha, inclusive o "Ligar", até a pessoa fechá-los.

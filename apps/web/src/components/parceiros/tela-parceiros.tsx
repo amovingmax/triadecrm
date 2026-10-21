@@ -47,6 +47,9 @@ export function TelaParceiros({
   filtrosIniciais,
   podeCriar,
   podeImportar,
+  podeSaudar,
+  podeMarcarConsultoria,
+  veExcluidos,
   leTelefoneCompleto,
   abrirCadastro = false,
 }: {
@@ -56,6 +59,16 @@ export function TelaParceiros({
   podeCriar: boolean;
   /** Mesmo conjunto de quem cria. Separado porque são duas perguntas diferentes. */
   podeImportar: boolean;
+  /**
+   * Saudação pela lista: só admin e gestor, como `saudacao_enfileirar` confere. Até
+   * 20/10/2026 era o mesmo que `podeCriar`; o SDR passou a criar, mas não manda
+   * mensagem em lote (`podeMandarMensagemAutomatica`).
+   */
+  podeSaudar: boolean;
+  /** A marca de Consultoria: só admin e gestor, como `consultoria_marcar` confere. */
+  podeMarcarConsultoria: boolean;
+  /** O link para os excluídos: só para quem exclui e restaura (admin e gestor). */
+  veExcluidos: boolean;
   /** Espelho de `app.reads_base_pii()`: só explica por que a busca por trecho não acha nada. */
   leTelefoneCompleto: boolean;
   /** Veio de `/parceiros?novo=1` (paleta de comandos): abre a folha já na entrada. */
@@ -104,9 +117,7 @@ export function TelaParceiros({
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
 
   // ---- A saudação (07/10/2026) ----
-  // Quem cria parceiro é quem cuida da base, e é quem manda a saudação pela lista
-  // (a função do banco confere o mesmo: admin e gestor).
-  const podeSaudar = podeCriar;
+  // Só admin e gestor mandam a saudação pela lista (a função do banco confere o mesmo).
   const saudacao = useSaudacao();
   // A marcação vale para o recorte em que foi feita: trocar de página, de filtro
   // ou de busca começa do zero. Guardada junto da chave do recorte em vez de
@@ -149,20 +160,31 @@ export function TelaParceiros({
   );
 
   // ---- A etapa e a Consultoria na linha (14/10/2026) ----
-  // Também de quem cuida da base (admin e gestor); o banco confere o mesmo.
-  const consultoria = useConsultoria(podeCriar);
+  // A etapa muda para quem escreve na base (o SDR também, desde 20/10/2026; quem
+  // decide é `move_deal`). A Consultoria é só de admin e gestor; o banco confere o mesmo.
+  const consultoria = useConsultoria(podeMarcarConsultoria);
   const marcarConsultoria = consultoria.marcar;
   const acoesNaTabela = useMemo<AcoesNaTabela | null>(
     () =>
       podeCriar
         ? {
-            naConsultoria: consultoria.naConsultoria,
-            marcarConsultoria: (id, sim) => void marcarConsultoria([id], sim),
+            consultoria: podeMarcarConsultoria
+              ? {
+                  naConsultoria: consultoria.naConsultoria,
+                  marcar: (id, sim) => void marcarConsultoria([id], sim),
+                }
+              : null,
             aoMudarEtapa: () =>
               void clienteDeConsultas.invalidateQueries({ queryKey: ['parceiros'] }),
           }
         : null,
-    [podeCriar, consultoria.naConsultoria, marcarConsultoria, clienteDeConsultas],
+    [
+      podeCriar,
+      podeMarcarConsultoria,
+      consultoria.naConsultoria,
+      marcarConsultoria,
+      clienteDeConsultas,
+    ],
   );
 
   return (
@@ -185,8 +207,8 @@ export function TelaParceiros({
             {/* A porta de volta de quem foi excluído (07/10/2026). Fica aqui, em
                 letra pequena, e não entre os botões: é para onde se vai de vez
                 em quando, atrás de uma ficha que saiu por engano. Só para quem
-                exclui — e quem exclui é quem cria. */}
-            {podeCriar ? (
+                exclui (admin e gestor). */}
+            {veExcluidos ? (
               <>
                 {' · '}
                 <Link

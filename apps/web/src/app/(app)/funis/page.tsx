@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
+import { PAPEIS_DO_CRM } from '@/lib/navegacao';
 import { TelaFunis } from '@/components/funis/acoes/tela-funis';
 import { filtrosQuadroDaUrl } from '@/components/funis/tipos';
 
@@ -21,8 +22,8 @@ export default async function Pagina({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  // Tela da gestão desde o pivô de 06/10/2026: quem liga vê só Ligar e Meu dia.
-  const [, params] = await Promise.all([requireRole('admin', 'gestor'), searchParams]);
+  // Admin, gestor e SDR (de 06/10 a 20/10/2026 foi só a gestão). Os papéis antigos ficam fora.
+  const [, params] = await Promise.all([requireRole(...PAPEIS_DO_CRM), searchParams]);
 
   return <TelaFunis filtrosIniciais={filtrosQuadroDaUrl(params)} />;
 }
