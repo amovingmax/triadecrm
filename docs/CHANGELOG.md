@@ -7502,3 +7502,44 @@ Verificado: Meu dia, Lotes, Agenda, Revisão, Prospectados, ficha, excluídos, F
 **Verificado.** Lint, typecheck e os testes do web (1.311), do `schema` (105) e do `prompts` (284). pgTAP: as mesmas falhas de antes da junção, presas a dados e ao relógio do banco local. Servida em build de produção (`next start`), porque o `next dev` compila cada tela no primeiro acesso e esconderia a velocidade. No PC, em 17 telas, o SDR tem os mesmos botões que o gestor, menos Ajustes, sem erro de JavaScript. No celular emulado, o Meu dia e o lote abrem com o "Ligar pelo navegador". Pela ficha, o "Ligar" tira o parceiro da fila do lote e abre a tela de ligar, no PC e no celular, como SDR e como gestor. No teste, o início da chamada ficou bloqueado e o banco voltou ao que era.
 
 **Não publicado.** Sem push, sem merge na main, sem `db push` e sem deploy, como pedido.
+
+## 21/10/2026 (tarde) — Telas que abrem na hora (branch `instantaneo`; RF-BAS-15, RF-ADM-02)
+
+**O pedido.** Testando no celular a versão `completo`: "está bem mais rápido que a versão antiga, porém ainda há um tempo grande de delay até abrir as telas. Preciso que as telas fiquem mais rápidas, de modo que eu clique e a tela abra instantaneamente. Depois quero que faça a comparação em ms de antes da correção e depois da correção." Branch local `instantaneo` (worktree `../triadecrm-instantaneo`), sobre a `completo`, sem push.
+
+**O que segurava a tela, medido.** Toda tela do CRM é dinâmica (depende de quem está logado), e o Next não adianta tela dinâmica: cada toque pedia a página ao servidor, depois baixava o código da tela e só então buscava os dados — idas em série, ~35 ms cada no Wi-Fi e ~150 ms ou mais no 4G. Na ficha e no lote havia ainda o esqueleto (`loading.tsx`): depois de mostrá-lo, o React segura o conteúdo pronto por 300 ms, e no Wi-Fi a ficha chegava do servidor aos ~30 ms e aparecia aos ~350 ms. Por fim, a entrada de página (180 ms do transparente) e as linhas escalonadas (15 ms × 24, 220 ms cada) faziam a lista de Prospectados e a do Meu dia levar ~700 ms para assentar.
+
+**Entregue (3 commits).**
+- **O menu adianta a página e o código** (`prefetch` nos quatro jeitos do `nav-link.tsx` e no "Abrir e ligar" dos lotes): o Next busca a tela assim que o item fica visível e guarda por 5 minutos. Com o aparelho ocioso, `AdiantarDados` pede também a página INTEIRA (`kind: 'full'`) das telas da folha "Mais", que só ficam visíveis quando ela abre.
+- **Os dados chegam antes do toque** (`consultas/adiantar-dados.tsx` e `adiantadores.ts`): com o aparelho ocioso, Lotes, Prospectados, Funis, Conversas, Revisão e Relatórios buscam o que mostram ao abrir, com a mesma chave e a mesma função da tela (`useQuadro` passou a usar `consultaDoQuadro`, a mesma do adiantamento). Só busca o que falta no cache; o cache solta o que ninguém olhou em 5 minutos. A ordem é a do polegar (`telasParaAdiantar`). Com economia de dados ou 2G, nada. A tela continua renovando por cima ao abrir, como já fazia.
+- **Sem a espera do esqueleto:** saíram os `loading.tsx` da ficha e do lote (e `layout/carregando.tsx`). O toque responde no próprio link: ele esmaece onde está o dedo até a tela nova entrar (`layout/retorno-do-toque.tsx`, uma peça só na casca, com a regra testada em `retorno-do-toque-regra.test.ts`); os itens do menu continuam com a pílula deles.
+- **A entrada nasce legível:** página e linhas começam em 60% de opacidade e assentam em 120 ms; o escalonamento das listas fica em 4 ms e 8 linhas.
+
+**Medido.** Builds de produção lado a lado no mesmo banco local: **hoje** (a main no ar, `da2a47b`), **manhã** (a `completo` que o usuário testou) e **nova**. Chrome real emulando um celular 390×844; perfil "Wi-Fi" (30 ms por ida e volta, CPU 2× mais lenta) e "4G" (150 ms, 1,6 Mbps, CPU 4×); o passeio completo pela barra de baixo e pelo "Mais", primeiro visitando e depois voltando; 3 passeios por versão e perfil, medianas. "Conteúdo" é o quadro em que a tela mostra o que é dela (a lista, o quadro, o título sem "Carregando"), contado do toque.
+
+| Conteúdo na tela (ms) | Wi-Fi: hoje → manhã → nova | 4G: hoje → manhã → nova |
+|---|---|---|
+| Lotes (1ª visita) | 248 → 220 → **77** | 1.118 → 981 → **93** |
+| Abrir o lote | 179 → 413 → **117** | 954 → 905 → **462** |
+| Prospectados | 204 → 196 → **105** | 1.139 → 1.196 → **150** |
+| Abrir a ficha | 150 → 384 → **153** | 529 → 515 → **546** |
+| Funis | 196 → 226 → **74** | 910 → 932 → **93** |
+| Conversas | 248 → 252 → **87** | 1.899 → 1.984 → **120** |
+| Agenda | 173 → 174 → **106** | 787 → 790 → **273** |
+| Revisão | 181 → 185 → **74** | 720 → 724 → **100** |
+| Metas | 166 → 176 → **110** | 742 → 758 → **358** |
+| Relatórios | 189 → 189 → **79** | 756 → 840 → **101** |
+| Meu dia (de volta) | 125 → 104 → **93** | 648 → 282 → **124** |
+| Voltar a uma tela do menu já vista | 125–205 → 83–110 → **66–93** | 430–1.390 → 228–282 → **70–124** |
+
+Até a animação de entrada terminar: Prospectados 770 → 745 → **231** ms e Meu dia 690 → 666 → **223** ms no Wi-Fi.
+
+**O que ainda não é instantâneo, e por quê.** A ficha (~150 ms no Wi-Fi, ~550 ms no 4G) não é adiantada: a página dela traz os dados do parceiro, e guardá-la por 5 minutos mostraria ficha velha depois de uma mudança feita em outra tela. Continua como hoje, e sem os 300 ms da manhã. O lote (~460 ms no 4G) espera a reserva do próximo contato, que só pode acontecer ao abrir. Agenda e Metas adiantam a página, mas não os dados (a busca da Agenda depende do catálogo que o servidor entrega à página; a das Metas, de uma consulta por pessoa).
+
+**Verificado.** Lint, typecheck e 1.318 testes do web. No navegador, a visão do SDR na nova é idêntica à da manhã (menu, folha "Mais", o que cada módulo abre, botões do lote e da ficha), no celular e no PC, sem erro de JavaScript. O cartão tocado esmaece a partir de ~120 ms no 4G. O "Ligar" da ficha continua tirando o parceiro da fila e abrindo a tela de ligar, no PC e no celular pelo endereço da rede; nos testes o início da chamada ficou bloqueado e as reservas do lote foram devolvidas (0 abertas no fim).
+
+**Custo.** Ao abrir o CRM, o aparelho pede a página de cada tela do menu (sessão e catálogos) e os dados de abertura de seis telas, uma vez; depois, só o que o cache soltou. Nada disso escreve: são as mesmas leituras que as telas fariam um instante depois.
+
+**Não mexe no WhatsApp.** Nenhum arquivo do caminho de envio e entrada foi tocado. O adiantamento de Conversas só lê a lista, como a tela já lia.
+
+**Não publicado.** Branch local `instantaneo`, sem push, sem merge na main e sem deploy. Sobe junto com a `completo` (é feita sobre ela), com pedido do usuário.
