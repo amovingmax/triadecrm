@@ -4,11 +4,11 @@ import { BottomNav } from '@/components/layout/bottom-nav';
 import { Header } from '@/components/layout/header';
 import { Sidebar } from '@/components/layout/sidebar';
 import { AcompanhanteDeAvisos } from '@/components/ligacao/aviso-no-recibo';
+import { podeLigar } from '@/components/ligacao/chamada-contexto';
 import { ProvedorDoSoftphone } from '@/components/ligacao/voz-provedor';
 import { TransicaoPagina } from '@/components/movimento';
 import { type Sessao } from '@/lib/auth/session';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
-import { podeCriarParceiro } from '@/lib/navegacao';
 
 /**
  * Casca da área autenticada, responsiva e mobile-first (PRD §8):
@@ -34,6 +34,9 @@ import { podeCriarParceiro } from '@/lib/navegacao';
  * `ProvedorDoSoftphone` também envolve tudo, pelo mesmo motivo: a ligação feita pelo
  * navegador tem de sobreviver à troca de tela, e o painel dela fica no canto de baixo
  * (`components/ligacao/voz-provedor.tsx`). Com a telefonia desligada ele não desenha nada.
+ * Quem recebe o telefone é quem liga (`podeLigar`, espelho de `app.can_write()`, que
+ * `voz_pode_ligar` confere). De 10/10 a 20/10/2026 a chave foi `podeCriarParceiro`,
+ * que desde o pivô é só da gestão: o SDR, que é quem liga, ficava sem o telefone.
  */
 export function AppShell({
   sessao,
@@ -47,7 +50,7 @@ export function AppShell({
 }) {
   return (
     <ProvedorDeAvisos usuarioId={sessao.id} papel={sessao.papel}>
-      <ProvedorDoSoftphone podeLigar={podeCriarParceiro(sessao.papel)}>
+      <ProvedorDoSoftphone podeLigar={podeLigar(sessao.papel)}>
         <div className="flex min-h-dvh bg-background">
           <Sidebar papel={sessao.papel} filas={filas} />
 
