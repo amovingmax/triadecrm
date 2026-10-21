@@ -103,6 +103,7 @@ const NOME_DA_TABELA: Record<string, string> = {
   profiles: 'Acesso de pessoa',
   allowed_users: 'Lista de permitidos',
   allowed_domains: 'Domínio permitido',
+  acesso_a_outras_empresas: 'Acesso a outra empresa',
   consent_events: 'Consentimento',
   suppression_list: 'Lista de supressão',
   interaction_outcomes: 'Desfecho de interação',

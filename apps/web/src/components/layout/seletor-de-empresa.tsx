@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { DESTINOS_DO_SELETOR, EMPRESA } from '@/lib/empresa';
+import { type DestinoDoSeletor, EMPRESA } from '@/lib/empresa';
 
 /**
  * Troca de empresa: o mesmo CRM, com os dados de outra empresa.
@@ -21,10 +21,11 @@ import { DESTINOS_DO_SELETOR, EMPRESA } from '@/lib/empresa';
  * uma aba antiga não grava no banco errado. Na primeira vez, a outra empresa pede o
  * login com Google; o navegador guarda os dois.
  *
- * Com uma empresa só (`NEXT_PUBLIC_EMPRESAS_LINKS` vazio ou incompleto), não aparece.
+ * `destinos` já vem recortado para a pessoa (`destinosDaPessoa`): só aparece para quem
+ * o admin marcou como tendo acesso a outra empresa. Com uma empresa só, não aparece.
  */
-export function SeletorDeEmpresa() {
-  if (DESTINOS_DO_SELETOR.length < 2) return null;
+export function SeletorDeEmpresa({ destinos }: { destinos: DestinoDoSeletor[] }) {
+  if (destinos.length < 2) return null;
 
   return (
     <DropdownMenu>
@@ -48,7 +49,7 @@ export function SeletorDeEmpresa() {
           Trocar de empresa
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {DESTINOS_DO_SELETOR.map((destino) =>
+        {destinos.map((destino) =>
           destino.atual ? (
             <DropdownMenuItem key={destino.slug} className="min-h-11 md:min-h-0" disabled>
               <Check aria-hidden="true" />

@@ -1190,6 +1190,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      acesso_a_outras_empresas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          empresa: string
+          id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          empresa: string
+          id?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          empresa?: string
+          id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acesso_a_outras_empresas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acesso_a_outras_empresas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acesso_a_outras_empresas_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acesso_a_outras_empresas_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activities: {
         Row: {
           author_kind: string
@@ -8634,6 +8687,7 @@ export type Database = {
         }[]
       }
       meu_papel: { Args: never; Returns: Json }
+      minhas_outras_empresas: { Args: never; Returns: string[] }
       modelo_whatsapp_criar: { Args: { p: Json }; Returns: Json }
       montar_lote: {
         Args: {

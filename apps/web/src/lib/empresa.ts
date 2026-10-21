@@ -8,6 +8,7 @@
  *
  * O seletor lê `NEXT_PUBLIC_EMPRESAS_LINKS` ("komune=https://…;imova=https://…").
  * Com menos de duas empresas nela, não aparece: a KOMUNE fica igual até a Imova existir.
+ * E só aparece para quem também tem acesso à outra empresa (`destinosDaPessoa`).
  * Trocar de empresa é ABRIR o endereço da outra — nunca trocar de banco por dentro —,
  * para cada aba ficar presa à sua empresa.
  */
@@ -77,3 +78,20 @@ export const DESTINOS_DO_SELETOR: DestinoDoSeletor[] = lerLinksDasEmpresas(
   process.env.NEXT_PUBLIC_EMPRESAS_LINKS,
   EMPRESA.slug,
 );
+
+/** As outras empresas do seletor, sem esta: as que o admin pode marcar em Ajustes → Pessoas. */
+export const OUTRAS_EMPRESAS_DO_SELETOR: DestinoDoSeletor[] = DESTINOS_DO_SELETOR.filter((d) => !d.atual);
+
+/**
+ * O seletor de UMA pessoa: esta empresa mais as outras que ela também acessa
+ * (`public.minhas_outras_empresas()`, marcadas pelo admin; decisão do usuário em
+ * 21/10/2026). Sem nenhuma outra, vazio: quem tem acesso a uma empresa só não vê
+ * botão nenhum.
+ */
+export function destinosDaPessoa(
+  destinos: DestinoDoSeletor[],
+  outrasDaPessoa: readonly string[],
+): DestinoDoSeletor[] {
+  const daPessoa = destinos.filter((d) => d.atual || outrasDaPessoa.includes(d.slug));
+  return daPessoa.some((d) => !d.atual) ? daPessoa : [];
+}

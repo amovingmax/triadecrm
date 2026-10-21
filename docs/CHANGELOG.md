@@ -7706,3 +7706,37 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - o endereço definitivo da Imova;
 - o horário de atendimento dela;
 - o roteiro de ligação e os funis definitivos.
+
+## 21/10/2026 — O botão de trocar de empresa só aparece para quem tem acesso às duas (branch `seletor-por-pessoa`)
+
+**O pedido.** "Deve aparecer o botão de trocar o módulo para quem tem acesso aos dois módulos. Para quem tem acesso somente a um módulo não deve aparecer nada." Escolhida a opção de **marcação por pessoa em cada empresa**. Foi recusada a consulta de um banco ao outro, que criaria uma chave de cada empresa no site da outra.
+
+**Entregue:**
+- **Migração `20261022110000`**, que só acrescenta. `public.acesso_a_outras_empresas` guarda quem também acessa outra empresa (slug):
+  - só admin marca e desmarca (RLS), e cada pessoa lê só a própria marcação;
+  - marcar a empresa do próprio banco é recusado (`23514`);
+  - não há UPDATE;
+  - auditoria por `app.audit()`.
+
+  `public.minhas_outras_empresas()` responde ao site sobre quem está logado. pgTAP `114`: 16 testes, nos bancos locais da KOMUNE e da Imova.
+- **Site:**
+  - o layout pergunta, no mesmo `Promise.all`, a quais outras empresas a pessoa tem acesso (`lib/outras-empresas.ts`);
+  - `destinosDaPessoa` recorta o seletor; sem nenhuma outra empresa, o botão não aparece;
+  - sem outra empresa configurada no site, nem vai ao banco; erro vira "nenhuma".
+- **Ajustes → Pessoas:**
+  - coluna "Também acessa", com a escolha "Outra empresa", só para admin e só quando há outra empresa configurada;
+  - um parágrafo no "Como alguém entra" diz que a marcação só mostra o botão e quem entra lá é a lista de permitidos de lá.
+- **Auditoria:** a tabela aparece como "Acesso a outra empresa".
+
+**Verificado no computador** (KOMUNE em `localhost:3000`, Imova em `127.0.0.1:3100`, `next dev`):
+- **Gestor de teste,** marcado nas duas: vê o botão nas duas.
+- **SDR e admin de teste,** sem marcação: não veem nas duas.
+- **Marcação pela tela:** o admin da Imova marcou a SDR e ela passou a ver o botão ao recarregar. Desmarcada, o botão sumiu.
+- **Testes:** lint e tipos OK; 1.325 testes do site (4 novos); sem erro de página.
+- **Sem a variável de links,** caso da KOMUNE no ar hoje: não há consulta nova, coluna nova nem botão. Ela fica como está até ser republicada com o seletor.
+
+**Pendente (produção, só com pedido):**
+- migração `20261022110000`, primeiro na Imova e depois na KOMUNE, pelo `publicar-banco`;
+- republicar a Imova;
+- na KOMUNE, junto com o seletor ("Pode republicar a KOMUNE com o seletor");
+- depois, o admin de cada empresa marca quem trabalha nas duas. Hoje, na Imova, o botão aparece para os 2 usuários; com esta versão, só para quem for marcado.

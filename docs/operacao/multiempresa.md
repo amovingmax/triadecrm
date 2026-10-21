@@ -17,6 +17,15 @@ O Tríade serve duas empresas com o **mesmo código** e **uma instalação por e
 - **Textos que o próprio banco escreve** (arquivo da LGPD): `app.empresa_texto`, lido de `app_settings['empresa']`.
 - **Regra para migrações novas:** a migração roda nos dois bancos. Dado de empresa entra pelo seed da empresa, nunca pela migração.
 
+## Quem vê o botão de trocar de empresa
+
+Só quem o admin marcou em **Ajustes → Pessoas → Também acessa**. A marcação fica em `public.acesso_a_outras_empresas`, no banco de cada empresa, e é feita por admin.
+- **Para alguém trabalhar nas duas empresas:**
+  1. pôr o e-mail na lista de permitidos de cada uma;
+  2. depois do primeiro login dela em cada empresa, marcar a outra empresa nas duas.
+- **A marcação só mostra o botão.** Quem entra continua sendo decidido pela lista de permitidos de cada empresa.
+- **Nenhum banco consulta o outro.**
+
 ## As travas contra o projeto errado
 
 1. **Cada banco sabe de quem é.** `app.identidade` guarda uma linha, gravada uma vez e imutável. Todo seed e script de empresa começa por `app.exigir_empresa('<empresa>')`.
