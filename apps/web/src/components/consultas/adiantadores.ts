@@ -1,23 +1,31 @@
 import type { QueryClient } from '@tanstack/react-query';
 
+import { hojeEmNatal } from '@/components/agenda/tipos';
 import { buscarMeuPapel, CHAVE_MEU_PAPEL } from '@/components/cadencias/usar-papel';
 import { carregarConversas, CHAVE_CONVERSAS } from '@/components/conversas/dados';
 import { carregarFunisDisponiveis, CHAVE_FUNIS_DISPONIVEIS } from '@/components/funis/acoes/consultas';
 import { filtrosQuadroDaUrl } from '@/components/funis/tipos';
 import { consultaDoQuadro } from '@/components/funis/use-quadro';
+import { carregarLigacoesDoDia, chaveDasLigacoesDoDia } from '@/components/ligacoes-do-dia/dados';
 import { carregarLotes, CHAVE_LOTES } from '@/components/ligacao/consultas';
 import { buscarParceiros, chaveDaBusca } from '@/components/parceiros/busca';
 import { carregarConsultoria, CHAVE_CONSULTORIA } from '@/components/parceiros/consultoria';
 import { filtrosDaUrl } from '@/components/parceiros/tipos';
+import { buscarFila, buscarResumo, chaveDaFila } from '@/components/revisao/dados';
+import { FILTROS_INICIAIS } from '@/components/revisao/tipos';
 import { type AppRole } from '@/lib/auth/role';
 import { podeMarcarConsultoria } from '@/lib/navegacao';
 
 /**
- * O que cada tela da barra de baixo busca AO ABRIR, para ser buscado antes do toque
+ * O que cada tela do menu busca AO ABRIR, para ser buscado antes do toque
  * (`adiantar-dados.tsx`). Cada entrada usa a mesma chave e a mesma função da própria
  * tela — se divergissem, o que veio antes nunca seria achado. A tela aberta pelo
  * menu é sempre a do endereço sem filtro (`/parceiros`, `/funis`), então o recorte é
  * o padrão da URL vazia.
+ *
+ * Ficam de fora o Meu dia (é a tela de entrada, e já está aberta), a Agenda (a busca
+ * dela depende do catálogo e das etapas que o servidor entrega à página) e as Metas
+ * (uma consulta por pessoa da equipe). Delas o menu adianta só a página e o código.
  *
  * Só leitura: são as mesmas consultas que a tela faria um instante depois.
  *
@@ -65,4 +73,23 @@ export const ADIANTADORES: Readonly<Partial<Record<string, Adiantador>>> = {
 
   '/conversas': (cliente) =>
     seFaltar(cliente, { queryKey: CHAVE_CONVERSAS, queryFn: carregarConversas }),
+
+  '/revisao': async (cliente) => {
+    await Promise.all([
+      seFaltar(cliente, { queryKey: ['radar', 'resumo'], queryFn: buscarResumo }),
+      seFaltar(cliente, {
+        queryKey: chaveDaFila(FILTROS_INICIAIS),
+        queryFn: () => buscarFila(FILTROS_INICIAIS),
+      }),
+    ]);
+  },
+
+  // O painel que abre é o das ligações de hoje (`painelDaUrl`), do time inteiro.
+  '/relatorios': async (cliente) => {
+    const hoje = hojeEmNatal();
+    await seFaltar(cliente, {
+      queryKey: chaveDasLigacoesDoDia(hoje, null),
+      queryFn: () => carregarLigacoesDoDia(hoje, null),
+    });
+  },
 };

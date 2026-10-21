@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { type AppRole } from '@/lib/auth/role';
@@ -14,8 +14,9 @@ const ESPERA_MS = 1200;
  * OS DADOS JÁ ESTÃO AQUI QUANDO O DEDO CHEGA (21/10/2026). O menu adianta a página e
  * o código de cada tela (`layout/nav-link.tsx`), mas a tela ainda buscava os dados
  * DEPOIS do toque — uma a três idas ao banco em série, ~35 ms cada no Wi-Fi e
- * ~150 ms ou mais no 4G. Aqui, com o aparelho ocioso, as telas da barra de baixo que
- * ainda não têm nada no cache buscam o que mostram ao abrir (`adiantadores.ts`).
+ * ~150 ms ou mais no 4G. Aqui, com o aparelho ocioso, as telas do menu que ainda não
+ * têm nada no cache buscam o que mostram ao abrir (`adiantadores.ts`), e a página e o
+ * código de todas elas, inclusive as da folha "Mais", ficam guardados.
  * O toque desenha a tela com eles na hora, e a tela renova por cima como já fazia
  * (`provedor-consultas.tsx`): nada aparece velho por mais que essa renovação.
  *
@@ -27,6 +28,7 @@ const ESPERA_MS = 1200;
  */
 export function AdiantarDados({ papel, telas }: { papel: AppRole; telas: readonly string[] }) {
   const cliente = useQueryClient();
+  const router = useRouter();
   const caminho = usePathname();
   const lista = telas.join('|');
 
@@ -39,6 +41,10 @@ export function AdiantarDados({ papel, telas }: { papel: AppRole; telas: readonl
       for (const tela of lista.split('|')) {
         if (cancelado) return;
         if (estaAtivo(caminho, tela)) continue;
+        // A página e o código também: os itens da folha "Mais" só ficam visíveis (e
+        // só seriam adiantados pelo `nav-link.tsx`) quando a folha abre, e no 4G o
+        // toque chegava antes. O que já está guardado o Next não pede de novo.
+        router.prefetch(tela);
         // Uma falha aqui não é da pessoa: a tela busca de novo ao abrir e mostra o erro ela mesma.
         await ADIANTADORES[tela]?.(cliente, papel).catch(() => undefined);
       }
@@ -56,7 +62,7 @@ export function AdiantarDados({ papel, telas }: { papel: AppRole; telas: readonl
       window.clearTimeout(espera);
       if (ocioso !== undefined) window.cancelIdleCallback(ocioso);
     };
-  }, [cliente, caminho, papel, lista]);
+  }, [cliente, router, caminho, papel, lista]);
 
   return null;
 }

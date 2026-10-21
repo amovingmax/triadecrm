@@ -537,6 +537,17 @@ export function barraDoCelular(papel: AppRole): {
 }
 
 /**
+ * As telas que o aparelho adianta quando está ocioso (`consultas/adiantar-dados.tsx`),
+ * na ordem em que costumam ser tocadas: as fatias da barra de baixo, na ordem do
+ * polegar, e depois as do "Mais". O adiantamento vai uma por uma, e no 4G a fila
+ * inteira leva segundos: a ordem é o que decide qual já está pronta no primeiro toque.
+ */
+export function telasParaAdiantar(papel: AppRole): string[] {
+  const { fatias, emMais } = barraDoCelular(papel);
+  return [...fatias, ...emMais].map((item) => item.href);
+}
+
+/**
  * Item ativo para um caminho (a própria rota ou uma sub-rota dela).
  *
  * Compara só o caminho, nunca a query string: `/registrar?org=<id>` e `/parceiros?novo=1`

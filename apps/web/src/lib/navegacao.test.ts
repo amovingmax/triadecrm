@@ -17,6 +17,7 @@ import {
   podeImportarPlanilha,
   podeMandarMensagemAutomatica,
   podeMarcarConsultoria,
+  telasParaAdiantar,
   temPoderDeGestao,
 } from '@/lib/navegacao';
 
@@ -48,6 +49,17 @@ describe('NAVEGACAO', () => {
     expect(sdr.emMais.map((item) => item.rotulo)).toEqual(
       admin.emMais.map((item) => item.rotulo).filter((rotulo) => rotulo !== 'Ajustes'),
     );
+  });
+
+  it('o aparelho adianta as telas na ordem do polegar, e depois as do "Mais" (21/10/2026)', () => {
+    // O adiantamento vai uma tela por vez; no 4G a fila inteira leva segundos, e a
+    // ordem decide qual já está pronta no primeiro toque.
+    const sdr = telasParaAdiantar('sdr');
+    expect(sdr.slice(0, 5)).toEqual(['/meu-dia', '/ligar', '/parceiros', '/funis', '/conversas']);
+    expect(new Set(sdr)).toEqual(new Set(navegacaoPara('sdr').map((item) => item.href)));
+    expect(sdr).not.toContain('/admin');
+    expect(telasParaAdiantar('gestor')).toContain('/admin');
+    expect(telasParaAdiantar('leitura')).toEqual([]);
   });
 
   it('Campanhas e Cadências deixaram de existir, e Registrar saiu do menu (pivô de 06/10/2026)', () => {

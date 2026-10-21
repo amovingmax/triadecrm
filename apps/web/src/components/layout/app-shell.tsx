@@ -11,7 +11,7 @@ import { ProvedorDoSoftphone } from '@/components/ligacao/voz-provedor';
 import { TransicaoPagina } from '@/components/movimento';
 import { type Sessao } from '@/lib/auth/session';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
-import { navegacaoPara } from '@/lib/navegacao';
+import { telasParaAdiantar } from '@/lib/navegacao';
 
 /**
  * Casca da área autenticada, responsiva e mobile-first (PRD §8):
@@ -87,10 +87,7 @@ export function AppShell({
           {/* O link tocado esmaece até a tela nova entrar, em qualquer tela. */}
           <RetornoDoToque />
           {/* Com o aparelho ocioso, as telas do menu buscam os dados antes do toque. */}
-          <AdiantarDados
-            papel={sessao.papel}
-            telas={navegacaoPara(sessao.papel).map((item) => item.href)}
-          />
+          <AdiantarDados papel={sessao.papel} telas={telasParaAdiantar(sessao.papel)} />
         </div>
       </ProvedorDoSoftphone>
     </ProvedorDeAvisos>
