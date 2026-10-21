@@ -7545,3 +7545,20 @@ Até a animação de entrada terminar: Prospectados 770 → 745 → **231** ms e
 **Não mexe no WhatsApp.** Nenhum arquivo do caminho de envio e entrada foi tocado. O adiantamento de Conversas só lê a lista, como a tela já lia.
 
 **Não publicado.** Branch local `instantaneo`, sem push, sem merge na main e sem deploy. Sobe junto com a `completo` (é feita sobre ela), com pedido do usuário.
+
+## 21/10/2026 (tarde) — Publicado: velocidade, SDR igual ao gestor, ficha que liga e telas que abrem na hora
+
+**O pedido.** "Quero que suba essa versão pro ar" e, em seguida, "Pode enviar para a main, aplicar as migrações no banco e publicar na Vercel."
+
+**Conferido antes.** O ar estava igual à main: deploy `triade-iauu7gid7` (commit `d0fcb64`, desta conta, pelo CLI) e as 152 migrações da main no banco, nenhuma a mais. As regras de acesso, funções e views que as migrações novas reescrevem foram comparadas com uma cópia da estrutura de produção: as 76 políticas e as 11 funções regeneradas eram exatamente as que a migração supunha (a troca de `app.is_manager()` por `app.admin_ou_gestor()` aplicada às definições de produção reproduziu o texto da migração letra por letra); `app.is_manager`, `app.acompanha`, `montar_lote_avulso`, `pipeline_board` e as duas views, também. Testes: web 1.318, workers 388, `schema` 105, `prompts` 284; lint e tipos.
+
+**Publicado.**
+- **GitHub:** a main avançou `da2a47b → 7c3ab6e` (as branches `velocidade`, `sdr-acesso`, `completo` e `instantaneo`, sem merge novo).
+- **Banco:** `supabase db push` das seis migrações (`20261020120000`, `20261020130000`, `20261020140000`, `20261020200000`, `20261021090000`, `20261021110000`); 158 migrações no ar, todas com par local. Conferido depois: `is_manager` com o SDR, `admin_ou_gestor` com admin e gestor, 76 políticas com ela, a nova `montar_lote_avulso`, a Consultoria lida pelo SDR e os dois índices.
+- **Web:** deploy `triade-5jll2hsyh` (commit `7c3ab6e`), de uma cópia limpa do commit (sem `.env.local` e sem a rota `/auth/dev`), no ar em `triade-crm-tawny.vercel.app` e `ir.komune.app.br`. Conferido: login 200, telas internas pedem login, `/auth/dev` dá 404, `/r/` segue para o site da Komune.
+
+**Para a equipe.** Fechar e abrir de novo o CRM (no celular, fechar o app de vez): quem ficar com a aba antiga não recebe a versão nova. O SDR passa a ver todas as telas menos Ajustes, inclusive os botões com custo (mensagem automática pelo WhatsApp e "Ler com a IA").
+
+**Volta, se precisar.** Web: promover de novo o `triade-iauu7gid7`. Banco: cada migração traz o "COMO DESFAZER" no cabeçalho.
+
+**Pendente.** A primeira ligação real pelo navegador em produção (a recarga da Twilio estava pendente) e a conferência do usuário no celular.
