@@ -31,11 +31,12 @@
  * dele, e um teste falha se alguém acrescentar um motivo sem dizer de que lado ele
  * está (laudo §3.12a).
  */
-import { z } from 'zod';
+import * as z from 'zod';
 
 import { type OrgKind, type Temperature } from '@komune/schema';
 
 import { createClient } from '@/lib/supabase/client';
+import { idDaSessao } from '@/lib/supabase/quem-sou';
 
 import {
   ETAPAS_SEM_LIGACAO_DE_ATIVACAO,
@@ -497,12 +498,11 @@ const PAPEIS_QUE_RECEBEM_LOTE: readonly string[] = ['admin', 'gestor', 'sdr'];
 
 export async function carregarQuemLiga(): Promise<QuemLiga[]> {
   const supabase = createClient();
-  const [sessao, time] = await Promise.all([
-    supabase.auth.getUser(),
+  const [meuId, time] = await Promise.all([
+    idDaSessao(supabase),
     supabase.from('team_directory').select('id, full_name, role').eq('is_active', true),
   ]);
   if (time.error) throw time.error;
-  const meuId = sessao.data.user?.id ?? null;
 
   return (
     ((time.data ?? []) as { id: string | null; full_name: string | null; role: string | null }[])
@@ -597,10 +597,10 @@ const TETO_DE_CHAMADAS = 5000;
 export async function carregarLotes(): Promise<LoteNaLista[]> {
   const supabase = createClient();
 
-  const sessao = await supabase.auth.getUser();
-  const meuId = sessao.data.user?.id ?? null;
-
-  const [lotes, funis, pessoas, roteiros, desfechoDeReuniao] = await Promise.all([
+  // Quem sou vem junto, e não antes: era uma ida ao Auth em série, só para marcar
+  // quais lotes são meus.
+  const [meuId, lotes, funis, pessoas, roteiros, desfechoDeReuniao] = await Promise.all([
+    idDaSessao(supabase),
     supabase
       .from('call_batches')
       .select(

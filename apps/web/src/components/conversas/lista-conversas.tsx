@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { ChevronRight, Sparkles } from 'lucide-react';
 
 import { FaixaDeNova, MarcaDeNova } from '@/components/avisos/marca-de-nova';
@@ -80,7 +80,7 @@ export function ListaConversas({
     <ul className="corpo-tabela flex flex-col">
       {juntarNaLista(itens, clientes).map((linha) =>
         linha.tipo === 'parceiro' ? (
-          <Linha
+          <LinhaMemorizada
             key={linha.item.id}
             item={linha.item}
             selecionado={linha.item.id === selecionadoId}
@@ -89,7 +89,7 @@ export function ListaConversas({
             aoEscolher={aoEscolher}
           />
         ) : (
-          <LinhaDeCliente
+          <LinhaDeClienteMemorizada
             key={linha.fio.id}
             fio={linha.fio}
             selecionado={linha.fio.id === clienteSelecionadoId}
@@ -102,6 +102,17 @@ export function ListaConversas({
     </ul>
   );
 }
+
+/**
+ * As linhas são memorizadas (20/10/2026): cada tecla na caixa de resposta muda o
+ * mapa de rascunhos, e a lista, que o escuta, era redesenhada INTEIRA — até 500
+ * linhas por tecla, ao lado da conversa no PC. Só que a linha da conversa aberta
+ * nunca mostra "Rascunho:" (`rascunhoDe` devolve `null` para a selecionada), então
+ * enquanto se digita nenhuma linha muda: com as propriedades iguais, nenhuma é
+ * redesenhada. `item` vem do cache e `aoEscolher` é estável (`useCallback`).
+ */
+const LinhaMemorizada = memo(Linha);
+const LinhaDeClienteMemorizada = memo(LinhaDeCliente);
 
 /**
  * "Rascunho: É assim que deveri…": o que a pessoa digitou e não enviou, no lugar

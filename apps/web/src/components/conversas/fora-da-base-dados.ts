@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 import { createClient } from '@/lib/supabase/client';
 import { formatarTelefone } from '@/components/parceiros/formatos';

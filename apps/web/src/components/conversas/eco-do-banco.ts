@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
 import { chaveDasMensagensDoFio } from './fora-da-base-dados';
 import { chaveDaLeitura } from './leitura-da-ia-dados';
+import { ESPERA_DA_RAJADA_MS, RITMO_SEM_ECO_MS, RITMO_VIGIANDO_MS } from './ritmo-do-eco';
 
 /**
  * O eco do banco: a tela se atualiza sozinha quando o parceiro responde.
@@ -58,11 +59,7 @@ import { chaveDaLeitura } from './leitura-da-ia-dados';
  */
 
 /** As tabelas publicadas no Realtime (migração `20260917150000`). */
-export type TabelaDoEco =
-  | 'messages'
-  | 'conversations'
-  | 'message_drafts'
-  | 'ficha_da_conversa';
+export type TabelaDoEco = 'messages' | 'conversations' | 'message_drafts' | 'ficha_da_conversa';
 
 export interface EventoDoEco {
   readonly tabela: TabelaDoEco;
@@ -72,6 +69,8 @@ export interface EventoDoEco {
   readonly organizacaoId: string | null;
   /** `true` só para mensagem NOVA vinda do parceiro. É o que merece aviso. */
   readonly respostaDoParceiro: boolean;
+  /** O registro é novo (INSERT). Em `messages`, o contrário é recibo ou transcrição. */
+  readonly novo: boolean;
 }
 
 /**
@@ -80,25 +79,8 @@ export interface EventoDoEco {
  */
 export type EstadoDoEco = 'ligando' | 'ao_vivo' | 'sem_eco';
 
-/** Quanto tempo juntar eventos antes de buscar. Rajada vira uma busca só. */
-export const ESPERA_DA_RAJADA_MS = 400;
-
-/** Ritmo da sondagem quando não há eco. Barata o bastante para ser frequente. */
-export const RITMO_SEM_ECO_MS = 20_000;
-
-/**
- * Ritmo da MESMA sondagem enquanto o eco está de pé.
- *
- * Ela não some quando o socket sobe, e a razão é um modo de falha real: "ao
- * vivo" quer dizer que o canal assinou, não que os eventos estão chegando. Se a
- * publicação sumir numa migração futura, ou se o socket ficar aberto e surdo, a
- * tela diria "ao vivo" e estaria morta — em silêncio, que é a pior forma.
- *
- * A noventa segundos ela custa duas consultas minúsculas por minuto e meio, e é
- * o que garante que o atraso máximo da tela seja um minuto e meio em vez de
- * infinito.
- */
-export const RITMO_VIGIANDO_MS = 90_000;
+// Os ritmos moram em `ritmo-do-eco.ts` (o aviso de resposta, na casca, usa os mesmos).
+export { ESPERA_DA_RAJADA_MS, RITMO_SEM_ECO_MS, RITMO_VIGIANDO_MS };
 
 interface RegistroCru {
   readonly id?: unknown;
@@ -135,12 +117,13 @@ export function lerEvento(
     conversaId,
     organizacaoId,
     respostaDoParceiro: tabela === 'messages' && ehInsercao && r.direction === 'in',
+    novo: ehInsercao,
   };
 }
 
 /** O que juntar enquanto a rajada não termina (ou enquanto a aba está escondida). */
 export interface Pendencia {
-  /** A lista sempre precisa: ordem, prévia e "por ler" mudam com qualquer evento. */
+  /** A lista: ordem, prévia e "por ler" mudam com quase todo evento (ver `somarAoPendente`). */
   lista: boolean;
   /** As linhas do tempo abertas que precisam ser buscadas de novo. */
   readonly organizacoes: Set<string>;
@@ -162,7 +145,16 @@ export function somarAoPendente(pendencia: Pendencia, evento: EventoDoEco): Pend
   // que ninguém estava vendo. Deixou de ser verdade no dia em que a lista passou
   // a mostrar a próxima ação: agora um resumo novo MUDA o que está na tela, e não
   // recarregar seria deixar o conselho velho no lugar onde se decide.
-  pendencia.lista = true;
+  //
+  // A EXCEÇÃO É A MENSAGEM QUE JÁ EXISTIA (20/10/2026). Cada mensagem enviada
+  // volta três vezes como UPDATE em `messages` (enviado, entregue, lido), e cada
+  // volta recarregava a lista inteira — as dezesseis consultas, em toda aba de
+  // Conversas aberta, só para mudar o tique da conversa aberta. A lista não lê
+  // `messages`, e no banco o UPDATE de mensagem não mexe em outra tabela (os
+  // gatilhos que tocam `conversations` e `activities` são todos de INSERT). Então
+  // o recibo atualiza a conversa aberta e deixa a lista quieta; mensagem NOVA e
+  // qualquer evento das outras tabelas continuam recarregando tudo.
+  if (evento.tabela !== 'messages' || evento.novo) pendencia.lista = true;
   if (evento.organizacaoId !== null) pendencia.organizacoes.add(evento.organizacaoId);
   if (evento.conversaId !== null) pendencia.fios.add(evento.conversaId);
   if (evento.respostaDoParceiro) pendencia.respostas.push(evento);

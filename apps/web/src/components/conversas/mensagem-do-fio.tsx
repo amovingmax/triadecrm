@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   AudioLines,
   BadgeCheck,
@@ -13,6 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+import { SOBREVIVE_A_NAVEGACAO } from '@/components/consultas/provedor-consultas';
 import { cn } from '@/lib/utils';
 import { iniciaisDe } from '@/lib/iniciais';
 import { Badge } from '@/components/ui/badge';
@@ -112,70 +114,71 @@ export function Mensagem({
       )}
 
       <div className={cn('flex min-w-0 flex-col', entrada ? 'items-start' : 'items-end')}>
-      {agrupada ? null : <Quem mensagem={mensagem} nomeDoParceiro={nomeDoParceiro} />}
+        {agrupada ? null : <Quem mensagem={mensagem} nomeDoParceiro={nomeDoParceiro} />}
 
-      <div
-        className={cn(
-          'min-w-0 max-w-[85%] space-y-2 px-4 py-3 text-base leading-relaxed',
-          'md:max-w-[38rem]',
-          // O canto reto é o "rabinho" do balão: fica no lado de quem falou, e só
-          // no último do bloco — no meio do bloco todos os cantos são redondos.
-          'rounded-2xl',
-          // O cinza da recebida muda de degrau com o tema: no claro o cartão é
-          // quase branco (some no fundo da página) e quem separa é o `muted`; no
-          // escuro é o contrário — o `muted` encosta no fundo e o cartão destaca.
-          // O QUE NÓS MANDAMOS É VERDE SÓLIDO. Era `bg-primary/20`: no tema
-          // escuro o véu de 20% caía quase no mesmo cinza da recebida, e os dois
-          // lados da conversa ficavam com o mesmo peso — a queixa de "não dá
-          // para ver quem é quem" era literalmente isso. A recebida ganhou
-          // borda em vez de fundo mais claro, para não competir.
-          entrada
-            ? cn('border border-hairline bg-card text-foreground', fechaGrupo && 'rounded-bl-md')
-            : cn('bg-primary text-primary-foreground', fechaGrupo && 'rounded-br-md'),
-        )}
-      >
-        {mensagem.tipo === 'audio' ? <Audio mensagem={mensagem} /> : null}
-        {mensagem.tipo === 'image' ? <Foto mensagem={mensagem} /> : null}
-        {mensagem.tipo === 'video' ? <Video mensagem={mensagem} /> : null}
-        {mensagem.tipo === 'document' ? <Documento mensagem={mensagem} /> : null}
-
-        {mensagem.texto ? <Texto texto={mensagem.texto} /> : null}
-
-        {!TIPOS_COM_ARQUIVO.has(mensagem.tipo) && semTexto ? <SemCorpo mensagem={mensagem} /> : null}
-
-      </div>
-
-      {fechaGrupo ? (
-        <p
+        <div
           className={cn(
-            'mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground',
-            entrada ? 'justify-start' : 'flex-row-reverse',
+            'min-w-0 max-w-[85%] space-y-2 px-4 py-3 text-base leading-relaxed',
+            'md:max-w-[38rem]',
+            // O canto reto é o "rabinho" do balão: fica no lado de quem falou, e só
+            // no último do bloco — no meio do bloco todos os cantos são redondos.
+            'rounded-2xl',
+            // O cinza da recebida muda de degrau com o tema: no claro o cartão é
+            // quase branco (some no fundo da página) e quem separa é o `muted`; no
+            // escuro é o contrário — o `muted` encosta no fundo e o cartão destaca.
+            // O QUE NÓS MANDAMOS É VERDE SÓLIDO. Era `bg-primary/20`: no tema
+            // escuro o véu de 20% caía quase no mesmo cinza da recebida, e os dois
+            // lados da conversa ficavam com o mesmo peso — a queixa de "não dá
+            // para ver quem é quem" era literalmente isso. A recebida ganhou
+            // borda em vez de fundo mais claro, para não competir.
+            entrada
+              ? cn('border border-hairline bg-card text-foreground', fechaGrupo && 'rounded-bl-md')
+              : cn('bg-primary text-primary-foreground', fechaGrupo && 'rounded-br-md'),
           )}
         >
-          <time dateTime={mensagem.em} title={dataHoraCompleta(mensagem.em)} className="numerico">
-            {hora(mensagem.em)}
-          </time>
-          <span
+          {mensagem.tipo === 'audio' ? <Audio mensagem={mensagem} /> : null}
+          {mensagem.tipo === 'image' ? <Foto mensagem={mensagem} /> : null}
+          {mensagem.tipo === 'video' ? <Video mensagem={mensagem} /> : null}
+          {mensagem.tipo === 'document' ? <Documento mensagem={mensagem} /> : null}
+
+          {mensagem.texto ? <Texto texto={mensagem.texto} /> : null}
+
+          {!TIPOS_COM_ARQUIVO.has(mensagem.tipo) && semTexto ? (
+            <SemCorpo mensagem={mensagem} />
+          ) : null}
+        </div>
+
+        {fechaGrupo ? (
+          <p
             className={cn(
-              'inline-flex items-center gap-1',
-              entrega.tom === 'falha' && 'text-destructive-texto',
-              entrega.tom === 'espera' && 'text-foreground',
+              'mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground',
+              entrada ? 'justify-start' : 'flex-row-reverse',
             )}
           >
-            {entrega.tom === 'espera' ? (
-              <Hourglass className="size-3" aria-hidden="true" />
-            ) : entrega.tom === 'falha' ? (
-              <Ban className="size-3" aria-hidden="true" />
+            <time dateTime={mensagem.em} title={dataHoraCompleta(mensagem.em)} className="numerico">
+              {hora(mensagem.em)}
+            </time>
+            <span
+              className={cn(
+                'inline-flex items-center gap-1',
+                entrega.tom === 'falha' && 'text-destructive-texto',
+                entrega.tom === 'espera' && 'text-foreground',
+              )}
+            >
+              {entrega.tom === 'espera' ? (
+                <Hourglass className="size-3" aria-hidden="true" />
+              ) : entrega.tom === 'falha' ? (
+                <Ban className="size-3" aria-hidden="true" />
+              ) : null}
+              {entrega.rotulo}
+            </span>
+            <Selos mensagem={mensagem} />
+            {entrada ? <VirarTarefa mensagemId={mensagem.id} /> : null}
+            {entrega.detalhe ? (
+              <span className="w-full text-muted-foreground">{entrega.detalhe}</span>
             ) : null}
-            {entrega.rotulo}
-          </span>
-          <Selos mensagem={mensagem} />
-          {entrada ? <VirarTarefa mensagemId={mensagem.id} /> : null}
-          {entrega.detalhe ? (
-            <span className="w-full text-muted-foreground">{entrega.detalhe}</span>
-          ) : null}
-        </p>
-      ) : null}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -225,9 +228,7 @@ function Retrato({
     );
   }
 
-  const nome = mensagem.entrada
-    ? (nomeDoParceiro?.trim() || 'Parceiro')
-    : (mensagem.autor ?? 'Time');
+  const nome = mensagem.entrada ? nomeDoParceiro?.trim() || 'Parceiro' : (mensagem.autor ?? 'Time');
 
   return (
     <Avatar className="size-8 shrink-0" title={nome}>
@@ -273,7 +274,7 @@ function Quem({
   const doSistema = mensagem.autorTipo === 'system';
 
   const quem = mensagem.entrada
-    ? (nomeDoParceiro?.trim() || 'O parceiro')
+    ? nomeDoParceiro?.trim() || 'O parceiro'
     : mensagem.autorTipo === 'human'
       ? (mensagem.autor ?? 'Alguém do time')
       : ROTULO_DO_ROBO[mensagem.autorTipo];
@@ -363,7 +364,15 @@ const TIPOS_COM_ARQUIVO: ReadonlySet<string> = new Set(['audio', 'image', 'video
  * A URL vale cinco minutos (`/api/midia`). Quem fica mais tempo com a conversa
  * aberta e dá play num vídeo pega uma URL vencida — por isso `renovar()`, que o
  * player chama no erro, uma vez.
+ *
+ * A assinatura fica no cache de consultas por quatro minutos (20/10/2026): voltar
+ * a uma conversa já aberta, ou o React montar o balão de novo, reaproveita a
+ * mesma URL — e, com a mesma URL, o navegador também não baixa a foto outra vez.
+ * Antes, cada montagem era um pedido ao servidor e um download. A chave leva a
+ * mensagem, o caminho e a vez: nenhuma resposta serve a outro arquivo.
  */
+const VALIDADE_DA_ASSINATURA_MS = 4 * 60_000;
+
 function useArquivoDaMensagem(mensagem: MensagemDoFio): {
   estado: EstadoDoArquivo;
   url: string | null;
@@ -372,31 +381,31 @@ function useArquivoDaMensagem(mensagem: MensagemDoFio): {
   const caminho = mensagem.midiaCaminho;
   const messageId = mensagem.id;
   const [vez, setVez] = useState(0);
-  // A resposta guarda O CAMINHO e a VEZ que ela responde. Sem isso, trocar de
-  // conversa mostraria por um instante o arquivo anterior — de outra pessoa.
-  const [assinada, setAssinada] = useState<{ chave: string; url: string | null } | null>(null);
-  const chave = `${caminho ?? ''}#${vez}`;
+  const assinatura = useQuery({
+    queryKey: ['conversas', 'midia', messageId, caminho, vez],
+    queryFn: () => urlDaMidia(messageId),
+    enabled: Boolean(caminho),
+    // A URL vale cinco minutos; quatro deixam um de folga para quem der play.
+    staleTime: VALIDADE_DA_ASSINATURA_MS,
+    gcTime: VALIDADE_DA_ASSINATURA_MS,
+    // `urlDaMidia` não lança: falha é `null`, e o balão mostra a transcrição.
+    retry: false,
+    // Uma URL assinada não é dado que envelhece com a troca de tela.
+    meta: SOBREVIVE_A_NAVEGACAO,
+  });
 
-  useEffect(() => {
-    if (!caminho) return;
-    let vivo = true;
-    void urlDaMidia(messageId).then((url) => {
-      if (vivo) setAssinada({ chave, url });
-    });
-    return () => {
-      vivo = false;
-    };
-  }, [caminho, messageId, chave]);
-
-  const resposta = assinada?.chave === chave ? assinada : null;
   const estado: EstadoDoArquivo = !caminho
     ? 'ausente'
-    : resposta === null
+    : assinatura.data === undefined
       ? 'procurando'
-      : resposta.url
+      : assinatura.data
         ? 'pronto'
         : 'ausente';
-  return { estado, url: resposta?.url ?? null, renovar: () => setVez((v) => (v < 2 ? v + 1 : v)) };
+  return {
+    estado,
+    url: assinatura.data ?? null,
+    renovar: () => setVez((v) => (v < 2 ? v + 1 : v)),
+  };
 }
 
 /**
@@ -450,7 +459,9 @@ function Foto({ mensagem }: { mensagem: MensagemDoFio }) {
   const figurinha = mensagem.tipoNaMeta === 'sticker';
   const nome = figurinha ? 'Figurinha' : 'Foto';
   if (estado === 'ausente') {
-    return <ArquivoAusente rotulo={nome} icone={<ImageIcon className="size-3.5" aria-hidden="true" />} />;
+    return (
+      <ArquivoAusente rotulo={nome} icone={<ImageIcon className="size-3.5" aria-hidden="true" />} />
+    );
   }
   if (estado === 'procurando' || !url) {
     return (
@@ -498,10 +509,17 @@ function Foto({ mensagem }: { mensagem: MensagemDoFio }) {
 function Video({ mensagem }: { mensagem: MensagemDoFio }) {
   const { estado, url, renovar } = useArquivoDaMensagem(mensagem);
   if (estado === 'ausente') {
-    return <ArquivoAusente rotulo="Vídeo" icone={<Film className="size-3.5" aria-hidden="true" />} />;
+    return (
+      <ArquivoAusente rotulo="Vídeo" icone={<Film className="size-3.5" aria-hidden="true" />} />
+    );
   }
   if (estado === 'procurando' || !url) {
-    return <div className="h-48 w-72 max-w-full animate-pulse rounded-xl bg-muted" aria-label="Carregando o vídeo" />;
+    return (
+      <div
+        className="h-48 w-72 max-w-full animate-pulse rounded-xl bg-muted"
+        aria-label="Carregando o vídeo"
+      />
+    );
   }
   return (
     <video
@@ -520,7 +538,12 @@ function Video({ mensagem }: { mensagem: MensagemDoFio }) {
 function Documento({ mensagem }: { mensagem: MensagemDoFio }) {
   const { estado } = useArquivoDaMensagem(mensagem);
   if (estado === 'ausente') {
-    return <ArquivoAusente rotulo="Documento" icone={<FileText className="size-3.5" aria-hidden="true" />} />;
+    return (
+      <ArquivoAusente
+        rotulo="Documento"
+        icone={<FileText className="size-3.5" aria-hidden="true" />}
+      />
+    );
   }
   const pdf = (mensagem.midiaTipo ?? '').includes('pdf');
   return (
@@ -536,7 +559,11 @@ function Documento({ mensagem }: { mensagem: MensagemDoFio }) {
       )}
     >
       <FileText className="size-4 shrink-0" aria-hidden="true" />
-      {estado === 'procurando' ? 'Procurando o arquivo...' : pdf ? 'Abrir o PDF' : 'Abrir o documento'}
+      {estado === 'procurando'
+        ? 'Procurando o arquivo...'
+        : pdf
+          ? 'Abrir o PDF'
+          : 'Abrir o documento'}
     </button>
   );
 }

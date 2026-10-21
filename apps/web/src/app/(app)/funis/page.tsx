@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
-import { ProvedorConsultas } from '@/components/consultas/provedor-consultas';
 import { TelaFunis } from '@/components/funis/acoes/tela-funis';
 import { filtrosQuadroDaUrl } from '@/components/funis/tipos';
 
@@ -14,10 +13,8 @@ export const metadata: Metadata = { title: 'Funis' };
  * aqui é a segunda camada) e traduz a query string no recorte inicial, para que um
  * link de quadro filtrado — mandado no grupo do time — abra já filtrado. O quadro em
  * si é buscado no cliente, com TanStack Query, porque ele muda o dia inteiro e é
- * arrastado, movido e recarregado sem trocar de página.
- *
- * O provedor de consultas mora aqui, e não no layout raiz: só as telas que buscam no
- * cliente precisam dele, e a casca do app continua sendo servidor puro.
+ * arrastado, movido e recarregado sem trocar de página. O provedor de consultas vem
+ * do layout da área autenticada (`app/(app)/layout.tsx`).
  */
 export default async function Pagina({
   searchParams,
@@ -27,9 +24,5 @@ export default async function Pagina({
   // Tela da gestão desde o pivô de 06/10/2026: quem liga vê só Ligar e Meu dia.
   const [, params] = await Promise.all([requireRole('admin', 'gestor'), searchParams]);
 
-  return (
-    <ProvedorConsultas>
-      <TelaFunis filtrosIniciais={filtrosQuadroDaUrl(params)} />
-    </ProvedorConsultas>
-  );
+  return <TelaFunis filtrosIniciais={filtrosQuadroDaUrl(params)} />;
 }

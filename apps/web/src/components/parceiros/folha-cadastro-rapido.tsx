@@ -12,7 +12,6 @@ import {
   type QuickCreateOrganizationFormInput,
   type QuickCreateOrganizationResult,
 } from '@komune/schema';
-import { motion } from 'motion/react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -34,7 +33,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { useMovimento } from '@/components/movimento';
 
 import { ROTULO_TIPO } from './formatos';
 import { useEhCelular } from './usar-eh-celular';
@@ -44,8 +42,8 @@ import type { Catalogos, OpcaoCategoria } from './tipos';
  * Cadastro rápido (RF-BAS-15): quatro campos e pronto, em menos de 30 segundos
  * no celular, ainda dentro da conversa que acabou de acontecer na rua.
  *
- * Entra pela lateral no desktop e por baixo no celular, com mola (a folha vem do
- * lugar de onde o botão foi tocado). Os campos têm 44px de altura no celular.
+ * Entra pela lateral no desktop e por baixo no celular (a folha vem do lugar de
+ * onde o botão foi tocado). Os campos têm 44px de altura no celular.
  *
  * A dedup por telefone é do banco (`quick_create_organization`): quando o número já
  * existe, a resposta traz o id da ficha e a folha vira um atalho para ela, em vez de
@@ -105,7 +103,6 @@ function Formulario({
   aoCriar?: () => void;
 }) {
   const router = useRouter();
-  const { mola } = useMovimento();
   const [jaExiste, setJaExiste] = useState<JaExiste | null>(null);
   const [falha, setFalha] = useState<string | null>(null);
 
@@ -189,14 +186,12 @@ function Formulario({
   }
 
   return (
-    <motion.form
+    <form
       onSubmit={form.handleSubmit(enviar)}
-      // A folha em si entra pelo Radix (translate + fade, na direção certa); a mola
-      // fica no conteúdo, que é o que a pessoa vai tocar assim que ele assentar.
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={mola}
-      className="flex flex-col gap-4 px-4 pb-4"
+      // A folha em si entra pelo Radix (translate + fade, na direção certa); a
+      // entrada curta fica no conteúdo, que é o que a pessoa vai tocar assim que
+      // ele assentar (`entrada-folha`, em globals.css).
+      className="entrada-folha flex flex-col gap-4 px-4 pb-4"
       noValidate
     >
       <Campo
@@ -333,7 +328,7 @@ function Formulario({
           {form.formState.isSubmitting ? 'Salvando...' : 'Salvar parceiro'}
         </Button>
       </div>
-    </motion.form>
+    </form>
   );
 }
 

@@ -1,9 +1,10 @@
 'use client';
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { Constants } from '@komune/schema';
 
 import { createClient } from '@/lib/supabase/client';
+import { idDaSessao } from '@/lib/supabase/quem-sou';
 
 import {
   COLUNAS_DO_LOTE,
@@ -198,15 +199,14 @@ export type LoteAberto = {
  */
 export async function lerLote(loteId: string): Promise<LoteAberto | null> {
   const supabase = createClient();
-  const [linha, sessao] = await Promise.all([
+  const [linha, meuId] = await Promise.all([
     supabase.from('call_batches').select(COLUNAS_DO_LOTE_COM_DONO).eq('id', loteId).maybeSingle(),
-    supabase.auth.getUser(),
+    idDaSessao(supabase),
   ]);
   if (linha.error) levantar(linha.error.code, linha.error);
   if (!linha.data) return null;
 
   const bruta = linha.data as LinhaDeLote & { owner_id: string };
-  const meuId = sessao.data.user?.id ?? null;
   const ehMeu = meuId !== null && bruta.owner_id === meuId;
 
   // O nome do dono só é buscado quando o lote NÃO é meu: é a única situação em que a

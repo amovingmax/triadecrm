@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowRight, MessageCircle, NotebookPen, PauseCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -58,7 +58,6 @@ export function ChamadaRecibo({
   comQuemGravado,
   whatsapp = null,
   avisoDaTentativa = null,
-  restaMs,
   pausado,
   aoPausar,
   aoProximo,
@@ -75,7 +74,6 @@ export function ChamadaRecibo({
   whatsapp?: MensagemDeDepois | null;
   /** A tentativa não atendida cujo aviso no WhatsApp o recibo mostra (e deixa cancelar). */
   avisoDaTentativa?: string | null;
-  restaMs: number;
   /** A contagem parou porque a pessoa tocou em alguma coisa aqui. */
   pausado: boolean;
   aoPausar: () => void;
@@ -87,6 +85,31 @@ export function ChamadaRecibo({
   const [comQuem, setComQuem] = useState<ComQuem>(comQuemGravado);
 
   const proxima = formatarQuando(resultado.proxima_acao_em);
+  // O recibo some sozinho e traz o próximo contato: é o "encerrar-e-próxima" do
+  // R13 §7.6, e é o ganho de produtividade real do módulo.
+  //
+  // A contagem NÃO corre enquanto a pessoa está mexendo no recibo (`pausado`), e uma
+  // vez parada não recomeça: quem começou a escrever uma anotação decide sozinha
+  // quando vai para o próximo contato, no botão que já está na tela.
+  //
+  // Mora aqui, e não na `TelaChamada` (20/10/2026): o passo de 100 ms da barra
+  // redesenhava a tela de chamada inteira cinquenta vezes por recibo. Cada recibo
+  // monta este componente do zero, então a contagem sempre começa cheia.
+  const [restaMs, setRestaMs] = useState(ESPERA_ANTES_DO_PROXIMO_MS);
+  useEffect(() => {
+    if (pausado) return;
+    const prazo = Date.now() + ESPERA_ANTES_DO_PROXIMO_MS;
+    const id = window.setInterval(() => {
+      const resta = prazo - Date.now();
+      if (resta <= 0) {
+        window.clearInterval(id);
+        aoProximo();
+      } else {
+        setRestaMs(resta);
+      }
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [pausado, aoProximo]);
   const fracao = Math.max(0, Math.min(1, restaMs / ESPERA_ANTES_DO_PROXIMO_MS));
 
   /**

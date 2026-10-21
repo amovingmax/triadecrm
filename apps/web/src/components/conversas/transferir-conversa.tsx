@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRightLeft } from 'lucide-react';
 import { toast } from 'sonner';
-import { z } from 'zod';
+import * as z from 'zod';
 
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';

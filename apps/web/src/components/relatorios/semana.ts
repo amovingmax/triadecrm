@@ -1,6 +1,6 @@
 'use client';
 
-import { z } from 'zod';
+import * as z from 'zod';
 
 import type { FunctionReturns } from '@komune/schema';
 

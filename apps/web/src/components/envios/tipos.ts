@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 /**
  * O vocabulário dos envios em massa (migração `20260921100000_envios_em_massa`).

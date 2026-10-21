@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducedMotion } from 'motion/react';
+import { useMovimentoReduzido } from '@/components/movimento/usar-movimento';
 
 import { cn } from '@/lib/utils';
 
@@ -31,7 +31,7 @@ import { definicaoTemperatura, type Temperatura } from './escala-termica';
  * O halo é DECORAÇÃO, não sinal: medido contra o fundo ele fica entre 1,53:1 e 1,74:1
  * no claro e entre 1,74:1 e 2,36:1 no escuro, longe dos 3:1 da WCAG 1.4.11. Foi por
  * isso que a espessura virou permanente: quem pediu menos movimento no sistema perde
- * o pulso (useReducedMotion, mais a rede de segurança em globals.css) e não pode ficar
+ * o pulso (useMovimentoReduzido, mais a rede de segurança em globals.css) e não pode ficar
  * dependendo do halo, e mesmo com movimento ligado o olhar de relance cai no vale do
  * ciclo, onde a barra media exatamente os mesmos 3px de uma linha normal.
  *
@@ -66,7 +66,7 @@ export function BarraTermica({
   semRotulo?: boolean;
   className?: string;
 }) {
-  const movimentoReduzido = useReducedMotion();
+  const movimentoReduzido = useMovimentoReduzido();
   const definicao = definicaoTemperatura(temperatura);
   const pulsa = needsAttention && !movimentoReduzido;
 

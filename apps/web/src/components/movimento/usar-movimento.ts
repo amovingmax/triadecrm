@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducedMotion } from 'motion/react';
+import { useState } from 'react';
 
 /**
  * Centro do movimento do app. Toda animação passa por aqui para que a decisão
@@ -8,16 +8,13 @@ import { useReducedMotion } from 'motion/react';
  *
  * Regra do sistema: cada animação precisa de uma frase que a justifique.
  * Só animamos `transform` e `opacity`; nada de width, height, top ou left.
+ *
+ * Desde 20/10/2026 as animações das telas de trabalho são de CSS (`globals.css`:
+ * `entrada-pagina`, `revelar-linha`, `entrada-folha`, `crescer-barra`), e a regra
+ * de movimento reduzido do fim daquele arquivo vale para todas. O `motion` ficou só
+ * no login: perguntar "reduzir movimento?" pelo `useReducedMotion` dele levava a
+ * biblioteca inteira (39 KB comprimidos) para toda página do CRM.
  */
-
-/** Folha de cadastro rápido: entra por baixo no celular, pela lateral no desktop. */
-export const MOLA_FOLHA = { type: 'spring', stiffness: 260, damping: 30 } as const;
-
-/** Substituta da mola quando o sistema pede menos movimento: chega pronta. */
-export const SEM_MOLA = { duration: 0 } as const;
-
-/** Troca de página dentro do app: opacidade mais 2px, curto o bastante para não atrasar. */
-export const TRANSICAO_PAGINA = { duration: 0.18, ease: [0.22, 0.61, 0.36, 1] } as const;
 
 /** Entrada escalonada da lista: os primeiros resultados chegam primeiro. */
 export const ESCALONAMENTO = {
@@ -25,35 +22,35 @@ export const ESCALONAMENTO = {
   atrasoPorItem: 0.015,
   /** Acima de 24 linhas o escalonamento vira espera; da 25 em diante todas entram juntas. */
   maximoItens: 24,
-  /** Duração da entrada de cada linha. */
+  /** Duração da entrada de cada linha (a mesma do `revelar-linha` do CSS). */
   duracao: 0.22,
 } as const;
 
-/** Deslocamento vertical padrão das entradas, em pixels. */
-export const DESLOCAMENTO_ENTRADA = 4;
+const CONSULTA = '(prefers-reduced-motion: reduce)';
+
+function lerPreferencia(): boolean | null {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null;
+  return window.matchMedia(CONSULTA).matches;
+}
+
+/**
+ * O sistema pediu menos movimento? Faz o que o `useReducedMotion` do `motion` fazia:
+ * lê a preferência na primeira renderização do navegador (no servidor, `null`) e a
+ * guarda. Mesmo valor, mesmo instante, sem a biblioteca.
+ */
+export function useMovimentoReduzido(): boolean | null {
+  const [reduzido] = useState(lerPreferencia);
+  return reduzido;
+}
 
 /**
  * O nome do arquivo é `usar-movimento`, mas a função se chama `useMovimento`:
  * a regra `react-hooks/rules-of-hooks` só reconhece um hook pelo prefixo `use`.
  */
 export function useMovimento() {
-  const reduzido = useReducedMotion() ?? false;
-
+  const reduzido = useMovimentoReduzido() ?? false;
   return {
     /** `true` quando o sistema pede menos movimento (prefers-reduced-motion). */
     reduzido,
-    /** Mola da folha, já neutralizada quando o movimento é reduzido. */
-    mola: reduzido ? SEM_MOLA : MOLA_FOLHA,
-    /** Transição de troca de página, já neutralizada quando o movimento é reduzido. */
-    transicaoPagina: reduzido ? SEM_MOLA : TRANSICAO_PAGINA,
-    /** Constantes do escalonamento da lista. */
-    escalonamento: ESCALONAMENTO,
-    /** Deslocamento de entrada: zero quando o movimento é reduzido. */
-    deslocamento: reduzido ? 0 : DESLOCAMENTO_ENTRADA,
-    /** Atraso da linha de índice `indice`, em segundos. */
-    atrasoDaLinha(indice: number) {
-      if (reduzido || indice >= ESCALONAMENTO.maximoItens) return 0;
-      return indice * ESCALONAMENTO.atrasoPorItem;
-    },
   };
 }

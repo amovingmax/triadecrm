@@ -2,10 +2,9 @@
 
 import { useId, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { motion } from 'motion/react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { z } from 'zod';
+import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +24,6 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
-import { useMovimento } from '@/components/movimento';
 
 import { criarCandidato, mensagemDoErro, MOTIVO_DA_CRIACAO } from './dados';
 import { EXPLICACAO_DA_MARCA, type CatalogosDoRadar } from './tipos';
@@ -96,7 +94,6 @@ function Corpo({
   aoFechar: () => void;
   aoCriar: () => void;
 }) {
-  const { mola } = useMovimento();
   const [falha, setFalha] = useState<string | null>(null);
   const [maisDados, setMaisDados] = useState(false);
 
@@ -161,12 +158,9 @@ function Corpo({
   }
 
   return (
-    <motion.form
+    <form
       onSubmit={form.handleSubmit(enviar)}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={mola}
-      className="flex flex-col gap-4 px-4 pb-4"
+      className="entrada-folha flex flex-col gap-4 px-4 pb-4"
       noValidate
     >
       <Campo
@@ -390,7 +384,7 @@ function Corpo({
           {form.formState.isSubmitting ? 'Salvando...' : 'Pôr na fila'}
         </Button>
       </div>
-    </motion.form>
+    </form>
   );
 }
 

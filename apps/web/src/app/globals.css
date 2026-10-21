@@ -644,13 +644,17 @@
   }
 }
 
-/* Pílula de eyebrow e chip de estado: borda fina, cartão a 50%, desfoque leve. */
+/* Pílula de eyebrow e chip de estado: borda fina, cartão a 50%.
+   Sem `backdrop-filter` desde 20/10/2026. A pílula está em toda linha da lista e em
+   todo balão da conversa, sempre sobre fundo liso (a linha, o cartão, o balão ou o
+   cabeçalho, que já é vidro): desfocar um fundo liso não muda um pixel, mas cada
+   pílula com desfoque virava uma camada que o celular recalcula a cada quadro de
+   rolagem. Vidro de verdade continua onde há conteúdo passando por baixo: o
+   cabeçalho, a barra de baixo e o separador de dia da conversa. */
 @utility pilula {
   border-radius: 9999px;
   border: 1px solid var(--hairline);
   background-color: color-mix(in oklab, var(--card) 50%, transparent);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
 }
 
 /* Título em gradiente. SÓ no login: espalhar pelo app vira clichê e atrapalha a
@@ -726,6 +730,42 @@
 
 @utility revelar-linha {
   animation: revelar-linha 220ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+/* O conteúdo das folhas (mover etapa, cadastro rápido, candidato da Revisão)
+   entra 8px abaixo e assenta. Era a mola do `motion` (rigidez 260, amortecimento
+   30): com amortecimento de 0,93 do crítico ela não quica e assenta em ~270ms, e
+   esta curva desenha o mesmo caminho sem levar a biblioteca para a página
+   (20/10/2026). `backwards` pelo motivo da entrada de página, logo abaixo. */
+@keyframes entrada-folha {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility entrada-folha {
+  animation: entrada-folha 300ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+/* A barra do recibo de registro cresce da esquerda, na cor nova (era `motion`,
+   com a mesma duração e a mesma curva). */
+@keyframes crescer-barra {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@utility crescer-barra {
+  transform-origin: left center;
+  animation: crescer-barra 450ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 /* A ENTRADA DE PÁGINA, em CSS e não em JavaScript (29/09/2026).

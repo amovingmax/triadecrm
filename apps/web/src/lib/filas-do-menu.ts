@@ -32,10 +32,10 @@ import { type ChaveDeFila } from '@/lib/navegacao';
  * ---------------------------------------------------------------------------
  * POR QUE NO SERVIDOR, E NÃO NO CLIENTE
  * ---------------------------------------------------------------------------
- * O `ProvedorConsultas` (TanStack Query) vive em cada `layout` de rota, não acima
- * da casca. Contar no cliente exigiria subir o provedor para o `AppShell` — e
- * pagaria com um estado de carregamento piscando na lateral a cada troca de tela,
- * que é exatamente o tipo de ruído que a passada de layout acabou de remover.
+ * Contar no cliente pagaria com um estado de carregamento na lateral até a
+ * primeira busca voltar, que é exatamente o tipo de ruído que a passada de layout
+ * removeu. (Desde 20/10/2026 o `ProvedorConsultas` fica acima da casca, mas o
+ * motivo continua: no servidor o número chega pronto, junto com a página.)
  *
  * Aqui é um `count: 'exact', head: true`: o Postgres conta pelo índice e não
  * devolve linha nenhuma. Roda em paralelo com a sessão, no mesmo `layout`, então

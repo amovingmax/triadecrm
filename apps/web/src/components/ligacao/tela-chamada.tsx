@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Hourglass, PhoneOff, RotateCw, SkipForward } from 'lucide-react';
 import { toast } from 'sonner';
@@ -64,7 +64,6 @@ import {
 import { ObjecoesEmGaveta, ObjecoesLaterais } from './roteiro-objecoes';
 import { RoteiroNo } from './roteiro-no';
 import {
-  ESPERA_ANTES_DO_PROXIMO_MS,
   INTERVALO_RELOGIO_MS,
   janelaDeLigacao,
   NO_DE_ABERTURA,
@@ -139,7 +138,6 @@ export function TelaChamada({
   const [ciclo, setCiclo] = useState(0);
   const [chamada, setChamada] = useState<ChamadaEmCurso | null>(null);
   const [clientKey, setClientKey] = useState<string | null>(null);
-  const [segundos, setSegundos] = useState(0);
   /**
    * Onde a conversa está, por onde passou e o que ela anotou — os quatro campos que
    * andam JUNTOS a cada toque e que antes eram quatro `useState` separados. As regras
@@ -203,7 +201,6 @@ export function TelaChamada({
     whatsapp: MensagemDeDepois | null;
     avisoDaTentativa: string | null;
   } | null>(null);
-  const [restaMs, setRestaMs] = useState(ESPERA_ANTES_DO_PROXIMO_MS);
   const [reciboPausado, setReciboPausado] = useState(false);
 
   // Relógio da janela de horário: um tique a cada 15 s repinta a contagem regressiva.
@@ -271,16 +268,9 @@ export function TelaChamada({
   const variante = emMaos?.variante ?? 'fornecedor';
   const entrada = emMaos?.entrada ?? NO_DE_ABERTURA;
 
-  // Cronômetro da chamada: começa no toque de "Ligar" / "Liguei" / "Copiar".
+  // Cronômetro da chamada: começa no toque de "Ligar" / "Liguei" / "Copiar". O tique
+  // de cada segundo mora no cabeçalho (`CabecalhoComCronometro`), e não aqui.
   const iniciadaEm = chamada ? Date.parse(chamada.iniciadaEm) : null;
-  useEffect(() => {
-    if (iniciadaEm === null) return;
-    const id = window.setInterval(
-      () => setSegundos(segundosDecorridos(iniciadaEm, Date.now())),
-      1000,
-    );
-    return () => window.clearInterval(id);
-  }, [iniciadaEm]);
 
   /**
    * Esta chamada saiu pelo navegador? Então quem sabe da linha é o provedor: o
@@ -295,15 +285,11 @@ export function TelaChamada({
   // negado, telefonia fora do ar). A pessoa ainda pode discar do aparelho, com o número
   // que está na tela — e aí o relógio volta a ser o dela.
   const voz = daVoz && !(daVoz.estado === 'falha' && daVoz.atendidaEm === null) ? daVoz : null;
-  const segundosDaChamada = voz
-    ? segundosDeConversa(voz.atendidaEm, voz.encerradaEm, new Date())
-    : segundos;
 
   /** Limpa tudo que pertence à ligação anterior e puxa o próximo da fila. */
   const irParaOProximo = useCallback(() => {
     setChamada(null);
     setClientKey(null);
-    setSegundos(0);
     setPercurso(estadoAoDiscar());
     setCombinadoEm(null);
     setPendente(null);
@@ -315,7 +301,6 @@ export function TelaChamada({
     setErroDaGravacao(null);
     setAvisoDaFila(null);
     setRecibo(null);
-    setRestaMs(ESPERA_ANTES_DO_PROXIMO_MS);
     setReciboPausado(false);
     setCiclo((c) => c + 1);
   }, []);
@@ -330,25 +315,8 @@ export function TelaChamada({
   }, [daFicha, aoSair, irParaOProximo, recibo]);
 
   // O recibo some sozinho e traz o próximo contato: é o "encerrar-e-próxima" do
-  // R13 §7.6, e é o ganho de produtividade real do módulo.
-  //
-  // A contagem NÃO corre enquanto a pessoa está mexendo no recibo (`reciboPausado`),
-  // e uma vez parada não recomeça: quem começou a escrever uma anotação decide sozinha
-  // quando vai para o próximo contato, no botão que já está na tela.
-  useEffect(() => {
-    if (!recibo || reciboPausado) return;
-    const prazo = Date.now() + ESPERA_ANTES_DO_PROXIMO_MS;
-    const id = window.setInterval(() => {
-      const resta = prazo - Date.now();
-      if (resta <= 0) {
-        window.clearInterval(id);
-        depoisDoRecibo();
-      } else {
-        setRestaMs(resta);
-      }
-    }, 100);
-    return () => window.clearInterval(id);
-  }, [recibo, reciboPausado, depoisDoRecibo]);
+  // R13 §7.6. A contagem mora no próprio recibo (`ChamadaRecibo`), que chama
+  // `depoisDoRecibo` no fim; aqui fica só a pausa, que a tabulação zera.
 
   const pausarRecibo = useCallback(() => setReciboPausado(true), []);
 
@@ -364,7 +332,6 @@ export function TelaChamada({
       setChamada(aberta);
       setClientKey(crypto.randomUUID());
       setPercurso(estadoAoDiscar(entrada));
-      setSegundos(0);
       if (peloNavegador) {
         // O número não vai junto: o banco disca o da reserva desta tentativa.
         void softphone.ligar({
@@ -540,7 +507,7 @@ export function TelaChamada({
           outcomeId: desfecho?.id ?? null,
           comQuem: comQuemGravado,
           caminhoScript: caminho,
-          duracaoSeg: duracaoParaGravar(segundosDaChamada),
+          duracaoSeg: duracaoParaGravar(segundosDaChamadaAgora(iniciadaEm, voz)),
           observacao: null,
           capturas,
           /**
@@ -586,7 +553,6 @@ export function TelaChamada({
           }),
           avisoDaTentativa: resultadoPedeAviso(resultado) ? chamada.id : null,
         });
-        setRestaMs(ESPERA_ANTES_DO_PROXIMO_MS);
         setReciboPausado(false);
         void clienteDeConsultas.invalidateQueries({ queryKey: ['registro'] });
         // O "N falaram" do topo é `call_batches.talked`, materializado pelo gatilho
@@ -614,8 +580,8 @@ export function TelaChamada({
       comQuem,
       gravando,
       item,
+      iniciadaEm,
       provedor,
-      segundosDaChamada,
       softphone,
       voz,
       variante,
@@ -724,7 +690,6 @@ export function TelaChamada({
           comQuemGravado={recibo.comQuem}
           whatsapp={recibo.whatsapp}
           avisoDaTentativa={recibo.avisoDaTentativa}
-          restaMs={restaMs}
           pausado={reciboPausado}
           aoPausar={pausarRecibo}
           aoProximo={depoisDoRecibo}
@@ -838,12 +803,13 @@ export function TelaChamada({
       />
 
       <div className="flex flex-col gap-6">
-        <ChamadaCabecalho
+        <CabecalhoComCronometro
+          iniciadaEm={iniciadaEm}
+          voz={voz}
           item={item}
           maxTentativas={lote.maxTentativas}
           janela={janela}
           chamada={chamada}
-          segundos={segundosDaChamada}
           estadoDaLinha={voz ? ROTULO_DA_LINHA[voz.estado] : undefined}
           abrindo={abrindo}
           aoLigar={() => void ligar()}
@@ -1237,6 +1203,53 @@ function Topo({
       </p>
     </div>
   );
+}
+
+/**
+ * O cabeçalho da chamada com o relógio dela. O tique de cada segundo mora aqui
+ * (20/10/2026): na `TelaChamada` ele redesenhava a tela inteira, roteiro e
+ * tabulação incluídos, sessenta vezes por minuto de ligação — no celular de quem
+ * liga o dia todo. Aqui só o cabeçalho anda.
+ *
+ * A conta é a de antes: pelo navegador, o relógio conta a CONVERSA (do atendimento
+ * ao fim, como vai para o banco); no modo manual, desde o toque em "Ligar". O valor
+ * guardado leva o início que ele mede, então uma chamada nova começa do zero.
+ */
+function CabecalhoComCronometro({
+  iniciadaEm,
+  voz,
+  ...cabecalho
+}: Omit<ComponentProps<typeof ChamadaCabecalho>, 'segundos'> & {
+  iniciadaEm: number | null;
+  voz: { atendidaEm: string | null; encerradaEm: string | null } | null;
+}) {
+  const [contado, setContado] = useState<{ de: number; segundos: number } | null>(null);
+  useEffect(() => {
+    if (iniciadaEm === null) return;
+    const id = window.setInterval(
+      () => setContado({ de: iniciadaEm, segundos: segundosDecorridos(iniciadaEm, Date.now()) }),
+      1000,
+    );
+    return () => window.clearInterval(id);
+  }, [iniciadaEm]);
+  const segundos = voz
+    ? segundosDeConversa(voz.atendidaEm, voz.encerradaEm, new Date())
+    : contado !== null && contado.de === iniciadaEm
+      ? contado.segundos
+      : 0;
+  return <ChamadaCabecalho {...cabecalho} segundos={segundos} />;
+}
+
+/**
+ * A duração que vai para o banco na tabulação: a mesma conta do cronômetro, feita no
+ * instante do toque (antes ela vinha do último tique, até um segundo atrás).
+ */
+function segundosDaChamadaAgora(
+  iniciadaEm: number | null,
+  voz: { atendidaEm: string | null; encerradaEm: string | null } | null,
+): number {
+  if (voz) return segundosDeConversa(voz.atendidaEm, voz.encerradaEm, new Date());
+  return iniciadaEm === null ? 0 : segundosDecorridos(iniciadaEm, Date.now());
 }
 
 /** O dia civil de hoje em Fortaleza, para a sugestão de data da folha de extras. */

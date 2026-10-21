@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
 import { ArrowRight, CloudOff, Loader2, NotebookPen, PauseCircle, Undo2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -92,7 +91,6 @@ export function Recibo({
   aoRemarcar: (iso: string) => void;
   aoRegistrarOutro: () => void;
 }) {
-  const movimentoReduzido = useReducedMotion();
   const [anotando, setAnotando] = useState(false);
   const [remarcando, setRemarcando] = useState(false);
 
@@ -116,14 +114,13 @@ export function Recibo({
     >
       {/* A barra cresce da esquerda, na cor nova. Sem interpolação de cor: as cinco
           cores da escala são variáveis de CSS, e animar entre elas exigiria hex na
-          mão — justamente o que `escala-termica.ts` existe para impedir. */}
-      <motion.div
+          mão — justamente o que `escala-termica.ts` existe para impedir. O
+          crescimento é do CSS (`crescer-barra`, em globals.css); com movimento
+          reduzido ela já nasce cheia. */}
+      <div
         aria-hidden="true"
-        initial={movimentoReduzido ? false : { scaleX: 0 }}
-        animate={{ scaleX: 1 }}
-        transition={{ duration: 0.45, ease: [0.22, 0.61, 0.36, 1] }}
-        style={{ backgroundColor: definicao.cor, transformOrigin: 'left center' }}
-        className="h-1.5 w-full"
+        style={{ backgroundColor: definicao.cor }}
+        className="crescer-barra h-1.5 w-full"
       />
 
       <div className="flex flex-col gap-2">

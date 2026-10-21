@@ -20,6 +20,7 @@ import {
   type FiltrosConversas,
   type ItemConversa,
 } from './tipos';
+import { melhorNegocio } from './escolher-negocio';
 import { chaveDoDia, nomeExibido } from './formatos';
 import {
   montarFio,
@@ -331,32 +332,9 @@ export function montarConversas({
   return ordenarConversas(itens);
 }
 
-/**
- * O negócio em foco de uma organização: o aberto mexido mais recentemente e, se
- * nenhum estiver aberto, o mais recente de todos. Exportado porque o cabeçalho da
- * conversa precisa da mesma escolha que a lista fez, senão as duas discordariam
- * sobre a etapa e a próxima ação do mesmo parceiro.
- */
-export function escolherNegocio<N extends NegocioParaEscolha>(negocios: readonly N[]): N | null {
-  let escolhido: N | null = null;
-  for (const d of negocios) {
-    if (!escolhido || melhorNegocio(d, escolhido)) escolhido = d;
-  }
-  return escolhido;
-}
-
-/**
- * O que a escolha olha de um negócio. O cartão de aviso (`components/avisos`)
- * lê só isto, e precisa chegar à MESMA etapa que a lista mostra.
- */
-type NegocioParaEscolha = Pick<NegocioCru, 'status' | 'updated_at'>;
-
-function melhorNegocio(candidato: NegocioParaEscolha, atual: NegocioParaEscolha): boolean {
-  const abertoCandidato = candidato.status === 'open';
-  const abertoAtual = atual.status === 'open';
-  if (abertoCandidato !== abertoAtual) return abertoCandidato;
-  return candidato.updated_at > atual.updated_at;
-}
+// A escolha do negócio em foco mora em `escolher-negocio.ts` (o aviso de resposta,
+// na casca do app, usa a mesma); reexportada para quem já a importava daqui.
+export { escolherNegocio } from './escolher-negocio';
 
 /** Uma linha do que aconteceu por último: o desfecho, ou a observação, ou o tipo. */
 function resumoDaAtividade(a: AtividadeCrua, nomeDoDesfecho: Map<number, string>): string {

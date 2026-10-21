@@ -177,7 +177,29 @@ function textosDe(dono: string | null): TextosDigitados {
 
 function guardar(dono: string | null, textos: TextosDigitados): void {
   porDono.set(dono ?? SEM_DONO, textos);
-  if (dono !== null) {
+  if (dono !== null) agendarGravacao(dono, textos);
+  for (const ouvinte of ouvintes) ouvinte();
+}
+
+/**
+ * O aparelho recebe o texto um instante depois da tecla (20/10/2026). A memória,
+ * que é o que a caixa e a lista leem, muda na hora; o `localStorage` — síncrono, e
+ * que serializava os até cem rascunhos a cada tecla — espera a pessoa parar de
+ * digitar por `ESPERA_DA_GRAVACAO_MS`. Se a aba for escondida ou fechada antes,
+ * grava na hora (`pagehide` e `visibilitychange`), então recarregar ou trocar de
+ * aplicativo no celular não perde a última frase.
+ */
+const ESPERA_DA_GRAVACAO_MS = 300;
+const aGravar = new Map<string, TextosDigitados>();
+let relogioDaGravacao: number | null = null;
+let ouvindoASaida = false;
+
+function gravarAgora(): void {
+  if (relogioDaGravacao !== null) {
+    window.clearTimeout(relogioDaGravacao);
+    relogioDaGravacao = null;
+  }
+  for (const [dono, textos] of aGravar) {
     try {
       const json = paraGuardar(textos);
       if (json === null) window.localStorage.removeItem(chaveDe(dono));
@@ -186,7 +208,22 @@ function guardar(dono: string | null, textos: TextosDigitados): void {
       // Sem armazenamento o texto não sobrevive à recarga; continua na memória.
     }
   }
-  for (const ouvinte of ouvintes) ouvinte();
+  aGravar.clear();
+}
+
+function aoEsconder(): void {
+  if (document.visibilityState === 'hidden') gravarAgora();
+}
+
+function agendarGravacao(dono: string, textos: TextosDigitados): void {
+  aGravar.set(dono, textos);
+  if (!ouvindoASaida) {
+    ouvindoASaida = true;
+    window.addEventListener('pagehide', gravarAgora);
+    document.addEventListener('visibilitychange', aoEsconder);
+  }
+  if (relogioDaGravacao !== null) window.clearTimeout(relogioDaGravacao);
+  relogioDaGravacao = window.setTimeout(gravarAgora, ESPERA_DA_GRAVACAO_MS);
 }
 
 /**
@@ -196,6 +233,9 @@ function guardar(dono: string | null, textos: TextosDigitados): void {
  */
 function aoGuardarEmOutraAba(evento: StorageEvent): void {
   if (evento.key !== null && !evento.key.startsWith(CHAVE)) return;
+  // O que esta aba digitou e ainda não foi para o aparelho vai antes da releitura:
+  // senão a releitura traria o texto de antes da última tecla.
+  gravarAgora();
   for (const quem of [...porDono.keys()]) if (quem !== SEM_DONO) porDono.delete(quem);
   for (const ouvinte of ouvintes) ouvinte();
 }

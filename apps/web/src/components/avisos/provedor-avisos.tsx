@@ -13,7 +13,7 @@ import {
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
-import { ESPERA_DA_RAJADA_MS, RITMO_VIGIANDO_MS } from '@/components/conversas/eco-do-banco';
+import { ESPERA_DA_RAJADA_MS, RITMO_VIGIANDO_MS } from '@/components/conversas/ritmo-do-eco';
 import { type AppRole } from '@/lib/auth/role';
 import { estaAtivo } from '@/lib/navegacao';
 import { createClient } from '@/lib/supabase/client';

@@ -9,7 +9,7 @@
  * Tudo o que é rótulo — nome de canal, texto de condição, frase de atraso — mora
  * neste arquivo e é função pura, testada. Nenhuma tradução nasce dentro de JSX.
  */
-import { z } from 'zod';
+import * as z from 'zod';
 
 // ---------------------------------------------------------------------------
 // A tela das cadências

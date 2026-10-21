@@ -13,8 +13,8 @@ export const metadata: Metadata = { title: 'Parceiros excluídos' };
  * usa — sem ela, "dá para restaurar" seria uma promessa sem botão.
  *
  * Só admin e gestor: são os mesmos que excluem, e `public.parceiros_excluidos`
- * recusa qualquer outro papel. O provedor de consultas vem do `layout` de
- * `/parceiros`, que esta rota herda.
+ * recusa qualquer outro papel. O provedor de consultas vem do layout da área
+ * autenticada (`app/(app)/layout.tsx`).
  */
 export default async function Pagina() {
   await requireRole('admin', 'gestor');

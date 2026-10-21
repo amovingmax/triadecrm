@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
-import { ProvedorConsultas } from '@/components/consultas/provedor-consultas';
 import { hojeEmNatal, periodoDaUrl, semanaDaUrl } from '@/components/relatorios/periodo';
 import { TelaRelatorios } from '@/components/relatorios/tela-relatorios';
 import { painelDaUrl } from '@/components/relatorios/tipos';
@@ -28,12 +27,10 @@ export default async function Pagina({
   const [, params] = await Promise.all([requireRole('admin', 'gestor'), searchParams]);
 
   return (
-    <ProvedorConsultas>
-      <TelaRelatorios
-        painelInicial={painelDaUrl(params.painel)}
-        periodoInicial={periodoDaUrl(params, hojeEmNatal())}
-        semanaInicial={semanaDaUrl(params.semana)}
-      />
-    </ProvedorConsultas>
+    <TelaRelatorios
+      painelInicial={painelDaUrl(params.painel)}
+      periodoInicial={periodoDaUrl(params, hojeEmNatal())}
+      semanaInicial={semanaDaUrl(params.semana)}
+    />
   );
 }

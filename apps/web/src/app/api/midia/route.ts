@@ -45,10 +45,13 @@ const SEGUNDOS_DA_URL = 300;
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, motivo: 'sem_sessao' }, { status: 401 });
+  // `getClaims` valida o JWT aqui, com a chave pública do projeto (o mesmo do
+  // proxy); `getUser` era uma ida ao Auth por balão de mídia. Quem decide o acesso
+  // é a consulta logo abaixo, feita com a mesma sessão e a RLS de `messages`.
+  const { data: sessao } = await supabase.auth.getClaims();
+  if (!sessao?.claims) {
+    return NextResponse.json({ ok: false, motivo: 'sem_sessao' }, { status: 401 });
+  }
 
   if (!temChaveDeServico()) {
     registrarRecusa('midia/assinar', 'nao_configurado');
