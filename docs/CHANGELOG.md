@@ -7743,8 +7743,19 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - **Imova republicada** de uma cópia limpa (`imova-mts8a3x42`): `/login` 200, telas internas → login, `/auth/dev` 404.
 - **Site da KOMUNE intocado:** continua em `triade-5jll2hsyh`.
 
+**Site da KOMUNE republicado em 21/10/2026, à noite** (pedido do usuário: "pode subir para main e colocar no ar"):
+- **Antes:**
+  - o ar conferido: `triade-5jll2hsyh`, publicado daqui;
+  - comparação das 88 telas da KOMUNE, versão no ar × `d0978ed` com `NEXT_PUBLIC_EMPRESAS_LINKS` e ninguém marcado: 88 de 88 iguais, nada para conferir, nada reprovado (`~/triadecrm-capturas/2026-10-21-21-56`).
+- **Variável nova** `NEXT_PUBLIC_EMPRESAS_LINKS=komune=https://triade-crm-tawny.vercel.app;imova=https://imova-crm.vercel.app`, só em Production. As 5 antigas não foram tocadas.
+- **Deploy** `triade-8kvrdwegp`, de uma cópia limpa de `d0978ed`. Volta: promover o `triade-5jll2hsyh`.
+- **Conferido depois:**
+  - `/login` 200 "Entrar · Tríade";
+  - telas internas → login;
+  - `/auth/dev` 404;
+  - `ir.komune.app.br/login` → `komune.app.br`, como antes;
+  - o botão do Google leva ao `toqdjcajyrowutunczhr`, sem erro na página.
+
 **Pendente:**
-- **Site da KOMUNE com o seletor e a coluna "Também acessa":** pedido próprio, "Pode republicar a KOMUNE com o seletor".
-- **Marcações:**
-  - na Imova, o admin marca quem trabalha nas duas, como o `contato@komune.app.br`, depois do primeiro login dele lá;
-  - na KOMUNE, depois da republicação.
+- **Marcações**, pelo admin de cada empresa em Ajustes → Pessoas → Também acessa. Para o `contato@komune.app.br`, o único com acesso às duas hoje: Komune, na Imova; Imova, na KOMUNE.
+- A equipe da KOMUNE precisa fechar e abrir o CRM para pegar a versão nova.
