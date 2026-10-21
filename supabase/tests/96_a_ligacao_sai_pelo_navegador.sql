@@ -21,7 +21,7 @@
 -- transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(51);
+select plan(52);
 
 create table pg_temp.r (chave text primary key, valor jsonb);
 grant select, insert on pg_temp.r to authenticated, service_role;
@@ -188,6 +188,10 @@ begin
   insert into pg_temp.r values ('pode_leitura', public.voz_pode_ligar());
   perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a1', 'sdr');
   insert into pg_temp.r values ('pode_sdr', public.voz_pode_ligar());
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a2', 'gestor');
+  insert into pg_temp.r values ('pode_gestor', public.voz_pode_ligar());
+  perform pg_temp.entrar('a0000000-0000-4000-8000-0000000096a2', 'admin');
+  insert into pg_temp.r values ('pode_admin', public.voz_pode_ligar());
 end $$;
 select pg_temp.sair();
 select is((select valor ->> 'motivo' from pg_temp.r where chave = 'pode_leitura'), 'sem_permissao',
@@ -195,6 +199,13 @@ select is((select valor ->> 'motivo' from pg_temp.r where chave = 'pode_leitura'
 select is((select valor ->> 'identidade' from pg_temp.r where chave = 'pode_sdr'),
           'crm_a0000000-0000-4000-8000-0000000096a1',
   'a identidade da credencial é o id de quem está logado');
+-- O SDR é quem mais liga, e a gestão continua ligando (20/10/2026: de 10/10 a
+-- 20/10 a tela não entregava o telefone ao SDR, embora o banco deixasse).
+select ok((select bool_and((valor ->> 'ok')::boolean) from pg_temp.r
+            where chave in ('pode_sdr', 'pode_gestor', 'pode_admin'))
+          and (select count(*) from pg_temp.r
+                where chave in ('pode_sdr', 'pode_gestor', 'pode_admin')) = 3,
+  'admin, gestor e SDR recebem a credencial do softphone');
 select ok(not has_function_privilege('anon', 'public.voz_pode_ligar()', 'execute'),
   'anônimo não pergunta');
 
