@@ -11,6 +11,17 @@ import { estaAtivo } from '@/lib/navegacao';
 const ESPERA_MS = 1200;
 
 /**
+ * A página INTEIRA, como faz o `prefetch` do link (`layout/nav-link.tsx`). Sem isto o
+ * `router.prefetch` adianta só o esqueleto da rota, e numa tela dinâmica — todas as do
+ * CRM — o toque ainda esperava o servidor: medido no 4G, a Agenda abria aos ~820 ms
+ * mesmo "adiantada". O tipo é um enum interno do Next; a conversão parte do tipo do
+ * próprio `useRouter` para não depender de caminho interno do pacote.
+ */
+const PAGINA_INTEIRA = { kind: 'full' } as unknown as NonNullable<
+  Parameters<ReturnType<typeof useRouter>['prefetch']>[1]
+>;
+
+/**
  * OS DADOS JÁ ESTÃO AQUI QUANDO O DEDO CHEGA (21/10/2026). O menu adianta a página e
  * o código de cada tela (`layout/nav-link.tsx`), mas a tela ainda buscava os dados
  * DEPOIS do toque — uma a três idas ao banco em série, ~35 ms cada no Wi-Fi e
@@ -44,7 +55,7 @@ export function AdiantarDados({ papel, telas }: { papel: AppRole; telas: readonl
         // A página e o código também: os itens da folha "Mais" só ficam visíveis (e
         // só seriam adiantados pelo `nav-link.tsx`) quando a folha abre, e no 4G o
         // toque chegava antes. O que já está guardado o Next não pede de novo.
-        router.prefetch(tela);
+        router.prefetch(tela, PAGINA_INTEIRA);
         // Uma falha aqui não é da pessoa: a tela busca de novo ao abrir e mostra o erro ela mesma.
         await ADIANTADORES[tela]?.(cliente, papel).catch(() => undefined);
       }
