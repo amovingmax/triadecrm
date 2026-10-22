@@ -41,7 +41,9 @@ export function SeletorDeEmpresa({ destinos }: { destinos: DestinoDoSeletor[] })
           <span className="hidden max-w-40 truncate text-[13px] font-medium sm:inline">
             {EMPRESA.nome}
           </span>
-          <ChevronDown className="hidden size-3.5 text-muted-foreground sm:block" aria-hidden="true" />
+          {/* A seta aparece também no celular (pedido do usuário, 22/10/2026): sem ela, o
+          prédio sozinho não dizia que dá para tocar e trocar de empresa. */}
+          <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">

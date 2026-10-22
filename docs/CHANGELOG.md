@@ -7799,3 +7799,16 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 **Precisa de decisão humana:**
 - **LGPD (Dennis):** o e-mail de quem abre o CRM vai do servidor de uma empresa ao da outra, só para a resposta sim ou não. Não é guardado nem registrado em log. As duas empresas são controladoras distintas.
 - **Segundo tempo:** tirar `public.acesso_a_outras_empresas` e `public.minhas_outras_empresas()`, sem uso desde esta versão, depois que ela estiver no ar nas duas empresas.
+
+## 22/10/2026 (tarde) — A seta do botão de trocar de empresa também no celular (RF-ADM-01)
+
+**O pedido.** Vendo as fotos do celular, o usuário pediu "um ícone de uma setinha pra baixo, dessa forma conseguimos alterar o módulo do CRM". No celular, o botão era só o prédio. A seta (`ChevronDown`) aparecia só a partir de 640 px.
+
+**Entregue:** a seta aparece em toda largura (`components/layout/seletor-de-empresa.tsx`). O nome da empresa continua só em tela larga. No computador nada muda.
+
+**Verificado no computador** (Chrome, celular simulado com toque, KOMUNE e Imova locais):
+- seta visível em 320 px e 390 px, nas duas empresas;
+- nenhum estouro lateral;
+- lint e tipos OK.
+
+**Pendente:** publicar, só com pedido.
