@@ -7786,12 +7786,15 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - **Testes:** lint e tipos OK; 2.116 testes Vitest (site 1.335, workers 388, prompts 284, schema 109), com 9 novos de assinatura e prazo e 1 de rota pública. pgTAP 114 e 115 nos dois bancos locais.
 - **pgTAP completo na KOMUNE local:** 6 arquivos falham (14, 24, 48, 68, 74, 90), com as **mesmas** falhas depois de retirar a função nova do banco. Elas já existiam neste banco local e dependem dos dados ou da hora, não desta mudança.
 
-**Nada em produção.** Para levar, só com pedido:
-1. Gerar o segredo (`openssl rand -hex 32`) e pôr `SEGREDO_ENTRE_EMPRESAS` em Production nos projetos `imova-crm` e `triade-crm` da Vercel, com o mesmo valor.
-2. `node scripts/publicar-banco.mjs imova migrar`, depois `komune migrar`: a migração `20261023090000`.
-3. Republicar a Imova e a KOMUNE de uma cópia limpa da `main`, conferindo o ar antes.
-
-Publicar as duas juntas: enquanto só um lado tiver a versão nova, esse lado não mostra o botão, porque a versão antiga do outro não tem a rota.
+**Em produção (22/10/2026, com pedido do usuário: "Pode subir pra main e colocar essa atualização no ar"):**
+- **O ar conferido antes:** KOMUNE em `triade-8kvrdwegp` e Imova em `imova-mts8a3x42`, os dois publicados daqui; os dois bancos com 161 migrações e só a `20261023090000` pendente.
+- **Backup da KOMUNE antes:** `~/triadecrm-backups/komune-producao-2026-10-22-antes-do-botao-automatico` (estrutura, dados, papéis, histórico e contagem de linhas do banco). A conferência tabela a tabela dentro do arquivo de dados não foi feita desta vez; o tamanho bate com o de 21/10.
+- **`main`:** `f9218c1`, fast-forward de `4bc8fcb`.
+- **Migração `20261023090000`:** primeiro na Imova (conferido: só `service_role` executa), depois na KOMUNE, pelo `publicar-banco`.
+- **`SEGREDO_ENTRE_EMPRESAS`:** gerado nesta máquina e gravado direto nos dois projetos (`triade-crm` e `imova-crm`), só em Production e como *Sensitive*. O valor não foi impresso nem guardado em arquivo.
+- **Imova** `imova-muylf7yuj` e **KOMUNE** `triade-6ey71zk68`, de cópias limpas de `f9218c1`. Volta: promover `imova-mts8a3x42` e `triade-8kvrdwegp` (o botão volta a depender da marcação manual, que segue no banco).
+- **Conferido de fora, nos dois:** `/login` 200, telas internas → login, `/auth/dev` 404, `/api/empresas/acesso` responde 400 a corpo vazio e 401 a assinatura errada (com o segredo ausente seria 404). Na KOMUNE, `ir.komune.app.br/login` → `komune.app.br`, como antes.
+- **Falta:** o teste com login de verdade. O `contato@komune.app.br` deve ver o botão na KOMUNE e na Imova e ir e voltar. A equipe precisa fechar e abrir o CRM para pegar a versão nova.
 
 **Precisa de decisão humana:**
 - **LGPD (Dennis):** o e-mail de quem abre o CRM vai do servidor de uma empresa ao da outra, só para a resposta sim ou não. Não é guardado nem registrado em log. As duas empresas são controladoras distintas.
