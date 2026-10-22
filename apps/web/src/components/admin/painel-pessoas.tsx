@@ -24,11 +24,9 @@ import { EscolhaMultipla } from '@/components/envios/escolha-multipla';
 import { DialogoConfirmar } from './confirmar';
 import {
   adicionarPermitido,
-  carregarOutrasEmpresas,
   carregarPermitidos,
   carregarPessoas,
   carregarSetoresDoTime,
-  definirOutrasEmpresas,
   definirSetoresDaPessoa,
   removerPermitido,
   SemAcessoAoRegistro,
@@ -90,32 +88,6 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
     queryKey: ['admin', 'permitidos'],
     queryFn: carregarPermitidos,
     enabled: ehAdmin,
-  });
-
-  // Quem também acessa a outra empresa e por isso vê o botão de trocar (decisão do
-  // usuário, 21/10/2026). Só admin marca; sem outra empresa configurada, não existe.
-  const marcaOutras = ehAdmin && OUTRAS_EMPRESAS_DO_SELETOR.length > 0;
-  const outrasEmpresas = useQuery({
-    queryKey: ['admin', 'outras-empresas'],
-    queryFn: carregarOutrasEmpresas,
-    enabled: marcaOutras,
-  });
-  const mudarOutras = useMutation({
-    mutationFn: ({ pessoa, novas, atuais }: { pessoa: Pessoa; novas: string[]; atuais: string[] }) =>
-      definirOutrasEmpresas(pessoa.id, novas, atuais),
-    onSuccess: (_dado, { pessoa, novas }) => {
-      const nomes = OUTRAS_EMPRESAS_DO_SELETOR.filter((d) => novas.includes(d.slug)).map((d) => d.nome);
-      toast.success(
-        nomes.length
-          ? `${pessoa.nome} vê o botão de trocar para ${nomes.join(' e ')}.`
-          : `${pessoa.nome} não vê mais o botão de trocar de empresa.`,
-        { description: 'Vale quando a pessoa abrir o CRM de novo.' },
-      );
-    },
-    onError: (erro) =>
-      toast.error('Não deu para mudar as outras empresas.', { description: mensagemDoErro(erro) }),
-    onSettled: () =>
-      void clienteDeConsultas.invalidateQueries({ queryKey: ['admin', 'outras-empresas'] }),
   });
 
   const invalidar = () => {
@@ -276,26 +248,6 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
         );
       },
     },
-    ...(marcaOutras
-      ? [
-          {
-            id: 'outras',
-            rotulo: 'Também acessa',
-            largura: 'w-44',
-            celula: (p: Pessoa) => {
-              const marcadas = outrasEmpresas.data?.[p.id] ?? [];
-              return (
-                <EscolhaMultipla
-                  rotulo="Outra empresa"
-                  opcoes={OUTRAS_EMPRESAS_DO_SELETOR.map((d) => ({ valor: d.slug as string, rotulo: d.nome }))}
-                  valor={marcadas}
-                  aoMudar={(novas) => mudarOutras.mutate({ pessoa: p, novas, atuais: marcadas })}
-                />
-              );
-            },
-          } satisfies ColunaAdmin<Pessoa>,
-        ]
-      : []),
     {
       id: 'acesso',
       rotulo: 'Acesso',
@@ -370,11 +322,11 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
           <strong>domínio permitido</strong>. O papel viaja no token da sessão, então{' '}
           <strong>toda troca de papel só vale no próximo login da pessoa</strong>.
         </p>
-        {marcaOutras ? (
+        {OUTRAS_EMPRESAS_DO_SELETOR.length > 0 ? (
           <p>
-            Em <strong>Também acessa</strong>, marque a outra empresa só para quem trabalha nas
-            duas: é o que mostra o botão de trocar de empresa para a pessoa. Quem entra lá continua
-            sendo decidido pela lista de permitidos de lá.
+            Quem também entra na {OUTRAS_EMPRESAS_DO_SELETOR.map((d) => d.nome).join(' e ')} vê o
+            botão de trocar de empresa no topo, sem ninguém marcar nada: basta o mesmo e-mail estar
+            liberado lá.
           </p>
         ) : null}
       </Aviso>

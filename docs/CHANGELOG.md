@@ -7759,3 +7759,40 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 **Pendente:**
 - **Marcações**, pelo admin de cada empresa em Ajustes → Pessoas → Também acessa. Para o `contato@komune.app.br`, o único com acesso às duas hoje: Komune, na Imova; Imova, na KOMUNE.
 - A equipe da KOMUNE precisa fechar e abrir o CRM para pegar a versão nova.
+
+## 22/10/2026 — O botão de trocar de empresa aparece sozinho para quem entra nas duas (branch `seletor-automatico`; RF-ADM-01)
+
+**O pedido.** "Se a conta tiver acesso aos dois ambientes, o switch account deve sempre aparecer e fazer a troca para o outro ambiente." O `contato@komune.app.br` ia da KOMUNE para a Imova e não conseguia voltar: a marcação "Também acessa" estava feita só no banco da KOMUNE. Entre duas opções (a volta se marcar sozinha na primeira troca, ou totalmente automático), o usuário escolheu **totalmente automático**: nenhuma marcação, e um servidor pergunta ao outro.
+
+**Entregue:**
+- **Migração `20261023090000`**, que só acrescenta. `public.email_entra_no_crm(email)` responde se o e-mail entra no CRM desta empresa, com a regra do próprio login:
+  - quem já entrou (tem conta em `auth.users`): perfil existe e está ativo, como confere `custom_access_token_hook`; fora da lista de permitidos continua entrando, como no login;
+  - quem nunca entrou: lista de permitidos ou domínio permitido e aberto, como confere `handle_new_auth_user`.
+
+  Só `service_role` executa. pgTAP `115`: 15 testes, nos bancos locais da KOMUNE e da Imova.
+- **Rota `POST /api/empresas/acesso`** (pública no proxy, só ela entre as rotas de API): recebe a pergunta da outra empresa, confere a assinatura e responde `{ empresa, entra }`.
+  - A pergunta é assinada com HMAC-SHA256 e `SEGREDO_ENTRE_EMPRESAS` (`lib/pergunta-entre-empresas.ts`). Ela leva quem pergunta, a quem e quando, e vale 5 minutos. A comparação é em tempo constante.
+  - Sem o segredo: 404. Corpo estranho: 400. Pergunta para outra empresa, vencida ou com assinatura errada: 401. Sem chave de serviço ou com o banco fora: 503.
+- **Quem pergunta** (`lib/outras-empresas.ts`): o servidor pergunta a cada outra empresa do seletor sobre o e-mail de quem está logado, com 3 s de espera. Só vale "entra" vindo da empresa a quem se perguntou. Guarda a resposta por 10 min (sim), 2 min (não) ou 30 s (falha). Na dúvida, o botão some.
+- **A tela não espera:** o botão saiu do `Promise.all` do layout e chega pelo `Suspense` do cabeçalho (`components/layout/seletor-da-pessoa.tsx`).
+- **Ajustes → Pessoas:** sai a coluna "Também acessa" e o que a alimentava (`carregarOutrasEmpresas`, `definirOutrasEmpresas`). O "Como alguém entra" diz que o botão aparece sozinho para quem também entra na outra empresa.
+- **`SEGREDO_ENTRE_EMPRESAS`** no `apps/web/.env.example`. O guia (`docs/operacao/multiempresa.md`, "Quem vê o botão") foi reescrito.
+
+**Verificado no computador** (KOMUNE em `localhost:3000` e Imova em `127.0.0.1:3100`, `next dev`, bancos locais, mesmo segredo):
+- **A rota:** sem assinatura → 400; assinatura errada → 401; assinada → `{"empresa":"komune","entra":true}` e `{"empresa":"imova","entra":true}`; e-mail desconhecido → `entra:false`.
+- **Admin e SDR de teste**, ativos nos dois bancos: veem o botão nas duas empresas.
+- **Gestor de teste desativado só na Imova:** na KOMUNE não vê botão nenhum.
+- **Chrome real (Playwright):** KOMUNE → botão → Imova → botão → KOMUNE. O botão aparece cerca de 40 ms depois da página, nos dois lados.
+- **Testes:** lint e tipos OK; 2.116 testes Vitest (site 1.335, workers 388, prompts 284, schema 109), com 9 novos de assinatura e prazo e 1 de rota pública. pgTAP 114 e 115 nos dois bancos locais.
+- **pgTAP completo na KOMUNE local:** 6 arquivos falham (14, 24, 48, 68, 74, 90), com as **mesmas** falhas depois de retirar a função nova do banco. Elas já existiam neste banco local e dependem dos dados ou da hora, não desta mudança.
+
+**Nada em produção.** Para levar, só com pedido:
+1. Gerar o segredo (`openssl rand -hex 32`) e pôr `SEGREDO_ENTRE_EMPRESAS` em Production nos projetos `imova-crm` e `triade-crm` da Vercel, com o mesmo valor.
+2. `node scripts/publicar-banco.mjs imova migrar`, depois `komune migrar`: a migração `20261023090000`.
+3. Republicar a Imova e a KOMUNE de uma cópia limpa da `main`, conferindo o ar antes.
+
+Publicar as duas juntas: enquanto só um lado tiver a versão nova, esse lado não mostra o botão, porque a versão antiga do outro não tem a rota.
+
+**Precisa de decisão humana:**
+- **LGPD (Dennis):** o e-mail de quem abre o CRM vai do servidor de uma empresa ao da outra, só para a resposta sim ou não. Não é guardado nem registrado em log. As duas empresas são controladoras distintas.
+- **Segundo tempo:** tirar `public.acesso_a_outras_empresas` e `public.minhas_outras_empresas()`, sem uso desde esta versão, depois que ela estiver no ar nas duas empresas.

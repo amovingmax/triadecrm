@@ -21,8 +21,8 @@ import { type DestinoDoSeletor, EMPRESA } from '@/lib/empresa';
  * uma aba antiga não grava no banco errado. Na primeira vez, a outra empresa pede o
  * login com Google; o navegador guarda os dois.
  *
- * `destinos` já vem recortado para a pessoa (`destinosDaPessoa`): só aparece para quem
- * o admin marcou como tendo acesso a outra empresa. Com uma empresa só, não aparece.
+ * `destinos` já vem recortado para a pessoa (`seletor-da-pessoa.tsx`): só aparece para
+ * quem a outra empresa respondeu que entra lá. Com uma empresa só, não aparece.
  */
 export function SeletorDeEmpresa({ destinos }: { destinos: DestinoDoSeletor[] }) {
   if (destinos.length < 2) return null;

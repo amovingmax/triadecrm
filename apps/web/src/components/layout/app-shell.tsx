@@ -10,7 +10,6 @@ import { podeLigar } from '@/components/ligacao/chamada-contexto';
 import { ProvedorDoSoftphone } from '@/components/ligacao/voz-provedor';
 import { TransicaoPagina } from '@/components/movimento';
 import { type Sessao } from '@/lib/auth/session';
-import { type DestinoDoSeletor } from '@/lib/empresa';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
 import { telasParaAdiantar } from '@/lib/navegacao';
 
@@ -48,14 +47,11 @@ import { telasParaAdiantar } from '@/lib/navegacao';
 export function AppShell({
   sessao,
   filas,
-  empresas,
   children,
 }: {
   sessao: Sessao;
   /** Quanto trabalho está parado em cada fila que o menu conta (`lib/filas-do-menu.ts`). */
   filas: ContagemDasFilas;
-  /** O seletor de empresa desta pessoa; vazio para quem só tem acesso a esta (`destinosDaPessoa`). */
-  empresas: DestinoDoSeletor[];
   children: React.ReactNode;
 }) {
   return (
@@ -65,7 +61,7 @@ export function AppShell({
           <Sidebar papel={sessao.papel} filas={filas} />
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <Header sessao={sessao} empresas={empresas} />
+            <Header sessao={sessao} />
 
             <main
               id="conteudo"

@@ -8345,6 +8345,7 @@ export type Database = {
         Returns: Json
       }
       dlq_drenar: { Args: { p_qty?: number }; Returns: Json }
+      email_entra_no_crm: { Args: { p_email: string }; Returns: boolean }
       empresa_do_banco: { Args: never; Returns: string }
       encerrar_cadencia: {
         Args: { p_enrollment_id: string; p_motivo: string }

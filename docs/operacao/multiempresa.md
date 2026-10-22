@@ -19,12 +19,14 @@ O Tríade serve duas empresas com o **mesmo código** e **uma instalação por e
 
 ## Quem vê o botão de trocar de empresa
 
-Só quem o admin marcou em **Ajustes → Pessoas → Também acessa**. A marcação fica em `public.acesso_a_outras_empresas`, no banco de cada empresa, e é feita por admin.
-- **Para alguém trabalhar nas duas empresas:**
-  1. pôr o e-mail na lista de permitidos de cada uma;
-  2. depois do primeiro login dela em cada empresa, marcar a outra empresa nas duas.
-- **A marcação só mostra o botão.** Quem entra continua sendo decidido pela lista de permitidos de cada empresa.
-- **Nenhum banco consulta o outro.**
+Quem entra nas duas, sem ninguém marcar nada (decisão do usuário em 22/10/2026; até então era a marcação "Também acessa" em cada empresa, e marcada só de um lado a pessoa ia e não voltava).
+- **Como funciona:** ao abrir o CRM, o servidor desta empresa pergunta ao servidor da outra "este e-mail entra aí?" (`POST /api/empresas/acesso`). A outra responde pelo próprio banco (`public.email_entra_no_crm`, a mesma regra do login: perfil ativo de quem já entrou; lista de permitidos ou domínio aberto de quem nunca entrou). A resposta é só sim ou não.
+- **Para alguém trabalhar nas duas empresas:** pôr o mesmo e-mail Google na lista de permitidos de cada uma. Mais nada.
+- **A pergunta vai assinada** (HMAC-SHA256, válida por 5 minutos, com a empresa de destino) com `SEGREDO_ENTRE_EMPRESAS`, o mesmo valor nos dois projetos da Vercel e em nenhum outro lugar. Sem a assinatura, a rota não diz nada sobre ninguém.
+- **Nenhum site toca no banco do outro.** Cada um usa só as próprias chaves; o que atravessa é a pergunta.
+- **Na dúvida, o botão some:** sem o segredo, com a outra empresa fora do ar ou lenta (mais de 3 s), ou respondendo em nome de outra empresa. A tela não espera pela resposta: o botão chega depois, pelo `Suspense` do cabeçalho.
+- **Cada servidor guarda a resposta** por 10 minutos (sim) ou 2 minutos (não). Quem ganha ou perde acesso na outra empresa vê o botão mudar nesse prazo.
+- **Fica para o segundo tempo:** `public.acesso_a_outras_empresas` e `public.minhas_outras_empresas()` (20261022110000) estão sem uso; tirar depois que esta versão estiver no ar nas duas empresas.
 
 ## As travas contra o projeto errado
 

@@ -42,6 +42,14 @@ describe('ehRotaPublica', () => {
     expect(ehRotaPublica('/revisao')).toBe(false);
   });
 
+  it('a pergunta da outra empresa abre sem sessão, e só ela entre as rotas de API', () => {
+    expect(ehRotaPublica('/api/empresas/acesso')).toBe(true);
+    expect(ehRotaPublica('/api/empresas/acesso/outra')).toBe(false);
+    expect(ehRotaPublica('/api/empresas')).toBe(false);
+    expect(ehRotaPublica('/api/midia')).toBe(false);
+    expect(ehRotaPublica('/api/telefone/procurar')).toBe(false);
+  });
+
   it('não confunde /c/ com uma rota que apenas começa com "c"', () => {
     expect(ehRotaPublica('/conversas')).toBe(false);
     expect(ehRotaPublica('/c')).toBe(false);

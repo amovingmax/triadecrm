@@ -1,12 +1,12 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 import { PaletaComandos } from '@/components/layout/paleta-comandos';
-import { SeletorDeEmpresa } from '@/components/layout/seletor-de-empresa';
+import { SeletorDaPessoa } from '@/components/layout/seletor-da-pessoa';
 import { UserMenu } from '@/components/layout/user-menu';
 import { Logo } from '@/components/logo';
 import { AlternadorTema } from '@/components/tema/alternador-tema';
 import { type Sessao } from '@/lib/auth/session';
-import { type DestinoDoSeletor } from '@/lib/empresa';
 
 /**
  * Cabeçalho fixo de 56px (o teto da densidade 7: a lista é que precisa da altura).
@@ -22,7 +22,7 @@ import { type DestinoDoSeletor } from '@/lib/empresa';
  * dá tamanho, e sem a caixa o alvo era o do próprio SVG (35x28px). O `-ml-1.5`
  * devolve a folga que a caixa acrescenta, para o "K" ficar onde já estava.
  */
-export function Header({ sessao, empresas }: { sessao: Sessao; empresas: DestinoDoSeletor[] }) {
+export function Header({ sessao }: { sessao: Sessao }) {
   return (
     // 72px no desktop (Tríade Design System, 29/09/2026): a mesma altura do
     // quadrado da marca no trilho, para o cabeçalho e o trilho começarem na
@@ -43,7 +43,9 @@ export function Header({ sessao, empresas }: { sessao: Sessao; empresas: Destino
       <PaletaComandos papel={sessao.papel} />
 
       <div className="ml-auto flex items-center gap-1">
-        <SeletorDeEmpresa destinos={empresas} />
+        <Suspense fallback={null}>
+          <SeletorDaPessoa />
+        </Suspense>
         <AlternadorTema />
         <UserMenu sessao={sessao} />
       </div>

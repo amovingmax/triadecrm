@@ -26,10 +26,15 @@ export const ROTA_INICIAL = '/meu-dia';
  * `/r/<código>` é o link rastreado dos envios em massa: também é aberto pelo
  * parceiro, sem conta. Só grava o clique e redireciona para um destino que o
  * banco escolhe (`public.envio_clique`).
+ *
+ * `/api/empresas/acesso` é chamada pelo servidor da OUTRA empresa, sem cookie, para
+ * saber se mostra o botão de trocar. Quem a protege é a assinatura com o segredo que
+ * só os dois sites têm (`lib/pergunta-entre-empresas.ts`).
  */
 export function ehRotaPublica(pathname: string): boolean {
   return (
     pathname === '/login' ||
+    pathname === '/api/empresas/acesso' ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/c/') ||
     pathname.startsWith('/r/')

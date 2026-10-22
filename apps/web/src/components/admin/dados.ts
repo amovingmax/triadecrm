@@ -226,45 +226,6 @@ export async function trocarPapel(pessoaId: string, papel: AppRole): Promise<voi
   if (error) throw new Error(error.message);
 }
 
-/**
- * Quem também acessa outra empresa do Tríade: id da pessoa → slugs ("komune",
- * "imova"). É o que mostra o botão de trocar de empresa para ela (migração
- * 20261022110000). Só admin lê a de todos; para os outros, a RLS devolve só a própria.
- */
-export async function carregarOutrasEmpresas(): Promise<Record<string, string[]>> {
-  const supabase = createClient();
-  const { data, error } = await supabase.from('acesso_a_outras_empresas').select('user_id, empresa');
-  if (error) throw new Error(error.message);
-  const porPessoa: Record<string, string[]> = {};
-  for (const linha of data ?? []) (porPessoa[linha.user_id] ??= []).push(linha.empresa);
-  return porPessoa;
-}
-
-/** Marca e desmarca as outras empresas de uma pessoa: insere as novas, apaga as que saíram. */
-export async function definirOutrasEmpresas(
-  pessoaId: string,
-  novas: string[],
-  atuais: string[],
-): Promise<void> {
-  const supabase = createClient();
-  const entrar = novas.filter((e) => !atuais.includes(e));
-  const sair = atuais.filter((e) => !novas.includes(e));
-  if (entrar.length) {
-    const { error } = await supabase
-      .from('acesso_a_outras_empresas')
-      .insert(entrar.map((empresa) => ({ user_id: pessoaId, empresa })));
-    if (error) throw new Error(error.message);
-  }
-  if (sair.length) {
-    const { error } = await supabase
-      .from('acesso_a_outras_empresas')
-      .delete()
-      .eq('user_id', pessoaId)
-      .in('empresa', sair);
-    if (error) throw new Error(error.message);
-  }
-}
-
 export async function trocarAcesso(pessoaId: string, ativo: boolean): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from('profiles').update({ is_active: ativo }).eq('id', pessoaId);

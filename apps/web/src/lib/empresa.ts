@@ -79,14 +79,14 @@ export const DESTINOS_DO_SELETOR: DestinoDoSeletor[] = lerLinksDasEmpresas(
   EMPRESA.slug,
 );
 
-/** As outras empresas do seletor, sem esta: as que o admin pode marcar em Ajustes → Pessoas. */
+/** As outras empresas do seletor, sem esta: as que este servidor pergunta se a pessoa também acessa. */
 export const OUTRAS_EMPRESAS_DO_SELETOR: DestinoDoSeletor[] = DESTINOS_DO_SELETOR.filter((d) => !d.atual);
 
 /**
  * O seletor de UMA pessoa: esta empresa mais as outras que ela também acessa
- * (`public.minhas_outras_empresas()`, marcadas pelo admin; decisão do usuário em
- * 21/10/2026). Sem nenhuma outra, vazio: quem tem acesso a uma empresa só não vê
- * botão nenhum.
+ * (cada outra empresa responde pelo próprio login, `lib/outras-empresas.ts`; decisão
+ * do usuário em 22/10/2026). Sem nenhuma outra, vazio: quem tem acesso a uma empresa
+ * só não vê botão nenhum.
  */
 export function destinosDaPessoa(
   destinos: DestinoDoSeletor[],

@@ -3,9 +3,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { BancoDeOutraEmpresa } from '@/components/layout/banco-de-outra-empresa';
 import { requireSession } from '@/lib/auth/session';
 import { conferirEmpresaDoBanco } from '@/lib/conferir-empresa';
-import { DESTINOS_DO_SELETOR, destinosDaPessoa } from '@/lib/empresa';
 import { contarFilasDoMenu } from '@/lib/filas-do-menu';
-import { lerMinhasOutrasEmpresas } from '@/lib/outras-empresas';
 
 /**
  * Área autenticada: exige sessão (o proxy já barra antes; aqui é a segunda
@@ -22,28 +20,23 @@ import { lerMinhasOutrasEmpresas } from '@/lib/outras-empresas';
  * mesmo `Promise.all`: na primeira tela de cada servidor ela pergunta ao banco, e
  * depois de confirmada não pergunta mais. Banco de outra empresa = o CRM não abre.
  *
- * Também no mesmo `Promise.all`: a quais outras empresas a pessoa tem acesso, que
- * decide se ela vê o botão de trocar (`lib/outras-empresas.ts`). Sem outra empresa
- * configurada no site, não vai ao banco.
+ * O botão de trocar de empresa NÃO entra no `Promise.all`: saber se a pessoa entra na
+ * outra empresa é perguntar ao servidor de lá, e a tela não espera por isso. Ele chega
+ * depois, pelo `Suspense` do cabeçalho (`components/layout/seletor-da-pessoa.tsx`).
  *
  * O cache de consultas (`ProvedorConsultas`) é um só e fica acima da casca, para
  * sobreviver à troca de tela (20/10/2026; o porquê está no próprio provedor).
  */
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
-  const [sessao, filas, empresa, outrasEmpresas] = await Promise.all([
+  const [sessao, filas, empresa] = await Promise.all([
     requireSession(),
     contarFilasDoMenu(),
     conferirEmpresaDoBanco(),
-    lerMinhasOutrasEmpresas(),
   ]);
   if (!empresa.ok) return <BancoDeOutraEmpresa empresaDoBanco={empresa.empresaDoBanco} />;
   return (
     <ProvedorConsultas>
-      <AppShell
-        sessao={sessao}
-        filas={filas}
-        empresas={destinosDaPessoa(DESTINOS_DO_SELETOR, outrasEmpresas)}
-      >
+      <AppShell sessao={sessao} filas={filas}>
         {children}
       </AppShell>
     </ProvedorConsultas>
