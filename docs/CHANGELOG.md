@@ -7811,4 +7811,11 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - nenhum estouro lateral;
 - lint e tipos OK.
 
-**Pendente:** publicar, só com pedido.
+**Em produção (22/10/2026, pedido do usuário: "Suba essa atualização pro ar"):**
+- **Antes:** conferido o ar (KOMUNE `triade-6ey71zk68`, Imova `imova-er9pdwz96`, os dois publicados daqui).
+- **Main:** `a9276b8`, fast-forward de `c54bb37`.
+- **Deploys:** Imova `imova-e4trvfb60` e KOMUNE `triade-71kvz5rey`, de cópias limpas. Sem banco e sem variável nova.
+- **Conferido de fora, nos dois:** `/login` 200, telas internas → login, `/auth/dev` 404, rota de acesso 400 a corpo vazio. `ir.komune.app.br/login` → `komune.app.br`.
+- **Volta:** promover `triade-6ey71zk68` e `imova-er9pdwz96`.
+
+**Correção feita antes, na mesma tarde:** a `SUPABASE_SERVICE_ROLE_KEY` do `imova-crm` na Vercel não era a chave secreta da Imova. O Supabase recusava com "Invalid API key", a rota de acesso da Imova respondia 503 e a KOMUNE não mostrava o botão. A outra direção funcionava. O usuário regravou a chave `secret`/`default` pelo painel, porque o classificador barrou a escrita pela CLI, e a Imova foi republicada (`imova-er9pdwz96`). Desde então a Imova responde 200 às perguntas da KOMUNE.
