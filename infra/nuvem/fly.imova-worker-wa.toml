@@ -1,0 +1,46 @@
+# =============================================================================
+# imova-worker-wa no Fly.io — o motor do WhatsApp da IMOVA, ligado 24 h
+# =============================================================================
+#
+# O mesmo motor da KOMUNE (`fly.worker-wa.toml`), o mesmo Dockerfile e o mesmo
+# comando `wa`. A empresa não está no código do motor: ele trabalha para quem lhe
+# dá as chaves. Com as chaves da Imova, só enxerga o banco `imova-crm` e o número
+# da Imova; nunca o banco nem o número da KOMUNE.
+#
+# Mora na mesma conta do Fly que o `triade-worker-wa` (decisão do usuário em
+# 26/10/2026), como um app separado: máquina, imagem e segredos próprios.
+#
+# O NOME DO APP ESTÁ AQUI DENTRO DE PROPÓSITO. Publicar com este arquivo nunca
+# toca o motor da KOMUNE. E o contrário: nunca use `fly.worker-wa.toml` para a
+# Imova, e passe `--app imova-worker-wa` em todo comando.
+#
+# Publicar (da RAIZ do repositório, de uma cópia limpa do commit):
+#   fly deploy . --config infra/nuvem/fly.imova-worker-wa.toml --dockerfile apps/workers/Dockerfile
+#
+# Segredos por `fly secrets set --app imova-worker-wa` (nunca neste arquivo), com
+# os valores do `.env.imova`: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+# META_WA_ACCESS_TOKEN, META_WA_PHONE_NUMBER_ID, META_WA_BUSINESS_ACCOUNT_ID.
+# Os três da Meta só existem depois que o número da Imova é registrado.
+# =============================================================================
+
+app = "imova-worker-wa"
+primary_region = "gru"
+
+# O SIGTERM acorda qualquer descanso (lib/dormir.ts) e o worker termina a mensagem
+# atual antes de sair. O pior caso é uma chamada à Graph API em andamento, com
+# timeout de 30 s — daí os 35.
+kill_signal = "SIGTERM"
+kill_timeout = "35s"
+
+[env]
+  WORKER_COMANDO = "wa"
+  NODE_ENV = "production"
+  TZ = "America/Fortaleza"
+
+# Caiu, volta. O que chegou enquanto ele estava fora espera na fila do banco.
+[[restart]]
+  policy = "always"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

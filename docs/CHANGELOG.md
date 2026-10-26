@@ -7847,3 +7847,21 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - **Volta:** promover `imova-e4trvfb60`.
 
 **Precisa de decisão humana:** se a Imova tiver advogado, vale passar o texto por ele. O CRECI aparece como "CRECI 7260", como no site; se o registro for de pessoa física, decidir se o nome do titular entra.
+
+## 26/10/2026 (noite) — O motor do WhatsApp da Imova ganha lugar no Fly (branch `motor-imova`; RF-CON-01)
+
+**O pedido.** Preparar o motor que leva as mensagens do WhatsApp da Imova ao CRM dela, para o dia da troca do número durar o mínimo. Decisão do usuário: na mesma conta do Fly da KOMUNE, como app separado.
+
+**Entregue:**
+- `flyctl` v0.4.123 nesta máquina (`~/.fly/bin`, instalador oficial), com login como `contato@komune.app.br`.
+- App `imova-worker-wa` criado na organização `personal`, a mesma do `triade-worker-wa`: status *pending*, sem imagem, sem máquina e sem segredo. Não roda e não custa nada até o dia da troca.
+- `infra/nuvem/fly.imova-worker-wa.toml`: cópia do `fly.worker-wa.toml` com o nome do app fixo, para um deploy da Imova nunca tocar o motor da KOMUNE. `fly config validate` OK.
+
+**Verificado:** o `triade-worker-wa` antes e depois, só leitura: a mesma máquina (`7817912f1d0198`), versão 14, `started`, em `gru`.
+
+**Pendente (dia da troca):** os segredos do `imova-worker-wa` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e os três da Meta, que só existem com o número registrado) e o primeiro deploy, de cópia limpa. Antes de ligar na Imova: `aviso-por-email.ts` diz "WhatsApp da Komune" e `modelos-meta.ts` usa links da Komune como exemplo de variável; hoje não afetam a Imova (aviso por e-mail desligado, modelos sem variável).
+
+**Ajustes no banco da Imova (26/10/2026, com OK do usuário: "pode"):** feitos pelo REST com a chave de serviço do `imova-crm`, depois de conferir que o `.env.imova` aponta para `kkqadgxvmzulcamuakzk`.
+- `channel_windows` do WhatsApp, seg–sex: 8h–17h45 → **8h–19h** (o teto do CHECK `channel_windows_teto_legal`). Sábado continua 10h–12h só para quem respondeu; domingo nunca.
+- `inbox.responsavel_padrao` → o perfil de `contato@imovaimobiliaria.com.br` (era vazio, e a cascata caía no admin mais antigo).
+- **Pendente:** quatro textos da tela ainda dizem "8h às 17h45" e a estimativa de envio em massa usa 9,75 h por dia (`envios/formatos.ts`, `novo-envio.tsx`, `painel-atendimento.tsx`, `aviso-no-whatsapp.ts`). Na Imova são telas de funções desligadas (envio em massa, ausência, aviso de ligação), mas o certo é ler o horário do banco.
