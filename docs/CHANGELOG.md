@@ -7839,4 +7839,11 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - Aprovação do texto pelo usuário e publicação na Imova (só com pedido).
 - O apagamento automático depois de 2 anos ainda não existe: `app.aplicar_retencao` só limpa o Radar. A base da Imova começa agora, então o primeiro prazo vence em 10/2028; é preciso uma rotina antes disso.
 
+**Em produção (26/10/2026, pedido do usuário: "Pode publicar"):**
+- **Antes:** conferido o ar. Imova em `imova-e4trvfb60` (a `a9276b8`, publicada daqui em 22/10), KOMUNE em `triade-71kvz5rey`; nenhum deploy de outra máquina.
+- **Main:** `521a1eb`, fast-forward de `660273c`. O push não dispara deploy: a Vercel não está ligada ao GitHub (conferido depois do push).
+- **Só a Imova:** `imova-34b72aunc`, de cópia limpa de `521a1eb`. Sem banco e sem variável nova. **A KOMUNE não foi republicada** e segue em `triade-71kvz5rey`; a mudança não altera nada nela.
+- **Conferido de fora:** Imova `/privacidade` 200 sem login, com o título "Política de privacidade · Tríade · Imova" e sem "Komune" no texto visível; `/login` 200; `/meu-dia`, `/conversas` e `/privacidade/outra` → login; `/auth/dev` 404; `/api/empresas/acesso` 400 a corpo vazio. KOMUNE `/privacidade` sem login → login, como antes.
+- **Volta:** promover `imova-e4trvfb60`.
+
 **Precisa de decisão humana:** se a Imova tiver advogado, vale passar o texto por ele. O CRECI aparece como "CRECI 7260", como no site; se o registro for de pessoa física, decidir se o nome do titular entra.
