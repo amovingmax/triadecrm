@@ -7819,3 +7819,24 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - **Volta:** promover `triade-6ey71zk68` e `imova-er9pdwz96`.
 
 **Correção feita antes, na mesma tarde:** a `SUPABASE_SERVICE_ROLE_KEY` do `imova-crm` na Vercel não era a chave secreta da Imova. O Supabase recusava com "Invalid API key", a rota de acesso da Imova respondia 503 e a KOMUNE não mostrava o botão. A outra direção funcionava. O usuário regravou a chave `secret`/`default` pelo painel, porque o classificador barrou a escrita pela CLI, e a Imova foi republicada (`imova-er9pdwz96`). Desde então a Imova responde 200 às perguntas da KOMUNE.
+
+## 26/10/2026 — Política de privacidade pública da Imova em `/privacidade` (branch `privacidade-imova`; RF-CON-12, R06 §2)
+
+**O pedido.** Levar o WhatsApp da Imova ao CRM dela exige publicar o app "Imova CRM" na Meta, e publicar o login Google da Imova (hoje em "Testando"). Os dois pedem o link de uma política de privacidade, e o site da Imova não tem uma. Respostas do usuário na entrevista de 26/10: sem CNPJ (vale o CRECI 7260), endereço Av. Engenheiro Roberto Freire, 4715, Ponta Negra, Natal/RN, 59090-145; pedidos pelo contato@imovaimobiliaria.com.br, que também é o canal do encarregado; guarda de 2 anos depois do último contato; sem IA nas conversas por enquanto; o próprio usuário aprova o texto.
+
+**Entregue:**
+- `app/privacidade/page.tsx`: página pública, sem login, em 12 seções: quem somos, dados, finalidades e bases legais, compartilhamento, dados fora do Brasil, guarda, direitos (art. 18), como parar de receber mensagens, como pedir a exclusão (âncora `#exclusao`, para o campo "Exclusão de dados do usuário" da Meta), segurança, cookies e mudanças.
+- O texto é um só; o que muda por empresa fica em `EMPRESA.privacidade` (`packages/schema/src/empresas.ts`). **KOMUNE: `null`**, porque a política dela mora em komune.app.br/privacidade. Na KOMUNE, `/privacidade` continua atrás do login e dá 404 para quem entra, exatamente como antes.
+- `ehRotaPublica` abre `/privacidade` só para a empresa que tem a política no CRM (`lib/supabase/middleware.ts`).
+- A página só promete o que o CRM faz: as palavras de parada são as de `app.wa_parece_optout` (sair, parar, não quero, remover); a lista de serviços é a do deploy da Imova (Meta, Supabase em `sa-east-1`, conferido, Fly.io em São Paulo, Vercel, Google); a Anthropic só entra se o módulo de IA for ligado.
+
+**Verificado:**
+- Vitest: `empresas.test.ts` (5) e `rotas-publicas.test.ts` (10), com os casos novos: KOMUNE sem política, Imova sem texto da KOMUNE, `/privacidade` pública só na Imova, sem `startsWith` frouxo.
+- typecheck e lint do monorepo OK. A página passou pelo Prettier; `empresas.ts` e `empresas.test.ts` já estavam fora do Prettier antes e não foram reformatados inteiros.
+- Local, como Imova (`NEXT_PUBLIC_EMPRESA=imova`, porta 3100): `/privacidade` 200 sem login; `/meu-dia` sem login → `/login`. Chrome (Playwright) em 1280 e 390 px: sem rolagem lateral.
+
+**Pendente:**
+- Aprovação do texto pelo usuário e publicação na Imova (só com pedido).
+- O apagamento automático depois de 2 anos ainda não existe: `app.aplicar_retencao` só limpa o Radar. A base da Imova começa agora, então o primeiro prazo vence em 10/2028; é preciso uma rotina antes disso.
+
+**Precisa de decisão humana:** se a Imova tiver advogado, vale passar o texto por ele. O CRECI aparece como "CRECI 7260", como no site; se o registro for de pessoa física, decidir se o nome do titular entra.

@@ -55,6 +55,29 @@ export interface Empresa {
     /** Leitura da IA, resumos e rascunhos: usam a base de conhecimento da empresa. */
     ia: boolean;
   };
+  /**
+   * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
+   * publicar o app do WhatsApp e o Google pede para publicar o login. null = a empresa
+   * publica a política fora do CRM (a KOMUNE, em komune.app.br/privacidade), e a rota
+   * continua atrás do login, como sempre esteve.
+   */
+  privacidade: PoliticaDePrivacidade | null;
+}
+
+/** Quem responde pelos dados e como falar com ela, no topo de `/privacidade`. */
+export interface PoliticaDePrivacidade {
+  /** O controlador (LGPD, art. 5º, VI), como a pessoa conhece a empresa. */
+  controlador: string;
+  /** O registro que identifica o controlador. Sem CNPJ, o CRECI. */
+  registro: string;
+  endereco: string;
+  /** Canal dos pedidos de privacidade, que também é o do encarregado (LGPD, art. 41). */
+  email: string;
+  whatsapp: string;
+  /** Por quanto tempo contatos e conversas ficam depois do último contato, por extenso. */
+  guarda: string;
+  /** Data da versão em vigor, por extenso. Muda junto com qualquer mudança no texto. */
+  versao: string;
 }
 
 export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
@@ -71,6 +94,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
     gruposDeCategoria: {},
     origens: null,
     modulos: { plataformaKomune: true, ia: true },
+    privacidade: null,
   },
   imova: {
     slug: 'imova',
@@ -96,6 +120,15 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       padrao: 'numa lista de contatos da Imova Imobiliária',
     },
     modulos: { plataformaKomune: false, ia: false },
+    privacidade: {
+      controlador: 'Imova Imobiliária',
+      registro: 'CRECI 7260',
+      endereco: 'Av. Engenheiro Roberto Freire, 4715, Ponta Negra, Natal/RN, CEP 59090-145',
+      email: 'contato@imovaimobiliaria.com.br',
+      whatsapp: '(84) 99405-8888',
+      guarda: '2 anos',
+      versao: '26 de outubro de 2026',
+    },
   },
 };
 

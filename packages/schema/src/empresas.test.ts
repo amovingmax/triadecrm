@@ -37,6 +37,16 @@ describe('empresas', () => {
     expect(i.tipos.cerimonialista).toBeNull();
   });
 
+  it('a política de privacidade é página do CRM só na Imova; a da KOMUNE mora no site dela', () => {
+    expect(EMPRESAS.komune.privacidade).toBeNull();
+    const p = EMPRESAS.imova.privacidade;
+    expect(p).not.toBeNull();
+    for (const texto of Object.values(p!)) {
+      expect(texto).not.toMatch(/komune|rafael|luiz|matheus|heloísa|dennis/i);
+    }
+    expect(p!.email).toMatch(/@imovaimobiliaria\.com\.br$/);
+  });
+
   it('sem empresa no ambiente é a KOMUNE; empresa desconhecida é erro, não KOMUNE', () => {
     expect(empresaPorSlug(undefined).slug).toBe('komune');
     expect(empresaPorSlug('imova').slug).toBe('imova');

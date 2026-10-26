@@ -8,6 +8,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+import type { Empresa } from '@komune/schema/empresas';
+
+import { EMPRESA } from '@/lib/empresa';
 import { supabaseAnonKey, supabaseUrl } from '@/lib/env';
 
 /** Rota inicial de quem está autenticado. */
@@ -30,14 +33,19 @@ export const ROTA_INICIAL = '/meu-dia';
  * `/api/empresas/acesso` é chamada pelo servidor da OUTRA empresa, sem cookie, para
  * saber se mostra o botão de trocar. Quem a protege é a assinatura com o segredo que
  * só os dois sites têm (`lib/pergunta-entre-empresas.ts`).
+ *
+ * `/privacidade` é a política de privacidade da empresa que a publica no CRM (a Imova):
+ * a Meta, o Google e quem conversa com a empresa abrem o link sem conta. Na KOMUNE a
+ * política mora no site dela, e a rota continua atrás do login, como sempre esteve.
  */
-export function ehRotaPublica(pathname: string): boolean {
+export function ehRotaPublica(pathname: string, empresa: Empresa = EMPRESA): boolean {
   return (
     pathname === '/login' ||
     pathname === '/api/empresas/acesso' ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/c/') ||
-    pathname.startsWith('/r/')
+    pathname.startsWith('/r/') ||
+    (pathname === '/privacidade' && empresa.privacidade !== null)
   );
 }
 

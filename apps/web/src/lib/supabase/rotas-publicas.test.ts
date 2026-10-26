@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { EMPRESAS } from '@komune/schema/empresas';
+
 import { destinoNoHostDosLinks, destinoSeguro, ehRotaPublica, ROTA_INICIAL } from './middleware';
 
 /**
@@ -48,6 +50,14 @@ describe('ehRotaPublica', () => {
     expect(ehRotaPublica('/api/empresas')).toBe(false);
     expect(ehRotaPublica('/api/midia')).toBe(false);
     expect(ehRotaPublica('/api/telefone/procurar')).toBe(false);
+  });
+
+  it('a política de privacidade abre sem sessão só na empresa que a publica no CRM', () => {
+    expect(ehRotaPublica('/privacidade', EMPRESAS.imova)).toBe(true);
+    expect(ehRotaPublica('/privacidade', EMPRESAS.komune)).toBe(false);
+    expect(ehRotaPublica('/privacidade')).toBe(false);
+    expect(ehRotaPublica('/privacidade/outra', EMPRESAS.imova)).toBe(false);
+    expect(ehRotaPublica('/privacidades', EMPRESAS.imova)).toBe(false);
   });
 
   it('não confunde /c/ com uma rota que apenas começa com "c"', () => {
