@@ -68,7 +68,10 @@ export interface Empresa {
 export interface PoliticaDePrivacidade {
   /** O controlador (LGPD, art. 5º, VI), como a pessoa conhece a empresa. */
   controlador: string;
-  /** O registro que identifica o controlador. Sem CNPJ, o CRECI. */
+  /**
+   * O que identifica o controlador como pessoa jurídica: razão social, CNPJ e o CRECI
+   * da empresa, nunca o do corretor responsável técnico.
+   */
   registro: string;
   endereco: string;
   /** Canal dos pedidos de privacidade, que também é o do encarregado (LGPD, art. 41). */
@@ -122,12 +125,12 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
     modulos: { plataformaKomune: false, ia: false },
     privacidade: {
       controlador: 'Imova Imobiliária',
-      registro: 'CRECI 7260',
-      endereco: 'Av. Engenheiro Roberto Freire, 4715, Ponta Negra, Natal/RN, CEP 59090-145',
+      registro: 'razão social IMOVA LTDA, CNPJ 66.913.275/0001-24, CRECI-RN 9825',
+      endereco: 'Av. Engenheiro Roberto Freire, 4715, Sala A, Ponta Negra, Natal/RN, CEP 59090-000',
       email: 'contato@imovaimobiliaria.com.br',
       whatsapp: '(84) 99405-8888',
       guarda: '2 anos',
-      versao: '26 de outubro de 2026',
+      versao: '27 de outubro de 2026',
     },
   },
 };

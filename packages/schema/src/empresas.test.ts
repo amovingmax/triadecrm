@@ -47,6 +47,13 @@ describe('empresas', () => {
     expect(p!.email).toMatch(/@imovaimobiliaria\.com\.br$/);
   });
 
+  it('a controladora da Imova é a pessoa jurídica: CNPJ e CRECI da empresa, não o do corretor', () => {
+    const { registro } = EMPRESAS.imova.privacidade!;
+    expect(registro).toMatch(/CNPJ \d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/);
+    expect(registro).toContain('CRECI-RN 9825');
+    expect(registro).not.toContain('7260');
+  });
+
   it('sem empresa no ambiente é a KOMUNE; empresa desconhecida é erro, não KOMUNE', () => {
     expect(empresaPorSlug(undefined).slug).toBe('komune');
     expect(empresaPorSlug('imova').slug).toBe('imova');

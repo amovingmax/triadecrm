@@ -7865,3 +7865,17 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - `channel_windows` do WhatsApp, seg–sex: 8h–17h45 → **8h–19h** (o teto do CHECK `channel_windows_teto_legal`). Sábado continua 10h–12h só para quem respondeu; domingo nunca.
 - `inbox.responsavel_padrao` → o perfil de `contato@imovaimobiliaria.com.br` (era vazio, e a cascata caía no admin mais antigo).
 - **Pendente:** quatro textos da tela ainda dizem "8h às 17h45" e a estimativa de envio em massa usa 9,75 h por dia (`envios/formatos.ts`, `novo-envio.tsx`, `painel-atendimento.tsx`, `aviso-no-whatsapp.ts`). Na Imova são telas de funções desligadas (envio em massa, ausência, aviso de ligação), mas o certo é ler o horário do banco.
+
+## 27/10/2026 — A política de privacidade da Imova passa a identificar a empresa pelo CNPJ e pelo CRECI dela (RF-CON-12, R06 §2)
+
+**O pedido.** O suporte da Meta pediu um comprovante de propriedade para liberar o limite de contas do portfólio "Rafael Abreu", e o Rafael mandou o Cartão CNPJ e a certidão do CRECI-RN. Os dois mostram que a entrada de 26/10 estava errada: a Imova **tem CNPJ**, e o 7260 é o CRECI pessoal do responsável técnico, não o da imobiliária.
+
+**Entregue:**
+- `EMPRESAS.imova.privacidade` (`packages/schema/src/empresas.ts`): `registro` vira "razão social IMOVA LTDA, CNPJ 66.913.275/0001-24, CRECI-RN 9825" (era "CRECI 7260"); `endereco` fica igual ao do Cartão CNPJ, com "Sala A" e CEP 59090-000 (era 59090-145); `versao` vai para 27 de outubro de 2026. O texto da página não mudou.
+- Teste novo em `empresas.test.ts`: o registro da Imova traz um CNPJ e o CRECI-RN 9825, e não o 7260.
+
+**Fontes:** Cartão CNPJ da Receita (IMOVA LTDA, matriz, aberta em 21/05/2026, ativa, sem nome de fantasia) e Certidão de Regularidade Pessoa Jurídica do CRECI-RN (nº 9825 desde 04/09/2026, ativa; responsável técnico Rafael Bezerra de Abreu, CRECI 7260; código HTB6RC, válida até 19/11/2026).
+
+**Precisa de decisão humana:**
+- O site da Imova mostra "CRECI: 7260", que é o número do corretor. Se deve mostrar o da imobiliária, é decisão do Rafael. Não é do CRM.
+- No Cartão CNPJ, o e-mail é contato@imovaimoveis.com.br e o telefone é o (84) 9118-5097. A política continua com contato@imovaimobiliaria.com.br e o 99405-8888, que são os canais de atendimento.
