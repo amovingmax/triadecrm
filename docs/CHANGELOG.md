@@ -7943,14 +7943,16 @@ O pedido: "quero todas as funcionalidades do wpp no nosso crm, criar grupo, apag
 - Os grupos dependem de a KOMUNE ter o selo OBA, e isto não foi conferido. Sem o selo, criar grupo falha e a tela mostra a recusa.
 - O formato exato da resposta de `POST /groups` não está documentado. O CRM guarda o `request_id` e casa pelo webhook; se não vier, casa pelo nome.
 
+**Em produção (27/10/2026, entre 17h42 e 17h50), a pedido do Rafael ("pode"):** branch `whatsapp-completo` no GitHub (main intocada); o Rafael rodou os comandos, porque o classificador barrou o `migrar` daqui.
+- **Banco:** as duas migrações na Imova e na KOMUNE (164 nas duas). Conferido nos dois: `wa_acoes_proximas` e `wa_saida_ainda_vale` existem, `wa_grupos` e `wa_grupo_mensagens` no Realtime, filas `wa_*` vazias, nenhuma dead-letter.
+- **Edge Function `wa-webhook`:** KOMUNE v6 e Imova v3, `verify_jwt` desligado. Chamada sem assinatura recebe a recusa da própria função (401 `handshake_invalido`).
+- **worker-wa:** Fly v15, de cópia limpa de `caf7cb6`, com `META_APP_ID`. O motor da Imova (`imova-worker-wa`) continua sem máquina.
+- **Site:** deploy `triade-aj65vublh` (volta: `triade-71kvz5rey`), de cópia limpa de `caf7cb6`. `/login` 200, `/conversas` pede login, `/auth/dev` 404. **A Imova não foi republicada:** o site dela sai só da main.
+- **Ordem que deu errado:** o banco ficou para trás por uns 6 minutos, porque o `publicar-banco.mjs` quebrava no terminal de uma pessoa (a CLI 2.122 devolve as linhas soltas para pessoas e em `{rows}` para agentes); nesse tempo o motor novo procurava funções que não existiam. Nenhuma mensagem entrou nem saiu no intervalo e nada se perdeu. O script lê os dois formatos desde `5f5ff01`. A CLI deste Mac subiu de 2.109 para 2.122, porque a 2.109 não aceita `--project-ref` no `db query`.
+
 **Pendente.**
-- **Publicar:**
-  - banco, por `scripts/publicar-banco.mjs` (Imova antes, KOMUNE depois);
-  - Edge Function `wa-webhook`;
-  - worker-wa no Fly, antes do site;
-  - site na Vercel;
-  - no painel do app da Meta, assinar os quatro campos `group_*`.
-- Para trocar a foto do perfil, `META_APP_ID` no worker-wa do Fly.
+- No painel do app da Meta, assinar os quatro campos `group_*`.
 - Pedir o selo OBA à Meta, se os grupos forem para valer.
+- Primeiro uso de verdade: reagir, citar, documento, localização, bloquear e a foto do perfil, com o número da KOMUNE.
 - A lista da aba Clientes ainda não ordena por fixada nem mostra silenciada; a conversa aberta tem o menu.
 - O teste `107` precisa ser atualizado para o SDR com poder de gestor.
