@@ -111,7 +111,7 @@ A Meta só deixa assinar as mensagens do WhatsApp pelo painel do app.
    - URL de retorno: `https://toqdjcajyrowutunczhr.supabase.co/functions/v1/wa-webhook`
    - Token de verificação: o valor de `META_WA_VERIFY_TOKEN` do `.env` (gerado na Parte 2)
    - *Verificar e salvar*. Se der erro, a Parte 2 não terminou.
-3. Em **Campos do webhook**, *Gerenciar* → assinar **quatro** campos:
+3. Em **Campos do webhook**, *Gerenciar* → assinar **oito** campos:
 
    | Campo | Para quê |
    |---|---|
@@ -119,6 +119,13 @@ A Meta só deixa assinar as mensagens do WhatsApp pelo painel do app.
    | `phone_number_quality_update` | a nota do número caindo (`FLAGGED`) e o tier novo |
    | `account_update` | restrição, violação e banimento da conta |
    | `business_capability_update` | quantas conversas por dia a Meta libera |
+   | `group_lifecycle_update` | grupo criado (com o link de convite) ou apagado |
+   | `group_participants_update` | quem entrou, saiu ou pediu para entrar num grupo |
+   | `group_settings_update` | nome, descrição e foto do grupo mudaram |
+   | `group_status_update` | grupo suspenso pela Meta |
+
+   Os quatro de grupo entraram em 27/10/2026. Sem eles o grupo fica "criando" para
+   sempre no CRM: o id e o link do grupo só chegam por webhook.
 
    Os três últimos entraram em 25/09/2026, com o freio da Fase 3. **Não há como
    assiná-los por API**: `POST /{waba}/subscribed_apps` assina a app na conta e
@@ -192,6 +199,33 @@ Os 42 modelos vão para a aprovação da Meta. Se algum voltar recusado, o motiv
   A legenda sai com o primeiro nome em negrito, como o texto. Até 10 arquivos de uma vez;
   cada um vira uma mensagem, e a legenda vai na primeira.
 
+- **O WhatsApp completo (27/10/2026).** Na conversa: responder citando, reagir com emoji,
+  encaminhar (até 5 conversas), copiar, estrela, informações da mensagem (enviada, entregue,
+  lida, ouvida), buscar na conversa e no texto de todas, fixar (até 3), silenciar, marcar
+  como não lida e bloquear. Na caixa: documento (PDF, Word, Excel, PowerPoint, texto, CSV,
+  zip; até 20 MB), figurinha, localização, pedir localização, cartão de contato, pergunta
+  com até 3 botões e lista de até 10 opções, e emoji. O contato vê os tracinhos azuis quando
+  alguém abre a conversa, e "digitando…" enquanto alguém escreve (as duas coisas desligam
+  em Ajustes). Tudo isso é mensagem livre: só dentro da janela de 24 h.
+  - **Apagar não apaga no celular do contato.** A Cloud API não tem "apagar para todos".
+    Mensagem ainda na fila é cancelada de verdade (não sai); a que já saiu some só do CRM,
+    com quem apagou registrado.
+  - **Editar é corrigir.** A API também não edita: sai uma mensagem nova, "Correção: …",
+    respondendo à errada.
+  - **Bloquear** vale na hora no CRM (nada sai, a fila do número é cancelada) e é pedido à
+    Meta, que só bloqueia quem escreveu nas últimas 24 h; se ela recusar, a conversa diz.
+  - **O contato apagou ou editou** a mensagem dele: com o número só na Cloud API, a Meta
+    avisa a edição sem mandar o texto novo, e não avisa quando ele apaga.
+- **Grupos (27/10/2026).** Aba Grupos em Conversas: criar, link de convite, mandar o
+  convite numa conversa, aprovar quem pede para entrar, tirar participante, mudar nome,
+  descrição e foto, fixar mensagem e apagar o grupo. **Só funciona com conta oficial da
+  Meta (OBA, o selo verde)**: sem ela, o grupo fica "não criado" com a recusa da Meta.
+  Limites da Meta: 8 pessoas contando o número da empresa, ninguém é posto dentro (entra
+  pelo link), quem é tirado não volta pelo link, e mensagem livre só nas 24 h depois de
+  alguém do grupo escrever.
+- **Perfil da empresa no WhatsApp (27/10/2026).** Em Ajustes: recado, descrição, endereço,
+  e-mail, sites e categoria. Trocar a foto precisa do `META_APP_ID` no motor
+  (`fly secrets set META_APP_ID=... --app triade-worker-wa`).
 - **Modelos.** Desde 22/09/2026, fora da janela de 24 h a conversa só abre com o cumprimento:
   “Bom dia!”, “Boa tarde!” ou “Boa noite!”, escolhido pelo relógio de Natal — na conversa e
   nas campanhas. Quando a pessoa responde, o resto vai em texto livre. A exceção é o recibo
@@ -221,6 +255,9 @@ Os 42 modelos vão para a aprovação da Meta. Se algum voltar recusado, o motiv
 | Vídeo falha com `video_de_codec_recusado` | o MP4 está em HEVC (ou o som não é AAC): exportar em MP4 H.264 e mandar de novo |
 | Foto ou vídeo falha com `midia_recusado_pela_meta` | ler `messages.error_detail`: a Meta diz por que recusou o arquivo |
 | Mensagem falha com 131049 | a Meta segurou por excesso de mensagens de marketing para essa pessoa; tente outro dia |
+| Grupo fica "não criado" | a conta não é oficial (OBA) na Meta; ler o erro do grupo na aba Grupos |
+| Grupo fica "criando" para sempre | os campos `group_*` não foram assinados na Parte 3 |
+| Bloquear diz que a Meta não bloqueou | a pessoa não escreveu nas últimas 24 h; no CRM o bloqueio vale do mesmo jeito |
 | Todos os modelos recusados | ler o motivo em `message_templates.meta_rejection_reason` e ajustar o texto no `seed.sql`/migração, subindo a versão |
 
 

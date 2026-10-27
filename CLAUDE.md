@@ -60,6 +60,16 @@ Detalhe no `docs/CHANGELOG.md` (entrada de 14/10/2026).
 - **Consultoria é marca, não etapa:** a aba Consultoria de Conversas mostra quem tem negócio ganho, temperatura de cliente **ou** linha em `public.consultoria` (posta e tirada por `public.consultoria_marcar`, botão em Prospectados). A marca não mexe na etapa nem conta como publicado.
 - **Respondeu tem SLA de 24 h** (era 1 h): as respostas ao bom-dia e ao aviso de ligação entram lá sozinhas e sem dono.
 
+## WhatsApp completo, de 27/10/2026
+
+Pedido do Rafael ("quero todas as funcionalidades do wpp no nosso CRM"); detalhe no `docs/CHANGELOG.md` e em `docs/operacao/whatsapp-no-crm.md`.
+
+- **Só o que a Cloud API oficial tem, e o mais perto possível do resto** (ADR-06 continua: nada de API não oficial). Não existe "apagar para todos" nem "editar" de mensagem da empresa: `public.mensagem_apagar` cancela de verdade o que está na fila e, no que já saiu, esconde só no CRM (`messages.apagada_em`); `public.mensagem_corrigir` manda "Correção: …" respondendo à original. A tela diz a diferença.
+- **Tipos novos de mensagem:** `location` e `contacts` no enum; documento (`media_nome`), figurinha (`image` + `tipo_na_meta = 'sticker'`), reação (`reage_a`), resposta citada (`responde_a`), botões, lista e pedir localização (`interactive` com `conteudo.interativo`). A forma é conferida por `app.messages_forma`; a porteira (`messages_guard`) vale igual para todos.
+- **Ações que não são mensagem** (ler, digitando, bloquear, grupos, perfil) vão por `public.wa_acoes`, pedidas só por funções do banco e feitas pelo worker-wa num laço próprio (`apps/workers/src/whatsapp/acoes.ts`). Efeitos no banco ficam em `app.wa_acao_efeito`.
+- **Bloquear não é opt-out:** `public.conversa_bloquear` trava o envio no CRM na hora e pede o bloqueio à Meta (que só bloqueia quem escreveu nas últimas 24 h); a supressão da LGPD não é mexida.
+- **Grupos moram fora de `conversations`/`messages`** (`wa_grupos`, `wa_grupo_mensagens`, `wa_grupo_participantes`, `wa_grupo_pedidos`): só funcionam com conta oficial da Meta (OBA), até 8 pessoas, entrada só por link, janela de 24 h do grupo.
+
 ## Estrutura do monorepo (pnpm workspaces; criar assim no D1)
 
 ```

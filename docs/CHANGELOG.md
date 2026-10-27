@@ -7881,3 +7881,76 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 - No Cartão CNPJ, o e-mail é contato@imovaimoveis.com.br e o telefone é o (84) 9118-5097. A política continua com contato@imovaimobiliaria.com.br e o 99405-8888, que são os canais de atendimento.
 
 **Em produção (27/10/2026, 11h21):** só a Imova, de cópia limpa do `8b924de`: deploy `imova-8snmfdi8m` (volta: `imova-34b72aunc`). Houve um segundo deploy idêntico, `imova-3oa3uer96`, porque o comando foi repetido; os dois são do mesmo commit. Conferido no ar: `/privacidade` 200 sem login, com "razão social IMOVA LTDA, CNPJ 66.913.275/0001-24, CRECI-RN 9825", o endereço com Sala A e CEP 59090-000 e a versão de 27 de outubro; sem "7260" e sem KOMUNE no texto; `/meu-dia` e `/privacidade/outra` continuam pedindo login. A KOMUNE não foi republicada (`triade-71kvz5rey`).
+
+## 27/10/2026 — O WhatsApp inteiro dentro do CRM (branch `whatsapp-completo`; RF-CON-03, RF-CON-05, RF-CON-10, RF-CON-11, RF-CON-19, RF-ADM-03)
+
+O pedido: "quero todas as funcionalidades do wpp no nosso crm, criar grupo, apagar mensagem e etc, verifique tudo q existe de funcionalidade, e adeque ao nosso crm". Quando ouviu o que a Meta não deixa, o Rafael respondeu: "mas eu quero tudo isso".
+
+**O que a Meta deixa, e o que não** (documentação oficial da Cloud API, conferida em 27/10/2026):
+- **Tem:** responder citando, reagir, marcar como lida, "digitando…", documento, figurinha, localização, pedir localização, cartão de contato, botões e lista, bloquear (só quem escreveu nas últimas 24 h), o perfil da empresa e grupos (API de 06/10/2025).
+- **Grupos têm condições:** só conta oficial (OBA, o selo da Meta), até 8 pessoas contando o número da empresa, entrada só por link de convite, e mensagem livre só nas 24 h depois de alguém do grupo escrever.
+- **Não tem:** "apagar para todos" e "editar" para mensagem que a empresa mandou. Quando o contato edita, um número só na Cloud API recebe o aviso sem o texto novo; quando ele apaga, não recebe nada. Os dois avisos completos só existem no Coexistence.
+- **O caminho não oficial** (Baileys, Evolution) teria apagar e editar, mas pode banir o número, e o ADR-06 continua proibindo. Não foi usado.
+
+**Entregue.**
+- **Banco** (`20261027100000_tipos_novos_de_mensagem.sql` e `20261027110000_whatsapp_completo.sql`):
+  - `location` e `contacts` entram no enum. As linhas antigas, que estavam como `system`, foram corrigidas.
+  - `messages` ganha `responde_a`, `reage_a`, `corrige_a`, `encaminhada`/`encaminhada_de`, `conteudo` (localização, contatos, botões, lista, opção escolhida, anúncio, erro da Meta), `media_nome`, `apagada_em`/`apagada_por`, `apagada_pelo_contato_em`, `editada_pelo_contato_em` e `ouvida_em`.
+  - `app.messages_forma` confere a forma de cada tipo dentro dos limites da Meta, recusa envio para conversa bloqueada e recusa arquivo que não seja da conversa (nem de mensagem que quem envia já enxerga). O que o worker lê não muda depois do insert.
+  - **Apagar** (`mensagem_apagar`): cancela de verdade o que ainda está na fila. O worker pergunta de novo antes de mandar (`wa_saida_ainda_vale`) e, se a Meta aceitou um instante antes do cancelamento, o registro diz que saiu. O que já saiu é escondido só no CRM, e `mensagem_restaurar` desfaz.
+  - **Corrigir** (`mensagem_corrigir`): manda "_Correção:_ …" respondendo à original.
+  - Também: `mensagem_reagir`, `mensagem_encaminhar` (até 5 conversas, cada uma pela própria porteira), `mensagem_favoritar`, `conversa_fixar` (até 3, por pessoa), `conversa_silenciar` (por pessoa), `conversa_marcar_nao_lida`, `conversa_bloquear` (não é opt-out: a supressão não é mexida), `conversa_digitando` e `conversas_buscar` (busca pelo texto, sem contar a assinatura).
+  - `conversa_marcar_lida` passa a pedir também os tracinhos azuis, uma vez por mensagem.
+  - **Fila de ações** `public.wa_acoes`: só funções do banco escrevem nela. O efeito de cada ação fica em `app.wa_acao_efeito`.
+  - **Grupos:** `wa_grupos`, `wa_grupo_mensagens`, `wa_grupo_participantes` e `wa_grupo_pedidos`, as funções `grupo_*` e as funções do worker para mensagem, recibo, mídia e os quatro webhooks de grupo. Os grupos moram fora de `conversations`, porque opt-out, funil, robô e lead são de pessoa.
+  - **Perfil da empresa:** `wa_perfil_ler` e `wa_perfil_salvar`.
+  - O balde `mensagens` aceita Word, Excel, PowerPoint, texto, CSV, ODF e zip, até 50 MB. Antes, o .docx que chegava era recusado.
+- **Webhook** (`wa-webhook/extrair.ts`): a mensagem leva em `extra` o que antes era jogado fora (citação, encaminhada, alvo da reação, coordenadas, cartão, botão escolhido, nome do documento, anúncio, erro). Saem itens novos de `evento` (o contato apagou ou editou) e de `grupo` (os quatro webhooks), e a mensagem de grupo sai marcada.
+- **Worker-wa:**
+  - `graph.ts` e `saida.ts` mandam documento, figurinha, reação, localização, contatos, botões, lista e pedir localização, com `context` quando é resposta citada. `entrada.ts` trata os eventos, as mensagens e mídias de grupo e o recibo `played` (voz ouvida); tipo de arquivo desconhecido vai para o balde como `octet-stream`.
+  - `acoes.ts` (novo) faz as ações num laço próprio, de 2 em 2 s, porque o laço das mensagens pode ficar minutos no intervalo entre aberturas. As ações são lida, digitando, bloquear e desbloquear, todas as de grupo, e ler e salvar o perfil (a foto vai pelo upload retomável, e precisa de `META_APP_ID`).
+  - `conectar.ts` pede os campos `group_*` do webhook.
+- **Conversas** (`components/conversas`):
+  - **Menu da mensagem:** responder, reagir, copiar, encaminhar, estrela, corrigir, apagar (dizendo o que o contato vê), informações e desfazer o apagar.
+  - **No fio:** reações viram selos embaixo da mensagem. Aparecem também citação, cartão de localização e de contato, botões enviados, opção escolhida, anúncio, enquete ou edição não suportada, encaminhada, documento com nome, figurinha sem balão, os três "apagada", "corrigida" e "ouvido".
+  - **Clipe de anexo:** documento, figurinha, localização, contato, pergunta com botões, lista e pedir localização. Também entram a grade de emojis e o "digitando…".
+  - **Menu da conversa:** fixar, silenciar, marcar como não lida, buscar na conversa, favoritas e bloquear.
+  - **Lista:** fixadas no topo, sinal de silenciada e de bloqueado, e busca nas mensagens. A silenciada sai do número do menu de quem silenciou.
+- **Grupos** (`components/grupos`, aba Grupos em Conversas): lista, criar, fio com resposta e anexo, fixar e apagar mensagem. O painel tem foto, nome, descrição, link de convite (copiar, gerar novo, mandar numa conversa), participantes (x/8, tirar), pedidos para entrar (aprovar, recusar), atualizar do WhatsApp e apagar o grupo. As rotas novas são `/api/grupos/midia` e `/api/grupos/midia-url`.
+- **Ajustes → WhatsApp:**
+  - as duas chaves (tracinhos azuis e "digitando…");
+  - o perfil da empresa (recado, descrição, endereço, e-mail, sites, categoria e foto), com a rota `/api/whatsapp/perfil-foto`.
+- **Documentação:** o guia `docs/operacao/whatsapp-no-crm.md` ganhou os campos de webhook novos e as seções do WhatsApp completo, dos grupos e do perfil. O `CLAUDE.md` ganhou a seção "WhatsApp completo".
+
+**Verificado.**
+- **pgTAP:** `116_o_whatsapp_completo.sql` tem 49 asserções. Quatro testes antigos foram ajustados de propósito:
+  - `45`: a entrada ganhou o 11º parâmetro;
+  - `52`: duas tabelas novas no Realtime;
+  - `105`: `location` virou tipo;
+  - `111`: o caminho da foto agora é o que a rota gera.
+
+  Num banco novo (`db reset`) a suíte inteira tem **113 arquivos e 3.935 asserções, com 2 falhas que não são desta entrega**: `107` ("outra pessoa não cancela" o aviso de ligação). Desde 21/10 o SDR tem o poder do gestor e cancela, e o teste ainda espera o contrário.
+- **Vitest:** worker **410**, com o novo `whatsapp-completo.test.ts`; site **1.441**; schema 111; prompts 284. Lint e typecheck estão verdes no repositório inteiro.
+- **Deno:** o adaptador do webhook passa nos 33 testes, 7 deles novos. O comando do cabeçalho de `extrair.test.ts` usa um `--allow-none` que o Deno 2.1 não aceita; rodou sem ele.
+- **No navegador, contra o Supabase local:**
+  - uma conversa com anúncio, localização, cartão, enquete, encaminhada, botões enviados, resposta citada, opção escolhida, mensagem apagada pelo contato e reação ❤️ apareceu inteira e sem erro;
+  - a aba Grupos abre pelo endereço, e mandar no grupo pôs a mensagem na fila;
+  - o worker, rodado contra o dublê da Graph, fez as duas leituras, mandou a mensagem do grupo (`recipient_type: group`, assinada) e a pergunta com botões no formato da Meta, e descartou um "digitando…" atrasado.
+  - Os dados da prova foram apagados.
+
+**Não verificado.**
+- Nada foi mandado à Meta de verdade.
+- Os grupos dependem de a KOMUNE ter o selo OBA, e isto não foi conferido. Sem o selo, criar grupo falha e a tela mostra a recusa.
+- O formato exato da resposta de `POST /groups` não está documentado. O CRM guarda o `request_id` e casa pelo webhook; se não vier, casa pelo nome.
+
+**Pendente.**
+- **Publicar:**
+  - banco, por `scripts/publicar-banco.mjs` (Imova antes, KOMUNE depois);
+  - Edge Function `wa-webhook`;
+  - worker-wa no Fly, antes do site;
+  - site na Vercel;
+  - no painel do app da Meta, assinar os quatro campos `group_*`.
+- Para trocar a foto do perfil, `META_APP_ID` no worker-wa do Fly.
+- Pedir o selo OBA à Meta, se os grupos forem para valer.
+- A lista da aba Clientes ainda não ordena por fixada nem mostra silenciada; a conversa aberta tem o menu.
+- O teste `107` precisa ser atualizado para o SDR com poder de gestor.
