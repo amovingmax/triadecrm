@@ -77,7 +77,8 @@ select is(app.wa_tipo_da_meta('sticker')::text,  'image',       'tradução: sti
 select is(app.wa_tipo_da_meta('button')::text,   'interactive', 'tradução: button → interactive');
 select is(app.wa_tipo_da_meta('VIDEO')::text,    'video',       'tradução: maiúscula não atrapalha');
 select is(app.wa_tipo_da_meta(null)::text,       'text',        'tradução: sem tipo é texto');
-select is(app.wa_tipo_da_meta('location')::text, 'system',      'tradução: o que o enum não conhece vira system');
+-- `location` e `contacts` ganharam nome no enum em 27/10/2026 (20261027100000).
+select is(app.wa_tipo_da_meta('order')::text,    'system',      'tradução: o que o enum não conhece vira system');
 
 set local role authenticated;
 select throws_ok($$select app.wa_tipo_da_meta('sticker')$$, '42501', null,

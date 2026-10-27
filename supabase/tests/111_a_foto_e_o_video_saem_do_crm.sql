@@ -48,19 +48,23 @@ select public.wa_entrada_registrar('wamid.F111.1', '+5584999911100', '+558498881
 reset role;
 
 -- ---------- 1. a gestão grava a foto e o vídeo ----------
+-- O caminho é o que a rota de upload escolhe: a pasta da conversa. Desde
+-- 27/10/2026 (`app.messages_forma`) arquivo de fora da pasta da conversa só
+-- entra se for de uma mensagem que quem envia já enxerga.
 select pg_temp.entrar(pg_temp.gil(), 'gestor');
 select lives_ok($$
   insert into public.messages (id, conversation_id, direction, type, status, body, media_path, media_mime,
                                author_kind, sent_by, origin)
   values ('a1110000-0000-4000-8000-000000000001', pg_temp.conversa('+5584988811101'), 'out', 'image',
-          'queued', 'O cardápio de dezembro', 'fio/saida/1760000000000-abcd1234.jpg', 'image/jpeg',
+          'queued', 'O cardápio de dezembro',
+          pg_temp.conversa('+5584988811101') || '/saida/1760000000000-abcd1234.jpg', 'image/jpeg',
           'human', 'a0000000-0000-4000-8000-000000011101', 'crm')
 $$, 'A GESTÃO GRAVA A FOTO com a própria sessão: a policy de messages aceita image');
 select lives_ok($$
   insert into public.messages (id, conversation_id, direction, type, status, body, media_path, media_mime,
                                author_kind, sent_by, origin)
   values ('a1110000-0000-4000-8000-000000000002', pg_temp.conversa('+5584988811101'), 'out', 'video',
-          'queued', null, 'fio/saida/1760000000001-beef5678.mp4', 'video/mp4',
+          'queued', null, pg_temp.conversa('+5584988811101') || '/saida/1760000000001-beef5678.mp4', 'video/mp4',
           'human', 'a0000000-0000-4000-8000-000000011101', 'crm')
 $$, 'e o vídeo, sem legenda');
 select pg_temp.sair();
@@ -80,7 +84,7 @@ select is(app.wa_enfileirar_envio('a1110000-0000-4000-8000-000000000002') ->> 'e
 create table pg_temp.lote as select app.wa_proximos(50) as j;
 select is((select i ->> 'media_path' || ' ' || (i ->> 'tipo') from pg_temp.lote l, jsonb_array_elements(l.j -> 'itens') i
             where (i ->> 'message_id')::uuid = 'a1110000-0000-4000-8000-000000000001'),
-  'fio/saida/1760000000000-abcd1234.jpg image',
+  pg_temp.conversa('+5584988811101') || '/saida/1760000000000-abcd1234.jpg image',
   'O ITEM DA FOTO LEVA O ARQUIVO E O TIPO — é o que o worker sobe para a Meta');
 select is((select i ->> 'media_mime' from pg_temp.lote l, jsonb_array_elements(l.j -> 'itens') i
             where (i ->> 'message_id')::uuid = 'a1110000-0000-4000-8000-000000000002'),

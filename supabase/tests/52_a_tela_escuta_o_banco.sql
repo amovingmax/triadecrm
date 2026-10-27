@@ -39,9 +39,10 @@ select ok(exists (
    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'ficha_da_conversa'),
   'FICHA_DA_CONVERSA está publicada: a leitura da IA fica pronta 30-60 s depois da resposta');
 
+-- Os grupos de WhatsApp (27/10/2026) entraram: a mensagem do grupo chegando.
 select is((select count(*)::int from pg_publication_tables
-            where pubname = 'supabase_realtime' and schemaname = 'public'), 4,
-  'e são SÓ essas quatro: activities, deals e organizations mudam por ação de quem está na tela');
+            where pubname = 'supabase_realtime' and schemaname = 'public'), 6,
+  'e são SÓ essas seis (as quatro e os grupos): activities, deals e organizations mudam por ação de quem está na tela');
 
 -- A RLS é a fechadura do evento, não um detalhe de outra camada.
 select ok((select relrowsecurity from pg_class where oid = 'public.messages'::regclass),

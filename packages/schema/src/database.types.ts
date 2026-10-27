@@ -9,7 +9,24 @@ export type Json =
 export type Database = {
   app: {
     Tables: {
-      [_ in never]: never
+      identidade: {
+        Row: {
+          definida_em: string
+          empresa: string
+          unica: boolean
+        }
+        Insert: {
+          definida_em?: string
+          empresa: string
+          unica?: boolean
+        }
+        Update: {
+          definida_em?: string
+          empresa?: string
+          unica?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       deal_cards: {
@@ -98,6 +115,7 @@ export type Database = {
       }
       abrir_proximo_toque: { Args: { p_enrollment: string }; Returns: Json }
       acompanha: { Args: { p_alvo: string }; Returns: boolean }
+      admin_ou_gestor: { Args: never; Returns: boolean }
       ai_alerta_orcamento: { Args: never; Returns: Json }
       ai_custo: {
         Args: {
@@ -225,11 +243,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      definir_identidade: {
+        Args: { p_banco_com_dados?: boolean; p_empresa: string }
+        Returns: string
+      }
       dia_util_de_operacao: { Args: { p_at?: string }; Returns: boolean }
       dlq_drenar: { Args: { p_qty?: number }; Returns: Json }
       e_o_worker: { Args: never; Returns: boolean }
       eh_dia_util: { Args: { p_dia: string }; Returns: boolean }
       email_de: { Args: { p_user_id: string }; Returns: string }
+      empresa_texto: { Args: { p_chave: string }; Returns: string }
       encerrar_lotes_avulsos: { Args: never; Returns: number }
       encerrar_matricula: {
         Args: {
@@ -339,6 +362,7 @@ export type Database = {
         }
       }
       esvaziar_quadro: { Args: { p_motivo: string }; Returns: Json }
+      exigir_empresa: { Args: { p_empresa: string }; Returns: undefined }
       expirar_reservas: { Args: never; Returns: number }
       ficha_para_busca_de_telefone: {
         Args: { p_organization_id: string }
@@ -368,6 +392,21 @@ export type Database = {
         Args: { p_descricao?: string; p_nome: string; p_valor: string }
         Returns: undefined
       }
+      grupo_janela_aberta: { Args: { p_grupo_id: string }; Returns: boolean }
+      grupo_linha_de_sistema: {
+        Args: {
+          p_evento: string
+          p_grupo_id: string
+          p_quando: string
+          p_wa_id: string
+        }
+        Returns: undefined
+      }
+      grupo_pedir: {
+        Args: { p_dados?: Json; p_grupo_id: string; p_tipo: string }
+        Returns: number
+      }
+      grupo_posso: { Args: never; Returns: boolean }
       ia_alvo_do_trabalho: {
         Args: { p_payload: Json }
         Returns: {
@@ -624,6 +663,10 @@ export type Database = {
         }
         Returns: Json
       }
+      posso_mexer_na_conversa: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
       prazo_do_lote: {
         Args: { p_inicio: string; p_max_tentativas: number }
         Returns: string
@@ -861,6 +904,7 @@ export type Database = {
         Returns: string
       }
       segredo: { Args: { p_nome: string }; Returns: string }
+      sem_assinatura: { Args: { p_texto: string }; Returns: string }
       sem_cpf: { Args: { t: string }; Returns: string }
       setor_da_opcao_do_bot: { Args: { p_chave: string }; Returns: number }
       setor_padrao: { Args: never; Returns: number }
@@ -925,6 +969,14 @@ export type Database = {
       }
       voz_ativa: { Args: never; Returns: boolean }
       voz_fechar_orfas: { Args: never; Returns: number }
+      wa_acao_efeito: {
+        Args: {
+          a: Database["public"]["Tables"]["wa_acoes"]["Row"]
+          p_ok: boolean
+          p_resultado: Json
+        }
+        Returns: undefined
+      }
       wa_atraso_do_envio: { Args: { p_message_id: string }; Returns: number }
       wa_avancar_negocio: {
         Args: { p_de: string[]; p_deal_id: string; p_para: string }
@@ -968,6 +1020,10 @@ export type Database = {
         }[]
       }
       wa_enfileirar_envio: { Args: { p_message_id: string }; Returns: Json }
+      wa_entrada_completar: {
+        Args: { p_extra: Json; p_message_id: string }
+        Returns: undefined
+      }
       wa_envio_no_funil: {
         Args: { p_organization_id: string; p_template_code: string }
         Returns: Json
@@ -1011,7 +1067,9 @@ export type Database = {
         Args: { p_organization_id: string }
         Returns: string
       }
+      wa_numero_dos_grupos: { Args: never; Returns: string }
       wa_numero_padrao: { Args: never; Returns: string }
+      wa_opcao: { Args: { p_chave: string }; Returns: boolean }
       wa_parece_optout: { Args: { p_texto: string }; Returns: boolean }
       wa_proximos: { Args: { p_qty?: number }; Returns: Json }
       wa_registrar_entrada: {
@@ -1053,6 +1111,10 @@ export type Database = {
       wa_tipo_da_meta: {
         Args: { p_type: string }
         Returns: Database["app"]["Enums"]["msg_type"]
+      }
+      wa_ultima_recebida: {
+        Args: { p_conversation_id: string }
+        Returns: string
       }
       website_domain: { Args: { u: string }; Returns: string }
     }
@@ -1136,6 +1198,8 @@ export type Database = {
         | "interactive"
         | "reaction"
         | "system"
+        | "location"
+        | "contacts"
       org_kind:
         | "fornecedor"
         | "produtor"
@@ -3027,6 +3091,59 @@ export type Database = {
           },
         ]
       }
+      conversa_preferencias: {
+        Row: {
+          atualizada_em: string
+          conversation_id: string
+          fixada_em: string | null
+          profile_id: string
+          silenciada_ate: string | null
+        }
+        Insert: {
+          atualizada_em?: string
+          conversation_id: string
+          fixada_em?: string | null
+          profile_id: string
+          silenciada_ate?: string | null
+        }
+        Update: {
+          atualizada_em?: string
+          conversation_id?: string
+          fixada_em?: string | null
+          profile_id?: string
+          silenciada_ate?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversa_preferencias_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_preferencias_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "conversa_preferencias_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_preferencias_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversa_transferencias: {
         Row: {
           conversation_id: string
@@ -3142,6 +3259,10 @@ export type Database = {
           arquivada_em: string | null
           arquivada_por: string | null
           assignee_id: string
+          bloqueada_em: string | null
+          bloqueada_por: string | null
+          bloqueio_erro: string | null
+          bloqueio_na_meta: string | null
           bot_estado: string | null
           bot_opcao: string | null
           bot_paused: boolean
@@ -3175,6 +3296,10 @@ export type Database = {
           arquivada_em?: string | null
           arquivada_por?: string | null
           assignee_id: string
+          bloqueada_em?: string | null
+          bloqueada_por?: string | null
+          bloqueio_erro?: string | null
+          bloqueio_na_meta?: string | null
           bot_estado?: string | null
           bot_opcao?: string | null
           bot_paused?: boolean
@@ -3208,6 +3333,10 @@ export type Database = {
           arquivada_em?: string | null
           arquivada_por?: string | null
           assignee_id?: string
+          bloqueada_em?: string | null
+          bloqueada_por?: string | null
+          bloqueio_erro?: string | null
+          bloqueio_na_meta?: string | null
           bot_estado?: string | null
           bot_opcao?: string | null
           bot_paused?: boolean
@@ -3259,6 +3388,20 @@ export type Database = {
           {
             foreignKeyName: "conversations_assignee_id_fkey"
             columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_bloqueada_por_fkey"
+            columns: ["bloqueada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_bloqueada_por_fkey"
+            columns: ["bloqueada_por"]
             isOneToOne: false
             referencedRelation: "team_directory"
             referencedColumns: ["id"]
@@ -4644,6 +4787,46 @@ export type Database = {
         }
         Relationships: []
       }
+      mensagens_favoritas: {
+        Row: {
+          criada_em: string
+          message_id: string
+          profile_id: string
+        }
+        Insert: {
+          criada_em?: string
+          message_id: string
+          profile_id: string
+        }
+        Update: {
+          criada_em?: string
+          message_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensagens_favoritas_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_favoritas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_favoritas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_drafts: {
         Row: {
           ai_run_id: number | null
@@ -4896,6 +5079,9 @@ export type Database = {
       messages: {
         Row: {
           activity_id: string | null
+          apagada_em: string | null
+          apagada_pelo_contato_em: string | null
+          apagada_por: string | null
           approved_by: string | null
           audio_asset_id: string | null
           author_kind: string
@@ -4904,12 +5090,17 @@ export type Database = {
           business_initiated: boolean
           cadence_touch_id: string | null
           contact_id: string | null
+          conteudo: Json | null
           conversation_id: string
+          corrige_a: string | null
           cost_usd: number | null
           created_at: string
           delivered_at: string | null
           direction: Database["app"]["Enums"]["msg_direction"]
           draft_id: string | null
+          editada_pelo_contato_em: string | null
+          encaminhada: boolean
+          encaminhada_de: string | null
           error_code: string | null
           error_detail: string | null
           failed_at: string | null
@@ -4917,11 +5108,17 @@ export type Database = {
           is_first_contact: boolean
           media_id: string | null
           media_mime: string | null
+          media_nome: string | null
           media_path: string | null
           optout_confirmation: boolean
           organization_id: string | null
           origin: string
+          ouvida_em: string | null
           read_at: string | null
+          reage_a: string | null
+          reage_a_wamid: string | null
+          responde_a: string | null
+          responde_a_wamid: string | null
           sent_at: string | null
           sent_by: string | null
           status: Database["app"]["Enums"]["msg_status"]
@@ -4934,6 +5131,9 @@ export type Database = {
         }
         Insert: {
           activity_id?: string | null
+          apagada_em?: string | null
+          apagada_pelo_contato_em?: string | null
+          apagada_por?: string | null
           approved_by?: string | null
           audio_asset_id?: string | null
           author_kind?: string
@@ -4942,12 +5142,17 @@ export type Database = {
           business_initiated?: boolean
           cadence_touch_id?: string | null
           contact_id?: string | null
+          conteudo?: Json | null
           conversation_id: string
+          corrige_a?: string | null
           cost_usd?: number | null
           created_at?: string
           delivered_at?: string | null
           direction: Database["app"]["Enums"]["msg_direction"]
           draft_id?: string | null
+          editada_pelo_contato_em?: string | null
+          encaminhada?: boolean
+          encaminhada_de?: string | null
           error_code?: string | null
           error_detail?: string | null
           failed_at?: string | null
@@ -4955,11 +5160,17 @@ export type Database = {
           is_first_contact?: boolean
           media_id?: string | null
           media_mime?: string | null
+          media_nome?: string | null
           media_path?: string | null
           optout_confirmation?: boolean
           organization_id?: string | null
           origin?: string
+          ouvida_em?: string | null
           read_at?: string | null
+          reage_a?: string | null
+          reage_a_wamid?: string | null
+          responde_a?: string | null
+          responde_a_wamid?: string | null
           sent_at?: string | null
           sent_by?: string | null
           status?: Database["app"]["Enums"]["msg_status"]
@@ -4972,6 +5183,9 @@ export type Database = {
         }
         Update: {
           activity_id?: string | null
+          apagada_em?: string | null
+          apagada_pelo_contato_em?: string | null
+          apagada_por?: string | null
           approved_by?: string | null
           audio_asset_id?: string | null
           author_kind?: string
@@ -4980,12 +5194,17 @@ export type Database = {
           business_initiated?: boolean
           cadence_touch_id?: string | null
           contact_id?: string | null
+          conteudo?: Json | null
           conversation_id?: string
+          corrige_a?: string | null
           cost_usd?: number | null
           created_at?: string
           delivered_at?: string | null
           direction?: Database["app"]["Enums"]["msg_direction"]
           draft_id?: string | null
+          editada_pelo_contato_em?: string | null
+          encaminhada?: boolean
+          encaminhada_de?: string | null
           error_code?: string | null
           error_detail?: string | null
           failed_at?: string | null
@@ -4993,11 +5212,17 @@ export type Database = {
           is_first_contact?: boolean
           media_id?: string | null
           media_mime?: string | null
+          media_nome?: string | null
           media_path?: string | null
           optout_confirmation?: boolean
           organization_id?: string | null
           origin?: string
+          ouvida_em?: string | null
           read_at?: string | null
+          reage_a?: string | null
+          reage_a_wamid?: string | null
+          responde_a?: string | null
+          responde_a_wamid?: string | null
           sent_at?: string | null
           sent_by?: string | null
           status?: Database["app"]["Enums"]["msg_status"]
@@ -5014,6 +5239,20 @@ export type Database = {
             columns: ["activity_id"]
             isOneToOne: false
             referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_apagada_por_fkey"
+            columns: ["apagada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_apagada_por_fkey"
+            columns: ["apagada_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
             referencedColumns: ["id"]
           },
           {
@@ -5073,10 +5312,24 @@ export type Database = {
             referencedColumns: ["conversation_id"]
           },
           {
+            foreignKeyName: "messages_corrige_a_fkey"
+            columns: ["corrige_a"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "messages_draft_id_fkey"
             columns: ["draft_id"]
             isOneToOne: false
             referencedRelation: "message_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_encaminhada_de_fkey"
+            columns: ["encaminhada_de"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
           {
@@ -5091,6 +5344,20 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_reage_a_fkey"
+            columns: ["reage_a"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_responde_a_fkey"
+            columns: ["responde_a"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
           {
@@ -7711,6 +7978,430 @@ export type Database = {
           },
         ]
       }
+      wa_acoes: {
+        Row: {
+          chave: string | null
+          comecada_em: string | null
+          conversation_id: string | null
+          dados: Json
+          erro: string | null
+          erro_codigo: string | null
+          estado: string
+          feita_em: string | null
+          grupo_id: string | null
+          id: number
+          pedida_em: string
+          pedida_por: string | null
+          proxima_em: string
+          resultado: Json | null
+          tentativas: number
+          tipo: string
+        }
+        Insert: {
+          chave?: string | null
+          comecada_em?: string | null
+          conversation_id?: string | null
+          dados?: Json
+          erro?: string | null
+          erro_codigo?: string | null
+          estado?: string
+          feita_em?: string | null
+          grupo_id?: string | null
+          id?: never
+          pedida_em?: string
+          pedida_por?: string | null
+          proxima_em?: string
+          resultado?: Json | null
+          tentativas?: number
+          tipo: string
+        }
+        Update: {
+          chave?: string | null
+          comecada_em?: string | null
+          conversation_id?: string | null
+          dados?: Json
+          erro?: string | null
+          erro_codigo?: string | null
+          estado?: string
+          feita_em?: string | null
+          grupo_id?: string | null
+          id?: never
+          pedida_em?: string
+          pedida_por?: string | null
+          proxima_em?: string
+          resultado?: Json | null
+          tentativas?: number
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_acoes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_acoes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "wa_acoes_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "wa_grupos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_acoes_pedida_por_fkey"
+            columns: ["pedida_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_acoes_pedida_por_fkey"
+            columns: ["pedida_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_grupo_mensagens: {
+        Row: {
+          apagada_em: string | null
+          apagada_por: string | null
+          body: string | null
+          conteudo: Json | null
+          created_at: string
+          de_nome: string | null
+          de_wa_id: string | null
+          delivered_at: string | null
+          direction: Database["app"]["Enums"]["msg_direction"]
+          error_code: string | null
+          error_detail: string | null
+          failed_at: string | null
+          fixada_ate: string | null
+          grupo_id: string
+          id: string
+          media_id: string | null
+          media_mime: string | null
+          media_nome: string | null
+          media_path: string | null
+          read_at: string | null
+          reage_a: string | null
+          reage_a_wamid: string | null
+          responde_a: string | null
+          responde_a_wamid: string | null
+          sent_at: string | null
+          sent_by: string | null
+          status: Database["app"]["Enums"]["msg_status"]
+          tipo_na_meta: string | null
+          type: Database["app"]["Enums"]["msg_type"]
+          wa_message_id: string | null
+        }
+        Insert: {
+          apagada_em?: string | null
+          apagada_por?: string | null
+          body?: string | null
+          conteudo?: Json | null
+          created_at?: string
+          de_nome?: string | null
+          de_wa_id?: string | null
+          delivered_at?: string | null
+          direction: Database["app"]["Enums"]["msg_direction"]
+          error_code?: string | null
+          error_detail?: string | null
+          failed_at?: string | null
+          fixada_ate?: string | null
+          grupo_id: string
+          id?: string
+          media_id?: string | null
+          media_mime?: string | null
+          media_nome?: string | null
+          media_path?: string | null
+          read_at?: string | null
+          reage_a?: string | null
+          reage_a_wamid?: string | null
+          responde_a?: string | null
+          responde_a_wamid?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status: Database["app"]["Enums"]["msg_status"]
+          tipo_na_meta?: string | null
+          type?: Database["app"]["Enums"]["msg_type"]
+          wa_message_id?: string | null
+        }
+        Update: {
+          apagada_em?: string | null
+          apagada_por?: string | null
+          body?: string | null
+          conteudo?: Json | null
+          created_at?: string
+          de_nome?: string | null
+          de_wa_id?: string | null
+          delivered_at?: string | null
+          direction?: Database["app"]["Enums"]["msg_direction"]
+          error_code?: string | null
+          error_detail?: string | null
+          failed_at?: string | null
+          fixada_ate?: string | null
+          grupo_id?: string
+          id?: string
+          media_id?: string | null
+          media_mime?: string | null
+          media_nome?: string | null
+          media_path?: string | null
+          read_at?: string | null
+          reage_a?: string | null
+          reage_a_wamid?: string | null
+          responde_a?: string | null
+          responde_a_wamid?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: Database["app"]["Enums"]["msg_status"]
+          tipo_na_meta?: string | null
+          type?: Database["app"]["Enums"]["msg_type"]
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_grupo_mensagens_apagada_por_fkey"
+            columns: ["apagada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupo_mensagens_apagada_por_fkey"
+            columns: ["apagada_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupo_mensagens_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "wa_grupos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupo_mensagens_reage_a_fkey"
+            columns: ["reage_a"]
+            isOneToOne: false
+            referencedRelation: "wa_grupo_mensagens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupo_mensagens_responde_a_fkey"
+            columns: ["responde_a"]
+            isOneToOne: false
+            referencedRelation: "wa_grupo_mensagens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupo_mensagens_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupo_mensagens_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_grupo_participantes: {
+        Row: {
+          entrou_em: string | null
+          grupo_id: string
+          nome: string | null
+          saiu_em: string | null
+          wa_id: string
+        }
+        Insert: {
+          entrou_em?: string | null
+          grupo_id: string
+          nome?: string | null
+          saiu_em?: string | null
+          wa_id: string
+        }
+        Update: {
+          entrou_em?: string | null
+          grupo_id?: string
+          nome?: string | null
+          saiu_em?: string | null
+          wa_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_grupo_participantes_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "wa_grupos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_grupo_pedidos: {
+        Row: {
+          criado_em: string
+          decidido_em: string | null
+          decidido_por: string | null
+          decisao: string | null
+          grupo_id: string
+          pedido_id: string
+          wa_id: string | null
+        }
+        Insert: {
+          criado_em?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          decisao?: string | null
+          grupo_id: string
+          pedido_id: string
+          wa_id?: string | null
+        }
+        Update: {
+          criado_em?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          decisao?: string | null
+          grupo_id?: string
+          pedido_id?: string
+          wa_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_grupo_pedidos_decidido_por_fkey"
+            columns: ["decidido_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupo_pedidos_decidido_por_fkey"
+            columns: ["decidido_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupo_pedidos_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "wa_grupos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_grupos: {
+        Row: {
+          apagado_em: string | null
+          aprovacao: string
+          assunto: string
+          atualizado_em: string
+          business_number: string
+          criado_em: string
+          criado_por: string | null
+          descricao: string | null
+          erro: string | null
+          estado: string
+          foto_path: string | null
+          group_id: string | null
+          id: string
+          last_inbound_at: string | null
+          last_message_at: string | null
+          link_convite: string | null
+          organization_id: string | null
+          participantes_total: number | null
+          pedido_id: string | null
+          unread_count: number
+        }
+        Insert: {
+          apagado_em?: string | null
+          aprovacao?: string
+          assunto: string
+          atualizado_em?: string
+          business_number: string
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string | null
+          erro?: string | null
+          estado?: string
+          foto_path?: string | null
+          group_id?: string | null
+          id?: string
+          last_inbound_at?: string | null
+          last_message_at?: string | null
+          link_convite?: string | null
+          organization_id?: string | null
+          participantes_total?: number | null
+          pedido_id?: string | null
+          unread_count?: number
+        }
+        Update: {
+          apagado_em?: string | null
+          aprovacao?: string
+          assunto?: string
+          atualizado_em?: string
+          business_number?: string
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string | null
+          erro?: string | null
+          estado?: string
+          foto_path?: string | null
+          group_id?: string | null
+          id?: string
+          last_inbound_at?: string | null
+          last_message_at?: string | null
+          link_convite?: string | null
+          organization_id?: string | null
+          participantes_total?: number | null
+          pedido_id?: string | null
+          unread_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_grupos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_grupos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wa_saude_numero: {
         Row: {
           banido: boolean
@@ -8286,9 +8977,36 @@ export type Database = {
         Args: { p_arquivar?: boolean; p_conversation_id: string }
         Returns: Json
       }
+      conversa_bloquear: {
+        Args: { p_bloquear?: boolean; p_conversation_id: string }
+        Returns: Json
+      }
+      conversa_digitando: { Args: { p_conversation_id: string }; Returns: Json }
+      conversa_fixar: {
+        Args: { p_conversation_id: string; p_fixar?: boolean }
+        Returns: Json
+      }
       conversa_marcar_lida: {
         Args: { p_conversation_id: string }
         Returns: Json
+      }
+      conversa_marcar_nao_lida: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
+      conversa_silenciar: {
+        Args: { p_ate?: string; p_conversation_id: string }
+        Returns: Json
+      }
+      conversas_buscar: {
+        Args: { p_limite?: number; p_texto: string }
+        Returns: {
+          conversation_id: string
+          created_at: string
+          direction: Database["app"]["Enums"]["msg_direction"]
+          message_id: string
+          trecho: string
+        }[]
       }
       criar_ficha_da_conversa: {
         Args: {
@@ -8500,6 +9218,57 @@ export type Database = {
           ritmo_necessario: number
         }[]
       }
+      grupo_apagar: { Args: { p_grupo_id: string }; Returns: Json }
+      grupo_apagar_mensagem: { Args: { p_mensagem_id: string }; Returns: Json }
+      grupo_atualizar: {
+        Args: {
+          p_assunto?: string
+          p_descricao?: string
+          p_foto_path?: string
+          p_grupo_id: string
+        }
+        Returns: Json
+      }
+      grupo_convidar: {
+        Args: { p_conversation_id: string; p_grupo_id: string }
+        Returns: Json
+      }
+      grupo_criar: {
+        Args: {
+          p_aprovacao?: string
+          p_assunto: string
+          p_descricao?: string
+          p_organization_id?: string
+        }
+        Returns: Json
+      }
+      grupo_decidir: {
+        Args: { p_aprovar: boolean; p_grupo_id: string; p_pedidos: string[] }
+        Returns: Json
+      }
+      grupo_enviar: {
+        Args: {
+          p_grupo_id: string
+          p_media_mime?: string
+          p_media_nome?: string
+          p_media_path?: string
+          p_responde_a?: string
+          p_texto?: string
+          p_tipo?: string
+        }
+        Returns: Json
+      }
+      grupo_fixar_mensagem: {
+        Args: { p_dias?: number; p_mensagem_id: string }
+        Returns: Json
+      }
+      grupo_marcar_lido: { Args: { p_grupo_id: string }; Returns: Json }
+      grupo_novo_link: { Args: { p_grupo_id: string }; Returns: Json }
+      grupo_remover: {
+        Args: { p_grupo_id: string; p_wa_ids: string[] }
+        Returns: Json
+      }
+      grupo_sincronizar: { Args: { p_grupo_id: string }; Returns: Json }
       ia_adiar_trabalho: {
         Args: {
           p_chave: string
@@ -8646,6 +9415,24 @@ export type Database = {
         }
         Returns: Json
       }
+      mensagem_apagar: { Args: { p_message_id: string }; Returns: Json }
+      mensagem_corrigir: {
+        Args: { p_message_id: string; p_texto: string }
+        Returns: Json
+      }
+      mensagem_encaminhar: {
+        Args: { p_conversas: string[]; p_message_id: string }
+        Returns: Json
+      }
+      mensagem_favoritar: {
+        Args: { p_favorita?: boolean; p_message_id: string }
+        Returns: Json
+      }
+      mensagem_reagir: {
+        Args: { p_emoji?: string; p_message_id: string }
+        Returns: Json
+      }
+      mensagem_restaurar: { Args: { p_message_id: string }; Returns: Json }
       mensagens_automaticas: {
         Args: { p_ate?: string; p_desde?: string; p_limite?: number }
         Returns: {
@@ -9302,6 +10089,20 @@ export type Database = {
         Args: { p_activity_id: string; p_call_id: string }
         Returns: Json
       }
+      wa_acao_concluir: {
+        Args: { p_id: number; p_resultado?: Json }
+        Returns: boolean
+      }
+      wa_acao_falhar: {
+        Args: {
+          p_codigo: string
+          p_erro: string
+          p_id: number
+          p_retentar?: boolean
+        }
+        Returns: string
+      }
+      wa_acoes_proximas: { Args: { p_qty?: number }; Returns: Json }
       wa_bot_ligar: { Args: { p_ativo: boolean }; Returns: Json }
       wa_eco_registrar: {
         Args: {
@@ -9316,10 +10117,20 @@ export type Database = {
         }
         Returns: Json
       }
+      wa_entrada_evento: {
+        Args: {
+          p_alvo_wamid: string
+          p_dados?: Json
+          p_ocorrido_em?: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
       wa_entrada_registrar: {
         Args: {
           p_body?: string
           p_business_number: string
+          p_extra?: Json
           p_media_id?: string
           p_media_mime?: string
           p_occurred_at?: string
@@ -9348,6 +10159,37 @@ export type Database = {
         Returns: Json
       }
       wa_freios_status: { Args: never; Returns: Json }
+      wa_grupo_entrada_registrar: {
+        Args: {
+          p_body?: string
+          p_business_number: string
+          p_de: string
+          p_de_nome: string
+          p_extra?: Json
+          p_group_id: string
+          p_media_id?: string
+          p_media_mime?: string
+          p_occurred_at?: string
+          p_type?: string
+          p_wamid: string
+        }
+        Returns: Json
+      }
+      wa_grupo_evento_registrar: { Args: { p_item: Json }; Returns: Json }
+      wa_grupo_midia_registrar: {
+        Args: { p_media_path: string; p_message_id: string }
+        Returns: boolean
+      }
+      wa_grupo_status_registrar: {
+        Args: {
+          p_codigo?: string
+          p_detalhe?: string
+          p_ocorrido_em?: string
+          p_status: string
+          p_wamid: string
+        }
+        Returns: Json
+      }
       wa_midia_falhou: {
         Args: { p_message_id: string; p_motivo?: string }
         Returns: Json
@@ -9394,11 +10236,18 @@ export type Database = {
         }
         Returns: Json
       }
+      wa_perfil_ler: { Args: never; Returns: Json }
+      wa_perfil_salvar: { Args: { p_dados: Json }; Returns: Json }
       wa_preparar_envio: { Args: { p_organization_id: string }; Returns: Json }
       wa_preparar_envio_na_conversa: {
         Args: { p_conversation_id: string }
         Returns: Json
       }
+      wa_recibo_ouvido: {
+        Args: { p_ocorrido_em?: string; p_wamid: string }
+        Returns: Json
+      }
+      wa_saida_ainda_vale: { Args: { p_message_id: string }; Returns: boolean }
       wa_saida_enfileirar_pendentes: { Args: { p_qty?: number }; Returns: Json }
       wa_saida_falha: {
         Args: {
@@ -9655,6 +10504,8 @@ export const Constants = {
         "interactive",
         "reaction",
         "system",
+        "location",
+        "contacts",
       ],
       org_kind: [
         "fornecedor",

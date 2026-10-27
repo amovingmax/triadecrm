@@ -80,11 +80,13 @@ select has_column('public', 'conversations', 'peer_user_id',
                   'a conversa tem onde guardar o BSUID');
 select has_index('public', 'conversations', 'conversations_bsuid_idx',
                  'e acha a conversa por ele sem varrer a tabela');
+-- Desde 27/10/2026 a entrada tem um 11º parâmetro, `p_extra` (resposta
+-- citada, reação, localização…), com padrão nulo: o worker antigo segue igual.
 select ok(has_function_privilege('service_role',
-            'public.wa_entrada_registrar(text, text, text, text, text, text, text, timestamptz, text, text)', 'execute'),
+            'public.wa_entrada_registrar(text, text, text, text, text, text, text, timestamptz, text, text, jsonb)', 'execute'),
           'o worker chama a entrada com o BSUID');
 select ok(not has_function_privilege('authenticated',
-            'public.wa_entrada_registrar(text, text, text, text, text, text, text, timestamptz, text, text)', 'execute'),
+            'public.wa_entrada_registrar(text, text, text, text, text, text, text, timestamptz, text, text, jsonb)', 'execute'),
           'e a tela não');
 select ok(has_function_privilege('service_role',
             'public.wa_status_registrar(text, text, timestamptz, text, text, text)', 'execute')
