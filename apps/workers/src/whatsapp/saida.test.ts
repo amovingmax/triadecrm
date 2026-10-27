@@ -55,6 +55,11 @@ function item(parcial: Partial<ItemDeSaida> = {}): ItemDeSaida {
     modelo: null,
     botoes: [],
     link_codigo: 'crm',
+    responde_a_wamid: null,
+    reage_a_wamid: null,
+    conteudo: null,
+    media_nome: null,
+    tipo_na_meta: null,
     ...parcial,
   };
 }
@@ -205,7 +210,7 @@ interface Chamada {
   args: Record<string, unknown>;
 }
 
-function bancoFalso(lote: { itens: unknown[]; recusados?: unknown[] }): {
+function bancoFalso(lote: { itens: unknown[]; recusados?: unknown[]; cancelada?: boolean }): {
   cliente: ClienteDoBanco;
   chamadas: Chamada[];
 } {
@@ -221,6 +226,10 @@ function bancoFalso(lote: { itens: unknown[]; recusados?: unknown[] }): {
       }
       if (nome === 'wa_saida_falha') {
         return Promise.resolve({ data: { acao: 'reagendado', tentativa: 1 }, error: null });
+      }
+      // A última pergunta antes de mandar (27/10/2026): ninguém cancelou.
+      if (nome === 'wa_saida_ainda_vale') {
+        return Promise.resolve({ data: !lote.cancelada, error: null });
       }
       return Promise.resolve({ data: { ok: true }, error: null });
     },

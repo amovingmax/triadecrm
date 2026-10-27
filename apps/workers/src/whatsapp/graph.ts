@@ -54,7 +54,20 @@ export interface ConfigDaGraph {
   timeoutMs?: number;
 }
 
-export type Destino = { para: string };
+/**
+ * Para quem vai. `grupo` = `para` é o id do grupo na Meta (`recipient_type:
+ * group`, API de grupos de 06/10/2025). `responde` = o wamid da mensagem citada
+ * (o "responder" do WhatsApp, `context.message_id`), em qualquer tipo.
+ */
+export type Destino = { para: string; grupo?: boolean; responde?: string };
+
+/** Um contato do cartão, no vocabulário do CRM (`messages.conteudo.contatos`). */
+export interface ContatoDoCartao {
+  nome: string;
+  telefones: { numero: string; tipo?: string; wa_id?: string }[];
+  emails?: string[];
+  empresa?: string;
+}
 
 /**
  * Os parâmetros de um modelo, nas duas formas que a Meta aceita:
@@ -86,7 +99,28 @@ export type Envio =
    * Foto e vídeo escolhidos na tela (16/10/2026). Como o áudio, o arquivo vira
    * `mediaId` no instante da entrega; a legenda é o texto que vai embaixo.
    */
-  | (Destino & { tipo: 'imagem' | 'video'; mediaId?: string; legenda?: string });
+  | (Destino & { tipo: 'imagem' | 'video'; mediaId?: string; legenda?: string })
+  /** O WhatsApp completo (27/10/2026): o que a Cloud API manda além disso. */
+  | (Destino & { tipo: 'documento'; mediaId?: string; nome: string; legenda?: string })
+  | (Destino & { tipo: 'figurinha'; mediaId?: string })
+  /** Emoji vazio tira a reação. */
+  | (Destino & { tipo: 'reacao'; alvo: string; emoji: string })
+  | (Destino & {
+      tipo: 'localizacao';
+      latitude: number;
+      longitude: number;
+      nome?: string;
+      endereco?: string;
+    })
+  | (Destino & { tipo: 'contatos'; contatos: ContatoDoCartao[] })
+  | (Destino & { tipo: 'botoes'; corpo: string; botoes: string[] })
+  | (Destino & {
+      tipo: 'lista';
+      corpo: string;
+      botao: string;
+      itens: { titulo: string; descricao?: string }[];
+    })
+  | (Destino & { tipo: 'pedir_localizacao'; corpo: string });
 
 /** A Graph API recusou, ou não respondeu. Mesma forma para envio e para conta. */
 export interface FalhaDaGraph {
@@ -182,9 +216,18 @@ export class ClienteDaGraph {
 
   /** O corpo do POST, no formato da Cloud API. */
   static payloadDoEnvio(envio: Envio): Record<string, unknown> {
+    const corpo = ClienteDaGraph.corpoDoEnvio(envio);
+    // A citação vale para qualquer tipo, menos a reação (que já aponta para a
+    // mensagem dela).
+    return envio.responde && envio.tipo !== 'reacao'
+      ? { ...corpo, context: { message_id: envio.responde } }
+      : corpo;
+  }
+
+  private static corpoDoEnvio(envio: Envio): Record<string, unknown> {
     const base = {
       messaging_product: 'whatsapp',
-      recipient_type: 'individual',
+      recipient_type: envio.grupo ? 'group' : 'individual',
       to: envio.para,
     };
     switch (envio.tipo) {
@@ -253,7 +296,220 @@ export class ClienteDaGraph {
           ? { ...base, type: 'image', image: midia }
           : { ...base, type: 'video', video: midia };
       }
+      case 'documento': {
+        // O nome do arquivo é o que a pessoa vê no balão ("cardapio.pdf").
+        const legenda = envio.legenda?.trim();
+        return {
+          ...base,
+          type: 'document',
+          document: {
+            id: envio.mediaId,
+            filename: envio.nome.slice(0, 240),
+            ...(legenda ? { caption: legenda.slice(0, 1024) } : {}),
+          },
+        };
+      }
+      case 'figurinha':
+        return { ...base, type: 'sticker', sticker: { id: envio.mediaId } };
+      case 'reacao':
+        return {
+          ...base,
+          type: 'reaction',
+          reaction: { message_id: envio.alvo, emoji: envio.emoji },
+        };
+      case 'localizacao':
+        return {
+          ...base,
+          type: 'location',
+          location: {
+            latitude: envio.latitude,
+            longitude: envio.longitude,
+            ...(envio.nome ? { name: envio.nome.slice(0, 1000) } : {}),
+            ...(envio.endereco ? { address: envio.endereco.slice(0, 1000) } : {}),
+          },
+        };
+      case 'contatos':
+        return {
+          ...base,
+          type: 'contacts',
+          contacts: envio.contatos.map((c) => ({
+            name: { formatted_name: c.nome, first_name: c.nome.split(/\s+/u)[0] ?? c.nome },
+            phones: c.telefones.map((t) => ({
+              phone: t.numero,
+              type: t.tipo ?? 'CELL',
+              ...(t.wa_id ? { wa_id: t.wa_id } : {}),
+            })),
+            ...(c.emails?.length ? { emails: c.emails.map((e) => ({ email: e, type: 'WORK' })) } : {}),
+            ...(c.empresa ? { org: { company: c.empresa } } : {}),
+          })),
+        };
+      case 'botoes':
+        // Os ids são posicionais (b1, b2, b3): a resposta volta com o id e o
+        // título, e o título é o que o fio mostra.
+        return {
+          ...base,
+          type: 'interactive',
+          interactive: {
+            type: 'button',
+            body: { text: envio.corpo.slice(0, 1024) },
+            action: {
+              buttons: envio.botoes.slice(0, 3).map((titulo, i) => ({
+                type: 'reply',
+                reply: { id: `b${i + 1}`, title: titulo.slice(0, 20) },
+              })),
+            },
+          },
+        };
+      case 'lista':
+        return {
+          ...base,
+          type: 'interactive',
+          interactive: {
+            type: 'list',
+            body: { text: envio.corpo.slice(0, 4096) },
+            action: {
+              button: envio.botao.slice(0, 20),
+              sections: [
+                {
+                  title: envio.botao.slice(0, 24),
+                  rows: envio.itens.slice(0, 10).map((item, i) => ({
+                    id: `l${i + 1}`,
+                    title: item.titulo.slice(0, 24),
+                    ...(item.descricao ? { description: item.descricao.slice(0, 72) } : {}),
+                  })),
+                },
+              ],
+            },
+          },
+        };
+      case 'pedir_localizacao':
+        return {
+          ...base,
+          type: 'interactive',
+          interactive: {
+            type: 'location_request_message',
+            body: { text: envio.corpo.slice(0, 1024) },
+            action: { name: 'send_location' },
+          },
+        };
     }
+  }
+
+  /**
+   * Marca a mensagem recebida como lida (os dois tracinhos azuis do contato)
+   * e, com `digitando`, mostra "digitando…" por até 25 s — a Meta junta as
+   * duas coisas na mesma chamada.
+   */
+  async marcarLida(wamid: string, digitando = false): Promise<RespostaDaGraph> {
+    return this.publicar(`${this.config.phoneNumberId}/messages`, {
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: wamid,
+      ...(digitando ? { typing_indicator: { type: 'text' } } : {}),
+    });
+  }
+
+  /** Bloqueia ou desbloqueia números (só quem escreveu nas últimas 24 h). */
+  async bloquear(numeros: readonly string[], bloquear: boolean): Promise<RespostaDaGraph> {
+    const corpo = {
+      messaging_product: 'whatsapp',
+      block_users: numeros.map((n) => ({ user: n })),
+    };
+    const caminho = `${this.config.phoneNumberId}/block_users`;
+    return bloquear ? this.publicar(caminho, corpo) : this.remover(caminho, corpo);
+  }
+
+  /** DELETE com corpo JSON — como a Meta desbloqueia, recusa pedidos e tira gente de grupo. */
+  async remover(caminho: string, corpo: Readonly<Record<string, unknown>> = {}): Promise<RespostaDaGraph> {
+    const vazio = Object.keys(corpo).length === 0;
+    return this.chamar(this.url(caminho), {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${this.config.token}`,
+        ...(vazio ? {} : { 'Content-Type': 'application/json' }),
+      },
+      ...(vazio ? {} : { body: JSON.stringify(corpo) }),
+    });
+  }
+
+  /**
+   * POST multipart com um arquivo e campos de texto: a foto do grupo (JPEG,
+   * quadrada, ≥ 192 px, ≤ 5 MB).
+   */
+  async publicarArquivo(
+    caminho: string,
+    campos: Readonly<Record<string, string>>,
+    arquivo: { bytes: Uint8Array; mime: string; nome: string },
+  ): Promise<RespostaDaGraph> {
+    const form = new FormData();
+    for (const [chave, valor] of Object.entries(campos)) form.append(chave, valor);
+    form.append('file', new Blob([arquivo.bytes], { type: arquivo.mime }), arquivo.nome);
+    return this.chamarComCorpo(this.url(caminho), form);
+  }
+
+  /**
+   * A foto do perfil da empresa não vai por `media id`: vai pela API de upload
+   * retomável do APP (`/{app-id}/uploads`), que devolve um `handle`. Sem
+   * `META_APP_ID` não há como.
+   */
+  async subirParaOPerfil(
+    appId: string,
+    arquivo: { bytes: Uint8Array; mime: string; nome: string },
+  ): Promise<{ ok: true; handle: string } | FalhaDaGraph> {
+    const sessao = await this.chamar(
+      `${this.url(`${appId}/uploads`)}?${new URLSearchParams({
+        file_name: arquivo.nome,
+        file_length: String(arquivo.bytes.byteLength),
+        file_type: arquivo.mime,
+      }).toString()}`,
+      { method: 'POST', headers: { Authorization: `Bearer ${this.config.token}` } },
+    );
+    if (!sessao.ok) return sessao;
+    const id = typeof sessao.json.id === 'string' ? sessao.json.id : null;
+    if (id === null) {
+      return {
+        ok: false,
+        codigo: 'upload_sem_sessao',
+        mensagem: 'A Meta não abriu a sessão de upload da foto.',
+        retentar: true,
+        httpStatus: sessao.httpStatus,
+      };
+    }
+    let resposta: Response;
+    try {
+      resposta = await this.buscar(this.url(id), {
+        method: 'POST',
+        headers: { Authorization: `OAuth ${this.config.token}`, file_offset: '0' },
+        body: new Blob([arquivo.bytes], { type: arquivo.mime }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (erro) {
+      return {
+        ok: false,
+        codigo: 'sem_resposta_da_meta',
+        mensagem: this.semSegredos(erro instanceof Error ? erro.message : String(erro)),
+        retentar: true,
+        httpStatus: null,
+      };
+    }
+    const texto = await resposta.text();
+    const json = interpretarJson(texto);
+    if (!resposta.ok) {
+      const falha = classificarErro(resposta.status, json, texto);
+      return { ...falha, mensagem: this.semSegredos(falha.mensagem) };
+    }
+    const handle =
+      typeof json === 'object' && json !== null ? (json as { h?: unknown }).h : undefined;
+    if (typeof handle !== 'string' || handle === '') {
+      return {
+        ok: false,
+        codigo: 'upload_sem_handle',
+        mensagem: 'A Meta recebeu a foto mas não devolveu o handle.',
+        retentar: true,
+        httpStatus: resposta.status,
+      };
+    }
+    return { ok: true, handle };
   }
 
   async enviar(envio: Envio): Promise<ResultadoDoEnvio> {
@@ -376,6 +632,41 @@ export class ClienteDaGraph {
     }
 
     return this.chamar(this.url(caminho), { method: 'POST', headers, body }, segredosDoCorpo);
+  }
+
+  /** POST multipart: o `fetch` monta o cabeçalho com a fronteira do formulário. */
+  private async chamarComCorpo(url: string, form: FormData): Promise<RespostaDaGraph> {
+    let resposta: Response;
+    try {
+      resposta = await this.buscar(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.config.token}` },
+        body: form,
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (erro) {
+      return {
+        ok: false,
+        codigo: 'sem_resposta_da_meta',
+        mensagem: this.semSegredos(erro instanceof Error ? erro.message : String(erro)),
+        retentar: true,
+        httpStatus: null,
+      };
+    }
+    const texto = await resposta.text();
+    const json = interpretarJson(texto);
+    if (resposta.ok) {
+      return {
+        ok: true,
+        json:
+          typeof json === 'object' && json !== null && !Array.isArray(json)
+            ? (json as Record<string, unknown>)
+            : {},
+        httpStatus: resposta.status,
+      };
+    }
+    const falha = classificarErro(resposta.status, json, texto);
+    return { ...falha, mensagem: this.semSegredos(falha.mensagem) };
   }
 
   private async chamar(

@@ -36,6 +36,25 @@
 // Nada aqui decide nada. Opt-out, supressão, janela e teto são do banco e do
 // worker; o adaptador não sabe o que é um opt-out.
 //
+// O WHATSAPP COMPLETO (27/10/2026)
+// -----------------------------------------------------------------------------
+// Pedido do Rafael: "quero todas as funcionalidades do wpp no nosso CRM". A
+// mensagem passa a levar, em `extra`, o que antes era jogado fora: a mensagem
+// citada (`context.id`), se veio encaminhada, o alvo da reação, a latitude e a
+// longitude, o cartão de contato, o id do botão escolhido, o nome do documento,
+// o anúncio de onde a pessoa veio e o erro da Meta. Vai inteiro para
+// `app.wa_entrada_completar`.
+//
+// E três coisas novas saem daqui:
+//   * `evento` — o contato apagou ou editou a mensagem dele (`revoke`, `edit`;
+//     formato do Coexistence). Não é mensagem nova: muda a original.
+//   * mensagem de GRUPO — a mesma `mensagem`, com `grupo` preenchido
+//     (`messages[].group_id`); o worker a manda para a aba Grupos.
+//   * `grupo` — os quatro webhooks da API de grupos (`group_lifecycle_update`,
+//     `group_participants_update`, `group_settings_update`,
+//     `group_status_update`), um item por grupo, já no vocabulário de
+//     `public.wa_grupo_evento_registrar`.
+//
 // O BSUID (nomes de usuário do WhatsApp, 2026)
 // -----------------------------------------------------------------------------
 // Desde abril de 2026 a Meta manda, em todo webhook de `messages`, o
@@ -49,6 +68,18 @@
 // banco (`app.wa_registrar_entrada`, migração 20260915120000).
 // https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/
 // =============================================================================
+
+/**
+ * O que a Meta disse além do corpo. Só as chaves que vieram: `{}` é "nada a
+ * mais". O formato de `conteudo` é o mesmo que o CRM usa para mandar.
+ */
+export interface ExtraDaMensagem {
+  responde_a_wamid?: string;
+  reage_a_wamid?: string;
+  encaminhada?: boolean;
+  media_nome?: string;
+  conteudo?: Record<string, unknown>;
+}
 
 /** Um item já traduzido para o vocabulário do Tríade, pronto para a fila. */
 export type ItemDaMeta =
@@ -77,6 +108,27 @@ export type ItemDaMeta =
       media_id: string | null;
       media_mime: string | null;
       ocorrido_em: string;
+      /** O id do grupo na Meta, quando a mensagem foi num grupo. */
+      grupo: string | null;
+      extra: ExtraDaMensagem;
+    }
+  | {
+      /** O contato apagou (`revoke`) ou editou (`edit`) uma mensagem dele. */
+      tipo: 'evento';
+      chave: string;
+      evento: 'revoke' | 'edit';
+      /** O wamid da mensagem apagada ou editada. */
+      alvo: string;
+      /** O texto novo, na edição. */
+      texto: string | null;
+      ocorrido_em: string;
+    }
+  | {
+      /** Um webhook da API de grupos, já no formato de `wa_grupo_evento_registrar`. */
+      tipo: 'grupo';
+      chave: string;
+      campo: string;
+      evento: Record<string, unknown>;
     }
   | {
       tipo: 'eco';
@@ -145,6 +197,16 @@ function texto(v: unknown): string | null {
   return typeof v === 'string' && v.trim() !== '' ? v.trim() : null;
 }
 
+function numero(v: unknown): number | null {
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+/** O objeto sem as chaves nulas: o que não veio não vira `null` gravado. */
+function semVazios(o: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined));
+}
+
 function numeroComoTexto(v: unknown): string | null {
   return typeof v === 'number' && Number.isFinite(v) ? String(v) : null;
 }
@@ -177,32 +239,229 @@ function conteudo(m: Record<string, unknown>): {
   texto: string | null;
   media_id: string | null;
   media_mime: string | null;
+  extra: ExtraDaMensagem;
 } {
   const tipo = texto(m.type) ?? 'text';
   const midia = objeto(m[tipo]);
+  const extra: ExtraDaMensagem = {};
+  const dados: Record<string, unknown> = {};
 
   let corpo: string | null = null;
   if (tipo === 'text') corpo = texto(objeto(m.text)?.body);
-  else if (tipo === 'button') corpo = texto(objeto(m.button)?.text);
-  else if (tipo === 'interactive') {
+  else if (tipo === 'button') {
+    const b = objeto(m.button);
+    corpo = texto(b?.text);
+    dados.resposta = semVazios({ titulo: corpo, payload: texto(b?.payload) });
+  } else if (tipo === 'interactive') {
     const i = objeto(m.interactive);
-    corpo =
-      texto(objeto(i?.button_reply)?.title) ??
-      texto(objeto(i?.list_reply)?.title) ??
-      texto(objeto(i?.nfm_reply)?.body);
-  } else if (tipo === 'reaction') corpo = texto(objeto(m.reaction)?.emoji);
-  else if (tipo === 'location') {
+    const botao = objeto(i?.button_reply);
+    const item = objeto(i?.list_reply);
+    const fluxo = objeto(i?.nfm_reply);
+    corpo = texto(botao?.title) ?? texto(item?.title) ?? texto(fluxo?.body);
+    if (botao) dados.resposta = semVazios({ id: texto(botao.id), titulo: texto(botao.title) });
+    else if (item) {
+      dados.resposta = semVazios({
+        id: texto(item.id),
+        titulo: texto(item.title),
+        descricao: texto(item.description),
+      });
+    } else if (fluxo) {
+      dados.fluxo = semVazios({ nome: texto(fluxo.name), resposta: texto(fluxo.response_json) });
+    }
+  } else if (tipo === 'reaction') {
+    const r = objeto(m.reaction);
+    // Sem emoji = a pessoa tirou a reação.
+    corpo = texto(r?.emoji);
+    const alvo = texto(r?.message_id);
+    if (alvo !== null) extra.reage_a_wamid = alvo;
+  } else if (tipo === 'location') {
     const l = objeto(m.location);
     corpo = texto(l?.name) ?? texto(l?.address);
-  } else if (tipo === 'contacts') corpo = null;
-  else corpo = texto(midia?.caption);
+    const latitude = numero(l?.latitude);
+    const longitude = numero(l?.longitude);
+    if (latitude !== null && longitude !== null) {
+      Object.assign(
+        dados,
+        semVazios({ latitude, longitude, nome: texto(l?.name), endereco: texto(l?.address), url: texto(l?.url) }),
+      );
+    }
+  } else if (tipo === 'contacts') {
+    corpo = null;
+    const contatos = lista(m.contacts).flatMap((bruto) => {
+      const c = objeto(bruto);
+      if (!c) return [];
+      const nome = objeto(c.name);
+      const telefones = lista(c.phones).flatMap((t) => {
+        const o = objeto(t);
+        const n = texto(o?.phone) ?? texto(o?.wa_id);
+        return n ? [semVazios({ numero: n, tipo: texto(o?.type), wa_id: texto(o?.wa_id) })] : [];
+      });
+      const emails = lista(c.emails).flatMap((e) => {
+        const t = texto(objeto(e)?.email);
+        return t ? [t] : [];
+      });
+      return [
+        semVazios({
+          nome: texto(nome?.formatted_name) ?? texto(nome?.first_name) ?? 'Contato',
+          telefones,
+          emails: emails.length ? emails : null,
+          empresa: texto(objeto(c.org)?.company),
+        }),
+      ];
+    });
+    if (contatos.length > 0) dados.contatos = contatos;
+  } else corpo = texto(midia?.caption);
+
+  if (tipo === 'document') {
+    const nome = texto(midia?.filename);
+    if (nome !== null) extra.media_nome = nome.slice(0, 240);
+  }
+  if (tipo === 'unsupported') {
+    dados.nao_suportado = { tipo: texto(objeto(m.unsupported)?.type) ?? 'desconhecido' };
+  }
+
+  // Responder citando e "encaminhada". Na reação o alvo é o dela.
+  const contexto = objeto(m.context);
+  if (contexto) {
+    const citada = texto(contexto.id);
+    if (citada !== null && tipo !== 'reaction') extra.responde_a_wamid = citada;
+    if (contexto.forwarded === true || contexto.frequently_forwarded === true) extra.encaminhada = true;
+    if (contexto.frequently_forwarded === true) dados.muito_encaminhada = true;
+  }
+
+  // Veio de um anúncio de "clique para o WhatsApp".
+  const anuncio = objeto(m.referral);
+  if (anuncio) {
+    dados.anuncio = semVazios({
+      titulo: texto(anuncio.headline),
+      corpo: texto(anuncio.body),
+      url: texto(anuncio.source_url),
+      tipo: texto(anuncio.source_type),
+      id: texto(anuncio.source_id),
+    });
+  }
+
+  const erro = objeto(lista(m.errors)[0]);
+  if (erro) {
+    dados.erro = semVazios({
+      codigo: texto(erro.code) ?? numeroComoTexto(erro.code),
+      titulo: texto(erro.title) ?? texto(erro.message),
+      detalhe: texto(objeto(erro.error_data)?.details),
+    });
+  }
+
+  if (Object.keys(dados).length > 0) extra.conteudo = dados;
 
   return {
     tipo,
     texto: corpo,
     media_id: texto(midia?.id),
     media_mime: texto(midia?.mime_type),
+    extra,
   };
+}
+
+/**
+ * O contato apagou ou editou: `revoke` e `edit` com a mensagem original. Sem
+ * a original não há o que mudar, e a mensagem segue como sempre (vira aviso
+ * de sistema no fio).
+ */
+function eventoDaMensagem(
+  m: Record<string, unknown>,
+): { evento: 'revoke' | 'edit'; alvo: string; texto: string | null } | null {
+  const tipo = texto(m.type);
+  if (tipo === 'revoke') {
+    const alvo = texto(objeto(m.revoke)?.original_message_id);
+    return alvo ? { evento: 'revoke', alvo, texto: null } : null;
+  }
+  if (tipo === 'edit') {
+    const e = objeto(m.edit);
+    const alvo = texto(e?.original_message_id);
+    if (!alvo) return null;
+    const nova = objeto(e?.message);
+    const qual = texto(nova?.type) ?? 'text';
+    const corpo =
+      qual === 'text' ? texto(objeto(nova?.text)?.body) : texto(objeto(nova?.[qual])?.caption);
+    return { evento: 'edit', alvo, texto: corpo };
+  }
+  return null;
+}
+
+/** Os campos da API de grupos. */
+const CAMPOS_DE_GRUPO = new Set([
+  'group_lifecycle_update',
+  'group_participants_update',
+  'group_settings_update',
+  'group_status_update',
+]);
+
+function idsDe(v: unknown): string {
+  return lista(v)
+    .map((p) => texto(objeto(p)?.wa_id) ?? texto(objeto(p)?.input) ?? '')
+    .join(',');
+}
+
+/** Um ajuste do grupo: `{text, update_successful}` → `{texto, ok}`. */
+function ajuste(v: unknown): Record<string, unknown> | null {
+  const o = objeto(v);
+  if (!o) return null;
+  return semVazios({
+    texto: texto(o.text),
+    ok: typeof o.update_successful === 'boolean' ? o.update_successful : null,
+  });
+}
+
+/** Os grupos de um webhook de grupo, no formato de `wa_grupo_evento_registrar`. */
+function eventosDeGrupo(campo: string, valor: Record<string, unknown>, numero: string | null): ItemDaMeta[] {
+  return lista(valor.groups).flatMap((bruto, j) => {
+    const g = objeto(bruto);
+    if (!g) return [];
+    const grupo = texto(g.group_id);
+    const tipo = texto(g.type) ?? campo;
+    const evento = semVazios({
+      tipo,
+      group_id: grupo,
+      request_id: texto(g.request_id),
+      subject: texto(g.subject),
+      invite_link: texto(g.invite_link),
+      join_approval_mode: texto(g.join_approval_mode),
+      join_request_id: texto(g.join_request_id),
+      wa_id: texto(g.wa_id),
+      initiated_by: texto(g.initiated_by),
+      added: lista(g.added_participants),
+      removed: lista(g.removed_participants),
+      failed: lista(g.failed_participants),
+      errors: lista(g.errors),
+      settings: semVazios({
+        assunto: ajuste(g.group_subject),
+        descricao: ajuste(g.group_description),
+        foto: ajuste(g.profile_picture),
+      }),
+      numero,
+      ocorrido_em: instante(g.timestamp),
+    });
+    return [
+      {
+        tipo: 'grupo' as const,
+        // A reentrega traz o mesmo grupo, o mesmo tipo, o mesmo instante e as
+        // mesmas pessoas: a mesma chave. O índice desempata dentro do lote.
+        chave: [
+          'grupo',
+          campo,
+          grupo ?? texto(g.request_id) ?? 'sem-id',
+          tipo,
+          String(g.timestamp ?? ''),
+          texto(g.join_request_id) ?? '',
+          texto(g.wa_id) ?? '',
+          idsDe(g.added_participants),
+          idsDe(g.removed_participants),
+          String(j),
+        ].join(':'),
+        campo,
+        evento,
+      },
+    ];
+  });
 }
 
 /**
@@ -274,6 +533,11 @@ export function extrairDaMeta(payload: unknown): Extracao {
       if (!mudanca) continue;
       const campo = texto(mudanca.field) ?? '';
       if (campo !== CAMPO_DE_MENSAGENS) {
+        if (CAMPOS_DE_GRUPO.has(campo)) {
+          const valor = objeto(mudanca.value) ?? {};
+          itens.push(...eventosDeGrupo(campo, valor, e164(objeto(valor.metadata)?.display_phone_number)));
+          continue;
+        }
         if (CAMPOS_DE_SAUDE.has(campo)) {
           const valor = objeto(mudanca.value) ?? {};
           const ban = objeto(valor.ban_info) ?? {};
@@ -338,6 +602,11 @@ export function extrairDaMeta(payload: unknown): Extracao {
           ignorados.push('mensagem_sem_id_ou_numero');
           continue;
         }
+        const evento = eventoDaMensagem(m);
+        if (evento !== null) {
+          itens.push({ tipo: 'evento', chave: wamid, ...evento, ocorrido_em: instante(m.timestamp) });
+          continue;
+        }
         const c = conteudo(m);
         itens.push({
           tipo: 'mensagem',
@@ -353,6 +622,8 @@ export function extrairDaMeta(payload: unknown): Extracao {
           media_id: c.media_id,
           media_mime: c.media_mime,
           ocorrido_em: instante(m.timestamp),
+          grupo: texto(m.group_id),
+          extra: c.extra,
         });
       }
 

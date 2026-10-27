@@ -102,8 +102,24 @@ export const CAMPOS_DE_SAUDE_ESPERADOS = [
   'business_capability_update',
 ] as const;
 
+/**
+ * Os campos da API de grupos (27/10/2026): grupo criado ou apagado (com o
+ * link de convite), quem entrou, saiu ou pediu para entrar, ajustes e
+ * suspensão. Sem eles o grupo fica "criando" para sempre no CRM.
+ */
+export const CAMPOS_DE_GRUPO_ESPERADOS = [
+  'group_lifecycle_update',
+  'group_participants_update',
+  'group_settings_update',
+  'group_status_update',
+] as const;
+
 /** Tudo o que o CRM precisa receber da Meta. */
-export const CAMPOS_DO_WEBHOOK = ['messages', ...CAMPOS_DE_SAUDE_ESPERADOS] as const;
+export const CAMPOS_DO_WEBHOOK = [
+  'messages',
+  ...CAMPOS_DE_SAUDE_ESPERADOS,
+  ...CAMPOS_DE_GRUPO_ESPERADOS,
+] as const;
 
 export const CAMPOS_DO_NUMERO =
   'display_phone_number,verified_name,quality_rating,code_verification_status,name_status,status,platform_type,throughput';

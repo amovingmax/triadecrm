@@ -174,6 +174,12 @@ export async function registrarEntrada(
     mediaId: string | null;
     mediaMime: string | null;
     ocorridoEm: string;
+    /**
+     * O que a Meta disse além do corpo (27/10/2026): a mensagem citada, o alvo
+     * da reação, a localização, o cartão de contato, o botão escolhido, o nome
+     * do documento. Vai inteiro para `app.wa_entrada_completar`.
+     */
+    extra?: Record<string, unknown> | null;
   },
 ): Promise<RespostaDeEntrada> {
   return paraRespostaDeEntrada(
@@ -188,8 +194,25 @@ export async function registrarEntrada(
       p_occurred_at: argumentos.ocorridoEm,
       p_peer_user_id: argumentos.deUserId,
       p_peer_name: argumentos.nomeDoPerfil,
+      p_extra: argumentos.extra ?? null,
     }),
   );
+}
+
+/** O contato apagou ou editou a mensagem dele: muda a original, sem linha nova. */
+export async function registrarEvento(
+  cliente: ClienteDoBanco,
+  argumentos: { evento: string; alvo: string; ocorridoEm: string; texto: string | null },
+): Promise<{ ok: boolean; motivo: string | null }> {
+  const r = objeto(
+    await rpc<unknown>(cliente, 'wa_entrada_evento', {
+      p_tipo: argumentos.evento,
+      p_alvo_wamid: argumentos.alvo,
+      p_ocorrido_em: argumentos.ocorridoEm,
+      p_dados: { texto: argumentos.texto },
+    }),
+  );
+  return { ok: r.ok === true, motivo: texto(r.motivo) };
 }
 
 export async function registrarEco(
@@ -305,6 +328,168 @@ export async function registrarOptOut(
   };
 }
 
+/** A mensagem de voz foi ouvida (recibo `played`). */
+export async function registrarOuvido(
+  cliente: ClienteDoBanco,
+  wamid: string,
+  ocorridoEm: string,
+): Promise<{ ok: boolean; motivo: string | null }> {
+  const r = objeto(
+    await rpc<unknown>(cliente, 'wa_recibo_ouvido', { p_wamid: wamid, p_ocorrido_em: ocorridoEm }),
+  );
+  return { ok: r.ok === true, motivo: texto(r.motivo) };
+}
+
+// ---------------------------------------------------------------------------
+// Grupos (migração 20261027110000)
+// ---------------------------------------------------------------------------
+
+export async function registrarReciboDeGrupo(
+  cliente: ClienteDoBanco,
+  argumentos: {
+    wamid: string;
+    estado: string;
+    ocorridoEm: string;
+    codigo: string | null;
+    detalhe: string | null;
+  },
+): Promise<{ ok: boolean; motivo: string | null }> {
+  const r = objeto(
+    await rpc<unknown>(cliente, 'wa_grupo_status_registrar', {
+      p_wamid: argumentos.wamid,
+      p_status: argumentos.estado,
+      p_ocorrido_em: argumentos.ocorridoEm,
+      p_codigo: argumentos.codigo,
+      p_detalhe: argumentos.detalhe,
+    }),
+  );
+  return { ok: r.ok === true, motivo: texto(r.motivo) };
+}
+
+export async function registrarEntradaDeGrupo(
+  cliente: ClienteDoBanco,
+  argumentos: {
+    wamid: string;
+    numeroDaEmpresa: string;
+    grupo: string;
+    de: string | null;
+    nomeDoPerfil: string | null;
+    tipo: string;
+    corpo: string | null;
+    mediaId: string | null;
+    mediaMime: string | null;
+    ocorridoEm: string;
+    extra: Record<string, unknown> | null;
+  },
+): Promise<{ novo: boolean; message_id: string | null; grupo_id: string | null }> {
+  const r = objeto(
+    await rpc<unknown>(cliente, 'wa_grupo_entrada_registrar', {
+      p_wamid: argumentos.wamid,
+      p_business_number: argumentos.numeroDaEmpresa,
+      p_group_id: argumentos.grupo,
+      p_de: argumentos.de,
+      p_de_nome: argumentos.nomeDoPerfil,
+      p_type: argumentos.tipo,
+      p_body: argumentos.corpo,
+      p_media_id: argumentos.mediaId,
+      p_media_mime: argumentos.mediaMime,
+      p_occurred_at: argumentos.ocorridoEm,
+      p_extra: argumentos.extra,
+    }),
+  );
+  return { novo: r.novo === true, message_id: texto(r.message_id), grupo_id: texto(r.grupo_id) };
+}
+
+export async function registrarMidiaDeGrupo(
+  cliente: ClienteDoBanco,
+  messageId: string,
+  caminho: string,
+): Promise<void> {
+  await rpc<unknown>(cliente, 'wa_grupo_midia_registrar', {
+    p_message_id: messageId,
+    p_media_path: caminho,
+  });
+}
+
+export async function registrarEventoDeGrupo(
+  cliente: ClienteDoBanco,
+  evento: Record<string, unknown>,
+): Promise<{ ok: boolean; motivo: string | null }> {
+  const r = objeto(await rpc<unknown>(cliente, 'wa_grupo_evento_registrar', { p_item: evento }));
+  return { ok: r.ok === true, motivo: texto(r.motivo) };
+}
+
+// ---------------------------------------------------------------------------
+// A fila de ações (ler, digitando, bloquear, grupos, perfil)
+// ---------------------------------------------------------------------------
+
+/** Uma ação pedida pela tela, como `public.wa_acoes_proximas` a entrega. */
+export interface AcaoDoWhatsapp {
+  id: number;
+  tipo: string;
+  tentativa: number;
+  dados: Record<string, unknown>;
+  conversation_id: string | null;
+  /** O telefone da conversa, para bloquear e desbloquear. */
+  para: string | null;
+  grupo_id: string | null;
+  /** O id do grupo NA META. Nulo enquanto o grupo não foi criado lá. */
+  group_id: string | null;
+  /** A mensagem do grupo, em `grupo_enviar`. */
+  mensagem: Record<string, unknown> | null;
+}
+
+export async function proximasAcoes(cliente: ClienteDoBanco, quantidade = 20): Promise<AcaoDoWhatsapp[]> {
+  const bruto = await rpc<unknown>(cliente, 'wa_acoes_proximas', { p_qty: quantidade });
+  if (!Array.isArray(bruto)) return [];
+  return bruto.flatMap((b) => {
+    const a = objeto(b);
+    const id = Number(a.id);
+    const tipo = texto(a.tipo);
+    if (!Number.isFinite(id) || tipo === null) return [];
+    const mensagem = objeto(a.mensagem);
+    return [
+      {
+        id,
+        tipo,
+        tentativa: Number(a.tentativa ?? 1),
+        dados: objeto(a.dados),
+        conversation_id: texto(a.conversation_id),
+        para: texto(a.para),
+        grupo_id: texto(a.grupo_id),
+        group_id: texto(a.group_id),
+        mensagem: Object.keys(mensagem).length > 0 ? mensagem : null,
+      },
+    ];
+  });
+}
+
+export async function acaoConcluida(
+  cliente: ClienteDoBanco,
+  id: number,
+  resultado: Record<string, unknown> = {},
+): Promise<void> {
+  await rpc<boolean>(cliente, 'wa_acao_concluir', { p_id: id, p_resultado: resultado });
+}
+
+export async function acaoFalhou(
+  cliente: ClienteDoBanco,
+  argumentos: { id: number; codigo: string; erro: string; retentar: boolean },
+): Promise<string> {
+  const r = await rpc<unknown>(cliente, 'wa_acao_falhar', {
+    p_id: argumentos.id,
+    p_codigo: argumentos.codigo,
+    p_erro: argumentos.erro.slice(0, 1000),
+    p_retentar: argumentos.retentar,
+  });
+  return typeof r === 'string' ? r : 'desconhecida';
+}
+
+/** A última pergunta antes de mandar: ninguém cancelou a mensagem? */
+export async function saidaAindaVale(cliente: ClienteDoBanco, messageId: string): Promise<boolean> {
+  return (await rpc<unknown>(cliente, 'wa_saida_ainda_vale', { p_message_id: messageId })) === true;
+}
+
 export async function registrarMidia(
   cliente: ClienteDoBanco,
   messageId: string,
@@ -399,6 +584,16 @@ export interface ItemDeSaida {
   botoes: BotaoDoModelo[];
   /** Sufixo do botão de link: o código do item do envio em massa, ou "crm". */
   link_codigo: string;
+  /** O wamid da mensagem citada (responder citando). */
+  responde_a_wamid: string | null;
+  /** O wamid da mensagem reagida. */
+  reage_a_wamid: string | null;
+  /** Localização, contatos, botões e lista (migração 20261027110000). */
+  conteudo: Record<string, unknown> | null;
+  /** O nome do arquivo do documento. */
+  media_nome: string | null;
+  /** `sticker` = a imagem vai como figurinha. */
+  tipo_na_meta: string | null;
 }
 
 /** Um botão de modelo, como `message_templates.botoes` guarda. */
@@ -460,6 +655,11 @@ function paraItemDeSaida(bruto: unknown): ItemDeSaida | null {
     janela_aberta: i.janela_aberta === true,
     botoes: paraBotoes(i.botoes),
     link_codigo: texto(i.link_codigo) ?? 'crm',
+    responde_a_wamid: texto(i.responde_a_wamid),
+    reage_a_wamid: texto(i.reage_a_wamid),
+    conteudo: Object.keys(objeto(i.conteudo)).length > 0 ? objeto(i.conteudo) : null,
+    media_nome: texto(i.media_nome),
+    tipo_na_meta: texto(i.tipo_na_meta),
     modelo:
       nomeMeta === null
         ? null

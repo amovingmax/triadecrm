@@ -75,6 +75,7 @@ import {
   type SincronizacaoPeriodica,
 } from '../whatsapp/modelos-meta';
 import { criarSaudePeriodica, type SaudePeriodica } from '../whatsapp/saude';
+import { criarLacoDasAcoes, fazerAcoes, type ContextoDasAcoes } from '../whatsapp/acoes';
 import { dormir } from '../lib/dormir';
 import { criarPulso } from '../lib/pulso';
 
@@ -210,12 +211,25 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
   const entradas = contagensDaEntradaZeradas();
   const saidas = contagensDaSaidaZeradas();
 
+  // As ações que não são mensagem (ler, digitando, bloquear, grupos, perfil)
+  // têm laço próprio: o das mensagens pode ficar minutos no intervalo entre
+  // aberturas, e "digitando…" atrasado não serve para nada.
+  const contextoDasAcoes: ContextoDasAcoes = {
+    cliente,
+    graph,
+    logger,
+    phoneNumberId: env.META_WA_PHONE_NUMBER_ID,
+    appId: env.META_APP_ID,
+  };
+  const acoes = criarLacoDasAcoes(contextoDasAcoes, { dormir: dormirAtePararem });
+
   const pulso = criarPulso({ cliente, logger, worker: 'wa' });
   await pulso.bater('ok', null, {
     modo: umaVez ? 'uma-vez' : 'contínuo',
     graph: env.META_WA_GRAPH_URL ?? 'https://graph.facebook.com',
   });
   pulso.iniciar();
+  if (!umaVez) acoes.iniciar();
 
   const pedirParada = (sinal: string): void => {
     if (parando) return;
@@ -274,6 +288,9 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
       }
       if (parando) break;
 
+      // 1e · No `--uma-vez`, as ações rodam aqui, uma passada só.
+      if (umaVez) await fazerAcoes(contextoDasAcoes);
+
       // 2 · O que a tela aprovou e ainda não estava na fila.
       const pendentes = await enfileirarPendentes(cliente, 50);
 
@@ -296,6 +313,7 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
     // entre um modelo e outro.
     await modelos?.encerrar(parando);
     await saude.encerrar(parando);
+    await acoes.encerrar();
 
     logger.info('worker-wa encerrado', { ...entradas, ...saidas, falhas });
     await pulso.bater('parado', null, {

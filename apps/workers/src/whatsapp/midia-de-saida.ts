@@ -147,6 +147,71 @@ export async function prepararMidia(
 }
 
 /** A saída do `ffprobe -of json` lida em codecs. Pura, para caber em teste. */
+/**
+ * Os documentos que a Meta aceita (o resto ela recusa com 131053) e o teto
+ * deles. A Meta aceita 100 MB; o balde guarda até 50 MB e o worker segura o
+ * arquivo inteiro na memória (512 MB no Fly), então o teto daqui é o do balde.
+ */
+export const TETO_DE_DOCUMENTO_BYTES = 50 * 1024 * 1024;
+
+const DOCUMENTOS_DA_META: ReadonlySet<string> = new Set([
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'application/zip',
+  'application/octet-stream',
+]);
+
+/** A figurinha: webp, 100 KB parada e 500 KB animada (o teto maior vale aqui). */
+export const TETO_DE_FIGURINHA_BYTES = 500 * 1024;
+
+/**
+ * Documento e figurinha (27/10/2026). Não há o que converter: o documento vai
+ * como está, com o nome que a pessoa deu; a figurinha só confere tipo e teto.
+ */
+export function prepararArquivo(
+  tipo: 'document' | 'sticker',
+  arquivo: { bytes: Uint8Array; mime: string | null; nome?: string | null },
+): MidiaPronta {
+  if (arquivo.bytes.length === 0) {
+    throw new ErroDaMidia('o arquivo está vazio', 'midia_vazia');
+  }
+  const base = tipoBase(arquivo.mime);
+  if (tipo === 'sticker') {
+    if (base !== 'image/webp') {
+      throw new ErroDaMidia('figurinha é imagem webp', 'figurinha_de_tipo_recusado');
+    }
+    if (arquivo.bytes.length > TETO_DE_FIGURINHA_BYTES) {
+      throw new ErroDaMidia(
+        `a figurinha tem ${megas(arquivo.bytes.length)} e o teto da Meta é 500 KB`,
+        'figurinha_grande_demais',
+      );
+    }
+    return { bytes: arquivo.bytes, mime: base, nome: 'figurinha.webp' };
+  }
+  if (!DOCUMENTOS_DA_META.has(base)) {
+    throw new ErroDaMidia(
+      `a Meta não aceita documento do tipo "${base || 'sem tipo'}"`,
+      'documento_de_tipo_recusado',
+    );
+  }
+  if (arquivo.bytes.length > TETO_DE_DOCUMENTO_BYTES) {
+    throw new ErroDaMidia(
+      `o documento tem ${megas(arquivo.bytes.length)} e o teto é 50 MB`,
+      'documento_grande_demais',
+    );
+  }
+  return { bytes: arquivo.bytes, mime: base, nome: arquivo.nome?.trim() || 'documento' };
+}
+
 export function codecsDaSondagem(saida: string): CodecsDoVideo {
   let dados: { streams?: { codec_type?: unknown; codec_name?: unknown }[] };
   try {

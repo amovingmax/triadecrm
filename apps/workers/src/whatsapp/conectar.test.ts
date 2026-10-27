@@ -134,7 +134,9 @@ describe('workers wa --conectar', () => {
         app_id: '4242',
         object: 'whatsapp_business_account',
         callback_url: 'https://projeto.supabase.co/functions/v1/wa-webhook',
-        fields: 'messages,phone_number_quality_update,account_update,business_capability_update',
+        fields:
+          'messages,phone_number_quality_update,account_update,business_capability_update,' +
+          'group_lifecycle_update,group_participants_update,group_settings_update,group_status_update',
       },
     ]);
 

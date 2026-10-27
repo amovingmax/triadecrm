@@ -36,11 +36,12 @@ import {
   envioFalhouDeVez,
   esperaEntreEnvios,
   proximosEnvios,
+  saidaAindaVale,
 } from './ponte';
 
-import type { ClienteDaGraph, Envio, ParametrosDoModelo } from './graph';
+import type { ClienteDaGraph, ContatoDoCartao, Envio, ParametrosDoModelo } from './graph';
 import { ErroDoAudio, prepararAudio } from './audio-de-saida';
-import { ErroDaMidia, prepararMidia, type Sondar } from './midia-de-saida';
+import { ErroDaMidia, prepararArquivo, prepararMidia, type Sondar } from './midia-de-saida';
 
 /**
  * O balde privado das mídias (migração `20260905000201`). O mesmo de onde o
@@ -96,6 +97,189 @@ export function contagensDaSaidaZeradas(): ContagensDaSaida {
 export function formaDoEnvio(
   item: ItemDeSaida,
 ): { ok: true; envio: Envio } | { ok: false; codigo: string; motivo: string } {
+  const forma = formaDosTiposNovos(item) ?? formaDeSempre(item);
+  // Responder citando vale para todo tipo (27/10/2026). Modelo fora da janela
+  // também aceita `context`, mas a citação só faz sentido em conversa aberta.
+  if (forma.ok && item.responde_a_wamid !== null && item.janela_aberta) {
+    return { ok: true, envio: { ...forma.envio, responde: item.responde_a_wamid } };
+  }
+  return forma;
+}
+
+type Forma = { ok: true; envio: Envio } | { ok: false; codigo: string; motivo: string };
+
+function semJanela(codigo: string, oQue: string): Forma {
+  return {
+    ok: false,
+    codigo,
+    motivo: `${oQue} só sai dentro das 24 h depois de a pessoa escrever: fora disso a Meta aceita só modelo aprovado.`,
+  };
+}
+
+function numeroOuNulo(v: unknown): number | null {
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function textoOuNulo(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() !== '' ? v.trim() : null;
+}
+
+/** `conteudo.contatos` → os contatos do cartão; o que não tiver forma fica de fora. */
+export function contatosDoConteudo(conteudo: Record<string, unknown> | null): ContatoDoCartao[] {
+  const lista = Array.isArray(conteudo?.contatos) ? conteudo.contatos : [];
+  return lista.flatMap((bruto) => {
+    if (typeof bruto !== 'object' || bruto === null) return [];
+    const c = bruto as Record<string, unknown>;
+    const nome = textoOuNulo(c.nome);
+    const telefones = (Array.isArray(c.telefones) ? c.telefones : []).flatMap((t) => {
+      if (typeof t === 'string') return textoOuNulo(t) ? [{ numero: t.trim() }] : [];
+      if (typeof t !== 'object' || t === null) return [];
+      const o = t as Record<string, unknown>;
+      const numero = textoOuNulo(o.numero);
+      if (numero === null) return [];
+      const tipo = textoOuNulo(o.tipo);
+      const waId = textoOuNulo(o.wa_id);
+      return [{ numero, ...(tipo ? { tipo } : {}), ...(waId ? { wa_id: waId } : {}) }];
+    });
+    if (nome === null || telefones.length === 0) return [];
+    const emails = (Array.isArray(c.emails) ? c.emails : []).flatMap((e) => {
+      const t = textoOuNulo(e);
+      return t ? [t] : [];
+    });
+    const empresa = textoOuNulo(c.empresa);
+    return [
+      { nome, telefones, ...(emails.length ? { emails } : {}), ...(empresa ? { empresa } : {}) },
+    ];
+  });
+}
+
+/**
+ * Os tipos do WhatsApp completo (27/10/2026): reação, localização, cartão de
+ * contato, documento, figurinha, botões, lista e pedir localização. Todos são
+ * mensagem livre — só dentro da janela de 24 h. `null` = não é tipo novo.
+ *
+ * A forma de cada um já foi conferida no insert (`app.messages_forma`); aqui
+ * só se traduz, e a conferência que se repete é a que protege a Meta de um
+ * pedido sem sentido.
+ */
+function formaDosTiposNovos(item: ItemDeSaida): Forma | null {
+  const c = item.conteudo;
+  const base = { para: item.para };
+
+  if (item.tipo === 'reaction') {
+    if (item.reage_a_wamid === null) {
+      return {
+        ok: false,
+        codigo: 'reacao_sem_alvo',
+        motivo: 'A mensagem reagida não tem id na Meta (não chegou a sair?): não há a que reagir.',
+      };
+    }
+    if (!item.janela_aberta) return semJanela('reacao_fora_da_janela', 'A reação');
+    return {
+      ok: true,
+      envio: { ...base, tipo: 'reacao', alvo: item.reage_a_wamid, emoji: item.corpo ?? '' },
+    };
+  }
+
+  if (item.tipo === 'location') {
+    const latitude = numeroOuNulo(c?.latitude);
+    const longitude = numeroOuNulo(c?.longitude);
+    if (latitude === null || longitude === null) {
+      return { ok: false, codigo: 'localizacao_sem_coordenada', motivo: 'A localização está sem latitude ou longitude.' };
+    }
+    if (!item.janela_aberta) return semJanela('localizacao_fora_da_janela', 'A localização');
+    const nome = textoOuNulo(c?.nome);
+    const endereco = textoOuNulo(c?.endereco);
+    return {
+      ok: true,
+      envio: {
+        ...base,
+        tipo: 'localizacao',
+        latitude,
+        longitude,
+        ...(nome ? { nome } : {}),
+        ...(endereco ? { endereco } : {}),
+      },
+    };
+  }
+
+  if (item.tipo === 'contacts') {
+    const contatos = contatosDoConteudo(c);
+    if (contatos.length === 0) {
+      return { ok: false, codigo: 'cartao_sem_contato', motivo: 'O cartão está sem contato com nome e telefone.' };
+    }
+    if (!item.janela_aberta) return semJanela('cartao_fora_da_janela', 'O cartão de contato');
+    return { ok: true, envio: { ...base, tipo: 'contatos', contatos } };
+  }
+
+  if (item.tipo === 'document') {
+    if (item.media_path === null || item.media_path === '') {
+      return { ok: false, codigo: 'midia_sem_arquivo', motivo: 'O documento está sem arquivo: não há o que enviar.' };
+    }
+    if (!item.janela_aberta) return semJanela('midia_fora_da_janela', 'O documento');
+    return {
+      ok: true,
+      envio: {
+        ...base,
+        tipo: 'documento',
+        nome: item.media_nome ?? 'documento',
+        ...(item.corpo ? { legenda: item.corpo } : {}),
+      },
+    };
+  }
+
+  if (item.tipo === 'image' && item.tipo_na_meta === 'sticker') {
+    if (item.media_path === null || item.media_path === '') {
+      return { ok: false, codigo: 'midia_sem_arquivo', motivo: 'A figurinha está sem arquivo: não há o que enviar.' };
+    }
+    if (!item.janela_aberta) return semJanela('midia_fora_da_janela', 'A figurinha');
+    return { ok: true, envio: { ...base, tipo: 'figurinha' } };
+  }
+
+  const interativo =
+    item.tipo === 'interactive' && typeof c?.interativo === 'object' && c.interativo !== null
+      ? (c.interativo as Record<string, unknown>)
+      : null;
+  if (interativo !== null) {
+    if (!item.janela_aberta) return semJanela('interativo_fora_da_janela', 'A pergunta com botões');
+    if (item.corpo === null) {
+      return { ok: false, codigo: 'mensagem_sem_corpo', motivo: 'A pergunta está sem texto.' };
+    }
+    if (interativo.tipo === 'botoes') {
+      const botoes = (Array.isArray(interativo.botoes) ? interativo.botoes : []).flatMap((b) => {
+        const t = textoOuNulo(b);
+        return t ? [t] : [];
+      });
+      if (botoes.length === 0) {
+        return { ok: false, codigo: 'botoes_vazios', motivo: 'A pergunta está sem botões.' };
+      }
+      return { ok: true, envio: { ...base, tipo: 'botoes', corpo: item.corpo, botoes } };
+    }
+    if (interativo.tipo === 'lista') {
+      const itens = (Array.isArray(interativo.itens) ? interativo.itens : []).flatMap((i) => {
+        if (typeof i !== 'object' || i === null) return [];
+        const o = i as Record<string, unknown>;
+        const titulo = textoOuNulo(o.titulo);
+        const descricao = textoOuNulo(o.descricao);
+        return titulo ? [{ titulo, ...(descricao ? { descricao } : {}) }] : [];
+      });
+      const botao = textoOuNulo(interativo.botao);
+      if (itens.length === 0 || botao === null) {
+        return { ok: false, codigo: 'lista_vazia', motivo: 'A lista está sem opções ou sem o nome do botão.' };
+      }
+      return { ok: true, envio: { ...base, tipo: 'lista', corpo: item.corpo, botao, itens } };
+    }
+    if (interativo.tipo === 'pedir_localizacao') {
+      return { ok: true, envio: { ...base, tipo: 'pedir_localizacao', corpo: item.corpo } };
+    }
+    return { ok: false, codigo: 'interativo_desconhecido', motivo: 'Mensagem interativa de um tipo que o CRM não manda.' };
+  }
+
+  return null;
+}
+
+function formaDeSempre(item: ItemDeSaida): Forma {
   if (item.tipo === 'audio') {
     // Áudio gravado na tela: o arquivo está no balde privado, e quem o sobe para
     // a Meta é o laço de envio (`mediaId` entra lá, depois do upload).
@@ -334,7 +518,11 @@ export async function drenarSaida(
     // subir antes gastaria upload por arquivo que a janela de 24 h vai recusar.
     let envio = forma.envio;
     if (
-      (envio.tipo === 'audio' || envio.tipo === 'imagem' || envio.tipo === 'video') &&
+      (envio.tipo === 'audio' ||
+        envio.tipo === 'imagem' ||
+        envio.tipo === 'video' ||
+        envio.tipo === 'documento' ||
+        envio.tipo === 'figurinha') &&
       envio.mediaId === undefined
     ) {
       const subida = await subirOArquivo(ctx, item, envio.tipo);
@@ -367,6 +555,16 @@ export async function drenarSaida(
         continue;
       }
       envio = { ...envio, mediaId: subida.mediaId };
+    }
+
+    // A última pergunta (27/10/2026): alguém apagou a mensagem enquanto ela
+    // esperava o intervalo entre aberturas ou subia o arquivo? Então ela não
+    // sai. Quem tirou da fila foi o "apagar" (`mensagem_apagar`), que já
+    // gravou o cancelamento; aqui só se arquiva o item.
+    if (!(await saidaAindaVale(ctx.cliente, item.message_id))) {
+      await tirarDaFilaOCancelado(ctx, item);
+      ctx.logger.info('mensagem cancelada antes de sair', { message_id: item.message_id });
+      continue;
     }
 
     const resultado = await ctx.graph.enviar(envio);
@@ -455,10 +653,24 @@ export async function drenarSaida(
  *    mensagem espera o conserto em vez de culpar o arquivo de quem enviou.
  * 3. **Subir para a Meta.** Quem decide se vale repetir é a resposta dela.
  */
-async function subirOArquivo(
-  ctx: ContextoDaSaida,
-  item: ItemDeSaida,
-  tipo: 'audio' | 'imagem' | 'video',
+/**
+ * Tira da fila um item que não vai mais sair (cancelado). `wa_saida_falha_
+ * definitiva` só arquiva o item da `wa_outbound` e não reescreve a mensagem,
+ * que já está `failed` com o motivo "cancelada".
+ */
+async function tirarDaFilaOCancelado(ctx: ContextoDaSaida, item: ItemDeSaida): Promise<void> {
+  await envioFalhouDeVez(ctx.cliente, {
+    msgId: item.msg_id,
+    messageId: item.message_id,
+    erro: 'Cancelada antes de sair.',
+    codigo: 'cancelada',
+  });
+}
+
+export async function subirOArquivo(
+  ctx: Pick<ContextoDaSaida, 'cliente' | 'graph' | 'sondarVideo'>,
+  item: Pick<ItemDeSaida, 'media_path' | 'media_mime' | 'media_nome'>,
+  tipo: 'audio' | 'imagem' | 'video' | 'documento' | 'figurinha',
 ): Promise<
   { ok: true; mediaId: string } | { ok: false; motivo: string; codigo: string; retentar: boolean }
 > {
@@ -491,11 +703,17 @@ async function subirOArquivo(
     pronto =
       tipo === 'audio'
         ? await prepararAudio({ bytes, mime: item.media_mime })
-        : await prepararMidia(
-            tipo === 'imagem' ? 'image' : 'video',
-            { bytes, mime: item.media_mime },
-            ctx.sondarVideo,
-          );
+        : tipo === 'documento' || tipo === 'figurinha'
+          ? prepararArquivo(tipo === 'documento' ? 'document' : 'sticker', {
+              bytes,
+              mime: item.media_mime,
+              nome: item.media_nome,
+            })
+          : await prepararMidia(
+              tipo === 'imagem' ? 'image' : 'video',
+              { bytes, mime: item.media_mime },
+              ctx.sondarVideo,
+            );
   } catch (erro) {
     const conhecido = erro instanceof ErroDoAudio || erro instanceof ErroDaMidia;
     const codigo = conhecido ? erro.codigo : `${prefixo}_ilegivel`;

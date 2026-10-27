@@ -491,3 +491,157 @@ Deno.test('nome do perfil: sem contacts, a mensagem segue sem nome', () => {
   );
   assertEquals(so(itens, 'mensagem')[0].nome_do_perfil, null);
 });
+
+// -----------------------------------------------------------------------------
+// O WhatsApp completo (27/10/2026)
+// -----------------------------------------------------------------------------
+
+function uma(m: Record<string, unknown>, extras: Record<string, unknown> = {}) {
+  return extrairDaMeta(
+    envelope({
+      metadata: METADADOS,
+      messages: [{ from: '5584988776655', timestamp: '1757030000', ...m }],
+      ...extras,
+    }),
+  ).itens;
+}
+
+Deno.test('resposta citada e encaminhada vão no extra', () => {
+  const m = so(
+    uma({
+      id: 'wamid.CIT',
+      type: 'text',
+      text: { body: 'isso mesmo' },
+      context: { from: '5584999880011', id: 'wamid.ORIGINAL', frequently_forwarded: true },
+    }),
+    'mensagem',
+  )[0];
+  assertEquals(m.extra.responde_a_wamid, 'wamid.ORIGINAL');
+  assertEquals(m.extra.encaminhada, true);
+  assertEquals(m.extra.conteudo, { muito_encaminhada: true });
+});
+
+Deno.test('reação aponta para a mensagem reagida; sem emoji é tirar', () => {
+  const r = so(uma({ id: 'wamid.R', type: 'reaction', reaction: { message_id: 'wamid.ALVO', emoji: '👍' } }), 'mensagem')[0];
+  assertEquals(r.texto, '👍');
+  assertEquals(r.extra.reage_a_wamid, 'wamid.ALVO');
+  const tirou = so(uma({ id: 'wamid.R2', type: 'reaction', reaction: { message_id: 'wamid.ALVO' } }), 'mensagem')[0];
+  assertEquals(tirou.texto, null);
+  assertEquals(tirou.extra.reage_a_wamid, 'wamid.ALVO');
+});
+
+Deno.test('localização guarda as coordenadas; cartão guarda nome e telefones', () => {
+  const l = so(
+    uma({ id: 'wamid.L', type: 'location', location: { latitude: -5.79, longitude: -35.2, name: 'Espaço Lagoa' } }),
+    'mensagem',
+  )[0];
+  assertEquals(l.extra.conteudo, { latitude: -5.79, longitude: -35.2, nome: 'Espaço Lagoa' });
+  const c = so(
+    uma({
+      id: 'wamid.C',
+      type: 'contacts',
+      contacts: [
+        {
+          name: { formatted_name: 'Marta Buffet' },
+          phones: [{ phone: '+55 84 99999-0000', type: 'CELL', wa_id: '5584999990000' }],
+        },
+      ],
+    }),
+    'mensagem',
+  )[0];
+  assertEquals(c.extra.conteudo, {
+    contatos: [
+      { nome: 'Marta Buffet', telefones: [{ numero: '+55 84 99999-0000', tipo: 'CELL', wa_id: '5584999990000' }] },
+    ],
+  });
+});
+
+Deno.test('botão escolhido, documento com nome, anúncio e não suportado', () => {
+  const b = so(
+    uma({ id: 'wamid.B', type: 'interactive', interactive: { type: 'button_reply', button_reply: { id: 'b2', title: 'Terça' } } }),
+    'mensagem',
+  )[0];
+  assertEquals(b.texto, 'Terça');
+  assertEquals(b.extra.conteudo, { resposta: { id: 'b2', titulo: 'Terça' } });
+  const d = so(
+    uma({ id: 'wamid.D', type: 'document', document: { id: 'm1', mime_type: 'application/pdf', filename: 'cardapio.pdf' } }),
+    'mensagem',
+  )[0];
+  assertEquals(d.extra.media_nome, 'cardapio.pdf');
+  const a = so(
+    uma({ id: 'wamid.A', type: 'text', text: { body: 'oi' }, referral: { headline: 'Seja parceiro', source_type: 'ad' } }),
+    'mensagem',
+  )[0];
+  assertEquals(a.extra.conteudo, { anuncio: { titulo: 'Seja parceiro', tipo: 'ad' } });
+  const u = so(uma({ id: 'wamid.U', type: 'unsupported', unsupported: { type: 'edit' } }), 'mensagem')[0];
+  assertEquals(u.extra.conteudo, { nao_suportado: { tipo: 'edit' } });
+});
+
+Deno.test('o contato apagou ou editou: evento sobre a original, não mensagem nova', () => {
+  const apagou = uma({ id: 'wamid.REV', type: 'revoke', revoke: { original_message_id: 'wamid.X' } });
+  assertEquals(so(apagou, 'mensagem').length, 0);
+  assertEquals(so(apagou, 'evento')[0].alvo, 'wamid.X');
+  const editou = so(
+    uma({
+      id: 'wamid.EDT',
+      type: 'edit',
+      edit: { original_message_id: 'wamid.Y', message: { type: 'text', text: { body: 'novo texto' } } },
+    }),
+    'evento',
+  )[0];
+  assertEquals(editou.evento, 'edit');
+  assertEquals(editou.texto, 'novo texto');
+});
+
+Deno.test('mensagem de grupo leva o id do grupo', () => {
+  const g = so(uma({ id: 'wamid.G', type: 'text', text: { body: 'oi, grupo' }, group_id: 'G1' }), 'mensagem')[0];
+  assertEquals(g.grupo, 'G1');
+});
+
+Deno.test('webhooks de grupo viram um item por grupo, com chave estável', () => {
+  const corpo = envelope(
+    {
+      messaging_product: 'whatsapp',
+      metadata: METADADOS,
+      groups: [
+        {
+          timestamp: '1757030000',
+          type: 'group_create',
+          group_id: 'G1',
+          request_id: 'REQ1',
+          subject: 'Réveillon',
+          invite_link: 'https://chat.whatsapp.com/abc',
+        },
+      ],
+    },
+    'group_lifecycle_update',
+  );
+  const a = so(extrairDaMeta(corpo).itens, 'grupo');
+  const b = so(extrairDaMeta(corpo).itens, 'grupo');
+  assertEquals(a.length, 1);
+  assertEquals(a[0].chave, b[0].chave);
+  assertEquals(a[0].evento.tipo, 'group_create');
+  assertEquals(a[0].evento.invite_link, 'https://chat.whatsapp.com/abc');
+  assertEquals(a[0].evento.numero, '+5584999880011');
+  const entrou = so(
+    extrairDaMeta(
+      envelope(
+        {
+          metadata: METADADOS,
+          groups: [
+            {
+              timestamp: '1757030001',
+              type: 'group_participants_add',
+              group_id: 'G1',
+              reason: 'invite_link',
+              added_participants: [{ wa_id: '5584977776666' }],
+            },
+          ],
+        },
+        'group_participants_update',
+      ),
+    ).itens,
+    'grupo',
+  )[0];
+  assertEquals(entrou.evento.added, [{ wa_id: '5584977776666' }]);
+});

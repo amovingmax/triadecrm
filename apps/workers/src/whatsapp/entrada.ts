@@ -43,9 +43,15 @@ import {
   pedirTrabalhoDeIa,
   registrarEco,
   registrarEntrada,
+  registrarEntradaDeGrupo,
+  registrarEvento,
+  registrarEventoDeGrupo,
   registrarMidia,
+  registrarMidiaDeGrupo,
   registrarOptOut,
+  registrarOuvido,
   registrarRecibo,
+  registrarReciboDeGrupo,
   registrarSaude,
   type ClienteDoBanco,
 } from './ponte';
@@ -99,6 +105,10 @@ export interface ContagensDaEntrada {
   midias_baixadas: number;
   /** Linhas de `public.wa_saude_numero` gravadas nesta passada (Fase 3 do pivô). */
   saude_registrada: number;
+  /** O contato apagou ou editou uma mensagem dele (27/10/2026). */
+  eventos: number;
+  /** Mensagens e eventos de grupo (27/10/2026). */
+  grupos: number;
   ignorados: number;
 }
 
@@ -114,6 +124,8 @@ export function contagensDaEntradaZeradas(): ContagensDaEntrada {
     classificacoes_pedidas: 0,
     midias_baixadas: 0,
     saude_registrada: 0,
+    eventos: 0,
+    grupos: 0,
     ignorados: 0,
   };
 }
@@ -138,6 +150,8 @@ export async function tratarEntrada(
   if (tipo === 'eco') return tratarEco(ctx, item, contagens);
   if (tipo === 'mensagem') return tratarMensagem(ctx, item, contagens);
   if (tipo === 'saude') return tratarSaude(ctx, item, contagens);
+  if (tipo === 'evento') return tratarEvento(ctx, item, contagens);
+  if (tipo === 'grupo') return tratarEventoDeGrupo(ctx, item, contagens);
 
   contagens.ignorados += 1;
   ctx.logger.warn('item da fila de entrada com tipo desconhecido', { tipo });
@@ -196,20 +210,143 @@ async function tratarRecibo(
     contagens.ignorados += 1;
     return;
   }
-  const r = await registrarRecibo(ctx.cliente, {
+  const ocorridoEm = texto(item.ocorrido_em) ?? new Date().toISOString();
+  // A mensagem de voz foi OUVIDA (desde 17/03/2026). Não é um estado novo da
+  // mensagem — ouvida é lida —, é uma data a mais.
+  if (estado === 'played') {
+    await registrarOuvido(ctx.cliente, wamid, ocorridoEm);
+    contagens.recibos += 1;
+    return;
+  }
+  let r = await registrarRecibo(ctx.cliente, {
     wamid,
     estado,
-    ocorridoEm: texto(item.ocorrido_em) ?? new Date().toISOString(),
+    ocorridoEm,
     codigo: texto(item.codigo),
     detalhe: texto(item.detalhe),
     paraUserId: texto(item.para_user_id),
   });
+  // O recibo de uma mensagem de GRUPO tem o mesmo formato e mora em outra
+  // tabela: quem não é de conversa 1:1 pode ser de grupo.
+  if (!r.ok && r.motivo === 'mensagem_desconhecida') {
+    const g = await registrarReciboDeGrupo(ctx.cliente, {
+      wamid,
+      estado,
+      ocorridoEm,
+      codigo: texto(item.codigo),
+      detalhe: texto(item.detalhe),
+    });
+    if (g.ok) r = g;
+  }
   contagens.recibos += 1;
   if (!r.ok) {
     // "mensagem_desconhecida" acontece de verdade: o recibo do eco pode chegar
     // antes do eco. Não é erro — é a fila fazendo o trabalho dela na próxima
     // volta. Fica em `debug` para não virar ruído.
     ctx.logger.debug('recibo sem efeito', { wamid, estado, motivo: r.motivo });
+  }
+}
+
+/**
+ * O contato apagou ("apagar para todos") ou editou uma mensagem dele. A Meta
+ * manda isso como mensagem nova, mas ela não é: o que muda é a original.
+ * Original desconhecida (anterior ao CRM) não é erro — não há o que marcar.
+ */
+async function tratarEvento(
+  ctx: ContextoDaEntrada,
+  item: Record<string, unknown>,
+  contagens: ContagensDaEntrada,
+): Promise<void> {
+  const evento = texto(item.evento);
+  const alvo = texto(item.alvo);
+  if (evento === null || alvo === null) {
+    contagens.ignorados += 1;
+    return;
+  }
+  const r = await registrarEvento(ctx.cliente, {
+    evento,
+    alvo,
+    ocorridoEm: texto(item.ocorrido_em) ?? new Date().toISOString(),
+    texto: texto(item.texto),
+  });
+  contagens.eventos += 1;
+  ctx.logger.info('o contato mexeu numa mensagem dele', { evento, ok: r.ok, motivo: r.motivo });
+}
+
+/** Os webhooks de grupo (criado, apagado, entrou, saiu, pedido, ajustes, suspenso). */
+async function tratarEventoDeGrupo(
+  ctx: ContextoDaEntrada,
+  item: Record<string, unknown>,
+  contagens: ContagensDaEntrada,
+): Promise<void> {
+  const evento =
+    typeof item.evento === 'object' && item.evento !== null
+      ? (item.evento as Record<string, unknown>)
+      : null;
+  if (evento === null) {
+    contagens.ignorados += 1;
+    return;
+  }
+  const r = await registrarEventoDeGrupo(ctx.cliente, evento);
+  contagens.grupos += 1;
+  if (!r.ok) {
+    ctx.logger.warn('evento de grupo sem efeito', { tipo: texto(evento.tipo), motivo: r.motivo });
+  }
+}
+
+/**
+ * Mensagem de GRUPO. Não passa pelo caminho do 1:1: grupo não tem opt-out por
+ * pessoa, funil, robô nem lead. Grava, guarda o arquivo e pronto — quem lê é
+ * o time, na aba Grupos.
+ */
+async function tratarMensagemDeGrupo(
+  ctx: ContextoDaEntrada,
+  item: Record<string, unknown>,
+  contagens: ContagensDaEntrada,
+  grupo: string,
+): Promise<void> {
+  const wamid = texto(item.wamid);
+  const numero = texto(item.numero_da_empresa);
+  if (wamid === null || numero === null) {
+    contagens.ignorados += 1;
+    return;
+  }
+  const tipoDaMensagem = texto(item.tipo_da_mensagem) ?? 'text';
+  const extra =
+    typeof item.extra === 'object' && item.extra !== null
+      ? (item.extra as Record<string, unknown>)
+      : null;
+  const gravada = await registrarEntradaDeGrupo(ctx.cliente, {
+    wamid,
+    numeroDaEmpresa: numero,
+    grupo,
+    de: texto(item.de),
+    nomeDoPerfil: texto(item.nome_do_perfil),
+    tipo: tipoDaMensagem,
+    corpo: texto(item.texto),
+    mediaId: texto(item.media_id),
+    mediaMime: texto(item.media_mime),
+    ocorridoEm: texto(item.ocorrido_em) ?? new Date().toISOString(),
+    extra,
+  });
+  if (!gravada.novo || gravada.message_id === null || gravada.grupo_id === null) {
+    contagens.repetidas += 1;
+    return;
+  }
+  contagens.grupos += 1;
+
+  const mediaId = texto(item.media_id);
+  if ((TIPOS_DE_ARQUIVO.has(tipoDaMensagem) || TIPOS_DE_VOZ.has(tipoDaMensagem)) && mediaId !== null) {
+    const caminho = await guardarMidia(ctx, {
+      mediaId,
+      messageId: gravada.message_id,
+      conversationId: gravada.grupo_id,
+      pasta: `grupos/${gravada.grupo_id}`,
+    });
+    if (caminho !== null) {
+      contagens.midias_baixadas += 1;
+      await registrarMidiaDeGrupo(ctx.cliente, gravada.message_id, caminho);
+    }
   }
 }
 
@@ -256,8 +393,16 @@ async function tratarMensagem(
     return;
   }
 
+  // Mensagem de grupo (API de grupos, 27/10/2026) segue por outro caminho.
+  const grupo = texto(item.grupo);
+  if (grupo !== null) return tratarMensagemDeGrupo(ctx, item, contagens, grupo);
+
   const tipoDaMensagem = texto(item.tipo_da_mensagem) ?? 'text';
   const corpo = texto(item.texto);
+  const extra =
+    typeof item.extra === 'object' && item.extra !== null
+      ? (item.extra as Record<string, unknown>)
+      : null;
 
   // 1 · Gravar. Sempre, e antes de julgar.
   const gravada = await registrarEntrada(ctx.cliente, {
@@ -271,6 +416,7 @@ async function tratarMensagem(
     mediaId: texto(item.media_id),
     mediaMime: texto(item.media_mime),
     ocorridoEm: texto(item.ocorrido_em) ?? new Date().toISOString(),
+    extra,
   });
 
   if (gravada.sem_telefone) {
@@ -383,8 +529,9 @@ async function tratarMensagem(
     return;
   }
 
-  // 4 · Classificar (RF-CON-20). Quem chama o modelo é o worker-ai.
-  if (corpo !== null) {
+  // 4 · Classificar (RF-CON-20). Quem chama o modelo é o worker-ai. A reação
+  //     é um emoji sobre outra mensagem: não há o que classificar nela.
+  if (corpo !== null && tipoDaMensagem !== 'reaction') {
     const pedido = await pedirTrabalhoDeIa(
       ctx.cliente,
       'classify_inbound',
@@ -405,7 +552,13 @@ async function tratarMensagem(
  */
 export async function guardarMidia(
   ctx: ContextoDaEntrada,
-  argumentos: { mediaId: string; messageId: string; conversationId: string },
+  argumentos: {
+    mediaId: string;
+    messageId: string;
+    conversationId: string;
+    /** A pasta no balde; o padrão é a da conversa. Grupo usa `grupos/<grupo>`. */
+    pasta?: string;
+  },
 ): Promise<string | null> {
   if (ctx.balde === '') return null;
 
@@ -427,7 +580,7 @@ export async function guardarMidia(
   }
 
   const extensao = extensaoDoMime(meta.mime);
-  const caminho = `${argumentos.conversationId}/${argumentos.messageId}${extensao}`;
+  const caminho = `${argumentos.pasta ?? argumentos.conversationId}/${argumentos.messageId}${extensao}`;
 
   try {
     const resposta = await fetch(
@@ -436,7 +589,7 @@ export async function guardarMidia(
         method: 'POST',
         headers: {
           Authorization: `Bearer ${ctx.chaveServico}`,
-          'Content-Type': meta.mime.split(';')[0]?.trim() ?? 'application/octet-stream',
+          'Content-Type': tipoParaOBalde(meta.mime),
           'x-upsert': 'true',
         },
         // `BodyInit` era um tipo global do `lib.dom`, que entrava de carona numa
@@ -463,6 +616,33 @@ export async function guardarMidia(
   return caminho;
 }
 
+/**
+ * Os tipos que o balde `mensagens` aceita (migração 20261027110000). O que a
+ * Meta mandar fora disso (um .rar, um .apk) é guardado como
+ * `application/octet-stream` em vez de ser recusado: o arquivo é do parceiro, e
+ * perdê-lo por causa do tipo seria pior que guardá-lo sem tipo.
+ */
+const TIPOS_DO_BALDE: ReadonlySet<string> = new Set([
+  'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/amr', 'audio/aac', 'audio/webm',
+  'video/webm', 'video/mp4', 'video/3gpp',
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+  'application/pdf', 'text/plain', 'text/csv',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'application/zip', 'application/octet-stream',
+]);
+
+export function tipoParaOBalde(mime: string): string {
+  const base = mime.split(';')[0]?.trim().toLowerCase() ?? '';
+  return TIPOS_DO_BALDE.has(base) ? base : 'application/octet-stream';
+}
+
 /** `audio/ogg; codecs=opus` → `.ogg`. Só o que a Cloud API entrega. */
 export function extensaoDoMime(mime: string): string {
   const base = mime.split(';')[0]?.trim().toLowerCase() ?? '';
@@ -479,6 +659,19 @@ export function extensaoDoMime(mime: string): string {
     'video/mp4': '.mp4',
     'video/3gpp': '.3gp',
     'application/pdf': '.pdf',
+    // Os documentos (27/10/2026).
+    'image/gif': '.gif',
+    'text/plain': '.txt',
+    'text/csv': '.csv',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'application/vnd.ms-excel': '.xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+    'application/vnd.ms-powerpoint': '.ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+    'application/vnd.oasis.opendocument.text': '.odt',
+    'application/vnd.oasis.opendocument.spreadsheet': '.ods',
+    'application/zip': '.zip',
   };
   return tabela[base] ?? '.bin';
 }
