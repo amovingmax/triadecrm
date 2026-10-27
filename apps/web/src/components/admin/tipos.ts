@@ -8,7 +8,7 @@
  */
 import type { AppRole } from '@/lib/auth/role';
 
-export type Aba = 'pessoas' | 'atendimento' | 'ligacoes' | 'catalogos' | 'lgpd';
+export type Aba = 'pessoas' | 'atendimento' | 'whatsapp' | 'ligacoes' | 'catalogos' | 'lgpd';
 
 export const ABAS: readonly { id: Aba; rotulo: string; descricao: string }[] = [
   {
@@ -21,6 +21,12 @@ export const ABAS: readonly { id: Aba; rotulo: string; descricao: string }[] = [
     rotulo: 'Atendimento',
     descricao:
       'O que o CRM faz sozinho no WhatsApp: os interruptores, os textos automáticos e os freios.',
+  },
+  {
+    // O perfil da empresa no WhatsApp e o que o contato vê de nós (27/10/2026).
+    id: 'whatsapp',
+    rotulo: 'WhatsApp',
+    descricao: 'Como a empresa aparece no WhatsApp: o perfil, os tiques azuis e o “digitando…”.',
   },
   {
     id: 'ligacoes',

@@ -12,6 +12,7 @@ import { PainelLgpd } from './painel-lgpd';
 import { PainelAtendimento } from './painel-atendimento';
 import { PainelLigacoes } from './painel-ligacoes';
 import { PainelPessoas } from './painel-pessoas';
+import { PainelWhatsapp } from './painel-whatsapp';
 import { ABAS, type Aba, type SecaoCatalogo, type SecaoLgpd } from './tipos';
 
 /**
@@ -86,6 +87,7 @@ export function TelaAdmin({
       {aba === 'atendimento' ? (
         <PainelAtendimento podeEditar={sessao.papel === 'admin' || sessao.papel === 'gestor'} />
       ) : null}
+      {aba === 'whatsapp' ? <PainelWhatsapp papel={sessao.papel} /> : null}
       {aba === 'ligacoes' ? (
         <PainelLigacoes podeEditar={sessao.papel === 'admin' || sessao.papel === 'gestor'} />
       ) : null}
