@@ -74,6 +74,11 @@ export interface ConversaComResposta {
    * `alguemEscreveu`. `null` = ninguém escreveu ainda.
    */
   readonly respondidaEm: string | null;
+  /**
+   * Até quando ESTA PESSOA silenciou a conversa (`conversa_preferencias`,
+   * 27/10/2026); `infinity` é para sempre. Ausente ou nulo: não silenciada.
+   */
+  readonly silenciadaAte?: string | null;
 }
 
 export interface QuemSouEu {
@@ -189,6 +194,33 @@ export function semResposta(minhas: readonly ConversaComResposta[]): ConversaCom
   return minhas.filter(
     (c) => c.respondidaEm === null || maisRecente(c.chegouEm, c.respondidaEm) > 0,
   );
+}
+
+/**
+ * Silenciada agora por quem está olhando? `infinity` é para sempre — e o
+ * Postgres o devolve como palavra, que `Date.parse` não lê.
+ */
+export function estaSilenciada(
+  conversa: Pick<ConversaComResposta, 'silenciadaAte'>,
+  agora: number = Date.now(),
+): boolean {
+  const ate = conversa.silenciadaAte?.trim();
+  if (!ate) return false;
+  if (/^infinity$/i.test(ate)) return true;
+  const fim = Date.parse(ate);
+  return Number.isFinite(fim) && fim > agora;
+}
+
+/**
+ * O que conta no número do menu e vira cartão: tudo, menos o que esta pessoa
+ * silenciou (27/10/2026, `public.conversa_silenciar`). A marca "Nova" na lista
+ * não passa por aqui: a conversa silenciada continua esperando resposta.
+ */
+export function contaNoMenu<T extends Pick<ConversaComResposta, 'silenciadaAte'>>(
+  conversas: readonly T[],
+  agora: number = Date.now(),
+): T[] {
+  return conversas.filter((c) => !estaSilenciada(c, agora));
 }
 
 /**
@@ -372,6 +404,8 @@ const PREVIA_POR_TIPO: Readonly<Record<string, string>> = {
   video: 'Vídeo',
   document: 'Documento',
   reaction: 'Reagiu a uma mensagem',
+  location: 'Localização',
+  contacts: 'Cartão de contato',
 };
 
 /** Quantos caracteres da mensagem cabem no cartão antes das reticências. */

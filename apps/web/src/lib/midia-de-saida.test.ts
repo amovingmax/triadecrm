@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   caminhoDaMidia,
   comoMandar,
+  comoMandarDocumento,
+  comoMandarFigurinha,
+  nomeDoDocumento,
+  TETO_DE_DOCUMENTO_BYTES,
+  TETO_DE_FIGURINHA_BYTES,
   conferirParaSubir,
   fraseDaMidia,
   lerCaminho,
@@ -143,5 +148,84 @@ describe('o caminho no balde', () => {
       tipo: 'video',
       mime: 'video/mp4',
     });
+  });
+});
+
+describe('documento e figurinha (27/10/2026)', () => {
+  it('o documento vai pelo tipo da extensão, mesmo quando o navegador diz outro', () => {
+    expect(comoMandarDocumento({ name: 'Contrato.DOCX', size: 100 })).toEqual({
+      ok: true,
+      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    expect(comoMandarDocumento({ name: 'cardapio.pdf', size: 100 })).toEqual({
+      ok: true,
+      mime: 'application/pdf',
+    });
+  });
+
+  it('o documento que não vai: tipo estranho, grande demais, vazio', () => {
+    expect(comoMandarDocumento({ name: 'virus.exe', size: 100 })).toEqual({
+      ok: false,
+      motivo: 'documento_de_tipo_recusado',
+    });
+    expect(comoMandarDocumento({ name: 'a.pdf', size: TETO_DE_DOCUMENTO_BYTES + 1 })).toEqual({
+      ok: false,
+      motivo: 'documento_grande_demais',
+    });
+    expect(comoMandarDocumento({ name: 'a.pdf', size: 0 })).toEqual({
+      ok: false,
+      motivo: 'midia_vazia',
+    });
+  });
+
+  it('a figurinha é webp até 500 KB', () => {
+    expect(comoMandarFigurinha(arquivo('image/webp', 'f.webp'))).toEqual({ ok: true });
+    expect(comoMandarFigurinha(arquivo('', 'f.webp'))).toEqual({ ok: true });
+    expect(comoMandarFigurinha(arquivo('image/png', 'f.png'))).toEqual({
+      ok: false,
+      motivo: 'figurinha_nao_e_webp',
+    });
+    expect(
+      comoMandarFigurinha(arquivo('image/webp', 'f.webp', TETO_DE_FIGURINHA_BYTES + 1)),
+    ).toEqual({
+      ok: false,
+      motivo: 'figurinha_grande_demais',
+    });
+  });
+
+  it('o servidor confere o documento e a figurinha como confere a foto', () => {
+    expect(conferirParaSubir('document', 'application/pdf', 100)).toEqual({
+      ok: true,
+      extensao: 'pdf',
+      mime: 'application/pdf',
+    });
+    expect(conferirParaSubir('sticker', 'image/webp', 100)).toEqual({
+      ok: true,
+      extensao: 'webp',
+      mime: 'image/webp',
+    });
+    expect(conferirParaSubir('document', 'image/jpeg', 100)).toEqual({
+      ok: false,
+      motivo: 'tipo_nao_aceito',
+    });
+  });
+
+  it('o caminho do documento e da figurinha é lido de volta com o tipo certo', () => {
+    expect(lerCaminho(caminhoDaMidia(FIO, 'xlsx', 1760000000000, 'abcd1234'), FIO)).toEqual({
+      tipo: 'document',
+      mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    expect(lerCaminho(caminhoDaMidia(FIO, 'webp', 1760000000000, 'abcd1234'), FIO)).toEqual({
+      tipo: 'sticker',
+      mime: 'image/webp',
+    });
+  });
+
+  it('o nome do documento perde a pasta e o controle, e cabe no banco com a extensão', () => {
+    expect(nomeDoDocumento('C:\\Users\\ana\\Proposta.pdf')).toBe('Proposta.pdf');
+    expect(nomeDoDocumento('  \u0007 ')).toBe('documento');
+    const longo = nomeDoDocumento(`${'a'.repeat(300)}.pdf`);
+    expect(longo.length).toBeLessThanOrEqual(240);
+    expect(longo.endsWith('….pdf')).toBe(true);
   });
 });

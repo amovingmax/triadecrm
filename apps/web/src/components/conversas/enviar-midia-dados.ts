@@ -18,18 +18,35 @@
 import { createClient } from '@/lib/supabase/client';
 import {
   BALDE_DAS_MIDIAS,
+  comoMandarDocumento,
+  fraseDaMidia,
   medidasReduzidas,
   mimeDoVideo,
   TETO_DE_FOTO_BYTES,
   tipoBase,
-  type TipoDeMidia,
+  type TipoDeEnvio,
 } from '@/lib/midia-de-saida';
 
+import { fraseDaRecusaDoEnvio } from './mensagens';
+
 export class ErroDaMidiaNaTela extends Error {
-  constructor(readonly motivo: string) {
+  constructor(
+    readonly motivo: string,
+    /** O texto do banco, quando ele recusou a mensagem ("Envio recusado: …"). */
+    readonly detalhe: string | null = null,
+  ) {
     super(motivo);
     this.name = 'ErroDaMidiaNaTela';
   }
+}
+
+/**
+ * A frase da recusa: a do banco quando ele disse por quê (janela fechada,
+ * contato bloqueado, citação de outra conversa), a da mídia quando não.
+ */
+export function fraseDoErroDaMidia(erro: unknown): string {
+  if (!(erro instanceof ErroDaMidiaNaTela)) return fraseDaMidia('falhou');
+  return (erro.detalhe ? fraseDaRecusaDoEnvio(erro.detalhe) : null) ?? fraseDaMidia(erro.motivo);
 }
 
 /** O PNG que sobe como está: pequeno e sem lado gigante. Print de tela, em geral. */
@@ -102,7 +119,7 @@ async function postar<T>(url: string, corpo: unknown): Promise<T> {
   };
   if (!resposta.ok || !dados.ok) {
     if (dados.detalhe) console.error('mídia recusada:', dados.motivo, dados.detalhe);
-    throw new ErroDaMidiaNaTela(dados.motivo ?? 'falhou');
+    throw new ErroDaMidiaNaTela(dados.motivo ?? 'falhou', dados.detalhe ?? null);
   }
   return dados as T;
 }
@@ -113,14 +130,13 @@ async function postar<T>(url: string, corpo: unknown): Promise<T> {
  */
 export async function mandarMidia(envio: {
   fioId: string;
-  tipo: TipoDeMidia;
+  tipo: TipoDeEnvio;
   arquivo: File;
   legenda: string;
+  /** A mensagem citada (27/10/2026). */
+  respondeA?: string | null;
 }): Promise<void> {
-  const pronto =
-    envio.tipo === 'image'
-      ? await prepararFoto(envio.arquivo)
-      : { arquivo: envio.arquivo as Blob, mime: mimeDoVideo(envio.arquivo) };
+  const pronto = await prontoParaSubir(envio.tipo, envio.arquivo);
 
   const autorizacao = await postar<{ caminho: string; token: string }>(
     '/api/midia-de-saida/autorizar',
@@ -151,8 +167,34 @@ export async function mandarMidia(envio: {
   await postar('/api/midia-de-saida/enviar', {
     conversation_id: envio.fioId,
     caminho: autorizacao.caminho,
-    legenda: envio.legenda,
+    legenda: envio.tipo === 'sticker' ? '' : envio.legenda,
+    // O documento chega ao contato com o nome que tinha no computador de quem mandou.
+    nome: envio.tipo === 'document' ? envio.arquivo.name : undefined,
+    responde_a: envio.respondeA ?? undefined,
   });
+}
+
+/**
+ * O arquivo como sobe: a foto vira JPEG; o vídeo, o documento e a figurinha
+ * vão como estão, com o tipo certo (o do documento sai da extensão).
+ */
+async function prontoParaSubir(
+  tipo: TipoDeEnvio,
+  arquivo: File,
+): Promise<{ arquivo: Blob; mime: string }> {
+  switch (tipo) {
+    case 'image':
+      return prepararFoto(arquivo);
+    case 'video':
+      return { arquivo, mime: mimeDoVideo(arquivo) };
+    case 'sticker':
+      return { arquivo, mime: 'image/webp' };
+    case 'document': {
+      const como = comoMandarDocumento(arquivo);
+      if (!como.ok) throw new ErroDaMidiaNaTela(como.motivo);
+      return { arquivo, mime: como.mime };
+    }
+  }
 }
 
 /**

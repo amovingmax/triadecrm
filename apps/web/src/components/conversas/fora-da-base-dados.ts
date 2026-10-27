@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client';
 import { formatarTelefone } from '@/components/parceiros/formatos';
 
 import { ErroDaConversa } from './acoes';
+import { COLUNAS_MENSAGEM } from './dados';
 import type { FioCru, MensagemCrua } from './mensagens';
 
 /**
@@ -42,9 +43,6 @@ export const CHAVE_FORA_DA_BASE = ['conversas', 'fora-da-base'] as const;
 export function chaveDasMensagensDoFio(fioId: string) {
   return ['conversas', 'fora-da-base', fioId] as const;
 }
-
-const COLUNAS_MENSAGEM =
-  'id, conversation_id, organization_id, direction, type, status, body, media_path, media_mime, tipo_na_meta, transcript, template_id, draft_id, author_kind, sent_by, approved_by, is_first_contact, business_initiated, optout_confirmation, origin, error_code, error_detail, created_at, sent_at, delivered_at, read_at, failed_at';
 
 /**
  * As 200 mensagens MAIS RECENTES, em ordem de conversa (a mais antiga em cima).

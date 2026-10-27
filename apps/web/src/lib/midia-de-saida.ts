@@ -16,11 +16,31 @@
 
 export type TipoDeMidia = 'image' | 'video';
 
+/**
+ * O que sobe pelo mesmo caminho desde 27/10/2026: a foto e o vídeo, o
+ * DOCUMENTO e a FIGURINHA. A figurinha é uma `image` no banco, com
+ * `tipo_na_meta = 'sticker'`; aqui ela tem nome próprio porque a regra dela é
+ * outra (webp, 500 KB, sem legenda).
+ */
+export type TipoDeEnvio = TipoDeMidia | 'document' | 'sticker';
+
 /** O balde privado das mídias: o mesmo do áudio, entrada e saída juntas. */
 export const BALDE_DAS_MIDIAS = 'mensagens';
 
 export const TETO_DE_FOTO_BYTES = 5 * 1024 * 1024;
 export const TETO_DE_VIDEO_BYTES = 16 * 1024 * 1024;
+
+/**
+ * O documento até 20 MB: a Meta aceita 100, mas o worker-wa segura o arquivo
+ * inteiro na memória dele (512 MB) e o balde vai a 50.
+ */
+export const TETO_DE_DOCUMENTO_BYTES = 20 * 1024 * 1024;
+
+/** A figurinha: webp até 500 KB (a animada; a parada é bem menor). */
+export const TETO_DE_FIGURINHA_BYTES = 500 * 1024;
+
+/** O teto do nome do documento no banco (`messages_media_nome_check`). */
+export const TETO_DO_NOME_DO_DOCUMENTO = 240;
 
 /** O teto da legenda na Cloud API. */
 export const TETO_DA_LEGENDA = 1024;
@@ -34,12 +54,41 @@ export const QUANTOS_DE_UMA_VEZ = 10;
  */
 export const LADO_MAXIMO_DA_FOTO = 2048;
 
+/**
+ * Os documentos que vão: os que a Meta aceita e o balde guarda (migração
+ * `20261027110000`, §11). Pela extensão, porque o tipo do arquivo vem vazio ou
+ * errado com frequência (o .docx do Windows chega como `application/zip`).
+ */
+const DOCUMENTOS: Readonly<Record<string, string>> = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  odt: 'application/vnd.oasis.opendocument.text',
+  ods: 'application/vnd.oasis.opendocument.spreadsheet',
+  zip: 'application/zip',
+};
+
+/** O `accept` do seletor de documentos. */
+export const ACEITA_DOCUMENTOS = Object.keys(DOCUMENTOS)
+  .map((e) => `.${e}`)
+  .join(',');
+
 /** O que pode subir para o balde, já depois da conversão da tela. */
-const SOBE: Readonly<Record<string, { tipo: TipoDeMidia; extensao: string }>> = {
+const SOBE: Readonly<Record<string, { tipo: TipoDeEnvio; extensao: string }>> = {
   'image/jpeg': { tipo: 'image', extensao: 'jpg' },
   'image/png': { tipo: 'image', extensao: 'png' },
   'video/mp4': { tipo: 'video', extensao: 'mp4' },
   'video/3gpp': { tipo: 'video', extensao: '3gp' },
+  'image/webp': { tipo: 'sticker', extensao: 'webp' },
+  ...Object.fromEntries(
+    Object.entries(DOCUMENTOS).map(([extensao, mime]) => [mime, { tipo: 'document', extensao }]),
+  ),
 };
 
 const MIME_DA_EXTENSAO: Readonly<Record<string, string>> = {
@@ -47,6 +96,8 @@ const MIME_DA_EXTENSAO: Readonly<Record<string, string>> = {
   png: 'image/png',
   mp4: 'video/mp4',
   '3gp': 'video/3gpp',
+  webp: 'image/webp',
+  ...DOCUMENTOS,
 };
 
 export type MotivoDaMidia =
@@ -58,7 +109,11 @@ export type MotivoDaMidia =
   | 'video_de_tipo_recusado'
   | 'foto_ilegivel'
   | 'legenda_longa'
-  | 'muitos_de_uma_vez';
+  | 'muitos_de_uma_vez'
+  | 'documento_grande_demais'
+  | 'documento_de_tipo_recusado'
+  | 'figurinha_nao_e_webp'
+  | 'figurinha_grande_demais';
 
 /** `video/mp4; codecs=...` → `video/mp4`. */
 export function tipoBase(mime: string | null | undefined): string {
@@ -110,6 +165,52 @@ export function comoMandar(arquivo: {
   return { ok: false, motivo: 'tipo_nao_aceito' };
 }
 
+/**
+ * O documento que a pessoa escolheu: vai, com o tipo da EXTENSÃO, ou é recusa.
+ * O tipo é o da extensão de propósito: é o que o balde e a Meta conferem, e o
+ * navegador às vezes chama de `application/zip` o que é .docx.
+ */
+export function comoMandarDocumento(arquivo: {
+  name: string;
+  size: number;
+}): { ok: true; mime: string } | { ok: false; motivo: MotivoDaMidia } {
+  if (arquivo.size === 0) return { ok: false, motivo: 'midia_vazia' };
+  const mime = DOCUMENTOS[extensaoDoNome(arquivo.name)];
+  if (!mime) return { ok: false, motivo: 'documento_de_tipo_recusado' };
+  if (arquivo.size > TETO_DE_DOCUMENTO_BYTES)
+    return { ok: false, motivo: 'documento_grande_demais' };
+  return { ok: true, mime };
+}
+
+/** A figurinha que a pessoa escolheu: webp até 500 KB, ou recusa. */
+export function comoMandarFigurinha(arquivo: {
+  type: string;
+  name: string;
+  size: number;
+}): { ok: true } | { ok: false; motivo: MotivoDaMidia } {
+  if (arquivo.size === 0) return { ok: false, motivo: 'midia_vazia' };
+  const webp = tipoBase(arquivo.type) === 'image/webp' || extensaoDoNome(arquivo.name) === 'webp';
+  if (!webp) return { ok: false, motivo: 'figurinha_nao_e_webp' };
+  if (arquivo.size > TETO_DE_FIGURINHA_BYTES)
+    return { ok: false, motivo: 'figurinha_grande_demais' };
+  return { ok: true };
+}
+
+/**
+ * O nome do documento como o contato vai ver: sem pasta, sem caractere de
+ * controle, e dentro do teto do banco (a extensão fica, o miolo encolhe).
+ */
+export function nomeDoDocumento(nome: string): string {
+  const base = nome.split(/[\\/]/).pop() ?? '';
+  // O caractere de controle sai: no nome do arquivo ele só atrapalha.
+  const limpo = base.replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  if (limpo === '') return 'documento';
+  if (limpo.length <= TETO_DO_NOME_DO_DOCUMENTO) return limpo;
+  const ponto = limpo.lastIndexOf('.');
+  const extensao = ponto > 0 && limpo.length - ponto <= 6 ? limpo.slice(ponto) : '';
+  return `${limpo.slice(0, TETO_DO_NOME_DO_DOCUMENTO - extensao.length - 1)}…${extensao}`;
+}
+
 /** O tipo do vídeo como sobe: o do arquivo, ou o da extensão quando veio vazio. */
 export function mimeDoVideo(arquivo: { type: string; name: string }): string {
   const base = tipoBase(arquivo.type);
@@ -137,7 +238,7 @@ export function medidasReduzidas(
  * O tipo declarado tem de bater com o arquivo: foto que diz ser vídeo não sobe.
  */
 export function conferirParaSubir(
-  tipo: TipoDeMidia,
+  tipo: TipoDeEnvio,
   mime: string,
   tamanho: number,
 ): { ok: true; extensao: string; mime: string } | { ok: false; motivo: MotivoDaMidia } {
@@ -149,7 +250,18 @@ export function conferirParaSubir(
     return { ok: false, motivo: 'foto_grande_demais' };
   if (tipo === 'video' && tamanho > TETO_DE_VIDEO_BYTES)
     return { ok: false, motivo: 'video_grande_demais' };
+  if (tipo === 'document' && tamanho > TETO_DE_DOCUMENTO_BYTES)
+    return { ok: false, motivo: 'documento_grande_demais' };
+  if (tipo === 'sticker' && tamanho > TETO_DE_FIGURINHA_BYTES)
+    return { ok: false, motivo: 'figurinha_grande_demais' };
   return { ok: true, extensao: regra.extensao, mime: base };
+}
+
+/** O tipo que o pedido diz, se for um dos que sobem por aqui. */
+export function lerTipoDeEnvio(valor: unknown): TipoDeEnvio | null {
+  return valor === 'image' || valor === 'video' || valor === 'document' || valor === 'sticker'
+    ? valor
+    : null;
 }
 
 /**
@@ -173,11 +285,14 @@ export function caminhoDaMidia(
 export function lerCaminho(
   caminho: string,
   fioId: string,
-): { tipo: TipoDeMidia; mime: string } | null {
+): { tipo: TipoDeEnvio; mime: string } | null {
   const prefixo = `${fioId}/saida/`;
   if (!caminho.startsWith(prefixo)) return null;
   const nome = caminho.slice(prefixo.length);
-  const casou = /^\d{10,16}-[0-9a-f]{8}\.(jpg|png|mp4|3gp)$/.exec(nome);
+  const casou =
+    /^\d{10,16}-[0-9a-f]{8}\.(jpg|png|mp4|3gp|webp|pdf|docx?|xlsx?|pptx?|txt|csv|odt|ods|zip)$/.exec(
+      nome,
+    );
   if (!casou) return null;
   const mime = MIME_DA_EXTENSAO[casou[1]!]!;
   return { tipo: SOBE[mime]!.tipo, mime };
@@ -204,6 +319,14 @@ export function fraseDaMidia(motivo: string): string {
       return `A legenda passou de ${TETO_DA_LEGENDA} caracteres, o teto do WhatsApp.`;
     case 'muitos_de_uma_vez':
       return `São ${QUANTOS_DE_UMA_VEZ} arquivos por vez, no máximo.`;
+    case 'documento_grande_demais':
+      return 'O documento passou de 20 MB. Comprima ou mande um link.';
+    case 'documento_de_tipo_recusado':
+      return 'Este tipo de arquivo não vai. Mande PDF, Word, Excel, PowerPoint, texto, CSV ou ZIP.';
+    case 'figurinha_nao_e_webp':
+      return 'Figurinha é imagem .webp. Para mandar outra imagem, use Foto.';
+    case 'figurinha_grande_demais':
+      return 'A figurinha passou de 500 KB, o teto do WhatsApp.';
     case 'arquivo_nao_chegou':
       return 'O arquivo não chegou ao armazenamento. Mande de novo.';
     case 'conversa_invisivel':

@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useEffect, useRef } from 'react';
-import { ChevronRight, Sparkles } from 'lucide-react';
+import { BellOff, ChevronRight, Pin, Sparkles } from 'lucide-react';
 
 import { FaixaDeNova, MarcaDeNova } from '@/components/avisos/marca-de-nova';
 import { useConversasNovas } from '@/components/avisos/provedor-avisos';
@@ -18,6 +18,7 @@ import { ICONE_CANAL } from './icones';
 import { ChipDaJanela } from './janela-24h';
 import { estadoDaJanela, type FioCru } from './mensagens';
 import { juntarNaLista } from './montagem';
+import { ehSilenciada, SEM_PREFERENCIAS, type Preferencias } from './preferencias';
 import { previaDoDigitado, useTextosDigitados } from './texto-digitado';
 import { ROTULO_CANAL, type ItemConversa } from './tipos';
 
@@ -61,10 +62,13 @@ export function ListaConversas({
   clientes = [],
   clienteSelecionadoId = null,
   aoEscolherCliente,
+  preferencias = SEM_PREFERENCIAS,
 }: {
   itens: ItemConversa[];
   selecionadoId: string | null;
   aoEscolher: (id: string) => void;
+  /** Fixar e silenciar de quem está olhando (27/10/2026). */
+  preferencias?: Preferencias;
   /** Quem escreveu e não é ficha. Só a lista de Conversas passa; as filas, não. */
   clientes?: FioCru[];
   /** O id da CONVERSA do cliente aberto — ele não tem ficha. */
@@ -78,7 +82,7 @@ export function ListaConversas({
     selecionado || !fioId ? null : previaDoDigitado(digitados.get(fioId)?.texto);
   return (
     <ul className="corpo-tabela flex flex-col">
-      {juntarNaLista(itens, clientes).map((linha) =>
+      {juntarNaLista(itens, clientes, preferencias).map((linha) =>
         linha.tipo === 'parceiro' ? (
           <LinhaMemorizada
             key={linha.item.id}
@@ -87,6 +91,7 @@ export function ListaConversas({
             nova={linha.item.fio ? novas.has(linha.item.fio.id) : false}
             rascunho={rascunhoDe(linha.item.fio?.id, linha.item.id === selecionadoId)}
             aoEscolher={aoEscolher}
+            marcas={marcasDa(linha.item.fio?.id, preferencias)}
           />
         ) : (
           <LinhaDeClienteMemorizada
@@ -96,10 +101,65 @@ export function ListaConversas({
             nova={novas.has(linha.fio.id)}
             rascunho={rascunhoDe(linha.fio.id, linha.fio.id === clienteSelecionadoId)}
             aoEscolher={aoEscolherCliente}
+            marcas={marcasDa(linha.fio.id, preferencias)}
           />
         ),
       )}
     </ul>
+  );
+}
+
+/**
+ * Fixada e silenciada, de quem está olhando (27/10/2026). Uma constante por
+ * combinação: a linha é memorizada, e um objeto novo a cada pintura a faria
+ * redesenhar à toa.
+ */
+type Marcas = { readonly fixada: boolean; readonly silenciada: boolean };
+const MARCAS: Record<string, Marcas> = {
+  '00': { fixada: false, silenciada: false },
+  '10': { fixada: true, silenciada: false },
+  '01': { fixada: false, silenciada: true },
+  '11': { fixada: true, silenciada: true },
+};
+function marcasDa(fioId: string | null | undefined, preferencias: Preferencias): Marcas {
+  const p = fioId ? preferencias.get(fioId) : undefined;
+  return MARCAS[`${p?.fixadaEm ? 1 : 0}${ehSilenciada(p?.silenciadaAte) ? 1 : 0}`]!;
+}
+
+/** O alfinete e o sino cortado, ao lado do nome. */
+function IconesDaLinha({ marcas }: { marcas: Marcas }) {
+  if (!marcas.fixada && !marcas.silenciada) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-1 self-center text-muted-foreground">
+      {marcas.silenciada ? <BellOff className="size-3.5" aria-label="Silenciada" /> : null}
+      {marcas.fixada ? <Pin className="size-3.5" aria-label="Fixada" /> : null}
+    </span>
+  );
+}
+
+/** O número de por ler: verde para agir; cinza quando silenciada, como no WhatsApp. */
+function PorLer({ quantas, silenciada }: { quantas: number; silenciada: boolean }) {
+  return (
+    <span
+      className={cn(
+        'numerico inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-semibold',
+        silenciada
+          ? 'bg-muted-foreground/60 text-background'
+          : 'bg-primary text-primary-foreground',
+      )}
+      title={`${quantas} mensagem(ns) por ler`}
+    >
+      {quantas}
+    </span>
+  );
+}
+
+/** O contato bloqueado (27/10/2026): nada sai para ele. */
+function SeloDeBloqueado() {
+  return (
+    <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
+      bloqueado
+    </Badge>
   );
 }
 
@@ -145,6 +205,7 @@ function LinhaDeCliente({
   nova,
   rascunho,
   aoEscolher,
+  marcas,
 }: {
   fio: FioCru;
   selecionado: boolean;
@@ -153,6 +214,7 @@ function LinhaDeCliente({
   /** O começo do que a pessoa digitou aqui e não enviou. */
   rascunho: string | null;
   aoEscolher?: (conversaId: string) => void;
+  marcas: Marcas;
 }) {
   const Icone = ICONE_CANAL.whatsapp;
   const nome = fio.peer_nome?.trim();
@@ -187,13 +249,9 @@ function LinhaDeCliente({
               {nomeDoCliente(fio)}
             </span>
             {nova ? <MarcaDeNova className="self-center" /> : null}
+            <IconesDaLinha marcas={marcas} />
             {fio.unread_count > 0 ? (
-              <span
-                className="numerico inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
-                title={`${fio.unread_count} mensagem(ns) por ler`}
-              >
-                {fio.unread_count}
-              </span>
+              <PorLer quantas={fio.unread_count} silenciada={marcas.silenciada} />
             ) : null}
             {fio.last_message_at ? (
               <span className="numerico shrink-0 text-xs text-muted-foreground">
@@ -215,6 +273,7 @@ function LinhaDeCliente({
               </span>
             )}
             <ChipDaJanela estado={janela} />
+            {fio.bloqueada_em ? <SeloDeBloqueado /> : null}
             {/* Onde o parceiro tem a etapa, o cliente diz o que é: é esta palavra
                 que explica por que a linha não tem funil nem bairro. */}
             <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
@@ -238,6 +297,7 @@ function Linha({
   nova,
   rascunho,
   aoEscolher,
+  marcas,
 }: {
   item: ItemConversa;
   selecionado: boolean;
@@ -246,6 +306,7 @@ function Linha({
   /** O começo do que a pessoa digitou aqui e não enviou. */
   rascunho: string | null;
   aoEscolher: (id: string) => void;
+  marcas: Marcas;
 }) {
   const Icone = item.ultimoCanal ? ICONE_CANAL[item.ultimoCanal] : null;
   const onde = local(item.bairro, item.cidade);
@@ -291,15 +352,11 @@ function Linha({
               {item.nome}
             </span>
             {nova ? <MarcaDeNova className="self-center" /> : null}
+            <IconesDaLinha marcas={marcas} />
             {/* Por ler vai no verde da ação, e não no branco: é o único número da
                 linha que pede para alguém fazer alguma coisa. */}
             {item.naoLidas > 0 ? (
-              <span
-                className="numerico inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
-                title={`${item.naoLidas} mensagem(ns) por ler`}
-              >
-                {item.naoLidas}
-              </span>
+              <PorLer quantas={item.naoLidas} silenciada={marcas.silenciada} />
             ) : null}
             <DiasSemContato
               dias={item.diasSemContato}
@@ -336,6 +393,7 @@ function Linha({
                 não contatar
               </Badge>
             ) : null}
+            {item.fio?.bloqueadaEm ? <SeloDeBloqueado /> : null}
             {/* O rascunho pendente é o que faz alguém abrir esta linha AGORA: ele
                 expira em três dias e some sozinho. */}
             {item.rascunhoPendente ? (

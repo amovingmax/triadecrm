@@ -97,7 +97,14 @@ export function useRolagemNoFim(conversaId: string, quantas: number) {
     return () => observador.disconnect();
   }, []);
 
-  return { rolagem, conteudo, aoRolar };
+  // Quem foi ATÉ uma mensagem (a citação, a lupa, a busca da lista) não pode ser
+  // puxado de volta para o fim pela próxima foto que terminar de carregar
+  // (27/10/2026). O gesto da pessoa recola, como sempre.
+  const soltar = useCallback(() => {
+    coladoNoFim.current = false;
+  }, []);
+
+  return { rolagem, conteudo, aoRolar, soltar };
 }
 
 /** Quantos pixels do fim ainda contam como "está no fim". */

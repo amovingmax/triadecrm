@@ -37,8 +37,14 @@ export function GravarAudio({
   rotulo,
   classeDoBotao,
   className,
+  respondeA = null,
+  aoEnviar,
 }: {
   fioId: string;
+  /** A mensagem citada na caixa (27/10/2026): o áudio também responde citando. */
+  respondeA?: string | null;
+  /** Saiu: quem monta a caixa fecha a citação. */
+  aoEnviar?: () => void;
   /** O nome à vista no celular, onde o botão vira pílula na fileira de ferramentas. */
   rotulo?: string;
   /** A classe do botão parado; `className` continua valendo para gravando e ouvindo. */
@@ -87,6 +93,7 @@ export function GravarAudio({
       const corpo = new FormData();
       corpo.append('conversation_id', fioId);
       corpo.append('arquivo', arquivo, 'audio');
+      if (respondeA) corpo.append('responde_a', respondeA);
       const resposta = await fetch('/api/audio', { method: 'POST', body: corpo });
       const dados = (await resposta.json().catch(() => ({}))) as {
         ok?: boolean;
@@ -101,6 +108,7 @@ export function GravarAudio({
     },
     onSuccess: () => {
       descartar();
+      aoEnviar?.();
       toast.success('Áudio na fila do WhatsApp.', {
         description: `Sai pelo número da ${EMPRESA.nomeDoNumero} em instantes.`,
       });
@@ -140,7 +148,8 @@ export function GravarAudio({
       }, 1000);
     } catch {
       toast.error('O microfone não abriu.', {
-        description: 'O navegador precisa da sua permissão para gravar — confira o cadeado da barra de endereço.',
+        description:
+          'O navegador precisa da sua permissão para gravar — confira o cadeado da barra de endereço.',
       });
     }
   }
@@ -166,7 +175,12 @@ export function GravarAudio({
   if (estado === 'revisando' && gravado) {
     return (
       <div className={cn('flex flex-wrap items-center gap-2', className)}>
-        <audio controls src={gravado.url} className="h-11 min-w-0 flex-1" aria-label="Ouça antes de enviar" />
+        <audio
+          controls
+          src={gravado.url}
+          className="h-11 min-w-0 flex-1"
+          aria-label="Ouça antes de enviar"
+        />
         <Button
           type="button"
           variant="ghost"

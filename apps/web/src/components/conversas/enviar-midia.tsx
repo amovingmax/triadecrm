@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Paperclip, Play, X } from 'lucide-react';
+import { FileText, Paperclip, Play, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { EMPRESA } from '@/lib/empresa';
@@ -9,13 +9,14 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   comoMandar,
+  comoMandarDocumento,
   fraseDaMidia,
   QUANTOS_DE_UMA_VEZ,
   TETO_DA_LEGENDA,
   type TipoDeMidia,
 } from '@/lib/midia-de-saida';
 
-import { ErroDaMidiaNaTela, mandarMidia } from './enviar-midia-dados';
+import { fraseDoErroDaMidia, mandarMidia } from './enviar-midia-dados';
 
 /**
  * Mandar foto e vídeo pelo WhatsApp, de dentro do CRM (16/10/2026).
@@ -32,10 +33,21 @@ import { ErroDaMidiaNaTela, mandarMidia } from './enviar-midia-dados';
 export type MidiaEscolhida = {
   id: string;
   arquivo: File;
-  tipo: TipoDeMidia;
+  /** Foto, vídeo ou, desde 27/10/2026, documento. */
+  tipo: TipoDeMidia | 'document';
   /** A prévia: URL do próprio arquivo, revogada quando ele sai da lista. */
   url: string;
 };
+
+/** Vai ou não vai, e como: o documento tem a regra dele (`comoMandarDocumento`). */
+function comoEscolher(
+  arquivo: File,
+  documento: boolean,
+): { ok: true; tipo: MidiaEscolhida['tipo'] } | { ok: false; motivo: string } {
+  if (!documento) return comoMandar(arquivo);
+  const como = comoMandarDocumento(arquivo);
+  return como.ok ? { ok: true, tipo: 'document' } : como;
+}
 
 /** A lista do que foi escolhido e ainda não saiu, com as portas de entrada. */
 export function useMidiaEscolhida() {
@@ -52,18 +64,19 @@ export function useMidiaEscolhida() {
     };
   }, []);
 
-  const escolher = useCallback((arquivos: readonly File[]) => {
+  const adicionar = useCallback((arquivos: readonly File[], comoDocumento: boolean) => {
     if (arquivos.length === 0) return;
     const recusas = new Map<string, string[]>();
     const novos: MidiaEscolhida[] = [];
     for (const arquivo of arquivos) {
-      const como = comoMandar(arquivo);
+      const como = comoEscolher(arquivo, comoDocumento);
       if (!como.ok) {
         recusas.set(como.motivo, [...(recusas.get(como.motivo) ?? []), arquivo.name]);
         continue;
       }
-      const url = URL.createObjectURL(arquivo);
-      urls.current.add(url);
+      // O documento não tem prévia: a URL do arquivo só serve à foto e ao vídeo.
+      const url = como.tipo === 'document' ? '' : URL.createObjectURL(arquivo);
+      if (url) urls.current.add(url);
       novos.push({ id: crypto.randomUUID(), arquivo, tipo: como.tipo, url });
     }
     for (const [motivo, nomes] of recusas) {
@@ -89,10 +102,20 @@ export function useMidiaEscolhida() {
     });
   }, []);
 
+  const escolher = useCallback(
+    (arquivos: readonly File[]) => adicionar(arquivos, false),
+    [adicionar],
+  );
+  /** O documento (27/10/2026): pelo mesmo painel, cada arquivo uma mensagem. */
+  const escolherDocumentos = useCallback(
+    (arquivos: readonly File[]) => adicionar(arquivos, true),
+    [adicionar],
+  );
+
   const tirar = useCallback((id: string) => {
     setItens((atuais) => {
       const saindo = atuais.find((i) => i.id === id);
-      if (saindo) {
+      if (saindo?.url) {
         URL.revokeObjectURL(saindo.url);
         urls.current.delete(saindo.url);
       }
@@ -106,7 +129,7 @@ export function useMidiaEscolhida() {
     setItens([]);
   }, []);
 
-  return { itens, escolher, tirar, limpar };
+  return { itens, escolher, escolherDocumentos, tirar, limpar };
 }
 
 export type Midia = ReturnType<typeof useMidiaEscolhida>;
@@ -171,11 +194,17 @@ export function PainelDaMidia({
   fioId,
   midia,
   aoEnviar,
+  respondeA = null,
+  aoCitar,
 }: {
   fioId: string;
   midia: Midia;
   /** Depois de cada envio: quem monta a caixa refaz as leituras da tela. */
   aoEnviar: () => void;
+  /** A mensagem citada vai com o PRIMEIRO arquivo, como a legenda. */
+  respondeA?: string | null;
+  /** Saiu a primeira: a citação foi junto, e a barra dela fecha. */
+  aoCitar?: () => void;
 }) {
   const [legenda, setLegenda] = useState('');
   const [enviando, setEnviando] = useState<number | null>(null);
@@ -193,14 +222,15 @@ export function PainelDaMidia({
           tipo: item.tipo,
           arquivo: item.arquivo,
           legenda: indice === 0 ? legenda : '',
+          respondeA: indice === 0 ? respondeA : null,
         });
+        if (indice === 0) aoCitar?.();
       } catch (erro) {
-        const motivo = erro instanceof ErroDaMidiaNaTela ? erro.motivo : 'falhou';
         toast.error(
           saiu === 0
             ? 'Não entrou na fila.'
             : `${saiu} de ${fila.length} entraram na fila; o resto parou.`,
-          { description: `${item.arquivo.name}: ${fraseDaMidia(motivo)}` },
+          { description: `${item.arquivo.name}: ${fraseDoErroDaMidia(erro)}` },
         );
         // A legenda já foi com o primeiro que saiu; não repete no próximo.
         if (saiu > 0) setLegenda('');
@@ -215,11 +245,13 @@ export function PainelDaMidia({
     setEnviando(null);
     setLegenda('');
     const fotos = fila.filter((i) => i.tipo === 'image').length;
-    const videos = fila.length - fotos;
+    const videos = fila.filter((i) => i.tipo === 'video').length;
+    const documentos = fila.length - fotos - videos;
     toast.success(
       [
         fotos > 0 ? (fotos === 1 ? '1 foto' : `${fotos} fotos`) : null,
         videos > 0 ? (videos === 1 ? '1 vídeo' : `${videos} vídeos`) : null,
+        documentos > 0 ? (documentos === 1 ? '1 documento' : `${documentos} documentos`) : null,
       ]
         .filter(Boolean)
         .join(' e ') + ' na fila do WhatsApp.',
@@ -230,7 +262,7 @@ export function PainelDaMidia({
   return (
     <div
       role="region"
-      aria-label="Foto e vídeo a enviar"
+      aria-label="Arquivos a enviar"
       className="space-y-2 rounded-2xl border border-input bg-card/60 p-2"
     >
       <ul className="flex gap-2 overflow-x-auto pb-1">
@@ -239,7 +271,14 @@ export function PainelDaMidia({
             key={item.id}
             className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-muted"
           >
-            {item.tipo === 'image' ? (
+            {item.tipo === 'document' ? (
+              <span className="flex size-full flex-col items-center justify-center gap-1 px-1.5 text-center">
+                <FileText className="size-6 text-muted-foreground" aria-hidden="true" />
+                <span className="line-clamp-2 text-[10px] leading-tight break-all">
+                  {item.arquivo.name}
+                </span>
+              </span>
+            ) : item.tipo === 'image' ? (
               // A prévia é o arquivo local (blob:): o otimizador de imagem do
               // Next não tem o que otimizar aqui.
               // eslint-disable-next-line @next/next/no-img-element

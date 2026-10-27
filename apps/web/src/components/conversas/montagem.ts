@@ -30,6 +30,7 @@ import {
   type MensagemCrua,
   type RascunhoCru,
 } from './mensagens';
+import { fixadasPrimeiro, SEM_PREFERENCIAS, type Preferencias } from './preferencias';
 
 /**
  * A montagem da tela de Conversas, em funções puras.
@@ -605,6 +606,23 @@ export function filtrarClientes(
  * instante da última mensagem do fio — ele não tem outra interação.
  */
 export function juntarNaLista(
+  itens: readonly ItemConversa[],
+  clientes: readonly FioCru[],
+  /**
+   * Fixar (27/10/2026): as fixadas por quem olha sobem para o topo, a fixada
+   * por último primeiro, e o resto fica na ordem de sempre.
+   */
+  preferencias: Preferencias = SEM_PREFERENCIAS,
+): LinhaDaLista[] {
+  return fixadasPrimeiro(juntarSemFixar(itens, clientes), idDaConversaDaLinha, preferencias);
+}
+
+/** A conversa de cada linha: a do fio em foco do parceiro, ou a do cliente. */
+export function idDaConversaDaLinha(linha: LinhaDaLista): string | null {
+  return linha.tipo === 'parceiro' ? (linha.item.fio?.id ?? null) : linha.fio.id;
+}
+
+function juntarSemFixar(
   itens: readonly ItemConversa[],
   clientes: readonly FioCru[],
 ): LinhaDaLista[] {

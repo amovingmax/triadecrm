@@ -7,12 +7,16 @@ import {
   BadgeCheck,
   Ban,
   Bot,
+  Download,
   FileText,
   Film,
   Hourglass,
   ImageIcon,
   Sparkles,
+  Star,
 } from 'lucide-react';
+
+import { toast } from 'sonner';
 
 import { SOBREVIVE_A_NAVEGACAO } from '@/components/consultas/provedor-consultas';
 import { cn } from '@/lib/utils';
@@ -20,7 +24,21 @@ import { iniciaisDe } from '@/lib/iniciais';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
-import { urlDaMidia } from './acoes';
+import { ErroDaConversa, reagirAMensagem, urlDaMidia } from './acoes';
+import { AcoesDaMensagem, motivoParaNaoReagir, useToqueLongo } from './acoes-da-mensagem';
+import { partesDestacadas } from './busca-no-fio';
+import { fraseDoErroDaMeta, fraseDoNaoSuportado, PREFIXO_DA_CORRECAO } from './conteudo';
+import { idDoBalao, useFio } from './contexto-do-fio';
+import {
+  CartaoDeContatos,
+  CartaoDeLocalizacao,
+  Citacao,
+  Encaminhada,
+  FaixaDoAnuncio,
+  OpcaoEscolhida,
+  OpcoesEnviadas,
+  SelosDeReacao,
+} from './partes-do-balao';
 import { VirarTarefa } from './virar-tarefa';
 import { dataHoraCompleta, hora } from './formatos';
 import { entregaDaMensagem, separarAssinatura } from './mensagens';
@@ -78,8 +96,29 @@ export function Mensagem({
   nomeDoParceiro?: string | null;
 }) {
   const entrega = entregaDaMensagem(mensagem);
-  const semTexto = mensagem.texto === null;
   const entrada = mensagem.entrada;
+  // O fio em volta (27/10/2026): o menu, a citação, a lupa e a estrela moram
+  // nele. Sem ele, o balão é o de antes.
+  const fio = useFio();
+  const [folha, setFolha] = useState(false);
+  const toque = useToqueLongo(() => setFolha(true), fio !== null);
+  const [verApagada, setVerApagada] = useState(false);
+
+  const termo = fio?.busca.aberta ? fio.busca.termo : '';
+  const emFoco = fio?.busca.atual === mensagem.id;
+  const favorita = fio?.favoritas.has(mensagem.id) ?? false;
+  // APAGADA NO CRM, CANCELADA NA FILA, APAGADA PELO CONTATO (27/10/2026): três
+  // coisas diferentes, e o balão diz qual. As duas primeiras escondem o
+  // conteúdo atrás de um "ver"; a do contato o mostra apagado, porque o time
+  // já o tinha lido e precisa saber o que sumiu do lado de lá.
+  const escondida = mensagem.cancelada || mensagem.apagadaEm !== null;
+  const doContatoApagada = mensagem.apagadaPeloContatoEm !== null;
+  const figurinha = mensagem.tipo === 'image' && mensagem.tipoNaMeta === 'sticker';
+  const extras =
+    mensagem.encaminhada || mensagem.citada !== null || mensagem.conteudo.anuncio !== null;
+  // A figurinha não tem balão no WhatsApp: ela é o balão.
+  const semFundo = figurinha && !extras && !escondida;
+  const nossa = !entrada;
 
   // ===========================================================================
   // 28/09/2026 — O REDESENHO QUE O RAFAEL PEDIU DE VERDADE
@@ -98,8 +137,10 @@ export function Mensagem({
   //   * TIPO MAIOR em toda largura (16 px, não 15), e mais ar por dentro.
   return (
     <div
+      // A âncora da citação, da lupa e da busca da lista (`irPara`).
+      id={idDoBalao(mensagem.id)}
       className={cn(
-        'group flex w-full items-end gap-2',
+        'group flex w-full scroll-mt-16 items-end gap-2 rounded-xl transition-colors data-[apontada]:bg-muted/70',
         entrada ? 'flex-row' : 'flex-row-reverse',
         fechaGrupo ? 'pb-4' : 'pb-1',
       )}
@@ -117,36 +158,102 @@ export function Mensagem({
         {agrupada ? null : <Quem mensagem={mensagem} nomeDoParceiro={nomeDoParceiro} />}
 
         <div
+          {...toque}
           className={cn(
-            'min-w-0 max-w-[85%] space-y-2 px-4 py-3 text-base leading-relaxed',
+            'group/balao relative min-w-0 max-w-[85%] space-y-2 text-base leading-relaxed',
             'md:max-w-[38rem]',
-            // O canto reto é o "rabinho" do balão: fica no lado de quem falou, e só
-            // no último do bloco — no meio do bloco todos os cantos são redondos.
-            'rounded-2xl',
-            // O cinza da recebida muda de degrau com o tema: no claro o cartão é
-            // quase branco (some no fundo da página) e quem separa é o `muted`; no
-            // escuro é o contrário — o `muted` encosta no fundo e o cartão destaca.
-            // O QUE NÓS MANDAMOS É VERDE SÓLIDO. Era `bg-primary/20`: no tema
-            // escuro o véu de 20% caía quase no mesmo cinza da recebida, e os dois
-            // lados da conversa ficavam com o mesmo peso — a queixa de "não dá
-            // para ver quem é quem" era literalmente isso. A recebida ganhou
-            // borda em vez de fundo mais claro, para não competir.
-            entrada
-              ? cn('border border-hairline bg-card text-foreground', fechaGrupo && 'rounded-bl-md')
-              : cn('bg-primary text-primary-foreground', fechaGrupo && 'rounded-br-md'),
+            fio && 'pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]',
+            semFundo
+              ? 'p-0'
+              : cn(
+                  'px-4 py-3',
+                  // O canto reto é o "rabinho" do balão: fica no lado de quem falou, e só
+                  // no último do bloco — no meio do bloco todos os cantos são redondos.
+                  'rounded-2xl',
+                  // O cinza da recebida muda de degrau com o tema: no claro o cartão é
+                  // quase branco (some no fundo da página) e quem separa é o `muted`; no
+                  // escuro é o contrário — o `muted` encosta no fundo e o cartão destaca.
+                  // O QUE NÓS MANDAMOS É VERDE SÓLIDO. Era `bg-primary/20`: no tema
+                  // escuro o véu de 20% caía quase no mesmo cinza da recebida, e os dois
+                  // lados da conversa ficavam com o mesmo peso — a queixa de "não dá
+                  // para ver quem é quem" era literalmente isso. A recebida ganhou
+                  // borda em vez de fundo mais claro, para não competir.
+                  escondida
+                    ? 'border border-dashed border-hairline bg-transparent text-muted-foreground'
+                    : entrada
+                      ? cn(
+                          'border border-hairline bg-card text-foreground',
+                          fechaGrupo && 'rounded-bl-md',
+                        )
+                      : cn('bg-primary text-primary-foreground', fechaGrupo && 'rounded-br-md'),
+                ),
+            emFoco && 'ring-3 ring-ring/60',
           )}
         >
-          {mensagem.tipo === 'audio' ? <Audio mensagem={mensagem} /> : null}
-          {mensagem.tipo === 'image' ? <Foto mensagem={mensagem} /> : null}
-          {mensagem.tipo === 'video' ? <Video mensagem={mensagem} /> : null}
-          {mensagem.tipo === 'document' ? <Documento mensagem={mensagem} /> : null}
-
-          {mensagem.texto ? <Texto texto={mensagem.texto} /> : null}
-
-          {!TIPOS_COM_ARQUIVO.has(mensagem.tipo) && semTexto ? (
-            <SemCorpo mensagem={mensagem} />
+          {fio ? (
+            <AcoesDaMensagem
+              mensagem={mensagem}
+              folhaAberta={folha}
+              aoMudarFolha={setFolha}
+              className="absolute top-1.5 right-1.5 z-10"
+            />
           ) : null}
+
+          {escondida ? (
+            <AvisoDeEscondida
+              mensagem={mensagem}
+              vendo={verApagada}
+              aoVer={() => setVerApagada((v) => !v)}
+            />
+          ) : null}
+
+          {!escondida || verApagada ? (
+            <div className={cn('space-y-2', (escondida || doContatoApagada) && 'opacity-60')}>
+              {mensagem.encaminhada ? (
+                <Encaminhada muito={mensagem.conteudo.muitoEncaminhada} />
+              ) : null}
+              {mensagem.conteudo.anuncio ? (
+                <FaixaDoAnuncio anuncio={mensagem.conteudo.anuncio} nossa={nossa && !escondida} />
+              ) : null}
+              {mensagem.citada ? (
+                <Citacao
+                  citada={mensagem.citada}
+                  nossa={nossa && !escondida}
+                  nomeDoParceiro={nomeDoParceiro}
+                  aoIr={fio?.irPara}
+                />
+              ) : null}
+              {mensagem.corrigeA ? (
+                <p className="text-xs font-semibold tracking-wide uppercase opacity-80">Correção</p>
+              ) : null}
+              <Conteudo mensagem={mensagem} termo={termo} />
+            </div>
+          ) : null}
+
+          {doContatoApagada ? (
+            <p className="flex items-center gap-1.5 text-xs italic opacity-80">
+              <Ban className="size-3.5" aria-hidden="true" />O contato apagou esta mensagem
+            </p>
+          ) : null}
+          <Marcas mensagem={mensagem} favorita={favorita} aoIr={fio?.irPara} />
         </div>
+
+        <SelosDeReacao
+          reacoes={mensagem.reacoes}
+          entrada={entrada}
+          aoTirarANossa={
+            fio && motivoParaNaoReagir(mensagem, fio) === null
+              ? () =>
+                  void reagirAMensagem(mensagem.id, null)
+                    .then(fio.atualizar)
+                    .catch((e: unknown) =>
+                      toast.error('Não tirou a reação.', {
+                        description: e instanceof ErroDaConversa ? e.message : 'Tente de novo.',
+                      }),
+                    )
+              : undefined
+          }
+        />
 
         {fechaGrupo ? (
           <p
@@ -161,7 +268,7 @@ export function Mensagem({
             <span
               className={cn(
                 'inline-flex items-center gap-1',
-                entrega.tom === 'falha' && 'text-destructive-texto',
+                entrega.tom === 'falha' && !mensagem.cancelada && 'text-destructive-texto',
                 entrega.tom === 'espera' && 'text-foreground',
               )}
             >
@@ -170,16 +277,182 @@ export function Mensagem({
               ) : entrega.tom === 'falha' ? (
                 <Ban className="size-3" aria-hidden="true" />
               ) : null}
-              {entrega.rotulo}
+              {/* A voz OUVIDA (recibo `played`, 27/10/2026) é mais que lida. */}
+              {mensagem.cancelada
+                ? 'cancelada'
+                : !entrada && mensagem.ouvidaEm
+                  ? 'ouvido'
+                  : entrega.rotulo}
             </span>
             <Selos mensagem={mensagem} />
             {entrada ? <VirarTarefa mensagemId={mensagem.id} /> : null}
-            {entrega.detalhe ? (
+            {entrega.detalhe && !mensagem.cancelada ? (
               <span className="w-full text-muted-foreground">{entrega.detalhe}</span>
             ) : null}
           </p>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * O miolo do balão, por tipo: o arquivo, o cartão, a pergunta, o texto e o que
+ * a Meta disse não entregar.
+ */
+function Conteudo({ mensagem, termo }: { mensagem: MensagemDoFio; termo: string }) {
+  const { conteudo } = mensagem;
+  const nossa = !mensagem.entrada && !mensagem.cancelada && mensagem.apagadaEm === null;
+  // A opção que o contato tocou: a resposta do botão ou da lista. Sem o
+  // `conteudo` (linha de antes de 27/10/2026), o corpo é o título da opção.
+  const escolha = mensagem.entrada
+    ? (conteudo.resposta ??
+      (mensagem.tipo === 'interactive' && mensagem.texto
+        ? { titulo: mensagem.texto, descricao: null }
+        : null))
+    : null;
+  const local = mensagem.tipo === 'location' ? conteudo.localizacao : null;
+  // O corpo da localização recebida é o nome (ou o endereço) do lugar, que o
+  // cartão já mostra: repetir embaixo seria dizer duas vezes a mesma coisa.
+  const textoRepeteOLocal =
+    local !== null && (mensagem.texto === local.nome || mensagem.texto === local.endereco);
+  const contatos = mensagem.tipo === 'contacts' ? conteudo.contatos : [];
+  const temCartao = local !== null || contatos.length > 0;
+  const aviso = conteudo.naoSuportado
+    ? fraseDoNaoSuportado(conteudo.naoSuportado)
+    : conteudo.erro
+      ? fraseDoErroDaMeta(conteudo.erro)
+      : null;
+  const semCorpo =
+    mensagem.texto === null &&
+    !TIPOS_COM_ARQUIVO.has(mensagem.tipo) &&
+    !temCartao &&
+    escolha === null &&
+    aviso === null;
+
+  return (
+    <>
+      {mensagem.tipo === 'audio' ? <Audio mensagem={mensagem} /> : null}
+      {mensagem.tipo === 'image' ? <Foto mensagem={mensagem} /> : null}
+      {mensagem.tipo === 'video' ? <Video mensagem={mensagem} /> : null}
+      {mensagem.tipo === 'document' ? <Documento mensagem={mensagem} /> : null}
+      {local ? <CartaoDeLocalizacao local={local} nossa={nossa} /> : null}
+      {contatos.length > 0 ? <CartaoDeContatos contatos={contatos} nossa={nossa} /> : null}
+
+      {escolha ? (
+        <OpcaoEscolhida titulo={escolha.titulo} descricao={escolha.descricao} />
+      ) : mensagem.texto && !textoRepeteOLocal ? (
+        <Texto texto={mensagem.texto} termo={termo} correcao={mensagem.corrigeA !== null} />
+      ) : null}
+
+      {!mensagem.entrada && conteudo.interativo ? (
+        <OpcoesEnviadas interativo={conteudo.interativo} nossa={nossa} />
+      ) : null}
+
+      {aviso ? (
+        <p className="flex items-start gap-1.5 text-xs leading-relaxed opacity-80">
+          <FileText className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+          <span>{aviso}</span>
+        </p>
+      ) : null}
+      {semCorpo ? <SemCorpo mensagem={mensagem} /> : null}
+    </>
+  );
+}
+
+/**
+ * Apagada no CRM ou cancelada na fila: o que aconteceu, com quem e o que o
+ * contato vê — e um "ver" para quem precisa conferir o que era.
+ */
+function AvisoDeEscondida({
+  mensagem,
+  vendo,
+  aoVer,
+}: {
+  mensagem: MensagemDoFio;
+  vendo: boolean;
+  aoVer: () => void;
+}) {
+  const quem = mensagem.apagadaPor ? ` por ${mensagem.apagadaPor}` : '';
+  return (
+    <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pr-6 text-sm italic">
+      <Ban className="size-4 shrink-0" aria-hidden="true" />
+      <span>
+        {mensagem.cancelada
+          ? 'Envio cancelado: o contato não recebeu.'
+          : mensagem.entrada
+            ? `Apagada no CRM${quem}. O contato ainda tem a dele.`
+            : `Apagada só no CRM${quem} — o contato ainda vê.`}
+      </span>
+      <button
+        type="button"
+        onClick={aoVer}
+        className="not-italic underline underline-offset-2 hover:text-foreground"
+      >
+        {vendo ? 'esconder' : 'ver'}
+      </button>
+    </p>
+  );
+}
+
+/**
+ * As marcas miúdas do pé do balão: a estrela, "corrigida" (leva à correção) e
+ * "editada" pelo contato (com o texto de antes, quando a Meta mandou).
+ */
+function Marcas({
+  mensagem,
+  favorita,
+  aoIr,
+}: {
+  mensagem: MensagemDoFio;
+  favorita: boolean;
+  aoIr?: (id: string) => void;
+}) {
+  const [antes, setAntes] = useState(false);
+  const corrigida = mensagem.corrigidaPor;
+  const editada = mensagem.editadaPeloContatoEm !== null;
+  if (!favorita && !corrigida && !editada) return null;
+  return (
+    <div className="space-y-1">
+      <p className="flex flex-wrap items-center gap-x-2 text-xs opacity-80">
+        {favorita ? <Star className="size-3 fill-current" aria-label="Favorita" /> : null}
+        {corrigida ? (
+          aoIr ? (
+            <button
+              type="button"
+              onClick={() => aoIr(corrigida)}
+              className="underline underline-offset-2"
+              title="Ir até a correção"
+            >
+              corrigida
+            </button>
+          ) : (
+            <span>corrigida</span>
+          )
+        ) : null}
+        {editada ? (
+          mensagem.conteudo.versoes.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setAntes((v) => !v)}
+              className="underline underline-offset-2"
+            >
+              editada{antes ? '' : ' · ver antes'}
+            </button>
+          ) : (
+            <span>editada</span>
+          )
+        ) : null}
+      </p>
+      {antes ? (
+        <ol className="space-y-1 border-l-2 border-current/30 pl-2 text-[13px] opacity-75">
+          {mensagem.conteudo.versoes.map((v, i) => (
+            <li key={i} className="whitespace-pre-line line-through decoration-1">
+              {separarAssinatura(v).resto}
+            </li>
+          ))}
+        </ol>
+      ) : null}
     </div>
   );
 }
@@ -425,6 +698,21 @@ async function abrirArquivo(messageId: string): Promise<void> {
   }
 }
 
+/** Baixa o documento com o nome que o contato vê (a URL assinada leva o nome). */
+async function baixarArquivo(messageId: string): Promise<void> {
+  const url = await urlDaMidia(messageId, true);
+  if (!url) {
+    toast.error('O arquivo não está disponível agora.');
+    return;
+  }
+  const link = document.createElement('a');
+  link.href = url;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 /**
  * Sem arquivo guardado. Diz o que aconteceu e o que vai acontecer: o worker busca
  * na Meta, a cada 10 minutos, o que chegou sem arquivo (`midias-atrasadas.ts`), e
@@ -534,7 +822,10 @@ function Video({ mensagem }: { mensagem: MensagemDoFio }) {
   );
 }
 
-/** O documento: um botão que abre o arquivo numa aba nova. */
+/**
+ * O documento: o nome do arquivo, que é o que o contato vê, e as duas saídas —
+ * abrir numa aba nova (o PDF abre no navegador) e baixar com o nome certo.
+ */
 function Documento({ mensagem }: { mensagem: MensagemDoFio }) {
   const { estado } = useArquivoDaMensagem(mensagem);
   if (estado === 'ausente') {
@@ -545,26 +836,47 @@ function Documento({ mensagem }: { mensagem: MensagemDoFio }) {
       />
     );
   }
-  const pdf = (mensagem.midiaTipo ?? '').includes('pdf');
+  const nome =
+    mensagem.midiaNome ?? ((mensagem.midiaTipo ?? '').includes('pdf') ? 'PDF' : 'Documento');
+  const botao = cn(
+    'inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors disabled:opacity-60',
+    mensagem.entrada
+      ? 'border-hairline bg-background/60 hover:bg-muted'
+      : 'border-primary-foreground/25 bg-primary-foreground/10 hover:bg-primary-foreground/20',
+  );
   return (
-    <button
-      type="button"
-      disabled={estado === 'procurando'}
-      onClick={() => void abrirArquivo(mensagem.id)}
+    <div
       className={cn(
-        'flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
+        'min-w-56 space-y-2 rounded-xl border p-3',
         mensagem.entrada
-          ? 'border-hairline bg-muted/50 hover:bg-muted'
-          : 'border-primary-foreground/20 bg-primary-foreground/10 hover:bg-primary-foreground/20',
+          ? 'border-hairline bg-muted/50'
+          : 'border-primary-foreground/20 bg-primary-foreground/10',
       )}
     >
-      <FileText className="size-4 shrink-0" aria-hidden="true" />
-      {estado === 'procurando'
-        ? 'Procurando o arquivo...'
-        : pdf
-          ? 'Abrir o PDF'
-          : 'Abrir o documento'}
-    </button>
+      <p className="flex items-center gap-2 pr-6">
+        <FileText className="size-5 shrink-0" aria-hidden="true" />
+        <span className="min-w-0 text-sm font-medium break-words">{nome}</span>
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={estado === 'procurando'}
+          onClick={() => void abrirArquivo(mensagem.id)}
+          className={botao}
+        >
+          {estado === 'procurando' ? 'Procurando...' : 'Abrir'}
+        </button>
+        <button
+          type="button"
+          disabled={estado === 'procurando'}
+          onClick={() => void baixarArquivo(mensagem.id)}
+          className={botao}
+        >
+          <Download className="size-3.5" aria-hidden="true" />
+          Baixar
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -634,7 +946,31 @@ function Transcricao({ texto }: { texto: string }) {
  * nome duas vezes em toda mensagem nossa era a maior fonte de ruído da coluna.
  * O texto que saiu continua inteiro no banco — aqui muda só o que a tela mostra.
  */
-function Texto({ texto }: { texto: string }) {
+function Texto({
+  texto,
+  termo = '',
+  correcao = false,
+}: {
+  texto: string;
+  /** A lupa da conversa (27/10/2026): o trecho que bate fica marcado. */
+  termo?: string;
+  /** É uma correção: o "Correção:" da frente já está no rótulo em cima. */
+  correcao?: boolean;
+}) {
   const { resto } = separarAssinatura(texto);
-  return <p className="whitespace-pre-line">{resto}</p>;
+  const corpo = correcao ? resto.replace(PREFIXO_DA_CORRECAO, '') : resto;
+  if (!termo) return <p className="whitespace-pre-line break-words">{corpo}</p>;
+  return (
+    <p className="whitespace-pre-line break-words">
+      {partesDestacadas(corpo, termo).map((parte, i) =>
+        parte.destaque ? (
+          <mark key={i} className="rounded-sm bg-menta px-0.5 text-menta-tinta">
+            {parte.texto}
+          </mark>
+        ) : (
+          <span key={i}>{parte.texto}</span>
+        ),
+      )}
+    </p>
+  );
 }

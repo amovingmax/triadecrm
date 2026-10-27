@@ -50,6 +50,7 @@ import {
   pisoPossivel,
   previaDaMensagem,
   recebeAvisos,
+  contaNoMenu,
   respostasParaMim,
   semResposta,
   textoDoAviso,
@@ -164,6 +165,11 @@ interface AcoesDosAvisos {
   readonly olharConversa: (conversaId: string | null) => void;
   /** A tela montada sabe abrir uma conversa sem navegar; `null` ao desmontar. */
   readonly registrarAbridor: (abrir: ((alvo: AlvoDaConversa) => void) | null) => void;
+  /**
+   * Conferir de novo agora (27/10/2026): silenciar uma conversa tira ela do
+   * número do menu, e a pessoa não deve esperar a próxima sondagem para ver.
+   */
+  readonly reconferir: () => void;
 }
 
 const SEM_AVISOS: Avisos = {
@@ -184,6 +190,7 @@ const SEM_AVISOS: Avisos = {
 const SEM_ACOES: AcoesDosAvisos = {
   olharConversa: () => undefined,
   registrarAbridor: () => undefined,
+  reconferir: () => undefined,
 };
 
 const SEM_NOVAS: ReadonlySet<string> = new Set();
@@ -270,7 +277,10 @@ export function ProvedorDeAvisos({
     if (minhas === null) return [];
     const aEspera = semResposta(minhas);
     const ids = aEspera.map((c) => c.conversaId);
-    setRespostasNovas(aEspera.length);
+    // A silenciada (27/10/2026) continua com a marca "Nova" na lista — a
+    // conversa espera do mesmo jeito —, mas sai do número do menu de quem a
+    // silenciou.
+    setRespostasNovas(contaNoMenu(aEspera).length);
     setNovasIds((atuais) => (mesmoConjunto(atuais, ids) ? atuais : new Set(ids)));
     return aEspera;
   }, []);
@@ -383,6 +393,8 @@ export function ProvedorDeAvisos({
       // aberta por ela ou pelo desktop.
       const olhando = emConversasAgora.current && !document.hidden && document.hasFocus();
       if (olhando) novas = novas.filter((c) => c.conversaId !== conversaAberta.current);
+      // A silenciada não vira cartão nem notificação (27/10/2026).
+      novas = contaNoMenu(novas);
 
       if (novas.length > 0) await avisar(novas);
     };
@@ -453,6 +465,13 @@ export function ProvedorDeAvisos({
     };
   }, [recebe, conferir]);
 
+  // O "conferir de novo" das ações da tela: por `ref`, para o contexto das
+  // ações continuar com valor estável (a tela de Conversas não repinta por ele).
+  const conferirAgora = useRef(conferir);
+  useEffect(() => {
+    conferirAgora.current = conferir;
+  }, [conferir]);
+
   // ---------- 2. entrar em Conversas, ou sair dela, muda o que está sendo olhado ----------
   useEffect(() => {
     emConversasAgora.current = emConversas;
@@ -492,6 +511,7 @@ export function ProvedorDeAvisos({
       registrarAbridor: (abrirNaTela) => {
         abridor.current = abrirNaTela;
       },
+      reconferir: () => void conferirAgora.current(),
     }),
     [dispensarCartao],
   );

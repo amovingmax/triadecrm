@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/client';
 
 import type { AtividadeCrua, HistoricoCru, NegocioCru, OrganizacaoCrua } from './montagem';
 import type { FioCru, MensagemCrua, RascunhoCru } from './mensagens';
+import type { PreferenciaDaConversa, Preferencias } from './preferencias';
 import type { DependenciasDaMeta, EtiquetaDoParceiro } from './tipos';
 
 /**
@@ -43,11 +44,18 @@ const COLUNAS_ATIVIDADE =
  * restringe a quem é dono do fio.
  */
 const COLUNAS_FIO =
-  'id, organization_id, contact_id, channel, peer_phone_e164, peer_nome, business_number, arquivada_em, assignee_id, setor_id, status, bot_paused, last_message_at, last_inbound_at, last_outbound_at, window_expires_at, unread_count, ai_summary, ai_intent, ai_confidence';
+  'id, organization_id, contact_id, channel, peer_phone_e164, peer_nome, business_number, arquivada_em, assignee_id, setor_id, status, bot_paused, last_message_at, last_inbound_at, last_outbound_at, window_expires_at, unread_count, ai_summary, ai_intent, ai_confidence, bloqueada_em, bloqueada_por, bloqueio_na_meta, bloqueio_erro';
 
-/** Colunas da mensagem. `body` pode ser null: a retenção dos 12 meses o apaga. */
-const COLUNAS_MENSAGEM =
-  'id, conversation_id, organization_id, direction, type, status, body, media_path, media_mime, tipo_na_meta, transcript, template_id, draft_id, author_kind, sent_by, approved_by, is_first_contact, business_initiated, optout_confirmation, origin, error_code, error_detail, created_at, sent_at, delivered_at, read_at, failed_at';
+/**
+ * Colunas da mensagem. `body` pode ser null: a retenção dos 12 meses o apaga.
+ *
+ * A segunda linha é o WhatsApp completo (27/10/2026): a resposta citada, o alvo
+ * da reação, a correção, o encaminhamento, o conteúdo (localização, contato,
+ * botões), o nome do documento, o apagar e o "ouvido". Exportada: a aba
+ * Clientes lê as mesmas colunas (`fora-da-base-dados.ts`).
+ */
+export const COLUNAS_MENSAGEM =
+  'id, conversation_id, organization_id, direction, type, status, body, media_path, media_mime, tipo_na_meta, transcript, template_id, draft_id, author_kind, sent_by, approved_by, is_first_contact, business_initiated, optout_confirmation, origin, error_code, error_detail, created_at, sent_at, delivered_at, read_at, failed_at, wa_message_id, responde_a, responde_a_wamid, reage_a, reage_a_wamid, corrige_a, encaminhada, encaminhada_de, conteudo, media_nome, apagada_em, apagada_por, apagada_pelo_contato_em, editada_pelo_contato_em, ouvida_em';
 
 /**
  * O que a leitura da IA empresta à LISTA.
@@ -341,6 +349,87 @@ export async function carregarLinhaDoParceiro(organizacaoId: string): Promise<Li
     mensagens: mensagens.data ?? [],
     rascunhos: rascunhos.data ?? [],
   };
+}
+
+// ---------------------------------------------------------------------------
+// O que é de cada pessoa: fixar, silenciar, a estrela (27/10/2026)
+// ---------------------------------------------------------------------------
+
+/** Chave das preferências (fixar e silenciar) de quem está usando a tela. */
+export const CHAVE_PREFERENCIAS = ['conversas', 'preferencias'] as const;
+
+/** Chave das mensagens com estrela de quem está usando a tela. */
+export const CHAVE_FAVORITAS = ['conversas', 'favoritas'] as const;
+
+/**
+ * Fixar e silenciar, por conversa. A RLS de `conversa_preferencias` só devolve
+ * as linhas de quem pergunta: não há filtro por pessoa aqui porque não precisa.
+ * Falha vira mapa vazio — a lista abre igual, só sem o alfinete.
+ */
+export async function carregarPreferencias(): Promise<Preferencias> {
+  const { data, error } = await createClient()
+    .from('conversa_preferencias')
+    .select('conversation_id, fixada_em, silenciada_ate')
+    .limit(TETO_ORGANIZACOES);
+  if (error) return new Map();
+  return new Map(
+    (data ?? []).map((p): [string, PreferenciaDaConversa] => [
+      p.conversation_id,
+      { fixadaEm: p.fixada_em, silenciadaAte: p.silenciada_ate },
+    ]),
+  );
+}
+
+/** Os ids das mensagens com estrela. Pela mesma RLS: só as minhas. */
+export async function carregarFavoritas(): Promise<ReadonlySet<string>> {
+  const { data, error } = await createClient()
+    .from('mensagens_favoritas')
+    .select('message_id')
+    .order('criada_em', { ascending: false })
+    .limit(TETO_ATIVIDADES);
+  if (error) return new Set();
+  return new Set((data ?? []).map((f) => f.message_id));
+}
+
+/** Um achado da lupa da lista: a mensagem e um trecho dela. */
+export type AchadoDaBusca = {
+  conversaId: string;
+  mensagemId: string;
+  trecho: string;
+  entrada: boolean;
+  em: string;
+};
+
+type AchadoCru = {
+  conversation_id: string;
+  message_id: string;
+  trecho: string | null;
+  direction: string;
+  created_at: string;
+};
+
+export function chaveDaBuscaDeMensagens(texto: string) {
+  return ['conversas', 'busca-de-mensagens', texto] as const;
+}
+
+/**
+ * A busca pelo TEXTO das mensagens (`public.conversas_buscar`, `security
+ * invoker`: a RLS de `messages` decide o que cada um acha). O banco já tira a
+ * assinatura do trecho e ignora reação e mensagem apagada no CRM.
+ */
+export async function buscarMensagens(texto: string, limite = 30): Promise<AchadoDaBusca[]> {
+  const { data, error } = await createClient().rpc('conversas_buscar', {
+    p_texto: texto,
+    p_limite: limite,
+  });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as AchadoCru[]).map((a) => ({
+    conversaId: a.conversation_id,
+    mensagemId: a.message_id,
+    trecho: a.trecho ?? '',
+    entrada: a.direction === 'in',
+    em: a.created_at,
+  }));
 }
 
 /**

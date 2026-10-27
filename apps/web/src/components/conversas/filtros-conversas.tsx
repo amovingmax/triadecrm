@@ -209,7 +209,9 @@ function CampoBusca({
           inputMode="search"
           autoComplete="off"
           enterKeyHint="search"
-          placeholder="Nome, categoria ou bairro"
+          // A busca acha também o TEXTO das mensagens (27/10/2026): os achados
+          // aparecem em "Mensagens", embaixo da lista.
+          placeholder="Nome, bairro ou mensagem"
           aria-describedby={`${id}-dica`}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
@@ -229,7 +231,7 @@ function CampoBusca({
         ) : null}
       </div>
       <p id={`${id}-dica`} className="sr-only">
-        Nome, categoria ou bairro.
+        Nome, categoria, bairro ou o texto de uma mensagem.
       </p>
     </div>
   );

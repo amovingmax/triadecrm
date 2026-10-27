@@ -20,8 +20,12 @@ import {
   BALDE_DAS_MIDIAS,
   conferirParaSubir,
   lerCaminho,
+  nomeDoDocumento,
   TETO_DA_LEGENDA,
 } from '@/lib/midia-de-saida';
+
+/** Um uuid, e só: `responde_a` vai direto para a coluna. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
 import { criarClienteAdmin, temChaveDeServico } from '@/lib/supabase/servidor-admin';
@@ -42,10 +46,19 @@ export async function POST(request: NextRequest) {
     conversation_id?: unknown;
     caminho?: unknown;
     legenda?: unknown;
+    nome?: unknown;
+    responde_a?: unknown;
   } | null;
   const fioId = typeof pedido?.conversation_id === 'string' ? pedido.conversation_id.trim() : '';
   const caminho = typeof pedido?.caminho === 'string' ? pedido.caminho : '';
   const legenda = typeof pedido?.legenda === 'string' ? pedido.legenda.trim() : '';
+  // O nome do documento (o que o contato vê) e a mensagem citada (27/10/2026).
+  // A citação de outra conversa é recusada pelo banco (`app.messages_forma`).
+  const nome = typeof pedido?.nome === 'string' ? nomeDoDocumento(pedido.nome) : null;
+  const respondeA =
+    typeof pedido?.responde_a === 'string' && UUID.test(pedido.responde_a)
+      ? pedido.responde_a
+      : null;
   if (fioId === '' || caminho === '') {
     return NextResponse.json({ ok: false, motivo: 'pedido_incompleto' }, { status: 400 });
   }
@@ -89,17 +102,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // A figurinha é uma `image` no banco, com `tipo_na_meta`, e não tem legenda
+  // (a Meta não aceita). O documento leva o nome do arquivo.
+  const figurinha = lido.tipo === 'sticker';
   const { data: mensagem, error: erroDaMensagem } = await supabase
     .from('messages')
     .insert({
       conversation_id: fioId,
       direction: 'out',
-      type: lido.tipo,
+      type: figurinha ? 'image' : lido.tipo,
       status: 'queued',
       // A legenda é o corpo; o banco a assina com o primeiro nome (20261016100000).
-      body: legenda === '' ? null : legenda,
+      body: legenda === '' || figurinha ? null : legenda,
       media_path: caminho,
       media_mime: lido.mime,
+      media_nome: lido.tipo === 'document' ? (nome ?? 'documento') : null,
+      tipo_na_meta: figurinha ? 'sticker' : null,
+      responde_a: respondeA,
       author_kind: 'human',
       sent_by: user.id,
       origin: 'crm',

@@ -10,6 +10,9 @@ import {
 
 import { EMPRESA } from '@/lib/empresa';
 
+import { lerConteudo } from './conteudo';
+import { completarFio } from './fio-completo';
+
 import {
   ROTULO_ENTREGA,
   type EstadoDaJanela,
@@ -70,6 +73,11 @@ export type FioCru = {
   ai_summary: string | null;
   ai_intent: string | null;
   ai_confidence: number | null;
+  /** Bloqueada no CRM (27/10/2026) e o que a Meta respondeu ao pedido. */
+  bloqueada_em?: string | null;
+  bloqueada_por?: string | null;
+  bloqueio_na_meta?: string | null;
+  bloqueio_erro?: string | null;
 };
 
 export type MensagemCrua = {
@@ -101,6 +109,23 @@ export type MensagemCrua = {
   delivered_at: string | null;
   read_at: string | null;
   failed_at: string | null;
+  // O WhatsApp completo (27/10/2026). Opcionais: a consulta que não os pede
+  // (e as linhas dos testes de antes) continua valendo.
+  wa_message_id?: string | null;
+  responde_a?: string | null;
+  responde_a_wamid?: string | null;
+  reage_a?: string | null;
+  reage_a_wamid?: string | null;
+  corrige_a?: string | null;
+  encaminhada?: boolean | null;
+  encaminhada_de?: string | null;
+  conteudo?: Json | null;
+  media_nome?: string | null;
+  apagada_em?: string | null;
+  apagada_por?: string | null;
+  apagada_pelo_contato_em?: string | null;
+  editada_pelo_contato_em?: string | null;
+  ouvida_em?: string | null;
 };
 
 export type RascunhoCru = {
@@ -201,18 +226,9 @@ export type Entrega = {
   tom: TomDaEntrega;
 };
 
-/**
- * A linha de assinatura que o banco põe no texto livre (`*Matheus:*` e quebra de
- * linha, gatilho `messages_nome_do_atendente`). No WhatsApp o asterisco vira
- * negrito; aqui a tela faz o mesmo, em vez de mostrar os asteriscos crus.
- */
-const ASSINATURA = /^\*([^*\n]{1,60}):\*\n/;
-
-export function separarAssinatura(texto: string): { nome: string | null; resto: string } {
-  const achado = ASSINATURA.exec(texto);
-  if (!achado?.[1]) return { nome: null, resto: texto };
-  return { nome: achado[1], resto: texto.slice(achado[0].length) };
-}
+// A assinatura do texto livre (`*Nome:*` na primeira linha) mora em `conteudo.ts`
+// desde 27/10/2026: o resumo da citação também a tira.
+export { separarAssinatura } from './conteudo';
 
 /**
  * O QUE A META QUIS DIZER, em português.
@@ -233,8 +249,7 @@ const RECADO_DO_ERRO: Record<string, string> = {
   '131047':
     'passou de 24 h desde a última mensagem da pessoa: fora da janela só sai modelo aprovado.',
   '131048': 'o WhatsApp segurou o envio para este número (limite de qualidade). Tente mais tarde.',
-  '131049':
-    'o WhatsApp entregou marketing demais para esta pessoa hoje e segurou esta mensagem.',
+  '131049': 'o WhatsApp entregou marketing demais para esta pessoa hoje e segurou esta mensagem.',
   '130472': 'a pessoa está fora do experimento de marketing da Meta neste período.',
   '132000': 'o modelo tem um número de variáveis diferente do que a Meta aprovou.',
   '132001': 'este modelo não existe mais na Meta, ou está com outro nome.',
@@ -464,6 +479,8 @@ const TIPOS_DE_MENSAGEM: readonly string[] = [
   'interactive',
   'reaction',
   'system',
+  'location',
+  'contacts',
 ];
 const ESTADOS_DE_ENTREGA: readonly string[] = [
   'queued',
@@ -483,11 +500,17 @@ const CANAIS: readonly string[] = [
   'other',
 ];
 
+/**
+ * As linhas cruas viram o fio da tela, e o fio é COMPLETADO (27/10/2026): a
+ * reação vira selo embaixo da mensagem reagida, a resposta citada ganha o
+ * trecho de quem ela cita, e a original corrigida sabe da correção. Quem faz
+ * essas três contas é `completarFio`, que só olha o próprio fio.
+ */
 export function montarMensagens(
   cruas: MensagemCrua[],
   nomeDaPessoa: Map<string, string>,
 ): MensagemDoFio[] {
-  return cruas
+  const fio = cruas
     .map((m): MensagemDoFio => {
       const entrada = m.direction === 'in';
       return {
@@ -522,10 +545,32 @@ export function montarMensagens(
         entregueEm: m.delivered_at,
         lidaEm: m.read_at,
         falhouEm: m.failed_at,
+        criadaEm: m.created_at,
+        waId: m.wa_message_id ?? null,
+        respondeA: m.responde_a ?? null,
+        respondeAWamid: m.responde_a_wamid ?? null,
+        reageA: m.reage_a ?? null,
+        reageAWamid: m.reage_a_wamid ?? null,
+        corrigeA: m.corrige_a ?? null,
+        encaminhada: m.encaminhada === true,
+        conteudo: lerConteudo(m.conteudo),
+        midiaNome: m.media_nome?.trim() || null,
+        apagadaEm: m.apagada_em ?? null,
+        apagadaPor: m.apagada_por ? (nomeDaPessoa.get(m.apagada_por) ?? null) : null,
+        cancelada: m.error_code === 'cancelada',
+        apagadaPeloContatoEm: m.apagada_pelo_contato_em ?? null,
+        editadaPeloContatoEm: m.editada_pelo_contato_em ?? null,
+        ouvidaEm: m.ouvida_em ?? null,
+        reacoes: SEM_REACOES,
+        citada: null,
+        corrigidaPor: null,
       };
     })
     .sort((a, b) => a.em.localeCompare(b.em) || a.id.localeCompare(b.id));
+  return completarFio(fio);
 }
+
+const SEM_REACOES: MensagemDoFio['reacoes'] = { nossa: null, deles: null };
 
 export function montarFio(cru: FioCru, nomeDaPessoa: Map<string, string>): FioDaConversa {
   return {
@@ -548,10 +593,19 @@ export function montarFio(cru: FioCru, nomeDaPessoa: Map<string, string>): FioDa
     ultimaEntradaEm: cru.last_inbound_at,
     ultimaSaidaEm: cru.last_outbound_at,
     janelaExpiraEm: cru.window_expires_at,
+    bloqueadaEm: cru.bloqueada_em ?? null,
+    bloqueadaPor: cru.bloqueada_por ? (nomeDaPessoa.get(cru.bloqueada_por) ?? null) : null,
+    bloqueioNaMeta: lerBloqueioNaMeta(cru.bloqueio_na_meta),
+    bloqueioErro: cru.bloqueio_erro?.trim() || null,
     intencao: cru.ai_intent,
     confianca: cru.ai_confidence,
     resumo: cru.ai_summary?.trim() || null,
   };
+}
+
+/** `conversations.bloqueio_na_meta`: o que a Meta disse do pedido de bloqueio. */
+export function lerBloqueioNaMeta(v: string | null | undefined): FioDaConversa['bloqueioNaMeta'] {
+  return v === 'pedido' || v === 'feito' || v === 'falhou' ? v : null;
 }
 
 const afirmacoesSchema = z.array(z.string()).catch([]);
@@ -678,6 +732,8 @@ export const MOTIVOS_DE_RECUSA_DO_ENVIO: Record<string, string> = {
   parametro_longo_demais: 'Um dos campos passou de 200 caracteres. Encurte e tente de novo.',
   modelo_nao_aprovado_na_meta:
     'A Meta ainda não aprovou este modelo. Fora da janela de 24 h só sai modelo aprovado.',
+  // O WhatsApp completo (migração 20261027110000, `app.messages_forma`).
+  conversa_bloqueada: 'Este contato está bloqueado. Desbloqueie para voltar a mandar mensagem.',
 };
 
 /**
@@ -722,5 +778,25 @@ export function fraseDaRecusaDoEnvio(texto: string): string | null {
   const achado = PREFIXO_DA_RECUSA.exec(texto);
   const motivo = achado?.[1]?.toLowerCase();
   if (!motivo) return null;
-  return MOTIVOS_DE_RECUSA_DO_ENVIO[motivo] ?? null;
+  return MOTIVOS_DE_RECUSA_DO_ENVIO[motivo] ?? fraseDaForma(texto);
+}
+
+/**
+ * A recusa que JÁ VEM EM PORTUGUÊS (27/10/2026).
+ *
+ * `app.messages_forma` não fala em código: ele recusa a forma da mensagem com a
+ * frase pronta ("Envio recusado: de 1 a 3 botões, cada um com até 20 letras e
+ * sem repetir"), porque a frase depende de limites da Meta que só ele conhece.
+ * O que distingue uma frase de um código desconhecido é a primeira palavra: o
+ * código tem sublinhado (`teto_do_numero_novo`) e a frase não. Código
+ * desconhecido continua sendo `null`, pelo mesmo motivo de sempre.
+ */
+const FRASE_DA_FORMA = /^\s*envio recusado:\s*([^\s_]+\s[\s\S]*)$/i;
+
+function fraseDaForma(texto: string): string | null {
+  const achado = FRASE_DA_FORMA.exec(texto);
+  const frase = achado?.[1]?.trim().replace(/\s*\(RF-[^)]*\)\s*$/, '');
+  if (!frase) return null;
+  const comPonto = /[.!?]$/.test(frase) ? frase : `${frase}.`;
+  return comPonto.charAt(0).toUpperCase() + comPonto.slice(1);
 }

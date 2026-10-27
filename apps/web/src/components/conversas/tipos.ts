@@ -3,6 +3,8 @@ import type { ActivityType, Channel, MsgStatus, MsgType, Temperature } from '@ko
 import { type AppRole } from '@/lib/auth/role';
 import { ehCanal } from '@/lib/canais';
 
+import type { ConteudoLido } from './conteudo';
+
 /**
  * Contrato da tela de Conversas (PRD §7.4, RF-CON-05/06/12; anexo R04).
  *
@@ -300,9 +302,10 @@ export const ROTULO_JANELA: Record<JanelaSemContato, string> = {
  * deixa de ser captação e passa a ser acompanhamento —, e por isso sai da lista
  * de Conversas e mora aqui (`ItemConversa.fechou`).
  */
-export type AbaDaEsquerda = 'conversas' | 'consultoria' | 'fora' | 'automaticas';
+export type AbaDaEsquerda = 'conversas' | 'consultoria' | 'fora' | 'automaticas' | 'grupos';
 
-const ABAS: readonly AbaDaEsquerda[] = ['conversas', 'consultoria', 'fora', 'automaticas'];
+/** `grupos` entrou em 27/10/2026: a aba dos grupos de WhatsApp (`components/grupos`). */
+const ABAS: readonly AbaDaEsquerda[] = ['conversas', 'consultoria', 'fora', 'automaticas', 'grupos'];
 
 export function ehAbaDaEsquerda(v: string): v is AbaDaEsquerda {
   return (ABAS as readonly string[]).includes(v);
@@ -515,6 +518,8 @@ export const ROTULO_TIPO_MENSAGEM: Record<MsgType, string> = {
   interactive: 'Botões',
   reaction: 'Reação',
   system: 'Aviso do WhatsApp',
+  location: 'Localização',
+  contacts: 'Cartão de contato',
 };
 
 /**
@@ -537,6 +542,15 @@ export function avisoSemConteudo(
   }
   if (mensagem.tipo === 'reaction') return 'Reação sem emoji: a pessoa tirou a reação.';
   if (mensagem.tipo === 'interactive') return 'Resposta a botões, sem o texto da opção.';
+  // Localização e cartão com tipo próprio (27/10/2026), mas de ANTES de o CRM
+  // guardar o conteúdo: a migração deu o nome certo às linhas antigas, e o
+  // ponto e o número delas nunca foram guardados.
+  if (mensagem.tipo === 'location') {
+    return 'Localização compartilhada antes de o CRM guardar o mapa. Se precisar, peça o endereço por escrito.';
+  }
+  if (mensagem.tipo === 'contacts') {
+    return 'Cartão de contato compartilhado antes de o CRM guardar o cartão. Se precisar, peça o nome e o número por escrito.';
+  }
 
   switch (mensagem.tipoNaMeta) {
     case 'unsupported':
@@ -632,6 +646,53 @@ export type MensagemDoFio = {
   entregueEm: string | null;
   lidaEm: string | null;
   falhouEm: string | null;
+  /** Quando a linha entrou no banco (a fila, para o que saiu). */
+  criadaEm: string;
+
+  // --- O WhatsApp completo (27/10/2026) -----------------------------------
+  /** O id da Meta (`wamid`). Sem ele não há como reagir nem citar do lado de lá. */
+  waId: string | null;
+  respondeA: string | null;
+  respondeAWamid: string | null;
+  reageA: string | null;
+  reageAWamid: string | null;
+  /** Esta mensagem é a correção (o "editar" possível) de outra. */
+  corrigeA: string | null;
+  encaminhada: boolean;
+  conteudo: ConteudoLido;
+  /** O nome do documento ("cardapio.pdf"), que é o que o contato vê. */
+  midiaNome: string | null;
+  /** Apagada NO CRM: a linha fica, o contato continua vendo. */
+  apagadaEm: string | null;
+  apagadaPor: string | null;
+  /** Cancelada na fila, antes de sair (`error_code = 'cancelada'`). */
+  cancelada: boolean;
+  apagadaPeloContatoEm: string | null;
+  editadaPeloContatoEm: string | null;
+  /** A mensagem de voz foi ouvida (recibo `played`). */
+  ouvidaEm: string | null;
+
+  // --- O que só o fio inteiro sabe (`completarFio`) -----------------------
+  /** A última reação de cada lado; `null` quando não há (ou foi tirada). */
+  reacoes: Reacoes;
+  /** O trecho da mensagem que esta responde, quando responde a alguma. */
+  citada: Citada | null;
+  /** O id da correção que saiu para esta mensagem. */
+  corrigidaPor: string | null;
+};
+
+/** Uma reação: o emoji, e se ainda está na fila (só a nossa pode estar). */
+export type Reacao = { emoji: string; naFila: boolean; quem: string | null };
+
+/** WhatsApp mostra uma reação por pessoa; aqui, uma do time e uma do contato. */
+export type Reacoes = { nossa: Reacao | null; deles: Reacao | null };
+
+/** O que o balão mostra da mensagem citada. `id` nulo: ela não está no CRM. */
+export type Citada = {
+  id: string | null;
+  entrada: boolean;
+  autor: string | null;
+  resumo: string;
 };
 
 /** Um motivo do validador determinístico de promessas (RF-CON-24). */
@@ -721,6 +782,15 @@ export type FioDaConversa = {
   /** A última vez que NÓS falamos. É ela que diz se a última palavra foi do parceiro. */
   ultimaSaidaEm: string | null;
   janelaExpiraEm: string | null;
+  /**
+   * Bloqueada no CRM (27/10/2026): nada sai para o número. O bloqueio na Meta é
+   * pedido ao worker e pode falhar — ela só bloqueia quem escreveu nas últimas
+   * 24 h —, e `bloqueioErro` diz o porquê.
+   */
+  bloqueadaEm: string | null;
+  bloqueadaPor: string | null;
+  bloqueioNaMeta: 'pedido' | 'feito' | 'falhou' | null;
+  bloqueioErro: string | null;
   /** O que a IA entendeu da última mensagem recebida (uma das 25 intenções do R08). */
   intencao: string | null;
   confianca: number | null;

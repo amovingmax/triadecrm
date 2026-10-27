@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
 import { useAcoesDosAvisos } from '@/components/avisos/provedor-avisos';
+import { TelaGrupos } from '@/components/grupos/tela-grupos';
 import { SeletorDeAba } from '@/components/ui/abas';
 
 import { useAreaVisivel } from './area-visivel';
@@ -15,6 +16,8 @@ import { FeedAutomaticas } from './automaticas';
 import { carregarAutomaticas, carregarMarcoZero, CHAVE_AUTOMATICAS } from './automaticas-dados';
 import { Conversa } from './conversa';
 import { carregarConversas, CHAVE_CONVERSAS, mensagemDoErro, TETO_ORGANIZACOES } from './dados';
+import { BuscaDeMensagens } from './busca-de-mensagens';
+import { usePreferencias } from './menu-da-conversa';
 import { useEcoDasConversas, type EstadoDoEco } from './eco-do-banco';
 import {
   ErroDaTela,
@@ -131,6 +134,15 @@ export function TelaConversas({
   const [foraId, setForaId] = useState<string | null>(clienteInicial);
 
   const consulta = useQuery({ queryKey: CHAVE_CONVERSAS, queryFn: carregarConversas });
+  // Fixar e silenciar, de quem está olhando (27/10/2026): a lista sobe as
+  // fixadas e marca as silenciadas.
+  const preferencias = usePreferencias();
+  /**
+   * A mensagem até onde a conversa aberta deve rolar: veio da busca pelo texto
+   * das mensagens (`BuscaDeMensagens`). Some quando a conversa chega nela.
+   */
+  const [mensagemAlvo, setMensagemAlvo] = useState<string | null>(null);
+  const chegouNoAlvo = useCallback(() => setMensagemAlvo(null), []);
 
   // O feed do que saiu sozinho é uma RPC própria, por MENSAGEM, e só é buscada
   // quando a aba está aberta: ela lê `public.messages` num intervalo de sete
@@ -210,7 +222,9 @@ export function TelaConversas({
   // Sem escolha nenhuma, o desktop abre a primeira linha da lista. Na aba
   // "Conversas" ela pode ser um cliente: é quem acabou de escrever.
   const primeiraLinha =
-    aba === 'conversas' ? (juntarNaLista(itens, clientesNaLista)[0] ?? null) : null;
+    aba === 'conversas'
+      ? (juntarNaLista(itens, clientesNaLista, preferencias.data)[0] ?? null)
+      : null;
   const semEscolha = escolhidoId === null && clienteEscolhido === null && !ehCelular;
   const foraAberta =
     aba === 'fora'
@@ -223,7 +237,11 @@ export function TelaConversas({
   // Sem escolha explícita, o desktop abre a primeira da lista. É derivação, não efeito:
   // um `setState` dentro de `useEffect` aqui reordenaria a tela depois de pintá-la.
   // Com um cliente aberto, nenhuma conversa de parceiro está aberta.
-  const abertaId = foraAberta ? null : (escolhidoId ?? (ehCelular ? null : (daAba[0]?.id ?? null)));
+  // Na aba Grupos nenhuma conversa está aberta: o aviso de resposta tem de chegar.
+  const abertaId =
+    foraAberta || aba === 'grupos'
+      ? null
+      : (escolhidoId ?? (ehCelular ? null : (daAba[0]?.id ?? null)));
 
   // A conversa aberta é procurada em TODOS, não no recorte: mudar o filtro não pode
   // fechar na cara da pessoa a conversa que ela está lendo.
@@ -436,7 +454,7 @@ export function TelaConversas({
             é a condição que muda. O feed é por mensagem e não por parceiro — uma
             lista de parceiros ao lado dele não responderia pergunta nenhuma, e
             roubaria 20rem do texto que saiu. */}
-        {telaCheia || aba === 'automaticas' ? null : (
+        {telaCheia || aba === 'automaticas' || aba === 'grupos' ? null : (
           <section
             aria-label={
               aba === 'consultoria'
@@ -484,6 +502,7 @@ export function TelaConversas({
                   itens={consultoria}
                   selecionadoId={aberta?.id ?? null}
                   aoEscolher={escolherParceiro}
+                  preferencias={preferencias.data}
                 />
               )
             ) : filtros.escopo === 'setor' && quem.meusSetores.length === 0 ? (
@@ -510,13 +529,32 @@ export function TelaConversas({
                 clientes={clientesNaLista}
                 clienteSelecionadoId={foraAberta?.id ?? null}
                 aoEscolherCliente={escolherCliente}
+                preferencias={preferencias.data}
               />
             )}
+            {/* A LUPA NAS MENSAGENS (27/10/2026): embaixo do que o nome achou, o
+                que o TEXTO das mensagens acha. Só na aba Conversas, que é onde
+                a busca mora. */}
+            {aba === 'conversas' && !consulta.isPending && !consulta.isError ? (
+              <BuscaDeMensagens
+                texto={filtros.q}
+                fios={consulta.data?.fios ?? []}
+                organizacoes={consulta.data?.organizacoes ?? []}
+                aoAbrir={({ conversaId, organizacaoId, mensagemId }) => {
+                  setMensagemAlvo(mensagemId);
+                  if (organizacaoId) escolherParceiro(organizacaoId);
+                  else escolherCliente(conversaId);
+                }}
+              />
+            ) : null}
           </section>
         )}
 
         {/* Conversa. No celular só existe quando alguém escolheu. */}
-        {aba === 'automaticas' ? (
+        {/* A aba Grupos põe as duas colunas dela nesta mesma grade (27/10/2026). */}
+        {aba === 'grupos' ? (
+          <TelaGrupos pessoas={catalogos.pessoas} />
+        ) : aba === 'automaticas' ? (
           <section
             aria-label="O que o CRM mandou sozinho"
             className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:col-span-2 md:overflow-y-auto"
@@ -566,6 +604,8 @@ export function TelaConversas({
                   key={foraAberta.id}
                   fio={foraAberta}
                   catalogos={catalogos}
+                  mensagemAlvo={mensagemAlvo}
+                  aoChegarNoAlvo={chegouNoAlvo}
                   escolhaExplicita={foraAberta.id === foraId}
                   aoVoltar={() => setForaId(null)}
                   aoLigar={(organizacaoId) => {
@@ -599,6 +639,8 @@ export function TelaConversas({
                 meta={meta}
                 aoVoltar={voltar}
                 escolhaExplicita={escolhidoId !== null}
+                mensagemAlvo={mensagemAlvo}
+                aoChegarNoAlvo={chegouNoAlvo}
               />
             ) : (
               <NenhumaEscolhida meta={meta} />
@@ -693,6 +735,8 @@ function Abas({
         // e o feed não é fila — a maior parte das automáticas não pede nada de
         // ninguém.
         { id: 'automaticas', rotulo: 'Automáticas' },
+        // Os grupos de WhatsApp (27/10/2026): até 8 pessoas, entrada por link.
+        { id: 'grupos', rotulo: 'Grupos' },
       ]}
     />
   );

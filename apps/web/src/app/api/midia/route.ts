@@ -58,8 +58,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, motivo: 'nao_configurado' }, { status: 503 });
   }
 
-  const corpo = (await request.json().catch(() => ({}))) as { message_id?: unknown };
+  const corpo = (await request.json().catch(() => ({}))) as {
+    message_id?: unknown;
+    baixar?: unknown;
+  };
   const messageId = typeof corpo.message_id === 'string' ? corpo.message_id.trim() : '';
+  // "Baixar" o documento (27/10/2026): a mesma URL, com o nome do arquivo que o
+  // contato vê, para o navegador salvar em vez de abrir.
+  const baixar = corpo.baixar === true;
   if (messageId === '') {
     return NextResponse.json({ ok: false, motivo: 'sem_mensagem' }, { status: 400 });
   }
@@ -68,7 +74,7 @@ export async function POST(request: NextRequest) {
   // `messages` responde exatamente o que esta pessoa pode ver.
   const { data: mensagem, error } = await supabase
     .from('messages')
-    .select('id, media_path')
+    .select('id, media_path, media_nome')
     .eq('id', messageId)
     .maybeSingle();
 
@@ -92,7 +98,11 @@ export async function POST(request: NextRequest) {
   const admin = criarClienteAdmin();
   const { data, error: erroDoBalde } = await admin.storage
     .from(BALDE)
-    .createSignedUrl(caminho, SEGUNDOS_DA_URL);
+    .createSignedUrl(
+      caminho,
+      SEGUNDOS_DA_URL,
+      baixar ? { download: mensagem.media_nome?.trim() || true } : undefined,
+    );
 
   if (erroDoBalde || !data?.signedUrl) {
     registrarRecusa('midia/assinar', 'balde_recusou');

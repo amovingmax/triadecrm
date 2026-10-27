@@ -22,7 +22,7 @@ import {
   BALDE_DAS_MIDIAS,
   caminhoDaMidia,
   conferirParaSubir,
-  type TipoDeMidia,
+  lerTipoDeEnvio,
 } from '@/lib/midia-de-saida';
 import { registrarRecusa } from '@/lib/registro-do-servidor';
 import { createClient } from '@/lib/supabase/server';
@@ -47,8 +47,9 @@ export async function POST(request: NextRequest) {
     tamanho?: unknown;
   } | null;
   const fioId = typeof pedido?.conversation_id === 'string' ? pedido.conversation_id.trim() : '';
-  const tipo =
-    pedido?.tipo === 'image' || pedido?.tipo === 'video' ? (pedido.tipo as TipoDeMidia) : null;
+  // Documento e figurinha também (27/10/2026): mesma autorização, outra regra
+  // de tipo e de tamanho (`conferirParaSubir`).
+  const tipo = lerTipoDeEnvio(pedido?.tipo);
   if (fioId === '' || tipo === null || typeof pedido?.mime !== 'string') {
     return NextResponse.json({ ok: false, motivo: 'pedido_incompleto' }, { status: 400 });
   }

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   chegaramAgora,
+  contaNoMenu,
   contextoDoAviso,
+  estaSilenciada,
   destinoDoAviso,
   ehParaMim,
   maisRecente,
@@ -478,5 +480,30 @@ describe('a marca e o rótulo', () => {
   it('o número fala no singular e no plural', () => {
     expect(rotuloDasRespostas(1)).toBe('1 resposta nova');
     expect(rotuloDasRespostas(4)).toBe('4 respostas novas');
+  });
+});
+
+describe('a conversa silenciada (27/10/2026)', () => {
+  const AGORA = Date.parse('2026-10-27T12:00:00Z');
+
+  it('sai do número do menu e do cartão de quem silenciou', () => {
+    const lista = [
+      conversa({ conversaId: 'a' }),
+      conversa({ conversaId: 'b', silenciadaAte: '2026-10-27T20:00:00Z' }),
+      conversa({ conversaId: 'c', silenciadaAte: 'infinity' }),
+      conversa({ conversaId: 'd', silenciadaAte: '2026-10-27T11:00:00Z' }),
+    ];
+    expect(contaNoMenu(lista, AGORA).map((c) => c.conversaId)).toEqual(['a', 'd']);
+  });
+
+  it('o silêncio que venceu volta a contar', () => {
+    expect(estaSilenciada({ silenciadaAte: '2026-10-27T11:59:59Z' }, AGORA)).toBe(false);
+    expect(estaSilenciada({ silenciadaAte: null }, AGORA)).toBe(false);
+    expect(estaSilenciada({}, AGORA)).toBe(false);
+  });
+
+  it('a localização e o cartão têm prévia própria no cartão do aviso', () => {
+    expect(previaDaMensagem('location', null)).toBe('Localização');
+    expect(previaDaMensagem('contacts', null)).toBe('Cartão de contato');
   });
 });

@@ -32,6 +32,8 @@ interface LinhaCrua {
   peer_nome: string | null;
   peer_phone_e164: string;
   messages: { created_at: string }[] | null;
+  /** Só a linha de quem pergunta: a RLS de `conversa_preferencias` recorta. */
+  conversa_preferencias: { silenciada_ate: string | null }[] | null;
 }
 
 /**
@@ -56,7 +58,7 @@ export async function lerConversasComResposta(
   const { data, error } = await supabase
     .from('conversations')
     .select(
-      'id, organization_id, assignee_id, last_inbound_at, peer_nome, peer_phone_e164, messages(created_at)',
+      'id, organization_id, assignee_id, last_inbound_at, peer_nome, peer_phone_e164, messages(created_at), conversa_preferencias(silenciada_ate)',
     )
     .gt('last_inbound_at', desde)
     .eq('messages.direction', 'out')
@@ -85,6 +87,7 @@ export async function lerConversasComResposta(
         telefone: linha.peer_phone_e164,
         alguemEscreveu: respondidaEm !== null,
         respondidaEm,
+        silenciadaAte: linha.conversa_preferencias?.[0]?.silenciada_ate ?? null,
       };
     });
   return { conversas, cheia: linhas.length >= TETO_DE_RESPOSTAS };

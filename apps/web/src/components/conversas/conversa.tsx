@@ -37,6 +37,7 @@ import { AssumirConversa, useEu } from './assumir-conversa';
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
 import { EtiquetasDoParceiro } from './etiquetas-do-parceiro';
 import { AvisoWhatsapp } from './aviso-whatsapp';
+import { ProvedorDoFio } from './contexto-do-fio';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { ErroDaTela, EsqueletoLinha } from './estados';
 import { contagemDeInteracoes, local } from './formatos';
@@ -44,7 +45,8 @@ import { FaixaDaJanela, Janela24h, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { LinhaDoTempo } from './linha-do-tempo';
-import { JANELA_APERTADA_MIN, montarFio } from './mensagens';
+import { JANELA_APERTADA_MIN, montarFio, podeEscreverLivre } from './mensagens';
+import { BarraDeBuscaNoFio, MenuDaConversa } from './menu-da-conversa';
 import {
   agruparPorDia,
   escolherNegocio,
@@ -94,6 +96,8 @@ export function Conversa({
   meta,
   aoVoltar,
   escolhaExplicita,
+  mensagemAlvo = null,
+  aoChegarNoAlvo,
 }: {
   item: ItemConversa;
   catalogos: CatalogosConversas;
@@ -105,6 +109,9 @@ export function Conversa({
   aoVoltar: () => void;
   /** A pessoa ESCOLHEU esta conversa; a que o desktop abre sozinho não conta como lida. */
   escolhaExplicita: boolean;
+  /** Abrir já na mensagem que a busca da lista achou (27/10/2026). */
+  mensagemAlvo?: string | null;
+  aoChegarNoAlvo?: () => void;
 }) {
   const consulta = useQuery({
     queryKey: chaveDaLinha(item.id),
@@ -157,7 +164,14 @@ export function Conversa({
   // Abre no fim e acompanha o fim enquanto a pessoa estiver nele; quem subiu
   // para ler o histórico não é puxado (ver `rolagem-no-fim.ts`).
   const quantosEventos = dias.reduce((soma, dia) => soma + dia.eventos.length, 0);
-  const { rolagem, conteudo, aoRolar } = useRolagemNoFim(item.id, quantosEventos);
+  const { rolagem, conteudo, aoRolar, soltar } = useRolagemNoFim(item.id, quantosEventos);
+  // O fio de mensagens, em ordem, para o menu de cada balão, a citação, a lupa e
+  // as favoritas (27/10/2026). Sai da linha do tempo já montada.
+  const mensagensDoFio = useMemo(
+    () => dias.flatMap((d) => d.eventos.flatMap((e) => (e.mensagem ? [e.mensagem] : []))),
+    [dias],
+  );
+  const chavesDaConversa = useMemo(() => [chaveDaLinha(item.id)], [item.id]);
 
   const negocio = consulta.data ? escolherNegocio(consulta.data.negocios) : null;
   const proxima = formatarProximaAcao(negocio?.next_action_at);
@@ -319,7 +333,7 @@ export function Conversa({
     </>
   );
 
-  return (
+  const corpo = (
     // `@container` no painel inteiro: no tablet, o desenho do celular vale quando
     // o PAINEL é estreito, e não a tela (`conversa-estreita`, em `globals.css`).
     <div className="@container flex h-full min-h-0 flex-col">
@@ -416,6 +430,15 @@ export function Conversa({
               </Link>
             </Button>
             {fio && eu?.podeEscrever ? <Arquivar fio={fio} /> : null}
+            {fio ? (
+              <MenuDaConversa
+                fioId={fio.id}
+                bloqueada={fio.bloqueadaEm !== null}
+                podeEscrever={Boolean(eu?.podeEscrever)}
+                atualizar={chavesDaConversa}
+                aoFecharConversa={aoVoltar}
+              />
+            ) : null}
             <Button asChild variant="ghost" size="icon" className="toque size-9">
               <Link href={`/parceiros/${item.id}`} title="Abrir a ficha do parceiro">
                 <ExternalLink aria-hidden="true" />
@@ -435,6 +458,8 @@ export function Conversa({
           />
         ) : null}
       </header>
+      {/* A lupa da conversa (27/10/2026), aberta pelo "⋯". */}
+      <BarraDeBuscaNoFio />
 
       <Sheet open={folha} onOpenChange={setFolha}>
         <SheetContent
@@ -498,6 +523,21 @@ export function Conversa({
               </Button>
             </div>
           </section>
+
+          {fio ? (
+            <section aria-label="Conversa" className="flex flex-col gap-1">
+              <h3 className={ROTULO_DA_FOLHA}>Conversa</h3>
+              <MenuDaConversa
+                variante="folha"
+                fioId={fio.id}
+                bloqueada={fio.bloqueadaEm !== null}
+                podeEscrever={Boolean(eu?.podeEscrever)}
+                atualizar={chavesDaConversa}
+                aoFecharConversa={aoVoltar}
+                aoEscolher={() => setFolha(false)}
+              />
+            </section>
+          ) : null}
 
           <section aria-label="Ficha" className="flex flex-col gap-1">
             <h3 className={ROTULO_DA_FOLHA}>Ficha</h3>
@@ -607,6 +647,24 @@ export function Conversa({
         </div>
       </div>
     </div>
+  );
+
+  // Sem fio de WhatsApp não há mensagem a responder, reagir ou procurar.
+  if (!fio) return corpo;
+  return (
+    <ProvedorDoFio
+      fioId={fio.id}
+      mensagens={mensagensDoFio}
+      janelaAberta={podeEscreverLivre(janela)}
+      bloqueada={fio.bloqueadaEm !== null}
+      nomeDoParceiro={item.nome}
+      atualizar={chavesDaConversa}
+      soltarRolagem={soltar}
+      mensagemAlvo={mensagemAlvo}
+      aoChegarNoAlvo={aoChegarNoAlvo}
+    >
+      {corpo}
+    </ProvedorDoFio>
   );
 }
 

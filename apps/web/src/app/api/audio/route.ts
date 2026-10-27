@@ -78,6 +78,12 @@ export async function POST(request: NextRequest) {
   const formulario = await request.formData().catch(() => null);
   const fioId = String(formulario?.get('conversation_id') ?? '').trim();
   const arquivo = formulario?.get('arquivo');
+  // A mensagem citada (27/10/2026): o áudio também responde citando. A citação
+  // de outra conversa é recusada pelo banco (`app.messages_forma`).
+  const citada = String(formulario?.get('responde_a') ?? '').trim();
+  const respondeA = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(citada)
+    ? citada
+    : null;
 
   if (fioId === '' || !(arquivo instanceof File)) {
     return NextResponse.json({ ok: false, motivo: 'pedido_incompleto' }, { status: 400 });
@@ -138,6 +144,7 @@ export async function POST(request: NextRequest) {
       status: 'queued',
       media_path: caminho,
       media_mime: base,
+      responde_a: respondeA,
       author_kind: 'human',
       sent_by: user.id,
       origin: 'crm',

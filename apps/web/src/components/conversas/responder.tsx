@@ -4,20 +4,31 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { BellOff, NotebookPen, PenLine, SendHorizontal, Zap } from 'lucide-react';
+import { BellOff, NotebookPen, PenLine, Reply, SendHorizontal, Smile, X, Zap } from 'lucide-react';
 
 import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
-import { ErroDaConversa, responder } from './acoes';
+import { avisarDigitando, ErroDaConversa, responder } from './acoes';
+import { resumoDaMensagem } from './conteudo';
+import { useFio } from './contexto-do-fio';
 import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
+import { deveAvisarDigitando, inserirNoCursor } from './emojis';
 import { EnviarModelo } from './enviar-modelo';
-import { BotaoDaMidia, PainelDaMidia, useMidiaEscolhida } from './enviar-midia';
+import { PainelDaMidia, useMidiaEscolhida } from './enviar-midia';
 import { arquivosDaTransferencia } from './enviar-midia-dados';
+import { GradeDeEmojis } from './grade-de-emojis';
 import { GravarAudio } from './gravar-audio';
 import { podeEscreverLivre } from './mensagens';
+import { AvisoDeBloqueio } from './menu-da-conversa';
+import { MenuDeAnexo } from './menu-de-anexo';
 import {
   aplicarResposta,
   atalhoEmDigitacao,
@@ -111,6 +122,21 @@ export function CaixaDeResposta({
   // e é a mesma caixa para os dois (migração 20260914100000).
   if (!fio)
     return <EnviarModelo destino={{ tipo: 'ficha', organizacaoId }} className={className} />;
+
+  // Bloqueado (27/10/2026): nada sai para o número, nem modelo. A caixa dá lugar
+  // ao aviso e ao "Desbloquear".
+  if (fio.bloqueadaEm) {
+    return (
+      <AvisoDeBloqueio
+        fioId={fio.id}
+        quem={fio.bloqueadaPor}
+        naMeta={fio.bloqueioNaMeta}
+        erro={fio.bloqueioErro}
+        atualizar={[chaveDaLinha(organizacaoId)]}
+        className={className}
+      />
+    );
+  }
 
   if (recolhida && !aberta && !temDigitado) {
     return (
@@ -212,6 +238,21 @@ export function TextoLivre({
   // O que é ENVIADO não mudou: o mesmo `responder`, com o mesmo texto aparado.
   const dono = useContext(DonoDoTextoDigitado);
   const [texto, setTexto] = useTextoDigitado(fioId);
+  // A citação (27/10/2026): o balão escolhe, a caixa manda. Só a desta conversa.
+  const doFio = useFio();
+  const citando = doFio?.citando && doFio.citando.fioId === fioId ? doFio.citando : null;
+  const pararDeCitar = doFio?.citar;
+  // "Digitando…" para o contato, no máximo a cada 15 s (`emojis.ts`). Só o que
+  // se digita na caixa conta: escolher uma resposta pronta não é digitar. O
+  // relógio é o do evento (`timeStamp`), que anda junto em toda tecla.
+  const avisadoEm = useRef<number | null>(null);
+  const aoDigitar = (novo: string, agora: number) => {
+    setTexto(novo);
+    if (deveAvisarDigitando({ ultimoEm: avisadoEm.current, agora, texto: novo })) {
+      avisadoEm.current = agora;
+      void avisarDigitando(fioId);
+    }
+  };
   const respostas = useQuery({
     queryKey: ['conversas', 'respostas-prontas'],
     queryFn: async (): Promise<RespostaPronta[]> => {
@@ -233,11 +274,12 @@ export function TextoLivre({
     // tela, e um texto que ficasse guardado voltaria como rascunho de uma
     // mensagem que já foi — convite a mandá-la duas vezes. Se a fila recusar, o
     // texto fica onde está, como sempre ficou.
-    mutationFn: async (envio: { fioId: string; texto: string }) => {
+    mutationFn: async (envio: { fioId: string; texto: string; respondeA: string | null }) => {
       await responder(envio);
       esquecerTextoDigitado(dono, envio.fioId);
     },
     onSuccess: () => {
+      pararDeCitar?.(null);
       toast.success('Mensagem na fila do WhatsApp.', {
         description: `Sai pelo número da ${EMPRESA.nomeDoNumero} em instantes.`,
       });
@@ -259,6 +301,15 @@ export function TextoLivre({
   const depoisDaMidia = () => {
     void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
     for (const chave of atualizar) void clientes.invalidateQueries({ queryKey: chave });
+  };
+  // O que sai pelo clipe leva a citação junto, e a fecha.
+  const destino = {
+    fioId,
+    respondeA: citando?.id ?? null,
+    aoEnviar: () => {
+      pararDeCitar?.(null);
+      depoisDaMidia();
+    },
   };
 
   const limpo = texto.trim();
@@ -282,12 +333,35 @@ export function TextoLivre({
     el.style.height = `${Math.min(el.scrollHeight, ALTURA_MAXIMA)}px`;
   }, [texto]);
 
+  // Escolheu "Responder" num balão: o cursor vem para cá.
+  const citandoId = citando?.id ?? null;
+  useEffect(() => {
+    if (citandoId) caixa.current?.focus();
+  }, [citandoId]);
+
+  /** O emoji entra onde o cursor estava, e o cursor fica depois dele. */
+  function porEmoji(emoji: string) {
+    const el = caixa.current;
+    const { texto: novo, cursor } = inserirNoCursor(
+      texto,
+      el?.selectionStart,
+      el?.selectionEnd,
+      emoji,
+    );
+    setTexto(novo);
+    window.requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(cursor, cursor);
+    });
+  }
+  const mandar = () => enviar.mutate({ fioId, texto: limpo, respondeA: citando?.id ?? null });
+
   return (
     <form
       className={cn('space-y-1.5', className)}
       onSubmit={(e) => {
         e.preventDefault();
-        if (pode) enviar.mutate({ fioId, texto: limpo });
+        if (pode) mandar();
       }}
     >
       <label htmlFor="resposta" className="sr-only">
@@ -313,8 +387,24 @@ export function TextoLivre({
         </ul>
       ) : null}
 
+      {citando ? (
+        <BarraDaCitacao
+          resumo={resumoDaMensagem(citando)}
+          quem={
+            citando.entrada ? doFio?.nomeDoParceiro?.trim() || 'Contato' : (citando.autor ?? 'Time')
+          }
+          aoCancelar={() => pararDeCitar?.(null)}
+        />
+      ) : null}
+
       {midia.itens.length > 0 ? (
-        <PainelDaMidia fioId={fioId} midia={midia} aoEnviar={depoisDaMidia} />
+        <PainelDaMidia
+          fioId={fioId}
+          midia={midia}
+          aoEnviar={depoisDaMidia}
+          respondeA={citando?.id ?? null}
+          aoCitar={() => pararDeCitar?.(null)}
+        />
       ) : null}
 
       {/* DOIS DESENHOS, UMA MARCAÇÃO SÓ (20/10/2026).
@@ -359,7 +449,7 @@ export function TextoLivre({
               id="resposta"
               ref={caixa}
               value={texto}
-              onChange={(e) => setTexto(e.target.value)}
+              onChange={(e) => aoDigitar(e.target.value, e.timeStamp)}
               onPaste={(e) => {
                 // Colar um print (Ctrl+V) leva à prévia; colar texto continua texto.
                 const arquivos = arquivosDaTransferencia(e.clipboardData);
@@ -373,7 +463,7 @@ export function TextoLivre({
                 if (e.key !== 'Enter' || e.shiftKey) return;
                 if (window.matchMedia?.('(pointer: coarse)').matches) return;
                 e.preventDefault();
-                if (pode) enviar.mutate({ fioId, texto: limpo });
+                if (pode) mandar();
               }}
               rows={1}
               placeholder="Mensagem"
@@ -382,6 +472,7 @@ export function TextoLivre({
               // zoom com dois dedos a cada mensagem (20/10/2026).
               className="min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-base leading-relaxed outline-none placeholder:text-muted-foreground max-md:max-h-[calc(var(--altura-visivel,100svh)*0.3)] md:text-[15px]"
             />
+            <SeletorDeEmoji aoEscolher={porEmoji} />
           </div>
           <Button
             type="submit"
@@ -416,13 +507,15 @@ export function TextoLivre({
               Respostas prontas
             </button>
           ) : null}
-          <BotaoDaMidia aoEscolher={midia.escolher} rotulo="Anexo" className={FERRAMENTA} />
+          <MenuDeAnexo midia={midia} destino={destino} rotulo="Anexo" className={FERRAMENTA} />
           <GravarAudio
             key={fioId}
             fioId={fioId}
             rotulo="Áudio"
             classeDoBotao={FERRAMENTA}
             className="max-md:w-full"
+            respondeA={citando?.id ?? null}
+            aoEnviar={() => pararDeCitar?.(null)}
           />
         </div>
       </div>
@@ -450,5 +543,62 @@ export function TextoLivre({
         </p>
       ) : null}
     </form>
+  );
+}
+
+/**
+ * "Respondendo a…" em cima da caixa (27/10/2026): quem e o começo do que foi
+ * dito. O X desiste da citação, não do texto.
+ */
+function BarraDaCitacao({
+  quem,
+  resumo,
+  aoCancelar,
+}: {
+  quem: string;
+  resumo: string;
+  aoCancelar: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border-l-4 border-l-primary bg-muted/60 py-1.5 pr-1 pl-3">
+      <Reply className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <p className="min-w-0 flex-1 text-[13px] leading-snug">
+        <span className="block text-xs font-semibold">Respondendo a {quem}</span>
+        <span className="block truncate text-muted-foreground">{resumo}</span>
+      </p>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="toque size-9 shrink-0"
+        onClick={aoCancelar}
+        aria-label="Não citar"
+      >
+        <X aria-hidden="true" />
+      </Button>
+    </div>
+  );
+}
+
+/** O botão do emoji, dentro da caixa: a grade da casa (`grade-de-emojis.tsx`). */
+function SeletorDeEmoji({ aoEscolher }: { aoEscolher: (emoji: string) => void }) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="toque size-9 shrink-0 self-end text-muted-foreground"
+          title="Emoji"
+        >
+          <Smile aria-hidden="true" />
+          <span className="sr-only">Pôr um emoji</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="end" className="w-[22rem] max-w-[calc(100vw-2rem)]">
+        <GradeDeEmojis aoEscolher={aoEscolher} />
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

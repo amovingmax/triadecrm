@@ -21,6 +21,7 @@ import {
   type MensagemCrua,
   type RascunhoCru,
 } from './mensagens';
+import { CONTEUDO_VAZIO } from './conteudo';
 import type { MensagemDoFio } from './tipos';
 
 /**
@@ -136,6 +137,25 @@ function mensagem(parcial: Partial<MensagemDoFio> = {}): MensagemDoFio {
     entregueEm: null,
     lidaEm: null,
     falhouEm: null,
+    criadaEm: '2026-09-05T11:00:00.000Z',
+    waId: null,
+    respondeA: null,
+    respondeAWamid: null,
+    reageA: null,
+    reageAWamid: null,
+    corrigeA: null,
+    encaminhada: false,
+    conteudo: CONTEUDO_VAZIO,
+    midiaNome: null,
+    apagadaEm: null,
+    apagadaPor: null,
+    cancelada: false,
+    apagadaPeloContatoEm: null,
+    editadaPeloContatoEm: null,
+    ouvidaEm: null,
+    reacoes: { nossa: null, deles: null },
+    citada: null,
+    corrigidaPor: null,
     ...parcial,
   };
 }
@@ -164,9 +184,9 @@ describe('entregaDaMensagem', () => {
       entregaDaMensagem(mensagem({ status: 'failed', erroCodigo: '999999', erroDetalhe: 'Boom' }))
         .detalhe,
     ).toBe('Boom (código 999999)');
-    expect(entregaDaMensagem(mensagem({ status: 'failed', erroDetalhe: 'sem código' })).detalhe).toBe(
-      'sem código',
-    );
+    expect(
+      entregaDaMensagem(mensagem({ status: 'failed', erroDetalhe: 'sem código' })).detalhe,
+    ).toBe('sem código');
   });
 
   it('entregue e lida não pedem explicação nenhuma', () => {
@@ -539,6 +559,26 @@ describe('fraseDaRecusaDoEnvio', () => {
     // a tela mostraria a frase do teto de aberturas para uma regra que
     // ninguém sabe qual é — e é assim que um aviso vira mentira sem ninguém ver.
     expect(fraseDaRecusaDoEnvio('Envio recusado: teto_do_numero_novo (RF-CON-10)')).toBeNull();
+  });
+
+  it('a recusa da FORMA já vem em português e chega inteira (27/10/2026)', () => {
+    // As frases de `app.messages_forma`, migração 20261027110000.
+    expect(
+      fraseDaRecusaDoEnvio(
+        'Envio recusado: de 1 a 3 botões, cada um com até 20 letras e sem repetir',
+      ),
+    ).toBe('De 1 a 3 botões, cada um com até 20 letras e sem repetir.');
+    expect(fraseDaRecusaDoEnvio('Envio recusado: a reação é um emoji só')).toBe(
+      'A reação é um emoji só.',
+    );
+    expect(
+      fraseDaRecusaDoEnvio('Envio recusado: localização precisa de latitude e longitude válidas'),
+    ).toBe('Localização precisa de latitude e longitude válidas.');
+    expect(
+      fraseDaRecusaDoEnvio(
+        'Envio recusado: conversa_bloqueada — desbloqueie o contato para voltar a mandar mensagem',
+      ),
+    ).toContain('bloqueado');
   });
 
   it('motivo desconhecido devolve null: melhor a frase genérica que o texto do Postgres', () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import * as z from 'zod';
+import type { Json, MsgType } from '@komune/schema';
 
 import { createClient } from '@/lib/supabase/client';
 
@@ -173,6 +174,8 @@ export async function descartarRascunho(rascunhoId: string, motivo: string): Pro
 export type Resposta = {
   fioId: string;
   texto: string;
+  /** A mensagem citada (27/10/2026): o WhatsApp mostra a "seta" em cima. */
+  respondeA?: string | null;
 };
 
 /**
@@ -193,7 +196,7 @@ export type Resposta = {
  * é recusado. A confirmação de opt-out não passa por esta tela: quem a
  * escreve é `public.wa_optout_registrar`, com o texto fixo do GEN-SYS-OPTOUT.
  */
-export async function responder({ fioId, texto }: Resposta): Promise<void> {
+export async function responder({ fioId, texto, respondeA = null }: Resposta): Promise<void> {
   const supabase = createClient();
   const { data: sessao } = await supabase.auth.getUser();
   const eu = sessao.user?.id;
@@ -210,12 +213,236 @@ export async function responder({ fioId, texto }: Resposta): Promise<void> {
     author_kind: 'human',
     sent_by: eu,
     origin: 'crm',
+    responde_a: respondeA,
   });
 
   if (error) {
     const frase = fraseDaRecusaDoEnvio(error.message);
     if (frase) throw new ErroDaConversa(frase, false, error);
     levantar(error.code, error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// O que não é texto: localização, contato, botões, lista, figurinha (27/10/2026)
+// ---------------------------------------------------------------------------
+
+export type EnvioEspecial = {
+  fioId: string;
+  tipo: Extract<MsgType, 'location' | 'contacts' | 'interactive' | 'image'>;
+  /** A pergunta dos botões e da lista; nulo para localização, contato e figurinha. */
+  corpo?: string | null;
+  conteudo?: Json | null;
+  respondeA?: string | null;
+  /** Só a figurinha reaproveitada: o arquivo que já está no balde. */
+  figurinha?: { caminho: string } | null;
+};
+
+/**
+ * Pela MESMA porta do texto: um insert em `messages`, com a sessão de quem
+ * manda. Quem confere a forma (botão de até 20 letras, lista de até 10 opções,
+ * latitude que existe) é `app.messages_forma`, e a recusa dele já vem em
+ * português ("Envio recusado: …") — `fraseDaRecusaDoEnvio` a entrega inteira.
+ * A janela de 24 h, a supressão e os tetos continuam com `messages_guard`.
+ */
+export async function enviarEspecial(envio: EnvioEspecial): Promise<void> {
+  const supabase = createClient();
+  const { data: sessao } = await supabase.auth.getUser();
+  const eu = sessao.user?.id;
+  if (!eu) throw new ErroDaConversa('Sua sessão expirou. Entre de novo para continuar.', false);
+
+  const { error } = await supabase.from('messages').insert({
+    conversation_id: envio.fioId,
+    direction: 'out',
+    type: envio.tipo,
+    status: 'queued',
+    body: envio.corpo?.trim() || null,
+    conteudo: envio.conteudo ?? null,
+    responde_a: envio.respondeA ?? null,
+    ...(envio.figurinha
+      ? { media_path: envio.figurinha.caminho, media_mime: 'image/webp', tipo_na_meta: 'sticker' }
+      : {}),
+    author_kind: 'human',
+    sent_by: eu,
+    origin: 'crm',
+  });
+  if (error) {
+    const frase = fraseDaRecusaDoEnvio(error.message);
+    if (frase) throw new ErroDaConversa(frase, false, error);
+    levantar(error.code, error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// O que se faz COM uma mensagem e com a conversa (27/10/2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * As recusas nomeadas das RPCs do WhatsApp completo, cada uma com a frase.
+ * As que chegam como `motivo: sqlerrm` (a porteira recusou dentro da RPC) são
+ * traduzidas por `fraseDaRecusaDoEnvio`, como no envio.
+ */
+export const MOTIVOS_DAS_ACOES: Record<string, string> = {
+  mensagem_inexistente: 'Esta mensagem não existe mais. Recarregue a conversa.',
+  conversa_inexistente: 'Esta conversa não existe mais. Recarregue a página.',
+  sem_permissao: 'Seu perfil não pode fazer isso nesta conversa.',
+  texto_vazio: 'Escreva o texto certo antes de mandar a correção.',
+  so_texto_do_time: 'Só se corrige texto que alguém do time escreveu.',
+  nao_saiu: 'Esta mensagem não saiu, então não há o que corrigir: mande de novo.',
+  mensagem_sem_id_na_meta:
+    'Esta mensagem ainda não saiu pelo WhatsApp. Dá para reagir depois que sair.',
+  de_1_a_5_conversas: 'Escolha de 1 a 5 conversas.',
+  nao_se_encaminha: 'Esta mensagem não se encaminha.',
+  arquivo_ausente: 'O arquivo desta mensagem não está no CRM, então não dá para encaminhar.',
+  sem_texto: 'Esta mensagem não tem texto para encaminhar.',
+  ja_tem_tres_fixadas: 'Já há 3 conversas fixadas. Desafixe uma para fixar esta.',
+};
+
+export function fraseDoMotivo(motivo: unknown): string {
+  if (typeof motivo !== 'string' || motivo === '') return 'Não deu certo. Tente de novo.';
+  return (
+    MOTIVOS_DAS_ACOES[motivo] ?? fraseDaRecusaDoEnvio(motivo) ?? 'Não deu certo. Tente de novo.'
+  );
+}
+
+type Retorno = Record<string, unknown>;
+
+/** O mesmo caminho para toda RPC daqui: exceção vira frase, `{ok:false}` também. */
+function conferir(data: unknown, error: { message: string; code?: string } | null): Retorno {
+  if (error) {
+    const frase = fraseDaRecusaDoEnvio(error.message);
+    if (frase) throw new ErroDaConversa(frase, false, error);
+    levantar(error.code, error);
+  }
+  const r = (data !== null && typeof data === 'object' ? data : {}) as Retorno;
+  if (r.ok !== true) throw new ErroDaConversa(fraseDoMotivo(r.motivo), false);
+  return r;
+}
+
+/**
+ * Apagar. A Cloud API não apaga para todos: o que já saiu some do CRM e
+ * continua no celular do contato. O que ainda estava na fila é cancelado de
+ * verdade — `cancelada: true` —, e o contato não recebe nada.
+ */
+export async function apagarMensagem(mensagemId: string): Promise<{ cancelada: boolean }> {
+  const { data, error } = await createClient().rpc('mensagem_apagar', {
+    p_message_id: mensagemId,
+  });
+  return { cancelada: conferir(data, error).cancelada === true };
+}
+
+export async function restaurarMensagem(mensagemId: string): Promise<void> {
+  const { data, error } = await createClient().rpc('mensagem_restaurar', {
+    p_message_id: mensagemId,
+  });
+  conferir(data, error);
+}
+
+/**
+ * Corrigir (o "editar" possível). Sai uma mensagem nova, "Correção: …",
+ * respondendo à original; se a original ainda estava na fila, ela é cancelada e
+ * a certa vai no lugar (`substituiu: true`).
+ */
+export async function corrigirMensagem(
+  mensagemId: string,
+  texto: string,
+): Promise<{ substituiu: boolean }> {
+  const { data, error } = await createClient().rpc('mensagem_corrigir', {
+    p_message_id: mensagemId,
+    p_texto: texto,
+  });
+  return { substituiu: conferir(data, error).substituiu === true };
+}
+
+/** Reagir; `null` tira a reação (a Meta pede emoji vazio). */
+export async function reagirAMensagem(mensagemId: string, emoji: string | null): Promise<void> {
+  const { data, error } = await createClient().rpc('mensagem_reagir', {
+    p_message_id: mensagemId,
+    // O tipo gerado diz `string`, mas a função aceita nulo: é como se tira a reação.
+    p_emoji: emoji as string,
+  });
+  conferir(data, error);
+}
+
+export type ResultadoDoEncaminhamento = { conversaId: string; ok: boolean; frase: string | null };
+
+const encaminhamentoSchema = z.array(
+  z.object({ conversation_id: z.string(), ok: z.boolean(), motivo: z.string().nullish() }),
+);
+
+/** Encaminhar para até 5 conversas; cada destino passa pela porteira dele. */
+export async function encaminharMensagem(
+  mensagemId: string,
+  conversas: readonly string[],
+): Promise<ResultadoDoEncaminhamento[]> {
+  const { data, error } = await createClient().rpc('mensagem_encaminhar', {
+    p_message_id: mensagemId,
+    p_conversas: [...conversas],
+  });
+  const r = conferir(data, error);
+  const lido = encaminhamentoSchema.safeParse(r.resultados);
+  if (!lido.success) return [];
+  return lido.data.map((x) => ({
+    conversaId: x.conversation_id,
+    ok: x.ok,
+    frase: x.ok ? null : fraseDoMotivo(x.motivo),
+  }));
+}
+
+export async function favoritarMensagem(mensagemId: string, favorita: boolean): Promise<void> {
+  const { data, error } = await createClient().rpc('mensagem_favoritar', {
+    p_message_id: mensagemId,
+    p_favorita: favorita,
+  });
+  conferir(data, error);
+}
+
+export async function fixarConversa(fioId: string, fixar: boolean): Promise<void> {
+  const { data, error } = await createClient().rpc('conversa_fixar', {
+    p_conversation_id: fioId,
+    p_fixar: fixar,
+  });
+  conferir(data, error);
+}
+
+/** `ate` nulo tira o silêncio; `'infinity'` é para sempre. */
+export async function silenciarConversa(fioId: string, ate: string | null): Promise<void> {
+  const { data, error } = await createClient().rpc('conversa_silenciar', {
+    p_conversation_id: fioId,
+    // O tipo gerado diz `string`, mas a função aceita nulo: é como se reativa.
+    p_ate: ate as string,
+  });
+  conferir(data, error);
+}
+
+export async function marcarComoNaoLida(fioId: string): Promise<void> {
+  const { data, error } = await createClient().rpc('conversa_marcar_nao_lida', {
+    p_conversation_id: fioId,
+  });
+  conferir(data, error);
+}
+
+/**
+ * Bloquear: no CRM vale na hora (nada sai, a fila do número é cancelada) e o
+ * pedido vai à Meta pelo worker. Não é opt-out: a supressão da LGPD é outra.
+ */
+export async function bloquearConversa(fioId: string, bloquear: boolean): Promise<void> {
+  const { data, error } = await createClient().rpc('conversa_bloquear', {
+    p_conversation_id: fioId,
+    p_bloquear: bloquear,
+  });
+  conferir(data, error);
+}
+
+/**
+ * "Digitando…" para o contato. Calado de propósito: se não der (janela fechada,
+ * opção desligada, rede), quem escreve não tem nada a fazer com o aviso.
+ */
+export async function avisarDigitando(fioId: string): Promise<void> {
+  try {
+    await createClient().rpc('conversa_digitando', { p_conversation_id: fioId });
+  } catch {
+    // Sinal de cortesia: a falha não interessa a ninguém.
   }
 }
 
@@ -312,12 +539,18 @@ export const BUCKET_MIDIA = 'mensagens';
  * worker estava parado quando ela chegou) e mensagem invisível respondem igual,
  * e o balão mostra a transcrição do mesmo jeito.
  */
-export async function urlDaMidia(messageId: string): Promise<string | null> {
+export async function urlDaMidia(
+  messageId: string,
+  /** O documento para BAIXAR, com o nome que o contato vê (27/10/2026). */
+  baixar = false,
+): Promise<string | null> {
   try {
     const resposta = await fetch('/api/midia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message_id: messageId }),
+      body: JSON.stringify(
+        baixar ? { message_id: messageId, baixar: true } : { message_id: messageId },
+      ),
     });
     if (!resposta.ok) return null;
     const dados = (await resposta.json()) as { ok?: boolean; url?: string };
