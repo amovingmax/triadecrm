@@ -72,7 +72,10 @@ function alvo(empresa, local) {
 /** Consulta só de leitura. */
 function consultar(empresa, local, sql) {
   const bruto = supabase(['db', 'query', ...alvo(empresa, local), sql, '--output-format', 'json']);
-  return JSON.parse(bruto.slice(bruto.indexOf('{'))).rows;
+  // A CLI devolve as linhas soltas (`[...]`) no terminal de uma pessoa e embrulhadas
+  // (`{"rows": [...]}`) quando acha que quem chama é um agente de IA (conferido em 27/10/2026).
+  const lido = JSON.parse(bruto.slice(bruto.search(/[[{]/)));
+  return Array.isArray(lido) ? lido : lido.rows;
 }
 
 /** O Postgres confere tabela e função antes de rodar: primeiro pergunta se existem. */
