@@ -7879,3 +7879,5 @@ As sessões vêm de `sessao-dev.mjs`, e não da rota `/auth/dev`, que fica fora 
 **Precisa de decisão humana:**
 - O site da Imova mostra "CRECI: 7260", que é o número do corretor. Se deve mostrar o da imobiliária, é decisão do Rafael. Não é do CRM.
 - No Cartão CNPJ, o e-mail é contato@imovaimoveis.com.br e o telefone é o (84) 9118-5097. A política continua com contato@imovaimobiliaria.com.br e o 99405-8888, que são os canais de atendimento.
+
+**Em produção (27/10/2026, 11h21):** só a Imova, de cópia limpa do `8b924de`: deploy `imova-8snmfdi8m` (volta: `imova-34b72aunc`). Houve um segundo deploy idêntico, `imova-3oa3uer96`, porque o comando foi repetido; os dois são do mesmo commit. Conferido no ar: `/privacidade` 200 sem login, com "razão social IMOVA LTDA, CNPJ 66.913.275/0001-24, CRECI-RN 9825", o endereço com Sala A e CEP 59090-000 e a versão de 27 de outubro; sem "7260" e sem KOMUNE no texto; `/meu-dia` e `/privacidade/outra` continuam pedindo login. A KOMUNE não foi republicada (`triade-71kvz5rey`).
