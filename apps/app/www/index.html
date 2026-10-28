@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Tríade</title>
+    <!--
+      O Capacitor exige um index.html na pasta do app, mas a casca abre o site direto
+      (server.url em src/ambiente.ts). Se algum dia esta página aparecer, ela só manda
+      para o Tríade do ambiente.
+    -->
+    <script src="inicio.js"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #050505;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      if (window.TRIADE_INICIO) window.location.replace(window.TRIADE_INICIO);
+    </script>
+  </body>
+</html>

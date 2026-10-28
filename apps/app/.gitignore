@@ -1,0 +1,3 @@
+# Gerados por scripts/preparar-www.ts a cada `pnpm preparar`.
+www/inicio.js
+www/fontes/

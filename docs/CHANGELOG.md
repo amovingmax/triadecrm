@@ -8214,6 +8214,7 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 
 **Continua fora do ar (não foi junto, por pedido):** a ligação pelo WhatsApp na KOMUNE (código e as migrações `20261029110000` e `20261030120000` no banco dela) e as branches locais não publicadas (concluir a conversa, ficha do cliente, cadastrar cliente, Parceiros na Imova, pedir reenvio, comando da ligação, tela de login local sem Google, app de celular).
 
+<<<<<<< HEAD
 ## 03/11/2026 (fim da tarde) — Receber ligação pelo WhatsApp na Imova: a ligação perdida na lista e o comando que abre aos clientes (branch `receber-ligacao`; RF-CON-18)
 
 **O pedido.** "Hoje eu já consigo receber ligações pelo CRM no navegador?" Não: o botão de ligar para a Imova está escondido dos clientes na Meta desde 30/10 (só a equipe liga). "Quero que você prepare isso. Receber ligações pelo CRM é uma funcionalidade crucial." Decisões do usuário: a ligação perdida aparece "na lista, para todos"; fechado nos feriados, com os pontos facultativos. O horário (seg–sex, 8h–19h) é o de 30/10.
@@ -8480,3 +8481,47 @@ Outras mudanças:
 **Pendente:**
 - o usuário conferir na Imova em produção, no computador e no iPhone (o teclado no Safari, com o diário só no `next dev`);
 - a KOMUNE e o Concluir nela, quando o usuário decidir (branch local `concluir-na-komune`).
+=======
+## 28/10/2026 — O WhatsApp da Imova entra no CRM dela (RF-CON-01; operação, sem código)
+
+O número **+55 84 99405-8888** passou a funcionar só pela Cloud API, atendido pelo Imova CRM. A Meta liberou o limite de contas do portfólio "Rafael Abreu" depois do chamado com o Cartão CNPJ, a certidão do CRECI-RN e a carta de consentimento assinada pelo gov.br.
+
+**Feito:**
+- Conta nova do WhatsApp `1138044745793411`, com o número `1348058288398842`, código por SMS e registro na Cloud API (12h25–12h35).
+- App Imova CRM (`1811710536538312`) assinado na conta.
+- Token do usuário de sistema `imova-crm` no `.env.imova`.
+- `workers wa --conectar`: 6 de 6 passos. O número foi gravado no banco da Imova, e os modelos GEN-ABR-OLA-MANHÃ/TARDE/NOITE ("Bom dia!", "Boa tarde!", "Boa noite!") foram mandados para aprovação.
+- `imova-worker-wa` no Fly, máquina `811d932b593718`, só com os 6 segredos da Imova. A chave do Resend ficou de fora, porque o aviso por e-mail ainda tem texto da KOMUNE.
+- Teste de ponta a ponta confirmado pelo usuário: as mensagens chegam no Imova CRM.
+- A KOMUNE não foi tocada: `triade-worker-wa` continua na mesma máquina e versão.
+
+**Pendente / decisão humana:**
+- Cadastrar o método de pagamento da conta. Sem ele, mensagem que a Imova inicia quase nunca chega.
+- O nome "Imova Imobiliária" ainda está em revisão na Meta.
+- Falta um modelo aprovado para a confirmação de quem pede para sair mais de 24 h depois da última conversa.
+- Tirar o texto da KOMUNE de `aviso-por-email.ts` e do log "AÇÃO HUMANA PENDENTE".
+
+## 28/10/2026 — A casca do app de celular, sem tocar no site (branch `app-celular`)
+
+Primeiro passo do app de celular (`docs/operacao/app-celular.md`). A regra, decisão do usuário: o mobile vira app, e a versão do PC não muda.
+
+**Entregue:**
+- `apps/app`: casca Capacitor 8.5.3, com os projetos nativos de Android e iPhone gerados pelo `cap add`. Escolhi a 8.5.3, de 07/10, porque a 8.6.0 saiu no mesmo dia.
+- O app abre o próprio site e se identifica ao site pela marca `TriadeApp/0.1.0` no user-agent. Ele só navega dentro das duas empresas (`src/ambiente.ts`).
+- Três ambientes: `local`, `local-android` e `producao`. Sem a variável, o ambiente é `local`, e valor desconhecido é erro.
+- A tela "Sem internet" do protótipo (`www/erro.html`) abre o Tríade de novo quando a conexão volta. O texto aprovado dizia que a tela volta "onde você estava". Ficou "o Tríade abre de novo sozinho", porque a casca não sabe que tela falhou.
+- 6 testes em `src/ambiente.test.ts`. Lint, tipos, testes e Prettier do pacote verdes.
+- **O site não mudou:** nenhum arquivo de `apps/web`, `packages` ou `supabase` foi alterado, e o `pnpm-lock.yaml` só ganhou linhas (0 removidas).
+
+**Pendente:**
+- Rodar no simulador. Este Mac não tem JDK nem Android SDK, e o Xcode completo exige atualizar o macOS (hoje 15.7.9).
+- Ícone e tela de abertura da marca.
+- Conferir a barra de status no simulador.
+- Etapas 4 a 7 do plano: login nativo, push, teste com a equipe e distribuição privada.
+
+**Precisa de decisão humana:**
+- Identificador `br.app.komune.triade` e nome "Tríade" na tela do celular. O identificador é fixo depois da primeira publicação.
+- Contas da Apple e do Google Play (Rafael).
+- Liberar o push para ler as mensagens que chegam (usuário).
+- Trecho da mensagem na tela bloqueada (Dennis).
+>>>>>>> 5f028de (Casca do app de celular em apps/app (Capacitor 8.5.3), sem tocar no site (PRD §8))

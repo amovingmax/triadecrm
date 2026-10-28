@@ -1,0 +1,28 @@
+{
+  "name": "@komune/app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "O app de celular do Tríade: casca Capacitor que abre o próprio site (KOMUNE e Imova) sem mudar a versão do computador.",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint capacitor.config.ts src scripts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "preparar": "tsx scripts/preparar-www.ts",
+    "sincronizar": "tsx scripts/preparar-www.ts && cap sync",
+    "android": "tsx scripts/preparar-www.ts && cap run android",
+    "ios": "tsx scripts/preparar-www.ts && cap run ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
