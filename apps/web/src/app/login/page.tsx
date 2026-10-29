@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
+import { entradaLocalLigada } from '@/lib/auth/entrada-local';
 import { getSession } from '@/lib/auth/session';
 import { destinoSeguro } from '@/lib/supabase/middleware';
 
@@ -23,5 +24,5 @@ export default async function PaginaLogin({ searchParams }: Props) {
   // O proxy já redireciona quem está logado; isto cobre o acesso direto em modo de desenvolvimento.
   if (await getSession()) redirect(next);
 
-  return <TelaLogin next={next} aviso={aviso} />;
+  return <TelaLogin next={next} aviso={aviso} entradaLocal={entradaLocalLigada()} />;
 }

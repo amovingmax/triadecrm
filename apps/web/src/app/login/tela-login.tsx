@@ -8,6 +8,7 @@ import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 
 import { BotaoGoogle } from './botao-google';
+import { EntradaLocal } from './entrada-local';
 import { EscadaTermica, VazamentoTermico } from './escada-termica';
 import type { AvisoAcesso } from './avisos';
 
@@ -61,7 +62,16 @@ const PASSO = 0.07;
  *  duas: se a proporção mudar, o fundo não pode ficar para trás do conteúdo. */
 const GRADE = 'lg:grid-cols-[1.15fr_1fr]';
 
-export function TelaLogin({ next, aviso }: { next: string; aviso: AvisoAcesso | null }) {
+export function TelaLogin({
+  next,
+  aviso,
+  entradaLocal = false,
+}: {
+  next: string;
+  aviso: AvisoAcesso | null;
+  /** CRM no computador, com o banco local: usuários de teste no lugar do Google. */
+  entradaLocal?: boolean;
+}) {
   const { reduzido } = useMovimento();
 
   /** Fade de um bloco na ordem de leitura. Roda uma vez, e só uma. */
@@ -171,7 +181,11 @@ export function TelaLogin({ next, aviso }: { next: string; aviso: AvisoAcesso | 
           ) : null}
 
           <motion.div {...entrada(aviso ? 4 : 3)}>
-            <BotaoGoogle next={next} rotulo={aviso?.rotuloBotao} />
+            {entradaLocal ? (
+              <EntradaLocal next={next} />
+            ) : (
+              <BotaoGoogle next={next} rotulo={aviso?.rotuloBotao} />
+            )}
           </motion.div>
 
           {/* A saída, antes de o erro acontecer. Até agora esta informação só existia
@@ -185,8 +199,17 @@ export function TelaLogin({ next, aviso }: { next: string; aviso: AvisoAcesso | 
               {...entrada(4)}
               className="mt-4 text-sm text-grafite-500 dark:text-grafite-450"
             >
-              Entre com a sua conta Google. Se o seu acesso ainda não foi liberado, peça a{' '}
-              {EMPRESA.admins.ou}.
+              {entradaLocal ? (
+                <>
+                  Este é o CRM do seu computador, com o banco de teste. O Google não funciona aqui:
+                  entre como um dos usuários de teste.
+                </>
+              ) : (
+                <>
+                  Entre com a sua conta Google. Se o seu acesso ainda não foi liberado, peça a{' '}
+                  {EMPRESA.admins.ou}.
+                </>
+              )}
             </motion.p>
           )}
         </div>
