@@ -8214,7 +8214,6 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 
 **Continua fora do ar (não foi junto, por pedido):** a ligação pelo WhatsApp na KOMUNE (código e as migrações `20261029110000` e `20261030120000` no banco dela) e as branches locais não publicadas (concluir a conversa, ficha do cliente, cadastrar cliente, Parceiros na Imova, pedir reenvio, comando da ligação, tela de login local sem Google, app de celular).
 
-<<<<<<< HEAD
 ## 03/11/2026 (fim da tarde) — Receber ligação pelo WhatsApp na Imova: a ligação perdida na lista e o comando que abre aos clientes (branch `receber-ligacao`; RF-CON-18)
 
 **O pedido.** "Hoje eu já consigo receber ligações pelo CRM no navegador?" Não: o botão de ligar para a Imova está escondido dos clientes na Meta desde 30/10 (só a equipe liga). "Quero que você prepare isso. Receber ligações pelo CRM é uma funcionalidade crucial." Decisões do usuário: a ligação perdida aparece "na lista, para todos"; fechado nos feriados, com os pontos facultativos. O horário (seg–sex, 8h–19h) é o de 30/10.
@@ -8481,7 +8480,7 @@ Outras mudanças:
 **Pendente:**
 - o usuário conferir na Imova em produção, no computador e no iPhone (o teclado no Safari, com o diário só no `next dev`);
 - a KOMUNE e o Concluir nela, quando o usuário decidir (branch local `concluir-na-komune`).
-=======
+
 ## 28/10/2026 — O WhatsApp da Imova entra no CRM dela (RF-CON-01; operação, sem código)
 
 O número **+55 84 99405-8888** passou a funcionar só pela Cloud API, atendido pelo Imova CRM. A Meta liberou o limite de contas do portfólio "Rafael Abreu" depois do chamado com o Cartão CNPJ, a certidão do CRECI-RN e a carta de consentimento assinada pelo gov.br.
@@ -8524,4 +8523,36 @@ Primeiro passo do app de celular (`docs/operacao/app-celular.md`). A regra, deci
 - Contas da Apple e do Google Play (Rafael).
 - Liberar o push para ler as mensagens que chegam (usuário).
 - Trecho da mensagem na tela bloqueada (Dennis).
->>>>>>> 5f028de (Casca do app de celular em apps/app (Capacitor 8.5.3), sem tocar no site (PRD §8))
+<<<<<<< HEAD
+=======
+
+## 29/10/2026 — O app de celular passa do Capacitor para o Expo (branch `app-celular`; PRD §8)
+
+Decisão do usuário: "quero usar o EXPO para criar o app". A casca do Capacitor precisava do Xcode neste Mac, e o Xcode pede um macOS mais novo (hoje 15.7.9). Com o Expo, o app do iPhone compila na nuvem (EAS) e o primeiro teste é no próprio iPhone, pelo Expo Go. A arquitetura combinada em 28/10 não muda: a casca abre o próprio site, e o que o app fizer de diferente entra atrás da marca `TriadeApp/<versão>`. Guia em `docs/operacao/app-celular.md`.
+
+**Entregue:**
+- **Branch rebaseada na main** (`608061e`): a casca de 28/10 virou `39a5425`. Os projetos `ios/` e `android/` do Capacitor, a pasta `www/` e o script `preparar-www.ts` saíram.
+- **`apps/app` em Expo 58.0.11 + React Native 0.88.0.** É a primeira combinação do SDK 58 com o RN final e completou duas semanas hoje. A WebView abre o site com a marca no user-agent:
+  - `navegacao.ts`: só as duas empresas abrem dentro do app. Outros sites, o login do Google, `tel:`, `mailto:` e `whatsapp:` vão para o aparelho. `javascript:`, `file:` e `data:` não abrem. `target="_blank"` da casa abre no próprio app, para não perder o login.
+  - `cor-da-barra.ts`: a faixa do relógio segue o `theme-color` que o site já troca entre claro (`#f0f8ff`) e escuro (`#0f172a`).
+  - "Sem internet" do protótipo em tela nativa: volta sozinha quando a conexão volta e, no teste local, diz onde o app procura o site.
+  - No Android, o botão voltar volta uma página. Se o iPhone encerrar a página por falta de memória, ela recarrega.
+- **Ambientes `local` e `producao`.** O `local-android` saiu, porque no Expo o app acha o Mac pelo endereço do próprio Expo. Valor desconhecido continua sendo erro.
+- **O app é um projeto pnpm à parte** (`apps/app/pnpm-workspace.yaml`, lockfile próprio, `'!apps/app'` no workspace da raiz). No mesmo workspace, o React 19.3 e o `@types/react` 19.3 do app foram para a reserva interna do pnpm (`node_modules/.pnpm/node_modules`), que pacotes do site sem dependência declarada consultam (o `cmdk`, por exemplo), e o typecheck do site quebrou com 19 erros. Separado, o `pnpm-lock.yaml` da raiz é **idêntico ao da main**, e a reserva voltou ao React 19.2.8 e ao `@types/react` 19.2.18.
+- **Site para o celular de teste** (`pnpm -C apps/app site`): um segundo `next dev` na porta 3100, preso ao endereço do Mac na rede, com o Supabase local nesse endereço (variáveis só no processo, `NEXT_DIST_DIR=.next-celular`). O `next dev` da 3000 continua igual, e nenhum arquivo de configuração do site mudou.
+- **Entrada de teste no celular** (`apps/web/src/lib/auth/entrada-local.ts` e `app/auth/dev/route.ts`, só `next dev`): a trava aceita o Supabase local também por endereço de rede privada (10.x, 172.16–31.x, 192.168.x). Nesse endereço, a rota entra ali mesmo, um papel por vez. Em produção nada muda: a trava de `NODE_ENV` vem primeiro e tem teste.
+- **CI:** trabalho novo "App de celular" com lint, tipos, testes e `expo export` para iPhone e Android, sem compilar app nem publicar nada.
+- **Verificado:** app com lint, tipos e 19 testes verdes, e `expo export` empacota iPhone (744 módulos) e Android (758). Raiz com lint, tipos e testes verdes: web 1447, workers 410, prompts 284, schema 111. Prettier limpo nos arquivos tocados.
+
+**Pendente:**
+- **O primeiro teste no iPhone.** O permissionamento desta sessão recusou ligar o site no endereço da rede. É o usuário quem roda `pnpm -C apps/app site` e `pnpm -C apps/app start` e lê o QR code com o Expo Go.
+- O `expo install --check` pede os patches 58.0.21 e RN 0.88.1, que ainda não têm duas semanas. Subir quando tiverem.
+- Ícone, tela de abertura e fonte da marca na tela "Sem internet".
+- Downloads por blob e os demais ajustes do site atrás da marca do app (etapa 2).
+- Android: teclado e borda de baixo não conferidos em aparelho.
+- Etapas 4 a 7: login nativo, push, teste com a equipe (EAS) e distribuição privada.
+
+**Precisa de decisão humana:**
+- Conta no Expo (grátis) para o EAS Build e o EAS Submit, quando chegar a hora do primeiro build. O código da casca e o certificado de assinatura ficam nos servidores do Expo. O plano grátis tem cota mensal de builds; o plano pago, se a cota apertar, é decisão do Rafael.
+- As decisões de 28/10 continuam abertas: identificador e nome, contas da Apple e do Google Play, push lendo mensagens e trecho na tela bloqueada.
+>>>>>>> 965e272 (CHANGELOG e guia do app: a casca em Expo e o teste no iPhone pelo Expo Go)
