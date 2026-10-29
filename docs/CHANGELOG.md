@@ -7975,3 +7975,58 @@ O pedido: "quero todas as funcionalidades do wpp no nosso crm, criar grupo, apag
 - **imova-worker-wa:** Fly, máquina `811d932b593718`, imagem `deployment-01M64D0JEMF394GA9SAGCTEHPJ` (volta: `deployment-01M5X0DHNSHEP6X5DHKMMMKQVS`, de `fe4d0fb`). Reiniciou em ~5 s, leu o número (GREEN) e fez os 3 "ler" que esperavam em `wa_acoes` desde 28/10. O `triade-worker-wa` da KOMUNE não foi mexido (já tinha o código).
 - **Sites:** Imova `imova-prp8bke8c` (volta: `imova-8snmfdi8m`) e KOMUNE `triade-4ce2bne1g` (volta: `triade-aj65vublh`). Nos dois: `/login` 200 com "Entrar com Google" (sem os botões de teste), `/conversas` pede login, `/auth/dev` 404; `ir.komune.app.br` continua mandando para komune.app.br.
 - **Imova:** tracinhos azuis e "digitando…" ficam ligados (padrão, como na KOMUNE); desliga-se em Ajustes → WhatsApp.
+
+## 29/10/2026 — A atitude do cliente: etiquetas de interesse e objeção na Imova (branch `etiquetas-de-atitude`; RF-CON-05, RF-CON-20)
+
+**O pedido.** "Quero essa etiqueta pra eu sempre saber quem são os clientes mais interessados", com uma regra que classifica cada pessoa "de acordo com sua própria atitude": quem entrou em contato é interessado, e a resposta seguinte mantém ou muda a etiqueta. Análise e decisões com o usuário em 29/10: os 7 níveis sugeridos, esfria em 3 dias (Muito interessado) e 7 (Interessado), as 7 objeções sugeridas, fase 1 sem IA e só na Imova. É fora do PRD; o OK foi do usuário.
+
+**Entregue:**
+- `20261029110000_a_atitude_do_cliente.sql`:
+  - Três coisas separadas. Interesse é uma etiqueta por conversa: Muito interessado, Interessado, Morno, Esfriando, Sem resposta, Sem interesse ou Não contatar. Objeção fica à parte (`objecoes`, `conversa_objecoes`). Recência não é etiqueta, é a ordem da lista.
+  - A etiqueta mora na conversa, e não na ficha, porque quase todo cliente da Imova fica em Conversas › Clientes, sem ficha. Ela é separada da temperatura e das etiquetas manuais (`tags`).
+- A regra (`app.atitude_calcular`):
+  1. Não contatar vence tudo: supressão, ficha marcada, contato bloqueado ou etapa de opt-out.
+  2. Depois vale o sinal mais novo entre o toque de quem atende e a etapa do negócio: quente dá Muito interessado, nutrição dá Morno, perdido dá Sem interesse.
+  3. A iniciativa do cliente dá Interessado: a primeira mensagem ser dele, ou ele voltar a escrever depois de 7 dias de silêncio.
+  4. Sem sinal, quem respondeu a nós fica Morno e quem não respondeu fica Sem resposta.
+  5. Esfriar só acontece quando a última mensagem é de gente do time e ficou sem resposta. Se o cliente falou por último, ele não esfria.
+- Recálculo e histórico:
+  - O `pg_cron` recalcula a cada minuto (`app.atitudes_recalcular`), só as conversas que mudaram e as que chegaram na hora de esfriar.
+  - Cada mudança vai para `atitude_historico` com o porquê em português.
+  - Nenhum gatilho em `messages` nem em `conversations`.
+- O toque e as permissões:
+  - `public.atitude_marcar` (os quatro toques; nulo devolve à regra) e `public.objecao_marcar`.
+  - Só marca quem escreve e vê a conversa (`app.posso_mexer_na_conversa`); quem não vê a conversa não lê a etiqueta (RLS por `app.conversa_visivel`).
+- **Só da Imova** (pedido do usuário, 29/10: "essas etiquetas devem servir somente para Imova. A KOMUNE já tem as dela"):
+  - No banco, `app.atitude_config` só liga onde `app.identidade` é "imova". Na KOMUNE ela fica desligada mesmo com a chave gravada à força; o toque e a objeção são recusados e o recálculo não faz nada.
+  - A chave `app_settings['atitude']`, as 7 objeções e o job `atitudes_recalcular` do `pg_cron` saíram da migração e moram no seed da Imova. A autoverificação do seed confere os três.
+  - Na tela, o módulo `atitudeDoCliente` existe só na Imova (`packages/schema/src/empresas.ts`). Na KOMUNE a tela não faz consulta nenhuma à atitude.
+  - **No banco da KOMUNE a migração não cria nada** (pedido do usuário, 29/10: "nada do CRM da Komune deve ser alterado agora nessa questão de etiquetas"). O corpo roda dentro de um bloco que olha `app.identidade` e sai quando ela é "komune"; fica só o registro da versão, para as migrações seguintes andarem na ordem. Nenhuma tabela, função, política, chave ou job. As etiquetas da KOMUNE (`tags`) não mudam.
+  - No banco da Imova, e num banco ainda sem identidade (o `db reset` local e o CI, onde a identidade só é gravada pelo seed, depois das migrações), tudo é criado. Por isso o pgTAP 117 roda no CI e não roda num banco local da KOMUNE que já tinha identidade quando recebeu a migração.
+  - Na tela, a KOMUNE também ignora o `?ordem=interesse` do endereço.
+- Tela (Conversas):
+  - A etiqueta e a objeção aparecem na linha da lista (abas Conversas, Consultoria e Clientes) e no topo da conversa (parceiro e cliente; no celular, na folha do "⋯").
+  - O menu da etiqueta mostra o porquê, os quatro toques, "Deixar a regra decidir", as objeções e as últimas mudanças.
+  - A ordem "Recentes · Mais interessados" (`?ordem=interesse`) fica em Conversas e Clientes. Dentro da mesma etiqueta vale a ordem de sempre, e as fixadas continuam em cima.
+- `database.types.ts`: só as tabelas e funções novas, no formato do arquivo.
+
+**Verificado:**
+- pgTAP `117_a_atitude_do_cliente` (44 asserções) cobre: a trava no banco da KOMUNE, cada etiqueta, esfriar e voltar, o toque, a volta sozinho, a etapa, a supressão, as permissões, a objeção e o WhatsApp intocado (nenhuma mensagem de saída, nada em `wa_outbound`, conversa igual).
+- Bateria inteira num banco limpo: antes e depois da migração falham só os mesmos três arquivos de antes (`74`, `107` e `114`, que já falhavam no `origin/main`).
+- Vitest (2.256), lint e typecheck verdes.
+- Ensaio no banco local da Imova com seis conversas fictícias, uma por etiqueta, e fotos no Chrome:
+  - PC 1440×900 e celular 390×844, sem estouro de largura e sem erro no console;
+  - o toque muda a etiqueta e a ordem na hora.
+- O ensaio achou um defeito, já corrigido: a linha que nascia só com o toque não voltava ao recálculo.
+
+**Pendente:**
+- Publicar, só com pedido: a migração (Imova primeiro, depois KOMUNE, pelo `publicar-banco.mjs`), o seed da Imova de novo (liga, traz as objeções e agenda o recálculo) e os dois sites.
+- Conferido no localhost lado a lado:
+  - no banco local da KOMUNE, a migração rodou de verdade e criou zero objetos (só o aviso);
+  - num banco sem identidade, ela criou os 22 objetos, o 117 passou e a bateria ficou igual à linha de base;
+  - a tela da KOMUNE (porta 3031) abre Conversas e Clientes sem a linha "Ordem", sem etiqueta de atitude, com zero consultas à atitude e sem erro, e tira `?ordem=interesse` do endereço;
+  - a Imova (3030) mostra tudo.
+- Ao publicar, **só a Imova** precisa ir agora: migração no banco dela, o seed dela e o site dela. A KOMUNE não precisa de nada. Quando a KOMUNE receber a próxima migração, esta passa junto sem criar nada; o site dela leva o código, desligado.
+- Fase 2: a IA lê a mensagem do cliente e sugere o toque e a objeção. Precisa de chave e worker de IA para a Imova e de instruções de imobiliária, porque as 25 intenções de hoje são da KOMUNE.
+- Ajustes → Catálogos ainda não edita as objeções (por enquanto só pelo seed).
+- "Muito interessado esperando resposta" no Meu dia e o relatório das objeções do mês ficaram para depois.
