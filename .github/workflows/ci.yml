@@ -167,3 +167,68 @@ jobs:
       - name: Derrubar a stack
         if: always()
         run: supabase stop --no-backup
+
+  # --------------------------------------------------------------------------
+  # 3) App de celular (apps/app): projeto pnpm à parte, com lockfile próprio
+  #    (ver apps/app/pnpm-workspace.yaml), por isso fora do `pnpm -r` da raiz.
+  #    Só confere o código e empacota o JavaScript: não compila app nem publica nada.
+  # --------------------------------------------------------------------------
+  app:
+    name: App de celular — lint, tipos, testes e empacotamento
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar o pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Instalar o Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            apps/app/pnpm-lock.yaml
+
+      - name: Instalar as dependências (lockfiles congelados)
+        id: dependencias
+        # A raiz entra pelo ESLint: o app usa a mesma configuração e o mesmo binário.
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm -C apps/app install --frozen-lockfile
+
+      - name: Lint
+        id: lint
+        run: pnpm -C apps/app lint
+
+      - name: Tipos
+        id: tipos
+        run: pnpm -C apps/app typecheck
+
+      - name: Testes (Vitest)
+        id: testes
+        run: pnpm -C apps/app test
+
+      - name: Empacotar para iPhone e Android (Metro)
+        id: empacotar
+        run: pnpm -C apps/app exec expo export --platform all --output-dir "$RUNNER_TEMP/app-export"
+
+      - name: O que quebrou
+        if: failure()
+        run: |
+          {
+            echo '### CI vermelho — App de celular'
+            echo ''
+            echo '| passo | resultado | como reproduzir |'
+            echo '| --- | --- | --- |'
+            echo '| dependências | ${{ steps.dependencias.outcome || 'não chegou a rodar' }} | `pnpm -C apps/app install --frozen-lockfile` — se acusar lockfile desatualizado, rode `pnpm -C apps/app install` e faça commit do `apps/app/pnpm-lock.yaml` |'
+            echo '| lint | ${{ steps.lint.outcome || 'não chegou a rodar' }} | `pnpm -C apps/app lint` |'
+            echo '| tipos | ${{ steps.tipos.outcome || 'não chegou a rodar' }} | `pnpm -C apps/app typecheck` |'
+            echo '| testes | ${{ steps.testes.outcome || 'não chegou a rodar' }} | `pnpm -C apps/app test` |'
+            echo '| empacotar | ${{ steps.empacotar.outcome || 'não chegou a rodar' }} | `pnpm -C apps/app exec expo export --platform all` |'
+          } >> "$GITHUB_STEP_SUMMARY"

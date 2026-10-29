@@ -2,6 +2,10 @@
 packages:
   - apps/*
   - packages/*
+  # O app de celular instala sozinho, com lockfile próprio (apps/app/pnpm-workspace.yaml).
+  # Ele usa outro React (o do React Native), e dentro deste workspace o pnpm passava
+  # essa versão para a reserva interna que o site também consulta.
+  - '!apps/app'
 
 # Versões compartilhadas (pnpm catalogs): os pacotes declaram "catalog:" e a versão
 # fica fechada aqui, em um único lugar, para web, workers e packages não divergirem.

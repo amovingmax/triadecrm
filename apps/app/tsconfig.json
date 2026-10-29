@@ -1,7 +1,15 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "expo/tsconfig.base.json",
   "compilerOptions": {
+    // As mesmas travas do tsconfig.base.json da raiz. Copiadas, e não herdadas: o
+    // app é um projeto à parte, e o Metro não enxerga arquivo fora de apps/app.
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
-  "include": ["capacitor.config.ts", "src", "scripts", "vitest.config.ts"]
+  "include": ["app.config.ts", "index.ts", "src", "scripts", "vitest.config.ts"]
 }

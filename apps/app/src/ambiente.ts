@@ -1,26 +1,28 @@
-import type { CapacitorConfig } from '@capacitor/cli';
-
 /**
  * De onde o app abre o Tríade, e o que ele deixa a casca fazer.
  *
- * O app é uma casca nativa (Capacitor) que abre o PRÓPRIO SITE: as mesmas telas, o
+ * O app é uma casca nativa (Expo) que abre o PRÓPRIO SITE: as mesmas telas, o
  * mesmo login, as mesmas permissões. Nada da versão do computador muda por causa dele
  * (decisão do usuário em 28/10/2026). Tudo que o app fizer de diferente no site entra
  * atrás da marca `TriadeApp/<versão>`, que a casca acrescenta ao user-agent: sem ela,
  * no navegador do PC ou do celular, o site segue exatamente como está.
  *
- * TRÊS AMBIENTES, escolhidos por `TRIADE_APP_AMBIENTE`:
- *   · `local`         o `next dev` deste Mac, visto pelo simulador do iPhone;
- *   · `local-android` o mesmo servidor, visto pelo emulador do Android, que enxerga o
- *                     Mac em 10.0.2.2, e não em localhost;
- *   · `producao`      o Tríade no ar.
+ * DOIS AMBIENTES, escolhidos por `TRIADE_APP_AMBIENTE` quando o Expo lê o
+ * `app.config.ts`:
+ *   · `local`    o site deste Mac, aberto pelo celular na mesma rede Wi-Fi. O app
+ *                acha o Mac pelo endereço de onde o próprio Expo o serve (`hostUri`),
+ *                e o site para o celular roda na porta 3100 (`pnpm -C apps/app site`);
+ *   · `producao` o Tríade no ar.
  * Sem a variável é `local`: um app de teste nunca aponta para a produção por descuido.
  * Valor desconhecido é erro, nunca "cai" num ambiente em silêncio (como `empresaPorSlug`).
+ *
+ * Este arquivo não importa nada do React Native: roda igual no `app.config.ts`, na
+ * casca e nos testes do Vitest.
  */
 
-export type AmbienteDoApp = 'local' | 'local-android' | 'producao';
+export type AmbienteDoApp = 'local' | 'producao';
 
-const AMBIENTES: readonly AmbienteDoApp[] = ['local', 'local-android', 'producao'];
+const AMBIENTES: readonly AmbienteDoApp[] = ['local', 'producao'];
 
 /** O identificador do app nas lojas. Fixo para sempre depois da primeira publicação. */
 export const ID_DO_APP = 'br.app.komune.triade';
@@ -30,6 +32,9 @@ export const VERSAO_DA_CASCA = '0.1.0';
 
 /** O que o site procura no user-agent para saber que está dentro do app. */
 export const MARCA_DO_APP = 'TriadeApp';
+
+/** O que a casca acrescenta ao user-agent do aparelho. */
+export const MARCA_NO_USER_AGENT = `${MARCA_DO_APP}/${VERSAO_DA_CASCA}`;
 
 /**
  * Os endereços no ar (memória "Endereços do CRM"). A KOMUNE é a porta de entrada; a
@@ -41,7 +46,14 @@ export const ENDERECOS = {
 } as const;
 
 /** O fundo escuro do Tríade (o `themeColor` do site), para a abertura não piscar branco. */
-const FUNDO = '#0f172a';
+export const FUNDO = '#0f172a';
+
+/**
+ * A porta do site para o celular (`scripts/site-na-rede.ts`). Não é a 3000 porque o
+ * `next dev` de sempre continua lá, com o Supabase em 127.0.0.1, que o celular não
+ * alcança.
+ */
+export const PORTA_DO_SITE_NA_REDE = 3100;
 
 export function ambienteDoApp(valor: string | undefined | null): AmbienteDoApp {
   const chave = (valor ?? '').trim() || 'local';
@@ -51,47 +63,54 @@ export function ambienteDoApp(valor: string | undefined | null): AmbienteDoApp {
   return chave as AmbienteDoApp;
 }
 
-/** O endereço que a casca abre ao ligar. */
-export function enderecoInicial(ambiente: AmbienteDoApp): string {
-  switch (ambiente) {
-    case 'local':
-      return 'http://localhost:3000';
-    case 'local-android':
-      return 'http://10.0.2.2:3000';
-    case 'producao':
-      return ENDERECOS.komune;
+/**
+ * Esquema e host de um endereço, sem `new URL`: o `URL` do React Native não
+ * implementa `host` em todas as versões, e esta conta precisa dar o mesmo resultado
+ * no aparelho e no teste. A porta padrão (443 no https, 80 no http) some, como no
+ * navegador; o que vem antes de `@` (usuário e senha) não é host.
+ */
+export function partesDoEndereco(endereco: string): { esquema: string; host: string } | null {
+  const achado = /^([a-z][a-z0-9+.-]*):(?:\/\/([^/?#]*))?/i.exec(endereco.trim());
+  if (!achado) return null;
+  const esquema = achado[1]!.toLowerCase();
+  let host = (achado[2] ?? '').split('@').pop()!.toLowerCase();
+  if (
+    (esquema === 'https' && host.endsWith(':443')) ||
+    (esquema === 'http' && host.endsWith(':80'))
+  ) {
+    host = host.slice(0, host.lastIndexOf(':'));
   }
+  return { esquema, host };
 }
 
 /**
- * Para onde a casca deixa navegar sem sair para o navegador do aparelho: as duas
- * empresas e, no teste, o servidor deste Mac. O login com Google NÃO entra aqui: o
- * Google recusa login dentro de WebView (`disallowed_useragent`), e o login do app
- * vai ser nativo (etapa 4 do plano, `docs/operacao/app-celular.md`).
+ * O Mac, como o celular o enxerga: o mesmo endereço de onde o Expo serve o app
+ * (`hostUri`, por exemplo "10.0.0.188:8081"). Sem ele (o simulador do iPhone, que
+ * divide a rede com o Mac), é `localhost`.
  */
-export function hostsPermitidos(ambiente: AmbienteDoApp): string[] {
-  const empresas = Object.values(ENDERECOS).map((url) => new URL(url).host);
-  if (ambiente === 'producao') return empresas;
-  return [...empresas, new URL(enderecoInicial(ambiente)).host];
+export function hostDoMac(hostUri: string | null | undefined): string {
+  return (hostUri ?? '').split(':')[0]!.trim() || 'localhost';
 }
 
-export function montarConfig(ambiente: AmbienteDoApp): CapacitorConfig {
-  return {
-    appId: ID_DO_APP,
-    appName: 'Tríade',
-    // Só a tela de "sem conexão" e a de abertura moram no app; o resto é o site.
-    webDir: 'www',
-    backgroundColor: FUNDO,
-    appendUserAgent: `${MARCA_DO_APP}/${VERSAO_DA_CASCA}`,
-    server: {
-      url: enderecoInicial(ambiente),
-      // http só no teste, contra o `next dev` deste Mac. No ar, só https.
-      cleartext: ambiente !== 'producao',
-      allowNavigation: hostsPermitidos(ambiente),
-      errorPath: 'erro.html',
-    },
-    android: {
-      allowMixedContent: false,
-    },
-  };
+export type RegrasDaCasca = {
+  /** O endereço que a casca abre ao ligar. */
+  inicio: string;
+  /**
+   * Para onde a casca deixa navegar sem sair para o navegador do aparelho: as duas
+   * empresas e, no teste, o site deste Mac. O login com Google NÃO entra aqui: o
+   * Google recusa login dentro de WebView (`disallowed_useragent`), e o login do app
+   * vai ser nativo (etapa 4 do plano, `docs/operacao/app-celular.md`).
+   */
+  hosts: string[];
+  /** No ar, só https. No teste, o site do Mac é http. */
+  soHttps: boolean;
+};
+
+export function regrasDaCasca(ambiente: AmbienteDoApp, hostUri?: string | null): RegrasDaCasca {
+  const empresas = Object.values(ENDERECOS).map((url) => partesDoEndereco(url)!.host);
+  if (ambiente === 'producao') {
+    return { inicio: ENDERECOS.komune, hosts: empresas, soHttps: true };
+  }
+  const site = `${hostDoMac(hostUri)}:${PORTA_DO_SITE_NA_REDE}`;
+  return { inicio: `http://${site}`, hosts: [...empresas, site], soHttps: false };
 }

@@ -1,3 +1,7 @@
-# Gerados por scripts/preparar-www.ts a cada `pnpm preparar`.
-www/inicio.js
-www/fontes/
+# Cache do Expo e saída do `expo export`.
+.expo/
+dist/
+# Os projetos nativos nascem do app.config.ts a cada build (Continuous Native
+# Generation do Expo): nunca editados à mão, nunca no git.
+/ios/
+/android/

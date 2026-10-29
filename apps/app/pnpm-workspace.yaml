@@ -1,0 +1,21 @@
+# O app de celular é um projeto pnpm à parte, com lockfile próprio (apps/app/pnpm-lock.yaml).
+#
+# Por quê: o app usa o React do React Native (19.3), e o site, o do Next (19.2). No mesmo
+# workspace, o pnpm punha o React e os tipos do app na reserva interna
+# (node_modules/.pnpm/node_modules), que pacotes do site sem dependência declarada
+# consultam: o typecheck do site quebrou em 29/10/2026. Separado, o lockfile da raiz e
+# tudo que o site resolve ficam exatamente como na main.
+#
+# Instalar: `pnpm -C apps/app install` (a raiz não instala o app).
+packages:
+  - '.'
+
+# As mesmas travas do .npmrc da raiz, que não vale aqui.
+engineStrict: true
+autoInstallPeers: true
+strictPeerDependencies: false
+
+# Como na raiz: o pnpm 11 bloqueia scripts de pós-instalação; só o esbuild (do tsx)
+# roda o dele, que valida o binário nativo.
+allowBuilds:
+  esbuild: true

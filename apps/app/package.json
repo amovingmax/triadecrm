@@ -2,27 +2,36 @@
   "name": "@komune/app",
   "version": "0.1.0",
   "private": true,
-  "description": "O app de celular do Tríade: casca Capacitor que abre o próprio site (KOMUNE e Imova) sem mudar a versão do computador.",
+  "description": "O app de celular do Tríade: casca Expo que abre o próprio site (KOMUNE e Imova) sem mudar a versão do computador.",
   "type": "module",
+  "main": "index.ts",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=11"
+  },
   "scripts": {
-    "lint": "eslint capacitor.config.ts src scripts",
+    "lint": "../../node_modules/.bin/eslint app.config.ts index.ts src scripts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "preparar": "tsx scripts/preparar-www.ts",
-    "sincronizar": "tsx scripts/preparar-www.ts && cap sync",
-    "android": "tsx scripts/preparar-www.ts && cap run android",
-    "ios": "tsx scripts/preparar-www.ts && cap run ios"
+    "site": "tsx scripts/site-na-rede.ts",
+    "start": "expo start"
   },
   "dependencies": {
-    "@capacitor/android": "8.5.3",
-    "@capacitor/core": "8.5.3",
-    "@capacitor/ios": "8.5.3"
+    "@react-native-community/netinfo": "12.0.1",
+    "expo": "58.0.11",
+    "expo-constants": "58.0.12",
+    "react": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-safe-area-context": "5.10.1",
+    "react-native-svg": "15.16.0",
+    "react-native-webview": "14.0.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "8.5.3",
-    "@types/node": "catalog:",
-    "tsx": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "@types/node": "22.20.1",
+    "@types/react": "19.3.0",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
   }
 }
