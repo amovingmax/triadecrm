@@ -7968,3 +7968,10 @@ O pedido: "quero todas as funcionalidades do wpp no nosso crm, criar grupo, apag
 - Vai junto o login local sem Google (`1d1af4c`), que não muda nada em produção.
 
 **Pendente:** publicar, só com pedido. O site da Imova ainda não tem o WhatsApp completo (sai só da main) e o `imova-worker-wa` roda a imagem de `fe4d0fb`, de antes dele: sem republicar o motor da Imova, lá a correção sairia sem citar a original e reações, lidas e "digitando" ficariam paradas na fila `wa_acoes`. A branch `correcao-de-mensagem` (o modelo próprio, de antes de achar o WhatsApp completo) fica superada.
+
+**Em produção (29/10/2026, entre 14h55 e 15h05), a pedido do usuário ("Pode efetuar as mudanças"):** de cópia limpa de `d8e4d4d`, conferido antes que o código do ar das duas empresas (`caf7cb6` na KOMUNE, `8b924de` na Imova) estava contido nele.
+- **main:** `97c1f61 → d8e4d4d` (fast-forward: o WhatsApp completo entra na main, com o negrito e o login local).
+- **Banco:** `20261029100000` pelo `publicar-banco.mjs`, Imova e depois KOMUNE (165 migrações nas duas). Conferido nos dois que `mensagem_corrigir` grava "*Correção:* " e não mais "_Correção:_ ".
+- **imova-worker-wa:** Fly, máquina `811d932b593718`, imagem `deployment-01M64D0JEMF394GA9SAGCTEHPJ` (volta: `deployment-01M5X0DHNSHEP6X5DHKMMMKQVS`, de `fe4d0fb`). Reiniciou em ~5 s, leu o número (GREEN) e fez os 3 "ler" que esperavam em `wa_acoes` desde 28/10. O `triade-worker-wa` da KOMUNE não foi mexido (já tinha o código).
+- **Sites:** Imova `imova-prp8bke8c` (volta: `imova-8snmfdi8m`) e KOMUNE `triade-4ce2bne1g` (volta: `triade-aj65vublh`). Nos dois: `/login` 200 com "Entrar com Google" (sem os botões de teste), `/conversas` pede login, `/auth/dev` 404; `ir.komune.app.br` continua mandando para komune.app.br.
+- **Imova:** tracinhos azuis e "digitando…" ficam ligados (padrão, como na KOMUNE); desliga-se em Ajustes → WhatsApp.
