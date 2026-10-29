@@ -54,6 +54,12 @@ export interface Empresa {
     plataformaKomune: boolean;
     /** Leitura da IA, resumos e rascunhos: usam a base de conhecimento da empresa. */
     ia: boolean;
+    /**
+     * Etiquetas de atitude do cliente (interesse e objeção) e a ordem "Mais
+     * interessados" em Conversas (29/10/2026). Só da Imova: a KOMUNE tem as dela.
+     * O banco também trava: a regra só liga no banco da Imova.
+     */
+    atitudeDoCliente: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -96,7 +102,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
     tipos: { fornecedor: 'Fornecedor', produtor: 'Produtor', cerimonialista: 'Cerimonialista' },
     gruposDeCategoria: {},
     origens: null,
-    modulos: { plataformaKomune: true, ia: true },
+    modulos: { plataformaKomune: true, ia: true, atitudeDoCliente: false },
     privacidade: null,
   },
   imova: {
@@ -122,7 +128,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       },
       padrao: 'numa lista de contatos da Imova Imobiliária',
     },
-    modulos: { plataformaKomune: false, ia: false },
+    modulos: { plataformaKomune: false, ia: false, atitudeDoCliente: true },
     privacidade: {
       controlador: 'Imova Imobiliária',
       registro: 'razão social IMOVA LTDA, CNPJ 66.913.275/0001-24, CRECI-RN 9825',

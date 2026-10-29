@@ -135,6 +135,24 @@ export type Database = {
         Returns: number
       }
       atendimento_liga: { Args: { p_chave: string }; Returns: boolean }
+      atitude_calcular: {
+        Args: { p_agora?: string; p_conversation_id: string }
+        Returns: {
+          antes_de_esfriar: string
+          decai_em: string
+          desde: string
+          etiqueta: string
+          motivo: string
+        }[]
+      }
+      atitude_config: { Args: never; Returns: Json }
+      atitude_dia: { Args: { p_em: string }; Returns: string }
+      atitude_gravar: {
+        Args: { p_agora?: string; p_conversation_id: string; p_por?: string }
+        Returns: undefined
+      }
+      atitude_rotulo: { Args: { p_etiqueta: string }; Returns: string }
+      atitudes_recalcular: { Args: { p_limite?: number }; Returns: number }
       ausencia_responder: { Args: { p_message_id: string }; Returns: Json }
       aviso_da_conversa: {
         Args: { p_ate?: string; p_conversation_id: string }
@@ -1789,6 +1807,136 @@ export type Database = {
           },
         ]
       }
+      atitude_historico: {
+        Row: {
+          conversation_id: string
+          de: string | null
+          em: string
+          id: number
+          motivo: string
+          para: string | null
+          por: string | null
+          tipo: string
+        }
+        Insert: {
+          conversation_id: string
+          de?: string | null
+          em?: string
+          id?: never
+          motivo: string
+          para?: string | null
+          por?: string | null
+          tipo: string
+        }
+        Update: {
+          conversation_id?: string
+          de?: string | null
+          em?: string
+          id?: never
+          motivo?: string
+          para?: string | null
+          por?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atitude_historico_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atitude_historico_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "atitude_historico_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atitude_historico_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atitudes: {
+        Row: {
+          antes_de_esfriar: string | null
+          calculada_em: string
+          conversation_id: string
+          decai_em: string | null
+          desde: string
+          etiqueta: string | null
+          marcada: string | null
+          marcada_em: string | null
+          marcada_por: string | null
+          motivo: string | null
+        }
+        Insert: {
+          antes_de_esfriar?: string | null
+          calculada_em?: string
+          conversation_id: string
+          decai_em?: string | null
+          desde?: string
+          etiqueta?: string | null
+          marcada?: string | null
+          marcada_em?: string | null
+          marcada_por?: string | null
+          motivo?: string | null
+        }
+        Update: {
+          antes_de_esfriar?: string | null
+          calculada_em?: string
+          conversation_id?: string
+          decai_em?: string | null
+          desde?: string
+          etiqueta?: string | null
+          marcada?: string | null
+          marcada_em?: string | null
+          marcada_por?: string | null
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atitudes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atitudes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "atitudes_marcada_por_fkey"
+            columns: ["marcada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atitudes_marcada_por_fkey"
+            columns: ["marcada_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audio_assets: {
         Row: {
           context: string | null
@@ -3087,6 +3235,83 @@ export type Database = {
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversa_objecoes: {
+        Row: {
+          conversation_id: string
+          marcada_em: string
+          marcada_por: string | null
+          objecao_id: number
+          resolvida_em: string | null
+          resolvida_por: string | null
+        }
+        Insert: {
+          conversation_id: string
+          marcada_em?: string
+          marcada_por?: string | null
+          objecao_id: number
+          resolvida_em?: string | null
+          resolvida_por?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          marcada_em?: string
+          marcada_por?: string | null
+          objecao_id?: number
+          resolvida_em?: string | null
+          resolvida_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversa_objecoes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_objecoes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_confirmacoes_devidas"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "conversa_objecoes_marcada_por_fkey"
+            columns: ["marcada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_objecoes_marcada_por_fkey"
+            columns: ["marcada_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_objecoes_objecao_id_fkey"
+            columns: ["objecao_id"]
+            isOneToOne: false
+            referencedRelation: "objecoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_objecoes_resolvida_por_fkey"
+            columns: ["resolvida_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversa_objecoes_resolvida_por_fkey"
+            columns: ["resolvida_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
             referencedColumns: ["id"]
           },
         ]
@@ -5411,6 +5636,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      objecoes: {
+        Row: {
+          ativa: boolean
+          id: number
+          nome: string
+          posicao: number
+          slug: string
+        }
+        Insert: {
+          ativa?: boolean
+          id?: never
+          nome: string
+          posicao?: number
+          slug: string
+        }
+        Update: {
+          ativa?: boolean
+          id?: never
+          nome?: string
+          posicao?: number
+          slug?: string
+        }
+        Relationships: []
       }
       organization_categories: {
         Row: {
@@ -8961,6 +9210,10 @@ export type Database = {
       }
       assumir_conversa: { Args: { p_conversation_id: string }; Returns: Json }
       atendimento_configurar: { Args: { p: Json }; Returns: Json }
+      atitude_marcar: {
+        Args: { p_conversation_id: string; p_etiqueta: string }
+        Returns: Json
+      }
       aviso_ligacao_cancelar: { Args: { p_attempt_id: string }; Returns: Json }
       aviso_ligacao_situacao: { Args: { p_attempt_id: string }; Returns: Json }
       cadencia_do_parceiro: {
@@ -9508,6 +9761,14 @@ export type Database = {
       }
       negocios_para_cadencia: {
         Args: { p_cadence_slug: string; p_limit?: number; p_q?: string }
+        Returns: Json
+      }
+      objecao_marcar: {
+        Args: {
+          p_aberta?: boolean
+          p_conversation_id: string
+          p_objecao_id: number
+        }
         Returns: Json
       }
       origem_dos_dados: { Args: { p_organization_id: string }; Returns: Json }

@@ -495,6 +495,37 @@ update public.channel_windows set note = 'Expediente (horário provisório; a Im
  where note like 'Expediente da KOMUNE%';
 
 -- =====================================================================
+-- 12c. A atitude do cliente (29/10/2026): só da Imova. A chave, as objeções e
+--      o recálculo de minuto em minuto moram aqui, e não na migração, para
+--      não existirem na KOMUNE. Prazos de esfriar aprovados pelo usuário:
+--      3 dias para Muito interessado, 7 para Interessado. A IA entra depois.
+-- =====================================================================
+insert into public.app_settings (key, value, description) values
+  ('atitude',
+   '{"ligada": true,
+     "esfria_em_dias": {"muito_interessado": 3, "interessado": 7},
+     "volta_sozinho_em_dias": 7}'::jsonb,
+   'Etiquetas de atitude do cliente (interesse e objeção), só da Imova. ligada: a regra roda e a tela mostra. esfria_em_dias: quantos dias sem responder a uma mensagem do time até virar Esfriando. volta_sozinho_em_dias: quantos dias de silêncio fazem uma mensagem do cliente contar como "voltou por conta própria".')
+on conflict (key) do update set value = excluded.value, description = excluded.description;
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('atitudes_recalcular', '* * * * *',
+                          $cron$select app.atitudes_recalcular(500)$cron$);
+  end if;
+end $$;
+insert into public.objecoes (slug, nome, posicao, ativa) values
+  ('preco',                   'Preço',                   1, true),
+  ('localizacao',             'Localização',             2, true),
+  ('financiamento',           'Financiamento',           3, true),
+  ('imovel_nao_atende',       'Imóvel não atende',       4, true),
+  ('decide_com_outra_pessoa', 'Decide com outra pessoa', 5, true),
+  ('prazo',                   'Prazo',                   6, true),
+  ('ja_tem_corretor',         'Já tem corretor',         7, true)
+on conflict (slug) do update
+  set nome = excluded.nome, posicao = excluded.posicao, ativa = excluded.ativa;
+
+-- =====================================================================
 -- 13. Autoverificação. Qualquer falta aborta com o nome do problema.
 -- =====================================================================
 do $$
@@ -516,6 +547,16 @@ begin
   select coalesce(cardinality(app.validar_roteiro(arvore)), 0) into n_err
     from public.call_scripts where slug = 'imova_v1' and is_published;
 
+  if not coalesce((app.atitude_config() ->> 'ligada')::boolean, false) then
+    raise exception 'seed imova: a atitude do cliente ficou desligada';
+  end if;
+  if (select count(*) from public.objecoes where ativa) < 7 then
+    raise exception 'seed imova: esperadas 7 objeções ativas';
+  end if;
+  if exists (select 1 from pg_namespace where nspname = 'cron')
+     and not exists (select 1 from cron.job where jobname = 'atitudes_recalcular') then
+    raise exception 'seed imova: o recálculo da atitude do cliente não ficou agendado';
+  end if;
   if n_cat <> 7 then raise exception 'seed imova: esperadas 7 categorias ativas, encontradas %', n_cat; end if;
   if n_pipe <> 2 then raise exception 'seed imova: esperados 2 funis, encontrados %', n_pipe; end if;
   if n_lost <> 7 then raise exception 'seed imova: esperados 7 motivos de perda, encontrados %', n_lost; end if;
