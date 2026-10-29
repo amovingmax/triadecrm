@@ -7956,3 +7956,15 @@ O pedido: "quero todas as funcionalidades do wpp no nosso crm, criar grupo, apag
 - Primeiro uso de verdade: reagir, citar, documento, localização, bloquear e a foto do perfil, com o número da KOMUNE.
 - A lista da aba Clientes ainda não ordena por fixada nem mostra silenciada; a conversa aberta tem o menu.
 - O teste `107` precisa ser atualizado para o SDR com poder de gestor.
+
+## 29/10/2026 — "Correção:" em negrito (branch `correcao-em-negrito`, sobre `whatsapp-completo`; RF-CON-05)
+
+**O pedido.** "A única mudança que quero que aconteça é que a palavra 'correção' esteja em negrito e não em itálico." O "Corrigir" do menu da mensagem (WhatsApp completo, 27/10) mandava "_Correção:_", que o WhatsApp mostra em itálico.
+
+**Entregue:**
+- `20261029100000_a_correcao_em_negrito.sql`: `public.mensagem_corrigir` igual à de 27/10, só com "*Correção:*" (negrito) no lugar de "_Correção:_". As correções que já saíram ficam como estão.
+- `conteudo.ts`: `PREFIXO_DA_CORRECAO` reconhece os dois rótulos, para as correções antigas continuarem aparecendo como correção no CRM e na busca.
+- Testes: `116_o_whatsapp_completo` (49 pgTAP) espera o negrito; `conteudo.test.ts` cobre os dois rótulos. Conferido no localhost com o worker e o dublê da Graph: a correção sai "*Janio:*", quebra de linha, "*Correção:* …", com `context.message_id` da original.
+- Vai junto o login local sem Google (`1d1af4c`), que não muda nada em produção.
+
+**Pendente:** publicar, só com pedido. O site da Imova ainda não tem o WhatsApp completo (sai só da main) e o `imova-worker-wa` roda a imagem de `fe4d0fb`, de antes dele: sem republicar o motor da Imova, lá a correção sairia sem citar a original e reações, lidas e "digitando" ficariam paradas na fila `wa_acoes`. A branch `correcao-de-mensagem` (o modelo próprio, de antes de achar o WhatsApp completo) fica superada.

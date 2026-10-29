@@ -243,6 +243,8 @@ describe('o resumo de uma mensagem numa linha', () => {
   };
 
   it('tira a assinatura e o "Correção:" da frente', () => {
+    expect(textoSemMarcas('*Ana:*\n*Correção:* Amanhã às 16h')).toBe('Amanhã às 16h');
+    // As que saíram antes de 29/10/2026, em itálico.
     expect(textoSemMarcas('*Ana:*\n_Correção:_ Amanhã às 16h')).toBe('Amanhã às 16h');
     expect(resumoDaMensagem({ ...base, texto: '*Ana:*\nOi, tudo bem?' })).toBe('Oi, tudo bem?');
   });

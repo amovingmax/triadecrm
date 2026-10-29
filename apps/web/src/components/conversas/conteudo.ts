@@ -350,8 +350,12 @@ export function separarAssinatura(texto: string): { nome: string | null; resto: 
   return { nome: achado[1], resto: texto.slice(achado[0].length) };
 }
 
-/** O prefixo que `mensagem_corrigir` põe na correção. */
-export const PREFIXO_DA_CORRECAO = /^_Corre[çc][ãa]o:_\s*/;
+/**
+ * O prefixo que `mensagem_corrigir` põe na correção: "*Correção:*", em negrito,
+ * desde 29/10/2026. As que saíram antes trazem "_Correção:_", em itálico, e
+ * continuam sendo reconhecidas.
+ */
+export const PREFIXO_DA_CORRECAO = /^(?:\*Corre[çc][ãa]o:\*|_Corre[çc][ãa]o:_)\s*/;
 
 /** O texto como o contato o lê, sem a assinatura nem o "Correção:" da frente. */
 export function textoSemMarcas(texto: string | null): string | null {

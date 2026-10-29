@@ -143,7 +143,7 @@ select is((select corrige_a from public.messages where id = pg_temp.u('correcao'
 select is((select responde_a from public.messages where id = pg_temp.u('correcao')), pg_temp.u('errada'),
   'e sai como resposta a ela, para o contato ver qual foi corrigida');
 select is((select body from public.messages where id = pg_temp.u('correcao')),
-  E'*Gil:*\n_Correção:_ Mensagem certa', 'assinada e com "Correção:" na frente');
+  E'*Gil:*\n*Correção:* Mensagem certa', 'assinada e com "Correção:" em negrito na frente');
 
 -- =====================================================================
 -- 4. A forma
