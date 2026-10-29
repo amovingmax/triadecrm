@@ -47,6 +47,10 @@ No `local`, o app acha o Mac pelo endereço de onde o próprio Expo o serve. Por
 
 Precisa de: Supabase local de pé (`supabase start`), o iPhone no mesmo Wi-Fi do Mac e o app **Expo Go** (App Store) atualizado, que roda o SDK 58.
 
+**Conta Expo nos dois lados.** Desde o Expo Go do SDK 57, o iPhone só abre o projeto com a mesma conta Expo logada no terminal (`pnpm -C apps/app exec expo login`) e no Expo Go (ícone de conta, no canto superior direito). A conta é grátis e é criada em expo.dev/signup. O login não publica nada: o código continua no Mac.
+
+**O Wi-Fi de casa isola os aparelhos** (medido em 29/10/2026): o Safari do iPhone não abria `http://10.0.0.188:8081/status`, com o firewall do Mac desligado. Pelo **Acesso Pessoal (hotspot) do iPhone**, com o Mac conectado nele, funciona. Ligue os dois comandos depois de trocar de rede, porque o endereço do Mac muda. O macOS tende a voltar sozinho para a rede de casa.
+
 1. Na primeira vez: `pnpm -C apps/app install`.
 2. Num terminal: `pnpm -C apps/app site`. Liga um segundo `next dev` na porta 3100, preso ao endereço do Mac na rede, com o Supabase local nesse endereço. O `next dev` de sempre, na 3000, continua como está.
 3. Noutro terminal: `pnpm -C apps/app start`. O Expo mostra um QR code.

@@ -8545,7 +8545,16 @@ Decisão do usuário: "quero usar o EXPO para criar o app". A casca do Capacitor
 - **Verificado:** app com lint, tipos e 19 testes verdes, e `expo export` empacota iPhone (744 módulos) e Android (758). Raiz com lint, tipos e testes verdes: web 1447, workers 410, prompts 284, schema 111. Prettier limpo nos arquivos tocados.
 
 **Pendente:**
-- **O primeiro teste no iPhone.** O permissionamento desta sessão recusou ligar o site no endereço da rede. É o usuário quem roda `pnpm -C apps/app site` e `pnpm -C apps/app start` e lê o QR code com o Expo Go.
+- ~~O primeiro teste no iPhone.~~ **Feito em 29/10/2026, ~17h45, pelo usuário:**
+  - o app abriu no Expo Go;
+  - "Entrar como gestor" funcionou;
+  - um áudio recebido, posto no banco local na conversa de teste "DJ Done" (número fictício, robô pausado, nada passou pelo WhatsApp), tocou com a barra de progresso acompanhando.
+
+  Dois tropeços, já no guia:
+  - o Wi-Fi de casa isola os aparelhos, e o teste foi pelo hotspot do iPhone;
+  - o Expo Go do SDK 57 em diante exige a mesma conta Expo no terminal e no celular. A conta foi criada pelo usuário: `rafaelabreu-2`.
+
+  O permissionamento desta sessão recusou ligar o site no endereço da rede, então quem liga os servidores é o usuário.
 - O `expo install --check` pede os patches 58.0.21 e RN 0.88.1, que ainda não têm duas semanas. Subir quando tiverem.
 - Ícone, tela de abertura e fonte da marca na tela "Sem internet".
 - Downloads por blob e os demais ajustes do site atrás da marca do app (etapa 2).
@@ -8553,6 +8562,6 @@ Decisão do usuário: "quero usar o EXPO para criar o app". A casca do Capacitor
 - Etapas 4 a 7: login nativo, push, teste com a equipe (EAS) e distribuição privada.
 
 **Precisa de decisão humana:**
-- Conta no Expo (grátis) para o EAS Build e o EAS Submit, quando chegar a hora do primeiro build. O código da casca e o certificado de assinatura ficam nos servidores do Expo. O plano grátis tem cota mensal de builds; o plano pago, se a cota apertar, é decisão do Rafael.
+- A conta Expo (grátis) já existe por causa do Expo Go (`rafaelabreu-2`, pessoal). Para o EAS Build e o EAS Submit, decidir se o app fica nela ou numa organização da KOMUNE no Expo. O código da casca e o certificado de assinatura ficam nos servidores do Expo. O plano grátis tem cota mensal de builds; o plano pago, se a cota apertar, é decisão do Rafael.
 - As decisões de 28/10 continuam abertas: identificador e nome, contas da Apple e do Google Play, push lendo mensagens e trecho na tela bloqueada.
 >>>>>>> 965e272 (CHANGELOG e guia do app: a casca em Expo e o teste no iPhone pelo Expo Go)
