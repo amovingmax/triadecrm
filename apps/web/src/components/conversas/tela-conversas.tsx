@@ -12,6 +12,9 @@ import { SeletorDeAba } from '@/components/ui/abas';
 import { useAreaVisivel } from './area-visivel';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
+import { OrdemDaLista } from './atitude';
+import { useAtitudes } from './atitude-dados';
+import { porInteresse } from './atitude-regra';
 import { FeedAutomaticas } from './automaticas';
 import { carregarAutomaticas, carregarMarcoZero, CHAVE_AUTOMATICAS } from './automaticas-dados';
 import { Conversa } from './conversa';
@@ -192,6 +195,15 @@ export function TelaConversas({
   const itens = useMemo(() => aplicarFiltros(captacao, filtros, quem), [captacao, filtros, quem]);
   // Quem escreveu e não é ficha: a aba "Clientes" inteira, e parte da lista de Conversas.
   const foraDaBase = useMemo(() => conversasForaDaBase(consulta.data?.fios ?? []), [consulta.data]);
+  // A atitude do cliente (29/10/2026): a etiqueta nas linhas e, com "Mais
+  // interessados", a ordem. Desligada (a KOMUNE), nada disso muda a tela.
+  const atitudes = useAtitudes();
+  const interesse =
+    atitudes.ligada && filtros.ordem === 'interesse' ? atitudes.porConversa : null;
+  const foraNaOrdem = useMemo(
+    () => (interesse ? porInteresse(foraDaBase, (f) => f.id, interesse) : foraDaBase),
+    [foraDaBase, interesse],
+  );
   const porEscopo = useMemo(
     () =>
       // "Todas" não leva número: é a lista inteira, e o número dela já está no
@@ -223,12 +235,12 @@ export function TelaConversas({
   // "Conversas" ela pode ser um cliente: é quem acabou de escrever.
   const primeiraLinha =
     aba === 'conversas'
-      ? (juntarNaLista(itens, clientesNaLista, preferencias.data)[0] ?? null)
+      ? (juntarNaLista(itens, clientesNaLista, preferencias.data, interesse)[0] ?? null)
       : null;
   const semEscolha = escolhidoId === null && clienteEscolhido === null && !ehCelular;
   const foraAberta =
     aba === 'fora'
-      ? (clienteEscolhido ?? (ehCelular ? null : (foraDaBase[0] ?? null)))
+      ? (clienteEscolhido ?? (ehCelular ? null : (foraNaOrdem[0] ?? null)))
       : aba === 'conversas'
         ? (clienteEscolhido ??
           (semEscolha && primeiraLinha?.tipo === 'cliente' ? primeiraLinha.fio : null))
@@ -241,7 +253,13 @@ export function TelaConversas({
   const abertaId =
     foraAberta || aba === 'grupos'
       ? null
-      : (escolhidoId ?? (ehCelular ? null : (daAba[0]?.id ?? null)));
+      : (escolhidoId ??
+        (ehCelular
+          ? null
+          : // Em "Mais interessados" a primeira linha é a do topo da ordem nova.
+            interesse && aba === 'conversas' && primeiraLinha?.tipo === 'parceiro'
+            ? primeiraLinha.item.id
+            : (daAba[0]?.id ?? null)));
 
   // A conversa aberta é procurada em TODOS, não no recorte: mudar o filtro não pode
   // fechar na cara da pessoa a conversa que ela está lendo.
@@ -476,6 +494,20 @@ export function TelaConversas({
                   aoTrocar={(escopo) => mudar({ escopo })}
                   rotulo="De quem são as conversas"
                 />
+                <OrdemDaLista
+                  ligada={atitudes.ligada}
+                  ordem={filtros.ordem}
+                  aoMudar={(ordem) => mudar({ ordem })}
+                  className="mt-2"
+                />
+              </div>
+            ) : aba === 'fora' && atitudes.ligada && !consulta.isPending ? (
+              <div className="sticky top-0 z-10 border-b border-hairline bg-background px-3 py-2">
+                <OrdemDaLista
+                  ligada
+                  ordem={filtros.ordem}
+                  aoMudar={(ordem) => mudar({ ordem })}
+                />
               </div>
             ) : null}
             {consulta.isPending ? (
@@ -487,9 +519,10 @@ export function TelaConversas({
               />
             ) : aba === 'fora' ? (
               <ListaForaDaBase
-                fios={foraDaBase}
+                fios={foraNaOrdem}
                 selecionadoId={foraAberta?.id ?? null}
                 aoEscolher={setForaId}
+                atitudes={atitudes}
               />
             ) : aba === 'consultoria' ? (
               consultoria.length === 0 ? (
@@ -503,6 +536,7 @@ export function TelaConversas({
                   selecionadoId={aberta?.id ?? null}
                   aoEscolher={escolherParceiro}
                   preferencias={preferencias.data}
+                  atitudes={atitudes}
                 />
               )
             ) : filtros.escopo === 'setor' && quem.meusSetores.length === 0 ? (
@@ -530,6 +564,8 @@ export function TelaConversas({
                 clienteSelecionadoId={foraAberta?.id ?? null}
                 aoEscolherCliente={escolherCliente}
                 preferencias={preferencias.data}
+                atitudes={atitudes}
+                porInteresse={interesse !== null}
               />
             )}
             {/* A LUPA NAS MENSAGENS (27/10/2026): embaixo do que o nome achou, o

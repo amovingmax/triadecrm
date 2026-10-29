@@ -35,6 +35,7 @@ import { MudarEtapa } from '@/components/funis/mudar-etapa';
 import { arquivarConversa } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
+import { AtitudeDaConversaNoTopo } from './atitude';
 import { EtiquetasDoParceiro } from './etiquetas-do-parceiro';
 import { AvisoWhatsapp } from './aviso-whatsapp';
 import { ProvedorDoFio } from './contexto-do-fio';
@@ -273,6 +274,14 @@ export function Conversa({
           <BotOff className="size-3" aria-hidden="true" />
           robô pausado
         </Badge>
+      ) : null}
+      {/* A atitude do cliente (29/10/2026) é da CONVERSA: sem fio, não há. */}
+      {fio ? (
+        <AtitudeDaConversaNoTopo
+          conversaId={fio.id}
+          podeEscrever={Boolean(eu?.podeEscrever)}
+          naFolha={naFolha}
+        />
       ) : null}
       <EtiquetasDoParceiro organizacaoId={item.id} podeEditar={Boolean(eu?.podeEscrever)} />
     </>

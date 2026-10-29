@@ -2,6 +2,7 @@ import type { ActivityType, Channel, MsgStatus, MsgType, Temperature } from '@ko
 
 import { type AppRole } from '@/lib/auth/role';
 import { ehCanal } from '@/lib/canais';
+import { EMPRESA } from '@/lib/empresa';
 
 import type { ConteudoLido } from './conteudo';
 
@@ -341,7 +342,16 @@ export type FiltrosConversas = {
    * precisa lembrar de desligar não tira nada da frente.
    */
   arquivadas: boolean;
+  /**
+   * A ordem da lista (29/10/2026): a de sempre (por ler, depois quem falou por
+   * último) ou "Mais interessados", pela etiqueta de atitude do cliente. Não é
+   * recorte: ninguém some da lista, só muda de lugar. Só aparece onde a atitude
+   * está ligada (`atitude-dados.ts`).
+   */
+  ordem: OrdemDaLista;
 };
+
+export type OrdemDaLista = 'recentes' | 'interesse';
 
 /** Minhas · Meu setor · Todas. */
 export type EscopoDaLista = 'minhas' | 'setor' | 'todas';
@@ -381,6 +391,7 @@ export const FILTROS_VAZIOS: FiltrosConversas = {
   canal: null,
   janela: 'qualquer',
   arquivadas: false,
+  ordem: 'recentes',
 };
 
 /** Há algum recorte ligado? Separa "a base está vazia" de "o filtro não achou nada". */
@@ -450,6 +461,9 @@ export function estadoDaUrl(
       canal: ehCanal(canal) ? canal : null,
       janela: ehJanela(janela) ? janela : 'qualquer',
       arquivadas: texto('arquivadas') === '1',
+      // Só a Imova tem a ordem por interesse: na KOMUNE o parâmetro é ignorado.
+      ordem:
+        EMPRESA.modulos.atitudeDoCliente && texto('ordem') === 'interesse' ? 'interesse' : 'recentes',
     },
     organizacaoId: texto('org') || null,
     aba: ehAbaDaEsquerda(texto('aba')) ? (texto('aba') as AbaDaEsquerda) : 'conversas',
@@ -475,6 +489,7 @@ export function urlDoEstado(
   if (f.canal) p.set('canal', f.canal);
   if (f.janela !== 'qualquer') p.set('janela', f.janela);
   if (f.arquivadas) p.set('arquivadas', '1');
+  if (f.ordem === 'interesse') p.set('ordem', 'interesse');
   if (aba !== 'conversas') p.set('aba', aba);
   if (organizacaoId) p.set('org', organizacaoId);
   else if (clienteId) p.set('cliente', clienteId);

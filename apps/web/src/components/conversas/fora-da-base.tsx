@@ -59,6 +59,8 @@ import {
 } from './mensagens';
 import { AvisoDeBloqueio, BarraDeBuscaNoFio, MenuDaConversa } from './menu-da-conversa';
 import { useEu } from './assumir-conversa';
+import { AtitudeDaConversaNoTopo, AtitudeNaLista } from './atitude';
+import type { BaseDasAtitudes } from './atitude-dados';
 import type { CatalogosConversas } from './montagem';
 import { TextoLivre } from './responder';
 import { useRolagemNoFim } from './rolagem-no-fim';
@@ -80,10 +82,13 @@ export function ListaForaDaBase({
   fios,
   selecionadoId,
   aoEscolher,
+  atitudes = null,
 }: {
   fios: FioCru[];
   selecionadoId: string | null;
   aoEscolher: (id: string) => void;
+  /** A atitude do cliente (29/10/2026). A ordem já vem feita de quem chama. */
+  atitudes?: BaseDasAtitudes | null;
 }) {
   // As conversas com mensagem ainda sem resposta: a mesma marca da lista de
   // Conversas, e o mesmo número do menu (`components/avisos`).
@@ -146,6 +151,14 @@ export function ListaForaDaBase({
                       : ''}
                   </span>
                 )}
+                {atitudes?.ligada ? (
+                  <span className="mt-1 block">
+                    <AtitudeNaLista
+                      atitude={atitudes.porConversa.get(fio.id)}
+                      objecoes={atitudes.objecoes}
+                    />
+                  </span>
+                ) : null}
               </span>
               <span className="flex shrink-0 flex-col items-end gap-1">
                 {fio.last_message_at ? (
@@ -296,6 +309,9 @@ export function ConversaForaDaBase({
               <p className="truncate text-[13px] text-muted-foreground">
                 {nome ? `${formatarTelefone(fio.peer_phone_e164)} · ` : ''}não é parceiro
               </p>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
+                <AtitudeDaConversaNoTopo conversaId={fio.id} podeEscrever={Boolean(eu?.podeEscrever)} />
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
               {virando ? null : (
@@ -341,6 +357,8 @@ export function ConversaForaDaBase({
                 </SheetDescription>
               </div>
             </SheetHeader>
+
+            <AtitudeNaFolha conversaId={fio.id} podeEscrever={Boolean(eu?.podeEscrever)} />
 
             <section aria-label="Ações" className="flex flex-col gap-2">
               <h3 className="text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">
@@ -505,6 +523,20 @@ export function ConversaForaDaBase({
  * Arquivar: tira da lista e não apaga nada. Atendeu o cliente, arquiva — e se
  * ele escrever de novo, a conversa volta sozinha (`messages_desarquiva`).
  */
+/** A atitude na folha do celular: some inteira quando está desligada. */
+function AtitudeNaFolha({ conversaId, podeEscrever }: { conversaId: string; podeEscrever: boolean }) {
+  return (
+    <section aria-label="Interesse" className="flex flex-col gap-2 has-[div:empty]:hidden">
+      <h3 className="text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">
+        Interesse
+      </h3>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <AtitudeDaConversaNoTopo conversaId={conversaId} podeEscrever={podeEscrever} naFolha />
+      </div>
+    </section>
+  );
+}
+
 function ArquivarCliente({
   fio,
   comNome = false,

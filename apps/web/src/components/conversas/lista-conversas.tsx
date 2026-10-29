@@ -12,6 +12,9 @@ import { EtiquetaEtapa } from '@/components/funis/etapa';
 import { formatarTelefone } from '@/components/parceiros/formatos';
 import { DiasSemContato } from '@/components/temperatura';
 
+import { AtitudeNaLista } from './atitude';
+import type { BaseDasAtitudes } from './atitude-dados';
+import type { AtitudeDaConversa, Objecao } from './atitude-regra';
 import { nomeDoCliente } from './fora-da-base-dados';
 import { local, rotuloDoDia } from './formatos';
 import { ICONE_CANAL } from './icones';
@@ -63,6 +66,8 @@ export function ListaConversas({
   clienteSelecionadoId = null,
   aoEscolherCliente,
   preferencias = SEM_PREFERENCIAS,
+  atitudes = null,
+  porInteresse = false,
 }: {
   itens: ItemConversa[];
   selecionadoId: string | null;
@@ -74,15 +79,28 @@ export function ListaConversas({
   /** O id da CONVERSA do cliente aberto — ele não tem ficha. */
   clienteSelecionadoId?: string | null;
   aoEscolherCliente?: (conversaId: string) => void;
+  /** A atitude do cliente (29/10/2026). Nula ou desligada, a lista fica como era. */
+  atitudes?: BaseDasAtitudes | null;
+  /** "Mais interessados": a lista vai pela etiqueta de atitude. */
+  porInteresse?: boolean;
 }) {
   const novas = useConversasNovas();
+  const ligadas = atitudes?.ligada ? atitudes : null;
+  const atitudeDe = (fioId: string | null | undefined): AtitudeDaConversa | undefined =>
+    fioId ? ligadas?.porConversa.get(fioId) : undefined;
+  const objecoes = ligadas?.objecoes ?? SEM_OBJECOES;
   const digitados = useTextosDigitados();
   /** O que a linha mostra depois de "Rascunho:", ou `null`. */
   const rascunhoDe = (fioId: string | null | undefined, selecionado: boolean): string | null =>
     selecionado || !fioId ? null : previaDoDigitado(digitados.get(fioId)?.texto);
   return (
     <ul className="corpo-tabela flex flex-col">
-      {juntarNaLista(itens, clientes, preferencias).map((linha) =>
+      {juntarNaLista(
+        itens,
+        clientes,
+        preferencias,
+        porInteresse ? (ligadas?.porConversa ?? null) : null,
+      ).map((linha) =>
         linha.tipo === 'parceiro' ? (
           <LinhaMemorizada
             key={linha.item.id}
@@ -92,6 +110,8 @@ export function ListaConversas({
             rascunho={rascunhoDe(linha.item.fio?.id, linha.item.id === selecionadoId)}
             aoEscolher={aoEscolher}
             marcas={marcasDa(linha.item.fio?.id, preferencias)}
+            atitude={atitudeDe(linha.item.fio?.id)}
+            objecoes={objecoes}
           />
         ) : (
           <LinhaDeClienteMemorizada
@@ -102,12 +122,17 @@ export function ListaConversas({
             rascunho={rascunhoDe(linha.fio.id, linha.fio.id === clienteSelecionadoId)}
             aoEscolher={aoEscolherCliente}
             marcas={marcasDa(linha.fio.id, preferencias)}
+            atitude={atitudeDe(linha.fio.id)}
+            objecoes={objecoes}
           />
         ),
       )}
     </ul>
   );
 }
+
+/** Constante: a linha é memorizada, e uma lista nova a cada pintura a redesenharia. */
+const SEM_OBJECOES: readonly Objecao[] = [];
 
 /**
  * Fixada e silenciada, de quem está olhando (27/10/2026). Uma constante por
@@ -206,6 +231,8 @@ function LinhaDeCliente({
   rascunho,
   aoEscolher,
   marcas,
+  atitude,
+  objecoes,
 }: {
   fio: FioCru;
   selecionado: boolean;
@@ -215,6 +242,8 @@ function LinhaDeCliente({
   rascunho: string | null;
   aoEscolher?: (conversaId: string) => void;
   marcas: Marcas;
+  atitude: AtitudeDaConversa | undefined;
+  objecoes: readonly Objecao[];
 }) {
   const Icone = ICONE_CANAL.whatsapp;
   const nome = fio.peer_nome?.trim();
@@ -280,6 +309,9 @@ function LinhaDeCliente({
               cliente
             </Badge>
           </span>
+
+          {/* A ATITUDE (29/10/2026): o quanto essa pessoa quer, e a objeção dela. */}
+          <AtitudeNaLista atitude={atitude} objecoes={objecoes} />
         </span>
 
         <ChevronRight
@@ -298,6 +330,8 @@ function Linha({
   rascunho,
   aoEscolher,
   marcas,
+  atitude,
+  objecoes,
 }: {
   item: ItemConversa;
   selecionado: boolean;
@@ -307,6 +341,8 @@ function Linha({
   rascunho: string | null;
   aoEscolher: (id: string) => void;
   marcas: Marcas;
+  atitude: AtitudeDaConversa | undefined;
+  objecoes: readonly Objecao[];
 }) {
   const Icone = item.ultimoCanal ? ICONE_CANAL[item.ultimoCanal] : null;
   const onde = local(item.bairro, item.cidade);
@@ -427,8 +463,11 @@ function Linha({
           {/* AS ETIQUETAS, com a cor que o gestor escolheu: é o que separa um
               fundador de um contato qualquer antes de abrir a conversa. Duas, e o
               resto em número — quatro pílulas comiam a largura da prévia. */}
-          {item.etiquetas.length > 0 ? (
+          {/* A ATITUDE (29/10/2026) abre a linha das etiquetas: é a primeira
+              coisa que se procura nela quando a pergunta é "quem quer mais?". */}
+          {item.etiquetas.length > 0 || atitude ? (
             <span className="flex flex-wrap items-center gap-1">
+              <AtitudeNaLista atitude={atitude} objecoes={objecoes} />
               {item.etiquetas.slice(0, 2).map((e) => (
                 <Etiqueta key={e.id} nome={e.nome} cor={e.cor} className="h-4 px-1.5 text-[10px]" />
               ))}

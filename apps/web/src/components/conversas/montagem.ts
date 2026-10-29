@@ -30,6 +30,7 @@ import {
   type MensagemCrua,
   type RascunhoCru,
 } from './mensagens';
+import { porInteresse, type AtitudeDaConversa } from './atitude-regra';
 import { fixadasPrimeiro, SEM_PREFERENCIAS, type Preferencias } from './preferencias';
 
 /**
@@ -613,8 +614,18 @@ export function juntarNaLista(
    * por último primeiro, e o resto fica na ordem de sempre.
    */
   preferencias: Preferencias = SEM_PREFERENCIAS,
+  /**
+   * "Mais interessados" (29/10/2026): com as atitudes, a lista vai pela
+   * etiqueta e, dentro dela, na ordem de sempre. As fixadas continuam em cima.
+   */
+  interesse: ReadonlyMap<string, AtitudeDaConversa> | null = null,
 ): LinhaDaLista[] {
-  return fixadasPrimeiro(juntarSemFixar(itens, clientes), idDaConversaDaLinha, preferencias);
+  const linhas = juntarSemFixar(itens, clientes);
+  return fixadasPrimeiro(
+    interesse ? porInteresse(linhas, idDaConversaDaLinha, interesse) : linhas,
+    idDaConversaDaLinha,
+    preferencias,
+  );
 }
 
 /** A conversa de cada linha: a do fio em foco do parceiro, ou a do cliente. */
