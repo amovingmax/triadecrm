@@ -8030,3 +8030,13 @@ O pedido: "quero todas as funcionalidades do wpp no nosso crm, criar grupo, apag
 - Fase 2: a IA lê a mensagem do cliente e sugere o toque e a objeção. Precisa de chave e worker de IA para a Imova e de instruções de imobiliária, porque as 25 intenções de hoje são da KOMUNE.
 - Ajustes → Catálogos ainda não edita as objeções (por enquanto só pelo seed).
 - "Muito interessado esperando resposta" no Meu dia e o relatório das objeções do mês ficaram para depois.
+
+**Em produção, só na Imova (29/10/2026, entre 17h05 e 17h15), a pedido do usuário ("Pode subir as alterações das etiquetas para o ambiente da Imova CRM"):**
+- **Conferido antes:** o site da Imova no ar (`imova-prp8bke8c`) era do commit `d8e4d4d`, já na main; o banco da Imova tinha as 165 migrações do repositório e nenhuma de fora.
+- **main:** `608061e → e9e03e2` (avanço direto).
+- **Banco da Imova:** `20261029110000` pelo `publicar-banco.mjs`. Depois, só o bloco 12c do seed (chave, 7 objeções e o job `atitudes_recalcular`), começando por `app.exigir_empresa('imova')`, tudo ou nada, ensaiado antes na Imova local. O seed inteiro **não** foi rodado de novo: ele reescreveria `atendimento`, `notificacoes.email` e `voz.telefonia` e desligaria respostas prontas que falam de Natal.
+- **Conferido depois:**
+  - no banco: `ligada` true, 7 objeções e o job agendado;
+  - o job rodou às 17:13 e às 17:14, e as 2 conversas da Imova com mensagem ganharam a etiqueta Interessado.
+- **Site da Imova:** `imova-1ivk3ar6k` (volta: `imova-prp8bke8c`), de cópia limpa de `e9e03e2`. `/login` 200 com "Entrar com Google", `/conversas` pede login, `/auth/dev` 404.
+- **KOMUNE:** nada. O banco dela segue com `20261029110000` pendente (quando for aplicada, não cria nada lá) e o site segue `triade-4ce2bne1g`.
