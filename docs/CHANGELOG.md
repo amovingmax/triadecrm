@@ -8040,3 +8040,60 @@ O pedido: "quero todas as funcionalidades do wpp no nosso crm, criar grupo, apag
   - o job rodou às 17:13 e às 17:14, e as 2 conversas da Imova com mensagem ganharam a etiqueta Interessado.
 - **Site da Imova:** `imova-1ivk3ar6k` (volta: `imova-prp8bke8c`), de cópia limpa de `e9e03e2`. `/login` 200 com "Entrar com Google", `/conversas` pede login, `/auth/dev` 404.
 - **KOMUNE:** nada. O banco dela segue com `20261029110000` pendente (quando for aplicada, não cria nada lá) e o site segue `triade-4ce2bne1g`.
+
+## 29/10/2026 (noite) — Aviso do navegador com o começo da mensagem e com som (branch `avisos-no-navegador`; RF-CON-05)
+
+**O pedido.** Depois de ver o protótipo (canvas "Notificações no navegador"): o aviso deve aparecer no navegador também com o CRM em outra aba ou minimizado; "O aviso deve mostrar o começo da Mensagem"; "Deve ser exibido um som ao chegar novas notificações, porém esse som pode ser removido nas configurações de notificações"; "Com o navegador fechado não deve ser exibido a notificação".
+
+**Entregue (só no site; sem migração, sem mexer no caminho do WhatsApp):**
+- A notificação do sistema já saía com o CRM em outra aba (desde 02/10). Agora ela leva o começo da mensagem: uma conversa, "Nova mensagem de {nome}" no título e o texto no corpo (áudio, imagem etc. dizem o que chegou); várias, uma linha por conversa, "Nome: começo da mensagem", até três e "E mais N conversas." (`textoDoAviso`, em `avisos/regra.ts`).
+- Som: `avisos/som.ts` toca dois tons curtos (Web Audio, sem arquivo) ao chegar mensagem nova, com o cartão de dentro do CRM e com a notificação do sistema. O navegador só deixa tocar depois do primeiro clique ou tecla na página; antes disso a notificação vai com o som do próprio sistema. Duas abas do CRM tocam uma vez só. Quando o CRM toca, a notificação vai calada (`silent`), para não tocar duas vezes.
+- Menu da conta: caixa "Som nos avisos", ligada de fábrica; ligar toca uma amostra. A escolha fica no aparelho, por pessoa (`komune.avisos.sem-som.v1:<id>`), como o "silenciar". Com os avisos silenciados a caixa some.
+- Navegador fechado: continua sem aviso, de propósito (sem service worker nem push). Aba escondida ou janela minimizada contam como fora de vista e avisam.
+- Testes: `regra.test.ts` com o texto novo (6 casos). Web: typecheck, lint e 1.454 testes Vitest passando. Conferido no Chrome (localhost, banco local, dublê da `Notification`): em outra aba, o aviso sai com o texto e o toque toca; com o som desligado, sai com o texto e calado; com o CRM à vista, só cartão e toque.
+
+**Pendente:**
+- Publicar, só com pedido. Vale para as duas empresas (o código é o mesmo).
+- A aba do CRM precisa estar aberta. Se o Chrome descartar a aba parada (Economia de memória), o aviso não sai: incluir o endereço do CRM em "Sempre manter estes sites ativos".
+- Aba escondida há mais de 5 min: o Chrome atrasa os relógios dela para um por minuto; o evento do Realtime chega na hora, e a sondagem de reserva pode atrasar até cerca de um minuto se o socket cair.
+
+**Decisão humana:** o texto da mensagem agora aparece por cima de qualquer tela, inclusive de tela compartilhada em reunião (era o motivo de não mostrar). Levar ao Dennis (LGPD); quem vai compartilhar a tela silencia os avisos no menu da conta.
+
+## 30/10/2026 — O aviso do navegador ganha o botão "Responder" e pode aparecer como Tríade (branch `avisos-no-navegador`; RF-CON-05)
+
+**O que aconteceu.** No teste real o som tocava e o cartão aparecia, mas o aviso do sistema não. A causa foi o Mac: Ajustes do Sistema → Notificações → Google Chrome estava "Desativadas". Depois de ligar, o aviso apareceu com o nome e o começo da mensagem. O site não enxerga esse bloqueio: `Notification.permission` continua `granted` e a chamada não dá erro. O teste de 29/10 usava um dublê da `Notification` e por isso não pegou. Em produção este Mac estava igual, então os avisos do sistema não apareciam nele; outros computadores podem estar na mesma situação.
+
+**O pedido.** "Quero mudar o layout da notificação para colocar os protótipos que fizemos". A caixa é desenhada pelo sistema; forma, cor e fonte não mudam por site. Entre as opções (aviso do Mac melhorado, janela flutuante, os dois, extensão do Chrome), o usuário escolheu melhorar o aviso do Mac.
+
+**Entregue (só no site; sem migração, sem mexer no caminho do WhatsApp):**
+- Botão no aviso: "Responder" para uma conversa, "Abrir Conversas" para várias (`botaoDoAviso`).
+- `public/sw-avisos.js`: service worker mínimo, porque botão em notificação só existe na que um service worker mostra. Só trata instalação e clique: **sem `fetch` e sem `push`**, então nenhuma requisição passa por ele, nada fica em cache e com o navegador fechado continua sem aviso. No clique, foca a aba e pede a ela para abrir a conversa; sem aba aberta, abre no destino. Se ele falhar ou ainda não estiver pronto, sai a `Notification` comum, sem o botão.
+- `proxy.ts` deixa o service worker passar sem login; `next.config.ts` manda os cabeçalhos do guia de PWA do Next.
+- Menu da conta: "Instalar o Tríade neste computador" (`avisos/instalar-app.ts`), só no computador e só quando o navegador oferece. No Chrome 152 ou mais novo no Mac, o app instalado aparece no aviso com nome e ícone próprios.
+- Efeito que vem junto: no Chrome do Android, que só mostra notificação por service worker, o aviso passa a sair com a aba aberta e a permissão dada.
+- Testes: `sw-avisos.test.ts` roda o service worker de verdade (clique com e sem aba, foco recusado, e que ele não escuta `fetch` nem `push`). Web: typecheck, lint e 1.461 testes Vitest passando.
+- Conferido no Chrome com a `Notification` real, por `getNotifications()`: uma conversa sai com "Responder", duas com "Abrir Conversas", e a mensagem do clique leva a aba a `/conversas?org=…`. O CRM não tem impedimento de instalação (o único erro listado, `in-incognito`, é da janela do teste). `/sw-avisos.js` responde 200 sem login.
+
+**O som depois de recarregar (achado no teste do usuário):** "não está mais saindo som". O Chrome só libera som depois de um clique na página carregada. Medido com a regra de computador ligada: clicar destrava, recarregar suspende de novo, e a mensagem em outra aba não toca nenhuma nota até o próximo clique. O som da notificação do sistema, previsto como reserva, também não saiu no Mac do usuário. `prepararSom` passou a tentar ao montar, para os casos que a documentação do Chrome libera sem clique (site muito usado, app instalado), mas isso **não resolve** a recarga numa aba comum.
+
+**De qual empresa é o aviso:** "Preciso que mostre se a notificação é do ambiente da Imova ou do ambiente da Komune". As duas têm o mesmo ícone, e "Tríade" não distingue. O título do aviso do sistema agora começa pela empresa: "KOMUNE · Nova mensagem de DJ Done" e "Imova · 2 conversas com mensagem nova" (campo novo `nomeNoAviso` em `packages/schema/src/empresas.ts`). No começo, porque o sistema corta título longo pelo fim. O cartão de dentro do CRM não mudou. Conferido no Chrome com a `Notification` real nas duas empresas locais (3002 e 3004), em duas rodadas seguidas; na primeira tentativa, com o servidor recém-recompilado, o aviso da KOMUNE não saiu, provavelmente porque a mensagem chegou antes da primeira leitura da página, que por regra não avisa.
+
+**Só recebe quem tem acesso ao ambiente:** "quem não tem acesso a Imova não receba nada da Imova". Cada empresa tem site, banco e login próprios, e o aviso nasce numa aba logada nela; não existe servidor mandando aviso para uma lista de pessoas. Medido no local, com a `Notification` real:
+- e-mail fora da lista, tentando criar conta na Imova: recusado (HTTP 500 do gatilho), nenhum usuário criado;
+- só com a KOMUNE aberta, mensagem na Imova: nenhum aviso;
+- depois de sair da Imova: a tela vai para `/login`, nenhum aviso;
+- **desativada com a aba aberta: recebia aviso, com o texto, porque o token vale até 1 h.** Corrigido: `aindaTemAcesso` (`avisos/dados.ts`) confere `profiles.is_active` no banco a cada aviso, junto com as outras leituras, sem atraso a mais. Sem cartão, som nem notificação. Refeito o teste: nenhum aviso. Se a leitura falhar por rede, vale o acesso que a pessoa tinha.
+
+**Não conferido, depende do Mac do usuário:**
+- como o Mac mostra o botão (a documentação não diz se aparece direto ou só ao passar o mouse) e o clique de verdade nele;
+- o nome e o ícone do Tríade depois de instalar, e se valem também com o CRM numa aba comum do Chrome (a documentação só fala do app instalado);
+- o Mac pede uma permissão à parte para o app instalado; a do site não vale para ele.
+
+**Pendente:**
+- Publicar, só com pedido. Vale para as duas empresas. Cada computador precisa ter as notificações do navegador ligadas no sistema.
+- Acesso, fora dos avisos: a pessoa desativada com a tela aberta ainda consegue ler o CRM até o token vencer (até 1 h), como já era antes. Tirar o e-mail da lista de liberados não barra quem já entrou uma vez: é preciso desativar a pessoa. A mensagem de recusa na Imova diz "KOMUNE CRM" (`app.handle_new_auth_user`, função comum às duas).
+- A lista de quem tem acesso à Imova em produção não foi consultada.
+- Proposto e sem resposta: botão "Enviar aviso de teste" no menu da conta, para cada pessoa descobrir se o aviso chega no computador dela.
+- Som: conferir no Mac se o app instalado toca sem clique depois de abrir. Proposto e sem resposta: avisar dentro do CRM quando o som estiver travado ("clique em qualquer lugar para liberar o som"), porque hoje a falha é silenciosa.
+
+**Decisão humana:** continua a de 29/10, levar ao Dennis o texto da mensagem aparecendo por cima de qualquer tela.
