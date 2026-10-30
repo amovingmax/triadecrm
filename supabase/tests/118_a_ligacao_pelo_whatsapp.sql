@@ -22,7 +22,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(70);
+select plan(72);
 
 insert into public.allowed_users (email, role, note) values
   ('h118.g@teste.local', 'gestor', 'pgTAP 118'),
@@ -359,6 +359,15 @@ select pg_temp.sair();
 select public.wa_chamada_marcar(pg_temp.id('ch6'), 'falhou', '{"codigo": 138006}'::jsonb);
 select is((select estado from public.wa_chamadas where id = pg_temp.id('ch6')), 'falhou', 'a Meta recusou: a ligação falha');
 select is((select estado from public.wa_permissoes_de_ligar where conversation_id = pg_temp.id('e')), 'sem_permissao', 'e a permissão que estava aqui cai');
+
+-- Conversa bloqueada no CRM não recebe pedido nem ligação.
+select pg_temp.conversa('blq', '+5584999911808');
+select pg_temp.respondeu('+5584999911808', 'accept');
+update public.conversations set bloqueada_em = now() where id = pg_temp.id('blq');
+select pg_temp.gestor();
+select is(public.wa_chamada_abrir(pg_temp.id('blq')) ->> 'motivo', 'conversa_bloqueada', 'bloqueada não recebe ligação');
+select is(public.wa_ligacao_estado(pg_temp.id('blq')) ->> 'suprimida', 'true', 'e o botão não aparece');
+select pg_temp.sair();
 
 -- Uma por pessoa, mesmo em conversas diferentes.
 select pg_temp.conversa('d', '+5584999911806');

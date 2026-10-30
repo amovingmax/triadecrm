@@ -429,7 +429,9 @@ begin
     'nao_atendidas_seguidas', coalesce(p.nao_atendidas_seguidas, 0),
     'proximo_pedido_em', app.wa_permissao_proximo_pedido(p_conversation_id),
     'janela_aberta', coalesce(c.window_expires_at > now(), false),
-    'suprimida', app.is_suppressed(c.peer_phone_e164)
+    -- Bloqueada no CRM conta igual: não recebe nada, e o botão não aparece.
+    'suprimida', c.bloqueada_em is not null
+                 or app.is_suppressed(c.peer_phone_e164)
                  or (c.organization_id is not null
                      and app.is_suppressed_target(c.organization_id, c.contact_id)),
     'horario', app.call_window(now()),
@@ -481,6 +483,9 @@ begin
   if app.is_suppressed(c.peer_phone_e164)
      or (c.organization_id is not null and app.is_suppressed_target(c.organization_id, c.contact_id)) then
     return jsonb_build_object('ok', false, 'motivo', 'contato_suprimido');
+  end if;
+  if c.bloqueada_em is not null then
+    return jsonb_build_object('ok', false, 'motivo', 'conversa_bloqueada');
   end if;
   if not coalesce(c.window_expires_at > now(), false) then
     return jsonb_build_object('ok', false, 'motivo', 'fora_da_janela');
@@ -546,6 +551,9 @@ begin
   if app.is_suppressed(c.peer_phone_e164)
      or (c.organization_id is not null and app.is_suppressed_target(c.organization_id, c.contact_id)) then
     return jsonb_build_object('ok', false, 'motivo', 'contato_suprimido');
+  end if;
+  if c.bloqueada_em is not null then
+    return jsonb_build_object('ok', false, 'motivo', 'conversa_bloqueada');
   end if;
   if not (app.call_window(now()) ->> 'aberta')::boolean then
     return jsonb_build_object('ok', false, 'motivo', 'fora_do_horario');

@@ -670,7 +670,7 @@ Deno.test('o cliente ligou: a oferta vai para as chamadas, e nada para a fila', 
       to: '5584994058888',
       event: 'connect',
       timestamp: '1671644824',
-      session: { sdp_type: 'offer', sdp: 'v=0 oferta' },
+      session: { sdp_type: 'offer', sdp: 'v=0 oferta\r\n' },
     }],
   }));
   assertEquals(itens, []);
@@ -684,7 +684,8 @@ Deno.test('o cliente ligou: a oferta vai para as chamadas, e nada para a fila', 
   assertEquals(c.nome, 'Carlos');
   assertEquals(c.numero_da_empresa, '+5584994058888');
   assertEquals(c.sdp_tipo, 'offer');
-  assertEquals(c.sdp, 'v=0 oferta');
+  // Inteiro: sem a última quebra de linha, o navegador recusa o SDP.
+  assertEquals(c.sdp, 'v=0 oferta\r\n');
 });
 
 Deno.test('a ligação feita: o cliente é o `to`, e a resposta volta com o id nosso', () => {

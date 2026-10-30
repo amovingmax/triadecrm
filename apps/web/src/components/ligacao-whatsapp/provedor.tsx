@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { MessageCircle, Mic, MicOff, Phone, PhoneOff, X } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -150,16 +151,17 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
         });
       }
       if (!chamadaViva(row.estado)) fecharMidia();
-      setLinha((l) =>
-        l && l.id === row.id
-          ? {
-              ...l,
-              estado: row.estado,
-              atendidaEm: row.atendida_em,
-              encerradaEm: row.encerrada_em,
-            }
-          : l,
-      );
+      setLinha((l) => {
+        if (!l || l.id !== row.id) return l;
+        // Aviso atrasado não ressuscita a ligação que já acabou neste navegador.
+        if (!chamadaViva(l.estado) && chamadaViva(row.estado)) return l;
+        return {
+          ...l,
+          estado: row.estado,
+          atendidaEm: row.atendida_em ?? l.atendidaEm,
+          encerradaEm: row.encerrada_em ?? l.encerradaEm,
+        };
+      });
       atualizarConversa(row.conversation_id);
     },
     [atualizarConversa, fecharMidia],
@@ -180,30 +182,39 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
   // O Realtime: a RLS de `wa_chamadas` diz quem recebe.
   useEffect(() => {
     const supabase = createClient();
-    const canal = supabase
-      .channel(`ligacao-whatsapp-${crypto.randomUUID().slice(0, 8)}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'wa_chamadas' },
-        (payload: { new?: unknown }) => {
-          const row = payload.new as ChamadaNoBanco | undefined;
-          if (!row?.id) return;
-          receberNoToque(row);
-          aplicarNaLinha(row);
-          atualizarConversa(row.conversation_id);
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'wa_permissoes_de_ligar' },
-        (payload: { new?: { conversation_id?: string } }) => {
-          const id = payload.new?.conversation_id;
-          if (id) atualizarConversa(id);
-        },
-      )
-      .subscribe();
+    let desmontou = false;
+    let canal: RealtimeChannel | null = null;
+    void (async () => {
+      // A sessão antes de assinar: sem ela o socket conecta só com a chave anônima, e a
+      // RLS não entrega evento nenhum, sem erro em lugar nenhum (`conversas/eco-do-banco.ts`).
+      await supabase.auth.getSession();
+      if (desmontou) return;
+      canal = supabase
+        .channel(`ligacao-whatsapp-${crypto.randomUUID().slice(0, 8)}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'wa_chamadas' },
+          (payload: { new?: unknown }) => {
+            const row = payload.new as ChamadaNoBanco | undefined;
+            if (!row?.id) return;
+            receberNoToque(row);
+            aplicarNaLinha(row);
+            atualizarConversa(row.conversation_id);
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'wa_permissoes_de_ligar' },
+          (payload: { new?: { conversation_id?: string } }) => {
+            const id = payload.new?.conversation_id;
+            if (id) atualizarConversa(id);
+          },
+        )
+        .subscribe();
+    })();
     return () => {
-      void supabase.removeChannel(canal);
+      desmontou = true;
+      if (canal) void supabase.removeChannel(canal);
     };
   }, [aplicarNaLinha, atualizarConversa, receberNoToque]);
 
@@ -349,6 +360,7 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
             : l,
         );
       } catch (e) {
+        console.error('[ligacao-whatsapp] atender', e);
         fecharMidia();
         const erro = e instanceof ErroDaLigacao ? e : null;
         const frase = erro?.frase ?? fraseDoMotivo(erro?.motivo);
@@ -371,7 +383,8 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
 
   const ligar = useCallback(
     async (conversaId: string, nome: string) => {
-      if (trava.current || linhaAtual.current !== null) return;
+      const atual = linhaAtual.current;
+      if (trava.current || (atual !== null && chamadaViva(atual.estado))) return;
       trava.current = true;
       try {
         let fluxo: MediaStream;
@@ -407,6 +420,7 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
           conexao.current = nova;
           await pedirAoServidor('ligar', id, sdp);
         } catch (e) {
+          console.error('[ligacao-whatsapp] ligar', e);
           fecharMidia();
           const erro = e instanceof ErroDaLigacao ? e : null;
           const frase = erro?.frase ?? fraseDoMotivo(erro?.motivo);
@@ -451,7 +465,8 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
   return (
     <Contexto.Provider value={valor}>
       {children}
-      {linha ? (
+      {/* Um aviso antigo no painel não esconde a ligação que está tocando agora. */}
+      {linha && (idDaLinhaViva !== null || !paraTocar) ? (
         <PainelDaLinha
           linha={linha}
           aoDesligar={desligar}

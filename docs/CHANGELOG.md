@@ -8125,3 +8125,23 @@ O pedido: "quero todas as funcionalidades do wpp no nosso crm, criar grupo, apag
 **Pendente:** o que está em "Pendente" na entrada anterior continua valendo, menos publicar. Os 5 avisos novos (conversa passada, tarefa nova, compromisso marcado, lembrete de 30 min, lote para ligar) seguem por construir.
 
 **Decisão humana:** continua levar ao Dennis (LGPD) o texto da mensagem aparecendo por cima de qualquer tela.
+
+## Ligação pelo WhatsApp, só na Imova — 30/10/2026 (branch `ligacao-meta`, fora da main e fora do ar)
+
+Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número de WhatsApp da Imova, de dentro do CRM, primeiro no navegador e depois no app. Guia em `docs/operacao/ligacao-whatsapp.md`.
+
+**Entregue (só local):**
+- Banco, `20261030120000_a_ligacao_pelo_whatsapp.sql`: chave `whatsapp.ligacao` (nasce desligada; fora da Imova não liga nem à força), `wa_chamadas`, `wa_permissoes_de_ligar` e as portas com as travas: permissão do cliente, supressão, bloqueio, horário de ligar, limites da Meta, uma ligação por pessoa e por conversa, o primeiro que atender leva. O telefone não sai para a tela. pgTAP 118 (72 asserções).
+- Webhook: o campo `calls` e a resposta ao pedido de permissão vão direto a `wa_chamada_eventos`, fora da fila. Corrigidos dois defeitos que derrubariam toda ligação real: a conferência de horário não olhava `calls[].timestamp` (recusaria com 400) e `texto()` aparava o SDP (o navegador o recusava).
+- Edge Function nova `wa-chamada`: atender, ligar e desligar na Meta, com os erros em português.
+- Worker: o pedido de permissão sai como `call_permission_request`, só dentro das 24 h.
+- Tela, `components/ligacao-whatsapp/`: botão na conversa de parceiro e de cliente, toque para todos com o CRM aberto, painel com silenciar e desligar, áudio WebRTC, confirmação ao fechar a aba. Fora da Imova o provedor não desenha nem assina nada.
+
+**Verificado:**
+- Ensaio no Chrome, com WebRTC e áudio de verdade e o dublê no lugar da Meta: 38 de 38. O toque chegou em menos de 1 s; a ligação continua ao andar pelas telas e ao trocar de aba; silenciar corta o som.
+- KOMUNE: pgTAP 118 com 72 de 72 no banco dela, em transação desfeita. Com este código, nenhuma consulta nem assinatura nova, nenhum botão de WhatsApp, e o "Ligar" da Twilio abre a tela de ligar. Nenhum arquivo da Twilio mudou.
+- Vitest: 1.464 no site. No worker, `graph.test.ts` e `modelos-meta.test.ts` falham ("o dublê da Graph API não subiu") igual na main limpa 0f9e565.
+
+**Pendente:** a prova de ativação na Meta, que precisa rodar no Terminal do usuário (o classificador barrou aqui); tudo em produção; e o teste real, porque a Meta de verdade nunca foi chamada. O que falta no produto está no guia: pedido fora das 24 h, relatório do dia, alerta de baixa taxa de atendimento, app, chave em Ajustes.
+
+**Decisão humana:** o horário de atendimento enquanto só houver o navegador (recomendado seg–sex, 8h–19h); o OK do Dennis para o registro das ligações, o texto do pedido e o nome do cliente na tela bloqueada do app. A ligação não entra no relatório do dia por pessoa nesta versão.

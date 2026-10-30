@@ -140,6 +140,7 @@ const FRASES: Record<string, string> = {
   ligacao_desligada: 'A ligação pelo WhatsApp está desligada.',
   conversa_desconhecida: 'Esta conversa não existe mais.',
   contato_suprimido: 'Este cliente pediu para não ser contatado.',
+  conversa_bloqueada: 'Esta conversa está bloqueada.',
   fora_da_janela: 'Só dá para pedir dentro das 24 h depois da última mensagem do cliente.',
   ja_permitida: 'O cliente já permitiu ligações, sem prazo.',
   limite_de_pedidos: 'A Meta só deixa pedir uma vez por dia e duas por semana.',

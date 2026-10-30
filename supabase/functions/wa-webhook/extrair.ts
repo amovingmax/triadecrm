@@ -583,7 +583,9 @@ function eventosDeChamada(valor: Record<string, unknown>): EventoDeChamada[] {
       de_user_id: deUserId,
       nome: nomeDoContato(contatos, de, deUserId),
       sdp_tipo: sdpTipo,
-      sdp: texto(sessao?.sdp),
+      // Sem `texto()`: ele apara o fim, e o SDP sem a última quebra de linha é recusado
+      // pelo navegador.
+      sdp: typeof sessao?.sdp === 'string' ? sessao.sdp : null,
       opaco: texto(c.biz_opaque_callback_data),
       status: texto(c.status),
       inicio: instanteOuNulo(c.start_time),
