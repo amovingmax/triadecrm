@@ -14,7 +14,8 @@ import { type Permissao } from './aviso-do-navegador';
 export function avisarDaPermissao(resultado: Permissao): void {
   if (resultado === 'liberada') {
     toast.success('Avisos ligados neste navegador.', {
-      description: 'Quando chegar mensagem, o aviso aparece mesmo com o CRM em outra aba.',
+      description:
+        'Quando chegar mensagem, o aviso aparece mesmo com o CRM em outra aba ou minimizado.',
     });
   } else if (resultado === 'bloqueada') {
     toast('O navegador bloqueou as notificações.', {

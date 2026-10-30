@@ -7,7 +7,7 @@ import { maisRecente } from './regra';
 /**
  * O que o aviso de resposta guarda no aparelho, por pessoa.
  *
- * Três coisas, e nenhuma é dado de parceiro:
+ * Quatro coisas, e nenhuma é dado de parceiro:
  *   - `silenciado`  a pessoa pediu para não ser avisada. Ausente = avisar, que é
  *                   o padrão: o aviso nasce ligado.
  *   - `visto`       o piso: a chegada abaixo da qual nada mais conta. Nasce na
@@ -15,6 +15,8 @@ import { maisRecente } from './regra';
  *                   vez neste navegador, e só anda quando o que ficou para trás
  *                   já foi respondido (`pisoPossivel`, em `regra.ts`).
  *   - `convite`     ela dispensou o convite de ligar as notificações do navegador.
+ *   - `semSom`      ela desligou o toque do aviso (29/10/2026). Ausente = tocar:
+ *                   o som nasce ligado, e sai pelo menu da conta.
  *
  * POR QUE NO APARELHO, E NÃO NO BANCO. A permissão de notificação já é do
  * navegador, não da pessoa: liberar no computador não libera no celular. Guardar
@@ -34,6 +36,7 @@ const CHAVES = {
   silenciado: 'komune.avisos.silenciado.v1',
   visto: 'komune.avisos.visto.v1',
   convite: 'komune.avisos.convite.v1',
+  semSom: 'komune.avisos.sem-som.v1',
 } as const;
 
 type Campo = keyof typeof CHAVES;
@@ -99,9 +102,23 @@ export function useConviteDispensado(usuarioId: string): [boolean, () => void] {
   return [dispensado, dispensar];
 }
 
+/** O toque do aviso: `true` = toca, que é o padrão. */
+export function useSomLigado(usuarioId: string): [boolean, (ligar: boolean) => void] {
+  const ligado = usePreferencia('semSom', usuarioId) !== '1';
+  const mudar = useCallback(
+    (ligar: boolean) => gravar('semSom', usuarioId, ligar ? null : '1'),
+    [usuarioId],
+  );
+  return [ligado, mudar];
+}
+
 /** Para quem decide fora da pintura: o provedor confere isto na hora de avisar. */
 export function estaSilenciado(usuarioId: string): boolean {
   return ler('silenciado', usuarioId) === '1';
+}
+
+export function somEstaLigado(usuarioId: string): boolean {
+  return ler('semSom', usuarioId) !== '1';
 }
 
 export function lerVistoAte(usuarioId: string): string | null {

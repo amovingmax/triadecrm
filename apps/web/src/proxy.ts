@@ -16,8 +16,9 @@ export const config = {
      * Tudo, exceto:
      * - _next/static, _next/image (arquivos do build e otimização de imagens)
      * - favicon.ico, manifest.webmanifest, icons/ (PWA — buscados sem cookies)
+     * - sw-avisos.js (o service worker não pode ser redirecionado para o login)
      * - arquivos estáticos por extensão (imagens, fontes, txt, xml, json)
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|txt|xml|json)$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest|sw-avisos\\.js|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|txt|xml|json)$).*)',
   ],
 };

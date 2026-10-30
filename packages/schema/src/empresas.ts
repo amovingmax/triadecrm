@@ -26,6 +26,11 @@ export interface Empresa {
   nome: string;
   /** Como aparece quando o texto fala do número de WhatsApp: "o número da KOMUNE". */
   nomeDoNumero: string;
+  /**
+   * O nome curto, que abre o título do aviso do navegador: quem está nas duas
+   * empresas precisa saber de qual delas é o aviso (30/10/2026).
+   */
+  nomeNoAviso: string;
   /** Nome do app na aba do navegador e no ícone instalado. */
   tituloDoApp: string;
   /** Linha de baixo do login. */
@@ -94,11 +99,16 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
     slug: 'komune',
     nome: 'Komune',
     nomeDoNumero: 'KOMUNE',
+    nomeNoAviso: 'KOMUNE',
     tituloDoApp: 'Tríade',
     descricaoDoLogin: 'CRM de captação da Komune.',
     descricaoDoApp:
       'CRM de captação da KOMUNE: parceiros, Revisão, funis, conversas de WhatsApp, agenda, metas e relatórios.',
-    admins: { ou: 'Rafael, Luiz ou Matheus', e: 'Rafael, Luiz e Matheus', tecnicos: 'Luiz ou Matheus' },
+    admins: {
+      ou: 'Rafael, Luiz ou Matheus',
+      e: 'Rafael, Luiz e Matheus',
+      tecnicos: 'Luiz ou Matheus',
+    },
     tipos: { fornecedor: 'Fornecedor', produtor: 'Produtor', cerimonialista: 'Cerimonialista' },
     gruposDeCategoria: {},
     origens: null,
@@ -109,6 +119,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
     slug: 'imova',
     nome: 'Imova Imobiliária',
     nomeDoNumero: 'Imova Imobiliária',
+    nomeNoAviso: 'Imova',
     tituloDoApp: 'Tríade · Imova',
     descricaoDoLogin: 'CRM da Imova Imobiliária.',
     descricaoDoApp:
@@ -146,7 +157,9 @@ export function empresaPorSlug(slug: string | undefined | null): Empresa {
   const chave = (slug ?? 'komune').trim() as EmpresaSlug;
   const empresa = EMPRESAS[chave];
   if (!empresa) {
-    throw new Error(`Empresa "${slug}" não existe no Tríade (${Object.keys(EMPRESAS).join(', ')}).`);
+    throw new Error(
+      `Empresa "${slug}" não existe no Tríade (${Object.keys(EMPRESAS).join(', ')}).`,
+    );
   }
   return empresa;
 }

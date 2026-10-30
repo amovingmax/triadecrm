@@ -361,40 +361,69 @@ export function contextoDoAviso(
   };
 }
 
-const LISTA = new Intl.ListFormat('pt-BR', { style: 'long', type: 'conjunction' });
+/** Quantas conversas cabem no corpo do aviso antes de virar "e mais N". */
+const CONVERSAS_NO_AVISO = 3;
 
-/** Quantos nomes cabem no corpo do aviso antes de virar "e mais N". */
-const NOMES_NO_AVISO = 3;
+/** Quantos caracteres da mensagem cabem em cada linha do aviso de várias conversas. */
+const TAMANHO_NA_LINHA = 60;
 
 export interface TextoDoAviso {
   readonly titulo: string;
   readonly corpo: string;
 }
 
+/** Uma conversa no aviso: quem escreveu e o começo do que escreveu. */
+export interface MensagemDoAviso {
+  readonly nome: string;
+  /** O que `previaDaMensagem` devolveu. `null` = não se sabe o que chegou. */
+  readonly previa: string | null;
+}
+
 /**
- * O texto da notificação DO SISTEMA. Ela não leva o conteúdo da mensagem: aparece
- * por cima de qualquer coisa, inclusive de uma tela compartilhada numa reunião.
- * A prévia do texto vai no cartão de dentro do CRM (`previaDaMensagem`), que só
- * quem está logado vê.
+ * O texto da notificação DO SISTEMA.
+ *
+ * DESDE 29/10/2026 ELA LEVA O COMEÇO DA MENSAGEM. O usuário: "O aviso deve
+ * mostrar o começo da Mensagem". Até ali ela dizia só de quem era, porque
+ * aparece por cima de qualquer coisa, inclusive de uma tela compartilhada numa
+ * reunião. O risco continua; quem vai compartilhar a tela silencia os avisos no
+ * menu da conta. Mensagem sem texto (áudio, imagem) diz o que chegou; sem saber
+ * nada, o corpo volta a ser o convite para abrir o Tríade.
+ *
+ * Uma conversa: o nome no título e a mensagem no corpo, como num aplicativo de
+ * mensagens. Várias: uma linha por conversa, "Nome: começo da mensagem".
  *
  * "Nova mensagem de", e não "respondeu": quem escreve primeiro — o cliente que
  * viu um anúncio — não está respondendo ninguém.
+ *
+ * O TÍTULO COMEÇA PELA EMPRESA (30/10/2026). "Preciso que mostre se a notificação é
+ * do ambiente da Imova ou do ambiente da Komune." As duas têm o mesmo ícone, e o
+ * endereço na linha de baixo não diz isso a ninguém. No começo, porque o sistema
+ * corta título longo pelo fim.
  */
-export function textoDoAviso(nomes: readonly string[]): TextoDoAviso {
-  const unicos = [...new Set(nomes)];
-  if (nomes.length <= 1) {
+export function textoDoAviso(mensagens: readonly MensagemDoAviso[], empresa: string): TextoDoAviso {
+  const primeira = mensagens[0];
+  if (mensagens.length <= 1) {
     return {
-      titulo: `Nova mensagem de ${unicos[0] ?? 'alguém'}`,
-      corpo: 'Abra o Tríade para ler e responder.',
+      titulo: `${empresa} · Nova mensagem de ${primeira?.nome ?? 'alguém'}`,
+      corpo: primeira?.previa ?? 'Abra o Tríade para ler e responder.',
     };
   }
 
-  const mostrados = unicos.slice(0, NOMES_NO_AVISO);
-  const resto = unicos.length - mostrados.length;
+  const mostradas = mensagens.slice(0, CONVERSAS_NO_AVISO);
+  const resto = mensagens.length - mostradas.length;
+  const linhas = mostradas.map((m) =>
+    m.previa ? `${m.nome}: ${encurtar(m.previa, TAMANHO_NA_LINHA)}` : m.nome,
+  );
+  if (resto > 0) linhas.push(resto === 1 ? 'E mais 1 conversa.' : `E mais ${resto} conversas.`);
   return {
-    titulo: `${nomes.length} conversas com mensagem nova`,
-    corpo: resto > 0 ? `${mostrados.join(', ')} e mais ${resto}.` : `${LISTA.format(mostrados)}.`,
+    titulo: `${empresa} · ${mensagens.length} conversas com mensagem nova`,
+    corpo: linhas.join('\n'),
   };
+}
+
+/** Corta no tamanho, com reticências, sem deixar espaço antes delas. */
+function encurtar(texto: string, tamanho: number): string {
+  return texto.length > tamanho ? `${texto.slice(0, tamanho - 1).trimEnd()}…` : texto;
 }
 
 /** O que dizer de uma mensagem que não é texto. */
@@ -412,16 +441,14 @@ const PREVIA_POR_TIPO: Readonly<Record<string, string>> = {
 const TAMANHO_DA_PREVIA = 140;
 
 /**
- * A prévia da mensagem no cartão de dentro do CRM: o começo do texto, numa linha
- * só. Sem texto (áudio, imagem), diz o que chegou. `null` quando não se sabe —
+ * A prévia da mensagem no cartão de dentro do CRM e, desde 29/10/2026, na
+ * notificação do sistema: o começo do texto, numa linha só. Sem texto (áudio, imagem), diz o que chegou. `null` quando não se sabe —
  * o cartão então mostra só o nome, em vez de inventar.
  */
 export function previaDaMensagem(tipo: string | null, corpo: string | null): string | null {
   const texto = corpo?.replace(/\s+/g, ' ').trim();
   if (texto) {
-    return texto.length > TAMANHO_DA_PREVIA
-      ? `${texto.slice(0, TAMANHO_DA_PREVIA - 1).trimEnd()}…`
-      : texto;
+    return encurtar(texto, TAMANHO_DA_PREVIA);
   }
   return tipo ? (PREVIA_POR_TIPO[tipo] ?? null) : null;
 }
@@ -443,6 +470,11 @@ export function destinoDoAviso(
   }
   if (novas.every((c) => c.organizacaoId === null)) return '/conversas?aba=fora';
   return '/conversas';
+}
+
+/** O botão da notificação do sistema: responder uma, ou ir à lista de várias. */
+export function botaoDoAviso(novas: readonly unknown[]): string {
+  return novas.length === 1 ? 'Responder' : 'Abrir Conversas';
 }
 
 /**

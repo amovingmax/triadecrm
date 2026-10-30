@@ -136,7 +136,7 @@ export function PilhaDeAvisos() {
                 Quer ser avisado quando chegar mensagem?
               </p>
               <p className="text-sm leading-snug text-muted-foreground">
-                O navegador mostra um aviso mesmo com o CRM em outra aba.
+                O navegador mostra um aviso mesmo com o CRM em outra aba ou minimizado.
               </p>
             </div>
           </div>

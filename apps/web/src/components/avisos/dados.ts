@@ -217,6 +217,30 @@ export async function lerFichasDoAviso(ids: readonly string[]): Promise<Map<stri
 }
 
 /**
+ * Esta pessoa ainda tem acesso a esta empresa? Conferido no banco a cada aviso.
+ *
+ * O papel vem do token, que vale até uma hora. Sem esta conferência, quem foi
+ * desativado com o CRM aberto seguia recebendo aviso, com o começo da mensagem, até
+ * o token vencer (medido em 30/10/2026). "Quem não tem acesso à Imova não receba
+ * nada da Imova."
+ *
+ * `false` só quando o banco responde que não: sem perfil ou desativada. Se a leitura
+ * falhar, vale o acesso que a pessoa tinha: uma oscilação de rede não pode calar o
+ * aviso de quem atende.
+ */
+export async function aindaTemAcesso(usuarioId: string): Promise<boolean> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('is_active')
+    .eq('id', usuarioId)
+    .maybeSingle();
+
+  if (error) return true;
+  return data?.is_active === true;
+}
+
+/**
  * Quem está ativo no time E atende o WhatsApp. A view `team_directory` não tem
  * PII e é legível por todo autenticado. `null` é falha de rede (ver `ehParaMim`).
  *

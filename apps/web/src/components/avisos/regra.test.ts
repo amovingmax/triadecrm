@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  botaoDoAviso,
   chegaramAgora,
   contaNoMenu,
   contextoDoAviso,
@@ -334,23 +335,73 @@ describe('o nome no aviso', () => {
   });
 });
 
-describe('o texto da notificação do sistema', () => {
-  it('uma mensagem diz de quem é, e não leva o conteúdo', () => {
-    const texto = textoDoAviso(['Buffet Aurora']);
-    expect(texto.titulo).toBe('Nova mensagem de Buffet Aurora');
+describe('o texto da notificação do sistema (com a mensagem desde 29/10/2026)', () => {
+  it('uma mensagem: o nome no título e o começo da mensagem no corpo', () => {
+    const texto = textoDoAviso(
+      [{ nome: 'Buffet Aurora', previa: 'Boa tarde! Pode me mandar o link do cadastro?' }],
+      'KOMUNE',
+    );
+    expect(texto.titulo).toBe('KOMUNE · Nova mensagem de Buffet Aurora');
+    expect(texto.corpo).toBe('Boa tarde! Pode me mandar o link do cadastro?');
+  });
+
+  it('mensagem sem texto diz o que chegou', () => {
+    const texto = textoDoAviso(
+      [{ nome: 'Dona Ivone', previa: previaDaMensagem('audio', null) }],
+      'KOMUNE',
+    );
+    expect(texto.corpo).toBe('Mensagem de áudio');
+  });
+
+  it('sem saber o que chegou, convida a abrir o Tríade', () => {
+    const texto = textoDoAviso([{ nome: 'Buffet Aurora', previa: null }], 'KOMUNE');
     expect(texto.corpo).toBe('Abra o Tríade para ler e responder.');
   });
 
-  it('várias viram um aviso só, com os nomes', () => {
-    const texto = textoDoAviso(['Buffet Aurora', 'Dona Ivone', 'Carla']);
-    expect(texto.titulo).toBe('3 conversas com mensagem nova');
-    expect(texto.corpo).toBe('Buffet Aurora, Dona Ivone e Carla.');
+  it('várias viram um aviso só, uma linha por conversa', () => {
+    const texto = textoDoAviso(
+      [
+        { nome: 'Buffet Aurora', previa: 'Boa tarde!' },
+        { nome: 'Dona Ivone', previa: 'Imagem' },
+        { nome: 'Carla', previa: null },
+      ],
+      'KOMUNE',
+    );
+    expect(texto.titulo).toBe('KOMUNE · 3 conversas com mensagem nova');
+    expect(texto.corpo).toBe('Buffet Aurora: Boa tarde!\nDona Ivone: Imagem\nCarla');
   });
 
-  it('mais de três nomes não cabem: o resto vira contagem', () => {
-    const texto = textoDoAviso(['A', 'B', 'C', 'D', 'E']);
-    expect(texto.titulo).toBe('5 conversas com mensagem nova');
-    expect(texto.corpo).toBe('A, B, C e mais 2.');
+  it('na lista, a mensagem longa se corta mais cedo que no aviso de uma só', () => {
+    const longa = 'a'.repeat(100);
+    const texto = textoDoAviso(
+      [
+        { nome: 'A', previa: longa },
+        { nome: 'B', previa: 'oi' },
+      ],
+      'KOMUNE',
+    );
+    const [primeira] = texto.corpo.split('\n');
+    expect(primeira).toBe(`A: ${'a'.repeat(59)}…`);
+    expect(textoDoAviso([{ nome: 'A', previa: longa }], 'KOMUNE').corpo).toBe(longa);
+  });
+
+  it('mais de três conversas não cabem: o resto vira contagem', () => {
+    const cinco = ['A', 'B', 'C', 'D', 'E'].map((nome) => ({ nome, previa: 'oi' }));
+    const texto = textoDoAviso(cinco, 'KOMUNE');
+    expect(texto.titulo).toBe('KOMUNE · 5 conversas com mensagem nova');
+    expect(texto.corpo).toBe('A: oi\nB: oi\nC: oi\nE mais 2 conversas.');
+    expect(textoDoAviso(cinco.slice(0, 4), 'KOMUNE').corpo.split('\n').at(-1)).toBe(
+      'E mais 1 conversa.',
+    );
+  });
+
+  it('o título começa pela empresa, nas duas', () => {
+    const uma = [{ nome: 'Carla', previa: 'Oi' }];
+    expect(textoDoAviso(uma, 'Imova').titulo).toBe('Imova · Nova mensagem de Carla');
+    expect(textoDoAviso([...uma, ...uma], 'Imova').titulo).toBe(
+      'Imova · 2 conversas com mensagem nova',
+    );
+    expect(textoDoAviso(uma, 'KOMUNE').titulo).toBe('KOMUNE · Nova mensagem de Carla');
   });
 });
 
@@ -505,5 +556,12 @@ describe('a conversa silenciada (27/10/2026)', () => {
   it('a localização e o cartão têm prévia própria no cartão do aviso', () => {
     expect(previaDaMensagem('location', null)).toBe('Localização');
     expect(previaDaMensagem('contacts', null)).toBe('Cartão de contato');
+  });
+});
+
+describe('o botão da notificação do sistema (30/10/2026)', () => {
+  it('uma conversa se responde; várias vão para a lista', () => {
+    expect(botaoDoAviso(['a'])).toBe('Responder');
+    expect(botaoDoAviso(['a', 'b'])).toBe('Abrir Conversas');
   });
 });

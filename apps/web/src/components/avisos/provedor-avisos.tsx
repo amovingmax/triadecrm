@@ -15,17 +15,21 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { ESPERA_DA_RAJADA_MS, RITMO_VIGIANDO_MS } from '@/components/conversas/ritmo-do-eco';
 import { type AppRole } from '@/lib/auth/role';
+import { EMPRESA } from '@/lib/empresa';
 import { estaAtivo } from '@/lib/navegacao';
 import { createClient } from '@/lib/supabase/client';
 
 import {
   mostrarAviso,
+  ouvirCliqueNoAviso,
   pedirPermissao as pedirAoNavegador,
+  prepararAvisoDoSistema,
   usePermissao,
   type Permissao,
 } from './aviso-do-navegador';
 import {
   ANTES_DE_TUDO,
+  aindaTemAcesso,
   lerConversasComResposta,
   lerFichasDoAviso,
   lerPessoasAtivas,
@@ -37,10 +41,13 @@ import {
   estaSilenciado,
   gravarVistoAte,
   lerVistoAte,
+  somEstaLigado,
   useConviteDispensado,
   useSilenciado,
+  useSomLigado,
 } from './preferencias';
 import {
+  botaoDoAviso,
   chegaramAgora,
   contextoDoAviso,
   destinoDoAviso,
@@ -59,6 +66,7 @@ import {
   type ConversaComResposta,
   type TipoDoAviso,
 } from './regra';
+import { outraAbaJaTocou, prepararSom, somDestravado, tocarSom } from './som';
 
 /**
  * O aviso de resposta: a casca do CRM fica sabendo que alguém escreveu, em
@@ -109,6 +117,15 @@ import {
  * 6. **O cartão aparece mesmo quando a notificação do sistema saiu.** Quem volta
  *    para a aba encontra o cartão esperando, e ele só começa a contar o tempo
  *    quando a pessoa está olhando (ver `pilha-de-avisos`).
+ * 7. **Mensagem nova toca um som (29/10/2026).** "Deve ser exibido um som ao
+ *    chegar novas notificações, porém esse som pode ser removido nas
+ *    configurações de notificações". Toca com o cartão e com a notificação do
+ *    sistema, nasce ligado e sai no menu da conta. O toque é do CRM (`som.ts`),
+ *    e a notificação do sistema vai calada para não tocar duas vezes.
+ * 8. **Só avisa quem ainda tem acesso (30/10/2026).** Cada empresa tem site, banco
+ *    e login próprios, e o aviso nasce numa aba logada nela: quem não tem acesso à
+ *    Imova não tem de onde receber nada da Imova. O caso que sobrava era o de quem
+ *    é desativado com a aba aberta, e por isso `aindaTemAcesso` confere no banco.
  */
 
 /** O cartão "Nova mensagem" de uma conversa. */
@@ -141,6 +158,9 @@ interface Avisos {
   readonly recebe: boolean;
   readonly silenciado: boolean;
   readonly silenciar: (silenciar: boolean) => void;
+  /** O toque ao chegar mensagem. Nasce ligado (29/10/2026). */
+  readonly somLigado: boolean;
+  readonly ligarSom: (ligar: boolean) => void;
   readonly permissao: Permissao;
   readonly pedirPermissao: () => Promise<Permissao>;
   /** O convite de ligar as notificações do navegador ainda cabe? */
@@ -177,6 +197,8 @@ const SEM_AVISOS: Avisos = {
   recebe: false,
   silenciado: false,
   silenciar: () => undefined,
+  somLigado: true,
+  ligarSom: () => undefined,
   permissao: 'sem_suporte',
   pedirPermissao: async () => 'sem_suporte',
   conviteAberto: false,
@@ -241,6 +263,7 @@ export function ProvedorDeAvisos({
   const [novasIds, setNovasIds] = useState<ReadonlySet<string>>(SEM_NOVAS);
   const [cartoes, setCartoes] = useState<readonly CartaoDeAviso[]>([]);
   const [silenciado, silenciar] = useSilenciado(usuarioId);
+  const [somLigado, ligarSom] = useSomLigado(usuarioId);
   const [conviteDispensado, dispensarConvite] = useConviteDispensado(usuarioId);
   const permissao = usePermissao();
 
@@ -293,6 +316,15 @@ export function ProvedorDeAvisos({
     else roteadorAgora.current.push(destinoDoAviso(alvos));
   }, []);
 
+  /** O clique no aviso do sistema: tira os cartões das conversas e abre. */
+  const abrirDoAviso = useCallback(
+    (alvos: readonly AlvoDaConversa[]) => {
+      for (const alvo of alvos) dispensarCartao(alvo.conversaId);
+      abrir(alvos);
+    },
+    [abrir, dispensarCartao],
+  );
+
   const abrirConversa = useCallback(
     (alvo: AlvoDaConversa) => {
       dispensarCartao(alvo.conversaId);
@@ -306,10 +338,14 @@ export function ProvedorDeAvisos({
       if (estaSilenciado(usuarioId)) return;
 
       const fichas = novas.flatMap((c) => (c.organizacaoId ? [c.organizacaoId] : []));
-      const [fichasDoAviso, ultimas] = await Promise.all([
+      const [temAcesso, fichasDoAviso, ultimas] = await Promise.all([
+        aindaTemAcesso(usuarioId),
         lerFichasDoAviso(fichas),
         lerUltimasMensagens(novas.map((c) => c.conversaId)),
       ]);
+      // Quem perdeu o acesso com o CRM aberto não recebe cartão, som nem notificação.
+      if (!temAcesso) return;
+
       const novos = novas.map((c): CartaoDeAviso => {
         const ultima = ultimas.get(c.conversaId);
         const ficha = c.organizacaoId ? (fichasDoAviso.get(c.organizacaoId) ?? null) : null;
@@ -334,23 +370,41 @@ export function ProvedorDeAvisos({
         );
       });
 
-      // Fora de vista é a aba escondida OU a janela sem foco: o CRM num segundo
-      // monitor, com a pessoa digitando em outro programa, também não está sendo
-      // olhado. Aí o sistema avisa — sem o texto da mensagem (ver `textoDoAviso`).
+      // O toque, com o CRM à vista ou não (ver a decisão 7). Sai de uma aba só;
+      // "resolvido" é: esta aba tocou, ou outra já tinha tocado este aviso.
+      const marca = marcaDoAviso(novas);
+      const comSom = somEstaLigado(usuarioId);
+      const somResolvido =
+        comSom && somDestravado() && (outraAbaJaTocou(usuarioId, marca) || tocarSom());
+
+      // Fora de vista é a aba escondida (outra aba, janela minimizada) OU a
+      // janela sem foco: o CRM num segundo monitor, com a pessoa digitando em
+      // outro programa, também não está sendo olhado. Aí o sistema avisa, com o
+      // começo da mensagem (ver `textoDoAviso`).
       if (document.hidden || !document.hasFocus()) {
-        const texto = textoDoAviso(novos.map((c) => c.nome));
-        mostrarAviso({
+        const texto = textoDoAviso(
+          novos.map((c) => ({ nome: c.nome, previa: c.previa })),
+          EMPRESA.nomeNoAviso,
+        );
+        const alvos = novos.map((c): AlvoDaConversa => ({
+          conversaId: c.conversaId,
+          organizacaoId: c.organizacaoId,
+        }));
+        void mostrarAviso({
           titulo: texto.titulo,
           corpo: texto.corpo,
-          marca: marcaDoAviso(novas),
-          aoClicar: () => {
-            for (const c of novos) dispensarCartao(c.conversaId);
-            abrir(novos);
-          },
+          marca,
+          botao: botaoDoAviso(alvos),
+          alvos,
+          destino: destinoDoAviso(alvos),
+          // Som desligado: calado. Toque do CRM já saiu: calado também. Ligado
+          // e sem o toque destravado: o som do próprio sistema faz as vezes.
+          silenciosa: !comSom || somResolvido,
+          aoClicar: () => abrirDoAviso(alvos),
         });
       }
     },
-    [usuarioId, abrir, dispensarCartao],
+    [usuarioId, abrirDoAviso],
   );
 
   const conferir = useCallback(async () => {
@@ -409,6 +463,19 @@ export function ProvedorDeAvisos({
       lendo.current = false;
     }
   }, [recebe, usuarioId, papel, avisar, publicar]);
+
+  // ---------- 0. o toque fica destravado desde o primeiro clique (ver `som.ts`) ----------
+  useEffect(() => {
+    if (!recebe) return;
+    return prepararSom();
+  }, [recebe]);
+
+  // ---------- 0. o service worker do botão, e o clique que volta dele ----------
+  useEffect(() => {
+    if (!recebe) return;
+    prepararAvisoDoSistema();
+    return ouvirCliqueNoAviso<AlvoDaConversa>(abrirDoAviso);
+  }, [recebe, abrirDoAviso]);
 
   // ---------- 1. o socket acorda, a sondagem garante ----------
   useEffect(() => {
@@ -522,6 +589,8 @@ export function ProvedorDeAvisos({
       recebe,
       silenciado,
       silenciar,
+      somLigado,
+      ligarSom,
       permissao,
       pedirPermissao,
       conviteAberto: recebe && permissao === 'a_pedir' && !silenciado && !conviteDispensado,
@@ -536,6 +605,8 @@ export function ProvedorDeAvisos({
       respostasNovas,
       silenciado,
       silenciar,
+      somLigado,
+      ligarSom,
       permissao,
       pedirPermissao,
       conviteDispensado,

@@ -1,10 +1,12 @@
 'use client';
 
-import { Bell, BellOff, ChevronDown, LogOut } from 'lucide-react';
+import { Bell, BellOff, ChevronDown, LogOut, MonitorDown, Volume2, VolumeX } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { avisarDaPermissao } from '@/components/avisos/convite-de-avisos';
+import { instalarApp, useDaParaInstalar } from '@/components/avisos/instalar-app';
 import { useAvisos } from '@/components/avisos/provedor-avisos';
+import { tocarAmostra } from '@/components/avisos/som';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -54,6 +57,15 @@ import { type Sessao } from '@/lib/auth/session';
  * lado de Conversas continua contando. A escolha é desta pessoa neste navegador
  * (`components/avisos/preferencias.ts`). O item só existe para quem é avisado:
  * leitura e financeiro não respondem conversa e não o veem.
+ *
+ * **O som do aviso também (29/10/2026).** "Esse som pode ser removido nas
+ * configurações de notificações": a caixa "Som nos avisos" logo abaixo. Ligar
+ * toca uma amostra, para a pessoa ouvir o que ligou; o menu fica aberto para ela
+ * ver a marca mudar. Com os avisos silenciados a caixa some: não há o que tocar.
+ *
+ * **Instalar o Tríade (30/10/2026).** No computador, com o CRM instalado o aviso
+ * aparece com o nome e o ícone do Tríade em vez dos do Chrome. O item só aparece
+ * quando o navegador oferece a instalação (`components/avisos/instalar-app.ts`).
  */
 export function UserMenu({ sessao }: { sessao: Sessao }) {
   const formSair = useRef<HTMLFormElement>(null);
@@ -61,6 +73,7 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
   const [naoSubiram, setNaoSubiram] = useState<readonly RegistroNaFila[]>([]);
   const [avisando, setAvisando] = useState(false);
   const avisos = useAvisos();
+  const daParaInstalar = useDaParaInstalar();
 
   // Três estados, um item. Ligar também pede a permissão do navegador quando ela
   // ainda não foi dada: o clique no menu é o gesto que o navegador exige.
@@ -158,11 +171,38 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
                 )}
                 {rotuloDosAvisos}
               </DropdownMenuItem>
+              {!avisos.silenciado ? (
+                <DropdownMenuCheckboxItem
+                  className="min-h-11 md:min-h-0"
+                  checked={avisos.somLigado}
+                  onSelect={(evento) => evento.preventDefault()}
+                  onCheckedChange={(ligar) => {
+                    avisos.ligarSom(ligar);
+                    if (ligar) tocarAmostra();
+                  }}
+                >
+                  {avisos.somLigado ? (
+                    <Volume2 aria-hidden="true" />
+                  ) : (
+                    <VolumeX aria-hidden="true" />
+                  )}
+                  Som nos avisos
+                </DropdownMenuCheckboxItem>
+              ) : null}
               {!avisos.silenciado && avisos.permissao === 'bloqueada' ? (
                 <p className="px-2 pb-1.5 text-xs leading-snug text-muted-foreground">
                   O navegador bloqueou as notificações: o aviso aparece só dentro do CRM.
                 </p>
               ) : null}
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          {daParaInstalar ? (
+            <>
+              <DropdownMenuItem className="min-h-11 md:min-h-0" onSelect={() => void instalarApp()}>
+                <MonitorDown aria-hidden="true" />
+                Instalar o Tríade neste computador
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
           ) : null}
