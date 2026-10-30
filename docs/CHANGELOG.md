@@ -8126,11 +8126,11 @@ O pedido: "quero todas as funcionalidades do wpp no nosso crm, criar grupo, apag
 
 **Decisão humana:** continua levar ao Dennis (LGPD) o texto da mensagem aparecendo por cima de qualquer tela.
 
-## Ligação pelo WhatsApp, só na Imova — 30/10/2026 (branch `ligacao-meta`, fora da main e fora do ar)
+## Ligação pelo WhatsApp, só na Imova — 30/10/2026 (branch `ligacao-meta`)
 
 Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número de WhatsApp da Imova, de dentro do CRM, primeiro no navegador e depois no app. Guia em `docs/operacao/ligacao-whatsapp.md`.
 
-**Entregue (só local):**
+**Entregue:**
 - Banco, `20261030120000_a_ligacao_pelo_whatsapp.sql`: chave `whatsapp.ligacao` (nasce desligada; fora da Imova não liga nem à força), `wa_chamadas`, `wa_permissoes_de_ligar` e as portas com as travas: permissão do cliente, supressão, bloqueio, horário de ligar, limites da Meta, uma ligação por pessoa e por conversa, o primeiro que atender leva. O telefone não sai para a tela. pgTAP 118 (72 asserções).
 - Webhook: o campo `calls` e a resposta ao pedido de permissão vão direto a `wa_chamada_eventos`, fora da fila. Corrigidos dois defeitos que derrubariam toda ligação real: a conferência de horário não olhava `calls[].timestamp` (recusaria com 400) e `texto()` aparava o SDP (o navegador o recusava).
 - Edge Function nova `wa-chamada`: atender, ligar e desligar na Meta, com os erros em português.
@@ -8147,3 +8147,26 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 **Pendente:** tudo em produção e a ligação real: o áudio com a Meta só dá para provar depois de publicar, porque a resposta de voz chega pelo webhook publicado. A prova de ativação na Meta passou em 30/10/2026. O que falta no produto está no guia: pedido fora das 24 h, relatório do dia, alerta de baixa taxa de atendimento, app, chave em Ajustes.
 
 **Decisão humana:** o horário de atendimento enquanto só houver o navegador (recomendado seg–sex, 8h–19h); o OK do Dennis para o registro das ligações, o texto do pedido e o nome do cliente na tela bloqueada do app. A ligação não entra no relatório do dia por pessoa nesta versão.
+
+## 30/10/2026 (tarde) — A ligação pelo WhatsApp publicada na Imova, ainda desligada (RF-CON-18)
+
+**O pedido.** "pode publicar", depois do pedido real provado na Meta.
+
+**Publicado, só na Imova, com a chave `whatsapp.ligacao` desligada e a chamada `DISABLED` na Meta:**
+- `main`: `0126825 → 273a637`.
+- Ar conferido antes: site em `92db3c0`, dentro da `main`; `wa-webhook` no ar igual ao da `main`, arquivo por arquivo; só esta migração pendente no banco.
+- Banco: `20261030120000_a_ligacao_pelo_whatsapp.sql`, por `publicar-banco.mjs imova migrar`. Criou também os dois jobs do pg_cron (`wa_chamadas_fechar_orfas` e `wa_permissoes_conferir_pedidos`).
+- Funções: `wa-webhook` v6 (era v5; a volta é publicar a de `0126825`) e `wa-chamada` v1, nova.
+- Site: `imova-ggkotd81v`, às 16:04 (volta: `imova-n789vzknp`).
+- Robô: `imova-worker-wa` v3, imagem `deployment-01M6738ZHKXKZYCPD00VGHKNDY` (volta: `deployment-01M64D0JEMF394GA9SAGCTEHPJ`).
+- Tudo de cópia limpa do commit (`triadecrm-publicar-imova`).
+
+**KOMUNE, não mexida:** site `triade-m2sd8u153`, robô `triade-worker-wa` v15 e banco sem a migração (pendentes lá: `20261029110000` e `20261030120000`). Nenhum arquivo da Twilio mudou.
+
+**Conferido:** `wa-webhook` e `wa-chamada` recusam pedido sem assinatura ou sem login (401); `/login` 200 e `/auth/dev` 404 no site; a máquina do robô em bom estado; nenhum gatilho novo em `messages`; chave desligada.
+
+**Não conferido:** uma mensagem real passando pelo `wa-webhook` novo, porque nenhuma chegou depois de publicar; e a ligação com voz, que depende da janela de teste com a chave ligada.
+
+**Pendente:** janela de teste real; ativação definitiva com o botão visível, de segunda a sexta, das 8h às 19h; `20261030120000` na KOMUNE, sem efeito lá, quando for a vez dela.
+
+**Fora desta entrega:** o robô da Imova já avisava antes desta publicação que falta aprovar na Meta o modelo `GEN-SYS-OPTOUT`, que confirma a saída de quem pede para sair fora das 24 h.

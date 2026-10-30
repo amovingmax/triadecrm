@@ -44,7 +44,7 @@ Fontes: páginas `calling`, `user-initiated-calls`, `business-initiated-calls`, 
 
 ## Como ativar, em ordem
 
-Feitos em 30/10/2026: a prova do passo 1 (a chamada voltou a ficar desligada no número), os segredos do passo 3 e a inscrição do passo 5. Cada passo em produção só com pedido.
+Passos de 1 a 5 feitos em 30/10/2026; a chave segue desligada, e a chamada, `DISABLED` na Meta. Cada passo em produção só com pedido.
 
 1. **Prova de ativação**, com o botão escondido, e desligar em seguida: `POST /<PHONE_NUMBER_ID>/settings` com `{"calling":{"status":"ENABLED","call_icon_visibility":"DISABLE_ALL","callback_permission_status":"DISABLED"}}`. O erro 138018 quer dizer que faltam pré-requisitos, provavelmente a inscrição do passo 5.
 2. **Banco da Imova:** aplicar `20261030120000_a_ligacao_pelo_whatsapp.sql`.
