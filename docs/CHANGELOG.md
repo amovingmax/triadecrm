@@ -8097,3 +8097,31 @@ O pedido: "quero todas as funcionalidades do wpp no nosso crm, criar grupo, apag
 - Som: conferir no Mac se o app instalado toca sem clique depois de abrir. Proposto e sem resposta: avisar dentro do CRM quando o som estiver travado ("clique em qualquer lugar para liberar o som"), porque hoje a falha é silenciosa.
 
 **Decisão humana:** continua a de 29/10, levar ao Dennis o texto da mensagem aparecendo por cima de qualquer tela.
+
+## 30/10/2026 (tarde) — O aviso do navegador em produção, nas duas empresas (RF-CON-05)
+
+**O pedido.** Depois de testar no localhost: "Tudo certo, quero subir essas atualizações das notificações para o ar".
+
+**Publicado (só os sites; sem migração, sem mexer em banco, WhatsApp ou robôs):**
+- `main`: `0f9e565 → 92db3c0` (código em `5223825`).
+- Ar conferido antes: KOMUNE em `d8e4d4d` e Imova em `e9e03e2`, os dois já dentro da `main`; nada de fora seria apagado.
+- Site da Imova: `imova-n789vzknp`, às 15:24 (volta: `imova-1ivk3ar6k`).
+- Site da KOMUNE: `triade-m2sd8u153`, às 15:27 (volta: `triade-4ce2bne1g`).
+- Os dois de cópia limpa do commit (`triadecrm-publicar-imova` e `triadecrm-publicar-komune`).
+
+**A KOMUNE levou de carona o código da tela da atitude (`3b14f6b`), desligado.** Era o primeiro deploy dela depois disso, e o banco dela não tem esses objetos (`20261029110000` segue pendente lá). Ensaiado antes de publicar: versão de produção (`next build` + `next start`) contra o banco local da KOMUNE, também sem os objetos. Conversas e as abas Consultoria, Clientes e Automáticas abrem, nenhuma etiqueta aparece e nenhuma chamada ao banco falhou.
+
+**Conferido:**
+- No ensaio da versão de produção, com a `Notification` real e medindo o sinal na saída de áudio: aviso "KOMUNE · Nova mensagem de DJ Done" com o botão "Responder"; o clique (a função real do service worker, disparada por script) abre `/conversas?org=…`; sinal de áudio em 5 de 6 rodadas. A rodada sem som foi a primeira depois de ligar o servidor: o áudio ainda não estava destravado e a notificação pediu o som do sistema. Causa não provada, e não se repetiu.
+- Nos dois endereços do ar, sem login e sem tocar em dados: `/login` 200, `/conversas` manda para o login, `/auth/dev` 404, `/sw-avisos.js` 200 com os cabeçalhos certos, service worker ativo e aviso de conferência com o botão num perfil descartável do Chrome. Em `ir.komune.app.br`, `/login` continua indo para `komune.app.br`.
+- Typecheck e lint limpos; 1.462 testes na web e 111 em `packages/schema` passando (1 ignorado).
+
+**Não conferido em produção:** um aviso de mensagem de verdade, com login. Depende da primeira mensagem real chegando com alguém do time fora da aba. Nenhuma mensagem de teste foi mandada em produção.
+
+**Para valer em cada computador:**
+- quem já estava com o CRM aberto precisa recarregar a página para receber a versão nova, e clicar uma vez nela para o som funcionar;
+- o aviso do sistema depende de o Chrome estar liberado em Ajustes do Sistema → Notificações, e o site não enxerga esse bloqueio.
+
+**Pendente:** o que está em "Pendente" na entrada anterior continua valendo, menos publicar. Os 5 avisos novos (conversa passada, tarefa nova, compromisso marcado, lembrete de 30 min, lote para ligar) seguem por construir.
+
+**Decisão humana:** continua levar ao Dennis (LGPD) o texto da mensagem aparecendo por cima de qualquer tela.
