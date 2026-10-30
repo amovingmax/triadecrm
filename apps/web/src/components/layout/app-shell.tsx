@@ -8,6 +8,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { AcompanhanteDeAvisos } from '@/components/ligacao/aviso-no-recibo';
 import { podeLigar } from '@/components/ligacao/chamada-contexto';
 import { ProvedorDoSoftphone } from '@/components/ligacao/voz-provedor';
+import { ProvedorDaLigacaoWhatsapp } from '@/components/ligacao-whatsapp/provedor';
 import { TransicaoPagina } from '@/components/movimento';
 import { type Sessao } from '@/lib/auth/session';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
@@ -57,6 +58,7 @@ export function AppShell({
   return (
     <ProvedorDeAvisos usuarioId={sessao.id} papel={sessao.papel}>
       <ProvedorDoSoftphone podeLigar={podeLigar(sessao.papel)}>
+        <ProvedorDaLigacaoWhatsapp podeLigar={podeLigar(sessao.papel)}>
         <div className="flex min-h-dvh bg-background">
           <Sidebar papel={sessao.papel} filas={filas} />
 
@@ -89,6 +91,7 @@ export function AppShell({
           {/* Com o aparelho ocioso, as telas do menu buscam os dados antes do toque. */}
           <AdiantarDados papel={sessao.papel} telas={telasParaAdiantar(sessao.papel)} />
         </div>
+        </ProvedorDaLigacaoWhatsapp>
       </ProvedorDoSoftphone>
     </ProvedorDeAvisos>
   );

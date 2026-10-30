@@ -8320,6 +8320,60 @@ export type Database = {
           },
         ]
       }
+      wa_chamadas: {
+        Row: {
+          atendida_em: string | null
+          atendida_por: string | null
+          conversation_id: string
+          direcao: string
+          duracao_seg: number | null
+          encerrada_em: string | null
+          erro: Json | null
+          estado: string
+          feita_por: string | null
+          id: string
+          meta_call_id: string | null
+          oferta_sdp: string | null
+          quem: string
+          resposta_sdp: string | null
+          tocou_em: string
+        }
+        Insert: {
+          atendida_em?: string | null
+          atendida_por?: string | null
+          conversation_id: string
+          direcao: string
+          duracao_seg?: number | null
+          encerrada_em?: string | null
+          erro?: Json | null
+          estado: string
+          feita_por?: string | null
+          id?: string
+          meta_call_id?: string | null
+          oferta_sdp?: string | null
+          quem: string
+          resposta_sdp?: string | null
+          tocou_em?: string
+        }
+        Update: {
+          atendida_em?: string | null
+          atendida_por?: string | null
+          conversation_id?: string
+          direcao?: string
+          duracao_seg?: number | null
+          encerrada_em?: string | null
+          erro?: Json | null
+          estado?: string
+          feita_por?: string | null
+          id?: string
+          meta_call_id?: string | null
+          oferta_sdp?: string | null
+          quem?: string
+          resposta_sdp?: string | null
+          tocou_em?: string
+        }
+        Relationships: []
+      }
       wa_grupo_mensagens: {
         Row: {
           apagada_em: string | null
@@ -8650,6 +8704,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      wa_permissoes_de_ligar: {
+        Row: {
+          atualizada_em: string
+          conversation_id: string
+          estado: string
+          expira_em: string | null
+          nao_atendidas_seguidas: number
+          origem: string | null
+          pedida_em: string | null
+          permanente: boolean
+          respondida_em: string | null
+        }
+        Insert: {
+          atualizada_em?: string
+          conversation_id: string
+          estado?: string
+          expira_em?: string | null
+          nao_atendidas_seguidas?: number
+          origem?: string | null
+          pedida_em?: string | null
+          permanente?: boolean
+          respondida_em?: string | null
+        }
+        Update: {
+          atualizada_em?: string
+          conversation_id?: string
+          estado?: string
+          expira_em?: string | null
+          nao_atendidas_seguidas?: number
+          origem?: string | null
+          pedida_em?: string | null
+          permanente?: boolean
+          respondida_em?: string | null
+        }
+        Relationships: []
       }
       wa_saude_numero: {
         Row: {
@@ -10365,6 +10455,24 @@ export type Database = {
       }
       wa_acoes_proximas: { Args: { p_qty?: number }; Returns: Json }
       wa_bot_ligar: { Args: { p_ativo: boolean }; Returns: Json }
+      wa_chamada_abrir: { Args: { p_conversation_id: string }; Returns: Json }
+      wa_chamada_atender: { Args: { p_chamada_id: string }; Returns: Json }
+      wa_chamada_autorizar: {
+        Args: { p_acao: string; p_chamada_id: string }
+        Returns: Json
+      }
+      wa_chamada_eventos: { Args: { p_eventos: Json }; Returns: Json }
+      wa_chamada_marcar: {
+        Args: { p_chamada_id: string; p_dados?: Json; p_evento: string }
+        Returns: Json
+      }
+      wa_chamada_para_meta: { Args: { p_chamada_id: string }; Returns: Json }
+      wa_chamada_soltar: { Args: { p_chamada_id: string }; Returns: Json }
+      wa_ligacao_estado: { Args: { p_conversation_id: string }; Returns: Json }
+      wa_permissao_pedir: {
+        Args: { p_conversation_id: string; p_texto: string }
+        Returns: Json
+      }
       wa_eco_registrar: {
         Args: {
           p_body?: string

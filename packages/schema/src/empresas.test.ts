@@ -14,7 +14,7 @@ describe('empresas', () => {
     );
     expect(k.admins).toEqual({ ou: 'Rafael, Luiz ou Matheus', e: 'Rafael, Luiz e Matheus', tecnicos: 'Luiz ou Matheus' });
     expect(k.tipos).toEqual({ fornecedor: 'Fornecedor', produtor: 'Produtor', cerimonialista: 'Cerimonialista' });
-    expect(k.modulos).toEqual({ plataformaKomune: true, ia: true, atitudeDoCliente: false });
+    expect(k.modulos).toEqual({ plataformaKomune: true, ia: true, atitudeDoCliente: false, ligacaoWhatsapp: false });
     expect(k.gruposDeCategoria).toEqual({});
     expect(k.origens).toBeNull();
   });
@@ -33,7 +33,7 @@ describe('empresas', () => {
       expect(texto).not.toMatch(/komune|rafael|luiz|matheus|heloísa/i);
     }
     expect(i.tituloDoApp).not.toBe(EMPRESAS.komune.tituloDoApp);
-    expect(i.modulos).toEqual({ plataformaKomune: false, ia: false, atitudeDoCliente: true });
+    expect(i.modulos).toEqual({ plataformaKomune: false, ia: false, atitudeDoCliente: true, ligacaoWhatsapp: true });
     expect(i.tipos.cerimonialista).toBeNull();
   });
 

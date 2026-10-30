@@ -65,6 +65,11 @@ export interface Empresa {
      * O banco também trava: a regra só liga no banco da Imova.
      */
     atitudeDoCliente: boolean;
+    /**
+     * Ligação pelo WhatsApp (Calling API da Meta), 30/10/2026. Só da Imova: a KOMUNE
+     * liga pela Twilio. O banco também trava (`app.wa_ligacao_ligada`).
+     */
+    ligacaoWhatsapp: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -112,7 +117,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
     tipos: { fornecedor: 'Fornecedor', produtor: 'Produtor', cerimonialista: 'Cerimonialista' },
     gruposDeCategoria: {},
     origens: null,
-    modulos: { plataformaKomune: true, ia: true, atitudeDoCliente: false },
+    modulos: { plataformaKomune: true, ia: true, atitudeDoCliente: false, ligacaoWhatsapp: false },
     privacidade: null,
   },
   imova: {
@@ -139,7 +144,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       },
       padrao: 'numa lista de contatos da Imova Imobiliária',
     },
-    modulos: { plataformaKomune: false, ia: false, atitudeDoCliente: true },
+    modulos: { plataformaKomune: false, ia: false, atitudeDoCliente: true, ligacaoWhatsapp: true },
     privacidade: {
       controlador: 'Imova Imobiliária',
       registro: 'razão social IMOVA LTDA, CNPJ 66.913.275/0001-24, CRECI-RN 9825',

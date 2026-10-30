@@ -46,6 +46,7 @@ import {
 } from './fora-da-base-dados';
 import { rotuloDoDia } from './formatos';
 import { PreviaDoRascunho } from './lista-conversas';
+import { BotaoDeLigarNaConversa, FaixaDaLigacao } from '@/components/ligacao-whatsapp/botao-na-conversa';
 import { FaixaDaJanela, Janela24h } from './janela-24h';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { Mensagem } from './mensagem-do-fio';
@@ -288,6 +289,9 @@ export function ConversaForaDaBase({
               </span>
               <span className="sr-only">: ver o telefone e as ações</span>
             </button>
+            {eu?.podeEscrever ? (
+              <BotaoDeLigarNaConversa conversaId={fio.id} nome={nomeDoCliente(fio)} compacto />
+            ) : null}
             <Button
               type="button"
               variant="ghost"
@@ -314,6 +318,9 @@ export function ConversaForaDaBase({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              {eu?.podeEscrever ? (
+                <BotaoDeLigarNaConversa conversaId={fio.id} nome={nomeDoCliente(fio)} />
+              ) : null}
               {virando ? null : (
                 <Button
                   type="button"
@@ -337,6 +344,7 @@ export function ConversaForaDaBase({
               />
             </div>
           </div>
+          <FaixaDaLigacao conversaId={fio.id} className="border-t border-hairline" />
         </header>
         {/* A lupa da conversa (27/10/2026), aberta pelo "⋯". */}
         <BarraDeBuscaNoFio />

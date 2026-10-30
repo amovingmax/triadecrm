@@ -31,6 +31,7 @@ import { formatarProximaAcao } from '@/components/parceiros/formatos';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { DiasSemContato } from '@/components/temperatura';
 import { MudarEtapa } from '@/components/funis/mudar-etapa';
+import { BotaoDeLigarNaConversa, FaixaDaLigacao } from '@/components/ligacao-whatsapp/botao-na-conversa';
 
 import { arquivarConversa } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
@@ -391,6 +392,9 @@ export function Conversa({
             </span>
             <span className="sr-only">: ver a etapa, as etiquetas, as ações e a ficha</span>
           </button>
+          {fio && eu?.podeEscrever ? (
+            <BotaoDeLigarNaConversa conversaId={fio.id} nome={item.nome} compacto />
+          ) : null}
           <Button
             variant="ghost"
             size="icon"
@@ -423,6 +427,9 @@ export function Conversa({
           {/* As ações na MESMA linha do nome (eram uma faixa própria de 64 px,
               gasta em toda conversa para ações de uma vez por visita). */}
           <div className="flex shrink-0 items-center gap-1.5">
+            {fio && eu?.podeEscrever ? (
+              <BotaoDeLigarNaConversa conversaId={fio.id} nome={item.nome} />
+            ) : null}
             {podeAssumir && fio ? <AssumirConversa fioId={fio.id} organizacaoId={item.id} /> : null}
             {fio && eu?.podeEscrever ? (
               <TransferirConversa
@@ -466,6 +473,7 @@ export function Conversa({
             className="border-t border-hairline conversa-estreita:hidden"
           />
         ) : null}
+        {fio ? <FaixaDaLigacao conversaId={fio.id} className="border-t border-hairline" /> : null}
       </header>
       {/* A lupa da conversa (27/10/2026), aberta pelo "⋯". */}
       <BarraDeBuscaNoFio />
