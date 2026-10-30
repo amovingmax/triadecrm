@@ -22,7 +22,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(79);
+select plan(82);
 
 insert into public.allowed_users (email, role, note) values
   ('h118.g@teste.local', 'gestor', 'pgTAP 118'),
@@ -313,6 +313,29 @@ select is(public.wa_ligacao_estado(pg_temp.id('ja_tinha')) ->> 'permanente', 'tr
 select is(public.wa_permissao_pedir(pg_temp.id('ja_tinha'), 'Posso?') ->> 'motivo', 'ja_permitida', 'daí em diante não se pede mais');
 select pg_temp.sair();
 select is((select count(*)::int from public.wa_permissoes_de_ligar where conversation_id = pg_temp.id('ja_tinha') and origem = 'pedido' and respondida_em is not null), 1, 'fica registrado como resposta ao pedido');
+
+-- O pedido que a Meta barrou pelo limite (migração 20261030170000): segura o botão por 24 h, sem contar para os 2 por semana.
+select pg_temp.conversa('limite', '+5584999911892');
+select pg_temp.conversa('semana', '+5584999911893');
+select pg_temp.gestor();
+select public.wa_permissao_pedir(pg_temp.id('limite'), 'Posso ligar?');
+select public.wa_permissao_pedir(pg_temp.id('semana'), 'Posso ligar?');
+select pg_temp.sair();
+update public.messages set status = 'failed'::app.msg_status, error_code = '138009'
+ where conversation_id = pg_temp.id('limite') and direction = 'out';
+update public.messages set status = 'delivered'::app.msg_status, created_at = now() - interval '3 days'
+ where conversation_id = pg_temp.id('semana') and direction = 'out';
+select pg_temp.gestor();
+select public.wa_permissao_pedir(pg_temp.id('semana'), 'De novo?');
+select pg_temp.sair();
+update public.messages set status = 'failed'::app.msg_status, error_code = '138009', created_at = now() - interval '2 days'
+ where conversation_id = pg_temp.id('semana') and direction = 'out' and status = 'queued';
+select app.wa_permissoes_conferir_pedidos();
+select pg_temp.gestor();
+select isnt(public.wa_ligacao_estado(pg_temp.id('limite')) ->> 'proximo_pedido_em', null, 'barrado pelo limite: a tela diz quando pode pedir de novo');
+select is(public.wa_permissao_pedir(pg_temp.id('limite'), 'De novo?') ->> 'motivo', 'limite_de_pedidos', 'e o banco não deixa tentar antes');
+select is(public.wa_ligacao_estado(pg_temp.id('semana')) ->> 'proximo_pedido_em', null, 'o barrado não conta para os 2 por semana');
+select pg_temp.sair();
 
 select pg_temp.respondeu('+5584999911803', 'reject');
 select pg_temp.gestor();

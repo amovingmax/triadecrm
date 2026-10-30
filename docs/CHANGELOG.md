@@ -8165,9 +8165,18 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 
 **Conferido:** `wa-webhook` e `wa-chamada` recusam pedido sem assinatura ou sem login (401); `/login` 200 e `/auth/dev` 404 no site; a máquina do robô em bom estado; nenhum gatilho novo em `messages`; chave desligada.
 
-**Não conferido:** uma mensagem real passando pelo `wa-webhook` novo, porque nenhuma chegou depois de publicar; e a ligação com voz, que depende da janela de teste com a chave ligada.
+**Teste real na janela de 30 minutos (16h17 às 16h47):**
+- Duas ligações feitas pelo navegador, atendidas e encerradas sem erro: 12 s (final 3045) e 130 s (final 8759).
+- Final 8759: o caminho inteiro pelo CRM, com pedido, aceite pelo `wa-webhook` novo e botão "Ligar".
+- Final 3045: permitiu às 15h18, antes do webhook novo, e o pedido novo voltou com 138009, e não 138017 como previsto, porque o limite veio antes. A resposta real foi registrada por `wa_chamada_eventos`, depois de conferir `permanent` na Meta.
+- 34 entregas da Meta e 9 mensagens recebidas pelo `wa-webhook` novo. A única saída com falha foi esse pedido.
+- A janela desligou a chave e a chamada sozinha às 16h47.
 
-**Pendente:** janela de teste real; ativação definitiva com o botão visível, de segunda a sexta, das 8h às 19h; `20261030120000` na KOMUNE, sem efeito lá, quando for a vez dela.
+**Corrigido, fora do ar por enquanto:** `20261030170000_o_limite_de_pedidos_de_ligar.sql`. O pedido recusado com 138009 segura o botão por 24 h, sem contar para os 2 por semana.
+
+**Não conferido:** o cliente ligar para a Imova com a Meta real, porque o botão segue escondido; e outras redes além da de quem testou.
+
+**Pendente:** publicar a correção do limite; deixar ligado para a equipe, no Terminal do usuário; ativação com o botão visível para os clientes, de segunda a sexta, das 8h às 19h; `20261030120000` e `20261030170000` na KOMUNE, sem efeito lá, quando for a vez dela.
 
 **Fora desta entrega:** o robô da Imova já avisava antes desta publicação que falta aprovar na Meta o modelo `GEN-SYS-OPTOUT`, que confirma a saída de quem pede para sair fora das 24 h.
 

@@ -44,7 +44,7 @@ Fontes: páginas `calling`, `user-initiated-calls`, `business-initiated-calls`, 
 
 ## Como ativar, em ordem
 
-Passos de 1 a 5 feitos em 30/10/2026; a chave segue desligada, e a chamada, `DISABLED` na Meta. Cada passo em produção só com pedido.
+Passos de 1 a 5 feitos em 30/10/2026, e o passo 7 feito só para a empresa ligar. A chave segue desligada, e a chamada, `DISABLED` na Meta. Cada passo em produção só com pedido.
 
 1. **Prova de ativação**, com o botão escondido, e desligar em seguida: `POST /<PHONE_NUMBER_ID>/settings` com `{"calling":{"status":"ENABLED","call_icon_visibility":"DISABLE_ALL","callback_permission_status":"DISABLED"}}`. O erro 138018 quer dizer que faltam pré-requisitos, provavelmente a inscrição do passo 5.
 2. **Banco da Imova:** aplicar `20261030120000_a_ligacao_pelo_whatsapp.sql`.
@@ -80,15 +80,18 @@ Em 30/10/2026, antes de publicar, com um envio direto pela API para um WhatsApp 
 - a resposta real passou por `extrairDaMeta`: vira o evento `permissao` e nada entra na fila. Na permissão sem prazo, `expiration_timestamp` não vem;
 - fora das 24 h a Meta aceita o envio e só depois recusa, por recibo com o erro 131047. Na tela isso não acontece, porque o botão fica desligado fora da janela.
 
-Uma permissão que existe na Meta e o CRM não viu (a resposta veio antes desta versão, ou o aviso se perdeu) se resolve no primeiro pedido: a Meta recusa com 138017, e `app.wa_permissoes_conferir_pedidos`, pelo pg_cron a cada minuto, passa a conversa para "aceita, sem prazo". Qualquer outra falha do pedido devolve o botão. Não há gatilho em `messages`.
+Ainda em 30/10/2026, já com a versão publicada e a chave ligada por 30 minutos:
+
+- o pedido saiu pelo CRM, foi aceito no celular e a resposta chegou ao CRM pelo `wa-webhook` novo; o botão virou "Ligar";
+- duas ligações feitas pelo navegador foram atendidas e encerradas sem erro, de 12 s e de 130 s: a Meta aceitou o SDP do Chrome, e a conexão subiu na rede de quem testou;
+- 34 entregas da Meta passaram pelo `wa-webhook` novo, com 9 mensagens recebidas.
+
+Uma permissão que existe na Meta e o CRM não viu (a resposta veio antes desta versão, ou o aviso se perdeu): se ainda houver limite de pedidos, a Meta recusa com 138017, e `app.wa_permissoes_conferir_pedidos`, pelo pg_cron a cada minuto, passa a conversa para "aceita, sem prazo". Se o limite estiver gasto, a Meta responde 138009 antes, e o botão fica preso por 24 h. Qualquer outra falha do pedido devolve o botão. Não há gatilho em `messages`.
 
 ## O que não foi provado
 
-O ensaio local usa o dublê no lugar da Meta (`_dubles/meta-graph-duble.mjs`). Ele prova o caminho inteiro, com WebRTC e áudio de verdade no Chrome, mas o outro lado é outro navegador, e não o servidor de mídia da Meta. Só o teste real (passo 7) prova:
-
-- que o SDP do Chrome é aceito pela Meta;
-- que a conexão sobe nas redes de quem usa o CRM. A Meta diz que STUN e TURN não são obrigatórios, e `webrtc.ts` não usa nenhum; rede que bloqueie UDP pode exigir um servidor TURN;
-- o texto e o desenho reais que o cliente vê, que a Meta não publica.
+- **O cliente ligar para a empresa, com a Meta real.** Só a empresa ligou: o botão segue escondido dos clientes. O caminho está provado só com o dublê (`_dubles/meta-graph-duble.mjs`).
+- **Outras redes.** A Meta diz que STUN e TURN não são obrigatórios, e `webrtc.ts` não usa nenhum; rede que bloqueie UDP pode exigir um servidor TURN.
 
 ## O que falta
 
