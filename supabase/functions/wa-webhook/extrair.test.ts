@@ -645,3 +645,180 @@ Deno.test('webhooks de grupo viram um item por grupo, com chave estável', () =>
   )[0];
   assertEquals(entrou.evento.added, [{ wa_id: '5584977776666' }]);
 });
+
+// =============================================================================
+// A ligação pelo WhatsApp: o campo `calls` e a resposta ao pedido de permissão não
+// entram na fila. Nada aqui pode virar `itens`, nem mensagem.
+// =============================================================================
+function loteDeLigacao(valor: Record<string, unknown>) {
+  return {
+    object: 'whatsapp_business_account',
+    entry: [{ id: 'WABA', changes: [{ field: 'calls', value: valor }] }],
+  };
+}
+const META_DA_LIGACAO = { phone_number_id: 'PN', display_phone_number: '5584994058888' };
+const CONTATO = [{ profile: { name: 'Carlos' }, wa_id: '5584999990001', user_id: 'BR.1' }];
+
+Deno.test('o cliente ligou: a oferta vai para as chamadas, e nada para a fila', () => {
+  const { itens, chamadas, ignorados } = extrairDaMeta(loteDeLigacao({
+    metadata: META_DA_LIGACAO,
+    contacts: CONTATO,
+    calls: [{
+      id: 'wacid.1',
+      from: '5584999990001',
+      from_user_id: 'BR.1',
+      to: '5584994058888',
+      event: 'connect',
+      timestamp: '1671644824',
+      session: { sdp_type: 'offer', sdp: 'v=0 oferta' },
+    }],
+  }));
+  assertEquals(itens, []);
+  assertEquals(ignorados, []);
+  assertEquals(chamadas.length, 1);
+  const c = chamadas[0];
+  if (c.tipo !== 'chamada') throw new Error('tipo errado');
+  assertEquals(c.evento, 'connect');
+  assertEquals(c.meta_call_id, 'wacid.1');
+  assertEquals(c.de, '+5584999990001');
+  assertEquals(c.nome, 'Carlos');
+  assertEquals(c.numero_da_empresa, '+5584994058888');
+  assertEquals(c.sdp_tipo, 'offer');
+  assertEquals(c.sdp, 'v=0 oferta');
+});
+
+Deno.test('a ligação feita: o cliente é o `to`, e a resposta volta com o id nosso', () => {
+  const { chamadas } = extrairDaMeta(loteDeLigacao({
+    metadata: META_DA_LIGACAO,
+    contacts: CONTATO,
+    calls: [{
+      id: 'wacid.2',
+      from: '5584994058888',
+      to: '5584999990001',
+      event: 'connect',
+      direction: 'BUSINESS_INITIATED',
+      biz_opaque_callback_data: 'id-nosso',
+      timestamp: '1749196895',
+      session: { sdp_type: 'answer', sdp: 'v=0 resposta' },
+    }],
+  }));
+  const c = chamadas[0];
+  if (c.tipo !== 'chamada') throw new Error('tipo errado');
+  assertEquals(c.de, '+5584999990001');
+  assertEquals(c.opaco, 'id-nosso');
+  assertEquals(c.sdp_tipo, 'answer');
+});
+
+Deno.test('o fim traz duração e erros, e sem início os horários ficam nulos', () => {
+  const { chamadas } = extrairDaMeta(loteDeLigacao({
+    metadata: META_DA_LIGACAO,
+    calls: [
+      {
+        id: 'wacid.3',
+        from: '5584999990001',
+        event: 'terminate',
+        direction: 'USER_INITIATED',
+        status: 'COMPLETED',
+        start_time: '1671644824',
+        end_time: '1671644944',
+        duration: 120,
+        timestamp: '1671644944',
+      },
+      {
+        id: 'wacid.4',
+        from: '5584999990001',
+        event: 'terminate',
+        direction: 'USER_INITIATED',
+        status: 'FAILED',
+        timestamp: '1671644944',
+      },
+    ],
+    errors: [{ code: 138021, message: 'Media receive timeout' }],
+  }));
+  const [a, b] = chamadas;
+  if (a.tipo !== 'chamada' || b.tipo !== 'chamada') throw new Error('tipo errado');
+  assertEquals(a.duracao, 120);
+  assertEquals(a.inicio, new Date(1671644824 * 1000).toISOString());
+  assertEquals(b.inicio, null);
+  assertEquals(b.fim, null);
+  assertEquals(b.erros.length, 1);
+});
+
+Deno.test('o andamento da ligação feita vem em `statuses`, no mesmo campo', () => {
+  const { itens, chamadas } = extrairDaMeta(loteDeLigacao({
+    metadata: META_DA_LIGACAO,
+    statuses: [{ id: 'wacid.5', type: 'call', status: 'RINGING', timestamp: '1671644824', recipient_id: '5584999990001' }],
+  }));
+  assertEquals(itens, []);
+  assertEquals(chamadas, [{
+    tipo: 'chamada_status',
+    meta_call_id: 'wacid.5',
+    status: 'RINGING',
+    opaco: null,
+    ocorrido_em: new Date(1671644824 * 1000).toISOString(),
+  }]);
+});
+
+Deno.test('a resposta ao pedido de permissão não vira mensagem', () => {
+  const { itens, chamadas } = extrairDaMeta({
+    object: 'whatsapp_business_account',
+    entry: [{
+      id: 'WABA',
+      changes: [{
+        field: 'messages',
+        value: {
+          metadata: META_DA_LIGACAO,
+          contacts: CONTATO,
+          messages: [{
+            id: 'wamid.PERM',
+            from: '5584999990001',
+            timestamp: '1768550000',
+            type: 'interactive',
+            interactive: {
+              type: 'call_permission_reply',
+              call_permission_reply: {
+                response: 'accept',
+                is_permanent: false,
+                expiration_timestamp: '1768550400',
+                response_source: 'user_action',
+              },
+            },
+          }],
+        },
+      }],
+    }],
+  });
+  assertEquals(itens, []);
+  const c = chamadas[0];
+  if (c.tipo !== 'permissao') throw new Error('tipo errado');
+  assertEquals(c.resposta, 'accept');
+  assertEquals(c.permanente, false);
+  assertEquals(c.expira_em, new Date(1768550400 * 1000).toISOString());
+  assertEquals(c.origem, 'user_action');
+  assertEquals(c.de, '+5584999990001');
+});
+
+Deno.test('a resposta a um botão comum continua sendo mensagem', () => {
+  const { itens, chamadas } = extrairDaMeta({
+    object: 'whatsapp_business_account',
+    entry: [{
+      id: 'WABA',
+      changes: [{
+        field: 'messages',
+        value: {
+          metadata: META_DA_LIGACAO,
+          messages: [{
+            id: 'wamid.BOT',
+            from: '5584999990001',
+            timestamp: '1768550000',
+            type: 'interactive',
+            interactive: { type: 'button_reply', button_reply: { id: 'b1', title: 'Sim' } },
+          }],
+        },
+      }],
+    }],
+  });
+  assertEquals(chamadas, []);
+  assertEquals(itens.length, 1);
+  assertEquals(itens[0].tipo, 'mensagem');
+});

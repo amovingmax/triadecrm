@@ -177,8 +177,57 @@ export type ItemDaMeta =
       detalhe: string | null;
     };
 
+/**
+ * A ligação pelo WhatsApp (campo `calls` e a resposta ao pedido de permissão). Não vai
+ * para a fila `wa_inbound`: o cliente está ouvindo chamar e a Meta dá de 30 a 60 s para
+ * atender, então `index.ts` entrega direto a `public.wa_chamada_eventos`.
+ */
+export type EventoDeChamada =
+  | {
+      tipo: 'chamada';
+      evento: string;
+      meta_call_id: string;
+      direcao: string | null;
+      numero_da_empresa: string | null;
+      /** O cliente: quem ligou, ou para quem a empresa ligou. */
+      de: string | null;
+      de_user_id: string | null;
+      nome: string | null;
+      sdp_tipo: string | null;
+      sdp: string | null;
+      /** O id nosso, que a ligação feita leva até a Meta e volta nos avisos. */
+      opaco: string | null;
+      status: string | null;
+      inicio: string | null;
+      fim: string | null;
+      duracao: number | null;
+      erros: Record<string, unknown>[];
+      ocorrido_em: string;
+    }
+  | {
+      tipo: 'chamada_status';
+      meta_call_id: string;
+      status: string;
+      opaco: string | null;
+      ocorrido_em: string;
+    }
+  | {
+      tipo: 'permissao';
+      numero_da_empresa: string;
+      de: string | null;
+      de_user_id: string | null;
+      nome: string | null;
+      resposta: string;
+      permanente: boolean;
+      expira_em: string | null;
+      /** `user_action` ou `automatic`. */
+      origem: string | null;
+      ocorrido_em: string;
+    };
+
 export interface Extracao {
   itens: ItemDaMeta[];
+  chamadas: EventoDeChamada[];
   /** Campos que a Meta mandou e que este adaptador não trata. Vão para o log. */
   ignorados: string[];
 }
@@ -499,8 +548,99 @@ function nomeDoContato(contatos: unknown[], telefone: string | null, userId: str
   return null;
 }
 
+/** Unix em segundos, como a Meta manda, ou nulo: `instante` cairia no agora. */
+function instanteOuNulo(v: unknown): string | null {
+  return texto(v) === null && typeof v !== 'number' ? null : instante(v);
+}
+
+/** O campo `calls`: `value.calls[]` (começo e fim) e `value.statuses[]` (andamento). */
+function eventosDeChamada(valor: Record<string, unknown>): EventoDeChamada[] {
+  const eventos: EventoDeChamada[] = [];
+  const numeroDaEmpresa = e164(objeto(valor.metadata)?.display_phone_number);
+  const contatos = lista(valor.contacts);
+  const errosDoValor = lista(valor.errors).map((x) => objeto(x) ?? {});
+
+  for (const bruta of lista(valor.calls)) {
+    const c = objeto(bruta);
+    const id = texto(c?.id);
+    const evento = texto(c?.event);
+    if (!c || id === null || evento === null) continue;
+    const direcao = texto(c.direction);
+    const sessao = objeto(c.session);
+    const sdpTipo = texto(sessao?.sdp_type);
+    // Na ligação feita o cliente é o `to`; na recebida, o `from`. A oferta só vem da
+    // Meta quando o cliente é quem ligou, e o primeiro exemplo da doc não traz `direction`.
+    const feita = direcao === 'BUSINESS_INITIATED' || sdpTipo === 'answer';
+    const deUserId = texto(feita ? c.to_user_id : c.from_user_id);
+    const de = e164(feita ? c.to : c.from) ?? telefoneDoContato(contatos, deUserId);
+    eventos.push({
+      tipo: 'chamada',
+      evento,
+      meta_call_id: id,
+      direcao,
+      numero_da_empresa: numeroDaEmpresa,
+      de,
+      de_user_id: deUserId,
+      nome: nomeDoContato(contatos, de, deUserId),
+      sdp_tipo: sdpTipo,
+      sdp: texto(sessao?.sdp),
+      opaco: texto(c.biz_opaque_callback_data),
+      status: texto(c.status),
+      inicio: instanteOuNulo(c.start_time),
+      fim: instanteOuNulo(c.end_time),
+      duracao: numero(c.duration),
+      erros: [...errosDoValor, ...lista(c.errors).map((x) => objeto(x) ?? {})],
+      ocorrido_em: instante(c.timestamp),
+    });
+  }
+
+  for (const bruta of lista(valor.statuses)) {
+    const r = objeto(bruta);
+    const id = texto(r?.id);
+    const status = texto(r?.status);
+    if (!r || id === null || status === null) continue;
+    eventos.push({
+      tipo: 'chamada_status',
+      meta_call_id: id,
+      status,
+      opaco: texto(r.biz_opaque_callback_data),
+      ocorrido_em: instante(r.timestamp),
+    });
+  }
+  return eventos;
+}
+
+/** A resposta ao pedido de permissão vem como mensagem, mas não é uma: `null` se for outra. */
+function respostaDePermissao(
+  m: Record<string, unknown>,
+  numero: string,
+  de: string | null,
+  deUserId: string | null,
+  nome: string | null,
+): EventoDeChamada | null {
+  if (texto(m.type) !== 'interactive') return null;
+  const i = objeto(m.interactive);
+  if (texto(i?.type) !== 'call_permission_reply') return null;
+  const r = objeto(i?.call_permission_reply);
+  const resposta = texto(r?.response);
+  if (!r || resposta === null) return null;
+  return {
+    tipo: 'permissao',
+    numero_da_empresa: numero,
+    de,
+    de_user_id: deUserId,
+    nome,
+    resposta,
+    permanente: r.is_permanent === true,
+    expira_em: instanteOuNulo(r.expiration_timestamp),
+    origem: texto(r.response_source),
+    ocorrido_em: instante(m.timestamp),
+  };
+}
+
 /** Campos de `changes[].field` que este adaptador reconhece como "nossos". */
 const CAMPO_DE_MENSAGENS = 'messages';
+const CAMPO_DE_LIGACOES = 'calls';
 
 /**
  * Campos de saúde do número que este adaptador traduz (Fase 3 do pivô).
@@ -517,9 +657,10 @@ const CAMPOS_DE_SAUDE = new Set([
 
 export function extrairDaMeta(payload: unknown): Extracao {
   const itens: ItemDaMeta[] = [];
+  const chamadas: EventoDeChamada[] = [];
   const ignorados: string[] = [];
   const raiz = objeto(payload);
-  if (!raiz) return { itens, ignorados: ['corpo_nao_e_objeto'] };
+  if (!raiz) return { itens, chamadas, ignorados: ['corpo_nao_e_objeto'] };
   if (texto(raiz.object) !== 'whatsapp_business_account') {
     ignorados.push(`object:${texto(raiz.object) ?? 'ausente'}`);
   }
@@ -533,6 +674,10 @@ export function extrairDaMeta(payload: unknown): Extracao {
       if (!mudanca) continue;
       const campo = texto(mudanca.field) ?? '';
       if (campo !== CAMPO_DE_MENSAGENS) {
+        if (campo === CAMPO_DE_LIGACOES) {
+          chamadas.push(...eventosDeChamada(objeto(mudanca.value) ?? {}));
+          continue;
+        }
         if (CAMPOS_DE_GRUPO.has(campo)) {
           const valor = objeto(mudanca.value) ?? {};
           itens.push(...eventosDeGrupo(campo, valor, e164(objeto(valor.metadata)?.display_phone_number)));
@@ -600,6 +745,17 @@ export function extrairDaMeta(payload: unknown): Extracao {
         // dead-letter com nome — nunca some aqui.
         if (wamid === null || (de === null && deUserId === null) || numeroDaEmpresa === null) {
           ignorados.push('mensagem_sem_id_ou_numero');
+          continue;
+        }
+        const permissao = respostaDePermissao(
+          m,
+          numeroDaEmpresa,
+          de,
+          deUserId,
+          nomeDoContato(lista(valor.contacts), de, deUserId),
+        );
+        if (permissao !== null) {
+          chamadas.push(permissao);
           continue;
         }
         const evento = eventoDaMensagem(m);
@@ -687,5 +843,5 @@ export function extrairDaMeta(payload: unknown): Extracao {
     }
   }
 
-  return { itens, ignorados };
+  return { itens, chamadas, ignorados };
 }

@@ -163,7 +163,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return erro(400, 'json_invalido', 'O corpo assinado não é um JSON válido.', e);
   }
 
-  const { itens, ignorados } = extrairDaMeta(corpo);
+  const { itens, chamadas, ignorados } = extrairDaMeta(corpo);
 
   // A identidade da entrega é a própria assinatura: ela é função determinística
   // do corpo e do segredo, então corpos iguais têm assinatura igual e a
@@ -181,11 +181,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       p_payload: corpo,
       p_itens: itens,
     });
+    // A ligação não espera a fila: daqui o Realtime leva direto à tela. Idempotente,
+    // então a reentrega (duplicado=true) passa de novo sem mudar nada.
+    if (chamadas.length > 0) {
+      await rpcServico<Record<string, unknown>>('wa_chamada_eventos', { p_eventos: chamadas });
+    }
     registrar('info', {
       funcao: 'wa-webhook',
       entrega: entrega.slice(0, 12),
       itens: itens.length,
       tipos: itens.map((i) => i.tipo),
+      chamadas: chamadas.length,
       ignorados,
       duplicado: resultado?.duplicado === true,
       enfileirados: resultado?.enfileirados ?? 0,

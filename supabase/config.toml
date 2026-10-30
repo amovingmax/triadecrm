@@ -490,3 +490,9 @@ verify_jwt = false
 
 [functions.voz-status]
 verify_jwt = false
+
+# Ligação pelo WhatsApp. Chamada pelo CRM com a sessão de quem está logado, mas a
+# segurança é do Postgres (`wa_chamada_autorizar` confere o JWT e o papel). `false`
+# porque um projeto novo pode assinar o JWT com chave que esta primeira porta não lê.
+[functions.wa-chamada]
+verify_jwt = false

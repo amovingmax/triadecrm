@@ -706,6 +706,13 @@ begin
     returning * into ch;
     if found then
       perform app.wa_chamada_ao_terminar(ch);
+      -- A Meta disse que não há permissão: o que estava aqui ficou velho (o cliente
+      -- pode tê-la tirado no perfil da empresa).
+      if p_dados ->> 'codigo' = '138006' then
+        update public.wa_permissoes_de_ligar
+           set estado = 'sem_permissao', permanente = false, expira_em = null, atualizada_em = now()
+         where conversation_id = ch.conversation_id;
+      end if;
     end if;
   else
     raise exception 'Evento desconhecido: %', p_evento using errcode = '22023';

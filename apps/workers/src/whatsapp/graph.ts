@@ -120,7 +120,8 @@ export type Envio =
       botao: string;
       itens: { titulo: string; descricao?: string }[];
     })
-  | (Destino & { tipo: 'pedir_localizacao'; corpo: string });
+  | (Destino & { tipo: 'pedir_localizacao'; corpo: string })
+  | (Destino & { tipo: 'permissao_de_ligar'; corpo: string });
 
 /** A Graph API recusou, ou não respondeu. Mesma forma para envio e para conta. */
 export interface FalhaDaGraph {
@@ -390,6 +391,16 @@ export class ClienteDaGraph {
             type: 'location_request_message',
             body: { text: envio.corpo.slice(0, 1024) },
             action: { name: 'send_location' },
+          },
+        };
+      case 'permissao_de_ligar':
+        return {
+          ...base,
+          type: 'interactive',
+          interactive: {
+            type: 'call_permission_request',
+            action: { name: 'call_permission_request' },
+            body: { text: envio.corpo.slice(0, 1024) },
           },
         };
     }

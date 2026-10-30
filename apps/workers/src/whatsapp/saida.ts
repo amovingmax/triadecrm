@@ -330,6 +330,15 @@ function formaDeSempre(item: ItemDeSaida): Forma {
   // link. Só existe dentro da janela — a pessoa acabou de tocar num botão.
   if (item.tipo === 'interactive') {
     const p = Array.isArray(item.template_params) ? {} : item.template_params;
+    // O pedido de permissão para ligar pelo WhatsApp (`wa_permissao_pedir`). Só o
+    // texto é nosso: o botão e as opções são do próprio WhatsApp.
+    if (p.permissao_de_ligar === true) {
+      if (!item.janela_aberta) return semJanela('permissao_fora_da_janela', 'O pedido para ligar');
+      if (item.corpo === null) {
+        return { ok: false, codigo: 'mensagem_sem_corpo', motivo: 'O pedido para ligar está sem texto.' };
+      }
+      return { ok: true, envio: { tipo: 'permissao_de_ligar', para: item.para, corpo: item.corpo } };
+    }
     const rotulo = typeof p.botao === 'string' ? p.botao : '';
     const url = typeof p.url === 'string' ? p.url : '';
     if (!item.janela_aberta || item.corpo === null || rotulo === '' || !url.startsWith('https://')) {

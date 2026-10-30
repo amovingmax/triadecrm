@@ -22,7 +22,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(68);
+select plan(70);
 
 insert into public.allowed_users (email, role, note) values
   ('h118.g@teste.local', 'gestor', 'pgTAP 118'),
@@ -349,6 +349,16 @@ select public.wa_chamada_eventos('[{"tipo": "chamada_status", "status": "REJECTE
 select public.wa_chamada_eventos('[{"tipo": "chamada", "evento": "terminate", "direcao": "BUSINESS_INITIATED", "meta_call_id": "wacid.C2"}]'::jsonb);
 select is((select estado from public.wa_chamadas where id = pg_temp.id('ch4')), 'recusada', 'ele recusou');
 select is((select nao_atendidas_seguidas from public.wa_permissoes_de_ligar where conversation_id = pg_temp.id('c')), 1, 'conta como sem resposta, uma vez só');
+
+-- A Meta recusa por falta de permissão: o que o banco sabia ficou velho.
+select pg_temp.conversa('e', '+5584999911807');
+select pg_temp.respondeu('+5584999911807', 'accept');
+select pg_temp.gestor();
+select pg_temp.guardar('ch6', (public.wa_chamada_abrir(pg_temp.id('e')) ->> 'chamada_id')::uuid);
+select pg_temp.sair();
+select public.wa_chamada_marcar(pg_temp.id('ch6'), 'falhou', '{"codigo": 138006}'::jsonb);
+select is((select estado from public.wa_chamadas where id = pg_temp.id('ch6')), 'falhou', 'a Meta recusou: a ligação falha');
+select is((select estado from public.wa_permissoes_de_ligar where conversation_id = pg_temp.id('e')), 'sem_permissao', 'e a permissão que estava aqui cai');
 
 -- Uma por pessoa, mesmo em conversas diferentes.
 select pg_temp.conversa('d', '+5584999911806');

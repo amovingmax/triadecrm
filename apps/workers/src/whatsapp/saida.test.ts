@@ -117,6 +117,26 @@ describe('a forma do envio', () => {
     });
   });
 
+  it('o pedido para ligar sai como pedido de permissão, só dentro da janela', () => {
+    const base = {
+      tipo: 'interactive',
+      corpo: 'Posso te ligar pelo WhatsApp?',
+      template_params: { permissao_de_ligar: true },
+    };
+    expect(formaDoEnvio(item(base))).toEqual({
+      ok: true,
+      envio: {
+        tipo: 'permissao_de_ligar',
+        para: '+5584988776655',
+        corpo: 'Posso te ligar pelo WhatsApp?',
+      },
+    });
+    expect(formaDoEnvio(item({ ...base, janela_aberta: false }))).toMatchObject({
+      ok: false,
+      codigo: 'permissao_fora_da_janela',
+    });
+  });
+
   it('dentro da janela de 24 h, texto livre', () => {
     const f = formaDoEnvio(item());
     expect(f.ok).toBe(true);

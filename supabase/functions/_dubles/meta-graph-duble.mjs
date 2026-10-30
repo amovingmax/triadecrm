@@ -14,6 +14,8 @@
 //
 // O que implementa (Cloud API; aceita qualquer versão /vNN.N/ no caminho — v26.0 é a padrão do worker):
 //   POST /vNN.N/<phone_number_id>/messages   envio de texto, template e áudio
+//   POST /vNN.N/<phone_number_id>/calls      ligação: connect, pre_accept, accept, reject, terminate
+//   GET  /_chamadas                          os pedidos de ligação recebidos (só para teste)
 //   GET  /vNN.N/<media_id>                   metadados da mídia (url temporária)
 //   GET  /midia/<media_id>                   os bytes (a url acima aponta para cá)
 //   GET  /vNN.N/<phone_number_id>            dados do número (nome, qualidade, status)
@@ -256,6 +258,9 @@ function erroPedidoPeloNumero(numero) {
   return null;
 }
 
+const chamadasRecebidas = [];
+const ERROS_DE_LIGACAO = [138001, 138003, 138006, 138012, 138013, 138014];
+
 function servir(porta) {
   const servidor = createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -266,6 +271,7 @@ function servir(porta) {
     }
     if (req.method === 'POST' && caminho === '/_zerar') {
       enviadas.length = 0;
+      chamadasRecebidas.length = 0;
       conta = contaInicial();
       return responder(res, 200, { ok: true });
     }
@@ -337,7 +343,36 @@ function servir(porta) {
       return responder(res, 200, m.bytes, m.mime_type);
     }
 
+    if (req.method === 'GET' && caminho === '/_chamadas') {
+      return responder(res, 200, { chamadas: chamadasRecebidas });
+    }
+
     if (!tokenOk(req)) return semToken(res);
+
+    // POST /vNN.N/<phone_number_id>/calls
+    // Ligação para um número terminado num código de erro devolve aquele erro.
+    const pedidoDeLigacao = caminho.match(/^\/v\d+\.\d+\/([^/]+)\/calls$/);
+    if (req.method === 'POST' && pedidoDeLigacao) {
+      let cru = '';
+      req.on('data', (p) => (cru += p));
+      req.on('end', () => {
+        const corpo = JSON.parse(cru || '{}');
+        chamadasRecebidas.push(corpo);
+        if (corpo.action === 'connect') {
+          const digitos = String(corpo.to ?? '');
+          const codigo = ERROS_DE_LIGACAO.find((c) => digitos.endsWith(String(c)));
+          if (codigo) {
+            return responder(res, 400, { error: { message: `Erro ${codigo} do dublê`, code: codigo } });
+          }
+          return responder(res, 200, {
+            messaging_product: 'whatsapp',
+            calls: [{ id: `wacid.DUBLE.${chamadasRecebidas.length}` }],
+          });
+        }
+        return responder(res, 200, { messaging_product: 'whatsapp', success: true });
+      });
+      return;
+    }
 
     // POST /vNN.N/<phone_number_id>/messages
     const envio = caminho.match(/^\/v\d+\.\d+\/([^/]+)\/messages$/);
