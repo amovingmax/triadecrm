@@ -22,7 +22,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(72);
+select plan(79);
 
 insert into public.allowed_users (email, role, note) values
   ('h118.g@teste.local', 'gestor', 'pgTAP 118'),
@@ -292,6 +292,27 @@ select pg_temp.gestor();
 select is(public.wa_permissao_pedir(pg_temp.id('c'), 'De novo?') ->> 'motivo', 'limite_de_pedidos', 'a Meta só deixa pedir uma vez por dia');
 select isnt(public.wa_ligacao_estado(pg_temp.id('c')) ->> 'proximo_pedido_em', null, 'e a tela sabe quando pode pedir de novo');
 select pg_temp.sair();
+
+-- O pedido que não saiu: a falha comum devolve o botão, e a 138017 revela a permissão que o CRM não viu.
+select pg_temp.conversa('nao_saiu', '+5584999911890');
+select pg_temp.conversa('ja_tinha', '+5584999911891');
+select pg_temp.gestor();
+select public.wa_permissao_pedir(pg_temp.id('nao_saiu'), 'Posso ligar?');
+select public.wa_permissao_pedir(pg_temp.id('ja_tinha'), 'Posso ligar?');
+select pg_temp.sair();
+update public.messages set status = 'failed'::app.msg_status, error_code = '131026'
+ where conversation_id = pg_temp.id('nao_saiu') and direction = 'out';
+update public.messages set status = 'failed'::app.msg_status, error_code = '138017'
+ where conversation_id = pg_temp.id('ja_tinha') and direction = 'out';
+select ok(app.wa_permissoes_conferir_pedidos() >= 2, 'a conferência acha os dois pedidos que não saíram');
+select pg_temp.gestor();
+select is(public.wa_ligacao_estado(pg_temp.id('nao_saiu')) ->> 'permissao', 'sem_permissao', 'o pedido que falhou não fica como enviado');
+select is(public.wa_ligacao_estado(pg_temp.id('nao_saiu')) ->> 'proximo_pedido_em', null, 'e não conta no limite de pedidos');
+select is(public.wa_ligacao_estado(pg_temp.id('ja_tinha')) ->> 'permissao', 'aceita', 'a Meta diz que já existe a permissão sem prazo: o CRM passa a saber');
+select is(public.wa_ligacao_estado(pg_temp.id('ja_tinha')) ->> 'permanente', 'true', 'e ela é sem prazo');
+select is(public.wa_permissao_pedir(pg_temp.id('ja_tinha'), 'Posso?') ->> 'motivo', 'ja_permitida', 'daí em diante não se pede mais');
+select pg_temp.sair();
+select is((select count(*)::int from public.wa_permissoes_de_ligar where conversation_id = pg_temp.id('ja_tinha') and origem = 'pedido' and respondida_em is not null), 1, 'fica registrado como resposta ao pedido');
 
 select pg_temp.respondeu('+5584999911803', 'reject');
 select pg_temp.gestor();

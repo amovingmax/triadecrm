@@ -799,6 +799,40 @@ Deno.test('a resposta ao pedido de permissão não vira mensagem', () => {
   assertEquals(c.de, '+5584999990001');
 });
 
+Deno.test('a permissão sem prazo, na forma que a Meta real mandou: sem expiration_timestamp', () => {
+  const { itens, chamadas } = extrairDaMeta({
+    object: 'whatsapp_business_account',
+    entry: [{
+      id: 'WABA',
+      changes: [{
+        field: 'messages',
+        value: {
+          metadata: { display_phone_number: '558494058888', phone_number_id: 'PID' },
+          contacts: [{ wa_id: '5584999990001', user_id: 'BR.1', profile: { name: 'Cliente' } }],
+          messages: [{
+            from: '5584999990001',
+            from_user_id: 'BR.1',
+            id: 'wamid.RESPOSTA',
+            timestamp: '1793384325',
+            type: 'interactive',
+            context: { from: '558494058888', id: 'wamid.PEDIDO' },
+            interactive: {
+              type: 'call_permission_reply',
+              call_permission_reply: { response: 'accept', is_permanent: true, response_source: 'user_action' },
+            },
+          }],
+        },
+      }],
+    }],
+  });
+  assertEquals(itens, []);
+  const c = chamadas[0];
+  if (c.tipo !== 'permissao') throw new Error('tipo errado');
+  assertEquals(c.permanente, true);
+  assertEquals(c.expira_em, null);
+  assertEquals(c.ocorrido_em, new Date(1793384325 * 1000).toISOString());
+});
+
 Deno.test('a resposta a um botão comum continua sendo mensagem', () => {
   const { itens, chamadas } = extrairDaMeta({
     object: 'whatsapp_business_account',

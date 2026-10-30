@@ -919,10 +919,57 @@ comment on function public.wa_chamada_eventos(jsonb) is
 revoke all on function public.wa_chamada_eventos(jsonb) from public, anon, authenticated;
 grant execute on function public.wa_chamada_eventos(jsonb) to service_role;
 
+-- O pedido que não saiu. A Meta recusa com 138017 quando o cliente já permitiu sem prazo
+-- e o CRM não viu a resposta (ela veio antes desta versão, ou o aviso se perdeu): a
+-- permissão existe, e o botão vira "Ligar". Em qualquer outra falha o pedido não chegou,
+-- e a tela não pode continuar dizendo que falta o cliente responder. Roda pelo pg_cron,
+-- e não por gatilho: nada novo no caminho de `messages`.
+create or replace function app.wa_permissoes_conferir_pedidos()
+returns int
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  p record;
+  n int := 0;
+begin
+  for p in
+    select w.conversation_id, u.error_code
+      from public.wa_permissoes_de_ligar w
+      cross join lateral (
+        select m.status, m.error_code
+          from public.messages m
+         where m.conversation_id = w.conversation_id
+           and m.direction = 'out'::app.msg_direction
+           and m.type = 'interactive'::app.msg_type
+           and m.template_params ->> 'permissao_de_ligar' = 'true'
+         order by m.created_at desc
+         limit 1
+      ) u
+     where w.estado = 'pedida'
+       and u.status = 'failed'::app.msg_status
+  loop
+    update public.wa_permissoes_de_ligar
+       set estado = case when p.error_code = '138017' then 'aceita' else 'sem_permissao' end,
+           permanente = p.error_code = '138017',
+           expira_em = null,
+           respondida_em = case when p.error_code = '138017' then now() else respondida_em end,
+           origem = case when p.error_code = '138017' then 'pedido' else origem end,
+           nao_atendidas_seguidas = case when p.error_code = '138017' then 0 else nao_atendidas_seguidas end,
+           atualizada_em = now()
+     where conversation_id = p.conversation_id;
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+revoke all on function app.wa_permissoes_conferir_pedidos() from public, anon, authenticated;
+
 do $$
 begin
   if exists (select 1 from pg_extension where extname = 'pg_cron') then
     perform cron.schedule('wa_chamadas_fechar_orfas', '*/5 * * * *', $cron$select app.wa_chamadas_fechar_orfas()$cron$);
+    perform cron.schedule('wa_permissoes_conferir_pedidos', '* * * * *', $cron$select app.wa_permissoes_conferir_pedidos()$cron$);
   end if;
 end $$;
 

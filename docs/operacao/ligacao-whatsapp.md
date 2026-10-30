@@ -44,7 +44,7 @@ Fontes: páginas `calling`, `user-initiated-calls`, `business-initiated-calls`, 
 
 ## Como ativar, em ordem
 
-Nada disto foi feito ainda. Cada passo em produção só com pedido.
+Feitos em 30/10/2026: a prova do passo 1 (a chamada voltou a ficar desligada no número), os segredos do passo 3 e a inscrição do passo 5. Cada passo em produção só com pedido.
 
 1. **Prova de ativação**, com o botão escondido, e desligar em seguida: `POST /<PHONE_NUMBER_ID>/settings` com `{"calling":{"status":"ENABLED","call_icon_visibility":"DISABLE_ALL","callback_permission_status":"DISABLED"}}`. O erro 138018 quer dizer que faltam pré-requisitos, provavelmente a inscrição do passo 5.
 2. **Banco da Imova:** aplicar `20261030120000_a_ligacao_pelo_whatsapp.sql`.
@@ -71,6 +71,16 @@ pnpm exec next dev -p 3040
 ```
 
 O CRM fica em `http://localhost:3040/auth/dev?quem=gestor`, e o celular simulado do cliente em `http://127.0.0.1:3050`. O robô de entrada não roda aqui: a mensagem do cliente entra direto no banco, e o pedido de permissão é marcado como enviado quando o cliente responde.
+
+## O que a Meta real já confirmou
+
+Em 30/10/2026, antes de publicar, com um envio direto pela API para um WhatsApp nosso e a chamada ligada só durante o teste:
+
+- o pedido, na forma que o worker monta, foi enviado, entregue e lido em segundos, e sem cobrança dentro das 24 h (`free_customer_service`, `billable: false`);
+- a resposta real passou por `extrairDaMeta`: vira o evento `permissao` e nada entra na fila. Na permissão sem prazo, `expiration_timestamp` não vem;
+- fora das 24 h a Meta aceita o envio e só depois recusa, por recibo com o erro 131047. Na tela isso não acontece, porque o botão fica desligado fora da janela.
+
+Uma permissão que existe na Meta e o CRM não viu (a resposta veio antes desta versão, ou o aviso se perdeu) se resolve no primeiro pedido: a Meta recusa com 138017, e `app.wa_permissoes_conferir_pedidos`, pelo pg_cron a cada minuto, passa a conversa para "aceita, sem prazo". Qualquer outra falha do pedido devolve o botão. Não há gatilho em `messages`.
 
 ## O que não foi provado
 

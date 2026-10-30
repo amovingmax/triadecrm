@@ -8135,13 +8135,15 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 - Webhook: o campo `calls` e a resposta ao pedido de permissão vão direto a `wa_chamada_eventos`, fora da fila. Corrigidos dois defeitos que derrubariam toda ligação real: a conferência de horário não olhava `calls[].timestamp` (recusaria com 400) e `texto()` aparava o SDP (o navegador o recusava).
 - Edge Function nova `wa-chamada`: atender, ligar e desligar na Meta, com os erros em português.
 - Worker: o pedido de permissão sai como `call_permission_request`, só dentro das 24 h.
+- O pedido que falha não fica como enviado: `app.wa_permissoes_conferir_pedidos`, pelo pg_cron a cada minuto e sem gatilho em `messages`, devolve o botão, e o erro 138017 (o cliente já permitiu sem prazo e o CRM não viu) passa a conversa para "aceita, sem prazo".
 - Tela, `components/ligacao-whatsapp/`: botão na conversa de parceiro e de cliente, toque para todos com o CRM aberto, painel com silenciar e desligar, áudio WebRTC, confirmação ao fechar a aba. Fora da Imova o provedor não desenha nem assina nada.
 
 **Verificado:**
 - Ensaio no Chrome, com WebRTC e áudio de verdade e o dublê no lugar da Meta: 38 de 38. O toque chegou em menos de 1 s; a ligação continua ao andar pelas telas e ao trocar de aba; silenciar corta o som.
-- KOMUNE: pgTAP 118 com 72 de 72 no banco dela, em transação desfeita. Com este código, nenhuma consulta nem assinatura nova, nenhum botão de WhatsApp, e o "Ligar" da Twilio abre a tela de ligar. Nenhum arquivo da Twilio mudou.
-- Vitest: 1.464 no site. No worker, `graph.test.ts` e `modelos-meta.test.ts` falham ("o dublê da Graph API não subiu") igual na main limpa 0f9e565.
+- KOMUNE: pgTAP 118 com 79 de 79 no banco dela, em transação desfeita. Com este código, nenhuma consulta nem assinatura nova, nenhum botão de WhatsApp, e o "Ligar" da Twilio abre a tela de ligar. Nenhum arquivo da Twilio mudou.
+- Pedido real na Meta (30/10/2026, ~15h18), sem publicar, com a chamada ligada só durante o teste: enviado, entregue e lido em segundos, sem cobrança dentro das 24 h, e aceito sem prazo. A resposta real passou pelo código novo sem ajuste. O CRM publicado a mostra como "Resposta a botões, sem o texto da opção", até o `wa-webhook` novo sair.
+- Vitest: 1.475 no site. No worker, `graph.test.ts` e `modelos-meta.test.ts` falham ("o dublê da Graph API não subiu") igual na main limpa 0f9e565.
 
-**Pendente:** a prova de ativação na Meta, que precisa rodar no Terminal do usuário (o classificador barrou aqui); tudo em produção; e o teste real, porque a Meta de verdade nunca foi chamada. O que falta no produto está no guia: pedido fora das 24 h, relatório do dia, alerta de baixa taxa de atendimento, app, chave em Ajustes.
+**Pendente:** tudo em produção e a ligação real: o áudio com a Meta só dá para provar depois de publicar, porque a resposta de voz chega pelo webhook publicado. A prova de ativação na Meta passou em 30/10/2026. O que falta no produto está no guia: pedido fora das 24 h, relatório do dia, alerta de baixa taxa de atendimento, app, chave em Ajustes.
 
 **Decisão humana:** o horário de atendimento enquanto só houver o navegador (recomendado seg–sex, 8h–19h); o OK do Dennis para o registro das ligações, o texto do pedido e o nome do cliente na tela bloqueada do app. A ligação não entra no relatório do dia por pessoa nesta versão.
