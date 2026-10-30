@@ -37,10 +37,10 @@ const RECUSAS: Record<string, string> = {
 };
 
 async function pedirAMeta(pedido: PedidoDaMeta): Promise<RespostaDaMeta> {
-  const [token, numero] = await Promise.all([
-    segredo('meta_wa_access_token'),
-    segredo('meta_wa_phone_number_id'),
-  ]);
+  // Colado no painel, o segredo pode vir com uma quebra de linha no fim.
+  const [token, numero] = (
+    await Promise.all([segredo('meta_wa_access_token'), segredo('meta_wa_phone_number_id')])
+  ).map((valor) => valor.trim());
   const controle = new AbortController();
   const tempo = setTimeout(() => controle.abort(), TEMPO_DA_META_MS);
   try {
