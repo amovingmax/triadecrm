@@ -55,6 +55,23 @@ Nada disto foi feito ainda. Cada passo em produção só com pedido.
 7. **Teste real** em uma janela combinada, entre celulares nossos.
 8. **Ativação definitiva**, no Gerenciador do WhatsApp (Ferramentas da conta > Números de telefone > engrenagem > Chamadas) ou pela API, com o horário de atendimento. Enquanto só houver o navegador, usar horário comercial: de madrugada ninguém está com o CRM aberto, e chamadas sem atender podem esconder o botão.
 
+## Testar no local, com as próprias mãos
+
+Sem a Meta. Precisa do Supabase local da Imova (`~/triadecrm-imova-local`) com a migração aplicada e a chave ligada.
+
+```bash
+node supabase/functions/_dubles/meta-graph-duble.mjs servir 8790
+node supabase/functions/_dubles/cliente-de-ligacao.mjs 3050
+# em ~/triadecrm-imova-local, com as funções copiadas para supabase/functions:
+supabase functions serve --no-verify-jwt --env-file <arquivo com META_WA_ACCESS_TOKEN=token-de-teste,
+  META_WA_PHONE_NUMBER_ID=1234567890, META_WA_APP_SECRET=segredo-de-teste e
+  META_WA_GRAPH_URL=http://host.docker.internal:8790>
+# em apps/web, com o .env.local da Imova:
+pnpm exec next dev -p 3040
+```
+
+O CRM fica em `http://localhost:3040/auth/dev?quem=gestor`, e o celular simulado do cliente em `http://127.0.0.1:3050`. O robô de entrada não roda aqui: a mensagem do cliente entra direto no banco, e o pedido de permissão é marcado como enviado quando o cliente responde.
+
 ## O que não foi provado
 
 O ensaio local usa o dublê no lugar da Meta (`_dubles/meta-graph-duble.mjs`). Ele prova o caminho inteiro, com WebRTC e áudio de verdade no Chrome, mas o outro lado é outro navegador, e não o servidor de mídia da Meta. Só o teste real (passo 7) prova:
