@@ -119,7 +119,8 @@ export function carimboDoCorpo(payload: unknown): number | null {
       const mudanca = objeto(mudancaBruta);
       const valor = mudanca && objeto(mudanca.value);
       if (!valor) continue;
-      for (const campo of ['messages', 'statuses', 'message_echoes']) {
+      // `calls`: o aviso de ligação da Meta só traz a hora aqui dentro (sem `entry[].time`).
+      for (const campo of ['messages', 'statuses', 'message_echoes', 'calls']) {
         const lista = Array.isArray(valor[campo]) ? (valor[campo] as unknown[]) : [];
         for (const itemBruto of lista) {
           const item = objeto(itemBruto);

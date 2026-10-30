@@ -213,3 +213,17 @@ Deno.test('corpo que não é objeto não tem carimbo', () => {
   assertEquals(carimboDoCorpo(null), null);
   assertEquals(carimboDoCorpo([1, 2]), null);
 });
+
+Deno.test('o aviso de ligação da Meta só traz a hora em calls[].timestamp, e ela vale', () => {
+  const corpo = {
+    object: 'whatsapp_business_account',
+    entry: [{
+      id: 'WABA',
+      changes: [{
+        field: 'calls',
+        value: { calls: [{ id: 'wacid.1', event: 'connect', timestamp: '1749196895' }] },
+      }],
+    }],
+  };
+  assertEquals(carimboDoCorpo(corpo), 1749196895);
+});
