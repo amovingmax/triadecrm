@@ -677,3 +677,49 @@ describe('a leitura da IA na ficha', () => {
     expect(arcoDaNota(-5, 10).preenchido).toBe(0);
   });
 });
+
+describe('a leitura do cliente da Imova na ficha (03/11/2026)', () => {
+  const doCliente = (parcial: Partial<LeituraCruaDaFicha> = {}) =>
+    leitura({
+      resumo: 'Quer o apartamento de 3 quartos em Ponta Negra e pediu visita no sábado.',
+      intencao: 'PEDIU_VISITA',
+      objecoes: ['decide_com_outra_pessoa'],
+      dados_extraidos: {
+        quartos: { valor: '3', confianca: 0.9, message_id: 'x' },
+        bairros: { valor: 'Ponta Negra', confianca: 0.9, message_id: 'x' },
+        valor_maximo: { valor: 'cerca de R$ 600 mil', confianca: 0.8, message_id: 'x' },
+        forma_pagamento: { valor: 'financiamento', confianca: 0.9, message_id: 'x' },
+        tipo_imovel: { valor: 'apartamento', confianca: 0.9, message_id: 'x' },
+      },
+      ...parcial,
+    });
+
+  it('o perfil sai na ordem de quem lê um pedido de imóvel', () => {
+    expect(montarLeituraDaFicha(doCliente())?.perfil).toEqual([
+      { rotulo: 'Imóvel', valor: 'apartamento' },
+      { rotulo: 'Bairros', valor: 'Ponta Negra' },
+      { rotulo: 'Quartos', valor: '3' },
+      { rotulo: 'Até', valor: 'cerca de R$ 600 mil' },
+      { rotulo: 'Pagamento', valor: 'financiamento' },
+    ]);
+  });
+
+  it('intenção e objeção da Imova em português de gente', () => {
+    const etiquetas = montarLeituraDaFicha(doCliente())?.etiquetas ?? [];
+    expect(etiquetas).toContainEqual({ rotulo: 'Intenção', valor: 'pediu visita' });
+    expect(etiquetas).toContainEqual({ rotulo: 'Objeção', valor: 'decide com outra pessoa' });
+  });
+
+  it('o que não é campo do perfil não aparece (os dados da ficha da KOMUNE são outros)', () => {
+    const l = montarLeituraDaFicha(
+      leitura({ dados_extraidos: { bairro: { valor: 'Tirol' }, email: { valor: 'a@b.c' } } }),
+    );
+    expect(l?.perfil).toEqual([]);
+    expect(montarLeituraDaFicha(leitura())?.perfil).toEqual([]);
+  });
+
+  it('valor vazio não vira linha', () => {
+    const l = montarLeituraDaFicha(doCliente({ dados_extraidos: { quartos: { valor: '  ' } } }));
+    expect(l?.perfil).toEqual([]);
+  });
+});

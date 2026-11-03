@@ -115,10 +115,13 @@ function NaoCarregou({ titulo, className }: { titulo: string; className?: string
 export function LeituraDaIaNaFicha({
   dados,
   temConversa,
+  tituloDoPerfil = 'O que procura',
   className,
 }: {
   dados: { leitura: LeituraDaFicha | null; moduloLigado: boolean | null } | null;
   temConversa: boolean;
+  /** "O que procura" para o cliente; "O imóvel" para o proprietário. */
+  tituloDoPerfil?: string;
   className?: string;
 }) {
   if (dados === null) return <NaoCarregou titulo="Leitura da IA" className={className} />;
@@ -184,6 +187,24 @@ export function LeituraDaIaNaFicha({
           ) : null}
         </div>
       </div>
+
+      {/* O PERFIL QUE A IA LEU (Imova, 03/11/2026): o que o cliente procura, campo a
+          campo, só com o que ele disse. É o que permite cruzar com a carteira. */}
+      {leitura.perfil.length > 0 ? (
+        <div className="flex flex-col gap-2 border-t border-hairline pt-3.5">
+          <h3 className="text-[11px] leading-4 font-semibold tracking-[0.07em] text-muted-foreground uppercase">
+            {tituloDoPerfil}
+          </h3>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
+            {leitura.perfil.map((p) => (
+              <div key={p.rotulo} className="contents">
+                <dt className="text-muted-foreground">{p.rotulo}</dt>
+                <dd className="min-w-0 break-words font-medium">{p.valor}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
 
       {leitura.sugestao ? (
         <p className="flex items-start gap-2.5 rounded-lg bg-menta-fundo px-3.5 py-3 text-sm leading-snug">

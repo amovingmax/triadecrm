@@ -334,6 +334,8 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
           <LeituraDaIaNaFicha
             dados={paineis.leitura}
             temConversa={ficha.conversa !== null || ficha.conversaFalhou}
+            // O perfil da leitura do cliente (Imova): o proprietário oferece um imóvel.
+            tituloDoPerfil={ficha.tipo === 'fornecedor' ? 'O imóvel' : 'O que procura'}
             className="order-1 lg:order-none"
           />
 
@@ -812,7 +814,12 @@ function Contato({
             {ficha.cnpj ? (
               <span className="numerico">{formatarCnpj(ficha.cnpj)}</span>
             ) : (
-              <span className="text-muted-foreground">Pessoa física (MEI ou autônomo)</span>
+              // Na Imova, a pessoa física é o cliente que procura imóvel, não o MEI.
+              <span className="text-muted-foreground">
+                {EMPRESA.modulos.fichaDoCliente && ficha.tipo === 'produtor'
+                  ? 'Pessoa física'
+                  : 'Pessoa física (MEI ou autônomo)'}
+              </span>
             )}
           </LinhaDeContato>
         ) : null}

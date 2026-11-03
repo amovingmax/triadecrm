@@ -180,7 +180,7 @@ async function lerLeitura(
     ? await supabase
         .from('ficha_da_conversa')
         .select(
-          'resumo, intencao, score_intencao, sentimento, sinais, objecoes, alertas, proxima_acao, dados_insuficientes, analisada_em',
+          'resumo, intencao, score_intencao, sentimento, sinais, objecoes, alertas, proxima_acao, dados_insuficientes, analisada_em, dados_extraidos',
         )
         .eq('conversation_id', conversa.id)
         .maybeSingle()

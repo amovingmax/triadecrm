@@ -542,6 +542,8 @@ export type LeituraCruaDaFicha = {
   proxima_acao: string | null;
   dados_insuficientes: boolean | null;
   analisada_em: string | null;
+  /** `{campo: {valor, confianca, message_id}}`: o perfil da leitura do cliente (Imova). */
+  dados_extraidos?: unknown;
 };
 
 export type LeituraDaFicha = {
@@ -552,6 +554,12 @@ export type LeituraDaFicha = {
   resumo: string | null;
   etiquetas: { rotulo: string; valor: string }[];
   sugestao: string | null;
+  /**
+   * O que o cliente procura (ou o imóvel que o proprietário oferece), como a leitura
+   * do cliente da Imova o achou na conversa (03/11/2026). Vazio na KOMUNE: os campos
+   * dela são outros, e são sugestão de cadastro, não perfil.
+   */
+  perfil: { rotulo: string; valor: string }[];
   analisadaEm: string | null;
   /** Conversa curta demais: há linha no banco, mas não há o que mostrar. */
   curtaDemais: boolean;
@@ -577,7 +585,62 @@ const ROTULO_DA_OBJECAO: Record<string, string> = {
   confianca: 'confiança',
   concorrente: 'concorrente',
   outro: 'outra',
+  // As sete da Imova (`public.objecoes`, 29/10/2026), que a leitura do cliente usa.
+  localizacao: 'localização',
+  financiamento: 'financiamento',
+  imovel_nao_atende: 'imóvel não atende',
+  decide_com_outra_pessoa: 'decide com outra pessoa',
+  ja_tem_corretor: 'já tem corretor',
 };
+
+/** As intenções da leitura do cliente da Imova que a ficha da KOMUNE não tem. */
+const ROTULO_DA_INTENCAO_DO_CLIENTE: Record<string, string> = {
+  QUER_COMPRAR: 'quer comprar',
+  QUER_ALUGAR: 'quer alugar',
+  QUER_VENDER_OU_ALUGAR_O_DELE: 'quer anunciar o imóvel',
+  PEDIU_INFORMACAO: 'pediu informação',
+  PERGUNTOU_PRECO: 'perguntou o preço',
+  PERGUNTOU_FINANCIAMENTO: 'perguntou de financiamento',
+  PEDIU_VISITA: 'pediu visita',
+  CONFIRMOU_VISITA: 'confirmou a visita',
+  NEGOCIANDO: 'negociando',
+  VOU_PENSAR: 'vai pensar',
+  SEM_INTERESSE: 'sem interesse',
+  PEDIU_PARA_PARAR: 'pediu para parar',
+};
+
+/**
+ * Os campos do perfil, na ordem em que se lê um pedido de imóvel. São as chaves de
+ * `CAMPOS_DO_PERFIL` (`leitura-do-cliente@v1`); o que não estiver aqui não é perfil.
+ */
+const ROTULO_DO_PERFIL: readonly (readonly [string, string])[] = [
+  ['finalidade', 'Quer'],
+  ['tipo_imovel', 'Imóvel'],
+  ['bairros', 'Bairros'],
+  ['quartos', 'Quartos'],
+  ['vagas', 'Vagas'],
+  ['valor_maximo', 'Até'],
+  ['forma_pagamento', 'Pagamento'],
+  ['prazo_mudanca', 'Prazo'],
+  ['decide_com', 'Decide com'],
+  ['imovel_de_interesse', 'Interesse'],
+  ['valor_pedido', 'Valor pedido'],
+];
+
+function perfilDaLeitura(dados: unknown): LeituraDaFicha['perfil'] {
+  if (typeof dados !== 'object' || dados === null || Array.isArray(dados)) return [];
+  const porCampo = dados as Record<string, unknown>;
+  const perfil: LeituraDaFicha['perfil'] = [];
+  for (const [campo, rotulo] of ROTULO_DO_PERFIL) {
+    const item = porCampo[campo];
+    const valor =
+      typeof item === 'object' && item !== null && 'valor' in item
+        ? String((item as { valor: unknown }).valor ?? '').trim()
+        : '';
+    if (valor) perfil.push({ rotulo, valor });
+  }
+  return perfil;
+}
 
 /** Depois disto sem reanálise, a leitura conta como velha (o debounce é de 10 min). */
 const FOLGA_DA_LEITURA_MS = 30 * 60_000;
@@ -601,7 +664,10 @@ export function montarLeituraDaFicha(
   const semSinais = !Array.isArray(crua.sinais) || crua.sinais.length === 0;
 
   const etiquetas: LeituraDaFicha['etiquetas'] = [];
-  const intencao = rotuloDaIntencao(crua.intencao) ?? (faixa ? ROTULO_DA_FAIXA[faixa] : null);
+  const intencao =
+    rotuloDaIntencao(crua.intencao) ??
+    (crua.intencao ? ROTULO_DA_INTENCAO_DO_CLIENTE[crua.intencao] : undefined) ??
+    (faixa ? ROTULO_DA_FAIXA[faixa] : null);
   if (intencao) etiquetas.push({ rotulo: 'Intenção', valor: intencao });
   const sentimento = crua.sentimento ? ROTULO_DO_SENTIMENTO[crua.sentimento] : null;
   if (sentimento) etiquetas.push({ rotulo: 'Sentimento', valor: sentimento });
@@ -627,6 +693,7 @@ export function montarLeituraDaFicha(
     resumo: limpo(crua.resumo),
     etiquetas,
     sugestao: limpo(crua.proxima_acao),
+    perfil: perfilDaLeitura(crua.dados_extraidos),
     analisadaEm: crua.analisada_em,
     curtaDemais: crua.dados_insuficientes !== false && semSinais,
     desatualizada:
