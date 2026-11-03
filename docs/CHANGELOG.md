@@ -8312,7 +8312,8 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 **Achados na KOMUNE, sem mexer (KOMUNE intocada):** a `ficha-da-conversa@v1` tem os mesmos dois defeitos (o formato da linha e a gravação sem devolver os nomes). Lá o módulo está desligado; ao ligar, os dois precisam da mesma correção.
 
 **Pendente:**
-- A **chave da Anthropic da Imova** (conta ou espaço próprio, com o teto) e **onde o worker de IA da Imova roda** (Fly, como o `imova-worker-wa`, ou a máquina dedicada). Sem os dois, as leituras esperam na fila, sem custo.
+- **Decidido pelo usuário em 03/11/2026: uma IA independente por ambiente.** O código é um só, mas cada empresa tem o próprio worker de IA, a própria chave e o próprio teto; nenhum processo atende as duas (cada empresa responde pelos dados dos próprios clientes, e uma parada ou um teto estourado não leva a outra junto). Recomendado: uma conta na Anthropic com um espaço (*workspace*) para cada empresa, cada um com a sua chave e o seu limite de gasto.
+- A **chave da Anthropic da Imova** (do espaço da Imova, com o teto de US$ 10) e o **worker de IA da Imova** no Fly, num app separado como o `imova-worker-wa` (cópia de `infra/nuvem/fly.worker-ai.toml` apontando para o banco da Imova). Sem os dois, as leituras esperam na fila, sem custo.
 - **OK do Dennis (LGPD):** a conversa vai à Anthropic sem nome e telefone; a política de privacidade da Imova provavelmente precisa citar o tratamento por IA.
 - A primeira medição real (custo com o raciocínio do modelo e qualidade em conversas de verdade da Imova).
 - Publicar, só com pedido: as duas migrações (Imova primeiro; na KOMUNE não criam nada), os blocos 12d e 12e do seed (nunca o seed inteiro), o site da Imova e o worker de IA. Ao ligar, as conversas que já existem entram na fila aos poucos (20 a cada 5 minutos).
