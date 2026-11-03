@@ -551,6 +551,23 @@ begin
 end $$;
 
 -- =====================================================================
+-- 12e. A IA lê o cliente (03/11/2026): só da Imova. Liga a leitura da conversa
+--      (a fila do CRM Inteligente: quem parou de falar entra, o worker de IA lê
+--      com `leitura-do-cliente`, Claude Haiku 5.5) e põe o teto do mês em US$ 10,
+--      decididos pelo usuário. O teto freia de verdade: a partir de 80% (US$ 8)
+--      a leitura para, e no teto não sai chamada nenhuma. Os outros módulos do
+--      CRM Inteligente (Pulso, Pergunte ao CRM, sugestões de campo) continuam
+--      desligados: têm prompts da KOMUNE.
+-- =====================================================================
+update public.app_settings
+   set value = jsonb_set(value, '{modulos,ficha}', 'true'::jsonb)
+ where key = 'ia.crm_inteligente';
+update public.app_settings
+   set value = value || jsonb_build_object('mensal_usd', 10, 'pendente_de_aprovacao', false),
+       description = 'Orçamento mensal só de IA, em US$ (PRD §10; ADR-10). Na Imova, 10 desde 03/11/2026, decidido pelo usuário, para a leitura do cliente (Claude Haiku 5.5). fracao_alerta = a linha de alerta (80% do teto), a partir da qual param os propósitos que não são de atendimento; o teto inteiro é a linha do freio, a partir da qual não sai chamada nenhuma.'
+ where key = 'ia.orcamento';
+
+-- =====================================================================
 -- 13. Autoverificação. Qualquer falta aborta com o nome do problema.
 -- =====================================================================
 do $$
@@ -588,6 +605,17 @@ begin
   if exists (select 1 from pg_namespace where nspname = 'cron')
      and not exists (select 1 from cron.job where jobname = 'fichas_automaticas_rodar') then
     raise exception 'seed imova: a ficha automática do cliente não ficou agendada';
+  end if;
+  if not coalesce((select (value -> 'modulos' ->> 'ficha')::boolean from public.app_settings
+                    where key = 'ia.crm_inteligente'), false) then
+    raise exception 'seed imova: a leitura do cliente pela IA ficou desligada';
+  end if;
+  if (select (value ->> 'mensal_usd')::numeric from public.app_settings where key = 'ia.orcamento')
+     is distinct from 10 then
+    raise exception 'seed imova: o teto da IA tem de ser US$ 10 (decisão de 03/11/2026)';
+  end if;
+  if not exists (select 1 from public.ai_model_prices where model = 'claude-haiku-5-5') then
+    raise exception 'seed imova: o Haiku 5.5 está sem preço (migração 20261103140000)';
   end if;
   if n_cat <> 7 then raise exception 'seed imova: esperadas 7 categorias ativas, encontradas %', n_cat; end if;
   if n_pipe <> 2 then raise exception 'seed imova: esperados 2 funis, encontrados %', n_pipe; end if;

@@ -100,7 +100,8 @@ create table if not exists public.proximas_acoes_automaticas (
   deal_id         uuid primary key references public.deals (id) on delete cascade,
   -- Qual regra escreveu: responder, retomar, primeiro_contato, marcar_visita,
   -- fazer_visita, registrar_visita, enviar_proposta, acompanhar_proposta,
-  -- pedir_documentacao, acompanhar_documentacao, reativar. Duas não escrevem:
+  -- pedir_documentacao, acompanhar_documentacao, reativar; e leitura_da_ia,
+  -- quando quem escreveu foi a IA (autor 'ia'). Duas não escrevem:
   -- 'manual' (a regra está respeitando a de alguém do time) e 'nenhuma' (não
   -- há passo a sugerir).
   regra           text not null check (regra ~ '^[a-z_]{3,40}$'),
@@ -505,6 +506,23 @@ comment on function app.proxima_acao_calcular(uuid, timestamptz) is
   'A próxima ação que a regra sugere para um negócio aberto (Imova): responder quem está esperando, a visita marcada, ou o passo da etapa. Só lê.';
 revoke all on function app.proxima_acao_calcular(uuid, timestamptz) from public, anon, authenticated;
 
+-- O ponto de encaixe da IA. Aqui não devolve nada: a regra decide sozinha. A
+-- migração da leitura do cliente (`20261103140000`) troca o corpo por um que
+-- devolve a próxima ação da última leitura da IA, quando ela é mais nova que o
+-- último fato (mensagem, etapa, agenda).
+create or replace function app.proxima_acao_da_ia(p_deal_id uuid, p_agora timestamptz default now())
+returns table (texto text, em timestamptz, motivo text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select null::text, null::timestamptz, null::text where false
+$$;
+comment on function app.proxima_acao_da_ia(uuid, timestamptz) is
+  'A próxima ação que a IA leu para o negócio, quando ela vale mais que a regra. Sem IA, não devolve nada.';
+revoke all on function app.proxima_acao_da_ia(uuid, timestamptz) from public, anon, authenticated;
+
 -- A próxima ação é da regra quando: não há nenhuma; é a que ela mesma
 -- escreveu; ou é o "Primeiro contato" / "Responder no WhatsApp" que o
 -- cadastro rápido e o lead automático põem ao nascer. Qualquer outra foi
@@ -520,6 +538,12 @@ declare
   d        record;
   a        public.proximas_acoes_automaticas%rowtype;
   n        record;
+  ia       record;
+  v_regra  text;
+  v_texto  text;
+  v_em     timestamptz;
+  v_motivo text;
+  v_autor  text := 'regra';
   v_dela   boolean;
   v_fato   timestamptz;
 begin
@@ -573,13 +597,25 @@ begin
     return false;
   end if;
 
-  if d.next_action is distinct from left(n.texto, 200) or d.next_action_at is distinct from n.em then
-    update public.deals set next_action = left(n.texto, 200), next_action_at = n.em
+  v_regra := n.regra;  v_texto := left(n.texto, 200);  v_em := n.em;  v_motivo := n.motivo;
+  -- A leitura da IA, quando é mais nova que o último fato, escreve no lugar da
+  -- regra. A hora fica a da regra quando a IA não deu uma.
+  select * into ia from app.proxima_acao_da_ia(p_deal_id, p_agora) limit 1;
+  if ia.texto is not null and btrim(ia.texto) <> '' then
+    v_regra := 'leitura_da_ia';
+    v_texto := left(btrim(ia.texto), 200);
+    v_em := coalesce(ia.em, n.em);
+    v_motivo := coalesce(nullif(btrim(ia.motivo), ''), n.motivo);
+    v_autor := 'ia';
+  end if;
+
+  if d.next_action is distinct from v_texto or d.next_action_at is distinct from v_em then
+    update public.deals set next_action = v_texto, next_action_at = v_em
      where id = p_deal_id;
   end if;
   insert into public.proximas_acoes_automaticas as x
          (deal_id, regra, texto, em, motivo, autor, gravada_em, manual_texto, manual_desde, calculada_em)
-  values (p_deal_id, n.regra, left(n.texto, 200), n.em, n.motivo, 'regra', p_agora, null, null, p_agora)
+  values (p_deal_id, v_regra, v_texto, v_em, v_motivo, v_autor, p_agora, null, null, p_agora)
   on conflict (deal_id) do update
     set regra = excluded.regra, texto = excluded.texto, em = excluded.em, motivo = excluded.motivo,
         autor = excluded.autor,
@@ -587,7 +623,7 @@ begin
                             or x.regra = 'manual'
                           then excluded.gravada_em else x.gravada_em end,
         manual_texto = null, manual_desde = null, calculada_em = excluded.calculada_em;
-  return d.next_action is distinct from left(n.texto, 200) or d.next_action_at is distinct from n.em;
+  return d.next_action is distinct from v_texto or d.next_action_at is distinct from v_em;
 end $$;
 comment on function app.proxima_acao_gravar(uuid, timestamptz) is
   'Escreve em deals.next_action / next_action_at a próxima ação que a regra sugere, respeitando a manual até um fato mais novo (o cliente escrever, a etapa mudar). Devolve true quando mudou. Não envia nada.';
@@ -673,7 +709,8 @@ begin
   end loop;
 
   -- 6.3 A próxima ação: os negócios abertos em que algo mudou desde a última
-  -- conta (o negócio, uma mensagem, a agenda) e os que nunca foram olhados.
+  -- conta (o negócio, uma mensagem, a agenda, uma leitura da IA) e os que nunca
+  -- foram olhados.
   for v_id in
     select dl.id
       from public.deals dl
@@ -685,6 +722,10 @@ begin
             or exists (select 1 from public.conversations c
                         where c.organization_id = dl.organization_id
                           and greatest(c.updated_at, c.last_message_at) > a.calculada_em - interval '5 minutes')
+            or exists (select 1 from public.ficha_da_conversa f
+                         join public.conversations c on c.id = f.conversation_id
+                        where c.organization_id = dl.organization_id
+                          and f.updated_at > a.calculada_em - interval '5 minutes')
             or exists (select 1 from public.reunioes rn
                         where rn.organization_id = dl.organization_id
                           and (greatest(rn.atualizada_em, rn.criada_em) > a.calculada_em - interval '5 minutes'
