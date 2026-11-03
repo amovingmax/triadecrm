@@ -8610,6 +8610,10 @@ Decisão do usuário: "quero usar o EXPO para criar o app". A casca do Capacitor
   - a volta para a KOMUNE vem logada.
 
   O Chrome segura os pedidos ao nome `.local` até alguém permitir (trava de rede local dele), e a conferência rodou com essa trava desligada. No iPhone ela não existe.
+- **Conferido no iPhone pelo usuário (03/11/2026, ~15h20, no hotspot):**
+  - as duas empresas abrem no app e a troca funciona;
+  - na Imova, o "Pedir para ligar" funcionou, e o pedido ficou só na fila do banco local (Ana Souza, +55 84 99911-0001). Nenhum robô de envio estava ligado no Mac.
+  - O Wi-Fi do escritório (192.168.0.x) também isola os aparelhos.
 - **Em produção a troca já funciona assim** para quem tem acesso às duas empresas. Dentro do app, o que falta é o login: na Imova, o login com Google vai para o Safari até a etapa do login no app.
 
 **Precisa de decisão humana:**
