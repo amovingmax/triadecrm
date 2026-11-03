@@ -8254,3 +8254,40 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 **Feito:** `scripts/ligacao-whatsapp.mjs abrir` passa a abrir sempre disponível: `call_hours` com `status: DISABLED` (a Meta trata como 24 horas; a semana vai inteira, 00h–23h59, porque a Meta pede a lista mesmo assim) e sem feriados. O horário comercial com os feriados ficou em `abrir --horario`. O pedido de retorno continua ligado. Guia atualizado (passos 8 e 9 e o teste com celulares). Conferido com `abrir --ver` e `abrir --horario --ver`, sem mudar nada.
 
 **Falta:** o usuário rodar `abrir` no Terminal (o classificador barra ajuste da Meta). Sem horário, a ligação fora do expediente só toca com alguém de CRM aberto; a que ninguém atende vira perdida no topo da lista, e muita ligação sem atender faz a Meta esconder o botão.
+
+## 03/11/2026 — A ficha do cliente que se preenche sozinha, só na Imova (branch `ficha-do-cliente`; RF-BAS-15, RF-FUN-02, RF-FUN-05, RF-CON-24)
+
+**O pedido.** "Todos os clientes que entrarem em contato no CRM da Imova devem ter uma ficha dessa no seu perfil [...] de acordo com a etapa em que ele se encontra, a ficha deverá preencher sozinha. Por exemplo, Ana Souza mandou uma mensagem, o progresso atualiza e a próxima ação mostra o que devemos fazer depois." A IA entra depois, lendo e escrevendo na mesma ficha. É fora do PRD; o pedido é do usuário.
+
+**Entregue:**
+- `20261103120000_a_ficha_do_cliente.sql`, tudo feito pelo `pg_cron` a cada minuto (`app.fichas_automaticas_rodar`):
+  1. **A ficha nasce sozinha** (`app.cliente_ficha_criar`). Quem escreveu para o número da Imova e ainda não é ficha ganha uma: tipo Cliente (`produtor`), pessoa física, categoria Comprador, funil Clientes, origem "Chegou pelo WhatsApp", com o nome do perfil do WhatsApp e quem atende a conversa como responsável. Número que a base já conhece (da ficha ou de uma pessoa dela) é ligado, nunca duplicado. Ficam sem ficha: quem pediu para sair, conversa bloqueada, número que não é telefone brasileiro e quem só mandou o que a Meta entrega sem conteúdo (enquete, tipo não suportado). A recusa é anotada (`app.ficha_automatica_recusas`) e só volta a ser olhada com mensagem nova.
+  2. **A régua anda.** A primeira mensagem já levava o negócio para Respondeu (`app.wa_resposta_no_funil`, 15/09), e a agenda já leva para Visita marcada e Visita realizada. O que faltava (`app.cliente_etapa_andar`): quem estava em Contatado, na etapa de entrada ou em Nutrição e voltou a escrever vai para Respondeu (o negócio em nutrição reabre).
+  3. **A próxima ação se escreve** (`app.proxima_acao_calcular` e `app.proxima_acao_gravar`), no mesmo `deals.next_action`/`next_action_at` que a ficha, o quadro e o Meu dia já leem:
+     - o cliente escreveu e ninguém respondeu: "Responder a mensagem", com a hora da mensagem;
+     - visita (avaliação, no funil de captação) na agenda: "Fazer a visita" na hora dela; passou o horário sem desfecho: "Registrar como foi a visita";
+     - respondemos e esperamos: "Retomar a conversa" em 2 dias úteis, às 9h (3 dias depois de uma mensagem nunca respondida);
+     - Visita realizada: "Enviar a proposta" (proprietário: "Pedir a documentação do imóvel"); Proposta: "Acompanhar a proposta" em 3 dias úteis (proprietário: "Acompanhar a documentação");
+     - Nutrição: "Reativar com uma novidade" em 30 dias; sem contato nenhum: "Primeiro contato".
+     - Vale para os dois funis da Imova: o exemplo do pedido (Ana Souza) é proprietária.
+  - **A próxima ação de gente vale.** A que alguém do time escreveu à mão fica até um fato mais novo que ela (o cliente escrever, a etapa mudar). A regra só toma o lugar da que ela mesma escreveu, da vazia e do "Primeiro contato"/"Responder no WhatsApp" que o cadastro rápido e o lead automático põem ao nascer.
+  - `public.proximas_acoes_automaticas` guarda o que a regra escreveu, a regra, o porquê e o autor (`regra`; a IA vai entrar como `ia`). Quem vê o negócio lê a linha (RLS de `deals`).
+  - "Algo mudou" é medido pela hora em que a linha foi escrita (`updated_at`), com folga de 5 minutos: a hora da mensagem é a da Meta e pode ser anterior à rodada que não a viu. Achado no teste.
+  - **O WhatsApp não muda.** Nenhum gatilho novo em `messages` nem em `conversations`; ligar a conversa à ficha é o mesmo `update` de `public.vincular_conversa`. O job nunca espera pelo motor do WhatsApp: conversa ou negócio que está sendo escrito fica para o minuto seguinte (`skip locked`).
+- **Só da Imova**, como a atitude do cliente: no banco da KOMUNE a migração não cria nada; num banco sem identidade (CI, `db reset`) cria tudo; a regra só liga onde `app.identidade` = imova. A chave `app_settings['ficha_automatica']` e o job `fichas_automaticas_rodar` vêm do seed da Imova (bloco 12d), e a autoverificação confere os dois.
+- Tela (módulo `fichaDoCliente`, só da Imova em `empresas.ts`):
+  - Ficha: embaixo da próxima ação, "Automática · Ana escreveu e ainda não teve resposta" quando foi a regra que escreveu (`proximaAcaoAutomatica`, com teste). A de gente não ganha a marca.
+  - Conversas › Clientes: a aba mostra os clientes com ficha (a mesma lista da aba Conversas, com etapa, categoria e atitude) junto com os que ainda não têm. Sem isso, a conversa sairia da aba no minuto seguinte e a aba ficaria vazia. A conversa concluída (arquivada) sai, como antes.
+  - `database.types.ts`: só a tabela nova, no formato do arquivo.
+
+**Verificado:**
+- pgTAP `119_a_ficha_do_cliente` (44 asserções): trava da KOMUNE; a ficha que nasce (tipo, categoria, funil, origem, responsável, mensagens ligadas, Respondeu); número já de ficha liga sem duplicar; suprimido, bloqueado e só-recebeu ficam sem ficha e não são tentados de novo; Responder → Retomar (2 dias úteis às 9h) → Fazer a visita; a manual vale até o cliente escrever; nutrição volta para Respondeu; RLS; o job não roda pela tela; o WhatsApp intocado (nenhuma saída, nada em `wa_outbound`, conversa igual).
+- Vitest (web 1.484, workers 411, prompts 284, schema 111), lint e typecheck verdes.
+- Ensaio no banco local da Imova, com o robô rodando de minuto em minuto: 15 fichas nasceram das conversas de teste; a Ana Souza (proprietária, sem conversa) escreveu e foi para Respondeu com "Responder a mensagem"; um número novo ganhou ficha de Cliente; a resposta do time trocou para "Retomar a conversa". Fotos no Chrome (1440×1000): ficha e aba Clientes, sem erro no console.
+
+**Pendente:**
+- Publicar, só com pedido: a migração (Imova primeiro, depois KOMUNE, onde não cria nada), só o bloco 12d do seed da Imova (nunca o seed inteiro), e o site da Imova. Ao ligar em produção, as conversas de clientes que já existem ganham ficha na primeira rodada.
+- Decisão do usuário: o aviso de mensagem. Cliente sem ficha avisa todos os operadores sempre; cliente com ficha segue a regra do parceiro (todos até alguém responder; depois, só quem atende). Com todo cliente virando ficha, os avisos da Imova passam a ser os do parceiro. Mudar isso é regra de tela (`avisos/regra.ts`).
+- Decisão do usuário: proprietário que escreve pela primeira vez nasce Cliente. Corrige-se em "Editar ficha" (categoria); não há botão de trocar de funil.
+- A branch `cadastrar-clientes` (não publicada) cria cliente sem ficha pelo botão; com esta entrega, ele ganha ficha quando responder.
+- A IA (fase 2): ler a conversa e escrever a próxima ação e o perfil do que o cliente procura (tipo de imóvel, bairro, faixa de valor) em `proximas_acoes_automaticas` com autor `ia`.
