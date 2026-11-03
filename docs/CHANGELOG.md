@@ -8246,3 +8246,11 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 **Falta:** abrir na Meta. O classificador desta máquina barrou `scripts/ligacao-whatsapp.mjs abrir`, como barra todo ajuste da Meta; o comando vai ao Terminal do usuário. Até lá a Meta segue com o botão escondido dos clientes (`DISABLE_ALL`), e nada muda para eles. Depois, o teste com celulares nossos (guia).
 
 **Volta:** site, promover `imova-jkcxprhrj`; Meta, `ligacao-whatsapp.mjs fechar`; banco, a migração só acrescenta (função `wa_ligacoes_perdidas` e gatilho `wa_chamadas_desarquiva`), e tirá-la é `drop trigger` + `drop function`.
+
+## 03/11/2026 (noite) — O botão de ligar para a Imova sempre disponível (RF-CON-18)
+
+**O pedido.** "Eu preciso que esse botão do ligar fique sempre disponível." Muda a decisão de 30/10 (seg–sex, 8h–19h, "por enquanto").
+
+**Feito:** `scripts/ligacao-whatsapp.mjs abrir` passa a abrir sempre disponível: `call_hours` com `status: DISABLED` (a Meta trata como 24 horas; a semana vai inteira, 00h–23h59, porque a Meta pede a lista mesmo assim) e sem feriados. O horário comercial com os feriados ficou em `abrir --horario`. O pedido de retorno continua ligado. Guia atualizado (passos 8 e 9 e o teste com celulares). Conferido com `abrir --ver` e `abrir --horario --ver`, sem mudar nada.
+
+**Falta:** o usuário rodar `abrir` no Terminal (o classificador barra ajuste da Meta). Sem horário, a ligação fora do expediente só toca com alguém de CRM aberto; a que ninguém atende vira perdida no topo da lista, e muita ligação sem atender faz a Meta esconder o botão.

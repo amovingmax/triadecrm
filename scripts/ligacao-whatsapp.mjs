@@ -5,12 +5,14 @@
  * antes da Meta, para a tela nunca oferecer um botão que a Meta recusaria.
  *
  * `ligar` e `janela` deixam o botão de ligar para a Imova escondido dos clientes
- * (`DISABLE_ALL`): só a equipe liga. `abrir` (03/11/2026) mostra o botão aos clientes, com o
- * horário de atendimento, os feriados e o pedido de retorno; `fechar` volta a só a equipe.
+ * (`DISABLE_ALL`): só a equipe liga. `abrir` (03/11/2026) mostra o botão aos clientes, sempre
+ * disponível, com o pedido de retorno; `abrir --horario` o limita ao horário de atendimento e
+ * fecha nos feriados; `fechar` volta a só a equipe.
  *
  *   node scripts/ligacao-whatsapp.mjs estado     (só lê)
  *   node scripts/ligacao-whatsapp.mjs ligar      (só a equipe liga; fica até alguém desligar)
- *   node scripts/ligacao-whatsapp.mjs abrir      (os clientes também ligam, no horário)
+ *   node scripts/ligacao-whatsapp.mjs abrir      (os clientes também ligam, a qualquer hora)
+ *   node scripts/ligacao-whatsapp.mjs abrir --horario (só seg–sex, 8h–19h, fechado nos feriados)
  *   node scripts/ligacao-whatsapp.mjs abrir --ver (mostra o que seria enviado, e não muda nada)
  *   node scripts/ligacao-whatsapp.mjs fechar     (volta a só a equipe ligar)
  *   node scripts/ligacao-whatsapp.mjs desligar
@@ -31,9 +33,11 @@ const TEMPO_MS = Number(process.env.TEMPO_DE_TESTE ?? 30 * 60 * 1000);
 const NUMERO_DA_IMOVA = '1348058288398842';
 
 /**
- * O horário de atendimento por ligação (decisão de 30/10/2026, "por enquanto"): de segunda a
- * sexta, das 8h às 19h, no fuso de Natal. Fora dele o WhatsApp não oferece a ligação e mostra
- * ao cliente o próximo horário, com a opção de mandar mensagem ou pedir retorno.
+ * O botão fica sempre disponível (decisão de 03/11/2026: "Eu preciso que esse botão do ligar
+ * fique sempre disponível"). O horário de 30/10 ("por enquanto": de segunda a sexta, das 8h
+ * às 19h, no fuso de Natal) continua em `abrir --horario`. Com ele, fora do horário o WhatsApp
+ * não oferece a ligação e mostra ao cliente o próximo horário, com a opção de mandar mensagem
+ * ou pedir retorno.
  */
 const DIAS_DE_ATENDIMENTO = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
 const ABRE = '0800';
@@ -61,9 +65,10 @@ function parar(frase) {
 }
 
 const SO_VER = args.includes('--ver');
+const COM_HORARIO = args.includes('--horario');
 
 if (!['estado', 'ligar', 'abrir', 'fechar', 'desligar', 'janela'].includes(acao)) {
-  parar('Use: node scripts/ligacao-whatsapp.mjs estado | ligar | abrir [--ver] | fechar | desligar | janela');
+  parar('Use: node scripts/ligacao-whatsapp.mjs estado | ligar | abrir [--horario] [--ver] | fechar | desligar | janela');
 }
 if (!ARQUIVO || !existsSync(ARQUIVO)) parar('Não achei o .env.imova.');
 
@@ -142,13 +147,15 @@ async function feriadosDaSemana() {
   return dias.slice(0, TETO_DE_FERIADOS);
 }
 
+const TODOS_OS_DIAS = [...DIAS_DE_ATENDIMENTO, 'SATURDAY', 'SUNDAY'];
+
+/**
+ * `feriados` nulo é o botão sempre disponível: o horário vai desligado (a Meta trata como
+ * 24 horas) e sem feriados. A Meta pede a semana mesmo assim, então ela vai inteira.
+ */
 function chamadaAberta(fuso, feriados) {
-  return {
-    calling: {
-      status: 'ENABLED',
-      call_icon_visibility: 'DEFAULT',
-      callback_permission_status: 'ENABLED',
-      call_hours: {
+  const call_hours = feriados
+    ? {
         status: 'ENABLED',
         timezone_id: fuso,
         weekly_operating_hours: DIAS_DE_ATENDIMENTO.map((day_of_week) => ({
@@ -157,7 +164,22 @@ function chamadaAberta(fuso, feriados) {
           close_time: FECHA,
         })),
         holiday_schedule: feriados.map((f) => ({ date: f.date, start_time: '0000', end_time: '2359' })),
-      },
+      }
+    : {
+        status: 'DISABLED',
+        timezone_id: fuso,
+        weekly_operating_hours: TODOS_OS_DIAS.map((day_of_week) => ({
+          day_of_week,
+          open_time: '0000',
+          close_time: '2359',
+        })),
+      };
+  return {
+    calling: {
+      status: 'ENABLED',
+      call_icon_visibility: 'DEFAULT',
+      callback_permission_status: 'ENABLED',
+      call_hours,
     },
   };
 }
@@ -200,15 +222,19 @@ async function mostrarEstado() {
  * é a ligação que entra, e com o CRM desligado ela ficaria gravada como perdida sem tocar.
  */
 async function abrirParaClientes() {
-  const feriados = await feriadosDaSemana();
+  const feriados = COM_HORARIO ? await feriadosDaSemana() : null;
   if (SO_VER) {
     console.log('Só olhando: nada será mudado.\n');
     console.log(JSON.stringify(chamadaAberta(FUSOS[0], feriados), null, 2));
-    console.log(`\nFeriados que fecham a ligação (${feriados.length}):`);
-    for (const f of feriados) console.log(`  ${dataBr(f.date)}  ${f.name}`);
+    if (feriados) {
+      console.log(`\nFeriados que fecham a ligação (${feriados.length}):`);
+      for (const f of feriados) console.log(`  ${dataBr(f.date)}  ${f.name}`);
+    } else {
+      console.log('\nSempre disponível: sem horário de atendimento e sem feriados.');
+    }
     return;
   }
-  if (feriados.length === 0) throw new Error('não achei feriado nenhum no CRM; confira a tabela antes de abrir');
+  if (feriados?.length === 0) throw new Error('não achei feriado nenhum no CRM; confira a tabela antes de abrir');
 
   await chaveDoCrmLigada(true);
   console.log('CRM: ligado.');
@@ -226,8 +252,12 @@ async function abrirParaClientes() {
     }
   }
   if (!usado) throw ultimoErro;
-  console.log(`Meta: aberta para os clientes, seg–sex ${ABRE.slice(0, 2)}h–${FECHA.slice(0, 2)}h (${usado}).`);
-  console.log(`Feriados fechados: ${feriados.length}, até ${dataBr(feriados.at(-1).date)}.`);
+  if (feriados) {
+    console.log(`Meta: aberta para os clientes, seg–sex ${ABRE.slice(0, 2)}h–${FECHA.slice(0, 2)}h (${usado}).`);
+    console.log(`Feriados fechados: ${feriados.length}, até ${dataBr(feriados.at(-1).date)}.`);
+  } else {
+    console.log('Meta: aberta para os clientes, sempre disponível (todos os dias, a qualquer hora).');
+  }
   console.log('Pedido de retorno: ligado (o WhatsApp pergunta ao cliente, depois de ligar, se a Imova pode ligar de volta).');
 }
 
