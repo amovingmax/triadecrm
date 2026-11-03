@@ -277,7 +277,13 @@ function lerClienteNoDuble(mensagem: string): Record<string, unknown> {
 
   const proprietario = mensagem.includes('caminho: proprietário');
   const disponivel = /dispon[íi]vel|ainda tem|ainda est[áa]/i.test(texto);
-  const visita = /visit|conhecer|ir ver|dá para ver|da pra ver|agendar/i.test(texto);
+  const visita =
+    /visit|conhecer|ir ver|dá para ver|da pra ver|agendar/i.test(texto) ||
+    /(s[áa]bado|domingo|amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta).*(\d{1,2}\s*h|pode ser)/i.test(
+      texto,
+    );
+  const quemDecide = /\b(esposa|marido|mulher|s[óo]cio|fam[íi]lia)\b/i.exec(texto)?.[1];
+  const decideJunto = quemDecide !== undefined && /decide|junto|ver com/i.test(texto);
   const caro = /caro|vou pensar|pensar melhor/i.test(texto);
   const financiamento = /financ|fgts|cons[óo]rcio/i.test(texto);
   const preco = /pre[çc]o|valor|quanto/i.test(texto);
@@ -304,6 +310,8 @@ function lerClienteNoDuble(mensagem: string): Record<string, unknown> {
     dados.push({ campo: 'finalidade', valor: 'compra', confianca: 0.7, messageId });
   if (financiamento)
     dados.push({ campo: 'forma_pagamento', valor: 'financiamento', confianca: 0.7, messageId });
+  if (decideJunto)
+    dados.push({ campo: 'decide_com', valor: quemDecide.toLowerCase(), confianca: 0.8, messageId });
 
   const doImovel = [tipo, bairro ? `em ${bairro}` : null].filter(Boolean).join(' ');
   const caso = proprietario
@@ -332,9 +340,9 @@ function lerClienteNoDuble(mensagem: string): Record<string, unknown> {
             score: 72,
             sinal: 'pediu_visita',
             polaridade: 'positivo',
-            acao: `Combinar dia e hora da visita${doImovel ? ` (${doImovel})` : ''} e marcar na agenda`,
+            acao: `Combinar dia e hora da visita${doImovel ? ` (${doImovel})` : ''}${decideJunto ? `, com ${quemDecide.toLowerCase()} junto,` : ''} e marcar na agenda`,
             alertas: ['pediu_visita'],
-            objecoes: [],
+            objecoes: decideJunto ? ['decide_com_outra_pessoa'] : [],
           }
         : caro
           ? {
