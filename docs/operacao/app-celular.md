@@ -52,7 +52,7 @@ Precisa de: Supabase local de pé (`supabase start`), o iPhone no mesmo Wi-Fi do
 **O Wi-Fi de casa isola os aparelhos** (medido em 29/10/2026): o Safari do iPhone não abria `http://10.0.0.188:8081/status`, com o firewall do Mac desligado. Pelo **Acesso Pessoal (hotspot) do iPhone**, com o Mac conectado nele, funciona. Ligue os dois comandos depois de trocar de rede, porque o endereço do Mac muda. O macOS tende a voltar sozinho para a rede de casa.
 
 1. Na primeira vez: `pnpm -C apps/app install`.
-2. Num terminal: `pnpm -C apps/app site`. Liga um segundo `next dev` na porta 3100, preso ao endereço do Mac na rede, com o Supabase local nesse endereço. O `next dev` de sempre, na 3000, continua como está.
+2. Num terminal: `pnpm -C apps/app site` (KOMUNE) ou `pnpm -C apps/app site imova` (a Imova de teste, com o banco local dela, em `~/triadecrm-imova-local`). Liga um segundo `next dev` na porta 3100, preso ao endereço do Mac na rede, com o Supabase local nesse endereço. O `next dev` de sempre, na 3000, continua como está. Trocou de empresa? No app, saia e entre de novo: a sessão de uma não vale na outra.
 3. Noutro terminal: `pnpm -C apps/app start`. O Expo mostra um QR code.
 4. No iPhone, aponte a câmera para o QR code. Ele abre no Expo Go. Na primeira vez, o iPhone pede acesso à rede local: permita.
 5. A tela de login do Tríade mostra "Entrar como gestor" e "Entrar como SDR". No celular é um papel por vez: para trocar, saia e entre com o outro.
@@ -60,6 +60,10 @@ Precisa de: Supabase local de pé (`supabase start`), o iPhone no mesmo Wi-Fi do
 **Cuidado:** enquanto o `site` estiver ligado, qualquer aparelho no mesmo Wi-Fi abre o Tríade local com a entrada de teste. Use só em rede de confiança e desligue (Ctrl+C) ao terminar.
 
 **Inspecionar a página:** com o iPhone no cabo e "Inspetor Web" ligado (Ajustes → Apps → Safari → Avançado), o Safari do Mac mostra a página em Desenvolvedor → iPhone.
+
+**Trocou de rede (Wi-Fi ↔ hotspot)?** Pare os dois comandos (Ctrl+C) e ligue de novo. O site fica preso ao endereço antigo, e o QR code aponta para ele.
+
+**Teste de resposta só em conversa de número fictício** (+55 84 90000-00xx). Uma mensagem recebida inserida no banco dispara as regras de verdade, como a apresentação automática depois do "Boa tarde!". Depois de cada inserção, confira se não ficou nada na fila (`direction = 'out' and status = 'queued'`). O botão "Conversar" da ficha usa o telefone cadastrado no parceiro, que pode ser real.
 
 **Mac com mais de uma rede:** se o app procurar o Tríade no endereço errado, fixe o mesmo endereço nos dois comandos: `TRIADE_IP_DO_MAC=192.168.0.10 pnpm -C apps/app site` e `REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.10 pnpm -C apps/app start`.
 

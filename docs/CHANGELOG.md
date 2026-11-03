@@ -8523,7 +8523,6 @@ Primeiro passo do app de celular (`docs/operacao/app-celular.md`). A regra, deci
 - Contas da Apple e do Google Play (Rafael).
 - Liberar o push para ler as mensagens que chegam (usuário).
 - Trecho da mensagem na tela bloqueada (Dennis).
-<<<<<<< HEAD
 =======
 
 ## 29/10/2026 — O app de celular passa do Capacitor para o Expo (branch `app-celular`; PRD §8)
@@ -8564,4 +8563,39 @@ Decisão do usuário: "quero usar o EXPO para criar o app". A casca do Capacitor
 **Precisa de decisão humana:**
 - A conta Expo (grátis) já existe por causa do Expo Go (`rafaelabreu-2`, pessoal). Para o EAS Build e o EAS Submit, decidir se o app fica nela ou numa organização da KOMUNE no Expo. O código da casca e o certificado de assinatura ficam nos servidores do Expo. O plano grátis tem cota mensal de builds; o plano pago, se a cota apertar, é decisão do Rafael.
 - As decisões de 28/10 continuam abertas: identificador e nome, contas da Apple e do Google Play, push lendo mensagens e trecho na tela bloqueada.
+<<<<<<< HEAD
 >>>>>>> 965e272 (CHANGELOG e guia do app: a casca em Expo e o teste no iPhone pelo Expo Go)
+
+## 03/11/2026 — App de celular: vistoria das telas e a ligação pelo WhatsApp clara no celular da Imova (branch `app-celular`; RF-CON-18, PRD §8)
+
+**Entregue:**
+- **Branch rebaseada na main** (`97dca03`). Só o CHANGELOG conflitou, e as duas partes ficaram.
+- **Vistoria das telas no tamanho do app,** com o user-agent `TriadeApp/0.1.0`, Chrome real e Playwright. Foram 13 telas, em 390 e 320 px:
+  - nenhuma estoura a largura e nenhum campo tem letra menor que 16 px (o tamanho que dá zoom no iPhone);
+  - o cabeçalho e a barra de baixo já são os do protótipo;
+  - o "Instalar o Tríade" e o convite de avisos do navegador já somem dentro do app.
+
+  A etapa 2 ("ajustes de tamanho") quase não tem o que fazer.
+- **A ligação pelo WhatsApp, clara no celular** (pedido do usuário testando no app: "quero que essa opção apareça de forma clara"). Só na Imova: fora dela o botão nunca aparece.
+  - Cabeçalho da conversa no celular: o ícone sozinho virou **"Ligar"** com a palavra. É cheio quando o toque liga na hora, tem contorno quando falta pedir a permissão e fica apagado quando não dá. No apagado, o toque conta o motivo, porque no celular não existe o balão do mouse.
+  - Folha do "⋯": a primeira ação passou a ser **"Ligar pelo WhatsApp"** ou **"Pedir para ligar pelo WhatsApp"**, com o motivo escrito embaixo quando está indisponível.
+  - Vale para as duas telas de conversa: parceiro (`conversa.tsx`) e cliente (`fora-da-base.tsx`). O cabeçalho do computador não mudou.
+  - O componente `BotaoDeLigarNaConversa` trocou `compacto` por `variante` (`computador`, `celular` ou `folha`). Ganhou também `rotuloPorExtenso` em `logica.ts`, com teste.
+  - Conferido na Imova de teste, em 390 e 320 px, nos três estados: cliente que permitiu (Carla Teste), falta pedir (Lucas Andrade) e janela de 24 h fechada (Ana Paula). Não estoura, e o motivo aparece ao tocar.
+- **`pnpm -C apps/app site imova`** abre a Imova de teste no app. As duas empresas usam as mesmas chaves locais; mudam a empresa, a porta do banco (56321) e a pasta de saída.
+- **Teste de resposta no app:**
+  - o "Boa tarde!" mandado pelo usuário saiu da ficha do DJ Done, numa conversa com o telefone do parceiro, que parece real;
+  - a resposta inserida por mim disparou a apresentação automática, e cancelei as duas mensagens com `public.mensagem_apagar`;
+  - nenhum robô de envio estava ligado no Mac;
+  - o guia ganhou a regra: teste só em número fictício e conferir a fila depois.
+- **Verificado:** site com 1.484 testes, tipos e lint; app com lint, tipos e 19 testes.
+
+**Pendente:**
+- **A ligação pela Meta continua desligada na Imova** desde a janela de teste de 30/10. Em produção, o botão só aparece depois de `node ~/triadecrm-ligacao-meta/scripts/ligacao-whatsapp.mjs ligar`, no Terminal do usuário.
+- No local, o "Ligar" mostra o botão, mas a ligação não completa: precisa das funções e da Meta, que só existem em produção.
+- Dentro do app, a ligação ainda não foi testada com voz. A WebView do iPhone deve deixar falar com a tela acesa; o toque com o app fechado é a etapa do CallKit.
+- O "Boa tarde!" de teste para o +55 84 99993-3831 continua na fila do banco local, esperando a decisão do usuário de cancelar.
+- Estas mudanças no site não foram publicadas. Antes de publicar: rodar a comparação de telas (`docs/operacao/comparar-versoes.md`).
+
+**Precisa de decisão humana:**
+- As três perguntas de 03/11 continuam abertas: login pela janela segura do Google, quem tem a conta Apple da KOMUNE e conta Expo pessoal ou da empresa.

@@ -12,8 +12,11 @@
  * `--hostname` com o endereço da rede também é o que o Next aceita como origem dos
  * recursos de desenvolvimento, sem mexer no `allowedDevOrigins` do `next.config.ts`.
  *
- * Uso: `pnpm -C apps/app site`. Se o Mac tiver mais de uma rede e a escolhida for
- * a errada, `TRIADE_IP_DO_MAC=192.168.0.10 pnpm -C apps/app site`.
+ * Uso: `pnpm -C apps/app site` (KOMUNE) ou `pnpm -C apps/app site imova` (a Imova de
+ * teste, com o banco local dela em ~/triadecrm-imova-local). As duas usam as mesmas
+ * chaves do Supabase local; muda a empresa, a porta do banco e a pasta de saída. Se o
+ * Mac tiver mais de uma rede e a escolhida for a errada,
+ * `TRIADE_IP_DO_MAC=192.168.0.10 pnpm -C apps/app site`.
  */
 import { spawn } from 'node:child_process';
 import { networkInterfaces } from 'node:os';
@@ -22,7 +25,20 @@ import { fileURLToPath } from 'node:url';
 
 import { PORTA_DO_SITE_NA_REDE } from '../src/ambiente';
 
-const PORTA_DO_SUPABASE = 54321;
+/** A porta do Supabase local de cada empresa (o `[api] port` do config.toml de cada uma). */
+const EMPRESAS = {
+  komune: { portaDoSupabase: 54321 },
+  imova: { portaDoSupabase: 56321 },
+} as const;
+type Empresa = keyof typeof EMPRESAS;
+
+function empresaPedida(valor: string | undefined): Empresa {
+  const chave = (valor ?? '').trim() || 'komune';
+  if (!(chave in EMPRESAS)) {
+    throw new Error(`Empresa "${valor}" não existe. Use ${Object.keys(EMPRESAS).join(' ou ')}.`);
+  }
+  return chave as Empresa;
+}
 const REDE_PRIVADA = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
 
 function enderecoNaRede(): string {
@@ -39,12 +55,17 @@ function enderecoNaRede(): string {
   return escolhido.endereco;
 }
 
+const empresa = empresaPedida(process.argv[2]);
+const { portaDoSupabase } = EMPRESAS[empresa];
 const ip = process.env.TRIADE_IP_DO_MAC?.trim() || enderecoNaRede();
 const web = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
 const site = `http://${ip}:${PORTA_DO_SITE_NA_REDE}`;
 
-console.log(`Site para o celular: ${site} (Supabase em http://${ip}:${PORTA_DO_SUPABASE})`);
+console.log(
+  `Site para o celular (${empresa.toUpperCase()}): ${site} (Supabase em http://${ip}:${portaDoSupabase})`,
+);
 console.log('No celular, no mesmo Wi-Fi: abra o app pelo Expo Go (pnpm -C apps/app start).');
+console.log('Trocou de empresa? No app, saia e entre de novo: a sessão de uma não vale na outra.');
 
 const next = spawn(
   'pnpm',
@@ -54,10 +75,12 @@ const next = spawn(
     stdio: 'inherit',
     env: {
       ...process.env,
-      NEXT_PUBLIC_SUPABASE_URL: `http://${ip}:${PORTA_DO_SUPABASE}`,
+      NEXT_PUBLIC_SUPABASE_URL: `http://${ip}:${portaDoSupabase}`,
       NEXT_PUBLIC_APP_URL: site,
-      // Pasta de saída própria: o `next dev` de sempre mantém o .next aberto.
-      NEXT_DIST_DIR: '.next-celular',
+      NEXT_PUBLIC_EMPRESA: empresa,
+      // Pasta de saída própria (e uma por empresa, porque o Next grava o NEXT_PUBLIC_*
+      // no código compilado): o `next dev` de sempre mantém o .next aberto.
+      NEXT_DIST_DIR: empresa === 'komune' ? '.next-celular' : `.next-celular-${empresa}`,
     },
   },
 );
