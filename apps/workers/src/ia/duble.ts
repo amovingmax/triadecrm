@@ -34,6 +34,7 @@ export type FluxoDoDuble =
   | 'followup'
   | 'classificacao'
   | 'ficha'
+  | 'leitura'
   | 'pulso';
 
 export class EsquemaDesconhecidoError extends Error {
@@ -57,7 +58,7 @@ export function fluxoDoEsquema(esquema: Record<string, unknown>): FluxoDoDuble {
   if (campos.has('textoLimpo')) return 'transcricao';
   // A ficha vem antes da classificação: ela também tem `intencao`, mas o que a
   // distingue é o score e os sinais que o sustentam (CRM Inteligente, Fase 1).
-  if (campos.has('scoreIntencao')) return 'ficha';
+  if (campos.has('scoreIntencao')) return ehLeituraDoCliente(esquema) ? 'leitura' : 'ficha';
   // O Pulso é o único que tem prioridades e um título: ele fala do dia, não de
   // uma conversa (CRM Inteligente, Fase 2).
   if (campos.has('prioridades')) return 'pulso';
@@ -232,6 +233,183 @@ function ficharConversa(mensagem: string): Record<string, unknown> {
 }
 
 /**
+ * A leitura do cliente da Imova tem a forma da ficha; o que a distingue é o
+ * vocabulário de imobiliária, que aparece na lista fechada das intenções.
+ */
+function ehLeituraDoCliente(esquema: Record<string, unknown>): boolean {
+  const propriedades = (esquema.properties ?? {}) as Record<string, { enum?: unknown }>;
+  const intencoes = propriedades.intencao?.enum;
+  return Array.isArray(intencoes) && intencoes.includes('PEDIU_VISITA');
+}
+
+const BAIRROS_DE_NATAL = [
+  'Ponta Negra',
+  'Tirol',
+  'Petrópolis',
+  'Lagoa Nova',
+  'Capim Macio',
+  'Candelária',
+  'Neópolis',
+  'Nova Parnamirim',
+  'Pitimbu',
+  'Barro Vermelho',
+  'Lagoa Seca',
+  'Areia Preta',
+  'Cidade Alta',
+  'Ribeira',
+  'Alecrim',
+];
+
+/**
+ * A leitura do cliente no dublê (Imova, 03/11/2026): lê a última mensagem do
+ * cliente e devolve uma leitura coerente com ela — visita, financiamento, preço,
+ * "achei caro" — e o perfil que dá para tirar por padrão de texto (tipo, bairro,
+ * quartos, valor). Não é inteligência: é o outro lado da linha para o teste local
+ * mostrar a ficha preenchida sem chave e sem custo. O resumo começa com
+ * "Simulação:" para ninguém confundir com a leitura de verdade.
+ */
+function lerClienteNoDuble(mensagem: string): Record<string, unknown> {
+  const doCliente = mensagem.split('\n').filter((l) => /^\[[^\]]+\] .* cliente: /.test(l));
+  const ultima = doCliente[doCliente.length - 1] ?? '';
+  const messageId = /^\[([^\]]+)\]/.exec(ultima)?.[1] ?? 'm1';
+  const texto = ultima.slice(ultima.indexOf(' cliente: ') + ' cliente: '.length).trim();
+  const tudo = doCliente.map((l) => l.slice(l.indexOf(' cliente: ') + 10)).join(' ');
+
+  const proprietario = mensagem.includes('caminho: proprietário');
+  const disponivel = /dispon[íi]vel|ainda tem|ainda est[áa]/i.test(texto);
+  const visita = /visit|conhecer|ir ver|dá para ver|da pra ver|agendar/i.test(texto);
+  const caro = /caro|vou pensar|pensar melhor/i.test(texto);
+  const financiamento = /financ|fgts|cons[óo]rcio/i.test(texto);
+  const preco = /pre[çc]o|valor|quanto/i.test(texto);
+
+  const dados: Record<string, unknown>[] = [];
+  const tipo = /apartamento|casa|terreno|sala comercial|cobertura|flat/i.exec(tudo)?.[0];
+  if (tipo)
+    dados.push({ campo: 'tipo_imovel', valor: tipo.toLowerCase(), confianca: 0.8, messageId });
+  const bairro = BAIRROS_DE_NATAL.find((b) => tudo.toLowerCase().includes(b.toLowerCase()));
+  if (bairro) dados.push({ campo: 'bairros', valor: bairro, confianca: 0.8, messageId });
+  const quartos = /(\d)\s*quartos?/i.exec(tudo)?.[1];
+  if (quartos) dados.push({ campo: 'quartos', valor: quartos, confianca: 0.8, messageId });
+  const valor = /(\d{2,4})\s*mil/i.exec(tudo)?.[1];
+  if (valor)
+    dados.push({
+      campo: 'valor_maximo',
+      valor: `cerca de R$ ${valor} mil`,
+      confianca: 0.7,
+      messageId,
+    });
+  if (/alug/i.test(tudo))
+    dados.push({ campo: 'finalidade', valor: 'aluguel', confianca: 0.7, messageId });
+  else if (/compr/i.test(tudo))
+    dados.push({ campo: 'finalidade', valor: 'compra', confianca: 0.7, messageId });
+  if (financiamento)
+    dados.push({ campo: 'forma_pagamento', valor: 'financiamento', confianca: 0.7, messageId });
+
+  const doImovel = [tipo, bairro ? `em ${bairro}` : null].filter(Boolean).join(' ');
+  const caso = proprietario
+    ? {
+        intencao: 'QUER_VENDER_OU_ALUGAR_O_DELE',
+        score: 60,
+        sinal: 'informou_tipo_e_tamanho',
+        polaridade: 'positivo',
+        acao: `Marcar a avaliação${doImovel ? ` (${doImovel})` : ' do imóvel'} e pedir fotos e a documentação básica`,
+        alertas: [],
+        objecoes: [],
+      }
+    : disponivel && !visita
+      ? {
+          intencao: 'PEDIU_INFORMACAO',
+          score: 58,
+          sinal: 'informou_tipo_e_tamanho',
+          polaridade: 'positivo',
+          acao: `Confirmar que ${doImovel ? `o ${doImovel}` : 'o imóvel'} está disponível e oferecer uma visita`,
+          alertas: [],
+          objecoes: [],
+        }
+      : visita
+        ? {
+            intencao: 'PEDIU_VISITA',
+            score: 72,
+            sinal: 'pediu_visita',
+            polaridade: 'positivo',
+            acao: `Combinar dia e hora da visita${doImovel ? ` (${doImovel})` : ''} e marcar na agenda`,
+            alertas: ['pediu_visita'],
+            objecoes: [],
+          }
+        : caro
+          ? {
+              intencao: 'VOU_PENSAR',
+              score: 28,
+              sinal: 'objecao_preco',
+              polaridade: 'negativo',
+              acao: 'Perguntar a faixa de valor que cabe e oferecer duas opções parecidas',
+              alertas: ['risco_perda'],
+              objecoes: ['preco'],
+            }
+          : financiamento
+            ? {
+                intencao: 'PERGUNTOU_FINANCIAMENTO',
+                score: 62,
+                sinal: 'perguntou_financiamento',
+                polaridade: 'positivo',
+                acao: 'Explicar como funciona o financiamento e perguntar a entrada que ele tem',
+                alertas: [],
+                objecoes: [],
+              }
+            : preco
+              ? {
+                  intencao: 'PERGUNTOU_PRECO',
+                  score: 55,
+                  sinal: 'perguntou_preco',
+                  polaridade: 'positivo',
+                  acao: `Mandar o valor e as condições${doImovel ? ` (${doImovel})` : ' do imóvel que ele perguntou'}`,
+                  alertas: [],
+                  objecoes: [],
+                }
+              : {
+                  intencao: texto.includes('?') ? 'PEDIU_INFORMACAO' : 'AMBIGUO',
+                  score: texto.includes('?') ? 45 : 20,
+                  sinal: null,
+                  polaridade: 'positivo',
+                  acao: 'Perguntar o que ele procura: tipo de imóvel, bairro e faixa de valor',
+                  alertas: [],
+                  objecoes: [],
+                };
+
+  return {
+    resumo: limitar(
+      `Simulação: ${texto === '' ? 'conversa sem mensagem do cliente.' : texto}`,
+      400,
+    ),
+    intencao: caso.intencao,
+    scoreIntencao: caso.score,
+    motivo: limitar(`Leitura simulada pela última mensagem do cliente.`, 200),
+    sentimento: caro ? 'negativo' : 'neutro',
+    sinais:
+      caso.sinal === null
+        ? []
+        : [
+            {
+              tipo: caso.sinal,
+              polaridade: caso.polaridade,
+              forca: 'forte',
+              messageId,
+              trecho: limitar(texto, 120),
+            },
+          ],
+    objecoes: caso.objecoes,
+    etapaSugerida: null,
+    compromissosNovos: [],
+    compromissosCumpridos: [],
+    proximaAcao: { descricao: limitar(caso.acao, 200), prazo: null },
+    dadosExtraidos: dados,
+    alertas: caso.alertas,
+    confianca: 0.75,
+    dadosInsuficientes: dados.length === 0 && caso.sinal === null,
+  };
+}
+
+/**
  * O Pulso do dublê: lê os leads da própria mensagem montada e escreve um texto
  * coerente com os números que recebeu. Não é inteligência — é fixture que responde
  * ao que entrou, para o teste exercitar o corte de prioridade que cita lead
@@ -267,6 +445,7 @@ const RESPOSTAS: Readonly<Record<FluxoDoDuble, (mensagem: string) => Record<stri
   followup: redigir,
   classificacao: classificar,
   ficha: ficharConversa,
+  leitura: lerClienteNoDuble,
   pulso: pulsar,
 };
 

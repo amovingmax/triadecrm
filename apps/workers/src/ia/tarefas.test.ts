@@ -807,6 +807,171 @@ describe('7. a ficha da conversa (CRM Inteligente, Fase 2)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 7b. A leitura do cliente da Imova (03/11/2026)
+// ---------------------------------------------------------------------------
+
+/** A entrada como o banco da Imova a devolve (`app.ia_entrada_do_cliente`). */
+function entradaDoClienteNoBanco(extras: Record<string, unknown> = {}): Record<string, unknown> {
+  return entradaDoBanco({
+    etapa: 'Respondeu',
+    etapas_validas: ['Contatado', 'Respondeu', 'Visita marcada', 'Visita realizada', 'Proposta'],
+    ultima_intencao: null,
+    mensagens: [
+      { id: M1, de: 'parceiro', quando: '03/11 09:30', texto: 'Vi o apartamento de 3 quartos em Ponta Negra.' },
+      { id: M2, de: 'parceiro', quando: '03/11 09:36', texto: 'Meu teto é 600 mil. Dá para ver sábado?' },
+    ],
+    funil: 'cliente',
+    historico_etapas: [{ etapa: 'Respondeu', desde: '03/11 09:30' }],
+    visitas: [],
+    atitude: { etiqueta: 'interessado', objecoes_abertas: ['preco', 'objecao_que_nao_existe'] },
+    ritmo: {
+      quem_falou_por_ultimo: 'cliente',
+      horas_desde_ultima_do_cliente: 0.2,
+      horas_desde_ultima_da_equipe: null,
+      mensagens_do_cliente: 2,
+      mensagens_da_equipe: 0,
+      minutos_para_responder: null,
+    },
+    perfil_anterior: [{ campo: 'tipo_imovel', valor: 'apartamento' }, { campo: 'cpf', valor: 'x' }],
+    ...extras,
+  });
+}
+
+function montarLeitura(entrada = entradaDoClienteNoBanco(), empresa: string | null = 'imova') {
+  const gravacoes: Record<string, unknown>[] = [];
+  const chamadas: string[] = [];
+  const banco = bancoFalso(tabelas(), {
+    rpcs: {
+      ia_entrada_da_ficha: () => {
+        chamadas.push('ia_entrada_da_ficha');
+        return entradaDoBanco();
+      },
+      ia_entrada_do_cliente: () => {
+        chamadas.push('ia_entrada_do_cliente');
+        return entrada;
+      },
+      ia_gravar_ficha: (argumentos) => {
+        gravacoes.push(argumentos);
+        return { gravada: true, compromissos_novos: 0, compromissos_cumpridos: 0, sugestoes: 0, evidencias_descartadas: 0 };
+      },
+    },
+  });
+  const { logger } = loggerDeTeste();
+  const duble = clienteDuble({});
+  const contexto: ContextoDaIa = { cliente: banco.cliente, modelo: duble, logger, empresa };
+  return { banco, contexto, duble, gravacoes, chamadas };
+}
+
+describe('7b. a leitura do cliente da Imova', () => {
+  it('no banco da Imova, lê o cliente com o prompt de imobiliária e o Haiku 5.5', async () => {
+    const { contexto, gravacoes, banco, duble, chamadas } = montarLeitura();
+
+    const resultado = await tratarTrabalho(contexto, {
+      purpose: 'analisar_conversa',
+      conversation_id: CONVERSA,
+    });
+
+    expect(resultado.feito).toBe(true);
+    expect(chamadas).toEqual(['ia_entrada_do_cliente']);
+    expect(duble.chamadas).toEqual(['leitura']);
+    expect(resultado.detalhes?.intencao).toBe('PEDIU_VISITA');
+    expect(gravacoes[0]?.p_prompt_version).toBe('leitura-do-cliente@v1');
+    // A prova citada pelo modelo volta como o uuid da mensagem do banco.
+    const saida = gravacoes[0]?.p_saida as {
+      sinais: { messageId: string }[];
+      dadosExtraidos: { campo: string; valor: string; messageId: string }[];
+    };
+    expect(saida.sinais[0]?.messageId).toBe(M2);
+    expect(saida.dadosExtraidos.map((d) => d.campo)).toEqual(
+      expect.arrayContaining(['tipo_imovel', 'bairros', 'quartos', 'valor_maximo']),
+    );
+    expect(saida.dadosExtraidos.every((d) => d.messageId === M2)).toBe(true);
+    const run = banco.tabelas.ai_runs?.[0] as { model?: string; purpose?: string } | undefined;
+    expect(run?.model).toBe('claude-haiku-5-5');
+    expect(run?.purpose).toBe('summarize_deal');
+  });
+
+  it('o comportamento e o que o time marcou chegam ao modelo; o que o catálogo não conhece, não', async () => {
+    const pedidos: string[] = [];
+    const { contexto } = montarLeitura();
+    const original = contexto.modelo;
+    const espiao: ContextoDaIa = {
+      ...contexto,
+      modelo: {
+        conversar: (pedido) => {
+          pedidos.push(pedido.mensagem);
+          return original.conversar(pedido);
+        },
+      },
+    };
+
+    await tratarTrabalho(espiao, { purpose: 'analisar_conversa', conversation_id: CONVERSA });
+
+    expect(pedidos[0]).toContain('quem falou por último: cliente');
+    expect(pedidos[0]).toContain('atitude: interessado; objeções marcadas: preco');
+    expect(pedidos[0]).not.toContain('objecao_que_nao_existe');
+    expect(pedidos[0]).toContain('- tipo_imovel: apartamento');
+    expect(pedidos[0]).not.toContain('cpf');
+    // O cliente aparece como cliente, não como "parceiro".
+    expect(pedidos[0]).toContain('[m2] em 03/11 às 09:36 — cliente:');
+  });
+
+  it('o que a ficha mostra volta com os nomes de verdade, não com os marcadores', async () => {
+    // O nome da ficha (o banco falso a chama de "Buffet Aurora") é trocado por um
+    // marcador na ida ao modelo; o dublê o devolve no resumo, e a gravação o desfaz.
+    const { contexto, gravacoes } = montarLeitura(
+      entradaDoClienteNoBanco({
+        mensagens: [
+          { id: M1, de: 'equipe', quando: '03/11 09:30', texto: 'Oi! Aqui é da Imova.' },
+          { id: M2, de: 'parceiro', quando: '03/11 09:36', texto: 'Aqui é da Buffet Aurora. Dá para visitar a casa sábado?' },
+        ],
+      }),
+    );
+    await tratarTrabalho(contexto, { purpose: 'analisar_conversa', conversation_id: CONVERSA });
+    const saida = gravacoes[0]?.p_saida as { resumo: string; sinais: { trecho: string }[] };
+    expect(saida.resumo).toContain('Buffet Aurora');
+    expect(saida.resumo).not.toMatch(/\[\[[A-Z]+_\d+\]\]/);
+    expect(saida.sinais[0]?.trecho).not.toMatch(/\[\[[A-Z]+_\d+\]\]/);
+  });
+
+  it('fora da Imova, o caminho é o de sempre: a ficha da KOMUNE', async () => {
+    const { contexto, chamadas, gravacoes } = montarLeitura(entradaDoClienteNoBanco(), 'komune');
+    await tratarTrabalho(contexto, { purpose: 'analisar_conversa', conversation_id: CONVERSA });
+    expect(chamadas).toEqual(['ia_entrada_da_ficha']);
+    expect(gravacoes[0]?.p_prompt_version).toBe('ficha-da-conversa@v1');
+  });
+
+  it('sem saber a empresa, também: nada muda para quem já rodava', async () => {
+    const { contexto, chamadas } = montarLeitura(entradaDoClienteNoBanco(), null);
+    await tratarTrabalho(contexto, { purpose: 'analisar_conversa', conversation_id: CONVERSA });
+    expect(chamadas).toEqual(['ia_entrada_da_ficha']);
+  });
+
+  it('na Imova, os trabalhos com prompt da KOMUNE saem da fila sem chamar o modelo', async () => {
+    const { contexto, duble, banco } = montarLeitura();
+    const resultado = await tratarTrabalho(contexto, {
+      purpose: 'classify_inbound',
+      chave: `msg:${MENSAGEM}`,
+      message_id: MENSAGEM,
+    });
+    expect(resultado).toMatchObject({ feito: false, motivo: 'fora_da_ia_da_empresa' });
+    expect(duble.chamadas).toEqual([]);
+    expect(banco.tabelas.ai_runs ?? []).toHaveLength(0);
+  });
+
+  it('janela sem mensagem nova não vira chamada paga', async () => {
+    const { contexto, gravacoes, banco } = montarLeitura(entradaDoClienteNoBanco({ mensagens: [] }));
+    const resultado = await tratarTrabalho(contexto, {
+      purpose: 'analisar_conversa',
+      conversation_id: CONVERSA,
+    });
+    expect(resultado).toMatchObject({ feito: false, motivo: 'sem_mensagem_nova' });
+    expect(gravacoes).toHaveLength(0);
+    expect(banco.tabelas.ai_runs ?? []).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 8. O Pulso do dia (CRM Inteligente, Fase 2)
 // ---------------------------------------------------------------------------
 

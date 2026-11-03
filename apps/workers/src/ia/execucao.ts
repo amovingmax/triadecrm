@@ -119,6 +119,12 @@ export interface ContextoDaIa {
    * é texto. A tarefa de áudio é que recusa, com nome (CRM Inteligente, Fase 1).
    */
   readonly transcritor?: TranscritorDeAudio;
+  /**
+   * De que empresa é o banco (`public.empresa_do_banco()`, lido ao ligar). Na Imova
+   * a leitura da conversa usa o prompt de imobiliária (`leitura-do-cliente`) e a
+   * entrada que só o banco dela monta. Ausente ou outra empresa: o caminho de sempre.
+   */
+  readonly empresa?: string | null;
 }
 
 /** Tudo que a tarefa de áudio precisa saber sobre quem ouve. */

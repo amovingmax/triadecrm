@@ -32,6 +32,11 @@
  *   segura o gasto — que é o ajuste recomendado para rota de alto volume e
  *   tarefa bem especificada. `effort` NÃO existe em Haiku 4.5 (a API recusa), e
  *   é por isso que a tabela abaixo é por modelo em vez de uma constante só.
+ * - **Haiku 5.5 (a leitura do cliente da Imova, 03/11/2026)** pensa sempre: omitir
+ *   `thinking` liga o modo adaptativo, e o esforço padrão dele é `medium`. Aqui vai
+ *   `low`, pelo mesmo motivo do Sonnet: saída estruturada, tarefa bem especificada,
+ *   validação determinística atrás. O raciocínio conta em `max_tokens`, e por isso
+ *   o prompt dele tem teto maior.
  */
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -98,6 +103,7 @@ export class RespostaIlegivelError extends Error {
  */
 const ESFORCO_POR_MODELO: Readonly<Record<string, 'low' | 'medium' | 'high'>> = {
   'claude-sonnet-5': 'low',
+  'claude-haiku-5-5': 'low',
 };
 
 /**

@@ -32,8 +32,11 @@
 import { z } from 'zod';
 
 import {
+  CAMPOS_DO_PERFIL,
   INTENCOES,
   INTENCOES_DA_FICHA,
+  INTENCOES_DO_CLIENTE,
+  OBJECOES_DA_IMOVA,
   LIMIAR_DE_CONFIANCA,
   MAXIMO_DE_INAUDIVEIS,
   classificarIntencaoV1,
@@ -42,6 +45,7 @@ import {
   detectarOptOut,
   fichaDaConversaV1,
   followupLigacaoV1,
+  leituraDoClienteV1,
   pulsoDoDiaV1,
   triagemDoRadarV2,
   reidratar,
@@ -50,9 +54,10 @@ import {
   validarPromessas,
   viradaProvavel,
   type Intencao,
+  type CampoDoPerfil,
   type IntencaoDaFicha,
+  type IntencaoDoCliente,
   type MapaDePseudonimos,
-  type SaidaDaFicha,
 } from '@komune/prompts';
 
 import { ErroDeTranscricao, transcrever as transcreverAudio, type TranscricaoBruta } from './asr';
@@ -63,6 +68,7 @@ import {
   buscarTentativa,
   criarRascunho,
   entradaDaFicha,
+  entradaDoCliente,
   entradaDaTriagem,
   entradaDoPulso,
   escalarConversa,
@@ -702,6 +708,9 @@ async function analisarConversa(
   bruto: unknown,
 ): Promise<ResultadoDoTrabalho> {
   const payload = interpretarPayload(payloadDaFicha, bruto);
+  // Na Imova a conversa é de cliente de imobiliária: outro prompt, outra entrada, a
+  // mesma gravação (03/11/2026). A KOMUNE segue exatamente o caminho de antes.
+  if (contexto.empresa === 'imova') return lerCliente(contexto, payload.conversation_id);
   const entrada = await entradaDaFicha(contexto.cliente, payload.conversation_id);
   if (entrada === null) {
     throw new ErroDeterministico(`conversa ${payload.conversation_id} não existe`);
@@ -795,8 +804,144 @@ async function analisarConversa(
  * existe some aqui mesmo. É a primeira das duas peneiras; a segunda é o banco,
  * que confere o uuid contra as mensagens da conversa.
  */
+/**
+ * A leitura do cliente da Imova (03/11/2026): o mesmo meio de `analisarConversa`,
+ * com o prompt de imobiliária (`leitura-do-cliente`, Haiku 5.5) e a entrada que só o
+ * banco da Imova monta (`app.ia_entrada_do_cliente`): o caminho pelas etapas, as
+ * visitas, a atitude, o ritmo das respostas e o perfil que as leituras anteriores
+ * acharam. A gravação é a mesma (`app.ia_gravar_ficha`), com a mesma conferência de
+ * cada prova; e a próxima ação que a leitura escreve entra no negócio pelo job da
+ * ficha automática, que a põe no lugar da regra até chegar um fato novo.
+ */
+async function lerCliente(
+  contexto: ContextoDaIa,
+  conversationId: string,
+): Promise<ResultadoDoTrabalho> {
+  const entrada = await entradaDoCliente(contexto.cliente, conversationId);
+  if (entrada === null) {
+    throw new ErroDeterministico(`conversa ${conversationId} não existe`);
+  }
+  if (entrada.mensagens.length === 0) {
+    return { proposito: 'analisar_conversa', feito: false, motivo: 'sem_mensagem_nova' };
+  }
+
+  const porEtiqueta = new Map<string, string>();
+  const mensagens = entrada.mensagens.map((m, indice) => {
+    const etiqueta = `m${indice + 1}`;
+    porEtiqueta.set(etiqueta, m.id);
+    return {
+      messageId: etiqueta,
+      de: m.de === 'parceiro' ? ('cliente' as const) : m.de,
+      quando: m.quando,
+      texto: m.texto,
+    };
+  });
+
+  const ficha = await buscarContatoDaFicha(
+    contexto.cliente,
+    entrada.organizationId,
+    entrada.contactId,
+    null,
+  );
+  const leadId = leadIdCurto(entrada.organizationId ?? entrada.conversationId);
+  // O que o catálogo de hoje não conhece fica de fora, em vez de derrubar a leitura:
+  // uma objeção nova no catálogo da Imova não pode parar a fila inteira.
+  const objecoes = entrada.atitude.objecoesAbertas.filter((o) =>
+    (OBJECOES_DA_IMOVA as readonly string[]).includes(o),
+  );
+  const perfil = entrada.perfilAnterior
+    .filter((p) => (CAMPOS_DO_PERFIL as readonly string[]).includes(p.campo) && p.valor !== '')
+    .map((p) => ({ campo: p.campo as CampoDoPerfil, valor: p.valor.slice(0, 200) }));
+
+  const executada = await executar(
+    contexto,
+    leituraDoClienteV1,
+    {
+      leadId,
+      agora: entrada.agora,
+      funil: entrada.funil,
+      etapa: entrada.etapa,
+      etapasValidas: entrada.etapasValidas.slice(0, 20),
+      historicoDeEtapas: entrada.historicoDeEtapas.slice(-12),
+      responsavel: entrada.responsavel,
+      temperaturaAtual: temperaturaConhecida(entrada.temperatura),
+      ultimaIntencao: intencaoDoCliente(entrada.ultimaIntencao),
+      fichaAnterior: entrada.fichaAnterior === null ? null : entrada.fichaAnterior.slice(0, 2000),
+      perfilAnterior: perfil.slice(0, 12),
+      atitude: { etiqueta: etiquetaConhecida(entrada.atitude.etiqueta), objecoesAbertas: objecoes },
+      visitas: entrada.visitas.slice(-6),
+      ritmo: entrada.ritmo,
+      compromissosAbertos: entrada.compromissosAbertos
+        .slice(0, 20)
+        .map((c) => ({ id: c.id, oQue: c.oQue, prazo: c.prazo })),
+      mensagens,
+      camposVazios: entrada.camposVazios.slice(0, 20),
+    },
+    { ...contatoDoPrompt({ ...ficha, organizationId: entrada.organizationId }), leadId },
+    {
+      organizationId: entrada.organizationId,
+      contactId: entrada.contactId,
+      conversationId: entrada.conversationId,
+    },
+  );
+
+  // O que a ficha mostra é lido por gente: os nomes trocados na ida voltam aqui,
+  // como no resumo da ligação. Sem isto o cartão dizia "[[EMPRESA_1]] pediu visita"
+  // (achado no ensaio local de 03/11/2026).
+  const r = (texto: string): string => reidratar(texto, executada.mapa);
+  const lida = executada.saida;
+  const reidratada = {
+    ...lida,
+    resumo: r(lida.resumo),
+    motivo: r(lida.motivo),
+    proximaAcao: { ...lida.proximaAcao, descricao: r(lida.proximaAcao.descricao) },
+    sinais: lida.sinais.map((x) => ({ ...x, trecho: r(x.trecho) })),
+    dadosExtraidos: lida.dadosExtraidos.map((x) => ({ ...x, valor: r(x.valor) })),
+    compromissosNovos: lida.compromissosNovos.map((x) => ({ ...x, oQue: r(x.oQue) })),
+  };
+  const saida = comMessageIdDeVerdade(reidratada, porEtiqueta);
+  const gravada = await gravarFicha(
+    contexto.cliente,
+    entrada.conversationId,
+    saida,
+    executada.aiRunId,
+    executada.promptVersion,
+    entrada.ateMessageId ?? entrada.mensagens[entrada.mensagens.length - 1]?.id ?? null,
+  );
+
+  contexto.logger.info('leitura do cliente atualizada', {
+    conversation_id: entrada.conversationId,
+    intencao: executada.saida.intencao,
+    score: executada.saida.scoreIntencao,
+    mensagens: mensagens.length,
+    primeira_analise: entrada.analisadaEm === null,
+    ...gravada,
+  });
+
+  return {
+    proposito: 'analisar_conversa',
+    feito: true,
+    aiRunId: executada.aiRunId,
+    custoUsd: executada.custoUsd,
+    detalhes: {
+      intencao: executada.saida.intencao,
+      score: executada.saida.scoreIntencao,
+      alertas: executada.saida.alertas,
+      ...gravada,
+    },
+  };
+}
+
+/** As provas que a saída cita, nas duas leituras (a ficha da KOMUNE e a do cliente). */
+interface SaidaComProvas {
+  readonly sinais: readonly { messageId: string }[];
+  readonly compromissosNovos: readonly { messageId: string }[];
+  readonly compromissosCumpridos: readonly { messageId: string }[];
+  readonly dadosExtraidos: readonly { messageId: string }[];
+}
+
 function comMessageIdDeVerdade(
-  saida: SaidaDaFicha,
+  saida: SaidaComProvas,
   porEtiqueta: ReadonlyMap<string, string>,
 ): Record<string, unknown> {
   const real = (etiqueta: string): string | null => porEtiqueta.get(etiqueta) ?? null;
@@ -826,6 +971,28 @@ function temperaturaConhecida(
 function intencaoDaFicha(valor: string | null): IntencaoDaFicha | null {
   return valor !== null && (INTENCOES_DA_FICHA as readonly string[]).includes(valor)
     ? (valor as IntencaoDaFicha)
+    : null;
+}
+
+function intencaoDoCliente(valor: string | null): IntencaoDoCliente | null {
+  return valor !== null && (INTENCOES_DO_CLIENTE as readonly string[]).includes(valor)
+    ? (valor as IntencaoDoCliente)
+    : null;
+}
+
+const ETIQUETAS_DE_ATITUDE = [
+  'muito_interessado',
+  'interessado',
+  'morno',
+  'esfriando',
+  'sem_resposta',
+  'sem_interesse',
+  'nao_contatar',
+] as const;
+
+function etiquetaConhecida(valor: string | null): (typeof ETIQUETAS_DE_ATITUDE)[number] | null {
+  return valor !== null && (ETIQUETAS_DE_ATITUDE as readonly string[]).includes(valor)
+    ? (valor as (typeof ETIQUETAS_DE_ATITUDE)[number])
     : null;
 }
 
@@ -1072,6 +1239,21 @@ export async function tratarTrabalho(
       `propósito "${String(proposito)}" não tem tratamento no worker-ai: ` +
         `os que têm são ${Object.keys(TRABALHOS).join(', ')}`,
     );
+  }
+
+  // ------------------------------------------------------------------------
+  // NA IMOVA, SÓ A LEITURA DO CLIENTE (03/11/2026)
+  // ------------------------------------------------------------------------
+  // Os outros trabalhos (classificar a mensagem, transcrever áudio, resumir a
+  // ligação, redigir follow-up, triar o Radar, o Pulso) têm prompts da KOMUNE:
+  // falam de eventos e de fornecedor. No banco da Imova eles se acumularam na fila
+  // enquanto não havia worker de IA, e rodá-los agora seria pagar por texto errado.
+  // Saem da fila como "sem o que fazer", sem chamar o modelo.
+  if (contexto.empresa === 'imova' && proposito !== 'analisar_conversa') {
+    contexto.logger.info('trabalho fora da IA da Imova: sai da fila sem chamar o modelo', {
+      proposito,
+    });
+    return { proposito, feito: false, motivo: 'fora_da_ia_da_empresa' };
   }
 
   // ------------------------------------------------------------------------

@@ -611,6 +611,10 @@ export async function entradaDaFicha(
     p_conversation_id: conversationId,
   });
   erroSe('ia_entrada_da_ficha', error);
+  return lerEntradaDaFicha(data, conversationId);
+}
+
+function lerEntradaDaFicha(data: unknown, conversationId: string): EntradaDaFichaDoBanco | null {
   const bruto = (data ?? {}) as Record<string, unknown>;
   if (bruto.existe !== true) return null;
 
@@ -648,6 +652,78 @@ export async function entradaDaFicha(
     }),
     ateMessageId: texto(bruto.ate_message_id),
     camposVazios: lista(bruto.campos_vazios).map(String),
+  };
+}
+
+/**
+ * A entrada da leitura do cliente da Imova (03/11/2026): a mesma da ficha, mais o
+ * que o banco da Imova sabe do processo inteiro (`app.ia_entrada_do_cliente`).
+ * Nenhuma regra aqui: os valores vêm crus, e quem os confere é o schema do prompt.
+ */
+export interface EntradaDoClienteDoBanco extends EntradaDaFichaDoBanco {
+  readonly funil: 'cliente' | 'proprietario';
+  readonly historicoDeEtapas: readonly { etapa: string; desde: string }[];
+  readonly visitas: readonly { quando: string; estado: string }[];
+  readonly atitude: { etiqueta: string | null; objecoesAbertas: readonly string[] };
+  readonly ritmo: {
+    quemFalouPorUltimo: 'cliente' | 'equipe' | null;
+    horasDesdeUltimaDoCliente: number | null;
+    horasDesdeUltimaDaEquipe: number | null;
+    mensagensDoCliente: number;
+    mensagensDaEquipe: number;
+    minutosParaResponder: number | null;
+  };
+  readonly perfilAnterior: readonly { campo: string; valor: string }[];
+}
+
+export async function entradaDoCliente(
+  cliente: ClienteDoBanco,
+  conversationId: string,
+): Promise<EntradaDoClienteDoBanco | null> {
+  const { data, error } = await cliente.rpc('ia_entrada_do_cliente', {
+    p_conversation_id: conversationId,
+  });
+  erroSe('ia_entrada_do_cliente', error);
+  const base = lerEntradaDaFicha(data, conversationId);
+  if (base === null) return null;
+  const bruto = (data ?? {}) as Record<string, unknown>;
+  const registro = (valor: unknown): Record<string, unknown> =>
+    typeof valor === 'object' && valor !== null && !Array.isArray(valor)
+      ? (valor as Record<string, unknown>)
+      : {};
+  const numeroOuNulo = (valor: unknown): number | null =>
+    typeof valor === 'number' && Number.isFinite(valor) ? valor : null;
+  const atitude = registro(bruto.atitude);
+  const ritmo = registro(bruto.ritmo);
+  const quem = texto(ritmo.quem_falou_por_ultimo);
+
+  return {
+    ...base,
+    funil: texto(bruto.funil) === 'proprietario' ? 'proprietario' : 'cliente',
+    historicoDeEtapas: lista(bruto.historico_etapas).map((e) => {
+      const linha = registro(e);
+      return { etapa: texto(linha.etapa) ?? '', desde: texto(linha.desde) ?? '' };
+    }),
+    visitas: lista(bruto.visitas).map((v) => {
+      const linha = registro(v);
+      return { quando: texto(linha.quando) ?? '', estado: texto(linha.estado) ?? '' };
+    }),
+    atitude: {
+      etiqueta: texto(atitude.etiqueta),
+      objecoesAbertas: lista(atitude.objecoes_abertas).map(String),
+    },
+    ritmo: {
+      quemFalouPorUltimo: quem === 'cliente' || quem === 'equipe' ? quem : null,
+      horasDesdeUltimaDoCliente: numeroOuNulo(ritmo.horas_desde_ultima_do_cliente),
+      horasDesdeUltimaDaEquipe: numeroOuNulo(ritmo.horas_desde_ultima_da_equipe),
+      mensagensDoCliente: numeroOuNulo(ritmo.mensagens_do_cliente) ?? 0,
+      mensagensDaEquipe: numeroOuNulo(ritmo.mensagens_da_equipe) ?? 0,
+      minutosParaResponder: numeroOuNulo(ritmo.minutos_para_responder),
+    },
+    perfilAnterior: lista(bruto.perfil_anterior).map((p) => {
+      const linha = registro(p);
+      return { campo: texto(linha.campo) ?? '', valor: texto(linha.valor) ?? '' };
+    }),
   };
 }
 

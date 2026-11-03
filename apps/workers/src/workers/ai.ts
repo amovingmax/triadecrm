@@ -106,10 +106,18 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
       provedor: transcricao.provedor,
     });
   }
+  // De que empresa é o banco: na Imova a leitura da conversa é a do cliente de
+  // imobiliária (03/11/2026). Falhar aqui não derruba o worker: sem a resposta, ele
+  // segue no caminho de sempre, que é o que já rodava.
+  const { data: empresa, error: erroDaEmpresa } = await cliente.rpc('empresa_do_banco');
+  if (erroDaEmpresa) {
+    logger.warn('não deu para ler de que empresa é o banco', { erro: erroDaEmpresa.message });
+  }
   const contexto: ContextoDaIa = {
     cliente,
     modelo,
     logger,
+    empresa: typeof empresa === 'string' ? empresa : null,
     transcritor: {
       balde: BALDE_DE_MIDIAS,
       config: transcricao,
@@ -150,6 +158,7 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
   await pulso.bater('ok', FILAS_DA_IA.trabalhos, {
     modo: umaVez ? 'uma-vez' : 'contínuo',
     base_do_modelo: env.ANTHROPIC_BASE_URL ?? 'api oficial',
+    empresa: contexto.empresa ?? 'desconhecida',
   });
   pulso.iniciar();
 
