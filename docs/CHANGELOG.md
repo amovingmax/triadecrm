@@ -8231,3 +8231,18 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 **Pendente, só com pedido:** publicar na Imova o banco (`20261030170000`, que segura o botão por 24 h depois do 138009, e `20261103160000`) e depois o site; só então rodar `abrir` no Terminal do usuário e fazer o teste com celulares nossos (passo a passo no guia). Nada vai para a KOMUNE: o banco dela não tem `wa_chamadas`, e o site dela continua sem a ligação pelo WhatsApp.
 
 **Decisão humana:** quem fica com o CRM aberto no horário de atendimento (hoje "a princípio será Rafael"). Muita ligação sem atender faz a Meta esconder o botão, e o aviso `USER_INITIATED_CALLS_LOW_PICKUP_RATE` ainda não aparece na tela.
+
+## 03/11/2026 (fim da tarde) — Receber ligação pelo WhatsApp: publicado na Imova, falta abrir aos clientes (RF-CON-18)
+
+**O pedido.** "Quero subir no ar", depois de ver o CRM local tocar com a ligação simulada.
+
+**Publicado (só na Imova):**
+- Ar conferido antes: site da Imova em `imova-jkcxprhrj` (`e0ee8d8`, dentro da `main`); banco da Imova com 167 migrações e só as 2 desta entrega pendentes; nada fora do repositório.
+- `main`: `97dca03 → 193d48d` (avanço direto).
+- Banco da Imova (`publicar-banco.mjs imova migrar`): `20261030170000` e `20261103160000`; 169 no banco, nenhuma pendente; `wa_ligacoes_perdidas` responde 200. A 1ª tentativa caiu na conexão da CLI sem gravar nada; a 2ª passou.
+- Site da Imova: `imova-otsk9jto2`, de `193d48d`, da cópia limpa `triadecrm-publicar-imova` (volta: `imova-jkcxprhrj`). `imova-crm.vercel.app`: `/login` 200, `/meu-dia` manda para o login, `/auth/dev` 404.
+- Sem mexer em funções, robô (`imova-worker-wa` segue na v3) nem KOMUNE (site `triade-12rd66zs6`, banco sem `wa_chamadas`).
+
+**Falta:** abrir na Meta. O classificador desta máquina barrou `scripts/ligacao-whatsapp.mjs abrir`, como barra todo ajuste da Meta; o comando vai ao Terminal do usuário. Até lá a Meta segue com o botão escondido dos clientes (`DISABLE_ALL`), e nada muda para eles. Depois, o teste com celulares nossos (guia).
+
+**Volta:** site, promover `imova-jkcxprhrj`; Meta, `ligacao-whatsapp.mjs fechar`; banco, a migração só acrescenta (função `wa_ligacoes_perdidas` e gatilho `wa_chamadas_desarquiva`), e tirá-la é `drop trigger` + `drop function`.
