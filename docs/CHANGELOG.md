@@ -8597,5 +8597,20 @@ Decisão do usuário: "quero usar o EXPO para criar o app". A casca do Capacitor
 - O "Boa tarde!" de teste para o +55 84 99993-3831 continua na fila do banco local, esperando a decisão do usuário de cancelar.
 - Estas mudanças no site não foram publicadas. Antes de publicar: rodar a comparação de telas (`docs/operacao/comparar-versoes.md`).
 
+**Troca de empresa no app de teste** (pedido do usuário: "preciso ter a opção de trocar de módulo"):
+- O botão de trocar já existia no site e funciona no ar. No teste ele não aparecia por dois motivos: só uma empresa ficava ligada, e sem `NEXT_PUBLIC_EMPRESAS_LINKS` e `SEGREDO_ENTRE_EMPRESAS` uma empresa não pergunta à outra se a pessoa entra lá.
+- Agora `pnpm -C apps/app site` liga as duas juntas, já ligadas uma à outra: KOMUNE na 3100 e Imova na 3101. O segredo é sorteado a cada vez que o script liga.
+- A casca aceita navegar entre as duas portas (`PORTAS_NA_REDE`, com teste).
+- O banco da Imova de teste é chamado pelo nome `.local` do Mac. Com o número nas duas empresas, o cookie de sessão tinha o mesmo nome e a Imova entrava com o usuário da KOMUNE, que não existe no banco dela, e as telas ficavam vazias.
+- A trava da entrada de teste (`entrada-local.ts`, só `next dev`) passou a aceitar nomes `.local`, com teste.
+- Conferido no Chrome, no tamanho de iPhone, nos dois sentidos:
+  - na KOMUNE, o botão do prédio aparece;
+  - "Imova Imobiliária" pede o login da Imova;
+  - "Entrar como gestor" mostra as conversas dela (Lucas Andrade, Ana Souza, Carla Teste);
+  - a volta para a KOMUNE vem logada.
+
+  O Chrome segura os pedidos ao nome `.local` até alguém permitir (trava de rede local dele), e a conferência rodou com essa trava desligada. No iPhone ela não existe.
+- **Em produção a troca já funciona assim** para quem tem acesso às duas empresas. Dentro do app, o que falta é o login: na Imova, o login com Google vai para o Safari até a etapa do login no app.
+
 **Precisa de decisão humana:**
 - As três perguntas de 03/11 continuam abertas: login pela janela segura do Google, quem tem a conta Apple da KOMUNE e conta Expo pessoal ou da empresa.

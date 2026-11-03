@@ -49,6 +49,13 @@ describe('ambiente do app', () => {
     expect(regrasDaCasca('local', '10.0.0.188:8081').hosts).toContain('10.0.0.188:3100');
   });
 
+  it('no teste, a troca de empresa vai da KOMUNE (3100) para a Imova (3101) dentro do app', () => {
+    const regras = regrasDaCasca('local', '172.20.10.2:8081');
+    expect(regras.inicio).toBe('http://172.20.10.2:3100');
+    expect(regras.hosts).toEqual(expect.arrayContaining(['172.20.10.2:3100', '172.20.10.2:3101']));
+    expect(regras.hosts).not.toContain('172.20.10.2:3000');
+  });
+
   it('a casca se identifica ao site pelo user-agent, e só por ele', () => {
     expect(MARCA_NO_USER_AGENT).toMatch(new RegExp(`^${MARCA_DO_APP}/\\d+\\.\\d+\\.\\d+$`));
   });

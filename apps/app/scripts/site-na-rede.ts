@@ -1,44 +1,49 @@
 /**
- * O site do Tríade para o celular de teste: um segundo `next dev`, na porta 3100,
- * no endereço deste Mac na rede Wi-Fi, com o Supabase local no mesmo endereço.
+ * Os sites do Tríade para o celular de teste: um `next dev` por empresa, KOMUNE na
+ * porta 3100 e Imova na 3101, no endereço deste Mac na rede, cada um com o Supabase
+ * local da sua empresa no mesmo endereço.
  *
  * Por que não o `next dev` de sempre (porta 3000): ele aponta o Supabase para
  * 127.0.0.1, e no celular 127.0.0.1 é o próprio celular. As consultas que a página
  * faz direto ao banco (Realtime, listas) e o cookie de sessão precisam do endereço
- * que o celular alcança. Nada muda em arquivo: as variáveis entram só neste processo,
- * e o `next dev` de sempre continua ligado ao lado, sem conflito (`NEXT_DIST_DIR`
- * próprio, porta própria).
+ * que o celular alcança. Nada muda em arquivo: as variáveis entram só nestes
+ * processos, e o `next dev` de sempre continua ligado ao lado, sem conflito
+ * (`NEXT_DIST_DIR` e porta próprios).
+ *
+ * AS DUAS JUNTAS, para a troca de empresa funcionar como no ar: cada site conhece o
+ * endereço do outro (`NEXT_PUBLIC_EMPRESAS_LINKS`) e pergunta a ele se a pessoa também
+ * entra lá, com uma assinatura (`SEGREDO_ENTRE_EMPRESAS`, sorteado a cada vez que o
+ * script liga e que só estes dois processos conhecem). Os usuários de teste existem
+ * nos dois bancos, então o botão de trocar aparece.
+ *
+ * O BANCO DA IMOVA PELO NOME DO MAC (`MacBook-Air-de-A.local`). Os dois sites ficam no
+ * mesmo endereço, e o navegador guarda cookie por endereço, não por porta. O cookie de
+ * sessão do Supabase leva no nome o primeiro pedaço do endereço do banco: com o número
+ * nas duas empresas, a Imova lia o login da KOMUNE e entrava com um usuário que não
+ * existe no banco dela (medido em 03/11/2026). Com o nome `.local` (mDNS, que o iPhone
+ * também enxerga), cada empresa guarda o seu login, como no ar, onde cada uma tem o seu
+ * endereço. A KOMUNE continua pelo número.
  *
  * `--hostname` com o endereço da rede também é o que o Next aceita como origem dos
  * recursos de desenvolvimento, sem mexer no `allowedDevOrigins` do `next.config.ts`.
  *
- * Uso: `pnpm -C apps/app site` (KOMUNE) ou `pnpm -C apps/app site imova` (a Imova de
- * teste, com o banco local dela em ~/triadecrm-imova-local). As duas usam as mesmas
- * chaves do Supabase local; muda a empresa, a porta do banco e a pasta de saída. Se o
- * Mac tiver mais de uma rede e a escolhida for a errada,
- * `TRIADE_IP_DO_MAC=192.168.0.10 pnpm -C apps/app site`.
+ * Uso: `pnpm -C apps/app site` (as duas), ou `pnpm -C apps/app site komune` /
+ * `site imova` (só uma, sem o botão de trocar). Se o Mac tiver mais de uma rede e a
+ * escolhida for a errada, `TRIADE_IP_DO_MAC=192.168.0.10 pnpm -C apps/app site`.
  */
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { PORTA_DO_SITE_NA_REDE } from '../src/ambiente';
+import { PORTAS_NA_REDE } from '../src/ambiente';
 
 /** A porta do Supabase local de cada empresa (o `[api] port` do config.toml de cada uma). */
-const EMPRESAS = {
-  komune: { portaDoSupabase: 54321 },
-  imova: { portaDoSupabase: 56321 },
-} as const;
-type Empresa = keyof typeof EMPRESAS;
+const SUPABASE_LOCAL = { komune: 54321, imova: 56321 } as const;
+type Empresa = keyof typeof SUPABASE_LOCAL;
+const TODAS = Object.keys(SUPABASE_LOCAL) as Empresa[];
 
-function empresaPedida(valor: string | undefined): Empresa {
-  const chave = (valor ?? '').trim() || 'komune';
-  if (!(chave in EMPRESAS)) {
-    throw new Error(`Empresa "${valor}" não existe. Use ${Object.keys(EMPRESAS).join(' ou ')}.`);
-  }
-  return chave as Empresa;
-}
 const REDE_PRIVADA = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
 
 function enderecoNaRede(): string {
@@ -55,33 +60,85 @@ function enderecoNaRede(): string {
   return escolhido.endereco;
 }
 
-const empresa = empresaPedida(process.argv[2]);
-const { portaDoSupabase } = EMPRESAS[empresa];
+/** O nome do Mac na rede local (mDNS). `TRIADE_NOME_DO_MAC` troca, se precisar. */
+function nomeDoMac(): string {
+  const pedido = process.env.TRIADE_NOME_DO_MAC?.trim();
+  if (pedido) return pedido;
+  return `${execFileSync('scutil', ['--get', 'LocalHostName'], { encoding: 'utf8' }).trim()}.local`;
+}
+
+function empresasPedidas(valor: string | undefined): Empresa[] {
+  const chave = (valor ?? '').trim();
+  if (!chave) return TODAS;
+  if (!(chave in SUPABASE_LOCAL)) {
+    throw new Error(
+      `Empresa "${valor}" não existe. Use ${TODAS.join(' ou ')}, ou nada para as duas.`,
+    );
+  }
+  return [chave as Empresa];
+}
+
+const empresas = empresasPedidas(process.argv[2]);
 const ip = process.env.TRIADE_IP_DO_MAC?.trim() || enderecoNaRede();
 const web = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
-const site = `http://${ip}:${PORTA_DO_SITE_NA_REDE}`;
+const enderecoDe = (empresa: Empresa) => `http://${ip}:${PORTAS_NA_REDE[empresa]}`;
+const bancoDe = (empresa: Empresa) =>
+  `http://${empresa === 'komune' ? ip : nomeDoMac()}:${SUPABASE_LOCAL[empresa]}`;
+const links = empresas.map((e) => `${e}=${enderecoDe(e)}`).join(';');
+const segredo = randomBytes(32).toString('hex');
 
-console.log(
-  `Site para o celular (${empresa.toUpperCase()}): ${site} (Supabase em http://${ip}:${portaDoSupabase})`,
-);
+for (const empresa of empresas) {
+  console.log(
+    `${empresa.toUpperCase().padEnd(6)} ${enderecoDe(empresa)} (Supabase em ${bancoDe(empresa)})`,
+  );
+}
 console.log('No celular, no mesmo Wi-Fi: abra o app pelo Expo Go (pnpm -C apps/app start).');
-console.log('Trocou de empresa? No app, saia e entre de novo: a sessão de uma não vale na outra.');
+if (empresas.length > 1) {
+  console.log('O app abre na KOMUNE; a troca de empresa fica no botão do prédio, no cabeçalho.');
+}
 
-const next = spawn(
-  'pnpm',
-  ['exec', 'next', 'dev', '--hostname', ip, '--port', String(PORTA_DO_SITE_NA_REDE)],
-  {
-    cwd: web,
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      NEXT_PUBLIC_SUPABASE_URL: `http://${ip}:${portaDoSupabase}`,
-      NEXT_PUBLIC_APP_URL: site,
-      NEXT_PUBLIC_EMPRESA: empresa,
-      // Pasta de saída própria (e uma por empresa, porque o Next grava o NEXT_PUBLIC_*
-      // no código compilado): o `next dev` de sempre mantém o .next aberto.
-      NEXT_DIST_DIR: empresa === 'komune' ? '.next-celular' : `.next-celular-${empresa}`,
+const processos: ChildProcess[] = empresas.map((empresa) => {
+  const filho = spawn(
+    'pnpm',
+    ['exec', 'next', 'dev', '--hostname', ip, '--port', String(PORTAS_NA_REDE[empresa])],
+    {
+      cwd: web,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_EMPRESA: empresa,
+        NEXT_PUBLIC_SUPABASE_URL: bancoDe(empresa),
+        NEXT_PUBLIC_APP_URL: enderecoDe(empresa),
+        ...(empresas.length > 1
+          ? { NEXT_PUBLIC_EMPRESAS_LINKS: links, SEGREDO_ENTRE_EMPRESAS: segredo }
+          : {}),
+        // Pasta de saída própria, uma por empresa (o Next grava o NEXT_PUBLIC_* no código
+        // compilado): o `next dev` de sempre mantém o .next aberto.
+        NEXT_DIST_DIR: `.next-celular-${empresa}`,
+      },
     },
-  },
-);
-next.on('exit', (codigo) => process.exit(codigo ?? 0));
+  );
+  // As linhas de cada site saem com o nome da empresa na frente.
+  const prefixo = `[${empresa}] `;
+  for (const fluxo of [filho.stdout, filho.stderr]) {
+    let resto = '';
+    fluxo?.on('data', (pedaco: Buffer) => {
+      const linhas = (resto + pedaco.toString()).split('\n');
+      resto = linhas.pop() ?? '';
+      for (const linha of linhas) if (linha.trim()) console.log(prefixo + linha);
+    });
+  }
+  filho.on('exit', (codigo) => {
+    console.log(`${prefixo}parou (código ${codigo ?? 0}).`);
+    for (const outro of processos) if (outro !== filho) outro.kill('SIGTERM');
+    process.exitCode = codigo ?? 0;
+  });
+  return filho;
+});
+
+// Ctrl+C derruba os dois sites juntos.
+for (const sinal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(sinal, () => {
+    for (const filho of processos) filho.kill('SIGTERM');
+  });
+}

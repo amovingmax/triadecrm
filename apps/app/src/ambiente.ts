@@ -49,11 +49,12 @@ export const ENDERECOS = {
 export const FUNDO = '#0f172a';
 
 /**
- * A porta do site para o celular (`scripts/site-na-rede.ts`). Não é a 3000 porque o
- * `next dev` de sempre continua lá, com o Supabase em 127.0.0.1, que o celular não
- * alcança.
+ * As portas dos sites de teste para o celular (`scripts/site-na-rede.ts`), uma por
+ * empresa, ligadas ao mesmo tempo para a troca de empresa funcionar como no ar. Não é
+ * a 3000 porque o `next dev` de sempre continua lá, com o Supabase em 127.0.0.1, que o
+ * celular não alcança. O app abre na KOMUNE.
  */
-export const PORTA_DO_SITE_NA_REDE = 3100;
+export const PORTAS_NA_REDE = { komune: 3100, imova: 3101 } as const;
 
 export function ambienteDoApp(valor: string | undefined | null): AmbienteDoApp {
   const chave = (valor ?? '').trim() || 'local';
@@ -97,7 +98,7 @@ export type RegrasDaCasca = {
   inicio: string;
   /**
    * Para onde a casca deixa navegar sem sair para o navegador do aparelho: as duas
-   * empresas e, no teste, o site deste Mac. O login com Google NÃO entra aqui: o
+   * empresas e, no teste, os dois sites deste Mac. O login com Google NÃO entra aqui: o
    * Google recusa login dentro de WebView (`disallowed_useragent`), e o login do app
    * vai ser nativo (etapa 4 do plano, `docs/operacao/app-celular.md`).
    */
@@ -111,6 +112,11 @@ export function regrasDaCasca(ambiente: AmbienteDoApp, hostUri?: string | null):
   if (ambiente === 'producao') {
     return { inicio: ENDERECOS.komune, hosts: empresas, soHttps: true };
   }
-  const site = `${hostDoMac(hostUri)}:${PORTA_DO_SITE_NA_REDE}`;
-  return { inicio: `http://${site}`, hosts: [...empresas, site], soHttps: false };
+  const mac = hostDoMac(hostUri);
+  const sites = Object.values(PORTAS_NA_REDE).map((porta) => `${mac}:${porta}`);
+  return {
+    inicio: `http://${mac}:${PORTAS_NA_REDE.komune}`,
+    hosts: [...empresas, ...sites],
+    soHttps: false,
+  };
 }

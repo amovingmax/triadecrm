@@ -52,7 +52,11 @@ Precisa de: Supabase local de pé (`supabase start`), o iPhone no mesmo Wi-Fi do
 **O Wi-Fi de casa isola os aparelhos** (medido em 29/10/2026): o Safari do iPhone não abria `http://10.0.0.188:8081/status`, com o firewall do Mac desligado. Pelo **Acesso Pessoal (hotspot) do iPhone**, com o Mac conectado nele, funciona. Ligue os dois comandos depois de trocar de rede, porque o endereço do Mac muda. O macOS tende a voltar sozinho para a rede de casa.
 
 1. Na primeira vez: `pnpm -C apps/app install`.
-2. Num terminal: `pnpm -C apps/app site` (KOMUNE) ou `pnpm -C apps/app site imova` (a Imova de teste, com o banco local dela, em `~/triadecrm-imova-local`). Liga um segundo `next dev` na porta 3100, preso ao endereço do Mac na rede, com o Supabase local nesse endereço. O `next dev` de sempre, na 3000, continua como está. Trocou de empresa? No app, saia e entre de novo: a sessão de uma não vale na outra.
+2. Num terminal: `pnpm -C apps/app site`. Liga as duas empresas de teste juntas, presas ao endereço do Mac na rede: KOMUNE na porta 3100 e Imova na 3101, cada uma com o Supabase local dela (o da Imova, em `~/triadecrm-imova-local`). O `next dev` de sempre, na 3000, continua como está.
+   - **Troca de empresa como no ar.** O app abre na KOMUNE, e o botão do prédio, no cabeçalho, leva à Imova. Na primeira vez, a Imova pede o login dela ("Entrar como gestor"). A volta para a KOMUNE já vem logada. Os dois sites se conhecem (`NEXT_PUBLIC_EMPRESAS_LINKS`) e perguntam um ao outro se a pessoa entra lá, com um segredo sorteado a cada vez que o script liga.
+   - **O banco da Imova é chamado pelo nome do Mac na rede** (`MacBook-Air-de-A.local`), e o da KOMUNE, pelo número. Os dois sites ficam no mesmo endereço, e o navegador guarda cookie por endereço, não por porta. Com o número nas duas, a Imova lia o login da KOMUNE. Se o nome não servir, use `TRIADE_NOME_DO_MAC=<nome>.local`.
+   - `pnpm -C apps/app site komune` ou `site imova` liga uma empresa só, sem o botão de trocar.
+   - No Chrome do computador, as telas da Imova por esse arranjo ficam em "Carregando": é a trava de acesso à rede local do próprio Chrome, que pede permissão para falar com o nome `.local`. No app do iPhone essa trava não existe.
 3. Noutro terminal: `pnpm -C apps/app start`. O Expo mostra um QR code.
 4. No iPhone, aponte a câmera para o QR code. Ele abre no Expo Go. Na primeira vez, o iPhone pede acesso à rede local: permita.
 5. A tela de login do Tríade mostra "Entrar como gestor" e "Entrar como SDR". No celular é um papel por vez: para trocar, saia e entre com o outro.
