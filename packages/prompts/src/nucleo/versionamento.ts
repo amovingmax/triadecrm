@@ -16,12 +16,20 @@ import { estimarTokens } from './tokens';
  * `versaoDoPrompt(prompt)` é a string gravada na coluna.
  */
 
-/** Os dois modelos do ADR-10. Nenhum outro entra sem mudar o ADR. */
+/**
+ * Os modelos do ADR-10. Nenhum outro entra sem mudar o ADR.
+ *
+ * O Haiku 5.5 entrou em 03/11/2026, por decisão do usuário, para a leitura do cliente
+ * da Imova (`leitura-do-cliente`): a geração atual do Haiku, a da mesma faixa do
+ * ADR-10. Os prompts da KOMUNE continuam no Haiku 4.5 e no Sonnet 5.
+ */
 export const MODELOS = {
   /** Classificação e extração, saídas estruturadas, Batch API. */
   haiku: 'claude-haiku-4-5',
   /** Rascunho, resumo, digest, Assistente e relatório. */
   sonnet: 'claude-sonnet-5',
+  /** A leitura do cliente da Imova (03/11/2026). Pensa antes de responder (adaptativo). */
+  haiku55: 'claude-haiku-5-5',
 } as const;
 
 export type ModeloAlvo = (typeof MODELOS)[keyof typeof MODELOS];
@@ -38,6 +46,9 @@ export type PropositoDeAiRun =
   // CRM Inteligente (17/09/2026): a ficha por conversa e o Pulso do dia.
   | 'analisar_conversa'
   | 'pulso_do_dia'
+  // A leitura do processo inteiro de um cliente da Imova (03/11/2026). O valor já
+  // existia na lista do banco (`ai_runs_purpose_check`), sem prompt.
+  | 'summarize_deal'
   // A metade que LÊ da triagem do Radar: a conta soma nota e avaliações, e não
   // sabe que "Fotografia Silva — Formaturas" não atende casamento.
   | 'triar_candidato';

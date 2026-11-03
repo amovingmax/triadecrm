@@ -1,5 +1,6 @@
 import { classificarIntencaoV1 } from './prompts/classificar-intencao/v1';
 import { fichaDaConversaV1 } from './prompts/ficha-da-conversa/v1';
+import { leituraDoClienteV1 } from './prompts/leitura-do-cliente/v1';
 import { followupLigacaoV1 } from './prompts/followup-ligacao/v1';
 import { pulsoDoDiaV1 } from './prompts/pulso-do-dia/v1';
 import { triagemDoRadarV1 } from './prompts/triagem-do-radar/v1';
@@ -38,6 +39,8 @@ export const CATALOGO = {
   'resumo-ligacao': { 1: resumoLigacaoV1 },
   'followup-ligacao': { 1: followupLigacaoV1 },
   'classificar-intencao': { 1: classificarIntencaoV1 },
+  // Só da Imova (03/11/2026): o worker o usa quando o banco é o da Imova.
+  'leitura-do-cliente': { 1: leituraDoClienteV1 },
 } as const;
 
 export type IdDePrompt = keyof typeof CATALOGO;
@@ -55,6 +58,7 @@ export const VIGENTES = {
   'resumo-ligacao': 1,
   'followup-ligacao': 1,
   'classificar-intencao': 1,
+  'leitura-do-cliente': 1,
 } as const satisfies Record<IdDePrompt, number>;
 
 /** Uma versão específica, com o tipo daquela versão. */

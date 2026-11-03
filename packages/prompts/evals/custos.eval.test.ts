@@ -101,6 +101,14 @@ describe('preços e conta por chamada', () => {
       escritaDeCache: 2.5,
       leituraDeCache: 0.2,
     });
+    // O Haiku 5.5 entrou em 03/11/2026, com o preço de tabela daquele dia (prompt de
+    // até 100 mil tokens).
+    expect(PRECOS['claude-haiku-5-5']).toEqual({
+      entrada: 0.1,
+      saida: 0.5,
+      escritaDeCache: 0.125,
+      leituraDeCache: 0.01,
+    });
   });
 
   it('um milhão de tokens custa exatamente o preço de tabela', () => {
@@ -198,6 +206,19 @@ describe('preços e conta por chamada', () => {
         tokensDeSaida: 55,
         semCache: 0.00129,
         comCache: 0.00042,
+      },
+      {
+        // A leitura do cliente da Imova (03/11/2026). Carrega mais contexto que a
+        // ficha da KOMUNE (o ritmo, as etapas, as visitas, o perfil) e ainda assim é
+        // a mais barata do catálogo: o Haiku 5.5 custa um décimo do 4.5. A conta não
+        // inclui o raciocínio do modelo, que só a primeira medição real mostra.
+        id: 'leitura-do-cliente',
+        modelo: 'claude-haiku-5-5',
+        tokensDeSistema: 1084,
+        tokensDaMensagem: 277,
+        tokensDeSaida: 402,
+        semCache: 0.00034,
+        comCache: 0.00024,
       },
     ]);
   });

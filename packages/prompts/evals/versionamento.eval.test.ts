@@ -112,7 +112,7 @@ describe('versionamento: a v2 não mexe na v1', () => {
 });
 
 describe('catálogo do Tríade', () => {
-  it('tem os sete prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
+  it('tem os oito prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
     expect(Object.keys(CATALOGO)).toEqual([
       'transcricao-audio',
       'ficha-da-conversa',
@@ -124,6 +124,9 @@ describe('catálogo do Tríade', () => {
       'resumo-ligacao',
       'followup-ligacao',
       'classificar-intencao',
+      // A leitura do cliente, só da Imova (03/11/2026): o worker a usa quando o
+      // banco é o da Imova; a KOMUNE segue na `ficha-da-conversa`.
+      'leitura-do-cliente',
     ]);
   });
 

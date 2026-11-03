@@ -28,6 +28,9 @@ export interface PrecoDoModelo {
 export const PRECOS: Readonly<Record<ModeloAlvo, PrecoDoModelo>> = {
   [MODELOS.haiku]: { entrada: 1.0, saida: 5.0, escritaDeCache: 1.25, leituraDeCache: 0.1 },
   [MODELOS.sonnet]: { entrada: 2.0, saida: 10.0, escritaDeCache: 2.5, leituraDeCache: 0.2 },
+  // Preço de tabela em 03/11/2026, para prompt de até 100 mil tokens (a leitura do
+  // cliente fica muito abaixo disso). Cache nas mesmas proporções: 1,25× e 0,1×.
+  [MODELOS.haiku55]: { entrada: 0.1, saida: 0.5, escritaDeCache: 0.125, leituraDeCache: 0.01 },
 };
 
 /** A Batch API custa metade, nos dois lados. Usada na extração em lote do Radar. */

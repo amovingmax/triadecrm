@@ -25,6 +25,16 @@ export {
   SINAIS_POSITIVOS,
   fichaDaConversaV1,
 } from './prompts/ficha-da-conversa/v1';
+export {
+  CAMPOS_DO_PERFIL,
+  INTENCOES_DO_CLIENTE,
+  OBJECOES_DA_IMOVA,
+  type CampoDoPerfil,
+  type EntradaDaLeitura,
+  type IntencaoDoCliente,
+  type SaidaDaLeitura,
+  leituraDoClienteV1,
+} from './prompts/leitura-do-cliente/v1';
 
 export {
   type EntradaDoPulso,
