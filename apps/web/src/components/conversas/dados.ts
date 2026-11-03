@@ -44,7 +44,7 @@ const COLUNAS_ATIVIDADE =
  * restringe a quem é dono do fio.
  */
 const COLUNAS_FIO =
-  'id, organization_id, contact_id, channel, peer_phone_e164, peer_nome, business_number, arquivada_em, assignee_id, setor_id, status, bot_paused, last_message_at, last_inbound_at, last_outbound_at, window_expires_at, unread_count, ai_summary, ai_intent, ai_confidence, bloqueada_em, bloqueada_por, bloqueio_na_meta, bloqueio_erro';
+  'id, organization_id, contact_id, channel, peer_phone_e164, peer_nome, business_number, arquivada_em, arquivada_por, assignee_id, setor_id, status, bot_paused, last_message_at, last_inbound_at, last_outbound_at, window_expires_at, unread_count, ai_summary, ai_intent, ai_confidence, bloqueada_em, bloqueada_por, bloqueio_na_meta, bloqueio_erro';
 
 /**
  * Colunas da mensagem. `body` pode ser null: a retenção dos 12 meses o apaga.

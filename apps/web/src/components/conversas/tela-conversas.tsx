@@ -20,6 +20,7 @@ import { useAtitudes } from './atitude-dados';
 import { porInteresse } from './atitude-regra';
 import { FeedAutomaticas } from './automaticas';
 import { carregarAutomaticas, carregarMarcoZero, CHAVE_AUTOMATICAS } from './automaticas-dados';
+import { CONCLUIR_NA_EMPRESA, FiltroDasConcluidas } from './concluir-conversa';
 import { Conversa } from './conversa';
 import { carregarConversas, CHAVE_CONVERSAS, mensagemDoErro, TETO_ORGANIZACOES } from './dados';
 import { BuscaDeMensagens } from './busca-de-mensagens';
@@ -29,6 +30,7 @@ import {
   ErroDaTela,
   EsqueletoLista,
   NenhumaEscolhida,
+  SemConcluidas,
   SemConversasMinhas,
   VazioDeVerdade,
   VazioPorFiltro,
@@ -223,6 +225,14 @@ export function TelaConversas({
     [comFicha, captacao],
   );
   const clientesNaAba = aba === 'fora' && comFicha;
+  // Os clientes que a lista de Conversas alcança. Na Imova entram também os
+  // concluídos (03/11/2026): é a gaveta de "Concluídas" que os mostra, e a
+  // conversa concluída continua aberta na tela de quem acabou de concluir, como a
+  // de parceiro. Na KOMUNE é a mesma lista da aba Clientes, como sempre foi.
+  const clientes = useMemo(
+    () => (CONCLUIR_NA_EMPRESA ? conversasForaDaBase(consulta.data?.fios ?? [], true) : foraDaBase),
+    [consulta.data, foraDaBase],
+  );
   // A atitude do cliente (29/10/2026): a etiqueta nas linhas e, com "Mais
   // interessados", a ordem. Desligada (a KOMUNE), nada disso muda a tela.
   const atitudes = useAtitudes();
@@ -247,9 +257,9 @@ export function TelaConversas({
           e.id === 'todas'
             ? null
             : aplicarFiltros(captacao, { ...filtros, escopo: e.id }, quem).length +
-              filtrarClientes(foraDaBase, { ...filtros, escopo: e.id }, quem).length,
+              filtrarClientes(clientes, { ...filtros, escopo: e.id }, quem).length,
       })),
-    [captacao, foraDaBase, filtros, quem],
+    [captacao, clientes, filtros, quem],
   );
 
   // A aba "Consultoria" não passa pelo recorte da lista ("Minhas", busca, canal):
@@ -257,20 +267,20 @@ export function TelaConversas({
   const daAba = aba === 'consultoria' ? consultoria : itens;
   // Os clientes que cabem no recorte da lista de Conversas ("Minhas", busca...).
   const clientesNaLista = useMemo(() => {
-    const recorte = filtrarClientes(foraDaBase, filtros, quem);
+    const recorte = filtrarClientes(clientes, filtros, quem);
     if (perdidas.size === 0 || filtros.escopo === 'todas') return recorte;
     return juntarAsPerdidas(
       recorte,
-      filtrarClientes(foraDaBase, { ...filtros, escopo: 'todas' }, quem),
+      filtrarClientes(clientes, { ...filtros, escopo: 'todas' }, quem),
       (f) => f.id,
       (f) => f.id,
       perdidas,
     );
-  }, [foraDaBase, filtros, quem, perdidas]);
+  }, [clientes, filtros, quem, perdidas]);
 
   // O cliente escolhido é procurado em TODOS os clientes, não no recorte — a
   // mesma regra da conversa de parceiro, logo abaixo.
-  const clienteEscolhido = foraId ? (foraDaBase.find((f) => f.id === foraId) ?? null) : null;
+  const clienteEscolhido = foraId ? (clientes.find((f) => f.id === foraId) ?? null) : null;
   // Sem escolha nenhuma, o desktop abre a primeira linha da lista. Na aba
   // "Conversas" ela pode ser um cliente: é quem acabou de escrever.
   const primeiraLinha =
@@ -545,12 +555,21 @@ export function TelaConversas({
                   aoTrocar={(escopo) => mudar({ escopo })}
                   rotulo="De quem são as conversas"
                 />
-                <OrdemDaLista
-                  ligada={atitudes.ligada}
-                  ordem={filtros.ordem}
-                  aoMudar={(ordem) => mudar({ ordem })}
-                  className="mt-2"
-                />
+                {/* A ordem e a gaveta das concluídas (Imova) dividem a linha, e a
+                    gaveta desce quando não cabe (celular). Na KOMUNE as duas
+                    somem, e a linha junto (`empty:hidden`). */}
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 empty:hidden">
+                  <OrdemDaLista
+                    ligada={atitudes.ligada}
+                    ordem={filtros.ordem}
+                    aoMudar={(ordem) => mudar({ ordem })}
+                  />
+                  <FiltroDasConcluidas
+                    ativo={filtros.concluidas}
+                    aoMudar={(concluidas) => mudar({ concluidas })}
+                    className="ml-auto"
+                  />
+                </div>
               </div>
             ) : aba === 'fora' && atitudes.ligada && !consulta.isPending ? (
               <div className="sticky top-0 z-10 border-b border-hairline bg-background px-3 py-2">
@@ -609,6 +628,11 @@ export function TelaConversas({
               <p className="px-4 py-8 text-sm text-muted-foreground">
                 Você ainda não está em nenhum setor. Um gestor coloca você em Ajustes → Pessoas.
               </p>
+            ) : nadaNaLista && filtros.concluidas && !filtros.q.trim() ? (
+              <SemConcluidas
+                soMinhas={filtros.escopo === 'minhas'}
+                aoVoltar={() => mudar({ concluidas: false })}
+              />
             ) : nadaNaLista && soMinhas ? (
               // A tela abre em "Minhas", e quem ainda não atende ninguém cairia
               // em "nenhuma conversa com esses filtros" sem ter filtrado nada.
@@ -857,6 +881,7 @@ function descreverRecorte(filtros: FiltrosConversas, catalogos: CatalogosConvers
   if (filtros.escopo === 'setor') partes.push('"Meu setor"');
   if (filtros.canal) partes.push(`canal ${ROTULO_CANAL[filtros.canal]}`);
   if (filtros.janela !== 'qualquer') partes.push(`"${ROTULO_JANELA[filtros.janela]}"`);
+  if (filtros.concluidas) partes.push('"Concluídas"');
 
   const quantos = partes.length;
   const lista = partes.join(', ');

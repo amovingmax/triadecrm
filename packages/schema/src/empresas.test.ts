@@ -20,6 +20,7 @@ describe('empresas', () => {
       atitudeDoCliente: false,
       ligacaoWhatsapp: false,
       fichaDoCliente: false,
+      concluirConversa: false,
     });
     expect(k.gruposDeCategoria).toEqual({});
     expect(k.origens).toBeNull();
@@ -45,6 +46,7 @@ describe('empresas', () => {
       atitudeDoCliente: true,
       ligacaoWhatsapp: true,
       fichaDoCliente: true,
+      concluirConversa: true,
     });
     expect(i.tipos.cerimonialista).toBeNull();
   });

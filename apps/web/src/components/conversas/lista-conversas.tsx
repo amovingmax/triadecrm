@@ -21,6 +21,7 @@ import { DiasSemContato } from '@/components/temperatura';
 import { AtitudeNaLista } from './atitude';
 import type { BaseDasAtitudes } from './atitude-dados';
 import type { AtitudeDaConversa, Objecao } from './atitude-regra';
+import { SeloDeConcluida } from './concluir-conversa';
 import { nomeDoCliente } from './fora-da-base-dados';
 import { local, rotuloDoDia } from './formatos';
 import { ICONE_CANAL } from './icones';
@@ -319,6 +320,7 @@ function LinhaDeCliente({
             )}
             <ChipDaJanela estado={janela} />
             {fio.bloqueada_em ? <SeloDeBloqueado /> : null}
+            <SeloDeConcluida concluidaEm={fio.arquivada_em} />
             {/* Onde o parceiro tem a etapa, o cliente diz o que é: é esta palavra
                 que explica por que a linha não tem funil nem bairro. */}
             <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
@@ -452,6 +454,7 @@ function Linha({
               </Badge>
             ) : null}
             {item.fio?.bloqueadaEm ? <SeloDeBloqueado /> : null}
+            <SeloDeConcluida concluidaEm={item.fio?.arquivadaEm} />
             {/* O rascunho pendente é o que faz alguém abrir esta linha AGORA: ele
                 expira em três dias e some sozinho. */}
             {item.rascunhoPendente ? (

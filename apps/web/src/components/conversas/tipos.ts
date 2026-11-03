@@ -356,6 +356,14 @@ export type FiltrosConversas = {
    */
   arquivadas: boolean;
   /**
+   * SÓ AS CONCLUÍDAS (03/11/2026, Imova). Diferente de `arquivadas`, que junta as
+   * arquivadas às abertas: aqui a lista vira a gaveta das conversas encerradas, e
+   * só elas aparecem. É por onde se acha a conversa de três meses atrás sem ela
+   * poluir a lista de todo dia. Só existe onde o módulo `concluirConversa` está
+   * ligado; na KOMUNE o endereço é ignorado e fica o "Ver arquivadas".
+   */
+  concluidas: boolean;
+  /**
    * A ordem da lista (29/10/2026): a de sempre (por ler, depois quem falou por
    * último) ou "Mais interessados", pela etiqueta de atitude do cliente. Não é
    * recorte: ninguém some da lista, só muda de lugar. Só aparece onde a atitude
@@ -404,6 +412,7 @@ export const FILTROS_VAZIOS: FiltrosConversas = {
   canal: null,
   janela: 'qualquer',
   arquivadas: false,
+  concluidas: false,
   ordem: 'recentes',
 };
 
@@ -418,7 +427,8 @@ export function temRecorte(f: FiltrosConversas): boolean {
     f.janela !== 'qualquer' ||
     // "Mostrar arquivadas" É um recorte: sem ele aqui, a tela diria "a base está
     // vazia" quando na verdade só não há nada ARQUIVADO para mostrar.
-    f.arquivadas
+    f.arquivadas ||
+    f.concluidas
   );
 }
 
@@ -474,6 +484,7 @@ export function estadoDaUrl(
       canal: ehCanal(canal) ? canal : null,
       janela: ehJanela(janela) ? janela : 'qualquer',
       arquivadas: texto('arquivadas') === '1',
+      concluidas: EMPRESA.modulos.concluirConversa && texto('concluidas') === '1',
       // Só a Imova tem a ordem por interesse: na KOMUNE o parâmetro é ignorado.
       ordem:
         EMPRESA.modulos.atitudeDoCliente && texto('ordem') === 'interesse' ? 'interesse' : 'recentes',
@@ -502,6 +513,7 @@ export function urlDoEstado(
   if (f.canal) p.set('canal', f.canal);
   if (f.janela !== 'qualquer') p.set('janela', f.janela);
   if (f.arquivadas) p.set('arquivadas', '1');
+  if (f.concluidas) p.set('concluidas', '1');
   if (f.ordem === 'interesse') p.set('ordem', 'interesse');
   if (aba !== 'conversas') p.set('aba', aba);
   if (organizacaoId) p.set('org', organizacaoId);
@@ -796,6 +808,11 @@ export type FioDaConversa = {
    * do banco.
    */
   arquivadaEm: string | null;
+  /**
+   * O nome de quem arquivou (concluiu, na Imova), ou null. A faixa da conversa
+   * concluída diz quem foi, para quem abrir saber a quem perguntar (03/11/2026).
+   */
+  arquivadaPor: string | null;
   /** O número da KOMUNE que fala neste fio (RF-CON-01). */
   numeroDaEmpresa: string;
   responsavelId: string;

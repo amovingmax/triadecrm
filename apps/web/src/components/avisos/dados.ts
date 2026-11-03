@@ -1,6 +1,7 @@
 import { escolherNegocio } from '@/components/conversas/escolher-negocio';
 import type { NegocioCru } from '@/components/conversas/montagem';
 import { isAppRole } from '@/lib/auth/role';
+import { EMPRESA } from '@/lib/empresa';
 import { createClient } from '@/lib/supabase/client';
 
 import { recebeAvisos, type ConversaComResposta, type FichaDoAviso } from './regra';
@@ -55,12 +56,18 @@ export async function lerConversasComResposta(
   desde: string,
 ): Promise<{ conversas: ConversaComResposta[]; cheia: boolean } | null> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const pedido = supabase
     .from('conversations')
     .select(
       'id, organization_id, assignee_id, last_inbound_at, peer_nome, peer_phone_e164, messages(created_at), conversa_preferencias(silenciada_ate)',
     )
-    .gt('last_inbound_at', desde)
+    .gt('last_inbound_at', desde);
+  // Na Imova a conversa CONCLUÍDA não espera resposta de ninguém (03/11/2026):
+  // sai do número do menu e da marca "Nova", e volta com ela quando a pessoa
+  // escreve de novo (o gatilho a reabre). Na KOMUNE a leitura fica como era.
+  const { data, error } = await (
+    EMPRESA.modulos.concluirConversa ? pedido.is('arquivada_em', null) : pedido
+  )
     .eq('messages.direction', 'out')
     .eq('messages.origin', 'crm')
     .in('messages.author_kind', ['human', 'bot_ai'])

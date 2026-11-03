@@ -1,7 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { FilterX, Inbox, MessagesSquare, Plus, RotateCw, SearchX, Users } from 'lucide-react';
+import {
+  CircleCheck,
+  FilterX,
+  Inbox,
+  MessagesSquare,
+  Plus,
+  RotateCw,
+  SearchX,
+  Users,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -107,6 +116,33 @@ export function SemConversasMinhas({ aoVerTodas }: { aoVerTodas: () => void }) {
       <Button variant="outline" onClick={aoVerTodas} className="toque h-11 md:h-9">
         <MessagesSquare aria-hidden="true" />
         Ver todas
+      </Button>
+    </Moldura>
+  );
+}
+
+/**
+ * A gaveta de "Concluídas" vazia (03/11/2026, Imova). Não é filtro demais — é
+ * ninguém ter concluído nada neste recorte —, e "Limpar filtros" ou "Nenhum
+ * parceiro com esse nome" mandariam a pessoa procurar o problema no lugar errado.
+ */
+export function SemConcluidas({
+  soMinhas,
+  aoVoltar,
+}: {
+  /** Em "Minhas": a frase fala das conversas DELA. */
+  soMinhas: boolean;
+  aoVoltar: () => void;
+}) {
+  return (
+    <Moldura
+      icone={<CircleCheck className="size-5" aria-hidden="true" />}
+      titulo={soMinhas ? 'Você não concluiu nenhuma conversa' : 'Nenhuma conversa concluída'}
+      texto="Quando uma conversa é concluída, ela sai da lista e fica guardada aqui, com o histórico inteiro. Se a pessoa escrever de novo, ela volta sozinha."
+    >
+      <Button variant="outline" onClick={aoVoltar} className="toque h-11 md:h-9">
+        <MessagesSquare aria-hidden="true" />
+        Ver as conversas abertas
       </Button>
     </Moldura>
   );

@@ -61,6 +61,7 @@ export type FioCru = {
   peer_nome: string | null;
   business_number: string;
   arquivada_em: string | null;
+  arquivada_por: string | null;
   assignee_id: string;
   setor_id: number | null;
   status: string;
@@ -580,6 +581,7 @@ export function montarFio(cru: FioCru, nomeDaPessoa: Map<string, string>): FioDa
     telefoneParceiro: cru.peer_phone_e164,
     nomeDoPerfil: cru.peer_nome?.trim() || null,
     arquivadaEm: cru.arquivada_em,
+    arquivadaPor: cru.arquivada_por ? (nomeDaPessoa.get(cru.arquivada_por) ?? null) : null,
     numeroDaEmpresa: cru.business_number,
     responsavelId: cru.assignee_id,
     responsavel: nomeDaPessoa.get(cru.assignee_id) ?? null,

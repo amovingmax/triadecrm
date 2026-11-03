@@ -433,6 +433,7 @@ function fio(parcial: Partial<FioCru> & { id: string; organization_id: string | 
     peer_phone_e164: '+5584999880011',
     peer_nome: null,
     arquivada_em: null,
+    arquivada_por: null,
     business_number: '+5584999990000',
     assignee_id: HELOISA,
     setor_id: null,
@@ -856,6 +857,7 @@ function fioDaLista(parcial: Partial<FioDaConversa> = {}): FioDaConversa {
     telefoneParceiro: '+5584999880011',
     nomeDoPerfil: null,
     arquivadaEm: null,
+    arquivadaPor: null,
     numeroDaEmpresa: '+5584999990000',
     responsavelId: HELOISA,
     responsavel: 'Heloísa',
@@ -940,6 +942,43 @@ describe('aplicarFiltros: as arquivadas', () => {
 
   it('mas NÃO entra no contador de filtros: é a porta do arquivo, não um recorte do trabalho', () => {
     expect(contarFiltros({ ...FILTROS_VAZIOS, arquivadas: true })).toBe(0);
+  });
+});
+
+describe('aplicarFiltros: as concluídas (Imova, 03/11/2026)', () => {
+  // Concluir é o arquivar com nome. A diferença na lista: "Concluídas" é a gaveta,
+  // e mostra SÓ as concluídas — "ver arquivadas" junta as duas.
+  const aberta = itemDaLista({ id: 'aberta', fio: fioDaLista({ arquivadaEm: null }) });
+  const concluida = itemDaLista({
+    id: 'concluida',
+    fio: fioDaLista({ arquivadaEm: '2026-11-03T12:00:00-03:00' }),
+  });
+  const semFio = itemDaLista({ id: 'sem-fio', fio: null });
+  const com = { ...FILTROS_VAZIOS, concluidas: true };
+
+  it('fora da gaveta, a concluída sai da lista, como a arquivada', () => {
+    const r = aplicarFiltros([aberta, concluida, semFio], FILTROS_VAZIOS);
+    expect(r.map((i) => i.id)).toEqual(['aberta', 'sem-fio']);
+  });
+
+  it('na gaveta, SÓ as concluídas: nem as abertas, nem parceiro sem conversa', () => {
+    const r = aplicarFiltros([aberta, concluida, semFio], com);
+    expect(r.map((i) => i.id)).toEqual(['concluida']);
+  });
+
+  it('e "Minhas" continua valendo dentro dela', () => {
+    const minha = itemDaLista({
+      id: 'minha',
+      fio: fioDaLista({ arquivadaEm: '2026-11-03T12:00:00-03:00', responsavelId: 'eu' }),
+    });
+    const quem = { euId: 'eu', meusSetores: [] };
+    const r = aplicarFiltros([concluida, minha], { ...com, escopo: 'minhas' }, quem);
+    expect(r.map((i) => i.id)).toEqual(['minha']);
+  });
+
+  it('é recorte, mas não entra no contador de filtros', () => {
+    expect(temRecorte(com)).toBe(true);
+    expect(contarFiltros(com)).toBe(0);
   });
 });
 
@@ -1088,6 +1127,17 @@ describe('clientes na lista "Todas"', () => {
     });
     expect(filtrarClientes([arquivado], FILTROS_VAZIOS)).toEqual([]);
     expect(filtrarClientes([arquivado], { ...FILTROS_VAZIOS, arquivadas: true })).toHaveLength(1);
+  });
+
+  it('"Concluídas" (Imova) mostra só o cliente concluído', () => {
+    const concluido = fio({
+      id: 'fio-conc',
+      organization_id: null,
+      arquivada_em: '2026-11-03T12:00:00+00:00',
+    });
+    expect(
+      filtrarClientes([carla, concluido], { ...FILTROS_VAZIOS, concluidas: true }).map((f) => f.id),
+    ).toEqual(['fio-conc']);
   });
 
   it('o filtro de dias sem contato é de prospecção: com ele, cliente sai', () => {

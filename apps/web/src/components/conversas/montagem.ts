@@ -498,7 +498,12 @@ export function aplicarFiltros(
     // nenhum outro filtro deve trazer a conversa de volta por acidente. O que a
     // traz de volta é a pessoa escrever (gatilho no banco) ou alguém marcar
     // "mostrar arquivadas".
-    if (!f.arquivadas && item.fio?.arquivadaEm != null) return false;
+    //
+    // "Concluídas" (03/11/2026, Imova) é o avesso: SÓ as concluídas. Parceiro sem
+    // fio não tem o que concluir e fica de fora.
+    if (f.concluidas) {
+      if (item.fio?.arquivadaEm == null) return false;
+    } else if (!f.arquivadas && item.fio?.arquivadaEm != null) return false;
 
     // "Minhas" e "Meu setor" perguntam pelo FIO de WhatsApp: parceiro sem
     // conversa não tem quem atenda nem setor, e sai desses dois recortes.
@@ -593,7 +598,9 @@ export function filtrarClientes(
 
   return fios.filter((fio) => {
     if (fio.organization_id !== null) return false;
-    if (!f.arquivadas && fio.arquivada_em !== null) return false;
+    if (f.concluidas) {
+      if (fio.arquivada_em === null) return false;
+    } else if (!f.arquivadas && fio.arquivada_em !== null) return false;
 
     if (f.escopo === 'minhas' && (quem.euId === null || fio.assignee_id !== quem.euId)) {
       return false;

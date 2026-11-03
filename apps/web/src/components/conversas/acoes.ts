@@ -480,6 +480,19 @@ export async function marcarComoLida(fioId: string): Promise<boolean> {
  * se esta pessoa PODE é a RPC, que repete o recorte de `conversations_select`.
  */
 export async function arquivarConversa(fioId: string, arquivar: boolean): Promise<void> {
+  await trocarArquivo(fioId, arquivar, 'arquivar');
+}
+
+/**
+ * Conclui a conversa, ou reabre (03/11/2026, Imova). É a MESMA porta do
+ * arquivar (`conversa_arquivar`), com as palavras da tela: quem clicou em
+ * "Concluir" não pode ler "não deu para arquivar". Ver `concluir-conversa.tsx`.
+ */
+export async function concluirConversa(fioId: string, concluir: boolean): Promise<void> {
+  await trocarArquivo(fioId, concluir, concluir ? 'concluir' : 'reabrir');
+}
+
+async function trocarArquivo(fioId: string, arquivar: boolean, verbo: string): Promise<void> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc('conversa_arquivar', {
     p_conversation_id: fioId,
@@ -490,8 +503,8 @@ export async function arquivarConversa(fioId: string, arquivar: boolean): Promis
   if (!r?.ok) {
     throw new ErroDaConversa(
       r?.motivo === 'sem_permissao'
-        ? 'Você não pode arquivar esta conversa.'
-        : 'Não deu para arquivar a conversa.',
+        ? `Você não pode ${verbo} esta conversa.`
+        : `Não deu para ${verbo} a conversa.`,
       false,
     );
   }

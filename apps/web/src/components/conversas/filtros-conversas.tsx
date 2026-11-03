@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+import { CONCLUIR_NA_EMPRESA } from './concluir-conversa';
 import {
   CANAIS_EM_ORDEM,
   contarFiltros,
@@ -134,16 +135,20 @@ export function FiltrosDaConversa({
               esmagadora maioria dos dias ("não, some com elas"), e um seletor
               obrigaria a pessoa a ler duas opções para escolher a de sempre.
               Ele não entra no contador de filtros por não ser um recorte do
-              trabalho — é a porta do arquivo. */}
-          <Button
-            variant={filtros.arquivadas ? 'secondary' : 'outline'}
-            onClick={() => aoMudar({ arquivadas: !filtros.arquivadas })}
-            aria-pressed={filtros.arquivadas}
-            className="toque h-11 w-full justify-start md:h-8 md:w-auto"
-          >
-            <Archive aria-hidden="true" />
-            {filtros.arquivadas ? 'Mostrando as arquivadas' : 'Ver arquivadas'}
-          </Button>
+              trabalho — é a porta do arquivo.
+              Na Imova a porta é a pílula "Concluídas", no alto da lista
+              (03/11/2026), e este botão sai. */}
+          {CONCLUIR_NA_EMPRESA ? null : (
+            <Button
+              variant={filtros.arquivadas ? 'secondary' : 'outline'}
+              onClick={() => aoMudar({ arquivadas: !filtros.arquivadas })}
+              aria-pressed={filtros.arquivadas}
+              className="toque h-11 w-full justify-start md:h-8 md:w-auto"
+            >
+              <Archive aria-hidden="true" />
+              {filtros.arquivadas ? 'Mostrando as arquivadas' : 'Ver arquivadas'}
+            </Button>
+          )}
         </div>
 
         {limpavel ? (

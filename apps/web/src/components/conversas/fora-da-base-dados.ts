@@ -17,12 +17,16 @@ import type { FioCru, MensagemCrua } from './mensagens';
  * uma ficha que já existe, ou criar a ficha a partir dela.
  */
 
-export function conversasForaDaBase(fios: readonly FioCru[]): FioCru[] {
+export function conversasForaDaBase(
+  fios: readonly FioCru[],
+  /** Com as concluídas (Imova, 03/11/2026): é o que a lista de Conversas alcança. */
+  comConcluidas = false,
+): FioCru[] {
   return (
     fios
       // Arquivada sai da lista (01/10/2026): atendido o cliente, ele some daqui, e
       // volta sozinho se escrever de novo (`messages_desarquiva`).
-      .filter((f) => f.organization_id === null && f.arquivada_em === null)
+      .filter((f) => f.organization_id === null && (comConcluidas || f.arquivada_em === null))
       .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''))
   );
 }

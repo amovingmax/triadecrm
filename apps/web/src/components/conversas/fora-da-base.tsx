@@ -32,6 +32,7 @@ import { buscarAlvos } from '@/components/registro/alvos';
 import { DEBOUNCE_BUSCA_MS, type SugestaoDeAlvo } from '@/components/registro/tipos';
 
 import { arquivarConversa, ErroDaConversa } from './acoes';
+import { CONCLUIR_NA_EMPRESA, ConcluirConversa, FaixaDeConcluida } from './concluir-conversa';
 import { ProvedorDoFio } from './contexto-do-fio';
 import { CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { EnviarModelo } from './enviar-modelo';
@@ -346,7 +347,15 @@ export function ConversaForaDaBase({
                   Virar parceiro
                 </Button>
               )}
-              <ArquivarCliente fio={fio} />
+              {CONCLUIR_NA_EMPRESA ? (
+                <ConcluirConversa
+                  fioId={fio.id}
+                  concluidaEm={fio.arquivada_em}
+                  className="toque h-8"
+                />
+              ) : (
+                <ArquivarCliente fio={fio} />
+              )}
               <MenuDaConversa
                 fioId={fio.id}
                 bloqueada={bloqueada}
@@ -356,6 +365,11 @@ export function ConversaForaDaBase({
               />
             </div>
           </div>
+          <FaixaDeConcluida
+            concluidaEm={fio.arquivada_em}
+            concluidaPor={fio.arquivada_por ? (nomeDaPessoa.get(fio.arquivada_por) ?? null) : null}
+            className="border-t border-hairline"
+          />
           <FaixaDaLigacao conversaId={fio.id} className="border-t border-hairline" />
         </header>
         {/* A lupa da conversa (27/10/2026), aberta pelo "⋯". */}
@@ -399,7 +413,16 @@ export function ConversaForaDaBase({
                     Virar parceiro
                   </Button>
                 )}
-                <ArquivarCliente fio={fio} comNome className={ACAO_DA_FOLHA} />
+                {CONCLUIR_NA_EMPRESA ? (
+                  <ConcluirConversa
+                    fioId={fio.id}
+                    concluidaEm={fio.arquivada_em}
+                    tamanho="default"
+                    className={ACAO_DA_FOLHA}
+                  />
+                ) : (
+                  <ArquivarCliente fio={fio} comNome className={ACAO_DA_FOLHA} />
+                )}
               </div>
             </section>
 

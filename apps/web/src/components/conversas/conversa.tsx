@@ -35,6 +35,7 @@ import { BotaoDeLigarNaConversa, FaixaDaLigacao } from '@/components/ligacao-wha
 
 import { arquivarConversa } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
+import { CONCLUIR_NA_EMPRESA, ConcluirConversa, FaixaDeConcluida } from './concluir-conversa';
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
 import { AtitudeDaConversaNoTopo } from './atitude';
 import { EtiquetasDoParceiro } from './etiquetas-do-parceiro';
@@ -445,7 +446,14 @@ export function Conversa({
                 Registrar contato
               </Link>
             </Button>
-            {fio && eu?.podeEscrever ? <Arquivar fio={fio} /> : null}
+            {/* Na Imova, "Concluir" com nome no lugar do ícone de arquivar (03/11/2026). */}
+            {fio && eu?.podeEscrever ? (
+              CONCLUIR_NA_EMPRESA ? (
+                <ConcluirConversa fioId={fio.id} concluidaEm={fio.arquivadaEm} rotuloPelaLargura />
+              ) : (
+                <Arquivar fio={fio} />
+              )
+            ) : null}
             {fio ? (
               <MenuDaConversa
                 fioId={fio.id}
@@ -464,6 +472,14 @@ export function Conversa({
           </div>
         </div>
 
+        {/* A conversa concluída diz que está fora da lista, nos dois aparelhos (Imova). */}
+        {fio ? (
+          <FaixaDeConcluida
+            concluidaEm={fio.arquivadaEm}
+            concluidaPor={fio.arquivadaPor}
+            className="border-t border-hairline"
+          />
+        ) : null}
         {/* A faixa da janela de 24 h: no computador, colada no cabeçalho; no
             desenho do celular ela desce para cima da caixa de escrever, que é
             onde a hora decide alguma coisa. */}
@@ -530,7 +546,16 @@ export function Conversa({
                 </Link>
               </Button>
               {fio && eu?.podeEscrever ? (
-                <Arquivar fio={fio} comNome className={ACAO_DA_FOLHA} />
+                CONCLUIR_NA_EMPRESA ? (
+                  <ConcluirConversa
+                    fioId={fio.id}
+                    concluidaEm={fio.arquivadaEm}
+                    tamanho="default"
+                    className={ACAO_DA_FOLHA}
+                  />
+                ) : (
+                  <Arquivar fio={fio} comNome className={ACAO_DA_FOLHA} />
+                )
               ) : null}
               <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
                 <Link href={`/parceiros/${item.id}`}>

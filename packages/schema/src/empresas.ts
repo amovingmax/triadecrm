@@ -77,6 +77,14 @@ export interface Empresa {
      * banco também trava (`app.ficha_automatica_config`).
      */
     fichaDoCliente: boolean;
+    /**
+     * Concluir a conversa (03/11/2026): o arquivar com nome na tela, a lista de
+     * "Concluídas" e a volta quando alguém do time escreve. Só da Imova até o
+     * usuário aprovar ("ficando bom e sendo aprovado por mim, a gente coloca na
+     * Komune"); na KOMUNE fica o ícone de arquivar. O banco também trava
+     * (`app.concluir_ligado`).
+     */
+    concluirConversa: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -130,6 +138,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       atitudeDoCliente: false,
       ligacaoWhatsapp: false,
       fichaDoCliente: false,
+      concluirConversa: false,
     },
     privacidade: null,
   },
@@ -163,6 +172,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       atitudeDoCliente: true,
       ligacaoWhatsapp: true,
       fichaDoCliente: true,
+      concluirConversa: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

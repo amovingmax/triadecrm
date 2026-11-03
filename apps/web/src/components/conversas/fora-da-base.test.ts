@@ -26,6 +26,7 @@ function fio(parcial: Partial<FioCru>): FioCru {
     peer_phone_e164: '+5584999994698',
     peer_nome: null,
     arquivada_em: null,
+    arquivada_por: null,
     business_number: '+5584999318888',
     assignee_id: 'u',
     setor_id: null,
@@ -52,6 +53,19 @@ describe('conversasForaDaBase', () => {
       fio({ id: 'd' }),
     ]);
     expect(lista.map((f) => f.id)).toEqual(['c', 'a', 'd']);
+  });
+
+  it('a concluída sai da aba Clientes, e só volta quando se pede com as concluídas', () => {
+    const fios = [
+      fio({ id: 'a', last_message_at: '2026-11-03T10:00:00Z' }),
+      fio({
+        id: 'b',
+        last_message_at: '2026-11-03T11:00:00Z',
+        arquivada_em: '2026-11-03T12:00:00Z',
+      }),
+    ];
+    expect(conversasForaDaBase(fios).map((f) => f.id)).toEqual(['a']);
+    expect(conversasForaDaBase(fios, true).map((f) => f.id)).toEqual(['b', 'a']);
   });
 });
 
@@ -99,6 +113,11 @@ describe('a aba na URL', () => {
   it('?aba=consultoria abre na aba de quem fechou, e volta para a URL', () => {
     expect(estadoDaUrl({ aba: 'consultoria' }).aba).toBe('consultoria');
     expect(urlDoEstado(FILTROS_VAZIOS, null, 'consultoria')).toBe('?aba=consultoria');
+  });
+
+  it('?concluidas=1 só vale onde concluir existe: na KOMUNE o endereço é ignorado', () => {
+    expect(urlDoEstado({ ...FILTROS_VAZIOS, concluidas: true }, null)).toBe('?concluidas=1');
+    expect(estadoDaUrl({ concluidas: '1' }).filtros.concluidas).toBe(false);
   });
 
   it('endereço antigo das abas que saíram cai em Conversas (pivô de 06/10/2026)', () => {
