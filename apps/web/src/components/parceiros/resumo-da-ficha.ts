@@ -306,3 +306,53 @@ export function presencaPublica(ficha: { nota: number | null; avaliacoes: number
   if (nota === null && avaliacoes === null) return null;
   return { nota, avaliacoes };
 }
+
+// ---------------------------------------------------------------------------
+// A próxima ação que se escreveu sozinha (Imova, 03/11/2026)
+// ---------------------------------------------------------------------------
+
+/** A linha de `public.proximas_acoes_automaticas` de um negócio. */
+export type ProximaAcaoGravada = {
+  regra: string;
+  texto: string;
+  em: string | null;
+  motivo: string | null;
+  autor: string;
+};
+
+export type ProximaAcaoAutomatica = {
+  /** Por que, em uma frase: "Ana escreveu e ainda não teve resposta". */
+  motivo: string | null;
+  /** Hoje só a regra; a IA vai escrever no mesmo lugar. */
+  autor: 'regra' | 'ia';
+};
+
+/**
+ * A próxima ação do negócio foi escrita pela regra (e, depois, pela IA)?
+ *
+ * Só quando o que está no negócio é EXATAMENTE o que ela gravou, texto e hora.
+ * Se alguém do time escreveu outra por cima, a ficha não pode chamá-la de
+ * automática: ela vale até um fato novo, e quem a escreveu tem de se reconhecer
+ * nela. "manual" e "nenhuma" são as linhas em que a regra só anotou que olhou.
+ */
+export function proximaAcaoAutomatica(
+  negocio: { proximaAcao: string | null; proximaAcaoEm: string | null },
+  gravada: ProximaAcaoGravada | null | undefined,
+): ProximaAcaoAutomatica | null {
+  if (!gravada || !negocio.proximaAcao) return null;
+  if (gravada.regra === 'manual' || gravada.regra === 'nenhuma') return null;
+  if (gravada.texto !== negocio.proximaAcao) return null;
+  if (!mesmoInstante(gravada.em, negocio.proximaAcaoEm)) return null;
+  return {
+    motivo: gravada.motivo?.trim() || null,
+    autor: gravada.autor === 'ia' ? 'ia' : 'regra',
+  };
+}
+
+/** O PostgREST escreve a mesma hora sempre do mesmo jeito; o `Date.parse` é a rede. */
+function mesmoInstante(a: string | null, b: string | null): boolean {
+  if (a === null || b === null) return a === b;
+  if (a === b) return true;
+  const [x, y] = [Date.parse(a), Date.parse(b)];
+  return !Number.isNaN(x) && x === y;
+}

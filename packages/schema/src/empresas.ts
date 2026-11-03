@@ -70,6 +70,13 @@ export interface Empresa {
      * liga pela Twilio. O banco também trava (`app.wa_ligacao_ligada`).
      */
     ligacaoWhatsapp: boolean;
+    /**
+     * A ficha do cliente que se preenche sozinha (03/11/2026). Só da Imova: quem
+     * escreve vira ficha de Cliente, a próxima ação se escreve pela etapa e pela
+     * conversa, e a aba Clientes de Conversas mostra os clientes com ficha. O
+     * banco também trava (`app.ficha_automatica_config`).
+     */
+    fichaDoCliente: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -117,7 +124,13 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
     tipos: { fornecedor: 'Fornecedor', produtor: 'Produtor', cerimonialista: 'Cerimonialista' },
     gruposDeCategoria: {},
     origens: null,
-    modulos: { plataformaKomune: true, ia: true, atitudeDoCliente: false, ligacaoWhatsapp: false },
+    modulos: {
+      plataformaKomune: true,
+      ia: true,
+      atitudeDoCliente: false,
+      ligacaoWhatsapp: false,
+      fichaDoCliente: false,
+    },
     privacidade: null,
   },
   imova: {
@@ -144,7 +157,13 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       },
       padrao: 'numa lista de contatos da Imova Imobiliária',
     },
-    modulos: { plataformaKomune: false, ia: false, atitudeDoCliente: true, ligacaoWhatsapp: true },
+    modulos: {
+      plataformaKomune: false,
+      ia: false,
+      atitudeDoCliente: true,
+      ligacaoWhatsapp: true,
+      fichaDoCliente: true,
+    },
     privacidade: {
       controlador: 'Imova Imobiliária',
       registro: 'razão social IMOVA LTDA, CNPJ 66.913.275/0001-24, CRECI-RN 9825',

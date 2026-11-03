@@ -12,6 +12,7 @@ import {
   MapPin,
   Phone,
   ShieldAlert,
+  Sparkles,
   Star,
   type LucideIcon,
 } from 'lucide-react';
@@ -603,6 +604,28 @@ function Numeros({
                 'sem data marcada'
               )}
             </Apoio>
+            {/* A FICHA QUE SE PREENCHE SOZINHA (Imova, 03/11/2026): a próxima ação
+                que a regra escreveu diz que é dela e por quê. A que alguém do time
+                escreveu não ganha a marca — é dela que a pessoa tem de se lembrar. */}
+            {principal.proximaAcaoAutomatica ? (
+              <Apoio>
+                <span className="inline-flex items-start gap-1.5">
+                  <Sparkles
+                    className="mt-[3px] size-3.5 shrink-0"
+                    aria-hidden="true"
+                    strokeWidth={1.75}
+                  />
+                  <span>
+                    {principal.proximaAcaoAutomatica.autor === 'ia'
+                      ? 'Sugerida pela IA'
+                      : 'Automática'}
+                    {principal.proximaAcaoAutomatica.motivo
+                      ? `${SEPARADOR}${principal.proximaAcaoAutomatica.motivo}`
+                      : null}
+                  </span>
+                </span>
+              </Apoio>
+            ) : null}
           </>
         ) : (
           <>

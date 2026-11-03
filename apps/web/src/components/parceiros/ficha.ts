@@ -1,10 +1,17 @@
 import { cache } from 'react';
 import type { OrgKind, Temperature } from '@komune/schema';
 
+import { EMPRESA } from '@/lib/empresa';
 import { createClient } from '@/lib/supabase/server';
 
 import type { FichaExcluidaLida } from './ficha-excluida';
-import type { ConversaDaFicha, EtapaDoFunil } from './resumo-da-ficha';
+import {
+  proximaAcaoAutomatica,
+  type ConversaDaFicha,
+  type EtapaDoFunil,
+  type ProximaAcaoAutomatica,
+  type ProximaAcaoGravada,
+} from './resumo-da-ficha';
 
 /**
  * Leitura da ficha do parceiro, no servidor.
@@ -30,6 +37,12 @@ export type NegocioDaFicha = {
   responsavelPapel: string | null;
   proximaAcao: string | null;
   proximaAcaoEm: string | null;
+  /**
+   * A próxima ação foi escrita sozinha (a ficha do cliente da Imova, 03/11/2026):
+   * o porquê, para o cabeçalho dizer "automática". `null` = escrita por alguém do
+   * time, ou empresa sem o módulo.
+   */
+  proximaAcaoAutomatica: ProximaAcaoAutomatica | null;
   ultimoContatoEm: string | null;
   naEtapaDesde: string;
   tier: string | null;
@@ -171,7 +184,7 @@ async function lerFicha(id: string): Promise<Ficha | null> {
   }
   if (!org) return null;
 
-  const [categorias, negocios, origem, time, conversas, funisLidos] = await Promise.all([
+  const [categorias, negocios, origem, time, conversas, funisLidos, gravadas] = await Promise.all([
     supabase
       .from('organization_categories')
       .select('is_primary, category_id, categories(name)')
@@ -204,9 +217,21 @@ async function lerFicha(id: string): Promise<Ficha | null> {
     // Os nomes dos funis não dependem de nada daqui: vêm na mesma ida, e não numa
     // ida a mais no fim, em série (20/10/2026).
     supabase.from('pipelines').select('id, name'),
+    // O que a regra escreveu como próxima ação, e por quê. A tabela só existe no
+    // banco de quem tem o módulo (a Imova); na KOMUNE nem é pedida. Falha de
+    // leitura só tira o "automática" do cabeçalho.
+    EMPRESA.modulos.fichaDoCliente
+      ? supabase
+          .from('proximas_acoes_automaticas')
+          .select('deal_id, regra, texto, em, motivo, autor, deals!inner(organization_id)')
+          .eq('deals.organization_id', id)
+      : Promise.resolve({ data: [] as (ProximaAcaoGravada & { deal_id: string })[] }),
   ]);
 
   const nomeDoTime = new Map((time.data ?? []).map((p) => [p.id, p.full_name]));
+  const gravadaPorNegocio = new Map<string, ProximaAcaoGravada>(
+    (gravadas.data ?? []).map((a) => [a.deal_id, a]),
+  );
   const papelDoTime = new Map((time.data ?? []).map((p) => [p.id, p.role as string | null]));
 
   // As etapas do FUNIL inteiro, e não só as dos negócios: a régua do cabeçalho
@@ -305,6 +330,10 @@ async function lerFicha(id: string): Promise<Ficha | null> {
       responsavelPapel: d.owner_id ? (papelDoTime.get(d.owner_id) ?? null) : null,
       proximaAcao: d.next_action,
       proximaAcaoEm: d.next_action_at,
+      proximaAcaoAutomatica: proximaAcaoAutomatica(
+        { proximaAcao: d.next_action, proximaAcaoEm: d.next_action_at },
+        gravadaPorNegocio.get(d.id),
+      ),
       ultimoContatoEm: d.last_activity_at,
       naEtapaDesde: d.entered_stage_at,
       tier: d.tier,

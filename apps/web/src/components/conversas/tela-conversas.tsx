@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { useAcoesDosAvisos } from '@/components/avisos/provedor-avisos';
 import { TelaGrupos } from '@/components/grupos/tela-grupos';
@@ -39,6 +40,7 @@ import { conversasForaDaBase } from './fora-da-base-dados';
 import { ListaConversas } from './lista-conversas';
 import {
   aplicarFiltros,
+  clientesComFicha,
   contatosDeConsultoria,
   emCaptacao,
   filtrarClientes,
@@ -211,6 +213,16 @@ export function TelaConversas({
   }, [captacao, filtros, quem, perdidas]);
   // Quem escreveu e não é ficha: a aba "Clientes" inteira, e parte da lista de Conversas.
   const foraDaBase = useMemo(() => conversasForaDaBase(consulta.data?.fios ?? []), [consulta.data]);
+  // TODO CLIENTE TEM FICHA (Imova, 03/11/2026): quem escreve ganha ficha de
+  // Cliente no minuto seguinte, e a conversa dele continua na aba Clientes —
+  // agora como conversa de ficha, com etapa e próxima ação. Os que ainda não
+  // ganharam (o minuto do robô, quem pediu para sair) seguem como sempre.
+  const comFicha = EMPRESA.modulos.fichaDoCliente;
+  const clientesFichados = useMemo(
+    () => (comFicha ? clientesComFicha(captacao) : []),
+    [comFicha, captacao],
+  );
+  const clientesNaAba = aba === 'fora' && comFicha;
   // A atitude do cliente (29/10/2026): a etiqueta nas linhas e, com "Mais
   // interessados", a ordem. Desligada (a KOMUNE), nada disso muda a tela.
   const atitudes = useAtitudes();
@@ -266,13 +278,20 @@ export function TelaConversas({
       ? (juntarNaLista(itens, clientesNaLista, preferencias.data, interesse, perdidas)[0] ?? null)
       : null;
   const semEscolha = escolhidoId === null && clienteEscolhido === null && !ehCelular;
+  // Na aba Clientes com ficha, a primeira linha pode ser de ficha ou não.
+  const primeiraDosClientes = clientesNaAba
+    ? (juntarNaLista(clientesFichados, foraDaBase, preferencias.data, interesse)[0] ?? null)
+    : null;
   const foraAberta =
-    aba === 'fora'
-      ? (clienteEscolhido ?? (ehCelular ? null : (foraNaOrdem[0] ?? null)))
-      : aba === 'conversas'
-        ? (clienteEscolhido ??
-          (semEscolha && primeiraLinha?.tipo === 'cliente' ? primeiraLinha.fio : null))
-        : null;
+    aba === 'fora' && clientesNaAba
+      ? (clienteEscolhido ??
+        (semEscolha && primeiraDosClientes?.tipo === 'cliente' ? primeiraDosClientes.fio : null))
+      : aba === 'fora'
+        ? (clienteEscolhido ?? (ehCelular ? null : (foraNaOrdem[0] ?? null)))
+        : aba === 'conversas'
+          ? (clienteEscolhido ??
+            (semEscolha && primeiraLinha?.tipo === 'cliente' ? primeiraLinha.fio : null))
+          : null;
 
   // Sem escolha explícita, o desktop abre a primeira da lista. É derivação, não efeito:
   // um `setState` dentro de `useEffect` aqui reordenaria a tela depois de pintá-la.
@@ -284,10 +303,14 @@ export function TelaConversas({
       : (escolhidoId ??
         (ehCelular
           ? null
-          : // Em "Mais interessados" a primeira linha é a do topo da ordem nova.
-            interesse && aba === 'conversas' && primeiraLinha?.tipo === 'parceiro'
-            ? primeiraLinha.item.id
-            : (daAba[0]?.id ?? null)));
+          : clientesNaAba
+            ? primeiraDosClientes?.tipo === 'parceiro'
+              ? primeiraDosClientes.item.id
+              : null
+            : // Em "Mais interessados" a primeira linha é a do topo da ordem nova.
+              interesse && aba === 'conversas' && primeiraLinha?.tipo === 'parceiro'
+              ? primeiraLinha.item.id
+              : (daAba[0]?.id ?? null)));
 
   // A conversa aberta é procurada em TODOS, não no recorte: mudar o filtro não pode
   // fechar na cara da pessoa a conversa que ela está lendo.
@@ -435,7 +458,7 @@ export function TelaConversas({
               aba={aba}
               aoTrocar={setAba}
               consultoria={consultoria.length}
-              foraDaBase={foraDaBase.length}
+              foraDaBase={foraDaBase.length + clientesFichados.length}
             />
 
             {/* O recorte é da lista de conversas. Nas outras abas ele não aparece
@@ -545,6 +568,20 @@ export function TelaConversas({
                 causa={mensagemDoErro(consulta.error)}
                 aoTentar={() => void consulta.refetch()}
               />
+            ) : clientesNaAba && clientesFichados.length > 0 ? (
+              // A mesma lista da aba Conversas, só com os clientes: a ficha abre a
+              // conversa de ficha; quem ainda não tem, a de sempre.
+              <ListaConversas
+                itens={clientesFichados}
+                selecionadoId={aberta?.id ?? null}
+                aoEscolher={escolherParceiro}
+                clientes={foraDaBase}
+                clienteSelecionadoId={foraAberta?.id ?? null}
+                aoEscolherCliente={escolherCliente}
+                preferencias={preferencias.data}
+                atitudes={atitudes}
+                porInteresse={interesse !== null}
+              />
             ) : aba === 'fora' ? (
               <ListaForaDaBase
                 fios={foraNaOrdem}
@@ -652,7 +689,7 @@ export function TelaConversas({
               />
             )}
           </section>
-        ) : aba === 'fora' || foraAberta ? (
+        ) : (aba === 'fora' && !(clientesNaAba && aberta)) || foraAberta ? (
           ehCelular && !foraAberta ? null : (
             <section
               aria-label="Conversa com cliente"

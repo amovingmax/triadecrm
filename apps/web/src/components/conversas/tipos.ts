@@ -1,4 +1,11 @@
-import type { ActivityType, Channel, MsgStatus, MsgType, Temperature } from '@komune/schema';
+import type {
+  ActivityType,
+  Channel,
+  MsgStatus,
+  MsgType,
+  OrgKind,
+  Temperature,
+} from '@komune/schema';
 
 import { type AppRole } from '@/lib/auth/role';
 import { ehCanal } from '@/lib/canais';
@@ -153,6 +160,12 @@ export type ItemConversa = {
   leituraDaIa: LeituraNaLista | null;
   /** As etiquetas do parceiro, para a lista mostrar de relance. */
   etiquetas: EtiquetaDoParceiro[];
+  /**
+   * O tipo da ficha (`organizations.kind`). Na Imova, `produtor` é Cliente: é ele
+   * que põe a conversa na aba Clientes desde que todo cliente tem ficha
+   * (03/11/2026). Ausente nas listas montadas antes disso.
+   */
+  tipo?: OrgKind | null;
   /** ISO da interação humana mais recente; `null` quando ninguém falou ainda. */
   ultimaEm: string | null;
   /** Dias inteiros desde `ultimaEm`; `null` quando nunca houve contato. */

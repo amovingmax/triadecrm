@@ -1,4 +1,4 @@
-import type { ActivityType, Channel, DealStatus, Json, Temperature } from '@komune/schema';
+import type { ActivityType, Channel, DealStatus, Json, OrgKind, Temperature } from '@komune/schema';
 
 import type { LeituraCrua } from './dados';
 
@@ -79,6 +79,8 @@ export type OrganizacaoCrua = {
   phone_e164: string | null;
   phone_is_masked: boolean | null;
   do_not_contact: boolean;
+  /** `organizations.kind`: o tipo da ficha (na Imova, `produtor` é Cliente). */
+  kind?: OrgKind | null;
 };
 
 export type NegocioCru = {
@@ -329,6 +331,7 @@ export function montarConversas({
       rascunhoPendente: rascunhoCru ? montarRascunho(rascunhoCru) : null,
       leituraDaIa: montarLeitura(leituraPorOrganizacao.get(o.id) ?? null),
       etiquetas: etiquetasPorOrganizacao.get(o.id) ?? [],
+      tipo: o.kind ?? null,
     };
   });
 
@@ -444,6 +447,20 @@ export function contatosDeConsultoria(itens: readonly ItemConversa[]): ItemConve
 /** O contrário da consultoria: quem ainda está sendo captado. */
 export function emCaptacao(itens: readonly ItemConversa[]): ItemConversa[] {
   return itens.filter((i) => !i.fechou);
+}
+
+/**
+ * Os clientes COM ficha que moram na aba Clientes (Imova, 03/11/2026).
+ *
+ * Até aqui a aba era só de quem não tinha ficha. Desde que todo cliente que
+ * escreve ganha a dele (`app.cliente_ficha_criar`), a conversa sairia da aba no
+ * minuto seguinte e a aba ficaria vazia. Fica na aba quem tem ficha de Cliente
+ * (`produtor`) e conversa de WhatsApp, menos a arquivada (concluída), como na
+ * parte sem ficha da aba (`conversasForaDaBase`). Quem fechou negócio já mora
+ * na Consultoria: vem de `emCaptacao`.
+ */
+export function clientesComFicha(itens: readonly ItemConversa[]): ItemConversa[] {
+  return itens.filter((i) => i.tipo === 'produtor' && i.fio !== null && i.fio.arquivadaEm == null);
 }
 
 export function filaDeQuemRespondeu(itens: ItemConversa[]): ItemConversa[] {

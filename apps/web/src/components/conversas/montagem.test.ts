@@ -5,6 +5,7 @@ import {
   agruparPorDia,
   aplicarFiltros,
   cabeNaJanela,
+  clientesComFicha,
   contatosDeConsultoria,
   diasDesde,
   ehInteracao,
@@ -1215,5 +1216,40 @@ describe('quem fechou vai para a Consultoria (pivô de 06/10/2026)', () => {
     });
     expect(ids(contatosDeConsultoria(comMarca))).toEqual(['captando']);
     expect(emCaptacao(comMarca)).toEqual([]);
+  });
+});
+
+describe('clientesComFicha: a aba Clientes quando todo cliente tem ficha (Imova, 03/11/2026)', () => {
+  const lista = [
+    itemDaLista({ id: 'cliente', tipo: 'produtor' }),
+    itemDaLista({ id: 'proprietario', tipo: 'fornecedor' }),
+    itemDaLista({ id: 'cliente-sem-conversa', tipo: 'produtor', fio: null }),
+    itemDaLista({
+      id: 'cliente-concluido',
+      tipo: 'produtor',
+      fio: fioDaLista({ arquivadaEm: '2026-11-03T10:00:00-03:00' }),
+    }),
+    itemDaLista({ id: 'sem-tipo' }),
+  ];
+
+  it('fica quem tem ficha de Cliente e conversa aberta', () => {
+    expect(clientesComFicha(lista).map((i) => i.id)).toEqual(['cliente']);
+  });
+
+  it('o proprietário, quem nunca conversou e a conversa concluída ficam de fora', () => {
+    const fora = lista.filter((i) => !clientesComFicha(lista).includes(i)).map((i) => i.id);
+    expect(fora).toEqual(['proprietario', 'cliente-sem-conversa', 'cliente-concluido', 'sem-tipo']);
+  });
+
+  it('o tipo vem da ficha quando a lista é montada', () => {
+    const agora = new Date('2026-11-03T12:00:00Z');
+    const itens = montarConversas({
+      organizacoes: [{ ...organizacao('o1', 'Ana Souza'), kind: 'produtor' }],
+      atividades: [],
+      negocios: [],
+      catalogos: CATALOGOS,
+      agora,
+    });
+    expect(itens[0]?.tipo).toBe('produtor');
   });
 });

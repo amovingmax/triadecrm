@@ -5,6 +5,7 @@ import {
   estadoDoWhatsapp,
   montarRegua,
   presencaPublica,
+  proximaAcaoAutomatica,
   ultimoContatoDaFicha,
   ultimoContatoPorExtenso,
   type EtapaDoFunil,
@@ -299,5 +300,58 @@ describe('a presença pública', () => {
     expect(presencaPublica({ nota: null, avaliacoes: 0 })).toBeNull();
     expect(presencaPublica({ nota: 0, avaliacoes: null })).toBeNull();
     expect(presencaPublica({ nota: null, avaliacoes: null })).toBeNull();
+  });
+});
+
+describe('a próxima ação que se escreveu sozinha', () => {
+  const gravada = {
+    regra: 'responder',
+    texto: 'Responder a mensagem',
+    em: '2026-11-03T11:27:13.123456-03:00',
+    motivo: 'Ana escreveu e ainda não teve resposta',
+    autor: 'regra',
+  };
+  const negocio = { proximaAcao: 'Responder a mensagem', proximaAcaoEm: gravada.em };
+
+  it('é automática quando o negócio tem exatamente o que a regra gravou', () => {
+    expect(proximaAcaoAutomatica(negocio, gravada)).toEqual({
+      motivo: 'Ana escreveu e ainda não teve resposta',
+      autor: 'regra',
+    });
+  });
+
+  it('a mesma hora escrita de outro jeito ainda é a mesma', () => {
+    expect(
+      proximaAcaoAutomatica(
+        { ...negocio, proximaAcaoEm: '2026-11-03T14:27:13.123456+00:00' },
+        gravada,
+      ),
+    ).not.toBeNull();
+  });
+
+  it('alguém do time escreveu outra por cima: não é automática', () => {
+    expect(
+      proximaAcaoAutomatica({ ...negocio, proximaAcao: 'Ligar para combinar a chave' }, gravada),
+    ).toBeNull();
+    expect(
+      proximaAcaoAutomatica({ ...negocio, proximaAcaoEm: '2026-11-04T09:00:00-03:00' }, gravada),
+    ).toBeNull();
+  });
+
+  it('a regra só anotou que olhou (manual, nenhuma): não é automática', () => {
+    expect(proximaAcaoAutomatica(negocio, { ...gravada, regra: 'manual' })).toBeNull();
+    expect(proximaAcaoAutomatica(negocio, { ...gravada, regra: 'nenhuma' })).toBeNull();
+  });
+
+  it('sem linha, ou sem próxima ação no negócio: nada a dizer', () => {
+    expect(proximaAcaoAutomatica(negocio, null)).toBeNull();
+    expect(proximaAcaoAutomatica({ proximaAcao: null, proximaAcaoEm: null }, gravada)).toBeNull();
+  });
+
+  it('a IA, quando entrar, assina como IA; motivo em branco não vira frase', () => {
+    expect(proximaAcaoAutomatica(negocio, { ...gravada, autor: 'ia', motivo: '  ' })).toEqual({
+      motivo: null,
+      autor: 'ia',
+    });
   });
 });

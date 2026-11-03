@@ -141,7 +141,7 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
     supabase
       .from('organizations_view')
       .select(
-        'id, name, primary_category_name, neighborhood, city_name, temperature, phone_e164, phone_is_masked, do_not_contact',
+        'id, name, kind, primary_category_name, neighborhood, city_name, temperature, phone_e164, phone_is_masked, do_not_contact',
       )
       .is('deleted_at', null)
       .order('name')

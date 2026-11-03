@@ -107,8 +107,9 @@ export function ListaForaDaBase({
       <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
         <p className="font-medium">Nenhum cliente esperando</p>
         <p className="max-w-xs text-sm text-muted-foreground">
-          Quem escrever para a {EMPRESA.nomeDoNumero} e não for parceiro aparece aqui: cliente da
-          plataforma, curioso ou fornecedor que ainda não está na base.
+          {EMPRESA.modulos.fichaDoCliente
+            ? `Quem escrever para a ${EMPRESA.nomeDoNumero} aparece aqui e ganha a ficha de cliente sozinho, com a etapa e a próxima ação.`
+            : `Quem escrever para a ${EMPRESA.nomeDoNumero} e não for parceiro aparece aqui: cliente da plataforma, curioso ou fornecedor que ainda não está na base.`}
         </p>
       </div>
     );
