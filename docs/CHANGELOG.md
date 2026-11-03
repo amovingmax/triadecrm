@@ -8170,3 +8170,20 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 **Pendente:** janela de teste real; ativação definitiva com o botão visível, de segunda a sexta, das 8h às 19h; `20261030120000` na KOMUNE, sem efeito lá, quando for a vez dela.
 
 **Fora desta entrega:** o robô da Imova já avisava antes desta publicação que falta aprovar na Meta o modelo `GEN-SYS-OPTOUT`, que confirma a saída de quem pede para sair fora das 24 h.
+
+## 03/11/2026 — "Instalar o Tríade neste computador" para todo mundo (branch `instalar-para-todos`; RF-CON-05)
+
+**O pedido.** "Na minha conta do CRM eu tenho a opção de baixar o app para PC, porém isso só aparece na minha conta. Quero que apareça pra todo mundo."
+
+**A causa.** O item não dependia da conta nem do papel: só aparecia quando o navegador disparava o `beforeinstallprompt`. Esse evento é só do Chrome e do Edge e, mesmo neles, não vem antes de a pessoa clicar na página e passar uns 30 segundos nela, some por um tempo depois que ela recusa a pergunta e não vem quando o Tríade já está instalado. No Safari e no Firefox ele não existe.
+
+**Entregue (só no site; sem migração, sem mexer no WhatsApp):**
+- O item aparece em todo computador, para todos os papéis, nas duas empresas. Some só dentro do app já instalado (`display-mode: standalone`, ou o app do Dock do Safari) e no celular, que tem o caminho do `apps/app`.
+- Com a pergunta do navegador guardada, o clique abre a pergunta, como antes. Sem ela, abre o passo a passo do navegador da pessoa (`avisos/passos-para-instalar.tsx`): Chrome (ícone na barra de endereço ou menu ⋮ → Transmitir, salvar e compartilhar), Edge (Aplicativo disponível ou menu ⋯ → Aplicativos), Safari do Mac (Arquivo → Adicionar ao Dock, macOS Sonoma ou mais novo). Firefox e outros: "Este navegador não instala o Tríade", com o botão de copiar o endereço para abrir no Chrome.
+- O passo a passo termina com a permissão do aviso: no Mac, a dada ao navegador não vale para o app instalado.
+- Testes: `instalar-app.test.ts` (Chrome no Mac e no Windows, Edge, Safari, Firefox, Opera e o iPad que se apresenta como Mac). Web: typecheck, lint e 1.480 testes Vitest passando.
+- Conferido no Chrome real (Playwright), em `localhost:3070`: gestor e SDR veem o item e o passo a passo do Chrome; com identificação de Safari, Edge e Firefox sai o passo a passo de cada um; no celular e com `display-mode: standalone` o item não aparece; com um `beforeinstallprompt` disparado, o clique chama a pergunta do navegador e não abre o passo a passo.
+
+**Não conferido:** os nomes dos menus do Chrome, do Edge e do Safari em português foram escritos pela documentação e podem mudar de versão para versão; conferir num computador de cada.
+
+**Pendente:** publicar, só com pedido. Vale para as duas empresas.

@@ -4,7 +4,8 @@ import { Bell, BellOff, ChevronDown, LogOut, MonitorDown, Volume2, VolumeX } fro
 import { useRef, useState } from 'react';
 
 import { avisarDaPermissao } from '@/components/avisos/convite-de-avisos';
-import { instalarApp, useDaParaInstalar } from '@/components/avisos/instalar-app';
+import { instalarApp, type Navegador, useComoInstalar } from '@/components/avisos/instalar-app';
+import { PassosParaInstalar } from '@/components/avisos/passos-para-instalar';
 import { useAvisos } from '@/components/avisos/provedor-avisos';
 import { tocarAmostra } from '@/components/avisos/som';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -64,8 +65,10 @@ import { type Sessao } from '@/lib/auth/session';
  * ver a marca mudar. Com os avisos silenciados a caixa some: não há o que tocar.
  *
  * **Instalar o Tríade (30/10/2026).** No computador, com o CRM instalado o aviso
- * aparece com o nome e o ícone do Tríade em vez dos do Chrome. O item só aparece
- * quando o navegador oferece a instalação (`components/avisos/instalar-app.ts`).
+ * aparece com o nome e o ícone do Tríade em vez dos do Chrome. Desde 03/11/2026 o
+ * item aparece em todo computador, menos dentro do app já instalado: quando o
+ * navegador oferece a instalação, abre a pergunta dele; quando não oferece, o passo
+ * a passo daquele navegador (`components/avisos/instalar-app.ts`).
  */
 export function UserMenu({ sessao }: { sessao: Sessao }) {
   const formSair = useRef<HTMLFormElement>(null);
@@ -73,7 +76,18 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
   const [naoSubiram, setNaoSubiram] = useState<readonly RegistroNaFila[]>([]);
   const [avisando, setAvisando] = useState(false);
   const avisos = useAvisos();
-  const daParaInstalar = useDaParaInstalar();
+  const comoInstalar = useComoInstalar();
+  // O navegador fica guardado junto: o passo a passo precisa dele até o fim da
+  // animação de fechar, e a pergunta do Chrome pode chegar com ele aberto.
+  const [passos, setPassos] = useState<{ aberto: boolean; navegador: Navegador }>({
+    aberto: false,
+    navegador: 'chrome',
+  });
+
+  function instalar() {
+    if (comoInstalar === 'pedido') void instalarApp();
+    else if (comoInstalar) setPassos({ aberto: true, navegador: comoInstalar });
+  }
 
   // Três estados, um item. Ligar também pede a permissão do navegador quando ela
   // ainda não foi dada: o clique no menu é o gesto que o navegador exige.
@@ -197,9 +211,9 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
               <DropdownMenuSeparator />
             </>
           ) : null}
-          {daParaInstalar ? (
+          {comoInstalar ? (
             <>
-              <DropdownMenuItem className="min-h-11 md:min-h-0" onSelect={() => void instalarApp()}>
+              <DropdownMenuItem className="min-h-11 md:min-h-0" onSelect={instalar}>
                 <MonitorDown aria-hidden="true" />
                 Instalar o Tríade neste computador
               </DropdownMenuItem>
@@ -212,6 +226,12 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <PassosParaInstalar
+        navegador={passos.navegador}
+        aberto={passos.aberto}
+        aoMudar={(aberto) => setPassos((atual) => ({ ...atual, aberto }))}
+      />
 
       <Dialog open={avisando} onOpenChange={setAvisando}>
         <DialogContent>
