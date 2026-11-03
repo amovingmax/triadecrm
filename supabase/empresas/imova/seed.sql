@@ -526,6 +526,31 @@ on conflict (slug) do update
   set nome = excluded.nome, posicao = excluded.posicao, ativa = excluded.ativa;
 
 -- =====================================================================
+-- 12d. A ficha do cliente que se preenche sozinha (03/11/2026): só da Imova.
+--      Quem escreve ganha ficha de Cliente no funil Clientes, a régua anda
+--      quando ele volta a escrever e a próxima ação se escreve pela etapa e
+--      por quem falou por último. A chave e o job moram aqui, e não na
+--      migração, para não existirem na KOMUNE. A IA entra depois.
+-- =====================================================================
+insert into public.app_settings (key, value, description) values
+  ('ficha_automatica',
+   '{"ligada": true,
+     "categoria": "comprador",
+     "retomar_em_dias": 2,
+     "retomar_sem_resposta_em_dias": 3,
+     "acompanhar_em_dias": 3,
+     "reativar_em_dias": 30}'::jsonb,
+   'Ficha automática do cliente, só da Imova. ligada: quem escreve vira ficha (Cliente, funil Clientes) e a próxima ação se escreve sozinha. categoria: a categoria da ficha nova. retomar_em_dias: dias úteis para retomar depois da nossa resposta; retomar_sem_resposta_em_dias: depois de uma mensagem nunca respondida; acompanhar_em_dias: proposta ou documentação; reativar_em_dias: nutrição.')
+on conflict (key) do update set value = excluded.value, description = excluded.description;
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('fichas_automaticas_rodar', '* * * * *',
+                          $cron$select app.fichas_automaticas_rodar(200)$cron$);
+  end if;
+end $$;
+
+-- =====================================================================
 -- 13. Autoverificação. Qualquer falta aborta com o nome do problema.
 -- =====================================================================
 do $$
@@ -556,6 +581,13 @@ begin
   if exists (select 1 from pg_namespace where nspname = 'cron')
      and not exists (select 1 from cron.job where jobname = 'atitudes_recalcular') then
     raise exception 'seed imova: o recálculo da atitude do cliente não ficou agendado';
+  end if;
+  if not coalesce((app.ficha_automatica_config() ->> 'ligada')::boolean, false) then
+    raise exception 'seed imova: a ficha automática do cliente ficou desligada';
+  end if;
+  if exists (select 1 from pg_namespace where nspname = 'cron')
+     and not exists (select 1 from cron.job where jobname = 'fichas_automaticas_rodar') then
+    raise exception 'seed imova: a ficha automática do cliente não ficou agendada';
   end if;
   if n_cat <> 7 then raise exception 'seed imova: esperadas 7 categorias ativas, encontradas %', n_cat; end if;
   if n_pipe <> 2 then raise exception 'seed imova: esperados 2 funis, encontrados %', n_pipe; end if;

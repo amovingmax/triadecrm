@@ -6442,6 +6442,53 @@ export type Database = {
           },
         ]
       }
+      proximas_acoes_automaticas: {
+        Row: {
+          autor: string
+          calculada_em: string
+          deal_id: string
+          em: string | null
+          gravada_em: string
+          manual_desde: string | null
+          manual_texto: string | null
+          motivo: string | null
+          regra: string
+          texto: string
+        }
+        Insert: {
+          autor?: string
+          calculada_em?: string
+          deal_id: string
+          em?: string | null
+          gravada_em?: string
+          manual_desde?: string | null
+          manual_texto?: string | null
+          motivo?: string | null
+          regra: string
+          texto: string
+        }
+        Update: {
+          autor?: string
+          calculada_em?: string
+          deal_id?: string
+          em?: string | null
+          gravada_em?: string
+          manual_desde?: string | null
+          manual_texto?: string | null
+          motivo?: string | null
+          regra?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proximas_acoes_automaticas_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: true
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       publicos_salvos: {
         Row: {
           criado_em: string
