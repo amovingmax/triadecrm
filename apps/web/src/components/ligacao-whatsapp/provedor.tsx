@@ -12,7 +12,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { MessageCircle, Mic, MicOff, Phone, PhoneOff, X } from 'lucide-react';
+import { MessageCircle, Mic, MicOff, Phone, PhoneMissed, PhoneOff, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { EMPRESA } from '@/lib/empresa';
@@ -26,6 +26,7 @@ import {
   chamadaViva,
   fraseDoMicrofone,
   fraseDoMotivo,
+  quandoLigou,
   ROTULO_DA_CHAMADA,
   TOQUE_VALE_MS,
   type EstadoDaChamada,
@@ -40,6 +41,7 @@ import {
   soltarChamada,
   type ChamadaNoBanco,
 } from './rpc';
+import { CHAVE_DAS_PERDIDAS } from './perdidas';
 import { iniciarToque } from './toque';
 import { abrirMicrofone, criarOferta, responderOferta, type ConexaoDeVoz } from './webrtc';
 
@@ -121,6 +123,10 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
   const respostaAplicada = useRef(false);
   const trava = useRef(false);
   const dispensadas = useRef(new Set<string>());
+  // As ligações que tocaram neste navegador: só elas viram o aviso de perdida aqui. Quem
+  // não estava com o CRM aberto encontra a perdida no topo da lista (`perdidas.tsx`).
+  const tocouAqui = useRef(new Set<string>());
+  const [perdidaAgora, setPerdidaAgora] = useState<ChamadaNoBanco | null>(null);
   const linhaAtual = useRef<LinhaAtual | null>(null);
   useEffect(() => {
     linhaAtual.current = linha;
@@ -173,6 +179,12 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
       row.estado === 'tocando' &&
       !dispensadas.current.has(row.id) &&
       aindaTocando(row.tocou_em, new Date());
+    if (toca) tocouAqui.current.add(row.id);
+    // Tocou aqui e ninguém atendeu: o aviso fica até alguém fechar. Quem clicou em
+    // Ignorar já decidiu, e não recebe o aviso. Qualquer fim tira a ligação da lista.
+    if (row.direcao === 'recebida' && !chamadaViva(row.estado) && tocouAqui.current.delete(row.id)) {
+      if (row.estado === 'perdida' && !dispensadas.current.has(row.id)) setPerdidaAgora(row);
+    }
     setTocando((lista) => {
       const sem = lista.filter((c) => c.id !== row.id);
       return toca ? [...sem, row] : sem;
@@ -200,6 +212,7 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
             receberNoToque(row);
             aplicarNaLinha(row);
             atualizarConversa(row.conversation_id);
+            void clientes.invalidateQueries({ queryKey: CHAVE_DAS_PERDIDAS });
           },
         )
         .on(
@@ -216,13 +229,14 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
       desmontou = true;
       if (canal) void supabase.removeChannel(canal);
     };
-  }, [aplicarNaLinha, atualizarConversa, receberNoToque]);
+  }, [aplicarNaLinha, atualizarConversa, clientes, receberNoToque]);
 
   // A reserva: o toque.
   useEffect(() => {
     const ler = () => {
       void lerTocando(new Date(Date.now() - TOQUE_VALE_MS)).then((lista) => {
         const validas = lista.filter((c) => !dispensadas.current.has(c.id));
+        for (const c of validas) tocouAqui.current.add(c.id);
         setTocando((antes) => {
           const iguais =
             antes.length === validas.length && antes.every((c) => validas.some((v) => v.id === c.id));
@@ -304,6 +318,26 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
       aviso?.close();
     };
   }, [idParaTocar, quemToca]);
+
+  // A perdida com a aba escondida: o aviso do sistema, como o do toque.
+  const idDaPerdida = perdidaAgora?.id ?? null;
+  const quemPerdeu = perdidaAgora?.quem ?? null;
+  useEffect(() => {
+    if (
+      !idDaPerdida ||
+      typeof Notification === 'undefined' ||
+      Notification.permission !== 'granted' ||
+      document.visibilityState === 'visible'
+    ) {
+      return;
+    }
+    const aviso = new Notification(`${EMPRESA.nome}: ligação perdida de ${quemPerdeu}`, {
+      body: 'Ninguém atendeu. A conversa está no topo de Conversas.',
+      tag: `ligacao-perdida-${idDaPerdida}`,
+    });
+    aviso.onclick = () => window.focus();
+    return () => aviso.close();
+  }, [idDaPerdida, quemPerdeu]);
 
   const caiuAConexao = useCallback(() => {
     const atual = linhaAtual.current;
@@ -481,6 +515,8 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
           aoAtender={() => void atender(paraTocar)}
           aoIgnorar={() => ignorar(paraTocar.id)}
         />
+      ) : perdidaAgora ? (
+        <PainelDaPerdida chamada={perdidaAgora} aoDispensar={() => setPerdidaAgora(null)} />
       ) : null}
     </Contexto.Provider>
   );
@@ -529,6 +565,80 @@ function PainelDoToque({
   );
 }
 
+/** A conversa da ligação: a do parceiro pela ficha, a do cliente pelo fio. */
+function useIrParaConversa(): (conversaId: string) => Promise<void> {
+  const router = useRouter();
+  return useCallback(
+    async (conversaId: string) => {
+      const { data } = await createClient()
+        .from('conversations')
+        .select('organization_id')
+        .eq('id', conversaId)
+        .maybeSingle();
+      router.push(
+        data?.organization_id
+          ? `/conversas?org=${data.organization_id}`
+          : `/conversas?cliente=${conversaId}`,
+      );
+    },
+    [router],
+  );
+}
+
+/**
+ * O cliente ligou, tocou aqui e ninguém atendeu (03/11/2026). Fica até alguém fechar ou
+ * abrir a conversa: some sozinho só o que não pede nada de ninguém.
+ */
+function PainelDaPerdida({
+  chamada,
+  aoDispensar,
+}: {
+  chamada: ChamadaNoBanco;
+  aoDispensar: () => void;
+}) {
+  const irParaConversa = useIrParaConversa();
+  return (
+    <section role="alert" aria-label={`Ligação perdida de ${chamada.quem}`} className={CLASSE_DO_PAINEL}>
+      <div className="flex items-center gap-2.5">
+        <span
+          aria-hidden="true"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive-texto"
+        >
+          <PhoneMissed className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-sm font-medium">{chamada.quem}</p>
+          <p className="text-xs text-muted-foreground">
+            Ligação perdida às {quandoLigou(chamada.tocou_em)}. Ninguém atendeu.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          className="toque h-9 shrink-0"
+          onClick={() => {
+            aoDispensar();
+            void irParaConversa(chamada.conversation_id);
+          }}
+        >
+          <MessageCircle aria-hidden="true" />
+          Abrir conversa
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="toque size-9 shrink-0"
+          onClick={aoDispensar}
+          aria-label="Fechar"
+        >
+          <X aria-hidden="true" />
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 function PainelDaLinha({
   linha,
   aoDesligar,
@@ -540,22 +650,9 @@ function PainelDaLinha({
   aoAlternarMudo: () => void;
   aoDispensar: () => void;
 }) {
-  const router = useRouter();
+  const irParaConversa = useIrParaConversa();
   const viva = chamadaViva(linha.estado);
   const segundos = segundosDeConversa(linha.atendidaEm, linha.encerradaEm, new Date());
-
-  async function abrirConversa() {
-    const { data } = await createClient()
-      .from('conversations')
-      .select('organization_id')
-      .eq('id', linha.conversaId)
-      .maybeSingle();
-    router.push(
-      data?.organization_id
-        ? `/conversas?org=${data.organization_id}`
-        : `/conversas?cliente=${linha.conversaId}`,
-    );
-  }
 
   return (
     <section role="dialog" aria-label={`Ligação com ${linha.quem}`} className={CLASSE_DO_PAINEL}>
@@ -584,7 +681,7 @@ function PainelDaLinha({
               variant="ghost"
               size="icon"
               className="toque size-9 shrink-0"
-              onClick={() => void abrirConversa()}
+              onClick={() => void irParaConversa(linha.conversaId)}
               aria-label="Abrir a conversa"
               title="Abrir a conversa"
             >

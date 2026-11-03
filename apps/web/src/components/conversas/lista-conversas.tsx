@@ -5,6 +5,12 @@ import { BellOff, ChevronRight, Pin, Sparkles } from 'lucide-react';
 
 import { FaixaDeNova, MarcaDeNova } from '@/components/avisos/marca-de-nova';
 import { useConversasNovas } from '@/components/avisos/provedor-avisos';
+import {
+  SEM_PERDIDAS,
+  type LigacaoPerdida,
+  type Perdidas,
+} from '@/components/ligacao-whatsapp/logica';
+import { FaixaDePerdida, SeloDeLigacaoPerdida } from '@/components/ligacao-whatsapp/perdidas';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Etiqueta } from '@/components/etiqueta';
@@ -68,6 +74,7 @@ export function ListaConversas({
   preferencias = SEM_PREFERENCIAS,
   atitudes = null,
   porInteresse = false,
+  perdidas = SEM_PERDIDAS,
 }: {
   itens: ItemConversa[];
   selecionadoId: string | null;
@@ -83,6 +90,8 @@ export function ListaConversas({
   atitudes?: BaseDasAtitudes | null;
   /** "Mais interessados": a lista vai pela etiqueta de atitude. */
   porInteresse?: boolean;
+  /** A ligação perdida e sem retorno (03/11/2026), por conversa. Sobe para o topo. */
+  perdidas?: Perdidas;
 }) {
   const novas = useConversasNovas();
   const ligadas = atitudes?.ligada ? atitudes : null;
@@ -100,6 +109,7 @@ export function ListaConversas({
         clientes,
         preferencias,
         porInteresse ? (ligadas?.porConversa ?? null) : null,
+        perdidas,
       ).map((linha) =>
         linha.tipo === 'parceiro' ? (
           <LinhaMemorizada
@@ -112,6 +122,7 @@ export function ListaConversas({
             marcas={marcasDa(linha.item.fio?.id, preferencias)}
             atitude={atitudeDe(linha.item.fio?.id)}
             objecoes={objecoes}
+            perdida={linha.item.fio ? perdidas.get(linha.item.fio.id) : undefined}
           />
         ) : (
           <LinhaDeClienteMemorizada
@@ -124,6 +135,7 @@ export function ListaConversas({
             marcas={marcasDa(linha.fio.id, preferencias)}
             atitude={atitudeDe(linha.fio.id)}
             objecoes={objecoes}
+            perdida={perdidas.get(linha.fio.id)}
           />
         ),
       )}
@@ -233,6 +245,7 @@ function LinhaDeCliente({
   marcas,
   atitude,
   objecoes,
+  perdida,
 }: {
   fio: FioCru;
   selecionado: boolean;
@@ -244,6 +257,8 @@ function LinhaDeCliente({
   marcas: Marcas;
   atitude: AtitudeDaConversa | undefined;
   objecoes: readonly Objecao[];
+  /** O cliente ligou e ninguém atendeu, e ainda não houve retorno. */
+  perdida: LigacaoPerdida | undefined;
 }) {
   const Icone = ICONE_CANAL.whatsapp;
   const nome = fio.peer_nome?.trim();
@@ -266,13 +281,13 @@ function LinhaDeCliente({
           selecionado && 'bg-muted',
         )}
       >
-        {nova ? <FaixaDeNova /> : null}
+        {perdida ? <FaixaDePerdida /> : nova ? <FaixaDeNova /> : null}
         <span className="min-w-0 flex-1 space-y-1">
           <span className="flex items-baseline gap-2">
             <span
               className={cn(
                 'min-w-0 flex-1 truncate text-sm xl:text-[15px]',
-                nova || fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
+                nova || perdida || fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
               )}
             >
               {nomeDoCliente(fio)}
@@ -294,6 +309,7 @@ function LinhaDeCliente({
               className="size-3.5 shrink-0 text-muted-foreground"
               aria-label={ROTULO_CANAL.whatsapp}
             />
+            {perdida ? <SeloDeLigacaoPerdida perdida={perdida} /> : null}
             {rascunho ? (
               <PreviaDoRascunho texto={rascunho} />
             ) : (
@@ -332,6 +348,7 @@ function Linha({
   marcas,
   atitude,
   objecoes,
+  perdida,
 }: {
   item: ItemConversa;
   selecionado: boolean;
@@ -343,6 +360,8 @@ function Linha({
   marcas: Marcas;
   atitude: AtitudeDaConversa | undefined;
   objecoes: readonly Objecao[];
+  /** O cliente ligou e ninguém atendeu, e ainda não houve retorno. */
+  perdida: LigacaoPerdida | undefined;
 }) {
   const Icone = item.ultimoCanal ? ICONE_CANAL[item.ultimoCanal] : null;
   const onde = local(item.bairro, item.cidade);
@@ -376,13 +395,13 @@ function Linha({
           selecionado && 'bg-muted',
         )}
       >
-        {nova ? <FaixaDeNova /> : null}
+        {perdida ? <FaixaDePerdida /> : nova ? <FaixaDeNova /> : null}
         <span className="min-w-0 flex-1 space-y-1">
           <span className="flex items-baseline gap-2">
             <span
               className={cn(
                 'min-w-0 flex-1 truncate text-sm xl:text-[15px]',
-                nova || item.naoLidas > 0 ? 'font-semibold' : 'font-medium',
+                nova || perdida || item.naoLidas > 0 ? 'font-semibold' : 'font-medium',
               )}
             >
               {item.nome}
@@ -412,6 +431,9 @@ function Linha({
                 aria-label={item.ultimoCanal ? ROTULO_CANAL[item.ultimoCanal] : undefined}
               />
             ) : null}
+            {/* A LIGAÇÃO PERDIDA (03/11/2026) antes da prévia: foi a última coisa
+                que aconteceu, e é a que pede alguém agora. */}
+            {perdida ? <SeloDeLigacaoPerdida perdida={perdida} /> : null}
             {rascunho ? (
               <PreviaDoRascunho texto={rascunho} />
             ) : (

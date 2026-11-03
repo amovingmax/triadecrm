@@ -9,6 +9,7 @@ import {
   type Superficie,
 } from '@/components/registro/tipos';
 import { rotuloDaSuperficie } from '@/components/relatorios/formatos';
+import { perdidasPrimeiro, SEM_PERDIDAS, type Perdidas } from '@/components/ligacao-whatsapp/logica';
 
 import {
   ROTULO_CANAL,
@@ -619,10 +620,20 @@ export function juntarNaLista(
    * etiqueta e, dentro dela, na ordem de sempre. As fixadas continuam em cima.
    */
   interesse: ReadonlyMap<string, AtitudeDaConversa> | null = null,
+  /**
+   * A ligação perdida (03/11/2026): quem ligou e não foi atendido sobe para o
+   * topo, acima de qualquer ordem, até alguém retornar. As fixadas continuam em
+   * cima: foram fixadas por quem olha.
+   */
+  perdidas: Perdidas = SEM_PERDIDAS,
 ): LinhaDaLista[] {
   const linhas = juntarSemFixar(itens, clientes);
   return fixadasPrimeiro(
-    interesse ? porInteresse(linhas, idDaConversaDaLinha, interesse) : linhas,
+    perdidasPrimeiro(
+      interesse ? porInteresse(linhas, idDaConversaDaLinha, interesse) : linhas,
+      idDaConversaDaLinha,
+      perdidas,
+    ),
     idDaConversaDaLinha,
     preferencias,
   );

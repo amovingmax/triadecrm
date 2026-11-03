@@ -25,6 +25,7 @@ import {
   type OrganizacaoCrua,
 } from './montagem';
 import type { FioCru, MensagemCrua, RascunhoCru } from './mensagens';
+import { SEM_PREFERENCIAS, type Preferencias } from './preferencias';
 import {
   contarFiltros,
   FILTROS_VAZIOS,
@@ -1115,6 +1116,38 @@ describe('clientes na lista "Todas"', () => {
       'org-1',
       'fio-jorge',
     ]);
+  });
+
+  it('quem ligou e não foi atendido sobe acima do por ler; a fixada continua em cima', () => {
+    const [parceiro] = montarConversas({
+      organizacoes: [organizacao('org-1', 'Buffet Aurora')],
+      atividades: [],
+      negocios: [],
+      catalogos: CATALOGOS,
+      fios: [
+        fio({
+          id: 'fio-aurora',
+          organization_id: 'org-1',
+          last_message_at: '2026-10-01T18:00:00+00:00',
+        }),
+      ],
+    });
+    if (!parceiro) throw new Error('a ficha não virou item');
+    const perdidas = new Map([
+      ['fio-jorge', { ultimaEm: '2026-11-03T13:00:00Z', quantas: 1 }],
+      ['fio-aurora', { ultimaEm: '2026-11-03T12:00:00Z', quantas: 2 }],
+    ]);
+    const ordem = (preferencias: Preferencias = SEM_PREFERENCIAS) =>
+      juntarNaLista([parceiro], [jorge, carla], preferencias, null, perdidas).map((l) =>
+        l.tipo === 'parceiro' ? l.item.id : l.fio.id,
+      );
+
+    // Sem a perdida, Carla (por ler) viria primeiro; com ela, quem ligou passa à frente.
+    expect(ordem()).toEqual(['fio-jorge', 'org-1', 'fio-carla']);
+    const fixadaACarla: Preferencias = new Map([
+      ['fio-carla', { fixadaEm: '2026-11-01T12:00:00Z', silenciadaAte: null }],
+    ]);
+    expect(ordem(fixadaACarla)).toEqual(['fio-carla', 'fio-jorge', 'org-1']);
   });
 
   it('sem cliente nenhum, a ordem dos parceiros não é tocada', () => {

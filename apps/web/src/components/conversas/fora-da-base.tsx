@@ -47,6 +47,8 @@ import {
 import { rotuloDoDia } from './formatos';
 import { PreviaDoRascunho } from './lista-conversas';
 import { BotaoDeLigarNaConversa, FaixaDaLigacao } from '@/components/ligacao-whatsapp/botao-na-conversa';
+import { SEM_PERDIDAS, type Perdidas } from '@/components/ligacao-whatsapp/logica';
+import { SeloDeLigacaoPerdida } from '@/components/ligacao-whatsapp/perdidas';
 import { FaixaDaJanela, Janela24h } from './janela-24h';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { Mensagem } from './mensagem-do-fio';
@@ -84,12 +86,15 @@ export function ListaForaDaBase({
   selecionadoId,
   aoEscolher,
   atitudes = null,
+  perdidas = SEM_PERDIDAS,
 }: {
   fios: FioCru[];
   selecionadoId: string | null;
   aoEscolher: (id: string) => void;
   /** A atitude do cliente (29/10/2026). A ordem já vem feita de quem chama. */
   atitudes?: BaseDasAtitudes | null;
+  /** A ligação perdida e sem retorno (03/11/2026). A ordem também vem feita. */
+  perdidas?: Perdidas;
 }) {
   // As conversas com mensagem ainda sem resposta: a mesma marca da lista de
   // Conversas, e o mesmo número do menu (`components/avisos`).
@@ -114,6 +119,7 @@ export function ListaForaDaBase({
         const selecionado = fio.id === selecionadoId;
         const nome = fio.peer_nome?.trim();
         const nova = novas.has(fio.id);
+        const perdida = perdidas.get(fio.id);
         const rascunho = selecionado ? null : previaDoDigitado(digitados.get(fio.id)?.texto);
         return (
           <li key={fio.id}>
@@ -135,13 +141,18 @@ export function ListaForaDaBase({
                   <span
                     className={cn(
                       'min-w-0 truncate text-[15px]',
-                      nova || fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
+                      nova || perdida || fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
                     )}
                   >
                     {nomeDoCliente(fio)}
                   </span>
                   {nova ? <MarcaDeNova /> : null}
                 </span>
+                {perdida ? (
+                  <span className="mt-0.5 block">
+                    <SeloDeLigacaoPerdida perdida={perdida} />
+                  </span>
+                ) : null}
                 {rascunho ? (
                   <PreviaDoRascunho texto={rascunho} className="block text-[13px]" />
                 ) : (

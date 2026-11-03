@@ -10469,6 +10469,14 @@ export type Database = {
       wa_chamada_para_meta: { Args: { p_chamada_id: string }; Returns: Json }
       wa_chamada_soltar: { Args: { p_chamada_id: string }; Returns: Json }
       wa_ligacao_estado: { Args: { p_conversation_id: string }; Returns: Json }
+      wa_ligacoes_perdidas: {
+        Args: never
+        Returns: {
+          conversation_id: string
+          quantas: number
+          ultima_em: string
+        }[]
+      }
       wa_permissao_pedir: {
         Args: { p_conversation_id: string; p_texto: string }
         Returns: Json

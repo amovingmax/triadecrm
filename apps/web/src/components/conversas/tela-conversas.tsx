@@ -7,6 +7,8 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { useAcoesDosAvisos } from '@/components/avisos/provedor-avisos';
 import { TelaGrupos } from '@/components/grupos/tela-grupos';
+import { juntarAsPerdidas, perdidasPrimeiro } from '@/components/ligacao-whatsapp/logica';
+import { useLigacoesPerdidas } from '@/components/ligacao-whatsapp/perdidas';
 import { SeletorDeAba } from '@/components/ui/abas';
 
 import { useAreaVisivel } from './area-visivel';
@@ -192,7 +194,21 @@ export function TelaConversas({
   // Quem fechou saiu da lista de captação e mora na aba "Consultoria" (06/10/2026).
   const captacao = useMemo(() => emCaptacao(todos), [todos]);
   const consultoria = useMemo(() => contatosDeConsultoria(todos), [todos]);
-  const itens = useMemo(() => aplicarFiltros(captacao, filtros, quem), [captacao, filtros, quem]);
+  // A ligação perdida (03/11/2026): quem ligou e não foi atendido sobe para o topo das
+  // listas e entra em "Minhas" para todos, até alguém retornar. Fora da Imova o mapa é
+  // sempre vazio.
+  const perdidas = useLigacoesPerdidas();
+  const itens = useMemo(() => {
+    const recorte = aplicarFiltros(captacao, filtros, quem);
+    if (perdidas.size === 0 || filtros.escopo === 'todas') return recorte;
+    return juntarAsPerdidas(
+      recorte,
+      aplicarFiltros(captacao, { ...filtros, escopo: 'todas' }, quem),
+      (i) => i.fio?.id ?? null,
+      (i) => i.id,
+      perdidas,
+    );
+  }, [captacao, filtros, quem, perdidas]);
   // Quem escreveu e não é ficha: a aba "Clientes" inteira, e parte da lista de Conversas.
   const foraDaBase = useMemo(() => conversasForaDaBase(consulta.data?.fios ?? []), [consulta.data]);
   // A atitude do cliente (29/10/2026): a etiqueta nas linhas e, com "Mais
@@ -201,8 +217,13 @@ export function TelaConversas({
   const interesse =
     atitudes.ligada && filtros.ordem === 'interesse' ? atitudes.porConversa : null;
   const foraNaOrdem = useMemo(
-    () => (interesse ? porInteresse(foraDaBase, (f) => f.id, interesse) : foraDaBase),
-    [foraDaBase, interesse],
+    () =>
+      perdidasPrimeiro(
+        interesse ? porInteresse(foraDaBase, (f) => f.id, interesse) : foraDaBase,
+        (f) => f.id,
+        perdidas,
+      ),
+    [foraDaBase, interesse, perdidas],
   );
   const porEscopo = useMemo(
     () =>
@@ -223,10 +244,17 @@ export function TelaConversas({
   // é curta e é inteira, como a de Clientes.
   const daAba = aba === 'consultoria' ? consultoria : itens;
   // Os clientes que cabem no recorte da lista de Conversas ("Minhas", busca...).
-  const clientesNaLista = useMemo(
-    () => filtrarClientes(foraDaBase, filtros, quem),
-    [foraDaBase, filtros, quem],
-  );
+  const clientesNaLista = useMemo(() => {
+    const recorte = filtrarClientes(foraDaBase, filtros, quem);
+    if (perdidas.size === 0 || filtros.escopo === 'todas') return recorte;
+    return juntarAsPerdidas(
+      recorte,
+      filtrarClientes(foraDaBase, { ...filtros, escopo: 'todas' }, quem),
+      (f) => f.id,
+      (f) => f.id,
+      perdidas,
+    );
+  }, [foraDaBase, filtros, quem, perdidas]);
 
   // O cliente escolhido é procurado em TODOS os clientes, não no recorte — a
   // mesma regra da conversa de parceiro, logo abaixo.
@@ -235,7 +263,7 @@ export function TelaConversas({
   // "Conversas" ela pode ser um cliente: é quem acabou de escrever.
   const primeiraLinha =
     aba === 'conversas'
-      ? (juntarNaLista(itens, clientesNaLista, preferencias.data, interesse)[0] ?? null)
+      ? (juntarNaLista(itens, clientesNaLista, preferencias.data, interesse, perdidas)[0] ?? null)
       : null;
   const semEscolha = escolhidoId === null && clienteEscolhido === null && !ehCelular;
   const foraAberta =
@@ -523,6 +551,7 @@ export function TelaConversas({
                 selecionadoId={foraAberta?.id ?? null}
                 aoEscolher={setForaId}
                 atitudes={atitudes}
+                perdidas={perdidas}
               />
             ) : aba === 'consultoria' ? (
               consultoria.length === 0 ? (
@@ -566,6 +595,7 @@ export function TelaConversas({
                 preferencias={preferencias.data}
                 atitudes={atitudes}
                 porInteresse={interesse !== null}
+                perdidas={perdidas}
               />
             )}
             {/* A LUPA NAS MENSAGENS (27/10/2026): embaixo do que o nome achou, o

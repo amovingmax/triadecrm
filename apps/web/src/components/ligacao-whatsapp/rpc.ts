@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 
-import type { EstadoDaChamada, EstadoNaConversa } from './logica';
+import type { EstadoDaChamada, EstadoNaConversa, LigacaoPerdida } from './logica';
 
 export type ChamadaNoBanco = {
   id: string;
@@ -98,6 +98,16 @@ export async function lerTocando(desde: Date): Promise<ChamadaNoBanco[]> {
     .eq('estado', 'tocando')
     .gte('tocou_em', desde.toISOString());
   return (data as ChamadaNoBanco[] | null) ?? [];
+}
+
+/** As conversas com ligação perdida e sem retorno, por id da conversa. */
+export async function lerPerdidas(): Promise<Map<string, LigacaoPerdida>> {
+  const { data, error } = await createClient().rpc('wa_ligacoes_perdidas');
+  if (error) throw new ErroDaLigacao(undefined);
+  const linhas = (data ?? []) as { conversation_id: string; ultima_em: string; quantas: number }[];
+  return new Map(
+    linhas.map((p) => [p.conversation_id, { ultimaEm: p.ultima_em, quantas: p.quantas }]),
+  );
 }
 
 /** A Edge Function que fala com a Meta. O corpo da recusa traz a frase pronta. */

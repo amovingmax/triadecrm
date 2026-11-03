@@ -7,8 +7,14 @@ import {
   dataCurta,
   fraseDaFaixa,
   fraseDoMotivo,
+  juntarAsPerdidas,
+  perdidasPrimeiro,
+  quandoLigou,
+  textoDaFaixa,
+  textoDoSelo,
   textoPadraoDoPedido,
   type EstadoNaConversa,
+  type Perdidas,
 } from './logica';
 
 function estado(extra: Partial<Extract<EstadoNaConversa, { ligada: true }>> = {}): EstadoNaConversa {
@@ -110,7 +116,95 @@ describe('a faixa da conversa', () => {
     ).toContain('ninguém atendeu');
     expect(fraseDaFaixa(estado())).toBeNull();
     expect(fraseDaFaixa({ ligada: false })).toBeNull();
+    expect(
+      fraseDaFaixa(
+        estado({
+          ultima: {
+            direcao: 'recebida',
+            estado: 'perdida',
+            tocou_em: '2026-10-30T13:21:00Z',
+            duracao_seg: null,
+            por: null,
+          },
+          suprimida: true,
+        }),
+      ),
+    ).toBeNull();
     expect(fraseDaFaixa(estado({ suprimida: true, permissao: 'aceita' }))).toBeNull();
+  });
+});
+
+describe('a ligação perdida (03/11/2026)', () => {
+  const perdida = {
+    direcao: 'recebida' as const,
+    estado: 'perdida' as const,
+    tocou_em: '2026-11-03T13:21:00Z',
+    duracao_seg: null,
+    por: null,
+  };
+
+  it('a faixa conta a perdida antes da permissão, e diz que dá para ligar de volta', () => {
+    expect(fraseDaFaixa(estado({ ultima: perdida, permissao: 'aceita', permanente: true }))).toBe(
+      'O cliente ligou em 03/11 10:21 e ninguém atendeu. Ele permite ligações: dá para ligar de volta.',
+    );
+    expect(fraseDaFaixa(estado({ ultima: perdida }))).toBe(
+      'O cliente ligou em 03/11 10:21 e ninguém atendeu.',
+    );
+  });
+
+  it('na conversa de quem só ligou, a perdida vem antes da nota do botão desligado', () => {
+    // Quem nunca escreveu não tem a janela de 24 h: o botão de pedir fica desligado.
+    const soLigou = estado({ ultima: perdida, janela_aberta: false });
+    expect(textoDaFaixa(soLigou, false)).toEqual({
+      texto: 'O cliente ligou em 03/11 10:21 e ninguém atendeu.',
+      perdida: true,
+    });
+    expect(textoDaFaixa(estado({ janela_aberta: false }), false)).toEqual({
+      texto: 'Só dá para pedir dentro das 24 h depois da última mensagem do cliente.',
+      perdida: false,
+    });
+    expect(textoDaFaixa(estado(), false)).toBeNull();
+  });
+
+  it('a ligação feita pelo time sem resposta não é perdida do cliente', () => {
+    const f = fraseDaFaixa(estado({ ultima: { ...perdida, direcao: 'feita' }, permissao: 'aceita' }));
+    expect(f).not.toContain('ninguém atendeu');
+  });
+
+  it('o selo diz a hora se foi hoje e o dia se foi antes, no fuso de Fortaleza', () => {
+    const agora = new Date('2026-11-03T20:00:00Z');
+    expect(quandoLigou('2026-11-03T13:21:00Z', agora)).toBe('10:21');
+    expect(quandoLigou('2026-11-02T13:21:00Z', agora)).toBe('02/11');
+    // 02h30 de 04/11 em UTC ainda é 23h30 de 03/11 em Natal.
+    expect(quandoLigou('2026-11-04T02:30:00Z', agora)).toBe('23:30');
+    expect(textoDoSelo({ ultimaEm: '2026-11-03T13:21:00Z', quantas: 1 }, agora)).toBe(
+      'Ligação perdida · 10:21',
+    );
+    expect(textoDoSelo({ ultimaEm: '2026-11-03T13:21:00Z', quantas: 3 }, agora)).toBe(
+      '3 ligações perdidas · 10:21',
+    );
+  });
+
+  it('as perdidas sobem, a mais recente primeiro, e o resto fica como estava', () => {
+    const perdidas: Perdidas = new Map([
+      ['c', { ultimaEm: '2026-11-03T12:00:00Z', quantas: 1 }],
+      ['e', { ultimaEm: '2026-11-03T13:00:00Z', quantas: 2 }],
+    ]);
+    const linhas = ['a', 'b', 'c', 'd', 'e', null];
+    expect(perdidasPrimeiro(linhas, (l) => l, perdidas)).toEqual(['e', 'c', 'a', 'b', 'd', null]);
+    expect(perdidasPrimeiro(linhas, (l) => l, new Map())).toEqual(linhas);
+  });
+
+  it('a perdida entra em "Minhas" mesmo sem dono, sem repetir quem já estava', () => {
+    const perdidas: Perdidas = new Map([
+      ['sem-dono', { ultimaEm: '2026-11-03T12:00:00Z', quantas: 1 }],
+      ['minha', { ultimaEm: '2026-11-03T12:00:00Z', quantas: 1 }],
+    ]);
+    const minhas = ['minha', 'outra-minha'];
+    const todas = ['minha', 'outra-minha', 'sem-dono', 'de-outra-pessoa'];
+    const id = (l: string) => l;
+    expect(juntarAsPerdidas(minhas, todas, id, id, perdidas)).toEqual(['minha', 'outra-minha', 'sem-dono']);
+    expect(juntarAsPerdidas(minhas, todas, id, id, new Map())).toEqual(minhas);
   });
 });
 

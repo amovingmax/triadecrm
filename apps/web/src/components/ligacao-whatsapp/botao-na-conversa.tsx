@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
-import { botaoDaConversa, fraseDaFaixa, fraseDoMotivo, textoPadraoDoPedido } from './logica';
+import { botaoDaConversa, fraseDoMotivo, textoDaFaixa, textoPadraoDoPedido } from './logica';
 import { chaveDaLigacaoNaConversa, useLigacaoWhatsapp } from './provedor';
 import { ErroDaLigacao, lerEstadoNaConversa, pedirPermissao } from './rpc';
 
@@ -158,11 +158,17 @@ export function FaixaDaLigacao({ conversaId, className }: { conversaId: string; 
   const { disponivel, ocupado } = useLigacaoWhatsapp();
   const { data: estado } = useEstadoNaConversa(conversaId);
   if (!disponivel || !estado) return null;
-  const botao = botaoDaConversa(estado, ocupado);
-  const nota = botao.tipo !== 'nenhum' && botao.desligado ? botao.nota : null;
-  const frase = nota ?? fraseDaFaixa(estado);
-  if (!frase) return null;
+  const faixa = textoDaFaixa(estado, ocupado);
+  if (!faixa) return null;
   return (
-    <p className={cn('px-5 py-1.5 text-xs text-muted-foreground conversa-estreita:px-3', className)}>{frase}</p>
+    <p
+      className={cn(
+        'px-5 py-1.5 text-xs conversa-estreita:px-3',
+        faixa.perdida ? 'font-medium text-destructive-texto' : 'text-muted-foreground',
+        className,
+      )}
+    >
+      {faixa.texto}
+    </p>
   );
 }

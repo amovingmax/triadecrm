@@ -71,6 +71,83 @@ export function dataCurta(iso: string): string {
   return hora.format(new Date(iso)).replace(',', '');
 }
 
+/** A ligação perdida e sem retorno de uma conversa (`wa_ligacoes_perdidas`). */
+export type LigacaoPerdida = { ultimaEm: string; quantas: number };
+
+/** Por id da conversa. */
+export type Perdidas = ReadonlyMap<string, LigacaoPerdida>;
+
+/** Constante: as linhas da lista são memorizadas, e um mapa novo as redesenharia. */
+export const SEM_PERDIDAS: Perdidas = new Map();
+
+/**
+ * As linhas com ligação perdida sobem para o topo, a mais recente primeiro; as outras
+ * ficam na ordem em que vieram. Ordenação estável, como a de `fixadasPrimeiro`, que vem
+ * depois e põe as fixadas acima de tudo.
+ */
+export function perdidasPrimeiro<T>(
+  linhas: readonly T[],
+  idDa: (linha: T) => string | null,
+  perdidas: Perdidas,
+): T[] {
+  if (perdidas.size === 0) return [...linhas];
+  const comPerdida: { linha: T; em: string }[] = [];
+  const resto: T[] = [];
+  for (const linha of linhas) {
+    const id = idDa(linha);
+    const perdida = id ? perdidas.get(id) : undefined;
+    if (perdida) comPerdida.push({ linha, em: perdida.ultimaEm });
+    else resto.push(linha);
+  }
+  comPerdida.sort((a, b) => b.em.localeCompare(a.em));
+  return [...comPerdida.map((c) => c.linha), ...resto];
+}
+
+/**
+ * A perdida é de todos (03/11/2026): ela entra em "Minhas" e no setor mesmo sem dono, como
+ * o toque, que toca para todos. `semEscopo` é a mesma lista com os outros filtros (busca,
+ * canal...) e o escopo "Todas"; dela só entram as linhas com perdida que o recorte deixou de
+ * fora.
+ */
+export function juntarAsPerdidas<T>(
+  recorte: readonly T[],
+  semEscopo: readonly T[],
+  conversaDa: (linha: T) => string | null,
+  chaveDa: (linha: T) => string,
+  perdidas: Perdidas,
+): T[] {
+  if (perdidas.size === 0) return [...recorte];
+  const ja = new Set(recorte.map(chaveDa));
+  const extras = semEscopo.filter((linha) => {
+    const conversa = conversaDa(linha);
+    return conversa !== null && perdidas.has(conversa) && !ja.has(chaveDa(linha));
+  });
+  return [...recorte, ...extras];
+}
+
+const soAHora = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Fortaleza',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const soODia = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Fortaleza',
+  day: '2-digit',
+  month: '2-digit',
+});
+
+/** "10:21" se foi hoje, "02/11" se foi antes, no fuso de Fortaleza. */
+export function quandoLigou(iso: string, agora: Date = new Date()): string {
+  const em = new Date(iso);
+  return soODia.format(em) === soODia.format(agora) ? soAHora.format(em) : soODia.format(em);
+}
+
+/** "Ligação perdida · 10:21", ou "3 ligações perdidas · 10:21". */
+export function textoDoSelo(perdida: LigacaoPerdida, agora: Date = new Date()): string {
+  const quantas = perdida.quantas > 1 ? `${perdida.quantas} ligações perdidas` : 'Ligação perdida';
+  return `${quantas} · ${quandoLigou(perdida.ultimaEm, agora)}`;
+}
+
 /** O que o botão da conversa faz agora. `ocupado`: esta pessoa já está numa ligação. */
 export function botaoDaConversa(e: EstadoNaConversa, ocupado: boolean): BotaoDaConversa {
   if (!e.ligada) return { tipo: 'nenhum' };
@@ -106,6 +183,12 @@ export function botaoDaConversa(e: EstadoNaConversa, ocupado: boolean): BotaoDaC
 /** A frase da faixa da conversa, ou null quando não há nada a dizer. */
 export function fraseDaFaixa(e: EstadoNaConversa): string | null {
   if (!e.ligada || e.suprimida) return null;
+  // A perdida vem antes de tudo (03/11/2026): é o cliente esperando retorno, e com a
+  // permissão de retorno ligada na Meta ele costuma permitir logo depois de ligar.
+  if (e.ultima?.estado === 'perdida' && e.ultima.direcao === 'recebida') {
+    const perdida = `O cliente ligou em ${dataCurta(e.ultima.tocou_em)} e ninguém atendeu.`;
+    return e.permissao === 'aceita' ? `${perdida} Ele permite ligações: dá para ligar de volta.` : perdida;
+  }
   if (e.permissao === 'aceita' && e.nao_atendidas_seguidas >= 2) {
     return `${e.nao_atendidas_seguidas} ligações seguidas sem resposta. Com 4, a Meta tira a permissão: mande uma mensagem antes de tentar de novo.`;
   }
@@ -117,10 +200,27 @@ export function fraseDaFaixa(e: EstadoNaConversa): string | null {
   if (e.permissao === 'pedida') return 'Pedido de ligação enviado. Falta o cliente responder.';
   if (e.permissao === 'recusada') return 'O cliente recusou ligações pelo WhatsApp. Continue por mensagem.';
   if (e.permissao === 'venceu') return 'A permissão para ligar venceu. Peça de novo para ligar.';
-  if (e.ultima?.estado === 'perdida' && e.ultima.direcao === 'recebida') {
-    return `O cliente ligou em ${dataCurta(e.ultima.tocou_em)} e ninguém atendeu.`;
-  }
   return null;
+}
+
+function ehPerdidaDoCliente(e: EstadoNaConversa): boolean {
+  return e.ligada && e.ultima?.estado === 'perdida' && e.ultima.direcao === 'recebida';
+}
+
+/**
+ * A faixa da conversa: a perdida primeiro (03/11/2026), porque é o cliente esperando
+ * retorno; depois, por que o botão está desligado; depois, o resto de `fraseDaFaixa`.
+ */
+export function textoDaFaixa(
+  e: EstadoNaConversa,
+  ocupado: boolean,
+): { texto: string; perdida: boolean } | null {
+  const frase = fraseDaFaixa(e);
+  if (frase && ehPerdidaDoCliente(e)) return { texto: frase, perdida: true };
+  const botao = botaoDaConversa(e, ocupado);
+  const nota = botao.tipo !== 'nenhum' && botao.desligado ? botao.nota : null;
+  const texto = nota ?? frase;
+  return texto ? { texto, perdida: false } : null;
 }
 
 export const ROTULO_DA_CHAMADA: Record<EstadoDaChamada, string> = {
