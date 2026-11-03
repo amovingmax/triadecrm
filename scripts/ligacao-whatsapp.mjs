@@ -4,11 +4,15 @@
  * `whatsapp.ligacao` no CRM. As duas andam juntas: liga a Meta antes do CRM e desliga o CRM
  * antes da Meta, para a tela nunca oferecer um botão que a Meta recusaria.
  *
- * O botão de ligar para a Imova continua escondido dos clientes (`DISABLE_ALL`): aqui só a
- * equipe liga. Abrir para os clientes é outra decisão, com horário de atendimento.
+ * `ligar` e `janela` deixam o botão de ligar para a Imova escondido dos clientes
+ * (`DISABLE_ALL`): só a equipe liga. `abrir` (03/11/2026) mostra o botão aos clientes, com o
+ * horário de atendimento, os feriados e o pedido de retorno; `fechar` volta a só a equipe.
  *
  *   node scripts/ligacao-whatsapp.mjs estado     (só lê)
- *   node scripts/ligacao-whatsapp.mjs ligar      (fica ligado até alguém desligar)
+ *   node scripts/ligacao-whatsapp.mjs ligar      (só a equipe liga; fica até alguém desligar)
+ *   node scripts/ligacao-whatsapp.mjs abrir      (os clientes também ligam, no horário)
+ *   node scripts/ligacao-whatsapp.mjs abrir --ver (mostra o que seria enviado, e não muda nada)
+ *   node scripts/ligacao-whatsapp.mjs fechar     (volta a só a equipe ligar)
  *   node scripts/ligacao-whatsapp.mjs desligar
  *   node scripts/ligacao-whatsapp.mjs janela     (liga por 30 minutos; Enter ou Ctrl+C desligam antes)
  *
@@ -26,6 +30,23 @@ const GRAPH = process.env.GRAPH_DE_TESTE ?? 'https://graph.facebook.com/v26.0';
 const TEMPO_MS = Number(process.env.TEMPO_DE_TESTE ?? 30 * 60 * 1000);
 const NUMERO_DA_IMOVA = '1348058288398842';
 
+/**
+ * O horário de atendimento por ligação (decisão de 30/10/2026, "por enquanto"): de segunda a
+ * sexta, das 8h às 19h, no fuso de Natal. Fora dele o WhatsApp não oferece a ligação e mostra
+ * ao cliente o próximo horário, com a opção de mandar mensagem ou pedir retorno.
+ */
+const DIAS_DE_ATENDIMENTO = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
+const ABRE = '0800';
+const FECHA = '1900';
+/**
+ * A Meta não diz se aceita todo fuso do IANA. Fortaleza é o do projeto; Recife e São Paulo
+ * estão na mesma hora o ano inteiro (sem horário de verão desde 2019), e entram só se a
+ * Meta recusar o anterior.
+ */
+const FUSOS = ['America/Fortaleza', 'America/Recife', 'America/Sao_Paulo'];
+/** A Meta guarda até 20 feriados. */
+const TETO_DE_FERIADOS = 20;
+
 const args = process.argv.slice(2);
 const acao = args[0];
 const iEnv = args.indexOf('--env');
@@ -39,8 +60,10 @@ function parar(frase) {
   process.exit(1);
 }
 
-if (!['estado', 'ligar', 'desligar', 'janela'].includes(acao)) {
-  parar('Use: node scripts/ligacao-whatsapp.mjs estado | ligar | desligar | janela');
+const SO_VER = args.includes('--ver');
+
+if (!['estado', 'ligar', 'abrir', 'fechar', 'desligar', 'janela'].includes(acao)) {
+  parar('Use: node scripts/ligacao-whatsapp.mjs estado | ligar | abrir [--ver] | fechar | desligar | janela');
 }
 if (!ARQUIVO || !existsSync(ARQUIVO)) parar('Não achei o .env.imova.');
 
@@ -91,17 +114,121 @@ const chamada = (status) => ({
   calling: { status, call_icon_visibility: 'DISABLE_ALL', callback_permission_status: 'DISABLED' },
 });
 
+/** "2026-11-20" → "20/11/2026". */
+const dataBr = (iso) => iso.split('-').reverse().join('/');
+
+/** Hoje em Natal, "AAAA-MM-DD". */
+function hojeEmNatal() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date());
+}
+
+/**
+ * Os feriados que caem de segunda a sexta, de hoje em diante, da tabela do CRM (nacionais,
+ * do RN e de Natal, com os pontos facultativos, como o CRM já trata). Fim de semana já está
+ * fechado pelo horário e não gasta vaga das 20.
+ */
+async function feriadosDaSemana() {
+  const linhas = await doCrm(
+    `holidays?select=date,name&date=gte.${hojeEmNatal()}&order=date&limit=60`,
+  );
+  const vistos = new Set();
+  const dias = [];
+  for (const f of linhas) {
+    const semana = new Date(`${f.date}T12:00:00Z`).getUTCDay();
+    if (semana === 0 || semana === 6 || vistos.has(f.date)) continue;
+    vistos.add(f.date);
+    dias.push(f);
+  }
+  return dias.slice(0, TETO_DE_FERIADOS);
+}
+
+function chamadaAberta(fuso, feriados) {
+  return {
+    calling: {
+      status: 'ENABLED',
+      call_icon_visibility: 'DEFAULT',
+      callback_permission_status: 'ENABLED',
+      call_hours: {
+        status: 'ENABLED',
+        timezone_id: fuso,
+        weekly_operating_hours: DIAS_DE_ATENDIMENTO.map((day_of_week) => ({
+          day_of_week,
+          open_time: ABRE,
+          close_time: FECHA,
+        })),
+        holiday_schedule: feriados.map((f) => ({ date: f.date, start_time: '0000', end_time: '2359' })),
+      },
+    },
+  };
+}
+
 async function mostrarEstado() {
   const meta = await graph('settings');
   const [linha] = await doCrm('app_settings?select=value,updated_at&key=eq.whatsapp.ligacao');
-  const naMeta = meta.calling?.status === 'ENABLED';
+  const c = meta.calling ?? {};
+  const naMeta = c.status === 'ENABLED';
   const noCrm = linha?.value?.ativa === true;
   const quando = linha?.updated_at
     ? new Date(linha.updated_at).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })
     : '?';
-  console.log(`Meta: ${naMeta ? 'ligada' : 'desligada'}, botão dos clientes ${meta.calling?.call_icon_visibility === 'DEFAULT' ? 'visível' : 'escondido'}.`);
+  const aberta = naMeta && c.call_icon_visibility === 'DEFAULT';
+  console.log(`Meta: ${naMeta ? 'ligada' : 'desligada'}, ${aberta ? 'os clientes também ligam' : 'botão dos clientes escondido'}.`);
   console.log(`CRM:  ${noCrm ? 'ligado' : 'desligado'} (última mudança: ${quando}).`);
+  const h = c.call_hours;
+  if (h?.status === 'ENABLED') {
+    const dias = (h.weekly_operating_hours ?? [])
+      .map((d) => `${d.day_of_week.slice(0, 3).toLowerCase()} ${d.open_time}–${d.close_time}`)
+      .join(', ');
+    console.log(`Horário: ${dias} (${h.timezone_id ?? 'fuso?'}).`);
+    const feriados = (h.holiday_schedule ?? []).map((f) => f.date).sort();
+    if (feriados.length > 0) {
+      console.log(`Feriados na Meta: ${feriados.length}, de ${dataBr(feriados[0])} a ${dataBr(feriados.at(-1))}.`);
+      const faltam = (Date.parse(feriados.at(-1)) - Date.now()) / 86_400_000;
+      if (faltam < 60) console.log('ATENÇÃO: os feriados acabam em menos de 60 dias. Rode "abrir" de novo para renovar.');
+    } else if (aberta) {
+      console.log('ATENÇÃO: nenhum feriado na Meta. Rode "abrir" de novo para gravar os do CRM.');
+    }
+  } else {
+    console.log('Horário: sem horário de atendimento (a Meta trata como 24 horas).');
+  }
+  console.log(`Pedido de retorno depois de o cliente ligar: ${c.callback_permission_status === 'ENABLED' ? 'ligado' : 'desligado'}.`);
   if (naMeta !== noCrm) console.log('ATENÇÃO: Meta e CRM estão diferentes. Rode "ligar" ou "desligar" para acertar.');
+}
+
+/**
+ * Abre para os clientes. O CRM liga antes da Meta, ao contrário de `ligar`: aqui o que importa
+ * é a ligação que entra, e com o CRM desligado ela ficaria gravada como perdida sem tocar.
+ */
+async function abrirParaClientes() {
+  const feriados = await feriadosDaSemana();
+  if (SO_VER) {
+    console.log('Só olhando: nada será mudado.\n');
+    console.log(JSON.stringify(chamadaAberta(FUSOS[0], feriados), null, 2));
+    console.log(`\nFeriados que fecham a ligação (${feriados.length}):`);
+    for (const f of feriados) console.log(`  ${dataBr(f.date)}  ${f.name}`);
+    return;
+  }
+  if (feriados.length === 0) throw new Error('não achei feriado nenhum no CRM; confira a tabela antes de abrir');
+
+  await chaveDoCrmLigada(true);
+  console.log('CRM: ligado.');
+  let usado = null;
+  let ultimoErro = null;
+  for (const fuso of FUSOS) {
+    try {
+      await graph('settings', chamadaAberta(fuso, feriados));
+      usado = fuso;
+      break;
+    } catch (e) {
+      ultimoErro = e;
+      // Só o fuso recusado vale outra tentativa; qualquer outro erro para aqui.
+      if (!/time.?zone/i.test(e.message)) break;
+    }
+  }
+  if (!usado) throw ultimoErro;
+  console.log(`Meta: aberta para os clientes, seg–sex ${ABRE.slice(0, 2)}h–${FECHA.slice(0, 2)}h (${usado}).`);
+  console.log(`Feriados fechados: ${feriados.length}, até ${dataBr(feriados.at(-1).date)}.`);
+  console.log('Pedido de retorno: ligado (o WhatsApp pergunta ao cliente, depois de ligar, se a Imova pode ligar de volta).');
 }
 
 async function ligarTudo() {
@@ -150,6 +277,20 @@ try {
     process.exit(0);
   }
   if (acao === 'desligar') process.exit((await desligarTudo()) ? 0 : 1);
+  if (acao === 'abrir') {
+    await abrirParaClientes();
+    if (!SO_VER) {
+      console.log('\nA Meta avisa que o celular do cliente pode levar até 7 dias para mostrar o botão;');
+      console.log('abrir os dados da Imova no WhatsApp atualiza na hora. Para voltar: "fechar".');
+      console.log('Só toca com o CRM aberto no navegador. Confira com "estado".');
+    }
+    process.exit(0);
+  }
+  if (acao === 'fechar') {
+    await graph('settings', chamada('ENABLED'));
+    console.log('Meta: os clientes não ligam mais; a equipe continua ligando.');
+    process.exit(0);
+  }
   await ligarTudo();
 } catch (e) {
   parar(`${e.message}.`);

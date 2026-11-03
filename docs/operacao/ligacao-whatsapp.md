@@ -12,6 +12,7 @@ Receber e fazer ligações pelo número de WhatsApp da empresa, de dentro do CRM
 2. A Meta avisa o `wa-webhook` (campo `calls`). O evento não passa pela fila `wa_inbound`: a Meta dá de 30 a 60 s para atender, então `public.wa_chamada_eventos` grava direto e o Realtime leva à tela.
 3. Toca para todos que estão com o CRM aberto (`ligacao-whatsapp/provedor.tsx`). O primeiro que clicar em Atender fica com a ligação (`wa_chamada_atender`), e os outros param de tocar.
 4. O navegador responde à oferta da Meta pela Edge Function `wa-chamada`: `pre_accept`, conexão de áudio, `accept`. O microfone só abre depois do 200 do `accept`.
+5. **Ninguém atendeu** (03/11/2026): a ligação fica `perdida`. Quem viu tocar e não clicou em Ignorar recebe o aviso "Ligação perdida às 10:21" no alto da tela, com "Abrir conversa", e o aviso do sistema se a aba estiver escondida. Para todos, a conversa sobe para o topo de Conversas e da aba Clientes, entra em "Minhas" mesmo sem dono e leva o selo coral "Ligação perdida · 10:21" (`public.wa_ligacoes_perdidas`, `ligacao-whatsapp/perdidas.tsx`). O selo sai quando alguém do time escreve (mensagem que não falhou) ou liga de volta, ou quando o cliente liga de novo e alguém atende; depois de 30 dias, sai sozinho. A conversa concluída volta para a lista quando o cliente liga (`app.wa_chamadas_desarquiva`). Nada disso mexe em `messages`, em `last_message_at` (que faria a IA reler a conversa) ou na janela de 24 h.
 
 **A empresa liga**
 
@@ -53,7 +54,18 @@ Passos de 1 a 5 feitos em 30/10/2026, e o passo 7 feito só para a empresa ligar
 5. **Inscrever o app** "Imova CRM" no campo `calls` do webhook.
 6. **Ligar a chave:** `node scripts/ligacao-whatsapp.mjs ligar`, que liga a chamada na Meta (botão escondido) e a chave no CRM. A janela de teste de 30/10 usou `janela`, que desliga sozinha em 30 minutos.
 7. **Teste real** em uma janela combinada, entre celulares nossos.
-8. **Ativação definitiva**, no Gerenciador do WhatsApp (Ferramentas da conta > Números de telefone > engrenagem > Chamadas) ou pela API, com o horário de atendimento. Enquanto só houver o navegador, usar horário comercial: de madrugada ninguém está com o CRM aberto, e chamadas sem atender podem esconder o botão.
+8. **Abrir para os clientes:** `node scripts/ligacao-whatsapp.mjs abrir`. Antes, `abrir --ver` mostra o que vai para a Meta, sem mudar nada. Liga a chave do CRM e depois a Meta, com o botão visível aos clientes (`DEFAULT`), o horário de atendimento de segunda a sexta, das 8h às 19h (`America/Fortaleza`; se a Meta recusar o fuso, tenta Recife e São Paulo, que estão na mesma hora), os feriados de segunda a sexta da tabela `holidays` (nacionais, do RN e de Natal, com os pontos facultativos; a Meta guarda até 20) fechados o dia inteiro, e o pedido de retorno ligado (`callback_permission_status`: depois de ligar, o WhatsApp pergunta ao cliente se a empresa pode ligar de volta). Fora do horário o WhatsApp não oferece a ligação, mostra o próximo horário e a opção de mandar mensagem. `fechar` volta a só a equipe ligar. Atenção: `ligar` e `janela` também escondem o botão dos clientes. Publicar antes o banco (`20261103160000`) e o site da Imova, para a ligação perdida aparecer na lista. Enquanto só houver o navegador, manter o horário comercial: de madrugada ninguém está com o CRM aberto, e muita ligação sem atender faz a Meta esconder o botão.
+9. **Renovar os feriados:** a Meta não aceita data passada e guarda até 20, então a lista acaba. `estado` avisa quando faltam menos de 60 dias; rodar `abrir` de novo. A tabela `holidays` vai até dezembro de 2027.
+
+### O teste com celulares nossos, depois de abrir
+
+Com o CRM aberto no Chrome de quem atende, e o microfone liberado:
+
+1. No celular de teste, abrir a conversa com a Imova e tocar no nome dela (os dados da empresa): isso atualiza o botão na hora, sem esperar os até 7 dias da Meta.
+2. **Atendida:** ligar pelo ícone de telefone; o CRM toca para todos; atender, falar alguns segundos, desligar. A ficha ou a conversa recebe a ligação, e o número do cliente não aparece na tela.
+3. **Perdida:** ligar e deixar tocar sem atender. Conferir o aviso "Ligação perdida", a conversa no topo de "Minhas" com o selo coral, e a pergunta do WhatsApp no celular sobre ligar de volta. Respondendo "sim", o botão "Ligar" aparece na conversa; ligar de volta tira o selo.
+4. **Fora do horário:** depois das 19h (ou no sábado), o WhatsApp deve mostrar o próximo horário em vez de ligar.
+5. **Feriado:** o primeiro de segunda a sexta é 20/11/2026; conferir nesse dia que a ligação não passa.
 
 ## Testar no local, com as próprias mãos
 
@@ -90,7 +102,8 @@ Uma permissão que existe na Meta e o CRM não viu (a resposta veio antes desta 
 
 ## O que não foi provado
 
-- **O cliente ligar para a empresa, com a Meta real.** Só a empresa ligou: o botão segue escondido dos clientes. O caminho está provado só com o dublê (`_dubles/meta-graph-duble.mjs`).
+- **O cliente ligar para a empresa, com a Meta real.** Só a empresa ligou: o botão segue escondido dos clientes. O caminho está provado só com o dublê (`_dubles/meta-graph-duble.mjs`) e, a ligação perdida, no Chrome real contra o banco local (03/11/2026).
+- **O formato do horário na Meta.** `call_hours` foi montado pela documentação (`call-settings`): o fuso `America/Fortaleza` e os feriados com `start_time`/`end_time` só se confirmam quando `abrir` passar e `estado` mostrar o que a Meta guardou.
 - **Outras redes.** A Meta diz que STUN e TURN não são obrigatórios, e `webrtc.ts` não usa nenhum; rede que bloqueie UDP pode exigir um servidor TURN.
 
 ## O que falta
@@ -99,4 +112,5 @@ Uma permissão que existe na Meta e o CRM não viu (a resposta veio antes desta 
 - **Relatório do dia por pessoa:** a ligação pelo WhatsApp entra na linha do tempo da ficha, mas não em `ligacoes_do_dia`, que conta `call_attempts`.
 - **Aviso de `USER_INITIATED_CALLS_LOW_PICKUP_RATE`:** o `account_update` já chega ao CRM, mas não vira alerta na tela.
 - **App:** tocar com o app fechado e a tela bloqueada exige aviso de chamada da Apple, CallKit e áudio nativo, porque o WKWebView perde o microfone em segundo plano (`app-celular.md`).
-- **Chave em Ajustes:** hoje ela é ligada pelo Terminal, com `node scripts/ligacao-whatsapp.mjs estado | ligar | desligar | janela`, que mexe na Meta e no CRM juntos, sempre com o botão escondido dos clientes.
+- **Chave em Ajustes:** hoje ela é ligada pelo Terminal, com `node scripts/ligacao-whatsapp.mjs estado | ligar | abrir | fechar | desligar | janela`, que mexe na Meta e no CRM juntos.
+- **Tocar com o CRM fechado:** o toque e o aviso do sistema dependem de uma aba do CRM aberta. Com todas fechadas, a ligação só aparece depois, como perdida.
