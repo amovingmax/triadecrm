@@ -8355,3 +8355,34 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 - A política de privacidade da Imova provavelmente precisa citar o tratamento por IA.
 - KOMUNE: seis migrações pendentes no banco dela (`20261029110000`, `20261030120000`, `20261030170000`, `20261103160000`, `20261104100000`, `20261104110000`), todas sem efeito lá; ficam para quando for a vez dela.
 - Visto de passagem, sem mexer: o `triade-worker-ai` da KOMUNE tem duas máquinas no Fly.
+## 03/11/2026 — Concluir a conversa, só na Imova (branch `concluir-conversa`; RF-CON-04)
+
+**O pedido.** Na Imova a lista de Conversas enchia de conversas antigas que não saíam de lá: "Quero que tenhamos a funcionalidade de colocar uma conversa como 'Concluída' e fazer com que ela saia das conversas, mas não devemos perder o histórico [...] Assim que formos conversar novamente com esse cliente devemos ter o histórico da conversa com ele". Decisões do usuário: primeiro só na Imova ("ficando bom e sendo aprovado por mim, a gente pode estar colocando na Komune também") e só pelo botão, sem concluir sozinho por tempo parado.
+
+**O que já existia.** O arquivar de 29/09/2026 (`conversa_arquivar`, `messages_desarquiva`) já tirava a conversa da lista sem apagar nada e a trazia de volta quando o contato escrevia. Só que na tela era um ícone de caixa sem nome, e as arquivadas ficavam escondidas em Filtros → "Ver arquivadas". Concluir é esse arquivar, agora com nome e com duas regras a mais.
+
+**Banco** (`20261103100000_concluir_a_conversa.sql`, pgTAP 119 com 17 asserções):
+- `app.concluir_ligado()`: só é verdade no banco cuja `app.identidade` é "imova".
+- `app.messages_desarquiva`: na Imova, a concluída volta para a lista também quando uma pessoa do time escreve (`author_kind = 'human'`). Mensagem de robô, de modelo automático ou do sistema não a traz de volta. O ramo novo roda num bloco de exceção: se a volta falhar, a mensagem sai assim mesmo. O ramo da entrada não mudou.
+- `app.conversas_esperando_gente`: na Imova, a concluída sai do Meu dia ("Responder no WhatsApp"), mesmo com a última palavra do cliente, e volta se ele escrever. O corpo é o de `20261002180000` com uma condição a mais.
+
+**Tela** (módulo `concluirConversa`, só da Imova, em `packages/schema/src/empresas.ts`; componentes em `components/conversas/concluir-conversa.tsx`):
+- "Concluir" com nome no cabeçalho da conversa, de parceiro e de cliente, no lugar do ícone de arquivar. Na concluída o botão vira "Reabrir", e o aviso traz "Desfazer". No cabeçalho de parceiro, com menos de 48rem de largura (notebook de 1280 px), fica só o ícone, como já acontece com o "Transferir"; com o nome, o do parceiro virava "So…". No celular o botão fica na folha do "⋯".
+- Faixa na conversa concluída: "Concluída hoje por Fulano. Ela volta para a lista quando a pessoa escrever ou quando alguém do time mandar mensagem."
+- "Concluídas" no alto da lista, ao lado da ordem: mostra SÓ as concluídas, de parceiro e de cliente, com o selo "concluída" na linha e um vazio próprio. Respeita Minhas, Meu setor e Todas e fica no endereço (`?concluidas=1`). Na Imova, o "Ver arquivadas" sai dos Filtros.
+- A concluída sai na hora do número do menu e da marca "Nova" (`avisos/dados.ts` + `reconferir`).
+- A conversa de cliente concluída continua aberta na tela e pode ser achada pela gaveta. A lista de clientes descartava as arquivadas logo na origem, então elas não abriam nem pela gaveta.
+
+**Na KOMUNE nada muda:** continuam o ícone de arquivar e o "Ver arquivadas" nos Filtros; mensagem do time não desarquiva e a arquivada continua no Meu dia. O banco é provado pelos pgTAP 93 e 119. A tela foi conferida no Chrome com o código da branch apontado para o banco local da KOMUNE.
+
+**WhatsApp intocado:** concluir não cria mensagem, não põe nada na fila de saída e não pede nada em `wa_acoes` (pgTAP 119). `saida.ts`, `graph.ts`, `entrada.ts`, `wa-webhook`, `messages_guard` e `app.pode_enviar` não mudaram.
+
+**Verificado:**
+- pgTAP 119 com 17 de 17 e 93 com 11 de 11. Os do Meu dia e da leitura (87, 90 e 99) continuam inteiros.
+- Bateria inteira no banco de validação: 116 arquivos, 4.072 asserções passando e 9 falhas, nenhuma desta entrega. 74, 107 e 114 já falhavam na `main` limpa. O 52 conta 8 tabelas no Realtime em vez de 6, porque a `20261030120000` (ligação, já na `main`) pôs mais duas e não atualizou o teste.
+- Vitest: 1.482 no site e 111 no schema. Typecheck e lint limpos.
+- Ensaio no Chrome (localhost:3030, banco `imova-crm-local`) a 1440×900, 1280×720 e 390×844. Funcionaram: concluir parceiro e cliente, a gaveta, reabrir, a faixa, o Meu dia (a concluída sai e volta), a volta quando o cliente escreve (com as 3 mensagens no fio) e o número do menu (de 1 para nenhum ao concluir). Nenhum erro no console.
+
+**Pendente:** publicar, com o banco da Imova antes do site. Na KOMUNE a migração não tem efeito. Depois da aprovação, levar para a KOMUNE: ligar `concluirConversa` e `app.concluir_ligado` lá e reescrever a última asserção do pgTAP 93 ("mensagem NOSSA não desarquiva").
+
+**Decisão humana:** aprovar o "Concluir" na Imova e, depois, decidir se ele vai para a KOMUNE.
