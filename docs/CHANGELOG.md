@@ -8186,4 +8186,21 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 
 **Não conferido:** os nomes dos menus do Chrome, do Edge e do Safari em português foram escritos pela documentação e podem mudar de versão para versão; conferir num computador de cada.
 
-**Pendente:** publicar, só com pedido. Vale para as duas empresas.
+**Pendente:** publicar, só com pedido. Vale para as duas empresas. (Publicado em 03/11/2026; ver a entrada seguinte.)
+
+## 03/11/2026 (tarde) — "Instalar o Tríade neste computador" em produção, nas duas empresas (RF-CON-05)
+
+**O pedido.** "Quero que suba essa atualização para todo mundo [...] Quero que no momento somente suba isso."
+
+**Publicado (só os sites; sem migração, sem mexer em banco, WhatsApp ou robôs):**
+- `main`: `29c6b32 → e0ee8d8`.
+- Ar conferido antes: KOMUNE em `92db3c0` e Imova em `273a637`, os dois dentro da `main`; nada de fora seria apagado.
+- Site da Imova: `imova-jkcxprhrj`, de `e0ee8d8` (volta: `imova-ggkotd81v`). Entre o ar anterior e este commit só mudaram os 4 arquivos desta entrega e o CHANGELOG.
+- Site da KOMUNE: `triade-12rd66zs6`, de `1e3e2a7` (volta: `triade-m2sd8u153`). **Este commit não está na `main` de propósito:** é o ar anterior (`92db3c0`) mais só os 4 arquivos de `e0ee8d8`, para a KOMUNE não levar de carona a ligação pelo WhatsApp da Imova (`aa6516f..273a637`), que está na `main` e fora do ar da KOMUNE. Os 4 arquivos são idênticos aos da `main`; o ar da KOMUNE não tem nada que a `main` não tenha. Typecheck e os 74 testes de `components/avisos` passando nessa combinação.
+- Os dois de cópia limpa (`triadecrm-publicar-imova` e `triadecrm-publicar-komune`).
+
+**Conferido nos dois endereços do ar, sem login:** `/login` 200, `/meu-dia` manda para o login, `/auth/dev` 404; na KOMUNE, `/sw-avisos.js` 200 e `ir.komune.app.br/login` continua indo para `komune.app.br`.
+
+**Não conferido em produção:** o item e o passo a passo com login, porque o código do menu só carrega depois de entrar. Quem já estava com o CRM aberto precisa recarregar a página.
+
+**Continua fora do ar (não foi junto, por pedido):** a ligação pelo WhatsApp na KOMUNE (código e as migrações `20261029110000` e `20261030120000` no banco dela) e as branches locais não publicadas (concluir a conversa, ficha do cliente, cadastrar cliente, Parceiros na Imova, pedir reenvio, comando da ligação, tela de login local sem Google, app de celular).
