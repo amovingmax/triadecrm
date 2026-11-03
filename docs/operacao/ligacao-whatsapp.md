@@ -51,7 +51,7 @@ Passos de 1 a 5 feitos em 30/10/2026, e o passo 7 feito só para a empresa ligar
 3. **Funções da Imova:** publicar `wa-webhook` e `wa-chamada`, e gravar os segredos `META_WA_ACCESS_TOKEN` e `META_WA_PHONE_NUMBER_ID` (hoje eles só existem no Fly).
 4. **Worker e site da Imova:** publicar o `imova-worker-wa` (leva o pedido de permissão) e o site, só o da Imova.
 5. **Inscrever o app** "Imova CRM" no campo `calls` do webhook.
-6. **Ligar a chave:** `update public.app_settings set value = '{"ativa": true}' where key = 'whatsapp.ligacao';`
+6. **Ligar a chave:** `node scripts/ligacao-whatsapp.mjs ligar`, que liga a chamada na Meta (botão escondido) e a chave no CRM. A janela de teste de 30/10 usou `janela`, que desliga sozinha em 30 minutos.
 7. **Teste real** em uma janela combinada, entre celulares nossos.
 8. **Ativação definitiva**, no Gerenciador do WhatsApp (Ferramentas da conta > Números de telefone > engrenagem > Chamadas) ou pela API, com o horário de atendimento. Enquanto só houver o navegador, usar horário comercial: de madrugada ninguém está com o CRM aberto, e chamadas sem atender podem esconder o botão.
 
@@ -99,4 +99,4 @@ Uma permissão que existe na Meta e o CRM não viu (a resposta veio antes desta 
 - **Relatório do dia por pessoa:** a ligação pelo WhatsApp entra na linha do tempo da ficha, mas não em `ligacoes_do_dia`, que conta `call_attempts`.
 - **Aviso de `USER_INITIATED_CALLS_LOW_PICKUP_RATE`:** o `account_update` já chega ao CRM, mas não vira alerta na tela.
 - **App:** tocar com o app fechado e a tela bloqueada exige aviso de chamada da Apple, CallKit e áudio nativo, porque o WKWebView perde o microfone em segundo plano (`app-celular.md`).
-- **Chave em Ajustes:** hoje ela é ligada por SQL.
+- **Chave em Ajustes:** hoje ela é ligada pelo Terminal, com `node scripts/ligacao-whatsapp.mjs estado | ligar | desligar | janela`, que mexe na Meta e no CRM juntos, sempre com o botão escondido dos clientes.
