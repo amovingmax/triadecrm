@@ -8533,3 +8533,10 @@ Pedido do usuário, com três fotos da ficha da Ana Paula (teste) no app da Imov
 **Pendente:**
 - A tarefa de bloqueio continua com o título técnico no Meu dia e na Agenda. O título nasce no worker de IA (`abrirTarefaDeBloqueio`), e trocar o texto lá muda o worker publicado na Imova.
 - A branch `parceiros-na-imova` (não publicada) troca o nome da lista na Imova e vai encontrar o "← Prospectados" novo.
+
+**Em produção nas duas empresas desde 04/11/2026, ~17h20** (main `3a0927f`, publicada das cópias limpas `~/triadecrm-publicar-komune` e `~/triadecrm-publicar-imova`):
+- KOMUNE: `triade-728tynghz`, em `triade-crm-tawny.vercel.app` e `ir.komune.app.br`. Volta: `triade-nw1hnpdv0`.
+- Imova: `imova-l5wlxx22l`, em `imova-crm.vercel.app`. Volta: `imova-i50bwhgai`. Ela também leva o `0291b82`, que na Imova não muda nada.
+- Antes do deploy, o ar das duas estava na `main` (`0291b82` e `c4e3741`, origem CLI).
+- Sem migração e sem mexer nos robôs.
+- Conferido de fora nas duas: `/login` 200, `/auth/dev` 404, e a ficha sem login vai para o login. A ficha com login não foi aberta em produção, porque o login é pelo Google.
