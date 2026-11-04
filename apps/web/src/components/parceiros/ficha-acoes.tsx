@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner';
 
 import { HREF_EXCLUIDOS } from '@/lib/navegacao';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -35,6 +36,19 @@ import { BotaoLigar } from '@/components/ligacao/voz-botao-ligar';
 import { useEditarFicha } from './ficha-edicao';
 
 /**
+ * Um botão das ações da ficha: bloco de 60 px com o ícone em cima no celular,
+ * pílula de 44 px (40 no desktop) a partir de `sm`. Os nomes do celular são de
+ * uma palavra, e os blocos dividem por igual o que o "Mais" (48 px) deixa.
+ *
+ * Medido em 04/11/2026, com os quatro botões da KOMUNE: com o "Mais" do mesmo
+ * tamanho dos outros, "Conversar" em 12,5 px passava da borda do bloco a 360 px
+ * e encostava a 320. Abaixo de 360 o nome desce para 10,5 px, o tamanho dos
+ * nomes da barra de baixo do iPhone.
+ */
+const BLOCO =
+  'toque h-auto min-h-[60px] min-w-0 flex-1 basis-0 flex-col gap-1 rounded-2xl px-0.5 py-2 text-[10.5px] min-[360px]:text-[12.5px] sm:h-11 sm:min-h-0 sm:flex-none sm:basis-auto sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-4 sm:text-sm md:h-10';
+
+/**
  * As saídas da ficha, no cabeçalho.
  *
  * Eram quatro botões do mesmo peso, empilhados no celular: 210 px de tela antes
@@ -49,7 +63,7 @@ import { useEditarFicha } from './ficha-edicao';
  *   - "⋯" guarda o que se faz de vez em quando: ver no funil, editar a ficha e,
  *     desde 07/10/2026, EXCLUIR o parceiro.
  *
- * No celular os dois primeiros dividem a largura e o menu fica na ponta.
+ * No celular todos dividem a largura em blocos iguais, o menu inclusive ("Mais").
  *
  * ---------------------------------------------------------------------------
  * EXCLUIR (07/10/2026)
@@ -122,19 +136,29 @@ export function AcoesDaFicha({
   }
 
   return (
-    // `flex-wrap`: com a telefonia ligada são quatro botões (Conversar,
-    // Registrar, Ligar e o menu), e numa linha só eles passavam da borda do
-    // celular e arrastavam a página para o lado (20/10/2026).
-    <nav aria-label="O que fazer com este parceiro" className="flex flex-wrap items-center gap-2">
-      <Button asChild className="toque h-11 flex-1 px-4 sm:flex-none md:h-10">
+    // NO CELULAR, BLOCOS IGUAIS NUMA LINHA SÓ (04/11/2026), com o ícone em cima e
+    // o nome embaixo, como as ações de um contato no iPhone. Os botões em pílula
+    // quebravam: "Abrir a conversa" e "Registrar" ocupavam a linha e o "⋯" descia
+    // sozinho para a segunda (antes, com a telefonia ligada, chegavam a passar da
+    // borda, 20/10/2026). Os blocos dividem a largura por quantos botões houver —
+    // dois, três ou quatro —, então nada quebra nem num celular de 320.
+    // A partir de `sm` volta a ser a fila de pílulas de sempre.
+    <nav
+      aria-label="O que fazer com este parceiro"
+      className="flex gap-1.5 min-[360px]:gap-2 sm:flex-wrap sm:items-center"
+    >
+      <Button asChild className={BLOCO}>
         <Link href={`/conversas?org=${organizationId}`}>
           <MessageCircle aria-hidden="true" />
-          {conversaNoCrm ? 'Conversar' : 'Abrir a conversa'}
+          <span className="sm:hidden">{conversaNoCrm ? 'Conversar' : 'Conversa'}</span>
+          <span className="hidden sm:inline">
+            {conversaNoCrm ? 'Conversar' : 'Abrir a conversa'}
+          </span>
         </Link>
       </Button>
 
       {podeEscrever ? (
-        <Button asChild variant="outline" className="toque h-11 flex-1 px-4 sm:flex-none md:h-10">
+        <Button asChild variant="outline" className={BLOCO}>
           <Link href={`/registrar?org=${organizationId}`}>
             <PhoneOutgoing aria-hidden="true" />
             <span className="sm:hidden">Registrar</span>
@@ -144,7 +168,7 @@ export function AcoesDaFicha({
       ) : null}
 
       {podeEscrever ? (
-        <BotaoLigar organizationId={organizationId} temTelefone={temTelefone} />
+        <BotaoLigar organizationId={organizationId} temTelefone={temTelefone} className={BLOCO} />
       ) : null}
 
       {temMenu ? (
@@ -152,11 +176,13 @@ export function AcoesDaFicha({
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              size="icon"
-              className="toque size-11 shrink-0 rounded-full md:size-10"
+              className={cn(BLOCO, 'w-12 flex-none basis-auto sm:size-11 sm:px-0 md:size-10')}
               aria-label="Mais ações deste parceiro"
             >
               <Ellipsis aria-hidden="true" />
+              <span className="sm:hidden" aria-hidden="true">
+                Mais
+              </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">

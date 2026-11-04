@@ -5,7 +5,9 @@ import type { AtividadeCrua, HistoricoCru } from '@/components/conversas/montage
 
 import {
   arcoDaNota,
+  avisoDaIa,
   contagemDosPassos,
+  mesmaFrase,
   montarAtividade,
   montarLeituraDaFicha,
   contatoMaisRecente,
@@ -432,6 +434,45 @@ describe('os próximos passos', () => {
       ['reuniao', null],
       ['tarefa', 't1'],
     ]);
+  });
+
+  it('o aviso do guardrail de PII vira o que fazer, e não o registro técnico', () => {
+    const p = montarProximosPassos(
+      {
+        reunioes: [],
+        tarefas: [
+          tarefa({
+            id: 't1',
+            kind: 'other',
+            title:
+              'IA bloqueada pelo guardrail de PII em leitura-do-cliente (ai_run 6): A chamada ao ' +
+              'modelo carregaria dado pessoal: TELEFONE em montagem (11] 30/10 11:20), TELEFONE em ' +
+              'montagem (12] 30/10 11:21), EMAIL em montagem (13] 30/10 11:21)',
+          }),
+        ],
+        pessoas: NOMES,
+      },
+      AGORA,
+    );
+    expect(p.passos[0]).toMatchObject({
+      titulo: 'Ler a conversa você mesmo',
+      apoio: 'A IA não leu: havia telefone e e-mail nas mensagens · Heloísa',
+      tarefaId: 't1',
+    });
+  });
+
+  it('a tarefa escrita por alguém do time passa como está', () => {
+    expect(avisoDaIa('Enviar a tabela de taxas')).toBeNull();
+    expect(avisoDaIa('IA bloqueada pelo guardrail de PII em resumo (ai_run 9): truncado')).toEqual({
+      titulo: 'Ler a conversa você mesmo',
+      apoio: 'A IA não leu: havia dado pessoal nas mensagens',
+    });
+  });
+
+  it('a mesma frase, com caixa, espaços e ponto final diferentes', () => {
+    expect(mesmaFrase('Perguntar o que ele procura.', ' perguntar o  que ele procura ')).toBe(true);
+    expect(mesmaFrase('Perguntar o bairro', 'Perguntar o valor')).toBe(false);
+    expect(mesmaFrase(null, 'Perguntar o bairro')).toBe(false);
   });
 
   it('a tarefa que é o eco de uma reunião não lista a reunião duas vezes', () => {
