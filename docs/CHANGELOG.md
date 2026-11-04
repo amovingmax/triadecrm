@@ -8638,3 +8638,33 @@ Pedido do usuário: "atualize isso para quando eu testar o app na Expo está tud
 **Precisa de decisão humana:**
 - Recolocar o "Ligar" com a palavra por cima da tela nova, ou ficar com o ícone do jeito do WhatsApp.
 - As três perguntas de 03/11 continuam abertas: login no app, conta Apple e conta Expo.
+
+## 04/11/2026 (noite) — A ficha do parceiro e do cliente mais organizada, principalmente no celular (branch `app-celular`; RF-BAS-01, PRD §8)
+
+Pedido do usuário, com três fotos da ficha da Ana Paula (teste) no app da Imova: "Preciso que essa tela seja mais organizada, tem muitas coisas e informações que estão bagunçadas e dificultando o entendimento [...] Foque em deixar mais responsivo também".
+
+**Feito:**
+- **As ações do topo cabem numa linha.** No celular viram blocos com o ícone em cima e o nome embaixo (Conversar, Registrar, Ligar quando há telefonia, Mais). Antes, o "⋯" descia sozinho para a segunda linha. A partir de `sm` continuam as pílulas de sempre. Medido de 320 a 430 px nas duas empresas: com os quatro botões da KOMUNE, abaixo de 360 px o nome usa 10,5 px e o "Mais" fica com 48 px.
+- **A próxima ação virou um bloco em destaque no celular**, na largura toda. Era uma coluna de 160 px com o texto em 17 px: quatro linhas espremidas, e mais cinco para a origem ("Sugerida pela IA · …"). No computador, ela ganhou a coluna mais larga e mostra duas linhas, em vez de cortar em "Perguntar o que ele pr…".
+- **Último contato, WhatsApp e Responsável viraram linhas no celular**, com o rótulo à esquerda e o valor à direita. No computador continuam as colunas.
+- **Nada repetido:**
+  - a sugestão da IA não aparece de novo no cartão "Leitura da IA" quando é a mesma frase da próxima ação (`mesmaFrase`);
+  - o "Abrir a conversa" saiu do título do cartão "Atividade", porque o botão do topo já leva lá. Ele virou "Ver a conversa inteira", no fim do cartão, quando a lista não mostra tudo.
+- **A tarefa técnica da IA em português claro.** O título "IA bloqueada pelo guardrail de PII em leitura-do-cliente (ai_run 6): …" ocupava 14 linhas no celular. Na ficha ela aparece como "Ler a conversa você mesmo", com o motivo embaixo: "A IA não leu: havia telefone nas mensagens" (`avisoDaIa`, com teste). O texto original continua na tarefa e em `ai_runs`.
+- **Linhas que não espremem no celular:**
+  - o selo "atrasada" fica embaixo do título da tarefa;
+  - a data da atividade desce para baixo do título quando os dois não cabem lado a lado;
+  - as etiquetas da leitura da IA ocupam a largura do cartão.
+- **"← Parceiros" virou "← Prospectados"**, o nome que a barra de baixo mostra acesa logo abaixo.
+- **Verificado:**
+  - fotos antes e depois a 390, 320 e 1280 px, na Imova (Ana Paula) e na KOMUNE (DJ Done), sem nada vazando para o lado;
+  - typecheck do site;
+  - lint dos arquivos tocados;
+  - os 121 testes de `components/parceiros`, com 3 novos.
+
+**Pendente:**
+- A tarefa de bloqueio continua com o título técnico no Meu dia e na Agenda. A ficha só traduz o que mostra. O título nasce no worker de IA (`abrirTarefaDeBloqueio`), e trocar o texto lá muda o worker publicado na Imova.
+- Nada publicado. A mudança é só do site. Para ir ao ar, o commit de código entra na main sozinho, sem os do app, e precisa da comparação tela a tela do PC (`docs/operacao/comparar-versoes.md`).
+
+**Precisa de decisão humana:**
+- Aprovar o desenho novo da ficha. No computador também muda: a coluna da próxima ação ficou mais larga, e o selo da tarefa foi para baixo do título.
