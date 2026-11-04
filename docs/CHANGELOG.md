@@ -8333,3 +8333,22 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 - Produção, só leitura (`publicar-banco.mjs conferir`): na Imova faltam exatamente as duas migrações. Na KOMUNE faltam seis (as quatro da Imova de 29/10 a 03/11 e estas duas), todas sem efeito lá; ela continua de fora, como nas entregas anteriores.
 
 **Para publicar, nesta ordem, só com pedido:** conferir o ar; `main` + push; `publicar-banco.mjs imova migrar`; só os blocos 12d e 12e do seed (com `app.exigir_empresa('imova')` antes; nunca o seed inteiro); o site da Imova de uma cópia limpa do commit; `fly deploy` do `imova-worker-ai` (cria a máquina e aplica os segredos *staged*). Ao ligar, as conversas de clientes que já existem ganham ficha na primeira rodada e entram na fila da leitura aos poucos (20 a cada 5 minutos); os 52 trabalhos da KOMUNE na fila saem sem custo.
+
+## 04/11/2026 — Ficha do cliente e IA da Imova em produção (RF-BAS-15, RF-CON-07, ADR-10)
+
+**Publicado a pedido do usuário ("Vamos publicar então. Quero subir"), só na Imova:**
+- Ar conferido antes: o site da Imova estava em `193d48d`, que já estava na `main` (depois dele, só documentação e o script local da ligação); os projetos da Vercel não publicam pelo GitHub.
+- `main` `528f846` (avanço direto sobre `bff38bd`). Banco da Imova: `20261104100000` e `20261104110000` por `publicar-banco.mjs imova migrar`, e só os blocos 12d e 12e do seed, numa transação com `app.exigir_empresa('imova')`. Conferido: ficha automática e leitura ligadas, teto US$ 10, preço do Haiku 5.5, `fichas_automaticas_rodar` agendado.
+- Site da Imova `imova-aeg9rndlv` (de `528f846`, cópia limpa em `~/triadecrm-publicar-imova`); volta: `imova-otsk9jto2`.
+- `imova-worker-ai` no Fly com uma máquina (`8747327c07edd8`, `--ha=false`), segredos aplicados. Os 52 trabalhos da KOMUNE na fila saíram sem chamar o modelo.
+- KOMUNE intocada: banco, site e worker de IA dela não foram mexidos.
+
+**O que a produção mostrou na primeira hora, e a correção (`leitura-do-cliente@v2`, `main` `49f4b47`):** com o Haiku 5.5 de verdade, 4 de 16 leituras da v1 foram recusadas pelo schema por texto um pouco mais longo que o teto (resumo 462/400, motivo 207 a 235/200, próxima ação 213 e 214/200). A saída estruturada não leva `maxLength`, e o prompt só falava do tamanho do resumo; o dublê nunca passou dos tetos, e o ensaio não pegou. O worker ficou parado uns 8 minutos (a ficha automática seguiu pelo banco); a v2 diz o tamanho de cada texto e encurta na palavra até o teto do banco, em vez de recusar (enum, número e `messageId` continuam estritos). Os 4 trabalhos que tinham ido para a `ai_dlq` voltaram para a `ai_jobs` (a chave contra repetição só deixaria reler com mensagem nova) e foram lidos pela v2. Site não republicado: a mudança é só do worker.
+
+**Medido em produção às 14h20:** 20 conversas, 18 com ficha; 17 leituras gravadas (12 da v1, 5 da v2) e 9 próximas ações escritas pela IA; fila e `ai_dlq` vazias; custo total US$ 0,011 (21 chamadas). A v2 lê em média 1.278 tokens e escreve 554, com o raciocínio.
+
+**Pendente:**
+- Acompanhar as leituras dos próximos dias: qualidade em conversas reais e custo por mês (o teto de US$ 10 no CRM e o de US$ 15 no espaço da Anthropic).
+- A política de privacidade da Imova provavelmente precisa citar o tratamento por IA.
+- KOMUNE: seis migrações pendentes no banco dela (`20261029110000`, `20261030120000`, `20261030170000`, `20261103160000`, `20261104100000`, `20261104110000`), todas sem efeito lá; ficam para quando for a vez dela.
+- Visto de passagem, sem mexer: o `triade-worker-ai` da KOMUNE tem duas máquinas no Fly.
