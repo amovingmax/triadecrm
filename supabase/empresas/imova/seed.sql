@@ -568,6 +568,25 @@ update public.app_settings
  where key = 'ia.orcamento';
 
 -- =====================================================================
+-- 12f. A leitura do cliente em 3 a 4 minutos (04/11/2026): só da Imova. Pedido
+--      do usuário: a leitura esperava 10 minutos sem mensagem e a fila era
+--      conferida de 5 em 5 minutos, até uns 15 minutos depois da última
+--      mensagem. Agora espera 3 minutos e confere a cada minuto. Cada leitura
+--      custou perto de US$ 0,0006 na primeira medição, longe do teto de US$ 10;
+--      conversa com pausas curtas é relida mais vezes.
+-- =====================================================================
+update public.app_settings
+   set value = jsonb_set(value, '{ficha,debounce_min}', '3'::jsonb)
+ where key = 'ia.crm_inteligente';
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('ia_enfileirar_analises', '* * * * *',
+                          $cron$select app.ia_enfileirar_analises(20)$cron$);
+  end if;
+end $$;
+
+-- =====================================================================
 -- 13. Autoverificação. Qualquer falta aborta com o nome do problema.
 -- =====================================================================
 do $$
@@ -613,6 +632,15 @@ begin
   if (select (value ->> 'mensal_usd')::numeric from public.app_settings where key = 'ia.orcamento')
      is distinct from 10 then
     raise exception 'seed imova: o teto da IA tem de ser US$ 10 (decisão de 03/11/2026)';
+  end if;
+  if (select (value -> 'ficha' ->> 'debounce_min')::int from public.app_settings
+       where key = 'ia.crm_inteligente') is distinct from 3 then
+    raise exception 'seed imova: a leitura do cliente tem de esperar 3 minutos (decisão de 04/11/2026)';
+  end if;
+  if exists (select 1 from pg_namespace where nspname = 'cron')
+     and not exists (select 1 from cron.job
+                      where jobname = 'ia_enfileirar_analises' and schedule = '* * * * *') then
+    raise exception 'seed imova: a fila da leitura do cliente não ficou conferida a cada minuto';
   end if;
   if not exists (select 1 from public.ai_model_prices where model = 'claude-haiku-5-5') then
     raise exception 'seed imova: o Haiku 5.5 está sem preço (migração 20261104110000)';

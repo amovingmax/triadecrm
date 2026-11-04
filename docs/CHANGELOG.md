@@ -8347,6 +8347,9 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 
 **Medido em produção às 14h20:** 20 conversas, 18 com ficha; 17 leituras gravadas (12 da v1, 5 da v2) e 9 próximas ações escritas pela IA; fila e `ai_dlq` vazias; custo total US$ 0,011 (21 chamadas). A v2 lê em média 1.278 tokens e escreve 554, com o raciocínio.
 
+**A leitura em 3 a 4 minutos (mesmo dia, a pedido: "descer o tempo de espera para 3 a 4 minutos"):** o usuário escreveu como cliente às 14h22 e a leitura não mudou, porque ela esperava 10 minutos sem mensagem e a fila era conferida de 5 em 5 minutos. Seed da Imova, bloco 12f: `ia.crm_inteligente.ficha.debounce_min` = 3 e `ia_enfileirar_analises` a cada minuto (na KOMUNE continua de 5 em 5, pela migração `20260917100000`); a autoverificação confere os dois. Seed inteiro ensaiado no banco igual ao da produção; em produção, só o bloco 12f, com `app.exigir_empresa('imova')`. Custo: cada leitura saiu perto de US$ 0,0006; conversa com pausas curtas é relida mais vezes.
+- Visto e não mexido: o cartão "Leitura da IA" diz "atualizada" com `analisada_em`, que é a hora da ÚLTIMA MENSAGEM LIDA e não a da leitura (a de 04/11 14h14 aparecia como "atualizada 30/10 17:36"). Proposto ao usuário trocar o texto.
+
 **Pendente:**
 - Acompanhar as leituras dos próximos dias: qualidade em conversas reais e custo por mês (o teto de US$ 10 no CRM e o de US$ 15 no espaço da Anthropic).
 - A política de privacidade da Imova provavelmente precisa citar o tratamento por IA.
