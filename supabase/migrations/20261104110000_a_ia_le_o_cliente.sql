@@ -153,15 +153,18 @@ begin
        where s.pipeline_id = d.pipeline_id and s.position < 90
          and not s.is_entry and s.retired_at is null
     ), '[]'::jsonb),
+    -- Desempate pelo `id`: a ficha que nasce na entrada e sobe para Respondeu na
+    -- mesma rodada grava as duas linhas com o mesmo `now()`, e só o horário deixava
+    -- o caminho terminar na etapa de entrada.
     'historico_etapas', coalesce((
       select jsonb_agg(jsonb_build_object(
                'etapa', h.nome,
                'desde', to_char(h.changed_at at time zone 'America/Fortaleza', 'DD/MM HH24:MI'))
-             order by h.changed_at)
-        from (select s.name as nome, x.changed_at
+             order by h.changed_at, h.id)
+        from (select s.name as nome, x.changed_at, x.id
                 from public.deal_stage_history x join public.stages s on s.id = x.to_stage_id
                where x.deal_id = d.id
-               order by x.changed_at desc limit 12) h
+               order by x.changed_at desc, x.id desc limit 12) h
     ), '[]'::jsonb),
     'temperatura', coalesce(d.temperature::text, v_org.temperature::text),
     -- A intenção que a última LEITURA achou (o classificador por mensagem é da

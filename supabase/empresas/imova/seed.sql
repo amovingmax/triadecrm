@@ -615,7 +615,7 @@ begin
     raise exception 'seed imova: o teto da IA tem de ser US$ 10 (decisão de 03/11/2026)';
   end if;
   if not exists (select 1 from public.ai_model_prices where model = 'claude-haiku-5-5') then
-    raise exception 'seed imova: o Haiku 5.5 está sem preço (migração 20261103140000)';
+    raise exception 'seed imova: o Haiku 5.5 está sem preço (migração 20261104110000)';
   end if;
   if n_cat <> 7 then raise exception 'seed imova: esperadas 7 categorias ativas, encontradas %', n_cat; end if;
   if n_pipe <> 2 then raise exception 'seed imova: esperados 2 funis, encontrados %', n_pipe; end if;

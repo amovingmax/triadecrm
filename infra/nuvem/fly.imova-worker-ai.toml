@@ -16,7 +16,7 @@
 # a Imova, e passe `--app imova-worker-ai` em todo comando.
 #
 # Publicar (da RAIZ do repositório, de uma cópia limpa do commit), só DEPOIS da
-# migração 20261103140000 e do bloco 12e do seed no banco da Imova — sem eles o
+# migração 20261104110000 e do bloco 12e do seed no banco da Imova — sem eles o
 # worker não acha `app.ia_entrada_do_cliente` e a fila tem trabalhos da KOMUNE:
 #   fly deploy . --config infra/nuvem/fly.imova-worker-ai.toml --dockerfile apps/workers/Dockerfile
 #

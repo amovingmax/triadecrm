@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — A IA lê o cliente (migração 20261103140000)
+-- pgTAP — A IA lê o cliente (migração 20261104110000)
 --
 -- Decisões do usuário em 03/11/2026: Claude Haiku 5.5; a próxima ação da IA
 -- vai direto para a ficha, marcada como da IA; teto de US$ 10 por mês. Este
@@ -21,9 +21,9 @@
 begin;
 select plan(25);
 
-insert into public.allowed_users (email, role, note) values ('h120.g@teste.local', 'gestor', 'pgTAP 120');
+insert into public.allowed_users (email, role, note) values ('h121.g@teste.local', 'gestor', 'pgTAP 121');
 insert into auth.users (id, email, raw_user_meta_data) values
-  ('a0000000-0000-4000-8000-000000012001'::uuid, 'h120.g@teste.local', '{"full_name":"Gil Gestor"}');
+  ('a0000000-0000-4000-8000-000000012101'::uuid, 'h121.g@teste.local', '{"full_name":"Gil Gestor"}');
 
 update public.app_settings set value = jsonb_set(value, '{numero_padrao}', '"+5584999912000"')
  where key = 'whatsapp.envio';
@@ -38,7 +38,7 @@ insert into public.categories (slug, name, "group", priority, position, komune_c
 values ('comprador', 'Comprador', 'producao', 1, 900, null, true)
 on conflict (slug) do update set is_active = true;
 insert into public.app_settings (key, value, description)
-values ('ficha_automatica', '{"ligada": true}'::jsonb, 'pgTAP 120')
+values ('ficha_automatica', '{"ligada": true}'::jsonb, 'pgTAP 121')
 on conflict (key) do update set value = excluded.value;
 
 create function pg_temp.virar(p_empresa text) returns void language plpgsql as $$
@@ -61,7 +61,7 @@ declare v uuid;
 begin
   insert into public.conversations (channel, business_number, peer_phone_e164, peer_nome, assignee_id, status)
   values ('whatsapp'::app.channel, '+5584999912000', p_tel, p_nome,
-          'a0000000-0000-4000-8000-000000012001'::uuid, 'aguardando_nos')
+          'a0000000-0000-4000-8000-000000012101'::uuid, 'aguardando_nos')
   returning id into v;
   insert into t120 values (p_chave, v);
   return v;
@@ -81,7 +81,7 @@ create function pg_temp.nossa(p_conv uuid, p_em timestamptz) returns void langua
   insert into public.messages (conversation_id, direction, type, status, body, author_kind, origin,
                                sent_by, wa_message_id, created_at, sent_at)
   values (p_conv, 'out'::app.msg_direction, 'text'::app.msg_type, 'sent'::app.msg_status,
-          'pgtap120 nossa', 'human', 'echo', 'a0000000-0000-4000-8000-000000012001'::uuid,
+          'pgtap120 nossa', 'human', 'echo', 'a0000000-0000-4000-8000-000000012101'::uuid,
           'wamid.PGTAP120.' || gen_random_uuid(), p_em, p_em)
 $$;
 create function pg_temp.negocio(p_conv uuid) returns uuid language sql stable as $$

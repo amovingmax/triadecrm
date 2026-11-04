@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — A ficha do cliente que se preenche sozinha (migração 20261103120000)
+-- pgTAP — A ficha do cliente que se preenche sozinha (migração 20261104100000)
 --
 -- Pedido de 03/11/2026 para a Imova: todo cliente que escreve tem ficha, e a
 -- ficha se preenche sozinha — a régua anda e a próxima ação diz o que fazer.
@@ -28,11 +28,11 @@ begin;
 select plan(44);
 
 insert into public.allowed_users (email, role, note) values
-  ('h119.g@teste.local', 'gestor', 'pgTAP 119'),
-  ('h119.e@teste.local', 'embaixador', 'pgTAP 119');
+  ('h120.g@teste.local', 'gestor', 'pgTAP 120'),
+  ('h120.e@teste.local', 'embaixador', 'pgTAP 120');
 insert into auth.users (id, email, raw_user_meta_data) values
-  ('a0000000-0000-4000-8000-000000011901'::uuid, 'h119.g@teste.local', '{"full_name":"Gil Gestor"}'),
-  ('a0000000-0000-4000-8000-000000011902'::uuid, 'h119.e@teste.local', '{"full_name":"Eva Embaixadora"}');
+  ('a0000000-0000-4000-8000-000000012001'::uuid, 'h120.g@teste.local', '{"full_name":"Gil Gestor"}'),
+  ('a0000000-0000-4000-8000-000000012002'::uuid, 'h120.e@teste.local', '{"full_name":"Eva Embaixadora"}');
 
 -- Nada automático responde às mensagens de teste.
 update public.app_settings set value = jsonb_set(value, '{numero_padrao}', '"+5584999911900"')
@@ -77,7 +77,7 @@ begin
   insert into public.conversations (channel, business_number, peer_phone_e164, peer_nome,
                                     assignee_id, status)
   values ('whatsapp'::app.channel, '+5584999911900', p_tel, p_nome,
-          'a0000000-0000-4000-8000-000000011901'::uuid, 'aguardando_nos')
+          'a0000000-0000-4000-8000-000000012001'::uuid, 'aguardando_nos')
   returning id into v;
   insert into t119 values (p_chave, v);
   return v;
@@ -85,13 +85,13 @@ end $$;
 create function pg_temp.dele(p_conv uuid, p_em timestamptz) returns void language sql as $$
   insert into public.messages (conversation_id, direction, type, status, body, author_kind, origin, created_at)
   values (p_conv, 'in'::app.msg_direction, 'text'::app.msg_type, 'received'::app.msg_status,
-          'pgtap119 dele', 'system', 'crm', p_em)
+          'pgtap120 dele', 'system', 'crm', p_em)
 $$;
 create function pg_temp.nossa(p_conv uuid, p_em timestamptz) returns void language sql as $$
   insert into public.messages (conversation_id, direction, type, status, body, author_kind, origin,
                                sent_by, wa_message_id, created_at, sent_at)
   values (p_conv, 'out'::app.msg_direction, 'text'::app.msg_type, 'sent'::app.msg_status,
-          'pgtap119 nossa', 'human', 'echo', 'a0000000-0000-4000-8000-000000011901'::uuid,
+          'pgtap120 nossa', 'human', 'echo', 'a0000000-0000-4000-8000-000000012001'::uuid,
           'wamid.PGTAP119.' || gen_random_uuid(), p_em, p_em)
 $$;
 create function pg_temp.ficha(p_conv uuid) returns uuid language sql stable as $$
@@ -125,7 +125,7 @@ create temp table t119_base as
          (select count(*) from pgmq.q_wa_outbound) as fila;
 
 insert into public.app_settings (key, value, description)
-values ('ficha_automatica', '{"ligada": true}'::jsonb, 'pgTAP 119')
+values ('ficha_automatica', '{"ligada": true}'::jsonb, 'pgTAP 120')
 on conflict (key) do update set value = excluded.value;
 
 -- =====================================================================
@@ -166,7 +166,7 @@ select is((select p.slug from public.deals d join public.pipelines p on p.id = d
   'produtor', 'o negócio está no funil de clientes');
 select is(pg_temp.etapa(pg_temp.id('a')), 'respondeu', 'e a régua já está em Respondeu: ela escreveu');
 select is((select d.owner_id from public.deals d where d.id = pg_temp.negocio(pg_temp.id('a')))::text,
-  'a0000000-0000-4000-8000-000000011901', 'quem atende a conversa responde pela ficha');
+  'a0000000-0000-4000-8000-000000012001', 'quem atende a conversa responde pela ficha');
 select is((select count(*)::int from public.messages m
             where m.conversation_id = pg_temp.id('a') and m.organization_id is distinct from pg_temp.ficha(pg_temp.id('a'))),
   0, 'as mensagens da conversa carregam a ficha');
@@ -196,9 +196,9 @@ select is((select d.next_action_at from public.deals d where d.id = pg_temp.nego
 -- Visita marcada na agenda: é ela a próxima ação.
 insert into public.reunioes (organization_id, deal_id, dono_id, titulo, formato, inicio, fim, link, estado, marcada_por, marcada_por_id)
 values (pg_temp.ficha(pg_temp.id('a')), pg_temp.negocio(pg_temp.id('a')),
-        'a0000000-0000-4000-8000-000000011901'::uuid, 'Visita pgTAP 119', 'online',
+        'a0000000-0000-4000-8000-000000012001'::uuid, 'Visita pgTAP 120', 'online',
         now() + interval '2 days', now() + interval '2 days 40 minutes', 'https://sala.invalid/s',
-        'marcada', 'pessoa', 'a0000000-0000-4000-8000-000000011901'::uuid);
+        'marcada', 'pessoa', 'a0000000-0000-4000-8000-000000012001'::uuid);
 select app.fichas_automaticas_rodar(200);
 select is(pg_temp.acao(pg_temp.id('a')), 'Fazer a visita', 'visita na agenda: Fazer a visita');
 
@@ -231,13 +231,13 @@ do $$
 declare v_org uuid;
 begin
   insert into public.organizations (kind, name, source_id, collector, owner_id, phone_e164)
-  select 'fornecedor'::app.org_kind, 'Proprietário pgTAP 119', s.id, 'pgtap119',
-         'a0000000-0000-4000-8000-000000011901'::uuid, '+5584999911902'
+  select 'fornecedor'::app.org_kind, 'Proprietário pgTAP 120', s.id, 'pgtap120',
+         'a0000000-0000-4000-8000-000000012001'::uuid, '+5584999911902'
     from public.sources s where s.slug = 'planilha'
   returning id into v_org;
   insert into t119 values ('dono', v_org);
   insert into public.deals (organization_id, pipeline_id, stage_id, owner_id)
-  select v_org, p.id, st.id, 'a0000000-0000-4000-8000-000000011901'::uuid
+  select v_org, p.id, st.id, 'a0000000-0000-4000-8000-000000012001'::uuid
     from public.pipelines p join public.stages st on st.pipeline_id = p.id and st.slug = 'apresentacao_realizada'
    where p.slug = 'fornecedor';
 end $$;
@@ -256,7 +256,7 @@ select is(pg_temp.acao(pg_temp.id('b')), 'Pedir a documentação do imóvel',
 select pg_temp.conversa('c', '+5584999911903', 'Carla');
 select pg_temp.dele(pg_temp.id('c'), now() - interval '1 hour');
 insert into public.suppression_list (hash, kind, reason)
-values (app.sha256_hex(app.normalize_phone_br('+5584999911903')), 'phone', 'pgtap119');
+values (app.sha256_hex(app.normalize_phone_br('+5584999911903')), 'phone', 'pgtap120');
 -- Só recebeu mensagem nossa.
 select pg_temp.conversa('d', '+5584999911904', 'Diego');
 select pg_temp.nossa(pg_temp.id('d'), now() - interval '1 hour');
@@ -306,11 +306,11 @@ select is(pg_temp.acao(pg_temp.id('f')), 'Responder a mensagem', 'com a próxima
 -- =====================================================================
 -- 7. Quem lê
 -- =====================================================================
-select pg_temp.entrar('a0000000-0000-4000-8000-000000011901'::uuid, 'gestor');
+select pg_temp.entrar('a0000000-0000-4000-8000-000000012001'::uuid, 'gestor');
 select is((select a.regra from public.proximas_acoes_automaticas a where a.deal_id = pg_temp.negocio(pg_temp.id('f'))),
   'responder', 'o gestor lê o porquê da próxima ação');
 select pg_temp.sair();
-select pg_temp.entrar('a0000000-0000-4000-8000-000000011902'::uuid, 'embaixador');
+select pg_temp.entrar('a0000000-0000-4000-8000-000000012002'::uuid, 'embaixador');
 select is((select count(*)::int from public.proximas_acoes_automaticas a
             where a.deal_id = pg_temp.negocio(pg_temp.id('f'))),
   0, 'quem não vê o negócio (embaixador de outra carteira) não lê');
@@ -322,7 +322,7 @@ select pg_temp.sair();
 -- 8. O WhatsApp não muda
 -- =====================================================================
 select is((select count(*) from public.messages m where m.direction = 'out'::app.msg_direction
-            and m.body is distinct from 'pgtap119 nossa'),
+            and m.body is distinct from 'pgtap120 nossa'),
   (select saidas from t119_base),
   'nenhuma mensagem de saída nasceu além das do próprio teste');
 select is((select count(*) from pgmq.q_wa_outbound), (select fila from t119_base),

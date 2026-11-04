@@ -34,7 +34,7 @@
 -- O WHATSAPP NÃO MUDA. Nenhum gatilho entra em `messages` nem em
 -- `conversations`, e nada aqui grava mensagem, enfileira envio ou mexe em
 -- janela, robô, ausência, opt-out ou atendente (`whatsapp-intocavel`; o
--- pgTAP 119 prova). Ligar a conversa à ficha é o mesmo `update` do botão
+-- pgTAP 120 prova). Ligar a conversa à ficha é o mesmo `update` do botão
 -- "Ligar a uma ficha" (`public.vincular_conversa`), sem a sessão de ninguém.
 --
 -- SÓ DA IMOVA, como a atitude do cliente (20261029110000): no banco da KOMUNE
@@ -507,7 +507,7 @@ comment on function app.proxima_acao_calcular(uuid, timestamptz) is
 revoke all on function app.proxima_acao_calcular(uuid, timestamptz) from public, anon, authenticated;
 
 -- O ponto de encaixe da IA. Aqui não devolve nada: a regra decide sozinha. A
--- migração da leitura do cliente (`20261103140000`) troca o corpo por um que
+-- migração da leitura do cliente (`20261104110000`) troca o corpo por um que
 -- devolve a próxima ação da última leitura da IA, quando ela é mais nova que o
 -- último fato (mensagem, etapa, agenda).
 create or replace function app.proxima_acao_da_ia(p_deal_id uuid, p_agora timestamptz default now())
