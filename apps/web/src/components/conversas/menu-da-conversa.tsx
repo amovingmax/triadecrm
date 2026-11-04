@@ -1,13 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bell,
   BellOff,
   ChevronDown,
   ChevronUp,
-  Ellipsis,
+  CircleCheck,
+  EllipsisVertical,
+  ExternalLink,
+  MessageSquarePlus,
+  RotateCcw,
   MessageSquareDot,
   Pin,
   PinOff,
@@ -57,9 +62,11 @@ import {
 } from './acoes';
 import { resumoDaMensagem } from './conteudo';
 import { useFio } from './contexto-do-fio';
+import { CONCLUIR_NA_EMPRESA, useConcluirConversa } from './concluir-conversa';
 import { carregarPreferencias, CHAVE_CONVERSAS, CHAVE_PREFERENCIAS } from './dados';
 import { dataHoraCompleta, hora, rotuloDoDia } from './formatos';
 import { ateDoSilencio, ehSilenciada, SILENCIOS, type Silencio } from './preferencias';
+import { BotaoRedondo } from './wpp';
 
 /**
  * O "⋯" da conversa (27/10/2026): fixar, silenciar, marcar como não lida,
@@ -90,6 +97,9 @@ export function MenuDaConversa({
   aoFecharConversa,
   variante = 'menu',
   aoEscolher,
+  concluidaEm,
+  registrarHref,
+  fichaHref,
 }: {
   fioId: string;
   bloqueada: boolean;
@@ -101,8 +111,19 @@ export function MenuDaConversa({
   variante?: 'menu' | 'folha';
   /** Na folha: fecha a folha antes de agir. */
   aoEscolher?: () => void;
+  /**
+   * Concluir a conversa, no alto do menu como no protótipo (03/11/2026): quando
+   * concluída, o ISO; aberta, null. Sem o campo, o item não aparece.
+   */
+  concluidaEm?: string | null;
+  /** "Registrar contato" e "Abrir a ficha", quando a conversa é de uma ficha. */
+  registrarHref?: string;
+  fichaHref?: string;
 }) {
   const fio = useFio();
+  const concluir = useConcluirConversa(fioId);
+  const temConcluir = concluidaEm !== undefined && podeEscrever && CONCLUIR_NA_EMPRESA;
+  const concluida = concluidaEm != null;
   const clientes = useQueryClient();
   const { reconferir } = useAcoesDosAvisos();
   const preferencias = usePreferencias();
@@ -175,6 +196,23 @@ export function MenuDaConversa({
     return (
       <>
         <ul className="flex flex-col">
+          {temConcluir ? (
+            <li>
+              <button
+                type="button"
+                className={botao}
+                disabled={concluir.isPending}
+                onClick={fazer(() => concluir.mutate(!concluida))}
+              >
+                {concluida ? (
+                  <RotateCcw className="size-5" aria-hidden="true" />
+                ) : (
+                  <CircleCheck className="size-5" aria-hidden="true" />
+                )}
+                {concluida ? 'Reabrir a conversa' : 'Concluir conversa'}
+              </button>
+            </li>
+          ) : null}
           <li>
             <button type="button" className={botao} onClick={fazer(() => void fixar())}>
               {fixada ? (
@@ -259,12 +297,27 @@ export function MenuDaConversa({
     <>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="toque size-9" title="Mais da conversa">
-            <Ellipsis aria-hidden="true" />
-            <span className="sr-only">Mais: fixar, silenciar, buscar, bloquear</span>
-          </Button>
+          <BotaoRedondo title="Mais da conversa">
+            <EllipsisVertical aria-hidden="true" />
+            <span className="sr-only">Mais: concluir, fixar, silenciar, buscar, bloquear</span>
+          </BotaoRedondo>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent
+          align="end"
+          className="w-64 rounded-2xl border-wpp-linha p-1.5 shadow-wpp-pop [&_[role=menuitem]]:min-h-10 [&_[role=menuitem]]:rounded-[10px] [&_[role=menuitem]]:px-3 [&_[role=menuitem]]:text-sm"
+        >
+          {temConcluir ? (
+            <>
+              <DropdownMenuItem
+                disabled={concluir.isPending}
+                onSelect={() => concluir.mutate(!concluida)}
+              >
+                {concluida ? <RotateCcw aria-hidden="true" /> : <CircleCheck aria-hidden="true" />}
+                {concluida ? 'Reabrir a conversa' : 'Concluir conversa'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           <DropdownMenuItem onSelect={() => void fixar()}>
             {fixada ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
             {fixada ? 'Desafixar' : 'Fixar no topo'}
@@ -306,6 +359,27 @@ export function MenuDaConversa({
                 <Star aria-hidden="true" />
                 Favoritas
               </DropdownMenuItem>
+            </>
+          ) : null}
+          {registrarHref || fichaHref ? (
+            <>
+              <DropdownMenuSeparator />
+              {registrarHref ? (
+                <DropdownMenuItem asChild>
+                  <Link href={registrarHref}>
+                    <MessageSquarePlus aria-hidden="true" />
+                    Registrar contato
+                  </Link>
+                </DropdownMenuItem>
+              ) : null}
+              {fichaHref ? (
+                <DropdownMenuItem asChild>
+                  <Link href={fichaHref}>
+                    <ExternalLink aria-hidden="true" />
+                    Abrir a ficha completa
+                  </Link>
+                </DropdownMenuItem>
+              ) : null}
             </>
           ) : null}
           {podeEscrever ? (
@@ -477,9 +551,14 @@ export function BarraDeBuscaNoFio({ className }: { className?: string }) {
   return (
     <div
       role="search"
-      className={cn('flex items-center gap-1 border-b border-hairline px-3 py-1.5', className)}
+      className={cn(
+        'flex shrink-0 items-center gap-1 border-b border-wpp-linha bg-wpp-painel px-2.5 py-2',
+        className,
+      )}
     >
-      <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <BotaoRedondo onClick={fio.fecharBusca} aria-label="Fechar a busca">
+        <X aria-hidden="true" />
+      </BotaoRedondo>
       <input
         ref={campo}
         value={termo}
@@ -492,48 +571,48 @@ export function BarraDeBuscaNoFio({ className }: { className?: string }) {
           }
         }}
         type="search"
-        placeholder="Buscar na conversa"
-        aria-label="Buscar na conversa"
-        className="h-10 min-w-0 flex-1 bg-transparent px-1 text-base outline-none md:h-8 md:text-sm"
+        placeholder="Buscar nesta conversa"
+        aria-label="Buscar nesta conversa"
+        className="h-[42px] min-w-0 flex-1 rounded-full bg-wpp-busca px-4 text-base outline-none placeholder:text-wpp-suave focus-visible:ring-3 focus-visible:ring-ring/40 md:text-[14.5px] [&::-webkit-search-cancel-button]:hidden"
       />
       {termo.trim().length >= 2 ? (
-        <span className="numerico shrink-0 px-1 text-xs text-muted-foreground">
+        <span
+          aria-live="polite"
+          className="numerico min-w-16 shrink-0 px-1 text-center text-xs text-wpp-suave"
+        >
           {achados.length === 0 ? 'nada' : `${posicao} de ${achados.length}`}
         </span>
       ) : null}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="toque size-9 shrink-0"
+      <BotaoRedondo
         disabled={achados.length === 0}
         onClick={() => fio.andarNaBusca(-1)}
         aria-label="Achado anterior (mais antigo)"
       >
         <ChevronUp aria-hidden="true" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="toque size-9 shrink-0"
+      </BotaoRedondo>
+      <BotaoRedondo
         disabled={achados.length === 0}
         onClick={() => fio.andarNaBusca(1)}
         aria-label="Próximo achado (mais recente)"
       >
         <ChevronDown aria-hidden="true" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="toque size-9 shrink-0"
-        onClick={fio.fecharBusca}
-        aria-label="Fechar a busca"
-      >
-        <X aria-hidden="true" />
-      </Button>
+      </BotaoRedondo>
     </div>
+  );
+}
+
+/** A lupa do cabeçalho da conversa: abre a busca nas mensagens deste fio. */
+export function BotaoDeBuscarNoFio({ className }: { className?: string }) {
+  const fio = useFio();
+  if (!fio) return null;
+  return (
+    <BotaoRedondo
+      onClick={() => fio.abrirBusca()}
+      aria-label="Buscar na conversa"
+      className={className}
+    >
+      <Search aria-hidden="true" />
+    </BotaoRedondo>
   );
 }
 

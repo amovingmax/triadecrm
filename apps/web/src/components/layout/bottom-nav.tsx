@@ -70,9 +70,12 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
   const { respostasNovas } = useAvisos();
 
   return (
+    // Some enquanto há uma conversa aberta em tela cheia (`data-area-visivel`, em
+    // Conversas e Grupos): no primeiro teste num iPhone, com o teclado aberto, ela
+    // apareceu embaixo da conversa (04/11/2026).
     <nav
       aria-label="Navegação principal"
-      className="superficie-vidro-inferior fixed inset-x-0 bottom-0 z-30 pb-[var(--area-segura-inferior)] md:hidden"
+      className="superficie-vidro-inferior fixed inset-x-0 bottom-0 z-30 pb-[var(--area-segura-inferior)] md:hidden [body:has([data-area-visivel])_&]:hidden"
     >
       <div className="flex h-[var(--altura-barra-inferior)] items-stretch">
         {principais.map((item) => (

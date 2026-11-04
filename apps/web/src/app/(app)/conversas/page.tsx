@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 import { requireRole } from '@/lib/auth/session';
 import { PAPEIS_DO_CRM } from '@/lib/navegacao';
@@ -8,6 +8,15 @@ import { ProvedorDoTextoDigitado } from '@/components/conversas/texto-digitado';
 import { escopoInicialDe, estadoDaUrl } from '@/components/conversas/tipos';
 
 export const metadata: Metadata = { title: 'Conversas' };
+
+/**
+ * No Android, a janela encolhe com o teclado, como no WhatsApp (04/11/2026): a
+ * caixa de escrever sobe colada nele e as mensagens encolhem junto. O padrão do
+ * Chrome é o teclado passar POR CIMA da página. O iPhone não lê este pedido; lá
+ * quem acompanha o teclado é `components/conversas/area-visivel.ts`. O resto
+ * vem do layout raiz (o Next junta os dois).
+ */
+export const viewport: Viewport = { interactiveWidget: 'resizes-content' };
 
 /**
  * Conversas (RF-CON-03 a RF-CON-06, RF-CON-22; anexos R04 e R08).

@@ -5,19 +5,20 @@ import {
   CircleCheck,
   FilterX,
   Inbox,
+  Lock,
   MessagesSquare,
   Plus,
   RotateCw,
   SearchX,
   Users,
 } from 'lucide-react';
+import type { EmpresaSlug } from '@komune/schema/empresas';
 
 import { cn } from '@/lib/utils';
+import { EMPRESA } from '@/lib/empresa';
+import { MarcaTriade } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-
-import { AvisoWhatsapp } from './aviso-whatsapp';
-import type { DependenciasDaMeta } from './tipos';
 
 /**
  * A espera, os vazios e o erro das Conversas.
@@ -198,20 +199,62 @@ export function ErroDaTela({
  * É o lugar certo para o aviso inteiro do WhatsApp: é a primeira coisa que alguém vê
  * ao abrir o módulo, e é onde a pergunta "cadê minhas mensagens?" nasce.
  */
-export function NenhumaEscolhida({ meta }: { meta: DependenciasDaMeta | null }) {
+/**
+ * A direita de Conversas quando nenhuma conversa está aberta (04/11/2026): a
+ * tela de entrada do WhatsApp do computador, com a marca da empresa no lugar da
+ * do WhatsApp. Pedido: "uma tela que não abre nenhuma conversa de alguém
+ * direto [...] aparece primeiro o logo da Imova na parte da direita". No
+ * celular ela não aparece: lá a lista ocupa a tela.
+ *
+ * O aviso do que falta no WhatsApp (`AvisoWhatsapp`) não vem para cá: ele já
+ * aparece dentro de cada conversa, que é onde ele muda o que a pessoa faz.
+ */
+export function TelaDeEntrada({
+  texto = 'Escolha uma conversa na lista ao lado.',
+}: {
+  texto?: string;
+}) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-12 text-center">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-        <MessagesSquare className="size-5" aria-hidden="true" />
-      </span>
-      <div className="space-y-1">
-        <p className="font-heading font-medium">Escolha um parceiro à esquerda</p>
-        <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-          A conversa mostra tudo que já aconteceu com ele, na mesma coluna e em ordem: mensagem
-          recebida e enviada, ligação, visita, nota e mudança de etapa, com quem fez e o desfecho.
-        </p>
+    <div className="flex h-full min-h-64 flex-col items-center bg-wpp-painel2 px-6 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 py-10">
+        <MarcaDaEmpresa />
+        <p className="text-sm text-wpp-suave">{texto}</p>
       </div>
-      <AvisoWhatsapp meta={meta} className="max-w-md text-left" />
+      <p className="flex items-center gap-1.5 pb-7 text-xs text-wpp-suave">
+        <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+        Conversas do WhatsApp oficial da {EMPRESA.nomeDoNumero}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * O logo de cada empresa, em `public/marca/`. A da Imova é o arquivo dela com o
+ * fundo branco tirado, para servir no claro e no escuro. Empresa sem arquivo
+ * mostra a marca do Tríade com o nome, no desenho da tela do WhatsApp.
+ */
+const LOGOS: Partial<Record<EmpresaSlug, { src: string; largura: number; altura: number }>> = {
+  imova: { src: '/marca/imova.png', largura: 640, altura: 238 },
+};
+
+function MarcaDaEmpresa() {
+  const logo = LOGOS[EMPRESA.slug];
+  if (logo) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- arquivo fixo, já no dobro do tamanho em que aparece: o CRM não usa o otimizador de imagens da Vercel.
+      <img
+        src={logo.src}
+        alt={EMPRESA.nome}
+        width={logo.largura}
+        height={logo.altura}
+        className="h-auto w-72 max-w-full lg:w-80"
+      />
+    );
+  }
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <MarcaTriade className="size-20" />
+      <p className="font-heading text-4xl font-semibold tracking-tight text-wpp-suave">Tríade</p>
     </div>
   );
 }

@@ -10,7 +10,6 @@ import {
   Download,
   FileText,
   Film,
-  Hourglass,
   ImageIcon,
   Sparkles,
   Star,
@@ -20,9 +19,6 @@ import { toast } from 'sonner';
 
 import { SOBREVIVE_A_NAVEGACAO } from '@/components/consultas/provedor-consultas';
 import { cn } from '@/lib/utils';
-import { iniciaisDe } from '@/lib/iniciais';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 import { ErroDaConversa, reagirAMensagem, urlDaMidia } from './acoes';
 import { AcoesDaMensagem, motivoParaNaoReagir, useToqueLongo } from './acoes-da-mensagem';
@@ -43,6 +39,7 @@ import { VirarTarefa } from './virar-tarefa';
 import { dataHoraCompleta, hora } from './formatos';
 import { entregaDaMensagem, separarAssinatura } from './mensagens';
 import { avisoSemConteudo, ROTULO_DO_ROBO, type MensagemDoFio } from './tipos';
+import { RabichoDoBalao, Tiques, type Tique } from './wpp';
 
 /**
  * Uma mensagem dentro da conversa — um balão de verdade.
@@ -90,9 +87,9 @@ export function Mensagem({
   mensagem: MensagemDoFio;
   /** Vem logo depois de outra do mesmo autor: sem nome em cima, colada na anterior. */
   agrupada?: boolean;
-  /** É a última do bloco: só ela mostra hora e entrega. */
+  /** É a última do bloco: só ela mostra os selos e o "Virar tarefa" embaixo. */
   fechaGrupo?: boolean;
-  /** Como se chama quem está do outro lado — o nome em cima do balão recebido. */
+  /** Como se chama quem está do outro lado — o nome na citação do que ele mandou. */
   nomeDoParceiro?: string | null;
 }) {
   const entrega = entregaDaMensagem(mensagem);
@@ -119,85 +116,98 @@ export function Mensagem({
   // A figurinha não tem balão no WhatsApp: ela é o balão.
   const semFundo = figurinha && !extras && !escondida;
   const nossa = !entrada;
+  // A PONTINHA fica no PRIMEIRO balão de cada bloco, como no WhatsApp; os que
+  // vêm colados embaixo têm os quatro cantos redondos.
+  const comPontinha = !agrupada && !semFundo;
+  // A HORA E O ✓✓ moram DENTRO do balão, no canto de baixo. Quando a última coisa
+  // do balão é texto, eles dividem a última linha com ele (um espaço invisível no
+  // fim do texto guarda o lugar); depois de foto, cartão ou botões, ganham a
+  // linha deles.
+  const metaNaLinha =
+    !escondida &&
+    !doContatoApagada &&
+    mensagem.texto !== null &&
+    !TIPOS_COM_ARQUIVO.has(mensagem.tipo) &&
+    mensagem.tipo !== 'location' &&
+    mensagem.tipo !== 'contacts' &&
+    mensagem.tipo !== 'interactive' &&
+    mensagem.conteudo.interativo === null &&
+    mensagem.conteudo.resposta === null &&
+    !mensagem.conteudo.naoSuportado &&
+    !mensagem.conteudo.erro &&
+    !favorita &&
+    mensagem.corrigidaPor === null &&
+    mensagem.editadaPeloContatoEm === null;
+  const tique: Tique | null = entrada
+    ? null
+    : mensagem.cancelada
+      ? null
+      : mensagem.status === 'failed'
+        ? 'falha'
+        : mensagem.status === 'queued'
+          ? 'espera'
+          : mensagem.status === 'read' || mensagem.ouvidaEm
+            ? 'lido'
+            : mensagem.status === 'delivered'
+              ? 'entregue'
+              : 'enviado';
+  const rotuloDaEntrega = mensagem.cancelada
+    ? 'cancelada'
+    : !entrada && mensagem.ouvidaEm
+      ? 'ouvido'
+      : entrega.rotulo;
+  const selos = selosDa(mensagem);
+  const temRodape =
+    (entrega.detalhe !== null && !mensagem.cancelada) ||
+    (fechaGrupo && (selos.length > 0 || entrada));
 
-  // ===========================================================================
-  // 28/09/2026 — O REDESENHO QUE O RAFAEL PEDIU DE VERDADE
-  // ===========================================================================
-  // "vamos pivotear o designer, ta mtt feio e pequeno, pode compor mais espaço
-  // (...) deixando o visual mais clean, deixando claro quem é quem". A primeira
-  // tentativa foi tímida — alargou a coluna e aumentou o balão —, e ele
-  // respondeu "manteve o mesmo". O que faltava era o desenho, não o tamanho:
-  //
-  //   * AVATAR por bloco, na coluna de quem falou. "Quem é quem" deixa de ser
-  //     uma linha de texto de 11 px e passa a ser reconhecível de relance, que
-  //     é como se lê uma conversa.
-  //   * COR DE VERDADE no que nós mandamos: `bg-primary` sólido no lugar do
-  //     véu de 20%, que no tema escuro era quase o mesmo cinza da recebida —
-  //     os dois lados pareciam iguais, e era esse o "não dá pra ver quem é".
-  //   * TIPO MAIOR em toda largura (16 px, não 15), e mais ar por dentro.
   return (
     <div
       // A âncora da citação, da lupa e da busca da lista (`irPara`).
       id={idDoBalao(mensagem.id)}
       className={cn(
-        'group flex w-full scroll-mt-16 items-end gap-2 rounded-xl transition-colors data-[apontada]:bg-muted/70',
-        entrada ? 'flex-row' : 'flex-row-reverse',
-        fechaGrupo ? 'pb-4' : 'pb-1',
+        'group flex w-full scroll-mt-20 rounded-lg transition-colors data-[apontada]:bg-wpp-cita-barra/15',
+        entrada ? 'justify-start' : 'justify-end',
+        // Bloco novo descola do anterior; dentro do bloco os balões quase encostam.
+        agrupada ? 'mt-0.5' : 'mt-2.5',
       )}
     >
-      {/* O avatar só no ÚLTIMO do bloco, e um espaço do mesmo tamanho nos
-          outros: é o que alinha a coluna sem repetir a mesma bolinha cinco
-          vezes numa sequência de cinco mensagens. */}
-      {fechaGrupo ? (
-        <Retrato mensagem={mensagem} nomeDoParceiro={nomeDoParceiro} />
-      ) : (
-        <span className="size-8 shrink-0" aria-hidden="true" />
-      )}
-
-      <div className={cn('flex min-w-0 flex-col', entrada ? 'items-start' : 'items-end')}>
-        {agrupada ? null : <Quem mensagem={mensagem} nomeDoParceiro={nomeDoParceiro} />}
-
+      <div
+        className={cn(
+          'flex min-w-0 max-w-[85%] flex-col gap-1 md:max-w-[65%]',
+          entrada ? 'items-start' : 'items-end',
+        )}
+      >
         <div
           {...toque}
           className={cn(
-            'group/balao relative min-w-0 max-w-[85%] space-y-2 text-base leading-relaxed',
-            'md:max-w-[38rem]',
+            'group/balao relative max-w-full min-w-0 text-[15px] leading-[1.45] text-foreground',
             fio && 'pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]',
             semFundo
               ? 'p-0'
               : cn(
-                  'px-4 py-3',
-                  // O canto reto é o "rabinho" do balão: fica no lado de quem falou, e só
-                  // no último do bloco — no meio do bloco todos os cantos são redondos.
-                  'rounded-2xl',
-                  // O cinza da recebida muda de degrau com o tema: no claro o cartão é
-                  // quase branco (some no fundo da página) e quem separa é o `muted`; no
-                  // escuro é o contrário — o `muted` encosta no fundo e o cartão destaca.
-                  // O QUE NÓS MANDAMOS É VERDE SÓLIDO. Era `bg-primary/20`: no tema
-                  // escuro o véu de 20% caía quase no mesmo cinza da recebida, e os dois
-                  // lados da conversa ficavam com o mesmo peso — a queixa de "não dá
-                  // para ver quem é quem" era literalmente isso. A recebida ganhou
-                  // borda em vez de fundo mais claro, para não competir.
-                  escondida
-                    ? 'border border-dashed border-hairline bg-transparent text-muted-foreground'
-                    : entrada
-                      ? cn(
-                          'border border-hairline bg-card text-foreground',
-                          fechaGrupo && 'rounded-bl-md',
-                        )
-                      : cn('bg-primary text-primary-foreground', fechaGrupo && 'rounded-br-md'),
+                  'rounded-lg pt-1.5 pr-[9px] pb-[7px] pl-2.5 shadow-wpp',
+                  entrada ? 'bg-wpp-entra' : 'bg-wpp-sai',
+                  comPontinha && (entrada ? 'rounded-tl-none' : 'rounded-tr-none'),
+                  escondida && 'text-wpp-suave',
                 ),
-            emFoco && 'ring-3 ring-ring/60',
+            emFoco && 'outline-2 outline-offset-3 outline-wpp-cita-barra',
           )}
         >
+          {comPontinha ? <RabichoDoBalao lado={entrada ? 'entra' : 'sai'} /> : null}
           {fio ? (
             <AcoesDaMensagem
               mensagem={mensagem}
               folhaAberta={folha}
               aoMudarFolha={setFolha}
-              className="absolute top-1.5 right-1.5 z-10"
+              className={cn(
+                'absolute top-0.5 right-0.5 z-10 shadow-none ring-0',
+                semFundo ? 'bg-wpp-painel' : entrada ? 'bg-wpp-entra' : 'bg-wpp-sai',
+              )}
             />
           ) : null}
+
+          {agrupada || semFundo ? null : <Quem mensagem={mensagem} />}
 
           {escondida ? (
             <AvisoDeEscondida
@@ -208,7 +218,7 @@ export function Mensagem({
           ) : null}
 
           {!escondida || verApagada ? (
-            <div className={cn('space-y-2', (escondida || doContatoApagada) && 'opacity-60')}>
+            <div className={cn('space-y-1.5', (escondida || doContatoApagada) && 'opacity-60')}>
               {mensagem.encaminhada ? (
                 <Encaminhada muito={mensagem.conteudo.muitoEncaminhada} />
               ) : null}
@@ -226,7 +236,11 @@ export function Mensagem({
               {mensagem.corrigeA ? (
                 <p className="text-xs font-semibold tracking-wide uppercase opacity-80">Correção</p>
               ) : null}
-              <Conteudo mensagem={mensagem} termo={termo} />
+              <Conteudo
+                mensagem={mensagem}
+                termo={termo}
+                espaco={metaNaLinha && !(escondida && verApagada)}
+              />
             </div>
           ) : null}
 
@@ -236,6 +250,26 @@ export function Mensagem({
             </p>
           ) : null}
           <Marcas mensagem={mensagem} favorita={favorita} aoIr={fio?.irPara} />
+
+          <span
+            className={cn(
+              'flex items-center gap-1 text-[11px] leading-none whitespace-nowrap',
+              entrada ? 'text-wpp-meta-e' : 'text-wpp-meta-s',
+              metaNaLinha
+                ? 'absolute right-[9px] bottom-[7px]'
+                : semFundo
+                  ? 'mt-1 justify-end rounded-full bg-wpp-sis px-2 py-1 shadow-wpp'
+                  : 'mt-1 justify-end',
+            )}
+            title={`${dataHoraCompleta(mensagem.em)} · ${rotuloDaEntrega}`}
+          >
+            <time dateTime={mensagem.em} className="numerico">
+              {hora(mensagem.em)}
+            </time>
+            {tique ? <Tiques tique={tique} className="size-[15px]" /> : null}
+            {mensagem.cancelada ? <span>cancelada</span> : null}
+            <span className="sr-only">{rotuloDaEntrega}</span>
+          </span>
         </div>
 
         <SelosDeReacao
@@ -255,39 +289,41 @@ export function Mensagem({
           }
         />
 
-        {fechaGrupo ? (
+        {/* Fora do balão, só o que o WhatsApp não tem e o CRM precisa dizer: por que
+            não saiu, os selos (modelo aprovado, primeiro contato) e o "Virar
+            tarefa" do que o parceiro mandou — este aparece ao passar o mouse, e
+            sempre no toque. */}
+        {temRodape ? (
           <p
             className={cn(
-              'mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground',
-              entrada ? 'justify-start' : 'flex-row-reverse',
+              'flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-[11px] text-wpp-suave',
+              entrada ? 'justify-start' : 'justify-end',
             )}
           >
-            <time dateTime={mensagem.em} title={dataHoraCompleta(mensagem.em)} className="numerico">
-              {hora(mensagem.em)}
-            </time>
-            <span
-              className={cn(
-                'inline-flex items-center gap-1',
-                entrega.tom === 'falha' && !mensagem.cancelada && 'text-destructive-texto',
-                entrega.tom === 'espera' && 'text-foreground',
-              )}
-            >
-              {entrega.tom === 'espera' ? (
-                <Hourglass className="size-3" aria-hidden="true" />
-              ) : entrega.tom === 'falha' ? (
-                <Ban className="size-3" aria-hidden="true" />
-              ) : null}
-              {/* A voz OUVIDA (recibo `played`, 27/10/2026) é mais que lida. */}
-              {mensagem.cancelada
-                ? 'cancelada'
-                : !entrada && mensagem.ouvidaEm
-                  ? 'ouvido'
-                  : entrega.rotulo}
-            </span>
-            <Selos mensagem={mensagem} />
-            {entrada ? <VirarTarefa mensagemId={mensagem.id} /> : null}
             {entrega.detalhe && !mensagem.cancelada ? (
-              <span className="w-full text-muted-foreground">{entrega.detalhe}</span>
+              <span
+                className={cn(
+                  'max-w-prose',
+                  entrega.tom === 'falha' ? 'text-destructive-texto' : 'text-foreground',
+                )}
+              >
+                {entrega.detalhe}
+              </span>
+            ) : null}
+            {fechaGrupo
+              ? selos.map((selo) => (
+                  <span
+                    key={selo}
+                    className="rounded-full bg-wpp-sis px-2 py-0.5 text-[10.5px] text-wpp-sis-texto shadow-wpp"
+                  >
+                    {selo}
+                  </span>
+                ))
+              : null}
+            {entrada && fechaGrupo ? (
+              <span className="rounded-full bg-wpp-sis shadow-wpp transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 pointer-coarse:opacity-100">
+                <VirarTarefa mensagemId={mensagem.id} />
+              </span>
             ) : null}
           </p>
         ) : null}
@@ -300,7 +336,16 @@ export function Mensagem({
  * O miolo do balão, por tipo: o arquivo, o cartão, a pergunta, o texto e o que
  * a Meta disse não entregar.
  */
-function Conteudo({ mensagem, termo }: { mensagem: MensagemDoFio; termo: string }) {
+function Conteudo({
+  mensagem,
+  termo,
+  espaco = false,
+}: {
+  mensagem: MensagemDoFio;
+  termo: string;
+  /** Guardar no fim do texto o lugar da hora e do ✓✓ (ver `metaNaLinha`). */
+  espaco?: boolean;
+}) {
   const { conteudo } = mensagem;
   const nossa = !mensagem.entrada && !mensagem.cancelada && mensagem.apagadaEm === null;
   // A opção que o contato tocou: a resposta do botão ou da lista. Sem o
@@ -342,7 +387,12 @@ function Conteudo({ mensagem, termo }: { mensagem: MensagemDoFio; termo: string 
       {escolha ? (
         <OpcaoEscolhida titulo={escolha.titulo} descricao={escolha.descricao} />
       ) : mensagem.texto && !textoRepeteOLocal ? (
-        <Texto texto={mensagem.texto} termo={termo} correcao={mensagem.corrigeA !== null} />
+        <Texto
+          texto={mensagem.texto}
+          termo={termo}
+          correcao={mensagem.corrigeA !== null}
+          espaco={espaco ? (mensagem.entrada ? 'entra' : 'sai') : null}
+        />
       ) : null}
 
       {!mensagem.entrada && conteudo.interativo ? (
@@ -458,116 +508,41 @@ function Marcas({
 }
 
 /**
- * O retrato de quem falou: duas letras num círculo, na coluna do lado dele.
+ * Quem escreveu, DENTRO do balão e no alto, como o nome nos grupos do WhatsApp.
  *
- * Não é enfeite. Numa conversa em que revezam o fornecedor, três pessoas do
- * time, o robô e a IA, o lado do balão distingue dois grupos — nós e eles — e
- * mais nada. O círculo distingue os cinco, e distingue antes de alguém ler.
- *
- * O robô e a IA têm ícone em vez de letra: eles não são gente, e dar iniciais a
- * eles seria exatamente a "tagzinha de IA" que o Rafael recusou — ao contrário,
- * na verdade: seria a máquina se fantasiando de pessoa.
+ * Só do nosso lado: a IA, o robô e o nome de quem do time escreveu — porque o
+ * número é de todos e saber quem falou por último é a pergunta de quem entra na
+ * conversa agora. O recebido não leva nome desde 03/11/2026: a conversa é com uma
+ * pessoa só, o nome dela está no cabeçalho, e é assim no WhatsApp (de 28/09 a
+ * 03/11 ele ia em cima do balão).
  */
-function Retrato({
-  mensagem,
-  nomeDoParceiro,
-}: {
-  mensagem: MensagemDoFio;
-  nomeDoParceiro: string | null;
-}) {
-  // Guardar o tipo NUMA CONSTANTE é o que deixa o TypeScript saber, lá embaixo,
-  // que `ROTULO_DO_ROBO` tem chave para ele: `mensagem.autorTipo` volta a ser o
-  // tipo largo dentro do JSX.
-  const robo =
-    mensagem.autorTipo === 'bot_ai' ||
-    mensagem.autorTipo === 'bot_fixed' ||
-    mensagem.autorTipo === 'system'
-      ? mensagem.autorTipo
-      : null;
-
-  if (!mensagem.entrada && robo !== null) {
-    return (
-      <span
-        className="flex size-8 shrink-0 items-center justify-center rounded-full border border-hairline bg-muted text-muted-foreground"
-        title={ROTULO_DO_ROBO[robo]}
-      >
-        {robo === 'bot_ai' ? (
-          <Sparkles className="size-4" aria-hidden="true" />
-        ) : (
-          <Bot className="size-4" aria-hidden="true" />
-        )}
-        <span className="sr-only">{ROTULO_DO_ROBO[robo]}</span>
-      </span>
-    );
-  }
-
-  const nome = mensagem.entrada ? nomeDoParceiro?.trim() || 'Parceiro' : (mensagem.autor ?? 'Time');
-
-  return (
-    <Avatar className="size-8 shrink-0" title={nome}>
-      <AvatarFallback
-        className={cn(
-          'text-[11px] font-medium',
-          mensagem.entrada ? 'bg-muted text-muted-foreground' : 'bg-primary/15 text-primary',
-        )}
-      >
-        {iniciaisDe(nome)}
-      </AvatarFallback>
-    </Avatar>
-  );
-}
-
-/**
- * Quem escreveu, em cima do balão e só quando acrescenta.
- *
- * De um lado a IA, o robô e o nome de quem do time escreveu — porque o número é
- * de todos e saber quem falou por último é a pergunta de quem entra na conversa
- * agora. Do outro, o nome do parceiro.
- *
- * O recebido ficou SEM nome por um tempo, com o argumento de que o lado do balão
- * já diz quem falou. Diz de quem NÃO é; não diz de quem é. Numa tela em que três
- * pessoas do time revezam no mesmo número e a conversa é lida do meio, "Buffet
- * Aurora" em cima do balão é o que fecha a conta — e é o nome que a pessoa pôs
- * no próprio WhatsApp, não o número (28/09/2026).
- */
-function Quem({
-  mensagem,
-  nomeDoParceiro,
-}: {
-  mensagem: MensagemDoFio;
-  nomeDoParceiro: string | null;
-}) {
+function Quem({ mensagem }: { mensagem: MensagemDoFio }) {
+  if (mensagem.entrada) return null;
   const daIa = mensagem.autorTipo === 'bot_ai';
   const doRobo = mensagem.autorTipo === 'bot_fixed';
   // `system` é o que o BANCO monta sozinho — hoje, a confirmação de opt-out
   // (`GEN-SYS-OPTOUT`). Ele caía em "Alguém do time", e isso é falso: não houve
-  // alguém. Ganhou nome em 28/09/2026 junto com a aba Automáticas, que usa estas
-  // mesmas três palavras — se a tela nova e o fio chamassem a mesma coisa por
-  // nomes diferentes, a pessoa teria de aprender duas vezes.
+  // alguém (28/09/2026).
   const doSistema = mensagem.autorTipo === 'system';
-
-  const quem = mensagem.entrada
-    ? nomeDoParceiro?.trim() || 'O parceiro'
-    : mensagem.autorTipo === 'human'
+  const quem =
+    mensagem.autorTipo === 'human'
       ? (mensagem.autor ?? 'Alguém do time')
       : ROTULO_DO_ROBO[mensagem.autorTipo];
 
   return (
-    <p className="mb-1 flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
-      {mensagem.entrada ? null : daIa ? (
+    <p className="mb-px flex items-center gap-1 pr-6 text-[12.5px] font-semibold text-wpp-autor">
+      {daIa ? (
         <Sparkles className="size-3" aria-hidden="true" />
       ) : doRobo || doSistema ? (
         <Bot className="size-3" aria-hidden="true" />
       ) : null}
-      <span className="font-medium text-foreground">{quem}</span>
+      <span className="truncate">{quem}</span>
       {daIa && mensagem.aprovadoPor ? (
-        <>
+        <span className="inline-flex shrink-0 items-center gap-1 font-normal text-wpp-meta-s">
           <span aria-hidden="true">·</span>
-          <span className="inline-flex items-center gap-1">
-            <BadgeCheck className="size-3" aria-hidden="true" />
-            {mensagem.aprovadoPor} aprovou
-          </span>
-        </>
+          <BadgeCheck className="size-3" aria-hidden="true" />
+          {mensagem.aprovadoPor} aprovou
+        </span>
       ) : null}
     </p>
   );
@@ -578,10 +553,10 @@ function Quem({
  *
  * Eles respondem a perguntas que alguém já fez em pé numa calçada — "isso gastou
  * o teto do dia?", "isso foi modelo aprovado?" —, mas são consulta, não leitura:
- * por isso vão na linha miúda embaixo do balão, e não dentro dele.
+ * por isso vão em pílulas miúdas embaixo do balão, e não dentro dele.
  */
-function Selos({ mensagem }: { mensagem: MensagemDoFio }) {
-  const selos = [
+function selosDa(mensagem: MensagemDoFio): string[] {
+  return [
     mensagem.porModelo ? 'modelo aprovado' : null,
     mensagem.primeiroContato ? 'primeiro contato' : null,
     mensagem.confirmacaoDeOptout ? 'confirmação de opt-out' : null,
@@ -589,17 +564,6 @@ function Selos({ mensagem }: { mensagem: MensagemDoFio }) {
       ? 'fora da janela'
       : null,
   ].filter((s): s is string => s !== null);
-  if (selos.length === 0) return null;
-
-  return (
-    <>
-      {selos.map((selo) => (
-        <Badge key={selo} variant="pilula" className="h-4 px-1.5 text-[10px] font-normal">
-          {selo}
-        </Badge>
-      ))}
-    </>
-  );
 }
 
 /**
@@ -840,19 +804,10 @@ function Documento({ mensagem }: { mensagem: MensagemDoFio }) {
     mensagem.midiaNome ?? ((mensagem.midiaTipo ?? '').includes('pdf') ? 'PDF' : 'Documento');
   const botao = cn(
     'inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors disabled:opacity-60',
-    mensagem.entrada
-      ? 'border-hairline bg-background/60 hover:bg-muted'
-      : 'border-primary-foreground/25 bg-primary-foreground/10 hover:bg-primary-foreground/20',
+    'border-wpp-linha-forte bg-wpp-painel/60 hover:bg-wpp-painel',
   );
   return (
-    <div
-      className={cn(
-        'min-w-56 space-y-2 rounded-xl border p-3',
-        mensagem.entrada
-          ? 'border-hairline bg-muted/50'
-          : 'border-primary-foreground/20 bg-primary-foreground/10',
-      )}
-    >
+    <div className="min-w-56 space-y-2 rounded-xl bg-wpp-cita p-3">
       <p className="flex items-center gap-2 pr-6">
         <FileText className="size-5 shrink-0" aria-hidden="true" />
         <span className="min-w-0 text-sm font-medium break-words">{nome}</span>
@@ -950,27 +905,47 @@ function Texto({
   texto,
   termo = '',
   correcao = false,
+  espaco = null,
 }: {
   texto: string;
-  /** A lupa da conversa (27/10/2026): o trecho que bate fica marcado. */
+  /** O que a lupa do fio está procurando: as ocorrências saem marcadas. */
   termo?: string;
-  /** É uma correção: o "Correção:" da frente já está no rótulo em cima. */
+  /** Mensagem de correção: o prefixo "Correção:" sai do corpo e vira o rótulo. */
   correcao?: boolean;
+  /**
+   * O lugar da hora (e do ✓✓, do nosso lado) na última linha: um espaço
+   * invisível do tamanho deles, que empurra a linha para baixo só quando ela
+   * não tem onde caber.
+   */
+  espaco?: 'entra' | 'sai' | null;
 }) {
   const { resto } = separarAssinatura(texto);
   const corpo = correcao ? resto.replace(PREFIXO_DA_CORRECAO, '') : resto;
-  if (!termo) return <p className="whitespace-pre-line break-words">{corpo}</p>;
+  const lugar = espaco ? (
+    <span
+      aria-hidden="true"
+      className={cn('inline-block h-px', espaco === 'sai' ? 'w-[4.25rem]' : 'w-[3rem]')}
+    />
+  ) : null;
+  if (!termo)
+    return (
+      <p className="break-words whitespace-pre-wrap">
+        {corpo}
+        {lugar}
+      </p>
+    );
   return (
-    <p className="whitespace-pre-line break-words">
+    <p className="break-words whitespace-pre-wrap">
       {partesDestacadas(corpo, termo).map((parte, i) =>
         parte.destaque ? (
-          <mark key={i} className="rounded-sm bg-menta px-0.5 text-menta-tinta">
+          <mark key={i} className="rounded-sm bg-wpp-marca px-0.5 text-wpp-marca-texto">
             {parte.texto}
           </mark>
         ) : (
           <span key={i}>{parte.texto}</span>
         ),
       )}
+      {lugar}
     </p>
   );
 }

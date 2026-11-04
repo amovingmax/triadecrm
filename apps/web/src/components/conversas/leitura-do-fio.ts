@@ -32,11 +32,12 @@ import { CHAVE_CONVERSAS } from './dados';
  * ===========================================================================
  * AS TRÊS CONDIÇÕES
  * ===========================================================================
- * - **A pessoa ESCOLHEU a conversa.** O desktop abre a primeira da lista sem
- *   ninguém pedir, e quem tem mensagem por ler vem primeiro. Zerar ali faria
- *   cada pessoa que entra na tela apagar, para o time inteiro, o sinal da
- *   conversa do topo — o contador é da conversa, não de quem olha. Clicar,
- *   rolar ou digitar dentro dela vale como escolha (`tela-conversas.tsx`).
+ * - **A pessoa ESCOLHEU a conversa.** Até 04/11/2026 o desktop abria a
+ *   primeira da lista sem ninguém pedir, e quem tem mensagem por ler vem
+ *   primeiro: zerar ali faria cada pessoa que entra na tela apagar, para o time
+ *   inteiro, o sinal da conversa do topo — o contador é da conversa, não de
+ *   quem olha. Hoje a tela só abre o que a pessoa escolheu (`tela-conversas.tsx`),
+ *   e a condição fica de guarda para nenhuma abertura sozinha voltar a zerar.
  * - **A janela está na frente dela.** Aba escondida ou outro programa em foco
  *   não é leitura: a mensagem que chega enquanto a pessoa está no e-mail
  *   continua por ler até ela voltar. É a regra do WhatsApp Web.

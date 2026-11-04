@@ -13,6 +13,7 @@ import { TransicaoPagina } from '@/components/movimento';
 import { type Sessao } from '@/lib/auth/session';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
 import { telasParaAdiantar } from '@/lib/navegacao';
+import { cn } from '@/lib/utils';
 
 /**
  * Casca da área autenticada, responsiva e mobile-first (PRD §8):
@@ -59,7 +60,10 @@ export function AppShell({
     <ProvedorDeAvisos usuarioId={sessao.id} papel={sessao.papel}>
       <ProvedorDoSoftphone podeLigar={podeLigar(sessao.papel)}>
         <ProvedorDaLigacaoWhatsapp podeLigar={podeLigar(sessao.papel)}>
-        <div className="flex min-h-dvh bg-background">
+        {/* Com uma conversa aberta em tela cheia no celular (`data-area-visivel`), o
+            fundo é o da caixa de escrever: qualquer fresta entre ela e o teclado
+            subindo fica da cor dela, nunca preta (04/11/2026). */}
+        <div className="flex min-h-dvh bg-background has-[[data-area-visivel]]:bg-wpp-painel2">
           <Sidebar papel={sessao.papel} filas={filas} />
 
           <div className="flex min-w-0 flex-1 flex-col">
@@ -67,7 +71,15 @@ export function AppShell({
 
             <main
               id="conteudo"
-              className="flex-1 px-4 pt-4 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-5 md:pt-3 md:pb-8"
+              className={cn(
+                'flex-1 px-4 pt-4 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-5 md:pt-3 md:pb-8',
+                // A tela de Conversas vai de ponta a ponta, como o WhatsApp
+                // (03/11/2026): sem a margem do conteúdo no celular e com 12px no
+                // computador, e sem o teto de 1400px. Ela se anuncia com
+                // `data-tela-cheia`; as outras telas ficam como eram.
+                'has-[[data-tela-cheia]]:px-0 has-[[data-tela-cheia]]:pt-0 has-[[data-tela-cheia]]:pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior))]',
+                'md:has-[[data-tela-cheia]]:px-3 md:has-[[data-tela-cheia]]:pb-3',
+              )}
             >
               {/* Coluna centralizada com teto: cada tela ainda escolhe a própria medida de
               leitura, mas nenhuma fica grudada na barra lateral com um terço de vazio
@@ -75,7 +87,7 @@ export function AppShell({
               {/* 1400px e não 1440 (Tríade Design System): o sistema desenha num
               quadro de 1440 com 20px de margem de cada lado, e o conteúdo que
               sobra é exatamente 1400. */}
-              <div className="mx-auto w-full max-w-[1400px]">
+              <div className="mx-auto w-full max-w-[1400px] has-[[data-tela-cheia]]:max-w-none">
                 <TransicaoPagina>{children}</TransicaoPagina>
               </div>
             </main>

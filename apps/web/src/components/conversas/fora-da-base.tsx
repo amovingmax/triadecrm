@@ -1,15 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArrowLeft, ChevronDown, Ellipsis, Link2, Phone, UserPlus, X } from 'lucide-react';
+import { Archive, ArrowLeft, EllipsisVertical, Link2, PanelRight, UserPlus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { MarcaDeNova } from '@/components/avisos/marca-de-nova';
-import { useConversasNovas } from '@/components/avisos/provedor-avisos';
 import { EMPRESA, TIPOS_EM_USO, TIPOS_POR_EXTENSO } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
-import { iniciaisDe } from '@/lib/iniciais';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,14 +42,20 @@ import {
   vincularConversa,
   type ResultadoDaFicha,
 } from './fora-da-base-dados';
-import { rotuloDoDia } from './formatos';
-import { PreviaDoRascunho } from './lista-conversas';
-import { BotaoDeLigarNaConversa, FaixaDaLigacao } from '@/components/ligacao-whatsapp/botao-na-conversa';
+import { ListaConversas } from './lista-conversas';
+import {
+  BotaoDeLigarNaConversa,
+  FaixaDaLigacao,
+} from '@/components/ligacao-whatsapp/botao-na-conversa';
 import { SEM_PERDIDAS, type Perdidas } from '@/components/ligacao-whatsapp/logica';
-import { SeloDeLigacaoPerdida } from '@/components/ligacao-whatsapp/perdidas';
-import { FaixaDaJanela, Janela24h } from './janela-24h';
+import { AreaDoFio, FichaAoLado, ROTULO_DA_SECAO, useAvisoDeNaoLidas } from './fio-wpp';
+import { Janela24h, PilulaDaJanela } from './janela-24h';
+import { LinhaDoTempo } from './linha-do-tempo';
+import { agruparPorDia, montarLinhaDoTempo } from './montagem';
+import type { Preferencias } from './preferencias';
+import { AvatarDaConversa, BotaoRedondo } from './wpp';
+import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 import { useLeituraDoFio } from './leitura-do-fio';
-import { Mensagem } from './mensagem-do-fio';
 import {
   estadoDaJanela,
   JANELA_APERTADA_MIN,
@@ -61,14 +64,18 @@ import {
   podeEscreverLivre,
   type FioCru,
 } from './mensagens';
-import { AvisoDeBloqueio, BarraDeBuscaNoFio, MenuDaConversa } from './menu-da-conversa';
+import {
+  AvisoDeBloqueio,
+  BarraDeBuscaNoFio,
+  BotaoDeBuscarNoFio,
+  MenuDaConversa,
+} from './menu-da-conversa';
 import { useEu } from './assumir-conversa';
-import { AtitudeDaConversaNoTopo, AtitudeNaLista } from './atitude';
+import { AtitudeDaConversaNoTopo } from './atitude';
 import type { BaseDasAtitudes } from './atitude-dados';
 import type { CatalogosConversas } from './montagem';
 import { TextoLivre } from './responder';
 import { useRolagemNoFim } from './rolagem-no-fim';
-import { previaDoDigitado, useTextosDigitados } from './texto-digitado';
 
 /**
  * A aba "Clientes" (era "Fora da base"): quem escreveu para o número da KOMUNE
@@ -88,26 +95,26 @@ export function ListaForaDaBase({
   aoEscolher,
   atitudes = null,
   perdidas = SEM_PERDIDAS,
+  preferencias,
+  porInteresse = false,
 }: {
   fios: FioCru[];
   selecionadoId: string | null;
   aoEscolher: (id: string) => void;
-  /** A atitude do cliente (29/10/2026). A ordem já vem feita de quem chama. */
+  /** A atitude do cliente (Imova): a etiqueta na linha. Desligada, nada aparece. */
   atitudes?: BaseDasAtitudes | null;
-  /** A ligação perdida e sem retorno (03/11/2026). A ordem também vem feita. */
+  /** Quem ligou e não foi atendido (03/11/2026): sobe para o topo com o selo. */
   perdidas?: Perdidas;
+  /** Fixar e silenciar de quem está olhando. */
+  preferencias?: Preferencias;
+  /** "Mais interessados": a ordem é a da atitude. */
+  porInteresse?: boolean;
 }) {
-  // As conversas com mensagem ainda sem resposta: a mesma marca da lista de
-  // Conversas, e o mesmo número do menu (`components/avisos`).
-  const novas = useConversasNovas();
-  // O que a pessoa digitou e não enviou: "Rascunho:" na linha, como na lista de
-  // Conversas (`texto-digitado.ts`).
-  const digitados = useTextosDigitados();
   if (fios.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
         <p className="font-medium">Nenhum cliente esperando</p>
-        <p className="max-w-xs text-sm text-muted-foreground">
+        <p className="max-w-xs text-sm text-wpp-suave">
           {EMPRESA.modulos.fichaDoCliente
             ? `Quem escrever para a ${EMPRESA.nomeDoNumero} aparece aqui e ganha a ficha de cliente sozinho, com a etapa e a próxima ação.`
             : `Quem escrever para a ${EMPRESA.nomeDoNumero} e não for parceiro aparece aqui: cliente da plataforma, curioso ou fornecedor que ainda não está na base.`}
@@ -115,82 +122,21 @@ export function ListaForaDaBase({
       </div>
     );
   }
+  // A mesma linha da lista de Conversas, no jeito do WhatsApp (03/11/2026): o
+  // retrato, o nome e a hora, a prévia, o número verde e a setinha das opções.
   return (
-    <ul className="flex flex-col gap-1 p-2">
-      {fios.map((fio) => {
-        const selecionado = fio.id === selecionadoId;
-        const nome = fio.peer_nome?.trim();
-        const nova = novas.has(fio.id);
-        const perdida = perdidas.get(fio.id);
-        const rascunho = selecionado ? null : previaDoDigitado(digitados.get(fio.id)?.texto);
-        return (
-          <li key={fio.id}>
-            <button
-              type="button"
-              onClick={() => aoEscolher(fio.id)}
-              aria-current={selecionado ? 'true' : undefined}
-              className={cn(
-                'flex min-h-16 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors',
-                'hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50',
-                selecionado && 'bg-muted',
-              )}
-            >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
-                {nome ? iniciaisDe(nome) : <Phone className="size-4" aria-hidden="true" />}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      'min-w-0 truncate text-[15px]',
-                      nova || perdida || fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
-                    )}
-                  >
-                    {nomeDoCliente(fio)}
-                  </span>
-                  {nova ? <MarcaDeNova /> : null}
-                </span>
-                {perdida ? (
-                  <span className="mt-0.5 block">
-                    <SeloDeLigacaoPerdida perdida={perdida} />
-                  </span>
-                ) : null}
-                {rascunho ? (
-                  <PreviaDoRascunho texto={rascunho} className="block text-[13px]" />
-                ) : (
-                  <span className="block truncate text-[13px] text-muted-foreground">
-                    {nome ? formatarTelefone(fio.peer_phone_e164) : 'sem nome no perfil'}
-                    {fio.unread_count > 0
-                      ? ` · ${fio.unread_count} ${fio.unread_count === 1 ? 'por ler' : 'por ler'}`
-                      : ''}
-                  </span>
-                )}
-                {atitudes?.ligada ? (
-                  <span className="mt-1 block">
-                    <AtitudeNaLista
-                      atitude={atitudes.porConversa.get(fio.id)}
-                      objecoes={atitudes.objecoes}
-                    />
-                  </span>
-                ) : null}
-              </span>
-              <span className="flex shrink-0 flex-col items-end gap-1">
-                {fio.last_message_at ? (
-                  <span className="numerico text-xs text-muted-foreground">
-                    {rotuloDoDia(fio.last_message_at).palavra}
-                  </span>
-                ) : null}
-                {fio.unread_count > 0 ? (
-                  <span className="numerico inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-menta px-1.5 text-[11px] font-semibold text-menta-tinta">
-                    {fio.unread_count}
-                  </span>
-                ) : null}
-              </span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+    <ListaConversas
+      itens={[]}
+      selecionadoId={null}
+      aoEscolher={() => {}}
+      clientes={fios}
+      clienteSelecionadoId={selecionadoId}
+      aoEscolherCliente={aoEscolher}
+      preferencias={preferencias}
+      atitudes={atitudes}
+      porInteresse={porInteresse}
+      perdidas={perdidas}
+    />
   );
 }
 
@@ -202,6 +148,8 @@ export function ConversaForaDaBase({
   escolhaExplicita,
   mensagemAlvo = null,
   aoChegarNoAlvo,
+  fichaAberta,
+  aoAlternarFicha,
 }: {
   fio: FioCru;
   catalogos: CatalogosConversas;
@@ -213,6 +161,9 @@ export function ConversaForaDaBase({
   /** Abrir já na mensagem que a busca da lista achou (27/10/2026). */
   mensagemAlvo?: string | null;
   aoChegarNoAlvo?: () => void;
+  /** A coluna "Dados do contato" ao lado, no computador: vale para todas as conversas. */
+  fichaAberta: boolean;
+  aoAlternarFicha: () => void;
 }) {
   const nomeDaPessoa = useMemo(
     () => new Map(catalogos.pessoas.map((p) => [p.id, p.nome])),
@@ -231,7 +182,7 @@ export function ConversaForaDaBase({
     escolhida: escolhaExplicita,
   });
   // Abre no fim, como a conversa de parceiro (ver `rolagem-no-fim.ts`).
-  const { rolagem, conteudo, aoRolar, soltar } = useRolagemNoFim(
+  const { rolagem, conteudo, aoRolar, soltar, longe, irAoFim } = useRolagemNoFim(
     fio.id,
     mensagens.data?.length ?? 0,
   );
@@ -250,6 +201,93 @@ export function ConversaForaDaBase({
   const janela = estadoDaJanela(fio.window_expires_at);
   const nome = fio.peer_nome?.trim();
 
+  const dias = useMemo(
+    () =>
+      mensagens.data
+        ? agruparPorDia(
+            montarLinhaDoTempo({
+              atividades: [],
+              historico: [],
+              mensagens: mensagens.data,
+              catalogos,
+            }),
+          )
+        : [],
+    [mensagens.data, catalogos],
+  );
+  const avisoDeNaoLidas = useAvisoDeNaoLidas(dias, fio.unread_count);
+  const painel = useRef<HTMLDivElement>(null);
+  const naoCabeAFicha = () =>
+    window.matchMedia('(max-width: 767px)').matches ||
+    (window.matchMedia('(pointer: coarse)').matches && (painel.current?.clientWidth ?? 0) < 672);
+  const ehCelular = useEhCelular();
+  const rotulo = nomeDoCliente(fio);
+
+  // O que a folha do celular e a coluna "Dados do contato" mostram: a atitude, as
+  // ações e o telefone.
+  const ficha = (naFolha: boolean) => (
+    <>
+      <AtitudeNaFolha conversaId={fio.id} podeEscrever={Boolean(eu?.podeEscrever)} />
+
+      <section aria-label="Ações" className="flex flex-col gap-2">
+        <h3 className={ROTULO_DA_SECAO}>Ações</h3>
+        <div className={cn('grid gap-2', naFolha ? 'grid-cols-2' : 'grid-cols-1')}>
+          {virando ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              className={ACAO_DA_FOLHA}
+              onClick={() => {
+                setFolha(false);
+                setVirando(true);
+              }}
+            >
+              <UserPlus aria-hidden="true" />
+              Virar parceiro
+            </Button>
+          )}
+          {eu?.podeEscrever ? (
+            CONCLUIR_NA_EMPRESA ? (
+              <ConcluirConversa
+                fioId={fio.id}
+                concluidaEm={fio.arquivada_em}
+                tamanho="bloco"
+                className={ACAO_DA_FOLHA}
+              />
+            ) : (
+              <ArquivarCliente fio={fio} comNome className={ACAO_DA_FOLHA} />
+            )
+          ) : null}
+        </div>
+      </section>
+
+      {naFolha ? (
+        <section aria-label="Conversa" className="flex flex-col gap-1">
+          <h3 className={ROTULO_DA_SECAO}>Conversa</h3>
+          <MenuDaConversa
+            variante="folha"
+            fioId={fio.id}
+            bloqueada={bloqueada}
+            podeEscrever={Boolean(eu?.podeEscrever)}
+            atualizar={chavesDaConversa}
+            aoFecharConversa={aoVoltar}
+            aoEscolher={() => setFolha(false)}
+          />
+        </section>
+      ) : null}
+
+      <section aria-label="Contato" className="flex flex-col gap-1">
+        <h3 className={ROTULO_DA_SECAO}>Contato</h3>
+        <dl className="flex flex-col text-sm">
+          <div className="flex items-baseline justify-between gap-4 py-2.5">
+            <dt className="text-wpp-suave">WhatsApp</dt>
+            <dd className="numerico text-right">{formatarTelefone(fio.peer_phone_e164)}</dd>
+          </div>
+        </dl>
+      </section>
+    </>
+  );
+
   return (
     <ProvedorDoFio
       fioId={fio.id}
@@ -262,301 +300,228 @@ export function ConversaForaDaBase({
       mensagemAlvo={mensagemAlvo}
       aoChegarNoAlvo={aoChegarNoAlvo}
     >
-      <div className="@container flex h-full min-h-0 flex-col">
-        {/* Um cabeçalho por aparelho, como o do parceiro (`conversa.tsx`).
-          Celular, e tablet com o painel estreito: UMA LINHA (protótipo A,
-          20/10/2026) — voltar, o retrato, o nome com o telefone embaixo e o "⋯";
-          o nome e o "⋯" abrem a folha com o telefone e as ações. Computador:
-          tudo numa linha, como antes. */}
-        <header className="@container border-b border-hairline">
-          <div className="hidden h-16 items-center gap-1 pr-1.5 pl-1 md:pl-3 conversa-estreita:flex">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="toque size-11 shrink-0 md:hidden"
+      <div className="flex h-full min-h-0">
+        <div ref={painel} className="@container flex h-full min-h-0 min-w-0 flex-1 flex-col">
+          {/* O cabeçalho do WhatsApp, como o do parceiro (`conversa.tsx`): o
+              retrato, o nome com o telefone embaixo e, à direita, buscar, ligar,
+              virar parceiro, concluir e o "⋯". Tocar no nome abre os dados do
+              contato — a folha no celular, a coluna ao lado no computador. */}
+          <header className="flex h-14 shrink-0 items-center gap-0.5 border-b md:h-16 border-wpp-linha bg-wpp-painel pr-2.5 pl-1 md:pl-3">
+            <BotaoRedondo
               onClick={aoVoltar}
+              className="text-foreground md:hidden"
               aria-label="Voltar para a lista"
             >
               <ArrowLeft aria-hidden="true" />
-            </Button>
+            </BotaoRedondo>
             <button
               type="button"
-              onClick={() => setFolha(true)}
+              onClick={() => (naoCabeAFicha() ? setFolha(true) : aoAlternarFicha())}
               aria-haspopup="dialog"
-              className="toque flex h-14 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 text-left outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="toque flex h-[52px] min-w-0 flex-1 items-center gap-3 rounded-[14px] pr-2 pl-1 text-left outline-none hover:bg-foreground/[0.04] focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
-                {nome ? iniciaisDe(nome) : <Phone className="size-4" aria-hidden="true" />}
-              </span>
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate text-[17px] leading-tight font-semibold">
-                  {nomeDoCliente(fio)}
-                </span>
-                <span className="flex min-w-0 items-center gap-1 text-[12.5px] text-muted-foreground">
-                  <span className="truncate">
-                    {nome ? `${formatarTelefone(fio.peer_phone_e164)} · ` : ''}não é parceiro
-                  </span>
-                  <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
+              <AvatarDaConversa nome={nome || '?'} tamanho={40} />
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate text-base leading-tight font-semibold">{rotulo}</span>
+                <span className="truncate text-[12.5px] text-wpp-suave">
+                  {nome ? `${formatarTelefone(fio.peer_phone_e164)} · ` : ''}não é parceiro
                 </span>
               </span>
               <span className="sr-only">: ver o telefone e as ações</span>
             </button>
+            <BotaoDeBuscarNoFio className="max-md:hidden" />
             {eu?.podeEscrever ? (
-              <BotaoDeLigarNaConversa conversaId={fio.id} nome={nomeDoCliente(fio)} compacto />
+              <BotaoDeLigarNaConversa conversaId={fio.id} nome={rotulo} compacto={ehCelular} />
             ) : null}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="toque size-11 shrink-0"
-              onClick={() => setFolha(true)}
-              aria-label="Mais: telefone e ações"
-            >
-              <Ellipsis aria-hidden="true" />
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-3 px-4 py-3 conversa-estreita:hidden">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
-              {nome ? iniciaisDe(nome) : <Phone className="size-4" aria-hidden="true" />}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px] font-semibold">{nomeDoCliente(fio)}</p>
-              <p className="truncate text-[13px] text-muted-foreground">
-                {nome ? `${formatarTelefone(fio.peer_phone_e164)} · ` : ''}não é parceiro
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
-                <AtitudeDaConversaNoTopo conversaId={fio.id} podeEscrever={Boolean(eu?.podeEscrever)} />
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              {eu?.podeEscrever ? (
-                <BotaoDeLigarNaConversa conversaId={fio.id} nome={nomeDoCliente(fio)} />
-              ) : null}
-              {virando ? null : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="toque h-8"
-                  onClick={() => setVirando(true)}
-                  title={`É ${TIPOS_POR_EXTENSO}? Leve para a base.`}
-                >
-                  <UserPlus aria-hidden="true" />
-                  Virar parceiro
-                </Button>
-              )}
-              {CONCLUIR_NA_EMPRESA ? (
+            {virando ? null : (
+              <Button
+                type="button"
+                variant="outline"
+                className="toque mx-0.5 h-10 shrink-0 rounded-full border-wpp-linha-forte bg-transparent px-3.5 text-[13.5px] font-medium conversa-estreita:hidden"
+                onClick={() => setVirando(true)}
+                title={`É ${TIPOS_POR_EXTENSO}? Leve para a base.`}
+              >
+                <UserPlus aria-hidden="true" />
+                <span className="hidden @3xl:inline">Virar parceiro</span>
+                <span className="sr-only @3xl:hidden">Virar parceiro</span>
+              </Button>
+            )}
+            {eu?.podeEscrever ? (
+              CONCLUIR_NA_EMPRESA ? (
                 <ConcluirConversa
                   fioId={fio.id}
                   concluidaEm={fio.arquivada_em}
-                  className="toque h-8"
+                  rotuloPelaLargura
+                  className="mx-1 conversa-estreita:hidden"
                 />
               ) : (
-                <ArquivarCliente fio={fio} />
-              )}
+                <ArquivarCliente fio={fio} className="conversa-estreita:hidden" />
+              )
+            ) : null}
+            <BotaoRedondo
+              onClick={aoAlternarFicha}
+              aria-pressed={fichaAberta}
+              aria-label={fichaAberta ? 'Fechar os dados do contato' : 'Ver os dados do contato'}
+              className="max-md:hidden conversa-estreita:hidden"
+            >
+              <PanelRight aria-hidden="true" />
+            </BotaoRedondo>
+            <span className="contents conversa-estreita:hidden">
               <MenuDaConversa
                 fioId={fio.id}
                 bloqueada={bloqueada}
                 podeEscrever={Boolean(eu?.podeEscrever)}
                 atualizar={chavesDaConversa}
                 aoFecharConversa={aoVoltar}
+                concluidaEm={fio.arquivada_em}
               />
-            </div>
-          </div>
+            </span>
+            <BotaoRedondo
+              onClick={() => setFolha(true)}
+              aria-label="Mais: telefone e ações"
+              className="hidden conversa-estreita:inline-flex"
+            >
+              <EllipsisVertical aria-hidden="true" />
+            </BotaoRedondo>
+          </header>
+
+          <BarraDeBuscaNoFio />
           <FaixaDeConcluida
+            fioId={fio.id}
             concluidaEm={fio.arquivada_em}
             concluidaPor={fio.arquivada_por ? (nomeDaPessoa.get(fio.arquivada_por) ?? null) : null}
-            className="border-t border-hairline"
+            podeReabrir={Boolean(eu?.podeEscrever)}
           />
-          <FaixaDaLigacao conversaId={fio.id} className="border-t border-hairline" />
-        </header>
-        {/* A lupa da conversa (27/10/2026), aberta pelo "⋯". */}
-        <BarraDeBuscaNoFio />
+          <FaixaDaLigacao conversaId={fio.id} className="border-b border-wpp-linha" />
 
-        <Sheet open={folha} onOpenChange={setFolha}>
-          <SheetContent
-            side="bottom"
-            className="max-h-[88svh] gap-5 overflow-y-auto rounded-t-2xl px-4 pt-4 pb-[calc(var(--area-segura-inferior)+1.25rem)]"
-          >
-            <SheetHeader className="flex-row items-center gap-3 p-0 pr-12 text-left">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground">
-                {nome ? iniciaisDe(nome) : <Phone className="size-5" aria-hidden="true" />}
-              </span>
-              <div className="min-w-0">
-                <SheetTitle className="text-lg leading-tight">{nomeDoCliente(fio)}</SheetTitle>
-                <SheetDescription className="text-[13px]">
-                  Não é parceiro: quem escreve aqui quase sempre é cliente.
-                </SheetDescription>
-              </div>
-            </SheetHeader>
-
-            <AtitudeNaFolha conversaId={fio.id} podeEscrever={Boolean(eu?.podeEscrever)} />
-
-            <section aria-label="Ações" className="flex flex-col gap-2">
-              <h3 className="text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">
-                Ações
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                {virando ? null : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={ACAO_DA_FOLHA}
-                    onClick={() => {
-                      setFolha(false);
-                      setVirando(true);
-                    }}
-                  >
-                    <UserPlus aria-hidden="true" />
-                    Virar parceiro
-                  </Button>
-                )}
-                {CONCLUIR_NA_EMPRESA ? (
-                  <ConcluirConversa
-                    fioId={fio.id}
-                    concluidaEm={fio.arquivada_em}
-                    tamanho="default"
-                    className={ACAO_DA_FOLHA}
-                  />
-                ) : (
-                  <ArquivarCliente fio={fio} comNome className={ACAO_DA_FOLHA} />
-                )}
-              </div>
-            </section>
-
-            <section aria-label="Conversa" className="flex flex-col gap-1">
-              <h3 className="text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">
-                Conversa
-              </h3>
-              <MenuDaConversa
-                variante="folha"
-                fioId={fio.id}
-                bloqueada={bloqueada}
-                podeEscrever={Boolean(eu?.podeEscrever)}
-                atualizar={chavesDaConversa}
-                aoFecharConversa={aoVoltar}
-                aoEscolher={() => setFolha(false)}
-              />
-            </section>
-
-            <section aria-label="Contato" className="flex flex-col gap-1">
-              <h3 className="text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">
-                Contato
-              </h3>
-              <dl className="flex flex-col text-sm">
-                <div className="flex items-baseline justify-between gap-4 py-2.5">
-                  <dt className="text-muted-foreground">WhatsApp</dt>
-                  <dd className="numerico text-right">{formatarTelefone(fio.peer_phone_e164)}</dd>
+          <Sheet open={folha} onOpenChange={setFolha}>
+            <SheetContent
+              side="bottom"
+              className="max-h-[88svh] gap-5 overflow-y-auto rounded-t-2xl px-4 pt-4 pb-[calc(var(--area-segura-inferior)+1.25rem)]"
+            >
+              <SheetHeader className="flex-row items-center gap-3 p-0 pr-12 text-left">
+                <AvatarDaConversa nome={nome || '?'} tamanho={48} anel="var(--background)" />
+                <div className="min-w-0">
+                  <SheetTitle className="text-lg leading-tight">{rotulo}</SheetTitle>
+                  <SheetDescription className="text-[13px]">
+                    Não é parceiro: quem escreve aqui quase sempre é cliente.
+                  </SheetDescription>
                 </div>
-              </dl>
-            </section>
-          </SheetContent>
-        </Sheet>
+              </SheetHeader>
+              {ficha(true)}
+            </SheetContent>
+          </Sheet>
 
-        {/* "Virar parceiro" é a exceção: quem escreve aqui quase sempre é cliente,
-          e cliente se responde, não se cadastra. O formulário só abre a pedido. */}
-        {virando ? (
-          <section
-            aria-label="Levar para a base de parceiros"
-            className="space-y-3 border-b border-hairline bg-muted/30 px-4 py-4"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">Levar para a base de parceiros</p>
-                <p className="text-xs text-muted-foreground">
-                  Só para {TIPOS_POR_EXTENSO}. Cliente se responde aqui mesmo.
-                </p>
+          {/* "Virar parceiro" é a exceção: quem escreve aqui quase sempre é cliente,
+              e cliente se responde, não se cadastra. O formulário só abre a pedido. */}
+          {virando ? (
+            <section
+              aria-label="Levar para a base de parceiros"
+              className="max-h-[50%] shrink-0 space-y-3 overflow-y-auto border-b border-wpp-linha bg-wpp-painel2 px-4 py-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Levar para a base de parceiros</p>
+                  <p className="text-xs text-wpp-suave">
+                    Só para {TIPOS_POR_EXTENSO}. Cliente se responde aqui mesmo.
+                  </p>
+                </div>
+                <BotaoRedondo onClick={() => setVirando(false)} aria-label="Fechar" tamanho="sm">
+                  <X aria-hidden="true" />
+                </BotaoRedondo>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="toque size-9 shrink-0"
-                onClick={() => setVirando(false)}
-              >
-                <X aria-hidden="true" />
-                <span className="sr-only">Fechar</span>
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={modo === 'criar' ? 'default' : 'outline'}
-                className="toque h-11 md:h-9"
-                onClick={() => setModo('criar')}
-              >
-                <UserPlus aria-hidden="true" />
-                Criar parceiro
-              </Button>
-              <Button
-                type="button"
-                variant={modo === 'ligar' ? 'default' : 'outline'}
-                className="toque h-11 md:h-9"
-                onClick={() => setModo('ligar')}
-              >
-                <Link2 aria-hidden="true" />
-                Ligar a um que já existe
-              </Button>
-            </div>
-            {modo === 'criar' ? (
-              <CriarFicha fio={fio} catalogos={catalogos} aoLigar={aoLigar} />
-            ) : (
-              <LigarFicha fio={fio} aoLigar={aoLigar} />
-            )}
-          </section>
-        ) : null}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={modo === 'criar' ? 'default' : 'outline'}
+                  className="toque h-11 rounded-full md:h-9"
+                  onClick={() => setModo('criar')}
+                >
+                  <UserPlus aria-hidden="true" />
+                  Criar parceiro
+                </Button>
+                <Button
+                  type="button"
+                  variant={modo === 'ligar' ? 'default' : 'outline'}
+                  className="toque h-11 rounded-full md:h-9"
+                  onClick={() => setModo('ligar')}
+                >
+                  <Link2 aria-hidden="true" />
+                  Ligar a um que já existe
+                </Button>
+              </div>
+              {modo === 'criar' ? (
+                <CriarFicha fio={fio} catalogos={catalogos} aoLigar={aoLigar} />
+              ) : (
+                <LigarFicha fio={fio} aoLigar={aoLigar} />
+              )}
+            </section>
+          ) : null}
 
-        <div ref={rolagem} onScroll={aoRolar} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <div ref={conteudo} className="space-y-2">
+          <AreaDoFio
+            rolagem={rolagem}
+            conteudo={conteudo}
+            aoRolar={aoRolar}
+            longe={longe}
+            irAoFim={irAoFim}
+            topo={<PilulaDaJanela estado={janela} />}
+          >
             {mensagens.isPending ? (
-              <p className="text-sm text-muted-foreground">Carregando as mensagens...</p>
+              <p className="mx-auto my-6 text-sm text-wpp-suave">Carregando as mensagens...</p>
             ) : mensagens.isError ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="mx-auto my-6 text-sm text-wpp-suave">
                 {mensagens.error instanceof ErroDaConversa
                   ? mensagens.error.message
                   : 'Não deu para ler as mensagens.'}
               </p>
             ) : (
-              // O nome do cliente em cima do balão dele: sem isto, a mensagem de quem
-              // não é parceiro aparecia assinada "O parceiro".
-              doFio.map((m) => (
-                <Mensagem key={m.id} mensagem={m} nomeDoParceiro={nome || 'Cliente'} />
-              ))
+              // O nome do cliente vai para a citação do que ele mandou: sem isto,
+              // a mensagem de quem não é parceiro aparecia assinada "O parceiro".
+              <LinhaDoTempo
+                dias={dias}
+                nomeDoParceiro={nome || 'Cliente'}
+                naoLidas={avisoDeNaoLidas}
+              />
+            )}
+          </AreaDoFio>
+
+          {/* A caixa de resposta, como em qualquer conversa: dentro das 24 h desde a
+              última mensagem da pessoa, texto livre; depois disso o WhatsApp só
+              deixa abrir com um modelo aprovado (o cumprimento do período). No
+              celular o rodapé cresce até 60% e respeita a barrinha do iPhone. */}
+          <div className="max-h-[42%] shrink-0 space-y-2 overflow-y-auto border-t border-wpp-linha bg-wpp-painel2 px-2 py-1.5 max-md:max-h-[60%] max-md:pb-[calc(0.375rem+var(--folga-inferior,0px))] md:px-3 md:py-2.5">
+            {janela.situacao === 'aberta' && janela.restanteMin <= JANELA_APERTADA_MIN ? (
+              <Janela24h estado={janela} className="mx-1" />
+            ) : null}
+            {bloqueada ? (
+              // Bloqueada no CRM: nada sai, nem modelo. Quem desbloqueia é o "⋯".
+              <AvisoDeBloqueio
+                fioId={fio.id}
+                quem={fio.bloqueada_por ? (nomeDaPessoa.get(fio.bloqueada_por) ?? null) : null}
+                naMeta={lerBloqueioNaMeta(fio.bloqueio_na_meta)}
+                erro={fio.bloqueio_erro?.trim() || null}
+                atualizar={chavesDaConversa}
+              />
+            ) : podeEscreverLivre(janela) ? (
+              <TextoLivre key={fio.id} fioId={fio.id} atualizar={chavesDaConversa} />
+            ) : (
+              <EnviarModelo destino={{ tipo: 'conversa', conversaId: fio.id }} />
             )}
           </div>
         </div>
 
-        {/* A caixa de resposta, como em qualquer conversa: dentro das 24 h desde a
-          última mensagem da pessoa, texto livre; depois disso o WhatsApp só
-          deixa abrir com um modelo aprovado (o cumprimento do período). */}
-        {/* No desenho do celular a faixa das 24 h fica em cima da caixa, como na
-          conversa de parceiro; no celular o rodapé cresce até 60% e respeita a
-          barrinha do iPhone. */}
-        <FaixaDaJanela
-          estado={janela}
-          className="hidden border-t border-hairline conversa-estreita:flex"
-        />
-        <div className="max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-3 py-2.5 max-md:max-h-[60%] max-md:pb-[calc(0.625rem+var(--folga-inferior,0px))] md:px-5 md:py-3 conversa-estreita:border-t-0 conversa-estreita:pt-1">
-          {janela.situacao === 'aberta' && janela.restanteMin <= JANELA_APERTADA_MIN ? (
-            <Janela24h estado={janela} />
-          ) : null}
-          {bloqueada ? (
-            // Bloqueado (27/10/2026): nada sai, nem modelo.
-            <AvisoDeBloqueio
-              fioId={fio.id}
-              quem={fio.bloqueada_por ? (nomeDaPessoa.get(fio.bloqueada_por) ?? null) : null}
-              naMeta={lerBloqueioNaMeta(fio.bloqueio_na_meta)}
-              erro={fio.bloqueio_erro?.trim() || null}
-              atualizar={chavesDaConversa}
-            />
-          ) : podeEscreverLivre(janela) ? (
-            <TextoLivre key={fio.id} fioId={fio.id} atualizar={chavesDaConversa} />
-          ) : (
-            <EnviarModelo destino={{ tipo: 'conversa', conversaId: fio.id }} />
-          )}
-        </div>
+        {fichaAberta ? (
+          <FichaAoLado aoFechar={aoAlternarFicha}>
+            <div className="flex flex-col items-center gap-2 text-center">
+              <AvatarDaConversa nome={nome || '?'} tamanho={72} />
+              <p className="text-lg leading-tight font-semibold">{rotulo}</p>
+              <p className="numerico text-[13px] text-wpp-suave">
+                {formatarTelefone(fio.peer_phone_e164)}
+              </p>
+            </div>
+            {ficha(false)}
+          </FichaAoLado>
+        ) : null}
       </div>
     </ProvedorDoFio>
   );
@@ -567,7 +532,13 @@ export function ConversaForaDaBase({
  * ele escrever de novo, a conversa volta sozinha (`messages_desarquiva`).
  */
 /** A atitude na folha do celular: some inteira quando está desligada. */
-function AtitudeNaFolha({ conversaId, podeEscrever }: { conversaId: string; podeEscrever: boolean }) {
+function AtitudeNaFolha({
+  conversaId,
+  podeEscrever,
+}: {
+  conversaId: string;
+  podeEscrever: boolean;
+}) {
   return (
     <section aria-label="Interesse" className="flex flex-col gap-2 has-[div:empty]:hidden">
       <h3 className="text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">

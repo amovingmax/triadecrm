@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
 import { useAreaVisivel } from '@/components/conversas/area-visivel';
-import { EsqueletoLista, ErroDaTela } from '@/components/conversas/estados';
+import { EsqueletoLista, ErroDaTela, TelaDeEntrada } from '@/components/conversas/estados';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
 import { CriarGrupo } from './criar-grupo';
@@ -21,8 +21,9 @@ const RITMO_SEM_ECO_MS = 20_000;
 /**
  * A aba "Grupos" de Conversas (27/10/2026): a lista de grupos à esquerda, o fio
  * do grupo à direita. Mesmo comportamento da aba de conversas: no computador,
- * duas colunas e o primeiro grupo já aberto; no celular, uma coisa por vez, e o
- * grupo aberto ocupa a tela inteira, com um "voltar".
+ * duas colunas e, sem escolha, a tela de entrada com a marca da empresa; no
+ * celular, uma coisa por vez, e o grupo aberto ocupa a tela inteira, com um
+ * "voltar".
  *
  * MORA DENTRO DA GRADE DE CONVERSAS: devolve as duas colunas (a lista e o fio)
  * soltas, e quem as põe lado a lado é a grade de `tela-conversas.tsx`, a mesma
@@ -33,7 +34,18 @@ const RITMO_SEM_ECO_MS = 20_000;
  * grupo está aqui; o que ela não deixa (pôr alguém dentro sem o link, apagar
  * mensagem para todos), a tela diz.
  */
-export function TelaGrupos({ pessoas }: { pessoas: readonly PessoaDoTime[] }) {
+export function TelaGrupos({
+  pessoas,
+  cabecalho = null,
+}: {
+  pessoas: readonly PessoaDoTime[];
+  /**
+   * O alto da coluna da lista: o título de Conversas e as pílulas das abas, para
+   * a aba Grupos não perder o caminho de volta (03/11/2026, Conversas no jeito
+   * do WhatsApp).
+   */
+  cabecalho?: React.ReactNode;
+}) {
   const ehCelular = useEhCelular();
   const [escolhidoId, setEscolhidoId] = useState<string | null>(null);
   const [criando, setCriando] = useState(false);
@@ -46,40 +58,40 @@ export function TelaGrupos({ pessoas }: { pessoas: readonly PessoaDoTime[] }) {
   });
   const grupos = lista.data ?? [];
 
-  // Sem escolha, o computador abre o primeiro da lista; o celular, nenhum.
-  const abertoId = escolhidoId ?? (ehCelular ? null : (grupos[0]?.id ?? null));
-  const aberto = abertoId ? (grupos.find((g) => g.id === abertoId) ?? null) : null;
+  // Só abre o grupo que a pessoa escolheu, como em Conversas (04/11/2026): sem
+  // escolha, o computador mostra a tela de entrada com a marca da empresa.
+  const aberto = escolhidoId ? (grupos.find((g) => g.id === escolhidoId) ?? null) : null;
 
   const telaCheia = ehCelular && aberto !== null;
-  const areaVisivel = useAreaVisivel(telaCheia);
-
-  // MEXER NO GRUPO É ESCOLHÊ-LO, como em Conversas: a abertura sozinha do
-  // primeiro da lista não zera o "por ler" de ninguém; clicar, rolar ou digitar
-  // dentro dele vale como a escolha.
-  const abertoAgoraId = aberto?.id ?? null;
-  const escolherAberto = () => {
-    if (abertoAgoraId !== null && abertoAgoraId !== escolhidoId) setEscolhidoId(abertoAgoraId);
-  };
+  useAreaVisivel(telaCheia);
 
   return (
     <>
       {telaCheia ? null : (
         <section
           aria-label="Grupos de WhatsApp"
-          className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-y-auto"
+          className="flex min-h-0 min-w-0 flex-col md:border-r md:border-wpp-linha"
         >
-          {lista.isPending ? (
-            <EsqueletoLista />
-          ) : lista.isError ? (
-            <ErroDaTela causa={lista.error.message} aoTentar={() => void lista.refetch()} />
-          ) : (
-            <ListaGrupos
-              grupos={grupos}
-              selecionadoId={aberto?.id ?? null}
-              aoEscolher={setEscolhidoId}
-              aoCriar={() => setCriando(true)}
-            />
-          )}
+          {cabecalho ? (
+            <div className="flex shrink-0 flex-col gap-3 px-3.5 pt-3.5 pb-2.5">
+              <h1 className="font-heading text-[21px] font-semibold tracking-tight">Conversas</h1>
+              {cabecalho}
+            </div>
+          ) : null}
+          <div className="min-h-0 flex-1 md:overflow-y-auto">
+            {lista.isPending ? (
+              <EsqueletoLista />
+            ) : lista.isError ? (
+              <ErroDaTela causa={lista.error.message} aoTentar={() => void lista.refetch()} />
+            ) : (
+              <ListaGrupos
+                grupos={grupos}
+                selecionadoId={aberto?.id ?? null}
+                aoEscolher={setEscolhidoId}
+                aoCriar={() => setCriando(true)}
+              />
+            )}
+          </div>
         </section>
       )}
 
@@ -87,14 +99,11 @@ export function TelaGrupos({ pessoas }: { pessoas: readonly PessoaDoTime[] }) {
         <section
           aria-label="Mensagens do grupo"
           className={cn(
-            'sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden',
+            'min-h-0 min-w-0 md:overflow-hidden',
             telaCheia &&
-              'fixed inset-x-0 top-0 z-40 h-dvh rounded-none bg-background pt-[env(safe-area-inset-top)] shadow-none',
+              'fixed inset-x-0 top-0 z-40 h-dvh rounded-none bg-wpp-painel pt-[env(safe-area-inset-top)] shadow-none',
           )}
-          style={areaVisivel}
-          onPointerDownCapture={escolherAberto}
-          onKeyDownCapture={escolherAberto}
-          onWheelCapture={escolherAberto}
+          data-area-visivel={telaCheia ? '' : undefined}
         >
           {aberto ? (
             <FioDoGrupo
@@ -105,12 +114,14 @@ export function TelaGrupos({ pessoas }: { pessoas: readonly PessoaDoTime[] }) {
               semEco={eco === 'sem_eco'}
               aoVoltar={() => setEscolhidoId(null)}
             />
-          ) : lista.isPending ? null : (
-            <div className="flex h-full min-h-64 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-              {grupos.length === 0
-                ? 'Crie o primeiro grupo na lista ao lado.'
-                : 'Escolha um grupo na lista.'}
-            </div>
+          ) : (
+            <TelaDeEntrada
+              texto={
+                !lista.isPending && grupos.length === 0
+                  ? 'Crie o primeiro grupo na lista ao lado.'
+                  : 'Escolha um grupo na lista ao lado.'
+              }
+            />
           )}
         </section>
       )}

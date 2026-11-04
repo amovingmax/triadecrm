@@ -884,3 +884,146 @@
   --altura-barra-inferior: 4rem;
   --area-segura-inferior: env(safe-area-inset-bottom, 0px);
 }
+
+/* --------------------------------------------------------------------------
+   CONVERSAS NO JEITO DO WHATSAPP (03/11/2026)
+   --------------------------------------------------------------------------
+   Só a tela de Conversas usa estas cores: o pedido foi deixar ela "cada vez mais
+   parecida com o WhatsApp, para gerar familiaridade e pela praticidade do visual",
+   e o resto do CRM continua com o desenho de sempre. Os valores são os do
+   protótipo aprovado (artifact S57JE4adzT4Fio9mmvCqi7): o fundo bege com desenhos
+   de festa, o balão enviado em menta e o recebido branco, as pílulas de dia e de
+   sistema, o ✓✓ azul de lida. Moram no :root, e não numa classe da tela, porque
+   os menus e as folhas abrem num portal fora dela.
+   -------------------------------------------------------------------------- */
+:root {
+  --wpp-painel: #ffffff;
+  --wpp-painel2: #f6f6f6;
+  --wpp-linha: rgba(17, 17, 16, 0.08);
+  --wpp-linha-forte: rgba(17, 17, 16, 0.16);
+  --wpp-suave: #6b6b6a;
+  --wpp-sel: #f1f1f1;
+  --wpp-busca: #f1f1f1;
+  --wpp-seg: #ffffff;
+  --wpp-entra: #ffffff;
+  --wpp-sai: #dcfee3;
+  --wpp-meta-e: #6b6b6a;
+  --wpp-meta-s: #4d6352;
+  --wpp-autor: #11702f;
+  --wpp-sis: rgba(255, 255, 255, 0.94);
+  --wpp-sis-texto: #545452;
+  --wpp-dia: #ffffff;
+  --wpp-dia-texto: #5c5c5b;
+  --wpp-janela: #fff4d6;
+  --wpp-janela-texto: #6e4c0f;
+  --wpp-chip: #f1f1f1;
+  --wpp-chip-texto: #3d3d3c;
+  --wpp-chip-ativo: #dcfee3;
+  --wpp-chip-ativo-texto: #0f5f28;
+  --wpp-nova: #11702f;
+  --wpp-tique: #1f86cf;
+  --wpp-cita: rgba(17, 17, 16, 0.05);
+  --wpp-cita-barra: #22b847;
+  --wpp-cita-nome: #11702f;
+  --wpp-campo: #ffffff;
+  --wpp-avatar: #e4e4e4;
+  --wpp-avatar-texto: #3d3d3c;
+  --wpp-perigo: #b93a22;
+  --wpp-marca: #fde68a;
+  --wpp-marca-texto: #111110;
+  --wpp-papel: #efeae2;
+  --wpp-papel-desenho: url(/conversas/rabiscos-claro.svg);
+  --wpp-sombra: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  --wpp-sombra-caixa: 0 1px 2px rgba(17, 17, 16, 0.06);
+  --wpp-sombra-pop: 0 12px 32px rgba(17, 17, 16, 0.16), 0 2px 6px rgba(17, 17, 16, 0.08);
+}
+
+.dark {
+  --wpp-painel: #1c1c1c;
+  --wpp-painel2: #161616;
+  --wpp-linha: rgba(255, 255, 255, 0.08);
+  --wpp-linha-forte: rgba(255, 255, 255, 0.18);
+  --wpp-suave: #a3a3a2;
+  --wpp-sel: #2a2a2a;
+  --wpp-busca: #252525;
+  --wpp-seg: #3a3a3a;
+  --wpp-entra: #232625;
+  --wpp-sai: #1d4a30;
+  --wpp-meta-e: #a3a3a2;
+  --wpp-meta-s: #a8c9b1;
+  --wpp-autor: #78fc90;
+  --wpp-sis: rgba(28, 28, 28, 0.94);
+  --wpp-sis-texto: #c4c4c2;
+  --wpp-dia: #1c1c1c;
+  --wpp-dia-texto: #b5b5b3;
+  --wpp-janela: #3a2e14;
+  --wpp-janela-texto: #f0cf8a;
+  --wpp-chip: #252525;
+  --wpp-chip-texto: #d4d4d2;
+  --wpp-chip-ativo: rgba(120, 252, 144, 0.14);
+  --wpp-chip-ativo-texto: #78fc90;
+  --wpp-nova: #78fc90;
+  --wpp-tique: #53bdeb;
+  --wpp-cita: rgba(255, 255, 255, 0.07);
+  --wpp-cita-barra: #78fc90;
+  --wpp-cita-nome: #78fc90;
+  --wpp-campo: #252525;
+  --wpp-avatar: #2e2e2e;
+  --wpp-avatar-texto: #e4e4e2;
+  --wpp-perigo: #e97e68;
+  --wpp-marca: #8a6d1f;
+  --wpp-marca-texto: #ffffff;
+  --wpp-papel: #0d1411;
+  --wpp-papel-desenho: url(/conversas/rabiscos-escuro.svg);
+  --wpp-sombra: 0 1px 0.5px rgba(0, 0, 0, 0.45);
+  --wpp-sombra-caixa: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --wpp-sombra-pop: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+@theme inline {
+  --color-wpp-painel: var(--wpp-painel);
+  --color-wpp-painel2: var(--wpp-painel2);
+  --color-wpp-linha: var(--wpp-linha);
+  --color-wpp-linha-forte: var(--wpp-linha-forte);
+  --color-wpp-suave: var(--wpp-suave);
+  --color-wpp-sel: var(--wpp-sel);
+  --color-wpp-busca: var(--wpp-busca);
+  --color-wpp-seg: var(--wpp-seg);
+  --color-wpp-entra: var(--wpp-entra);
+  --color-wpp-sai: var(--wpp-sai);
+  --color-wpp-meta-e: var(--wpp-meta-e);
+  --color-wpp-meta-s: var(--wpp-meta-s);
+  --color-wpp-autor: var(--wpp-autor);
+  --color-wpp-sis: var(--wpp-sis);
+  --color-wpp-sis-texto: var(--wpp-sis-texto);
+  --color-wpp-dia: var(--wpp-dia);
+  --color-wpp-dia-texto: var(--wpp-dia-texto);
+  --color-wpp-janela: var(--wpp-janela);
+  --color-wpp-janela-texto: var(--wpp-janela-texto);
+  --color-wpp-chip: var(--wpp-chip);
+  --color-wpp-chip-texto: var(--wpp-chip-texto);
+  --color-wpp-chip-ativo: var(--wpp-chip-ativo);
+  --color-wpp-chip-ativo-texto: var(--wpp-chip-ativo-texto);
+  --color-wpp-nova: var(--wpp-nova);
+  --color-wpp-tique: var(--wpp-tique);
+  --color-wpp-cita: var(--wpp-cita);
+  --color-wpp-cita-barra: var(--wpp-cita-barra);
+  --color-wpp-cita-nome: var(--wpp-cita-nome);
+  --color-wpp-campo: var(--wpp-campo);
+  --color-wpp-avatar: var(--wpp-avatar);
+  --color-wpp-avatar-texto: var(--wpp-avatar-texto);
+  --color-wpp-perigo: var(--wpp-perigo);
+  --color-wpp-marca: var(--wpp-marca);
+  --color-wpp-marca-texto: var(--wpp-marca-texto);
+  --shadow-wpp: var(--wpp-sombra);
+  --shadow-wpp-caixa: var(--wpp-sombra-caixa);
+  --shadow-wpp-pop: var(--wpp-sombra-pop);
+}
+
+/* O papel de parede da conversa: desenhos próprios de festa (o do WhatsApp não
+   pode ser copiado), num ladrilho de 360px. */
+.papel-de-parede {
+  background-color: var(--wpp-papel);
+  background-image: var(--wpp-papel-desenho);
+  background-size: 360px 360px;
+}

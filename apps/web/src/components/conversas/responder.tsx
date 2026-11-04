@@ -29,6 +29,7 @@ import { GravarAudio } from './gravar-audio';
 import { podeEscreverLivre } from './mensagens';
 import { AvisoDeBloqueio } from './menu-da-conversa';
 import { MenuDeAnexo } from './menu-de-anexo';
+import { BotaoRedondo } from './wpp';
 import {
   aplicarResposta,
   atalhoEmDigitacao,
@@ -205,13 +206,6 @@ function PediuParaSair({
 
 /** Até onde a caixa cresce sozinha: dez linhas, e daí em diante ela rola. */
 const ALTURA_MAXIMA = 220;
-
-/**
- * Uma ferramenta da fileira de baixo, no celular: pílula de 40 px com ícone e
- * nome. No computador ela volta a ser só o ícone dentro da moldura.
- */
-const FERRAMENTA =
-  'toque inline-flex items-center max-md:h-10 max-md:w-auto max-md:gap-1.5 max-md:rounded-full max-md:border max-md:border-hairline max-md:bg-card max-md:px-3.5 max-md:text-[13px] max-md:font-normal max-md:text-foreground max-md:[&_svg]:size-4';
 
 /**
  * Janela aberta: texto livre, que é o que a Meta permite e não cobra.
@@ -407,27 +401,24 @@ export function TextoLivre({
         />
       ) : null}
 
-      {/* DOIS DESENHOS, UMA MARCAÇÃO SÓ (20/10/2026).
+      {/* A CAIXA DO WHATSAPP (03/11/2026), do protótipo aprovado. Uma marcação só
+          para os dois aparelhos, porque o gravador de áudio tem estado (gravando,
+          ouvindo antes de mandar) e dois gravadores dariam dois relógios:
 
-          Computador: uma caixa só — o texto, o clipe, o microfone e o enviar na
-          mesma moldura, como em qualquer aplicativo de conversa.
+          Computador: emoji, anexo e respostas prontas à esquerda, o texto numa
+          pílula e, na ponta, o enviar verde — ou o microfone, com a caixa vazia.
 
-          Celular (protótipo D, escolhido pelo usuário): a caixa de texto ocupa a
-          largura e CRESCE PARA BAIXO, linha a linha; o enviar fica ao lado dela,
-          redondo; e as ferramentas (respostas prontas, foto ou vídeo, áudio) vão
-          para uma fileira embaixo, com nome. Antes os três ícones moravam dentro
-          da moldura e a frase se espremia numa coluna estreita.
-
-          É uma marcação só porque o gravador de áudio tem estado (gravando,
-          ouvindo antes de mandar): dois gravadores, um escondido, dariam dois
-          relógios. No computador os invólucros do celular viram `contents` e os
-          filhos caem direto na moldura.
+          Celular: a pílula leva o emoji, o texto, as respostas prontas e o anexo;
+          o botão redondo verde fica ao lado (enviar ou microfone). No computador
+          a pílula vira `contents` e os filhos caem direto na fileira, na ordem
+          do `md:order-*`. A caixa continua crescendo para baixo, linha a linha
+          (protótipo D, 20/10/2026).
 
           Arrastar foto ou vídeo para cima da caixa também vale (16/10/2026). */}
       <div
         className={cn(
-          'flex flex-col gap-2 md:flex-row md:items-end md:gap-1 md:rounded-2xl md:border md:border-input md:bg-card/60 md:py-1 md:pr-1 md:pl-2 md:transition-colors md:focus-within:border-ring md:focus-within:ring-3 md:focus-within:ring-ring/40',
-          arrastando && 'rounded-2xl ring-3 ring-ring/40 md:border-ring',
+          'flex flex-wrap items-end gap-1.5 md:flex-nowrap md:gap-0.5',
+          arrastando && 'rounded-3xl ring-3 ring-ring/40',
         )}
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes('Files')) return;
@@ -443,95 +434,92 @@ export function TextoLivre({
           midia.escolher(arquivos);
         }}
       >
-        <div className="flex items-end gap-2 md:contents">
-          <div className="flex min-w-0 flex-1 rounded-[20px] border border-input bg-card/60 px-3.5 py-1.5 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/40 md:contents">
-            <textarea
-              id="resposta"
-              ref={caixa}
-              value={texto}
-              onChange={(e) => aoDigitar(e.target.value, e.timeStamp)}
-              onPaste={(e) => {
-                // Colar um print (Ctrl+V) leva à prévia; colar texto continua texto.
-                const arquivos = arquivosDaTransferencia(e.clipboardData);
-                if (arquivos.length === 0) return;
-                e.preventDefault();
-                midia.escolher(arquivos);
+        <div className="flex min-h-11 min-w-0 flex-1 items-end rounded-3xl border border-wpp-linha bg-wpp-campo px-0.5 md:contents">
+          <SeletorDeEmoji aoEscolher={porEmoji} className="max-md:size-[42px] md:order-1" />
+          <textarea
+            id="resposta"
+            ref={caixa}
+            value={texto}
+            onChange={(e) => aoDigitar(e.target.value, e.timeStamp)}
+            onPaste={(e) => {
+              // Colar uma foto (print, imagem copiada) também anexa (16/10/2026).
+              const arquivos = arquivosDaTransferencia(e.clipboardData);
+              if (arquivos.length === 0) return;
+              e.preventDefault();
+              midia.escolher(arquivos);
+            }}
+            onKeyDown={(e) => {
+              // Enter envia e Shift+Enter quebra a linha, no computador. No celular
+              // o Enter do teclado quebra a linha: quem envia é o botão.
+              if (e.key !== 'Enter' || e.shiftKey) return;
+              if (window.matchMedia?.('(pointer: coarse)').matches) return;
+              e.preventDefault();
+              if (pode) mandar();
+            }}
+            rows={1}
+            placeholder="Mensagem"
+            title="/ abre as respostas prontas · Enter envia, Shift+Enter quebra a linha"
+            // 16px no celular: abaixo disso o Safari do iPhone dá zoom no campo.
+            className={cn(
+              'min-h-[42px] min-w-0 flex-1 resize-none bg-transparent px-1 py-2.5 text-base leading-snug outline-none placeholder:text-wpp-suave',
+              'max-md:max-h-[calc(var(--altura-visivel,100svh)*0.3)]',
+              'md:order-4 md:ml-1.5 md:min-h-[46px] md:rounded-[23px] md:border md:border-wpp-linha md:bg-wpp-campo md:px-[18px] md:py-3 md:text-[15px] md:focus-visible:ring-3 md:focus-visible:ring-ring/40',
+            )}
+          />
+          {(respostas.data ?? []).length > 0 ? (
+            <BotaoRedondo
+              onClick={() => {
+                // O "/" no fim do texto abre a lista das respostas prontas, a
+                // mesma que aparece quando se digita a barra.
+                setTexto(texto.length === 0 || /\s$/.test(texto) ? `${texto}/` : `${texto} /`);
+                caixa.current?.focus();
               }}
-              onKeyDown={(e) => {
-                // Enter manda no computador; no celular o Enter do teclado é quebra
-                // de linha, e enviar ali seria mandar metade da frase toda vez.
-                if (e.key !== 'Enter' || e.shiftKey) return;
-                if (window.matchMedia?.('(pointer: coarse)').matches) return;
-                e.preventDefault();
-                if (pode) mandar();
-              }}
-              rows={1}
-              placeholder="Mensagem"
-              // 16px no celular: com menos que isso o Safari do iPhone dá zoom na
-              // página inteira ao tocar na caixa, e quem responde tem de desfazer o
-              // zoom com dois dedos a cada mensagem (20/10/2026).
-              className="min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-base leading-relaxed outline-none placeholder:text-muted-foreground max-md:max-h-[calc(var(--altura-visivel,100svh)*0.3)] md:text-[15px]"
-            />
-            <SeletorDeEmoji aoEscolher={porEmoji} />
-          </div>
+              aria-label="Respostas prontas"
+              className="max-md:h-[42px] max-md:w-9 md:order-3"
+            >
+              <Zap aria-hidden="true" />
+            </BotaoRedondo>
+          ) : null}
+          <MenuDeAnexo
+            midia={midia}
+            destino={destino}
+            className="size-[42px] rounded-full text-wpp-suave hover:bg-foreground/[0.07] md:order-2 md:size-11 [&_svg]:size-[19px]"
+          />
+        </div>
+        {limpo.length > 0 ? (
           <Button
             type="submit"
             size="icon"
-            className="toque size-12 shrink-0 rounded-full max-md:bg-menta max-md:text-menta-tinta max-md:hover:bg-menta/90 md:order-last md:size-9"
+            className="toque size-11 shrink-0 rounded-full bg-menta text-menta-tinta hover:bg-menta/90 md:order-5 md:ml-2 md:size-[46px]"
             disabled={!pode}
           >
             <SendHorizontal aria-hidden="true" />
             <span className="sr-only">Enviar pelo WhatsApp</span>
           </Button>
-        </div>
-
-        {/* A fileira das ferramentas no celular. Gravar fica perto de Enviar no
-            computador porque são a mesma decisão: como mandar isto. Dentro da
-            janela de 24 h os três valem. */}
-        <div className="flex flex-wrap items-center gap-1.5 md:contents">
-          {(respostas.data ?? []).length > 0 ? (
-            <button
-              type="button"
-              onClick={() => {
-                // Abre a mesma lista do "/": a barra entra no fim do texto, e a
-                // escolha troca a barra pela resposta.
-                setTexto(texto.length === 0 || /\s$/.test(texto) ? `${texto}/` : `${texto} /`);
-                caixa.current?.focus();
-              }}
-              className={cn(
-                FERRAMENTA,
-                'outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden',
-              )}
-            >
-              <Zap aria-hidden="true" />
-              Respostas prontas
-            </button>
-          ) : null}
-          <MenuDeAnexo midia={midia} destino={destino} rotulo="Anexo" className={FERRAMENTA} />
+        ) : (
           <GravarAudio
             key={fioId}
             fioId={fioId}
-            rotulo="Áudio"
-            classeDoBotao={FERRAMENTA}
-            className="max-md:w-full"
+            classeDoBotao="toque size-11 shrink-0 rounded-full bg-menta text-menta-tinta hover:bg-menta/90 md:order-5 md:ml-2 md:size-[46px] md:bg-transparent md:text-wpp-suave md:hover:bg-foreground/[0.07] [&_svg]:size-5"
+            className="order-last basis-full"
             respondeA={citando?.id ?? null}
             aoEnviar={() => pararDeCitar?.(null)}
           />
-        </div>
+        )}
       </div>
 
-      {/* Com a caixa vazia, a dica dos atalhos — e só no computador, onde há
-          tecla para isso e espaço para dizer. No celular a mesma linha seria um
-          rodapé permanente sobre uma tela que já é estreita. */}
-      {texto.length === 0 ? (
-        <p className="hidden px-1 text-[11px] leading-relaxed text-muted-foreground md:block">
-          <code className="text-primary">/</code> abre as respostas prontas · Enter envia,
-          Shift+Enter quebra a linha
-        </p>
-      ) : null}
-
+      {/* A assinatura não aparece no balão do CRM, então a caixa diz como sai — só
+          no computador. No celular a linha aparecia ao começar a digitar e
+          empurrava a conversa para cima, o que o WhatsApp não faz (04/11/2026);
+          lá o nome de quem escreveu já vai no alto do balão enviado. O aviso de
+          texto longo demais continua nos dois. */}
       {texto.length > 0 ? (
-        <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
+        <p
+          className={cn(
+            'px-3 text-[11px] leading-relaxed text-wpp-suave',
+            texto.length <= TETO_DO_WHATSAPP - 400 && 'max-md:hidden',
+          )}
+        >
           Sai com seu primeiro nome em negrito na frente.
           {texto.length > TETO_DO_WHATSAPP - 400 ? (
             <span className={cn(longo && 'text-destructive-texto')}>
@@ -560,11 +548,13 @@ function BarraDaCitacao({
   aoCancelar: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border-l-4 border-l-primary bg-muted/60 py-1.5 pr-1 pl-3">
-      <Reply className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    <div className="mx-1 flex items-center gap-2.5 rounded-xl border-l-4 border-l-wpp-cita-barra bg-wpp-cita py-1.5 pr-1 pl-3">
+      <Reply className="size-4 shrink-0 text-wpp-suave" aria-hidden="true" />
       <p className="min-w-0 flex-1 text-[13px] leading-snug">
-        <span className="block text-xs font-semibold">Respondendo a {quem}</span>
-        <span className="block truncate text-muted-foreground">{resumo}</span>
+        <span className="block text-[12.5px] font-semibold text-wpp-cita-nome">
+          Respondendo a {quem}
+        </span>
+        <span className="block truncate text-wpp-suave">{resumo}</span>
       </p>
       <Button
         type="button"
@@ -581,22 +571,22 @@ function BarraDaCitacao({
 }
 
 /** O botão do emoji, dentro da caixa: a grade da casa (`grade-de-emojis.tsx`). */
-function SeletorDeEmoji({ aoEscolher }: { aoEscolher: (emoji: string) => void }) {
+function SeletorDeEmoji({
+  aoEscolher,
+  className,
+}: {
+  aoEscolher: (emoji: string) => void;
+  className?: string;
+}) {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="toque size-9 shrink-0 self-end text-muted-foreground"
-          title="Emoji"
-        >
+        <BotaoRedondo title="Emoji" className={className}>
           <Smile aria-hidden="true" />
           <span className="sr-only">Pôr um emoji</span>
-        </Button>
+        </BotaoRedondo>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="end" className="w-[22rem] max-w-[calc(100vw-2rem)]">
+      <DropdownMenuContent side="top" align="start" className="w-[22rem] max-w-[calc(100vw-2rem)]">
         <GradeDeEmojis aoEscolher={aoEscolher} />
       </DropdownMenuContent>
     </DropdownMenu>

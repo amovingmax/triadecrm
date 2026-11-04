@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -9,15 +9,13 @@ import {
   ArchiveRestore,
   ArrowLeft,
   BotOff,
-  ChevronDown,
-  Ellipsis,
+  EllipsisVertical,
   ExternalLink,
   MessageSquarePlus,
+  PanelRight,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { iniciaisDe } from '@/lib/iniciais';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,8 +28,14 @@ import {
 import { formatarProximaAcao } from '@/components/parceiros/formatos';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { DiasSemContato } from '@/components/temperatura';
+import { definicaoTemperatura } from '@/components/temperatura/escala-termica';
+import { BotaoLigar } from '@/components/ligacao/voz-botao-ligar';
+import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 import { MudarEtapa } from '@/components/funis/mudar-etapa';
-import { BotaoDeLigarNaConversa, FaixaDaLigacao } from '@/components/ligacao-whatsapp/botao-na-conversa';
+import {
+  BotaoDeLigarNaConversa,
+  FaixaDaLigacao,
+} from '@/components/ligacao-whatsapp/botao-na-conversa';
 
 import { arquivarConversa } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
@@ -44,12 +48,13 @@ import { ProvedorDoFio } from './contexto-do-fio';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { ErroDaTela, EsqueletoLinha } from './estados';
 import { contagemDeInteracoes, local } from './formatos';
-import { FaixaDaJanela, Janela24h, useJanela } from './janela-24h';
+import { FichaAoLado, ROTULO_DA_SECAO, AreaDoFio, useAvisoDeNaoLidas } from './fio-wpp';
+import { Janela24h, PilulaDaJanela, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { JANELA_APERTADA_MIN, montarFio, podeEscreverLivre } from './mensagens';
-import { BarraDeBuscaNoFio, MenuDaConversa } from './menu-da-conversa';
+import { BarraDeBuscaNoFio, BotaoDeBuscarNoFio, MenuDaConversa } from './menu-da-conversa';
 import {
   agruparPorDia,
   escolherNegocio,
@@ -64,6 +69,7 @@ import {
   type FioDaConversa,
   type ItemConversa,
 } from './tipos';
+import { AvatarDaConversa, BotaoRedondo } from './wpp';
 
 /**
  * A coluna da direita: quem é o parceiro, a conversa inteira, e o que dá para
@@ -101,6 +107,8 @@ export function Conversa({
   escolhaExplicita,
   mensagemAlvo = null,
   aoChegarNoAlvo,
+  fichaAberta,
+  aoAlternarFicha,
 }: {
   item: ItemConversa;
   catalogos: CatalogosConversas;
@@ -115,7 +123,17 @@ export function Conversa({
   /** Abrir já na mensagem que a busca da lista achou (27/10/2026). */
   mensagemAlvo?: string | null;
   aoChegarNoAlvo?: () => void;
+  /** A coluna "Dados do contato" ao lado, no computador: vale para todas as conversas. */
+  fichaAberta: boolean;
+  aoAlternarFicha: () => void;
 }) {
+  const ehCelular = useEhCelular();
+  // A coluna ao lado só cabe no computador e no tablet com o painel largo
+  // (o contrário de `conversa-estreita`); onde não cabe, o nome abre a folha.
+  const painel = useRef<HTMLDivElement>(null);
+  const naoCabeAFicha = () =>
+    window.matchMedia('(max-width: 767px)').matches ||
+    (window.matchMedia('(pointer: coarse)').matches && (painel.current?.clientWidth ?? 0) < 672);
   const consulta = useQuery({
     queryKey: chaveDaLinha(item.id),
     queryFn: () => carregarLinhaDoParceiro(item.id),
@@ -167,7 +185,10 @@ export function Conversa({
   // Abre no fim e acompanha o fim enquanto a pessoa estiver nele; quem subiu
   // para ler o histórico não é puxado (ver `rolagem-no-fim.ts`).
   const quantosEventos = dias.reduce((soma, dia) => soma + dia.eventos.length, 0);
-  const { rolagem, conteudo, aoRolar, soltar } = useRolagemNoFim(item.id, quantosEventos);
+  const { rolagem, conteudo, aoRolar, soltar, longe, irAoFim } = useRolagemNoFim(
+    item.id,
+    quantosEventos,
+  );
   // O fio de mensagens, em ordem, para o menu de cada balão, a citação, a lupa e
   // as favoritas (27/10/2026). Sai da linha do tempo já montada.
   const mensagensDoFio = useMemo(
@@ -344,276 +365,250 @@ export function Conversa({
     </>
   );
 
+  const avisoDeNaoLidas = useAvisoDeNaoLidas(dias, item.naoLidas);
+  const registrarHref = `/registrar?org=${item.id}`;
+  const fichaHref = `/parceiros/${item.id}`;
+
+  // O QUE A FICHA DIZ, num lugar só (03/11/2026): a folha do celular e a coluna
+  // "Dados do contato" do computador mostram a mesma coisa — em que pé está, as
+  // ações e a ficha. Até aqui o computador espalhava isso pelo cabeçalho e pelo
+  // alto da conversa, e as mensagens começavam 200px mais embaixo.
+  const ficha = (naFolha: boolean) => (
+    <>
+      <section aria-label="Em que pé está" className="flex flex-col gap-2">
+        <h3 className={ROTULO_DA_SECAO}>Em que pé está</h3>
+        <div className="flex flex-wrap items-center gap-1.5">{selos(true)}</div>
+      </section>
+
+      <section aria-label="Ações" className="flex flex-col gap-2">
+        <h3 className={ROTULO_DA_SECAO}>Ações</h3>
+        <div className={cn('grid gap-2', naFolha ? 'grid-cols-2' : 'grid-cols-1')}>
+          {podeAssumir && fio ? (
+            <AssumirConversa
+              fioId={fio.id}
+              organizacaoId={item.id}
+              className={cn(ACAO_DA_FOLHA, 'col-span-2')}
+            />
+          ) : null}
+          {fio && eu?.podeEscrever ? (
+            <TransferirConversa
+              fioId={fio.id}
+              organizacaoId={item.id}
+              pessoas={catalogos.pessoas}
+              setores={setores}
+              className={ACAO_DA_FOLHA}
+            />
+          ) : null}
+          <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
+            <Link href={registrarHref}>
+              <MessageSquarePlus aria-hidden="true" />
+              Registrar contato
+            </Link>
+          </Button>
+          {fio && eu?.podeEscrever ? (
+            CONCLUIR_NA_EMPRESA ? (
+              <ConcluirConversa
+                fioId={fio.id}
+                concluidaEm={fio.arquivadaEm}
+                tamanho="bloco"
+                className={ACAO_DA_FOLHA}
+              />
+            ) : (
+              <Arquivar fio={fio} comNome className={ACAO_DA_FOLHA} />
+            )
+          ) : null}
+          <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
+            <Link href={fichaHref}>
+              <ExternalLink aria-hidden="true" />
+              Abrir a ficha
+            </Link>
+          </Button>
+        </div>
+      </section>
+
+      {/* No celular o "⋯" do cabeçalho é a própria folha: fixar, silenciar e
+          bloquear moram aqui. No computador eles estão no "⋯" do cabeçalho. */}
+      {naFolha && fio ? (
+        <section aria-label="Conversa" className="flex flex-col gap-1">
+          <h3 className={ROTULO_DA_SECAO}>Conversa</h3>
+          <MenuDaConversa
+            variante="folha"
+            fioId={fio.id}
+            bloqueada={fio.bloqueadaEm !== null}
+            podeEscrever={Boolean(eu?.podeEscrever)}
+            atualizar={chavesDaConversa}
+            aoFecharConversa={aoVoltar}
+            aoEscolher={() => setFolha(false)}
+          />
+        </section>
+      ) : null}
+
+      <section aria-label="Ficha" className="flex flex-col gap-1">
+        <h3 className={ROTULO_DA_SECAO}>Ficha</h3>
+        <dl className="flex flex-col">{campos('folha')}</dl>
+      </section>
+
+      {fio ? <LeituraDaIa fioId={fio.id} /> : null}
+    </>
+  );
+
+  const temperatura = item.temperatura;
+  const definicao = definicaoTemperatura(temperatura);
+
   const corpo = (
-    // `@container` no painel inteiro: no tablet, o desenho do celular vale quando
-    // o PAINEL é estreito, e não a tela (`conversa-estreita`, em `globals.css`).
-    <div className="@container flex h-full min-h-0 flex-col">
-      {/* DOIS CABEÇALHOS, UM POR APARELHO (`conversa-estreita`, em `globals.css`).
+    <div className="flex h-full min-h-0">
+      {/* `@container` no painel da conversa: no tablet, o desenho do celular vale
+          quando o PAINEL é estreito, e não a tela (`conversa-estreita`, em
+          `globals.css`). */}
+      <div ref={painel} className="@container flex h-full min-h-0 min-w-0 flex-1 flex-col">
+        {/* O CABEÇALHO DO WHATSAPP (03/11/2026): o retrato com o ponto da
+            temperatura, o nome e uma linha de contexto; tocar nele abre os dados
+            do contato — a folha no celular, a coluna ao lado no computador. À
+            direita, só o que se faz toda hora: buscar, ligar, concluir e o "⋯".
 
-          Celular, e tablet com o painel estreito: UMA LINHA, do protótipo A
-          escolhido em 20/10/2026 — voltar, o retrato, o nome com a etapa e as
-          exceções embaixo, e o "⋯". O nome e o "⋯" abrem a folha com tudo o que
-          o cabeçalho mostrava: etapa, selos, etiquetas, ações e a ficha. Em três
-          andares sobravam ~300 px para as mensagens num iPhone; numa linha, o dobro.
-
-          Computador: o de sempre — o retrato, o nome com a frase e os selos
-          embaixo, e as ações na mesma linha, à direita. */}
-      <header className="@container flex flex-col border-b border-hairline">
-        <div className="hidden h-16 items-center gap-1 pr-1.5 pl-1 md:pl-3 conversa-estreita:flex">
-          <Button
-            variant="ghost"
-            size="icon"
+            No celular continua UMA LINHA, do protótipo A escolhido em 20/10/2026:
+            em três andares sobravam ~300 px para as mensagens num iPhone; numa
+            linha, o dobro. */}
+        <header className="flex h-14 shrink-0 items-center gap-0.5 border-b md:h-16 border-wpp-linha bg-wpp-painel pr-2.5 pl-1 md:pl-3">
+          <BotaoRedondo
             onClick={aoVoltar}
-            className="toque size-11 shrink-0 md:hidden"
+            className="text-foreground md:hidden"
+            aria-label="Voltar para a lista de conversas"
           >
             <ArrowLeft aria-hidden="true" />
-            <span className="sr-only">Voltar para a lista de conversas</span>
-          </Button>
+          </BotaoRedondo>
           <button
             type="button"
-            onClick={() => setFolha(true)}
+            onClick={() => (naoCabeAFicha() ? setFolha(true) : aoAlternarFicha())}
             aria-haspopup="dialog"
-            className="toque flex h-14 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 text-left outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="toque flex h-[52px] min-w-0 flex-1 items-center gap-3 rounded-[14px] pr-2 pl-1 text-left outline-none hover:bg-foreground/[0.04] focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            {/* O RETRATO TAMBÉM AQUI. Mesma bolinha que aparece nos balões: é o
-                que liga o cabeçalho ao fio. */}
-            <Avatar className="size-10 shrink-0">
-              <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
-                {iniciaisDe(item.nome)}
-              </AvatarFallback>
-            </Avatar>
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate font-heading text-[17px] leading-tight font-semibold tracking-tight">
-                {item.nome}
-              </span>
-              <span className="flex min-w-0 items-center gap-1 text-[12.5px] text-muted-foreground">
+            <AvatarDaConversa nome={item.nome} temperatura={temperatura} tamanho={40} />
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate text-base leading-tight font-semibold">{item.nome}</span>
+              <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] whitespace-nowrap text-wpp-suave">
+                <span
+                  className="inline-flex h-[18px] shrink-0 items-center rounded-full px-2 text-[11.5px] font-semibold"
+                  style={{ background: definicao.corFundo, color: definicao.corTexto }}
+                >
+                  {definicao.rotulo}
+                </span>
                 <span className="truncate">{resumo}</span>
-                <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
               </span>
             </span>
             <span className="sr-only">: ver a etapa, as etiquetas, as ações e a ficha</span>
           </button>
-          {fio && eu?.podeEscrever ? (
-            <BotaoDeLigarNaConversa conversaId={fio.id} nome={item.nome} compacto />
+          {fio ? <BotaoDeBuscarNoFio className="max-md:hidden" /> : null}
+          {eu?.podeEscrever ? (
+            <BotaoLigar
+              organizationId={item.id}
+              temTelefone={Boolean(item.telefone) || item.telefoneMascarado}
+              className="h-10 flex-none rounded-full border-wpp-linha-forte bg-transparent px-3.5 text-[13.5px] max-md:hidden sm:flex-none md:h-10"
+            />
           ) : null}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="toque size-11 shrink-0"
+          {fio && eu?.podeEscrever ? (
+            <BotaoDeLigarNaConversa conversaId={fio.id} nome={item.nome} compacto={ehCelular} />
+          ) : null}
+          {podeAssumir && fio ? (
+            <AssumirConversa
+              fioId={fio.id}
+              organizacaoId={item.id}
+              className="rounded-full max-md:hidden md:h-10"
+            />
+          ) : null}
+          {fio && eu?.podeEscrever ? (
+            CONCLUIR_NA_EMPRESA ? (
+              <ConcluirConversa
+                fioId={fio.id}
+                concluidaEm={fio.arquivadaEm}
+                rotuloPelaLargura
+                className="mx-1 conversa-estreita:hidden"
+              />
+            ) : (
+              <Arquivar fio={fio} className="conversa-estreita:hidden" />
+            )
+          ) : null}
+          <BotaoRedondo
+            onClick={aoAlternarFicha}
+            aria-pressed={fichaAberta}
+            aria-label={fichaAberta ? 'Fechar os dados do contato' : 'Ver os dados do contato'}
+            className="max-md:hidden conversa-estreita:hidden"
+          >
+            <PanelRight aria-hidden="true" />
+          </BotaoRedondo>
+          {/* Computador: o menu "⋯". Celular: o "⋯" abre a folha, que tem tudo. */}
+          {fio ? (
+            <span className="contents conversa-estreita:hidden">
+              <MenuDaConversa
+                fioId={fio.id}
+                bloqueada={fio.bloqueadaEm !== null}
+                podeEscrever={Boolean(eu?.podeEscrever)}
+                atualizar={chavesDaConversa}
+                aoFecharConversa={aoVoltar}
+                concluidaEm={fio.arquivadaEm}
+                registrarHref={registrarHref}
+                fichaHref={fichaHref}
+              />
+            </span>
+          ) : null}
+          <BotaoRedondo
             onClick={() => setFolha(true)}
             aria-label="Mais: etapa, etiquetas, ações e ficha"
+            className={cn('hidden conversa-estreita:inline-flex', !fio && 'md:inline-flex')}
           >
-            <Ellipsis aria-hidden="true" />
-          </Button>
-        </div>
+            <EllipsisVertical aria-hidden="true" />
+          </BotaoRedondo>
+        </header>
 
-        <div className="flex items-center gap-2 px-5 py-3 conversa-estreita:hidden">
-          <Avatar className="size-10 shrink-0">
-            <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
-              {iniciaisDe(item.nome)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate font-heading text-lg leading-tight font-semibold tracking-tight">
-              {item.nome}
-            </h2>
-            {/* UMA FRASE, EM TODA LARGURA: o contexto fixo da conversa (etapa,
-                funil, setor, estado) lê-se melhor como texto corrido.
-                (28/09/2026: "ta mtt feio e pequeno, pode compor mais espaço".) */}
-            <p className="truncate text-xs text-muted-foreground md:text-[13px]">{contexto}</p>
-            <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
-              {selos(false)}
-            </p>
-          </div>
-          {/* As ações na MESMA linha do nome (eram uma faixa própria de 64 px,
-              gasta em toda conversa para ações de uma vez por visita). */}
-          <div className="flex shrink-0 items-center gap-1.5">
-            {fio && eu?.podeEscrever ? (
-              <BotaoDeLigarNaConversa conversaId={fio.id} nome={item.nome} />
-            ) : null}
-            {podeAssumir && fio ? <AssumirConversa fioId={fio.id} organizacaoId={item.id} /> : null}
-            {fio && eu?.podeEscrever ? (
-              <TransferirConversa
-                fioId={fio.id}
-                organizacaoId={item.id}
-                pessoas={catalogos.pessoas}
-                setores={setores}
-              />
-            ) : null}
-            <Button asChild variant="outline" size="sm" className="toque h-9">
-              <Link href={`/registrar?org=${item.id}`}>
-                <MessageSquarePlus aria-hidden="true" />
-                Registrar contato
-              </Link>
-            </Button>
-            {/* Na Imova, "Concluir" com nome no lugar do ícone de arquivar (03/11/2026). */}
-            {fio && eu?.podeEscrever ? (
-              CONCLUIR_NA_EMPRESA ? (
-                <ConcluirConversa fioId={fio.id} concluidaEm={fio.arquivadaEm} rotuloPelaLargura />
-              ) : (
-                <Arquivar fio={fio} />
-              )
-            ) : null}
-            {fio ? (
-              <MenuDaConversa
-                fioId={fio.id}
-                bloqueada={fio.bloqueadaEm !== null}
-                podeEscrever={Boolean(eu?.podeEscrever)}
-                atualizar={chavesDaConversa}
-                aoFecharConversa={aoVoltar}
-              />
-            ) : null}
-            <Button asChild variant="ghost" size="icon" className="toque size-9">
-              <Link href={`/parceiros/${item.id}`} title="Abrir a ficha do parceiro">
-                <ExternalLink aria-hidden="true" />
-                <span className="sr-only">Abrir ficha</span>
-              </Link>
-            </Button>
-          </div>
-        </div>
+        <BarraDeBuscaNoFio />
 
-        {/* A conversa concluída diz que está fora da lista, nos dois aparelhos (Imova). */}
         {fio ? (
           <FaixaDeConcluida
+            fioId={fio.id}
             concluidaEm={fio.arquivadaEm}
             concluidaPor={fio.arquivadaPor}
-            className="border-t border-hairline"
+            podeReabrir={Boolean(eu?.podeEscrever)}
           />
         ) : null}
-        {/* A faixa da janela de 24 h: no computador, colada no cabeçalho; no
-            desenho do celular ela desce para cima da caixa de escrever, que é
-            onde a hora decide alguma coisa. */}
-        {fio ? (
-          <FaixaDaJanela
-            estado={janela}
-            className="border-t border-hairline conversa-estreita:hidden"
-          />
-        ) : null}
-        {fio ? <FaixaDaLigacao conversaId={fio.id} className="border-t border-hairline" /> : null}
-      </header>
-      {/* A lupa da conversa (27/10/2026), aberta pelo "⋯". */}
-      <BarraDeBuscaNoFio />
+        {fio ? <FaixaDaLigacao conversaId={fio.id} className="border-b border-wpp-linha" /> : null}
 
-      <Sheet open={folha} onOpenChange={setFolha}>
-        <SheetContent
-          side="bottom"
-          className="@container max-h-[88svh] gap-5 overflow-y-auto rounded-t-2xl px-4 pt-4 pb-[calc(var(--area-segura-inferior)+1.25rem)]"
-        >
-          <SheetHeader className="flex-row items-center gap-3 p-0 pr-12 text-left">
-            <Avatar className="size-12 shrink-0">
-              <AvatarFallback className="bg-muted text-sm font-medium text-muted-foreground">
-                {iniciaisDe(item.nome)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <SheetTitle className="font-heading text-lg leading-tight">{item.nome}</SheetTitle>
-              <SheetDescription className="text-[13px]">
-                {[item.funil, setorDoFio, fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </SheetDescription>
-            </div>
-          </SheetHeader>
-
-          <section aria-label="Em que pé está" className="flex flex-col gap-2">
-            <h3 className={ROTULO_DA_FOLHA}>Em que pé está</h3>
-            <div className="flex flex-wrap items-center gap-1.5">{selos(true)}</div>
-          </section>
-
-          <section aria-label="Ações" className="flex flex-col gap-2">
-            <h3 className={ROTULO_DA_FOLHA}>Ações</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {podeAssumir && fio ? (
-                <AssumirConversa
-                  fioId={fio.id}
-                  organizacaoId={item.id}
-                  className={cn(ACAO_DA_FOLHA, 'col-span-2')}
-                />
-              ) : null}
-              {fio && eu?.podeEscrever ? (
-                <TransferirConversa
-                  fioId={fio.id}
-                  organizacaoId={item.id}
-                  pessoas={catalogos.pessoas}
-                  setores={setores}
-                  className={ACAO_DA_FOLHA}
-                />
-              ) : null}
-              <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
-                <Link href={`/registrar?org=${item.id}`}>
-                  <MessageSquarePlus aria-hidden="true" />
-                  Registrar contato
-                </Link>
-              </Button>
-              {fio && eu?.podeEscrever ? (
-                CONCLUIR_NA_EMPRESA ? (
-                  <ConcluirConversa
-                    fioId={fio.id}
-                    concluidaEm={fio.arquivadaEm}
-                    tamanho="default"
-                    className={ACAO_DA_FOLHA}
-                  />
-                ) : (
-                  <Arquivar fio={fio} comNome className={ACAO_DA_FOLHA} />
-                )
-              ) : null}
-              <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
-                <Link href={`/parceiros/${item.id}`}>
-                  <ExternalLink aria-hidden="true" />
-                  Abrir a ficha
-                </Link>
-              </Button>
-            </div>
-          </section>
-
-          {fio ? (
-            <section aria-label="Conversa" className="flex flex-col gap-1">
-              <h3 className={ROTULO_DA_FOLHA}>Conversa</h3>
-              <MenuDaConversa
-                variante="folha"
-                fioId={fio.id}
-                bloqueada={fio.bloqueadaEm !== null}
-                podeEscrever={Boolean(eu?.podeEscrever)}
-                atualizar={chavesDaConversa}
-                aoFecharConversa={aoVoltar}
-                aoEscolher={() => setFolha(false)}
+        <Sheet open={folha} onOpenChange={setFolha}>
+          <SheetContent
+            side="bottom"
+            className="@container max-h-[88svh] gap-5 overflow-y-auto rounded-t-2xl px-4 pt-4 pb-[calc(var(--area-segura-inferior)+1.25rem)]"
+          >
+            <SheetHeader className="flex-row items-center gap-3 p-0 pr-12 text-left">
+              <AvatarDaConversa
+                nome={item.nome}
+                temperatura={temperatura}
+                tamanho={48}
+                anel="var(--background)"
               />
-            </section>
-          ) : null}
+              <div className="min-w-0">
+                <SheetTitle className="font-heading text-lg leading-tight">{item.nome}</SheetTitle>
+                <SheetDescription className="text-[13px]">
+                  {[item.funil, setorDoFio, fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </SheetDescription>
+              </div>
+            </SheetHeader>
+            {ficha(true)}
+          </SheetContent>
+        </Sheet>
 
-          <section aria-label="Ficha" className="flex flex-col gap-1">
-            <h3 className={ROTULO_DA_FOLHA}>Ficha</h3>
-            <dl className="flex flex-col">{campos('folha')}</dl>
-          </section>
-        </SheetContent>
-      </Sheet>
-
-      {/* A coluna de leitura fica em 56rem. Era 48, e com o balão limitado a 34rem
-          dentro dela a conversa aparecia pequena no meio de uma tela vazia. 56rem
-          ainda é largura de leitura — o que não pode é a linha de texto correr os
-          1.100px do painel de uma tela de 1440, porque aí ninguém acha o começo da
-          linha seguinte.
-
-          A FICHA ROLA JUNTO, e o cabeçalho ficou só com o nome e as ações. Ela
-          estava fixa; com o rodapé do inbox embaixo (relógio + rascunho), os dois
-          blocos fixos somavam mais que a altura do painel e a conversa — a razão
-          da tela — sobrava com trinta pixels. Endereço e categoria são consulta,
-          não decisão: podem sair de vista quando a pessoa desce para ler. */}
-      <div ref={rolagem} onScroll={aoRolar} className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
-        <div ref={conteudo}>
-          {/* A ficha em UMA LINHA que quebra, e não numa grade de seis campos:
-            onde, categoria, dono e último contato são consulta de canto de olho.
-            No celular ela mora na folha do cabeçalho (20/10/2026). */}
-          <dl className="mx-auto hidden max-w-4xl flex-wrap items-baseline gap-x-4 gap-y-1 pb-1 text-[11px] text-muted-foreground sm:flex">
-            {campos('linha')}
-          </dl>
-
-          {/* A leitura da IA entra ENTRE a ficha e a conversa, e não num painel à
-            parte: ela fala sobre o que está logo abaixo, e a evidência de cada
-            sinal é uma mensagem daquela mesma coluna. Fechada, é uma linha. */}
-          {fio ? <LeituraDaIa fioId={fio.id} className="mx-auto mt-2.5 max-w-4xl" /> : null}
-
-          <AvisoWhatsapp meta={meta} compacto className="mx-auto my-4 max-w-4xl" />
+        {/* A CONVERSA NO PAPEL DE PAREDE (03/11/2026): só as mensagens e o que
+            aconteceu entre elas. Endereço, categoria e a leitura da IA foram para
+            os dados do contato; o relógio da janela é a pílula grudada no alto. */}
+        <AreaDoFio
+          rolagem={rolagem}
+          conteudo={conteudo}
+          aoRolar={aoRolar}
+          longe={longe}
+          irAoFim={irAoFim}
+          topo={fio ? <PilulaDaJanela estado={janela} /> : null}
+        >
+          <AvisoWhatsapp meta={meta} compacto className="mx-auto my-3 w-full max-w-xl" />
 
           {consulta.isPending ? (
             <EsqueletoLinha />
@@ -625,44 +620,25 @@ export function Conversa({
           ) : dias.length === 0 ? (
             <SemHistorico organizacaoId={item.id} />
           ) : (
-            <div className="mx-auto max-w-4xl">
-              <LinhaDoTempo dias={dias} nomeDoParceiro={item.nome} />
-            </div>
+            <LinhaDoTempo dias={dias} nomeDoParceiro={item.nome} naoLidas={avisoDeNaoLidas} />
           )}
-        </div>
-      </div>
+        </AreaDoFio>
 
-      {/* O rodapé não rola com a conversa: o relógio decide o que pode sair, e
-          decisão não pode depender de a pessoa ter chegado ao fim da leitura.
-          O teto é 45% DO PAINEL, não da tela (`dvh`) — com `dvh` ele cabia na
-          janela e mesmo assim espremia a conversa contra o cabeçalho, porque o
-          painel é menor que a janela. */}
-      {fio ? (
-        <FaixaDaJanela
-          estado={janela}
-          className="hidden border-t border-hairline conversa-estreita:flex"
-        />
-      ) : null}
-      {/* No celular o rodapé cresce até 60% (a caixa cresce para baixo, linha a
-          linha) e respeita a barrinha do iPhone — zero com o teclado aberto. */}
-      <div
-        className={cn(
-          'max-h-[42%] shrink-0 space-y-3 overflow-y-auto border-t border-hairline bg-background/80 px-3 py-2.5 max-md:max-h-[60%] max-md:pb-[calc(0.625rem+var(--folga-inferior,0px))] md:px-5 md:py-3',
-          fio && 'conversa-estreita:border-t-0 conversa-estreita:pt-1',
-        )}
-      >
-        <div className="mx-auto max-w-4xl space-y-3">
-          {/* O relógio da janela virou a FAIXA do cabeçalho (`FaixaDaJanela`): a hora
-              está sempre à vista e não custa mais três linhas em cima da caixa de
-              escrever. O cartão inteiro só volta quando a janela está APERTADA — aí
-              a regra importa de novo, porque a decisão muda em minutos. */}
+        {/* O rodapé não rola com a conversa: o relógio decide o que pode sair, e
+            decisão não pode depender de a pessoa ter chegado ao fim da leitura.
+            O teto é 42% DO PAINEL, não da tela (`dvh`) — com `dvh` ele cabia na
+            janela e mesmo assim espremia a conversa contra o cabeçalho, porque o
+            painel é menor que a janela. No celular o rodapé cresce até 60% (a
+            caixa cresce para baixo, linha a linha) e respeita a barrinha do
+            iPhone — zero com o teclado aberto. */}
+        <div className="max-h-[42%] shrink-0 space-y-2 overflow-y-auto border-t border-wpp-linha bg-wpp-painel2 px-2 py-1.5 max-md:max-h-[60%] max-md:pb-[calc(0.375rem+var(--folga-inferior,0px))] md:px-3 md:py-2.5">
+          {/* O cartão inteiro da janela só volta quando ela está APERTADA — aí a
+              regra importa de novo, porque a decisão muda em minutos. */}
           {fio && janela.situacao === 'aberta' && janela.restanteMin <= JANELA_APERTADA_MIN ? (
-            <Janela24h estado={janela} />
+            <Janela24h estado={janela} className="mx-1" />
           ) : null}
-          {/* `naoContatar` viaja junto porque o rodapé é onde a pessoa ESCREVE: o
-              selo lá em cima informa, mas informar não impede ninguém de digitar
-              uma mensagem inteira e só descobrir na hora de enviar que o parceiro
-              tinha pedido para sair. Quem decide continua sendo o banco. */}
+          {/* Quem atende, logo acima da caixa: quem vai responder precisa saber
+              se está respondendo no lugar de alguém. */}
           {fio ? (
             <AvisoDeQuemAtende
               fioId={fio.id}
@@ -671,14 +647,10 @@ export function Conversa({
               nomeDaPessoa={nomeDaPessoa}
             />
           ) : null}
-          {/* No desenho do celular o "Assumir" fica aqui, ao lado de quem atende
-              — é a ação do dia, e não pode morar só dentro da folha. */}
+          {/* No celular o "Assumir" sai do cabeçalho (não cabe na linha) e vem
+              para cá, onde a pessoa já está com o dedo. */}
           {podeAssumir && fio ? (
-            <AssumirConversa
-              fioId={fio.id}
-              organizacaoId={item.id}
-              className="hidden w-full conversa-estreita:inline-flex"
-            />
+            <AssumirConversa fioId={fio.id} organizacaoId={item.id} className="w-full md:hidden" />
           ) : null}
           <CaixaDeResposta
             fio={fio}
@@ -688,6 +660,17 @@ export function Conversa({
           />
         </div>
       </div>
+
+      {fichaAberta ? (
+        <FichaAoLado aoFechar={aoAlternarFicha}>
+          <div className="flex flex-col items-center gap-2 text-center">
+            <AvatarDaConversa nome={item.nome} temperatura={temperatura} tamanho={72} />
+            <p className="text-lg leading-tight font-semibold">{item.nome}</p>
+            <p className="text-[13px] text-wpp-suave">{contexto || item.funil}</p>
+          </div>
+          {ficha(false)}
+        </FichaAoLado>
+      ) : null}
     </div>
   );
 
@@ -785,10 +768,6 @@ function Arquivar({
     </Button>
   );
 }
-
-/** O rótulo de cada bloco da folha do celular. */
-const ROTULO_DA_FOLHA =
-  'text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase';
 
 /** Uma ação da folha do celular: bloco de 56 px, ícone e nome, em duas colunas. */
 const ACAO_DA_FOLHA =

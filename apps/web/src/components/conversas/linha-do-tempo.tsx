@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment } from 'react';
 import { DoorOpen } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import { ICONE_TIPO } from './icones';
 import { Mensagem } from './mensagem-do-fio';
 import { mesmoBloco, procedenciaDoEvento } from './montagem';
 import { ROTULO_AUTOR, type DiaDaLinha, type EventoDaLinha } from './tipos';
+import { PilulaDoFio } from './wpp';
 
 /**
  * A linha do tempo do parceiro: uma coluna só, do mais antigo ao mais recente.
@@ -25,29 +27,52 @@ import { ROTULO_AUTOR, type DiaDaLinha, type EventoDaLinha } from './tipos';
  *
  * Sem cor cromática: o desenho e o peso da fonte fazem a hierarquia. Cor nesta
  * interface é temperatura, e um evento passado não tem temperatura.
+ *
+ * No jeito do WhatsApp (03/11/2026) o dia é a pílula branca do alto, o que não é
+ * mensagem é um cartão translúcido no meio, e quem abre uma conversa com mensagem
+ * nova vê o aviso "N mensagens não lidas" antes delas.
  */
 export function LinhaDoTempo({
   dias,
   nomeDoParceiro = null,
+  naoLidas = null,
 }: {
   dias: DiaDaLinha[];
+  /**
+   * O aviso das não lidas: quantas eram ao abrir e a mensagem antes da qual ele
+   * entra (a mais antiga delas). Fica onde estava até a conversa fechar, como no
+   * WhatsApp, mesmo depois de a leitura zerar o número.
+   */
+  naoLidas?: { quantas: number; antesDe: string } | null;
   /** Vai até o balão recebido: é o nome que aparece em cima dele. */
   nomeDoParceiro?: string | null;
 }) {
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-1">
       {dias.map((dia) => (
-        <section key={dia.chave} className="flex flex-col gap-3">
+        <section key={dia.chave} className="flex flex-col">
           <SeparadorDeDia iso={dia.em} />
           <ol className="flex flex-col">
             {dia.eventos.map((evento, i) => (
-              <Evento
-                key={evento.id}
-                evento={evento}
-                anterior={dia.eventos[i - 1]}
-                seguinte={dia.eventos[i + 1]}
-                nomeDoParceiro={nomeDoParceiro}
-              />
+              <Fragment key={evento.id}>
+                {naoLidas && naoLidas.antesDe === evento.id ? (
+                  <li
+                    id="aviso-nao-lidas"
+                    className="my-3 flex scroll-mt-16 justify-center rounded-lg bg-wpp-sis py-1.5"
+                  >
+                    <PilulaDoFio tom="dia" className="bg-wpp-painel">
+                      <span className="numerico">{naoLidas.quantas}</span>
+                      {naoLidas.quantas === 1 ? ' mensagem não lida' : ' mensagens não lidas'}
+                    </PilulaDoFio>
+                  </li>
+                ) : null}
+                <Evento
+                  evento={evento}
+                  anterior={dia.eventos[i - 1]}
+                  seguinte={dia.eventos[i + 1]}
+                  nomeDoParceiro={nomeDoParceiro}
+                />
+              </Fragment>
             ))}
           </ol>
         </section>
@@ -64,14 +89,14 @@ function SeparadorDeDia({ iso }: { iso: string }) {
     // GRUDADO NO TOPO. Numa conversa de três meses, rolar para o meio deixava a
     // pessoa sem saber de que dia era aquilo — o separador tinha passado
     // trezentos pixels acima. `z-10` porque os balões rolam por baixo dele.
-    <div className="sticky top-0 z-10 flex justify-center py-1">
-      <span
-        className="rounded-full border border-hairline bg-background/90 px-3 py-1 text-[11px] text-muted-foreground backdrop-blur-sm"
-        title={completo}
-      >
-        {palavra}
+    // Com a pílula da janela de 24 h no alto, gruda logo abaixo dela
+    // (`--topo-do-dia`, medido em `fio-wpp.tsx`).
+    <div className="sticky top-[var(--topo-do-dia,0.375rem)] z-10 mt-4 mb-1.5 flex justify-center">
+      <PilulaDoFio tom="dia" title={completo}>
+        {/* "Hoje", "Ontem", "Segunda-feira, ": com maiúscula, como no WhatsApp. */}
+        {palavra.charAt(0).toUpperCase() + palavra.slice(1)}
         {numero ? <span className="numerico">{numero}</span> : null}
-      </span>
+      </PilulaDoFio>
     </div>
   );
 }
@@ -95,7 +120,7 @@ function Evento({
       // no sinal rola até a mensagem que o prova (`leitura-da-ia.tsx`).
       <li
         id={`evento-${evento.id}`}
-        className="scroll-mt-4 transition-colors data-[apontada]:bg-muted/60"
+        className="scroll-mt-4 rounded-lg transition-colors data-[apontada]:bg-wpp-cita-barra/15"
       >
         <Mensagem
           mensagem={evento.mensagem}
@@ -131,28 +156,28 @@ function Evento({
   // mudança de etapa que ela causou continuam no mesmo fio, na mesma ordem, mas
   // sem disputar o lugar dos balões: elas são o que aconteceu, não o que foi dito.
   return (
-    <li className="flex justify-center pb-3">
-      <div className="w-full max-w-md space-y-1 rounded-xl border border-hairline bg-muted/40 px-3 py-2">
+    <li className="my-2.5 flex justify-center">
+      <div className="w-full max-w-md space-y-1 rounded-lg bg-wpp-sis px-3 py-2 text-wpp-sis-texto shadow-wpp">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Icone className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="text-sm leading-snug font-medium">{titulo}</span>
+          <Icone className="size-3.5 shrink-0" aria-hidden="true" />
+          <span className="text-sm leading-snug font-medium text-foreground">{titulo}</span>
           <time
             dateTime={evento.em}
             title={dataHoraCompleta(evento.em)}
-            className="numerico text-xs text-muted-foreground"
+            className="numerico text-xs"
           >
             {hora(evento.em)}
           </time>
           {evento.portaAberta ? (
             <Badge variant="pilula" className="h-5 gap-1 px-1.5 text-[10px] font-normal">
-              <DoorOpen className="size-3 text-muted-foreground" aria-hidden="true" />
+              <DoorOpen className="size-3" aria-hidden="true" />
               porta aberta
             </Badge>
           ) : null}
         </p>
 
         {partes.length || tempo ? (
-          <p className="text-xs leading-relaxed text-muted-foreground">
+          <p className="text-xs leading-relaxed">
             {partes.join(' · ')}
             {tempo ? (
               <>
@@ -168,15 +193,17 @@ function Evento({
             Demonstração marcada"); quando o desfecho já ocupou a primeira linha, ela
             reaparece aqui para não se perder. */}
         {evento.genero === 'etapa' && titulo !== evento.titulo ? (
-          <p className="text-xs text-muted-foreground">{evento.titulo}</p>
+          <p className="text-xs">{evento.titulo}</p>
         ) : null}
 
         {evento.detalhe ? (
-          <p className="text-sm leading-relaxed whitespace-pre-line">{evento.detalhe}</p>
+          <p className="text-sm leading-relaxed whitespace-pre-line text-foreground">
+            {evento.detalhe}
+          </p>
         ) : null}
 
         {semTexto ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs">
             Registro manual: o CRM guardou o desfecho, não o texto da mensagem.
           </p>
         ) : null}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * ONDE A CONVERSA ABRE, E QUANDO ELA ACOMPANHA O FIM (20/10/2026).
@@ -33,6 +33,12 @@ import { useCallback, useEffect, useRef } from 'react';
  * atende e o relógio da janela chegam depois e encolhem a coluna. Encolher não
  * dispara `scroll`, então a caixa é observada junto com o conteúdo.
  *
+ * O BOTÃO DE DESCER, COMO NO WHATSAPP (03/11/2026). Quem subiu mais de 200px
+ * vê o círculo com a seta no canto da conversa (`longe`); tocar nele desce até a
+ * mensagem mais recente e cola de novo no fim (`irAoFim`). Esse `longe` vale para
+ * qualquer rolagem, inclusive a do navegador, porque é só o desenho do botão: a
+ * régua de quem está lendo continua sendo a do gesto.
+ *
  * Uso: `rolagem` vai na caixa que rola (com `onScroll={aoRolar}`) e `conteudo`
  * num invólucro de tudo o que ela tem dentro.
  */
@@ -44,11 +50,22 @@ export function useRolagemNoFim(conversaId: string, quantas: number) {
   // página (`performance.now()` conta dali) passava por gesto da pessoa.
   const gestoEm = useRef(Number.NEGATIVE_INFINITY);
 
+  const [longe, setLonge] = useState(false);
+
   const aoRolar = useCallback(() => {
     const caixa = rolagem.current;
     if (!caixa) return;
+    const falta = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight;
+    setLonge(falta > DISTANCIA_DO_BOTAO);
     if (performance.now() - gestoEm.current > JANELA_DO_GESTO_MS) return;
-    coladoNoFim.current = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < FOLGA_DO_FIM;
+    coladoNoFim.current = falta < FOLGA_DO_FIM;
+  }, []);
+
+  const irAoFim = useCallback(() => {
+    const caixa = rolagem.current;
+    if (!caixa) return;
+    coladoNoFim.current = true;
+    caixa.scrollTo({ top: caixa.scrollHeight, behavior: 'smooth' });
   }, []);
 
   useEffect(() => {
@@ -104,11 +121,13 @@ export function useRolagemNoFim(conversaId: string, quantas: number) {
     coladoNoFim.current = false;
   }, []);
 
-  return { rolagem, conteudo, aoRolar, soltar };
+  return { rolagem, conteudo, aoRolar, soltar, longe, irAoFim };
 }
 
 /** Quantos pixels do fim ainda contam como "está no fim". */
 const FOLGA_DO_FIM = 120;
+/** A partir de quantos pixels do fim aparece o botão de descer. */
+const DISTANCIA_DO_BOTAO = 200;
 /** Quanto tempo depois de um gesto a rolagem ainda é da pessoa (cobre a inércia do toque). */
 const JANELA_DO_GESTO_MS = 1500;
 const GESTOS = ['wheel', 'touchstart', 'touchmove', 'touchend', 'pointerdown'] as const;

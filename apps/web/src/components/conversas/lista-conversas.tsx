@@ -1,7 +1,7 @@
 'use client';
 
-import { memo, useEffect, useRef } from 'react';
-import { BellOff, ChevronRight, Pin, Sparkles } from 'lucide-react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BellOff, Check, Pin, Sparkles } from 'lucide-react';
 
 import { FaixaDeNova, MarcaDeNova } from '@/components/avisos/marca-de-nova';
 import { useConversasNovas } from '@/components/avisos/provedor-avisos';
@@ -12,18 +12,16 @@ import {
 } from '@/components/ligacao-whatsapp/logica';
 import { FaixaDePerdida, SeloDeLigacaoPerdida } from '@/components/ligacao-whatsapp/perdidas';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Etiqueta } from '@/components/etiqueta';
-import { EtiquetaEtapa } from '@/components/funis/etapa';
 import { formatarTelefone } from '@/components/parceiros/formatos';
-import { DiasSemContato } from '@/components/temperatura';
+import type { Temperatura } from '@/components/temperatura/escala-termica';
 
 import { AtitudeNaLista } from './atitude';
 import type { BaseDasAtitudes } from './atitude-dados';
 import type { AtitudeDaConversa, Objecao } from './atitude-regra';
 import { SeloDeConcluida } from './concluir-conversa';
 import { nomeDoCliente } from './fora-da-base-dados';
-import { local, rotuloDoDia } from './formatos';
+import { local, quandoNaLista } from './formatos';
 import { ICONE_CANAL } from './icones';
 import { ChipDaJanela } from './janela-24h';
 import { estadoDaJanela, type FioCru } from './mensagens';
@@ -31,6 +29,9 @@ import { juntarNaLista } from './montagem';
 import { ehSilenciada, SEM_PREFERENCIAS, type Preferencias } from './preferencias';
 import { previaDoDigitado, useTextosDigitados } from './texto-digitado';
 import { ROTULO_CANAL, type ItemConversa } from './tipos';
+import { useToqueLongo } from './acoes-da-mensagem';
+import { BarraDaSelecao, MenuDaLinha, type EstadoDaLinha } from './menu-da-linha';
+import { AvatarDaConversa } from './wpp';
 
 /**
  * A lista da esquerda: um parceiro por linha, o que falou por último em cima.
@@ -82,16 +83,16 @@ export function ListaConversas({
   aoEscolher: (id: string) => void;
   /** Fixar e silenciar de quem está olhando (27/10/2026). */
   preferencias?: Preferencias;
-  /** Quem escreveu e não é ficha. Só a lista de Conversas passa; as filas, não. */
+  /** Quem escreveu e não é parceiro, para entrar na mesma lista (aba Conversas). */
   clientes?: FioCru[];
-  /** O id da CONVERSA do cliente aberto — ele não tem ficha. */
+  /** A conversa de cliente aberta ao lado, para marcar a linha dela. */
   clienteSelecionadoId?: string | null;
   aoEscolherCliente?: (conversaId: string) => void;
-  /** A atitude do cliente (29/10/2026). Nula ou desligada, a lista fica como era. */
+  /** A atitude do cliente (Imova): a etiqueta na linha. Desligada, nada aparece. */
   atitudes?: BaseDasAtitudes | null;
-  /** "Mais interessados": a lista vai pela etiqueta de atitude. */
+  /** "Mais interessados": a ordem é a da atitude, e não a de sempre. */
   porInteresse?: boolean;
-  /** A ligação perdida e sem retorno (03/11/2026), por conversa. Sobe para o topo. */
+  /** Quem ligou e não foi atendido (03/11/2026): sobe para o topo com o selo. */
   perdidas?: Perdidas;
 }) {
   const novas = useConversasNovas();
@@ -100,57 +101,70 @@ export function ListaConversas({
     fioId ? ligadas?.porConversa.get(fioId) : undefined;
   const objecoes = ligadas?.objecoes ?? SEM_OBJECOES;
   const digitados = useTextosDigitados();
-  /** O que a linha mostra depois de "Rascunho:", ou `null`. */
+  // O texto que a pessoa digitou e não enviou, no lugar da prévia — menos na
+  // conversa aberta, onde ele já está na caixa.
   const rascunhoDe = (fioId: string | null | undefined, selecionado: boolean): string | null =>
     selecionado || !fioId ? null : previaDoDigitado(digitados.get(fioId)?.texto);
+  // A linha segurada no celular (o toque longo do WhatsApp): o alto da tela vira
+  // a barra das ações dela até a pessoa agir ou desfazer.
+  const [segurada, setSegurada] = useState<EstadoDaLinha | null>(null);
+  const segurar = useCallback((linha: EstadoDaLinha) => setSegurada(linha), []);
   return (
-    <ul className="corpo-tabela flex flex-col">
-      {juntarNaLista(
-        itens,
-        clientes,
-        preferencias,
-        porInteresse ? (ligadas?.porConversa ?? null) : null,
-        perdidas,
-      ).map((linha) =>
-        linha.tipo === 'parceiro' ? (
-          <LinhaMemorizada
-            key={linha.item.id}
-            item={linha.item}
-            selecionado={linha.item.id === selecionadoId}
-            nova={linha.item.fio ? novas.has(linha.item.fio.id) : false}
-            rascunho={rascunhoDe(linha.item.fio?.id, linha.item.id === selecionadoId)}
-            aoEscolher={aoEscolher}
-            marcas={marcasDa(linha.item.fio?.id, preferencias)}
-            atitude={atitudeDe(linha.item.fio?.id)}
-            objecoes={objecoes}
-            perdida={linha.item.fio ? perdidas.get(linha.item.fio.id) : undefined}
-          />
-        ) : (
-          <LinhaDeClienteMemorizada
-            key={linha.fio.id}
-            fio={linha.fio}
-            selecionado={linha.fio.id === clienteSelecionadoId}
-            nova={novas.has(linha.fio.id)}
-            rascunho={rascunhoDe(linha.fio.id, linha.fio.id === clienteSelecionadoId)}
-            aoEscolher={aoEscolherCliente}
-            marcas={marcasDa(linha.fio.id, preferencias)}
-            atitude={atitudeDe(linha.fio.id)}
-            objecoes={objecoes}
-            perdida={perdidas.get(linha.fio.id)}
-          />
-        ),
-      )}
-    </ul>
+    <>
+      {segurada ? <BarraDaSelecao linha={segurada} aoCancelar={() => setSegurada(null)} /> : null}
+      <ul className="flex flex-col">
+        {juntarNaLista(
+          itens,
+          clientes,
+          preferencias,
+          porInteresse ? (ligadas?.porConversa ?? null) : null,
+          perdidas,
+        ).map((linha) =>
+          linha.tipo === 'parceiro' ? (
+            <LinhaMemorizada
+              key={linha.item.id}
+              item={linha.item}
+              selecionado={linha.item.id === selecionadoId}
+              nova={linha.item.fio ? novas.has(linha.item.fio.id) : false}
+              rascunho={rascunhoDe(linha.item.fio?.id, linha.item.id === selecionadoId)}
+              aoEscolher={aoEscolher}
+              marcas={marcasDa(linha.item.fio?.id, preferencias)}
+              atitude={atitudeDe(linha.item.fio?.id)}
+              objecoes={objecoes}
+              perdida={linha.item.fio ? perdidas.get(linha.item.fio.id) : undefined}
+              segurada={segurada !== null && segurada.fioId === linha.item.fio?.id}
+              aoSegurar={segurar}
+              aoSoltar={segurada ? () => setSegurada(null) : null}
+            />
+          ) : (
+            <LinhaDeClienteMemorizada
+              key={linha.fio.id}
+              fio={linha.fio}
+              selecionado={linha.fio.id === clienteSelecionadoId}
+              nova={novas.has(linha.fio.id)}
+              rascunho={rascunhoDe(linha.fio.id, linha.fio.id === clienteSelecionadoId)}
+              aoEscolher={aoEscolherCliente}
+              marcas={marcasDa(linha.fio.id, preferencias)}
+              atitude={atitudeDe(linha.fio.id)}
+              objecoes={objecoes}
+              perdida={perdidas.get(linha.fio.id)}
+              segurada={segurada !== null && segurada.fioId === linha.fio.id}
+              aoSegurar={segurar}
+              aoSoltar={segurada ? () => setSegurada(null) : null}
+            />
+          ),
+        )}
+      </ul>
+    </>
   );
 }
 
-/** Constante: a linha é memorizada, e uma lista nova a cada pintura a redesenharia. */
 const SEM_OBJECOES: readonly Objecao[] = [];
 
 /**
  * Fixada e silenciada, de quem está olhando (27/10/2026). Uma constante por
- * combinação: a linha é memorizada, e um objeto novo a cada pintura a faria
- * redesenhar à toa.
+ * combinação, para a linha memorizada receber o MESMO objeto entre um desenho e
+ * outro e não se redesenhar à toa.
  */
 type Marcas = { readonly fixada: boolean; readonly silenciada: boolean };
 const MARCAS: Record<string, Marcas> = {
@@ -162,43 +176,6 @@ const MARCAS: Record<string, Marcas> = {
 function marcasDa(fioId: string | null | undefined, preferencias: Preferencias): Marcas {
   const p = fioId ? preferencias.get(fioId) : undefined;
   return MARCAS[`${p?.fixadaEm ? 1 : 0}${ehSilenciada(p?.silenciadaAte) ? 1 : 0}`]!;
-}
-
-/** O alfinete e o sino cortado, ao lado do nome. */
-function IconesDaLinha({ marcas }: { marcas: Marcas }) {
-  if (!marcas.fixada && !marcas.silenciada) return null;
-  return (
-    <span className="flex shrink-0 items-center gap-1 self-center text-muted-foreground">
-      {marcas.silenciada ? <BellOff className="size-3.5" aria-label="Silenciada" /> : null}
-      {marcas.fixada ? <Pin className="size-3.5" aria-label="Fixada" /> : null}
-    </span>
-  );
-}
-
-/** O número de por ler: verde para agir; cinza quando silenciada, como no WhatsApp. */
-function PorLer({ quantas, silenciada }: { quantas: number; silenciada: boolean }) {
-  return (
-    <span
-      className={cn(
-        'numerico inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-semibold',
-        silenciada
-          ? 'bg-muted-foreground/60 text-background'
-          : 'bg-primary text-primary-foreground',
-      )}
-      title={`${quantas} mensagem(ns) por ler`}
-    >
-      {quantas}
-    </span>
-  );
-}
-
-/** O contato bloqueado (27/10/2026): nada sai para ele. */
-function SeloDeBloqueado() {
-  return (
-    <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
-      bloqueado
-    </Badge>
-  );
 }
 
 /**
@@ -214,22 +191,201 @@ const LinhaDeClienteMemorizada = memo(LinhaDeCliente);
 
 /**
  * "Rascunho: É assim que deveri…": o que a pessoa digitou e não enviou, no lugar
- * da prévia da linha. O rótulo vai na tinta de texto da menta (`menta-texto`),
- * e não na menta cheia — a cheia é clara demais para ser lida como letra.
+ * da prévia da linha, com o rótulo no verde do WhatsApp.
  */
 export function PreviaDoRascunho({ texto, className }: { texto: string; className?: string }) {
   return (
-    <span className={cn('min-w-0 flex-1 truncate text-xs', className)}>
-      <span className="font-medium text-menta-texto">Rascunho:</span>{' '}
-      <span className="text-muted-foreground">{texto}</span>
+    <span className={cn('min-w-0 flex-1 truncate', className)}>
+      <span className="font-medium text-wpp-nova">Rascunho:</span>{' '}
+      <span className="text-wpp-suave">{texto}</span>
     </span>
   );
 }
 
-/** "hoje", "ontem", "seg, 29/09" ou "29/09": o dia da última mensagem. */
-function quando(iso: string): string {
-  const dia = rotuloDoDia(iso);
-  return `${dia.palavra}${dia.numero ?? ''}`;
+/** O número de por ler: o círculo verde do WhatsApp; cinza quando silenciada. */
+function PorLer({ quantas, silenciada }: { quantas: number; silenciada: boolean }) {
+  return (
+    <span
+      className={cn(
+        'numerico inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-medium',
+        silenciada ? 'bg-wpp-suave/60 text-wpp-painel' : 'bg-menta text-menta-tinta',
+      )}
+      title={`${quantas} mensagem(ns) por ler`}
+    >
+      {quantas}
+    </span>
+  );
+}
+
+/** Um selo miúdo da segunda linha: "Concluída", "bloqueado", "não contatar". */
+function Selo({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-wpp-chip px-2 text-[11px] font-semibold text-wpp-chip-texto">
+      {children}
+    </span>
+  );
+}
+
+/**
+ * A LINHA NO JEITO DO WHATSAPP (03/11/2026), igual para parceiro e cliente: o
+ * retrato com o ponto da temperatura, o nome e a hora em cima, a prévia com os
+ * selos e o número verde embaixo, e o filete só sob o texto. Ao passar o mouse
+ * aparece a setinha das opções (o clique direito abre o mesmo menu); no celular,
+ * segurar seleciona a linha.
+ */
+function LinhaWpp({
+  nome,
+  temperatura,
+  quando,
+  destaque,
+  selecionado,
+  aoEscolher,
+  menu,
+  segurada,
+  aoSegurar,
+  aoSoltar,
+  faixa,
+  segunda,
+  terceira,
+  dica,
+}: {
+  nome: string;
+  temperatura: Temperatura | null;
+  quando: string | null;
+  /** Nova ou por ler: o nome em negrito e a hora em verde. */
+  destaque: boolean;
+  selecionado: boolean;
+  aoEscolher: () => void;
+  /** Sem conversa no WhatsApp (só registro de contato), a linha não tem menu. */
+  menu: EstadoDaLinha | null;
+  segurada: boolean;
+  aoSegurar: (linha: EstadoDaLinha) => void;
+  /** Com outra linha segurada, tocar nesta só desfaz a seleção. */
+  aoSoltar: (() => void) | null;
+  faixa: React.ReactNode;
+  segunda: React.ReactNode;
+  terceira?: React.ReactNode;
+  dica?: string;
+}) {
+  const alvo = useRef<HTMLLIElement>(null);
+  const [menuAberto, setMenuAberto] = useState(false);
+  // O toque longo seleciona e o dedo que sobe não pode abrir a conversa junto.
+  const segurou = useRef(false);
+  const toque = useToqueLongo(() => {
+    if (!menu) return;
+    segurou.current = true;
+    aoSegurar(menu);
+  }, menu !== null);
+
+  useEffect(() => {
+    if (selecionado) alvo.current?.scrollIntoView({ block: 'nearest' });
+  }, [selecionado]);
+
+  const fundo = segurada
+    ? 'var(--wpp-chip-ativo)'
+    : selecionado
+      ? 'var(--wpp-sel)'
+      : 'var(--wpp-painel)';
+
+  return (
+    <li ref={alvo} className="group/linha relative" style={{ background: fundo }}>
+      <button
+        type="button"
+        {...toque}
+        onClick={() => {
+          if (segurou.current) {
+            segurou.current = false;
+            return;
+          }
+          if (aoSoltar) {
+            aoSoltar();
+            return;
+          }
+          aoEscolher();
+        }}
+        onContextMenu={(e) => {
+          toque.onContextMenu(e);
+          if (e.defaultPrevented || !menu) return;
+          // O clique direito do mouse abre o menu da setinha, como no WhatsApp.
+          e.preventDefault();
+          setMenuAberto(true);
+        }}
+        aria-current={selecionado ? 'true' : undefined}
+        title={dica}
+        className={cn(
+          'relative flex w-full items-center gap-3 px-3.5 text-left outline-none',
+          'hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06]',
+          'pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]',
+        )}
+      >
+        {faixa}
+        <AvatarDaConversa nome={nome} temperatura={temperatura} anel={fundo}>
+          {segurada ? (
+            <span className="absolute right-[-2px] bottom-[-2px] flex size-5 items-center justify-center rounded-full bg-wpp-cita-barra text-white ring-2 ring-wpp-painel">
+              <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
+            </span>
+          ) : null}
+        </AvatarDaConversa>
+        <span className="flex min-w-0 flex-1 flex-col gap-[3px] border-b border-wpp-linha py-[13px]">
+          <span className="flex items-baseline gap-2">
+            <span
+              className={cn(
+                'min-w-0 flex-1 truncate text-[15px]',
+                destaque ? 'font-semibold' : 'font-medium',
+              )}
+            >
+              {nome}
+            </span>
+            {quando ? (
+              <span
+                className={cn(
+                  'numerico shrink-0 text-[11.5px]',
+                  destaque ? 'font-medium text-wpp-nova' : 'text-wpp-suave',
+                )}
+              >
+                {quando}
+              </span>
+            ) : null}
+          </span>
+          <span className="flex min-w-0 items-center gap-[5px] text-[13.5px] text-wpp-suave transition-[padding] md:group-hover/linha:pr-8">
+            {segunda}
+          </span>
+          {terceira}
+        </span>
+      </button>
+      {menu ? (
+        <MenuDaLinha
+          linha={menu}
+          aberto={menuAberto}
+          aoMudar={setMenuAberto}
+          className="absolute right-3 bottom-3 z-10"
+        />
+      ) : null}
+    </li>
+  );
+}
+
+/**
+ * A hora da linha é a da ÚLTIMA COISA que aconteceu, como no WhatsApp: a
+ * mensagem mais recente do fio ou o último contato registrado (ligação, visita),
+ * o que vier depois. Só o registro deixava "Ontem" numa conversa com mensagem de
+ * agora há pouco.
+ */
+function quandoDaLinha(item: ItemConversa): string | null {
+  const datas = [item.ultimaEm, item.fio?.ultimaEm ?? null].filter((d): d is string => !!d);
+  if (datas.length === 0) return null;
+  return quandoNaLista(datas.reduce((a, b) => (Date.parse(a) >= Date.parse(b) ? a : b)));
+}
+
+/** Os ícones de fixada e silenciada, à direita da prévia. */
+function IconesDaLinha({ marcas }: { marcas: Marcas }) {
+  if (!marcas.fixada && !marcas.silenciada) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      {marcas.silenciada ? <BellOff className="size-4" aria-label="Silenciada" /> : null}
+      {marcas.fixada ? <Pin className="size-4" aria-label="Fixada" /> : null}
+    </span>
+  );
 }
 
 /**
@@ -247,10 +403,13 @@ function LinhaDeCliente({
   atitude,
   objecoes,
   perdida,
+  segurada,
+  aoSegurar,
+  aoSoltar,
 }: {
   fio: FioCru;
   selecionado: boolean;
-  /** Tem mensagem para esta pessoa que ninguém do time respondeu ainda. */
+  /** Mensagem que ninguém do time respondeu ainda (02/10/2026). */
   nova: boolean;
   /** O começo do que a pessoa digitou aqui e não enviou. */
   rascunho: string | null;
@@ -258,86 +417,65 @@ function LinhaDeCliente({
   marcas: Marcas;
   atitude: AtitudeDaConversa | undefined;
   objecoes: readonly Objecao[];
-  /** O cliente ligou e ninguém atendeu, e ainda não houve retorno. */
+  /** Ligou e ninguém atendeu (03/11/2026). */
   perdida: LigacaoPerdida | undefined;
+  segurada: boolean;
+  aoSegurar: (linha: EstadoDaLinha) => void;
+  aoSoltar: (() => void) | null;
 }) {
-  const Icone = ICONE_CANAL.whatsapp;
   const nome = fio.peer_nome?.trim();
-  const alvo = useRef<HTMLLIElement>(null);
   const janela = estadoDaJanela(fio.window_expires_at);
-
-  useEffect(() => {
-    if (selecionado) alvo.current?.scrollIntoView({ block: 'nearest' });
-  }, [selecionado]);
+  const rotulo = nomeDoCliente(fio);
+  const menu = useMemo<EstadoDaLinha>(
+    () => ({
+      fioId: fio.id,
+      nome: rotulo,
+      fixada: marcas.fixada,
+      silenciada: marcas.silenciada,
+      naoLidas: fio.unread_count,
+      concluidaEm: fio.arquivada_em,
+    }),
+    [fio.id, rotulo, marcas, fio.unread_count, fio.arquivada_em],
+  );
 
   return (
-    <li ref={alvo} className="border-b border-hairline last:border-b-0">
-      <button
-        type="button"
-        onClick={() => aoEscolher?.(fio.id)}
-        aria-current={selecionado ? 'true' : undefined}
-        className={cn(
-          'relative flex min-h-[4rem] w-full items-center gap-3 py-2.5 pr-3 pl-4 text-left outline-none',
-          'hover:bg-muted/50 focus-visible:bg-muted/60',
-          selecionado && 'bg-muted',
-        )}
-      >
-        {perdida ? <FaixaDePerdida /> : nova ? <FaixaDeNova /> : null}
-        <span className="min-w-0 flex-1 space-y-1">
-          <span className="flex items-baseline gap-2">
-            <span
-              className={cn(
-                'min-w-0 flex-1 truncate text-sm xl:text-[15px]',
-                nova || perdida || fio.unread_count > 0 ? 'font-semibold' : 'font-medium',
-              )}
-            >
-              {nomeDoCliente(fio)}
+    <LinhaWpp
+      nome={rotulo}
+      temperatura={null}
+      quando={fio.last_message_at ? quandoNaLista(fio.last_message_at) : null}
+      destaque={nova || perdida !== undefined || fio.unread_count > 0}
+      selecionado={selecionado}
+      aoEscolher={() => aoEscolher?.(fio.id)}
+      menu={menu}
+      segurada={segurada}
+      aoSegurar={aoSegurar}
+      aoSoltar={aoSoltar}
+      faixa={perdida ? <FaixaDePerdida /> : nova ? <FaixaDeNova /> : null}
+      segunda={
+        <>
+          {perdida ? <SeloDeLigacaoPerdida perdida={perdida} /> : null}
+          {rascunho ? (
+            <PreviaDoRascunho texto={rascunho} />
+          ) : (
+            <span className="min-w-0 flex-1 truncate">
+              {nome ? formatarTelefone(fio.peer_phone_e164) : 'sem nome no perfil'}
             </span>
-            {nova ? <MarcaDeNova className="self-center" /> : null}
-            <IconesDaLinha marcas={marcas} />
-            {fio.unread_count > 0 ? (
-              <PorLer quantas={fio.unread_count} silenciada={marcas.silenciada} />
-            ) : null}
-            {fio.last_message_at ? (
-              <span className="numerico shrink-0 text-xs text-muted-foreground">
-                {quando(fio.last_message_at)}
-              </span>
-            ) : null}
-          </span>
-
-          <span className="flex items-center gap-1.5">
-            <Icone
-              className="size-3.5 shrink-0 text-muted-foreground"
-              aria-label={ROTULO_CANAL.whatsapp}
-            />
-            {perdida ? <SeloDeLigacaoPerdida perdida={perdida} /> : null}
-            {rascunho ? (
-              <PreviaDoRascunho texto={rascunho} />
-            ) : (
-              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                {nome ? formatarTelefone(fio.peer_phone_e164) : 'sem nome no perfil'}
-              </span>
-            )}
-            <ChipDaJanela estado={janela} />
-            {fio.bloqueada_em ? <SeloDeBloqueado /> : null}
-            <SeloDeConcluida concluidaEm={fio.arquivada_em} />
-            {/* Onde o parceiro tem a etapa, o cliente diz o que é: é esta palavra
-                que explica por que a linha não tem funil nem bairro. */}
-            <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
-              cliente
-            </Badge>
-          </span>
-
-          {/* A ATITUDE (29/10/2026): o quanto essa pessoa quer, e a objeção dela. */}
-          <AtitudeNaLista atitude={atitude} objecoes={objecoes} />
-        </span>
-
-        <ChevronRight
-          className="size-4 shrink-0 text-muted-foreground md:hidden"
-          aria-hidden="true"
-        />
-      </button>
-    </li>
+          )}
+          <ChipDaJanela estado={janela} />
+          {fio.bloqueada_em ? <Selo>bloqueado</Selo> : null}
+          <SeloDeConcluida concluidaEm={fio.arquivada_em} />
+          {/* Onde o parceiro tem a etapa, o cliente diz o que é: é esta palavra
+              que explica por que a linha não tem funil nem bairro. */}
+          <Selo>cliente</Selo>
+          <IconesDaLinha marcas={marcas} />
+          {nova ? <MarcaDeNova className="shrink-0" /> : null}
+          {fio.unread_count > 0 ? (
+            <PorLer quantas={fio.unread_count} silenciada={marcas.silenciada} />
+          ) : null}
+        </>
+      }
+      terceira={atitude ? <AtitudeNaLista atitude={atitude} objecoes={objecoes} /> : null}
+    />
   );
 }
 
@@ -351,10 +489,13 @@ function Linha({
   atitude,
   objecoes,
   perdida,
+  segurada,
+  aoSegurar,
+  aoSoltar,
 }: {
   item: ItemConversa;
   selecionado: boolean;
-  /** Tem mensagem para esta pessoa que ninguém do time respondeu ainda. */
+  /** Mensagem que ninguém do time respondeu ainda (02/10/2026). */
   nova: boolean;
   /** O começo do que a pessoa digitou aqui e não enviou. */
   rascunho: string | null;
@@ -362,178 +503,122 @@ function Linha({
   marcas: Marcas;
   atitude: AtitudeDaConversa | undefined;
   objecoes: readonly Objecao[];
-  /** O cliente ligou e ninguém atendeu, e ainda não houve retorno. */
+  /** Ligou e ninguém atendeu (03/11/2026). */
   perdida: LigacaoPerdida | undefined;
+  segurada: boolean;
+  aoSegurar: (linha: EstadoDaLinha) => void;
+  aoSoltar: (() => void) | null;
 }) {
   const Icone = item.ultimoCanal ? ICONE_CANAL[item.ultimoCanal] : null;
   const onde = local(item.bairro, item.cidade);
   const rodape = [onde, item.categoria].filter(Boolean).join(' · ');
-  const alvo = useRef<HTMLLIElement>(null);
-  // O relógio da janela na linha da lista NÃO anda: ele é lido uma vez por
-  // repintura da lista. Cem linhas com um `setInterval` cada é bateria da
-  // Heloísa indo embora para mudar um "3 h" em "2 h" que ninguém está olhando.
+  // A janela de 24 h na linha (16/10/2026): quem tem resposta livre aparece
+  // marcado, porque é a conversa que dá para responder agora sem modelo.
   const janela = estadoDaJanela(item.fio?.janelaExpiraEm ?? null);
-
-  // Um link com `?org=` pode apontar para o quinquagésimo parceiro da lista. Sem isto,
-  // a conversa abre à direita e a lista continua no topo, sem nenhuma linha acesa: a
-  // pessoa não vê onde está. Sincronizar o DOM com o estado é exatamente para o que
-  // serve um efeito, e `block: 'nearest'` não mexe na lista quando o item já está à vista.
-  useEffect(() => {
-    if (selecionado) alvo.current?.scrollIntoView({ block: 'nearest' });
-  }, [selecionado]);
+  const fio = item.fio;
+  const menu = useMemo<EstadoDaLinha | null>(
+    () =>
+      fio
+        ? {
+            fioId: fio.id,
+            nome: item.nome,
+            fixada: marcas.fixada,
+            silenciada: marcas.silenciada,
+            naoLidas: item.naoLidas,
+            concluidaEm: fio.arquivadaEm,
+          }
+        : null,
+    [fio, item.nome, marcas, item.naoLidas],
+  );
+  const temTerceira =
+    item.etiquetas.length > 0 || atitude !== undefined || Boolean(item.leituraDaIa?.proximaAcao);
 
   return (
-    <li ref={alvo} className="border-b border-hairline last:border-b-0">
-      <button
-        type="button"
-        onClick={() => aoEscolher(item.id)}
-        aria-current={selecionado ? 'true' : undefined}
-        // Bairro e categoria saíram da terceira linha e vivem aqui: são consulta de
-        // canto de olho, e custavam 40 px por linha — metade da lista visível.
-        title={rodape || undefined}
-        className={cn(
-          'relative flex min-h-[4rem] w-full items-center gap-3 py-2.5 pr-3 pl-4 text-left outline-none',
-          'hover:bg-muted/50 focus-visible:bg-muted/60',
-          selecionado && 'bg-muted',
-        )}
-      >
-        {perdida ? <FaixaDePerdida /> : nova ? <FaixaDeNova /> : null}
-        <span className="min-w-0 flex-1 space-y-1">
-          <span className="flex items-baseline gap-2">
-            <span
-              className={cn(
-                'min-w-0 flex-1 truncate text-sm xl:text-[15px]',
-                nova || perdida || item.naoLidas > 0 ? 'font-semibold' : 'font-medium',
-              )}
-            >
-              {item.nome}
-            </span>
-            {nova ? <MarcaDeNova className="self-center" /> : null}
-            <IconesDaLinha marcas={marcas} />
-            {/* Por ler vai no verde da ação, e não no branco: é o único número da
-                linha que pede para alguém fazer alguma coisa. */}
-            {item.naoLidas > 0 ? (
-              <PorLer quantas={item.naoLidas} silenciada={marcas.silenciada} />
-            ) : null}
-            <DiasSemContato
-              dias={item.diasSemContato}
-              atencao={item.precisaAtencao}
-              curto
-              className="shrink-0"
+    <LinhaWpp
+      nome={item.nome}
+      temperatura={item.temperatura}
+      quando={quandoDaLinha(item)}
+      destaque={nova || perdida !== undefined || item.naoLidas > 0}
+      selecionado={selecionado}
+      aoEscolher={() => aoEscolher(item.id)}
+      menu={menu}
+      segurada={segurada}
+      aoSegurar={aoSegurar}
+      aoSoltar={aoSoltar}
+      // Onde e o quê no `title`: a linha do WhatsApp tem duas linhas, e o bairro
+      // e a categoria estão na ficha ao lado.
+      dica={rodape || undefined}
+      faixa={perdida ? <FaixaDePerdida /> : nova ? <FaixaDeNova /> : null}
+      segunda={
+        <>
+          {Icone ? (
+            <Icone
+              className="size-4 shrink-0"
+              aria-label={item.ultimoCanal ? ROTULO_CANAL[item.ultimoCanal] : undefined}
             />
-          </span>
-
-          {/* O QUE ACONTECEU, primeiro. A prévia da última interação é o fato; o
-              conselho da IA, logo abaixo, é opinião. Estavam trocados de ordem, e
-              a linha inteira lia como se a máquina falasse pelo parceiro. */}
-          <span className="flex items-center gap-1.5">
-            {Icone ? (
-              <Icone
-                className="size-3.5 shrink-0 text-muted-foreground"
-                aria-label={item.ultimoCanal ? ROTULO_CANAL[item.ultimoCanal] : undefined}
+          ) : null}
+          {perdida ? <SeloDeLigacaoPerdida perdida={perdida} /> : null}
+          {rascunho ? (
+            <PreviaDoRascunho texto={rascunho} />
+          ) : (
+            <span className={cn('min-w-0 flex-1 truncate', item.resumo && 'text-foreground/80')}>
+              {item.resumo ?? 'Nenhum contato registrado'}
+            </span>
+          )}
+          {item.naoContatar ? <Selo>não contatar</Selo> : null}
+          {fio?.bloqueadaEm ? <Selo>bloqueado</Selo> : null}
+          <SeloDeConcluida concluidaEm={fio?.arquivadaEm} />
+          {/* O rascunho pendente é o que faz alguém abrir esta linha AGORA: ele
+              expira em três dias e some sozinho. */}
+          {item.rascunhoPendente ? (
+            <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full border border-wpp-linha-forte px-1.5 text-[11px]">
+              <Sparkles className="size-3" aria-hidden="true" />
+              aprovar
+            </span>
+          ) : null}
+          <ChipDaJanela estado={janela} />
+          <IconesDaLinha marcas={marcas} />
+          {nova ? <MarcaDeNova className="shrink-0" /> : null}
+          {item.naoLidas > 0 ? (
+            <PorLer quantas={item.naoLidas} silenciada={marcas.silenciada} />
+          ) : null}
+        </>
+      }
+      terceira={
+        temTerceira ? (
+          // Etiquetas, a atitude e o próximo passo da IA numa linha miúda só: a
+          // lista do WhatsApp tem duas linhas, e esta só aparece quando há o que
+          // dizer.
+          <span className="flex min-w-0 items-center gap-1 overflow-hidden text-[11px] text-wpp-suave">
+            <AtitudeNaLista atitude={atitude} objecoes={objecoes} />
+            {item.etiquetas.slice(0, 2).map((e) => (
+              <Etiqueta
+                key={e.id}
+                nome={e.nome}
+                cor={e.cor}
+                className="h-4 shrink-0 px-1.5 text-[10px]"
               />
+            ))}
+            {item.etiquetas.length > 2 ? (
+              <span className="numerico shrink-0">+{item.etiquetas.length - 2}</span>
             ) : null}
-            {/* A LIGAÇÃO PERDIDA (03/11/2026) antes da prévia: foi a última coisa
-                que aconteceu, e é a que pede alguém agora. */}
-            {perdida ? <SeloDeLigacaoPerdida perdida={perdida} /> : null}
-            {rascunho ? (
-              <PreviaDoRascunho texto={rascunho} />
-            ) : (
-              <span
-                className={cn(
-                  'min-w-0 flex-1 truncate text-xs',
-                  item.resumo ? 'text-foreground' : 'text-muted-foreground',
-                )}
-              >
-                {item.resumo ?? 'Nenhum contato registrado'}
-              </span>
-            )}
-            {item.naoContatar ? (
-              <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
-                não contatar
-              </Badge>
+            {item.leituraDaIa?.proximaAcao ? (
+              <>
+                <Sparkles className="ml-0.5 size-3 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">{item.leituraDaIa.proximaAcao}</span>
+                {(item.leituraDaIa.score ?? 0) >= NOTA_QUE_VALE ? (
+                  <span
+                    className="numerico shrink-0 rounded-full bg-wpp-chip px-1.5 text-[10px]"
+                    title={`A IA vê ${item.leituraDaIa.score} de 100 de intenção de fechar nesta conversa`}
+                  >
+                    IA {item.leituraDaIa.score}
+                  </span>
+                ) : null}
+              </>
             ) : null}
-            {item.fio?.bloqueadaEm ? <SeloDeBloqueado /> : null}
-            <SeloDeConcluida concluidaEm={item.fio?.arquivadaEm} />
-            {/* O rascunho pendente é o que faz alguém abrir esta linha AGORA: ele
-                expira em três dias e some sozinho. */}
-            {item.rascunhoPendente ? (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-hairline px-1.5 text-[10px]">
-                <Sparkles className="size-2.5" aria-hidden="true" />
-                aprovar
-              </span>
-            ) : null}
-            <ChipDaJanela estado={janela} />
-            {/* A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026, ADR-16). Ela vem aqui,
-                na linha da prévia, e não na borda esquerda onde ficava a barra
-                térmica: uma palavra diz o que uma cor não dizia — "Respondeu" e
-                "Em conversa" eram o mesmo morno. */}
-            <EtiquetaEtapa
-              etapa={item.etapa}
-              className="h-4 shrink-0 border-0 bg-transparent px-0 text-[10px] font-normal text-muted-foreground"
-            />
           </span>
-
-          {/* ONDE E O QUÊ — só onde há largura. Em 28/09/2026 a coluna passou de
-              20rem para 23 (27 no xl), e o que estava escondido no `title` porque
-              "custava 40 px por linha" cabe de novo: numa tela larga a lista não
-              disputa mais espaço com a conversa. Em telas menores continua no
-              tooltip, que é onde ele não custa altura nenhuma. */}
-          {rodape ? (
-            <span className="hidden truncate text-[11px] text-muted-foreground xl:block">
-              {rodape}
-            </span>
-          ) : null}
-
-          {/* AS ETIQUETAS, com a cor que o gestor escolheu: é o que separa um
-              fundador de um contato qualquer antes de abrir a conversa. Duas, e o
-              resto em número — quatro pílulas comiam a largura da prévia. */}
-          {/* A ATITUDE (29/10/2026) abre a linha das etiquetas: é a primeira
-              coisa que se procura nela quando a pergunta é "quem quer mais?". */}
-          {item.etiquetas.length > 0 || atitude ? (
-            <span className="flex flex-wrap items-center gap-1">
-              <AtitudeNaLista atitude={atitude} objecoes={objecoes} />
-              {item.etiquetas.slice(0, 2).map((e) => (
-                <Etiqueta key={e.id} nome={e.nome} cor={e.cor} className="h-4 px-1.5 text-[10px]" />
-              ))}
-              {item.etiquetas.length > 2 ? (
-                <span className="numerico text-[10px] text-muted-foreground">
-                  +{item.etiquetas.length - 2}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
-
-          {/* O CONSELHO DA IA, quando existe: "Recontatar em 3-5 dias com abordagem
-              diferente". Sem itálico — em 11 px o itálico só atrapalha a leitura —,
-              e com o ícone dizendo de onde vem. A nota de intenção (0 a 100) só
-              aparece quando é alta: "15" solto na linha não decide nada. */}
-          {item.leituraDaIa?.proximaAcao ? (
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                {item.leituraDaIa.proximaAcao}
-              </span>
-              {(item.leituraDaIa.score ?? 0) >= NOTA_QUE_VALE ? (
-                <span
-                  className="numerico shrink-0 rounded-full bg-muted px-1.5 text-[10px] text-muted-foreground"
-                  title={`A IA vê ${item.leituraDaIa.score} de 100 de intenção de fechar nesta conversa`}
-                >
-                  IA {item.leituraDaIa.score}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
-        </span>
-
-        {/* Só no celular: lá a lista dá lugar à conversa numa tela nova, e o chevron é
-            o que diz que aquele toque leva para outro lugar. No desktop a conversa
-            abre ao lado e o estado selecionado já é o sinal. */}
-        <ChevronRight
-          className="size-4 shrink-0 text-muted-foreground md:hidden"
-          aria-hidden="true"
-        />
-      </button>
-    </li>
+        ) : null
+      }
+    />
   );
 }

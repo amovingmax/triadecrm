@@ -231,6 +231,53 @@ export function FaixaDaJanela({
   );
 }
 
+/**
+ * A janela de 24 h numa pílula grudada no alto da conversa (03/11/2026), no lugar
+ * da faixa do cabeçalho: o aviso amarelo do WhatsApp quando só sai modelo, a
+ * pílula translúcida quando dá para responder livre.
+ */
+export function PilulaDaJanela({
+  estado,
+  className,
+}: {
+  estado: EstadoDaJanela;
+  className?: string;
+}) {
+  const aberta = estado.situacao === 'aberta';
+  const apertada = aberta && estado.restanteMin <= JANELA_APERTADA_MIN;
+  const resta = aberta ? tempoCurto(estado.restanteMin) : null;
+  return (
+    <span
+      title={explicacaoEmTexto(estado)}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-3 py-[5px] text-xs font-medium shadow-wpp',
+        aberta && !apertada
+          ? 'bg-wpp-sis text-wpp-sis-texto'
+          : 'bg-wpp-janela text-wpp-janela-texto',
+        className,
+      )}
+    >
+      {aberta ? (
+        <Clock className="size-3.5 shrink-0" aria-hidden="true" />
+      ) : estado.situacao === 'fechada' ? (
+        <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />
+      ) : (
+        <MessageSquareOff className="size-3.5 shrink-0" aria-hidden="true" />
+      )}
+      {aberta && resta ? (
+        <span>
+          Janela aberta: resposta livre por mais <span className="numerico">{resta.numero}</span>
+          {resta.unidade}
+        </span>
+      ) : estado.situacao === 'fechada' ? (
+        <span>Janela de 24 h fechada: só sai modelo aprovado</span>
+      ) : (
+        <span>Ninguém escreveu ainda: começa por modelo aprovado</span>
+      )}
+    </span>
+  );
+}
+
 /** A mesma explicação do cartão, em texto puro, para o `title` da faixa. */
 function explicacaoEmTexto(estado: EstadoDaJanela): string {
   if (estado.situacao === 'aberta') {

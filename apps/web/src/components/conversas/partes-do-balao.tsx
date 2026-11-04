@@ -28,15 +28,15 @@ import type { Citada, Reacoes } from './tipos';
  * citada, o "encaminhada", o anúncio, a localização, o cartão de contato, os
  * botões, a opção escolhida e o selo das reações.
  *
- * Todos recebem `nossa` — a mensagem é do time — porque o balão nosso é verde
- * sólido e o deles é o cartão: o que é claro num é ilegível no outro.
+ * Todos recebem `nossa` — a mensagem é do time. Até 03/11/2026 o balão nosso era
+ * escuro sólido e o que era claro num ficava ilegível no outro; no jeito do
+ * WhatsApp os dois balões são claros (menta e branco), e o véu é o mesmo
+ * cinza transparente nos dois lados.
  */
 
 /** O véu de dentro do balão: um degrau acima do fundo dele, nos dois lados. */
-function veu(nossa: boolean) {
-  return nossa
-    ? 'border-primary-foreground/25 bg-primary-foreground/10'
-    : 'border-hairline bg-muted/50';
+function veu(_nossa: boolean) {
+  return 'border-transparent bg-wpp-cita';
 }
 
 export async function copiar(texto: string, aviso = 'Copiado.'): Promise<void> {
@@ -70,15 +70,16 @@ export function Citacao({
     : null;
   const conteudo = (
     <>
-      {quem ? <span className="block text-xs font-semibold">{quem}</span> : null}
-      <span className="line-clamp-2 text-[13px] leading-snug opacity-90">{citada.resumo}</span>
+      {quem ? (
+        <span className="block text-[12.5px] font-semibold text-wpp-cita-nome">{quem}</span>
+      ) : null}
+      <span className="line-clamp-2 text-[13px] leading-snug text-wpp-suave">{citada.resumo}</span>
     </>
   );
+  // A citação do WhatsApp: a barrinha verde à esquerda e o véu cinza, nos dois lados.
   const classe = cn(
-    'block w-full rounded-lg border-l-4 px-2.5 py-1.5 text-left',
-    nossa
-      ? 'border-l-primary-foreground/70 bg-primary-foreground/10'
-      : 'border-l-primary bg-muted/60',
+    veu(nossa),
+    'block w-full rounded-lg border-l-4 border-l-wpp-cita-barra px-2.5 py-1.5 text-left',
   );
   if (!citada.id || !aoIr) return <div className={classe}>{conteudo}</div>;
   const id = citada.id;

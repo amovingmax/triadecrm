@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { useAcoesDosAvisos } from '@/components/avisos/provedor-avisos';
 import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 import { concluirConversa } from './acoes';
@@ -15,7 +14,8 @@ import { CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { rotuloDoDia } from './formatos';
 
 /**
- * CONCLUIR A CONVERSA (03/11/2026), só na Imova por enquanto.
+ * CONCLUIR A CONVERSA (03/11/2026), nas duas empresas desde a tela de Conversas
+ * no jeito do WhatsApp.
  *
  * Pedido: "colocar uma conversa como 'Concluída' e fazer com que ela saia das
  * conversas, mas não devemos perder o histórico [...] Assim que formos conversar
@@ -32,8 +32,10 @@ import { rotuloDoDia } from './formatos';
  *   - a volta também quando alguém do time escreve, e a saída do Meu dia
  *     (as duas no banco, `app.concluir_ligado`).
  *
- * Na KOMUNE nada disso aparece: fica o ícone de arquivar até o usuário aprovar
- * ("ficando bom e sendo aprovado por mim, a gente coloca na Komune").
+ * Nasceu só na Imova ("ficando bom e sendo aprovado por mim, a gente coloca na
+ * Komune") e foi para a KOMUNE com o protótipo da tela no jeito do WhatsApp, que
+ * o tem no cabeçalho, no menu ⋯ e na setinha de cada linha da lista. O módulo
+ * continua existindo: desligado, volta o ícone de arquivar.
  *
  * SEM CONFIRMAÇÃO, como o arquivar: nada é destruído, o aviso traz "Desfazer" e o
  * próprio botão vira "Reabrir".
@@ -49,33 +51,19 @@ const COMO_VOLTA =
  * do tamanho dos vizinhos ("Transferir", "Registrar contato"); na folha do
  * celular, quem chama passa a classe do bloco de ação.
  */
-export function ConcluirConversa({
-  fioId,
-  concluidaEm,
-  className = 'toque h-9',
-  tamanho = 'sm',
-  rotuloPelaLargura = false,
-}: {
-  fioId: string;
-  concluidaEm: string | null;
-  className?: string;
-  tamanho?: 'sm' | 'default';
-  /**
-   * O nome só com o cabeçalho largo (`@container`, 48rem), como o "Transferir".
-   * O cabeçalho do parceiro tem cinco ações: num notebook de 1280 px o nome com
-   * a palavra cortava o nome do parceiro em "So…". Estreito, fica o ícone.
-   */
-  rotuloPelaLargura?: boolean;
-}) {
+/**
+ * Concluir e reabrir, com o aviso e o "Desfazer". É a mesma ação no botão do
+ * cabeçalho, no menu ⋯ da conversa e no menu da linha da lista.
+ */
+export function useConcluirConversa(fioId: string) {
   const clientes = useQueryClient();
   const { reconferir } = useAcoesDosAvisos();
-  const concluida = concluidaEm !== null;
   const acao = useMutation({
     mutationFn: (concluir: boolean) => concluirConversa(fioId, concluir),
     onSuccess: (_r, concluir) => {
       void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
-      // A concluída sai do número do menu e da marca "Nova" na hora, e a
-      // reaberta volta: quem decide é a leitura dos avisos (`avisos/dados.ts`).
+      // A concluída sai do número do menu: a casca reconfere na hora, em vez de
+      // esperar o próximo minuto.
       reconferir();
       if (concluir) {
         toast.success('Conversa concluída.', {
@@ -88,13 +76,46 @@ export function ConcluirConversa({
     },
     onError: (e) => toast.error(mensagemDoErro(e)),
   });
+  return acao;
+}
+
+/**
+ * "Concluir", ou "Reabrir" na concluída: a pílula do cabeçalho, ao lado de
+ * "Ligar", como no protótipo; na folha do celular, quem chama passa a classe do
+ * bloco de ação.
+ */
+export function ConcluirConversa({
+  fioId,
+  concluidaEm,
+  className,
+  tamanho = 'pilula',
+  rotuloPelaLargura = false,
+}: {
+  fioId: string;
+  concluidaEm: string | null;
+  className?: string;
+  /** `pilula` no cabeçalho; `bloco` na folha e na ficha, com a classe de quem chama. */
+  tamanho?: 'pilula' | 'bloco';
+  /**
+   * Em cabeçalho apertado o rótulo sai e fica o ícone (o nome continua para o
+   * leitor de tela). Pede um `@container` em volta.
+   */
+  rotuloPelaLargura?: boolean;
+}) {
+  const acao = useConcluirConversa(fioId);
+  const concluida = concluidaEm !== null;
+  const rotulo = concluida ? 'Reabrir' : 'Concluir';
 
   return (
     <Button
       type="button"
       variant="outline"
-      size={tamanho}
-      className={className}
+      size={tamanho === 'pilula' ? 'sm' : 'default'}
+      className={cn(
+        tamanho === 'pilula' &&
+          'toque h-10 shrink-0 rounded-full border-wpp-linha-forte bg-transparent px-3.5 text-[13.5px] font-medium',
+        className,
+      )}
       disabled={acao.isPending}
       onClick={() => acao.mutate(!concluida)}
       title={
@@ -106,19 +127,16 @@ export function ConcluirConversa({
       {concluida ? <RotateCcw aria-hidden="true" /> : <CircleCheck aria-hidden="true" />}
       {rotuloPelaLargura ? (
         <>
-          <span className="hidden @3xl:inline">{concluida ? 'Reabrir' : 'Concluir'}</span>
-          <span className="sr-only @3xl:hidden">{concluida ? 'Reabrir' : 'Concluir'}</span>
+          <span className="hidden @3xl:inline">{rotulo}</span>
+          <span className="sr-only @3xl:hidden">{rotulo}</span>
         </>
-      ) : concluida ? (
-        'Reabrir'
       ) : (
-        'Concluir'
+        rotulo
       )}
     </Button>
   );
 }
 
-/** "hoje", "ontem" ou "em 30/10": o dia da conclusão, curto. */
 function quandoConcluiu(iso: string): string {
   const dia = rotuloDoDia(iso);
   return dia.numero ? `em ${dia.numero}` : dia.palavra;
@@ -130,31 +148,49 @@ function quandoConcluiu(iso: string): string {
  * precisa saber que ela está fora da lista antes de escrever nela.
  */
 export function FaixaDeConcluida({
+  fioId,
   concluidaEm,
   concluidaPor,
+  podeReabrir,
   className,
 }: {
+  fioId: string;
   concluidaEm: string | null;
   concluidaPor: string | null;
+  /** Quem só lê vê a faixa sem o botão. */
+  podeReabrir: boolean;
   className?: string;
 }) {
+  const acao = useConcluirConversa(fioId);
   if (!CONCLUIR_NA_EMPRESA || concluidaEm === null) return null;
   return (
-    <p
+    <div
+      role="status"
       className={cn(
-        'flex items-start gap-1.5 bg-muted/40 px-4 py-1.5 text-[11px] text-muted-foreground md:px-5',
+        'flex shrink-0 items-center gap-2.5 border-b border-wpp-linha bg-wpp-painel2 py-2 pr-3 pl-4 text-[13px] leading-snug text-wpp-suave',
         className,
       )}
     >
-      <CircleCheck className="mt-px size-3 shrink-0" aria-hidden="true" />
-      <span>
+      <CircleCheck className="size-[17px] shrink-0 text-wpp-autor" aria-hidden="true" />
+      <span className="min-w-0 flex-1">
         <span className="font-medium text-foreground">
           Concluída {quandoConcluiu(concluidaEm)}
           {concluidaPor ? ` por ${concluidaPor}` : ''}.
         </span>{' '}
         {COMO_VOLTA}
       </span>
-    </p>
+      {podeReabrir ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="toque h-9 shrink-0 rounded-full border-wpp-linha-forte bg-transparent px-3.5 text-[13px]"
+          disabled={acao.isPending}
+          onClick={() => acao.mutate(false)}
+        >
+          Reabrir
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -162,44 +198,8 @@ export function FaixaDeConcluida({
 export function SeloDeConcluida({ concluidaEm }: { concluidaEm: string | null | undefined }) {
   if (!CONCLUIR_NA_EMPRESA || !concluidaEm) return null;
   return (
-    <Badge variant="pilula" className="h-4 shrink-0 px-1.5 text-[10px] font-normal">
-      concluída
-    </Badge>
-  );
-}
-
-/**
- * "Concluídas", no alto da lista: liga e desliga a gaveta das conversas
- * concluídas. Mesma pílula da ordem ("Recentes · Mais interessados"), à direita
- * dela. Ligada, a lista mostra SÓ as concluídas (`FiltrosConversas.concluidas`).
- */
-export function FiltroDasConcluidas({
-  ativo,
-  aoMudar,
-  className,
-}: {
-  ativo: boolean;
-  aoMudar: (ativo: boolean) => void;
-  className?: string;
-}) {
-  if (!CONCLUIR_NA_EMPRESA) return null;
-  return (
-    <button
-      type="button"
-      aria-pressed={ativo}
-      onClick={() => aoMudar(!ativo)}
-      title={ativo ? 'Voltar para as conversas abertas' : 'Ver só as conversas concluídas'}
-      className={cn(
-        'toque inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition-colors md:h-6',
-        'focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
-        ativo
-          ? 'bg-foreground text-background'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-        className,
-      )}
-    >
-      <CircleCheck className="size-3" aria-hidden="true" />
-      Concluídas
-    </button>
+    <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-wpp-chip px-2 text-[11px] font-semibold text-wpp-chip-texto">
+      Concluída
+    </span>
   );
 }

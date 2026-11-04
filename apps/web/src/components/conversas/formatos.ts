@@ -89,6 +89,21 @@ export function rotuloDoDia(
 }
 
 /**
+ * A hora da linha da lista, como no WhatsApp (03/11/2026): "14:28" hoje, "Ontem",
+ * o dia da semana até uma semana atrás e a data completa depois.
+ */
+export function quandoNaLista(iso: string, agora: Date = new Date()): string {
+  const dias = diasDeCalendario(agora, new Date(iso));
+  if (dias === 0) return hora(iso);
+  if (dias === -1) return 'Ontem';
+  if (dias > -7) {
+    const dia = DIA_SEMANA.format(new Date(iso));
+    return dia.charAt(0).toUpperCase() + dia.slice(1);
+  }
+  return DIA_MES_ANO.format(new Date(iso));
+}
+
+/**
  * Diferença em dias de CALENDÁRIO no fuso de Natal (negativo para o passado), e não
  * em blocos de 24 horas: às 00h30, a ligação das 23h de ontem é "ontem", não "hoje".
  */

@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Archive, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Popover as PopoverPrimitive } from 'radix-ui';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 
 import { CONCLUIR_NA_EMPRESA } from './concluir-conversa';
+import { BotaoRedondo } from './wpp';
 import {
   CANAIS_EM_ORDEM,
   contarFiltros,
@@ -28,154 +29,145 @@ import {
 const TODOS = 'todos';
 
 /**
- * Busca e os três recortes da tela: responsável, canal e há quanto tempo ninguém fala.
+ * O botão de filtros da lista, com os recortes numa janelinha (03/11/2026).
  *
- * A barra fica ACIMA das duas colunas, e não dentro da lista da esquerda: no desktop a
- * lista tem 20rem, onde três gatilhos de select não cabem lado a lado sem truncar o
- * próprio rótulo, e no celular ela seria a segunda barra rolável de uma tela que já
- * tem a barra inferior da casca.
- *
- * A busca é local (a base inteira já está em memória, ver `dados.ts`), então não há
- * atraso de rede a esconder; mesmo assim ela mantém os 300 ms dos outros módulos, para
- * a lista não reordenar embaixo do dedo a cada tecla.
+ * Até o jeito do WhatsApp a barra de filtros ficava ACIMA das duas colunas, porque
+ * três gatilhos de select não cabiam lado a lado na lista de 20rem. Agora a lista é
+ * o cabeçalho de tudo (título, busca, abas) e os recortes moram atrás de um ícone,
+ * como os filtros do WhatsApp: a janelinha tem a largura que eles precisam, e o
+ * ponto verde no ícone avisa que a lista está recortada.
  */
-export function FiltrosDaConversa({
+export function BotaoDeFiltros({
   filtros,
   pessoas,
   aoMudar,
   aoLimpar,
-  className,
 }: {
   filtros: FiltrosConversas;
   pessoas: { id: string; nome: string }[];
   aoMudar: (parcial: Partial<FiltrosConversas>) => void;
   aoLimpar: () => void;
-  className?: string;
 }) {
-  const idBusca = useId();
   const ativos = contarFiltros(filtros);
-  const limpavel = ativos > 0 || filtros.q.trim() !== '';
-  // Os três recortes ficam FECHADOS até alguém pedir. Eles ocupavam uma faixa
-  // inteira acima da lista, em toda visita, para uma escolha que se faz uma vez
-  // por turno — e era essa faixa, somada ao título e às abas, que empurrava a
-  // lista para 200 px abaixo do topo da tela. Com filtro ligado, abrem sozinhos:
-  // recorte escondido é recorte esquecido.
-  const [abertos, setAbertos] = useState(ativos > 0);
-
-  const mudarBusca = useCallback((q: string) => aoMudar({ q }), [aoMudar]);
-
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
-      <div className="flex items-center gap-2">
-        <CampoBusca id={idBusca} valor={filtros.q} aoMudar={mudarBusca} />
-        <Button
-          variant={abertos ? 'secondary' : 'outline'}
-          onClick={() => setAbertos((v) => !v)}
-          aria-expanded={abertos}
-          className="toque h-11 shrink-0 md:h-9"
+    <PopoverPrimitive.Root>
+      <PopoverPrimitive.Trigger asChild>
+        <BotaoRedondo
+          aria-label={ativos > 0 ? `Filtros (${ativos} ligados)` : 'Filtros'}
+          className="relative"
         >
           <SlidersHorizontal aria-hidden="true" />
-          Filtros
-          {ativos > 0 ? <span className="numerico">({ativos})</span> : null}
-        </Button>
-      </div>
-
-      <div
-        className={cn(
-          'flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:gap-2',
-          !abertos && 'hidden',
-        )}
-      >
-        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] md:mx-0 md:flex-wrap md:px-0 md:pb-0 md:[mask-image:none]">
-          {/* Este filtro pergunta por QUALQUER laço da pessoa com o parceiro: dono do
-              negócio, quem atende o fio de WhatsApp e quem registrou algum contato.
-              É de propósito mais largo que o campo "Responsável" do cabeçalho da
-              conversa, que mostra só o dono do negócio — quem filtra por si mesma
-              está perguntando "o que é meu?", e uma conversa que ela mesma atende não
-              pode ficar de fora da resposta. O gatilho só cabe com uma palavra, então
-              são a lista e o `aria` que dizem os três laços. */}
-          <Filtro
-            rotulo="Responsável"
-            todos="Qualquer pessoa do time"
-            aria="Filtrar por responsável: dono do negócio, quem atende a conversa ou quem registrou contato"
-            valor={filtros.responsavelId}
-            opcoes={pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
-            aoMudar={(v) => aoMudar({ responsavelId: v })}
-          />
-          {/* "Atendendo" vem logo depois de "Responsável" porque é a mesma lista de
-              gente e a pergunta vizinha — mas a resposta é outra, e a diferença
-              está no gatilho e no `aria`: um é largo (qualquer laço), o outro é
-              só quem cuida da conversa. Quem coordena o time usa este. */}
-          <Filtro
-            rotulo="Atendendo"
-            todos="Qualquer atendente"
-            aria="Filtrar por quem atende a conversa no WhatsApp"
-            valor={filtros.atendenteId}
-            opcoes={pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
-            aoMudar={(v) => aoMudar({ atendenteId: v })}
-          />
-          <Filtro
-            rotulo="Canal"
-            todos="Todos os canais"
-            aria="Filtrar por canal da interação"
-            valor={filtros.canal}
-            opcoes={CANAIS_EM_ORDEM.map((c) => ({ valor: c, rotulo: ROTULO_CANAL[c] }))}
-            aoMudar={(v) => aoMudar({ canal: v })}
-          />
-          <Filtro
-            rotulo={ROTULO_JANELA.qualquer}
-            todos="Qualquer tempo sem contato"
-            aria="Filtrar por dias sem contato"
-            valor={filtros.janela === 'qualquer' ? null : filtros.janela}
-            opcoes={JANELAS_EM_ORDEM.map((j) => ({ valor: j, rotulo: ROTULO_JANELA[j] }))}
-            aoMudar={(v) => aoMudar({ janela: v ?? 'qualquer' })}
-          />
-          {/* AS ARQUIVADAS (29/09/2026). Um botão que liga e desliga, e não um
-              seletor com duas opções: a pergunta tem uma resposta só na
-              esmagadora maioria dos dias ("não, some com elas"), e um seletor
-              obrigaria a pessoa a ler duas opções para escolher a de sempre.
-              Ele não entra no contador de filtros por não ser um recorte do
-              trabalho — é a porta do arquivo.
-              Na Imova a porta é a pílula "Concluídas", no alto da lista
-              (03/11/2026), e este botão sai. */}
-          {CONCLUIR_NA_EMPRESA ? null : (
+          {ativos > 0 ? (
+            <span
+              aria-hidden="true"
+              className="absolute top-2 right-2 size-2 rounded-full bg-wpp-cita-barra"
+            />
+          ) : null}
+        </BotaoRedondo>
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          align="end"
+          sideOffset={6}
+          collisionPadding={12}
+          className="z-50 flex w-[19rem] flex-col gap-3 rounded-2xl border border-wpp-linha bg-popover p-3.5 text-popover-foreground shadow-wpp-pop outline-none"
+        >
+          <p className="text-xs font-medium text-wpp-suave">Filtrar a lista</p>
+          <div className="flex flex-col gap-2">
+            {/* Este filtro pergunta por QUALQUER laço da pessoa com o parceiro: dono do
+                negócio, quem atende o fio de WhatsApp e quem registrou algum contato.
+                É de propósito mais largo que o campo "Responsável" do cabeçalho da
+                conversa, que mostra só o dono do negócio — quem filtra por si mesma
+                está perguntando "o que é meu?", e uma conversa que ela mesma atende não
+                pode ficar de fora da resposta. O gatilho só cabe com uma palavra, então
+                são a lista e o `aria` que dizem os três laços. */}
+            <Filtro
+              rotulo="Responsável"
+              todos="Qualquer pessoa do time"
+              aria="Filtrar por responsável: dono do negócio, quem atende a conversa ou quem registrou contato"
+              valor={filtros.responsavelId}
+              opcoes={pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
+              aoMudar={(v) => aoMudar({ responsavelId: v })}
+            />
+            <Filtro
+              rotulo="Atendendo"
+              todos="Qualquer atendente"
+              aria="Filtrar por quem atende a conversa no WhatsApp"
+              valor={filtros.atendenteId}
+              opcoes={pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
+              aoMudar={(v) => aoMudar({ atendenteId: v })}
+            />
+            <Filtro
+              rotulo="Canal"
+              todos="Todos os canais"
+              aria="Filtrar por canal da interação"
+              valor={filtros.canal}
+              opcoes={CANAIS_EM_ORDEM.map((c) => ({ valor: c, rotulo: ROTULO_CANAL[c] }))}
+              aoMudar={(v) => aoMudar({ canal: v })}
+            />
+            <Filtro
+              rotulo={ROTULO_JANELA.qualquer}
+              todos="Qualquer tempo sem contato"
+              aria="Filtrar por dias sem contato"
+              valor={filtros.janela === 'qualquer' ? null : filtros.janela}
+              opcoes={JANELAS_EM_ORDEM.map((j) => ({ valor: j, rotulo: ROTULO_JANELA[j] }))}
+              aoMudar={(v) => aoMudar({ janela: v ?? 'qualquer' })}
+            />
+            {/* AS ARQUIVADAS (29/09/2026). Um botão que liga e desliga, e não um
+                seletor com duas opções: a pergunta tem uma resposta só na
+                esmagadora maioria dos dias ("não, some com elas"). Ele não entra no
+                contador de filtros por não ser um recorte do trabalho — é a porta
+                do arquivo. Onde o Concluir existe a porta é a linha "Concluídas",
+                no alto da lista (03/11/2026), e este botão sai. */}
+            {CONCLUIR_NA_EMPRESA ? null : (
+              <Button
+                variant={filtros.arquivadas ? 'secondary' : 'outline'}
+                onClick={() => aoMudar({ arquivadas: !filtros.arquivadas })}
+                aria-pressed={filtros.arquivadas}
+                className="toque h-11 w-full justify-start md:h-9"
+              >
+                <Archive aria-hidden="true" />
+                {filtros.arquivadas ? 'Mostrando as arquivadas' : 'Ver arquivadas'}
+              </Button>
+            )}
+          </div>
+          <div className="flex justify-between gap-2">
             <Button
-              variant={filtros.arquivadas ? 'secondary' : 'outline'}
-              onClick={() => aoMudar({ arquivadas: !filtros.arquivadas })}
-              aria-pressed={filtros.arquivadas}
-              className="toque h-11 w-full justify-start md:h-8 md:w-auto"
+              variant="outline"
+              onClick={aoLimpar}
+              disabled={ativos === 0 && filtros.q.trim() === ''}
+              className="toque h-10 rounded-full px-4"
             >
-              <Archive aria-hidden="true" />
-              {filtros.arquivadas ? 'Mostrando as arquivadas' : 'Ver arquivadas'}
+              <X aria-hidden="true" />
+              Limpar
             </Button>
-          )}
-        </div>
-
-        {limpavel ? (
-          <Button
-            variant="ghost"
-            onClick={aoLimpar}
-            className="toque h-11 w-fit shrink-0 text-muted-foreground md:h-8"
-          >
-            <X aria-hidden="true" />
-            Limpar
-            {ativos > 0 ? <span className="numerico">({ativos})</span> : null}
-          </Button>
-        ) : null}
-      </div>
-    </div>
+            <PopoverPrimitive.Close asChild>
+              <Button className="toque h-10 rounded-full px-5">Pronto</Button>
+            </PopoverPrimitive.Close>
+          </div>
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 }
 
-function CampoBusca({
-  id,
+/**
+ * A busca da lista, na pílula cinza do WhatsApp.
+ *
+ * A busca é local (a base inteira já está em memória, ver `dados.ts`), então não há
+ * atraso de rede a esconder; mesmo assim ela mantém os 300 ms dos outros módulos, para
+ * a lista não reordenar embaixo do dedo a cada tecla.
+ */
+export function BuscaDaLista({
   valor,
   aoMudar,
+  className,
 }: {
-  id: string;
   valor: string;
-  aoMudar: (v: string) => void;
+  aoMudar: (q: string) => void;
+  className?: string;
 }) {
+  const id = useId();
   const [texto, setTexto] = useState(valor);
   const ultimoEnviado = useRef(valor);
 
@@ -196,45 +188,34 @@ function CampoBusca({
   }, [texto, aoMudar]);
 
   return (
-    <div className="md:w-full md:max-w-xs md:shrink-0">
-      {/* Rótulo e lista de formatos saem do fluxo visual pelo mesmo motivo da busca de
-          Parceiros: três linhas para uma pergunta só. O `aria-describedby` continua
-          apontando para a lista, que segue no documento. */}
+    <div
+      className={cn(
+        'flex h-10 items-center gap-2.5 rounded-full bg-wpp-busca pr-1 pl-3.5 text-wpp-suave focus-within:ring-3 focus-within:ring-ring/40',
+        className,
+      )}
+    >
+      <Search className="size-4 shrink-0" aria-hidden="true" />
       <label htmlFor={id} className="sr-only">
-        Buscar parceiro
+        Buscar conversa
       </label>
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
-        />
-        <Input
-          id={id}
-          type="search"
-          inputMode="search"
-          autoComplete="off"
-          enterKeyHint="search"
-          // A busca acha também o TEXTO das mensagens (27/10/2026): os achados
-          // aparecem em "Mensagens", embaixo da lista.
-          placeholder="Nome, bairro ou mensagem"
-          aria-describedby={`${id}-dica`}
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          className="h-11 pl-9 md:h-9"
-        />
-        {texto ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setTexto('')}
-            className="absolute top-1/2 right-1.5 size-11 -translate-y-1/2 md:size-7"
-          >
-            <X aria-hidden="true" />
-            <span className="sr-only">Limpar a busca</span>
-          </Button>
-        ) : null}
-      </div>
+      <input
+        id={id}
+        type="search"
+        inputMode="search"
+        autoComplete="off"
+        enterKeyHint="search"
+        placeholder="Buscar nome, bairro ou mensagem"
+        aria-describedby={`${id}-dica`}
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        // 16px no celular: abaixo disso o Safari do iPhone dá zoom no campo.
+        className="h-full min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-wpp-suave md:text-sm [&::-webkit-search-cancel-button]:hidden"
+      />
+      {texto ? (
+        <BotaoRedondo tamanho="sm" onClick={() => setTexto('')} aria-label="Limpar a busca">
+          <X aria-hidden="true" />
+        </BotaoRedondo>
+      ) : null}
       <p id={`${id}-dica`} className="sr-only">
         Nome, categoria, bairro ou o texto de uma mensagem.
       </p>
@@ -267,7 +248,7 @@ function Filtro<T extends string>({
       <SelectTrigger
         aria-label={aria}
         className={cn(
-          'toque h-11 shrink-0 md:h-8',
+          'toque h-11 w-full md:h-9',
           valor !== null && 'border-foreground/40 font-medium',
         )}
       >

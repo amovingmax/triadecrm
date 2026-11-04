@@ -1,26 +1,26 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, CircleCheck, MessageSquarePlus, Search, Users } from 'lucide-react';
+import { Popover as PopoverPrimitive } from 'radix-ui';
 
 import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { useAcoesDosAvisos } from '@/components/avisos/provedor-avisos';
 import { TelaGrupos } from '@/components/grupos/tela-grupos';
-import { juntarAsPerdidas, perdidasPrimeiro } from '@/components/ligacao-whatsapp/logica';
+import { juntarAsPerdidas } from '@/components/ligacao-whatsapp/logica';
 import { useLigacoesPerdidas } from '@/components/ligacao-whatsapp/perdidas';
-import { SeletorDeAba } from '@/components/ui/abas';
 
 import { useAreaVisivel } from './area-visivel';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
 import { OrdemDaLista } from './atitude';
 import { useAtitudes } from './atitude-dados';
-import { porInteresse } from './atitude-regra';
 import { FeedAutomaticas } from './automaticas';
 import { carregarAutomaticas, carregarMarcoZero, CHAVE_AUTOMATICAS } from './automaticas-dados';
-import { CONCLUIR_NA_EMPRESA, FiltroDasConcluidas } from './concluir-conversa';
+import { CONCLUIR_NA_EMPRESA } from './concluir-conversa';
 import { Conversa } from './conversa';
 import { carregarConversas, CHAVE_CONVERSAS, mensagemDoErro, TETO_ORGANIZACOES } from './dados';
 import { BuscaDeMensagens } from './busca-de-mensagens';
@@ -29,14 +29,14 @@ import { useEcoDasConversas, type EstadoDoEco } from './eco-do-banco';
 import {
   ErroDaTela,
   EsqueletoLista,
-  NenhumaEscolhida,
   SemConcluidas,
   SemConversasMinhas,
+  TelaDeEntrada,
   VazioDeVerdade,
   VazioPorFiltro,
 } from './estados';
-import { FiltrosDaConversa } from './filtros-conversas';
-import { numero } from './formatos';
+import { BotaoDeFiltros, BuscaDaLista } from './filtros-conversas';
+import { local } from './formatos';
 import { ConversaForaDaBase, ListaForaDaBase } from './fora-da-base';
 import { conversasForaDaBase } from './fora-da-base-dados';
 import { ListaConversas } from './lista-conversas';
@@ -46,8 +46,8 @@ import {
   contatosDeConsultoria,
   emCaptacao,
   filtrarClientes,
-  juntarNaLista,
   montarConversas,
+  normalizar,
   type CatalogosConversas,
 } from './montagem';
 import {
@@ -63,6 +63,7 @@ import {
   type FiltrosConversas,
   type ItemConversa,
 } from './tipos';
+import { AvatarDaConversa, BotaoRedondo, ChipDeAba, Segmentado } from './wpp';
 
 /**
  * Conversas: a lista de parceiros à esquerda, a linha do tempo à direita.
@@ -83,9 +84,9 @@ import {
  * COMO ELA SE COMPORTA
  * ===========================================================================
  * - Desktop: duas colunas com rolagem própria, ocupando a altura da janela. Sem
- *   nenhuma escolha, a coluna da direita já mostra a primeira conversa da lista: abrir
- *   o módulo e ver uma coluna vazia é gastar um clique para chegar onde a pessoa ia
- *   de todo jeito.
+ *   nenhuma escolha, a coluna da direita mostra a tela de entrada com a marca da
+ *   empresa, como o WhatsApp do computador (04/11/2026). Até aqui ela abria sozinha
+ *   a primeira conversa da lista.
  * - Celular: uma coisa por vez. A lista ocupa a tela; ao tocar num parceiro ela dá
  *   lugar à conversa, com um "voltar" de 44px. O cabeçalho e os filtros saem junto,
  *   porque em 390px eles comeriam metade da linha do tempo.
@@ -236,17 +237,7 @@ export function TelaConversas({
   // A atitude do cliente (29/10/2026): a etiqueta nas linhas e, com "Mais
   // interessados", a ordem. Desligada (a KOMUNE), nada disso muda a tela.
   const atitudes = useAtitudes();
-  const interesse =
-    atitudes.ligada && filtros.ordem === 'interesse' ? atitudes.porConversa : null;
-  const foraNaOrdem = useMemo(
-    () =>
-      perdidasPrimeiro(
-        interesse ? porInteresse(foraDaBase, (f) => f.id, interesse) : foraDaBase,
-        (f) => f.id,
-        perdidas,
-      ),
-    [foraDaBase, interesse, perdidas],
-  );
+  const interesse = atitudes.ligada && filtros.ordem === 'interesse' ? atitudes.porConversa : null;
   const porEscopo = useMemo(
     () =>
       // "Todas" não leva número: é a lista inteira, e o número dela já está no
@@ -262,9 +253,6 @@ export function TelaConversas({
     [captacao, clientes, filtros, quem],
   );
 
-  // A aba "Consultoria" não passa pelo recorte da lista ("Minhas", busca, canal):
-  // é curta e é inteira, como a de Clientes.
-  const daAba = aba === 'consultoria' ? consultoria : itens;
   // Os clientes que cabem no recorte da lista de Conversas ("Minhas", busca...).
   const clientesNaLista = useMemo(() => {
     const recorte = filtrarClientes(clientes, filtros, quem);
@@ -281,46 +269,15 @@ export function TelaConversas({
   // O cliente escolhido é procurado em TODOS os clientes, não no recorte — a
   // mesma regra da conversa de parceiro, logo abaixo.
   const clienteEscolhido = foraId ? (clientes.find((f) => f.id === foraId) ?? null) : null;
-  // Sem escolha nenhuma, o desktop abre a primeira linha da lista. Na aba
-  // "Conversas" ela pode ser um cliente: é quem acabou de escrever.
-  const primeiraLinha =
-    aba === 'conversas'
-      ? (juntarNaLista(itens, clientesNaLista, preferencias.data, interesse, perdidas)[0] ?? null)
-      : null;
-  const semEscolha = escolhidoId === null && clienteEscolhido === null && !ehCelular;
-  // Na aba Clientes com ficha, a primeira linha pode ser de ficha ou não.
-  const primeiraDosClientes = clientesNaAba
-    ? (juntarNaLista(clientesFichados, foraDaBase, preferencias.data, interesse)[0] ?? null)
-    : null;
-  const foraAberta =
-    aba === 'fora' && clientesNaAba
-      ? (clienteEscolhido ??
-        (semEscolha && primeiraDosClientes?.tipo === 'cliente' ? primeiraDosClientes.fio : null))
-      : aba === 'fora'
-        ? (clienteEscolhido ?? (ehCelular ? null : (foraNaOrdem[0] ?? null)))
-        : aba === 'conversas'
-          ? (clienteEscolhido ??
-            (semEscolha && primeiraLinha?.tipo === 'cliente' ? primeiraLinha.fio : null))
-          : null;
+  // Só abre o que a pessoa escolheu, também no computador (04/11/2026): sem
+  // escolha, a direita mostra a tela de entrada com a marca da empresa, como o
+  // WhatsApp do computador (`TelaDeEntrada`). Até aqui o desktop abria sozinho a
+  // primeira linha da lista.
+  const foraAberta = aba === 'fora' || aba === 'conversas' ? clienteEscolhido : null;
 
-  // Sem escolha explícita, o desktop abre a primeira da lista. É derivação, não efeito:
-  // um `setState` dentro de `useEffect` aqui reordenaria a tela depois de pintá-la.
   // Com um cliente aberto, nenhuma conversa de parceiro está aberta.
   // Na aba Grupos nenhuma conversa está aberta: o aviso de resposta tem de chegar.
-  const abertaId =
-    foraAberta || aba === 'grupos'
-      ? null
-      : (escolhidoId ??
-        (ehCelular
-          ? null
-          : clientesNaAba
-            ? primeiraDosClientes?.tipo === 'parceiro'
-              ? primeiraDosClientes.item.id
-              : null
-            : // Em "Mais interessados" a primeira linha é a do topo da ordem nova.
-              interesse && aba === 'conversas' && primeiraLinha?.tipo === 'parceiro'
-              ? primeiraLinha.item.id
-              : (daAba[0]?.id ?? null)));
+  const abertaId = foraAberta || aba === 'grupos' ? null : escolhidoId;
 
   // A conversa aberta é procurada em TODOS, não no recorte: mudar o filtro não pode
   // fechar na cara da pessoa a conversa que ela está lendo.
@@ -374,51 +331,59 @@ export function TelaConversas({
   }, []);
 
   const limpar = useCallback(() => setFiltros(FILTROS_VAZIOS), []);
+  const mudarBusca = useCallback((q: string) => mudar({ q }), [mudar]);
   const voltar = useCallback(() => setEscolhidoId(null), []);
-
-  // MEXER NA CONVERSA É ESCOLHÊ-LA (06/10/2026).
-  //
-  // O desktop abre a primeira da lista sem ninguém pedir, e essa abertura não
-  // zera o "por ler" (ver `leitura-do-fio.ts`): o contador é do time, e zerar
-  // ali faria cada pessoa que entra na tela apagar o sinal da conversa do topo.
-  // Só que a linha dela já aparece marcada na lista, e ninguém clica no que
-  // parece escolhido. Clicar, rolar ou digitar dentro da conversa passa a valer
-  // como a escolha — e a prende no lugar, em vez de a tela trocar de conversa
-  // quando outra pessoa escreve e sobe para o topo.
-  const abertaAgoraId = aberta?.id ?? null;
-  const escolherAberta = useCallback(() => {
-    if (abertaAgoraId !== null && abertaAgoraId !== escolhidoId) escolherParceiro(abertaAgoraId);
-  }, [abertaAgoraId, escolhidoId, escolherParceiro]);
-  const foraAbertaId = foraAberta?.id ?? null;
-  const escolherForaAberta = useCallback(() => {
-    if (foraAbertaId !== null && foraAbertaId !== foraId) escolherCliente(foraAbertaId);
-  }, [foraAbertaId, foraId, escolherCliente]);
   const nadaNaLista = itens.length + clientesNaLista.length === 0;
 
   const recorte = temRecorte(filtros);
   const soBusca = recorte && contarFiltros(filtros) === 0;
   // "Minhas" e mais nada: nem busca, nem filtro, nem arquivadas.
   const soMinhas = filtros.escopo === 'minhas' && !temRecorte({ ...filtros, escopo: 'todas' });
-  const comContato = todos.filter((i) => i.ultimaEm !== null).length;
-  const porLer =
-    todos.reduce((soma, i) => soma + i.naoLidas, 0) +
-    foraDaBase.reduce((soma, f) => soma + f.unread_count, 0);
   const meta = consulta.data?.meta ?? null;
 
   // No celular, conversa aberta é tela cheia: cabeçalho e filtros saem de cena.
   const telaCheia = ehCelular && (foraAberta !== null || aberta !== null);
-  const areaVisivel = useAreaVisivel(telaCheia);
+  useAreaVisivel(telaCheia);
   // A conversa aberta no celular é uma camada da área visível inteira, por cima
   // do cabeçalho do CRM e da barra de baixo (ver `area-visivel.ts`). `h-dvh` é só
   // o primeiro quadro, antes de a área visível ser medida.
   const camadaDoCelular = telaCheia
-    ? 'fixed inset-x-0 top-0 z-40 h-dvh rounded-none bg-background pt-[env(safe-area-inset-top)] shadow-none'
+    ? 'fixed inset-x-0 top-0 z-40 h-dvh rounded-none bg-wpp-painel pt-[env(safe-area-inset-top)] shadow-none'
     : null;
+
+  // A GAVETA DAS CONCLUÍDAS (03/11/2026), no lugar das "Arquivadas" do WhatsApp:
+  // uma linha no alto da lista com quantas são, e ela abre a lista só delas. O
+  // número respeita o recorte ("Minhas", a busca), para bater com o que a gaveta
+  // mostra quando abre.
+  const verConcluidas = aba === 'conversas' && filtros.concluidas;
+  const quantasConcluidas = useMemo(() => {
+    if (!CONCLUIR_NA_EMPRESA || aba !== 'conversas') return 0;
+    const so = { ...filtros, concluidas: true };
+    return aplicarFiltros(captacao, so, quem).length + filtrarClientes(clientes, so, quem).length;
+  }, [aba, filtros, captacao, clientes, quem]);
+
+  // A ficha ao lado da conversa (computador): aberta ou fechada vale para todas as
+  // conversas, como no WhatsApp, e não volta a fechar a cada troca.
+  const [fichaAberta, setFichaAberta] = useState(false);
+  const alternarFicha = useCallback(() => setFichaAberta((v) => !v), []);
+
+  // As abas, como as pílulas do alto da lista do WhatsApp.
+  const chips = (
+    <ChipsDasAbas
+      aba={aba}
+      aoTrocar={setAba}
+      consultoria={consultoria.length}
+      foraDaBase={foraDaBase.length + clientesFichados.length}
+    />
+  );
 
   return (
     <div
+      // A casca tira as margens e o teto de largura desta tela (`app-shell.tsx`).
+      data-tela-cheia=""
       className={cn(
-        'flex w-full flex-col gap-4 md:h-[calc(100dvh-7.5rem)]',
+        // 72px do cabeçalho do CRM no computador e os 12px de baixo da casca.
+        'flex w-full flex-col md:h-[calc(100dvh-72px-0.75rem)]',
         // Piso de altura para o celular DEITADO (844x390), que já cai no layout
         // de tela larga: sem ele o painel ficava com 270px, o cabeçalho da
         // conversa e a caixa de resposta comiam tudo e a área das mensagens
@@ -426,103 +391,18 @@ export function TelaConversas({
         'md:min-h-[30rem]',
       )}
     >
-      {telaCheia ? null : (
-        <>
-          <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h1 className="flex items-baseline gap-2 font-heading text-lg font-semibold tracking-tight">
-              Conversas
-              <EstadoAoVivo estado={eco} />
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              {consulta.isPending ? (
-                'Carregando o histórico...'
-              ) : recorte ? (
-                <>
-                  <span className="numerico">{numero(itens.length + clientesNaLista.length)}</span>
-                  {itens.length + clientesNaLista.length === 1 ? ' conversa' : ' conversas'} com
-                  esse filtro
-                </>
-              ) : porLer > 0 ? (
-                <>
-                  <span className="numerico">{numero(porLer)}</span>
-                  {porLer === 1 ? ' mensagem por ler' : ' mensagens por ler'}
-                </>
-              ) : (
-                <>
-                  <span className="numerico">{numero(comContato)}</span> com contato registrado,{' '}
-                  <span className="numerico">{numero(todos.length - comContato)}</span> ainda sem
-                  nenhum
-                </>
-              )}
-            </p>
-          </header>
-
-          {/* Abas e busca dividem a MESMA faixa no desktop. Empilhadas, elas e o
-              título somavam 200 px antes da primeira conversa — numa tela em que o
-              conteúdo é a lista. No celular continuam uma embaixo da outra, porque
-              lá a busca precisa da largura inteira. No tablet em pé também: as
-              abas e a busca de 26rem somam mais que os 656px que sobram ao lado
-              da lateral, e o botão de filtros saía pela borda (20/10/2026). */}
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
-            <Abas
-              aba={aba}
-              aoTrocar={setAba}
-              consultoria={consultoria.length}
-              foraDaBase={foraDaBase.length + clientesFichados.length}
-            />
-
-            {/* O recorte é da lista de conversas. Nas outras abas ele não aparece
-                porque não se aplica: lá a lista já é curta e é inteira. */}
-            {aba === 'conversas' ? (
-              <FiltrosDaConversa
-                filtros={filtros}
-                pessoas={catalogos.pessoas}
-                aoMudar={mudar}
-                aoLimpar={limpar}
-                className="lg:w-[26rem]"
-              />
-            ) : null}
-          </div>
-
-          {consulta.data?.cortada ? (
-            // Uma frase para quem usa, e não o recado de engenharia que estava aqui
-            // ("o histórico precisa virar consulta paginada no banco"): quem lê
-            // precisa saber que a lista não é tudo e como achar o resto. A busca
-            // DESTA tela filtra só o que já foi lido; quem busca na base inteira é
-            // a tela de Parceiros, e a ficha abre a conversa com `?org=`.
-            <p className="text-xs text-muted-foreground">
-              A lista mostra os primeiros {TETO_ORGANIZACOES} parceiros. Para abrir outro, procure
-              em{' '}
-              <Link
-                href="/parceiros"
-                className="underline underline-offset-4 hover:text-foreground"
-              >
-                Parceiros
-              </Link>{' '}
-              e use &ldquo;Abrir a conversa&rdquo; na ficha.
-            </p>
-          ) : null}
-        </>
-      )}
-
       <div
         className={cn(
-          // DOIS CARTÕES SOBRE A TELA CINZA (29/09/2026, Design System), e não
-          // duas colunas de uma grade com filete entre elas. A lista e o fio são
-          // duas coisas, e cada uma mora no seu branco — é o que o protótipo
-          // desenha e o que separa "painel" de "tabela de duas colunas".
-          'grid min-h-0 flex-1 gap-3 md:gap-4',
-          // A lista era 20rem em qualquer tela: o nome do parceiro truncava no
-          // meio e a prévia da conversa cabia em cinco palavras. Numa tela de
-          // 1440 sobrava largura de sobra do outro lado — a conversa não fica
-          // melhor com 1.100 px do que com 900. Então a lista cresce com a tela.
-          'md:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] md:overflow-hidden',
-          // No TABLET em pé (768, toque) a lista de 23rem deixava a conversa com
-          // 270px: o nome do contato virava "C." e o telefone "+..". Lá a lista
-          // fica com 18rem, e a conversa com a largura de um celular. No
-          // computador, mesmo numa janela estreita, a lista continua como era.
+          // UM CARTÃO SÓ, como a janela do WhatsApp (03/11/2026): a lista e a
+          // conversa dividem o mesmo branco, separadas por um filete. Até aqui
+          // eram dois cartões sobre a tela cinza, com o título e as abas por cima,
+          // e a conversa perdia quase 200px de altura para eles.
+          'grid min-h-0 flex-1 bg-wpp-painel md:overflow-hidden md:rounded-[20px] md:border md:border-wpp-linha md:shadow-wpp-caixa',
+          // A lista cresce com a tela até 24rem; a conversa fica com o resto.
+          'md:grid-cols-[minmax(17rem,21rem)_minmax(0,1fr)] xl:grid-cols-[minmax(19rem,24rem)_minmax(0,1fr)]',
+          // No TABLET em pé (768, toque) a lista de 21rem deixava a conversa com a
+          // largura de um celular apertado; lá ela fica com 18rem.
           'md:max-lg:pointer-coarse:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]',
-          'xl:grid-cols-[minmax(0,27rem)_minmax(0,1fr)]',
           telaCheia && 'overflow-hidden',
         )}
       >
@@ -540,137 +420,196 @@ export function TelaConversas({
                 ? 'Quem fechou, por interação mais recente'
                 : 'Parceiros por interação mais recente'
             }
-            // `min-w-0`: sem ele o item de grade assume `min-width: auto` e cresce até o
-            // conteúdo, e em 390px a lista nascia com 484px de largura (o "hoje" e o
-            // chevron caíam fora da tela). É a mesma armadilha do flex.
             // `min-w-0`: sem ele o item de grade assume `min-width: auto` e
             // cresce até o conteúdo, e em 390px a lista nascia com 484px.
-            className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-y-auto"
+            className="flex min-h-0 min-w-0 flex-col md:border-r md:border-wpp-linha"
           >
-            {aba === 'conversas' && !consulta.isPending ? (
-              <div className="sticky top-0 z-10 border-b border-hairline bg-background px-3 py-2">
-                <SeletorDeAba
-                  itens={porEscopo}
-                  ativo={filtros.escopo}
-                  aoTrocar={(escopo) => mudar({ escopo })}
-                  rotulo="De quem são as conversas"
-                />
-                {/* A ordem e a gaveta das concluídas (Imova) dividem a linha, e a
-                    gaveta desce quando não cabe (celular). Na KOMUNE as duas
-                    somem, e a linha junto (`empty:hidden`). */}
-                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 empty:hidden">
+            {verConcluidas ? (
+              <CabecalhoDasConcluidas aoVoltar={() => mudar({ concluidas: false })} />
+            ) : (
+              <div className="flex shrink-0 flex-col gap-3 px-3.5 pt-3.5 pb-2.5">
+                <div className="flex items-center gap-0.5">
+                  <h1 className="font-heading text-[21px] font-semibold tracking-tight">
+                    Conversas
+                  </h1>
+                  <EstadoAoVivo estado={eco} />
+                  <span className="flex-1" />
+                  <NovaConversa
+                    itens={captacao}
+                    aoEscolher={(organizacaoId) => {
+                      setAba('conversas');
+                      escolherParceiro(organizacaoId);
+                    }}
+                  />
+                  {aba === 'conversas' ? (
+                    <BotaoDeFiltros
+                      filtros={filtros}
+                      pessoas={catalogos.pessoas}
+                      aoMudar={mudar}
+                      aoLimpar={limpar}
+                    />
+                  ) : null}
+                </div>
+                {/* O recorte é da lista de conversas. Nas outras abas ele não aparece
+                    porque não se aplica: lá a lista já é curta e é inteira. */}
+                {aba === 'conversas' ? (
+                  <BuscaDaLista valor={filtros.q} aoMudar={mudarBusca} />
+                ) : null}
+                {chips}
+                {aba === 'conversas' && !consulta.isPending ? (
+                  <div className="flex min-h-[34px] flex-wrap items-center gap-2">
+                    <Segmentado
+                      itens={porEscopo}
+                      ativo={filtros.escopo}
+                      aoTrocar={(escopo) => mudar({ escopo })}
+                      rotulo="De quem são as conversas"
+                    />
+                    <OrdemDaLista
+                      ligada={atitudes.ligada}
+                      ordem={filtros.ordem}
+                      aoMudar={(ordem) => mudar({ ordem })}
+                      className="ml-auto"
+                    />
+                  </div>
+                ) : aba === 'fora' && atitudes.ligada && !consulta.isPending ? (
                   <OrdemDaLista
-                    ligada={atitudes.ligada}
+                    ligada
                     ordem={filtros.ordem}
                     aoMudar={(ordem) => mudar({ ordem })}
                   />
-                  <FiltroDasConcluidas
-                    ativo={filtros.concluidas}
-                    aoMudar={(concluidas) => mudar({ concluidas })}
-                    className="ml-auto"
-                  />
-                </div>
+                ) : null}
               </div>
-            ) : aba === 'fora' && atitudes.ligada && !consulta.isPending ? (
-              <div className="sticky top-0 z-10 border-b border-hairline bg-background px-3 py-2">
-                <OrdemDaLista
-                  ligada
-                  ordem={filtros.ordem}
-                  aoMudar={(ordem) => mudar({ ordem })}
+            )}
+
+            <div className="min-h-0 flex-1 md:overflow-y-auto">
+              {aba === 'conversas' && !verConcluidas && quantasConcluidas > 0 ? (
+                <LinhaDasConcluidas
+                  quantas={quantasConcluidas}
+                  aoAbrir={() => mudar({ concluidas: true })}
                 />
-              </div>
-            ) : null}
-            {consulta.isPending ? (
-              <EsqueletoLista />
-            ) : consulta.isError ? (
-              <ErroDaTela
-                causa={mensagemDoErro(consulta.error)}
-                aoTentar={() => void consulta.refetch()}
-              />
-            ) : clientesNaAba && clientesFichados.length > 0 ? (
-              // A mesma lista da aba Conversas, só com os clientes: a ficha abre a
-              // conversa de ficha; quem ainda não tem, a de sempre.
-              <ListaConversas
-                itens={clientesFichados}
-                selecionadoId={aberta?.id ?? null}
-                aoEscolher={escolherParceiro}
-                clientes={foraDaBase}
-                clienteSelecionadoId={foraAberta?.id ?? null}
-                aoEscolherCliente={escolherCliente}
-                preferencias={preferencias.data}
-                atitudes={atitudes}
-                porInteresse={interesse !== null}
-              />
-            ) : aba === 'fora' ? (
-              <ListaForaDaBase
-                fios={foraNaOrdem}
-                selecionadoId={foraAberta?.id ?? null}
-                aoEscolher={setForaId}
-                atitudes={atitudes}
-                perdidas={perdidas}
-              />
-            ) : aba === 'consultoria' ? (
-              consultoria.length === 0 ? (
-                <p className="px-4 py-8 text-sm text-muted-foreground">
-                  Ninguém fechou ainda. Quando um negócio for ganho, a conversa desse parceiro sai
-                  da lista de Conversas e passa a aparecer aqui.
-                </p>
-              ) : (
+              ) : null}
+              {consulta.isPending ? (
+                <EsqueletoLista />
+              ) : consulta.isError ? (
+                <ErroDaTela
+                  causa={mensagemDoErro(consulta.error)}
+                  aoTentar={() => void consulta.refetch()}
+                />
+              ) : clientesNaAba && clientesFichados.length > 0 ? (
+                // A mesma lista da aba Conversas, só com os clientes: a ficha abre a
+                // conversa de ficha; quem ainda não tem, a de sempre.
                 <ListaConversas
-                  itens={consultoria}
+                  itens={clientesFichados}
                   selecionadoId={aberta?.id ?? null}
                   aoEscolher={escolherParceiro}
+                  clientes={foraDaBase}
+                  clienteSelecionadoId={foraAberta?.id ?? null}
+                  aoEscolherCliente={escolherCliente}
                   preferencias={preferencias.data}
                   atitudes={atitudes}
+                  porInteresse={interesse !== null}
                 />
-              )
-            ) : filtros.escopo === 'setor' && quem.meusSetores.length === 0 ? (
-              <p className="px-4 py-8 text-sm text-muted-foreground">
-                Você ainda não está em nenhum setor. Um gestor coloca você em Ajustes → Pessoas.
-              </p>
-            ) : nadaNaLista && filtros.concluidas && !filtros.q.trim() ? (
-              <SemConcluidas
-                soMinhas={filtros.escopo === 'minhas'}
-                aoVoltar={() => mudar({ concluidas: false })}
-              />
-            ) : nadaNaLista && soMinhas ? (
-              // A tela abre em "Minhas", e quem ainda não atende ninguém cairia
-              // em "nenhuma conversa com esses filtros" sem ter filtrado nada.
-              <SemConversasMinhas aoVerTodas={() => mudar({ escopo: 'todas' })} />
-            ) : nadaNaLista && recorte ? (
-              <VazioPorFiltro
-                descricao={descreverRecorte(filtros, catalogos)}
-                soBusca={soBusca}
-                aoLimpar={limpar}
-              />
-            ) : nadaNaLista ? (
-              <VazioDeVerdade />
-            ) : (
-              <ListaConversas
-                itens={itens}
-                selecionadoId={aberta?.id ?? null}
-                aoEscolher={escolherParceiro}
-                clientes={clientesNaLista}
-                clienteSelecionadoId={foraAberta?.id ?? null}
-                aoEscolherCliente={escolherCliente}
-                preferencias={preferencias.data}
-                atitudes={atitudes}
-                porInteresse={interesse !== null}
-                perdidas={perdidas}
-              />
-            )}
-            {/* A LUPA NAS MENSAGENS (27/10/2026): embaixo do que o nome achou, o
-                que o TEXTO das mensagens acha. Só na aba Conversas, que é onde
-                a busca mora. */}
-            {aba === 'conversas' && !consulta.isPending && !consulta.isError ? (
-              <BuscaDeMensagens
-                texto={filtros.q}
-                fios={consulta.data?.fios ?? []}
-                organizacoes={consulta.data?.organizacoes ?? []}
-                aoAbrir={({ conversaId, organizacaoId, mensagemId }) => {
-                  setMensagemAlvo(mensagemId);
-                  if (organizacaoId) escolherParceiro(organizacaoId);
-                  else escolherCliente(conversaId);
+              ) : aba === 'fora' ? (
+                <ListaForaDaBase
+                  fios={foraDaBase}
+                  selecionadoId={foraAberta?.id ?? null}
+                  aoEscolher={setForaId}
+                  atitudes={atitudes}
+                  perdidas={perdidas}
+                  preferencias={preferencias.data}
+                  porInteresse={interesse !== null}
+                />
+              ) : aba === 'consultoria' ? (
+                consultoria.length === 0 ? (
+                  <p className="px-4 py-8 text-sm text-wpp-suave">
+                    Ninguém fechou ainda. Quando um negócio for ganho, a conversa desse parceiro sai
+                    da lista de Conversas e passa a aparecer aqui.
+                  </p>
+                ) : (
+                  <ListaConversas
+                    itens={consultoria}
+                    selecionadoId={aberta?.id ?? null}
+                    aoEscolher={escolherParceiro}
+                    preferencias={preferencias.data}
+                    atitudes={atitudes}
+                  />
+                )
+              ) : filtros.escopo === 'setor' && quem.meusSetores.length === 0 ? (
+                <p className="px-4 py-8 text-sm text-wpp-suave">
+                  Você ainda não está em nenhum setor. Um gestor coloca você em Ajustes → Pessoas.
+                </p>
+              ) : nadaNaLista && filtros.concluidas && !filtros.q.trim() ? (
+                <SemConcluidas
+                  soMinhas={filtros.escopo === 'minhas'}
+                  aoVoltar={() => mudar({ concluidas: false })}
+                />
+              ) : nadaNaLista && soMinhas ? (
+                // A tela abre em "Minhas", e quem ainda não atende ninguém cairia
+                // em "nenhuma conversa com esses filtros" sem ter filtrado nada.
+                <SemConversasMinhas aoVerTodas={() => mudar({ escopo: 'todas' })} />
+              ) : nadaNaLista && recorte ? (
+                <VazioPorFiltro
+                  descricao={descreverRecorte(filtros, catalogos)}
+                  soBusca={soBusca}
+                  aoLimpar={limpar}
+                />
+              ) : nadaNaLista ? (
+                <VazioDeVerdade />
+              ) : (
+                <ListaConversas
+                  itens={itens}
+                  selecionadoId={aberta?.id ?? null}
+                  aoEscolher={escolherParceiro}
+                  clientes={clientesNaLista}
+                  clienteSelecionadoId={foraAberta?.id ?? null}
+                  aoEscolherCliente={escolherCliente}
+                  preferencias={preferencias.data}
+                  atitudes={atitudes}
+                  porInteresse={interesse !== null}
+                  perdidas={perdidas}
+                />
+              )}
+              {/* A LUPA NAS MENSAGENS (27/10/2026): embaixo do que o nome achou, o
+                  que o TEXTO das mensagens acha. Só na aba Conversas, que é onde
+                  a busca mora. */}
+              {aba === 'conversas' && !consulta.isPending && !consulta.isError ? (
+                <BuscaDeMensagens
+                  texto={filtros.q}
+                  fios={consulta.data?.fios ?? []}
+                  organizacoes={consulta.data?.organizacoes ?? []}
+                  aoAbrir={({ conversaId, organizacaoId, mensagemId }) => {
+                    setMensagemAlvo(mensagemId);
+                    if (organizacaoId) escolherParceiro(organizacaoId);
+                    else escolherCliente(conversaId);
+                  }}
+                />
+              ) : null}
+              {consulta.data?.cortada && aba === 'conversas' ? (
+                // Uma frase para quem usa: a lista não é tudo, e como achar o resto.
+                // A busca DESTA tela filtra só o que já foi lido; quem busca na base
+                // inteira é a tela de Parceiros, e a ficha abre a conversa com `?org=`.
+                <p className="px-4 py-3 text-xs text-wpp-suave">
+                  A lista mostra os primeiros {TETO_ORGANIZACOES} parceiros. Para abrir outro,
+                  procure em{' '}
+                  <Link
+                    href="/parceiros"
+                    className="underline underline-offset-4 hover:text-foreground"
+                  >
+                    Parceiros
+                  </Link>{' '}
+                  e use &ldquo;Abrir a conversa&rdquo; na ficha.
+                </p>
+              ) : null}
+            </div>
+            {/* No celular, "Nova conversa" é o botão verde do canto, como no
+                WhatsApp; no computador, o ícone ao lado do título. */}
+            {ehCelular && !verConcluidas ? (
+              <NovaConversa
+                flutuante
+                itens={captacao}
+                aoEscolher={(organizacaoId) => {
+                  setAba('conversas');
+                  escolherParceiro(organizacaoId);
                 }}
               />
             ) : null}
@@ -680,51 +619,56 @@ export function TelaConversas({
         {/* Conversa. No celular só existe quando alguém escolheu. */}
         {/* A aba Grupos põe as duas colunas dela nesta mesma grade (27/10/2026). */}
         {aba === 'grupos' ? (
-          <TelaGrupos pessoas={catalogos.pessoas} />
+          <TelaGrupos pessoas={catalogos.pessoas} cabecalho={chips} />
         ) : aba === 'automaticas' ? (
           <section
             aria-label="O que o CRM mandou sozinho"
-            className="sombra-base min-h-0 min-w-0 rounded-xl bg-card md:col-span-2 md:overflow-y-auto"
+            className="flex min-h-0 min-w-0 flex-col md:col-span-2"
           >
-            {automaticas.isPending ? (
-              <EsqueletoLista />
-            ) : automaticas.isError ? (
-              <ErroDaTela
-                causa={mensagemDoErro(automaticas.error)}
-                aoTentar={() => void automaticas.refetch()}
-              />
-            ) : (
-              <FeedAutomaticas
-                linhas={automaticas.data ?? []}
-                marcoZero={marcoZero.data ?? null}
-                aoAbrir={({ organizacaoId, conversaId }) => {
-                  // A ficha manda: a conversa dela abre na aba "Conversas", que é
-                  // onde o fio inteiro está. Sem ficha, o destino é a aba "Fora da
-                  // base", pelo id do FIO — o mesmo caminho que `fora-da-base.tsx`
-                  // já usa, e o único que existe para quem não é parceiro.
-                  if (organizacaoId) {
-                    setAba('conversas');
-                    escolherParceiro(organizacaoId);
-                  } else if (conversaId) {
-                    setAba('fora');
-                    setForaId(conversaId);
-                  }
-                }}
-              />
-            )}
+            <div className="flex shrink-0 flex-col gap-3 border-b border-wpp-linha px-5 pt-4 pb-3">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h1 className="font-heading text-[21px] font-semibold tracking-tight">Conversas</h1>
+                <span className="text-[13px] text-wpp-suave">
+                  Automáticas: o que o CRM mandou sozinho.
+                </span>
+              </div>
+              {chips}
+            </div>
+            <div className="min-h-0 flex-1 md:overflow-y-auto">
+              {automaticas.isPending ? (
+                <EsqueletoLista />
+              ) : automaticas.isError ? (
+                <ErroDaTela
+                  causa={mensagemDoErro(automaticas.error)}
+                  aoTentar={() => void automaticas.refetch()}
+                />
+              ) : (
+                <FeedAutomaticas
+                  linhas={automaticas.data ?? []}
+                  marcoZero={marcoZero.data ?? null}
+                  aoAbrir={({ organizacaoId, conversaId }) => {
+                    // A ficha manda: a conversa dela abre na aba "Conversas", que é
+                    // onde o fio inteiro está. Sem ficha, o destino é a aba "Fora da
+                    // base", pelo id do FIO — o mesmo caminho que `fora-da-base.tsx`
+                    // já usa, e o único que existe para quem não é parceiro.
+                    if (organizacaoId) {
+                      setAba('conversas');
+                      escolherParceiro(organizacaoId);
+                    } else if (conversaId) {
+                      setAba('fora');
+                      setForaId(conversaId);
+                    }
+                  }}
+                />
+              )}
+            </div>
           </section>
         ) : (aba === 'fora' && !(clientesNaAba && aberta)) || foraAberta ? (
           ehCelular && !foraAberta ? null : (
             <section
               aria-label="Conversa com cliente"
-              className={cn(
-                'sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden',
-                camadaDoCelular,
-              )}
-              style={areaVisivel}
-              onPointerDownCapture={escolherForaAberta}
-              onKeyDownCapture={escolherForaAberta}
-              onWheelCapture={escolherForaAberta}
+              className={cn('min-h-0 min-w-0 md:overflow-hidden', camadaDoCelular)}
+              data-area-visivel={telaCheia ? '' : undefined}
             >
               {foraAberta ? (
                 <ConversaForaDaBase
@@ -739,25 +683,23 @@ export function TelaConversas({
                     setAba('conversas');
                     escolherParceiro(organizacaoId);
                   }}
+                  fichaAberta={fichaAberta}
+                  aoAlternarFicha={alternarFicha}
                 />
-              ) : consulta.isPending ? null : (
-                <NenhumaEscolhida meta={meta} />
+              ) : consulta.isPending && foraId !== null ? null : (
+                <TelaDeEntrada />
               )}
             </section>
           )
         ) : ehCelular && !aberta ? null : (
           <section
             aria-label="Conversa com o parceiro"
-            className={cn(
-              'sombra-base min-h-0 min-w-0 rounded-xl bg-card md:overflow-hidden',
-              camadaDoCelular,
-            )}
-            style={areaVisivel}
-            onPointerDownCapture={escolherAberta}
-            onKeyDownCapture={escolherAberta}
-            onWheelCapture={escolherAberta}
+            className={cn('min-h-0 min-w-0 md:overflow-hidden', camadaDoCelular)}
+            data-area-visivel={telaCheia ? '' : undefined}
           >
-            {consulta.isPending ? null : aberta ? (
+            {/* A tela de entrada já aparece enquanto a lista carrega; só a
+                conversa pedida pelo endereço (`?org=`) espera, sem piscar o logo. */}
+            {consulta.isPending && escolhidoId !== null ? null : aberta ? (
               <Conversa
                 key={aberta.id}
                 item={aberta}
@@ -768,9 +710,11 @@ export function TelaConversas({
                 escolhaExplicita={escolhidoId !== null}
                 mensagemAlvo={mensagemAlvo}
                 aoChegarNoAlvo={chegouNoAlvo}
+                fichaAberta={fichaAberta}
+                aoAlternarFicha={alternarFicha}
               />
             ) : (
-              <NenhumaEscolhida meta={meta} />
+              <TelaDeEntrada />
             )}
           </section>
         )}
@@ -779,18 +723,6 @@ export function TelaConversas({
   );
 }
 
-/**
- * As duas listas da esquerda, num par de abas.
- *
- * A aba de aprovação carrega o número, e o número é o ponto: uma fila de
- * aprovação sem contador é uma fila que ninguém sabe que existe. Quando o
- * validador de promessas apitou em algum rascunho, isso também aparece aqui —
- * antes de abrir, e não depois de ler o texto inteiro.
- *
- * O tempo até o mais urgente sumir fecha a linha. Rascunho vive três dias; sem
- * essa conta, "5 esperando" parece uma pilha parada, quando às vezes é uma pilha
- * que some hoje à noite.
- */
 /**
  * Em que modo a tela está se atualizando.
  *
@@ -810,26 +742,30 @@ function EstadoAoVivo({ estado }: { estado: EstadoDoEco }) {
   if (estado === 'sem_eco') {
     return (
       <span
-        className="text-[0.6875rem] font-normal text-muted-foreground"
+        className="ml-2 text-[11.5px] font-normal text-wpp-suave"
         title="A conexão ao vivo com o banco não subiu (rede ou proxy). A tela confere sozinha a cada 20 segundos."
       >
-        atualizando a cada 20 s
+        a cada 20 s
       </span>
     );
   }
 
   return (
     <span
-      className="flex items-baseline gap-1.5 text-[0.6875rem] font-normal text-muted-foreground"
+      className="ml-2 flex items-center gap-1.5 text-[11.5px] font-normal text-wpp-suave"
       title="A tela recebe do banco e se atualiza sozinha quando o parceiro responde."
     >
-      <span aria-hidden="true" className="size-1.5 self-center rounded-full bg-current" />
+      <span
+        aria-hidden="true"
+        className="size-1.5 rounded-full bg-current motion-safe:animate-pulse"
+      />
       ao vivo
     </span>
   );
 }
 
-function Abas({
+/** As abas da tela, como as pílulas do alto da lista do WhatsApp. */
+function ChipsDasAbas({
   aba,
   aoTrocar,
   consultoria,
@@ -842,30 +778,208 @@ function Abas({
   /** Conversas de números que não são ficha. */
   foraDaBase: number;
 }) {
+  const itens: readonly { id: AbaDaEsquerda; rotulo: string; contagem?: number }[] = [
+    { id: 'conversas', rotulo: 'Conversas' },
+    // Pós-venda (06/10/2026): quem fechou com a gente sai da lista de
+    // Conversas e vem para cá.
+    { id: 'consultoria', rotulo: 'Consultoria', contagem: consultoria },
+    // "Clientes", e não "Fora da base" (01/10/2026): é o nome do que chega
+    // aqui na prática — gente que escreveu e não é lead.
+    { id: 'fora', rotulo: 'Clientes', contagem: foraDaBase },
+    // SEM CONTAGEM, de propósito: um número aqui diria "trabalho parado",
+    // e o feed não é fila — a maior parte das automáticas não pede nada de
+    // ninguém.
+    { id: 'automaticas', rotulo: 'Automáticas' },
+    // Os grupos de WhatsApp (27/10/2026): até 8 pessoas, entrada por link.
+    { id: 'grupos', rotulo: 'Grupos' },
+  ];
+  // A pílula da aba aberta fica sempre à vista: em Grupos ela é a última e
+  // nascia escondida à direita da fileira.
+  const fileira = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const ativa = fileira.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    const caixa = fileira.current;
+    if (!ativa || !caixa) return;
+    const fora =
+      ativa.offsetLeft < caixa.scrollLeft ||
+      ativa.offsetLeft + ativa.offsetWidth > caixa.scrollLeft + caixa.clientWidth;
+    if (fora) caixa.scrollLeft = ativa.offsetLeft - 14;
+  }, [aba]);
   return (
-    <SeletorDeAba
-      rotulo="O que mostrar na lista"
-      ativo={aba}
-      aoTrocar={aoTrocar}
-      // Em 390 px os rótulos quebravam em duas linhas e a faixa das abas
-      // crescia; rolando de lado ela fica com a altura de uma linha só.
-      rolavel
-      itens={[
-        { id: 'conversas', rotulo: 'Conversas' },
-        // Pós-venda (06/10/2026): quem fechou com a gente sai da lista de
-        // Conversas e vem para cá.
-        { id: 'consultoria', rotulo: 'Consultoria', contagem: consultoria },
-        // "Clientes", e não "Fora da base" (01/10/2026): é o nome do que chega
-        // aqui na prática — gente que escreveu e não é lead.
-        { id: 'fora', rotulo: 'Clientes', contagem: foraDaBase },
-        // SEM CONTAGEM, de propósito: um número aqui diria "trabalho parado",
-        // e o feed não é fila — a maior parte das automáticas não pede nada de
-        // ninguém.
-        { id: 'automaticas', rotulo: 'Automáticas' },
-        // Os grupos de WhatsApp (27/10/2026): até 8 pessoas, entrada por link.
-        { id: 'grupos', rotulo: 'Grupos' },
-      ]}
-    />
+    <div
+      ref={fileira}
+      role="group"
+      aria-label="O que mostrar na lista"
+      // Em 390 px as pílulas não cabem numa linha: rolam de lado, como no WhatsApp.
+      // `relative`: é a referência do `offsetLeft` das pílulas.
+      className="relative -mx-3.5 flex gap-1.5 overflow-x-auto px-3.5 pb-0.5 [scrollbar-width:none]"
+    >
+      {itens.map((item) => (
+        <ChipDeAba
+          key={item.id}
+          ativo={aba === item.id}
+          contagem={item.contagem}
+          onClick={() => aoTrocar(item.id)}
+        >
+          {item.rotulo}
+        </ChipDeAba>
+      ))}
+    </div>
+  );
+}
+
+/** A linha "Concluídas" no alto da lista, no lugar das "Arquivadas" do WhatsApp. */
+function LinhaDasConcluidas({ quantas, aoAbrir }: { quantas: number; aoAbrir: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={aoAbrir}
+      className="flex w-full items-center gap-3 px-3.5 text-left outline-none hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06]"
+    >
+      <span
+        aria-hidden="true"
+        className="flex size-12 shrink-0 items-center justify-center text-wpp-autor"
+      >
+        <CircleCheck className="size-[22px]" />
+      </span>
+      <span className="flex flex-1 items-center gap-2 border-b border-wpp-linha py-[15px]">
+        <span className="flex-1 text-[15px] font-medium">Concluídas</span>
+        <span className="numerico text-xs font-medium text-wpp-nova">{quantas}</span>
+      </span>
+    </button>
+  );
+}
+
+/** O alto da gaveta das concluídas: a seta de volta e o que ela guarda. */
+function CabecalhoDasConcluidas({ aoVoltar }: { aoVoltar: () => void }) {
+  return (
+    <div className="flex shrink-0 flex-col gap-2 border-b border-wpp-linha pt-3 pr-3.5 pb-3.5 pl-1.5">
+      <div className="flex items-center gap-1">
+        <BotaoRedondo
+          onClick={aoVoltar}
+          aria-label="Voltar para as conversas abertas"
+          className="text-foreground"
+        >
+          <ArrowLeft aria-hidden="true" />
+        </BotaoRedondo>
+        <h1 className="font-heading text-[19px] font-semibold">Concluídas</h1>
+      </div>
+      <p className="ml-3 text-[13px] leading-normal text-wpp-suave">
+        Saíram da lista sem perder o histórico. Voltam sozinhas quando a pessoa escrever ou quando
+        alguém do time mandar mensagem.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * "Nova conversa" (03/11/2026): o lápis do WhatsApp. Lista quem ainda não tem
+ * conversa no WhatsApp, e escolher abre a conversa dele, onde a primeira mensagem
+ * é o modelo aprovado (fora da janela de 24 h é só ele que sai). Quem não está
+ * na lista mora em Prospectados.
+ */
+function NovaConversa({
+  itens,
+  aoEscolher,
+  flutuante = false,
+}: {
+  itens: readonly ItemConversa[];
+  aoEscolher: (organizacaoId: string) => void;
+  /** No celular é o botão verde redondo do canto, acima da barra de baixo. */
+  flutuante?: boolean;
+}) {
+  const [aberta, setAberta] = useState(false);
+  const [q, setQ] = useState('');
+  const sem = useMemo(() => {
+    const termo = normalizar(q);
+    return itens
+      .filter((i) => i.fio === null && !i.naoContatar)
+      .filter((i) => !termo || normalizar(i.nome).includes(termo))
+      .slice(0, 30);
+  }, [itens, q]);
+  return (
+    <PopoverPrimitive.Root
+      open={aberta}
+      onOpenChange={(v) => {
+        setAberta(v);
+        if (!v) setQ('');
+      }}
+    >
+      <PopoverPrimitive.Trigger asChild>
+        {flutuante ? (
+          <button
+            type="button"
+            aria-label="Nova conversa"
+            className="fixed right-4 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] z-30 flex size-14 items-center justify-center rounded-2xl bg-menta text-menta-tinta shadow-wpp-pop outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
+          >
+            <MessageSquarePlus className="size-6" aria-hidden="true" />
+          </button>
+        ) : (
+          <BotaoRedondo aria-label="Nova conversa" className="max-md:hidden">
+            <MessageSquarePlus aria-hidden="true" />
+          </BotaoRedondo>
+        )}
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          align="end"
+          side={flutuante ? 'top' : 'bottom'}
+          sideOffset={6}
+          collisionPadding={12}
+          className="z-50 flex max-h-[min(30rem,var(--radix-popover-content-available-height))] w-[20rem] flex-col rounded-2xl border border-wpp-linha bg-popover p-1.5 text-popover-foreground shadow-wpp-pop outline-none"
+        >
+          <p className="mx-2.5 mt-1.5 mb-2 text-xs font-medium text-wpp-suave">
+            Prospectados ainda sem conversa
+          </p>
+          <label className="mx-1 mb-1 flex h-9 items-center gap-2 rounded-full bg-wpp-busca px-3 text-wpp-suave">
+            <Search className="size-4 shrink-0" aria-hidden="true" />
+            <span className="sr-only">Procurar prospectado</span>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Procurar pelo nome"
+              className="h-full min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-wpp-suave md:text-sm"
+            />
+          </label>
+          <div className="min-h-0 overflow-y-auto">
+            {sem.length === 0 ? (
+              <p className="mx-3 my-2.5 text-[13px] text-wpp-suave">
+                {q ? 'Ninguém com esse nome sem conversa.' : 'Todos desta lista já têm conversa.'}
+              </p>
+            ) : (
+              sem.map((i) => (
+                <button
+                  key={i.id}
+                  type="button"
+                  onClick={() => {
+                    setAberta(false);
+                    aoEscolher(i.id);
+                  }}
+                  className="flex min-h-[54px] w-full items-center gap-2.5 rounded-xl px-2.5 text-left outline-none hover:bg-wpp-sel focus-visible:bg-wpp-sel"
+                >
+                  <AvatarDaConversa nome={i.nome} tamanho={36} anel="var(--popover)" />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-medium">{i.nome}</span>
+                    <span className="truncate text-xs text-wpp-suave">
+                      {[i.categoria, local(i.bairro, i.cidade)].filter(Boolean).join(' · ') ||
+                        'sem categoria'}
+                    </span>
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+          <span className="mx-1 my-1.5 h-px shrink-0 bg-wpp-linha" />
+          <Link
+            href="/parceiros"
+            className="flex h-10 items-center gap-2.5 rounded-xl px-3 text-sm hover:bg-wpp-sel"
+          >
+            <Users className="size-4 text-wpp-suave" aria-hidden="true" />
+            Ver todos em Prospectados
+          </Link>
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 }
 
