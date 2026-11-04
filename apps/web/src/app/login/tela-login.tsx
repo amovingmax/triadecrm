@@ -66,11 +66,14 @@ export function TelaLogin({
   next,
   aviso,
   entradaLocal = false,
+  noApp = false,
 }: {
   next: string;
   aviso: AvisoAcesso | null;
   /** CRM no computador, com o banco local: usuários de teste no lugar do Google. */
   entradaLocal?: boolean;
+  /** Dentro do app de celular: o Google entra pela janela segura (`entrada-pelo-app.ts`). */
+  noApp?: boolean;
 }) {
   const { reduzido } = useMovimento();
 
@@ -182,9 +185,16 @@ export function TelaLogin({
 
           <motion.div {...entrada(aviso ? 4 : 3)}>
             {entradaLocal ? (
-              <EntradaLocal next={next} />
+              <div className="space-y-3">
+                <EntradaLocal next={next} />
+                {/* No app de teste, o caminho do Google também fica à mão: a janela
+                    segura abre e mostra estes mesmos usuários de teste. */}
+                {noApp ? (
+                  <BotaoGoogle next={next} noApp rotulo="Testar a janela segura do Google" />
+                ) : null}
+              </div>
             ) : (
-              <BotaoGoogle next={next} rotulo={aviso?.rotuloBotao} />
+              <BotaoGoogle next={next} rotulo={aviso?.rotuloBotao} noApp={noApp} />
             )}
           </motion.div>
 

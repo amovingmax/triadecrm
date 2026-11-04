@@ -10,6 +10,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import type { Empresa } from '@komune/schema/empresas';
 
+import { VOLTA_DO_APP } from '@/lib/auth/entrada-pelo-app';
 import { EMPRESA } from '@/lib/empresa';
 import { supabaseAnonKey, supabaseUrl } from '@/lib/env';
 
@@ -59,6 +60,16 @@ export function destinoSeguro(valor: string | null | undefined): string {
   }
   if (ehRotaPublica(valor)) return ROTA_INICIAL;
   return valor;
+}
+
+/**
+ * O destino depois do login, com a volta do app de celular como única rota pública
+ * aceita. `destinoSeguro` recusa toda rota de `/auth/` (é isso que impede o laço de
+ * login); a volta do app é a exceção, porque é ela que entrega o login ao app
+ * (`lib/auth/entrada-pelo-app.ts`).
+ */
+export function destinoDepoisDoLogin(valor: string | null | undefined): string {
+  return valor === VOLTA_DO_APP ? VOLTA_DO_APP : destinoSeguro(valor);
 }
 
 /**

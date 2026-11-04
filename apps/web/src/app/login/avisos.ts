@@ -9,7 +9,14 @@
 import { UM_ADMIN } from '@/lib/empresa';
 
 export type ChaveAviso =
-  'nao-autorizado' | 'sem-perfil' | 'desativado' | 'provedor' | 'callback' | 'sessao';
+  | 'nao-autorizado'
+  | 'sem-perfil'
+  | 'desativado'
+  | 'provedor'
+  | 'callback'
+  | 'sessao'
+  | 'app'
+  | 'app-codigo';
 
 export interface AvisoAcesso {
   titulo: string;
@@ -61,6 +68,19 @@ export const AVISOS: Record<ChaveAviso, AvisoAcesso> = {
   sessao: {
     titulo: 'Sua sessão expirou.',
     saida: 'Entre de novo para continuar de onde parou.',
+    grave: false,
+  },
+  // O login pelo app de celular (`lib/auth/entrada-pelo-app.ts`): a janela segura não
+  // começou pelo app, ou o caminho foi interrompido no meio.
+  app: {
+    titulo: 'O login pelo app não foi concluído.',
+    saida: 'Toque em Entrar com Google de novo. Se continuar assim, atualize o app.',
+    grave: false,
+  },
+  // O código de uso único já foi usado ou venceu: acontece ao tocar duas vezes.
+  'app-codigo': {
+    titulo: 'O login pelo app expirou antes de terminar.',
+    saida: 'Toque em Entrar com Google de novo.',
     grave: false,
   },
 };

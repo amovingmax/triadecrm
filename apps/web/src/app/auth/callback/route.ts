@@ -4,19 +4,28 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { VOLTA_DO_APP } from '@/lib/auth/entrada-pelo-app';
 import { origemDaRequisicao } from '@/lib/http';
-import { destinoSeguro } from '@/lib/supabase/middleware';
+import { destinoDepoisDoLogin } from '@/lib/supabase/middleware';
 import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const base = origemDaRequisicao(request);
-  const next = destinoSeguro(searchParams.get('next'));
+  const next = destinoDepoisDoLogin(searchParams.get('next'));
+  // No login pelo app de celular, a recusa volta para o app (`/auth/app/volta`), que a
+  // mostra na tela dele; aqui ela ficaria presa na janela segura.
+  const recusar = (motivo: string) =>
+    NextResponse.redirect(
+      next === VOLTA_DO_APP
+        ? `${base}${VOLTA_DO_APP}?erro=${motivo}`
+        : `${base}/login?erro=${motivo}`,
+    );
 
   // O provedor recusou, ou o gatilho da allowlist abortou a criação do usuário.
   if (searchParams.get('error')) {
     const detalhe = searchParams.get('error_description') ?? searchParams.get('error_code');
-    return NextResponse.redirect(`${base}/login?erro=${motivoDoProvedor(detalhe)}`);
+    return recusar(motivoDoProvedor(detalhe));
   }
 
   const code = searchParams.get('code');
@@ -26,10 +35,10 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(`${base}${next}`);
     }
-    return NextResponse.redirect(`${base}/login?erro=${motivoDaTroca(error.message)}`);
+    return recusar(motivoDaTroca(error.message));
   }
 
-  return NextResponse.redirect(`${base}/login?erro=callback`);
+  return recusar('callback');
 }
 
 /** Compara sem acento: a mensagem chega do Postgres, do GoTrue ou já reescrita. */
