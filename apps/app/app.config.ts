@@ -21,6 +21,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name: 'Tríade',
     slug: 'triade',
     version: VERSAO_DA_CASCA,
+    // O endereço de volta do login com Google (`triade://auth`, ver `src/entrada.ts`). No
+    // Expo Go a volta é o próprio projeto (`exp://`), e este esquema só vale no app instalado.
+    scheme: 'triade',
     // A casca é uma WebView: não existe versão de navegador do app (o navegador já tem o site).
     platforms: ['ios', 'android'],
     // "Só celular" (28/10/2026), mas deitado vale: está na auditoria de tamanhos.

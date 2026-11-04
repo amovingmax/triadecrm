@@ -99,8 +99,8 @@ export type RegrasDaCasca = {
   /**
    * Para onde a casca deixa navegar sem sair para o navegador do aparelho: as duas
    * empresas e, no teste, os dois sites deste Mac. O login com Google NÃO entra aqui: o
-   * Google recusa login dentro de WebView (`disallowed_useragent`), e o login do app
-   * vai ser nativo (etapa 4 do plano, `docs/operacao/app-celular.md`).
+   * Google recusa login dentro de WebView (`disallowed_useragent`). Ele acontece na
+   * janela segura do iPhone (`entrada.ts`), e o site entrega o resultado à casca.
    */
   hosts: string[];
   /** No ar, só https. No teste, o site do Mac é http. */

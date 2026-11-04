@@ -3,9 +3,9 @@ import { partesDoEndereco, type RegrasDaCasca } from './ambiente';
 /**
  * Para onde vai cada endereço que o site tenta abrir na janela principal:
  *   · `app`    abre dentro da casca (as duas empresas e, no teste, o site do Mac);
- *   · `fora`   vai para o aparelho: Safari/Chrome para outros sites (inclusive o
- *              login do Google, que recusa WebView), e o app certo para `tel:`,
- *              `mailto:`, `whatsapp:`;
+ *   · `fora`   vai para o aparelho: Safari/Chrome para outros sites, e o app certo
+ *              para `tel:`, `mailto:`, `whatsapp:`. O login com Google não passa por
+ *              aqui: a casca o abre na janela segura antes (`entrada.ts`);
  *   · `nenhum` não abre (endereço quebrado, `javascript:`, `file:`, `data:`).
  *
  * Só a janela principal passa por aqui: um iframe do site (um mapa, um vídeo)

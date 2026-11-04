@@ -1,5 +1,7 @@
 import NetInfo from '@react-native-community/netinfo';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { randomUUID } from 'expo-crypto';
+import { openAuthSessionAsync } from 'expo-web-browser';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,6 +17,13 @@ import { WebView, type WebViewProps } from 'react-native-webview';
 
 import { FUNDO, MARCA_NO_USER_AGENT, ambienteDoApp, regrasDaCasca } from './ambiente';
 import { AVISAR_COR_DA_BARRA, corDaMensagem, estiloDaBarra } from './cor-da-barra';
+import {
+  enderecoDepoisDaJanela,
+  enderecoDoInicio,
+  lerDevolucao,
+  origemDoInicio,
+  voltaDoApp,
+} from './entrada';
 import { destinoDoEndereco } from './navegacao';
 import { FUNDO_SEM_INTERNET, SemInternet } from './sem-internet';
 
@@ -30,6 +39,11 @@ const DICA_DO_TESTE =
   ambiente === 'local'
     ? `O app procura o Tríade em ${regras.inicio}. O site para o celular está ligado? (pnpm -C apps/app site)`
     : undefined;
+// Para onde o site devolve o login com Google (`entrada.ts`).
+const VOLTA_DO_LOGIN = voltaDoApp(
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient,
+  Constants.expoConfig?.hostUri,
+);
 
 function abrirNoAparelho(endereco: string) {
   // Sem app no aparelho para o endereço (um esquema desconhecido): não há o que fazer.
@@ -42,6 +56,8 @@ function abrirNoAparelho(endereco: string) {
  * O que ela faz, e nada além disso:
  *   · se identifica pelo user-agent (`TriadeApp/<versão>`);
  *   · só navega dentro das duas empresas; o resto vai para o aparelho (`navegacao.ts`);
+ *   · abre o login com Google na janela segura do iPhone e entrega o resultado ao site
+ *     (`entrada.ts`), porque o Google recusa login dentro da WebView;
  *   · pinta a faixa do relógio com a cor do tema do site (`cor-da-barra.ts`);
  *   · mostra "Sem internet" quando o site não abre e volta sozinha com a conexão;
  *   · no Android, o botão voltar volta uma página antes de sair do app.
@@ -90,9 +106,41 @@ function Tela() {
     return () => assinatura.remove();
   }, []);
 
+  // Uma janela segura por vez: um segundo toque em "Entrar com Google" com ela aberta
+  // não abre outra.
+  const entrando = useRef(false);
+
+  async function entrarPelaJanela(origem: string) {
+    if (entrando.current) return;
+    entrando.current = true;
+    try {
+      const estado = randomUUID();
+      const resultado = await openAuthSessionAsync(
+        enderecoDoInicio(origem, estado, VOLTA_DO_LOGIN),
+        VOLTA_DO_LOGIN,
+        // Sem guardar cookie no Safari: o login vale só para o app, e o iPhone dispensa
+        // a pergunta "quer usar google.com para entrar?".
+        { preferEphemeralSession: true },
+      );
+      // Fechou sem entrar: a tela de login continua onde estava.
+      if (resultado.type !== 'success') return;
+      const destino = enderecoDepoisDaJanela(origem, lerDevolucao(resultado.url, estado));
+      webview.current?.injectJavaScript(
+        `window.location.replace(${JSON.stringify(destino)});true;`,
+      );
+    } finally {
+      entrando.current = false;
+    }
+  }
+
   const aoNavegar: WebViewProps['onShouldStartLoadWithRequest'] = (pedido) => {
     // Iframes do site (um mapa, um vídeo) carregam dentro do próprio quadro.
     if (pedido.isTopFrame === false) return true;
+    const origemDoLogin = origemDoInicio(pedido.url, regras);
+    if (origemDoLogin) {
+      void entrarPelaJanela(origemDoLogin);
+      return false;
+    }
     const destino = destinoDoEndereco(pedido.url, regras);
     if (destino === 'fora') abrirNoAparelho(pedido.url);
     return destino === 'app';
