@@ -8507,3 +8507,29 @@ Outras mudanças:
 - o logo da KOMUNE para a tela de entrada (mandar o arquivo);
 - se quiser na KOMUNE algum dos módulos da Imova (atitude, ficha automática, IA que lê o cliente, ligação pelo WhatsApp): cada um tem custo ou regra própria e pede decisão;
 - as branches não publicadas que mexem nos mesmos arquivos (`cadastrar-clientes`, `pedir-reenvio`, `parceiros-na-imova`) vão precisar ser refeitas sobre a tela nova.
+
+## 04/11/2026 (noite) — A ficha do parceiro e do cliente mais organizada, principalmente no celular (RF-BAS-01, PRD §8)
+
+Pedido do usuário, com três fotos da ficha da Ana Paula (teste) no app da Imova: "Preciso que essa tela seja mais organizada, tem muitas coisas e informações que estão bagunçadas e dificultando o entendimento [...] Foque em deixar mais responsivo também". Ele viu o protótipo com o antes e o depois (https://claude.ai/artifact/PTLwqT5S3rnt23CkEzj94d) e aprovou: "Ficou muito bom. Quero que suba essa alteração para o ar".
+
+**Feito (vale nas duas empresas; só a ficha usa estas peças):**
+- **As ações do topo cabem numa linha.** No celular são blocos com o ícone em cima e o nome embaixo: Conversar, Registrar, Ligar (quando há telefonia) e Mais. Antes o "⋯" descia sozinho para a segunda linha. A partir de `sm` continuam as pílulas. Medido de 320 a 430 px: com os quatro botões da KOMUNE, abaixo de 360 px o nome usa 10,5 px e o "Mais" fica com 48 px.
+- **A próxima ação virou um bloco em destaque no celular**, na largura toda. Era meia coluna, com nove linhas espremidas contando a origem. No computador ela ganhou a coluna mais larga e mostra duas linhas, em vez de cortar em "Perguntar o que ele pr…".
+- **Último contato, WhatsApp e Responsável viraram linhas no celular**, com o rótulo à esquerda. No computador continuam as colunas.
+- **Nada repetido:**
+  - a sugestão da IA não se repete no cartão "Leitura da IA" quando é a mesma frase da próxima ação (`mesmaFrase`);
+  - o "Abrir a conversa" saiu do título do cartão "Atividade" e virou "Ver a conversa inteira", no fim, quando a lista não mostra tudo.
+- **A tarefa do guardrail de PII em português claro.** O título técnico ocupava 14 linhas no celular. Na ficha ela aparece como "Ler a conversa você mesmo", com o motivo embaixo: "A IA não leu: havia telefone nas mensagens" (`avisoDaIa`, com teste). O texto original continua na tarefa e em `ai_runs`.
+- **Linhas que não espremem a 320 px:**
+  - o selo "atrasada" fica embaixo do título da tarefa;
+  - a data da atividade desce quando não cabe ao lado do título;
+  - as etiquetas da leitura da IA ocupam a largura do cartão.
+- **"← Parceiros" virou "← Prospectados"**, o nome que a barra de baixo mostra.
+- **Verificado:**
+  - fotos antes e depois a 390, 320 e 1280 px, na Imova (Ana Paula) e na KOMUNE (DJ Done), sem estouro de largura;
+  - nesta cópia da main: typecheck, lint do site inteiro e os 1.523 testes, com 3 novos.
+  - A comparação tela a tela das 22 telas não rodou, porque a mudança não é do app. Os cinco arquivos tocados só são importados pela página da ficha (`parceiros/[id]/page.tsx`).
+
+**Pendente:**
+- A tarefa de bloqueio continua com o título técnico no Meu dia e na Agenda. O título nasce no worker de IA (`abrirTarefaDeBloqueio`), e trocar o texto lá muda o worker publicado na Imova.
+- A branch `parceiros-na-imova` (não publicada) troca o nome da lista na Imova e vai encontrar o "← Prospectados" novo.
