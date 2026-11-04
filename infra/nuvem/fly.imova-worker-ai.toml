@@ -1,0 +1,57 @@
+# =============================================================================
+# imova-worker-ai no Fly.io — a IA da IMOVA, que lê o cliente (04/11/2026)
+# =============================================================================
+#
+# O mesmo worker da KOMUNE (`fly.worker-ai.toml`), o mesmo Dockerfile e o mesmo
+# comando `ai`. A empresa não está no código: ele trabalha para quem lhe dá as
+# chaves, e na Imova (`public.empresa_do_banco()`) só roda a `leitura-do-cliente`
+# e descarta da fila os trabalhos com prompt da KOMUNE.
+#
+# Decisão de 03/11/2026: uma IA independente por empresa, nunca um processo
+# atendendo as duas. Por isso é um app separado, e não um comando a mais no
+# `imova-worker-wa`: publicar este app nunca reinicia o robô do WhatsApp.
+#
+# Mora na mesma conta do Fly que o `triade-worker-ai`, como o `imova-worker-wa`.
+# O NOME DO APP ESTÁ AQUI DENTRO DE PROPÓSITO: nunca use `fly.worker-ai.toml` para
+# a Imova, e passe `--app imova-worker-ai` em todo comando.
+#
+# Publicar (da RAIZ do repositório, de uma cópia limpa do commit), só DEPOIS da
+# migração 20261103140000 e do bloco 12e do seed no banco da Imova — sem eles o
+# worker não acha `app.ia_entrada_do_cliente` e a fila tem trabalhos da KOMUNE:
+#   fly deploy . --config infra/nuvem/fly.imova-worker-ai.toml --dockerfile apps/workers/Dockerfile
+#
+# Segredos por `fly secrets set --app imova-worker-ai` (nunca neste arquivo):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY — os do `.env.imova`, os mesmos do
+#                                             `imova-worker-wa`
+#   ANTHROPIC_API_KEY — a chave `imova-worker-ai` do workspace Imova
+#                       (wrkspc_01FThHJYb4UJwmyhgV1qk7eY) na conta Anthropic da
+#                       KOMUNE, com teto de US$ 15/mês no Console
+# Sem GROQ_API_KEY: a Imova não transcreve áudio pela IA.
+#
+# ATENÇÃO AO CUSTO: dois freios. O do CRM é `ia.orcamento` no banco da Imova
+# (US$ 10, para a leitura a partir de 80%); o da Anthropic é o teto do workspace.
+# =============================================================================
+
+app = "imova-worker-ai"
+primary_region = "gru"
+
+# O SIGTERM acorda o descanso (lib/dormir.ts) e o worker termina o trabalho atual
+# antes de sair. A leitura do cliente é Haiku com saída estruturada; os 70 s são os
+# mesmos da KOMUNE, por folga.
+kill_signal = "SIGTERM"
+kill_timeout = "70s"
+
+[env]
+  WORKER_COMANDO = "ai"
+  NODE_ENV = "production"
+  TZ = "America/Fortaleza"
+
+# Caiu, volta. O que estava na fila continua na fila — a `pgmq` devolve a mensagem
+# quando o visibility timeout expira, e a chave de idempotência impede pagar duas
+# vezes pela mesma leitura.
+[[restart]]
+  policy = "always"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
