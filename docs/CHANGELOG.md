@@ -8480,3 +8480,30 @@ Outras mudanças:
 **Pendente:**
 - o usuário conferir na Imova em produção, no computador e no iPhone (o teclado no Safari, com o diário só no `next dev`);
 - a KOMUNE e o Concluir nela, quando o usuário decidir (branch local `concluir-na-komune`).
+
+## 04/11/2026 (noite) — Conversas no jeito do WhatsApp e Concluir também na KOMUNE (RF-CON-04, RF-CON-05)
+
+**Pedido do usuário:** "Quero que todas as mudanças que fizemos na aba de conversas da Imova sejam feitas para o CRM da Komune também". Foram para a KOMUNE a tela de Conversas no jeito do WhatsApp (lista, conversa, dados do contato, tela de entrada, teclado do celular) e o Concluir. O que é módulo só da Imova e não é desta tela continua desligado na KOMUNE: a atitude do cliente, a ficha automática, a IA que lê o cliente e a ligação pelo WhatsApp (a KOMUNE liga pela Twilio).
+
+**Código:** `concluirConversa` ligado nas duas empresas e `20261104130000_concluir_tambem_na_komune.sql` (`app.concluir_ligado()` verdadeiro); pgTAP 93, 122 e o teste da URL `?concluidas=1` nas duas. Sem logo da KOMUNE no repositório, a tela de entrada dela mostra a marca do Tríade com o nome.
+
+**O que o banco da KOMUNE recebeu** (as 6 migrações que estavam fora dela desde 29/10, mais as 2 do Concluir). Antes de publicar, conferido migração por migração e ensaiado num banco no mesmo ponto da produção dela (165 migrações, semente da KOMUNE, 100 parceiros e duas conversas, uma arquivada), com a foto do banco antes e depois:
+- nenhuma mexe em parceiro, negócio, conversa ou mensagem (as somas de conferência bateram), nenhuma põe gatilho novo em `messages`, `conversations`, `deals`, `organizations` ou `contacts`, e nenhuma troca função do caminho de envio e entrada do WhatsApp;
+- a atitude e a ficha não criam nada num banco que diz ser da KOMUNE (sem efeito lá, de propósito); a tela não as pede quando o módulo está desligado;
+- a ligação pelo WhatsApp cria as tabelas dela, a chave desligada (`whatsapp.ligacao`) e dois agendamentos (`wa_chamadas_fechar_orfas` a cada 5 min e `wa_permissoes_conferir_pedidos` a cada minuto), que na KOMUNE não acham nada para fazer (rodados no ensaio: 0 e 0);
+- a IA acrescenta o preço do Haiku 5.5 e uma função que só a Imova usa;
+- o Concluir troca `app.messages_desarquiva` (a saída de uma pessoa do time traz a conversa de volta, e uma falha nessa volta nunca derruba o envio) e `app.conversas_esperando_gente` (a concluída sai do Meu dia), as duas a partir da versão mais nova que existia (02/10).
+- **Verificado:** typecheck e lint limpos; Vitest 1.520 no site e 111 no schema; pgTAP do zero com a semente da KOMUNE: só as falhas antigas da `main` (52 e 107), com o 93 e o 122 passando; no ensaio da produção da KOMUNE passaram o 93, o 122, o 119 (ligação perdida) e o 118 (ligação pelo WhatsApp). O site local da KOMUNE, com o banco local no mesmo estado, abriu Conversas, Concluídas, a conversa com Concluir e Ligar, os dados do contato e a ficha do parceiro sem erro no console e sem pedido recusado pelo banco, no computador e a 390×844.
+
+**Publicado:**
+- `main` `0291b82`.
+- Banco da Imova primeiro (a ordem do `publicar-banco.mjs`): só a `20261104130000`, sem efeito lá (a chave já era verdadeira).
+- Banco da KOMUNE: as 8 migrações, por `publicar-banco.mjs komune migrar`. Conferido em produção: 173 migrações, `app.concluir_ligado()` verdadeiro, ligação pelo WhatsApp desligada, tabelas da atitude e da ficha não criadas, robô do WhatsApp batendo (último sinal 2 s antes) antes e depois.
+- Site da KOMUNE `triade-nw1hnpdv0` (de `0291b82`, cópia limpa em `~/triadecrm-publicar-komune`), em `triade-crm-tawny.vercel.app` e `ir.komune.app.br`; volta: `triade-12rd66zs6`. Com isso o ar da KOMUNE volta a estar na `main` (o `1e3e2a7` de 03/11 fica para trás). Conferido de fora: `/login` 200, papel de parede 200, `/auth/dev` e `/auth/dev/teclado` 404, `/conversas` sem login vai para o login. A tela com login não foi aberta em produção (login pelo Google).
+- A Imova não foi republicada: o código novo só muda a KOMUNE, e o site dela segue em `c4e3741` (`imova-i50bwhgai`). Robôs das duas empresas intocados.
+
+**Pendente:**
+- o usuário conferir a KOMUNE em produção, no computador e no iPhone;
+- o logo da KOMUNE para a tela de entrada (mandar o arquivo);
+- se quiser na KOMUNE algum dos módulos da Imova (atitude, ficha automática, IA que lê o cliente, ligação pelo WhatsApp): cada um tem custo ou regra própria e pede decisão;
+- as branches não publicadas que mexem nos mesmos arquivos (`cadastrar-clientes`, `pedir-reenvio`, `parceiros-na-imova`) vão precisar ser refeitas sobre a tela nova.
