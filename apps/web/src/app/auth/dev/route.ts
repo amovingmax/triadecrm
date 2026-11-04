@@ -7,11 +7,16 @@
  * deixam (`lib/auth/entrada-local.ts`); fora delas, responde 404.
  *
  * Quem abre o link no endereço do outro papel é mandado para o endereço certo
- * antes de entrar (ver `USUARIOS_DE_TESTE`).
+ * antes de entrar (ver `USUARIOS_DE_TESTE`). No celular de teste não: lá é um
+ * papel por vez (ver abaixo).
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { entradaLocalLigada, USUARIOS_DE_TESTE } from '@/lib/auth/entrada-local';
+import {
+  enderecoDaRedeLocal,
+  entradaLocalLigada,
+  USUARIOS_DE_TESTE,
+} from '@/lib/auth/entrada-local';
 import { createClient } from '@/lib/supabase/server';
 import { destinoSeguro } from '@/lib/supabase/middleware';
 
@@ -31,9 +36,13 @@ export async function GET(request: NextRequest) {
   // primeiro desenho desta rota entrava em laço de redirecionamento por isso).
   const [hostDaAba = '', porta = '3000'] = (request.headers.get('host') ?? '').split(':');
   const origem = (host: string) => `http://${host}:${porta}`;
+  // O celular de teste abre o site pelo endereço do computador na rede: lá não há a
+  // aba do outro papel para proteger, e `localhost` seria o próprio celular. Entra
+  // ali mesmo, um papel por vez.
+  const hostCerto = enderecoDaRedeLocal(hostDaAba) ? hostDaAba : usuario.host;
 
-  if (hostDaAba !== usuario.host) {
-    const aqui = new URL('/auth/dev', origem(usuario.host));
+  if (hostDaAba !== hostCerto) {
+    const aqui = new URL('/auth/dev', origem(hostCerto));
     aqui.searchParams.set('quem', quem);
     aqui.searchParams.set('next', destino);
     return NextResponse.redirect(aqui);
@@ -50,5 +59,5 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-  return NextResponse.redirect(`${origem(usuario.host)}${destino}`);
+  return NextResponse.redirect(`${origem(hostCerto)}${destino}`);
 }
