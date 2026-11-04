@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { IconeGoogle } from '@/components/icone-google';
 import { Button } from '@/components/ui/button';
+import { INICIO_DO_APP } from '@/lib/auth/entrada-pelo-app';
 import { createClient } from '@/lib/supabase/client';
 
 /**
@@ -19,9 +20,16 @@ import { createClient } from '@/lib/supabase/client';
 export function BotaoGoogle({
   next,
   rotulo = 'Entrar com Google',
+  noApp = false,
 }: {
   next: string;
   rotulo?: string;
+  /**
+   * Dentro do app de celular. O Google recusa login em WebView, então o botão abre
+   * `/auth/app/google`, que o app intercepta para abrir a janela segura do iPhone
+   * (`lib/auth/entrada-pelo-app.ts`).
+   */
+  noApp?: boolean;
 }) {
   const [carregando, setCarregando] = useState(false);
 
@@ -29,6 +37,13 @@ export function BotaoGoogle({
     // `aria-disabled` não bloqueia o clique como `disabled`: a guarda é aqui.
     if (carregando) return;
     setCarregando(true);
+    if (noApp) {
+      window.location.assign(INICIO_DO_APP);
+      // A página não sai daqui: a janela segura abre por cima. Se a pessoa a fechar sem
+      // entrar, o botão precisa voltar a responder.
+      window.setTimeout(() => setCarregando(false), 1500);
+      return;
+    }
     const supabase = createClient();
     const redirectTo = new URL('/auth/callback', window.location.origin);
     redirectTo.searchParams.set('next', next);

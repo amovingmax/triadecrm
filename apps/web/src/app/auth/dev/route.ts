@@ -17,8 +17,8 @@ import {
   entradaLocalLigada,
   USUARIOS_DE_TESTE,
 } from '@/lib/auth/entrada-local';
+import { destinoDepoisDoLogin } from '@/lib/supabase/middleware';
 import { createClient } from '@/lib/supabase/server';
-import { destinoSeguro } from '@/lib/supabase/middleware';
 
 const SENHA = 'teste-local-agenda';
 
@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
 
   const quem = request.nextUrl.searchParams.get('quem') === 'sdr' ? 'sdr' : 'gestor';
   const usuario = USUARIOS_DE_TESTE[quem];
-  const destino = destinoSeguro(request.nextUrl.searchParams.get('next'));
+  // A volta do app de celular também vale: é por ela que o teste do login pelo app passa
+  // pelos usuários de teste dentro da janela segura (`/auth/app/google`, no computador).
+  const destino = destinoDepoisDoLogin(request.nextUrl.searchParams.get('next'));
 
   // O endereço de verdade sai do cabeçalho `Host`: em `next dev`, `request.url` e
   // `nextUrl` dizem `localhost` mesmo quando a aba abriu `127.0.0.1` (medido: o
