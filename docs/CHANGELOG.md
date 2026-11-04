@@ -8523,7 +8523,6 @@ Primeiro passo do app de celular (`docs/operacao/app-celular.md`). A regra, deci
 - Contas da Apple e do Google Play (Rafael).
 - Liberar o push para ler as mensagens que chegam (usuário).
 - Trecho da mensagem na tela bloqueada (Dennis).
-=======
 
 ## 29/10/2026 — O app de celular passa do Capacitor para o Expo (branch `app-celular`; PRD §8)
 
@@ -8563,8 +8562,6 @@ Decisão do usuário: "quero usar o EXPO para criar o app". A casca do Capacitor
 **Precisa de decisão humana:**
 - A conta Expo (grátis) já existe por causa do Expo Go (`rafaelabreu-2`, pessoal). Para o EAS Build e o EAS Submit, decidir se o app fica nela ou numa organização da KOMUNE no Expo. O código da casca e o certificado de assinatura ficam nos servidores do Expo. O plano grátis tem cota mensal de builds; o plano pago, se a cota apertar, é decisão do Rafael.
 - As decisões de 28/10 continuam abertas: identificador e nome, contas da Apple e do Google Play, push lendo mensagens e trecho na tela bloqueada.
-<<<<<<< HEAD
->>>>>>> 965e272 (CHANGELOG e guia do app: a casca em Expo e o teste no iPhone pelo Expo Go)
 
 ## 03/11/2026 — App de celular: vistoria das telas e a ligação pelo WhatsApp clara no celular da Imova (branch `app-celular`; RF-CON-18, PRD §8)
 
@@ -8618,3 +8615,26 @@ Decisão do usuário: "quero usar o EXPO para criar o app". A casca do Capacitor
 
 **Precisa de decisão humana:**
 - As três perguntas de 03/11 continuam abertas: login pela janela segura do Google, quem tem a conta Apple da KOMUNE e conta Expo pessoal ou da empresa.
+
+## 04/11/2026 — App de celular em dia com a main: Conversas no jeito do WhatsApp, leitura da IA e Concluir (branch `app-celular`; PRD §8)
+
+Pedido do usuário: "atualize isso para quando eu testar o app na Expo está tudo atualizado".
+
+**Feito:**
+- **A branch foi refeita em cima da main nova** (`0291b82`), levando só os commits do app, e a anterior ficou guardada como `app-celular-ate-03-11`. Ficaram de fora:
+  - **a junção do Concluir antigo**, porque a main tem a própria versão, com outros commits e a migração com data nova;
+  - **os dois commits da entrada de teste pelo endereço da rede e pelo nome `.local`**, porque a main já tem os dois desde `774adce`, que também traz o `randomUUID` fora do https;
+  - **o "Ligar" com a palavra no cabeçalho do celular** (`1620664`). A tela de Conversas no jeito do WhatsApp, aprovada e publicada na Imova depois dele, reescreveu o cabeçalho e mostra a ligação como o ícone de telefone, como no WhatsApp. O commit ficou guardado na `app-celular-ate-03-11`, à espera da decisão do usuário.
+- **Bancos de teste:** a KOMUNE já tinha todas as migrações da main. Na Imova, apliquei a `20261104130000_concluir_tambem_na_komune`, que lá não muda nada.
+- **Leitura da IA no teste:** o banco de teste da Imova tem 19 leituras gravadas (`leitura-do-cliente@v1`, de 30/10), que aparecem no app como quente, morno ou frio. Leitura nova no teste só sai com o worker de IA ligado no Mac, e isso gasta na conta da Anthropic.
+- **Conferido no tamanho de iPhone, com a marca do app:**
+  - Conversas da KOMUNE e da Imova sem estourar a largura;
+  - na KOMUNE, a gaveta "Concluídas";
+  - na Imova, os selos "Ligação perdida" e "Interessado";
+  - na conversa do Lucas Andrade, o selo "Morno" da leitura da IA e o telefone no cabeçalho.
+- **Verificado:** site com 1.520 testes e tipos; app com lint, tipos, 20 testes e empacotamento.
+- Tirei três marcas de conflito que tinham entrado no CHANGELOG ao refazer a branch.
+
+**Precisa de decisão humana:**
+- Recolocar o "Ligar" com a palavra por cima da tela nova, ou ficar com o ícone do jeito do WhatsApp.
+- As três perguntas de 03/11 continuam abertas: login no app, conta Apple e conta Expo.
