@@ -8668,3 +8668,42 @@ Pedido do usuário, com três fotos da ficha da Ana Paula (teste) no app da Imov
 
 **Precisa de decisão humana:**
 - Aprovar o desenho novo da ficha. No computador também muda: a coluna da próxima ação ficou mais larga, e o selo da tarefa foi para baixo do título.
+
+## 04/11/2026 (noite) — Login com Google dentro do app de celular, pela janela segura do iPhone (branch `app-celular`; RF-ADM-01, PRD §8)
+
+Pedido do usuário: "Faça logo o login com o Google".
+
+**Feito:**
+- **O caminho.** O Google recusa login em WebView, e o app mandava o login para o Safari, de onde a pessoa não voltava logada. Agora:
+  - a casca intercepta `/auth/app/google`, sorteia um estado e abre a janela segura do iPhone (`ASWebAuthenticationSession`, pelo `expo-web-browser` 58.0.6);
+  - o site faz o login com Google lá, pelo mesmo Supabase do navegador;
+  - `/auth/app/volta` gera um código de uso único (link mágico do Supabase, sem e-mail) e devolve a `triade://auth`, ou ao Expo Go do Mac;
+  - a casca confere o estado e abre `/auth/app/entrar` na WebView, que fica logada.
+  - Desenho em `apps/web/src/lib/auth/entrada-pelo-app.ts`; guia em `docs/operacao/app-celular.md`, seção "Login com Google".
+- **Site** (rotas novas `/auth/app/google`, `/auth/app/volta` e `/auth/app/entrar`):
+  - `/auth/callback` aceita a volta do app (`destinoDepoisDoLogin`) e manda a recusa para o app;
+  - o botão "Entrar com Google" toma o caminho novo só com a marca `TriadeApp/` no user-agent;
+  - dois avisos novos no login (`app`, `app-codigo`).
+  - O navegador do computador e do celular segue igual: conferido que a recusa do botão do navegador continua em `/login?erro=…` e que o botão novo de teste não aparece fora do app.
+- **App:** `src/entrada.ts` (com teste), a janela segura na casca (`preferEphemeralSession`, sem cookie no Safari), o esquema `triade` no `app.config.ts` e o `expo-crypto` 58.0.7 para o estado.
+- **Segurança:**
+  - o código só vai para `triade://auth` ou para `exp://` de endereço da rede local (o Expo Go do Mac), nunca para um site;
+  - sem o cookie da ida, a volta não gera nada;
+  - sem o estado sorteado pelo app, a casca não usa o código;
+  - o código vale uma vez.
+- **Teste do Mac:** sem Google no Supabase local, a tela de login do app mostra também "Testar a janela segura do Google", e a janela abre com os usuários de teste.
+- **Verificado:**
+  - de ponta a ponta nas duas empresas de teste (KOMUNE 3100 e Imova 3101): ida, usuário de teste, volta com o estado certo, WebView logada em `/meu-dia`, código reusado recusado (`app-codigo`), volta sem cookie recusada, volta para um site recusada, sem estado recusado;
+  - recusa do Google ("cancelou" e "e-mail sem acesso") voltando ao app com o aviso certo;
+  - site: tipos, lint e 1.532 testes (9 novos);
+  - app: tipos, lint, 27 testes (6 novos) e empacotamento do iPhone.
+  - **Não testado no iPhone de verdade**, nem com o Google de verdade.
+
+**Pendente:**
+- O usuário reiniciar o `pnpm -C apps/app start` (módulos novos) e testar no iPhone pelo botão de teste.
+- **Para o Google de verdade:**
+  - publicar o site (com a comparação tela a tela antes, porque é mudança feita para o app);
+  - conferir se a volta `/auth/callback?next=/auth/app/volta` passa na lista de endereços de retorno do Supabase das duas empresas. Não consegui ler a configuração daqui;
+  - abrir o app no ambiente `producao`.
+- Tirar a volta pelo Expo Go (`exp://`) quando a equipe usar o app instalado.
+- Login com Apple: depende da chave da conta Apple da KOMUNE.

@@ -16,7 +16,9 @@ Decisão do usuário em 28/10/2026: "transformar a versão do mobile em app, sem
 - **O que o app fizer de diferente no site entra atrás da marca do app.** A casca acrescenta `TriadeApp/<versão>` ao user-agent (`apps/app/src/ambiente.ts`). Sem essa marca, no PC ou no navegador do celular, o site segue exatamente como está.
 - **Antes de publicar qualquer mudança no site feita para o app**, rodar a comparação tela a tela (`docs/operacao/comparar-versoes.md`): as 22 telas, gestor e SDR, PC e celular, têm de sair iguais à versão no ar.
 
-A única mudança no site até aqui é da entrada de teste, que só existe em `next dev` (em produção a rota dá 404): ela aceita o Supabase local também pelo endereço do Mac na rede, que é como o celular o enxerga (`apps/web/src/lib/auth/entrada-local.ts`).
+As mudanças no site feitas para o app:
+- **A entrada de teste**, que só existe em `next dev` (em produção a rota dá 404): ela aceita o Supabase local também pelo endereço do Mac na rede, que é como o celular o enxerga (`apps/web/src/lib/auth/entrada-local.ts`).
+- **O login com Google pela janela segura** (04/11/2026, `apps/web/src/lib/auth/entrada-pelo-app.ts` e `apps/app/src/entrada.ts`). O botão "Entrar com Google" só toma o caminho novo com a marca do app no user-agent. As rotas `/auth/app/*` só respondem a quem chega pela janela segura do app. Veja "Login com Google" abaixo.
 
 ## Como está organizado
 
@@ -25,7 +27,8 @@ A única mudança no site até aqui é da entrada de teste, que só existe em `n
 | `apps/app/src/ambiente.ts` | Os dois ambientes, de onde o app abre o Tríade, os hosts da casa e a marca no user-agent. Não importa nada do React Native: roda no `app.config.ts`, na casca e no Vitest. |
 | `apps/app/src/navegacao.ts` | Para onde vai cada endereço: dentro do app (as duas empresas), para o aparelho (outros sites, login do Google, `tel:`, `mailto:`, `whatsapp:`) ou nada (`javascript:`, `file:`, `data:`). |
 | `apps/app/src/cor-da-barra.ts` | A faixa do relógio acompanha o tema do site, como no Safari: a casca lê o `<meta name="theme-color">` que o site já troca entre claro e escuro. |
-| `apps/app/src/casca.tsx` | A WebView, as bordas do aparelho, o botão voltar do Android e a volta sozinha depois de "Sem internet". |
+| `apps/app/src/casca.tsx` | A WebView, as bordas do aparelho, o botão voltar do Android, a volta sozinha depois de "Sem internet" e a janela segura do login. |
+| `apps/app/src/entrada.ts` | O login com Google do lado do app: reconhece o pedido do site, monta a ida e a volta da janela segura e confere o estado. |
 | `apps/app/src/sem-internet.tsx` | A tela "Sem conexão" do protótipo. |
 | `apps/app/app.config.ts` | Nome, identificador, permissões e o ambiente (`TRIADE_APP_AMBIENTE`). Os projetos nativos (`ios/`, `android/`) nascem dele a cada build e não vão para o git. |
 | `apps/app/scripts/site-na-rede.ts` | Liga o site para o celular de teste (`pnpm -C apps/app site`). |
@@ -71,13 +74,33 @@ Precisa de: Supabase local de pé (`supabase start`), o iPhone no mesmo Wi-Fi do
 
 **Mac com mais de uma rede:** se o app procurar o Tríade no endereço errado, fixe o mesmo endereço nos dois comandos: `TRIADE_IP_DO_MAC=192.168.0.10 pnpm -C apps/app site` e `REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.10 pnpm -C apps/app start`.
 
+## Login com Google
+
+O Google recusa login dentro de WebView (`disallowed_useragent`). Por isso o login acontece na **janela segura do iPhone** (`ASWebAuthenticationSession`, pelo `expo-web-browser`), a mesma folha que outros apps abrem para "Entrar com Google":
+
+1. No app, "Entrar com Google" abre `/auth/app/google`. A casca intercepta esse endereço, sorteia um estado e abre a janela segura.
+2. Na janela, o site guarda o estado e a volta num cookie e manda para o Google, pelo mesmo Supabase do navegador. A volta do Google é `/auth/callback?next=/auth/app/volta`.
+3. `/auth/app/volta` gera um código de uso único para o mesmo e-mail (link mágico do Supabase, sem e-mail nenhum) e redireciona para a volta do app. A janela fecha, e só o app recebe o código. A sessão da janela é encerrada.
+4. A casca confere o estado e abre `/auth/app/entrar?token=…` na WebView, que fica logada.
+
+**Para onde o código pode ir:** `triade://auth`, o app instalado, ou `exp://<endereço da rede local>:<porta>/--/auth`, o Expo Go servido pelo Mac. Nunca um site, nem um Expo Go com endereço público. A volta do Expo Go sai quando a equipe passar a usar o app instalado.
+
+**Recusas** (cancelou no Google, e-mail sem acesso, conta sem perfil): voltam para o app, que mostra o aviso na tela de login. Na janela, a pessoa ficaria presa.
+
+**No teste do Mac** não há Google: a tela de login do app mostra também "Testar a janela segura do Google". A janela abre com os usuários de teste, e o resto do caminho é o mesmo do ar. Para testar, saia do Tríade no app (menu da conta → Sair) e toque nesse botão.
+
+**No ar** precisa:
+- do site publicado com as rotas `/auth/app/*`;
+- da volta `/auth/callback?next=/auth/app/volta` aceita na lista de endereços de retorno do Supabase de cada empresa. O botão do navegador já usa `/auth/callback?next=…`;
+- do app aberto no ambiente `producao` (`TRIADE_APP_AMBIENTE=producao pnpm -C apps/app start`).
+
 ## Versões
 
 Expo 58.0.11 com React Native 0.88.0, a primeira combinação do SDK 58 com o React Native final, que completou duas semanas em 29/10/2026. O `expo install --check` pede patches mais novos (58.0.21, RN 0.88.1), que ainda não têm duas semanas. O Expo Go confere só o SDK, então isso não impede o teste.
 
 ## Limites conhecidos desta versão
 
-- **Login com Google vai para o Safari.** O Google recusa login dentro de WebView (`disallowed_useragent`). Por isso, a casca manda esse endereço para o navegador do aparelho, em vez de mostrar a página de erro do Google. O login nativo com Google e Apple é a etapa 4.
+- **Login com Apple ainda não existe.** O Google entra pela janela segura (acima). A Apple precisa da chave da conta Apple da KOMUNE e de uma versão instalável do app, porque no Expo Go o app tem o identificador do Expo.
 - **Downloads por blob** (CSV e XLSX dos relatórios, exportação do parceiro) não salvam dentro do app. É um dos ajustes do site atrás da marca do app.
 - **Ícone e tela de abertura são os padrões do Expo.** Faltam os da marca.
 - **A tela "Sem internet" usa a fonte do sistema.** A Plus Jakarta Sans entra junto com o ícone da marca.
@@ -89,7 +112,7 @@ Expo 58.0.11 com React Native 0.88.0, a primeira combinação do SDK 58 com o Re
 1. Proteção: a comparação tela a tela do PC e do celular antes de cada publicação do site.
 2. Ajustes de tamanho, só dentro do app.
 3. **Casca no iPhone** (Expo desde 29/10/2026: a casca empacota para iPhone e Android; falta o primeiro teste no aparelho).
-4. Login nativo com Google e Apple, com a escolha da empresa.
+4. Login: **Google pela janela segura** (04/11/2026, conferido no teste; falta o ar). Apple nativo e a escolha da empresa ainda faltam.
 5. Push: mensagem nova, conversa transferida, compromisso marcado, lote para ligar, lembrete 30 min antes e resumo às 8h.
 6. Teste com a equipe: build de desenvolvimento e TestFlight pelo EAS (conta Expo), teste fechado do Google Play.
 7. Distribuição privada: Apple Business Manager e teste fechado.
