@@ -115,9 +115,9 @@ describe('a aba na URL', () => {
     expect(urlDoEstado(FILTROS_VAZIOS, null, 'consultoria')).toBe('?aba=consultoria');
   });
 
-  it('?concluidas=1 só vale onde concluir existe: na KOMUNE o endereço é ignorado', () => {
+  it('?concluidas=1 abre a gaveta das concluídas, nas duas empresas desde 04/11/2026', () => {
     expect(urlDoEstado({ ...FILTROS_VAZIOS, concluidas: true }, null)).toBe('?concluidas=1');
-    expect(estadoDaUrl({ concluidas: '1' }).filtros.concluidas).toBe(false);
+    expect(estadoDaUrl({ concluidas: '1' }).filtros.concluidas).toBe(true);
   });
 
   it('endereço antigo das abas que saíram cai em Conversas (pivô de 06/10/2026)', () => {

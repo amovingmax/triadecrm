@@ -356,11 +356,12 @@ export type FiltrosConversas = {
    */
   arquivadas: boolean;
   /**
-   * SÓ AS CONCLUÍDAS (03/11/2026, Imova). Diferente de `arquivadas`, que junta as
-   * arquivadas às abertas: aqui a lista vira a gaveta das conversas encerradas, e
-   * só elas aparecem. É por onde se acha a conversa de três meses atrás sem ela
-   * poluir a lista de todo dia. Só existe onde o módulo `concluirConversa` está
-   * ligado; na KOMUNE o endereço é ignorado e fica o "Ver arquivadas".
+   * SÓ AS CONCLUÍDAS (03/11/2026; nas duas empresas desde 04/11). Diferente de
+   * `arquivadas`, que junta as arquivadas às abertas: aqui a lista vira a gaveta
+   * das conversas encerradas, e só elas aparecem. É por onde se acha a conversa
+   * de três meses atrás sem ela poluir a lista de todo dia. Só existe onde o
+   * módulo `concluirConversa` está ligado; desligado, o endereço é ignorado e
+   * fica o "Ver arquivadas".
    */
   concluidas: boolean;
   /**

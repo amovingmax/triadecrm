@@ -17,7 +17,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(11);
+select plan(12);
 
 insert into public.allowed_users (email, role, note) values
   ('h93.g@teste.local', 'gestor', 'pgTAP arquivar'),
@@ -123,16 +123,26 @@ values (pg_temp.conv(), 'in'::app.msg_direction, 'text'::app.msg_type,
 select ok(not pg_temp.arquivada(),
   'o parceiro escreveu e a conversa VOLTOU sozinha: arquivar diz "nada a fazer agora", não "não me importa mais"');
 
--- E saída nossa NÃO desarquiva: quem arquivou não quer a conversa de volta
--- porque o robô ou alguém mandou alguma coisa — só porque a pessoa respondeu.
+-- Saída do ROBÔ não desarquiva: quem arquivou não quer a conversa de volta
+-- porque saiu um automático. A de uma PESSOA do time desarquiva desde o Concluir
+-- nas duas empresas (04/11/2026, `app.concluir_ligado`): alguém voltou a conversar.
 select pg_temp.entrar('a0000000-0000-4000-8000-000000009301'::uuid, 'gestor');
 select public.conversa_arquivar(pg_temp.conv());
 select pg_temp.sair();
 insert into public.messages (conversation_id, direction, type, status, body,
+                             template_id, author_kind, origin)
+values (pg_temp.conv(), 'out'::app.msg_direction, 'text'::app.msg_type, 'queued'::app.msg_status,
+        'oi',
+        (select t.id from public.message_templates t
+          where t.template_code = 'GEN-SYS-MENU' and t.is_active),
+        'bot_fixed', 'crm');
+select ok(pg_temp.arquivada(), 'mensagem do ROBÔ não desarquiva: não é ninguém voltando a conversar');
+insert into public.messages (conversation_id, direction, type, status, body,
                              author_kind, sent_by, origin)
 values (pg_temp.conv(), 'out'::app.msg_direction, 'text'::app.msg_type, 'queued'::app.msg_status,
         'oi', 'human', 'a0000000-0000-4000-8000-000000009301'::uuid, 'crm');
-select ok(pg_temp.arquivada(), 'mas mensagem NOSSA não desarquiva: quem volta é a pessoa, não nós');
+select ok(not pg_temp.arquivada(),
+  'mas a de alguém do time desarquiva (Concluir, 03/11/2026): a conversa voltou a andar');
 
 -- =====================================================================
 -- 4. Ninguém arquiva o que não enxerga

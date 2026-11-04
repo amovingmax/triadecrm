@@ -20,7 +20,7 @@ describe('empresas', () => {
       atitudeDoCliente: false,
       ligacaoWhatsapp: false,
       fichaDoCliente: false,
-      concluirConversa: false,
+      concluirConversa: true,
     });
     expect(k.gruposDeCategoria).toEqual({});
     expect(k.origens).toBeNull();

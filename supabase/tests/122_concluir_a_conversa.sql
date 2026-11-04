@@ -1,13 +1,14 @@
 -- =====================================================================
--- pgTAP — Concluir a conversa, só na Imova (migração 20261104120000)
+-- pgTAP — Concluir a conversa (migrações 20261104120000 e 20261104130000)
 --
 -- Pedido de 03/11/2026, para a Imova: concluir tira a conversa da lista sem
 -- perder o histórico, e "assim que formos conversar novamente com esse cliente
 -- devemos ter o histórico". Concluir é o arquivar de 29/09 (pgTAP 93) com duas
 -- regras a mais, e este arquivo prova:
 --
---   1. NA KOMUNE NADA MUDA: a chave é falsa, mensagem do time não traz a
---      conversa de volta e a concluída continua no Meu dia — como no pgTAP 93;
+--   1. NA KOMUNE TAMBÉM, desde 04/11/2026, com a tela de Conversas no jeito do WhatsApp
+--      (migração 20261104130000): a chave é verdadeira, a concluída sai do
+--      Meu dia e a mensagem do time a traz de volta;
 --   2. O WHATSAPP NÃO É TOCADO: concluir não cria mensagem, não põe nada na fila
 --      de saída nem pede nada à Meta (`wa_acoes`), e o histórico fica inteiro;
 --   3. CONCLUÍDA SAI DO MEU DIA na Imova, mesmo com a última palavra do cliente;
@@ -129,18 +130,17 @@ begin
 end $$;
 
 -- =====================================================================
--- 1. Na KOMUNE nada muda
+-- 1. Na KOMUNE também (04/11/2026, Conversas no jeito do WhatsApp)
 -- =====================================================================
 select pg_temp.virar('komune');
 select pg_temp.conversa('k', '+5584999911901');
 
-select ok(not app.concluir_ligado(), 'no banco da KOMUNE a chave de concluir é falsa');
-select is(pg_temp.concluir('k'), 'true', 'arquivar continua funcionando como sempre');
-select ok(pg_temp.no_meu_dia('k'),
-  'e a arquivada continua no Meu dia, como era antes de concluir existir');
+select ok(app.concluir_ligado(), 'no banco da KOMUNE a chave de concluir também é verdadeira');
+select is(pg_temp.concluir('k'), 'true', 'quem atende conclui a conversa na KOMUNE');
+select ok(not pg_temp.no_meu_dia('k'), 'e a concluída sai do Meu dia, como na Imova');
 select pg_temp.saida('k', 'human');
-select ok(pg_temp.concluida('k'),
-  'mensagem do time NÃO desarquiva na KOMUNE: a regra do pgTAP 93 fica intacta');
+select ok(not pg_temp.concluida('k'),
+  'mensagem de alguém do time traz a conversa de volta, como na Imova');
 
 -- =====================================================================
 -- 2. Na Imova, concluir não toca o WhatsApp e não apaga nada

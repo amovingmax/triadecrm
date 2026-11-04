@@ -79,9 +79,10 @@ export interface Empresa {
     fichaDoCliente: boolean;
     /**
      * Concluir a conversa (03/11/2026): o arquivar com nome na tela, a lista de
-     * "Concluídas" e a volta quando alguém do time escreve. Só da Imova até o
-     * usuário aprovar ("ficando bom e sendo aprovado por mim, a gente coloca na
-     * Komune"); na KOMUNE fica o ícone de arquivar. O banco também trava
+     * "Concluídas" e a volta quando alguém do time escreve. Nasceu só na Imova e
+     * foi para a KOMUNE em 04/11/2026, com a tela de Conversas no jeito do
+     * WhatsApp ("todas as mudanças que fizemos na aba de conversas da Imova").
+     * Desligado, volta o ícone de arquivar. O banco também trava
      * (`app.concluir_ligado`).
      */
     concluirConversa: boolean;
@@ -138,7 +139,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       atitudeDoCliente: false,
       ligacaoWhatsapp: false,
       fichaDoCliente: false,
-      concluirConversa: false,
+      concluirConversa: true,
     },
     privacidade: null,
   },
