@@ -8386,3 +8386,74 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 **Pendente:** publicar, com o banco da Imova antes do site. Na KOMUNE a migração não tem efeito. Depois da aprovação, levar para a KOMUNE: ligar `concluirConversa` e `app.concluir_ligado` lá e reescrever a última asserção do pgTAP 93 ("mensagem NOSSA não desarquiva").
 
 **Decisão humana:** aprovar o "Concluir" na Imova e, depois, decidir se ele vai para a KOMUNE.
+
+## 03/11/2026 (noite) — Conversas no jeito do WhatsApp (branch `conversas-whatsapp`; RF-CON-04, RF-CON-05)
+
+**O pedido.** "Quero que somente essa aba de conversas tenha esse layout mais voltado para WhatsApp justamente para facilitar e ser mais prático visualmente. A aba de conversa deve funcionar exatamente como está o protótipo no artifact" (protótipo navegável de 03/11, computador e celular, com o Concluir). O resto do CRM fica com o desenho de sempre.
+
+**Base da branch.** `origin/main` (bff38bd) com os 3 commits do Concluir da Imova (`concluir-conversa`) por cima. O conflito em `tela-conversas.tsx` (a ligação perdida de hoje) foi resolvido juntando as duas.
+
+**Tela** (só `/conversas`; cores `--wpp-*` em `globals.css`, que só esta tela usa):
+- **De ponta a ponta:** a casca tira a margem e o teto de 1400px quando a tela tem `data-tela-cheia`. Lista e conversa dividem um cartão só, como a janela do WhatsApp. Título, abas e busca moram no alto da lista, e a conversa ganhou quase 200px de altura.
+- **Lista:** "Conversas" com "ao vivo", busca em pílula, as abas como pílulas (Conversas, Consultoria, Clientes, Automáticas, Grupos) e "Minhas · Meu setor · Todas" num seletor. Os filtros foram para uma janelinha atrás de um ícone, com o ponto verde quando ligados. "Nova conversa" abre os prospectados sem conversa.
+- **Linha da lista:** retrato com o ponto da temperatura, nome e hora no formato do WhatsApp ("14:28", "Ontem", o dia da semana, a data). Embaixo vêm a prévia com os selos, o número verde de não lidas e os ícones de fixada e silenciada. A aba Clientes usa a mesma linha.
+- **Menu de cada linha:** a setinha ao passar o mouse e o clique direito abrem Concluir/Reabrir, Fixar, Silenciar e Marcar como lida/não lida (`menu-da-linha.tsx`). No celular, o toque longo seleciona a linha (✓ no retrato) e troca o alto da tela pela barra dessas ações.
+- **Concluídas:** a linha no alto da lista, no lugar das "Arquivadas" do WhatsApp, com quantas são no recorte. Ela abre a gaveta com a seta de volta.
+- **Conversa:** cabeçalho do WhatsApp com o retrato, o nome e a temperatura. À direita ficam buscar, Ligar (telefonia pelo navegador da KOMUNE ou ligação pelo WhatsApp da Imova), Concluir, o ícone dos dados do contato e o ⋯ com Concluir no alto. A faixa da concluída ganhou o botão Reabrir.
+- **Dados do contato:** a coluna ao lado no computador (abre pelo nome ou pelo ícone e fica aberta de uma conversa para a outra) e a folha no celular. Mostram a mesma coisa: em que pé está, as ações, a ficha e a leitura da IA, que saíram do alto da conversa.
+- **Fio:** papel de parede bege com desenhos próprios de festa, um ladrilho de 360px (`public/conversas/`, claro e escuro). A janela de 24 h virou a pílula grudada no alto. O dia é a pílula branca, e o que não é mensagem virou cartão translúcido.
+- **Balões:** o enviado é menta e o recebido branco, com a pontinha no primeiro de cada bloco. O nome de quem do time escreveu vai dentro, no alto. A hora e o ✓/✓✓/✓✓ azul vão dentro, no canto. Os selos e o "Virar tarefa" ficam embaixo, este só ao passar o mouse. O recebido não leva mais o nome nem o retrato.
+- **Rolagem:** o aviso "N mensagens não lidas" entra antes da mais antiga delas e fica até a conversa fechar. O botão redondo ⌄ aparece a 200px do fim e desce até a mais recente.
+- **Caixa de escrever:** emoji, anexo e respostas prontas, o texto em pílula e o botão verde de enviar, que vira microfone com a caixa vazia. No celular a pílula leva tudo, e "Nova conversa" é o botão verde do canto.
+- **Conversa de cliente** (`fora-da-base.tsx`): o mesmo cabeçalho, fio, caixa e dados do contato, agora com as pílulas de dia. Grupos e Automáticas entraram no cartão novo, com as abas no alto.
+
+**O Concluir continua só na Imova.** Em 03/11 ele foi ligado também na KOMUNE, lido do pedido ("exatamente como o protótipo", que tem o Concluir). Em 04/11 o usuário pediu para publicar só na Imova, e a ida à KOMUNE voltou a esperar a decisão dele, como no pedido do Concluir ("ficando bom e sendo aprovado por mim, a gente coloca na Komune"). Na KOMUNE o módulo `concluirConversa` segue desligado e a tela mostra o ícone de arquivar e o "Ver arquivadas" de antes. A versão para a KOMUNE (a migração que liga `app.concluir_ligado`, o pgTAP 93 e o do Concluir reescritos e o módulo ligado) ficou guardada na branch local `concluir-na-komune`.
+
+**WhatsApp intocado:** nada no caminho de envio e recebimento (`saida.ts`, `graph.ts`, `entrada.ts`, `wa-webhook`, `messages_guard`, `app.pode_enviar`). As ações novas da lista são as RPCs que já existiam (`conversa_arquivar`, `conversa_fixar`, `conversa_silenciar`, `conversa_marcar_lida`/`_nao_lida`). No ensaio, concluir não criou mensagem.
+
+**Verificado:**
+- typecheck e lint limpos;
+- Vitest: 1.494 no site e 111 no schema;
+- Chrome (Playwright) a 1440×900 e 390×844, claro e escuro: a lista, o menu da linha pelo clique direito, a gaveta, a coluna dos dados do contato, concluir de verdade (sai da lista, contador sobe, faixa e Desfazer; a conversa foi reaberta depois), o toque longo no celular, a folha, Grupos e Automáticas.
+
+**Ajustes depois do primeiro ensaio no celular:**
+- a hora da linha da lista é a da mensagem mais recente ou do último contato registrado, o que vier depois (só o registro deixava "Ontem" numa conversa de agora);
+- "Hoje" e "Ontem" com maiúscula na pílula do dia;
+- `src/instrumentation-client.ts`, só no `next dev`: dá `crypto.randomUUID` ao celular de teste, que abre o site pelo endereço do Mac na rede, sem https. Sem ele, o eco ao vivo e o anexo quebravam. A entrada de teste por esse endereço veio da branch `app-celular`.
+
+**O teclado do celular no jeito do WhatsApp (04/11/2026).** "Quando clicamos no campo de escrever ele fica meio bugado; quero exatamente igual ao WhatsApp". Mudou `area-visivel.ts`:
+- a altura da conversa aberta é escrita direto na camada (`data-area-visivel`), sem redesenhar a tela de Conversas a cada quadro da subida do teclado;
+- enquanto o iPhone empurra a área visível e ainda não contou a altura nova, a camada encolhe junto (`medirAreaVisivel`, com teste), e a caixa sobe colada no teclado em vez de pular no fim;
+- ao fechar o teclado, a página deslocada volta para o lugar.
+
+Outras mudanças:
+- **Android:** a página de Conversas pede que a janela encolha com o teclado (`interactiveWidget: 'resizes-content'`).
+- **Toque na conversa:** um toque parado no papel de parede ou num balão fecha o teclado.
+- **Linha embaixo da caixa:** "Sai com seu primeiro nome em negrito" não aparece mais no celular, porque empurrava a conversa ao começar a digitar.
+- **Ensaio no Chrome com a janela encolhendo:** cabeçalho no alto, caixa colada embaixo, a última mensagem à vista e a volta ao fechar. O iPhone de verdade não foi ensaiado (não há simulador neste Mac).
+
+**O teclado no iPhone de verdade, segunda e terceira voltas (04/11/2026).** No primeiro teste no iPhone (Safari), tocar no campo deixava um quadrado preto no lugar da conversa, com a barra de baixo do CRM aparecendo, até a pessoa arrastar a tela; depois de arrastar, a conversa tremia e ficava pequena. Na segunda volta "ainda não foi corrigido". A referência pedida é o print do WhatsApp com o teclado aberto.
+- **O que o Safari faz, medido no iPhone do usuário** (iOS 26, pelo diário abaixo): sem teclado a área visível tem 699 px; ao tocar no campo ela cai para 362 e o Safari ROLA A PÁGINA 337 px para baixo, com animação, para mostrar o campo. Os números chegam em ordens diferentes a cada vez (numa delas o empurrão só apareceu 400 ms depois da rolagem). A camada corria atrás desses números e chegava atrasada: o pedaço preto, em cima ou embaixo. A conta da primeira versão ainda usava a janela de agora, que no iPhone encolhe junto com o teclado, e prendia a camada com 25 px.
+- **A página não rola mais com a conversa aberta** (`area-visivel.ts`): se o Safari rolar, ela volta ao topo na hora; a camada já tem a altura da área visível, então o campo continua à vista. Se o Safari insistir (mais de 4 vezes num segundo), a camada desiste até o próximo toque no campo e acompanha o empurrão. O empurrão nunca passa do quanto a página rolou (logo depois de voltar ao topo o Safari ainda conta o velho por um instante).
+- **A caixa sobe junto com o teclado:** só a altura da camada muda, com a curva do teclado (0,28 s); o Safari avisa a altura nova quando o teclado começa a subir. Fora isso, a medida é refeita a cada quadro por um segundo depois de cada aviso, porque às vezes o último não vem, e nunca dá menos que 40% da tela.
+- **Nada preto atrás:** com a conversa aberta em tela cheia, o fundo da página é o da caixa de escrever (`app-shell.tsx`, `has-[[data-area-visivel]]`); qualquer fresta entre a caixa e o teclado fica da cor dela.
+- **O tremor:** o dedo não arrasta a página: só rola o que tem para onde rolar (as mensagens, a caixa comprida, as listas); o campo de texto e o controle do áudio ficam com o navegador; as mensagens não passam o arrasto para a página (`overscroll-contain`).
+- **A barra de baixo do CRM** some enquanto há conversa aberta em tela cheia (`bottom-nav.tsx`).
+- **Mais espaço para as mensagens no celular:** cabeçalho de 64 para 56 px e caixa de escrever de 64 para 56 px (pílula de 44 px, botão verde de 44 px).
+- **As duas pílulas do alto não se cobrem mais:** a do dia ("Hoje") grudava no mesmo lugar da janela de 24 h e ficava escondida atrás dela (aparece no print do usuário). Agora gruda logo abaixo, com a altura da janela medida (`fio-wpp.tsx`, `--topo-do-dia`), no celular e no computador.
+- **Diário do teclado, só no `next dev`** (`registro-do-teclado.ts` + `/auth/dev/teclado`): o celular de teste manda cada mudança da área visível para `triade-teclado.log` na pasta temporária do computador. Em produção não faz nada: o registro só liga em `next dev`, e a rota responde 404 fora das travas da entrada de teste (`entradaLocalLigada`).
+- **Verificado:** typecheck e lint limpos; Vitest 1.507 no site (8 da medida, com os números do iPhone). As três sequências que o diário gravou no iPhone, reproduzidas no Chrome com a área visível do Safari imitada (tudo junto; rolagem antes do empurrão; Safari insistindo): a camada fica no lugar em todos os quadros, abre com 362 px e volta a 699 ao fechar. No Chrome com a janela encolhendo (o Android): camada de 480 px no topo, caixa encostada embaixo, última mensagem à vista, barra de baixo escondida, arrasto travado no cabeçalho e nas pontas das mensagens e livre no meio delas e no campo, toque na conversa fecha o teclado. Computador a 1440×900 igual ao de antes. **Não ensaiado num iPhone de verdade** (sem simulador neste Mac): o diário do próximo teste diz se o Safari aceitou voltar ao topo.
+- **Não dá para tirar no Safari:** a pílula do endereço e a barra das setas com o ✓ que o Safari põe acima do teclado (~100 px que o WhatsApp não tem). No Tríade instalado na tela de início a pílula do endereço some; a barra das setas só a casca do app (Expo) consegue esconder.
+
+**A tela de entrada do WhatsApp (04/11/2026).** "Uma tela que não abre nenhuma conversa de alguém direto [...] aparece primeiro o logo da Imova na parte da direita e os contatos com as conversas na parte esquerda. Isso é exatamente igual o WhatsApp no PC faz":
+- **No computador, nada abre sozinho.** Conversas, Consultoria, Clientes e Grupos deixam de abrir a primeira linha da lista; a conversa abre só quando a pessoa clica, vem por link (`?org=`, `?cliente=`), pelo aviso de nova mensagem ou pela busca nas mensagens. Saiu junto o "mexer na conversa é escolhê-la" (`tela-conversas.tsx`, `tela-grupos.tsx`), que só existia por causa da abertura sozinha. A condição de "escolhida" do "por ler" (`leitura-do-fio.ts`) fica como guarda.
+- **A direita mostra a marca da empresa** (`TelaDeEntrada`, em `estados.tsx`, no lugar do "Escolha um parceiro à esquerda"): fundo cinza do WhatsApp, o logo no centro, "Escolha uma conversa na lista ao lado." embaixo e, no pé, o cadeado com "Conversas do WhatsApp oficial da {empresa}". Na Imova é o logo dela (`public/marca/imova.png`, tirado do arquivo do usuário, com o fundo branco removido para servir no claro e no escuro, em 640×238). Na KOMUNE, sem arquivo de logo, vai a marca do Tríade com o nome. O aviso do que falta no WhatsApp saiu desta tela: ele continua dentro de cada conversa.
+- **Celular igual:** lá a lista já ocupava a tela e nada abria sozinho.
+- **Verificado:** typecheck e lint limpos; Vitest 1.504 no site. Chrome (Playwright) nas duas empresas (Imova local em 127.0.0.1:3082, banco 56321; KOMUNE em localhost:3080), claro a 1440×900 e escuro a 1280×720: nenhuma conversa aberta em 0,3 s, 1 s, 2,5 s e 5 s, o logo à direita, o clique na linha abre a conversa, a aba Grupos com a mesma entrada, o link `?org=` abre direto sem o logo piscar, e a 390×844 a lista continua sozinha, sem estouro de largura.
+
+**Pendente:**
+- o usuário testar no localhost (`next dev -p 3080` na worktree `triadecrm-conversas-wpp`, banco local da KOMUNE; no celular, `next dev --hostname <IP> -p 3081` com `NEXT_DIST_DIR=.next-celular` e o Supabase pelo IP);
+- commitar quando o usuário aprovar;
+- publicar só com pedido: banco antes do site, nas duas empresas.
+
+**Decisão humana:** levar o Concluir à KOMUNE foi lido do pedido ("exatamente como o protótipo"). Se for para ficar só na Imova, basta voltar o módulo e não publicar a migração 20261103200000. Na Imova, a etiqueta de atitude que ficava no alto da conversa foi para os dados do contato.
