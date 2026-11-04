@@ -8467,3 +8467,16 @@ Outras mudanças:
 - as branches que mexem nos mesmos arquivos e não estão publicadas (`cadastrar-clientes`, `pedir-reenvio`, `parceiros-na-imova`) vão precisar ser refeitas sobre a tela nova.
 
 **Decisão humana:** o Concluir na KOMUNE. Na Imova, a etiqueta de atitude que ficava no alto da conversa foi para os dados do contato.
+
+## 04/11/2026 (fim da tarde) — Conversas no jeito do WhatsApp e Concluir em produção, só na Imova (RF-CON-04, RF-CON-05)
+
+**Publicado a pedido do usuário ("Por enquanto quero publicar somente na Imova"):**
+- Ar conferido antes e de novo na hora: o site da Imova estava em `imova-aeg9rndlv` (`528f846`, na `main`), e os dois bancos batiam com a `main` (Imova 171 de 171; KOMUNE 165, sem nada de fora). A `origin/main` continuava em `b7e0184`.
+- `main` `c4e3741` (avanço direto sobre `b7e0184`).
+- Banco da Imova: só `20261104120000_concluir_a_conversa`, por `publicar-banco.mjs imova migrar`. Conferido em produção: 172 migrações, nada pendente, `app.concluir_ligado()` verdadeiro.
+- Site da Imova `imova-i50bwhgai` (de `c4e3741`, cópia limpa em `~/triadecrm-publicar-imova`), em `imova-crm.vercel.app`; volta: `imova-aeg9rndlv`. Conferido de fora: `/login`, o logo e o papel de parede respondem 200; `/auth/dev` e `/auth/dev/teclado` respondem 404; `/conversas` sem login vai para o login. A tela com login não foi aberta em produção (o login é pelo Google).
+- KOMUNE intocada: banco, site (`triade-12rd66zs6`) e robôs não foram mexidos. Os robôs da Imova também não: nada mudou no código deles.
+
+**Pendente:**
+- o usuário conferir na Imova em produção, no computador e no iPhone (o teclado no Safari, com o diário só no `next dev`);
+- a KOMUNE e o Concluir nela, quando o usuário decidir (branch local `concluir-na-komune`).
