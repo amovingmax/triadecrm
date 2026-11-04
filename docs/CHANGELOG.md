@@ -8355,6 +8355,7 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 - A política de privacidade da Imova provavelmente precisa citar o tratamento por IA.
 - KOMUNE: seis migrações pendentes no banco dela (`20261029110000`, `20261030120000`, `20261030170000`, `20261103160000`, `20261104100000`, `20261104110000`), todas sem efeito lá; ficam para quando for a vez dela.
 - Visto de passagem, sem mexer: o `triade-worker-ai` da KOMUNE tem duas máquinas no Fly.
+
 ## 03/11/2026 — Concluir a conversa, só na Imova (branch `concluir-conversa`; RF-CON-04)
 
 **O pedido.** Na Imova a lista de Conversas enchia de conversas antigas que não saíam de lá: "Quero que tenhamos a funcionalidade de colocar uma conversa como 'Concluída' e fazer com que ela saia das conversas, mas não devemos perder o histórico [...] Assim que formos conversar novamente com esse cliente devemos ter o histórico da conversa com ele". Decisões do usuário: primeiro só na Imova ("ficando bom e sendo aprovado por mim, a gente pode estar colocando na Komune também") e só pelo botão, sem concluir sozinho por tempo parado.
@@ -8391,7 +8392,7 @@ Pedido do usuário em 29 e 30/10/2026: receber e fazer ligações pelo número d
 
 **O pedido.** "Quero que somente essa aba de conversas tenha esse layout mais voltado para WhatsApp justamente para facilitar e ser mais prático visualmente. A aba de conversa deve funcionar exatamente como está o protótipo no artifact" (protótipo navegável de 03/11, computador e celular, com o Concluir). O resto do CRM fica com o desenho de sempre.
 
-**Base da branch.** `origin/main` (bff38bd) com os 3 commits do Concluir da Imova (`concluir-conversa`) por cima. O conflito em `tela-conversas.tsx` (a ligação perdida de hoje) foi resolvido juntando as duas.
+**Base da branch.** Nasceu sobre `origin/main` (bff38bd) com os 3 commits do Concluir da Imova (`concluir-conversa`) por cima; o conflito em `tela-conversas.tsx` (a ligação perdida) foi resolvido juntando as duas. Em 04/11 foi para cima da `main` b7e0184, com a ficha do cliente e a IA da Imova (ver "Junção com a main" no fim desta entrada).
 
 **Tela** (só `/conversas`; cores `--wpp-*` em `globals.css`, que só esta tela usa):
 - **De ponta a ponta:** a casca tira a margem e o teto de 1400px quando a tela tem `data-tela-cheia`. Lista e conversa dividem um cartão só, como a janela do WhatsApp. Título, abas e busca moram no alto da lista, e a conversa ganhou quase 200px de altura.
@@ -8451,9 +8452,18 @@ Outras mudanças:
 - **Celular igual:** lá a lista já ocupava a tela e nada abria sozinho.
 - **Verificado:** typecheck e lint limpos; Vitest 1.504 no site. Chrome (Playwright) nas duas empresas (Imova local em 127.0.0.1:3082, banco 56321; KOMUNE em localhost:3080), claro a 1440×900 e escuro a 1280×720: nenhuma conversa aberta em 0,3 s, 1 s, 2,5 s e 5 s, o logo à direita, o clique na linha abre a conversa, a aba Grupos com a mesma entrada, o link `?org=` abre direto sem o logo piscar, e a 390×844 a lista continua sozinha, sem estouro de largura.
 
-**Pendente:**
-- o usuário testar no localhost (`next dev -p 3080` na worktree `triadecrm-conversas-wpp`, banco local da KOMUNE; no celular, `next dev --hostname <IP> -p 3081` com `NEXT_DIST_DIR=.next-celular` e o Supabase pelo IP);
-- commitar quando o usuário aprovar;
-- publicar só com pedido: banco antes do site, nas duas empresas.
+**Aprovado pelo usuário em 04/11/2026** ("testei o novo layout das conversas e foram aprovadas"), com o pedido de publicar só na Imova por enquanto.
 
-**Decisão humana:** levar o Concluir à KOMUNE foi lido do pedido ("exatamente como o protótipo"). Se for para ficar só na Imova, basta voltar o módulo e não publicar a migração 20261103200000. Na Imova, a etiqueta de atitude que ficava no alto da conversa foi para os dados do contato.
+**Junção com a main (04/11/2026).** A ficha do cliente e a IA da Imova entraram na `main` e no ar depois que a branch nasceu, mexendo em 6 arquivos que ela reescreve. Sem juntar, publicar a branch tiraria a ficha do ar. O que foi feito:
+- **Aba Clientes da Imova:** os clientes com ficha voltam a aparecer na lista no jeito novo (a mesma linha da aba Conversas), e a conversa de ficha abre com o cabeçalho, o Concluir e os dados do contato (próxima ação automática, "Sugerida pela IA" e a leitura da IA). O texto da aba vazia é o da ficha.
+- **No computador continua não abrindo nada sozinho:** a `main` abria a primeira linha da aba Clientes; a tela de entrada com o logo venceu, como no resto da tela.
+- **Concluir só na Imova:** módulo, `app.concluir_ligado`, pgTAP 93 e o teste da URL `?concluidas=1` voltaram ao que eram no pedido do Concluir.
+- **Migração do Concluir com data nova:** `20261103100000_concluir_a_conversa` virou `20261104120000_concluir_a_conversa`, porque o banco da Imova já tem as de 04/11 e o `db push` recusa uma mais antiga. Nenhuma migração depois dela redefine as 3 funções que ela troca. O pgTAP do Concluir virou 122 (o 120 é da ficha).
+- **Diário do teclado no git:** a rota `/auth/dev/teclado` saiu do `.git/info/exclude` e foi junto com `registro-do-teclado.ts`; as duas só funcionam no `next dev`.
+- **Verificado:** typecheck e lint limpos; Vitest 1.520 no site e 111 no schema. pgTAP do zero num Supabase à parte (55322) com a semente da KOMUNE: 119 arquivos e 4.177 asserções, só as falhas antigas da `main` (52 e 107). Ensaio igual à produção da Imova no mesmo banco (todas as migrações da `main` mais a semente da Imova): o `db push` só quis a `20261104120000`, aplicou sem erro, `app.concluir_ligado()` deu verdadeiro, e passaram os pgTAP 122 (Concluir), 119 (ligação perdida), 120 (ficha) e 121 (IA). O 93 falha ali numa asserção, de propósito: ela prova a regra da KOMUNE (mensagem do time não desarquiva), e na Imova o Concluir troca essa regra. Chrome (Playwright) no site local da Imova a 1440×900 e 390×844: lista de Conversas com o logo, aba Clientes com as fichas, conversa de ficha aberta com Concluir e "Pedir para ligar", dados do contato com a próxima ação e a leitura da IA, sem erro no console.
+
+**Pendente:**
+- o Concluir e a tela nova na KOMUNE: a decisão é do usuário. A versão do Concluir para a KOMUNE está na branch local `concluir-na-komune`. Publicar o site da KOMUNE a partir da `main` leva junto o que ficou fora dela em 03/11 (ligação pelo WhatsApp, atitude, ficha e IA, todas desligadas lá) e pede as seis migrações pendentes no banco dela, a ensaiar antes.
+- as branches que mexem nos mesmos arquivos e não estão publicadas (`cadastrar-clientes`, `pedir-reenvio`, `parceiros-na-imova`) vão precisar ser refeitas sobre a tela nova.
+
+**Decisão humana:** o Concluir na KOMUNE. Na Imova, a etiqueta de atitude que ficava no alto da conversa foi para os dados do contato.
