@@ -14,8 +14,7 @@ import { CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { rotuloDoDia } from './formatos';
 
 /**
- * CONCLUIR A CONVERSA (03/11/2026), nas duas empresas desde a tela de Conversas
- * no jeito do WhatsApp.
+ * CONCLUIR A CONVERSA (03/11/2026), só na Imova por enquanto.
  *
  * Pedido: "colocar uma conversa como 'Concluída' e fazer com que ela saia das
  * conversas, mas não devemos perder o histórico [...] Assim que formos conversar
@@ -32,10 +31,10 @@ import { rotuloDoDia } from './formatos';
  *   - a volta também quando alguém do time escreve, e a saída do Meu dia
  *     (as duas no banco, `app.concluir_ligado`).
  *
- * Nasceu só na Imova ("ficando bom e sendo aprovado por mim, a gente coloca na
- * Komune") e foi para a KOMUNE com o protótipo da tela no jeito do WhatsApp, que
- * o tem no cabeçalho, no menu ⋯ e na setinha de cada linha da lista. O módulo
- * continua existindo: desligado, volta o ícone de arquivar.
+ * Só na Imova até o usuário aprovar ("ficando bom e sendo aprovado por mim, a gente
+ * coloca na Komune"). Na tela no jeito do WhatsApp ele fica no cabeçalho, no menu ⋯
+ * e na setinha de cada linha da lista; com o módulo desligado (a KOMUNE), volta o
+ * ícone de arquivar.
  *
  * SEM CONFIRMAÇÃO, como o arquivar: nada é destruído, o aviso traz "Desfazer" e o
  * próprio botão vira "Reabrir".

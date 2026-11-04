@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — Concluir a conversa, só na Imova (migração 20261103100000)
+-- pgTAP — Concluir a conversa, só na Imova (migração 20261104120000)
 --
 -- Pedido de 03/11/2026, para a Imova: concluir tira a conversa da lista sem
 -- perder o histórico, e "assim que formos conversar novamente com esse cliente
