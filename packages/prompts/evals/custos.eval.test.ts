@@ -211,10 +211,11 @@ describe('preços e conta por chamada', () => {
         // A leitura do cliente da Imova (03/11/2026). Carrega mais contexto que a
         // ficha da KOMUNE (o ritmo, as etapas, as visitas, o perfil) e ainda assim é
         // a mais barata do catálogo: o Haiku 5.5 custa um décimo do 4.5. A conta não
-        // inclui o raciocínio do modelo, que só a primeira medição real mostra.
+        // inclui o raciocínio do modelo, que só a primeira medição real mostra. A v2
+        // (04/11/2026) tem 60 tokens a mais de sistema: a regra dos tamanhos.
         id: 'leitura-do-cliente',
         modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 1084,
+        tokensDeSistema: 1144,
         tokensDaMensagem: 277,
         tokensDeSaida: 402,
         semCache: 0.00034,

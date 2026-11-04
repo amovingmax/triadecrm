@@ -1,6 +1,7 @@
 import { classificarIntencaoV1 } from './prompts/classificar-intencao/v1';
 import { fichaDaConversaV1 } from './prompts/ficha-da-conversa/v1';
 import { leituraDoClienteV1 } from './prompts/leitura-do-cliente/v1';
+import { leituraDoClienteV2 } from './prompts/leitura-do-cliente/v2';
 import { followupLigacaoV1 } from './prompts/followup-ligacao/v1';
 import { pulsoDoDiaV1 } from './prompts/pulso-do-dia/v1';
 import { triagemDoRadarV1 } from './prompts/triagem-do-radar/v1';
@@ -40,7 +41,7 @@ export const CATALOGO = {
   'followup-ligacao': { 1: followupLigacaoV1 },
   'classificar-intencao': { 1: classificarIntencaoV1 },
   // Só da Imova (03/11/2026): o worker o usa quando o banco é o da Imova.
-  'leitura-do-cliente': { 1: leituraDoClienteV1 },
+  'leitura-do-cliente': { 1: leituraDoClienteV1, 2: leituraDoClienteV2 },
 } as const;
 
 export type IdDePrompt = keyof typeof CATALOGO;
@@ -58,7 +59,10 @@ export const VIGENTES = {
   'resumo-ligacao': 1,
   'followup-ligacao': 1,
   'classificar-intencao': 1,
-  'leitura-do-cliente': 1,
+  // v2 desde 04/11/2026: na primeira hora em produção a v1 perdeu 4 de 12 leituras
+  // por texto um pouco mais longo que o teto do schema. A v2 diz o tamanho e encurta
+  // em vez de recusar; voltar é trocar este número.
+  'leitura-do-cliente': 2,
 } as const satisfies Record<IdDePrompt, number>;
 
 /** Uma versão específica, com o tipo daquela versão. */

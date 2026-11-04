@@ -37,6 +37,12 @@ export {
 } from './prompts/leitura-do-cliente/v1';
 
 export {
+  type SaidaDaLeituraV2,
+  encurtarTexto,
+  leituraDoClienteV2,
+} from './prompts/leitura-do-cliente/v2';
+
+export {
   type EntradaDoPulso,
   type SaidaDoPulso,
   pulsoDoDiaV1,

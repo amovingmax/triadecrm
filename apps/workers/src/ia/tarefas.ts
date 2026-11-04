@@ -45,7 +45,7 @@ import {
   detectarOptOut,
   fichaDaConversaV1,
   followupLigacaoV1,
-  leituraDoClienteV1,
+  leituraDoClienteV2,
   pulsoDoDiaV1,
   triagemDoRadarV2,
   reidratar,
@@ -855,7 +855,7 @@ async function lerCliente(
 
   const executada = await executar(
     contexto,
-    leituraDoClienteV1,
+    leituraDoClienteV2,
     {
       leadId,
       agora: entrada.agora,

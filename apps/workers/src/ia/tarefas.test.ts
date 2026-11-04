@@ -875,7 +875,7 @@ describe('7b. a leitura do cliente da Imova', () => {
     expect(chamadas).toEqual(['ia_entrada_do_cliente']);
     expect(duble.chamadas).toEqual(['leitura']);
     expect(resultado.detalhes?.intencao).toBe('PEDIU_VISITA');
-    expect(gravacoes[0]?.p_prompt_version).toBe('leitura-do-cliente@v1');
+    expect(gravacoes[0]?.p_prompt_version).toBe('leitura-do-cliente@v2');
     // A prova citada pelo modelo volta como o uuid da mensagem do banco.
     const saida = gravacoes[0]?.p_saida as {
       sinais: { messageId: string }[];

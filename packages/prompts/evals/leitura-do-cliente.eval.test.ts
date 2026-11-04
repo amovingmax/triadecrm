@@ -3,13 +3,15 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { prepararChamada } from '../src/nucleo/chamada';
+import { VIGENTES, promptVigente } from '../src/catalogo';
+import { esquemaDeSaida, prepararChamada } from '../src/nucleo/chamada';
 import { MODELOS } from '../src/nucleo/versionamento';
 import {
   CAMPOS_DO_PERFIL,
   OBJECOES_DA_IMOVA,
   leituraDoClienteV1 as prompt,
 } from '../src/prompts/leitura-do-cliente/v1';
+import { encurtarTexto, leituraDoClienteV2 } from '../src/prompts/leitura-do-cliente/v2';
 
 /**
  * A LEITURA DO CLIENTE DA IMOVA (03/11/2026), SEM REDE.
@@ -120,5 +122,71 @@ describe('leitura-do-cliente@v1', () => {
 
   it('o teto de saída deixa lugar para o raciocínio do Haiku 5.5', () => {
     expect(prompt.maxTokens).toBeGreaterThanOrEqual(4000);
+  });
+});
+
+describe('leitura-do-cliente@v2 (04/11/2026)', () => {
+  // Os tamanhos de verdade das quatro leituras que a v1 recusou na primeira hora em
+  // produção: resumo 462, motivo 207 a 235, próxima ação 213 e 214.
+  const longa = (n: number) =>
+    Array.from({ length: n }, (_, i) => (i % 7 === 6 ? ' ' : 'a')).join('').slice(0, n);
+  const recusadaPelaV1 = {
+    ...prompt.exemplos[0]!.saida,
+    resumo: longa(462),
+    motivo: longa(235),
+    proximaAcao: { descricao: longa(214), prazo: null },
+  };
+
+  it('é a v1 com outro número: mesmo modelo, entrada, mensagem e exemplos', () => {
+    expect(leituraDoClienteV2.versao).toBe(2);
+    expect(leituraDoClienteV2.modelo).toBe(prompt.modelo);
+    expect(leituraDoClienteV2.proposito).toBe(prompt.proposito);
+    expect(leituraDoClienteV2.entrada).toBe(prompt.entrada);
+    expect(leituraDoClienteV2.montarMensagem).toBe(prompt.montarMensagem);
+    expect(leituraDoClienteV2.exemplos).toBe(prompt.exemplos);
+  });
+
+  it('o prompt diz o tamanho de cada texto, e o schema que o modelo recebe também', () => {
+    expect(leituraDoClienteV2.sistema).toMatch(/motivo até 200/);
+    expect(leituraDoClienteV2.sistema).toMatch(/proximaAcao\.descricao até 160/);
+    const esquema = JSON.stringify(esquemaDeSaida(leituraDoClienteV2));
+    expect(esquema).toContain('até 400 caracteres');
+    expect(esquema).toContain('até 160 caracteres');
+  });
+
+  it('a leitura que a v1 recusou por tamanho agora passa, encurtada até o teto do banco', () => {
+    expect(() => prompt.saida.parse(recusadaPelaV1)).toThrow();
+    const lida = leituraDoClienteV2.saida.parse(recusadaPelaV1);
+    expect(lida.resumo).toHaveLength(462);
+    expect(lida.motivo).toHaveLength(235);
+    expect(lida.proximaAcao.descricao.length).toBeLessThanOrEqual(200);
+    expect(lida.proximaAcao.descricao.endsWith('…')).toBe(true);
+  });
+
+  it('encurta na palavra, e o que já cabe passa igual', () => {
+    expect(encurtarTexto(20)('Mandar as fotos do apartamento hoje')).toBe('Mandar as fotos do…');
+    expect(encurtarTexto(20)('Mandar as fotos')).toBe('Mandar as fotos');
+    expect(encurtarTexto(20)(null)).toBeNull();
+  });
+
+  it('lista comprida fica com os primeiros itens; enum errado continua sendo erro', () => {
+    const muitos = { ...recusadaPelaV1, alertas: Array(9).fill('pediu_visita') };
+    expect(leituraDoClienteV2.saida.parse(muitos).alertas).toHaveLength(6);
+    expect(() =>
+      leituraDoClienteV2.saida.parse({ ...recusadaPelaV1, intencao: 'QUER_EVENTO' }),
+    ).toThrow();
+  });
+
+  it('prazo que não cabe vira null, em vez de data cortada', () => {
+    const lida = leituraDoClienteV2.saida.parse({
+      ...recusadaPelaV1,
+      proximaAcao: { descricao: 'Ligar', prazo: 'sábado de manhã, depois que ele falar com a esposa' },
+    });
+    expect(lida.proximaAcao.prazo).toBeNull();
+  });
+
+  it('é a vigente', () => {
+    expect(VIGENTES['leitura-do-cliente']).toBe(2);
+    expect(promptVigente('leitura-do-cliente')).toBe(leituraDoClienteV2);
   });
 });
