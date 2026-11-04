@@ -432,6 +432,64 @@ export type ProximosPassos = {
 /** Quantos passos a ficha lista antes de dizer "e mais N". */
 export const LINHAS_DE_PASSOS = 5;
 
+/** O nome de cada dado pessoal do guardrail (`TipoDePii`), como se fala. */
+const DADO_PESSOAL: Record<string, string> = {
+  TELEFONE: 'telefone',
+  EMAIL: 'e-mail',
+  INSTAGRAM: 'Instagram',
+  DOCUMENTO: 'documento',
+  NOME: 'nome',
+  EMPRESA: 'nome de empresa',
+};
+
+/**
+ * A tarefa que o worker de IA abre quando o guardrail de PII segura uma chamada
+ * (`abrirTarefaDeBloqueio` em `apps/workers/src/ia/execucao.ts`). O título dela é
+ * o registro técnico ("IA bloqueada pelo guardrail de PII em leitura-do-cliente
+ * (ai_run 6): A chamada ao modelo carregaria dado pessoal: TELEFONE em …"), e na
+ * ficha ele ocupava 14 linhas no celular sem dizer o que fazer (04/11/2026).
+ *
+ * A ficha diz o que a pessoa faz e por quê; o texto inteiro continua na tarefa e
+ * em `ai_runs`. Qualquer outro título passa como está.
+ */
+export function avisoDaIa(titulo: string): { titulo: string; apoio: string } | null {
+  if (!/^IA bloqueada pelo guardrail de PII\b/.test(titulo)) return null;
+  const motivo = titulo.split('dado pessoal:')[1] ?? '';
+  const dados = [
+    ...new Set(
+      [...motivo.matchAll(/\b([A-Z]{4,})\b/g)]
+        .map((m) => DADO_PESSOAL[m[1] as string])
+        .filter((d): d is string => d !== undefined),
+    ),
+  ];
+  const quais =
+    dados.length === 0
+      ? 'dado pessoal'
+      : dados.length === 1
+        ? (dados[0] as string)
+        : `${dados.slice(0, -1).join(', ')} e ${dados.at(-1) as string}`;
+  return {
+    titulo: 'Ler a conversa você mesmo',
+    apoio: `A IA não leu: havia ${quais} nas mensagens`,
+  };
+}
+
+/**
+ * Duas frases que dizem a mesma coisa, sem contar caixa, espaços e o ponto final.
+ * É o que deixa a ficha mostrar a sugestão da IA uma vez só: a regra copia a
+ * sugestão para a próxima ação do negócio, e as duas apareciam a 600 px uma da
+ * outra (04/11/2026).
+ */
+export function mesmaFrase(a: string | null | undefined, b: string | null | undefined): boolean {
+  const limpa = (s: string) =>
+    s
+      .trim()
+      .replace(/[.!\s]+$/, '')
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  return Boolean(a && b) && limpa(a as string) === limpa(b as string);
+}
+
 /**
  * O que está marcado com este parceiro: as reuniões de pé e as tarefas abertas.
  *
@@ -483,11 +541,14 @@ export function montarProximosPassos(
     .map((t): Passo => {
       const dias = t.due_at ? diasDeDiferenca(agora, new Date(t.due_at)) : null;
       const dono = nomeDe(t.assignee_id);
+      const aviso = avisoDaIa(t.title);
       return {
         id: `tarefa:${t.id}`,
         tipo: 'tarefa',
-        titulo: t.title,
-        apoio: [ROTULO_DA_TAREFA[t.kind] ?? 'Tarefa', dono].filter(Boolean).join(' · '),
+        titulo: aviso?.titulo ?? t.title,
+        apoio: [aviso?.apoio ?? ROTULO_DA_TAREFA[t.kind] ?? 'Tarefa', dono]
+          .filter(Boolean)
+          .join(' · '),
         quando: t.due_at ? quando(t.due_at, agora, false) : null,
         // Pela HORA, e não pelo dia: tarefa das 09:00 vista às 15:00 já venceu,
         // e é assim que o Meu dia a chama ("vencida há 6 h"). "Vence hoje" fica

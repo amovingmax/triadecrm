@@ -191,9 +191,11 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
     <TransicaoPagina className={cn(LEITURA, 'flex flex-col gap-5')}>
       {/* 44px de alvo no celular, 28 no desktop. */}
       <Button asChild variant="ghost" size="sm" className="toque -ml-2 h-11 w-fit md:h-7">
+        {/* O nome que o menu dá à lista (06/10/2026). Aqui ainda dizia "Parceiros",
+            com "Prospectados" aceso na barra logo embaixo. */}
         <Link href="/parceiros">
           <ArrowLeft aria-hidden="true" />
-          Parceiros
+          Prospectados
         </Link>
       </Button>
 
@@ -336,6 +338,10 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
             temConversa={ficha.conversa !== null || ficha.conversaFalhou}
             // O perfil da leitura do cliente (Imova): o proprietário oferece um imóvel.
             tituloDoPerfil={ficha.tipo === 'fornecedor' ? 'O imóvel' : 'O que procura'}
+            // Com reunião marcada, o cabeçalho mostra a reunião, e não a próxima ação.
+            proximaAcaoNoCabecalho={
+              paineis.passos?.proximaReuniao ? null : (principal?.proximaAcao ?? null)
+            }
             className="order-1 lg:order-none"
           />
 
@@ -510,7 +516,13 @@ function ApoioDaRegua({
 
 /**
  * Os quatro números de quem vai falar com o parceiro agora. Quatro colunas com
- * um fio entre elas no desktop; dois por linha no celular.
+ * um fio entre elas no desktop, a primeira mais larga.
+ *
+ * NO CELULAR (04/11/2026): a próxima ação é um bloco em destaque, na largura
+ * toda, e os outros três são linhas com o rótulo à esquerda e o valor à direita.
+ * Eram dois por linha, com o valor em 17 px numa coluna de 160 px: a próxima ação
+ * ocupava quatro linhas espremidas, e a origem dela ("Sugerida pela IA · …"),
+ * mais cinco.
  */
 function Numeros({
   ficha,
@@ -547,21 +559,8 @@ function Numeros({
   const reuniao: Passo | null = paineis.passos?.proximaReuniao ?? null;
 
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-4 md:gap-0 md:divide-x md:divide-hairline">
-      <Numero
-        rotulo={
-          reuniao ? (
-            // No celular a coluna tem 160 px: "Próximo compromisso" quebrava em
-            // duas linhas e desalinhava o valor do vizinho.
-            <>
-              <span className="md:hidden">Compromisso</span>
-              <span className="hidden md:inline">Próximo compromisso</span>
-            </>
-          ) : (
-            'Próxima ação'
-          )
-        }
-      >
+    <dl className="flex flex-col md:grid md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))] md:divide-x md:divide-hairline">
+      <Numero destaque rotulo={reuniao ? 'Próximo compromisso' : 'Próxima ação'}>
         {reuniao ? (
           <>
             <Valor>
@@ -569,7 +568,7 @@ function Numeros({
                 aria-hidden="true"
                 className="size-2 shrink-0 rounded-full bg-menta ring-4 ring-menta/20"
               />
-              <span className="min-w-0 break-words md:truncate">{reuniao.titulo}</span>
+              <span className="min-w-0 break-words md:line-clamp-2">{reuniao.titulo}</span>
             </Valor>
             <Apoio>
               {reuniao.quando ? (
@@ -593,7 +592,11 @@ function Numeros({
                 aria-hidden="true"
                 className="size-2 shrink-0 rounded-full bg-menta ring-4 ring-menta/20"
               />
-              <span className="min-w-0 break-words md:truncate">{principal.proximaAcao}</span>
+              {/* Duas linhas no desktop, e não reticências: cortada em "Perguntar o
+                  que ele pr…", a ação era justamente o que não se lia. */}
+              <span className="min-w-0 break-words md:line-clamp-2" title={principal.proximaAcao}>
+                {principal.proximaAcao}
+              </span>
             </Valor>
             <Apoio>
               {proxima ? (
@@ -702,10 +705,37 @@ function Numeros({
   );
 }
 
-function Numero({ rotulo, children }: { rotulo: React.ReactNode; children: React.ReactNode }) {
+/**
+ * Um dos números do cabeçalho. O `destaque` é a próxima ação: no celular, um bloco
+ * de fundo próprio; os outros são linhas de rótulo e valor, com um fio entre elas.
+ * No desktop os quatro voltam a ser colunas iguais na forma.
+ */
+function Numero({
+  rotulo,
+  destaque = false,
+  children,
+}: {
+  rotulo: React.ReactNode;
+  destaque?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 md:px-7 md:first:pl-0 md:last:pr-0">
-      <dt className="text-[11px] leading-4 font-semibold tracking-[0.07em] text-muted-foreground uppercase">
+    <div
+      className={cn(
+        'min-w-0 md:flex md:flex-col md:gap-1 md:px-7 md:first:pl-0 md:last:pr-0',
+        destaque
+          ? 'mb-2 flex flex-col gap-1 rounded-xl bg-foreground/[0.05] p-4 md:mb-0 md:rounded-none md:bg-transparent md:py-0'
+          : 'grid grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-3 border-t border-hairline py-3 last:pb-0 md:border-t-0 md:py-0',
+      )}
+    >
+      <dt
+        className={cn(
+          'text-muted-foreground md:text-[11px] md:leading-4 md:font-semibold md:tracking-[0.07em] md:uppercase',
+          destaque
+            ? 'text-[11px] leading-4 font-semibold tracking-[0.07em] uppercase'
+            : 'text-[13px] leading-snug',
+        )}
+      >
         {rotulo}
       </dt>
       <dd className="flex min-w-0 flex-col gap-1">{children}</dd>
@@ -717,7 +747,7 @@ function Valor({ children, apagado = false }: { children: React.ReactNode; apaga
   return (
     <span
       className={cn(
-        'flex min-w-0 items-center gap-2.5 text-[17px] leading-snug font-semibold tracking-[-0.015em] md:text-xl',
+        'flex min-w-0 items-center gap-2.5 text-[15.5px] leading-snug font-semibold tracking-[-0.015em] md:text-xl',
         apagado && 'font-medium text-muted-foreground',
       )}
     >

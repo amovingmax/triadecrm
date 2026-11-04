@@ -20,6 +20,7 @@ import { ExcluirPasso } from './excluir-passo';
 import {
   arcoDaNota,
   contagemDosPassos,
+  mesmaFrase,
   quando,
   type Atividade,
   type ItemDeAtividade,
@@ -116,12 +117,18 @@ export function LeituraDaIaNaFicha({
   dados,
   temConversa,
   tituloDoPerfil = 'O que procura',
+  proximaAcaoNoCabecalho = null,
   className,
 }: {
   dados: { leitura: LeituraDaFicha | null; moduloLigado: boolean | null } | null;
   temConversa: boolean;
   /** "O que procura" para o cliente; "O imóvel" para o proprietário. */
   tituloDoPerfil?: string;
+  /**
+   * A próxima ação que o cabeçalho já mostra. Quando é a mesma frase da sugestão
+   * (a regra copia uma na outra), a sugestão não se repete aqui.
+   */
+  proximaAcaoNoCabecalho?: string | null;
   className?: string;
 }) {
   if (dados === null) return <NaoCarregou titulo="Leitura da IA" className={className} />;
@@ -168,25 +175,27 @@ export function LeituraDaIaNaFicha({
 
       <div className="flex items-start gap-4 md:items-center md:gap-[22px]">
         {leitura.nota !== null ? <Nota nota={leitura.nota} faixa={leitura.faixa} /> : null}
-        <div className="flex min-w-0 flex-col gap-2.5">
-          {leitura.resumo ? (
-            <p className="text-[14.5px] leading-normal md:text-[15px]">{leitura.resumo}</p>
-          ) : null}
-          {leitura.etiquetas.length > 0 ? (
-            <ul className="flex flex-wrap gap-[7px]">
-              {leitura.etiquetas.map((e, i) => (
-                <li
-                  key={`${e.rotulo}-${i}`}
-                  className="inline-flex min-h-[26px] items-center gap-1.5 rounded-full bg-foreground/[0.07] px-2.5 py-0.5 text-[12.5px] text-muted-foreground"
-                >
-                  {e.rotulo}
-                  <span className="font-medium text-foreground">{e.valor}</span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
+        {leitura.resumo ? (
+          <p className="min-w-0 text-[14.5px] leading-normal md:text-[15px]">{leitura.resumo}</p>
+        ) : null}
       </div>
+
+      {/* As etiquetas na largura do cartão, e não na coluna do resumo: ao lado do
+          medidor, num celular de 320, "Intenção pediu informação" partia em duas
+          linhas dentro da própria pílula (04/11/2026). */}
+      {leitura.etiquetas.length > 0 ? (
+        <ul className="flex flex-wrap gap-[7px]">
+          {leitura.etiquetas.map((e, i) => (
+            <li
+              key={`${e.rotulo}-${i}`}
+              className="inline-flex min-h-[26px] items-center gap-1.5 rounded-full bg-foreground/[0.07] px-2.5 py-0.5 text-[12.5px] whitespace-nowrap text-muted-foreground"
+            >
+              {e.rotulo}
+              <span className="font-medium text-foreground">{e.valor}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {/* O PERFIL QUE A IA LEU (Imova, 03/11/2026): o que o cliente procura, campo a
           campo, só com o que ele disse. É o que permite cruzar com a carteira. */}
@@ -206,7 +215,7 @@ export function LeituraDaIaNaFicha({
         </div>
       ) : null}
 
-      {leitura.sugestao ? (
+      {leitura.sugestao && !mesmaFrase(leitura.sugestao, proximaAcaoNoCabecalho) ? (
         <p className="flex items-start gap-2.5 rounded-lg bg-menta-fundo px-3.5 py-3 text-sm leading-snug">
           <ArrowRight
             className="mt-0.5 size-4 shrink-0 text-menta-texto"
@@ -309,18 +318,10 @@ export function AtividadeDaFicha({
 
   return (
     <section className={cn(CARTAO, className)}>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className={TITULO}>Atividade</h2>
-        {temConversa ? (
-          <Link
-            href={`/conversas?org=${organizationId}`}
-            className="toque inline-flex min-h-11 items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline md:min-h-0"
-          >
-            Abrir a conversa
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
-        ) : null}
-      </div>
+      {/* Sem "Abrir a conversa" no título (04/11/2026): o botão do cabeçalho já
+          leva lá, e o mesmo convite aparecia três vezes na ficha. Ele fica só no
+          fim, quando a lista é curta demais para a história inteira. */}
+      <h2 className={TITULO}>Atividade</h2>
 
       {atividade.itens.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nada registrado com este parceiro ainda.</p>
@@ -339,7 +340,18 @@ export function AtividadeDaFicha({
 
       {atividade.haMais ? (
         <p className="border-t border-hairline pt-3.5 text-[13px] text-muted-foreground">
-          Estas são as últimas. O histórico inteiro está na conversa.
+          Estas são as últimas.{' '}
+          {temConversa ? (
+            <Link
+              href={`/conversas?org=${organizationId}`}
+              className="toque inline-flex min-h-11 items-center gap-1 font-medium text-foreground underline-offset-4 hover:underline md:min-h-0"
+            >
+              Ver a conversa inteira
+              <ArrowRight className="size-3.5" aria-hidden="true" />
+            </Link>
+          ) : (
+            'O histórico inteiro está na conversa.'
+          )}
         </p>
       ) : null}
     </section>
@@ -367,7 +379,9 @@ function LinhaDeAtividade({
       ) : null}
       <Ladrilho icone={ICONE_DA_ATIVIDADE[item.tipo]} destaque={item.tipo === 'recebida'} redondo />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-baseline justify-between gap-3">
+        {/* A data desce para baixo do título quando os dois não cabem na linha: ao
+            lado, num celular de 320, "Mudou de etapa" partia em duas linhas. */}
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
           <p className="min-w-0 text-[14.5px] leading-snug font-medium">{item.titulo}</p>
           <time dateTime={item.em} className="shrink-0 text-[12.5px] text-muted-foreground">
             <Data quando={quando(item.em, agora, true)} />
@@ -442,21 +456,23 @@ export function ProximosPassosDaFicha({
 
 function LinhaDePasso({ passo, podeExcluir }: { passo: Passo; podeExcluir: boolean }) {
   const reuniao = passo.tipo === 'reuniao';
-  // Na reunião a hora é a informação; na tarefa o prazo fica à direita, onde o
-  // olho procura "para quando".
-  const prazoADireita = !reuniao && passo.quando !== null;
+  // Na reunião a hora abre a linha de apoio; na tarefa o prazo a fecha. "Vence
+  // hoje" já é o prazo: escrever "prazo hoje" ao lado diria a mesma coisa duas vezes.
+  const prazoNoApoio = !reuniao && passo.quando !== null && passo.selo !== 'vence hoje';
 
   return (
-    // A linha QUEBRA quando o selo e a lixeira não cabem ao lado do título: o
-    // título tem piso de 8,5rem e o resto desce, à direita. Sem isso, num
-    // celular de 320 sobravam 65px para o texto e "Reunião" saía partida em
-    // "Reuniã / o" (20/10/2026).
+    // O selo ("atrasada", "a confirmar") mora embaixo do título, e não na ponta
+    // direita (04/11/2026): na ponta ele disputava a linha com a lixeira e, no
+    // celular, descia sozinho para uma terceira linha, longe da tarefa a que
+    // pertence. À direita ficam só as ações: a sala da reunião e a lixeira. A
+    // linha ainda QUEBRA quando a sala não cabe: o título tem piso de 8,5rem
+    // (20/10/2026, "Reuniã / o" num celular de 320).
     <li className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2 border-t border-hairline py-3 first:border-t-0 first:pt-0 last:pb-0">
       <Ladrilho
         icone={reuniao ? (passo.presencial ? MapPin : Video) : ListChecks}
         destaque={reuniao && passo.selo !== 'aguarda resultado'}
       />
-      <div className="flex min-w-[8.5rem] flex-1 flex-col gap-0.5">
+      <div className="flex min-w-[8.5rem] flex-1 flex-col gap-1">
         <p className="text-[15px] leading-snug font-medium break-words">{passo.titulo}</p>
         <p className="text-[12.5px] leading-snug text-muted-foreground">
           {reuniao && passo.quando ? (
@@ -467,9 +483,7 @@ function LinhaDePasso({ passo, podeExcluir }: { passo: Passo; podeExcluir: boole
           ) : (
             <>
               {passo.apoio}
-              {/* Na atrasada o selo ocupa o lugar do prazo: a data vem para cá,
-                  senão "atrasada" não diz desde quando. */}
-              {passo.selo === 'atrasada' && passo.quando ? (
+              {prazoNoApoio && passo.quando ? (
                 <>
                   {' · prazo '}
                   <Data quando={passo.quando} />
@@ -478,36 +492,32 @@ function LinhaDePasso({ passo, podeExcluir }: { passo: Passo; podeExcluir: boole
             </>
           )}
         </p>
-      </div>
-
-      <div className="ml-auto flex shrink-0 items-center gap-3.5">
-        {passo.sala ? (
-          <Button
-            asChild
-            variant="outline"
-            className="toque h-11 shrink-0 px-3.5 text-[13.5px] md:h-[34px]"
-          >
-            <a href={passo.sala} target="_blank" rel="noopener noreferrer">
-              Abrir a sala
-            </a>
-          </Button>
-        ) : passo.selo ? (
-          <span
-            className="shrink-0 rounded-full bg-foreground/10 px-2.5 py-0.5 text-[12.5px] font-medium whitespace-nowrap"
-            title={prazoADireita && passo.quando ? passo.quando.texto : undefined}
-          >
+        {passo.selo ? (
+          <span className="w-fit rounded-full bg-foreground/10 px-2.5 py-0.5 text-[12px] font-medium whitespace-nowrap">
             {passo.selo}
           </span>
-        ) : prazoADireita && passo.quando ? (
-          <span className="shrink-0 text-[12.5px] whitespace-nowrap text-muted-foreground">
-            <Data quando={passo.quando} />
-          </span>
-        ) : null}
-
-        {podeExcluir && passo.tarefaId ? (
-          <ExcluirPasso tarefaId={passo.tarefaId} titulo={passo.titulo} />
         ) : null}
       </div>
+
+      {passo.sala || (podeExcluir && passo.tarefaId) ? (
+        <div className="ml-auto flex shrink-0 items-center gap-3.5">
+          {passo.sala ? (
+            <Button
+              asChild
+              variant="outline"
+              className="toque h-11 shrink-0 px-3.5 text-[13.5px] md:h-[34px]"
+            >
+              <a href={passo.sala} target="_blank" rel="noopener noreferrer">
+                Abrir a sala
+              </a>
+            </Button>
+          ) : null}
+
+          {podeExcluir && passo.tarefaId ? (
+            <ExcluirPasso tarefaId={passo.tarefaId} titulo={passo.titulo} />
+          ) : null}
+        </div>
+      ) : null}
     </li>
   );
 }
