@@ -23,7 +23,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   }
   return {
     ...config,
-    name: 'Tríade',
+    // Sem acento no nome do projeto: cada etapa da montagem na nuvem tirava o "í" de um
+    // jeito ("Triade" e "Trade") e uma não achava o projeto da outra (05/11/2026). O nome
+    // embaixo do ícone continua "Tríade" (CFBundleDisplayName, abaixo).
+    name: 'Triade',
     slug: 'triade',
     // A organização do Expo da KOMUNE, a mesma do app da Komune (projeto separado).
     owner: 'komune-app',
@@ -49,6 +52,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       // pergunta a cada versão enviada ao TestFlight.
       config: { usesNonExemptEncryption: false },
       infoPlist: {
+        CFBundleDisplayName: 'Tríade',
         NSMicrophoneUsageDescription:
           'O Tríade usa o microfone para gravar áudios e fazer ligações.',
         NSCameraUsageDescription: 'O Tríade usa a câmera para anexar fotos nas conversas.',

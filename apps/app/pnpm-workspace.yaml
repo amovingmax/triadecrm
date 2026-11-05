@@ -19,3 +19,12 @@ strictPeerDependencies: false
 # roda o dele, que valida o binário nativo.
 allowBuilds:
   esbuild: true
+
+# Uma versão só de cada módulo nativo (05/11/2026). A montagem do iPhone leva um módulo
+# nativo uma vez só, e o `expo doctor` da nuvem do Expo achou dois: o expo puxava o
+# expo-file-system 58.0.13 e o expo-asset 58.0.19 (que pede o expo-constants 58.0.14),
+# versões com menos de duas semanas. Aqui ficam as versões com duas semanas que todos aceitam.
+overrides:
+  expo-asset: 58.0.18
+  expo-constants: 58.0.13
+  expo-file-system: 58.0.10
