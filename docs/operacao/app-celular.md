@@ -36,7 +36,7 @@ As mudanças no site feitas para o app:
 | `apps/app/app.config.ts` | Nome, identificador, permissões e o ambiente (`TRIADE_APP_AMBIENTE`). Os projetos nativos (`ios/`, `android/`) nascem dele a cada build e não vão para o git. |
 | `apps/app/scripts/site-na-rede.ts` | Liga o site para o celular de teste (`pnpm -C apps/app site`). |
 
-**Identificador nas lojas:** `br.app.komune.triade`. Fica fixo para sempre depois da primeira publicação.
+**Identificador nas lojas:** `app.triade.crm`, neutro de empresa porque o app serve à KOMUNE e à Imova (05/11/2026). Fica fixo para sempre depois do cadastro na App Store. O primeiro, `br.app.komune.triade`, chegou a ser registrado na conta Apple numa montagem de teste e não foi usado.
 
 ## Ambientes
 
