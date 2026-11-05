@@ -8566,3 +8566,13 @@ Pedidos do usuário: "Faça logo o login com o Google". Depois, ao testar o áud
 **Pendente:**
 - O primeiro login com o Google de verdade, pelo app ligado à produção (`TRIADE_APP_AMBIENTE=producao pnpm -C apps/app start`, na branch `app-celular`). Ele confirma que a volta `/auth/callback?next=/auth/app/volta` passa na lista de endereços de retorno do Supabase de cada empresa.
 - Tirar a volta pelo Expo Go (`exp://` de rede local) quando houver app instalado.
+
+**Em produção nas duas empresas desde 05/11/2026, ~12h50** (main `9d4c39b`, publicada das cópias limpas):
+- KOMUNE: `triade-khq601hqt`, em `triade-crm-tawny.vercel.app` e `ir.komune.app.br`. Volta: `triade-728tynghz`.
+- Imova: `imova-j6funec58`, em `imova-crm.vercel.app`. Volta: `imova-l5wlxx22l`.
+- Antes do deploy, o ar das duas estava em `3a0927f`.
+- Sem migração e sem mexer nos robôs ou no Supabase.
+- **Conferido de fora nas duas:**
+  - `/login` 200 e `/auth/dev` 404;
+  - `/auth/app/google` sem estado vai para `/login?erro=app`;
+  - com estado e volta, vai ao Supabase e ao Google com `redirect_to` = `/auth/callback?next=/auth/app/volta`, sem troca pela URL do site. É indício de que a lista de retorno aceita a volta, e o primeiro login real confirma.
