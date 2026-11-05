@@ -8540,3 +8540,29 @@ Pedido do usuário, com três fotos da ficha da Ana Paula (teste) no app da Imov
 - Antes do deploy, o ar das duas estava na `main` (`0291b82` e `c4e3741`, origem CLI).
 - Sem migração e sem mexer nos robôs.
 - Conferido de fora nas duas: `/login` 200, `/auth/dev` 404, e a ficha sem login vai para o login. A ficha com login não foi aberta em produção, porque o login é pelo Google.
+
+## 05/11/2026 — Login com Google dentro do app de celular (parte do site) e o aviso do microfone (RF-ADM-01, RF-CON-05, PRD §8)
+
+Pedidos do usuário: "Faça logo o login com o Google". Depois, ao testar o áudio no app de teste ("O microfone não abriu"), escolheu publicar o login para testar o áudio no app ligado ao Tríade no ar.
+
+**Feito (só o site; a casca do app continua na branch `app-celular`):**
+- **Login pela janela segura do iPhone.** O Google recusa login dentro de WebView. As rotas novas são `/auth/app/google`, `/auth/app/volta` e `/auth/app/entrar`, e o desenho está em `apps/web/src/lib/auth/entrada-pelo-app.ts`:
+  - o app abre `/auth/app/google` na janela segura;
+  - o site faz o login com Google lá, pelo mesmo Supabase e pela mesma volta do navegador (`/auth/callback`);
+  - o site gera um código de uso único (link mágico do Supabase, sem e-mail) e devolve ao app;
+  - o app entra em `/auth/app/entrar` na WebView.
+  - O código só vai para `triade://auth` ou para o Expo Go da rede local, e vale uma vez.
+  - A recusa ("cancelou", "e-mail sem acesso", "sem perfil") volta ao app com o aviso certo.
+- **No navegador nada muda.** O botão "Entrar com Google" só toma o caminho novo com a marca `TriadeApp/` no user-agent. `/auth/callback` segue igual para o navegador; o que mudou é que aceita a volta do app (`destinoDepoisDoLogin`, em `lib/supabase/middleware.ts`).
+- **Aviso do microfone.** O aviso do gravador de áudio diz o motivo certo:
+  - fora de https, o navegador nem oferece o microfone à página;
+  - no app, a saída é ligar o microfone nos Ajustes do iPhone;
+  - no navegador, continua o cadeado da barra de endereço.
+- **Verificado:**
+  - typecheck, lint e 1.532 testes (9 novos) nesta cópia da main;
+  - o caminho inteiro, de ponta a ponta, no teste do Mac, nas duas empresas;
+  - comparação tela a tela (`comparar-versoes.mjs`) contra a versão no ar (`3a0927f`): 88 de 88 telas iguais (`~/triadecrm-capturas/2026-11-05-15-38`).
+
+**Pendente:**
+- O primeiro login com o Google de verdade, pelo app ligado à produção (`TRIADE_APP_AMBIENTE=producao pnpm -C apps/app start`, na branch `app-celular`). Ele confirma que a volta `/auth/callback?next=/auth/app/volta` passa na lista de endereços de retorno do Supabase de cada empresa.
+- Tirar a volta pelo Expo Go (`exp://` de rede local) quando houver app instalado.
