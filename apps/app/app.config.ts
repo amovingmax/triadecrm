@@ -25,6 +25,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: 'Tríade',
     slug: 'triade',
+    // A organização do Expo da KOMUNE, a mesma do app da Komune (projeto separado).
+    owner: 'komune-app',
     version: VERSAO_DA_CASCA,
     // O endereço de volta do login com Google (`triade://auth`, ver `src/entrada.ts`). No
     // Expo Go a volta é o próprio projeto (`exp://`), e este esquema só vale no app instalado.

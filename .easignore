@@ -1,0 +1,17 @@
+# O que vai para a nuvem do Expo quando o app de celular é montado (eas build, em apps/app).
+# Só o app: o site, os workers, o banco e a documentação ficam de fora. Este arquivo
+# substitui o .gitignore nessa cópia, por isso repete o que o app não leva.
+/*
+!/apps
+/apps/*
+!/apps/app
+/apps/app/node_modules
+/apps/app/.expo
+/apps/app/dist
+/apps/app/ios
+/apps/app/android
+.env
+.env.*
+*.p8
+*.p12
+*.mobileprovision
