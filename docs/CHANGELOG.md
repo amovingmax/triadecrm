@@ -8707,3 +8707,19 @@ Pedido do usuário: "Faça logo o login com o Google".
   - abrir o app no ambiente `producao`.
 - Tirar a volta pelo Expo Go (`exp://`) quando a equipe usar o app instalado.
 - Login com Apple: depende da chave da conta Apple da KOMUNE.
+
+## 05/11/2026 — Primeiro login com Google e primeiro áudio pelo app, no Tríade no ar (branch `app-celular`; RF-ADM-01, RF-CON-05, PRD §8)
+
+**Conferido pelo usuário no iPhone, pelo Expo Go aberto no Tríade no ar** (`TRIADE_APP_AMBIENTE=producao`):
+- **O login com Google pela janela segura funcionou** ("Deu certo"). O Supabase da KOMUNE aceitou a volta `/auth/callback?next=/auth/app/volta`: era a última incerteza da publicação da manhã.
+- **O áudio gravado no app chegou ao WhatsApp dele** ("O áudio chegou certinho"), pelo número da KOMUNE. O microfone funciona dentro do app quando o site é https.
+
+**Antes, no teste do Mac:**
+- o microfone recusou, com o aviso novo: o site de teste é `http://<IP do Mac>`, e fora de https o navegador nem oferece o microfone à página;
+- o "Entrar como gestor" da janela segura falhou com "Invalid login credentials": a comparação de telas (`sessao-dev.mjs`) tinha trocado a senha dos usuários de teste. A senha foi devolvida, e o script agora usa a mesma da entrada de teste (`8e47941`).
+
+**Pendente para a primeira versão instalável:**
+- ícone e tela de abertura;
+- downloads por blob;
+- escolha da empresa no login;
+- build pelo EAS e TestFlight, que dependem da conta Expo da KOMUNE e da chave da conta Apple.

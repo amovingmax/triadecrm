@@ -87,6 +87,8 @@ O Google recusa login dentro de WebView (`disallowed_useragent`). Por isso o log
 
 **Recusas** (cancelou no Google, e-mail sem acesso, conta sem perfil): voltam para o app, que mostra o aviso na tela de login. Na janela, a pessoa ficaria presa.
 
+**O microfone só funciona em https.** No teste do Mac (`http://<IP do Mac>`) o navegador nem oferece o microfone à página, e o gravador avisa isso. Para gravar áudio pelo app, abra o Tríade no ar.
+
 **No teste do Mac** não há Google: a tela de login do app mostra também "Testar a janela segura do Google". A janela abre com os usuários de teste, e o resto do caminho é o mesmo do ar. Para testar, saia do Tríade no app (menu da conta → Sair) e toque nesse botão.
 
 **No ar** precisa:
@@ -112,7 +114,7 @@ Expo 58.0.11 com React Native 0.88.0, a primeira combinação do SDK 58 com o Re
 1. Proteção: a comparação tela a tela do PC e do celular antes de cada publicação do site.
 2. Ajustes de tamanho, só dentro do app.
 3. **Casca no iPhone** (Expo desde 29/10/2026: a casca empacota para iPhone e Android; falta o primeiro teste no aparelho).
-4. Login: **Google pela janela segura** (04/11/2026, conferido no teste; falta o ar). Apple nativo e a escolha da empresa ainda faltam.
+4. Login: **Google pela janela segura** (no ar desde 05/11/2026; primeiro login real e primeiro áudio pelo app conferidos no iPhone). Apple nativo e a escolha da empresa ainda faltam.
 5. Push: mensagem nova, conversa transferida, compromisso marcado, lote para ligar, lembrete 30 min antes e resumo às 8h.
 6. Teste com a equipe: build de desenvolvimento e TestFlight pelo EAS (conta Expo), teste fechado do Google Play.
 7. Distribuição privada: Apple Business Manager e teste fechado.
