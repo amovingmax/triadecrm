@@ -8747,3 +8747,4 @@ Pedido do usuário para esta versão do app: logo, downloads, escolha da empresa
 - O usuário testar no iPhone pelo teste do Mac (escolha da empresa e downloads funcionam em http).
 - Publicar o site (com a comparação tela a tela antes) para a escolha da empresa e os downloads valerem no app aberto no Tríade no ar.
 - **TestFlight:** conta Expo (organização "komune" ou a pessoal do usuário) e a chave da API do App Store Connect (Key ID, Issuer ID, Team ID e o caminho do .p8 no Mac).
+- **Conferido pelo usuário no iPhone (teste do Mac):** a escolha da empresa no login funciona ("Funciona"). Os downloads pela folha de compartilhar ficam para ajustar depois, a pedido dele.
