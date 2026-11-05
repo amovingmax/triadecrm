@@ -5,11 +5,28 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Mic, Square, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { estouNoApp } from '@/lib/auth/entrada-pelo-app';
 import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 import { CHAVE_CONVERSAS, chaveDaLinha } from './dados';
+
+/**
+ * Por que o microfone não abriu, dito para onde a pessoa está (05/11/2026). O aviso
+ * único mandava conferir "o cadeado da barra de endereço", e no app de celular não há
+ * barra de endereço. E fora de https (o site de teste do celular, `http://<IP do Mac>`)
+ * o navegador nem oferece o microfone à página: nenhuma permissão resolve.
+ */
+function motivoDoMicrofone(): string {
+  if (!window.isSecureContext) {
+    return 'Gravar áudio só funciona em endereço seguro (https). No Tríade no ar funciona; neste endereço de teste, não.';
+  }
+  if (estouNoApp(navigator.userAgent)) {
+    return 'O app precisa da sua permissão para gravar: abra os Ajustes do iPhone, toque no app e ligue o Microfone.';
+  }
+  return 'O navegador precisa da sua permissão para gravar — confira o cadeado da barra de endereço.';
+}
 
 /**
  * Gravar e mandar áudio pelo WhatsApp, de dentro do CRM.
@@ -147,10 +164,7 @@ export function GravarAudio({
         });
       }, 1000);
     } catch {
-      toast.error('O microfone não abriu.', {
-        description:
-          'O navegador precisa da sua permissão para gravar — confira o cadeado da barra de endereço.',
-      });
+      toast.error('O microfone não abriu.', { description: motivoDoMicrofone() });
     }
   }
 
