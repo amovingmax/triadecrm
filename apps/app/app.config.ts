@@ -16,6 +16,11 @@ import { FUNDO, ID_DO_APP, VERSAO_DA_CASCA, ambienteDoApp } from './src/ambiente
  */
 export default ({ config }: ConfigContext): ExpoConfig => {
   const ambiente = ambienteDoApp(process.env.TRIADE_APP_AMBIENTE);
+  // A versão que vai para o TestFlight (montada na nuvem do Expo, que liga EAS_BUILD) só
+  // abre o Tríade no ar: um app instalado procurando o site de um Mac não abriria nunca.
+  if (process.env.EAS_BUILD === 'true' && ambiente !== 'producao') {
+    throw new Error('A montagem na nuvem só sai com TRIADE_APP_AMBIENTE=producao (eas.json).');
+  }
   return {
     ...config,
     name: 'Tríade',
@@ -38,8 +43,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       bundleIdentifier: ID_DO_APP,
       // No iPad o app abre no tamanho de iPhone, sem ajuste próprio.
       supportsTablet: false,
+      // O app só usa a criptografia padrão do iPhone (https): isenta. Sem isto, a Apple
+      // pergunta a cada versão enviada ao TestFlight.
+      config: { usesNonExemptEncryption: false },
       infoPlist: {
-        NSMicrophoneUsageDescription: 'O Tríade usa o microfone nas ligações feitas pelo app.',
+        NSMicrophoneUsageDescription:
+          'O Tríade usa o microfone para gravar áudios e fazer ligações.',
         NSCameraUsageDescription: 'O Tríade usa a câmera para anexar fotos nas conversas.',
         NSPhotoLibraryUsageDescription: 'O Tríade abre suas fotos para anexar nas conversas.',
         // Só no teste: o site do Mac é http. No ar, o iPhone exige https (o padrão).

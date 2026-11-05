@@ -1,0 +1,18 @@
+{
+  "cli": {
+    "version": ">= 25.3.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "producao": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "TRIADE_APP_AMBIENTE": "producao"
+      }
+    }
+  },
+  "submit": {
+    "producao": {}
+  }
+}
