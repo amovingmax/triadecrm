@@ -50,10 +50,17 @@ const ORIGENS = origensDasEmpresas(ambiente, Constants.expoConfig?.hostUri);
 
 // A última empresa em que a pessoa entrou, guardada no aparelho (`empresa.ts`). Sem
 // arquivo, ou com um que não se lê, é a KOMUNE: o pior caso é o login da outra empresa.
-const MEMORIA_DA_EMPRESA = new ArquivoNoAparelho(Paths.document, 'empresa.txt');
+function memoriaDaEmpresa(): ArquivoNoAparelho | null {
+  try {
+    return new ArquivoNoAparelho(Paths.document, 'empresa.txt');
+  } catch {
+    return null;
+  }
+}
 function lerEmpresa(): EmpresaDoApp | null {
   try {
-    return MEMORIA_DA_EMPRESA.exists ? empresaGuardada(MEMORIA_DA_EMPRESA.textSync()) : null;
+    const memoria = memoriaDaEmpresa();
+    return memoria?.exists ? empresaGuardada(memoria.textSync()) : null;
   } catch {
     return null;
   }
@@ -64,8 +71,9 @@ function lembrarEmpresa(endereco: string) {
   if (!empresa || empresa === empresaLembrada) return;
   empresaLembrada = empresa;
   try {
-    MEMORIA_DA_EMPRESA.create({ overwrite: true });
-    MEMORIA_DA_EMPRESA.writeSync(empresa);
+    const memoria = memoriaDaEmpresa();
+    memoria?.create({ overwrite: true });
+    memoria?.writeSync(empresa);
   } catch {
     // Sem gravar, o app só abre na empresa de antes da próxima vez.
   }
