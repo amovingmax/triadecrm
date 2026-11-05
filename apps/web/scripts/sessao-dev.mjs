@@ -36,8 +36,13 @@ export const CAMINHO_SESSAO = resolve(AQUI, '.sessao-dev.json');
 /** Usuário de desenvolvimento padrão: a Heloísa é quem usa o CRM no campo. */
 const EMAIL_PADRAO = 'heloisa.dev@komune.app.br';
 
-/** Senha efêmera, só para a stack local. */
-const SENHA = 'komune-dev-foto-2026';
+/**
+ * Senha só para a stack local. É a MESMA da entrada de teste (`app/auth/dev/route.ts`):
+ * com outra, cada comparação de telas trocava a senha de gestor.teste e sdr.teste, e o
+ * "Entrar como gestor" do teste no celular passava a responder "Invalid login
+ * credentials" (05/11/2026).
+ */
+const SENHA = 'teste-local-agenda';
 
 /** URL do app rodando em desenvolvimento; é o domínio dos cookies. */
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
