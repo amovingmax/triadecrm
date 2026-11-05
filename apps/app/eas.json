@@ -18,7 +18,8 @@
         "ascApiKeyPath": "/Users/amovingmaxm4/.komune-secrets/AuthKey_5F3W6H9F85.p8",
         "ascApiKeyIssuerId": "fb0ec628-6f9b-4493-9302-c453fb47489a",
         "ascApiKeyId": "5F3W6H9F85",
-        "appleTeamId": "8GF4F9C98L"
+        "appleTeamId": "8GF4F9C98L",
+        "ascAppId": "6831297069"
       }
     }
   }
