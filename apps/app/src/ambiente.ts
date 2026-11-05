@@ -37,8 +37,9 @@ export const MARCA_DO_APP = 'TriadeApp';
 export const MARCA_NO_USER_AGENT = `${MARCA_DO_APP}/${VERSAO_DA_CASCA}`;
 
 /**
- * Os endereços no ar (memória "Endereços do CRM"). A KOMUNE é a porta de entrada; a
- * troca para a Imova é a mesma do site, que navega para o endereço dela.
+ * Os endereços no ar (memória "Endereços do CRM"). A troca de empresa é a mesma do site,
+ * que navega para o endereço da outra; no login do app, a pessoa escolhe a empresa
+ * antes de entrar, e o app abre na última em que entrou (`empresa.ts`).
  */
 export const ENDERECOS = {
   komune: 'https://triade-crm-tawny.vercel.app',
@@ -52,7 +53,7 @@ export const FUNDO = '#0f172a';
  * As portas dos sites de teste para o celular (`scripts/site-na-rede.ts`), uma por
  * empresa, ligadas ao mesmo tempo para a troca de empresa funcionar como no ar. Não é
  * a 3000 porque o `next dev` de sempre continua lá, com o Supabase em 127.0.0.1, que o
- * celular não alcança. O app abre na KOMUNE.
+ * celular não alcança. O app abre na última empresa usada (na primeira vez, a KOMUNE).
  */
 export const PORTAS_NA_REDE = { komune: 3100, imova: 3101 } as const;
 
@@ -107,16 +108,38 @@ export type RegrasDaCasca = {
   soHttps: boolean;
 };
 
-export function regrasDaCasca(ambiente: AmbienteDoApp, hostUri?: string | null): RegrasDaCasca {
+/** As empresas que o app abre. A primeira vez é sempre a KOMUNE. */
+export type EmpresaDoApp = keyof typeof ENDERECOS;
+export const EMPRESA_PADRAO: EmpresaDoApp = 'komune';
+
+/** O endereço de cada empresa neste ambiente: no ar, o site; no teste, a porta no Mac. */
+export function origensDasEmpresas(
+  ambiente: AmbienteDoApp,
+  hostUri?: string | null,
+): Record<EmpresaDoApp, string> {
+  if (ambiente === 'producao') return { ...ENDERECOS };
+  const mac = hostDoMac(hostUri);
+  return {
+    komune: `http://${mac}:${PORTAS_NA_REDE.komune}`,
+    imova: `http://${mac}:${PORTAS_NA_REDE.imova}`,
+  };
+}
+
+/**
+ * `empresa` é onde a casca abre: a última empresa em que a pessoa entrou de fato
+ * (`empresa.ts`), ou a KOMUNE na primeira vez.
+ */
+export function regrasDaCasca(
+  ambiente: AmbienteDoApp,
+  hostUri?: string | null,
+  empresa: EmpresaDoApp = EMPRESA_PADRAO,
+): RegrasDaCasca {
   const empresas = Object.values(ENDERECOS).map((url) => partesDoEndereco(url)!.host);
+  const inicio = origensDasEmpresas(ambiente, hostUri)[empresa];
   if (ambiente === 'producao') {
-    return { inicio: ENDERECOS.komune, hosts: empresas, soHttps: true };
+    return { inicio, hosts: empresas, soHttps: true };
   }
   const mac = hostDoMac(hostUri);
   const sites = Object.values(PORTAS_NA_REDE).map((porta) => `${mac}:${porta}`);
-  return {
-    inicio: `http://${mac}:${PORTAS_NA_REDE.komune}`,
-    hosts: [...empresas, ...sites],
-    soHttps: false,
-  };
+  return { inicio, hosts: [...empresas, ...sites], soHttps: false };
 }

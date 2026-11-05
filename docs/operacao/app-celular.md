@@ -29,7 +29,10 @@ As mudanças no site feitas para o app:
 | `apps/app/src/cor-da-barra.ts` | A faixa do relógio acompanha o tema do site, como no Safari: a casca lê o `<meta name="theme-color">` que o site já troca entre claro e escuro. |
 | `apps/app/src/casca.tsx` | A WebView, as bordas do aparelho, o botão voltar do Android, a volta sozinha depois de "Sem internet" e a janela segura do login. |
 | `apps/app/src/entrada.ts` | O login com Google do lado do app: reconhece o pedido do site, monta a ida e a volta da janela segura e confere o estado. |
+| `apps/app/src/empresa.ts` | Em que empresa o app abre: a última em que a pessoa entrou de fato (página de dentro do CRM, nunca o login). A casca guarda a escolha no aparelho (`empresa.txt`). |
+| `apps/app/src/arquivo.ts` | Os downloads do site no app: confere o recado com o arquivo (nome simples, CSV, XLSX ou JSON, até 20 MB). A casca grava e abre a folha de compartilhar. |
 | `apps/app/src/sem-internet.tsx` | A tela "Sem conexão" do protótipo. |
+| `apps/app/assets/` | A logo do Tríade: ícone do iPhone, ícone do Android e tela de abertura. Os SVGs são a fonte; os PNGs saem de `node scripts/gerar-icones.mjs`. |
 | `apps/app/app.config.ts` | Nome, identificador, permissões e o ambiente (`TRIADE_APP_AMBIENTE`). Os projetos nativos (`ios/`, `android/`) nascem dele a cada build e não vão para o git. |
 | `apps/app/scripts/site-na-rede.ts` | Liga o site para o celular de teste (`pnpm -C apps/app site`). |
 
@@ -56,7 +59,8 @@ Precisa de: Supabase local de pé (`supabase start`), o iPhone no mesmo Wi-Fi do
 
 1. Na primeira vez: `pnpm -C apps/app install`.
 2. Num terminal: `pnpm -C apps/app site`. Liga as duas empresas de teste juntas, presas ao endereço do Mac na rede: KOMUNE na porta 3100 e Imova na 3101, cada uma com o Supabase local dela (o da Imova, em `~/triadecrm-imova-local`). O `next dev` de sempre, na 3000, continua como está.
-   - **Troca de empresa como no ar.** O app abre na KOMUNE, e o botão do prédio, no cabeçalho, leva à Imova. Na primeira vez, a Imova pede o login dela ("Entrar como gestor"). A volta para a KOMUNE já vem logada. Os dois sites se conhecem (`NEXT_PUBLIC_EMPRESAS_LINKS`) e perguntam um ao outro se a pessoa entra lá, com um segredo sorteado a cada vez que o script liga.
+   - **Escolha da empresa no login.** Na tela de login do app, "Entrar na empresa: KOMUNE | Imova" abre o login da empresa tocada (no navegador esse seletor não aparece). O app guarda a última empresa em que a pessoa entrou e abre nela da próxima vez.
+   - **Troca de empresa como no ar.** Já logado, o botão do prédio, no cabeçalho, leva à outra empresa. Na primeira vez, a Imova pede o login dela ("Entrar como gestor"). A volta para a KOMUNE já vem logada. Os dois sites se conhecem (`NEXT_PUBLIC_EMPRESAS_LINKS`) e perguntam um ao outro se a pessoa entra lá, com um segredo sorteado a cada vez que o script liga.
    - **O banco da Imova é chamado pelo nome do Mac na rede** (`MacBook-Air-de-A.local`), e o da KOMUNE, pelo número. Os dois sites ficam no mesmo endereço, e o navegador guarda cookie por endereço, não por porta. Com o número nas duas, a Imova lia o login da KOMUNE. Se o nome não servir, use `TRIADE_NOME_DO_MAC=<nome>.local`.
    - `pnpm -C apps/app site komune` ou `site imova` liga uma empresa só, sem o botão de trocar.
    - No Chrome do computador, as telas da Imova por esse arranjo ficam em "Carregando": é a trava de acesso à rede local do próprio Chrome, que pede permissão para falar com o nome `.local`. No app do iPhone essa trava não existe.
@@ -103,18 +107,18 @@ Expo 58.0.11 com React Native 0.88.0, a primeira combinação do SDK 58 com o Re
 ## Limites conhecidos desta versão
 
 - **Login com Apple ainda não existe.** O Google entra pela janela segura (acima). A Apple precisa da chave da conta Apple da KOMUNE e de uma versão instalável do app, porque no Expo Go o app tem o identificador do Expo.
-- **Downloads por blob** (CSV e XLSX dos relatórios, exportação do parceiro) não salvam dentro do app. É um dos ajustes do site atrás da marca do app.
-- **Ícone e tela de abertura são os padrões do Expo.** Faltam os da marca.
-- **A tela "Sem internet" usa a fonte do sistema.** A Plus Jakarta Sans entra junto com o ícone da marca.
+- **Downloads** (CSV e XLSX dos relatórios, exportação do parceiro): desde 05/11/2026, no app, o arquivo abre na folha de compartilhar do aparelho (Salvar em Arquivos, WhatsApp, e-mail), em vez de baixar (`lib/entregar-arquivo.ts` no site, `src/arquivo.ts` na casca). No navegador, o download é o de sempre.
+- **Ícone e tela de abertura do Tríade** (05/11/2026) só aparecem no app instalado. No Expo Go aparecem os do Expo Go.
+- **A tela "Sem internet" usa a fonte do sistema.**
 - **Android:** a casca afasta o site da barra de baixo, porque nem toda WebView do Android informa essa borda ao site. O teclado não foi conferido.
-- **Quem só tem acesso à Imova** entra pela KOMUNE e não consegue. A escolha da empresa no login vem com a etapa 4.
+- **A escolha da empresa no login** só aparece com o site publicado com ela (05/11/2026, ainda não no ar). Antes disso, no app, quem só tem acesso à Imova é recusado pela KOMUNE.
 
 ## As etapas
 
 1. Proteção: a comparação tela a tela do PC e do celular antes de cada publicação do site.
 2. Ajustes de tamanho, só dentro do app.
 3. **Casca no iPhone** (Expo desde 29/10/2026: a casca empacota para iPhone e Android; falta o primeiro teste no aparelho).
-4. Login: **Google pela janela segura** (no ar desde 05/11/2026; primeiro login real e primeiro áudio pelo app conferidos no iPhone). Apple nativo e a escolha da empresa ainda faltam.
+4. Login: **Google pela janela segura** (no ar desde 05/11/2026; primeiro login real e primeiro áudio pelo app conferidos no iPhone). Escolha da empresa no login feita em 05/11/2026. Apple nativo ainda falta.
 5. Push: mensagem nova, conversa transferida, compromisso marcado, lote para ligar, lembrete 30 min antes e resumo às 8h.
 6. Teste com a equipe: build de desenvolvimento e TestFlight pelo EAS (conta Expo), teste fechado do Google Play.
 7. Distribuição privada: Apple Business Manager e teste fechado.

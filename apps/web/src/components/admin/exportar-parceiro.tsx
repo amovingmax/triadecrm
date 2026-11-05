@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Download, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { entregarArquivo } from '@/lib/entregar-arquivo';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -116,15 +117,7 @@ function texto(valor: unknown): string | null {
 }
 
 function baixar(nomeDoArquivo: string, conteudo: string) {
-  const blob = new Blob([conteudo], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const ancora = document.createElement('a');
-  ancora.href = url;
-  ancora.download = nomeDoArquivo;
-  document.body.appendChild(ancora);
-  ancora.click();
-  ancora.remove();
-  URL.revokeObjectURL(url);
+  entregarArquivo(nomeDoArquivo, new Blob([conteudo], { type: 'application/json;charset=utf-8' }));
 }
 
 function apelido(nome: string): string {

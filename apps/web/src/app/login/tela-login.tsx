@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 
 import { BotaoGoogle } from './botao-google';
 import { EntradaLocal } from './entrada-local';
+import { DICA_DA_OUTRA_EMPRESA, EscolhaDaEmpresa } from './escolha-da-empresa';
 import { EscadaTermica, VazamentoTermico } from './escada-termica';
 import type { AvisoAcesso } from './avisos';
 
@@ -155,6 +156,12 @@ export function TelaLogin({
           contra os 32ch da frase), então os dois blocos rimam de largura e de base. */}
       <section className="relative mt-10 px-7 sm:px-12 lg:mt-0 lg:flex lg:flex-col lg:justify-end lg:px-16 lg:py-20">
         <div className="w-full max-w-sm">
+          {noApp ? (
+            <motion.div {...entrada(3)}>
+              <EscolhaDaEmpresa next={next} />
+            </motion.div>
+          ) : null}
+
           {aviso ? (
             <motion.div
               {...entrada(3)}
@@ -180,6 +187,11 @@ export function TelaLogin({
               >
                 {aviso.saida}
               </p>
+              {noApp && aviso.grave && DICA_DA_OUTRA_EMPRESA ? (
+                <p className="mt-1.5 text-sm text-grafite-700 dark:text-grafite-300">
+                  {DICA_DA_OUTRA_EMPRESA}
+                </p>
+              ) : null}
             </motion.div>
           ) : null}
 

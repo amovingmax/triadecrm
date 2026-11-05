@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Frente do ícone adaptável do Android: só o desenho, sem fundo (o fundo #0f172a vem do
+       `adaptiveIcon.backgroundColor`), na escala da variante maskable do site, que cabe no
+       círculo seguro em que o Android recorta o ícone. -->
+  <path d="M256 174 344 331 168 331Z" fill="none" stroke="#fdfeff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#fdfeff">
+    <circle cx="256" cy="174" r="37"/>
+    <circle cx="344" cy="331" r="37"/>
+    <circle cx="168" cy="331" r="37"/>
+  </g>
+</svg>

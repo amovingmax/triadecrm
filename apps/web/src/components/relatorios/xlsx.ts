@@ -1,5 +1,7 @@
 import { zipSync, strToU8 } from 'fflate';
 
+import { entregarArquivo } from '@/lib/entregar-arquivo';
+
 import type { Periodo } from './periodo';
 import type { Coluna } from './tipos';
 
@@ -190,19 +192,12 @@ export function nomeDoArquivoXlsx(painel: string, periodo: Periodo): string {
   return `triade-${painel}-${periodo.de}-a-${periodo.ate}.xlsx`;
 }
 
-/** Entrega o arquivo ao navegador. Só roda no cliente, a partir de um clique. */
+/** Entrega o arquivo (download no navegador, compartilhar no app). Só roda no cliente, a partir de um clique. */
 export function baixarXlsx(nome: string, bytes: Uint8Array): void {
   // `slice()` corta um ArrayBuffer próprio: o buffer que o fflate devolve pode ser
   // uma janela sobre um buffer maior, e o Blob levaria junto o que não é do arquivo.
   const blob = new Blob([bytes.slice().buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
-  const endereco = URL.createObjectURL(blob);
-  const ancora = document.createElement('a');
-  ancora.href = endereco;
-  ancora.download = nome;
-  document.body.append(ancora);
-  ancora.click();
-  ancora.remove();
-  URL.revokeObjectURL(endereco);
+  entregarArquivo(nome, blob);
 }

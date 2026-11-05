@@ -94,7 +94,7 @@ for (const empresa of empresas) {
 }
 console.log('No celular, no mesmo Wi-Fi: abra o app pelo Expo Go (pnpm -C apps/app start).');
 if (empresas.length > 1) {
-  console.log('O app abre na KOMUNE; a troca de empresa fica no botão do prédio, no cabeçalho.');
+  console.log('No login do app, escolha a empresa; depois ele abre na última em que você entrou.');
 }
 
 const processos: ChildProcess[] = empresas.map((empresa) => {

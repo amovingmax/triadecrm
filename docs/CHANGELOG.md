@@ -8723,3 +8723,27 @@ Pedido do usuário: "Faça logo o login com o Google".
 - downloads por blob;
 - escolha da empresa no login;
 - build pelo EAS e TestFlight, que dependem da conta Expo da KOMUNE e da chave da conta Apple.
+
+## 05/11/2026 — Logo do Tríade, downloads e escolha da empresa no app (branch `app-celular`; RF-REL-09, RF-ADM-01, PRD §8)
+
+Pedido do usuário para esta versão do app: logo, downloads, escolha da empresa no login e TestFlight. Os três primeiros estão feitos; o TestFlight espera a conta Expo e a chave da Apple.
+
+**Entregue:**
+- **Logo do Tríade no app** (`apps/app/assets`, `node scripts/gerar-icones.mjs`):
+  - ícone do iPhone e ícone adaptável do Android, com o mesmo desenho do ícone do site (três pontos em triângulo, fundo #0f172a);
+  - tela de abertura com a logo sobre o mesmo fundo (`expo-splash-screen` 58.0.11);
+  - só aparecem no app instalado; o Expo Go mostra os dele.
+- **Downloads dentro do app:**
+  - site: `lib/entregar-arquivo.ts` junta as três rotinas de download (CSV e XLSX dos relatórios, exportação do parceiro). No navegador faz o mesmo de antes; no app manda o arquivo à casca;
+  - casca: `src/arquivo.ts` confere o recado (nome simples, CSV, XLSX ou JSON, até 20 MB, só de página das empresas), grava o arquivo e abre a folha de compartilhar (Salvar em Arquivos, WhatsApp, e-mail). Usa `expo-file-system` 58.0.10 e `expo-sharing` 58.0.20.
+- **Escolha da empresa no login do app:**
+  - na tela de login, só dentro do app, "Entrar na empresa: KOMUNE | Imova" (`app/login/escolha-da-empresa.tsx`). Tocar na outra empresa abre o login dela;
+  - **quem entra continua sendo decidido pelo login de cada empresa**: e-mail fora da lista ou sem perfil é recusado lá, como no navegador. Na recusa, o aviso lembra que dá para escolher a outra empresa;
+  - a casca guarda a última empresa em que a pessoa entrou de fato (nunca a que só tocou) e abre nela da próxima vez (`src/empresa.ts`, arquivo `empresa.txt` no aparelho).
+- **Verificado:** site com tipos, lint e 1.532 testes; app com tipos, lint e 38 testes (11 novos); `expo config` lê o ícone, o ícone do Android e a abertura.
+  - **Não testado no iPhone ainda.**
+
+**Pendente:**
+- O usuário testar no iPhone pelo teste do Mac (escolha da empresa e downloads funcionam em http).
+- Publicar o site (com a comparação tela a tela antes) para a escolha da empresa e os downloads valerem no app aberto no Tríade no ar.
+- **TestFlight:** conta Expo (organização "komune" ou a pessoal do usuário) e a chave da API do App Store Connect (Key ID, Issuer ID, Team ID e o caminho do .p8 no Mac).

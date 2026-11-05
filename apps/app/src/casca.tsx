@@ -1,10 +1,13 @@
 import NetInfo from '@react-native-community/netinfo';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { randomUUID } from 'expo-crypto';
+import { File as ArquivoNoAparelho, Paths } from 'expo-file-system';
+import { shareAsync } from 'expo-sharing';
 import { openAuthSessionAsync } from 'expo-web-browser';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   BackHandler,
   Linking,
   Platform,
@@ -15,8 +18,18 @@ import {
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewProps } from 'react-native-webview';
 
-import { FUNDO, MARCA_NO_USER_AGENT, ambienteDoApp, regrasDaCasca } from './ambiente';
+import {
+  EMPRESA_PADRAO,
+  FUNDO,
+  MARCA_NO_USER_AGENT,
+  ambienteDoApp,
+  origensDasEmpresas,
+  regrasDaCasca,
+  type EmpresaDoApp,
+} from './ambiente';
+import { arquivoDaMensagem, type ArquivoRecebido } from './arquivo';
 import { AVISAR_COR_DA_BARRA, corDaMensagem, estiloDaBarra } from './cor-da-barra';
+import { empresaGuardada, empresaParaLembrar } from './empresa';
 import {
   enderecoDepoisDaJanela,
   enderecoDoInicio,
@@ -33,7 +46,32 @@ const PaginaWeb = WebView<object>;
 
 // O ambiente sai do `app.config.ts` (`extra.ambiente`); o Mac, do endereço do Expo.
 const ambiente = ambienteDoApp(Constants.expoConfig?.extra?.ambiente as string | undefined);
-const regras = regrasDaCasca(ambiente, Constants.expoConfig?.hostUri);
+const ORIGENS = origensDasEmpresas(ambiente, Constants.expoConfig?.hostUri);
+
+// A última empresa em que a pessoa entrou, guardada no aparelho (`empresa.ts`). Sem
+// arquivo, ou com um que não se lê, é a KOMUNE: o pior caso é o login da outra empresa.
+const MEMORIA_DA_EMPRESA = new ArquivoNoAparelho(Paths.document, 'empresa.txt');
+function lerEmpresa(): EmpresaDoApp | null {
+  try {
+    return MEMORIA_DA_EMPRESA.exists ? empresaGuardada(MEMORIA_DA_EMPRESA.textSync()) : null;
+  } catch {
+    return null;
+  }
+}
+let empresaLembrada: EmpresaDoApp = lerEmpresa() ?? EMPRESA_PADRAO;
+function lembrarEmpresa(endereco: string) {
+  const empresa = empresaParaLembrar(endereco, ORIGENS);
+  if (!empresa || empresa === empresaLembrada) return;
+  empresaLembrada = empresa;
+  try {
+    MEMORIA_DA_EMPRESA.create({ overwrite: true });
+    MEMORIA_DA_EMPRESA.writeSync(empresa);
+  } catch {
+    // Sem gravar, o app só abre na empresa de antes da próxima vez.
+  }
+}
+
+const regras = regrasDaCasca(ambiente, Constants.expoConfig?.hostUri, empresaLembrada);
 const ORIGEM = { uri: regras.inicio };
 const DICA_DO_TESTE =
   ambiente === 'local'
@@ -51,6 +89,34 @@ function abrirNoAparelho(endereco: string) {
 }
 
 /**
+ * O download do site, no aparelho (`arquivo.ts`): grava o arquivo na pasta temporária
+ * do app e abre a folha de compartilhar (Salvar em Arquivos, WhatsApp, e-mail). Uma
+ * folha por vez: um segundo toque com ela aberta não abre outra.
+ */
+let compartilhando = false;
+async function entregarAoAparelho({ nome, base64, tipo }: ArquivoRecebido) {
+  if (compartilhando) return;
+  compartilhando = true;
+  try {
+    const arquivo = new ArquivoNoAparelho(Paths.cache, nome);
+    arquivo.create({ overwrite: true });
+    arquivo.writeSync(base64, { encoding: 'base64' });
+    // No iPhone o formato sai da extensão do nome; o Android pede o tipo.
+    await shareAsync(
+      arquivo.uri,
+      Platform.OS === 'android' ? { mimeType: tipo, dialogTitle: nome } : undefined,
+    );
+  } catch {
+    Alert.alert(
+      'O arquivo não abriu',
+      'Toque em baixar de novo. Se continuar assim, avise quem cuida do CRM.',
+    );
+  } finally {
+    compartilhando = false;
+  }
+}
+
+/**
  * A casca: uma WebView do tamanho da tela com o próprio site dentro.
  *
  * O que ela faz, e nada além disso:
@@ -58,6 +124,8 @@ function abrirNoAparelho(endereco: string) {
  *   · só navega dentro das duas empresas; o resto vai para o aparelho (`navegacao.ts`);
  *   · abre o login com Google na janela segura do iPhone e entrega o resultado ao site
  *     (`entrada.ts`), porque o Google recusa login dentro da WebView;
+ *   · abre na última empresa em que a pessoa entrou (`empresa.ts`);
+ *   · entrega os downloads do site à folha de compartilhar do aparelho (`arquivo.ts`);
  *   · pinta a faixa do relógio com a cor do tema do site (`cor-da-barra.ts`);
  *   · mostra "Sem internet" quando o site não abre e volta sozinha com a conexão;
  *   · no Android, o botão voltar volta uma página antes de sair do app.
@@ -190,10 +258,19 @@ function Tela() {
         injectedJavaScript={AVISAR_COR_DA_BARRA}
         onMessage={({ nativeEvent }) => {
           const nova = corDaMensagem(nativeEvent.data);
-          if (nova) setCor(nova);
+          if (nova) {
+            setCor(nova);
+            return;
+          }
+          // Arquivo só de página das empresas, nunca de um quadro de outro site.
+          const arquivo = arquivoDaMensagem(nativeEvent.data);
+          if (arquivo && destinoDoEndereco(nativeEvent.url, regras) === 'app') {
+            void entregarAoAparelho(arquivo);
+          }
         }}
         onNavigationStateChange={(estado) => {
           podeVoltar.current = estado.canGoBack;
+          if (!estado.loading) lembrarEmpresa(estado.url);
         }}
         onLoad={() => setSemInternet(false)}
         onError={() => setSemInternet(true)}

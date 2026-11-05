@@ -30,6 +30,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     orientation: 'default',
     userInterfaceStyle: 'dark',
     backgroundColor: FUNDO,
+    // A logo do Tríade, o mesmo desenho do ícone do site (assets/*.svg; os PNGs saem de
+    // `node scripts/gerar-icones.mjs`). No Expo Go aparece o ícone do Expo Go: o do
+    // Tríade só existe no app instalado (TestFlight).
+    icon: './assets/icone.png',
     ios: {
       bundleIdentifier: ID_DO_APP,
       // No iPad o app abre no tamanho de iPhone, sem ajuste próprio.
@@ -51,8 +55,22 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     android: {
       package: ID_DO_APP,
+      adaptiveIcon: { foregroundImage: './assets/icone-android.png', backgroundColor: FUNDO },
       permissions: ['android.permission.RECORD_AUDIO', 'android.permission.MODIFY_AUDIO_SETTINGS'],
     },
+    plugins: [
+      // A abertura: a logo sobre o fundo escuro do site, para a troca para a WebView não
+      // piscar outra cor.
+      [
+        'expo-splash-screen',
+        {
+          image: './assets/abertura.png',
+          imageWidth: 112,
+          resizeMode: 'contain',
+          backgroundColor: FUNDO,
+        },
+      ],
+    ],
     extra: { ambiente },
   };
 };

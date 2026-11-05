@@ -1,3 +1,5 @@
+import { entregarArquivo } from '@/lib/entregar-arquivo';
+
 import type { Periodo } from './periodo';
 import type { Coluna } from './tipos';
 
@@ -31,15 +33,7 @@ export function nomeDoArquivo(painel: string, periodo: Periodo): string {
   return `triade-${painel}-${periodo.de}-a-${periodo.ate}.csv`;
 }
 
-/** Entrega o arquivo ao navegador. Só roda no cliente, a partir de um clique. */
+/** Entrega o arquivo (download no navegador, compartilhar no app). Só roda no cliente, a partir de um clique. */
 export function baixarCsv(nome: string, conteudo: string): void {
-  const blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8' });
-  const endereco = URL.createObjectURL(blob);
-  const ancora = document.createElement('a');
-  ancora.href = endereco;
-  ancora.download = nome;
-  document.body.append(ancora);
-  ancora.click();
-  ancora.remove();
-  URL.revokeObjectURL(endereco);
+  entregarArquivo(nome, new Blob([conteudo], { type: 'text/csv;charset=utf-8' }));
 }

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="96 96 320 320" width="320" height="320">
+  <!-- Tela de abertura: só o desenho do ícone, recortado em volta dele. O fundo é o do app
+       (#0f172a, `FUNDO` em src/ambiente.ts), pintado pelo expo-splash-screen. -->
+  <path d="M256 154 366 350 146 350Z" fill="none" stroke="#fdfeff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#fdfeff">
+    <circle cx="256" cy="154" r="46"/>
+    <circle cx="366" cy="350" r="46"/>
+    <circle cx="146" cy="350" r="46"/>
+  </g>
+</svg>

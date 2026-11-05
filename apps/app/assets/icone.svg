@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Ícone do app no iPhone: o mesmo desenho do ícone do site (apps/web/public/icons/icone.svg,
+       três pontos ligados em triângulo), com o quadrado até a borda. O iPhone arredonda os cantos
+       sozinho e recusa ícone com transparência. Gerado em PNG por `node scripts/gerar-icones.mjs`. -->
+  <rect width="512" height="512" fill="#0f172a"/>
+  <path d="M256 154 366 350 146 350Z" fill="none" stroke="#fdfeff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#fdfeff">
+    <circle cx="256" cy="154" r="46"/>
+    <circle cx="366" cy="350" r="46"/>
+    <circle cx="146" cy="350" r="46"/>
+  </g>
+</svg>
