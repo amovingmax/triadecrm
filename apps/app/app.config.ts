@@ -82,6 +82,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
     ],
-    extra: { ambiente },
+    // O projeto "triade" na organização komune-app do Expo (criado em 05/11/2026).
+    extra: { ambiente, eas: { projectId: '45aab53a-2195-4f28-aef4-0758ab244430' } },
   };
 };
