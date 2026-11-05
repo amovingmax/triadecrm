@@ -5,7 +5,13 @@ import 'tsx/cjs';
 
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
-import { FUNDO, ID_DO_APP, VERSAO_DA_CASCA, ambienteDoApp } from './src/ambiente';
+import {
+  FUNDO,
+  ID_DO_APP,
+  ID_DO_APP_ANDROID,
+  VERSAO_DA_CASCA,
+  ambienteDoApp,
+} from './src/ambiente';
 
 /**
  * A configuração do app. O Expo lê este arquivo a cada `expo start` e a cada build;
@@ -69,7 +75,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       },
     },
     android: {
-      package: ID_DO_APP,
+      package: ID_DO_APP_ANDROID,
       adaptiveIcon: { foregroundImage: './assets/icone-android.png', backgroundColor: FUNDO },
       permissions: ['android.permission.RECORD_AUDIO', 'android.permission.MODIFY_AUDIO_SETTINGS'],
     },

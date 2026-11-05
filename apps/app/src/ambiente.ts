@@ -25,11 +25,15 @@ export type AmbienteDoApp = 'local' | 'producao';
 const AMBIENTES: readonly AmbienteDoApp[] = ['local', 'producao'];
 
 /**
- * O identificador do app nas lojas. Fixo para sempre depois do cadastro na App Store.
+ * O identificador do app no iPhone. Fixo para sempre depois do cadastro na App Store.
  * Neutro de empresa (decisão do usuário em 05/11/2026): o app serve à KOMUNE e à Imova.
- * Antes era `br.app.komune.triade`, registrado na conta Apple e nunca cadastrado.
+ * O usuário registrou `app.triade.ios` na conta Apple (o `app.triade.crm` não ficou). O
+ * primeiro, `br.app.komune.triade`, chegou a ser registrado numa montagem e não foi usado.
  */
-export const ID_DO_APP = 'app.triade.crm';
+export const ID_DO_APP = 'app.triade.ios';
+
+/** O identificador no Android, no mesmo padrão. Só fica fixo ao publicar no Google Play. */
+export const ID_DO_APP_ANDROID = 'app.triade.android';
 
 /** A versão da casca. Sobe junto com cada nova versão enviada às lojas. */
 export const VERSAO_DA_CASCA = '0.1.0';
