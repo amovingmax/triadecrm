@@ -8748,3 +8748,20 @@ Pedido do usuário para esta versão do app: logo, downloads, escolha da empresa
 - Publicar o site (com a comparação tela a tela antes) para a escolha da empresa e os downloads valerem no app aberto no Tríade no ar.
 - **TestFlight:** conta Expo (organização "komune" ou a pessoal do usuário) e a chave da API do App Store Connect (Key ID, Issuer ID, Team ID e o caminho do .p8 no Mac).
 - **Conferido pelo usuário no iPhone (teste do Mac):** a escolha da empresa no login funciona ("Funciona"). Os downloads pela folha de compartilhar ficam para ajustar depois, a pedido dele.
+
+## 05/11/2026 — Primeira versão do app no TestFlight (branch `app-celular`; PRD §8)
+
+**Entregue:**
+- **Tríade CRM 0.1.0 (nº 2) no TestFlight**, processado pela Apple (VALID) em 05/11/2026 ~17h:
+  - identificador `app.triade.ios`, neutro de empresa porque o app serve à KOMUNE e à Imova (decisão do usuário). O Android fica `app.triade.android`, ainda sem publicação;
+  - cadastro "Tríade CRM" no App Store Connect (Apple ID 6831297069, SKU triade-ios), na conta Apple da KOMUNE, ao lado de Komune, Aurora Lab e Viva Positivo, sem mexer neles;
+  - montagem na nuvem do Expo, na organização `komune-app` (projeto `@komune-app/triade`). Só `apps/app` vai para o Expo (`.easignore`, 123 KB);
+  - chave da API do App Store Connect (Admin, a do kit da Komune) guardada em `~/.komune-secrets/`, fora do repositório. O envio está em `apps/app/eas.json` (perfil `producao`).
+- **Corrigido para a montagem:** nome do projeto sem acento (o "í" virava "Triade" numa etapa e "Trade" em outra; embaixo do ícone continua "Tríade"); uma versão só de cada módulo nativo (expo-asset 58.0.18, expo-constants 58.0.13, expo-file-system 58.0.10).
+- **Como montar e enviar as próximas versões:** `TRIADE_APP_AMBIENTE=producao npx eas-cli@25.3.0 build --platform ios --profile producao --non-interactive` e depois `npx eas-cli@25.3.0 submit --platform ios --profile producao --latest --non-interactive`. A primeira montagem de um identificador novo precisa do modo com perguntas (certificado e perfil). No plano grátis, a montagem e o envio esperam fila.
+
+**Pendente:**
+- O usuário criar o grupo de teste interno e instalar pelo TestFlight.
+- Publicar a parte do site (seletor de empresa e downloads), com a comparação tela a tela antes: sem isso, o app do TestFlight entra só na KOMUNE.
+- **Avisos (push), decididos em 05/11/2026:** mensagem nova de cliente, conversa transferida, compromisso marcado e lembrete 30 min antes; na tela de bloqueio, o nome sem a mensagem. Vão na segunda versão.
+- O identificador `br.app.komune.triade` ficou registrado na conta Apple, sem uso. Remover só com o OK do usuário.
