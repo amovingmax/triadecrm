@@ -129,6 +129,22 @@ export type Database = {
         Returns: number
       }
       ai_gasto_do_mes: { Args: { p_ref?: string }; Returns: Json }
+      anuncio_editavel: {
+        Args: { a: Database["public"]["Tables"]["anuncios"]["Row"] }
+        Returns: boolean
+      }
+      anuncio_pendencias: { Args: { p_id: string }; Returns: string[] }
+      anuncio_tipo: {
+        Args: { p_tipo: string }
+        Returns: {
+          area: string
+          pede_banheiros: boolean
+          pede_quartos: boolean
+          uso: string
+          vrsync: string
+        }[]
+      }
+      anuncio_tipo_existe: { Args: { p_tipo: string }; Returns: boolean }
       aplicar_retencao: { Args: never; Returns: Json }
       aposentar_etapa: {
         Args: { p_etapa: string; p_funil: string; p_sucessora: string }
@@ -1768,6 +1784,379 @@ export type Database = {
           },
         ]
       }
+      anuncio_fotos: {
+        Row: {
+          anuncio_id: string
+          caminho: string
+          criada_em: string
+          criada_por: string | null
+          id: string
+          posicao: number
+        }
+        Insert: {
+          anuncio_id: string
+          caminho: string
+          criada_em?: string
+          criada_por?: string | null
+          id?: string
+          posicao?: number
+        }
+        Update: {
+          anuncio_id?: string
+          caminho?: string
+          criada_em?: string
+          criada_por?: string | null
+          id?: string
+          posicao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anuncio_fotos_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncio_fotos_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios_na_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncio_fotos_criada_por_fkey"
+            columns: ["criada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncio_fotos_criada_por_fkey"
+            columns: ["criada_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anuncios: {
+        Row: {
+          area_total: number | null
+          area_util: number | null
+          atualizado_por: string | null
+          bairro: string | null
+          banheiros: number | null
+          caracteristicas: string[]
+          cep: string | null
+          cidade: string | null
+          codigo: string
+          complemento: string | null
+          condominio: number | null
+          criado_em: string
+          criado_por: string | null
+          descricao: string
+          destaque: string
+          endereco: string | null
+          estado: string | null
+          excluido_em: string | null
+          excluido_por: string | null
+          id: string
+          importado_em: string | null
+          iptu: number | null
+          iptu_periodo: string
+          mostrar_endereco: string
+          motivo_exclusao: string | null
+          negocio: string
+          numero: string | null
+          origem: string
+          periodo_aluguel: string
+          preco_aluguel: number | null
+          preco_venda: number | null
+          proprietario_id: string | null
+          publicado_em: string | null
+          publicado_por: string | null
+          quartos: number | null
+          saiu_do_ar_em: string | null
+          situacao: string
+          suites: number | null
+          tipo: string
+          titulo: string
+          updated_at: string
+          vagas: number | null
+          video_youtube: string | null
+        }
+        Insert: {
+          area_total?: number | null
+          area_util?: number | null
+          atualizado_por?: string | null
+          bairro?: string | null
+          banheiros?: number | null
+          caracteristicas?: string[]
+          cep?: string | null
+          cidade?: string | null
+          codigo?: string
+          complemento?: string | null
+          condominio?: number | null
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string
+          destaque?: string
+          endereco?: string | null
+          estado?: string | null
+          excluido_em?: string | null
+          excluido_por?: string | null
+          id?: string
+          importado_em?: string | null
+          iptu?: number | null
+          iptu_periodo?: string
+          mostrar_endereco?: string
+          motivo_exclusao?: string | null
+          negocio?: string
+          numero?: string | null
+          origem?: string
+          periodo_aluguel?: string
+          preco_aluguel?: number | null
+          preco_venda?: number | null
+          proprietario_id?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          quartos?: number | null
+          saiu_do_ar_em?: string | null
+          situacao?: string
+          suites?: number | null
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          vagas?: number | null
+          video_youtube?: string | null
+        }
+        Update: {
+          area_total?: number | null
+          area_util?: number | null
+          atualizado_por?: string | null
+          bairro?: string | null
+          banheiros?: number | null
+          caracteristicas?: string[]
+          cep?: string | null
+          cidade?: string | null
+          codigo?: string
+          complemento?: string | null
+          condominio?: number | null
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string
+          destaque?: string
+          endereco?: string | null
+          estado?: string | null
+          excluido_em?: string | null
+          excluido_por?: string | null
+          id?: string
+          importado_em?: string | null
+          iptu?: number | null
+          iptu_periodo?: string
+          mostrar_endereco?: string
+          motivo_exclusao?: string | null
+          negocio?: string
+          numero?: string | null
+          origem?: string
+          periodo_aluguel?: string
+          preco_aluguel?: number | null
+          preco_venda?: number | null
+          proprietario_id?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          quartos?: number | null
+          saiu_do_ar_em?: string | null
+          situacao?: string
+          suites?: number | null
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          vagas?: number | null
+          video_youtube?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anuncios_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_excluido_por_fkey"
+            columns: ["excluido_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_excluido_por_fkey"
+            columns: ["excluido_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_proprietario_id_fkey"
+            columns: ["proprietario_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_proprietario_id_fkey"
+            columns: ["proprietario_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_publicado_por_fkey"
+            columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_publicado_por_fkey"
+            columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anuncios_no_canal_pro: {
+        Row: {
+          anuncio_id: string | null
+          area: number | null
+          bairro: string | null
+          cidade: string | null
+          codigo: string
+          destaque: string | null
+          endereco: string | null
+          excluido_em: string | null
+          excluido_por: string | null
+          id: string
+          linha: NonNullable<Json>
+          link: string | null
+          marcado_excluido_em: string | null
+          negocio: string | null
+          no_relatorio: boolean
+          preco_aluguel: number | null
+          preco_venda: number | null
+          quartos: number | null
+          situacao: string | null
+          tipo: string | null
+          tipo_crm: string | null
+          titulo: string | null
+          visto_em: string
+          canal_pro_parece_com: string | null
+        }
+        Insert: {
+          anuncio_id?: string | null
+          area?: number | null
+          bairro?: string | null
+          cidade?: string | null
+          codigo: string
+          destaque?: string | null
+          endereco?: string | null
+          excluido_em?: string | null
+          excluido_por?: string | null
+          id?: string
+          linha?: NonNullable<Json>
+          link?: string | null
+          marcado_excluido_em?: string | null
+          negocio?: string | null
+          no_relatorio?: boolean
+          preco_aluguel?: number | null
+          preco_venda?: number | null
+          quartos?: number | null
+          situacao?: string | null
+          tipo?: string | null
+          tipo_crm?: string | null
+          titulo?: string | null
+          visto_em?: string
+        }
+        Update: {
+          anuncio_id?: string | null
+          area?: number | null
+          bairro?: string | null
+          cidade?: string | null
+          codigo?: string
+          destaque?: string | null
+          endereco?: string | null
+          excluido_em?: string | null
+          excluido_por?: string | null
+          id?: string
+          linha?: NonNullable<Json>
+          link?: string | null
+          marcado_excluido_em?: string | null
+          negocio?: string | null
+          no_relatorio?: boolean
+          preco_aluguel?: number | null
+          preco_venda?: number | null
+          quartos?: number | null
+          situacao?: string | null
+          tipo?: string | null
+          tipo_crm?: string | null
+          titulo?: string | null
+          visto_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anuncios_no_canal_pro_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: true
+            referencedRelation: "anuncios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_no_canal_pro_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: true
+            referencedRelation: "anuncios_na_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_no_canal_pro_excluido_por_fkey"
+            columns: ["excluido_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_no_canal_pro_excluido_por_fkey"
+            columns: ["excluido_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           description: string | null
@@ -2847,6 +3236,113 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      canal_pro: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          chave: string
+          email: string | null
+          importado_em: string | null
+          importado_por: string | null
+          importados: number | null
+          limite_anuncios: number | null
+          limite_destaques: number | null
+          nome: string | null
+          sistema_atual_lido_em: string | null
+          sistema_atual_url: string | null
+          site: string | null
+          telefone: string | null
+          um: boolean
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          chave?: string
+          email?: string | null
+          importado_em?: string | null
+          importado_por?: string | null
+          importados?: number | null
+          limite_anuncios?: number | null
+          limite_destaques?: number | null
+          nome?: string | null
+          sistema_atual_lido_em?: string | null
+          sistema_atual_url?: string | null
+          site?: string | null
+          telefone?: string | null
+          um?: boolean
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          chave?: string
+          email?: string | null
+          importado_em?: string | null
+          importado_por?: string | null
+          importados?: number | null
+          limite_anuncios?: number | null
+          limite_destaques?: number | null
+          nome?: string | null
+          sistema_atual_lido_em?: string | null
+          sistema_atual_url?: string | null
+          site?: string | null
+          telefone?: string | null
+          um?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canal_pro_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canal_pro_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canal_pro_importado_por_fkey"
+            columns: ["importado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canal_pro_importado_por_fkey"
+            columns: ["importado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      canal_pro_leituras: {
+        Row: {
+          anuncios: number
+          do_grupo_olx: boolean
+          em: string
+          id: number
+          user_agent: string | null
+        }
+        Insert: {
+          anuncios: number
+          do_grupo_olx: boolean
+          em?: string
+          id?: never
+          user_agent?: string | null
+        }
+        Update: {
+          anuncios?: number
+          do_grupo_olx?: boolean
+          em?: string
+          id?: never
+          user_agent?: string | null
+        }
+        Relationships: []
       }
       categories: {
         Row: {
@@ -6078,6 +6574,199 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_lead_contatos: {
+        Row: {
+          criado_em: string
+          email: string | null
+          lead_id: string
+          nome: string | null
+          telefone_e164: string | null
+        }
+        Insert: {
+          criado_em?: string
+          email?: string | null
+          lead_id: string
+          nome?: string | null
+          telefone_e164?: string | null
+        }
+        Update: {
+          criado_em?: string
+          email?: string | null
+          lead_id?: string
+          nome?: string | null
+          telefone_e164?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_lead_contatos_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "portal_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_lead_contatos_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "portal_leads_na_lista"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portal_leads: {
+        Row: {
+          anuncio_id: string | null
+          anuncio_no_canal_pro_id: string | null
+          client_listing_id: string | null
+          contato_apagado_em: string | null
+          conversation_id: string | null
+          id: string
+          lead_certo: boolean
+          link_historico: string | null
+          mcmv: boolean
+          mensagem: string | null
+          motivo_descarte: string | null
+          organization_id: string | null
+          origem: string
+          origem_no_portal: string | null
+          origin_lead_id: string
+          origin_listing_id: string | null
+          payload: NonNullable<Json>
+          recebido_em: string
+          recebido_no_portal_em: string | null
+          responsavel_id: string | null
+          situacao: string
+          situacao_em: string | null
+          situacao_por: string | null
+          suprimido: boolean
+          temperatura: string | null
+          tipos: string[]
+          transacao: string | null
+        }
+        Insert: {
+          anuncio_id?: string | null
+          anuncio_no_canal_pro_id?: string | null
+          client_listing_id?: string | null
+          contato_apagado_em?: string | null
+          conversation_id?: string | null
+          id?: string
+          lead_certo?: boolean
+          link_historico?: string | null
+          mcmv?: boolean
+          mensagem?: string | null
+          motivo_descarte?: string | null
+          organization_id?: string | null
+          origem?: string
+          origem_no_portal?: string | null
+          origin_lead_id: string
+          origin_listing_id?: string | null
+          payload?: NonNullable<Json>
+          recebido_em?: string
+          recebido_no_portal_em?: string | null
+          responsavel_id?: string | null
+          situacao?: string
+          situacao_em?: string | null
+          situacao_por?: string | null
+          suprimido?: boolean
+          temperatura?: string | null
+          tipos?: string[]
+          transacao?: string | null
+        }
+        Update: {
+          anuncio_id?: string | null
+          anuncio_no_canal_pro_id?: string | null
+          client_listing_id?: string | null
+          contato_apagado_em?: string | null
+          conversation_id?: string | null
+          id?: string
+          lead_certo?: boolean
+          link_historico?: string | null
+          mcmv?: boolean
+          mensagem?: string | null
+          motivo_descarte?: string | null
+          organization_id?: string | null
+          origem?: string
+          origem_no_portal?: string | null
+          origin_lead_id?: string
+          origin_listing_id?: string | null
+          payload?: NonNullable<Json>
+          recebido_em?: string
+          recebido_no_portal_em?: string | null
+          responsavel_id?: string | null
+          situacao?: string
+          situacao_em?: string | null
+          situacao_por?: string | null
+          suprimido?: boolean
+          temperatura?: string | null
+          tipos?: string[]
+          transacao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_leads_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios_na_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_anuncio_no_canal_pro_id_fkey"
+            columns: ["anuncio_no_canal_pro_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios_no_canal_pro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_situacao_por_fkey"
+            columns: ["situacao_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_situacao_por_fkey"
+            columns: ["situacao_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pre_registration_acceptances: {
         Row: {
           accepted_at: string
@@ -7129,6 +7818,24 @@ export type Database = {
           nome?: string
           posicao?: number
           slug?: string
+        }
+        Relationships: []
+      }
+      sistema_atual_no_arquivo: {
+        Row: {
+          codigo: string
+          em: string
+          no_arquivo: boolean
+        }
+        Insert: {
+          codigo: string
+          em?: string
+          no_arquivo: boolean
+        }
+        Update: {
+          codigo?: string
+          em?: string
+          no_arquivo?: boolean
         }
         Relationships: []
       }
@@ -8961,6 +9668,78 @@ export type Database = {
       }
     }
     Views: {
+      anuncios_na_lista: {
+        Row: {
+          area_total: number | null
+          area_util: number | null
+          bairro: string | null
+          banheiros: number | null
+          capa: string | null
+          caracteristicas_qtd: number | null
+          cep: string | null
+          cidade: string | null
+          codigo: string | null
+          codigo_no_canal_pro: string | null
+          condominio: number | null
+          criado_em: string | null
+          criado_por_nome: string | null
+          descricao_tamanho: number | null
+          destaque: string | null
+          endereco: string | null
+          estado: string | null
+          excluido_em: string | null
+          fotos: number | null
+          id: string | null
+          importado_em: string | null
+          iptu: number | null
+          leads: number | null
+          mostrar_endereco: string | null
+          motivo_exclusao: string | null
+          negocio: string | null
+          no_canal_pro_contatos: number | null
+          no_canal_pro_criado_em: string | null
+          no_canal_pro_situacao: string | null
+          no_canal_pro_visto_em: string | null
+          no_canal_pro_visualizacoes: number | null
+          no_sistema_atual: boolean | null
+          numero: string | null
+          origem: string | null
+          pendencias: string[] | null
+          periodo_aluguel: string | null
+          preco_aluguel: number | null
+          preco_venda: number | null
+          proprietario_id: string | null
+          proprietario_nome: string | null
+          publicado_em: string | null
+          quartos: number | null
+          saiu_do_ar_em: string | null
+          sistema_atual_em: string | null
+          situacao: string | null
+          suites: number | null
+          tipo: string | null
+          titulo: string | null
+          ultima_leitura_do_portal: string | null
+          updated_at: string | null
+          vagas: number | null
+          video_youtube: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anuncios_proprietario_id_fkey"
+            columns: ["proprietario_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anuncios_proprietario_id_fkey"
+            columns: ["proprietario_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts_view: {
         Row: {
           anonymized_at: string | null
@@ -9121,6 +9900,103 @@ export type Database = {
           {
             foreignKeyName: "organizations_temperature_override_by_fkey"
             columns: ["temperature_override_by"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portal_leads_na_lista: {
+        Row: {
+          anuncio_codigo: string | null
+          anuncio_id: string | null
+          anuncio_no_canal_pro_id: string | null
+          anuncio_titulo: string | null
+          chegou_em: string | null
+          chegou_por: string | null
+          client_listing_id: string | null
+          contato_apagado_em: string | null
+          conversation_id: string | null
+          email: string | null
+          ficha_nome: string | null
+          grupo: string | null
+          id: string | null
+          lead_certo: boolean | null
+          link_historico: string | null
+          mcmv: boolean | null
+          mensagem: string | null
+          motivo_descarte: string | null
+          nome_no_portal: string | null
+          organization_id: string | null
+          origem: string | null
+          origem_no_portal: string | null
+          origin_lead_id: string | null
+          origin_listing_id: string | null
+          phone_e164: string | null
+          phone_is_masked: boolean | null
+          primeira_mensagem: string | null
+          primeira_mensagem_tipo: string | null
+          recebido_em: string | null
+          recebido_no_portal_em: string | null
+          respondido_em: string | null
+          respondido_por_nome: string | null
+          responsavel_id: string | null
+          responsavel_nome: string | null
+          situacao: string | null
+          situacao_em: string | null
+          situacao_por: string | null
+          situacao_registrada: string | null
+          suprimido: boolean | null
+          temperatura: string | null
+          tipos: string[] | null
+          transacao: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_leads_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios_na_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_anuncio_no_canal_pro_id_fkey"
+            columns: ["anuncio_no_canal_pro_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios_no_canal_pro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_situacao_por_fkey"
+            columns: ["situacao_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_situacao_por_fkey"
+            columns: ["situacao_por"]
             isOneToOne: false
             referencedRelation: "team_directory"
             referencedColumns: ["id"]
@@ -9341,6 +10217,16 @@ export type Database = {
         Args: { p_contact_id?: string; p_organization_id: string }
         Returns: boolean
       }
+      anuncio_destaque: { Args: { p_destaque: string; p_id: string }; Returns: Json }
+      anuncio_excluir: { Args: { p_id: string; p_motivo: string }; Returns: Json }
+      anuncio_foto_adicionar: { Args: { p_anuncio: string; p_caminho: string }; Returns: Json }
+      anuncio_foto_remover: { Args: { p_foto: string }; Returns: Json }
+      anuncio_fotos_ordenar: { Args: { p_anuncio: string; p_ordem: string[] }; Returns: Json }
+      anuncio_importar: { Args: { p_dados: Json }; Returns: Json }
+      anuncio_publicar: { Args: { p_id: string }; Returns: Json }
+      anuncio_restaurar: { Args: { p_id: string }; Returns: Json }
+      anuncio_salvar: { Args: { p_dados: Json; p_id?: string }; Returns: Json }
+      anuncio_tirar_do_ar: { Args: { p_id: string }; Returns: Json }
       aprovar_rascunho: {
         Args: { p_draft_id: string; p_texto_final?: string }
         Returns: Json
@@ -9359,6 +10245,24 @@ export type Database = {
       }
       cadencias_do_negocio: { Args: { p_deal_id: string }; Returns: Json }
       cadencias_visao: { Args: never; Returns: Json }
+      canal_pro_ajustar: {
+        Args: { p_email: string; p_nome: string; p_site: string; p_telefone: string }
+        Returns: Json
+      }
+      canal_pro_ajustar_plano: {
+        Args: { p_anuncios: number; p_destaques: number }
+        Returns: Json
+      }
+      canal_pro_feed: { Args: { p_chave: string; p_quem?: string }; Returns: Json }
+      canal_pro_importar: { Args: { p_anuncios: Json }; Returns: Json }
+      canal_pro_marcar_excluido: { Args: { p_excluido?: boolean; p_id: string }; Returns: Json }
+      canal_pro_parece_com: {
+        Args: { m: Database["public"]["Tables"]["anuncios_no_canal_pro"]["Row"] }
+        Returns: string
+      }
+      canal_pro_situacao: { Args: never; Returns: Json }
+      canal_pro_trazer: { Args: { p_id: string }; Returns: Json }
+      canal_pro_trocar_chave: { Args: never; Returns: Json }
       consultoria_marcar: {
         Args: { p_organization_ids: string[]; p_sim: boolean }
         Returns: Json
@@ -9659,6 +10563,7 @@ export type Database = {
         Returns: Json
       }
       grupo_sincronizar: { Args: { p_grupo_id: string }; Returns: Json }
+      grupozap_lead_receber: { Args: { p_chave: string; p_lead: Json }; Returns: Json }
       ia_adiar_trabalho: {
         Args: {
           p_chave: string
@@ -9941,6 +10846,12 @@ export type Database = {
         }
         Returns: Json
       }
+      portal_lead_assumir: { Args: { p_id: string }; Returns: Json }
+      portal_lead_mudar: {
+        Args: { p_id: string; p_motivo?: string; p_situacao: string }
+        Returns: Json
+      }
+      portal_lead_revelar_telefone: { Args: { p_id: string }; Returns: string }
       pre_cadastro_do_parceiro: {
         Args: { p_organization_id: string }
         Returns: Json
@@ -10382,6 +11293,9 @@ export type Database = {
           total_count: number
         }[]
       }
+      sistema_atual_endereco: { Args: Record<PropertyKey, never>; Returns: string }
+      sistema_atual_endereco_salvar: { Args: { p_url: string }; Returns: Json }
+      sistema_atual_leitura_registrar: { Args: { p_codigos: string[] }; Returns: Json }
       source_category_esquecer: {
         Args: { p_source_id: number; p_texto: string }
         Returns: Json

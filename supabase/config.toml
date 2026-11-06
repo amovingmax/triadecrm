@@ -496,3 +496,17 @@ verify_jwt = false
 # porque um projeto novo pode assinar o JWT com chave que esta primeira porta não lê.
 [functions.wa-chamada]
 verify_jwt = false
+
+# O arquivo de anúncios que o Canal Pro lê (04/11/2026), só no projeto da Imova.
+# O robô do Grupo OLX baixa sem credencial do Supabase: quem confere é a chave
+# de 64 caracteres na URL, comparada pelo Postgres (`public.canal_pro_feed`).
+[functions.canal-pro-feed]
+verify_jwt = false
+
+# Os leads do ZAP Imóveis, Viva Real e OLX (05/11/2026), só no projeto da Imova.
+# O Grupo OLX chama com `Authorization: Basic` (usuário e SECRET_KEY): quem
+# confere é a função (grupozap-lead/autenticacao.ts), antes de ler o corpo. Com
+# `true` o gateway tomaria esse Basic por um JWT inválido e responderia 401 a
+# todo lead — inclusive ao validador oficial de endpoint.
+[functions.grupozap-lead]
+verify_jwt = false

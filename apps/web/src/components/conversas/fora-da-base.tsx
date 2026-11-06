@@ -74,6 +74,8 @@ import { useEu } from './assumir-conversa';
 import { AtitudeDaConversaNoTopo } from './atitude';
 import type { BaseDasAtitudes } from './atitude-dados';
 import type { CatalogosConversas } from './montagem';
+import { OrigemNoPortal } from './origem-no-portal';
+import { origemCurta, useOrigemNoPortal } from './origem-no-portal-dados';
 import { TextoLivre } from './responder';
 import { useRolagemNoFim } from './rolagem-no-fim';
 
@@ -222,12 +224,21 @@ export function ConversaForaDaBase({
     (window.matchMedia('(pointer: coarse)').matches && (painel.current?.clientWidth ?? 0) < 672);
   const ehCelular = useEhCelular();
   const rotulo = nomeDoCliente(fio);
+  // O lead dos portais (05/11/2026, só na Imova; na KOMUNE não há consulta): a
+  // pessoa mandou mensagem aqui depois de tocar num anúncio, e a ficha automática
+  // ainda não rodou. Só lido e mostrado: nada disso toca no WhatsApp.
+  const origemNoPortal = useOrigemNoPortal({ conversaId: fio.id, organizacaoId: null });
 
   // O que a folha do celular e a coluna "Dados do contato" mostram: a atitude, as
   // ações e o telefone.
   const ficha = (naFolha: boolean) => (
     <>
       <AtitudeNaFolha conversaId={fio.id} podeEscrever={Boolean(eu?.podeEscrever)} />
+      {origemNoPortal ? (
+        <div className="flex flex-wrap">
+          <OrigemNoPortal conversaId={fio.id} organizacaoId={null} naFolha={naFolha} />
+        </div>
+      ) : null}
 
       <section aria-label="Ações" className="flex flex-col gap-2">
         <h3 className={ROTULO_DA_SECAO}>Ações</h3>
@@ -324,7 +335,8 @@ export function ConversaForaDaBase({
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="truncate text-base leading-tight font-semibold">{rotulo}</span>
                 <span className="truncate text-[12.5px] text-wpp-suave">
-                  {nome ? `${formatarTelefone(fio.peer_phone_e164)} · ` : ''}não é parceiro
+                  {nome ? `${formatarTelefone(fio.peer_phone_e164)} · ` : ''}
+                  {origemCurta(origemNoPortal) ?? 'não é parceiro'}
                 </span>
               </span>
               <span className="sr-only">: ver o telefone e as ações</span>

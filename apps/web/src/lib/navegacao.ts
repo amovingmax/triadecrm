@@ -88,6 +88,7 @@
  */
 import {
   Bot,
+  Building2,
   CalendarDays,
   ChartColumn,
   Handshake,
@@ -150,8 +151,9 @@ export type ItemNavegacao = {
   papeis?: readonly AppRole[];
   /**
    * O módulo da empresa sem o qual a tela não existe (`EMPRESA.modulos`). Sem
-   * valor, a tela é de todas as empresas. A "IA que atende" (06/11/2026) só
-   * aparece na Imova: na KOMUNE não está em menu, paleta nem barra.
+   * valor, a tela é de todas as empresas. Anúncios (04/11/2026) e a "IA que
+   * atende" (06/11/2026) são de uma empresa só: na KOMUNE eles não aparecem em
+   * menu, paleta nem barra.
    */
   modulo?: keyof Empresa['modulos'];
   /** A fila que este item conta na lateral. Ausente = nunca mostra número. */
@@ -346,6 +348,18 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
       'Kanban dos funis de fornecedores e de produtores, a partir de Contatado: cartão com semáforo, próxima ação obrigatória e motivos de perda. Quem ainda não foi contatado está em Prospectados.',
     posicaoNaBarra: 4,
     papeis: PAPEIS_DO_CRM,
+  },
+  {
+    href: '/anuncios',
+    rotulo: 'Anúncios',
+    icone: Building2,
+    grupo: 'a_base',
+    // As palavras que alguém digitaria na paleta: ZAP, Viva Real, OLX, Canal Pro,
+    // imóvel, casa, apartamento, terreno, foto, destaque.
+    descricao:
+      'Anúncios de imóveis (casa, apartamento, terreno, sala) que sobem pelo Canal Pro para o ZAP, Viva Real e OLX: fotos, preço, endereço e destaque, o que falta para ir ao ar e quando o portal leu.',
+    papeis: PAPEIS_DO_CRM,
+    modulo: 'anuncios',
   },
   // -------------------------------------------------------------------------
   // Controle
