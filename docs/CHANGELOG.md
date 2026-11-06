@@ -9352,3 +9352,22 @@ Pedido do usuário: "utilizar uma IA para responder os clientes no CRM da Imova.
 **Em produção agora (lido em 06/11):** IA ligada, modo treino, modelo Sonnet 5.5 (escolhido pela tela), **sem conversa de treino**, 0 respostas.
 
 **Para publicar, só com pedido:** conferir o ar; `main` + push; `publicar-banco.mjs imova migrar` (as 4 migrações); site da Imova de cópia limpa; `fly deploy` do `imova-worker-ai` (sem ele, o worker no ar ignora o Haiku e usa o Opus). Depois, na tela: Configuração → Conversa do treino → "Janio" → "Treinar por esta".
+
+## 06/11/2026 (fim da tarde) — App de celular em dia com a main: Anúncios do Canal Pro e IA que atende (branch `app-celular`; PRD §8)
+
+Pedido do usuário: o que foi publicado hoje deve aparecer também no teste do app (Expo).
+
+- **Junção da main** (`97b4c1d`) na `app-celular` (`ad4c11c`). Só dois conflitos:
+  - o aviso `troca` do login, mantido;
+  - o fim deste arquivo, com as duas partes mantidas.
+- **A migração dos avisos agora é `20261106210000`** (era `20261106120000`), e o pgTAP passou a ser o `135`.
+  - O horário antigo era o mesmo da migração do canal de chegada, que está noutra branch.
+  - O horário antigo também ficaria atrás das migrações da Imova que já estão no ar, e a publicação pediria `--include-all`.
+- **Bancos locais em dia com a main** (sem publicar nada):
+  - na Imova, 7 migrações dos Anúncios. A `20261106100000` já estava aplicada sem registro; foi reaplicada, tirando antes a política repetida;
+  - na KOMUNE, as mesmas 7 e mais as 5 da IA que atende. Lá elas não ligam nada.
+- **Verificado:**
+  - site: tipos, lint e 1.710 testes;
+  - app: tipos e 42 testes;
+  - pgTAP 135 (avisos) nos dois bancos locais, e 133 (IA que atende) e 130 (excluir duplicado) no da Imova.
+- **No teste local a IA não responde:** o robô da IA (`worker-ai`) não roda no Mac. As telas da IA aparecem; as respostas, não.
