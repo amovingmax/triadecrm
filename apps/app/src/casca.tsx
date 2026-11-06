@@ -2,6 +2,7 @@ import NetInfo from '@react-native-community/netinfo';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { randomUUID } from 'expo-crypto';
 import { File as ArquivoNoAparelho, Paths } from 'expo-file-system';
+import * as Notificacoes from 'expo-notifications';
 import { shareAsync } from 'expo-sharing';
 import { openAuthSessionAsync } from 'expo-web-browser';
 import { useEffect, useRef, useState } from 'react';
@@ -28,6 +29,7 @@ import {
   type EmpresaDoApp,
 } from './ambiente';
 import { arquivoDaMensagem, type ArquivoRecebido } from './arquivo';
+import { enderecoDoAviso, origemDe, scriptDoAparelho } from './aviso';
 import { AVISAR_COR_DA_BARRA, corDaMensagem, estiloDaBarra } from './cor-da-barra';
 import { empresaGuardada, empresaParaLembrar } from './empresa';
 import {
@@ -101,6 +103,38 @@ function abrirNoAparelho(endereco: string) {
  * do app e abre a folha de compartilhar (Salvar em Arquivos, WhatsApp, e-mail). Uma
  * folha por vez: um segundo toque com ela aberta não abre outra.
  */
+/**
+ * Os avisos no celular (`aviso.ts`). Com o app aberto, o aviso aparece em cima, como o
+ * do WhatsApp; o número no ícone fica para depois.
+ */
+Notificacoes.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+// O endereço de push deste aparelho, pedido uma vez por abertura do app. A pergunta do
+// iPhone ("Permitir notificações?") aparece só na primeira vez, já dentro do CRM.
+let enderecoDePush: Promise<string | null> | null = null;
+function pedirEnderecoDePush(): Promise<string | null> {
+  enderecoDePush ??= (async () => {
+    try {
+      const { status } = await Notificacoes.requestPermissionsAsync();
+      if (status !== 'granted') return null;
+      const projectId = (Constants.expoConfig?.extra?.eas as { projectId?: string } | undefined)
+        ?.projectId;
+      const { data } = await Notificacoes.getExpoPushTokenAsync(projectId ? { projectId } : {});
+      return data;
+    } catch {
+      return null;
+    }
+  })();
+  return enderecoDePush;
+}
+
 let compartilhando = false;
 async function entregarAoAparelho({ nome, base64, tipo }: ArquivoRecebido) {
   if (compartilhando) return;
@@ -134,6 +168,7 @@ async function entregarAoAparelho({ nome, base64, tipo }: ArquivoRecebido) {
  *     (`entrada.ts`), porque o Google recusa login dentro da WebView;
  *   · abre na última empresa em que a pessoa entrou (`empresa.ts`);
  *   · entrega os downloads do site à folha de compartilhar do aparelho (`arquivo.ts`);
+ *   · recebe os avisos no celular e abre a tela do aviso tocado (`aviso.ts`);
  *   · pinta a faixa do relógio com a cor do tema do site (`cor-da-barra.ts`);
  *   · mostra "Sem internet" quando o site não abre e volta sozinha com a conexão;
  *   · no Android, o botão voltar volta uma página antes de sair do app.
@@ -185,6 +220,54 @@ function Tela() {
   // Uma janela segura por vez: um segundo toque em "Entrar com Google" com ela aberta
   // não abre outra.
   const entrando = useRef(false);
+
+  // Avisos: em que empresas este aparelho já foi entregue nesta abertura do app, e a
+  // tela de um aviso tocado antes de a página estar pronta.
+  const entregueEm = useRef(new Set<string>());
+  const carregou = useRef(false);
+  const avisoPendente = useRef<string | null>(null);
+
+  function irPara(endereco: string) {
+    webview.current?.injectJavaScript(`window.location.assign(${JSON.stringify(endereco)});true;`);
+  }
+
+  function abrirAviso(resposta: Notificacoes.NotificationResponse) {
+    const destino = enderecoDoAviso(resposta.notification.request.content.data, ORIGENS);
+    if (!destino) return;
+    if (carregou.current) irPara(destino);
+    else avisoPendente.current = destino;
+  }
+
+  useEffect(() => {
+    const assinatura = Notificacoes.addNotificationResponseReceivedListener(abrirAviso);
+    // O app estava fechado e abriu pelo toque no aviso.
+    void Notificacoes.getLastNotificationResponseAsync().then((resposta) => {
+      if (resposta) {
+        abrirAviso(resposta);
+        void Notificacoes.clearLastNotificationResponseAsync();
+      }
+    });
+    return () => assinatura.remove();
+  }, []);
+
+  // Já dentro do CRM de uma empresa (e não no login): entrega o aparelho a ela, uma vez
+  // por abertura. Voltar ao login (saiu da conta) libera a entrega de novo, para quem
+  // entrar depois neste aparelho.
+  async function entregarAparelho(endereco: string) {
+    const origem = origemDe(endereco);
+    if (!origem) return;
+    if (!empresaParaLembrar(endereco, ORIGENS)) {
+      if (/\/login(\?|$)/.test(endereco)) entregueEm.current.delete(origem);
+      return;
+    }
+    if (entregueEm.current.has(origem)) return;
+    entregueEm.current.add(origem);
+    const token = await pedirEnderecoDePush();
+    if (!token) return;
+    webview.current?.injectJavaScript(
+      scriptDoAparelho(token, Platform.OS === 'android' ? 'android' : 'ios'),
+    );
+  }
 
   async function entrarPelaJanela(origem: string) {
     if (entrando.current) return;
@@ -278,9 +361,19 @@ function Tela() {
         }}
         onNavigationStateChange={(estado) => {
           podeVoltar.current = estado.canGoBack;
-          if (!estado.loading) lembrarEmpresa(estado.url);
+          if (!estado.loading) {
+            lembrarEmpresa(estado.url);
+            void entregarAparelho(estado.url);
+          }
         }}
-        onLoad={() => setSemInternet(false)}
+        onLoad={() => {
+          setSemInternet(false);
+          carregou.current = true;
+          if (avisoPendente.current) {
+            irPara(avisoPendente.current);
+            avisoPendente.current = null;
+          }
+        }}
         onError={() => setSemInternet(true)}
         renderError={() => (
           <SemInternet

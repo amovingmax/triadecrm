@@ -8787,3 +8787,41 @@ Pedido do usuário: a logo de cada empresa na escolha do login do app, e trocar 
 **Pendente:**
 - Publicar (com a comparação tela a tela antes). O botão de trocar muda também no navegador.
 - Não testado: a recusa de quem não tem acesso na outra empresa (403). Os usuários de teste têm acesso às duas.
+
+## 06/11/2026 — Avisos no celular (push do app) (branch `app-celular`; RF-CON-05, PRD §8)
+
+Decisões do usuário (05/11/2026): avisar **mensagem nova de cliente ou parceiro**, **conversa transferida para a pessoa** e **compromisso marcado para ela, com lembrete 30 min antes**. Lote para ligar ficou fora. Na tela de bloqueio vai **o nome, nunca o conteúdo**. Pedido de 06/11: os avisos antes de publicar qualquer coisa.
+
+**Entregue:**
+- **Banco** (migração `20261106120000_avisos_no_celular`, as duas empresas):
+  - `public.aparelhos_push`, gravada só por `public.aparelho_registrar` e `public.aparelho_remover`, com a sessão da pessoa;
+  - `app.push_fila`, onde cada fato vira no máximo um aviso por pessoa (chave única);
+  - `app.avisos_push_rodar` a cada 10 segundos pelo pg_cron. A rotina varre os últimos 2 minutos e manda ao serviço de push do Expo (grátis) com o pg_net, que a migração liga. Quando o Expo diz que o app saiu do aparelho, o aparelho é esquecido.
+  - **O WhatsApp não é tocado:** nenhum gatilho em `messages` ou `conversations`. A varredura só lê `conversations.last_inbound_at`, `conversa_transferencias`, `agenda_avisos`, `reunioes` e `tasks`.
+  - **Quem recebe a mensagem nova** segue a regra do aviso do navegador (`components/avisos/regra.ts`): parceiro já atendido avisa só o responsável; cliente, ou parceiro sem resposta, avisa todos os ativos que atendem (admin, gestor e sdr). Quem silenciou a conversa não recebe. Mensagens seguidas da mesma conversa geram um aviso por minuto.
+  - Os textos:
+    - "Nova mensagem de DJ Done";
+    - "Gil passou a conversa com DJ Done para você";
+    - "Gil marcou para você: Visita ao Buffet, 20/11 às 13:00";
+    - "Daqui a 30 min: Reunião …, às 15:00".
+    O título é o nome da empresa.
+  - Chave geral: `app_settings['avisos.push'].ativo = false` desliga tudo, sem deploy.
+- **Site:**
+  - `POST /api/aparelhos` registra o aparelho na empresa, com a sessão;
+  - `/auth/signout` lê o cookie `triade_aparelho` que o app deixa e remove o aparelho antes de encerrar a sessão.
+- **App** (`src/aviso.ts`, `expo-notifications` 58.1.6):
+  - pede a permissão do iPhone já dentro do CRM;
+  - entrega o aparelho a cada empresa em que a pessoa entra;
+  - mostra o aviso também com o app aberto;
+  - o toque abre a conversa ou a agenda na empresa certa, inclusive com o app fechado.
+- **Verificado:**
+  - no banco de teste, uma mensagem de número fictício virou "Nova mensagem de DJ Done" só para o responsável, foi ao Expo, e o aparelho falso foi esquecido pela resposta dele. Nada saiu pelo WhatsApp;
+  - pgTAP 130 com 19 testes;
+  - site: registrar (204), lixo (400), sem sessão (login) e sair removendo o aparelho;
+  - app: tipos, lint e 42 testes; site: 1.539 testes.
+  - A bateria pgTAP inteira tem falhas antigas do banco local (dados de testes manuais, datas e migrações de outros ramos), nenhuma ligada aos avisos.
+
+**Pendente:**
+- O primeiro aviso de verdade no iPhone, pelo teste do Mac (Expo Go).
+- Na versão do TestFlight, conferir se a chave de push da Apple está no Expo. Se não estiver, criá-la ou reaproveitar a da conta (limite de 2 por conta).
+- Publicar: banco (com o pg_net) e site das duas empresas, com a comparação tela a tela antes, e montar a versão 2 do app.

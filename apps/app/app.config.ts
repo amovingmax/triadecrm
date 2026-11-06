@@ -80,6 +80,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       permissions: ['android.permission.RECORD_AUDIO', 'android.permission.MODIFY_AUDIO_SETTINGS'],
     },
     plugins: [
+      // Os avisos no celular (push): a permissão do iPhone e o recebimento (src/aviso.ts).
+      'expo-notifications',
       // A abertura: a logo sobre o fundo escuro do site, para a troca para a WebView não
       // piscar outra cor.
       [
