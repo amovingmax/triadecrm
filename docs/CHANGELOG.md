@@ -8917,3 +8917,28 @@ Pedido do usuário: "utilizar uma IA para responder os clientes no CRM da Imova.
 - Pôr os anúncios no ar pela aba Anúncios: enquanto estiverem em rascunho, a IA não os oferece como disponíveis.
 - Os avisos por e-mail do espaço Imova na Anthropic continuam em US$ 8 e US$ 12 (sugestão: US$ 15 e US$ 24).
 - As decisões da entrada de 06/11 (setor que recebe, agenda da visita, quando ir para os clientes, login do colaborador).
+
+### 06/11/2026 (fim da tarde) — a IA que atende no Claude Haiku 5.5, e três correções que o ensaio mostrou (só na Imova)
+
+**Pedido do usuário:** "Preciso que mude o modelo da IA para o haiku 5.5 para economizarmos mais, e ainda termos um treinamento de qualidade." Antes disso: "Não consegui encontrar essa conversa do treino."
+
+**Feito (branch `ia-atendente`, ainda não publicado):**
+- **Haiku 5.5** (`20261106180000_a_ia_atende_com_haiku`): `ia_atendente_configurar` aceita `claude-haiku-5-5`, e o modelo de hoje vira o Haiku (troca única; depois, quem escolhe é a tela). Preço oficial US$ 0,10 / US$ 0,50 por milhão de tokens, 40 vezes menos que o Opus 5.5; já estava em `ai_model_prices` (a leitura do cliente usa o mesmo modelo). O worker aceita os três modelos; a tela oferece Haiku, Sonnet e Opus 5.5, com o custo de cada um. O seed (bloco 12h) nasce com o Haiku nas instalações novas. Esforço `low`, o mesmo da leitura.
+- **O teto de fala do robô** (`20261106190000_a_ia_e_o_teto_do_robo`): o RF-CON-20 (6 falas por conversa em 24 h; pingue-pongue de 20 s) derrubava a IA que atende na sétima resposta do dia e pausava o robô para sempre quando o cliente respondia rápido três vezes. Na Imova: as respostas da IA não contam nas 6 falas (ela tem o teto dela, 20 por hora numa conversa); pingue-pongue em 8 s; com o robô pausado a IA não atende (a tela mostra "IA parada" com o motivo); ligar a IA de novo tira a pausa, menos de quem pediu para sair, foi suprimido ou apagado (`app.wa_motivo_de_recusa`). Fusível global e repetição continuam valendo. A KOMUNE não muda.
+- **No treino, passar não para** (`20261106193000_no_treino_a_ia_nao_para_ao_passar`): na conversa do treino, o aviso de passar para o corretor sai, mas a IA continua atendendo, sem trocar o responsável nem abrir tarefa. Sem isso, a instrução seguinte do Janio era ignorada. Com cliente de verdade, nada muda. Número trocado de `20261106200000` porque outra branch (`os_relatorios_da_imova`) já usa esse.
+- **Procurar a conversa do treino** (`20261106194000_procurar_a_conversa_do_treino`): `public.ia_procurar_conversas` procura sem acento e sem maiúscula no nome do contato e no da ficha, ou pelos dígitos do telefone; a tela mostra o telefone mascarado ao lado do nome. Antes, "Jânio" não achava "Janio".
+
+**Medido no local, com o Haiku 5.5 de verdade** (bateria escrevendo como o cliente, em ritmo de gente):
+- terreno do anúncio em Parnamirim: perguntou qual dos dois, com tamanho e preço certos;
+- visita: ofereceu horários livres e marcou na agenda (segunda, 10h20, no endereço do anúncio);
+- desconto à vista: não prometeu e passou para o corretor;
+- escritura e financiamento: "não tenho essa informação confirmada, prefiro não chutar";
+- "IA, anota: ...": gravou no caderno, e a pergunta seguinte já usou a regra;
+- ligação: passou para o corretor.
+- Custo: de US$ 0,0003 a US$ 0,0018 por resposta (o Opus custou de US$ 0,01 a US$ 0,058). Ponto de estilo para o treino: ela abre quase toda mensagem com "Oi, Janio!".
+
+**Verificado:** pgTAP 133 com 62 asserções; o teste 70 (teto de fala) continua compatível (pingue-pongue de 5 s, 6 falas dos outros robôs) e o erro dele no banco local da Imova já existia com as regras antigas; lint, tipos e 2.548 testes.
+
+**Em produção agora (lido em 06/11):** IA ligada, modo treino, modelo Sonnet 5.5 (escolhido pela tela), **sem conversa de treino**, 0 respostas.
+
+**Para publicar, só com pedido:** conferir o ar; `main` + push; `publicar-banco.mjs imova migrar` (as 4 migrações); site da Imova de cópia limpa; `fly deploy` do `imova-worker-ai` (sem ele, o worker no ar ignora o Haiku e usa o Opus). Depois, na tela: Configuração → Conversa do treino → "Janio" → "Treinar por esta".
