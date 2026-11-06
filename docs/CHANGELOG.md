@@ -9511,3 +9511,40 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 - `imova-worker-ai` v5 no Fly (de cópia limpa de `988f055`); volta: v4. Site não publicado (nada mudou nele).
 - Conferido em produção: `repeticoes_minutos` 10 e a janela no `wa_bot_pode_falar`; `ia_impressoes` e `ia_fotos_reconhecidas` com RLS; as 7 portas; descrição inteira (a maior com 1.100 caracteres); 24 imóveis conhecidos; IA ligada, treino, Haiku 5.5, conversa do treino "Janio Ramalho" atendendo e sem pausa; batimentos do `ai` e do `wa` em segundos. As 65 fotos dos anúncios ganham a impressão na primeira foto que um cliente mandar (a primeira resposta com foto demora uns segundos a mais).
 - KOMUNE intocada: nenhuma migração, nenhum worker.
+
+## 06/11/2026 — Os relatórios da Imova (branch `relatorios-imova`; RF-REL-01, RF-REL-09, ADR-10 alterado na Imova)
+
+**Pedido do usuário:** "Preciso que esse relatório me mostre uma lista de pessoas mais interessadas (clientes mais quentes), preciso saber quantos cliques cada anúncio teve, me retornar relatórios com indicadores interessantes para maior organização e maior potencial de venda", "o modelo de mensagem que mais retornou resultado positivo" e "o nível de satisfação da IA [...] se cada vez mais ela está deixando mais pessoas interessadas, está tirando dúvidas melhores, entregando informações interessantes, quantas reuniões conseguiu marcar".
+
+**Decisões do usuário (06/11, as quatro recomendadas):**
+- Clique do anúncio = visualizações e contatos do relatório do Canal Pro (ZAP, Viva Real e OLX) + conversas e visitas do imóvel no CRM. Sem link rastreado.
+- Mensagem positiva = o cliente respondeu em até 24 h **e** estava Interessado ou Muito interessado; colunas também para "respondeu" e "visita em 7 dias". Conta como modelo: modelo aprovado, resposta rápida e texto que o time manda igual para 3 pessoas ou mais.
+- A IA que atende é medida por indicadores semanais e por uma **IA juíza** diária (Claude Haiku 5.5), com nota de 1 a 5 para "tirou a dúvida", "informação útil" e "cliente satisfeito".
+- Na Imova a barra fica: Visão geral (abre nela), Clientes quentes, Anúncios, Mensagens, IA que atende, Atendimento, Funil e Pessoas. Saem só na Imova: Ligações do dia, Semana, Categorias, Bairros, Horários, Fontes e Base. **A KOMUNE não muda.**
+
+**Entregue (nada em produção):**
+- **Banco** — `20261106200000_os_relatorios_da_imova` (só Imova; na KOMUNE não cria nada, conferido no banco de validação):
+  - `canal_pro_fotos`: cada importação do relatório do Canal Pro vira foto (gatilho em `anuncios_no_canal_pro` que nunca derruba a importação; uma linha só quando algum número muda). O número do período é a diferença entre duas fotos; sem foto antes do começo do período, fica em branco em vez de mostrar o total. As 17 linhas que já existem viram a primeira foto.
+  - `ficha_da_conversa_notas`: cada nota de interesse da leitura da IA, com a hora (gatilho na ficha da conversa), para o "antes e depois" da IA.
+  - A IA juíza: `ia_atendimento_notas`, propósito `avaliar_atendimento` **acrescentado** às listas do banco (`ai_runs.purpose`, `app.ia_enfileirar`, `public.ia_adiar_trabalho`, `app.ia_gasto_bloqueado_para`) logo depois de `triar_candidato`, sem reescrevê-las; `app.ia_juiza_config`, `app.ia_juiza_enfileirar` (conversa:dia, últimos 7 dias, sem o treino, chave idempotente) e as portas do worker `public.ia_juiza_entrada` e `public.ia_juiza_gravar` (só `service_role`).
+  - Os relatórios, `SECURITY DEFINER` com a porteira de sempre (`app.sees_all()`): `relatorio_imova_visao_geral`, `relatorio_imova_quentes` (calor 0–100 = metade a atitude, metade a nota da leitura da IA, mais bônus por falar nos últimos dias e por visita marcada; fora: sem interesse, não contatar, suprimido, negócio ganho ou perdido, conversa concluída e o treino), `relatorio_imova_anuncios`, `relatorio_imova_mensagens` (assinatura e primeiro nome do cliente ignorados; só o primeiro envio a cada pessoa; só envios com 24 h) e `relatorio_imova_ia`.
+  - Nada grava mensagem nem mexe no caminho do WhatsApp (o pgTAP prova).
+- **Seed da Imova, bloco 12j:** `ia.juiza` ligada e o cron `ia_juiza_enfileirar` às 6h15 de Natal (9h15 UTC).
+- **Worker de IA:** `apps/workers/src/ia/juiza.ts` e o prompt `avaliacao-do-atendimento@v1` (Haiku 5.5): a juíza lê o dia da conversa (10 mensagens antes, o dia e as 12 h seguintes), pseudonimizada, e grava nota e porquê. `ErroDeterministico` mudou para `ia/erros.ts` (`tarefas.ts` continua exportando). Na Imova, o worker aceita só `analisar_conversa`, `draft_reply` e `avaliar_atendimento` (`TRABALHOS_DA_IMOVA`).
+- **Tela:** módulo `relatoriosDaImova`; painéis `painel-visao-geral` (os números do período, "Para cobrar hoje", funil dos clientes, visitas, objeções, o que os clientes procuram e procura × oferta por bairro), `painel-clientes-quentes` (filtros, CSV/XLSX, link para a conversa), `painel-anuncios`, `painel-mensagens` (destaque "A que mais funcionou", com botão de copiar, só entre mensagens com 5 envios ou mais) e `painel-ia` (semana a semana, interesse antes e depois, notas da juíza, "Para revisar" e "O que deu certo"). Na Imova o menu adianta a Visão geral no lugar das Ligações do dia.
+
+**Verificado:**
+- pgTAP 134 (55 testes) no banco local da Imova: tudo passa. O 67 ganhou os propósitos só da Imova (este e o `identificar_canal` do canal de chegada) e passa com o orçamento da KOMUNE; o 71 também. As falhas de 34, 35 e 48 no banco local da Imova já existiam antes desta migração (conferido numa cópia restaurada do backup).
+- Vitest: web 1.711, workers 439, prompts 329, schema 111; lint e tipos verdes nos quatro.
+- Chrome real (Playwright), 1440×900 e 390×844: os oito painéis sem erro de console e sem estouro de largura.
+- **Uma chamada real da juíza** com a chave da Imova e uma conversa de teste do banco local: US$ 0,00066, 3,5 s, notas 5/4/sem nota de satisfação, porquê concreto. Estimativa: US$ 0,5 a 1,5 por mês.
+- Local: migração e bloco 12j aplicados no banco local da Imova (56322; backup antes em `~/triadecrm-backups/imova-local-antes-relatorios-0611.dump`).
+
+**Pendente:**
+- Os cliques do período só aparecem a partir da **segunda** importação do relatório do Canal Pro; o ideal é importar uma vez por semana ("Atualizar do Canal Pro" na aba Anúncios).
+- Encaixe com a branch `canal-de-chegada` (sem commit): ela também mexe em `relatorios/tipos.ts`, `tela-relatorios.tsx`, `dados.ts`, no pgTAP 67 e nas listas de propósito da IA. O painel "Canais" dela precisa do campo `onde: 'imobiliaria'`; o 67 desta branch já conta o `identificar_canal`; e a migração dela reescreve as listas de propósito — se entrar depois desta, precisa acrescentar `avaliar_atendimento` (ou usar o mesmo jeito de acrescentar).
+- Para publicar (quando pedir): conferir o ar → main → `publicar-banco.mjs imova migrar` → só o bloco 12j com `app.exigir_empresa('imova')` → `fly deploy` do `imova-worker-ai` → site da Imova de cópia limpa.
+
+**Decisão humana:**
+- A juíza não recebe o caderno nem a lista de imóveis (custaria ~10 vezes mais e leria a base de hoje para julgar a resposta de ontem): "informação correta" é conferida pela própria conversa. Confirmar.
+- O papel `leitura` (sem uso desde o pivô) vê estes relatórios, como vê os de sempre.
