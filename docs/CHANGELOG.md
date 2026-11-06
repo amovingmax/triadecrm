@@ -9410,3 +9410,22 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
   - Pela App Store Connect API, o identificador `app.triade.ios` só tinha `IN_APP_PURCHASE`, sem `PUSH_NOTIFICATIONS`.
   - O perfil de assinatura reaproveitado era o da versão 1. O build sem login na Apple não liga a permissão nem refaz o perfil, e a assinatura com avisos falharia.
 - **Falta (com o usuário, no Terminal dele):** o build interativo com login na Apple. Ele liga as notificações no identificador, refaz o perfil e configura (ou reaproveita) a chave de avisos da Apple. Depois o envio ao TestFlight segue sozinho.
+
+**App 0.2.0 (6) no TestFlight (06/11/2026, ~17h10):**
+- **Build interativo no Terminal do usuário, com login na Apple de quem é Titular da conta.**
+  - Ligou `Push Notifications` no `app.triade.ios`.
+  - Refez o perfil `J8KQUXM473`, que ficou com as notificações.
+- **A chave de avisos da Apple não pôde ser criada:** a conta já tem o máximo de chaves de avisos.
+  - `H4Y969X46Z`, "Expo Push Notifications Key", é a do app da Komune, guardada no Expo da conta `rafaelabreu`.
+  - `Q2FD3T3CSC`, "Aurora push", é a do Aurora Lab.
+  - As duas estão em uso e **não podem ser revogadas**.
+  - Os números 4 e 5 foram gastos nas tentativas.
+- **Build `fe1d20bf`**, montado sem a chave e enviado sozinho pelo `--auto-submit`. Na Apple:
+  - processado (`VALID`), sem criptografia a declarar;
+  - no grupo Equipe, já em teste interno (`IN_BETA_TESTING`).
+
+**Pendente: os avisos ainda não chegam ao iPhone.**
+- O app pede a permissão e registra o aparelho, mas o Expo não entrega sem uma chave.
+- O usuário não quer arriscar os avisos do app da Komune. O caminho escolhido é a chave da Aurora, se alguém tiver o arquivo `AuthKey_Q2FD3T3CSC.p8`; a Apple não deixa baixar de novo.
+- Com o arquivo, o usuário o põe no Expo do Tríade pelo `eas credentials -p ios` (Push Notifications → enviar o próprio arquivo → Key ID `Q2FD3T3CSC`).
+- Não precisa de versão nova do app.
