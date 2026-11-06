@@ -51,6 +51,7 @@ import { contagemDeInteracoes, local } from './formatos';
 import { FichaAoLado, ROTULO_DA_SECAO, AreaDoFio, useAvisoDeNaoLidas } from './fio-wpp';
 import { Janela24h, PilulaDaJanela, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
+import { ControleDaIa, SeloDaIa } from '@/components/ia-que-atende/na-conversa';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { JANELA_APERTADA_MIN, montarFio, podeEscreverLivre } from './mensagens';
@@ -298,6 +299,8 @@ export function Conversa({
           robô pausado
         </Badge>
       ) : null}
+      {/* A IA que atende sozinha (Imova, 06/11/2026). */}
+      {fio ? <SeloDaIa fioId={fio.id} naFolha={naFolha} /> : null}
       {/* A atitude do cliente (29/10/2026) é da CONVERSA: sem fio, não há. */}
       {fio ? (
         <AtitudeDaConversaNoTopo
@@ -399,6 +402,7 @@ export function Conversa({
               className={ACAO_DA_FOLHA}
             />
           ) : null}
+          {fio && eu?.podeEscrever ? <ControleDaIa fioId={fio.id} className={ACAO_DA_FOLHA} /> : null}
           <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
             <Link href={registrarHref}>
               <MessageSquarePlus aria-hidden="true" />
@@ -515,6 +519,10 @@ export function Conversa({
               organizacaoId={item.id}
               className="rounded-full max-md:hidden md:h-10"
             />
+          ) : null}
+          {/* A IA que atende (Imova, 06/11/2026): o estado e o "parar" a um toque. */}
+          {fio && eu?.podeEscrever ? (
+            <ControleDaIa fioId={fio.id} variante="pilula" className="ml-1" />
           ) : null}
           {fio && eu?.podeEscrever ? (
             CONCLUIR_NA_EMPRESA ? (

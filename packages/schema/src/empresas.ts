@@ -86,6 +86,14 @@ export interface Empresa {
      * (`app.concluir_ligado`).
      */
     concluirConversa: boolean;
+    /**
+     * A IA que atende o cliente sozinha (06/11/2026): responde, tira dúvida dos
+     * imóveis, marca visita e passa para um corretor; o selo e o "Parar a IA" na
+     * conversa, o "Boa / Corrigir" nas respostas dela e a tela "IA que atende"
+     * (caderno, placar e configuração). Só da Imova: na KOMUNE a migração não cria
+     * nada e a porteira de mensagens continua exigindo aprovação (ADR-05).
+     */
+    iaQueAtende: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -140,6 +148,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       ligacaoWhatsapp: false,
       fichaDoCliente: false,
       concluirConversa: true,
+      iaQueAtende: false,
     },
     privacidade: null,
   },
@@ -174,6 +183,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       ligacaoWhatsapp: true,
       fichaDoCliente: true,
       concluirConversa: true,
+      iaQueAtende: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

@@ -39,6 +39,7 @@ import { VirarTarefa } from './virar-tarefa';
 import { dataHoraCompleta, hora } from './formatos';
 import { entregaDaMensagem, separarAssinatura } from './mensagens';
 import { avisoSemConteudo, ROTULO_DO_ROBO, type MensagemDoFio } from './tipos';
+import { AvaliacaoDaIa, IA_QUE_ATENDE } from '@/components/ia-que-atende/na-conversa';
 import { RabichoDoBalao, Tiques, type Tique } from './wpp';
 
 /**
@@ -157,9 +158,13 @@ export function Mensagem({
       ? 'ouvido'
       : entrega.rotulo;
   const selos = selosDa(mensagem);
+  // O "Boa / Corrigir" da IA que atende (Imova, 06/11/2026), em toda resposta dela.
+  const avaliaIa =
+    IA_QUE_ATENDE && fio !== null && mensagem.autorTipo === 'bot_ai' && !mensagem.aprovadoPor;
   const temRodape =
     (entrega.detalhe !== null && !mensagem.cancelada) ||
-    (fechaGrupo && (selos.length > 0 || entrada));
+    (fechaGrupo && (selos.length > 0 || entrada)) ||
+    avaliaIa;
 
   return (
     <div
@@ -325,6 +330,7 @@ export function Mensagem({
                 <VirarTarefa mensagemId={mensagem.id} />
               </span>
             ) : null}
+            {avaliaIa && fio ? <AvaliacaoDaIa fioId={fio.fioId} mensagemId={mensagem.id} /> : null}
           </p>
         ) : null}
       </div>
@@ -527,7 +533,10 @@ function Quem({ mensagem }: { mensagem: MensagemDoFio }) {
   const quem =
     mensagem.autorTipo === 'human'
       ? (mensagem.autor ?? 'Alguém do time')
-      : ROTULO_DO_ROBO[mensagem.autorTipo];
+      : // A IA que atende sozinha (Imova, 06/11/2026) não tem rascunho nem quem aprove.
+        daIa && !mensagem.aprovadoPor && IA_QUE_ATENDE
+        ? 'IA · respondeu sozinha'
+        : ROTULO_DO_ROBO[mensagem.autorTipo];
 
   return (
     <p className="mb-px flex items-center gap-1 pr-6 text-[12.5px] font-semibold text-wpp-autor">
