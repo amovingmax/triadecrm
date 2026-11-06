@@ -10,6 +10,7 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { levarAparelhoAsOutrasEmpresas } from '@/lib/aparelho-entre-empresas';
 import { plataformaValida, tokenValido } from '@/lib/avisos-no-celular';
 import { EMPRESA } from '@/lib/empresa';
 import { createClient } from '@/lib/supabase/server';
@@ -50,5 +51,9 @@ export async function POST(request: NextRequest) {
     console.error(`[erro] /api/aparelhos aparelho_registrar: ${error.message}`);
     return NextResponse.json({ ok: false, motivo: 'banco' }, { status: 503, headers: SEM_CACHE });
   }
+  // E nas outras empresas em que a pessoa entra: os avisos chegam qualquer que seja a
+  // empresa aberta no app (`lib/aparelho-entre-empresas.ts`).
+  const email = typeof data.claims.email === 'string' ? data.claims.email : null;
+  if (email) await levarAparelhoAsOutrasEmpresas(email, 'registrar', corpo.token, corpo.plataforma);
   return new NextResponse(null, { status: 204, headers: SEM_CACHE });
 }

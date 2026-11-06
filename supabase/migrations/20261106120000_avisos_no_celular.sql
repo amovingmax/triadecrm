@@ -93,6 +93,56 @@ $$;
 comment on function public.aparelho_remover(text) is
   'Ao sair da conta no app, o aparelho deixa de receber os avisos daquela pessoa.';
 
+-- O mesmo aparelho levado de uma empresa à outra (06/11/2026): quem tem acesso às duas
+-- recebe os avisos das duas, qualquer que seja a empresa aberta no app. Quem chama é o
+-- servidor da outra empresa (`/api/empresas/aparelho`, pedido assinado), com a chave de
+-- serviço: só registra para quem entra NESTA empresa pela regra do próprio banco.
+create or replace function public.aparelho_registrar_por_email(
+  p_email text, p_token text, p_plataforma text, p_empresa text, p_empresa_nome text
+) returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_pessoa uuid;
+begin
+  if not public.email_entra_no_crm(p_email) then
+    return false;
+  end if;
+  select p.id into v_pessoa
+    from public.profiles p join auth.users u on u.id = p.id
+   where lower(u.email) = lower(trim(p_email)) and p.is_active
+   limit 1;
+  if v_pessoa is null then
+    return false;
+  end if;
+  insert into public.aparelhos_push (token, pessoa_id, plataforma, empresa, empresa_nome)
+  values (p_token, v_pessoa, p_plataforma, p_empresa, p_empresa_nome)
+  on conflict (token) do update
+     set pessoa_id = excluded.pessoa_id,
+         plataforma = excluded.plataforma,
+         empresa = excluded.empresa,
+         empresa_nome = excluded.empresa_nome,
+         visto_em = now();
+  return true;
+end $$;
+
+create or replace function public.aparelho_remover_por_email(p_email text, p_token text) returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  delete from public.aparelhos_push a
+   using auth.users u
+   where a.token = p_token and u.id = a.pessoa_id and lower(u.email) = lower(trim(p_email));
+$$;
+
+revoke all on function public.aparelho_registrar_por_email(text, text, text, text, text) from public, anon, authenticated;
+revoke all on function public.aparelho_remover_por_email(text, text) from public, anon, authenticated;
+grant execute on function public.aparelho_registrar_por_email(text, text, text, text, text) to service_role;
+grant execute on function public.aparelho_remover_por_email(text, text) to service_role;
+
 revoke all on function public.aparelho_registrar(text, text, text, text) from public, anon;
 revoke all on function public.aparelho_remover(text) from public, anon;
 grant execute on function public.aparelho_registrar(text, text, text, text) to authenticated;

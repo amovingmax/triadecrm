@@ -8862,3 +8862,8 @@ Pedido do usuário: cada empresa tem os seus avisos. "Não faz sentido chegar um
 - Lead novo e anúncio com problema, quando os Anúncios entrarem na main.
 - O primeiro aviso de cada tipo no iPhone de verdade.
 - Publicar banco e site das duas empresas, com a comparação tela a tela antes, e a versão 2 do app.
+- **Os avisos chegam qualquer que seja a empresa aberta** (`lib/aparelho-entre-empresas.ts`, `/api/empresas/aparelho`):
+  - o celular registrado numa empresa é levado às outras, por pedido assinado (finalidade `aparelho`, com a ação e o endereço de push dentro da assinatura);
+  - cada empresa só o registra para quem entra lá pelo próprio banco (`public.aparelho_registrar_por_email`, só chave de serviço);
+  - sair da conta desliga o celular em todas.
+  - Testado: registrado na KOMUNE, apareceu na Imova; saiu na KOMUNE, sumiu das duas; pedido falso recusado. pgTAP 130 com 30 testes, e 2 novos testes da assinatura.

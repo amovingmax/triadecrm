@@ -29,7 +29,7 @@ export const VALIDADE_DA_PERGUNTA_S = 300;
  * login (`app/api/empresas/entrada`): vale menos tempo e é assinada com outro prefixo,
  * então uma pergunta do seletor nunca serve como pedido de entrada, nem o contrário.
  */
-export type Finalidade = 'seletor' | 'entrada';
+export type Finalidade = 'seletor' | 'entrada' | 'aparelho';
 
 /** Quanto vale um pedido de entrada: o servidor de uma empresa chama o da outra na hora. */
 export const VALIDADE_DA_ENTRADA_S = 60;
@@ -37,6 +37,8 @@ export const VALIDADE_DA_ENTRADA_S = 60;
 const VALIDADE: Record<Finalidade, number> = {
   seletor: VALIDADE_DA_PERGUNTA_S,
   entrada: VALIDADE_DA_ENTRADA_S,
+  // O aparelho do app levado à outra empresa (avisos no celular, 06/11/2026).
+  aparelho: VALIDADE_DA_ENTRADA_S,
 };
 
 export interface Pergunta {
@@ -47,6 +49,11 @@ export interface Pergunta {
   email: string;
   /** Quando foi feita, em segundos desde 1970. */
   em: number;
+  /**
+   * O que mais o pedido leva, assinado junto (só fora do seletor): no `aparelho`, a
+   * ação e o endereço de push. Sem ele, ninguém troca o aparelho de um pedido no caminho.
+   */
+  extra?: string;
 }
 
 export interface PerguntaAssinada extends Pergunta {
@@ -62,6 +69,7 @@ const perguntaSchema = z.object({
   para: slug,
   email: z.string().min(3).max(320),
   em: z.number().int(),
+  extra: z.string().max(400).optional(),
   assinatura: z.string().regex(/^[0-9a-f]{64}$/),
 });
 
@@ -73,7 +81,9 @@ function normalizarEmail(email: string): string {
 
 // O texto do seletor é o mesmo desde 22/10/2026: as versões no ar se entendem com as novas.
 function textoAssinado(p: Pergunta, finalidade: Finalidade): string {
-  return [`triade-${finalidade}`, 'v1', p.de, p.para, p.email, String(p.em)].join('\n');
+  const partes = [`triade-${finalidade}`, 'v1', p.de, p.para, p.email, String(p.em)];
+  if (p.extra !== undefined) partes.push(p.extra);
+  return partes.join('\n');
 }
 
 function hmac(segredo: string, p: Pergunta, finalidade: Finalidade): string {

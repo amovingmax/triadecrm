@@ -25,7 +25,7 @@
 -- faria depois do commit).
 -- =====================================================================
 begin;
-select plan(28);
+select plan(30);
 
 insert into public.allowed_users (email, role, note) values
   ('p130.g1@teste.local', 'gestor', 'pgTAP avisos'),
@@ -125,6 +125,15 @@ select public.aparelho_remover('ExponentPushToken[abcdefghij0123456789]');
 select pg_temp.sair();
 select ok(not exists (select 1 from public.aparelhos_push where token = 'ExponentPushToken[abcdefghij0123456789]'),
   'ao sair da conta, o aparelho deixa de receber');
+
+-- O aparelho trazido pela outra empresa: só para quem entra aqui.
+select is(public.aparelho_registrar_por_email('p130.g1@teste.local', 'ExponentPushToken[outraEmpresa000000001]',
+                                              'ios', 'komune', 'Komune'), true,
+  'a outra empresa traz o aparelho de quem também entra aqui');
+select is(public.aparelho_registrar_por_email('ninguem@fora.com', 'ExponentPushToken[outraEmpresa000000002]',
+                                              'ios', 'komune', 'Komune'), false,
+  'e-mail sem acesso aqui não ganha aparelho, mesmo com o pedido da outra empresa');
+delete from public.aparelhos_push where token like 'ExponentPushToken[outraEmpresa%';
 
 -- ---------------------------------------------------------------------
 -- 2. Quem recebe a mensagem nova

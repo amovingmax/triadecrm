@@ -176,3 +176,32 @@ describe('o pedido de entrada da troca de empresa (06/11/2026)', () => {
     ).toEqual({ ok: false, motivo: 'vencida' });
   });
 });
+
+describe('o aparelho levado à outra empresa (avisos no celular, 06/11/2026)', () => {
+  const base = { de: 'imova', para: 'komune', email: 'janio@komune.app.br', em: AGORA } as const;
+  const extra = 'registrar|ios|ExponentPushToken[abcdefghij0123456789]';
+
+  it('o endereço de push vai dentro da assinatura: trocado no caminho, é recusado', () => {
+    const pedido = assinarPergunta(SEGREDO, { ...base, extra }, 'aparelho');
+    expect(conferirPergunta(SEGREDO, pedido, 'komune', AGORA, 'aparelho')).toMatchObject({
+      ok: true,
+    });
+    expect(
+      conferirPergunta(
+        SEGREDO,
+        { ...pedido, extra: 'registrar|ios|ExponentPushToken[outroAparelho0123456]' },
+        'komune',
+        AGORA,
+        'aparelho',
+      ),
+    ).toEqual({ ok: false, motivo: 'assinatura' });
+  });
+
+  it('um pedido de entrada não serve como pedido de aparelho', () => {
+    const entrada = assinarPergunta(SEGREDO, { ...base, extra }, 'entrada');
+    expect(conferirPergunta(SEGREDO, entrada, 'komune', AGORA, 'aparelho')).toEqual({
+      ok: false,
+      motivo: 'assinatura',
+    });
+  });
+});
