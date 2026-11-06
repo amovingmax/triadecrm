@@ -9429,3 +9429,14 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 - O usuário não quer arriscar os avisos do app da Komune. O caminho escolhido é a chave da Aurora, se alguém tiver o arquivo `AuthKey_Q2FD3T3CSC.p8`; a Apple não deixa baixar de novo.
 - Com o arquivo, o usuário o põe no Expo do Tríade pelo `eas credentials -p ios` (Push Notifications → enviar o próprio arquivo → Key ID `Q2FD3T3CSC`).
 - Não precisa de versão nova do app.
+
+**Avisos ligados de ponta a ponta (06/11/2026, ~17h40):**
+- O usuário pôs no Expo do Tríade a chave "Aurora push" (`Q2FD3T3CSC`, equipe `8GF4F9C98L`), pelo `eas credentials -p ios`.
+  - Foi sem login na Apple e sem gerar chave nova: nada foi criado, trocado ou revogado na Apple.
+  - O Aurora Lab segue com a mesma chave.
+  - O arquivo ficou em `~/.komune-secrets/`.
+- O Expo respondeu "Push Key assigned to triade: app.triade.ios".
+- O iPhone do usuário (0.2.0 (6), Rafael Abreu) se registrou às 17h19 na Imova e na KOMUNE, a segunda por meio do pedido entre empresas.
+- **Teste direto pelo Expo:**
+  - antes da chave, a recusa `InvalidCredentials`;
+  - depois da chave, o envio `ok` e o recibo de entrega à Apple `ok`.
