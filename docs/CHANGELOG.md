@@ -8576,3 +8576,53 @@ Pedidos do usuário: "Faça logo o login com o Google". Depois, ao testar o áud
   - `/login` 200 e `/auth/dev` 404;
   - `/auth/app/google` sem estado vai para `/login?erro=app`;
   - com estado e volta, vai ao Supabase e ao Google com `redirect_to` = `/auth/callback?next=/auth/app/volta`, sem troca pela URL do site. É indício de que a lista de retorno aceita a volta, e o primeiro login real confirma.
+
+## 06/11/2026 — A IA que atende o cliente sozinha, só na Imova (branch `ia-atendente`; RF-CON-09, RF-CON-22, RF-CON-26, RF-AGE-04, ADR-05 e ADR-10 alterados na Imova)
+
+Pedido do usuário: "utilizar uma IA para responder os clientes no CRM da Imova. Essa IA deve responder o cliente sozinho e tirar as dúvidas dele também", para suprir o colaborador com deficiência motora, que não consegue escrever as mensagens ("essa IA seria dedicada a ele"). Treino de uma semana pela conversa do contato Janio Ramalho, da equipe.
+
+**Decisões do usuário (06/11/2026):**
+- "Essa trava não pode existir na Imova": o texto da IA sai sem rascunho aprovado. **Muda o ADR-05 (e a recusa de 28/09, ADR-16) só na Imova.** Na KOMUNE a migração não cria nada e a porteira continua igual.
+- A IA responde sozinha até um fator que é de gente: ligação de áudio, conduzir a visita, falar com um corretor. Quando o cliente pede corretor, ela avisa logo que vai passar e passa.
+- O colaborador pode parar a IA numa conversa e redirecionar para outra pessoa.
+- Assinatura "Imova" (é a IA do Rafael, o colaborador).
+- Ela fala de todos os anúncios, imóveis e terrenos da aba Anúncios, e marca visita.
+- A conversa do Janio é dedicada a treinar a IA e passar instruções.
+- Modelo: Claude Opus 5.5 (o mais capaz; o Sonnet 5.5, pela metade do custo, se escolhe na tela). Muda o ADR-10 só na Imova.
+
+**Feito:**
+- **Banco** (`20261106170000_a_ia_atende_o_cliente.sql`, só na Imova; num banco sem identidade cria tudo, para o CI):
+  - `ia_atendimento` (onde a IA atende ou foi parada), `ia_caderno` (o que ela sabe além dos anúncios) e `ia_respostas` (cada resposta, a avaliação e a prova que a porteira confere), com RLS por `app.is_manager()`.
+  - `app.ia_atende`: chave-mestra ligada; no treino, só a conversa do treino; com clientes, toda conversa em que ninguém do time escreveu. Quando alguém do time escreve, a IA para ali (gente assumiu).
+  - A porteira (`app.messages_guard`) ganha o ramo (2a): `bot_ai` sem rascunho passa só quando `app.ia_atendente_dizer` registrou o mesmo corpo em `ia_respostas` na mesma transação, numa conversa em que a IA atende. A troca é feita sobre a função que está no banco (um trecho, conferido para existir uma vez só) e o resto da porteira não muda: supressão, janela de 24 h, conversa bloqueada e tetos valem igual. `bot_ai` inserido por fora continua recusado.
+  - `app.ia_atendente_dizer` é o único caminho: confere que a IA atende ali, que não chegou mensagem nova do cliente (resposta velha não sai), que a mensagem não foi respondida e o teto por hora (20; contra pingue-pongue com robô de outra empresa); assina `*Imova:*`; põe em fila como qualquer mensagem. Porteira recusou: fica o registro, nada sai.
+  - Passar para gente (`public.ia_atendente_passar`): avisa o cliente, para a IA naquela conversa, entrega a quem recebe no setor escolhido (ou fica com quem atende) e abre tarefa para agora.
+  - Visita (`public.ia_atendente_marcar_visita`): `app.reuniao_gravar` presencial, no endereço do imóvel até onde o anúncio mostra, origem robô, com a confirmação na mesma transação; se a confirmação não sai, a visita é desfeita. Horário tomado: o worker oferece as alternativas que o banco devolveu.
+  - A fila (`app.ia_atendente_enfileirar`, cron a cada 10 s no bloco 12h do seed da Imova): conversa em que a IA atende, última mensagem do cliente, parado há 15 s (para ler as mensagens seguidas de uma vez). Pedido de corretor é resolvido por regra, sem modelo. Orçamento de IA no limite: passa para gente em vez de silêncio.
+  - Os imóveis são lidos de `public.anuncios` e `public.anuncios_no_canal_pro` quando existem (leitura dinâmica: a branch `anuncios-canal-pro` ainda não está na main); o canal de chegada, de `public.chegadas` quando existe.
+  - Preços do Opus 5.5 e do Sonnet 5.5 em `ai_model_prices`.
+- **Prompt** `atendente-imova@v1` (`packages/prompts/src/prompts/atendente-imova/v1.ts`, propósito `draft_reply`, escala de conversa): regras de verdade (só afirma o que está nos anúncios, no caderno ou na conversa; nada de desconto, aprovação de crédito ou condição fora do caderno), o que é de gente, a visita por rótulo de horário (o modelo nunca faz conta de data), o treino (instrução vira `anotacoes`, que só a conversa do treino grava). O caderno e os imóveis vão no bloco de sistema, com cache; telefone escrito na descrição de anúncio ou no caderno sai antes (`semTelefone`), porque barraria toda chamada.
+- **Worker** (`apps/workers/src/ia/atendente.ts`): lê a entrada, chama o modelo, troca o nome completo pelo primeiro nome e leva a decisão ao banco. Nunca fica em silêncio: dado pessoal barrado, orçamento esgotado, recusa ou saída fora do combinado passam a conversa para gente com o aviso padrão.
+- **Tela** (módulo `iaQueAtende`, só na Imova):
+  - na conversa: a pílula "IA atendendo" / "IA em treino" / "IA parada" no cabeçalho (o toque para ou liga), "Parar a IA" nas ações, e "Boa / Corrigir" embaixo de cada resposta dela (a correção vira linha do caderno);
+  - a tela "IA que atende" (`/ia`): placar dos 7 dias, respostas para avaliar em lote, caderno (escrever, editar, tirar) e configuração (ligar, modo treino ou clientes, conversa do treino, setor que recebe, aviso ao passar, modelo).
+- **Verificado:**
+  - pgTAP 133 (42 asserções) no banco local da Imova; os testes antigos da porteira (10, 24, 25, 43, 52, 83, 91) dão o mesmo resultado com a porteira antiga e com a nova nesse banco;
+  - lint, tipos e 2.371 testes (Vitest);
+  - de ponta a ponta no local, com o dublê e com **duas chamadas reais ao Opus 5.5** (chave da Imova, US$ 0,065 no total): a resposta a "tem apartamento para alugar em Ponta Negra até 3 mil?" foi correta e honesta sobre a lista, e a instrução do treino virou três linhas limpas no caderno;
+  - fotos das telas no computador e no celular, sem erro de página.
+
+**Pendente:**
+- **Publicar** (só com pedido): main → migração na Imova (`publicar-banco imova migrar`; na KOMUNE ela não faz nada) → só o bloco 12h do seed da Imova → site da Imova → `fly deploy` do `imova-worker-ai`. Depois, na tela, escolher a conversa do Janio e ligar.
+- **Sem a aba Anúncios em produção, a IA não conhece imóvel nenhum** (ela diz que vai confirmar com o corretor). A branch `anuncios-canal-pro` precisa subir antes ou junto.
+- **Orçamento:** o teto da IA da Imova é US$ 10 por mês e a resposta para em 80% (US$ 8). Cada resposta custou de US$ 0,01 (com cache) a US$ 0,055 (sem cache). Na semana de treino cabe; com clientes não cabe. O teto do workspace da Imova na Anthropic (US$ 15) também precisa subir, no Console.
+- Medido só no local: a qualidade de verdade é a da semana de treino.
+- Sem `fallbacks` da API: uma recusa do modelo passa a conversa para gente.
+- Mensagem do cliente numa conversa da IA continua avisando o time (avisos e push); com clientes, rever.
+- Áudio do cliente: sem transcrição na Imova, a IA pede para escrever e, no segundo áudio, passa para gente.
+- Canal de chegada: a IA pergunta quando não se sabe; quem grava é o módulo da branch `canal-de-chegada`.
+
+**Decisão humana:**
+- Quem recebe quando a IA passa (setor dos corretores) e na agenda de quem a visita entra (hoje, na de quem atende a conversa).
+- Quando passar do treino para os clientes, e o novo teto do orçamento.
+- O login próprio do colaborador (hoje `contato@imovaimobiliaria.com.br`).
