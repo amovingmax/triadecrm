@@ -12,8 +12,16 @@ describe('empresas', () => {
     expect(k.descricaoDoApp).toBe(
       'CRM de captação da KOMUNE: parceiros, Revisão, funis, conversas de WhatsApp, agenda, metas e relatórios.',
     );
-    expect(k.admins).toEqual({ ou: 'Rafael, Luiz ou Matheus', e: 'Rafael, Luiz e Matheus', tecnicos: 'Luiz ou Matheus' });
-    expect(k.tipos).toEqual({ fornecedor: 'Fornecedor', produtor: 'Produtor', cerimonialista: 'Cerimonialista' });
+    expect(k.admins).toEqual({
+      ou: 'Rafael, Luiz ou Matheus',
+      e: 'Rafael, Luiz e Matheus',
+      tecnicos: 'Luiz ou Matheus',
+    });
+    expect(k.tipos).toEqual({
+      fornecedor: 'Fornecedor',
+      produtor: 'Produtor',
+      cerimonialista: 'Cerimonialista',
+    });
     expect(k.modulos).toEqual({
       plataformaKomune: true,
       ia: true,
@@ -21,6 +29,8 @@ describe('empresas', () => {
       ligacaoWhatsapp: false,
       fichaDoCliente: false,
       concluirConversa: true,
+      anuncios: false,
+      iaQueAtende: false,
     });
     expect(k.gruposDeCategoria).toEqual({});
     expect(k.origens).toBeNull();
@@ -32,11 +42,20 @@ describe('empresas', () => {
     for (const frase of [...Object.values(origens!.porFonte), origens!.padrao]) {
       expect(frase).not.toMatch(/komune|evento|fornecedor/i);
     }
+    // A origem das fichas que nascem dos leads dos portais (sources.slug = 'canal_pro').
+    expect(origens!.porFonte.canal_pro).toMatch(/anúncio.*ZAP.*Viva Real.*OLX/);
   });
 
   it('a Imova não herda nome, pessoas nem módulos da KOMUNE', () => {
     const i = EMPRESAS.imova;
-    for (const texto of [i.nome, i.nomeDoNumero, i.descricaoDoLogin, i.descricaoDoApp, i.admins.ou, i.admins.e]) {
+    for (const texto of [
+      i.nome,
+      i.nomeDoNumero,
+      i.descricaoDoLogin,
+      i.descricaoDoApp,
+      i.admins.ou,
+      i.admins.e,
+    ]) {
       expect(texto).not.toMatch(/komune|rafael|luiz|matheus|heloísa/i);
     }
     expect(i.tituloDoApp).not.toBe(EMPRESAS.komune.tituloDoApp);
@@ -47,6 +66,8 @@ describe('empresas', () => {
       ligacaoWhatsapp: true,
       fichaDoCliente: true,
       concluirConversa: true,
+      anuncios: true,
+      iaQueAtende: true,
     });
     expect(i.tipos.cerimonialista).toBeNull();
   });

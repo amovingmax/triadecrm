@@ -221,6 +221,19 @@ describe('preços e conta por chamada', () => {
         semCache: 0.00034,
         comCache: 0.00024,
       },
+      {
+        // A IA que atende o cliente da Imova (06/11/2026), no Opus 5.5. A conta mede só
+        // as regras: na chamada de verdade o bloco de sistema leva também o caderno e os
+        // imóveis (alguns milhares de tokens, quase todos lidos do cache), e o modelo
+        // pensa antes de responder. A primeira medição real é a que vale.
+        id: 'atendente-imova',
+        modelo: 'claude-opus-5-5',
+        tokensDeSistema: 1510,
+        tokensDaMensagem: 160,
+        tokensDeSaida: 96,
+        semCache: 0.0086,
+        comCache: 0.00286,
+      },
     ]);
   });
 });

@@ -43,6 +43,8 @@ import { CONCLUIR_NA_EMPRESA, ConcluirConversa, FaixaDeConcluida } from './concl
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
 import { AtitudeDaConversaNoTopo } from './atitude';
 import { EtiquetasDoParceiro } from './etiquetas-do-parceiro';
+import { OrigemNoPortal } from './origem-no-portal';
+import { origemCurta, useOrigemNoPortal } from './origem-no-portal-dados';
 import { AvisoWhatsapp } from './aviso-whatsapp';
 import { ProvedorDoFio } from './contexto-do-fio';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
@@ -51,6 +53,8 @@ import { contagemDeInteracoes, local } from './formatos';
 import { FichaAoLado, ROTULO_DA_SECAO, AreaDoFio, useAvisoDeNaoLidas } from './fio-wpp';
 import { Janela24h, PilulaDaJanela, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
+import { ControleDaIa, SeloDaIa } from '@/components/ia-que-atende/na-conversa';
+import { ClienteDeTeste } from '@/components/ia-que-atende/cliente-de-teste';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { JANELA_APERTADA_MIN, montarFio, podeEscreverLivre } from './mensagens';
@@ -249,11 +253,18 @@ export function Conversa({
   ]
     .filter(Boolean)
     .join(' · ');
-  // O que o cabeçalho de UMA LINHA diz embaixo do nome: a etapa e só as exceções.
+  // De qual anúncio dos portais o cliente veio (05/11/2026, só na Imova; na
+  // KOMUNE não há consulta): o lead de quem mandou mensagem, achado pela conversa
+  // em foco e, sem ela, pela ficha. Só lido e mostrado: nada disso toca no WhatsApp.
+  const origemNoPortal = useOrigemNoPortal({ conversaId: fio?.id ?? null, organizacaoId: item.id });
+
+  // O que o cabeçalho de UMA LINHA diz embaixo do nome: a etapa, o anúncio de
+  // onde o cliente veio (é o que decide a primeira resposta) e só as exceções.
   // O resto está a um toque, na folha.
   const resumo =
     [
       item.etapa,
+      origemCurta(origemNoPortal),
       item.naoContatar ? 'não contatar' : null,
       fio?.roboPausado ? 'robô pausado' : null,
       fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null,
@@ -298,6 +309,8 @@ export function Conversa({
           robô pausado
         </Badge>
       ) : null}
+      {/* A IA que atende sozinha (Imova, 06/11/2026). */}
+      {fio ? <SeloDaIa fioId={fio.id} naFolha={naFolha} /> : null}
       {/* A atitude do cliente (29/10/2026) é da CONVERSA: sem fio, não há. */}
       {fio ? (
         <AtitudeDaConversaNoTopo
@@ -307,6 +320,8 @@ export function Conversa({
         />
       ) : null}
       <EtiquetasDoParceiro organizacaoId={item.id} podeEditar={Boolean(eu?.podeEscrever)} />
+      {/* O lead dos portais (05/11/2026, só na Imova), só leitura. */}
+      <OrigemNoPortal conversaId={fio?.id ?? null} organizacaoId={item.id} naFolha={naFolha} />
     </>
   );
 
@@ -399,6 +414,7 @@ export function Conversa({
               className={ACAO_DA_FOLHA}
             />
           ) : null}
+          {fio && eu?.podeEscrever ? <ControleDaIa fioId={fio.id} className={ACAO_DA_FOLHA} /> : null}
           <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
             <Link href={registrarHref}>
               <MessageSquarePlus aria-hidden="true" />
@@ -515,6 +531,10 @@ export function Conversa({
               organizacaoId={item.id}
               className="rounded-full max-md:hidden md:h-10"
             />
+          ) : null}
+          {/* A IA que atende (Imova, 06/11/2026): o estado e o "parar" a um toque. */}
+          {fio && eu?.podeEscrever ? (
+            <ControleDaIa fioId={fio.id} variante="pilula" className="ml-1" />
           ) : null}
           {fio && eu?.podeEscrever ? (
             CONCLUIR_NA_EMPRESA ? (
@@ -652,6 +672,8 @@ export function Conversa({
           {podeAssumir && fio ? (
             <AssumirConversa fioId={fio.id} organizacaoId={item.id} className="w-full md:hidden" />
           ) : null}
+          {/* Só no computador de teste e só na conversa do treino da IA. */}
+          {fio ? <ClienteDeTeste fioId={fio.id} className="mx-1" /> : null}
           <CaixaDeResposta
             fio={fio}
             janela={janela}

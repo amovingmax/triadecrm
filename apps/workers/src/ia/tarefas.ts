@@ -61,6 +61,7 @@ import {
 } from '@komune/prompts';
 
 import { ErroDeTranscricao, transcrever as transcreverAudio, type TranscricaoBruta } from './asr';
+import { atenderCliente, payloadDoAtendente } from './atendente';
 import {
   buscarContatoDaFicha,
   buscarConversa,
@@ -191,6 +192,8 @@ const PAYLOADS = {
   analisar_conversa: payloadDaFicha,
   pulso_do_dia: payloadDoPulso,
   triar_candidato: payloadDaTriagem,
+  // A IA que atende o cliente da Imova sozinha (06/11/2026): `ia/atendente.ts`.
+  draft_reply: payloadDoAtendente,
 } as const;
 
 export type PropositoConhecido = keyof typeof PAYLOADS;
@@ -1227,6 +1230,7 @@ const TRABALHOS: Readonly<
   analisar_conversa: analisarConversa,
   pulso_do_dia: escreverOPulso,
   triar_candidato: triarCandidatos,
+  draft_reply: async (contexto, bruto) => ({ proposito: 'draft_reply', ...(await atenderCliente(contexto, bruto)) }),
 };
 
 export async function tratarTrabalho(
@@ -1249,7 +1253,8 @@ export async function tratarTrabalho(
   // falam de eventos e de fornecedor. No banco da Imova eles se acumularam na fila
   // enquanto não havia worker de IA, e rodá-los agora seria pagar por texto errado.
   // Saem da fila como "sem o que fazer", sem chamar o modelo.
-  if (contexto.empresa === 'imova' && proposito !== 'analisar_conversa') {
+  // A IA que atende o cliente (06/11/2026) também é da Imova, e só dela.
+  if (contexto.empresa === 'imova' && proposito !== 'analisar_conversa' && proposito !== 'draft_reply') {
     contexto.logger.info('trabalho fora da IA da Imova: sai da fila sem chamar o modelo', {
       proposito,
     });

@@ -86,6 +86,21 @@ export interface Empresa {
      * (`app.concluir_ligado`).
      */
     concluirConversa: boolean;
+    /**
+     * Anúncios de imóveis que sobem para o Canal Pro (04/11/2026): a aba Anúncios
+     * e o arquivo VRSync que o Grupo OLX lê a cada 12 horas. Só da Imova: no banco
+     * da KOMUNE a migração não cria nada, e a Edge Function `canal-pro-feed` só é
+     * publicada no projeto da Imova.
+     */
+    anuncios: boolean;
+    /**
+     * A IA que atende o cliente sozinha (06/11/2026): responde, tira dúvida dos
+     * imóveis, marca visita e passa para um corretor; o selo e o "Parar a IA" na
+     * conversa, o "Boa / Corrigir" nas respostas dela e a tela "IA que atende"
+     * (caderno, placar e configuração). Só da Imova: na KOMUNE a migração não cria
+     * nada e a porteira de mensagens continua exigindo aprovação (ADR-05).
+     */
+    iaQueAtende: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -140,6 +155,8 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       ligacaoWhatsapp: false,
       fichaDoCliente: false,
       concluirConversa: true,
+      anuncios: false,
+      iaQueAtende: false,
     },
     privacidade: null,
   },
@@ -164,6 +181,8 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
         indicacao: 'por indicação de um cliente da Imova Imobiliária',
         captura_campo: 'num atendimento da Imova Imobiliária',
         whatsapp_entrada: 'pelo WhatsApp da Imova Imobiliária',
+        // A ficha que nasce de um lead do Canal Pro (migração 20261105100000).
+        canal_pro: 'pelo anúncio da Imova Imobiliária que você viu no ZAP, no Viva Real ou na OLX',
       },
       padrao: 'numa lista de contatos da Imova Imobiliária',
     },
@@ -174,6 +193,8 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       ligacaoWhatsapp: true,
       fichaDoCliente: true,
       concluirConversa: true,
+      anuncios: true,
+      iaQueAtende: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

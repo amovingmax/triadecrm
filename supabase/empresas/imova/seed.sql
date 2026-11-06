@@ -587,6 +587,53 @@ begin
 end $$;
 
 -- =====================================================================
+-- 12h. A IA que atende o cliente sozinha (06/11/2026): só da Imova. Nasce
+--      DESLIGADA, no modo treino e sem conversa de treino: quem liga é a
+--      gestão, na tela (IA que atende → Configuração), escolhendo a conversa
+--      do Janio. Assina "Imova", usa o Claude Haiku 5.5 (pedido do usuário
+--      no mesmo dia, para economizar: 40 vezes mais barato que o Opus 5.5;
+--      Sonnet e Opus 5.5 se escolhem na mesma tela; migração 20261106180000),
+--      espera 15 s sem mensagem nova do cliente antes de responder e fala no
+--      máximo 20 vezes por hora numa conversa. `on conflict do nothing`: rodar
+--      o bloco de novo não desfaz o que a tela configurou. A fila confere a
+--      cada 10 segundos.
+-- =====================================================================
+insert into public.app_settings (key, value, description) values
+  ('ia.atendente',
+   '{"ligada": false,
+     "modo": "treino",
+     "conversa_de_treino": null,
+     "assinatura": "Imova",
+     "modelo": "claude-haiku-5-5",
+     "espera_seg": 15,
+     "teto_por_hora": 20,
+     "setor_corretores": null,
+     "aviso_corretor": "Certo! Já vou te passar para um dos nossos corretores, que continua o atendimento com você por aqui."}'::jsonb,
+   'A IA que atende o cliente sozinha, só da Imova (06/11/2026). ligada: a chave-mestra. modo: treino (só a conversa_de_treino) ou clientes (toda conversa em que o time ainda não escreveu, mais as que alguém ligar). assinatura: o nome em negrito em cima de cada mensagem. modelo: claude-haiku-5-5 (desde 06/11/2026), claude-sonnet-5-5 ou claude-opus-5-5. espera_seg: quanto tempo sem mensagem nova do cliente antes de responder. teto_por_hora: respostas por conversa por hora. setor_corretores: o setor que recebe quando a IA passa (null = fica com quem atende). aviso_corretor: o aviso de quando passa.')
+on conflict (key) do update set description = excluded.description;
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('ia_atendente_enfileirar', '10 seconds',
+                          $cron$select app.ia_atendente_enfileirar(20)$cron$);
+  end if;
+end $$;
+
+-- =====================================================================
+-- 12i. O teto da IA sobe para US$ 30 por mês (06/11/2026): só da Imova.
+--      Pedido do usuário, por causa da IA que atende (cada resposta custa de
+--      US$ 0,01 a US$ 0,055; os US$ 10 de 03/11 eram para a leitura do
+--      cliente sozinha). O freio continua igual: em 80% (US$ 24) param a
+--      leitura e a IA que atende (que passa a conversa para gente), e em
+--      US$ 30 não sai chamada nenhuma. O teto do espaço da Imova na
+--      Anthropic é à parte e sobe no Console.
+-- =====================================================================
+update public.app_settings
+   set value = value || jsonb_build_object('mensal_usd', 30, 'pendente_de_aprovacao', false),
+       description = 'Orçamento mensal só de IA, em US$ (PRD §10; ADR-10). Na Imova, 30 desde 06/11/2026, decidido pelo usuário, para a leitura do cliente (Claude Haiku 5.5) e a IA que atende (Claude Opus 5.5); era 10 desde 03/11. fracao_alerta = a linha de alerta (80% do teto, US$ 24), a partir da qual param a leitura e a IA que atende (esta passa a conversa para gente); o teto inteiro é a linha do freio, a partir da qual não sai chamada nenhuma.'
+ where key = 'ia.orcamento';
+
+-- =====================================================================
 -- 13. Autoverificação. Qualquer falta aborta com o nome do problema.
 -- =====================================================================
 do $$
@@ -630,8 +677,8 @@ begin
     raise exception 'seed imova: a leitura do cliente pela IA ficou desligada';
   end if;
   if (select (value ->> 'mensal_usd')::numeric from public.app_settings where key = 'ia.orcamento')
-     is distinct from 10 then
-    raise exception 'seed imova: o teto da IA tem de ser US$ 10 (decisão de 03/11/2026)';
+     is distinct from 30 then
+    raise exception 'seed imova: o teto da IA tem de ser US$ 30 (decisão de 06/11/2026; era 10 desde 03/11)';
   end if;
   if (select (value -> 'ficha' ->> 'debounce_min')::int from public.app_settings
        where key = 'ia.crm_inteligente') is distinct from 3 then
@@ -644,6 +691,17 @@ begin
   end if;
   if not exists (select 1 from public.ai_model_prices where model = 'claude-haiku-5-5') then
     raise exception 'seed imova: o Haiku 5.5 está sem preço (migração 20261104110000)';
+  end if;
+  if not exists (select 1 from public.app_settings where key = 'ia.atendente') then
+    raise exception 'seed imova: a configuração da IA que atende não existe (bloco 12h)';
+  end if;
+  if not exists (select 1 from public.ai_model_prices where model = 'claude-opus-5-5') then
+    raise exception 'seed imova: o Opus 5.5 está sem preço (migração 20261106170000)';
+  end if;
+  if exists (select 1 from pg_namespace where nspname = 'cron')
+     and not exists (select 1 from cron.job
+                      where jobname = 'ia_atendente_enfileirar' and schedule = '10 seconds') then
+    raise exception 'seed imova: a fila da IA que atende não ficou conferida a cada 10 segundos';
   end if;
   if n_cat <> 7 then raise exception 'seed imova: esperadas 7 categorias ativas, encontradas %', n_cat; end if;
   if n_pipe <> 2 then raise exception 'seed imova: esperados 2 funis, encontrados %', n_pipe; end if;

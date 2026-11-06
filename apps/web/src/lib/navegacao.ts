@@ -87,6 +87,8 @@
  * item é o D8, o segundo é o D4, o terceiro é o D1/D2.)
  */
 import {
+  Bot,
+  Building2,
   CalendarDays,
   ChartColumn,
   Handshake,
@@ -100,8 +102,11 @@ import {
   Target,
 } from 'lucide-react';
 
+import type { Empresa } from '@komune/schema/empresas';
+
 import { acompanhaEquipe } from '@/lib/auth/hierarquia';
 import { type AppRole } from '@/lib/auth/role';
+import { EMPRESA } from '@/lib/empresa';
 
 /** A que grupo da lateral o item pertence. A ordem aqui é a ordem na tela. */
 export type ChaveDeGrupo = 'todo_dia' | 'a_base' | 'controle';
@@ -144,6 +149,13 @@ export type ItemNavegacao = {
   posicaoNaBarra?: 1 | 2 | 3 | 4 | 5;
   /** Restringe o item a alguns papéis; sem valor, todos veem. */
   papeis?: readonly AppRole[];
+  /**
+   * O módulo da empresa sem o qual a tela não existe (`EMPRESA.modulos`). Sem
+   * valor, a tela é de todas as empresas. Anúncios (04/11/2026) e a "IA que
+   * atende" (06/11/2026) são de uma empresa só: na KOMUNE eles não aparecem em
+   * menu, paleta nem barra.
+   */
+  modulo?: keyof Empresa['modulos'];
   /** A fila que este item conta na lateral. Ausente = nunca mostra número. */
   fila?: ChaveDeFila;
   /**
@@ -337,6 +349,18 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     posicaoNaBarra: 4,
     papeis: PAPEIS_DO_CRM,
   },
+  {
+    href: '/anuncios',
+    rotulo: 'Anúncios',
+    icone: Building2,
+    grupo: 'a_base',
+    // As palavras que alguém digitaria na paleta: ZAP, Viva Real, OLX, Canal Pro,
+    // imóvel, casa, apartamento, terreno, foto, destaque.
+    descricao:
+      'Anúncios de imóveis (casa, apartamento, terreno, sala) que sobem pelo Canal Pro para o ZAP, Viva Real e OLX: fotos, preço, endereço e destaque, o que falta para ir ao ar e quando o portal leu.',
+    papeis: PAPEIS_DO_CRM,
+    modulo: 'anuncios',
+  },
   // -------------------------------------------------------------------------
   // Controle
   // -------------------------------------------------------------------------
@@ -357,6 +381,18 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     grupo: 'controle',
     descricao: 'Relatório de segunda-feira (texto + XLSX), funil e atividades por pessoa.',
     papeis: PAPEIS_DO_CRM,
+  },
+  {
+    href: '/ia',
+    rotulo: 'IA que atende',
+    icone: Bot,
+    grupo: 'controle',
+    // As palavras que alguém digitaria na paleta: robô, IA, treino, caderno,
+    // respostas, corrigir, Janio.
+    descricao:
+      'A IA que responde os clientes sozinha: ligar e desligar, a conversa do treino, o caderno do que ela sabe, as respostas para avaliar (boa ou corrigir) e o placar da semana.',
+    papeis: PAPEIS_DO_CRM,
+    modulo: 'iaQueAtende',
   },
   {
     // Era "Admin". "Ajustes" diz o que a tela faz; "Admin" dizia quem entra —
@@ -477,7 +513,11 @@ export function contagemDoItem(
 /** Itens visíveis para um papel. Papel que não existe mais não vê menu nenhum. */
 export function navegacaoPara(papel: AppRole): ItemNavegacao[] {
   if (!PAPEIS_DO_CRM.includes(papel)) return [];
-  return NAVEGACAO.filter((item) => !item.papeis || item.papeis.includes(papel));
+  return NAVEGACAO.filter(
+    (item) =>
+      (!item.papeis || item.papeis.includes(papel)) &&
+      (!item.modulo || EMPRESA.modulos[item.modulo]),
+  );
 }
 
 /**

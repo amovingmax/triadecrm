@@ -30,6 +30,10 @@ export const MODELOS = {
   sonnet: 'claude-sonnet-5',
   /** A leitura do cliente da Imova (03/11/2026). Pensa antes de responder (adaptativo). */
   haiku55: 'claude-haiku-5-5',
+  /** A IA que atende o cliente da Imova sozinha (06/11/2026). Sempre pensa (adaptativo). */
+  opus55: 'claude-opus-5-5',
+  /** Alternativa mais barata para a IA que atende (06/11/2026), escolhida na configuração. */
+  sonnet55: 'claude-sonnet-5-5',
 } as const;
 
 export type ModeloAlvo = (typeof MODELOS)[keyof typeof MODELOS];
@@ -49,6 +53,9 @@ export type PropositoDeAiRun =
   // A leitura do processo inteiro de um cliente da Imova (03/11/2026). O valor já
   // existia na lista do banco (`ai_runs_purpose_check`), sem prompt.
   | 'summarize_deal'
+  // A IA que atende o cliente da Imova sozinha (06/11/2026). O valor já existia na
+  // lista do banco, sem prompt.
+  | 'draft_reply'
   // A metade que LÊ da triagem do Radar: a conta soma nota e avaliações, e não
   // sabe que "Fotografia Silva — Formaturas" não atende casamento.
   | 'triar_candidato';

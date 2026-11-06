@@ -8891,3 +8891,464 @@ Pergunta do usuário: "Existe notificação para quando alguém está ligando?".
 **Pendente:**
 - Publicar junto com o resto dos avisos (banco e site), só com pedido do usuário.
 - **Opção 2, "em breve": a tela de chamada igual à do WhatsApp.** Plano no guia `docs/operacao/app-celular.md`, etapa 5: aviso de voz da Apple (PushKit), tela de chamada do iPhone (CallKit) e áudio no nativo. É uma versão nova do app.
+## 04/11/2026 (noite) — Conversas no jeito do WhatsApp e Concluir também na KOMUNE (RF-CON-04, RF-CON-05)
+
+**Pedido do usuário:** "Quero que todas as mudanças que fizemos na aba de conversas da Imova sejam feitas para o CRM da Komune também". Foram para a KOMUNE a tela de Conversas no jeito do WhatsApp (lista, conversa, dados do contato, tela de entrada, teclado do celular) e o Concluir. O que é módulo só da Imova e não é desta tela continua desligado na KOMUNE: a atitude do cliente, a ficha automática, a IA que lê o cliente e a ligação pelo WhatsApp (a KOMUNE liga pela Twilio).
+
+**Código:** `concluirConversa` ligado nas duas empresas e `20261104130000_concluir_tambem_na_komune.sql` (`app.concluir_ligado()` verdadeiro); pgTAP 93, 122 e o teste da URL `?concluidas=1` nas duas. Sem logo da KOMUNE no repositório, a tela de entrada dela mostra a marca do Tríade com o nome.
+
+**O que o banco da KOMUNE recebeu** (as 6 migrações que estavam fora dela desde 29/10, mais as 2 do Concluir). Antes de publicar, conferido migração por migração e ensaiado num banco no mesmo ponto da produção dela (165 migrações, semente da KOMUNE, 100 parceiros e duas conversas, uma arquivada), com a foto do banco antes e depois:
+- nenhuma mexe em parceiro, negócio, conversa ou mensagem (as somas de conferência bateram), nenhuma põe gatilho novo em `messages`, `conversations`, `deals`, `organizations` ou `contacts`, e nenhuma troca função do caminho de envio e entrada do WhatsApp;
+- a atitude e a ficha não criam nada num banco que diz ser da KOMUNE (sem efeito lá, de propósito); a tela não as pede quando o módulo está desligado;
+- a ligação pelo WhatsApp cria as tabelas dela, a chave desligada (`whatsapp.ligacao`) e dois agendamentos (`wa_chamadas_fechar_orfas` a cada 5 min e `wa_permissoes_conferir_pedidos` a cada minuto), que na KOMUNE não acham nada para fazer (rodados no ensaio: 0 e 0);
+- a IA acrescenta o preço do Haiku 5.5 e uma função que só a Imova usa;
+- o Concluir troca `app.messages_desarquiva` (a saída de uma pessoa do time traz a conversa de volta, e uma falha nessa volta nunca derruba o envio) e `app.conversas_esperando_gente` (a concluída sai do Meu dia), as duas a partir da versão mais nova que existia (02/10).
+- **Verificado:** typecheck e lint limpos; Vitest 1.520 no site e 111 no schema; pgTAP do zero com a semente da KOMUNE: só as falhas antigas da `main` (52 e 107), com o 93 e o 122 passando; no ensaio da produção da KOMUNE passaram o 93, o 122, o 119 (ligação perdida) e o 118 (ligação pelo WhatsApp). O site local da KOMUNE, com o banco local no mesmo estado, abriu Conversas, Concluídas, a conversa com Concluir e Ligar, os dados do contato e a ficha do parceiro sem erro no console e sem pedido recusado pelo banco, no computador e a 390×844.
+
+**Publicado:**
+- `main` `0291b82`.
+- Banco da Imova primeiro (a ordem do `publicar-banco.mjs`): só a `20261104130000`, sem efeito lá (a chave já era verdadeira).
+- Banco da KOMUNE: as 8 migrações, por `publicar-banco.mjs komune migrar`. Conferido em produção: 173 migrações, `app.concluir_ligado()` verdadeiro, ligação pelo WhatsApp desligada, tabelas da atitude e da ficha não criadas, robô do WhatsApp batendo (último sinal 2 s antes) antes e depois.
+- Site da KOMUNE `triade-nw1hnpdv0` (de `0291b82`, cópia limpa em `~/triadecrm-publicar-komune`), em `triade-crm-tawny.vercel.app` e `ir.komune.app.br`; volta: `triade-12rd66zs6`. Com isso o ar da KOMUNE volta a estar na `main` (o `1e3e2a7` de 03/11 fica para trás). Conferido de fora: `/login` 200, papel de parede 200, `/auth/dev` e `/auth/dev/teclado` 404, `/conversas` sem login vai para o login. A tela com login não foi aberta em produção (login pelo Google).
+- A Imova não foi republicada: o código novo só muda a KOMUNE, e o site dela segue em `c4e3741` (`imova-i50bwhgai`). Robôs das duas empresas intocados.
+
+**Pendente:**
+- o usuário conferir a KOMUNE em produção, no computador e no iPhone;
+- o logo da KOMUNE para a tela de entrada (mandar o arquivo);
+- se quiser na KOMUNE algum dos módulos da Imova (atitude, ficha automática, IA que lê o cliente, ligação pelo WhatsApp): cada um tem custo ou regra própria e pede decisão;
+- as branches não publicadas que mexem nos mesmos arquivos (`cadastrar-clientes`, `pedir-reenvio`, `parceiros-na-imova`) vão precisar ser refeitas sobre a tela nova.
+
+## 04/11/2026 (noite) — A ficha do parceiro e do cliente mais organizada, principalmente no celular (RF-BAS-01, PRD §8)
+
+Pedido do usuário, com três fotos da ficha da Ana Paula (teste) no app da Imova: "Preciso que essa tela seja mais organizada, tem muitas coisas e informações que estão bagunçadas e dificultando o entendimento [...] Foque em deixar mais responsivo também". Ele viu o protótipo com o antes e o depois (https://claude.ai/artifact/PTLwqT5S3rnt23CkEzj94d) e aprovou: "Ficou muito bom. Quero que suba essa alteração para o ar".
+
+**Feito (vale nas duas empresas; só a ficha usa estas peças):**
+- **As ações do topo cabem numa linha.** No celular são blocos com o ícone em cima e o nome embaixo: Conversar, Registrar, Ligar (quando há telefonia) e Mais. Antes o "⋯" descia sozinho para a segunda linha. A partir de `sm` continuam as pílulas. Medido de 320 a 430 px: com os quatro botões da KOMUNE, abaixo de 360 px o nome usa 10,5 px e o "Mais" fica com 48 px.
+- **A próxima ação virou um bloco em destaque no celular**, na largura toda. Era meia coluna, com nove linhas espremidas contando a origem. No computador ela ganhou a coluna mais larga e mostra duas linhas, em vez de cortar em "Perguntar o que ele pr…".
+- **Último contato, WhatsApp e Responsável viraram linhas no celular**, com o rótulo à esquerda. No computador continuam as colunas.
+- **Nada repetido:**
+  - a sugestão da IA não se repete no cartão "Leitura da IA" quando é a mesma frase da próxima ação (`mesmaFrase`);
+  - o "Abrir a conversa" saiu do título do cartão "Atividade" e virou "Ver a conversa inteira", no fim, quando a lista não mostra tudo.
+- **A tarefa do guardrail de PII em português claro.** O título técnico ocupava 14 linhas no celular. Na ficha ela aparece como "Ler a conversa você mesmo", com o motivo embaixo: "A IA não leu: havia telefone nas mensagens" (`avisoDaIa`, com teste). O texto original continua na tarefa e em `ai_runs`.
+- **Linhas que não espremem a 320 px:**
+  - o selo "atrasada" fica embaixo do título da tarefa;
+  - a data da atividade desce quando não cabe ao lado do título;
+  - as etiquetas da leitura da IA ocupam a largura do cartão.
+- **"← Parceiros" virou "← Prospectados"**, o nome que a barra de baixo mostra.
+- **Verificado:**
+  - fotos antes e depois a 390, 320 e 1280 px, na Imova (Ana Paula) e na KOMUNE (DJ Done), sem estouro de largura;
+  - nesta cópia da main: typecheck, lint do site inteiro e os 1.523 testes, com 3 novos.
+  - A comparação tela a tela das 22 telas não rodou, porque a mudança não é do app. Os cinco arquivos tocados só são importados pela página da ficha (`parceiros/[id]/page.tsx`).
+
+**Pendente:**
+- A tarefa de bloqueio continua com o título técnico no Meu dia e na Agenda. O título nasce no worker de IA (`abrirTarefaDeBloqueio`), e trocar o texto lá muda o worker publicado na Imova.
+- A branch `parceiros-na-imova` (não publicada) troca o nome da lista na Imova e vai encontrar o "← Prospectados" novo.
+
+**Em produção nas duas empresas desde 04/11/2026, ~17h20** (main `3a0927f`, publicada das cópias limpas `~/triadecrm-publicar-komune` e `~/triadecrm-publicar-imova`):
+- KOMUNE: `triade-728tynghz`, em `triade-crm-tawny.vercel.app` e `ir.komune.app.br`. Volta: `triade-nw1hnpdv0`.
+- Imova: `imova-l5wlxx22l`, em `imova-crm.vercel.app`. Volta: `imova-i50bwhgai`. Ela também leva o `0291b82`, que na Imova não muda nada.
+- Antes do deploy, o ar das duas estava na `main` (`0291b82` e `c4e3741`, origem CLI).
+- Sem migração e sem mexer nos robôs.
+- Conferido de fora nas duas: `/login` 200, `/auth/dev` 404, e a ficha sem login vai para o login. A ficha com login não foi aberta em produção, porque o login é pelo Google.
+
+## 05/11/2026 — Login com Google dentro do app de celular (parte do site) e o aviso do microfone (RF-ADM-01, RF-CON-05, PRD §8)
+
+Pedidos do usuário: "Faça logo o login com o Google". Depois, ao testar o áudio no app de teste ("O microfone não abriu"), escolheu publicar o login para testar o áudio no app ligado ao Tríade no ar.
+
+**Feito (só o site; a casca do app continua na branch `app-celular`):**
+- **Login pela janela segura do iPhone.** O Google recusa login dentro de WebView. As rotas novas são `/auth/app/google`, `/auth/app/volta` e `/auth/app/entrar`, e o desenho está em `apps/web/src/lib/auth/entrada-pelo-app.ts`:
+  - o app abre `/auth/app/google` na janela segura;
+  - o site faz o login com Google lá, pelo mesmo Supabase e pela mesma volta do navegador (`/auth/callback`);
+  - o site gera um código de uso único (link mágico do Supabase, sem e-mail) e devolve ao app;
+  - o app entra em `/auth/app/entrar` na WebView.
+  - O código só vai para `triade://auth` ou para o Expo Go da rede local, e vale uma vez.
+  - A recusa ("cancelou", "e-mail sem acesso", "sem perfil") volta ao app com o aviso certo.
+- **No navegador nada muda.** O botão "Entrar com Google" só toma o caminho novo com a marca `TriadeApp/` no user-agent. `/auth/callback` segue igual para o navegador; o que mudou é que aceita a volta do app (`destinoDepoisDoLogin`, em `lib/supabase/middleware.ts`).
+- **Aviso do microfone.** O aviso do gravador de áudio diz o motivo certo:
+  - fora de https, o navegador nem oferece o microfone à página;
+  - no app, a saída é ligar o microfone nos Ajustes do iPhone;
+  - no navegador, continua o cadeado da barra de endereço.
+- **Verificado:**
+  - typecheck, lint e 1.532 testes (9 novos) nesta cópia da main;
+  - o caminho inteiro, de ponta a ponta, no teste do Mac, nas duas empresas;
+  - comparação tela a tela (`comparar-versoes.mjs`) contra a versão no ar (`3a0927f`): 88 de 88 telas iguais (`~/triadecrm-capturas/2026-11-05-15-38`).
+
+**Pendente:**
+- O primeiro login com o Google de verdade, pelo app ligado à produção (`TRIADE_APP_AMBIENTE=producao pnpm -C apps/app start`, na branch `app-celular`). Ele confirma que a volta `/auth/callback?next=/auth/app/volta` passa na lista de endereços de retorno do Supabase de cada empresa.
+- Tirar a volta pelo Expo Go (`exp://` de rede local) quando houver app instalado.
+
+**Em produção nas duas empresas desde 05/11/2026, ~12h50** (main `9d4c39b`, publicada das cópias limpas):
+- KOMUNE: `triade-khq601hqt`, em `triade-crm-tawny.vercel.app` e `ir.komune.app.br`. Volta: `triade-728tynghz`.
+- Imova: `imova-j6funec58`, em `imova-crm.vercel.app`. Volta: `imova-l5wlxx22l`.
+- Antes do deploy, o ar das duas estava em `3a0927f`.
+- Sem migração e sem mexer nos robôs ou no Supabase.
+- **Conferido de fora nas duas:**
+  - `/login` 200 e `/auth/dev` 404;
+  - `/auth/app/google` sem estado vai para `/login?erro=app`;
+  - com estado e volta, vai ao Supabase e ao Google com `redirect_to` = `/auth/callback?next=/auth/app/volta`, sem troca pela URL do site. É indício de que a lista de retorno aceita a volta, e o primeiro login real confirma.
+
+## 04/11/2026 (noite) — Anúncios de imóveis pelo Canal Pro, só na Imova (branch `anuncios-canal-pro`; fora do PRD)
+
+**Pedido do usuário:** uma aba no CRM da Imova para subir o anúncio do imóvel (casa, apartamento, terreno etc.) e mandá-lo ao Canal Pro, "ao invés de subir pelo ZAP, mas continuaríamos com o plano". Fora do PRD (que é da KOMUNE); perguntado antes de construir.
+
+**Como o Grupo OLX recebe (documentação oficial em developers.grupozap.com/feeds, lida em 04/11):** não existe API para criar anúncio na hora. A integração oficial é um arquivo XML no formato VRSync numa URL que a imobiliária cola uma vez no Canal Pro ("Integração de anúncios"); o robô do Grupo OLX (`VivaRealBot`) baixa o arquivo a cada 12 horas, e o portal mostra em até 4 h (ZAP e Viva Real) ou 24 h (OLX). O plano continua: o destaque (PublicationType) gasta a cota contratada, e o que passa dela o Grupo OLX inativa sozinho. Anúncio manual continua no Canal Pro; um do XML igual a um manual é recusado por duplicidade; o do XML não se edita pelo Canal Pro.
+
+**Decisões do usuário (04/11):** só os anúncios novos passam pelo CRM (os de hoje ficam no Canal Pro); todos criam e a gestão publica (admin, gestor e SDR criam e editam rascunho e fora do ar; pôr no ar, tirar do ar, destaque, excluir e mexer em anúncio no ar é de admin e gestor); os contatos (leads) que chegam pelos portais ficam para outra etapa.
+
+**Entregue (nada em produção):**
+- Banco — migração `20261104150000_anuncios_no_canal_pro` (na KOMUNE não cria nada, como a da atitude): `anuncios` (código `IMV-0001` em diante, que é o ListingID e nunca muda), `anuncio_fotos` (posição 0 = capa), `canal_pro` (chave secreta da URL e o contato da imobiliária, sem política: só funções), `canal_pro_leituras` (cada download, 90 dias), a lista `anuncios_na_lista`, `app.anuncio_tipo` (os 24 tipos com o PropertyType e o que o portal pede de cada um) e `app.anuncio_pendencias` (título 10–100 e descrição 50–3.000 sem HTML, 5 fotos, preço, CEP, estado, cidade, bairro, área útil ou total conforme o tipo, quartos e banheiros onde o VRSync pede, vídeo só do YouTube, nome e e-mail da imobiliária). Escrita só por funções: `anuncio_salvar` (no ar, recusa salvar com pendência e devolve o que falta), `anuncio_publicar`, `anuncio_tirar_do_ar`, `anuncio_destaque`, `anuncio_excluir` (com motivo; sai do arquivo) e `anuncio_restaurar` (volta fora do ar), `anuncio_foto_adicionar` (confere que o arquivo chegou ao balde, no caminho do anúncio), `anuncio_fotos_ordenar`, `anuncio_foto_remover` (no ar, nunca menos de 5), `canal_pro_situacao` (a chave só para admin e gestor), `canal_pro_ajustar`, `canal_pro_trocar_chave` e `canal_pro_feed` (anônimo, só com a chave). Auditoria em `anuncios`.
+- Fotos num balde PÚBLICO `anuncios` (só JPEG, até 7 MB): o robô do Grupo OLX baixa sem credencial. É o único balde público do CRM; o nome de cada foto é sorteado e muda quando a foto muda (o VRSync pede). Escrever, só pela rota `/api/anuncios/fotos`, que confere quem pode e emite autorização de uso único (como as mídias de saída); apagar o arquivo também é dela.
+- Edge Function `canal-pro-feed` (só no projeto da Imova, `verify_jwt = false`): monta o XML VRSync (`vrsync.ts`, função pura, com teste Deno). Chave errada dá 404 sem anotar nada; banco fora do ar dá 503 e nunca um arquivo vazio (que diria ao Grupo OLX para tirar tudo do ar). Descrição com quebra de linha em `&lt;br&gt;` dentro do CDATA, como a documentação pede.
+- Site — aba Anúncios no grupo "A base", só onde `EMPRESA.modulos.anuncios` (Imova); o item de menu ganhou o campo `modulo`, e na KOMUNE a rota dá 404. Lista com capa, preço, situação, destaque, o que falta e se o Grupo OLX já levou a última mudança; filtros Todos, No ar, Rascunhos, Fora do ar e Excluídos (com Restaurar). Formulário por blocos (imóvel e proprietário da base, valores, tamanho, endereço com o CEP preenchendo rua e bairro pelo ViaCEP, texto com contadores, características com os valores do VRSync, fotos com capa, setas e remover; a foto vira JPEG no navegador, sem os dados de localização da câmera). Cartão ao lado com o que falta (a lista é a do banco), Pôr no ar, Tirar do ar, Destaque e Excluir para a gestão. Folha "Canal Pro" com o contato (preenchido com o da política de privacidade), a URL para copiar, o passo a passo e a última leitura.
+
+**Verificado:** pgTAP 123 (47 asserções) no banco local da Imova, inclusive uma que confere que nenhuma função dos anúncios tem `UPDATE`/`DELETE` sem `WHERE` (o `safeupdate` da API recusou o primeiro `canal_pro_ajustar`, e o pgTAP, que roda direto no banco, não pega isso); `supabase db lint` sem apontamento nas funções novas; teste Deno do XML (9) e `deno check` da função; typecheck e lint limpos; Vitest 1.521 no site e 111 no schema. Chrome (Playwright) no site local da Imova, com a função rodando em Deno contra o banco local: gestor salva o contato, cria o anúncio, o CEP preenche, sobe 6 fotos, troca a capa, tira uma, põe no ar e escolhe Super destaque; o arquivo baixado com o user-agent do robô sai bem-formado, com a capa certa primeiro, e a foto responde `image/jpeg`; a leitura fica anotada como do Grupo OLX. SDR cria rascunho de terreno (pede área total, não quartos), não vê Pôr no ar, a URL nem o contato editável, e o anúncio no ar fica travado para ele. 1440×900 e 390×844 sem estouro de largura. Migração aplicada nos bancos locais da Imova (56322), da KOMUNE (54322) e de validação (55322); nos dois da KOMUNE, sem efeito.
+
+**Pendente:**
+- publicar, quando o usuário pedir: migração no banco da Imova, `supabase functions deploy canal-pro-feed` no projeto da Imova e o site da Imova. Nada na KOMUNE.
+- alguém com o login do Canal Pro da Imova colar a URL (Anúncios → Canal Pro) e esperar a primeira leitura. Conferir no primeiro uso real: o nome do integrador na lista do Canal Pro (um integrador cita "Desenvolvedor próprio"; não está na documentação oficial), se tirar do arquivo tira do portal (a documentação diz que "exclusões serão refletidas", sem dizer como), e se o terreno passa com a área total repetida como útil.
+- os erros do Grupo OLX ficam no relatório de integração do Canal Pro e no e-mail. O webhook do relatório (mostrar no CRM qual anúncio foi recusado e por quê) pede cadastro da URL por formulário do Grupo OLX: outra etapa.
+- os leads dos portais no CRM (decidido: outra etapa; a página da API de leads estava fora do ar em 04/11).
+- o XSD oficial (`xml.vivareal.com/vrsync.xsd`) responde 403; o XML foi conferido contra os exemplos da documentação.
+
+**Decisão humana:** o balde público das fotos (o CLAUDE.md pede Storage privado; aqui o portal precisa baixar sem credencial). A cota de destaques do plano não está no CRM: a tela conta os destaques no ar, mas não sabe o limite.
+
+### 04/11/2026 (noite) — "No ar" com tudo o que está no Canal Pro (mesma branch e mesma migração)
+
+**Pedido do usuário:** a aba "No ar" deve listar todos os imóveis publicados no Canal Pro, inclusive os cadastrados lá à mão, e ter um botão para encerrar o anúncio. O Grupo OLX não tem API para ler anúncios nem para excluir o anúncio manual: "a exclusão de anúncio manual deve ser feita de forma manual através do Canal Pro" (integration_rules). Explicado ao usuário, que escolheu **mostrar todos e migrar aos poucos** (a Imova tem até 20 anúncios). Muda a decisão da tarde ("só os novos"): os manuais continuam no Canal Pro, mas aparecem no CRM.
+
+**Entregue (nada em produção):**
+- Banco, na mesma migração `20261104150000` (ainda não publicada): `anuncios_no_canal_pro` (código, título, tipo e o tipo do CRM, negócio, preços, bairro, cidade, área, quartos, destaque, situação, link e a linha inteira do relatório; `no_relatorio`, `excluido_em` e o `anuncio_id` de quando é trazido); `canal_pro_importar` (admin e gestor; atualiza pelo código e marca quem sumiu do relatório como fora do Canal Pro; arquivo sem código não muda nada), `canal_pro_marcar_excluido` ("já excluí no Canal Pro", admin e gestor, com desfazer e registro no `audit_log`) e `canal_pro_trazer` (equipe toda; cria o rascunho com o que o relatório tem, uma vez só). `app.anuncio_pendencias` ganhou "excluir o original (código X) no Canal Pro e marcar aqui como excluído": o trazido não vai ao ar enquanto o original estiver lá, senão o Grupo OLX recusa por duplicidade.
+- Site: "Trazer a lista do Canal Pro" (folha com o passo a passo do Canal Pro → Anúncios → Exportar relatório, que chega por e-mail; lê o CSV ou .xlsx no navegador com o leitor da importação, mostra que coluna virou o quê e as primeiras linhas antes de importar). "No ar" e "Todos" mostram os do CRM e, embaixo, "Cadastrados direto no Canal Pro", com "Trazer para o CRM" e "Excluir no Canal Pro" (diálogo que copia o código, abre o canalpro.grupozap.com e pede a confirmação). Os do CRM ganharam "Tirar do ar" na própria linha, com Desfazer. O editor diz quando o anúncio veio do Canal Pro.
+- `relatorio-canal-pro.ts` reconhece as colunas pelo nome (código do anúncio antes do código do anunciante, uma coluna só de preço vai para venda ou aluguel conforme o negócio, tipos como "Lote/Terreno" e "Casa de Condomínio" viram o tipo do CRM), com 26 testes Vitest.
+
+**Verificado:** pgTAP 123 com 59 asserções (12 novas: quem importa, arquivo sem código, quem some do relatório, trazer uma vez só, a pendência do original e a marca que cai se o original voltar no relatório); `db lint` sem apontamento nas funções; typecheck e lint limpos; Vitest 1.547 no site. Chrome (Playwright) no site local da Imova com um relatório de exemplo (`;`, valores em R$): 10 colunas reconhecidas, 3 importados, "No ar 4" (1 do CRM e 3 do Canal Pro), terreno trazido nasce com área total e com a pendência do original, o diálogo copia o código certo, "Já excluí" tira o original da lista e a pendência, "Tirar do ar" e Desfazer na linha, e o SDR no celular só vê "Trazer para o CRM", sem estouro de largura. Migração reaplicada nos três bancos locais (na KOMUNE, sem efeito).
+
+**Pendente:**
+- **as colunas reais do relatório do Canal Pro:** nenhuma fonte publicada as descreve, e o reconhecimento foi feito com os nomes prováveis. O primeiro relatório de verdade (o usuário exporta e manda o arquivo) diz o que acertar. Arquivo sem coluna de código é recusado com a lista das colunas que ele tem.
+- o relatório é uma foto do dia: o CRM só sabe de mudança feita no Canal Pro na próxima importação.
+- o relatório não deve trazer fotos, descrição nem CEP: o trazido pede tudo isso antes de ir ao ar.
+
+### 04/11/2026 (noite) — O limite do plano e o validador do Grupo OLX (mesma branch; migração `20261104180000`)
+
+**Pedido do usuário:** mandou a especificação da integração (`integracao-imova-grupozap.md`) e pediu "faça esse passo a passo". Dela saíram o plano da Imova (Multiportais 10 Padrão: 10 anúncios, 2 com destaque, até 22/01/2027; hoje 9 manuais) e o caminho do validador oficial. Combinado: (1) o CRM respeita o limite do plano; (2) o arquivo passa no validador do Grupo OLX. Publicar continua só a pedido.
+
+**O validador (developers.grupozap.com/feeds/xml_validator, que chama `integrations-api-re-listings.olx.com.br/v1/sandbox/xml_validation`):** confere estrutura e vocabulário, não as regras de conteúdo (CEP, 5 fotos e tamanho do título passam nele; essas o CRM já cobra em `app.anuncio_pendencias`). Arquivos de exemplo feitos com o próprio `vrsync.ts`, com os 24 tipos, os 6 destaques, os 5 períodos de aluguel, os 3 modos de endereço e as 40 características: passou tudo, menos `TRIPLE` (aceitos: STANDARD, PREMIUM, SUPER_PREMIUM, PREMIERE_1, PREMIERE_2, PREMIERE_3) e `Residential / Loft` (a tabela da documentação lista; o validador recusa). Confirmou também que o `ContactInfo` vai dentro de cada `Listing` (fora dá erro) e aceita o terreno com e sem `LivingArea`. O arquivo de verdade do CRM local, com um anúncio no ar em Super destaque, deu "Valid XML".
+
+**Entregue (nada em produção):**
+- Banco — migração `20261104180000_anuncios_limite_do_plano` (na KOMUNE não cria nada): `canal_pro.limite_anuncios` e `limite_destaques` (10 e 2 na Imova; vazio = o CRM não confere), `app.canal_pro_ocupadas` (anúncios do CRM no ar + manuais da lista; destaques do CRM + manuais cujo relatório escreve um destaque, por `app.canal_pro_destaque_do_relatorio`: "Destaque padrão" é destaque, "Padrão" não). `anuncio_publicar` recusa com `plano_cheio` ou `plano_sem_destaque`; `anuncio_destaque` recusa `plano_sem_destaque` no anúncio no ar (rascunho escolhe à vontade); as duas travam a linha de `canal_pro`, para duas pessoas não pegarem a última vaga juntas. `canal_pro_situacao` devolve o plano; `canal_pro_ajustar_plano` (admin e gestor, com `audit_log`). O destaque triplo saiu (check e função) e o loft vai como `Residential / Apartment`. Importar o relatório e desfazer um "já excluí" não são recusados: contam o que existe no Canal Pro.
+- Site: "Plano: X de 10 vagas · Y de 2 destaques" no alto de Anúncios ("Plano cheio" quando lota); no anúncio, "Pôr no ar" trava com o motivo (plano cheio, ou destaques em uso com o anúncio em destaque) e o destaque bloqueia as opções sem vaga; os destaques Zap+ somem da escolha (a Imova não tem contrato Zap+); o loft aparece como "Loft (no portal, como apartamento)"; folha "Canal Pro" com o plano editável e o uso atual.
+
+**Verificado:** pgTAP 124 (30 asserções: vaga, manual contando, destaque no ar e no rascunho, troca de destaque sem gastar vaga, quem muda o plano, números que não fecham, vazio = não confere, auditoria, triplo e loft) e 123 (59) no banco local da Imova; `db lint` sem apontamento nas funções; typecheck e lint limpos; Vitest 1.547 no site; Deno 9 e `deno check`. Chrome (Playwright) como gestor: plano 3/0 bloqueia o anúncio em Super destaque com o motivo e a opção Destaque bloqueada; em Padrão, vai ao ar; plano 2/0 mostra "Plano cheio: 2 de 2" e trava o botão; de volta a 10/2, no ar com Super destaque ("1 de 2"); 390×844 sem estouro de largura. Migração aplicada nos três bancos locais (na KOMUNE, sem efeito).
+
+**Pendente:**
+- a conta dos manuais usa o relatório importado: se o relatório de verdade trouxer anúncio inativo, ele conta como vaga até o reconhecimento da coluna de situação ser acertado com o primeiro arquivo real.
+- se o "Super destaque" gasta a mesma cota dos 2 destaques do plano, a especificação não diz; o CRM conta todos os destaques juntos.
+- continua tudo da entrada anterior: publicar a pedido; colar a URL no Canal Pro; como o Canal Pro aceita a URL de um CRM próprio (a especificação também deixa em aberto; perguntar ao suporte, chamado.integracao@olxbr.com); os leads, em outra etapa.
+
+## 05/11/2026 — Anúncios e leads do Canal Pro no CRM da Imova (branch `anuncios-canal-pro`; fora do PRD)
+
+**Pedido do usuário (com prints do Canal Pro):** continuar anunciando no ZAP pelo plano, mas publicar pelo CRM; ver no CRM tudo o que está no Canal Pro (no ar, não publicados e rascunhos); tirar do ar pelo CRM; todos os leads no CRM com o contato e o código do anúncio de onde vieram, inclusive quem chama no WhatsApp; e um protótipo interativo com a estrutura do Canal Pro.
+
+**O que a pesquisa mudou (documentação do Grupo OLX, conferida por um segundo agente que tentou derrubar cada afirmação):**
+- Os 17 anúncios da Imova aparecem "Via Integração": vêm do arquivo de OUTRO sistema, não de cadastro manual (a especificação de 04/11 falava em 9 manuais). Só esse sistema os tira do ar; manual ("Via CanalPro") se exclui no Canal Pro.
+- Um integrador por conta ("Não é possível cadastrar múltiplos integradores"). A ajuda manda cancelar a integração atual para trocar, e "o cancelamento apaga os anúncios atuais". Nenhuma fonte diz se manter os mesmos ListingID preserva visualizações e leads. Por isso o CRM traz os anúncios com o MESMO código, e a troca do endereço no Canal Pro fica para depois de perguntar ao suporte (chamado.integracao@olxbr.com).
+- O VRSync não tem campo de situação: "não publicado" é decisão do Canal Pro; tirar do arquivo é tirar do ar (na próxima leitura, até 12 h + 4 h no ZAP/Viva Real e 24 h na OLX).
+- Leads pelo webhook exigem homologação do CRM (formulário do Grupo OLX → SECRET_KEY em Basic). Plano B sem homologação: o e-mail de lead, que traz atributos estáveis (lead-name, lead-phoneNumber, lead-email, listing-externalCode).
+- Lead Certo: o código é de um anúncio PARECIDO da Imova, não do que a pessoa viu. Responder 404 ao webhook desativa a integração de leads (relato no repositório oficial).
+- O WhatsApp do anúncio vem do cadastro da conta no Canal Pro (Informações públicas), não do arquivo; com a Izi contratada, o clique vai para um número da Twilio, fora do CRM.
+
+**Entregue (nada em produção):**
+- Banco — `20261105100000_leads_dos_portais` (só Imova): origem `canal_pro` no catálogo; `portal_leads` (sem telefone nem e-mail: ficam na ficha, com a máscara do SDR; payload sem nome, contato, mensagem e dados do MCMV; mensagem sem CPF); `grupozap_lead_receber` (só service_role; idempotente por originLeadId; soma o tipo de contato quando o mesmo lead volta; liga ao anúncio pelo código em `anuncios` ou no relatório; acha a ficha pelo telefone, pela pessoa ou pelo e-mail sem trocar a origem, ou cria a ficha de Cliente como a ficha automática; telefone suprimido ou ficha "não contatar" não liga; atividade "Lead do portal" na ficha; erro de ficha repetida sem o telefone no texto); `portal_lead_assumir`, `portal_lead_mudar` (descartar pede motivo); a view `portal_leads_na_lista` e a coluna `leads` em `anuncios_na_lista`. `20261105110000_anuncios_do_sistema_atual` (só Imova): `anuncios.origem` e `importado_em`; `anuncio_importar` (admin e gestor; cria rascunho com o código do arquivo ou atualiza; não desfaz o proprietário; o destaque do arquivo vale no rascunho); `canal_pro_trazer` mantém o código do relatório; a pendência "excluir o original" só com código diferente; a vaga do plano conta uma vez quando o mesmo anúncio está no CRM e no relatório.
+- Edge Function `grupozap-lead` (verify_jwt = false; Basic conferido por SHA-256 em tempo constante antes do JSON; chave anterior e usuário opcionais; 200/401/400/405/413/422/500/503, nunca 404 nem 3xx; logs sem dado pessoal). Segredos `GRUPOZAP_LEAD_SECRET` (+ `_ANTERIOR`, `GRUPOZAP_LEAD_USUARIO`) no `.env.example`.
+- Importador "Trazer do sistema atual" (gestão): lê o arquivo VRSync pelo endereço (busca no servidor com bloqueio de IP privado e de metadados, conferido a cada conexão e redirecionamento; nunca se passa pelo robô do Grupo OLX) ou pelo arquivo escolhido; mostra o que leu; traz cada anúncio com o mesmo código e as fotos (JPEG, PNG ou WebP pelos primeiros bytes, até 7 MB, capa primeiro; pula quem já tem fotos). `fast-xml-parser` 5.11.2.
+- O sistema que publica hoje é a **Arbo Imóveis** (Canal Pro → Integração de anúncios: software "Desenvolvedor Próprio", endereço em `integracao.arboimoveis.com`, próxima leitura às 00:07). O arquivo dela tem **7 anúncios** (o Canal Pro mostrava 17: 9 publicados e 8 não publicados) e entrega as fotos em **WebP**, que o balde e o portal não aceitam. O servidor agora converte toda foto trazida para JPEG (`importar/fotos/foto-em-jpeg.ts`, com `sharp` 0.35.4, que o Next já trazia), com as regras do editor: de pé pela orientação gravada, maior lado em até 2.560 px, sem metadados, transparente vira branco, e recusa acima de 50 milhões de pontos (PNG pequeno que pede gigabytes ao abrir). O endereço da Arbo leva uma chave no caminho: fica fora do repositório.
+- Telas: seletor "Anúncios | Leads"; Leads dos portais (resumo, filtros, busca, lista e ficha do lead com assumir, respondido, descartar e trazer de volta; telefone mascarado para o SDR com o Revelar que já existe; Lead Certo como "Parecido com"); número de leads em cada anúncio; etiqueta "Veio do anúncio X · WhatsApp" na conversa e em "Dados do contato", só leitura e só na Imova. O bloco do Canal Pro virou "No Canal Pro hoje", com "Como tirar do ar" explicando Via Integração × Via CanalPro.
+
+**Verificado:** pgTAP 123 (59), 124 (30), 125 (66), 126 (39) e 120 (44, regressão) no banco local da Imova; migrações nos três bancos locais (na KOMUNE, só o aviso); `db lint` sem apontamento novo; Deno 39 (feed e leads) e `deno check`; Vitest 1.633 no site e o do schema; typecheck e lint limpos. Depois: Vitest 1.641 (8 novos da conversão), typecheck e lint limpos. Ensaios: 17 casos de curl na função de leads (contêiner local), leads de teste na tela no Chrome (gestor e SDR, 1440 e 390 px) e o importador de ponta a ponta com um arquivo de exemplo dos 3 anúncios dos prints (mesmos códigos, 5 fotos cada, prontos para ir ao ar) e depois com o **arquivo real da Arbo** no banco local: os 7 entraram como rascunho com as 66 fotos convertidas; 6 prontos para ir ao ar e o TE0003_IMOVA com 4 fotos (o Grupo OLX pede no mínimo 5). O arquivo do CRM e o de exemplo passaram no validador oficial.
+
+**Pendente:**
+- publicar só a pedido: as duas migrações novas junto com as de 04/11, as funções `canal-pro-feed` e `grupozap-lead` e o site da Imova; gravar `GRUPOZAP_LEAD_SECRET` quando o Grupo OLX mandar a chave.
+- a mensagem do lead não entra em `app.lgpd_dossie` nem tem retenção própria (as funções são das duas empresas; mexer pede cuidado). A ficha e as atividades entram.
+- o webhook do relatório de integração (erro por anúncio no CRM) e o plano B do e-mail de lead (pede um serviço que receba e-mail).
+- quem chama no WhatsApp com nome de usuário (BSUID) e sem telefone não abre conversa hoje: risco do caminho de entrada, que está congelado.
+
+**Decisão humana:** os outros 10 anúncios do Canal Pro, que não estão no arquivo da Arbo (o relatório exportado do Canal Pro os lista); se a Arbo também recebe os leads do Grupo OLX hoje; qual WhatsApp está no Canal Pro e se a Izi está ligada; enviar o formulário de homologação dos leads; a troca do integrador só depois da resposta do suporte; o balde público das fotos (pendente desde 04/11).
+
+### 05/11/2026, tarde — o lead só entra quando a pessoa manda mensagem (só na Imova)
+
+**Pedido do usuário:** "os leads somente cheguem ao CRM quando enviarem mensagem", já com a etiqueta do anúncio e o código do imóvel; seguir COM o formulário de homologação dos leads do Grupo OLX. Nas perguntas: quem escreveu pelo chat, formulário ou pedido de visita do portal entra na lista principal; quem só clicou no WhatsApp ou em "ver telefone" fica numa seção à parte, para a equipe ligar, com o contato apagado em 90 dias.
+
+**Entregue (nada em produção):**
+- Banco — `20261105130000_leads_so_com_mensagem` (só Imova; na KOMUNE só o aviso): o contato que o portal manda vai para `portal_lead_contatos` (só a gestão lê; o SDR revela por `portal_lead_revelar_telefone`, com `pii_access_log`); `grupozap_lead_receber` só dá ficha a quem escreveu pelo portal (`app.portal_lead_ligar_ficha`, o mesmo caminho de antes), e o clique no WhatsApp espera a mensagem (a ficha vem da ficha automática do WhatsApp); `portal_leads_na_lista` virou como `organizations_view` (dono + security_barrier, filtro `is_manager`) e liga o lead à conversa do mesmo `peer_phone_e164` com mensagem recebida depois do clique, NA LEITURA, com `grupo`, `chegou_por`, `chegou_em`, `primeira_mensagem`, `respondido_em`/`respondido_por_nome` e a situação "respondido" sozinha quando alguém do time responde (a resposta do robô não conta); a conta da lista de Anúncios passou a ser de quem mandou mensagem; `app.portal_leads_manter` (pg_cron a cada 15 min) grava a conversa achada, põe a atividade "Lead do portal" na ficha e apaga o contato 90 dias depois do aviso. Nenhum gatilho nem chave estrangeira em `messages`/`conversations`: só leitura.
+- Telas (aba Leads): "Mandaram mensagem" (WhatsApp, chat, formulário, visita; primeira mensagem na linha; "Respondido em 13 min · fulano" ou "Sem resposta há 47 min"; resumo com tempo médio até a 1ª resposta) e "Clicaram e não chamaram" (nome e e-mail do portal, telefone com Revelar para o SDR, o que tocou, Descartar, aviso dos 90 dias); "Resumo por anúncio · últimos 7 dias" (mandaram mensagem, clicaram e não chamaram, sem resposta; o Lead Certo fica fora da conta, com nota); a ficha do lead mostra o nome que veio do portal, a primeira mensagem, quando respondeu e "Abrir conversa" pela conversa (`?cliente=` quando ainda não há ficha); a etiqueta "Veio do anúncio X" em Conversas só para quem mandou mensagem, procurada pela conversa e depois pela ficha, também na conversa fora da base; o número do "Leads" conta só os novos que mandaram mensagem.
+
+**Verificado:** pgTAP 125 (66, com o formulário como tipo padrão), 127 novo (43: clique sem ficha, quem lê e revela, mensagem antes do clique não conta, resposta do robô não conta, formulário depois do clique, suprimido, rotina e 90 dias, nada sai pelo WhatsApp), 123 (59), 124 (30), 126 (39); migração nos bancos locais da KOMUNE só com o aviso; `db lint` sem apontamento nas funções novas; Vitest 1.661 (20 novos), typecheck, eslint e prettier limpos; telas no Chrome em 1440 e 390 px como gestor e SDR, com 7 leads de exemplo semeados pela função local.
+
+**Pendente:**
+- o formulário de homologação só vai depois de publicar a função `grupozap-lead` (com chave provisória) e passar no validador de endpoint do Grupo OLX; publicar o banco cria também o balde público das fotos.
+- o texto pronto que o portal põe no WhatsApp ainda não foi visto: se trouxer link ou código, vira uma segunda fonte da etiqueta, independente do aviso do Grupo OLX.
+
+### 05/11/2026, fim da tarde — a lista de Anúncios no formato do cartão do Canal Pro (só na Imova)
+
+**Pedido do usuário** (print do CRM ao lado do print do Canal Pro): "Preciso que o meu CRM fique igual o Canal Pro"; "todos os nossos anúncios que estão no Canal Pro devem aparecer no nosso CRM".
+
+**Entregue (nada em produção):**
+- Banco — `20261105140000_anuncios_como_no_canal_pro` (só Imova): `anuncios_na_lista` ganha, no fim, cômodos, endereço, o que pesa na nota de qualidade (tamanho da descrição, características, vídeo, CEP, número, condomínio, IPTU), `origem`, a última leitura do Grupo OLX (`ultima_leitura_do_portal`) e o que o último relatório do Canal Pro disse do anúncio de mesmo código (situação, data e visualizações, só se o relatório tiver a coluna).
+- Tela — cada anúncio é um cartão no molde do Canal Pro, com as cores do CRM (`cartao-do-anuncio.tsx`, regras puras em `regras-do-cartao.ts`): foto grande com a contagem; o endereço como título (o número só com `mostrar_endereco = 'completo'`) e o título do anúncio embaixo; Venda/Aluguel, a origem ("Via sistema atual", "Do Canal Pro", "Criado no CRM") e o código com copiar; tipo, área, quartos, banheiros e vagas; preço; "Criado em · Atualizado em"; "Qualidade do anúncio" com barra e nota de 0 a 10 (a conta do protótipo: fotos, descrição, características, vídeo, CEP e número, título, condomínio e IPTU, áreas e cômodos), que abre o que sobe a nota e avisa que pode diferir da nota do Canal Pro; a situação com as palavras do Canal Pro (Publicado; Em processamento quando foi ao ar depois da última leitura; Rascunho; Não publicado; Excluído); "No portal pelo sistema atual" nos rascunhos que vieram da Arbo; "No Canal Pro: <situação>" e as visualizações só quando o relatório traz; leads (quem mandou mensagem) com link para a aba Leads filtrada; menu ⋮ com editar, copiar código, ver os leads e, para admin e gestor, pôr no ar (desligado com o motivo), destaque, tirar do ar, excluir com motivo e restaurar.
+
+**Verificado:** pgTAP 123–127 passando depois da migração; KOMUNE só com o aviso; Vitest 1.687 (26 novos das regras do cartão), typecheck, eslint e prettier limpos; Chrome em 1440 e 390 px, claro e escuro, gestor e SDR, sem rolagem lateral; nenhum anúncio mexido no teste.
+
+**Pendente / decisão humana:**
+- pôr no ar, destaque e excluir passaram a estar também no menu do cartão (antes só no editor), com as mesmas travas e confirmações; se a gestão preferir só no editor, sai do menu.
+- "Criado em" é a data do CRM: os 7 da Arbo mostram 05/11/2026 (no Canal Pro, 16/09, 23/07...). Visualizações e a nota do próprio Canal Pro só existem lá; as visualizações entram se o relatório exportado trouxer.
+- a nota do CRM dos anúncios da Arbo é mais baixa que a do Canal Pro (PT0001: 7,0 aqui, 9,2 lá), porque o arquivo da Arbo não traz características nem IPTU.
+- os outros 10 anúncios do Canal Pro dependem do relatório exportado (o primeiro arquivo vem para conferência do formato).
+
+### 05/11/2026, noite — o relatório de verdade do Canal Pro (só na Imova)
+
+**O arquivo:** o usuário exportou o relatório do Canal Pro (`.xlsx`, aba "Anúncios", 17 linhas, 36 colunas: ID Interno, Código do Imóvel, Status do anúncio, Motivo da Inativação, Tipo do anúncio, endereço completo, cômodos, áreas, valores, Benefícios, Título, Descrição, Número de fotos, Total de visualizações, Total de contatos, Criação, Última atualização...). "Código do Imóvel" é o ListingID que o sistema publica: os 7 da Arbo casaram pelo código, sem repetir.
+
+**O que ele mostrou:** 9 ativos e 8 inativos. Os 7 da Arbo (ativos); 2 anúncios ANTIGOS do mesmo imóvel ainda ativos ("BONOR-ESQUINA-HERONIDES" = TE0002_IMOVA, "Terreno - Pipa" = TE0005_IMOVA), ocupando 2 vagas do plano com o imóvel repetido; 4 antigos inativos de imóveis atuais (Sala 05 = SA0012, Bonor 10.000 = TE0003, Tabatinga = TE0004, Capim Macio = TE0001); e 4 imóveis que só existem lá, inativos: "Brisa Mall - Loja 02" (bloqueado pelo Grupo OLX "por infringir regulamento"), "Casa extremox" (Extremoz), "Edifício Simone" (Lagoa Nova; 1.073 visualizações e 58 contatos) e "SANTA CATARINA" (Potengi). O TE0003_IMOVA está ativo lá com 4 fotos, embora a documentação peça 5.
+
+**Entregue (nada em produção):**
+- Banco — `20261105150000_relatorio_real_do_canal_pro` (só Imova): só o ATIVO no relatório ocupa vaga do plano (`app.canal_pro_ativo_no_relatorio`, `app.canal_pro_ocupadas`; o plano passou de "17 de 10" para 9 de 10 e 2 de 2 destaques, o retrato do Canal Pro); "Trazer para o CRM" de linha com o código de um anúncio do CRM liga em vez de duplicar, e a de outro código vira rascunho com descrição (sem CPF), CEP, estado em sigla (`app.uf_do_estado`), suítes, banheiros, vagas, as duas áreas, condomínio e IPTU lidos da linha (`app.canal_pro_campo`, `app.canal_pro_inteiro`); `anuncios_na_lista` ganha os contatos e a data de criação do Canal Pro.
+- Site: a leitura reconhece "Título do imóvel" e "Tipo do anúncio" e deduz venda/aluguel pelos preços; o cartão mostra "Criado em" do Canal Pro (data sem fuso) e os contatos de lá ao lado das visualizações; "No Canal Pro hoje" mostra só o que não tem cartão no CRM, os ativos primeiro, com a conta de ativos e inativos; a linha que parece o mesmo imóvel de um anúncio do CRM (mesma cidade e área, e bairro quando há) diz isso, sugere tirar o antigo do ar se estiver ativo, e não oferece "Trazer".
+- Local: os anúncios de teste IMV-… e a lista falsa do Canal Pro saíram do banco local; o relatório real foi importado pela tela, como gestor.
+
+**Verificado:** pgTAP 128 novo (16) e 123–127 passando; KOMUNE só com o aviso; Vitest 1.695, typecheck, eslint e prettier limpos; a tela no Chrome.
+
+**Decisão humana:** tirar do ar no Canal Pro os 2 antigos ativos repetidos (liberam 2 vagas); trazer ou não para o CRM os 4 imóveis que só existem lá (vêm sem fotos: o relatório só diz quantas são); a regra das 5 fotos (o Grupo OLX aceitou o TE0003 com 4).
+
+### 05/11/2026, noite — um código, um anúncio; as abas do Canal Pro; 4 fotos (só na Imova)
+
+**Decisões do usuário:** "Cada imóvel/terreno possui um código. Esse código deve ser único, ou seja só pode ter um único anúncio por código"; "Os inativos devem ser listados como inativos, mas devem aparecer na aba de não listados"; "Mantém a regra de ir com 4 mesmo".
+
+**Entregue (nada em produção):**
+- Um código, um anúncio: o banco já garantia (`anuncios.codigo` e `anuncios_no_canal_pro.codigo` únicos; a linha do relatório liga a um anúncio só). Os caminhos de entrada respeitam: o importador da Arbo atualiza pelo código, "Trazer para o CRM" liga quando o código já existe, e a linha antiga que parece o mesmo imóvel não oferece "Trazer".
+- Abas com as palavras do Canal Pro: **Publicados · Não publicados · Rascunhos · Excluídos** (eram No ar, Rascunhos, Fora do ar). Cada anúncio cai pela situação no portal (`estadoNoPortal` em `regras-do-cartao.ts`): no ar pelo CRM é publicado; fora disso vale o último relatório do Canal Pro (Ativo = publicado, pelo sistema atual; Inativo = não publicado, com o selo "Inativo"); sem relatório, fora do ar é não publicado e o resto é rascunho. As linhas do Canal Pro sem anúncio no CRM entram na aba da situação delas. Com o relatório real: Publicados 9, Não publicados 8, Rascunhos 0, como no Canal Pro. Nos inativos sai o "Como tirar do ar".
+- `20261105160000_quatro_fotos_bastam`: `app.anuncio_pendencias` pede 4 fotos e `anuncio_foto_remover` não deixa o anúncio no ar com menos de 4 (motivo `no_ar_menos_de_4`); `MINIMO_DE_FOTOS = 4` na tela de fotos. O TE0003_IMOVA ficou pronto para ir ao ar.
+- A situação do relatório só vale enquanto o anúncio está no último relatório importado (`no_relatorio`).
+
+**Verificado:** pgTAP 123 (60), 124 (30), 125 (66), 126 (39), 127 (43), 128 (16); KOMUNE só com o aviso; Vitest 1.697, typecheck, eslint e prettier limpos; as quatro abas no Chrome.
+
+### 05/11/2026, noite — sem trava de 4 fotos (só na Imova)
+
+**Decisão do usuário:** "Eu não quero mais um limite de 4 fotos por anúncio, como tínhamos conversado. Tire essa trava." (O 4 era o mínimo para ir ao ar; o máximo sempre foi 40.)
+
+**Entregue (nada em produção):**
+- A migração da tarde virou `20261105160000_fotos_sem_minimo` (troca a `quatro_fotos_bastam`, que nunca saiu do local): `app.anuncio_pendencias` só pede "pelo menos 1 foto" quando o anúncio não tem nenhuma, e `anuncio_foto_remover` só recusa tirar a última foto de um anúncio no ar (motivo `no_ar_ultima_foto`). Uma foto continua porque o `<Media>` do VRSync é obrigatório e precisa de pelo menos um `<Item>`; a documentação do Grupo OLX ainda fala em 5 imagens, e o Canal Pro mantém no ar o TE0003_IMOVA com 4.
+- Na tela de fotos saiu o "faltam N para ir ao ar"; `MINIMO_DE_FOTOS` saiu de `tipos.ts`. Continua o máximo de 40.
+
+**Verificado:** migração reaplicada no banco local da Imova; pgTAP 123 (60), 124 (30), 125 (66), 126 (39), 127 (43), 128 (16); Vitest dos anúncios (157), typecheck, eslint e prettier limpos. Os 7 anúncios da Arbo seguem sem pendência.
+
+**Pendente:** se o portal recusar anúncio por poucas fotos, a recusa aparece no relatório de integração do Canal Pro (o webhook desse relatório ainda não foi feito).
+
+### 05/11/2026, noite — os imóveis que só existem no Canal Pro vêm para o CRM, com o código de lá (só na Imova)
+
+**Decisão do usuário:** "Esses imóveis que só existem no Canal Pro devem vir pra o CRM também" (somada a "cada imóvel possui um código; esse código deve ser único").
+
+**Entregue (nada em produção):**
+- `20261105170000_codigo_como_no_canal_pro`: o código do anúncio passa a aceitar o que o Canal Pro usa, com espaço e acento ("Casa extremox", "Edifício Simone"). A regra é a do ListingID no VRSync (1 a 50 caracteres, único) mais sem espaço nas pontas e sem `<` `>` nem caractere de controle, em `app.codigo_de_anuncio_valido`; vale no check de `anuncios.codigo`, em `anuncio_importar` (sistema atual) e em `canal_pro_trazer` (relatório). Antes, esses códigos viravam IMV-0001: o imóvel ficava com dois códigos e, publicado pelo CRM, viraria um anúncio novo no portal em vez do antigo, com o histórico. O código não vai para caminho de arquivo nem URL (fotos e telas usam o id) e sai escapado no XML.
+- No site, `CODIGO_VALIDO` virou `codigoValido` (`arquivo-vrsync.ts`), com a mesma regra.
+- No banco local, os 4 foram trazidos pelo `canal_pro_trazer`, com o mesmo código: Brisa Mall - Loja 02, Casa extremox, Edifício Simone e SANTA CATARINA. Viraram cartões em **Não publicados**, com o selo "Inativo", visualizações, contatos e a data de criação do Canal Pro; vieram sem fotos (o relatório só diz quantas são). Ficam na lista do Canal Pro só as 6 cópias antigas.
+
+**Verificado:** migração nos três bancos locais (na KOMUNE, só o aviso); pgTAP 123 (60), 124 (30), 125 (66), 126 (39), 127 (43), 128 (18); Vitest 1.699; typecheck, eslint e prettier limpos; as abas no Chrome: Publicados 9 (7 cartões + 2 cópias ativas), Não publicados 8 (4 cartões + 4 cópias inativas), Rascunhos 0.
+
+**Pendente / decisão humana:** as fotos dos 4 (não há de onde trazer: só quem tem os arquivos); a Brisa Mall - Loja 02 foi bloqueada pelo portal "por infringir regulamento" e o cartão não mostra o motivo; como mostrar as 6 cópias antigas.
+
+### 06/11/2026 — atualizar com um clique (só na Imova)
+
+**Pedido do usuário:** "Quero que façamos uma automação que sempre que clicarmos nos botões a gente já receba a lista dos anúncios dentro do nosso CRM. E dentro do CRM a gente deve listar aqueles anúncios que estão no ar, os que estão inativos e os rascunhos."
+
+**Entregue (nada em produção):**
+- **"Atualizar do sistema atual"** (era "Trazer do sistema atual"): na primeira vez a gestão cola o endereço do arquivo do sistema atual e o CRM o guarda; das próximas, um clique lê o arquivo e traz tudo, sem lista para marcar. Cria o que é novo (rascunho, mesmo código), atualiza o que já tem o código, baixa as fotos de quem não tem, deixa de fora o excluído no CRM e marca quem saiu do arquivo. A folha mostra o andamento e o resumo (novos, atualizados, quantos saíram), com "Atualizar de novo" e "Trocar o endereço"; o arquivo .xml escolhido no computador continua valendo (e não guarda nada).
+- **Relatório do Canal Pro:** importar a planilha agora traz sozinho para o CRM o que só existe lá (`canal_pro_importar` chama `canal_pro_trazer`), menos as cópias antigas (mesma cidade e área de um anúncio do CRM), o código que o CRM já tem (mesmo excluído) e a linha marcada como fora do ar. Entre duas linhas do mesmo imóvel, vem a ativa. A mensagem diz quantos vieram. O Canal Pro não deixa o CRM buscar a planilha: exportar lá continua manual.
+- **Abas:** Publicados, Não publicados e Rascunhos passam a considerar também o arquivo do sistema atual (`situacaoForaDoCrm` em `regras-do-cartao.ts`): o relatório manda; o anúncio novo no arquivo, que o relatório ainda não tem, já é publicado; o que saiu do arquivo depois do relatório vai para não publicado, com a nota "Saiu do sistema atual em …" no cartão. A faixa do topo diz quando o sistema atual foi lido.
+- Banco — `20261106100000_atualizar_com_um_clique`: `canal_pro.sistema_atual_url` (credencial: só admin e gestor, por `sistema_atual_endereco` e `sistema_atual_endereco_salvar`; a tela só sabe se existe, por `canal_pro_situacao`) e `sistema_atual_lido_em`; tabela `sistema_atual_no_arquivo` (código, no_arquivo, em), escrita por `sistema_atual_leitura_registrar` (arquivo vazio é recusado); `canal_pro_parece_com` (a regra de cópia saiu do TypeScript para o banco, como campo calculado da API); `anuncios_na_lista` com `no_sistema_atual` e `sistema_atual_em`. Rota `/api/anuncios/importar` aceita `{ guardado: true }` (lê o endereço guardado no servidor) e `{ url, guardar: true }`.
+
+**Verificado:** pgTAP 129 novo (26) e 123 (60), 124 (30), 125 (66), 126 (39), 127 (43), 128 (18, a linha antiga do teste ganhou cidade); KOMUNE só com o aviso; Vitest 1.701; typecheck, eslint e prettier limpos; tipos regenerados. No Chrome, com arquivos de teste feitos pelo gerador do próprio CRM (os 7 anúncios + um novo): a 1ª vez pediu o endereço e trouxe (Publicados 10); a 2ª, sem o TE0004 no arquivo, rodou com um clique sem perguntar (1 saiu; Publicados 9, Não publicados 9, nota no cartão); no celular (390 px) sem rolagem lateral. Os 7 anúncios saíram do ensaio com os mesmos dados (conferido campo a campo); o anúncio de teste e o endereço de teste foram apagados do banco local.
+
+**Ajuste da tarde (06/11):** o usuário clicou e ainda tinha campos na frente ("Quando eu clico nos botões ainda tenho que preencher algumas coisas"). Agora:
+- **"Atualizar do sistema atual"** não pede nada: o endereço da Arbo que o usuário colou na conversa ficou guardado no banco local (`canal_pro.sistema_atual_url`, nunca no repositório). A folha diz onde os anúncios aparecem, e não mais "os novos entram como rascunho".
+- **"Atualizar do Canal Pro"** é o botão novo do topo: abre a folha do relatório, e escolher o arquivo já importa. Saiu a conferência (colunas reconhecidas, primeiras linhas e o segundo clique "Importar N anúncios"); o que o CRM não reconhece continua aparecendo como aviso.
+- **O antigo botão "Canal Pro"** abria o contato, o plano e o endereço do arquivo do CRM, ajustes que se fazem uma vez. Ele virou o ícone de engrenagem "Ajustes do Canal Pro" e abre sem o cursor no primeiro campo (o nome selecionado parecia pedir preenchimento). A faixa do topo diz "Atualizar de novo".
+- Verificado no Chrome: o sistema atual atualizou os 7 com um clique, em 1 s e sem perguntar; os ajustes abriram com o foco na folha; o relatório real de 05/11 importou com um clique (17 anúncios) e a folha fechou; no celular (390 px), sem rolagem lateral. Depois, a hora do relatório voltou para 05/11 17:38, conferida linha a linha. Vitest dos anúncios (145), typecheck, eslint e prettier limpos.
+
+**Pendente / decisão humana:** na produção, guardar o endereço da Arbo na hora de publicar, para ninguém precisar colar; ao trocar o Canal Pro para o arquivo do CRM, o botão "Atualizar do sistema atual" deixa de fazer sentido (o CRM vira a origem) e deve sair; a leitura automática diária da Arbo não foi feita (o clique resolve); como mostrar as 6 cópias antigas.
+
+### 06/11/2026 — excluir anúncio duplicado (só na Imova)
+
+**Pedido do usuário:** "Quero que o CRM seja capaz de excluir anúncios duplicados." O Grupo OLX não dá ao CRM nenhum comando para excluir anúncio no Canal Pro, e os 2 repetidos no ar (BONOR-ESQUINA-HERONIDES = TE0002_IMOVA, Terreno - Pipa = TE0005_IMOVA) parecem cadastrados à mão lá: são de janeiro, anteriores à Arbo, e seguem ativos fora do arquivo dela. Das três saídas oferecidas, o usuário escolheu **"botão + 1 clique lá"**. As outras eram um robô com a senha do Canal Pro (risco de bloqueio da conta) ou esperar a troca para o arquivo do CRM.
+
+**Entregue (nada em produção):**
+- **"Excluir duplicado"** em toda linha do Canal Pro que repete um anúncio do CRM (`canal_pro_parece_com`), ativa ou inativa: os 2 ativos e os 4 inativos. No lugar de "Como tirar do ar", que continua nas outras linhas. O diálogo:
+  1. diz de qual anúncio ela é cópia e se ocupa vaga;
+  2. tem um botão que copia o código e abre o Canal Pro;
+  3. diz onde clicar lá e o que fazer se o anúncio aparecer como "Via Integração";
+  4. termina em "Pronto, excluí". A linha sai da lista, a vaga volta na conta do CRM e o aviso tem "Desfazer".
+- **O próximo relatório confere.** Antes, o anúncio marcado como excluído que ainda vinha no relatório voltava para a lista calado. Agora volta com o aviso "Marcado como excluído …, mas o relatório importado … ainda o traz: a exclusão não pegou no Canal Pro". Se não vier, sai de vez.
+- Banco — `20261106110000_excluir_duplicado`: coluna `anuncios_no_canal_pro.marcado_excluido_em`; `canal_pro_importar` a preenche quando a linha marcada volta; `canal_pro_marcar_excluido` a apaga numa marca nova. Na KOMUNE, só o aviso.
+
+**Verificado:** pgTAP 130 novo (13), além de 123 (60), 124 (30), 125 (66), 126 (39), 127 (43), 128 (18) e 129 (26); Vitest 1.701; typecheck, eslint e prettier limpos; tipos regenerados (só a tabela). No Chrome, com o site do Canal Pro trocado por uma página falsa no teste:
+- os 2 ativos e os 4 inativos repetidos têm o botão;
+- o botão abriu o Canal Pro e copiou o código;
+- "Pronto, excluí" tirou a linha e o plano foi de 9 para 8 vagas; "Desfazer" voltou a 9;
+- o aviso de exclusão que não pegou aparece na linha;
+- no celular (390 px), sem rolagem lateral.
+
+O banco local terminou como começou.
+
+**Pendente / decisão humana:** excluir de verdade os 6 repetidos no Canal Pro, com o login da Imova. Antes, decidir se vale perder o histórico dos 2 antigos ativos: BONOR tem 107 visualizações e 6 contatos, contra 21 e 0 do TE0002; Pipa tem 92 e 0, contra 30 e 0 do TE0005. O endereço do Canal Pro abre a página inicial: não há endereço público conhecido que abra direto o anúncio.
+
+### 06/11/2026 — excluir no CRM e sair do Canal Pro (só na Imova)
+
+**Pedido do usuário:** "Quero que o nosso CRM tenha alguma integração com o Canal Pro para estarmos excluindo o anúncio no CRM e ele está sendo excluído também lá no Canal Pro."
+
+**Como já funciona (construído em 04/11, falta ligar):** o arquivo VRSync do CRM (`canal-pro-feed` → `canal_pro_feed`) só leva o que está no ar no CRM e não foi excluído. Com esse endereço colado no Canal Pro, excluir ou tirar do ar no CRM tira o anúncio do arquivo, e o Grupo OLX o tira do ZAP, do Viva Real e da OLX na leitura seguinte: até 12 h, mais até 4 h no ZAP e no Viva Real e até 24 h na OLX. Hoje o Canal Pro lê o arquivo da Arbo, então nada disso vale ainda.
+
+**O perigo achado:** os 7 anúncios da Arbo são **rascunho** no CRM, e o arquivo do CRM está **vazio** (conferido no local: `<Listings>` sem nada). Colar o endereço do CRM no Canal Pro hoje faria o Grupo OLX tirar os 7 do ar.
+
+**Entregue (nada em produção):**
+- **"Antes de colar o endereço no Canal Pro"** nos Ajustes do Canal Pro, junto do endereço. O quadro lista o que está no portal por fora do CRM e não está no ar aqui (`situacaoForaDoCrm` = ativo e situação ≠ no ar) e tem o botão **"Pôr os N no ar pelo CRM"**. Ele publica um de cada vez, porque cada um confere o limite do plano, e diz quem ficou de fora e por quê. Quando não falta nenhum: "O arquivo do CRM tem todos os anúncios que estão no portal hoje". O quadro também diz quantos foram cadastrados direto no Canal Pro, que o arquivo não tira, e aponta para o Excluir duplicado. O passo a passo termina dizendo o que vale depois da troca.
+- **Excluir, com a verdade:** se o anúncio está no portal pelo sistema atual e não está no ar no CRM, o diálogo de excluir diz que excluir aqui não o tira do portal enquanto o Canal Pro ler o arquivo do sistema atual.
+
+**Verificado:** no Chrome, com a função do arquivo rodando no Docker local (`canal-pro-feed-local`):
+- o arquivo tinha 0 anúncios;
+- o quadro listou os 7 e "Pôr os 7 no ar pelo CRM" os pôs no ar: o arquivo passou a ter os 7, com os mesmos códigos da Arbo;
+- excluir o TE0004 pelo menu do cartão o tirou do arquivo, que ficou com 6;
+- o diálogo de excluir mostrou o texto certo antes e depois.
+
+Depois, os anúncios voltaram ao estado de antes, conferido coluna a coluna, e as 8 linhas de histórico do teste foram apagadas. A marca de excluído do BONOR-ESQUINA-HERONIDES, feita por um gestor às 14:48 fora do teste, ficou como estava. Vitest dos anúncios (145), typecheck, eslint e prettier limpos.
+
+**Para ligar de verdade (quando o usuário pedir):**
+1. Publicar na Imova as migrações 20261104150000 a 20261106110000, a função `canal-pro-feed` e o site. Antes, aprovar o balde público das fotos, porque o robô do Grupo OLX baixa as fotos sem login.
+2. Na produção: "Atualizar do sistema atual" (guardar o endereço da Arbo), "Atualizar do Canal Pro" e, nos Ajustes, "Pôr os 7 no ar pelo CRM".
+3. No Canal Pro, com o login da Imova: Integração de anúncios → trocar o endereço da Arbo pelo do CRM.
+4. Esperar a 1ª leitura (até 12 h) e conferir o Relatório de integração.
+
+Risco já aceito em 05/11: a troca de integrador pode recriar os anúncios (até cerca de 1 dia fora do ar e perda do histórico). A volta é colar o endereço da Arbo de novo.
+
+**Pendente / decisão humana:** os cadastrados direto no Canal Pro (hoje 1 ativo, o Terreno - Pipa) continuam saindo só pelo Canal Pro. Também em aberto: se o arquivo do CRM deve se recusar a sair vazio, para proteger contra um apagão por engano (não feito).
+
+### 06/11/2026 — anúncios no Canal Pro em produção, só na Imova
+
+**Pedido do usuário:** "Eu quero que ligue a integração para eu conseguir estar removendo o anúncio pelo próprio CRM." A resposta anterior pedia, junto, a aprovação do balde público das fotos (o robô do Grupo OLX baixa as fotos sem login). O risco da troca de integrador já tinha sido aceito em 05/11.
+
+**Publicado:**
+- **main** `7a56dc7`, em 4 commits sobre `1179115`: banco, funções, site e CHANGELOG.
+- **Conferido antes:** o site da Imova no ar era `9d4c39b` (main) e os dois bancos tinham as mesmas 173 migrações da main, sem nenhuma de fora.
+- **Banco da Imova** (`publicar-banco.mjs imova migrar`): as 11 migrações de 20261104150000 a 20261106110000, com a identidade conferida. O balde `anuncios` é público e só aceita JPEG. **A KOMUNE não foi mexida:** continua com 173, e as 11 só dariam o aviso lá.
+- **Função `canal-pro-feed`** na Imova, sem verify_jwt. Responde 404 sem a chave e com chave errada. A `grupozap-lead` **não** foi publicada, porque espera a homologação.
+- **Site da Imova** de cópia limpa (`~/triadecrm-publicar-imova` em `7a56dc7`): `imova-19e8sia78`, em https://imova-crm.vercel.app. Um primeiro deploy igual, `imova-e53d1i7kd`, saiu por um comando repetido. A volta é `imova-j6funec58`. Nenhuma variável nova.
+- **Dados da Imova:** o contato do anúncio (Imova Imobiliária, contato@imovaimobiliaria.com.br, (84) 99405-8888), o plano (10 anúncios, 2 destaques) e o endereço da Arbo (`canal_pro.sistema_atual_url`), para os botões não pedirem nada.
+
+**Para ligar (usuário, logado na Imova, nesta ordem):**
+1. Anúncios → "Atualizar do sistema atual": traz os 7 com as fotos.
+2. "Atualizar do Canal Pro": o relatório exportado. Um novo é melhor; o de 05/11 em Downloads também serve.
+3. Engrenagem → "Pôr os 7 no ar pelo CRM" → "Copiar" o endereço.
+4. Canal Pro → Configurações da conta → Integração de anúncios: trocar o endereço da Arbo pelo do CRM e salvar.
+5. Esperar a 1ª leitura (até 12 h). A faixa de Anúncios mostra "Última leitura do Grupo OLX".
+
+Daí em diante, excluir ou tirar do ar no CRM tira do portal na leitura seguinte.
+
+**Pendente / decisão humana:**
+- Os passos acima; ninguém da Imova testou a aba em produção ainda.
+- Conferir o Relatório de integração do Canal Pro depois da 1ª leitura.
+- O Terreno - Pipa repetido: se for "Via Integração", sai sozinho na troca; se foi cadastrado à mão, sai pelo Excluir duplicado.
+- Leads: homologação e `grupozap-lead`.
+- KOMUNE: as 11 migrações quando ela for publicada de novo (só avisos).
+
+## 06/11/2026 — A IA que atende o cliente sozinha, só na Imova (branch `ia-atendente`; RF-CON-09, RF-CON-22, RF-CON-26, RF-AGE-04, ADR-05 e ADR-10 alterados na Imova)
+
+Pedido do usuário: "utilizar uma IA para responder os clientes no CRM da Imova. Essa IA deve responder o cliente sozinho e tirar as dúvidas dele também", para suprir o colaborador com deficiência motora, que não consegue escrever as mensagens ("essa IA seria dedicada a ele"). Treino de uma semana pela conversa do contato Janio Ramalho, da equipe.
+
+**Decisões do usuário (06/11/2026):**
+- "Essa trava não pode existir na Imova": o texto da IA sai sem rascunho aprovado. **Muda o ADR-05 (e a recusa de 28/09, ADR-16) só na Imova.** Na KOMUNE a migração não cria nada e a porteira continua igual.
+- A IA responde sozinha até um fator que é de gente: ligação de áudio, conduzir a visita, falar com um corretor. Quando o cliente pede corretor, ela avisa logo que vai passar e passa.
+- O colaborador pode parar a IA numa conversa e redirecionar para outra pessoa.
+- Assinatura "Imova" (é a IA do Rafael, o colaborador).
+- Ela fala de todos os anúncios, imóveis e terrenos da aba Anúncios, e marca visita.
+- A conversa do Janio é dedicada a treinar a IA e passar instruções.
+- Modelo: Claude Opus 5.5 (o mais capaz; o Sonnet 5.5, pela metade do custo, se escolhe na tela). Muda o ADR-10 só na Imova.
+
+**Feito:**
+- **Banco** (`20261106170000_a_ia_atende_o_cliente.sql`, só na Imova; num banco sem identidade cria tudo, para o CI):
+  - `ia_atendimento` (onde a IA atende ou foi parada), `ia_caderno` (o que ela sabe além dos anúncios) e `ia_respostas` (cada resposta, a avaliação e a prova que a porteira confere), com RLS por `app.is_manager()`.
+  - `app.ia_atende`: chave-mestra ligada; no treino, só a conversa do treino; com clientes, toda conversa em que ninguém do time escreveu. Quando alguém do time escreve, a IA para ali (gente assumiu).
+  - A porteira (`app.messages_guard`) ganha o ramo (2a): `bot_ai` sem rascunho passa só quando `app.ia_atendente_dizer` registrou o mesmo corpo em `ia_respostas` na mesma transação, numa conversa em que a IA atende. A troca é feita sobre a função que está no banco (um trecho, conferido para existir uma vez só) e o resto da porteira não muda: supressão, janela de 24 h, conversa bloqueada e tetos valem igual. `bot_ai` inserido por fora continua recusado.
+  - `app.ia_atendente_dizer` é o único caminho: confere que a IA atende ali, que não chegou mensagem nova do cliente (resposta velha não sai), que a mensagem não foi respondida e o teto por hora (20; contra pingue-pongue com robô de outra empresa); assina `*Imova:*`; põe em fila como qualquer mensagem. Porteira recusou: fica o registro, nada sai.
+  - Passar para gente (`public.ia_atendente_passar`): avisa o cliente, para a IA naquela conversa, entrega a quem recebe no setor escolhido (ou fica com quem atende) e abre tarefa para agora.
+  - Visita (`public.ia_atendente_marcar_visita`): `app.reuniao_gravar` presencial, no endereço do imóvel até onde o anúncio mostra, origem robô, com a confirmação na mesma transação; se a confirmação não sai, a visita é desfeita. Horário tomado: o worker oferece as alternativas que o banco devolveu.
+  - A fila (`app.ia_atendente_enfileirar`, cron a cada 10 s no bloco 12h do seed da Imova): conversa em que a IA atende, última mensagem do cliente, parado há 15 s (para ler as mensagens seguidas de uma vez). Pedido de corretor é resolvido por regra, sem modelo. Orçamento de IA no limite: passa para gente em vez de silêncio.
+  - Os imóveis são lidos de `public.anuncios` e `public.anuncios_no_canal_pro` quando existem (leitura dinâmica: a branch `anuncios-canal-pro` ainda não está na main); o canal de chegada, de `public.chegadas` quando existe.
+  - Preços do Opus 5.5 e do Sonnet 5.5 em `ai_model_prices`.
+- **Prompt** `atendente-imova@v1` (`packages/prompts/src/prompts/atendente-imova/v1.ts`, propósito `draft_reply`, escala de conversa): regras de verdade (só afirma o que está nos anúncios, no caderno ou na conversa; nada de desconto, aprovação de crédito ou condição fora do caderno), o que é de gente, a visita por rótulo de horário (o modelo nunca faz conta de data), o treino (instrução vira `anotacoes`, que só a conversa do treino grava). O caderno e os imóveis vão no bloco de sistema, com cache; telefone escrito na descrição de anúncio ou no caderno sai antes (`semTelefone`), porque barraria toda chamada.
+- **Worker** (`apps/workers/src/ia/atendente.ts`): lê a entrada, chama o modelo, troca o nome completo pelo primeiro nome e leva a decisão ao banco. Nunca fica em silêncio: dado pessoal barrado, orçamento esgotado, recusa ou saída fora do combinado passam a conversa para gente com o aviso padrão.
+- **Tela** (módulo `iaQueAtende`, só na Imova):
+  - na conversa: a pílula "IA atendendo" / "IA em treino" / "IA parada" no cabeçalho (o toque para ou liga), "Parar a IA" nas ações, e "Boa / Corrigir" embaixo de cada resposta dela (a correção vira linha do caderno);
+  - a tela "IA que atende" (`/ia`): placar dos 7 dias, respostas para avaliar em lote, caderno (escrever, editar, tirar) e configuração (ligar, modo treino ou clientes, conversa do treino, setor que recebe, aviso ao passar, modelo).
+- **Verificado:**
+  - pgTAP 133 (42 asserções) no banco local da Imova; os testes antigos da porteira (10, 24, 25, 43, 52, 83, 91) dão o mesmo resultado com a porteira antiga e com a nova nesse banco;
+  - lint, tipos e 2.371 testes (Vitest);
+  - de ponta a ponta no local, com o dublê e com **duas chamadas reais ao Opus 5.5** (chave da Imova, US$ 0,065 no total): a resposta a "tem apartamento para alugar em Ponta Negra até 3 mil?" foi correta e honesta sobre a lista, e a instrução do treino virou três linhas limpas no caderno;
+  - fotos das telas no computador e no celular, sem erro de página;
+  - com a aba Anúncios já na `main` (publicada em 06/11/2026): as colunas que a IA lê existem com os mesmos nomes. Os anúncios feitos à mão no Canal Pro que o relatório dá como **inativos** (fora do portal) entravam na lista da IA como disponíveis; agora vão como "pausado" (`app.canal_pro_ativo_no_relatorio`), e a IA confirma com o corretor antes de marcar visita. pgTAP 133 com 44 asserções;
+  - **teste pela tela no computador:** na conversa do treino, só em `next dev` com o banco local, a caixa "Teste no computador: escreva aqui como se fosse o cliente" grava a mensagem como recebida (rota `/auth/dev/cliente`, com as travas do `/auth/dev`; fora delas, a caixa não aparece e a rota responde 404). Escrito "terreno à venda em Parnamirim?", a resposta apareceu em 32 s, com os dois terrenos da lista, metragem e preço (US$ 0,058, chamada real ao Opus 5.5).
+
+**Pendente:**
+- **Publicar** (só com pedido): main → migração na Imova (`publicar-banco imova migrar`; na KOMUNE ela não faz nada) → só os blocos 12h e 12i do seed da Imova → site da Imova → `fly deploy` do `imova-worker-ai`. Depois, na tela, escolher a conversa do Janio e ligar.
+- A aba Anúncios está em produção desde 06/11/2026: publicada a IA, ela já lê os anúncios de verdade da Imova.
+- **Orçamento: US$ 30 por mês** (pedido do usuário em 06/11/2026; era US$ 10 desde 03/11). Bloco 12i do seed da Imova; a autoverificação confere os 30. O freio é o mesmo: em 80% (US$ 24) param a leitura do cliente e a IA que atende (que passa a conversa para gente com o aviso padrão), e em US$ 30 não sai chamada nenhuma. Cada resposta custou de US$ 0,01 (com cache) a US$ 0,055 (sem cache): perto de 450 a 2.400 respostas no mês, conforme o cache. Aplicado no banco local; em produção continua US$ 10 até a publicação. O teto do espaço da Imova na Anthropic subiu de US$ 15 para US$ 30 no Console (feito pelo usuário em 06/11/2026); os avisos por e-mail do Console continuavam em US$ 8 e US$ 12.
+- Medido só no local: a qualidade de verdade é a da semana de treino.
+- Sem `fallbacks` da API: uma recusa do modelo passa a conversa para gente.
+- Mensagem do cliente numa conversa da IA continua avisando o time (avisos e push); com clientes, rever.
+- Áudio do cliente: sem transcrição na Imova, a IA pede para escrever e, no segundo áudio, passa para gente.
+- Canal de chegada: a IA pergunta quando não se sabe; quem grava é o módulo da branch `canal-de-chegada`.
+
+**Decisão humana:**
+- Quem recebe quando a IA passa (setor dos corretores) e na agenda de quem a visita entra (hoje, na de quem atende a conversa).
+- Quando passar do treino para os clientes (o teto do orçamento já foi decidido: US$ 30).
+- O login próprio do colaborador (hoje `contato@imovaimobiliaria.com.br`).
+
+### 06/11/2026 — a IA que atende em produção, só na Imova (desligada até a gestão ligar)
+
+**Pedido do usuário:** "Pode subir".
+
+**Publicado:**
+- **Ar conferido antes:** o site da Imova era `7a56dc7` (contido na `main`); o banco da Imova tinha 184 migrações, todas do repositório, e só faltava a `20261106170000`; o `imova-worker-ai` estava na v2 de 04/11.
+- **main** `90a1e0a` (avanço direto sobre `1929b0e`).
+- **Banco da Imova:** `20261106170000_a_ia_atende_o_cliente` por `publicar-banco.mjs imova migrar`, e só os blocos 12h e 12i do seed, com `app.exigir_empresa('imova')` antes. Conferido em produção: `ia.atendente` desligada no modo treino, `ia.orcamento` em US$ 30 (alerta em US$ 24), `ia_atendente_enfileirar` a cada 10 s, preços do Opus 5.5 e do Sonnet 5.5, porteira com o ramo da IA e o comentário de 06/11. A IA lê os 7 anúncios do CRM (hoje todos em rascunho: ela fala deles e confirma com o corretor antes de marcar visita). **A KOMUNE não foi mexida.**
+- **Site da Imova** de cópia limpa (`~/triadecrm-publicar-imova-ia` em `90a1e0a`): `imova-6k5lfuru8`, em https://imova-crm.vercel.app. A volta é `imova-19e8sia78`. `/auth/dev/cliente` responde 404 em produção.
+- **`imova-worker-ai`** v3 no Fly (máquina `8747327c07edd8`); batida de vida em segundos. O `imova-worker-wa` não foi reiniciado.
+
+**Para ligar (gestão, logada na Imova):** IA que atende → Configuração → conversa do treino: "Janio Ramalho" (a única com esse nome) → ligar. Daí em diante a IA responde ao Janio quando ele escrever. Se alguém da equipe escrever nessa conversa, a IA para; para voltar, o botão do topo da conversa.
+
+**Pendente / decisão humana:**
+- Pôr os anúncios no ar pela aba Anúncios: enquanto estiverem em rascunho, a IA não os oferece como disponíveis.
+- Os avisos por e-mail do espaço Imova na Anthropic continuam em US$ 8 e US$ 12 (sugestão: US$ 15 e US$ 24).
+- As decisões da entrada de 06/11 (setor que recebe, agenda da visita, quando ir para os clientes, login do colaborador).
+
+### 06/11/2026 (fim da tarde) — a IA que atende no Claude Haiku 5.5, e três correções que o ensaio mostrou (só na Imova)
+
+**Pedido do usuário:** "Preciso que mude o modelo da IA para o haiku 5.5 para economizarmos mais, e ainda termos um treinamento de qualidade." Antes disso: "Não consegui encontrar essa conversa do treino."
+
+**Feito (branch `ia-atendente`, ainda não publicado):**
+- **Haiku 5.5** (`20261106180000_a_ia_atende_com_haiku`): `ia_atendente_configurar` aceita `claude-haiku-5-5`, e o modelo de hoje vira o Haiku (troca única; depois, quem escolhe é a tela). Preço oficial US$ 0,10 / US$ 0,50 por milhão de tokens, 40 vezes menos que o Opus 5.5; já estava em `ai_model_prices` (a leitura do cliente usa o mesmo modelo). O worker aceita os três modelos; a tela oferece Haiku, Sonnet e Opus 5.5, com o custo de cada um. O seed (bloco 12h) nasce com o Haiku nas instalações novas. Esforço `low`, o mesmo da leitura.
+- **O teto de fala do robô** (`20261106190000_a_ia_e_o_teto_do_robo`): o RF-CON-20 (6 falas por conversa em 24 h; pingue-pongue de 20 s) derrubava a IA que atende na sétima resposta do dia e pausava o robô para sempre quando o cliente respondia rápido três vezes. Na Imova: as respostas da IA não contam nas 6 falas (ela tem o teto dela, 20 por hora numa conversa); pingue-pongue em 8 s; com o robô pausado a IA não atende (a tela mostra "IA parada" com o motivo); ligar a IA de novo tira a pausa, menos de quem pediu para sair, foi suprimido ou apagado (`app.wa_motivo_de_recusa`). Fusível global e repetição continuam valendo. A KOMUNE não muda.
+- **No treino, passar não para** (`20261106193000_no_treino_a_ia_nao_para_ao_passar`): na conversa do treino, o aviso de passar para o corretor sai, mas a IA continua atendendo, sem trocar o responsável nem abrir tarefa. Sem isso, a instrução seguinte do Janio era ignorada. Com cliente de verdade, nada muda. Número trocado de `20261106200000` porque outra branch (`os_relatorios_da_imova`) já usa esse.
+- **Procurar a conversa do treino** (`20261106194000_procurar_a_conversa_do_treino`): `public.ia_procurar_conversas` procura sem acento e sem maiúscula no nome do contato e no da ficha, ou pelos dígitos do telefone; a tela mostra o telefone mascarado ao lado do nome. Antes, "Jânio" não achava "Janio".
+
+**Medido no local, com o Haiku 5.5 de verdade** (bateria escrevendo como o cliente, em ritmo de gente):
+- terreno do anúncio em Parnamirim: perguntou qual dos dois, com tamanho e preço certos;
+- visita: ofereceu horários livres e marcou na agenda (segunda, 10h20, no endereço do anúncio);
+- desconto à vista: não prometeu e passou para o corretor;
+- escritura e financiamento: "não tenho essa informação confirmada, prefiro não chutar";
+- "IA, anota: ...": gravou no caderno, e a pergunta seguinte já usou a regra;
+- ligação: passou para o corretor.
+- Custo: de US$ 0,0003 a US$ 0,0018 por resposta (o Opus custou de US$ 0,01 a US$ 0,058). Ponto de estilo para o treino: ela abre quase toda mensagem com "Oi, Janio!".
+
+**Verificado:** pgTAP 133 com 62 asserções; o teste 70 (teto de fala) continua compatível (pingue-pongue de 5 s, 6 falas dos outros robôs) e o erro dele no banco local da Imova já existia com as regras antigas; lint, tipos e 2.548 testes.
+
+**Em produção agora (lido em 06/11):** IA ligada, modo treino, modelo Sonnet 5.5 (escolhido pela tela), **sem conversa de treino**, 0 respostas.
+
+**Para publicar, só com pedido:** conferir o ar; `main` + push; `publicar-banco.mjs imova migrar` (as 4 migrações); site da Imova de cópia limpa; `fly deploy` do `imova-worker-ai` (sem ele, o worker no ar ignora o Haiku e usa o Opus). Depois, na tela: Configuração → Conversa do treino → "Janio" → "Treinar por esta".
