@@ -9371,3 +9371,9 @@ Pedido do usuário: o que foi publicado hoje deve aparecer também no teste do a
   - app: tipos e 42 testes;
   - pgTAP 135 (avisos) nos dois bancos locais, e 133 (IA que atende) e 130 (excluir duplicado) no da Imova.
 - **No teste local a IA não responde:** o robô da IA (`worker-ai`) não roda no Mac. As telas da IA aparecem; as respostas, não.
+**Publicado em 06/11/2026, a pedido ("Quero que suba essas atualizações pro ar"), só na Imova:**
+- Ar conferido antes: site `90a1e0a`, banco com 185 migrações (todas do repositório), `imova-worker-ai` v3 — tudo da publicação anterior.
+- `main` `97b4c1d` (avanço direto sobre `99acf9b`). Banco da Imova: as 4 migrações por `publicar-banco.mjs imova migrar` (189 no banco). Sem bloco de seed.
+- Site da Imova `imova-3tdrfix2c` (de `97b4c1d`, cópia limpa); volta: `imova-6k5lfuru8`. `/auth/dev/cliente` continua 404.
+- `imova-worker-ai` v4 no Fly; volta: v3.
+- Conferido em produção: modelo `claude-haiku-5-5` (a migração trocou o Sonnet que a tela tinha escolhido), pingue-pongue 8 s, 6 falas por conversa para os outros robôs, `wa_bot_falas` sem as respostas da IA, `ia_atende` olhando a pausa, passar no treino, `ia_procurar_conversas`, teto US$ 30, batidas de vida do worker de IA e do robô do WhatsApp em segundos. IA ligada, modo treino, **ainda sem conversa de treino**. KOMUNE intocada.
