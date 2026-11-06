@@ -62,6 +62,16 @@ describe('NAVEGACAO', () => {
     expect(telasParaAdiantar('leitura')).toEqual([]);
   });
 
+  it('Anúncios é tela de uma empresa só: na KOMUNE não aparece em menu nem paleta (04/11/2026)', () => {
+    // Os testes rodam sem NEXT_PUBLIC_EMPRESA, isto é, como a KOMUNE.
+    const anuncios = NAVEGACAO.find((item) => item.href === '/anuncios');
+    expect(anuncios?.modulo).toBe('anuncios');
+    for (const papel of ['admin', 'gestor', 'sdr'] as const) {
+      expect(navegacaoPara(papel).map((item) => item.href)).not.toContain('/anuncios');
+      expect(telasParaAdiantar(papel)).not.toContain('/anuncios');
+    }
+  });
+
   it('Campanhas e Cadências deixaram de existir, e Registrar saiu do menu (pivô de 06/10/2026)', () => {
     const hrefs = NAVEGACAO.map((item) => item.href);
     expect(hrefs).not.toContain('/envios');

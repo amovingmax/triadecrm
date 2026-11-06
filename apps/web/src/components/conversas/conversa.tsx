@@ -43,6 +43,8 @@ import { CONCLUIR_NA_EMPRESA, ConcluirConversa, FaixaDeConcluida } from './concl
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
 import { AtitudeDaConversaNoTopo } from './atitude';
 import { EtiquetasDoParceiro } from './etiquetas-do-parceiro';
+import { OrigemNoPortal } from './origem-no-portal';
+import { origemCurta, useOrigemNoPortal } from './origem-no-portal-dados';
 import { AvisoWhatsapp } from './aviso-whatsapp';
 import { ProvedorDoFio } from './contexto-do-fio';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
@@ -249,11 +251,18 @@ export function Conversa({
   ]
     .filter(Boolean)
     .join(' · ');
-  // O que o cabeçalho de UMA LINHA diz embaixo do nome: a etapa e só as exceções.
+  // De qual anúncio dos portais o cliente veio (05/11/2026, só na Imova; na
+  // KOMUNE não há consulta): o lead de quem mandou mensagem, achado pela conversa
+  // em foco e, sem ela, pela ficha. Só lido e mostrado: nada disso toca no WhatsApp.
+  const origemNoPortal = useOrigemNoPortal({ conversaId: fio?.id ?? null, organizacaoId: item.id });
+
+  // O que o cabeçalho de UMA LINHA diz embaixo do nome: a etapa, o anúncio de
+  // onde o cliente veio (é o que decide a primeira resposta) e só as exceções.
   // O resto está a um toque, na folha.
   const resumo =
     [
       item.etapa,
+      origemCurta(origemNoPortal),
       item.naoContatar ? 'não contatar' : null,
       fio?.roboPausado ? 'robô pausado' : null,
       fio ? ROTULO_ESTADO_DO_FIO[fio.estado] : null,
@@ -307,6 +316,8 @@ export function Conversa({
         />
       ) : null}
       <EtiquetasDoParceiro organizacaoId={item.id} podeEditar={Boolean(eu?.podeEscrever)} />
+      {/* O lead dos portais (05/11/2026, só na Imova), só leitura. */}
+      <OrigemNoPortal conversaId={fio?.id ?? null} organizacaoId={item.id} naFolha={naFolha} />
     </>
   );
 
