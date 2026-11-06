@@ -16,7 +16,8 @@ export type ChaveAviso =
   | 'callback'
   | 'sessao'
   | 'app'
-  | 'app-codigo';
+  | 'app-codigo'
+  | 'troca';
 
 export interface AvisoAcesso {
   titulo: string;
@@ -81,6 +82,13 @@ export const AVISOS: Record<ChaveAviso, AvisoAcesso> = {
   'app-codigo': {
     titulo: 'O login pelo app expirou antes de terminar.',
     saida: 'Toque em Entrar com Google de novo.',
+    grave: false,
+  },
+  // A troca de empresa sem novo login (`lib/troca-de-empresa.ts`) não terminou: o código
+  // venceu ou já foi usado (dois toques). O login desta empresa resolve.
+  troca: {
+    titulo: 'A troca de empresa não entrou sozinha.',
+    saida: 'Entre com a sua conta Google para continuar nesta empresa.',
     grave: false,
   },
 };

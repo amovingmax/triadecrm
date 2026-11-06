@@ -12,14 +12,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { type DestinoDoSeletor, EMPRESA } from '@/lib/empresa';
+import { enderecoDaTroca } from '@/lib/troca-de-empresa';
 
 /**
  * Troca de empresa: o mesmo CRM, com os dados de outra empresa.
  *
  * Cada empresa é um deploy com banco próprio, então trocar é ABRIR o endereço da
  * outra, nunca mudar de banco por dentro — assim cada aba fica presa à sua empresa e
- * uma aba antiga não grava no banco errado. Na primeira vez, a outra empresa pede o
- * login com Google; o navegador guarda os dois.
+ * uma aba antiga não grava no banco errado. Desde 06/11/2026 a pessoa chega lá já
+ * logada, sem entrar com o Google de novo (`lib/troca-de-empresa.ts`).
  *
  * `destinos` já vem recortado para a pessoa (`seletor-da-pessoa.tsx`): só aparece para
  * quem a outra empresa respondeu que entra lá. Com uma empresa só, não aparece.
@@ -59,7 +60,7 @@ export function SeletorDeEmpresa({ destinos }: { destinos: DestinoDoSeletor[] })
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem key={destino.slug} className="min-h-11 md:min-h-0" asChild>
-              <a href={`${destino.url}/meu-dia`}>
+              <a href={enderecoDaTroca(destino.slug)}>
                 <span className="size-4" aria-hidden="true" />
                 {destino.nome}
               </a>
@@ -67,7 +68,7 @@ export function SeletorDeEmpresa({ destinos }: { destinos: DestinoDoSeletor[] })
           ),
         )}
         <p className="px-2 pt-1 pb-1.5 text-xs leading-snug text-muted-foreground">
-          Cada empresa tem os seus dados e o seu login. Na primeira vez, entre com o Google.
+          Cada empresa tem os seus dados. Você entra com a mesma conta, sem login de novo.
         </p>
       </DropdownMenuContent>
     </DropdownMenu>

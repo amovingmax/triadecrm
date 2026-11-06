@@ -23,6 +23,22 @@ import * as z from 'zod';
 /** Por quanto tempo uma pergunta assinada vale, para cada lado, contando relógios fora de acerto. */
 export const VALIDADE_DA_PERGUNTA_S = 300;
 
+/**
+ * Para que a pergunta serve. `seletor` é a de sempre ("este e-mail entra aí?", só sim ou
+ * não). `entrada` (06/11/2026) pede o código de uso único da troca de empresa sem novo
+ * login (`app/api/empresas/entrada`): vale menos tempo e é assinada com outro prefixo,
+ * então uma pergunta do seletor nunca serve como pedido de entrada, nem o contrário.
+ */
+export type Finalidade = 'seletor' | 'entrada';
+
+/** Quanto vale um pedido de entrada: o servidor de uma empresa chama o da outra na hora. */
+export const VALIDADE_DA_ENTRADA_S = 60;
+
+const VALIDADE: Record<Finalidade, number> = {
+  seletor: VALIDADE_DA_PERGUNTA_S,
+  entrada: VALIDADE_DA_ENTRADA_S,
+};
+
 export interface Pergunta {
   /** Quem pergunta. */
   de: EmpresaSlug;
@@ -55,17 +71,22 @@ function normalizarEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-function textoAssinado(p: Pergunta): string {
-  return ['triade-seletor', 'v1', p.de, p.para, p.email, String(p.em)].join('\n');
+// O texto do seletor é o mesmo desde 22/10/2026: as versões no ar se entendem com as novas.
+function textoAssinado(p: Pergunta, finalidade: Finalidade): string {
+  return [`triade-${finalidade}`, 'v1', p.de, p.para, p.email, String(p.em)].join('\n');
 }
 
-function hmac(segredo: string, p: Pergunta): string {
-  return createHmac('sha256', segredo).update(textoAssinado(p)).digest('hex');
+function hmac(segredo: string, p: Pergunta, finalidade: Finalidade): string {
+  return createHmac('sha256', segredo).update(textoAssinado(p, finalidade)).digest('hex');
 }
 
-export function assinarPergunta(segredo: string, pergunta: Pergunta): PerguntaAssinada {
+export function assinarPergunta(
+  segredo: string,
+  pergunta: Pergunta,
+  finalidade: Finalidade = 'seletor',
+): PerguntaAssinada {
   const p = { ...pergunta, email: normalizarEmail(pergunta.email) };
-  return { ...p, assinatura: hmac(segredo, p) };
+  return { ...p, assinatura: hmac(segredo, p, finalidade) };
 }
 
 /**
@@ -78,13 +99,18 @@ export function conferirPergunta(
   corpo: unknown,
   esta: EmpresaSlug,
   agoraS: number,
+  finalidade: Finalidade = 'seletor',
 ): { ok: true; pergunta: Pergunta } | { ok: false; motivo: RecusaDaPergunta } {
   const lida = perguntaSchema.safeParse(corpo);
   if (!lida.success || lida.data.de === lida.data.para) return { ok: false, motivo: 'malformada' };
   const { assinatura, ...pergunta } = lida.data;
   if (pergunta.para !== esta) return { ok: false, motivo: 'outro_destino' };
-  if (Math.abs(agoraS - pergunta.em) > VALIDADE_DA_PERGUNTA_S) return { ok: false, motivo: 'vencida' };
-  const esperada = Buffer.from(hmac(segredo, { ...pergunta, email: normalizarEmail(pergunta.email) }), 'hex');
+  if (Math.abs(agoraS - pergunta.em) > VALIDADE[finalidade])
+    return { ok: false, motivo: 'vencida' };
+  const esperada = Buffer.from(
+    hmac(segredo, { ...pergunta, email: normalizarEmail(pergunta.email) }, finalidade),
+    'hex',
+  );
   const recebida = Buffer.from(assinatura, 'hex');
   if (esperada.length !== recebida.length || !timingSafeEqual(esperada, recebida)) {
     return { ok: false, motivo: 'assinatura' };

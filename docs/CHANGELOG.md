@@ -8765,3 +8765,25 @@ Pedido do usuário para esta versão do app: logo, downloads, escolha da empresa
 - Publicar a parte do site (seletor de empresa e downloads), com a comparação tela a tela antes: sem isso, o app do TestFlight entra só na KOMUNE.
 - **Avisos (push), decididos em 05/11/2026:** mensagem nova de cliente, conversa transferida, compromisso marcado e lembrete 30 min antes; na tela de bloqueio, o nome sem a mensagem. Vão na segunda versão.
 - O identificador `br.app.komune.triade` ficou registrado na conta Apple, sem uso. Remover só com o OK do usuário.
+
+## 06/11/2026 — Logos das empresas no login do app e troca de empresa sem novo login (branch `app-celular`; RF-ADM-01, PRD §8)
+
+Pedido do usuário: a logo de cada empresa na escolha do login do app, e trocar de empresa sem entrar de novo quando a conta tem acesso às duas.
+
+**Entregue:**
+- **Logos no login do app** (`app/login/escolha-da-empresa.tsx`): a KOMUNE com o ícone oficial (o do app da Komune, `public/marca/komune.png`) e o nome, e a Imova com o logotipo (`public/marca/imova.png`). Os cartões são brancos nos dois temas, para as cores das marcas aparecerem certas; a empresa escolhida tem contorno e sinal de marcado. Escolher a empresa e entrar com o Google continua levando direto a ela. Só no app; no navegador o login não muda.
+- **Troca de empresa sem novo login** (`lib/troca-de-empresa.ts`), no app e no navegador:
+  1. o botão de trocar abre `/auth/empresa/ir` na empresa atual, que lê o e-mail da sessão no servidor;
+  2. esse servidor pede à outra empresa um código de entrada (`/api/empresas/entrada`), assinado com `SEGREDO_ENTRE_EMPRESAS` para a finalidade nova `entrada`, que vale 1 minuto. A pergunta do seletor continua assinada como antes, então as versões no ar seguem se entendendo;
+  3. a outra empresa só emite o código se o e-mail entra lá pela regra do próprio banco (`public.email_entra_no_crm`). O código é o link mágico do Supabase, de uso único e sem e-mail enviado;
+  4. `/auth/empresa/entrar` troca o código pela sessão e abre o Meu dia já logado.
+  - Qualquer falha cai no caminho de antes: a tela da outra empresa, que pede o login se precisar. Código já usado ou vencido mostra o aviso novo `troca` no login.
+- **Verificado no teste do Mac** (KOMUNE 3100 e Imova 3101):
+  - KOMUNE → Imova e Imova → KOMUNE chegam logados no Meu dia;
+  - o código não serve duas vezes;
+  - sem estar logado, sem assinatura, com assinatura inventada ou com empresa inexistente, nada é emitido;
+  - site: tipos, lint e 1.536 testes (4 novos, inclusive a trava de que a assinatura do seletor não mudou).
+
+**Pendente:**
+- Publicar (com a comparação tela a tela antes). O botão de trocar muda também no navegador.
+- Não testado: a recusa de quem não tem acesso na outra empresa (403). Os usuários de teste têm acesso às duas.

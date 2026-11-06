@@ -43,6 +43,7 @@ export function ehRotaPublica(pathname: string, empresa: Empresa = EMPRESA): boo
   return (
     pathname === '/login' ||
     pathname === '/api/empresas/acesso' ||
+    pathname === '/api/empresas/entrada' ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/c/') ||
     pathname.startsWith('/r/') ||
