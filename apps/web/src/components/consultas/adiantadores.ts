@@ -11,9 +11,13 @@ import { carregarLotes, CHAVE_LOTES } from '@/components/ligacao/consultas';
 import { buscarParceiros, chaveDaBusca } from '@/components/parceiros/busca';
 import { carregarConsultoria, CHAVE_CONSULTORIA } from '@/components/parceiros/consultoria';
 import { filtrosDaUrl } from '@/components/parceiros/tipos';
+import { chaveDoRelatorio } from '@/components/relatorios/dados';
+import { carregarVisaoGeral } from '@/components/relatorios/dados-imova';
+import { periodoDaUrl } from '@/components/relatorios/periodo';
 import { buscarFila, buscarResumo, chaveDaFila } from '@/components/revisao/dados';
 import { FILTROS_INICIAIS } from '@/components/revisao/tipos';
 import { type AppRole } from '@/lib/auth/role';
+import { EMPRESA } from '@/lib/empresa';
 import { podeMarcarConsultoria } from '@/lib/navegacao';
 
 /**
@@ -85,8 +89,17 @@ export const ADIANTADORES: Readonly<Partial<Record<string, Adiantador>>> = {
   },
 
   // O painel que abre é o das ligações de hoje (`painelDaUrl`), do time inteiro.
+  // Na Imova (06/11/2026) abre a Visão geral, nos últimos 30 dias.
   '/relatorios': async (cliente) => {
     const hoje = hojeEmNatal();
+    if (EMPRESA.modulos.relatoriosDaImova) {
+      const periodo = periodoDaUrl({}, hoje);
+      await seFaltar(cliente, {
+        queryKey: chaveDoRelatorio('visao', periodo),
+        queryFn: () => carregarVisaoGeral(periodo),
+      });
+      return;
+    }
     await seFaltar(cliente, {
       queryKey: chaveDasLigacoesDoDia(hoje, null),
       queryFn: () => carregarLigacoesDoDia(hoje, null),

@@ -3,17 +3,23 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { PainelLigacoesDoDia } from '@/components/ligacoes-do-dia/painel-do-time';
+import { EMPRESA } from '@/lib/empresa';
 
 import { BarraDePeriodo, SeletorDePainel } from './barra-recorte';
+import { PainelAnuncios } from './painel-anuncios';
 import { PainelAtendimento } from './painel-atendimento';
 import { PainelBairros } from './painel-bairros';
 import { PainelBase } from './painel-base';
 import { PainelCategorias } from './painel-categorias';
+import { PainelClientesQuentes } from './painel-clientes-quentes';
 import { PainelFontes } from './painel-fontes';
 import { PainelFunil } from './painel-funil';
 import { PainelHorarios } from './painel-horarios';
+import { PainelIa } from './painel-ia';
+import { PainelMensagens } from './painel-mensagens';
 import { PainelPessoas } from './painel-pessoas';
 import { PainelSemana } from './painel-semana';
+import { PainelVisaoGeral } from './painel-visao-geral';
 import { periodoValido, urlDoRecorte, type Periodo } from './periodo';
 import { PAINEIS, painelUsaPeriodo, type ChavePainel } from './tipos';
 
@@ -84,8 +90,9 @@ export function TelaRelatorios({
             painel logo abaixo já diz o que aquela leitura responde. Ela fica onde há
             espaço para ela. */}
         <p className="hidden max-w-[90ch] text-sm text-muted-foreground md:block">
-          Onde o funil trava, que categoria secou, que bairro ainda não foi batido. O que está
-          na tela desce em CSV.
+          {EMPRESA.modulos.relatoriosDaImova
+            ? 'Quem está mais perto de comprar, o que cada anúncio rende, que mensagem funciona e como a IA está atendendo. O que está na tela desce em CSV.'
+            : 'Onde o funil trava, que categoria secou, que bairro ainda não foi batido. O que está na tela desce em CSV.'}
         </p>
       </header>
 
@@ -108,6 +115,7 @@ export function TelaRelatorios({
           semana={semana}
           aoTrocarSemana={setSemana}
           podeGerarSemana={podeGerarSemana}
+          aoAbrirPainel={setPainel}
         />
       ) : null}
     </div>
@@ -120,17 +128,30 @@ function Painel({
   semana,
   aoTrocarSemana,
   podeGerarSemana,
+  aoAbrirPainel,
 }: {
   chave: ChavePainel;
   periodo: Periodo;
   semana: string | null;
   aoTrocarSemana: (semana: string) => void;
   podeGerarSemana: boolean;
+  aoAbrirPainel: (chave: ChavePainel) => void;
 }) {
   const painel = PAINEIS.find((item) => item.chave === chave);
   if (!painel) return null;
 
   switch (chave) {
+    // Os da Imova (06/11/2026).
+    case 'visao':
+      return <PainelVisaoGeral painel={painel} periodo={periodo} aoAbrirPainel={aoAbrirPainel} />;
+    case 'quentes':
+      return <PainelClientesQuentes painel={painel} />;
+    case 'anuncios':
+      return <PainelAnuncios painel={painel} periodo={periodo} />;
+    case 'mensagens':
+      return <PainelMensagens painel={painel} periodo={periodo} />;
+    case 'ia':
+      return <PainelIa painel={painel} periodo={periodo} />;
     case 'ligacoes':
       return <PainelLigacoesDoDia painel={painel} />;
     case 'atendimento':

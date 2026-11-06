@@ -101,6 +101,15 @@ export interface Empresa {
      * nada e a porteira de mensagens continua exigindo aprovação (ADR-05).
      */
     iaQueAtende: boolean;
+    /**
+     * Os relatórios da Imova (06/11/2026): a aba Relatórios abre na Visão geral e
+     * mostra Clientes quentes, Anúncios (cliques e contatos do Canal Pro),
+     * Mensagens que funcionam e a IA que atende (com a nota da IA juíza), além de
+     * Atendimento, Funil e Pessoas. Os painéis feitos para a captação da KOMUNE
+     * (Ligações do dia, Semana, Categorias, Bairros, Horários, Fontes e Base)
+     * saem da barra. No banco da KOMUNE a migração não cria nada.
+     */
+    relatoriosDaImova: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -157,6 +166,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       concluirConversa: true,
       anuncios: false,
       iaQueAtende: false,
+      relatoriosDaImova: false,
     },
     privacidade: null,
   },
@@ -195,6 +205,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       concluirConversa: true,
       anuncios: true,
       iaQueAtende: true,
+      relatoriosDaImova: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',
