@@ -8785,7 +8785,7 @@ Pedido do usuário: a logo de cada empresa na escolha do login do app, e trocar 
   - site: tipos, lint e 1.536 testes (4 novos, inclusive a trava de que a assinatura do seletor não mudou).
 
 **Pendente:**
-- Publicar (com a comparação tela a tela antes). O botão de trocar muda também no navegador.
+- Publicar (com a comparação tela a tela antes). O botão de trocar muda também no navegador: **confirmado pelo usuário em 06/11/2026** ("a troca sem login também serve para computador").
 - Não testado: a recusa de quem não tem acesso na outra empresa (403). Os usuários de teste têm acesso às duas.
 
 ## 06/11/2026 — Avisos no celular (push do app) (branch `app-celular`; RF-CON-05, PRD §8)
