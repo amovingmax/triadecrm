@@ -52,6 +52,7 @@ import { FichaAoLado, ROTULO_DA_SECAO, AreaDoFio, useAvisoDeNaoLidas } from './f
 import { Janela24h, PilulaDaJanela, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
 import { ControleDaIa, SeloDaIa } from '@/components/ia-que-atende/na-conversa';
+import { ClienteDeTeste } from '@/components/ia-que-atende/cliente-de-teste';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { JANELA_APERTADA_MIN, montarFio, podeEscreverLivre } from './mensagens';
@@ -660,6 +661,8 @@ export function Conversa({
           {podeAssumir && fio ? (
             <AssumirConversa fioId={fio.id} organizacaoId={item.id} className="w-full md:hidden" />
           ) : null}
+          {/* Só no computador de teste e só na conversa do treino da IA. */}
+          {fio ? <ClienteDeTeste fioId={fio.id} className="mx-1" /> : null}
           <CaixaDeResposta
             fio={fio}
             janela={janela}
