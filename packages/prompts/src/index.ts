@@ -43,6 +43,21 @@ export {
 } from './prompts/leitura-do-cliente/v2';
 
 export {
+  ACOES_DO_ATENDENTE,
+  CANAIS_DE_CHEGADA,
+  type AcaoDoAtendente,
+  type BaseDoAtendente,
+  type EntradaDoAtendente,
+  type ImovelDaBase,
+  type SaidaDoAtendente,
+  atendenteImovaV1,
+  linhaDoImovel,
+  montarBase,
+  semTelefone,
+  sistemaComBase,
+} from './prompts/atendente-imova/v1';
+
+export {
   type EntradaDoPulso,
   type SaidaDoPulso,
   pulsoDoDiaV1,

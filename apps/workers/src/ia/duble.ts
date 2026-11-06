@@ -35,7 +35,8 @@ export type FluxoDoDuble =
   | 'classificacao'
   | 'ficha'
   | 'leitura'
-  | 'pulso';
+  | 'pulso'
+  | 'atendente';
 
 export class EsquemaDesconhecidoError extends Error {
   constructor(campos: readonly string[]) {
@@ -56,6 +57,9 @@ function camposDoEsquema(esquema: Record<string, unknown>): string[] {
 export function fluxoDoEsquema(esquema: Record<string, unknown>): FluxoDoDuble {
   const campos = new Set(camposDoEsquema(esquema));
   if (campos.has('textoLimpo')) return 'transcricao';
+  // A IA que atende o cliente da Imova (06/11/2026): é a única que devolve uma ação
+  // e as anotações do treino.
+  if (campos.has('acao') && campos.has('anotacoes')) return 'atendente';
   // A ficha vem antes da classificação: ela também tem `intencao`, mas o que a
   // distingue é o score e os sinais que o sustentam (CRM Inteligente, Fase 1).
   if (campos.has('scoreIntencao')) return ehLeituraDoCliente(esquema) ? 'leitura' : 'ficha';
@@ -447,6 +451,61 @@ function pulsar(mensagem: string): Record<string, unknown> {
   };
 }
 
+/**
+ * A IA que atende no dublê (Imova, 06/11/2026): lê a última mensagem do cliente e
+ * decide como o prompt manda — pediu corretor ou ligação, passa; no treino, "anota"
+ * vira anotação; aceitou um horário oferecido, marca; o resto, responde. O texto
+ * começa com "Simulação:" para ninguém confundir com a IA de verdade.
+ */
+function atenderNoDuble(mensagem: string): Record<string, unknown> {
+  const treino = /conversa do treino: SIM/.test(mensagem);
+  const linhas = mensagem.split('\n').filter((l) => / — cliente: /.test(l));
+  const ultima = (linhas[linhas.length - 1] ?? '').replace(/^.* — cliente: /, '');
+  const minuscula = ultima.toLowerCase();
+  const horarios = [...mensagem.matchAll(/^- (h\d+): (.+)$/gm)].map((m) => ({ opcao: m[1] ?? '', quando: m[2] ?? '' }));
+  const codigo = /\b([A-Z]{2,5}-\d{2,6})\b/.exec(mensagem.slice(mensagem.indexOf('CONVERSA')))?.[1] ?? null;
+  const base = { visita: null, anotacoes: [] as string[], confianca: 0.8 };
+
+  if (/corretor|ligar|liga[çc][ãa]o|atendente/.test(minuscula)) {
+    return {
+      ...base,
+      acao: 'passar_para_corretor',
+      mensagem: 'Simulação: já vou te passar para um dos nossos corretores, que continua com você por aqui.',
+      motivo: 'Simulação: pediu corretor ou ligação.',
+    };
+  }
+  if (treino && /anota|instru[çc][ãa]o|a partir de agora|quando perguntarem/.test(minuscula)) {
+    const regra = limitar(ultima.replace(/^(ia,?\s*)?(anota(\s+a[ií])?:?\s*)/i, ''), 400);
+    return {
+      ...base,
+      acao: 'responder',
+      mensagem: limitar(`Simulação: anotado — ${regra}`, 600),
+      motivo: 'Simulação: instrução do treino.',
+      anotacoes: regra.length >= 3 ? [regra] : [],
+    };
+  }
+  const aceitou = horarios.find((h) => minuscula.length > 0 && h.quando.toLowerCase().includes(minuscula.replace(/[^0-9h]/g, '').slice(0, 5)));
+  if (/(pode ser|fechado|combinado|ótimo|otimo|marca)/.test(minuscula) && horarios.length > 0) {
+    const h = aceitou ?? horarios[0];
+    return {
+      ...base,
+      acao: 'marcar_visita',
+      mensagem: limitar(`Simulação: visita marcada para ${h?.quando ?? 'o horário combinado'}. Um corretor acompanha você.`, 600),
+      visita: { opcao: h?.opcao ?? 'h1', imovelCodigo: codigo },
+      motivo: 'Simulação: aceitou um horário oferecido.',
+    };
+  }
+  if (/^(ok|obrigad[oa]|valeu|👍)[.!]*$/.test(minuscula.trim())) {
+    return { ...base, acao: 'nao_responder', mensagem: '', motivo: 'Simulação: só agradeceu.' };
+  }
+  return {
+    ...base,
+    acao: 'responder',
+    mensagem: limitar(`Simulação: recebi "${ultima}". Posso te mostrar os imóveis que combinam com isso?`, 600),
+    motivo: 'Simulação: respondeu a pergunta do cliente.',
+  };
+}
+
 const RESPOSTAS: Readonly<Record<FluxoDoDuble, (mensagem: string) => Record<string, unknown>>> = {
   transcricao: transcrever,
   resumo: resumir,
@@ -455,6 +514,7 @@ const RESPOSTAS: Readonly<Record<FluxoDoDuble, (mensagem: string) => Record<stri
   ficha: ficharConversa,
   leitura: lerClienteNoDuble,
   pulso: pulsar,
+  atendente: atenderNoDuble,
 };
 
 // ---------------------------------------------------------------------------

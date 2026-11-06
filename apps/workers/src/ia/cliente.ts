@@ -104,6 +104,10 @@ export class RespostaIlegivelError extends Error {
 const ESFORCO_POR_MODELO: Readonly<Record<string, 'low' | 'medium' | 'high'>> = {
   'claude-sonnet-5': 'low',
   'claude-haiku-5-5': 'low',
+  // A IA que atende o cliente da Imova (06/11/2026). Os dois pensam sempre (o Opus
+  // 5.5 não aceita desligar); `low` é o recomendado para conversa.
+  'claude-opus-5-5': 'low',
+  'claude-sonnet-5-5': 'low',
 };
 
 /**
