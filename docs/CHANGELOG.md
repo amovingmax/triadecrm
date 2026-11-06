@@ -8867,3 +8867,4 @@ Pedido do usuário: cada empresa tem os seus avisos. "Não faz sentido chegar um
   - cada empresa só o registra para quem entra lá pelo próprio banco (`public.aparelho_registrar_por_email`, só chave de serviço);
   - sair da conta desliga o celular em todas.
   - Testado: registrado na KOMUNE, apareceu na Imova; saiu na KOMUNE, sumiu das duas; pedido falso recusado. pgTAP 130 com 30 testes, e 2 novos testes da assinatura.
+- **Conferido pelo usuário no iPhone (06/11/2026, 12h58, Expo Go):** com o app aberto na Imova, chegaram as duas notificações, "Nova mensagem de Maria (teste)" pela Imova e "Nova mensagem de DJ Done" pela KOMUNE ("Chegaram as duas"). O iPhone se registrou na Imova ao abrir e foi levado sozinho à KOMUNE, no mesmo segundo. Antes disso, duas da Imova (12h48 e 12h49) também foram aceitas pelo Expo.
