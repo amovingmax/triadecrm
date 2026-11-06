@@ -8819,3 +8819,31 @@ Depois, os anúncios voltaram ao estado de antes, conferido coluna a coluna, e a
 Risco já aceito em 05/11: a troca de integrador pode recriar os anúncios (até cerca de 1 dia fora do ar e perda do histórico). A volta é colar o endereço da Arbo de novo.
 
 **Pendente / decisão humana:** os cadastrados direto no Canal Pro (hoje 1 ativo, o Terreno - Pipa) continuam saindo só pelo Canal Pro. Também em aberto: se o arquivo do CRM deve se recusar a sair vazio, para proteger contra um apagão por engano (não feito).
+
+### 06/11/2026 — anúncios no Canal Pro em produção, só na Imova
+
+**Pedido do usuário:** "Eu quero que ligue a integração para eu conseguir estar removendo o anúncio pelo próprio CRM." A resposta anterior pedia, junto, a aprovação do balde público das fotos (o robô do Grupo OLX baixa as fotos sem login). O risco da troca de integrador já tinha sido aceito em 05/11.
+
+**Publicado:**
+- **main** `7a56dc7`, em 4 commits sobre `1179115`: banco, funções, site e CHANGELOG.
+- **Conferido antes:** o site da Imova no ar era `9d4c39b` (main) e os dois bancos tinham as mesmas 173 migrações da main, sem nenhuma de fora.
+- **Banco da Imova** (`publicar-banco.mjs imova migrar`): as 11 migrações de 20261104150000 a 20261106110000, com a identidade conferida. O balde `anuncios` é público e só aceita JPEG. **A KOMUNE não foi mexida:** continua com 173, e as 11 só dariam o aviso lá.
+- **Função `canal-pro-feed`** na Imova, sem verify_jwt. Responde 404 sem a chave e com chave errada. A `grupozap-lead` **não** foi publicada, porque espera a homologação.
+- **Site da Imova** de cópia limpa (`~/triadecrm-publicar-imova` em `7a56dc7`): `imova-19e8sia78`, em https://imova-crm.vercel.app. Um primeiro deploy igual, `imova-e53d1i7kd`, saiu por um comando repetido. A volta é `imova-j6funec58`. Nenhuma variável nova.
+- **Dados da Imova:** o contato do anúncio (Imova Imobiliária, contato@imovaimobiliaria.com.br, (84) 99405-8888), o plano (10 anúncios, 2 destaques) e o endereço da Arbo (`canal_pro.sistema_atual_url`), para os botões não pedirem nada.
+
+**Para ligar (usuário, logado na Imova, nesta ordem):**
+1. Anúncios → "Atualizar do sistema atual": traz os 7 com as fotos.
+2. "Atualizar do Canal Pro": o relatório exportado. Um novo é melhor; o de 05/11 em Downloads também serve.
+3. Engrenagem → "Pôr os 7 no ar pelo CRM" → "Copiar" o endereço.
+4. Canal Pro → Configurações da conta → Integração de anúncios: trocar o endereço da Arbo pelo do CRM e salvar.
+5. Esperar a 1ª leitura (até 12 h). A faixa de Anúncios mostra "Última leitura do Grupo OLX".
+
+Daí em diante, excluir ou tirar do ar no CRM tira do portal na leitura seguinte.
+
+**Pendente / decisão humana:**
+- Os passos acima; ninguém da Imova testou a aba em produção ainda.
+- Conferir o Relatório de integração do Canal Pro depois da 1ª leitura.
+- O Terreno - Pipa repetido: se for "Via Integração", sai sozinho na troca; se foi cadastrado à mão, sai pelo Excluir duplicado.
+- Leads: homologação e `grupozap-lead`.
+- KOMUNE: as 11 migrações quando ela for publicada de novo (só avisos).
