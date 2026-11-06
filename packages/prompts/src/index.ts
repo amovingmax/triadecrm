@@ -89,6 +89,15 @@ export {
 } from './nucleo/imagens';
 
 export {
+  ACOES_DA_IA_NO_DIA,
+  ATITUDES_DO_CLIENTE,
+  INTERESSE_DO_CLIENTE,
+  type EntradaDaAvaliacao,
+  type SaidaDaAvaliacao,
+  avaliacaoDoAtendimentoV1,
+} from './prompts/avaliacao-do-atendimento/v1';
+
+export {
   type EntradaDoPulso,
   type SaidaDoPulso,
   pulsoDoDiaV1,

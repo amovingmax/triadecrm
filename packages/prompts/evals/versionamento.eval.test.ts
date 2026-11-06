@@ -131,6 +131,8 @@ describe('catálogo do Tríade', () => {
       'atendente-imova',
       // De qual anúncio é a foto que o cliente mandou, só da Imova (09/11/2026).
       'foto-do-anuncio',
+      // A IA juíza, só da Imova (06/11/2026): a nota diária do atendimento da de cima.
+      'avaliacao-do-atendimento',
     ]);
   });
 

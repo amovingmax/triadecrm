@@ -58,7 +58,11 @@ export type PropositoDeAiRun =
   | 'draft_reply'
   // A metade que LÊ da triagem do Radar: a conta soma nota e avaliações, e não
   // sabe que "Fotografia Silva — Formaturas" não atende casamento.
-  | 'triar_candidato';
+  | 'triar_candidato'
+  // A IA juíza da Imova (06/11/2026): a nota diária do atendimento da IA que atende.
+  // Entrou na lista do banco pela migração 20261106200000, logo depois de
+  // 'triar_candidato', e é por ela que o custo da juíza aparece separado.
+  | 'avaliar_atendimento';
 
 /**
  * As imagens que um prompt aceita junto com o texto (06/11/2026).

@@ -15,6 +15,12 @@ describe('fluxoDoEsquema', () => {
     );
   });
 
+  it('reconhece os prompts da Imova, inclusive a IA juíza (06/11/2026)', () => {
+    expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('leitura-do-cliente')))).toBe('leitura');
+    expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('atendente-imova')))).toBe('atendente');
+    expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('avaliacao-do-atendimento')))).toBe('juiza');
+  });
+
   it('esquema que ninguém ensinou falha barulhento', () => {
     // Um prompt novo tem de aparecer aqui. Devolver algo plausível seria testar
     // o dublê em vez do worker.

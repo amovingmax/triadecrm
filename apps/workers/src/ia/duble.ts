@@ -36,7 +36,8 @@ export type FluxoDoDuble =
   | 'ficha'
   | 'leitura'
   | 'pulso'
-  | 'atendente';
+  | 'atendente'
+  | 'juiza';
 
 export class EsquemaDesconhecidoError extends Error {
   constructor(campos: readonly string[]) {
@@ -60,6 +61,8 @@ export function fluxoDoEsquema(esquema: Record<string, unknown>): FluxoDoDuble {
   // A IA que atende o cliente da Imova (06/11/2026): é a única que devolve uma ação
   // e as anotações do treino.
   if (campos.has('acao') && campos.has('anotacoes')) return 'atendente';
+  // A IA juíza da Imova (06/11/2026): é a única que devolve a satisfação do cliente.
+  if (campos.has('satisfacao')) return 'juiza';
   // A ficha vem antes da classificação: ela também tem `intencao`, mas o que a
   // distingue é o score e os sinais que o sustentam (CRM Inteligente, Fase 1).
   if (campos.has('scoreIntencao')) return ehLeituraDoCliente(esquema) ? 'leitura' : 'ficha';
@@ -506,6 +509,57 @@ function atenderNoDuble(mensagem: string): Record<string, unknown> {
   };
 }
 
+/**
+ * A IA juíza no dublê (Imova, 06/11/2026): lê quem falou o quê na conversa montada e
+ * devolve notas coerentes com isso — pergunta do cliente dá nota de dúvida, a reação
+ * depois da última resposta da IA dá a de satisfação, "visita" sobe o interesse. O
+ * porquê começa com "Simulação:" e repete a última fala do cliente, para o teste ver
+ * o marcador ([[NOME_1]]) atravessar o modelo e voltar com o nome.
+ */
+function julgarNoDuble(mensagem: string): Record<string, unknown> {
+  const falas = mensagem
+    .split('\n')
+    .map((linha) => /^\[[^\]]+\] .* — (cliente|IA|equipe|automática): (.*)$/.exec(linha))
+    .filter((achado): achado is RegExpExecArray => achado !== null)
+    .map((achado) => ({ quem: achado[1] ?? '', texto: achado[2] ?? '' }));
+  const ultimaDaIa = falas.map((f) => f.quem).lastIndexOf('IA');
+  const doCliente = falas.filter((f) => f.quem === 'cliente');
+  if (ultimaDaIa === -1 || doCliente.length === 0) {
+    return {
+      duvida: null,
+      informacao: null,
+      satisfacao: null,
+      interesse: 'igual',
+      porque: 'Simulação: não há conversa entre o cliente e a IA para julgar.',
+      melhorar: null,
+      dadosInsuficientes: true,
+    };
+  }
+  const reacao = falas
+    .slice(ultimaDaIa + 1)
+    .filter((f) => f.quem === 'cliente')
+    .map((f) => f.texto)
+    .join(' ');
+  const satisfacao =
+    reacao === ''
+      ? null
+      : /n[ãa]o entendi|j[áa] perguntei|^mas |reclam|absurdo/i.test(reacao)
+        ? 2
+        : /obrigad|[óo]timo|perfeito|combinado|pode ser/i.test(reacao)
+          ? 5
+          : 4;
+  const perguntou = doCliente.some((f) => f.texto.includes('?'));
+  return {
+    duvida: perguntou ? (satisfacao === 2 ? 2 : 4) : null,
+    informacao: 4,
+    satisfacao,
+    interesse: /visita|pode ser|combinado/i.test(reacao) ? 'subiu' : satisfacao === 2 ? 'caiu' : 'igual',
+    porque: limitar(`Simulação: o cliente disse "${doCliente[doCliente.length - 1]?.texto ?? ''}".`, 400),
+    melhorar: satisfacao !== null && satisfacao <= 2 ? 'Simulação: responder direto o que o cliente perguntou.' : null,
+    dadosInsuficientes: false,
+  };
+}
+
 const RESPOSTAS: Readonly<Record<FluxoDoDuble, (mensagem: string) => Record<string, unknown>>> = {
   transcricao: transcrever,
   resumo: resumir,
@@ -515,6 +569,7 @@ const RESPOSTAS: Readonly<Record<FluxoDoDuble, (mensagem: string) => Record<stri
   leitura: lerClienteNoDuble,
   pulso: pulsar,
   atendente: atenderNoDuble,
+  juiza: julgarNoDuble,
 };
 
 // ---------------------------------------------------------------------------

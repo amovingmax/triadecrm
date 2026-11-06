@@ -89,20 +89,15 @@ import {
   leadIdCurto,
   type ContextoDaIa,
 } from './execucao';
+import { ErroDeterministico } from './erros';
 import { adiarTrabalho, enfileirarTrabalho } from './fila';
+import { avaliarAtendimento, payloadDaJuiza } from './juiza';
 
 import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
 
-/**
- * Erro que não adianta repetir: o mundo teria de mudar, não a tentativa.
- * A mensagem é concluída na fila e o motivo fica no log.
- */
-export class ErroDeterministico extends Error {
-  constructor(motivo: string) {
-    super(motivo);
-    this.name = 'ErroDeterministico';
-  }
-}
+// A classe mora em `erros.ts` desde a IA juíza (06/11/2026); quem a importava
+// daqui continua importando.
+export { ErroDeterministico };
 
 export function eDeterministico(erro: unknown): boolean {
   return (
@@ -194,6 +189,9 @@ const PAYLOADS = {
   triar_candidato: payloadDaTriagem,
   // A IA que atende o cliente da Imova sozinha (06/11/2026): `ia/atendente.ts`.
   draft_reply: payloadDoAtendente,
+  // A IA juíza da Imova (06/11/2026), que dá nota ao dia de atendimento da de
+  // cima: `ia/juiza.ts`.
+  avaliar_atendimento: payloadDaJuiza,
 } as const;
 
 export type PropositoConhecido = keyof typeof PAYLOADS;
@@ -1231,7 +1229,24 @@ const TRABALHOS: Readonly<
   pulso_do_dia: escreverOPulso,
   triar_candidato: triarCandidatos,
   draft_reply: async (contexto, bruto) => ({ proposito: 'draft_reply', ...(await atenderCliente(contexto, bruto)) }),
+  avaliar_atendimento: async (contexto, bruto) => ({
+    proposito: 'avaliar_atendimento',
+    ...(await avaliarAtendimento(contexto, bruto)),
+  }),
 };
+
+/**
+ * Os trabalhos que têm prompt da Imova. Os outros falam de evento e de fornecedor, e no
+ * banco dela saem da fila sem chamar o modelo (ver `tratarTrabalho`).
+ */
+const TRABALHOS_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoConhecido>([
+  // A leitura do cliente (03/11/2026): `analisar_conversa` vira `lerCliente` lá.
+  'analisar_conversa',
+  // A IA que atende o cliente (06/11/2026).
+  'draft_reply',
+  // A IA juíza, que dá nota ao atendimento da de cima (06/11/2026).
+  'avaliar_atendimento',
+]);
 
 export async function tratarTrabalho(
   contexto: ContextoDaIa,
@@ -1253,8 +1268,9 @@ export async function tratarTrabalho(
   // falam de eventos e de fornecedor. No banco da Imova eles se acumularam na fila
   // enquanto não havia worker de IA, e rodá-los agora seria pagar por texto errado.
   // Saem da fila como "sem o que fazer", sem chamar o modelo.
-  // A IA que atende o cliente (06/11/2026) também é da Imova, e só dela.
-  if (contexto.empresa === 'imova' && proposito !== 'analisar_conversa' && proposito !== 'draft_reply') {
+  // A IA que atende o cliente e a IA juíza (06/11/2026) também são da Imova, e só
+  // dela: a lista inteira está em `TRABALHOS_DA_IMOVA`.
+  if (contexto.empresa === 'imova' && !TRABALHOS_DA_IMOVA.has(proposito)) {
     contexto.logger.info('trabalho fora da IA da Imova: sai da fila sem chamar o modelo', {
       proposito,
     });

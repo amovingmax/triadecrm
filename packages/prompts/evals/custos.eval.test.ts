@@ -250,6 +250,21 @@ describe('preços e conta por chamada', () => {
         semCache: 0.0001,
         comCache: 0.00005,
       },
+      {
+        // A IA juíza da Imova (06/11/2026): uma avaliação por conversa e por dia em que
+        // a IA atendeu, no Haiku 5.5. A conta é do primeiro exemplo (cinco mensagens);
+        // conversa real é mais longa, e na fatura entram ainda o esquema da saída e o
+        // raciocínio do modelo (até 3.000 tokens de saída, US$ 0,0015 no pior caso).
+        // Mesmo a 0,001 por avaliação, 50 conversas por dia dão US$ 1,50 no mês: dentro
+        // dos US$ 2 que o usuário previu.
+        id: 'avaliacao-do-atendimento',
+        modelo: 'claude-haiku-5-5',
+        tokensDeSistema: 1481,
+        tokensDaMensagem: 243,
+        tokensDeSaida: 75,
+        semCache: 0.00021,
+        comCache: 0.00008,
+      },
     ]);
   });
 });
