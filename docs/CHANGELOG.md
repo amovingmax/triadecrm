@@ -8942,3 +8942,10 @@ Pedido do usuário: "utilizar uma IA para responder os clientes no CRM da Imova.
 **Em produção agora (lido em 06/11):** IA ligada, modo treino, modelo Sonnet 5.5 (escolhido pela tela), **sem conversa de treino**, 0 respostas.
 
 **Para publicar, só com pedido:** conferir o ar; `main` + push; `publicar-banco.mjs imova migrar` (as 4 migrações); site da Imova de cópia limpa; `fly deploy` do `imova-worker-ai` (sem ele, o worker no ar ignora o Haiku e usa o Opus). Depois, na tela: Configuração → Conversa do treino → "Janio" → "Treinar por esta".
+
+**Publicado em 06/11/2026, a pedido ("Quero que suba essas atualizações pro ar"), só na Imova:**
+- Ar conferido antes: site `90a1e0a`, banco com 185 migrações (todas do repositório), `imova-worker-ai` v3 — tudo da publicação anterior.
+- `main` `97b4c1d` (avanço direto sobre `99acf9b`). Banco da Imova: as 4 migrações por `publicar-banco.mjs imova migrar` (189 no banco). Sem bloco de seed.
+- Site da Imova `imova-3tdrfix2c` (de `97b4c1d`, cópia limpa); volta: `imova-6k5lfuru8`. `/auth/dev/cliente` continua 404.
+- `imova-worker-ai` v4 no Fly; volta: v3.
+- Conferido em produção: modelo `claude-haiku-5-5` (a migração trocou o Sonnet que a tela tinha escolhido), pingue-pongue 8 s, 6 falas por conversa para os outros robôs, `wa_bot_falas` sem as respostas da IA, `ia_atende` olhando a pausa, passar no treino, `ia_procurar_conversas`, teto US$ 30, batidas de vida do worker de IA e do robô do WhatsApp em segundos. IA ligada, modo treino, **ainda sem conversa de treino**. KOMUNE intocada.
