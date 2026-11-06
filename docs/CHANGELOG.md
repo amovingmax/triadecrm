@@ -8899,3 +8899,21 @@ Pedido do usuário: "utilizar uma IA para responder os clientes no CRM da Imova.
 - Quem recebe quando a IA passa (setor dos corretores) e na agenda de quem a visita entra (hoje, na de quem atende a conversa).
 - Quando passar do treino para os clientes (o teto do orçamento já foi decidido: US$ 30).
 - O login próprio do colaborador (hoje `contato@imovaimobiliaria.com.br`).
+
+### 06/11/2026 — a IA que atende em produção, só na Imova (desligada até a gestão ligar)
+
+**Pedido do usuário:** "Pode subir".
+
+**Publicado:**
+- **Ar conferido antes:** o site da Imova era `7a56dc7` (contido na `main`); o banco da Imova tinha 184 migrações, todas do repositório, e só faltava a `20261106170000`; o `imova-worker-ai` estava na v2 de 04/11.
+- **main** `90a1e0a` (avanço direto sobre `1929b0e`).
+- **Banco da Imova:** `20261106170000_a_ia_atende_o_cliente` por `publicar-banco.mjs imova migrar`, e só os blocos 12h e 12i do seed, com `app.exigir_empresa('imova')` antes. Conferido em produção: `ia.atendente` desligada no modo treino, `ia.orcamento` em US$ 30 (alerta em US$ 24), `ia_atendente_enfileirar` a cada 10 s, preços do Opus 5.5 e do Sonnet 5.5, porteira com o ramo da IA e o comentário de 06/11. A IA lê os 7 anúncios do CRM (hoje todos em rascunho: ela fala deles e confirma com o corretor antes de marcar visita). **A KOMUNE não foi mexida.**
+- **Site da Imova** de cópia limpa (`~/triadecrm-publicar-imova-ia` em `90a1e0a`): `imova-6k5lfuru8`, em https://imova-crm.vercel.app. A volta é `imova-19e8sia78`. `/auth/dev/cliente` responde 404 em produção.
+- **`imova-worker-ai`** v3 no Fly (máquina `8747327c07edd8`); batida de vida em segundos. O `imova-worker-wa` não foi reiniciado.
+
+**Para ligar (gestão, logada na Imova):** IA que atende → Configuração → conversa do treino: "Janio Ramalho" (a única com esse nome) → ligar. Daí em diante a IA responde ao Janio quando ele escrever. Se alguém da equipe escrever nessa conversa, a IA para; para voltar, o botão do topo da conversa.
+
+**Pendente / decisão humana:**
+- Pôr os anúncios no ar pela aba Anúncios: enquanto estiverem em rascunho, a IA não os oferece como disponíveis.
+- Os avisos por e-mail do espaço Imova na Anthropic continuam em US$ 8 e US$ 12 (sugestão: US$ 15 e US$ 24).
+- As decisões da entrada de 06/11 (setor que recebe, agenda da visita, quando ir para os clientes, login do colaborador).
