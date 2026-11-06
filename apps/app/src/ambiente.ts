@@ -36,7 +36,7 @@ export const ID_DO_APP = 'app.triade.ios';
 export const ID_DO_APP_ANDROID = 'app.triade.android';
 
 /** A versão da casca. Sobe junto com cada nova versão enviada às lojas. */
-export const VERSAO_DA_CASCA = '0.1.0';
+export const VERSAO_DA_CASCA = '0.2.0';
 
 /** O que o site procura no user-agent para saber que está dentro do app. */
 export const MARCA_DO_APP = 'TriadeApp';

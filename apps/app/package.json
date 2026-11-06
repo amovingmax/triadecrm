@@ -1,6 +1,6 @@
 {
   "name": "@komune/app",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "O app de celular do Tríade: casca Expo que abre o próprio site (KOMUNE e Imova) sem mudar a versão do computador.",
   "type": "module",
