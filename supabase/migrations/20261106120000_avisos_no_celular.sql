@@ -10,7 +10,7 @@
 --                     outra pessoa · lembrete 30 min antes · resumo das 8h ·
 --                     resposta atrasada (24 h)
 --   SÓ KOMUNE         lote para ligar · reunião marcada pelo robô · parceiro publicado
---   SÓ IMOVA          ligação perdida pelo WhatsApp
+--   SÓ IMOVA          cliente ligando pelo WhatsApp (enquanto toca) · ligação perdida
 --                     (lead novo dos portais e anúncio com problema entram com o ramo
 --                     dos Anúncios, que ainda não está na main)
 --
@@ -168,7 +168,8 @@ as $$
       ('lote',            'Lote para ligar',            'Quando a gestão monta ou passa um lote de ligações para você.', 7, 'komune'),
       ('reuniao_robo',    'Reunião marcada pelo robô',  'Quando o robô marca uma reunião com um parceiro seu.',          8, 'komune'),
       ('publicado',       'Parceiro publicado',         'Quando um parceiro seu é publicado na Komune.',                 9, 'komune'),
-      ('ligacao_perdida', 'Ligação perdida',            'Quando um cliente liga pelo WhatsApp e ninguém atende.',       10, 'imova')
+      ('ligando',         'Cliente ligando',            'Na hora em que um cliente liga pelo WhatsApp, enquanto toca.', 10, 'imova'),
+      ('ligacao_perdida', 'Ligação perdida',            'Quando um cliente liga pelo WhatsApp e ninguém atende.',       11, 'imova')
     ) as v (tipo, nome, descricao, ordem, empresa)
    where v.empresa is null or v.empresa = (select i.empresa from app.identidade i limit 1);
 $$;
@@ -237,7 +238,8 @@ create table if not exists app.push_fila (
   pessoa_id   uuid not null references public.profiles (id) on delete cascade,
   tipo        text not null check (tipo in ('mensagem', 'transferencia', 'compromisso',
                                             'lembrete', 'atrasada', 'resumo', 'lote',
-                                            'reuniao_robo', 'publicado', 'ligacao_perdida')),
+                                            'reuniao_robo', 'publicado', 'ligando',
+                                            'ligacao_perdida')),
   -- Idempotência: o mesmo fato nunca vira dois avisos para a mesma pessoa.
   chave       text not null unique,
   corpo       text not null check (length(corpo) between 1 and 240),
@@ -582,7 +584,30 @@ begin
   end if;
 
   if v_empresa = 'imova' then
-    -- 9. Ligação perdida pelo WhatsApp: o cliente ligou e ninguém atendeu.
+    -- 9. Cliente ligando pelo WhatsApp (pedido de 06/11/2026): enquanto a ligação toca,
+    --    para todos que atendem, como a ligação toca no navegador de todos. O toque abre
+    --    a conversa, e o CRM aberto mostra a ligação para atender. Só a ligação que
+    --    começou há menos de 1 minuto: depois disso o aviso chegaria com ela acabada.
+    begin
+      insert into app.push_fila (pessoa_id, tipo, chave, corpo, caminho, conversa_id)
+      select q.pessoa, 'ligando', 'ligando:' || w.id || ':' || q.pessoa,
+             left(app.nome_da_conversa(w.conversation_id), 60) || ' está ligando pelo WhatsApp',
+             app.caminho_da_conversa(w.conversation_id), w.conversation_id
+        from public.wa_chamadas w
+       cross join app.avisos_quem_atende() as q (pessoa)
+       where w.direcao = 'recebida'
+         and w.estado = 'tocando'
+         and w.tocou_em > now() - interval '1 minute'
+         and not exists (select 1 from public.conversa_preferencias cp
+                          where cp.profile_id = q.pessoa
+                            and cp.conversation_id = w.conversation_id
+                            and cp.silenciada_ate > now())
+      on conflict (chave) do nothing;
+      get diagnostics v_n = row_count; v_novos := v_novos + v_n;
+    exception when others then raise warning 'avisos: ligando: %', sqlerrm;
+    end;
+
+    -- 10. Ligação perdida pelo WhatsApp: o cliente ligou e ninguém atendeu.
     begin
       insert into app.push_fila (pessoa_id, tipo, chave, corpo, caminho, conversa_id)
       select d.pessoa, 'ligacao_perdida', 'ligacao_perdida:' || w.id || ':' || d.pessoa,
@@ -721,7 +746,10 @@ declare
 begin
   -- Aviso velho não sai: o celular avisando 20 minutos depois só atrapalha.
   update app.push_fila set enviado_em = now(), resultado = 'vencido'
-   where enviado_em is null and criado_em < now() - interval '10 minutes';
+   where enviado_em is null
+     and (criado_em < now() - interval '10 minutes'
+          -- "Está ligando" depois de 1 minuto já não é verdade.
+          or (tipo = 'ligando' and criado_em < now() - interval '1 minute'));
   -- O que a pessoa desligou para si.
   update app.push_fila f set enviado_em = now(), resultado = 'desligado'
    where f.enviado_em is null
@@ -747,6 +775,8 @@ begin
            'body', l.corpo,
            'sound', case when v_com_som or l.tipo = 'lembrete' then 'default' end,
            'priority', 'high',
+           -- O celular desligado não recebe "está ligando" quando volta: só no primeiro minuto.
+           'ttl', case when l.tipo = 'ligando' then 60 end,
            'data', jsonb_build_object('empresa', l.empresa, 'caminho', l.caminho, 'tipo', l.tipo)
          )) order by l.id, l.token),
          array_agg(l.token order by l.id, l.token),

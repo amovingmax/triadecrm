@@ -16,16 +16,18 @@
 --   6. O WHATSAPP NÃO É TOCADO: a varredura não grava mensagem nenhuma;
 --   7. A CHAVE GERAL desliga tudo;
 --   8. CADA EMPRESA TEM O SEU CATÁLOGO (entrevista de 06/11/2026): lote, robô e
---      publicado só na KOMUNE; ligação perdida só na Imova;
+--      publicado só na KOMUNE; cliente ligando e ligação perdida só na Imova;
 --   9. CADA PESSOA DESLIGA O QUE QUISER, e o desligado não sai;
 --  10. A RESPOSTA ATRASADA avisa quem atende, uma vez, 24 h depois;
---  11. O RESUMO DAS 8H fala do dia da pessoa.
+--  11. O RESUMO DAS 8H fala do dia da pessoa;
+--  12. CLIENTE LIGANDO (Imova, 06/11/2026) avisa todos que atendem enquanto toca, só
+--      no primeiro minuto, e quem silenciou a conversa fica de fora.
 --
 -- Roda em transação e desfaz tudo (inclusive o pedido ao Expo, que o pg_net só
 -- faria depois do commit).
 -- =====================================================================
 begin;
-select plan(30);
+select plan(35);
 
 insert into public.allowed_users (email, role, note) values
   ('p130.g1@teste.local', 'gestor', 'pgTAP avisos'),
@@ -88,6 +90,16 @@ create function pg_temp.chega(p_chave text) returns void language sql as $$
   values (pg_temp.id(p_chave), 'in'::app.msg_direction, 'text'::app.msg_type,
           'received'::app.msg_status, 'quanto custa o pacote?', 'system', 'crm');
 $$;
+-- A empresa do banco, para o mesmo arquivo provar a KOMUNE e a Imova.
+create function pg_temp.virar(p_empresa text) returns void language plpgsql as $$
+begin
+  alter table app.identidade disable trigger identidade_imutavel;
+  alter table app.identidade disable trigger identidade_imutavel_truncate;
+  delete from app.identidade;
+  insert into app.identidade (empresa) values (p_empresa);
+  alter table app.identidade enable trigger identidade_imutavel;
+  alter table app.identidade enable trigger identidade_imutavel_truncate;
+end $$;
 create function pg_temp.avisos(p_tipo text, p_pessoa uuid) returns bigint language sql stable as $$
   select count(*) from app.push_fila where tipo = p_tipo and pessoa_id = p_pessoa
 $$;
@@ -267,8 +279,9 @@ select is((select count(*) from app.push_fila
   'com alguém atendendo, só essa pessoa é avisada do atraso');
 
 -- ---------------------------------------------------------------------
--- 11. O resumo das 8h
+-- 11. O resumo das 8h (o texto da KOMUNE; o da Imova fala de visitas)
 -- ---------------------------------------------------------------------
+select pg_temp.virar('komune');
 insert into public.tasks (title, kind, status, due_at, assignee_id, created_by)
 values ('Visita ao Salão Azul', 'visit', 'todo',
         ((now() at time zone 'America/Fortaleza')::date + time '23:59') at time zone 'America/Fortaleza',
@@ -284,23 +297,52 @@ select is(app.avisos_push_resumo(), (select count(*)::integer from app.push_fila
 -- ---------------------------------------------------------------------
 -- 8. O catálogo de cada empresa
 -- ---------------------------------------------------------------------
-create function pg_temp.virar(p_empresa text) returns void language plpgsql as $$
-begin
-  alter table app.identidade disable trigger identidade_imutavel;
-  alter table app.identidade disable trigger identidade_imutavel_truncate;
-  delete from app.identidade;
-  insert into app.identidade (empresa) values (p_empresa);
-  alter table app.identidade enable trigger identidade_imutavel;
-  alter table app.identidade enable trigger identidade_imutavel_truncate;
-end $$;
 select pg_temp.virar('komune');
 select ok((select array_agg(tipo) from app.avisos_catalogo()) @> array['mensagem', 'resumo', 'lote', 'reuniao_robo', 'publicado']
-          and not exists (select 1 from app.avisos_catalogo() where tipo = 'ligacao_perdida'),
-  'na KOMUNE: os comuns, lote, reunião do robô e parceiro publicado; sem ligação perdida');
+          and not exists (select 1 from app.avisos_catalogo() where tipo in ('ligando', 'ligacao_perdida')),
+  'na KOMUNE: os comuns, lote, reunião do robô e parceiro publicado; sem aviso de ligação');
 select pg_temp.virar('imova');
-select ok((select array_agg(tipo) from app.avisos_catalogo()) @> array['mensagem', 'resumo', 'ligacao_perdida']
+select ok((select array_agg(tipo) from app.avisos_catalogo()) @> array['mensagem', 'resumo', 'ligando', 'ligacao_perdida']
           and not exists (select 1 from app.avisos_catalogo() where tipo in ('lote', 'reuniao_robo', 'publicado')),
-  'na Imova: os comuns e a ligação perdida; nada de lote nem de parceiro publicado');
+  'na Imova: os comuns, cliente ligando e ligação perdida; nada de lote nem de parceiro publicado');
+
+-- ---------------------------------------------------------------------
+-- 12. Cliente ligando pelo WhatsApp (só na Imova; daqui em diante o banco é a Imova)
+-- ---------------------------------------------------------------------
+select pg_temp.conversa('ligou', '+5584900013005', false);
+select pg_temp.conversa('ligou_antes', '+5584900013006', false);
+-- Sara silenciou a conversa: não é avisada nem da ligação.
+insert into public.conversa_preferencias (profile_id, conversation_id, silenciada_ate)
+values ('a0000000-0000-4000-8000-000000013003'::uuid, pg_temp.id('ligou'), now() + interval '1 day');
+insert into public.wa_chamadas (conversation_id, direcao, estado, quem, tocou_em) values
+  (pg_temp.id('ligou'), 'recebida', 'tocando', 'Cliente ligou', now()),
+  (pg_temp.id('ligou_antes'), 'recebida', 'tocando', 'Cliente ligou_antes', now() - interval '2 minutes');
+select app.avisos_push_varrer();
+
+select is((select count(*) from app.push_fila
+            where tipo = 'ligando' and conversa_id = pg_temp.id('ligou')
+              and pessoa_id in ('a0000000-0000-4000-8000-000000013001'::uuid,
+                                'a0000000-0000-4000-8000-000000013002'::uuid)), 2::bigint,
+  'cliente ligando avisa todos que atendem, mesmo com a conversa tendo dono');
+select is((select corpo from app.push_fila
+            where tipo = 'ligando' and conversa_id = pg_temp.id('ligou')
+              and pessoa_id = 'a0000000-0000-4000-8000-000000013002'::uuid),
+  'Cliente ligou está ligando pelo WhatsApp', 'o aviso diz quem está ligando, pelo nome');
+select is(pg_temp.avisos('ligando', 'a0000000-0000-4000-8000-000000013003'::uuid), 0::bigint,
+  'quem silenciou a conversa não é avisado da ligação');
+select ok(not exists (select 1 from app.push_fila
+                       where tipo = 'ligando' and conversa_id = pg_temp.id('ligou_antes')),
+  'ligação que começou há mais de 1 minuto não vira aviso de "está ligando"');
+
+insert into public.aparelhos_push (token, pessoa_id, plataforma, empresa, empresa_nome)
+values ('ExponentPushToken[pgtap130ligando00000]', 'a0000000-0000-4000-8000-000000013001'::uuid,
+        'ios', 'imova', 'Imova');
+insert into app.push_fila (pessoa_id, tipo, chave, corpo, caminho, criado_em)
+values ('a0000000-0000-4000-8000-000000013001'::uuid, 'ligando', 'ligando:pgtap130:velho',
+        'Fulano está ligando pelo WhatsApp', '/conversas', now() - interval '70 seconds');
+select app.avisos_push_enviar();
+select is((select resultado from app.push_fila where chave = 'ligando:pgtap130:velho'), 'vencido',
+  '"está ligando" que não saiu em 1 minuto não sai mais');
 
 -- ---------------------------------------------------------------------
 -- 7. A chave geral

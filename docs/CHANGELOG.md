@@ -8868,3 +8868,26 @@ Pedido do usuário: cada empresa tem os seus avisos. "Não faz sentido chegar um
   - sair da conta desliga o celular em todas.
   - Testado: registrado na KOMUNE, apareceu na Imova; saiu na KOMUNE, sumiu das duas; pedido falso recusado. pgTAP 130 com 30 testes, e 2 novos testes da assinatura.
 - **Conferido pelo usuário no iPhone (06/11/2026, 12h58, Expo Go):** com o app aberto na Imova, chegaram as duas notificações, "Nova mensagem de Maria (teste)" pela Imova e "Nova mensagem de DJ Done" pela KOMUNE ("Chegaram as duas"). O iPhone se registrou na Imova ao abrir e foi levado sozinho à KOMUNE, no mesmo segundo. Antes disso, duas da Imova (12h48 e 12h49) também foram aceitas pelo Expo.
+
+## 06/11/2026 — Aviso de cliente ligando pelo WhatsApp, só na Imova (branch `app-celular`; RF-CON-18, RF-CON-05)
+
+Pergunta do usuário: "Existe notificação para quando alguém está ligando?". Até aqui, só a ligação perdida. Ele escolheu a opção 1 (aviso comum), para entrar antes de publicar, e pediu para deixar anotada a opção 2 (tela de chamada igual à do WhatsApp), que será usada em breve.
+
+**Entregue (na mesma migração `20261106120000`, ainda não publicada):**
+- **Novo aviso "Cliente ligando"** (`ligando`), só no catálogo da Imova. Diz "Fulano está ligando pelo WhatsApp". Tocar no aviso abre a conversa, e o CRM aberto mostra a ligação para atender.
+- **Quem recebe:** todos que atendem, como a ligação toca no navegador de todos, mesmo com a conversa tendo dono. Quem silenciou a conversa fica de fora.
+- **Como a varredura decide:** lê `wa_chamadas` recebida e `tocando`, começada há menos de 1 minuto. Nenhum gatilho foi posto na tabela; o WhatsApp não é tocado.
+- **Aviso que chega atrasado não sai:**
+  - o que não sai em 1 minuto vira `vencido`;
+  - o Expo recebe `ttl` de 60 s, então o celular desligado não mostra "está ligando" quando volta.
+- **Horário:** segue a regra aprovada: das 8h às 20h com som, fora disso sem som.
+- **Pode ser desligado** pela pessoa na tela "Avisos no celular".
+- **Verificado:**
+  - pgTAP 130 com 35 testes, passando no banco local da KOMUNE e no da Imova. O teste do resumo das 8h agora fixa a KOMUNE, porque no banco da Imova o texto fala de visitas.
+  - No banco local da Imova, uma ligação fictícia na conversa "Teste do Aviso" virou aviso em 9 segundos, e o Expo aceitou o envio ao iPhone de teste.
+
+**Não testado:** atender pelo próprio app. A ligação de voz só funciona com a Meta de verdade, e até hoje só se atendeu pelo navegador do computador. Testar com celulares nossos depois de publicar.
+
+**Pendente:**
+- Publicar junto com o resto dos avisos (banco e site), só com pedido do usuário.
+- **Opção 2, "em breve": a tela de chamada igual à do WhatsApp.** Plano no guia `docs/operacao/app-celular.md`, etapa 5: aviso de voz da Apple (PushKit), tela de chamada do iPhone (CallKit) e áudio no nativo. É uma versão nova do app.
