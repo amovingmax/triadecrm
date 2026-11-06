@@ -1,7 +1,17 @@
 'use client';
 
-import { Bell, BellOff, ChevronDown, LogOut, MonitorDown, Volume2, VolumeX } from 'lucide-react';
-import { useRef, useState } from 'react';
+import {
+  Bell,
+  BellOff,
+  ChevronDown,
+  LogOut,
+  MonitorDown,
+  Smartphone,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useRef, useState, useSyncExternalStore } from 'react';
 
 import { avisarDaPermissao } from '@/components/avisos/convite-de-avisos';
 import { instalarApp, type Navegador, useComoInstalar } from '@/components/avisos/instalar-app';
@@ -29,6 +39,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { lerFilaDaPessoa, limparFilaAoSair } from '@/components/registro/fila-offline';
 import type { RegistroNaFila } from '@/components/registro/tipos';
+import { estouNoApp } from '@/lib/auth/entrada-pelo-app';
 import { ROTULO_PAPEL } from '@/lib/auth/role';
 import { type Sessao } from '@/lib/auth/session';
 
@@ -70,7 +81,19 @@ import { type Sessao } from '@/lib/auth/session';
  * navegador oferece a instalação, abre a pergunta dele; quando não oferece, o passo
  * a passo daquele navegador (`components/avisos/instalar-app.ts`).
  */
+// Dentro do app de celular? O servidor não sabe (renderiza como navegador); o
+// navegador responde depois da hidratação, sem descompasso.
+const nadaAssinar = () => () => {};
+function useNoApp(): boolean {
+  return useSyncExternalStore(
+    nadaAssinar,
+    () => estouNoApp(navigator.userAgent),
+    () => false,
+  );
+}
+
 export function UserMenu({ sessao }: { sessao: Sessao }) {
+  const noApp = useNoApp();
   const formSair = useRef<HTMLFormElement>(null);
   const rotuloPapel = ROTULO_PAPEL[sessao.papel];
   const [naoSubiram, setNaoSubiram] = useState<readonly RegistroNaFila[]>([]);
@@ -216,6 +239,18 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
               <DropdownMenuItem className="min-h-11 md:min-h-0" onSelect={instalar}>
                 <MonitorDown aria-hidden="true" />
                 Instalar o Tríade neste computador
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          {/* Só no app de celular: os avisos dele são escolhidos por pessoa (06/11/2026). */}
+          {noApp ? (
+            <>
+              <DropdownMenuItem className="min-h-11 md:min-h-0" asChild>
+                <Link href="/avisos-no-celular">
+                  <Smartphone aria-hidden="true" />
+                  Avisos no celular
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>

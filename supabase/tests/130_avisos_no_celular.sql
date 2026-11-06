@@ -14,13 +14,18 @@
 --   4. O LEMBRETE sai 30 min antes da reunião;
 --   5. O MESMO FATO NÃO VIRA DOIS AVISOS, e sem aparelho nada é mandado;
 --   6. O WHATSAPP NÃO É TOCADO: a varredura não grava mensagem nenhuma;
---   7. A CHAVE GERAL desliga tudo.
+--   7. A CHAVE GERAL desliga tudo;
+--   8. CADA EMPRESA TEM O SEU CATÁLOGO (entrevista de 06/11/2026): lote, robô e
+--      publicado só na KOMUNE; ligação perdida só na Imova;
+--   9. CADA PESSOA DESLIGA O QUE QUISER, e o desligado não sai;
+--  10. A RESPOSTA ATRASADA avisa quem atende, uma vez, 24 h depois;
+--  11. O RESUMO DAS 8H fala do dia da pessoa.
 --
 -- Roda em transação e desfaz tudo (inclusive o pedido ao Expo, que o pg_net só
 -- faria depois do commit).
 -- =====================================================================
 begin;
-select plan(19);
+select plan(28);
 
 insert into public.allowed_users (email, role, note) values
   ('p130.g1@teste.local', 'gestor', 'pgTAP avisos'),
@@ -212,15 +217,81 @@ select is(pg_temp.avisos('lembrete', 'a0000000-0000-4000-8000-000000013001'::uui
 -- 5 e 6. Sem repetição, sem aparelho nada sai, e o WhatsApp fica como estava
 -- ---------------------------------------------------------------------
 select is(app.avisos_push_varrer(), 0, 'varrer de novo não repete aviso nenhum');
+
+-- 9. Gabi desliga "Mensagem nova" para si.
+select pg_temp.entrar('a0000000-0000-4000-8000-000000013002'::uuid, 'gestor');
+select public.avisos_definir('mensagem', false);
+select is((select ligado from public.avisos_meus() where tipo = 'mensagem'), false,
+  'a tela "Avisos no celular" mostra o aviso desligado');
+select throws_ok($$select public.avisos_definir('lead_inventado', false)$$, '22023', null,
+  'aviso que não existe nesta empresa não se desliga');
+select pg_temp.sair();
+
 select app.avisos_push_enviar();
+select ok(not exists (select 1 from app.push_fila
+                       where pessoa_id = 'a0000000-0000-4000-8000-000000013002'::uuid
+                         and tipo = 'mensagem' and resultado <> 'desligado'),
+  'o aviso desligado pela pessoa não sai');
 select ok(not exists (select 1 from app.push_fila
                        where pessoa_id in ('a0000000-0000-4000-8000-000000013001'::uuid,
                                            'a0000000-0000-4000-8000-000000013002'::uuid,
                                            'a0000000-0000-4000-8000-000000013003'::uuid)
-                         and coalesce(resultado, '') <> 'sem_aparelho'),
+                         and coalesce(resultado, '') not in ('sem_aparelho', 'desligado')),
   'sem aparelho registrado, nada é mandado ao Expo');
 select is((select count(*) from public.messages where direction = 'out'), (select n from t130_saida),
   'os avisos não gravam mensagem nenhuma: o WhatsApp não é tocado');
+
+-- ---------------------------------------------------------------------
+-- 10. A resposta atrasada: o cliente escreveu há 24 h e ninguém respondeu
+-- ---------------------------------------------------------------------
+select pg_temp.conversa('esquecida', '+5584900013004', false);
+select pg_temp.chega('esquecida');
+update public.conversations set last_inbound_at = now() - interval '24 hours 5 minutes'
+ where id = pg_temp.id('esquecida');
+select app.avisos_push_varrer();
+select is((select corpo from app.push_fila
+            where tipo = 'atrasada' and conversa_id = pg_temp.id('esquecida')
+              and pessoa_id = 'a0000000-0000-4000-8000-000000013001'::uuid),
+  'Cliente esquecida espera resposta há 24 h', 'a resposta atrasada avisa quem atende a conversa');
+select is((select count(*) from app.push_fila
+            where tipo = 'atrasada' and conversa_id = pg_temp.id('esquecida')), 1::bigint,
+  'com alguém atendendo, só essa pessoa é avisada do atraso');
+
+-- ---------------------------------------------------------------------
+-- 11. O resumo das 8h
+-- ---------------------------------------------------------------------
+insert into public.tasks (title, kind, status, due_at, assignee_id, created_by)
+values ('Visita ao Salão Azul', 'visit', 'todo',
+        ((now() at time zone 'America/Fortaleza')::date + time '23:59') at time zone 'America/Fortaleza',
+        'a0000000-0000-4000-8000-000000013003'::uuid, 'a0000000-0000-4000-8000-000000013001'::uuid);
+select app.avisos_push_resumo();
+select matches((select corpo from app.push_fila
+                 where tipo = 'resumo' and pessoa_id = 'a0000000-0000-4000-8000-000000013003'::uuid),
+  '^Bom dia! .*você tem 1 compromisso hoje, às 23:59$',
+  'o resumo das 8h conta o compromisso do dia, com a hora');
+select is(app.avisos_push_resumo(), (select count(*)::integer from app.push_fila where tipo = 'resumo'),
+  'o resumo sai uma vez por dia para cada pessoa');
+
+-- ---------------------------------------------------------------------
+-- 8. O catálogo de cada empresa
+-- ---------------------------------------------------------------------
+create function pg_temp.virar(p_empresa text) returns void language plpgsql as $$
+begin
+  alter table app.identidade disable trigger identidade_imutavel;
+  alter table app.identidade disable trigger identidade_imutavel_truncate;
+  delete from app.identidade;
+  insert into app.identidade (empresa) values (p_empresa);
+  alter table app.identidade enable trigger identidade_imutavel;
+  alter table app.identidade enable trigger identidade_imutavel_truncate;
+end $$;
+select pg_temp.virar('komune');
+select ok((select array_agg(tipo) from app.avisos_catalogo()) @> array['mensagem', 'resumo', 'lote', 'reuniao_robo', 'publicado']
+          and not exists (select 1 from app.avisos_catalogo() where tipo = 'ligacao_perdida'),
+  'na KOMUNE: os comuns, lote, reunião do robô e parceiro publicado; sem ligação perdida');
+select pg_temp.virar('imova');
+select ok((select array_agg(tipo) from app.avisos_catalogo()) @> array['mensagem', 'resumo', 'ligacao_perdida']
+          and not exists (select 1 from app.avisos_catalogo() where tipo in ('lote', 'reuniao_robo', 'publicado')),
+  'na Imova: os comuns e a ligação perdida; nada de lote nem de parceiro publicado');
 
 -- ---------------------------------------------------------------------
 -- 7. A chave geral

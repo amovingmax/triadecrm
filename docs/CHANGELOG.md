@@ -8825,3 +8825,40 @@ Decisões do usuário (05/11/2026): avisar **mensagem nova de cliente ou parceir
 - O primeiro aviso de verdade no iPhone, pelo teste do Mac (Expo Go).
 - Na versão do TestFlight, conferir se a chave de push da Apple está no Expo. Se não estiver, criá-la ou reaproveitar a da conta (limite de 2 por conta).
 - Publicar: banco (com o pg_net) e site das duas empresas, com a comparação tela a tela antes, e montar a versão 2 do app.
+
+## 06/11/2026 — Avisos no celular por empresa (entrevista com o usuário) (branch `app-celular`; RF-CON-05, PRD §8)
+
+Pedido do usuário: cada empresa tem os seus avisos. "Não faz sentido chegar um push de venda de imóvel na Komune." O app recebe os das duas empresas, qualquer que seja a aberta. O catálogo foi fechado numa entrevista em quatro rodadas.
+
+**Catálogo aprovado** (`app.avisos_catalogo`, pela empresa de `app.identidade`):
+- **Comuns:**
+  - mensagem nova (regra do computador);
+  - conversa transferida (quem recebeu);
+  - compromisso marcado por outra pessoa (quem vai);
+  - lembrete 30 min antes (toca sempre);
+  - **resposta atrasada de 24 h** (quem atende; sem dono, todos);
+  - **resumo das 8h**, de segunda a sábado.
+- **Só KOMUNE:**
+  - **lote para ligar** ("Gil montou um lote de 30 ligações para você", pelo `audit_log` de `call_batches`);
+  - **reunião marcada pelo robô** (dono da reunião);
+  - **parceiro publicado na Komune** (responsável pelo negócio; sem ele, admin e gestor; evento `published`).
+  - O resumo traz conversas esperando e compromissos do dia.
+- **Só Imova:**
+  - **ligação perdida pelo WhatsApp** (`wa_chamadas` recebida e perdida; quem atende, sem dono todos).
+  - O resumo traz conversas, visitas e compromissos, e ligações perdidas desde ontem.
+  - **Lead novo dos portais** e **anúncio com problema** foram aprovados e entram junto com o ramo `anuncios-canal-pro`, que ainda não está na main.
+
+**Também entregue:**
+- **Horário:** das 8h às 20h (Fortaleza) o aviso toca; fora disso vai sem som, menos o lembrete. O serviço do Expo não confirma o modo "passivo" do iPhone, então o fora de hora chega sem som, mas chega.
+- **Tela "Avisos no celular"** (`/avisos-no-celular`, no menu da pessoa, só no app): uma chave por aviso da empresa (`public.avisos_meus`, `public.avisos_definir`, `public.avisos_desligados`). O aviso desligado não sai.
+- **Verificado:**
+  - nos dois bancos de teste, cada um com o seu catálogo;
+  - o resumo saiu ("Bom dia! 5 conversas esperam resposta");
+  - pgTAP 130 com 28 testes (catálogo das duas empresas, desligar, atraso e resumo);
+  - tipos, lint e testes do site;
+  - foto da tela no tamanho do iPhone.
+
+**Pendente:**
+- Lead novo e anúncio com problema, quando os Anúncios entrarem na main.
+- O primeiro aviso de cada tipo no iPhone de verdade.
+- Publicar banco e site das duas empresas, com a comparação tela a tela antes, e a versão 2 do app.
