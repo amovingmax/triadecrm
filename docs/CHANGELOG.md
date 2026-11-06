@@ -9377,3 +9377,36 @@ Pedido do usuário: o que foi publicado hoje deve aparecer também no teste do a
 - Site da Imova `imova-3tdrfix2c` (de `97b4c1d`, cópia limpa); volta: `imova-6k5lfuru8`. `/auth/dev/cliente` continua 404.
 - `imova-worker-ai` v4 no Fly; volta: v3.
 - Conferido em produção: modelo `claude-haiku-5-5` (a migração trocou o Sonnet que a tela tinha escolhido), pingue-pongue 8 s, 6 falas por conversa para os outros robôs, `wa_bot_falas` sem as respostas da IA, `ia_atende` olhando a pausa, passar no treino, `ia_procurar_conversas`, teto US$ 30, batidas de vida do worker de IA e do robô do WhatsApp em segundos. IA ligada, modo treino, **ainda sem conversa de treino**. KOMUNE intocada.
+
+## 06/11/2026 (noite) — Avisos no celular, logos no login do app e troca de empresa sem novo login em produção, nas duas empresas
+
+Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele escolheu publicar tudo junto: banco e site das duas empresas e a versão 2 do app. Os Relatórios da Imova ficaram de fora ("só na próxima build").
+
+- **Ar conferido antes:**
+  - KOMUNE `triade-khq601hqt`, em `9d4c39b`;
+  - Imova `imova-3tdrfix2c`, em `97b4c1d`;
+  - os dois commits já estavam dentro da `app-celular`.
+- **Comparação tela a tela** (`~/triadecrm-capturas/2026-11-06-19-33`), do ar `9d4c39b` contra a nova `03fb0b4`:
+  - 87 de 88 telas iguais e 0 reprovadas;
+  - a única diferença é o ruído conhecido da conversa aberta ("2 mensagens não lidas" marcadas como lidas pela primeira visita).
+- **`main` = `b1c5207`**, por avanço direto: a `app-celular` já continha a main inteira. A pasta `apps/app` entra na main, fora do workspace da raiz, com o job próprio no CI.
+- **Banco da Imova** (`publicar-banco.mjs imova migrar`): só a `20261106210000`. Conferido: `avisos_push` a cada 10 s sem falha, `avisos_push_resumo` às 8h, catálogo com `ligando` e `ligacao_perdida`.
+- **Banco da KOMUNE** (`publicar-banco.mjs komune migrar`): 17 migrações, 190 no banco.
+  - São as 11 dos Anúncios e as 5 da IA que atende, que na KOMUNE só se registram, e mais a dos avisos.
+  - Conferido em produção: a porteira (`messages_guard`) e o teto do robô (`wa_bot_falas`) sem nada da IA, pingue-pongue em 20 s, sem tabela da IA.
+  - Catálogo da KOMUNE com `lote`, `reuniao_robo` e `publicado`, e as duas rotinas ligadas.
+- **Sites**, de cópias limpas de `b1c5207`:
+  - Imova: `imova-b4i211oym` (volta: `imova-3tdrfix2c`);
+  - KOMUNE: `triade-npxd0dvhb`, em `triade-crm-tawny.vercel.app` e `ir.komune.app.br` (volta: `triade-khq601hqt`).
+- **Conferido de fora nas duas:**
+  - `/login` 200 e `/auth/dev` 404;
+  - `/avisos-no-celular` e `/anuncios` pedem login;
+  - `/api/empresas/aparelho` e `/api/empresas/entrada` respondem 400 a pedido vazio;
+  - `/marca/komune.png` 200;
+  - o login mostra as duas logos só para o app (`TriadeApp/0.2.0`); no navegador, nada muda.
+
+**App, versão 0.2.0:**
+- O primeiro build (`d243f30a`, número 3) foi **cancelado** antes de começar.
+  - Pela App Store Connect API, o identificador `app.triade.ios` só tinha `IN_APP_PURCHASE`, sem `PUSH_NOTIFICATIONS`.
+  - O perfil de assinatura reaproveitado era o da versão 1. O build sem login na Apple não liga a permissão nem refaz o perfil, e a assinatura com avisos falharia.
+- **Falta (com o usuário, no Terminal dele):** o build interativo com login na Apple. Ele liga as notificações no identificador, refaz o perfil e configura (ou reaproveita) a chave de avisos da Apple. Depois o envio ao TestFlight segue sozinho.
