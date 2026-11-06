@@ -498,14 +498,17 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
             : 'Nenhuma ainda. Procure a conversa do Janio Ramalho.'}
         </p>
         <label htmlFor={idBusca} className="text-xs text-muted-foreground">
-          Procurar pelo nome
+          Procurar pelo nome ou telefone
         </label>
         <Input id={idBusca} value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Janio" />
         {achadas.data && achadas.data.length > 0 ? (
           <ul className="flex flex-col gap-1">
             {achadas.data.map((c) => (
               <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
-                <span className="truncate">{c.nome}</span>
+                <span className="min-w-0 truncate">
+                  {c.nome}
+                  {c.telefone ? <span className="ml-1.5 text-xs text-muted-foreground">{c.telefone}</span> : null}
+                </span>
                 <Button
                   type="button"
                   size="sm"
@@ -521,8 +524,10 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
               </li>
             ))}
           </ul>
+        ) : achadas.isError ? (
+          <p className="text-xs text-destructive">Não deu para procurar agora. Tente de novo.</p>
         ) : busca.trim().length >= 2 && !achadas.isPending ? (
-          <p className="text-xs text-muted-foreground">Nenhuma conversa com esse nome.</p>
+          <p className="text-xs text-muted-foreground">Nenhuma conversa com esse nome ou telefone.</p>
         ) : null}
       </div>
 
@@ -582,8 +587,9 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
           onChange={(e) => salvar.mutate({ modelo: e.target.value })}
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
         >
-          <option value="claude-opus-5-5">Claude Opus 5.5: o mais capaz (cerca de 1 a 5 centavos de dólar por resposta)</option>
-          <option value="claude-sonnet-5-5">Claude Sonnet 5.5: metade do custo</option>
+          <option value="claude-haiku-5-5">Claude Haiku 5.5: o mais econômico (menos de 0,2 centavo de dólar por resposta)</option>
+          <option value="claude-sonnet-5-5">Claude Sonnet 5.5: intermediário (metade do custo do Opus)</option>
+          <option value="claude-opus-5-5">Claude Opus 5.5: o mais capaz (cerca de 1 a 6 centavos de dólar por resposta)</option>
         </select>
       </div>
     </section>

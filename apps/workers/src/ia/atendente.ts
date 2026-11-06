@@ -100,7 +100,8 @@ const baseDoBanco = z.object({
 });
 
 /** Os modelos que a configuração pode escolher; qualquer outro valor fica no padrão. */
-const MODELOS_DO_ATENDENTE = new Set<string>([MODELOS.opus55, MODELOS.sonnet55]);
+// O Haiku 5.5 desde 06/11/2026, a pedido do usuário (economia; migração 20261106180000).
+const MODELOS_DO_ATENDENTE = new Set<string>([MODELOS.haiku55, MODELOS.sonnet55, MODELOS.opus55]);
 
 export interface ResultadoDoAtendente {
   readonly feito: boolean;

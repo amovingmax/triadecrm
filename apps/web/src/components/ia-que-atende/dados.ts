@@ -178,12 +178,16 @@ export async function avaliarResposta(
 // A tela "IA que atende"
 // ---------------------------------------------------------------------------
 
+/** Os modelos que a tela oferece; o Haiku 5.5 é o de hoje (06/11/2026, para economizar). */
+export type ModeloDaIa = 'claude-haiku-5-5' | 'claude-sonnet-5-5' | 'claude-opus-5-5';
+const MODELOS_DA_IA: readonly ModeloDaIa[] = ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'];
+
 export interface ConfiguracaoDaIa {
   readonly ligada: boolean;
   readonly modo: 'treino' | 'clientes';
   readonly conversaDeTreino: string | null;
   readonly assinatura: string;
-  readonly modelo: 'claude-opus-5-5' | 'claude-sonnet-5-5';
+  readonly modelo: ModeloDaIa;
   readonly setorCorretores: number | null;
   readonly avisoCorretor: string;
   readonly ligadaEm: string | null;
@@ -229,7 +233,7 @@ export async function carregarPainel(dias = 7): Promise<PainelDaIa | null> {
       modo: c.modo === 'clientes' ? 'clientes' : 'treino',
       conversaDeTreino: texto(c.conversa_de_treino),
       assinatura: texto(c.assinatura) ?? 'Imova',
-      modelo: c.modelo === 'claude-sonnet-5-5' ? 'claude-sonnet-5-5' : 'claude-opus-5-5',
+      modelo: MODELOS_DA_IA.find((m) => m === c.modelo) ?? 'claude-opus-5-5',
       setorCorretores: c.setor_corretores === null || c.setor_corretores === undefined ? null : numero(c.setor_corretores),
       avisoCorretor: texto(c.aviso_corretor) ?? '',
       ligadaEm: texto(c.ligada_em),
@@ -325,23 +329,24 @@ export async function carregarSetores(): Promise<Setor[]> {
 export interface ConversaAchada {
   readonly id: string;
   readonly nome: string;
+  /** Mascarado (+55 84 •••••-••12), para distinguir dois contatos de mesmo nome. */
+  readonly telefone: string | null;
 }
 
-/** Procura a conversa do treino pelo nome (da ficha ou do perfil do WhatsApp). */
+/**
+ * A busca da conversa do treino: sem acento e sem maiúscula, no nome do contato e no
+ * da ficha, ou pelos dígitos do telefone (`public.ia_procurar_conversas`, 06/11/2026).
+ */
 export async function procurarConversas(termo: string): Promise<ConversaAchada[]> {
-  const limpo = termo.trim().replace(/[%_,()]/g, ' ');
+  const limpo = termo.trim();
   if (limpo.length < 2) return [];
-  const { data, error } = await createClient()
-    .from('conversations')
-    .select('id, peer_nome, organizations(name)')
-    .or(`peer_nome.ilike.%${limpo}%`)
-    .order('last_message_at', { ascending: false, nullsFirst: false })
-    .limit(8);
+  const { data, error } = await createClient().rpc('ia_procurar_conversas' as never, { p_termo: limpo } as never);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map((c) => {
-    const org = (c.organizations ?? null) as Record<string, unknown> | null;
-    return { id: String(c.id), nome: texto(org?.name) ?? texto(c.peer_nome) ?? 'Sem nome' };
-  });
+  return ((data ?? []) as Record<string, unknown>[]).map((c) => ({
+    id: String(c.id),
+    nome: texto(c.nome) ?? 'Sem nome',
+    telefone: texto(c.telefone),
+  }));
 }
 
 export function linkDaConversa(r: { organizacaoId: string | null; conversaId: string }): string {
