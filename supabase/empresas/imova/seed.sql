@@ -634,6 +634,32 @@ update public.app_settings
  where key = 'ia.orcamento';
 
 -- =====================================================================
+-- 12j. A IA juíza dos relatórios (06/11/2026): só da Imova. Pedido do
+--      usuário: saber se a IA que atende "está tirando dúvidas melhores,
+--      entregando informações interessantes" e deixando o cliente mais
+--      interessado. Toda manhã, às 6h15 de Natal (9h15 UTC), cada conversa em
+--      que a IA respondeu num dia que já acabou (até 7 dias para trás) e que
+--      ainda não tem nota entra na fila; o worker de IA lê o dia com o Claude
+--      Haiku 5.5 e dá nota de 1 a 5 para tirou a dúvida, informação útil e
+--      cliente satisfeito, com o porquê (`ia_atendimento_notas`). Custo
+--      previsto abaixo de US$ 2 por mês, dentro do teto de 12i. A conversa do
+--      treino fica de fora. `on conflict do nothing`: rodar de novo não
+--      desliga o que alguém desligou.
+-- =====================================================================
+insert into public.app_settings (key, value, description) values
+  ('ia.juiza',
+   '{"ligada": true, "dias_para_tras": 7, "por_rodada": 200}'::jsonb,
+   'A IA juíza dos relatórios, só da Imova (06/11/2026). ligada: põe na fila, toda manhã, as conversas que a IA que atende respondeu nos dias anteriores. dias_para_tras: até quantos dias para trás ainda avalia (o worker pode ter ficado desligado). por_rodada: quantas conversas por manhã, no máximo.')
+on conflict (key) do update set description = excluded.description;
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('ia_juiza_enfileirar', '15 9 * * *',
+                          $cron$select app.ia_juiza_enfileirar()$cron$);
+  end if;
+end $$;
+
+-- =====================================================================
 -- 13. Autoverificação. Qualquer falta aborta com o nome do problema.
 -- =====================================================================
 do $$

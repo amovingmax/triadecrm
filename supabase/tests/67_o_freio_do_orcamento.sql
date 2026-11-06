@@ -85,18 +85,31 @@ select ok((app.ia_pode_gastar('transcribe_audio') ->> 'pode')::boolean,
 
 -- Aqui, e não depois do teto: passada a linha do freio param os 14, e a
 -- partição deixaria de ser visível.
-select is(app.ia_gasto_bloqueado_para(), array['analisar_conversa','assistant','digest',
-          'draft_followup','draft_reply','extract_listing','next_action','perguntar_ao_crm',
-          'pulso_do_dia','summarize_call','summarize_deal','triar_candidato']::text[],
-  'os 12 que param na linha de alerta, nomeados um a um: propósito novo derruba este teste');
+-- Os propósitos só da Imova (o canal de chegada, 20261106130000, e a IA juíza
+-- dos relatórios, 20261106200000) existem no banco dela e no CI (sem
+-- identidade); no da KOMUNE as migrações não os criam. Cada um conta se está na
+-- lista de `ai_runs.purpose` deste banco — qualquer outro propósito novo
+-- continua derrubando o teste.
+create function pg_temp.so_da_imova() returns text[] language sql stable as $$
+  select coalesce(array_agg(p order by p), array[]::text[])
+    from unnest(array['identificar_canal', 'avaliar_atendimento']) p
+   where (select pg_get_constraintdef(c.oid) from pg_constraint c
+           where c.conname = 'ai_runs_purpose_check') like '%''' || p || '''%'
+$$;
+select is(app.ia_gasto_bloqueado_para(),
+          (select array_agg(p order by p) from unnest(array['analisar_conversa','assistant','digest',
+             'draft_followup','draft_reply','extract_listing','next_action','perguntar_ao_crm',
+             'pulso_do_dia','summarize_call','summarize_deal','triar_candidato'] || pg_temp.so_da_imova()) p),
+  'os 12 que param na linha de alerta (mais os só da Imova, onde existem), nomeados um a um: propósito novo derruba este teste');
 
 select pg_temp.gastar(12);                                   -- total US$ 61
 select ok(not (app.ia_pode_gastar('classify_inbound') ->> 'pode')::boolean,
   'com US$ 61 de 60, nem classify_inbound passa');
 select is(app.ia_pode_gastar('classify_inbound') ->> 'motivo', 'orcamento_esgotado',
   'e o motivo é o teto, não a linha de alerta: são prazos diferentes');
-select is(array_length(app.ia_gasto_bloqueado_para(), 1), 14,
-  'passada a linha do freio, param os 14 — inclusive os dois do atendimento');
+select is(array_length(app.ia_gasto_bloqueado_para(), 1),
+          14 + coalesce(array_length(pg_temp.so_da_imova(), 1), 0),
+  'passada a linha do freio, param os 14 (mais os só da Imova) — inclusive os dois do atendimento');
 
 -- =====================================================================
 -- 3. A FILA RECUSA — e a recusa é valor, não exceção
@@ -165,7 +178,8 @@ end $$;
 select pg_temp.entrar('00000000-0000-4000-8000-000000000067'::uuid, 'admin');
 select is((public.ia_orcamento_status() ->> 'freado')::boolean, true,
   'o painel sabe que o mês está freado');
-select is((public.ia_orcamento_status() ->> 'parados')::int, 14,
+select is((public.ia_orcamento_status() ->> 'parados')::int,
+          14 + coalesce(array_length(pg_temp.so_da_imova(), 1), 0),
   'e conta quantos propósitos o freio está recusando agora');
 select pg_temp.sair();
 
