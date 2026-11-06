@@ -587,6 +587,38 @@ begin
 end $$;
 
 -- =====================================================================
+-- 12h. A IA que atende o cliente sozinha (06/11/2026): só da Imova. Nasce
+--      DESLIGADA, no modo treino e sem conversa de treino: quem liga é a
+--      gestão, na tela (IA que atende → Configuração), escolhendo a conversa
+--      do Janio. Assina "Imova", usa o Claude Opus 5.5 (o mais capaz para
+--      conversar; o Sonnet 5.5 custa metade e se escolhe na mesma tela),
+--      espera 15 s sem mensagem nova do cliente antes de responder e fala no
+--      máximo 20 vezes por hora numa conversa. `on conflict do nothing`: rodar
+--      o bloco de novo não desfaz o que a tela configurou. A fila confere a
+--      cada 10 segundos.
+-- =====================================================================
+insert into public.app_settings (key, value, description) values
+  ('ia.atendente',
+   '{"ligada": false,
+     "modo": "treino",
+     "conversa_de_treino": null,
+     "assinatura": "Imova",
+     "modelo": "claude-opus-5-5",
+     "espera_seg": 15,
+     "teto_por_hora": 20,
+     "setor_corretores": null,
+     "aviso_corretor": "Certo! Já vou te passar para um dos nossos corretores, que continua o atendimento com você por aqui."}'::jsonb,
+   'A IA que atende o cliente sozinha, só da Imova (06/11/2026). ligada: a chave-mestra. modo: treino (só a conversa_de_treino) ou clientes (toda conversa em que o time ainda não escreveu, mais as que alguém ligar). assinatura: o nome em negrito em cima de cada mensagem. modelo: claude-opus-5-5 ou claude-sonnet-5-5. espera_seg: quanto tempo sem mensagem nova do cliente antes de responder. teto_por_hora: respostas por conversa por hora. setor_corretores: o setor que recebe quando a IA passa (null = fica com quem atende). aviso_corretor: o aviso de quando passa.')
+on conflict (key) do update set description = excluded.description;
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('ia_atendente_enfileirar', '10 seconds',
+                          $cron$select app.ia_atendente_enfileirar(20)$cron$);
+  end if;
+end $$;
+
+-- =====================================================================
 -- 13. Autoverificação. Qualquer falta aborta com o nome do problema.
 -- =====================================================================
 do $$
@@ -644,6 +676,17 @@ begin
   end if;
   if not exists (select 1 from public.ai_model_prices where model = 'claude-haiku-5-5') then
     raise exception 'seed imova: o Haiku 5.5 está sem preço (migração 20261104110000)';
+  end if;
+  if not exists (select 1 from public.app_settings where key = 'ia.atendente') then
+    raise exception 'seed imova: a configuração da IA que atende não existe (bloco 12h)';
+  end if;
+  if not exists (select 1 from public.ai_model_prices where model = 'claude-opus-5-5') then
+    raise exception 'seed imova: o Opus 5.5 está sem preço (migração 20261106170000)';
+  end if;
+  if exists (select 1 from pg_namespace where nspname = 'cron')
+     and not exists (select 1 from cron.job
+                      where jobname = 'ia_atendente_enfileirar' and schedule = '10 seconds') then
+    raise exception 'seed imova: a fila da IA que atende não ficou conferida a cada 10 segundos';
   end if;
   if n_cat <> 7 then raise exception 'seed imova: esperadas 7 categorias ativas, encontradas %', n_cat; end if;
   if n_pipe <> 2 then raise exception 'seed imova: esperados 2 funis, encontrados %', n_pipe; end if;
