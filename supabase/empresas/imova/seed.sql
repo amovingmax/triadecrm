@@ -619,6 +619,20 @@ begin
 end $$;
 
 -- =====================================================================
+-- 12i. O teto da IA sobe para US$ 30 por mês (06/11/2026): só da Imova.
+--      Pedido do usuário, por causa da IA que atende (cada resposta custa de
+--      US$ 0,01 a US$ 0,055; os US$ 10 de 03/11 eram para a leitura do
+--      cliente sozinha). O freio continua igual: em 80% (US$ 24) param a
+--      leitura e a IA que atende (que passa a conversa para gente), e em
+--      US$ 30 não sai chamada nenhuma. O teto do espaço da Imova na
+--      Anthropic é à parte e sobe no Console.
+-- =====================================================================
+update public.app_settings
+   set value = value || jsonb_build_object('mensal_usd', 30, 'pendente_de_aprovacao', false),
+       description = 'Orçamento mensal só de IA, em US$ (PRD §10; ADR-10). Na Imova, 30 desde 06/11/2026, decidido pelo usuário, para a leitura do cliente (Claude Haiku 5.5) e a IA que atende (Claude Opus 5.5); era 10 desde 03/11. fracao_alerta = a linha de alerta (80% do teto, US$ 24), a partir da qual param a leitura e a IA que atende (esta passa a conversa para gente); o teto inteiro é a linha do freio, a partir da qual não sai chamada nenhuma.'
+ where key = 'ia.orcamento';
+
+-- =====================================================================
 -- 13. Autoverificação. Qualquer falta aborta com o nome do problema.
 -- =====================================================================
 do $$
@@ -662,8 +676,8 @@ begin
     raise exception 'seed imova: a leitura do cliente pela IA ficou desligada';
   end if;
   if (select (value ->> 'mensal_usd')::numeric from public.app_settings where key = 'ia.orcamento')
-     is distinct from 10 then
-    raise exception 'seed imova: o teto da IA tem de ser US$ 10 (decisão de 03/11/2026)';
+     is distinct from 30 then
+    raise exception 'seed imova: o teto da IA tem de ser US$ 30 (decisão de 06/11/2026; era 10 desde 03/11)';
   end if;
   if (select (value -> 'ficha' ->> 'debounce_min')::int from public.app_settings
        where key = 'ia.crm_inteligente') is distinct from 3 then

@@ -8613,9 +8613,9 @@ Pedido do usuário: "utilizar uma IA para responder os clientes no CRM da Imova.
   - fotos das telas no computador e no celular, sem erro de página.
 
 **Pendente:**
-- **Publicar** (só com pedido): main → migração na Imova (`publicar-banco imova migrar`; na KOMUNE ela não faz nada) → só o bloco 12h do seed da Imova → site da Imova → `fly deploy` do `imova-worker-ai`. Depois, na tela, escolher a conversa do Janio e ligar.
+- **Publicar** (só com pedido): main → migração na Imova (`publicar-banco imova migrar`; na KOMUNE ela não faz nada) → só os blocos 12h e 12i do seed da Imova → site da Imova → `fly deploy` do `imova-worker-ai`. Depois, na tela, escolher a conversa do Janio e ligar.
 - **Sem a aba Anúncios em produção, a IA não conhece imóvel nenhum** (ela diz que vai confirmar com o corretor). A branch `anuncios-canal-pro` precisa subir antes ou junto.
-- **Orçamento:** o teto da IA da Imova é US$ 10 por mês e a resposta para em 80% (US$ 8). Cada resposta custou de US$ 0,01 (com cache) a US$ 0,055 (sem cache). Na semana de treino cabe; com clientes não cabe. O teto do workspace da Imova na Anthropic (US$ 15) também precisa subir, no Console.
+- **Orçamento: US$ 30 por mês** (pedido do usuário em 06/11/2026; era US$ 10 desde 03/11). Bloco 12i do seed da Imova; a autoverificação confere os 30. O freio é o mesmo: em 80% (US$ 24) param a leitura do cliente e a IA que atende (que passa a conversa para gente com o aviso padrão), e em US$ 30 não sai chamada nenhuma. Cada resposta custou de US$ 0,01 (com cache) a US$ 0,055 (sem cache): perto de 450 a 2.400 respostas no mês, conforme o cache. Aplicado no banco local; em produção continua US$ 10 até a publicação. **O teto do espaço da Imova na Anthropic (US$ 15) é à parte e precisa subir para US$ 30 no Console**, senão a Anthropic corta antes do CRM.
 - Medido só no local: a qualidade de verdade é a da semana de treino.
 - Sem `fallbacks` da API: uma recusa do modelo passa a conversa para gente.
 - Mensagem do cliente numa conversa da IA continua avisando o time (avisos e push); com clientes, rever.
@@ -8624,5 +8624,5 @@ Pedido do usuário: "utilizar uma IA para responder os clientes no CRM da Imova.
 
 **Decisão humana:**
 - Quem recebe quando a IA passa (setor dos corretores) e na agenda de quem a visita entra (hoje, na de quem atende a conversa).
-- Quando passar do treino para os clientes, e o novo teto do orçamento.
+- Quando passar do treino para os clientes (o teto do orçamento já foi decidido: US$ 30).
 - O login próprio do colaborador (hoje `contato@imovaimobiliaria.com.br`).
