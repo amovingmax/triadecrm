@@ -320,6 +320,9 @@ grant execute on function app.ia_pediu_corretor(text) to authenticated, service_
 -- mão no Canal Pro (`public.anuncios_no_canal_pro`), quando essas tabelas
 -- existem. A leitura é dinâmica e por `to_jsonb`: coluna que mudar de nome
 -- some da lista em vez de derrubar a IA, e erro vira lista vazia com aviso.
+-- O anúncio feito à mão que o relatório do Canal Pro dá como INATIVO (não está
+-- no portal; `app.canal_pro_ativo_no_relatorio`, da 20261105150000) vai como
+-- "pausado": a IA pode falar dele, mas confirma com o corretor antes da visita.
 create or replace function app.ia_atendente_imoveis()
 returns jsonb
 language plpgsql
@@ -330,6 +333,10 @@ as $$
 declare
   v_crm    jsonb := '[]'::jsonb;
   v_manual jsonb := '[]'::jsonb;
+  -- Sem a regra do relatório (banco sem a 20261105150000), tudo conta como no ar.
+  v_ativo  text := case when to_regprocedure('app.canal_pro_ativo_no_relatorio(text)') is not null
+                        then 'app.canal_pro_ativo_no_relatorio(j ->> ''situacao'')'
+                        else 'true' end;
 begin
   if to_regclass('public.anuncios') is not null then
     begin
@@ -373,10 +380,10 @@ begin
 
   if to_regclass('public.anuncios_no_canal_pro') is not null then
     begin
-      execute $q$
+      execute format($q$
         select coalesce(jsonb_agg(jsonb_build_object(
                  'codigo',        j ->> 'codigo',
-                 'situacao',      'no_ar',
+                 'situacao',      case when %s then 'no_ar' else 'pausado' end,
                  'titulo',        nullif(j ->> 'titulo', ''),
                  'tipo',          coalesce(j ->> 'tipo_crm', j ->> 'tipo'),
                  'negocio',       j ->> 'negocio',
@@ -392,7 +399,7 @@ begin
          where (j ->> 'excluido_em') is null
            and coalesce((j ->> 'no_relatorio')::boolean, true)
            and (j ->> 'anuncio_id') is null
-      $q$ into v_manual;
+      $q$, v_ativo) into v_manual;
     exception when others then
       raise warning 'ia_atendente_imoveis: não consegui ler public.anuncios_no_canal_pro: %', sqlerrm;
       v_manual := '[]'::jsonb;
@@ -402,7 +409,7 @@ begin
   return v_crm || v_manual;
 end $$;
 comment on function app.ia_atendente_imoveis() is
-  'Os imóveis que a IA que atende conhece: os da aba Anúncios (menos os excluídos) e os anúncios feitos à mão no Canal Pro que ainda não vieram para o CRM. Endereço só até onde o anúncio mostra.';
+  'Os imóveis que a IA que atende conhece: os da aba Anúncios (menos os excluídos) e os anúncios feitos à mão no Canal Pro que ainda não vieram para o CRM (os inativos no relatório vão como pausado). Endereço só até onde o anúncio mostra.';
 revoke all on function app.ia_atendente_imoveis() from public, anon, authenticated;
 
 -- A base da IA: o caderno e os imóveis, em ordem estável (é o bloco que vai

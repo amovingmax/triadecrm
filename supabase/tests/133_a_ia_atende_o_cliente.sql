@@ -27,7 +27,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(42);
+select plan(44);
 
 insert into public.allowed_users (email, role, note) values
   ('h133.g@teste.local', 'gestor', 'pgTAP 133'),
@@ -276,6 +276,19 @@ select ok(not exists (select 1 from public.ia_respostas r where r.em_resposta_a 
 select pg_temp.entrar('a0000000-0000-4000-8000-000000013303'::uuid, 'leitura');
 select is((select count(*)::int from public.ia_respostas), 0, 'leitura não vê as respostas da IA');
 select pg_temp.sair();
+
+-- ---------------------------------------------------------------------
+-- 10. O anúncio feito à mão no Canal Pro: ativo está no ar; inativo, pausado
+-- ---------------------------------------------------------------------
+insert into public.anuncios_no_canal_pro (codigo, situacao, titulo, no_relatorio) values
+  ('TST133A_IMOVA', 'Ativo', 'Casa de teste ativa', true),
+  ('TST133B_IMOVA', 'Inativo', 'Casa de teste inativa', true);
+select is((select i ->> 'situacao' from jsonb_array_elements(app.ia_atendente_imoveis()) i
+            where i ->> 'codigo' = 'TST133A_IMOVA'), 'no_ar',
+          'anúncio ativo no relatório do Canal Pro: a IA o oferece como disponível');
+select is((select i ->> 'situacao' from jsonb_array_elements(app.ia_atendente_imoveis()) i
+            where i ->> 'codigo' = 'TST133B_IMOVA'), 'pausado',
+          'anúncio inativo no relatório (fora do portal): vai como pausado, a IA confirma antes');
 
 select * from finish();
 rollback;
