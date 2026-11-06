@@ -9440,3 +9440,4 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 - **Teste direto pelo Expo:**
   - antes da chave, a recusa `InvalidCredentials`;
   - depois da chave, o envio `ok` e o recibo de entrega à Apple `ok`.
+- **Conferido pelo usuário no iPhone (06/11/2026, ~17h45, TestFlight 0.2.0 (6)):** o aviso com o título "Imova Imobiliária" chegou e, ao ser tocado, abriu as Conversas da Imova. Foi mandado direto pelo Expo, sem gravar nada no CRM.
