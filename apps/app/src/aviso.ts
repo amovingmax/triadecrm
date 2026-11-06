@@ -4,7 +4,7 @@ import { partesDoEndereco, type EmpresaDoApp } from './ambiente';
  * Os avisos no celular (push), do lado do app (06/11/2026).
  *
  * Quem decide e manda os avisos é o banco de cada empresa (migração
- * 20261106120000_avisos_no_celular, pelo serviço de push do Expo). O app faz duas coisas:
+ * 20261106210000_avisos_no_celular, pelo serviço de push do Expo). O app faz duas coisas:
  *
  *   · entrega o endereço de push deste aparelho a cada empresa em que a pessoa entra
  *     (`scriptDoAparelho`, rodado DENTRO da página, com a sessão dela): o site o grava

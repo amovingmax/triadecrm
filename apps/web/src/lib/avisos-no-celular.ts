@@ -7,7 +7,7 @@
  * empresa (`COOKIE_DO_APARELHO`): ao sair da conta, a rota `/auth/signout` o lê e
  * desliga o aparelho daquela pessoa ANTES de encerrar a sessão.
  *
- * Quem decide e manda os avisos é o banco (migração 20261106120000, `app.avisos_push_*`).
+ * Quem decide e manda os avisos é o banco (migração 20261106210000, `app.avisos_push_*`).
  * Fora do app nada disso acontece: o navegador nunca chama estas rotas.
  */
 

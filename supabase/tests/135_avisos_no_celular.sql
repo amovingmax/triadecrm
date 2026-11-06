@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — Avisos no celular (migração 20261106120000)
+-- pgTAP — Avisos no celular (migração 20261106210000)
 --
 -- Pedido de 05/11/2026: o app avisa mensagem nova, conversa transferida e
 -- compromisso marcado (com lembrete 30 min antes), com o NOME e nunca o conteúdo.

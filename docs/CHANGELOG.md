@@ -8793,7 +8793,7 @@ Pedido do usuário: a logo de cada empresa na escolha do login do app, e trocar 
 Decisões do usuário (05/11/2026): avisar **mensagem nova de cliente ou parceiro**, **conversa transferida para a pessoa** e **compromisso marcado para ela, com lembrete 30 min antes**. Lote para ligar ficou fora. Na tela de bloqueio vai **o nome, nunca o conteúdo**. Pedido de 06/11: os avisos antes de publicar qualquer coisa.
 
 **Entregue:**
-- **Banco** (migração `20261106120000_avisos_no_celular`, as duas empresas):
+- **Banco** (migração `20261106210000_avisos_no_celular`, as duas empresas):
   - `public.aparelhos_push`, gravada só por `public.aparelho_registrar` e `public.aparelho_remover`, com a sessão da pessoa;
   - `app.push_fila`, onde cada fato vira no máximo um aviso por pessoa (chave única);
   - `app.avisos_push_rodar` a cada 10 segundos pelo pg_cron. A rotina varre os últimos 2 minutos e manda ao serviço de push do Expo (grátis) com o pg_net, que a migração liga. Quando o Expo diz que o app saiu do aparelho, o aparelho é esquecido.
@@ -8816,7 +8816,7 @@ Decisões do usuário (05/11/2026): avisar **mensagem nova de cliente ou parceir
   - o toque abre a conversa ou a agenda na empresa certa, inclusive com o app fechado.
 - **Verificado:**
   - no banco de teste, uma mensagem de número fictício virou "Nova mensagem de DJ Done" só para o responsável, foi ao Expo, e o aparelho falso foi esquecido pela resposta dele. Nada saiu pelo WhatsApp;
-  - pgTAP 130 com 19 testes;
+  - pgTAP 135 com 19 testes;
   - site: registrar (204), lixo (400), sem sessão (login) e sair removendo o aparelho;
   - app: tipos, lint e 42 testes; site: 1.539 testes.
   - A bateria pgTAP inteira tem falhas antigas do banco local (dados de testes manuais, datas e migrações de outros ramos), nenhuma ligada aos avisos.
@@ -8854,7 +8854,7 @@ Pedido do usuário: cada empresa tem os seus avisos. "Não faz sentido chegar um
 - **Verificado:**
   - nos dois bancos de teste, cada um com o seu catálogo;
   - o resumo saiu ("Bom dia! 5 conversas esperam resposta");
-  - pgTAP 130 com 28 testes (catálogo das duas empresas, desligar, atraso e resumo);
+  - pgTAP 135 com 28 testes (catálogo das duas empresas, desligar, atraso e resumo);
   - tipos, lint e testes do site;
   - foto da tela no tamanho do iPhone.
 
@@ -8866,14 +8866,14 @@ Pedido do usuário: cada empresa tem os seus avisos. "Não faz sentido chegar um
   - o celular registrado numa empresa é levado às outras, por pedido assinado (finalidade `aparelho`, com a ação e o endereço de push dentro da assinatura);
   - cada empresa só o registra para quem entra lá pelo próprio banco (`public.aparelho_registrar_por_email`, só chave de serviço);
   - sair da conta desliga o celular em todas.
-  - Testado: registrado na KOMUNE, apareceu na Imova; saiu na KOMUNE, sumiu das duas; pedido falso recusado. pgTAP 130 com 30 testes, e 2 novos testes da assinatura.
+  - Testado: registrado na KOMUNE, apareceu na Imova; saiu na KOMUNE, sumiu das duas; pedido falso recusado. pgTAP 135 com 30 testes, e 2 novos testes da assinatura.
 - **Conferido pelo usuário no iPhone (06/11/2026, 12h58, Expo Go):** com o app aberto na Imova, chegaram as duas notificações, "Nova mensagem de Maria (teste)" pela Imova e "Nova mensagem de DJ Done" pela KOMUNE ("Chegaram as duas"). O iPhone se registrou na Imova ao abrir e foi levado sozinho à KOMUNE, no mesmo segundo. Antes disso, duas da Imova (12h48 e 12h49) também foram aceitas pelo Expo.
 
 ## 06/11/2026 — Aviso de cliente ligando pelo WhatsApp, só na Imova (branch `app-celular`; RF-CON-18, RF-CON-05)
 
 Pergunta do usuário: "Existe notificação para quando alguém está ligando?". Até aqui, só a ligação perdida. Ele escolheu a opção 1 (aviso comum), para entrar antes de publicar, e pediu para deixar anotada a opção 2 (tela de chamada igual à do WhatsApp), que será usada em breve.
 
-**Entregue (na mesma migração `20261106120000`, ainda não publicada):**
+**Entregue (na mesma migração `20261106210000`, ainda não publicada):**
 - **Novo aviso "Cliente ligando"** (`ligando`), só no catálogo da Imova. Diz "Fulano está ligando pelo WhatsApp". Tocar no aviso abre a conversa, e o CRM aberto mostra a ligação para atender.
 - **Quem recebe:** todos que atendem, como a ligação toca no navegador de todos, mesmo com a conversa tendo dono. Quem silenciou a conversa fica de fora.
 - **Como a varredura decide:** lê `wa_chamadas` recebida e `tocando`, começada há menos de 1 minuto. Nenhum gatilho foi posto na tabela; o WhatsApp não é tocado.
@@ -8883,7 +8883,7 @@ Pergunta do usuário: "Existe notificação para quando alguém está ligando?".
 - **Horário:** segue a regra aprovada: das 8h às 20h com som, fora disso sem som.
 - **Pode ser desligado** pela pessoa na tela "Avisos no celular".
 - **Verificado:**
-  - pgTAP 130 com 35 testes, passando no banco local da KOMUNE e no da Imova. O teste do resumo das 8h agora fixa a KOMUNE, porque no banco da Imova o texto fala de visitas.
+  - pgTAP 135 com 35 testes, passando no banco local da KOMUNE e no da Imova. O teste do resumo das 8h agora fixa a KOMUNE, porque no banco da Imova o texto fala de visitas.
   - No banco local da Imova, uma ligação fictícia na conversa "Teste do Aviso" virou aviso em 9 segundos, e o Expo aceitou o envio ao iPhone de teste.
 
 **Não testado:** atender pelo próprio app. A ligação de voz só funciona com a Meta de verdade, e até hoje só se atendeu pelo navegador do computador. Testar com celulares nossos depois de publicar.

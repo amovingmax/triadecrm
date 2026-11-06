@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: 'Avisos no celular' };
  * "Avisos no celular" (entrevista de 06/11/2026): cada pessoa liga e desliga, para si,
  * cada tipo de aviso do app. A lista é a desta empresa (`app.avisos_catalogo`): a
  * KOMUNE e a Imova têm avisos diferentes. Quem decide e manda é o banco (migração
- * 20261106120000); aqui só se escolhe.
+ * 20261106210000); aqui só se escolhe.
  */
 export default async function PaginaAvisosNoCelular() {
   await requireSession();
