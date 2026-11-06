@@ -590,8 +590,9 @@ end $$;
 -- 12h. A IA que atende o cliente sozinha (06/11/2026): só da Imova. Nasce
 --      DESLIGADA, no modo treino e sem conversa de treino: quem liga é a
 --      gestão, na tela (IA que atende → Configuração), escolhendo a conversa
---      do Janio. Assina "Imova", usa o Claude Opus 5.5 (o mais capaz para
---      conversar; o Sonnet 5.5 custa metade e se escolhe na mesma tela),
+--      do Janio. Assina "Imova", usa o Claude Haiku 5.5 (pedido do usuário
+--      no mesmo dia, para economizar: 40 vezes mais barato que o Opus 5.5;
+--      Sonnet e Opus 5.5 se escolhem na mesma tela; migração 20261106180000),
 --      espera 15 s sem mensagem nova do cliente antes de responder e fala no
 --      máximo 20 vezes por hora numa conversa. `on conflict do nothing`: rodar
 --      o bloco de novo não desfaz o que a tela configurou. A fila confere a
@@ -603,12 +604,12 @@ insert into public.app_settings (key, value, description) values
      "modo": "treino",
      "conversa_de_treino": null,
      "assinatura": "Imova",
-     "modelo": "claude-opus-5-5",
+     "modelo": "claude-haiku-5-5",
      "espera_seg": 15,
      "teto_por_hora": 20,
      "setor_corretores": null,
      "aviso_corretor": "Certo! Já vou te passar para um dos nossos corretores, que continua o atendimento com você por aqui."}'::jsonb,
-   'A IA que atende o cliente sozinha, só da Imova (06/11/2026). ligada: a chave-mestra. modo: treino (só a conversa_de_treino) ou clientes (toda conversa em que o time ainda não escreveu, mais as que alguém ligar). assinatura: o nome em negrito em cima de cada mensagem. modelo: claude-opus-5-5 ou claude-sonnet-5-5. espera_seg: quanto tempo sem mensagem nova do cliente antes de responder. teto_por_hora: respostas por conversa por hora. setor_corretores: o setor que recebe quando a IA passa (null = fica com quem atende). aviso_corretor: o aviso de quando passa.')
+   'A IA que atende o cliente sozinha, só da Imova (06/11/2026). ligada: a chave-mestra. modo: treino (só a conversa_de_treino) ou clientes (toda conversa em que o time ainda não escreveu, mais as que alguém ligar). assinatura: o nome em negrito em cima de cada mensagem. modelo: claude-haiku-5-5 (desde 06/11/2026), claude-sonnet-5-5 ou claude-opus-5-5. espera_seg: quanto tempo sem mensagem nova do cliente antes de responder. teto_por_hora: respostas por conversa por hora. setor_corretores: o setor que recebe quando a IA passa (null = fica com quem atende). aviso_corretor: o aviso de quando passa.')
 on conflict (key) do update set description = excluded.description;
 do $$
 begin

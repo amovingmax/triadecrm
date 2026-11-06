@@ -27,7 +27,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(44);
+select plan(62);
 
 insert into public.allowed_users (email, role, note) values
   ('h133.g@teste.local', 'gestor', 'pgTAP 133'),
@@ -136,6 +136,14 @@ select is(public.ia_atendente_configurar('{"ligada": "sim"}'::jsonb) ->> 'motivo
           'configurar recusa valor torto');
 select is(public.ia_atendente_configurar('{"chave_que_nao_existe": 1}'::jsonb) ->> 'motivo', 'chave_desconhecida',
           'configurar recusa chave desconhecida');
+-- O modelo: Haiku 5.5 desde 06/11/2026 (migração 20261106180000); Sonnet e Opus 5.5 na tela.
+select is(public.ia_atendente_configurar('{"modelo": "claude-haiku-4-5"}'::jsonb) ->> 'motivo', 'modelo_invalido',
+          'configurar recusa modelo fora da lista');
+select is(public.ia_atendente_configurar('{"modelo": "claude-haiku-5-5"}'::jsonb) -> 'config' ->> 'modelo', 'claude-haiku-5-5',
+          'o gestor escolhe o Haiku 5.5');
+select is((select (p.ok)::int from (select (public.ia_atendente_configurar('{"modelo": "claude-opus-5-5"}'::jsonb) ->> 'ok')::boolean as ok) p)
+          + (select (p.ok)::int from (select (public.ia_atendente_configurar('{"modelo": "claude-sonnet-5-5"}'::jsonb) ->> 'ok')::boolean as ok) p),
+          2, 'Opus e Sonnet 5.5 continuam na escolha');
 select is((public.ia_atendente_configurar(jsonb_build_object(
             'ligada', true, 'modo', 'treino', 'conversa_de_treino', pg_temp.id('treino'))) ->> 'ok')::boolean,
           true, 'o gestor liga a IA no treino, com a conversa do Janio');
@@ -289,6 +297,68 @@ select is((select i ->> 'situacao' from jsonb_array_elements(app.ia_atendente_im
 select is((select i ->> 'situacao' from jsonb_array_elements(app.ia_atendente_imoveis()) i
             where i ->> 'codigo' = 'TST133B_IMOVA'), 'pausado',
           'anúncio inativo no relatório (fora do portal): vai como pausado, a IA confirma antes');
+
+-- ---------------------------------------------------------------------
+-- 11. O teto de fala do robô (RF-CON-20) e a IA que atende (20261106190000)
+-- ---------------------------------------------------------------------
+select ok((select count(*) from public.messages m join public.ia_respostas r on r.message_id = m.id
+            where m.conversation_id = pg_temp.id('treino')) > 0
+          and app.wa_bot_falas(pg_temp.id('treino'), now() - interval '1 day') = 0,
+          'as respostas da IA que atende não contam nas 6 falas do robô por dia');
+select is((app.wa_robo_teto() ->> 'pingue_pongue_segundos')::int, 8,
+          'pingue-pongue na Imova: 8 s (gente responde "sim" em menos de 20 s)');
+select is((app.wa_robo_teto() ->> 'falas_por_conversa')::int, 6,
+          'o teto dos outros robôs continua 6 por conversa');
+
+select pg_temp.conversa('freio', '+5584999913390', 'Cliente do Freio');
+select is(app.ia_atende(pg_temp.id('freio')), true, 'com clientes, a IA atende a conversa nova');
+update public.conversations set bot_paused = true where id = pg_temp.id('freio');
+select is(app.ia_atende(pg_temp.id('freio')), false, 'robô pausado pelo freio: a IA não atende (a porteira recusaria)');
+select pg_temp.entrar('a0000000-0000-4000-8000-000000013302'::uuid, 'sdr');
+select is(public.ia_conversa_estado(pg_temp.id('freio')) ->> 'estado', 'parada',
+          'a tela mostra a IA parada quando o freio pausou o robô');
+select is((public.ia_conversa_ligar(pg_temp.id('freio')) ->> 'atende')::boolean, true,
+          'ligar a IA de novo tira a pausa e ela volta a atender');
+select pg_temp.sair();
+
+select pg_temp.conversa('saiu', '+5584999913391', 'Cliente Que Saiu');
+select public.wa_optout_registrar(pg_temp.id('saiu'), 'SAIR', false);
+select pg_temp.entrar('a0000000-0000-4000-8000-000000013302'::uuid, 'sdr');
+select is((public.ia_conversa_ligar(pg_temp.id('saiu')) ->> 'atende')::boolean, false,
+          'quem pediu para sair: ligar a IA não tira a pausa');
+select pg_temp.sair();
+select is((select bot_paused from public.conversations where id = pg_temp.id('saiu')), true,
+          'o robô continua pausado para quem pediu para sair');
+
+-- ---------------------------------------------------------------------
+-- 12. No treino, passar é simulação (20261106193000)
+-- ---------------------------------------------------------------------
+update public.app_settings set value = value || '{"modo": "treino"}'::jsonb where key = 'ia.atendente';
+select pg_temp.conversa('treino2', '+5584999913392', 'Treino Dois');
+select pg_temp.entrar('a0000000-0000-4000-8000-000000013301'::uuid, 'gestor');
+select public.ia_atendente_configurar(jsonb_build_object('conversa_de_treino', pg_temp.id('treino2')));
+select pg_temp.sair();
+select pg_temp.dele('t2m1', pg_temp.id('treino2'), 60, 'Faz por menos?');
+select is((public.ia_atendente_passar(pg_temp.id('treino2'), pg_temp.id('t2m1'), null,
+                                      'negociação de valor', null, 'regra') ->> 'ok')::boolean, true,
+          'no treino, o aviso de passar para o corretor sai');
+select is(app.ia_atende(pg_temp.id('treino2')), true,
+          'no treino, a IA continua atendendo depois de passar (o Janio segue treinando)');
+select ok(not exists (select 1 from public.tasks t where t.title like 'A IA passou o cliente para você: Treino Dois%'),
+          'no treino, passar não abre tarefa nem troca o responsável');
+
+-- ---------------------------------------------------------------------
+-- 13. Procurar a conversa do treino (20261106194000)
+-- ---------------------------------------------------------------------
+select pg_temp.entrar('a0000000-0000-4000-8000-000000013302'::uuid, 'sdr');
+select ok(exists (select 1 from public.ia_procurar_conversas('JÂNIO ramal') p where p.id = pg_temp.id('treino')),
+          'a busca acha o Janio com acento e maiúscula');
+select ok(exists (select 1 from public.ia_procurar_conversas('8813301') p where p.id = pg_temp.id('treino')),
+          'a busca acha pelos dígitos do telefone');
+select pg_temp.sair();
+select pg_temp.entrar('a0000000-0000-4000-8000-000000013303'::uuid, 'leitura');
+select is((select count(*)::int from public.ia_procurar_conversas('Janio')), 0, 'leitura não procura conversa');
+select pg_temp.sair();
 
 select * from finish();
 rollback;
