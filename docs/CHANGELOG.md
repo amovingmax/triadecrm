@@ -9503,3 +9503,11 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 - **A foto do cliente vai à Anthropic** (como o texto já ia), sem pseudonimizar: a descrição pede para não falar de rosto, documento ou placa de carro.
 
 **Para publicar, só com pedido (junto com a v2 e o freio):** rebase sobre `origin/main`; `main` + push; `publicar-banco.mjs imova migrar` (20261109120000 e 20261109130000); `fly deploy` do `imova-worker-ai` (a imagem leva o `sharp`; montada em linux/amd64 no local). O site não muda. Ao juntar a branch do canal de chegada, `imagens.ts`, `cliente.ts` e `execucao.ts` vêm iguais dos dois lados.
+
+**Publicado em 09/11/2026, a pedido ("Pode subir as atualizações feitas agora"), só na Imova — a v2, o freio e a foto do anúncio:**
+- Ar conferido antes: banco da Imova com 190 migrações (pendentes só as 2 desta branch), `imova-worker-ai` v4 (a de 06/11), site `imova-b4i211oym` (avisos no celular, de 06/11; não muda agora).
+- `main` `988f055` (rebase sobre `600ea80`, avanço direto; só o CHANGELOG conflitou, com os dois lados mantidos). Antes do push: tipos de `prompts`, `workers` e `web`, lint, 437 testes do worker, 332 evals, pacote do worker.
+- Banco da Imova: `20261109120000` e `20261109130000` por `publicar-banco.mjs imova migrar` (192 no banco). Sem bloco de seed.
+- `imova-worker-ai` v5 no Fly (de cópia limpa de `988f055`); volta: v4. Site não publicado (nada mudou nele).
+- Conferido em produção: `repeticoes_minutos` 10 e a janela no `wa_bot_pode_falar`; `ia_impressoes` e `ia_fotos_reconhecidas` com RLS; as 7 portas; descrição inteira (a maior com 1.100 caracteres); 24 imóveis conhecidos; IA ligada, treino, Haiku 5.5, conversa do treino "Janio Ramalho" atendendo e sem pausa; batimentos do `ai` e do `wa` em segundos. As 65 fotos dos anúncios ganham a impressão na primeira foto que um cliente mandar (a primeira resposta com foto demora uns segundos a mais).
+- KOMUNE intocada: nenhuma migração, nenhum worker.
