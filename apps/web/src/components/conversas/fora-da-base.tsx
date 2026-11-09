@@ -73,6 +73,8 @@ import {
 import { useEu } from './assumir-conversa';
 import { AtitudeDaConversaNoTopo } from './atitude';
 import type { BaseDasAtitudes } from './atitude-dados';
+import { CanalNoTopo, ComoChegou } from './canal-de-chegada';
+import type { BaseDosCanais } from './canal-de-chegada-dados';
 import type { CatalogosConversas } from './montagem';
 import { OrigemNoPortal } from './origem-no-portal';
 import { origemCurta, useOrigemNoPortal } from './origem-no-portal-dados';
@@ -96,6 +98,7 @@ export function ListaForaDaBase({
   selecionadoId,
   aoEscolher,
   atitudes = null,
+  canais = null,
   perdidas = SEM_PERDIDAS,
   preferencias,
   porInteresse = false,
@@ -105,6 +108,8 @@ export function ListaForaDaBase({
   aoEscolher: (id: string) => void;
   /** A atitude do cliente (Imova): a etiqueta na linha. Desligada, nada aparece. */
   atitudes?: BaseDasAtitudes | null;
+  /** O canal de chegada (Imova, 06/11/2026): o chip na linha. Desligado, nada aparece. */
+  canais?: BaseDosCanais | null;
   /** Quem ligou e não foi atendido (03/11/2026): sobe para o topo com o selo. */
   perdidas?: Perdidas;
   /** Fixar e silenciar de quem está olhando. */
@@ -136,6 +141,7 @@ export function ListaForaDaBase({
       aoEscolherCliente={aoEscolher}
       preferencias={preferencias}
       atitudes={atitudes}
+      canais={canais}
       porInteresse={porInteresse}
       perdidas={perdidas}
     />
@@ -229,8 +235,8 @@ export function ConversaForaDaBase({
   // ainda não rodou. Só lido e mostrado: nada disso toca no WhatsApp.
   const origemNoPortal = useOrigemNoPortal({ conversaId: fio.id, organizacaoId: null });
 
-  // O que a folha do celular e a coluna "Dados do contato" mostram: a atitude, as
-  // ações e o telefone.
+  // O que a folha do celular e a coluna "Dados do contato" mostram: a atitude, o
+  // canal de chegada, as ações e o telefone.
   const ficha = (naFolha: boolean) => (
     <>
       <AtitudeNaFolha conversaId={fio.id} podeEscrever={Boolean(eu?.podeEscrever)} />
@@ -239,6 +245,7 @@ export function ConversaForaDaBase({
           <OrigemNoPortal conversaId={fio.id} organizacaoId={null} naFolha={naFolha} />
         </div>
       ) : null}
+      <ComoChegou conversaId={fio.id} podeEscrever={Boolean(eu?.podeEscrever)} />
 
       <section aria-label="Ações" className="flex flex-col gap-2">
         <h3 className={ROTULO_DA_SECAO}>Ações</h3>
@@ -341,6 +348,12 @@ export function ConversaForaDaBase({
               </span>
               <span className="sr-only">: ver o telefone e as ações</span>
             </button>
+            {/* O canal de chegada (Imova): no celular ele mora na folha. */}
+            <CanalNoTopo
+              conversaId={fio.id}
+              podeEscrever={Boolean(eu?.podeEscrever)}
+              className="mx-1 max-md:hidden conversa-estreita:hidden"
+            />
             <BotaoDeBuscarNoFio className="max-md:hidden" />
             {eu?.podeEscrever ? (
               <BotaoDeLigarNaConversa conversaId={fio.id} nome={rotulo} compacto={ehCelular} />

@@ -36,6 +36,7 @@ import {
   INTENCOES,
   INTENCOES_DA_FICHA,
   INTENCOES_DO_CLIENTE,
+  ImagemNaoDeclaradaError,
   OBJECOES_DA_IMOVA,
   LIMIAR_DE_CONFIANCA,
   MAXIMO_DE_INAUDIVEIS,
@@ -63,6 +64,8 @@ import {
 import { ErroDeTranscricao, transcrever as transcreverAudio, type TranscricaoBruta } from './asr';
 import { atenderCliente, payloadDoAtendente } from './atendente';
 import { aconselharVendas, payloadDoConselheiro } from './conselheiro';
+import { identificarCanal } from './canal-de-chegada';
+import { RecusaDoModeloError } from './cliente';
 import {
   buscarContatoDaFicha,
   buscarConversa,
@@ -80,6 +83,7 @@ import {
   gravarResumoDaLigacao,
   gravarTranscricao,
   gravarTriagem,
+  RespostaForaDoContratoError,
   type ConversaDoFio,
 } from './banco';
 import {
@@ -110,7 +114,15 @@ export function eDeterministico(erro: unknown): boolean {
     // O mês acabado é da mesma família: repetir não faz o dinheiro voltar, e a
     // fila girando em cima do freio seria a própria fila pagando para bater na
     // parede. O trabalho volta pelo cron `ia_retomar_adiados`, não pelo retry.
-    erro instanceof OrcamentoEsgotadoError
+    erro instanceof OrcamentoEsgotadoError ||
+    // O modelo recusou (`stop_reason = refusal`, 06/11/2026): a mesma pergunta dá a
+    // mesma recusa, e cada volta é cobrada. Antes ela girava até a `ai_dlq` como
+    // "resposta ilegível".
+    erro instanceof RecusaDoModeloError ||
+    // O banco devolveu algo fora do contrato, ou o código mandou imagem a um prompt
+    // que não a declarou: é código a consertar, não rede a esperar.
+    erro instanceof RespostaForaDoContratoError ||
+    erro instanceof ImagemNaoDeclaradaError
   );
 }
 
@@ -180,6 +192,18 @@ const payloadDaTriagem = z.object({
   limite: z.number().int().min(1).max(30).default(30),
 });
 
+/**
+ * O canal de chegada do lead (só Imova, 06/11/2026). A `chave` é obrigatória: é ela que
+ * dá novas tentativas à falha passageira e que anota a dívida quando o freio do
+ * orçamento recusa (`<chegada>:<n mensagens>@<última>`, de `app.canal_enfileirar_ia`).
+ */
+const payloadDoCanal = z.object({
+  purpose: z.literal('identificar_canal'),
+  chegada_id: uuid,
+  conversation_id: uuid,
+  chave: z.string().min(1).max(200),
+});
+
 const PAYLOADS = {
   transcribe_audio: payloadDaTranscricao,
   summarize_call: payloadDoResumo,
@@ -196,6 +220,7 @@ const PAYLOADS = {
   // O conselheiro de vendas da Imova (09/11/2026), o "relatório que vende": por
   // cliente e por imóvel, `ia/conselheiro.ts`.
   aconselhar_vendas: payloadDoConselheiro,
+  identificar_canal: payloadDoCanal,
 } as const;
 
 export type PropositoConhecido = keyof typeof PAYLOADS;
@@ -1222,6 +1247,16 @@ async function triarCandidatos(
   };
 }
 
+// ---------------------------------------------------------------------------
+// 8. O canal de chegada do lead (só Imova, 06/11/2026)
+// ---------------------------------------------------------------------------
+
+/** O meio está em `canal-de-chegada.ts`; aqui só o contrato da fila. */
+async function lerOCanal(contexto: ContextoDaIa, bruto: unknown): Promise<ResultadoDoTrabalho> {
+  const payload = interpretarPayload(payloadDoCanal, bruto);
+  return { proposito: 'identificar_canal', ...(await identificarCanal(contexto, payload)) };
+}
+
 const TRABALHOS: Readonly<
   Record<PropositoConhecido, (contexto: ContextoDaIa, bruto: unknown) => Promise<ResultadoDoTrabalho>>
 > = {
@@ -1241,6 +1276,7 @@ const TRABALHOS: Readonly<
     proposito: 'aconselhar_vendas',
     ...(await aconselharVendas(contexto, bruto)),
   }),
+  identificar_canal: lerOCanal,
 };
 
 /**
@@ -1256,7 +1292,12 @@ const TRABALHOS_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoCon
   'avaliar_atendimento',
   // O conselheiro de vendas, por cliente e por imóvel (09/11/2026).
   'aconselhar_vendas',
+  // O canal de chegada do lead: placa, anúncio, rede social ou outros (06 e 09/11/2026).
+  'identificar_canal',
 ]);
+
+/** Os que só existem na Imova. Fora dela, saem da fila sem chamar o modelo. */
+const SO_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoConhecido>(['identificar_canal']);
 
 export async function tratarTrabalho(
   contexto: ContextoDaIa,
@@ -1271,7 +1312,7 @@ export async function tratarTrabalho(
   }
 
   // ------------------------------------------------------------------------
-  // NA IMOVA, SÓ A LEITURA DO CLIENTE (03/11/2026)
+  // NA IMOVA, SÓ A LEITURA DO CLIENTE, A IA QUE ATENDE E O CANAL DE CHEGADA (03 e 06/11/2026)
   // ------------------------------------------------------------------------
   // Os outros trabalhos (classificar a mensagem, transcrever áudio, resumir a
   // ligação, redigir follow-up, triar o Radar, o Pulso) têm prompts da KOMUNE:
@@ -1279,11 +1320,18 @@ export async function tratarTrabalho(
   // enquanto não havia worker de IA, e rodá-los agora seria pagar por texto errado.
   // Saem da fila como "sem o que fazer", sem chamar o modelo.
   // A IA que atende o cliente e a IA juíza (06/11/2026) também são da Imova, e só
-  // dela, como o conselheiro de vendas (09/11/2026): a lista inteira está em
-  // `TRABALHOS_DA_IMOVA`.
-  if (contexto.empresa === 'imova' && !TRABALHOS_DA_IMOVA.has(proposito)) {
-    contexto.logger.info('trabalho fora da IA da Imova: sai da fila sem chamar o modelo', {
+  // dela, como o conselheiro de vendas e o canal de chegada (09/11/2026): a lista
+  // inteira está em `TRABALHOS_DA_IMOVA`.
+  //
+  // E o inverso (06/11/2026): o canal de chegada é só da Imova. Num banco que não é o
+  // dela — ou cuja empresa o worker não conseguiu ler — `identificar_canal` sai da fila
+  // do mesmo jeito, sem chamar o modelo.
+  const daEmpresa =
+    contexto.empresa === 'imova' ? TRABALHOS_DA_IMOVA.has(proposito) : !SO_DA_IMOVA.has(proposito);
+  if (!daEmpresa) {
+    contexto.logger.info('trabalho fora da IA desta empresa: sai da fila sem chamar o modelo', {
       proposito,
+      empresa: contexto.empresa ?? null,
     });
     return { proposito, feito: false, motivo: 'fora_da_ia_da_empresa' };
   }

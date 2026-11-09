@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BellOff, Check, Pin, Sparkles } from 'lucide-react';
+import type { CanalDeChegada } from '@komune/schema';
 
 import { FaixaDeNova, MarcaDeNova } from '@/components/avisos/marca-de-nova';
 import { useConversasNovas } from '@/components/avisos/provedor-avisos';
@@ -19,6 +20,9 @@ import type { Temperatura } from '@/components/temperatura/escala-termica';
 import { AtitudeNaLista } from './atitude';
 import type { BaseDasAtitudes } from './atitude-dados';
 import type { AtitudeDaConversa, Objecao } from './atitude-regra';
+import { CanalNaLista } from './canal-de-chegada';
+import type { BaseDosCanais } from './canal-de-chegada-dados';
+import { canalNaLista } from './canal-de-chegada-regra';
 import { SeloDeConcluida } from './concluir-conversa';
 import { nomeDoCliente } from './fora-da-base-dados';
 import { local, quandoNaLista } from './formatos';
@@ -75,6 +79,7 @@ export function ListaConversas({
   aoEscolherCliente,
   preferencias = SEM_PREFERENCIAS,
   atitudes = null,
+  canais = null,
   porInteresse = false,
   perdidas = SEM_PERDIDAS,
 }: {
@@ -90,6 +95,8 @@ export function ListaConversas({
   aoEscolherCliente?: (conversaId: string) => void;
   /** A atitude do cliente (Imova): a etiqueta na linha. Desligada, nada aparece. */
   atitudes?: BaseDasAtitudes | null;
+  /** O canal de chegada (Imova, 06/11/2026): o chip na linha. Desligado, nada aparece. */
+  canais?: BaseDosCanais | null;
   /** "Mais interessados": a ordem é a da atitude, e não a de sempre. */
   porInteresse?: boolean;
   /** Quem ligou e não foi atendido (03/11/2026): sobe para o topo com o selo. */
@@ -100,6 +107,10 @@ export function ListaConversas({
   const atitudeDe = (fioId: string | null | undefined): AtitudeDaConversa | undefined =>
     fioId ? ligadas?.porConversa.get(fioId) : undefined;
   const objecoes = ligadas?.objecoes ?? SEM_OBJECOES;
+  // Só o canal (um texto), e não a chegada inteira: a linha é memorizada, e o
+  // mapa dos canais é refeito a cada minuto.
+  const canalDe = (fioId: string | null | undefined): CanalDeChegada | null =>
+    !fioId || !canais?.ligada ? null : canalNaLista(canais.porConversa.get(fioId));
   const digitados = useTextosDigitados();
   // O texto que a pessoa digitou e não enviou, no lugar da prévia — menos na
   // conversa aberta, onde ele já está na caixa.
@@ -131,6 +142,7 @@ export function ListaConversas({
               marcas={marcasDa(linha.item.fio?.id, preferencias)}
               atitude={atitudeDe(linha.item.fio?.id)}
               objecoes={objecoes}
+              canal={canalDe(linha.item.fio?.id)}
               perdida={linha.item.fio ? perdidas.get(linha.item.fio.id) : undefined}
               segurada={segurada !== null && segurada.fioId === linha.item.fio?.id}
               aoSegurar={segurar}
@@ -147,6 +159,7 @@ export function ListaConversas({
               marcas={marcasDa(linha.fio.id, preferencias)}
               atitude={atitudeDe(linha.fio.id)}
               objecoes={objecoes}
+              canal={canalDe(linha.fio.id)}
               perdida={perdidas.get(linha.fio.id)}
               segurada={segurada !== null && segurada.fioId === linha.fio.id}
               aoSegurar={segurar}
@@ -402,6 +415,7 @@ function LinhaDeCliente({
   marcas,
   atitude,
   objecoes,
+  canal,
   perdida,
   segurada,
   aoSegurar,
@@ -417,6 +431,8 @@ function LinhaDeCliente({
   marcas: Marcas;
   atitude: AtitudeDaConversa | undefined;
   objecoes: readonly Objecao[];
+  /** O canal de chegada (Imova), só quando há o que dizer. */
+  canal: CanalDeChegada | null;
   /** Ligou e ninguém atendeu (03/11/2026). */
   perdida: LigacaoPerdida | undefined;
   segurada: boolean;
@@ -474,7 +490,14 @@ function LinhaDeCliente({
           ) : null}
         </>
       }
-      terceira={atitude ? <AtitudeNaLista atitude={atitude} objecoes={objecoes} /> : null}
+      terceira={
+        atitude || canal ? (
+          <span className="flex min-w-0 items-center gap-1 overflow-hidden text-[11px] text-wpp-suave">
+            <AtitudeNaLista atitude={atitude} objecoes={objecoes} />
+            <CanalNaLista canal={canal} />
+          </span>
+        ) : null
+      }
     />
   );
 }
@@ -488,6 +511,7 @@ function Linha({
   marcas,
   atitude,
   objecoes,
+  canal,
   perdida,
   segurada,
   aoSegurar,
@@ -503,6 +527,8 @@ function Linha({
   marcas: Marcas;
   atitude: AtitudeDaConversa | undefined;
   objecoes: readonly Objecao[];
+  /** O canal de chegada (Imova), só quando há o que dizer. */
+  canal: CanalDeChegada | null;
   /** Ligou e ninguém atendeu (03/11/2026). */
   perdida: LigacaoPerdida | undefined;
   segurada: boolean;
@@ -531,7 +557,10 @@ function Linha({
     [fio, item.nome, marcas, item.naoLidas],
   );
   const temTerceira =
-    item.etiquetas.length > 0 || atitude !== undefined || Boolean(item.leituraDaIa?.proximaAcao);
+    item.etiquetas.length > 0 ||
+    atitude !== undefined ||
+    canal !== null ||
+    Boolean(item.leituraDaIa?.proximaAcao);
 
   return (
     <LinhaWpp
@@ -586,11 +615,12 @@ function Linha({
       }
       terceira={
         temTerceira ? (
-          // Etiquetas, a atitude e o próximo passo da IA numa linha miúda só: a
-          // lista do WhatsApp tem duas linhas, e esta só aparece quando há o que
-          // dizer.
+          // Etiquetas, a atitude, o canal de chegada e o próximo passo da IA numa
+          // linha miúda só: a lista do WhatsApp tem duas linhas, e esta só aparece
+          // quando há o que dizer.
           <span className="flex min-w-0 items-center gap-1 overflow-hidden text-[11px] text-wpp-suave">
             <AtitudeNaLista atitude={atitude} objecoes={objecoes} />
+            <CanalNaLista canal={canal} />
             {item.etiquetas.slice(0, 2).map((e) => (
               <Etiqueta
                 key={e.id}

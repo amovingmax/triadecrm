@@ -37,6 +37,11 @@ export interface OpcoesDoBancoFalso {
   readonly rpcs?: Record<string, (argumentos: Record<string, unknown>) => unknown>;
   /** Falha a escrita nesta tabela, para exercitar o caminho do erro. */
   readonly falharEm?: string;
+  /**
+   * Os arquivos do Storage, por `balde/caminho`. Ausente: "Object not found", como o
+   * Storage de verdade responde. Um `Error` é lançado no download (rede caiu no meio).
+   */
+  readonly arquivos?: Record<string, Blob | Error>;
 }
 
 export interface BancoFalso {
@@ -44,6 +49,10 @@ export interface BancoFalso {
   readonly tabelas: TabelasFalsas;
   /** Toda chamada de `rpc`, na ordem, para o teste conferir a idempotência. */
   readonly chamadasDeRpc: { nome: string; argumentos: Record<string, unknown> }[];
+  /** Toda tabela tocada, como `operação:tabela` (`select:ai_runs`, `insert:tasks`…). */
+  readonly acessos: string[];
+  /** Todo download do Storage, na ordem. */
+  readonly downloads: { balde: string; caminho: string }[];
 }
 
 /**
@@ -183,6 +192,8 @@ export function bancoFalso(
   opcoes: OpcoesDoBancoFalso = {},
 ): BancoFalso {
   const chamadasDeRpc: { nome: string; argumentos: Record<string, unknown> }[] = [];
+  const acessos: string[] = [];
+  const downloads: { balde: string; caminho: string }[] = [];
   const banco: TabelasFalsas = { ...tabelas };
   const linhasDe = (tabela: string): LinhaFalsa[] => (banco[tabela] ??= []);
 
@@ -190,10 +201,12 @@ export function bancoFalso(
     from(tabela: string) {
       return {
         select(colunas?: string, opcoesDoSelect?: { count?: string; head?: boolean }) {
+          acessos.push(`select:${tabela}`);
           const consulta = new Consulta(linhasDe(tabela), tabela);
           return opcoesDoSelect?.head === true ? consulta.comContagem() : consulta;
         },
         insert(valores: LinhaFalsa) {
+          acessos.push(`insert:${tabela}`);
           return new Escrita(
             () => {
               const linha: LinhaFalsa = { id: novoUuid(), created_at: new Date().toISOString(), ...valores };
@@ -219,6 +232,7 @@ export function bancoFalso(
           );
         },
         update(valores: LinhaFalsa) {
+          acessos.push(`update:${tabela}`);
           const filtros: Filtro[] = [];
           const alvo = {
             eq(coluna: string, valor: unknown) {
@@ -247,7 +261,29 @@ export function bancoFalso(
       }
       return await Promise.resolve({ data: PADROES_DE_RPC[nome] ?? PADRAO_DE_RPC, error: null });
     },
+    storage: {
+      from(balde: string) {
+        return {
+          async download(caminho: string) {
+            downloads.push({ balde, caminho });
+            const arquivo = opcoes.arquivos?.[`${balde}/${caminho}`];
+            if (arquivo instanceof Error) throw arquivo;
+            return await Promise.resolve(
+              arquivo === undefined
+                ? { data: null, error: { message: 'Object not found' } }
+                : { data: arquivo, error: null },
+            );
+          },
+        };
+      },
+    },
   };
 
-  return { cliente: cliente as unknown as ClienteDoBanco, tabelas: banco, chamadasDeRpc };
+  return {
+    cliente: cliente as unknown as ClienteDoBanco,
+    tabelas: banco,
+    chamadasDeRpc,
+    acessos,
+    downloads,
+  };
 }

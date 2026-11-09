@@ -9,6 +9,7 @@ import type { Periodo } from './periodo';
 import type {
   FatiaTermica,
   LinhaBairro,
+  LinhaCanal,
   LinhaCategoria,
   LinhaFonte,
   LinhaFunil,
@@ -83,6 +84,10 @@ export const carregarHorarios = (periodo: Periodo) =>
 
 export const carregarFontes = (periodo: Periodo) =>
   chamar<LinhaFonte>('relatorio_por_fonte', periodo);
+
+/** O canal de chegada (só Imova): a tela nem chama fora do módulo. */
+export const carregarCanaisDeChegada = (periodo: Periodo) =>
+  chamar<LinhaCanal>('relatorio_por_canal', periodo);
 
 /**
  * A base de hoje por temperatura, uma contagem por faixa da escala.

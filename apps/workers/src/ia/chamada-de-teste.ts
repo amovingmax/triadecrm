@@ -17,19 +17,45 @@
  *
  * Rodar duas vezes seguidas é o teste do CACHE: a segunda chamada deve mostrar
  * leitura de cache e custar menos, e é isso que sustenta a projeção mensal.
+ *
+ * ===========================================================================
+ * O CANAL DE CHEGADA (06/11/2026)
+ * ===========================================================================
+ * `--chamada-de-teste=canal-de-chegada --foto=/caminho/da/placa.jpg` faz a mesma
+ * medição com `canal-de-chegada@v1`: a conversa é o primeiro exemplo do prompt ("Boa
+ * tarde!", a foto, "Quanto está essa casa?") e a foto é o arquivo que a pessoa passar —
+ * uma placa de teste fotografada para isso, nunca foto de cliente. Sem `--foto` o
+ * comando recusa: medir o canal sem imagem mediria outra coisa. É a "1 chamada real com
+ * foto de teste" da Fase 2 do desenho, antes de ligar a fila.
  */
+import { readFile } from 'node:fs/promises';
 
-import { fichaDaConversaV1, type EntradaDaFicha } from '@komune/prompts';
+import {
+  canalDeChegadaV1,
+  conferirImagens,
+  fichaDaConversaV1,
+  type EntradaDaFicha,
+} from '@komune/prompts';
 
 import { executar, type ContextoDaIa } from './execucao';
+
+export const PROMPTS_DA_CHAMADA_DE_TESTE = ['ficha-da-conversa', 'canal-de-chegada'] as const;
+export type PromptDaChamadaDeTeste = (typeof PROMPTS_DA_CHAMADA_DE_TESTE)[number];
+
+export interface OpcoesDaChamadaDeTeste {
+  /** Qual prompt medir. Sem nada, a ficha da conversa — o que o comando sempre mediu. */
+  readonly prompt?: PromptDaChamadaDeTeste;
+  /** Só para o canal de chegada: o arquivo da foto de teste (JPEG, PNG, WebP ou GIF). */
+  readonly foto?: string;
+}
 
 export interface ResultadoDaChamadaDeTeste {
   readonly aiRunId: number;
   readonly custoUsd: number;
   readonly promptVersion: string;
   readonly modelo: string;
-  readonly scoreIntencao: number;
-  readonly resumo: string;
+  /** Uma linha legível do que o modelo devolveu. */
+  readonly resposta: string;
 }
 
 /**
@@ -45,9 +71,18 @@ export function conversaDeExemplo(): EntradaDaFicha {
   return exemplo.entrada;
 }
 
+export function ePromptDaChamadaDeTeste(valor: unknown): valor is PromptDaChamadaDeTeste {
+  return (
+    typeof valor === 'string' && (PROMPTS_DA_CHAMADA_DE_TESTE as readonly string[]).includes(valor)
+  );
+}
+
 export async function chamadaDeTeste(
   contexto: ContextoDaIa,
+  opcoes: OpcoesDaChamadaDeTeste = {},
 ): Promise<ResultadoDaChamadaDeTeste> {
+  if (opcoes.prompt === 'canal-de-chegada') return await canalDeTeste(contexto, opcoes.foto);
+
   const entrada = conversaDeExemplo();
 
   const executada = await executar(
@@ -65,7 +100,58 @@ export async function chamadaDeTeste(
     custoUsd: executada.custoUsd,
     promptVersion: executada.promptVersion,
     modelo: fichaDaConversaV1.modelo,
-    scoreIntencao: executada.saida.scoreIntencao,
-    resumo: executada.saida.resumo,
+    resposta: `score ${executada.saida.scoreIntencao}: ${executada.saida.resumo}`,
+  };
+}
+
+/** O canal de chegada com UMA foto de teste: o exemplo do prompt, a foto do arquivo. */
+async function canalDeTeste(
+  contexto: ContextoDaIa,
+  caminho: string | undefined,
+): Promise<ResultadoDaChamadaDeTeste> {
+  if (caminho === undefined || caminho.trim() === '') {
+    throw new Error(
+      'a chamada de teste do canal de chegada precisa de uma foto: --foto=/caminho/da/placa.jpg',
+    );
+  }
+  const exemplo = canalDeChegadaV1.exemplos[0];
+  if (exemplo === undefined) throw new Error('canal-de-chegada@v1 sem exemplo: não há o que medir');
+  const comFoto = exemplo.entrada.mensagens.find((m) => m.fotoId !== null);
+  if (comFoto?.fotoId == null) throw new Error('o exemplo do canal de chegada não tem foto');
+
+  const bytes = await readFile(caminho);
+  // O tipo de verdade sai dos bytes, na porteira; o `mime` aqui é só o palpite. A
+  // porteira roda antes para a medição não sair SEM a foto sem ninguém perceber.
+  const imagem = {
+    mime: 'image/jpeg',
+    base64: bytes.toString('base64'),
+    rotulo: `Foto ${comFoto.fotoId}, enviada na mensagem ${comFoto.messageId}`,
+  };
+  const conferidas = conferirImagens(canalDeChegadaV1, [imagem]);
+  const recusada = conferidas.descartadas[0];
+  if (recusada !== undefined) {
+    throw new Error(`a foto ${caminho} não passa na porteira das imagens: ${recusada.motivo}`);
+  }
+
+  const executada = await executar(
+    contexto,
+    canalDeChegadaV1,
+    exemplo.entrada,
+    { leadId: exemplo.entrada.leadId, nome: null },
+    {},
+    { imagens: [imagem] },
+  );
+
+  const lida = executada.saida;
+  const foto =
+    lida.foto === null
+      ? 'sem foto descrita'
+      : `foto ${lida.foto.peca}/${lida.foto.marca}, código ${lida.foto.codigoDoImovel ?? '—'}: ${lida.foto.descricao}`;
+  return {
+    aiRunId: executada.aiRunId,
+    custoUsd: executada.custoUsd,
+    promptVersion: executada.promptVersion,
+    modelo: canalDeChegadaV1.modelo,
+    resposta: `${lida.canal}/${lida.subcanal} (${lida.confianca}) — ${lida.motivo} [${foto}]`,
   };
 }

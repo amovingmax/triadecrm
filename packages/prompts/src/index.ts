@@ -76,6 +76,19 @@ export {
 } from './prompts/foto-do-anuncio/v1';
 
 export {
+  CANAIS_NO_PROMPT,
+  MARCAS_DA_FOTO,
+  PECAS_DA_FOTO,
+  SUBCANAIS_NO_PROMPT,
+  TIPOS_DE_MENSAGEM_DO_CANAL,
+  type CanalNoPrompt,
+  type EntradaDoCanal,
+  type SaidaDoCanal,
+  canalDeChegadaV1,
+  subcanalCabeNoCanal,
+} from './prompts/canal-de-chegada/v1';
+
+export {
   type ImagemAceita,
   type ImagemDescartada,
   type ImagemParaOModelo,

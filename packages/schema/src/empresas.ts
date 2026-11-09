@@ -110,6 +110,13 @@ export interface Empresa {
      * barra. No banco da KOMUNE as migrações não criam nada.
      */
     relatoriosDaImova: boolean;
+    /**
+     * O canal de chegada do lead (06/11/2026): Placa, Anúncios, Redes sociais ou
+     * Outros (até 09/11, Indicação), posto pela regra e pela IA (que lê a foto da placa) e corrigível por
+     * quem atende; etiqueta em Conversas, bloco na ficha e painel "Canais" nos
+     * relatórios. Só da Imova. O banco também trava (`app.canal_de_chegada_config`).
+     */
+    canalDeChegada: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -167,6 +174,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       anuncios: false,
       iaQueAtende: false,
       relatoriosDaImova: false,
+      canalDeChegada: false,
     },
     privacidade: null,
   },
@@ -206,6 +214,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       anuncios: true,
       iaQueAtende: true,
       relatoriosDaImova: true,
+      canalDeChegada: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

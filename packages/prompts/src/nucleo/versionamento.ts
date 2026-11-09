@@ -66,7 +66,31 @@ export type PropositoDeAiRun =
   // O "relatório que vende" da Imova (09/11/2026): o conselho por cliente
   // (`conselheiro-do-lead`) e por imóvel (`conselheiro-do-imovel`), um propósito só para
   // o custo do relatório aparecer junto. Precisa entrar em `ai_runs_purpose_check`.
-  | 'aconselhar_vendas';
+  | 'aconselhar_vendas'
+  // O canal de chegada do lead da Imova (06/11/2026): placa, anúncio, rede social
+  // ou outros, lido do começo da conversa e de até três fotos.
+  | 'identificar_canal';
+
+/**
+ * As imagens que um prompt aceita junto com o texto (06/11/2026).
+ *
+ * Opcional, e a ausência é a regra: prompt que não declara `imagens` não leva imagem
+ * nenhuma, e `conferirImagens` (`nucleo/imagens.ts`) recusa com
+ * `ImagemNaoDeclaradaError` em vez de deixar passar. Foto não se pseudonimiza — pode
+ * ter rosto, documento, placa de carro —, então mandar imagem é decisão de cada
+ * versão de prompt, escrita no próprio prompt, e não uma opção de quem chama.
+ */
+export interface ImagensDoPrompt {
+  /** Quantas imagens, no máximo, numa chamada. O que passar disso fica de fora. */
+  readonly maximo: number;
+  /** Os tipos aceitos, conferidos pelos BYTES da imagem e não pelo que o arquivo diz ser. */
+  readonly tipos: readonly ('image/jpeg' | 'image/png' | 'image/gif' | 'image/webp')[];
+  /**
+   * Tamanho máximo de cada imagem como ela vai na requisição — em base64, que é o que
+   * a API mede contra o limite dela (5 MB). Uma foto de 4 MB vira 5,3 MB em base64.
+   */
+  readonly bytesMax: number;
+}
 
 /**
  * As imagens que um prompt aceita junto com o texto (06/11/2026).

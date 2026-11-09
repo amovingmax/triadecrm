@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Archive, Search, SlidersHorizontal, X } from 'lucide-react';
 import { Popover as PopoverPrimitive } from 'radix-ui';
+import { CANAIS_DE_CHEGADA, ROTULO_DO_CANAL as ROTULO_DA_CHEGADA } from '@komune/schema';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+import { CANAL_NA_EMPRESA } from './canal-de-chegada-dados';
 import { CONCLUIR_NA_EMPRESA } from './concluir-conversa';
 import { BotaoRedondo } from './wpp';
 import {
@@ -97,6 +99,19 @@ export function BotaoDeFiltros({
               opcoes={pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
               aoMudar={(v) => aoMudar({ atendenteId: v })}
             />
+            {/* O CANAL DE CHEGADA (06/11/2026, só Imova): por onde a pessoa
+                ficou sabendo da empresa. Outro nome que o "Canal" logo abaixo,
+                que é o meio da interação (WhatsApp, ligação). */}
+            {CANAL_NA_EMPRESA ? (
+              <Filtro
+                rotulo="Canal de chegada"
+                todos="Qualquer canal de chegada"
+                aria="Filtrar por canal de chegada: placa, anúncios, redes sociais, outros ou não identificado"
+                valor={filtros.chegada}
+                opcoes={CANAIS_DE_CHEGADA.map((c) => ({ valor: c, rotulo: ROTULO_DA_CHEGADA[c] }))}
+                aoMudar={(v) => aoMudar({ chegada: v })}
+              />
+            ) : null}
             <Filtro
               rotulo="Canal"
               todos="Todos os canais"

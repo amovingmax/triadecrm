@@ -544,8 +544,8 @@ function Canais({ dados }: { dados: PainelFunilEquipe }) {
     >
       {!canais ? (
         <SemDado>
-          O canal de chegada (placa, anúncios, redes sociais, indicação) ainda não está no ar. Este gráfico aparece quando
-          estiver.
+          Este gráfico ainda não lê o canal de chegada. Por enquanto, os números por canal (placa, anúncios, redes sociais e
+          outros) estão na aba Canais.
         </SemDado>
       ) : lista_.length === 0 ? (
         <SemDado>Nenhum lead com canal de chegada no período.</SemDado>

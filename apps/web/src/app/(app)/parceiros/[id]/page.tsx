@@ -75,6 +75,7 @@ import { PainelPreCadastro } from '@/components/precadastro/painel-precadastro';
 import { requireSession } from '@/lib/auth/session';
 import { podeExcluirParceiro } from '@/lib/navegacao';
 import { whatsappConectado } from '@/components/conversas/whatsapp-conectado';
+import { CanalNoTopoDaFicha, ComoChegouNaFicha } from '@/components/conversas/canal-de-chegada';
 
 /**
  * Separador de termos: espaço normal ANTES do ponto (ali pode quebrar) e espaço
@@ -220,6 +221,8 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
                   temperatura={ficha.temperatura}
                   esfriando={principal?.precisaAtencao ?? false}
                 />
+                {/* A etiqueta de prospecção (Imova, 09/11/2026): por onde a pessoa chegou. */}
+                <CanalNoTopoDaFicha chegadas={ficha.chegadas} />
                 {ficha.vip ? <Badge variant="outline">VIP</Badge> : null}
                 {ficha.naoContatar ? (
                   <Badge variant="destructive">
@@ -899,6 +902,11 @@ function Contato({
         {SEPARADOR}coletado em <span className="numerico">{formatarData(ficha.coletadoEm)}</span>{' '}
         por {ficha.coletadoPor}
       </p>
+
+      {/* O canal de chegada (Imova, 06/11/2026), ao lado da origem: a origem diz
+          como a ficha entrou no CRM; isto, por onde a pessoa nos achou. Vazio
+          fora do módulo e para quem nunca nos procurou primeiro. */}
+      <ComoChegouNaFicha chegadas={ficha.chegadas} />
 
       {ficha.descricao ? (
         <p className="max-w-prose border-t border-hairline pt-4 text-sm text-muted-foreground">

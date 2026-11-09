@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, CircleCheck, MessageSquarePlus, Search, Users } from 'lucide-react';
 import { Popover as PopoverPrimitive } from 'radix-ui';
+import { ROTULO_DO_CANAL as ROTULO_DA_CHEGADA } from '@komune/schema';
 
 import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,7 @@ import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
 import { OrdemDaLista } from './atitude';
 import { useAtitudes } from './atitude-dados';
+import { useCanais } from './canal-de-chegada-dados';
 import { FeedAutomaticas } from './automaticas';
 import { carregarAutomaticas, carregarMarcoZero, CHAVE_AUTOMATICAS } from './automaticas-dados';
 import { CONCLUIR_NA_EMPRESA } from './concluir-conversa';
@@ -203,17 +205,22 @@ export function TelaConversas({
   // listas e entra em "Minhas" para todos, até alguém retornar. Fora da Imova o mapa é
   // sempre vazio.
   const perdidas = useLigacoesPerdidas();
+  // O canal de chegada (06/11/2026, só Imova): o chip nas linhas e o filtro
+  // "Canal de chegada". Uma leitura só para a tela; desligado, o mapa é vazio e
+  // o filtro nem aparece.
+  const canais = useCanais();
+  const chegadas = canais.porConversa;
   const itens = useMemo(() => {
-    const recorte = aplicarFiltros(captacao, filtros, quem);
+    const recorte = aplicarFiltros(captacao, filtros, quem, chegadas);
     if (perdidas.size === 0 || filtros.escopo === 'todas') return recorte;
     return juntarAsPerdidas(
       recorte,
-      aplicarFiltros(captacao, { ...filtros, escopo: 'todas' }, quem),
+      aplicarFiltros(captacao, { ...filtros, escopo: 'todas' }, quem, chegadas),
       (i) => i.fio?.id ?? null,
       (i) => i.id,
       perdidas,
     );
-  }, [captacao, filtros, quem, perdidas]);
+  }, [captacao, filtros, quem, perdidas, chegadas]);
   // Quem escreveu e não é ficha: a aba "Clientes" inteira, e parte da lista de Conversas.
   const foraDaBase = useMemo(() => conversasForaDaBase(consulta.data?.fios ?? []), [consulta.data]);
   // TODO CLIENTE TEM FICHA (Imova, 03/11/2026): quem escreve ganha ficha de
@@ -247,24 +254,24 @@ export function TelaConversas({
         contagem:
           e.id === 'todas'
             ? null
-            : aplicarFiltros(captacao, { ...filtros, escopo: e.id }, quem).length +
-              filtrarClientes(clientes, { ...filtros, escopo: e.id }, quem).length,
+            : aplicarFiltros(captacao, { ...filtros, escopo: e.id }, quem, chegadas).length +
+              filtrarClientes(clientes, { ...filtros, escopo: e.id }, quem, chegadas).length,
       })),
-    [captacao, clientes, filtros, quem],
+    [captacao, clientes, filtros, quem, chegadas],
   );
 
   // Os clientes que cabem no recorte da lista de Conversas ("Minhas", busca...).
   const clientesNaLista = useMemo(() => {
-    const recorte = filtrarClientes(clientes, filtros, quem);
+    const recorte = filtrarClientes(clientes, filtros, quem, chegadas);
     if (perdidas.size === 0 || filtros.escopo === 'todas') return recorte;
     return juntarAsPerdidas(
       recorte,
-      filtrarClientes(clientes, { ...filtros, escopo: 'todas' }, quem),
+      filtrarClientes(clientes, { ...filtros, escopo: 'todas' }, quem, chegadas),
       (f) => f.id,
       (f) => f.id,
       perdidas,
     );
-  }, [clientes, filtros, quem, perdidas]);
+  }, [clientes, filtros, quem, perdidas, chegadas]);
 
   // O cliente escolhido é procurado em TODOS os clientes, não no recorte — a
   // mesma regra da conversa de parceiro, logo abaixo.
@@ -359,8 +366,11 @@ export function TelaConversas({
   const quantasConcluidas = useMemo(() => {
     if (!CONCLUIR_NA_EMPRESA || aba !== 'conversas') return 0;
     const so = { ...filtros, concluidas: true };
-    return aplicarFiltros(captacao, so, quem).length + filtrarClientes(clientes, so, quem).length;
-  }, [aba, filtros, captacao, clientes, quem]);
+    return (
+      aplicarFiltros(captacao, so, quem, chegadas).length +
+      filtrarClientes(clientes, so, quem, chegadas).length
+    );
+  }, [aba, filtros, captacao, clientes, quem, chegadas]);
 
   // A ficha ao lado da conversa (computador): aberta ou fechada vale para todas as
   // conversas, como no WhatsApp, e não volta a fechar a cada troca.
@@ -507,6 +517,7 @@ export function TelaConversas({
                   aoEscolherCliente={escolherCliente}
                   preferencias={preferencias.data}
                   atitudes={atitudes}
+                  canais={canais}
                   porInteresse={interesse !== null}
                 />
               ) : aba === 'fora' ? (
@@ -515,6 +526,7 @@ export function TelaConversas({
                   selecionadoId={foraAberta?.id ?? null}
                   aoEscolher={setForaId}
                   atitudes={atitudes}
+                  canais={canais}
                   perdidas={perdidas}
                   preferencias={preferencias.data}
                   porInteresse={interesse !== null}
@@ -532,6 +544,7 @@ export function TelaConversas({
                     aoEscolher={escolherParceiro}
                     preferencias={preferencias.data}
                     atitudes={atitudes}
+                    canais={canais}
                   />
                 )
               ) : filtros.escopo === 'setor' && quem.meusSetores.length === 0 ? (
@@ -565,6 +578,7 @@ export function TelaConversas({
                   aoEscolherCliente={escolherCliente}
                   preferencias={preferencias.data}
                   atitudes={atitudes}
+                  canais={canais}
                   porInteresse={interesse !== null}
                   perdidas={perdidas}
                 />
@@ -994,6 +1008,7 @@ function descreverRecorte(filtros: FiltrosConversas, catalogos: CatalogosConvers
   if (filtros.escopo === 'minhas') partes.push('"Minhas"');
   if (filtros.escopo === 'setor') partes.push('"Meu setor"');
   if (filtros.canal) partes.push(`canal ${ROTULO_CANAL[filtros.canal]}`);
+  if (filtros.chegada) partes.push(`chegada por "${ROTULO_DA_CHEGADA[filtros.chegada]}"`);
   if (filtros.janela !== 'qualquer') partes.push(`"${ROTULO_JANELA[filtros.janela]}"`);
   if (filtros.concluidas) partes.push('"Concluídas"');
 

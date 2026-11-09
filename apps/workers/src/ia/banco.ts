@@ -22,6 +22,8 @@
  *   follow-up     → `message_drafts` em `pendente` (a fila de aprovação, RF-CON-22)
  *   classificação → `conversations.ai_intent` / `ai_confidence`
  */
+import { z } from 'zod';
+
 import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
 
 // ---------------------------------------------------------------------------
@@ -906,4 +908,173 @@ export async function gravarTriagem(
   erroSe('ia_gravar_triagem', error);
   const bruto = (data ?? {}) as Record<string, unknown>;
   return Number(bruto.gravados) || 0;
+}
+
+// ---------------------------------------------------------------------------
+// O canal de chegada do lead (Imova, 06/11/2026)
+// ---------------------------------------------------------------------------
+// As duas pontas são do Postgres, como na ficha: `app.canal_entrada_da_ia` monta a
+// entrada (o começo da conversa, quais fotos podem ir, os limites) e diz se é para
+// pular; `app.canal_gravar_da_ia` confere cada prova contra as mensagens da conversa e
+// grava, respeitando a marcação de gente e a regra forte. Aqui só a chamada e a forma —
+// conferida com zod, porque daqui sai o que vai ao modelo e o que volta ao banco.
+
+/** O banco devolveu algo fora do contrato combinado. Repetir não conserta: é código. */
+export class RespostaForaDoContratoError extends Error {
+  readonly operacao: string;
+
+  constructor(operacao: string, problemas: string) {
+    super(`${operacao} devolveu algo fora do contrato — ${problemas}`);
+    this.name = 'RespostaForaDoContratoError';
+    this.operacao = operacao;
+  }
+}
+
+function lerContrato<T>(operacao: string, schema: z.ZodType<T>, bruto: unknown): T {
+  const lido = schema.safeParse(bruto ?? {});
+  if (!lido.success) {
+    throw new RespostaForaDoContratoError(
+      operacao,
+      lido.error.issues.map((i) => `${i.path.join('.') || '(raiz)'}: ${i.message}`).join('; '),
+    );
+  }
+  return lido.data;
+}
+
+const TIPOS_DA_MENSAGEM_NO_CANAL = ['texto', 'foto', 'audio', 'video', 'documento', 'outro'] as const;
+
+const mensagemDoCanalNoBanco = z.object({
+  id: z.string().uuid(),
+  de: z.enum(['cliente', 'equipe', 'robo']),
+  quando: z.string().min(1).max(40),
+  created_at: z.string().min(1),
+  // Tipo novo no banco não derruba a leitura: entra como "outro".
+  tipo: z.enum(TIPOS_DA_MENSAGEM_NO_CANAL).catch('outro'),
+  texto: z.string().nullable().default(null),
+  media_path: z.string().nullable().default(null),
+  media_mime: z.string().nullable().default(null),
+  foto_elegivel: z.boolean().default(false),
+});
+
+const entradaDoCanalNoBanco = z.object({
+  chegada_id: z.string().nullable().default(null),
+  conversation_id: z.string().uuid().nullable().default(null),
+  organization_id: z.string().uuid().nullable().default(null),
+  contact_id: z.string().uuid().nullable().default(null),
+  peer_nome: z.string().nullable().default(null),
+  // Opcional (não está no contrato de 06/11/2026): com ele, o telefone que o CRM já
+  // conhece sai pela passada do "telefone conhecido" da pseudonimização, a que não pode
+  // falhar, e não só pelas passadas genéricas.
+  peer_telefone: z.string().nullable().default(null),
+  inicio_em: z.string().nullable().default(null),
+  agora: z.string().nullable().default(null),
+  // `desligada`, `nao_achada`, `fechada`, `marcada_por_gente`, `suprimido`,
+  // `teto_de_leituras`… Motivo novo também é motivo para pular: quem decide é o banco.
+  pular: z.string().nullable().default(null),
+  mensagens: z.array(mensagemDoCanalNoBanco).max(40).default([]),
+  fotos_indisponiveis: z.number().int().min(0).default(0),
+  fotos_max: z.number().int().min(0).default(3),
+  // `nao_achada` vem com 0 aqui: com motivo para pular, o teto não importa.
+  foto_bytes_max: z.number().int().min(0).default(5 * 1024 * 1024),
+  lida_ate: z.string().nullable().default(null),
+});
+
+export type MensagemDoCanalNoBanco = z.infer<typeof mensagemDoCanalNoBanco>;
+
+export interface EntradaDoCanalDoBanco {
+  readonly chegadaId: string;
+  readonly conversationId: string | null;
+  readonly organizationId: string | null;
+  readonly contactId: string | null;
+  readonly peerNome: string | null;
+  readonly peerTelefone: string | null;
+  readonly inicioEm: string | null;
+  readonly agora: string | null;
+  readonly pular: string | null;
+  readonly mensagens: readonly MensagemDoCanalNoBanco[];
+  readonly fotosIndisponiveis: number;
+  readonly fotosMax: number;
+  readonly fotoBytesMax: number;
+  readonly lidaAte: string | null;
+}
+
+export async function entradaDoCanal(
+  cliente: ClienteDoBanco,
+  chegadaId: string,
+): Promise<EntradaDoCanalDoBanco> {
+  const { data, error } = await cliente.rpc('canal_entrada_da_ia', { p_chegada_id: chegadaId });
+  erroSe('canal_entrada_da_ia', error);
+  const lida = lerContrato('canal_entrada_da_ia', entradaDoCanalNoBanco, data);
+  if (lida.pular === null && lida.conversation_id === null) {
+    throw new RespostaForaDoContratoError(
+      'canal_entrada_da_ia',
+      'sem motivo para pular e sem conversation_id',
+    );
+  }
+  return {
+    chegadaId: lida.chegada_id ?? chegadaId,
+    conversationId: lida.conversation_id,
+    organizationId: lida.organization_id,
+    contactId: lida.contact_id,
+    peerNome: texto(lida.peer_nome),
+    peerTelefone: texto(lida.peer_telefone),
+    inicioEm: lida.inicio_em,
+    agora: lida.agora,
+    pular: lida.pular,
+    mensagens: lida.mensagens,
+    fotosIndisponiveis: lida.fotos_indisponiveis,
+    fotosMax: lida.fotos_max,
+    fotoBytesMax: lida.foto_bytes_max,
+    lidaAte: lida.lida_ate,
+  };
+}
+
+/** O resultado da IA no vocabulário do banco (snake_case), com os uuids já de volta. */
+export interface ResultadoDoCanalParaOBanco {
+  readonly canal: string;
+  readonly subcanal: string;
+  readonly confianca: number;
+  readonly evidencias: readonly {
+    readonly message_id: string;
+    readonly tipo: 'texto' | 'foto';
+    readonly trecho: string;
+  }[];
+  readonly foto: {
+    readonly message_id: string;
+    readonly peca: string;
+    readonly marca: string;
+    readonly descricao: string;
+    readonly codigo_do_imovel: string | null;
+  } | null;
+  readonly motivo: string;
+}
+
+const canalGravadoNoBanco = z.object({
+  gravado: z.boolean(),
+  motivo: z.string().nullable().default(null),
+  canal: z.string().nullable().default(null),
+});
+
+export type CanalGravado = z.infer<typeof canalGravadoNoBanco>;
+
+export async function gravarCanal(
+  cliente: ClienteDoBanco,
+  chegadaId: string,
+  resultado: ResultadoDoCanalParaOBanco,
+  /** Até onde a IA leu: fecha a janela na última mensagem LIDA, não em `now()`. */
+  lidaAte: string | null,
+  /**
+   * A linha de `ai_runs`. `ai_runs.id` é `bigint` (como em `ia_gravar_ficha`), e vai
+   * como número; sem chamada (recusa antes do registro), `null`.
+   */
+  aiRunId: number | null,
+): Promise<CanalGravado> {
+  const { data, error } = await cliente.rpc('canal_gravar_da_ia', {
+    p_chegada_id: chegadaId,
+    p_resultado: resultado,
+    p_lida_ate: lidaAte,
+    p_ai_run_id: aiRunId,
+  });
+  erroSe('canal_gravar_da_ia', error);
+  return lerContrato('canal_gravar_da_ia', canalGravadoNoBanco, data);
 }

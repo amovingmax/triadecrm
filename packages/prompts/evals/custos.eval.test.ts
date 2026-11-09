@@ -292,6 +292,21 @@ describe('preços e conta por chamada', () => {
         semCache: 0.0002,
         comCache: 0.00012,
       },
+      {
+        // O canal de chegada da Imova (06/11/2026). A conta é só do TEXTO: a foto da
+        // placa entra como bloco de imagem e custa por pixel — uma foto típica do
+        // WhatsApp (~1600×1200) é da ordem de 2.500 tokens de entrada, ~US$ 0,00025
+        // no Haiku 5.5, mais que o texto inteiro. Nem ela nem o raciocínio do modelo
+        // aparecem aqui; só a primeira chamada real mostra os dois.
+        id: 'canal-de-chegada',
+        modelo: 'claude-haiku-5-5',
+        // 1.119 desde 09/11/2026: a explicação de Outros (indicação, site, Google).
+        tokensDeSistema: 1119,
+        tokensDaMensagem: 89,
+        tokensDeSaida: 124,
+        semCache: 0.00018,
+        comCache: 0.00008,
+      },
     ]);
   });
 });

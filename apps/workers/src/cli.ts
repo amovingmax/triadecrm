@@ -12,7 +12,7 @@ export type WorkerCommand = (typeof WORKER_COMMANDS)[number];
  */
 export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
   wa: ['uma-vez', 'conectar', 'sincronizar-modelos'],
-  ai: ['uma-vez', 'chamada-de-teste'],
+  ai: ['uma-vez', 'chamada-de-teste', 'foto'],
   rotas: ['uma-vez', 'geocodificar'],
 };
 
@@ -35,6 +35,9 @@ Opções de "ai":
   --chamada-de-teste     Faz UMA chamada real ao modelo com uma conversa de exemplo e
                          imprime tokens, cache e custo em dólar. É como se confere, sem
                          mexer em dado de ninguém, quanto custa uma ficha de conversa.
+  --chamada-de-teste=canal-de-chegada --foto=/caminho/placa.jpg
+                         O mesmo, com o canal de chegada da Imova e UMA foto de teste
+                         (uma placa fotografada para isso, nunca foto de cliente).
 
 Opções de "rotas":
   --geocodificar         Faz UMA passada de geocodificação no Nominatim (1 req/s) e sai.

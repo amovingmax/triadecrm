@@ -587,6 +587,38 @@ begin
 end $$;
 
 -- =====================================================================
+-- 12g. O canal de chegada do lead (06/11/2026): só da Imova. Por onde a pessoa
+--      conheceu a Imova — Placa (inclui foto do banner), Anúncios, Redes
+--      sociais ou Outros (indicação, site, Google; até 09/11, Indicação) —, posto pela regra e pela IA (que lê até 3 fotos
+--      do começo da conversa) e corrigível por quem atende. Decisões do Rafael
+--      em 06/11/2026: valer para quem chegou desde 27/10/2026 (quando o
+--      anúncio da Meta passou a ser gravado) e a IA pode ler a foto. A chave,
+--      as palavras e o job moram aqui, e não na migração, para não existirem
+--      na KOMUNE.
+--      As palavras e links (`canal_padroes`) vêm da migração 20261109220000,
+--      para o pgTAP 138 provar cada um; aqui só se confere que estão lá.
+-- =====================================================================
+insert into public.app_settings (key, value, description) values
+  ('canal_de_chegada',
+   '{"ligada": true,
+     "ia": true,
+     "piloto_numeros": [],
+     "aplicar_desde": "2026-10-27",
+     "nova_chegada_apos_dias": 30,
+     "fotos_max": 3,
+     "reavaliar_horas": 24,
+     "ia_confianca_minima": 0.6}'::jsonb,
+   'Canal de chegada do lead, só da Imova. ligada: o job acha as chegadas e aplica as regras; ia: pede a leitura da IA (texto e até fotos_max fotos) quando nenhuma regra forte decide; piloto_numeros: se não vazio, a IA só lê esses telefones (E.164); aplicar_desde: a primeira data olhada; nova_chegada_apos_dias: silêncio que faz a volta contar como chegada nova; reavaliar_horas: quanto tempo a chegada fica aberta; ia_confianca_minima: abaixo disso a IA deixa Não identificado.')
+on conflict (key) do update set value = excluded.value, description = excluded.description;
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('chegadas_rodar', '* * * * *',
+                          $cron$select app.chegadas_rodar(200)$cron$);
+  end if;
+end $$;
+
+-- =====================================================================
 -- 12h. A IA que atende o cliente sozinha (06/11/2026): só da Imova. Nasce
 --      DESLIGADA, no modo treino e sem conversa de treino: quem liga é a
 --      gestão, na tela (IA que atende → Configuração), escolhendo a conversa
@@ -766,6 +798,21 @@ begin
      and not exists (select 1 from cron.job
                       where jobname = 'ia_atendente_enfileirar' and schedule = '10 seconds') then
     raise exception 'seed imova: a fila da IA que atende não ficou conferida a cada 10 segundos';
+  end if;
+  if not coalesce((app.canal_de_chegada_config() ->> 'ligada')::boolean, false) then
+    raise exception 'seed imova: o canal de chegada ficou desligado';
+  end if;
+  if (select count(*) from public.canal_padroes where ativo) < 15 then
+    raise exception 'seed imova: esperadas 15 palavras ativas do canal de chegada';
+  end if;
+  if exists (select 1 from pg_namespace where nspname = 'cron')
+     and not exists (select 1 from cron.job where jobname = 'chegadas_rodar' and schedule = '* * * * *') then
+    raise exception 'seed imova: o canal de chegada não ficou agendado a cada minuto';
+  end if;
+  if not exists (select 1 from pg_constraint
+                  where conname = 'ai_runs_purpose_check'
+                    and pg_get_constraintdef(oid) like '%identificar_canal%') then
+    raise exception 'seed imova: o propósito identificar_canal não está em ai_runs (migração 20261109230000)';
   end if;
   if n_cat <> 7 then raise exception 'seed imova: esperadas 7 categorias ativas, encontradas %', n_cat; end if;
   if n_pipe <> 2 then raise exception 'seed imova: esperados 2 funis, encontrados %', n_pipe; end if;

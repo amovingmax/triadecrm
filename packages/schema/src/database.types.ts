@@ -3413,6 +3413,102 @@ export type Database = {
         }
         Relationships: []
       }
+      chegadas: {
+        Row: {
+          ai_run_id: number | null
+          canal: string | null
+          canal_automatico: string | null
+          canal_marcado: string | null
+          codigo_do_anuncio: string | null
+          confianca: number | null
+          conversation_id: string
+          created_at: string
+          decidido_por: string | null
+          evidencias: Json
+          fecha_em: string
+          fechada_em: string | null
+          foto: Json | null
+          fotos_indisponiveis: number
+          ia_lida_ate: string | null
+          ia_pedida_em: string | null
+          id: string
+          inicio_em: string
+          leituras_da_ia: number
+          marcado_em: string | null
+          marcado_por: string | null
+          motivo: string | null
+          primeira_mensagem_id: string
+          regra_slug: string | null
+          situacao: string
+          subcanal_automatico: string | null
+          subcanal_marcado: string | null
+          sugestao_da_ia: Json | null
+          ultima_olhada_em: string | null
+        }
+        Insert: {
+          ai_run_id?: number | null
+          canal?: string | null
+          canal_automatico?: string | null
+          canal_marcado?: string | null
+          codigo_do_anuncio?: string | null
+          confianca?: number | null
+          conversation_id?: string
+          created_at?: string
+          decidido_por?: string | null
+          evidencias?: Json
+          fecha_em?: string
+          fechada_em?: string | null
+          foto?: Json | null
+          fotos_indisponiveis?: number
+          ia_lida_ate?: string | null
+          ia_pedida_em?: string | null
+          id?: string
+          inicio_em?: string
+          leituras_da_ia?: number
+          marcado_em?: string | null
+          marcado_por?: string | null
+          motivo?: string | null
+          primeira_mensagem_id?: string
+          regra_slug?: string | null
+          situacao?: string
+          subcanal_automatico?: string | null
+          subcanal_marcado?: string | null
+          sugestao_da_ia?: Json | null
+          ultima_olhada_em?: string | null
+        }
+        Update: {
+          ai_run_id?: number | null
+          canal?: string | null
+          canal_automatico?: string | null
+          canal_marcado?: string | null
+          codigo_do_anuncio?: string | null
+          confianca?: number | null
+          conversation_id?: string
+          created_at?: string
+          decidido_por?: string | null
+          evidencias?: Json
+          fecha_em?: string
+          fechada_em?: string | null
+          foto?: Json | null
+          fotos_indisponiveis?: number
+          ia_lida_ate?: string | null
+          ia_pedida_em?: string | null
+          id?: string
+          inicio_em?: string
+          leituras_da_ia?: number
+          marcado_em?: string | null
+          marcado_por?: string | null
+          motivo?: string | null
+          primeira_mensagem_id?: string
+          regra_slug?: string | null
+          situacao?: string
+          subcanal_automatico?: string | null
+          subcanal_marcado?: string | null
+          sugestao_da_ia?: Json | null
+          ultima_olhada_em?: string | null
+        }
+        Relationships: []
+      }
       cities: {
         Row: {
           created_at: string
@@ -9740,6 +9836,66 @@ export type Database = {
           },
         ]
       }
+      canal_por_conversa: {
+        Row: {
+          canal: string | null
+          canal_automatico: string | null
+          canal_marcado: string | null
+          codigo_do_anuncio: string | null
+          confianca: number | null
+          conversation_id: string | null
+          decidido_automatico_por: string | null
+          decidido_por: string | null
+          evidencias: Json | null
+          fechada_em: string | null
+          foto: Json | null
+          id: string | null
+          inicio_em: string | null
+          marcado_em: string | null
+          marcado_por: string | null
+          marcado_por_nome: string | null
+          motivo: string | null
+          motivo_automatico: string | null
+          organization_id: string | null
+          regra_slug: string | null
+          situacao: string | null
+          subcanal: string | null
+          subcanal_automatico: string | null
+          subcanal_marcado: string | null
+          sugestao_da_ia: Json | null
+        }
+        Relationships: []
+      }
+      chegadas_na_lista: {
+        Row: {
+          canal: string | null
+          canal_automatico: string | null
+          canal_marcado: string | null
+          codigo_do_anuncio: string | null
+          confianca: number | null
+          conversation_id: string | null
+          decidido_automatico_por: string | null
+          decidido_por: string | null
+          evidencias: Json | null
+          fechada_em: string | null
+          foto: Json | null
+          id: string | null
+          inicio_em: string | null
+          marcado_em: string | null
+          marcado_por: string | null
+          marcado_por_nome: string | null
+          motivo: string | null
+          motivo_automatico: string | null
+          organization_id: string | null
+          regra_slug: string | null
+          situacao: string | null
+          subcanal: string | null
+          subcanal_automatico: string | null
+          subcanal_marcado: string | null
+          sugestao_da_ia: Json | null
+        }
+        Relationships: []
+      }
       contacts_view: {
         Row: {
           anonymized_at: string | null
@@ -10263,6 +10419,20 @@ export type Database = {
       canal_pro_situacao: { Args: never; Returns: Json }
       canal_pro_trazer: { Args: { p_id: string }; Returns: Json }
       canal_pro_trocar_chave: { Args: never; Returns: Json }
+      canal_entrada_da_ia: { Args: { p_chegada_id: string }; Returns: Json }
+      canal_gravar_da_ia: {
+        Args: {
+          p_ai_run_id?: number | null
+          p_chegada_id: string
+          p_lida_ate: string
+          p_resultado: Json
+        }
+        Returns: Json
+      }
+      chegada_marcar: {
+        Args: { p_canal: string | null; p_chegada_id: string; p_subcanal?: string | null }
+        Returns: Json
+      }
       consultoria_marcar: {
         Args: { p_organization_ids: string[]; p_sim: boolean }
         Returns: Json
@@ -11049,6 +11219,27 @@ export type Database = {
           publicados: number
           sem_contato: number
           taxa_abertura: number
+        }[]
+      }
+      relatorio_por_canal: {
+        Args: { p_ate?: string; p_de?: string }
+        Returns: {
+          atendidos: number
+          canal: string
+          chegadas: number
+          com_foto_da_placa: number
+          com_foto_do_banner: number
+          corrigidos: number
+          ganhos: number
+          ja_na_base: number
+          leads_novos: number
+          por_gente: number
+          por_ia: number
+          por_regra: number
+          sem_ficha: number
+          subcanal: string
+          visitas_marcadas: number
+          visitas_realizadas: number
         }[]
       }
       relatorio_por_categoria: {

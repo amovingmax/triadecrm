@@ -29,6 +29,7 @@ import type { PedidoAoModelo, RespostaDoModelo, UsoDoModelo } from './cliente';
 
 /** Qual dos fluxos o esquema pedido descreve. */
 export type FluxoDoDuble =
+  | 'canal'
   | 'transcricao'
   | 'resumo'
   | 'followup'
@@ -59,6 +60,9 @@ function camposDoEsquema(esquema: Record<string, unknown>): string[] {
 
 export function fluxoDoEsquema(esquema: Record<string, unknown>): FluxoDoDuble {
   const campos = new Set(camposDoEsquema(esquema));
+  // O canal de chegada (Imova, 06/11/2026) vem primeiro: `subcanal` só existe nele, e
+  // ele tem `confianca` e `motivo`, que outros também têm.
+  if (campos.has('subcanal')) return 'canal';
   if (campos.has('textoLimpo')) return 'transcricao';
   // A IA que atende o cliente da Imova (06/11/2026): é a única que devolve uma ação
   // e as anotações do treino.
@@ -651,6 +655,61 @@ function aconselharClienteNoDuble(mensagem: string): Record<string, unknown> {
 }
 
 /**
+ * O canal de chegada no dublê (Imova, 06/11/2026). Não vê a imagem — nenhum dublê vê —:
+ * se veio foto, trata a primeira como placa da Imova; se o cliente falou de Instagram,
+ * Redes sociais; senão, Não identificado. O motivo começa com "Simulação:" para ninguém
+ * confundir com a leitura de verdade na tela local.
+ */
+function lerCanalNoDuble(mensagem: string, pedido: PedidoAoModelo): Record<string, unknown> {
+  const imagens = pedido.imagens?.length ?? 0;
+  const linhas = mensagem.split('\n');
+  const daFoto = linhas
+    .map((l) => /^\[(m\d+)\] .* — cliente mandou a foto (f\d)/.exec(l))
+    .find((achado) => achado !== null);
+  if (imagens > 0 && daFoto) {
+    const [, messageId, fotoId] = daFoto;
+    return {
+      canal: 'placa',
+      subcanal: 'foto_da_placa',
+      confianca: 0.9,
+      evidencias: [
+        { messageId, tipo: 'foto', trecho: 'Simulação: o dublê trata a primeira foto como placa da Imova' },
+      ],
+      foto: {
+        fotoId,
+        peca: 'placa',
+        marca: 'imova',
+        descricao: 'Simulação: o dublê não vê a imagem',
+        codigoDoImovel: null,
+      },
+      motivo: `Simulação: ${imagens} foto(s) recebida(s); a primeira foi tratada como placa.`,
+    };
+  }
+  const doCliente = linhas
+    .map((l) => /^\[(m\d+)\] .* — cliente: (.*)$/.exec(l))
+    .filter((achado): achado is RegExpExecArray => achado !== null);
+  const insta = doCliente.find(([, , texto]) => /\binsta(gram)?\b|\[\[INSTAGRAM_\d+\]\]/i.test(texto ?? ''));
+  if (insta) {
+    return {
+      canal: 'redes_sociais',
+      subcanal: 'instagram',
+      confianca: 0.75,
+      evidencias: [{ messageId: insta[1], tipo: 'texto', trecho: limitar(insta[2] ?? '', 160) }],
+      foto: null,
+      motivo: 'Simulação: o cliente falou do Instagram.',
+    };
+  }
+  return {
+    canal: 'nao_identificado',
+    subcanal: 'desconhecido',
+    confianca: 0.1,
+    evidencias: [],
+    foto: null,
+    motivo: 'Simulação: nada no começo da conversa diz como a pessoa chegou.',
+  };
+}
+
+/**
  * O conselheiro do imóvel no dublê (Imova, 09/11/2026): a pergunta e a objeção que mais
  * se repetem e os muito interessados viram as sugestões, cada uma com o número que veio.
  * Sem pergunta nem objeção, não há o que sustentar.
@@ -694,7 +753,17 @@ function aconselharImovelNoDuble(mensagem: string): Record<string, unknown> {
   return { sugestoes: sugestoes.slice(0, 3), dadosInsuficientes: false };
 }
 
-const RESPOSTAS: Readonly<Record<FluxoDoDuble, (mensagem: string) => Record<string, unknown>>> = {
+/**
+ * Tokens de uma imagem no dublê. A conta de verdade é por pixel (largura × altura / 750);
+ * o dublê não decodifica a imagem e usa a de uma foto típica do WhatsApp, só para os
+ * contadores de `ai_runs` mexerem quando vem foto.
+ */
+export const TOKENS_POR_IMAGEM_NO_DUBLE = 1600;
+
+const RESPOSTAS: Readonly<
+  Record<FluxoDoDuble, (mensagem: string, pedido: PedidoAoModelo) => Record<string, unknown>>
+> = {
+  canal: lerCanalNoDuble,
   transcricao: transcrever,
   resumo: resumir,
   followup: redigir,
@@ -731,24 +800,33 @@ export function clienteDuble(opcoes: OpcoesDoDuble = {}): {
   conversar(pedido: PedidoAoModelo): Promise<RespostaDoModelo>;
   /** Quantas chamadas passaram por aqui, por fluxo. */
   readonly chamadas: FluxoDoDuble[];
+  /** Quantas imagens vieram em cada chamada, na mesma ordem de `chamadas`. */
+  readonly imagens: number[];
 } {
   const sistemasVistos = new Set<string>();
   const chamadas: FluxoDoDuble[] = [];
+  const imagens: number[] = [];
 
   return {
     chamadas,
+    imagens,
     async conversar(pedido: PedidoAoModelo): Promise<RespostaDoModelo> {
       if (opcoes.falharCom !== undefined) throw opcoes.falharCom();
       const fluxo = fluxoDoEsquema(pedido.esquema);
       chamadas.push(fluxo);
+      const quantasImagens = pedido.imagens?.length ?? 0;
+      imagens.push(quantasImagens);
       const forcada = opcoes.forcar?.[fluxo];
-      const json = forcada === undefined ? RESPOSTAS[fluxo](pedido.mensagem) : forcada;
+      const json = forcada === undefined ? RESPOSTAS[fluxo](pedido.mensagem, pedido) : forcada;
 
       const tokensDoSistema = estimarTokens(pedido.sistema);
       const jaVisto = sistemasVistos.has(pedido.sistema);
       sistemasVistos.add(pedido.sistema);
       const uso: UsoDoModelo = {
-        entrada: estimarTokens(pedido.mensagem),
+        entrada:
+          estimarTokens(pedido.mensagem) +
+          quantasImagens * TOKENS_POR_IMAGEM_NO_DUBLE +
+          estimarTokens((pedido.imagens ?? []).map((i) => i.rotulo).join('\n')),
         saida: estimarTokens(JSON.stringify(json)),
         escritaDeCache: jaVisto ? 0 : tokensDoSistema,
         leituraDeCache: jaVisto ? tokensDoSistema : 0,

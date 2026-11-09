@@ -5,6 +5,7 @@ import { avaliacaoDoAtendimentoV1 } from './prompts/avaliacao-do-atendimento/v1'
 import { avaliacaoDoAtendimentoV2 } from './prompts/avaliacao-do-atendimento/v2';
 import { conselheiroDoImovelV1 } from './prompts/conselheiro-do-imovel/v1';
 import { conselheiroDoLeadV1 } from './prompts/conselheiro-do-lead/v1';
+import { canalDeChegadaV1 } from './prompts/canal-de-chegada/v1';
 import { classificarIntencaoV1 } from './prompts/classificar-intencao/v1';
 import { fichaDaConversaV1 } from './prompts/ficha-da-conversa/v1';
 import { leituraDoClienteV1 } from './prompts/leitura-do-cliente/v1';
@@ -58,6 +59,9 @@ export const CATALOGO = {
   // Só da Imova (09/11/2026): o "relatório que vende", por cliente e por imóvel.
   'conselheiro-do-lead': { 1: conselheiroDoLeadV1 },
   'conselheiro-do-imovel': { 1: conselheiroDoImovelV1 },
+  // Só da Imova (06/11/2026): o canal de chegada do lead, lido do começo da conversa e
+  // de até três fotos. O worker só o chama quando o banco é o da Imova.
+  'canal-de-chegada': { 1: canalDeChegadaV1 },
 } as const;
 
 export type IdDePrompt = keyof typeof CATALOGO;
@@ -89,6 +93,7 @@ export const VIGENTES = {
   'avaliacao-do-atendimento': 2,
   'conselheiro-do-lead': 1,
   'conselheiro-do-imovel': 1,
+  'canal-de-chegada': 1,
 } as const satisfies Record<IdDePrompt, number>;
 
 /** Uma versão específica, com o tipo daquela versão. */
@@ -149,4 +154,5 @@ export const INVENTARIO: readonly MetadadosDePrompt[] = [
   metadadosDoPrompt(resumoLigacaoV1),
   metadadosDoPrompt(followupLigacaoV1),
   metadadosDoPrompt(classificarIntencaoV1),
+  metadadosDoPrompt(canalDeChegadaV1),
 ];

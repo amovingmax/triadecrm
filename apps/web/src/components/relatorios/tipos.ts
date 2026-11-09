@@ -18,6 +18,8 @@ export type LinhaBairro = FunctionReturns<'relatorio_por_bairro'>[number];
 export type LinhaPessoa = FunctionReturns<'relatorio_por_responsavel'>[number];
 export type LinhaHorario = FunctionReturns<'relatorio_por_horario'>[number];
 export type LinhaFonte = FunctionReturns<'relatorio_por_fonte'>[number];
+/** O canal de chegada (06/11/2026, só Imova): uma linha por canal e subcanal. */
+export type LinhaCanal = FunctionReturns<'relatorio_por_canal'>[number];
 
 /** Uma temperatura da escala e quantas organizações estão nela hoje. */
 export type FatiaTermica = { temperatura: Temperature; organizacoes: number };
@@ -72,6 +74,7 @@ export type ChavePainel =
   | 'pessoas'
   | 'horarios'
   | 'fontes'
+  | 'canais'
   | 'base';
 
 /**
@@ -214,6 +217,21 @@ const TODOS_OS_PAINEIS: readonly (DefinicaoPainel & { onde: OndeAparece })[] = [
     descricao:
       'De cada fonte: quantos entraram, quantos responderam, autorizaram e publicaram.',
   },
+  // O CANAL DE CHEGADA (06/11/2026): só onde o módulo existe (a Imova), no fim da
+  // barra do "relatório que vende". Fora dele a leitura nem aparece na barra, e
+  // `?painel=canais` cai na de sempre.
+  ...(EMPRESA.modulos.canalDeChegada
+    ? [
+        {
+          chave: 'canais',
+          onde: 'imobiliaria',
+          rotulo: 'Canais',
+          titulo: 'Por onde os clientes chegaram',
+          descricao:
+            'Placa, anúncios, redes sociais ou outros: quantos procuraram por cada canal, quantos foram atendidos, visitaram e fecharam.',
+        } satisfies DefinicaoPainel & { onde: OndeAparece },
+      ]
+    : []),
   {
     chave: 'base',
     onde: 'captacao',

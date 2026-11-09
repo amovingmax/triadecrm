@@ -9,6 +9,7 @@ import { BarraDePeriodo, SeletorDePainel } from './barra-recorte';
 import { PainelAtendimento } from './painel-atendimento';
 import { PainelBairros } from './painel-bairros';
 import { PainelBase } from './painel-base';
+import { PainelCanais } from './painel-canais';
 import { PainelCategorias } from './painel-categorias';
 import { PainelFontes } from './painel-fontes';
 import { PainelFunil } from './painel-funil';
@@ -196,6 +197,8 @@ function Painel({
       return <PainelHorarios painel={painel} periodo={periodo} />;
     case 'fontes':
       return <PainelFontes painel={painel} periodo={periodo} />;
+    case 'canais':
+      return <PainelCanais painel={painel} periodo={periodo} />;
     case 'base':
       return <PainelBase painel={painel} periodo={periodo} />;
   }

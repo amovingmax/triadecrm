@@ -27,6 +27,7 @@ export * from './tipos';
 export * from './normalizadores';
 export * from './schemas';
 export * from './empresas';
+export * from './canal-de-chegada';
 
 /** Nome do pacote, útil em logs e testes de integração do workspace. */
 export const SCHEMA_PACKAGE = '@komune/schema' as const;

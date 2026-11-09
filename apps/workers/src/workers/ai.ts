@@ -38,7 +38,11 @@ import {
 import { criarPulso } from '../lib/pulso';
 
 import { ASR_PADRAO, type ConfiguracaoDoAsr } from '../ia/asr';
-import { chamadaDeTeste } from '../ia/chamada-de-teste';
+import {
+  PROMPTS_DA_CHAMADA_DE_TESTE,
+  chamadaDeTeste,
+  ePromptDaChamadaDeTeste,
+} from '../ia/chamada-de-teste';
 import type { ContextoDaIa } from '../ia/execucao';
 
 /** O balde privado das mídias recebidas (migração 20260905000201). */
@@ -87,7 +91,17 @@ function dormir(ms: number): Promise<void> {
 export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
   const { env, logger, opcoes } = ctx;
   const umaVez = opcoes['uma-vez'] === true;
-  const medir = opcoes['chamada-de-teste'] === true;
+  // `--chamada-de-teste` mede a ficha da conversa (o de sempre);
+  // `--chamada-de-teste=canal-de-chegada --foto=…` mede o canal com uma foto de teste.
+  const pedidoDeMedida = opcoes['chamada-de-teste'];
+  const medir = pedidoDeMedida !== undefined;
+  if (typeof pedidoDeMedida === 'string' && !ePromptDaChamadaDeTeste(pedidoDeMedida)) {
+    logger.error('chamada de teste para um prompt que ela não mede', {
+      pedido: pedidoDeMedida,
+      aceitos: PROMPTS_DA_CHAMADA_DE_TESTE.join(', '),
+    });
+    return 2;
+  }
 
   const cliente = criarClienteDaIa(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
   // O cliente real e o dublê entram pelo mesmo lugar: `ANTHROPIC_BASE_URL`
@@ -131,7 +145,12 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
   // laço da fila e não toca conversa de ninguém — o dado é o exemplo do prompt.
   if (medir) {
     const t0 = Date.now();
-    const r = await chamadaDeTeste(contexto);
+    const r = await chamadaDeTeste(contexto, {
+      ...(typeof pedidoDeMedida === 'string' && ePromptDaChamadaDeTeste(pedidoDeMedida)
+        ? { prompt: pedidoDeMedida }
+        : {}),
+      ...(typeof opcoes.foto === 'string' ? { foto: opcoes.foto } : {}),
+    });
     logger.info('chamada de teste concluída', {
       ai_run_id: r.aiRunId,
       prompt: r.promptVersion,
@@ -144,7 +163,7 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
         `✓ Chamada real ao modelo: ${r.promptVersion} (${r.modelo})`,
         `  custo desta chamada: US$ ${r.custoUsd.toFixed(6)}`,
         `  ai_runs.id: ${r.aiRunId} — tokens e cache estão na linha`,
-        `  o modelo devolveu score ${r.scoreIntencao}: ${r.resumo}`,
+        `  o modelo devolveu ${r.resposta}`,
         '',
         '  Rode de novo para ver a leitura de cache: a segunda chamada do mesmo',
         '  prompt custa menos, e é dela que sai a projeção do mês.',

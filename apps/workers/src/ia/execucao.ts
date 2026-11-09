@@ -25,6 +25,9 @@
  *   RespostaIlegivelError, ZodError → a saída não serve; repetir talvez sirva,
  *                                     mas não cinco vezes. Uma tentativa a mais
  *                                     é da fila; o teto é o da fila.
+ *   RecusaDoModeloError           → o modelo recusou (`stop_reason = refusal`):
+ *                                     determinístico, e a linha de `ai_runs` leva
+ *                                     os tokens, porque a recusa é cobrada.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -42,7 +45,7 @@ import {
   type PromptVersionado,
 } from '@komune/prompts';
 
-import { RespostaIlegivelError, type ClienteDoModelo } from './cliente';
+import { RecusaDoModeloError, RespostaIlegivelError, type ClienteDoModelo } from './cliente';
 import { USO_ZERADO, registrarChamada, type VinculosDaChamada } from './registro';
 
 import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
@@ -131,9 +134,9 @@ export interface ContextoDaIa {
   readonly empresa?: string | null;
   /**
    * O balde privado das mídias recebidas (`mensagens`, migração 20260905000201), de onde
-   * a IA que atende baixa a foto que o cliente mandou (09/11/2026). Ausente: a tarefa
-   * cai no balde do transcritor, que é o mesmo; sem nenhum dos dois, a foto conta como
-   * indisponível.
+   * o canal de chegada (06/11/2026) e a IA que atende (09/11/2026) baixam as fotos que o
+   * cliente mandou. Ausente: a tarefa cai no balde do transcritor, que é o mesmo; sem
+   * nenhum dos dois, a foto conta como indisponível.
    */
   readonly baldeDeMidias?: string;
 }
@@ -323,14 +326,25 @@ export async function executar<Entrada, Saida>(
     });
   } catch (erro) {
     const texto = erro instanceof Error ? erro.message : String(erro);
-    await registrarChamada(contexto.cliente, contexto.logger, {
+    // A recusa custou (veio com `usage`), e a linha leva os tokens: o orçamento conta o
+    // que a fatura conta. Os outros erros não têm uso a registrar.
+    const recusa = erro instanceof RecusaDoModeloError ? erro : null;
+    const registro = await registrarChamada(contexto.cliente, contexto.logger, {
       ...comum,
       situacao: 'erro',
-      uso: USO_ZERADO,
+      uso: recusa?.uso ?? USO_ZERADO,
       latenciaMs: Date.now() - comecou,
       saida: null,
       erro: texto.slice(0, 4000),
     });
+    if (recusa !== null) {
+      contexto.logger.warn('o modelo recusou o pedido', {
+        prompt: promptVersion,
+        ai_run_id: registro.id,
+        categoria: recusa.categoria,
+      });
+      throw recusa.registrada(registro.id);
+    }
     throw erro;
   }
 

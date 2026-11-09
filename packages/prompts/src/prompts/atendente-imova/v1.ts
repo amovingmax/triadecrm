@@ -53,7 +53,7 @@ export const CANAIS_DE_CHEGADA = [
   'placa',
   'anuncios',
   'redes_sociais',
-  'indicacao',
+  'outros',
   'nao_identificado',
 ] as const;
 

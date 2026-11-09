@@ -32,6 +32,7 @@ import {
   type RascunhoCru,
 } from './mensagens';
 import { porInteresse, type AtitudeDaConversa } from './atitude-regra';
+import { cabeNoCanal, type ChegadaDaConversa } from './canal-de-chegada-regra';
 import { fixadasPrimeiro, SEM_PREFERENCIAS, type Preferencias } from './preferencias';
 
 /**
@@ -485,10 +486,17 @@ export function normalizar(texto: string): string {
 /** Quem está olhando a lista: é o que "Minhas" e "Meu setor" perguntam. */
 export type QuemVe = { euId: string | null; meusSetores: readonly number[] };
 
+/**
+ * A chegada de cada conversa (06/11/2026, só Imova), para o filtro "Canal de
+ * chegada". Quem não tem o módulo não passa nada, e o filtro nunca liga.
+ */
+export type CanaisDasConversas = ReadonlyMap<string, ChegadaDaConversa> | null;
+
 export function aplicarFiltros(
   itens: ItemConversa[],
   f: FiltrosConversas,
   quem: QuemVe = { euId: null, meusSetores: [] },
+  canais: CanaisDasConversas = null,
 ): ItemConversa[] {
   const busca = normalizar(f.q);
 
@@ -556,6 +564,15 @@ export function aplicarFiltros(
 
     if (f.canal !== null && !item.canais.includes(f.canal)) return false;
 
+    // O canal de chegada é o da conversa em foco: parceiro sem fio não chegou
+    // por canal nenhum, e sai do recorte.
+    if (
+      f.chegada !== null &&
+      !cabeNoCanal(item.fio ? canais?.get(item.fio.id) : undefined, f.chegada)
+    ) {
+      return false;
+    }
+
     if (!cabeNaJanela(item.diasSemContato, f.janela)) return false;
 
     return true;
@@ -593,6 +610,7 @@ export function filtrarClientes(
   fios: readonly FioCru[],
   f: FiltrosConversas,
   quem: QuemVe = { euId: null, meusSetores: [] },
+  canais: CanaisDasConversas = null,
 ): FioCru[] {
   const busca = normalizar(f.q);
 
@@ -620,6 +638,7 @@ export function filtrarClientes(
     if (f.responsavelId !== null && fio.assignee_id !== f.responsavelId) return false;
     if (f.atendenteId !== null && fio.assignee_id !== f.atendenteId) return false;
     if (f.canal !== null && f.canal !== fio.channel) return false;
+    if (f.chegada !== null && !cabeNoCanal(canais?.get(fio.id), f.chegada)) return false;
     if (f.janela !== 'qualquer') return false;
 
     return true;

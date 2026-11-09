@@ -4,6 +4,13 @@ import type { OrgKind, Temperature } from '@komune/schema';
 import { EMPRESA } from '@/lib/empresa';
 import { createClient } from '@/lib/supabase/server';
 
+import {
+  COLUNAS_DA_CHEGADA,
+  montarChegada,
+  type ChegadaCrua,
+  type ChegadaDaConversa,
+} from '@/components/conversas/canal-de-chegada-regra';
+
 import type { FichaExcluidaLida } from './ficha-excluida';
 import {
   proximaAcaoAutomatica,
@@ -108,6 +115,13 @@ export type Ficha = {
    * erro de rede virava a afirmação "nenhuma mensagem trocada ainda".
    */
   conversaFalhou: boolean;
+  /**
+   * O canal de chegada de cada vez que a pessoa nos procurou (06/11/2026, só
+   * Imova): a primeira chegada e as voltas depois de 30 dias de silêncio, de
+   * todas as conversas da ficha. Vazio fora do módulo, sem conversa ou se a
+   * leitura falhar: o bloco "Como chegou" simplesmente não aparece.
+   */
+  chegadas: ChegadaDaConversa[];
 };
 
 /**
@@ -184,7 +198,7 @@ async function lerFicha(id: string): Promise<Ficha | null> {
   }
   if (!org) return null;
 
-  const [categorias, negocios, origem, time, conversas, funisLidos, gravadas] = await Promise.all([
+  const leituras = await Promise.all([
     supabase
       .from('organization_categories')
       .select('is_primary, category_id, categories(name)')
@@ -226,7 +240,19 @@ async function lerFicha(id: string): Promise<Ficha | null> {
           .select('deal_id, regra, texto, em, motivo, autor, deals!inner(organization_id)')
           .eq('deals.organization_id', id)
       : Promise.resolve({ data: [] as (ProximaAcaoGravada & { deal_id: string })[] }),
+    // O canal de chegada (Imova): a view só existe no banco de quem tem o módulo,
+    // e na KOMUNE nem é pedida. A RLS mostra só as conversas que a pessoa vê.
+    EMPRESA.modulos.canalDeChegada
+      ? supabase
+          .from('chegadas_na_lista')
+          .select(COLUNAS_DA_CHEGADA)
+          .eq('organization_id', id)
+          .order('inicio_em', { ascending: true })
+          .limit(50)
+      : Promise.resolve({ data: [] as ChegadaCrua[] }),
   ]);
+  const [categorias, negocios, origem, time, conversas, funisLidos, gravadas, chegadasLidas] =
+    leituras;
 
   const nomeDoTime = new Map((time.data ?? []).map((p) => [p.id, p.full_name]));
   const gravadaPorNegocio = new Map<string, ProximaAcaoGravada>(
@@ -317,6 +343,9 @@ async function lerFicha(id: string): Promise<Ficha | null> {
     etapasPorFunil,
     conversa,
     conversaFalhou: Boolean(conversas.error),
+    chegadas: ((chegadasLidas.data ?? []) as ChegadaCrua[])
+      .map(montarChegada)
+      .filter((c): c is ChegadaDaConversa => c !== null),
     negocios: (negocios.data ?? []).map((d) => ({
       id: d.id,
       funil: funilPorId.get(d.pipeline_id) ?? 'Funil',

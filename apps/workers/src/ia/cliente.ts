@@ -18,7 +18,8 @@
  * entrada nenhum. Ele recebe `sistema` e `mensagem` já prontos por
  * `prepararChamada` (packages/prompts), que é o único caminho sancionado até a
  * API, e devolve o JSON e a contagem de tokens. Trocar a ordem disso seria
- * contornar a pseudonimização.
+ * contornar a pseudonimização. As imagens (só o canal de chegada da Imova,
+ * 06/11/2026) chegam do mesmo jeito: já conferidas por `conferirImagens`.
  *
  * ## Duas decisões de requisição, por modelo (ADR-10)
  *
@@ -113,6 +114,39 @@ export class RespostaIlegivelError extends Error {
   constructor(motivo: string) {
     super(`A resposta do modelo não deu para ler: ${motivo}`);
     this.name = 'RespostaIlegivelError';
+  }
+}
+
+/**
+ * O modelo recusou (`stop_reason = 'refusal'`, HTTP 200): um classificador de segurança
+ * declinou o pedido. Vale para todos os prompts (06/11/2026).
+ *
+ * **Determinístico**: repetir o mesmo pedido dá a mesma recusa, e cada volta é paga —
+ * a recusa vem com `usage` e é cobrada. Antes disto a recusa caía em "resposta ilegível"
+ * (sem bloco de texto, ou texto que não era JSON) e girava na fila até a `ai_dlq`. O
+ * Haiku 5.5 não tem fallback do lado do servidor: quem trata é quem chamou.
+ *
+ * O `uso` vai junto porque a recusa custou; `aiRunId` é preenchido por `executar` quando
+ * a linha de `ai_runs` já foi escrita (ver `registrada`).
+ */
+export class RecusaDoModeloError extends Error {
+  readonly categoria: string | null;
+  readonly uso: UsoDoModelo;
+  readonly modelo: string;
+  readonly aiRunId: number | null;
+
+  constructor(categoria: string | null, uso: UsoDoModelo, modelo: string, aiRunId: number | null = null) {
+    super(`O modelo recusou o pedido (stop_reason refusal${categoria === null ? '' : `, categoria ${categoria}`})`);
+    this.name = 'RecusaDoModeloError';
+    this.categoria = categoria;
+    this.uso = uso;
+    this.modelo = modelo;
+    this.aiRunId = aiRunId;
+  }
+
+  /** A mesma recusa, agora com a linha de `ai_runs` que a registrou. */
+  registrada(aiRunId: number): RecusaDoModeloError {
+    return new RecusaDoModeloError(this.categoria, this.uso, this.modelo, aiRunId);
   }
 }
 
@@ -235,6 +269,11 @@ export interface OpcoesDoCliente {
    */
   readonly tentativas?: number;
   readonly tempoLimiteMs?: number;
+  /**
+   * O `fetch` que o SDK usa. Só os testes passam um: é como se prova, sem rede, o corpo
+   * EXATO que sai para a API (`cliente.test.ts`).
+   */
+  readonly fetch?: NonNullable<ConstructorParameters<typeof Anthropic>[0]>['fetch'];
 }
 
 /**
@@ -243,7 +282,8 @@ export interface OpcoesDoCliente {
  * Sem imagem: a string da mensagem, como sempre foi — é o que mantém a requisição dos
  * outros prompts idêntica byte a byte, e com ela o cache. Com imagem: cada foto
  * anunciada pelo rótulo e logo depois o bloco `image`, e a mensagem montada por último
- * (imagem antes do texto é a ordem que a API recomenda).
+ * (imagem antes do texto é a ordem que a API recomenda, e o prompt do canal diz isso ao
+ * modelo).
  */
 function conteudoDoUsuario(pedido: PedidoAoModelo): string | Anthropic.ContentBlockParam[] {
   const imagens = pedido.imagens ?? [];
@@ -275,10 +315,17 @@ export function corpoDaRequisicao(pedido: PedidoAoModelo): Anthropic.MessageCrea
   };
 }
 
+/** A categoria da recusa, quando a API a manda (`stop_details`, só em `refusal`). */
+function categoriaDaRecusa(resposta: unknown): string | null {
+  const detalhes = (resposta as { stop_details?: { category?: unknown } | null }).stop_details;
+  return typeof detalhes?.category === 'string' ? detalhes.category : null;
+}
+
 export function clienteAnthropic(opcoes: OpcoesDoCliente): ClienteDoModelo {
   const anthropic = new Anthropic({
     apiKey: opcoes.chave,
     ...(opcoes.baseUrl === undefined ? {} : { baseURL: opcoes.baseUrl }),
+    ...(opcoes.fetch === undefined ? {} : { fetch: opcoes.fetch }),
     maxRetries: opcoes.tentativas ?? 1,
     timeout: opcoes.tempoLimiteMs ?? 120_000,
   });
@@ -290,6 +337,22 @@ export function clienteAnthropic(opcoes: OpcoesDoCliente): ClienteDoModelo {
         resposta = await anthropic.messages.create(corpoDaRequisicao(pedido));
       } catch (erro) {
         throw traduzirErro(erro);
+      }
+
+      // A recusa é lida ANTES do texto: uma recusa pode vir sem bloco de texto, ou com
+      // texto que não é o JSON combinado, e as duas coisas virariam "resposta ilegível",
+      // que a fila repete.
+      if (resposta.stop_reason === 'refusal') {
+        throw new RecusaDoModeloError(
+          categoriaDaRecusa(resposta),
+          {
+            entrada: resposta.usage.input_tokens,
+            saida: resposta.usage.output_tokens,
+            escritaDeCache: resposta.usage.cache_creation_input_tokens ?? 0,
+            leituraDeCache: resposta.usage.cache_read_input_tokens ?? 0,
+          },
+          resposta.model,
+        );
       }
 
       const texto = primeiroTexto(resposta.content);

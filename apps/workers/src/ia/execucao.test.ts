@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { PRECOS, transcricaoAudioV1 } from '@komune/prompts';
+import {
+  ImagemNaoDeclaradaError,
+  PRECOS,
+  canalDeChegadaV1,
+  transcricaoAudioV1,
+} from '@komune/prompts';
 
 import { bancoFalso, type LinhaFalsa } from './banco-de-teste';
 import { clienteDuble } from './duble';
@@ -12,7 +17,7 @@ import {
   leadIdCurto,
   type ContextoDaIa,
 } from './execucao';
-import { RespostaIlegivelError } from './cliente';
+import { RecusaDoModeloError, RespostaIlegivelError } from './cliente';
 
 import type { LogFields, Logger } from '../lib/log';
 
@@ -322,5 +327,122 @@ describe('o freio do orçamento na entrega', () => {
       executar(contexto, transcricaoAudioV1, ENTRADA, CONTATO, { organizationId: 'org-1' }),
     ).rejects.toBeInstanceOf(AlvoSuprimidoError);
     expect(String((banco.tabelas.ai_runs?.[0] as LinhaFalsa).error)).toContain('suprimido');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Imagens e recusa (06/11/2026, canal de chegada da Imova)
+// ---------------------------------------------------------------------------
+
+const PNG_1X1 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+describe('executar com imagens', () => {
+  const exemploDoCanal = canalDeChegadaV1.exemplos[0]!;
+  const contatoDoCanal = { leadId: exemploDoCanal.entrada.leadId, nome: null };
+
+  it('prompt que não declara imagens não leva imagem: bloqueado, custo zero, nada sai', async () => {
+    const { banco, contexto, duble } = montar();
+    const erro = await executar(
+      contexto,
+      transcricaoAudioV1,
+      ENTRADA,
+      CONTATO,
+      { organizationId: 'org-1' },
+      { imagens: [{ mime: 'image/png', base64: PNG_1X1, rotulo: 'Foto f1, enviada na mensagem m1' }] },
+    ).catch((e: unknown) => e);
+
+    expect(erro).toBeInstanceOf(ImagemNaoDeclaradaError);
+    expect(duble.chamadas).toHaveLength(0);
+    const linha = banco.tabelas.ai_runs?.[0] as LinhaFalsa;
+    expect(linha.status).toBe('bloqueado');
+    expect(Number(linha.cost_usd)).toBe(0);
+    expect(String(linha.error)).toContain('não declara imagens');
+  });
+
+  it('rótulo com telefone é o guardrail de PII: bloqueado e tarefa, como a mensagem', async () => {
+    const { banco, contexto, duble } = montar();
+    const erro = await executar(
+      contexto,
+      canalDeChegadaV1,
+      exemploDoCanal.entrada,
+      contatoDoCanal,
+      { organizationId: 'org-1' },
+      { imagens: [{ mime: 'image/png', base64: PNG_1X1, rotulo: 'Foto de 84 99988-0011' }] },
+    ).catch((e: unknown) => e);
+
+    expect(erro).toBeInstanceOf(ChamadaBloqueadaError);
+    expect(duble.chamadas).toHaveLength(0);
+    expect((banco.tabelas.ai_runs?.[0] as LinhaFalsa).status).toBe('bloqueado');
+    expect(banco.tabelas.tasks).toHaveLength(1);
+  });
+
+  it('a imagem que passa na porteira chega ao modelo, com o tipo dos bytes', async () => {
+    const pedidos: { mime: string; rotulo: string }[][] = [];
+    const { contexto } = montar();
+    const original = contexto.modelo;
+    const espiao: ContextoDaIa = {
+      ...contexto,
+      modelo: {
+        conversar: (pedido) => {
+          pedidos.push((pedido.imagens ?? []).map((i) => ({ mime: i.mime, rotulo: i.rotulo })));
+          return original.conversar(pedido);
+        },
+      },
+    };
+    const executada = await executar(
+      espiao,
+      canalDeChegadaV1,
+      exemploDoCanal.entrada,
+      contatoDoCanal,
+      {},
+      // Dito JPEG, é PNG: vai como PNG, senão a API recusaria com 400.
+      { imagens: [{ mime: 'image/jpeg', base64: PNG_1X1, rotulo: 'Foto f1, enviada na mensagem m2' }] },
+    );
+    expect(pedidos).toEqual([[{ mime: 'image/png', rotulo: 'Foto f1, enviada na mensagem m2' }]]);
+    expect(executada.saida.canal).toBe('placa');
+  });
+
+  it('sem imagem, o pedido nem leva o campo: os outros prompts ficam como eram', async () => {
+    const chaves: string[][] = [];
+    const { contexto } = montar();
+    const original = contexto.modelo;
+    const espiao: ContextoDaIa = {
+      ...contexto,
+      modelo: {
+        conversar: (pedido) => {
+          chaves.push(Object.keys(pedido));
+          return original.conversar(pedido);
+        },
+      },
+    };
+    await executar(espiao, transcricaoAudioV1, ENTRADA, CONTATO, { organizationId: 'org-1' });
+    await executar(espiao, canalDeChegadaV1, exemploDoCanal.entrada, contatoDoCanal, {}, { imagens: [] });
+    for (const lista of chaves) expect(lista).not.toContain('imagens');
+  });
+});
+
+describe('executar quando o modelo recusa', () => {
+  it('registra a recusa com os tokens que ela custou e sobe com o ai_run', async () => {
+    const uso = { entrada: 3100, saida: 12, escritaDeCache: 0, leituraDeCache: 0 };
+    const { banco, contexto } = montar({}, {
+      falharCom: () => new RecusaDoModeloError('general_harms', uso, 'claude-haiku-5-5'),
+    });
+    const erro = await executar(
+      contexto,
+      canalDeChegadaV1,
+      canalDeChegadaV1.exemplos[0]!.entrada,
+      { leadId: 'lead-1a2b3c', nome: null },
+      { organizationId: 'org-1' },
+    ).catch((e: unknown) => e);
+
+    expect(erro).toBeInstanceOf(RecusaDoModeloError);
+    const linha = banco.tabelas.ai_runs?.[0] as LinhaFalsa;
+    expect((erro as RecusaDoModeloError).aiRunId).toBe(linha.id);
+    expect(linha.status).toBe('erro');
+    expect(linha.purpose).toBe('identificar_canal');
+    expect(Number(linha.tokens_in)).toBe(3100);
+    expect(Number(linha.cost_usd)).toBeGreaterThan(0);
+    expect(String(linha.error)).toContain('refusal');
   });
 });

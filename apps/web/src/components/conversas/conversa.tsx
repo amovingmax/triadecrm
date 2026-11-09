@@ -42,6 +42,7 @@ import { AssumirConversa, useEu } from './assumir-conversa';
 import { CONCLUIR_NA_EMPRESA, ConcluirConversa, FaixaDeConcluida } from './concluir-conversa';
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
 import { AtitudeDaConversaNoTopo } from './atitude';
+import { CanalNoTopo, ComoChegou } from './canal-de-chegada';
 import { EtiquetasDoParceiro } from './etiquetas-do-parceiro';
 import { OrigemNoPortal } from './origem-no-portal';
 import { origemCurta, useOrigemNoPortal } from './origem-no-portal-dados';
@@ -395,6 +396,9 @@ export function Conversa({
         <div className="flex flex-wrap items-center gap-1.5">{selos(true)}</div>
       </section>
 
+      {/* O canal de chegada (Imova, 06/11/2026) é da CONVERSA: sem fio, não há. */}
+      {fio ? <ComoChegou conversaId={fio.id} podeEscrever={Boolean(eu?.podeEscrever)} /> : null}
+
       <section aria-label="Ações" className="flex flex-col gap-2">
         <h3 className={ROTULO_DA_SECAO}>Ações</h3>
         <div className={cn('grid gap-2', naFolha ? 'grid-cols-2' : 'grid-cols-1')}>
@@ -514,6 +518,15 @@ export function Conversa({
             </span>
             <span className="sr-only">: ver a etapa, as etiquetas, as ações e a ficha</span>
           </button>
+          {/* O canal de chegada (Imova): o chip abre o porquê e a correção. No
+              celular ele mora na folha, em "Como chegou". */}
+          {fio ? (
+            <CanalNoTopo
+              conversaId={fio.id}
+              podeEscrever={Boolean(eu?.podeEscrever)}
+              className="mx-1 max-md:hidden conversa-estreita:hidden"
+            />
+          ) : null}
           {fio ? <BotaoDeBuscarNoFio className="max-md:hidden" /> : null}
           {eu?.podeEscrever ? (
             <BotaoLigar

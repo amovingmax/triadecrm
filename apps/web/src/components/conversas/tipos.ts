@@ -1,10 +1,12 @@
-import type {
-  ActivityType,
-  Channel,
-  MsgStatus,
-  MsgType,
-  OrgKind,
-  Temperature,
+import {
+  CANAIS_DE_CHEGADA,
+  type ActivityType,
+  type CanalDeChegada,
+  type Channel,
+  type MsgStatus,
+  type MsgType,
+  type OrgKind,
+  type Temperature,
 } from '@komune/schema';
 
 import { type AppRole } from '@/lib/auth/role';
@@ -371,6 +373,15 @@ export type FiltrosConversas = {
    * está ligada (`atitude-dados.ts`).
    */
   ordem: OrdemDaLista;
+  /**
+   * O CANAL DE CHEGADA (06/11/2026, só Imova): por onde a pessoa ficou sabendo da
+   * empresa — Placa, Anúncios, Redes sociais, Outros ou Não identificado. É
+   * outra pergunta que `canal` (o meio da interação: WhatsApp, ligação), por isso
+   * outro campo. Conversa sem chegada (aberta por nós) não entra em canal nenhum.
+   * Só existe onde o módulo `canalDeChegada` está ligado; fora dele, o endereço é
+   * ignorado.
+   */
+  chegada: CanalDeChegada | null;
 };
 
 export type OrdemDaLista = 'recentes' | 'interesse';
@@ -415,6 +426,7 @@ export const FILTROS_VAZIOS: FiltrosConversas = {
   arquivadas: false,
   concluidas: false,
   ordem: 'recentes',
+  chegada: null,
 };
 
 /** Há algum recorte ligado? Separa "a base está vazia" de "o filtro não achou nada". */
@@ -425,6 +437,7 @@ export function temRecorte(f: FiltrosConversas): boolean {
     f.atendenteId !== null ||
     f.escopo !== 'todas' ||
     f.canal !== null ||
+    f.chegada !== null ||
     f.janela !== 'qualquer' ||
     // "Mostrar arquivadas" É um recorte: sem ele aqui, a tela diria "a base está
     // vazia" quando na verdade só não há nada ARQUIVADO para mostrar.
@@ -439,6 +452,7 @@ export function contarFiltros(f: FiltrosConversas): number {
     f.responsavelId,
     f.atendenteId,
     f.canal,
+    f.chegada,
     f.janela === 'qualquer' ? null : f.janela,
   ].filter((v) => v !== null).length;
 }
@@ -449,6 +463,12 @@ export function contarFiltros(f: FiltrosConversas): number {
 
 function ehJanela(v: string): v is JanelaSemContato {
   return v in ROTULO_JANELA;
+}
+
+/** `?chegada=placa`, só onde o canal de chegada existe. */
+function chegadaDaUrl(v: string): CanalDeChegada | null {
+  if (!EMPRESA.modulos.canalDeChegada) return null;
+  return (CANAIS_DE_CHEGADA as readonly string[]).includes(v) ? (v as CanalDeChegada) : null;
 }
 
 /**
@@ -489,6 +509,7 @@ export function estadoDaUrl(
       // Só a Imova tem a ordem por interesse: na KOMUNE o parâmetro é ignorado.
       ordem:
         EMPRESA.modulos.atitudeDoCliente && texto('ordem') === 'interesse' ? 'interesse' : 'recentes',
+      chegada: chegadaDaUrl(texto('chegada')),
     },
     organizacaoId: texto('org') || null,
     aba: ehAbaDaEsquerda(texto('aba')) ? (texto('aba') as AbaDaEsquerda) : 'conversas',
@@ -512,6 +533,7 @@ export function urlDoEstado(
   if (f.atendenteId) p.set('atendente', f.atendenteId);
   if (f.escopo !== escopoPadrao) p.set('ver', f.escopo);
   if (f.canal) p.set('canal', f.canal);
+  if (f.chegada) p.set('chegada', f.chegada);
   if (f.janela !== 'qualquer') p.set('janela', f.janela);
   if (f.arquivadas) p.set('arquivadas', '1');
   if (f.concluidas) p.set('concluidas', '1');

@@ -112,7 +112,7 @@ describe('versionamento: a v2 não mexe na v1', () => {
 });
 
 describe('catálogo do Tríade', () => {
-  it('tem os treze prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
+  it('tem os catorze prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
     expect(Object.keys(CATALOGO)).toEqual([
       'transcricao-audio',
       'ficha-da-conversa',
@@ -137,6 +137,9 @@ describe('catálogo do Tríade', () => {
       // imóvel, com o mesmo propósito (`aconselhar_vendas`).
       'conselheiro-do-lead',
       'conselheiro-do-imovel',
+      // O canal de chegada do lead, só da Imova (06/11/2026): o primeiro prompt que lê
+      // foto do começo da conversa (até três).
+      'canal-de-chegada',
     ]);
   });
 

@@ -85,7 +85,7 @@ select ok((app.ia_pode_gastar('transcribe_audio') ->> 'pode')::boolean,
 
 -- Aqui, e não depois do teto: passada a linha do freio param os 14, e a
 -- partição deixaria de ser visível.
--- Os propósitos só da Imova (o canal de chegada, 20261106130000, a IA juíza
+-- Os propósitos só da Imova (o canal de chegada, 20261109230000, a IA juíza
 -- dos relatórios, 20261109200000, e o conselheiro de vendas, 20261109210000)
 -- existem no banco dela e no CI (sem
 -- identidade); no da KOMUNE as migrações não os criam. Cada um conta se está na
