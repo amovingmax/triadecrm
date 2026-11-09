@@ -9553,7 +9553,7 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 
 **Pedido do usuário:** "Me faça um relatório mais efetivo e que realmente mude e melhore as análises e que impulsione minhas vendas"; depois do primeiro protótipo, "um visual mais analítico e simples de ler", "quantas pessoas estão mais interessadas em um imóvel/terreno específico", "qual o imóvel mais interessado pelos leads", "o lead mais interessado para cada imóvel/terreno", "sugestões da IA para vender mais e pontos a falar ou fazer para cada" e "progresso da IA". Aprovado o protótipo (artifact WtP68UJeSK8dx3cMPSBFd4): "Gostei. Suba esse protótipo na aba de relatórios".
 
-**Entregue (nada em produção):**
+**Entregue (em produção na Imova desde 09/11/2026, ~16h; ver o fim desta entrada):**
 - **Branch atualizada com a main** (`0cf201e`, a IA que atende v2 e a foto do anúncio). A migração de 06/11 passou a `20261109200000` (a de antes ficaria atrás de migrações que já estão no ar).
 - **Banco** — `20261109210000_o_relatorio_que_vende` (só Imova; na KOMUNE não cria nada, conferido no banco de validação):
   - a carteira (`app.imova_carteira`: anúncios do CRM + os que só existem no Canal Pro, com a categoria) e o **interesse lead × imóvel** (`app.imova_interesses`): a leitura do conselheiro (`interesse_no_imovel`) e, onde ela não leu, os sinais certos — código citado, foto reconhecida, lead do portal, visita da IA, imóvel da ficha;
@@ -9577,8 +9577,19 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 - Canais de venda: o gráfico mostra "disponível quando o canal de chegada for publicado" (branch `canal-de-chegada`, sem commit).
 - O progresso da IA começa em 06/11 (uma semana de dado); as versões no gráfico são as que a IA que atende usou de fato.
 - Sem botões de ação em lote (mandar imóvel para os N, distribuir os sem dono): ficaram fora até haver o fluxo no CRM.
-- Para publicar (quando pedir): conferir o ar → main → `publicar-banco.mjs imova migrar` (as duas migrações) → blocos 12j e 12k com `app.exigir_empresa('imova')` → `fly deploy` do `imova-worker-ai` → site da Imova.
+- ~~Para publicar (quando pedir): conferir o ar → main → `publicar-banco.mjs imova migrar` (as duas migrações) → blocos 12j e 12k com `app.exigir_empresa('imova')` → `fly deploy` do `imova-worker-ai` → site da Imova.~~ Feito em 09/11 (abaixo).
+- A KOMUNE fica sem as duas migrações (sem efeito lá), como nas entregas anteriores só da Imova.
 
 **Decisão humana:**
 - Premissas de partida: 6% de comissão na venda e um aluguel na locação, sem meta. Ajustáveis na tela ("Ajustar", admin e gestor).
 - "Mandar o imóvel" segue como mensagem que a equipe confere antes de enviar; nada automático (WhatsApp intocável).
+
+**Em produção, só na Imova (09/11/2026, ~16h de Natal; pedido do usuário: "Quero que suba pro ar no ambiente da Imova"):**
+- **Ar conferido antes:** site `imova-b4i211oym` de `b1c5207` (ancestral da main, sem diferença em `apps/web` até `0cf201e`); banco com 192 migrações e só as duas desta entrada pendentes; `imova-worker-ai` v5 de `988f055`. Nada fora da main.
+- `main` `4a478e3` (avanço direto sobre `0cf201e`).
+- **Banco da Imova:** `20261109200000` e `20261109210000` por `publicar-banco.mjs imova migrar` (194 migrações). Depois, só os blocos 12j e 12k do seed, começando por `app.exigir_empresa('imova')`, tudo ou nada (ensaiado antes no banco local). Conferido: `ia.juiza`, `ia.conselheiro` e `relatorio.premissas` (6% · 1 aluguel · sem meta); os 4 agendamentos (`ia_juiza_enfileirar` 9h15 UTC, `ia_conselheiro_leads` 9h e 16h, `ia_conselheiro_imoveis` 9h40, `relatorio_imova_foto_da_mesa` 2h50); RLS nas 5 tabelas; as 4 portas do conselheiro fechadas para `authenticated`; propósito `aconselhar_vendas` no `ai_runs`.
+- `imova-worker-ai` **v6** no Fly, de cópia limpa de `4a478e3` (`~/triadecrm-pub-imova-4a478e3`); volta: v5.
+- **Site da Imova** `imova-errleqvqz` (de `4a478e3`, mesma cópia limpa), em `imova-crm.vercel.app`; volta: `imova-b4i211oym`. De fora: `/login` 200, `/relatorios` sem login vai para o login, `/auth/dev` 404.
+- **As leituras em produção, como gestor** (`authenticated`, transação da CLI): Visão geral 208 ms, Imóveis 66 ms (17 imóveis no ranking), Oportunidades 45 ms (5 na fila de hoje), Funil e equipe 144 ms, Progresso da IA 4 ms.
+- **Primeira rodada do conselheiro adiantada** (a do agendamento seria amanhã às 6h): 10 leads (6 com "dados insuficientes": há pouca conversa de cliente ainda) e 2 imóveis (PT0001 e TE0005, 3 sugestões cada), 12 chamadas, US$ 0,0066. Sugestões concretas e sem promessa (ex.: "Destaque no título que o valor de R$ 635.000 é por lote"). A juíza não tinha conversa para avaliar (0 na fila; a do treino fica de fora).
+- KOMUNE intocada: nem banco, nem site, nem motor.
