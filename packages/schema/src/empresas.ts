@@ -102,12 +102,12 @@ export interface Empresa {
      */
     iaQueAtende: boolean;
     /**
-     * Os relatórios da Imova (06/11/2026): a aba Relatórios abre na Visão geral e
-     * mostra Clientes quentes, Anúncios (cliques e contatos do Canal Pro),
-     * Mensagens que funcionam e a IA que atende (com a nota da IA juíza), além de
-     * Atendimento, Funil e Pessoas. Os painéis feitos para a captação da KOMUNE
-     * (Ligações do dia, Semana, Categorias, Bairros, Horários, Fontes e Base)
-     * saem da barra. No banco da KOMUNE a migração não cria nada.
+     * Os relatórios da Imova, o "relatório que vende" (09/11/2026; a primeira
+     * versão é de 06/11): a aba Relatórios tem Visão geral (abre primeiro),
+     * Imóveis (interessados por imóvel, o lead mais quente de cada um e as
+     * sugestões da IA), Oportunidades (o dinheiro parado e a fila de hoje), Funil
+     * e equipe, e Progresso da IA. Os painéis da captação da KOMUNE saem da
+     * barra. No banco da KOMUNE as migrações não criam nada.
      */
     relatoriosDaImova: boolean;
   };

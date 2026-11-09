@@ -1400,7 +1400,9 @@ begin
                                           round(avg(m.chance), 4) as chance
                                      from m group by 1) s), '[]'::jsonb),
     'fila', coalesce((select jsonb_agg(jsonb_build_object(
-                              'conversation_id', u.conversation_id, 'nome', u.nome, 'calor', u.calor, 'nivel', u.nivel,
+                              'conversation_id', u.conversation_id,
+                              'organization_id', (select c.organization_id from public.conversations c where c.id = u.conversation_id),
+                              'nome', u.nome, 'calor', u.calor, 'nivel', u.nivel,
                               'codigo', u.codigo, 'imovel', u.imovel, 'situacao', u.situacao, 'desde', u.desde,
                               'porque', u.porque, 'fazer', u.fazer, 'fazer_da_ia', u.fazer_da_ia,
                               'valor', u.valor, 'chance', u.chance, 'dono', u.dono)
@@ -1509,10 +1511,11 @@ begin
                   from (select (v_sem - 7 * g)::date as inicio from generate_series(0, 7) g) s),
     'entrou_no_ar_em', (select k.no_ar_desde from app.imova_carteira() k where k.codigo = p_codigo),
     'leads', coalesce((select jsonb_agg(jsonb_build_object(
-                                'conversation_id', x.conversation_id, 'nome', x.nome, 'calor', x.calor, 'nivel', x.nivel,
+                                'conversation_id', x.conversation_id, 'organization_id', x.organization_id,
+                                'nome', x.nome, 'calor', x.calor, 'nivel', x.nivel,
                                 'situacao', x.situacao, 'falar', x.falar, 'dono', x.dono)
                               order by x.calor desc, x.nome)
-                         from (select l.conversation_id, l.nome, l.calor, i.nivel,
+                         from (select l.conversation_id, l.organization_id, l.nome, l.calor, i.nivel,
                                       coalesce(l.conselho_situacao, f.motivo) as situacao,
                                       coalesce(l.conselho_falar, f.proxima_acao) as falar, l.dono
                                  from l join i on i.conversation_id = l.conversation_id

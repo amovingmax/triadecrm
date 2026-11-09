@@ -12,7 +12,7 @@ import { buscarParceiros, chaveDaBusca } from '@/components/parceiros/busca';
 import { carregarConsultoria, CHAVE_CONSULTORIA } from '@/components/parceiros/consultoria';
 import { filtrosDaUrl } from '@/components/parceiros/tipos';
 import { chaveDoRelatorio } from '@/components/relatorios/dados';
-import { carregarVisaoGeral } from '@/components/relatorios/dados-imova';
+import { carregarPainelVisao } from '@/components/relatorios/dados-vende';
 import { periodoDaUrl } from '@/components/relatorios/periodo';
 import { buscarFila, buscarResumo, chaveDaFila } from '@/components/revisao/dados';
 import { FILTROS_INICIAIS } from '@/components/revisao/tipos';
@@ -89,14 +89,15 @@ export const ADIANTADORES: Readonly<Partial<Record<string, Adiantador>>> = {
   },
 
   // O painel que abre é o das ligações de hoje (`painelDaUrl`), do time inteiro.
-  // Na Imova (06/11/2026) abre a Visão geral, nos últimos 30 dias.
+  // Na Imova abre a Visão geral do "relatório que vende" (09/11/2026), nos últimos
+  // 30 dias, com a mesma chave de `painel-vende-visao.tsx`.
   '/relatorios': async (cliente) => {
     const hoje = hojeEmNatal();
     if (EMPRESA.modulos.relatoriosDaImova) {
       const periodo = periodoDaUrl({}, hoje);
       await seFaltar(cliente, {
-        queryKey: chaveDoRelatorio('visao', periodo),
-        queryFn: () => carregarVisaoGeral(periodo),
+        queryKey: chaveDoRelatorio('vende-visao', periodo),
+        queryFn: () => carregarPainelVisao(periodo),
       });
       return;
     }

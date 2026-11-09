@@ -57,12 +57,12 @@ export type Coluna<L> = {
 
 /** Os painéis da tela, na ordem da barra. */
 export type ChavePainel =
-  // Os da Imova (06/11/2026): `relatoriosDaImova`.
+  // Os da Imova: o "relatório que vende" (09/11/2026), `relatoriosDaImova`.
   | 'visao'
-  | 'quentes'
-  | 'anuncios'
-  | 'mensagens'
-  | 'ia'
+  | 'imoveis'
+  | 'oportunidades'
+  | 'funil_equipe'
+  | 'progresso_ia'
   | 'ligacoes'
   | 'atendimento'
   | 'semana'
@@ -74,6 +74,12 @@ export type ChavePainel =
   | 'fontes'
   | 'base';
 
+/**
+ * Troca de aba sem sair da tela. `alvo` é o que a aba de destino abre já escolhido
+ * (o código do imóvel, quando a sugestão da Visão geral é de um imóvel).
+ */
+export type AbrirPainel = (chave: ChavePainel, alvo?: string | null) => void;
+
 export type DefinicaoPainel = {
   chave: ChavePainel;
   rotulo: string;
@@ -84,54 +90,60 @@ export type DefinicaoPainel = {
 
 /**
  * Em que tela de Relatórios o painel aparece. A da KOMUNE é a da captação de
- * fornecedores; a da Imova (`relatoriosDaImova`, 06/11/2026) é a de uma
- * imobiliária, e os painéis feitos para a captação saem da barra dela.
+ * fornecedores; a da Imova (`relatoriosDaImova`, 06/11/2026; o "relatório que vende"
+ * desde 09/11/2026) é a de uma imobiliária, e os painéis feitos para a captação
+ * saem da barra dela.
  */
 type OndeAparece = 'captacao' | 'imobiliaria' | 'ambas';
 
 const TODOS_OS_PAINEIS: readonly (DefinicaoPainel & { onde: OndeAparece })[] = [
-  // ---- Os da Imova, na ordem que o usuário pediu: a Visão geral abre. ----
+  // ---- Os da Imova: o "relatório que vende" (09/11/2026), na ordem do protótipo
+  // aprovado. A Visão geral abre. Substituem os cinco de 06/11 (Visão geral,
+  // Clientes quentes, Anúncios, Mensagens e IA que atende). ----
   {
     chave: 'visao',
     rotulo: 'Visão geral',
-    titulo: 'O período em números e o que cobrar hoje',
+    titulo: 'O período em números e onde está o dinheiro',
     descricao:
-      'Quem chegou e em quanto tempo foi atendido, quem está esperando agora, as visitas, o funil dos clientes, as objeções e o que os clientes procuram.',
+      'Os números do período contra o período anterior, o que a IA sugere para vender mais, a previsão do mês, os imóveis mais procurados, o funil, a IA e a comissão parada.',
     onde: 'imobiliaria',
   },
   {
-    chave: 'quentes',
-    rotulo: 'Clientes quentes',
-    titulo: 'Os clientes mais quentes agora',
+    chave: 'imoveis',
+    rotulo: 'Imóveis',
+    titulo: 'Quem quer cada imóvel e o que falar',
     descricao:
-      'Quem está mais perto de comprar ou alugar, pela atitude e pela leitura da IA: o que procura, a objeção, quem atende e o próximo passo.',
+      'Os imóveis no ar pelo número de leads interessados e pelo nível de interesse. Escolha um para ver quem são, o que perguntam, o que trava e o que a IA sugere.',
     onde: 'imobiliaria',
   },
   {
-    chave: 'anuncios',
-    rotulo: 'Anúncios',
-    titulo: 'Cliques e contatos de cada anúncio',
+    chave: 'oportunidades',
+    rotulo: 'Oportunidades',
+    titulo: 'O dinheiro parado agora e a fila de hoje',
     descricao:
-      'Quantas vezes cada anúncio foi aberto e quantos contatos rendeu no ZAP, no Viva Real e na OLX, e quantas conversas e visitas ele virou no CRM.',
+      'Os leads com chance de negócio e nenhuma ação em dia: por que estão parados, quanto valem de comissão provável, com quem estão e o que fazer com cada um.',
     onde: 'imobiliaria',
   },
   {
-    chave: 'mensagens',
-    rotulo: 'Mensagens',
-    titulo: 'As mensagens que mais funcionam',
+    chave: 'funil_equipe',
+    rotulo: 'Funil e equipe',
+    titulo: 'Onde o funil trava e quem converte',
     descricao:
-      'Dos modelos, das respostas rápidas e dos textos que o time repete: quantos clientes responderam em 24 h, quantos ficaram interessados e quantos marcaram visita.',
+      'O placar do mês, cada passagem do funil e o que travou, o que faz o lead marcar visita, as objeções, os canais, a equipe e as mensagens que funcionam.',
     onde: 'imobiliaria',
   },
   {
-    chave: 'ia',
-    rotulo: 'IA que atende',
-    titulo: 'Como a IA está atendendo',
+    chave: 'progresso_ia',
+    rotulo: 'Progresso da IA',
+    titulo: 'Como a IA está melhorando',
     descricao:
-      'Semana a semana: se ela deixa os clientes mais interessados, tira as dúvidas, dá informação útil, marca visitas e quando passa para um corretor.',
+      'Desde que a IA começou, semana a semana: as notas da avaliação diária, se o cliente sai mais interessado, o que ela resolve sozinha, o que cada versão mudou e o que ainda falta.',
     onde: 'imobiliaria',
   },
-  // ---- Os de sempre (a KOMUNE vê todos; a Imova, os marcados "ambas"). ----
+  // ---- Os da captação: a KOMUNE vê todos, na ordem de sempre. Desde 09/11/2026
+  // nenhum é "ambas": Atendimento, Funil e Pessoas saíram da barra da Imova, que
+  // tem o Funil e equipe no lugar deles. O "ambas" continua valendo para o painel
+  // que um dia servir às duas. ----
   {
     // O primeiro, e o que abre: desde o pivô de 06/10/2026 a pergunta de todo
     // dia é "o que cada pessoa que ligou fez hoje?".
@@ -144,7 +156,7 @@ const TODOS_OS_PAINEIS: readonly (DefinicaoPainel & { onde: OndeAparece })[] = [
   },
   {
     chave: 'atendimento',
-    onde: 'ambas',
+    onde: 'captacao',
     rotulo: 'Atendimento',
     titulo: 'Como o time atende no WhatsApp',
     descricao:
@@ -160,7 +172,7 @@ const TODOS_OS_PAINEIS: readonly (DefinicaoPainel & { onde: OndeAparece })[] = [
   },
   {
     chave: 'funil',
-    onde: 'ambas',
+    onde: 'captacao',
     rotulo: 'Funil',
     titulo: 'Funil por etapa e conversão',
     descricao:
@@ -182,7 +194,7 @@ const TODOS_OS_PAINEIS: readonly (DefinicaoPainel & { onde: OndeAparece })[] = [
   },
   {
     chave: 'pessoas',
-    onde: 'ambas',
+    onde: 'captacao',
     rotulo: 'Pessoas',
     titulo: 'Atividade por responsável',
     descricao: 'Portas, ligações, visitas, reuniões e o prazo das próximas ações de cada pessoa.',
@@ -248,6 +260,9 @@ export function painelDaUrl(
  */
 export function painelUsaPeriodo(chave: ChavePainel): boolean {
   // "Ligações do dia" é recortado por UM dia, com passo próprio, pela mesma razão.
-  // "Clientes quentes" é o retrato de AGORA: o calor de hoje não tem período.
-  return chave !== 'semana' && chave !== 'ligacoes' && chave !== 'quentes';
+  // "Oportunidades" é o retrato de AGORA (o dinheiro parado hoje não tem período), e
+  // "Progresso da IA" conta desde que a IA começou.
+  return (
+    chave !== 'semana' && chave !== 'ligacoes' && chave !== 'oportunidades' && chave !== 'progresso_ia'
+  );
 }

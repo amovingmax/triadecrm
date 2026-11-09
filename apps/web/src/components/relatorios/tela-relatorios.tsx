@@ -1,27 +1,27 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { PainelLigacoesDoDia } from '@/components/ligacoes-do-dia/painel-do-time';
 import { EMPRESA } from '@/lib/empresa';
 
 import { BarraDePeriodo, SeletorDePainel } from './barra-recorte';
-import { PainelAnuncios } from './painel-anuncios';
 import { PainelAtendimento } from './painel-atendimento';
 import { PainelBairros } from './painel-bairros';
 import { PainelBase } from './painel-base';
 import { PainelCategorias } from './painel-categorias';
-import { PainelClientesQuentes } from './painel-clientes-quentes';
 import { PainelFontes } from './painel-fontes';
 import { PainelFunil } from './painel-funil';
 import { PainelHorarios } from './painel-horarios';
-import { PainelIa } from './painel-ia';
-import { PainelMensagens } from './painel-mensagens';
 import { PainelPessoas } from './painel-pessoas';
 import { PainelSemana } from './painel-semana';
-import { PainelVisaoGeral } from './painel-visao-geral';
+import { PainelVendeFunil } from './painel-vende-funil';
+import { PainelVendeIA } from './painel-vende-ia';
+import { PainelVendeImoveis } from './painel-vende-imoveis';
+import { PainelVendeOportunidades } from './painel-vende-oportunidades';
+import { PainelVendeVisao } from './painel-vende-visao';
 import { periodoValido, urlDoRecorte, type Periodo } from './periodo';
-import { PAINEIS, painelUsaPeriodo, type ChavePainel } from './tipos';
+import { PAINEIS, painelUsaPeriodo, type AbrirPainel, type ChavePainel } from './tipos';
 
 /**
  * A tela de Relatórios (RF-REL-01 a RF-REL-11).
@@ -57,6 +57,22 @@ export function TelaRelatorios({
   // A semana mora aqui, e não dentro do painel, porque é ela que vai para a URL:
   // o painel avisa qual semana está mostrando e a tela escreve o endereço.
   const [semana, setSemana] = useState<string | null>(semanaInicial);
+  // O que a aba de destino abre já escolhido (o imóvel da sugestão da Visão geral).
+  const [alvo, setAlvo] = useState<string | null>(null);
+  const barra = useRef<HTMLDivElement>(null);
+
+  const trocarPainel = useCallback((chave: ChavePainel) => {
+    setAlvo(null);
+    setPainel(chave);
+  }, []);
+
+  // Trocar de aba por um cartão (o "Ver…" ou a sugestão) leva a pessoa de volta à
+  // barra: a aba nova começa no topo, e o clique foi lá embaixo.
+  const abrirPainel = useCallback<AbrirPainel>((chave, destino) => {
+    setAlvo(destino ?? null);
+    setPainel(chave);
+    requestAnimationFrame(() => barra.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, []);
 
   const trocarPeriodo = useCallback((novo: Periodo) => {
     setPeriodo(novo);
@@ -91,7 +107,7 @@ export function TelaRelatorios({
             espaço para ela. */}
         <p className="hidden max-w-[90ch] text-sm text-muted-foreground md:block">
           {EMPRESA.modulos.relatoriosDaImova
-            ? 'Quem está mais perto de comprar, o que cada anúncio rende, que mensagem funciona e como a IA está atendendo. O que está na tela desce em CSV.'
+            ? 'Onde está a comissão parada, quem quer cada imóvel e o que falar, onde o funil trava, quem converte na equipe e como a IA está melhorando.'
             : 'Onde o funil trava, que categoria secou, que bairro ainda não foi batido. O que está na tela desce em CSV.'}
         </p>
       </header>
@@ -99,8 +115,8 @@ export function TelaRelatorios({
       {/* A barra de recorte vira CARTÃO (29/09/2026): entre dois filetes ela lia
           como divisória, e o que ela é de fato é o controle da tela — o que
           decide todos os números abaixo. */}
-      <div className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-4">
-        <SeletorDePainel painel={painel} aoTrocar={setPainel} />
+      <div ref={barra} className="sombra-base flex scroll-mt-4 flex-col gap-3 rounded-xl bg-card p-4">
+        <SeletorDePainel painel={painel} aoTrocar={trocarPainel} />
         {/* A leitura da semana tem recorte próprio (a semana civil) e seletor
             próprio: a barra de 7/30 dias ali não mudaria número nenhum. */}
         {painelUsaPeriodo(painel) ? (
@@ -115,7 +131,8 @@ export function TelaRelatorios({
           semana={semana}
           aoTrocarSemana={setSemana}
           podeGerarSemana={podeGerarSemana}
-          aoAbrirPainel={setPainel}
+          aoAbrirPainel={abrirPainel}
+          alvo={alvo}
         />
       ) : null}
     </div>
@@ -129,29 +146,31 @@ function Painel({
   aoTrocarSemana,
   podeGerarSemana,
   aoAbrirPainel,
+  alvo,
 }: {
   chave: ChavePainel;
   periodo: Periodo;
   semana: string | null;
   aoTrocarSemana: (semana: string) => void;
   podeGerarSemana: boolean;
-  aoAbrirPainel: (chave: ChavePainel) => void;
+  aoAbrirPainel: AbrirPainel;
+  alvo: string | null;
 }) {
   const painel = PAINEIS.find((item) => item.chave === chave);
   if (!painel) return null;
 
   switch (chave) {
-    // Os da Imova (06/11/2026).
+    // Os da Imova: o "relatório que vende" (09/11/2026).
     case 'visao':
-      return <PainelVisaoGeral painel={painel} periodo={periodo} aoAbrirPainel={aoAbrirPainel} />;
-    case 'quentes':
-      return <PainelClientesQuentes painel={painel} />;
-    case 'anuncios':
-      return <PainelAnuncios painel={painel} periodo={periodo} />;
-    case 'mensagens':
-      return <PainelMensagens painel={painel} periodo={periodo} />;
-    case 'ia':
-      return <PainelIa painel={painel} periodo={periodo} />;
+      return <PainelVendeVisao painel={painel} periodo={periodo} aoAbrirPainel={aoAbrirPainel} />;
+    case 'imoveis':
+      return <PainelVendeImoveis painel={painel} periodo={periodo} imovelInicial={alvo} />;
+    case 'oportunidades':
+      return <PainelVendeOportunidades painel={painel} />;
+    case 'funil_equipe':
+      return <PainelVendeFunil painel={painel} periodo={periodo} />;
+    case 'progresso_ia':
+      return <PainelVendeIA painel={painel} />;
     case 'ligacoes':
       return <PainelLigacoesDoDia painel={painel} />;
     case 'atendimento':
