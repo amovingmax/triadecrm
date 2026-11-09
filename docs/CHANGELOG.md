@@ -9653,3 +9653,22 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 - Continuam as pendências da entrada de 06/11: fotos reais para o eval, a política de privacidade com o Dennis, o encaixe dos leads do Canal Pro (`app.canal_sinal_do_portal`) quando eles chegarem.
 
 **Decisão humana:** nenhuma nova. A de hoje (Outros no lugar de Indicação) já foi tomada.
+
+## 09/11/2026 (noite) — Relatórios da Imova: o teste da foto da noite e as funções do `app` sem EXECUTE público (branch `relatorios-imova-permissoes`; RF-REL-01, PRD §10)
+
+**Achado da sessão do canal de chegada**, num banco de validação criado do zero na main `b2558f4`: o pgTAP 137 falhava no item 44 e o 09 nos itens 49 e 50.
+
+**Entregue (nada em produção):**
+- **pgTAP 137, item 44** — o erro era do teste, não da função. Ele pedia "≥ 3" leads na foto da noite, mas no fim do teste só duas conversas dele seguem paradas (a que esfriou e a da promessa; a equipe respondeu a terceira). Passava no banco local só por causa das outras conversas que estão lá. Agora a foto é comparada com a mesa de agora (`app.imova_mesa_agora`) e precisa guardar as duas conversas do teste.
+- **Migração `20261109234000_relatorios_da_imova_sem_execucao_publica`** — a `20261109200000` criou nove funções no `app` sem tirar o EXECUTE de PUBLIC, que o `anon` herda; a décima é a `app.codigo_de_anuncio_valido` (Anúncios, 05/11).
+  - Gatilhos (`canal_pro_fotografar`, `ficha_anotar_nota`), juíza (`ia_juiza_config`, `ia_juiza_enfileirar`) e `canal_pro_total`: sem EXECUTE para PUBLIC, anon e authenticated. Só são chamados por gatilho, por função SECURITY DEFINER, pelo pg_cron e pela própria migração.
+  - Ajudantes de leitura (`atitude_em`, `atitude_degrau`, `texto_de_modelo`, `procura_em_categoria`, `codigo_de_anuncio_valido`): perdem só PUBLIC e anon; authenticated e service_role continuam.
+  - Mexe só no que existe: na KOMUNE essas funções não existem e nada muda.
+- **Sem porta aberta de verdade em produção** (lido na Imova): o `anon` não tem USAGE no schema `app`, e o `app` não está na API.
+
+**Verificado (banco local da Imova):**
+- 137 com as conversas e anúncios esvaziados dentro da transação do teste (o TRUNCATE é desfeito no rollback): o teste antigo falha no 44, o novo passa; com o banco cheio, os dois passam.
+- 09: antes, o 49 tinha 2 e o 50 tinha 10 funções; depois, os dois passam. Os itens 15, 16, 17 e 22 (embaixador) falham antes e depois só no banco da Imova, que tem outros funis; não são desta entrega.
+- 133 (66), 134 (55) e 137 (45) verdes com a migração aplicada; na KOMUNE local, a migração roda sem erro e sem mudar nada (numa transação desfeita).
+
+**Para publicar, só com pedido:** depois que a publicação do canal de chegada terminar, `main` + push e `publicar-banco.mjs imova migrar` (só esta migração). Site e motor não mudam.

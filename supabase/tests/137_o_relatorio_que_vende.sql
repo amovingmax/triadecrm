@@ -296,11 +296,16 @@ select pg_temp.sair();
 
 select is((select count(*)::int from public.messages), (select n from t136_msgs),
           'nenhuma leitura grava mensagem');
-select ok((app.relatorio_imova_fotografar_mesa() ->> 'leads')::int >= 3, 'a foto da noite conta as oportunidades');
+-- Conta contra a mesa de agora, e não contra um número fixo: no fim do teste só
+-- b (esfriando) e c (promessa) seguem parados — a equipe respondeu a "a" — e um
+-- banco com outras conversas tem mais (o "≥ 3" antigo só passava assim).
+select is((app.relatorio_imova_fotografar_mesa() ->> 'leads')::int,
+          (select count(distinct m.conversation_id)::int from app.imova_mesa_agora() m),
+          'a foto da noite conta um lead por oportunidade parada');
 select ok(exists (select 1 from public.relatorio_imova_mesa_dia d
                        where d.dia = (now() at time zone 'America/Fortaleza')::date
-                         and pg_temp.id('c') = any (d.conversas)),
-          'e guarda quais leads');
+                         and array[pg_temp.id('b'), pg_temp.id('c')] <@ d.conversas),
+          'e guarda quais leads (o que esfriou e o da promessa)');
 
 select * from finish();
 rollback;
