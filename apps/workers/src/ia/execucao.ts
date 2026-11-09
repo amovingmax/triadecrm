@@ -29,11 +29,15 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  ImagemNaoDeclaradaError,
   PiiNaChamadaError,
   TipoNaoAuditavelError,
+  conferirImagens,
   esquemaDeSaida,
   prepararChamada,
   type ContextoDoContato,
+  type ImagemAceita,
+  type ImagemParaOModelo,
   type MapaDePseudonimos,
   type PromptVersionado,
 } from '@komune/prompts';
@@ -125,6 +129,23 @@ export interface ContextoDaIa {
    * entrada que só o banco dela monta. Ausente ou outra empresa: o caminho de sempre.
    */
   readonly empresa?: string | null;
+  /**
+   * O balde privado das mídias recebidas (`mensagens`, migração 20260905000201), de onde
+   * a IA que atende baixa a foto que o cliente mandou (09/11/2026). Ausente: a tarefa
+   * cai no balde do transcritor, que é o mesmo; sem nenhum dos dois, a foto conta como
+   * indisponível.
+   */
+  readonly baldeDeMidias?: string;
+}
+
+/** O que uma chamada leva além do texto. Hoje, só imagens. */
+export interface OpcoesDaExecucao {
+  /**
+   * Passam por `conferirImagens` antes do POST: prompt que não as declarou recusa
+   * (`ImagemNaoDeclaradaError`, registrado em `ai_runs` como `bloqueado`), e o rótulo de
+   * cada uma é auditado como a mensagem.
+   */
+  readonly imagens?: readonly ImagemParaOModelo[];
 }
 
 /** Tudo que a tarefa de áudio precisa saber sobre quem ouve. */
@@ -163,6 +184,7 @@ export async function executar<Entrada, Saida>(
   entrada: unknown,
   contato: ContextoDoContato,
   vinculos: VinculosDaChamada,
+  opcoes: OpcoesDaExecucao = {},
 ): Promise<Executada<Saida>> {
   const promptVersion = `${prompt.id}@v${prompt.versao}`;
   const comum = {
@@ -194,6 +216,44 @@ export async function executar<Entrada, Saida>(
         erro: erro.name,
       });
       throw new ChamadaBloqueadaError(erro.message, registro.id, taskId);
+    }
+    throw erro;
+  }
+
+  // ---------------------------------------------------------------- imagens
+  // A porteira das imagens é parte da montagem: o que ela recusa não sai, e fica em
+  // `ai_runs` como `bloqueado`, custo zero. Rótulo com dado pessoal é o mesmo guardrail
+  // da mensagem, e vira tarefa como ele; imagem num prompt que não a declarou é erro de
+  // código, não de dado, e só fica registrada.
+  let imagens: readonly ImagemAceita[];
+  try {
+    const conferidas = conferirImagens(prompt, opcoes.imagens ?? []);
+    imagens = conferidas.aceitas;
+    if (conferidas.descartadas.length > 0) {
+      contexto.logger.warn('imagens que não foram ao modelo', {
+        prompt: promptVersion,
+        descartadas: conferidas.descartadas.map((d) => `${d.rotulo}: ${d.motivo}`),
+      });
+    }
+  } catch (erro) {
+    if (erro instanceof ImagemNaoDeclaradaError || erro instanceof PiiNaChamadaError) {
+      const registro = await registrarChamada(contexto.cliente, contexto.logger, {
+        ...comum,
+        situacao: 'bloqueado',
+        uso: USO_ZERADO,
+        latenciaMs: null,
+        saida: null,
+        erro: erro.message.slice(0, 4000),
+      });
+      contexto.logger.warn('chamada bloqueada na porteira das imagens', {
+        prompt: promptVersion,
+        ai_run_id: registro.id,
+        erro: erro.name,
+      });
+      if (erro instanceof PiiNaChamadaError) {
+        const taskId = await abrirTarefaDeBloqueio(contexto, prompt.id, erro.message, vinculos, registro.id);
+        throw new ChamadaBloqueadaError(erro.message, registro.id, taskId);
+      }
     }
     throw erro;
   }
@@ -258,6 +318,8 @@ export async function executar<Entrada, Saida>(
       mensagem: chamada.mensagem,
       maxTokens: chamada.maxTokens,
       esquema: esquemaDeSaida(prompt),
+      // Sem imagem, o campo nem aparece: o pedido dos outros prompts fica como era.
+      ...(imagens.length === 0 ? {} : { imagens }),
     });
   } catch (erro) {
     const texto = erro instanceof Error ? erro.message : String(erro);

@@ -58,6 +58,37 @@ export {
 } from './prompts/atendente-imova/v1';
 
 export {
+  type BaseDoAtendenteV2,
+  type ImovelDaBaseV2,
+  type SaidaDoAtendenteV2,
+  atendenteImovaV2,
+  jaRespondeuHoje,
+  linhaDoImovelV2,
+  montarBaseV2,
+  sistemaComBaseV2,
+} from './prompts/atendente-imova/v2';
+
+export {
+  CERTEZAS_DA_FOTO,
+  type EntradaDaFoto,
+  type SaidaDaFoto,
+  fotoDoAnuncioV1,
+} from './prompts/foto-do-anuncio/v1';
+
+export {
+  type ImagemAceita,
+  type ImagemDescartada,
+  type ImagemParaOModelo,
+  ImagemNaoDeclaradaError,
+  type ImagensConferidas,
+  type MotivoDoDescarte,
+  TIPOS_DE_IMAGEM_DA_API,
+  type TipoDeImagem,
+  conferirImagens,
+  tipoPelosBytes,
+} from './nucleo/imagens';
+
+export {
   type EntradaDoPulso,
   type SaidaDoPulso,
   pulsoDoDiaV1,
@@ -172,6 +203,7 @@ export { CARACTERES_POR_TOKEN_PT_BR, estimarTokens } from './nucleo/tokens';
 
 export {
   type ExemploDePrompt,
+  type ImagensDoPrompt,
   MODELOS,
   type MetadadosDePrompt,
   type ModeloAlvo,

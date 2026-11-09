@@ -222,17 +222,33 @@ describe('preços e conta por chamada', () => {
         comCache: 0.00024,
       },
       {
-        // A IA que atende o cliente da Imova (06/11/2026), no Opus 5.5. A conta mede só
-        // as regras: na chamada de verdade o bloco de sistema leva também o caderno e os
-        // imóveis (alguns milhares de tokens, quase todos lidos do cache), e o modelo
-        // pensa antes de responder. A primeira medição real é a que vale.
+        // A IA que atende o cliente da Imova. v2 (06/11/2026) no Haiku 5.5: fala como a
+        // equipe (quem fala, assunto velho, cumprimento) e, desde 09/11, sabe usar a foto
+        // reconhecida e os dados do imóvel: 1.089 tokens de sistema a mais que a v1. A conta
+        // mede só as regras: na chamada de verdade o bloco de sistema leva também o
+        // caderno e os imóveis, quase todos lidos do cache. Na medição real de 06/11, cada
+        // resposta custou de US$ 0,0004 a 0,0018.
         id: 'atendente-imova',
-        modelo: 'claude-opus-5-5',
-        tokensDeSistema: 1510,
+        modelo: 'claude-haiku-5-5',
+        tokensDeSistema: 2599,
         tokensDaMensagem: 160,
-        tokensDeSaida: 96,
-        semCache: 0.0086,
-        comCache: 0.00286,
+        tokensDeSaida: 102,
+        semCache: 0.00033,
+        comCache: 0.00009,
+      },
+      {
+        // De qual anúncio é a foto do cliente (09/11/2026, Imova). A conta mede só o
+        // texto: na chamada vão também a foto do cliente e um painel por anúncio
+        // (~1.200 tokens cada). Medido em 09/11 com os 7 anúncios: ~17 mil tokens de
+        // entrada, US$ 0,0019 a 0,0020 por foto.
+        // Só roda quando a impressão digital não achou a mesma foto do anúncio.
+        id: 'foto-do-anuncio',
+        modelo: 'claude-haiku-5-5',
+        tokensDeSistema: 520,
+        tokensDaMensagem: 92,
+        tokensDeSaida: 68,
+        semCache: 0.0001,
+        comCache: 0.00005,
       },
     ]);
   });

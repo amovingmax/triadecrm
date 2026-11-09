@@ -9441,3 +9441,65 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
   - antes da chave, a recusa `InvalidCredentials`;
   - depois da chave, o envio `ok` e o recibo de entrega à Apple `ok`.
 - **Conferido pelo usuário no iPhone (06/11/2026, ~17h45, TestFlight 0.2.0 (6)):** o aviso com o título "Imova Imobiliária" chegou e, ao ser tocado, abriu as Conversas da Imova. Foi mandado direto pelo Expo, sem gravar nada no CRM.
+
+## 06 a 09/11/2026 — A IA que atende: fala como a equipe, o freio de repetição e a foto do anúncio (branch `ia-atendente`, só na Imova)
+
+### 06/11/2026 (noite) — a IA que atende fala como a equipe, sem se dizer "assistente virtual" (só na Imova)
+
+**Pedido do usuário**, com o print da primeira resposta de verdade (o Janio mandou "Olá" às 17h34 e a IA respondeu "Aqui é a assistente virtual da Imova [...] não encontrei nenhuma negociação de pix [...] no meu sistema"): "essa IA serve para falar como se fosse o nosso operador com deficiência [...] é uma ferramenta de acessibilidade do meu funcionário. Então não deve aparecer como assistente virtual."
+
+**Feito (branch `ia-atendente`, sem push, não publicado):** prompt `atendente-imova@v2` (`packages/prompts/src/prompts/atendente-imova/v2.ts`), vigente no catálogo e usado pelo worker; a v1 fica no catálogo e voltar é trocar `VIGENTES`. Sem migração.
+- **Quem fala:** é a ferramenta de acessibilidade que escreve pelo colaborador. Fala como a equipe, em primeira pessoa e no masculino, sem se apresentar e sem "assistente virtual", "robô", "IA" ou "sistema". A quem pergunta com quem fala: "Aqui é da Imova", sem inventar nome.
+- **O limite, de propósito:** ela não diz que é uma pessoa. A quem pergunta **de verdade** se é robô ou gente, responde que as mensagens são escritas com uma ferramenta de inteligência artificial que a equipe usa e acompanha, e oferece um corretor. Ela responde sozinha; dizer que é gente seria enganar o cliente (e o CDC pede informação clara). O treino também não pode ensinar o contrário.
+- **Assunto velho:** responde à última mensagem; não puxa assunto de outro dia que o cliente não trouxe; a um cumprimento, cumprimenta e pergunta como pode ajudar. Pergunta dela que ficou sem resposta não volta na mensagem seguinte.
+- **Cumprimento repetido:** se a IA já respondeu hoje na conversa, a mensagem ao modelo ganha um lembrete no fim para não abrir com "Oi" e o nome (o Haiku seguia a regra escrita só às vezes).
+
+**Medido no local, com o Haiku 5.5 de verdade:** "Com quem eu falo?" → "Aqui é da Imova"; "Você é um robô?" / "pessoa de verdade?" / "robô ou gente?" → a verdade e a oferta do corretor; o valor do terreno direto, sem "Oi, Janio!" e sem repetir a pergunta antiga; "Beleza, obrigado" → não respondeu. Nenhuma resposta disse "assistente virtual". De US$ 0,0004 a US$ 0,0018 por resposta.
+
+**Verificado:** evals dos prompts (321, com os novos da v2 e a tabela de custo no Haiku), tipos de `prompts` e `workers`, lint, 422 testes dos workers.
+
+**Para publicar, só com pedido:** `main` + push e `fly deploy` do `imova-worker-ai` (o prompt mora no worker; site e banco não mudam).
+
+### 09/11/2026 — a IA parou na conversa do treino: a repetição do freio só conta em poucos minutos (só na Imova)
+
+**Pedido do usuário:** "Já iniciei a conversa com a IA para treinar ela, porém ela não está me respondendo."
+
+**O que aconteceu (lido em produção, 09/11 12h23):** o Janio mandou "Olá" em 06/11 às 17h34, de novo às 17h59 e em 07/11 às 09h06. A regra de repetição do teto de fala (RF-CON-20, `app.wa_bot_pode_falar`, regra (e)) olha as três últimas recebidas e, iguais, conclui que é resposta automática, sem olhar o relógio. Em 07/11 às 09h06 o freio mandou "Vou chamar alguém do time para te responder.", pausou o robô na conversa (`bot_paused`) e abriu a tarefa "O robô parou nesta conversa (repeticao)". O "Oi" de 09/11 às 12h21 chegou com a IA pausada.
+
+**Feito (branch `ia-atendente`, sem push, não publicado):** `20261109120000_a_repeticao_do_robo_em_poucos_minutos` — na Imova, as mensagens iguais só contam se as três chegaram dentro de `repeticoes_minutos` (10). Resposta automática repete em segundos; gente que cumprimenta de manhã e de tarde não é laço. Fusível, pingue-pongue (8 s), robô pausado e teto de falas não mudam. Na KOMUNE não faz nada. A migração não religa a conversa do Janio: quem religa é a equipe, tocando em "IA parada" no topo da conversa (`public.ia_conversa_ligar` tira a pausa), e a fila responde sozinha a última mensagem sem resposta.
+
+**Verificado:** pgTAP 133 com 66 asserções no banco local da Imova (três "Olá" em dois dias não pausam; o mesmo texto três vezes em dois minutos pausa). O pgTAP 70 continua com o erro que já existia no banco local da Imova (é da KOMUNE).
+
+**Para publicar, só com pedido (junto com a v2 do prompt):** rebase sobre `origin/main`; `main` + push; `publicar-banco.mjs imova migrar`; `fly deploy` do `imova-worker-ai`. O site não muda.
+
+### 09/11/2026 — a IA que atende reconhece a foto do anúncio e conhece os dados do imóvel (só na Imova)
+
+**Pedido do usuário**, com o print do treino (o Janio mandou a foto da loja de plantas com a marca d'água IMOVA e "Gostaria de saber mais informações sobre esse imóvel", e a IA pediu o código): "Preciso que a IA saiba trabalhar com as imagens/fotos dos anúncios. Ela deve saber reconhecer todas as fotos e associar a foto ao anúncio que o cliente quer. Além disso [...] o valor daquele terreno, seja aluguel ou venda, quantidade de quartos (se tem suíte ou não), metragem (comprimento, largura, área total), endereço, etc."
+
+**Feito (branch `ia-atendente`, sem push, não publicado):**
+- **Três camadas para a foto do cliente** (`apps/workers/src/ia/fotos-dos-anuncios.ts`, antes de a IA escrever):
+  1. *Impressão digital, sem modelo*: dHash de 64 bits de cada foto dos anúncios (balde `anuncios`) e da foto do cliente (inteira e sem a moldura do print). A mesma foto com diferença de até 8 bits, e o outro anúncio mais parecido pelo menos 4 bits mais longe, decide sozinha, de graça.
+  2. *Visão do modelo*: senão, `foto-do-anuncio@v1` (Haiku 5.5, prompt novo) recebe a foto do cliente e um painel por anúncio (até 12 fotos em grade) e devolve o código, a certeza e o que a foto mostra.
+  3. *Na conversa*: o "[foto]" que a IA lia vira "[foto do anúncio X]", "[foto: parece o anúncio X (certeza média) — …]" ou "[foto: não bate com nenhum anúncio — …]". A `atendente-imova@v2` diz o que fazer com cada um e nunca pede o código.
+- **O treino ensina foto**: o Janio diz de qual imóvel é uma foto, a saída da v2 traz `fotosEnsinadas`, e a foto vira referência daquele anúncio (impressão e painel). Só na conversa do treino.
+- **Banco** (`20261109130000_a_ia_reconhece_as_fotos`): `ia_impressoes` e `ia_fotos_reconhecidas` (RLS: admin, gestor e SDR leem); portas só do worker (`service_role`). Código que a IA não conhece nunca é gravado; o que o treino ensinou não é desfeito por leitura nova. `app.ia_atendente_imoveis` passa a levar a descrição inteira (antes, 900 caracteres: a frente, a esquina e as opções de metragem dos terrenos de Capim Macio e Parnamirim ficavam de fora) e o complemento quando o anúncio mostra o endereço completo.
+- **Dados do imóvel na v2**: negócio por extenso, "sem suíte" quando o anúncio diz zero, "área do terreno" no terreno, complemento; regras: medida que não está escrita não se calcula; valor que a descrição e o campo dão diferente não se afirma (e não se conta ao cliente a diferença); nunca dizer "rascunho", "pausado", "no ar" ao cliente.
+- **Fotos para o modelo**: a porteira das imagens do canal de chegada (`packages/prompts/src/nucleo/imagens.ts`, o campo `imagens` do prompt, o corpo da requisição com imagens e `executar` com `imagens`), trazida igual para esta branch. Só `foto-do-anuncio` declara imagens; a IA que atende não leva foto. `sharp` 0.35.4 entra no worker (o site já usava), carregado na hora: sem ele, a IA segue como antes.
+
+**Medido no local, com o Haiku 5.5 de verdade e as 66 fotos dos 7 anúncios:**
+- impressão: mesma foto recomprimida como no WhatsApp, diferença 2; com marca d'água, 0; print com moldura, 1 a 4; recortada nas bordas, 12 (vai para o modelo). As fotos mais parecidas de anúncios DIFERENTES (dois terrenos de Parnamirim) deram 10, daí o limite 8 e a margem 4.
+- a foto da loja de plantas: reconhecida pela impressão; a IA respondeu com endereço, repasse de R$ 120.000, aluguel de R$ 5.500, 350 m² e a casa de 2 quartos (1 suíte), sem pedir código.
+- terreno de Tabatinga recortado: o modelo acertou (certeza alta, US$ 0,002, ~17 mil tokens); a IA viu os dois preços e disse que confirma o valor atualizado com o corretor.
+- foto de uma sala que não é de anúncio: "não bate com nenhum"; a IA ofereceu opções e perguntou o que o cliente procura, sem pedir código.
+- treino: "IA, anota: essa foto é do TE0003_IMOVA" virou referência; a mesma foto, mandada de novo, foi reconhecida pela impressão (diferença 0).
+- "frente e fundo do terreno de Capim Macio?": 3.000 m² de área do terreno; frente e fundo, vai confirmar. "A casa do repasse tem suíte?": 2 quartos, 1 suíte.
+
+**Verificado:** pgTAP 136 (27) e 133 (66) no banco local da Imova; `supabase db lint` sem apontamento nas funções novas; evals dos prompts (332), testes do worker (437), tipos de `prompts`, `workers` e `web`, lint; `tsup` deixa o `sharp` de fora do pacote.
+
+**Precisa de decisão humana:**
+- **Frente e fundo não existem no anúncio.** A IA só sabe as medidas que estiverem escritas. Hoje: escrever na descrição do anúncio (aparece também no portal) ou ensinar no treino. Campos próprios "Frente" e "Fundo" na aba Anúncios são outra mudança, a pedir.
+- **TE0004_IMOVA (Tabatinga)**: o campo diz R$ 510.000 e a descrição R$ 620.000. A IA não afirma nenhum dos dois até alguém corrigir.
+- **Os 7 anúncios estão como rascunho** na aba Anúncios: a IA fala de tudo, mas diz que confirma a disponibilidade com o corretor antes de marcar visita.
+- **A foto do cliente vai à Anthropic** (como o texto já ia), sem pseudonimizar: a descrição pede para não falar de rosto, documento ou placa de carro.
+
+**Para publicar, só com pedido (junto com a v2 e o freio):** rebase sobre `origin/main`; `main` + push; `publicar-banco.mjs imova migrar` (20261109120000 e 20261109130000); `fly deploy` do `imova-worker-ai` (a imagem leva o `sharp`; montada em linux/amd64 no local). O site não muda. Ao juntar a branch do canal de chegada, `imagens.ts`, `cliente.ts` e `execucao.ts` vêm iguais dos dois lados.

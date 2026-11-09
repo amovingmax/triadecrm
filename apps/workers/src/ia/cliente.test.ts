@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { esquemaParaAApi } from './cliente';
+import { corpoDaRequisicao, esquemaParaAApi } from './cliente';
 import { fichaDaConversaV1, pulsoDoDiaV1, esquemaDeSaida } from '@komune/prompts';
 
 /**
@@ -85,5 +85,39 @@ describe('o esquema que vai para a API', () => {
 
   it('$schema não vira tráfego', () => {
     expect('$schema' in esquemaParaAApi(esquemaDeSaida(fichaDaConversaV1))).toBe(false);
+  });
+});
+
+describe('o corpo da requisição com e sem imagem (09/11/2026)', () => {
+  const pedido = {
+    modelo: 'claude-haiku-5-5',
+    sistema: 'regras',
+    mensagem: 'a conversa',
+    maxTokens: 1000,
+    esquema: { type: 'object', properties: {}, required: [] },
+  };
+
+  it('sem imagem, o conteúdo do usuário continua sendo a string (o cache dos outros prompts não muda)', () => {
+    const corpo = corpoDaRequisicao(pedido);
+    expect(corpo.messages).toEqual([{ role: 'user', content: 'a conversa' }]);
+    expect(corpo.system).toEqual([{ type: 'text', text: 'regras', cache_control: { type: 'ephemeral' } }]);
+    expect(corpoDaRequisicao({ ...pedido, imagens: [] }).messages[0]!.content).toBe('a conversa');
+  });
+
+  it('com imagem: rótulo, imagem, e a mensagem por último', () => {
+    const corpo = corpoDaRequisicao({
+      ...pedido,
+      imagens: [
+        { mime: 'image/jpeg', base64: '/9j/AAAA', rotulo: 'FOTO DO CLIENTE' },
+        { mime: 'image/jpeg', base64: '/9j/BBBB', rotulo: 'Painel do anúncio PT0001_IMOVA' },
+      ],
+    });
+    expect(corpo.messages[0]!.content).toEqual([
+      { type: 'text', text: 'FOTO DO CLIENTE' },
+      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: '/9j/AAAA' } },
+      { type: 'text', text: 'Painel do anúncio PT0001_IMOVA' },
+      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: '/9j/BBBB' } },
+      { type: 'text', text: 'a conversa' },
+    ]);
   });
 });

@@ -23,20 +23,27 @@
 import { z } from 'zod';
 
 import {
-  type BaseDoAtendente,
+  type BaseDoAtendenteV2,
   type EntradaDoAtendente,
+  type ImovelDaBaseV2,
   type PromptVersionado,
-  type SaidaDoAtendente,
+  type SaidaDoAtendenteV2,
   CANAIS_DE_CHEGADA,
   MODELOS,
-  atendenteImovaV1,
+  atendenteImovaV2,
   reidratar,
-  sistemaComBase,
+  sistemaComBaseV2,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
 import { buscarContatoDaFicha } from './banco';
 import { ErroDoModelo, RespostaIlegivelError } from './cliente';
+import {
+  aplicarReconhecimentos,
+  ensinarFotos,
+  fotosReconhecidasDaConversa,
+  reconhecerFotosDaConversa,
+} from './fotos-dos-anuncios';
 import {
   ChamadaBloqueadaError,
   type ContextoDaIa,
@@ -142,8 +149,15 @@ export function limparTexto(texto: string): string {
 export function montarEntrada(
   e: EntradaDoBancoDoAtendente,
   leadId: string,
-): { entrada: EntradaDoAtendente; horarios: Map<string, { inicio: string; quando: string }> } {
-  const mensagens = (e.mensagens ?? []).slice(-40).map((m, indice) => ({
+): {
+  entrada: EntradaDoAtendente;
+  horarios: Map<string, { inicio: string; quando: string }>;
+  /** m1, m2... → o id da mensagem no banco (para a foto que o treino ensina). */
+  rotulos: Map<string, string>;
+} {
+  const ultimas = (e.mensagens ?? []).slice(-40);
+  const rotulos = new Map(ultimas.map((m, indice) => [`m${indice + 1}`, m.id]));
+  const mensagens = ultimas.map((m, indice) => ({
     messageId: `m${indice + 1}`,
     de: m.de,
     quem: m.quem === null ? null : m.quem.slice(0, 60),
@@ -157,6 +171,7 @@ export function montarEntrada(
   const canal = e.cliente?.canal_de_chegada ?? null;
   return {
     horarios,
+    rotulos,
     entrada: {
       leadId,
       agora: (e.agora ?? '').slice(0, 40),
@@ -212,7 +227,7 @@ async function modeloEscolhido(contexto: ContextoDaIa): Promise<string> {
   const valor = ((data as { value?: unknown } | null)?.value ?? {}) as Record<string, unknown>;
   return typeof valor.modelo === 'string' && MODELOS_DO_ATENDENTE.has(valor.modelo)
     ? valor.modelo
-    : atendenteImovaV1.modelo;
+    : atendenteImovaV2.modelo;
 }
 
 /** Entrega a conversa a uma pessoa, com o aviso padrão e o motivo para a equipe. */
@@ -255,11 +270,10 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   if (e.ultima_do_cliente !== payload.message_id) return { feito: false, motivo: 'chegou_mensagem_nova' };
   if ((e.mensagens ?? []).length === 0) return { feito: false, motivo: 'conversa_vazia' };
 
-  const base = baseDoBanco.parse(await rpc(contexto, 'ia_atendente_base', {})) as BaseDoAtendente & {
+  const base = baseDoBanco.parse(await rpc(contexto, 'ia_atendente_base', {})) as BaseDoAtendenteV2 & {
     versao?: Record<string, unknown>;
   };
   const leadId = leadIdCurto(e.organization_id ?? payload.conversation_id);
-  const { entrada, horarios } = montarEntrada(e, leadId);
 
   // O nome e o telefone do cliente saem pseudonimizados. Sem ficha, o nome do perfil
   // do WhatsApp é o que existe, e é ele que entra na troca.
@@ -273,19 +287,39 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     instagram: ficha.instagram,
   };
 
-  const prompt: PromptVersionado<EntradaDoAtendente, SaidaDoAtendente> = {
-    ...atendenteImovaV1,
-    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV1.modelo,
-    sistema: sistemaComBase(base),
+  const vinculos = {
+    organizationId: e.organization_id ?? null,
+    contactId: e.contact_id ?? null,
+    conversationId: payload.conversation_id,
+  };
+
+  // A foto que o cliente mandou (09/11/2026): reconhecida antes de a IA escrever, e
+  // escrita na conversa no lugar de "[foto]". Falha aqui não derruba a resposta.
+  await reconhecerFotosDaConversa(
+    contexto,
+    payload.conversation_id,
+    leadId,
+    contato,
+    vinculos,
+    base.imoveis as readonly ImovelDaBaseV2[],
+  );
+  const reconhecidas = await fotosReconhecidasDaConversa(contexto, payload.conversation_id).catch(
+    () => new Map(),
+  );
+  const { entrada, horarios, rotulos } = montarEntrada(
+    { ...e, mensagens: aplicarReconhecimentos(e.mensagens ?? [], reconhecidas) },
+    leadId,
+  );
+
+  const prompt: PromptVersionado<EntradaDoAtendente, SaidaDoAtendenteV2> = {
+    ...atendenteImovaV2,
+    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV2.modelo,
+    sistema: sistemaComBaseV2(base),
   };
 
   let executada;
   try {
-    executada = await executar(contexto, prompt, entrada, contato, {
-      organizationId: e.organization_id ?? null,
-      contactId: e.contact_id ?? null,
-      conversationId: payload.conversation_id,
-    });
+    executada = await executar(contexto, prompt, entrada, contato, vinculos);
   } catch (erro) {
     if (erro instanceof ChamadaBloqueadaError) {
       return passarParaGente(
@@ -341,6 +375,16 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
       p_message_id: payload.message_id,
       p_textos: saida.anotacoes.map((a) => limparTexto(reidratar(a, executada.mapa))),
     });
+  }
+
+  // O treino também ensina de qual anúncio é uma foto.
+  let fotosEnsinadas = 0;
+  if (e.treino === true && saida.fotosEnsinadas.length > 0) {
+    fotosEnsinadas = await ensinarFotos(
+      contexto,
+      payload.conversation_id,
+      saida.fotosEnsinadas.map((f) => ({ messageId: rotulos.get(f.messageId), codigo: f.imovelCodigo })),
+    );
   }
 
   let resultado: Record<string, unknown>;
@@ -429,6 +473,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     motivo: resultado.motivo ?? null,
     treino: e.treino === true,
     anotadas,
+    fotos_ensinadas: fotosEnsinadas,
     confianca: saida.confianca,
     custo_usd: executada.custoUsd,
   });
@@ -437,6 +482,6 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     motivo: resultado.ok === true ? saida.acao : String(resultado.motivo ?? 'recusado'),
     aiRunId: executada.aiRunId,
     custoUsd: executada.custoUsd,
-    detalhes: { acao: saida.acao, anotadas },
+    detalhes: { acao: saida.acao, anotadas, fotosEnsinadas },
   };
 }

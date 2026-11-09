@@ -40,6 +40,21 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 
+/**
+ * Uma imagem que vai junto do texto (06/11/2026, canal de chegada da Imova; 09/11/2026,
+ * a foto do anúncio na IA que atende).
+ *
+ * Quem chega aqui já passou pela porteira de `packages/prompts` (`conferirImagens`,
+ * chamada por `executar`): o prompt a declarou, o tipo é o dos bytes, o tamanho cabe e o
+ * rótulo foi auditado. Este arquivo não confere nada disso de novo — ele só monta.
+ */
+export interface ImagemDoPedido {
+  readonly mime: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+  readonly base64: string;
+  /** "Foto f1, enviada na mensagem m3": o texto que vai logo antes da imagem. */
+  readonly rotulo: string;
+}
+
 /** Um pedido pronto para a API: o que `prepararChamada` devolveu, mais o esquema. */
 export interface PedidoAoModelo {
   readonly modelo: string;
@@ -50,6 +65,12 @@ export interface PedidoAoModelo {
   readonly maxTokens: number;
   /** JSON Schema da saída, de `esquemaDeSaida(prompt)`. */
   readonly esquema: Record<string, unknown>;
+  /**
+   * As imagens, na ordem. Ausente ou vazia: a requisição sai exatamente como saía antes
+   * de existir imagem — o conteúdo do usuário continua sendo a string da mensagem, e o
+   * cache dos outros prompts não muda.
+   */
+  readonly imagens?: readonly ImagemDoPedido[];
 }
 
 /** Os quatro contadores de `ai_runs`, no vocabulário de `custoDaChamada`. */
@@ -216,6 +237,44 @@ export interface OpcoesDoCliente {
   readonly tempoLimiteMs?: number;
 }
 
+/**
+ * O conteúdo do turno do usuário.
+ *
+ * Sem imagem: a string da mensagem, como sempre foi — é o que mantém a requisição dos
+ * outros prompts idêntica byte a byte, e com ela o cache. Com imagem: cada foto
+ * anunciada pelo rótulo e logo depois o bloco `image`, e a mensagem montada por último
+ * (imagem antes do texto é a ordem que a API recomenda).
+ */
+function conteudoDoUsuario(pedido: PedidoAoModelo): string | Anthropic.ContentBlockParam[] {
+  const imagens = pedido.imagens ?? [];
+  if (imagens.length === 0) return pedido.mensagem;
+  return [
+    ...imagens.flatMap((imagem): Anthropic.ContentBlockParam[] => [
+      { type: 'text', text: imagem.rotulo },
+      { type: 'image', source: { type: 'base64', media_type: imagem.mime, data: imagem.base64 } },
+    ]),
+    { type: 'text', text: pedido.mensagem },
+  ];
+}
+
+/**
+ * O corpo do `messages.create`. Separado de `conversar` para o teste poder compará-lo
+ * com o de antes das imagens sem passar por rede nenhuma.
+ */
+export function corpoDaRequisicao(pedido: PedidoAoModelo): Anthropic.MessageCreateParamsNonStreaming {
+  const esforco = ESFORCO_POR_MODELO[pedido.modelo];
+  return {
+    model: pedido.modelo,
+    max_tokens: pedido.maxTokens,
+    system: [{ type: 'text', text: pedido.sistema, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: conteudoDoUsuario(pedido) }],
+    output_config: {
+      format: { type: 'json_schema', schema: esquemaLimpo(pedido.esquema) },
+      ...(esforco === undefined ? {} : { effort: esforco }),
+    },
+  };
+}
+
 export function clienteAnthropic(opcoes: OpcoesDoCliente): ClienteDoModelo {
   const anthropic = new Anthropic({
     apiKey: opcoes.chave,
@@ -226,21 +285,9 @@ export function clienteAnthropic(opcoes: OpcoesDoCliente): ClienteDoModelo {
 
   return {
     async conversar(pedido: PedidoAoModelo): Promise<RespostaDoModelo> {
-      const esforco = ESFORCO_POR_MODELO[pedido.modelo];
       let resposta;
       try {
-        resposta = await anthropic.messages.create({
-          model: pedido.modelo,
-          max_tokens: pedido.maxTokens,
-          system: [
-            { type: 'text', text: pedido.sistema, cache_control: { type: 'ephemeral' } },
-          ],
-          messages: [{ role: 'user', content: pedido.mensagem }],
-          output_config: {
-            format: { type: 'json_schema', schema: esquemaLimpo(pedido.esquema) },
-            ...(esforco === undefined ? {} : { effort: esforco }),
-          },
-        });
+        resposta = await anthropic.messages.create(corpoDaRequisicao(pedido));
       } catch (erro) {
         throw traduzirErro(erro);
       }

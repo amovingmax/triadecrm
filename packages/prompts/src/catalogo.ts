@@ -1,4 +1,6 @@
 import { atendenteImovaV1 } from './prompts/atendente-imova/v1';
+import { atendenteImovaV2 } from './prompts/atendente-imova/v2';
+import { fotoDoAnuncioV1 } from './prompts/foto-do-anuncio/v1';
 import { classificarIntencaoV1 } from './prompts/classificar-intencao/v1';
 import { fichaDaConversaV1 } from './prompts/ficha-da-conversa/v1';
 import { leituraDoClienteV1 } from './prompts/leitura-do-cliente/v1';
@@ -44,7 +46,9 @@ export const CATALOGO = {
   // Só da Imova (03/11/2026): o worker o usa quando o banco é o da Imova.
   'leitura-do-cliente': { 1: leituraDoClienteV1, 2: leituraDoClienteV2 },
   // Só da Imova (06/11/2026): a IA que atende o cliente sozinha.
-  'atendente-imova': { 1: atendenteImovaV1 },
+  'atendente-imova': { 1: atendenteImovaV1, 2: atendenteImovaV2 },
+  // Só da Imova (09/11/2026): de qual anúncio é a foto que o cliente mandou.
+  'foto-do-anuncio': { 1: fotoDoAnuncioV1 },
 } as const;
 
 export type IdDePrompt = keyof typeof CATALOGO;
@@ -66,7 +70,11 @@ export const VIGENTES = {
   // por texto um pouco mais longo que o teto do schema. A v2 diz o tamanho e encurta
   // em vez de recusar; voltar é trocar este número.
   'leitura-do-cliente': 2,
-  'atendente-imova': 1,
+  // v2 desde 06/11/2026: a v1 se apresentava como "assistente virtual", e a IA é a
+  // ferramenta de acessibilidade de um colaborador; a v2 fala como a equipe (sem
+  // dizer que é gente) e não puxa assunto velho. Voltar é trocar este número.
+  'atendente-imova': 2,
+  'foto-do-anuncio': 1,
 } as const satisfies Record<IdDePrompt, number>;
 
 /** Uma versão específica, com o tipo daquela versão. */

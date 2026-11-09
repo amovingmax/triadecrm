@@ -61,6 +61,27 @@ export type PropositoDeAiRun =
   | 'triar_candidato';
 
 /**
+ * As imagens que um prompt aceita junto com o texto (06/11/2026).
+ *
+ * Opcional, e a ausência é a regra: prompt que não declara `imagens` não leva imagem
+ * nenhuma, e `conferirImagens` (`nucleo/imagens.ts`) recusa com
+ * `ImagemNaoDeclaradaError` em vez de deixar passar. Foto não se pseudonimiza — pode
+ * ter rosto, documento, placa de carro —, então mandar imagem é decisão de cada
+ * versão de prompt, escrita no próprio prompt, e não uma opção de quem chama.
+ */
+export interface ImagensDoPrompt {
+  /** Quantas imagens, no máximo, numa chamada. O que passar disso fica de fora. */
+  readonly maximo: number;
+  /** Os tipos aceitos, conferidos pelos BYTES da imagem e não pelo que o arquivo diz ser. */
+  readonly tipos: readonly ('image/jpeg' | 'image/png' | 'image/gif' | 'image/webp')[];
+  /**
+   * Tamanho máximo de cada imagem como ela vai na requisição — em base64, que é o que
+   * a API mede contra o limite dela (5 MB). Uma foto de 4 MB vira 5,3 MB em base64.
+   */
+  readonly bytesMax: number;
+}
+
+/**
  * Um caso do próprio prompt: entrada e a saída que a versão deve produzir.
  *
  * Não é decoração. Os evals validam cada exemplo contra os dois schemas — um exemplo que
@@ -143,6 +164,12 @@ export interface PromptVersionado<Entrada, Saida> extends MetadadosDePrompt {
    * mensagem. Falha fechado, como `camposDoTriade`.
    */
   readonly escala?: 'mensagem' | 'conversa';
+  /**
+   * As imagens que esta versão aceita (ver `ImagensDoPrompt`). Ausente em todo prompt
+   * anterior ao canal de chegada: a ausência quer dizer "nenhuma", e quem tenta mandar
+   * uma assim mesmo recebe `ImagemNaoDeclaradaError`.
+   */
+  readonly imagens?: ImagensDoPrompt;
   readonly exemplos: readonly ExemploDePrompt<Entrada, Saida>[];
 }
 
@@ -150,7 +177,18 @@ export interface PromptVersionado<Entrada, Saida> extends MetadadosDePrompt {
 export function definirPrompt<Entrada, Saida>(
   prompt: Omit<PromptVersionado<Entrada, Saida>, 'tokensDeSistema'>,
 ): PromptVersionado<Entrada, Saida> {
-  return Object.freeze({ ...prompt, tokensDeSistema: estimarTokens(prompt.sistema) });
+  // A declaração das imagens é congelada junto: um `maximo` trocado em tempo de
+  // execução mudaria o que sai para o modelo sem mudar a versão.
+  const imagens =
+    prompt.imagens === undefined
+      ? {}
+      : {
+          imagens: Object.freeze({
+            ...prompt.imagens,
+            tipos: Object.freeze([...prompt.imagens.tipos]),
+          }),
+        };
+  return Object.freeze({ ...prompt, ...imagens, tokensDeSistema: estimarTokens(prompt.sistema) });
 }
 
 /** A string gravada em `ai_runs.prompt_version`. */

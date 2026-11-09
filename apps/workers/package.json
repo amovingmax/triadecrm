@@ -17,6 +17,7 @@
     "@komune/prompts": "workspace:*",
     "@komune/schema": "workspace:*",
     "@supabase/supabase-js": "2.112.4",
+    "sharp": "0.35.4",
     "zod": "catalog:"
   },
   "devDependencies": {

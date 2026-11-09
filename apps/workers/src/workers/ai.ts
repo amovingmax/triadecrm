@@ -118,6 +118,8 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
     modelo,
     logger,
     empresa: typeof empresa === 'string' ? empresa : null,
+    // A foto que o cliente manda, reconhecida pela IA que atende (Imova, 09/11/2026).
+    baldeDeMidias: BALDE_DE_MIDIAS,
     transcritor: {
       balde: BALDE_DE_MIDIAS,
       config: transcricao,

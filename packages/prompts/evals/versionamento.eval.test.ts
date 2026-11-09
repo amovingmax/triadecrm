@@ -112,7 +112,7 @@ describe('versionamento: a v2 não mexe na v1', () => {
 });
 
 describe('catálogo do Tríade', () => {
-  it('tem os nove prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
+  it('tem os dez prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
     expect(Object.keys(CATALOGO)).toEqual([
       'transcricao-audio',
       'ficha-da-conversa',
@@ -129,6 +129,8 @@ describe('catálogo do Tríade', () => {
       'leitura-do-cliente',
       // A IA que atende o cliente sozinha, só da Imova (06/11/2026).
       'atendente-imova',
+      // De qual anúncio é a foto que o cliente mandou, só da Imova (09/11/2026).
+      'foto-do-anuncio',
     ]);
   });
 
