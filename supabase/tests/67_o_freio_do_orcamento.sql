@@ -86,7 +86,7 @@ select ok((app.ia_pode_gastar('transcribe_audio') ->> 'pode')::boolean,
 -- Aqui, e não depois do teto: passada a linha do freio param os 14, e a
 -- partição deixaria de ser visível.
 -- Os propósitos só da Imova (o canal de chegada, 20261106130000, e a IA juíza
--- dos relatórios, 20261106200000) existem no banco dela e no CI (sem
+-- dos relatórios, 20261109200000) existem no banco dela e no CI (sem
 -- identidade); no da KOMUNE as migrações não os criam. Cada um conta se está na
 -- lista de `ai_runs.purpose` deste banco — qualquer outro propósito novo
 -- continua derrubando o teste.

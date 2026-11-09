@@ -60,7 +60,7 @@ export type PropositoDeAiRun =
   // sabe que "Fotografia Silva — Formaturas" não atende casamento.
   | 'triar_candidato'
   // A IA juíza da Imova (06/11/2026): a nota diária do atendimento da IA que atende.
-  // Entrou na lista do banco pela migração 20261106200000, logo depois de
+  // Entrou na lista do banco pela migração 20261109200000, logo depois de
   // 'triar_candidato', e é por ela que o custo da juíza aparece separado.
   | 'avaliar_atendimento';
 

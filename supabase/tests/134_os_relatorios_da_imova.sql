@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — Os relatórios da Imova (migração 20261106200000)
+-- pgTAP — Os relatórios da Imova (migração 20261109200000)
 --
 -- Decisões do usuário em 06/11/2026: clique do anúncio = visualizações do
 -- relatório do Canal Pro, com o período pela diferença entre duas fotos;

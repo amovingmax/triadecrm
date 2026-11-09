@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { Periodo } from './periodo';
 
 /**
- * A camada de dados dos relatórios da Imova (06/11/2026; migração 20261106200000).
+ * A camada de dados dos relatórios da Imova (06/11/2026; migração 20261109200000).
  *
  * Como em `dados.ts`, nenhuma conta acontece aqui: cada painel chama uma função
  * `SECURITY DEFINER` do Postgres e recebe as linhas prontas (ADR-03). As funções só
