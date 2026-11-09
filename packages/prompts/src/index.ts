@@ -95,7 +95,38 @@ export {
   type EntradaDaAvaliacao,
   type SaidaDaAvaliacao,
   avaliacaoDoAtendimentoV1,
+  saidaDaAvaliacaoV1,
 } from './prompts/avaliacao-do-atendimento/v1';
+
+export {
+  LACUNAS_DO_ATENDIMENTO,
+  type LacunaDoAtendimento,
+  type SaidaDaAvaliacaoV2,
+  avaliacaoDoAtendimentoV2,
+} from './prompts/avaliacao-do-atendimento/v2';
+
+export {
+  FINALIDADES_DO_PERFIL,
+  NEGOCIOS_DO_IMOVEL,
+  NIVEIS_DE_INTERESSE,
+  ORIGENS_DO_SINAL,
+  PAGAMENTOS_DO_PERFIL,
+  REGRA_DE_NAO_PROMETER,
+  TIPOS_DO_PERFIL,
+  type EntradaDoConselhoDoLead,
+  type ImovelDaCarteira,
+  type NivelDeInteresse,
+  type SaidaDoConselhoDoLead,
+  conselheiroDoLeadV1,
+  prazoVencido,
+} from './prompts/conselheiro-do-lead/v1';
+
+export {
+  TIPOS_DE_SUGESTAO,
+  type EntradaDoConselhoDoImovel,
+  type SaidaDoConselhoDoImovel,
+  conselheiroDoImovelV1,
+} from './prompts/conselheiro-do-imovel/v1';
 
 export {
   type EntradaDoPulso,

@@ -62,6 +62,7 @@ import {
 
 import { ErroDeTranscricao, transcrever as transcreverAudio, type TranscricaoBruta } from './asr';
 import { atenderCliente, payloadDoAtendente } from './atendente';
+import { aconselharVendas, payloadDoConselheiro } from './conselheiro';
 import {
   buscarContatoDaFicha,
   buscarConversa,
@@ -192,6 +193,9 @@ const PAYLOADS = {
   // A IA juíza da Imova (06/11/2026), que dá nota ao dia de atendimento da de
   // cima: `ia/juiza.ts`.
   avaliar_atendimento: payloadDaJuiza,
+  // O conselheiro de vendas da Imova (09/11/2026), o "relatório que vende": por
+  // cliente e por imóvel, `ia/conselheiro.ts`.
+  aconselhar_vendas: payloadDoConselheiro,
 } as const;
 
 export type PropositoConhecido = keyof typeof PAYLOADS;
@@ -1233,6 +1237,10 @@ const TRABALHOS: Readonly<
     proposito: 'avaliar_atendimento',
     ...(await avaliarAtendimento(contexto, bruto)),
   }),
+  aconselhar_vendas: async (contexto, bruto) => ({
+    proposito: 'aconselhar_vendas',
+    ...(await aconselharVendas(contexto, bruto)),
+  }),
 };
 
 /**
@@ -1246,6 +1254,8 @@ const TRABALHOS_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoCon
   'draft_reply',
   // A IA juíza, que dá nota ao atendimento da de cima (06/11/2026).
   'avaliar_atendimento',
+  // O conselheiro de vendas, por cliente e por imóvel (09/11/2026).
+  'aconselhar_vendas',
 ]);
 
 export async function tratarTrabalho(
@@ -1269,7 +1279,8 @@ export async function tratarTrabalho(
   // enquanto não havia worker de IA, e rodá-los agora seria pagar por texto errado.
   // Saem da fila como "sem o que fazer", sem chamar o modelo.
   // A IA que atende o cliente e a IA juíza (06/11/2026) também são da Imova, e só
-  // dela: a lista inteira está em `TRABALHOS_DA_IMOVA`.
+  // dela, como o conselheiro de vendas (09/11/2026): a lista inteira está em
+  // `TRABALHOS_DA_IMOVA`.
   if (contexto.empresa === 'imova' && !TRABALHOS_DA_IMOVA.has(proposito)) {
     contexto.logger.info('trabalho fora da IA da Imova: sai da fila sem chamar o modelo', {
       proposito,

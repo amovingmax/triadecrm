@@ -112,7 +112,8 @@ function nota(pedido: string) {
   return z.literal([1, 2, 3, 4, 5]).nullable().describe(pedido);
 }
 
-const saida = z.object({
+/** A forma da nota; a v2 a estende com a lacuna. */
+export const saidaDaAvaliacaoV1 = z.object({
   duvida: nota(
     'A IA respondeu o que o cliente perguntou? De 1 a 5; null se ele não perguntou nada.',
   ),
@@ -132,7 +133,7 @@ const saida = z.object({
   dadosInsuficientes: z.boolean(),
 });
 
-export type SaidaDaAvaliacao = z.infer<typeof saida>;
+export type SaidaDaAvaliacao = z.infer<typeof saidaDaAvaliacaoV1>;
 
 const sistema = `Você avalia a qualidade da IA que atende os clientes da Imova Imobiliária, de Natal/RN,
 no WhatsApp. Lê a conversa de um dia de atendimento e dá nota ao que a IA fez, para a
@@ -238,7 +239,7 @@ export const avaliacaoDoAtendimentoV1 = definirPrompt<EntradaDaAvaliacao, SaidaD
   modelo: MODELOS.haiku55,
   proposito: 'avaliar_atendimento',
   entrada,
-  saida,
+  saida: saidaDaAvaliacaoV1,
   sistema,
   // A conversa é texto de fora (o cliente escreveu, e a IA e a equipe escreveram para
   // ele): passa pela pseudonimização e pela auditoria antes de virar mensagem.

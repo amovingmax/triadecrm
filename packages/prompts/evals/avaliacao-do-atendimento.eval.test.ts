@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { VIGENTES, promptVigente } from '../src/catalogo';
+import { VIGENTES, obterPrompt, promptVigente } from '../src/catalogo';
 import { esquemaDeSaida, prepararChamada } from '../src/nucleo/chamada';
 import { MODELOS } from '../src/nucleo/versionamento';
 import {
   type EntradaDaAvaliacao,
   avaliacaoDoAtendimentoV1 as prompt,
 } from '../src/prompts/avaliacao-do-atendimento/v1';
+import {
+  LACUNAS_DO_ATENDIMENTO,
+  avaliacaoDoAtendimentoV2 as v2,
+} from '../src/prompts/avaliacao-do-atendimento/v2';
 
 /**
  * A IA JUÍZA DA IMOVA (06/11/2026), SEM REDE.
@@ -36,8 +40,8 @@ describe('avaliacao-do-atendimento@v1', () => {
     expect(prompt.modelo).toBe('claude-haiku-5-5');
     expect(prompt.escala).toBe('conversa');
     expect(prompt.proposito).toBe('avaliar_atendimento');
-    expect(VIGENTES['avaliacao-do-atendimento']).toBe(1);
-    expect(promptVigente('avaliacao-do-atendimento')).toBe(prompt);
+    // A v2 (09/11/2026) é a vigente; a v1 fica no catálogo para voltar trocando um número.
+    expect(obterPrompt('avaliacao-do-atendimento', 1)).toBe(prompt);
   });
 
   it('o texto é da Imova, avalia só a IA e diz que não vê a base', () => {
@@ -222,5 +226,88 @@ describe('avaliacao-do-atendimento@v1', () => {
   it('o teto de saída deixa lugar para o raciocínio, sem passar do da leitura do cliente', () => {
     expect(prompt.maxTokens).toBeGreaterThanOrEqual(2000);
     expect(prompt.maxTokens).toBeLessThanOrEqual(4000);
+  });
+});
+
+describe('avaliacao-do-atendimento@v2: a lacuna', () => {
+  const validaV2 = () => ({ ...v2.exemplos[0]!.saida });
+
+  it('é a vigente, com o modelo, o propósito, a entrada e a mensagem da v1', () => {
+    expect(VIGENTES['avaliacao-do-atendimento']).toBe(2);
+    expect(promptVigente('avaliacao-do-atendimento')).toBe(v2);
+    expect(v2.versao).toBe(2);
+    expect(v2.modelo).toBe(prompt.modelo);
+    expect(v2.proposito).toBe('avaliar_atendimento');
+    expect(v2.escala).toBe('conversa');
+    expect(v2.entrada).toBe(prompt.entrada);
+    expect(v2.montarMensagem).toBe(prompt.montarMensagem);
+    expect(v2.maxTokens).toBe(prompt.maxTokens);
+    const entrada = prompt.exemplos[0]!.entrada;
+    expect(prepararChamada(v2, entrada, CONTATO).mensagem).toBe(
+      prepararChamada(prompt, entrada, CONTATO).mensagem,
+    );
+  });
+
+  it('o texto é o da v1 com a régua da lacuna antes dos textos', () => {
+    expect(
+      v2.sistema.startsWith(
+        prompt.sistema.slice(0, prompt.sistema.indexOf('OS TEXTOS:')).trimEnd(),
+      ),
+    ).toBe(true);
+    const inicio = v2.sistema.indexOf('lacuna —');
+    expect(inicio).toBeGreaterThan(v2.sistema.indexOf('interesse —'));
+    expect(inicio).toBeLessThan(v2.sistema.indexOf('OS TEXTOS:'));
+    for (const lacuna of LACUNAS_DO_ATENDIMENTO) {
+      expect(v2.sistema, lacuna).toContain(`- ${lacuna}:`);
+    }
+    expect(prompt.sistema).not.toContain('lacuna');
+  });
+
+  it('a saída é a da v1 mais a lacuna, e a lacuna vai ao modelo como enum', () => {
+    const esquema = esquemaDeSaida(v2) as {
+      properties: Record<string, { enum?: unknown }>;
+      required?: string[];
+    };
+    expect(Object.keys(esquema.properties).sort()).toEqual(
+      [
+        ...Object.keys((esquemaDeSaida(prompt) as { properties: object }).properties),
+        'lacuna',
+      ].sort(),
+    );
+    expect(esquema.properties.lacuna?.enum).toEqual([...LACUNAS_DO_ATENDIMENTO]);
+    expect(esquema.required).toContain('lacuna');
+  });
+
+  it('lacuna fora da lista, ou faltando, é recusada: é estrutura, não texto', () => {
+    expect(() => v2.saida.parse({ ...validaV2(), lacuna: 'demorou' })).toThrow();
+    const { lacuna: _semLacuna, ...semLacuna } = validaV2();
+    expect(() => v2.saida.parse(semLacuna)).toThrow();
+    for (const lacuna of LACUNAS_DO_ATENDIMENTO) {
+      expect(v2.saida.parse({ ...validaV2(), lacuna }).lacuna).toBe(lacuna);
+    }
+  });
+
+  it('todo exemplo passa pelos dois schemas e pela auditoria de PII', () => {
+    for (const exemplo of v2.exemplos) {
+      expect(() => v2.entrada.parse(exemplo.entrada), exemplo.nome).not.toThrow();
+      expect(() => v2.saida.parse(exemplo.saida), exemplo.nome).not.toThrow();
+      expect(() => prepararChamada(v2, exemplo.entrada, CONTATO), exemplo.nome).not.toThrow();
+      expect(exemplo.saida.porque.length, exemplo.nome).toBeLessThanOrEqual(300);
+    }
+  });
+
+  it('os exemplos são coerentes: sem dado ou sem falha, nenhuma; com nota baixa, uma lacuna', () => {
+    for (const { nome, saida } of v2.exemplos) {
+      if (saida.dadosInsuficientes) expect(saida.lacuna, nome).toBe('nenhuma');
+      const notas = [saida.duvida, saida.informacao, saida.satisfacao].filter(
+        (n): n is 1 | 2 | 3 | 4 | 5 => n !== null,
+      );
+      if (notas.some((n) => n <= 2)) expect(saida.lacuna, nome).not.toBe('nenhuma');
+      if (notas.length > 0 && notas.every((n) => n >= 4))
+        expect(saida.lacuna, nome).toBe('nenhuma');
+    }
+    expect(new Set(v2.exemplos.map((e) => e.saida.lacuna))).toEqual(
+      new Set(['nenhuma', 'nao_sabia_do_imovel', 'passou_sem_precisar']),
+    );
   });
 });

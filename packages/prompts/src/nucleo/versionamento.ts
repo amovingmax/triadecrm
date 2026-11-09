@@ -62,7 +62,11 @@ export type PropositoDeAiRun =
   // A IA juíza da Imova (06/11/2026): a nota diária do atendimento da IA que atende.
   // Entrou na lista do banco pela migração 20261109200000, logo depois de
   // 'triar_candidato', e é por ela que o custo da juíza aparece separado.
-  | 'avaliar_atendimento';
+  | 'avaliar_atendimento'
+  // O "relatório que vende" da Imova (09/11/2026): o conselho por cliente
+  // (`conselheiro-do-lead`) e por imóvel (`conselheiro-do-imovel`), um propósito só para
+  // o custo do relatório aparecer junto. Precisa entrar em `ai_runs_purpose_check`.
+  | 'aconselhar_vendas';
 
 /**
  * As imagens que um prompt aceita junto com o texto (06/11/2026).

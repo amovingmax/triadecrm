@@ -9,6 +9,10 @@
  * a grava pela outra porta (`public.ia_juiza_gravar`). A tela de relatórios lê
  * `ia_atendimento_notas`, que só essa porta escreve.
  *
+ * Desde 09/11/2026 o prompt é a v2: a nota leva também a `lacuna` (onde a IA que atende
+ * falhou no dia, numa lista fechada), que a porta de escrita lê de `p_saida ->> 'lacuna'`.
+ * O worker não a trata: ela vai como veio, dentro da saída.
+ *
  * ## O que é de quem
  *
  * O banco escolhe as conversas, recorta as mensagens (10 de antes, o dia e 12 horas de
@@ -37,7 +41,7 @@ import {
   ACOES_DA_IA_NO_DIA,
   ATITUDES_DO_CLIENTE,
   type EntradaDaAvaliacao,
-  avaliacaoDoAtendimentoV1,
+  avaliacaoDoAtendimentoV2,
   encurtarTexto,
   reidratar,
 } from '@komune/prompts';
@@ -212,7 +216,7 @@ export async function avaliarAtendimento(
   try {
     executada = await executar(
       contexto,
-      avaliacaoDoAtendimentoV1,
+      avaliacaoDoAtendimentoV2,
       entrada,
       {
         leadId,
@@ -267,6 +271,7 @@ export async function avaliarAtendimento(
     informacao: nota.informacao,
     satisfacao: nota.satisfacao,
     interesse: nota.interesse,
+    lacuna: nota.lacuna,
     dados_insuficientes: nota.dadosInsuficientes,
     respostas: typeof gravada.respostas === 'number' ? gravada.respostas : (e.respostas ?? null),
   };

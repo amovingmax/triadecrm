@@ -256,14 +256,41 @@ describe('preços e conta por chamada', () => {
         // conversa real é mais longa, e na fatura entram ainda o esquema da saída e o
         // raciocínio do modelo (até 3.000 tokens de saída, US$ 0,0015 no pior caso).
         // Mesmo a 0,001 por avaliação, 50 conversas por dia dão US$ 1,50 no mês: dentro
-        // dos US$ 2 que o usuário previu.
+        // dos US$ 2 que o usuário previu. A v2 (09/11/2026) tem 269 tokens a mais de
+        // sistema e 5 de saída: a lacuna, onde a IA que atende falhou no dia.
         id: 'avaliacao-do-atendimento',
         modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 1481,
+        tokensDeSistema: 1750,
         tokensDaMensagem: 243,
-        tokensDeSaida: 75,
-        semCache: 0.00021,
+        tokensDeSaida: 80,
+        semCache: 0.00024,
         comCache: 0.00008,
+      },
+      {
+        // O conselho por cliente do "relatório que vende" (09/11/2026, Imova): uma chamada
+        // por conversa com mensagem nova no dia. A conta é do primeiro exemplo (quatro
+        // mensagens e três imóveis); conversa real chega a 40 mensagens e a carteira
+        // inteira, e na fatura entram ainda o esquema da saída (~600 tokens) e o
+        // raciocínio. O pior caso medido em `conselheiro.eval.test.ts` fica em
+        // ~US$ 0,0013; 60 clientes por dia dão menos de US$ 2,50 no mês.
+        id: 'conselheiro-do-lead',
+        modelo: 'claude-haiku-5-5',
+        tokensDeSistema: 1430,
+        tokensDaMensagem: 509,
+        tokensDeSaida: 146,
+        semCache: 0.00027,
+        comCache: 0.00014,
+      },
+      {
+        // O conselho por imóvel (09/11/2026, Imova): uma chamada por imóvel com cliente
+        // interessado, por dia. ~15 imóveis por dia ficam abaixo de US$ 0,50 no mês.
+        id: 'conselheiro-do-imovel',
+        modelo: 'claude-haiku-5-5',
+        tokensDeSistema: 878,
+        tokensDaMensagem: 374,
+        tokensDeSaida: 155,
+        semCache: 0.0002,
+        comCache: 0.00012,
       },
     ]);
   });

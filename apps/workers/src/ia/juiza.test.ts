@@ -165,7 +165,7 @@ describe('a IA juíza: o caminho feliz', () => {
     const run = banco.tabelas.ai_runs?.[0] as Record<string, unknown> | undefined;
     expect(run?.purpose).toBe('avaliar_atendimento');
     expect(run?.model).toBe('claude-haiku-5-5');
-    expect(run?.prompt_version).toBe('avaliacao-do-atendimento@v1');
+    expect(run?.prompt_version).toBe('avaliacao-do-atendimento@v2');
     expect(run?.conversation_id).toBe(CONVERSA);
     expect(resultado.aiRunId).toBe(run?.id);
 
@@ -174,7 +174,7 @@ describe('a IA juíza: o caminho feliz', () => {
     expect(gravacao.p_conversation_id).toBe(CONVERSA);
     expect(gravacao.p_dia).toBe('2026-11-05');
     expect(gravacao.p_ai_run_id).toBe(run?.id);
-    expect(gravacao.p_prompt_version).toBe('avaliacao-do-atendimento@v1');
+    expect(gravacao.p_prompt_version).toBe('avaliacao-do-atendimento@v2');
     expect(gravacao.p_saida).toMatchObject({
       duvida: 4,
       informacao: 4,
@@ -182,7 +182,49 @@ describe('a IA juíza: o caminho feliz', () => {
       interesse: 'subiu',
       melhorar: null,
       dadosInsuficientes: false,
+      // A v2 (09/11/2026): a lacuna vai na saída, e é dela que a porta lê `p_saida ->> 'lacuna'`.
+      lacuna: 'nenhuma',
     });
+  });
+
+  it('a lacuna que o modelo deu vai como veio para a gravação e para o log', async () => {
+    const { contexto, gravacoes, linhas } = montar(entradaNoBanco(), 'imova', {
+      forcar: {
+        juiza: {
+          duvida: 2,
+          informacao: 2,
+          satisfacao: 2,
+          interesse: 'caiu',
+          porque: 'O cliente perguntou o condomínio e a IA não disse.',
+          melhorar: 'Dizer o condomínio junto com o valor.',
+          dadosInsuficientes: false,
+          lacuna: 'condominio_iptu',
+        },
+      },
+    });
+    await tratarTrabalho(contexto, PAYLOAD);
+    expect((gravacoes[0]?.p_saida as { lacuna: string }).lacuna).toBe('condominio_iptu');
+    const linha = linhas.find((l) => l.msg === 'a IA juíza deu nota ao atendimento');
+    expect(linha?.campos).toMatchObject({ lacuna: 'condominio_iptu' });
+  });
+
+  it('nota sem lacuna não passa pelo schema da v2: nada é gravado', async () => {
+    const { banco, contexto, gravacoes } = montar(entradaNoBanco(), 'imova', {
+      forcar: {
+        juiza: {
+          duvida: 5,
+          informacao: 5,
+          satisfacao: 5,
+          interesse: 'subiu',
+          porque: 'Tudo certo.',
+          melhorar: null,
+          dadosInsuficientes: false,
+        },
+      },
+    });
+    await expect(tratarTrabalho(contexto, PAYLOAD)).rejects.toThrow(/fora do schema/);
+    expect(gravacoes).toEqual([]);
+    expect((banco.tabelas.ai_runs?.[0] as { status?: string }).status).toBe('erro');
   });
 
   it('o porquê volta com o nome de verdade; o que fica em ai_runs, não', async () => {
@@ -251,6 +293,7 @@ describe('a IA juíza: o caminho feliz', () => {
           porque: '[[NOME_1]] gostou da resposta. '.repeat(12).trim(),
           melhorar: null,
           dadosInsuficientes: false,
+          lacuna: 'nenhuma',
         },
       },
     });

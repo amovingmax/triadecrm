@@ -19,6 +19,13 @@ describe('fluxoDoEsquema', () => {
     expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('leitura-do-cliente')))).toBe('leitura');
     expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('atendente-imova')))).toBe('atendente');
     expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('avaliacao-do-atendimento')))).toBe('juiza');
+    // O conselheiro de vendas (09/11/2026): o do cliente e o do imóvel são fluxos distintos.
+    expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('conselheiro-do-lead')))).toBe(
+      'conselheiro_lead',
+    );
+    expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('conselheiro-do-imovel')))).toBe(
+      'conselheiro_imovel',
+    );
   });
 
   it('esquema que ninguém ensinou falha barulhento', () => {

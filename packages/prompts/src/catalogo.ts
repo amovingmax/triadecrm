@@ -2,6 +2,9 @@ import { atendenteImovaV1 } from './prompts/atendente-imova/v1';
 import { atendenteImovaV2 } from './prompts/atendente-imova/v2';
 import { fotoDoAnuncioV1 } from './prompts/foto-do-anuncio/v1';
 import { avaliacaoDoAtendimentoV1 } from './prompts/avaliacao-do-atendimento/v1';
+import { avaliacaoDoAtendimentoV2 } from './prompts/avaliacao-do-atendimento/v2';
+import { conselheiroDoImovelV1 } from './prompts/conselheiro-do-imovel/v1';
+import { conselheiroDoLeadV1 } from './prompts/conselheiro-do-lead/v1';
 import { classificarIntencaoV1 } from './prompts/classificar-intencao/v1';
 import { fichaDaConversaV1 } from './prompts/ficha-da-conversa/v1';
 import { leituraDoClienteV1 } from './prompts/leitura-do-cliente/v1';
@@ -51,7 +54,10 @@ export const CATALOGO = {
   // Só da Imova (09/11/2026): de qual anúncio é a foto que o cliente mandou.
   'foto-do-anuncio': { 1: fotoDoAnuncioV1 },
   // Só da Imova (06/11/2026): a IA juíza, que dá nota ao atendimento da de cima.
-  'avaliacao-do-atendimento': { 1: avaliacaoDoAtendimentoV1 },
+  'avaliacao-do-atendimento': { 1: avaliacaoDoAtendimentoV1, 2: avaliacaoDoAtendimentoV2 },
+  // Só da Imova (09/11/2026): o "relatório que vende", por cliente e por imóvel.
+  'conselheiro-do-lead': { 1: conselheiroDoLeadV1 },
+  'conselheiro-do-imovel': { 1: conselheiroDoImovelV1 },
 } as const;
 
 export type IdDePrompt = keyof typeof CATALOGO;
@@ -78,7 +84,11 @@ export const VIGENTES = {
   // dizer que é gente) e não puxa assunto velho. Voltar é trocar este número.
   'atendente-imova': 2,
   'foto-do-anuncio': 1,
-  'avaliacao-do-atendimento': 1,
+  // v2 desde 09/11/2026: a juíza diz também a lacuna, onde a IA que atende falhou no
+  // dia, para o relatório contar por tema. Voltar é trocar este número.
+  'avaliacao-do-atendimento': 2,
+  'conselheiro-do-lead': 1,
+  'conselheiro-do-imovel': 1,
 } as const satisfies Record<IdDePrompt, number>;
 
 /** Uma versão específica, com o tipo daquela versão. */
