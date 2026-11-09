@@ -9548,3 +9548,37 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 **Decisão humana:**
 - A juíza não recebe o caderno nem a lista de imóveis (custaria ~10 vezes mais e leria a base de hoje para julgar a resposta de ontem): "informação correta" é conferida pela própria conversa. Confirmar.
 - O papel `leitura` (sem uso desde o pivô) vê estes relatórios, como vê os de sempre.
+
+## 09/11/2026 — O relatório que vende, da Imova (branch `relatorios-imova`; RF-REL-01, RF-REL-09, ADR-10 alterado na Imova)
+
+**Pedido do usuário:** "Me faça um relatório mais efetivo e que realmente mude e melhore as análises e que impulsione minhas vendas"; depois do primeiro protótipo, "um visual mais analítico e simples de ler", "quantas pessoas estão mais interessadas em um imóvel/terreno específico", "qual o imóvel mais interessado pelos leads", "o lead mais interessado para cada imóvel/terreno", "sugestões da IA para vender mais e pontos a falar ou fazer para cada" e "progresso da IA". Aprovado o protótipo (artifact WtP68UJeSK8dx3cMPSBFd4): "Gostei. Suba esse protótipo na aba de relatórios".
+
+**Entregue (nada em produção):**
+- **Branch atualizada com a main** (`0cf201e`, a IA que atende v2 e a foto do anúncio). A migração de 06/11 passou a `20261109200000` (a de antes ficaria atrás de migrações que já estão no ar).
+- **Banco** — `20261109210000_o_relatorio_que_vende` (só Imova; na KOMUNE não cria nada, conferido no banco de validação):
+  - a carteira (`app.imova_carteira`: anúncios do CRM + os que só existem no Canal Pro, com a categoria) e o **interesse lead × imóvel** (`app.imova_interesses`): a leitura do conselheiro (`interesse_no_imovel`) e, onde ela não leu, os sinais certos — código citado, foto reconhecida, lead do portal, visita da IA, imóvel da ficha;
+  - o **conselheiro de vendas** (propósito `aconselhar_vendas`, acrescentado às listas como o da juíza): `ia_conselho_do_lead`, `ia_conselho_do_imovel`, fila `app.ia_conselheiro_enfileirar('lead'|'imovel')`, portas `ia_conselheiro_{lead,imovel}_{entrada,gravar}` só para `service_role`; sem telefone nem e-mail para o modelo; só códigos da carteira; só sugestão de falar ou fazer;
+  - as **oportunidades paradas** (`app.imova_mesa_agora`: esperando, promessa, proposta, visita, combina, esfriando) com a comissão provável = comissão × chance da etapa (histórico de 180 dias puxado para uma referência enquanto há pouco histórico) e a foto da noite (`relatorio_imova_mesa_dia`);
+  - a **previsão do mês** (`app.imova_previsao`), o funil do período, a equipe, o progresso da IA (a juíza grava a `lacuna`);
+  - as leituras `relatorio_imova_painel_{visao,imoveis,imovel,oportunidades,funil,ia}` (jsonb, porteira de sempre) e `relatorio_imova_premissas_salvar` (só admin e gestor; comissão 0,5–20%, aluguéis 0–3, meta 1–500 ou vazia).
+- **Seed da Imova, bloco 12k:** `ia.conselheiro` ligada; `relatorio.premissas` 6% · 1 aluguel · sem meta (`on conflict do nothing`); crons `ia_conselheiro_leads` 6h e 13h de Natal, `ia_conselheiro_imoveis` 6h40, `relatorio_imova_foto_da_mesa` 23h50.
+- **IA:** `conselheiro-do-lead@v1` e `conselheiro-do-imovel@v1` (Haiku 5.5; nunca sugerem prometer condição comercial — levam ao proprietário ou ao financeiro); `avaliacao-do-atendimento@v2` vigente (com a lacuna); worker `apps/workers/src/ia/conselheiro.ts` em `TRABALHOS_DA_IMOVA`.
+- **Tela:** na Imova a barra tem Visão geral, Imóveis, Oportunidades, Funil e equipe e Progresso da IA (`painel-vende-*.tsx`, `graficos-vende.tsx`, `formatos-vende.ts`, `premissas-vende.tsx`, contrato em `dados-vende.ts`). Saem os painéis de 06/11 da Imova (Clientes quentes, Anúncios, Mensagens, IA que atende, Atendimento, Funil, Pessoas). KOMUNE igual (teste).
+
+**Verificado:**
+- pgTAP 137 (45 asserções) e 134 (55) no banco local da Imova; o 67 conhece o propósito novo e passa com o teto da KOMUNE (29/29; no banco da Imova falha 7, todos do teto de US$ 30 × 60, como antes).
+- Vitest: web 1.752, workers 481, prompts 382, schema 111; lint e tipos verdes.
+- Chrome real (Playwright), 1440 e 390 px: as 5 abas sem erro de console e sem estouro de largura, com os dados do banco local.
+- **Conselheiro de verdade** no banco local (chave da Imova, runner que só lê `aconselhar_vendas` da fila): 34 leads + 6 imóveis, 40 chamadas, US$ 0,018 no total (~US$ 0,0004 por chamada). Sugestões concretas e sem promessa ("levar a proposta de 800 mil ao proprietário; não prometer desconto"); achou a divergência de preço do TE0004 (R$ 510 mil × R$ 620 mil). Estimativa: US$ 1,50 a 2,30 por mês.
+
+**Pendente:**
+- A comissão provável depende de o lead estar ligado a um imóvel ou ter dito o teto; no começo muitos aparecem com R$ 0. O conselheiro preenche o perfil a cada rodada.
+- "Desde ontem" só aparece depois da primeira foto da noite (23h50).
+- Canais de venda: o gráfico mostra "disponível quando o canal de chegada for publicado" (branch `canal-de-chegada`, sem commit).
+- O progresso da IA começa em 06/11 (uma semana de dado); as versões no gráfico são as que a IA que atende usou de fato.
+- Sem botões de ação em lote (mandar imóvel para os N, distribuir os sem dono): ficaram fora até haver o fluxo no CRM.
+- Para publicar (quando pedir): conferir o ar → main → `publicar-banco.mjs imova migrar` (as duas migrações) → blocos 12j e 12k com `app.exigir_empresa('imova')` → `fly deploy` do `imova-worker-ai` → site da Imova.
+
+**Decisão humana:**
+- Premissas de partida: 6% de comissão na venda e um aluguel na locação, sem meta. Ajustáveis na tela ("Ajustar", admin e gestor).
+- "Mandar o imóvel" segue como mensagem que a equipe confere antes de enviar; nada automático (WhatsApp intocável).
