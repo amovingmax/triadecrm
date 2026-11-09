@@ -9683,4 +9683,4 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 - 09: antes, o 49 tinha 2 e o 50 tinha 10 funções; depois, os dois passam. Os itens 15, 16, 17 e 22 (embaixador) falham antes e depois só no banco da Imova, que tem outros funis; não são desta entrega.
 - 133 (66), 134 (55) e 137 (45) verdes com a migração aplicada; na KOMUNE local, a migração roda sem erro e sem mudar nada (numa transação desfeita).
 
-**Para publicar, só com pedido:** depois que a publicação do canal de chegada terminar, `main` + push e `publicar-banco.mjs imova migrar` (só esta migração). Site e motor não mudam.
+**Em produção, só na Imova (09/11/2026, pedido do usuário: "pode"):** depois da publicação do canal de chegada (main `4e362e4`, 197 migrações). `main` `66a5482` (avanço direto) e `publicar-banco.mjs imova migrar`, só a `20261109234000` (198 migrações). Conferido em produção: nenhuma função do `app` executável por anon e nenhuma de gatilho aberta; os cinco ajudantes seguem executáveis por authenticated; as cinco leituras dos relatórios respondem como gestor (até 189 ms; 17 imóveis no ranking, 5 na fila). Site e motor não mudaram; KOMUNE intocada.
