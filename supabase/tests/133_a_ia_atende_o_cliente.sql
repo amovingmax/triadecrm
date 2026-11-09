@@ -23,11 +23,14 @@
 --   8. O CADERNO: só a conversa do treino anota; "Corrigir" vira linha do
 --      caderno;
 --   9. QUEM VÊ: gestor e SDR veem; leitura não.
+--  10. A REPETIÇÃO do teto de fala só conta em poucos minutos (20261109120000):
+--      três "Olá" em dois dias não pausam o robô; resposta automática em um
+--      minuto, sim.
 --
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(62);
+select plan(66);
 
 insert into public.allowed_users (email, role, note) values
   ('h133.g@teste.local', 'gestor', 'pgTAP 133'),
@@ -359,6 +362,30 @@ select pg_temp.sair();
 select pg_temp.entrar('a0000000-0000-4000-8000-000000013303'::uuid, 'leitura');
 select is((select count(*)::int from public.ia_procurar_conversas('Janio')), 0, 'leitura não procura conversa');
 select pg_temp.sair();
+
+-- ---------------------------------------------------------------------
+-- 14. A repetição só conta em poucos minutos (20261109120000)
+-- ---------------------------------------------------------------------
+select is((app.wa_robo_teto() ->> 'repeticoes_minutos')::int, 10,
+          'na Imova, as mensagens iguais só contam dentro de 10 minutos');
+
+-- O caso do Janio: "Olá" em 06/11 à tarde, de novo à noite e em 07/11 de manhã.
+select pg_temp.conversa('cumprimenta', '+5584999913393', 'Cliente Que Cumprimenta');
+select pg_temp.dele('cu1', pg_temp.id('cumprimenta'), 2 * 86400, 'Olá');
+select pg_temp.dele('cu2', pg_temp.id('cumprimenta'), 86400, 'Olá');
+select pg_temp.dele('cu3', pg_temp.id('cumprimenta'), 0, 'Olá');
+select is((select bot_paused from public.conversations where id = pg_temp.id('cumprimenta')), false,
+          'três "Olá" em dois dias não são resposta automática: o robô não pausa');
+select is(app.wa_bot_pode_falar(pg_temp.id('cumprimenta')) ->> 'pode', 'true',
+          'e a IA pode responder o terceiro "Olá"');
+
+-- Resposta automática de verdade: o mesmo texto três vezes em dois minutos.
+select pg_temp.conversa('automatica', '+5584999913394', 'Loja Com Resposta Automática');
+select pg_temp.dele('au1', pg_temp.id('automatica'), 120, 'Olá! Estamos fora do horário de atendimento.');
+select pg_temp.dele('au2', pg_temp.id('automatica'), 60, 'Olá! Estamos fora do horário de atendimento.');
+select pg_temp.dele('au3', pg_temp.id('automatica'), 0, 'Olá! Estamos fora do horário de atendimento.');
+select is((select bot_paused from public.conversations where id = pg_temp.id('automatica')), true,
+          'o mesmo texto três vezes em dois minutos continua freando o robô');
 
 select * from finish();
 rollback;
