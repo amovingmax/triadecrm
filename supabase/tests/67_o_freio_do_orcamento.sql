@@ -85,14 +85,15 @@ select ok((app.ia_pode_gastar('transcribe_audio') ->> 'pode')::boolean,
 
 -- Aqui, e não depois do teto: passada a linha do freio param os 14, e a
 -- partição deixaria de ser visível.
--- Os propósitos só da Imova (o canal de chegada, 20261106130000, e a IA juíza
--- dos relatórios, 20261109200000) existem no banco dela e no CI (sem
+-- Os propósitos só da Imova (o canal de chegada, 20261106130000, a IA juíza
+-- dos relatórios, 20261109200000, e o conselheiro de vendas, 20261109210000)
+-- existem no banco dela e no CI (sem
 -- identidade); no da KOMUNE as migrações não os criam. Cada um conta se está na
 -- lista de `ai_runs.purpose` deste banco — qualquer outro propósito novo
 -- continua derrubando o teste.
 create function pg_temp.so_da_imova() returns text[] language sql stable as $$
   select coalesce(array_agg(p order by p), array[]::text[])
-    from unnest(array['identificar_canal', 'avaliar_atendimento']) p
+    from unnest(array['identificar_canal', 'avaliar_atendimento', 'aconselhar_vendas']) p
    where (select pg_get_constraintdef(c.oid) from pg_constraint c
            where c.conname = 'ai_runs_purpose_check') like '%''' || p || '''%'
 $$;

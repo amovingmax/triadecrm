@@ -660,6 +660,44 @@ begin
 end $$;
 
 -- =====================================================================
+-- 12k. O relatório que vende (09/11/2026): só da Imova. Pedido do usuário:
+--      "sugestões da IA para vender mais e pontos a falar ou fazer para
+--      cada" imóvel e lead, e quantas pessoas estão interessadas em cada
+--      imóvel. O CONSELHEIRO de vendas (Claude Haiku 5.5, propósito
+--      `aconselhar_vendas`) lê às 6h e às 13h de Natal (9h e 16h UTC) cada
+--      lead que teve mensagem depois da última leitura (até 30 dias para
+--      trás) e diz em que imóveis ele está interessado, o perfil em números e
+--      o que a equipe deve falar ou fazer; às 6h40 (9h40 UTC) lê cada imóvel
+--      com interessado e dá três sugestões para vendê-lo. Nada vai ao
+--      cliente: é para a equipe. Às 23h50 de Natal (2h50 UTC) a foto das
+--      oportunidades paradas guarda o "desde ontem". As premissas da conta de
+--      dinheiro (6% de comissão na venda, um aluguel na locação, sem meta)
+--      mudam pela tela (admin e gestor). `on conflict do nothing` nas
+--      premissas: rodar de novo não desfaz o que alguém ajustou.
+-- =====================================================================
+insert into public.app_settings (key, value, description) values
+  ('ia.conselheiro',
+   '{"ligada": true, "dias_para_tras": 30, "por_rodada": 150}'::jsonb,
+   'O conselheiro de vendas dos relatórios, só da Imova (09/11/2026). ligada: põe na fila os leads com mensagem nova (6h e 13h de Natal) e os imóveis com interessado (6h40). dias_para_tras: até quantos dias sem mensagem um lead ainda é lido. por_rodada: quantos leads ou imóveis por rodada, no máximo.')
+on conflict (key) do update set description = excluded.description;
+insert into public.app_settings (key, value, description) values
+  ('relatorio.premissas',
+   '{"comissao_venda_pct": 6, "alugueis_na_locacao": 1, "meta_mes": null}'::jsonb,
+   'As premissas do relatório que vende da Imova (09/11/2026): comissão da venda em %, aluguéis de comissão na locação e a meta de negócios do mês. Mudam pela tela de Relatórios (admin e gestor).')
+on conflict (key) do nothing;
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('ia_conselheiro_leads', '0 9,16 * * *',
+                          $cron$select app.ia_conselheiro_enfileirar('lead')$cron$);
+    perform cron.schedule('ia_conselheiro_imoveis', '40 9 * * *',
+                          $cron$select app.ia_conselheiro_enfileirar('imovel')$cron$);
+    perform cron.schedule('relatorio_imova_foto_da_mesa', '50 2 * * *',
+                          $cron$select app.relatorio_imova_fotografar_mesa()$cron$);
+  end if;
+end $$;
+
+-- =====================================================================
 -- 13. Autoverificação. Qualquer falta aborta com o nome do problema.
 -- =====================================================================
 do $$
