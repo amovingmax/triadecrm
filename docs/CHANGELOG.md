@@ -9684,3 +9684,29 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 - 133 (66), 134 (55) e 137 (45) verdes com a migração aplicada; na KOMUNE local, a migração roda sem erro e sem mudar nada (numa transação desfeita).
 
 **Em produção, só na Imova (09/11/2026, pedido do usuário: "pode"):** depois da publicação do canal de chegada (main `4e362e4`, 197 migrações). `main` `66a5482` (avanço direto) e `publicar-banco.mjs imova migrar`, só a `20261109234000` (198 migrações). Conferido em produção: nenhuma função do `app` executável por anon e nenhuma de gatilho aberta; os cinco ajudantes seguem executáveis por authenticated; as cinco leituras dos relatórios respondem como gestor (até 189 ms; 17 imóveis no ranking, 5 na fila). Site e motor não mudaram; KOMUNE intocada.
+
+## 10/11/2026 — o código do anúncio com a tag do tipo, e o editor que abria com o Tipo em branco (branch `codigo-por-tipo`; só na Imova)
+
+**Pedido do usuário:** "Assim que criarmos anúncios é possível já colocar uma TAG no anúncio que seja única? A ideia é colocar TAGS: TE0001 para Terrenos, IM0001 para Imóveis, etc. Se já tivermos um terreno com o código TE0001, quando formos criar um novo anúncio ele deve ter um código diferente, que ainda não existe." A tabela de tags proposta foi aceita ("siga com a regra para as demais tags"); o PT ninguém soube dizer o que é. A primeira versão deixava a pessoa marcar a tag; o usuário pediu que ela saia sozinha do tipo: "O código da tag deve ser preenchido automaticamente quando selecionarmos o tipo de anúncio. Caso escolhermos um anúncio de terreno, a tag deve automaticamente ser TE (e um número que ainda não existe)." É o que ficou.
+
+**Entregue (nada em produção):**
+- **Migração `20261110100000_codigo_com_tag`** (na KOMUNE, só o aviso):
+  - Tags: **TE** terreno e terreno comercial; **SA** sala comercial e consultório (a Arbo já usa SA); **IM** os outros residenciais; **CO** os outros comerciais (`app.anuncio_tag_valida`, `app.anuncio_tag_do_tipo`, `app.anuncio_tag_do_codigo`). PT não é tag do CRM: o PT0001_IMOVA (uma casa da Arbo) fica como está.
+  - **O próximo número livre** (`app.anuncio_proximo_codigo`) é 1 + o maior já usado com a tag nos anúncios do CRM (inclusive excluídos), no relatório do Canal Pro e no arquivo do sistema atual, com ou sem sufixo (TE0005_IMOVA ocupa o 5). Número nunca volta a ser usado. Com os dados de hoje: TE0006, SA0013, IM0001, CO0001.
+  - **`public.anuncio_salvar`** dá o código pela tag do tipo: o anúncio novo nasce com ela e o próximo número livre, e não mais com IMV-0001 (um `prefixo` mandado é ignorado). No rascunho que nasceu no CRM e nunca foi ao ar, o código segue o tipo: casa → terreno troca IM0003 pelo próximo TE; casa → apartamento mantém IM0003; o rascunho antigo IMV-… ganha a tag no próximo salvar. Publicado ou trazido de fora, o código fica, mesmo trocando o tipo. Uma trava (`pg_advisory_xact_lock`) impede dois salvares de pegarem o mesmo número.
+  - **`public.anuncio_proximos_codigos()`**: o próximo código de cada tag, para a tela mostrar ao escolher o tipo (admin, gestor e SDR).
+- **Tela:** campo **"Código"** em "O imóvel", só leitura, que se preenche ao escolher o tipo: terreno → TE0006, sala → SA0013, loja → CO0001, casa → IM0001 ("Sai sozinho do tipo: TE e o próximo número livre"). No rascunho do CRM, trocar o tipo avisa antes de salvar ("O tipo pede IM: ao salvar, o código passa de TE0006 para IM0001"). Com o código fixo, mostra o código e o porquê. O aviso depois de salvar diz o código novo.
+- **Correção de um defeito que já existia na main:** ao abrir qualquer anúncio, o **Tipo aparecia em branco** e a tela já dizia "Há mudanças ainda não salvas". Salvar assim seria recusado (tipo vazio). O formulário nascia com os valores do anúncio novo e trocava logo depois, e o seletor que muda antes de as opções existirem se esvazia sozinho. Isso valia para todo seletor cujo valor fosse diferente do anúncio novo (Para, Período, Mostrar endereço). Agora o editor só nasce com o anúncio carregado e o formulário já começa com os valores dele (`EditorDeAnuncio` carrega, `Editor` edita). Conferido: a main sem a correção abre o TE0002_IMOVA com o Tipo em branco; com ela, abre certo.
+
+**Verificado:**
+- pgTAP 141 novo (21) e 123 a 130 verdes (316 asserções) no banco local da Imova (o 123 agora espera IM… no lugar de IMV-…). No 09, só falham os itens 15, 16, 17 e 22 (embaixador), que já falhavam no banco da Imova (outros funis); no 135 (avisos), uma colisão de numeração dos dados locais; nenhum dos dois é desta entrega.
+- Vitest 1.791 (novo `tags-do-codigo.test.ts`, com o espelho de todos os 24 tipos), typecheck, eslint e prettier limpos.
+- No Chrome (site local, banco local da Imova, como gestor): o anúncio novo mostra IM0001; terreno, sala, loja, consultório, terreno comercial e casa dão TE0006, SA0013, CO0001, SA0013, TE0006 e IM0001; salvar o terreno criou o TE0006; trocar o tipo para casa e salvar deu IM0001; casa → apartamento manteve IM0001; o TE0001_IMOVA mantém o código mesmo trocando o tipo; no celular (390 px), sem rolagem lateral; nenhum erro de página. O anúncio do ensaio foi apagado, com o histórico dele.
+- Banco local da Imova: backup antes em `~/triadecrm-backups/imova-local-antes-codigo-com-tag-1011.dump`. A migração entrou direto pelo psql, porque o `publicar-banco.mjs migrar --local` recusou: o banco local tem duas migrações de outros ramos (20261030100000 e 20261104140000) e não tem a 20261109210000 da main.
+
+**Pendente:**
+- Produção: publicar a migração, os tipos e o site na Imova, quando o usuário pedir.
+- O `canal_pro_trazer` continua dando IMV-… quando o código do relatório não serve ou já está em uso (caso raro). Pode passar a usar a tag do tipo.
+- O ramo `fotos-do-canal-pro` (ainda não publicado) também mexe em `dados.ts` e `tipos.ts` dos anúncios, em outras partes; quem juntar por último confere o encaixe.
+
+**Decisão humana:** nenhuma nova.
