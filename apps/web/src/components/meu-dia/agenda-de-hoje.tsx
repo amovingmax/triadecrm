@@ -135,12 +135,19 @@ function Compromisso({ compromisso, agora }: { compromisso: CompromissoDeHoje; a
         </span>
         <span className="truncate text-xs text-muted-foreground">
           {compromisso.tipo === 'visit' ? 'Visita' : 'Reunião'}
-          {compromisso.feito
-            ? ' · feita'
-            : !passou
-              ? ` · ${quantoFalta(compromisso.quando, agora)}`
-              : ''}
+          {compromisso.feito ? ' · feita' : ''}
         </span>
+        {/* O que vem diz quanto falta, no laranja da marca; o que passou sem ser
+            feito diz há quanto tempo, no tom de alerta — como no protótipo. */}
+        {!compromisso.feito && !passou ? (
+          <span className="numerico mt-0.5 text-xs font-medium text-menta-texto">
+            {quantoFalta(compromisso.quando, agora)}
+          </span>
+        ) : !compromisso.feito ? (
+          <span className="numerico mt-1 self-start rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-semibold text-destructive-texto">
+            {quantoPassou(compromisso.quando, agora)}
+          </span>
+        ) : null}
       </span>
     </Link>
   );
@@ -149,11 +156,11 @@ function Compromisso({ compromisso, agora }: { compromisso: CompromissoDeHoje; a
 function LinhaDoAgora({ agora }: { agora: number }) {
   return (
     <span
-      className="flex items-center gap-2 py-1 text-xs font-medium text-primary"
+      className="flex items-center gap-2 py-1 text-xs font-semibold text-menta-texto"
       role="presentation"
     >
       <span className="numerico w-11 shrink-0">{hora(new Date(agora).toISOString())}</span>
-      <span aria-hidden="true" className="h-0.5 flex-1 rounded-full bg-primary" />
+      <span aria-hidden="true" className="h-0.5 flex-1 rounded-full bg-menta" />
       <span className="sr-only">agora</span>
     </span>
   );
@@ -174,6 +181,14 @@ const FORMATO_DA_HORA = new Intl.DateTimeFormat('pt-BR', {
 
 function hora(iso: string): string {
   return FORMATO_DA_HORA.format(new Date(iso));
+}
+
+/** "atrasada 42 min", "atrasada 2 h": o compromisso que passou sem ser marcado feito. */
+function quantoPassou(iso: string, agora: number): string {
+  const minutos = Math.max(1, Math.round((agora - new Date(iso).getTime()) / 60_000));
+  if (minutos < 60) return `atrasada ${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  return `atrasada ${horas} h`;
 }
 
 /** "em 48 min", "em 2 h", "agora". */

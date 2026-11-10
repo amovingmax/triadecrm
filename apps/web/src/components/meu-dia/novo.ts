@@ -5,7 +5,8 @@
  * conversa —, sem nenhum dado novo no banco. A KOMUNE não passa por este arquivo.
  */
 
-import type { BlocoPreenchido, ItemDoDia } from './tipos';
+import { iconeDoItem } from './icones';
+import type { BlocoPreenchido, IdDoBloco, ItemDoDia, TipoDeItem } from './tipos';
 
 // ---------------------------------------------------------------------------
 // A janela de 24 h
@@ -115,24 +116,143 @@ export function pastilhaDaJanela(
  * sendo o alvo de toque (ver `ItemDaFila`); o rótulo só diz em palavras o que o
  * toque faz, que antes era uma seta. Vale o mesmo destino de `destinoDoItem`.
  */
-export function rotuloDaAcao(
+/** O desenho do botão da linha; quem desenha troca a chave pelo ícone. */
+export type IconeDaAcao = 'responder' | 'modelo' | 'ligar' | 'registrar' | 'combinar' | 'abrir';
+
+export type AcaoDoItem = {
+  rotulo: string;
+  icone: IconeDaAcao;
+  /** O botão cheio, no laranja: só a conversa com a janela aberta, como no protótipo. */
+  destaque: boolean;
+};
+
+/** Os tipos que são tarefa ou próxima ação: só neles o verbo do título vira o botão. */
+const TIPOS_DE_TAREFA: readonly TipoDeItem[] = [
+  'tarefa_atrasada',
+  'tarefa_hoje',
+  'proxima_acao_atrasada',
+  'proxima_acao_hoje',
+  'tarefa_futura',
+  'tarefa_sem_data',
+];
+
+/**
+ * O que o botão da linha diz e desenha. A linha inteira continua sendo o link
+ * (`destinoDoItem`), e o rótulo diz o que se faz do outro lado: "Responder" e
+ * "Enviar modelo" abrem a conversa, "Registrar resultado" abre o Registrar, e
+ * "Combinar próximo passo" abre o funil.
+ *
+ * "Ligar" é a tarefa cujo título começa por ligar (a mesma regra do ícone, em
+ * `iconeDoItem`): ela leva à ficha, onde o botão Ligar é o primeiro da tela. As
+ * outras tarefas e a reunião dizem "Abrir ficha", e não "Ver compromisso", que
+ * prometeria a Agenda.
+ */
+export function acaoDoItem(
   item: ItemDoDia,
   { somenteLeitura = false }: { somenteLeitura?: boolean } = {},
-): string {
-  if (somenteLeitura) return 'Ver ficha';
+): AcaoDoItem {
+  if (somenteLeitura) return { rotulo: 'Ver ficha', icone: 'abrir', destaque: false };
   switch (item.tipo) {
     case 'conversa_esperando':
-      return ladoDaJanela(item) === 'fechada' ? 'Enviar modelo' : 'Responder';
+      return ladoDaJanela(item) === 'fechada'
+        ? { rotulo: 'Enviar modelo', icone: 'modelo', destaque: false }
+        : { rotulo: 'Responder', icone: 'responder', destaque: true };
     case 'desfecho_pendente':
-      return 'Registrar resultado';
+      return { rotulo: 'Registrar resultado', icone: 'registrar', destaque: false };
     case 'sem_proxima_acao':
     case 'negocio_parado':
-      return 'Combinar próximo passo';
-    // Tarefa, próxima ação e reunião levam à ficha (`destinoDoItem`): o rótulo diz
-    // isso, e não "Ver compromisso", que prometeria a Agenda.
+      return { rotulo: 'Combinar próximo passo', icone: 'combinar', destaque: false };
     default:
-      return 'Abrir ficha';
+      return TIPOS_DE_TAREFA.includes(item.tipo) && iconeDoItem(item) === 'ligar'
+        ? { rotulo: 'Ligar', icone: 'ligar', destaque: false }
+        : { rotulo: 'Abrir ficha', icone: 'abrir', destaque: false };
   }
+}
+
+export function rotuloDaAcao(item: ItemDoDia, opcoes: { somenteLeitura?: boolean } = {}): string {
+  return acaoDoItem(item, opcoes).rotulo;
+}
+
+// ---------------------------------------------------------------------------
+// Os grupos em cartão e os filtros (protótipo aprovado em 10/11/2026)
+// ---------------------------------------------------------------------------
+
+/** O nome do grupo no filtro, curto o bastante para caber numa pílula. */
+export const ROTULO_CURTO_DO_BLOCO: Record<IdDoBloco, string> = {
+  respondeu: 'Responderam',
+  respondeu_aberta: 'Janela aberta',
+  respondeu_modelo: 'Esperando modelo',
+  agora: 'Urgente',
+  hoje: 'Para hoje',
+  sem_proxima_acao: 'Sem próxima ação',
+  parados: 'Parados',
+  depois: 'Depois',
+  sistema: 'Avisos',
+};
+
+/**
+ * O tom do ícone do grupo. O laranja da marca só para a janela aberta, que é o
+ * único relógio que não é nosso; o alerta para o que já passou da hora.
+ */
+export type TomDoBloco = 'acento' | 'alerta' | 'neutro';
+
+export const TOM_DO_BLOCO: Record<IdDoBloco, TomDoBloco> = {
+  respondeu: 'acento',
+  respondeu_aberta: 'acento',
+  respondeu_modelo: 'alerta',
+  agora: 'alerta',
+  hoje: 'neutro',
+  sem_proxima_acao: 'neutro',
+  parados: 'neutro',
+  depois: 'neutro',
+  sistema: 'neutro',
+};
+
+/** Quantas linhas cada grupo mostra antes do "Mostrar mais". */
+export const LINHAS_POR_GRUPO = 5;
+
+/** O filtro escolhido, ou "tudo" quando o grupo dele saiu da fila. */
+export type FiltroDaFila = 'tudo' | IdDoBloco;
+
+export function blocosDoFiltro(
+  blocos: readonly BlocoPreenchido[],
+  filtro: FiltroDaFila,
+): readonly BlocoPreenchido[] {
+  if (filtro === 'tudo') return blocos;
+  const escolhidos = blocos.filter((bloco) => bloco.id === filtro);
+  return escolhidos.length > 0 ? escolhidos : blocos;
+}
+
+/**
+ * A linha que ganha o selo "Comece por aqui": a primeira do que está na tela,
+ * que é a primeira na ordem do banco. Aviso do sistema não ganha: ele não é
+ * trabalho de carteira.
+ */
+export function primeiraDaFila(blocos: readonly BlocoPreenchido[]): ItemDoDia | null {
+  const primeiro = blocos[0];
+  if (!primeiro || primeiro.id === 'sistema') return null;
+  return primeiro.itens[0] ?? null;
+}
+
+/** "Paula Ramos" → "PR"; "Imova" → "I". Sem letra nenhuma, vazio. */
+export function iniciais(nome: string | null | undefined): string {
+  const palavras = (nome ?? '').match(/\p{L}[\p{L}'’-]*/gu) ?? [];
+  const primeira = palavras[0];
+  if (!primeira) return '';
+  const ultima = palavras.length > 1 ? palavras[palavras.length - 1] : null;
+  return `${primeira[0]}${ultima ? ultima[0] : ''}`.toLocaleUpperCase('pt-BR');
+}
+
+/** Qual das quatro cores do disco de iniciais: a mesma pessoa, sempre a mesma cor. */
+export function corDoDisco(nome: string, cores: number): number {
+  let soma = 0;
+  for (const letra of nome) soma = (soma * 31 + (letra.codePointAt(0) ?? 0)) % 9973;
+  return soma % cores;
+}
+
+/** A frase da janela no cabeçalho: por onde começar, ou que nenhuma está aberta. */
+export function fraseDaJanela(blocos: readonly BlocoPreenchido[]): string {
+  return porOndeComecar(blocos) ?? 'Nenhuma janela aberta agora.';
 }
 
 /**

@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  acaoDoItem,
   BLOCO_JANELA_ABERTA,
   BLOCO_SO_MODELO,
+  blocosDoFiltro,
+  corDoDisco,
   fracaoDoExpediente,
+  fraseDaJanela,
+  iniciais,
+  primeiraDaFila,
   horasParaFechar,
   ladoDaJanela,
   motivoQueSobra,
@@ -153,8 +159,32 @@ describe('rotuloDaAcao', () => {
     expect(rotuloDaAcao(item({ tipo: 'desfecho_pendente' }))).toBe('Registrar resultado');
     expect(rotuloDaAcao(item({ tipo: 'sem_proxima_acao' }))).toBe('Combinar próximo passo');
     expect(rotuloDaAcao(item({ tipo: 'negocio_parado' }))).toBe('Combinar próximo passo');
-    expect(rotuloDaAcao(item({ tipo: 'tarefa_hoje' }))).toBe('Abrir ficha');
+    expect(rotuloDaAcao(item({ tipo: 'tarefa_hoje', titulo: 'Mandar a proposta' }))).toBe(
+      'Abrir ficha',
+    );
     expect(rotuloDaAcao(item({ tipo: 'reuniao_proxima' }))).toBe('Abrir ficha');
+  });
+
+  it('a tarefa de ligar diz "Ligar", pela mesma regra do ícone', () => {
+    expect(acaoDoItem(item({ tipo: 'tarefa_hoje', titulo: 'Ligar D+1' }))).toEqual({
+      rotulo: 'Ligar',
+      icone: 'ligar',
+      destaque: false,
+    });
+    expect(rotuloDaAcao(item({ tipo: 'proxima_acao_atrasada', titulo: 'Telefonar' }))).toBe(
+      'Ligar',
+    );
+    // A reunião com "Ligar" no título continua abrindo a ficha: o verbo só vale
+    // para tarefa e próxima ação.
+    expect(rotuloDaAcao(item({ tipo: 'reuniao_proxima', titulo: 'Ligar D+1' }))).toBe(
+      'Abrir ficha',
+    );
+  });
+
+  it('só a conversa com a janela aberta ganha o botão cheio', () => {
+    expect(acaoDoItem(conversa(FECHA_EM(3))).destaque).toBe(true);
+    expect(acaoDoItem(conversa(FECHOU)).destaque).toBe(false);
+    expect(acaoDoItem(conversa(FECHA_EM(3)), { somenteLeitura: true }).destaque).toBe(false);
   });
 
   it('no dia de outra pessoa, toda linha só abre a ficha', () => {
@@ -237,5 +267,61 @@ describe('nomeDaSaudacao', () => {
   it('nunca um e-mail', () => {
     expect(nomeDaSaudacao('gestor.teste@teste.local')).toBe('Gestor');
     expect(nomeDaSaudacao('ana@imova.com.br')).toBe('Ana');
+  });
+});
+
+describe('os grupos em cartão e os filtros', () => {
+  const fila = [
+    conversa(FECHA_EM(2), { organizacaoId: 'b', organizacao: 'Bruna Lima' }),
+    conversa(FECHOU, { organizacaoId: 'a', organizacao: 'Ana' }),
+    item({ prioridade: 3, organizacaoId: 'e', organizacao: 'E' }),
+  ];
+  const blocos = separarPelaJanela(agruparFila(fila));
+
+  it('o filtro mostra só o grupo escolhido, e "tudo" mostra todos', () => {
+    expect(blocosDoFiltro(blocos, 'tudo')).toBe(blocos);
+    expect(blocosDoFiltro(blocos, 'agora').map((b) => b.id)).toEqual(['agora']);
+  });
+
+  it('o grupo que saiu da fila não deixa a tela vazia', () => {
+    expect(blocosDoFiltro(blocos, 'parados')).toBe(blocos);
+  });
+
+  it('o selo vai para a primeira linha do que está na tela', () => {
+    expect(primeiraDaFila(blocos)?.organizacao).toBe('Bruna Lima');
+    expect(primeiraDaFila(blocosDoFiltro(blocos, 'agora'))?.organizacao).toBe('E');
+    expect(primeiraDaFila([])).toBeNull();
+  });
+
+  it('aviso do sistema não ganha o selo', () => {
+    const aviso = item({ organizacaoId: null, negocioId: null, titulo: 'Dead-letter' });
+    expect(primeiraDaFila(agruparFila([aviso]))).toBeNull();
+  });
+
+  it('a frase do topo: por onde começar, ou nenhuma janela aberta', () => {
+    expect(fraseDaJanela(blocos)).toBe('Comece por Bruna Lima: a janela fecha em 2 h.');
+    expect(fraseDaJanela(separarPelaJanela(agruparFila([conversa(FECHOU)])))).toBe(
+      'Nenhuma janela aberta agora.',
+    );
+  });
+});
+
+describe('o disco de iniciais', () => {
+  it('primeira e última palavra, em maiúscula', () => {
+    expect(iniciais('Paula Ramos')).toBe('PR');
+    expect(iniciais('marina da costa')).toBe('MC');
+    expect(iniciais('Imova')).toBe('I');
+    expect(iniciais('Ótica Ângela')).toBe('ÓÂ');
+  });
+
+  it('sem letra, sem disco', () => {
+    expect(iniciais('+55 84 99999-0000')).toBe('');
+    expect(iniciais(null)).toBe('');
+  });
+
+  it('a mesma pessoa tem sempre a mesma cor', () => {
+    expect(corDoDisco('Paula Ramos', 4)).toBe(corDoDisco('Paula Ramos', 4));
+    expect(corDoDisco('Paula Ramos', 4)).toBeGreaterThanOrEqual(0);
+    expect(corDoDisco('Paula Ramos', 4)).toBeLessThan(4);
   });
 });

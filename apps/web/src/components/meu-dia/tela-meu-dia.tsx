@@ -3,7 +3,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, MessagesSquare, RotateCw, Users } from 'lucide-react';
+import {
+  Bell,
+  CalendarClock,
+  ChevronDown,
+  CircleDashed,
+  Flame,
+  Hourglass,
+  Lock,
+  MessagesSquare,
+  PauseCircle,
+  RotateCw,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 
 import type { AppRole } from '@/lib/auth/role';
 import { NotaRecolhida } from '@/components/ui/nota-recolhida';
@@ -23,7 +36,18 @@ import { RevelarLista } from '@/components/movimento';
 import { diaDoInstante, rotuloDiaPorExtenso, somarDias } from '@/components/agenda/tipos';
 
 import { AgendaDeHoje } from './agenda-de-hoje';
-import { porOndeComecar, separarPelaJanela } from './novo';
+import { LinhaNova } from './linha-nova';
+import {
+  blocosDoFiltro,
+  fraseDaJanela,
+  LINHAS_POR_GRUPO,
+  primeiraDaFila,
+  ROTULO_CURTO_DO_BLOCO,
+  separarPelaJanela,
+  TOM_DO_BLOCO,
+  type FiltroDaFila,
+  type TomDoBloco,
+} from './novo';
 import { ResumoCompacto } from './resumo-compacto';
 import {
   buscarFeitoHoje,
@@ -62,6 +86,7 @@ import {
   type AbaDoDia,
   type BlocoPreenchido,
   type DiaDaFila,
+  type IdDoBloco,
   type ItemDoDia,
 } from './tipos';
 
@@ -144,6 +169,9 @@ export function TelaMeuDia({
   const clienteDeConsultas = useQueryClient();
   const [aba, setAba] = useState<AbaDoDia>(abaInicial);
   const [pessoa, setPessoa] = useState<string>(pessoaInicial);
+  // O filtro por grupo (Meu dia novo). Vive só na tela: é um recorte de leitura,
+  // e voltar da ficha para a fila inteira é o que se espera.
+  const [filtro, setFiltro] = useState<FiltroDaFila>('tudo');
   const doProprio = pessoa === usuarioId;
   const escolhida = pessoas.find((p) => p.id === pessoa);
   const nomeDaPessoa = escolhida?.nome ?? null;
@@ -228,7 +256,13 @@ export function TelaMeuDia({
   const blocosDaFila = blocosParaFazer(agruparFila(visiveis));
   const blocos = NOVO ? separarPelaJanela(blocosDaFila) : blocosDaFila;
   const pendentes = contarPendentesDeHoje(visiveis);
-  const comecePor = NOVO && doProprio && pendentes > 0 ? porOndeComecar(blocos) : null;
+  const fraseDoTopo = NOVO && doProprio && pendentes > 0 ? fraseDaJanela(blocos) : null;
+  // O grupo do filtro pode sair da fila (alguém respondeu, a lista recarregou): aí
+  // a tela volta para "Tudo" em vez de ficar vazia.
+  const filtroValido: FiltroDaFila =
+    filtro !== 'tudo' && blocos.some((bloco) => bloco.id === filtro) ? filtro : 'tudo';
+  const blocosNaTela = NOVO ? blocosDoFiltro(blocos, filtroValido) : blocos;
+  const primeira = NOVO && doProprio ? primeiraDaFila(blocosNaTela) : null;
 
   // A fala do lead na linha (Meu dia novo): só das conversas que estão na tela, e
   // só depois que a fila chegou. A chave é a lista de parceiros, para a prévia
@@ -260,6 +294,26 @@ export function TelaMeuDia({
   const conversasDeTodos = itens.length - visiveis.length;
   const atualizando =
     fila.isFetching || resumo.isFetching || feito.isFetching || futuros.isFetching;
+  const atualizadoEm = fila.dataUpdatedAt > 0 ? horaDe(fila.dataUpdatedAt) : null;
+
+  const abas = (
+    <SeletorDeAba
+      rotulo={doProprio ? 'O seu dia' : `O dia de ${nomeDaPessoa ?? 'outra pessoa'}`}
+      ativo={aba}
+      aoTrocar={setAba}
+      itens={[
+        { id: 'fazer', rotulo: 'Para fazer', contagem: fila.isSuccess ? pendentes : null },
+        { id: 'feito', rotulo: 'Feito hoje', contagem: feito.isSuccess ? feitas : null },
+        {
+          id: 'proximos',
+          rotulo: 'Próximos dias',
+          rotuloCurto: 'Próximos',
+          contagem:
+            futuros.isPending || (futuros.isError && !fila.isSuccess) ? null : proximos.length,
+        },
+      ]}
+    />
+  );
 
   return (
     // Coluna de leitura, ancorada na goteira esquerda como o resto do produto. Sem
@@ -301,38 +355,117 @@ export function TelaMeuDia({
               Mudar o cabeçalho, e não o bloco, porque o total é o que a pessoa deve
               hoje — contar só as prioridades do bloco esconderia o resto da dívida.
               O zero já dizia "nada pendente"; agora a frase toda combina com ele. */}
-          <p className="text-sm text-muted-foreground">
-            {data}
-            {fila.isPending ? (
-              <> · carregando a fila...</>
-            ) : fila.isError ? null : pendentes > 0 ? (
-              <>
-                {' · '}
-                <span className="numerico">{pendentes}</span>
-                {pendentes === 1 ? ' item pendente' : ' itens pendentes'}
-              </>
-            ) : (
-              ' · nada pendente'
-            )}
-          </p>
-          {/* Por onde começar (Meu dia novo): a primeira conversa com janela aberta,
-              que é o único relógio da fila que não é nosso. */}
-          {comecePor ? <p className="mt-0.5 text-sm font-medium">{comecePor}</p> : null}
+          {NOVO ? (
+            <p className="text-sm text-muted-foreground">
+              {data}
+              {fila.isPending ? (
+                <> · carregando a fila...</>
+              ) : fila.isError ? null : pendentes > 0 ? (
+                <>
+                  {' · '}
+                  <strong className="font-semibold text-foreground">
+                    <span className="numerico">{pendentes}</span>
+                    {pendentes === 1 ? ' pendência' : ' pendências'}
+                  </strong>
+                  .{fraseDoTopo ? ` ${fraseDoTopo}` : ''}
+                </>
+              ) : (
+                ' · nada pendente'
+              )}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {data}
+              {fila.isPending ? (
+                <> · carregando a fila...</>
+              ) : fila.isError ? null : pendentes > 0 ? (
+                <>
+                  {' · '}
+                  <span className="numerico">{pendentes}</span>
+                  {pendentes === 1 ? ' item pendente' : ' itens pendentes'}
+                </>
+              ) : (
+                ' · nada pendente'
+              )}
+            </p>
+          )}
         </div>
 
-        <Button
-          variant="outline"
-          onClick={atualizar}
-          disabled={atualizando}
-          aria-label="Atualizar a fila e o resumo"
-          className="toque h-11 md:h-9"
-        >
-          <RotateCw className={cn(atualizando && 'animate-spin')} aria-hidden="true" />
-          <span className="hidden sm:inline">Atualizar</span>
-        </Button>
+        {NOVO ? (
+          <div className="flex shrink-0 items-center gap-2 self-end sm:gap-3">
+            {pessoas.length > 1 ? (
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="hidden md:inline">Vendo o dia de</span>
+                <Select value={pessoa} onValueChange={setPessoa}>
+                  <SelectTrigger
+                    className="toque h-11 min-w-32 bg-card md:h-10"
+                    aria-label="De quem é o dia"
+                  >
+                    <span className="flex min-w-0 items-center gap-2 text-foreground">
+                      <Users className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <SelectValue />
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pessoas.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.id === usuarioId ? 'Você' : p.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+            ) : null}
+            {atualizadoEm ? (
+              <span className="hidden border-l pl-3 text-[13px] text-muted-foreground lg:inline">
+                Atualizado às <span className="numerico">{atualizadoEm}</span>
+              </span>
+            ) : null}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={atualizar}
+              disabled={atualizando}
+              aria-label="Atualizar a fila e o resumo"
+              className="toque size-11 md:size-10"
+            >
+              <RotateCw className={cn(atualizando && 'animate-spin')} aria-hidden="true" />
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="outline"
+            onClick={atualizar}
+            disabled={atualizando}
+            aria-label="Atualizar a fila e o resumo"
+            className="toque h-11 md:h-9"
+          >
+            <RotateCw className={cn(atualizando && 'animate-spin')} aria-hidden="true" />
+            <span className="hidden sm:inline">Atualizar</span>
+          </Button>
+        )}
       </header>
 
-      {pessoas.length > 1 ? (
+      {NOVO ? (
+        !doProprio && nomeDaPessoa ? (
+          <p
+            className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground"
+            role="status"
+          >
+            <span>
+              Você está vendo o dia de{' '}
+              <span className="font-medium text-foreground">{nomeDaPessoa}</span>, só para leitura.
+            </span>
+            <button
+              type="button"
+              onClick={() => setPessoa(usuarioId)}
+              className="toque min-h-11 cursor-pointer underline underline-offset-4 hover:text-foreground sm:min-h-0"
+            >
+              Voltar ao meu dia
+            </button>
+          </p>
+        ) : null
+      ) : pessoas.length > 1 ? (
         <SeletorDePessoa
           pessoas={pessoas}
           pessoa={pessoa}
@@ -374,23 +507,12 @@ export function TelaMeuDia({
       {/* No celular, só o próximo compromisso, numa faixa (Meu dia novo). */}
       {NOVO ? <AgendaDeHoje pessoa={pessoa} hoje={hoje} forma="faixa" /> : null}
 
+      {/* No Meu dia novo as abas ficam acima das duas colunas, como no protótipo: a
+          agenda ao lado é do dia, e não de uma aba. */}
+      {NOVO ? abas : null}
+
       <ComAgendaAoLado ativo={NOVO} pessoa={pessoa} hoje={hoje}>
-        <SeletorDeAba
-          rotulo={doProprio ? 'O seu dia' : `O dia de ${nomeDaPessoa ?? 'outra pessoa'}`}
-          ativo={aba}
-          aoTrocar={setAba}
-          itens={[
-            { id: 'fazer', rotulo: 'Para fazer', contagem: fila.isSuccess ? pendentes : null },
-            { id: 'feito', rotulo: 'Feito hoje', contagem: feito.isSuccess ? feitas : null },
-            {
-              id: 'proximos',
-              rotulo: 'Próximos dias',
-              rotuloCurto: 'Próximos',
-              contagem:
-                futuros.isPending || (futuros.isError && !fila.isSuccess) ? null : proximos.length,
-            },
-          ]}
-        />
+        {NOVO ? null : abas}
 
         {aba === 'feito' ? (
           <section role="tabpanel" aria-label="Feito hoje" className="flex flex-col gap-4">
@@ -442,17 +564,20 @@ export function TelaMeuDia({
               ) : (
                 <RevelarLista>
                   {proximosPodemFaltar ? <FuturoCortado /> : null}
-                  {diasProximos.map((dia, ordem) => (
-                    <DiaDosProximos
-                      key={dia.dia ?? 'sem-data'}
-                      dia={dia}
-                      somenteLeitura={!doProprio}
-                      amanha={somarDias(hoje, 1)}
-                      deslocamento={diasProximos
-                        .slice(0, ordem)
-                        .reduce((total, anterior) => total + anterior.itens.length, 0)}
-                    />
-                  ))}
+                  {diasProximos.map((dia, ordem) => {
+                    const Dia = NOVO ? DiaNovo : DiaDosProximos;
+                    return (
+                      <Dia
+                        key={dia.dia ?? 'sem-data'}
+                        dia={dia}
+                        somenteLeitura={!doProprio}
+                        amanha={somarDias(hoje, 1)}
+                        deslocamento={diasProximos
+                          .slice(0, ordem)
+                          .reduce((total, anterior) => total + anterior.itens.length, 0)}
+                      />
+                    );
+                  })}
                 </RevelarLista>
               )
             ) : fila.isPending ? (
@@ -477,18 +602,40 @@ export function TelaMeuDia({
                     aoVerProximos={() => setAba('proximos')}
                   />
                 ) : null}
+                {NOVO && blocos.length > 1 ? (
+                  <FiltrosDaFila
+                    blocos={blocos}
+                    // O mesmo número de "Para fazer" e do cabeçalho: os avisos do sistema
+                    // têm pílula própria, mas não são dívida da pessoa.
+                    total={pendentes}
+                    filtro={filtroValido}
+                    aoTrocar={setFiltro}
+                  />
+                ) : null}
                 <RevelarLista>
-                  {blocos.map((bloco, ordem) => (
-                    <Bloco
-                      key={bloco.id}
-                      bloco={bloco}
-                      previas={textoDasPrevias}
-                      somenteLeitura={!doProprio}
-                      deslocamento={blocos
-                        .slice(0, ordem)
-                        .reduce((total, anterior) => total + anterior.itens.length, 0)}
-                    />
-                  ))}
+                  {blocosNaTela.map((bloco, ordem) =>
+                    NOVO ? (
+                      <GrupoNovo
+                        key={bloco.id}
+                        bloco={bloco}
+                        previas={textoDasPrevias}
+                        somenteLeitura={!doProprio}
+                        primeira={primeira}
+                        deslocamento={blocosNaTela
+                          .slice(0, ordem)
+                          .reduce((total, anterior) => total + anterior.itens.length, 0)}
+                      />
+                    ) : (
+                      <Bloco
+                        key={bloco.id}
+                        bloco={bloco}
+                        somenteLeitura={!doProprio}
+                        deslocamento={blocos
+                          .slice(0, ordem)
+                          .reduce((total, anterior) => total + anterior.itens.length, 0)}
+                      />
+                    ),
+                  )}
                 </RevelarLista>
               </>
             )}
@@ -527,6 +674,244 @@ function ComAgendaAoLado({
         <AgendaDeHoje pessoa={pessoa} hoje={hoje} forma="coluna" />
       </aside>
     </div>
+  );
+}
+
+/** "15:42", no relógio de Fortaleza. */
+const FORMATO_DA_HORA = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Fortaleza',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+function horaDe(instante: number): string {
+  return FORMATO_DA_HORA.format(new Date(instante));
+}
+
+/**
+ * Os filtros por grupo do Meu dia novo: "Tudo" e uma pílula por grupo que está na
+ * fila, com a contagem. É recorte de leitura, e não muda a ordem de nada.
+ */
+function FiltrosDaFila({
+  blocos,
+  total,
+  filtro,
+  aoTrocar,
+}: {
+  blocos: readonly BlocoPreenchido[];
+  total: number;
+  filtro: FiltroDaFila;
+  aoTrocar: (filtro: FiltroDaFila) => void;
+}) {
+  const opcoes: { id: FiltroDaFila; rotulo: string; contagem: number }[] = [
+    { id: 'tudo', rotulo: 'Tudo', contagem: total },
+    ...blocos.map((bloco) => ({
+      id: bloco.id,
+      rotulo: ROTULO_CURTO_DO_BLOCO[bloco.id],
+      contagem: bloco.itens.length,
+    })),
+  ];
+  return (
+    <div role="group" aria-label="Filtrar pendências" className="flex flex-wrap gap-2">
+      {opcoes.map((opcao) => {
+        const ligado = opcao.id === filtro;
+        return (
+          <button
+            key={opcao.id}
+            type="button"
+            aria-pressed={ligado}
+            onClick={() => aoTrocar(opcao.id)}
+            className={cn(
+              'toque inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-semibold transition-colors',
+              ligado
+                ? 'border-foreground bg-foreground text-background'
+                : 'border-border text-foreground/80 hover:bg-muted/50',
+            )}
+          >
+            {opcao.rotulo}
+            <span
+              className={cn(
+                'numerico text-[13px] font-medium',
+                ligado ? 'text-background/70' : 'text-muted-foreground',
+              )}
+            >
+              {opcao.contagem}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const ICONE_DO_GRUPO: Record<IdDoBloco, LucideIcon> = {
+  respondeu: MessagesSquare,
+  respondeu_aberta: Hourglass,
+  respondeu_modelo: Lock,
+  agora: Flame,
+  hoje: CalendarClock,
+  sem_proxima_acao: CircleDashed,
+  parados: PauseCircle,
+  depois: CalendarClock,
+  sistema: Bell,
+};
+
+const COR_DO_TOM: Record<TomDoBloco, string> = {
+  acento: 'bg-menta-fundo text-menta-texto',
+  alerta: 'bg-destructive/15 text-destructive-texto',
+  neutro: 'bg-muted text-muted-foreground',
+};
+
+/**
+ * Um grupo da aba "Para fazer" no Meu dia novo, no desenho do protótipo: o cartão
+ * com o ícone, o título, a contagem e a regra do grupo dita embaixo (é o único
+ * lugar onde a regra da janela de 24 h aparece, já que ela saiu de cada linha). As
+ * linhas moram dentro do cartão, separadas por um filete, e as primeiras
+ * `LINHAS_POR_GRUPO` aparecem; o resto, no "Mostrar mais".
+ *
+ * Todo grupo recolhe pela seta. O dos avisos do sistema nasce recolhido, como antes.
+ */
+function GrupoNovo({
+  bloco,
+  deslocamento,
+  somenteLeitura,
+  previas,
+  primeira,
+}: {
+  bloco: BlocoPreenchido;
+  deslocamento: number;
+  somenteLeitura: boolean;
+  previas: Record<string, string>;
+  primeira: ItemDoDia | null;
+}) {
+  const [aberto, setAberto] = useState(!bloco.recolhidoPorPadrao);
+  const [todas, setTodas] = useState(false);
+  const idDoTitulo = `grupo-${bloco.id}`;
+  const idDaLista = `lista-${bloco.id}`;
+  const Icone = ICONE_DO_GRUPO[bloco.id];
+  const visiveis = todas ? bloco.itens : bloco.itens.slice(0, LINHAS_POR_GRUPO);
+  const sobram = bloco.itens.length - visiveis.length;
+
+  return (
+    <section
+      aria-labelledby={idDoTitulo}
+      className="sombra-base overflow-hidden rounded-xl bg-card"
+    >
+      <div className="flex items-start gap-3.5 py-4 pr-2 pl-4 sm:pl-5">
+        <span
+          aria-hidden="true"
+          className={cn(
+            'flex size-9.5 shrink-0 items-center justify-center rounded-[11px]',
+            COR_DO_TOM[TOM_DO_BLOCO[bloco.id]],
+          )}
+        >
+          <Icone className="size-4.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span id={idDoTitulo} className="font-heading text-lg leading-snug font-semibold">
+              {bloco.titulo}
+            </span>
+            <span className="numerico rounded-full bg-muted px-2 py-0.5 text-[13px] font-bold text-foreground/80">
+              {bloco.itens.length}
+            </span>
+          </h2>
+          <p className="mt-1 max-w-[640px] text-sm text-muted-foreground">{bloco.explicacao}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAberto((valor) => !valor)}
+          aria-expanded={aberto}
+          aria-controls={idDaLista}
+          aria-label={`${aberto ? 'Recolher' : 'Abrir'} ${ROTULO_CURTO_DO_BLOCO[bloco.id]}`}
+          className="toque flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl text-muted-foreground outline-none hover:bg-muted/50 focus-visible:bg-muted/50"
+        >
+          <ChevronDown
+            className={cn('size-5 transition-transform', aberto && 'rotate-180')}
+            aria-hidden="true"
+          />
+        </button>
+      </div>
+
+      <div id={idDaLista} hidden={!aberto}>
+        <ul className="flex flex-col">
+          {visiveis.map((item, ordem) => (
+            <LinhaNova
+              key={chaveDoItem(item, ordem)}
+              item={item}
+              indice={deslocamento + ordem}
+              somenteLeitura={somenteLeitura}
+              primeira={item === primeira}
+              previa={
+                item.tipo === 'conversa_esperando' && item.organizacaoId
+                  ? (previas[item.organizacaoId] ?? null)
+                  : null
+              }
+            />
+          ))}
+        </ul>
+        {sobram > 0 ? (
+          <button
+            type="button"
+            onClick={() => setTodas(true)}
+            className="toque flex min-h-12 w-full cursor-pointer items-center justify-center gap-1.5 border-t text-sm font-semibold text-foreground/80 outline-none hover:bg-muted/40 focus-visible:bg-muted/40"
+          >
+            Mostrar mais <span className="numerico">{sobram}</span>
+            <ChevronDown className="size-4" aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+/** Um dia da aba "Próximos dias" no Meu dia novo: o mesmo cartão dos grupos. */
+function DiaNovo({
+  dia,
+  amanha,
+  deslocamento,
+  somenteLeitura,
+}: {
+  dia: DiaDaFila;
+  amanha: string;
+  deslocamento: number;
+  somenteLeitura: boolean;
+}) {
+  const idDoTitulo = `proximos-${dia.dia ?? 'sem-data'}`;
+  const titulo =
+    dia.dia === null
+      ? 'Sem data'
+      : dia.dia === amanha
+        ? `Amanhã · ${rotuloDiaPorExtenso(dia.dia)}`
+        : rotuloDiaPorExtenso(dia.dia);
+
+  return (
+    <section
+      aria-labelledby={idDoTitulo}
+      className="sombra-base overflow-hidden rounded-xl bg-card"
+    >
+      <h2 className="flex items-center gap-2.5 px-4 py-4 sm:px-5">
+        <span
+          id={idDoTitulo}
+          className="font-heading text-lg leading-snug font-semibold first-letter:uppercase"
+        >
+          {titulo}
+        </span>
+        <span className="numerico rounded-full bg-muted px-2 py-0.5 text-[13px] font-bold text-foreground/80">
+          {dia.itens.length}
+        </span>
+      </h2>
+      <ul className="flex flex-col">
+        {dia.itens.map((item, ordem) => (
+          <LinhaNova
+            key={chaveDoItem(item, ordem)}
+            item={item}
+            indice={deslocamento + ordem}
+            somenteLeitura={somenteLeitura}
+          />
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -577,7 +962,6 @@ function DiaDosProximos({
             item={item}
             indice={deslocamento + ordem}
             somenteLeitura={somenteLeitura}
-            novo={NOVO}
           />
         ))}
       </ul>
@@ -664,13 +1048,10 @@ function Bloco({
   bloco,
   deslocamento,
   somenteLeitura,
-  previas = SEM_PREVIAS,
 }: {
   bloco: BlocoPreenchido;
   deslocamento: number;
   somenteLeitura: boolean;
-  /** A fala de cada lead, por parceiro (Meu dia novo). */
-  previas?: Record<string, string>;
 }) {
   const [aberto, setAberto] = useState(!bloco.recolhidoPorPadrao);
   const idDoTitulo = `bloco-${bloco.id}`;
@@ -698,10 +1079,8 @@ function Bloco({
       </span>
       {/* A explicação do bloco ("Passou da hora, ou acontece em menos de três
           horas") vira `title`: ela é regra, lida uma vez, e disputava a linha do
-          cabeçalho com o que muda todo dia — o nome do bloco e a contagem.
-          No Meu dia novo ela aparece, embaixo do título: é o único lugar onde a
-          regra da janela de 24 h é dita, já que saiu de cada linha. */}
-      {NOVO ? null : <span className="sr-only">{bloco.explicacao}</span>}
+          cabeçalho com o que muda todo dia — o nome do bloco e a contagem. */}
+      <span className="sr-only">{bloco.explicacao}</span>
     </>
   );
 
@@ -736,12 +1115,6 @@ function Bloco({
         </h2>
       )}
 
-      {NOVO ? (
-        <p className="-mt-2 max-w-[70ch] text-[0.8125rem] text-muted-foreground">
-          {bloco.explicacao}
-        </p>
-      ) : null}
-
       {/* 8px entre as linhas, e não 2: com fundo próprio (29/09/2026) elas são
           superfícies, e superfície colada em superfície vira um bloco só. */}
       <ul id={idDaLista} hidden={!aberto} className="flex flex-col gap-2">
@@ -751,12 +1124,6 @@ function Bloco({
             item={item}
             indice={deslocamento + ordem}
             somenteLeitura={somenteLeitura}
-            novo={NOVO}
-            previa={
-              item.tipo === 'conversa_esperando' && item.organizacaoId
-                ? (previas[item.organizacaoId] ?? null)
-                : null
-            }
           />
         ))}
       </ul>

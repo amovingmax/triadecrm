@@ -28,9 +28,11 @@ import {
  *    meta; a frase embaixo diz o resultado em palavras ("5 abaixo do ritmo").
  * 2. **Mais baixa.** Os quatro cartões de 40px com zero ocupavam a primeira dobra
  *    inteira nos prints de antes; aqui o número desce para 28px e o cartão encolhe.
- * 3. **Mesma regra de cor do produto:** a barra continua acromática e só a meta
- *    batida ganha a cor principal. O único texto em tom de alerta é "abaixo do
- *    ritmo", o mesmo tom do prazo vencido na fila — é a mesma notícia: atrasou.
+ * 3. **A cor diz o ritmo, como no protótipo aprovado em 10/11/2026:** abaixo do
+ *    ritmo, a barra e a frase vão para o laranja da marca (`menta`, que na Imova é
+ *    o laranja do logo); no ritmo ou com a meta batida, para o petróleo
+ *    (`primary`). Antes das 9h e sem meta, a barra fica neutra: ainda não há
+ *    ritmo para dizer.
  */
 export function ResumoCompacto({
   metricas,
@@ -100,7 +102,7 @@ export function ResumoCompacto({
         </p>
       ) : null}
 
-      <ul className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {comRitmo.map(({ metrica, ritmo }) => (
           <CartaoCompacto key={metrica.metrica} metrica={metrica} ritmo={ritmo} />
         ))}
@@ -143,12 +145,12 @@ function CartaoCompacto({ metrica, ritmo }: { metrica: MetricaDoDia; ritmo: Ritm
   return (
     <li
       title={definicao ? `${metrica.rotulo}: ${definicao}` : metrica.rotulo}
-      className="sombra-base flex flex-col gap-1.5 rounded-xl bg-card px-4 py-3.5"
+      className="sombra-base flex flex-col gap-2 rounded-xl bg-card px-4 py-4 sm:px-5"
     >
-      <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
+      <p className="flex items-center gap-2.5 text-sm text-muted-foreground">
         {Icone ? (
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
-            <Icone className="size-3" aria-hidden="true" strokeWidth={1.75} />
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-muted text-foreground">
+            <Icone className="size-4" aria-hidden="true" strokeWidth={1.75} />
           </span>
         ) : null}
         <span className="truncate">{metrica.rotulo}</span>
@@ -157,7 +159,7 @@ function CartaoCompacto({ metrica, ritmo }: { metrica: MetricaDoDia; ritmo: Ritm
       <p className="flex items-baseline gap-1.5">
         <span
           className={cn(
-            'numerico text-[28px] leading-none font-medium tracking-[-0.03em]',
+            'numerico text-[34px] leading-none font-medium tracking-[-0.03em]',
             realizado === 0 && 'text-muted-foreground',
           )}
         >
@@ -181,11 +183,18 @@ function CartaoCompacto({ metrica, ritmo }: { metrica: MetricaDoDia; ritmo: Ritm
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label={`${metrica.rotulo}: ${realizado} de ${meta}. ${ritmo.frase}.`}
-          className="relative mt-1 block h-1 rounded-full bg-muted"
+          className="relative mt-1 block h-1.5 rounded-full bg-muted"
         >
           <span
             aria-hidden="true"
-            className={cn('block h-full rounded-full', bateu ? 'bg-primary' : 'bg-foreground')}
+            className={cn(
+              'block h-full rounded-full',
+              ritmo.situacao === 'abaixo'
+                ? 'bg-menta'
+                : ritmo.situacao === 'no_ritmo' || bateu
+                  ? 'bg-primary'
+                  : 'bg-foreground/45',
+            )}
             style={{ width: `${preenchido}%` }}
           />
           {ritmo.marca !== null ? (
@@ -193,7 +202,7 @@ function CartaoCompacto({ metrica, ritmo }: { metrica: MetricaDoDia; ritmo: Ritm
             // barra já passou da marca, o traço some dentro do preenchimento.
             <span
               aria-hidden="true"
-              className="absolute -top-1 h-3 w-0.5 -translate-x-1/2 rounded-full bg-foreground ring-2 ring-card"
+              className="absolute -top-[5px] h-4 w-0.5 -translate-x-1/2 rounded-full bg-foreground ring-2 ring-card"
               style={{ left: `${ritmo.marca}%` }}
             />
           ) : null}
@@ -202,11 +211,11 @@ function CartaoCompacto({ metrica, ritmo }: { metrica: MetricaDoDia; ritmo: Ritm
 
       <p
         className={cn(
-          'mt-0.5 text-xs',
+          'mt-0.5 text-[13px]',
           ritmo.situacao === 'abaixo'
-            ? 'font-medium text-destructive-texto'
+            ? 'font-semibold text-menta-texto'
             : ritmo.situacao === 'no_ritmo' || bateu
-              ? 'font-medium text-foreground'
+              ? 'font-semibold text-primary'
               : 'text-muted-foreground',
         )}
       >
@@ -221,7 +230,7 @@ function EsqueletoCompacto() {
   return (
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">Carregando o resumo do dia.</span>
-      <ul className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <li key={i} className="sombra-base flex flex-col gap-2 rounded-xl bg-card px-4 py-3.5">
             <Skeleton className="h-6 w-24 rounded-full" />

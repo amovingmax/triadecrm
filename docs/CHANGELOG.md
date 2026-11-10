@@ -9791,27 +9791,26 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 - `imova-worker-ai` não foi republicado (não muda). KOMUNE intocada.
 - **Falta, na tela (gestão logada na Imova):** IA que atende → Configuração → Conversas de teste → procurar "Matheus" → "Testar por esta". A IA precisa estar ligada; a conversa do Matheus só aparece se ele já escreveu para o WhatsApp da Imova. Não lido em produção se ela existe.
 
-## 10/11/2026 — o Meu dia novo, fase 1 (branch `meu-dia-imova`; só na Imova; ainda não publicado)
+## 10/11/2026 — o Meu dia novo, no desenho do protótipo (branch `meu-dia-imova`; só na Imova)
 
-**Pedido do usuário:** protótipos para melhorar o Meu dia da Imova, a partir de dois prints da tela (canvas em claude.ai, duas rodadas). Aprovada a segunda ("Gostei dessa atualização. Suba para o ambiente da Imova"). Escolhas dele antes de começar: **fase 1, só a tela** (as ações dentro da linha, o modo foco e a distribuição do gestor ficam para depois) e **mostrar rodando no Mac antes de publicar**.
+**Pedido do usuário:** protótipos para melhorar o Meu dia da Imova, a partir de dois prints da tela (canvas em claude.ai, duas rodadas). Aprovada a segunda ("Gostei dessa atualização. Suba para o ambiente da Imova"); escolhas dele: **fase 1, só a tela** e **mostrar rodando no Mac antes de publicar**. A primeira versão local (faixa de números, quem respondeu partido pela janela e agenda ao lado) foi mostrada em `192.168.0.193:3101`; depois, com o print do protótipo: "Gostei bastante desse protótipo. Me manda um localhost dele" (o protótipo foi servido como está em `localhost:3200`) e "Pode subir essa atualização sem mudar o ambiente da Komune". A tela real foi então levada ao desenho do protótipo.
 
-**Entregue (módulo novo `meuDiaNovo`, ligado só na Imova; a KOMUNE recebe a mesma árvore de antes):**
-- **Saudação sem e-mail:** quem não tem nome no perfil lia "Boa tarde, gestor.teste@teste.local."; agora vale o pedaço antes do "@" (`nomeDaSaudacao`). Embaixo, por onde começar: "Comece por Marina Costa: a janela fecha em 2 h." (`porOndeComecar`).
-- **Números do dia numa faixa compacta com a marca de ritmo** (`ResumoCompacto`): mesmos dados de `public.goal_progress`; o traço na barra é onde a pessoa deveria estar agora para bater a meta até as 18h, num ritmo constante das 9h às 18h de Fortaleza (`EXPEDIENTE` em `novo.ts`, premissa do protótipo); a frase diz "No ritmo", "5 abaixo do ritmo", "Meta batida" ou "Só o realizado". Barra acromática como antes; só "abaixo do ritmo" no tom de alerta.
-- **Quem respondeu, separado pela janela de 24 h:** "Janela aberta: responda antes que feche" e "Esperando há mais de 24 h" (`separarPelaJanela`). A regra da janela é dita uma vez, no cabeçalho do bloco, e sai de cada linha; a conversa aberta mostra "fecha em 3 h" no lugar de "há 21 h" (alerta até 3 h). O lado da janela é lido da frase que `public.meu_dia` já escreve no `motivo` — sem migração; o teste `novo.test.ts` guarda as frases exatas.
-- **A fala do lead na linha:** a última mensagem recebida, entre aspas, ou "Enviou um áudio" / "Foto: …" (`buscarUltimasMensagens`, uma leitura por conversa da fila, sob a RLS de `messages`; se falhar, a linha fica sem prévia).
-- **A ação escrita na linha:** "Responder", "Enviar modelo", "Registrar resultado", "Combinar próximo passo"… no lugar da seta (a linha inteira continua sendo o link; no celular volta a seta). O destino é o mesmo de `destinoDoItem`.
-- **Agenda de hoje ao lado da fila** (`AgendaDeHoje`): reuniões e visitas do dia, a feita riscada e a linha do "agora"; no celular, só o próximo compromisso numa faixa.
+**Entregue (módulo novo `meuDiaNovo`, ligado só na Imova; na KOMUNE a árvore é a de antes — `ItemDaFila`, `Bloco` e `DiaDosProximos` voltaram a ser os da `main`):**
+- **Cabeçalho:** "Boa tarde, Gustavo." sem e-mail (`nomeDaSaudacao`); embaixo, "Terça-feira, 10 de novembro · **39 pendências**. Comece por Marina Costa: a janela fecha em 2 h." ou "Nenhuma janela aberta agora." (`fraseDaJanela`). À direita, "Vendo o dia de [Você]" (quem acompanha equipe), "Atualizado às 15:42" e o botão de atualizar.
+- **Seu dia em números com a marca de ritmo** (`ResumoCompacto`): o traço é onde a pessoa deveria estar agora para bater a meta até as 18h (ritmo constante das 9h às 18h de Fortaleza, `EXPEDIENTE`). A cor diz o ritmo, como no protótipo: abaixo, barra e frase no laranja da marca (`menta`); no ritmo ou meta batida, no petróleo (`primary`).
+- **Abas acima das duas colunas** e, embaixo, **filtros por grupo**: "Tudo" (o mesmo número de "Para fazer") e uma pílula por grupo da fila, com a contagem (`ROTULO_CURTO_DO_BLOCO`, `blocosDoFiltro`).
+- **Grupos em cartão** (`GrupoNovo`): ícone no tom do grupo (laranja para a janela aberta, alerta para o que passou da hora), título, contagem, a regra do grupo dita embaixo, seta para recolher e "Mostrar mais N" depois de 5 linhas. Quem respondeu continua partido em "Janela aberta: responda antes que feche" e "Esperando há mais de 24 h" (`separarPelaJanela`, lido da frase que `public.meu_dia` escreve, sem migração).
+- **Linha nova** (`linha-nova.tsx`): disco com as iniciais; nome com categoria · etapa · bairro ao lado; a fala do lead (`buscarUltimasMensagens`) ou o que fazer; "Para Fulano" quando a conversa é de outra pessoa; o prazo numa pastilha ("fecha em 3 h", "há 11 d", "15:00 · atrasado"); e o botão que diz o que o toque faz: "Responder" (cheio, em laranja, só com a janela aberta), "Enviar modelo", "Ligar" (tarefa que começa por ligar; leva à ficha, onde o Ligar é o primeiro botão), "Registrar resultado", "Combinar próximo passo", "Abrir ficha" (`acaoDoItem`). A primeira linha da tela ganha o selo "Comece por aqui" (`primeiraDaFila`). A linha inteira continua sendo um link só; no celular, o botão vira a seta e o prazo fica ao lado do nome.
+- **Agenda de hoje ao lado** (`AgendaDeHoje`): a feita riscada, "em 48 min" no laranja, "atrasada 42 min" na pastilha de alerta e a linha do agora em laranja; no celular, o próximo compromisso numa faixa.
 - Nenhuma migração, nenhuma Edge Function, nenhum worker.
 
+**Ficou de fora de propósito (fase 2, precisa de banco ou de tela nova):** a caixa de seleção com as ações em lote (enviar modelo para vários, adiar, passar para outro corretor), o menu "…" da linha, responder e registrar a ligação sem sair da tela, "Enviar modelo para todos", o Modo foco, o "Ver equipe" e o cartão "Muita coisa parada?". Uma caixa ou um menu que não fazem nada seriam piores que nenhum.
+
 **Verificado:**
-- Vitest 1.815 no site (24 novos em `novo.test.ts`) e 111 no `packages/schema`; typecheck, eslint e prettier limpos.
+- Vitest: 1.843 no site (`novo.test.ts` com as regras novas: botão, filtro, selo, iniciais, frase do topo) e 113 no `packages/schema`; typecheck, eslint e prettier limpos nos arquivos tocados.
+- Local, como Imova (next dev, banco local da Imova, troca de empresa ligada): claro e escuro em 1440 px, filtro "Urgente", "Mostrar mais 20", avisos do sistema recolhidos, celular em 390 px sem rolagem lateral; nenhum erro de página.
+- `comparar-versoes.mjs` na KOMUNE: a `main` no ar (`701360a`) contra esta branch, dois builds de produção no banco local, gestor e SDR, computador e celular: **88 telas iguais, nenhuma para conferir, nenhuma reprovada** (`~/triadecrm-capturas/2026-11-10-20-00`).
 
-**Pendente:**
-- Mostrar ao usuário rodando no Mac (build de produção como Imova, banco local da Imova) e publicar só com o ok dele.
-- Antes de publicar: `comparar-versoes.mjs` na KOMUNE (deve dar igual: tudo é condicionado ao módulo).
-- Fase 2 (precisa de banco): responder, enviar modelo e registrar o resultado da ligação dentro da linha; modo foco; distribuição do gestor.
-
-**Decisão humana:** o expediente do ritmo (9h às 18h) é premissa; se a Imova trabalhar em outro horário, muda em `EXPEDIENTE`.
+**Decisão humana:** o expediente do ritmo (9h às 18h) é premissa do protótipo; se a Imova trabalhar em outro horário, muda em `EXPEDIENTE`.
 
 ---
