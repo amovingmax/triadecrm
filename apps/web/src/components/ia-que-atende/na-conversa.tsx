@@ -60,13 +60,13 @@ function useEstadoDaIa(fioId: string) {
   });
 }
 
-/** O selo do cabeçalho: "IA atendendo", "IA em treino" ou "IA parada". */
+/** O selo do cabeçalho: "IA atendendo", "IA em treino", "IA em teste" ou "IA parada". */
 export function SeloDaIa({ fioId, naFolha = false }: { fioId: string; naFolha?: boolean }) {
   const { data } = useEstadoDaIa(fioId);
   if (!IA_QUE_ATENDE || !data || !data.ligada) return null;
   if (!data.atende && data.estado !== 'parada') return null;
   const parada = !data.atende;
-  const rotulo = parada ? 'IA parada' : data.treino ? 'IA em treino' : 'IA atendendo';
+  const rotulo = parada ? 'IA parada' : rotuloDeQuemAtende(data);
   const Icone = parada ? BotOff : Bot;
   return (
     <Badge
@@ -74,7 +74,9 @@ export function SeloDaIa({ fioId, naFolha = false }: { fioId: string; naFolha?: 
       title={
         parada
           ? `A IA não responde nesta conversa${data.motivo ? ` (${data.motivo})` : ''}.`
-          : 'A IA responde esta conversa sozinha. Para parar, use "Parar a IA".'
+          : data.teste
+            ? 'Conversa de teste: a IA conversa como com um cliente e não aprende nada aqui. Para parar, use "Parar a IA".'
+            : 'A IA responde esta conversa sozinha. Para parar, use "Parar a IA".'
       }
       className={naFolha ? 'h-9 gap-1.5 px-3 text-sm font-normal' : 'h-5 gap-1 px-2 text-[11px] font-normal'}
     >
@@ -179,7 +181,7 @@ export function ControleDaIa({
         title="A IA está respondendo esta conversa sozinha. Tocar para parar; nada é enviado ao cliente."
       >
         {pilula ? <Bot aria-hidden="true" /> : <BotOff aria-hidden="true" />}
-        {rotulo(pilula ? (data.treino ? 'IA em treino' : 'IA atendendo') : 'Parar a IA')}
+        {rotulo(pilula ? rotuloDeQuemAtende(data) : 'Parar a IA')}
       </Button>
       <Dialog open={aberto} onOpenChange={(v) => !parar.isPending && setAberto(v)}>
         <DialogContent className="sm:max-w-md">
@@ -217,9 +219,16 @@ export function ControleDaIa({
   );
 }
 
-/** Dá para ligar a IA de volta aqui: no treino, só na conversa do treino. */
+/** Dá para ligar a IA de volta aqui: no treino, só na conversa do treino e nas de teste. */
 function podeLigarAqui(e: EstadoDaIaNaConversa): boolean {
-  return e.modo === 'clientes' || e.treino;
+  return e.modo === 'clientes' || e.treino || e.teste;
+}
+
+/** Na conversa do treino ela aprende; na de teste, só conversa (10/11/2026). */
+function rotuloDeQuemAtende(e: EstadoDaIaNaConversa): string {
+  if (e.treino) return 'IA em treino';
+  if (e.teste) return 'IA em teste';
+  return 'IA atendendo';
 }
 
 /**

@@ -8,7 +8,8 @@
  * como pegaria a de verdade.
  *
  * Travas: as mesmas do `/auth/dev` (`entradaLocalLigada`: `next dev` e banco local;
- * fora delas, 404), pessoa logada, módulo da IA ligado e SÓ a conversa do treino.
+ * fora delas, 404), pessoa logada, módulo da IA ligado e SÓ a conversa do treino ou
+ * uma de teste (10/11/2026).
  * Nada vai ao WhatsApp: a mensagem nasce no banco local, como recebida.
  */
 import { NextResponse, type NextRequest } from 'next/server';
@@ -48,9 +49,14 @@ export async function POST(request: NextRequest) {
     .select('value')
     .eq('key', 'ia.atendente')
     .maybeSingle();
-  const treino = (config?.value as Record<string, unknown> | null)?.conversa_de_treino;
-  if (treino !== conversa) {
-    return NextResponse.json({ erro: 'Só dá para escrever como o cliente na conversa do treino.' }, { status: 403 });
+  const valor = (config?.value ?? null) as Record<string, unknown> | null;
+  const treino = valor?.conversa_de_treino;
+  const testes = Array.isArray(valor?.conversas_de_teste) ? (valor.conversas_de_teste as unknown[]) : [];
+  if (treino !== conversa && !testes.includes(conversa)) {
+    return NextResponse.json(
+      { erro: 'Só dá para escrever como o cliente na conversa do treino ou numa de teste.' },
+      { status: 403 },
+    );
   }
 
   const { error } = await admin.from('messages').insert({

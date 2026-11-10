@@ -635,13 +635,14 @@ insert into public.app_settings (key, value, description) values
    '{"ligada": false,
      "modo": "treino",
      "conversa_de_treino": null,
+     "conversas_de_teste": [],
      "assinatura": "Imova",
      "modelo": "claude-haiku-5-5",
      "espera_seg": 15,
      "teto_por_hora": 20,
      "setor_corretores": null,
      "aviso_corretor": "Certo! Já vou te passar para um dos nossos corretores, que continua o atendimento com você por aqui."}'::jsonb,
-   'A IA que atende o cliente sozinha, só da Imova (06/11/2026). ligada: a chave-mestra. modo: treino (só a conversa_de_treino) ou clientes (toda conversa em que o time ainda não escreveu, mais as que alguém ligar). assinatura: o nome em negrito em cima de cada mensagem. modelo: claude-haiku-5-5 (desde 06/11/2026), claude-sonnet-5-5 ou claude-opus-5-5. espera_seg: quanto tempo sem mensagem nova do cliente antes de responder. teto_por_hora: respostas por conversa por hora. setor_corretores: o setor que recebe quando a IA passa (null = fica com quem atende). aviso_corretor: o aviso de quando passa.')
+   'A IA que atende o cliente sozinha, só da Imova (06/11/2026). ligada: a chave-mestra. modo: treino (só a conversa_de_treino e as conversas_de_teste) ou clientes (toda conversa em que o time ainda não escreveu, mais as que alguém ligar). conversas_de_teste (10/11/2026): até 5 conversas em que a IA conversa como com um cliente, sem aprender nada (public.ia_conversa_de_teste_marcar). assinatura: o nome em negrito em cima de cada mensagem. modelo: claude-haiku-5-5 (desde 06/11/2026), claude-sonnet-5-5 ou claude-opus-5-5. espera_seg: quanto tempo sem mensagem nova do cliente antes de responder. teto_por_hora: respostas por conversa por hora. setor_corretores: o setor que recebe quando a IA passa (null = fica com quem atende). aviso_corretor: o aviso de quando passa.')
 on conflict (key) do update set description = excluded.description;
 do $$
 begin

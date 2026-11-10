@@ -9755,3 +9755,31 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 
 **Decisão humana:**
 - Publicada só a Imova (o padrão das entregas "só na Imova"). Quem já escolheu um tema no alternador fica com a escolha; quem nunca escolheu passa a abrir no claro. O app instalado no celular pode demorar a trocar o ícone.
+
+## 10/11/2026 — A conversa de teste da IA que atende: ela conversa, mas não aprende (branch `ia-atendente`, só na Imova; RF-CON-09)
+
+**Pedido do usuário:** "Quero que a IA fale com o Matheu Rondon Teste, mas utilize a conversa apenas para conversar mesmo, não para aprender."
+
+**Por que precisou de algo novo:** no modo treino a IA só falava com a conversa do treino (a do Janio), e é ali que ela aprende (instrução vira linha do caderno; foto vira referência de anúncio). Escolher o Matheu como conversa do treino faria a IA aprender com ele e tiraria o Janio do treino.
+
+**Feito (sem push, não publicado):**
+- **Banco** (`20261110150000_a_conversa_de_teste`, só na Imova; na KOMUNE avisa e não cria nada): a lista `conversas_de_teste` em `ia.atendente` (até 5), mudada só por `public.ia_conversa_de_teste_marcar` (admin e gestor).
+  - `app.ia_atende`: no modo treino, a IA atende a conversa do treino **e** as de teste, e mais nenhuma.
+  - Não aprende: a entrada do worker diz `treino: false` (a IA trata como cliente), e `ia_atendente_anotar` e `ia_foto_ensinar` continuam aceitando só a conversa do treino (as duas não mudaram; quem barra é o banco). O worker e o prompt não mudaram.
+  - Pedir corretor, ali, é como no treino: o aviso sai, a IA continua, o responsável não muda e não nasce tarefa para corretor.
+  - Marcar liga a IA na conversa (mensagem antiga do time não a deixa parada); desmarcar a para ali (também se o modo virar clientes). A conversa do treino não pode ser de teste, e uma conversa de teste escolhida para o treino sai da lista.
+  - `ia_conversa_estado` diz `teste`; `ia_atendente_painel` traz a lista (nome, telefone mascarado, se a IA atende) e o placar `no_teste`. Seed da Imova (bloco 12h) nasce com a lista vazia.
+- **Tela:** em IA que atende → Configuração, o bloco "Conversas de teste" (procurar pelo nome ou telefone → "Testar por esta"; "Tirar"); a busca virou um componente só, usado também pela conversa do treino. Na conversa, o selo "IA em teste". A caixa "Teste no computador" (só `next dev`) vale também na conversa de teste.
+
+**Verificado:**
+- pgTAP 143 (26 asserções) no banco local da Imova; 133, 136, 137 e 139 continuam verdes (208 no total). Na KOMUNE local, a migração rodou numa transação desfeita: só o aviso, nenhuma função criada.
+- Tipos e lint do site; 1.809 testes do site e 171 da IA no worker.
+- Pela tela, no computador e no celular (390 px), com o banco local: marcar, a lista, o selo na conversa e "É a do treino" desabilitado; sem erro de página nem rolagem lateral.
+- Durante a foto, a conversa de mentira que criei no banco local tinha o número de uma ficha de teste da branch `agenda-calendly` ("Teste Calendly Ana") e foi ligada a ela, levando a etapa de Identificado para Respondeu. Desfeito no banco local com os valores do `audit_log` (etapa, temperatura, próxima ação, histórico), e tirados a conversa, as duas atividades e o trabalho na fila `ai_jobs` (nenhum worker local chegou a responder).
+
+**Para publicar, só com pedido:** rebase sobre `origin/main`; `main` + push; `publicar-banco.mjs imova migrar` (20261110150000); site da Imova de cópia limpa. O `imova-worker-ai` não muda (ele só lê `treino` da entrada). Depois, na tela: IA que atende → Configuração → Conversas de teste → procurar "Matheu" → "Testar por esta".
+
+**Pendente / decisão humana:**
+- **O contato não foi conferido em produção** (a leitura do banco da Imova foi barrada nesta sessão). A conversa do Matheu só existe depois que ele mandar mensagem para o WhatsApp da Imova; a IA responde à última mensagem dele sem resposta das últimas 24 h.
+- Os relatórios da Imova separam só a conversa do treino; as respostas da IA na conversa de teste entram no "Progresso da IA" como de cliente.
+- "Corrigir" numa resposta da conversa de teste ainda grava a correção no caderno (é a gestão ensinando de propósito, pelo botão); marcar visita ali também entra na agenda, como no treino.

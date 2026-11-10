@@ -13,14 +13,16 @@ import { Input } from '@/components/ui/input';
 import { carregarEstado, chaveDoEstado } from './dados';
 
 /**
- * TESTE NO COMPUTADOR: escrever como o cliente, na conversa do treino.
+ * TESTE NO COMPUTADOR: escrever como o cliente, na conversa do treino ou numa de
+ * teste (10/11/2026).
  *
  * Na tela, tudo o que se escreve sai como mensagem da equipe, e isso para a IA
  * (gente assumiu). Esta caixa grava a mensagem como RECEBIDA, pela rota
  * `/auth/dev/cliente`, e a IA responde como responderia ao WhatsApp de verdade.
  *
  * Só existe em `next dev` (no build de produção `NODE_ENV` é 'production' e a
- * caixa nem é desenhada; a rota, lá, responde 404) e só na conversa do treino.
+ * caixa nem é desenhada; a rota, lá, responde 404) e só na conversa do treino ou
+ * numa de teste.
  */
 const NO_COMPUTADOR = process.env.NODE_ENV === 'development' && EMPRESA.modulos.iaQueAtende;
 
@@ -52,7 +54,7 @@ export function ClienteDeTeste({ fioId, className }: { fioId: string; className?
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Não deu para gravar a mensagem.'),
   });
 
-  if (!NO_COMPUTADOR || !data?.treino) return null;
+  if (!NO_COMPUTADOR || !(data?.treino || data?.teste)) return null;
 
   const mandar = () => {
     const t = texto.trim();

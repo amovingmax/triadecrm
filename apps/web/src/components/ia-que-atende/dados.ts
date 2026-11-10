@@ -35,6 +35,8 @@ const MOTIVOS: Readonly<Record<string, string>> = {
   modelo_invalido: 'Modelo desconhecido.',
   aviso_fora_do_tamanho: 'O aviso precisa ter de 10 a 400 caracteres.',
   assinatura_longa: 'A assinatura passou de 40 caracteres.',
+  e_a_conversa_do_treino: 'Essa é a conversa do treino: lá a IA aprende. Escolha outra para testar.',
+  muitas_conversas_de_teste: 'Já são 5 conversas de teste. Tire uma antes de pôr outra.',
 };
 
 export class ErroDaIa extends Error {
@@ -68,6 +70,8 @@ export interface EstadoDaIaNaConversa {
   readonly modo: 'treino' | 'clientes';
   /** É a conversa do treino? */
   readonly treino: boolean;
+  /** É uma conversa de teste (a IA conversa como com um cliente, sem aprender)? */
+  readonly teste: boolean;
   /** A IA responde nesta conversa agora? */
   readonly atende: boolean;
   /** O que alguém (ou a IA) decidiu aqui: atendendo, parada ou nada ainda. */
@@ -87,6 +91,7 @@ export async function carregarEstado(fioId: string): Promise<EstadoDaIaNaConvers
     ligada: e.ligada === true,
     modo: e.modo === 'clientes' ? 'clientes' : 'treino',
     treino: e.treino === true,
+    teste: e.teste === true,
     atende: e.atende === true,
     estado: e.estado === 'atendendo' || e.estado === 'parada' ? e.estado : null,
     motivo: texto(e.motivo),
@@ -193,10 +198,24 @@ export interface ConfiguracaoDaIa {
   readonly ligadaEm: string | null;
 }
 
+/**
+ * Conversa de teste (10/11/2026): a IA conversa ali como com um cliente, também no
+ * modo treino, e não aprende nada (nem caderno, nem foto ensinada).
+ */
+export interface ConversaDeTeste {
+  readonly id: string;
+  readonly nome: string;
+  readonly telefone: string | null;
+  readonly organizacaoId: string | null;
+  /** A IA responde ali agora? */
+  readonly atende: boolean;
+}
+
 export interface PainelDaIa {
   readonly config: ConfiguracaoDaIa;
   readonly podeConfigurar: boolean;
   readonly treino: { readonly id: string; readonly nome: string | null; readonly organizacaoId: string | null } | null;
+  readonly testes: readonly ConversaDeTeste[];
   readonly placar: {
     readonly respostas: number;
     readonly boas: number;
@@ -207,6 +226,7 @@ export interface PainelDaIa {
     readonly silencios: number;
     readonly conversas: number;
     readonly noTreino: number;
+    readonly noTeste: number;
   };
   readonly custoUsd: number;
   readonly caderno: { readonly ativas: number; readonly doTreino: number; readonly correcoes: number };
@@ -227,6 +247,7 @@ export async function carregarPainel(dias = 7): Promise<PainelDaIa | null> {
   const placar = (p.placar ?? {}) as Record<string, unknown>;
   const caderno = (p.caderno ?? {}) as Record<string, unknown>;
   const treino = (p.conversa_de_treino ?? null) as Record<string, unknown> | null;
+  const testes = (Array.isArray(p.conversas_de_teste) ? p.conversas_de_teste : []) as Record<string, unknown>[];
   return {
     config: {
       ligada: c.ligada === true,
@@ -242,6 +263,13 @@ export async function carregarPainel(dias = 7): Promise<PainelDaIa | null> {
     treino: treino
       ? { id: String(treino.id), nome: texto(treino.nome), organizacaoId: texto(treino.organization_id) }
       : null,
+    testes: testes.map((t) => ({
+      id: String(t.id),
+      nome: texto(t.nome) ?? 'Sem nome',
+      telefone: texto(t.telefone),
+      organizacaoId: texto(t.organization_id),
+      atende: t.atende === true,
+    })),
     placar: {
       respostas: numero(placar.respostas),
       boas: numero(placar.boas),
@@ -252,6 +280,7 @@ export async function carregarPainel(dias = 7): Promise<PainelDaIa | null> {
       silencios: numero(placar.silencios),
       conversas: numero(placar.conversas),
       noTreino: numero(placar.no_treino),
+      noTeste: numero(placar.no_teste),
     },
     custoUsd: numero(p.custo_usd),
     caderno: {
@@ -265,6 +294,11 @@ export async function carregarPainel(dias = 7): Promise<PainelDaIa | null> {
 
 export async function configurarIa(valores: Record<string, unknown>): Promise<void> {
   await pedir('ia_atendente_configurar', { p_valores: valores });
+}
+
+/** Põe ou tira uma conversa da lista de teste (`public.ia_conversa_de_teste_marcar`, só admin e gestor). */
+export async function marcarConversaDeTeste(fioId: string, teste: boolean): Promise<void> {
+  await pedir('ia_conversa_de_teste_marcar', { p_conversation_id: fioId, p_teste: teste });
 }
 
 /** As respostas mais recentes, com o que o cliente tinha dito, para avaliar em lote. */
@@ -334,7 +368,7 @@ export interface ConversaAchada {
 }
 
 /**
- * A busca da conversa do treino: sem acento e sem maiúscula, no nome do contato e no
+ * A busca da conversa do treino e das de teste: sem acento e sem maiúscula, no nome do contato e no
  * da ficha, ou pelos dígitos do telefone (`public.ia_procurar_conversas`, 06/11/2026).
  */
 export async function procurarConversas(termo: string): Promise<ConversaAchada[]> {

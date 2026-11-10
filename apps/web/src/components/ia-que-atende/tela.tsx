@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bot, BotOff, Check, ExternalLink, Pencil, ThumbsUp, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,8 +25,10 @@ import {
   configurarIa,
   escreverNoCaderno,
   linkDaConversa,
+  marcarConversaDeTeste,
   procurarConversas,
   tirarDoCaderno,
+  type ConversaAchada,
   type LinhaDoCaderno,
   type PainelDaIa,
   type RespostaDaIa,
@@ -40,7 +42,8 @@ import { DialogoDeCorrecao } from './na-conversa';
  * "Respostas" é onde quem acompanha diz "Boa" ou "Corrigir" sem abrir conversa por
  * conversa, "Caderno" é o que ela sabe (o que o Janio ensinou, as correções e o
  * que a equipe escrever) e "Configuração" liga, desliga e escolhe a conversa do
- * treino. A IA lê o caderno e os imóveis da aba Anúncios a cada resposta.
+ * treino e as de teste (10/11/2026: a IA conversa ali sem aprender). A IA lê o
+ * caderno e os imóveis da aba Anúncios a cada resposta.
  */
 
 type Aba = 'respostas' | 'caderno' | 'configuracao';
@@ -106,13 +109,19 @@ export function TelaDaIa() {
 }
 
 function Situacao({ painel }: { painel: PainelDaIa }) {
-  const { config, treino } = painel;
+  const { config, treino, testes } = painel;
+  const deTeste =
+    testes.length === 0
+      ? ''
+      : ` E conversa, sem aprender, com ${testes.map((t) => t.nome).join(', ')} (teste).`;
   const texto = !config.ligada
     ? 'Desligada: não responde ninguém.'
     : config.modo === 'treino'
       ? treino
-        ? `Ligada, em treino: responde só a conversa de ${treino.nome ?? 'treino'}.`
-        : 'Ligada, em treino, mas sem conversa de treino escolhida: não responde ninguém.'
+        ? `Ligada, em treino: aprende só na conversa de ${treino.nome ?? 'treino'}.${deTeste}`
+        : testes.length > 0
+          ? `Ligada, em treino, sem conversa de treino escolhida.${deTeste}`
+          : 'Ligada, em treino, mas sem conversa de treino escolhida: não responde ninguém.'
       : 'Ligada para os clientes: responde toda conversa em que ninguém do time escreveu.';
   return (
     <p
@@ -140,7 +149,11 @@ function Placar({ painel }: { painel: PainelDaIa }) {
   const avaliadas = placar.boas + placar.corrigidas;
   const acerto = avaliadas === 0 ? null : Math.round((placar.boas / avaliadas) * 100);
   const itens: { rotulo: string; valor: string; detalhe?: string }[] = [
-    { rotulo: 'Respostas', valor: String(placar.respostas), detalhe: `${placar.conversas} conversa(s)` },
+    {
+      rotulo: 'Respostas',
+      valor: String(placar.respostas),
+      detalhe: `${placar.conversas} conversa(s)${placar.noTeste > 0 ? ` · ${placar.noTeste} no teste` : ''}`,
+    },
     {
       rotulo: 'Boas',
       valor: acerto === null ? '—' : `${acerto}%`,
@@ -408,29 +421,82 @@ function Caderno() {
 // Configuração
 // ---------------------------------------------------------------------------
 
-function Configuracao({ painel }: { painel: PainelDaIa }) {
-  const clientes = useQueryClient();
-  const { config, podeConfigurar } = painel;
-  const setores = useQuery({ queryKey: [...CHAVE_DA_IA, 'setores'], queryFn: carregarSetores });
-  const [aviso, setAviso] = useState(config.avisoCorretor);
+/**
+ * Procurar uma conversa pelo nome ou pelo telefone (sem acento e sem maiúscula) e
+ * oferecer um botão para cada uma: "Treinar por esta" ou "Testar por esta".
+ */
+function ProcurarConversa({
+  placeholder,
+  acao,
+}: {
+  placeholder: string;
+  acao: (conversa: ConversaAchada, limpar: () => void) => ReactNode;
+}) {
   const [busca, setBusca] = useState('');
-  const idAviso = useId();
-  const idBusca = useId();
-  const idSetor = useId();
-  const idModelo = useId();
-
-
+  const id = useId();
   const achadas = useQuery({
     queryKey: [...CHAVE_DA_IA, 'procurar', busca],
     queryFn: () => procurarConversas(busca),
     enabled: busca.trim().length >= 2,
   });
+  return (
+    <>
+      <label htmlFor={id} className="text-xs text-muted-foreground">
+        Procurar pelo nome ou telefone
+      </label>
+      <Input id={id} value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={placeholder} />
+      {achadas.data && achadas.data.length > 0 ? (
+        <ul className="flex flex-col gap-1">
+          {achadas.data.map((c) => (
+            <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
+              <span className="min-w-0 truncate">
+                {c.nome}
+                {c.telefone ? <span className="ml-1.5 text-xs text-muted-foreground">{c.telefone}</span> : null}
+              </span>
+              {acao(c, () => setBusca(''))}
+            </li>
+          ))}
+        </ul>
+      ) : achadas.isError ? (
+        <p className="text-xs text-destructive">Não deu para procurar agora. Tente de novo.</p>
+      ) : busca.trim().length >= 2 && !achadas.isPending ? (
+        <p className="text-xs text-muted-foreground">Nenhuma conversa com esse nome ou telefone.</p>
+      ) : null}
+    </>
+  );
+}
+
+function Configuracao({ painel }: { painel: PainelDaIa }) {
+  const clientes = useQueryClient();
+  const { config, podeConfigurar } = painel;
+  const setores = useQuery({ queryKey: [...CHAVE_DA_IA, 'setores'], queryFn: carregarSetores });
+  const [aviso, setAviso] = useState(config.avisoCorretor);
+  const idAviso = useId();
+  const idSetor = useId();
+  const idModelo = useId();
 
   const salvar = useMutation({
     mutationFn: (valores: Record<string, unknown>) => configurarIa(valores),
     onSuccess: () => {
       void clientes.invalidateQueries({ queryKey: CHAVE_DA_IA });
       toast.success('Configuração salva.');
+    },
+    onError: (e) => toast.error(mensagemDoErro(e)),
+  });
+
+  const marcar = useMutation({
+    mutationFn: ({ id, teste }: { id: string; teste: boolean }) => marcarConversaDeTeste(id, teste),
+    onSuccess: (_, { teste }) => {
+      void clientes.invalidateQueries({ queryKey: CHAVE_DA_IA });
+      if (teste) {
+        toast.success('A IA vai conversar nesta conversa, sem aprender.', {
+          description: config.ligada
+            ? 'Ela responde à última mensagem que ainda estiver sem resposta (das últimas 24 h).'
+            : 'Ela só responde depois que for ligada.',
+        });
+      } else {
+        toast.success('A conversa saiu do teste, e a IA parou nela.');
+      }
     },
     onError: (e) => toast.error(mensagemDoErro(e)),
   });
@@ -473,7 +539,7 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
             disabled={salvar.isPending}
             onClick={() => salvar.mutate({ modo: 'treino' })}
           >
-            Treino: só a conversa do treino
+            Treino: a do treino e as de teste
           </Button>
           <Button
             type="button"
@@ -497,38 +563,87 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
             ? `Hoje: ${painel.treino.nome ?? 'sem nome'}. Ali, quem escreve é da equipe e pode ensinar a IA.`
             : 'Nenhuma ainda. Procure a conversa do Janio Ramalho.'}
         </p>
-        <label htmlFor={idBusca} className="text-xs text-muted-foreground">
-          Procurar pelo nome ou telefone
-        </label>
-        <Input id={idBusca} value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Janio" />
-        {achadas.data && achadas.data.length > 0 ? (
+        <ProcurarConversa
+          placeholder="Janio"
+          acao={(c, limpar) => (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={salvar.isPending || c.id === config.conversaDeTreino}
+              onClick={() => {
+                salvar.mutate({ conversa_de_treino: c.id });
+                limpar();
+              }}
+            >
+              {c.id === config.conversaDeTreino ? 'É esta' : 'Treinar por esta'}
+            </Button>
+          )}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-lg border border-hairline bg-card p-3">
+        <h3 className="text-sm font-medium">Conversas de teste</h3>
+        <p className="text-sm text-muted-foreground">
+          A IA conversa ali como conversa com um cliente, também no modo treino, mas não aprende
+          nada: o que for escrito nelas não vai para o caderno, e nenhuma foto vira referência.
+          Pedir corretor mostra o aviso, mas não passa a conversa nem abre tarefa. Até 5.
+        </p>
+        {painel.testes.length > 0 ? (
           <ul className="flex flex-col gap-1">
-            {achadas.data.map((c) => (
-              <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
+            {painel.testes.map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
                 <span className="min-w-0 truncate">
-                  {c.nome}
-                  {c.telefone ? <span className="ml-1.5 text-xs text-muted-foreground">{c.telefone}</span> : null}
+                  <Link
+                    href={linkDaConversa({ organizacaoId: t.organizacaoId, conversaId: t.id })}
+                    className="underline-offset-2 hover:underline"
+                  >
+                    {t.nome}
+                  </Link>
+                  {t.telefone ? <span className="ml-1.5 text-xs text-muted-foreground">{t.telefone}</span> : null}
+                  {config.ligada && !t.atende ? (
+                    <span className="ml-1.5 text-xs text-muted-foreground">
+                      (IA parada aqui: religue no topo da conversa)
+                    </span>
+                  ) : null}
                 </span>
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
-                  disabled={salvar.isPending || c.id === config.conversaDeTreino}
-                  onClick={() => {
-                    salvar.mutate({ conversa_de_treino: c.id });
-                    setBusca('');
-                  }}
+                  variant="ghost"
+                  disabled={marcar.isPending}
+                  onClick={() => marcar.mutate({ id: t.id, teste: false })}
                 >
-                  {c.id === config.conversaDeTreino ? 'É esta' : 'Treinar por esta'}
+                  <Trash2 aria-hidden="true" /> Tirar
                 </Button>
               </li>
             ))}
           </ul>
-        ) : achadas.isError ? (
-          <p className="text-xs text-destructive">Não deu para procurar agora. Tente de novo.</p>
-        ) : busca.trim().length >= 2 && !achadas.isPending ? (
-          <p className="text-xs text-muted-foreground">Nenhuma conversa com esse nome ou telefone.</p>
-        ) : null}
+        ) : (
+          <p className="text-xs text-muted-foreground">Nenhuma ainda.</p>
+        )}
+        <ProcurarConversa
+          placeholder="Matheu"
+          acao={(c, limpar) => {
+            const jaE = painel.testes.some((t) => t.id === c.id);
+            const doTreino = c.id === config.conversaDeTreino;
+            return (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={marcar.isPending || jaE || doTreino}
+                title={doTreino ? 'É a conversa do treino: lá a IA aprende.' : undefined}
+                onClick={() => {
+                  marcar.mutate({ id: c.id, teste: true });
+                  limpar();
+                }}
+              >
+                {doTreino ? 'É a do treino' : jaE ? 'Já é de teste' : 'Testar por esta'}
+              </Button>
+            );
+          }}
+        />
       </div>
 
       <div className="flex flex-col gap-2 rounded-lg border border-hairline bg-card p-3">
