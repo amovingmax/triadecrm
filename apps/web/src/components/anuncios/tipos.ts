@@ -234,6 +234,43 @@ export function tipoDeImovel(id: string): TipoDeImovel {
   return TIPOS_DE_IMOVEL.find((t) => t.id === id) ?? TIPOS_DE_IMOVEL[0]!;
 }
 
+export type TagDoCodigo = 'TE' | 'SA' | 'IM' | 'CO';
+
+/**
+ * A tag do código do anúncio, que sai sozinha do tipo (decisões do usuário em
+ * 10/11/2026: "TE0001 para Terrenos, IM0001 para Imóveis"; "caso escolhermos um
+ * anúncio de terreno, a tag deve automaticamente ser TE"). O banco dá o próximo
+ * número livre (`app.anuncio_proximo_codigo`, migração 20261110100000). PT (o
+ * PT0001_IMOVA da Arbo) não é tag do CRM. Espelho de `app.anuncio_tag_do_tipo`.
+ */
+export function tagDoTipo(tipo: string): TagDoCodigo {
+  if (tipo === 'terreno' || tipo === 'terreno_comercial') return 'TE';
+  if (tipo === 'sala_comercial' || tipo === 'consultorio') return 'SA';
+  return tipoDeImovel(tipo).grupo === 'Residencial' ? 'IM' : 'CO';
+}
+
+/**
+ * A tag de um código que o CRM deu ("TE0006" → TE); código de fora (com
+ * sufixo, como TE0001_IMOVA, ou com texto) → null. Espelho de `app.anuncio_tag_do_codigo`.
+ */
+export function tagDoCodigo(codigo: string): TagDoCodigo | null {
+  const m = /^(TE|SA|IM|CO)[0-9]{4,9}$/.exec(codigo);
+  return m ? (m[1] as TagDoCodigo) : null;
+}
+
+/**
+ * Se o código ainda segue o tipo: só no rascunho que nasceu no CRM e nunca foi
+ * ao ar. Publicado, o código é o do portal; trazido de fora, é o que liga o
+ * anúncio ao que já está lá. Espelho da regra de `public.anuncio_salvar`.
+ */
+export function tagTrocavel(a: {
+  origem: string;
+  situacao: Situacao;
+  publicado_em: string | null;
+}): boolean {
+  return a.origem === 'crm' && a.situacao === 'rascunho' && a.publicado_em === null;
+}
+
 export const NEGOCIOS: readonly { id: Negocio; rotulo: string }[] = [
   { id: 'venda', rotulo: 'Venda' },
   { id: 'aluguel', rotulo: 'Aluguel' },
@@ -398,6 +435,8 @@ export type DadosDoAnuncio = {
 export type Anuncio = DadosDoAnuncio & {
   id: string;
   codigo: string;
+  /** De onde veio: 'crm', 'sistema_atual' ou 'relatorio_canal_pro'. */
+  origem: string;
   situacao: Situacao;
   destaque: Destaque;
   updated_at: string;

@@ -19,6 +19,7 @@ import type {
   Destaque,
   FotoDoAnuncio,
   SituacaoDoCanalPro,
+  TagDoCodigo,
 } from './tipos';
 
 export const CHAVE_DOS_ANUNCIOS = ['anuncios'] as const;
@@ -88,6 +89,17 @@ export async function salvarAnuncio(
     ...(id ? { p_id: id } : {}),
   });
   return resultado(data, error);
+}
+
+/**
+ * O próximo código de cada tag ({ TE: 'TE0006', ... }), para o formulário mostrar
+ * antes de salvar. É prévia: quem dá o código é o salvar (20261110100000).
+ */
+export async function carregarProximosCodigos(): Promise<Partial<Record<TagDoCodigo, string>>> {
+  const { data, error } = await createClient().rpc('anuncio_proximos_codigos');
+  if (error) throw new Error(error.message);
+  const r = (data ?? {}) as { ok?: boolean; codigos?: Partial<Record<TagDoCodigo, string>> };
+  return r.ok ? (r.codigos ?? {}) : {};
 }
 
 export async function publicarAnuncio(id: string): Promise<Resultado> {

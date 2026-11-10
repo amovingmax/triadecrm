@@ -28,6 +28,7 @@ import { DialogoExcluir } from '@/components/exclusao/dialogo-excluir';
 import {
   carregarAnuncio,
   carregarCanalPro,
+  carregarProximosCodigos,
   CHAVE_DO_CANAL_PRO,
   CHAVE_DOS_ANUNCIOS,
   escolherDestaque,
@@ -57,6 +58,10 @@ import {
   PERIODOS,
   type PeriodoAluguel,
   SITUACOES,
+  type TagDoCodigo,
+  tagDoCodigo,
+  tagDoTipo,
+  tagTrocavel,
   TIPOS_DE_IMOVEL,
   tipoDeImovel,
 } from './tipos';
@@ -214,6 +219,8 @@ function conferir(v: Valores): { campo: keyof Valores; mensagem: string } | null
   return null;
 }
 
+type DadosDoEditor = NonNullable<Awaited<ReturnType<typeof carregarAnuncio>>>;
+
 export function EditorDeAnuncio({
   id,
   podePublicar,
@@ -221,26 +228,11 @@ export function EditorDeAnuncio({
   id: string | null;
   podePublicar: boolean;
 }) {
-  const router = useRouter();
-  const cliente = useQueryClient();
   const consulta = useQuery({
     queryKey: [...CHAVE_DOS_ANUNCIOS, 'um', id],
     queryFn: () => carregarAnuncio(id!),
     enabled: id !== null,
   });
-  const canalPro = useQuery({ queryKey: CHAVE_DO_CANAL_PRO, queryFn: carregarCanalPro });
-  const form = useForm<Valores>({ defaultValues: VAZIO });
-  const [salvando, setSalvando] = useState(false);
-  const [agindo, setAgindo] = useState<null | 'publicar' | 'tirar' | 'destaque' | 'excluir'>(null);
-  const [excluir, setExcluir] = useState(false);
-
-  // O formulário segue o banco enquanto a pessoa não mexeu; depois de mexer,
-  // só um salvar o realinha (`reset` no fim de `salvar`).
-  const { reset, formState } = form;
-  const dados = consulta.data;
-  useEffect(() => {
-    if (dados && !formState.isDirty) reset(valoresDe(dados.anuncio));
-  }, [dados, formState.isDirty, reset]);
 
   if (id !== null && consulta.isPending) {
     return (
@@ -250,7 +242,7 @@ export function EditorDeAnuncio({
       </div>
     );
   }
-  if (id !== null && (consulta.isError || !dados)) {
+  if (id !== null && (consulta.isError || !consulta.data)) {
     return (
       <div className="flex w-full max-w-3xl flex-col gap-3">
         <Voltar />
@@ -262,6 +254,45 @@ export function EditorDeAnuncio({
       </div>
     );
   }
+  return <Editor id={id} podePublicar={podePublicar} dados={consulta.data ?? null} />;
+}
+
+/**
+ * O editor só nasce com o anúncio na mão, e o formulário já começa com os
+ * valores dele. Antes ele começava com os do anúncio novo e trocava logo em
+ * seguida: um seletor que muda antes de as opções dele existirem se esvazia
+ * sozinho e marca o formulário como mexido (medido em 10/11/2026: o Tipo abria
+ * em branco e o salvar era recusado por tipo vazio).
+ */
+function Editor({
+  id,
+  podePublicar,
+  dados,
+}: {
+  id: string | null;
+  podePublicar: boolean;
+  dados: DadosDoEditor | null;
+}) {
+  const router = useRouter();
+  const cliente = useQueryClient();
+  const canalPro = useQuery({ queryKey: CHAVE_DO_CANAL_PRO, queryFn: carregarCanalPro });
+  // A prévia do código de cada tag, só enquanto a tag ainda pode ser marcada.
+  const proximos = useQuery({
+    queryKey: [...CHAVE_DOS_ANUNCIOS, 'proximos-codigos'],
+    queryFn: carregarProximosCodigos,
+    enabled: dados === null || tagTrocavel(dados.anuncio),
+  });
+  const form = useForm<Valores>({ defaultValues: dados ? valoresDe(dados.anuncio) : VAZIO });
+  const [salvando, setSalvando] = useState(false);
+  const [agindo, setAgindo] = useState<null | 'publicar' | 'tirar' | 'destaque' | 'excluir'>(null);
+  const [excluir, setExcluir] = useState(false);
+
+  // O formulário segue o banco enquanto a pessoa não mexeu; depois de mexer,
+  // só um salvar o realinha (`reset` no fim de `salvar`).
+  const { reset, formState } = form;
+  useEffect(() => {
+    if (dados && !formState.isDirty) reset(valoresDe(dados.anuncio));
+  }, [dados, formState.isDirty, reset]);
 
   const anuncio = dados?.anuncio ?? null;
   const pendencias = dados?.pendencias ?? [];
@@ -307,6 +338,8 @@ export function EditorDeAnuncio({
     if (id === null) {
       toast.success(`Rascunho ${r.codigo} criado. Agora ponha as fotos.`);
       router.replace(`/anuncios/${r.id}`);
+    } else if (anuncio && r.codigo !== anuncio.codigo) {
+      toast.success(`Salvo. O código agora é ${r.codigo}.`);
     } else {
       toast.success(r.pendencias.length ? 'Salvo. Ainda falta o que está na lista.' : 'Salvo.');
     }
@@ -393,7 +426,15 @@ export function EditorDeAnuncio({
           className="order-2 flex min-w-0 flex-col gap-5 lg:order-1"
         >
           <fieldset disabled={!editavel || salvando} className="flex min-w-0 flex-col gap-5">
-            <Formulario form={form} />
+            <Formulario
+              form={form}
+              codigo={{
+                atual: anuncio?.codigo ?? null,
+                trocavel: anuncio ? tagTrocavel(anuncio) : true,
+                foiAoAr: anuncio?.publicado_em != null,
+                proximos: proximos.data,
+              }}
+            />
           </fieldset>
 
           <Secao titulo="Fotos">
@@ -671,11 +712,83 @@ function Campo({
 }
 
 const ENTRADA = 'h-11 md:h-9';
+
+/**
+ * O código do anúncio (10/11/2026): a tag sai sozinha do tipo (terreno → TE,
+ * sala → SA, residencial → IM, comercial → CO) e o número é o próximo livre.
+ * Quem dá o código é o banco, ao salvar; aqui é prévia. Com o código fixo (já
+ * foi ao ar, ou veio de fora), só mostra o código e o porquê.
+ */
+function CampoDoCodigo({
+  id,
+  tipo,
+  codigo,
+}: {
+  id: string;
+  tipo: string;
+  codigo: CodigoDoFormulario;
+}) {
+  if (codigo.atual !== null && !codigo.trocavel) {
+    return (
+      <Campo
+        id={id}
+        rotulo="Código"
+        dica={
+          codigo.foiAoAr
+            ? 'Não muda depois de ir ao ar: é ele que liga o anúncio ao portal.'
+            : 'Veio de fora com o código de lá, que não muda: é ele que liga o anúncio ao que já está no portal.'
+        }
+      >
+        <Input id={id} value={codigo.atual} readOnly className={cn(ENTRADA, 'numerico bg-muted')} />
+      </Campo>
+    );
+  }
+
+  const tag = tagDoTipo(tipo);
+  // O tipo pede a tag que o código já tem: fica o código dele.
+  const fica = codigo.atual !== null && tagDoCodigo(codigo.atual) === tag;
+  const vaiSair = fica ? codigo.atual : codigo.proximos?.[tag];
+  const dica =
+    codigo.atual === null
+      ? `Sai sozinho do tipo: ${tag} e o próximo número livre.`
+      : fica
+        ? 'Segue o tipo enquanto for rascunho e nunca tiver ido ao ar.'
+        : `O tipo pede ${tag}: ao salvar, o código passa de ${codigo.atual} para ${vaiSair ?? `${tag} e o próximo número livre`}.`;
+
+  return (
+    <Campo id={id} rotulo="Código" dica={dica}>
+      <Input
+        id={id}
+        value={vaiSair ?? `${tag}…`}
+        readOnly
+        aria-live="polite"
+        className={cn(ENTRADA, 'numerico bg-muted')}
+      />
+    </Campo>
+  );
+}
+
 const CAIXA_DE_TEXTO =
   'w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 md:text-sm';
 
 /** Os campos, em blocos na ordem em que a pessoa pensa o anúncio. */
-function Formulario({ form }: { form: UseFormReturn<Valores> }) {
+type CodigoDoFormulario = {
+  /** O código do anúncio aberto; null no anúncio novo. */
+  atual: string | null;
+  /** Se o código ainda segue o tipo (`tagTrocavel`); no anúncio novo, sempre. */
+  trocavel: boolean;
+  foiAoAr: boolean;
+  /** A prévia do próximo código de cada tag. */
+  proximos: Partial<Record<TagDoCodigo, string>> | undefined;
+};
+
+function Formulario({
+  form,
+  codigo,
+}: {
+  form: UseFormReturn<Valores>;
+  codigo: CodigoDoFormulario;
+}) {
   const id = useId();
   const { register, control, watch, formState, setValue, getValues } = form;
   const tipo = tipoDeImovel(watch('tipo'));
@@ -763,6 +876,7 @@ function Formulario({ form }: { form: UseFormReturn<Valores> }) {
               )}
             />
           </Campo>
+          <CampoDoCodigo id={`${id}-codigo`} tipo={tipo.id} codigo={codigo} />
         </div>
         <Proprietario form={form} />
       </Secao>
