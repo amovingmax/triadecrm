@@ -9783,3 +9783,10 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 - **O contato não foi conferido em produção** (a leitura do banco da Imova foi barrada nesta sessão). A conversa do Matheu só existe depois que ele mandar mensagem para o WhatsApp da Imova; a IA responde à última mensagem dele sem resposta das últimas 24 h.
 - Os relatórios da Imova separam só a conversa do treino; as respostas da IA na conversa de teste entram no "Progresso da IA" como de cliente.
 - "Corrigir" numa resposta da conversa de teste ainda grava a correção no caderno (é a gestão ensinando de propósito, pelo botão); marcar visita ali também entra na agenda, como no treino.
+
+**Publicado em 10/11/2026, a pedido ("sim", depois de "A IA agora atende Matheus Rondon Teste também?"), só na Imova:**
+- `main` `efe2ae6` (avanço direto sobre `e30769b`).
+- Banco da Imova: `20261110150000` por `publicar-banco.mjs imova migrar --confirmar imova` (identidade conferida antes e depois); `conferir`: 200 migrações, nenhuma pendente. Sem bloco de seed (o padrão da lista vazia vem de `app.ia_atendente_config`).
+- Site da Imova **`imova-2y0yqop4m`**, de cópia limpa de `efe2ae6` em `~/triadecrm-publicar-imova` (volta: `imova-7pb7i7956`). Conferido de fora: `imova-crm.vercel.app` aponta para ele; `/login` 200; `/ia` sem login vai para o login; `/auth/dev` e `POST /auth/dev/cliente` 404.
+- `imova-worker-ai` não foi republicado (não muda). KOMUNE intocada.
+- **Falta, na tela (gestão logada na Imova):** IA que atende → Configuração → Conversas de teste → procurar "Matheus" → "Testar por esta". A IA precisa estar ligada; a conversa do Matheus só aparece se ele já escreveu para o WhatsApp da Imova. Não lido em produção se ela existe.
