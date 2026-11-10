@@ -48,7 +48,7 @@ cliente ─ link ─► Calendly ── webhook assinado ──► Edge Function
 ```
 
 - **Edge Function** `supabase/functions/calendly-webhook`: confere a assinatura do Calendly (`CALENDLY_WEBHOOK_SIGNING_KEY`) e resume o aviso.
-- **Banco** `supabase/migrations/20261110120000_calendly_na_agenda.sql`: `calendly_agendamentos`, `calendly_receber`, a régua `app.agenda_ocupada` e as listas do que falta (`calendly_cancelamentos_pendentes`, `agenda_espelho_pendencias`).
+- **Banco** `supabase/migrations/20261110180000_calendly_na_agenda.sql`: `calendly_agendamentos`, `calendly_receber`, a régua `app.agenda_ocupada` e as listas do que falta (`calendly_cancelamentos_pendentes`, `agenda_espelho_pendencias`).
 - **Worker** `apps/workers/src/agenda` no `imova-worker-wa`: cancela no Calendly (`CALENDLY_TOKEN`) e grava e apaga os blocos no Google (`GOOGLE_AGENDA_CREDENCIAL`).
 - **Script** `scripts/calendly-assinar.mjs`: cria a assinatura do webhook no Calendly (não há tela para isso, só a API).
 
@@ -149,8 +149,9 @@ O plano grátis tem **um tipo de evento ativo**. Use um só (ex.: "Agendamento I
 | Pergunta **"Telefone (WhatsApp)"**, obrigatória | O telefone liga o agendamento à ficha e à conversa do cliente |
 | Local Google Meet ou Zoom | Reunião **on-line**, com o botão "Entrar na sala" |
 | Local presencial (endereço) | **Presencial**, com o endereço |
-| Idioma português e relógio de 24 h | A página fala português e mostra "14:30" |
-| Horário: seg. a sex., 9h30–17h20, 10 min entre compromissos, 3 h de antecedência | As mesmas regras da agenda do CRM |
+| Idioma do convidado **Português (Brasil)** (⋮ no cartão do evento → "Alterar idioma do convidado"; o idioma da conta não muda a página do cliente) e relógio de 24 h | A página fala português e mostra "14:30" |
+| Duração 45 min (a visita do CRM dura 45; a reunião, 40) | O compromisso ocupa a agenda pelo tempo que o Calendly marcou |
+| Horário: seg. a sex., 9h30–17h45 (o último começa às 17h00, como na grade do CRM), 10 min depois de cada evento, 3 h de antecedência | As mesmas regras da agenda do CRM |
 
 Num plano pago, um tipo de evento com "Visita" no nome também entra como visita.
 

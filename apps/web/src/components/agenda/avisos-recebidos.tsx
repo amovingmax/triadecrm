@@ -59,7 +59,7 @@ export function chaveDosAvisos(usuarioId: string) {
 const COLUNAS =
   'id, tipo, titulo, quando, marcado_por, origem, detalhe, reunioes(estado, inicio), tasks(status, due_at)';
 /**
- * Sem `origem` e `detalhe`: o banco que ainda não recebeu a migração 20261110120000.
+ * Sem `origem` e `detalhe`: o banco que ainda não recebeu a migração 20261110180000.
  * O site sobe junto nas duas empresas e o banco, uma de cada vez; sem esta volta, o
  * aviso de quem recebe um compromisso sumiria nesse intervalo.
  */

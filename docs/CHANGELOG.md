@@ -9832,7 +9832,7 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 - Se mesmo assim chegar um agendamento em horário ocupado (o intervalo entre o CRM marcar e o Calendly reler o Google), **o CRM cancela o novo no Calendly**. (Uma primeira versão, da mesma tarde, deixava entrar marcado como conflito; foi trocada por esta antes de sair do computador.)
 
 **Entregue (nada em produção):**
-- **Migração `20261110120000_calendly_na_agenda`**:
+- **Migração `20261110180000_calendly_na_agenda`**:
   - **Nas duas empresas (só acrescenta):** `agenda_avisos` ganha `origem` ('equipe' | 'calendly') e `detalhe`, e `marcado_por` aceita nulo quando a origem é o Calendly; `reunioes.marcada_por` e `tasks.origin` aceitam 'calendly'.
   - **Só na Imova:** origem "Calendly" em `sources`; `calendly_agendamentos` (um por convidado, RLS: gestão e dono leem, ninguém escreve); `public.calendly_receber`; a régua única de ocupação `app.agenda_ocupada` (reunião viva, visita aberta, reunião com hora combinada; a tarefa "a marcar" não ocupa); `app.agenda_espelho` e as funções que dizem e registram o que falta (`calendly_cancelamentos_pendentes` / `_feito` / `_falhou`, `agenda_espelho_pendencias` / `_gravado` / `_apagado` / `_falhou`), todas só `service_role`.
   - **Agendou em horário livre:** ficha pelo telefone e depois pelo e-mail (as regras do lead do portal) ou nova de Cliente; dono = e-mail do anfitrião, senão `app_settings['calendly'].dono_email`, senão o admin mais antigo; reunião em `reunioes` (`marcada_por = 'calendly'`, fim e sala do Calendly) + tarefa-eco + e-mail; visita como tarefa `visit`; negócio na etapa que pede data; aviso, push e nota na ficha.
