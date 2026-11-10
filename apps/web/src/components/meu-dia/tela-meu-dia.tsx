@@ -16,16 +16,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TRABALHO } from '@/lib/larguras';
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { RevelarLista } from '@/components/movimento';
 import { diaDoInstante, rotuloDiaPorExtenso, somarDias } from '@/components/agenda/tipos';
 
+import { AgendaDeHoje } from './agenda-de-hoje';
+import { porOndeComecar, separarPelaJanela } from './novo';
+import { ResumoCompacto } from './resumo-compacto';
 import {
   buscarFeitoHoje,
   buscarFilaDoDia,
   buscarProximosDias,
   buscarResumoDoDia,
+  buscarUltimasMensagens,
   contarCandidatosAguardandoRevisao,
   contarNegociosSemResponsavel,
   LIMITE_DA_FILA,
@@ -90,6 +95,16 @@ import {
 /** Lista vazia estável: um `?? []` novo a cada renderização invalidaria os memos. */
 const SEM_ITENS: ItemDoDia[] = [];
 const SEM_REGISTROS: RegistroDoDia[] = [];
+const SEM_PREVIAS: Record<string, string> = {};
+
+/**
+ * O Meu dia novo (módulo `meuDiaNovo`, só da Imova, 10/11/2026): faixa compacta
+ * de números com a marca de ritmo, quem respondeu separado pela janela de 24 h,
+ * a fala do lead e a ação escrita na linha, e a agenda de hoje ao lado. A KOMUNE
+ * passa por esta tela exatamente como antes: cada mudança abaixo é condicionada a
+ * esta constante, e nenhuma muda a ordem ou o conteúdo da fila.
+ */
+const NOVO = EMPRESA.modulos.meuDiaNovo;
 
 /** Uma pessoa do seletor "De quem é o dia". O papel decide o bloco de quem respondeu. */
 export type PessoaDoSeletor = { id: string; nome: string; papel: AppRole | null };
@@ -210,8 +225,27 @@ export function TelaMeuDia({
     void clienteDeConsultas.invalidateQueries({ queryKey: ['meu-dia'] });
   }, [clienteDeConsultas]);
 
-  const blocos = blocosParaFazer(agruparFila(visiveis));
+  const blocosDaFila = blocosParaFazer(agruparFila(visiveis));
+  const blocos = NOVO ? separarPelaJanela(blocosDaFila) : blocosDaFila;
   const pendentes = contarPendentesDeHoje(visiveis);
+  const comecePor = NOVO && doProprio && pendentes > 0 ? porOndeComecar(blocos) : null;
+
+  // A fala do lead na linha (Meu dia novo): só das conversas que estão na tela, e
+  // só depois que a fila chegou. A chave é a lista de parceiros, para a prévia
+  // acompanhar a fila quando alguém responde e a conversa sai.
+  const orgsDasConversas = [
+    ...new Set(
+      visiveis.flatMap((item) =>
+        item.tipo === 'conversa_esperando' && item.organizacaoId ? [item.organizacaoId] : [],
+      ),
+    ),
+  ];
+  const previas = useQuery({
+    queryKey: ['meu-dia', 'previas', orgsDasConversas],
+    queryFn: () => buscarUltimasMensagens(orgsDasConversas),
+    enabled: NOVO && orgsDasConversas.length > 0,
+  });
+  const textoDasPrevias = previas.data ?? SEM_PREVIAS;
   // O teto vale para o que o BANCO devolveu, e não para o que sobrou na tela.
   const cheia = itens.length >= LIMITE_DA_FILA;
   // Se a leitura própria falhar, vale o que a fila trouxe do futuro — e aí, com a
@@ -281,6 +315,9 @@ export function TelaMeuDia({
               ' · nada pendente'
             )}
           </p>
+          {/* Por onde começar (Meu dia novo): a primeira conversa com janela aberta,
+              que é o único relógio da fila que não é nosso. */}
+          {comecePor ? <p className="mt-0.5 text-sm font-medium">{comecePor}</p> : null}
         </div>
 
         <Button
@@ -309,6 +346,12 @@ export function TelaMeuDia({
         <p className="text-sm text-muted-foreground">
           O resumo do dia não carregou. {mensagemDoErro(resumo.error)}
         </p>
+      ) : NOVO ? (
+        <ResumoCompacto
+          metricas={resumo.data ?? []}
+          carregando={resumo.isPending}
+          podeDefinirMeta={podeDefinirMeta}
+        />
       ) : (
         <ResumoDoDia
           metricas={resumo.data ?? []}
@@ -328,128 +371,161 @@ export function TelaMeuDia({
 
       {doProprio ? <PulsoDoDia /> : null}
 
-      <SeletorDeAba
-        rotulo={doProprio ? 'O seu dia' : `O dia de ${nomeDaPessoa ?? 'outra pessoa'}`}
-        ativo={aba}
-        aoTrocar={setAba}
-        itens={[
-          { id: 'fazer', rotulo: 'Para fazer', contagem: fila.isSuccess ? pendentes : null },
-          { id: 'feito', rotulo: 'Feito hoje', contagem: feito.isSuccess ? feitas : null },
-          {
-            id: 'proximos',
-            rotulo: 'Próximos dias',
-            rotuloCurto: 'Próximos',
-            contagem:
-              futuros.isPending || (futuros.isError && !fila.isSuccess) ? null : proximos.length,
-          },
-        ]}
-      />
+      {/* No celular, só o próximo compromisso, numa faixa (Meu dia novo). */}
+      {NOVO ? <AgendaDeHoje pessoa={pessoa} hoje={hoje} forma="faixa" /> : null}
 
-      {aba === 'feito' ? (
-        <section role="tabpanel" aria-label="Feito hoje" className="flex flex-col gap-4">
-          <FeitoHoje
-            quem={doProprio ? null : nomeDaPessoa}
-            categorias={categorias}
-            portasBatidas={
-              resumo.data?.find((m) => m.metrica === 'doors_knocked')?.realizado ?? null
-            }
-            carregando={feito.isPending}
-            erro={feito.isError ? mensagemDoErro(feito.error) : null}
-            aoTentar={() => void feito.refetch()}
-          />
-        </section>
-      ) : (
-        <section
-          role="tabpanel"
-          aria-label={aba === 'fazer' ? 'Para fazer' : 'Próximos dias'}
-          className="flex flex-col gap-4"
-        >
-          {aba === 'fazer' && fila.isSuccess && !doProprio && alcance === 'todos' ? (
-            <FilaDeTodos
-              nome={nomeDaPessoa}
-              quantas={conversasDeTodos}
-              aoVoltar={() => setPessoa(usuarioId)}
+      <ComAgendaAoLado ativo={NOVO} pessoa={pessoa} hoje={hoje}>
+        <SeletorDeAba
+          rotulo={doProprio ? 'O seu dia' : `O dia de ${nomeDaPessoa ?? 'outra pessoa'}`}
+          ativo={aba}
+          aoTrocar={setAba}
+          itens={[
+            { id: 'fazer', rotulo: 'Para fazer', contagem: fila.isSuccess ? pendentes : null },
+            { id: 'feito', rotulo: 'Feito hoje', contagem: feito.isSuccess ? feitas : null },
+            {
+              id: 'proximos',
+              rotulo: 'Próximos dias',
+              rotuloCurto: 'Próximos',
+              contagem:
+                futuros.isPending || (futuros.isError && !fila.isSuccess) ? null : proximos.length,
+            },
+          ]}
+        />
+
+        {aba === 'feito' ? (
+          <section role="tabpanel" aria-label="Feito hoje" className="flex flex-col gap-4">
+            <FeitoHoje
+              quem={doProprio ? null : nomeDaPessoa}
+              categorias={categorias}
+              portasBatidas={
+                resumo.data?.find((m) => m.metrica === 'doors_knocked')?.realizado ?? null
+              }
+              carregando={feito.isPending}
+              erro={feito.isError ? mensagemDoErro(feito.error) : null}
+              aoTentar={() => void feito.refetch()}
             />
-          ) : null}
-
-          {aba === 'proximos' ? (
-            // A aba do futuro responde pela leitura dela, e não pela da fila: um
-            // erro na fila não esconde a agenda, e a fila vazia não quer dizer
-            // que não há nada marcado.
-            futuros.isPending || (futuros.isError && fila.isPending) ? (
-              <EsqueletoDaFila />
-            ) : futuros.isError && fila.isError ? (
-              <ErroDaFila
-                causa={mensagemDoErro(futuros.error)}
-                aoTentar={() => {
-                  void futuros.refetch();
-                  void fila.refetch();
-                }}
+          </section>
+        ) : (
+          <section
+            role="tabpanel"
+            aria-label={aba === 'fazer' ? 'Para fazer' : 'Próximos dias'}
+            className="flex flex-col gap-4"
+          >
+            {aba === 'fazer' && fila.isSuccess && !doProprio && alcance === 'todos' ? (
+              <FilaDeTodos
+                nome={nomeDaPessoa}
+                quantas={conversasDeTodos}
+                aoVoltar={() => setPessoa(usuarioId)}
               />
-            ) : diasProximos.length === 0 ? (
-              proximosPodemFaltar ? (
-                <FuturoCortado />
+            ) : null}
+
+            {aba === 'proximos' ? (
+              // A aba do futuro responde pela leitura dela, e não pela da fila: um
+              // erro na fila não esconde a agenda, e a fila vazia não quer dizer
+              // que não há nada marcado.
+              futuros.isPending || (futuros.isError && fila.isPending) ? (
+                <EsqueletoDaFila />
+              ) : futuros.isError && fila.isError ? (
+                <ErroDaFila
+                  causa={mensagemDoErro(futuros.error)}
+                  aoTentar={() => {
+                    void futuros.refetch();
+                    void fila.refetch();
+                  }}
+                />
+              ) : diasProximos.length === 0 ? (
+                proximosPodemFaltar ? (
+                  <FuturoCortado />
+                ) : (
+                  <SemProximos />
+                )
               ) : (
-                <SemProximos />
+                <RevelarLista>
+                  {proximosPodemFaltar ? <FuturoCortado /> : null}
+                  {diasProximos.map((dia, ordem) => (
+                    <DiaDosProximos
+                      key={dia.dia ?? 'sem-data'}
+                      dia={dia}
+                      somenteLeitura={!doProprio}
+                      amanha={somarDias(hoje, 1)}
+                      deslocamento={diasProximos
+                        .slice(0, ordem)
+                        .reduce((total, anterior) => total + anterior.itens.length, 0)}
+                    />
+                  ))}
+                </RevelarLista>
+              )
+            ) : fila.isPending ? (
+              <EsqueletoDaFila />
+            ) : fila.isError ? (
+              <ErroDaFila causa={mensagemDoErro(fila.error)} aoTentar={() => void fila.refetch()} />
+            ) : visiveis.length === 0 ? (
+              doProprio ? (
+                <FilaVazia
+                  nome={nome}
+                  semResponsavel={semDono.data ?? null}
+                  aguardandoRevisao={aRevisar.data ?? null}
+                />
+              ) : (
+                <FilaVaziaDeOutraPessoa nome={nomeDaPessoa} />
               )
             ) : (
-              <RevelarLista>
-                {proximosPodemFaltar ? <FuturoCortado /> : null}
-                {diasProximos.map((dia, ordem) => (
-                  <DiaDosProximos
-                    key={dia.dia ?? 'sem-data'}
-                    dia={dia}
-                    somenteLeitura={!doProprio}
-                    amanha={somarDias(hoje, 1)}
-                    deslocamento={diasProximos
-                      .slice(0, ordem)
-                      .reduce((total, anterior) => total + anterior.itens.length, 0)}
+              <>
+                {pendentes === 0 ? (
+                  <NadaParaHoje
+                    quantosDepois={proximos.length}
+                    aoVerProximos={() => setAba('proximos')}
                   />
-                ))}
-              </RevelarLista>
-            )
-          ) : fila.isPending ? (
-            <EsqueletoDaFila />
-          ) : fila.isError ? (
-            <ErroDaFila causa={mensagemDoErro(fila.error)} aoTentar={() => void fila.refetch()} />
-          ) : visiveis.length === 0 ? (
-            doProprio ? (
-              <FilaVazia
-                nome={nome}
-                semResponsavel={semDono.data ?? null}
-                aguardandoRevisao={aRevisar.data ?? null}
-              />
-            ) : (
-              <FilaVaziaDeOutraPessoa nome={nomeDaPessoa} />
-            )
-          ) : (
-            <>
-              {pendentes === 0 ? (
-                <NadaParaHoje
-                  quantosDepois={proximos.length}
-                  aoVerProximos={() => setAba('proximos')}
-                />
-              ) : null}
-              <RevelarLista>
-                {blocos.map((bloco, ordem) => (
-                  <Bloco
-                    key={bloco.id}
-                    bloco={bloco}
-                    somenteLeitura={!doProprio}
-                    deslocamento={blocos
-                      .slice(0, ordem)
-                      .reduce((total, anterior) => total + anterior.itens.length, 0)}
-                  />
-                ))}
-              </RevelarLista>
-            </>
-          )}
-        </section>
-      )}
+                ) : null}
+                <RevelarLista>
+                  {blocos.map((bloco, ordem) => (
+                    <Bloco
+                      key={bloco.id}
+                      bloco={bloco}
+                      previas={textoDasPrevias}
+                      somenteLeitura={!doProprio}
+                      deslocamento={blocos
+                        .slice(0, ordem)
+                        .reduce((total, anterior) => total + anterior.itens.length, 0)}
+                    />
+                  ))}
+                </RevelarLista>
+              </>
+            )}
+          </section>
+        )}
 
-      {aba === 'fazer' && !fila.isPending && !fila.isError ? (
-        <NotaDoQueFalta cheia={cheia} />
-      ) : null}
+        {aba === 'fazer' && !fila.isPending && !fila.isError ? (
+          <NotaDoQueFalta cheia={cheia} />
+        ) : null}
+      </ComAgendaAoLado>
+    </div>
+  );
+}
+
+/**
+ * A agenda de hoje numa coluna à direita da fila, em tela larga (Meu dia novo). Fora
+ * dele, devolve os filhos sem embrulho nenhum: a KOMUNE recebe exatamente a mesma
+ * árvore de antes.
+ */
+function ComAgendaAoLado({
+  ativo,
+  pessoa,
+  hoje,
+  children,
+}: {
+  ativo: boolean;
+  pessoa: string;
+  hoje: string;
+  children: React.ReactNode;
+}) {
+  if (!ativo) return <>{children}</>;
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <div className="flex min-w-0 flex-col gap-4">{children}</div>
+      <aside aria-label="Agenda de hoje" className="hidden lg:sticky lg:top-4 lg:block">
+        <AgendaDeHoje pessoa={pessoa} hoje={hoje} forma="coluna" />
+      </aside>
     </div>
   );
 }
@@ -501,6 +577,7 @@ function DiaDosProximos({
             item={item}
             indice={deslocamento + ordem}
             somenteLeitura={somenteLeitura}
+            novo={NOVO}
           />
         ))}
       </ul>
@@ -587,10 +664,13 @@ function Bloco({
   bloco,
   deslocamento,
   somenteLeitura,
+  previas = SEM_PREVIAS,
 }: {
   bloco: BlocoPreenchido;
   deslocamento: number;
   somenteLeitura: boolean;
+  /** A fala de cada lead, por parceiro (Meu dia novo). */
+  previas?: Record<string, string>;
 }) {
   const [aberto, setAberto] = useState(!bloco.recolhidoPorPadrao);
   const idDoTitulo = `bloco-${bloco.id}`;
@@ -618,8 +698,10 @@ function Bloco({
       </span>
       {/* A explicação do bloco ("Passou da hora, ou acontece em menos de três
           horas") vira `title`: ela é regra, lida uma vez, e disputava a linha do
-          cabeçalho com o que muda todo dia — o nome do bloco e a contagem. */}
-      <span className="sr-only">{bloco.explicacao}</span>
+          cabeçalho com o que muda todo dia — o nome do bloco e a contagem.
+          No Meu dia novo ela aparece, embaixo do título: é o único lugar onde a
+          regra da janela de 24 h é dita, já que saiu de cada linha. */}
+      {NOVO ? null : <span className="sr-only">{bloco.explicacao}</span>}
     </>
   );
 
@@ -654,6 +736,12 @@ function Bloco({
         </h2>
       )}
 
+      {NOVO ? (
+        <p className="-mt-2 max-w-[70ch] text-[0.8125rem] text-muted-foreground">
+          {bloco.explicacao}
+        </p>
+      ) : null}
+
       {/* 8px entre as linhas, e não 2: com fundo próprio (29/09/2026) elas são
           superfícies, e superfície colada em superfície vira um bloco só. */}
       <ul id={idDaLista} hidden={!aberto} className="flex flex-col gap-2">
@@ -663,6 +751,12 @@ function Bloco({
             item={item}
             indice={deslocamento + ordem}
             somenteLeitura={somenteLeitura}
+            novo={NOVO}
+            previa={
+              item.tipo === 'conversa_esperando' && item.organizacaoId
+                ? (previas[item.organizacaoId] ?? null)
+                : null
+            }
           />
         ))}
       </ul>

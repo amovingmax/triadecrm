@@ -5,7 +5,9 @@ import { pessoaPedida } from '@/lib/auth/hierarquia';
 import { requireSession } from '@/lib/auth/session';
 import { temPoderDeGestao } from '@/lib/navegacao';
 import { hojeEmNatal } from '@/components/agenda/tipos';
+import { EMPRESA } from '@/lib/empresa';
 import { dataPorExtenso, primeiroNome, saudacaoDoDia } from '@/components/meu-dia/formatos';
+import { nomeDaSaudacao } from '@/components/meu-dia/novo';
 import { TelaMeuDia, type PessoaDoSeletor } from '@/components/meu-dia/tela-meu-dia';
 import { abaDaUrl } from '@/components/meu-dia/tipos';
 
@@ -44,7 +46,8 @@ export default async function Pagina({
 
   return (
     <TelaMeuDia
-      nome={primeiroNome(sessao.nome)}
+      // No Meu dia novo (só da Imova), nunca um e-mail na saudação (`nomeDaSaudacao`).
+      nome={EMPRESA.modulos.meuDiaNovo ? nomeDaSaudacao(sessao.nome) : primeiroNome(sessao.nome)}
       saudacao={saudacaoDoDia(agora)}
       data={dataPorExtenso(agora)}
       podeDefinirMeta={temPoderDeGestao(sessao.papel)}

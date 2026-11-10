@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client';
 import { hojeEmNatal, janelaDeDias } from '@/components/agenda/tipos';
 
 import type { RegistroDoDia } from './feito';
+import { textoDaPrevia } from './novo';
 import {
   ehTipoConhecido,
   hojeParaOCorte,
@@ -388,6 +389,122 @@ export async function buscarFeitoHoje(usuarioId: string, hoje: string): Promise<
       desfecho: linha.interaction_outcomes as RegistroDoDia['desfecho'],
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Meu dia novo da Imova (módulo `meuDiaNovo`): duas leituras a mais, só `select`
+// ---------------------------------------------------------------------------
+
+/**
+ * A última mensagem que cada lead mandou, para a prévia na linha de quem respondeu.
+ *
+ * Uma consulta por parceiro, com `limit(1)`, e não um `in` só: com um `in` e um teto
+ * de linhas, um lead que mandou vinte mensagens seguidas tomaria o lugar dos outros.
+ * São no máximo 15 (o teto de conversas da `public.meu_dia`), em paralelo.
+ *
+ * Sob a RLS de quem entrou (`messages_select`), a mesma de Conversas. A prévia é um
+ * acréscimo: se a leitura de um parceiro falhar, a linha fica sem prévia, e a fila
+ * continua de pé — por isso aqui não se lança erro.
+ */
+export async function buscarUltimasMensagens(
+  orgIds: readonly string[],
+): Promise<Record<string, string>> {
+  if (orgIds.length === 0) return {};
+  const supabase = createClient();
+  const respostas = await Promise.all(
+    orgIds.map((id) =>
+      supabase
+        .from('messages')
+        .select('organization_id, body, type, transcript')
+        .eq('organization_id', id)
+        .eq('direction', 'in')
+        .order('created_at', { ascending: false })
+        .limit(1),
+    ),
+  );
+  const previas: Record<string, string> = {};
+  for (const resposta of respostas) {
+    const linha = resposta.data?.[0] as
+      | {
+          organization_id: string | null;
+          body: string | null;
+          type: string;
+          transcript: string | null;
+        }
+      | undefined;
+    if (resposta.error || !linha?.organization_id) continue;
+    const texto = textoDaPrevia(linha);
+    if (texto) previas[linha.organization_id] = texto;
+  }
+  return previas;
+}
+
+/** Um compromisso de hoje, para a coluna "Agenda de hoje" ao lado da fila. */
+export type CompromissoDeHoje = {
+  id: string;
+  titulo: string;
+  quando: string;
+  tipo: 'meeting' | 'visit';
+  feito: boolean;
+  organizacaoId: string | null;
+  organizacao: string | null;
+};
+
+/**
+ * As reuniões e visitas de hoje de uma pessoa, feitas ou não (a feita aparece
+ * riscada: a agenda do dia é o dia inteiro, e não só o que falta). Direto de
+ * `tasks`, sob a mesma RLS de `buscarProximosDias`; os nomes, pela
+ * `organizations_view`, como lá.
+ */
+export async function buscarAgendaDeHoje(
+  usuarioId: string,
+  hoje: string,
+): Promise<CompromissoDeHoje[]> {
+  const supabase = createClient();
+  const diaDoCorte = hojeParaOCorte(hoje, hojeEmNatal());
+  const { de, ate } = janelaDeDias(diaDoCorte, diaDoCorte);
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('id, title, due_at, kind, status, organization_id')
+    .eq('assignee_id', usuarioId)
+    .in('kind', ['meeting', 'visit'])
+    .in('status', ['todo', 'doing', 'done'])
+    .gte('due_at', de)
+    .lt('due_at', ate)
+    .order('due_at')
+    .order('id')
+    .limit(30);
+  if (error) throw new ErroDoDia(error.message, error.code);
+
+  const linhas = (data ?? []) as unknown as {
+    id: string;
+    title: string;
+    due_at: string;
+    kind: 'meeting' | 'visit';
+    status: string;
+    organization_id: string | null;
+  }[];
+  const orgIds = [...new Set(linhas.flatMap((l) => l.organization_id ?? []))];
+
+  const nomes = new Map<string, string>();
+  if (orgIds.length > 0) {
+    const resposta = await supabase.from('organizations_view').select('id, name').in('id', orgIds);
+    if (resposta.error) throw new ErroDoDia(resposta.error.message, resposta.error.code);
+    for (const parceiro of (resposta.data ?? []) as { id: string | null; name: string | null }[]) {
+      if (parceiro.id && parceiro.name) nomes.set(parceiro.id, parceiro.name);
+    }
+  }
+
+  return linhas.map((linha) => ({
+    id: linha.id,
+    titulo: linha.title,
+    quando: linha.due_at,
+    tipo: linha.kind,
+    feito: linha.status === 'done',
+    organizacaoId: linha.organization_id,
+    organizacao: linha.organization_id ? (nomes.get(linha.organization_id) ?? null) : null,
+  }));
 }
 
 /** Erro do banco com o código preservado, para a tela traduzir em vez de exibir cru. */

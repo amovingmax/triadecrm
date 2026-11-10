@@ -33,6 +33,7 @@ describe('empresas', () => {
       iaQueAtende: false,
       relatoriosDaImova: false,
       canalDeChegada: false,
+      meuDiaNovo: false,
     });
     expect(k.gruposDeCategoria).toEqual({});
     expect(k.origens).toBeNull();
@@ -91,6 +92,7 @@ describe('empresas', () => {
       iaQueAtende: true,
       relatoriosDaImova: true,
       canalDeChegada: true,
+      meuDiaNovo: true,
     });
     expect(i.tipos.cerimonialista).toBeNull();
   });

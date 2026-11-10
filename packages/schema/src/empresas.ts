@@ -117,6 +117,15 @@ export interface Empresa {
      * relatórios. Só da Imova. O banco também trava (`app.canal_de_chegada_config`).
      */
     canalDeChegada: boolean;
+    /**
+     * O Meu dia novo (10/11/2026), a fase 1 do protótipo aprovado ("Gostei dessa
+     * atualização. Suba para o ambiente da Imova"): os números do dia numa faixa
+     * compacta com a marca de ritmo, quem respondeu separado em "janela aberta" e
+     * "só com modelo" (o aviso da janela uma vez por bloco, e não em cada linha), a
+     * última mensagem do lead na linha, a ação escrita na própria linha e a agenda
+     * de hoje ao lado da fila. Só da Imova: é só tela, nenhum dado novo no banco.
+     */
+    meuDiaNovo: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -194,6 +203,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       iaQueAtende: false,
       relatoriosDaImova: false,
       canalDeChegada: false,
+      meuDiaNovo: false,
     },
     privacidade: null,
     visual: {
@@ -240,6 +250,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       iaQueAtende: true,
       relatoriosDaImova: true,
       canalDeChegada: true,
+      meuDiaNovo: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

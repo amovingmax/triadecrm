@@ -93,7 +93,17 @@ export function ehTipoConhecido(valor: string): valor is TipoDeItem {
  * abre sozinho, 9 é o futuro.
  */
 export type IdDoBloco =
-  'respondeu' | 'agora' | 'hoje' | 'sem_proxima_acao' | 'parados' | 'depois' | 'sistema';
+  | 'respondeu'
+  // Só no Meu dia novo da Imova (`separarPelaJanela` em `novo.ts`): o bloco de quem
+  // respondeu partido em dois pela janela de 24 h.
+  | 'respondeu_aberta'
+  | 'respondeu_modelo'
+  | 'agora'
+  | 'hoje'
+  | 'sem_proxima_acao'
+  | 'parados'
+  | 'depois'
+  | 'sistema';
 
 export type DefinicaoDeBloco = {
   id: IdDoBloco;

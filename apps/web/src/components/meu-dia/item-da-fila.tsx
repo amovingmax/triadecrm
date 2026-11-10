@@ -10,6 +10,7 @@ import { EtiquetaEtapa } from '@/components/funis/etapa';
 
 import { formatarQuando, quandoEmTexto } from './formatos';
 import { ICONE_DO_ITEM, iconeDoItem } from './icones';
+import { ladoDaJanela, motivoQueSobra, pastilhaDaJanela, rotuloDaAcao } from './novo';
 import { destinoDoItem, type ItemDoDia } from './tipos';
 
 /**
@@ -38,21 +39,41 @@ export function ItemDaFila({
   item,
   indice,
   somenteLeitura = false,
+  novo = false,
+  previa = null,
 }: {
   item: ItemDoDia;
   indice: number;
   /** Dia de outra pessoa: a linha leva só à ficha (ver `destinoDoItem`). */
   somenteLeitura?: boolean;
+  /**
+   * O Meu dia novo da Imova (módulo `meuDiaNovo`): a fala do lead no lugar de
+   * "Responder no WhatsApp", a pastilha "fecha em 3 h" no lugar de "há 21 h", sem
+   * a frase da janela (o bloco já disse) e a ação escrita num botão à direita.
+   */
+  novo?: boolean;
+  /** A última mensagem do lead, já em uma linha (`textoDaPrevia`). Só no `novo`. */
+  previa?: string | null;
 }) {
   const revelar = useRevelarLinha(indice);
   const destino = destinoDoItem(item, { somenteLeitura });
   const quando = formatarQuando(item);
+  const janela = novo ? pastilhaDaJanela(item) : null;
 
   const nome = item.organizacao ?? item.titulo;
   // O AVISO DO SISTEMA não tem parceiro: o título dele JÁ é a linha de cima.
   // Sem esta condição, "Dead-letter ai_dlq: 1 mensagem morreu" aparecia duas
   // vezes, uma embaixo da outra, em toda linha sem organização.
-  const acao = item.organizacao && item.titulo !== item.organizacao ? item.titulo : null;
+  //
+  // No Meu dia novo, "Responder no WhatsApp" sai da linha da conversa quando há a
+  // fala do lead para pôr no lugar: a ação virou o botão da direita, e a fala é o
+  // que decide a ordem em que a pessoa responde. Sem prévia, a frase fica.
+  const acao =
+    item.organizacao &&
+    item.titulo !== item.organizacao &&
+    !(novo && item.tipo === 'conversa_esperando' && previa)
+      ? item.titulo
+      : null;
   // MOSTRAR O MOTIVO NÃO É A MESMA COISA QUE ESCONDER A ETAPA. Eram uma variável
   // só porque, nos três motivos antigos, o motivo já NOMEAVA a etapa ("parado na
   // etapa Contatado") e repeti-la gastava a largura do nome. O motivo da conversa
@@ -65,7 +86,7 @@ export function ItemDaFila({
     item.tipo === 'desfecho_pendente';
   // E o motivo só entra quando diz algo que as duas linhas acima não disseram.
   const mostrarMotivo = motivoNomeiaEtapa || item.tipo === 'conversa_esperando' || !acao;
-  const motivoCru = mostrarMotivo ? item.motivo : null;
+  const motivoCru = mostrarMotivo ? (novo ? motivoQueSobra(item) : item.motivo) : null;
   const motivo = motivoCru && motivoCru !== nome && motivoCru !== acao ? motivoCru : null;
   const local = formatarLocal(item.bairro, null);
 
@@ -100,6 +121,9 @@ export function ItemDaFila({
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{nome}</p>
           {acao ? <p className="truncate text-[0.8125rem]">{acao}</p> : null}
+          {novo && previa ? (
+            <p className="truncate text-[0.8125rem] text-foreground/85">{previa}</p>
+          ) : null}
           {motivo ? <p className="text-xs text-muted-foreground">{motivo}</p> : null}
         </div>
 
@@ -116,9 +140,7 @@ export function ItemDaFila({
               coluna vem nula, porque "endereçada a mim" em toda linha é um
               rótulo que a pessoa aprende a não ler. Não é um aviso para parar:
               quem responde primeiro tira a conversa da fila de todos. */}
-          {item.atendente ? (
-            <span className="truncate">Endereçada a {item.atendente}</span>
-          ) : null}
+          {item.atendente ? <span className="truncate">Endereçada a {item.atendente}</span> : null}
           {item.etapa && !motivoNomeiaEtapa ? <EtiquetaEtapa etapa={item.etapa} /> : null}
           {local ? <span className="truncate">{local}</span> : null}
           {item.categoria ? <span className="truncate">{item.categoria}</span> : null}
@@ -128,24 +150,63 @@ export function ItemDaFila({
       <div className="flex shrink-0 items-center gap-0.5 pt-1">
         {/* O prazo vencido vira pastilha: "há 6 d" em cinza, no fim de uma linha
             cinza, era a informação mais urgente da tela escrita no tom mais baixo. */}
-        <span
-          title={quando.detalhe}
-          className={cn(
-            'inline-flex items-center rounded-full whitespace-nowrap',
-            quando.atencao
-              ? 'bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive-texto'
-              : 'text-xs text-muted-foreground',
-          )}
-        >
-          <span aria-hidden="true">
-            {quando.prefixo}
-            {quando.numero ? <span className="numerico">{quando.numero}</span> : null}
-            {quando.sufixo}
+        {janela ? (
+          // A conversa com janela aberta conta o que FALTA, e não o que passou: "há
+          // 21 h" e "fecha em 3 h" são o mesmo fato, mas só o segundo diz o que fazer.
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full whitespace-nowrap',
+              janela.pressa
+                ? 'bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive-texto'
+                : 'text-xs text-muted-foreground',
+            )}
+          >
+            {janela.texto}
+            <span className="numerico">{janela.numero}</span>
           </span>
-          <span className="sr-only">{`${quandoEmTexto(quando)}. ${quando.detalhe}`}</span>
-        </span>
+        ) : (
+          <span
+            title={quando.detalhe}
+            className={cn(
+              'inline-flex items-center rounded-full whitespace-nowrap',
+              quando.atencao
+                ? 'bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive-texto'
+                : 'text-xs text-muted-foreground',
+            )}
+          >
+            <span aria-hidden="true">
+              {quando.prefixo}
+              {quando.numero ? <span className="numerico">{quando.numero}</span> : null}
+              {quando.sufixo}
+            </span>
+            <span className="sr-only">{`${quandoEmTexto(quando)}. ${quando.detalhe}`}</span>
+          </span>
+        )}
+        {destino && novo ? (
+          // O RÓTULO DA AÇÃO (Meu dia novo). A linha inteira continua sendo o link —
+          // um botão dentro de um link é HTML inválido e dois alvos na mesma linha
+          // brigam pelo polegar —; o que muda é que o toque deixa de ser uma seta e
+          // passa a dizer o que faz. No celular volta a seta, por falta de largura.
+          <span
+            aria-hidden="true"
+            className={cn(
+              'ml-2 hidden h-9 items-center gap-1 rounded-lg border px-3 text-[13px] font-medium whitespace-nowrap sm:inline-flex',
+              item.tipo === 'conversa_esperando' &&
+                ladoDaJanela(item) === 'aberta' &&
+                !somenteLeitura
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'bg-card text-foreground',
+            )}
+          >
+            {rotuloDaAcao(item, { somenteLeitura })}
+            <ChevronRight className="size-3.5" />
+          </span>
+        ) : null}
         {destino ? (
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <ChevronRight
+            className={cn('size-4 shrink-0 text-muted-foreground', novo && 'sm:hidden')}
+            aria-hidden="true"
+          />
         ) : null}
       </div>
     </>

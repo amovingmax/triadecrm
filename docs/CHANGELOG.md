@@ -9790,3 +9790,28 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 - Site da Imova **`imova-2y0yqop4m`**, de cópia limpa de `efe2ae6` em `~/triadecrm-publicar-imova` (volta: `imova-7pb7i7956`). Conferido de fora: `imova-crm.vercel.app` aponta para ele; `/login` 200; `/ia` sem login vai para o login; `/auth/dev` e `POST /auth/dev/cliente` 404.
 - `imova-worker-ai` não foi republicado (não muda). KOMUNE intocada.
 - **Falta, na tela (gestão logada na Imova):** IA que atende → Configuração → Conversas de teste → procurar "Matheus" → "Testar por esta". A IA precisa estar ligada; a conversa do Matheus só aparece se ele já escreveu para o WhatsApp da Imova. Não lido em produção se ela existe.
+
+## 10/11/2026 — o Meu dia novo, fase 1 (branch `meu-dia-imova`; só na Imova; ainda não publicado)
+
+**Pedido do usuário:** protótipos para melhorar o Meu dia da Imova, a partir de dois prints da tela (canvas em claude.ai, duas rodadas). Aprovada a segunda ("Gostei dessa atualização. Suba para o ambiente da Imova"). Escolhas dele antes de começar: **fase 1, só a tela** (as ações dentro da linha, o modo foco e a distribuição do gestor ficam para depois) e **mostrar rodando no Mac antes de publicar**.
+
+**Entregue (módulo novo `meuDiaNovo`, ligado só na Imova; a KOMUNE recebe a mesma árvore de antes):**
+- **Saudação sem e-mail:** quem não tem nome no perfil lia "Boa tarde, gestor.teste@teste.local."; agora vale o pedaço antes do "@" (`nomeDaSaudacao`). Embaixo, por onde começar: "Comece por Marina Costa: a janela fecha em 2 h." (`porOndeComecar`).
+- **Números do dia numa faixa compacta com a marca de ritmo** (`ResumoCompacto`): mesmos dados de `public.goal_progress`; o traço na barra é onde a pessoa deveria estar agora para bater a meta até as 18h, num ritmo constante das 9h às 18h de Fortaleza (`EXPEDIENTE` em `novo.ts`, premissa do protótipo); a frase diz "No ritmo", "5 abaixo do ritmo", "Meta batida" ou "Só o realizado". Barra acromática como antes; só "abaixo do ritmo" no tom de alerta.
+- **Quem respondeu, separado pela janela de 24 h:** "Janela aberta: responda antes que feche" e "Esperando há mais de 24 h" (`separarPelaJanela`). A regra da janela é dita uma vez, no cabeçalho do bloco, e sai de cada linha; a conversa aberta mostra "fecha em 3 h" no lugar de "há 21 h" (alerta até 3 h). O lado da janela é lido da frase que `public.meu_dia` já escreve no `motivo` — sem migração; o teste `novo.test.ts` guarda as frases exatas.
+- **A fala do lead na linha:** a última mensagem recebida, entre aspas, ou "Enviou um áudio" / "Foto: …" (`buscarUltimasMensagens`, uma leitura por conversa da fila, sob a RLS de `messages`; se falhar, a linha fica sem prévia).
+- **A ação escrita na linha:** "Responder", "Enviar modelo", "Registrar resultado", "Combinar próximo passo"… no lugar da seta (a linha inteira continua sendo o link; no celular volta a seta). O destino é o mesmo de `destinoDoItem`.
+- **Agenda de hoje ao lado da fila** (`AgendaDeHoje`): reuniões e visitas do dia, a feita riscada e a linha do "agora"; no celular, só o próximo compromisso numa faixa.
+- Nenhuma migração, nenhuma Edge Function, nenhum worker.
+
+**Verificado:**
+- Vitest 1.815 no site (24 novos em `novo.test.ts`) e 111 no `packages/schema`; typecheck, eslint e prettier limpos.
+
+**Pendente:**
+- Mostrar ao usuário rodando no Mac (build de produção como Imova, banco local da Imova) e publicar só com o ok dele.
+- Antes de publicar: `comparar-versoes.mjs` na KOMUNE (deve dar igual: tudo é condicionado ao módulo).
+- Fase 2 (precisa de banco): responder, enviar modelo e registrar o resultado da ligação dentro da linha; modo foco; distribuição do gestor.
+
+**Decisão humana:** o expediente do ritmo (9h às 18h) é premissa; se a Imova trabalhar em outro horário, muda em `EXPEDIENTE`.
+
+---

@@ -130,7 +130,7 @@ export function ResumoDoDia({
  * mesmo tamanho: nada dizia, de relance, qual deles era porta batida e qual era
  * reunião. O ícone faz isso sem gastar linha.
  */
-const ICONE_DA_METRICA: Record<string, LucideIcon> = {
+export const ICONE_DA_METRICA: Record<string, LucideIcon> = {
   doors_knocked: DoorOpen,
   doors_opened: DoorClosed,
   calls_made: Phone,
