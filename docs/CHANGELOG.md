@@ -9813,4 +9813,12 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 
 **Decisão humana:** o expediente do ritmo (9h às 18h) é premissa do protótipo; se a Imova trabalhar em outro horário, muda em `EXPEDIENTE`.
 
+**Publicado em 10/11/2026, ~17h05 de Natal, só na Imova** (pedido: "Pode subir essa atualização sem mudar o ambiente da Komune"):
+- **Ar conferido antes:** Imova em `imova-2y0yqop4m` (de `efe2ae6`); KOMUNE em `triade-npxd0dvhb` (06/11). O ramo foi refeito sobre a `main` `701360a` antes (o visual Maré e a conversa de teste da IA tinham entrado no mesmo dia); só o CHANGELOG conflitou.
+- **Publicado:** `main` `f7b099d` (avanço direto sobre `701360a`). Site da Imova **`imova-o7mjztrwm`**, de cópia limpa de `f7b099d` em `~/triadecrm-publicar-imova` (volta: `imova-2y0yqop4m`). Sem banco, sem migração, sem variável nova, sem worker.
+- **A KOMUNE não foi republicada** e segue em `triade-npxd0dvhb` (o `triade-crm` não publica pelo push). Quando ela for publicada da `main`, leva este código com a tela igual (88 de 88).
+- **Conferido de fora:** `imova-crm.vercel.app` aponta para o deploy novo, com `data-empresa="imova"`; `/login` 200; `/meu-dia` sem login vai para o login; `/auth/dev` 404. A tela com login não foi aberta em produção (login pelo Google).
+
+**Pendente:** a fase 2 do protótipo (ver "Ficou de fora de propósito"), que pede banco: seleção e ações em lote, menu da linha, responder e registrar sem sair da tela, Modo foco e o dia da equipe.
+
 ---
