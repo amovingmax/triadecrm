@@ -1466,9 +1466,11 @@ export type Database = {
       agenda_avisos: {
         Row: {
           criado_em: string
+          detalhe: string | null
           dono_id: string
           id: string
-          marcado_por: string
+          marcado_por: string | null
+          origem: string
           quando: string
           reuniao_id: string | null
           task_id: string | null
@@ -1478,9 +1480,11 @@ export type Database = {
         }
         Insert: {
           criado_em?: string
+          detalhe?: string | null
           dono_id: string
           id?: string
-          marcado_por: string
+          marcado_por?: string | null
+          origem?: string
           quando: string
           reuniao_id?: string | null
           task_id?: string | null
@@ -1490,9 +1494,11 @@ export type Database = {
         }
         Update: {
           criado_em?: string
+          detalhe?: string | null
           dono_id?: string
           id?: string
-          marcado_por?: string
+          marcado_por?: string | null
+          origem?: string
           quando?: string
           reuniao_id?: string | null
           task_id?: string | null
@@ -2791,6 +2797,175 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      calendly_agendamentos: {
+        Row: {
+          atualizado_em: string
+          aviso_id: string | null
+          cancelado_em: string | null
+          cancelado_no_calendly_em: string | null
+          cancelado_por: string | null
+          cancelar_depois_de: string | null
+          cancelar_erro: string | null
+          cancelar_tentativas: number
+          conflitos: Json
+          convidado_uri: string
+          deal_id: string | null
+          dono_id: string | null
+          evento_uri: string
+          ficha: string | null
+          fim: string | null
+          formato: string | null
+          id: string
+          inicio: string | null
+          link: string | null
+          link_cancelar: string | null
+          link_remarcar: string | null
+          local: string | null
+          motivo_cancelamento: string | null
+          natureza: string | null
+          organization_id: string | null
+          recebido_em: string
+          remarcado_de: string | null
+          respostas: Json
+          reuniao_id: string | null
+          situacao: string
+          task_id: string | null
+          tipo_de_evento: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          aviso_id?: string | null
+          cancelado_em?: string | null
+          cancelado_no_calendly_em?: string | null
+          cancelado_por?: string | null
+          cancelar_depois_de?: string | null
+          cancelar_erro?: string | null
+          cancelar_tentativas?: number
+          conflitos?: Json
+          convidado_uri: string
+          deal_id?: string | null
+          dono_id?: string | null
+          evento_uri: string
+          ficha?: string | null
+          fim?: string | null
+          formato?: string | null
+          id?: string
+          inicio?: string | null
+          link?: string | null
+          link_cancelar?: string | null
+          link_remarcar?: string | null
+          local?: string | null
+          motivo_cancelamento?: string | null
+          natureza?: string | null
+          organization_id?: string | null
+          recebido_em?: string
+          remarcado_de?: string | null
+          respostas?: Json
+          reuniao_id?: string | null
+          situacao: string
+          task_id?: string | null
+          tipo_de_evento?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          aviso_id?: string | null
+          cancelado_em?: string | null
+          cancelado_no_calendly_em?: string | null
+          cancelado_por?: string | null
+          cancelar_depois_de?: string | null
+          cancelar_erro?: string | null
+          cancelar_tentativas?: number
+          conflitos?: Json
+          convidado_uri?: string
+          deal_id?: string | null
+          dono_id?: string | null
+          evento_uri?: string
+          ficha?: string | null
+          fim?: string | null
+          formato?: string | null
+          id?: string
+          inicio?: string | null
+          link?: string | null
+          link_cancelar?: string | null
+          link_remarcar?: string | null
+          local?: string | null
+          motivo_cancelamento?: string | null
+          natureza?: string | null
+          organization_id?: string | null
+          recebido_em?: string
+          remarcado_de?: string | null
+          respostas?: Json
+          reuniao_id?: string | null
+          situacao?: string
+          task_id?: string | null
+          tipo_de_evento?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendly_agendamentos_aviso_id_fkey"
+            columns: ["aviso_id"]
+            isOneToOne: false
+            referencedRelation: "agenda_avisos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendly_agendamentos_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendly_agendamentos_dono_id_fkey"
+            columns: ["dono_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendly_agendamentos_dono_id_fkey"
+            columns: ["dono_id"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendly_agendamentos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendly_agendamentos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendly_agendamentos_remarcado_de_fkey"
+            columns: ["remarcado_de"]
+            isOneToOne: false
+            referencedRelation: "calendly_agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendly_agendamentos_reuniao_id_fkey"
+            columns: ["reuniao_id"]
+            isOneToOne: false
+            referencedRelation: "reunioes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendly_agendamentos_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       call_attempts: {
         Row: {
@@ -10373,6 +10548,16 @@ export type Database = {
         Returns: Json
       }
       agenda_avisos_vistos: { Args: { p_ids?: string[] }; Returns: number }
+      agenda_espelho_apagado: { Args: { p_item: string }; Returns: undefined }
+      agenda_espelho_falhou: {
+        Args: { p_erro: string; p_fim: string; p_inicio: string; p_item: string }
+        Returns: undefined
+      }
+      agenda_espelho_gravado: {
+        Args: { p_fim: string; p_inicio: string; p_item: string }
+        Returns: undefined
+      }
+      agenda_espelho_pendencias: { Args: { p_limite?: number }; Returns: Json }
       alvo_suprimido: {
         Args: { p_contact_id?: string; p_organization_id: string }
         Returns: boolean
@@ -10406,6 +10591,13 @@ export type Database = {
       }
       cadencias_do_negocio: { Args: { p_deal_id: string }; Returns: Json }
       cadencias_visao: { Args: never; Returns: Json }
+      calendly_cancelamento_falhou: {
+        Args: { p_definitivo?: boolean; p_erro: string; p_id: string }
+        Returns: boolean
+      }
+      calendly_cancelamento_feito: { Args: { p_id: string }; Returns: boolean }
+      calendly_cancelamentos_pendentes: { Args: { p_limite?: number }; Returns: Json }
+      calendly_receber: { Args: { p_evento: Json }; Returns: Json }
       canal_pro_ajustar: {
         Args: { p_email: string; p_nome: string; p_site: string; p_telefone: string }
         Returns: Json
