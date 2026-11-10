@@ -9715,7 +9715,7 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 
 **Decisão humana:** nenhuma nova.
 
-## 10/11/2026 — O visual da Imova ("Maré"), só na Imova (branch `visual-imova`; PRD §8, docs/design)
+## 10/11/2026 — O visual da Imova ("Maré"), em produção só na Imova (branch `visual-imova`; PRD §8, docs/design)
 
 Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, primeiro em protótipo e depois "essas atualizações [...] somente na Imova e que a Komune continue igual está hoje". Até aqui a Imova usava a tinta preta, a menta e o triângulo da Tríade; o logo dela só aparecia na escolha de empresa do login e num estado vazio de Conversas.
 
@@ -9741,10 +9741,17 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 - Lint, typecheck, Prettier, 1.805 testes da web e 113 do schema; build de produção das duas empresas.
 - Local, as duas juntas com a troca de empresa (KOMUNE em `localhost:3300`, Imova em `localhost:3301`, cada uma com o seu Supabase local): os dois logins convivem no mesmo navegador, o botão de trocar aparece nas duas e nenhuma tela teve erro de JavaScript.
 
+
+**Em produção, só na Imova (10/11/2026, ~14h40 de Natal; pedido do usuário: "Suba a mudança que fizemos no ambiente da IMOVA. Preciso que mantenhamos o crm da Komune do jeito que está"):**
+- **Ar conferido antes:** Imova em `imova-dtxwae2oj` (de `3cd6b53`, contido na main `a2829ff`); KOMUNE em `triade-npxd0dvhb`. O `triade-crm` não publica pelo push (nenhum deploy dele com os pushes do dia).
+- **Publicado:** ramo refeito sobre a main `a2829ff` (lint, typecheck, 1809 testes da web e 113 do schema verdes de novo), main `6e2d9f0` (avanço direto). Site da Imova **`imova-7pb7i7956`**, de cópia limpa de `6e2d9f0` em `~/triadecrm-publicar-imova` (volta: `imova-dtxwae2oj`). Sem banco, sem migração, sem variável nova.
+- **A KOMUNE não foi republicada** e segue em `triade-npxd0dvhb`. Quando ela for publicada da main, leva este código, que dá a tela dela igual (88 de 88 no `comparar-versoes`).
+- **Conferido em produção:** `<html data-empresa="imova">` com Figtree e Urbanist; o CSS servido traz os blocos claro, escuro e do trilho da Imova; manifest com `#0f3a37`/`#f1f5f4` e os ícones de `/icons/imova`; ícones e papéis de parede 200; `/login` 200 na névoa, botão petróleo e alvo laranja, no computador e no celular, sem erro de página; `/meu-dia` sem login vai para o login; `/auth/dev` 404. A KOMUNE serve o mesmo deploy de antes, sem `data-empresa`. A tela com login não foi aberta em produção (login pelo Google).
+
 **Pendente:**
 - O `favicon.ico` da aba continua o do Tríade nas duas empresas (é o arquivo de `app/`, que o Next serve igual para todo build). Os ícones da PWA e do celular já são os da Imova.
 - O ícone de Prospectados (aperto de mão) e os rótulos do menu são os mesmos nas duas empresas; ficaram de fora de propósito (só visual nesta entrega).
 - Os botões da entrada de teste do login local continuam em pílula: não são `Button` e só existem no computador de quem desenvolve.
 
 **Decisão humana:**
-- Publicar só a Imova (o padrão das entregas "só na Imova"). Quem já escolheu um tema no alternador fica com a escolha; quem nunca escolheu passa a abrir no claro. O app instalado no celular pode demorar a trocar o ícone.
+- Publicada só a Imova (o padrão das entregas "só na Imova"). Quem já escolheu um tema no alternador fica com a escolha; quem nunca escolheu passa a abrir no claro. O app instalado no celular pode demorar a trocar o ícone.
