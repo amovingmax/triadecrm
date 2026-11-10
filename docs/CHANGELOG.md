@@ -9831,8 +9831,8 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 - **Duas pessoas nunca no mesmo horário.** Para o Calendly enxergar o que o CRM marca, o CRM **espelha a agenda num Google Agenda** ligado a ele (só "Ocupado", sem nome de cliente), com conta de serviço. **Muda em parte o ADR-15** (a agenda saiu do Google em 30/09): o Google volta só como espelho, sem OAuth por pessoa, sem o robô depender dele, e o CRM continua a fonte da verdade.
 - Se mesmo assim chegar um agendamento em horário ocupado (o intervalo entre o CRM marcar e o Calendly reler o Google), **o CRM cancela o novo no Calendly**. (Uma primeira versão, da mesma tarde, deixava entrar marcado como conflito; foi trocada por esta antes de sair do computador.)
 
-**Entregue (nada em produção):**
-- **Migração `20261110180000_calendly_na_agenda`**:
+**Entregue:**
+- **Migração `20261110180000_calendly_na_agenda`** (era `20261110120000`; renomeada porque a `20261110150000` da conversa de teste já estava no banco da Imova e o `db push` recusa migração fora de ordem):
   - **Nas duas empresas (só acrescenta):** `agenda_avisos` ganha `origem` ('equipe' | 'calendly') e `detalhe`, e `marcado_por` aceita nulo quando a origem é o Calendly; `reunioes.marcada_por` e `tasks.origin` aceitam 'calendly'.
   - **Só na Imova:** origem "Calendly" em `sources`; `calendly_agendamentos` (um por convidado, RLS: gestão e dono leem, ninguém escreve); `public.calendly_receber`; a régua única de ocupação `app.agenda_ocupada` (reunião viva, visita aberta, reunião com hora combinada; a tarefa "a marcar" não ocupa); `app.agenda_espelho` e as funções que dizem e registram o que falta (`calendly_cancelamentos_pendentes` / `_feito` / `_falhou`, `agenda_espelho_pendencias` / `_gravado` / `_apagado` / `_falhou`), todas só `service_role`.
   - **Agendou em horário livre:** ficha pelo telefone e depois pelo e-mail (as regras do lead do portal) ou nova de Cliente; dono = e-mail do anfitrião, senão `app_settings['calendly'].dono_email`, senão o admin mais antigo; reunião em `reunioes` (`marcada_por = 'calendly'`, fim e sala do Calendly) + tarefa-eco + e-mail; visita como tarefa `visit`; negócio na etapa que pede data; aviso, push e nota na ficha.
@@ -9859,10 +9859,22 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 - Banco local da Imova: backup em `~/triadecrm-backups/imova-local-antes-calendly-1011.dump`; migração aplicada; exemplos "Teste Calendly …" e "Teste E2E …" (e-mails `@exemplo.test`); `app_settings['calendly']` aponta para o gestor de teste e uma agenda Google fictícia.
 - **Não verificado:** o Google e o Calendly de verdade (sem conta de serviço nem token aqui); `calendly-assinar.mjs assinar/trocar/remover`.
 
+**Em produção, só na Imova (10/11/2026, autorização escrita do usuário: "Autorizo enviar o agenda-calendly para a main, migrar o banco da Imova, publicar a função calendly-webhook, o site da Imova e o imova-worker-wa, e gravar a chave do Google no Fly"):**
+- **Ar conferido antes:** banco com 200 migrações, só a `20261110180000` pendente; site `imova-o7mjztrwm` (de `f7b099d`); `imova-worker-wa` v3 (de `273a637`; desde então o caminho do `wa` só mudou por esta entrega). Ramo refeito sobre a `main` `ef24aa4`; lint, typecheck, testes (web 1850, worker 534, prompts 413, schema 113) e pgTAP 142 (74) e 143 (26) verdes de novo.
+- **`main` `a61055b`** (avanço direto).
+- **Banco:** `publicar-banco.mjs imova migrar --confirmar imova` (201 migrações). Conferido: `calendly_agendamentos` com RLS; as 8 funções públicas novas executáveis só por `postgres` e `service_role`; origem `calendly` em `sources`; `app_settings['calendly']` ainda vazio.
+- **Função `calendly-webhook`** publicada (`--no-verify-jwt`). De fora, `POST` sem assinatura → 503 `integracao_nao_configurada` (falta a chave, que nasce com o `assinar`).
+- **Site** `imova-jrrpvrmpn`, de cópia limpa de `a61055b` em `~/triadecrm-publicar-imova` (volta: `imova-o7mjztrwm`). De fora: `/login` 200 com `data-empresa="imova"`; `/agenda` e `/meu-dia` sem login vão para o login; `/auth/dev` 404.
+- **`imova-worker-wa` v4**, da mesma cópia limpa (volta: v3), com `GOOGLE_AGENDA_CREDENCIAL` (a chave da conta de serviço `crm-imova-agenda@crm-imova-agenda.iam.gserviceaccount.com`, em base64). Log: "agenda do Calendly ligada neste worker" (google sim, calendly não); mensagens e ações do WhatsApp seguem. O "AÇÃO HUMANA PENDENTE" do log é o modelo `GEN-SYS-OPTOUT` na Meta, anterior a esta entrega.
+- **Do lado do usuário, feito:** agenda "CRM Imova - ocupado" (`c_f19a6b93…@group.calendar.google.com`) na conta Google Workspace; projeto `crm-imova-agenda` no Google Cloud com a Calendar API e a conta de serviço; Calendly ligado ao Google (Verificar conflitos com a agenda nova e a principal); evento "Agendamento Imova" de 45 min, fuso de Brasília, 24 h, seg. a sex.
+- **KOMUNE intocada:** nem banco, nem site, nem worker.
+
 **Pendente:**
-- Produção, só na Imova, quando o usuário aprovar: banco, função `calendly-webhook`, site e `imova-worker-wa` (com `CALENDLY_TOKEN` e `GOOGLE_AGENDA_CREDENCIAL`), `app_settings['calendly']`, `assinar` e os três testes do guia. Antes, do lado do usuário: Google Agenda + conta de serviço, Calendly ligado ao Google, o tipo de evento com as perguntas, e o token.
+- **Token do Calendly** (`CALENDLY_TOKEN`): no `.env.imova` e no `imova-worker-wa`; depois `calendly-assinar.mjs assinar` (cria a assinatura e grava `CALENDLY_WEBHOOK_SIGNING_KEY`) e um agendamento de teste pelo link. Sem ele, o Calendly não avisa o CRM.
+- **Compartilhar a agenda com a conta de serviço** ("Fazer alterações nos eventos"): a opção estava apagada à espera do Admin do Workspace aplicar a mudança de compartilhamento externo (até 24 h). Depois, `app_settings['calendly'].google_agenda_id` e o teste do bloco "Ocupado". Plano B, se não liberar: delegação em todo o domínio (exige `sub` no JWT do worker).
+- `app_settings['calendly'].dono_email`: confirmar quem atende (sem ele, vale o e-mail do anfitrião no Calendly e, se não houver no CRM, o admin mais antigo).
+- No Calendly da Imova: idioma do convidado Português (Brasil) e as perguntas "O que você quer marcar?" (Reunião / Visita a um imóvel) e "Telefone (WhatsApp)" obrigatória.
 - O e-mail de reunião marcada na Imova depende da `RESEND_API_KEY` no `imova-worker-wa` e de um texto do e-mail sem a KOMUNE (pendência anterior a esta entrega).
-- No Calendly da Imova: um tipo de evento com a pergunta "O que você quer marcar?" (Reunião / Visita a um imóvel) e "Telefone (WhatsApp)" obrigatória.
 - Dossiê da LGPD e retenção não leem `calendly_agendamentos` (o mesmo recorte dos leads dos portais).
 
 **Decisão humana:**
