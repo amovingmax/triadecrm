@@ -134,6 +134,10 @@ export type Database = {
         Returns: boolean
       }
       anuncio_pendencias: { Args: { p_id: string }; Returns: string[] }
+      anuncio_proximo_codigo: { Args: { p_tag: string }; Returns: string }
+      anuncio_tag_do_codigo: { Args: { p_codigo: string }; Returns: string }
+      anuncio_tag_do_tipo: { Args: { p_tipo: string }; Returns: string }
+      anuncio_tag_valida: { Args: { p: string }; Returns: boolean }
       anuncio_tipo: {
         Args: { p_tipo: string }
         Returns: {
@@ -10379,6 +10383,7 @@ export type Database = {
       anuncio_foto_remover: { Args: { p_foto: string }; Returns: Json }
       anuncio_fotos_ordenar: { Args: { p_anuncio: string; p_ordem: string[] }; Returns: Json }
       anuncio_importar: { Args: { p_dados: Json }; Returns: Json }
+      anuncio_proximos_codigos: { Args: never; Returns: Json }
       anuncio_publicar: { Args: { p_id: string }; Returns: Json }
       anuncio_restaurar: { Args: { p_id: string }; Returns: Json }
       anuncio_salvar: { Args: { p_dados: Json; p_id?: string }; Returns: Json }

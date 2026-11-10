@@ -131,7 +131,7 @@ select 'anuncio', (r ->> 'id')::uuid
 select pg_temp.sair();
 
 select ok(pg_temp.id() is not null, 'o SDR cria o anúncio');
-select matches(pg_temp.campo('codigo'), '^IMV-[0-9]{4,}$', 'o anúncio ganha o código do portal');
+select matches(pg_temp.campo('codigo'), '^IM[0-9]{4,}$', 'o anúncio ganha o código do portal, com a tag do tipo (20261110100000)');
 select is(pg_temp.campo('situacao'), 'rascunho', 'e nasce como rascunho');
 select is(pg_temp.campo('cep') || '/' || pg_temp.campo('estado'), '59090000/RN',
   'CEP só com números e estado em maiúscula');
