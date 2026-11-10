@@ -11,6 +11,7 @@ import {
 
 import { escaparCuringas, normalizarBusca, ordenarCandidatos } from './autocompletar';
 import {
+  conflitosDoCalendly,
   escolherResultado,
   janelaDeDias,
   naturezaDoCompromisso,
@@ -80,7 +81,7 @@ function erroDe(codigo: string | null | undefined, causa: unknown): ErroDaAgenda
 }
 
 const COLUNAS_TAREFA =
-  'id, title, kind, status, due_at, organization_id, deal_id, completed_at' as const;
+  'id, title, kind, status, due_at, organization_id, deal_id, completed_at, origin' as const;
 const COLUNAS_ORG =
   'id, name, neighborhood, city_name, address, primary_category_name, temperature, do_not_contact' as const;
 const COLUNAS_NEGOCIO =
@@ -95,6 +96,8 @@ type LinhaTarefa = {
   organization_id: string | null;
   deal_id: string | null;
   completed_at: string | null;
+  /** `manual`, `ai`, `system`… e `calendly`, quando o cliente marcou pelo link. */
+  origin: string;
 };
 
 const COLUNAS_REUNIAO =
@@ -228,7 +231,7 @@ export async function buscarCompromissos(params: {
   const agora = Date.now();
   const marcamHora = new Set(params.etapasComHoraMarcada);
 
-  return linhas.flatMap((tarefa) => {
+  const compromissos = linhas.flatMap((tarefa) => {
     const org = tarefa.organization_id ? porOrg.get(tarefa.organization_id) : undefined;
     // Organização apagada ou fora da carteira: a tarefa existe e o parceiro não é
     // legível. Sem nome não há cartão honesto para desenhar.
@@ -238,8 +241,14 @@ export async function buscarCompromissos(params: {
     const ehVisita = tarefa.kind === 'visit';
     const reuniaoDaTarefa = porTarefa.get(tarefa.id) ?? null;
     const tipo = ehVisita ? ('visita' as const) : ('reuniao' as const);
+    const peloCalendly = tarefa.origin === 'calendly';
     const natureza = naturezaDoCompromisso(
-      { reuniaoId: reuniaoDaTarefa?.id ?? null, tipo, etapaId: negocio?.stage_id ?? null },
+      {
+        reuniaoId: reuniaoDaTarefa?.id ?? null,
+        tipo,
+        etapaId: negocio?.stage_id ?? null,
+        peloCalendly,
+      },
       marcamHora,
     );
 
@@ -257,6 +266,8 @@ export async function buscarCompromissos(params: {
         local: reuniaoDaTarefa?.local ?? null,
         estado: reuniaoDaTarefa?.estado ?? null,
         marcadaPeloRobo: reuniaoDaTarefa?.marcada_por === 'robo',
+        peloCalendly,
+        emConflito: false,
         avisoEnviadoEm: reuniaoDaTarefa?.aviso_enviado_em ?? null,
         reuniaoCriadaEm: reuniaoDaTarefa?.criada_em ?? null,
         organizationId: tarefa.organization_id,
@@ -279,6 +290,13 @@ export async function buscarCompromissos(params: {
       } satisfies Compromisso,
     ];
   });
+
+  // O choque de horário é da agenda inteira da pessoa, não de um cartão: só dá
+  // para contar depois de a lista estar montada.
+  const emConflito = conflitosDoCalendly(compromissos);
+  return emConflito.size === 0
+    ? compromissos
+    : compromissos.map((c) => (emConflito.has(c.taskId) ? { ...c, emConflito: true } : c));
 }
 
 type RegistroDeQuem = RegistroComDesfecho & { autorId: string | null };

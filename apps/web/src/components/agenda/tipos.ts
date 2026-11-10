@@ -90,6 +90,10 @@ export type Compromisso = {
   estado: string | null;
   /** `reunioes.marcada_por = 'robo'`: o selo que a amostragem das primeiras semanas lê. */
   marcadaPeloRobo: boolean;
+  /** `tasks.origin = 'calendly'`: o cliente marcou sozinho, pelo link do Calendly. */
+  peloCalendly: boolean;
+  /** Do Calendly e batendo com outro compromisso aberto (`conflitosDoCalendly`). */
+  emConflito: boolean;
   /** `reunioes.aviso_enviado_em`. Nulo depois de 10 minutos quer dizer que o e-mail não saiu. */
   avisoEnviadoEm: string | null;
   /** `reunioes.criada_em`: é dela que se conta a folga antes de acusar o e-mail. */
@@ -416,12 +420,80 @@ export function chaveDoCompromisso(c: Compromisso): string {
  * "a marcar".
  */
 export function naturezaDoCompromisso(
-  c: Pick<Compromisso, 'reuniaoId' | 'tipo' | 'etapaId'>,
+  c: Pick<Compromisso, 'reuniaoId' | 'tipo' | 'etapaId'> & { peloCalendly?: boolean },
   etapasQueMarcamHora: ReadonlySet<number>,
 ): NaturezaDoCompromisso {
   if (c.tipo === 'visita') return 'visita';
   if (c.reuniaoId) return 'marcado';
+  // O cliente escolheu a hora no Calendly. A reunião em conflito não tem linha em
+  // `reunioes` (a trava de sobreposição a recusa), e nem por isso é "a combinar".
+  if (c.peloCalendly) return 'marcado';
   return c.etapaId !== null && etapasQueMarcamHora.has(c.etapaId) ? 'marcado' : 'a_marcar';
+}
+
+/** Quem "marcou", no aviso, o que veio pelo link: o cliente, pelo Calendly. */
+export const PELO_CALENDLY = 'Calendly';
+
+/**
+ * O título do aviso de compromissos novos (`avisos-recebidos.tsx`): "Fulano marcou…",
+ * "Novo agendamento pelo Calendly", ou a conta quando vêm de mais de um lugar.
+ */
+export function tituloDosAvisos(avisos: readonly { quemMarcou: string }[]): string {
+  const quem = [...new Set(avisos.map((a) => a.quemMarcou))];
+  const n = avisos.length;
+  if (quem.length === 1 && quem[0] === PELO_CALENDLY) {
+    return n === 1 ? 'Novo agendamento pelo Calendly' : `${n} agendamentos novos pelo Calendly`;
+  }
+  if (quem.length === 1) {
+    return `${quem[0]} marcou ${n === 1 ? 'um compromisso' : `${n} compromissos`} na sua agenda`;
+  }
+  return quem.includes(PELO_CALENDLY)
+    ? `${n} compromissos novos na sua agenda, da equipe e do Calendly`
+    : `${n} compromissos novos na sua agenda, marcados pela equipe`;
+}
+
+/**
+ * Quanto dura o que não tem fim guardado: a `tasks` só tem o começo. São os padrões
+ * de `agenda.reunioes` (`duracao_min`, `duracao_visita_min`), os mesmos que o banco
+ * usa em `app.calendly_conflitos`.
+ */
+const MINUTOS_SEM_FIM = { reuniao: 40, visita: 45 } as const;
+
+/**
+ * Os compromissos do Calendly que batem com outro compromisso aberto da mesma lista.
+ *
+ * Desde 10/11/2026 duas pessoas não ficam no mesmo horário: o banco recusa o
+ * agendamento do Calendly que chega em horário ocupado (`calendly_receber`), e o
+ * espelho no Google esconde do Calendly o que o CRM já marcou. O selo fica como
+ * rede de segurança para o que entra por outra porta depois (ex.: uma tarefa de
+ * reunião criada sem conferir horário). A conta é refeita a cada leitura, e não
+ * guardada: quando a pessoa resolve, o selo some sozinho. Os dois lados do choque
+ * levam o selo quando os dois vieram do Calendly; o compromisso que a equipe marcou
+ * não leva, porque não foi ele que chegou por cima.
+ */
+export function conflitosDoCalendly(
+  itens: readonly Pick<
+    Compromisso,
+    'taskId' | 'tipo' | 'quando' | 'fim' | 'concluido' | 'natureza' | 'peloCalendly'
+  >[],
+): Set<string> {
+  const abertos = itens
+    .filter((c) => !c.concluido && c.natureza !== 'a_marcar')
+    .map((c) => {
+      const comeco = Date.parse(c.quando);
+      const fim = c.fim ? Date.parse(c.fim) : comeco + MINUTOS_SEM_FIM[c.tipo] * 60_000;
+      return { c, comeco, fim };
+    })
+    .filter((x) => Number.isFinite(x.comeco) && Number.isFinite(x.fim));
+  const emConflito = new Set<string>();
+  for (const a of abertos) {
+    if (!a.c.peloCalendly) continue;
+    // `[)`, como a trava do banco: encostar não é sobrepor.
+    if (abertos.some((b) => b.c.taskId !== a.c.taskId && a.comeco < b.fim && b.comeco < a.fim)) {
+      emConflito.add(a.c.taskId);
+    }
+  }
+  return emConflito;
 }
 
 /**

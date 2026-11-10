@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import {
+  CalendarCheck,
   CalendarClock,
   Check,
   CircleCheck,
@@ -10,6 +11,7 @@ import {
   MapPin,
   PhoneOff,
   SquarePen,
+  TriangleAlert,
   Trophy,
   UserX,
 } from 'lucide-react';
@@ -82,7 +84,9 @@ export function CartaoCompromisso({
 }) {
   const { realizada, ausente, reagendar } = recortesDoCompromisso(catalogo, compromisso);
   const ehVisita = compromisso.tipo === 'visita';
-  const temHora = compromisso.natureza === 'marcado';
+  // A visita do CRM é porta a bater no dia, sem hora; a do Calendly tem a hora que
+  // o cliente escolheu, e é ela que a pessoa precisa ver no cartão.
+  const temHora = compromisso.natureza === 'marcado' || (ehVisita && compromisso.peloCalendly);
 
   function pedir(titulo: string, descricao: string, opcoes: DesfechoCatalogo[]) {
     aoPedirDesfecho({ compromisso, titulo, descricao, opcoes });
@@ -136,6 +140,26 @@ export function CartaoCompromisso({
             <Badge variant="pilula" className="gap-1 bg-morno-fundo font-normal text-morno-texto">
               <CalendarClock className="size-3" aria-hidden="true" />
               Reagendada
+            </Badge>
+          ) : null}
+          {/* O cliente marcou sozinho, pelo link. Cinza como o "marcada pelo robô":
+              é procedência, não alerta. */}
+          {compromisso.peloCalendly ? (
+            <Badge variant="pilula" className="gap-1 font-normal text-muted-foreground">
+              <CalendarCheck className="size-3" aria-hidden="true" />
+              pelo Calendly
+            </Badge>
+          ) : null}
+          {/* O Calendly não enxerga a agenda do CRM: o horário pode já estar ocupado.
+              Vermelho, porque alguém precisa resolver com o cliente. Some sozinho
+              quando o outro compromisso sai (a conta é refeita a cada leitura). */}
+          {compromisso.emConflito && !compromisso.concluido ? (
+            <Badge
+              variant="pilula"
+              className="gap-1 bg-destructive/10 font-normal text-destructive-texto"
+            >
+              <TriangleAlert className="size-3" aria-hidden="true" />
+              Horário em conflito
             </Badge>
           ) : null}
           {compromisso.etapa ? (

@@ -2,21 +2,31 @@
 
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BellRing, Check } from 'lucide-react';
+import { BellRing, Check, TriangleAlert } from 'lucide-react';
 
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 
-import { diaDoInstante, horaEmNatal, rotuloDiaCurto, rotuloSemanaCurto, type Dia } from './tipos';
+import {
+  diaDoInstante,
+  horaEmNatal,
+  PELO_CALENDLY,
+  rotuloDiaCurto,
+  rotuloSemanaCurto,
+  tituloDosAvisos,
+  type Dia,
+} from './tipos';
 
 /**
  * "Fulano marcou um compromisso na sua agenda."
  *
  * Os avisos de `public.agenda_avisos` que ainda não foram vistos: nascem quando
  * gestor ou admin marca uma reunião ou visita para alguém que acompanha
- * (`reuniao_marcar_na_agenda`, `visita_marcar`). A RLS devolve também os avisos
- * que a própria pessoa MANDOU (é como quem marcou sabe que o outro viu), então o
- * filtro por `dono_id` é explícito.
+ * (`reuniao_marcar_na_agenda`, `visita_marcar`), e, só na Imova, quando um cliente
+ * marca pelo link do Calendly (`calendly_receber`: `origem = 'calendly'`, sem
+ * `marcado_por`, e às vezes com um `detalhe` — o conflito de horário ou a
+ * remarcação). A RLS devolve também os avisos que a própria pessoa MANDOU (é como
+ * quem marcou sabe que o outro viu), então o filtro por `dono_id` é explícito.
  *
  * Aparece no topo da Agenda e do Meu dia, e some quando a pessoa diz que viu —
  * aviso que não sai nunca vira papel de parede — ou quando o compromisso deixou de
@@ -28,6 +38,8 @@ type Aviso = {
   titulo: string;
   quando: string;
   quemMarcou: string;
+  /** Uma frase a mais: com o que o horário conflita, ou de quando foi remarcado. */
+  detalhe: string | null;
 };
 
 const ESTADOS_VIVOS = ['a_confirmar', 'marcada', 'confirmada'];
@@ -44,17 +56,54 @@ export function chaveDosAvisos(usuarioId: string) {
   return ['agenda', 'avisos', usuarioId] as const;
 }
 
+const COLUNAS =
+  'id, tipo, titulo, quando, marcado_por, origem, detalhe, reunioes(estado, inicio), tasks(status, due_at)';
+/**
+ * Sem `origem` e `detalhe`: o banco que ainda não recebeu a migração 20261110120000.
+ * O site sobe junto nas duas empresas e o banco, uma de cada vez; sem esta volta, o
+ * aviso de quem recebe um compromisso sumiria nesse intervalo.
+ */
+const COLUNAS_ANTES_DO_CALENDLY =
+  'id, tipo, titulo, quando, marcado_por, reunioes(estado, inicio), tasks(status, due_at)';
+
+type LinhaDoAviso = {
+  id: string;
+  tipo: string;
+  titulo: string;
+  quando: string;
+  marcado_por: string | null;
+  origem: string;
+  detalhe: string | null;
+  reunioes: unknown;
+  tasks: unknown;
+};
+
+async function lerLinhas(usuarioId: string): Promise<LinhaDoAviso[]> {
+  const supabase = createClient();
+  const consulta = (colunas: string) =>
+    supabase
+      .from('agenda_avisos')
+      .select(colunas)
+      .eq('dono_id', usuarioId)
+      .is('visto_em', null)
+      .order('quando');
+  const nova = await consulta(COLUNAS);
+  if (!nova.error) return (nova.data ?? []) as unknown as LinhaDoAviso[];
+  // 42703 = coluna que não existe.
+  if (nova.error.code !== '42703') return [];
+  const antiga = await consulta(COLUNAS_ANTES_DO_CALENDLY);
+  if (antiga.error || !antiga.data) return [];
+  return (antiga.data as unknown as Omit<LinhaDoAviso, 'origem' | 'detalhe'>[]).map((l) => ({
+    ...l,
+    origem: 'equipe',
+    detalhe: null,
+  }));
+}
+
 async function buscarAvisos(usuarioId: string): Promise<Aviso[]> {
   const supabase = createClient();
-  const { data: linhas, error } = await supabase
-    .from('agenda_avisos')
-    .select(
-      'id, tipo, titulo, quando, marcado_por, reunioes(estado, inicio), tasks(status, due_at)',
-    )
-    .eq('dono_id', usuarioId)
-    .is('visto_em', null)
-    .order('quando');
-  if (error || !linhas) return [];
+  const linhas = await lerLinhas(usuarioId);
+  if (linhas.length === 0) return [];
 
   // O aviso diz o que está de pé AGORA, e não o que foi marcado: reunião cancelada
   // ou remarcada (a remarcação cria outra linha e fecha esta) e visita cancelada ou
@@ -74,10 +123,11 @@ async function buscarAvisos(usuarioId: string): Promise<Aviso[]> {
   });
   if (data.length === 0) return [];
 
-  const quem = await supabase
-    .from('team_directory')
-    .select('id, full_name')
-    .in('id', [...new Set(data.map((a) => a.marcado_por))]);
+  const ids = [...new Set(data.flatMap((a) => (a.marcado_por ? [a.marcado_por] : [])))];
+  const quem =
+    ids.length === 0
+      ? { data: [] }
+      : await supabase.from('team_directory').select('id, full_name').in('id', ids);
   const nomes = new Map((quem.data ?? []).map((p) => [p.id, p.full_name] as const));
 
   return data.map((a) => ({
@@ -85,7 +135,11 @@ async function buscarAvisos(usuarioId: string): Promise<Aviso[]> {
     tipo: a.tipo === 'visita' ? 'visita' : 'reuniao',
     titulo: a.titulo,
     quando: a.quando,
-    quemMarcou: nomes.get(a.marcado_por) ?? 'Alguém da equipe',
+    quemMarcou:
+      a.origem === 'calendly'
+        ? PELO_CALENDLY
+        : ((a.marcado_por ? nomes.get(a.marcado_por) : null) ?? 'Alguém da equipe'),
+    detalhe: a.detalhe,
   }));
 }
 
@@ -120,10 +174,7 @@ export function AvisosRecebidos({
   if (avisos.length === 0) return null;
 
   const quemMarcou = [...new Set(avisos.map((a) => a.quemMarcou))];
-  const titulo =
-    quemMarcou.length === 1
-      ? `${quemMarcou[0]} marcou ${avisos.length === 1 ? 'um compromisso' : `${avisos.length} compromissos`} na sua agenda`
-      : `${avisos.length} compromissos novos na sua agenda, marcados pela equipe`;
+  const titulo = tituloDosAvisos(avisos);
 
   return (
     <section
@@ -156,8 +207,19 @@ export function AvisosRecebidos({
               <span className="text-sm font-medium">{a.titulo}</span>
               <span className="numerico text-xs text-muted-foreground">
                 {a.tipo === 'visita' ? 'Visita' : 'Reunião'} · {quandoCurto(a.quando)}
-                {quemMarcou.length > 1 ? ` · por ${a.quemMarcou}` : ''}
+                {quemMarcou.length > 1
+                  ? a.quemMarcou === PELO_CALENDLY
+                    ? ' · pelo Calendly'
+                    : ` · por ${a.quemMarcou}`
+                  : ''}
               </span>
+              {/* Âmbar, como o "Reagendada" do cartão: pede atenção, não é erro. */}
+              {a.detalhe ? (
+                <span className="flex items-start gap-1 text-xs text-morno-texto">
+                  <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+                  {a.detalhe}
+                </span>
+              ) : null}
             </>
           );
           const classe =

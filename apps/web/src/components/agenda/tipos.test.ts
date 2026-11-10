@@ -5,6 +5,7 @@ import {
   BAIRRO_SEM_NOME,
   blocosDoDia,
   chaveDoCompromisso,
+  conflitosDoCalendly,
   consultaDoMapa,
   contarPorDia,
   diaDaSemana,
@@ -19,12 +20,14 @@ import {
   mapaPorNome,
   naturezaDoCompromisso,
   numeroDoDia,
+  PELO_CALENDLY,
   proximoCompromisso,
   recortesDoCompromisso,
   resultadoDoDesfecho,
   rotuloDaSemana,
   rotuloSemanaCurto,
   somarDias,
+  tituloDosAvisos,
   type Compromisso,
 } from './tipos';
 import type { DesfechoCatalogo } from '@/components/registro/tipos';
@@ -49,6 +52,8 @@ function compromisso(parcial: Partial<Compromisso> = {}): Compromisso {
     local: null,
     estado: null,
     marcadaPeloRobo: false,
+    peloCalendly: false,
+    emConflito: false,
     avisoEnviadoEm: null,
     reuniaoCriadaEm: null,
     organizationId: 'org-1',
@@ -290,6 +295,15 @@ describe('reunião e eco', () => {
     ).toBe('visita');
   });
 
+  it('a reunião do Calendly sem linha em reunioes (a do conflito) tem hora: é marcada', () => {
+    expect(
+      naturezaDoCompromisso(
+        { reuniaoId: null, tipo: 'reuniao', etapaId: 4, peloCalendly: true },
+        new Set([5]),
+      ),
+    ).toBe('marcado');
+  });
+
   it('mostra 10h20–11h00, e não só o começo: é a primeira vez que o produto tem fim', () => {
     expect(
       faixaDeHoras({ quando: '2026-10-01T13:20:00.000Z', fim: '2026-10-01T14:00:00.000Z' }),
@@ -298,6 +312,67 @@ describe('reunião e eco', () => {
 
   it('sem fim, mostra só a hora — a `meeting` antiga não ganha fim inventado', () => {
     expect(faixaDeHoras({ quando: '2026-10-01T13:20:00.000Z', fim: null })).toBe('10h20');
+  });
+});
+
+describe('o que vem do Calendly', () => {
+  // 10h00 de Natal = 13h00 UTC.
+  const as10 = '2026-11-12T13:00:00.000Z';
+
+  it('reunião do Calendly em cima de outra reunião: só a do Calendly leva o selo', () => {
+    const daEquipe = compromisso({ taskId: 'equipe', quando: as10, fim: '2026-11-12T13:40:00.000Z' });
+    const doCalendly = compromisso({
+      taskId: 'calendly',
+      quando: '2026-11-12T13:15:00.000Z',
+      fim: '2026-11-12T13:45:00.000Z',
+      peloCalendly: true,
+    });
+    expect([...conflitosDoCalendly([daEquipe, doCalendly])]).toEqual(['calendly']);
+  });
+
+  it('encostar não é sobrepor, como na trava do banco', () => {
+    const antes = compromisso({ taskId: 'a', quando: as10, fim: '2026-11-12T13:30:00.000Z' });
+    const depois = compromisso({
+      taskId: 'b',
+      quando: '2026-11-12T13:30:00.000Z',
+      fim: '2026-11-12T14:00:00.000Z',
+      peloCalendly: true,
+    });
+    expect(conflitosDoCalendly([antes, depois]).size).toBe(0);
+  });
+
+  it('sem fim guardado, vale a duração padrão: 45 min a visita, 40 a reunião', () => {
+    const visita = compromisso({ taskId: 'v', tipo: 'visita', natureza: 'visita', quando: as10 });
+    const as1040 = compromisso({ taskId: 'c1', quando: '2026-11-12T13:40:00.000Z', peloCalendly: true });
+    const as1045 = compromisso({ taskId: 'c2', quando: '2026-11-12T13:45:00.000Z', peloCalendly: true });
+    expect([...conflitosDoCalendly([visita, as1040])]).toEqual(['c1']);
+    expect(conflitosDoCalendly([visita, as1045]).size).toBe(0);
+  });
+
+  it('o que já foi feito e o que está "a marcar" não ocupam horário', () => {
+    const feito = compromisso({ taskId: 'f', quando: as10, concluido: true });
+    const aMarcar = compromisso({ taskId: 'm', quando: as10, natureza: 'a_marcar' });
+    const doCalendly = compromisso({ taskId: 'c', quando: as10, peloCalendly: true });
+    expect(conflitosDoCalendly([feito, aMarcar, doCalendly]).size).toBe(0);
+  });
+
+  it('dois do Calendly no mesmo horário: os dois levam o selo', () => {
+    const um = compromisso({ taskId: 'um', quando: as10, peloCalendly: true });
+    const outro = compromisso({ taskId: 'outro', quando: as10, peloCalendly: true });
+    expect(conflitosDoCalendly([um, outro])).toEqual(new Set(['um', 'outro']));
+  });
+
+  it('o título do aviso: só Calendly, só uma pessoa, ou a mistura', () => {
+    const cal = { quemMarcou: PELO_CALENDLY };
+    expect(tituloDosAvisos([cal])).toBe('Novo agendamento pelo Calendly');
+    expect(tituloDosAvisos([cal, cal])).toBe('2 agendamentos novos pelo Calendly');
+    expect(tituloDosAvisos([{ quemMarcou: 'Gina' }])).toBe('Gina marcou um compromisso na sua agenda');
+    expect(tituloDosAvisos([cal, { quemMarcou: 'Gina' }])).toBe(
+      '2 compromissos novos na sua agenda, da equipe e do Calendly',
+    );
+    expect(tituloDosAvisos([{ quemMarcou: 'Gina' }, { quemMarcou: 'Rui' }])).toBe(
+      '2 compromissos novos na sua agenda, marcados pela equipe',
+    );
   });
 });
 

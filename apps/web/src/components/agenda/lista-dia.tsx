@@ -126,7 +126,11 @@ export function ListaDoDia({
           icone={<Footprints className="size-4" aria-hidden="true" />}
           titulo="Visitas do dia"
           contagem={visitas.length}
-          nota="Sem hora combinada: são as portas a bater neste dia, agrupadas por bairro."
+          nota={
+            visitas.some((v) => v.peloCalendly)
+              ? 'As portas a bater neste dia, agrupadas por bairro. As que vieram do Calendly têm a hora que o cliente escolheu.'
+              : 'Sem hora combinada: são as portas a bater neste dia, agrupadas por bairro.'
+          }
         >
           <div className="flex flex-col gap-4">
             {agruparPorBairro(visitas).map((grupo) => (
