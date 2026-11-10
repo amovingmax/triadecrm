@@ -9685,11 +9685,11 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 
 **Em produção, só na Imova (09/11/2026, pedido do usuário: "pode"):** depois da publicação do canal de chegada (main `4e362e4`, 197 migrações). `main` `66a5482` (avanço direto) e `publicar-banco.mjs imova migrar`, só a `20261109234000` (198 migrações). Conferido em produção: nenhuma função do `app` executável por anon e nenhuma de gatilho aberta; os cinco ajudantes seguem executáveis por authenticated; as cinco leituras dos relatórios respondem como gestor (até 189 ms; 17 imóveis no ranking, 5 na fila). Site e motor não mudaram; KOMUNE intocada.
 
-## 10/11/2026 — o código do anúncio com a tag do tipo, e o editor que abria com o Tipo em branco (branch `codigo-por-tipo`; só na Imova)
+## 10/11/2026 — o código do anúncio com a tag do tipo, e o editor que abria com o Tipo em branco (branch `codigo-por-tipo`; em produção só na Imova)
 
 **Pedido do usuário:** "Assim que criarmos anúncios é possível já colocar uma TAG no anúncio que seja única? A ideia é colocar TAGS: TE0001 para Terrenos, IM0001 para Imóveis, etc. Se já tivermos um terreno com o código TE0001, quando formos criar um novo anúncio ele deve ter um código diferente, que ainda não existe." A tabela de tags proposta foi aceita ("siga com a regra para as demais tags"); o PT ninguém soube dizer o que é. A primeira versão deixava a pessoa marcar a tag; o usuário pediu que ela saia sozinha do tipo: "O código da tag deve ser preenchido automaticamente quando selecionarmos o tipo de anúncio. Caso escolhermos um anúncio de terreno, a tag deve automaticamente ser TE (e um número que ainda não existe)." É o que ficou.
 
-**Entregue (nada em produção):**
+**Entregue:**
 - **Migração `20261110100000_codigo_com_tag`** (na KOMUNE, só o aviso):
   - Tags: **TE** terreno e terreno comercial; **SA** sala comercial e consultório (a Arbo já usa SA); **IM** os outros residenciais; **CO** os outros comerciais (`app.anuncio_tag_valida`, `app.anuncio_tag_do_tipo`, `app.anuncio_tag_do_codigo`). PT não é tag do CRM: o PT0001_IMOVA (uma casa da Arbo) fica como está.
   - **O próximo número livre** (`app.anuncio_proximo_codigo`) é 1 + o maior já usado com a tag nos anúncios do CRM (inclusive excluídos), no relatório do Canal Pro e no arquivo do sistema atual, com ou sem sufixo (TE0005_IMOVA ocupa o 5). Número nunca volta a ser usado. Com os dados de hoje: TE0006, SA0013, IM0001, CO0001.
@@ -9704,8 +9704,12 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 - No Chrome (site local, banco local da Imova, como gestor): o anúncio novo mostra IM0001; terreno, sala, loja, consultório, terreno comercial e casa dão TE0006, SA0013, CO0001, SA0013, TE0006 e IM0001; salvar o terreno criou o TE0006; trocar o tipo para casa e salvar deu IM0001; casa → apartamento manteve IM0001; o TE0001_IMOVA mantém o código mesmo trocando o tipo; no celular (390 px), sem rolagem lateral; nenhum erro de página. O anúncio do ensaio foi apagado, com o histórico dele.
 - Banco local da Imova: backup antes em `~/triadecrm-backups/imova-local-antes-codigo-com-tag-1011.dump`. A migração entrou direto pelo psql, porque o `publicar-banco.mjs migrar --local` recusou: o banco local tem duas migrações de outros ramos (20261030100000 e 20261104140000) e não tem a 20261109210000 da main.
 
+**Em produção, só na Imova (10/11/2026, ~13h de Natal; pedido do usuário: "Pode subir essa atualização"):**
+- **Ar conferido antes:** banco com 198 migrações e só a `20261110100000` pendente; site `imova-b9txz44h6`, de `4e362e4`, sem diferença de `apps/web` nem `packages` para a main `26011ec` em que o ramo nasceu.
+- **Publicado:** main `3cd6b53`. A migração entrou pelo `publicar-banco.mjs imova migrar` rodado pelo próprio usuário no terminal (a permissão do agente recusou o comando no banco de produção); banco com 199, nenhuma pendente. Depois, o site **`imova-dtxwae2oj`**, de cópia limpa de `3cd6b53` (volta: `imova-b9txz44h6`). KOMUNE intocada.
+- **Conferido em produção:** próximos códigos TE0006, SA0013, IM0001 e CO0001 (os mesmos do banco local); 11 anúncios, nenhum rascunho do CRM com código sem tag; a prévia (`anuncio_proximos_codigos`) não abre para o anon. De fora: `/login` 200, `/anuncios` e `/anuncios/novo` mandam para o login, `/auth/dev` 404. A tela logada em produção não foi vista pelo agente.
+
 **Pendente:**
-- Produção: publicar a migração, os tipos e o site na Imova, quando o usuário pedir.
 - O `canal_pro_trazer` continua dando IMV-… quando o código do relatório não serve ou já está em uso (caso raro). Pode passar a usar a tag do tipo.
 - O ramo `fotos-do-canal-pro` (ainda não publicado) também mexe em `dados.ts` e `tipos.ts` dos anúncios, em outras partes; quem juntar por último confere o encaixe.
 
