@@ -38,6 +38,25 @@ describe('empresas', () => {
     expect(k.origens).toBeNull();
   });
 
+  it('a KOMUNE guarda a moldura de antes do visual da Imova: escuro, barra e ícones de sempre', () => {
+    // Os valores que estavam fixos em layout.tsx, manifest.ts e provedor-tema.tsx
+    // antes de 10/11/2026. Se um deles mudar, a KOMUNE mudou junto com a Imova.
+    expect(EMPRESAS.komune.visual).toEqual({
+      temaPadrao: 'dark',
+      corDaBarra: { dark: '#0f172a', light: '#f0f8ff' },
+      icones: '/icons',
+      manifest: { fundo: '#f0f8ff', tema: '#0f172a' },
+    });
+  });
+
+  it('a Imova tem moldura própria: abre no claro, com ícones e barra dela', () => {
+    const v = EMPRESAS.imova.visual;
+    expect(v.temaPadrao).toBe('light');
+    expect(v.icones).not.toBe(EMPRESAS.komune.visual.icones);
+    expect(v.corDaBarra).not.toEqual(EMPRESAS.komune.visual.corDaBarra);
+    expect(v.manifest).not.toEqual(EMPRESAS.komune.visual.manifest);
+  });
+
   it('a Imova fala a origem do contato sem evento, Natal de evento nem KOMUNE', () => {
     const { origens } = EMPRESAS.imova;
     expect(origens).not.toBeNull();

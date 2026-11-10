@@ -4,11 +4,25 @@ import Link from 'next/link';
 
 import { useAvisos } from '@/components/avisos/provedor-avisos';
 import { NavLink } from '@/components/layout/nav-link';
-import { MarcaTriade } from '@/components/logo';
+import { AlvoImova, MarcaTriade } from '@/components/logo';
 import { type AppRole } from '@/lib/auth/role';
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
 import { contagemDoItem, navegacaoDaLateral } from '@/lib/navegacao';
+
+/**
+ * O TRILHO DA IMOVA (10/11/2026, o visual "Maré"). Funciona igual ao da KOMUNE:
+ * 72px fechado, abre no mouse e fecha quando ele sai ("deve funcionar igual o da
+ * Komune"; a primeira versão deixava o menu aberto de vez em tela larga e saiu no
+ * mesmo dia). Mudam só três coisas, e só na Imova:
+ *   1. a marca é o alvo do logo dela, e não o triângulo do Tríade;
+ *   2. o item ativo pinta o DISCO do ícone, e não a linha inteira: aberto no mouse,
+ *      a linha em laranja gritaria mais que o conteúdo (`ativoNoDisco`);
+ *   3. as cores (o petróleo, o disco laranja), que não estão aqui: estão no
+ *      `globals.css`, presas ao `data-trilho` deste `<aside>`.
+ */
+const MARCA_DA_IMOVA = EMPRESA.slug === 'imova';
 
 /**
  * O TRILHO do desktop (md+): 72px, só ícones. No celular a navegação continua na
@@ -97,7 +111,9 @@ export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFi
   return (
     // O LUGAR do trilho: 72px no fluxo, sempre. `z-40` para o painel aberto
     // passar por cima do cabeçalho (z-30), e por baixo de diálogos e folhas (z-50).
-    <aside className="sticky top-0 z-40 hidden h-dvh w-[72px] shrink-0 md:block">
+    // `data-trilho` é o gancho das cores do trilho da Imova no `globals.css`; na KOMUNE
+    // nenhuma regra usa o atributo.
+    <aside data-trilho="" className="sticky top-0 z-40 hidden h-dvh w-[72px] shrink-0 md:block">
       <div
         className={cn(
           'group/trilho absolute inset-y-0 left-0 flex w-[72px] flex-col gap-1.5 overflow-hidden border-r border-sidebar-border bg-sidebar px-3.5 py-4 text-sidebar-foreground',
@@ -106,25 +122,45 @@ export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFi
           'has-[:focus-visible]:w-60 has-[:focus-visible]:delay-0 has-[:focus-visible]:sombra-base-forte',
         )}
       >
-        {/* A marca num quadrado de canto macio, e não numa pílula: ela é a única
-            coisa do trilho que não navega entre módulos. */}
-        <Link
-          href="/meu-dia"
-          aria-label="Tríade, ir para Meu dia"
-          className="mb-2.5 flex h-10 shrink-0 items-center gap-3 pl-0.5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 rounded-xl"
-        >
-          {/* A própria marca já é a chapa de canto macio (`rect rx=112` com
+        {MARCA_DA_IMOVA ? (
+          // A marca da Imova: o alvo do logo dela no lugar do triângulo, e o nome
+          // ao lado quando o trilho abre, como o "Tríade" da KOMUNE.
+          <Link
+            href="/meu-dia"
+            aria-label="Imova, ir para Meu dia"
+            className="mb-2.5 flex h-10 shrink-0 items-center gap-3 rounded-xl pl-0.5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <span className="flex size-10 shrink-0 items-center justify-center">
+              <AlvoImova className="size-8" />
+            </span>
+            <span
+              aria-hidden="true"
+              className="font-heading text-lg font-bold whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover/trilho:opacity-100 group-hover/trilho:delay-150 group-has-[:focus-visible]/trilho:opacity-100 motion-reduce:transition-none"
+            >
+              Imova
+            </span>
+          </Link>
+        ) : (
+          /* A marca num quadrado de canto macio, e não numa pílula: ela é a única
+            coisa do trilho que não navega entre módulos. */
+          <Link
+            href="/meu-dia"
+            aria-label="Tríade, ir para Meu dia"
+            className="mb-2.5 flex h-10 shrink-0 items-center gap-3 pl-0.5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 rounded-xl"
+          >
+            {/* A própria marca já é a chapa de canto macio (`rect rx=112` com
               `fill-primary`), então ela NÃO ganha um segundo fundo em volta: no
               desenho novo o `--primary` é a tinta, e a marca vira o quadrado preto
               que o sistema pede, sem nenhuma moldura extra. */}
-          <MarcaTriade className="size-10 shrink-0" />
-          <span
-            aria-hidden="true"
-            className="text-base font-semibold whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover/trilho:opacity-100 group-hover/trilho:delay-150 group-has-[:focus-visible]/trilho:opacity-100 motion-reduce:transition-none"
-          >
-            Tríade
-          </span>
-        </Link>
+            <MarcaTriade className="size-10 shrink-0" />
+            <span
+              aria-hidden="true"
+              className="text-base font-semibold whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover/trilho:opacity-100 group-hover/trilho:delay-150 group-has-[:focus-visible]/trilho:opacity-100 motion-reduce:transition-none"
+            >
+              Tríade
+            </span>
+          </Link>
+        )}
 
         <nav
           aria-label="Navegação principal"
@@ -135,6 +171,7 @@ export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFi
               key={item.href}
               item={item}
               variante="trilho"
+              ativoNoDisco={MARCA_DA_IMOVA}
               contagem={contagemDoItem(item, filas, respostasNovas)}
             />
           ))}
@@ -150,6 +187,7 @@ export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFi
                   key={item.href}
                   item={item}
                   variante="trilho"
+                  ativoNoDisco={MARCA_DA_IMOVA}
                   contagem={contagemDoItem(item, filas, respostasNovas)}
                 />
               ))}

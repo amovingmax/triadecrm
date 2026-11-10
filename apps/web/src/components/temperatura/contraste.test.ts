@@ -138,10 +138,36 @@ function comAlfa(cor: Cor, alfa: number): Cor {
   return { ...cor, a: alfa };
 }
 
+/*
+ * A IMOVA (10/11/2026). O bloco dela no `globals.css` vale por cima do da KOMUNE
+ * (especificidade 0,2,0), na mesma ordem em que o navegador aplica: o claro da
+ * KOMUNE, o escuro da KOMUNE, o claro da Imova e o escuro da Imova. Cada regra
+ * abaixo vale igual para as duas empresas.
+ */
+const IMOVA = declaracoes(":root[data-empresa='imova']");
+const IMOVA_CLARO = new Map([...CLARO, ...IMOVA]);
+const IMOVA_ESCURO = new Map([...ESCURO, ...IMOVA, ...declaracoes(".dark[data-empresa='imova']")]);
+
 const MODOS = [
   { nome: 'claro', escopo: CLARO },
   { nome: 'escuro', escopo: ESCURO },
+  { nome: 'claro da Imova', escopo: IMOVA_CLARO },
+  { nome: 'escuro da Imova', escopo: IMOVA_ESCURO },
 ] as const;
+
+describe('o bloco da Imova', () => {
+  it('existe e é lido pelo teste (sem ele, os modos da Imova mediriam a KOMUNE)', () => {
+    expect(IMOVA.size).toBeGreaterThan(20);
+    expect(declaracoes(".dark[data-empresa='imova']").size).toBeGreaterThan(20);
+  });
+
+  it('não muda nenhum valor da KOMUNE: os blocos `:root` e `.dark` dela são lidos sem a Imova', () => {
+    // O laranja é da Imova; na KOMUNE a menta continua a de sempre.
+    expect(CLARO.get('--komune-400')).toBe('#78fc90');
+    expect(ESCURO.get('--background')).toBe('var(--grafite-950)');
+    expect(CLARO.get('--grafite-950')).toBe('#050505');
+  });
+});
 
 /** As quatro superfícies opacas onde texto e marca podem cair. */
 const SUPERFICIES = ['--background', '--card', '--popover', '--muted'] as const;

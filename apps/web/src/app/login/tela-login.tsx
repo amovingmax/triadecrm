@@ -3,7 +3,7 @@
 import { motion, type Transition } from 'motion/react';
 
 import { useMovimento } from '@/components/movimento';
-import { MarcaTriade } from '@/components/logo';
+import { MarcaDaEmpresa } from '@/components/logo';
 import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 
@@ -125,7 +125,7 @@ export function TelaLogin({
               do brilho radial, o esmaecido do claro para em 4,40:1. E o eyebrow é para ser
               lido, não para sumir. */}
           <span className="pilula inline-flex items-center gap-2 py-1.5 pr-3.5 pl-1.5 text-xs text-foreground">
-            <MarcaTriade className="size-5" />
+            <MarcaDaEmpresa className="size-5" />
             Acesso restrito ao time
           </span>
         </motion.div>

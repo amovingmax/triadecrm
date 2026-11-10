@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { PaletaComandos } from '@/components/layout/paleta-comandos';
 import { SeletorDaPessoa } from '@/components/layout/seletor-da-pessoa';
 import { UserMenu } from '@/components/layout/user-menu';
-import { Logo } from '@/components/logo';
+import { Logo, NOME_DA_MARCA } from '@/components/logo';
 import { AlternadorTema } from '@/components/tema/alternador-tema';
 import { type Sessao } from '@/lib/auth/session';
 
@@ -33,7 +33,7 @@ export function Header({ sessao }: { sessao: Sessao }) {
       <Link
         href="/meu-dia"
         className="toque -ml-1.5 inline-flex h-11 min-w-11 items-center justify-center md:hidden"
-        aria-label="Tríade, ir para Meu dia"
+        aria-label={`${NOME_DA_MARCA}, ir para Meu dia`}
         title="Meu dia"
       >
         <Logo somenteIcone className="sm:hidden" />

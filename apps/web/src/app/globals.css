@@ -1027,3 +1027,285 @@
   background-image: var(--wpp-papel-desenho);
   background-size: 360px 360px;
 }
+
+/* ============================================================================
+   O VISUAL DA IMOVA ("Maré", 10/11/2026)
+   ----------------------------------------------------------------------------
+   Pedido do usuário: "essas atualizações que foram feitas no ambiente da Imova
+   fiquem somente na Imova e que a Komune continue igual está hoje". Até aqui a
+   Imova vestia a roupa da KOMUNE: a mesma tinta, a mesma menta e o triângulo da
+   Tríade. Daqui para baixo, tudo vale SÓ com `data-empresa="imova"` no <html>
+   (layout.tsx, lido de EMPRESA.slug). Na KOMUNE o atributo é "komune" e nenhuma
+   regra casa com ele: o que está acima deste bloco continua sendo a tela dela.
+
+   As cores saem do logo da Imova: o PETRÓLEO (#2D827D) e o LARANJA do "O"
+   (#F38121). A regra de território da casa continua palavra por palavra:
+   - o petróleo é estrutura: menu do computador, botão principal, foco, links;
+   - o laranja ocupa o lugar EXATO da menta (contador, item ativo, o disco do
+     menu): por isso ele entra pela rampa `--komune-*`, que é de onde a menta sai;
+   - a escala térmica continua a única cor DENTRO do dado. Dois degraus mudam, e
+     só aqui: morno vai do âmbar para o ocre e quente vai da brasa para o vermelho,
+     para nenhum dos dois ser lido como o laranja da marca.
+
+   OS NOMES DOS TOKENS NÃO MUDAM, só os valores (mesma decisão do pivô de
+   29/09/2026): nenhum componente sabe que existe uma Imova.
+
+   POR QUE ESTES SELETORES, e não `[data-empresa='imova'].dark`: o teste de
+   contraste (components/temperatura/contraste.test.ts) acha os blocos pelo texto
+   "seletor + espaço + chave", e um seletor terminado em ".dark" seria lido como o
+   escuro da KOMUNE. Os dois daqui terminam no colchete do atributo, não casam com
+   os da KOMUNE, e o teste mede a Imova pelo nome deles. (Por isso também nenhum
+   comentário deste arquivo escreve um seletor seguido de chave aberta: o teste
+   leria o comentário como bloco.)
+
+   ESPECIFICIDADE: os dois blocos valem 0,2,0 e ganham do `:root` e do `.dark` da
+   KOMUNE (0,1,0). Por isso todo token que o bloco claro da Imova declara e que o
+   escuro precisa trocar é declarado de novo no bloco escuro, logo abaixo.
+   ========================================================================== */
+:root[data-empresa='imova'] {
+  /* A rampa neutra puxada para o petróleo: a "névoa do mar". Mesmos degraus de
+     luminosidade da rampa da KOMUNE, para todo `grafite-NNN` escrito num
+     componente cair no mesmo lugar da hierarquia. */
+  --grafite-25: #ffffff;
+  --grafite-50: #f1f5f4; /* fundo da página */
+  --grafite-100: #e8efed; /* pílula, linha dentro do cartão, muted */
+  --grafite-150: #dfe8e6;
+  --grafite-200: #dae4e1; /* borda, secundário */
+  --grafite-300: #c4d3cf;
+  --grafite-400: #a7bab6;
+  /* Borda de campo: 3:1 na pior superfície do claro (o muted, 3,36:1). */
+  --grafite-450: #6f8582;
+  --grafite-500: #4e6663; /* texto esmaecido: 5,28:1 sobre o muted */
+  --grafite-600: #4e6663;
+  --grafite-700: #2f4a47;
+  --grafite-750: #24433f;
+  --grafite-800: #1c3734; /* muted do escuro */
+  --grafite-850: #152a28; /* cartão do escuro */
+  --grafite-900: #0e2826; /* a tinta: texto e tinta sobre o laranja */
+  --grafite-950: #0b1918; /* fundo do escuro */
+
+  /* O laranja do "O" no lugar da menta. `--komune-400` é o preenchimento (com a
+     tinta em cima, 5,9:1); `--komune-700` é o laranja que pode ser texto (5,67:1). */
+  --komune-50: #fff4ea;
+  --komune-100: #fdebda;
+  --komune-200: #fbd3ad;
+  --komune-300: #f8b67a;
+  --komune-400: #f38121;
+  --komune-500: #e06d0f;
+  --komune-600: #c35a08;
+  --komune-700: #a84c07;
+  --komune-800: #7f3a06;
+  --komune-900: #3d1f07;
+
+  /* A ação é o petróleo, um degrau mais fundo que o do logo para o texto branco
+     passar folgado (6,35:1). */
+  --primary: #1f6a65;
+  --primary-foreground: #ffffff;
+  --acao-gradiente: #1f6a65;
+  --acao-texto: #ffffff;
+  --ring: #1f6a65;
+  --menta-tinta: #0e2826;
+  --hairline: rgb(14 40 38 / 0.09);
+
+  /* Escala térmica: os dois degraus que mudam (ver o cabeçalho do bloco). O texto
+     do frio desce um passo porque o muted da névoa é mais escuro que o da KOMUNE:
+     com o #4a6788 de lá, o chip frio sobre o muted parava em 4,42:1. */
+  --frio-texto: #405b7c;
+  --cliente-texto: #116632; /* pelo mesmo motivo: o #147437 parava em 4,42:1 */
+  --cliente-ativo-texto: #03634a; /* e o #047152, em 4,40:1 */
+  --morno: #a8820e;
+  --morno-texto: #735906;
+  --quente: #c73838;
+  --quente-texto: #a82e2e;
+
+  /* Forma: cartão a 18px e linha a 12px, menos "app" e mais escritório. */
+  --raio-container: 1.125rem;
+  --raio-linha: 0.75rem;
+  --raio-painel: 1.5rem;
+
+  /* Figtree na interface e Urbanist nos títulos (layout.tsx liga as duas só aqui). */
+  --font-sans:
+    var(--font-figtree), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-titulo: var(--font-urbanist), var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+
+  /* O logo desenhado em código (components/logo.tsx): letras e o "O". */
+  --marca-letra: #2d827d;
+  --marca-alvo: #f38121;
+
+  /* A conversa: o balão de saída em petróleo claro no lugar do verde do WhatsApp,
+     o nome de quem escreveu em petróleo e o "nova" em laranja. */
+  --wpp-painel: #ffffff;
+  --wpp-painel2: #f1f5f4;
+  --wpp-linha: rgba(14, 40, 38, 0.08);
+  --wpp-linha-forte: rgba(14, 40, 38, 0.16);
+  --wpp-suave: #4e6663;
+  --wpp-sel: #dcedea;
+  --wpp-busca: #e8efed;
+  --wpp-seg: #ffffff;
+  --wpp-entra: #ffffff;
+  --wpp-sai: #d3ece8;
+  --wpp-meta-e: #4e6663;
+  --wpp-meta-s: #3d5f5b;
+  --wpp-autor: #1f6a65;
+  --wpp-sis: rgba(255, 255, 255, 0.94);
+  --wpp-sis-texto: #4e6663;
+  --wpp-dia: #ffffff;
+  --wpp-dia-texto: #4e6663;
+  --wpp-janela: #fff4d6;
+  --wpp-janela-texto: #6e4c0f;
+  --wpp-chip: #e8efed;
+  --wpp-chip-texto: #2f4a47;
+  --wpp-chip-ativo: #d3ece8;
+  --wpp-chip-ativo-texto: #17524e;
+  --wpp-nova: #a84c07;
+  --wpp-tique: #1f86cf;
+  --wpp-cita: rgba(14, 40, 38, 0.05);
+  --wpp-cita-barra: #2d827d;
+  --wpp-cita-nome: #1f6a65;
+  --wpp-campo: #ffffff;
+  --wpp-avatar: #dcedea;
+  --wpp-avatar-texto: #1f6a65;
+  /* Casas, chaves, prédios e coqueiros no lugar dos balões e taças da KOMUNE. */
+  --wpp-papel: #e8f0ee;
+  --wpp-papel-desenho: url(/conversas/imoveis-claro.svg);
+}
+
+.dark[data-empresa='imova'] {
+  /* O escuro da Imova é petróleo da noite, sem o quase preto da KOMUNE. */
+  --background: #0b1918;
+  --foreground: #e6f0ee;
+  --card: #152a28;
+  --card-foreground: #e6f0ee;
+  --popover: #152a28;
+  --popover-foreground: #e6f0ee;
+  --primary: #4fb3ab;
+  --primary-foreground: #062220;
+  --secondary: #24433f;
+  --secondary-foreground: #e6f0ee;
+  --muted: #1c3734;
+  --muted-hover: #234240;
+  --muted-foreground: #9db4b0;
+  --accent: #1c3734;
+  --accent-foreground: #e6f0ee;
+  --menta: #f7923a;
+  --menta-fundo: rgb(247 146 58 / 0.15);
+  --menta-texto: #ffaa62;
+  --menta-tinta: #1a0d02;
+  --border: #24423e;
+  /* 3,32:1 sobre o muted, a pior superfície do escuro. */
+  --input: #6e8784;
+  --ring: #6cc7bf;
+  --hairline: rgb(230 240 238 / 0.08);
+  --acao-gradiente: #4fb3ab;
+  --acao-texto: #062220;
+  --titulo-gradiente: linear-gradient(to bottom, #e6f0ee, rgb(230 240 238 / 0.6));
+  --sidebar: var(--background);
+  --sidebar-foreground: #e6f0ee;
+  --sidebar-muted-foreground: #9db4b0;
+  --sidebar-primary: #e6f0ee;
+  --sidebar-primary-foreground: #0b1918;
+  --sidebar-accent: #f7923a;
+  --sidebar-accent-foreground: #1a0d02;
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: #6cc7bf;
+  /* O muted petróleo é mais claro que o #252525 da KOMUNE: o frio sobe um passo. */
+  --frio-texto: #a3bcda;
+  --cliente-texto: #34d399; /* o do escuro da KOMUNE: o do claro da Imova não serve aqui */
+  --cliente-ativo-texto: #2ec48f; /* o #10b981 parava em 4,37:1 sobre o muted petróleo */
+  --morno: #e2ba45;
+  --morno-texto: #e8c45a;
+  --quente: #f0705f;
+  --quente-texto: #f48a7c;
+  --marca-letra: #e6f0ee;
+  --marca-alvo: #f7923a;
+
+  --wpp-painel: #152a28;
+  --wpp-painel2: #0f2120;
+  --wpp-linha: rgba(255, 255, 255, 0.08);
+  --wpp-linha-forte: rgba(255, 255, 255, 0.18);
+  --wpp-suave: #9db4b0;
+  --wpp-sel: #1f3b38;
+  --wpp-busca: #1c3734;
+  --wpp-seg: #2a4a46;
+  --wpp-entra: #18302d;
+  --wpp-sai: #1d4a45;
+  --wpp-meta-e: #9db4b0;
+  --wpp-meta-s: #a6cbc6;
+  --wpp-autor: #6cc7bf;
+  --wpp-sis: rgba(21, 42, 40, 0.94);
+  --wpp-sis-texto: #c3d6d3;
+  --wpp-dia: #152a28;
+  --wpp-dia-texto: #b3c7c4;
+  --wpp-janela: #3a2e14;
+  --wpp-janela-texto: #f0cf8a;
+  --wpp-chip: #1c3734;
+  --wpp-chip-texto: #d0dedb;
+  --wpp-chip-ativo: rgba(79, 179, 171, 0.16);
+  --wpp-chip-ativo-texto: #6cc7bf;
+  --wpp-nova: #ffaa62;
+  --wpp-tique: #53bdeb;
+  --wpp-cita: rgba(255, 255, 255, 0.07);
+  --wpp-cita-barra: #4fb3ab;
+  --wpp-cita-nome: #6cc7bf;
+  --wpp-campo: #1c3734;
+  --wpp-avatar: #23403d;
+  --wpp-avatar-texto: #d6e6e3;
+  --wpp-papel: #0e1f1d;
+  --wpp-papel-desenho: url(/conversas/imoveis-escuro.svg);
+}
+
+/* O MENU DO COMPUTADOR EM PETRÓLEO, e só ele. Os tokens `--sidebar-*` também
+   pintam a barra de baixo do celular (`superficie-vidro-inferior`), onde o rótulo
+   ativo é a tinta: petróleo lá apagaria o rótulo. Por isso o petróleo é declarado
+   no próprio trilho (`data-trilho`, em layout/sidebar.tsx) e desce só para dentro
+   dele. `--muted` também troca aqui dentro, porque é o fundo do "passar o mouse"
+   de cada item. */
+:root[data-empresa='imova'] [data-trilho] {
+  --sidebar: #0f3a37;
+  --sidebar-foreground: #e3efed;
+  --sidebar-muted-foreground: #9fc0bb; /* 6,4:1 sobre o petróleo */
+  --sidebar-primary: #e3efed;
+  --sidebar-primary-foreground: #0f3a37;
+  --sidebar-accent: #f38121; /* o disco do item ativo: o "O" do logo */
+  --sidebar-accent-foreground: #0e2826;
+  --sidebar-border: rgb(255 255 255 / 0.08);
+  --muted: rgb(255 255 255 / 0.08);
+  --ring: #f8b67a;
+  --menta: #f38121;
+  --menta-tinta: #0e2826;
+  --marca-letra: #e3efed;
+}
+
+.dark[data-empresa='imova'] [data-trilho] {
+  --sidebar: #081312;
+  --sidebar-foreground: #e6f0ee;
+  --sidebar-muted-foreground: #8faaa6;
+  --sidebar-primary-foreground: #081312;
+  --sidebar-accent: #f7923a;
+  --sidebar-accent-foreground: #1a0d02;
+  --sidebar-border: rgb(255 255 255 / 0.07);
+  --muted: rgb(255 255 255 / 0.06);
+  --menta: #f7923a;
+  --menta-tinta: #1a0d02;
+}
+
+/* Títulos em Urbanist, um peso acima: a forma redonda dela ecoa o IMOVA do logo.
+   `font-heading` é utilidade do `@theme inline` (vira a pilha da interface no
+   próprio CSS), então a troca é por regra, e não por token. */
+:root[data-empresa='imova'] .font-heading {
+  font-family: var(--font-titulo);
+}
+
+:root[data-empresa='imova'] h1.font-heading {
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+/* Botão e campo em retângulo de canto macio (12px) no lugar da pílula. Os botões
+   só de ícone (`data-size="icon…"`) continuam redondos. */
+:root[data-empresa='imova'] [data-slot='button']:not([data-size^='icon']),
+:root[data-empresa='imova'] [data-slot='input'],
+:root[data-empresa='imova'] [data-slot='select-trigger'] {
+  border-radius: var(--raio-linha);
+}

@@ -19,6 +19,12 @@ type Props = {
    * o contrário — que não há por que entrar. Fila vazia é silêncio.
    */
   contagem?: number | null;
+  /**
+   * Só no trilho: o ativo pinta o disco do ícone, e não a linha inteira. Fechado, dá
+   * no mesmo; aberto no mouse, a linha ganha só um realce. É o trilho da Imova
+   * (`sidebar.tsx`, 10/11/2026); na KOMUNE fica desligado.
+   */
+  ativoNoDisco?: boolean;
 };
 
 /**
@@ -77,7 +83,13 @@ type Props = {
  */
 const ADIANTAR_A_TELA = true;
 
-export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
+export function NavLink({
+  item,
+  variante,
+  onNavegar,
+  contagem = null,
+  ativoNoDisco = false,
+}: Props) {
   const pathname = usePathname();
   const ativo = estaAtivo(pathname, item.href);
   const Icone = item.icone;
@@ -127,11 +139,16 @@ export function NavLink({ item, variante, onNavegar, contagem = null }: Props) {
           'relative flex h-11 w-full shrink-0 items-center gap-3 rounded-full pr-4 transition-colors',
           'outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
           ativo
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            ? // No trilho da Imova, aberto no mouse, a linha inteira em laranja
+              // gritaria mais que o conteúdo: o laranja fica no disco do ícone, e a
+              // linha ganha só o realce do "passar o mouse".
+              ativoNoDisco
+              ? 'bg-muted font-medium text-sidebar-foreground'
+              : 'bg-sidebar-accent text-sidebar-accent-foreground'
             : 'text-sidebar-muted-foreground hover:bg-muted hover:text-sidebar-foreground',
         )}
       >
-        <DiscoDoIcone ativo={ativo}>
+        <DiscoDoIcone ativo={ativo} discoNoAtivo={ativoNoDisco}>
           <Icone className="size-[18px]" aria-hidden="true" strokeWidth={1.75} />
           {numero !== null ? (
             // A MENTA, e é o único lugar do trilho fechado com cor. Ela existe
@@ -336,13 +353,23 @@ function PilulaDoIcone({ ativo, children }: { ativo: boolean; children: React.Re
   );
 }
 
-function DiscoDoIcone({ ativo, children }: { ativo: boolean; children: React.ReactNode }) {
+function DiscoDoIcone({
+  ativo,
+  discoNoAtivo = false,
+  children,
+}: {
+  ativo: boolean;
+  /** O ativo pinta o disco, e não a linha (o trilho da Imova, `ativoNoDisco`). */
+  discoNoAtivo?: boolean;
+  children: React.ReactNode;
+}) {
   const { pending } = useLinkStatus();
   return (
     <span
       className={cn(
         'relative flex size-11 shrink-0 items-center justify-center rounded-full transition-colors',
         !ativo && pending && 'bg-muted text-sidebar-foreground',
+        ativo && discoNoAtivo && 'bg-sidebar-accent text-sidebar-accent-foreground',
       )}
     >
       {children}

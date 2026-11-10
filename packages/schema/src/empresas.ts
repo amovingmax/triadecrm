@@ -125,6 +125,25 @@ export interface Empresa {
    * continua atrás do login, como sempre esteve.
    */
   privacidade: PoliticaDePrivacidade | null;
+  /**
+   * O que muda na MOLDURA do CRM de uma empresa para a outra (10/11/2026). As cores
+   * de tela não moram aqui: moram no `globals.css`, num bloco `[data-empresa]` que só
+   * vale para a empresa dele. Aqui fica o que o navegador lê fora do CSS. A KOMUNE
+   * guarda, valor por valor, o que estava fixo no código antes (um teste confere).
+   */
+  visual: VisualDaEmpresa;
+}
+
+/** A moldura de uma empresa: tema de entrada, barra do navegador e ícones da PWA. */
+export interface VisualDaEmpresa {
+  /** O tema com que o CRM abre para quem nunca escolheu um no alternador. */
+  temaPadrao: 'dark' | 'light';
+  /** A cor da barra do navegador (e da barra de status do app instalado), por tema. */
+  corDaBarra: { dark: string; light: string };
+  /** A pasta dos ícones da PWA dentro de `public/`, sem barra no fim. */
+  icones: string;
+  /** As duas cores do manifest: a splash do app instalado e a barra antes de o CRM abrir. */
+  manifest: { fundo: string; tema: string };
 }
 
 /** Quem responde pelos dados e como falar com ela, no topo de `/privacidade`. */
@@ -177,6 +196,12 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       canalDeChegada: false,
     },
     privacidade: null,
+    visual: {
+      temaPadrao: 'dark',
+      corDaBarra: { dark: '#0f172a', light: '#f0f8ff' },
+      icones: '/icons',
+      manifest: { fundo: '#f0f8ff', tema: '#0f172a' },
+    },
   },
   imova: {
     slug: 'imova',
@@ -224,6 +249,16 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       whatsapp: '(84) 99405-8888',
       guarda: '2 anos',
       versao: '27 de outubro de 2026',
+    },
+    // A Imova abre no claro (10/11/2026): o time dela atende de dia e sai para avaliar
+    // imóvel e fotografar placa, e o claro é o tema que se lê no sol. As cores são as
+    // do logo: o petróleo (#2D827D) puxado para o fundo da casca e a névoa do fundo da
+    // página. O escuro continua no alternador.
+    visual: {
+      temaPadrao: 'light',
+      corDaBarra: { dark: '#0b1918', light: '#f1f5f4' },
+      icones: '/icons/imova',
+      manifest: { fundo: '#f1f5f4', tema: '#0f3a37' },
     },
   },
 };

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Variante maskable do ícone da IMOVA: quadrado inteiro, alvo dentro da área segura. -->
+  <rect width="512" height="512" fill="#0f3a37"/>
+  <circle cx="256" cy="256" r="101.4" fill="none" stroke="#f38121" stroke-width="57.2"/>
+  <circle cx="256" cy="256" r="39" fill="#f38121"/>
+</svg>

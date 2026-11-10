@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Ícone da PWA da IMOVA (10/11/2026): o "O" do logo dela (anel, fresta e ponto,
+       o mesmo desenho de AlvoImova em src/components/logo.tsx) sobre o petróleo do
+       menu (#0f3a37, o theme_color do manifest dela). Gerado em PNG por
+       `node scripts/gerar-icones.mjs`; o SVG é a fonte. -->
+  <rect width="512" height="512" rx="112" fill="#0f3a37"/>
+  <circle cx="256" cy="256" r="132.6" fill="none" stroke="#f38121" stroke-width="74.8"/>
+  <circle cx="256" cy="256" r="51" fill="#f38121"/>
+</svg>

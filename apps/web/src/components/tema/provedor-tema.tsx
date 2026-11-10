@@ -3,14 +3,14 @@
 import { ThemeProvider, useTheme } from 'next-themes';
 import { useEffect } from 'react';
 
+import { EMPRESA } from '@/lib/empresa';
+
 /**
  * Cor da barra do navegador (e da barra de status quando o CRM roda instalado),
- * por tema. São os mesmos dois fundos do Ocean Breeze do `globals.css`.
+ * por tema. Na KOMUNE são os mesmos dois fundos do Ocean Breeze do `globals.css`;
+ * desde 10/11/2026 cada empresa tem os seus (`EMPRESA.visual`).
  */
-const COR_DA_BARRA = {
-  dark: '#0f172a',
-  light: '#f0f8ff',
-} as const;
+const COR_DA_BARRA = EMPRESA.visual.corDaBarra;
 
 /**
  * O `themeColor` do `layout.tsx` é estático e nasce escuro, que é o padrão do
@@ -42,12 +42,16 @@ function CorDaBarraDoNavegador() {
  * toque no alternador do cabeçalho, e "Do aparelho" continua na lista para quem
  * quiser seguir o sistema. O next-themes escreve a classe no <html> por script,
  * antes da hidratação, então nada pisca na primeira renderização.
+ *
+ * Desde 10/11/2026 o padrão é da empresa (`EMPRESA.visual.temaPadrao`): a KOMUNE
+ * continua no escuro, a Imova abre no claro. Quem já escolheu um tema no alternador
+ * fica com a escolha, que o next-themes guarda no navegador.
  */
 export function ProvedorTema({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider
       attribute="class"
-      defaultTheme="dark"
+      defaultTheme={EMPRESA.visual.temaPadrao}
       enableSystem
       disableTransitionOnChange
       storageKey="komune-crm-tema"

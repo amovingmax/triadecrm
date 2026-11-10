@@ -46,6 +46,45 @@ const geistMono = localFont({
   display: 'swap',
 });
 
+/**
+ * As fontes da Imova (10/11/2026): Figtree na interface e Urbanist nos títulos, que
+ * tem o O redondo do logo. Só a Imova liga as variáveis delas no <html>; na KOMUNE
+ * nenhum elemento as usa, e o navegador não baixa fonte que ninguém usa.
+ *
+ * `preload: false` por isso mesmo: fonte do layout raiz é pré-carregada em TODA rota
+ * (docs do next/font, "Preloading"), e a KOMUNE passaria a baixar duas fontes que não
+ * desenha. Na Imova o preço é o primeiro desenho com a fonte do sistema, por um
+ * instante, na primeira visita (`display: swap`).
+ */
+const figtree = localFont({
+  src: [
+    { path: './fontes/Figtree-latin.woff2', weight: '300 800', style: 'normal' },
+    { path: './fontes/Figtree-latin-ext.woff2', weight: '300 800', style: 'normal' },
+  ],
+  variable: '--font-figtree',
+  display: 'swap',
+  preload: false,
+});
+
+const urbanist = localFont({
+  src: [
+    { path: './fontes/Urbanist-latin.woff2', weight: '500 800', style: 'normal' },
+    { path: './fontes/Urbanist-latin-ext.woff2', weight: '500 800', style: 'normal' },
+  ],
+  variable: '--font-urbanist',
+  display: 'swap',
+  preload: false,
+});
+
+/** As classes de fonte que cada empresa liga no <html>. A KOMUNE fica com as de sempre. */
+const FONTES_DA_EMPRESA =
+  EMPRESA.slug === 'imova'
+    ? `${jakarta.variable} ${geistMono.variable} ${figtree.variable} ${urbanist.variable}`
+    : `${jakarta.variable} ${geistMono.variable}`;
+
+/** Os ícones da PWA ficam numa pasta por empresa (`public/icons`, `public/icons/imova`). */
+const ICONES = EMPRESA.visual.icones;
+
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl()),
   title: {
@@ -62,10 +101,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: `${ICONES}/icon-192.png`, sizes: '192x192', type: 'image/png' },
+      { url: `${ICONES}/icon-512.png`, sizes: '512x512', type: 'image/png' },
     ],
-    apple: [{ url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+    apple: [{ url: `${ICONES}/icon-192.png`, sizes: '192x192', type: 'image/png' }],
   },
   formatDetection: { telephone: false },
   robots: { index: false, follow: false },
@@ -81,13 +120,15 @@ export const viewport: Viewport = {
   // efeito do ProvedorTema rodar, um frame depois da hidratação. Só a COR da barra
   // fica pendurada em JS; o `color-scheme` do documento, que é o que faria os
   // controles nativos piscarem, o next-themes já carimba antes do primeiro paint.
-  themeColor: '#0f172a',
+  // Por empresa desde 10/11/2026: a barra nasce na cor do tema de entrada da empresa
+  // (KOMUNE: escuro, #0f172a, como sempre; Imova: claro).
+  themeColor: EMPRESA.visual.corDaBarra[EMPRESA.visual.temaPadrao],
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  // Escuro primeiro: é o que o next-themes resolve por padrão, e é o que os
+  // O tema de entrada primeiro: é o que o next-themes resolve por padrão, e é o que os
   // controles nativos (barra de rolagem, campo de data) devem desenhar.
-  colorScheme: 'dark light',
+  colorScheme: EMPRESA.visual.temaPadrao === 'dark' ? 'dark light' : 'light dark',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -95,9 +136,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // `.variable` publica --font-geist e --font-geist-mono, lidos pelo globals.css.
     // `suppressHydrationWarning` é exigido pelo next-themes, que escreve a classe do tema
     // no <html> antes da hidratação.
+    // `data-empresa` liga o bloco de cores da empresa no globals.css. Só a Imova tem
+    // bloco; na KOMUNE o atributo não casa com nenhuma regra e a tela fica a de sempre.
     <html
       lang="pt-BR"
-      className={`${jakarta.variable} ${geistMono.variable} h-full antialiased`}
+      data-empresa={EMPRESA.slug}
+      className={`${FONTES_DA_EMPRESA} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
