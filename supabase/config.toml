@@ -510,3 +510,10 @@ verify_jwt = false
 # todo lead — inclusive ao validador oficial de endpoint.
 [functions.grupozap-lead]
 verify_jwt = false
+
+# Os agendamentos do Calendly (10/11/2026), só no projeto da Imova. O Calendly
+# chama sem credencial do Supabase: quem confere é a função, pelo cabeçalho
+# `Calendly-Webhook-Signature` (calendly-webhook/assinatura.ts), antes de ler o
+# corpo. Com `true` o gateway recusaria todo aviso com 401.
+[functions.calendly-webhook]
+verify_jwt = false
