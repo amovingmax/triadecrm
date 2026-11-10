@@ -85,6 +85,19 @@ const waEnvSchema = baseEnvSchema.extend({
   META_WA_PIN: optionalString,
   /** Onde a Meta entrega os webhooks. Vazia = `${SUPABASE_URL}/functions/v1/wa-webhook`. */
   WA_WEBHOOK_URL: optionalUrl,
+  /**
+   * Calendly, só na Imova (docs/operacao/calendly.md): o token pessoal da conta,
+   * com `scheduled_events:write`. Com ele o worker cancela no Calendly o
+   * agendamento que chegou em horário ocupado e o que a equipe desmarcou pelo
+   * CRM. Vazio = nada é cancelado no Calendly.
+   */
+  CALENDLY_TOKEN: optionalString,
+  /**
+   * A chave (o JSON, cru ou em base64) da conta de serviço do Google que grava
+   * os blocos "Ocupado" no Google Agenda que o Calendly confere. Vazia = o
+   * espelho fica parado, e o Calendly não enxerga o que o CRM marca.
+   */
+  GOOGLE_AGENDA_CREDENCIAL: optionalString,
 });
 
 const aiEnvSchema = baseEnvSchema.extend({

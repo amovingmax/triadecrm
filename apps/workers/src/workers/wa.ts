@@ -48,6 +48,7 @@
  */
 import { avisarPorEmail, type EntradaParaAviso } from '../whatsapp/aviso-por-email';
 import { recuperarMidias } from '../whatsapp/midias-atrasadas';
+import { criarSincronizacaoDaAgenda } from '../agenda/sincronizar';
 import { avisarDasReunioes } from '../whatsapp/reuniao-avisos';
 import { ClienteDaGraph, VERSAO_PADRAO } from '../whatsapp/graph';
 import {
@@ -97,6 +98,13 @@ const BALDE_DE_MIDIAS = 'mensagens';
  * resolve em algumas voltas sem tomar o lugar da entrada e da saída.
  */
 const INTERVALO_DA_RECUPERACAO_MS = 10 * 60_000;
+
+/**
+ * De quanto em quanto a agenda do Calendly vai ao Google e ao Calendly. Entre o
+ * CRM marcar e o Calendly esconder o horário passam até ~15 s mais o tempo do
+ * Calendly reler o Google Agenda.
+ */
+const INTERVALO_DA_AGENDA_MS = 15_000;
 
 export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
   const { env, logger, opcoes } = ctx;
@@ -223,6 +231,21 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
   };
   const acoes = criarLacoDasAcoes(contextoDasAcoes, { dormir: dormirAtePararem });
 
+  // A agenda do Calendly (só na Imova): o espelho "Ocupado" no Google e os
+  // cancelamentos que o CRM pede ao Calendly. Sem as duas chaves, não faz nada.
+  const agenda = criarSincronizacaoDaAgenda({
+    cliente,
+    logger,
+    tokenCalendly: env.CALENDLY_TOKEN,
+    credencialGoogle: env.GOOGLE_AGENDA_CREDENCIAL,
+  });
+  if (agenda.ligada) {
+    logger.info('agenda do Calendly ligada neste worker', {
+      calendly: env.CALENDLY_TOKEN !== undefined,
+      google: env.GOOGLE_AGENDA_CREDENCIAL !== undefined,
+    });
+  }
+
   const pulso = criarPulso({ cliente, logger, worker: 'wa' });
   await pulso.bater('ok', null, {
     modo: umaVez ? 'uma-vez' : 'contínuo',
@@ -242,6 +265,7 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
 
   let falhas = 0;
   let proximaRecuperacao = 0;
+  let proximaAgenda = 0;
 
   try {
     for (;;) {
@@ -290,6 +314,14 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
 
       // 1e · No `--uma-vez`, as ações rodam aqui, uma passada só.
       if (umaVez) await fazerAcoes(contextoDasAcoes);
+
+      // 1f · A agenda do Calendly, a cada 15 s: o bloco "Ocupado" no Google é o
+      //      que esconde do cliente o horário que o CRM ocupou, e o cancelamento
+      //      no Calendly é o que devolve o horário e avisa o cliente. Nunca lança.
+      if (agenda.ligada && Date.now() >= proximaAgenda) {
+        proximaAgenda = Date.now() + INTERVALO_DA_AGENDA_MS;
+        await agenda.rodar();
+      }
 
       // 2 · O que a tela aprovou e ainda não estava na fila.
       const pendentes = await enfileirarPendentes(cliente, 50);
