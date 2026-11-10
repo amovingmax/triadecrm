@@ -15,6 +15,7 @@ O Tríade serve duas empresas com o **mesmo código** e **uma instalação por e
 - **Texto de tela, rótulos e módulos:** `packages/schema/src/empresas.ts`. Para a KOMUNE, os textos de sempre (um teste guarda isso). O site lê a empresa em `apps/web/src/lib/empresa.ts`.
 - **Dados** (funis, categorias, motivos de perda, roteiro de ligação, modelos, configurações): o banco de cada uma, pelo seed da empresa.
 - **Textos que o próprio banco escreve** (arquivo da LGPD): `app.empresa_texto`, lido de `app_settings['empresa']`.
+- **Cores, fontes, logo e menu:** o bloco `[data-empresa='imova']` no fim do `apps/web/src/app/globals.css` (só valores de token, nenhum nome novo), o logo em `components/logo.tsx` e a marca e o item ativo do trilho em `layout/sidebar.tsx` (o trilho abre no mouse, igual nas duas). Tema de entrada, cor da barra do navegador e ícones da PWA ficam em `EMPRESA.visual` (`empresas.ts`); os ícones de cada empresa, em `public/icons/<empresa>` (`node scripts/gerar-icones.mjs <empresa>`). A KOMUNE não tem bloco: a tela dela é o resto do `globals.css`. Antes de publicar qualquer mudança de visual, `comparar-versoes.mjs` dá a KOMUNE igual à `main`.
 - **Regra para migrações novas:** a migração roda nos dois bancos. Dado de empresa entra pelo seed da empresa, nunca pela migração.
 
 ## Quem vê o botão de trocar de empresa

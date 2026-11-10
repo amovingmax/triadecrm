@@ -9714,3 +9714,37 @@ Pedido do usuário: "mande essa atualização e versão para o TestFlight". Ele 
 - O ramo `fotos-do-canal-pro` (ainda não publicado) também mexe em `dados.ts` e `tipos.ts` dos anúncios, em outras partes; quem juntar por último confere o encaixe.
 
 **Decisão humana:** nenhuma nova.
+
+## 10/11/2026 — O visual da Imova ("Maré"), só na Imova (branch `visual-imova`; PRD §8, docs/design)
+
+Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, primeiro em protótipo e depois "essas atualizações [...] somente na Imova e que a Komune continue igual está hoje". Até aqui a Imova usava a tinta preta, a menta e o triângulo da Tríade; o logo dela só aparecia na escolha de empresa do login e num estado vazio de Conversas.
+
+**Entregue (tudo preso à Imova; a KOMUNE não muda):**
+- **Cores pelo logo dela** (`globals.css`, bloco no fim do arquivo): `:root[data-empresa='imova']` e `.dark[data-empresa='imova']`, ligados por `data-empresa` no `<html>` (`layout.tsx`, de `EMPRESA.slug`). Só valores mudam, nenhum nome de token:
+  - rampa neutra puxada para o petróleo (névoa do mar: fundo `#f1f5f4`, tinta `#0e2826`);
+  - ação e foco em petróleo (`#1f6a65`; `#4fb3ab` no escuro);
+  - o laranja do "O" (`#f38121`) no lugar exato da menta, pela rampa `--komune-*`: contador, disco do item ativo, aba ativa;
+  - escala térmica: morno vai para o ocre (`#a8820e`) e quente para o vermelho (`#c73838`), para não serem lidos como o laranja da marca. Os textos de frio, cliente e cliente ativo descem um passo, porque o muted da névoa é mais escuro (o teste de contraste pediu);
+  - escuro em petróleo da noite (`#0b1918`), sem o quase preto.
+- **Menu do computador em petróleo**, só ele (`data-trilho` no `<aside>`): os tokens `--sidebar-*` também pintam a barra de baixo do celular, onde o petróleo apagaria o rótulo.
+- **Trilho igual ao da KOMUNE** (`sidebar.tsx`, `nav-link.tsx` com `ativoNoDisco`): 72px fechado, abre no mouse e fecha quando ele sai. Na Imova, o alvo do logo no lugar do triângulo, com "Imova" ao lado quando abre, e o item ativo com o laranja só no disco do ícone (aberto, a linha ganha só um realce). A primeira versão deixava o menu aberto de vez a partir de 1024px; saiu no mesmo dia, a pedido do usuário: "a barra lateral do CRM da IMOVA deve funcionar igual o da Komune".
+- **Logo desenhado em código** (`components/logo.tsx`: `LogoImova`, `AlvoImova`, `MarcaDaEmpresa`): troca de cor com o tema; o logotipo aparece no cabeçalho do celular, e o alvo no trilho e na pílula do login.
+- **Fontes**: Figtree na interface e Urbanist nos títulos (`font-heading`, peso 650), servidas de `app/fontes` com `preload: false`. A KOMUNE não baixa nenhuma das duas: só a Imova liga as variáveis no `<html>`.
+- **Botão e campo com canto de 12px** no lugar da pílula (`[data-slot='button']`, `input`, `select-trigger`); botão só de ícone continua redondo. Cartão a 18px.
+- **Fundo da conversa** com casas, chaves, prédios, coqueiros e a placa de vende-se (`public/conversas/imoveis-claro.svg` e `-escuro.svg`), no lugar dos balões e taças.
+- **Moldura por empresa** (`packages/schema/src/empresas.ts`, campo `visual`): tema de entrada (a Imova abre no claro), cor da barra do navegador, ícones da PWA (`public/icons/imova`, alvo laranja sobre o petróleo) e cores do manifest. A KOMUNE guarda os valores que estavam fixos no código (um teste confere).
+- `scripts/gerar-icones.mjs` aceita a empresa (`node scripts/gerar-icones.mjs imova`), para gerar os ícones dela sem regravar os da KOMUNE.
+
+**Verificado:**
+- `comparar-versoes.mjs`: a KOMUNE da `main` (`26011ec`) contra a KOMUNE desta branch, dois builds de produção no mesmo banco local, gestor e SDR, computador e celular: **88 telas iguais, nenhuma para conferir e nenhuma reprovada**.
+- O teste de contraste mede agora quatro modos (claro e escuro da KOMUNE e da Imova), com as mesmas regras; os 41 passam. Um teste novo garante que o bloco da Imova existe e que os valores da KOMUNE seguem os de antes.
+- Lint, typecheck, Prettier, 1.805 testes da web e 113 do schema; build de produção das duas empresas.
+- Local, as duas juntas com a troca de empresa (KOMUNE em `localhost:3300`, Imova em `localhost:3301`, cada uma com o seu Supabase local): os dois logins convivem no mesmo navegador, o botão de trocar aparece nas duas e nenhuma tela teve erro de JavaScript.
+
+**Pendente:**
+- O `favicon.ico` da aba continua o do Tríade nas duas empresas (é o arquivo de `app/`, que o Next serve igual para todo build). Os ícones da PWA e do celular já são os da Imova.
+- O ícone de Prospectados (aperto de mão) e os rótulos do menu são os mesmos nas duas empresas; ficaram de fora de propósito (só visual nesta entrega).
+- Os botões da entrada de teste do login local continuam em pílula: não são `Button` e só existem no computador de quem desenvolve.
+
+**Decisão humana:**
+- Publicar só a Imova (o padrão das entregas "só na Imova"). Quem já escolheu um tema no alternador fica com a escolha; quem nunca escolheu passa a abrir no claro. O app instalado no celular pode demorar a trocar o ícone.
