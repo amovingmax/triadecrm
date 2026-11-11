@@ -10779,6 +10779,7 @@ export type Database = {
       }
       cadencias_do_negocio: { Args: { p_deal_id: string }; Returns: Json }
       cadencias_visao: { Args: never; Returns: Json }
+      calendly_agenda_do_link: { Args: never; Returns: Json }
       calendly_cancelamento_falhou: {
         Args: { p_definitivo?: boolean; p_erro: string; p_id: string }
         Returns: boolean
