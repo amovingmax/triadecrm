@@ -11,6 +11,8 @@ import {
   type DesfechoCatalogo,
 } from '@/components/registro/tipos';
 
+import type { RespostaDoLembrete } from './lembrete-de-visita';
+
 /**
  * Contrato da Agenda (PRD §7.5, RF-AGE-01 a RF-AGE-08 e RF-ROT-03/05).
  *
@@ -102,6 +104,12 @@ export type Compromisso = {
   horaCombinada: boolean;
   /** Há aviso ainda não visto deste compromisso em `agenda_avisos`: o selo "Novo". */
   novo: boolean;
+  /**
+   * O que o cliente tocou no lembrete da véspera para ESTE horário (só na Imova,
+   * `visita_lembretes`): "Cliente confirmou" ou "Pediu para remarcar". Nulo sem
+   * lembrete, sem resposta, ou quando a visita foi remarcada depois do toque.
+   */
+  respostaDoLembrete: RespostaDoLembrete | null;
   /** `reunioes.aviso_enviado_em`. Nulo depois de 10 minutos quer dizer que o e-mail não saiu. */
   avisoEnviadoEm: string | null;
   /** `reunioes.criada_em`: é dela que se conta a folga antes de acusar o e-mail. */

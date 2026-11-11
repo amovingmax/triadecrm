@@ -133,6 +133,13 @@ export interface Empresa {
      * continua sendo "porta a bater" sem hora (PRD RF-AGE-01). Só tela.
      */
     horaNaVisita: boolean;
+    /**
+     * O lembrete da visita na véspera pelo WhatsApp, com "Confirmo" e "Preciso
+     * remarcar" (11/11/2026): o selo "Cliente confirmou" / "Pediu para remarcar"
+     * no cartão da Agenda e na agenda do Meu dia, e o interruptor em Ajustes →
+     * WhatsApp. Só da Imova: na KOMUNE a migração não cria nada.
+     */
+    lembreteDeVisita: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -212,6 +219,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       canalDeChegada: false,
       meuDiaNovo: false,
       horaNaVisita: false,
+      lembreteDeVisita: false,
     },
     privacidade: null,
     visual: {
@@ -260,6 +268,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       canalDeChegada: true,
       meuDiaNovo: true,
       horaNaVisita: true,
+      lembreteDeVisita: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

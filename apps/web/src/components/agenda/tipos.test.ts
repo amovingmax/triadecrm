@@ -56,6 +56,7 @@ function compromisso(parcial: Partial<Compromisso> = {}): Compromisso {
     peloCalendly: false,
     emConflito: false,
     horaCombinada: false,
+    respostaDoLembrete: null,
     novo: false,
     avisoEnviadoEm: null,
     reuniaoCriadaEm: null,

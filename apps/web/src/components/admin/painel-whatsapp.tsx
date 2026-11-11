@@ -17,6 +17,7 @@ import { ErroDoArquivo, subirFotoDoPerfil } from '@/components/grupos/midia';
 import { situacaoDasAcoes, temPedidoNaFila } from '@/components/grupos/regras';
 
 import { Interruptor } from './painel-atendimento';
+import { PainelLembreteDeVisita } from './painel-lembrete-de-visita';
 import {
   CHAVE_DO_WHATSAPP,
   CHAVE_DOS_PEDIDOS_DO_PERFIL,
@@ -127,6 +128,15 @@ export function PainelWhatsapp({ papel }: { papel: AppRole }) {
           aoMudar={(v) => mudar.mutate({ mostrar_digitando: v })}
         />
       </section>
+
+      {/* Só na Imova (11/11/2026): o lembrete da visita na véspera, com os botões
+          "Confirmo" e "Preciso remarcar". */}
+      {EMPRESA.modulos.lembreteDeVisita ? (
+        <section className="flex flex-col gap-3 border-t border-hairline pt-4">
+          <h2 className="font-heading text-base font-medium">Lembrete da visita</h2>
+          <PainelLembreteDeVisita podeEditar={podeEditar} />
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-3 border-t border-hairline pt-4">
         <h2 className="font-heading text-base font-medium">Perfil da empresa no WhatsApp</h2>
