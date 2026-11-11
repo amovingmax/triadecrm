@@ -43,7 +43,7 @@ Nada vai pelo WhatsApp. Só a Imova tem isso; a KOMUNE não.
 | O horário foi ocupado por… | Como o Calendly esconde |
 | --- | --- |
 | outro cliente, pelo próprio Calendly | O Calendly já faz isso sozinho. |
-| a equipe ou a IA, direto no CRM | O CRM grava um bloco **"Ocupado — CRM Imova"** num Google Agenda ligado ao Calendly, e o Calendly não oferece esse horário. Só início e fim vão ao Google: nenhum nome, telefone ou endereço. |
+| a equipe, direto no CRM (a IA que atende não marca mais: desde 11/11/2026 ela manda o link, [abaixo](#a-ia-que-atende-manda-o-link)) | O CRM grava um bloco **"Ocupado — CRM Imova"** num Google Agenda ligado ao Calendly, e o Calendly não oferece esse horário. Só início e fim vão ao Google: nenhum nome, telefone ou endereço. |
 | um feriado da Imova (Ajustes → Catálogos → Feriados, `public.holidays`) | O CRM grava um bloco **"Ocupado — feriado"** de dia inteiro no mesmo Google Agenda, para cada feriado dos próximos 12 meses. O Calendly só sabe "seg. a sex." e, sem isso, oferecia 20/11 e 21/11. Feriado apagado ou trocado de data tira o bloco. |
 
 E para liberar:
@@ -281,3 +281,32 @@ Num plano pago, um tipo de evento com "Visita" no nome também entra como visita
 | Tudo cai na agenda do Rafael | Ninguém foi escolhido em "Quem atende o que chega pelo Calendly" (Agenda, admin), ou o e-mail gravado não é de ninguém ativo (o campo avisa). |
 
 Trocar a chave do webhook sem perder agendamento no meio: `node scripts/calendly-assinar.mjs trocar`. Desligar: `node scripts/calendly-assinar.mjs remover` (os agendamentos já recebidos ficam). Os blocos "Ocupado — CRM Imova" que sobrarem no Google Agenda saem pelo próprio Google Agenda.
+
+---
+
+## A IA que atende manda o link
+
+Desde `atendente-imova@v3` (11/11/2026, "a visita pelo link"), a IA que atende **não marca visita sozinha**. Quando o cliente quer visitar um imóvel ou conversar com um corretor, ela escreve uma ou duas frases e o CRM põe embaixo a linha do imóvel (código e endereço, na visita) e o link pessoal do Calendly (`public.ia_atendente_enviar_link`). Quem escolhe o horário é o cliente.
+
+| O cliente… | A IA |
+| --- | --- |
+| quer visitar um imóvel da lista que está no ar | manda o link da **visita**, com o código do imóvel |
+| quer visitar e não disse qual imóvel | pergunta qual (o bairro ou onde viu o anúncio), sem link |
+| fala de um imóvel que não está na lista | pergunta onde viu o anúncio; se ainda não der para saber, passa para o corretor |
+| quer visitar um imóvel em rascunho ou pausado, ou mais de um imóvel | passa para o corretor, que confirma e combina |
+| é o proprietário e quer anunciar, vender, alugar ou avaliar | manda o link da **reunião** |
+| pede para marcar uma conversa com um corretor | manda o link da **reunião** |
+| pede corretor agora, ligação, quer negociar, remarcar ou cancelar | passa para o corretor |
+| propõe dia e hora ("amanhã às 10h") | manda o link e diz que lá ele vê se o horário está livre; nunca confirma |
+| já recebeu o mesmo link há menos de 24 h e não agendou | não manda de novo; manda só se ele pedir ou mudar de imóvel |
+| já agendou a visita a esse imóvel | não manda outro link |
+
+Quando o banco recusa o link: "visita sem imóvel" ou "imóvel desconhecido" viram uma pergunta curta ao cliente sobre qual é o imóvel; "sem link configurado" e as outras recusas passam a conversa para o corretor, com o motivo. A IA nunca escreve endereço de site: se o modelo escrever, o worker tira antes de mandar.
+
+**Conferir com o modelo de verdade** (11 cenários, com conversas e imóveis de mentira; nada sai para cliente nenhum): na pasta do CRM, com `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `ANTHROPIC_API_KEY` no ambiente (o banco local serve; as chamadas ficam em `ai_runs` dele),
+
+```bash
+pnpm -C apps/workers dev ai --ensaio=atendente-imova
+```
+
+O comando imprime cada cenário com ✓ ou ✗, a resposta do modelo, o que errou e o custo, e sai com 1 se algum errou. Os mesmos cenários rodam sem rede no `pnpm -C packages/prompts test`.

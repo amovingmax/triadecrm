@@ -605,6 +605,7 @@ describe('a linha em SVG', () => {
 describe('o que mudou e o que corrigir', () => {
   it('conta o que cada versão conhecida mudou, e cala na desconhecida', () => {
     expect(oQueMudouNaVersao('atendente-imova@v2')).toMatch(/foto do anúncio/);
+    expect(oQueMudouNaVersao('atendente-imova@v3')).toMatch(/link da agenda/);
     expect(oQueMudouNaVersao('atendente-imova@v9')).toBeNull();
     expect(oQueMudouNaVersao(null)).toBeNull();
   });

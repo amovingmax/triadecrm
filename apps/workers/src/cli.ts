@@ -12,7 +12,7 @@ export type WorkerCommand = (typeof WORKER_COMMANDS)[number];
  */
 export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
   wa: ['uma-vez', 'conectar', 'sincronizar-modelos'],
-  ai: ['uma-vez', 'chamada-de-teste', 'foto'],
+  ai: ['uma-vez', 'chamada-de-teste', 'foto', 'ensaio'],
   rotas: ['uma-vez', 'geocodificar'],
 };
 
@@ -38,6 +38,10 @@ Opções de "ai":
   --chamada-de-teste=canal-de-chegada --foto=/caminho/placa.jpg
                          O mesmo, com o canal de chegada da Imova e UMA foto de teste
                          (uma placa fotografada para isso, nunca foto de cliente).
+  --ensaio=atendente-imova
+                         Manda os cenários da IA que atende (a visita pelo link) ao modelo
+                         de verdade, confere cada resposta e imprime o que errou e o custo.
+                         Conversas de mentira: nada sai para cliente nenhum.
 
 Opções de "rotas":
   --geocodificar         Faz UMA passada de geocodificação no Nominatim (1 req/s) e sai.
