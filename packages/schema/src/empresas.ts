@@ -163,6 +163,16 @@ export interface Empresa {
      * WhatsApp. Só da Imova: na KOMUNE a migração não cria nada.
      */
     lembreteDeVisita: boolean;
+    /**
+     * A agenda integrada com o imóvel (11/11/2026): "Caso seja visita presencial,
+     * deverá ter o endereço e o código do imóvel/terreno que será tratado." O botão
+     * "Enviar link da agenda" em Conversas (o link pessoal do Calendly, com o imóvel),
+     * o imóvel obrigatório na visita do "Novo compromisso", o código e o endereço no
+     * cartão da visita (Agenda e Meu dia), "Falta o imóvel" com "Definir imóvel", e o
+     * campo "Link do Calendly" do admin. Só da Imova: no banco da KOMUNE a migração
+     * 20261111210000 não cria `visita_imoveis`, `agenda_convites` nem as funções.
+     */
+    agendaComImovel: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -246,6 +256,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       calendly: false,
       esperaEmDegraus: false,
       lembreteDeVisita: false,
+      agendaComImovel: false,
     },
     privacidade: null,
     visual: {
@@ -298,6 +309,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       calendly: true,
       esperaEmDegraus: true,
       lembreteDeVisita: true,
+      agendaComImovel: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

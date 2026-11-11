@@ -8,6 +8,8 @@ import {
   type RespostaDoLembrete,
 } from '@/components/agenda/lembrete-de-visita';
 import { buscarRespostasDosLembretes } from '@/components/agenda/lembrete-de-visita-dados';
+import type { ImovelDaVisita } from '@/components/agenda/imovel-da-visita';
+import { buscarImoveisDasVisitas } from '@/components/agenda/imovel-da-visita-dados';
 
 import type { RegistroDoDia } from './feito';
 import { textoDaPrevia } from './novo';
@@ -457,6 +459,10 @@ export type CompromissoDeHoje = {
   organizacao: string | null;
   /** O toque do cliente no lembrete da véspera, para este horário (só na Imova). */
   respostaDoLembrete: RespostaDoLembrete | null;
+  /** O imóvel da visita (`visita_imoveis`, só na Imova), como no cartão da Agenda. */
+  imovel?: ImovelDaVisita | null;
+  /** A visita da Imova sem imóvel: o selo "Falta o imóvel" e o "Definir imóvel". */
+  faltaImovel?: boolean;
 };
 
 /**
@@ -498,13 +504,18 @@ export async function buscarAgendaDeHoje(
 
   const nomes = new Map<string, string>();
   // O selo do lembrete vai junto com os nomes: erro nele é engolido lá dentro.
-  const [resposta, lembretes] = await Promise.all([
+  const [resposta, lembretes, imoveis] = await Promise.all([
     orgIds.length > 0
       ? supabase.from('organizations_view').select('id, name').in('id', orgIds)
       : null,
     buscarRespostasDosLembretes(
       supabase,
       linhas.map((l) => l.id),
+    ),
+    // O imóvel de cada visita (só na Imova); nulo quando a leitura falhou.
+    buscarImoveisDasVisitas(
+      supabase,
+      linhas.filter((l) => l.kind === 'visit').map((l) => l.id),
     ),
   ]);
   if (resposta) {
@@ -524,6 +535,8 @@ export async function buscarAgendaDeHoje(
     organizacaoId: linha.organization_id,
     organizacao: linha.organization_id ? (nomes.get(linha.organization_id) ?? null) : null,
     respostaDoLembrete: respostaDoLembrete(linha.due_at, lembretesDaTarefa.get(linha.id) ?? []),
+    imovel: linha.kind === 'visit' ? (imoveis?.get(linha.id) ?? null) : null,
+    faltaImovel: linha.kind === 'visit' && imoveis !== null && !imoveis.has(linha.id),
   }));
 }
 

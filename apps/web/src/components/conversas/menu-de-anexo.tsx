@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import {
+  CalendarPlus,
   FileText,
   ImageIcon,
   List,
@@ -26,10 +27,12 @@ import {
 
 import { EnviarContato } from './enviar-contato';
 import { EnviarFigurinha } from './enviar-figurinha';
+import { FolhaDoLinkDaAgenda } from './enviar-link-da-agenda';
 import { EnviarLocalizacao } from './enviar-localizacao';
 import type { Midia } from './enviar-midia';
 import { EnviarPergunta, type ModoDaPergunta } from './enviar-pergunta';
 import type { DestinoDoAnexo } from './janela-do-anexo';
+import { LINK_DA_AGENDA_NA_EMPRESA } from './link-da-agenda-dados';
 
 /**
  * O clipe (27/10/2026): tudo o que o WhatsApp manda além de texto e áudio.
@@ -37,8 +40,11 @@ import type { DestinoDoAnexo } from './janela-do-anexo';
  * Foto, vídeo e documento caem na prévia de sempre (`PainelDaMidia`), em cima
  * da caixa; o resto abre um formulário curto. Só existe com a janela de 24 h
  * aberta, como a caixa inteira: fora dela só sai modelo aprovado.
+ *
+ * Na Imova (11/11/2026), "Link da agenda": o link pessoal do Calendly, com o imóvel
+ * na visita (`enviar-link-da-agenda.tsx`).
  */
-type Formulario = 'figurinha' | 'localizacao' | 'contato' | ModoDaPergunta | null;
+type Formulario = 'figurinha' | 'localizacao' | 'contato' | 'agenda' | ModoDaPergunta | null;
 
 export function MenuDeAnexo({
   midia,
@@ -141,12 +147,29 @@ export function MenuDeAnexo({
             <MapPinned aria-hidden="true" />
             Pedir localização
           </DropdownMenuItem>
+          {LINK_DA_AGENDA_NA_EMPRESA ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="h-10 md:h-8" onSelect={() => setAberto('agenda')}>
+                <CalendarPlus aria-hidden="true" />
+                Link da agenda
+              </DropdownMenuItem>
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
 
       <EnviarFigurinha aberto={aberto === 'figurinha'} aoFechar={fechar} destino={destino} />
       <EnviarLocalizacao aberto={aberto === 'localizacao'} aoFechar={fechar} destino={destino} />
       <EnviarContato aberto={aberto === 'contato'} aoFechar={fechar} destino={destino} />
+      {LINK_DA_AGENDA_NA_EMPRESA ? (
+        <FolhaDoLinkDaAgenda
+          aberta={aberto === 'agenda'}
+          aoFechar={fechar}
+          conversaId={destino.fioId}
+          aoEnviar={destino.aoEnviar}
+        />
+      ) : null}
       {aberto === 'botoes' || aberto === 'lista' || aberto === 'pedir_localizacao' ? (
         <EnviarPergunta modo={aberto} aberto aoFechar={fechar} destino={destino} />
       ) : null}

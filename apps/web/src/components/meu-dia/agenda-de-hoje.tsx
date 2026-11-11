@@ -2,12 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, CalendarDays, CircleCheck } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CalendarClock, CalendarDays, CircleCheck, MapPin, MapPinOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ROTULO_DA_RESPOSTA } from '@/components/agenda/lembrete-de-visita';
+import { DefinirImovel } from '@/components/agenda/definir-imovel';
+import {
+  FALTA_O_IMOVEL,
+  linhaDoImovel,
+  linkDoMapaDoImovel,
+} from '@/components/agenda/imovel-da-visita';
 
 import { buscarAgendaDeHoje, type CompromissoDeHoje } from './consultas';
 
@@ -54,7 +60,13 @@ export function AgendaDeHoje({
       >
         <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="numerico shrink-0 font-medium">{hora(proximo.quando)}</span>
-        <span className="min-w-0 flex-1 truncate">{tituloDoCompromisso(proximo)}</span>
+        <span className="min-w-0 flex-1 truncate">
+          {tituloDoCompromisso(proximo)}
+          {/* O código do imóvel da próxima visita (Imova): o resto está na Agenda. */}
+          {proximo.imovel?.codigo ? (
+            <span className="text-muted-foreground"> · {proximo.imovel.codigo}</span>
+          ) : null}
+        </span>
         <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
           {quantoFalta(proximo.quando, agora)}
         </span>
@@ -99,6 +111,7 @@ export function AgendaDeHoje({
             <li key={compromisso.id} className="flex flex-col">
               {ordem === indiceDoAgora ? <LinhaDoAgora agora={agora} /> : null}
               <Compromisso compromisso={compromisso} agora={agora} />
+              <ImovelDaVisitaDeHoje compromisso={compromisso} />
             </li>
           ))}
           {indiceDoAgora === -1 ? <LinhaDoAgora agora={agora} /> : null}
@@ -170,6 +183,68 @@ function Compromisso({ compromisso, agora }: { compromisso: CompromissoDeHoje; a
         ) : null}
       </span>
     </Link>
+  );
+}
+
+/**
+ * O imóvel da visita (só na Imova), embaixo da linha dela, como no cartão da Agenda:
+ * "IM0003 · título", que abre o anúncio, o endereço e o Maps por ele. Mora fora do
+ * link da linha (que leva à ficha) porque link dentro de link não existe. A visita
+ * sem imóvel mostra "Falta o imóvel" e o "Definir imóvel".
+ */
+function ImovelDaVisitaDeHoje({ compromisso }: { compromisso: CompromissoDeHoje }) {
+  const cliente = useQueryClient();
+  if (compromisso.tipo !== 'visit' || compromisso.feito) return null;
+  const { imovel } = compromisso;
+
+  if (imovel) {
+    const linha = linhaDoImovel(imovel);
+    return (
+      <div className="-mt-1 flex flex-col gap-0.5 pb-2.5 pl-14 text-xs text-muted-foreground">
+        <span className="flex min-w-0 items-start gap-1.5">
+          <MapPin className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+          {imovel.anuncioId ? (
+            <Link
+              href={`/anuncios/${imovel.anuncioId}`}
+              title="Abrir o anúncio no CRM"
+              className="min-w-0 font-medium break-words text-foreground underline-offset-4 hover:underline"
+            >
+              {linha}
+            </Link>
+          ) : (
+            <span className="min-w-0 font-medium break-words text-foreground">{linha}</span>
+          )}
+        </span>
+        <span className="pl-[18px] break-words">{imovel.endereco}</span>
+        <a
+          href={linkDoMapaDoImovel(imovel.endereco)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="toque inline-flex min-h-11 items-center self-start pl-[18px] underline underline-offset-4 hover:text-foreground sm:min-h-0"
+        >
+          Abrir no Google Maps
+        </a>
+      </div>
+    );
+  }
+
+  if (!compromisso.faltaImovel) return null;
+  return (
+    <div className="-mt-1 flex flex-wrap items-center gap-2 pb-2.5 pl-14">
+      <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive-texto">
+        <MapPinOff className="size-3" aria-hidden="true" />
+        {FALTA_O_IMOVEL}
+      </span>
+      <DefinirImovel
+        taskId={compromisso.id}
+        organizacao={compromisso.organizacao}
+        compacto
+        aoMudar={() => {
+          void cliente.invalidateQueries({ queryKey: ['meu-dia', 'agenda-de-hoje'] });
+          void cliente.invalidateQueries({ queryKey: ['agenda'] });
+        }}
+      />
+    </div>
   );
 }
 
