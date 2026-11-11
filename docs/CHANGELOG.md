@@ -9884,3 +9884,26 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 - Quem pediu para não ser contatado e agenda pelo Calendly fica fora da agenda (só anotado), e o Calendly mantém o agendamento dele. Manter, ou cancelar no Calendly também?
 - Quem não está na base vira **Cliente**. Um proprietário que agenda avaliação deveria ir para **Captação de imóveis**? Dá para decidir por uma opção da pergunta ("Avaliar meu imóvel").
 - O negócio anda sozinho para Visita marcada / Avaliação marcada no agendamento, como na reunião marcada pela tela. Confirmar.
+
+---
+## 11/11/2026 — a Agenda da Imova como no protótipo do Calendly (branch `agenda-calendly-tela`; em produção só na Imova; RF-AGE-01, RF-AGE-05)
+
+**Pedido do usuário:** depois de ver o protótipo (página do Calendly ligada à Agenda do CRM, `localhost:3092`) e a comparação com o que estava no ar ("Já está desse jeito ou ainda precisamos implementar algo?"), "Gostei dessa atualização. Suba ela para o ambiente da Imova e coloque no ar". A comparação foi feita por um agente lendo o código e por fotos da Agenda real no site local.
+
+**Entregue (só tela; nenhum banco, worker ou variável nova):**
+- **Visita do Calendly com endereço e fim:** `consultas.ts` lê `calendly_agendamentos` (`local`, `fim`, `link`) das tarefas `origin = 'calendly'` da janela (a RLS já deixa o dono e a gestão lerem; erro engolido: sem ele a visita aparece como antes). O endereço aparece no cartão e o botão do Maps busca por ele (`consultaDoMapa`: o `local` da visita vale por cima do endereço da ficha).
+- **Linha de onde** no cartão (`ondeDoCompromisso`): "On-line · Google Meet" / "· Zoom" / "· Microsoft Teams" pela sala, ou o endereço combinado. Sem sala nem endereço, nada.
+- **Hora na visita marcada no CRM**, com fim pela duração padrão (45 min): só onde `EMPRESA.modulos.horaNaVisita` (Imova sim, KOMUNE não: lá a visita segue "porta a bater", PRD RF-AGE-01). `Compromisso.horaCombinada` = Calendly, ou `origin = 'manual'` com o módulo. A nota do bloco de visitas acompanha.
+- **Selo "Novo"** nos cartões com aviso não visto (`agenda_avisos`, `Compromisso.novo`); o "Ok, vi" relê a agenda inteira e o selo sai junto.
+- **Aviso do topo:** selo "Calendly" na linha (no lugar do "· pelo Calendly"); tocar na linha vai para o dia e contorna o cartão por 4 s (`alvo` = `reuniao_id` ou `task_id`; `destaque` em `tela-agenda.tsx` → `lista-dia.tsx` → `cartao-compromisso.tsx`, que rola até ele).
+- **Cancelar o que veio do Calendly:** a visita do Calendly mostra "Cancelar" (não "Excluir"), e o diálogo diz que o Calendly cancela, avisa o cliente por e-mail e libera o horário, e que o motivo fica só no CRM. O diálogo de cancelar reunião diz o mesmo quando a reunião veio do Calendly. Por baixo, as mesmas funções de antes (`tarefa_excluir`, `reuniao_cancelar`), que já deixavam o cancelamento pendente para o `imova-worker-wa`.
+- **Tira de livres:** "Livres hoje:" só no dia de hoje; nos outros dias, "Livres neste dia:" (defeito anterior).
+- Testes novos em `tipos.test.ts` (mapa pelo endereço do Calendly, `ondeDoCompromisso`); `horaNaVisita` em `empresas.test.ts`.
+
+**Verificado:** lint, typecheck e testes do monorepo verdes (web 1854, worker 534, prompts 413, schema 113). No site local, com o banco local da Imova e dois agendamentos de demonstração entrando por `calendly_receber` (reunião hoje 15h com sala, visita amanhã 14h com endereço) e uma visita `manual` às 10h, no Chrome sem janela: "Novo", "On-line · Google Meet", selo "Calendly" no aviso, o toque no aviso levando ao cartão contornado, "Rua das Algas, 120 · Ponta Negra" no cartão, "10h00–10h45" na visita do CRM e "14h00–14h45" na do Calendly, "Livres neste dia:", "Cancelar" com o texto do Calendly, e o "Ok, vi" tirando o aviso e os selos. Nenhum erro de página.
+
+**Em produção, só na Imova (11/11/2026, pedido do usuário: "Suba ela para o ambiente da Imova e coloque no ar"):** ar conferido antes (`imova-jrrpvrmpn`, de `a61055b`, sem deploy depois). `main` `fa1f33e` (avanço direto sobre `29fc5bc`). Site **`imova-ovn3utvdv`**, de cópia limpa de `fa1f33e` em `~/triadecrm-publicar-imova` (volta: `imova-jrrpvrmpn`). De fora: `/login` 200 com `data-empresa="imova"`; `/agenda` e `/meu-dia` sem login vão para o login; `/auth/dev` 404. Sem banco, sem worker. KOMUNE intocada (e, quando for republicada, nada muda para ela além do selo "Novo", da linha de onde e do "Livres neste dia").
+
+**Ficou como estava, de propósito:** a semana de 7 dias (a tela é a mesma da KOMUNE, que usa o sábado); as visitas agrupadas por bairro (RF-ROT-03): a ficha nova do Calendly não tem bairro, então a visita dele cai em "Bairro não informado", com o endereço no cartão; os avisos de "bloco gravado no Google" e "cancelado no Calendly" seguem sem retorno na tela (o robô faz em segundo plano; o dono recebe push dos casos do Calendly).
+
+**Pendente (configuração, sem código):** compartilhar a agenda "CRM Imova - ocupado" com a conta de serviço e gravar `app_settings['calendly'].google_agenda_id` (sem isso, o que a equipe marca no CRM não some do Calendly); no Calendly, idioma do convidado em português e as perguntas "O que você quer marcar?" e "Telefone (WhatsApp)"; trocar o `CALENDLY_TOKEN` (foi colado no chat).
