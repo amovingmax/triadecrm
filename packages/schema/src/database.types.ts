@@ -9076,6 +9076,130 @@ export type Database = {
         }
         Relationships: []
       }
+      visita_lembretes: {
+        Row: {
+          atualizado_em: string
+          conversation_id: string | null
+          criado_em: string
+          enviado_em: string | null
+          id: string
+          marcada_para: string
+          message_id: string | null
+          motivo: string | null
+          organization_id: string
+          respondido_em: string | null
+          resposta: string | null
+          resposta_message_id: string | null
+          reuniao_id: string | null
+          situacao: string
+          tarefa_remarcar_id: string | null
+          task_id: string
+          template_id: number | null
+        }
+        Insert: {
+          atualizado_em?: string
+          conversation_id?: string | null
+          criado_em?: string
+          enviado_em?: string | null
+          id?: string
+          marcada_para: string
+          message_id?: string | null
+          motivo?: string | null
+          organization_id: string
+          respondido_em?: string | null
+          resposta?: string | null
+          resposta_message_id?: string | null
+          reuniao_id?: string | null
+          situacao: string
+          tarefa_remarcar_id?: string | null
+          task_id: string
+          template_id?: number | null
+        }
+        Update: {
+          atualizado_em?: string
+          conversation_id?: string | null
+          criado_em?: string
+          enviado_em?: string | null
+          id?: string
+          marcada_para?: string
+          message_id?: string | null
+          motivo?: string | null
+          organization_id?: string
+          respondido_em?: string | null
+          resposta?: string | null
+          resposta_message_id?: string | null
+          reuniao_id?: string | null
+          situacao?: string
+          tarefa_remarcar_id?: string | null
+          task_id?: string
+          template_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visita_lembretes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_lembretes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_lembretes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_lembretes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_lembretes_resposta_message_id_fkey"
+            columns: ["resposta_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_lembretes_reuniao_id_fkey"
+            columns: ["reuniao_id"]
+            isOneToOne: false
+            referencedRelation: "reunioes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_lembretes_tarefa_remarcar_id_fkey"
+            columns: ["tarefa_remarcar_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_lembretes_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_lembretes_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       voice_call_events: {
         Row: {
           call_id: string
@@ -11028,6 +11152,9 @@ export type Database = {
         Args: { p_delivery_id: string; p_payload: Json }
         Returns: Json
       }
+      lembrete_de_visita_configurar: { Args: { p: Json }; Returns: Json }
+      lembrete_de_visita_modelo_para_a_meta: { Args: never; Returns: Json }
+      lembrete_de_visita_painel: { Args: never; Returns: Json }
       ligacao_corrigir: {
         Args: {
           p_attempt_id: string
