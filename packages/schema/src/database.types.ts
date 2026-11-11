@@ -6895,6 +6895,7 @@ export type Database = {
           client_listing_id: string | null
           contato_apagado_em: string | null
           conversation_id: string | null
+          escreveu_em: string | null
           id: string
           lead_certo: boolean
           link_historico: string | null
@@ -6924,6 +6925,7 @@ export type Database = {
           client_listing_id?: string | null
           contato_apagado_em?: string | null
           conversation_id?: string | null
+          escreveu_em?: string | null
           id?: string
           lead_certo?: boolean
           link_historico?: string | null
@@ -6953,6 +6955,7 @@ export type Database = {
           client_listing_id?: string | null
           contato_apagado_em?: string | null
           conversation_id?: string | null
+          escreveu_em?: string | null
           id?: string
           lead_certo?: boolean
           link_historico?: string | null
