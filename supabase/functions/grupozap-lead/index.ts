@@ -22,9 +22,18 @@
 // nova. GRUPOZAP_LEAD_USUARIO, se existir, passa a exigir também o usuário (a
 // documentação mostra `vivareal`). Como confere: `autenticacao.ts`.
 //
+// GRUPOZAP_LEAD_SECRET_TESTE (opcional, 10/11/2026) é a chave PÚBLICA da
+// página de segurança do Grupo OLX, com que o suporte deles testa o endpoint
+// na homologação. Quem autentica com ela recebe 200 e NADA é gravado. Depois
+// da homologação: a SECRET_KEY definitiva vai em GRUPOZAP_LEAD_SECRET e a de
+// teste sai (`supabase secrets unset`). Nenhuma das duas mexe no código.
+//
 // AS RESPOSTAS — para o Grupo OLX só o status conta; o corpo é ignorado
 // -----------------------------------------------------------------------------
 //   200  recebido, inclusive repetido (idempotência pelo `originLeadId`)
+//   200  teste, NÃO gravado: chave de teste, ou o lead de exemplo da
+//        documentação (`originLeadId` 59ee0fc6…) com qualquer chave. O corpo
+//        diz `teste: true` e o motivo (`lead.ts`, `motivoDeTeste`)
 //   401  credencial ausente ou errada, com a mesma frase para todo motivo
 //   422  lead de anúncio ("Grupo OLX") sem `clientListingId`: a regra deles
 //        pede 4xx "para que o lead seja revisado e reprocessado". O lead é
@@ -58,6 +67,7 @@ import {
   chaveDeIdempotencia,
   decidirResposta,
   lerCorpo,
+  motivoDeTeste,
   paraOBanco,
   resumoParaLog,
 } from './lead.ts';
@@ -134,11 +144,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
   //    para qualquer um criar "cliente interessado" no CRM da Imova.
   let chave: string;
   let chaveAnterior: string | null;
+  let chaveTeste: string | null;
   let usuario: string | null;
   try {
     chave = await segredo('grupozap_lead_secret');
-    [chaveAnterior, usuario] = await Promise.all([
+    [chaveAnterior, chaveTeste, usuario] = await Promise.all([
       segredoOpcional('grupozap_lead_secret_anterior'),
+      segredoOpcional('grupozap_lead_secret_teste'),
       segredoOpcional('grupozap_lead_usuario'),
     ]);
   } catch (e) {
@@ -165,6 +177,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     cabecalho: req.headers.get('authorization'),
     segredo: chave,
     segredoAnterior: chaveAnterior,
+    segredoTeste: chaveTeste,
     usuarioExigido: usuario,
   });
   if (!conferencia.ok) {
@@ -196,6 +209,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const resumo = resumoParaLog(lead, idem);
   if (idem.de === 'corpo') {
     registrar('aviso', { funcao: FUNCAO, ...resumo, evento: idem.motivo });
+  }
+
+  // 6b. Teste não chega ao banco. Responde 200 mesmo quando o lead de verdade
+  //     receberia 422: o validador quer saber se a porta abre, e nada foi
+  //     guardado para ser revisado. O log diz o que o lead real receberia.
+  const teste = motivoDeTeste(conferencia.chave, lead);
+  if (teste !== null) {
+    registrar('info', {
+      funcao: FUNCAO,
+      ...resumo,
+      evento: 'teste_nao_gravado',
+      motivo: teste,
+      formato: conferencia.formato,
+      status_se_fosse_real: decidirResposta(lead).status,
+      status: 200,
+    });
+    return json({
+      ok: true,
+      teste: true,
+      gravado: false,
+      motivo: teste,
+      formato: conferencia.formato,
+    });
   }
 
   // 7. O Postgres grava. Também o lead que vai receber 422 (passo 8).

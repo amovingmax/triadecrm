@@ -198,3 +198,213 @@ Deno.test('segredo vazio nunca confere com senha vazia', async () => {
     'credencial_invalida',
   );
 });
+
+// -----------------------------------------------------------------------------
+// A chave de teste da homologação (10/11/2026). O cabeçalho abaixo é o EXEMPLO
+// PÚBLICO da página de segurança do Grupo OLX (developers.grupozap.com/webhooks/
+// security.html), copiado letra por letra; decodificado, é
+// `vivareal:594F803B380A41396ED63DCA39503542`. Não é segredo de ninguém.
+// -----------------------------------------------------------------------------
+const CABECALHO_DA_DOCUMENTACAO = 'Basic dml2YXJlYWw6NTk0RjgwM0IzODBBNDEzOTZFRDYzRENBMzk1MDM1NDI=';
+const CHAVE_DA_DOCUMENTACAO = '594F803B380A41396ED63DCA39503542';
+const PROVISORIA = 'chave-provisoria-de-teste';
+
+Deno.test(
+  'o 401 da homologação: o cabeçalho da documentação contra só a chave provisória',
+  async () => {
+    assertEquals(
+      await motivo({ cabecalho: CABECALHO_DA_DOCUMENTACAO, segredo: PROVISORIA }),
+      'credencial_invalida',
+    );
+  },
+);
+
+Deno.test(
+  'o cabeçalho da documentação passa como teste quando a chave de teste está configurada',
+  async () => {
+    const r = await conferirCredencial({
+      cabecalho: CABECALHO_DA_DOCUMENTACAO,
+      segredo: PROVISORIA,
+      segredoTeste: CHAVE_DA_DOCUMENTACAO,
+    });
+    assertEquals(r, { ok: true, chave: 'teste', formato: 'usuario_e_senha' });
+    // A chave de verdade continua valendo ao lado dela, e é `atual`, não teste.
+    assertEquals(
+      await motivo({
+        cabecalho: basic(`vivareal:${PROVISORIA}`),
+        segredo: PROVISORIA,
+        segredoTeste: CHAVE_DA_DOCUMENTACAO,
+      }),
+      'ok:atual',
+    );
+  },
+);
+
+Deno.test('com a chave de teste configurada, chave errada continua recebendo recusa', async () => {
+  const opcoes = { segredo: PROVISORIA, segredoTeste: CHAVE_DA_DOCUMENTACAO };
+  for (const ruim of [
+    basic('vivareal:outra-chave'),
+    basic(`vivareal:${CHAVE_DA_DOCUMENTACAO.toLowerCase()}`),
+    basic(`vivareal:${CHAVE_DA_DOCUMENTACAO}x`),
+    basic('vivareal:'),
+  ]) {
+    assertEquals(await motivo({ ...opcoes, cabecalho: ruim }), 'credencial_invalida', ruim);
+  }
+  assertEquals(await motivo({ ...opcoes, cabecalho: null }), 'cabecalho_ausente');
+  assertEquals(
+    await motivo({ ...opcoes, cabecalho: `Bearer ${CHAVE_DA_DOCUMENTACAO}` }),
+    'esquema_invalido',
+  );
+});
+
+Deno.test(
+  'trocar pela SECRET_KEY definitiva é só trocar o segredo; tirada a de teste, ela deixa de valer',
+  async () => {
+    const DEFINITIVA = 'secret-key-definitiva-de-teste';
+    assertEquals(
+      await motivo({ cabecalho: basic(`vivareal:${DEFINITIVA}`), segredo: DEFINITIVA }),
+      'ok:atual',
+    );
+    assertEquals(
+      await motivo({
+        cabecalho: CABECALHO_DA_DOCUMENTACAO,
+        segredo: DEFINITIVA,
+        segredoTeste: null,
+      }),
+      'credencial_invalida',
+    );
+    // A provisória pode ficar como anterior enquanto o Grupo OLX não troca.
+    assertEquals(
+      await motivo({
+        cabecalho: basic(`vivareal:${PROVISORIA}`),
+        segredo: DEFINITIVA,
+        segredoAnterior: PROVISORIA,
+      }),
+      'ok:anterior',
+    );
+  },
+);
+
+Deno.test(
+  'se a chave de teste coincidir com a atual, vale teste (na dúvida, não grava)',
+  async () => {
+    assertEquals(
+      await motivo({
+        cabecalho: CABECALHO_DA_DOCUMENTACAO,
+        segredo: CHAVE_DA_DOCUMENTACAO,
+        segredoTeste: CHAVE_DA_DOCUMENTACAO,
+      }),
+      'ok:teste',
+    );
+  },
+);
+
+Deno.test('chave de teste vazia não confere com senha vazia', async () => {
+  assertEquals(
+    await motivo({ cabecalho: basic('vivareal:'), segredo: '', segredoTeste: '' }),
+    'sem_segredo',
+  );
+  assertEquals(
+    await motivo({ cabecalho: basic('vivareal:'), segredo: PROVISORIA, segredoTeste: '' }),
+    'credencial_invalida',
+  );
+});
+
+Deno.test('a chave de teste obedece ao usuário exigido como as outras', async () => {
+  const opcoes = { segredo: PROVISORIA, segredoTeste: CHAVE_DA_DOCUMENTACAO };
+  assertEquals(
+    await motivo({ ...opcoes, usuarioExigido: 'vivareal', cabecalho: CABECALHO_DA_DOCUMENTACAO }),
+    'ok:teste',
+  );
+  assertEquals(
+    await motivo({ ...opcoes, usuarioExigido: 'zap', cabecalho: CABECALHO_DA_DOCUMENTACAO }),
+    'credencial_invalida',
+  );
+});
+
+Deno.test('o formato diz só se havia usuário, nunca qual', async () => {
+  const sem = await conferirCredencial({ cabecalho: basic(CHAVE), segredo: CHAVE });
+  assertEquals(sem, { ok: true, chave: 'atual', formato: 'so_senha' });
+  const com = await conferirCredencial({ cabecalho: basic(`zap:${CHAVE}`), segredo: CHAVE });
+  assertEquals(com, { ok: true, chave: 'atual', formato: 'usuario_e_senha' });
+});
+
+// -----------------------------------------------------------------------------
+// O que o validador oficial manda conforme o que se digita em "Token" (medido
+// em 10/11/2026): ele põe `Basic ` na frente do texto digitado, sem codificar.
+// -----------------------------------------------------------------------------
+Deno.test('validador com a chave crua digitada (`Basic 594F…`) passa como teste', async () => {
+  const r = await conferirCredencial({
+    cabecalho: `Basic ${CHAVE_DA_DOCUMENTACAO}`,
+    segredo: PROVISORIA,
+    segredoTeste: CHAVE_DA_DOCUMENTACAO,
+  });
+  assertEquals(r, { ok: true, chave: 'teste', formato: 'chave_crua' });
+});
+
+Deno.test(
+  'validador com o cabeçalho inteiro digitado (`Basic Basic dml2…`) passa como teste',
+  async () => {
+    const r = await conferirCredencial({
+      cabecalho: `Basic ${CABECALHO_DA_DOCUMENTACAO}`,
+      segredo: PROVISORIA,
+      segredoTeste: CHAVE_DA_DOCUMENTACAO,
+    });
+    assertEquals(r, { ok: true, chave: 'teste', formato: 'usuario_e_senha' });
+  },
+);
+
+Deno.test('a chave crua vale também para a chave de verdade, e só para ela', async () => {
+  assertEquals(await motivo({ cabecalho: `Basic ${PROVISORIA}`, segredo: PROVISORIA }), 'ok:atual');
+  for (const ruim of [
+    `Basic ${PROVISORIA}x`,
+    `Basic ${PROVISORIA.slice(0, -1)}`,
+    `Basic ${CHAVE_DA_DOCUMENTACAO}`,
+    `Basic ${PROVISORIA.toUpperCase()}`,
+  ]) {
+    // Recusa sempre; o motivo do log (credencial ou base64) depende só de o
+    // texto decodificar ou não, e não importa aqui.
+    const r = await conferirCredencial({ cabecalho: ruim, segredo: PROVISORIA });
+    assertEquals(r.ok, false, ruim);
+  }
+});
+
+Deno.test('a chave crua não tem usuário: com usuário exigido, não passa', async () => {
+  assertEquals(
+    await motivo({
+      cabecalho: `Basic ${CHAVE_DA_DOCUMENTACAO}`,
+      segredo: PROVISORIA,
+      segredoTeste: CHAVE_DA_DOCUMENTACAO,
+      usuarioExigido: 'vivareal',
+    }),
+    'credencial_invalida',
+  );
+});
+
+Deno.test(
+  'só UM `Basic ` repetido é tolerado, e a chave sem esquema continua recusada',
+  async () => {
+    const opcoes = { segredo: PROVISORIA, segredoTeste: CHAVE_DA_DOCUMENTACAO };
+    for (const ruim of [
+      `Basic Basic ${CABECALHO_DA_DOCUMENTACAO}`,
+      `Basic  ${CHAVE_DA_DOCUMENTACAO}`,
+      CHAVE_DA_DOCUMENTACAO,
+      `Bearer ${CHAVE_DA_DOCUMENTACAO}`,
+      `Basic vivareal:${CHAVE_DA_DOCUMENTACAO}`,
+    ]) {
+      assertEquals(await motivo({ ...opcoes, cabecalho: ruim }), 'esquema_invalido', ruim);
+    }
+  },
+);
+
+Deno.test('chave crua que não é base64 nem confere continua com o motivo de base64', async () => {
+  // `abcde` não decodifica (resto 1) e não é a chave: o log diz base64_invalido.
+  assertEquals(
+    await motivo({
+      cabecalho: 'Basic abcde',
+      segredo: PROVISORIA,
+      segredoTeste: CHAVE_DA_DOCUMENTACAO,
+    }),
+    'base64_invalido',
+  );
+});

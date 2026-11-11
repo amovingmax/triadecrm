@@ -18,7 +18,10 @@ import { assertEquals, assertMatch, assertNotEquals } from 'jsr:@std/assert@1';
 import {
   chaveDeIdempotencia,
   decidirResposta,
+  ehLeadDeExemplo,
+  ID_DO_LEAD_DE_EXEMPLO,
   lerCorpo,
+  motivoDeTeste,
   normalizarLeadCerto,
   paraOBanco,
   resumoParaLog,
@@ -237,4 +240,35 @@ Deno.test('o tipo de contato só vai ao log se tiver a forma dos documentados', 
   assertEquals(resumoParaLog({}, chave).tipo, 'sem_tipo');
   // Sem originLeadId, o log leva o começo do resumo do corpo.
   assertMatch(resumoParaLog({}, chave).lead, /^sha256:[0-9a-f]{12}$/);
+});
+
+// -----------------------------------------------------------------------------
+// Teste não grava (10/11/2026): a chave de teste, ou o lead de exemplo da
+// documentação com qualquer chave.
+// -----------------------------------------------------------------------------
+Deno.test('o lead de exemplo da documentação é reconhecido, também com espaço em volta', () => {
+  assertEquals(ID_DO_LEAD_DE_EXEMPLO, EXEMPLO.originLeadId);
+  assertEquals(ehLeadDeExemplo(EXEMPLO), true);
+  assertEquals(ehLeadDeExemplo({ ...EXEMPLO, originLeadId: ` ${ID_DO_LEAD_DE_EXEMPLO} ` }), true);
+  // Um caractere diferente, outro id ou id ausente: lead de verdade.
+  assertEquals(ehLeadDeExemplo({ ...EXEMPLO, originLeadId: '59ee0fc6e4b043e1b2a6d864' }), false);
+  assertEquals(ehLeadDeExemplo({ ...EXEMPLO, originLeadId: '6720f1a2b3c4d5e6f7a8b9c0' }), false);
+  const { originLeadId: _sem, ...semId } = EXEMPLO;
+  assertEquals(ehLeadDeExemplo(semId), false);
+});
+
+Deno.test('chamada com a chave de teste é teste, seja qual for o lead', () => {
+  assertEquals(motivoDeTeste('teste', EXEMPLO), 'chave_de_teste');
+  assertEquals(
+    motivoDeTeste('teste', { ...EXEMPLO, originLeadId: '6720f1a2b3c4d5e6f7a8b9c0' }),
+    'chave_de_teste',
+  );
+});
+
+Deno.test('com a chave de verdade, só o lead de exemplo é teste; o resto vai ao banco', () => {
+  assertEquals(motivoDeTeste('atual', EXEMPLO), 'lead_de_exemplo');
+  assertEquals(motivoDeTeste('anterior', EXEMPLO), 'lead_de_exemplo');
+  const real = { ...EXEMPLO, originLeadId: '6720f1a2b3c4d5e6f7a8b9c0' };
+  assertEquals(motivoDeTeste('atual', real), null);
+  assertEquals(motivoDeTeste('anterior', real), null);
 });

@@ -18,7 +18,11 @@
 //     (`MCMV_OLX`) vem sem ele por natureza e recebe 200. Código que não existe
 //     no CRM NÃO é motivo de recusa: o validador oficial manda `a40171`;
 //   * `extraData.leadCerto` aparece como booleano na documentação e como texto
-//     ("true"/"false") em leads reais — o banco recebe sempre booleano.
+//     ("true"/"false") em leads reais — o banco recebe sempre booleano;
+//   * o lead de EXEMPLO da documentação, que o validador oficial manda por
+//     padrão (`originLeadId` 59ee0fc6e4b043e1b2a6d863, de 23/10/2017), não é
+//     lead de ninguém: com qualquer chave, recebe 200 e não é gravado. Chamada
+//     com a chave de teste também não grava. Ver `motivoDeTeste`.
 // =============================================================================
 
 /** Lead de anúncio: sem `clientListingId`, devolve 4xx. */
@@ -27,6 +31,12 @@ export const ORIGEM_ANUNCIO = 'Grupo OLX';
 export const ORIGEM_MCMV = 'MCMV_OLX';
 /** Teto da chave de idempotência vinda do `originLeadId`. */
 export const TAMANHO_MAXIMO_DA_CHAVE = 200;
+/**
+ * O `originLeadId` do lead de exemplo da documentação do Grupo OLX, que o
+ * validador de endpoint manda quando ninguém muda o campo. Não é segredo: é o
+ * dado de exemplo publicado. É um ObjectId de 2017; lead real nunca o repete.
+ */
+export const ID_DO_LEAD_DE_EXEMPLO = '59ee0fc6e4b043e1b2a6d863';
 
 export type Lead = Record<string, unknown>;
 
@@ -108,6 +118,30 @@ export function decidirResposta(lead: Lead): Decisao {
     return { status: 422, codigo: 'anuncio_sem_codigo' };
   }
   return { status: 200 };
+}
+
+export type MotivoDeTeste = 'chave_de_teste' | 'lead_de_exemplo';
+
+/** É o lead de exemplo da documentação (o que o validador manda por padrão)? */
+export function ehLeadDeExemplo(lead: Lead): boolean {
+  return textoDe(lead.originLeadId) === ID_DO_LEAD_DE_EXEMPLO;
+}
+
+/**
+ * Se a chamada é teste, por quê; `null` se é lead de verdade. Teste recebe 200
+ * e NÃO vai ao banco:
+ *   - `chave_de_teste`: autenticou com a chave pública da documentação, que
+ *     qualquer um conhece — gravar com ela abriria o CRM a lead falso;
+ *   - `lead_de_exemplo`: o lead de exemplo da documentação, mesmo com a chave
+ *     de verdade (alguém rodou o validador com a nossa chave).
+ */
+export function motivoDeTeste(
+  chave: 'atual' | 'anterior' | 'teste',
+  lead: Lead,
+): MotivoDeTeste | null {
+  if (chave === 'teste') return 'chave_de_teste';
+  if (ehLeadDeExemplo(lead)) return 'lead_de_exemplo';
+  return null;
 }
 
 /** `true`/`false`, em booleano ou texto (e 1/0); qualquer outra coisa é `null`. */
