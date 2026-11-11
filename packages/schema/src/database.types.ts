@@ -10747,6 +10747,18 @@ export type Database = {
       envio_em_massa_publico: { Args: { p_filtro: Json }; Returns: Json[] }
       envio_em_massa_teto: { Args: never; Returns: Json }
       envios_em_massa_lista: { Args: never; Returns: Json[] }
+      esperas_para_avisar: {
+        Args: never
+        Returns: {
+          conversa_id: string
+          degrau: string
+          desde: string
+          minutos: number
+          nome: string
+          organizacao_id: string
+          responsavel: string
+        }[]
+      }
       esteira_abrir_lote: {
         Args: {
           p_kind: string

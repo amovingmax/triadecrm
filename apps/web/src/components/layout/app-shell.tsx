@@ -3,6 +3,7 @@ import { PilhaDeAvisos } from '@/components/avisos/pilha-de-avisos';
 import { AdiantarDados } from '@/components/consultas/adiantar-dados';
 import { ProvedorDeAvisos } from '@/components/avisos/provedor-avisos';
 import { recebeAvisos } from '@/components/avisos/regra';
+import { VigiaDeEspera } from '@/components/avisos/vigia-de-espera';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Header } from '@/components/layout/header';
 import { RetornoDoToque } from '@/components/layout/retorno-do-toque';
@@ -45,6 +46,12 @@ import { cn } from '@/lib/utils';
  * `VigiaDeLeads` (11/11/2026, só na Imova) é o mesmo para os leads dos portais:
  * o cartão "Novo lead do portal", o som e a notificação do sistema, e o número
  * ao lado de Anúncios (`components/anuncios/leads/vigia-de-leads.tsx`).
+ *
+ * `VigiaDeEspera` (11/11/2026, só na Imova) é a espera em degraus: o cliente sem
+ * resposta há 15 min de expediente avisa quem atende, e há 1 h, a gestão, com o
+ * cartão, o som e a notificação do sistema, pela mesma regra do aviso no celular
+ * (`components/avisos/vigia-de-espera.tsx`). Fica dentro de `ProvedorDeAvisos`
+ * porque abre a conversa pelo mesmo caminho do clique no aviso de mensagem.
  *
  * `ProvedorDoSoftphone` também envolve tudo, pelo mesmo motivo: a ligação feita pelo
  * navegador tem de sobreviver à troca de tela, e o painel dela fica no canto de baixo
@@ -106,6 +113,10 @@ export function AppShell({
 
           <BottomNav papel={sessao.papel} filas={filas} />
           <PilhaDeAvisos />
+          <VigiaDeEspera
+            usuarioId={sessao.id}
+            ligado={EMPRESA.modulos.esperaEmDegraus && recebeAvisos(sessao.papel)}
+          />
           {/* O aviso no WhatsApp de quem não atendeu sai até um minuto depois do
           recibo; quem ligou já está em outro contato (ou outra tela). */}
           <AcompanhanteDeAvisos />
