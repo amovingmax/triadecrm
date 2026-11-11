@@ -10,6 +10,8 @@
 import { createClient } from '@/lib/supabase/client';
 import { supabaseUrl } from '@/lib/env';
 
+import type { EstadoDoCaminho } from './passos-do-caminho';
+import { ocupaVagaPeloRelatorio } from './regras-do-cartao';
 import type { AnuncioDoRelatorio } from './relatorio-canal-pro';
 import type {
   Anuncio,
@@ -49,9 +51,13 @@ export async function carregarAnuncios(excluidos: boolean): Promise<AnuncioNaLis
   return (data ?? []) as unknown as AnuncioNaLista[];
 }
 
-export async function carregarAnuncio(
-  id: string,
-): Promise<{ anuncio: Anuncio; fotos: FotoDoAnuncio[]; pendencias: string[] } | null> {
+export async function carregarAnuncio(id: string): Promise<{
+  anuncio: Anuncio;
+  fotos: FotoDoAnuncio[];
+  pendencias: string[];
+  /** O último relatório do Canal Pro já o conta como vaga (11/11/2026). */
+  ocupaVagaPeloRelatorio: boolean;
+} | null> {
   const supabase = createClient();
   const [anuncio, fotos, lista] = await Promise.all([
     supabase.from('anuncios').select('*').eq('id', id).maybeSingle(),
@@ -62,7 +68,9 @@ export async function carregarAnuncio(
       .order('posicao'),
     supabase
       .from('anuncios_na_lista')
-      .select('pendencias, proprietario_nome, codigo_no_canal_pro')
+      .select(
+        'pendencias, proprietario_nome, codigo_no_canal_pro, no_canal_pro_situacao, no_canal_pro_visto_em',
+      )
       .eq('id', id)
       .maybeSingle(),
   ]);
@@ -77,6 +85,11 @@ export async function carregarAnuncio(
     },
     fotos: (fotos.data ?? []) as FotoDoAnuncio[],
     pendencias: (lista.data?.pendencias as string[] | null) ?? [],
+    ocupaVagaPeloRelatorio: ocupaVagaPeloRelatorio({
+      situacao: (anuncio.data as unknown as Anuncio).situacao,
+      no_canal_pro_situacao: lista.data?.no_canal_pro_situacao ?? null,
+      no_canal_pro_visto_em: lista.data?.no_canal_pro_visto_em ?? null,
+    }),
   };
 }
 
@@ -236,6 +249,94 @@ export async function ajustarCanalPro(c: {
 export async function trocarChaveDoCanalPro(): Promise<Resultado<{ chave: string }>> {
   const { data, error } = await createClient().rpc('canal_pro_trocar_chave');
   return resultado(data, error);
+}
+
+// ---------------------------------------------------------------------------
+// O caminho até o primeiro lead (11/11/2026)
+// ---------------------------------------------------------------------------
+
+export const CHAVE_DO_CAMINHO = ['anuncios', 'caminho-do-lead'] as const;
+
+type Cru = Record<string, unknown>;
+const lista = <T>(v: unknown, f: (x: Cru) => T): T[] =>
+  Array.isArray(v) ? v.map((x) => f(x as Cru)) : [];
+const texto = (v: unknown): string => (typeof v === 'string' ? v : '');
+const textoOuNulo = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+const numero = (v: unknown): number => (typeof v === 'number' ? v : 0);
+
+/**
+ * O estado do caminho numa chamada (`public.anuncios_caminho_do_lead`, migração
+ * 20261111203000). Só admin e gestor: para os outros o banco devolve
+ * `sem_permissao`, e aqui vira erro.
+ */
+export async function carregarCaminhoDoLead(): Promise<EstadoDoCaminho> {
+  const { data, error } = await createClient().rpc('anuncios_caminho_do_lead');
+  if (error) throw new Error(error.message);
+  const r = (data ?? {}) as Cru;
+  if (r.ok !== true) throw new Error(texto(r.motivo) || 'sem_permissao');
+  const arquivo = (r.arquivo ?? {}) as Cru;
+  const plano = (r.plano ?? {}) as Cru;
+  const anuncios = (r.anuncios ?? {}) as Cru;
+  const relatorio = (r.relatorio ?? {}) as Cru;
+  const leads = (r.leads ?? {}) as Cru;
+  const robo = arquivo.leitura_do_robo as Cru | null;
+  const outra = arquivo.outra_leitura as Cru | null;
+  const ultimo = leads.ultimo as Cru | null;
+  const doCaminho = (x: Cru) => ({
+    id: texto(x.id),
+    codigo: texto(x.codigo),
+    titulo: texto(x.titulo),
+  });
+  const comPendencia = (x: Cru) => ({
+    ...doCaminho(x),
+    pendencias: lista(x.pendencias, (p) => String(p)),
+  });
+  return {
+    arquivo: {
+      leituraDoRobo: robo ? { em: texto(robo.em), anuncios: numero(robo.anuncios) } : null,
+      leiturasDoRobo7Dias: numero(arquivo.leituras_do_robo_7_dias),
+      outraLeitura: outra ? { em: texto(outra.em), quem: texto(outra.quem) } : null,
+    },
+    plano: {
+      anuncios: typeof plano.anuncios === 'number' ? plano.anuncios : null,
+      destaques: typeof plano.destaques === 'number' ? plano.destaques : null,
+      anunciosEmUso: numero(plano.anuncios_em_uso),
+      destaquesEmUso: numero(plano.destaques_em_uso),
+    },
+    anuncios: {
+      noAr: numero(anuncios.no_ar),
+      noArquivo: numero(anuncios.no_arquivo),
+      foraDoArquivo: lista(anuncios.fora_do_arquivo, comPendencia),
+      prontos: lista(anuncios.prontos, (x) => ({
+        ...doCaminho(x),
+        ocupaVaga: x.ocupa_vaga === true,
+      })),
+      comPendencia: lista(anuncios.com_pendencia, comPendencia),
+    },
+    relatorio: {
+      importadoEm: textoOuNulo(relatorio.importado_em),
+      repetidosAtivos: lista(relatorio.repetidos_ativos, (x) => ({
+        id: texto(x.id),
+        codigo: texto(x.codigo),
+        titulo: textoOuNulo(x.titulo),
+        situacao: textoOuNulo(x.situacao),
+        copiaDe: texto(x.copia_de),
+        marcadoExcluidoEm: textoOuNulo(x.marcado_excluido_em),
+      })),
+      repetidosInativos: numero(relatorio.repetidos_inativos),
+    },
+    leads: {
+      ultimo: ultimo
+        ? {
+            id: texto(ultimo.id),
+            em: texto(ultimo.em),
+            tipos: lista(ultimo.tipos, (t) => String(t)),
+            anuncio: textoOuNulo(ultimo.anuncio),
+          }
+        : null,
+      total: numero(leads.total),
+    },
+  };
 }
 
 /** A URL que se cola no Canal Pro. */

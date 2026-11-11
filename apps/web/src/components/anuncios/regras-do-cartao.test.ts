@@ -7,6 +7,11 @@ import {
   faixaDaNota,
   diaDeCriacao,
   estadoNoPortal,
+  foraDoArquivo,
+  fraseForaDoArquivo,
+  ocupaVagaPeloRelatorio,
+  oQueFalta,
+  travasDoPlano,
   formatarDia,
   formatarNota,
   negociosDoCartao,
@@ -501,5 +506,110 @@ describe('estadoNoPortal', () => {
         sistema_atual_em: depois,
       }),
     ).toBe('nao_publicado');
+  });
+});
+
+describe('no ar no CRM, mas fora do arquivo (11/11/2026)', () => {
+  const noAr = {
+    situacao: 'no_ar' as const,
+    excluido_em: null,
+    pendencias: ['pelo menos 1 foto'] as string[] | null,
+  };
+
+  it('no ar com pendência está fora do arquivo; sem pendência, rascunho ou excluído, não', () => {
+    expect(foraDoArquivo(noAr)).toBe(true);
+    expect(foraDoArquivo({ ...noAr, pendencias: [] })).toBe(false);
+    expect(foraDoArquivo({ ...noAr, pendencias: null })).toBe(false);
+    expect(foraDoArquivo({ ...noAr, situacao: 'rascunho' })).toBe(false);
+    expect(foraDoArquivo({ ...noAr, excluido_em: '2026-11-11T12:00:00Z' })).toBe(false);
+  });
+
+  it('o selo diz "Fora do arquivo", e não "Publicado"', () => {
+    const a = {
+      ...noAr,
+      publicado_em: '2026-11-05T10:00:00Z',
+      ultima_leitura_do_portal: '2026-11-05T12:00:00Z',
+      no_canal_pro_situacao: null,
+      no_canal_pro_visto_em: null,
+      no_sistema_atual: null,
+      sistema_atual_em: null,
+    };
+    expect(seloDoAnuncio(a)).toEqual({ rotulo: 'Fora do arquivo', tom: 'alerta' });
+    expect(seloDoAnuncio({ ...a, pendencias: [] }).rotulo).toBe('Publicado');
+  });
+
+  it('a frase diz o que falta e o que acontece', () => {
+    expect(fraseForaDoArquivo(['CEP', 'bairro'], '2026-11-11T03:07:00Z')).toBe(
+      'No ar no CRM, mas fora do arquivo: falta CEP, bairro. O Grupo OLX o tira do portal na próxima leitura. Complete o que falta, ou tire do ar.',
+    );
+    expect(fraseForaDoArquivo(['CEP'], null)).toMatch(
+      /Quando o Canal Pro passar a ler o arquivo do CRM, ele não vai\./,
+    );
+    expect(oQueFalta(['a', 'b', 'c', 'd', 'e', 'f'])).toBe('a, b, c, d e mais 2');
+  });
+});
+
+describe('o plano antes do clique (11/11/2026)', () => {
+  const plano = { anuncios: 10, destaques: 2, anunciosEmUso: 10, destaquesEmUso: 2 };
+  const rascunho = {
+    situacao: 'rascunho' as const,
+    no_canal_pro_situacao: 'Ativo' as string | null,
+    no_canal_pro_visto_em: '2026-11-05T20:38:00Z' as string | null,
+  };
+
+  it('o relatório já conta o rascunho quando a linha dele está ativa', () => {
+    expect(ocupaVagaPeloRelatorio(rascunho)).toBe(true);
+    expect(ocupaVagaPeloRelatorio({ ...rascunho, no_canal_pro_situacao: 'Inativo' })).toBe(false);
+    expect(
+      ocupaVagaPeloRelatorio({
+        ...rascunho,
+        no_canal_pro_situacao: null,
+        no_canal_pro_visto_em: null,
+      }),
+    ).toBe(false);
+    expect(ocupaVagaPeloRelatorio({ ...rascunho, situacao: 'no_ar' })).toBe(false);
+  });
+
+  it('plano cheio pelo sistema atual: o anúncio que já ocupa a vaga não é barrado', () => {
+    expect(
+      travasDoPlano(plano, {
+        situacao: 'rascunho',
+        destaque: 'padrao',
+        ocupaVagaPeloRelatorio: true,
+      }).semVaga,
+    ).toBe(false);
+    expect(
+      travasDoPlano(plano, {
+        situacao: 'rascunho',
+        destaque: 'padrao',
+        ocupaVagaPeloRelatorio: false,
+      }).semVaga,
+    ).toBe(true);
+  });
+
+  it('o destaque do anúncio que o relatório conta fica com o banco', () => {
+    const comDestaque = { situacao: 'rascunho' as const, destaque: 'destaque' };
+    expect(
+      travasDoPlano(plano, { ...comDestaque, ocupaVagaPeloRelatorio: false }).destaqueBarrado,
+    ).toBe(true);
+    expect(
+      travasDoPlano(plano, { ...comDestaque, ocupaVagaPeloRelatorio: true }).destaqueBarrado,
+    ).toBe(false);
+  });
+
+  it('no ar, o próprio destaque não conta contra ele; sem plano, nada trava', () => {
+    const t = travasDoPlano(plano, {
+      situacao: 'no_ar',
+      destaque: 'destaque',
+      ocupaVagaPeloRelatorio: false,
+    });
+    expect(t).toEqual({ semVaga: false, semDestaque: false, destaqueBarrado: false });
+    expect(
+      travasDoPlano(null, {
+        situacao: 'rascunho',
+        destaque: 'destaque',
+        ocupaVagaPeloRelatorio: false,
+      }),
+    ).toEqual({ semVaga: false, semDestaque: false, destaqueBarrado: false });
   });
 });

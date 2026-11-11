@@ -10,6 +10,7 @@ import { ChipsDeSecao } from '@/components/ui/abas';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { LinhaDoCanalPro } from './anuncios-no-canal-pro';
+import { CaminhoDoLead } from './caminho-do-lead';
 import { CartaoDoAnuncio } from './cartao-do-anuncio';
 import {
   carregarAnuncios,
@@ -216,6 +217,16 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
             </Button>
           </div>
         </div>
+
+        {/* O que falta para o primeiro lead dos portais (11/11/2026): só para quem
+            publica, cola a URL e exclui os repetidos. */}
+        {podePublicar ? (
+          <CaminhoDoLead
+            chave={canalPro.data?.chave ?? null}
+            noPortalSoPeloSistemaAtual={aAssumir.length}
+            aoImportar={() => setImportarAberto(true)}
+          />
+        ) : null}
 
         <ResumoDaIntegracao
           carregando={canalPro.isPending}

@@ -10576,6 +10576,7 @@ export type Database = {
       anuncio_restaurar: { Args: { p_id: string }; Returns: Json }
       anuncio_salvar: { Args: { p_dados: Json; p_id?: string }; Returns: Json }
       anuncio_tirar_do_ar: { Args: { p_id: string }; Returns: Json }
+      anuncios_caminho_do_lead: { Args: never; Returns: Json }
       aprovar_rascunho: {
         Args: { p_draft_id: string; p_texto_final?: string }
         Returns: Json
