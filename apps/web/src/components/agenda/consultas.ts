@@ -11,6 +11,7 @@ import {
 } from '@/components/registro/tipos';
 
 import { escaparCuringas, normalizarBusca, ordenarCandidatos } from './autocompletar';
+import { buscarImoveisDasVisitas } from './imovel-da-visita-dados';
 import { lembretesPorTarefa, respostaDoLembrete } from './lembrete-de-visita';
 import { buscarRespostasDosLembretes } from './lembrete-de-visita-dados';
 import {
@@ -56,6 +57,9 @@ import {
  *    pessoa fez para os MESMOS parceiros perto de quando cada tarefa foi fechada. É
  *    deles que sai o resultado pintado no cartão (`escolherResultado`). Falha aqui é
  *    engolida: o cartão fica sem a cor, e a semana continua certa.
+ * 6. Na Imova, o imóvel de cada visita (`visita_imoveis`, com o título e a situação
+ *    do anúncio), na mesma leva. Falha também é engolida, e sem acusar ninguém: com a
+ *    leitura falhando, nenhuma visita ganha "Falta o imóvel".
  *
  * Nenhum texto do Postgres chega à tela: falha vira `ErroDaAgenda` com frase em
  * português, pela mesma tradução que a tela de registro usa.
@@ -246,6 +250,14 @@ export async function buscarCompromissos(params: {
 
   const fechadas = linhas.filter((t) => t.status === 'done');
 
+  // O imóvel de cada visita (só na Imova): o código, o título e o endereço no cartão,
+  // e o "Falta o imóvel" da que não tem. Sai junto com a leva abaixo; nulo quando a
+  // leitura falhou.
+  const imoveisDasVisitas = buscarImoveisDasVisitas(
+    supabase,
+    linhas.filter((t) => t.kind === 'visit').map((t) => t.id),
+  ).catch(() => null);
+
   const [orgs, negocios, reuniao, registros, doCalendly, novos, lembretes] = await Promise.all([
     supabase.from('organizations_view').select(COLUNAS_ORG).in('id', orgIds),
     buscarNegocios(supabase, dealIds),
@@ -283,6 +295,7 @@ export async function buscarCompromissos(params: {
       linhas.map((t) => t.id),
     ),
   ]);
+  const imoveis = await imoveisDasVisitas;
 
   if (orgs.error) throw erroDe(orgs.error.code, orgs.error);
   // Ao contrário do espelho do Google, este erro NÃO é engolido: sem a reunião a
@@ -373,6 +386,8 @@ export async function buscarCompromissos(params: {
         resultado: resultadoDaTarefa(tarefa, tipo, registros, params.usuarioId),
         reagendada: reuniaoDaTarefa?.remarcada_de != null,
         responsavelId: params.usuarioId,
+        imovel: ehVisita ? (imoveis?.get(tarefa.id) ?? null) : null,
+        faltaImovel: ehVisita && imoveis !== null && !imoveis.has(tarefa.id),
       } satisfies Compromisso,
     ];
   });

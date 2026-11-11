@@ -37,6 +37,14 @@ import {
   type HorarioLivre,
 } from './acoes-reuniao';
 import { CampoParceiro } from './campo-parceiro';
+import { EscolherImovel } from './escolher-imovel';
+import {
+  ESCOLHA_VAZIA,
+  recadoDoImovel,
+  validarImovel,
+  type EscolhaDoImovel,
+} from './imovel-da-visita';
+import { IMOVEL_NA_VISITA, marcarVisitaComImovel } from './imovel-da-visita-dados';
 import { lerSala, salvarMinhaSala, validarSala, type SalaDaPessoa } from './sala';
 import { diaDoInstante, ehFimDeSemana, horaEmNatal, rotuloDiaPorExtenso, type Dia } from './tipos';
 
@@ -61,6 +69,12 @@ import { diaDoInstante, ehFimDeSemana, horaEmNatal, rotuloDiaPorExtenso, type Di
  *    robô não marca sem ela) — e é aqui que cada pessoa cadastra a sua (`sala.ts`).
  *  · **Visita** grava por `visita_marcar`, que recusa o horário em que a pessoa
  *    já tem reunião ou outra visita, e diz com o quê bateu.
+ *
+ *    Na Imova (módulo `agendaComImovel`, 11/11/2026) a visita tem IMÓVEL
+ *    obrigatório: o anúncio (código, título e endereço) ou, na avaliação de
+ *    proprietário, o endereço do imóvel sem anúncio. Grava por
+ *    `visita_marcar_com_imovel`, que chama a mesma `visita_marcar` e guarda o
+ *    imóvel em `visita_imoveis`.
  */
 type Tipo = 'reuniao' | 'visita';
 
@@ -661,20 +675,35 @@ function ParteDaVisita({
   const [hora, setHora] = useState('14:00');
   const [gravando, setGravando] = useState(false);
   const [erro, setErro] = useState<{ frase: string; conflitos: ConflitoDeVisita[] } | null>(null);
+  const [imovel, setImovel] = useState<EscolhaDoImovel>(ESCOLHA_VAZIA);
+  const [erroDoImovel, setErroDoImovel] = useState<string | null>(null);
 
   async function marcar() {
+    // O imóvel primeiro: é o que falta mais vezes, e fica em cima na folha.
+    const doImovel = IMOVEL_NA_VISITA ? validarImovel(imovel) : null;
+    if (doImovel && !doImovel.ok) {
+      setErroDoImovel(doImovel.recado);
+      return;
+    }
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) {
       setErro({ frase: 'Escolha a hora da visita.', conflitos: [] });
       return;
     }
     setGravando(true);
-    const r = await marcarVisita({
+    const pedido = {
       organizationId: alvo.id,
       dealId: alvo.dealId,
       // Hora de Natal, dita com o fuso: o aparelho pode estar noutro.
       inicio: `${dia}T${hora}:00-03:00`,
       donoId: outraPessoa ? donoId : null,
-    });
+    };
+    const r = doImovel?.ok
+      ? await marcarVisitaComImovel({
+          ...pedido,
+          anuncioId: doImovel.anuncioId,
+          endereco: doImovel.endereco,
+        })
+      : await marcarVisita(pedido);
     setGravando(false);
     if (r.ok) {
       toast.success(
@@ -683,6 +712,11 @@ function ParteDaVisita({
           : 'Visita marcada na sua agenda.',
       );
       aoMarcar(dia, donoId);
+      return;
+    }
+    // As recusas do imóvel (sem imóvel, anúncio excluído) voltam para o campo dele.
+    if (r.motivo === 'visita_sem_imovel' || r.motivo === 'anuncio_invalido') {
+      setErroDoImovel(recadoDoImovel(r.motivo));
       return;
     }
     setErro({
@@ -698,6 +732,18 @@ function ParteDaVisita({
 
   return (
     <div className="flex flex-col gap-4">
+      {IMOVEL_NA_VISITA ? (
+        <EscolherImovel
+          valor={imovel}
+          aoMudar={(escolha) => {
+            setImovel(escolha);
+            setErroDoImovel(null);
+          }}
+          permiteSemAnuncio
+          erro={erroDoImovel}
+        />
+      ) : null}
+
       <div className="flex flex-col gap-1.5">
         <label htmlFor={`${id}-hora`} className="text-sm font-medium">
           Hora

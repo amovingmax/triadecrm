@@ -11,6 +11,7 @@ import {
   type DesfechoCatalogo,
 } from '@/components/registro/tipos';
 
+import type { ImovelDaVisita } from './imovel-da-visita';
 import type { RespostaDoLembrete } from './lembrete-de-visita';
 
 /**
@@ -145,6 +146,18 @@ export type Compromisso = {
    * não é o dono.
    */
   responsavelId: string;
+  /**
+   * O imóvel da visita (`public.visita_imoveis`, só na Imova, módulo
+   * `agendaComImovel`): o código e o título do anúncio, ou o endereço do imóvel sem
+   * anúncio. Ausente fora da Imova e na reunião.
+   */
+  imovel?: ImovelDaVisita | null;
+  /**
+   * A visita da Imova que não tem linha em `visita_imoveis`: o selo "Falta o imóvel"
+   * e a ação "Definir imóvel". Falso quando a leitura falhou: sem saber, a tela não
+   * acusa.
+   */
+  faltaImovel?: boolean;
 };
 
 /**
@@ -635,16 +648,22 @@ export function lugarDeVerdade(local: string | null | undefined): string | null 
 const CODIGO_DO_ANUNCIO = /\s*\(anúncio [A-Za-z0-9_-]+\)\s*$/i;
 
 /**
- * O endereço da visita: o que o cliente escreveu no Calendly (`local`, só na visita;
- * ou o endereço do anúncio cujo código ele escreveu) vale por cima do endereço da
- * ficha, que costuma estar vazio.
+ * O endereço da visita: o do imóvel dela (`visita_imoveis`, na Imova), e depois o que
+ * o cliente escreveu no Calendly (`local`, só na visita; ou o endereço do anúncio
+ * cujo código ele escreveu), por cima do endereço da ficha, que costuma estar vazio.
  */
 function enderecoDaVisita(c: Compromisso): string | null {
+  const doImovel = c.tipo === 'visita' ? lugarDeVerdade(c.imovel?.endereco) : null;
+  if (doImovel) return doImovel;
   const doCalendly = c.tipo === 'visita' ? lugarDeVerdade(c.local) : null;
   return doCalendly?.replace(CODIGO_DO_ANUNCIO, '') || c.endereco?.trim() || null;
 }
 
 export function consultaDoMapa(c: Compromisso): string {
+  // O imóvel da visita (Imova) já traz o bairro e a cidade DELE: somar o bairro da
+  // ficha, que é onde o cliente mora, mandaria o Maps para outro lugar.
+  const doImovel = c.tipo === 'visita' ? lugarDeVerdade(c.imovel?.endereco) : null;
+  if (doImovel) return doImovel;
   const local = [c.bairro, c.cidade ?? 'Natal', 'RN'].filter(Boolean).join(', ');
   const endereco = enderecoDaVisita(c);
   return endereco ? `${endereco}, ${local}` : `${c.organizacao}, ${local}`;

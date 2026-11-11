@@ -690,3 +690,37 @@ describe('de qual registro sai o resultado (opção A, sem banco)', () => {
     expect(escolherResultado({ quando, fechadoEm: null }, [])).toBeNull();
   });
 });
+
+describe('o mapa da visita com imóvel (Imova, 11/11/2026)', () => {
+  const imovel = {
+    anuncioId: 'anuncio-1',
+    codigo: 'IM0003',
+    endereco: 'Rua das Algas, 120, Ponta Negra, Natal',
+    titulo: 'Casa com 3 quartos',
+    situacao: 'no_ar' as const,
+    origem: 'crm' as const,
+  };
+
+  it('busca pelo endereço do imóvel, sem o bairro da ficha do cliente', () => {
+    const visita = compromisso({
+      tipo: 'visita',
+      bairro: 'Tirol',
+      local: 'Outro lugar, 1',
+      imovel,
+    });
+    expect(consultaDoMapa(visita)).toBe('Rua das Algas, 120, Ponta Negra, Natal');
+    expect(linkDoMapa(visita)).toContain(
+      encodeURIComponent('Rua das Algas, 120, Ponta Negra, Natal'),
+    );
+    expect(mapaPorNome(visita)).toBe(false);
+  });
+
+  it('sem imóvel, continua como antes; e a reunião não usa o imóvel', () => {
+    expect(consultaDoMapa(compromisso({ tipo: 'visita', imovel: null }))).toBe(
+      'Buffet Sabor, Tirol, Natal, RN',
+    );
+    expect(consultaDoMapa(compromisso({ tipo: 'reuniao', imovel }))).toBe(
+      'Buffet Sabor, Tirol, Natal, RN',
+    );
+  });
+});

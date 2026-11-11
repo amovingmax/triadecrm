@@ -142,6 +142,8 @@ Quem atende, pela tela: **Agenda → "Quem atende o que chega pelo Calendly"** (
 - O agendamento entra na agenda dessa pessoa, e a ficha e o negócio novos ficam com ela como responsável.
 - É a agenda dessa pessoa que o CRM espelha no Google.
 
+O link que vai para o cliente, também pela tela: **Agenda → "Link do Calendly"**, ao lado de "Quem atende" (só admin, 11/11/2026). Mostra o link atual (`app_settings['calendly'].link`) e grava por `public.calendly_link_configurar`, que só aceita `https://calendly.com/...` e não mexe em `dono_email` nem em `google_agenda_id`. O campo mostra a ordem das perguntas que o preenchimento do link espera (ver [as perguntas](#as-perguntas-a-criar-no-calendly)): 1. "O que você quer marcar?" (Visita a um imóvel / Reunião), 2. "Telefone (WhatsApp)", 3. "Endereço ou código do imóvel". É esse link que o botão **"Enviar link da agenda"** de Conversas e a IA mandam ao cliente; sem ele, os dois recusam com "o link do Calendly ainda não foi cadastrado".
+
 ### 6. O token do Calendly
 
 Em calendly.com, com a conta da Imova: **Integrações → API e webhooks → Personal access tokens → Gerar token**, com `users:read`, `webhooks:read`, `webhooks:write` e `scheduled_events:write`. Ponha no `.env.imova` (fora do git):

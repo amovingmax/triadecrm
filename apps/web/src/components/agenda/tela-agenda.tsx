@@ -33,6 +33,7 @@ import { FalhasDoCalendly } from './falhas-do-calendly';
 import { CartaoDoEspelhoNoGoogle } from './cartao-do-espelho';
 import { FolhaDesfecho } from './folha-desfecho';
 import { BotaoNovoCompromisso, FolhaNovoCompromisso } from './folha-novo-compromisso';
+import { LinkDoCalendly } from './link-do-calendly';
 import { ListaDoDia } from './lista-dia';
 import { QuemAtendeOCalendly } from './quem-atende-o-calendly';
 import { registrarDesfechoDoCompromisso } from './registrar-desfecho';
@@ -371,7 +372,16 @@ export function TelaAgenda({
           mais nada para configurar aqui — a sala de cada pessoa mora na folha de
           Novo compromisso (`sala.ts`), e o livre/ocupado é calculado pelo CRM. Na
           aba Rota a nota não aparece: ela fala da lista do dia. */}
-      {EMPRESA.modulos.calendly && ehAdmin && visao !== 'rota' ? <QuemAtendeOCalendly /> : null}
+      {/* Ao lado, o "Link do Calendly" (Imova, 11/11/2026): o link que o botão de
+          Conversas e a IA mandam ao cliente, e a ordem das perguntas do evento. */}
+      {ehAdmin &&
+      visao !== 'rota' &&
+      (EMPRESA.modulos.calendly || EMPRESA.modulos.agendaComImovel) ? (
+        <div className="grid items-start gap-5 lg:grid-cols-2">
+          {EMPRESA.modulos.calendly ? <QuemAtendeOCalendly /> : null}
+          {EMPRESA.modulos.agendaComImovel ? <LinkDoCalendly /> : null}
+        </div>
+      ) : null}
 
       {visao === 'rota' ? null : <AindaNaoLigado />}
 

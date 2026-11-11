@@ -196,6 +196,14 @@ export async function marcarVisita(p: {
     p_deal_id: p.dealId ?? undefined,
     p_dono: p.donoId ?? undefined,
   });
+  return resultadoDeVisita(data, error);
+}
+
+/**
+ * O retorno de `visita_marcar` — e de `visita_marcar_com_imovel` (Imova), que devolve
+ * o mesmo —, com os compromissos com que o horário bateu.
+ */
+export function resultadoDeVisita(data: unknown, error: unknown): ResultadoDeVisita {
   if (error) return { ok: false, motivo: 'erro_do_servidor', conflitos: [] };
   const r = (data ?? {}) as { ok?: boolean; motivo?: string; conflitos?: unknown };
   if (r.ok === true) return { ok: true };
