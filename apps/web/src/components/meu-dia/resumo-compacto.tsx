@@ -96,7 +96,8 @@ export function ResumoCompacto({
                 Definir metas
               </Link>
             ) : (
-              <span>Quem define a meta é gestor ou admin.</span>
+              // O SDR também define meta desde 21/10/2026 (`PAPEIS_QUE_DEFINEM_META`).
+              <span>Quem define a meta é admin, gestor ou SDR.</span>
             )}
           </span>
         </p>

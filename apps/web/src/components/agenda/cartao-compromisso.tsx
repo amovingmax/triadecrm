@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DiasSemContato } from '@/components/temperatura';
+import { VOCABULARIO } from '@/lib/vocabulario';
 
 import {
   faixaDeHoras,
@@ -248,8 +249,8 @@ export function CartaoCompromisso({
         {compromisso.naoContatar ? (
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <PhoneOff className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            Pediu para não ser contatado. Só dá para registrar o que não devolve este parceiro para
-            a fila.
+            Pediu para não ser contatado. Só dá para registrar o que não devolve este{' '}
+            {VOCABULARIO.parceiro} para a fila.
           </p>
         ) : null}
 

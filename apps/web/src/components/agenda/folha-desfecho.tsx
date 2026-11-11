@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/sheet';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 import { type DesfechoCatalogo, type EtapaAlvo } from '@/components/registro/tipos';
+import { VOCABULARIO } from '@/lib/vocabulario';
 
 import { type PedidoDeDesfecho } from './tipos';
 
@@ -63,7 +64,7 @@ export function FolhaDesfecho({
         <div className="flex flex-col gap-1.5 px-4 pb-4">
           {pedido?.opcoes.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Não há resultado deste tipo para registrar neste parceiro. Se ele procurou você, anote
+              Não há resultado deste tipo para registrar neste {VOCABULARIO.parceiro}. Se ele procurou você, anote
               na ficha: anotação não devolve ninguém para a fila.
             </p>
           ) : null}

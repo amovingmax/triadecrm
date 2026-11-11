@@ -520,13 +520,15 @@ export function TelaMeuDia({
       {doProprio ? <PulsoDoDia /> : null}
 
       {/* No celular, só o próximo compromisso, numa faixa (Meu dia novo). */}
-      {NOVO ? <AgendaDeHoje pessoa={pessoa} hoje={hoje} forma="faixa" /> : null}
+      {NOVO ? (
+        <AgendaDeHoje pessoa={pessoa} usuarioId={usuarioId} hoje={hoje} forma="faixa" />
+      ) : null}
 
       {/* No Meu dia novo as abas ficam acima das duas colunas, como no protótipo: a
           agenda ao lado é do dia, e não de uma aba. */}
       {NOVO ? abas : null}
 
-      <ComAgendaAoLado ativo={NOVO} pessoa={pessoa} hoje={hoje}>
+      <ComAgendaAoLado ativo={NOVO} pessoa={pessoa} usuarioId={usuarioId} hoje={hoje}>
         {NOVO ? null : abas}
 
         {aba === 'feito' ? (
@@ -673,11 +675,13 @@ export function TelaMeuDia({
 function ComAgendaAoLado({
   ativo,
   pessoa,
+  usuarioId,
   hoje,
   children,
 }: {
   ativo: boolean;
   pessoa: string;
+  usuarioId: string;
   hoje: string;
   children: React.ReactNode;
 }) {
@@ -686,7 +690,7 @@ function ComAgendaAoLado({
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
       <div className="flex min-w-0 flex-col gap-4">{children}</div>
       <aside aria-label="Agenda de hoje" className="hidden lg:sticky lg:top-4 lg:block">
-        <AgendaDeHoje pessoa={pessoa} hoje={hoje} forma="coluna" />
+        <AgendaDeHoje pessoa={pessoa} usuarioId={usuarioId} hoje={hoje} forma="coluna" />
       </aside>
     </div>
   );

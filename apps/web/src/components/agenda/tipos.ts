@@ -10,6 +10,7 @@ import {
   SLUGS_REUNIAO_AGENDADA,
   type DesfechoCatalogo,
 } from '@/components/registro/tipos';
+import { maiuscula, VOCABULARIO } from '@/lib/vocabulario';
 
 import type { ImovelDaVisita } from './imovel-da-visita';
 import type { RespostaDoLembrete } from './lembrete-de-visita';
@@ -138,7 +139,11 @@ export type Compromisso = {
    * Nulo no que está aberto e no que foi fechado sem registro com desfecho.
    */
   resultado: ResultadoDoCompromisso | null;
-  /** `reunioes.remarcada_de` preenchido: esta reunião é a nova data de outra. */
+  /**
+   * Esta é a nova data de outra: a reunião com `reunioes.remarcada_de`, ou o que o
+   * cliente remarcou pelo Calendly (`calendly_agendamentos.remarcado_de`, que é o
+   * único rastro da visita remarcada, porque a visita é tarefa e não reunião).
+   */
   reagendada: boolean;
   /**
    * `tasks.assignee_id`: de quem é a agenda em que o compromisso está. É a grade
@@ -199,25 +204,27 @@ export function resultadoDoDesfecho(
   if ((SLUGS_REUNIAO_AGENDADA as readonly string[]).includes(desfecho.slug)) {
     return { ...base, tom: 'reagendado', rotulo: 'Reagendada' };
   }
+  // "Parceiro"; na Imova, "Cliente" (`EMPRESA.vocabulario`).
+  const quem = maiuscula(VOCABULARIO.parceiro);
   if (comQuemPadrao(desfecho) === 'ninguem') {
     return {
       ...base,
       tom: 'ausente',
-      rotulo: tipo === 'visita' ? 'Parceiro não estava' : 'Parceiro não compareceu',
+      rotulo: tipo === 'visita' ? `${quem} não estava` : `${quem} não compareceu`,
     };
   }
   if (desfecho.target_stage_slug === 'perdido') {
     return {
       ...base,
       tom: 'perda',
-      rotulo: tipo === 'visita' ? desfecho.name : 'Parceiro recusou',
+      rotulo: tipo === 'visita' ? desfecho.name : `${quem} recusou`,
     };
   }
   if (desfecho.target_stage_slug === 'nutricao') {
     return { ...base, tom: 'adiado', rotulo: desfecho.name };
   }
   if (ehAutorizacao(desfecho)) {
-    return { ...base, tom: 'sucesso', rotulo: 'Parceiro autorizou', trofeu: true };
+    return { ...base, tom: 'sucesso', rotulo: `${quem} autorizou`, trofeu: true };
   }
   if (
     (desfecho.target_stage_slug && ETAPAS_DE_SUCESSO.includes(desfecho.target_stage_slug)) ||
@@ -458,6 +465,50 @@ export function naturezaDoCompromisso(
   // `reunioes` (a trava de sobreposição a recusa), e nem por isso é "a combinar".
   if (c.peloCalendly) return 'marcado';
   return c.etapaId !== null && etapasQueMarcamHora.has(c.etapaId) ? 'marcado' : 'a_marcar';
+}
+
+/** A etapa que pede `meeting_at` em `stages.required_fields`: a que marca hora (ver o cabeçalho). */
+export function etapaPedeHora(camposObrigatorios: unknown): boolean {
+  return (
+    Array.isArray(camposObrigatorios) &&
+    camposObrigatorios.some(
+      (campo) =>
+        typeof campo === 'object' &&
+        campo !== null &&
+        (campo as { field?: unknown }).field === 'meeting_at',
+    )
+  );
+}
+
+/**
+ * A visita tem hora combinada pela origem da tarefa: a do Calendly sempre; a
+ * marcada no CRM (`tasks.origin = 'manual'`), onde a empresa mostra essa hora
+ * (`EMPRESA.modulos.horaNaVisita`). As outras são porta a bater no dia.
+ */
+export function visitaComHoraCombinada(origem: string, horaNaVisita: boolean): boolean {
+  return origem === 'calendly' || (horaNaVisita && origem === 'manual');
+}
+
+/**
+ * A hora do compromisso é hora combinada com alguém, e é para ser vista: a reunião
+ * marcada e a visita de hora combinada. A apresentação "a marcar" e a visita sem
+ * hora carregam o prazo da régua (09:00), que não é hora de nada. É a régua do
+ * cartão da Agenda (`temHora` em `cartao-compromisso.tsx`) e da "Agenda de hoje"
+ * do Meu dia.
+ */
+export function temHoraCombinada(
+  c: Pick<Compromisso, 'natureza' | 'tipo' | 'horaCombinada'>,
+): boolean {
+  return c.natureza === 'marcado' || (c.tipo === 'visita' && c.horaCombinada);
+}
+
+/**
+ * O compromisso segura horário na agenda (a régua de `app.agenda_ocupada`): a
+ * reunião marcada e toda visita aberta. A apresentação "a marcar" não segura.
+ * É o que o espelho copia no Google para o Calendly esconder o horário.
+ */
+export function seguraHorario(c: Pick<Compromisso, 'natureza'>): boolean {
+  return c.natureza !== 'a_marcar';
 }
 
 /** Quem "marcou", no aviso, o que veio pelo link: o cliente, pelo Calendly. */

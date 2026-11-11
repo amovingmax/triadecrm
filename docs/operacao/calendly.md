@@ -27,6 +27,8 @@ Nada vai pelo WhatsApp. Só a Imova tem isso; a KOMUNE não.
 - o endereço da visita pela pergunta "Endereço ou código do imóvel" (com o código de um anúncio, vale o endereço do anúncio);
 - o aviso **"Não consegui cancelar no Calendly o agendamento de…"** no topo da Agenda, para o dono do agendamento e os admins, quando o cancelamento esgota as tentativas.
 
+**Pronto no código, à espera de publicar (banco `20261111211000` e site; o acabamento):** os textos da Agenda, do Meu dia e das Metas no vocabulário da imobiliária; o selo "Reagendada" também na visita que o cliente remarcou; os diálogos de cancelar e remarcar dizendo o que acontece no Calendly; o conflito do "Novo compromisso" com "(marcado pelo Calendly)"; sem as frases do e-mail que não sai; e a LGPD do agendamento (dossiê, 2 anos e exclusão a pedido). Ver [O que a tela diz e o que a LGPD guarda](#o-que-a-tela-diz-e-o-que-a-lgpd-guarda).
+
 **Falta (configuração, do lado de quem tem as contas):**
 - compartilhar "CRM Imova - ocupado" com a conta de serviço ("Fazer alterações nos eventos") e gravar `google_agenda_id` (passo 5). **Sem isso o espelho fica desligado:** o que a equipe marca no CRM continua livre no Calendly, e só a rede de segurança (recusar e cancelar) segura;
 - trocar o token do Calendly (foi colado no chat) no `.env.imova` e no `imova-worker-wa`, e conferir com `calendly-assinar.mjs estado`;
@@ -261,10 +263,22 @@ Num plano pago, um tipo de evento com "Visita" no nome também entra como visita
 - **Sábado, domingo ou feriado:** não entra; nota na ficha e push a quem atende ("O Calendly marcou num feriado (20/11); o CRM pediu o cancelamento"), e o Calendly cancela com o recado *"Este dia é feriado e a Imova Imobiliária não atende. Por favor, escolha outro dia pelo mesmo link."* (no fim de semana: *"A Imova Imobiliária não atende aos sábados e domingos…"*).
 - **Visita sem endereço** (nem resposta, nem local no evento, ou o evento em Google Meet): o banco grava "Local a combinar (o Calendly não informou)". O cartão não mostra linha de onde e o Maps busca pelo nome da ficha.
 - **O cliente cancelou:** a reunião é cancelada (com o e-mail de cancelamento), a visita sai da agenda, push "Cancelado pelo Calendly" e nota com o motivo.
-- **O cliente remarcou:** o horário velho fecha e o novo entra com o selo "Reagendada"; o aviso diz de quando era.
+- **O cliente remarcou:** o horário velho fecha e o novo entra com o selo "Reagendada" (na reunião e, desde o acabamento de 11/11, também na visita); o aviso diz de quando era.
 - **A equipe desmarcou pelo CRM:** o Calendly cancela, avisa o cliente e libera o horário. Se a equipe remarcou, o recado ao cliente diz que a Imova vai combinar o novo horário.
 - **Cliente que pediu para não ser contatado:** não entra na agenda (a regra da LGPD do CRM). Fica registrado como `suprimido`.
 - **O mesmo aviso duas vezes:** o segundo vira "repetido", sem nada duplicado.
+
+---
+
+## O que a tela diz e o que a LGPD guarda
+
+O acabamento de 11/11/2026 (`20261111211000` e site):
+
+- **Cancelar o que a equipe marcou** diz, no diálogo, *"O bloco 'Ocupado' sai do Google Agenda, e o horário volta a ficar livre para o cliente no Calendly"* só quando é verdade: o compromisso está na agenda de quem atende o Calendly e o espelho está ligado (`public.calendly_agenda_do_link`). Noutra agenda, ou com o espelho desligado, o diálogo não fala do Calendly. A apresentação "a marcar" diz que não segurava horário.
+- **Remarcar uma reunião que o cliente marcou pelo Calendly** avisa antes, na folha: o CRM cancela o agendamento lá, e o Calendly manda ao cliente *"A Imova Imobiliária remarcou este compromisso e vai combinar o novo horário com você."* Quem remarca manda o horário novo pelo WhatsApp.
+- **O conflito do "Novo compromisso"** diz "(marcado pelo Calendly)" ao lado do que o cliente marcou pelo link.
+- **E-mail:** enquanto a Imova não tiver o Resend, a Agenda não diz "O time é avisado por e-mail" nem acusa "O time não foi avisado por e-mail". Para ligar, além da `RESEND_API_KEY` e do texto sem a KOMUNE, trocar `emailDeReuniao` para `true` na Imova em `packages/schema/src/empresas.ts` e publicar o site.
+- **LGPD do `calendly_agendamentos`:** o dossiê (`exportar_lgpd`) traz os agendamentos do titular (quando, o quê, o local, as respostas e o cancelamento; sem os links de cancelar e remarcar, sem as URIs e sem os compromissos de outras pessoas). O agendamento sai **2 anos** depois da data marcada (ou da última mudança), pelo pg_cron `calendly_retencao`, com relatório em `retention_runs`. O pedido de eliminação (`erasure_request`/`erasure_done`) da ficha, ou da pessoa ligada a ela, apaga as respostas, o local, a sala, os links e o motivo; ficam a data, a situação e as URIs, para o CRM ainda conseguir cancelar no Calendly o que está de pé.
 
 ---
 

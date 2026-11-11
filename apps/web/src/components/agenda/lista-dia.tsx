@@ -4,6 +4,7 @@ import { CalendarClock, Footprints, Route, Video } from 'lucide-react';
 
 import { type DesfechoCatalogo } from '@/components/registro/tipos';
 import { NotaRecolhida } from '@/components/ui/nota-recolhida';
+import { VOCABULARIO } from '@/lib/vocabulario';
 
 import { CartaoCompromisso } from './cartao-compromisso';
 import { VazioDoDia } from './estados';
@@ -108,7 +109,7 @@ export function ListaDoDia({
           icone={<Video className="size-4" aria-hidden="true" />}
           titulo="Com hora marcada"
           contagem={marcados.length}
-          nota="Reuniões cuja data e hora foram combinadas com o parceiro e estão gravadas no funil."
+          nota={`Reuniões cuja data e hora foram combinadas com o ${VOCABULARIO.parceiro} e estão gravadas no funil.`}
         >
           <ul className="flex flex-col gap-2">
             {marcados.map((c) => (
@@ -135,7 +136,7 @@ export function ListaDoDia({
           nota={
             visitas.some((v) => v.horaCombinada)
               ? 'As visitas do dia, agrupadas por bairro. As que têm hora marcada (pelo Calendly ou na agenda) mostram a hora.'
-              : 'Sem hora combinada: são as portas a bater neste dia, agrupadas por bairro.'
+              : `Sem hora combinada: são ${VOCABULARIO.visitasSemHora} neste dia, agrupadas por bairro.`
           }
         >
           <div className="flex flex-col gap-4">
@@ -165,8 +166,8 @@ export function ListaDoDia({
             <NotaRecolhida titulo="Por que a ordem é a do relógio">
               A rota otimizada (ordem por tempo de deslocamento e um link único do Maps com as
               paradas) depende da geocodificação dos endereços, e hoje nenhuma organização da base
-              tem coordenada nem endereço gravado. Por isso o botão do Maps busca pelo nome do
-              parceiro e pelo bairro.
+              tem coordenada nem endereço gravado. Por isso o botão do Maps busca pelo nome do{' '}
+              {VOCABULARIO.parceiro} e pelo bairro.
             </NotaRecolhida>
           </div>
         </Bloco>

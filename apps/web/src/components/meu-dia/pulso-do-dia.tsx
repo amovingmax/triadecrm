@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, FileText, Sparkles, TriangleAlert } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { maiuscula, VOCABULARIO } from '@/lib/vocabulario';
 
 import { buscarPulso, CHAVE_PULSO, type PrioridadeDoPulso } from './pulso-dados';
 import {
@@ -238,7 +239,7 @@ function Resumo({
  */
 function Prioridade({ prioridade }: { prioridade: PrioridadeDoPulso }) {
   const link = linkDaPrioridade(prioridade);
-  const nome = prioridade.nome ?? 'Parceiro sem nome na base';
+  const nome = prioridade.nome ?? `${maiuscula(VOCABULARIO.parceiro)} sem nome na base`;
 
   const corpo = (
     <>

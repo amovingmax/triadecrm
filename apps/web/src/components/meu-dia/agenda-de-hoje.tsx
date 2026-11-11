@@ -16,6 +16,7 @@ import {
 } from '@/components/agenda/imovel-da-visita';
 
 import { buscarAgendaDeHoje, type CompromissoDeHoje } from './consultas';
+import { linkDaAgenda, rotuloSemHora, separarPelaHora } from './hora-na-agenda';
 
 /**
  * A agenda de hoje ao lado da fila, no Meu dia novo da Imova (módulo `meuDiaNovo`).
@@ -26,14 +27,23 @@ import { buscarAgendaDeHoje, type CompromissoDeHoje } from './consultas';
  *
  * Duas formas: a coluna inteira em tela larga, e no celular só o próximo
  * compromisso, numa faixa, que é o que cabe no topo sem empurrar a fila para baixo.
+ *
+ * SÓ O QUE TEM HORA LEVA HORA (11/11/2026). A apresentação a combinar e a visita
+ * sem hora combinada carregam o prazo da régua (09:00), e apareciam como "09:00 ·
+ * atrasada 3 h". Agora a régua é a da Agenda (`hora-na-agenda.ts`): elas descem
+ * para "Sem hora marcada", sem hora e sem atraso. E "Abrir agenda" leva a agenda
+ * da pessoa cujo dia está aberto, e não a de quem entrou.
  */
 export function AgendaDeHoje({
   pessoa,
+  usuarioId,
   hoje,
   forma,
 }: {
   /** De quem é o dia (o mesmo do seletor). */
   pessoa: string;
+  /** Quem entrou: com outra pessoa no seletor, os links levam `?pessoa=`. */
+  usuarioId?: string;
   hoje: string;
   forma: 'coluna' | 'faixa';
 }) {
@@ -49,13 +59,15 @@ export function AgendaDeHoje({
   }, []);
 
   const itens = agenda.data ?? [];
-  const proximo = itens.find((c) => !c.feito && new Date(c.quando).getTime() >= agora);
+  const { comHora, semHora } = separarPelaHora(itens);
+  const proximo = comHora.find((c) => !c.feito && new Date(c.quando).getTime() >= agora);
+  const daAgenda = linkDaAgenda(pessoa, usuarioId);
 
   if (forma === 'faixa') {
     if (!proximo) return null;
     return (
       <Link
-        href="/agenda"
+        href={daAgenda}
         className="sombra-base flex min-h-12 items-center gap-2.5 rounded-xl bg-card px-3.5 py-2 text-sm lg:hidden"
       >
         <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -75,7 +87,7 @@ export function AgendaDeHoje({
   }
 
   // O "agora" entra entre o último compromisso que já passou e o primeiro que não.
-  const indiceDoAgora = itens.findIndex((c) => new Date(c.quando).getTime() >= agora);
+  const indiceDoAgora = comHora.findIndex((c) => new Date(c.quando).getTime() >= agora);
 
   return (
     <section
@@ -87,7 +99,7 @@ export function AgendaDeHoje({
           Agenda de hoje
         </h2>
         <Link
-          href="/agenda"
+          href={daAgenda}
           className="toque inline-flex min-h-11 items-center text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground sm:min-h-0"
         >
           Abrir agenda
@@ -106,25 +118,76 @@ export function AgendaDeHoje({
           Nenhuma reunião ou visita marcada para hoje.
         </p>
       ) : (
-        <ol className="flex flex-col">
-          {itens.map((compromisso, ordem) => (
-            <li key={compromisso.id} className="flex flex-col">
-              {ordem === indiceDoAgora ? <LinhaDoAgora agora={agora} /> : null}
-              <Compromisso compromisso={compromisso} agora={agora} />
-              <ImovelDaVisitaDeHoje compromisso={compromisso} />
-            </li>
-          ))}
-          {indiceDoAgora === -1 ? <LinhaDoAgora agora={agora} /> : null}
-        </ol>
+        <>
+          {comHora.length > 0 ? (
+            <ol className="flex flex-col">
+              {comHora.map((compromisso, ordem) => (
+                <li key={compromisso.id} className="flex flex-col">
+                  {ordem === indiceDoAgora ? <LinhaDoAgora agora={agora} /> : null}
+                  <Compromisso compromisso={compromisso} agora={agora} daAgenda={daAgenda} />
+                  <ImovelDaVisitaDeHoje compromisso={compromisso} />
+                </li>
+              ))}
+              {indiceDoAgora === -1 ? <LinhaDoAgora agora={agora} /> : null}
+            </ol>
+          ) : (
+            <p className="py-2 text-sm text-muted-foreground">Nenhum horário marcado para hoje.</p>
+          )}
+          {semHora.length > 0 ? <SemHora itens={semHora} daAgenda={daAgenda} /> : null}
+        </>
       )}
     </section>
   );
 }
 
-function Compromisso({ compromisso, agora }: { compromisso: CompromissoDeHoje; agora: number }) {
+/**
+ * O que é de hoje mas não tem hora combinada: a apresentação a combinar e a visita
+ * sem hora. Sem hora e sem "atrasada": a hora delas é prazo, não compromisso.
+ */
+function SemHora({ itens, daAgenda }: { itens: readonly CompromissoDeHoje[]; daAgenda: string }) {
+  return (
+    <div className="flex flex-col pt-2">
+      <h3 className="text-xs font-medium text-muted-foreground">Sem hora marcada</h3>
+      <ul className="flex flex-col">
+        {itens.map((c) => (
+          <li key={c.id}>
+            <Link
+              href={c.organizacaoId ? `/parceiros/${c.organizacaoId}` : daAgenda}
+              className="flex min-w-0 flex-col border-t py-2.5 first:border-t-0 outline-none focus-visible:bg-muted/40 md:hover:bg-muted/40"
+            >
+              <span
+                className={cn(
+                  'truncate text-sm',
+                  c.feito ? 'text-muted-foreground line-through' : 'text-foreground',
+                )}
+              >
+                {tituloDoCompromisso(c)}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {rotuloSemHora(c.tipo)}
+                {c.feito ? ' · feita' : ''}
+              </span>
+            </Link>
+            <ImovelDaVisitaDeHoje compromisso={c} semRecuo />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Compromisso({
+  compromisso,
+  agora,
+  daAgenda,
+}: {
+  compromisso: CompromissoDeHoje;
+  agora: number;
+  daAgenda: string;
+}) {
   const instante = new Date(compromisso.quando).getTime();
   const passou = compromisso.feito || instante < agora;
-  const destino = compromisso.organizacaoId ? `/parceiros/${compromisso.organizacaoId}` : '/agenda';
+  const destino = compromisso.organizacaoId ? `/parceiros/${compromisso.organizacaoId}` : daAgenda;
   return (
     <Link
       href={destino}
@@ -192,7 +255,18 @@ function Compromisso({ compromisso, agora }: { compromisso: CompromissoDeHoje; a
  * link da linha (que leva à ficha) porque link dentro de link não existe. A visita
  * sem imóvel mostra "Falta o imóvel" e o "Definir imóvel".
  */
-function ImovelDaVisitaDeHoje({ compromisso }: { compromisso: CompromissoDeHoje }) {
+/**
+ * `semRecuo`: na lista "Sem hora marcada" não há a coluna da hora, então o bloco do
+ * imóvel começa rente ao título.
+ */
+function ImovelDaVisitaDeHoje({
+  compromisso,
+  semRecuo = false,
+}: {
+  compromisso: CompromissoDeHoje;
+  semRecuo?: boolean;
+}) {
+  const recuo = semRecuo ? '' : 'pl-14';
   const cliente = useQueryClient();
   if (compromisso.tipo !== 'visit' || compromisso.feito) return null;
   const { imovel } = compromisso;
@@ -200,7 +274,9 @@ function ImovelDaVisitaDeHoje({ compromisso }: { compromisso: CompromissoDeHoje 
   if (imovel) {
     const linha = linhaDoImovel(imovel);
     return (
-      <div className="-mt-1 flex flex-col gap-0.5 pb-2.5 pl-14 text-xs text-muted-foreground">
+      <div
+        className={cn('-mt-1 flex flex-col gap-0.5 pb-2.5 text-xs text-muted-foreground', recuo)}
+      >
         <span className="flex min-w-0 items-start gap-1.5">
           <MapPin className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
           {imovel.anuncioId ? (
@@ -230,7 +306,7 @@ function ImovelDaVisitaDeHoje({ compromisso }: { compromisso: CompromissoDeHoje 
 
   if (!compromisso.faltaImovel) return null;
   return (
-    <div className="-mt-1 flex flex-wrap items-center gap-2 pb-2.5 pl-14">
+    <div className={cn('-mt-1 flex flex-wrap items-center gap-2 pb-2.5', recuo)}>
       <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive-texto">
         <MapPinOff className="size-3" aria-hidden="true" />
         {FALTA_O_IMOVEL}
