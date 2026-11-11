@@ -20,6 +20,7 @@ Nada vai pelo WhatsApp. Só a Imova tem isso; a KOMUNE não.
 | --- | --- |
 | outro cliente, pelo próprio Calendly | O Calendly já faz isso sozinho. |
 | a equipe ou a IA, direto no CRM | O CRM grava um bloco **"Ocupado — CRM Imova"** num Google Agenda ligado ao Calendly, e o Calendly não oferece esse horário. Só início e fim vão ao Google: nenhum nome, telefone ou endereço. |
+| um feriado da Imova (Ajustes → Catálogos → Feriados, `public.holidays`) | O CRM grava um bloco **"Ocupado — feriado"** de dia inteiro no mesmo Google Agenda, para cada feriado dos próximos 12 meses. O Calendly só sabe "seg. a sex." e, sem isso, oferecia 20/11 e 21/11. Feriado apagado ou trocado de data tira o bloco. |
 
 E para liberar:
 
@@ -49,8 +50,11 @@ cliente ─ link ─► Calendly ── webhook assinado ──► Edge Function
 
 - **Edge Function** `supabase/functions/calendly-webhook`: confere a assinatura do Calendly (`CALENDLY_WEBHOOK_SIGNING_KEY`) e resume o aviso.
 - **Banco** `supabase/migrations/20261110180000_calendly_na_agenda.sql`: `calendly_agendamentos`, `calendly_receber`, a régua `app.agenda_ocupada` e as listas do que falta (`calendly_cancelamentos_pendentes`, `agenda_espelho_pendencias`).
-- **Worker** `apps/workers/src/agenda` no `imova-worker-wa`: cancela no Calendly (`CALENDLY_TOKEN`) e grava e apaga os blocos no Google (`GOOGLE_AGENDA_CREDENCIAL`).
+- **Worker** `apps/workers/src/agenda` no `imova-worker-wa`: cancela no Calendly (`CALENDLY_TOKEN`) e grava e apaga os blocos no Google (`GOOGLE_AGENDA_CREDENCIAL`; no plano B, também `GOOGLE_AGENDA_SUB`).
+- **Banco do espelho** `supabase/migrations/20261111205000_o_espelho_no_google.sql`: os feriados na lista do worker (`app.agenda_espelho_desejado`) e o estado do espelho para a tela (`public.agenda_espelho_estado`, só admin e gestor).
+- **Cartão "Espelho no Google"** na Agenda, só para o admin e só na Imova (`components/agenda/cartao-do-espelho.tsx`): diz em uma frase se o espelho está desligado, com erro, parado ou ligado.
 - **Script** `scripts/calendly-assinar.mjs`: cria a assinatura do webhook no Calendly (não há tela para isso, só a API).
+- **Script** `scripts/google-agenda-conferir.mjs`: confere, do seu computador, se a conta de serviço consegue gravar na agenda, e diz o que falta.
 
 Os webhooks do Calendly funcionam no **plano grátis** desde 06/11/2026.
 
@@ -82,7 +86,17 @@ Com a conta Google que vai ficar ligada ao Calendly:
 
 1. Em **calendar.google.com → Configurações → Adicionar agenda → Criar nova agenda**, crie **"CRM Imova — ocupado"**.
 2. No **Google Cloud** (console.cloud.google.com), num projeto da Imova: **APIs e serviços → Biblioteca → Google Calendar API → Ativar**. Depois **IAM e administrador → Contas de serviço → Criar** (ex.: `crm-imova-agenda`, sem papel nenhum) → **Chaves → Adicionar chave → JSON**. Guarde o arquivo baixado fora do repositório.
-3. De volta ao Google Agenda, nas configurações de "CRM Imova — ocupado": **Compartilhar com pessoas específicas → o e-mail da conta de serviço** (termina em `iam.gserviceaccount.com`) com **"Fazer alterações nos eventos"**. Na mesma tela, em **Integrar agenda**, copie o **ID da agenda**.
+3. De volta ao Google Agenda, nas configurações de "CRM Imova — ocupado": **Compartilhar com pessoas específicas → o e-mail da conta de serviço** (termina em `iam.gserviceaccount.com`) com **"Fazer alterações nos eventos"**. Na mesma tela, em **Integrar agenda**, copie o **ID da agenda**. Confira o **fuso** da agenda: (GMT-03:00) Fortaleza ou Brasília (o feriado de dia inteiro vale no fuso da agenda).
+
+#### 3b. Plano B: delegação em todo o domínio
+
+Se o compartilhamento não pegar (em 10/11/2026 ele não tinha propagado; o script de conferência diz "a agenda não foi compartilhada com a conta de serviço"), a conta de serviço pode agir **em nome de um usuário do Google Workspace da Imova**, só no escopo de eventos:
+
+1. No Google Cloud, em **IAM e administrador → Contas de serviço → crm-imova-agenda → Detalhes**, copie o **ID exclusivo** (o *client ID*, só números; o script de conferência também mostra).
+2. No **Admin do Google** (admin.google.com), com uma conta de administrador do Workspace: **Segurança → Controles de API → Delegação em todo o domínio → Adicionar novo**, com esse **client ID** e o escopo **`https://www.googleapis.com/auth/calendar.events`** (só ele). Em algumas contas o caminho é Segurança → Controle de acesso e de dados → Controles de API → Gerenciar a delegação em todo o domínio. Pode levar alguns minutos para valer.
+3. Escolha o usuário em nome de quem o CRM grava: o dono da agenda "CRM Imova — ocupado" (ou alguém com "Fazer alterações nos eventos" nela). Rode a conferência com `--sub <e-mail dele>` e, dando certo, ponha `GOOGLE_AGENDA_SUB=<e-mail dele>` no `imova-worker-wa`.
+
+Sem `GOOGLE_AGENDA_SUB`, o worker continua como antes: a conta de serviço grava em nome próprio, na agenda compartilhada com ela.
 
 ### 4. Ligar o Google ao Calendly
 
@@ -136,6 +150,50 @@ node scripts/calendly-assinar.mjs assinar
 1. Marque um horário pelo link do Calendly numa janela anônima: em segundos ele aparece na Agenda de quem atende.
 2. Marque uma visita direto no CRM, na agenda dessa pessoa: em até um minuto o bloco "Ocupado — CRM Imova" aparece no Google Agenda e o horário some do Calendly.
 3. Desmarque essa visita no CRM: o bloco sai e o horário volta.
+4. Os feriados: em até um minuto depois de ligar, o Google Agenda mostra "Ocupado — feriado" em 20/11 e 21/11 (dia inteiro), e o link do Calendly não oferece esses dias.
+
+---
+
+## Ligar o espelho no Google (o que falta, em 11/11/2026)
+
+O código do espelho está pronto, mas **desligado**: sem ele, o que a equipe marca no CRM continua livre no Calendly, o cliente escolhe o horário, recebe "confirmado" e, segundos depois, "cancelado" (a rede de segurança). O cartão **"Espelho no Google"** no topo da Agenda (só o admin vê) diz em que pé está:
+
+| O cartão diz | O que fazer |
+| --- | --- |
+| "Espelho no Google desligado: falta o id da agenda" | Os passos abaixo, do 1 ao 6. |
+| "Com erro desde 10/11 15h: a agenda recusou (403). Rode a conferência" | O passo 2: o script diz o motivo e o que mudar. |
+| "Espelho parado: o worker não passa desde …" | O id está gravado, mas o `imova-worker-wa` não passa: falta `GOOGLE_AGENDA_CREDENCIAL` (ou ela é inválida), ou o worker caiu. Veja `fly logs --app imova-worker-wa`. |
+| "Ligado: 12 horários copiados e 3 feriados, o último às 14h10" | Nada. |
+
+Antes, o banco da Imova precisa da migração `20261111205000_o_espelho_no_google.sql` (`node scripts/publicar-banco.mjs imova migrar`), e o site, do cartão. Depois, na ordem:
+
+1. **Conferir o compartilhamento** da agenda "CRM Imova — ocupado" com `crm-imova-agenda@crm-imova-agenda.iam.gserviceaccount.com`, com **"Fazer alterações nos eventos"** (passo 3.3). Se não pegar, ligue a **delegação em todo o domínio** (passo 3b).
+2. **Rodar a conferência** no Terminal, na pasta do CRM, com o arquivo da chave que o Google Cloud baixou (o script nunca mostra o conteúdo dele):
+
+   ```bash
+   node scripts/google-agenda-conferir.mjs ~/Downloads/crm-imova-agenda-XXXX.json
+   # plano B, em nome de um usuário do Workspace:
+   node scripts/google-agenda-conferir.mjs ~/Downloads/crm-imova-agenda-XXXX.json --sub voce@imovaimobiliaria.com.br
+   ```
+
+   Ele confere, nesta ordem: a credencial é lida; o token sai; a agenda abre e a conta pode mudar eventos; dá para gravar (cria um evento de teste em 04/01, daqui a dez anos, às 3h, e apaga). No primeiro que falhar, ele para e diz o que fazer ("a agenda não foi compartilhada com a conta de serviço", "a conta tem só leitura: falta 'Fazer alterações nos eventos'", "a delegação em todo o domínio não está ligada para este escopo", "a API do Google Agenda não está ativada"…). Sem o arquivo, ele lê `GOOGLE_AGENDA_CREDENCIAL` do ambiente. Rode de novo até dar "Tudo certo".
+3. **Gravar o `google_agenda_id`** no banco da Imova (SQL Editor do Supabase do projeto da Imova). Este SQL junta o id ao que já existe em `app_settings['calendly']` (o `dono_email` fica):
+
+   ```sql
+   insert into public.app_settings (key, value)
+   values ('calendly', '{"google_agenda_id":"c_f19a6b93d8540370fd77d78a27ee3ee0c4c6d5453aa7107ab30cce60aace2e85@group.calendar.google.com"}')
+   on conflict (key) do update
+     set value = public.app_settings.value || excluded.value, updated_at = now();
+   ```
+
+4. **Só no plano B:** pôr o usuário no worker (o valor não é segredo, mas fica com os outros):
+
+   ```bash
+   fly secrets set --app imova-worker-wa GOOGLE_AGENDA_SUB=voce@imovaimobiliaria.com.br
+   ```
+
+5. **Publicar o worker** (da raiz, de uma cópia limpa do commit): `fly deploy . --config infra/nuvem/fly.imova-worker-wa.toml --dockerfile apps/workers/Dockerfile`. No log da partida aparece "agenda do Calendly ligada neste worker" com `credencialDoGoogleLida: true`; na primeira passada, **"espelho no Google ligado"**. Se aparecer **"espelho desligado: falta google_agenda_id em app_settings[calendly]"**, o passo 3 não entrou (o log diz isso uma vez, e de novo só quando muda).
+6. **Fazer o teste 9.2** (visita marcada no CRM some do Calendly em até um minuto), o 9.3 e o 9.4 (os feriados).
 
 ---
 
@@ -177,7 +235,8 @@ Num plano pago, um tipo de evento com "Visita" no nome também entra como visita
 | `estado` mostra a assinatura `disabled` | O Calendly desligou depois de muitas falhas. Veja o log da função e rode `trocar`. |
 | Log da função: `recusa: assinatura_invalida` | A chave da função não é a da assinatura. Rode `trocar`. |
 | Log da função: `integracao_nao_configurada` (503) | Falta `CALENDLY_WEBHOOK_SIGNING_KEY`. Rode `remover` e depois `assinar`. |
-| Horário marcado no CRM continua livre no Calendly | Veja o log do `imova-worker-wa` ("o Google não gravou o bloco"). Os motivos de sempre: agenda não compartilhada com a conta de serviço (Google 404), `google_agenda_id` ou `dono_email` errados, ou a agenda não marcada em "Verificar conflitos" no Calendly. |
+| Horário marcado no CRM continua livre no Calendly | Olhe o cartão "Espelho no Google" na Agenda e rode `node scripts/google-agenda-conferir.mjs <chave.json>`. No log do `imova-worker-wa`: "espelho desligado: falta google_agenda_id…" (passo 3 de "Ligar o espelho"), "o Google não gravou o bloco" (agenda não compartilhada com a conta de serviço, Google 404, ou só leitura, Google 403). Também: `dono_email` errado (a agenda espelhada é de outra pessoa) ou a agenda não marcada em "Verificar conflitos" no Calendly. |
+| O Calendly ainda oferece um feriado | O feriado está em Ajustes → Catálogos → Feriados (`public.holidays`)? O cartão diz quantos feriados foram copiados. No Google Agenda, o bloco "Ocupado — feriado" do dia tem de estar como **Ocupado** (o CRM grava assim); se a agenda estiver num fuso que não é o de Natal, o dia inteiro cai deslocado. |
 | Cliente recusado continua com o agendamento no Calendly | Log do worker: "o Calendly não cancelou". Token sem `scheduled_events:write` (403) ou vencido (401). O CRM tenta de novo, com espera, até 8 vezes; o erro fica em `calendly_agendamentos.cancelar_erro`. |
 
 Trocar a chave do webhook sem perder agendamento no meio: `node scripts/calendly-assinar.mjs trocar`. Desligar: `node scripts/calendly-assinar.mjs remover` (os agendamentos já recebidos ficam). Os blocos "Ocupado — CRM Imova" que sobrarem no Google Agenda saem pelo próprio Google Agenda.

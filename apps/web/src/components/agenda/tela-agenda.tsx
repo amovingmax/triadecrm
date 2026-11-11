@@ -28,6 +28,7 @@ import { buscarCompromissos, chaveDaAgenda, ErroDaAgenda } from './consultas';
 import { type ContextoDaAgenda } from './dados';
 import { ErroDaAgendaNaTela, EsqueletoAgenda } from './estados';
 import { AvisosRecebidos } from './avisos-recebidos';
+import { CartaoDoEspelhoNoGoogle } from './cartao-do-espelho';
 import { FolhaDesfecho } from './folha-desfecho';
 import { BotaoNovoCompromisso, FolhaNovoCompromisso } from './folha-novo-compromisso';
 import { ListaDoDia } from './lista-dia';
@@ -81,6 +82,7 @@ export function TelaAgenda({
   agoraIso,
   diaInicial,
   visaoInicial,
+  mostrarEspelho = false,
 }: {
   usuarioId: string;
   /** O papel escreve (`app.can_write()`): pode marcar na própria agenda. */
@@ -95,6 +97,11 @@ export function TelaAgenda({
   agoraIso: string;
   diaInicial: Dia;
   visaoInicial: Visao;
+  /**
+   * O cartão "Espelho no Google" (11/11/2026): só o admin, só na Imova. Diz se o
+   * que a equipe marca aqui está sumindo do Calendly.
+   */
+  mostrarEspelho?: boolean;
 }) {
   const [dia, setDia] = useState<Dia>(diaInicial);
   const [visao, setVisao] = useState<Visao>(visaoInicial);
@@ -278,6 +285,8 @@ export function TelaAgenda({
       </header>
 
       {daPropriaPessoa ? <AvisosRecebidos usuarioId={usuarioId} aoIrParaDia={irParaDia} /> : null}
+
+      {mostrarEspelho ? <CartaoDoEspelhoNoGoogle /> : null}
 
       {daPropriaPessoa ? null : (
         <p className="sombra-base flex items-center gap-2 rounded-xl bg-card px-4 py-3 text-sm">

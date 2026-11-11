@@ -64,6 +64,18 @@ describe('loadEnv', () => {
     expect(loadEnv('wa', { ...wa, WA_WEBHOOK_URL: 'nao-e-url' }).ok).toBe(false);
   });
 
+  it('GOOGLE_AGENDA_SUB (plano B do espelho) é opcional e, quando vem, é um e-mail', () => {
+    const wa = { ...base, META_WA_ACCESS_TOKEN: 'token', META_WA_PHONE_NUMBER_ID: '123' };
+    const vazio = loadEnv('wa', { ...wa, GOOGLE_AGENDA_SUB: '' });
+    expect(vazio.ok && vazio.env.GOOGLE_AGENDA_SUB).toBeUndefined();
+    const cheio = loadEnv('wa', { ...wa, GOOGLE_AGENDA_SUB: 'agenda@imovaimobiliaria.com.br' });
+    expect(cheio.ok && cheio.env.GOOGLE_AGENDA_SUB).toBe('agenda@imovaimobiliaria.com.br');
+    const torto = loadEnv('wa', { ...wa, GOOGLE_AGENDA_SUB: 'não é e-mail' });
+    expect(torto.ok).toBe(false);
+    if (torto.ok) return;
+    expect(torto.issues.join('\n')).toContain('GOOGLE_AGENDA_SUB');
+  });
+
   it('exige ANTHROPIC_API_KEY só para ai', () => {
     expect(loadEnv('ai', base).ok).toBe(false);
     expect(loadEnv('ai', { ...base, ANTHROPIC_API_KEY: 'sk-teste' }).ok).toBe(true);

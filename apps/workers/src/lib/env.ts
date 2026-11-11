@@ -98,6 +98,20 @@ const waEnvSchema = baseEnvSchema.extend({
    * espelho fica parado, e o Calendly não enxerga o que o CRM marca.
    */
   GOOGLE_AGENDA_CREDENCIAL: optionalString,
+  /**
+   * Plano B do espelho (11/11/2026): o e-mail do usuário do Google Workspace da
+   * Imova em nome de quem a conta de serviço grava, com a delegação em todo o
+   * domínio ligada no Admin do Google. Vazia = a conta de serviço grava em nome
+   * próprio, na agenda compartilhada com ela (o caminho de sempre).
+   */
+  GOOGLE_AGENDA_SUB: z.preprocess(
+    emptyToUndefined,
+    z
+      .email({
+        error: 'GOOGLE_AGENDA_SUB deve ser o e-mail de um usuário do Google Workspace da Imova',
+      })
+      .optional(),
+  ),
 });
 
 const aiEnvSchema = baseEnvSchema.extend({
