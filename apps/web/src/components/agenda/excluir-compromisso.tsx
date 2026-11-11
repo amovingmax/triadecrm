@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -39,25 +39,35 @@ export function ExcluirCompromisso({
 
   const ehVisita = compromisso.tipo === 'visita';
   const oQue = ehVisita ? 'visita' : 'compromisso';
+  // O que o cliente marcou pelo link não se "exclui": se cancela, e o Calendly avisa
+  // o cliente (`calendly_cancelamentos_pendentes` lê a tarefa cancelada; o
+  // `imova-worker-wa` cancela lá em segundos).
+  const doCalendly = compromisso.peloCalendly;
 
   async function excluir(motivo: string) {
     setOcupado(true);
     const r = await excluirTarefa(compromisso.taskId, motivo);
     setOcupado(false);
     if (!r.ok) {
-      toast.error('Não foi excluído.', { description: recadoDaExclusao(r.motivo) });
+      toast.error(doCalendly ? 'Não foi cancelado.' : 'Não foi excluído.', {
+        description: recadoDaExclusao(r.motivo),
+      });
       return;
     }
     setAberto(false);
     toast.success(
       r.eraReuniao
         ? 'Reunião cancelada. O time é avisado por e-mail.'
-        : ehVisita
-          ? 'Visita excluída da agenda.'
-          : 'Compromisso excluído da agenda.',
+        : doCalendly
+          ? `${ehVisita ? 'Visita cancelada' : 'Compromisso cancelado'}. O Calendly avisa o cliente por e-mail.`
+          : ehVisita
+            ? 'Visita excluída da agenda.'
+            : 'Compromisso excluído da agenda.',
     );
     aoMudar();
   }
+
+  const dia = rotuloDiaPorExtenso(diaDoInstante(compromisso.quando));
 
   return (
     <>
@@ -67,31 +77,59 @@ export function ExcluirCompromisso({
         className="toque h-11 text-muted-foreground hover:text-destructive-texto md:h-9"
         onClick={() => setAberto(true)}
       >
-        <Trash2 aria-hidden="true" />
-        Excluir
+        {doCalendly ? <X aria-hidden="true" /> : <Trash2 aria-hidden="true" />}
+        {doCalendly ? 'Cancelar' : 'Excluir'}
       </Button>
 
       <DialogoExcluir
         aberto={aberto}
         aoFechar={() => setAberto(false)}
-        titulo={ehVisita ? 'Excluir esta visita?' : 'Excluir este compromisso?'}
+        titulo={
+          doCalendly
+            ? `Cancelar esta ${oQue}?`
+            : ehVisita
+              ? 'Excluir esta visita?'
+              : 'Excluir este compromisso?'
+        }
         descricao={
-          <>
-            <p>
-              {compromisso.organizacao} · {rotuloDiaPorExtenso(diaDoInstante(compromisso.quando))}.
-              {ehVisita
-                ? ' A visita sai da agenda e da rota do dia.'
-                : ' O compromisso sai da agenda.'}
-            </p>
-            <p>
-              O funil não muda. Se o parceiro desistiu ou pediu outra data, registre o contato em
-              vez de excluir a {oQue}.
-            </p>
-          </>
+          doCalendly ? (
+            <>
+              <p>
+                {compromisso.organizacao} · {dia}. A {oQue} sai da agenda, e o Calendly cancela o
+                agendamento e avisa o cliente por e-mail: o horário volta a ficar livre no link.
+              </p>
+              <p>
+                O cliente recebe o aviso do Calendly; o motivo fica só no CRM. O funil não muda.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                {compromisso.organizacao} · {dia}.
+                {ehVisita
+                  ? ' A visita sai da agenda e da rota do dia.'
+                  : ' O compromisso sai da agenda.'}
+              </p>
+              <p>
+                O funil não muda. Se o parceiro desistiu ou pediu outra data, registre o contato
+                em vez de excluir a {oQue}.
+              </p>
+            </>
+          )
         }
         motivo="opcional"
-        exemploDeMotivo="Ex.: marcada por engano, o parceiro é de outra cidade"
-        rotuloConfirmar={ehVisita ? 'Excluir visita' : 'Excluir compromisso'}
+        exemploDeMotivo={
+          doCalendly
+            ? 'Ex.: o cliente pediu por telefone para desmarcar'
+            : 'Ex.: marcada por engano, o parceiro é de outra cidade'
+        }
+        rotuloConfirmar={
+          doCalendly
+            ? `Cancelar ${oQue}`
+            : ehVisita
+              ? 'Excluir visita'
+              : 'Excluir compromisso'
+        }
         ocupado={ocupado}
         aoConfirmar={(motivo) => void excluir(motivo)}
       />

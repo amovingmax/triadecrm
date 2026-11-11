@@ -206,9 +206,18 @@ export function TelaAgenda({
     [pedido, gravar],
   );
 
-  const irParaDia = useCallback((novo: Dia) => {
+  // O cartão que o aviso do topo apontou: contornado por alguns segundos.
+  const [destaque, setDestaque] = useState<string | null>(null);
+  useEffect(() => {
+    if (!destaque) return;
+    const t = window.setTimeout(() => setDestaque(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [destaque]);
+
+  const irParaDia = useCallback((novo: Dia, alvo?: string | null) => {
     setDia(novo);
     setVisao('dia');
+    setDestaque(alvo ?? null);
   }, []);
 
   const erro = consulta.error;
@@ -329,6 +338,7 @@ export function TelaAgenda({
             proximo={proximoCompromisso(itens, referenciaDoProximo)}
             semanaVazia={abertos === 0}
             aoIrParaDia={irParaDia}
+            destaque={destaque}
             pessoaId={pessoa}
             somenteLeitura={!daPropriaPessoa}
             podeMexerNaReuniao={podeMarcar && (daPropriaPessoa || comEquipe)}

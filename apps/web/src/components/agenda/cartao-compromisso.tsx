@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   CalendarCheck,
@@ -14,6 +15,7 @@ import {
   TriangleAlert,
   Trophy,
   UserX,
+  Video,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -24,6 +26,7 @@ import { DiasSemContato } from '@/components/temperatura';
 import {
   faixaDeHoras,
   linkDoMapa,
+  ondeDoCompromisso,
   recortesDoCompromisso,
   type Compromisso,
   type PedidoDeDesfecho,
@@ -74,6 +77,7 @@ export function CartaoCompromisso({
   aoMudarReuniao,
   somenteLeitura = false,
   podeMexerNaReuniao = !somenteLeitura,
+  destacado = false,
 }: {
   compromisso: Compromisso;
   catalogo: readonly DesfechoCatalogo[];
@@ -81,12 +85,20 @@ export function CartaoCompromisso({
   aoMudarReuniao?: () => void;
   somenteLeitura?: boolean;
   podeMexerNaReuniao?: boolean;
+  /** Tocou no aviso deste compromisso: o cartão aparece na tela, contornado. */
+  destacado?: boolean;
 }) {
   const { realizada, ausente, reagendar } = recortesDoCompromisso(catalogo, compromisso);
   const ehVisita = compromisso.tipo === 'visita';
-  // A visita do CRM é porta a bater no dia, sem hora; a do Calendly tem a hora que
-  // o cliente escolheu, e é ela que a pessoa precisa ver no cartão.
-  const temHora = compromisso.natureza === 'marcado' || (ehVisita && compromisso.peloCalendly);
+  // A visita sem hora combinada é porta a bater no dia; a do Calendly (e, na Imova,
+  // a marcada no CRM com hora) tem hora, e é ela que a pessoa precisa ver no cartão.
+  const temHora = compromisso.natureza === 'marcado' || (ehVisita && compromisso.horaCombinada);
+  const onde = ondeDoCompromisso(compromisso);
+  const linha = useRef<HTMLLIElement>(null);
+
+  useEffect(() => {
+    if (destacado) linha.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [destacado]);
 
   function pedir(titulo: string, descricao: string, opcoes: DesfechoCatalogo[]) {
     aoPedirDesfecho({ compromisso, titulo, descricao, opcoes });
@@ -94,9 +106,11 @@ export function CartaoCompromisso({
 
   return (
     <li
+      ref={linha}
       className={cn(
-        'flex items-start gap-3 rounded-lg bg-muted/45 px-4 py-3',
+        'flex items-start gap-3 rounded-lg bg-muted/45 px-4 py-3 transition-shadow duration-700',
         compromisso.concluido && !compromisso.resultado && 'opacity-70',
+        destacado && 'ring-2 ring-menta',
       )}
     >
 
@@ -126,6 +140,19 @@ export function CartaoCompromisso({
             .join(' · ') || 'Sem categoria e sem bairro na base'}
         </p>
 
+        {/* Onde: a sala (pelo link) ou o endereço combinado. Na visita do Calendly,
+            é o endereço que o cliente escreveu ao marcar. */}
+        {onde ? (
+          <p className="flex items-start gap-1.5 text-xs text-foreground/80">
+            {onde.formato === 'online' ? (
+              <Video className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            ) : (
+              <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            )}
+            <span className="min-w-0 break-words">{onde.texto}</span>
+          </p>
+        ) : null}
+
         <div className="flex flex-wrap items-center gap-1.5">
           {/* O rótulo é o TIPO da tarefa (reunião ou visita), não a natureza: depois
               do registro a etapa muda e "a marcar" viraria uma contradição em cima de
@@ -134,6 +161,12 @@ export function CartaoCompromisso({
           <Badge variant="pilula" className="font-normal">
             {ehVisita ? 'Visita' : 'Reunião'}
           </Badge>
+          {/* Chegou e a pessoa ainda não tocou em "Ok, vi" no aviso do topo. */}
+          {compromisso.novo && !compromisso.concluido ? (
+            <Badge variant="pilula" className="bg-menta font-medium text-menta-tinta">
+              Novo
+            </Badge>
+          ) : null}
           {/* A reunião que é a nova data de outra (`reunioes.remarcada_de`). Âmbar
               pelo mesmo motivo do resultado "Reagendada": mudou de data. */}
           {compromisso.reagendada && !compromisso.concluido ? (

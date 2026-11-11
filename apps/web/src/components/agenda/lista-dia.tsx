@@ -44,6 +44,7 @@ export function ListaDoDia({
   pessoaId,
   somenteLeitura = false,
   podeMexerNaReuniao = !somenteLeitura,
+  destaque = null,
 }: {
   dia: Dia;
   itens: readonly Compromisso[];
@@ -62,7 +63,11 @@ export function ListaDoDia({
   somenteLeitura?: boolean;
   /** Remarcar e cancelar a reunião, mesmo na agenda de outra pessoa (quem a acompanha). */
   podeMexerNaReuniao?: boolean;
+  /** A reunião ou a tarefa que o aviso do topo apontou: o cartão aparece contornado. */
+  destaque?: string | null;
 }) {
+  const destacado = (c: Compromisso) =>
+    destaque !== null && (c.taskId === destaque || c.reuniaoId === destaque);
   const { marcados, visitas, aMarcar, concluidos } = blocosDoDia(itens);
 
   if (marcados.length + visitas.length + aMarcar.length + concluidos.length === 0) {
@@ -115,6 +120,7 @@ export function ListaDoDia({
                 aoMudarReuniao={aoMudarReuniao}
                 somenteLeitura={somenteLeitura}
                 podeMexerNaReuniao={podeMexerNaReuniao}
+                destacado={destacado(c)}
               />
             ))}
           </ul>
@@ -127,8 +133,8 @@ export function ListaDoDia({
           titulo="Visitas do dia"
           contagem={visitas.length}
           nota={
-            visitas.some((v) => v.peloCalendly)
-              ? 'As portas a bater neste dia, agrupadas por bairro. As que vieram do Calendly têm a hora que o cliente escolheu.'
+            visitas.some((v) => v.horaCombinada)
+              ? 'As visitas do dia, agrupadas por bairro. As que têm hora marcada (pelo Calendly ou na agenda) mostram a hora.'
               : 'Sem hora combinada: são as portas a bater neste dia, agrupadas por bairro.'
           }
         >
@@ -150,6 +156,7 @@ export function ListaDoDia({
                       aoMudarReuniao={aoMudarReuniao}
                       somenteLeitura={somenteLeitura}
                       podeMexerNaReuniao={podeMexerNaReuniao}
+                      destacado={destacado(c)}
                     />
                   ))}
                 </ul>
@@ -182,6 +189,7 @@ export function ListaDoDia({
                 aoMudarReuniao={aoMudarReuniao}
                 somenteLeitura={somenteLeitura}
                 podeMexerNaReuniao={podeMexerNaReuniao}
+                destacado={destacado(c)}
               />
             ))}
           </ul>
@@ -204,6 +212,7 @@ export function ListaDoDia({
                 aoMudarReuniao={aoMudarReuniao}
                 somenteLeitura={somenteLeitura}
                 podeMexerNaReuniao={podeMexerNaReuniao}
+                destacado={destacado(c)}
               />
             ))}
           </ul>

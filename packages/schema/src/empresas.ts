@@ -126,6 +126,13 @@ export interface Empresa {
      * de hoje ao lado da fila. Só da Imova: é só tela, nenhum dado novo no banco.
      */
     meuDiaNovo: boolean;
+    /**
+     * A visita marcada no CRM com hora (`visita_marcar`, `tasks.origin = 'manual'`)
+     * mostra a hora e o fim no cartão da Agenda (11/11/2026, junto com o Calendly:
+     * na imobiliária a visita é horário combinado com o cliente). Na KOMUNE a visita
+     * continua sendo "porta a bater" sem hora (PRD RF-AGE-01). Só tela.
+     */
+    horaNaVisita: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -204,6 +211,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       relatoriosDaImova: false,
       canalDeChegada: false,
       meuDiaNovo: false,
+      horaNaVisita: false,
     },
     privacidade: null,
     visual: {
@@ -251,6 +259,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       relatoriosDaImova: true,
       canalDeChegada: true,
       meuDiaNovo: true,
+      horaNaVisita: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

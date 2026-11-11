@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BellRing, Check, TriangleAlert } from 'lucide-react';
+import { BellRing, CalendarCheck, Check, TriangleAlert } from 'lucide-react';
 
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,8 @@ type Aviso = {
   quemMarcou: string;
   /** Uma frase a mais: com o que o horário conflita, ou de quando foi remarcado. */
   detalhe: string | null;
+  /** A reunião (ou a tarefa) do aviso: o cartão que a Agenda destaca ao tocar. */
+  alvo: string | null;
 };
 
 const ESTADOS_VIVOS = ['a_confirmar', 'marcada', 'confirmada'];
@@ -57,14 +59,14 @@ export function chaveDosAvisos(usuarioId: string) {
 }
 
 const COLUNAS =
-  'id, tipo, titulo, quando, marcado_por, origem, detalhe, reunioes(estado, inicio), tasks(status, due_at)';
+  'id, tipo, titulo, quando, marcado_por, origem, detalhe, task_id, reuniao_id, reunioes(estado, inicio), tasks(status, due_at)';
 /**
  * Sem `origem` e `detalhe`: o banco que ainda não recebeu a migração 20261110180000.
  * O site sobe junto nas duas empresas e o banco, uma de cada vez; sem esta volta, o
  * aviso de quem recebe um compromisso sumiria nesse intervalo.
  */
 const COLUNAS_ANTES_DO_CALENDLY =
-  'id, tipo, titulo, quando, marcado_por, reunioes(estado, inicio), tasks(status, due_at)';
+  'id, tipo, titulo, quando, marcado_por, task_id, reuniao_id, reunioes(estado, inicio), tasks(status, due_at)';
 
 type LinhaDoAviso = {
   id: string;
@@ -74,6 +76,8 @@ type LinhaDoAviso = {
   marcado_por: string | null;
   origem: string;
   detalhe: string | null;
+  task_id: string | null;
+  reuniao_id: string | null;
   reunioes: unknown;
   tasks: unknown;
 };
@@ -140,6 +144,7 @@ async function buscarAvisos(usuarioId: string): Promise<Aviso[]> {
         ? PELO_CALENDLY
         : ((a.marcado_por ? nomes.get(a.marcado_por) : null) ?? 'Alguém da equipe'),
     detalhe: a.detalhe,
+    alvo: a.reuniao_id ?? a.task_id,
   }));
 }
 
@@ -153,8 +158,11 @@ export function AvisosRecebidos({
   aoIrParaDia,
 }: {
   usuarioId: string;
-  /** Na Agenda, troca o dia sem sair da tela; fora dela, o item vira link. */
-  aoIrParaDia?: (dia: Dia) => void;
+  /**
+   * Na Agenda, troca o dia sem sair da tela e destaca o cartão do aviso (`alvo`);
+   * fora dela, o item vira link.
+   */
+  aoIrParaDia?: (dia: Dia, alvo?: string | null) => void;
 }) {
   const cliente = useQueryClient();
   const consulta = useQuery({
@@ -167,7 +175,8 @@ export function AvisosRecebidos({
       const supabase = createClient();
       await supabase.rpc('agenda_avisos_vistos', { p_ids: ids });
     },
-    onSettled: () => void cliente.invalidateQueries({ queryKey: chaveDosAvisos(usuarioId) }),
+    // Relê a agenda inteira, e não só os avisos: o selo "Novo" dos cartões sai junto.
+    onSettled: () => void cliente.invalidateQueries({ queryKey: ['agenda'] }),
   });
 
   const avisos = consulta.data ?? [];
@@ -204,13 +213,20 @@ export function AvisosRecebidos({
           const dia = diaDoInstante(a.quando);
           const conteudo = (
             <>
-              <span className="text-sm font-medium">{a.titulo}</span>
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-sm font-medium">{a.titulo}</span>
+                {/* De onde veio, no mesmo selo do cartão. */}
+                {a.quemMarcou === PELO_CALENDLY ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-menta/15 px-2 py-0.5 text-[11px] font-medium text-foreground">
+                    <CalendarCheck className="size-3" aria-hidden="true" />
+                    Calendly
+                  </span>
+                ) : null}
+              </span>
               <span className="numerico text-xs text-muted-foreground">
                 {a.tipo === 'visita' ? 'Visita' : 'Reunião'} · {quandoCurto(a.quando)}
-                {quemMarcou.length > 1
-                  ? a.quemMarcou === PELO_CALENDLY
-                    ? ' · pelo Calendly'
-                    : ` · por ${a.quemMarcou}`
+                {quemMarcou.length > 1 && a.quemMarcou !== PELO_CALENDLY
+                  ? ` · por ${a.quemMarcou}`
                   : ''}
               </span>
               {/* Âmbar, como o "Reagendada" do cartão: pede atenção, não é erro. */}
@@ -227,7 +243,7 @@ export function AvisosRecebidos({
           return (
             <li key={a.id}>
               {aoIrParaDia ? (
-                <button type="button" className={classe} onClick={() => aoIrParaDia(dia)}>
+                <button type="button" className={classe} onClick={() => aoIrParaDia(dia, a.alvo)}>
                   {conteudo}
                 </button>
               ) : (

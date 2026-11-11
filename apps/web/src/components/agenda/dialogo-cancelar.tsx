@@ -86,6 +86,12 @@ function Conteudo({
           {compromisso.organizacao} · {rotuloDiaPorExtenso(diaDoInstante(compromisso.quando))},{' '}
           <span className="numerico">{faixaDeHoras(compromisso)}</span>. O time é avisado por
           e-mail.
+          {/* Marcada pelo cliente no link: o cancelamento chega ao Calendly
+              (`calendly_cancelamentos_pendentes` → `imova-worker-wa`), que avisa o
+              cliente com uma frase fixa, e não com o motivo daqui. */}
+          {compromisso.peloCalendly
+            ? ' O Calendly cancela o agendamento e avisa o cliente por e-mail: o horário volta a ficar livre no link. O motivo fica só no CRM.'
+            : null}
         </DialogDescription>
       </DialogHeader>
 

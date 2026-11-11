@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CalendarCheck } from 'lucide-react';
 
 import { faixaDoHorario, livresDoDia, type HorarioLivre } from './acoes-reuniao';
-import { type Dia } from './tipos';
+import { hojeEmNatal, type Dia } from './tipos';
 
 /**
  * "O que o robô pode oferecer no meu nome hoje."
@@ -40,7 +40,8 @@ export function TiraDeLivres({ dia, donoId }: { dia: Dia; donoId?: string }) {
     <div className="flex flex-wrap items-center gap-1.5 pb-1">
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <CalendarCheck className="size-3.5 shrink-0" aria-hidden="true" />
-        Livres hoje:
+        {/* "hoje" só no dia de hoje: a tira acompanha o dia escolhido na semana. */}
+        {dia === hojeEmNatal() ? 'Livres hoje:' : 'Livres neste dia:'}
       </span>
       {livres.map((h) => (
         <span

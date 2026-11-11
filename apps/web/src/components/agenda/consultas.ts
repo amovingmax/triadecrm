@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { EMPRESA } from '@/lib/empresa';
 import { prepararConsulta } from '@/components/parceiros/busca';
 import { hidratarAlvos } from '@/components/registro/alvos';
 import {
@@ -14,6 +15,7 @@ import {
   conflitosDoCalendly,
   escolherResultado,
   janelaDeDias,
+  MINUTOS_SEM_FIM,
   naturezaDoCompromisso,
   resultadoDoDesfecho,
   type Compromisso,
@@ -118,6 +120,60 @@ type LinhaReuniao = {
   remarcada_de: string | null;
 };
 
+/**
+ * O que só o agendamento do Calendly sabe da visita: o endereço que o cliente
+ * escreveu e o fim. A visita é uma `tasks`, que não tem nem um nem outro.
+ */
+type LinhaDoCalendly = {
+  task_id: string | null;
+  local: string | null;
+  fim: string | null;
+  link: string | null;
+};
+
+/**
+ * Os agendamentos do Calendly das tarefas da janela. Só a Imova tem a tabela, e só
+ * quando há tarefa do Calendly: lista vazia não vai ao servidor. É enfeite do
+ * cartão (endereço e fim), então o erro é engolido: sem ele a visita aparece como
+ * antes, na hora certa.
+ */
+async function buscarDoCalendly(
+  supabase: ReturnType<typeof createClient>,
+  taskIds: readonly string[],
+): Promise<Map<string, LinhaDoCalendly>> {
+  if (taskIds.length === 0) return new Map();
+  const { data, error } = await supabase
+    .from('calendly_agendamentos')
+    .select('task_id, local, fim, link')
+    .in('task_id', [...taskIds]);
+  if (error || !data) return new Map();
+  return new Map(
+    (data as LinhaDoCalendly[]).flatMap((l) => (l.task_id ? [[l.task_id, l] as const] : [])),
+  );
+}
+
+/**
+ * As tarefas e reuniões com aviso ainda não visto (`agenda_avisos`): o selo "Novo"
+ * do cartão. Some quando a pessoa toca em "Ok, vi". Erro engolido pelo mesmo motivo
+ * do Calendly: o selo é enfeite.
+ */
+async function buscarNovos(
+  supabase: ReturnType<typeof createClient>,
+  usuarioId: string,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('agenda_avisos')
+    .select('task_id, reuniao_id')
+    .eq('dono_id', usuarioId)
+    .is('visto_em', null);
+  if (error || !data) return new Set();
+  return new Set(
+    (data as { task_id: string | null; reuniao_id: string | null }[]).flatMap((a) =>
+      [a.task_id, a.reuniao_id].filter((id): id is string => id !== null),
+    ),
+  );
+}
+
 type LinhaNegocio = {
   id: string;
   pipeline_id: number;
@@ -188,7 +244,7 @@ export async function buscarCompromissos(params: {
 
   const fechadas = linhas.filter((t) => t.status === 'done');
 
-  const [orgs, negocios, reuniao, registros] = await Promise.all([
+  const [orgs, negocios, reuniao, registros, doCalendly, novos] = await Promise.all([
     supabase.from('organizations_view').select(COLUNAS_ORG).in('id', orgIds),
     buscarNegocios(supabase, dealIds),
     // As reuniões das tarefas desta janela. Uma ida só, e não uma por cartão:
@@ -214,6 +270,11 @@ export async function buscarCompromissos(params: {
       ).toISOString(),
       catalogo: params.catalogo,
     }),
+    buscarDoCalendly(
+      supabase,
+      linhas.filter((t) => t.origin === 'calendly').map((t) => t.id),
+    ),
+    buscarNovos(supabase, params.usuarioId),
   ]);
 
   if (orgs.error) throw erroDe(orgs.error.code, orgs.error);
@@ -242,6 +303,17 @@ export async function buscarCompromissos(params: {
     const reuniaoDaTarefa = porTarefa.get(tarefa.id) ?? null;
     const tipo = ehVisita ? ('visita' as const) : ('reuniao' as const);
     const peloCalendly = tarefa.origin === 'calendly';
+    const agendamento = peloCalendly ? (doCalendly.get(tarefa.id) ?? null) : null;
+    // A hora da visita: a do Calendly sempre; a marcada no CRM, onde a empresa a
+    // mostra. O fim é o do Calendly, ou a duração padrão da visita.
+    const horaCombinada =
+      ehVisita && (peloCalendly || (EMPRESA.modulos.horaNaVisita && tarefa.origin === 'manual'));
+    const fimDaVisita = !ehVisita
+      ? null
+      : (agendamento?.fim ??
+        (horaCombinada
+          ? new Date(Date.parse(tarefa.due_at) + MINUTOS_SEM_FIM.visita * 60_000).toISOString()
+          : null));
     const natureza = naturezaDoCompromisso(
       {
         reuniaoId: reuniaoDaTarefa?.id ?? null,
@@ -261,13 +333,15 @@ export async function buscarCompromissos(params: {
         quando: tarefa.due_at,
         concluido: tarefa.status === 'done',
         reuniaoId: reuniaoDaTarefa?.id ?? null,
-        fim: reuniaoDaTarefa?.fim ?? null,
-        link: reuniaoDaTarefa?.link ?? null,
-        local: reuniaoDaTarefa?.local ?? null,
+        fim: reuniaoDaTarefa?.fim ?? fimDaVisita,
+        link: reuniaoDaTarefa?.link ?? agendamento?.link ?? null,
+        local: reuniaoDaTarefa?.local ?? agendamento?.local ?? null,
         estado: reuniaoDaTarefa?.estado ?? null,
         marcadaPeloRobo: reuniaoDaTarefa?.marcada_por === 'robo',
         peloCalendly,
         emConflito: false,
+        horaCombinada,
+        novo: novos.has(tarefa.id) || (reuniaoDaTarefa !== null && novos.has(reuniaoDaTarefa.id)),
         avisoEnviadoEm: reuniaoDaTarefa?.aviso_enviado_em ?? null,
         reuniaoCriadaEm: reuniaoDaTarefa?.criada_em ?? null,
         organizationId: tarefa.organization_id,

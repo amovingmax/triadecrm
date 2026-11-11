@@ -20,6 +20,7 @@ import {
   mapaPorNome,
   naturezaDoCompromisso,
   numeroDoDia,
+  ondeDoCompromisso,
   PELO_CALENDLY,
   proximoCompromisso,
   recortesDoCompromisso,
@@ -54,6 +55,8 @@ function compromisso(parcial: Partial<Compromisso> = {}): Compromisso {
     marcadaPeloRobo: false,
     peloCalendly: false,
     emConflito: false,
+    horaCombinada: false,
+    novo: false,
     avisoEnviadoEm: null,
     reuniaoCriadaEm: null,
     organizationId: 'org-1',
@@ -193,6 +196,41 @@ describe('link do mapa', () => {
     expect(mapaPorNome(c)).toBe(true);
     expect(consultaDoMapa(c)).toBe('Buffet Sabor, Tirol, Natal, RN');
     expect(linkDoMapa(c)).toContain('https://www.google.com/maps/search/?api=1&query=');
+  });
+
+  it('na visita do Calendly, busca pelo endereço que o cliente escreveu', () => {
+    const c = compromisso({ tipo: 'visita', peloCalendly: true, local: 'Rua das Algas, 120' });
+    expect(mapaPorNome(c)).toBe(false);
+    expect(consultaDoMapa(c)).toBe('Rua das Algas, 120, Tirol, Natal, RN');
+  });
+
+  it('o endereço da reunião presencial não vira busca de mapa da visita', () => {
+    const c = compromisso({ tipo: 'reuniao', local: 'Sala da Imova' });
+    expect(mapaPorNome(c)).toBe(true);
+  });
+});
+
+describe('onde acontece', () => {
+  it('a sala diz a plataforma', () => {
+    expect(ondeDoCompromisso({ link: 'https://meet.google.com/abc-defg-hij', local: null })).toEqual({
+      formato: 'online',
+      texto: 'On-line · Google Meet',
+    });
+    expect(ondeDoCompromisso({ link: 'https://us02web.zoom.us/j/123', local: null })?.texto).toBe(
+      'On-line · Zoom',
+    );
+    expect(ondeDoCompromisso({ link: 'https://exemplo.com/sala', local: null })?.texto).toBe(
+      'On-line',
+    );
+  });
+
+  it('sem sala, o endereço; sem nada, nada', () => {
+    expect(ondeDoCompromisso({ link: null, local: ' Rua das Algas, 120 ' })).toEqual({
+      formato: 'presencial',
+      texto: 'Rua das Algas, 120',
+    });
+    expect(ondeDoCompromisso({ link: '  ', local: null })).toBeNull();
+    expect(ondeDoCompromisso({ link: 'não é link', local: null })?.texto).toBe('On-line');
   });
 });
 

@@ -94,6 +94,14 @@ export type Compromisso = {
   peloCalendly: boolean;
   /** Do Calendly e batendo com outro compromisso aberto (`conflitosDoCalendly`). */
   emConflito: boolean;
+  /**
+   * A visita tem hora combinada: veio do Calendly, ou foi marcada no CRM com hora
+   * (`tasks.origin = 'manual'`) na empresa que mostra essa hora
+   * (`EMPRESA.modulos.horaNaVisita`). As outras visitas são porta a bater no dia.
+   */
+  horaCombinada: boolean;
+  /** Há aviso ainda não visto deste compromisso em `agenda_avisos`: o selo "Novo". */
+  novo: boolean;
   /** `reunioes.aviso_enviado_em`. Nulo depois de 10 minutos quer dizer que o e-mail não saiu. */
   avisoEnviadoEm: string | null;
   /** `reunioes.criada_em`: é dela que se conta a folga antes de acusar o e-mail. */
@@ -457,7 +465,7 @@ export function tituloDosAvisos(avisos: readonly { quemMarcou: string }[]): stri
  * de `agenda.reunioes` (`duracao_min`, `duracao_visita_min`), os mesmos que o banco
  * usa em `app.calendly_conflitos`.
  */
-const MINUTOS_SEM_FIM = { reuniao: 40, visita: 45 } as const;
+export const MINUTOS_SEM_FIM = { reuniao: 40, visita: 45 } as const;
 
 /**
  * Os compromissos do Calendly que batem com outro compromisso aberto da mesma lista.
@@ -596,9 +604,18 @@ export function proximoCompromisso(
  * exatamente o que a Heloísa digitaria no celular. O cartão diz qual dos dois foi
  * usado, para ninguém sair achando que tem número e rua.
  */
+/**
+ * O endereço da visita: o que o cliente escreveu no Calendly (`local`, só na visita)
+ * vale por cima do endereço da ficha, que costuma estar vazio.
+ */
+function enderecoDaVisita(c: Compromisso): string | null {
+  return (c.tipo === 'visita' ? c.local?.trim() : null) || c.endereco?.trim() || null;
+}
+
 export function consultaDoMapa(c: Compromisso): string {
   const local = [c.bairro, c.cidade ?? 'Natal', 'RN'].filter(Boolean).join(', ');
-  return c.endereco?.trim() ? `${c.endereco}, ${local}` : `${c.organizacao}, ${local}`;
+  const endereco = enderecoDaVisita(c);
+  return endereco ? `${endereco}, ${local}` : `${c.organizacao}, ${local}`;
 }
 
 export function linkDoMapa(c: Compromisso): string {
@@ -607,7 +624,36 @@ export function linkDoMapa(c: Compromisso): string {
 
 /** `true` quando o link do mapa é uma busca pelo nome, e não por endereço. */
 export function mapaPorNome(c: Compromisso): boolean {
-  return !c.endereco?.trim();
+  return !enderecoDaVisita(c);
+}
+
+/** Onde o compromisso acontece, para a linha do cartão. */
+export type OndeDoCompromisso = { formato: 'online' | 'presencial'; texto: string };
+
+/**
+ * "On-line · Google Meet" (pela sala), ou o endereço combinado. Nulo quando não há
+ * nem sala nem endereço: o cartão não inventa lugar.
+ */
+export function ondeDoCompromisso(c: Pick<Compromisso, 'link' | 'local'>): OndeDoCompromisso | null {
+  const sala = c.link?.trim();
+  if (sala) {
+    let host = '';
+    try {
+      host = new URL(sala).hostname.toLowerCase();
+    } catch {
+      host = '';
+    }
+    const plataforma = host.endsWith('meet.google.com')
+      ? 'Google Meet'
+      : host.endsWith('zoom.us')
+        ? 'Zoom'
+        : host.endsWith('teams.microsoft.com') || host.endsWith('teams.live.com')
+          ? 'Microsoft Teams'
+          : null;
+    return { formato: 'online', texto: plataforma ? `On-line · ${plataforma}` : 'On-line' };
+  }
+  const endereco = c.local?.trim();
+  return endereco ? { formato: 'presencial', texto: endereco } : null;
 }
 
 // ---------------------------------------------------------------------------
