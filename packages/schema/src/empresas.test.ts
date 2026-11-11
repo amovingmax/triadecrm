@@ -36,6 +36,7 @@ describe('empresas', () => {
       meuDiaNovo: false,
       horaNaVisita: false,
       avisosDaEquipe: false,
+      calendly: false,
     });
     expect(k.gruposDeCategoria).toEqual({});
     expect(k.origens).toBeNull();
@@ -97,6 +98,7 @@ describe('empresas', () => {
       meuDiaNovo: true,
       horaNaVisita: true,
       avisosDaEquipe: true,
+      calendly: true,
     });
     expect(i.tipos.cerimonialista).toBeNull();
   });

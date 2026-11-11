@@ -141,6 +141,13 @@ export interface Empresa {
      * 20261111202000 não cria nada, e lá o convite de sempre continua.
      */
     avisosDaEquipe: boolean;
+    /**
+     * O Calendly na Agenda (10/11/2026), com a parte da tela que depende do banco
+     * dele (11/11/2026): o campo "Quem atende o que chega pelo Calendly" (só admin)
+     * e o aviso do cancelamento que o CRM não conseguiu fazer no Calendly. Só da
+     * Imova: no banco da KOMUNE as funções do Calendly não existem.
+     */
+    calendly: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -221,6 +228,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       meuDiaNovo: false,
       horaNaVisita: false,
       avisosDaEquipe: false,
+      calendly: false,
     },
     privacidade: null,
     visual: {
@@ -270,6 +278,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       meuDiaNovo: true,
       horaNaVisita: true,
       avisosDaEquipe: true,
+      calendly: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

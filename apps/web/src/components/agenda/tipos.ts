@@ -605,11 +605,35 @@ export function proximoCompromisso(
  * usado, para ninguém sair achando que tem número e rua.
  */
 /**
- * O endereço da visita: o que o cliente escreveu no Calendly (`local`, só na visita)
- * vale por cima do endereço da ficha, que costuma estar vazio.
+ * O que o banco grava quando não sabe onde é: "Local a combinar (o Calendly não
+ * informou)", e as variações dele ("Local a combinar (o anúncio IM0003 não tem
+ * endereço)"). O texto existe porque a reunião presencial precisa de um lugar escrito
+ * (`reunioes_lugar_chk`), mas não é endereço: com ele, o cartão mostrava a frase na
+ * linha de onde e o Maps buscava "Local a combinar…, Natal, RN" (11/11/2026).
+ */
+const SEM_LUGAR = /^local a combinar\b/i;
+
+/** O lugar escrito, quando é um lugar de verdade; o "Local a combinar…" vale como nada. */
+export function lugarDeVerdade(local: string | null | undefined): string | null {
+  const texto = local?.trim();
+  return texto && !SEM_LUGAR.test(texto) ? texto : null;
+}
+
+/**
+ * O código do anúncio que o banco cita depois do endereço da visita ("Rua X, 10,
+ * Ponta Negra, Natal (anúncio IM0003)"): aparece no cartão, e sai da busca do Maps,
+ * que não conhece o código.
+ */
+const CODIGO_DO_ANUNCIO = /\s*\(anúncio [A-Za-z0-9_-]+\)\s*$/i;
+
+/**
+ * O endereço da visita: o que o cliente escreveu no Calendly (`local`, só na visita;
+ * ou o endereço do anúncio cujo código ele escreveu) vale por cima do endereço da
+ * ficha, que costuma estar vazio.
  */
 function enderecoDaVisita(c: Compromisso): string | null {
-  return (c.tipo === 'visita' ? c.local?.trim() : null) || c.endereco?.trim() || null;
+  const doCalendly = c.tipo === 'visita' ? lugarDeVerdade(c.local) : null;
+  return doCalendly?.replace(CODIGO_DO_ANUNCIO, '') || c.endereco?.trim() || null;
 }
 
 export function consultaDoMapa(c: Compromisso): string {
@@ -632,7 +656,8 @@ export type OndeDoCompromisso = { formato: 'online' | 'presencial'; texto: strin
 
 /**
  * "On-line · Google Meet" (pela sala), ou o endereço combinado. Nulo quando não há
- * nem sala nem endereço: o cartão não inventa lugar.
+ * nem sala nem endereço — e o "Local a combinar…" do banco conta como não haver: o
+ * cartão não inventa lugar.
  */
 export function ondeDoCompromisso(c: Pick<Compromisso, 'link' | 'local'>): OndeDoCompromisso | null {
   const sala = c.link?.trim();
@@ -652,7 +677,7 @@ export function ondeDoCompromisso(c: Pick<Compromisso, 'link' | 'local'>): OndeD
           : null;
     return { formato: 'online', texto: plataforma ? `On-line · ${plataforma}` : 'On-line' };
   }
-  const endereco = c.local?.trim();
+  const endereco = lugarDeVerdade(c.local);
   return endereco ? { formato: 'presencial', texto: endereco } : null;
 }
 
