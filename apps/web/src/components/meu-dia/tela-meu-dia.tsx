@@ -36,6 +36,7 @@ import { RevelarLista } from '@/components/movimento';
 import { diaDoInstante, rotuloDiaPorExtenso, somarDias } from '@/components/agenda/tipos';
 
 import { AgendaDeHoje } from './agenda-de-hoje';
+import { BlocoPrimeiraResposta } from './bloco-primeira-resposta';
 import { LinhaNova } from './linha-nova';
 import {
   blocosDoFiltro,
@@ -492,6 +493,20 @@ export function TelaMeuDia({
           podeDefinirMeta={podeDefinirMeta}
         />
       )}
+
+      {/* A primeira resposta (Meu dia novo, 11/11/2026): quem espera a resposta do
+          time agora e a mediana de hoje contra o alvo de 15 min, logo depois dos
+          números do dia, porque também é número do dia. Para admin e gestor, a
+          equipe. Fora do Meu dia novo (a KOMUNE), nada. */}
+      {NOVO ? (
+        <BlocoPrimeiraResposta
+          pessoa={pessoa}
+          doProprio={doProprio}
+          usuarioId={usuarioId}
+          selecionaveis={pessoas.map((p) => p.id)}
+          aoVerPessoa={setPessoa}
+        />
+      ) : null}
 
       {/* O Pulso é o CONTEXTO da fila — por que o dia está assim —, e contexto vem
           antes da lista, não no lugar dela. Quem responde "o que eu faço agora?"

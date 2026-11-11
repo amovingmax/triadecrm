@@ -11139,6 +11139,10 @@ export type Database = {
           titulo: string
         }[]
       }
+      meu_dia_primeira_resposta: {
+        Args: { p_dia?: string; p_pessoa?: string }
+        Returns: Json
+      }
       meu_papel: { Args: never; Returns: Json }
       minhas_outras_empresas: { Args: never; Returns: string[] }
       modelo_whatsapp_criar: { Args: { p: Json }; Returns: Json }
