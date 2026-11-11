@@ -163,7 +163,21 @@ export interface Empresa {
      * WhatsApp. Só da Imova: na KOMUNE a migração não cria nada.
      */
     lembreteDeVisita: boolean;
+    /**
+     * O e-mail de reunião marcada, remarcada e cancelada (RF-AGE-05), que o
+     * worker-wa manda pelo Resend. Desligado, a Agenda não promete e-mail ("O
+     * time é avisado por e-mail") nem acusa o que não saiu ("O time não foi
+     * avisado por e-mail"): na Imova não há `RESEND_API_KEY` no `imova-worker-wa`
+     * nem texto do e-mail sem a KOMUNE (11/11/2026). Ligar é trocar para `true`
+     * no dia em que o Resend da Imova estiver no ar.
+     */
+    emailDeReuniao: boolean;
   };
+  /**
+   * As palavras de tela que mudam com o ramo (11/11/2026: Agenda, Meu dia e Metas).
+   * Na KOMUNE, as que já estavam escritas; na Imova, as da imobiliária.
+   */
+  vocabulario: Vocabulario;
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
    * publicar o app do WhatsApp e o Google pede para publicar o login. null = a empresa
@@ -178,6 +192,61 @@ export interface Empresa {
    * guarda, valor por valor, o que estava fixo no código antes (um teste confere).
    */
   visual: VisualDaEmpresa;
+}
+
+/**
+ * O vocabulário de tela de uma empresa (11/11/2026). Pedido do usuário para a Agenda
+ * da Imova: textos "no vocabulário da imobiliária (cliente, proprietário, visita,
+ * corretor), nunca 'parceiro' nem 'fornecedor'". As palavras são as de quem está do
+ * outro lado do compromisso e as de quem marca sozinho pela conversa; a frase em
+ * volta continua no componente. Na KOMUNE, os valores são as palavras que já estavam
+ * escritas no código (o teste confere).
+ */
+export interface Vocabulario {
+  /**
+   * Quem está do outro lado, no meio da frase: "parceiro"; na Imova, "cliente".
+   * Masculino nas duas empresas, então "o", "do" e "deste" em volta não mudam.
+   */
+  parceiro: string;
+  /** O plural: "parceiros"; na Imova, "clientes". */
+  parceiros: string;
+  /**
+   * Quem ainda não sabe o horário da reunião que o robô marcou (a rampa de
+   * confirmação): "fornecedor"; na Imova, "cliente".
+   */
+  fornecedor: string;
+  /**
+   * Quem marca e escreve sozinho pela conversa, com o artigo e as contrações:
+   * "o robô"; na Imova, "a IA" (a IA que atende, que marca a visita).
+   */
+  robo: { o: string; do: string; pelo: string };
+  /**
+   * As visitas sem hora combinada, no meio da frase: "as portas a bater"; na
+   * Imova, "as visitas a fazer".
+   */
+  visitasSemHora: string;
+  /**
+   * O que a meta de esforço do dia conta, no singular, para a nota do "Feito hoje":
+   * "porta batida" e "uma porta"; na Imova, "contato feito" e "um contato".
+   */
+  portaBatida: { nome: string; uma: string };
+  /**
+   * As métricas do `goal_progress` que a empresa chama por outro nome, por métrica.
+   * O banco escreve o rótulo e a fonte da captação da KOMUNE ("Portas batidas",
+   * "máx. 1 por alvo por dia"); o site troca na leitura (`lib/vocabulario.ts`),
+   * para os dois bancos continuarem com a MESMA função. Vazio = os do banco.
+   */
+  metricas: Partial<Record<string, MetricaNaEmpresa>>;
+}
+
+/** Como uma métrica do `goal_progress` aparece numa empresa. */
+export interface MetricaNaEmpresa {
+  /** O nome da métrica na tela ("Contatos feitos"). */
+  rotulo: string;
+  /** Como o número é contado, no lugar da `fonte` do banco. */
+  fonte: string;
+  /** A leitura em uma linha que o Meu dia mostra embaixo do número. */
+  definicao: string;
 }
 
 /** A moldura de uma empresa: tema de entrada, barra do navegador e ícones da PWA. */
@@ -246,6 +315,16 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       calendly: false,
       esperaEmDegraus: false,
       lembreteDeVisita: false,
+      emailDeReuniao: true,
+    },
+    vocabulario: {
+      parceiro: 'parceiro',
+      parceiros: 'parceiros',
+      fornecedor: 'fornecedor',
+      robo: { o: 'o robô', do: 'do robô', pelo: 'pelo robô' },
+      visitasSemHora: 'as portas a bater',
+      portaBatida: { nome: 'porta batida', uma: 'uma porta' },
+      metricas: {},
     },
     privacidade: null,
     visual: {
@@ -298,6 +377,58 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       calendly: true,
       esperaEmDegraus: true,
       lembreteDeVisita: true,
+      // Sem Resend no `imova-worker-wa` (11/11/2026): a Agenda não promete e-mail.
+      emailDeReuniao: false,
+    },
+    // Quem está do outro lado é o cliente (ou o proprietário), e quem marca sozinho é
+    // a IA que atende. As métricas trocam o jargão da captação ("porta batida",
+    // "alvo") pelo do atendimento; a conta é a mesma do banco.
+    vocabulario: {
+      parceiro: 'cliente',
+      parceiros: 'clientes',
+      fornecedor: 'cliente',
+      robo: { o: 'a IA', do: 'da IA', pelo: 'pela IA' },
+      visitasSemHora: 'as visitas a fazer',
+      portaBatida: { nome: 'contato feito', uma: 'um contato' },
+      metricas: {
+        doors_knocked: {
+          rotulo: 'Contatos feitos',
+          fonte: 'activities com desfecho do catálogo; máx. 1 por cliente ou proprietário por dia',
+          definicao: 'Contato registrado com cliente ou proprietário. Um por pessoa, por dia.',
+        },
+        doors_opened: {
+          rotulo: 'Atendimentos',
+          fonte:
+            'activities cujo desfecho vale atendimento e com quem se falou decide ou influencia; máx. 1 por cliente ou proprietário a cada 30 dias',
+          definicao: 'O cliente ou o proprietário respondeu, e quem falou decide ou influencia.',
+        },
+        meetings_booked: {
+          rotulo: 'Visitas e avaliações marcadas',
+          fonte: 'deal_stage_history: entradas nas etapas "Visita marcada" e "Avaliação marcada"',
+          definicao: 'Negócios que chegaram a Visita marcada ou a Avaliação marcada.',
+        },
+        new_targets: {
+          rotulo: 'Contatos novos',
+          fonte: 'organizations criadas no período com a pessoa como responsável',
+          definicao: 'Clientes e proprietários novos com você como responsável.',
+        },
+        pre_registrations: {
+          rotulo: 'Documentações iniciadas',
+          fonte: 'entradas na etapa "Documentação" da captação de imóveis',
+          definicao: 'Negócios que entraram em "Documentação".',
+        },
+        published: {
+          rotulo: 'Imóveis captados',
+          fonte: 'entradas na etapa "Imóvel captado" da captação de imóveis',
+          definicao: 'Imóveis que chegaram a "Imóvel captado".',
+        },
+        replies: {
+          rotulo: 'Respostas recebidas',
+          fonte:
+            'mensagens recebidas nas conversas sob responsabilidade da pessoa, depois de a Imova ter escrito na conversa; máx. 1 por conversa por dia',
+          definicao: 'Mensagens que o cliente respondeu.',
+        },
+      },
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

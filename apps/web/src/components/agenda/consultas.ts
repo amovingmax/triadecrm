@@ -20,6 +20,7 @@ import {
   MINUTOS_SEM_FIM,
   naturezaDoCompromisso,
   resultadoDoDesfecho,
+  visitaComHoraCombinada,
   type Compromisso,
   type Dia,
   type RegistroComDesfecho,
@@ -131,6 +132,8 @@ type LinhaDoCalendly = {
   local: string | null;
   fim: string | null;
   link: string | null;
+  /** O agendamento que este substituiu: o cliente remarcou pelo Calendly. */
+  remarcado_de: string | null;
 };
 
 /**
@@ -146,7 +149,7 @@ async function buscarDoCalendly(
   if (taskIds.length === 0) return new Map();
   const { data, error } = await supabase
     .from('calendly_agendamentos')
-    .select('task_id, local, fim, link')
+    .select('task_id, local, fim, link, remarcado_de')
     .in('task_id', [...taskIds]);
   if (error || !data) return new Map();
   return new Map(
@@ -315,7 +318,7 @@ export async function buscarCompromissos(params: {
     // A hora da visita: a do Calendly sempre; a marcada no CRM, onde a empresa a
     // mostra. O fim é o do Calendly, ou a duração padrão da visita.
     const horaCombinada =
-      ehVisita && (peloCalendly || (EMPRESA.modulos.horaNaVisita && tarefa.origin === 'manual'));
+      ehVisita && visitaComHoraCombinada(tarefa.origin, EMPRESA.modulos.horaNaVisita);
     const fimDaVisita = !ehVisita
       ? null
       : (agendamento?.fim ??
@@ -371,7 +374,9 @@ export async function buscarCompromissos(params: {
         diasSemContato: diasDesde(negocio?.last_activity_at ?? null, agora),
         naoContatar: org.do_not_contact,
         resultado: resultadoDaTarefa(tarefa, tipo, registros, params.usuarioId),
-        reagendada: reuniaoDaTarefa?.remarcada_de != null,
+        // A reunião remarcada (`reunioes.remarcada_de`) e a visita que o cliente
+        // remarcou pelo Calendly: a visita é tarefa, e só o agendamento sabe.
+        reagendada: reuniaoDaTarefa?.remarcada_de != null || agendamento?.remarcado_de != null,
         responsavelId: params.usuarioId,
       } satisfies Compromisso,
     ];

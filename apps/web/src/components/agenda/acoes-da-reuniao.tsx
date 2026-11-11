@@ -14,6 +14,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
+import { VOCABULARIO } from '@/lib/vocabulario';
 
 import {
   cancelarReuniao,
@@ -25,6 +26,11 @@ import {
   type HorarioLivre,
 } from './acoes-reuniao';
 import { DialogoCancelar } from './dialogo-cancelar';
+import {
+  avisoAoRemarcarDoCalendly,
+  EMAIL_DE_REUNIAO,
+  recadoDeReuniaoRemarcada,
+} from './efeito-no-calendly';
 import { diaDoInstante, type Compromisso } from './tipos';
 
 /**
@@ -52,6 +58,9 @@ import { diaDoInstante, type Compromisso } from './tipos';
 const FOLGA_DO_AVISO_MS = 10 * 60 * 1000;
 
 export function avisoNaoSaiu(compromisso: Compromisso, agora: number = Date.now()): boolean {
+  // Onde não há e-mail de reunião (a Imova, sem Resend), não há o que acusar: o
+  // aviso sairia em todo cartão, por falta de configuração e não por falha.
+  if (!EMAIL_DE_REUNIAO) return false;
   if (!compromisso.reuniaoId || compromisso.avisoEnviadoEm) return false;
   if (compromisso.estado === 'cancelada' || compromisso.estado === 'remarcada') return false;
   // A folga existe para o cartão não acusar o e-mail no minuto em que a reunião
@@ -110,7 +119,7 @@ export function AcoesDaReuniao({
     <>
       {compromisso.marcadaPeloRobo ? (
         <Badge variant="pilula" className="font-normal text-muted-foreground">
-          marcada pelo robô
+          marcada {VOCABULARIO.robo.pelo}
         </Badge>
       ) : null}
 
@@ -169,7 +178,8 @@ export function AcoesDaReuniao({
             Confirmar o horário
           </Button>
           <p className="pt-1 text-xs text-muted-foreground">
-            O fornecedor ainda não sabe o horário; confirme para o robô poder dizer.
+            O {VOCABULARIO.fornecedor} ainda não sabe o horário; confirme para {VOCABULARIO.robo.o}{' '}
+            poder dizer.
           </p>
         </div>
       ) : null}
@@ -202,11 +212,19 @@ export function AcoesDaReuniao({
           <SheetHeader>
             <SheetTitle>Remarcar</SheetTitle>
             <SheetDescription>
-              {compromisso.organizacao} · os horários livres deste dia, na mesma grade que o robô
-              usa
+              {compromisso.organizacao} · os horários livres deste dia, na mesma grade que{' '}
+              {VOCABULARIO.robo.o} usa
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-2 px-4 pb-4">
+            {/* O cliente marcou pelo link: remarcar aqui cancela lá, e o Calendly manda
+                a ele a frase fixa (`calendly_cancelamentos_pendentes`). Quem remarca
+                fica sabendo antes, para mandar o horário novo. */}
+            {compromisso.peloCalendly ? (
+              <p className="rounded-lg bg-morno-fundo px-3 py-2.5 text-sm text-morno-texto">
+                {avisoAoRemarcarDoCalendly()}
+              </p>
+            ) : null}
             {livres === null ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 <Loader2 className="inline size-4 animate-spin" aria-hidden="true" /> Procurando
@@ -229,7 +247,7 @@ export function AcoesDaReuniao({
                       const r = await remarcarReuniao(reuniaoId, h.inicio);
                       if (r.ok) setFolhaAberta(false);
                       return r;
-                    }, 'Reunião remarcada. O time é avisado por e-mail.')
+                    }, recadoDeReuniaoRemarcada(compromisso.peloCalendly))
                   }
                 >
                   <span className="numerico">{faixaDoHorario(h)}</span>

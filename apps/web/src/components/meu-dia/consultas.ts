@@ -1,7 +1,9 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
-import { hojeEmNatal, janelaDeDias } from '@/components/agenda/tipos';
+import { EMPRESA } from '@/lib/empresa';
+import { metricaNaEmpresa } from '@/lib/vocabulario';
+import { etapaPedeHora, hojeEmNatal, janelaDeDias } from '@/components/agenda/tipos';
 import {
   lembretesPorTarefa,
   respostaDoLembrete,
@@ -10,6 +12,7 @@ import {
 import { buscarRespostasDosLembretes } from '@/components/agenda/lembrete-de-visita-dados';
 
 import type { RegistroDoDia } from './feito';
+import { temHoraNaAgendaDeHoje } from './hora-na-agenda';
 import { textoDaPrevia } from './novo';
 import { lerPrimeiraResposta, type PrimeiraResposta } from './primeira-resposta';
 import {
@@ -140,17 +143,25 @@ export async function buscarResumoDoDia(pessoaId?: string): Promise<MetricaDoDia
   if (error) throw new ErroDoDia(error.message, error.code);
 
   const linhas = (data ?? []) as unknown as LinhaDeMetrica[];
-  return linhas.map((linha) => ({
-    metrica: linha.metrica ?? '',
-    rotulo: linha.metrica_rotulo ?? linha.metrica ?? '',
-    meta: linha.meta,
-    realizado: linha.realizado,
-    percentual: numero(linha.percentual),
-    mensuravel: linha.mensuravel ?? true,
-    fonte: linha.fonte ?? '',
-    periodoInicio: linha.periodo_inicio ?? '',
-    periodoFim: linha.periodo_fim ?? '',
-  }));
+  return linhas.map((linha) => {
+    // O rótulo e a fonte no vocabulário da empresa (na Imova, "Contatos feitos" no
+    // lugar de "Portas batidas"); a conta é a do banco.
+    const { rotulo, fonte } = metricaNaEmpresa(linha.metrica ?? '', {
+      rotulo: linha.metrica_rotulo ?? linha.metrica ?? '',
+      fonte: linha.fonte ?? '',
+    });
+    return {
+      metrica: linha.metrica ?? '',
+      rotulo,
+      meta: linha.meta,
+      realizado: linha.realizado,
+      percentual: numero(linha.percentual),
+      mensuravel: linha.mensuravel ?? true,
+      fonte,
+      periodoInicio: linha.periodo_inicio ?? '',
+      periodoFim: linha.periodo_fim ?? '',
+    };
+  });
 }
 
 /**
@@ -457,6 +468,12 @@ export type CompromissoDeHoje = {
   organizacao: string | null;
   /** O toque do cliente no lembrete da véspera, para este horário (só na Imova). */
   respostaDoLembrete: RespostaDoLembrete | null;
+  /**
+   * A hora é hora combinada com alguém (a régua da Agenda, `hora-na-agenda.ts`).
+   * Falso na apresentação a combinar e na visita sem hora: a hora delas é o prazo
+   * da régua (09:00), e a coluna não a mostra nem diz "atrasada".
+   */
+  comHora: boolean;
 };
 
 /**
@@ -475,7 +492,7 @@ export async function buscarAgendaDeHoje(
 
   const { data, error } = await supabase
     .from('tasks')
-    .select('id, title, due_at, kind, status, organization_id')
+    .select('id, title, due_at, kind, status, organization_id, origin, deal_id')
     .eq('assignee_id', usuarioId)
     .in('kind', ['meeting', 'visit'])
     .in('status', ['todo', 'doing', 'done'])
@@ -493,12 +510,19 @@ export async function buscarAgendaDeHoje(
     kind: 'meeting' | 'visit';
     status: string;
     organization_id: string | null;
+    origin: string;
+    deal_id: string | null;
   }[];
   const orgIds = [...new Set(linhas.flatMap((l) => l.organization_id ?? []))];
+  const dealIds = [...new Set(linhas.flatMap((l) => l.deal_id ?? []))];
+  const reunioesDe = linhas.filter((l) => l.kind === 'meeting').map((l) => l.id);
 
   const nomes = new Map<string, string>();
-  // O selo do lembrete vai junto com os nomes: erro nele é engolido lá dentro.
-  const [resposta, lembretes] = await Promise.all([
+  // O selo do lembrete vai junto com os nomes: erro nele é engolido lá dentro. A
+  // reunião e a etapa dizem se a hora é hora combinada (a régua da Agenda): erro
+  // nelas derruba a coluna, como na Agenda, porque sem elas a reunião de verdade
+  // apareceria como "a combinar".
+  const [resposta, lembretes, reunioes, negocios] = await Promise.all([
     orgIds.length > 0
       ? supabase.from('organizations_view').select('id, name').in('id', orgIds)
       : null,
@@ -506,7 +530,34 @@ export async function buscarAgendaDeHoje(
       supabase,
       linhas.map((l) => l.id),
     ),
+    reunioesDe.length > 0
+      ? supabase
+          .from('reunioes')
+          .select('id, task_id')
+          .in('estado', ['a_confirmar', 'marcada', 'confirmada', 'realizada', 'nao_compareceu'])
+          .in('task_id', reunioesDe)
+      : null,
+    dealIds.length > 0
+      ? supabase.from('deals').select('id, stage_id, stages(required_fields)').in('id', dealIds)
+      : null,
   ]);
+  if (reunioes?.error) throw new ErroDoDia(reunioes.error.message, reunioes.error.code);
+  if (negocios?.error) throw new ErroDoDia(negocios.error.message, negocios.error.code);
+  const reuniaoDaTarefa = new Map(
+    ((reunioes?.data ?? []) as { id: string; task_id: string | null }[]).flatMap((r) =>
+      r.task_id ? [[r.task_id, r.id] as const] : [],
+    ),
+  );
+  const etapaDoNegocio = new Map<string, number>();
+  const etapasQueMarcamHora = new Set<number>();
+  for (const d of (negocios?.data ?? []) as unknown as {
+    id: string;
+    stage_id: number;
+    stages: { required_fields: unknown } | null;
+  }[]) {
+    etapaDoNegocio.set(d.id, d.stage_id);
+    if (etapaPedeHora(d.stages?.required_fields)) etapasQueMarcamHora.add(d.stage_id);
+  }
   if (resposta) {
     if (resposta.error) throw new ErroDoDia(resposta.error.message, resposta.error.code);
     for (const parceiro of (resposta.data ?? []) as { id: string | null; name: string | null }[]) {
@@ -524,6 +575,16 @@ export async function buscarAgendaDeHoje(
     organizacaoId: linha.organization_id,
     organizacao: linha.organization_id ? (nomes.get(linha.organization_id) ?? null) : null,
     respostaDoLembrete: respostaDoLembrete(linha.due_at, lembretesDaTarefa.get(linha.id) ?? []),
+    comHora: temHoraNaAgendaDeHoje(
+      {
+        kind: linha.kind,
+        origin: linha.origin,
+        reuniaoId: reuniaoDaTarefa.get(linha.id) ?? null,
+        etapaId: linha.deal_id ? (etapaDoNegocio.get(linha.deal_id) ?? null) : null,
+      },
+      etapasQueMarcamHora,
+      EMPRESA.modulos.horaNaVisita,
+    ),
   }));
 }
 

@@ -1,6 +1,7 @@
 import type { GoalMetric } from '@komune/schema';
 
 import { ROTULO_PAPEL, type AppRole } from '@/lib/auth/role';
+import { VOCABULARIO } from '@/lib/vocabulario';
 
 import type { Periodo } from './periodo';
 
@@ -74,6 +75,13 @@ export const PAPEIS_QUE_REGISTRAM_TRABALHO: readonly AppRole[] = [
 ];
 
 /**
+ * O trabalho que se registra, no vocabulário da empresa: "porta, ligação, visita nem
+ * cadastro"; na Imova, "contato, ligação…". A primeira palavra de "porta batida"
+ * (na Imova, de "contato feito").
+ */
+const O_QUE_SE_REGISTRA = `${VOCABULARIO.portaBatida.nome.split(' ')[0]}, ligação, visita nem cadastro`;
+
+/**
  * Por que o realizado desta pessoa vai ficar em zero — ou `null` quando não vai.
  *
  * A tela AVISA e não impede, de propósito. Impedir seria inventar uma recusa que o
@@ -94,9 +102,9 @@ export function porQueFicaEmZero(
 
   const rotulo = ROTULO_PAPEL[papel];
   if (ehVoce) {
-    return `O seu papel é ${rotulo}, e o Tríade não registra porta, ligação, visita nem cadastro em nome desse papel. Os números abaixo ficam em zero por isso, e não por falta de registro seu. Quem troca papel é o admin, na Administração.`;
+    return `O seu papel é ${rotulo}, e o Tríade não registra ${O_QUE_SE_REGISTRA} em nome desse papel. Os números abaixo ficam em zero por isso, e não por falta de registro seu. Quem troca papel é o admin, na Administração.`;
   }
-  return `${nome} tem o papel ${rotulo}, e o Tríade não registra porta, ligação, visita nem cadastro em nome desse papel. A meta definida aqui fica em zero até um admin trocar o papel, na Administração.`;
+  return `${nome} tem o papel ${rotulo}, e o Tríade não registra ${O_QUE_SE_REGISTRA} em nome desse papel. A meta definida aqui fica em zero até um admin trocar o papel, na Administração.`;
 }
 
 /**

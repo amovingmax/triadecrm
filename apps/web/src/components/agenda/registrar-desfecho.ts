@@ -3,6 +3,7 @@
 import { carregarAlvo } from '@/components/registro/alvos';
 import { type ValoresExtras } from '@/components/registro/folha-extra';
 import { formatarQuando } from '@/components/registro/formatos';
+import { VOCABULARIO } from '@/lib/vocabulario';
 import {
   ErroDeRegistro,
   fraseDaRecusa,
@@ -66,7 +67,7 @@ export async function registrarDesfechoDoCompromisso(entrada: {
   if (!alvo) {
     return {
       ok: false,
-      frase: 'Não achei este parceiro na base. Recarregue a agenda e tente de novo.',
+      frase: `Não achei este ${VOCABULARIO.parceiro} na base. Recarregue a agenda e tente de novo.`,
       compromissoFechado: false,
       avisoDaReuniao: null,
     };
@@ -192,7 +193,7 @@ function fraseDoRegistro(
   } else if (resultado.etapa_recusa === 'etapa_mudou') {
     partes.push('Alguém mexeu na etapa antes de você; confira o funil.');
   } else if (resultado.sem_negocio) {
-    partes.push('Este parceiro não está em funil nenhum: ficou só a atividade.');
+    partes.push(`Este ${VOCABULARIO.parceiro} não está em funil nenhum: ficou só a atividade.`);
   }
 
   const quando = formatarQuando(resultado.proxima_acao_em);

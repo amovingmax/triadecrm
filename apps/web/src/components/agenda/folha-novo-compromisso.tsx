@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/sheet';
 import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 import type { SugestaoDeAlvo } from '@/components/registro/tipos';
+import { maiuscula, VOCABULARIO } from '@/lib/vocabulario';
 
 import {
   faixaDoHorario,
@@ -37,8 +38,11 @@ import {
   type HorarioLivre,
 } from './acoes-reuniao';
 import { CampoParceiro } from './campo-parceiro';
+import { useAgendaDoLink } from './agenda-do-link';
+import { EMAIL_DE_REUNIAO, MARCADO_SOME_DO_LINK, marcarSomeDoLink } from './efeito-no-calendly';
+import { ListaDeConflitos } from './lista-de-conflitos';
 import { lerSala, salvarMinhaSala, validarSala, type SalaDaPessoa } from './sala';
-import { diaDoInstante, ehFimDeSemana, horaEmNatal, rotuloDiaPorExtenso, type Dia } from './tipos';
+import { diaDoInstante, ehFimDeSemana, rotuloDiaPorExtenso, type Dia } from './tipos';
 
 /**
  * Marcar um compromisso direto pela Agenda: reunião ou visita.
@@ -103,7 +107,9 @@ export function FolhaNovoCompromisso({
       >
         <SheetHeader>
           <SheetTitle>Novo compromisso</SheetTitle>
-          <SheetDescription>Reunião na grade do robô, ou visita com dia e hora.</SheetDescription>
+          <SheetDescription>
+            Reunião na grade {VOCABULARIO.robo.do}, ou visita com dia e hora.
+          </SheetDescription>
         </SheetHeader>
         {/* A `key` zera o formulário a cada abertura: começar com o parceiro — ou
             com a pessoa — da última vez é o jeito de marcar no lugar errado. */}
@@ -157,6 +163,9 @@ function Formulario({
   // num dia que não vai passar.
   const diaBloqueado = ehFimDeSemana(dia) || feriados.includes(dia);
   const outraPessoa = para === usuarioId ? null : (pessoas.find((p) => p.id === para) ?? null);
+  // Só na Imova: a agenda que o link do Calendly oferece, para dizer que o horário
+  // marcado aqui some do link.
+  const agendaDoLink = useAgendaDoLink();
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-4">
@@ -197,7 +206,7 @@ function Formulario({
                 Você está marcando na agenda de{' '}
                 <span className="font-semibold">{outraPessoa.nome}</span>, e não na sua.{' '}
                 {primeiroNome(outraPessoa.nome)} recebe o compromisso e um aviso no CRM
-                {tipo === 'reuniao' ? ', além do e-mail de reunião marcada' : ''}.
+                {tipo === 'reuniao' && EMAIL_DE_REUNIAO ? ', além do e-mail de reunião marcada' : ''}.
               </span>
             </p>
           ) : null}
@@ -206,7 +215,7 @@ function Formulario({
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor={`${id}-parceiro`} className="text-sm font-medium">
-          Parceiro
+          {maiuscula(VOCABULARIO.parceiro)}
         </label>
         {alvo ? (
           <div className="flex items-start justify-between gap-3 rounded-lg bg-muted/45 px-3 py-2">
@@ -222,7 +231,7 @@ function Formulario({
               size="sm"
               className="toque h-11 shrink-0 md:h-8"
               onClick={() => setAlvo(null)}
-              aria-label="Trocar o parceiro"
+              aria-label={`Trocar o ${VOCABULARIO.parceiro}`}
             >
               <X aria-hidden="true" />
               Trocar
@@ -255,6 +264,8 @@ function Formulario({
             {feriados.includes(dia) && !ehFimDeSemana(dia) ? 'É feriado. ' : ''}
             {recadoDoMotivo('dia_nao_util')}
           </p>
+        ) : marcarSomeDoLink(para, agendaDoLink) ? (
+          <p className="text-xs text-muted-foreground">{MARCADO_SOME_DO_LINK}</p>
         ) : null}
       </div>
 
@@ -326,7 +337,7 @@ function ParteDaReuniao({
   if (!dealId) {
     return (
       <p className="rounded-lg bg-muted/45 px-3 py-3 text-sm text-muted-foreground">
-        Este parceiro não está em nenhum funil, e a reunião nasce do negócio. Abra a ficha e coloque
+        Este {VOCABULARIO.parceiro} não está em nenhum funil, e a reunião nasce do negócio. Abra a ficha e coloque
         ele no funil antes de marcar.{' '}
         <Link
           href={`/parceiros/${alvo.id}`}
@@ -544,8 +555,8 @@ function SalaDaReuniao({
     }
     return (
       <p className="text-xs text-muted-foreground">
-        {nome} não tem sala cadastrada. A reunião é marcada sem link, e {nome} combina a sala com o
-        parceiro.
+        {nome} não tem sala cadastrada. A reunião é marcada sem link, e {nome} combina a sala com o{' '}
+        {VOCABULARIO.parceiro}.
       </p>
     );
   }
@@ -638,7 +649,7 @@ function SalaDaReuniao({
           ? 'A troca vale para as próximas reuniões. As já marcadas ficam com a sala antiga.'
           : sala.padrao
             ? 'Sem a sua, vale a sala padrão da casa. Cole aqui o link permanente da sua sala, se tiver.'
-            : 'Não é obrigatório. Com o link salvo (Google Meet, Zoom, Jitsi…), a reunião já nasce com o botão "Entrar na sala". Sem ele, a reunião é marcada do mesmo jeito e você combina a sala com o parceiro.'}
+            : `Não é obrigatório. Com o link salvo (Google Meet, Zoom, Jitsi…), a reunião já nasce com o botão "Entrar na sala". Sem ele, a reunião é marcada do mesmo jeito e você combina a sala com o ${VOCABULARIO.parceiro}.`}
       </p>
     </div>
   );
@@ -721,15 +732,8 @@ function ParteDaVisita({
         {erro ? (
           <div className="text-xs text-destructive-texto">
             <p>{erro.frase}</p>
-            {erro.conflitos.length > 0 ? (
-              <ul className="mt-1 list-disc pl-4">
-                {erro.conflitos.map((c) => (
-                  <li key={`${c.inicio}-${c.titulo}`}>
-                    <span className="numerico">{horaEmNatal(c.inicio)}</span> · {c.titulo}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+            {/* Na Imova, com "(marcado pelo Calendly)" no que o cliente marcou pelo link. */}
+            <ListaDeConflitos conflitos={erro.conflitos} donoId={donoId} />
           </div>
         ) : null}
       </div>

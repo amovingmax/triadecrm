@@ -18,6 +18,7 @@ import {
 
 import { NotaRecolhida } from '@/components/ui/nota-recolhida';
 import { cn } from '@/lib/utils';
+import { VOCABULARIO } from '@/lib/vocabulario';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -225,7 +226,7 @@ function CabecalhoDaRota({
 
           <p className="text-xs leading-relaxed text-muted-foreground">
             O trajeto começa de onde você estiver: o link não manda ponto de partida, o Maps usa a
-            posição do aparelho. Os botões buscam cada parceiro pelo NOME — a coordenada que o CRM
+            posição do aparelho. Os botões buscam cada {VOCABULARIO.parceiro} pelo NOME — a coordenada que o CRM
             tem é o centro do bairro, e serve para ordenar a tarde, não para chegar na porta.
             {trajeto && trajeto.incluidas < rota.paradas.length
               ? ` As ${rota.paradas.length - trajeto.incluidas} última(s) parada(s) não cabem num link só — cada uma tem o botão dela na lista.`
@@ -551,13 +552,13 @@ function ForaDaRota({ exclusoes }: { exclusoes: ReturnType<typeof agruparExcluso
 function SemOndeConsertar() {
   return (
     <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
-      Não há hoje onde escrever bairro ou endereço numa ficha que já existe — nem na ficha do
-      parceiro, nem no cadastro rápido, e reimportar a planilha não altera ficha repetida. Quem
-      preenche esses campos é a Revisão: quando uma importação traz o mesmo parceiro e alguém usa
+      Não há hoje onde escrever bairro ou endereço numa ficha que já existe — nem na ficha do{' '}
+      {VOCABULARIO.parceiro}, nem no cadastro rápido, e reimportar a planilha não altera ficha repetida. Quem
+      preenche esses campos é a Revisão: quando uma importação traz o mesmo {VOCABULARIO.parceiro} e alguém usa
       Mesclar, o
       que estava em branco na ficha entra, e a visita passa a caber na rota. Até lá, estas visitas
-      continuam na aba <span className="text-foreground">Dia</span>, com o botão do mapa buscando o
-      parceiro pelo nome — que é como se chegava nelas antes de existir rota.
+      continuam na aba <span className="text-foreground">Dia</span>, com o botão do mapa buscando o{' '}
+      {VOCABULARIO.parceiro} pelo nome — que é como se chegava nelas antes de existir rota.
     </p>
   );
 }
@@ -573,7 +574,7 @@ function AindaNaoLigado({ rota }: { rota: RotaDoDia }) {
         <li>
           <span className="text-foreground">Hora marcada dentro da rota</span>: a ordem é só por
           tempo de carro. O horário que aparece na
-          tarefa de visita é prazo calculado, não hora combinada com o fornecedor — a Agenda explica
+          tarefa de visita é prazo calculado, não hora combinada com o {VOCABULARIO.fornecedor} — a Agenda explica
           isso na aba Dia.
         </li>
         <li>

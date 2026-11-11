@@ -39,6 +39,17 @@ describe('empresas', () => {
       calendly: false,
       esperaEmDegraus: false,
       lembreteDeVisita: false,
+      emailDeReuniao: true,
+    });
+    // As palavras que a Agenda, o Meu dia e as Metas já escreviam (11/11/2026).
+    expect(k.vocabulario).toEqual({
+      parceiro: 'parceiro',
+      parceiros: 'parceiros',
+      fornecedor: 'fornecedor',
+      robo: { o: 'o robô', do: 'do robô', pelo: 'pelo robô' },
+      visitasSemHora: 'as portas a bater',
+      portaBatida: { nome: 'porta batida', uma: 'uma porta' },
+      metricas: {},
     });
     expect(k.gruposDeCategoria).toEqual({});
     expect(k.origens).toBeNull();
@@ -103,8 +114,31 @@ describe('empresas', () => {
       calendly: true,
       esperaEmDegraus: true,
       lembreteDeVisita: true,
+      emailDeReuniao: false,
     });
     expect(i.tipos.cerimonialista).toBeNull();
+  });
+
+  it('a Imova fala a língua da imobiliária: sem parceiro, fornecedor, robô, porta nem alvo', () => {
+    const v = EMPRESAS.imova.vocabulario;
+    const textos = [
+      v.parceiro,
+      v.parceiros,
+      v.fornecedor,
+      ...Object.values(v.robo),
+      v.visitasSemHora,
+      ...Object.values(v.portaBatida),
+      ...Object.values(v.metricas).flatMap((m) => (m ? [m.rotulo, m.fonte, m.definicao] : [])),
+    ];
+    for (const texto of textos) {
+      expect(texto).not.toMatch(/parceir|fornecedor|robô|porta|alvo|komune|evento|buffet/i);
+    }
+    expect(v.parceiro).toBe('cliente');
+    expect(v.robo.o).toBe('a IA');
+    // As métricas com jargão da captação ganham nome da imobiliária.
+    expect(v.metricas.doors_knocked?.rotulo).toBe('Contatos feitos');
+    expect(v.metricas.doors_opened?.rotulo).toBe('Atendimentos');
+    expect(v.metricas.new_targets?.rotulo).toBe('Contatos novos');
   });
 
   it('a política de privacidade é página do CRM só na Imova; a da KOMUNE mora no site dela', () => {

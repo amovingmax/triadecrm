@@ -427,13 +427,24 @@ function AindaNaoLigado() {
   return (
     <NotaRecolhida titulo="O que ainda não está ligado">
       <ul className="flex flex-col gap-1.5">
-        <li>
-          <span className="text-foreground">Lembrete automático ao parceiro</span>, na véspera e
-          na hora: depende de a Meta aprovar os dois modelos de 24 h, que ainda estão
-          pendentes. Na véspera a janela de resposta livre já fechou, e o CRM não manda
-          texto livre fora dela. Enquanto isso, quem atende recebe uma tarefa às 17h do dia
-          anterior para confirmar por conta própria.
-        </li>
+        {/* Na Imova o lembrete da véspera existe (20261111206000): o que falta é a
+            Meta aprovar o modelo, e o item diz isso, e não "ainda não existe". */}
+        {EMPRESA.modulos.lembreteDeVisita ? (
+          <li>
+            <span className="text-foreground">Lembrete da visita ao cliente</span>, na véspera,
+            pelo WhatsApp, com &ldquo;Confirmo&rdquo; e &ldquo;Preciso remarcar&rdquo;: sai depois
+            que a Meta aprovar o modelo (Ajustes → WhatsApp). O lembrete na hora da visita não
+            existe.
+          </li>
+        ) : (
+          <li>
+            <span className="text-foreground">Lembrete automático ao parceiro</span>, na véspera e
+            na hora: depende de a Meta aprovar os dois modelos de 24 h, que ainda estão
+            pendentes. Na véspera a janela de resposta livre já fechou, e o CRM não manda
+            texto livre fora dela. Enquanto isso, quem atende recebe uma tarefa às 17h do dia
+            anterior para confirmar por conta própria.
+          </li>
+        )}
         <li>
           <span className="text-foreground">Rota otimizada</span> por tempo de deslocamento já
           existe: está na aba <span className="text-foreground">Rota</span>.

@@ -1,4 +1,5 @@
 import { ehAutorizacao, ehInteresse, type DesfechoCatalogo } from '@/components/registro/tipos';
+import { maiuscula, VOCABULARIO } from '@/lib/vocabulario';
 
 /**
  * O "Feito hoje" do Meu dia: cada parceiro com quem a pessoa registrou um resultado
@@ -182,7 +183,9 @@ export function agruparFeitoHoje(registros: readonly RegistroDoDia[]): Categoria
       organizacaoId: registro.organizacaoId,
       organizacao:
         registro.organizacao ??
-        (registro.organizacaoId ? 'Parceiro fora da sua carteira' : 'Parceiro sem cadastro'),
+        (registro.organizacaoId
+          ? `${maiuscula(VOCABULARIO.parceiro)} fora da sua carteira`
+          : `${maiuscula(VOCABULARIO.parceiro)} sem cadastro`),
       bairro: registro.bairro,
       categoriaDoParceiro: registro.categoriaDoParceiro,
       quando: registro.quando,
