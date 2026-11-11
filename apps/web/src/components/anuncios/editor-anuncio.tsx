@@ -40,6 +40,7 @@ import {
 } from './dados';
 import { FotosDoAnuncio } from './fotos-do-anuncio';
 import { SituacaoNoPortal } from './no-portal';
+import { consequenciaForaDoArquivo, travasDoPlano } from './regras-do-cartao';
 import {
   type Anuncio,
   CARACTERISTICAS,
@@ -300,14 +301,16 @@ function Editor({
   const editavel = !excluido && (anuncio?.situacao !== 'no_ar' || podePublicar);
 
   // O plano do Canal Pro (migração 20261104180000): quem recusa é o banco; a
-  // tela só avisa antes do clique. No ar, este anúncio já está na conta.
+  // tela só avisa antes do clique. No ar, este anúncio já está na conta; fora
+  // do ar, também está quando o relatório o traz ativo (20261111203000).
   const plano = canalPro.data?.plano ?? null;
   const noAr = anuncio?.situacao === 'no_ar';
-  const semVaga = !noAr && plano?.anuncios != null && plano.anunciosEmUso >= plano.anuncios;
-  const destaquesDosOutros =
-    (plano?.destaquesEmUso ?? 0) - (noAr && anuncio?.destaque !== 'padrao' ? 1 : 0);
-  const semDestaque = plano?.destaques != null && destaquesDosOutros >= plano.destaques;
-  const destaqueBarrado = !noAr && anuncio?.destaque !== 'padrao' && semDestaque;
+  const ocupaVaga = dados?.ocupaVagaPeloRelatorio ?? false;
+  const { semVaga, semDestaque, destaqueBarrado } = travasDoPlano(plano, {
+    situacao: anuncio?.situacao ?? 'rascunho',
+    destaque: anuncio?.destaque ?? 'padrao',
+    ocupaVagaPeloRelatorio: ocupaVaga,
+  });
 
   function atualizar() {
     void cliente.invalidateQueries({ queryKey: CHAVE_DOS_ANUNCIOS });
@@ -485,7 +488,25 @@ function Editor({
               </p>
             ) : (
               <>
-                {pendencias.length ? (
+                {pendencias.length && noAr ? (
+                  // No ar com pendência: o arquivo o pula, e o portal o tira na
+                  // leitura seguinte (11/11/2026). Antes disso era calado.
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-sm font-medium text-destructive-texto">
+                      No ar no CRM, mas fora do arquivo. Falta:
+                    </p>
+                    <ul className="flex list-disc flex-col gap-0.5 pl-5 text-sm text-muted-foreground">
+                      {pendencias.map((p) => (
+                        <li key={p}>{p}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-muted-foreground">
+                      O arquivo do Canal Pro só leva anúncio sem pendência.{' '}
+                      {consequenciaForaDoArquivo(canalPro.data?.ultimaLeitura?.em ?? null)} Complete
+                      o que falta, ou tire do ar.
+                    </p>
+                  </div>
+                ) : pendencias.length ? (
                   <div className="flex flex-col gap-1.5">
                     <p className="text-sm font-medium">Para ir ao ar, falta:</p>
                     <ul className="flex list-disc flex-col gap-0.5 pl-5 text-sm text-muted-foreground">
@@ -564,7 +585,9 @@ function Editor({
                           ? `Plano cheio: ${plano.anunciosEmUso} de ${plano.anuncios} anúncios no ar. Para pôr este, tire outro do ar (no CRM ou um dos que estão no Canal Pro por fora dele).`
                           : destaqueBarrado
                             ? `Os destaques do plano estão em uso (${plano.destaquesEmUso} de ${plano.destaques}). Ponha este como Padrão para ir ao ar.`
-                            : `Vagas do plano em uso: ${plano.anunciosEmUso} de ${plano.anuncios}.`}
+                            : ocupaVaga
+                              ? `Vagas do plano em uso: ${plano.anunciosEmUso} de ${plano.anuncios}, contando este, que já está no portal pelo sistema atual: pôr no ar pelo CRM não gasta vaga nova.`
+                              : `Vagas do plano em uso: ${plano.anunciosEmUso} de ${plano.anuncios}.`}
                       </p>
                     ) : null}
                     <div className="flex flex-col gap-1.5">

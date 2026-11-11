@@ -24,6 +24,7 @@ import {
   Ruler,
   ShowerHead,
   Trash2,
+  TriangleAlert,
   UserRound,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -67,17 +68,21 @@ import {
   faixaDaNota,
   type FaixaDaNota,
   diaDeCriacao,
+  foraDoArquivo,
   formatarDia,
+  fraseForaDoArquivo,
   formatarNota,
   type ItemDaNota,
   negociosDoCartao,
   noPortalPeloSistemaAtual,
+  ocupaVagaPeloRelatorio,
   saiuDoSistemaAtual,
   situacaoForaDoCrm,
   qualidadeDoAnuncio,
   rotuloDaOrigem,
   seloDoAnuncio,
   type SeloDoAnuncio,
+  travasDoPlano,
 } from './regras-do-cartao';
 import {
   type AnuncioNaLista,
@@ -519,6 +524,8 @@ const TOM_DO_SELO: Record<SeloDoAnuncio['tom'], { classe: string; Icone: typeof 
   processando: { classe: 'bg-morno-fundo text-morno-texto', Icone: Clock },
   rascunho: { classe: 'border border-border text-foreground', Icone: CircleDashed },
   apagado: { classe: 'bg-muted text-muted-foreground', Icone: CircleOff },
+  // No ar no CRM, mas fora do arquivo (11/11/2026): sai do portal sem ninguém pedir.
+  alerta: { classe: 'bg-destructive/10 text-destructive-texto', Icone: TriangleAlert },
 };
 
 function Selo({ selo }: { selo: SeloDoAnuncio }) {
@@ -544,11 +551,15 @@ function Selo({ selo }: { selo: SeloDoAnuncio }) {
 function Avisos({ anuncio: a, podePublicar }: { anuncio: AnuncioNaLista; podePublicar: boolean }) {
   const excluido = a.excluido_em !== null;
   const leitura = a.ultima_leitura_do_portal;
+  const fora = foraDoArquivo(a);
   let passo: string;
   if (excluido) {
     passo = `Excluído ${a.excluido_em ? formatarQuando(a.excluido_em) : ''}${
       a.motivo_exclusao ? `: “${a.motivo_exclusao}”` : '.'
     }`;
+  } else if (fora) {
+    // O arquivo só leva o que está no ar SEM pendência: este é pulado (11/11/2026).
+    passo = fraseForaDoArquivo(a.pendencias ?? [], leitura);
   } else if (a.situacao === 'no_ar') {
     const lido = (iso: string | null) =>
       iso !== null && leitura !== null && new Date(leitura).getTime() > new Date(iso).getTime();
@@ -577,7 +588,9 @@ function Avisos({ anuncio: a, podePublicar }: { anuncio: AnuncioNaLista; podePub
 
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      <p className="min-w-0 flex-1 basis-64">{passo}</p>
+      <p className={cn('min-w-0 flex-1 basis-64', fora && 'font-medium text-destructive-texto')}>
+        {passo}
+      </p>
       {portal.length ? (
         <p className="font-medium text-foreground sm:text-right">{portal.join(' · ')}</p>
       ) : null}
@@ -616,12 +629,13 @@ function MenuDoAnuncio({
   const noAr = a.situacao === 'no_ar';
   const pendente = (a.pendencias?.length ?? 0) > 0;
   // O plano do Canal Pro, com a mesma conta do editor: quem recusa é o banco
-  // (migração 20261104180000); o menu só avisa antes do clique.
-  const semVaga = !noAr && plano?.anuncios != null && plano.anunciosEmUso >= plano.anuncios;
-  const destaquesDosOutros =
-    (plano?.destaquesEmUso ?? 0) - (noAr && a.destaque !== 'padrao' ? 1 : 0);
-  const semDestaque = plano?.destaques != null && destaquesDosOutros >= plano.destaques;
-  const destaqueBarrado = !noAr && a.destaque !== 'padrao' && semDestaque;
+  // (migrações 20261104180000 e 20261111203000); o menu só avisa antes do clique.
+  // O anúncio que o relatório já conta não é barrado: só ocuparia a própria vaga.
+  const { semVaga, semDestaque, destaqueBarrado } = travasDoPlano(plano, {
+    situacao: a.situacao,
+    destaque: a.destaque,
+    ocupaVagaPeloRelatorio: ocupaVagaPeloRelatorio(a),
+  });
   const motivoParaNaoPublicar = pendente
     ? 'falta preencher'
     : semVaga

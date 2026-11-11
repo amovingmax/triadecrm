@@ -87,16 +87,7 @@ export function PainelCanalPro({
     void cliente.invalidateQueries({ queryKey: CHAVE_DO_CANAL_PRO });
   }
 
-  async function copiar(url: string) {
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success('Endereço copiado.');
-    } catch {
-      toast.error('Não consegui copiar. Selecione o endereço e copie à mão.');
-    }
-  }
-
-  const url = dados?.chave ? urlDoArquivo(dados.chave) : null;
+  const chave = dados?.chave ?? null;
 
   return (
     <Sheet open={aberto} onOpenChange={aoMudar}>
@@ -147,27 +138,10 @@ export function PainelCanalPro({
                 podeAjustar={podeAjustar}
               />
 
-              {podeAjustar && url ? (
+              {podeAjustar && chave ? (
                 <section className="flex flex-col gap-3">
                   <h3 className="text-sm font-medium">O endereço do arquivo</h3>
-                  <div className="flex gap-2">
-                    <Input
-                      readOnly
-                      value={url}
-                      aria-label="Endereço do arquivo de anúncios"
-                      className="h-11 font-mono text-xs md:h-9"
-                      onFocus={(e) => e.currentTarget.select()}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="toque h-11 shrink-0 md:h-9"
-                      onClick={() => void copiar(url)}
-                    >
-                      <Copy aria-hidden="true" />
-                      Copiar
-                    </Button>
-                  </div>
+                  <EnderecoDoArquivo chave={chave} />
                   <AntesDeColar aAssumir={aAssumir} soNoCanalProNoAr={soNoCanalProNoAr} />
                   <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm text-muted-foreground">
                     <li>Salve o contato e resolva o quadro &ldquo;Antes de colar&rdquo;.</li>
@@ -442,38 +416,6 @@ function AntesDeColar({
   aAssumir: AnuncioNaLista[];
   soNoCanalProNoAr: number;
 }) {
-  const cliente = useQueryClient();
-  const [pondo, setPondo] = useState<{ feitos: number; total: number } | null>(null);
-
-  async function porTodosNoAr() {
-    const lista = [...aAssumir];
-    const falhas: string[] = [];
-    setPondo({ feitos: 0, total: lista.length });
-    // Um de cada vez: cada um confere o limite do plano contando os anteriores.
-    for (const [i, a] of lista.entries()) {
-      const r = await publicarAnuncio(a.id);
-      if (!r.ok) {
-        falhas.push(
-          `${a.codigo}: ${r.pendencias?.length ? `falta ${r.pendencias.join(', ')}` : fraseDaRecusa(r.motivo)}`,
-        );
-      }
-      setPondo({ feitos: i + 1, total: lista.length });
-    }
-    setPondo(null);
-    void cliente.invalidateQueries({ queryKey: CHAVE_DOS_ANUNCIOS });
-    const certos = lista.length - falhas.length;
-    if (falhas.length === 0) {
-      toast.success(`${certos} ${certos === 1 ? 'anúncio no ar' : 'anúncios no ar'} pelo CRM.`, {
-        description: 'O arquivo do CRM agora tem o que está no portal hoje. Pode colar o endereço.',
-      });
-    } else {
-      toast.error(
-        `${certos} no ar; ${falhas.length} ${falhas.length === 1 ? 'ficou' : 'ficaram'} de fora.`,
-        { description: falhas.join(' · ') },
-      );
-    }
-  }
-
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-hairline p-3 text-sm">
       <h4 className="font-medium">Antes de colar o endereço no Canal Pro</h4>
@@ -492,19 +434,10 @@ function AntesDeColar({
           <p className="numerico text-xs text-muted-foreground">
             {aAssumir.map((a) => a.codigo).join(' · ')}
           </p>
-          <Button
-            type="button"
-            className="toque h-11 w-fit md:h-9"
-            disabled={pondo !== null}
-            onClick={() => void porTodosNoAr()}
-          >
-            <Upload aria-hidden="true" />
-            {pondo
-              ? `Pondo no ar... ${pondo.feitos} de ${pondo.total}`
-              : aAssumir.length === 1
-                ? 'Pôr no ar pelo CRM'
-                : `Pôr os ${aAssumir.length} no ar pelo CRM`}
-          </Button>
+          <BotaoPorNoAr
+            anuncios={aAssumir}
+            aoPorTodos="O arquivo do CRM agora tem o que está no portal hoje. Pode colar o endereço."
+          />
           <p className="text-xs text-muted-foreground">
             Faça isso na hora de colar: até o Canal Pro ler o arquivo do CRM, quem publica continua
             sendo o sistema atual.
@@ -526,5 +459,116 @@ function AntesDeColar({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * A URL do arquivo do CRM, com o botão de copiar: é ela que se cola no Canal Pro
+ * (Configurações da conta → Integração de anúncios). A chave é credencial: só
+ * admin e gestor a recebem do banco. Também usada no caminho até o primeiro lead.
+ */
+export function EnderecoDoArquivo({ chave }: { chave: string }) {
+  const url = urlDoArquivo(chave);
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Endereço copiado.');
+    } catch {
+      toast.error('Não consegui copiar. Selecione o endereço e copie à mão.');
+    }
+  }
+
+  return (
+    <div className="flex gap-2">
+      <Input
+        readOnly
+        value={url}
+        aria-label="Endereço do arquivo de anúncios"
+        className="h-11 min-w-0 font-mono text-xs md:h-9"
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        className="toque h-11 shrink-0 md:h-9"
+        onClick={() => void copiar()}
+      >
+        <Copy aria-hidden="true" />
+        Copiar
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * "Pôr no ar pelo CRM" para uma lista de anúncios (06/11/2026): um de cada vez,
+ * porque cada um confere o limite do plano contando os anteriores, e no fim diz
+ * quem ficou de fora e por quê. Com um anúncio só, é o "Pôr no ar" dele. Usado no
+ * "Antes de colar" e no caminho até o primeiro lead.
+ */
+export function BotaoPorNoAr({
+  anuncios,
+  aoPorTodos,
+  variante = 'default',
+  rotulo,
+}: {
+  anuncios: readonly { id: string; codigo: string }[];
+  /** A descrição do aviso quando todos foram ao ar. */
+  aoPorTodos?: string;
+  variante?: 'default' | 'outline';
+  /** O texto do botão parado; sem ele, "Pôr os N no ar pelo CRM". */
+  rotulo?: string;
+}) {
+  const cliente = useQueryClient();
+  const [pondo, setPondo] = useState<{ feitos: number; total: number } | null>(null);
+
+  async function porTodosNoAr() {
+    const lista = [...anuncios];
+    const falhas: string[] = [];
+    setPondo({ feitos: 0, total: lista.length });
+    // Um de cada vez: cada um confere o limite do plano contando os anteriores.
+    for (const [i, a] of lista.entries()) {
+      const r = await publicarAnuncio(a.id);
+      if (!r.ok) {
+        falhas.push(
+          `${a.codigo}: ${r.pendencias?.length ? `falta ${r.pendencias.join(', ')}` : fraseDaRecusa(r.motivo)}`,
+        );
+      }
+      setPondo({ feitos: i + 1, total: lista.length });
+    }
+    setPondo(null);
+    void cliente.invalidateQueries({ queryKey: CHAVE_DOS_ANUNCIOS });
+    const certos = lista.length - falhas.length;
+    if (falhas.length === 0) {
+      toast.success(`${certos} ${certos === 1 ? 'anúncio no ar' : 'anúncios no ar'} pelo CRM.`, {
+        description: aoPorTodos,
+      });
+    } else {
+      toast.error(
+        `${certos} no ar; ${falhas.length} ${falhas.length === 1 ? 'ficou' : 'ficaram'} de fora.`,
+        { description: falhas.join(' · ') },
+      );
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant={variante}
+      className="toque h-11 w-fit md:h-9"
+      disabled={pondo !== null || anuncios.length === 0}
+      onClick={() => void porTodosNoAr()}
+    >
+      <Upload aria-hidden="true" />
+      {pondo
+        ? pondo.total === 1
+          ? 'Pondo no ar...'
+          : `Pondo no ar... ${pondo.feitos} de ${pondo.total}`
+        : (rotulo ??
+          (anuncios.length === 1
+            ? 'Pôr no ar pelo CRM'
+            : `Pôr os ${anuncios.length} no ar pelo CRM`))}
+    </Button>
   );
 }

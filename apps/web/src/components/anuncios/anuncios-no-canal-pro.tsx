@@ -343,16 +343,17 @@ function DialogoComoTirarDoAr({
  * lá"). O Grupo OLX não deixa o CRM excluir no Canal Pro: o botão copia o código
  * e abre o Canal Pro, onde a exclusão é um clique, e a gestão confirma aqui. A
  * confirmação tira a linha da lista e libera a vaga na conta do CRM; o próximo
- * relatório confere (se ainda vier, volta com o aviso).
+ * relatório confere (se ainda vier, volta com o aviso). Também abre do caminho
+ * até o primeiro lead (11/11/2026), que só tem o id, o código e a situação.
  */
-function DialogoExcluirDuplicado({
+export function DialogoExcluirDuplicado({
   anuncio,
   original,
   aberto,
   aoFechar,
 }: {
-  anuncio: AnuncioNoCanalPro;
-  original: AnuncioNaLista;
+  anuncio: Pick<AnuncioNoCanalPro, 'id' | 'codigo' | 'situacao'>;
+  original: Pick<AnuncioNaLista, 'codigo'>;
   aberto: boolean;
   aoFechar: () => void;
 }) {
