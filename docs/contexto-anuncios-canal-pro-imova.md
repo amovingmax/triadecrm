@@ -170,6 +170,7 @@ Palavras do usuário, em 04 e 05/11/2026:
   - Aceita só POST, até 256 KB.
   - Responde 200, 401, 400, 405, 413, 422, 500 ou 503, nunca 404 nem 3xx.
   - Usa o segredo `GRUPOZAP_LEAD_SECRET` (mais `_ANTERIOR` e `GRUPOZAP_LEAD_USUARIO`, opcionais).
+  - Na homologação, `GRUPOZAP_LEAD_SECRET_TESTE` guarda a chave pública da documentação: quem autentica com ela recebe 200 e nada é gravado. O lead de exemplo do validador (`originLeadId` 59ee0fc6…) também não é gravado, com qualquer chave (10/11/2026).
   - Tem `verify_jwt = false` no `config.toml`.
 
 ### Site (`apps/web/src`)
@@ -239,8 +240,8 @@ Palavras do usuário, em 04 e 05/11/2026:
 1. **Autorização do usuário: "pode publicar" e "sim" para o balde público das fotos.** O robô do Grupo OLX precisa baixar as fotos, que já são públicas no portal. Publicar o banco cria o balde público.
    - Publicar só na Imova: as 6 migrações (`publicar-banco.mjs imova migrar`), as funções `canal-pro-feed` e `grupozap-lead` (`supabase functions deploy … --project-ref kkqadgxvmzulcamuakzk`) e o site da Imova, de uma cópia limpa da main.
    - Antes: conferir o que está no ar contra a main.
-2. **Validar o endpoint de leads:** gravar uma chave provisória em `GRUPOZAP_LEAD_SECRET`, rodar o validador do Grupo OLX contra `https://kkqadgxvmzulcamuakzk.supabase.co/functions/v1/grupozap-lead` e apagar o lead de teste que entra na produção.
-3. **Enviar o formulário de homologação**, com as respostas do anexo A. Quando o Grupo OLX mandar a SECRET_KEY, trocar o segredo. A partir daí os leads chegam.
+2. **Validar o endpoint de leads: feito em 10/11/2026.** O suporte do Grupo OLX testa com a chave pública da página de segurança, que agora está em `GRUPOZAP_LEAD_SECRET_TESTE`. O validador devolve 200 com o base64 da documentação, com a chave crua ou com o cabeçalho inteiro no campo Token, e 401 com token errado. O teste não grava lead.
+3. **Homologação: aprovada em 10/11/2026.** A SECRET_KEY definitiva está em `GRUPOZAP_LEAD_SECRET` (gravada pelo usuário, exatamente como o Grupo OLX mandou, em base64), e `GRUPOZAP_LEAD_SECRET_TESTE` foi removido. Os leads reais passam a chegar.
 4. **Relatório do Canal Pro: feito no local (05/11, noite).** O arquivo real foi lido e importado. Os 7 da Arbo casaram pelo código, e os cartões mostram a situação, as visualizações, os contatos e a data de criação de lá.
    - **Falta decidir:** tirar do ar no Canal Pro os 2 antigos ativos repetidos, e trazer ou não os 4 imóveis que só existem lá. Eles vêm sem fotos.
    - Importar de novo uma vez por semana até a troca.

@@ -9886,6 +9886,49 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 - O negócio anda sozinho para Visita marcada / Avaliação marcada no agendamento, como na reunião marcada pela tela. Confirmar.
 
 ---
+## 10/11/2026 — Leads do Grupo OLX: o 401 da homologação e a chave de teste (branch `grupozap-homologacao`, só na Imova)
+
+**Pedido do usuário:** o suporte do Grupo OLX testou `grupozap-lead` e recebeu 401, e a homologação não foi aprovada. Eles pedem o teste com o token da página de segurança e um status 2xx.
+
+**A causa:**
+- O suporte autentica com a chave pública de exemplo da página de segurança: `Authorization: Basic dml2YXJl…`, que decodifica para `vivareal:594F803B…`.
+- A função conferia só `GRUPOZAP_LEAD_SECRET`, que tem a chave provisória da Imova (o SHA-256 do segredo no ar não é o da chave da documentação). Por isso o 401.
+- O parse do cabeçalho estava certo: o nome não diferencia maiúsculas, o esquema `Basic` também não, o base64 é decodificado e a senha é o que vem depois do primeiro `:`. O `verify_jwt` estava desligado no ar.
+- **Medido no validador oficial:** ele chama `integrations-api-re-listings.olx.com.br/v1/sandbox/leads/send-a-lead-to-me` e põe `Basic ` na frente do que se digita em "Token", sem codificar. Com o base64 da documentação chega o cabeçalho certo; com a chave crua chega `Basic 594F…`; com o cabeçalho inteiro chega `Basic Basic dml2…`.
+- A resposta HTTP do validador é sempre 200; o status do endpoint vem em `statusCodeResponse`. O "200" de 09/11 pode ter sido esse. Não deu para conferir nos logs: a leitura dos logs da função pela API foi recusada pela permissão desta sessão.
+
+**Entregue:**
+- `GRUPOZAP_LEAD_SECRET_TESTE` (opcional, Secrets das Edge Functions ou Vault): terceiro segredo, conferido em tempo constante como os outros. Quem autentica com ele recebe 200 `{teste: true, gravado: false}`. Nada vai ao banco, porque a chave é pública. Se ela coincidir com a atual, vale teste.
+- O lead de exemplo da documentação (`originLeadId` 59ee0fc6e4b043e1b2a6d863, o padrão do validador) recebe 200 e não é gravado com qualquer chave. Assim, rodar o validador com a chave de verdade não cria lead falso.
+- O parse aceita também as duas formas que o validador produz: um `Basic ` repetido é ignorado, e o texto depois de `Basic ` é conferido também cru, como senha sem usuário (formato `chave_crua`). As duas exigem um dos segredos; sem esquema e `Bearer` continuam recusados.
+- O log registra `teste_nao_gravado` com o motivo, o formato da credencial e o status que o lead receberia se fosse real.
+- `.env.example` e `docs/contexto-anuncios-canal-pro-imova.md` atualizados.
+
+**Verificado:**
+- Deno: 47 testes de `grupozap-lead` (eram 30), `deno check` e prettier limpos. O teste novo reproduz o 401: o cabeçalho da documentação contra só a chave provisória. Os 36 testes de `komune-webhook`, `canal-pro-feed` e `_compartilhado` seguem verdes.
+- curl no ar, com 13 casos. Cabeçalho e payload da documentação: 200, sem gravar. O mesmo com header e esquema em minúsculas, outro `originLeadId`, sem `clientListingId`, `Basic` + chave crua e `Basic Basic`: 200, sem gravar. Chave errada, chave crua errada, sem cabeçalho, sem esquema e `Bearer`: 401. GET: 405.
+- Validador oficial: 200 com o base64 da documentação, 200 com a chave crua, 200 com o cabeçalho inteiro e 401 com token errado.
+- Banco da Imova (só leitura): `portal_leads` com 0 linhas antes e depois dos testes.
+
+**Em produção, só na Imova (10/11/2026; pedido do usuário: "Faça o deploy e teste"):**
+- O ar foi conferido antes: a v1 era igual à main `26011ec`.
+- Gravado o segredo `GRUPOZAP_LEAD_SECRET_TESTE`.
+- `grupozap-lead` **v4**, publicada da worktree `grupozap-homologacao` (ainda sem commit), com `verify_jwt = false`. O código baixado do ar é igual ao da worktree. Para voltar: publicar de novo a partir da main.
+
+**Pendente:**
+- Commit, PR e merge desta branch. Até lá, o ar está à frente da main.
+- Pedir ao suporte do Grupo OLX uma nova validação.
+- ~~Quando chegar a SECRET_KEY, trocar o segredo e tirar o de teste.~~ Feito na tarde de 10/11 (abaixo).
+
+**Decisão humana:** nenhuma.
+
+**Homologado; chave definitiva no ar (10/11/2026, tarde):**
+- O Grupo OLX homologou o Imova CRM e mandou a SECRET_KEY em base64 (o próprio valor do `Basic`). O usuário gravou `GRUPOZAP_LEAD_SECRET` com ela, exatamente como veio; o SHA-256 que o Supabase mostra confere. `GRUPOZAP_LEAD_SECRET_TESTE` foi removido. Nenhuma linha de código mudou.
+- Gravada assim, a chave confere de dois jeitos: `Basic <a chave>` (leitura crua) e `Basic base64("vivareal:<a chave>")` (decodificada).
+- `grupozap-lead` publicada de novo, com o mesmo código, para descartar segredos em memória (v7; os `secrets set/unset` sobem a versão sozinhos, v5 e v6). O código baixado do ar era igual ao da worktree.
+- curl: token inválido, o antigo token de teste (base64 e cru), sem cabeçalho e `Bearer` recebem 401. O validador oficial com o antigo token de teste também devolve 401. O teste com a chave válida fica com o usuário. `portal_leads` segue com 0 linhas.
+- Pendente: commit, PR e merge desta branch (o ar está à frente da main).
+
 ## 11/11/2026 — a Agenda da Imova como no protótipo do Calendly (branch `agenda-calendly-tela`; em produção só na Imova; RF-AGE-01, RF-AGE-05)
 
 **Pedido do usuário:** depois de ver o protótipo (página do Calendly ligada à Agenda do CRM, `localhost:3092`) e a comparação com o que estava no ar ("Já está desse jeito ou ainda precisamos implementar algo?"), "Gostei dessa atualização. Suba ela para o ambiente da Imova e coloque no ar". A comparação foi feita por um agente lendo o código e por fotos da Agenda real no site local.
