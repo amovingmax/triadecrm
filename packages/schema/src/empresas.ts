@@ -156,6 +156,13 @@ export interface Empresa {
      * KOMUNE a migração 20261111200000 não cria as funções da espera.
      */
     esperaEmDegraus: boolean;
+    /**
+     * O lembrete da visita na véspera pelo WhatsApp, com "Confirmo" e "Preciso
+     * remarcar" (11/11/2026): o selo "Cliente confirmou" / "Pediu para remarcar"
+     * no cartão da Agenda e na agenda do Meu dia, e o interruptor em Ajustes →
+     * WhatsApp. Só da Imova: na KOMUNE a migração não cria nada.
+     */
+    lembreteDeVisita: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -238,6 +245,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       avisosDaEquipe: false,
       calendly: false,
       esperaEmDegraus: false,
+      lembreteDeVisita: false,
     },
     privacidade: null,
     visual: {
@@ -289,6 +297,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       avisosDaEquipe: true,
       calendly: true,
       esperaEmDegraus: true,
+      lembreteDeVisita: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

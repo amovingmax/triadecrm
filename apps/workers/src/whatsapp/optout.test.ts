@@ -99,6 +99,10 @@ describe('O QUE NÃO PODE DISPARAR — os falsos positivos que custam um fornece
     ['o buffet remove a taxa de serviço?', 'pergunta comercial'],
     ['não quero atrapalhar, me chama depois', 'educação, não opt-out'],
     ['parabéns pelo trabalho de vocês', 'a palavra "para" dentro de outra'],
+    // Os botões do lembrete da visita (IMV-VIS-LEMBRETE, 11/11/2026): o toque
+    // chega como mensagem com o título do botão e passa por esta regra.
+    ['Confirmo', 'botão do lembrete da visita'],
+    ['Preciso remarcar', 'botão do lembrete da visita'],
   ])('"%s" NÃO é opt-out (%s)', (texto) => {
     expect(pediuParaSair(texto).pediu).toBe(false);
   });

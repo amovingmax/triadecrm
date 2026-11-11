@@ -11,6 +11,8 @@ import {
 } from '@/components/registro/tipos';
 
 import { escaparCuringas, normalizarBusca, ordenarCandidatos } from './autocompletar';
+import { lembretesPorTarefa, respostaDoLembrete } from './lembrete-de-visita';
+import { buscarRespostasDosLembretes } from './lembrete-de-visita-dados';
 import {
   conflitosDoCalendly,
   escolherResultado,
@@ -244,7 +246,7 @@ export async function buscarCompromissos(params: {
 
   const fechadas = linhas.filter((t) => t.status === 'done');
 
-  const [orgs, negocios, reuniao, registros, doCalendly, novos] = await Promise.all([
+  const [orgs, negocios, reuniao, registros, doCalendly, novos, lembretes] = await Promise.all([
     supabase.from('organizations_view').select(COLUNAS_ORG).in('id', orgIds),
     buscarNegocios(supabase, dealIds),
     // As reuniões das tarefas desta janela. Uma ida só, e não uma por cartão:
@@ -275,6 +277,11 @@ export async function buscarCompromissos(params: {
       linhas.filter((t) => t.origin === 'calendly').map((t) => t.id),
     ),
     buscarNovos(supabase, params.usuarioId),
+    // O toque do cliente no lembrete da véspera (só na Imova): o selo do cartão.
+    buscarRespostasDosLembretes(
+      supabase,
+      linhas.map((t) => t.id),
+    ),
   ]);
 
   if (orgs.error) throw erroDe(orgs.error.code, orgs.error);
@@ -289,6 +296,7 @@ export async function buscarCompromissos(params: {
       .map((r) => [r.task_id as string, r] as const),
   );
   const porNegocio = new Map(negocios.map((d) => [d.id, d] as const));
+  const lembretesDaTarefa = lembretesPorTarefa(lembretes);
   const agora = Date.now();
   const marcamHora = new Set(params.etapasComHoraMarcada);
 
@@ -342,6 +350,10 @@ export async function buscarCompromissos(params: {
         emConflito: false,
         horaCombinada,
         novo: novos.has(tarefa.id) || (reuniaoDaTarefa !== null && novos.has(reuniaoDaTarefa.id)),
+        respostaDoLembrete: respostaDoLembrete(
+          tarefa.due_at,
+          lembretesDaTarefa.get(tarefa.id) ?? [],
+        ),
         avisoEnviadoEm: reuniaoDaTarefa?.aviso_enviado_em ?? null,
         reuniaoCriadaEm: reuniaoDaTarefa?.criada_em ?? null,
         organizationId: tarefa.organization_id,

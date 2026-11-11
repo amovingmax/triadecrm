@@ -2,6 +2,12 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { hojeEmNatal, janelaDeDias } from '@/components/agenda/tipos';
+import {
+  lembretesPorTarefa,
+  respostaDoLembrete,
+  type RespostaDoLembrete,
+} from '@/components/agenda/lembrete-de-visita';
+import { buscarRespostasDosLembretes } from '@/components/agenda/lembrete-de-visita-dados';
 
 import type { RegistroDoDia } from './feito';
 import { textoDaPrevia } from './novo';
@@ -449,6 +455,8 @@ export type CompromissoDeHoje = {
   feito: boolean;
   organizacaoId: string | null;
   organizacao: string | null;
+  /** O toque do cliente no lembrete da véspera, para este horário (só na Imova). */
+  respostaDoLembrete: RespostaDoLembrete | null;
 };
 
 /**
@@ -489,13 +497,23 @@ export async function buscarAgendaDeHoje(
   const orgIds = [...new Set(linhas.flatMap((l) => l.organization_id ?? []))];
 
   const nomes = new Map<string, string>();
-  if (orgIds.length > 0) {
-    const resposta = await supabase.from('organizations_view').select('id, name').in('id', orgIds);
+  // O selo do lembrete vai junto com os nomes: erro nele é engolido lá dentro.
+  const [resposta, lembretes] = await Promise.all([
+    orgIds.length > 0
+      ? supabase.from('organizations_view').select('id, name').in('id', orgIds)
+      : null,
+    buscarRespostasDosLembretes(
+      supabase,
+      linhas.map((l) => l.id),
+    ),
+  ]);
+  if (resposta) {
     if (resposta.error) throw new ErroDoDia(resposta.error.message, resposta.error.code);
     for (const parceiro of (resposta.data ?? []) as { id: string | null; name: string | null }[]) {
       if (parceiro.id && parceiro.name) nomes.set(parceiro.id, parceiro.name);
     }
   }
+  const lembretesDaTarefa = lembretesPorTarefa(lembretes);
 
   return linhas.map((linha) => ({
     id: linha.id,
@@ -505,6 +523,7 @@ export async function buscarAgendaDeHoje(
     feito: linha.status === 'done',
     organizacaoId: linha.organization_id,
     organizacao: linha.organization_id ? (nomes.get(linha.organization_id) ?? null) : null,
+    respostaDoLembrete: respostaDoLembrete(linha.due_at, lembretesDaTarefa.get(linha.id) ?? []),
   }));
 }
 

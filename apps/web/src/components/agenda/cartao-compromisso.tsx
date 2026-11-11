@@ -35,6 +35,7 @@ import {
 import { type DesfechoCatalogo } from '@/components/registro/tipos';
 
 import { AcoesDaReuniao } from './acoes-da-reuniao';
+import { ROTULO_DA_RESPOSTA } from './lembrete-de-visita';
 import { ExcluirCompromisso } from './excluir-compromisso';
 
 /**
@@ -165,6 +166,27 @@ export function CartaoCompromisso({
           {compromisso.novo && !compromisso.concluido ? (
             <Badge variant="pilula" className="bg-menta font-medium text-menta-tinta">
               Novo
+            </Badge>
+          ) : null}
+          {/* O toque do cliente no lembrete da véspera (só na Imova). Verde é o
+              "deu certo" da faixa do resultado; âmbar é "mudou de data". Some
+              quando o compromisso é registrado: aí quem fala é o resultado. */}
+          {compromisso.respostaDoLembrete && !compromisso.concluido ? (
+            <Badge
+              variant="pilula"
+              className={cn(
+                'gap-1 font-medium',
+                compromisso.respostaDoLembrete === 'confirmou'
+                  ? 'bg-cliente-fundo text-cliente-texto'
+                  : 'bg-morno-fundo text-morno-texto',
+              )}
+            >
+              {compromisso.respostaDoLembrete === 'confirmou' ? (
+                <CircleCheck className="size-3" aria-hidden="true" />
+              ) : (
+                <CalendarClock className="size-3" aria-hidden="true" />
+              )}
+              {ROTULO_DA_RESPOSTA[compromisso.respostaDoLembrete]}
             </Badge>
           ) : null}
           {/* A reunião que é a nova data de outra (`reunioes.remarcada_de`). Âmbar

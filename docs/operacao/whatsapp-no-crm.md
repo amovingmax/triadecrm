@@ -308,3 +308,64 @@ pediu SAIR pode receber assim mesmo.
 **Onde fica a configuração.** Em `.mcp.json`, na raiz. O arquivo não guarda
 segredo (a autenticação é OAuth, por pessoa), então versioná-lo só decide se o
 resto do time herda o servidor ao abrir o repositório.
+
+## Lembrete da visita na véspera (só na Imova, 11/11/2026)
+
+Na véspera de cada visita com hora marcada, o cliente recebe pelo WhatsApp o dia, a
+hora e o endereço, com os botões **Confirmo** e **Preciso remarcar**. O toque aparece
+no cartão da Agenda e na agenda do Meu dia ("Cliente confirmou" / "Pediu para
+remarcar"); o "Preciso remarcar" vira a tarefa "Remarcar a visita com …" para o
+corretor responsável, com prazo agora. Detalhe na migração `20261111206000` e no
+`docs/CHANGELOG.md`.
+
+- **Quais visitas:** a visita com hora combinada (marcada no CRM ou pelo Calendly) e a
+  reunião presencial marcada ou confirmada (a visita que a IA e o Calendly marcam).
+  Ficam de fora a tarefa "a marcar", a cancelada, a on-line, a "a confirmar", quem
+  pediu para sair, quem não tem WhatsApp e a conversa bloqueada.
+- **Quando:** a partir da hora de Ajustes (padrão 10h), para as visitas do dia
+  seguinte. A de segunda sai no sábado se o sábado vale para o cliente (na Imova, só
+  para quem já respondeu) e na sexta para os outros. Nunca em domingo nem em feriado.
+  Visita marcada depois dessa hora para o dia seguinte recebe em até 5 minutos, se
+  ainda estiver no horário de envio. Uma vez por visita e horário; remarcou, sai outro.
+- **O envio é o de sempre:** modelo na fila de `messages`, pela porteira
+  (`app.pode_enviar`): supressão, horário, tetos e o teto de fala do robô continuam
+  valendo.
+
+### Ligar (passo a passo)
+
+1. **Mandar o modelo para a Meta.** O modelo `IMV-VIS-LEMBRETE` entra no banco
+   **inativo**. Em **Ajustes → WhatsApp → Lembrete da visita**, toque em **Mandar para
+   a Meta aprovar** (admin ou gestor). O `imova-worker-wa` manda o modelo na próxima
+   sincronização (até 30 min), com o nome `imv_vis_lembrete_v1`, categoria UTILITY,
+   pt_BR, as variáveis `{{nome}}`, `{{dia}}`, `{{hora}}` e `{{local}}` e os dois
+   botões de resposta rápida. Para não esperar: `workers wa --sincronizar-modelos`.
+2. **Esperar a aprovação.** A seção mostra "Modelo aprovado pela Meta" quando a
+   sincronização trouxer a aprovação. Recusado, mostra o motivo da Meta.
+3. **Ligar.** O interruptor **Mandar o lembrete na véspera** e a hora ficam na mesma
+   seção. Ligado antes da aprovação, nada sai até a Meta aprovar.
+
+**Sem o worker (pelo WhatsApp Manager da Meta):** Modelos de mensagem → Criar modelo →
+categoria **Utilidade**, nome `imv_vis_lembrete_v1`, idioma **Português (BR)**, tipo de
+variável **Nome** (parâmetros nomeados). Corpo, exatamente:
+
+```
+Olá, {{nome}}! Lembrete da sua visita com a Imova: {{dia}}, às {{hora}}.
+Local: {{local}}.
+Você confirma a visita? Se não puder ir, toque em Preciso remarcar e combinamos outro horário.
+```
+
+Exemplos: nome `Mariana`, dia `terça-feira, 17/11`, hora `15h`, local
+`Av. Engenheiro Roberto Freire, 1000`. Botões: **Resposta rápida** "Confirmo" e
+**Resposta rápida** "Preciso remarcar", nessa ordem (o primeiro confirma, o segundo
+pede para remarcar). Depois, o modelo ainda precisa ser ativado no CRM (passo 1):
+a sincronização acha o modelo pelo nome e grava a aprovação.
+
+**A IA que atende** não responde ao toque como se fosse pergunta: o toque fica
+registrado como silêncio dela e sai uma resposta curta da casa ("Visita confirmada!
+Obrigado, e até lá." ou "Sem problema! Um corretor da Imova vai falar com você por
+aqui para combinar outro horário."). No "Preciso remarcar" a IA para na conversa, para
+o corretor remarcar; a equipe religa pela conversa.
+
+**Os títulos dos botões não são pedido de saída.** A regra de opt-out (palavra
+sozinha como "Cancelar", "Para", "Sair") não casa "Confirmo" nem "Preciso remarcar".
+Trocar o modelo por outro com botão parecido com saída é recusado pelo banco.

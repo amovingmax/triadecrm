@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays } from 'lucide-react';
+import { CalendarClock, CalendarDays, CircleCheck } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ROTULO_DA_RESPOSTA } from '@/components/agenda/lembrete-de-visita';
 
 import { buscarAgendaDeHoje, type CompromissoDeHoje } from './consultas';
 
@@ -137,6 +138,25 @@ function Compromisso({ compromisso, agora }: { compromisso: CompromissoDeHoje; a
           {compromisso.tipo === 'visit' ? 'Visita' : 'Reunião'}
           {compromisso.feito ? ' · feita' : ''}
         </span>
+        {/* O toque do cliente no lembrete da véspera: verde confirmou, âmbar quer
+            outro horário — as mesmas cores do cartão da Agenda. */}
+        {compromisso.respostaDoLembrete && !compromisso.feito ? (
+          <span
+            className={cn(
+              'mt-1 inline-flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-xs font-medium',
+              compromisso.respostaDoLembrete === 'confirmou'
+                ? 'bg-cliente-fundo text-cliente-texto'
+                : 'bg-morno-fundo text-morno-texto',
+            )}
+          >
+            {compromisso.respostaDoLembrete === 'confirmou' ? (
+              <CircleCheck className="size-3" aria-hidden="true" />
+            ) : (
+              <CalendarClock className="size-3" aria-hidden="true" />
+            )}
+            {ROTULO_DA_RESPOSTA[compromisso.respostaDoLembrete]}
+          </span>
+        ) : null}
         {/* O que vem diz quanto falta, no laranja da marca; o que passou sem ser
             feito diz há quanto tempo, no tom de alerta — como no protótipo. */}
         {!compromisso.feito && !passou ? (

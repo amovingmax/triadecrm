@@ -38,6 +38,7 @@ describe('empresas', () => {
       avisosDaEquipe: false,
       calendly: false,
       esperaEmDegraus: false,
+      lembreteDeVisita: false,
     });
     expect(k.gruposDeCategoria).toEqual({});
     expect(k.origens).toBeNull();
@@ -101,6 +102,7 @@ describe('empresas', () => {
       avisosDaEquipe: true,
       calendly: true,
       esperaEmDegraus: true,
+      lembreteDeVisita: true,
     });
     expect(i.tipos.cerimonialista).toBeNull();
   });
