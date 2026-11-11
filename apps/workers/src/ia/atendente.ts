@@ -5,11 +5,16 @@
  * a IA atende e cujo cliente parou de escrever; este trabalho lê a conversa, a base da
  * Imova (caderno e imóveis), chama o modelo e leva a decisão ao banco:
  *
- *   responder             → `public.ia_atendente_responder`
- *   marcar_visita         → `public.ia_atendente_marcar_visita` (e, se o horário foi
- *                           tomado, oferece as alternativas que o banco devolveu)
- *   passar_para_corretor  → `public.ia_atendente_passar` (avisa e entrega a uma pessoa)
- *   nao_responder         → `public.ia_atendente_registrar_silencio`
+ *   responder              → `public.ia_atendente_responder`
+ *   enviar_link_da_agenda  → `public.ia_atendente_enviar_link` (11/11/2026, prompt v3: o
+ *                            link da agenda, de visita com o imóvel ou de reunião; o
+ *                            cliente escolhe o horário no Calendly)
+ *   passar_para_corretor   → `public.ia_atendente_passar` (avisa e entrega a uma pessoa)
+ *   nao_responder          → `public.ia_atendente_registrar_silencio`
+ *
+ * A visita marcada pela própria IA (`marcar_visita`, prompt v2) saiu em 11/11/2026: a
+ * versão do prompt é a que este arquivo importa (a configuração `ia.atendente` escolhe
+ * só o modelo), e a v3 não tem mais essa ação.
  *
  * Quem decide se AINDA dá para falar é o banco, no instante de gravar: a IA continua
  * atendendo ali, não chegou mensagem nova do cliente, a mensagem não foi respondida, o
@@ -24,15 +29,18 @@ import { z } from 'zod';
 
 import {
   type BaseDoAtendenteV2,
-  type EntradaDoAtendente,
+  type ConviteDaAgenda,
+  type EntradaDoAtendenteV3,
   type ImovelDaBaseV2,
   type PromptVersionado,
-  type SaidaDoAtendenteV2,
+  type SaidaDoAtendenteV3,
+  type TipoDaAgenda,
   CANAIS_DE_CHEGADA,
   MODELOS,
-  atendenteImovaV2,
+  TIPOS_DA_AGENDA,
+  atendenteImovaV3,
   reidratar,
-  sistemaComBaseV2,
+  sistemaComBaseV3,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -80,9 +88,10 @@ const entradaDoBanco = z.object({
       canal_de_chegada: z.string().nullable(),
     })
     .optional(),
-  horarios_de_visita: z
-    .array(z.object({ inicio: z.string(), quando_por_extenso: z.string() }).passthrough())
-    .optional(),
+  // Os links da agenda que já saíram (11/11/2026, `agenda_convites`): até cinco, o mais
+  // novo primeiro. Lidos um a um em `convitesDaEntrada`; uma forma inesperada aqui vira
+  // lista vazia, e não derruba a resposta.
+  convites_da_agenda: z.array(z.unknown()).optional().catch(undefined),
   ultima_do_cliente: uuid.nullable().optional(),
   respostas_na_ultima_hora: z.number().optional(),
   mensagens: z
@@ -141,17 +150,81 @@ export function limparTexto(texto: string): string {
     .trim();
 }
 
+/** Um link da agenda como o banco devolve em `convites_da_agenda`. */
+const conviteDoBanco = z.object({
+  tipo: z.enum(TIPOS_DA_AGENDA),
+  imovel_codigo: z.string().nullable().optional(),
+  enviado_em: z.string(),
+  agendado: z.boolean().nullable().optional(),
+});
+
+const FORTALEZA = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Fortaleza',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/**
+ * O instante do banco (ISO) como o prompt lê: AAAA-MM-DDTHH:MM, no relógio de Natal.
+ * Com o "T": com espaço, todo instante de 2027 tem dez dígitos seguidos começando por
+ * DDD, e a auditoria de dado pessoal barraria a chamada (achado de 11/11/2026).
+ */
+export function instanteDeFortaleza(iso: string): string | null {
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return null;
+  const partes = Object.fromEntries(FORTALEZA.formatToParts(data).map((p) => [p.type, p.value]));
+  return `${partes.year}-${partes.month}-${partes.day}T${partes.hour}:${partes.minute}`;
+}
+
+/** Os links da agenda que o modelo lê: só os de forma conhecida, no máximo cinco. */
+export function convitesDaEntrada(brutos: readonly unknown[] | undefined): ConviteDaAgenda[] {
+  const convites: ConviteDaAgenda[] = [];
+  for (const bruto of brutos ?? []) {
+    const lido = conviteDoBanco.safeParse(bruto);
+    if (!lido.success) continue;
+    const enviadoEm = instanteDeFortaleza(lido.data.enviado_em);
+    if (enviadoEm === null) continue;
+    const codigo = lido.data.imovel_codigo?.trim() ?? '';
+    convites.push({
+      tipo: lido.data.tipo,
+      imovelCodigo: lido.data.tipo === 'visita' && codigo !== '' ? codigo.slice(0, 80) : null,
+      enviadoEm,
+      agendado: lido.data.agendado === true,
+    });
+    if (convites.length === 5) break;
+  }
+  return convites;
+}
+
+/**
+ * O link do Calendly que a IA (ou a equipe) já mandou volta na conversa como
+ * "[link da agenda]". O modelo não precisa dele, e ele leva preenchidos o nome e o
+ * telefone do cliente.
+ */
+export function semOLinkDaAgenda(texto: string): string {
+  return texto.replace(/(?:https?:\/\/)?(?:www\.)?calendly\.com\/[^\s)>\]]*/gi, '[link da agenda]');
+}
+
+/** O agora do banco ("AAAA-MM-DD HH:MM") com o "T" (ver `instanteDeFortaleza`). */
+function agoraComT(agora: string | undefined): string {
+  return (agora ?? '').slice(0, 40).replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})/, '$1T$2');
+}
+
 /**
  * A entrada do prompt, a partir do que o banco devolveu. As mensagens ganham rótulo
- * curto (m1, m2...) e os horários também (h1, h2...): o modelo nunca vê uuid nem
- * instante, e os mapas devolvem o rótulo ao banco.
+ * curto (m1, m2...): o modelo nunca vê uuid, e o mapa devolve o rótulo ao banco. Os
+ * horários de visita não vão mais ao modelo (v3, 11/11/2026); vão os links da agenda
+ * que já saíram.
  */
 export function montarEntrada(
   e: EntradaDoBancoDoAtendente,
   leadId: string,
 ): {
-  entrada: EntradaDoAtendente;
-  horarios: Map<string, { inicio: string; quando: string }>;
+  entrada: EntradaDoAtendenteV3;
   /** m1, m2... → o id da mensagem no banco (para a foto que o treino ensina). */
   rotulos: Map<string, string>;
 } {
@@ -162,19 +235,14 @@ export function montarEntrada(
     de: m.de,
     quem: m.quem === null ? null : m.quem.slice(0, 60),
     quando: m.quando.slice(0, 40),
-    texto: (m.texto ?? '').slice(0, 2000),
+    texto: semOLinkDaAgenda(m.texto ?? '').slice(0, 2000),
   }));
-  const horarios = new Map<string, { inicio: string; quando: string }>();
-  for (const [indice, h] of (e.horarios_de_visita ?? []).slice(0, 8).entries()) {
-    horarios.set(`h${indice + 1}`, { inicio: h.inicio, quando: h.quando_por_extenso.slice(0, 80) });
-  }
   const canal = e.cliente?.canal_de_chegada ?? null;
   return {
-    horarios,
     rotulos,
     entrada: {
       leadId,
-      agora: (e.agora ?? '').slice(0, 40),
+      agora: agoraComT(e.agora),
       agoraPorExtenso: (e.agora_por_extenso ?? e.agora ?? '').slice(0, 80),
       treino: e.treino === true,
       cliente: {
@@ -191,25 +259,58 @@ export function montarEntrada(
           local: v.local === null ? null : v.local.slice(0, 200),
         })),
         canalDeChegada: (CANAIS_DE_CHEGADA as readonly string[]).includes(canal ?? '')
-          ? (canal as EntradaDoAtendente['cliente']['canalDeChegada'])
+          ? (canal as EntradaDoAtendenteV3['cliente']['canalDeChegada'])
           : null,
       },
-      horariosDeVisita: [...horarios.entries()].map(([opcao, h]) => ({ opcao, quando: h.quando })),
+      convitesDaAgenda: convitesDaEntrada(e.convites_da_agenda),
       respostasNaUltimaHora: Math.max(0, Math.trunc(e.respostas_na_ultima_hora ?? 0)),
       mensagens,
     },
   };
 }
 
-/** O texto das alternativas quando o horário escolhido foi tomado entre a oferta e o aceite. */
-export function textoDasAlternativas(alternativas: readonly { quando_por_extenso?: unknown }[]): string | null {
-  const quando = alternativas
-    .map((a) => (typeof a.quando_por_extenso === 'string' ? a.quando_por_extenso : null))
-    .filter((q): q is string => q !== null)
-    .slice(0, 3);
-  if (quando.length === 0) return null;
-  const lista = quando.length === 1 ? quando[0] : `${quando.slice(0, -1).join('; ')} ou ${quando[quando.length - 1]}`;
-  return `Esse horário acabou de ser ocupado. Posso marcar ${lista}. Qual fica melhor para você?`;
+/** As travas de sempre: o banco não deixou falar, e a próxima rodada lê tudo de novo. */
+const TRAVAS_DE_SEMPRE = new Set(['chegou_mensagem_nova', 'ja_respondida', 'ia_nao_atende']);
+
+/** Recusas do link que viram pergunta ao cliente, e não silêncio nem passagem. */
+const RECUSAS_QUE_PERGUNTAM_O_IMOVEL = new Set(['visita_sem_imovel', 'imovel_desconhecido']);
+
+/**
+ * A pergunta curta quando o banco não achou o imóvel da visita: sem ele não há link,
+ * porque toda visita da Imova tem código e endereço. Não pede o código (decisão do
+ * treino, 11/11/2026): pergunta onde ele viu.
+ */
+export function perguntaDoImovel(motivo: string): string {
+  return motivo === 'imovel_desconhecido'
+    ? 'Não encontrei esse imóvel por aqui. Onde você viu o anúncio? Assim confirmo qual é e te mando o link para escolher o horário da visita.'
+    : 'Para eu te mandar o link da visita, qual imóvel você quer ver? Pode me dizer o bairro ou onde viu o anúncio.';
+}
+
+/** O começo da mensagem do link quando o modelo não escreveu nada que sirva. */
+export function textoDoLink(tipo: TipoDaAgenda): string {
+  return tipo === 'visita'
+    ? 'Vou te mandar o link da agenda para você escolher o melhor dia e horário da visita.'
+    : 'Vou te mandar o link da agenda para você escolher o melhor horário para conversar com um dos nossos corretores.';
+}
+
+/**
+ * O texto do modelo como vai ao banco no link: sem endereço de site nenhum (o modelo
+ * nunca escreve URL; se escrever, sai aqui) e, vazio, o texto padrão do tipo.
+ */
+export function textoParaOLink(texto: string, tipo: TipoDaAgenda): string {
+  const limpo = limparTexto(texto.replace(/(?:https?:\/\/|www\.)\S+|\b[\w.-]+\.(?:com|ly|br)(?:\/\S*)?/gi, ''))
+    .replace(/[:\s]+$/u, '')
+    .trim();
+  if (limpo === '') return textoDoLink(tipo);
+  return /[.!?…]$/u.test(limpo) ? limpo : `${limpo}.`;
+}
+
+/** O banco ainda não tem a função (a migração do convite não foi publicada). */
+function funcaoQueNaoExiste(erro: unknown): boolean {
+  return (
+    erro instanceof ErroDaEsteira &&
+    /could not find the function|does not exist|PGRST202|42883/i.test(erro.message)
+  );
 }
 
 async function rpc<T = Record<string, unknown>>(
@@ -222,12 +323,13 @@ async function rpc<T = Record<string, unknown>>(
   return data as T;
 }
 
-async function modeloEscolhido(contexto: ContextoDaIa): Promise<string> {
+/** O modelo que a configuração escolheu (`ia.atendente.modelo`), ou o padrão da versão. */
+export async function modeloEscolhido(contexto: ContextoDaIa): Promise<string> {
   const { data } = await contexto.cliente.from('app_settings').select('value').eq('key', 'ia.atendente').maybeSingle();
   const valor = ((data as { value?: unknown } | null)?.value ?? {}) as Record<string, unknown>;
   return typeof valor.modelo === 'string' && MODELOS_DO_ATENDENTE.has(valor.modelo)
     ? valor.modelo
-    : atendenteImovaV2.modelo;
+    : atendenteImovaV3.modelo;
 }
 
 /** Entrega a conversa a uma pessoa, com o aviso padrão e o motivo para a equipe. */
@@ -306,15 +408,15 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   const reconhecidas = await fotosReconhecidasDaConversa(contexto, payload.conversation_id).catch(
     () => new Map(),
   );
-  const { entrada, horarios, rotulos } = montarEntrada(
+  const { entrada, rotulos } = montarEntrada(
     { ...e, mensagens: aplicarReconhecimentos(e.mensagens ?? [], reconhecidas) },
     leadId,
   );
 
-  const prompt: PromptVersionado<EntradaDoAtendente, SaidaDoAtendenteV2> = {
-    ...atendenteImovaV2,
-    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV2.modelo,
-    sistema: sistemaComBaseV2(base),
+  const prompt: PromptVersionado<EntradaDoAtendenteV3, SaidaDoAtendenteV3> = {
+    ...atendenteImovaV3,
+    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV3.modelo,
+    sistema: sistemaComBaseV3(base),
   };
 
   let executada;
@@ -388,6 +490,9 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   }
 
   let resultado: Record<string, unknown>;
+  // O que de fato saiu: na recusa do imóvel, a ação do modelo era o link e o que saiu
+  // foi a pergunta.
+  let feita: string = saida.acao;
   switch (saida.acao) {
     case 'nao_responder': {
       await rpc(contexto, 'ia_atendente_registrar_silencio', {
@@ -406,45 +511,56 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
       });
       break;
     }
-    case 'marcar_visita': {
-      const horario = saida.visita === null ? undefined : horarios.get(saida.visita.opcao);
-      if (horario === undefined || saida.visita === null || texto === '') {
+    case 'enviar_link_da_agenda': {
+      if (saida.agenda === null) {
         return passarParaGente(
           contexto,
           payload.conversation_id,
           payload.message_id,
-          `o cliente quer marcar visita e a IA não achou um horário válido (${detalhes.motivo})`,
+          `o cliente quer marcar uma visita ou conversa, e a IA não disse se é visita ou reunião (${detalhes.motivo})`,
           executada.aiRunId,
         );
       }
-      resultado = await rpc(contexto, 'ia_atendente_marcar_visita', {
-        ...comum,
-        p_inicio: horario.inicio,
-        p_imovel_codigo: saida.visita.imovelCodigo,
-        p_texto: texto,
-      });
-      if (resultado.ok !== true && resultado.motivo === 'horario_indisponivel') {
-        const alternativas = textoDasAlternativas(
-          Array.isArray(resultado.alternativas) ? (resultado.alternativas as { quando_por_extenso?: unknown }[]) : [],
-        );
-        if (alternativas !== null) {
-          resultado = await rpc(contexto, 'ia_atendente_responder', {
-            ...comum,
-            p_texto: alternativas,
-            p_detalhes: { ...detalhes, visita: 'horario_tomado' },
-          });
-          break;
-        }
-      }
-      if (
-        resultado.ok !== true &&
-        !['chegou_mensagem_nova', 'ja_respondida', 'ia_nao_atende'].includes(String(resultado.motivo))
-      ) {
+      const { tipo } = saida.agenda;
+      // Na reunião o imóvel não vai: um código que o modelo pôs ali faria o banco recusar
+      // por "imóvel desconhecido" uma conversa que não precisa de imóvel.
+      const imovelCodigo = tipo === 'visita' ? saida.agenda.imovelCodigo?.trim() || null : null;
+      const agenda = { tipo, imovelCodigo };
+      try {
+        resultado = await rpc(contexto, 'ia_atendente_enviar_link', {
+          ...comum,
+          p_tipo: tipo,
+          p_imovel_codigo: imovelCodigo,
+          p_texto: textoParaOLink(texto, tipo),
+        });
+      } catch (erro) {
+        if (!funcaoQueNaoExiste(erro)) throw erro;
         return passarParaGente(
           contexto,
           payload.conversation_id,
           payload.message_id,
-          `o cliente quer visitar ${saida.visita.imovelCodigo ?? 'um imóvel'} em ${horario.quando}, e a IA não conseguiu marcar sozinha (${String(resultado.motivo)})`,
+          `o cliente quer ${tipo === 'visita' ? `visitar ${imovelCodigo ?? 'um imóvel'}` : 'marcar uma conversa'}, e o banco ainda não manda o link da agenda (ia_atendente_enviar_link)`,
+          executada.aiRunId,
+        );
+      }
+      if (resultado.ok === true) break;
+      const recusa = String(resultado.motivo ?? 'recusado');
+      // Sem o imóvel não há link de visita: a IA pergunta qual, em vez de calar.
+      if (RECUSAS_QUE_PERGUNTAM_O_IMOVEL.has(recusa)) {
+        resultado = await rpc(contexto, 'ia_atendente_responder', {
+          ...comum,
+          p_texto: perguntaDoImovel(recusa),
+          p_detalhes: { ...detalhes, agenda: { ...agenda, recusa } },
+        });
+        feita = 'perguntou_o_imovel';
+        break;
+      }
+      if (!TRAVAS_DE_SEMPRE.has(recusa)) {
+        return passarParaGente(
+          contexto,
+          payload.conversation_id,
+          payload.message_id,
+          `o cliente quer ${tipo === 'visita' ? `visitar ${imovelCodigo ?? 'um imóvel'}` : 'marcar uma conversa com um corretor'}, e a IA não conseguiu mandar o link da agenda (${recusa})`,
           executada.aiRunId,
         );
       }
@@ -469,6 +585,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   contexto.logger.info('a IA que atende decidiu', {
     conversation_id: payload.conversation_id,
     acao: saida.acao,
+    feita,
     ok: resultado.ok === true,
     motivo: resultado.motivo ?? null,
     treino: e.treino === true,
@@ -479,9 +596,9 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   });
   return {
     feito: resultado.ok === true,
-    motivo: resultado.ok === true ? saida.acao : String(resultado.motivo ?? 'recusado'),
+    motivo: resultado.ok === true ? feita : String(resultado.motivo ?? 'recusado'),
     aiRunId: executada.aiRunId,
     custoUsd: executada.custoUsd,
-    detalhes: { acao: saida.acao, anotadas, fotosEnsinadas },
+    detalhes: { acao: saida.acao, anotadas, fotosEnsinadas, ...(saida.agenda === null ? {} : { agenda: saida.agenda }) },
   };
 }

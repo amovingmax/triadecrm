@@ -503,6 +503,8 @@ const O_QUE_MUDOU: Record<string, string> = {
     'Responde sozinha, assina “Imova” e passa para um corretor quando pedem visita, proposta ou ligação.',
   'atendente-imova@v2':
     'Fala como a equipe, não puxa assunto velho, reconhece a foto do anúncio que o cliente manda e conhece os dados de cada imóvel.',
+  'atendente-imova@v3':
+    'Manda o link da agenda para o cliente escolher o horário: a visita, com o código e o endereço do imóvel, ou a reunião com um corretor.',
 };
 
 export function oQueMudouNaVersao(versao: string | null | undefined): string | null {
