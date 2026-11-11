@@ -10,15 +10,28 @@
 -- isso: o único alerta, "Resposta atrasada" (`atrasada`, 20261106210000), só
 -- sai com 24 h. Agora a espera tem dois degraus:
 --
---   DEGRAU 1  `espera`         aos 15 min de expediente, para quem atende a
---                              conversa (`app.avisos_destino_da_conversa(c,
---                              false)`: o responsável, ou todos que atendem se
---                              ele não atende mais). "Maria Souza espera
---                              resposta há 15 min".
+--   DEGRAU 1  `espera`         aos 15 min de expediente, pela regra do aviso de
+--                              mensagem do navegador
+--                              (`app.avisos_destino_da_conversa(c, true)`).
+--                              "Maria Souza espera resposta há 15 min".
 --   DEGRAU 2  `espera_gestao`  a 1 h de expediente, para admin e gestor ativos
 --                              (o SDR não), dizendo com quem está: "Maria Souza
 --                              espera resposta há 1 h · com João" ou "· sem
 --                              responsável".
+--
+-- QUEM RECEBE O DEGRAU 1 (decisão de 11/11/2026, do agente principal, depois
+-- de ver que a conversa nova nasce com o responsável padrão, o admin mais
+-- antigo, e que a regra "quem atende a conversa" mandaria a primeira resposta
+-- só para ele):
+--   * ninguém do time escreveu ainda na conversa (a primeira resposta de
+--     verdade): TODOS que atendem (admin, gestor e SDR);
+--   * alguém do time já escreveu (gente ou a IA que atende; modelo e mensagem
+--     que falhou não contam), a conversa tem ficha e o responsável atende: SÓ
+--     o responsável;
+--   * conversa sem ficha: todos, como no aviso de mensagem nova.
+-- É exatamente o `p_regra_do_computador = true` de
+-- `app.avisos_destino_da_conversa` (20261106210000), que não muda aqui. Quem
+-- silenciou a conversa fica de fora nos dois casos.
 --
 -- O "Resposta atrasada" de 24 h continua como está.
 --
@@ -275,12 +288,14 @@ begin
         or (e.minutos >= v_gestao and e.minutos < v_gestao + v_janela)
   ),
   avisos as (
-    -- Degrau 1: quem atende a conversa (sem dono que atenda, todos), sem quem a silenciou.
+    -- Degrau 1: a regra do aviso de mensagem (antes da primeira resposta do time,
+    -- todos que atendem; depois, numa conversa com ficha, o responsável que atende),
+    -- sem quem silenciou a conversa.
     select d.pessoa, 'espera' as tipo, e.conversation_id, e.desde,
            app.nome_da_conversa(e.conversation_id) || ' espera resposta há '
              || app.espera_duracao(v_alvo) as texto
       from cruzou e
-     cross join lateral app.avisos_destino_da_conversa(e.conversation_id, false) as d (pessoa)
+     cross join lateral app.avisos_destino_da_conversa(e.conversation_id, true) as d (pessoa)
      where e.minutos >= v_alvo and e.minutos < v_alvo + v_janela
     union all
     -- Degrau 2: admin e gestor ativos, sem quem silenciou a conversa, dizendo com quem está.
@@ -308,7 +323,7 @@ begin
   return v_novos;
 end $$;
 comment on function app.avisos_push_varrer_espera(timestamptz) is
-  'Põe na fila os avisos da espera em degraus (11/11/2026): espera (alvo_min de expediente, para quem atende a conversa) e espera_gestao (gestao_min, para admin e gestor, com quem está). Um por espera e por pessoa (a chave leva o começo da espera). Chamada por app.avisos_push_rodar, só na Imova.';
+  'Põe na fila os avisos da espera em degraus (11/11/2026): espera (alvo_min de expediente; antes da primeira resposta do time, para todos que atendem, depois, para o responsável: app.avisos_destino_da_conversa(c, true)) e espera_gestao (gestao_min, para admin e gestor, com quem está). Um por espera e por pessoa (a chave leva o começo da espera). Chamada por app.avisos_push_rodar, só na Imova.';
 revoke all on function app.avisos_push_varrer_espera(timestamptz) from public, anon, authenticated;
 
 -- =====================================================================
@@ -339,7 +354,7 @@ as $$
     from esperas e cross join cfg
    where e.minutos >= cfg.alvo
      and p_pessoa in (select d.pessoa
-                        from app.avisos_destino_da_conversa(e.conversation_id, false) as d (pessoa))
+                        from app.avisos_destino_da_conversa(e.conversation_id, true) as d (pessoa))
      and not exists (select 1 from public.avisos_desligados x
                       where x.pessoa_id = p_pessoa and x.tipo = 'espera')
   union all
@@ -358,7 +373,7 @@ as $$
                       where x.pessoa_id = p_pessoa and x.tipo = 'espera_gestao')
 $$;
 comment on function app.esperas_da_pessoa(uuid, timestamptz) is
-  'As esperas acima de cada degrau que valem para uma pessoa (11/11/2026): espera (alvo_min, se ela atende a conversa) e espera_gestao (gestao_min, se é admin ou gestor ativo), sem as conversas que ela silenciou e sem o degrau desligado. responsavel = o primeiro nome de quem atende, ou nulo (sem responsável). Só a Imova.';
+  'As esperas acima de cada degrau que valem para uma pessoa (11/11/2026): espera (alvo_min, se a regra do aviso de mensagem a inclui: antes da primeira resposta do time, todos que atendem; depois, o responsável) e espera_gestao (gestao_min, se é admin ou gestor ativo), sem as conversas que ela silenciou e sem o degrau desligado. responsavel = o primeiro nome de quem atende, ou nulo (sem responsável). Só a Imova.';
 revoke all on function app.esperas_da_pessoa(uuid, timestamptz) from public, anon, authenticated;
 
 create or replace function public.esperas_para_avisar()
@@ -408,7 +423,7 @@ as $$
       ('ligando',         'Cliente ligando',            'Na hora em que um cliente liga pelo WhatsApp, enquanto toca.', 10, 'imova'),
       ('ligacao_perdida', 'Ligação perdida',            'Quando um cliente liga pelo WhatsApp e ninguém atende.',       11, 'imova'),
       ('lead_portal',     'Lead novo dos portais',      'Quando alguém escreve num anúncio do ZAP, do Viva Real ou da OLX.', 12, 'imova'),
-      ('espera',          'Cliente esperando resposta', 'Quando um cliente da sua conversa espera a nossa resposta há 15 minutos, contando só o horário de trabalho.', 13, 'imova'),
+      ('espera',          'Cliente esperando resposta', 'Quando um cliente espera a nossa resposta há 15 minutos de trabalho. Antes da primeira resposta, todos que atendem são avisados; depois, quem atende a conversa.', 13, 'imova'),
       ('espera_gestao',   'Cliente esperando há 1 hora', 'Para admin e gestor: quando um cliente espera a nossa resposta há 1 hora de trabalho, com o nome de quem atende.', 14, 'imova')
     ) as v (tipo, nome, descricao, ordem, empresa)
    where v.empresa is null or v.empresa = (select i.empresa from app.identidade i limit 1);

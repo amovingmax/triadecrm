@@ -7,8 +7,9 @@
 --   1. O RELÓGIO DO EXPEDIENTE: 22h de sexta até 8h10 de segunda são 10 min;
 --      10h às 10h20 do mesmo dia útil são 20; fim de semana e feriado não contam;
 --      intervalo invertido é 0;
---   2. O DEGRAU 1 (15 min) avisa quem atende a conversa, uma vez por espera; sem
---      dono que atenda, todos que atendem;
+--   2. O DEGRAU 1 (15 min), uma vez por espera, pela regra do aviso de mensagem:
+--      antes da primeira resposta do time, todos que atendem; com resposta do
+--      time, ficha e responsável que atende, só o responsável;
 --   3. O DEGRAU 2 (1 h) avisa admin e gestor (não o SDR), dizendo com quem está;
 --   4. O QUE É ESPERA: resposta de gente ou da IA encerra; modelo e mensagem que
 --      falhou não; reação não começa espera; o cliente que escreve de novo não
@@ -131,6 +132,21 @@ begin
   update public.conversations set last_outbound_at = greatest(coalesce(last_outbound_at, p_em), p_em)
    where id = pg_temp.id(p_chave);
 end $$;
+-- A conversa ganha ficha (o cliente com ficha, como a Imova faz sozinha).
+create function pg_temp.ficha(p_chave text, p_nome text) returns uuid language plpgsql as $$
+declare v_org uuid;
+begin
+  insert into public.organizations (name, phone_e164, source_id, collector)
+  select p_nome, c.peer_phone_e164, (select id from public.sources where slug = 'planilha'), 'pgtap150'
+    from public.conversations c where c.id = pg_temp.id(p_chave)
+  returning id into v_org;
+  update public.conversations set organization_id = v_org where id = pg_temp.id(p_chave);
+  return v_org;
+end $$;
+create function pg_temp.quantos(p_chave text, p_tipo text, p_pessoa uuid) returns bigint language sql stable as $$
+  select count(*) from app.push_fila
+   where conversa_id = pg_temp.id(p_chave) and tipo = p_tipo and pessoa_id = p_pessoa
+$$;
 create function pg_temp.avisos(p_chave text, p_tipo text) returns bigint language sql stable as $$
   select count(*) from app.push_fila where conversa_id = pg_temp.id(p_chave) and tipo = p_tipo
 $$;
@@ -173,18 +189,31 @@ select pg_temp.dele('lucas', '2026-11-09 10:10-03');
 -- O responsável saiu da empresa: a conversa é de todos que atendem.
 select pg_temp.conversa('sem_dono', '+5584900015003', 'Sem Dono', 'a0000000-0000-4000-8000-000000015005'::uuid);
 select pg_temp.dele('sem_dono', '2026-11-09 10:00-03');
+-- O time já respondeu antes (João), a conversa tem ficha e ele atende: a espera
+-- nova é dele.
+select pg_temp.conversa('atendida', '+5584900015004', 'Pedro', 'a0000000-0000-4000-8000-000000015001'::uuid);
+select pg_temp.ficha('atendida', 'Pedro Atendido');
+select pg_temp.dele('atendida', '2026-11-09 09:00-03');
+select pg_temp.nossa('atendida', '2026-11-09 09:05-03');
+select pg_temp.dele('atendida', '2026-11-09 10:00-03');
 
 select app.avisos_push_varrer_espera('2026-11-09 10:14-03');
 select is(pg_temp.avisos('maria', 'espera'), 0::bigint, 'aos 14 min ninguém é avisado');
 
 select app.avisos_push_varrer_espera('2026-11-09 10:15-03');
-select is(pg_temp.avisos('maria', 'espera'), 1::bigint,
-          'aos 15 min sai um aviso, para quem atende a conversa e só para ele');
-select ok(pg_temp.recebeu('maria', 'espera', 'a0000000-0000-4000-8000-000000015001'::uuid),
-          'o aviso de 15 min vai para o responsável (João)');
-select is((select corpo from app.push_fila where conversa_id = pg_temp.id('maria') and tipo = 'espera'),
+select ok(pg_temp.recebeu('maria', 'espera', 'a0000000-0000-4000-8000-000000015001'::uuid)
+          and pg_temp.recebeu('maria', 'espera', 'a0000000-0000-4000-8000-000000015002'::uuid)
+          and pg_temp.recebeu('maria', 'espera', 'a0000000-0000-4000-8000-000000015003'::uuid)
+          and pg_temp.recebeu('maria', 'espera', 'a0000000-0000-4000-8000-000000015004'::uuid),
+          'ninguém do time respondeu ainda (a primeira resposta): aos 15 min todos que atendem são avisados, o responsável, os gestores, o SDR e a admin');
+select ok(pg_temp.avisos('atendida', 'espera') = 1
+          and pg_temp.recebeu('atendida', 'espera', 'a0000000-0000-4000-8000-000000015001'::uuid),
+          'o time já respondeu, a conversa tem ficha e o responsável atende: só o responsável é avisado');
+select is((select corpo from app.push_fila
+            where conversa_id = pg_temp.id('maria') and tipo = 'espera' and pessoa_id = 'a0000000-0000-4000-8000-000000015001'::uuid),
           'Maria Souza espera resposta há 15 min', 'o aviso diz quem e há quanto tempo');
-select is((select caminho from app.push_fila where conversa_id = pg_temp.id('maria') and tipo = 'espera'),
+select is((select caminho from app.push_fila
+            where conversa_id = pg_temp.id('maria') and tipo = 'espera' and pessoa_id = 'a0000000-0000-4000-8000-000000015001'::uuid),
           '/conversas?cliente=' || pg_temp.id('maria'), 'o toque abre a conversa');
 select ok(pg_temp.recebeu('lucas', 'espera', 'a0000000-0000-4000-8000-000000015001'::uuid),
           'quem escreveu de novo aos 10 min é avisado aos 15 min do primeiro "oi"');
@@ -202,7 +231,7 @@ select is((select count(*) from app.push_fila
             where conversa_id in (pg_temp.id('maria'), pg_temp.id('lucas'), pg_temp.id('sem_dono'))),
           (select n from t150_antes_da_repeticao),
           'as rodadas seguintes não repetem o aviso da mesma espera');
-select is(pg_temp.avisos('maria', 'espera'), 1::bigint, 'a mesma espera não avisa duas vezes');
+select is(pg_temp.quantos('maria', 'espera', 'a0000000-0000-4000-8000-000000015001'::uuid), 1::bigint, 'a mesma espera não avisa duas vezes');
 select is(pg_temp.avisos('maria', 'espera_gestao'), 0::bigint, 'aos 15 min a gestão ainda não é avisada');
 
 select app.avisos_push_varrer_espera('2026-11-09 11:00-03');
@@ -219,7 +248,7 @@ select is((select corpo from app.push_fila
             where conversa_id = pg_temp.id('sem_dono') and tipo = 'espera_gestao'
               and pessoa_id = 'a0000000-0000-4000-8000-000000015004'::uuid),
           'Sem Dono espera resposta há 1 h · sem responsável', 'sem responsável que atenda, diz isso');
-select is(pg_temp.avisos('maria', 'espera'), 1::bigint, 'a 1 h o degrau de 15 min não volta');
+select is(pg_temp.quantos('maria', 'espera', 'a0000000-0000-4000-8000-000000015001'::uuid), 1::bigint, 'a 1 h o degrau de 15 min não volta');
 
 -- ---------------------------------------------------------------------
 -- 4. O que é espera
@@ -244,7 +273,7 @@ select pg_temp.dele('noite', '2026-11-06 22:00-03');
 select app.avisos_push_varrer_espera('2026-11-09 10:15-03');
 select ok(pg_temp.avisos('respondida', 'espera') = 0 and pg_temp.avisos('ia', 'espera') = 0,
           'respondida por gente ou pela IA que atende: não é espera');
-select is(pg_temp.avisos('falhou', 'espera'), 1::bigint,
+select ok(pg_temp.recebeu('falhou', 'espera', 'a0000000-0000-4000-8000-000000015001'::uuid),
           'resposta que falhou e modelo automático não contam: o cliente segue esperando');
 select is(pg_temp.avisos('reacao', 'espera'), 0::bigint, 'reação do cliente não começa espera');
 
@@ -252,7 +281,7 @@ select app.avisos_push_varrer_espera('2026-11-09 08:14-03');
 select is(pg_temp.avisos('noite', 'espera'), 0::bigint,
           'mensagem das 22h de sexta: às 8h14 de segunda ainda não deu 15 min');
 select app.avisos_push_varrer_espera('2026-11-09 08:15-03');
-select is(pg_temp.avisos('noite', 'espera'), 1::bigint,
+select ok(pg_temp.recebeu('noite', 'espera', 'a0000000-0000-4000-8000-000000015001'::uuid),
           'mensagem das 22h de sexta: o aviso sai às 8h15 de segunda');
 
 -- ---------------------------------------------------------------------
@@ -281,8 +310,10 @@ values (app.sha256_hex('+5584900015025'), 'phone', 'pgTAP 150');
 
 select app.avisos_push_varrer_espera('2026-11-09 10:15-03');
 select app.avisos_push_varrer_espera('2026-11-09 11:00-03');
-select is(pg_temp.avisos('silenciada', 'espera'), 0::bigint,
-          'quem silenciou a conversa não recebe o aviso de 15 min (e ninguém recebe no lugar dele)');
+select ok(not pg_temp.recebeu('silenciada', 'espera', 'a0000000-0000-4000-8000-000000015001'::uuid)
+          and not pg_temp.recebeu('silenciada', 'espera', 'a0000000-0000-4000-8000-000000015002'::uuid)
+          and pg_temp.recebeu('silenciada', 'espera', 'a0000000-0000-4000-8000-000000015003'::uuid),
+          'quem silenciou a conversa não recebe o aviso de 15 min; os outros que atendem recebem');
 select ok(not pg_temp.recebeu('silenciada', 'espera_gestao', 'a0000000-0000-4000-8000-000000015002'::uuid)
           and pg_temp.recebeu('silenciada', 'espera_gestao', 'a0000000-0000-4000-8000-000000015004'::uuid),
           'quem silenciou fica de fora do aviso da gestão; os outros recebem');
@@ -302,7 +333,7 @@ select app.avisos_push_varrer_espera('2026-11-09 10:44-03');
 select is(pg_temp.avisos('concluida', 'espera'), 0::bigint,
           'a espera conta da volta, não do "ok, obrigado" de antes de concluir');
 select app.avisos_push_varrer_espera('2026-11-09 10:45-03');
-select is(pg_temp.avisos('concluida', 'espera'), 1::bigint,
+select ok(pg_temp.recebeu('concluida', 'espera', 'a0000000-0000-4000-8000-000000015001'::uuid),
           'aos 15 min da volta, o aviso sai');
 
 -- ---------------------------------------------------------------------
@@ -336,13 +367,16 @@ select is((select e.responsavel
              from app.esperas_da_pessoa('a0000000-0000-4000-8000-000000015004'::uuid, '2026-11-09 11:00-03') e
             where e.conversa_id = pg_temp.id('maria') and e.degrau = 'espera_gestao'),
           'João', 'a admin vê a mesma espera no degrau da gestão, com o responsável');
-select ok(not exists (select 1 from app.esperas_da_pessoa('a0000000-0000-4000-8000-000000015003'::uuid,
+select ok(exists (select 1 from app.esperas_da_pessoa('a0000000-0000-4000-8000-000000015003'::uuid,
+                                                      '2026-11-09 11:00-03') e
+                   where e.conversa_id = pg_temp.id('maria') and e.degrau = 'espera')
+          and not exists (select 1 from app.esperas_da_pessoa('a0000000-0000-4000-8000-000000015003'::uuid,
                                                           '2026-11-09 11:00-03') e
-                       where e.degrau = 'espera_gestao' or e.conversa_id = pg_temp.id('maria'))
-          and exists (select 1 from app.esperas_da_pessoa('a0000000-0000-4000-8000-000000015003'::uuid,
-                                                          '2026-11-09 11:00-03') e
-                       where e.conversa_id = pg_temp.id('sem_dono') and e.degrau = 'espera'),
-          'o SDR vê só a espera da conversa que é de todos, e nunca o degrau da gestão');
+                           where e.degrau = 'espera_gestao' or e.conversa_id = pg_temp.id('atendida'))
+          and exists (select 1 from app.esperas_da_pessoa('a0000000-0000-4000-8000-000000015001'::uuid,
+                                                      '2026-11-09 11:00-03') e
+                       where e.conversa_id = pg_temp.id('atendida') and e.degrau = 'espera'),
+          'no computador, a mesma divisão: o SDR vê a Maria (sem resposta) e não a do Pedro, que é só do João, e nunca o degrau da gestão');
 select ok(not exists (select 1 from app.esperas_da_pessoa('a0000000-0000-4000-8000-000000015001'::uuid,
                                                           '2026-11-09 11:00-03') e
                        where e.conversa_id in (pg_temp.id('silenciada'), pg_temp.id('teste'),

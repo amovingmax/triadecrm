@@ -39,10 +39,11 @@ import { outraAbaJaTocou, somDestravado, tocarSom } from './som';
  * O que faz, em qualquer tela do CRM:
  * - a cada 30 segundos, e ao voltar para a aba, pergunta ao banco quem a regra
  *   manda avisar (`public.esperas_para_avisar`, migração 20261111200000): as
- *   conversas que passaram de 15 min de expediente sem resposta, para quem atende,
- *   e de 1 h, para admin e gestor. É a mesma regra do aviso no celular, então os
- *   dois concordam, inclusive em quem silenciou a conversa e no degrau desligado em
- *   "Avisos no celular";
+ *   conversas que passaram de 15 min de expediente sem resposta (antes da primeira
+ *   resposta do time, para todos que atendem; depois, numa conversa com ficha, para
+ *   o responsável: a regra do aviso de mensagem), e de 1 h, para admin e gestor. É
+ *   a mesma regra do aviso no celular, então os dois concordam, inclusive em quem
+ *   silenciou a conversa e no degrau desligado em "Avisos no celular";
  * - para cada espera nova: o cartão (com "Responder", que abre a conversa pelo
  *   mesmo caminho do clique no aviso de mensagem), o toque e, com o CRM fora de
  *   vista, a notificação do sistema.
