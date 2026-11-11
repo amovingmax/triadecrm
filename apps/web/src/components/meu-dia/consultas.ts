@@ -5,6 +5,7 @@ import { hojeEmNatal, janelaDeDias } from '@/components/agenda/tipos';
 
 import type { RegistroDoDia } from './feito';
 import { textoDaPrevia } from './novo';
+import { lerPrimeiraResposta, type PrimeiraResposta } from './primeira-resposta';
 import {
   ehTipoConhecido,
   hojeParaOCorte,
@@ -505,6 +506,26 @@ export async function buscarAgendaDeHoje(
     organizacaoId: linha.organization_id,
     organizacao: linha.organization_id ? (nomes.get(linha.organization_id) ?? null) : null,
   }));
+}
+
+/**
+ * A primeira resposta do dia (Meu dia novo da Imova, 11/11/2026): quem espera a
+ * resposta do time agora, as esperas respondidas no dia (mediana em minutos de
+ * expediente e quantas no alvo) e, para admin e gestor, a equipe. Uma leitura
+ * só, `public.meu_dia_primeira_resposta`, que confere no banco se quem lê pode
+ * ver o dia de `pessoaId` (a mesma hierarquia do seletor) e recusa na KOMUNE.
+ */
+export async function buscarPrimeiraResposta(
+  pessoaId: string | undefined,
+  dia: string,
+): Promise<PrimeiraResposta> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('meu_dia_primeira_resposta', {
+    ...(pessoaId ? { p_pessoa: pessoaId } : {}),
+    p_dia: dia,
+  });
+  if (error) throw new ErroDoDia(error.message, error.code);
+  return lerPrimeiraResposta(data);
 }
 
 /** Erro do banco com o código preservado, para a tela traduzir em vez de exibir cru. */
