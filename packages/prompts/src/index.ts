@@ -69,6 +69,30 @@ export {
 } from './prompts/atendente-imova/v2';
 
 export {
+  ACOES_DO_ATENDENTE_V3,
+  TIPOS_DA_AGENDA,
+  type AcaoDoAtendenteV3,
+  type ConviteDaAgenda,
+  type EntradaDoAtendenteV3,
+  type SaidaDoAtendenteV3,
+  type TipoDaAgenda,
+  atendenteImovaV3,
+  haQuantoTempo,
+  linhaDoConvite,
+  sistemaComBaseV3,
+} from './prompts/atendente-imova/v3';
+
+export {
+  BASE_DO_ENSAIO,
+  CENARIOS_DO_ATENDENTE_V3,
+  type CenarioDoAtendente,
+  type EsperaDoCenario,
+  TAMANHO_DA_MENSAGEM_DO_LINK,
+  conferirCenario,
+  mesmoCodigo,
+} from './prompts/atendente-imova/cenarios-v3';
+
+export {
   CERTEZAS_DA_FOTO,
   type EntradaDaFoto,
   type SaidaDaFoto,

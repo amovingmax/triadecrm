@@ -227,14 +227,16 @@ describe('preços e conta por chamada', () => {
         // reconhecida e os dados do imóvel: 1.089 tokens de sistema a mais que a v1. A conta
         // mede só as regras: na chamada de verdade o bloco de sistema leva também o
         // caderno e os imóveis, quase todos lidos do cache. Na medição real de 06/11, cada
-        // resposta custou de US$ 0,0004 a 0,0018.
+        // resposta custou de US$ 0,0004 a 0,0018. A v3 (11/11/2026, a visita pelo link) tem
+        // 505 tokens de sistema a mais (a visita, a reunião e os links já mandados) e 18 a
+        // menos de mensagem: os horários de visita saíram da entrada.
         id: 'atendente-imova',
         modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 2599,
-        tokensDaMensagem: 160,
+        tokensDeSistema: 3104,
+        tokensDaMensagem: 142,
         tokensDeSaida: 102,
-        semCache: 0.00033,
-        comCache: 0.00009,
+        semCache: 0.00038,
+        comCache: 0.0001,
       },
       {
         // De qual anúncio é a foto do cliente (09/11/2026, Imova). A conta mede só o

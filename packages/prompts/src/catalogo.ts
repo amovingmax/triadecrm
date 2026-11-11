@@ -1,5 +1,6 @@
 import { atendenteImovaV1 } from './prompts/atendente-imova/v1';
 import { atendenteImovaV2 } from './prompts/atendente-imova/v2';
+import { atendenteImovaV3 } from './prompts/atendente-imova/v3';
 import { fotoDoAnuncioV1 } from './prompts/foto-do-anuncio/v1';
 import { avaliacaoDoAtendimentoV1 } from './prompts/avaliacao-do-atendimento/v1';
 import { avaliacaoDoAtendimentoV2 } from './prompts/avaliacao-do-atendimento/v2';
@@ -51,7 +52,7 @@ export const CATALOGO = {
   // Só da Imova (03/11/2026): o worker o usa quando o banco é o da Imova.
   'leitura-do-cliente': { 1: leituraDoClienteV1, 2: leituraDoClienteV2 },
   // Só da Imova (06/11/2026): a IA que atende o cliente sozinha.
-  'atendente-imova': { 1: atendenteImovaV1, 2: atendenteImovaV2 },
+  'atendente-imova': { 1: atendenteImovaV1, 2: atendenteImovaV2, 3: atendenteImovaV3 },
   // Só da Imova (09/11/2026): de qual anúncio é a foto que o cliente mandou.
   'foto-do-anuncio': { 1: fotoDoAnuncioV1 },
   // Só da Imova (06/11/2026): a IA juíza, que dá nota ao atendimento da de cima.
@@ -85,8 +86,14 @@ export const VIGENTES = {
   'leitura-do-cliente': 2,
   // v2 desde 06/11/2026: a v1 se apresentava como "assistente virtual", e a IA é a
   // ferramenta de acessibilidade de um colaborador; a v2 fala como a equipe (sem
-  // dizer que é gente) e não puxa assunto velho. Voltar é trocar este número.
-  'atendente-imova': 2,
+  // dizer que é gente) e não puxa assunto velho.
+  // v3 desde 11/11/2026, a visita pelo link: a IA não marca mais a visita pelos
+  // horários do banco; manda o link da agenda (visita com o código do imóvel, ou
+  // reunião) e o cliente escolhe o horário. A entrada e a saída mudaram (sem horários,
+  // com os links já mandados; `agenda` no lugar de `visita`), então voltar à v2 é
+  // trocar este número E o worker (`apps/workers/src/ia/atendente.ts`), que importa a
+  // versão que sabe levar ao banco.
+  'atendente-imova': 3,
   'foto-do-anuncio': 1,
   // v2 desde 09/11/2026: a juíza diz também a lacuna, onde a IA que atende falhou no
   // dia, para o relatório contar por tema. Voltar é trocar este número.

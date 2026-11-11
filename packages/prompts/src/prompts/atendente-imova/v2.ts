@@ -348,6 +348,9 @@ const saida = saidaDoAtendenteV1.extend({
 
 export type SaidaDoAtendenteV2 = z.infer<typeof saida>;
 
+/** O schema da saída da v2, para a v3 trocar a visita pelo link da agenda (11/11/2026). */
+export const saidaDoAtendenteV2 = saida;
+
 const v1 = atendenteImovaV1;
 
 /**
@@ -367,7 +370,7 @@ export function jaRespondeuHoje(dados: Pick<EntradaDoAtendente, 'agora' | 'mensa
  * resposta com "Oi, Janio!". O lembrete no fim da mensagem, onde o modelo lê por
  * último, vem do que o CRM sabe, e não do que o modelo acha.
  */
-const LEMBRETE_DO_CUMPRIMENTO =
+export const LEMBRETE_DO_CUMPRIMENTO =
   'LEMBRETE: você já respondeu hoje nesta conversa. Não comece com "Oi", "Olá" nem com o nome do cliente; vá direto ao assunto.';
 
 export const atendenteImovaV2 = definirPrompt<EntradaDoAtendente, SaidaDoAtendenteV2>({

@@ -125,6 +125,9 @@ export type SaidaDoAtendente = z.infer<typeof saida>;
 /** O schema da saída da v1, para a v2 estender (09/11/2026). */
 export const saidaDoAtendenteV1 = saida;
 
+/** O schema da entrada da v1, para a v3 trocar os horários pelos links da agenda (11/11/2026). */
+export const entradaDoAtendenteV1 = entrada;
+
 const sistema = `Você é a atendente virtual da Imova Imobiliária, de Natal/RN, no WhatsApp. Conversa
 com quem quer comprar, alugar, vender ou anunciar imóvel. Suas mensagens saem com a
 assinatura "Imova" em cima (o CRM põe; você não assina). Você atende no lugar do Rafael,
