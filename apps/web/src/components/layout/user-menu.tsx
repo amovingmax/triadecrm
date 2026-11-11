@@ -3,6 +3,7 @@
 import {
   Bell,
   BellOff,
+  BellRing,
   ChevronDown,
   LogOut,
   MonitorDown,
@@ -18,6 +19,7 @@ import { instalarApp, type Navegador, useComoInstalar } from '@/components/aviso
 import { PassosParaInstalar } from '@/components/avisos/passos-para-instalar';
 import { useAvisos } from '@/components/avisos/provedor-avisos';
 import { tocarAmostra } from '@/components/avisos/som';
+import { testarAvisoDesteComputador } from '@/components/avisos/testar-aviso';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +44,7 @@ import type { RegistroNaFila } from '@/components/registro/tipos';
 import { estouNoApp } from '@/lib/auth/entrada-pelo-app';
 import { ROTULO_PAPEL } from '@/lib/auth/role';
 import { type Sessao } from '@/lib/auth/session';
+import { EMPRESA } from '@/lib/empresa';
 
 /**
  * Usuário no cabeçalho: avatar, nome e o papel em pt-BR (nunca o enum do banco).
@@ -80,6 +83,11 @@ import { type Sessao } from '@/lib/auth/session';
  * item aparece em todo computador, menos dentro do app já instalado: quando o
  * navegador oferece a instalação, abre a pergunta dele; quando não oferece, o passo
  * a passo daquele navegador (`components/avisos/instalar-app.ts`).
+ *
+ * **Testar aviso deste computador (11/11/2026, só na Imova).** Logo abaixo do som:
+ * mostra uma notificação de teste e toca o som, aqui mesmo, para a pessoa conferir
+ * que o aviso chega neste navegador (`components/avisos/testar-aviso.ts`). Não
+ * aparece dentro do app de celular, que tem os avisos dele.
  */
 // Dentro do app de celular? O servidor não sabe (renderiza como navegador); o
 // navegador responde depois da hidratação, sem descompasso.
@@ -225,6 +233,15 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
                   )}
                   Som nos avisos
                 </DropdownMenuCheckboxItem>
+              ) : null}
+              {EMPRESA.modulos.avisosDaEquipe && !avisos.silenciado && !noApp ? (
+                <DropdownMenuItem
+                  className="min-h-11 md:min-h-0"
+                  onSelect={() => void testarAvisoDesteComputador(avisos.somLigado)}
+                >
+                  <BellRing aria-hidden="true" />
+                  Testar aviso deste computador
+                </DropdownMenuItem>
               ) : null}
               {!avisos.silenciado && avisos.permissao === 'bloqueada' ? (
                 <p className="px-2 pb-1.5 text-xs leading-snug text-muted-foreground">

@@ -6,15 +6,33 @@
  * aba, e cada aba tem seções. Aba e seção vivem na URL para que um link possa apontar
  * direto para "a auditoria de ontem" sem obrigar quem abre a procurar.
  */
+import type { Empresa } from '@komune/schema/empresas';
+
 import type { AppRole } from '@/lib/auth/role';
+import { EMPRESA } from '@/lib/empresa';
 
-export type Aba = 'pessoas' | 'atendimento' | 'whatsapp' | 'ligacoes' | 'catalogos' | 'lgpd';
+export type Aba =
+  'pessoas' | 'avisos' | 'atendimento' | 'whatsapp' | 'ligacoes' | 'catalogos' | 'lgpd';
 
-export const ABAS: readonly { id: Aba; rotulo: string; descricao: string }[] = [
+export const ABAS: readonly {
+  id: Aba;
+  rotulo: string;
+  descricao: string;
+  /** A aba só existe na empresa com este módulo. */
+  modulo?: keyof Empresa['modulos'];
+}[] = [
   {
     id: 'pessoas',
     rotulo: 'Pessoas',
     descricao: 'Quem entra no CRM, com que papel, e quem está na lista de permitidos.',
+  },
+  {
+    // Quem recebe avisos (11/11/2026, só na Imova): o celular, o computador, ou nada.
+    id: 'avisos',
+    rotulo: 'Avisos',
+    descricao:
+      'Quem da equipe fica sabendo na hora quando um cliente escreve: no celular, no computador ou em nenhum dos dois.',
+    modulo: 'avisosDaEquipe',
   },
   {
     id: 'atendimento',
@@ -46,6 +64,9 @@ export const ABAS: readonly { id: Aba; rotulo: string; descricao: string }[] = [
     descricao: 'Quem pediu para parar, quem viu telefone, o que mudou e a exportação.',
   },
 ];
+
+/** As abas desta empresa: a de um módulo desligado não aparece nem abre pela URL. */
+export const ABAS_DA_EMPRESA = ABAS.filter((item) => !item.modulo || EMPRESA.modulos[item.modulo]);
 
 /** Seções da aba de catálogos. A ordem é a do uso diário, não a alfabética. */
 export type SecaoCatalogo =
@@ -299,7 +320,7 @@ export const POR_PAGINA = 50;
  */
 export function abaDaUrl(valor: string | string[] | undefined): Aba {
   const texto = Array.isArray(valor) ? valor[0] : valor;
-  return ABAS.some((item) => item.id === texto) ? (texto as Aba) : 'pessoas';
+  return ABAS_DA_EMPRESA.some((item) => item.id === texto) ? (texto as Aba) : 'pessoas';
 }
 
 export function catalogoDaUrl(aba: Aba, valor: string | string[] | undefined): SecaoCatalogo {

@@ -10,10 +10,11 @@ import { SeletorDeAba } from './abas';
 import { PainelCatalogos } from './painel-catalogos';
 import { PainelLgpd } from './painel-lgpd';
 import { PainelAtendimento } from './painel-atendimento';
+import { PainelAvisos } from './painel-avisos';
 import { PainelLigacoes } from './painel-ligacoes';
 import { PainelPessoas } from './painel-pessoas';
 import { PainelWhatsapp } from './painel-whatsapp';
-import { ABAS, type Aba, type SecaoCatalogo, type SecaoLgpd } from './tipos';
+import { ABAS_DA_EMPRESA, type Aba, type SecaoCatalogo, type SecaoLgpd } from './tipos';
 
 /**
  * A tela de Admin (PRD §7.9).
@@ -56,7 +57,7 @@ export function TelaAdmin({
 
   const trocarAba = useCallback((nova: Aba) => setAba(nova), []);
 
-  const descricao = ABAS.find((item) => item.id === aba)?.descricao ?? '';
+  const descricao = ABAS_DA_EMPRESA.find((item) => item.id === aba)?.descricao ?? '';
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -78,12 +79,13 @@ export function TelaAdmin({
         rotulo="Partes da administração"
         // Cinco nomes não cabem em 390px: a faixa rola de lado, como a dos funis.
         rolavel
-        itens={ABAS.map((item) => ({ id: item.id, rotulo: item.rotulo }))}
+        itens={ABAS_DA_EMPRESA.map((item) => ({ id: item.id, rotulo: item.rotulo }))}
         ativo={aba}
         aoTrocar={trocarAba}
       />
 
       {aba === 'pessoas' ? <PainelPessoas sessao={sessao} /> : null}
+      {aba === 'avisos' ? <PainelAvisos /> : null}
       {aba === 'atendimento' ? (
         <PainelAtendimento podeEditar={sessao.papel === 'admin' || sessao.papel === 'gestor'} />
       ) : null}

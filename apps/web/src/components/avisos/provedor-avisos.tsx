@@ -607,7 +607,14 @@ export function ProvedorDeAvisos({
       ligarSom,
       permissao,
       pedirPermissao,
-      conviteAberto: recebe && permissao === 'a_pedir' && !silenciado && !conviteDispensado,
+      // Na Imova o convite dá lugar à faixa "Ligar avisos" (11/11/2026), que volta
+      // três dias depois do "Agora não" (`avisos-deste-computador.tsx`).
+      conviteAberto:
+        recebe &&
+        permissao === 'a_pedir' &&
+        !silenciado &&
+        !conviteDispensado &&
+        !EMPRESA.modulos.avisosDaEquipe,
       dispensarConvite,
       cartoes,
       dispensarCartao,

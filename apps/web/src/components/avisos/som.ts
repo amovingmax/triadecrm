@@ -84,6 +84,15 @@ export function prepararSom(): () => void {
   };
 }
 
+/**
+ * Destrava o toque de dentro de um clique, sem tocar nada: o "Ligar avisos" da
+ * faixa (11/11/2026). O gesto já destravaria pela escuta de `prepararSom`; aqui
+ * fica dito, e vale mesmo se a escuta ainda não estiver montada.
+ */
+export function destravarSom(): void {
+  destravar();
+}
+
 /** O toque já pode sair agora, sem um gesto novo? */
 export function somDestravado(): boolean {
   return contexto?.state === 'running';
