@@ -133,6 +133,13 @@ export interface Empresa {
      * continua sendo "porta a bater" sem hora (PRD RF-AGE-01). Só tela.
      */
     horaNaVisita: boolean;
+    /**
+     * O Calendly na Agenda (10/11/2026), com a parte da tela que depende do banco
+     * dele (11/11/2026): o campo "Quem atende o que chega pelo Calendly" (só admin)
+     * e o aviso do cancelamento que o CRM não conseguiu fazer no Calendly. Só da
+     * Imova: no banco da KOMUNE as funções do Calendly não existem.
+     */
+    calendly: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -212,6 +219,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       canalDeChegada: false,
       meuDiaNovo: false,
       horaNaVisita: false,
+      calendly: false,
     },
     privacidade: null,
     visual: {
@@ -260,6 +268,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       canalDeChegada: true,
       meuDiaNovo: true,
       horaNaVisita: true,
+      calendly: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

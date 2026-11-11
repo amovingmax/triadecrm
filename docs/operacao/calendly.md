@@ -2,15 +2,39 @@
 
 Quem abre o link do Calendly da Imova vê os horários livres, escolhe um e marca uma reunião ou uma visita. Segundos depois, o CRM da Imova:
 
-- põe o compromisso na **Agenda** de quem atende (reunião ou visita, com a sala do Meet ou o endereço);
+- põe o compromisso na **Agenda** de quem atende (reunião ou visita, com a sala do Meet ou o endereço; na visita, o endereço que o cliente escreveu ou o do anúncio cujo código ele deu);
 - mostra o aviso **"Novo agendamento pelo Calendly"** no topo da Agenda e do Meu dia, até a pessoa tocar em "Ok, vi";
 - manda o **push** para o celular de quem atende (quem tem o app) e, na reunião, o **e-mail** de reunião marcada (só quando o `imova-worker-wa` tiver a `RESEND_API_KEY`, que hoje ele não tem: o texto do e-mail ainda é o da KOMUNE);
-- acha a **ficha** do cliente pelo telefone ou pelo e-mail, ou cria uma de Cliente (origem "Calendly"), e anota o agendamento nela;
+- acha a **ficha** do cliente pelo telefone ou pelo e-mail, ou cria uma de Cliente (origem "Calendly"), põe quem atende como **responsável** (da ficha e do negócio, quando ainda não têm um) e anota o agendamento nela;
 - leva o negócio para a etapa que pede data (**Visita marcada** em Clientes, **Avaliação marcada** em Captação).
 
 **Duas pessoas nunca ficam no mesmo horário.** Horário ocupado não aparece para o cliente no Calendly, e só volta a aparecer quando o compromisso que estava nele é desmarcado.
 
+**Nada em sábado, domingo ou feriado.** O Calendly só sabe "seg. a sex." e não conhece os feriados de Natal (20/11, 21/11, 25/12…). O agendamento que cai num desses dias não entra na agenda: o CRM pede ao Calendly que cancele, anota na ficha ("O Calendly marcou num feriado (20/11); o CRM pediu o cancelamento") e avisa quem atende por push.
+
 Nada vai pelo WhatsApp. Só a Imova tem isso; a KOMUNE não.
+
+---
+
+## Estado em 11/11/2026
+
+**Feito (10/11/2026):** banco, função `calendly-webhook`, site e `imova-worker-wa` com as duas chaves (Calendly e Google); agenda "CRM Imova - ocupado" criada na conta Google Workspace; projeto `crm-imova-agenda` no Google Cloud com a Calendar API e a conta de serviço; Calendly ligado ao Google ("Verificar conflitos" com a agenda nova e a principal); evento "Agendamento Imova" de 45 min, fuso de Brasília, relógio de 24 h, seg. a sex.; assinatura do webhook ativa; primeiro agendamento real recebido (reunião on-line de 11/11, na agenda do Rafael).
+
+**Pronto no código, à espera de publicar (banco `20261111204000` e site; a função e o worker não mudam):**
+- feriado, sábado e domingo recusados, com cancelamento no Calendly e o recado "não atende neste dia";
+- **"Quem atende o que chega pelo Calendly"**: campo no pé da **Agenda**, só para admin. A pessoa escolhida vale **antes** do anfitrião (a conta do Calendly é do Rafael, então sem escolha tudo cai na agenda dele). É também a agenda que o espelho copia no Google;
+- a ficha e o negócio que nascem do Calendly ficam com quem atende como responsável;
+- o endereço da visita pela pergunta "Endereço ou código do imóvel" (com o código de um anúncio, vale o endereço do anúncio);
+- o aviso **"Não consegui cancelar no Calendly o agendamento de…"** no topo da Agenda, para o dono do agendamento e os admins, quando o cancelamento esgota as tentativas.
+
+**Falta (configuração, do lado de quem tem as contas):**
+- compartilhar "CRM Imova - ocupado" com a conta de serviço ("Fazer alterações nos eventos") e gravar `google_agenda_id` (passo 5). **Sem isso o espelho fica desligado:** o que a equipe marca no CRM continua livre no Calendly, e só a rede de segurança (recusar e cancelar) segura;
+- trocar o token do Calendly (foi colado no chat) no `.env.imova` e no `imova-worker-wa`, e conferir com `calendly-assinar.mjs estado`;
+- escolher quem atende, na Agenda (admin);
+- no Calendly: as três perguntas e o idioma em português ([abaixo](#as-perguntas-a-criar-no-calendly)), e conferir o horário 9h30–17h45, os 10 min depois de cada evento e as 3 h de antecedência (o registro de 10/11 não cita esses três);
+- o e-mail de reunião marcada na Imova (`RESEND_API_KEY` no `imova-worker-wa` e um texto sem a KOMUNE).
+
+**Próximo passo (fora desta entrega):** rodízio entre corretores. Ele pede que o espelho no Google bloqueie só o horário em que **todos** estão ocupados, e não o de uma pessoa só.
 
 ---
 
@@ -48,7 +72,8 @@ cliente ─ link ─► Calendly ── webhook assinado ──► Edge Function
 ```
 
 - **Edge Function** `supabase/functions/calendly-webhook`: confere a assinatura do Calendly (`CALENDLY_WEBHOOK_SIGNING_KEY`) e resume o aviso.
-- **Banco** `supabase/migrations/20261110180000_calendly_na_agenda.sql`: `calendly_agendamentos`, `calendly_receber`, a régua `app.agenda_ocupada` e as listas do que falta (`calendly_cancelamentos_pendentes`, `agenda_espelho_pendencias`).
+- **Banco** `supabase/migrations/20261110180000_calendly_na_agenda.sql`: `calendly_agendamentos`, `calendly_receber`, a régua `app.agenda_ocupada` e as listas do que falta (`calendly_cancelamentos_pendentes`, `agenda_espelho_pendencias`). E `20261111204000_o_calendly_respeita_feriado_e_dono.sql`: o dia útil (`app.eh_dia_util`), quem atende (`app.calendly_pessoa_escolhida`, usada por `app.calendly_dono` e `app.calendly_pessoa_da_agenda`), o responsável da ficha, o endereço da visita pela resposta ou pelo anúncio (`app.calendly_local_da_visita`) e as funções das duas partes da tela (`calendly_quem_atende`, `calendly_quem_atende_gravar`, `calendly_cancelamentos_que_falharam`, `calendly_cancelamento_resolvido`).
+- **Site** `apps/web/src/components/agenda`: `quem-atende-o-calendly.tsx` (o campo do admin), `falhas-do-calendly.tsx` (o aviso do cancelamento que falhou) e `calendly.ts` (as frases).
 - **Worker** `apps/workers/src/agenda` no `imova-worker-wa`: cancela no Calendly (`CALENDLY_TOKEN`) e grava e apaga os blocos no Google (`GOOGLE_AGENDA_CREDENCIAL`).
 - **Script** `scripts/calendly-assinar.mjs`: cria a assinatura do webhook no Calendly (não há tela para isso, só a API).
 
@@ -88,18 +113,21 @@ Com a conta Google que vai ficar ligada ao Calendly:
 
 Em calendly.com: **Disponibilidade → Configurações da agenda → Conectar agenda → Google**, com a mesma conta. Em **"Verificar conflitos"**, marque **"CRM Imova — ocupado"** (e a agenda principal, se quiser). O plano grátis aceita uma conta de agenda; se ele não deixar escolher a agenda secundária, use a agenda principal da conta no lugar dela (passos 3 e 5 com o ID da principal, que é o próprio e-mail).
 
-### 5. Dizer ao CRM de quem é a agenda e qual é o Google Agenda
+### 5. Dizer ao CRM qual é o Google Agenda e quem atende
 
-No banco da Imova (SQL Editor do Supabase):
+O Google Agenda, no banco da Imova (SQL Editor do Supabase), sem apagar o resto da configuração:
 
 ```sql
 insert into public.app_settings (key, value)
-values ('calendly', '{"dono_email": "quem-atende@imovaimobiliaria.com.br",
-                      "google_agenda_id": "xxxxxxxx@group.calendar.google.com"}')
-on conflict (key) do update set value = excluded.value;
+values ('calendly', '{"google_agenda_id": "xxxxxxxx@group.calendar.google.com"}')
+on conflict (key) do update set value = public.app_settings.value || excluded.value;
 ```
 
-`dono_email` é o e-mail, **no CRM**, de quem atende pelo Calendly. É a agenda dessa pessoa que o CRM espelha.
+Quem atende, pela tela: **Agenda → "Quem atende o que chega pelo Calendly"** (no pé da página, só para admin). A lista tem as pessoas ativas da equipe (admin, gestor e SDR). Por baixo, grava `dono_email` em `app_settings['calendly']`.
+
+- A pessoa escolhida vale **antes** do e-mail do anfitrião que vem no agendamento. Sem escolha, vale o anfitrião (a pessoa do CRM com o e-mail da conta do Calendly, hoje o Rafael) e, se ele não estiver no CRM, o admin mais antigo.
+- O agendamento entra na agenda dessa pessoa, e a ficha e o negócio novos ficam com ela como responsável.
+- É a agenda dessa pessoa que o CRM espelha no Google.
 
 ### 6. O token do Calendly
 
@@ -141,17 +169,27 @@ node scripts/calendly-assinar.mjs assinar
 
 ## Como deixar o Calendly do jeito que o CRM entende
 
-O plano grátis tem **um tipo de evento ativo**. Use um só (ex.: "Agendamento Imova") com estas perguntas:
+O plano grátis tem **um tipo de evento ativo**. Use um só (ex.: "Agendamento Imova").
+
+### As perguntas a criar no Calendly
+
+No cartão do evento: **Editar → Perguntas para o convidado → Adicionar nova pergunta**, nesta ordem.
+
+1. **"O que você quer marcar?"** — tipo **Uma opção** (botões), obrigatória, com as opções **"Reunião"** e **"Visita a um imóvel"**.
+2. **"Telefone (WhatsApp)"** — tipo **Número de telefone**, **obrigatória**.
+3. **"Endereço ou código do imóvel"** — tipo **Uma linha**, **opcional**.
+4. O **idioma do convidado em Português (Brasil)**: ⋮ no cartão do evento → "Alterar idioma do convidado" (o idioma da conta não muda a página do cliente).
 
 | No Calendly | O que o CRM faz |
 | --- | --- |
-| Pergunta de múltipla escolha **"O que você quer marcar?"** com as opções **"Reunião"** e **"Visita a um imóvel"** | Quem escolhe a opção que começa com "Visita" entra como **visita**; o resto, como **reunião** |
-| Pergunta **"Telefone (WhatsApp)"**, obrigatória | O telefone liga o agendamento à ficha e à conversa do cliente |
+| **"O que você quer marcar?"** com **"Reunião"** e **"Visita a um imóvel"** | Quem escolhe a opção que começa com "Visita" entra como **visita**; o resto, como **reunião** |
+| **"Telefone (WhatsApp)"**, obrigatória | O telefone liga o agendamento à ficha e à conversa do cliente. Sem ele, a ficha é procurada só pelo e-mail, e quem já está na base pelo WhatsApp ganha ficha repetida |
+| **"Endereço ou código do imóvel"**, opcional | Na visita, vira o endereço do cartão e do Maps. Com o código de um anúncio da Imova (IM0003, SA0012, TE…, CO…, com ou sem os zeros), vale o **endereço do anúncio**, com o código citado ("Rua X, 10, Ponta Negra, Natal (anúncio IM0003)"). Qualquer pergunta com "endereço", "imóvel" ou "código" no texto serve |
 | Local Google Meet ou Zoom | Reunião **on-line**, com o botão "Entrar na sala" |
-| Local presencial (endereço) | **Presencial**, com o endereço |
+| Local presencial (endereço) | **Presencial**, com o endereço (na visita, a resposta do cliente vale por cima dele) |
 | Idioma do convidado **Português (Brasil)** (⋮ no cartão do evento → "Alterar idioma do convidado"; o idioma da conta não muda a página do cliente) e relógio de 24 h | A página fala português e mostra "14:30" |
 | Duração 45 min (a visita do CRM dura 45; a reunião, 40) | O compromisso ocupa a agenda pelo tempo que o Calendly marcou |
-| Horário: seg. a sex., 9h30–17h45 (o último começa às 17h00, como na grade do CRM), 10 min depois de cada evento, 3 h de antecedência | As mesmas regras da agenda do CRM |
+| Horário: seg. a sex., 9h30–17h45 (o último começa às 17h00, como na grade do CRM), 10 min depois de cada evento, 3 h de antecedência | As mesmas regras da agenda do CRM. Feriado o Calendly não conhece: o CRM recusa e cancela. Para o cliente nem ver o feriado, bloqueie a data em **Disponibilidade → Datas específicas** |
 
 Num plano pago, um tipo de evento com "Visita" no nome também entra como visita.
 
@@ -161,6 +199,8 @@ Num plano pago, um tipo de evento com "Visita" no nome também entra como visita
 
 - **Horário livre:** entra na agenda, com aviso, push, e-mail (reunião) e nota na ficha.
 - **Horário ocupado (o caso raro do intervalo):** não entra; nota na ficha, push a quem atende, e o Calendly cancela e pede outro horário ao cliente.
+- **Sábado, domingo ou feriado:** não entra; nota na ficha e push a quem atende ("O Calendly marcou num feriado (20/11); o CRM pediu o cancelamento"), e o Calendly cancela com o recado *"Este dia é feriado e a Imova Imobiliária não atende. Por favor, escolha outro dia pelo mesmo link."* (no fim de semana: *"A Imova Imobiliária não atende aos sábados e domingos…"*).
+- **Visita sem endereço** (nem resposta, nem local no evento, ou o evento em Google Meet): o banco grava "Local a combinar (o Calendly não informou)". O cartão não mostra linha de onde e o Maps busca pelo nome da ficha.
 - **O cliente cancelou:** a reunião é cancelada (com o e-mail de cancelamento), a visita sai da agenda, push "Cancelado pelo Calendly" e nota com o motivo.
 - **O cliente remarcou:** o horário velho fecha e o novo entra com o selo "Reagendada"; o aviso diz de quando era.
 - **A equipe desmarcou pelo CRM:** o Calendly cancela, avisa o cliente e libera o horário. Se a equipe remarcou, o recado ao cliente diz que a Imova vai combinar o novo horário.
@@ -179,5 +219,7 @@ Num plano pago, um tipo de evento com "Visita" no nome também entra como visita
 | Log da função: `integracao_nao_configurada` (503) | Falta `CALENDLY_WEBHOOK_SIGNING_KEY`. Rode `remover` e depois `assinar`. |
 | Horário marcado no CRM continua livre no Calendly | Veja o log do `imova-worker-wa` ("o Google não gravou o bloco"). Os motivos de sempre: agenda não compartilhada com a conta de serviço (Google 404), `google_agenda_id` ou `dono_email` errados, ou a agenda não marcada em "Verificar conflitos" no Calendly. |
 | Cliente recusado continua com o agendamento no Calendly | Log do worker: "o Calendly não cancelou". Token sem `scheduled_events:write` (403) ou vencido (401). O CRM tenta de novo, com espera, até 8 vezes; o erro fica em `calendly_agendamentos.cancelar_erro`. |
+| Aviso **"Não consegui cancelar no Calendly o agendamento de…"** no topo da Agenda | O CRM esgotou as tentativas (ou o Calendly recusou de vez). Aparece para o dono do agendamento e os admins. Cancele em **calendly.com → Eventos agendados** (o botão "Abrir o Calendly" leva lá), avise o cliente e toque em **"Já cancelei e avisei"**. Cancelado lá, o aviso também sai sozinho. Se for o token, troque-o (passo 6). |
+| Tudo cai na agenda do Rafael | Ninguém foi escolhido em "Quem atende o que chega pelo Calendly" (Agenda, admin), ou o e-mail gravado não é de ninguém ativo (o campo avisa). |
 
 Trocar a chave do webhook sem perder agendamento no meio: `node scripts/calendly-assinar.mjs trocar`. Desligar: `node scripts/calendly-assinar.mjs remover` (os agendamentos já recebidos ficam). Os blocos "Ocupado — CRM Imova" que sobrarem no Google Agenda saem pelo próprio Google Agenda.

@@ -44,6 +44,7 @@ export default async function Pagina({
       usuarioId={sessao.id}
       podeMarcar={podeMarcarCompromisso(sessao.papel)}
       comEquipe={comEquipe}
+      ehAdmin={sessao.papel === 'admin'}
       pessoaInicial={pessoaInicial}
       contexto={contexto}
       hoje={hoje}

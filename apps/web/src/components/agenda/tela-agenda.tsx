@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 
 import { cn } from '@/lib/utils';
+import { EMPRESA } from '@/lib/empresa';
 import {
   EXTRAS_VAZIOS,
   FolhaExtra,
@@ -28,9 +29,11 @@ import { buscarCompromissos, chaveDaAgenda, ErroDaAgenda } from './consultas';
 import { type ContextoDaAgenda } from './dados';
 import { ErroDaAgendaNaTela, EsqueletoAgenda } from './estados';
 import { AvisosRecebidos } from './avisos-recebidos';
+import { FalhasDoCalendly } from './falhas-do-calendly';
 import { FolhaDesfecho } from './folha-desfecho';
 import { BotaoNovoCompromisso, FolhaNovoCompromisso } from './folha-novo-compromisso';
 import { ListaDoDia } from './lista-dia';
+import { QuemAtendeOCalendly } from './quem-atende-o-calendly';
 import { registrarDesfechoDoCompromisso } from './registrar-desfecho';
 import { TelaRota } from './tela-rota';
 import { TiraDaSemana } from './tira-semana';
@@ -75,6 +78,7 @@ export function TelaAgenda({
   usuarioId,
   podeMarcar,
   comEquipe,
+  ehAdmin = false,
   pessoaInicial,
   contexto,
   hoje,
@@ -87,6 +91,11 @@ export function TelaAgenda({
   podeMarcar: boolean;
   /** Admin ou gestor: escolhe de quem é a agenda aberta. */
   comEquipe: boolean;
+  /**
+   * Admin: na Imova, vê o campo "Quem atende o que chega pelo Calendly". O banco
+   * confere de novo (`calendly_quem_atende*` recusam quem não é admin).
+   */
+  ehAdmin?: boolean;
   /** De quem é a agenda ao abrir: a própria pessoa, ou `?pessoa=` validado no servidor. */
   pessoaInicial: string;
   contexto: ContextoDaAgenda;
@@ -279,6 +288,10 @@ export function TelaAgenda({
 
       {daPropriaPessoa ? <AvisosRecebidos usuarioId={usuarioId} aoIrParaDia={irParaDia} /> : null}
 
+      {/* O cancelamento que o CRM não conseguiu fazer no Calendly (só Imova): é
+          sobre quem está olhando (o dono ou o admin), não sobre a agenda aberta. */}
+      {EMPRESA.modulos.calendly ? <FalhasDoCalendly usuarioId={usuarioId} /> : null}
+
       {daPropriaPessoa ? null : (
         <p className="sombra-base flex items-center gap-2 rounded-xl bg-card px-4 py-3 text-sm">
           <Eye className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -350,6 +363,8 @@ export function TelaAgenda({
           mais nada para configurar aqui — a sala de cada pessoa mora na folha de
           Novo compromisso (`sala.ts`), e o livre/ocupado é calculado pelo CRM. Na
           aba Rota a nota não aparece: ela fala da lista do dia. */}
+      {EMPRESA.modulos.calendly && ehAdmin && visao !== 'rota' ? <QuemAtendeOCalendly /> : null}
+
       {visao === 'rota' ? null : <AindaNaoLigado />}
 
       <FolhaNovoCompromisso
@@ -417,10 +432,13 @@ function AindaNaoLigado() {
           Aqui, na lista do dia, a ordem continua sendo a do relógio e o agrupamento é por bairro —
           são perguntas diferentes.
         </li>
-        <li>
-          <span className="text-foreground">Página pública de agendamento</span> está
-          fora do MVP.
-        </li>
+        {/* Na Imova a página pública existe: é o link do Calendly (10/11/2026). */}
+        {EMPRESA.modulos.calendly ? null : (
+          <li>
+            <span className="text-foreground">Página pública de agendamento</span> está
+            fora do MVP.
+          </li>
+        )}
       </ul>
       <p className="mt-2">
         Todos os horários no fuso de Natal (America/Fortaleza), seja qual for o fuso do aparelho.

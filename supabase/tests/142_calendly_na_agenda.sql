@@ -68,10 +68,18 @@ create function pg_temp.anfitria() returns uuid language sql as
 create function pg_temp.sdr() returns uuid language sql as
   $$ select 'a0000000-0000-4000-8000-000000014202'::uuid $$;
 
--- 10h de Natal, daqui a cinco dias: longe de qualquer compromisso de verdade
--- da anfitriã (ela nasceu agora).
-create function pg_temp.base() returns timestamptz language sql as
-  $$ select date_trunc('day', now()) + interval '5 days' + interval '13 hours' $$;
+-- 10h de Natal da primeira segunda-feira, daqui a cinco dias ou mais, de uma
+-- semana sem feriado: longe de qualquer compromisso de verdade da anfitriã (ela
+-- nasceu agora), e com os casos abaixo (até a sexta) em dia útil, porque desde
+-- 20261111204000 o Calendly em sábado, domingo ou feriado é recusado (ver o 154).
+create function pg_temp.base() returns timestamptz language sql as $$
+  select ((select d::date
+             from generate_series((now() at time zone 'America/Fortaleza')::date + 5,
+                                  (now() at time zone 'America/Fortaleza')::date + 120, interval '1 day') d
+            where extract(isodow from d) = 1
+              and (select bool_and(app.eh_dia_util(d::date + k)) from generate_series(0, 4) k)
+            order by d limit 1) + time '10:00') at time zone 'America/Fortaleza'
+$$;
 
 create function pg_temp.uri(p text) returns text language sql as
   $$ select 'https://api.calendly.com/scheduled_events/EV142' || p || '/invitees/IN142' || p $$;

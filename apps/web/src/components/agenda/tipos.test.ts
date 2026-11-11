@@ -17,6 +17,7 @@ import {
   inicioDaSemana,
   janelaDeDias,
   linkDoMapa,
+  lugarDeVerdade,
   mapaPorNome,
   naturezaDoCompromisso,
   numeroDoDia,
@@ -208,6 +209,49 @@ describe('link do mapa', () => {
     const c = compromisso({ tipo: 'reuniao', local: 'Sala da Imova' });
     expect(mapaPorNome(c)).toBe(true);
   });
+
+  it('"Local a combinar" do banco não é endereço: o Maps busca pelo nome', () => {
+    const c = compromisso({
+      tipo: 'visita',
+      peloCalendly: true,
+      local: 'Local a combinar (o Calendly não informou)',
+    });
+    expect(mapaPorNome(c)).toBe(true);
+    expect(consultaDoMapa(c)).toBe('Buffet Sabor, Tirol, Natal, RN');
+  });
+
+  it('sem lugar do Calendly, vale o endereço da ficha', () => {
+    const c = compromisso({
+      tipo: 'visita',
+      local: 'Local a combinar (o anúncio IM0003 não tem endereço)',
+      endereco: 'Av. Prudente de Morais, 100',
+    });
+    expect(consultaDoMapa(c)).toBe('Av. Prudente de Morais, 100, Tirol, Natal, RN');
+  });
+
+  it('o endereço do anúncio busca sem o código, que o Maps não conhece', () => {
+    const c = compromisso({
+      tipo: 'visita',
+      peloCalendly: true,
+      local: 'Rua Teste 154, 10, Ponta Negra, Natal (anúncio IM0003)',
+    });
+    expect(mapaPorNome(c)).toBe(false);
+    expect(consultaDoMapa(c)).toBe('Rua Teste 154, 10, Ponta Negra, Natal, Tirol, Natal, RN');
+  });
+});
+
+describe('lugar de verdade', () => {
+  it('o "Local a combinar…" do banco vale como nada, em qualquer caixa', () => {
+    expect(lugarDeVerdade('Local a combinar (o Calendly não informou)')).toBeNull();
+    expect(lugarDeVerdade('  local a combinar ')).toBeNull();
+    expect(lugarDeVerdade(null)).toBeNull();
+    expect(lugarDeVerdade('   ')).toBeNull();
+  });
+
+  it('o resto é lugar, aparado', () => {
+    expect(lugarDeVerdade(' Rua das Algas, 120 ')).toBe('Rua das Algas, 120');
+    expect(lugarDeVerdade('Localiza Hertz, Ponta Negra')).toBe('Localiza Hertz, Ponta Negra');
+  });
 });
 
 describe('onde acontece', () => {
@@ -231,6 +275,16 @@ describe('onde acontece', () => {
     });
     expect(ondeDoCompromisso({ link: '  ', local: null })).toBeNull();
     expect(ondeDoCompromisso({ link: 'não é link', local: null })?.texto).toBe('On-line');
+  });
+
+  it('"Local a combinar" não vira linha de onde; o código do anúncio aparece', () => {
+    expect(
+      ondeDoCompromisso({ link: null, local: 'Local a combinar (o Calendly não informou)' }),
+    ).toBeNull();
+    expect(
+      ondeDoCompromisso({ link: null, local: 'Rua Teste 154, 10, Ponta Negra (anúncio IM0003)' })
+        ?.texto,
+    ).toBe('Rua Teste 154, 10, Ponta Negra (anúncio IM0003)');
   });
 });
 

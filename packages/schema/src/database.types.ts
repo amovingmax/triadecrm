@@ -2800,6 +2800,7 @@ export type Database = {
       }
       calendly_agendamentos: {
         Row: {
+          anuncio_id: string | null
           atualizado_em: string
           aviso_id: string | null
           cancelado_em: string | null
@@ -2807,6 +2808,8 @@ export type Database = {
           cancelado_por: string | null
           cancelar_depois_de: string | null
           cancelar_erro: string | null
+          cancelar_resolvido_em: string | null
+          cancelar_resolvido_por: string | null
           cancelar_tentativas: number
           conflitos: Json
           convidado_uri: string
@@ -2823,6 +2826,7 @@ export type Database = {
           link_remarcar: string | null
           local: string | null
           motivo_cancelamento: string | null
+          motivo_recusa: string | null
           natureza: string | null
           organization_id: string | null
           recebido_em: string
@@ -2834,6 +2838,7 @@ export type Database = {
           tipo_de_evento: string | null
         }
         Insert: {
+          anuncio_id?: string | null
           atualizado_em?: string
           aviso_id?: string | null
           cancelado_em?: string | null
@@ -2841,6 +2846,8 @@ export type Database = {
           cancelado_por?: string | null
           cancelar_depois_de?: string | null
           cancelar_erro?: string | null
+          cancelar_resolvido_em?: string | null
+          cancelar_resolvido_por?: string | null
           cancelar_tentativas?: number
           conflitos?: Json
           convidado_uri: string
@@ -2857,6 +2864,7 @@ export type Database = {
           link_remarcar?: string | null
           local?: string | null
           motivo_cancelamento?: string | null
+          motivo_recusa?: string | null
           natureza?: string | null
           organization_id?: string | null
           recebido_em?: string
@@ -2868,6 +2876,7 @@ export type Database = {
           tipo_de_evento?: string | null
         }
         Update: {
+          anuncio_id?: string | null
           atualizado_em?: string
           aviso_id?: string | null
           cancelado_em?: string | null
@@ -2875,6 +2884,8 @@ export type Database = {
           cancelado_por?: string | null
           cancelar_depois_de?: string | null
           cancelar_erro?: string | null
+          cancelar_resolvido_em?: string | null
+          cancelar_resolvido_por?: string | null
           cancelar_tentativas?: number
           conflitos?: Json
           convidado_uri?: string
@@ -2891,6 +2902,7 @@ export type Database = {
           link_remarcar?: string | null
           local?: string | null
           motivo_cancelamento?: string | null
+          motivo_recusa?: string | null
           natureza?: string | null
           organization_id?: string | null
           recebido_em?: string
@@ -2903,10 +2915,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "calendly_agendamentos_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "calendly_agendamentos_aviso_id_fkey"
             columns: ["aviso_id"]
             isOneToOne: false
             referencedRelation: "agenda_avisos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendly_agendamentos_cancelar_resolvido_por_fkey"
+            columns: ["cancelar_resolvido_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendly_agendamentos_cancelar_resolvido_por_fkey"
+            columns: ["cancelar_resolvido_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
             referencedColumns: ["id"]
           },
           {
@@ -10599,7 +10632,25 @@ export type Database = {
         Returns: boolean
       }
       calendly_cancelamento_feito: { Args: { p_id: string }; Returns: boolean }
+      calendly_cancelamento_resolvido: { Args: { p_id: string }; Returns: boolean }
       calendly_cancelamentos_pendentes: { Args: { p_limite?: number }; Returns: Json }
+      calendly_cancelamentos_que_falharam: {
+        Args: never
+        Returns: {
+          cliente: string
+          dono_id: string
+          dono_nome: string
+          erro: string
+          id: string
+          inicio: string
+          motivo_recusa: string
+          natureza: string
+          organization_id: string
+          situacao: string
+        }[]
+      }
+      calendly_quem_atende: { Args: never; Returns: Json }
+      calendly_quem_atende_gravar: { Args: { p_pessoa?: string }; Returns: Json }
       calendly_receber: { Args: { p_evento: Json }; Returns: Json }
       canal_pro_ajustar: {
         Args: { p_email: string; p_nome: string; p_site: string; p_telefone: string }
