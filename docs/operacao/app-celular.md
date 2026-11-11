@@ -123,7 +123,7 @@ Expo 58.0.11 com React Native 0.88.0, a primeira combinação do SDK 58 com o Re
    - **Ligação pelo WhatsApp (Imova):** desde 06/11/2026 o app avisa "Fulano está ligando pelo WhatsApp" enquanto toca (aviso comum, uns 10 segundos depois de começar; o toque abre a conversa) e "Ligação perdida" quando ninguém atende.
    - **Próximo, pedido do usuário em 06/11/2026 ("em breve estaremos utilizando"): a tela de chamada igual à do WhatsApp.** Tocar com o celular bloqueado, em tela cheia, com Atender e Recusar, e falar pelo próprio app. Exige parte nativa nova na casca: aviso de voz da Apple (PushKit/VoIP, mandado direto à Apple, não pelo serviço do Expo), a tela de chamada do iPhone (CallKit) e o áudio da ligação no nativo (WebRTC), porque a página dentro do app dorme com o celular bloqueado. É uma versão nova do app no TestFlight, com teste entre celulares nossos. A Apple exige que todo aviso de voz abra a tela de chamada, então ele só serve para ligação. Vale para a Imova; na KOMUNE a ligação que chega pela Twilio não toca para ninguém.
 6. Teste com a equipe: build de desenvolvimento e TestFlight pelo EAS (conta Expo), teste fechado do Google Play. Na Imova, o passo a passo para pôr cada pessoa no TestFlight e conferir quem recebe está em "Como a equipe da Imova passa a receber os avisos", abaixo.
-7. Distribuição privada: Apple Business Manager e teste fechado.
+7. Distribuição privada: **App Store não listada** no iPhone (decisão de 11/11/2026, no lugar do Apple Business Manager; passo a passo, respostas e o que falta em `docs/operacao/app-store.md`) e teste fechado do Google Play.
 
 ## Como a equipe da Imova passa a receber os avisos
 

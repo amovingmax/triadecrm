@@ -10223,3 +10223,33 @@ Os três problemas eram: o código da `grupozap-lead` que está no ar só existi
 - Mandar o modelo para a Meta (Ajustes → WhatsApp → Lembrete da visita) e, aprovado, ligar o interruptor. Fora da janela de 24 h, o lembrete é mensagem iniciada pela empresa: a conta do WhatsApp da Imova precisa do **método de pagamento** cadastrado na Meta (pendência registrada em 28/10).
 - Decidido aqui, a confirmar com o dono: entra também a reunião presencial (a visita que a IA marca); a on-line não; o lugar é o endereço da reunião, o que o cliente escreveu no Calendly ou o endereço da ficha (o mesmo do cartão da Agenda; na visita marcada no CRM, a ficha do cliente pode ter o endereço dele, não o do imóvel) e, sem nenhum, "a combinar com o corretor"; o dia vai com a data ("sexta-feira, 05/03"), nunca "amanhã"; visita na terça depois de uma segunda de feriado recebe na sexta; a resposta da casa ao toque; a IA para no "Preciso remarcar"; admin e gestor mudam o ajuste.
 - Ficou de fora: aviso ao cliente quando a visita é cancelada depois do lembrete; dois lembretes na mesma conversa (duas visitas no mesmo dia) — o toque vale para a visita mais recente que continua de pé; o modelo aprovado também aparece na lista de modelos da ficha (`wa_preparar_envio`), e um envio manual dele não tem o botão acompanhado; o dossiê e a retenção da LGPD não leem `visita_lembretes` (só ids, horários e motivo, sem dado pessoal); o aviso no celular de "Pediu para remarcar" (os tipos de push são de outro agente; a tarefa e a mensagem nova já avisam). A regra de opt-out continua tratando um botão "Cancelar" de outros envios como saída (achado da revisão, fora desta tarefa).
+
+## 11/11/2026 — o app do iPhone a caminho da App Store, não listado (branch `app-loja-nao-listado`; PRD §8)
+
+Pedido do usuário: "pretendo subir o app na App Store, sendo que o app será privado somente à equipe". Ele escolheu a **distribuição não listada**: o app fica na loja, mas só instala quem tem o link, e quem não está em `allowed_users` não entra. Também escolheu pôr a conta do revisor da Apple na **KOMUNE em produção** (SDR), criar páginas próprias do app para suporte e privacidade, e deixar a ficha ser preenchida pela API. Guia completo em `docs/operacao/app-store.md`.
+
+**Entregue:**
+- **App 1.0.0** (`VERSAO_DA_CASCA`): a Apple recusa o pedido de não listado de app que pareça beta. Build `179fa46f` (número 7), montada na nuvem do Expo com `--auto-submit` para o App Store Connect. O código da casca é o da 0.2.0.
+- **Site: `/aplicativo` (suporte) e `/aplicativo/privacidade` (política do app)**, abertas sem login nas duas empresas (`ehRotaPublica`, com testes).
+  - A política fala de quem usa o app: a conta Google, o registro de atividades (12 meses), o endereço de avisos, as permissões e os serviços.
+  - Os dados dos clientes seguem a política de cada empresa, linkada na página.
+  - O texto mora em `app/aplicativo/` e `lib/aplicativo.ts`. As peças de texto da `/privacidade` da Imova passaram para `components/pagina-publica.tsx`, sem mudar o que ela mostra.
+- **App Store Connect, preenchido pela API em rascunho** (versão 1.0.0 do "Tríade CRM", `6831297069`):
+  - textos, links e categorias (Negócios e Produtividade);
+  - classificação etária (só "mensagens e chat: sim"), "sem conteúdo de terceiros", copyright;
+  - grátis, **só no Brasil**, **liberação manual**;
+  - notas para o revisor (em inglês, com o pedido de não listado e o de não mandar mensagem nem ligar);
+  - **5 capturas de iPhone 6,9"** (Meu dia, Conversas, uma conversa, Agenda e Funis), feitas num banco local à parte, com dados fictícios (fornecedores inventados, telefones +55 84 90000-00xx).
+- **Os links da ficha estão no domínio da Imova** (`imova-crm.vercel.app/aplicativo…`): o site dela sai da `main`, e a KOMUNE está parada de propósito na versão de 06/11.
+
+**Verificado:** sobre a `main` de 11/11 (`7044762`), typecheck e Vitest do site (126 arquivos, 2.019 testes) e lint dos arquivos tocados; typecheck e Vitest do app (42 testes). A ficha foi relida pela API: as 5 capturas foram processadas (`COMPLETE`). As duas páginas responderam 200 sem login num build de produção local. **Não verificado:** as páginas no ar (o site ainda não foi publicado com elas).
+
+**O que muda em produção (quando publicado):** só o site da Imova (duas páginas públicas novas). Sem banco, sem worker. O banco da Imova precisa estar com as migrações da `main` antes (banco antes do site, como sempre).
+
+**Pendente / decisão humana (passo a passo em `docs/operacao/app-store.md`):**
+- Publicar o site da Imova da `main` com este ramo. Antes do envio à revisão, os links de suporte e de privacidade precisam abrir.
+- Criar o Gmail do revisor, liberar como SDR em Administração → Pessoas da KOMUNE, entrar uma vez e pôr usuário, senha e o contato em "Informações para revisão do app".
+- Responder "Privacidade do app" no painel (a API não tem): as respostas estão no guia.
+- Escolher a build 1.0.0 (7) na versão, quando a Apple terminar de processar.
+- Enviar para revisão e, logo depois, mandar o pedido de não listado (respostas sugeridas no guia).
+- Depois das duas aprovações: liberar a versão à mão e mandar o link para a equipe.
