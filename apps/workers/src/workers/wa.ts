@@ -238,11 +238,17 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
     logger,
     tokenCalendly: env.CALENDLY_TOKEN,
     credencialGoogle: env.GOOGLE_AGENDA_CREDENCIAL,
+    subGoogle: env.GOOGLE_AGENDA_SUB,
   });
   if (agenda.ligada) {
+    // Até 11/11/2026 isto dizia "google: true" só por a variável existir, com o
+    // espelho desligado no banco (sem google_agenda_id) e até com a chave torta.
+    // Aqui vai só o que o worker sabe na partida; se o espelho está ligado, a
+    // primeira passada diz ("espelho no Google ligado" ou "espelho desligado: …").
     logger.info('agenda do Calendly ligada neste worker', {
-      calendly: env.CALENDLY_TOKEN !== undefined,
-      google: env.GOOGLE_AGENDA_CREDENCIAL !== undefined,
+      cancelaNoCalendly: agenda.cancelaNoCalendly,
+      credencialDoGoogleLida: agenda.credencialDoGoogle,
+      googleEmNomeDeUmUsuario: env.GOOGLE_AGENDA_SUB !== undefined,
     });
   }
 

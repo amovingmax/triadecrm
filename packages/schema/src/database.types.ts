@@ -10585,6 +10585,7 @@ export type Database = {
       }
       agenda_avisos_vistos: { Args: { p_ids?: string[] }; Returns: number }
       agenda_espelho_apagado: { Args: { p_item: string }; Returns: undefined }
+      agenda_espelho_estado: { Args: never; Returns: Json }
       agenda_espelho_falhou: {
         Args: { p_erro: string; p_fim: string; p_inicio: string; p_item: string }
         Returns: undefined

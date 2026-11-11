@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { requireRole } from '@/lib/auth/session';
 import { PAPEIS_DO_CRM, podeMarcarCompromisso, veAgendaDaEquipe } from '@/lib/navegacao';
 import { carregarContextoDaAgenda } from '@/components/agenda/dados';
+import { ESPELHO_NA_EMPRESA } from '@/components/agenda/espelho-no-google';
 import { TelaAgenda } from '@/components/agenda/tela-agenda';
 import { hojeEmNatal, type Dia, type Visao } from '@/components/agenda/tipos';
 
@@ -51,6 +52,9 @@ export default async function Pagina({
       agoraIso={agora.toISOString()}
       diaInicial={diaDaUrl(params.dia) ?? hoje}
       visaoInicial={visaoDaUrl(params.visao)}
+      // Só o admin: é ele quem roda a conferência e liga o espelho. O banco
+      // deixa o gestor ler também (`agenda_espelho_estado`).
+      mostrarEspelho={ESPELHO_NA_EMPRESA && sessao.papel === 'admin'}
     />
   );
 }

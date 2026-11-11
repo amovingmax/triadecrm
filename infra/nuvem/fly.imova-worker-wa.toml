@@ -21,6 +21,13 @@
 # os valores do `.env.imova`: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 # META_WA_ACCESS_TOKEN, META_WA_PHONE_NUMBER_ID, META_WA_BUSINESS_ACCOUNT_ID.
 # Os três da Meta só existem depois que o número da Imova é registrado.
+#
+# A agenda do Calendly (docs/operacao/calendly.md), opcionais: CALENDLY_TOKEN
+# (cancela no Calendly), GOOGLE_AGENDA_CREDENCIAL (a chave da conta de serviço,
+# em base64: o espelho "Ocupado" no Google) e GOOGLE_AGENDA_SUB (só no plano B,
+# a delegação em todo o domínio: o e-mail do usuário em nome de quem gravar).
+# O log da partida diz o que o worker leu; a primeira passada diz se o espelho
+# está ligado ("espelho no Google ligado" ou "espelho desligado: …").
 # =============================================================================
 
 app = "imova-worker-wa"
