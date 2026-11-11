@@ -9950,3 +9950,31 @@ Pedido do usuário: um visual mais bonito e que combine com uma imobiliária, pr
 **Ficou como estava, de propósito:** a semana de 7 dias (a tela é a mesma da KOMUNE, que usa o sábado); as visitas agrupadas por bairro (RF-ROT-03): a ficha nova do Calendly não tem bairro, então a visita dele cai em "Bairro não informado", com o endereço no cartão; os avisos de "bloco gravado no Google" e "cancelado no Calendly" seguem sem retorno na tela (o robô faz em segundo plano; o dono recebe push dos casos do Calendly).
 
 **Pendente (configuração, sem código):** compartilhar a agenda "CRM Imova - ocupado" com a conta de serviço e gravar `app_settings['calendly'].google_agenda_id` (sem isso, o que a equipe marca no CRM não some do Calendly); no Calendly, idioma do convidado em português e as perguntas "O que você quer marcar?" e "Telefone (WhatsApp)"; trocar o `CALENDLY_TOKEN` (foi colado no chat).
+
+## 11/11/2026 — o lead do portal avisa a equipe, e quem escreveu sem dizer o tipo entra como lead (branch `lead-avisa`; só na Imova; fora do PRD, RF-CON-05)
+
+**Pedido do usuário:** depois da revisão geral do CRM da Imova ("Qual o problema com os leads hoje?"), "Resolva esses três problemas! O lead deve aparecer na aba de leads em anúncios e devemos ser notificados que um novo lead chega."
+
+Os três problemas eram: o código da `grupozap-lead` que está no ar só existia sem commit (resolvido na entrada de 10/11 logo acima, agora na `main`); nenhum lead real tinha entrado (conferido em produção, só leitura: `portal_leads` com 0 linhas em 11/11); e o lead que chega fica parado, sem aviso, e o que escreve sem `leadType` some em "Clicaram e não chamaram".
+
+**Entregue:**
+- **Banco (migração `20261111120000`, pgTAP 144):**
+  - `portal_leads.escreveu_em`, gravado por gatilho na primeira vez em que o lead conta como "escreveu pelo portal": na chegada, ou quando um aviso seguinte traz a mensagem (clicou antes, escreveu depois).
+  - Lead com mensagem e sem `leadType` (ou com um tipo que o CRM não conhece) ganha o tipo `MENSAGEM_NO_PORTAL`: conta como mensagem pelo portal, ganha ficha de Cliente e entra na lista principal da aba Leads. A atividade da ficha diz "mandou mensagem pelo portal". Mensagem em branco não conta.
+  - Aviso no celular "Lead novo dos portais" (`lead_portal`, só no catálogo da Imova; a entrevista de 06/11 já o tinha aprovado): na rodada de 10 segundos, um aviso para cada pessoa que atende (admin, gestor e SDR ativos), com o nome, o que fez e o código do anúncio ("Novo lead: Maria Souza pediu uma visita · IM0003"). O toque abre `/anuncios/leads?lead=<id>`. Descartado, suprimido e lead de mais de 2 minutos não avisam. Cada pessoa desliga em "Avisos no celular".
+  - A rodada (`app.avisos_push_rodar`) só chama a varredura dos leads na Imova; o catálogo e a restrição de tipos valem nos dois bancos, sem efeito na KOMUNE.
+- **Site (só na Imova, admin, gestor e SDR):**
+  - `components/anuncios/leads/vigia-de-leads.tsx`, montado na casca: a cada 30 segundos e ao voltar para a aba, lê os leads que escreveram depois do último visto. Para cada lead novo: o cartão "Novo lead do portal" com "Ver lead", o toque (o mesmo do aviso de mensagem, que sai no menu da conta) e, com o CRM fora de vista, a notificação do sistema com o botão "Ver lead". "Silenciar avisos" cala tudo; a primeira leitura num navegador não anuncia o que já estava lá; o piso é dividido entre as abas.
+  - O número de leads sem resposta ao lado de **Anúncios** no menu (lateral e barra do celular), mantido vivo pelo vigia; a lista e o número da aba Leads recarregam quando chega lead.
+  - `/anuncios/leads?lead=<id>` abre a ficha do lead, também com a tela já aberta.
+  - O aviso de mensagem passa a ignorar o clique em notificação que não é de conversa (o canal do service worker é dividido).
+
+**Verificado:**
+- pgTAP 144 (31) no banco local da Imova, numa transação desfeita (o banco local tem duas migrações de branches fora da `main` e o `publicar-banco --local` recusa; o histórico dele não foi mexido). Com e sem a migração: 125 (66) e 127 (43) verdes; 09 e 135 com as mesmas falhas de antes no banco local.
+- Site: lint e typecheck limpos; Vitest 118 arquivos, 1864 testes (os novos de `aviso-de-lead` e o do menu).
+- **Não verificado:** o cartão e a notificação num navegador de verdade (sem navegador nesta sessão), o aviso no iPhone e um lead real chegando.
+
+**Pendente / decisão humana:**
+- Fazer um contato de teste num anúncio real (formulário ou chat do ZAP) e conferir: o lead em Anúncios → Leads, o cartão no computador e o aviso no celular. Sem ele não se sabe se o Grupo OLX já manda os leads da Imova para o CRM (ou ainda para a Arbo ou a Izi).
+- Quem clicou no WhatsApp do anúncio e escreveu por lá continua avisado pelo aviso de mensagem nova, não por este; quem só clicou ou só viu o telefone não avisa (decisão de 05/11: lead entra quando manda mensagem).
+- O resumo das 8h ainda não conta os leads novos.
