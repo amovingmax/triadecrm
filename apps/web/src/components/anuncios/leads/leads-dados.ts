@@ -53,6 +53,75 @@ export async function contarLeadsNovos(): Promise<number> {
   return count ?? 0;
 }
 
+/** Um lead que escreveu pelo portal, para o aviso de lead novo (`vigia-de-leads.tsx`). */
+export interface LeadQueEscreveu {
+  readonly id: string;
+  readonly escreveuEm: string;
+  readonly tipos: readonly string[];
+  readonly codigo: string | null;
+}
+
+/** Quantos o aviso lê de uma vez. Mais do que isso em 30 segundos vira "N leads novos". */
+const TETO_DO_AVISO = 20;
+
+/**
+ * Os leads que escreveram pelo portal depois de `desde` (migração 20261111120000,
+ * `portal_leads.escreveu_em`), sem os descartados e os suprimidos, do mais novo
+ * para o mais velho. `null` = a leitura falhou: o vigia tenta de novo na próxima volta.
+ */
+export async function lerLeadsQueEscreveram(desde: string): Promise<LeadQueEscreveu[] | null> {
+  const { data, error } = await createClient()
+    .from('portal_leads')
+    .select('id, escreveu_em, tipos, client_listing_id')
+    .gt('escreveu_em', desde)
+    .eq('suprimido', false)
+    .neq('situacao', 'descartado')
+    .order('escreveu_em', { ascending: false })
+    .limit(TETO_DO_AVISO);
+  if (error || !data) return null;
+  return data.flatMap((l) =>
+    l.escreveu_em
+      ? [{ id: l.id, escreveuEm: l.escreveu_em, tipos: l.tipos ?? [], codigo: l.client_listing_id }]
+      : [],
+  );
+}
+
+/**
+ * Quando escreveu o lead mais recente: a linha de base da primeira vez que o vigia
+ * roda neste navegador (o que já estava lá não é novidade). `null` = nenhum lead
+ * escreveu ainda; `undefined` = a leitura falhou.
+ */
+export async function lerUltimoLeadQueEscreveu(): Promise<string | null | undefined> {
+  const { data, error } = await createClient()
+    .from('portal_leads')
+    .select('escreveu_em')
+    .not('escreveu_em', 'is', null)
+    .order('escreveu_em', { ascending: false })
+    .limit(1);
+  if (error) return undefined;
+  return data?.[0]?.escreveu_em ?? null;
+}
+
+/**
+ * O nome de cada lead para o aviso: o da ficha, ou o que o portal mandou. Pela
+ * lista (`portal_leads_na_lista`), que vale igual para gestão e SDR. Falhou, o
+ * aviso sai sem o nome ("Alguém").
+ */
+export async function lerNomesDosLeads(ids: readonly string[]): Promise<Map<string, string>> {
+  const nomes = new Map<string, string>();
+  if (ids.length === 0) return nomes;
+  const { data, error } = await createClient()
+    .from('portal_leads_na_lista')
+    .select('id, ficha_nome, nome_no_portal')
+    .in('id', [...ids]);
+  if (error || !data) return nomes;
+  for (const l of data) {
+    const nome = (l.ficha_nome ?? l.nome_no_portal ?? '').trim();
+    if (l.id && nome) nomes.set(l.id, nome);
+  }
+  return nomes;
+}
+
 /**
  * O telefone inteiro de quem ainda não tem ficha (o que o portal mandou). Fica
  * em `pii_access_log`. Quem tem ficha revela pelo botão da ficha (`reveal_phone`).

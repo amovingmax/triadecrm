@@ -124,8 +124,10 @@ describe('NAVEGACAO', () => {
     // A regra que faz o número significar alguma coisa: um numeral na lateral diz
     // "tem coisa parada aqui". Configuração e leitura não contam NUNCA — um número
     // em Ajustes ensinaria a pessoa a ignorar os números que importam.
+    // Anúncios entrou em 11/11/2026: lead dos portais que escreveu e está sem
+    // resposta é trabalho parado, como a resposta nova em Conversas.
     const contam = NAVEGACAO.filter((item) => item.fila).map((item) => item.rotulo);
-    expect(contam.sort()).toEqual(['Conversas', 'Revisão']);
+    expect(contam.sort()).toEqual(['Anúncios', 'Conversas', 'Revisão']);
 
     const controle = NAVEGACAO.filter((item) => item.grupo === 'controle');
     for (const item of controle) expect(item.fila).toBeUndefined();
@@ -147,6 +149,14 @@ describe('NAVEGACAO', () => {
     expect(contagemDoItem(revisao, { candidatos: 12 }, 3)).toBe(12);
     expect(contagemDoItem(revisao, {}, 3)).toBeNull();
     expect(contagemDoItem(metas, { candidatos: 12 }, 3)).toBeNull();
+  });
+
+  it('Anúncios conta os leads dos portais sem resposta, que o vigia mantém vivo', () => {
+    const anuncios = NAVEGACAO.find((item) => item.href === '/anuncios');
+    if (!anuncios) throw new Error('item de menu sumiu');
+    expect(anuncios.fila).toBe('leads');
+    expect(contagemDoItem(anuncios, { candidatos: 12 }, 3, 2)).toBe(2);
+    expect(contagemDoItem(anuncios, { candidatos: 12 }, 3)).toBeNull();
   });
 
   it('a Revisão saiu de "A base" e foi para "Todo dia"', () => {

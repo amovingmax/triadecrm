@@ -148,6 +148,15 @@ export interface AlvoDaConversa {
   readonly organizacaoId: string | null;
 }
 
+/** O alvo que voltou do clique na notificação é de conversa? */
+function ehAlvoDeConversa(alvo: unknown): alvo is AlvoDaConversa {
+  return (
+    typeof alvo === 'object' &&
+    alvo !== null &&
+    typeof (alvo as { conversaId?: unknown }).conversaId === 'string'
+  );
+}
+
 interface Avisos {
   /**
    * Conversas com mensagem nova para esta pessoa, que ninguém do time respondeu
@@ -474,7 +483,12 @@ export function ProvedorDeAvisos({
   useEffect(() => {
     if (!recebe) return;
     prepararAvisoDoSistema();
-    return ouvirCliqueNoAviso<AlvoDaConversa>(abrirDoAviso);
+    // O canal do clique é dividido com o aviso de lead novo (11/11/2026), que
+    // manda `{ lead }`: aqui só entra o que é conversa.
+    return ouvirCliqueNoAviso<unknown>((alvos) => {
+      const conversas = alvos.filter(ehAlvoDeConversa);
+      if (conversas.length > 0) abrirDoAviso(conversas);
+    });
   }, [recebe, abrirDoAviso]);
 
   // ---------- 1. o socket acorda, a sondagem garante ----------

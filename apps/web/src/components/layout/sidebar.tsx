@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 
+import { useLeadsNovos } from '@/components/anuncios/leads/vigia-de-leads';
 import { useAvisos } from '@/components/avisos/provedor-avisos';
 import { NavLink } from '@/components/layout/nav-link';
 import { AlvoImova, MarcaTriade } from '@/components/logo';
@@ -108,6 +109,7 @@ const MARCA_DA_IMOVA = EMPRESA.slug === 'imova';
 export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFilas }) {
   const { principais, mais } = navegacaoDaLateral(papel);
   const { respostasNovas } = useAvisos();
+  const { novos: leadsNovos } = useLeadsNovos();
   return (
     // O LUGAR do trilho: 72px no fluxo, sempre. `z-40` para o painel aberto
     // passar por cima do cabeçalho (z-30), e por baixo de diálogos e folhas (z-50).
@@ -172,7 +174,7 @@ export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFi
               item={item}
               variante="trilho"
               ativoNoDisco={MARCA_DA_IMOVA}
-              contagem={contagemDoItem(item, filas, respostasNovas)}
+              contagem={contagemDoItem(item, filas, respostasNovas, leadsNovos)}
             />
           ))}
 
@@ -188,7 +190,7 @@ export function Sidebar({ papel, filas }: { papel: AppRole; filas: ContagemDasFi
                   item={item}
                   variante="trilho"
                   ativoNoDisco={MARCA_DA_IMOVA}
-                  contagem={contagemDoItem(item, filas, respostasNovas)}
+                  contagem={contagemDoItem(item, filas, respostasNovas, leadsNovos)}
                 />
               ))}
             </>

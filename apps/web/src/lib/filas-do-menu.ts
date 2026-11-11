@@ -24,6 +24,10 @@ import { type ChaveDeFila } from '@/lib/navegacao';
  *   mantém é o aviso de resposta (`components/avisos/provedor-avisos.tsx`). Até
  *   01/10/2026 o número de Conversas era o de rascunhos da IA pendentes; eles
  *   seguem na aba "Aprovar" da própria tela.
+ * - `leads` — lead dos portais que escreveu e está sem resposta, em Anúncios
+ *   (11/11/2026, só na Imova). Também NÃO é contado aqui, pelo mesmo motivo das
+ *   respostas: quem o mantém é o vigia de leads
+ *   (`components/anuncios/leads/vigia-de-leads.tsx`), que avisa o lead novo.
  *
  * E por isso Metas, Relatórios, Cadências e Ajustes NÃO contam, mesmo tendo o que
  * contar. São telas de configuração e de leitura: nada ali espera por ninguém, e

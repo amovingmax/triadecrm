@@ -4,6 +4,7 @@ import { Ellipsis } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
+import { useLeadsNovos } from '@/components/anuncios/leads/vigia-de-leads';
 import { useAvisos } from '@/components/avisos/provedor-avisos';
 import { NavLink } from '@/components/layout/nav-link';
 import {
@@ -68,6 +69,7 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
   })).filter((bloco) => bloco.itens.length > 0);
 
   const { respostasNovas } = useAvisos();
+  const { novos: leadsNovos } = useLeadsNovos();
 
   return (
     // Some enquanto há uma conversa aberta em tela cheia (`data-area-visivel`, em
@@ -83,7 +85,7 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
             key={item.href}
             item={item}
             variante="inferior"
-            contagem={contagemDoItem(item, filas, respostasNovas)}
+            contagem={contagemDoItem(item, filas, respostasNovas, leadsNovos)}
           />
         ))}
 
@@ -143,7 +145,7 @@ export function BottomNav({ papel, filas }: { papel: AppRole; filas: ContagemDas
                           key={item.href}
                           item={item}
                           variante="menu"
-                          contagem={contagemDoItem(item, filas, respostasNovas)}
+                          contagem={contagemDoItem(item, filas, respostasNovas, leadsNovos)}
                           onNavegar={() => setAberto(false)}
                         />
                       ))}

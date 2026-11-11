@@ -118,7 +118,7 @@ export type ChaveDeGrupo = 'todo_dia' | 'a_base' | 'controle';
  * dado: é a metade de baixo da regra. Um número em Ajustes ou em Metas diria
  * "tem trabalho parado aí" sobre uma tela onde nada espera por ninguém.
  */
-export type ChaveDeFila = 'candidatos' | 'respostas';
+export type ChaveDeFila = 'candidatos' | 'respostas' | 'leads';
 
 export type ItemNavegacao = {
   href: string;
@@ -360,6 +360,9 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
       'Anúncios de imóveis (casa, apartamento, terreno, sala) que sobem pelo Canal Pro para o ZAP, Viva Real e OLX: fotos, preço, endereço e destaque, o que falta para ir ao ar e quando o portal leu.',
     papeis: PAPEIS_DO_CRM,
     modulo: 'anuncios',
+    // Lead dos portais que escreveu e ninguém respondeu (11/11/2026): é trabalho
+    // parado. Quem conta é o vigia de leads no navegador, como as respostas.
+    fila: 'leads',
   },
   // -------------------------------------------------------------------------
   // Controle
@@ -497,16 +500,19 @@ export function leTelefoneCompleto(papel: AppRole): boolean {
  * O número de um item do menu, venha de onde vier.
  *
  * `filas` é o que o servidor contou (`lib/filas-do-menu.ts`); `respostasNovas` é
- * o que o aviso de resposta mantém vivo no navegador. Item sem `fila` não mostra
- * número nunca, nem quando haveria o que contar.
+ * o que o aviso de resposta mantém vivo no navegador, e `leadsNovos` o que o
+ * vigia de leads mantém (11/11/2026). Item sem `fila` não mostra número nunca,
+ * nem quando haveria o que contar.
  */
 export function contagemDoItem(
   item: ItemNavegacao,
   filas: Partial<Record<ChaveDeFila, number | null>>,
   respostasNovas: number | null,
+  leadsNovos: number | null = null,
 ): number | null {
   if (!item.fila) return null;
   if (item.fila === 'respostas') return respostasNovas;
+  if (item.fila === 'leads') return leadsNovos;
   return filas[item.fila] ?? null;
 }
 

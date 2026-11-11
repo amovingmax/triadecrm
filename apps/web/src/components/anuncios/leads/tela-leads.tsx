@@ -94,15 +94,24 @@ function useAgora(passoMs = 60_000): Date {
 export function TelaLeads({
   euId,
   anuncioInicial,
+  leadInicial = null,
 }: {
   euId: string;
   anuncioInicial: string | null;
+  /** `?lead=<id>`: o toque no aviso de lead novo abre a ficha dele (11/11/2026). */
+  leadInicial?: string | null;
 }) {
   const [filtros, setFiltros] = useState<FiltrosDosLeads>({
     ...FILTROS_INICIAIS,
     anuncio: anuncioInicial,
   });
-  const [abertoId, setAbertoId] = useState<string | null>(null);
+  const [abertoId, setAbertoId] = useState<string | null>(leadInicial);
+  // Já na tela, o toque num aviso troca só a URL: a ficha do lead novo abre igual.
+  const [leadDaUrl, setLeadDaUrl] = useState(leadInicial);
+  if (leadInicial !== leadDaUrl) {
+    setLeadDaUrl(leadInicial);
+    if (leadInicial) setAbertoId(leadInicial);
+  }
   const agora = useAgora();
 
   const consulta = useQuery({

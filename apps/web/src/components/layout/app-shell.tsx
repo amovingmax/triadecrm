@@ -1,6 +1,8 @@
+import { VigiaDeLeads } from '@/components/anuncios/leads/vigia-de-leads';
 import { PilhaDeAvisos } from '@/components/avisos/pilha-de-avisos';
 import { AdiantarDados } from '@/components/consultas/adiantar-dados';
 import { ProvedorDeAvisos } from '@/components/avisos/provedor-avisos';
+import { recebeAvisos } from '@/components/avisos/regra';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Header } from '@/components/layout/header';
 import { RetornoDoToque } from '@/components/layout/retorno-do-toque';
@@ -11,6 +13,7 @@ import { ProvedorDoSoftphone } from '@/components/ligacao/voz-provedor';
 import { ProvedorDaLigacaoWhatsapp } from '@/components/ligacao-whatsapp/provedor';
 import { TransicaoPagina } from '@/components/movimento';
 import { type Sessao } from '@/lib/auth/session';
+import { EMPRESA } from '@/lib/empresa';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
 import { telasParaAdiantar } from '@/lib/navegacao';
 import { cn } from '@/lib/utils';
@@ -39,6 +42,10 @@ import { cn } from '@/lib/utils';
  * quem está no funil de que alguém respondeu (`components/avisos`). Os cartões
  * "Nova mensagem" saem por `PilhaDeAvisos`, no canto de cima.
  *
+ * `VigiaDeLeads` (11/11/2026, só na Imova) é o mesmo para os leads dos portais:
+ * o cartão "Novo lead do portal", o som e a notificação do sistema, e o número
+ * ao lado de Anúncios (`components/anuncios/leads/vigia-de-leads.tsx`).
+ *
  * `ProvedorDoSoftphone` também envolve tudo, pelo mesmo motivo: a ligação feita pelo
  * navegador tem de sobreviver à troca de tela, e o painel dela fica no canto de baixo
  * (`components/ligacao/voz-provedor.tsx`). Com a telefonia desligada ele não desenha nada.
@@ -58,6 +65,10 @@ export function AppShell({
 }) {
   return (
     <ProvedorDeAvisos usuarioId={sessao.id} papel={sessao.papel}>
+      <VigiaDeLeads
+        usuarioId={sessao.id}
+        ligado={EMPRESA.modulos.anuncios && recebeAvisos(sessao.papel)}
+      >
       <ProvedorDoSoftphone podeLigar={podeLigar(sessao.papel)}>
         <ProvedorDaLigacaoWhatsapp podeLigar={podeLigar(sessao.papel)}>
         {/* Com uma conversa aberta em tela cheia no celular (`data-area-visivel`), o
@@ -105,6 +116,7 @@ export function AppShell({
         </div>
         </ProvedorDaLigacaoWhatsapp>
       </ProvedorDoSoftphone>
+      </VigiaDeLeads>
     </ProvedorDeAvisos>
   );
 }
