@@ -10588,6 +10588,32 @@ export type Database = {
       }
       aviso_ligacao_cancelar: { Args: { p_attempt_id: string }; Returns: Json }
       aviso_ligacao_situacao: { Args: { p_attempt_id: string }; Returns: Json }
+      avisos_quem_recebe: {
+        Args: never
+        Returns: {
+          celular_aparelhos: number
+          celular_mensagem_ligada: boolean
+          celular_push_ligado: boolean
+          celular_visto_em: string
+          computador_ligados: number
+          computador_visto_em: string
+          navegadores: Json
+          nome: string
+          papel: string
+          pessoa_id: string
+          situacao: string
+        }[]
+      }
+      avisos_registrar_navegador: {
+        Args: {
+          p_aparelho: string
+          p_permissao: string
+          p_rotulo: string
+          p_silenciado: boolean
+          p_som: boolean
+        }
+        Returns: undefined
+      }
       cadencia_do_parceiro: {
         Args: { p_organization_id: string }
         Returns: Json

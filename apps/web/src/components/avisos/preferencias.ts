@@ -7,7 +7,7 @@ import { maisRecente } from './regra';
 /**
  * O que o aviso de resposta guarda no aparelho, por pessoa.
  *
- * Quatro coisas, e nenhuma é dado de parceiro:
+ * Cinco coisas, e nenhuma é dado de parceiro:
  *   - `silenciado`  a pessoa pediu para não ser avisada. Ausente = avisar, que é
  *                   o padrão: o aviso nasce ligado.
  *   - `visto`       o piso: a chegada abaixo da qual nada mais conta. Nasce na
@@ -17,6 +17,8 @@ import { maisRecente } from './regra';
  *   - `convite`     ela dispensou o convite de ligar as notificações do navegador.
  *   - `semSom`      ela desligou o toque do aviso (29/10/2026). Ausente = tocar:
  *                   o som nasce ligado, e sai pelo menu da conta.
+ *   - `faixa`       até quando o "Agora não" da faixa "Ligar avisos" vale (só na
+ *                   Imova, 11/11/2026; `avisos-deste-computador.tsx`).
  *
  * POR QUE NO APARELHO, E NÃO NO BANCO. A permissão de notificação já é do
  * navegador, não da pessoa: liberar no computador não libera no celular. Guardar
@@ -37,6 +39,7 @@ const CHAVES = {
   visto: 'komune.avisos.visto.v1',
   convite: 'komune.avisos.convite.v1',
   semSom: 'komune.avisos.sem-som.v1',
+  faixa: 'komune.avisos.faixa-adiada.v1',
 } as const;
 
 type Campo = keyof typeof CHAVES;
@@ -100,6 +103,16 @@ export function useConviteDispensado(usuarioId: string): [boolean, () => void] {
   const dispensado = usePreferencia('convite', usuarioId) === '1';
   const dispensar = useCallback(() => gravar('convite', usuarioId, '1'), [usuarioId]);
   return [dispensado, dispensar];
+}
+
+/**
+ * Até quando a faixa "Ligar avisos" fica escondida (ISO), e como adiá-la. É da
+ * pessoa neste navegador, como o resto.
+ */
+export function useFaixaAdiada(usuarioId: string): [string | null, (ate: string) => void] {
+  const ate = usePreferencia('faixa', usuarioId);
+  const adiar = useCallback((quando: string) => gravar('faixa', usuarioId, quando), [usuarioId]);
+  return [ate, adiar];
 }
 
 /** O toque do aviso: `true` = toca, que é o padrão. */

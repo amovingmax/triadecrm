@@ -1,4 +1,5 @@
 import { VigiaDeLeads } from '@/components/anuncios/leads/vigia-de-leads';
+import { AvisosDesteComputador } from '@/components/avisos/avisos-deste-computador';
 import { PilhaDeAvisos } from '@/components/avisos/pilha-de-avisos';
 import { AdiantarDados } from '@/components/consultas/adiantar-dados';
 import { ProvedorDeAvisos } from '@/components/avisos/provedor-avisos';
@@ -45,6 +46,10 @@ import { cn } from '@/lib/utils';
  * `VigiaDeLeads` (11/11/2026, só na Imova) é o mesmo para os leads dos portais:
  * o cartão "Novo lead do portal", o som e a notificação do sistema, e o número
  * ao lado de Anúncios (`components/anuncios/leads/vigia-de-leads.tsx`).
+ *
+ * `AvisosDesteComputador` (11/11/2026, só na Imova) conta ao banco se este
+ * navegador avisa, para a gestão ver quem recebe, e mostra no alto do conteúdo a
+ * faixa "Ligar avisos" (`components/avisos/avisos-deste-computador.tsx`).
  *
  * `ProvedorDoSoftphone` também envolve tudo, pelo mesmo motivo: a ligação feita pelo
  * navegador tem de sobreviver à troca de tela, e o painel dela fica no canto de baixo
@@ -99,6 +104,8 @@ export function AppShell({
               quadro de 1440 com 20px de margem de cada lado, e o conteúdo que
               sobra é exatamente 1400. */}
               <div className="mx-auto w-full max-w-[1400px] has-[[data-tela-cheia]]:max-w-none">
+                {/* Fora da transição: a faixa não reaparece animada a cada tela. */}
+                <AvisosDesteComputador usuarioId={sessao.id} />
                 <TransicaoPagina>{children}</TransicaoPagina>
               </div>
             </main>

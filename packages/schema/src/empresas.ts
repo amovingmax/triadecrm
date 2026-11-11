@@ -133,6 +133,14 @@ export interface Empresa {
      * continua sendo "porta a bater" sem hora (PRD RF-AGE-01). Só tela.
      */
     horaNaVisita: boolean;
+    /**
+     * Toda a equipe recebe aviso, e a gestão vê quem não recebe (11/11/2026): a
+     * faixa "Ligar avisos" no alto do CRM, o "Testar aviso deste computador" no
+     * menu da conta, o registro de cada navegador no banco e Ajustes → Avisos
+     * ("Quem recebe avisos"). Só da Imova: no banco da KOMUNE a migração
+     * 20261111202000 não cria nada, e lá o convite de sempre continua.
+     */
+    avisosDaEquipe: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -212,6 +220,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       canalDeChegada: false,
       meuDiaNovo: false,
       horaNaVisita: false,
+      avisosDaEquipe: false,
     },
     privacidade: null,
     visual: {
@@ -260,6 +269,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       canalDeChegada: true,
       meuDiaNovo: true,
       horaNaVisita: true,
+      avisosDaEquipe: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',

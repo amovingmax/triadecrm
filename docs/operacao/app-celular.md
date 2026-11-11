@@ -122,5 +122,62 @@ Expo 58.0.11 com React Native 0.88.0, a primeira combinação do SDK 58 com o Re
 5. Push: mensagem nova, conversa transferida, compromisso marcado, lote para ligar, lembrete 30 min antes e resumo às 8h.
    - **Ligação pelo WhatsApp (Imova):** desde 06/11/2026 o app avisa "Fulano está ligando pelo WhatsApp" enquanto toca (aviso comum, uns 10 segundos depois de começar; o toque abre a conversa) e "Ligação perdida" quando ninguém atende.
    - **Próximo, pedido do usuário em 06/11/2026 ("em breve estaremos utilizando"): a tela de chamada igual à do WhatsApp.** Tocar com o celular bloqueado, em tela cheia, com Atender e Recusar, e falar pelo próprio app. Exige parte nativa nova na casca: aviso de voz da Apple (PushKit/VoIP, mandado direto à Apple, não pelo serviço do Expo), a tela de chamada do iPhone (CallKit) e o áudio da ligação no nativo (WebRTC), porque a página dentro do app dorme com o celular bloqueado. É uma versão nova do app no TestFlight, com teste entre celulares nossos. A Apple exige que todo aviso de voz abra a tela de chamada, então ele só serve para ligação. Vale para a Imova; na KOMUNE a ligação que chega pela Twilio não toca para ninguém.
-6. Teste com a equipe: build de desenvolvimento e TestFlight pelo EAS (conta Expo), teste fechado do Google Play.
+6. Teste com a equipe: build de desenvolvimento e TestFlight pelo EAS (conta Expo), teste fechado do Google Play. Na Imova, o passo a passo para pôr cada pessoa no TestFlight e conferir quem recebe está em "Como a equipe da Imova passa a receber os avisos", abaixo.
 7. Distribuição privada: Apple Business Manager e teste fechado.
+
+## Como a equipe da Imova passa a receber os avisos
+
+Gargalo da revisão de 11/11/2026: o app só estava no iPhone do dono, o e-mail de aviso estava desligado e cada computador só avisava se alguém tivesse ligado a notificação do navegador. Ninguém sabia quem estava recebendo. Pedido: "Instalar o app em toda a equipe ou, no mínimo, ligar a notificação do navegador em cada computador."
+
+São dois caminhos, e o ideal é cada pessoa ter os dois: o **celular** avisa com o CRM fechado; o **computador** avisa enquanto houver uma aba do CRM aberta, mesmo minimizada ou atrás de outra. A gestão confere quem está em cada um em **Ajustes → Avisos** (passo 3).
+
+### 1. No celular: pôr cada pessoa no TestFlight (passo do dono)
+
+Só iPhone: o Android ainda não tem build. Quem faz é o Titular da conta Apple, ou alguém com papel de Admin ou App Manager na App Store Connect.
+
+**Interno ou externo?** Os dois servem para a equipe.
+- **Testador interno:** até 100 pessoas, sem revisão da Apple, e o build novo chega na hora. A pessoa precisa antes ser usuária da App Store Connect da conta: em **Usuários e Acesso**, convide pelo e-mail, com o papel de menos acesso (por exemplo, Marketing) e só o app do Tríade. Ela aceita esse convite de usuário primeiro.
+- **Testador externo:** só o e-mail, sem dar acesso à conta. O primeiro build de cada versão passa pela revisão de teste da Apple (costuma levar um dia) antes de o convite sair.
+
+**O dono, na App Store Connect** (appstoreconnect.apple.com):
+1. **Apps → Tríade → TestFlight.**
+2. Interno: em **Testes internos**, abra o grupo **Equipe** e toque em **+** ao lado de Testadores; escolha a pessoa (ela já tem de estar em Usuários e Acesso).
+   Externo: em **Testes externos**, crie um grupo (por exemplo, "Equipe Imova"), acrescente o build mais novo (hoje o 0.2.0 (6)), mande para a revisão se a Apple pedir e, em **Testadores**, acrescente a pessoa pelo nome e e-mail.
+3. A Apple manda o convite por e-mail para a pessoa.
+
+**A pessoa, no iPhone dela:**
+1. Instala o app **TestFlight** pela App Store.
+2. Abre o e-mail do convite no próprio iPhone e toca em **Ver no TestFlight**. Toca em **Aceitar** e depois em **Instalar**.
+3. Abre o **Tríade**, escolhe **Imova** e entra com o Google do e-mail que tem acesso ao CRM.
+4. Quando o iPhone perguntar se o Tríade pode mandar notificações, toca em **Permitir**. Se recusou: Ajustes do iPhone → Notificações → Tríade → Permitir Notificações.
+5. Confere no menu com o nome dela → **Avisos no celular**: "Mensagem nova" ligado.
+
+**Cuidados:**
+- Build do TestFlight vale **90 dias**. O 0.2.0 (6), de 06/11/2026, para de abrir no começo de fevereiro de 2027: antes disso, monte e envie um build novo pelo EAS. O site não precisa de versão nova para isso.
+- Os avisos do app dependem da chave de avisos da Apple "Aurora push" (veja o CHANGELOG de 06/11/2026). Se ela for trocada, o app para de receber sem erro na tela.
+- A chave geral `app_settings['avisos.push'].ativo = false` desliga os avisos do app para todos; Ajustes → Avisos mostra isso no alto.
+
+### 2. No computador: ligar a notificação do navegador (cada pessoa, uma vez por computador)
+
+1. Abra o CRM da Imova no navegador em que você atende: Google Chrome, Edge ou Safari do Mac.
+2. No alto do CRM aparece a faixa **"Ligue os avisos deste computador para saber na hora quando um cliente escreve"**. Clique em **Ligar avisos** e, na pergunta do navegador, em **Permitir**. A faixa some.
+   - Sem a faixa? Ela não aparece em Conversas nem nos três dias seguintes a um "Agora não". O mesmo pedido está no menu com o seu nome: **Ativar avisos neste navegador**.
+3. No menu com o seu nome, clique em **Testar aviso deste computador**: aparece uma notificação "Imova · Aviso de teste" no canto da tela e toca o som do CRM. Nada é gravado e ninguém mais é avisado.
+4. A notificação não apareceu?
+   - **Mac:** Ajustes do Sistema → Notificações → Google Chrome (ou o navegador que você usa): "Permitir notificações" ligado. Confira também se o Foco (Não perturbe) está desligado.
+   - **Windows:** Configurações → Sistema → Notificações: o navegador ligado, e o "Não incomodar" desligado.
+5. Clicou em Bloquear sem querer? A faixa passa a dizer que o navegador bloqueou os avisos e mostra **Como desbloquear**, com o passo a passo do navegador que você está usando (no Chrome: ícone à esquerda do endereço → Notificações → Permitir → recarregar a página).
+6. Para o aviso sair com o nome e o ícone do Tríade, e não do Chrome, use **Instalar o Tríade neste computador**, no mesmo menu (no Mac, o app instalado pede a permissão de novo).
+
+O aviso do computador **só sai com o CRM aberto** em alguma aba, como o usuário pediu em 29/10/2026. Com o navegador fechado, quem avisa é o celular.
+
+### 3. Conferir quem recebe (admin e gestor)
+
+**Ajustes → Avisos → "Quem recebe avisos"** (só na Imova). Uma linha por pessoa ativa que atende (admin, gestor e SDR), quem não recebe nada primeiro:
+- **Celular:** o app registrado para a pessoa, com o aviso de mensagem nova ligado, e o último sinal (a última vez que o app abriu). "App instalado, sem o aviso de mensagem nova" é quem desligou em Avisos no celular.
+- **Computador:** quantos navegadores estão com o aviso ligado, e o último sinal (a última vez que o CRM abriu ali). Embaixo, o que falta em cada um: "Chrome no Windows: notificação bloqueada no navegador", "avisos silenciados no menu", "avisa, sem som".
+- **Situação:** "Recebe no celular e no computador", "Só no computador", "Só no celular" ou **"Não recebe aviso nenhum"**, em destaque.
+
+Como o computador entra na conta: cada navegador conta ao banco se avisa quando o CRM abre, quando a pessoa volta para a aba e quando ela liga, bloqueia, silencia ou tira o som; o mesmo estado vai no máximo uma vez por hora (`public.avisos_registrar_navegador`, migração `20261111202000`). Vai só o necessário: um id sorteado pelo navegador, a permissão, o som, o silêncio, um rótulo como "Chrome no Mac" e a hora. Navegador sem sinal há 30 dias deixa de contar. Por isso **um computador só aparece depois de a pessoa abrir o CRM nele** com o site novo no ar.
+
+Não muda nada na KOMUNE: a faixa, o teste, o registro e a aba Avisos são do módulo `avisosDaEquipe`, e a migração não cria nada no banco dela.

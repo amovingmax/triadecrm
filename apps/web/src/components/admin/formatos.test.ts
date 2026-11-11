@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { EMPRESA } from '@/lib/empresa';
+
 import {
   diaDaSemana,
   diferencas,
@@ -11,7 +13,7 @@ import {
   rotuloDaTabela,
   rotuloDoSilencio,
 } from './formatos';
-import { abaDaUrl, catalogoDaUrl, lgpdDaUrl } from './tipos';
+import { ABAS, ABAS_DA_EMPRESA, abaDaUrl, catalogoDaUrl, lgpdDaUrl } from './tipos';
 
 describe('datas do fuso de Natal', () => {
   it('não empurra a data pura para o dia anterior', () => {
@@ -94,6 +96,14 @@ describe('aba e seção vindas da URL', () => {
     expect(abaDaUrl('lgpd')).toBe('lgpd');
     expect(abaDaUrl('inventada')).toBe('pessoas');
     expect(abaDaUrl(undefined)).toBe('pessoas');
+  });
+
+  it('a aba Avisos só abre onde o módulo existe (11/11/2026, só na Imova)', () => {
+    // Os testes rodam como KOMUNE, a empresa sem a variável.
+    expect(EMPRESA.modulos.avisosDaEquipe).toBe(false);
+    expect(abaDaUrl('avisos')).toBe('pessoas');
+    expect(ABAS_DA_EMPRESA.map((a) => a.id)).not.toContain('avisos');
+    expect(ABAS.map((a) => a.id)).toContain('avisos');
   });
 
   it('só lê a seção quando ela pertence à aba', () => {
