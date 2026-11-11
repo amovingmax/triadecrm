@@ -60,6 +60,17 @@ describe('ehRotaPublica', () => {
     expect(ehRotaPublica('/privacidades', EMPRESAS.imova)).toBe(false);
   });
 
+  it('o suporte e a política do app abrem sem sessão nas duas empresas, e só eles', () => {
+    for (const empresa of [EMPRESAS.komune, EMPRESAS.imova]) {
+      expect(ehRotaPublica('/aplicativo', empresa)).toBe(true);
+      expect(ehRotaPublica('/aplicativo/privacidade', empresa)).toBe(true);
+      expect(ehRotaPublica('/aplicativo/outra', empresa)).toBe(false);
+      expect(ehRotaPublica('/aplicativos', empresa)).toBe(false);
+      expect(ehRotaPublica('/aplicativo/privacidade/x', empresa)).toBe(false);
+    }
+    expect(destinoSeguro('/aplicativo')).toBe(ROTA_INICIAL);
+  });
+
   it('não confunde /c/ com uma rota que apenas começa com "c"', () => {
     expect(ehRotaPublica('/conversas')).toBe(false);
     expect(ehRotaPublica('/c')).toBe(false);
