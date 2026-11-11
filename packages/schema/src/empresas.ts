@@ -148,6 +148,14 @@ export interface Empresa {
      * Imova: no banco da KOMUNE as funções do Calendly não existem.
      */
     calendly: boolean;
+    /**
+     * A espera em degraus (11/11/2026): "15 min sem resposta avisa quem atende;
+     * 1 h avisa a gestão". O cartão, o som e a notificação do sistema no
+     * computador (`components/avisos/vigia-de-espera`), com a mesma regra do
+     * aviso no celular (`public.esperas_para_avisar`). Só da Imova: no banco da
+     * KOMUNE a migração 20261111200000 não cria as funções da espera.
+     */
+    esperaEmDegraus: boolean;
   };
   /**
    * A política de privacidade pública, em `/privacidade`. É o link que a Meta pede para
@@ -229,6 +237,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       horaNaVisita: false,
       avisosDaEquipe: false,
       calendly: false,
+      esperaEmDegraus: false,
     },
     privacidade: null,
     visual: {
@@ -279,6 +288,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       horaNaVisita: true,
       avisosDaEquipe: true,
       calendly: true,
+      esperaEmDegraus: true,
     },
     privacidade: {
       controlador: 'Imova Imobiliária',
