@@ -13,7 +13,7 @@ import {
 
 /**
  * O que a folha "Enviar link da agenda" pede ao banco (11/11/2026, só na Imova;
- * migração 20261111210000, do agente do convite). Nenhuma regra aqui: a prévia e o
+ * migração 20261112160000, do agente do convite). Nenhuma regra aqui: a prévia e o
  * envio são funções do Postgres que conferem quem pode, a janela e a porteira, e
  * devolvem `{ ok, motivo }`. Nada de texto do banco chega à tela.
  */

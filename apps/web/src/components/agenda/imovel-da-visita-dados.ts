@@ -16,7 +16,7 @@ import {
 
 /**
  * O que a tela pede ao banco sobre o imóvel da visita (11/11/2026, só na Imova,
- * módulo `agendaComImovel`; migração 20261111210000, do agente do convite).
+ * módulo `agendaComImovel`; migração 20261112160000, do agente do convite).
  *
  * Toda escrita é função do Postgres, que confere quem pode e devolve `{ ok, motivo }`:
  * `visita_marcar_com_imovel` (a visita nova, que chama a `visita_marcar` de sempre e

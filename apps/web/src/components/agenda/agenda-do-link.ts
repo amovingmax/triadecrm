@@ -9,7 +9,7 @@ import { lerAgendaDoLink, type AgendaDoLink } from './efeito-no-calendly';
 
 /**
  * A agenda que o link do Calendly oferece, e se o espelho no Google está ligado
- * (`public.calendly_agenda_do_link`, migração 20261111211000, só na Imova). Serve
+ * (`public.calendly_agenda_do_link`, migração 20261112161000, só na Imova). Serve
  * para o diálogo de cancelar dizer o efeito no Calendly só quando ele existe.
  *
  * Fora da Imova não vai ao banco. Banco sem a função, ou erro: nulo, e a tela só
