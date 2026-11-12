@@ -8,7 +8,9 @@
  * O lead que conta é o que ESCREVEU pelo portal (chat, formulário, pedido de
  * visita ou mensagem sem tipo): o banco grava `portal_leads.escreveu_em` (migração
  * 20261111120000). Quem clicou no WhatsApp do anúncio e mandou mensagem por lá
- * já avisa pelo aviso de mensagem nova, e quem só clicou não escreveu nada.
+ * já avisa pelo aviso de mensagem nova, e quem só clicou não escreveu nada. O
+ * lead que nasce dessa conversa (12/11/2026, "Mensagem no WhatsApp") também não
+ * avisa: `lerLeadsQueEscreveram` o deixa de fora.
  */
 
 /** O que o lead fez no portal, na mesma ordem e com as mesmas palavras do aviso do celular. */

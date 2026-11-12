@@ -38,10 +38,11 @@ import { fraseDaRecusa } from '../tipos';
 import { assumirLead, mudarLead } from './leads-dados';
 import {
   chegouEm,
-  comoChegou,
+  comoChegouOLead,
   contatoApagaEm,
   dataDoLead,
   dataHoraDoLead,
+  ehLeadDoWhatsapp,
   escreveuNoPortal,
   marcaRespondidoAMao,
   nomeDoLead,
@@ -52,6 +53,7 @@ import {
   recebidoHa,
   respostaDoLead,
   rotuloDaTransacao,
+  rotuloDoPortal,
   rotuloDoTipo,
   SITUACOES_DO_LEAD,
   tiposDoLead,
@@ -131,7 +133,10 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
   const tipos = tiposDoLead(lead.tipos);
   const chegou = chegouEm(lead);
   const clicou = quandoChegou(lead);
-  const como = comoChegou(lead.chegou_por);
+  const como = comoChegouOLead(lead);
+  // 12/11/2026: o lead que nasceu da conversa (o texto do anúncio no WhatsApp).
+  const doWhatsapp = ehLeadDoWhatsapp(lead);
+  const portal = rotuloDoPortal(lead.portal);
   const resposta = respostaDoLead(lead, agora);
   const primeira = primeiraMensagemDoLead(lead);
   const transacao = rotuloDaTransacao(lead.transacao);
@@ -196,7 +201,8 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
         </SheetTitle>
         {noPortal ? (
           <p className="text-sm text-muted-foreground">
-            No portal: <span className="text-foreground">{noPortal}</span>
+            {doWhatsapp ? 'No WhatsApp' : 'No portal'}:{' '}
+            <span className="text-foreground">{noPortal}</span>
           </p>
         ) : null}
         <SheetDescription>
@@ -352,8 +358,20 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
         </Bloco>
 
         <Bloco titulo={mandou ? 'Como chegou' : 'O que tocou no anúncio'}>
-          {mandou ? <ComoChegou chegouPor={lead.chegou_por} className="text-sm" /> : null}
-          {mandou && tipos.length > 0 ? (
+          {mandou ? <ComoChegou lead={lead} className="text-sm" /> : null}
+          {doWhatsapp ? (
+            <p className="text-xs text-muted-foreground">
+              O canal de chegada da conversa diz que a pessoa veio do anúncio
+              {portal ? ` no ${portal}` : ' num portal'}: o texto pronto do botão de WhatsApp, ou a
+              correção de alguém do time.
+            </p>
+          ) : null}
+          {!doWhatsapp && portal ? (
+            <p className="text-xs text-muted-foreground">
+              Do {portal}, pelo canal de chegada da conversa de WhatsApp da mesma pessoa.
+            </p>
+          ) : null}
+          {mandou && !doWhatsapp && tipos.length > 0 ? (
             <p className="text-xs text-muted-foreground">
               No anúncio: {tipos.map((t) => rotuloDoTipo(t)).join(' · ')}
             </p>
@@ -411,9 +429,12 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
 
         <Bloco titulo="Quando">
           <dl className="flex flex-col gap-2 text-sm">
-            <Linha rotulo={pelaConversa || !mandou ? 'Clicou' : 'Pediu contato'}>
-              {dataHoraDoLead(clicou)}
-            </Linha>
+            {/* O lead do WhatsApp não clicou em nada que o portal tenha avisado. */}
+            {doWhatsapp ? null : (
+              <Linha rotulo={pelaConversa || !mandou ? 'Clicou' : 'Pediu contato'}>
+                {dataHoraDoLead(clicou)}
+              </Linha>
+            )}
             {pelaConversa ? <Linha rotulo="1ª mensagem">{dataHoraDoLead(chegou)}</Linha> : null}
             {lead.respondido_em ? (
               <Linha rotulo="1ª resposta">
@@ -451,6 +472,8 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
  */
 function ContatoDoLead({ lead }: { lead: LeadDoPortal }) {
   const comFicha = Boolean(lead.organization_id);
+  const doWhatsapp = ehLeadDoWhatsapp(lead);
+  const semDado = comFicha ? null : doWhatsapp ? 'O WhatsApp não traz' : 'O portal não mandou';
   if (!comFicha && lead.suprimido) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -462,8 +485,9 @@ function ContatoDoLead({ lead }: { lead: LeadDoPortal }) {
   if (!comFicha && lead.contato_apagado_em) {
     return (
       <p className="text-sm text-muted-foreground">
-        O contato que o portal mandou foi apagado em {dataDoLead(lead.contato_apagado_em)}, 90 dias
-        depois do aviso. Ficam o anúncio, o que a pessoa tocou e a data.
+        {doWhatsapp
+          ? `O telefone guardado com o lead foi apagado em ${dataDoLead(lead.contato_apagado_em)}, 90 dias depois da mensagem. A conversa continua em Conversas.`
+          : `O contato que o portal mandou foi apagado em ${dataDoLead(lead.contato_apagado_em)}, 90 dias depois do aviso. Ficam o anúncio, o que a pessoa tocou e a data.`}
       </p>
     );
   }
@@ -479,18 +503,14 @@ function ContatoDoLead({ lead }: { lead: LeadDoPortal }) {
           {lead.phone_e164 ? (
             <TelefoneDoLead lead={lead} />
           ) : (
-            <span className="text-muted-foreground">
-              {comFicha ? 'Sem telefone na ficha' : 'O portal não mandou'}
-            </span>
+            <span className="text-muted-foreground">{semDado ?? 'Sem telefone na ficha'}</span>
           )}
         </Linha>
         <Linha rotulo="E-mail">
           {lead.email ? (
             <span className="break-all">{lead.email}</span>
           ) : (
-            <span className="text-muted-foreground">
-              {comFicha ? 'Sem e-mail na ficha' : 'O portal não mandou'}
-            </span>
+            <span className="text-muted-foreground">{semDado ?? 'Sem e-mail na ficha'}</span>
           )}
         </Linha>
       </dl>

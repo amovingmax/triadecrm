@@ -26,6 +26,7 @@ import {
   chegouEm,
   codigoDoAnuncioDoLead,
   comoChegou,
+  comoChegouOLead,
   contagemPorSituacao,
   cortarMensagem,
   dataHoraDoLead,
@@ -33,6 +34,7 @@ import {
   ehJeitoDeChegar,
   filtrarLeads,
   FILTROS_INICIAIS,
+  jeitoDeChegar,
   JEITOS_DE_CHEGAR,
   nomeDoLead,
   origemDoLead,
@@ -85,6 +87,10 @@ function useAgora(passoMs = 60_000): Date {
  * um. Quem tocou no WhatsApp, em "ver telefone" ou em agendar e não escreveu
  * fica em "Clicaram e não chamaram": sem ficha e sem conversa, para a equipe
  * ligar; o contato que o portal mandou some 90 dias depois.
+ *
+ * Desde 12/11/2026, quem manda o texto pronto do anúncio no WhatsApp entra
+ * sozinho, mesmo sem o aviso do Grupo OLX: é a "Mensagem no WhatsApp" ("WhatsApp
+ * pelo ZAP Imóveis"), com o filtro e a conta próprios.
  *
  * No computador é uma tabela; no celular, cartões. Tocar abre a ficha do lead
  * (`ficha-do-lead.tsx`), com as ações. O filtro de anúncio vem da URL
@@ -242,6 +248,7 @@ export function TelaLeads({
           <ResumoPorAnuncio
             anuncios={porAnuncio.anuncios}
             leadCerto={porAnuncio.leadCerto}
+            whatsapp={porAnuncio.whatsapp}
             aoEscolher={escolherAnuncio}
           />
         ) : null}
@@ -268,7 +275,7 @@ export function TelaLeads({
       ) : leads.length === 0 ? (
         <Vazio
           titulo="Nenhum lead ainda."
-          texto="Quem mandar mensagem por um anúncio no ZAP Imóveis, Viva Real ou OLX aparece aqui assim que o Grupo OLX liberar a integração de leads do CRM."
+          texto="Quem mandar mensagem por um anúncio no ZAP Imóveis, Viva Real ou OLX aparece aqui: pelo WhatsApp, assim que o CRM reconhece o texto do anúncio na conversa; pelo chat, formulário ou pedido de visita do portal, quando o Grupo OLX liberar a integração de leads do CRM."
         >
           <Button asChild variant="outline" className="toque h-11 md:h-9">
             <Link href="/anuncios">Ver os anúncios</Link>
@@ -515,10 +522,13 @@ function Duracao({ texto }: { texto: string }) {
 function ResumoPorAnuncio({
   anuncios,
   leadCerto,
+  whatsapp,
   aoEscolher,
 }: {
   anuncios: ResumoDoAnuncio[];
   leadCerto: number;
+  /** Dos que mandaram mensagem, quantos nasceram da conversa ("Mensagem no WhatsApp"). */
+  whatsapp: number;
   aoEscolher: (codigo: string) => void;
 }) {
   const numeroDeAnuncios = anuncios.filter((a) => a.codigo !== null).length;
@@ -579,7 +589,14 @@ function ResumoPorAnuncio({
                       <span className="block truncate text-xs text-muted-foreground">{titulo}</span>
                     ) : null}
                   </td>
-                  <NumeroDoResumo valor={a.mensagem} />
+                  <NumeroDoResumo
+                    valor={a.mensagem}
+                    titulo={
+                      a.whatsapp > 0
+                        ? `${a.whatsapp} pela mensagem no WhatsApp (o texto do anúncio)`
+                        : undefined
+                    }
+                  />
                   <NumeroDoResumo valor={a.clicou} />
                   <NumeroDoResumo valor={a.semResposta} destaque ultima />
                 </tr>
@@ -588,6 +605,12 @@ function ResumoPorAnuncio({
           </tbody>
         </table>
       )}
+      {whatsapp > 0 ? (
+        <p className="border-t border-hairline px-4 py-2 text-xs text-muted-foreground">
+          Mensagem no WhatsApp: <span className="numerico">{whatsapp}</span> dos que mandaram
+          mensagem chegaram pelo texto do anúncio, que o CRM reconheceu na conversa.
+        </p>
+      ) : null}
       {leadCerto > 0 ? (
         <p className="border-t border-hairline px-4 py-2 text-xs text-muted-foreground">
           Fora da conta: <span className="numerico">{leadCerto}</span> Lead Certo (a pessoa viu um
@@ -625,13 +648,17 @@ function NumeroDoResumo({
   valor,
   destaque = false,
   ultima = false,
+  titulo,
 }: {
   valor: number;
   destaque?: boolean;
   ultima?: boolean;
+  /** A dica ao passar o mouse ("2 pela mensagem no WhatsApp"). */
+  titulo?: string;
 }) {
   return (
     <td
+      title={titulo}
       className={cn(
         'numerico py-2 pl-2 text-right',
         ultima ? 'pr-4' : 'pr-2',
@@ -811,7 +838,7 @@ function TabelaDeLeads({
                   ) : null}
                 </td>
                 <td className="px-3 py-3">
-                  <ComoChegou chegouPor={lead.chegou_por} />
+                  <ComoChegou lead={lead} />
                 </td>
                 <td className="px-3 py-3">
                   <AnuncioDaLinha lead={lead} comLink />
@@ -857,7 +884,7 @@ function CartoesDeLeads({
         const { nome, semNome } = nomeDoLead(lead);
         const telefone = telefoneDaLinha(lead);
         const titulo = tituloCurto(lead.anuncio_titulo, 40);
-        const jeito = ehJeitoDeChegar(lead.chegou_por) ? lead.chegou_por : null;
+        const jeito = jeitoDeChegar(lead);
         return (
           <li key={lead.id}>
             <button
@@ -886,7 +913,7 @@ function CartoesDeLeads({
                   tipo={jeito ? TIPO_DA_CHEGADA[jeito] : null}
                   className="text-muted-foreground"
                 />
-                <span className="shrink-0">{comoChegou(jeito) ?? 'Mensagem'}</span>
+                <span className="shrink-0">{comoChegouOLead(lead) ?? 'Mensagem'}</span>
                 <span className="text-muted-foreground">·</span>
                 <span className="min-w-0 truncate text-muted-foreground">
                   {origemDoLead(lead).tipo === 'parecido' ? 'parecido com ' : ''}

@@ -13,6 +13,14 @@
  * assumir, descartar, o que conta); aqui ficam os rótulos, as contas do resumo e
  * os filtros que a tela faz sem ir ao servidor.
  *
+ * Desde 12/11/2026 (migração 20261112180000) o lead também nasce da CONVERSA:
+ * quem toca em "WhatsApp" no anúncio do ZAP ou do Viva Real manda o texto
+ * pronto do portal, o canal de chegada reconhece, e a chegada vira um lead com
+ * `origem = 'whatsapp'` e o tipo `WHATSAPP_DO_PORTAL` ("Mensagem no WhatsApp"),
+ * que diz de qual portal veio (`portal`). Ele não avisa como lead novo (a
+ * mensagem já avisou), e a lista mostra uma vez só a pessoa que também chegou
+ * pelo aviso do Grupo OLX.
+ *
  * Puro: sem React, sem Supabase. Testado em `leads-rotulos.test.ts`.
  */
 import { TIMEZONE } from '@komune/schema';
@@ -22,8 +30,21 @@ export type SituacaoDoLead = 'novo' | 'em_atendimento' | 'respondido' | 'descart
 /** `mensagem`: mandou mensagem (WhatsApp ou portal). `clicou`: só tocou. */
 export type GrupoDoLead = 'mensagem' | 'clicou';
 
-/** Por onde a primeira mensagem chegou. */
-export type ChegouPor = 'whatsapp' | 'chat' | 'formulario' | 'visita';
+/**
+ * Por onde a primeira mensagem chegou. `whatsapp_do_portal` não vem do banco
+ * (para ele, a mensagem chegou `whatsapp`): é o lead que nasceu da conversa,
+ * separado na tela por `jeitoDeChegar`.
+ */
+export type ChegouPor = 'whatsapp' | 'whatsapp_do_portal' | 'chat' | 'formulario' | 'visita';
+
+/** De qual portal veio (só o lead que nasce do WhatsApp sabe; o webhook não diz). */
+export type Portal = 'zap' | 'vivareal' | 'olx';
+
+/** A origem do lead que nasce da conversa de WhatsApp (o do webhook é 'grupo_olx'). */
+export const ORIGEM_WHATSAPP = 'whatsapp';
+
+/** O tipo que o CRM dá ao lead que nasce da conversa de WhatsApp. */
+export const TIPO_WHATSAPP_DO_PORTAL = 'WHATSAPP_DO_PORTAL';
 
 /**
  * Uma linha de `public.portal_leads_na_lista` (migrações 20261105100000 e
@@ -92,6 +113,11 @@ export type LeadDoPortal = {
   respondido_por_nome: string | null;
   /** Quando o contato que o portal mandou foi apagado (90 dias depois do aviso). */
   contato_apagado_em: string | null;
+  /**
+   * De qual portal veio: o do lead que nasceu do WhatsApp, ou o do par dele
+   * quando a lista mostra o aviso do Grupo OLX da mesma pessoa. null = não se sabe.
+   */
+  portal: Portal | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -130,8 +156,12 @@ export function ehTipoConhecido(tipo: string): tipo is TipoDeContato {
   return (TIPOS_DE_CONTATO as readonly string[]).includes(tipo);
 }
 
-/** "WhatsApp", "Pediu visita"...; o que o Grupo OLX inventar depois vira "Outro contato". */
+/**
+ * "WhatsApp", "Pediu visita"...; o tipo do CRM para o lead que nasce da conversa
+ * é "Mensagem no WhatsApp"; o que o Grupo OLX inventar depois vira "Outro contato".
+ */
 export function rotuloDoTipo(tipo: string): string {
+  if (tipo === TIPO_WHATSAPP_DO_PORTAL) return 'Mensagem no WhatsApp';
   return ehTipoConhecido(tipo) ? ROTULO_DO_TIPO[tipo] : 'Outro contato';
 }
 
@@ -168,10 +198,17 @@ export function escreveuNoPortal(tipos: readonly string[] | null | undefined): b
 // Como chegou e a primeira mensagem
 // ---------------------------------------------------------------------------
 
-export const JEITOS_DE_CHEGAR: readonly ChegouPor[] = ['whatsapp', 'chat', 'formulario', 'visita'];
+export const JEITOS_DE_CHEGAR: readonly ChegouPor[] = [
+  'whatsapp',
+  'whatsapp_do_portal',
+  'chat',
+  'formulario',
+  'visita',
+];
 
 const ROTULO_DA_CHEGADA: Record<ChegouPor, string> = {
   whatsapp: 'Pelo WhatsApp',
+  whatsapp_do_portal: 'WhatsApp pelo portal',
   chat: 'Pelo chat do portal',
   formulario: 'Pelo formulário do portal',
   visita: 'Pediu visita pelo portal',
@@ -180,6 +217,7 @@ const ROTULO_DA_CHEGADA: Record<ChegouPor, string> = {
 /** O tipo do Grupo OLX de cada jeito de chegar: é dele o ícone. */
 export const TIPO_DA_CHEGADA: Record<ChegouPor, TipoDeContato> = {
   whatsapp: 'CLICK_WHATSAPP',
+  whatsapp_do_portal: 'CLICK_WHATSAPP',
   chat: 'CONTACT_CHAT',
   formulario: 'CONTACT_FORM',
   visita: 'VISIT_REQUEST',
@@ -192,6 +230,52 @@ export function ehJeitoDeChegar(valor: string | null | undefined): valor is Cheg
 /** "Pelo WhatsApp", "Pelo chat do portal"...; null quando não mandou mensagem. */
 export function comoChegou(chegouPor: string | null | undefined): string | null {
   return ehJeitoDeChegar(chegouPor) ? ROTULO_DA_CHEGADA[chegouPor] : null;
+}
+
+const ROTULO_DO_PORTAL: Record<Portal, string> = {
+  zap: 'ZAP Imóveis',
+  vivareal: 'Viva Real',
+  olx: 'OLX',
+};
+
+function ehPortal(valor: string | null | undefined): valor is Portal {
+  return valor === 'zap' || valor === 'vivareal' || valor === 'olx';
+}
+
+/** "ZAP Imóveis", "Viva Real", "OLX"; null quando não se sabe. */
+export function rotuloDoPortal(portal: string | null | undefined): string | null {
+  return ehPortal(portal) ? ROTULO_DO_PORTAL[portal] : null;
+}
+
+/** O lead nasceu da conversa de WhatsApp (o canal de chegada reconheceu o portal)? */
+export function ehLeadDoWhatsapp(lead: Pick<LeadDoPortal, 'origem' | 'tipos'>): boolean {
+  return lead.origem === ORIGEM_WHATSAPP || (lead.tipos ?? []).includes(TIPO_WHATSAPP_DO_PORTAL);
+}
+
+/**
+ * Por onde chegou, como a tela separa: o lead que nasceu da conversa é
+ * `whatsapp_do_portal`; os outros, o `chegou_por` do banco.
+ */
+export function jeitoDeChegar(
+  lead: Pick<LeadDoPortal, 'chegou_por' | 'origem' | 'tipos'>,
+): ChegouPor | null {
+  if (ehLeadDoWhatsapp(lead)) return 'whatsapp_do_portal';
+  return ehJeitoDeChegar(lead.chegou_por) ? lead.chegou_por : null;
+}
+
+/**
+ * Como chegou, com o portal quando se sabe: "WhatsApp pelo ZAP Imóveis",
+ * "WhatsApp pela OLX", "Pelo chat do portal"...; null quando não mandou mensagem.
+ */
+export function comoChegouOLead(
+  lead: Pick<LeadDoPortal, 'chegou_por' | 'origem' | 'tipos' | 'portal'>,
+): string | null {
+  const jeito = jeitoDeChegar(lead);
+  const portal = rotuloDoPortal(lead.portal);
+  if (jeito === 'whatsapp_do_portal' && portal) {
+    return `WhatsApp ${lead.portal === 'olx' ? 'pela' : 'pelo'} ${portal}`;
+  }
+  return comoChegou(jeito);
 }
 
 /** O que a pessoa mandou quando a mensagem é mídia sem texto. */
@@ -317,6 +401,9 @@ export function origemDoLead(
 
 const CANAL_DA_CHEGADA: Record<ChegouPor, string> = {
   whatsapp: 'WhatsApp',
+  // O banco diz 'whatsapp' também para o lead que nasce da conversa; isto é só
+  // para quem passar o jeito da tela.
+  whatsapp_do_portal: 'WhatsApp',
   chat: 'Chat do portal',
   formulario: 'Formulário',
   visita: 'Pediu visita',
@@ -587,6 +674,8 @@ export type ResumoDoAnuncio = {
   codigo: string | null;
   titulo: string | null;
   mensagem: number;
+  /** Dos que mandaram mensagem, quantos nasceram da conversa ("Mensagem no WhatsApp"). */
+  whatsapp: number;
   clicou: number;
   semResposta: number;
 };
@@ -596,18 +685,27 @@ export type ResumoDoAnuncio = {
  * quantos só clicaram, e quantos dos que mandaram estão sem resposta. Os mesmos
  * recortes das duas listas (sem os descartados; quem pediu para não ser
  * contatado não entra em "clicaram"). O Lead Certo fica de fora e é contado à
- * parte: a pessoa não viu o anúncio, então ele não "rendeu" esse lead.
+ * parte: a pessoa não viu o anúncio, então ele não "rendeu" esse lead. Dos que
+ * mandaram mensagem, `whatsapp` conta os que nasceram da conversa (o texto do
+ * anúncio que o CRM reconheceu), por anúncio e no total.
  */
 export function resumoPorAnuncio(
   leads: readonly (ParaContar &
     Pick<
       LeadDoPortal,
-      'suprimido' | 'lead_certo' | 'anuncio_codigo' | 'client_listing_id' | 'anuncio_titulo'
+      | 'suprimido'
+      | 'lead_certo'
+      | 'anuncio_codigo'
+      | 'client_listing_id'
+      | 'anuncio_titulo'
+      | 'origem'
+      | 'tipos'
     >)[],
   agora: Date = new Date(),
-): { anuncios: ResumoDoAnuncio[]; leadCerto: number } {
+): { anuncios: ResumoDoAnuncio[]; leadCerto: number; whatsapp: number } {
   const porCodigo = new Map<string, ResumoDoAnuncio>();
   let leadCerto = 0;
+  let whatsapp = 0;
   for (const lead of leads) {
     if (lead.situacao === 'descartado') continue;
     const mandou = estaNoGrupo(lead, 'mensagem');
@@ -625,12 +723,17 @@ export function resumoPorAnuncio(
       codigo,
       titulo: null,
       mensagem: 0,
+      whatsapp: 0,
       clicou: 0,
       semResposta: 0,
     };
     linha.titulo ??= lead.anuncio_titulo?.trim() || null;
     if (mandou) {
       linha.mensagem += 1;
+      if (ehLeadDoWhatsapp(lead)) {
+        linha.whatsapp += 1;
+        whatsapp += 1;
+      }
       if (lead.situacao === 'novo') linha.semResposta += 1;
     } else {
       linha.clicou += 1;
@@ -645,7 +748,7 @@ export function resumoPorAnuncio(
       b.mensagem - a.mensagem ||
       (a.codigo ?? '').localeCompare(b.codigo ?? '', 'pt-BR'),
   );
-  return { anuncios, leadCerto };
+  return { anuncios, leadCerto, whatsapp };
 }
 
 /** "Todos" deixa os descartados de fora, como a lista de Anúncios faz com os excluídos. */
@@ -705,7 +808,7 @@ export function filtrarLeads<T extends LeadDoPortal>(
       if (fora) return false;
     }
     if (filtros.tipo && !tiposDoLead(lead.tipos).includes(filtros.tipo)) return false;
-    if (filtros.chegouPor && lead.chegou_por !== filtros.chegouPor) return false;
+    if (filtros.chegouPor && jeitoDeChegar(lead) !== filtros.chegouPor) return false;
     if (anuncio && codigoDoAnuncioDoLead(lead)?.toLowerCase() !== anuncio) return false;
     if (
       busca &&
