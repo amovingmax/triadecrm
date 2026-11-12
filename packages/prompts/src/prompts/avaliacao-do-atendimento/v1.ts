@@ -44,6 +44,9 @@ export const ACOES_DA_IA_NO_DIA = [
   'respondeu',
   'passou_para_pessoa',
   'marcou_visita',
+  // A IA manda o link da agenda em vez de marcar a visita (`atendente-imova@v3`,
+  // 12/11/2026; `ia_respostas.acao` = 'enviou_link', migração 20261112160000).
+  'enviou_link',
   'anotou',
   'nao_respondeu',
 ] as const;
@@ -75,6 +78,7 @@ const ROTULO_DA_ACAO: Readonly<Record<(typeof ACOES_DA_IA_NO_DIA)[number], strin
   respondeu: 'respondeu',
   passou_para_pessoa: 'passou para uma pessoa',
   marcou_visita: 'marcou visita',
+  enviou_link: 'mandou o link da agenda',
   anotou: 'anotou no caderno',
   nao_respondeu: 'decidiu não responder',
 };

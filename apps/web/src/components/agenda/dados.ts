@@ -3,6 +3,8 @@ import { carregarPessoasAcompanhadas } from '@/lib/auth/equipe';
 import type { Sessao } from '@/lib/auth/session';
 import { carregarContextoDoRegistro, type ContextoDoRegistro } from '@/components/registro/dados';
 
+import { etapaPedeHora } from './tipos';
+
 /**
  * O que o servidor entrega pronto para a Agenda.
  *
@@ -54,16 +56,5 @@ export async function carregarContextoDaAgenda(
 export function etapasQueMarcamHora(
   etapas: readonly { id: number; required_fields: unknown }[],
 ): number[] {
-  return etapas
-    .filter((etapa) =>
-      Array.isArray(etapa.required_fields)
-        ? etapa.required_fields.some(
-            (campo) =>
-              typeof campo === 'object' &&
-              campo !== null &&
-              (campo as { field?: unknown }).field === 'meeting_at',
-          )
-        : false,
-    )
-    .map((etapa) => etapa.id);
+  return etapas.filter((etapa) => etapaPedeHora(etapa.required_fields)).map((etapa) => etapa.id);
 }

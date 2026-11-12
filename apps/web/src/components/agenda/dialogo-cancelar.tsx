@@ -11,7 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { VOCABULARIO } from '@/lib/vocabulario';
 
+import { useAgendaDoLink } from './agenda-do-link';
+import { efeitoDeCancelarNoCalendly, fraseDoEmail } from './efeito-no-calendly';
 import { diaDoInstante, faixaDeHoras, rotuloDiaPorExtenso, type Compromisso } from './tipos';
 
 /**
@@ -19,7 +22,12 @@ import { diaDoInstante, faixaDeHoras, rotuloDiaPorExtenso, type Compromisso } fr
  *
  * O motivo vai para `reuniao_cancelar` (`p_motivo`), que já o aceitava e que a tela
  * não perguntava: daqui a um mês, "cancelada" sem porquê não ajuda ninguém a
- * entender o funil. O time continua sendo avisado por e-mail, como antes.
+ * entender o funil. O time continua sendo avisado por e-mail, como antes, onde há
+ * e-mail de reunião (`EMPRESA.modulos.emailDeReuniao`; na Imova, não há).
+ *
+ * Na Imova o diálogo diz também o efeito no Calendly (`efeito-no-calendly.ts`): a
+ * reunião que o cliente marcou é cancelada lá; a que a equipe marcou, na agenda que
+ * o link oferece e com o espelho ligado, libera o horário no link.
  *
  * Cancelar NÃO mexe no funil. Se o parceiro desistiu, isso é um desfecho, e se
  * registra pelo caminho de sempre.
@@ -67,6 +75,8 @@ function Conteudo({
   aoFechar: () => void;
 }) {
   const id = useId();
+  const agendaDoLink = useAgendaDoLink();
+  const noCalendly = efeitoDeCancelarNoCalendly(compromisso, agendaDoLink);
   const [motivo, setMotivo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
 
@@ -84,14 +94,15 @@ function Conteudo({
         <DialogTitle>Cancelar esta reunião?</DialogTitle>
         <DialogDescription>
           {compromisso.organizacao} · {rotuloDiaPorExtenso(diaDoInstante(compromisso.quando))},{' '}
-          <span className="numerico">{faixaDeHoras(compromisso)}</span>. O time é avisado por
-          e-mail.
+          <span className="numerico">{faixaDeHoras(compromisso)}</span>.{fraseDoEmail()}
           {/* Marcada pelo cliente no link: o cancelamento chega ao Calendly
               (`calendly_cancelamentos_pendentes` → `imova-worker-wa`), que avisa o
               cliente com uma frase fixa, e não com o motivo daqui. */}
           {compromisso.peloCalendly
             ? ' O Calendly cancela o agendamento e avisa o cliente por e-mail: o horário volta a ficar livre no link. O motivo fica só no CRM.'
-            : null}
+            : noCalendly
+              ? ` ${noCalendly}`
+              : null}
         </DialogDescription>
       </DialogHeader>
 
@@ -108,7 +119,7 @@ function Conteudo({
             setMotivo(e.target.value);
             setErro(null);
           }}
-          placeholder="Ex.: o parceiro pediu para deixar para o mês que vem"
+          placeholder={`Ex.: o ${VOCABULARIO.parceiro} pediu para deixar para o mês que vem`}
           aria-invalid={erro !== null}
           className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base md:text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         />

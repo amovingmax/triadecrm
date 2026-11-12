@@ -9,7 +9,9 @@ import {
   CircleCheck,
   CirclePause,
   CircleX,
+  ExternalLink,
   MapPin,
+  MapPinOff,
   PhoneOff,
   SquarePen,
   TriangleAlert,
@@ -22,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DiasSemContato } from '@/components/temperatura';
+import { VOCABULARIO } from '@/lib/vocabulario';
 
 import {
   faixaDeHoras,
@@ -35,6 +38,8 @@ import {
 import { type DesfechoCatalogo } from '@/components/registro/tipos';
 
 import { AcoesDaReuniao } from './acoes-da-reuniao';
+import { DefinirImovel } from './definir-imovel';
+import { FALTA_O_IMOVEL, linhaDoImovel, type ImovelDaVisita } from './imovel-da-visita';
 import { ROTULO_DA_RESPOSTA } from './lembrete-de-visita';
 import { ExcluirCompromisso } from './excluir-compromisso';
 
@@ -70,6 +75,11 @@ import { ExcluirCompromisso } from './excluir-compromisso';
  * ganhou saída, no fim da fileira (`excluir-compromisso.tsx`). A reunião de
  * verdade continua saindo pelo "Cancelar" dela. Vale a mesma régua de quem
  * mexe na reunião: a própria pessoa, e quem a acompanha.
+ *
+ * O IMÓVEL DA VISITA (11/11/2026, só na Imova): a linha de onde vira "IM0003 ·
+ * título do anúncio", que abre o anúncio, com o endereço embaixo, e o Maps busca
+ * por esse endereço. A visita sem imóvel ganha o selo "Falta o imóvel" e a ação
+ * "Definir imóvel", com a mesma régua de quem mexe. A reunião fica com o `local`.
  */
 export function CartaoCompromisso({
   compromisso,
@@ -142,8 +152,11 @@ export function CartaoCompromisso({
         </p>
 
         {/* Onde: a sala (pelo link) ou o endereço combinado. Na visita do Calendly,
-            é o endereço que o cliente escreveu ao marcar. */}
-        {onde ? (
+            é o endereço que o cliente escreveu ao marcar. Na visita da Imova com
+            imóvel, o código e o título do anúncio, e o endereço embaixo. */}
+        {ehVisita && compromisso.imovel ? (
+          <OndeDaVisita imovel={compromisso.imovel} />
+        ) : onde ? (
           <p className="flex items-start gap-1.5 text-xs text-foreground/80">
             {onde.formato === 'online' ? (
               <Video className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
@@ -217,6 +230,17 @@ export function CartaoCompromisso({
               Horário em conflito
             </Badge>
           ) : null}
+          {/* A visita da Imova sem imóvel (sem anúncio nem endereço). Vermelho como
+              o conflito: alguém precisa descobrir com o cliente onde é. */}
+          {compromisso.faltaImovel && !compromisso.concluido ? (
+            <Badge
+              variant="pilula"
+              className="gap-1 bg-destructive/10 font-normal text-destructive-texto"
+            >
+              <MapPinOff className="size-3" aria-hidden="true" />
+              {FALTA_O_IMOVEL}
+            </Badge>
+          ) : null}
           {compromisso.etapa ? (
             <span className="truncate text-xs text-muted-foreground">{compromisso.etapa}</span>
           ) : null}
@@ -225,8 +249,8 @@ export function CartaoCompromisso({
         {compromisso.naoContatar ? (
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <PhoneOff className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            Pediu para não ser contatado. Só dá para registrar o que não devolve este parceiro para
-            a fila.
+            Pediu para não ser contatado. Só dá para registrar o que não devolve este{' '}
+            {VOCABULARIO.parceiro} para a fila.
           </p>
         ) : null}
 
@@ -241,6 +265,13 @@ export function CartaoCompromisso({
           )
         ) : somenteLeitura ? (
           <div className="flex flex-wrap items-center gap-2 pt-1 empty:hidden">
+            {compromisso.faltaImovel && podeMexerNaReuniao ? (
+              <DefinirImovel
+                taskId={compromisso.taskId}
+                organizacao={compromisso.organizacao}
+                aoMudar={aoMudarReuniao ?? (() => {})}
+              />
+            ) : null}
             {ehVisita ? (
               <Button asChild variant="outline" size="lg" className="toque h-11 md:h-9">
                 <a href={linkDoMapa(compromisso)} target="_blank" rel="noopener noreferrer">
@@ -319,6 +350,15 @@ export function CartaoCompromisso({
               </>
             )}
 
+            {/* A visita sem imóvel ganha o imóvel aqui (só na Imova). */}
+            {compromisso.faltaImovel ? (
+              <DefinirImovel
+                taskId={compromisso.taskId}
+                organizacao={compromisso.organizacao}
+                aoMudar={aoMudarReuniao ?? (() => {})}
+              />
+            ) : null}
+
             {ehVisita ? (
               <Button asChild variant="outline" size="lg" className="toque h-11 md:h-9">
                 <a href={linkDoMapa(compromisso)} target="_blank" rel="noopener noreferrer">
@@ -347,6 +387,35 @@ export function CartaoCompromisso({
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * Onde é a visita da Imova (`visita_imoveis`): "IM0003 · Casa com 3 quartos" — que
+ * abre o anúncio no CRM — e o endereço embaixo, que é o que o botão do Maps busca.
+ */
+function OndeDaVisita({ imovel }: { imovel: ImovelDaVisita }) {
+  const linha = linhaDoImovel(imovel);
+  return (
+    <div className="flex items-start gap-1.5 text-xs text-foreground/80">
+      <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+      <div className="flex min-w-0 flex-col gap-0.5">
+        {imovel.anuncioId ? (
+          <Link
+            href={`/anuncios/${imovel.anuncioId}`}
+            title="Abrir o anúncio no CRM"
+            className="inline-flex min-w-0 items-start gap-1 font-medium break-words text-foreground outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <span className="min-w-0">{linha}</span>
+            <ExternalLink className="mt-0.5 size-3 shrink-0 opacity-70" aria-hidden="true" />
+            <span className="sr-only">: abrir o anúncio no CRM</span>
+          </Link>
+        ) : (
+          <span className="font-medium break-words text-foreground">{linha}</span>
+        )}
+        <span className="break-words">{imovel.endereco}</span>
+      </div>
+    </div>
   );
 }
 

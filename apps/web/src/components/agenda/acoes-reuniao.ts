@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { VOCABULARIO } from '@/lib/vocabulario';
 
 import { diaDoInstante, horaEmNatal, type Dia } from './tipos';
 
@@ -27,10 +28,10 @@ const RECADO: Record<string, string> = {
   horario_indisponivel: 'Esse horário não está mais livre.',
   horario_tomado: 'Esse horário acabou de ser ocupado.',
   sem_sala: 'Quem atende ainda não cadastrou a sala de reunião.',
-  suprimido: 'Este parceiro pediu para não ser contatado.',
-  negocio_invisivel: 'Seu perfil não vê o negócio deste parceiro.',
-  negocio_nao_existe: 'O negócio deste parceiro não existe mais. Recarregue a agenda.',
-  sem_dono: 'O negócio deste parceiro não tem responsável. Defina um na ficha antes de marcar.',
+  suprimido: `Este ${VOCABULARIO.parceiro} pediu para não ser contatado.`,
+  negocio_invisivel: `Seu perfil não vê o negócio deste ${VOCABULARIO.parceiro}.`,
+  negocio_nao_existe: `O negócio deste ${VOCABULARIO.parceiro} não existe mais. Recarregue a agenda.`,
+  sem_dono: `O negócio deste ${VOCABULARIO.parceiro} não tem responsável. Defina um na ficha antes de marcar.`,
   sem_lugar: 'Reunião presencial precisa do endereço.',
   formato_invalido: 'Escolha se a reunião é on-line ou presencial.',
   nao_acompanha: 'Você só marca na sua agenda ou na de quem você acompanha.',
@@ -196,6 +197,14 @@ export async function marcarVisita(p: {
     p_deal_id: p.dealId ?? undefined,
     p_dono: p.donoId ?? undefined,
   });
+  return resultadoDeVisita(data, error);
+}
+
+/**
+ * O retorno de `visita_marcar` — e de `visita_marcar_com_imovel` (Imova), que devolve
+ * o mesmo —, com os compromissos com que o horário bateu.
+ */
+export function resultadoDeVisita(data: unknown, error: unknown): ResultadoDeVisita {
   if (error) return { ok: false, motivo: 'erro_do_servidor', conflitos: [] };
   const r = (data ?? {}) as { ok?: boolean; motivo?: string; conflitos?: unknown };
   if (r.ok === true) return { ok: true };

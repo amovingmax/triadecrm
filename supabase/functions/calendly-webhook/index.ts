@@ -61,6 +61,8 @@ type Recebido = {
   situacao?: string;
   ficha?: string;
   conflitos?: number;
+  /** O convite do link (11/11/2026): valido, usado, expirado ou inexistente; nulo sem token. */
+  convite?: string | null;
 };
 
 // A chave anterior é opcional. `segredo()` não guarda a ausência, e sem esta
@@ -196,6 +198,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     situacao: recebido.situacao,
     ficha: recebido.ficha,
     conflitos: recebido.conflitos,
+    convite: recebido.convite ?? null,
     status: 200,
   });
   return json({ ok: true, duplicado: recebido.duplicado === true, situacao: recebido.situacao });

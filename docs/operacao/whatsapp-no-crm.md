@@ -319,7 +319,8 @@ corretor responsável, com prazo agora. Detalhe na migração `20261111206000` e
 `docs/CHANGELOG.md`.
 
 - **Quais visitas:** a visita com hora combinada (marcada no CRM ou pelo Calendly) e a
-  reunião presencial marcada ou confirmada (a visita que a IA e o Calendly marcam).
+  reunião presencial marcada ou confirmada (a visita que o Calendly marca, também pelo
+  link que a IA manda desde 11/11/2026).
   Ficam de fora a tarefa "a marcar", a cancelada, a on-line, a "a confirmar", quem
   pediu para sair, quem não tem WhatsApp e a conversa bloqueada.
 - **Quando:** a partir da hora de Ajustes (padrão 10h), para as visitas do dia

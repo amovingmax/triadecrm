@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { isAppRole, type AppRole } from '@/lib/auth/role';
+import { metricaNaEmpresa } from '@/lib/vocabulario';
 
 import type { Periodo } from './periodo';
 import type { LinhaProgresso } from './tipos';
@@ -66,7 +67,15 @@ export async function buscarProgresso(
   });
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as LinhaProgresso[];
+  // O rótulo e a fonte no vocabulário da empresa (na Imova, "Atendimentos" no lugar
+  // de "Portas abertas"); a conta continua a do banco.
+  return ((data ?? []) as LinhaProgresso[]).map((linha) => {
+    const { rotulo, fonte } = metricaNaEmpresa(linha.metrica, {
+      rotulo: linha.metrica_rotulo,
+      fonte: linha.fonte,
+    });
+    return { ...linha, metrica_rotulo: rotulo, fonte };
+  });
 }
 
 export type MetaParaSalvar = {
