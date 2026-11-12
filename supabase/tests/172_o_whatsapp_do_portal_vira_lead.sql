@@ -34,7 +34,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(89);
+select plan(111);
 
 insert into public.allowed_users (email, role, note) values
   ('w172.g@teste.local', 'gestor', 'pgTAP 172'),
@@ -582,6 +582,168 @@ select is(app.portal_lead_da_chegada(pg_temp.chegada(pg_temp.id('komune'))), 'fo
   'a função diz por quê');
 select is(app.portal_leads_do_whatsapp(), '{"ligada": false}'::jsonb, 'e a rotina não faz nada');
 select pg_temp.virar('imova');
+
+-- =====================================================================
+-- 10. O par só com o clique puro, do mesmo anúncio, e um por grupo
+-- =====================================================================
+-- Quantos da lista (como a gestão vê) estão entre estes ids.
+create function pg_temp.na_lista_entre(p_ids uuid[]) returns int language sql stable as $$
+  select count(*)::int from public.portal_leads_na_lista where id = any (p_ids)
+$$;
+grant execute on function pg_temp.na_lista_entre(uuid[]) to authenticated;
+create function pg_temp.webhook(p_chave text) returns uuid language sql stable as $$
+  select id from public.portal_leads where origem = 'grupo_olx' and origin_lead_id = p_chave
+$$;
+grant execute on function pg_temp.webhook(text) to authenticated;
+create function pg_temp.leads_do_anuncio(p_anuncio uuid) returns int language sql stable as $$
+  select leads from public.anuncios_na_lista where id = p_anuncio
+$$;
+grant execute on function pg_temp.leads_do_anuncio(uuid) to authenticated;
+create temp table t172_conta (chave text primary key, n int);
+grant select, insert on t172_conta to authenticated;
+
+-- a. A mensagem no WhatsApp pelo ZAP (PT0172) e, 10 minutos depois, um pedido de
+--    visita em OUTRO anúncio (TE0172): são dois contatos (cenário do revisor).
+select pg_temp.gestor();
+insert into t172_conta values ('te_antes', pg_temp.leads_do_anuncio(pg_temp.id('an_te')));
+select pg_temp.sair();
+select pg_temp.chegou('d', '+5584981720021', pg_temp.texto_zap('PT0172_IMOVA'), now() - interval '60 minutes');
+select pg_temp.receber('w172-visita', '84981720021', now() - interval '50 minutes', 'VISIT_REQUEST',
+                       '{"message": "Quero visitar sábado", "clientListingId": "TE0172"}'::jsonb)
+  is not null as webhook_gravou;
+select app.avisos_push_varrer_leads();
+select pg_temp.gestor();
+select is(pg_temp.na_lista_entre(array[pg_temp.lead_id(pg_temp.id('d')), pg_temp.webhook('w172-visita')]), 2,
+  'a visita pedida no portal não some atrás da mensagem no WhatsApp: os dois na lista');
+select is(pg_temp.leads_do_anuncio(pg_temp.id('an_te')), (select n from t172_conta where chave = 'te_antes') + 1,
+  'e a visita conta para o anúncio dela');
+select pg_temp.sair();
+select ok(exists (select 1 from app.push_fila f
+                   where f.tipo = 'lead_portal'
+                     and f.caminho = '/anuncios/leads?lead=' || pg_temp.webhook('w172-visita')),
+  'o aviso "pediu uma visita" abre esse lead, que a lista mostra');
+
+-- b. Clique puro, mas em outro anúncio: dois contatos.
+select pg_temp.chegou('e', '+5584981720022', pg_temp.texto_zap('PT0172_IMOVA'));
+select pg_temp.receber('w172-outro', '84981720022',
+                       (pg_temp.lead_de(pg_temp.id('e'))).escreveu_em - interval '5 minutes', 'CLICK_WHATSAPP',
+                       '{"clientListingId": "TE0172"}'::jsonb) is not null as webhook_gravou;
+select pg_temp.gestor();
+select is(pg_temp.na_lista_entre(array[pg_temp.lead_id(pg_temp.id('e')), pg_temp.webhook('w172-outro')]), 2,
+  'o clique no WhatsApp de outro anúncio não forma par');
+select pg_temp.sair();
+
+-- c. Clique puro sem o código do anúncio: forma par (um lado sem anúncio).
+select pg_temp.chegou('f', '+5584981720023', pg_temp.texto_zap('PT0172_IMOVA'));
+select pg_temp.receber('w172-semcod', '84981720023',
+                       (pg_temp.lead_de(pg_temp.id('f'))).escreveu_em - interval '5 minutes', 'CLICK_WHATSAPP',
+                       '{"clientListingId": null}'::jsonb) is not null as webhook_gravou;
+select pg_temp.gestor();
+select is(pg_temp.na_lista_entre(array[pg_temp.lead_id(pg_temp.id('f')), pg_temp.webhook('w172-semcod')]), 1,
+  'o clique sem código do anúncio forma par com a mensagem');
+select pg_temp.sair();
+
+-- d. Cadeia (cenário B do revisor): formulário em TE0172 (assumido), clique em
+--    PT0172 e a mensagem no WhatsApp em PT0172.
+select pg_temp.gestor();
+insert into t172_conta values ('b_te', pg_temp.leads_do_anuncio(pg_temp.id('an_te'))),
+                              ('b_pt', pg_temp.leads_do_anuncio(pg_temp.id('an_pt')));
+select pg_temp.sair();
+select pg_temp.receber('w172-b1', '84981720024', now() - interval '2 days 3 hours', 'CONTACT_FORM',
+                       '{"message": "Quero visitar o terreno", "clientListingId": "TE0172"}'::jsonb)
+  is not null as webhook_gravou;
+select pg_temp.receber('w172-b2', '84981720024', now() - interval '2 days 2 hours', 'CLICK_WHATSAPP')
+  is not null as webhook_gravou;
+select pg_temp.chegou('b', '+5584981720024', pg_temp.texto_zap('PT0172_IMOVA'));
+select pg_temp.gestor();
+select is((public.portal_lead_assumir(pg_temp.webhook('w172-b1'))) ->> 'ok', 'true', 'o gestor assume o formulário');
+select ok(pg_temp.na_lista_entre(array[pg_temp.webhook('w172-b1')]) = 1
+          and pg_temp.na_lista_entre(array[pg_temp.webhook('w172-b2'), pg_temp.lead_id(pg_temp.id('b'))]) = 1,
+  'o formulário aparece, e o clique com a mensagem aparecem uma vez (o vencedor do par não some por outro par)');
+select ok(pg_temp.leads_do_anuncio(pg_temp.id('an_te')) = (select n from t172_conta where chave = 'b_te') + 1
+          and pg_temp.leads_do_anuncio(pg_temp.id('an_pt')) = (select n from t172_conta where chave = 'b_pt') + 1,
+  'cada anúncio conta o seu: TE0172 o formulário, PT0172 a mensagem');
+select pg_temp.sair();
+
+-- e. Dois cliques puros e a mensagem: um grupo, um na lista; quem alguém mexeu fica.
+select pg_temp.chegou('h', '+5584981720025', pg_temp.texto_zap('PT0172_IMOVA'));
+select pg_temp.receber('w172-h1', '84981720025',
+                       (pg_temp.lead_de(pg_temp.id('h'))).escreveu_em - interval '30 minutes', 'CLICK_WHATSAPP')
+  is not null as webhook_gravou;
+select pg_temp.receber('w172-h2', '84981720025',
+                       (pg_temp.lead_de(pg_temp.id('h'))).escreveu_em - interval '10 minutes', 'CLICK_WHATSAPP')
+  is not null as webhook_gravou;
+select pg_temp.gestor();
+select is(pg_temp.na_lista_entre(array[pg_temp.lead_id(pg_temp.id('h')), pg_temp.webhook('w172-h1'),
+                                       pg_temp.webhook('w172-h2')]), 1,
+  'dois cliques e a mensagem da mesma pessoa e anúncio: um só na lista');
+select public.portal_lead_assumir(pg_temp.webhook('w172-h2'));
+select ok(pg_temp.na_lista_entre(array[pg_temp.webhook('w172-h2')]) = 1
+          and pg_temp.na_lista_entre(array[pg_temp.lead_id(pg_temp.id('h')), pg_temp.webhook('w172-h1')]) = 0,
+  'o que alguém assumiu é o que fica');
+select pg_temp.sair();
+
+-- =====================================================================
+-- 11. O código do anúncio não come o resto da frase
+-- =====================================================================
+select pg_temp.chegou('virgula', '+5584981720031',
+  'Olá! Tenho interesse que encontrei no Zap: https://www.zapimoveis.com.br/imovel/x-id-2812345678/. Código da oferta: TE0172, gostaria de visitar amanhã');
+select ok((pg_temp.lead_de(pg_temp.id('virgula'))).client_listing_id = 'TE0172'
+          and (pg_temp.lead_de(pg_temp.id('virgula'))).anuncio_id = pg_temp.id('an_te'),
+  '"TE0172, gostaria de visitar amanhã": o código é TE0172, com o anúncio');
+select pg_temp.chegou('colado', '+5584981720032',
+  'Olá! Tenho interesse em casa que encontrei no Zap. Código da oferta: PT0172_IMOVA.Obrigado');
+select ok((pg_temp.lead_de(pg_temp.id('colado'))).client_listing_id = 'PT0172_IMOVA'
+          and (pg_temp.lead_de(pg_temp.id('colado'))).anuncio_id = pg_temp.id('an_pt'),
+  '"PT0172_IMOVA.Obrigado": o ponto colado fecha o código');
+select pg_temp.chegou('palavra', '+5584981720033',
+  'Olá! Tenho interesse em terreno que encontrei no Zap. Código da oferta: TE0172 quero visitar');
+select ok((pg_temp.lead_de(pg_temp.id('palavra'))).client_listing_id = 'TE0172'
+          and (pg_temp.lead_de(pg_temp.id('palavra'))).anuncio_id = pg_temp.id('an_te'),
+  'sem pontuação, vale a primeira palavra que acha o anúncio');
+select pg_temp.chegou('brisa', '+5584981720034', pg_temp.texto_vivareal('Brisa Mall - Loja 072, obrigado'));
+select ok((pg_temp.lead_de(pg_temp.id('brisa'))).client_listing_id = 'Brisa Mall - Loja 072'
+          and (pg_temp.lead_de(pg_temp.id('brisa'))).anuncio_id = pg_temp.id('an_brisa'),
+  'o código com espaço do Canal Pro fica inteiro, sem o que vem depois da vírgula');
+select is(app.portal_codigo_no_texto('Código do anúncio: Terreno Bonor 10.000'), 'Terreno Bonor 10.000',
+  'o ponto entre algarismos é do código');
+select pg_temp.chegou('depois', '+5584981720035', pg_temp.texto_zap('CO0172'));
+select ok((pg_temp.lead_de(pg_temp.id('depois'))).client_listing_id = 'CO0172'
+          and (pg_temp.lead_de(pg_temp.id('depois'))).anuncio_id is null,
+  'código sem anúncio no CRM: o lead fica com o código, sem anúncio');
+with x as (insert into public.anuncios (codigo, titulo, negocio)
+           values ('CO0172', 'Loja 172', 'aluguel') returning id)
+insert into t172 select 'an_co', id from x;
+select app.portal_lead_da_chegada(pg_temp.chegada(pg_temp.id('depois')));
+select ok((pg_temp.lead_de(pg_temp.id('depois'))).anuncio_id = pg_temp.id('an_co')
+          and (pg_temp.lead_de(pg_temp.id('depois'))).transacao = 'RENT',
+  'o anúncio que entrou depois é ligado ao lead que estava sem nenhum');
+
+-- =====================================================================
+-- 12. O caminho até o primeiro lead conta o que a lista mostra
+-- =====================================================================
+select pg_temp.chegou('c', '+5584981720041', pg_temp.texto_zap('TE0172'), now() - interval '1 hour');
+select pg_temp.gestor();
+select public.chegada_marcar(pg_temp.chegada(pg_temp.id('c')), 'placa', 'texto_da_placa');
+select pg_temp.sair();
+select ok((pg_temp.lead_de(pg_temp.id('c'))).escondido_em is not null, 'o lead do WhatsApp desmarcado saiu da lista');
+select pg_temp.gestor();
+select is((public.anuncios_caminho_do_lead() -> 'leads' ->> 'total')::int,
+          (select count(*)::int from public.portal_leads_na_lista),
+  'o caminho conta os leads que a lista mostra (sem o escondido e com o par uma vez)');
+select ok(exists (select 1 from public.portal_leads_na_lista
+                   where id::text = public.anuncios_caminho_do_lead() -> 'leads' -> 'ultimo' ->> 'id'),
+  'e o último lead do caminho é um que a lista mostra');
+select pg_temp.sair();
+select is(pg_temp.leads_de(pg_temp.id('c')), 1, 'o lead escondido continua no banco (nada é apagado)');
+
+-- O gatilho põe 1 s de espera de trava só na parte do lead, e devolve o que havia.
+set local lock_timeout = '7s';
+select pg_temp.gestor();
+select public.chegada_marcar(pg_temp.chegada(pg_temp.id('c')), 'anuncios', 'portal_zap');
+select is(current_setting('lock_timeout'), '7s', 'o gatilho devolve o lock_timeout de antes');
+select pg_temp.sair();
+reset lock_timeout;
 
 -- =====================================================================
 -- 9. O WhatsApp não é tocado

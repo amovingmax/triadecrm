@@ -138,7 +138,9 @@ grant execute on function public.grupozap_lead_anotar_chamada(text, int, boolean
 -- =====================================================================
 -- 3. O caminho até o primeiro lead, agora com a entrega de leads
 -- =====================================================================
--- Igual à 20261111203000 nas partes a até d; a parte e é nova. Esta função só
+-- Igual à 20261111203000 nas partes a até c; a parte d passa a contar pela
+-- lista de leads (a mesma regra do par e sem os escondidos), e a parte e é
+-- nova. Esta função só
 -- lê (o pgTAP 153 confere o texto): nenhum comentário aqui dentro usa as
 -- palavras de escrita do SQL.
 create or replace function public.anuncios_caminho_do_lead()
@@ -156,6 +158,7 @@ declare
   v_anuncios jsonb;
   v_rel      jsonb;
   v_lead     jsonb;
+  v_leads    bigint;
   v_entrega  jsonb;
   v_hoje     date := (now() at time zone 'America/Fortaleza')::date;
 begin
@@ -243,15 +246,17 @@ begin
     into v_rel
     from r;
 
-  -- d. O último lead que chegou, de qualquer tipo: prova que o Grupo OLX manda
-  --    os leads da Imova para o CRM.
-  select jsonb_build_object('id', l.id, 'em', l.recebido_em, 'tipos', to_jsonb(l.tipos),
-                            'anuncio', coalesce(a.codigo, m.codigo, l.client_listing_id))
-    into v_lead
-    from public.portal_leads l
-    left join public.anuncios a on a.id = l.anuncio_id
-    left join public.anuncios_no_canal_pro m on m.id = l.anuncio_no_canal_pro_id
-   order by l.recebido_em desc
+  -- d. O último lead que chegou, de qualquer tipo, e quantos são. Contados pela
+  --    própria lista de leads (`portal_leads_na_lista`, 20261112180000): sem o
+  --    lead do WhatsApp que saiu da lista e com o par (WhatsApp e clique do
+  --    Grupo OLX da mesma pessoa) uma vez só. Assim o "Ver o lead" abre um lead
+  --    que a lista mostra. Quem chama é admin ou gestor, que a lista mostra tudo.
+  select jsonb_build_object('id', v.id, 'em', v.recebido_em, 'tipos', to_jsonb(v.tipos),
+                            'anuncio', coalesce(v.anuncio_codigo, v.client_listing_id)),
+         count(*) over ()
+    into v_lead, v_leads
+    from public.portal_leads_na_lista v
+   order by v.recebido_em desc
    limit 1;
 
   -- e. A entrega de leads (12/11/2026): o Grupo OLX bate na porta do CRM? O que
@@ -314,7 +319,7 @@ begin
     'relatorio', v_rel,
     'leads', jsonb_build_object(
       'ultimo', v_lead,
-      'total', (select count(*) from public.portal_leads)));
+      'total', coalesce(v_leads, 0)));
 end $f$;
 comment on function public.anuncios_caminho_do_lead() is
   'O caminho até o primeiro lead dos portais, numa chamada (11/11/2026): a entrega de leads (12/11/2026: a última chamada real do Grupo OLX à função grupozap-lead, o último lead do webhook, as recusas e os erros dos últimos 7 dias), a última leitura do robô do Grupo OLX (e a de outro programa), o plano, os anúncios no ar, fora do arquivo, prontos e com pendência, os repetidos ativos do último relatório e o último lead. Só admin e gestor; os outros recebem sem_permissao.';

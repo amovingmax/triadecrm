@@ -23,7 +23,9 @@
 --          início da chegada (a primeira mensagem da pessoa); não tem
 --          `recebido_no_portal_em`, porque o portal não avisou nada;
 --        * liga ao anúncio pelo código do texto pronto ("Código da oferta: X",
---          "Código do anúncio: X"), primeiro como `grupozap_lead_receber` casa
+--          "Código do anúncio: X"; o código como está no texto, a primeira
+--          palavra dele e o código que a chegada guardou, nesta ordem, até um
+--          achar anúncio), primeiro como `grupozap_lead_receber` casa
 --          o clientListingId (o código exato em `anuncios`, depois no relatório
 --          do Canal Pro) e, sem achar, pelo mesmo código sem o sufixo
 --          (`_IMOVA`), sem zeros à esquerda, sem caixa e sem pontuação
@@ -60,12 +62,15 @@
 --      ele. Marcar portal de novo traz o escondido de volta.
 --
 --   4. SEM LEAD DOBRADO. Quando o Grupo OLX passar a mandar o CLICK_WHATSAPP da
---      mesma pessoa (mesmo telefone, ou a mesma conversa já gravada, com o
---      clique entre 24 h antes e 15 min depois do início da chegada — a janela
---      do comentário de `app.canal_sinal_do_portal`), os dois leads ficam no
---      banco e a LISTA mostra um só (`portal_leads_na_lista`): o que alguém já
+--      mesma pessoa (só o clique puro: quem também escreveu, pediu visita ou
+--      preencheu o formulário fez outro contato; mesmo telefone, ou a mesma
+--      conversa já gravada; o mesmo anúncio, quando os dois têm um; o clique
+--      entre 24 h antes e 15 min depois do início da chegada — a janela do
+--      comentário de `app.canal_sinal_do_portal`), os leads ficam no banco e a
+--      LISTA mostra um só por grupo (`portal_leads_na_lista`): o que alguém já
 --      mexeu; empatado, o que chegou primeiro; empatado, o do Grupo OLX. O que
---      fica mostra o portal do par. Juntar no banco pediria mexer em
+--      fica mostra o portal do par. O caminho até o primeiro lead
+--      (`anuncios_caminho_do_lead`, 20261112181000) conta pela mesma lista. Juntar no banco pediria mexer em
 --      `grupozap_lead_receber` (o caminho do webhook) e decidir qual apagar;
 --      esconder na leitura não toca o webhook e vale nos dois sentidos (o
 --      clique antes ou depois da mensagem). A conta da lista de Anúncios lê a
@@ -140,9 +145,13 @@ comment on column public.portal_leads.motivo_escondido is
 -- "Código da oferta: PT0001_IMOVA" (ZAP e Viva Real) ou "Código do anúncio:
 -- BRISA MALL - loja 2". "Código do anúncio no Zap: 2812345678" é o número do
 -- PORTAL (o originListingId), não o nosso: o ":" logo depois de "anúncio" o
--- deixa de fora. O código vai até o fim da linha, da frase (". ") ou do
--- próximo "Código". Diferente do `chegadas.codigo_do_anuncio`, aceita espaço e
--- acento, como o código do Canal Pro (decisão de 05/11).
+-- deixa de fora. O código vai até o fim da linha, a vírgula (e ; ! ?), o fim
+-- da frase (". " ou o ponto colado numa palavra, "SA0012_IMOVA.Obrigado"; o
+-- ponto entre algarismos fica, "Terreno Bonor 10.000") ou o próximo "Código".
+-- Diferente do `chegadas.codigo_do_anuncio`, aceita espaço e acento, como o
+-- código do Canal Pro (decisão de 05/11). O que a pessoa escreveu depois sem
+-- pontuação ("TE0172 quero visitar") ainda vem junto: quem usa
+-- (`app.portal_lead_da_chegada`) tenta também a primeira palavra.
 create or replace function app.portal_codigo_no_texto(p_texto text)
 returns text
 language plpgsql
@@ -158,7 +167,8 @@ begin
     return null;
   end if;
   v := regexp_replace(v, '\s+c[oó]digo\s.*$', '', 'i');
-  v := regexp_replace(v, '\.\s.*$', '');
+  v := regexp_replace(v, '[,;!?].*$', '');
+  v := regexp_replace(v, '\.(\s|[[:alpha:]]).*$', '');
   v := btrim(regexp_replace(v, '[\s.,;:!?)"]+$', ''));
   v := regexp_replace(v, '\s+', ' ', 'g');
   if char_length(v) < 2 or char_length(v) > 100 then
@@ -260,6 +270,9 @@ declare
   cv          record;
   m           record;
   v_cod       text;
+  v_texto     text;
+  v_tenta     text;
+  v_achou     boolean := false;
   v_cod_port  text;
   an          record;
   v_supr      boolean;
@@ -318,31 +331,52 @@ begin
      order by mm.created_at, mm.id
      limit 5
   loop
-    v_cod := coalesce(v_cod, app.portal_codigo_no_texto(m.body));
+    v_texto := coalesce(v_texto, app.portal_codigo_no_texto(m.body));
     v_cod_port := coalesce(v_cod_port,
       substring(m.body from '(?i)c[oó]digo do an[uú]ncio n[ao] (?:zap|viva ?real|olx)[^:\n]{0,20}:\s*([0-9A-Za-z_-]{3,40})'),
       substring(m.body from '(?i)(?:zapimoveis|vivareal)\.com\.br/[^\s]*-id-([0-9]{5,15})'));
   end loop;
-  v_cod := left(coalesce(v_cod, ch.codigo_do_anuncio), 100);
-  select * into an from app.portal_lead_anuncio_pelo_codigo(v_cod);
+  -- O código, nesta ordem: como está no texto (o do Canal Pro tem espaço,
+  -- "BRISA MALL - loja 2"), a primeira palavra dele ("TE0172 quero visitar") e
+  -- o que o canal de chegada guardou. Fica o primeiro que acha anúncio; sem
+  -- nenhum, o do canal de chegada ou o do texto, e o lead fica sem anúncio.
+  select * into an from app.portal_lead_anuncio_pelo_codigo(null);
+  foreach v_tenta in array array_remove(array[v_texto, substring(v_texto from '^[A-Za-z0-9_-]{2,}'),
+                                              ch.codigo_do_anuncio], null)
+  loop
+    select * into an from app.portal_lead_anuncio_pelo_codigo(v_tenta);
+    if an.anuncio_id is not null or an.anuncio_no_canal_pro_id is not null then
+      v_cod := v_tenta;
+      v_achou := true;
+      exit;
+    end if;
+  end loop;
+  v_cod := left(coalesce(v_cod, ch.codigo_do_anuncio, v_texto), 100);
   v_trans := case an.negocio when 'venda' then 'SELL' when 'aluguel' then 'RENT' end;
 
-  -- ---- Já existe: o portal acompanha a chegada, o código só completa ----
+  -- ---- Já existe: o portal acompanha a chegada; o código completa, e o
+  --      anúncio é refeito enquanto o lead não tem nenhum (o anúncio pode ter
+  --      entrado no CRM depois) ----
   if v_lead.id is not null then
     update public.portal_leads l
        set portal           = coalesce(v_portal, l.portal),
            escondido_em     = null,
            motivo_escondido = null,
-           client_listing_id = coalesce(l.client_listing_id, v_cod),
+           client_listing_id = case when l.anuncio_id is null and l.anuncio_no_canal_pro_id is null
+                                         and (v_achou or l.client_listing_id is null)
+                                    then coalesce(v_cod, l.client_listing_id)
+                                    else l.client_listing_id end,
+           anuncio_id       = case when l.anuncio_id is null and l.anuncio_no_canal_pro_id is null
+                                   then an.anuncio_id else l.anuncio_id end,
+           anuncio_no_canal_pro_id = case when l.anuncio_id is null and l.anuncio_no_canal_pro_id is null
+                                          then an.anuncio_no_canal_pro_id else l.anuncio_no_canal_pro_id end,
            origin_listing_id = coalesce(l.origin_listing_id, left(v_cod_port, 100)),
-           anuncio_id       = case when l.client_listing_id is null then an.anuncio_id else l.anuncio_id end,
-           anuncio_no_canal_pro_id = case when l.client_listing_id is null then an.anuncio_no_canal_pro_id
-                                          else l.anuncio_no_canal_pro_id end,
            transacao        = coalesce(l.transacao, v_trans)
      where l.id = v_lead.id
        and (l.portal is distinct from coalesce(v_portal, l.portal)
             or l.escondido_em is not null
             or (l.client_listing_id is null and v_cod is not null)
+            or (l.anuncio_id is null and l.anuncio_no_canal_pro_id is null and v_achou)
             or (l.origin_listing_id is null and v_cod_port is not null));
     return case when v_lead.escondido_em is not null then 'de_volta' else 'ja_existia' end;
   end if;
@@ -396,23 +430,31 @@ comment on function app.portal_lead_da_chegada(uuid) is
   'A chegada de WhatsApp de portal (Anúncios: ZAP, Viva Real, OLX, Canal Pro; gente vence) vira UM lead do portal (origem whatsapp, chave whatsapp:<chegada>), ligado ao anúncio pelo código do texto pronto, à conversa e ao telefone (portal_lead_contatos). Chegada que deixou de ser de portal esconde o lead que ninguém mexeu. Só na Imova. Só lê messages e conversations.';
 revoke all on function app.portal_lead_da_chegada(uuid) from public, anon, authenticated;
 
--- O gatilho de `chegadas`: nunca deixa a chegada falhar por causa do lead.
+-- O gatilho de `chegadas`: nunca deixa a chegada falhar nem esperar por causa
+-- do lead. Qualquer erro é engolido; e a parte do lead espera trava no máximo
+-- 1 s (`lock_timeout`, só durante ela: o valor de antes volta depois), o que
+-- vira `lock_not_available`, engolido também. Assim `chegada_marcar` não fica
+-- preso atrás da rotina de 5 minutos, que refaz o lead depois.
 create or replace function app.portal_lead_da_chegada_gatilho()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  v_espera text := current_setting('lock_timeout');
 begin
+  perform set_config('lock_timeout', '1s', true);
   begin
     perform app.portal_lead_da_chegada(new.id);
   exception when others then
     raise warning 'portal_lead_da_chegada(%): %', new.id, sqlerrm;
   end;
+  perform set_config('lock_timeout', v_espera, true);
   return null;
 end $$;
 comment on function app.portal_lead_da_chegada_gatilho() is
-  'Gatilho de public.chegadas (depois de gravar): chama app.portal_lead_da_chegada e engole qualquer erro, para a chegada nunca falhar por causa do lead.';
+  'Gatilho de public.chegadas (depois de gravar): chama app.portal_lead_da_chegada com lock_timeout de 1 s e engole qualquer erro, para a chegada nunca falhar nem esperar por causa do lead.';
 revoke all on function app.portal_lead_da_chegada_gatilho() from public, anon, authenticated;
 
 drop trigger if exists chegadas_lead_do_portal on public.chegadas;
@@ -454,6 +496,9 @@ begin
   if (select i.empresa from app.identidade i) is distinct from 'imova' then
     return jsonb_build_object('ligada', false);
   end if;
+  -- A rotina não espera trava de quem atende: o que ficou preso é refeito na
+  -- próxima volta.
+  perform set_config('lock_timeout', '1s', true);
 
   -- 1. A chegada de portal sem lead na lista (sem lead, ou com o lead
   --    escondido), e o lead na lista cuja chegada deixou de ser de portal.
@@ -494,7 +539,9 @@ begin
   end loop;
 
   -- 2. A ficha que a ficha automática criou depois do lead: grava, com a
-  --    atividade "Lead do portal" (como app.portal_leads_manter faz).
+  --    atividade "Lead do portal" (como app.portal_leads_manter faz). Uma
+  --    trava que não sai em 1 s deixa para a próxima volta.
+  begin
   with achadas as (
     select l.id, c.organization_id, l.client_listing_id, l.portal, l.escreveu_em, l.chegada_id
       from public.portal_leads l
@@ -522,6 +569,10 @@ begin
     returning 1
   )
   select count(*) into n_fichas from gravadas;
+  exception when others then
+    n_erros := n_erros + 1;
+    raise warning 'portal_leads_do_whatsapp (fichas): %', sqlerrm;
+  end;
 
   return jsonb_build_object('ligada', true, 'criados', n_criados, 'mudados', n_mudados,
                             'fichas', n_fichas, 'erros', n_erros);
@@ -534,9 +585,20 @@ revoke all on function app.portal_leads_do_whatsapp(int) from public, anon, auth
 -- 5. A lista: o lead do WhatsApp, e o par com o webhook visto uma vez só
 -- =====================================================================
 -- A da 20261105130000, com quatro mudanças marcadas "12/11/2026": o escondido
--- fica de fora; o par (lead do WhatsApp × aviso do Grupo OLX da mesma pessoa)
--- aparece uma vez só; o lead do WhatsApp é "mensagem" e chega "pelo WhatsApp"
--- mesmo antes de a conversa ser achada; e a coluna `portal`, no fim.
+-- fica de fora; o par (lead do WhatsApp × clique no WhatsApp avisado pelo Grupo
+-- OLX, da mesma pessoa e do mesmo anúncio) aparece uma vez só; o lead do
+-- WhatsApp é "mensagem" e chega "pelo WhatsApp" mesmo antes de a conversa ser
+-- achada; e a coluna `portal`, no fim.
+--
+-- O PAR. Só o aviso de CLIQUE PURO no WhatsApp (CLICK_WHATSAPP, sem chat,
+-- formulário, visita nem mensagem: `app.portal_lead_mandou_mensagem` falso) é o
+-- mesmo contato que a mensagem no WhatsApp; quem pediu visita ou escreveu no
+-- portal fez outro contato, e aparece sempre. Mesmo telefone ou mesma conversa
+-- (duas junções, e não um OR, para o banco usar hash), clique entre 24 h antes
+-- e 15 min depois do início da chegada, e o mesmo anúncio quando os dois têm um.
+-- Cada aviso fica no grupo do lead do WhatsApp mais perto no tempo (os grupos
+-- não se encostam), e cada grupo mostra UM: o que alguém mexeu; empatado, o que
+-- chegou primeiro; empatado, o do Grupo OLX.
 create or replace view public.portal_leads_na_lista
 with (security_barrier = true, security_invoker = false) as
 with todos as (
@@ -549,30 +611,57 @@ with todos as (
      -- 12/11/2026: o lead do WhatsApp cuja chegada deixou de ser de portal.
      and l.escondido_em is null
 ),
-pares as (
-  -- 12/11/2026: a mesma pessoa pelos dois caminhos. Fica o que alguém mexeu;
-  -- empatado, o que chegou primeiro; empatado, o do Grupo OLX.
-  select w.id as do_whatsapp, g.id as do_grupo_olx, w.portal,
-         case when w.mexido <> g.mexido then w.mexido
-              else w.recebido_em < g.recebido_em end as fica_o_do_whatsapp
-    from todos w
-    join todos g
-      on g.origem = 'grupo_olx'
-     and ((g.conversation_id is not null and g.conversation_id = w.conversation_id)
-          or (g.k_tel is not null and g.k_tel = w.k_tel))
-     and g.clicou_em >= w.escreveu_em - interval '24 hours'
+do_whatsapp as (
+  select t.* from todos t where t.origem = 'whatsapp'
+),
+cliques as (
+  select t.* from todos t
+   where t.origem = 'grupo_olx'
+     and 'CLICK_WHATSAPP' = any (t.tipos)
+     and not app.portal_lead_mandou_mensagem(t.tipos)
+),
+mesma_pessoa as (
+  select w.id as w_id, g.id as g_id
+    from do_whatsapp w join cliques g on g.k_tel = w.k_tel
+  union
+  select w.id, g.id
+    from do_whatsapp w join cliques g on g.conversation_id = w.conversation_id
+),
+casados as (
+  -- O aviso vai para o lead do WhatsApp mais perto no tempo.
+  select mp.w_id, mp.g_id,
+         row_number() over (partition by mp.g_id
+                            order by abs(extract(epoch from g.clicou_em - w.escreveu_em)), w.id) as n
+    from mesma_pessoa mp
+    join do_whatsapp w on w.id = mp.w_id
+    join cliques g on g.id = mp.g_id
+   where g.clicou_em >= w.escreveu_em - interval '24 hours'
      and g.clicou_em <= w.escreveu_em + interval '15 minutes'
-   where w.origem = 'whatsapp'
+     and ((w.anuncio_id is null and w.anuncio_no_canal_pro_id is null)
+          or (g.anuncio_id is null and g.anuncio_no_canal_pro_id is null)
+          or w.anuncio_id = g.anuncio_id
+          or w.anuncio_no_canal_pro_id = g.anuncio_no_canal_pro_id)
+),
+grupos as (
+  select c.w_id, c.g_id as lead_id from casados c where c.n = 1
+  union
+  select c.w_id, c.w_id from casados c where c.n = 1
+),
+ordem as (
+  select gr.w_id, gr.lead_id,
+         row_number() over (partition by gr.w_id
+                            order by t.mexido desc, t.recebido_em, (t.origem = 'grupo_olx') desc, t.id) as pos
+    from grupos gr
+    join todos t on t.id = gr.lead_id
 ),
 leads as (
   select t.*,
-         (select p.portal from pares p
-           where p.do_grupo_olx = t.id and p.portal is not null
-           order by p.portal limit 1) as portal_do_par
+         -- O aviso do Grupo OLX que ficou no lugar do par mostra o portal do lead do WhatsApp.
+         (select w.portal from ordem o join do_whatsapp w on w.id = o.w_id
+           where o.lead_id = t.id and t.origem = 'grupo_olx'
+           limit 1) as portal_do_par
     from todos t
-   where not exists (select 1 from pares p
-                      where (p.do_whatsapp = t.id and not p.fica_o_do_whatsapp)
-                         or (p.do_grupo_olx = t.id and p.fica_o_do_whatsapp))
+   where not exists (select 1 from ordem o where o.lead_id = t.id and o.pos > 1)
 ),
 candidatas as (
   -- A conversa já gravada, ou as do mesmo telefone (uma passada em conversations).
