@@ -92,6 +92,10 @@ export {
   mesmoCodigo,
 } from './prompts/atendente-imova/cenarios-v3';
 
+export { atendenteImovaV4, sistemaComBaseV4 } from './prompts/atendente-imova/v4';
+
+export { BASE_DO_ENSAIO_V4, CENARIOS_DO_ATENDENTE_V4 } from './prompts/atendente-imova/cenarios-v4';
+
 export {
   CERTEZAS_DA_FOTO,
   type EntradaDaFoto,

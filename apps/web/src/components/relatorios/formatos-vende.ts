@@ -505,6 +505,8 @@ const O_QUE_MUDOU: Record<string, string> = {
     'Fala como a equipe, não puxa assunto velho, reconhece a foto do anúncio que o cliente manda e conhece os dados de cada imóvel.',
   'atendente-imova@v3':
     'Manda o link da agenda para o cliente escolher o horário: a visita, com o código e o endereço do imóvel, ou a reunião com um corretor.',
+  'atendente-imova@v4':
+    'Manda o link da visita também para o imóvel em rascunho no CRM; só o anúncio pausado vai para um corretor.',
 };
 
 export function oQueMudouNaVersao(versao: string | null | undefined): string | null {

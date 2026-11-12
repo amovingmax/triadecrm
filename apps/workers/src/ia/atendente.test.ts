@@ -248,13 +248,13 @@ function montar(
 }
 
 describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () => {
-  it('a visita: o tipo, o código, o texto e o ai_run, com a versão v3', async () => {
+  it('a visita: o tipo, o código, o texto e o ai_run, com a versão vigente (v4)', async () => {
     const { contexto, chamadas, banco } = montar(saidaDoModelo());
     const r = await atenderCliente(contexto, PAYLOAD);
 
     expect(r).toMatchObject({ feito: true, motivo: 'enviar_link_da_agenda' });
     const run = banco.tabelas.ai_runs?.[0] as Record<string, unknown>;
-    expect(run.prompt_version).toBe('atendente-imova@v3');
+    expect(run.prompt_version).toBe('atendente-imova@v4');
     expect(chamadas('ia_atendente_enviar_link')).toEqual([
       {
         p_conversation_id: CONVERSA,
@@ -263,7 +263,7 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
         p_imovel_codigo: 'TE0004',
         p_texto: 'Claro! Vou te mandar o link da agenda para você escolher o dia e o horário da visita.',
         p_ai_run_id: run.id,
-        p_prompt_version: 'atendente-imova@v3',
+        p_prompt_version: 'atendente-imova@v4',
       },
     ]);
     expect(chamadas('ia_atendente_marcar_visita')).toEqual([]);
@@ -314,7 +314,7 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
     expect(respondeu[0]).toMatchObject({
       p_conversation_id: CONVERSA,
       p_em_resposta_a: ULTIMA,
-      p_prompt_version: 'atendente-imova@v3',
+      p_prompt_version: 'atendente-imova@v4',
       p_detalhes: { agenda: { tipo: 'visita', imovelCodigo: 'XX9999', recusa: motivo } },
     });
     expect(chamadas('ia_atendente_passar')).toEqual([]);

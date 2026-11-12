@@ -74,9 +74,9 @@ function entrada(extra: Partial<EntradaDoAtendenteV3> = {}): EntradaDoAtendenteV
 const comBase = { ...v3, sistema: sistemaComBaseV3(BASE_DO_ENSAIO) };
 
 describe('atendente-imova@v3: o contrato', () => {
-  it('é a vigente, no Haiku 5.5, com o propósito e a escala da v2', () => {
-    expect(VIGENTES['atendente-imova']).toBe(3);
-    expect(promptVigente('atendente-imova')).toBe(v3);
+  it('continua no catálogo (a vigente é a v4, desde 12/11/2026), no Haiku 5.5, com o propósito e a escala da v2', () => {
+    expect(VIGENTES['atendente-imova']).toBe(4);
+    expect(promptVigente('atendente-imova')).not.toBe(v3);
     expect(obterPrompt('atendente-imova', 3)).toBe(v3);
     // A v2 continua no catálogo, com a saída dela.
     expect(obterPrompt('atendente-imova', 2)).toBe(v2);

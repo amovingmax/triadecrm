@@ -229,10 +229,11 @@ describe('preços e conta por chamada', () => {
         // caderno e os imóveis, quase todos lidos do cache. Na medição real de 06/11, cada
         // resposta custou de US$ 0,0004 a 0,0018. A v3 (11/11/2026, a visita pelo link) tem
         // 505 tokens de sistema a mais (a visita, a reunião e os links já mandados) e 18 a
-        // menos de mensagem: os horários de visita saíram da entrada.
+        // menos de mensagem: os horários de visita saíram da entrada. A v4 (12/11/2026, o
+        // rascunho também recebe o link) tem 41 tokens de sistema a mais que a v3.
         id: 'atendente-imova',
         modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 3104,
+        tokensDeSistema: 3145,
         tokensDaMensagem: 142,
         tokensDeSaida: 102,
         semCache: 0.00038,

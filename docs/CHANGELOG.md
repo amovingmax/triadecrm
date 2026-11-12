@@ -10494,3 +10494,22 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 **Em produção desde 12/11/2026, ~16h40:** na main (juntada `67f4e94`); banco da Imova com a `20261112170000`; banco da KOMUNE com a `20261112170000` e as duas da agenda da Imova que estavam seguradas lá (`20261112160000`, `20261112161000`; decisão do usuário: "publicar tudo"; entram sem efeito na KOMUNE); site da KOMUNE `triade-36w5yto7a` (volta: `triade-ocaz086r1`), também em `ir.komune.app.br`. Conferido: as duas funções novas e o `envio_em_massa_teto` novo no banco da KOMUNE; de fora, `/login` 200, `/envios` pede login, `/auth/dev` 404. Sem mudança no worker. O site da Imova não foi republicado.
 
 **Decisão humana:** os filtros que saíram (cidade, etapa, etiqueta, setor, responsável, temperatura, "sem contato há N dias") e o texto livre voltam se alguém sentir falta; a busca da base procura pelo nome da ficha (empresa), não pelo da pessoa.
+
+## 12/11/2026 — a IA que atende manda o link da visita também para o imóvel em rascunho (`atendente-imova@v4`; branch `ia-link-rascunho`; só na Imova)
+
+**O problema:** depois da publicação da v3 (12/11, `imova-worker-ai` v8), a IA atendeu 5 vezes e não mandou o link nenhuma vez: respondeu 3 e passou ao corretor 2. A regra da v3 mandava ao corretor todo imóvel em "rascunho" ou "pausado", e na Imova quase toda a carteira está em rascunho no CRM (os portais ainda leem o arquivo da Arbo). Pelos registros do worker; a leitura das respostas no banco de produção não foi feita.
+
+**Decisão do usuário (12/11/2026), entre três opções:** "Manda o link". Imóvel no ar ou em rascunho recebe o link da visita, com o código e o endereço; só o pausado (o anúncio parado no portal) continua com o corretor.
+
+**O que mudou:**
+- `packages/prompts/src/prompts/atendente-imova/v4.ts`: a v3 com dois trechos trocados (a regra da visita e a regra de verdade 2). Entrada, saída, montagem, exemplos e modelo são os da v3; a troca confere que cada trecho da v3 existe uma vez só. A v3 continua no catálogo; a vigente passa a 4.
+- `cenarios-v4.ts`: os cenários da v3 com o rascunho mandando o link, mais o pausado indo ao corretor (12 cenários; a base do ensaio ganha um imóvel pausado).
+- O worker (`apps/workers/src/ia/atendente.ts`) e o ensaio (`workers ai --ensaio=atendente-imova`) usam a v4.
+- O relatório diz o que a v4 mudou.
+- Nada muda no banco: `ia_atendente_enviar_link` já mandava o link de anúncio não excluído (com `aviso: 'anuncio_nao_esta_no_ar'`).
+
+**Verificado:** `packages/prompts` 443 testes (9 novos, da v4), typecheck e lint; workers 595 testes, typecheck e lint; Vitest do relatório e typecheck do site. A v4 tem 41 tokens de sistema a mais que a v3; o custo por chamada arredondado não muda. O ensaio contra o modelo de verdade não foi rodado (pede a chave da Anthropic).
+
+**Para publicar:** só o `imova-worker-ai` (`fly deploy`) e, para a frase do relatório, o site da Imova. Sem banco e sem Edge Function.
+
+**Para a sessão das fotos do anúncio:** a branch `ia-fotos-escolha` tem um `atendente-imova@v4` feito a partir da v2. Ao juntar, ele passa a ser a v5, feita a partir desta v4.

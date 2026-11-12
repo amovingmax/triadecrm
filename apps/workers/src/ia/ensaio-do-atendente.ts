@@ -1,28 +1,31 @@
 /**
  * `workers ai --ensaio=atendente-imova`: os cenários da IA que atende contra o modelo de
- * verdade (11/11/2026, `atendente-imova@v3`, a visita pelo link).
+ * verdade (11/11/2026, `atendente-imova@v3`, a visita pelo link; desde 12/11/2026, a
+ * v4, com o imóvel em rascunho também recebendo o link).
  *
- * Os cenários e o conferidor moram em `packages/prompts` (`cenarios-v3.ts`) e rodam sem
+ * Os cenários e o conferidor moram em `packages/prompts` (`cenarios-v3.ts` e
+ * `cenarios-v4.ts`) e rodam sem
  * rede no `pnpm test`, com uma resposta boa escrita à mão. Este comando manda as mesmas
  * conversas ao modelo que a configuração escolheu (`ia.atendente.modelo`, o Haiku 5.5 por
  * padrão) e passa cada resposta pelo mesmo `conferirCenario`: visita com código, visita
  * sem imóvel, imóvel fora da lista, link já mandado, pediu de novo, reunião do
- * proprietário, "amanhã às 10h", só o preço, já agendou, mudou de imóvel e rascunho.
+ * proprietário, "amanhã às 10h", só o preço, já agendou, mudou de imóvel, rascunho e
+ * pausado.
  *
  * Cada chamada passa pelo caminho de sempre (`executar`: pseudonimização, auditoria,
  * freio do orçamento, schema e a linha em `ai_runs`, sem ficha e sem conversa). Nada é
  * mandado a cliente nenhum: as conversas e a base são as do ensaio, de mentira.
  */
 import {
-  BASE_DO_ENSAIO,
-  CENARIOS_DO_ATENDENTE_V3,
+  BASE_DO_ENSAIO_V4,
+  CENARIOS_DO_ATENDENTE_V4,
   type CenarioDoAtendente,
   type EntradaDoAtendenteV3,
   type PromptVersionado,
   type SaidaDoAtendenteV3,
-  atendenteImovaV3,
+  atendenteImovaV4,
   conferirCenario,
-  sistemaComBaseV3,
+  sistemaComBaseV4,
 } from '@komune/prompts';
 
 import { modeloEscolhido } from './atendente';
@@ -52,7 +55,7 @@ export interface ResultadoDoEnsaio {
 }
 
 export interface OpcoesDoEnsaio {
-  /** Os cenários; sem nada, todos os da v3. */
+  /** Os cenários; sem nada, todos os da v4 (os da v3 com o rascunho mandando o link, mais o pausado). */
   readonly cenarios?: readonly CenarioDoAtendente[];
   /** O modelo; sem nada, o da configuração. */
   readonly modelo?: string;
@@ -64,14 +67,14 @@ export async function ensaiarAtendente(
 ): Promise<ResultadoDoEnsaio> {
   const modelo = opcoes.modelo ?? (await modeloEscolhido(contexto));
   const prompt: PromptVersionado<EntradaDoAtendenteV3, SaidaDoAtendenteV3> = {
-    ...atendenteImovaV3,
-    modelo: modelo as typeof atendenteImovaV3.modelo,
-    sistema: sistemaComBaseV3(BASE_DO_ENSAIO),
+    ...atendenteImovaV4,
+    modelo: modelo as typeof atendenteImovaV4.modelo,
+    sistema: sistemaComBaseV4(BASE_DO_ENSAIO_V4),
   };
   const cenarios: ResultadoDoCenario[] = [];
   // Um de cada vez: a primeira chamada escreve o cache do bloco de sistema e as outras o
   // leem, que é como a IA roda de verdade.
-  for (const cenario of opcoes.cenarios ?? CENARIOS_DO_ATENDENTE_V3) {
+  for (const cenario of opcoes.cenarios ?? CENARIOS_DO_ATENDENTE_V4) {
     try {
       const executada = await executar(
         contexto,

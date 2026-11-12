@@ -8,7 +8,8 @@
  *   responder              → `public.ia_atendente_responder`
  *   enviar_link_da_agenda  → `public.ia_atendente_enviar_link` (11/11/2026, prompt v3: o
  *                            link da agenda, de visita com o imóvel ou de reunião; o
- *                            cliente escolhe o horário no Calendly)
+ *                            cliente escolhe o horário no Calendly. Desde 12/11/2026, a
+ *                            v4: o imóvel em rascunho também recebe o link)
  *   passar_para_corretor   → `public.ia_atendente_passar` (avisa e entrega a uma pessoa)
  *   nao_responder          → `public.ia_atendente_registrar_silencio`
  *
@@ -38,9 +39,9 @@ import {
   CANAIS_DE_CHEGADA,
   MODELOS,
   TIPOS_DA_AGENDA,
-  atendenteImovaV3,
+  atendenteImovaV4,
   reidratar,
-  sistemaComBaseV3,
+  sistemaComBaseV4,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -329,7 +330,7 @@ export async function modeloEscolhido(contexto: ContextoDaIa): Promise<string> {
   const valor = ((data as { value?: unknown } | null)?.value ?? {}) as Record<string, unknown>;
   return typeof valor.modelo === 'string' && MODELOS_DO_ATENDENTE.has(valor.modelo)
     ? valor.modelo
-    : atendenteImovaV3.modelo;
+    : atendenteImovaV4.modelo;
 }
 
 /** Entrega a conversa a uma pessoa, com o aviso padrão e o motivo para a equipe. */
@@ -414,9 +415,9 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   );
 
   const prompt: PromptVersionado<EntradaDoAtendenteV3, SaidaDoAtendenteV3> = {
-    ...atendenteImovaV3,
-    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV3.modelo,
-    sistema: sistemaComBaseV3(base),
+    ...atendenteImovaV4,
+    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV4.modelo,
+    sistema: sistemaComBaseV4(base),
   };
 
   let executada;
