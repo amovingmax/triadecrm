@@ -1,6 +1,6 @@
 -- =====================================================================
 -- pgTAP — O convite da Agenda e o imóvel de toda visita (migração
--- 20261111210000), só na Imova
+-- 20261112160000), só na Imova
 --
 -- Pedido de 11/11/2026: "Preciso que a IA envie o link da agenda para o
 -- cliente marcar o horário da visita ao local ou horário da reunião. Caso seja
@@ -226,8 +226,13 @@ select is(to_regprocedure('public.agenda_link_previa(uuid, text, uuid, text)') i
           'as seis funções do contrato existem na Imova, e não na KOMUNE');
 select is(to_regclass('public.agenda_convites') is not null and to_regclass('public.visita_imoveis') is not null,
           not pg_temp.na_komune(), 'as duas tabelas também');
-select is(position('convites_da_agenda' in pg_get_functiondef('app.lgpd_dossie(uuid)'::regprocedure)) > 0,
-          not pg_temp.na_komune(), 'o dossiê da LGPD só muda na Imova');
+-- O acabamento da Agenda (20261112161000) embrulha o dossiê: a definição desta
+-- migração passa a se chamar `app.lgpd_dossie_sem_o_calendly`, e `app.lgpd_dossie`
+-- chama ela. Vale achar os convites em qualquer uma das duas.
+select is(exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                   where n.nspname = 'app' and p.proname like 'lgpd_dossie%'
+                     and position('convites_da_agenda' in pg_get_functiondef(p.oid)) > 0),
+          not pg_temp.na_komune(), 'o dossiê da LGPD só muda na Imova (direto ou pela casca do acabamento)');
 select is(position('agenda_convites' in pg_get_functiondef('app.aplicar_retencao()'::regprocedure)) > 0,
           not pg_temp.na_komune(), 'a retenção também');
 select ok(position('visita_imoveis' in pg_get_functiondef(
