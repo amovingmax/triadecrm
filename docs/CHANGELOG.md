@@ -10494,3 +10494,85 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 **Em produção desde 12/11/2026, ~16h40:** na main (juntada `67f4e94`); banco da Imova com a `20261112170000`; banco da KOMUNE com a `20261112170000` e as duas da agenda da Imova que estavam seguradas lá (`20261112160000`, `20261112161000`; decisão do usuário: "publicar tudo"; entram sem efeito na KOMUNE); site da KOMUNE `triade-36w5yto7a` (volta: `triade-ocaz086r1`), também em `ir.komune.app.br`. Conferido: as duas funções novas e o `envio_em_massa_teto` novo no banco da KOMUNE; de fora, `/login` 200, `/envios` pede login, `/auth/dev` 404. Sem mudança no worker. O site da Imova não foi republicado.
 
 **Decisão humana:** os filtros que saíram (cidade, etapa, etiqueta, setor, responsável, temperatura, "sem contato há N dias") e o texto livre voltam se alguém sentir falta; a busca da base procura pelo nome da ficha (empresa), não pelo da pessoa.
+
+## 12/11/2026 — os leads dos portais chegam ao CRM: o WhatsApp do portal vira lead, a porta dos leads e o passo que faltava (branches `leads-do-whatsapp` e `leads-porta-do-crm`, juntas em `leads-chegam`; só na Imova; RF-CON-05)
+
+**Pedido:** "A lista dos leads ainda não está chegando ao nosso CRM da Imova. Preciso que conserte esse problema. Utilize agentes para entregar um resultado melhor."
+
+**Diagnóstico (produção, só leitura, 12/11):**
+- `portal_leads` com 0 linhas e `canal_pro_leituras` com 0 linhas.
+- A `grupozap-lead` no ar (v8) é idêntica à `main` byte a byte; responde 401 sem credencial; `GRUPOZAP_LEAD_SECRET` presente.
+- Nos registros das Edge Functions (o endpoint novo é `analytics/endpoints/logs`, tabela `logs` com `source='function_edge_logs'`, uma consulta por dia), **o Grupo OLX nunca fez um POST** desde a homologação (10/11, 15:15). Não houve 401 nem 5xx: eles nunca chamaram.
+- A pesquisa explicou o porquê. A homologação só cadastra o CRM no Grupo OLX. Cada anunciante aponta a entrega no Canal Pro, em ☰ → Configurações → Integrações → aba Leads → **"Receber leads no CRM"**, que é um campo separado da integração de anúncios. Esse campo deve ter a URL da Arbo (`…execute-api.sa-east-1.amazonaws.com/arbo`) ou nada. O painel "Caminho até o primeiro lead" não falava dele.
+- **Os leads já chegavam pelo WhatsApp do CRM, com o texto pronto do portal.** Por exemplo, "…que encontrei no VivaReal: … Código da oferta: PT0001_IMOVA", em 11/11 às 18:50. O canal de chegada os marcava como `portal_zap`/`portal_vivareal`, mas eles nunca viravam `portal_leads`. Por isso a aba Leads mostrava 0.
+
+**Entregue:**
+- **O WhatsApp do portal vira lead (migração `20261112180000`, pgTAP 172):**
+  - Toda chegada cujo canal que vale é Anúncios com subcanal de portal (ZAP, Viva Real, OLX ou Canal Pro), pela regra, pela IA ou por gente, vira um lead em `portal_leads`, um por chegada. A origem é `whatsapp`, a chave é `whatsapp:<chegada>` e o tipo é `WHATSAPP_DO_PORTAL`. O lead entra em "Mandaram mensagem", com o portal (coluna `portal`), o anúncio pelo código, a conversa e o contato em `portal_lead_contatos` (só a gestão vê o telefone, e o SDR revela).
+  - O lead nasce por gatilho em `chegadas`, que engole erro e espera trava por no máximo 1 s. A rotina `portal_leads_do_whatsapp`, a cada 5 min, refaz o que o gatilho perdeu e liga a ficha. As chegadas antigas viram lead quando a migração roda.
+  - **O código do anúncio:** a função tenta o código inteiro ("BRISA MALL - loja 2"), depois a primeira palavra, depois o `codigo_do_anuncio` da chegada. A comparação é exata e, se não achar, segue sem o `_IMOVA`, sem caixa, sem pontuação e sem zeros à esquerda. O código para na vírgula e no ponto final.
+  - **Sem lead dobrado:** quando o webhook mandar o `CLICK_WHATSAPP` da mesma pessoa, a lista mostra um só. Só o clique puro, do mesmo anúncio, entre −24 h e +15 min, forma par. Cada clique entra no grupo do lead do WhatsApp mais perto no tempo, e o grupo mostra quem alguém mexeu, depois o que chegou primeiro, depois o do Grupo OLX. Visita, formulário e chat aparecem sempre.
+  - **Desmarcar** a chegada esconde o lead que ninguém mexeu (`escondido_em`). O que já foi assumido, mudado ou descartado fica.
+  - O lead do WhatsApp não dispara o push "Lead novo dos portais" nem o cartão do vigia: a mensagem já avisou.
+  - **Tela:** "Mensagem no WhatsApp" e "WhatsApp pelo ZAP Imóveis / pelo Viva Real / pela OLX", o filtro "WhatsApp pelo portal" e "Abrir conversa" na ficha. O lead suprimido, sem conversa, pode ser marcado como respondido à mão.
+- **A porta dos leads (migração `20261112181000`, pgTAP 173, função `grupozap-lead`):**
+  - **Lead gravado é 200, sempre.** Antes, o lead de anúncio sem `clientListingId` recebia 422. Os anúncios criados direto no Canal Pro (o Edifício Simone tem 58 contatos) vão sem código, e há relato de que falhas seguidas desligam a integração. O log mantém o aviso `anuncio_sem_codigo`.
+  - **Cada chamada é anotada** em `grupozap_lead_chamadas`, sem dado pessoal: dia, resultado (`recebido`, `repetido`, `teste`, `recusado_credencial`, `erro`), se veio do Grupo OLX, contador, último horário e status. A gravação é por upsert, com no máximo 10 linhas por dia, e o que passa de 365 dias sai. A anotação roda depois da resposta (`EdgeRuntime.waitUntil`, prazo de 3 s) e nunca muda a resposta. A tabela tem RLS, sem política e sem grade, e a RPC `grupozap_lead_anotar_chamada` é só da service_role.
+  - A resposta saiu para `atender.ts` (com dependências injetadas, testável) e a anotação para `porta.ts`. `autenticacao.ts` não mudou.
+  - `anuncios_caminho_do_lead` ganha `entrega`: a última chamada real, o último lead do webhook, o último teste e as recusas e erros de 7 dias, separados pelo user-agent. O último lead e o total passam a vir de `portal_leads_na_lista`.
+- **Passo novo no painel, o primeiro: "Os leads vêm para o CRM".**
+  - **Falta:** a URL de leads com o botão de copiar, o caminho no Canal Pro e três avisos (a URL da Arbo, o suporte, o e-mail como cópia).
+  - **Pede um olhar:** recusa ou erro com o user-agent do Grupo OLX depois da última entrega; 14 dias sem chamada real com anúncios no portal; ou chamada real que não veio do Grupo OLX (um `curl` com a chave verdadeira não dá o passo como feito).
+  - **Feito:** só quando há entrega do Grupo OLX. O passo "O primeiro lead" diz para ligar os leads antes do teste.
+
+**Achados da revisão independente corrigidos:**
+- o par que escondia a visita ou o formulário de outro anúncio, e o link do aviso que não abria nada;
+- o par em cadeia que zerava um anúncio;
+- o código "guloso" ("TE0172, gostaria de visitar…") que deixava o lead sem anúncio;
+- o caminho que contava lead escondido;
+- o passo dado como feito sem o Grupo OLX;
+- a espera de trava no gatilho;
+- o `OR` na junção do par;
+- o lead suprimido preso em "novo".
+O pgTAP 34 do 172 dependia da ordem de um `inicio_em` empatado e foi fixado.
+
+**Verificado (banco local da Imova, em transação desfeita, com as migrações da `main` que faltam nele antes):**
+- pgTAP 172 (111, sendo 22 novas; 11 delas falham com o código anterior à revisão) e 173 (51).
+- Regressão: 153 (49), 123 (60), 124 (30), 125 (66), 126 (39), 127 (43), 128 (18), 129 (26), 130 (13), 137 (45), 138 (73), 139 (44), 140 (14), 141 (21), 144 (31), 170 (130) e 171 (34), tudo verde.
+- O 160 falha igual sem estas migrações: falta categoria no banco local. O 09 e o 135 falham como antes.
+- KOMUNE: as duas migrações só dão o aviso. Num banco sem identidade, aplicadas duas vezes, não criam lead.
+- Deno: `grupozap-lead`, `_compartilhado` e `canal-pro-feed`, 103 de 103.
+- curl na função local: os 11 casos (sem código 200, repetido, teste, 401, sondador com uma linha só, 405, 400, tabela travada com 200 em 0,02 s).
+- Site: Vitest 132 arquivos, 2.140 testes; typecheck e lint limpos; Prettier nos arquivos tocados.
+
+**Não verificado:**
+- as telas num navegador;
+- o `EdgeRuntime.waitUntil` no runtime real do Supabase;
+- o `lock_timeout` contra uma trava de outra sessão;
+- a tela "Receber leads no CRM" do Canal Pro, que vem da pesquisa (a central de ajuda recusa acesso automático).
+
+**Para publicar (só na Imova):**
+1. Banco: `publicar-banco.mjs imova migrar`, só a `20261112180000` e a `20261112181000`. A produção já tem tudo da `main` até a `20261112170000`.
+2. Função: `supabase functions deploy grupozap-lead --project-ref kkqadgxvmzulcamuakzk`, de cópia limpa da `main`. Nunca de versão anterior a `bda070d`.
+3. Site da Imova.
+
+Qualquer ordem é segura: a função sem a tabela só registra aviso, e o site sem `entrega` mostra o passo como "falta". Nenhum segredo novo. O worker não muda. Na KOMUNE as migrações só dão o aviso no próximo `komune migrar`.
+
+**Passos do usuário (com o login de administrador da Imova no Canal Pro):**
+1. ☰ → Configurações → Integrações → aba Leads → "Receber leads no CRM" → Configurar. CRM "Desenvolvedor Próprio" (ou "Imova CRM", se estiver na lista), URL `https://kkqadgxvmzulcamuakzk.supabase.co/functions/v1/grupozap-lead`, salvar. Se houver a URL da Arbo, trocar: a Arbo deixa de receber os leads dos portais.
+2. Se a tela não deixar trocar, chamado no suporte (chamado.integracao@olxbr.com) pedindo para ligar a conta à integração de leads do CRM homologado em 10/11/2026.
+3. Manter o e-mail da Imova em "Receber leads no e-mail".
+4. Lead de teste pelo formulário de um anúncio ativo no ZAP. O passo 1 do painel vira "feito" na primeira entrega.
+
+**Decisões tomadas sem o dono:**
+- o lead do WhatsApp não manda o push de lead novo;
+- o número ao lado de Anúncios conta o lead do WhatsApp sem resposta humana (regra de 05/11);
+- a lista esconde o par, mas o banco não junta;
+- lead desmarcado e intocado sai da lista;
+- 14 dias sem chamada real pedem um olhar;
+- a função responde 200 ao lead sem código, contrariando o 4xx da documentação do Grupo OLX, para não arriscar a integração.
+
+**Fora do escopo:**
+- `app.canal_sinal_do_portal` segue vazia (o lead do webhook ainda não marca a chegada);
+- o plano B pelo e-mail de lead;
+- o arquivo do CRM, que segue vazio (0 anúncios no ar): não colar a URL do XML antes de pôr os anúncios no ar.
