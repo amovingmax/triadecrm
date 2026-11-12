@@ -1615,6 +1615,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "agenda_convites_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios_na_lista"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "agenda_convites_calendly_agendamento_id_fkey"
             columns: ["calendly_agendamento_id"]
             isOneToOne: false
@@ -9260,6 +9267,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "visita_imoveis_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios_na_lista"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "visita_imoveis_atualizado_por_fkey"
             columns: ["atualizado_por"]
             isOneToOne: false
@@ -10904,7 +10918,25 @@ export type Database = {
         Args: { p_fim: string; p_inicio: string; p_item: string }
         Returns: undefined
       }
+      agenda_enviar_link: {
+        Args: {
+          p_anuncio_id?: string
+          p_conversation_id: string
+          p_texto?: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
       agenda_espelho_pendencias: { Args: { p_limite?: number }; Returns: Json }
+      agenda_link_previa: {
+        Args: {
+          p_anuncio_id?: string
+          p_conversation_id: string
+          p_texto?: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
       alvo_suprimido: {
         Args: { p_contact_id?: string; p_organization_id: string }
         Returns: boolean
@@ -11348,6 +11380,18 @@ export type Database = {
       }
       ia_alvo_suprimido: {
         Args: { p_payload: Json; p_purpose: string }
+        Returns: Json
+      }
+      ia_atendente_enviar_link: {
+        Args: {
+          p_ai_run_id?: number
+          p_conversation_id: string
+          p_em_resposta_a: string
+          p_imovel_codigo: string
+          p_prompt_version?: string
+          p_texto: string
+          p_tipo: string
+        }
         Returns: Json
       }
       ia_entrada_da_ficha: {

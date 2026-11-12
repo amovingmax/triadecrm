@@ -10334,3 +10334,22 @@ Os três problemas eram: o código da `grupozap-lead` que está no ar só existi
 - "Quem chega só pelo Calendly" continua sem canal de chegada (proposta na resposta do agente: não criar o canal "Calendly"; publicar o link com `utm_source` por lugar e cair em "Outros" sem ele).
 - Ligar o Resend da Imova e, com ele, `emailDeReuniao`.
 - Ficou de fora: o contorno de 4 s do cartão ao tocar no aviso do Meu dia; "Livres no link do Calendly" no dia vazio; a ordem das visitas por bairro; a tela da Rota, que ainda fala de "porta" e de visita sem hora combinada; "Candidato… vira alvo de contato" e "Google Calendar conectado" na nota recolhida do Meu dia; a mensagem de erro de Metas "Só gestor ou admin define meta" (comum às duas empresas). O registro de auditoria (`audit_log`, 12 meses) guarda a linha antiga do agendamento apagado ou anonimizado, como em toda tabela auditada.
+## 12/11/2026 — o convite da Agenda: o link pessoal do Calendly que a IA ou a equipe manda, e o imóvel de toda visita (branch `agenda-convite`; só na Imova; RF-AGE-01, RF-AGE-05)
+
+Pedido do usuário (11/11/2026): "Quero focar na agenda agora para deixar ela completamente integrada e funcional no projeto. Preciso que a IA envie o link da agenda para o cliente marcar o horário da visita ao local ou horário da reunião. Caso seja visita presencial, deverá ter o endereço e o código do imóvel/terreno que será tratado."
+
+É a parte do banco e da Edge Function da Agenda integrada. A tela (`agenda-tela-imovel`), a IA (`agenda-ia-link`, `atendente-imova@v3`) e o acabamento (`agenda-acabamento`) seguem o mesmo contrato.
+
+- **O link pessoal:** `public.agenda_enviar_link` (a equipe) e `public.ia_atendente_enviar_link` (a IA) criam um convite (`public.agenda_convites`, token sorteado, vale 30 dias) e mandam a mensagem pelo caminho de sempre (`insert` em `messages`, com a porteira). O texto leva, na visita, a linha "Imóvel: IM0003 · Rua X, 10, Ponta Negra, Natal" e o link. O modelo nunca escreve URL. `public.agenda_link_previa` mostra exatamente o que sairia (com o mesmo `p_texto`).
+- **O preenchimento:** o link leva o nome, o tipo na opção exata ("Visita a um imóvel" ou "Reunião"), o telefone e, na visita, o código e o endereço, conforme `app_settings['calendly'].perguntas` (a1, a2, a3) e `.opcoes`, mais `utm_source=crm`, `utm_medium=whatsapp`, `utm_campaign=ia|equipe` e `utm_content=<token>`, tudo codificado para URL (`app.url_codificar`). O link público fica em `app_settings['calendly'].link` (gravado pela migração; troca por `public.calendly_link_configurar`, só admin).
+- **A volta do Calendly:** a `calendly-webhook` passa `tracking.utm_content` como `convite`, e `calendly_receber` usa dele a ficha (mesmo com outro e-mail), o tipo e o imóvel. Sem convite, como antes.
+- **Toda visita tem imóvel:** `public.visita_imoveis` (uma linha por visita: código e endereço do anúncio, ou o endereço escrito do imóvel de um proprietário). Entra pelo convite, pela resposta "Endereço ou código do imóvel", por `public.visita_marcar_com_imovel` (Agenda; `visita_marcar` fica intocada, a KOMUNE usa) e por `public.visita_definir_imovel` (corrigir). A visita do Calendly sem imóvel gera, uma vez, a tarefa "Confirmar o imóvel da visita com <cliente>".
+- **A IA:** `ia_respostas.acao` ganha `enviou_link`; a entrada do worker ganha `convites_da_agenda` (os 5 mais novos).
+- **O lembrete da véspera** diz no `{{local}}` o imóvel da visita.
+- **LGPD:** dossiê, retenção e exclusão leem as duas tabelas novas.
+
+**Verificado (12/11/2026):** pgTAP 157 com 130 de 130 no banco local da Imova (numa transação desfeita); Deno da `calendly-webhook` com 25 de 25 e `deno check` limpo; typecheck do schema e do site.
+
+**Para publicar (só na Imova):** o banco (a migração), a Edge Function `calendly-webhook` e o site; o `imova-worker-ai` com o `atendente-imova@v3` só depois do banco.
+
+**Passos do usuário:** no Calendly, as três perguntas nesta ordem: "O que você quer marcar?" (opções exatas "Visita a um imóvel" e "Reunião"), "Telefone (WhatsApp)" e "Endereço ou código do imóvel"; o idioma do convidado em português (`docs/operacao/calendly.md`).
