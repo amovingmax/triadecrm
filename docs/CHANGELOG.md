@@ -10295,11 +10295,12 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 - `wa_saude_numero.origem` aceita `pessoa`, e `public.wa_limite_informar(tier)` (admin e gestor) grava o limite visto no Meta Business; vale até a próxima notícia da Meta. Só no banco da KOMUNE, a migração grava o TIER_2K que o usuário informou ("temos 2k").
 - Worker-wa (`apps/workers/src/whatsapp/saude.ts`): a leitura de meia em meia hora passa a pedir `whatsapp_business_manager_messaging_limit` numa chamada própria (se a Graph recusar o campo, a nota já foi gravada) e grava o tier. Vitest do worker: 564. **Vale só quando o worker da KOMUNE for publicado de novo** (hoje ele roda o código de 27/10 e só foi reiniciado).
 
-**Para publicar (nada no ar):**
-1. Banco da KOMUNE: a migração `20261112100000` (pelo `scripts/publicar-banco.mjs`). Atenção: o banco da KOMUNE tem migrações pendentes seguradas de propósito (as da Imova) e a `20261111100000` do aviso de 30 mensagens, ainda sem commit; decidir se esta sobe sozinha.
-2. Reiniciar o worker-wa da KOMUNE no Fly (ele lê o intervalo de 8–24 s só na subida). Sem código novo no worker.
-3. Site da KOMUNE (Vercel), depois do banco: a tela chama `envio_em_massa_teto` com os campos novos, mas funciona com o banco antigo (só não mostra o que está na fila).
-4. A Imova recebe a migração antes (o script exige), sem efeito nos limites dela.
+**Em produção desde 12/11/2026, ~14h50:**
+- Banco da Imova: `20261112100000` e `20261112110000` (chave `teto_da_meta` desligada: teto 45, como antes; a nota da Meta passou a ser reconhecida também lá, então nota amarela ou vermelha agora pesa no teto da Imova, como já era o desenho).
+- Banco da KOMUNE: as 19 migrações da Imova que estavam seguradas desde 09/11 (decisão do usuário: "subir tudo junto"; cada uma entra sem efeito na KOMUNE), `20261112100000` e `20261112110000`. Conferido: chave ligada, nota GREEN, TIER_2K, teto 2.000, intervalo 8–24 s.
+- Worker-wa da KOMUNE (`triade-worker-wa`, Fly v15, código de 27/10): só reiniciado, para ler o intervalo novo. A leitura do tier pela Graph está na branch e entra na próxima publicação do worker; até lá vale o TIER_2K informado.
+- Site da KOMUNE: `triade-ocaz086r1` (volta: `triade-npxd0dvhb`), da branch `disparos` (main + estes 4 commits), também em `ir.komune.app.br`. Conferido de fora: `/login` 200, `/envios` pede login, `/auth/dev` 404.
+- Branch `disparos` no GitHub; **main não mesclada**.
 
 **Decisão humana:**
 - O limite do dia passou a ser o da Meta em qualquer disparo, sem teto do CRM por baixo (pedido explícito: "não quero que a quantidade seja determinada"). Quem quiser um freio volta a ter um com `update` em `cadencia.tetos` (aquecimento) — os 150/60 só valem sem notícia da Meta.
