@@ -10286,6 +10286,15 @@ Pedido do usuário: "pretendo subir o app na App Store, sendo que o app será pr
 - Navegador, numa pilha Supabase local separada (todas as migrações pelo CLI, sem erro) com o número em TIER_2K verde: a lista mostra "2.000 mensagens ainda cabem · 0 de 2.000 usadas"; o novo disparo com "Quantos = 3" e o modelo "Convite para a feira de noivas" (2 botões na prévia) nasceu com as 3 primeiras fichas; o relógio do `pg_cron` mandou as 3, uma por minuto, como modelo na fila do worker; a lista passou a "1.997 · 3 de 2.000 usadas" com o cartão "Enviando · 3 enviadas". Em 390 px, sem rolagem lateral. O SDR entra na tela, monta disparo e não vê "Criar modelo novo".
 - **Não verificado:** a saída de verdade pela Meta (worker-wa e Graph) e a sincronização de um modelo criado pela tela.
 
+**Ao publicar, o banco da KOMUNE mostrou que o CRM nunca soube o limite da Meta** (`teto_da_meta` nulo, teto 45), por dois motivos antigos, de 25/09:
+- **O número não batia:** o worker-wa grava o número como a Graph escreve (`+55 84 9931-8888`, sem o nono dígito) e a porteira procura `+5584999318888`. 1.982 leituras de nota GREEN, nenhuma valendo.
+- **O tier nunca foi pedido:** a leitura periódica da Graph não pede o limite (o campo antigo, `messaging_limit_tier`, a Meta aposentou; o atual é `whatsapp_business_manager_messaging_limit`), e o webhook `business_capability_update` só avisa quando ele muda.
+
+Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP 158 com 9 casos; worker):
+- `public.wa_saude_registrar` grava o número em E.164 (`app.normalize_phone_br`), e `app.wa_teto_da_meta` compara as linhas antigas pelo mesmo normalizador: a nota verde passa a valer.
+- `wa_saude_numero.origem` aceita `pessoa`, e `public.wa_limite_informar(tier)` (admin e gestor) grava o limite visto no Meta Business; vale até a próxima notícia da Meta. Só no banco da KOMUNE, a migração grava o TIER_2K que o usuário informou ("temos 2k").
+- Worker-wa (`apps/workers/src/whatsapp/saude.ts`): a leitura de meia em meia hora passa a pedir `whatsapp_business_manager_messaging_limit` numa chamada própria (se a Graph recusar o campo, a nota já foi gravada) e grava o tier. Vitest do worker: 564. **Vale só quando o worker da KOMUNE for publicado de novo** (hoje ele roda o código de 27/10 e só foi reiniciado).
+
 **Para publicar (nada no ar):**
 1. Banco da KOMUNE: a migração `20261112100000` (pelo `scripts/publicar-banco.mjs`). Atenção: o banco da KOMUNE tem migrações pendentes seguradas de propósito (as da Imova) e a `20261111100000` do aviso de 30 mensagens, ainda sem commit; decidir se esta sobe sozinha.
 2. Reiniciar o worker-wa da KOMUNE no Fly (ele lê o intervalo de 8–24 s só na subida). Sem código novo no worker.
