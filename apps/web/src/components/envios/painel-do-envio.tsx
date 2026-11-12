@@ -37,7 +37,7 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
   const mudar = useMutation({
     mutationFn: (acao: 'pausar' | 'retomar' | 'cancelar') => mudarEnvio(id ?? '', acao),
     onSuccess: (_r, acao) => {
-      toast.success(acao === 'pausar' ? 'Campanha pausada.' : acao === 'retomar' ? 'Campanha retomada.' : 'Campanha cancelada.');
+      toast.success(acao === 'pausar' ? 'Disparo pausado.' : acao === 'retomar' ? 'Disparo retomado.' : 'Disparo cancelado.');
       void clientes.invalidateQueries({ queryKey: ['envios'] });
     },
     onError: (erro: Error) =>
@@ -52,7 +52,7 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
     <Sheet open={id !== null} onOpenChange={(v) => !v && aoFechar()}>
       <SheetContent className="flex w-full flex-col gap-0 sm:max-w-xl">
         <SheetHeader>
-          <SheetTitle>{envio?.nome ?? 'Campanha'}</SheetTitle>
+          <SheetTitle>{envio?.nome ?? 'Disparo'}</SheetTitle>
           <SheetDescription>
             {envio
               ? `${STATUS_DO_ENVIO[envio.status]} · ${rotuloDaMensagem(envio.modelo)} · ${envio.por_hora} por hora · criada por ${envio.criado_por ?? '—'}`
@@ -95,13 +95,13 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
                   className="toque h-11 text-destructive md:h-9"
                   disabled={mudar.isPending}
                   onClick={() => {
-                    if (window.confirm('Cancelar a campanha? Quem ainda não recebeu não vai receber.')) {
+                    if (window.confirm('Cancelar o disparo? Quem ainda não recebeu não vai receber.')) {
                       mudar.mutate('cancelar');
                     }
                   }}
                 >
                   <X aria-hidden="true" />
-                  Cancelar campanha
+                  Cancelar disparo
                 </Button>
               ) : null}
             </div>

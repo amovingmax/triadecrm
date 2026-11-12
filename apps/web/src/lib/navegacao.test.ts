@@ -72,11 +72,19 @@ describe('NAVEGACAO', () => {
     }
   });
 
-  it('Campanhas e Cadências deixaram de existir, e Registrar saiu do menu (pivô de 06/10/2026)', () => {
+  it('Cadências deixaram de existir, e Registrar saiu do menu (pivô de 06/10/2026)', () => {
     const hrefs = NAVEGACAO.map((item) => item.href);
-    expect(hrefs).not.toContain('/envios');
     expect(hrefs).not.toContain('/cadencias');
     expect(hrefs).not.toContain('/registrar');
+  });
+
+  it('Disparos volta ao menu para quem o banco deixa disparar (12/11/2026)', () => {
+    const disparos = NAVEGACAO.find((item) => item.href === '/envios');
+    expect(disparos?.rotulo).toBe('Disparos');
+    for (const papel of ['admin', 'gestor', 'sdr'] as const) {
+      expect(navegacaoPara(papel).map((item) => item.href)).toContain('/envios');
+    }
+    expect(navegacaoPara('leitura').map((item) => item.href)).not.toContain('/envios');
   });
 
   it('não repete posição na barra, e nenhuma passa de cinco', () => {
@@ -202,6 +210,7 @@ describe('navegacaoPara', () => {
       'Meu dia',
       'Lotes',
       'Conversas',
+      'Disparos',
       'Agenda',
       'Revisão',
       'Prospectados',
@@ -217,6 +226,7 @@ describe('navegacaoPara', () => {
         'Meu dia',
         'Lotes',
         'Conversas',
+        'Disparos',
         'Agenda',
         'Revisão',
         'Prospectados',

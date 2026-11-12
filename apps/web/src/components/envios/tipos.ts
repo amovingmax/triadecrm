@@ -165,12 +165,12 @@ export type Previa = z.infer<typeof previaSchema>;
 // ---------------------------------------------------------------------------
 
 export const STATUS_DO_ENVIO = {
-  agendado: 'Agendada',
+  agendado: 'Agendado',
   enviando: 'Enviando',
-  pausado: 'Pausada',
-  parado: 'Parada pela proteção',
-  concluido: 'Concluída',
-  cancelado: 'Cancelada',
+  pausado: 'Pausado',
+  parado: 'Parado pela proteção',
+  concluido: 'Concluído',
+  cancelado: 'Cancelado',
 } as const;
 export type StatusDoEnvio = keyof typeof STATUS_DO_ENVIO;
 

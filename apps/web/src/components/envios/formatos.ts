@@ -2,6 +2,7 @@ import { EMPRESA } from '@/lib/empresa';
 
 import {
   CAMPOS_DA_FICHA,
+  type AcaoDoBotao,
   type CampoDaFicha,
   type Contagem,
   type FiltroDoPublico,
@@ -97,8 +98,8 @@ export function fraseDoMotivo(motivo: string | null | undefined): string {
 }
 
 const RECUSAS_DO_LOTE: Record<string, string> = {
-  sem_permissao: 'Só admin e gestor montam e controlam campanhas.',
-  nome_invalido: 'Dê um nome à campanha (até 120 letras).',
+  sem_permissao: 'Só admin, gestor e SDR montam e controlam disparos.',
+  nome_invalido: 'Dê um nome ao disparo (até 120 letras).',
   tipo_invalido: 'Escolha entre modelo aprovado e texto livre.',
   modelo_inexistente: 'Este modelo não existe mais. Escolha outro.',
   modelo_nao_aprovado_na_meta: 'A Meta ainda não aprovou este modelo.',
@@ -106,12 +107,12 @@ const RECUSAS_DO_LOTE: Record<string, string> = {
   variavel_sem_regra: 'Uma variável ficou sem regra.',
   variavel_longa_demais: 'O texto de uma variável ficou longo demais.',
   publico_vazio: 'Ninguém marcado para receber.',
-  publico_grande_demais: 'No máximo 2.000 pessoas por campanha.',
-  ritmo_invalido: 'O ritmo vai de 1 a 60 mensagens por hora.',
+  publico_grande_demais: 'No máximo 2.000 pessoas por disparo.',
+  ritmo_invalido: 'O ritmo vai de 1 a 300 mensagens por hora.',
   inicio_distante_demais: 'Agende para no máximo 30 dias à frente.',
   assinatura_invalida: 'Escolha quem assina.',
   atendente_invalido: 'Um dos atendentes escolhidos não está ativo ou não pode enviar.',
-  envio_inexistente: 'Esta campanha não existe mais. Atualize a tela.',
+  envio_inexistente: 'Este disparo não existe mais. Atualize a tela.',
   modelo_tem_atendente: `Este modelo diz "aqui é {{atendente}}". Em nome da ${EMPRESA.nome}, escolha um modelo sem nome de atendente.`,
   acoes_invalidas: 'Confira o que acontece em cada botão: o link precisa de texto e de rótulo.',
   destino_invalido: 'O destino do link precisa começar com https://.',
@@ -123,7 +124,8 @@ const RECUSAS_DO_LOTE: Record<string, string> = {
   variavel_na_borda: 'A mensagem não pode começar nem terminar com uma variável: a Meta recusa.',
   variaveis_coladas: 'Há duas variáveis coladas: ponha texto entre elas.',
   botoes_invalidos: 'Até 3 botões de até 25 letras, no máximo 1 de link, sem textos repetidos.',
-  acao_invalida_no_estado: 'A campanha mudou de estado. Atualize a tela.',
+  acao_invalida_no_estado: 'O disparo mudou de estado. Atualize a tela.',
+  sem_permissao_modelo: 'Só admin e gestor criam modelos: é catálogo, como em Ajustes.',
 };
 
 export function fraseDaRecusa(motivo: string | undefined, variavel?: string): string {
@@ -155,6 +157,58 @@ export function duracaoEstimada(
   if (dias > 1) return `cerca de ${dias} dias úteis`;
   if (horas < 1) return `cerca de ${Math.max(1, Math.round(horas * 60))} min`;
   return `cerca de ${Math.round(horas * 10) / 10} h`.replace('.', ',');
+}
+
+/**
+ * Quem recebe, dada a quantidade escolhida: os N primeiros dos marcados, na
+ * ordem da lista. `null` (ou vazio) é "todos os marcados". A quantidade é
+ * escolha de quem dispara (12/11/2026: "eu não quero que a quantidade seja
+ * determinada"); o limite do dia é só o da Meta.
+ */
+export function aplicarQuantidade<T>(marcados: readonly T[], quantidade: number | null): T[] {
+  if (quantidade === null || !Number.isFinite(quantidade)) return [...marcados];
+  return marcados.slice(0, Math.max(0, Math.floor(quantidade)));
+}
+
+/**
+ * Quantas destas mensagens cabem hoje e quantas ficam para o próximo dia útil.
+ * Conta só quem ABRE conversa (quem está com a janela de 24 h aberta não gasta
+ * o limite) e desconta o que os disparos em curso já vão mandar.
+ */
+export function divisaoDoDia(
+  abrem: number,
+  sobra: number | null,
+  naFila: number,
+): { hoje: number; depois: number } | null {
+  if (sobra === null) return null;
+  const cabe = Math.max(sobra - naFila, 0);
+  return { hoje: Math.min(abrem, cabe), depois: Math.max(abrem - cabe, 0) };
+}
+
+/**
+ * O que a tela sugere para cada botão de resposta: "Agora não" e parecidos
+ * encerram o contato; o resto manda o link — é a ação que o envio quer.
+ */
+export function acaoSugerida(textoDoBotao: string): AcaoDoBotao {
+  if (/agora n[aã]o|n[aã]o quero|sair|parar|sem interesse/i.test(textoDoBotao)) return { acao: 'sair' };
+  return {
+    acao: 'link',
+    texto: 'Que bom! O cadastro leva 5 minutos e é grátis. É só tocar no botão abaixo.',
+    botao: 'Criar meu perfil',
+  };
+}
+
+/** As ações dos botões de resposta de um modelo, mantendo as que já foram editadas. */
+export function acoesPara(
+  botoes: readonly { tipo: string; texto: string }[],
+  anteriores: Record<string, AcaoDoBotao>,
+): Record<string, AcaoDoBotao> {
+  const acoes: Record<string, AcaoDoBotao> = {};
+  for (const b of botoes) {
+    if (b.tipo !== 'resposta') continue;
+    acoes[b.texto] = anteriores[b.texto] ?? acaoSugerida(b.texto);
+  }
+  return acoes;
 }
 
 /** Fração do lote já decidida (enviada, pulada ou cancelada), de 0 a 1. */
@@ -212,6 +266,11 @@ export function formatarReais(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
 }
 
+/** Número inteiro com o ponto de milhar: "2.000". */
+export function formatarNumero(valor: number): string {
+  return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(valor);
+}
+
 /**
  * Quantos filtros estão ligados dentro de "Mais filtros". O botão mostra o
  * número: filtro escondido e esquecido é público menor sem ninguém saber por quê.
@@ -225,7 +284,7 @@ export function filtrosEscondidos(f: FiltroDoPublico): number {
   );
 }
 
-/** Como a lista chama a mensagem da campanha: os três cumprimentos são um só. */
+/** Como a lista chama a mensagem do disparo: os três cumprimentos são um só. */
 export function rotuloDaMensagem(modelo: string | null): string {
   if (modelo === null) return 'Texto livre';
   return /cumprimento solto/i.test(modelo) ? 'Cumprimento' : modelo;
