@@ -46,7 +46,7 @@
  *   · `--conectar`            liga o número de ponta a ponta (`whatsapp/conectar.ts`);
  *   · `--sincronizar-modelos` só a passada dos modelos.
  */
-import { avisarPorEmail, type EntradaParaAviso } from '../whatsapp/aviso-por-email';
+import { avisarDoAcumulo } from '../whatsapp/aviso-por-email';
 import { recuperarMidias } from '../whatsapp/midias-atrasadas';
 import { criarSincronizacaoDaAgenda } from '../agenda/sincronizar';
 import { avisarDasReunioes } from '../whatsapp/reuniao-avisos';
@@ -64,8 +64,10 @@ import {
   FILA_ENTRADA,
   lerFila,
   lerConfigDeEnvio,
+  conferirAcumulo,
   lerConfigDoAviso,
-  lerConversasParaAviso,
+  registrarAvisoDeAcumulo,
+  type ClienteDoBanco,
 } from '../whatsapp/ponte';
 import { contagensDaSaidaZeradas, drenarSaida, type ContextoDaSaida } from '../whatsapp/saida';
 import { configDaConexao, conectarNumero } from '../whatsapp/conectar';
@@ -81,6 +83,7 @@ import { dormir } from '../lib/dormir';
 import { criarPulso } from '../lib/pulso';
 
 import type { WorkerContext } from '../lib/context';
+import type { Logger } from '../lib/log';
 
 /** Descanso entre voltas quando as duas filas estão vazias. */
 const DESCANSO_MS = 5_000;
@@ -105,6 +108,14 @@ const INTERVALO_DA_RECUPERACAO_MS = 10 * 60_000;
  * Calendly reler o Google Agenda.
  */
 const INTERVALO_DA_AGENDA_MS = 15_000;
+
+/**
+ * De quanto em quanto o worker confere se as mensagens sem resposta passaram do
+ * limite do aviso por e-mail (`aviso-por-email.ts`). O e-mail é para quando a
+ * fila cresce, não para a mensagem que acabou de chegar: um minuto basta, e é
+ * uma consulta só.
+ */
+const INTERVALO_DO_ACUMULO_MS = 60_000;
 
 export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
   const { env, logger, opcoes } = ctx;
@@ -202,7 +213,6 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
     cliente,
     graph,
     logger,
-    chegaram: [],
     balde: BALDE_DE_MIDIAS,
     supabaseUrl: env.SUPABASE_URL,
     chaveServico: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -272,6 +282,7 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
   let falhas = 0;
   let proximaRecuperacao = 0;
   let proximaAgenda = 0;
+  let proximoAcumulo = 0;
 
   try {
     for (;;) {
@@ -291,9 +302,13 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
         },
         () => parando,
       );
-      // 1b · Avisar o time. Um e-mail por lote: cinco mensagens em dez segundos
-      //      são uma conversa, e cinco e-mails são ruído.
-      await avisarDoQueChegou(contextoDaEntrada, env.RESEND_API_KEY);
+      // 1b · Avisar o time por e-mail só quando acumula: mais de 30 mensagens
+      //      sem resposta desde o último aviso (11/11/2026). Uma conferência
+      //      por minuto; nunca lança.
+      if (Date.now() >= proximoAcumulo) {
+        proximoAcumulo = Date.now() + INTERVALO_DO_ACUMULO_MS;
+        await avisarSeAcumulou(cliente, env.RESEND_API_KEY, logger);
+      }
 
       // 1c · Reunião marcada: um e-mail por reunião. A reunião JÁ está
       //      gravada e já foi confirmada ao parceiro quando isto roda — se o
@@ -372,32 +387,24 @@ export async function runWa(ctx: WorkerContext<'wa'>): Promise<number> {
  * procurar mensagem de fornecedor no meio das falhas do Radar.
  */
 /**
- * Manda o aviso do lote e esvazia a lista. Nada aqui derruba o laço: o e-mail é
- * conforto do time, e a mensagem do parceiro já está gravada.
+ * Confere a conta das mensagens sem resposta e, se o banco disser que passou do
+ * limite, manda o e-mail e registra o aviso — só depois que o Resend aceitou,
+ * para que um e-mail que falhou seja tentado de novo na próxima conferência.
+ * Nada aqui derruba o laço: o e-mail é conforto do time, e as mensagens já
+ * estão gravadas.
  */
-async function avisarDoQueChegou(ctx: ContextoDaEntrada, chave: string | undefined): Promise<void> {
-  const chegaram = ctx.chegaram ?? [];
-  if (chegaram.length === 0) return;
-  ctx.chegaram = [];
+async function avisarSeAcumulou(
+  cliente: ClienteDoBanco,
+  chave: string | undefined,
+  logger: Logger,
+): Promise<void> {
   try {
-    const config = await lerConfigDoAviso(ctx.cliente);
+    const config = await lerConfigDoAviso(cliente);
     if (!config.ativo || config.para.length === 0) return;
-    const conversas = await lerConversasParaAviso(
-      ctx.cliente,
-      chegaram.map((c) => c.conversationId),
-    );
-    const entradas: EntradaParaAviso[] = chegaram.map((c) => {
-      const conversa = conversas.get(c.conversationId);
-      return {
-        ficha: conversa?.ficha ?? null,
-        organizationId: conversa?.organization_id ?? null,
-        telefone: conversa?.telefone ?? null,
-        opcao: conversa?.opcao ?? null,
-        texto: c.texto,
-      };
-    });
-    await avisarPorEmail(
-      entradas,
+    const acumulo = await conferirAcumulo(cliente);
+    if (!acumulo.mandar) return;
+    const mandou = await avisarDoAcumulo(
+      acumulo,
       {
         ativo: config.ativo,
         para: config.para,
@@ -406,10 +413,11 @@ async function avisarDoQueChegou(ctx: ContextoDaEntrada, chave: string | undefin
         urlDoCrm: config.url_do_crm,
       },
       chave,
-      ctx.logger,
+      logger,
     );
+    if (mandou) await registrarAvisoDeAcumulo(cliente, acumulo);
   } catch (erro) {
-    ctx.logger.error('aviso do lote falhou', { erro: (erro as Error).message });
+    logger.error('aviso das mensagens acumuladas falhou', { erro: (erro as Error).message });
   }
 }
 

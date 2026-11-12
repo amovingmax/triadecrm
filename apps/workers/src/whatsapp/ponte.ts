@@ -20,6 +20,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import type { AvisoDeReuniao } from './aviso-de-reuniao';
+import type { Acumulo } from './aviso-por-email';
 
 export type ClienteDoBanco = SupabaseClient;
 
@@ -939,7 +940,7 @@ export async function configurarNumero(
 }
 
 // ---------------------------------------------------------------------------
-// O aviso por e-mail (migração 20260916120000)
+// O aviso por e-mail (migrações 20260916120000 e 20261111100000)
 // ---------------------------------------------------------------------------
 
 export interface ConfigDoAvisoCrua {
@@ -979,41 +980,44 @@ export async function lerConfigDoAviso(cliente: ClienteDoBanco): Promise<ConfigD
   };
 }
 
-export interface ConversaParaAviso {
-  id: string;
-  organization_id: string | null;
-  ficha: string | null;
-  telefone: string | null;
-  opcao: string | null;
+/**
+ * A conta das mensagens novas sem resposta desde o último aviso
+ * (`public.aviso_de_acumulo_conferir`, migração 20261111100000). A regra e o
+ * limite moram no banco; aqui só se traduzem nomes de coluna em nomes de campo.
+ */
+export async function conferirAcumulo(cliente: ClienteDoBanco): Promise<Acumulo> {
+  const r = objeto(await rpc<unknown>(cliente, 'aviso_de_acumulo_conferir', {}));
+  const lista = Array.isArray(r.lista) ? r.lista : [];
+  return {
+    mandar: r.mandar === true,
+    limite: Number(r.limite ?? 30),
+    mensagens: Number(r.mensagens ?? 0),
+    conversas: Number(r.conversas ?? 0),
+    ate: texto(r.ate),
+    lista: lista.map((linha) => {
+      const l = objeto(linha);
+      return {
+        conversationId: texto(l.conversation_id) ?? '',
+        organizationId: texto(l.organization_id),
+        nome: texto(l.nome),
+        finalDoNumero: texto(l.final_do_numero),
+        mensagens: Number(l.mensagens ?? 0),
+        ultima: typeof l.ultima === 'string' ? l.ultima : null,
+      };
+    }),
+  };
 }
 
-/**
- * Quem é quem, para o e-mail: nome da ficha (quando o número é conhecido), a
- * escolha do menu do bot e o telefone — de que o aviso só usa os quatro últimos
- * dígitos (RF-BAS-14).
- */
-export async function lerConversasParaAviso(
+/** Registra o aviso que o Resend aceitou: a próxima conta começa depois de `ate`. */
+export async function registrarAvisoDeAcumulo(
   cliente: ClienteDoBanco,
-  ids: readonly string[],
-): Promise<Map<string, ConversaParaAviso>> {
-  const mapa = new Map<string, ConversaParaAviso>();
-  if (ids.length === 0) return mapa;
-  const { data, error } = await cliente
-    .from('conversations')
-    .select('id, organization_id, peer_phone_e164, bot_opcao, organizations(name)')
-    .in('id', [...new Set(ids)]);
-  if (error || !data) return mapa;
-  for (const linha of data as unknown as Record<string, unknown>[]) {
-    const org = objeto(linha.organizations);
-    mapa.set(String(linha.id), {
-      id: String(linha.id),
-      organization_id: typeof linha.organization_id === 'string' ? linha.organization_id : null,
-      ficha: typeof org.name === 'string' ? org.name : null,
-      telefone: typeof linha.peer_phone_e164 === 'string' ? linha.peer_phone_e164 : null,
-      opcao: typeof linha.bot_opcao === 'string' ? linha.bot_opcao : null,
-    });
-  }
-  return mapa;
+  acumulo: Pick<Acumulo, 'ate' | 'mensagens' | 'conversas'>,
+): Promise<void> {
+  await rpc<null>(cliente, 'aviso_de_acumulo_registrar', {
+    p_ate: acumulo.ate,
+    p_mensagens: acumulo.mensagens,
+    p_conversas: acumulo.conversas,
+  });
 }
 
 // ---------------------------------------------------------------------------
