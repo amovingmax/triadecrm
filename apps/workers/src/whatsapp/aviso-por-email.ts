@@ -1,40 +1,55 @@
 /**
- * O aviso que chega ao time quando alguém escreve para a Komune no WhatsApp.
+ * O aviso por e-mail das mensagens que acumulam no WhatsApp.
  *
  * POR QUE ISTO EXISTE
  * ---------------------------------------------------------------------------
- * O número da KOMUNE vive só na Cloud API (decisão de 14/09/2026): ele não toca
- * em celular nenhum, e por isso ninguém ouve "plim". Sem aviso, a mensagem que
- * chegou às 9h fica esperando alguém abrir a tela Conversas — e a janela de 24 h
- * da Meta corre do mesmo jeito.
+ * O número vive só na Cloud API (decisão de 14/09/2026): ele não toca em
+ * celular nenhum. De 16/09 a 11/11/2026 o worker mandava um e-mail a cada lote
+ * que chegava; com o aviso no navegador e no celular, aquilo virou ruído.
  *
- * O aviso é E-MAIL, pelo Resend (pedido do Rafael em 16/09/2026). Um e-mail por
- * lote da fila, não um por mensagem: cinco mensagens de uma pessoa em dez
- * segundos são uma conversa, e cinco e-mails seriam ruído — que é como um aviso
- * deixa de ser lido.
+ * Desde 11/11/2026 ("precisamos tirar os avisos de mensagem por email, coloque
+ * aviso no email agora, quando tiver mais de 30 novas mensagens") o e-mail só
+ * sai quando passam de 30 as mensagens NOVAS sem resposta do time, contadas
+ * desde o último aviso. Quem decide é o banco (`public.aviso_de_acumulo_conferir`,
+ * migração 20261112120000): a regra do que é "nova", o limite e o marco de onde
+ * a conta recomeça moram lá. Este arquivo só escreve e manda o e-mail.
  *
  * O QUE VAI NO E-MAIL, E O QUE NÃO VAI
  * ---------------------------------------------------------------------------
- * Vai o suficiente para decidir se é agora: quem escreveu (nome da ficha, ou o
- * fim do número quando não é ficha), o que a pessoa escolheu no menu do bot e a
- * primeira linha da mensagem. NÃO vai o número inteiro nem o histórico: e-mail é
- * caixa de entrada de gente, fora da RLS do CRM, e telefone completo lá é PII
- * exportada sem `pii_access_log` (RF-BAS-14). Quem quer o resto abre o CRM — e o
- * e-mail leva o link direto da conversa.
+ * Quantas são, em quantas conversas, e as dez conversas com mais mensagens
+ * esperando: nome da ficha (ou do perfil), o fim do número quando não há nome,
+ * a última mensagem e o link direto. NÃO vai o número inteiro nem o histórico:
+ * e-mail é caixa de entrada de gente, fora da RLS do CRM, e telefone completo
+ * lá é PII exportada sem `pii_access_log` (RF-BAS-14). O banco já devolve só os
+ * quatro últimos dígitos.
  */
 
 import type { Logger } from '../lib/log';
 
-/** Uma mensagem que chegou, do jeito que o aviso precisa dela. */
-export interface EntradaParaAviso {
-  /** Nome da ficha, quando o número é conhecido. */
-  ficha: string | null;
+/** Uma conversa da lista do e-mail, como `aviso_de_acumulo_conferir` devolve. */
+export interface ConversaDoAcumulo {
+  conversationId: string;
   organizationId: string | null;
-  /** E.164 — usado só para tirar os quatro últimos dígitos. */
-  telefone: string | null;
-  texto: string | null;
-  /** O que a pessoa escolheu no menu do bot de entrada, quando escolheu. */
-  opcao: string | null;
+  /** Nome da ficha ou, sem ficha, o nome do perfil no WhatsApp. */
+  nome: string | null;
+  /** Os quatro últimos dígitos do número; o resto não sai do banco. */
+  finalDoNumero: string | null;
+  mensagens: number;
+  /** A última mensagem que a pessoa escreveu (nulo em áudio, imagem, documento). */
+  ultima: string | null;
+}
+
+/** A conta das mensagens novas sem resposta, desde o último aviso. */
+export interface Acumulo {
+  /** A decisão do banco: passou do limite. */
+  mandar: boolean;
+  limite: number;
+  mensagens: number;
+  conversas: number;
+  /** A chegada mais recente contada: o próximo aviso conta depois dela. */
+  ate: string | null;
+  /** As dez conversas com mais mensagens esperando. */
+  lista: ConversaDoAcumulo[];
 }
 
 export interface ConfiguracaoDoAviso {
@@ -52,46 +67,55 @@ export interface ConfiguracaoDoAviso {
 
 const RESEND = 'https://api.resend.com/emails';
 
-/** "terminado em 4698": o mesmo recorte que a tela usa (RF-BAS-14). */
-export function finalDoNumero(e164: string | null): string {
-  const digitos = (e164 ?? '').replace(/\D/g, '');
-  return digitos.length >= 4 ? `terminado em ${digitos.slice(-4)}` : 'sem número';
+/** Como a conversa aparece no e-mail: o nome, ou o fim do número (RF-BAS-14). */
+export function quemEscreveu(c: Pick<ConversaDoAcumulo, 'nome' | 'finalDoNumero'>): string {
+  if (c.nome) return c.nome;
+  return c.finalDoNumero ? `Número terminado em ${c.finalDoNumero}` : 'Número sem identificação';
 }
 
-export function quemEscreveu(entrada: EntradaParaAviso): string {
-  return entrada.ficha ?? `Número ${finalDoNumero(entrada.telefone)}`;
-}
-
-/** Primeira linha do que a pessoa escreveu, curta o bastante para caber no assunto. */
+/** Primeira linha do que a pessoa escreveu, curta o bastante para o e-mail. */
 export function primeiraLinha(texto: string | null, limite = 120): string {
   const limpo = (texto ?? '').replace(/\s+/g, ' ').trim();
   if (limpo === '') return '(sem texto: áudio, imagem ou documento)';
   return limpo.length > limite ? `${limpo.slice(0, limite - 1)}…` : limpo;
 }
 
-export function assuntoDoAviso(entradas: readonly EntradaParaAviso[]): string {
-  if (entradas.length === 1) {
-    const e = entradas[0]!;
-    return `WhatsApp: ${quemEscreveu(e)} — ${primeiraLinha(e.texto, 60)}`;
-  }
-  return `WhatsApp: ${entradas.length} mensagens novas`;
+/** O link que abre a conversa certa: a ficha, ou a conversa do cliente sem ficha. */
+export function linkDaConversa(c: ConversaDoAcumulo, urlDoCrm: string): string {
+  return c.organizationId
+    ? `${urlDoCrm}/conversas?org=${c.organizationId}`
+    : `${urlDoCrm}/conversas?cliente=${c.conversationId}`;
+}
+
+function plural(n: number, um: string, varios: string): string {
+  return `${n} ${n === 1 ? um : varios}`;
+}
+
+export function assuntoDoAcumulo(a: Acumulo): string {
+  return `WhatsApp: ${a.mensagens} mensagens novas sem resposta`;
 }
 
 /** O corpo em texto puro. Sem HTML: e-mail de aviso se lê no relógio e no celular. */
-export function corpoDoAviso(entradas: readonly EntradaParaAviso[], urlDoCrm: string): string {
-  const linhas = entradas.map((e) => {
-    const onde = e.organizationId
-      ? `${urlDoCrm}/conversas?org=${e.organizationId}`
-      : `${urlDoCrm}/conversas?aba=fora`;
-    const escolha = e.opcao ? `\n  Escolheu no menu: ${e.opcao}` : '';
-    return `• ${quemEscreveu(e)}${escolha}\n  "${primeiraLinha(e.texto, 280)}"\n  ${onde}`;
-  });
+export function corpoDoAcumulo(a: Acumulo, urlDoCrm: string): string {
+  const linhas = a.lista.map(
+    (c) =>
+      `• ${quemEscreveu(c)}: ${plural(c.mensagens, 'mensagem', 'mensagens')}\n` +
+      `  "${primeiraLinha(c.ultima, 280)}"\n` +
+      `  ${linkDaConversa(c, urlDoCrm)}`,
+  );
+  const fora = a.conversas - a.lista.length;
   return [
-    entradas.length === 1
-      ? 'Chegou uma mensagem no WhatsApp da Komune.'
-      : `Chegaram ${entradas.length} mensagens no WhatsApp da Komune.`,
+    `Chegaram ${plural(a.mensagens, 'mensagem', 'mensagens')} no WhatsApp que ainda não ` +
+      `tiveram resposta do time, em ${plural(a.conversas, 'conversa', 'conversas')}.`,
+    `Este e-mail só sai quando passam de ${a.limite}. O próximo só sai se acumularem ` +
+      `mais ${a.limite + 1} sem resposta.`,
+    '',
+    'Onde há mais mensagens esperando:',
     '',
     ...linhas,
+    ...(fora > 0 ? ['', `E mais ${plural(fora, 'conversa', 'conversas')} na tela Conversas.`] : []),
+    '',
+    `Abrir as Conversas: ${urlDoCrm}/conversas`,
     '',
     'Responder é pelo CRM: o número não abre no celular (ele vive na Cloud API).',
     'A janela de resposta livre da Meta dura 24 h depois da última mensagem da pessoa.',
@@ -103,9 +127,9 @@ export function corpoDoAviso(entradas: readonly EntradaParaAviso[], urlDoCrm: st
  *
  * DUAS COISAS MUDAM NA EXTRAÇÃO, E AS DUAS SÃO OBRIGATÓRIAS.
  *
- * 1. `avisarPorEmail` engole o erro e devolve `false`, e para a fila de
- *    ENTRADA isso está certo: aviso que derruba a fila é pior que aviso que
- *    não chega. Para uma fila COM RETENTATIVA está errado — mensagem que
+ * 1. `avisarDoAcumulo` engole o erro e devolve `false`, e para ele isso está
+ *    certo: aviso que derruba o laço do worker é pior que aviso que não
+ *    chega. Para uma fila COM RETENTATIVA está errado — mensagem que
  *    "deu certo" é arquivada, e as cinco tentativas prometidas nunca
  *    acontecem. Então o resultado é discriminado.
  *
@@ -176,21 +200,21 @@ export async function enviarPeloResend(
 }
 
 /**
- * Manda o aviso da fila de ENTRADA. Nunca lança, e continua devolvendo
- * booleano: aviso que derruba a fila de entrada é pior que aviso que não
- * chega — a mensagem do parceiro já está gravada quando isto roda.
+ * Manda o aviso das mensagens acumuladas. Nunca lança: devolve `true` só quando
+ * o Resend aceitou, e é só aí que o worker registra o aviso e a conta recomeça.
+ * Se falhou, a próxima conferência tenta de novo.
  */
-export async function avisarPorEmail(
-  entradas: readonly EntradaParaAviso[],
+export async function avisarDoAcumulo(
+  acumulo: Acumulo,
   config: ConfiguracaoDoAviso,
   chave: string | undefined,
   logger: Logger,
   buscar: typeof fetch = fetch,
 ): Promise<boolean> {
-  if (entradas.length === 0) return false;
+  if (!acumulo.mandar || acumulo.mensagens === 0) return false;
   const r = await enviarPeloResend(
-    assuntoDoAviso(entradas),
-    corpoDoAviso(entradas, config.urlDoCrm),
+    assuntoDoAcumulo(acumulo),
+    corpoDoAcumulo(acumulo, config.urlDoCrm),
     config,
     config.para,
     chave,

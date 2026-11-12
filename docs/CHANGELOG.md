@@ -10305,3 +10305,32 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 **Decisão humana:**
 - O limite do dia passou a ser o da Meta em qualquer disparo, sem teto do CRM por baixo (pedido explícito: "não quero que a quantidade seja determinada"). Quem quiser um freio volta a ter um com `update` em `cadencia.tetos` (aquecimento) — os 150/60 só valem sem notícia da Meta.
 - Na KOMUNE, o intervalo do worker caiu para 8–24 s em toda mensagem iniciada pela empresa, não só nos disparos.
+
+## 11/11/2026 — o aviso por e-mail só quando passam de 30 mensagens sem resposta (branch `aviso-por-email-30-mensagens`; RF-CON-05)
+
+**Pedido do usuário:** "precisamos tirar os avisos de mensagem por email, coloque aviso no email agora, quando tiver mais de 30 novas mensagens".
+
+**Entregue (banco + worker-wa; nenhuma tela):**
+- **Sai o e-mail a cada lote** que chegava no WhatsApp (de 16/09/2026): `avisarDoQueChegou`, `ContextoDaEntrada.chegaram` e `lerConversasParaAviso` foram apagados.
+- **Entra o e-mail do acúmulo** (`20261112120000_aviso_por_email_so_no_acumulo.sql (nasceu 20261112120000; renomeada em 12/11 para ficar depois das que já estavam em produção)`):
+  - "Nova" é a regra da marca "Nova" e do número do menu (`avisos/dados.ts`): a mensagem chegou depois da última resposta do time na conversa (saída do CRM, por gente ou pela IA que atende, que não é modelo e não falhou). Não contam reação, mensagem apagada pela pessoa nem conversa concluída.
+  - **A conta recomeça a cada aviso:** só entra o que chegou depois do último e-mail (`avisos_de_acumulo.ate`). Sem isso, a fila antiga sem resposta deixaria a conta acima de 30 para sempre. O time em dia não recebe nada; o segundo e-mail só sai com mais 31 sem resposta depois do primeiro. A linha de partida da migração deixa de fora o que chegou antes dela.
+  - `public.aviso_de_acumulo_conferir()` devolve a decisão (`mandar`), o total, as conversas e as dez com mais mensagens esperando (nome da ficha ou do perfil, **só os quatro últimos dígitos** do número, a última mensagem). `public.aviso_de_acumulo_registrar()` grava o aviso **depois** que o Resend aceitou: se o e-mail falhar, a próxima conferência tenta de novo, e o marco nunca volta para trás. As duas só com a chave de serviço; `avisos_de_acumulo` só a gestão lê, e ninguém escreve pela tela.
+  - O limite é `notificacoes.email.mais_de_mensagens` (30). "Mais de" é mais de: 30 não manda, 31 manda.
+- **worker-wa:** confere uma vez por minuto (`INTERVALO_DO_ACUMULO_MS`) e manda um e-mail só ("WhatsApp: 31 mensagens novas sem resposta"), com os links de cada conversa (`?org=` com ficha, `?cliente=` sem) e o da tela Conversas. O texto não diz mais "WhatsApp da Komune". Nunca derruba o laço.
+- **O e-mail de reunião marcada (ADR-15) não muda**: continua pela mesma chave `notificacoes.email`.
+- pgTAP 159 (20 provas); `aviso-por-email.test.ts` reescrito (10 provas).
+
+**Verificado:** no banco local (com as migrações até 20261112120000 aplicadas), o pgTAP 159 passou e o `supabase db lint` não acusou nada; o worker chamou `aviso_de_acumulo_conferir` pelo supabase-js com a chave de serviço. Worker: typecheck, eslint e 537 testes do Vitest verdes. A suíte inteira de pgTAP no banco local tem falhas fora desta entrega: testes da Imova sem o banco da Imova (125–143), testes que dependem de data (74) e estado local (47, 52, 68, 83). O CI recria o banco do zero.
+
+**O aviso de 30 não está no ar.** Produção conferida (só leitura, `publicar-banco.mjs conferir`): o banco da Imova tem só esta migração pendente; o da KOMUNE tem 12 pendentes, 11 delas de entregas que foram só para a Imova, de propósito (09 e 10/11). O `triade-worker-wa` da KOMUNE roda o código de 27/10, e desde então o código do worker mudou em 34 arquivos.
+
+**Paliativo em produção na KOMUNE (11/11/2026, 14h51; escolha do usuário: "Parar os e-mails já"):** `notificacoes.email.para` passou de `["komune@komune.app.br"]` para `[]` no banco da KOMUNE (`supabase db query --linked --project-ref toqdjcajyrowutunczhr`). No worker de 27/10, que é o que está no ar, a lista vazia faz o e-mail de cada mensagem parar na hora. O e-mail de reunião marcada continua indo para quem atende a reunião, mas não vai mais para a caixa do time. Nada mais mudou: nem migração, nem worker, nem site.
+
+**Pendente:**
+- **Ao publicar o aviso de 30 na KOMUNE, devolver a lista**, senão ele também não sai: `update public.app_settings set value = jsonb_set(value, '{para}', '["komune@komune.app.br"]'::jsonb), updated_at = now() where key = 'notificacoes.email';`
+- Publicar o aviso de 30 na KOMUNE: o banco de lá tem 12 migrações pendentes (11 de entregas só da Imova) e o worker roda o código de 27/10. Ou se leva tudo, ou só esta mudança, à mão e fora do caminho do `publicar-banco.mjs`.
+
+**Decisão humana:**
+- Quando e como publicar o aviso de 30 na KOMUNE (o item acima).
+- 30 é o limite pedido; o número fica em `app_settings` e pode mudar sem código.
