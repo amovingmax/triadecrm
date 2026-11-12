@@ -12,7 +12,7 @@
 import { createClient } from '@/lib/supabase/client';
 
 import type { Resultado } from '../dados';
-import type { LeadDoPortal, SituacaoDoLead } from './leads-rotulos';
+import { ORIGEM_WHATSAPP, type LeadDoPortal, type SituacaoDoLead } from './leads-rotulos';
 
 export const CHAVE_DOS_LEADS = ['anuncios', 'leads'] as const;
 export const CHAVE_DA_LISTA_DE_LEADS = [...CHAVE_DOS_LEADS, 'lista'] as const;
@@ -25,7 +25,7 @@ export const CHAVE_DOS_LEADS_NOVOS = [...CHAVE_DOS_LEADS, 'novos'] as const;
 export const TETO_DOS_LEADS = 1000;
 
 const COLUNAS =
-  'id, origem, origin_lead_id, origem_no_portal, client_listing_id, origin_listing_id, anuncio_id, anuncio_no_canal_pro_id, organization_id, tipos, temperatura, transacao, lead_certo, mcmv, mensagem, link_historico, recebido_no_portal_em, recebido_em, situacao, situacao_registrada, responsavel_id, responsavel_nome, motivo_descarte, situacao_em, situacao_por, suprimido, ficha_nome, nome_no_portal, phone_e164, email, phone_is_masked, anuncio_codigo, anuncio_titulo, conversation_id, grupo, chegou_por, chegou_em, primeira_mensagem, primeira_mensagem_tipo, respondido_em, respondido_por_nome, contato_apagado_em';
+  'id, origem, origin_lead_id, origem_no_portal, client_listing_id, origin_listing_id, anuncio_id, anuncio_no_canal_pro_id, organization_id, tipos, temperatura, transacao, lead_certo, mcmv, mensagem, link_historico, recebido_no_portal_em, recebido_em, situacao, situacao_registrada, responsavel_id, responsavel_nome, motivo_descarte, situacao_em, situacao_por, suprimido, ficha_nome, nome_no_portal, phone_e164, email, phone_is_masked, anuncio_codigo, anuncio_titulo, conversation_id, grupo, chegou_por, chegou_em, primeira_mensagem, primeira_mensagem_tipo, respondido_em, respondido_por_nome, contato_apagado_em, portal';
 
 /** Os mais recentes primeiro, pela hora em que chegaram (a mensagem, ou o clique). */
 export async function carregarLeads(): Promise<LeadDoPortal[]> {
@@ -68,6 +68,10 @@ const TETO_DO_AVISO = 20;
  * Os leads que escreveram pelo portal depois de `desde` (migração 20261111120000,
  * `portal_leads.escreveu_em`), sem os descartados e os suprimidos, do mais novo
  * para o mais velho. `null` = a leitura falhou: o vigia tenta de novo na próxima volta.
+ *
+ * O lead que nasce da conversa de WhatsApp (12/11/2026, `origem = 'whatsapp'`)
+ * fica de fora: a mensagem dele já avisou pelo aviso de mensagem nova, e avisar
+ * de novo como lead seria o mesmo contato duas vezes.
  */
 export async function lerLeadsQueEscreveram(desde: string): Promise<LeadQueEscreveu[] | null> {
   const { data, error } = await createClient()
@@ -76,6 +80,7 @@ export async function lerLeadsQueEscreveram(desde: string): Promise<LeadQueEscre
     .gt('escreveu_em', desde)
     .eq('suprimido', false)
     .neq('situacao', 'descartado')
+    .neq('origem', ORIGEM_WHATSAPP)
     .order('escreveu_em', { ascending: false })
     .limit(TETO_DO_AVISO);
   if (error || !data) return null;
@@ -89,13 +94,15 @@ export async function lerLeadsQueEscreveram(desde: string): Promise<LeadQueEscre
 /**
  * Quando escreveu o lead mais recente: a linha de base da primeira vez que o vigia
  * roda neste navegador (o que já estava lá não é novidade). `null` = nenhum lead
- * escreveu ainda; `undefined` = a leitura falhou.
+ * escreveu ainda; `undefined` = a leitura falhou. Sem o lead do WhatsApp, como
+ * em `lerLeadsQueEscreveram`.
  */
 export async function lerUltimoLeadQueEscreveu(): Promise<string | null | undefined> {
   const { data, error } = await createClient()
     .from('portal_leads')
     .select('escreveu_em')
     .not('escreveu_em', 'is', null)
+    .neq('origem', ORIGEM_WHATSAPP)
     .order('escreveu_em', { ascending: false })
     .limit(1);
   if (error) return undefined;

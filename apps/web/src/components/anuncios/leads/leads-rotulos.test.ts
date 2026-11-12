@@ -3,15 +3,18 @@ import { describe, expect, it } from 'vitest';
 import {
   chegouEm,
   comoChegou,
+  comoChegouOLead,
   contagemPorSituacao,
   contatoApagaEm,
   cortarMensagem,
   dataHoraDoLead,
   duracao,
+  ehLeadDoWhatsapp,
   estaNoGrupo,
   filtrarLeads,
   FILTROS_INICIAIS,
   fraseDaOrigem,
+  jeitoDeChegar,
   marcaRespondidoAMao,
   nomeDoLead,
   nomeNoPortalDiferente,
@@ -24,6 +27,7 @@ import {
   resumoDosTipos,
   resumoPorAnuncio,
   rotuloDaTransacao,
+  rotuloDoPortal,
   rotuloDoTipo,
   temperaturaDoLead,
   tiposDoLead,
@@ -74,8 +78,24 @@ function lead(parcial: Partial<LeadDoPortal> = {}): LeadDoPortal {
     respondido_em: null,
     respondido_por_nome: null,
     contato_apagado_em: null,
+    portal: null,
     ...parcial,
   };
+}
+
+/** O lead que nasce da conversa de WhatsApp (12/11/2026, migração 20261112180000). */
+function leadDoWhatsapp(parcial: Partial<LeadDoPortal> = {}): LeadDoPortal {
+  return lead({
+    origem: 'whatsapp',
+    origin_lead_id: 'whatsapp:c1',
+    origem_no_portal: null,
+    origin_listing_id: '2812345678',
+    tipos: ['WHATSAPP_DO_PORTAL'],
+    temperatura: null,
+    conversation_id: 'conv1',
+    portal: 'zap',
+    ...parcial,
+  });
 }
 
 // 05/11/2026 15:00 em Natal (UTC-3).
@@ -87,6 +107,11 @@ describe('tipo de contato', () => {
     expect(rotuloDoTipo('PHONE_VIEW')).toBe('Viu o telefone');
     expect(rotuloDoTipo('VISIT_REQUEST')).toBe('Pediu visita');
     expect(rotuloDoTipo('NOVO_TIPO')).toBe('Outro contato');
+  });
+
+  it('o tipo do CRM para o lead que nasce da conversa é "Mensagem no WhatsApp"', () => {
+    expect(rotuloDoTipo('WHATSAPP_DO_PORTAL')).toBe('Mensagem no WhatsApp');
+    expect(resumoDosTipos(['WHATSAPP_DO_PORTAL'])).toBe('Mensagem no WhatsApp');
   });
 
   it('tira repetição e põe o mais quente primeiro', () => {
@@ -182,6 +207,41 @@ describe('como chegou e a primeira mensagem', () => {
     expect(comoChegou('visita')).toBe('Pediu visita pelo portal');
     expect(comoChegou(null)).toBeNull();
     expect(comoChegou('telepatia')).toBeNull();
+  });
+
+  it('o lead que nasce da conversa de WhatsApp tem rótulo próprio, com o portal', () => {
+    expect(comoChegou('whatsapp_do_portal')).toBe('WhatsApp pelo portal');
+    expect(comoChegouOLead(leadDoWhatsapp())).toBe('WhatsApp pelo ZAP Imóveis');
+    expect(comoChegouOLead(leadDoWhatsapp({ portal: 'vivareal' }))).toBe('WhatsApp pelo Viva Real');
+    expect(comoChegouOLead(leadDoWhatsapp({ portal: 'olx' }))).toBe('WhatsApp pela OLX');
+    // Corrigido por gente para "Canal Pro", sem dizer qual portal.
+    expect(comoChegouOLead(leadDoWhatsapp({ portal: null }))).toBe('WhatsApp pelo portal');
+    // O aviso do Grupo OLX continua "Pelo WhatsApp", mesmo com o portal do par.
+    expect(comoChegouOLead(lead({ portal: 'zap' }))).toBe('Pelo WhatsApp');
+    expect(comoChegouOLead(lead({ chegou_por: 'chat' }))).toBe('Pelo chat do portal');
+    expect(comoChegouOLead(lead({ grupo: 'clicou', chegou_por: null }))).toBeNull();
+  });
+
+  it('separa o lead do WhatsApp pela origem ou pelo tipo', () => {
+    expect(ehLeadDoWhatsapp(leadDoWhatsapp())).toBe(true);
+    expect(ehLeadDoWhatsapp(lead({ origem: null, tipos: ['WHATSAPP_DO_PORTAL'] }))).toBe(true);
+    expect(ehLeadDoWhatsapp(lead())).toBe(false);
+    // Para o banco a mensagem chegou 'whatsapp'; a tela separa.
+    expect(jeitoDeChegar(leadDoWhatsapp({ chegou_por: 'whatsapp' }))).toBe('whatsapp_do_portal');
+    expect(jeitoDeChegar(lead({ chegou_por: 'whatsapp' }))).toBe('whatsapp');
+    expect(jeitoDeChegar(lead({ chegou_por: null }))).toBeNull();
+  });
+
+  it('diz o nome de cada portal', () => {
+    expect(rotuloDoPortal('zap')).toBe('ZAP Imóveis');
+    expect(rotuloDoPortal('vivareal')).toBe('Viva Real');
+    expect(rotuloDoPortal('olx')).toBe('OLX');
+    expect(rotuloDoPortal(null)).toBeNull();
+    expect(rotuloDoPortal('toString')).toBeNull();
+  });
+
+  it('o lead do WhatsApp responde pela conversa, como o do aviso do WhatsApp', () => {
+    expect(marcaRespondidoAMao(leadDoWhatsapp())).toBe(false);
   });
 
   it('mídia sem texto vira o nome da mídia; com legenda, os dois', () => {
@@ -432,6 +492,7 @@ describe('o resumo por anúncio', () => {
         codigo: 'TE0002_IMOVA',
         titulo: 'Terreno',
         mensagem: 2,
+        whatsapp: 0,
         clicou: 1,
         semResposta: 1,
       },
@@ -440,16 +501,50 @@ describe('o resumo por anúncio', () => {
         codigo: 'TE0001_IMOVA',
         titulo: 'Apartamento em Ponta Negra',
         mensagem: 0,
+        whatsapp: 0,
         clicou: 1,
         semResposta: 0,
       },
-      { chave: '', codigo: null, titulo: null, mensagem: 1, clicou: 0, semResposta: 1 },
+      {
+        chave: '',
+        codigo: null,
+        titulo: null,
+        mensagem: 1,
+        whatsapp: 0,
+        clicou: 0,
+        semResposta: 1,
+      },
     ]);
+    expect(r.whatsapp).toBe(0);
+  });
+
+  it('conta, dos que mandaram mensagem, os que vieram pela mensagem no WhatsApp', () => {
+    const r = resumoPorAnuncio(
+      [
+        leadDoWhatsapp({ anuncio_codigo: 'PT0001_IMOVA' }),
+        leadDoWhatsapp({ anuncio_codigo: 'PT0001_IMOVA', situacao: 'respondido' }),
+        lead({ anuncio_codigo: 'PT0001_IMOVA', tipos: ['CONTACT_FORM'], chegou_por: 'formulario' }),
+        leadDoWhatsapp({ anuncio_codigo: 'TE0002_IMOVA', situacao: 'descartado' }),
+      ],
+      AGORA,
+    );
+    expect(r.anuncios).toEqual([
+      {
+        chave: 'PT0001_IMOVA',
+        codigo: 'PT0001_IMOVA',
+        titulo: 'Apartamento em Ponta Negra',
+        mensagem: 3,
+        whatsapp: 2,
+        clicou: 0,
+        semResposta: 2,
+      },
+    ]);
+    expect(r.whatsapp).toBe(2);
   });
 
   it('o Lead Certo não conta para o anúncio: a pessoa não o viu', () => {
     const r = resumoPorAnuncio([lead({ lead_certo: true })], AGORA);
-    expect(r).toEqual({ anuncios: [], leadCerto: 1 });
+    expect(r).toEqual({ anuncios: [], leadCerto: 1, whatsapp: 0 });
   });
 });
 
@@ -505,6 +600,22 @@ describe('os filtros', () => {
     expect(
       ids(filtrarLeads(grupos, { ...FILTROS_INICIAIS, grupo: 'clicou', busca: 'mendes' })),
     ).toEqual(['c1']);
+  });
+
+  it('"WhatsApp pelo portal" é um filtro à parte de "Pelo WhatsApp"', () => {
+    const jeitos = [
+      lead({ id: 'w1', chegou_por: 'whatsapp' }),
+      leadDoWhatsapp({ id: 'p1', chegou_por: 'whatsapp' }),
+      lead({ id: 'f1', chegou_por: 'formulario' }),
+    ];
+    expect(ids(filtrarLeads(jeitos, { ...FILTROS_INICIAIS, chegouPor: 'whatsapp' }))).toEqual([
+      'w1',
+    ]);
+    expect(
+      ids(filtrarLeads(jeitos, { ...FILTROS_INICIAIS, chegouPor: 'whatsapp_do_portal' })),
+    ).toEqual(['p1']);
+    // Sem filtro, os dois estão em "Mandaram mensagem".
+    expect(ids(filtrarLeads(jeitos, FILTROS_INICIAIS))).toEqual(['w1', 'p1', 'f1']);
   });
 
   it('conta cada situação para os chips', () => {

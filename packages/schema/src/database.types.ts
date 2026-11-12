@@ -6925,9 +6925,11 @@ export type Database = {
         Row: {
           anuncio_id: string | null
           anuncio_no_canal_pro_id: string | null
+          chegada_id: string | null
           client_listing_id: string | null
           contato_apagado_em: string | null
           conversation_id: string | null
+          escondido_em: string | null
           escreveu_em: string | null
           id: string
           lead_certo: boolean
@@ -6935,12 +6937,14 @@ export type Database = {
           mcmv: boolean
           mensagem: string | null
           motivo_descarte: string | null
+          motivo_escondido: string | null
           organization_id: string | null
           origem: string
           origem_no_portal: string | null
           origin_lead_id: string
           origin_listing_id: string | null
           payload: NonNullable<Json>
+          portal: string | null
           recebido_em: string
           recebido_no_portal_em: string | null
           responsavel_id: string | null
@@ -6955,9 +6959,11 @@ export type Database = {
         Insert: {
           anuncio_id?: string | null
           anuncio_no_canal_pro_id?: string | null
+          chegada_id?: string | null
           client_listing_id?: string | null
           contato_apagado_em?: string | null
           conversation_id?: string | null
+          escondido_em?: string | null
           escreveu_em?: string | null
           id?: string
           lead_certo?: boolean
@@ -6965,12 +6971,14 @@ export type Database = {
           mcmv?: boolean
           mensagem?: string | null
           motivo_descarte?: string | null
+          motivo_escondido?: string | null
           organization_id?: string | null
           origem?: string
           origem_no_portal?: string | null
           origin_lead_id: string
           origin_listing_id?: string | null
           payload?: NonNullable<Json>
+          portal?: string | null
           recebido_em?: string
           recebido_no_portal_em?: string | null
           responsavel_id?: string | null
@@ -6985,9 +6993,11 @@ export type Database = {
         Update: {
           anuncio_id?: string | null
           anuncio_no_canal_pro_id?: string | null
+          chegada_id?: string | null
           client_listing_id?: string | null
           contato_apagado_em?: string | null
           conversation_id?: string | null
+          escondido_em?: string | null
           escreveu_em?: string | null
           id?: string
           lead_certo?: boolean
@@ -6995,12 +7005,14 @@ export type Database = {
           mcmv?: boolean
           mensagem?: string | null
           motivo_descarte?: string | null
+          motivo_escondido?: string | null
           organization_id?: string | null
           origem?: string
           origem_no_portal?: string | null
           origin_lead_id?: string
           origin_listing_id?: string | null
           payload?: NonNullable<Json>
+          portal?: string | null
           recebido_em?: string
           recebido_no_portal_em?: string | null
           responsavel_id?: string | null
@@ -10429,6 +10441,7 @@ export type Database = {
           origin_listing_id: string | null
           phone_e164: string | null
           phone_is_masked: boolean | null
+          portal: string | null
           primeira_mensagem: string | null
           primeira_mensagem_tipo: string | null
           recebido_em: string | null
