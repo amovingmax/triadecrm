@@ -6,12 +6,13 @@
 // Protegem: o que é visita e o que é reunião; on-line × presencial × ligação
 // (e que o telefone do cliente numa ligação não vire "local"); que a resposta
 // de telefone vá para a ficha e não para as respostas; o cancelamento e a
-// remarcação; os avisos que não são agendamento; e que o log não leve dado
-// pessoal.
+// remarcação; os avisos que não são agendamento; o token do convite da Agenda
+// (`tracking.utm_content`, 11/11/2026); e que o log não leve dado pessoal.
 // =============================================================================
 
 import { assertEquals } from 'jsr:@std/assert@1';
 import {
+  conviteDe,
   lerCorpo,
   lugarDe,
   naturezaDe,
@@ -53,6 +54,14 @@ function aviso(
       status: 'active',
       text_reminder_number: null,
       timezone: 'America/Fortaleza',
+      tracking: {
+        utm_campaign: null,
+        utm_source: null,
+        utm_medium: null,
+        utm_content: null,
+        utm_term: null,
+        salesforce_uuid: null,
+      },
       uri: 'https://api.calendly.com/scheduled_events/EV1/invitees/INV1',
       scheduled_event: {
         uri: 'https://api.calendly.com/scheduled_events/EV1',
@@ -108,7 +117,48 @@ Deno.test('agendamento on-line: o resumo inteiro', () => {
     cancelamento: null,
     link_cancelar: 'https://calendly.com/cancellations/INV1',
     link_remarcar: 'https://calendly.com/reschedulings/INV1',
+    convite: null,
   });
+});
+
+Deno.test('o convite da Agenda: o token do utm_content vai ao banco', () => {
+  const comConvite = (utm: unknown) =>
+    resumoDe(
+      aviso('invitee.created', {
+        tracking: {
+          utm_campaign: 'ia',
+          utm_source: 'crm',
+          utm_medium: 'whatsapp',
+          utm_content: utm,
+          utm_term: null,
+          salesforce_uuid: null,
+        },
+      }),
+    ).convite;
+  assertEquals(comConvite('k3p9x2m7q1za'), 'k3p9x2m7q1za');
+  // O Calendly pode devolver em maiúsculas, ou com espaço em volta.
+  assertEquals(comConvite(' K3P9X2M7Q1ZA '), 'k3p9x2m7q1za');
+  // Não é token: curto, longo, com outro caractere, ou de outra campanha.
+  assertEquals(comConvite('abc'), null);
+  assertEquals(comConvite('a'.repeat(17)), null);
+  assertEquals(comConvite('k3p9x2m7-q1za'), null);
+  assertEquals(comConvite('instagram_bio'), null);
+  assertEquals(comConvite(null), null);
+  assertEquals(comConvite(12345678901), null);
+  // Sem `tracking` (aviso antigo), ou tracking que não é objeto.
+  assertEquals(conviteDe(undefined), null);
+  assertEquals(conviteDe('k3p9x2m7q1za'), null);
+  assertEquals(resumoDe(aviso('invitee.created', { tracking: undefined })).convite, null);
+});
+
+Deno.test('o convite vem também no cancelamento (o banco não precisa dele ali)', () => {
+  const r = resumoDe(
+    aviso('invitee.canceled', {
+      tracking: { utm_content: 'k3p9x2m7q1za' },
+      cancellation: { canceler_type: 'invitee', reason: null },
+    }),
+  );
+  assertEquals(r.convite, 'k3p9x2m7q1za');
 });
 
 Deno.test('visita: pelo nome do tipo de evento, ou pela resposta "Visita…"', () => {
@@ -288,5 +338,12 @@ Deno.test('o log não leva nome, e-mail, telefone nem resposta', () => {
     natureza: 'reuniao',
     formato: 'online',
     remarcacao: false,
+    com_convite: false,
   });
+  // O token do convite não vai para o log: só se havia um.
+  const comToken = resumoParaLog(
+    resumir(aviso('invitee.created', { tracking: { utm_content: 'k3p9x2m7q1za' } })),
+  );
+  assertEquals(comToken.com_convite, true);
+  assertEquals(JSON.stringify(comToken).includes('k3p9x2m7q1za'), false);
 });

@@ -1551,6 +1551,127 @@ export type Database = {
           },
         ]
       }
+      agenda_convites: {
+        Row: {
+          anuncio_id: string | null
+          calendly_agendamento_id: string | null
+          conversation_id: string
+          criado_em: string
+          criado_por: string | null
+          endereco: string | null
+          expira_em: string
+          id: string
+          imovel_codigo: string | null
+          link: string
+          mensagem_id: string | null
+          organization_id: string | null
+          pela_ia: boolean
+          tipo: string
+          token: string
+          usado_em: string | null
+        }
+        Insert: {
+          anuncio_id?: string | null
+          calendly_agendamento_id?: string | null
+          conversation_id: string
+          criado_em?: string
+          criado_por?: string | null
+          endereco?: string | null
+          expira_em?: string
+          id?: string
+          imovel_codigo?: string | null
+          link: string
+          mensagem_id?: string | null
+          organization_id?: string | null
+          pela_ia?: boolean
+          tipo: string
+          token: string
+          usado_em?: string | null
+        }
+        Update: {
+          anuncio_id?: string | null
+          calendly_agendamento_id?: string | null
+          conversation_id?: string
+          criado_em?: string
+          criado_por?: string | null
+          endereco?: string | null
+          expira_em?: string
+          id?: string
+          imovel_codigo?: string | null
+          link?: string
+          mensagem_id?: string | null
+          organization_id?: string | null
+          pela_ia?: boolean
+          tipo?: string
+          token?: string
+          usado_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_convites_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_convites_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios_na_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_convites_calendly_agendamento_id_fkey"
+            columns: ["calendly_agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "calendly_agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_convites_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_convites_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_convites_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_convites_mensagem_id_fkey"
+            columns: ["mensagem_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_convites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_convites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_budget_alerts: {
         Row: {
           created_at: string
@@ -9109,6 +9230,72 @@ export type Database = {
         }
         Relationships: []
       }
+      visita_imoveis: {
+        Row: {
+          anuncio_id: string | null
+          atualizado_em: string
+          atualizado_por: string | null
+          codigo: string | null
+          endereco: string
+          origem: string
+          task_id: string
+        }
+        Insert: {
+          anuncio_id?: string | null
+          atualizado_em?: string
+          atualizado_por?: string | null
+          codigo?: string | null
+          endereco: string
+          origem: string
+          task_id: string
+        }
+        Update: {
+          anuncio_id?: string | null
+          atualizado_em?: string
+          atualizado_por?: string | null
+          codigo?: string | null
+          endereco?: string
+          origem?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visita_imoveis_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_imoveis_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios_na_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_imoveis_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_imoveis_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_imoveis_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: true
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       visita_lembretes: {
         Row: {
           atualizado_em: string
@@ -10718,7 +10905,25 @@ export type Database = {
         Args: { p_fim: string; p_inicio: string; p_item: string }
         Returns: undefined
       }
+      agenda_enviar_link: {
+        Args: {
+          p_anuncio_id?: string
+          p_conversation_id: string
+          p_texto?: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
       agenda_espelho_pendencias: { Args: { p_limite?: number }; Returns: Json }
+      agenda_link_previa: {
+        Args: {
+          p_anuncio_id?: string
+          p_conversation_id: string
+          p_texto?: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
       alvo_suprimido: {
         Args: { p_contact_id?: string; p_organization_id: string }
         Returns: boolean
@@ -10801,6 +11006,7 @@ export type Database = {
           situacao: string
         }[]
       }
+      calendly_link_configurar: { Args: { p_link: string }; Returns: Json }
       calendly_quem_atende: { Args: never; Returns: Json }
       calendly_quem_atende_gravar: { Args: { p_pessoa?: string }; Returns: Json }
       calendly_receber: { Args: { p_evento: Json }; Returns: Json }
@@ -11160,6 +11366,18 @@ export type Database = {
       }
       ia_alvo_suprimido: {
         Args: { p_payload: Json; p_purpose: string }
+        Returns: Json
+      }
+      ia_atendente_enviar_link: {
+        Args: {
+          p_ai_run_id?: number
+          p_conversation_id: string
+          p_em_resposta_a: string
+          p_imovel_codigo: string
+          p_prompt_version?: string
+          p_texto: string
+          p_tipo: string
+        }
         Returns: Json
       }
       ia_entrada_da_ficha: {
@@ -11970,10 +12188,25 @@ export type Database = {
         Args: { p_message_id: string; p_quando?: string; p_titulo?: string }
         Returns: Json
       }
+      visita_definir_imovel: {
+        Args: { p_anuncio_id?: string; p_endereco?: string; p_task_id: string }
+        Returns: Json
+      }
       visita_marcar: {
         Args: {
           p_deal_id?: string
           p_dono?: string
+          p_inicio: string
+          p_organization_id: string
+        }
+        Returns: Json
+      }
+      visita_marcar_com_imovel: {
+        Args: {
+          p_anuncio_id?: string
+          p_deal_id?: string
+          p_dono?: string
+          p_endereco?: string
           p_inicio: string
           p_organization_id: string
         }
