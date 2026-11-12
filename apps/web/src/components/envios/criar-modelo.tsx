@@ -67,7 +67,7 @@ export function CriarModelo({ podeCriar }: { podeCriar: boolean }) {
             .join(' · ')}
         </p>
       ) : null}
-      {aberta ? <Folha aoFechar={() => setAberta(false)} /> : null}
+      {aberta ? <FolhaDoModelo aoFechar={() => setAberta(false)} /> : null}
     </div>
   );
 }
@@ -77,7 +77,12 @@ const BOTOES_INICIAIS: Botao[] = [
   { tipo: 'resposta', texto: 'Agora não' },
 ];
 
-function Folha({ aoFechar }: { aoFechar: () => void }) {
+/**
+ * A folha de escrever o modelo. Exportada para o disparo abrir direto do link
+ * "Escrever uma mensagem nova" (12/11/2026), sem a lista de espera do
+ * `CriarModelo`: lá os que esperam a Meta já aparecem como cartão "Em análise".
+ */
+export function FolhaDoModelo({ aoFechar }: { aoFechar: () => void }) {
   const clientes = useQueryClient();
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState<'marketing' | 'utility'>('marketing');

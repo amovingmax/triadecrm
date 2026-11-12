@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Megaphone, Plus } from 'lucide-react';
+import { ArrowLeft, Megaphone, Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -20,9 +20,10 @@ import { STATUS_DO_ENVIO, type Envio, type StatusDoEnvio } from './tipos';
  * 12/11/2026).
  *
  * A tela tem dois estados: a lista dos disparos, com o andamento de cada um e o
- * limite de hoje no topo, e a montagem de um novo, numa página só. O envio em
- * si nunca acontece aqui: criar grava a fila, e o relógio do banco manda no
- * ritmo escolhido, pela mesma porteira do botão da conversa.
+ * limite de hoje no topo, e a montagem de um novo, numa página só, com o
+ * celular ao lado (protótipo B, 12/11/2026). O envio em si nunca acontece aqui:
+ * criar grava a fila, e o relógio do banco manda no ritmo escolhido, pela
+ * mesma porteira do botão da conversa.
  */
 export function TelaEnvios({ catalogos, criaModelo }: { catalogos: Catalogos; criaModelo: boolean }) {
   const [montando, setMontando] = useState(false);
@@ -49,19 +50,23 @@ export function TelaEnvios({ catalogos, criaModelo }: { catalogos: Catalogos; cr
           <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
             {montando ? 'Novo disparo' : 'Disparos'}
           </h1>
-          {!montando ? (
-            <p className="max-w-[90ch] text-sm text-muted-foreground">
-              Uma mensagem para muitos parceiros: você escolhe para quem, o que e quantos, e o CRM manda
-              no ritmo escolhido, com parada automática.
-            </p>
-          ) : null}
+          <p className="max-w-[90ch] text-sm text-muted-foreground">
+            {montando
+              ? 'Uma mensagem de WhatsApp para várias pessoas de uma vez.'
+              : 'Uma mensagem para muitos parceiros: você escolhe para quem, o que e quantos, e o CRM manda no ritmo escolhido, com parada automática.'}
+          </p>
         </div>
-        {!montando ? (
+        {montando ? (
+          <Button variant="ghost" className="toque h-11 md:h-9" onClick={() => setMontando(false)}>
+            <ArrowLeft aria-hidden="true" />
+            Voltar aos disparos
+          </Button>
+        ) : (
           <Button className="toque h-11 md:h-9" onClick={() => setMontando(true)}>
             <Plus aria-hidden="true" />
             Novo disparo
           </Button>
-        ) : null}
+        )}
       </header>
 
       {!montando && teto.data ? <CotaDeHoje cota={teto.data} /> : null}
@@ -70,7 +75,6 @@ export function TelaEnvios({ catalogos, criaModelo }: { catalogos: Catalogos; cr
         <NovoEnvio
           catalogos={catalogos}
           criaModelo={criaModelo}
-          aoCancelar={() => setMontando(false)}
           aoCriar={(id) => {
             setMontando(false);
             setAberto(id);
