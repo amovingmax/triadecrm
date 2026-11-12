@@ -1,15 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  AVISOS_AO_LIGAR,
   caminhoDoLead,
+  DIAS_SEM_LEAD,
   diasDeCalendario,
   type EstadoDoCaminho,
   haQuanto,
   LEAD_DE_TESTE,
+  LIGAR_NO_CANAL_PRO,
+  entregaDeOutro,
+  passoDaEntrega,
   passoDoArquivo,
   passoDosAnuncios,
   passoDosLeads,
   passoDosRepetidos,
+  TESTE_DEPOIS_DE_LIGAR,
+  ultimaEntrega,
 } from './passos-do-caminho';
 
 /** 11/11/2026, 10h em Natal (13h UTC). */
@@ -23,8 +30,20 @@ const pronto = (codigo: string, ocupaVaga: boolean) => ({
   ocupaVaga,
 });
 
+const NADA = { quantas: 0, ultimaEm: null };
+
+/** O Grupo OLX nunca chamou a função de leads (a produção em 12/11/2026). */
+const SEM_ENTREGA: EstadoDoCaminho['entrega'] = {
+  ultimaChamadaReal: null,
+  ultimoLeadDoWebhook: null,
+  ultimoTeste: null,
+  recusas7Dias: { doGrupoOlx: NADA, outras: NADA },
+  erros7Dias: { doGrupoOlx: NADA, outros: NADA },
+};
+
 /** A Imova em 11/11/2026: nada lido, 7 prontos da Arbo, 9 de 10 vagas, 2 repetidos, 0 leads. */
 const HOJE: EstadoDoCaminho = {
+  entrega: SEM_ENTREGA,
   arquivo: { leituraDoRobo: null, leiturasDoRobo7Dias: 0, outraLeitura: null },
   plano: { anuncios: 10, destaques: 2, anunciosEmUso: 9, destaquesEmUso: 2 },
   anuncios: {
@@ -74,8 +93,13 @@ const HOJE: EstadoDoCaminho = {
   leads: { ultimo: null, total: 0 },
 };
 
-/** Tudo feito: 7 no ar, lido há 3 h, sem repetidos, relatório de ontem, um lead. */
+/** Tudo feito: o Grupo OLX entregou há 2 h, 7 no ar, lido há 3 h, sem repetidos, relatório de ontem, um lead. */
 const LIGADO: EstadoDoCaminho = {
+  entrega: {
+    ...SEM_ENTREGA,
+    ultimaChamadaReal: { em: horasAntes(2), doGrupoOlx: true },
+    ultimoLeadDoWebhook: horasAntes(2),
+  },
   arquivo: {
     leituraDoRobo: { em: horasAntes(3), anuncios: 7 },
     leiturasDoRobo7Dias: 5,
@@ -111,7 +135,242 @@ describe('haQuanto e diasDeCalendario', () => {
   });
 });
 
-describe('1. Anúncios no ar pelo CRM', () => {
+describe('1. Os leads vêm para o CRM', () => {
+  it('nunca entregou: falta, com a URL de leads, o caminho no Canal Pro e os avisos', () => {
+    const p = passoDaEntrega(HOJE, AGORA);
+    expect(p.situacao).toBe('falta');
+    expect(p.nome).toBe('Os leads vêm para o CRM');
+    expect(p.resumo).toBe('Ligue os leads no Canal Pro');
+    expect(p.ligar).toBe(true);
+    expect(p.notas).toEqual([]);
+    // Não depende da troca do arquivo de anúncios, e o texto diz isso.
+    expect(p.detalhe).toMatch(/campo separado do arquivo de anúncios/);
+    expect(p.detalhe).toMatch(/Não depende da troca do arquivo \(passo 3\)/);
+  });
+
+  it('o caminho no Canal Pro e os três avisos', () => {
+    expect(LIGAR_NO_CANAL_PRO.join(' ')).toMatch(
+      /☰ → Configurações → Integrações, aba Leads.*“Receber leads no CRM”.*Configurar.*“Desenvolvedor Próprio”.*salve/,
+    );
+    expect(AVISOS_AO_LIGAR).toHaveLength(3);
+    expect(AVISOS_AO_LIGAR[0]).toMatch(/URL da Arbo.*troque pela do CRM.*A Arbo deixa de receber/);
+    expect(AVISOS_AO_LIGAR[1]).toMatch(
+      /suporte do Canal Pro.*integração de leads do CRM homologado em 10\/11\/2026/,
+    );
+    expect(AVISOS_AO_LIGAR[2]).toMatch(/“Receber leads no e-mail”.*cópia/);
+  });
+
+  it('nunca entregou, mas outro programa errou a chave e o validador testou: as notas dizem', () => {
+    const e: EstadoDoCaminho = {
+      ...HOJE,
+      entrega: {
+        ...SEM_ENTREGA,
+        ultimoTeste: horasAntes(30),
+        recusas7Dias: { doGrupoOlx: NADA, outras: { quantas: 3, ultimaEm: horasAntes(5) } },
+      },
+    };
+    const p = passoDaEntrega(e, AGORA);
+    expect(p.situacao).toBe('falta');
+    expect(p.ligar).toBe(true);
+    expect(p.notas).toEqual([
+      'Nos últimos 7 dias, 3 chamadas com a chave errada vieram de outro programa, não do Grupo OLX (a última há 5 h).',
+      'A URL de leads respondeu a um teste há 30 h (o validador do Grupo OLX; teste não grava lead).',
+    ]);
+  });
+
+  it('o Grupo OLX bate e a chave não confere, sem nunca ter entregado: falta, sem a URL', () => {
+    const e: EstadoDoCaminho = {
+      ...HOJE,
+      entrega: {
+        ...SEM_ENTREGA,
+        recusas7Dias: { doGrupoOlx: { quantas: 6, ultimaEm: horasAntes(1) }, outras: NADA },
+      },
+    };
+    const p = passoDaEntrega(e, AGORA);
+    expect(p.situacao).toBe('falta');
+    expect(p.resumo).toBe(
+      'O Grupo OLX tentou entregar leads 6 vezes nos últimos 7 dias e a chave não conferiu: a última há 1 h',
+    );
+    expect(p.detalhe).toMatch(/A URL de leads está certa.*GRUPOZAP_LEAD_SECRET/);
+    expect(p.ligar).toBe(false);
+  });
+
+  it('recusa do Grupo OLX depois da última entrega: pede um olhar', () => {
+    const e: EstadoDoCaminho = {
+      ...LIGADO,
+      entrega: {
+        ...LIGADO.entrega,
+        recusas7Dias: { doGrupoOlx: { quantas: 1, ultimaEm: horasAntes(1) }, outras: NADA },
+      },
+    };
+    const p = passoDaEntrega(e, AGORA);
+    expect(p.situacao).toBe('atencao');
+    expect(p.resumo).toBe(
+      'O Grupo OLX tentou entregar leads 1 vez nos últimos 7 dias e a chave não conferiu: a última há 1 h',
+    );
+  });
+
+  it('recusa antes da última entrega já passou: feito (a chave voltou a conferir)', () => {
+    const e: EstadoDoCaminho = {
+      ...LIGADO,
+      entrega: {
+        ...LIGADO.entrega,
+        recusas7Dias: { doGrupoOlx: { quantas: 3, ultimaEm: horasAntes(20) }, outras: NADA },
+      },
+    };
+    expect(passoDaEntrega(e, AGORA).situacao).toBe('feito');
+  });
+
+  it('recusa de outro programa não pede olhar nenhum depois de ligado', () => {
+    const e: EstadoDoCaminho = {
+      ...LIGADO,
+      entrega: {
+        ...LIGADO.entrega,
+        recusas7Dias: { doGrupoOlx: NADA, outras: { quantas: 1000, ultimaEm: horasAntes(1) } },
+      },
+    };
+    expect(passoDaEntrega(e, AGORA).situacao).toBe('feito');
+  });
+
+  it('o CRM falhou com o Grupo OLX depois da última entrega: pede um olhar', () => {
+    const e: EstadoDoCaminho = {
+      ...LIGADO,
+      entrega: {
+        ...LIGADO.entrega,
+        erros7Dias: { doGrupoOlx: { quantas: 3, ultimaEm: horasAntes(1) }, outros: NADA },
+      },
+    };
+    const p = passoDaEntrega(e, AGORA);
+    expect(p.situacao).toBe('atencao');
+    expect(p.resumo).toBe(
+      'O Grupo OLX tentou entregar leads 3 vezes nos últimos 7 dias e o CRM falhou: a última há 1 h',
+    );
+  });
+
+  it(`mais de ${DIAS_SEM_LEAD} dias sem lead, com anúncios no portal: pede um olhar e mostra a URL`, () => {
+    const e: EstadoDoCaminho = {
+      ...LIGADO,
+      entrega: {
+        ...LIGADO.entrega,
+        ultimaChamadaReal: { em: horasAntes(15 * 24), doGrupoOlx: true },
+        ultimoLeadDoWebhook: horasAntes(16 * 24),
+      },
+    };
+    const p = passoDaEntrega(e, AGORA);
+    expect(p.situacao).toBe('atencao');
+    expect(p.resumo).toBe('O Grupo OLX não entrega um lead há 15 dias');
+    expect(p.detalhe).toMatch(/^Com 7 anúncios no portal, é tempo demais/);
+    expect(p.ligar).toBe(true);
+  });
+
+  it(`${DIAS_SEM_LEAD} dias, ou sem anúncio no portal: continua feito`, () => {
+    const quatorze: EstadoDoCaminho = {
+      ...LIGADO,
+      entrega: {
+        ...LIGADO.entrega,
+        ultimaChamadaReal: { em: horasAntes(14 * 24), doGrupoOlx: true },
+        ultimoLeadDoWebhook: null,
+      },
+    };
+    expect(passoDaEntrega(quatorze, AGORA).situacao).toBe('feito');
+    const semAnuncio: EstadoDoCaminho = {
+      ...LIGADO,
+      plano: { ...LIGADO.plano, anunciosEmUso: 0 },
+      entrega: {
+        ...LIGADO.entrega,
+        ultimaChamadaReal: { em: horasAntes(40 * 24), doGrupoOlx: true },
+        ultimoLeadDoWebhook: null,
+      },
+    };
+    expect(passoDaEntrega(semAnuncio, AGORA).situacao).toBe('feito');
+  });
+
+  it('feito: o Grupo OLX entregou o último lead há X h', () => {
+    const p = passoDaEntrega(LIGADO, AGORA);
+    expect(p.situacao).toBe('feito');
+    expect(p.resumo).toBe('O Grupo OLX entregou o último lead há 2 h');
+    expect(p.detalhe).toBeNull();
+    expect(p.ligar).toBe(false);
+  });
+
+  it('a entrega é a mais nova entre a chamada anotada e o lead do webhook', () => {
+    expect(ultimaEntrega(HOJE)).toBeNull();
+    const soLead: EstadoDoCaminho = {
+      ...HOJE,
+      entrega: { ...SEM_ENTREGA, ultimoLeadDoWebhook: horasAntes(5) },
+    };
+    // O lead gravado antes de a função anotar as chamadas também conta.
+    expect(ultimaEntrega(soLead)).toBe(horasAntes(5));
+    expect(passoDaEntrega(soLead, AGORA).resumo).toBe('O Grupo OLX entregou o último lead há 5 h');
+    const os2: EstadoDoCaminho = {
+      ...HOJE,
+      entrega: {
+        ...SEM_ENTREGA,
+        ultimaChamadaReal: { em: horasAntes(1), doGrupoOlx: true },
+        ultimoLeadDoWebhook: horasAntes(5),
+      },
+    };
+    expect(ultimaEntrega(os2)).toBe(horasAntes(1));
+  });
+
+  it('a chamada real sem o user-agent do Grupo OLX (um teste com a chave de verdade): pede um olhar', () => {
+    // O lead que a chamada gravou vem junto, um pouco antes dela ser anotada.
+    const e: EstadoDoCaminho = {
+      ...HOJE,
+      entrega: {
+        ...SEM_ENTREGA,
+        ultimaChamadaReal: { em: horasAntes(3), doGrupoOlx: false },
+        ultimoLeadDoWebhook: horasAntes(3.001),
+      },
+    };
+    expect(entregaDeOutro(e)).toBe(true);
+    const p = passoDaEntrega(e, AGORA);
+    expect(p.situacao).toBe('atencao');
+    expect(p.resumo).toBe('Um lead chegou pela URL de leads há 3 h, mas não veio do Grupo OLX');
+    expect(p.detalhe).toMatch(/user-agent do Grupo OLX.*não prova.*“Receber leads no CRM”/);
+    expect(p.ligar).toBe(true);
+  });
+
+  it('feito só com a chamada do Grupo OLX, ou com lead do webhook mais novo que a outra chamada', () => {
+    const doGrupo: EstadoDoCaminho = {
+      ...HOJE,
+      entrega: {
+        ...SEM_ENTREGA,
+        ultimaChamadaReal: { em: horasAntes(3), doGrupoOlx: true },
+        ultimoLeadDoWebhook: horasAntes(3.001),
+      },
+    };
+    expect(entregaDeOutro(doGrupo)).toBe(false);
+    expect(passoDaEntrega(doGrupo, AGORA).situacao).toBe('feito');
+    // Lead do webhook gravado depois da chamada de fora (ela não o explica).
+    const leadDepois: EstadoDoCaminho = {
+      ...HOJE,
+      entrega: {
+        ...SEM_ENTREGA,
+        ultimaChamadaReal: { em: horasAntes(30), doGrupoOlx: false },
+        ultimoLeadDoWebhook: horasAntes(2),
+      },
+    };
+    expect(entregaDeOutro(leadDepois)).toBe(false);
+    expect(passoDaEntrega(leadDepois, AGORA).situacao).toBe('feito');
+  });
+
+  it('o lead que chegou pelo WhatsApp não liga este passo (o banco o deixa fora do webhook)', () => {
+    // O banco não conta o lead `whatsapp:…` em `ultimo_lead_do_webhook`; o passo
+    // dos leads, sim. Este passo continua faltando.
+    const e: EstadoDoCaminho = {
+      ...HOJE,
+      leads: {
+        ultimo: { id: 'w1', em: horasAntes(1), tipos: ['CLICK_WHATSAPP'], anuncio: null },
+        total: 1,
+      },
+    };
+    expect(passoDaEntrega(e, AGORA).situacao).toBe('falta');
+    expect(passoDosLeads(e, AGORA).situacao).toBe('feito');
+  });
+});
+
+describe('2. Anúncios no ar pelo CRM', () => {
   it('hoje: os 7 da Arbo prontos cabem todos, porque o relatório já os conta', () => {
     const p = passoDosAnuncios(HOJE);
     expect(p.situacao).toBe('falta');
@@ -218,7 +477,7 @@ describe('1. Anúncios no ar pelo CRM', () => {
   });
 });
 
-describe('2. O Grupo OLX lê o arquivo do CRM', () => {
+describe('3. O Grupo OLX lê o arquivo do CRM', () => {
   it('nunca leu: colar a URL, com o aviso de pôr no ar antes', () => {
     const p = passoDoArquivo(HOJE, AGORA, 7);
     expect(p.situacao).toBe('falta');
@@ -279,7 +538,7 @@ describe('2. O Grupo OLX lê o arquivo do CRM', () => {
   });
 });
 
-describe('3. Sem repetidos ocupando vaga', () => {
+describe('4. Sem repetidos ocupando vaga', () => {
   it('hoje: 2 repetidos ocupam vaga, com a idade do relatório', () => {
     const p = passoDosRepetidos(HOJE, AGORA);
     expect(p.situacao).toBe('falta');
@@ -313,14 +572,23 @@ describe('3. Sem repetidos ocupando vaga', () => {
   });
 });
 
-describe('4. O primeiro lead chega ao CRM', () => {
-  it('nenhum lead: o teste no celular', () => {
+describe('5. O primeiro lead chega ao CRM', () => {
+  it('nenhum lead e os leads ainda não ligados: primeiro o passo 1, depois o teste', () => {
     const p = passoDosLeads(HOJE, AGORA);
     expect(p.situacao).toBe('falta');
-    expect(p.detalhe).toBe(LEAD_DE_TESTE);
+    expect(p.detalhe).toBe(`${TESTE_DEPOIS_DE_LIGAR} ${LEAD_DE_TESTE}`);
+    expect(TESTE_DEPOIS_DE_LIGAR).toMatch(/^Primeiro ligue os leads no Canal Pro \(passo 1\)/);
     expect(LEAD_DE_TESTE).toBe(
       'Faça um teste: no celular, abra um anúncio seu no ZAP, preencha o formulário com seu nome e telefone e confira se ele aparece em Anúncios → Leads e se o aviso chega.',
     );
+  });
+
+  it('nenhum lead com os leads ligados: só o teste no celular', () => {
+    const e: EstadoDoCaminho = {
+      ...HOJE,
+      entrega: { ...SEM_ENTREGA, ultimaChamadaReal: { em: horasAntes(1), doGrupoOlx: true } },
+    };
+    expect(passoDosLeads(e, AGORA).detalhe).toBe(LEAD_DE_TESTE);
   });
 
   it('com lead: o último, o que fez e de que anúncio', () => {
@@ -331,10 +599,29 @@ describe('4. O primeiro lead chega ao CRM', () => {
 });
 
 describe('caminhoDoLead', () => {
-  it('hoje faltam os quatro passos, na ordem: pôr no ar, colar, repetidos, lead', () => {
+  it('hoje faltam os cinco passos, na ordem: ligar os leads, pôr no ar, colar, repetidos, lead', () => {
     const c = caminhoDoLead(HOJE, AGORA, 7);
-    expect(c.passos.map((p) => p.id)).toEqual(['anuncios', 'arquivo', 'repetidos', 'leads']);
+    expect(c.passos.map((p) => p.id)).toEqual([
+      'entrega',
+      'anuncios',
+      'arquivo',
+      'repetidos',
+      'leads',
+    ]);
     expect(c.passos.every((p) => p.situacao === 'falta')).toBe(true);
+    expect(c.ligado).toBe(false);
+  });
+
+  it('os leads ligados com o arquivo ainda da Arbo: o passo 1 fica feito sozinho', () => {
+    const e: EstadoDoCaminho = { ...HOJE, entrega: LIGADO.entrega };
+    const c = caminhoDoLead(e, AGORA, 7);
+    expect(c.passos[0].situacao).toBe('feito');
+    expect(c.passos[2].situacao).toBe('falta');
+  });
+
+  it('sem leads ligados, nada está ligado, mesmo com o resto feito', () => {
+    const c = caminhoDoLead({ ...LIGADO, entrega: SEM_ENTREGA }, AGORA, 0);
+    expect(c.passos[0].situacao).toBe('falta');
     expect(c.ligado).toBe(false);
   });
 

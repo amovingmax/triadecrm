@@ -2,7 +2,7 @@
  * O caminho até o primeiro lead dos portais (11/11/2026), só na Imova: a regra
  * que decide cada passo, sem React e sem banco, para o Vitest. Quem desenha é
  * `caminho-do-lead.tsx`; quem junta o estado é `public.anuncios_caminho_do_lead`
- * (migração 20261111203000).
+ * (migrações 20261111203000 e 20261112181000).
  *
  * O gargalo era "entra pouco lead": a produção tinha 0 leads dos portais, o
  * Canal Pro lia o arquivo do sistema que publicava antes do CRM (a Arbo, que a
@@ -12,11 +12,26 @@
  * e o lead de teste são passos de quem tem o login do Canal Pro: a lista diz o
  * que falta, com a ação ao lado, e some quando tudo está feito.
  *
- * A ORDEM. Pôr os anúncios no ar pelo CRM vem antes de colar a URL: o arquivo do
- * CRM só leva o que está no ar aqui, e o Grupo OLX tira do portal o que não está
- * no arquivo que ele lê (decisão de 06/11/2026, "Antes de colar"). Enquanto o
- * Canal Pro ler o arquivo do sistema atual, pôr no ar pelo CRM não muda nada
- * no portal.
+ * A ORDEM (12/11/2026):
+ *   1. Os leads vêm para o CRM. É o primeiro porque é o que traz lead, e porque
+ *      não depende de nenhum outro: a homologação (10/11) só cadastrou o CRM no
+ *      Grupo OLX; cada anunciante aponta a entrega no Canal Pro, em Integrações
+ *      → aba Leads → "Receber leads no CRM", um campo SEPARADO do arquivo de
+ *      anúncios. Os leads de um anúncio que veio da Arbo chegam ao CRM do mesmo
+ *      jeito. Até 12/11 o Grupo OLX nunca tinha chamado a função de leads, e o
+ *      caminho não falava desse campo: quem o seguia nunca ligava os leads.
+ *      Olha SÓ o webhook (o que a função `grupozap-lead` anotou e os leads que
+ *      ela gravou), para não ser dado como feito por um lead que chegou pelo
+ *      WhatsApp com o texto do portal.
+ *   2. Anúncios no ar pelo CRM, antes de colar a URL do arquivo: o arquivo do
+ *      CRM só leva o que está no ar aqui, e o Grupo OLX tira do portal o que não
+ *      está no arquivo que ele lê (decisão de 06/11/2026, "Antes de colar").
+ *      Enquanto o Canal Pro ler o arquivo do sistema atual, pôr no ar pelo CRM
+ *      não muda nada no portal.
+ *   3. O Grupo OLX lê o arquivo do CRM.
+ *   4. Sem repetidos ocupando vaga.
+ *   5. O primeiro lead chega ao CRM: o lead de teste, que só serve depois do
+ *      passo 1 (antes, ele vai para onde o Canal Pro manda hoje).
  */
 import { diaEmNatal, recebidoHa, resumoDosTipos } from './leads/leads-rotulos';
 import type { SituacaoDoCanalPro } from './tipos';
@@ -41,7 +56,23 @@ export type RepetidoNoRelatorio = {
   marcadoExcluidoEm: string | null;
 };
 
+/** Quantas chamadas, e a última, nos últimos 7 dias. */
+export type Contagem = { quantas: number; ultimaEm: string | null };
+
 export type EstadoDoCaminho = {
+  /** O que a função de leads (`grupozap-lead`) anotou, e o último lead dela (12/11/2026). */
+  entrega: {
+    /** A última chamada autenticada que não foi teste (lead recebido ou repetido). */
+    ultimaChamadaReal: { em: string; doGrupoOlx: boolean } | null;
+    /** O último lead gravado pelo webhook (os que chegam pelo WhatsApp ficam de fora). */
+    ultimoLeadDoWebhook: string | null;
+    /** A última chamada de teste (o validador do Grupo OLX), que não grava. */
+    ultimoTeste: string | null;
+    /** As recusas de credencial (401) de hoje e dos 6 dias antes. */
+    recusas7Dias: { doGrupoOlx: Contagem; outras: Contagem };
+    /** Os erros (400, 405, 413, 500, 503) de hoje e dos 6 dias antes. */
+    erros7Dias: { doGrupoOlx: Contagem; outros: Contagem };
+  };
   arquivo: {
     /** A última leitura do robô do Grupo OLX (user-agent "VivaRealBot"). */
     leituraDoRobo: { em: string; anuncios: number } | null;
@@ -87,6 +118,14 @@ type Base = {
   detalhe: string | null;
 };
 
+export type PassoDaEntrega = Base & {
+  id: 'entrega';
+  /** Mostrar a URL de leads, o caminho no Canal Pro e os avisos. */
+  ligar: boolean;
+  /** O que mais as chamadas dizem (outro programa com a chave errada, o validador). */
+  notas: string[];
+};
+
 export type PassoDosAnuncios = Base & {
   id: 'anuncios';
   /** "9 de 10 vagas"; null quando o plano não está no CRM. */
@@ -117,13 +156,20 @@ export type PassoDosRepetidos = Base & {
 
 export type PassoDosLeads = Base & { id: 'leads' };
 
-export type PassoDoCaminho = PassoDosAnuncios | PassoDoArquivo | PassoDosRepetidos | PassoDosLeads;
+export type PassoDoCaminho =
+  PassoDaEntrega | PassoDosAnuncios | PassoDoArquivo | PassoDosRepetidos | PassoDosLeads;
 
 const HORA = 3_600_000;
 /** Mais que isso sem leitura do robô é leitura perdida: ele lê pelo menos uma vez por dia. */
 export const HORAS_SEM_LEITURA = 48;
 /** O relatório do Canal Pro, o ideal é importar uma vez por semana. */
 export const DIAS_DO_RELATORIO = 7;
+/**
+ * Mais que isso sem lead entregue, com anúncios no portal, pede um olhar. Com
+ * os 10 anúncios do plano da Imova, duas semanas sem nenhum contato é raro; e é
+ * o prazo em que o Grupo OLX guarda um lead que não conseguiu entregar.
+ */
+export const DIAS_SEM_LEAD = 14;
 
 function plural(n: number, um: string, varios: string): string {
   return n === 1 ? um : varios;
@@ -154,8 +200,164 @@ function quandoFoi(dias: number): string {
   return `há ${dias} dias`;
 }
 
+/** A URL de leads vai em Integrações → aba Leads, no Canal Pro; os passos curtos. */
+export const LIGAR_NO_CANAL_PRO = [
+  'Entre no Canal Pro com o login da Imova e abra ☰ → Configurações → Integrações, aba Leads.',
+  'Em “Receber leads no CRM”, clique em Configurar.',
+  'Escolha o CRM “Desenvolvedor Próprio” (ou “Imova CRM”, se aparecer na lista), cole a URL de leads e salve.',
+] as const;
+
+/** Os três avisos de quem vai trocar o campo. */
+export const AVISOS_AO_LIGAR = [
+  'Se o campo mostrar a URL da Arbo (…execute-api.sa-east-1.amazonaws.com/arbo), é para lá que os leads vão hoje: troque pela do CRM. A Arbo deixa de receber os leads dos portais.',
+  'Se a tela não deixar trocar, abra um chamado no suporte do Canal Pro pedindo para ligar a conta à integração de leads do CRM homologado em 10/11/2026 (Imova CRM).',
+  'Mantenha o e-mail da Imova em “Receber leads no e-mail”: ele fica como cópia.',
+] as const;
+
+/** O que entrou por último pelo webhook: a chamada anotada ou o lead gravado. */
+export function ultimaEntrega(e: EstadoDoCaminho): string | null {
+  const datas = [e.entrega.ultimaChamadaReal?.em, e.entrega.ultimoLeadDoWebhook].filter(
+    (d): d is string => typeof d === 'string' && !Number.isNaN(Date.parse(d)),
+  );
+  if (datas.length === 0) return null;
+  return datas.reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a));
+}
+
 /**
- * 1. Os anúncios no ar pelo CRM. Os prontos entram na ordem do banco (primeiro
+ * A última entrega é uma chamada real SEM o user-agent do Grupo OLX, e nenhum
+ * lead do webhook é mais novo que ela? O lead que essa chamada gravou é dela
+ * (o lead é gravado antes de a chamada ser anotada), então não conta.
+ */
+export function entregaDeOutro(e: EstadoDoCaminho): boolean {
+  const chamada = e.entrega.ultimaChamadaReal;
+  if (chamada === null || chamada.doGrupoOlx || Number.isNaN(Date.parse(chamada.em))) return false;
+  const lead = e.entrega.ultimoLeadDoWebhook;
+  return (
+    lead === null || Number.isNaN(Date.parse(lead)) || Date.parse(lead) <= Date.parse(chamada.em)
+  );
+}
+
+/** A contagem tem chamada mais nova que a última entrega (ou não houve entrega)? */
+function depoisDaEntrega(c: Contagem, entrega: string | null): boolean {
+  if (c.quantas <= 0) return false;
+  if (entrega === null) return true;
+  return c.ultimaEm !== null && Date.parse(c.ultimaEm) > Date.parse(entrega);
+}
+
+function vezes(n: number): string {
+  return `${n} ${plural(n, 'vez', 'vezes')}`;
+}
+
+/**
+ * 1. Os leads vêm para o CRM (12/11/2026). Só o webhook conta.
+ *
+ *   * falta: o Grupo OLX nunca entregou um lead pela função. Mostra a URL de
+ *     leads, o caminho no Canal Pro e os avisos — a não ser que o Grupo OLX já
+ *     esteja batendo e sendo recusado (a URL está lá; a chave é que não
+ *     confere) ou que o CRM esteja falhando: aí diz isso, sem a URL;
+ *   * pede um olhar: depois da última entrega, o Grupo OLX foi recusado pela
+ *     chave (401 com o user-agent dele, nos últimos 7 dias) ou recebeu erro; ou
+ *     a última entrega não veio com o user-agent do Grupo OLX (alguém com a
+ *     chave de verdade, num teste: não prova que o Canal Pro entrega); ou a
+ *     última entrega tem mais de 14 dias e há anúncios no portal;
+ *   * feito: "O Grupo OLX entregou o último lead há X h", só com a última
+ *     chamada vinda do Grupo OLX, ou com lead do webhook mais novo que ela (o
+ *     lead gravado antes de a função anotar as chamadas).
+ */
+export function passoDaEntrega(e: EstadoDoCaminho, agora: Date): PassoDaEntrega {
+  const nome = 'Os leads vêm para o CRM';
+  const base = { id: 'entrega' as const, nome };
+  const entrega = ultimaEntrega(e);
+  const { recusas7Dias, erros7Dias, ultimoTeste } = e.entrega;
+
+  const recusas = recusas7Dias.doGrupoOlx;
+  if (depoisDaEntrega(recusas, entrega)) {
+    return {
+      ...base,
+      situacao: entrega === null ? 'falta' : 'atencao',
+      resumo: `O Grupo OLX tentou entregar leads ${vezes(recusas.quantas)} nos últimos 7 dias e a chave não conferiu${recusas.ultimaEm ? `: a última ${haQuanto(recusas.ultimaEm, agora)}` : ''}`,
+      detalhe:
+        'A URL de leads está certa no Canal Pro, mas a chave (SECRET_KEY) que o Grupo OLX manda não é a gravada no CRM. Peça a quem cuida do CRM para conferir o segredo GRUPOZAP_LEAD_SECRET da função de leads. Enquanto isso, os leads só aparecem no Canal Pro (e no e-mail, se estiver ligado).',
+      ligar: false,
+      notas: [],
+    };
+  }
+  const erros = erros7Dias.doGrupoOlx;
+  if (depoisDaEntrega(erros, entrega)) {
+    return {
+      ...base,
+      situacao: entrega === null ? 'falta' : 'atencao',
+      resumo: `O Grupo OLX tentou entregar leads ${vezes(erros.quantas)} nos últimos 7 dias e o CRM falhou${erros.ultimaEm ? `: a última ${haQuanto(erros.ultimaEm, agora)}` : ''}`,
+      detalhe:
+        'O Grupo OLX tenta cada lead 3 vezes. Peça a quem cuida do CRM para olhar os registros da função de leads (grupozap-lead).',
+      ligar: false,
+      notas: [],
+    };
+  }
+
+  if (entrega === null) {
+    const notas: string[] = [];
+    const outras = recusas7Dias.outras;
+    if (outras.quantas > 0) {
+      notas.push(
+        `Nos últimos 7 dias, ${plural(outras.quantas, '1 chamada', `${outras.quantas} chamadas`)} com a chave errada ${plural(outras.quantas, 'veio', 'vieram')} de outro programa, não do Grupo OLX${outras.ultimaEm ? ` (a última ${haQuanto(outras.ultimaEm, agora)})` : ''}.`,
+      );
+    }
+    if (ultimoTeste) {
+      notas.push(
+        `A URL de leads respondeu a um teste ${haQuanto(ultimoTeste, agora)} (o validador do Grupo OLX; teste não grava lead).`,
+      );
+    }
+    return {
+      ...base,
+      situacao: 'falta',
+      resumo: 'Ligue os leads no Canal Pro',
+      detalhe:
+        'O Grupo OLX ainda não entregou nenhum lead ao CRM. A homologação só cadastrou o CRM no Grupo OLX: falta apontar a entrega dos leads no Canal Pro, num campo separado do arquivo de anúncios. Não depende da troca do arquivo (passo 3): os leads vêm para o CRM mesmo com os anúncios ainda saindo pela Arbo.',
+      ligar: true,
+      notas,
+    };
+  }
+
+  // A última entrega foi uma chamada sem o user-agent do Grupo OLX (um teste
+  // com a chave de verdade, por exemplo): não prova que o Canal Pro entrega.
+  if (entregaDeOutro(e)) {
+    return {
+      ...base,
+      situacao: 'atencao',
+      resumo: `Um lead chegou pela URL de leads ${haQuanto(entrega, agora)}, mas não veio do Grupo OLX`,
+      detalhe:
+        'A chamada não trouxe o user-agent do Grupo OLX: parece um teste feito com a chave de verdade, e não prova que o Canal Pro entrega os leads ao CRM. Confira no Canal Pro, em Integrações → aba Leads, se “Receber leads no CRM” está com a URL do CRM.',
+      ligar: true,
+      notas: [],
+    };
+  }
+
+  const dias = Math.floor((agora.getTime() - Date.parse(entrega)) / (24 * HORA));
+  const noPortal = e.plano.anunciosEmUso;
+  if (dias > DIAS_SEM_LEAD && noPortal > 0) {
+    return {
+      ...base,
+      situacao: 'atencao',
+      resumo: `O Grupo OLX não entrega um lead há ${dias} dias`,
+      detalhe: `Com ${noPortal} ${plural(noPortal, 'anúncio', 'anúncios')} no portal, é tempo demais. Confira no Canal Pro, em Integrações → aba Leads, se “Receber leads no CRM” continua com a URL do CRM.`,
+      ligar: true,
+      notas: [],
+    };
+  }
+
+  return {
+    ...base,
+    situacao: 'feito',
+    resumo: `O Grupo OLX entregou o último lead ${haQuanto(entrega, agora)}`,
+    detalhe: null,
+    ligar: false,
+    notas: [],
+  };
+}
+
+/**
+ * 2. Os anúncios no ar pelo CRM. Os prontos entram na ordem do banco (primeiro
  * os que o relatório já conta, que não gastam vaga nova); os outros cabem até as
  * vagas livres do plano. No ar com pendência é o pior caso: o anúncio parece no
  * ar, e o arquivo o pula.
@@ -210,7 +412,7 @@ export function passoDosAnuncios(e: EstadoDoCaminho): PassoDosAnuncios {
       situacao: a.noAr === 0 ? 'falta' : 'atencao',
       resumo: `Plano cheio: ${m} ${plural(m, 'pronto espera', 'prontos esperam')} vaga · ${vagas}`,
       detalhe:
-        'Exclua no Canal Pro os repetidos que ocupam vaga (passo 3), ou tire outro anúncio do ar.',
+        'Exclua no Canal Pro os repetidos que ocupam vaga (passo 4), ou tire outro anúncio do ar.',
     };
   }
   if (a.noAr === 0) {
@@ -233,7 +435,7 @@ export function passoDosAnuncios(e: EstadoDoCaminho): PassoDosAnuncios {
 }
 
 /**
- * 2. O Grupo OLX lê o arquivo do CRM. Nunca leu: colar a URL (com o aviso de
+ * 3. O Grupo OLX lê o arquivo do CRM. Nunca leu: colar a URL (com o aviso de
  * pôr no ar antes, se há anúncio no portal pelo sistema atual que é rascunho
  * aqui). Leu o arquivo vazio: o portal tira tudo. Leu há mais de 48 horas: a
  * URL pode ter saído do Canal Pro.
@@ -262,7 +464,7 @@ export function passoDoArquivo(
       colar: true,
       antesDeColar:
         n > 0
-          ? `Antes de colar, ponha no ar pelo CRM ${plural(n, 'o anúncio que está', `os ${n} anúncios que estão`)} no portal pelo sistema atual (passo 1). O arquivo do CRM só leva o que está no ar aqui: sem isso, a troca ${plural(n, 'o tira', 'os tira')} do portal.`
+          ? `Antes de colar, ponha no ar pelo CRM ${plural(n, 'o anúncio que está', `os ${n} anúncios que estão`)} no portal pelo sistema atual (passo 2). O arquivo do CRM só leva o que está no ar aqui: sem isso, a troca ${plural(n, 'o tira', 'os tira')} do portal.`
           : null,
       outraLeitura: outra
         ? `O arquivo foi aberto ${haQuanto(outra.em, agora)} por “${outra.quem}”, que não é o robô do Grupo OLX. Se a URL já está no Canal Pro, confira lá o Relatório de integração.`
@@ -275,7 +477,7 @@ export function passoDoArquivo(
       situacao: 'falta',
       resumo: `A última leitura, ${haQuanto(l.em, agora)}, levou o arquivo vazio`,
       detalhe:
-        'Com o arquivo vazio, o Grupo OLX tira do portal os anúncios da integração. Ponha os anúncios no ar pelo CRM (passo 1).',
+        'Com o arquivo vazio, o Grupo OLX tira do portal os anúncios da integração. Ponha os anúncios no ar pelo CRM (passo 2).',
       colar: false,
     };
   }
@@ -300,7 +502,7 @@ export function passoDoArquivo(
 }
 
 /**
- * 3. Os repetidos que ocupam vaga, no último relatório importado. O relatório é
+ * 4. Os repetidos que ocupam vaga, no último relatório importado. O relatório é
  * uma foto do dia: velho, ele não confere as vagas nem as exclusões feitas no
  * Canal Pro (o ideal é uma vez por semana).
  */
@@ -354,7 +556,15 @@ export function passoDosRepetidos(e: EstadoDoCaminho, agora: Date): PassoDosRepe
 export const LEAD_DE_TESTE =
   'Faça um teste: no celular, abra um anúncio seu no ZAP, preencha o formulário com seu nome e telefone e confira se ele aparece em Anúncios → Leads e se o aviso chega.';
 
-/** 4. O primeiro lead: prova que o Grupo OLX manda os leads da Imova para o CRM. */
+/** Antes de ligar os leads, o teste não chega aqui (12/11/2026). */
+export const TESTE_DEPOIS_DE_LIGAR =
+  'Primeiro ligue os leads no Canal Pro (passo 1): antes disso, o lead de teste vai para onde o Canal Pro manda hoje e não aparece aqui.';
+
+/**
+ * 5. O primeiro lead: a prova de ponta a ponta. Conta qualquer lead dos portais
+ * (também o que chega pelo WhatsApp com o texto do portal). O lead de teste só
+ * serve depois do passo 1.
+ */
 export function passoDosLeads(e: EstadoDoCaminho, agora: Date): PassoDosLeads {
   const nome = 'O primeiro lead chega ao CRM';
   const u = e.leads.ultimo;
@@ -364,7 +574,8 @@ export function passoDosLeads(e: EstadoDoCaminho, agora: Date): PassoDosLeads {
       nome,
       situacao: 'falta',
       resumo: 'Nenhum lead chegou ainda',
-      detalhe: LEAD_DE_TESTE,
+      detalhe:
+        ultimaEntrega(e) === null ? `${TESTE_DEPOIS_DE_LIGAR} ${LEAD_DE_TESTE}` : LEAD_DE_TESTE,
     };
   }
   const total = e.leads.total;
@@ -378,7 +589,7 @@ export function passoDosLeads(e: EstadoDoCaminho, agora: Date): PassoDosLeads {
 }
 
 export type Caminho = {
-  passos: [PassoDosAnuncios, PassoDoArquivo, PassoDosRepetidos, PassoDosLeads];
+  passos: [PassoDaEntrega, PassoDosAnuncios, PassoDoArquivo, PassoDosRepetidos, PassoDosLeads];
   /** Nenhum passo com "falta": a lista vira a linha "Portais ligados". */
   ligado: boolean;
   /** O que pede um olhar mesmo com tudo feito (vai na linha pequena). */
@@ -391,6 +602,7 @@ export function caminhoDoLead(
   noPortalSoPeloSistemaAtual: number,
 ): Caminho {
   const passos: Caminho['passos'] = [
+    passoDaEntrega(e, agora),
     passoDosAnuncios(e),
     passoDoArquivo(e, agora, noPortalSoPeloSistemaAtual),
     passoDosRepetidos(e, agora),

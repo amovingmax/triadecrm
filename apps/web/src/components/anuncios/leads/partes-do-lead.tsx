@@ -23,8 +23,8 @@ import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 
 import { revelarTelefoneDoLead } from './leads-dados';
 import {
-  comoChegou,
-  ehJeitoDeChegar,
+  comoChegouOLead,
+  jeitoDeChegar,
   rotuloDoTipo,
   SITUACOES_DO_LEAD,
   temperaturaDoLead,
@@ -47,6 +47,8 @@ const ICONE_DO_TIPO: Record<string, LucideIcon> = {
   CONTACT_FORM: FileText,
   CONTACT_CHAT: MessagesSquare,
   PHONE_VIEW: Phone,
+  // 12/11/2026: o lead que nasce da conversa de WhatsApp (o texto do anúncio).
+  WHATSAPP_DO_PORTAL: MessageCircle,
 };
 
 export function IconeDoTipo({ tipo, className }: { tipo: string | null; className?: string }) {
@@ -64,21 +66,25 @@ export function TipoDeContato({ tipo, className }: { tipo: string; className?: s
   );
 }
 
-/** "Pelo WhatsApp", "Pelo chat do portal"... com o ícone do mesmo canal. */
+/**
+ * "Pelo WhatsApp", "Pelo chat do portal", "WhatsApp pelo ZAP Imóveis"... com o
+ * ícone do mesmo canal.
+ */
 export function ComoChegou({
-  chegouPor,
+  lead,
   className,
 }: {
-  chegouPor: string | null;
+  lead: Pick<LeadDoPortal, 'chegou_por' | 'origem' | 'tipos' | 'portal'>;
   className?: string;
 }) {
-  const rotulo = comoChegou(chegouPor);
-  if (!rotulo || !ehJeitoDeChegar(chegouPor)) {
+  const jeito = jeitoDeChegar(lead);
+  const rotulo = comoChegouOLead(lead);
+  if (!rotulo || !jeito) {
     return <span className="text-muted-foreground">—</span>;
   }
   return (
     <span className={cn('inline-flex min-w-0 items-center gap-1.5', className)}>
-      <IconeDoTipo tipo={TIPO_DA_CHEGADA[chegouPor]} className="text-muted-foreground" />
+      <IconeDoTipo tipo={TIPO_DA_CHEGADA[jeito]} className="text-muted-foreground" />
       <span className="min-w-0">{rotulo}</span>
     </span>
   );

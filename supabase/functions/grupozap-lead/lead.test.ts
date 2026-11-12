@@ -4,9 +4,10 @@
 //     deno test grupozap-lead/
 //
 // O que estes testes protegem, em ordem de importância:
-//   1. que a resposta siga a regra deles: 422 só para lead de anúncio ("Grupo
-//      OLX") sem `clientListingId`; MCMV sem código, código que não existe no
-//      CRM e campo desconhecido recebem 200 — recusar à toa perde lead;
+//   1. que a resposta seja sempre 200 (12/11/2026): o lead de anúncio ("Grupo
+//      OLX") sem `clientListingId` leva só o aviso `anuncio_sem_codigo`, para o
+//      log; MCMV sem código, código que não existe no CRM e campo desconhecido
+//      recebem 200 sem aviso — recusar à toa perde lead e arrisca a integração;
 //   2. que a chave de idempotência seja estável: o mesmo lead reenviado dá a
 //      mesma chave, com ou sem `originLeadId`;
 //   3. que `leadCerto` chegue ao banco como booleano, venha como vier, sem que
@@ -70,7 +71,7 @@ function lido(corpoCru: string) {
 
 Deno.test('o exemplo oficial é lido e recebe 200', () => {
   const lead = lido(JSON.stringify(EXEMPLO));
-  assertEquals(decidirResposta(lead), { status: 200 });
+  assertEquals(decidirResposta(lead), { status: 200, aviso: null });
   assertEquals(temCodigoDoAnuncio(lead), true);
 });
 
@@ -83,34 +84,52 @@ Deno.test('JSON quebrado e corpo que não é objeto são recusados', () => {
   assertEquals(lerCorpo('{}').ok, true);
 });
 
-Deno.test('lead de anúncio sem clientListingId recebe 422', () => {
-  const { clientListingId: _, ...semCodigo } = EXEMPLO;
-  assertEquals(decidirResposta(semCodigo), { status: 422, codigo: 'anuncio_sem_codigo' });
-  // Vazio, só espaços ou null contam como ausente.
-  for (const vazio of ['', '   ', null]) {
+Deno.test(
+  'lead de anúncio sem clientListingId recebe 200, com o aviso para o log (nunca 422)',
+  () => {
+    const { clientListingId: _, ...semCodigo } = EXEMPLO;
+    assertEquals(decidirResposta(semCodigo), { status: 200, aviso: 'anuncio_sem_codigo' });
+    // Vazio, só espaços ou null contam como ausente.
+    for (const vazio of ['', '   ', null]) {
+      assertEquals(
+        decidirResposta({ ...EXEMPLO, clientListingId: vazio }),
+        { status: 200, aviso: 'anuncio_sem_codigo' },
+        String(vazio),
+      );
+    }
+    // A origem com espaço ou maiúscula diferente continua sendo de anúncio.
     assertEquals(
-      decidirResposta({ ...EXEMPLO, clientListingId: vazio }).status,
-      422,
-      String(vazio),
+      decidirResposta({ ...semCodigo, leadOrigin: ' grupo  OLX ' }).aviso,
+      'anuncio_sem_codigo',
     );
-  }
-  // A origem com espaço ou maiúscula diferente continua sendo de anúncio.
-  assertEquals(decidirResposta({ ...semCodigo, leadOrigin: ' grupo  OLX ' }).status, 422);
+  },
+);
+
+Deno.test('lead MCMV sem clientListingId recebe 200, sem aviso', () => {
+  assertEquals(decidirResposta(lido(JSON.stringify(MCMV))), { status: 200, aviso: null });
 });
 
-Deno.test('lead MCMV sem clientListingId recebe 200', () => {
-  assertEquals(decidirResposta(lido(JSON.stringify(MCMV))), { status: 200 });
-});
-
-Deno.test('origem ausente ou desconhecida sem código recebe 200 (não perde lead)', () => {
-  const { clientListingId: _, leadOrigin: __, ...semNada } = EXEMPLO;
-  assertEquals(decidirResposta(semNada).status, 200);
-  assertEquals(decidirResposta({ ...semNada, leadOrigin: 'Outro Portal' }).status, 200);
-});
+Deno.test(
+  'origem ausente ou desconhecida sem código recebe 200, sem aviso (não perde lead)',
+  () => {
+    const { clientListingId: _, leadOrigin: __, ...semNada } = EXEMPLO;
+    assertEquals(decidirResposta(semNada), { status: 200, aviso: null });
+    assertEquals(decidirResposta({ ...semNada, leadOrigin: 'Outro Portal' }), {
+      status: 200,
+      aviso: null,
+    });
+  },
+);
 
 Deno.test('código que não existe no CRM, ou numérico, não é recusado', () => {
-  assertEquals(decidirResposta({ ...EXEMPLO, clientListingId: 'nao-existe-no-crm' }).status, 200);
-  assertEquals(decidirResposta({ ...EXEMPLO, clientListingId: 40171 }).status, 200);
+  assertEquals(decidirResposta({ ...EXEMPLO, clientListingId: 'nao-existe-no-crm' }), {
+    status: 200,
+    aviso: null,
+  });
+  assertEquals(decidirResposta({ ...EXEMPLO, clientListingId: 40171 }), {
+    status: 200,
+    aviso: null,
+  });
 });
 
 Deno.test('campos a mais não atrapalham nada', () => {
