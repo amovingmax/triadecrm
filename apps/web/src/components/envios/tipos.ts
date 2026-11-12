@@ -152,6 +152,8 @@ export const previaSchema = z.object({
         assinante: z.string().nullable(),
         ok: z.boolean(),
         corpo: z.string().optional(),
+        /** O valor de cada variável para esta pessoa (`app.envio_montar`). */
+        parametros: z.record(z.string(), z.string()).optional().catch(undefined),
         motivo: z.string().optional(),
         variavel: z.string().optional(),
       }),
@@ -159,6 +161,71 @@ export const previaSchema = z.object({
     .optional(),
 });
 export type Previa = z.infer<typeof previaSchema>;
+export type ItemDaPrevia = NonNullable<Previa['itens']>[number];
+
+// ---------------------------------------------------------------------------
+// Quem recebe: o cadastro na hora e a lista do disparo (12/11/2026)
+// ---------------------------------------------------------------------------
+
+/** Uma pessoa digitada ou colada na tela, no formato de `disparo_adicionar_contatos`. */
+export type ContatoDigitado = { nome: string; telefone: string; empresa?: string | null };
+
+/**
+ * O que aconteceu com cada linha do cadastro. O schema lê o status como texto:
+ * a ficha já foi criada quando a resposta chega, e um status novo no banco não
+ * pode virar "não deu" na tela — ele é contado como recusado.
+ */
+export const STATUS_DO_CADASTRO = [
+  'novo',
+  'ja_estava',
+  'repetido',
+  'telefone_invalido',
+  'nome_obrigatorio',
+  'pediu_para_sair',
+  'telefone_de_outra_ficha',
+  /** O número é de uma pessoa de outra ficha, que recebe por outro WhatsApp. */
+  'numero_de_outra_pessoa',
+] as const;
+export type StatusDoCadastro = (typeof STATUS_DO_CADASTRO)[number];
+
+export const itemDoCadastroSchema = z.object({
+  linha: z.number(),
+  nome: z.string().nullish().transform((v) => v ?? null),
+  empresa: z.string().nullish().transform((v) => v ?? null),
+  status: z.string(),
+  organization_id: z.string().nullish().transform((v) => v ?? null),
+  /** O nome da ficha que já existia (`ja_estava`, `numero_de_outra_pessoa`). */
+  ficha: z.string().nullish().transform((v) => v ?? null),
+});
+export type ItemDoCadastro = z.infer<typeof itemDoCadastroSchema>;
+
+export const cadastroDeContatosSchema = z.object({
+  itens: z.array(itemDoCadastroSchema),
+  novos: z.number(),
+  ja_estavam: z.number(),
+  recusados: z.number(),
+});
+export type CadastroDeContatos = z.infer<typeof cadastroDeContatosSchema>;
+
+/**
+ * Uma linha da lista "Quem recebe" (`disparo_pessoas`). O telefone vem inteiro
+ * para admin e gestor e mascarado para o SDR; quem decide é o banco.
+ */
+export const pessoaDoDisparoSchema = z.object({
+  organization_id: z.string(),
+  empresa: z.string(),
+  nome: z.string().nullish().transform((v) => v ?? null),
+  primeiro_nome: z.string().nullish().transform((v) => v ?? null),
+  telefone: z.string().nullish().transform((v) => v ?? null),
+  categoria: z.string().nullish().transform((v) => v ?? null),
+  /** Por que não pode receber (`sem_whatsapp`, `contato_suprimido`…); nulo é "pode". */
+  bloqueio: z.string().nullish().transform((v) => v ?? null),
+  /** Falou com a gente nas últimas 24 h: não gasta o limite do dia. */
+  janela_aberta: z.boolean().catch(false),
+  /** `mensagem_recente_sem_resposta`: o disparo vai pular essa pessoa. */
+  aviso: z.string().nullish().transform((v) => v ?? null),
+});
+export type PessoaDoDisparo = z.infer<typeof pessoaDoDisparoSchema>;
 
 // ---------------------------------------------------------------------------
 // O acompanhamento

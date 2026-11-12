@@ -10463,3 +10463,32 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 **Decisão humana:**
 - Quando e como publicar o aviso de 30 na KOMUNE (o item acima).
 - 30 é o limite pedido; o número fica em `app_settings` e pode mudar sem código.
+
+## 12/11/2026 — Disparos mais simples: cadastrar quem recebe ali mesmo e ver a mensagem exata (branch `disparos-simples`; RF-BAS-14, RF-BAS-15, RF-CON-02)
+
+**Pedido do usuário:** "quero que na tela de disparo, eu consiga com mais clareza, cadastrar contatos, ver a mensagem clara que vai ser enviada, ta bastante confuso, simplifique mais, e vamos trabalhar com protótipos e agentes, faça direito e me mostre".
+
+**Como foi feito:** três agentes desenharam três protótipos clicáveis em paralelo (A passo a passo, B uma página com o celular ao lado, C lista primeiro), publicados num canvas; o usuário escolheu o **B**. Dois agentes implementaram em paralelo, a partir de um contrato entre banco e tela (um o banco, outro a tela), e um terceiro revisou tudo de fora: 12 achados, os graves corrigidos antes da prova (abaixo). A tela de verdade foi provada no navegador e as imagens estão no mesmo canvas.
+
+**Entregue:**
+- **Banco (migração `20261112170000_disparo_cadastra_contatos.sql` (nasceu `20261112170000`; renomeada para ficar depois das da agenda da Imova, `20261112160000` e `20261112161000`, que já estavam em produção na Imova), pgTAP 160 com 70 casos):**
+  - `public.disparo_adicionar_contatos(jsonb)` — cadastra até 500 pessoas digitadas ou coladas (nome, WhatsApp, empresa opcional): cria a ficha (origem "contato pessoal", etapa de entrada do funil de fornecedor, pessoa principal, atividade "Parceiro criado pelo disparo", sem bom-dia e sem prioridade A+) ou reconhece a que já existe pelo telefone. Cada linha volta com o que aconteceu: `novo`, `ja_estava`, `numero_de_outra_pessoa` (o número é de uma pessoa de uma ficha que recebe por outro WhatsApp: não entra, para a mensagem não ir para um número que ninguém digitou), `repetido`, `pediu_para_sair`, `telefone_invalido` (inclusive texto com forma de CPF), `nome_obrigatorio`. CPF sai do nome e da empresa (ADR-09). Só `app.is_manager()`.
+  - `public.disparo_pessoas(uuid[])` — a lista "Quem recebe" na ordem pedida: nome, empresa, WhatsApp (inteiro para admin e gestor, mascarado para o SDR), categoria, o que impede o envio (`sem_whatsapp`, supressão, `conversa_bloqueada`) e o aviso de quem vai ser pulado (mensagem nossa sem resposta nas últimas 72 h).
+  - `public.envio_em_massa_teto()` ganha `janela_aberta` e `abre_em`, para a tela dizer quando o disparo começa a sair.
+- **Site (`components/envios/`: `novo-envio.tsx` reescrito; novos `quem-recebe.tsx`, `adicionar-pessoas.tsx`, `qual-mensagem.tsx`, `celular.tsx`, `barra-de-enviar.tsx`, `mais-opcoes.tsx`):**
+  - **1. Quem recebe:** a lista sempre aberta, com "Ficha nova", avisos de quem não recebe ou vai ser pulado, × com "Desfazer" (e, na ficha nova, "Tirar e apagar a ficha", que usa `parceiro_excluir`). Adicionar contato (Enter adiciona), Colar lista (vírgula, ponto e vírgula ou tabulação de planilha; pula o cabeçalho; ignora coluna de CPF e colunas a mais; deixa na caixa só as linhas que não entraram) e Escolher da base (busca pelo nome da ficha, categoria, "só quem ainda não recebeu mensagem nossa", "Marcar todas" e "Marcar as primeiras N").
+  - **2. Qual mensagem:** cartões do Cumprimento e dos modelos aprovados, com os campos como "[Nome]"/"[Empresa]" e os botões; os que esperam a Meta aparecem apagados. "Escrever uma mensagem nova" (admin e gestor).
+  - **O celular:** o texto exato que cada pessoa recebe (`envio_em_massa_previa`), com o que muda por pessoa sublinhado, "‹ Larissa · 3 de 3 ›" e "É exatamente isto que Larissa vai receber"; aviso quando a pessoa não tem empresa e a mensagem usa [Empresa]; a hora e o cumprimento de quando a mensagem vai sair de verdade (fora do horário ou agendado, "Bom dia!" às 8h/9h).
+  - **A barra de enviar:** "Vai para 3 pessoas, agora, em nome da Komune · ≈ R$ 1,02 na Meta · cerca de 3 min · hoje ainda cabem 1.994 de 2.000" (descontando o que já está na fila; "Começa a sair amanhã às 9h" quando é o caso), "Mais opções" (quando, ritmo, quem assina, nome do disparo, o que cada botão faz, de onde vem cada campo) e o botão, que fica desligado com o motivo enquanto falta algo ou a lista ainda carrega. Depois: "Disparo criado", com "Ver andamento" e "Fazer outro".
+  - **Saíram da tela:** os filtros de situação, etiqueta, setor e "mais filtros", os públicos salvos, o campo "Quantos" (agora a quantidade é a lista; na base, "Marcar as primeiras N") e o texto livre.
+  - `CLAUDE.md`: a seção dos Disparos descreve a tela nova.
+
+**Achados da revisão corrigidos:** a mensagem que iria para o número da ficha e não para o digitado; a pessoa reaproveitada que ficava com o nome antigo; o cumprimento e a "agora" que não batiam com a hora real de saída; Enviar ativo antes de a lista carregar; "texto fixo" sem volta; CPF lido como WhatsApp; conversa bloqueada contada como destinatário; a frase-resumo que se contradizia; o telefone sem formato.
+
+**Verificado:**
+- pgTAP 160 (70/70) e a suíte inteira (150 arquivos) num Postgres descartável: as mesmas 6 falhas de antes (08, 52, 107, 127, 151, 154), nenhuma nova.
+- Site: typecheck e lint limpos; Vitest 126 arquivos, 2.061 testes (`formatos.test.ts` com 56).
+- Navegador, numa pilha Supabase local isolada (todas as migrações pelo CLI): cadastrar digitando e com Enter; colar lista com cabeçalho, linha errada, quem já estava e coluna de CPF; escolher da base; número de outra pessoa de uma ficha recusado com o nome da ficha; Desfazer; o menu de apagar a ficha nova; aviso de sem empresa; agendar para amanhã às 9h ("Bom dia!" às 09:00 e "Começa a sair amanhã às 9h"); 390 px sem rolagem lateral; enviar. As fichas nasceram com pessoa, origem e etapa certas, e o relógio mandou as mensagens pela porteira com o nome de cada um.
+- **Não verificado:** a saída de verdade pela Meta.
+
+**Decisão humana:** os filtros que saíram (cidade, etapa, etiqueta, setor, responsável, temperatura, "sem contato há N dias") e o texto livre voltam se alguém sentir falta; a busca da base procura pelo nome da ficha (empresa), não pelo da pessoa.
