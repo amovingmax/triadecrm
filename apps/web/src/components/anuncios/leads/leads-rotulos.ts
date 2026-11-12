@@ -364,9 +364,13 @@ export function rotuloDaTransacao(valor: string | null | undefined): string | nu
  * "Marcar como respondido" é para quem escreveu pelo portal (a resposta vai por
  * telefone ou e-mail, e o CRM não vê). No WhatsApp a situação muda sozinha
  * quando alguém do time responde na conversa; quem só clicou não escreveu nada.
+ * Sem a conversa ligada (o lead do WhatsApp de quem pediu para não ser
+ * contatado), nada muda sozinho, e a marca à mão volta.
  */
-export function marcaRespondidoAMao(lead: Pick<LeadDoPortal, 'grupo' | 'chegou_por'>): boolean {
-  return lead.grupo === 'mensagem' && lead.chegou_por !== 'whatsapp';
+export function marcaRespondidoAMao(
+  lead: Pick<LeadDoPortal, 'grupo' | 'chegou_por' | 'conversation_id'>,
+): boolean {
+  return lead.grupo === 'mensagem' && (lead.chegou_por !== 'whatsapp' || !lead.conversation_id);
 }
 
 // ---------------------------------------------------------------------------

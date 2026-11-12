@@ -9,6 +9,7 @@ import {
   haQuanto,
   LEAD_DE_TESTE,
   LIGAR_NO_CANAL_PRO,
+  entregaDeOutro,
   passoDaEntrega,
   passoDoArquivo,
   passoDosAnuncios,
@@ -312,16 +313,46 @@ describe('1. Os leads vêm para o CRM', () => {
     expect(ultimaEntrega(os2)).toBe(horasAntes(1));
   });
 
-  it('a chamada real sem o user-agent do Grupo OLX: feito, mas o resumo avisa', () => {
+  it('a chamada real sem o user-agent do Grupo OLX (um teste com a chave de verdade): pede um olhar', () => {
+    // O lead que a chamada gravou vem junto, um pouco antes dela ser anotada.
     const e: EstadoDoCaminho = {
       ...HOJE,
-      entrega: { ...SEM_ENTREGA, ultimaChamadaReal: { em: horasAntes(3), doGrupoOlx: false } },
+      entrega: {
+        ...SEM_ENTREGA,
+        ultimaChamadaReal: { em: horasAntes(3), doGrupoOlx: false },
+        ultimoLeadDoWebhook: horasAntes(3.001),
+      },
     };
+    expect(entregaDeOutro(e)).toBe(true);
     const p = passoDaEntrega(e, AGORA);
-    expect(p.situacao).toBe('feito');
-    expect(p.resumo).toBe(
-      'O Grupo OLX entregou o último lead há 3 h (a chamada não veio com o user-agent do Grupo OLX)',
-    );
+    expect(p.situacao).toBe('atencao');
+    expect(p.resumo).toBe('Um lead chegou pela URL de leads há 3 h, mas não veio do Grupo OLX');
+    expect(p.detalhe).toMatch(/user-agent do Grupo OLX.*não prova.*“Receber leads no CRM”/);
+    expect(p.ligar).toBe(true);
+  });
+
+  it('feito só com a chamada do Grupo OLX, ou com lead do webhook mais novo que a outra chamada', () => {
+    const doGrupo: EstadoDoCaminho = {
+      ...HOJE,
+      entrega: {
+        ...SEM_ENTREGA,
+        ultimaChamadaReal: { em: horasAntes(3), doGrupoOlx: true },
+        ultimoLeadDoWebhook: horasAntes(3.001),
+      },
+    };
+    expect(entregaDeOutro(doGrupo)).toBe(false);
+    expect(passoDaEntrega(doGrupo, AGORA).situacao).toBe('feito');
+    // Lead do webhook gravado depois da chamada de fora (ela não o explica).
+    const leadDepois: EstadoDoCaminho = {
+      ...HOJE,
+      entrega: {
+        ...SEM_ENTREGA,
+        ultimaChamadaReal: { em: horasAntes(30), doGrupoOlx: false },
+        ultimoLeadDoWebhook: horasAntes(2),
+      },
+    };
+    expect(entregaDeOutro(leadDepois)).toBe(false);
+    expect(passoDaEntrega(leadDepois, AGORA).situacao).toBe('feito');
   });
 
   it('o lead que chegou pelo WhatsApp não liga este passo (o banco o deixa fora do webhook)', () => {

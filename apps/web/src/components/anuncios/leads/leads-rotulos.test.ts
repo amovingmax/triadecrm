@@ -194,7 +194,9 @@ describe('temperatura e negócio', () => {
     expect(marcaRespondidoAMao(lead({ chegou_por: 'chat' }))).toBe(true);
     expect(marcaRespondidoAMao(lead({ chegou_por: 'visita' }))).toBe(true);
     // No WhatsApp a situação muda sozinha; quem só clicou não escreveu.
-    expect(marcaRespondidoAMao(lead({ chegou_por: 'whatsapp' }))).toBe(false);
+    expect(marcaRespondidoAMao(lead({ chegou_por: 'whatsapp', conversation_id: 'conv1' }))).toBe(
+      false,
+    );
     expect(marcaRespondidoAMao(lead({ grupo: 'clicou', chegou_por: null }))).toBe(false);
   });
 });
@@ -242,6 +244,14 @@ describe('como chegou e a primeira mensagem', () => {
 
   it('o lead do WhatsApp responde pela conversa, como o do aviso do WhatsApp', () => {
     expect(marcaRespondidoAMao(leadDoWhatsapp())).toBe(false);
+  });
+
+  it('sem conversa ligada (quem pediu para não ser contatado), marca à mão', () => {
+    expect(
+      marcaRespondidoAMao(
+        leadDoWhatsapp({ conversation_id: null, suprimido: true, organization_id: null }),
+      ),
+    ).toBe(true);
   });
 
   it('mídia sem texto vira o nome da mídia; com legenda, os dois', () => {

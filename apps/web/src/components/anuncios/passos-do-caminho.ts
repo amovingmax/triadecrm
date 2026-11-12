@@ -223,6 +223,20 @@ export function ultimaEntrega(e: EstadoDoCaminho): string | null {
   return datas.reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a));
 }
 
+/**
+ * A última entrega é uma chamada real SEM o user-agent do Grupo OLX, e nenhum
+ * lead do webhook é mais novo que ela? O lead que essa chamada gravou é dela
+ * (o lead é gravado antes de a chamada ser anotada), então não conta.
+ */
+export function entregaDeOutro(e: EstadoDoCaminho): boolean {
+  const chamada = e.entrega.ultimaChamadaReal;
+  if (chamada === null || chamada.doGrupoOlx || Number.isNaN(Date.parse(chamada.em))) return false;
+  const lead = e.entrega.ultimoLeadDoWebhook;
+  return (
+    lead === null || Number.isNaN(Date.parse(lead)) || Date.parse(lead) <= Date.parse(chamada.em)
+  );
+}
+
 /** A contagem tem chamada mais nova que a última entrega (ou não houve entrega)? */
 function depoisDaEntrega(c: Contagem, entrega: string | null): boolean {
   if (c.quantas <= 0) return false;
@@ -243,14 +257,18 @@ function vezes(n: number): string {
  *     confere) ou que o CRM esteja falhando: aí diz isso, sem a URL;
  *   * pede um olhar: depois da última entrega, o Grupo OLX foi recusado pela
  *     chave (401 com o user-agent dele, nos últimos 7 dias) ou recebeu erro; ou
- *     a última entrega tem mais de 14 dias e há anúncios no portal;
- *   * feito: "O Grupo OLX entregou o último lead há X h".
+ *     a última entrega não veio com o user-agent do Grupo OLX (alguém com a
+ *     chave de verdade, num teste: não prova que o Canal Pro entrega); ou a
+ *     última entrega tem mais de 14 dias e há anúncios no portal;
+ *   * feito: "O Grupo OLX entregou o último lead há X h", só com a última
+ *     chamada vinda do Grupo OLX, ou com lead do webhook mais novo que ela (o
+ *     lead gravado antes de a função anotar as chamadas).
  */
 export function passoDaEntrega(e: EstadoDoCaminho, agora: Date): PassoDaEntrega {
   const nome = 'Os leads vêm para o CRM';
   const base = { id: 'entrega' as const, nome };
   const entrega = ultimaEntrega(e);
-  const { recusas7Dias, erros7Dias, ultimoTeste, ultimaChamadaReal } = e.entrega;
+  const { recusas7Dias, erros7Dias, ultimoTeste } = e.entrega;
 
   const recusas = recusas7Dias.doGrupoOlx;
   if (depoisDaEntrega(recusas, entrega)) {
@@ -301,6 +319,20 @@ export function passoDaEntrega(e: EstadoDoCaminho, agora: Date): PassoDaEntrega 
     };
   }
 
+  // A última entrega foi uma chamada sem o user-agent do Grupo OLX (um teste
+  // com a chave de verdade, por exemplo): não prova que o Canal Pro entrega.
+  if (entregaDeOutro(e)) {
+    return {
+      ...base,
+      situacao: 'atencao',
+      resumo: `Um lead chegou pela URL de leads ${haQuanto(entrega, agora)}, mas não veio do Grupo OLX`,
+      detalhe:
+        'A chamada não trouxe o user-agent do Grupo OLX: parece um teste feito com a chave de verdade, e não prova que o Canal Pro entrega os leads ao CRM. Confira no Canal Pro, em Integrações → aba Leads, se “Receber leads no CRM” está com a URL do CRM.',
+      ligar: true,
+      notas: [],
+    };
+  }
+
   const dias = Math.floor((agora.getTime() - Date.parse(entrega)) / (24 * HORA));
   const noPortal = e.plano.anunciosEmUso;
   if (dias > DIAS_SEM_LEAD && noPortal > 0) {
@@ -314,14 +346,10 @@ export function passoDaEntrega(e: EstadoDoCaminho, agora: Date): PassoDaEntrega 
     };
   }
 
-  // A chamada anotada sem o user-agent do Grupo OLX (alguém com a chave de
-  // verdade) não diz que o Canal Pro entrega: a tela avisa, sem mudar o passo.
-  const deOutro =
-    ultimaChamadaReal !== null && ultimaChamadaReal.em === entrega && !ultimaChamadaReal.doGrupoOlx;
   return {
     ...base,
     situacao: 'feito',
-    resumo: `O Grupo OLX entregou o último lead ${haQuanto(entrega, agora)}${deOutro ? ' (a chamada não veio com o user-agent do Grupo OLX)' : ''}`,
+    resumo: `O Grupo OLX entregou o último lead ${haQuanto(entrega, agora)}`,
     detalhe: null,
     ligar: false,
     notas: [],

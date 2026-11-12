@@ -143,7 +143,9 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
   const ehMeu = lead.responsavel_id === euId;
   const descartado = lead.situacao === 'descartado';
   const conversa = enderecoDaConversa(lead);
-  const pelaConversa = mandou && lead.chegou_por === 'whatsapp';
+  // Pela conversa só quando há conversa ligada: o lead do WhatsApp de quem pediu
+  // para não ser contatado chega sem ela.
+  const pelaConversa = mandou && lead.chegou_por === 'whatsapp' && Boolean(lead.conversation_id);
   // A mensagem do portal, inteira (a da lista vem cortada em 280 letras), só
   // quando a pessoa escreveu nele: no clique, o portal manda um texto pronto.
   const mensagemNoPortal = (escreveuNoPortal(lead.tipos) && lead.mensagem?.trim()) || null;
@@ -417,6 +419,11 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
           <Bloco titulo="Primeira mensagem">
             {mensagemNoPortal ? (
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{mensagemNoPortal}</p>
+            ) : doWhatsapp ? (
+              <p className="text-sm text-muted-foreground">
+                Escreveu no WhatsApp; a conversa não fica ligada a quem pediu para não ser
+                contatado.
+              </p>
             ) : (
               <p className="text-sm text-muted-foreground">Não escreveu mensagem.</p>
             )}
@@ -435,7 +442,9 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
                 {dataHoraDoLead(clicou)}
               </Linha>
             )}
-            {pelaConversa ? <Linha rotulo="1ª mensagem">{dataHoraDoLead(chegou)}</Linha> : null}
+            {pelaConversa || doWhatsapp ? (
+              <Linha rotulo="1ª mensagem">{dataHoraDoLead(chegou)}</Linha>
+            ) : null}
             {lead.respondido_em ? (
               <Linha rotulo="1ª resposta">
                 {dataHoraDoLead(lead.respondido_em)}
