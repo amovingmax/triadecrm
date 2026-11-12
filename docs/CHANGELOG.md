@@ -10298,7 +10298,7 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 **Em produção desde 12/11/2026, ~14h50:**
 - Banco da Imova: `20261112100000` e `20261112110000` (chave `teto_da_meta` desligada: teto 45, como antes; a nota da Meta passou a ser reconhecida também lá, então nota amarela ou vermelha agora pesa no teto da Imova, como já era o desenho).
 - Banco da KOMUNE: as 19 migrações da Imova que estavam seguradas desde 09/11 (decisão do usuário: "subir tudo junto"; cada uma entra sem efeito na KOMUNE), `20261112100000` e `20261112110000`. Conferido: chave ligada, nota GREEN, TIER_2K, teto 2.000, intervalo 8–24 s.
-- Worker-wa da KOMUNE (`triade-worker-wa`, Fly v15, código de 27/10): só reiniciado, para ler o intervalo novo. A leitura do tier pela Graph está na branch e entra na próxima publicação do worker; até lá vale o TIER_2K informado.
+- Worker-wa da KOMUNE: reiniciado às 14h41 para ler o intervalo novo e, às 14h57, publicado com o código da `main` (v16, junto com o aviso de 30). Na subida, a Graph respondeu `whatsapp_business_manager_messaging_limit = TIER_2K` e o worker gravou: o limite de 2.000 agora vem da Meta, não só do que foi informado.
 - Site da KOMUNE: `triade-ocaz086r1` (volta: `triade-npxd0dvhb`), da branch `disparos` (main + estes 4 commits), também em `ir.komune.app.br`. Conferido de fora: `/login` 200, `/envios` pede login, `/auth/dev` 404.
 - Branch `disparos` no GitHub; **main não mesclada**.
 
@@ -10329,10 +10329,7 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 
 **Na main desde 12/11/2026** (junto com os Disparos; a migração renomeada para `20261112120000`). Os dois bancos de produção já estão em dia com tudo o mais (as 19 migrações da Imova subiram na KOMUNE com os Disparos).
 
-**Falta publicar, nesta ordem** (o modo automático barrou a migração em produção; da pasta do repositório, na `main`):
-1. Banco: `node scripts/publicar-banco.mjs imova migrar --confirmar imova` e depois `node scripts/publicar-banco.mjs komune migrar --confirmar komune` (só a `20261112120000` pendente em cada um).
-2. Worker da KOMUNE: `fly deploy . --config infra/nuvem/fly.worker-wa.toml --dockerfile apps/workers/Dockerfile`. Leva junto tudo o que entrou no worker desde 27/10 (inclusive a leitura do limite da Meta dos Disparos); só pede as variáveis que o Fly já tem.
-3. **Só com o worker novo no ar**, devolver a lista (com o worker antigo, ela religaria o e-mail de cada mensagem): `supabase db query --linked --project-ref toqdjcajyrowutunczhr "update public.app_settings set value = jsonb_set(value, '{para}', '[\"komune@komune.app.br\"]'::jsonb), updated_at = now() where key = 'notificacoes.email';"`
+**No ar desde 12/11/2026, ~15h:** a migração `20261112120000` nos bancos da Imova e da KOMUNE (pelo `publicar-banco.mjs`, rodado pelo usuário); o worker da KOMUNE publicado (`triade-worker-wa` v16, imagem `deployment-01M78EEVASCK08BPE7EJ715XS5`, código da `main` fa2c3bc), sem erro nos logs; e a lista devolvida (`notificacoes.email.para = ["komune@komune.app.br"]`), só depois do worker novo. O e-mail de cada mensagem não volta: o worker novo não tem mais esse caminho. Na Imova a migração entra sem efeito (o worker de lá não foi mexido).
 
 **Decisão humana:**
 - Quando e como publicar o aviso de 30 na KOMUNE (o item acima).
