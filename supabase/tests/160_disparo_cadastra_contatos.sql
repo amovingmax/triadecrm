@@ -1,6 +1,6 @@
 -- =====================================================================
 -- pgTAP — Disparos: cadastrar quem recebe e ver a lista como ela é
--- (migração 20261112130000_disparo_cadastra_contatos.sql)
+-- (migração 20261112170000_disparo_cadastra_contatos.sql)
 --
 -- "Quero que na tela de disparo, eu consiga com mais clareza, cadastrar
 -- contatos, ver a mensagem clara que vai ser enviada" (12/11/2026).
