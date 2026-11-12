@@ -36,7 +36,7 @@ Decidido pelo time em 06/10/2026; detalhe e pendências no `docs/CHANGELOG.md` (
 - **Os dois caminhos do lead:** Revisão → *aprovar e mandar mensagem* → Conversas → esperar responder; ou Revisão → *só aprovar* → Prospectados → Lotes → montar o lote para alguém → ligar → relatório.
 - **Papéis: só admin, gestor e SDR.** Embaixador, leitura e financeiro saíram (continuam no enum do banco, sem uso). **O SDR é igual ao gestor, menos Ajustes** (decisões de 20 e 21/10/2026; de 06/10 a 20/10 ele via só Lotes e Meu dia): as mesmas telas, o mesmo Meu dia e os mesmos botões, inclusive mensagem automática pela base, Consultoria, excluir e restaurar parceiro, desfazer importação, triagem da IA, relatório da semana, e lote, meta e dia de outra pessoa. No banco, `app.is_manager()` é admin, gestor e SDR; o que fica só com admin e gestor é `app.admin_ou_gestor()`: Ajustes (catálogos, `app_settings`, atendimento, telefonia, robô, LGPD) e o telefone completo (tabela-base de `organizations` e `contacts`; o SDR vê o número mascarado e revela pelo botão, com registro). Todos ligam pelo navegador.
 - **Lotes** (era "Ligar"): admin e gestor montam o lote para eles mesmos ou para quem liga (`public.lote_atribuir`). **Prospectados** é o nome da lista que se chamava "Parceiros".
-- **O bom-dia automático continua, mas a pedido:** só entra na fila pelo botão "aprovar e mandar mensagem" da Revisão (`radar_revisar_*_com_mensagem`). A tela de Campanhas saiu; a fila por baixo (`envios_em_massa`) fica, porque o bom-dia roda nela.
+- **O bom-dia automático continua, mas a pedido:** só entra na fila pelo botão "aprovar e mandar mensagem" da Revisão (`radar_revisar_*_com_mensagem`). A tela de Campanhas saiu; a fila por baixo (`envios_em_massa`) fica, porque o bom-dia roda nela. (Em 12/11/2026 a tela voltou como **Disparos**: ver a seção abaixo.)
 - **Cadências deixam de existir** (telas, banco e dados), junto com o "Resumo do dia" de `/cadencias/resumo`. Registrar saiu do menu e continua pelo botão "Registrar contato".
 - **Conversas:** abas Conversas, Consultoria (pós-venda: quem fechou), Clientes e Automáticas. Não há mais fila de aprovação nem rascunho da IA na tela: "a IA não vai me dizer o que escreve".
 - **O relatório do dia por pessoa** é `public.ligacoes_do_dia` + `apps/web/src/components/ligacoes-do-dia`; é a mesma conta para quem liga e para a gestão.
@@ -70,6 +70,16 @@ Pedido do Rafael ("quero todas as funcionalidades do wpp no nosso CRM"); detalhe
 - **Bloquear não é opt-out:** `public.conversa_bloquear` trava o envio no CRM na hora e pede o bloqueio à Meta (que só bloqueia quem escreveu nas últimas 24 h); a supressão da LGPD não é mexida.
 - **Grupos moram fora de `conversations`/`messages`** (`wa_grupos`, `wa_grupo_mensagens`, `wa_grupo_participantes`, `wa_grupo_pedidos`): só funcionam com conta oficial da Meta (OBA), até 8 pessoas, entrada só por link, janela de 24 h do grupo.
 
+## Disparos, de 12/11/2026 (vale sobre o pivô e sobre o teto de primeiros contatos abaixo)
+
+Pedido do usuário: "temos 2k de mensagens disponíveis para envio em massa por dia; quero escolher para quem enviar, o que enviar e a quantidade" e "eu não quero que a quantidade seja determinada". Detalhe no `docs/CHANGELOG.md` (entrada de 12/11/2026).
+
+- **A tela `/envios` volta ao menu como "Disparos"**, para admin, gestor e SDR (`app.is_manager()`). Criar modelo novo pela tela continua só de admin e gestor (`modelo_whatsapp_criar` confere `app.admin_ou_gestor()`).
+- **O que enviar:** o cumprimento, qualquer modelo aprovado pela Meta (o "só o cumprimento" de 22/09 caiu) ou texto livre para quem está com a janela de 24 h aberta.
+- **Quantos:** escolha de quem dispara, a cada disparo (os N primeiros dos marcados, ou marcados a dedo). Não existe número fixo do CRM no lugar.
+- **O limite do dia é o da Meta, só na KOMUNE** (chave `whatsapp.envio.teto_da_meta`, `app.wa_teto_segue_a_meta()`; na Imova desligada, limites de antes). Com ela: `app.wa_teto_da_meta`, dobrado pela nota (amarela é metade, vermelha é zero). Passado o aquecimento de um número novo (20 e 35 nas duas primeiras semanas), `app.teto_do_canal` e o passo 6 de `app.pode_enviar` seguem a Meta; os 45/150/60 de `app_settings` só valem quando a Meta não disse nada. O teto da hora é o do dia dividido por 8.
+- **Ritmo de 1 a 300 por hora**; acima de 60 o relógio (`app.envios_em_massa_rodar`) manda mais de uma por minuto. O worker-wa espaça as mensagens iniciadas pela empresa em 8–24 s (era 45–180 s), lido de `whatsapp.envio` na subida do worker.
+
 ## Estrutura do monorepo (pnpm workspaces; criar assim no D1)
 
 ```
@@ -100,7 +110,7 @@ docs/                 PRD, anexos, CHANGELOG, decisões
 ## Guardrails de produto que o código deve garantir
 
 - Opt-out por regra (palavras como "sair", "parar", "não quero", "remover") → `do_not_contact` imediato e entrada na `suppression_list`; nenhum envio a contato suprimido, em nenhum modo.
-- Teto de primeiros contatos por dia e por número (configurável; padrão 20 na primeira semana, subindo até 40–60), envio só na janela permitida (RF-CON-11), nunca em domingo ou feriado.
+- Teto de conversas abertas por dia e por número: 20 e 35 nas duas primeiras semanas de um número novo; depois, na KOMUNE, o limite que a Meta dá ao número (desde 12/11/2026, Disparos); onde a chave `teto_da_meta` está desligada, o `depois` de `cadencia.tetos` (45). Envio só na janela permitida (RF-CON-11), nunca em domingo ou feriado.
 - Pré-cadastro na Komune só depois de autorização registrada em `consent_events`; o pedido de autorização é a segunda mensagem da conversa, nunca a primeira.
 - O robô nunca promete condição comercial fora da base de conhecimento (validador de promessas); dúvida financeira sem resposta na FAQ → "vou confirmar com o financeiro".
 - Pseudonimizar o que vai ao modelo (`lead_id`, sem telefone ou e-mail quando evitável); registrar toda chamada em `ai_runs` com modelo, tokens e custo; alerta a 80% do orçamento mensal.
