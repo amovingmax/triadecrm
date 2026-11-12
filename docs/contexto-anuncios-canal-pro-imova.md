@@ -68,6 +68,7 @@ Palavras do usuário, em 04 e 05/11/2026:
     - nunca 404, que desliga a integração;
     - nunca 3xx.
   - O Grupo OLX tenta 3 vezes e guarda o lead por 14 dias.
+  - **A homologação só cadastra o CRM no Grupo OLX (12/11/2026).** Cada anunciante aponta a entrega no Canal Pro, num campo **separado** da integração de anúncios: ☰ → Configurações → Integrações → aba **Leads** → "Receber leads no CRM" → Configurar → CRM "Desenvolvedor Próprio" (ou "Imova CRM", se aparecer na lista) → a URL de leads → Salvar. Trocar a URL do XML de anúncios não é preciso para receber leads. Se o campo tiver a URL da Arbo (`…execute-api.sa-east-1.amazonaws.com/arbo`), é para lá que os leads vão; se a tela não deixar trocar, é chamado no suporte do Canal Pro. "Receber leads no e-mail" fica como cópia.
 - **Campos do lead:**
   - originLeadId, que identifica o lead e evita duplicidade;
   - clientListingId, o código do imóvel no CRM;
@@ -168,7 +169,9 @@ Palavras do usuário, em 04 e 05/11/2026:
 - `grupozap-lead`: recebe os leads.
   - Confere a credencial Basic em tempo constante.
   - Aceita só POST, até 256 KB.
-  - Responde 200, 401, 400, 405, 413, 422, 500 ou 503, nunca 404 nem 3xx.
+  - Responde 200, 401, 400, 405, 413, 500 ou 503, nunca 404 nem 3xx.
+  - **Lead gravado é 200, sempre (12/11/2026).** Até ali, o lead de anúncio sem `clientListingId` recebia 422 depois de gravado, como a documentação pede ("para que o lead seja revisado e reprocessado"). Mas a Imova tem anúncios criados direto no Canal Pro, sem código do arquivo (o Edifício Simone tem 58 contatos), o Grupo OLX tenta de novo 3 vezes cada não-2xx, e há relato de que falhas seguidas desligam a integração do anunciante (github.com/olxbr/crm-lead-integration, issues 41 e 48). O log continua com o aviso `anuncio_sem_codigo`.
+  - **Cada chamada é anotada (12/11/2026),** sem dado pessoal: por dia e resultado (`recebido`, `repetido`, `teste`, `recusado_credencial`, `erro`), quantas, a última e se o user-agent era o do Grupo OLX (`grupozap-notification-api`), em `public.grupozap_lead_chamadas` (migração `20261112181000`). Melhor esforço: depois da resposta, por `EdgeRuntime.waitUntil`; se falhar, a resposta não muda. O passo "Os leads vêm para o CRM", primeiro do caminho no alto de Anúncios, lê isso.
   - Usa o segredo `GRUPOZAP_LEAD_SECRET` (mais `_ANTERIOR` e `GRUPOZAP_LEAD_USUARIO`, opcionais).
   - Na homologação, `GRUPOZAP_LEAD_SECRET_TESTE` guarda a chave pública da documentação: quem autentica com ela recebe 200 e nada é gravado. O lead de exemplo do validador (`originLeadId` 59ee0fc6…) também não é gravado, com qualquer chave (10/11/2026).
   - Tem `verify_jwt = false` no `config.toml`.
@@ -241,7 +244,8 @@ Palavras do usuário, em 04 e 05/11/2026:
    - Publicar só na Imova: as 6 migrações (`publicar-banco.mjs imova migrar`), as funções `canal-pro-feed` e `grupozap-lead` (`supabase functions deploy … --project-ref kkqadgxvmzulcamuakzk`) e o site da Imova, de uma cópia limpa da main.
    - Antes: conferir o que está no ar contra a main.
 2. **Validar o endpoint de leads: feito em 10/11/2026.** O suporte do Grupo OLX testa com a chave pública da página de segurança, que agora está em `GRUPOZAP_LEAD_SECRET_TESTE`. O validador devolve 200 com o base64 da documentação, com a chave crua ou com o cabeçalho inteiro no campo Token, e 401 com token errado. O teste não grava lead.
-3. **Homologação: aprovada em 10/11/2026.** A SECRET_KEY definitiva está em `GRUPOZAP_LEAD_SECRET` (gravada pelo usuário, exatamente como o Grupo OLX mandou, em base64), e `GRUPOZAP_LEAD_SECRET_TESTE` foi removido. Os leads reais passam a chegar.
+3. **Homologação: aprovada em 10/11/2026.** A SECRET_KEY definitiva está em `GRUPOZAP_LEAD_SECRET` (gravada pelo usuário, exatamente como o Grupo OLX mandou, em base64), e `GRUPOZAP_LEAD_SECRET_TESTE` foi removido.
+   - **Correção de 12/11/2026:** os leads não passam a chegar sozinhos. Até 12/11 o Grupo OLX nunca fez um POST na função: falta apontar a entrega no Canal Pro, em Integrações → aba Leads → "Receber leads no CRM" (seção 3, "Leads"). É o primeiro passo do caminho no alto de Anúncios, e não depende da troca do arquivo de anúncios.
 4. **Relatório do Canal Pro: feito no local (05/11, noite).** O arquivo real foi lido e importado. Os 7 da Arbo casaram pelo código, e os cartões mostram a situação, as visualizações, os contatos e a data de criação de lá.
    - **Falta decidir:** tirar do ar no Canal Pro os 2 antigos ativos repetidos, e trazer ou não os 4 imóveis que só existem lá. Eles vêm sem fotos.
    - Importar de novo uma vez por semana até a troca.
