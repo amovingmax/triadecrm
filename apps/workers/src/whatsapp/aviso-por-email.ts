@@ -11,7 +11,7 @@
  * aviso no email agora, quando tiver mais de 30 novas mensagens") o e-mail só
  * sai quando passam de 30 as mensagens NOVAS sem resposta do time, contadas
  * desde o último aviso. Quem decide é o banco (`public.aviso_de_acumulo_conferir`,
- * migração 20261111100000): a regra do que é "nova", o limite e o marco de onde
+ * migração 20261112120000): a regra do que é "nova", o limite e o marco de onde
  * a conta recomeça moram lá. Este arquivo só escreve e manda o e-mail.
  *
  * O QUE VAI NO E-MAIL, E O QUE NÃO VAI

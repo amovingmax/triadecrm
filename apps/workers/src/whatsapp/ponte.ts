@@ -940,7 +940,7 @@ export async function configurarNumero(
 }
 
 // ---------------------------------------------------------------------------
-// O aviso por e-mail (migrações 20260916120000 e 20261111100000)
+// O aviso por e-mail (migrações 20260916120000 e 20261112120000)
 // ---------------------------------------------------------------------------
 
 export interface ConfigDoAvisoCrua {
@@ -982,7 +982,7 @@ export async function lerConfigDoAviso(cliente: ClienteDoBanco): Promise<ConfigD
 
 /**
  * A conta das mensagens novas sem resposta desde o último aviso
- * (`public.aviso_de_acumulo_conferir`, migração 20261111100000). A regra e o
+ * (`public.aviso_de_acumulo_conferir`, migração 20261112120000). A regra e o
  * limite moram no banco; aqui só se traduzem nomes de coluna em nomes de campo.
  */
 export async function conferirAcumulo(cliente: ClienteDoBanco): Promise<Acumulo> {

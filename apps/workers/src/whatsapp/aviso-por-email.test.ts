@@ -14,7 +14,7 @@ import { createLogger } from '../lib/log';
 
 /**
  * Desde 11/11/2026 o e-mail só sai quando passam de 30 as mensagens novas sem
- * resposta do time (a conta e a decisão são do banco: migração 20261111100000,
+ * resposta do time (a conta e a decisão são do banco: migração 20261112120000,
  * pgTAP 144). O que estes testes protegem:
  *
  *  1. **Só manda quando o banco diz que passou do limite.** Nada de e-mail por

@@ -45,7 +45,7 @@ const baseEnvSchema = z.object({
   KOMUNE_HMAC_SECRET: optionalString,
   /**
    * Resend: liga o aviso por e-mail quando passam de 30 as mensagens sem
-   * resposta no WhatsApp (migração 20261111100000) e o de reunião marcada.
+   * resposta no WhatsApp (migração 20261112120000) e o de reunião marcada.
    * Vazia = ninguém é avisado, e o worker diz isso no log; o resto do laço não
    * depende dela.
    */

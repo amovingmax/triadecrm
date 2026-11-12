@@ -1,6 +1,6 @@
 -- =====================================================================
 -- pgTAP — O aviso por e-mail só quando as mensagens acumulam
--- (migração 20261111100000)
+-- (migração 20261112120000)
 --
 -- Pedido de 11/11/2026: "precisamos tirar os avisos de mensagem por email,
 -- coloque aviso no email agora, quando tiver mais de 30 novas mensagens".
