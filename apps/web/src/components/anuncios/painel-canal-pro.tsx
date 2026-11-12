@@ -26,6 +26,7 @@ import {
   CHAVE_DOS_ANUNCIOS,
   publicarAnuncio,
   trocarChaveDoCanalPro,
+  urlDeLeads,
   urlDoArquivo,
 } from './dados';
 import { formatarQuando } from './no-portal';
@@ -468,8 +469,20 @@ function AntesDeColar({
  * admin e gestor a recebem do banco. Também usada no caminho até o primeiro lead.
  */
 export function EnderecoDoArquivo({ chave }: { chave: string }) {
-  const url = urlDoArquivo(chave);
+  return <EnderecoParaCopiar url={urlDoArquivo(chave)} nome="Endereço do arquivo de anúncios" />;
+}
 
+/**
+ * A URL de leads, com o botão de copiar (12/11/2026): vai no Canal Pro em
+ * Integrações → aba Leads → "Receber leads no CRM", um campo separado do
+ * arquivo de anúncios. Usada no primeiro passo do caminho até o primeiro lead.
+ */
+export function EnderecoDeLeads() {
+  return <EnderecoParaCopiar url={urlDeLeads()} nome="URL de leads" />;
+}
+
+/** Uma URL só de leitura (selecionada ao focar) e o botão "Copiar". */
+function EnderecoParaCopiar({ url, nome }: { url: string; nome: string }) {
   async function copiar() {
     try {
       await navigator.clipboard.writeText(url);
@@ -484,7 +497,7 @@ export function EnderecoDoArquivo({ chave }: { chave: string }) {
       <Input
         readOnly
         value={url}
-        aria-label="Endereço do arquivo de anúncios"
+        aria-label={nome}
         className="h-11 min-w-0 font-mono text-xs md:h-9"
         onFocus={(e) => e.currentTarget.select()}
       />

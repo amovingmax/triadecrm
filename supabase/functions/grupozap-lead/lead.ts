@@ -12,11 +12,17 @@
 //   * `originLeadId` "sempre presente" e único: é a chave de idempotência. Se
 //     um dia faltar, a chave vira o SHA-256 do corpo cru (o reenvio do mesmo
 //     lead tem o mesmo corpo) e o `index.ts` registra um aviso;
-//   * `clientListingId` é o `ListingID` do nosso feed. Lead de anúncio
-//     (`leadOrigin = "Grupo OLX"`) sem ele deve receber 4xx "para que o lead
-//     seja revisado e reprocessado"; lead de simulação Minha Casa Minha Vida
-//     (`MCMV_OLX`) vem sem ele por natureza e recebe 200. Código que não existe
-//     no CRM NÃO é motivo de recusa: o validador oficial manda `a40171`;
+//   * `clientListingId` é o `ListingID` do nosso feed. A documentação pede 4xx
+//     ao lead de anúncio (`leadOrigin = "Grupo OLX"`) sem ele, "para que o lead
+//     seja revisado e reprocessado". Desde 12/11/2026 a resposta é 200 mesmo
+//     assim, e o log leva o aviso `anuncio_sem_codigo`: a Imova tem anúncios
+//     criados direto no Canal Pro, sem código do arquivo (o Edifício Simone tem
+//     58 contatos), o Grupo OLX tenta de novo 3 vezes cada não-2xx, e há relato
+//     de que falhas seguidas desligam a integração do anunciante (issues 41 e
+//     48 de olxbr/crm-lead-integration). O lead já estava gravado: o 422 só
+//     arriscava a integração. O lead de simulação Minha Casa Minha Vida
+//     (`MCMV_OLX`) vem sem código por natureza, sem aviso. Código que não existe
+//     no CRM também não é motivo de recusa: o validador oficial manda `a40171`;
 //   * `extraData.leadCerto` aparece como booleano na documentação e como texto
 //     ("true"/"false") em leads reais — o banco recebe sempre booleano;
 //   * o lead de EXEMPLO da documentação, que o validador oficial manda por
@@ -25,7 +31,7 @@
 //     com a chave de teste também não grava. Ver `motivoDeTeste`.
 // =============================================================================
 
-/** Lead de anúncio: sem `clientListingId`, devolve 4xx. */
+/** Lead de anúncio: sem `clientListingId`, recebe 200 com o aviso `anuncio_sem_codigo`. */
 export const ORIGEM_ANUNCIO = 'Grupo OLX';
 /** Lead de simulação Minha Casa Minha Vida: sem `clientListingId` é normal. */
 export const ORIGEM_MCMV = 'MCMV_OLX';
@@ -50,7 +56,11 @@ export type Chave = {
   motivo?: 'originLeadId_ausente' | 'originLeadId_longo_demais';
 };
 
-export type Decisao = { status: 200 } | { status: 422; codigo: 'anuncio_sem_codigo' };
+/**
+ * A resposta ao lead gravado: sempre 200 (12/11/2026). `aviso` vai só para o
+ * log, para a gente saber do lead de anúncio que veio sem código.
+ */
+export type Decisao = { status: 200; aviso: 'anuncio_sem_codigo' | null };
 
 const codificador = new TextEncoder();
 
@@ -108,16 +118,17 @@ export function temCodigoDoAnuncio(lead: Lead): boolean {
 }
 
 /**
- * 200 ou 422. O lead é gravado nos dois casos (o `index.ts` grava antes de
- * responder): o 422 só diz ao Grupo OLX que aquele lead precisa de revisão do
- * lado deles. Origem desconhecida sem código recebe 200 — a regra do 4xx é
- * explícita para "Grupo OLX", e recusar o que não se conhece perderia lead.
+ * Sempre 200: lead gravado, lead respondido com 2xx (12/11/2026; até ali, o de
+ * anúncio sem código recebia 422 depois de gravado). O aviso
+ * `anuncio_sem_codigo` marca, no log, o lead de anúncio ("Grupo OLX") sem
+ * `clientListingId` — o do MCMV e o de origem desconhecida vêm sem código sem
+ * que isso diga nada.
  */
 export function decidirResposta(lead: Lead): Decisao {
   if (ehDeAnuncio(lead) && !temCodigoDoAnuncio(lead)) {
-    return { status: 422, codigo: 'anuncio_sem_codigo' };
+    return { status: 200, aviso: 'anuncio_sem_codigo' };
   }
-  return { status: 200 };
+  return { status: 200, aviso: null };
 }
 
 export type MotivoDeTeste = 'chave_de_teste' | 'lead_de_exemplo';

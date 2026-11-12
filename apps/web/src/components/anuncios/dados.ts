@@ -10,7 +10,7 @@
 import { createClient } from '@/lib/supabase/client';
 import { supabaseUrl } from '@/lib/env';
 
-import type { EstadoDoCaminho } from './passos-do-caminho';
+import type { Contagem, EstadoDoCaminho } from './passos-do-caminho';
 import { ocupaVagaPeloRelatorio } from './regras-do-cartao';
 import type { AnuncioDoRelatorio } from './relatorio-canal-pro';
 import type {
@@ -264,16 +264,27 @@ const texto = (v: unknown): string => (typeof v === 'string' ? v : '');
 const textoOuNulo = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 const numero = (v: unknown): number => (typeof v === 'number' ? v : 0);
 
+/** `{quantas, ultima_em}` das recusas e dos erros de 7 dias. */
+const contagem = (v: unknown): Contagem => {
+  const c = (v ?? {}) as Cru;
+  return { quantas: numero(c.quantas), ultimaEm: textoOuNulo(c.ultima_em) };
+};
+
 /**
- * O estado do caminho numa chamada (`public.anuncios_caminho_do_lead`, migração
- * 20261111203000). Só admin e gestor: para os outros o banco devolve
- * `sem_permissao`, e aqui vira erro.
+ * O estado do caminho numa chamada (`public.anuncios_caminho_do_lead`, migrações
+ * 20261111203000 e 20261112181000). Só admin e gestor: para os outros o banco
+ * devolve `sem_permissao`, e aqui vira erro. Sem `entrega` (o banco ainda sem a
+ * 20261112181000), o passo dos leads fica como "nunca entregou".
  */
 export async function carregarCaminhoDoLead(): Promise<EstadoDoCaminho> {
   const { data, error } = await createClient().rpc('anuncios_caminho_do_lead');
   if (error) throw new Error(error.message);
   const r = (data ?? {}) as Cru;
   if (r.ok !== true) throw new Error(texto(r.motivo) || 'sem_permissao');
+  const entrega = (r.entrega ?? {}) as Cru;
+  const real = entrega.ultima_chamada_real as Cru | null;
+  const recusas = (entrega.recusas_7_dias ?? {}) as Cru;
+  const erros = (entrega.erros_7_dias ?? {}) as Cru;
   const arquivo = (r.arquivo ?? {}) as Cru;
   const plano = (r.plano ?? {}) as Cru;
   const anuncios = (r.anuncios ?? {}) as Cru;
@@ -292,6 +303,18 @@ export async function carregarCaminhoDoLead(): Promise<EstadoDoCaminho> {
     pendencias: lista(x.pendencias, (p) => String(p)),
   });
   return {
+    entrega: {
+      ultimaChamadaReal: real
+        ? { em: texto(real.em), doGrupoOlx: real.do_grupo_olx === true }
+        : null,
+      ultimoLeadDoWebhook: textoOuNulo(entrega.ultimo_lead_do_webhook),
+      ultimoTeste: textoOuNulo(entrega.ultimo_teste),
+      recusas7Dias: {
+        doGrupoOlx: contagem(recusas.do_grupo_olx),
+        outras: contagem(recusas.outras),
+      },
+      erros7Dias: { doGrupoOlx: contagem(erros.do_grupo_olx), outros: contagem(erros.outros) },
+    },
     arquivo: {
       leituraDoRobo: robo ? { em: texto(robo.em), anuncios: numero(robo.anuncios) } : null,
       leiturasDoRobo7Dias: numero(arquivo.leituras_do_robo_7_dias),
@@ -342,6 +365,15 @@ export async function carregarCaminhoDoLead(): Promise<EstadoDoCaminho> {
 /** A URL que se cola no Canal Pro. */
 export function urlDoArquivo(chave: string): string {
   return `${supabaseUrl()}/functions/v1/canal-pro-feed?chave=${chave}`;
+}
+
+/**
+ * A URL de leads, que vai no Canal Pro em Integrações → aba Leads → "Receber
+ * leads no CRM" (12/11/2026). Não leva chave: quem confere é a SECRET_KEY que o
+ * Grupo OLX manda em cada lead.
+ */
+export function urlDeLeads(): string {
+  return `${supabaseUrl()}/functions/v1/grupozap-lead`;
 }
 
 // ---------------------------------------------------------------------------

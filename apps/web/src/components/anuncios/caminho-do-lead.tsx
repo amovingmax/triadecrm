@@ -8,6 +8,7 @@ import {
   CircleCheck,
   CircleDashed,
   FileSpreadsheet,
+  Info,
   RotateCw,
   Trash2,
   TriangleAlert,
@@ -20,11 +21,14 @@ import { cn } from '@/lib/utils';
 import { DialogoExcluirDuplicado } from './anuncios-no-canal-pro';
 import { carregarCaminhoDoLead, CHAVE_DO_CAMINHO } from './dados';
 import { formatarQuando } from './no-portal';
-import { BotaoPorNoAr, EnderecoDoArquivo } from './painel-canal-pro';
+import { BotaoPorNoAr, EnderecoDeLeads, EnderecoDoArquivo } from './painel-canal-pro';
 import {
   type AnuncioComPendencia,
+  AVISOS_AO_LIGAR,
   caminhoDoLead,
   type EstadoDoCaminho,
+  LIGAR_NO_CANAL_PRO,
+  type PassoDaEntrega,
   type PassoDoArquivo,
   type PassoDoCaminho,
   type PassoDosAnuncios,
@@ -46,6 +50,10 @@ import { oQueFalta } from './regras-do-cartao';
  * (`painel-canal-pro.tsx`), o "Excluir duplicado" (`anuncios-no-canal-pro.tsx`)
  * e o "Atualizar do Canal Pro". A regra de cada passo mora em
  * `passos-do-caminho.ts`. Com tudo feito, a lista vira a linha "Portais ligados".
+ *
+ * O primeiro passo (12/11/2026) é ligar os leads: a URL de leads para copiar e
+ * o caminho no Canal Pro (Integrações → aba Leads → "Receber leads no CRM"),
+ * que não depende da troca do arquivo de anúncios.
  */
 export function CaminhoDoLead({
   chave,
@@ -216,7 +224,9 @@ function DetalheDoPasso({
   return (
     <div className="flex flex-col gap-2.5 text-sm">
       {passo.detalhe ? <p className="text-muted-foreground">{passo.detalhe}</p> : null}
-      {passo.id === 'anuncios' ? (
+      {passo.id === 'entrega' ? (
+        <DetalheDaEntrega passo={passo} />
+      ) : passo.id === 'anuncios' ? (
         <DetalheDosAnuncios passo={passo} estado={estado} />
       ) : passo.id === 'arquivo' ? (
         <DetalheDoArquivo passo={passo} chave={chave} />
@@ -224,6 +234,50 @@ function DetalheDoPasso({
         <DetalheDosRepetidos passo={passo} estado={estado} aoImportar={aoImportar} />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Ligar os leads (12/11/2026): a URL de leads com o botão de copiar, o caminho
+ * no Canal Pro em passos curtos e os três avisos (a Arbo, o suporte, o e-mail).
+ */
+function DetalheDaEntrega({ passo }: { passo: PassoDaEntrega }) {
+  return (
+    <>
+      {passo.ligar ? (
+        <div className="flex flex-col gap-2">
+          <EnderecoDeLeads />
+          <ol className="flex list-decimal flex-col gap-1 pl-5 text-muted-foreground">
+            {LIGAR_NO_CANAL_PRO.map((texto) => (
+              <li key={texto}>{texto}</li>
+            ))}
+          </ol>
+          <ul className="flex flex-col gap-1.5">
+            {AVISOS_AO_LIGAR.map((texto, i) => {
+              // O primeiro (a URL da Arbo no campo) é o que muda para onde os leads vão.
+              const Icone = i === 0 ? TriangleAlert : Info;
+              return (
+                <li
+                  key={texto}
+                  className={cn(
+                    'flex items-start gap-1.5 rounded-lg px-3 py-2',
+                    i === 0 ? 'bg-morno-fundo text-morno-texto' : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  <Icone className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  {texto}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+      {passo.notas.map((nota) => (
+        <p key={nota} className="text-xs text-muted-foreground">
+          {nota}
+        </p>
+      ))}
+    </>
   );
 }
 
