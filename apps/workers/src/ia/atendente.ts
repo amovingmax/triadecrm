@@ -9,7 +9,9 @@
  *   enviar_link_da_agenda  → `public.ia_atendente_enviar_link` (11/11/2026, prompt v3: o
  *                            link da agenda, de visita com o imóvel ou de reunião; o
  *                            cliente escolhe o horário no Calendly. Desde 12/11/2026, a
- *                            v4: o imóvel em rascunho também recebe o link)
+ *                            v4: o imóvel em rascunho também recebe o link; e, no
+ *                            mesmo dia, a v5: o link é só da reunião online, e a
+ *                            visita presencial vira a frase da agenda e a passagem)
  *   passar_para_corretor   → `public.ia_atendente_passar` (avisa e entrega a uma pessoa)
  *   nao_responder          → `public.ia_atendente_registrar_silencio`
  *
@@ -39,9 +41,10 @@ import {
   CANAIS_DE_CHEGADA,
   MODELOS,
   TIPOS_DA_AGENDA,
-  atendenteImovaV4,
+  FRASE_DA_VISITA,
+  atendenteImovaV5,
   reidratar,
-  sistemaComBaseV4,
+  sistemaComBaseV5,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -330,7 +333,7 @@ export async function modeloEscolhido(contexto: ContextoDaIa): Promise<string> {
   const valor = ((data as { value?: unknown } | null)?.value ?? {}) as Record<string, unknown>;
   return typeof valor.modelo === 'string' && MODELOS_DO_ATENDENTE.has(valor.modelo)
     ? valor.modelo
-    : atendenteImovaV4.modelo;
+    : atendenteImovaV5.modelo;
 }
 
 /** Entrega a conversa a uma pessoa, com o aviso padrão e o motivo para a equipe. */
@@ -415,9 +418,9 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   );
 
   const prompt: PromptVersionado<EntradaDoAtendenteV3, SaidaDoAtendenteV3> = {
-    ...atendenteImovaV4,
-    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV4.modelo,
-    sistema: sistemaComBaseV4(base),
+    ...atendenteImovaV5,
+    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV5.modelo,
+    sistema: sistemaComBaseV5(base),
   };
 
   let executada;
@@ -523,9 +526,24 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
         );
       }
       const { tipo } = saida.agenda;
-      // Na reunião o imóvel não vai: um código que o modelo pôs ali faria o banco recusar
-      // por "imóvel desconhecido" uma conversa que não precisa de imóvel.
-      const imovelCodigo = tipo === 'visita' ? saida.agenda.imovelCodigo?.trim() || null : null;
+      // A trava da visita (v5, 12/11/2026): o link da agenda é só de reunião online. Se o
+      // modelo devolver o link da visita mesmo assim, não sai link nenhum: o cliente
+      // recebe a frase da visita, e a conversa vai para uma pessoa, com o imóvel no
+      // motivo. Voltar à v4 é tirar este bloco junto com o import.
+      if (tipo === 'visita') {
+        const codigo = saida.agenda.imovelCodigo?.trim() || 'imóvel não informado';
+        resultado = await rpc(contexto, 'ia_atendente_passar', {
+          ...comum,
+          p_texto: FRASE_DA_VISITA,
+          p_motivo: `Visita: ${codigo} · ${detalhes.motivo}`.slice(0, 300),
+        });
+        feita = 'passou_a_visita';
+        break;
+      }
+      // Daqui em diante é a reunião, e nela o imóvel não vai: um código que o modelo pôs
+      // ali faria o banco recusar por "imóvel desconhecido" uma conversa que não precisa
+      // de imóvel.
+      const imovelCodigo = null;
       const agenda = { tipo, imovelCodigo };
       try {
         resultado = await rpc(contexto, 'ia_atendente_enviar_link', {
@@ -540,13 +558,15 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
           contexto,
           payload.conversation_id,
           payload.message_id,
-          `o cliente quer ${tipo === 'visita' ? `visitar ${imovelCodigo ?? 'um imóvel'}` : 'marcar uma conversa'}, e o banco ainda não manda o link da agenda (ia_atendente_enviar_link)`,
+          'o cliente quer marcar uma conversa, e o banco ainda não manda o link da agenda (ia_atendente_enviar_link)',
           executada.aiRunId,
         );
       }
       if (resultado.ok === true) break;
       const recusa = String(resultado.motivo ?? 'recusado');
-      // Sem o imóvel não há link de visita: a IA pergunta qual, em vez de calar.
+      // Sem o imóvel não há link de visita: a IA pergunta qual, em vez de calar. Era da
+      // visita pelo link (v3 e v4); desde a v5 só a reunião chega ao banco do link, e ela
+      // não tem essas recusas. O caminho fica para quem voltar à v4.
       if (RECUSAS_QUE_PERGUNTAM_O_IMOVEL.has(recusa)) {
         resultado = await rpc(contexto, 'ia_atendente_responder', {
           ...comum,
@@ -561,7 +581,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
           contexto,
           payload.conversation_id,
           payload.message_id,
-          `o cliente quer ${tipo === 'visita' ? `visitar ${imovelCodigo ?? 'um imóvel'}` : 'marcar uma conversa com um corretor'}, e a IA não conseguiu mandar o link da agenda (${recusa})`,
+          `o cliente quer marcar uma conversa, e a IA não conseguiu mandar o link da agenda (${recusa})`,
           executada.aiRunId,
         );
       }

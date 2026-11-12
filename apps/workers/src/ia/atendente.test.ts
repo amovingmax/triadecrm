@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { SaidaDoAtendenteV3 } from '@komune/prompts';
+import { FRASE_DA_VISITA, type SaidaDoAtendenteV3 } from '@komune/prompts';
 
 import {
   atenderCliente,
@@ -175,10 +175,11 @@ function loggerDeTeste(): Logger {
 
 function saidaDoModelo(mudanca: Partial<SaidaDoAtendenteV3> = {}): SaidaDoAtendenteV3 {
   return {
+    // Desde a v5 (12/11/2026), o link da agenda é só da reunião online.
     acao: 'enviar_link_da_agenda',
-    mensagem: 'Claro! Vou te mandar o link da agenda para você escolher o dia e o horário da visita.',
-    agenda: { tipo: 'visita', imovelCodigo: 'TE0004' },
-    motivo: 'Quer visitar o TE0004.',
+    mensagem: 'Claro! Vou te mandar o link da agenda para você escolher o dia e o horário da nossa conversa.',
+    agenda: { tipo: 'reuniao', imovelCodigo: null },
+    motivo: 'Quer anunciar o apartamento dele.',
     anotacoes: [],
     fotosEnsinadas: [],
     confianca: 0.9,
@@ -248,27 +249,61 @@ function montar(
 }
 
 describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () => {
-  it('a visita: o tipo, o código, o texto e o ai_run, com a versão vigente (v4)', async () => {
+  it('a reunião: o tipo, o texto e o ai_run, com a versão vigente (v5)', async () => {
     const { contexto, chamadas, banco } = montar(saidaDoModelo());
     const r = await atenderCliente(contexto, PAYLOAD);
 
     expect(r).toMatchObject({ feito: true, motivo: 'enviar_link_da_agenda' });
     const run = banco.tabelas.ai_runs?.[0] as Record<string, unknown>;
-    expect(run.prompt_version).toBe('atendente-imova@v4');
+    expect(run.prompt_version).toBe('atendente-imova@v5');
     expect(chamadas('ia_atendente_enviar_link')).toEqual([
       {
         p_conversation_id: CONVERSA,
         p_em_resposta_a: ULTIMA,
-        p_tipo: 'visita',
-        p_imovel_codigo: 'TE0004',
-        p_texto: 'Claro! Vou te mandar o link da agenda para você escolher o dia e o horário da visita.',
+        p_tipo: 'reuniao',
+        p_imovel_codigo: null,
+        p_texto: 'Claro! Vou te mandar o link da agenda para você escolher o dia e o horário da nossa conversa.',
         p_ai_run_id: run.id,
-        p_prompt_version: 'atendente-imova@v4',
+        p_prompt_version: 'atendente-imova@v5',
       },
     ]);
     expect(chamadas('ia_atendente_marcar_visita')).toEqual([]);
     expect(chamadas('ia_atendente_responder')).toEqual([]);
     expect(chamadas('ia_atendente_passar')).toEqual([]);
+  });
+
+  it('a visita (v5): não sai link; a frase da agenda e a passagem, com o imóvel no motivo', async () => {
+    const { contexto, chamadas, banco } = montar(
+      saidaDoModelo({
+        mensagem: 'Claro! Vou te mandar o link da agenda para você escolher o dia e o horário da visita.',
+        agenda: { tipo: 'visita', imovelCodigo: ' TE0004 ' },
+        motivo: 'Quer visitar o TE0004 na sexta de manhã.',
+      }),
+    );
+    const r = await atenderCliente(contexto, PAYLOAD);
+
+    expect(r).toMatchObject({ feito: true, motivo: 'passou_a_visita' });
+    const run = banco.tabelas.ai_runs?.[0] as Record<string, unknown>;
+    expect(chamadas('ia_atendente_enviar_link')).toEqual([]);
+    expect(chamadas('ia_atendente_responder')).toEqual([]);
+    expect(chamadas('ia_atendente_passar')).toEqual([
+      {
+        p_conversation_id: CONVERSA,
+        p_em_resposta_a: ULTIMA,
+        p_texto: FRASE_DA_VISITA,
+        p_motivo: 'Visita: TE0004 · Quer visitar o TE0004 na sexta de manhã.',
+        p_ai_run_id: run.id,
+        p_prompt_version: 'atendente-imova@v5',
+      },
+    ]);
+  });
+
+  it('a visita sem imóvel também não chama o banco do link (v5)', async () => {
+    const { contexto, chamadas } = montar(saidaDoModelo({ agenda: { tipo: 'visita', imovelCodigo: null } }));
+    const r = await atenderCliente(contexto, PAYLOAD);
+    expect(r.motivo).toBe('passou_a_visita');
+    expect(chamadas('ia_atendente_enviar_link')).toEqual([]);
+    expect(String(chamadas('ia_atendente_passar')[0]?.p_motivo)).toMatch(/^Visita: imóvel não informado · /);
   });
 
   it('o modelo lê os links já mandados, e não lê os horários nem o link cru', async () => {
@@ -278,7 +313,8 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
     expect(mensagem).toContain('LINKS DA AGENDA que já saíram nesta conversa (o mais novo primeiro):\n- visita ao IM0003 · saiu há 35 minutos · ainda não agendou');
     expect(mensagem).toContain('[link da agenda]');
     expect(mensagem).not.toMatch(/calendly|HORÁRIOS DE VISITA|12 de novembro/);
-    expect(pedidos[0]?.sistema).toContain('A VISITA E A REUNIÃO (acao = enviar_link_da_agenda)');
+    expect(pedidos[0]?.sistema).toContain('A REUNIÃO ONLINE (acao = enviar_link_da_agenda)');
+    expect(pedidos[0]?.sistema).toContain('A VISITA PRESENCIAL (ir ver um imóvel ou terreno): NUNCA mande o link');
   });
 
   it('a reunião vai sem imóvel, mesmo que o modelo tenha posto um código', async () => {
@@ -294,31 +330,11 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
 
     const vazio = montar(saidaDoModelo({ mensagem: '' }));
     await atenderCliente(vazio.contexto, PAYLOAD);
-    expect(vazio.chamadas('ia_atendente_enviar_link')[0]?.p_texto).toBe(textoDoLink('visita'));
+    expect(vazio.chamadas('ia_atendente_enviar_link')[0]?.p_texto).toBe(textoDoLink('reuniao'));
   });
 
-  it.each([
-    ['visita_sem_imovel', /qual imóvel você quer ver\?/],
-    ['imovel_desconhecido', /Onde você viu o anúncio\?/],
-  ])('recusa %s: pergunta qual é o imóvel pelo ia_atendente_responder, sem silêncio', async (motivo, pergunta) => {
-    const { contexto, chamadas } = montar(saidaDoModelo({ agenda: { tipo: 'visita', imovelCodigo: 'XX9999' } }), () => ({
-      ok: false,
-      motivo,
-    }));
-    const r = await atenderCliente(contexto, PAYLOAD);
-
-    expect(r).toMatchObject({ feito: true, motivo: 'perguntou_o_imovel' });
-    const respondeu = chamadas('ia_atendente_responder');
-    expect(respondeu).toHaveLength(1);
-    expect(String(respondeu[0]?.p_texto)).toMatch(pergunta);
-    expect(respondeu[0]).toMatchObject({
-      p_conversation_id: CONVERSA,
-      p_em_resposta_a: ULTIMA,
-      p_prompt_version: 'atendente-imova@v4',
-      p_detalhes: { agenda: { tipo: 'visita', imovelCodigo: 'XX9999', recusa: motivo } },
-    });
-    expect(chamadas('ia_atendente_passar')).toEqual([]);
-  });
+  // As recusas que perguntavam o imóvel (visita_sem_imovel, imovel_desconhecido) eram da
+  // visita pelo link; desde a v5 a visita não chega ao banco do link (a trava acima).
 
   it.each(['sem_link_configurado', 'tipo_invalido', 'teto_por_hora', 'porteira', 'motivo_que_ninguem_previu'])(
     'recusa %s: passa para o corretor, com o motivo',
@@ -329,7 +345,7 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
       expect(r.motivo).toMatch(/^passou_para_pessoa: /);
       const passou = chamadas('ia_atendente_passar');
       expect(passou).toHaveLength(1);
-      expect(String(passou[0]?.p_motivo)).toContain(`visitar TE0004`);
+      expect(String(passou[0]?.p_motivo)).toContain('marcar uma conversa');
       expect(String(passou[0]?.p_motivo)).toContain(`(${motivo})`);
       expect(chamadas('ia_atendente_responder')).toEqual([]);
     },

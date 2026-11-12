@@ -10596,3 +10596,25 @@ Qualquer ordem é segura: a função sem a tabela só registra aviso, e o site s
 - no passo da entrega, um teste por `curl` com a chave de verdade deixa o passo em "pede um olhar" até o próximo lead do Grupo OLX;
 - o plano B pelo e-mail de lead;
 - o arquivo do CRM, que segue vazio (0 anúncios no ar): não colar a URL do XML antes de pôr os anúncios no ar.
+
+## 12/11/2026 — a IA que atende não manda link para visita presencial (`atendente-imova@v5`; branch `ia-visita-sem-link`; só na Imova)
+
+**O problema:** a v4 (no ar desde 12/11) manda o link do Calendly quando o cliente quer visitar um imóvel, mas o evento do Calendly é só de reunião online. Às 17h25 o usuário escreveu no caderno (nota 39): "Sempre que alguém pedir ou perguntar algo que seja voltado a fazer uma visita presencial ao local não deve ser mostrado o link da agenda, pois lá é só reunião online. Para esse tipo de situação quero que você diga ao cliente 'Vou consultar um horário em que entre na minha agenda e te retorno pra combinarmos'." A nota sozinha não basta, porque a regra do prompt mandava o link.
+
+**Decisões do usuário (entrevista de 12/11/2026):** visita presencial sem link; a IA pergunta o dia e o período que o cliente prefere (se ele ainda não disse), diz a frase e passa a conversa, que fica parada esperando a equipe. O link fica só para a reunião online (o proprietário que quer anunciar, ou quem pede uma conversa).
+
+**O que mudou:**
+- `packages/prompts/src/prompts/atendente-imova/v5.ts`: a v4 com o bloco "A VISITA E A REUNIÃO" trocado por "A REUNIÃO ONLINE" e "A VISITA PRESENCIAL", e a linha da `agenda` na saída (sempre reunião). A frase do usuário é `FRASE_DA_VISITA`, palavra por palavra. No `motivo`, a IA escreve "Visita:", o código e o dia e período preferidos, que vão para o título da tarefa de quem recebe a conversa. Entrada, saída (o schema), modelo, montagem e exemplos são os da v4; a vigente passa a 5.
+- `cenarios-v5.ts`: os 12 cenários da v4 com toda visita trocada (pergunta o dia, ou a frase e a passagem; link de visita é sempre erro), mais três: a resposta com o dia, "me manda o link" para visitar e o link da reunião pedido de novo (15 cenários).
+- O worker (`apps/workers/src/ia/atendente.ts`) usa a v5 e tem uma trava: se o modelo devolver o link com `agenda.tipo = 'visita'`, não sai link nenhum; o cliente recebe a frase da visita e a conversa vai para uma pessoa (`ia_atendente_passar`), com o imóvel no motivo. O ensaio (`workers ai --ensaio=atendente-imova`) usa a v5.
+- O relatório diz o que a v5 mudou.
+- Nada muda no banco.
+
+**Pendente (da entrevista, para a versão seguinte):**
+- O push do pedido de visita para todos os usuários do CRM. Hoje a passagem cria uma tarefa só para quem recebe a conversa, e o push para todos precisa de migração.
+- As outras decisões da entrevista: sem "corretor" nas mensagens, até ~300 caracteres, um imóvel por vez, nunca o código do anúncio, uma pergunta só no imóvel indefinido, o cliente irritado, as fotos, "avisar quando aparecer" por tarefa, o expediente, a retomada e o caderno limpo.
+- As notas 30 (AGENDA, com o endereço do Calendly e o link na visita) e 39 do caderno de produção ficam como estão. A 30 contradiz a v5; a v5 diz que vale a regra dela mesmo que o caderno mande o link na visita. Desativar a 30 é escrita no banco de produção e pede autorização.
+
+**Para publicar:** só o `imova-worker-ai` (`fly deploy`) e, para a frase do relatório, o site da Imova. Sem banco e sem Edge Function.
+
+**Para a sessão das fotos do anúncio:** a v4 da branch `ia-fotos-escolha` (feita a partir da v2) passa a ser a v6, feita a partir desta v5.

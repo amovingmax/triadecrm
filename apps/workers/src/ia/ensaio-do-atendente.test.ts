@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CENARIOS_DO_ATENDENTE_V4, type SaidaDoAtendenteV3 } from '@komune/prompts';
+import { CENARIOS_DO_ATENDENTE_V5, type SaidaDoAtendenteV3 } from '@komune/prompts';
 
 import { bancoFalso } from './banco-de-teste';
 import type { PedidoAoModelo, RespostaDoModelo } from './cliente';
@@ -34,12 +34,15 @@ function modeloQueResponde(responder: (pedido: PedidoAoModelo) => SaidaDoAtenden
   };
 }
 
-/** O cenário da conversa pedida: o da última mensagem do cliente. */
+/**
+ * O cenário da conversa pedida: o que tem todas as mensagens no pedido, e, entre esses,
+ * o da conversa mais longa (desde a v5, uma conversa pode começar com a mensagem única
+ * de outro cenário).
+ */
 function respostaBoaDo(pedido: PedidoAoModelo): SaidaDoAtendenteV3 {
-  const cenario = CENARIOS_DO_ATENDENTE_V4.find((c) => {
-    const ultima = c.entrada.mensagens[c.entrada.mensagens.length - 1];
-    return ultima !== undefined && pedido.mensagem.includes(ultima.texto);
-  });
+  const cenario = CENARIOS_DO_ATENDENTE_V5.filter((c) =>
+    c.entrada.mensagens.every((m) => pedido.mensagem.includes(m.texto)),
+  ).sort((a, b) => b.entrada.mensagens.length - a.entrada.mensagens.length)[0];
   if (cenario === undefined) throw new Error('conversa que não é de cenário nenhum');
   return cenario.respostaBoa;
 }
@@ -59,25 +62,25 @@ describe('workers ai --ensaio=atendente-imova', () => {
     expect(eEnsaio(true)).toBe(false);
   });
 
-  it('manda todos os cenários à v4, com a base do ensaio, e confere cada resposta', async () => {
+  it('manda todos os cenários à v5, com a base do ensaio, e confere cada resposta', async () => {
     const modelo = modeloQueResponde(respostaBoaDo);
     const { banco, contexto: ctx } = contexto(modelo);
     const r = await ensaiarAtendente(ctx);
 
-    expect(r.promptVersion).toBe('atendente-imova@v4');
+    expect(r.promptVersion).toBe('atendente-imova@v5');
     expect(r.modelo).toBe('claude-haiku-5-5');
-    expect(r.cenarios).toHaveLength(CENARIOS_DO_ATENDENTE_V4.length);
-    expect(r.acertos).toBe(CENARIOS_DO_ATENDENTE_V4.length);
-    expect(modelo.pedidos).toHaveLength(CENARIOS_DO_ATENDENTE_V4.length);
+    expect(r.cenarios).toHaveLength(CENARIOS_DO_ATENDENTE_V5.length);
+    expect(r.acertos).toBe(CENARIOS_DO_ATENDENTE_V5.length);
+    expect(modelo.pedidos).toHaveLength(CENARIOS_DO_ATENDENTE_V5.length);
     expect(modelo.pedidos[0]?.sistema).toContain('TE0004 · terreno');
     // Toda chamada fica em ai_runs, como a IA que atende.
-    expect(banco.tabelas.ai_runs).toHaveLength(CENARIOS_DO_ATENDENTE_V4.length);
+    expect(banco.tabelas.ai_runs).toHaveLength(CENARIOS_DO_ATENDENTE_V5.length);
     expect((banco.tabelas.ai_runs?.[0] as { prompt_version?: string }).prompt_version).toBe(
-      'atendente-imova@v4',
+      'atendente-imova@v5',
     );
     expect(r.custoUsd).toBeGreaterThan(0);
     expect(relatorioDoEnsaio(r)).toMatch(
-      /^Ensaio de atendente-imova@v4 no claude-haiku-5-5: 12 de 12 cenários certos/,
+      /^Ensaio de atendente-imova@v5 no claude-haiku-5-5: 15 de 15 cenários certos/,
     );
   });
 
@@ -92,7 +95,7 @@ describe('workers ai --ensaio=atendente-imova', () => {
       confianca: 0.5,
     }));
     const r = await ensaiarAtendente(contexto(modelo).contexto, {
-      cenarios: CENARIOS_DO_ATENDENTE_V4.slice(0, 2),
+      cenarios: CENARIOS_DO_ATENDENTE_V5.slice(0, 2),
     });
     expect(r.acertos).toBe(0);
     const texto = relatorioDoEnsaio(r);
@@ -109,7 +112,7 @@ describe('workers ai --ensaio=atendente-imova', () => {
       },
     };
     const r = await ensaiarAtendente(contexto(modelo).contexto, {
-      cenarios: CENARIOS_DO_ATENDENTE_V4.slice(0, 3),
+      cenarios: CENARIOS_DO_ATENDENTE_V5.slice(0, 3),
     });
     expect(r.cenarios).toHaveLength(3);
     expect(r.cenarios[0]?.falhas[0]).toMatch(/a chamada falhou \(Error: rede caiu\)/);

@@ -507,6 +507,8 @@ const O_QUE_MUDOU: Record<string, string> = {
     'Manda o link da agenda para o cliente escolher o horário: a visita, com o código e o endereço do imóvel, ou a reunião com um corretor.',
   'atendente-imova@v4':
     'Manda o link da visita também para o imóvel em rascunho no CRM; só o anúncio pausado vai para um corretor.',
+  'atendente-imova@v5':
+    'Visita presencial sem link: pergunta o dia e o período, diz que vai consultar a agenda e passa a conversa para a equipe. O link da agenda fica só para a reunião online.',
 };
 
 export function oQueMudouNaVersao(versao: string | null | undefined): string | null {
