@@ -170,7 +170,7 @@ export interface Empresa {
      * o imóvel obrigatório na visita do "Novo compromisso", o código e o endereço no
      * cartão da visita (Agenda e Meu dia), "Falta o imóvel" com "Definir imóvel", e o
      * campo "Link do Calendly" do admin. Só da Imova: no banco da KOMUNE a migração
-     * 20261111210000 não cria `visita_imoveis`, `agenda_convites` nem as funções.
+     * 20261112160000 não cria `visita_imoveis`, `agenda_convites` nem as funções.
      */
     agendaComImovel: boolean;
     /**

@@ -29,7 +29,7 @@
 --         `app.lgpd_dossie_sem_o_calendly`, e `app.lgpd_dossie` vira uma casca
 --         que chama essa e acrescenta a parte do Calendly. Assim o que outra
 --         migração anterior pôs no dossiê fica como está, seja qual for a forma:
---         é o caso da 20261111210000 (o convite da agenda), que inclui
+--         é o caso da 20261112160000 (o convite da agenda), que inclui
 --         `agenda_convites` e `visita_imoveis` no mesmo dia. A casca tem as
 --         mesmas permissões (só `service_role`; quem exporta é
 --         `exportar_lgpd`/`exportar_lgpd_por_token`, que não mudam).
@@ -155,9 +155,9 @@ begin
       'Os agendamentos feitos pelo Calendly ficam 2 anos depois da data marcada.'));
 end $$;
 comment on function app.lgpd_dossie(uuid) is
-  'Dossiê do art. 18 (I/II) e art. 9º: a definição de antes (app.lgpd_dossie_sem_o_calendly, com tudo o que as migrações anteriores puseram nela) mais os agendamentos do Calendly (20261111211000, só na Imova). Interna: quem chama é exportar_lgpd ou exportar_lgpd_por_token.';
+  'Dossiê do art. 18 (I/II) e art. 9º: a definição de antes (app.lgpd_dossie_sem_o_calendly, com tudo o que as migrações anteriores puseram nela) mais os agendamentos do Calendly (20261112161000, só na Imova). Interna: quem chama é exportar_lgpd ou exportar_lgpd_por_token.';
 comment on function app.lgpd_dossie_sem_o_calendly(uuid) is
-  'O dossiê da LGPD como era antes de 20261111211000. Chamado só pela casca app.lgpd_dossie, que acrescenta os agendamentos do Calendly.';
+  'O dossiê da LGPD como era antes de 20261112161000. Chamado só pela casca app.lgpd_dossie, que acrescenta os agendamentos do Calendly.';
 
 -- ---------------------------------------------------------------------
 -- 2b. A retenção: 2 anos depois da data marcada

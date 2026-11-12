@@ -31,9 +31,9 @@ O Calendly em si não manda nada pelo WhatsApp: o que vai pelo WhatsApp é o lin
 - o endereço da visita pela pergunta "Endereço ou código do imóvel" (com o código de um anúncio, vale o endereço do anúncio);
 - o aviso **"Não consegui cancelar no Calendly o agendamento de…"** no topo da Agenda, para o dono do agendamento e os admins, quando o cancelamento esgota as tentativas.
 
-**Pronto no código, à espera de publicar (banco `20261111211000` e site; o acabamento):** os textos da Agenda, do Meu dia e das Metas no vocabulário da imobiliária; o selo "Reagendada" também na visita que o cliente remarcou; os diálogos de cancelar e remarcar dizendo o que acontece no Calendly; o conflito do "Novo compromisso" com "(marcado pelo Calendly)"; sem as frases do e-mail que não sai; e a LGPD do agendamento (dossiê, 2 anos e exclusão a pedido). Ver [O que a tela diz e o que a LGPD guarda](#o-que-a-tela-diz-e-o-que-a-lgpd-guarda).
+**Pronto no código, à espera de publicar (banco `20261112161000` e site; o acabamento):** os textos da Agenda, do Meu dia e das Metas no vocabulário da imobiliária; o selo "Reagendada" também na visita que o cliente remarcou; os diálogos de cancelar e remarcar dizendo o que acontece no Calendly; o conflito do "Novo compromisso" com "(marcado pelo Calendly)"; sem as frases do e-mail que não sai; e a LGPD do agendamento (dossiê, 2 anos e exclusão a pedido). Ver [O que a tela diz e o que a LGPD guarda](#o-que-a-tela-diz-e-o-que-a-lgpd-guarda).
 
-**Pronto no código, à espera de publicar (11/11/2026, o convite da Agenda):** banco `20261111210000_o_convite_da_agenda.sql` e a função `calendly-webhook` (passa o `utm_content` do convidado ao banco). O site (botão "Enviar link da agenda", "Falta o imóvel", o campo do link) e a IA (`atendente-imova@v3`) vêm de outras entregas do mesmo dia.
+**Pronto no código, à espera de publicar (11/11/2026, o convite da Agenda):** banco `20261112160000_o_convite_da_agenda.sql` e a função `calendly-webhook` (passa o `utm_content` do convidado ao banco). O site (botão "Enviar link da agenda", "Falta o imóvel", o campo do link) e a IA (`atendente-imova@v3`) vêm de outras entregas do mesmo dia.
 
 **Falta (configuração, do lado de quem tem as contas):**
 - compartilhar "CRM Imova - ocupado" com a conta de serviço ("Fazer alterações nos eventos") e gravar `google_agenda_id` (passo 5). **Sem isso o espelho fica desligado:** o que a equipe marca no CRM continua livre no Calendly, e só a rede de segurança (recusar e cancelar) segura;
@@ -82,7 +82,7 @@ cliente ─ link ─► Calendly ── webhook assinado ──► Edge Function
 
 - **Edge Function** `supabase/functions/calendly-webhook`: confere a assinatura do Calendly (`CALENDLY_WEBHOOK_SIGNING_KEY`) e resume o aviso.
 - **Banco** `supabase/migrations/20261110180000_calendly_na_agenda.sql`: `calendly_agendamentos`, `calendly_receber`, a régua `app.agenda_ocupada` e as listas do que falta (`calendly_cancelamentos_pendentes`, `agenda_espelho_pendencias`). E `20261111204000_o_calendly_respeita_feriado_e_dono.sql`: o dia útil (`app.eh_dia_util`), quem atende (`app.calendly_pessoa_escolhida`, usada por `app.calendly_dono` e `app.calendly_pessoa_da_agenda`), o responsável da ficha, o endereço da visita pela resposta ou pelo anúncio (`app.calendly_local_da_visita`) e as funções das duas partes da tela (`calendly_quem_atende`, `calendly_quem_atende_gravar`, `calendly_cancelamentos_que_falharam`, `calendly_cancelamento_resolvido`).
-- **Banco do convite** `supabase/migrations/20261111210000_o_convite_da_agenda.sql`: o convite (`agenda_convites`), o imóvel de cada visita (`visita_imoveis`), o link (`app.agenda_link_montar`, `app.url_codificar`), as portas da tela (`agenda_link_previa`, `agenda_enviar_link`, `visita_marcar_com_imovel`, `visita_definir_imovel`, `calendly_link_configurar`), a da IA (`ia_atendente_enviar_link`) e o `calendly_receber` que usa o convite.
+- **Banco do convite** `supabase/migrations/20261112160000_o_convite_da_agenda.sql`: o convite (`agenda_convites`), o imóvel de cada visita (`visita_imoveis`), o link (`app.agenda_link_montar`, `app.url_codificar`), as portas da tela (`agenda_link_previa`, `agenda_enviar_link`, `visita_marcar_com_imovel`, `visita_definir_imovel`, `calendly_link_configurar`), a da IA (`ia_atendente_enviar_link`) e o `calendly_receber` que usa o convite.
 - **Banco do espelho** `supabase/migrations/20261111205000_o_espelho_no_google.sql`: os feriados na lista do worker (`app.agenda_espelho_desejado`) e o estado do espelho para a tela (`public.agenda_espelho_estado`, só admin e gestor).
 - **Site** `apps/web/src/components/agenda`: `quem-atende-o-calendly.tsx` (o campo do admin), `falhas-do-calendly.tsx` (o aviso do cancelamento que falhou), `calendly.ts` (as frases) e `cartao-do-espelho.tsx` (o cartão "Espelho no Google", só para o admin: diz em uma frase se o espelho está desligado, com erro, parado ou ligado).
 - **Worker** `apps/workers/src/agenda` no `imova-worker-wa`: cancela no Calendly (`CALENDLY_TOKEN`) e grava e apaga os blocos no Google (`GOOGLE_AGENDA_CREDENCIAL`; no plano B, também `GOOGLE_AGENDA_SUB`).
@@ -111,7 +111,7 @@ A KOMUNE não precisa de nada agora. A parte comum da migração (o aviso da age
 supabase functions deploy calendly-webhook --project-ref kkqadgxvmzulcamuakzk
 ```
 
-O `supabase/config.toml` já diz `verify_jwt = false` para ela. **Publique de novo junto com o banco `20261111210000`** (o convite): a versão nova passa ao banco o `tracking.utm_content` do convidado. A ordem não quebra nada: a função velha com o banco novo só não manda o token (o agendamento entra como sem convite), e a função nova com o banco velho manda um campo que o banco ignora. O site da Imova sai como em `publicar-na-vercel.md`, de uma cópia limpa.
+O `supabase/config.toml` já diz `verify_jwt = false` para ela. **Publique de novo junto com o banco `20261112160000`** (o convite): a versão nova passa ao banco o `tracking.utm_content` do convidado. A ordem não quebra nada: a função velha com o banco novo só não manda o token (o agendamento entra como sem convite), e a função nova com o banco velho manda um campo que o banco ignora. O site da Imova sai como em `publicar-na-vercel.md`, de uma cópia limpa.
 
 ### 3. O Google Agenda que o Calendly confere
 
@@ -325,7 +325,7 @@ https://calendly.com/contato-imovaimobiliaria/30min?name=Maria%20Souza&a1=Visita
 
 ## O que a tela diz e o que a LGPD guarda
 
-O acabamento de 11/11/2026 (`20261111211000` e site):
+O acabamento de 11/11/2026 (`20261112161000` e site):
 
 - **Cancelar o que a equipe marcou** diz, no diálogo, *"O bloco 'Ocupado' sai do Google Agenda, e o horário volta a ficar livre para o cliente no Calendly"* só quando é verdade: o compromisso está na agenda de quem atende o Calendly e o espelho está ligado (`public.calendly_agenda_do_link`). Noutra agenda, ou com o espelho desligado, o diálogo não fala do Calendly. A apresentação "a marcar" diz que não segurava horário.
 - **Remarcar uma reunião que o cliente marcou pelo Calendly** avisa antes, na folha: o CRM cancela o agendamento lá, e o Calendly manda ao cliente *"A Imova Imobiliária remarcou este compromisso e vai combinar o novo horário com você."* Quem remarca manda o horário novo pelo WhatsApp.

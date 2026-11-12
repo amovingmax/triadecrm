@@ -1790,7 +1790,7 @@ grant execute on function public.calendly_receber(jsonb) to service_role;
     end if;
     execute replace(v_def, v_ancora,
       $a$'mensagens', v_msgs,
-    -- O convite da Agenda (20261111210000): os 5 mais novos, para a IA não
+    -- O convite da Agenda (20261112160000): os 5 mais novos, para a IA não
     -- mandar o mesmo link de novo e saber se o cliente já agendou.
     'convites_da_agenda', app.ia_convites_da_agenda(c.id));$a$);
     comment on function public.ia_entrada_do_atendente(uuid) is
@@ -1806,7 +1806,7 @@ grant execute on function public.calendly_receber(jsonb) to service_role;
       raise exception 'app.lgpd_dossie não tem a chave ''retencao'' exatamente uma vez (achei %): nada foi trocado.', v_vezes;
     end if;
     execute replace(v_def, v_ancora,
-      $a$-- A agenda da Imova (20261111210000): os links do Calendly mandados ao
+      $a$-- A agenda da Imova (20261112160000): os links do Calendly mandados ao
     -- titular e o imóvel das visitas dele.
     'convites_da_agenda', app.lgpd_agenda_convites(o.id),
     'imoveis_das_visitas', app.lgpd_visita_imoveis(o.id),
@@ -1821,7 +1821,7 @@ grant execute on function public.calendly_receber(jsonb) to service_role;
     if v_vezes <> 1 then
       raise exception 'app.aplicar_retencao não grava retention_runs exatamente uma vez (achei %): nada foi trocado.', v_vezes;
     end if;
-    v_trecho := $a$  -- (17) A agenda da Imova (20261111210000). O link do convite leva o nome e o
+    v_trecho := $a$  -- (17) A agenda da Imova (20261112160000). O link do convite leva o nome e o
   --      telefone do cliente: 90 dias depois de vencer, fica só a base do link
   --      (o resto da linha é a contagem de convites e de visitas). Ficha
   --      anonimizada perde os convites. E o endereço escrito à mão (o imóvel sem

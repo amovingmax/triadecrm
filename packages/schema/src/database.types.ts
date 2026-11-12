@@ -10895,19 +10895,6 @@ export type Database = {
         Returns: Json
       }
       agenda_avisos_vistos: { Args: { p_ids?: string[] }; Returns: number }
-      agenda_enviar_link: {
-        Args: {
-          p_anuncio_id?: string
-          p_conversation_id: string
-          p_texto?: string
-          p_tipo: string
-        }
-        Returns: Json
-      }
-      agenda_link_previa: {
-        Args: { p_anuncio_id?: string; p_conversation_id: string; p_tipo: string }
-        Returns: Json
-      }
       agenda_espelho_apagado: { Args: { p_item: string }; Returns: undefined }
       agenda_espelho_estado: { Args: never; Returns: Json }
       agenda_espelho_falhou: {
