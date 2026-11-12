@@ -10534,10 +10534,10 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 - a espera de trava no gatilho;
 - o `OR` na junção do par;
 - o lead suprimido preso em "novo".
-O pgTAP 34 do 172 dependia da ordem de um `inicio_em` empatado e foi fixado.
+O pgTAP 34 do 172 dependia da ordem de um `inicio_em` empatado e foi fixado. Na reconferência entrou mais um ajuste: a rotina de 5 min devolve o `lock_timeout` de antes, como o gatilho já fazia.
 
 **Verificado (banco local da Imova, em transação desfeita, com as migrações da `main` que faltam nele antes):**
-- pgTAP 172 (111, sendo 22 novas; 11 delas falham com o código anterior à revisão) e 173 (51).
+- pgTAP 172 (112, sendo 23 novas; 11 delas falham com o código anterior à revisão) e 173 (51). A revisão independente reconferiu os 8 achados num Postgres descartável, com as 217 migrações e o seed, e não achou regressão.
 - Regressão: 153 (49), 123 (60), 124 (30), 125 (66), 126 (39), 127 (43), 128 (18), 129 (26), 130 (13), 137 (45), 138 (73), 139 (44), 140 (14), 141 (21), 144 (31), 170 (130) e 171 (34), tudo verde.
 - O 160 falha igual sem estas migrações: falta categoria no banco local. O 09 e o 135 falham como antes.
 - KOMUNE: as duas migrações só dão o aviso. Num banco sem identidade, aplicadas duas vezes, não criam lead.
@@ -10574,5 +10574,7 @@ Qualquer ordem é segura: a função sem a tabela só registra aviso, e o site s
 
 **Fora do escopo:**
 - `app.canal_sinal_do_portal` segue vazia (o lead do webhook ainda não marca a chegada);
+- o lead do WhatsApp sem anúncio (código que o CRM ainda não tinha) só ganha o anúncio quando a chegada muda de canal ou de código, não na rotina de 5 min. Os 11 anúncios da Imova já estão no CRM;
+- no passo da entrega, um teste por `curl` com a chave de verdade deixa o passo em "pede um olhar" até o próximo lead do Grupo OLX;
 - o plano B pelo e-mail de lead;
 - o arquivo do CRM, que segue vazio (0 anúncios no ar): não colar a URL do XML antes de pôr os anúncios no ar.

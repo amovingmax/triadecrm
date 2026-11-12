@@ -34,7 +34,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(111);
+select plan(112);
 
 insert into public.allowed_users (email, role, note) values
   ('w172.g@teste.local', 'gestor', 'pgTAP 172'),
@@ -743,6 +743,9 @@ select pg_temp.gestor();
 select public.chegada_marcar(pg_temp.chegada(pg_temp.id('c')), 'anuncios', 'portal_zap');
 select is(current_setting('lock_timeout'), '7s', 'o gatilho devolve o lock_timeout de antes');
 select pg_temp.sair();
+-- A rotina de 5 min também devolve (a migração a chama e segue com o cron).
+select app.portal_leads_do_whatsapp();
+select is(current_setting('lock_timeout'), '7s', 'a rotina devolve o lock_timeout de antes');
 reset lock_timeout;
 
 -- =====================================================================

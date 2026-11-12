@@ -492,12 +492,14 @@ declare
   n_mudados int := 0;
   n_erros   int := 0;
   n_fichas  int := 0;
+  v_espera  text := current_setting('lock_timeout');
 begin
   if (select i.empresa from app.identidade i) is distinct from 'imova' then
     return jsonb_build_object('ligada', false);
   end if;
   -- A rotina não espera trava de quem atende: o que ficou preso é refeito na
-  -- próxima volta.
+  -- próxima volta. O valor de antes volta no fim, para não ficar 1 s no resto
+  -- da transação de quem chamou (a migração, ou alguém à mão).
   perform set_config('lock_timeout', '1s', true);
 
   -- 1. A chegada de portal sem lead na lista (sem lead, ou com o lead
@@ -574,6 +576,7 @@ begin
     raise warning 'portal_leads_do_whatsapp (fichas): %', sqlerrm;
   end;
 
+  perform set_config('lock_timeout', v_espera, true);
   return jsonb_build_object('ligada', true, 'criados', n_criados, 'mudados', n_mudados,
                             'fichas', n_fichas, 'erros', n_erros);
 end $$;
