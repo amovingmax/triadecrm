@@ -94,6 +94,7 @@ import {
   Handshake,
   ListChecks,
   type LucideIcon,
+  Megaphone,
   MessageCircle,
   PhoneCall,
   Settings,
@@ -291,6 +292,21 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
     // na aba "Aprovar", dentro da tela. Somar os dois misturaria "chegou
     // resposta" com "tem rascunho", e o número não cairia ao abrir a conversa.
     fila: 'respostas',
+  },
+  {
+    // Disparos (12/11/2026): a tela de /envios volta ao menu, que tinha saído no
+    // pivô de 06/10/2026. "Temos 2k de mensagens disponíveis por dia": quem monta
+    // escolhe para quem, o que e quantos, e o limite do dia é o da Meta.
+    href: '/envios',
+    rotulo: 'Disparos',
+    icone: Megaphone,
+    grupo: 'todo_dia',
+    // As palavras que alguém digitaria na paleta: envio em massa, campanha,
+    // disparo, modelo, quantidade, limite.
+    descricao:
+      'Envio em massa pelo WhatsApp: escolher para quem, a mensagem (modelo aprovado pela Meta ou texto livre) e quantos, com o limite do dia, o que já foi usado e o andamento de cada disparo.',
+    // Espelho de `app.is_manager()`, que toda RPC de envio em massa confere.
+    papeis: PAPEIS_DO_CRM,
   },
   {
     href: '/agenda',

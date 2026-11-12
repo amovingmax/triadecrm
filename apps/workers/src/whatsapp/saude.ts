@@ -60,6 +60,63 @@ export async function lerSaudeDoNumero(ctx: ContextoDaSaude): Promise<void> {
     status: numero.status,
     vazao: numero.vazao,
   });
+  await lerLimiteDoNumero(ctx, numero.numero);
+}
+
+/**
+ * O campo do limite de conversas por dia na Graph. O antigo,
+ * `messaging_limit_tier`, a Meta aposentou quando o limite passou a ser do
+ * portfólio; este é o que a documentação manda pedir no lugar (12/11/2026).
+ */
+export const CAMPO_DO_LIMITE = 'whatsapp_business_manager_messaging_limit';
+
+/**
+ * O tier ("TIER_2K") na resposta da Graph. A documentação mostra o valor como
+ * texto; aceita também um objeto com `current_limit` ou `tier`, para não
+ * perder a leitura se a forma mudar. Qualquer outra coisa é "não disse".
+ */
+export function limiteDaResposta(json: unknown): string | null {
+  if (typeof json !== 'object' || json === null) return null;
+  const bruto = (json as Record<string, unknown>)[CAMPO_DO_LIMITE];
+  const valor =
+    typeof bruto === 'string'
+      ? bruto
+      : typeof bruto === 'object' && bruto !== null
+        ? ((bruto as Record<string, unknown>).current_limit ?? (bruto as Record<string, unknown>).tier)
+        : null;
+  if (typeof valor !== 'string') return null;
+  const tier = valor.trim().toUpperCase();
+  return /^TIER_[A-Z0-9]+$/.test(tier) ? tier : null;
+}
+
+/**
+ * O limite numa leitura PRÓPRIA, depois da nota: se a Graph recusar o campo,
+ * a nota já foi gravada. Até 12/11/2026 o CRM nunca pediu o limite, e o teto
+ * da Meta ficava "não sei" (migração 20261112110000).
+ */
+async function lerLimiteDoNumero(ctx: ContextoDaSaude, numero: string | null): Promise<void> {
+  const lido = await ctx.graph.ler(ctx.phoneNumberId, { fields: CAMPO_DO_LIMITE });
+  if (!lido.ok) {
+    ctx.logger.warn('a Meta não disse o limite de conversas do número', {
+      phone_number_id: ctx.phoneNumberId,
+      codigo: lido.codigo,
+    });
+    return;
+  }
+  const tier = limiteDaResposta(lido.json);
+  if (tier === null) return;
+  await registrarSaude(ctx.cliente, {
+    numero,
+    origem: 'graph',
+    campo: 'phone_number',
+    evento: 'LIMITE',
+    limite_atual: tier,
+    payload: lido.json,
+  });
+  ctx.logger.info('a Meta disse o limite de conversas do número', {
+    phone_number_id: ctx.phoneNumberId,
+    limite: tier,
+  });
 }
 
 export interface SaudePeriodica {

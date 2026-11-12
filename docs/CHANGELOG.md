@@ -10353,3 +10353,113 @@ Pedido do usuário (11/11/2026): "Quero focar na agenda agora para deixar ela co
 **Para publicar (só na Imova):** o banco (a migração), a Edge Function `calendly-webhook` e o site; o `imova-worker-ai` com o `atendente-imova@v3` só depois do banco.
 
 **Passos do usuário:** no Calendly, as três perguntas nesta ordem: "O que você quer marcar?" (opções exatas "Visita a um imóvel" e "Reunião"), "Telefone (WhatsApp)" e "Endereço ou código do imóvel"; o idioma do convidado em português (`docs/operacao/calendly.md`).
+## 11/11/2026 — o app do iPhone a caminho da App Store, não listado (branch `app-loja-nao-listado`; PRD §8)
+
+Pedido do usuário: "pretendo subir o app na App Store, sendo que o app será privado somente à equipe". Ele escolheu a **distribuição não listada**: o app fica na loja, mas só instala quem tem o link, e quem não está em `allowed_users` não entra. Também escolheu pôr a conta do revisor da Apple na **KOMUNE em produção** (SDR), criar páginas próprias do app para suporte e privacidade, e deixar a ficha ser preenchida pela API. Guia completo em `docs/operacao/app-store.md`.
+
+**Entregue:**
+- **App 1.0.0** (`VERSAO_DA_CASCA`): a Apple recusa o pedido de não listado de app que pareça beta. Build `179fa46f` (número 7), montada na nuvem do Expo com `--auto-submit` para o App Store Connect. O código da casca é o da 0.2.0.
+- **Site: `/aplicativo` (suporte) e `/aplicativo/privacidade` (política do app)**, abertas sem login nas duas empresas (`ehRotaPublica`, com testes).
+  - A política fala de quem usa o app: a conta Google, o registro de atividades (12 meses), o endereço de avisos, as permissões e os serviços.
+  - Os dados dos clientes seguem a política de cada empresa, linkada na página.
+  - O texto mora em `app/aplicativo/` e `lib/aplicativo.ts`. As peças de texto da `/privacidade` da Imova passaram para `components/pagina-publica.tsx`, sem mudar o que ela mostra.
+- **App Store Connect, preenchido pela API em rascunho** (versão 1.0.0 do "Tríade CRM", `6831297069`):
+  - textos, links e categorias (Negócios e Produtividade);
+  - classificação etária (só "mensagens e chat: sim"), "sem conteúdo de terceiros", copyright;
+  - grátis, **só no Brasil**, **liberação manual**;
+  - notas para o revisor (em inglês, com o pedido de não listado e o de não mandar mensagem nem ligar);
+  - **5 capturas de iPhone 6,9"** (Meu dia, Conversas, uma conversa, Agenda e Funis), feitas num banco local à parte, com dados fictícios (fornecedores inventados, telefones +55 84 90000-00xx).
+- **Os links da ficha estão no domínio da Imova** (`imova-crm.vercel.app/aplicativo…`): o site dela sai da `main`, e a KOMUNE está parada de propósito na versão de 06/11.
+
+**Verificado:** sobre a `main` de 11/11 (`7044762`), typecheck e Vitest do site (126 arquivos, 2.019 testes) e lint dos arquivos tocados; typecheck e Vitest do app (42 testes). A ficha foi relida pela API: as 5 capturas foram processadas (`COMPLETE`). As duas páginas responderam 200 sem login num build de produção local. **Não verificado:** as páginas no ar (o site ainda não foi publicado com elas).
+
+**O que muda em produção (quando publicado):** só o site da Imova (duas páginas públicas novas). Sem banco, sem worker. O banco da Imova precisa estar com as migrações da `main` antes (banco antes do site, como sempre).
+
+**Pendente / decisão humana (passo a passo em `docs/operacao/app-store.md`):**
+- Publicar o site da Imova da `main` com este ramo. Antes do envio à revisão, os links de suporte e de privacidade precisam abrir.
+- Criar o Gmail do revisor, liberar como SDR em Administração → Pessoas da KOMUNE, entrar uma vez e pôr usuário, senha e o contato em "Informações para revisão do app".
+- Responder "Privacidade do app" no painel (a API não tem): as respostas estão no guia.
+- Escolher a build 1.0.0 (7) na versão, quando a Apple terminar de processar.
+- Enviar para revisão e, logo depois, mandar o pedido de não listado (respostas sugeridas no guia).
+- Depois das duas aprovações: liberar a versão à mão e mandar o link para a equipe.
+
+## 12/11/2026 — Disparos: escolher para quem, o que e quantos, com o limite do dia sendo o da Meta (branch `disparos`; o limite da Meta só na KOMUNE; RF-CON-02, RF-CON-10, RF-CON-11)
+
+**Pedido do usuário:** "temos 2k de mensagens disponíveis para envio em massa por dia, quero fazer a funcionalidade com que podemos escolher para quem enviar, o que enviar e a quantidade de envios". Sobre o teto: "Eu quero determinar isso no CRM. Eu não quero que a quantidade seja determinada. Até porque para testes agora a gente vai enviar apenas para 3 pessoas. Das 2.000 disponíveis. Estamos cientes dos custos". Sobre a mensagem, escolheu "modelo aprovado + criar novo" (o "só o cumprimento" de 22/09 caiu).
+
+**O que travava os 2.000:** a fila de envio em massa (21/09) e a tela `/envios` existiam; a tela só tinha saído do menu no pivô de 06/10. O que segurava eram as travas do próprio CRM, todas abaixo da Meta: o aquecimento parado em 45/dia (teto duro 100), 150 iniciadas por dia e 60 por hora, o disparo em até 60/h com o relógio mandando uma por minuto, e o worker-wa esperando 45–180 s entre mensagens (≈ 32 por hora).
+
+**Entregue:**
+- **Banco (migração `20261112100000_disparos.sql`, pgTAP 157 com 24 casos):**
+  - **Só na KOMUNE** (decisão do usuário ao publicar): a chave `whatsapp.envio.teto_da_meta` (`app.wa_teto_segue_a_meta()`) liga o teto pela Meta e o intervalo novo do worker. A migração a liga só no banco cuja `app.identidade` é `komune`; na Imova ela fica desligada e os limites são os de antes. Ligar na Imova depois é um `update` na chave (e no intervalo).
+  - `app.teto_do_canal`: com a chave ligada, passado o aquecimento (20 e 35 nas duas primeiras semanas de um número novo, como antes), o teto do WhatsApp é o da Meta (`app.wa_teto_da_meta`: o tier, com nota amarela pela metade e vermelha zero). Sem notícia da Meta, volta o `depois` com o teto duro.
+  - `app.pode_enviar`, passo 6 (definição viva, uma troca): com a chave ligada e o limite da Meta conhecido, o teto do dia é o dela e o da hora é o do dia dividido por 8 (2.000 → 250/h); sem eles, a regra de antes (150/60 de `whatsapp.envio`, o do dia limitado pela Meta).
+  - `envios_em_massa.por_hora` de 1 a 300 (era 60), e `public.envio_em_massa_criar` aceita o mesmo.
+  - `app.envios_em_massa_rodar`: acima de 60 por hora a volta do relógio manda quantas couberem no minuto (até 20), contando o passo de onde a anterior parou e nunca de mais de 1 min atrás. Até 60/h, nada muda (uma por volta).
+  - `public.envio_em_massa_teto` diz também `sobra`, `tier` e `na_fila` (o que os disparos em curso ainda vão mandar; o bom-dia contínuo fora).
+  - `app.wa_motivo_legivel`: as frases dos tetos não dizem mais "150" e "60".
+  - `whatsapp.envio` (só no banco da KOMUNE): a chave ligada, e o intervalo do worker-wa entre mensagens iniciadas pela empresa de 45–180 s para 8–24 s, só onde ainda estava no padrão.
+- **Site:**
+  - "Disparos" no menu (grupo Todo dia, depois de Conversas), para admin, gestor e SDR; a página aceita os três (antes só admin e gestor).
+  - Topo da lista: **Limite de hoje** — quanto ainda cabe, usadas de quanto, a barra, quem manda (Meta ou aquecimento), a nota e quantas já estão na fila de outros disparos.
+  - Novo disparo: **Para quem** (os filtros de antes, a lista para marcar e desmarcar), **Quantos** (vazio = todos os marcados; com número, os N primeiros da lista; e o que ainda cabe hoje), **Mensagem** (Cumprimento, **Modelo aprovado** com a lista dos aprovados pela Meta, ou Texto livre), com **Criar modelo novo** de volta (admin e gestor; vai para a Meta pela sincronização de 30 em 30 min) e a lista do que espera a Meta. Opções avançadas: quem assina, ritmo (10 a 240/h, padrão 60), o que cada botão do modelo faz e o destino do link. À direita: a prévia com os botões, a duração, o custo estimado, o limite de hoje e, quando não cabe tudo, quantas saem hoje e quantas no próximo dia útil.
+  - "Campanha" virou "disparo" nos textos da tela; o link da aba Automáticas diz "Disparos".
+  - `CLAUDE.md`: seção "Disparos, de 12/11/2026" e o guardrail do teto atualizado.
+
+**Arquivos:** `supabase/migrations/20261112100000_disparos.sql`, `supabase/tests/157_disparos.sql`, `apps/web/src/app/(app)/envios/page.tsx`, `apps/web/src/components/envios/{tela-envios.tsx,novo-envio.tsx,criar-modelo.tsx,dados.ts,formatos.ts,formatos.test.ts,tipos.ts,painel-do-envio.tsx}`, `apps/web/src/lib/{navegacao.ts,navegacao.test.ts}`, `apps/web/src/components/conversas/automaticas.tsx`, `CLAUDE.md`.
+
+**Verificado:**
+- pgTAP 157 (24/24) num Postgres descartável com todas as migrações e o seed: teto 45 sem a Meta, 2.000 com TIER_2K verde, 20 na primeira semana, 1.000 com nota amarela, 0 com vermelha (e a porteira recusando), a 151ª abertura do dia passando com a Meta, os 150 valendo no número sem notícia dela, 61 na última hora passando, ritmo 301 recusado, 60/h mandando uma por volta mesmo atrasado, 240/h mandando de 4 a 6 numa volta, cada uma pela porteira, a cota com sobra e fila, a frase sem "150", e a chave desligada mantendo 45 e o teto de antes. O bloco da KOMUNE, reaplicando a migração numa transação desfeita: num banco `komune` a chave liga e o intervalo vai a 8–24; num banco `imova`, nada muda.
+- Suíte pgTAP inteira: as mesmas 6 falhas de antes da migração (08, 52, 107, 127, 151, 154, que já falhavam nesse banco), nenhuma nova; 56, 57, 58, 63, 65, 68, 69, 70, 92 e os de WhatsApp verdes.
+- Site: typecheck e lint limpos; Vitest inteiro (126 arquivos, 2.032 testes), com os novos da quantidade, da divisão do dia, dos botões e do menu.
+- Navegador, numa pilha Supabase local separada (todas as migrações pelo CLI, sem erro) com o número em TIER_2K verde: a lista mostra "2.000 mensagens ainda cabem · 0 de 2.000 usadas"; o novo disparo com "Quantos = 3" e o modelo "Convite para a feira de noivas" (2 botões na prévia) nasceu com as 3 primeiras fichas; o relógio do `pg_cron` mandou as 3, uma por minuto, como modelo na fila do worker; a lista passou a "1.997 · 3 de 2.000 usadas" com o cartão "Enviando · 3 enviadas". Em 390 px, sem rolagem lateral. O SDR entra na tela, monta disparo e não vê "Criar modelo novo".
+- **Não verificado:** a saída de verdade pela Meta (worker-wa e Graph) e a sincronização de um modelo criado pela tela.
+
+**Ao publicar, o banco da KOMUNE mostrou que o CRM nunca soube o limite da Meta** (`teto_da_meta` nulo, teto 45), por dois motivos antigos, de 25/09:
+- **O número não batia:** o worker-wa grava o número como a Graph escreve (`+55 84 9931-8888`, sem o nono dígito) e a porteira procura `+5584999318888`. 1.982 leituras de nota GREEN, nenhuma valendo.
+- **O tier nunca foi pedido:** a leitura periódica da Graph não pede o limite (o campo antigo, `messaging_limit_tier`, a Meta aposentou; o atual é `whatsapp_business_manager_messaging_limit`), e o webhook `business_capability_update` só avisa quando ele muda.
+
+Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP 158 com 9 casos; worker):
+- `public.wa_saude_registrar` grava o número em E.164 (`app.normalize_phone_br`), e `app.wa_teto_da_meta` compara as linhas antigas pelo mesmo normalizador: a nota verde passa a valer.
+- `wa_saude_numero.origem` aceita `pessoa`, e `public.wa_limite_informar(tier)` (admin e gestor) grava o limite visto no Meta Business; vale até a próxima notícia da Meta. Só no banco da KOMUNE, a migração grava o TIER_2K que o usuário informou ("temos 2k").
+- Worker-wa (`apps/workers/src/whatsapp/saude.ts`): a leitura de meia em meia hora passa a pedir `whatsapp_business_manager_messaging_limit` numa chamada própria (se a Graph recusar o campo, a nota já foi gravada) e grava o tier. Vitest do worker: 564. **Vale só quando o worker da KOMUNE for publicado de novo** (hoje ele roda o código de 27/10 e só foi reiniciado).
+
+**Em produção desde 12/11/2026, ~14h50:**
+- Banco da Imova: `20261112100000` e `20261112110000` (chave `teto_da_meta` desligada: teto 45, como antes; a nota da Meta passou a ser reconhecida também lá, então nota amarela ou vermelha agora pesa no teto da Imova, como já era o desenho).
+- Banco da KOMUNE: as 19 migrações da Imova que estavam seguradas desde 09/11 (decisão do usuário: "subir tudo junto"; cada uma entra sem efeito na KOMUNE), `20261112100000` e `20261112110000`. Conferido: chave ligada, nota GREEN, TIER_2K, teto 2.000, intervalo 8–24 s.
+- Worker-wa da KOMUNE: reiniciado às 14h41 para ler o intervalo novo e, às 14h57, publicado com o código da `main` (v16, junto com o aviso de 30). Na subida, a Graph respondeu `whatsapp_business_manager_messaging_limit = TIER_2K` e o worker gravou: o limite de 2.000 agora vem da Meta, não só do que foi informado.
+- Site da KOMUNE: `triade-ocaz086r1` (volta: `triade-npxd0dvhb`), da branch `disparos` (main + estes 4 commits), também em `ir.komune.app.br`. Conferido de fora: `/login` 200, `/envios` pede login, `/auth/dev` 404.
+- Branch `disparos` no GitHub; **main não mesclada**.
+
+**Decisão humana:**
+- O limite do dia passou a ser o da Meta em qualquer disparo, sem teto do CRM por baixo (pedido explícito: "não quero que a quantidade seja determinada"). Quem quiser um freio volta a ter um com `update` em `cadencia.tetos` (aquecimento) — os 150/60 só valem sem notícia da Meta.
+- Na KOMUNE, o intervalo do worker caiu para 8–24 s em toda mensagem iniciada pela empresa, não só nos disparos.
+
+## 11/11/2026 — o aviso por e-mail só quando passam de 30 mensagens sem resposta (branch `aviso-por-email-30-mensagens`; RF-CON-05)
+
+**Pedido do usuário:** "precisamos tirar os avisos de mensagem por email, coloque aviso no email agora, quando tiver mais de 30 novas mensagens".
+
+**Entregue (banco + worker-wa; nenhuma tela):**
+- **Sai o e-mail a cada lote** que chegava no WhatsApp (de 16/09/2026): `avisarDoQueChegou`, `ContextoDaEntrada.chegaram` e `lerConversasParaAviso` foram apagados.
+- **Entra o e-mail do acúmulo** (`20261112120000_aviso_por_email_so_no_acumulo.sql (nasceu 20261112120000; renomeada em 12/11 para ficar depois das que já estavam em produção)`):
+  - "Nova" é a regra da marca "Nova" e do número do menu (`avisos/dados.ts`): a mensagem chegou depois da última resposta do time na conversa (saída do CRM, por gente ou pela IA que atende, que não é modelo e não falhou). Não contam reação, mensagem apagada pela pessoa nem conversa concluída.
+  - **A conta recomeça a cada aviso:** só entra o que chegou depois do último e-mail (`avisos_de_acumulo.ate`). Sem isso, a fila antiga sem resposta deixaria a conta acima de 30 para sempre. O time em dia não recebe nada; o segundo e-mail só sai com mais 31 sem resposta depois do primeiro. A linha de partida da migração deixa de fora o que chegou antes dela.
+  - `public.aviso_de_acumulo_conferir()` devolve a decisão (`mandar`), o total, as conversas e as dez com mais mensagens esperando (nome da ficha ou do perfil, **só os quatro últimos dígitos** do número, a última mensagem). `public.aviso_de_acumulo_registrar()` grava o aviso **depois** que o Resend aceitou: se o e-mail falhar, a próxima conferência tenta de novo, e o marco nunca volta para trás. As duas só com a chave de serviço; `avisos_de_acumulo` só a gestão lê, e ninguém escreve pela tela.
+  - O limite é `notificacoes.email.mais_de_mensagens` (30). "Mais de" é mais de: 30 não manda, 31 manda.
+- **worker-wa:** confere uma vez por minuto (`INTERVALO_DO_ACUMULO_MS`) e manda um e-mail só ("WhatsApp: 31 mensagens novas sem resposta"), com os links de cada conversa (`?org=` com ficha, `?cliente=` sem) e o da tela Conversas. O texto não diz mais "WhatsApp da Komune". Nunca derruba o laço.
+- **O e-mail de reunião marcada (ADR-15) não muda**: continua pela mesma chave `notificacoes.email`.
+- pgTAP 159 (20 provas); `aviso-por-email.test.ts` reescrito (10 provas).
+
+**Verificado:** no banco local (com as migrações até 20261112120000 aplicadas), o pgTAP 159 passou e o `supabase db lint` não acusou nada; o worker chamou `aviso_de_acumulo_conferir` pelo supabase-js com a chave de serviço. Worker: typecheck, eslint e 537 testes do Vitest verdes. A suíte inteira de pgTAP no banco local tem falhas fora desta entrega: testes da Imova sem o banco da Imova (125–143), testes que dependem de data (74) e estado local (47, 52, 68, 83). O CI recria o banco do zero.
+
+**O aviso de 30 não está no ar.** Produção conferida (só leitura, `publicar-banco.mjs conferir`): o banco da Imova tem só esta migração pendente; o da KOMUNE tem 12 pendentes, 11 delas de entregas que foram só para a Imova, de propósito (09 e 10/11). O `triade-worker-wa` da KOMUNE roda o código de 27/10, e desde então o código do worker mudou em 34 arquivos.
+
+**Paliativo em produção na KOMUNE (11/11/2026, 14h51; escolha do usuário: "Parar os e-mails já"):** `notificacoes.email.para` passou de `["komune@komune.app.br"]` para `[]` no banco da KOMUNE (`supabase db query --linked --project-ref toqdjcajyrowutunczhr`). No worker de 27/10, que é o que está no ar, a lista vazia faz o e-mail de cada mensagem parar na hora. O e-mail de reunião marcada continua indo para quem atende a reunião, mas não vai mais para a caixa do time. Nada mais mudou: nem migração, nem worker, nem site.
+
+**Na main desde 12/11/2026** (junto com os Disparos; a migração renomeada para `20261112120000`). Os dois bancos de produção já estão em dia com tudo o mais (as 19 migrações da Imova subiram na KOMUNE com os Disparos).
+
+**No ar desde 12/11/2026, ~15h:** a migração `20261112120000` nos bancos da Imova e da KOMUNE (pelo `publicar-banco.mjs`, rodado pelo usuário); o worker da KOMUNE publicado (`triade-worker-wa` v16, imagem `deployment-01M78EEVASCK08BPE7EJ715XS5`, código da `main` fa2c3bc), sem erro nos logs; e a lista devolvida (`notificacoes.email.para = ["komune@komune.app.br"]`), só depois do worker novo. O e-mail de cada mensagem não volta: o worker novo não tem mais esse caminho. Na Imova a migração entra sem efeito (o worker de lá não foi mexido).
+
+**Decisão humana:**
+- Quando e como publicar o aviso de 30 na KOMUNE (o item acima).
+- 30 é o limite pedido; o número fica em `app_settings` e pode mudar sem código.

@@ -9,7 +9,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { bancoFalso } from '../ia/banco-de-teste';
 import { subirDubleDaGraph, type DubleDaGraph } from './duble-da-graph-de-teste';
-import { criarSaudePeriodica, lerSaudeDoNumero, type ContextoDaSaude } from './saude';
+import {
+  CAMPO_DO_LIMITE,
+  criarSaudePeriodica,
+  lerSaudeDoNumero,
+  limiteDaResposta,
+  type ContextoDaSaude,
+} from './saude';
 import { createLogger } from '../lib/log';
 
 import type { ClienteDoBanco } from './ponte';
@@ -61,6 +67,40 @@ describe('a leitura periódica da saúde do número', () => {
     // A nota de qualidade NÃO vem por webhook nenhum: quem a sabe é este GET.
     expect(item).toMatchObject({ qualidade: 'YELLOW', origem: 'graph', campo: 'phone_number' });
     expect(item.numero).toBe('5584999990000');
+  });
+
+  it('pede o limite pelo campo atual da Meta e o grava numa linha própria (12/11/2026)', async () => {
+    await duble.cenario({
+      numeros: {
+        '1234567890': {
+          display_phone_number: '+55 84 9999-0000',
+          quality_rating: 'GREEN',
+          status: 'CONNECTED',
+          [CAMPO_DO_LIMITE]: 'TIER_2K',
+        },
+      },
+    });
+    const banco = bancoFalso({}, { rpcs: { wa_saude_registrar: () => 1 } });
+    await lerSaudeDoNumero({
+      cliente: banco.cliente as unknown as ClienteDoBanco,
+      graph: duble.cliente({ phoneNumberId: '1234567890' }),
+      phoneNumberId: '1234567890',
+      logger,
+    });
+    const itens = banco.chamadasDeRpc
+      .filter((c) => c.nome === 'wa_saude_registrar')
+      .map((c) => (c.argumentos as { p_item: Record<string, unknown> }).p_item);
+    expect(itens).toHaveLength(2);
+    expect(itens[0]).toMatchObject({ qualidade: 'GREEN' });
+    expect(itens[1]).toMatchObject({ limite_atual: 'TIER_2K', origem: 'graph', numero: '+55 84 9999-0000' });
+  });
+
+  it('o tier sai do texto ou de um objeto, e qualquer outra coisa é "não disse"', () => {
+    expect(limiteDaResposta({ [CAMPO_DO_LIMITE]: 'TIER_2K' })).toBe('TIER_2K');
+    expect(limiteDaResposta({ [CAMPO_DO_LIMITE]: { current_limit: 'tier_10k' } })).toBe('TIER_10K');
+    expect(limiteDaResposta({ [CAMPO_DO_LIMITE]: 2000 })).toBeNull();
+    expect(limiteDaResposta({ quality_rating: 'GREEN' })).toBeNull();
+    expect(limiteDaResposta(null)).toBeNull();
   });
 
   it('falha de rede vira aviso e NÃO grava: a última linha continua valendo', async () => {

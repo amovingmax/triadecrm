@@ -38,6 +38,10 @@ export const ROTA_INICIAL = '/meu-dia';
  * `/privacidade` é a política de privacidade da empresa que a publica no CRM (a Imova):
  * a Meta, o Google e quem conversa com a empresa abrem o link sem conta. Na KOMUNE a
  * política mora no site dela, e a rota continua atrás do login, como sempre esteve.
+ *
+ * `/aplicativo` e `/aplicativo/privacidade` são o suporte e a política do app de
+ * celular, os links que a ficha da App Store pede. Abrem nas duas empresas: o app é um
+ * só, e o revisor da Apple e quem baixa o app abrem os links sem conta.
  */
 export function ehRotaPublica(pathname: string, empresa: Empresa = EMPRESA): boolean {
   return (
@@ -48,7 +52,9 @@ export function ehRotaPublica(pathname: string, empresa: Empresa = EMPRESA): boo
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/c/') ||
     pathname.startsWith('/r/') ||
-    (pathname === '/privacidade' && empresa.privacidade !== null)
+    (pathname === '/privacidade' && empresa.privacidade !== null) ||
+    pathname === '/aplicativo' ||
+    pathname === '/aplicativo/privacidade'
   );
 }
 
