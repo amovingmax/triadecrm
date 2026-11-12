@@ -10327,9 +10327,12 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 
 **Paliativo em produção na KOMUNE (11/11/2026, 14h51; escolha do usuário: "Parar os e-mails já"):** `notificacoes.email.para` passou de `["komune@komune.app.br"]` para `[]` no banco da KOMUNE (`supabase db query --linked --project-ref toqdjcajyrowutunczhr`). No worker de 27/10, que é o que está no ar, a lista vazia faz o e-mail de cada mensagem parar na hora. O e-mail de reunião marcada continua indo para quem atende a reunião, mas não vai mais para a caixa do time. Nada mais mudou: nem migração, nem worker, nem site.
 
-**Pendente:**
-- **Ao publicar o aviso de 30 na KOMUNE, devolver a lista**, senão ele também não sai: `update public.app_settings set value = jsonb_set(value, '{para}', '["komune@komune.app.br"]'::jsonb), updated_at = now() where key = 'notificacoes.email';`
-- Publicar o aviso de 30 na KOMUNE: o banco de lá tem 12 migrações pendentes (11 de entregas só da Imova) e o worker roda o código de 27/10. Ou se leva tudo, ou só esta mudança, à mão e fora do caminho do `publicar-banco.mjs`.
+**Na main desde 12/11/2026** (junto com os Disparos; a migração renomeada para `20261112120000`). Os dois bancos de produção já estão em dia com tudo o mais (as 19 migrações da Imova subiram na KOMUNE com os Disparos).
+
+**Falta publicar, nesta ordem** (o modo automático barrou a migração em produção; da pasta do repositório, na `main`):
+1. Banco: `node scripts/publicar-banco.mjs imova migrar --confirmar imova` e depois `node scripts/publicar-banco.mjs komune migrar --confirmar komune` (só a `20261112120000` pendente em cada um).
+2. Worker da KOMUNE: `fly deploy . --config infra/nuvem/fly.worker-wa.toml --dockerfile apps/workers/Dockerfile`. Leva junto tudo o que entrou no worker desde 27/10 (inclusive a leitura do limite da Meta dos Disparos); só pede as variáveis que o Fly já tem.
+3. **Só com o worker novo no ar**, devolver a lista (com o worker antigo, ela religaria o e-mail de cada mensagem): `supabase db query --linked --project-ref toqdjcajyrowutunczhr "update public.app_settings set value = jsonb_set(value, '{para}', '[\"komune@komune.app.br\"]'::jsonb), updated_at = now() where key = 'notificacoes.email';"`
 
 **Decisão humana:**
 - Quando e como publicar o aviso de 30 na KOMUNE (o item acima).
