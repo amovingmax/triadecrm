@@ -349,7 +349,14 @@ select pg_temp.chegou('placa', '+5584981720005', 'Passei em frente e vi a placa 
 select pg_temp.chegou('oi', '+5584981720006', 'Oi, tudo bem?');
 select pg_temp.chegou('meta', '+5584981720007', 'Olá! Quero mais informações',
                       p_conteudo => '{"anuncio": {"tipo": "ad", "titulo": "Apto Ponta Negra", "id": "172"}}'::jsonb);
-select is((select string_agg(c.canal || '/' || c.subcanal_automatico, ',' order by c.inicio_em)
+-- A ordem é a da conversa, e não `inicio_em`: as três chegadas nascem no mesmo
+-- instante da transação, e o empate deixava a ordem ao acaso.
+select is((select string_agg(c.canal || '/' || c.subcanal_automatico, ','
+                             order by case c.conversation_id
+                                        when pg_temp.id('placa') then 1
+                                        when pg_temp.id('oi') then 2
+                                        else 3
+                                      end)
              from public.chegadas c
             where c.conversation_id in (pg_temp.id('placa'), pg_temp.id('oi'), pg_temp.id('meta'))),
   'placa/texto_da_placa,nao_identificado/desconhecido,anuncios/meta_anuncio',
