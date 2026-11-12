@@ -10253,3 +10253,55 @@ Pedido do usuário: "pretendo subir o app na App Store, sendo que o app será pr
 - Escolher a build 1.0.0 (7) na versão, quando a Apple terminar de processar.
 - Enviar para revisão e, logo depois, mandar o pedido de não listado (respostas sugeridas no guia).
 - Depois das duas aprovações: liberar a versão à mão e mandar o link para a equipe.
+
+## 12/11/2026 — Disparos: escolher para quem, o que e quantos, com o limite do dia sendo o da Meta (branch `disparos`; o limite da Meta só na KOMUNE; RF-CON-02, RF-CON-10, RF-CON-11)
+
+**Pedido do usuário:** "temos 2k de mensagens disponíveis para envio em massa por dia, quero fazer a funcionalidade com que podemos escolher para quem enviar, o que enviar e a quantidade de envios". Sobre o teto: "Eu quero determinar isso no CRM. Eu não quero que a quantidade seja determinada. Até porque para testes agora a gente vai enviar apenas para 3 pessoas. Das 2.000 disponíveis. Estamos cientes dos custos". Sobre a mensagem, escolheu "modelo aprovado + criar novo" (o "só o cumprimento" de 22/09 caiu).
+
+**O que travava os 2.000:** a fila de envio em massa (21/09) e a tela `/envios` existiam; a tela só tinha saído do menu no pivô de 06/10. O que segurava eram as travas do próprio CRM, todas abaixo da Meta: o aquecimento parado em 45/dia (teto duro 100), 150 iniciadas por dia e 60 por hora, o disparo em até 60/h com o relógio mandando uma por minuto, e o worker-wa esperando 45–180 s entre mensagens (≈ 32 por hora).
+
+**Entregue:**
+- **Banco (migração `20261112100000_disparos.sql`, pgTAP 157 com 24 casos):**
+  - **Só na KOMUNE** (decisão do usuário ao publicar): a chave `whatsapp.envio.teto_da_meta` (`app.wa_teto_segue_a_meta()`) liga o teto pela Meta e o intervalo novo do worker. A migração a liga só no banco cuja `app.identidade` é `komune`; na Imova ela fica desligada e os limites são os de antes. Ligar na Imova depois é um `update` na chave (e no intervalo).
+  - `app.teto_do_canal`: com a chave ligada, passado o aquecimento (20 e 35 nas duas primeiras semanas de um número novo, como antes), o teto do WhatsApp é o da Meta (`app.wa_teto_da_meta`: o tier, com nota amarela pela metade e vermelha zero). Sem notícia da Meta, volta o `depois` com o teto duro.
+  - `app.pode_enviar`, passo 6 (definição viva, uma troca): com a chave ligada e o limite da Meta conhecido, o teto do dia é o dela e o da hora é o do dia dividido por 8 (2.000 → 250/h); sem eles, a regra de antes (150/60 de `whatsapp.envio`, o do dia limitado pela Meta).
+  - `envios_em_massa.por_hora` de 1 a 300 (era 60), e `public.envio_em_massa_criar` aceita o mesmo.
+  - `app.envios_em_massa_rodar`: acima de 60 por hora a volta do relógio manda quantas couberem no minuto (até 20), contando o passo de onde a anterior parou e nunca de mais de 1 min atrás. Até 60/h, nada muda (uma por volta).
+  - `public.envio_em_massa_teto` diz também `sobra`, `tier` e `na_fila` (o que os disparos em curso ainda vão mandar; o bom-dia contínuo fora).
+  - `app.wa_motivo_legivel`: as frases dos tetos não dizem mais "150" e "60".
+  - `whatsapp.envio` (só no banco da KOMUNE): a chave ligada, e o intervalo do worker-wa entre mensagens iniciadas pela empresa de 45–180 s para 8–24 s, só onde ainda estava no padrão.
+- **Site:**
+  - "Disparos" no menu (grupo Todo dia, depois de Conversas), para admin, gestor e SDR; a página aceita os três (antes só admin e gestor).
+  - Topo da lista: **Limite de hoje** — quanto ainda cabe, usadas de quanto, a barra, quem manda (Meta ou aquecimento), a nota e quantas já estão na fila de outros disparos.
+  - Novo disparo: **Para quem** (os filtros de antes, a lista para marcar e desmarcar), **Quantos** (vazio = todos os marcados; com número, os N primeiros da lista; e o que ainda cabe hoje), **Mensagem** (Cumprimento, **Modelo aprovado** com a lista dos aprovados pela Meta, ou Texto livre), com **Criar modelo novo** de volta (admin e gestor; vai para a Meta pela sincronização de 30 em 30 min) e a lista do que espera a Meta. Opções avançadas: quem assina, ritmo (10 a 240/h, padrão 60), o que cada botão do modelo faz e o destino do link. À direita: a prévia com os botões, a duração, o custo estimado, o limite de hoje e, quando não cabe tudo, quantas saem hoje e quantas no próximo dia útil.
+  - "Campanha" virou "disparo" nos textos da tela; o link da aba Automáticas diz "Disparos".
+  - `CLAUDE.md`: seção "Disparos, de 12/11/2026" e o guardrail do teto atualizado.
+
+**Arquivos:** `supabase/migrations/20261112100000_disparos.sql`, `supabase/tests/157_disparos.sql`, `apps/web/src/app/(app)/envios/page.tsx`, `apps/web/src/components/envios/{tela-envios.tsx,novo-envio.tsx,criar-modelo.tsx,dados.ts,formatos.ts,formatos.test.ts,tipos.ts,painel-do-envio.tsx}`, `apps/web/src/lib/{navegacao.ts,navegacao.test.ts}`, `apps/web/src/components/conversas/automaticas.tsx`, `CLAUDE.md`.
+
+**Verificado:**
+- pgTAP 157 (24/24) num Postgres descartável com todas as migrações e o seed: teto 45 sem a Meta, 2.000 com TIER_2K verde, 20 na primeira semana, 1.000 com nota amarela, 0 com vermelha (e a porteira recusando), a 151ª abertura do dia passando com a Meta, os 150 valendo no número sem notícia dela, 61 na última hora passando, ritmo 301 recusado, 60/h mandando uma por volta mesmo atrasado, 240/h mandando de 4 a 6 numa volta, cada uma pela porteira, a cota com sobra e fila, a frase sem "150", e a chave desligada mantendo 45 e o teto de antes. O bloco da KOMUNE, reaplicando a migração numa transação desfeita: num banco `komune` a chave liga e o intervalo vai a 8–24; num banco `imova`, nada muda.
+- Suíte pgTAP inteira: as mesmas 6 falhas de antes da migração (08, 52, 107, 127, 151, 154, que já falhavam nesse banco), nenhuma nova; 56, 57, 58, 63, 65, 68, 69, 70, 92 e os de WhatsApp verdes.
+- Site: typecheck e lint limpos; Vitest inteiro (126 arquivos, 2.032 testes), com os novos da quantidade, da divisão do dia, dos botões e do menu.
+- Navegador, numa pilha Supabase local separada (todas as migrações pelo CLI, sem erro) com o número em TIER_2K verde: a lista mostra "2.000 mensagens ainda cabem · 0 de 2.000 usadas"; o novo disparo com "Quantos = 3" e o modelo "Convite para a feira de noivas" (2 botões na prévia) nasceu com as 3 primeiras fichas; o relógio do `pg_cron` mandou as 3, uma por minuto, como modelo na fila do worker; a lista passou a "1.997 · 3 de 2.000 usadas" com o cartão "Enviando · 3 enviadas". Em 390 px, sem rolagem lateral. O SDR entra na tela, monta disparo e não vê "Criar modelo novo".
+- **Não verificado:** a saída de verdade pela Meta (worker-wa e Graph) e a sincronização de um modelo criado pela tela.
+
+**Ao publicar, o banco da KOMUNE mostrou que o CRM nunca soube o limite da Meta** (`teto_da_meta` nulo, teto 45), por dois motivos antigos, de 25/09:
+- **O número não batia:** o worker-wa grava o número como a Graph escreve (`+55 84 9931-8888`, sem o nono dígito) e a porteira procura `+5584999318888`. 1.982 leituras de nota GREEN, nenhuma valendo.
+- **O tier nunca foi pedido:** a leitura periódica da Graph não pede o limite (o campo antigo, `messaging_limit_tier`, a Meta aposentou; o atual é `whatsapp_business_manager_messaging_limit`), e o webhook `business_capability_update` só avisa quando ele muda.
+
+Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP 158 com 9 casos; worker):
+- `public.wa_saude_registrar` grava o número em E.164 (`app.normalize_phone_br`), e `app.wa_teto_da_meta` compara as linhas antigas pelo mesmo normalizador: a nota verde passa a valer.
+- `wa_saude_numero.origem` aceita `pessoa`, e `public.wa_limite_informar(tier)` (admin e gestor) grava o limite visto no Meta Business; vale até a próxima notícia da Meta. Só no banco da KOMUNE, a migração grava o TIER_2K que o usuário informou ("temos 2k").
+- Worker-wa (`apps/workers/src/whatsapp/saude.ts`): a leitura de meia em meia hora passa a pedir `whatsapp_business_manager_messaging_limit` numa chamada própria (se a Graph recusar o campo, a nota já foi gravada) e grava o tier. Vitest do worker: 564. **Vale só quando o worker da KOMUNE for publicado de novo** (hoje ele roda o código de 27/10 e só foi reiniciado).
+
+**Em produção desde 12/11/2026, ~14h50:**
+- Banco da Imova: `20261112100000` e `20261112110000` (chave `teto_da_meta` desligada: teto 45, como antes; a nota da Meta passou a ser reconhecida também lá, então nota amarela ou vermelha agora pesa no teto da Imova, como já era o desenho).
+- Banco da KOMUNE: as 19 migrações da Imova que estavam seguradas desde 09/11 (decisão do usuário: "subir tudo junto"; cada uma entra sem efeito na KOMUNE), `20261112100000` e `20261112110000`. Conferido: chave ligada, nota GREEN, TIER_2K, teto 2.000, intervalo 8–24 s.
+- Worker-wa da KOMUNE (`triade-worker-wa`, Fly v15, código de 27/10): só reiniciado, para ler o intervalo novo. A leitura do tier pela Graph está na branch e entra na próxima publicação do worker; até lá vale o TIER_2K informado.
+- Site da KOMUNE: `triade-ocaz086r1` (volta: `triade-npxd0dvhb`), da branch `disparos` (main + estes 4 commits), também em `ir.komune.app.br`. Conferido de fora: `/login` 200, `/envios` pede login, `/auth/dev` 404.
+- Branch `disparos` no GitHub; **main não mesclada**.
+
+**Decisão humana:**
+- O limite do dia passou a ser o da Meta em qualquer disparo, sem teto do CRM por baixo (pedido explícito: "não quero que a quantidade seja determinada"). Quem quiser um freio volta a ter um com `update` em `cadencia.tetos` (aquecimento) — os 150/60 só valem sem notícia da Meta.
+- Na KOMUNE, o intervalo do worker caiu para 8–24 s em toda mensagem iniciada pela empresa, não só nos disparos.

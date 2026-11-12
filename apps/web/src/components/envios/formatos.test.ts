@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  acaoSugerida,
+  acoesPara,
+  aplicarQuantidade,
   custoEstimado,
+  divisaoDoDia,
   duracaoEstimada,
   filtrosEscondidos,
+  formatarNumero,
   formatarReais,
   fraseDaRecusa,
   fraseDoMotivo,
@@ -116,5 +121,74 @@ describe('a tela única da campanha', () => {
     expect(rotuloDaMensagem('Convite de fornecedor fundador (Komune)')).toBe(
       'Convite de fornecedor fundador (Komune)',
     );
+  });
+});
+
+describe('a quantidade do disparo (12/11/2026)', () => {
+  const marcados = ['a', 'b', 'c', 'd', 'e'];
+
+  it('vazio manda para todos os marcados', () => {
+    expect(aplicarQuantidade(marcados, null)).toEqual(marcados);
+  });
+
+  it('com um número, vão os primeiros da lista, nessa ordem — os 3 do teste', () => {
+    expect(aplicarQuantidade(marcados, 3)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('pedir mais do que há manda para todos, sem inventar ninguém', () => {
+    expect(aplicarQuantidade(marcados, 50)).toEqual(marcados);
+  });
+
+  it('zero, negativo e fração não viram gente', () => {
+    expect(aplicarQuantidade(marcados, 0)).toEqual([]);
+    expect(aplicarQuantidade(marcados, -2)).toEqual([]);
+    expect(aplicarQuantidade(marcados, 2.9)).toEqual(['a', 'b']);
+    expect(aplicarQuantidade(marcados, Number.NaN)).toEqual(marcados);
+  });
+});
+
+describe('o que cabe hoje no limite da Meta', () => {
+  it('cabe tudo: nada fica para depois', () => {
+    expect(divisaoDoDia(3, 1990, 0)).toEqual({ hoje: 3, depois: 0 });
+  });
+
+  it('desconta o que outros disparos já vão mandar', () => {
+    expect(divisaoDoDia(500, 1000, 700)).toEqual({ hoje: 300, depois: 200 });
+  });
+
+  it('limite esgotado: tudo para o próximo dia útil', () => {
+    expect(divisaoDoDia(10, 0, 0)).toEqual({ hoje: 0, depois: 10 });
+  });
+
+  it('sem saber o limite, não chuta', () => {
+    expect(divisaoDoDia(10, null, 0)).toBeNull();
+  });
+
+  it('o número sai com ponto de milhar', () => {
+    expect(formatarNumero(2000)).toBe('2.000');
+  });
+});
+
+describe('os botões de um modelo', () => {
+  it('"Agora não" tira da lista; o resto manda o link', () => {
+    expect(acaoSugerida('Agora não')).toEqual({ acao: 'sair' });
+    expect(acaoSugerida('Quero saber mais').acao).toBe('link');
+  });
+
+  it('só os de resposta ganham ação, e o que já foi editado fica', () => {
+    const acoes = acoesPara(
+      [
+        { tipo: 'resposta', texto: 'Quero' },
+        { tipo: 'resposta', texto: 'Agora não' },
+        { tipo: 'link', texto: 'Criar meu perfil' },
+      ],
+      { Quero: { acao: 'nada' } },
+    );
+    expect(acoes).toEqual({ Quero: { acao: 'nada' }, 'Agora não': { acao: 'sair' } });
+  });
+
+  it('as recusas falam em disparo e no ritmo novo', () => {
+    expect(fraseDaRecusa('ritmo_invalido')).toMatch(/300/);
+    expect(fraseDaRecusa('sem_permissao')).toMatch(/SDR/);
   });
 });

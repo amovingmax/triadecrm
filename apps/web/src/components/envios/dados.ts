@@ -13,6 +13,7 @@ import {
   publicoSalvoSchema,
   type AcaoDoBotao,
   type Assinatura,
+  type Botao,
   type Envio,
   type FiltroDoPublico,
   type ItemDoEnvio,
@@ -80,8 +81,9 @@ export async function buscarEtiquetasESetores(): Promise<{
 }
 
 /**
- * Os cumprimentos que dá para mandar em massa: ativos e aprovados pela Meta.
- * Fora da janela, a campanha só abre conversa com eles (22/09/2026).
+ * Os cumprimentos que dá para mandar em massa: ativos e aprovados pela Meta. Os
+ * três viram uma opção só no disparo: o banco troca pelo do período na hora de
+ * cada envio (`app.modelo_da_hora`).
  */
 export async function buscarCumprimentos(): Promise<Modelo[]> {
   const supabase = createClient();
@@ -98,10 +100,74 @@ export async function buscarCumprimentos(): Promise<Modelo[]> {
   return z.array(modeloSchema).parse(data ?? []);
 }
 
+/**
+ * Os outros modelos que dá para disparar: ativos, de WhatsApp e aprovados pela
+ * Meta. Desde 12/11/2026 a mensagem de um disparo pode ser qualquer um deles
+ * (antes, de 22/09 a 12/11, só o cumprimento). Ficam de fora os do sistema
+ * (GEN-SYS-*) e os três cumprimentos, que têm a opção deles.
+ */
+export async function buscarModelos(): Promise<Modelo[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('message_templates')
+    .select('id, template_code, name, body, category, kind, botoes')
+    .eq('is_active', true)
+    .eq('channel', 'whatsapp')
+    .eq('meta_status', 'approved')
+    .not('meta_template_name', 'is', null)
+    .not('template_code', 'like', 'GEN-SYS-%')
+    .not('template_code', 'like', 'GEN-ABR-OLA-%')
+    .order('name');
+  if (error) throw new ErroDoEnvio(error.message);
+  return z.array(modeloSchema).parse(data ?? []);
+}
+
+/** Modelos criados pela tela que ainda esperam a Meta, ou que ela recusou. */
+export async function buscarModelosEmAnalise(): Promise<
+  { id: number; name: string; meta_status: string | null }[]
+> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('message_templates')
+    .select('id, name, meta_status')
+    .eq('is_active', true)
+    .eq('kind', 'envio')
+    .or('meta_status.is.null,meta_status.neq.approved')
+    .order('created_at', { ascending: false });
+  if (error) throw new ErroDoEnvio(error.message);
+  return z
+    .array(z.object({ id: z.number(), name: z.string(), meta_status: z.string().nullable() }))
+    .parse(data ?? []);
+}
+
+/**
+ * Um modelo novo, escrito na tela. Nasce sem status na Meta; a sincronização do
+ * worker-wa (de 30 em 30 min) o manda para aprovação. Só admin e gestor: é
+ * catálogo (`app.admin_ou_gestor()` em `modelo_whatsapp_criar`).
+ */
+export async function criarModelo(modelo: {
+  nome: string;
+  categoria: 'marketing' | 'utility';
+  corpo: string;
+  botoes: Botao[];
+}): Promise<{ id: number; codigo: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('modelo_whatsapp_criar', { p: modelo });
+  if (error) throw new ErroDoEnvio(error.message);
+  const r = conferir(data);
+  return { id: Number(r.id), codigo: String(r.codigo) };
+}
+
 export type TetoDeHoje = {
   /** O menor entre o nosso e o da Meta: é este que vale. */
   teto: number;
   usados: number;
+  /** O que ainda cabe hoje (teto menos usados). */
+  sobra: number;
+  /** O que os disparos em curso ainda vão mandar. */
+  naFila: number;
+  /** O tier da Meta, cru (`TIER_2K`); `null` é "não sei". */
+  tier: string | null;
   /** O aquecimento (RF-CON-10). */
   tetoNosso: number | null;
   /** O tier da Meta, dobrado pela nota do número. `null` é "não sei". */
@@ -125,12 +191,22 @@ export async function buscarTetoDeHoje(): Promise<TetoDeHoje | null> {
       qualidade: z.string().nullable().optional(),
       quem_manda: z.enum(['nos', 'meta']).optional(),
       usados: z.number().optional(),
+      sobra: z.number().optional(),
+      na_fila: z.number().optional(),
+      tier: z.string().nullable().optional(),
     })
     .parse(data);
-  if (!r.ok || r.teto === undefined) return null;
+  // Sem teto nenhum configurado o banco devolve o maior inteiro: isso não é um
+  // limite para mostrar, é a ausência dele.
+  if (!r.ok || r.teto === undefined || r.teto >= 1_000_000_000) return null;
+  const usados = r.usados ?? 0;
   return {
     teto: r.teto,
-    usados: r.usados ?? 0,
+    usados,
+    // Banco antigo (sem `sobra`) ainda dá a conta certa.
+    sobra: r.sobra ?? Math.max(r.teto - usados, 0),
+    naFila: r.na_fila ?? 0,
+    tier: r.tier ?? null,
     tetoNosso: r.teto_nosso ?? null,
     tetoDaMeta: r.teto_da_meta ?? null,
     qualidade: r.qualidade ?? null,

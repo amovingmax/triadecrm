@@ -32,6 +32,7 @@ import {
   apagarPublico,
   buscarCumprimentos,
   buscarEtiquetasESetores,
+  buscarModelos,
   buscarPrevia,
   buscarPublico,
   buscarTetoDeHoje,
@@ -41,11 +42,16 @@ import {
   salvarPublico,
   type ConfigDoEnvio,
 } from './dados';
+import { CriarModelo } from './criar-modelo';
 import { EscolhaMultipla } from './escolha-multipla';
 import {
+  acoesPara,
+  aplicarQuantidade,
   custoEstimado,
+  divisaoDoDia,
   duracaoEstimada,
   filtrosEscondidos,
+  formatarNumero,
   formatarReais,
   fraseDaRecusa,
   fraseDoMotivo,
@@ -59,6 +65,7 @@ import {
   SITUACOES,
   TEMPERATURAS,
   TIPOS_DE_PARCEIRO,
+  type AcaoDoBotao,
   type Assinatura,
   type FiltroDoPublico,
   type PessoaDoPublico,
@@ -67,17 +74,25 @@ import {
 } from './tipos';
 
 /**
- * Montar uma campanha numa tela só (Fase 5, plano aprovado pelo Rafael em
- * 21/09/2026: "montar um envio em menos de 1 minuto").
+ * Montar um disparo numa tela só (Fase 5, plano aprovado pelo Rafael em
+ * 21/09/2026: "montar um envio em menos de 1 minuto"; Disparos desde
+ * 12/11/2026).
  *
- * À esquerda, as duas perguntas de toda campanha — para quem e qual
- * mensagem. À direita, sempre à vista, como ela chega e o botão de enviar.
- * Tudo o que tem um padrão bom (quem assina, ritmo, de onde vem cada variável)
+ * À esquerda, as três perguntas de todo disparo — para quem, quantos e qual
+ * mensagem. À direita, sempre à vista, como ela chega, quanto do limite do dia
+ * ela usa e o botão de enviar. Tudo o que tem um padrão bom (quem assina,
+ * ritmo, o que cada botão faz, o destino do link, de onde vem cada variável)
  * mora em "Opções avançadas", já preenchido: quem não abre envia do jeito certo.
  *
- * A mensagem é o cumprimento ou texto livre, e mais nada (decisão do Rafael,
- * 22/09/2026): o cumprimento abre a janela de 24 h e o time conversa com quem
- * responder; o texto livre fala com quem já está com a janela aberta.
+ * A mensagem é o cumprimento, um modelo aprovado pela Meta ou texto livre
+ * (12/11/2026: "escolher o que enviar"; de 22/09 a 12/11 era só o cumprimento).
+ * Fora da janela de 24 h a Meta só aceita modelo aprovado; o texto livre fala
+ * com quem já está com a janela aberta.
+ *
+ * A QUANTIDADE é de quem dispara, e não um número fixo (12/11/2026: "eu não
+ * quero que a quantidade seja determinada [...] para testes agora a gente vai
+ * enviar apenas para 3 pessoas"): vão os N primeiros dos marcados, ou quem for
+ * marcado a dedo. O limite do dia é o da Meta, e a tela diz quanto sobra.
  *
  * A lista de pessoas continua lá, recolhida: quem manda para 120 ainda pode
  * bater o olho e tirar os três que não fazem sentido. Quem o banco não deixaria
@@ -85,7 +100,20 @@ import {
  * que o filtro errou.
  */
 
-const RITMOS = [5, 10, 15, 20, 30, 45, 60] as const;
+/** Por hora. Acima de 60 o relógio manda mais de uma por minuto (20261112100000). */
+const RITMOS = [10, 20, 30, 60, 120, 240] as const;
+const RITMO_PADRAO = 60;
+
+/**
+ * Para onde vai quem toca no botão de link, se o disparo não disser outro lugar.
+ * Na KOMUNE é o cadastro de parceiro; onde não há plataforma, a pessoa escreve.
+ */
+const DESTINO_PADRAO = EMPRESA.modulos.plataformaKomune
+  ? 'https://admin.komune.app.br/seja-parceiro'
+  : '';
+
+/** As três formas de mensagem. As duas primeiras são modelo da Meta para o banco. */
+type FormaDaMensagem = 'cumprimento' | 'modelo' | 'texto';
 
 /** Quantas linhas a lista desenha de cada vez. A seleção vale para todas. */
 const LINHAS_VISIVEIS = 150;
@@ -115,10 +143,13 @@ function temAtendente(corpo: string): boolean {
 
 export function NovoEnvio({
   catalogos,
+  criaModelo,
   aoCriar,
   aoCancelar,
 }: {
   catalogos: Catalogos;
+  /** Admin e gestor criam modelo novo; o SDR dispara com os que existem. */
+  criaModelo: boolean;
   aoCriar: (id: string) => void;
   aoCancelar: () => void;
 }) {
@@ -162,34 +193,54 @@ export function NovoEnvio({
     });
   }
 
+  // ---------------- quantos ----------------
+  // Vazio = todos os marcados. É escolha de quem dispara (12/11/2026).
+  const [quantidadeEscrita, setQuantidadeEscrita] = useState('');
+  const quantidade = quantidadeEscrita.trim() === '' ? null : Number(quantidadeEscrita);
+
   // ---------------- mensagem ----------------
-  const [tipo, setTipo] = useState<TipoDoEnvio>('modelo');
+  const [forma, setForma] = useState<FormaDaMensagem>('cumprimento');
+  const tipo: TipoDoEnvio = forma === 'texto' ? 'texto' : 'modelo';
+  const [modeloEscolhido, setModeloEscolhido] = useState<number | null>(null);
   const [texto, setTexto] = useState('');
   const [regras, setRegras] = useState<Record<string, RegraDaVariavel>>({});
+  const [acoesEditadas, setAcoesEditadas] = useState<Record<string, AcaoDoBotao>>({});
+  const [linkDestino, setLinkDestino] = useState(DESTINO_PADRAO);
 
   // ---------------- como e quando ----------------
   const [nomeEscrito, setNomeEscrito] = useState<string | null>(null);
-  const [porHora, setPorHora] = useState(20);
+  const [porHora, setPorHora] = useState<number>(RITMO_PADRAO);
   const [agendar, setAgendar] = useState(false);
   const [inicio, setInicio] = useState('');
   const [assinatura, setAssinatura] = useState<Assinatura>('marca');
   const [atendentes, setAtendentes] = useState<string[]>([]);
   const [vista, setVista] = useState(0);
 
-  // Fora da janela, só o cumprimento (decisão do Rafael, 22/09/2026). Os três
-  // viram uma opção só: o banco troca pelo do período na hora de cada envio
-  // (`app.modelo_da_hora`), então qualquer um serve de ponto de partida — o de
-  // agora deixa a prévia certa.
+  // O cumprimento: os três viram uma opção só, e o banco troca pelo do período
+  // na hora de cada envio (`app.modelo_da_hora`), então qualquer um serve de
+  // ponto de partida — o de agora deixa a prévia certa.
   const cumprimentos = useQuery({
     queryKey: ['envios', 'cumprimentos'],
     queryFn: buscarCumprimentos,
     staleTime: 60_000,
   });
-  const modelo =
+  const cumprimento =
     cumprimentos.data?.find((m) => m.template_code === cumprimentoDaHora()) ??
     cumprimentos.data?.[0] ??
     null;
-  const modeloId = tipo === 'modelo' ? (modelo?.id ?? null) : null;
+  // Os outros modelos aprovados pela Meta (12/11/2026).
+  const modelos = useQuery({ queryKey: ['envios', 'modelos'], queryFn: buscarModelos, staleTime: 60_000 });
+  // Em nome da marca ninguém assina: modelo com {{atendente}} nem aparece.
+  const modelosVisiveis = (modelos.data ?? []).filter(
+    (m) => assinatura !== 'marca' || !temAtendente(m.body),
+  );
+  const modelo =
+    forma === 'cumprimento'
+      ? cumprimento
+      : forma === 'modelo'
+        ? (modelos.data?.find((m) => m.id === modeloEscolhido) ?? null)
+        : null;
+  const modeloId = modelo?.id ?? null;
   const corpo = tipo === 'modelo' ? (modelo?.body ?? '') : texto;
   const variaveis = variaveisComRegra(corpo);
   const regrasDoCorpo = regrasPara(corpo, regras);
@@ -198,25 +249,49 @@ export function NovoEnvio({
   // vista. O que vem da ficha já tem regra e reserva: fica nas opções.
   const fixas = variaveis.filter((v) => 'fixo' in (regrasDoCorpo[v] ?? { fixo: '' }));
   const daFicha = variaveis.filter((v) => !fixas.includes(v));
+  // Os botões do modelo: o que acontece em cada um e, se houver link, para onde.
+  const botoes = tipo === 'modelo' ? (modelo?.botoes ?? []) : [];
+  const acoes = acoesPara(botoes, acoesEditadas);
+  const precisaDeLink =
+    botoes.some((b) => b.tipo === 'link') || Object.values(acoes).some((a) => a.acao === 'link');
+  const acoesIncompletas = Object.values(acoes).some(
+    (a) => a.acao === 'link' && (a.texto.trim() === '' || a.botao.trim() === ''),
+  );
+
+  function mudarForma(nova: FormaDaMensagem) {
+    setForma(nova);
+    if (nova === 'texto') setRegras((r) => ({ ...r, ...regrasPara(texto, r) }));
+  }
+
+  function escolherModelo(id: number) {
+    setModeloEscolhido(id);
+    const novoCorpo = modelos.data?.find((m) => m.id === id)?.body ?? '';
+    setRegras((r) => ({ ...r, ...regrasPara(novoCorpo, r) }));
+  }
 
   function mudarTexto(novoTexto: string) {
     setTexto(novoTexto);
     setRegras((r) => ({ ...r, ...regrasPara(novoTexto, r) }));
   }
 
-  const nome = nomeEscrito ?? nomeSugerido(tipo === 'texto' ? 'Texto livre' : 'Cumprimento');
+  const nome =
+    nomeEscrito ??
+    nomeSugerido(
+      forma === 'texto' ? 'Texto livre' : forma === 'cumprimento' ? 'Cumprimento' : (modelo?.name ?? null),
+    );
 
   // Texto livre só chega a quem está com a janela de 24 h aberta: os outros nem
   // entram na fila (entrariam só para aparecer como "pulados").
-  const destinatarios =
+  const alcancaveis =
     tipo === 'texto' ? escolhidas.filter((p) => p.situacao === 'janela_aberta') : escolhidas;
+  const destinatarios = aplicarQuantidade(alcancaveis, quantidade);
   const vaoReceber = destinatarios.length;
-  const comJanela = escolhidas.filter((p) => p.situacao === 'janela_aberta').length;
-  const primeiros = destinatarios.filter((p) => p.situacao === 'nunca_contatado').length;
+  const comJanela = destinatarios.filter((p) => p.situacao === 'janela_aberta').length;
+  // Quem ABRE conversa gasta o limite do dia; quem está com a janela aberta, não.
+  const abrem = tipo === 'modelo' ? vaoReceber - comJanela : 0;
 
   const teto = useQuery({ queryKey: ['envios', 'teto'], queryFn: buscarTetoDeHoje, staleTime: 60_000 });
-  const tetoLivre = teto.data ? Math.max(teto.data.teto - teto.data.usados, 0) : null;
-  const tetoSegura = tipo === 'modelo' && tetoLivre !== null && primeiros > tetoLivre;
+  const divisao = divisaoDoDia(abrem, teto.data?.sobra ?? null, teto.data?.naFila ?? 0);
 
   const config: ConfigDoEnvio = {
     nome,
@@ -229,14 +304,16 @@ export function NovoEnvio({
     porHora,
     inicio: agendar && inicio ? new Date(inicio).toISOString() : null,
     filtro,
-    // O cumprimento não tem botão: nem link, nem ação.
-    linkDestino: '',
-    acoes: {},
+    linkDestino: precisaDeLink ? linkDestino : '',
+    acoes,
   };
 
   const conflitoDeAssinatura = assinatura === 'marca' && temAtendente(corpo);
   const mensagemPronta =
-    (tipo === 'modelo' ? modelo !== null : texto.trim().length > 0) && incompletas.length === 0;
+    (tipo === 'modelo' ? modelo !== null : texto.trim().length > 0) &&
+    incompletas.length === 0 &&
+    !acoesIncompletas &&
+    (!precisaDeLink || linkDestino.startsWith('https://'));
 
   const amostra = destinatarios.slice(0, 3).map((p) => p.organization_id);
   const previa = useQuery({
@@ -252,15 +329,15 @@ export function NovoEnvio({
   const criar = useMutation({
     mutationFn: () => criarEnvio(config, destinatarios.map((p) => p.organization_id)),
     onSuccess: (r) => {
-      toast.success(config.inicio ? 'Campanha agendada.' : 'Enviando a campanha.', {
-        description: `${r.itens} mensagens saem aos poucos. A campanha para sozinha se muita gente bloquear.`,
+      toast.success(config.inicio ? 'Disparo agendado.' : 'Disparando.', {
+        description: `${r.itens} ${r.itens === 1 ? 'mensagem sai' : 'mensagens saem'} no ritmo escolhido. O disparo para sozinho se muita gente bloquear.`,
       });
       void clientes.invalidateQueries({ queryKey: ['envios'] });
       aoCriar(r.id);
     },
     onError: (erro: Error) => {
       const e = erro instanceof ErroDoEnvio ? erro : null;
-      toast.error('A campanha não foi criada.', {
+      toast.error('O disparo não foi criado.', {
         description: e ? fraseDaRecusa(e.motivo, e.variavel) : erro.message,
       });
     },
@@ -269,22 +346,35 @@ export function NovoEnvio({
   /** O primeiro motivo de o botão estar apagado, dito ao lado dele. */
   function oQueFalta(): string | null {
     if (publico.isPending) return null;
-    if (escolhidas.length === 0) return 'Ninguém no público: afrouxe um filtro.';
-    if (tipo === 'modelo' && cumprimentos.isPending) return null;
-    if (tipo === 'modelo' && !modelo) return 'O cumprimento ainda não foi aprovado pela Meta.';
+    if (escolhidas.length === 0) return 'Ninguém marcado: afrouxe um filtro ou marque alguém na lista.';
+    if (quantidade !== null && (!Number.isInteger(quantidade) || quantidade < 1)) {
+      return 'A quantidade é um número inteiro a partir de 1 (ou vazio, para todos os marcados).';
+    }
+    if (forma === 'cumprimento' && cumprimentos.isPending) return null;
+    if (forma === 'cumprimento' && !modelo) return 'O cumprimento ainda não foi aprovado pela Meta.';
+    if (forma === 'modelo' && modelos.isPending) return null;
+    if (forma === 'modelo' && !modelo) {
+      return modelosVisiveis.length === 0
+        ? 'Nenhum modelo aprovado pela Meta para disparar ainda.'
+        : 'Escolha o modelo.';
+    }
     if (tipo === 'texto' && texto.trim() === '') return 'Escreva o texto.';
-    if (tipo === 'texto' && vaoReceber === 0) {
-      return 'Ninguém deste público falou com a gente nas últimas 24 h: texto livre não chega. Mande o cumprimento.';
+    if (tipo === 'texto' && alcancaveis.length === 0) {
+      return 'Ninguém deste público falou com a gente nas últimas 24 h: texto livre não chega. Mande um modelo aprovado.';
     }
     if (incompletas.length > 0) return `Preencha ${incompletas.map((v) => `{{${v}}}`).join(', ')}.`;
     if (conflitoDeAssinatura) {
-      return 'O texto diz o nome de quem envia: troque quem assina em Opções avançadas.';
+      return 'A mensagem diz o nome de quem envia: troque quem assina em Opções avançadas.';
+    }
+    if (acoesIncompletas) return 'Confira o que acontece em cada botão, em Opções avançadas.';
+    if (precisaDeLink && !linkDestino.startsWith('https://')) {
+      return 'O destino do link precisa começar com https:// (Opções avançadas).';
     }
     if (assinatura === 'revezar' && atendentes.length === 0) {
-      return 'Escolha quem divide a campanha, em Opções avançadas.';
+      return 'Escolha quem divide o disparo, em Opções avançadas.';
     }
     if (agendar && inicio === '') return 'Escolha o dia e a hora do início.';
-    if (nome.trim() === '') return 'Dê um nome à campanha.';
+    if (nome.trim() === '') return 'Dê um nome ao disparo.';
     return null;
   }
   const falta = oQueFalta();
@@ -505,25 +595,115 @@ export function NovoEnvio({
           ) : null}
         </section>
 
+        {/* ------------------------------- Quantos ------------------------------- */}
+        <section aria-labelledby="bloco-quantos" className="space-y-2 p-4 md:p-5">
+          <h2 id="bloco-quantos" className="text-sm font-semibold">
+            Quantos
+          </h2>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <label htmlFor="quantidade" className="text-muted-foreground">
+              Enviar para
+            </label>
+            <Input
+              id="quantidade"
+              type="number"
+              min={1}
+              step={1}
+              inputMode="numeric"
+              value={quantidadeEscrita}
+              onChange={(e) => setQuantidadeEscrita(e.target.value)}
+              placeholder={String(alcancaveis.length)}
+              aria-describedby="quantidade-dica"
+              className="numerico h-11 w-24 md:h-8"
+            />
+            <span className="text-muted-foreground">
+              de <span className="numerico">{alcancaveis.length}</span>{' '}
+              {alcancaveis.length === 1 ? 'marcada' : 'marcadas'}
+            </span>
+            {quantidadeEscrita !== '' ? (
+              <button
+                type="button"
+                onClick={() => setQuantidadeEscrita('')}
+                className="toque min-h-11 text-xs text-primary hover:underline md:min-h-0"
+              >
+                Todas
+              </button>
+            ) : null}
+          </div>
+          <p id="quantidade-dica" className="text-[11px] leading-relaxed text-muted-foreground">
+            Vazio manda para todas as marcadas. Com um número, vão as primeiras da lista, nessa ordem.
+            Para escolher a dedo, abra “Ver quem”, desmarque todas e marque só quem deve receber.
+            {teto.data ? (
+              <>
+                {' '}
+                Hoje ainda cabem <span className="numerico">{formatarNumero(teto.data.sobra)}</span> de{' '}
+                <span className="numerico">{formatarNumero(teto.data.teto)}</span>.
+              </>
+            ) : null}
+          </p>
+        </section>
+
         {/* ------------------------------ Mensagem ------------------------------ */}
         <section aria-labelledby="bloco-mensagem" className="space-y-3 p-4 md:p-5">
           <h2 id="bloco-mensagem" className="text-sm font-semibold">
             Mensagem
           </h2>
           <div role="group" aria-labelledby="bloco-mensagem" className="flex flex-wrap gap-2">
-            <Chip ativo={tipo === 'modelo'} aoClicar={() => setTipo('modelo')}>
+            <Chip ativo={forma === 'cumprimento'} aoClicar={() => mudarForma('cumprimento')}>
               Cumprimento
             </Chip>
-            <Chip ativo={tipo === 'texto'} aoClicar={() => setTipo('texto')}>
+            <Chip ativo={forma === 'modelo'} aoClicar={() => mudarForma('modelo')}>
+              Modelo aprovado
+            </Chip>
+            <Chip ativo={forma === 'texto'} aoClicar={() => mudarForma('texto')}>
               Texto livre
             </Chip>
           </div>
 
-          {tipo === 'modelo' ? (
+          {forma === 'cumprimento' ? (
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               “Bom dia!”, “Boa tarde!” ou “Boa noite!”, conforme a hora de cada envio. Quem responder
               abre 24 h de conversa livre com o time.
             </p>
+          ) : null}
+
+          {forma === 'modelo' ? (
+            <div className="space-y-2">
+              <Select
+                value={modeloEscolhido === null ? '' : String(modeloEscolhido)}
+                onValueChange={(v) => escolherModelo(Number(v))}
+              >
+                <SelectTrigger aria-label="Modelo aprovado pela Meta" className="toque h-11 w-full md:h-9">
+                  <SelectValue
+                    placeholder={
+                      modelos.isPending
+                        ? 'Carregando…'
+                        : modelosVisiveis.length === 0
+                          ? 'Nenhum modelo aprovado ainda'
+                          : 'Escolha o modelo'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {modelosVisiveis.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.name}
+                      {m.botoes.length > 0
+                        ? ` · ${m.botoes.length} ${m.botoes.length === 1 ? 'botão' : 'botões'}`
+                        : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Só aparecem os modelos que a Meta aprovou: é o que ela aceita para quem não falou com a
+                gente nas últimas 24 h.
+                {assinatura === 'marca' && modelosVisiveis.length < (modelos.data ?? []).length
+                  ? ` Os que dizem o nome de quem envia ficam de fora enquanto o disparo for em nome da ${EMPRESA.nome} (Opções avançadas).`
+                  : ''}
+              </p>
+              <CriarModelo podeCriar={criaModelo} />
+            </div>
           ) : null}
 
           {tipo === 'texto' ? (
@@ -613,7 +793,7 @@ export function NovoEnvio({
                   {conflitoDeAssinatura
                     ? `O modelo escolhido diz o nome de quem envia. Em nome da ${EMPRESA.nome}, escolha um modelo sem nome de atendente.`
                     : assinatura === 'marca'
-                      ? 'As respostas caem nas Conversas do responsável de cada parceiro (ou de quem montou a campanha).'
+                      ? 'As respostas caem nas Conversas do responsável de cada parceiro (ou de quem montou o disparo).'
                       : 'As respostas caem nas Conversas de quem assinou.'}
                 </p>
               </Campo>
@@ -626,16 +806,46 @@ export function NovoEnvio({
                   <SelectContent>
                     {RITMOS.map((r) => (
                       <SelectItem key={r} value={String(r)}>
-                        {r} por hora{r === 20 ? ' (recomendado)' : ''}
+                        {r} por hora{r === 60 ? ' (1 por minuto)' : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Mais devagar parece gente, e dá tempo de o time responder quem responder.
+                  Mais devagar dá tempo de o time responder quem responder. Quem segura o total do dia é
+                  o limite da Meta, não o ritmo.
                 </p>
               </Campo>
             </div>
+
+            {Object.keys(acoes).length > 0 || precisaDeLink ? (
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium text-muted-foreground">O que acontece em cada botão</h3>
+                {Object.entries(acoes).map(([rotulo, acao]) => (
+                  <EditorDeAcao
+                    key={rotulo}
+                    rotulo={rotulo}
+                    acao={acao}
+                    aoMudar={(a) => setAcoesEditadas((atual) => ({ ...atual, [rotulo]: a }))}
+                  />
+                ))}
+                {precisaDeLink ? (
+                  <Campo rotulo="Para onde o link leva" htmlFor="destino-do-link">
+                    <Input
+                      id="destino-do-link"
+                      value={linkDestino}
+                      onChange={(e) => setLinkDestino(e.target.value)}
+                      placeholder="https://"
+                      className="h-11 md:h-9"
+                    />
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      O link passa pelo CRM, que conta o clique e marca o disparo antes de mandar a pessoa
+                      para lá.
+                    </p>
+                  </Campo>
+                ) : null}
+              </div>
+            ) : null}
 
             {daFicha.length > 0 ? (
               <div className="space-y-2">
@@ -655,9 +865,10 @@ export function NovoEnvio({
               <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <p>
                 Sempre ligadas: só de 8h às 17h45 em dia útil; ninguém que pediu para sair; ninguém que
-                recebeu mensagem nossa sem responder nas últimas 72 h; teto de aberturas do dia (toda
-                conversa que a gente começa conta, inclusive recontato — é como a Meta conta); e a campanha
-                para sozinha se 3 pessoas ou mais (acima de 2%) pedirem para sair.
+                recebeu mensagem nossa sem responder nas últimas 72 h; o limite de conversas por dia que a
+                Meta dá ao número (toda conversa que a gente começa conta, inclusive recontato, e a nota
+                amarela corta pela metade); e o disparo para sozinho se 3 pessoas ou mais (acima de 2%)
+                pedirem para sair.
               </p>
             </div>
           </div>
@@ -671,7 +882,7 @@ export function NovoEnvio({
             <h2 id="bloco-previa" className="text-sm font-semibold">
               Como chega
             </h2>
-            {tipo === 'texto' && itensDaPrevia.length > 1 ? (
+            {(tipo === 'texto' || variaveis.length > 0) && itensDaPrevia.length > 1 ? (
               <button
                 type="button"
                 onClick={() => setVista((i) => i + 1)}
@@ -687,9 +898,13 @@ export function NovoEnvio({
                 ? `Preencha ${incompletas.map((v) => `{{${v}}}`).join(', ')} para ver a prévia.`
                 : tipo === 'texto'
                   ? 'Escreva o texto para ver a prévia.'
-                  : cumprimentos.isPending
-                    ? 'Carregando…'
-                    : 'O cumprimento ainda não foi aprovado pela Meta.'}
+                  : forma === 'modelo'
+                    ? modelo
+                      ? 'Confira os botões e o link em Opções avançadas para ver a prévia.'
+                      : 'Escolha o modelo para ver a prévia.'
+                    : cumprimentos.isPending
+                      ? 'Carregando…'
+                      : 'O cumprimento ainda não foi aprovado pela Meta.'}
             </p>
           ) : amostra.length === 0 ? (
             <p className="text-sm text-muted-foreground">A prévia aparece quando houver alguém no público.</p>
@@ -711,6 +926,7 @@ export function NovoEnvio({
               {itemVisto.ok ? (
                 <div className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-foreground">
                   <p className="whitespace-pre-wrap">{itemVisto.corpo}</p>
+                  <ChipsDosBotoes botoes={botoes} />
                 </div>
               ) : (
                 <p className="text-sm text-destructive">
@@ -735,38 +951,47 @@ export function NovoEnvio({
               valor={duracaoEstimada(
                 vaoReceber,
                 porHora,
-                tipo === 'modelo' && primeiros > 0 ? (teto.data?.teto ?? null) : null,
+                abrem > 0 ? (teto.data?.teto ?? null) : null,
               )}
             />
             {custo !== null ? (
               <Linha rotulo="Custo na Meta" valor={custo === 0 ? 'grátis' : `≈ ${formatarReais(custo)}`} />
             ) : null}
+            {teto.data ? (
+              <Linha
+                rotulo="Limite de hoje"
+                valor={`${formatarNumero(teto.data.usados)} de ${formatarNumero(teto.data.teto)} usados`}
+              />
+            ) : null}
           </dl>
           {teto.data ? (
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              <span className="numerico">{teto.data.teto}</span> aberturas por dia ·{' '}
-              <span className="numerico">{teto.data.usados}</span> usadas hoje ·{' '}
               {teto.data.quemManda === 'meta'
-                ? `o teto é da Meta hoje${teto.data.qualidade ? ` — qualidade ${QUALIDADE_EM_PT[teto.data.qualidade] ?? teto.data.qualidade.toLowerCase()}` : ''}`
-                : 'o teto é nosso (aquecimento)'}
-              .
+                ? `O limite é o da Meta${teto.data.qualidade ? `, com a nota ${QUALIDADE_EM_PT[teto.data.qualidade] ?? teto.data.qualidade.toLowerCase()}` : ''}`
+                : 'O limite é o do próprio CRM, abaixo do que a Meta dá ao número'}
+              {teto.data.naFila > 0 ? (
+                <>
+                  ; <span className="numerico">{formatarNumero(teto.data.naFila)}</span> já estão na fila de
+                  outros disparos
+                </>
+              ) : null}
+              . Toda conversa que a gente começa conta, inclusive recontato: é como a Meta conta.
             </p>
           ) : null}
-          {tetoSegura ? (
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Hoje ainda cabem <span className="numerico">{tetoLivre}</span> aberturas: o resto sai nos
-              próximos dias úteis. Toda conversa que a gente começa conta aqui, inclusive recontato — é como a
-              Meta conta.
+          {divisao && divisao.depois > 0 ? (
+            <p className="text-[11px] leading-relaxed text-foreground">
+              Hoje cabem <span className="numerico">{formatarNumero(divisao.hoje)}</span>; as outras{' '}
+              <span className="numerico">{formatarNumero(divisao.depois)}</span> saem no próximo dia útil.
             </p>
           ) : null}
 
-          <Campo rotulo="Nome da campanha" htmlFor="nome-da-campanha">
+          <Campo rotulo="Nome do disparo" htmlFor="nome-do-disparo">
             <Input
-              id="nome-da-campanha"
+              id="nome-do-disparo"
               value={nome}
               maxLength={120}
               onChange={(e) => setNomeEscrito(e.target.value)}
-              placeholder="Ex.: Convite buffets — setembro"
+              placeholder="Ex.: Convite buffets — novembro"
               className="h-11 md:h-9"
             />
           </Campo>
@@ -784,7 +1009,7 @@ export function NovoEnvio({
             {agendar ? (
               <Input
                 type="datetime-local"
-                aria-label="Início da campanha"
+                aria-label="Início do disparo"
                 value={inicio}
                 onChange={(e) => setInicio(e.target.value)}
                 className="h-11 md:h-9"
@@ -802,7 +1027,7 @@ export function NovoEnvio({
               ? agendar
                 ? 'Agendando…'
                 : 'Enviando…'
-              : `${agendar ? 'Agendar' : 'Enviar'} para ${vaoReceber}`}
+              : `${agendar ? 'Agendar' : 'Enviar'} para ${formatarNumero(vaoReceber)}`}
           </Button>
           {falta ? <p className="text-xs leading-relaxed text-muted-foreground">{falta}</p> : null}
           <Button variant="ghost" className="toque h-11 w-full md:h-9" onClick={aoCancelar}>
@@ -1090,6 +1315,85 @@ function ListaDoPublico({
         <button type="button" onClick={aoVerTodas} className="w-full border-t border-hairline py-2 text-sm text-primary hover:bg-muted/50">
           Mostrar as {total} (a seleção já vale para todas)
         </button>
+      ) : null}
+    </div>
+  );
+}
+
+function ChipsDosBotoes({ botoes }: { botoes: readonly { tipo: string; texto: string }[] }) {
+  if (botoes.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-col gap-1 border-t border-hairline pt-2">
+      {botoes.map((b) => (
+        <span
+          key={b.texto}
+          className="rounded-md bg-background/70 px-2 py-1 text-center text-xs font-medium text-primary"
+        >
+          {b.tipo === 'link' ? '↗ ' : ''}
+          {b.texto}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function EditorDeAcao({
+  rotulo,
+  acao,
+  aoMudar,
+}: {
+  rotulo: string;
+  acao: AcaoDoBotao;
+  aoMudar: (a: AcaoDoBotao) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border border-hairline p-2">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_14rem] sm:items-center">
+        <span className="text-sm">
+          Quem tocar em <span className="font-medium">“{rotulo}”</span>
+        </span>
+        <Select
+          value={acao.acao}
+          onValueChange={(v) =>
+            aoMudar(
+              v === 'link'
+                ? {
+                    acao: 'link',
+                    texto: 'Que bom! O cadastro leva 5 minutos e é grátis. É só tocar no botão abaixo.',
+                    botao: 'Criar meu perfil',
+                  }
+                : { acao: v as 'sair' | 'nada' },
+            )
+          }
+        >
+          <SelectTrigger className="toque h-11 md:h-8" aria-label={`O que acontece em “${rotulo}”`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="link">recebe o link na hora</SelectItem>
+            <SelectItem value="sair">sai da lista (não recebe mais)</SelectItem>
+            <SelectItem value="nada">fica na caixa para o time responder</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {acao.acao === 'link' ? (
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
+          <textarea
+            value={acao.texto}
+            maxLength={900}
+            rows={2}
+            onChange={(e) => aoMudar({ ...acao, texto: e.target.value })}
+            aria-label={`Texto que vai com o link em “${rotulo}”`}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:text-sm"
+          />
+          <Input
+            value={acao.botao}
+            maxLength={20}
+            onChange={(e) => aoMudar({ ...acao, botao: e.target.value })}
+            aria-label={`Rótulo do botão do link em “${rotulo}”`}
+            className="h-11 md:h-9"
+          />
+        </div>
       ) : null}
     </div>
   );

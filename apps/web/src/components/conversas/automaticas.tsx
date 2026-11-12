@@ -78,14 +78,14 @@ export function FeedAutomaticas({
         <p className="mt-1 text-xs text-muted-foreground">
           Os últimos <span className="numerico">{DIAS_DO_FEED}</span> dias: o cumprimento
           automático, a introdução, o menu do bot, o aviso de fora do horário, os rascunhos da
-          IA aprovados e as confirmações de saída. O cumprimento das campanhas não está aqui — ele é
+          IA aprovados e as confirmações de saída. O que sai pelos disparos não está aqui — é
           assinado por quem disparou e mora em{' '}
           {/* O LINK, e não só o nome da tela. A frase já dizia onde estava o
               cumprimento da campanha; quem lê isto está justamente procurando por
               ele, e fazer a pessoa achar o menu depois de ler onde é são dois
               passos para uma resposta que já está na mão. */}
           <Link href="/envios" className="underline underline-offset-2 hover:text-foreground">
-            Envios
+            Disparos
           </Link>
           .
         </p>
