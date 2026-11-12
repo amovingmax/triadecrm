@@ -1,4 +1,5 @@
 import type { AppRole } from '@/lib/auth/role';
+import { definicaoNaEmpresa, VOCABULARIO } from '@/lib/vocabulario';
 import type { Temperatura } from '@/components/temperatura';
 
 /**
@@ -181,7 +182,7 @@ export function ehAvisoDoSistema(item: ItemDoDia): boolean {
 const BLOCO_DO_SISTEMA: DefinicaoDeBloco = {
   id: 'sistema',
   titulo: 'Avisos do sistema',
-  explicacao: 'Sem parceiro e sem negócio: é o motor pedindo atenção, não a carteira.',
+  explicacao: `Sem ${VOCABULARIO.parceiro} e sem negócio: é o motor pedindo atenção, não a carteira.`,
   prioridades: [],
   recolhidoPorPadrao: true,
 };
@@ -503,7 +504,7 @@ export function destinoDoItem(
   // ficha, e por isso fica sem link.
   if (somenteLeitura) {
     return item.organizacaoId
-      ? { href: `/parceiros/${item.organizacaoId}`, onde: 'a ficha do parceiro' }
+      ? { href: `/parceiros/${item.organizacaoId}`, onde: `a ficha do ${VOCABULARIO.parceiro}` }
       : null;
   }
 
@@ -526,7 +527,7 @@ export function destinoDoItem(
     return { href: hrefDoFunil(item), onde: 'o funil' };
   }
 
-  return { href: `/parceiros/${item.organizacaoId}`, onde: 'a ficha do parceiro' };
+  return { href: `/parceiros/${item.organizacaoId}`, onde: `a ficha do ${VOCABULARIO.parceiro}` };
 }
 
 /**
@@ -619,8 +620,12 @@ export const DEFINICAO_DA_METRICA: Record<string, string> = {
   replies: 'Mensagens que o parceiro respondeu.',
 };
 
+/**
+ * A leitura da métrica nesta empresa: a da empresa, quando ela troca o jargão (na
+ * Imova, "Contato registrado com cliente ou proprietário…"); senão a de cima.
+ */
 export function definicaoDaMetrica(metrica: string): string | null {
-  return DEFINICAO_DA_METRICA[metrica] ?? null;
+  return definicaoNaEmpresa(metrica) ?? DEFINICAO_DA_METRICA[metrica] ?? null;
 }
 
 export function metricasVisiveis(metricas: readonly MetricaDoDia[]): MetricaDoDia[] {

@@ -465,19 +465,20 @@ function pulsar(mensagem: string): Record<string, unknown> {
 }
 
 /**
- * A IA que atende no dublê (Imova, 06/11/2026): lê a última mensagem do cliente e
- * decide como o prompt manda — pediu corretor ou ligação, passa; no treino, "anota"
- * vira anotação; aceitou um horário oferecido, marca; o resto, responde. O texto
- * começa com "Simulação:" para ninguém confundir com a IA de verdade.
+ * A IA que atende no dublê (Imova, 06/11/2026; v3 em 11/11/2026): lê a última mensagem
+ * do cliente e decide como o prompt manda — pediu corretor ou ligação, passa; no treino,
+ * "anota" vira anotação; quer visitar um imóvel com código, manda o link da visita, e sem
+ * código pergunta qual; o proprietário que quer anunciar ganha o link da reunião; o resto,
+ * responde. O texto começa com "Simulação:" para ninguém confundir com a IA de verdade.
  */
 function atenderNoDuble(mensagem: string): Record<string, unknown> {
   const treino = /conversa do treino: SIM/.test(mensagem);
   const linhas = mensagem.split('\n').filter((l) => / — cliente: /.test(l));
   const ultima = (linhas[linhas.length - 1] ?? '').replace(/^.* — cliente: /, '');
   const minuscula = ultima.toLowerCase();
-  const horarios = [...mensagem.matchAll(/^- (h\d+): (.+)$/gm)].map((m) => ({ opcao: m[1] ?? '', quando: m[2] ?? '' }));
-  const codigo = /\b([A-Z]{2,5}-\d{2,6})\b/.exec(mensagem.slice(mensagem.indexOf('CONVERSA')))?.[1] ?? null;
-  const base = { visita: null, anotacoes: [] as string[], confianca: 0.8 };
+  const conversa = mensagem.slice(mensagem.indexOf('CONVERSA'));
+  const codigo = /\b([A-Z]{2,5}-?\d{2,6}(?:_[A-Z]+)?)\b/.exec(ultima)?.[1] ?? /\b([A-Z]{2,5}-?\d{2,6}(?:_[A-Z]+)?)\b/.exec(conversa)?.[1] ?? null;
+  const base = { agenda: null, anotacoes: [] as string[], fotosEnsinadas: [] as unknown[], confianca: 0.8 };
 
   if (/corretor|ligar|liga[çc][ãa]o|atendente/.test(minuscula)) {
     return {
@@ -497,15 +498,30 @@ function atenderNoDuble(mensagem: string): Record<string, unknown> {
       anotacoes: regra.length >= 3 ? [regra] : [],
     };
   }
-  const aceitou = horarios.find((h) => minuscula.length > 0 && h.quando.toLowerCase().includes(minuscula.replace(/[^0-9h]/g, '').slice(0, 5)));
-  if (/(pode ser|fechado|combinado|ótimo|otimo|marca)/.test(minuscula) && horarios.length > 0) {
-    const h = aceitou ?? horarios[0];
+  if (/(anunciar|vender|alugar|avaliar).*\b(meu|minha|nosso|nossa)\b|\b(tenho|meu|minha)\b.*(anunciar|vender|avaliar)/.test(minuscula)) {
     return {
       ...base,
-      acao: 'marcar_visita',
-      mensagem: limitar(`Simulação: visita marcada para ${h?.quando ?? 'o horário combinado'}. Um corretor acompanha você.`, 600),
-      visita: { opcao: h?.opcao ?? 'h1', imovelCodigo: codigo },
-      motivo: 'Simulação: aceitou um horário oferecido.',
+      acao: 'enviar_link_da_agenda',
+      mensagem: 'Simulação: vou te mandar o link da agenda para você escolher um horário para conversar com um corretor.',
+      agenda: { tipo: 'reuniao', imovelCodigo: null },
+      motivo: 'Simulação: proprietário quer anunciar; link da reunião.',
+    };
+  }
+  if (/visit|marcar|agendar|quero ver/.test(minuscula)) {
+    if (codigo === null) {
+      return {
+        ...base,
+        acao: 'responder',
+        mensagem: 'Simulação: qual imóvel você quer visitar? Pode me dizer o bairro ou onde viu o anúncio.',
+        motivo: 'Simulação: quer visitar sem dizer o imóvel.',
+      };
+    }
+    return {
+      ...base,
+      acao: 'enviar_link_da_agenda',
+      mensagem: 'Simulação: vou te mandar o link da agenda para você escolher o dia e o horário da visita.',
+      agenda: { tipo: 'visita', imovelCodigo: codigo },
+      motivo: `Simulação: quer visitar o ${codigo}; link da visita.`,
     };
   }
   if (/^(ok|obrigad[oa]|valeu|👍)[.!]*$/.test(minuscula.trim())) {

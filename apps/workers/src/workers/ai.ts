@@ -43,6 +43,7 @@ import {
   chamadaDeTeste,
   ePromptDaChamadaDeTeste,
 } from '../ia/chamada-de-teste';
+import { ENSAIOS, eEnsaio, ensaiarAtendente, relatorioDoEnsaio } from '../ia/ensaio-do-atendente';
 import type { ContextoDaIa } from '../ia/execucao';
 
 /** O balde privado das mídias recebidas (migração 20260905000201). */
@@ -103,6 +104,13 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
     return 2;
   }
 
+  // `--ensaio=atendente-imova` (11/11/2026): os cenários da IA que atende contra o modelo.
+  const pedidoDeEnsaio = opcoes.ensaio;
+  if (pedidoDeEnsaio !== undefined && !eEnsaio(pedidoDeEnsaio)) {
+    logger.error('ensaio que não existe', { pedido: String(pedidoDeEnsaio), aceitos: ENSAIOS.join(', ') });
+    return 2;
+  }
+
   const cliente = criarClienteDaIa(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
   // O cliente real e o dublê entram pelo mesmo lugar: `ANTHROPIC_BASE_URL`
   // apontada para o dublê local faz este mesmo binário, com este mesmo SDK,
@@ -140,6 +148,19 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
       chave: env.GROQ_API_KEY,
     },
   };
+
+  if (pedidoDeEnsaio !== undefined) {
+    const r = await ensaiarAtendente(contexto);
+    logger.info('ensaio concluído', {
+      prompt: r.promptVersion,
+      modelo: r.modelo,
+      acertos: r.acertos,
+      cenarios: r.cenarios.length,
+      custo_usd: r.custoUsd,
+    });
+    process.stdout.write(relatorioDoEnsaio(r));
+    return r.acertos === r.cenarios.length ? 0 : 1;
+  }
 
   // A medição do GATE 1: uma chamada real, o preço na tela, e sai. Não entra no
   // laço da fila e não toca conversa de ninguém — o dado é o exemplo do prompt.

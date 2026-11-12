@@ -4,20 +4,26 @@ import * as z from 'zod';
 
 import { createClient } from '@/lib/supabase/client';
 
+import { emPedacos, type FaixaDeEnvio } from './formatos';
 import {
+  cadastroDeContatosSchema,
   envioSchema,
   itemDoEnvioSchema,
   modeloSchema,
+  pessoaDoDisparoSchema,
   pessoaDoPublicoSchema,
   previaSchema,
   publicoSalvoSchema,
   type AcaoDoBotao,
   type Assinatura,
   type Botao,
+  type CadastroDeContatos,
+  type ContatoDigitado,
   type Envio,
   type FiltroDoPublico,
   type ItemDoEnvio,
   type Modelo,
+  type PessoaDoDisparo,
   type PessoaDoPublico,
   type Previa,
   type PublicoSalvo,
@@ -122,22 +128,80 @@ export async function buscarModelos(): Promise<Modelo[]> {
   return z.array(modeloSchema).parse(data ?? []);
 }
 
-/** Modelos criados pela tela que ainda esperam a Meta, ou que ela recusou. */
+/**
+ * Modelos criados pela tela que ainda esperam a Meta, ou que ela recusou. O
+ * texto vem junto para o cartão "Em análise" mostrar o que está esperando.
+ */
 export async function buscarModelosEmAnalise(): Promise<
-  { id: number; name: string; meta_status: string | null }[]
+  { id: number; name: string; meta_status: string | null; body: string | null }[]
 > {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('message_templates')
-    .select('id, name, meta_status')
+    .select('id, name, meta_status, body')
     .eq('is_active', true)
     .eq('kind', 'envio')
     .or('meta_status.is.null,meta_status.neq.approved')
     .order('created_at', { ascending: false });
   if (error) throw new ErroDoEnvio(error.message);
   return z
-    .array(z.object({ id: z.number(), name: z.string(), meta_status: z.string().nullable() }))
+    .array(
+      z.object({
+        id: z.number(),
+        name: z.string(),
+        meta_status: z.string().nullable(),
+        body: z.string().nullish().transform((v) => v ?? null),
+      }),
+    )
     .parse(data ?? []);
+}
+
+/** O banco aceita até 500 pessoas por chamada de `disparo_adicionar_contatos`. */
+const CONTATOS_POR_CHAMADA = 500;
+
+/**
+ * Cadastra quem foi digitado ou colado no disparo (`disparo_adicionar_contatos`).
+ * Quem é novo vira ficha em Prospectados; quem já tinha ficha volta com o id
+ * dela. Lista maior que 500 vai em partes, uma depois da outra, e a resposta
+ * volta como se fosse uma só, com a linha contada desde o começo da lista.
+ */
+export async function adicionarContatosAoDisparo(
+  contatos: readonly ContatoDigitado[],
+): Promise<CadastroDeContatos> {
+  const supabase = createClient();
+  const junto: CadastroDeContatos = { itens: [], novos: 0, ja_estavam: 0, recusados: 0 };
+  let antes = 0;
+  for (const parte of emPedacos(contatos, CONTATOS_POR_CHAMADA)) {
+    const { data, error } = await supabase.rpc('disparo_adicionar_contatos', {
+      p_contatos: parte.map((c) => ({
+        nome: c.nome,
+        telefone: c.telefone,
+        empresa: c.empresa?.trim() ? c.empresa.trim() : null,
+      })),
+    });
+    if (error) throw new ErroDoEnvio(error.code === '42501' ? 'sem_permissao' : error.message);
+    const r = cadastroDeContatosSchema.parse(conferir(data));
+    junto.itens.push(...r.itens.map((i) => ({ ...i, linha: i.linha + antes })));
+    junto.novos += r.novos;
+    junto.ja_estavam += r.ja_estavam;
+    junto.recusados += r.recusados;
+    antes += parte.length;
+  }
+  return junto;
+}
+
+/**
+ * Os detalhes da lista "Quem recebe" (`disparo_pessoas`), na ordem dos ids. A
+ * tela guarda só os ids; nome, WhatsApp e quem não pode receber vêm daqui, e
+ * ficha excluída ou que a pessoa não enxerga simplesmente não volta.
+ */
+export async function buscarPessoasDoDisparo(ids: readonly string[]): Promise<PessoaDoDisparo[]> {
+  if (ids.length === 0) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('disparo_pessoas', { p_organizacoes: ids });
+  if (error) throw new ErroDoEnvio(error.code === '42501' ? 'sem_permissao' : error.message);
+  const r = conferir(data);
+  return z.array(pessoaDoDisparoSchema).parse(r.pessoas ?? []);
 }
 
 /**
@@ -174,6 +238,14 @@ export type TetoDeHoje = {
   tetoDaMeta: number | null;
   qualidade: string | null;
   quemManda: 'nos' | 'meta' | null;
+  /**
+   * A janela de envio do WhatsApp está aberta agora? Fora dela (depois das
+   * 17h45, fim de semana, feriado) nada sai até `abreEm`. `null` é "o banco não
+   * disse" (banco antigo).
+   */
+  janelaAberta: boolean | null;
+  /** Quando a janela abre de novo (ISO), se agora está fechada. */
+  abreEm: string | null;
 };
 
 export async function buscarTetoDeHoje(): Promise<TetoDeHoje | null> {
@@ -194,6 +266,8 @@ export async function buscarTetoDeHoje(): Promise<TetoDeHoje | null> {
       sobra: z.number().optional(),
       na_fila: z.number().optional(),
       tier: z.string().nullable().optional(),
+      janela_aberta: z.boolean().nullable().optional(),
+      abre_em: z.string().nullable().optional(),
     })
     .parse(data);
   // Sem teto nenhum configurado o banco devolve o maior inteiro: isso não é um
@@ -211,6 +285,40 @@ export async function buscarTetoDeHoje(): Promise<TetoDeHoje | null> {
     tetoDaMeta: r.teto_da_meta ?? null,
     qualidade: r.qualidade ?? null,
     quemManda: r.quem_manda ?? null,
+    janelaAberta: r.janela_aberta ?? null,
+    abreEm: r.abre_em ?? null,
+  };
+}
+
+/**
+ * As faixas de envio do WhatsApp para primeiro contato (`channel_windows`, sem
+ * as que pedem resposta) e os feriados: o bastante para a tela saber quando um
+ * disparo AGENDADO começa de verdade. Para "agora", quem diz é o banco
+ * (`janelaAberta`/`abreEm` do teto). Falhou a leitura, a tela fica sem a conta
+ * e diz só o horário escolhido.
+ */
+export async function buscarJanelaDeEnvio(): Promise<{
+  faixas: FaixaDeEnvio[];
+  feriados: string[];
+} | null> {
+  const supabase = createClient();
+  const hoje = new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10);
+  const [faixas, feriados] = await Promise.all([
+    supabase
+      .from('channel_windows')
+      .select('dow, de, ate')
+      .eq('channel', 'whatsapp')
+      .eq('requires_reply', false),
+    supabase.from('holidays').select('date').gte('date', hoje),
+  ]);
+  if (faixas.error) return null;
+  return {
+    faixas: z
+      .array(z.object({ dow: z.number(), de: z.coerce.number(), ate: z.coerce.number() }))
+      .parse(faixas.data ?? []),
+    feriados: feriados.error
+      ? []
+      : z.array(z.object({ date: z.string() })).parse(feriados.data ?? []).map((f) => f.date),
   };
 }
 

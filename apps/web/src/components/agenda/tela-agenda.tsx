@@ -33,6 +33,7 @@ import { FalhasDoCalendly } from './falhas-do-calendly';
 import { CartaoDoEspelhoNoGoogle } from './cartao-do-espelho';
 import { FolhaDesfecho } from './folha-desfecho';
 import { BotaoNovoCompromisso, FolhaNovoCompromisso } from './folha-novo-compromisso';
+import { LinkDoCalendly } from './link-do-calendly';
 import { ListaDoDia } from './lista-dia';
 import { QuemAtendeOCalendly } from './quem-atende-o-calendly';
 import { registrarDesfechoDoCompromisso } from './registrar-desfecho';
@@ -371,7 +372,16 @@ export function TelaAgenda({
           mais nada para configurar aqui — a sala de cada pessoa mora na folha de
           Novo compromisso (`sala.ts`), e o livre/ocupado é calculado pelo CRM. Na
           aba Rota a nota não aparece: ela fala da lista do dia. */}
-      {EMPRESA.modulos.calendly && ehAdmin && visao !== 'rota' ? <QuemAtendeOCalendly /> : null}
+      {/* Ao lado, o "Link do Calendly" (Imova, 11/11/2026): o link que o botão de
+          Conversas e a IA mandam ao cliente, e a ordem das perguntas do evento. */}
+      {ehAdmin &&
+      visao !== 'rota' &&
+      (EMPRESA.modulos.calendly || EMPRESA.modulos.agendaComImovel) ? (
+        <div className="grid items-start gap-5 lg:grid-cols-2">
+          {EMPRESA.modulos.calendly ? <QuemAtendeOCalendly /> : null}
+          {EMPRESA.modulos.agendaComImovel ? <LinkDoCalendly /> : null}
+        </div>
+      ) : null}
 
       {visao === 'rota' ? null : <AindaNaoLigado />}
 
@@ -427,13 +437,24 @@ function AindaNaoLigado() {
   return (
     <NotaRecolhida titulo="O que ainda não está ligado">
       <ul className="flex flex-col gap-1.5">
-        <li>
-          <span className="text-foreground">Lembrete automático ao parceiro</span>, na véspera e
-          na hora: depende de a Meta aprovar os dois modelos de 24 h, que ainda estão
-          pendentes. Na véspera a janela de resposta livre já fechou, e o CRM não manda
-          texto livre fora dela. Enquanto isso, quem atende recebe uma tarefa às 17h do dia
-          anterior para confirmar por conta própria.
-        </li>
+        {/* Na Imova o lembrete da véspera existe (20261111206000): o que falta é a
+            Meta aprovar o modelo, e o item diz isso, e não "ainda não existe". */}
+        {EMPRESA.modulos.lembreteDeVisita ? (
+          <li>
+            <span className="text-foreground">Lembrete da visita ao cliente</span>, na véspera,
+            pelo WhatsApp, com &ldquo;Confirmo&rdquo; e &ldquo;Preciso remarcar&rdquo;: sai depois
+            que a Meta aprovar o modelo (Ajustes → WhatsApp). O lembrete na hora da visita não
+            existe.
+          </li>
+        ) : (
+          <li>
+            <span className="text-foreground">Lembrete automático ao parceiro</span>, na véspera e
+            na hora: depende de a Meta aprovar os dois modelos de 24 h, que ainda estão
+            pendentes. Na véspera a janela de resposta livre já fechou, e o CRM não manda
+            texto livre fora dela. Enquanto isso, quem atende recebe uma tarefa às 17h do dia
+            anterior para confirmar por conta própria.
+          </li>
+        )}
         <li>
           <span className="text-foreground">Rota otimizada</span> por tempo de deslocamento já
           existe: está na aba <span className="text-foreground">Rota</span>.

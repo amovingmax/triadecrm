@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { VOCABULARIO } from '@/lib/vocabulario';
 import { Button } from '@/components/ui/button';
 import { RevelarLista, useRevelarLinha } from '@/components/movimento';
 import { horaEmNatal } from '@/components/agenda/tipos';
@@ -208,7 +209,7 @@ function ResumoDoFeito({
             {quantos > 0 ? (
               <a
                 href={`#${idDaSecao(categoria.id)}`}
-                aria-label={`${categoria.titulo}: ${quantos} ${quantos === 1 ? 'parceiro' : 'parceiros'}. Ir para o bloco.`}
+                aria-label={`${categoria.titulo}: ${quantos} ${quantos === 1 ? VOCABULARIO.parceiro : VOCABULARIO.parceiros}. Ir para o bloco.`}
                 className={cn(
                   molde,
                   'toque h-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
@@ -245,19 +246,25 @@ function NotaDasPortas({
   portasBatidas: number | null;
 }) {
   if (portasBatidas === null) return null;
-  const regra = 'a meta conta uma porta por parceiro por dia, para quem registrou primeiro';
+  // "porta batida"; na Imova, "contato feito" (`EMPRESA.vocabulario`).
+  const porta = VOCABULARIO.portaBatida;
+  const regra = `a meta conta ${porta.uma} por ${VOCABULARIO.parceiro} por dia, para quem registrou primeiro`;
   return (
     <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
       <Info className="mt-px size-3.5 shrink-0" aria-hidden="true" />
       <span>
         <span className="numerico">{parceiros}</span>{' '}
-        {parceiros === 1 ? 'parceiro com resultado hoje' : 'parceiros com resultado hoje'}
+        {parceiros === 1
+          ? `${VOCABULARIO.parceiro} com resultado hoje`
+          : `${VOCABULARIO.parceiros} com resultado hoje`}
         {portasBatidas === parceiros ? (
-          <>, todos como porta batida ({regra}).</>
+          <>
+            , todos como {porta.nome} ({regra}).
+          </>
         ) : (
           <>
             ; <span className="numerico">{portasBatidas}</span>{' '}
-            {portasBatidas === 1 ? 'conta' : 'contam'} como porta batida, porque {regra}.
+            {portasBatidas === 1 ? 'conta' : 'contam'} como {porta.nome}, porque {regra}.
           </>
         )}
       </span>
@@ -404,7 +411,7 @@ function LinhaDoFeito({
           className={cn(molde, 'outline-none', estilo.realce)}
         >
           {miolo}
-          <span className="sr-only">Abrir a ficha do parceiro.</span>
+          <span className="sr-only">Abrir a ficha do {VOCABULARIO.parceiro}.</span>
         </Link>
       ) : (
         <div className={molde}>{miolo}</div>
@@ -429,7 +436,7 @@ function FeitoVazio({ quem }: { quem: string | null }) {
     <Moldura
       icone={icone}
       titulo="Nenhum resultado registrado hoje"
-      texto="Quando você registrar como foi uma reunião, visita, ligação ou conversa, o parceiro aparece aqui, separado por como foi."
+      texto={`Quando você registrar como foi uma reunião, visita, ligação ou conversa, o ${VOCABULARIO.parceiro} aparece aqui, separado por como foi.`}
     >
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button asChild className="toque h-11 md:h-9">

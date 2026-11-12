@@ -13,6 +13,7 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { VOCABULARIO } from '@/lib/vocabulario';
 
 /**
  * Os jeitos de a fila não ter linhas para mostrar, mais a espera.
@@ -112,7 +113,7 @@ export function FilaVazia({
       ? '. Comece por onde preferir.'
       : temSemDono
         ? '. Assuma um no funil e ele passa a aparecer aqui.'
-        : '. Aprovado, o candidato vira parceiro e entra no funil.';
+        : `. Aprovado, o candidato vira ${VOCABULARIO.parceiro} e entra no funil.`;
 
   return (
     <Moldura

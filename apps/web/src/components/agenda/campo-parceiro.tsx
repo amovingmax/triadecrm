@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { carregarSugestoes } from '@/components/registro/alvos';
 import type { SugestaoDeAlvo } from '@/components/registro/tipos';
+import { maiuscula, VOCABULARIO } from '@/lib/vocabulario';
 
 import { trechosDestacados } from './autocompletar';
 import { buscarParceirosParaAgenda } from './consultas';
@@ -134,7 +135,7 @@ export function CampoParceiro({
         <div
           id={idDaLista}
           role="listbox"
-          aria-label="Parceiros"
+          aria-label={maiuscula(VOCABULARIO.parceiros)}
           className="absolute top-full right-0 left-0 z-50 mt-1 max-h-80 overflow-y-auto rounded-lg border border-hairline bg-popover shadow-lg"
           // Clicar na lista não tira o foco do campo: o clique chega à opção antes
           // de o `onBlur` fechar a lista.
@@ -151,19 +152,19 @@ export function CampoParceiro({
               {procurando ? (
                 'Procurando...'
               ) : vazio ? (
-                'Digite para procurar entre os parceiros cadastrados.'
+                `Digite para procurar entre os ${VOCABULARIO.parceiros} cadastrados.`
               ) : busca.isError ? (
                 'A busca falhou. Tente de novo.'
               ) : (
                 <>
-                  Nenhum parceiro com &ldquo;{texto.trim()}&rdquo;.{' '}
+                  Nenhum {VOCABULARIO.parceiro} com &ldquo;{texto.trim()}&rdquo;.{' '}
                   <a
                     href="/parceiros?novo=1"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-foreground underline underline-offset-2"
                   >
-                    Cadastrar parceiro
+                    Cadastrar {VOCABULARIO.parceiro}
                   </a>
                 </>
               )}

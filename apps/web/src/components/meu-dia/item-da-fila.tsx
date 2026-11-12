@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { VOCABULARIO } from '@/lib/vocabulario';
 import { formatarLocal } from '@/components/parceiros/formatos';
 import { useRevelarLinha } from '@/components/movimento';
 import { EtiquetaEtapa } from '@/components/funis/etapa';
@@ -181,7 +182,7 @@ export function ItemDaFila({
       ) : (
         <div className={molde}>
           {miolo}
-          <span className="sr-only">Sem parceiro ligado: não há para onde abrir.</span>
+          <span className="sr-only">Sem {VOCABULARIO.parceiro} ligado: não há para onde abrir.</span>
         </div>
       )}
     </li>

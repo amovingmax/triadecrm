@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { VIGENTES, promptVigente } from '../src/catalogo';
+import { obterPrompt } from '../src/catalogo';
 import { varrerMontagem } from '../src/nucleo/auditoria-pii';
 import { esquemaDeSaida, prepararChamada } from '../src/nucleo/chamada';
 import { MODELOS } from '../src/nucleo/versionamento';
@@ -131,9 +131,8 @@ describe('atendente-imova@v1', () => {
 });
 
 describe('atendente-imova@v2: fala como a equipe, sem mentir', () => {
-  it('é a vigente, no Haiku 5.5, com a entrada, a saída e a montagem da v1', () => {
-    expect(VIGENTES['atendente-imova']).toBe(2);
-    expect(promptVigente('atendente-imova')).toBe(v2);
+  it('continua no catálogo (vigente até 11/11/2026), no Haiku 5.5, com a entrada e a montagem da v1', () => {
+    expect(obterPrompt('atendente-imova', 2)).toBe(v2);
     expect(v2.versao).toBe(2);
     expect(v2.modelo).toBe(MODELOS.haiku55);
     expect(v2.proposito).toBe('draft_reply');

@@ -11,6 +11,7 @@ import {
 } from '@/components/registro/tipos';
 
 import { escaparCuringas, normalizarBusca, ordenarCandidatos } from './autocompletar';
+import { buscarImoveisDasVisitas } from './imovel-da-visita-dados';
 import { lembretesPorTarefa, respostaDoLembrete } from './lembrete-de-visita';
 import { buscarRespostasDosLembretes } from './lembrete-de-visita-dados';
 import {
@@ -20,6 +21,7 @@ import {
   MINUTOS_SEM_FIM,
   naturezaDoCompromisso,
   resultadoDoDesfecho,
+  visitaComHoraCombinada,
   type Compromisso,
   type Dia,
   type RegistroComDesfecho,
@@ -56,6 +58,9 @@ import {
  *    pessoa fez para os MESMOS parceiros perto de quando cada tarefa foi fechada. É
  *    deles que sai o resultado pintado no cartão (`escolherResultado`). Falha aqui é
  *    engolida: o cartão fica sem a cor, e a semana continua certa.
+ * 6. Na Imova, o imóvel de cada visita (`visita_imoveis`, com o título e a situação
+ *    do anúncio), na mesma leva. Falha também é engolida, e sem acusar ninguém: com a
+ *    leitura falhando, nenhuma visita ganha "Falta o imóvel".
  *
  * Nenhum texto do Postgres chega à tela: falha vira `ErroDaAgenda` com frase em
  * português, pela mesma tradução que a tela de registro usa.
@@ -131,6 +136,8 @@ type LinhaDoCalendly = {
   local: string | null;
   fim: string | null;
   link: string | null;
+  /** O agendamento que este substituiu: o cliente remarcou pelo Calendly. */
+  remarcado_de: string | null;
 };
 
 /**
@@ -146,7 +153,7 @@ async function buscarDoCalendly(
   if (taskIds.length === 0) return new Map();
   const { data, error } = await supabase
     .from('calendly_agendamentos')
-    .select('task_id, local, fim, link')
+    .select('task_id, local, fim, link, remarcado_de')
     .in('task_id', [...taskIds]);
   if (error || !data) return new Map();
   return new Map(
@@ -246,6 +253,14 @@ export async function buscarCompromissos(params: {
 
   const fechadas = linhas.filter((t) => t.status === 'done');
 
+  // O imóvel de cada visita (só na Imova): o código, o título e o endereço no cartão,
+  // e o "Falta o imóvel" da que não tem. Sai junto com a leva abaixo; nulo quando a
+  // leitura falhou.
+  const imoveisDasVisitas = buscarImoveisDasVisitas(
+    supabase,
+    linhas.filter((t) => t.kind === 'visit').map((t) => t.id),
+  ).catch(() => null);
+
   const [orgs, negocios, reuniao, registros, doCalendly, novos, lembretes] = await Promise.all([
     supabase.from('organizations_view').select(COLUNAS_ORG).in('id', orgIds),
     buscarNegocios(supabase, dealIds),
@@ -283,6 +298,7 @@ export async function buscarCompromissos(params: {
       linhas.map((t) => t.id),
     ),
   ]);
+  const imoveis = await imoveisDasVisitas;
 
   if (orgs.error) throw erroDe(orgs.error.code, orgs.error);
   // Ao contrário do espelho do Google, este erro NÃO é engolido: sem a reunião a
@@ -315,7 +331,7 @@ export async function buscarCompromissos(params: {
     // A hora da visita: a do Calendly sempre; a marcada no CRM, onde a empresa a
     // mostra. O fim é o do Calendly, ou a duração padrão da visita.
     const horaCombinada =
-      ehVisita && (peloCalendly || (EMPRESA.modulos.horaNaVisita && tarefa.origin === 'manual'));
+      ehVisita && visitaComHoraCombinada(tarefa.origin, EMPRESA.modulos.horaNaVisita);
     const fimDaVisita = !ehVisita
       ? null
       : (agendamento?.fim ??
@@ -371,8 +387,12 @@ export async function buscarCompromissos(params: {
         diasSemContato: diasDesde(negocio?.last_activity_at ?? null, agora),
         naoContatar: org.do_not_contact,
         resultado: resultadoDaTarefa(tarefa, tipo, registros, params.usuarioId),
-        reagendada: reuniaoDaTarefa?.remarcada_de != null,
+        // A reunião remarcada (`reunioes.remarcada_de`) e a visita que o cliente
+        // remarcou pelo Calendly: a visita é tarefa, e só o agendamento sabe.
+        reagendada: reuniaoDaTarefa?.remarcada_de != null || agendamento?.remarcado_de != null,
         responsavelId: params.usuarioId,
+        imovel: ehVisita ? (imoveis?.get(tarefa.id) ?? null) : null,
+        faltaImovel: ehVisita && imoveis !== null && !imoveis.has(tarefa.id),
       } satisfies Compromisso,
     ];
   });

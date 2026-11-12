@@ -66,6 +66,7 @@ import {
   montarLinhaDoTempo,
   type CatalogosConversas,
 } from './montagem';
+import { BotaoDoLinkDaAgenda } from './enviar-link-da-agenda';
 import { CaixaDeResposta } from './responder';
 import { useRolagemNoFim } from './rolagem-no-fim';
 import {
@@ -407,6 +408,19 @@ export function Conversa({
               fioId={fio.id}
               organizacaoId={item.id}
               className={cn(ACAO_DA_FOLHA, 'col-span-2')}
+            />
+          ) : null}
+          {/* O link da agenda (Imova, 11/11/2026): também com a janela fechada, e
+              aí desligado, dizendo por quê. Na folha ocupa a linha inteira. */}
+          {fio && eu?.podeEscrever ? (
+            <BotaoDoLinkDaAgenda
+              conversaId={fio.id}
+              organizacaoId={item.id}
+              janela={janela}
+              naoContatar={item.naoContatar}
+              bloqueada={fio.bloqueadaEm !== null}
+              className={ACAO_DA_FOLHA}
+              classeDoBloco={naFolha ? 'col-span-2' : undefined}
             />
           ) : null}
           {fio && eu?.podeEscrever ? (

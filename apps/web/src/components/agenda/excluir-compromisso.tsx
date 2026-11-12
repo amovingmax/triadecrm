@@ -7,7 +7,10 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { excluirTarefa, recadoDaExclusao } from '@/components/exclusao/acoes';
 import { DialogoExcluir } from '@/components/exclusao/dialogo-excluir';
+import { VOCABULARIO } from '@/lib/vocabulario';
 
+import { useAgendaDoLink } from './agenda-do-link';
+import { efeitoDeCancelarNoCalendly, recadoDeReuniaoCancelada } from './efeito-no-calendly';
 import { diaDoInstante, rotuloDiaPorExtenso, type Compromisso } from './tipos';
 
 /**
@@ -43,6 +46,9 @@ export function ExcluirCompromisso({
   // o cliente (`calendly_cancelamentos_pendentes` lê a tarefa cancelada; o
   // `imova-worker-wa` cancela lá em segundos).
   const doCalendly = compromisso.peloCalendly;
+  // O que a equipe marcou, na agenda que o link oferece: o horário volta ao Calendly
+  // (só na Imova, e só com o espelho ligado; ver `efeito-no-calendly.ts`).
+  const noCalendly = efeitoDeCancelarNoCalendly(compromisso, useAgendaDoLink(aberto));
 
   async function excluir(motivo: string) {
     setOcupado(true);
@@ -57,7 +63,7 @@ export function ExcluirCompromisso({
     setAberto(false);
     toast.success(
       r.eraReuniao
-        ? 'Reunião cancelada. O time é avisado por e-mail.'
+        ? recadoDeReuniaoCancelada()
         : doCalendly
           ? `${ehVisita ? 'Visita cancelada' : 'Compromisso cancelado'}. O Calendly avisa o cliente por e-mail.`
           : ehVisita
@@ -109,10 +115,11 @@ export function ExcluirCompromisso({
                 {ehVisita
                   ? ' A visita sai da agenda e da rota do dia.'
                   : ' O compromisso sai da agenda.'}
+                {noCalendly ? ` ${noCalendly}` : null}
               </p>
               <p>
-                O funil não muda. Se o parceiro desistiu ou pediu outra data, registre o contato
-                em vez de excluir a {oQue}.
+                O funil não muda. Se o {VOCABULARIO.parceiro} desistiu ou pediu outra data, registre
+                o contato em vez de excluir a {oQue}.
               </p>
             </>
           )
@@ -121,7 +128,7 @@ export function ExcluirCompromisso({
         exemploDeMotivo={
           doCalendly
             ? 'Ex.: o cliente pediu por telefone para desmarcar'
-            : 'Ex.: marcada por engano, o parceiro é de outra cidade'
+            : `Ex.: marcada por engano, o ${VOCABULARIO.parceiro} é de outra cidade`
         }
         rotuloConfirmar={
           doCalendly

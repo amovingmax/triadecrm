@@ -16,6 +16,13 @@
 // O TELEFONE: o número do lembrete por SMS, ou a resposta a uma pergunta de
 // telefone/WhatsApp/celular. Essa resposta NÃO vai junto com as outras: o
 // telefone mora na ficha, onde o SDR o vê mascarado.
+//
+// O CONVITE (11/11/2026): o link pessoal que a IA ou a equipe manda na conversa
+// leva `utm_content=<token>`, e o Calendly devolve no convidado
+// (`payload.tracking.utm_content`, "InviteeTracking" da API). O token vai ao
+// banco como `convite`, só quando tem a forma de um token (10 a 16 de
+// [a-z0-9]); com ele, `calendly_receber` usa a ficha, a conversa, o tipo e o
+// imóvel do convite. Qualquer outra coisa no utm_content é ignorada.
 // =============================================================================
 
 export type Natureza = 'reuniao' | 'visita';
@@ -44,6 +51,8 @@ export type ParaOBanco = {
   cancelamento: { por: 'convidado' | 'anfitriao' | null; motivo: string | null } | null;
   link_cancelar: string | null;
   link_remarcar: string | null;
+  /** O token do convite da Agenda (`tracking.utm_content`), ou nulo. */
+  convite: string | null;
 };
 
 export type Leitura =
@@ -78,6 +87,13 @@ function telefoneDe(v: unknown): string | null {
   const t = texto(v, 40);
   if (!t) return null;
   return t.replace(/\D/g, '').length >= 8 ? t : null;
+}
+
+/** O token do convite: `utm_content` com a forma de um (10 a 16 de [a-z0-9]). */
+export function conviteDe(tracking: unknown): string | null {
+  if (!ehObjeto(tracking)) return null;
+  const t = texto(tracking.utm_content, 40)?.toLowerCase() ?? null;
+  return t && /^[a-z0-9]{10,16}$/.test(t) ? t : null;
 }
 
 function link(v: unknown): string | null {
@@ -215,6 +231,7 @@ export function resumir(corpo: Objeto): Leitura {
       cancelamento,
       link_cancelar: link(p.cancel_url),
       link_remarcar: link(p.reschedule_url),
+      convite: conviteDe(p.tracking),
     },
   };
 }
@@ -229,5 +246,6 @@ export function resumoParaLog(leitura: Leitura): Record<string, unknown> {
     natureza: r.natureza,
     formato: r.formato,
     remarcacao: r.convidado_anterior_uri !== null || r.remarcado,
+    com_convite: r.convite !== null,
   };
 }
