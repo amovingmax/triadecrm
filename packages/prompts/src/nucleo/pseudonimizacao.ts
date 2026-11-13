@@ -219,6 +219,13 @@ const GRAFIAS_NAO_TELEFONICAS: readonly RegExp[] = [
  */
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 const CPF = /(?<!\d)\d{3}\.\d{3}\.\d{3}-\d{2}(?!\d)/g;
+/**
+ * O CPF digitado sem pontuação, como o cliente da KOMUNE manda para resolver o cadastro
+ * (desde 13/11/2026 a mensagem recebida guarda o número). Onze dígitos só viram
+ * DOCUMENTO quando fecham no dígito verificador; um celular que por acaso feche também
+ * sai do texto, só com outro marcador.
+ */
+const CPF_CORRIDO = /(?<!\d)\d{11}(?!\d)/g;
 const CNPJ = /(?<!\d)(?:\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{14})(?!\d)/g;
 
 function digitoDeControle(base: string, pesoInicial: number): number {
@@ -239,6 +246,14 @@ function digitoDeControle(base: string, pesoInicial: number): number {
  * 14 dígitos onde bastava colar três números no fim de um celular para calar a segunda
  * camada.
  */
+function eCpf(digitos: string): boolean {
+  if (digitos.length !== 11 || /^(\d)\1{10}$/.test(digitos)) return false;
+  return (
+    digitoDeControle(digitos.slice(0, 9), 10) === Number(digitos[9]) &&
+    digitoDeControle(digitos.slice(0, 10), 11) === Number(digitos[10])
+  );
+}
+
 function eCnpj(digitos: string): boolean {
   if (digitos.length !== 14 || /^(\d)\1{13}$/.test(digitos)) return false;
   return (
@@ -809,6 +824,11 @@ function varrer(texto: string, variantes: readonly string[]): Ocorrencia[] {
   for (const achado of texto.matchAll(CPF)) {
     if (achado.index !== undefined)
       documentos.push([achado.index, achado.index + achado[0].length]);
+  }
+  for (const achado of texto.matchAll(CPF_CORRIDO)) {
+    if (achado.index === undefined) continue;
+    if (!eCpf(achado[0])) continue;
+    documentos.push([achado.index, achado.index + achado[0].length]);
   }
   for (const achado of texto.matchAll(CNPJ)) {
     if (achado.index === undefined) continue;

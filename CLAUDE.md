@@ -24,7 +24,7 @@ Não releia tudo a cada tarefa: use a seção do PRD e o anexo do módulo.
 - Human-in-the-loop por padrão: o robô classifica e redige; a Heloísa aprova o primeiro contato e as respostas (ADR-05). O modo automático (RF-CON-09) fica atrás de uma feature flag desligada e está fora do MVP.
 - Inbox próprio dentro do CRM no MVP (ADR-07); Chatwoot só se o gatilho de reversão do D8 disparar.
 - IA: Claude Haiku 4.5 para classificação e extração (saídas estruturadas, Batch API), Claude Sonnet 5 para rascunhos, resumos, digests, Assistente e relatório (ADR-10). Prompts versionados em `packages/prompts`, com evals.
-- Sem CPF, dados bancários ou Pix no CRM (ADR-09). Voz: biblioteca de áudios reais da Heloísa (ogg/opus); nada de voz clonada.
+- Sem CPF, dados bancários ou Pix no CRM (ADR-09). **Exceção desde 13/11/2026:** na KOMUNE, a mensagem que o cliente manda pelo WhatsApp guarda o CPF (suporte de cadastro); na Imova o número vira "[CPF apagado]" (`messages_cpf_da_entrada`). O que sai continua sem CPF. Voz: biblioteca de áudios reais da Heloísa (ogg/opus); nada de voz clonada.
 - Filas e cron nativos do Postgres (ADR-11); sem Redis, BullMQ ou n8n.
 - Ingestão unificada: planilha e scrapers passam pela mesma esteira `raw_capture → source_record → supplier_candidate → revisão → organizations` (ADR-08).
 

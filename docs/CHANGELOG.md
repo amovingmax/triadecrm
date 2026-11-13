@@ -10596,3 +10596,25 @@ Qualquer ordem é segura: a função sem a tabela só registra aviso, e o site s
 - no passo da entrega, um teste por `curl` com a chave de verdade deixa o passo em "pede um olhar" até o próximo lead do Grupo OLX;
 - o plano B pelo e-mail de lead;
 - o arquivo do CRM, que segue vazio (0 anúncios no ar): não colar a URL do XML antes de pôr os anúncios no ar.
+
+## 13/11/2026 — o CPF que o cliente manda chega à conversa (branch `cpf-do-cliente`; ADR-09 muda na mensagem recebida da KOMUNE; RF-CON-03)
+
+Pedido do usuário: "quando o cliente manda o CPF pelo CRM da Komune, a gente não consegue receber. Quando a pessoa escrever o CPF e enviar, a gente precisa receber, pois muitas vezes se trata de resolução de cadastro."
+
+**A causa:** a constraint `messages_sem_cpf` (ADR-09) recusava qualquer mensagem com CPF válido, inclusive a recebida. O INSERT de `app.wa_registrar_entrada` falhava, a esteira tentava de novo, desistia e mandava a mensagem para a `wa_dlq`: na conversa, a mensagem simplesmente não aparecia. Na KOMUNE foram 24 assim, de 05/10 a 13/11/2026 (22 na `wa_dlq`, 2 ainda em nova tentativa); todas guardadas em `webhook_deliveries`.
+
+**Entregue** (migração `20261113120000_o_cpf_do_cliente_chega.sql`, `packages/prompts`):
+- `messages_sem_cpf` vale só para a mensagem que sai (`direction = 'in'` passa). O que a equipe, a IA ou um modelo mandam continua sem CPF.
+- Gatilho `messages_cpf_da_entrada` (BEFORE INSERT e UPDATE do texto, só na recebida), por empresa (`public.empresa_do_banco()`):
+  - **KOMUNE:** a mensagem fica como veio, com o CPF.
+  - **Imova** (e banco sem identidade): o número vira "[CPF apagado]" (`app.cpf_trocado`) e o resto chega. A política pública da Imova diz que o CRM não guarda CPF, e ela continua verdadeira; antes, a mensagem inteira se perdia.
+- A pseudonimização da IA passa a trocar por `[[DOCUMENTO_n]]` também o CPF sem pontuação (11 dígitos que fecham no verificador); o CPF com pontuação já era trocado. A IA nunca vê o número e `ai_runs_sem_cpf` fica como está. +3 casos no eval de pseudonimização.
+- Verificado: evals e testes de `packages/prompts` (446), typecheck e lint; a migração rodou nos dois bancos de produção dentro de uma transação desfeita no fim (KOMUNE guarda "529.982.247-25" e "52998224725"; Imova grava "meu cpf é [CPF apagado], pode ver?"), sem deixar linha nem gatilho.
+
+**Pendente:**
+- Publicar a migração nos dois bancos e o worker de IA (pseudonimização).
+- Recuperar as 24 mensagens da KOMUNE que caíram por causa do CPF. As 2 em nova tentativa entram sozinhas depois da migração; as 22 da `wa_dlq` precisam ser devolvidas à fila `wa_inbound`.
+- pgTAP do gatilho: não rodou aqui (sem Docker para o `supabase start`).
+- Grupos do WhatsApp (`wa_grupo_mensagens`) ficaram como estavam: a mensagem com CPF chega sem o texto.
+
+**Decisão humana tomada:** o ADR-09 ("sem CPF no CRM") deixa de valer para a mensagem que o cliente manda na KOMUNE, a pedido do usuário em 13/11/2026.
