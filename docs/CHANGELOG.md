@@ -10611,9 +10611,11 @@ Pedido do usuário: "quando o cliente manda o CPF pelo CRM da Komune, a gente n�
 - A pseudonimização da IA passa a trocar por `[[DOCUMENTO_n]]` também o CPF sem pontuação (11 dígitos que fecham no verificador); o CPF com pontuação já era trocado. A IA nunca vê o número e `ai_runs_sem_cpf` fica como está. +3 casos no eval de pseudonimização.
 - Verificado: evals e testes de `packages/prompts` (446), typecheck e lint; a migração rodou nos dois bancos de produção dentro de uma transação desfeita no fim (KOMUNE guarda "529.982.247-25" e "52998224725"; Imova grava "meu cpf é [CPF apagado], pode ver?"), sem deixar linha nem gatilho.
 
+**No ar desde 13/11/2026, ~12h15:** a migração `20261113120000` nos bancos da Imova e da KOMUNE (`publicar-banco.mjs`, Imova primeiro; só esta migração: a `20261112180000` e a `20261112181000`, dos portais, continuam fora dos dois bancos). Conferido na KOMUNE: constraint nova e gatilho ativos.
+
 **Pendente:**
-- Publicar a migração nos dois bancos e o worker de IA (pseudonimização).
-- Recuperar as 24 mensagens da KOMUNE que caíram por causa do CPF. As 2 em nova tentativa entram sozinhas depois da migração; as 22 da `wa_dlq` precisam ser devolvidas à fila `wa_inbound`.
+- O `triade-worker-ai` (KOMUNE, publicado em 17/09) não foi republicado, por decisão do usuário: até lá, o CPF sem pontuação numa conversa chega ao modelo como veio (o com pontuação já vira `[[DOCUMENTO_n]]`). Publicar o worker leva junto tudo o que mudou na main desde 17/09.
+- Recuperar as 22 mensagens da KOMUNE que estão na `wa_dlq` por causa do CPF (devolver à fila `wa_inbound`). As que ainda estavam em nova tentativa entram sozinhas.
 - pgTAP do gatilho: não rodou aqui (sem Docker para o `supabase start`).
 - Grupos do WhatsApp (`wa_grupo_mensagens`) ficaram como estavam: a mensagem com CPF chega sem o texto.
 
