@@ -13,7 +13,7 @@
  * assumir, descartar, o que conta); aqui ficam os rótulos, as contas do resumo e
  * os filtros que a tela faz sem ir ao servidor.
  *
- * Desde 12/11/2026 (migração 20261112180000) o lead também nasce da CONVERSA:
+ * Desde 12/11/2026 (migração 20261113130000) o lead também nasce da CONVERSA:
  * quem toca em "WhatsApp" no anúncio do ZAP ou do Viva Real manda o texto
  * pronto do portal, o canal de chegada reconhece, e a chegada vira um lead com
  * `origem = 'whatsapp'` e o tipo `WHATSAPP_DO_PORTAL` ("Mensagem no WhatsApp"),

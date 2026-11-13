@@ -83,7 +83,7 @@ function lead(parcial: Partial<LeadDoPortal> = {}): LeadDoPortal {
   };
 }
 
-/** O lead que nasce da conversa de WhatsApp (12/11/2026, migração 20261112180000). */
+/** O lead que nasce da conversa de WhatsApp (12/11/2026, migração 20261113130000). */
 function leadDoWhatsapp(parcial: Partial<LeadDoPortal> = {}): LeadDoPortal {
   return lead({
     origem: 'whatsapp',

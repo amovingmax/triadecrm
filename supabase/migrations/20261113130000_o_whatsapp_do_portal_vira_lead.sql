@@ -70,7 +70,7 @@
 --      LISTA mostra um só por grupo (`portal_leads_na_lista`): o que alguém já
 --      mexeu; empatado, o que chegou primeiro; empatado, o do Grupo OLX. O que
 --      fica mostra o portal do par. O caminho até o primeiro lead
---      (`anuncios_caminho_do_lead`, 20261112181000) conta pela mesma lista. Juntar no banco pediria mexer em
+--      (`anuncios_caminho_do_lead`, 20261113131000) conta pela mesma lista. Juntar no banco pediria mexer em
 --      `grupozap_lead_receber` (o caminho do webhook) e decidir qual apagar;
 --      esconder na leitura não toca o webhook e vale nos dois sentidos (o
 --      clique antes ou depois da mensagem). A conta da lista de Anúncios lê a
@@ -734,7 +734,7 @@ select l.id, l.origem, l.origem_no_portal, l.origin_lead_id, l.client_listing_id
        coalesce(r.created_at, case when l.situacao = 'respondido' then l.situacao_em end) as respondido_em,
        coalesce(rp.full_name, case when l.situacao = 'respondido' then sp.full_name end) as respondido_por_nome,
        l.contato_apagado_em,
-       -- Daqui para baixo, o que a 20261112180000 acrescentou.
+       -- Daqui para baixo, o que a 20261113130000 acrescentou.
        coalesce(l.portal, l.portal_do_par) as portal
   from leads l
   left join conv v on v.lead_id = l.id

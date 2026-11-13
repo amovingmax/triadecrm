@@ -10525,7 +10525,7 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 - **Os leads já chegavam pelo WhatsApp do CRM, com o texto pronto do portal.** Por exemplo, "…que encontrei no VivaReal: … Código da oferta: PT0001_IMOVA", em 11/11 às 18:50. O canal de chegada os marcava como `portal_zap`/`portal_vivareal`, mas eles nunca viravam `portal_leads`. Por isso a aba Leads mostrava 0.
 
 **Entregue:**
-- **O WhatsApp do portal vira lead (migração `20261112180000`, pgTAP 172):**
+- **O WhatsApp do portal vira lead (migração `20261113130000`, pgTAP 172):**
   - Toda chegada cujo canal que vale é Anúncios com subcanal de portal (ZAP, Viva Real, OLX ou Canal Pro), pela regra, pela IA ou por gente, vira um lead em `portal_leads`, um por chegada. A origem é `whatsapp`, a chave é `whatsapp:<chegada>` e o tipo é `WHATSAPP_DO_PORTAL`. O lead entra em "Mandaram mensagem", com o portal (coluna `portal`), o anúncio pelo código, a conversa e o contato em `portal_lead_contatos` (só a gestão vê o telefone, e o SDR revela).
   - O lead nasce por gatilho em `chegadas`, que engole erro e espera trava por no máximo 1 s. A rotina `portal_leads_do_whatsapp`, a cada 5 min, refaz o que o gatilho perdeu e liga a ficha. As chegadas antigas viram lead quando a migração roda.
   - **O código do anúncio:** a função tenta o código inteiro ("BRISA MALL - loja 2"), depois a primeira palavra, depois o `codigo_do_anuncio` da chegada. A comparação é exata e, se não achar, segue sem o `_IMOVA`, sem caixa, sem pontuação e sem zeros à esquerda. O código para na vírgula e no ponto final.
@@ -10533,7 +10533,7 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
   - **Desmarcar** a chegada esconde o lead que ninguém mexeu (`escondido_em`). O que já foi assumido, mudado ou descartado fica.
   - O lead do WhatsApp não dispara o push "Lead novo dos portais" nem o cartão do vigia: a mensagem já avisou.
   - **Tela:** "Mensagem no WhatsApp" e "WhatsApp pelo ZAP Imóveis / pelo Viva Real / pela OLX", o filtro "WhatsApp pelo portal" e "Abrir conversa" na ficha. O lead suprimido, sem conversa, pode ser marcado como respondido à mão.
-- **A porta dos leads (migração `20261112181000`, pgTAP 173, função `grupozap-lead`):**
+- **A porta dos leads (migração `20261113131000`, pgTAP 173, função `grupozap-lead`):**
   - **Lead gravado é 200, sempre.** Antes, o lead de anúncio sem `clientListingId` recebia 422. Os anúncios criados direto no Canal Pro (o Edifício Simone tem 58 contatos) vão sem código, e há relato de que falhas seguidas desligam a integração. O log mantém o aviso `anuncio_sem_codigo`.
   - **Cada chamada é anotada** em `grupozap_lead_chamadas`, sem dado pessoal: dia, resultado (`recebido`, `repetido`, `teste`, `recusado_credencial`, `erro`), se veio do Grupo OLX, contador, último horário e status. A gravação é por upsert, com no máximo 10 linhas por dia, e o que passa de 365 dias sai. A anotação roda depois da resposta (`EdgeRuntime.waitUntil`, prazo de 3 s) e nunca muda a resposta. A tabela tem RLS, sem política e sem grade, e a RPC `grupozap_lead_anotar_chamada` é só da service_role.
   - A resposta saiu para `atender.ts` (com dependências injetadas, testável) e a anotação para `porta.ts`. `autenticacao.ts` não mudou.
@@ -10570,7 +10570,7 @@ O pgTAP 34 do 172 dependia da ordem de um `inicio_em` empatado e foi fixado. Na 
 - a tela "Receber leads no CRM" do Canal Pro, que vem da pesquisa (a central de ajuda recusa acesso automático).
 
 **Para publicar (só na Imova):**
-1. Banco: `publicar-banco.mjs imova migrar`, só a `20261112180000` e a `20261112181000`. A produção já tem tudo da `main` até a `20261112170000`.
+1. Banco: `publicar-banco.mjs imova migrar`, só a `20261113130000` e a `20261113131000`. A produção já tem tudo da `main` até a `20261112170000`, mais a `20261113120000` (o CPF do cliente).
 2. Função: `supabase functions deploy grupozap-lead --project-ref kkqadgxvmzulcamuakzk`, de cópia limpa da `main`. Nunca de versão anterior a `bda070d`.
 3. Site da Imova.
 
@@ -10611,7 +10611,7 @@ Pedido do usuário: "quando o cliente manda o CPF pelo CRM da Komune, a gente n�
 - A pseudonimização da IA passa a trocar por `[[DOCUMENTO_n]]` também o CPF sem pontuação (11 dígitos que fecham no verificador); o CPF com pontuação já era trocado. A IA nunca vê o número e `ai_runs_sem_cpf` fica como está. +3 casos no eval de pseudonimização.
 - Verificado: evals e testes de `packages/prompts` (446), typecheck e lint; a migração rodou nos dois bancos de produção dentro de uma transação desfeita no fim (KOMUNE guarda "529.982.247-25" e "52998224725"; Imova grava "meu cpf é [CPF apagado], pode ver?"), sem deixar linha nem gatilho.
 
-**No ar desde 13/11/2026, ~12h15:** a migração `20261113120000` nos bancos da Imova e da KOMUNE (`publicar-banco.mjs`, Imova primeiro; só esta migração: a `20261112180000` e a `20261112181000`, dos portais, continuam fora dos dois bancos). Conferido na KOMUNE: constraint nova e gatilho ativos.
+**No ar desde 13/11/2026, ~12h15:** a migração `20261113120000` nos bancos da Imova e da KOMUNE (`publicar-banco.mjs`, Imova primeiro; só esta migração: a `20261113130000` e a `20261113131000`, dos portais, continuam fora dos dois bancos). Conferido na KOMUNE: constraint nova e gatilho ativos.
 
 **Pendente:**
 - O `triade-worker-ai` (KOMUNE, publicado em 17/09) não foi republicado, por decisão do usuário: até lá, o CPF sem pontuação numa conversa chega ao modelo como veio (o com pontuação já vira `[[DOCUMENTO_n]]`). Publicar o worker leva junto tudo o que mudou na main desde 17/09.
@@ -10620,3 +10620,7 @@ Pedido do usuário: "quando o cliente manda o CPF pelo CRM da Komune, a gente n�
 - Grupos do WhatsApp (`wa_grupo_mensagens`) ficaram como estavam: a mensagem com CPF chega sem o texto.
 
 **Decisão humana tomada:** o ADR-09 ("sem CPF no CRM") deixa de valer para a mensagem que o cliente manda na KOMUNE, a pedido do usuário em 13/11/2026.
+
+### Renumeração das migrações dos portais (13/11/2026)
+- As migrações `20261112180000` (o WhatsApp do portal vira lead) e `20261112181000` (a porta dos leads) passam a `20261113130000` e `20261113131000`, com as referências no código, nos testes e nos guias. Motivo: a `20261113120000` (o CPF do cliente) já está nos bancos da Imova e da KOMUNE, e o `supabase db push` do `publicar-banco.mjs` (sem `--include-all`) recusa migração com data anterior à última do banco. Nenhuma das duas estava em produção; o conteúdo é o mesmo.
+- Junta a branch `cpf-do-cliente` na `main` (a migração dela já estava nos dois bancos; sem ela no repositório, o `db push` também recusaria).

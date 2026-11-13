@@ -64,7 +64,7 @@
 // da integração de anúncios. Agora, depois de responder, a função anota o
 // resultado (`recebido`, `repetido`, `teste`, `recusado_credencial`, `erro`),
 // o status e se o user-agent é o do Grupo OLX, numa linha por dia e resultado
-// (`public.grupozap_lead_anotar_chamada`, migração 20261112181000). Nada da
+// (`public.grupozap_lead_anotar_chamada`, migração 20261113131000). Nada da
 // pessoa nem do corpo. É o que o passo "Os leads vêm para o CRM", no alto de
 // Anúncios, lê. Melhor esforço (`porta.ts`): entregue a `EdgeRuntime.waitUntil`,
 // com prazo de 3 s; se falhar, a resposta não muda nem atrasa.
