@@ -182,6 +182,15 @@ export interface Empresa {
      * no dia em que o Resend da Imova estiver no ar.
      */
     emailDeReuniao: boolean;
+    /**
+     * As duas caixas de Conversas (13/11/2026): Fornecedores (quem tem ficha em
+     * Prospectados) e Clientes (quem escreve sem ficha, quase sempre usuário do
+     * app), cada uma com a sua lista e o seu número de conversas esperando. Pedido
+     * do usuário: "clientes e prospectados entram na mesma aba de conversa".
+     * Desligado, a lista de Conversas junta os dois, como desde 01/10/2026. Só da
+     * KOMUNE: na Imova o cliente tem ficha e a aba Clientes é outra coisa.
+     */
+    caixasDeConversa: boolean;
   };
   /**
    * As palavras de tela que mudam com o ramo (11/11/2026: Agenda, Meu dia e Metas).
@@ -327,6 +336,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       lembreteDeVisita: false,
       agendaComImovel: false,
       emailDeReuniao: true,
+      caixasDeConversa: true,
     },
     vocabulario: {
       parceiro: 'parceiro',
@@ -391,6 +401,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       agendaComImovel: true,
       // Sem Resend no `imova-worker-wa` (11/11/2026): a Agenda não promete e-mail.
       emailDeReuniao: false,
+      caixasDeConversa: false,
     },
     // Quem está do outro lado é o cliente (ou o proprietário), e quem marca sozinho é
     // a IA que atende. As métricas trocam o jargão da captação ("porta batida",

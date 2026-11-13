@@ -38,6 +38,24 @@ export function conversasForaDaBase(
  * nome, e quando n tiver, o numero completo". O fio já chegava com o número
  * cru (o inbox não mascara o fio); só a tela o cortava.
  */
+/**
+ * Quem escreveu sem ficha mas tem cara de fornecedor (13/11/2026): no robô de
+ * entrada escolheu "Quero ser fornecedor ou parceiro" (`parceria`) ou "Já sou
+ * parceiro e preciso de ajuda" (`suporte`). É o próprio robô que grava a escolha
+ * em `ai_intent` (`app.wa_bot_responder`). Com as caixas de Conversas, esta
+ * conversa mora em Clientes, porque o número não está em Prospectados, e a tela
+ * avisa que talvez ela devesse virar parceiro.
+ */
+export const INTENCOES_DE_FORNECEDOR: readonly string[] = ['parceria', 'suporte'];
+
+export function pareceFornecedor(fio: Pick<FioCru, 'organization_id' | 'ai_intent'>): boolean {
+  return (
+    fio.organization_id === null &&
+    fio.ai_intent !== null &&
+    INTENCOES_DE_FORNECEDOR.includes(fio.ai_intent)
+  );
+}
+
 export function nomeDoCliente(fio: Pick<FioCru, 'peer_nome' | 'peer_phone_e164'>): string {
   return fio.peer_nome?.trim() || formatarTelefone(fio.peer_phone_e164) || 'sem número';
 }

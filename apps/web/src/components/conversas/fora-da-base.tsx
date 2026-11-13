@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArrowLeft, EllipsisVertical, Link2, PanelRight, UserPlus, X } from 'lucide-react';
+import {
+  Archive,
+  ArrowLeft,
+  CircleAlert,
+  EllipsisVertical,
+  Link2,
+  PanelRight,
+  UserPlus,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { EMPRESA, TIPOS_EM_USO, TIPOS_POR_EXTENSO } from '@/lib/empresa';
@@ -41,6 +50,7 @@ import {
   nomeDoCliente,
   vincularConversa,
   type ResultadoDaFicha,
+  pareceFornecedor,
 } from './fora-da-base-dados';
 import { ListaConversas } from './lista-conversas';
 import {
@@ -93,6 +103,15 @@ import { useRolagemNoFim } from './rolagem-no-fim';
  * "virar parceiro" continua a um botão, para o fornecedor que escreveu antes de
  * estar na base.
  */
+/**
+ * O botão que leva a conversa para a base (13/11/2026). Com as caixas de
+ * Conversas ligadas, o que a pessoa vê é a conversa mudar de caixa, e o nome diz
+ * isso; a ação é a mesma de sempre (criar ou ligar a ficha).
+ */
+const ROTULO_DE_VIRAR = EMPRESA.modulos.caixasDeConversa
+  ? 'Mover para Fornecedores'
+  : 'Virar parceiro';
+
 export function ListaForaDaBase({
   fios,
   selecionadoId,
@@ -261,7 +280,7 @@ export function ConversaForaDaBase({
               }}
             >
               <UserPlus aria-hidden="true" />
-              Virar parceiro
+              {ROTULO_DE_VIRAR}
             </Button>
           )}
           {eu?.podeEscrever ? (
@@ -367,8 +386,8 @@ export function ConversaForaDaBase({
                 title={`É ${TIPOS_POR_EXTENSO}? Leve para a base.`}
               >
                 <UserPlus aria-hidden="true" />
-                <span className="hidden @3xl:inline">Virar parceiro</span>
-                <span className="sr-only @3xl:hidden">Virar parceiro</span>
+                <span className="hidden @3xl:inline">{ROTULO_DE_VIRAR}</span>
+                <span className="sr-only @3xl:hidden">{ROTULO_DE_VIRAR}</span>
               </Button>
             )}
             {eu?.podeEscrever ? (
@@ -418,6 +437,35 @@ export function ConversaForaDaBase({
             podeReabrir={Boolean(eu?.podeEscrever)}
           />
           <FaixaDaLigacao conversaId={fio.id} className="border-b border-wpp-linha" />
+          {/* PARECE FORNECEDOR (13/11/2026): o número não está em Prospectados,
+              mas no robô de entrada a pessoa disse que é fornecedor. Com as caixas
+              de Conversas ela está em Clientes; o botão leva para Fornecedores. */}
+          {EMPRESA.modulos.caixasDeConversa && pareceFornecedor(fio) && !virando ? (
+            <div
+              role="note"
+              className="flex shrink-0 items-center gap-2.5 border-b border-wpp-linha bg-wpp-janela px-4 py-2.5 text-[13px] text-wpp-janela-texto"
+            >
+              <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
+              <p className="min-w-0 flex-1 leading-snug">
+                <span className="font-semibold">Parece fornecedor.</span> No robô de entrada
+                escolheu &ldquo;
+                {fio.ai_intent === 'suporte'
+                  ? 'Já sou parceiro e preciso de ajuda'
+                  : 'Quero ser fornecedor ou parceiro'}
+                &rdquo;, mas o número não está em Prospectados, por isso a conversa está em
+                Clientes.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                className="toque h-8 shrink-0 rounded-full bg-wpp-janela-texto px-3 text-[12.5px] font-semibold text-wpp-janela hover:bg-wpp-janela-texto/90"
+                onClick={() => setVirando(true)}
+              >
+                <UserPlus aria-hidden="true" />
+                {ROTULO_DE_VIRAR}
+              </Button>
+            </div>
+          ) : null}
 
           <Sheet open={folha} onOpenChange={setFolha}>
             <SheetContent
