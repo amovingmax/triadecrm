@@ -102,7 +102,12 @@ export {
   sistemaComBaseV5,
 } from './prompts/atendente-imova/v5';
 
-export { BASE_DO_ENSAIO_V5, CENARIOS_DO_ATENDENTE_V5 } from './prompts/atendente-imova/cenarios-v5';
+export {
+  BASE_DO_ENSAIO_V5,
+  CENARIOS_DE_VISITA_V5,
+  CENARIOS_DO_ATENDENTE_V5,
+  conferirCenarioV5,
+} from './prompts/atendente-imova/cenarios-v5';
 
 export {
   CERTEZAS_DA_FOTO,

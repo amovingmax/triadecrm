@@ -1,25 +1,49 @@
 import type { BaseDoAtendenteV2 } from './v2';
 import type { EntradaDoAtendenteV3, SaidaDoAtendenteV3 } from './v3';
-import type { CenarioDoAtendente } from './cenarios-v3';
+import { type CenarioDoAtendente, conferirCenario } from './cenarios-v3';
 import { BASE_DO_ENSAIO_V4, CENARIOS_DO_ATENDENTE_V4 } from './cenarios-v4';
 import { FRASE_DA_VISITA } from './v5';
 
 /**
  * Os cenários do ensaio de `atendente-imova@v5` (12/11/2026): a visita presencial sem
  * link. São os da v4 com toda visita trocada (pergunta o dia e o período, ou diz a frase
- * da agenda e passa; link de visita nunca), mais quatro novos: a resposta com o dia, o
- * horário proposto, o cliente que pede "o link" para visitar e o link da reunião pedido
- * de novo. A régua (`conferirCenario`) é a mesma da v3: como nenhum cenário de visita
- * aceita `enviar_link_da_agenda`, mandar o link na visita é sempre erro.
+ * da agenda e passa; link de visita nunca; o pausado passa já), mais quatro novos: a
+ * resposta com o dia, o cliente que pede "o link" para visitar, o "ok, obrigado" depois
+ * da pergunta do dia e o link da reunião pedido de novo.
+ *
+ * A régua é a da v3 (`conferirCenario`) mais a da visita (`conferirCenarioV5`): nos
+ * cenários de visita, a passagem tem a frase, não fala em corretor e o motivo começa por
+ * "Visita:"; nenhum horário é dado por marcado.
  */
 
-export const BASE_DO_ENSAIO_V5: BaseDoAtendenteV2 = BASE_DO_ENSAIO_V4;
+/**
+ * A base do ensaio da v5: a da v4, mais a nota AGENDA do caderno da Imova (a 30, de
+ * 11/11/2026) como o modelo a lê desde a v5: o worker troca o endereço do Calendly por
+ * "[link da agenda]". É a nota que mandava o link na visita; o ensaio mede que a v5 vale
+ * mais que ela.
+ */
+export const BASE_DO_ENSAIO_V5: BaseDoAtendenteV2 = {
+  ...BASE_DO_ENSAIO_V4,
+  caderno: [
+    ...BASE_DO_ENSAIO_V4.caderno,
+    {
+      id: 30,
+      texto:
+        'AGENDA: Quando o cliente quiser visitar o imóvel, conhecer pessoalmente ou marcar uma reunião, responda de forma humanizada e envie o link da nossa agenda para ele escolher o dia e o horário que preferir: [link da agenda] Não ofereça horários soltos e nunca diga que a visita ou a reunião está marcada: quem confirma é a agenda.',
+      origem: 'tela',
+    },
+  ],
+};
 
 /** A frase da visita, com folga para o acento e a pontuação. */
 export const FRASE_DA_VISITA_NA_MENSAGEM = /consultar um hor[áa]rio em que entre na minha agenda/i;
 
-/** Pergunta de dia ou período, sem oferecer horário. */
-const PERGUNTA_DO_DIA = /dia|per[íi]odo|turno|manh[ãa]|tarde/i;
+/** Pergunta de dia ou período, sem oferecer horário (um "Boa tarde" não conta). */
+const PERGUNTA_DO_DIA = /(qual|que|melhor(es)?) dia|per[íi]odo|turno|manh[ãa] ou (de |à )?tarde/i;
+
+/** Horário dado por certo: quem marca a visita é a equipe. */
+const CONFIRMOU =
+  /\b(marquei|agendei|confirmei|combinado|fechado|te espero|nos vemos|(est[áa]|ficou) (marcad|agendad|confirmad)[ao])\b/i;
 
 type Mensagens = EntradaDoAtendenteV3['mensagens'];
 
@@ -170,13 +194,13 @@ const TROCADOS: Readonly<Record<string, CenarioDoAtendente>> = {
     ),
   },
   [NOMES_DA_V4.pausado]: {
-    nome: 'imóvel pausado: pergunta o dia ou passa, sem link (v5)',
+    nome: 'imóvel pausado: a frase da agenda e passa já, sem perguntar o dia (v5)',
     entrada: pausado.entrada,
-    espera: { acoes: ['responder', 'passar_para_corretor'] },
+    espera: { acoes: ['passar_para_corretor'], exigido: [FRASE_DA_VISITA_NA_MENSAGEM] },
     respostaBoa: resposta(
-      'responder',
-      `Boa tarde, [[NOME_1]]! Claro. ${PERGUNTA_BOA}`,
-      'Quer visitar o IM0009 e não disse o dia; perguntei.',
+      'passar_para_corretor',
+      `Boa tarde, [[NOME_1]]! ${FRASE_DA_VISITA}`,
+      'Visita: IM0009 (pausado) · dia a combinar.',
     ),
   },
 };
@@ -211,6 +235,39 @@ const respondeuODia: CenarioDoAtendente = {
     'passar_para_corretor',
     `Perfeito! ${FRASE_DA_VISITA}`,
     'Visita: IM0007 · prefere sexta à tarde.',
+  ),
+};
+
+const soAgradeceu: CenarioDoAtendente = {
+  nome: 'perguntou o dia e ele só agradeceu: a frase da agenda e passa, sem calar (v5)',
+  entrada: comMensagens(rascunho.entrada, '2026-11-11T13:41', 'quarta-feira, 11 de novembro, às 13h41', [
+    {
+      messageId: 'm1',
+      de: 'cliente',
+      quem: null,
+      quando: '11/11 13:10',
+      texto: 'Quero visitar a casa IM0007 em Capim Macio.',
+    },
+    {
+      messageId: 'm2',
+      de: 'ia',
+      quem: null,
+      quando: '11/11 13:11',
+      texto: `Boa tarde! Claro. ${PERGUNTA_BOA}`,
+    },
+    {
+      messageId: 'm3',
+      de: 'cliente',
+      quem: null,
+      quando: '11/11 13:40',
+      texto: 'Ok, obrigado!',
+    },
+  ]),
+  espera: { acoes: ['passar_para_corretor'], exigido: [FRASE_DA_VISITA_NA_MENSAGEM] },
+  respostaBoa: resposta(
+    'passar_para_corretor',
+    `Imagina! ${FRASE_DA_VISITA}`,
+    'Visita: IM0007 · dia a combinar.',
   ),
 };
 
@@ -278,5 +335,58 @@ export const CENARIOS_DO_ATENDENTE_V5: readonly CenarioDoAtendente[] = [
   ...CENARIOS_DO_ATENDENTE_V4.map((c) => TROCADOS[c.nome] ?? c),
   respondeuODia,
   pedeOLinkParaVisitar,
+  soAgradeceu,
   reuniaoDeNovo,
 ];
+
+/**
+ * Os cenários de visita: o cliente quer ir ver um imóvel. São os trocados da v4 (menos o
+ * proprietário, que é reunião) e os novos de visita. "Link já mandado" (o condomínio), "só
+ * o preço" e "já agendou" ficam de fora: não pedem visita agora.
+ */
+export const CENARIOS_DE_VISITA_V5: ReadonlySet<string> = new Set([
+  ...Object.entries(TROCADOS)
+    .filter(([daV4Nome]) => daV4Nome !== NOMES_DA_V4.proprietario)
+    .map(([, c]) => c.nome),
+  respondeuODia.nome,
+  pedeOLinkParaVisitar.nome,
+  soAgradeceu.nome,
+]);
+
+/**
+ * Os cenários de visita em que o imóvel já está definido e o dia não: respondendo, a IA
+ * tem de perguntar o dia ou o período (um "Boa tarde" não conta), sem o link.
+ */
+export const CENARIOS_QUE_PERGUNTAM_O_DIA_V5: ReadonlySet<string> = new Set(
+  [
+    TROCADOS[NOMES_DA_V4.comCodigo],
+    TROCADOS[NOMES_DA_V4.pediuDeNovo],
+    TROCADOS[NOMES_DA_V4.mudouDeImovel],
+    TROCADOS[NOMES_DA_V4.rascunho],
+    pedeOLinkParaVisitar,
+  ].map((c) => c!.nome),
+);
+
+/**
+ * A régua da v5: a da v3 e, nos cenários de visita, a passagem com a frase da agenda,
+ * sem falar em corretor, com "Visita:" no começo do motivo, e nenhum horário dado por
+ * marcado. Lista vazia é acerto.
+ */
+export function conferirCenarioV5(cenario: CenarioDoAtendente, saida: SaidaDoAtendenteV3): string[] {
+  const falhas = conferirCenario(cenario, saida);
+  if (!CENARIOS_DE_VISITA_V5.has(cenario.nome)) return falhas;
+  const mensagem = saida.mensagem.trim();
+  if (CONFIRMOU.test(mensagem)) falhas.push('deu a visita por marcada');
+  if (saida.acao === 'responder' && CENARIOS_QUE_PERGUNTAM_O_DIA_V5.has(cenario.nome)) {
+    if (!/\?/.test(mensagem) || !PERGUNTA_DO_DIA.test(mensagem)) {
+      falhas.push('respondeu sem perguntar o dia ou o período da visita');
+    }
+    if (/\[link da agenda\]/i.test(mensagem)) falhas.push('falou do link da agenda na visita');
+  }
+  if (saida.acao === 'passar_para_corretor') {
+    if (!FRASE_DA_VISITA_NA_MENSAGEM.test(mensagem)) falhas.push('passou a visita sem a frase da agenda');
+    if (/corretor/i.test(mensagem)) falhas.push('falou em corretor na passagem da visita');
+    if (!/^Visita:/.test(saida.motivo.trim())) falhas.push('o motivo da visita não começa por "Visita:"');
+  }
+  return falhas;
+}

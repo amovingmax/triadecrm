@@ -213,6 +213,28 @@ export function semOLinkDaAgenda(texto: string): string {
   return texto.replace(/(?:https?:\/\/)?(?:www\.)?calendly\.com\/[^\s)>\]]*/gi, '[link da agenda]');
 }
 
+/**
+ * O texto que vai ao cliente sem o endereço do Calendly (v5, 12/11/2026): o link só sai
+ * pelo banco, na reunião. O modelo não deveria escrevê-lo, mas o caderno da Imova já
+ * trouxe o endereço (nota 30); se ele aparecer numa resposta comum, sai aqui.
+ */
+export function semOCalendlyNoTexto(texto: string): string {
+  return limparTexto(
+    texto
+      .replace(/(?:https?:\/\/)?(?:www\.)?calendly\.com\/[^\s)>\]]*/gi, '')
+      .replace(/\[link da agenda\]/gi, '')
+      .replace(/[ \t]*:[ \t]*(?=\n|$)/g, '.'),
+  ).trim();
+}
+
+/**
+ * A trava da visita (v5): o link que o modelo pediu é, na verdade, de visita? O tipo
+ * "visita", um imóvel na reunião (que não leva imóvel) ou a palavra "visita" no texto.
+ */
+export function eLinkDeVisita(agenda: { tipo: TipoDaAgenda; imovelCodigo: string | null }, texto: string): boolean {
+  return agenda.tipo === 'visita' || (agenda.imovelCodigo ?? '').trim() !== '' || /\bvisit/i.test(texto);
+}
+
 /** O agora do banco ("AAAA-MM-DD HH:MM") com o "T" (ver `instanteDeFortaleza`). */
 function agoraComT(agora: string | undefined): string {
   return (agora ?? '').slice(0, 40).replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})/, '$1T$2');
@@ -376,9 +398,12 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   if (e.ultima_do_cliente !== payload.message_id) return { feito: false, motivo: 'chegou_mensagem_nova' };
   if ((e.mensagens ?? []).length === 0) return { feito: false, motivo: 'conversa_vazia' };
 
-  const base = baseDoBanco.parse(await rpc(contexto, 'ia_atendente_base', {})) as BaseDoAtendenteV2 & {
+  const lida = baseDoBanco.parse(await rpc(contexto, 'ia_atendente_base', {})) as BaseDoAtendenteV2 & {
     versao?: Record<string, unknown>;
   };
+  // O endereço do Calendly não vai ao modelo nem pelo caderno (v5, 12/11/2026): uma nota
+  // com o link o levava a escrevê-lo na visita. Ele lê "[link da agenda]".
+  const base = { ...lida, caderno: lida.caderno.map((k) => ({ ...k, texto: semOLinkDaAgenda(k.texto) })) };
   const leadId = leadIdCurto(e.organization_id ?? payload.conversation_id);
 
   // O nome e o telefone do cliente saem pseudonimizados. Sem ficha, o nome do perfil
@@ -458,7 +483,9 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   }
 
   const saida = executada.saida;
-  const texto = soOPrimeiroNome(limparTexto(reidratar(saida.mensagem, executada.mapa)), contato.nome);
+  const texto = semOCalendlyNoTexto(
+    soOPrimeiroNome(limparTexto(reidratar(saida.mensagem, executada.mapa)), contato.nome),
+  );
   const comum = {
     p_conversation_id: payload.conversation_id,
     p_em_resposta_a: payload.message_id,
@@ -527,15 +554,17 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
       }
       const { tipo } = saida.agenda;
       // A trava da visita (v5, 12/11/2026): o link da agenda é só de reunião online. Se o
-      // modelo devolver o link da visita mesmo assim, não sai link nenhum: o cliente
-      // recebe a frase da visita, e a conversa vai para uma pessoa, com o imóvel no
-      // motivo. Voltar à v4 é tirar este bloco junto com o import.
-      if (tipo === 'visita') {
+      // modelo pedir o link de uma visita mesmo assim (o tipo "visita", um imóvel na
+      // reunião ou "visita" no texto), não sai link nenhum: o cliente recebe a frase da
+      // visita, e a conversa vai para uma pessoa. O motivo é da trava, e não do modelo,
+      // que o escreveu achando que o link sairia. Voltar à v4 é tirar este bloco junto
+      // com o import.
+      if (eLinkDeVisita(saida.agenda, saida.mensagem)) {
         const codigo = saida.agenda.imovelCodigo?.trim() || 'imóvel não informado';
         resultado = await rpc(contexto, 'ia_atendente_passar', {
           ...comum,
           p_texto: FRASE_DA_VISITA,
-          p_motivo: `Visita: ${codigo} · ${detalhes.motivo}`.slice(0, 300),
+          p_motivo: `Visita: ${codigo} · combinar o dia e o horário com o cliente`,
         });
         feita = 'passou_a_visita';
         break;

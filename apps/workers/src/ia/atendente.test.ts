@@ -195,7 +195,7 @@ function saidaDoModelo(mudanca: Partial<SaidaDoAtendenteV3> = {}): SaidaDoAtende
 function montar(
   saida: SaidaDoAtendenteV3,
   enviarLink: (argumentos: Record<string, unknown>) => unknown = () => ({ ok: true, mensagem_id: 'm', link: 'x', convite_id: 'c' }),
-  opcoes: { erroNoLink?: string; entrada?: Record<string, unknown> } = {},
+  opcoes: { erroNoLink?: string; entrada?: Record<string, unknown>; caderno?: unknown[] } = {},
 ) {
   const banco = bancoFalso(
     {
@@ -208,7 +208,7 @@ function montar(
     {
       rpcs: {
         ia_entrada_do_atendente: () => opcoes.entrada ?? entradaNoBanco(),
-        ia_atendente_base: () => ({ caderno: [], imoveis: [{ codigo: 'IM0003' }, { codigo: 'TE0004' }] }),
+        ia_atendente_base: () => ({ caderno: opcoes.caderno ?? [], imoveis: [{ codigo: 'IM0003' }, { codigo: 'TE0004' }] }),
         ia_fotos_do_cliente: () => [],
         ia_fotos_reconhecidas_da_conversa: () => [],
         alvo_suprimido: () => false,
@@ -291,7 +291,7 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
         p_conversation_id: CONVERSA,
         p_em_resposta_a: ULTIMA,
         p_texto: FRASE_DA_VISITA,
-        p_motivo: 'Visita: TE0004 · Quer visitar o TE0004 na sexta de manhã.',
+        p_motivo: 'Visita: TE0004 · combinar o dia e o horário com o cliente',
         p_ai_run_id: run.id,
         p_prompt_version: 'atendente-imova@v5',
       },
@@ -317,10 +317,60 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
     expect(pedidos[0]?.sistema).toContain('A VISITA PRESENCIAL (ir ver um imóvel ou terreno): NUNCA mande o link');
   });
 
-  it('a reunião vai sem imóvel, mesmo que o modelo tenha posto um código', async () => {
-    const { contexto, chamadas } = montar(saidaDoModelo({ agenda: { tipo: 'reuniao', imovelCodigo: 'IM0003' } }));
+  it('a reunião com um imóvel é visita disfarçada (v5): a trava passa, sem link', async () => {
+    const { contexto, chamadas } = montar(saidaDoModelo({ agenda: { tipo: 'reuniao', imovelCodigo: 'IM0007' } }));
+    const r = await atenderCliente(contexto, PAYLOAD);
+    expect(r.motivo).toBe('passou_a_visita');
+    expect(chamadas('ia_atendente_enviar_link')).toEqual([]);
+    expect(chamadas('ia_atendente_passar')[0]).toMatchObject({
+      p_texto: FRASE_DA_VISITA,
+      p_motivo: 'Visita: IM0007 · combinar o dia e o horário com o cliente',
+    });
+  });
+
+  it('a reunião que fala em visita também passa pela trava (v5)', async () => {
+    const { contexto, chamadas } = montar(
+      saidaDoModelo({ mensagem: 'Segue o link para você escolher o horário da visita ao terreno.' }),
+    );
+    const r = await atenderCliente(contexto, PAYLOAD);
+    expect(r.motivo).toBe('passou_a_visita');
+    expect(chamadas('ia_atendente_enviar_link')).toEqual([]);
+  });
+
+  it('o Calendly escrito numa resposta comum sai do texto (v5)', async () => {
+    const { contexto, chamadas } = montar(
+      saidaDoModelo({
+        acao: 'responder',
+        agenda: null,
+        mensagem: 'Agende aqui: https://calendly.com/contato-imovaimobiliaria/30min',
+      }),
+    );
     await atenderCliente(contexto, PAYLOAD);
-    expect(chamadas('ia_atendente_enviar_link')[0]).toMatchObject({ p_tipo: 'reuniao', p_imovel_codigo: null });
+    expect(chamadas('ia_atendente_responder')[0]?.p_texto).toBe('Agende aqui.');
+  });
+
+  it('só o Calendly na resposta comum: vazia, vai para uma pessoa', async () => {
+    const { contexto, chamadas } = montar(
+      saidaDoModelo({ acao: 'responder', agenda: null, mensagem: 'https://calendly.com/contato-imovaimobiliaria/30min' }),
+    );
+    const r = await atenderCliente(contexto, PAYLOAD);
+    expect(r.motivo).toMatch(/resposta vazia/);
+    expect(chamadas('ia_atendente_responder')).toEqual([]);
+  });
+
+  it('o endereço do Calendly no caderno não chega ao modelo (v5)', async () => {
+    const { contexto, pedidos } = montar(saidaDoModelo(), undefined, {
+      caderno: [
+        {
+          id: 30,
+          texto: 'AGENDA: envie o link da nossa agenda: https://calendly.com/contato-imovaimobiliaria/30min',
+          origem: 'tela',
+        },
+      ],
+    });
+    await atenderCliente(contexto, PAYLOAD);
+    expect(pedidos[0]?.sistema).toContain('[30] AGENDA: envie o link da nossa agenda: [link da agenda]');
+    expect(pedidos[0]?.sistema).not.toMatch(/calendly/i);
   });
 
   it('o endereço de site que o modelo escreveu sai do texto; vazio vira o texto padrão', async () => {

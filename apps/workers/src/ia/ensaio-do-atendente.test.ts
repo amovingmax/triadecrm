@@ -80,7 +80,7 @@ describe('workers ai --ensaio=atendente-imova', () => {
     );
     expect(r.custoUsd).toBeGreaterThan(0);
     expect(relatorioDoEnsaio(r)).toMatch(
-      /^Ensaio de atendente-imova@v5 no claude-haiku-5-5: 15 de 15 cenários certos/,
+      /^Ensaio de atendente-imova@v5 no claude-haiku-5-5: 16 de 16 cenários certos/,
     );
   });
 

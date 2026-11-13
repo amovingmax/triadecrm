@@ -10604,11 +10604,27 @@ Qualquer ordem é segura: a função sem a tabela só registra aviso, e o site s
 **Decisões do usuário (entrevista de 12/11/2026):** visita presencial sem link; a IA pergunta o dia e o período que o cliente prefere (se ele ainda não disse), diz a frase e passa a conversa, que fica parada esperando a equipe. O link fica só para a reunião online (o proprietário que quer anunciar, ou quem pede uma conversa).
 
 **O que mudou:**
-- `packages/prompts/src/prompts/atendente-imova/v5.ts`: a v4 com o bloco "A VISITA E A REUNIÃO" trocado por "A REUNIÃO ONLINE" e "A VISITA PRESENCIAL", e a linha da `agenda` na saída (sempre reunião). A frase do usuário é `FRASE_DA_VISITA`, palavra por palavra. No `motivo`, a IA escreve "Visita:", o código e o dia e período preferidos, que vão para o título da tarefa de quem recebe a conversa. Entrada, saída (o schema), modelo, montagem e exemplos são os da v4; a vigente passa a 5.
-- `cenarios-v5.ts`: os 12 cenários da v4 com toda visita trocada (pergunta o dia, ou a frase e a passagem; link de visita é sempre erro), mais três: a resposta com o dia, "me manda o link" para visitar e o link da reunião pedido de novo (15 cenários).
-- O worker (`apps/workers/src/ia/atendente.ts`) usa a v5 e tem uma trava: se o modelo devolver o link com `agenda.tipo = 'visita'`, não sai link nenhum; o cliente recebe a frase da visita e a conversa vai para uma pessoa (`ia_atendente_passar`), com o imóvel no motivo. O ensaio (`workers ai --ensaio=atendente-imova`) usa a v5.
+- `packages/prompts/src/prompts/atendente-imova/v5.ts`: a v4 com o bloco "A VISITA E A REUNIÃO" trocado por "A REUNIÃO ONLINE" e "A VISITA PRESENCIAL", a regra de verdade 2 (o pausado segue a visita) e as duas linhas da saída que falavam do imóvel no link. A frase do usuário é `FRASE_DA_VISITA`, palavra por palavra.
+  - **O que conta como imóvel definido:** pelo código, pela foto, pelo lugar ("o terreno de Tabatinga") ou o único que combina.
+  - **O pausado** passa já, sem a pergunta do dia.
+  - **A visita nunca fica sem passagem:** se o cliente muda de assunto ou só agradece depois da pergunta do dia, a IA responde, diz a frase e passa. Isso vale mais que "não repetir pergunta" e que o silêncio no "ok".
+  - **A mensagem da passagem de visita é só a frase,** sem "vou passar para um corretor".
+  - **O motivo:** a IA escreve "Visita:", o código e o dia e o período (ou "dia a combinar"), que vão para o título da tarefa de quem recebe a conversa.
+  - **O resto não muda:** entrada, saída (o schema), modelo, montagem e exemplos são os da v4. A vigente passa a 5.
+- `cenarios-v5.ts`: os 12 cenários da v4 com toda visita trocada, mais quatro: a resposta com o dia, "me manda o link" para visitar, o "ok, obrigado" depois da pergunta do dia e o link da reunião pedido de novo (16 cenários).
+  - A base do ensaio ganha a nota AGENDA do caderno (a 30) como o modelo a lê.
+  - A régua nova, `conferirCenarioV5`, cobra o seguinte nos cenários de visita:
+    - a passagem tem a frase, não fala em corretor e o motivo começa por "Visita:";
+    - nenhum horário é dado por marcado;
+    - com o imóvel definido, a IA pergunta o dia de verdade (um "Boa tarde" não conta).
+- O worker (`apps/workers/src/ia/atendente.ts`) usa a v5, e o ensaio (`workers ai --ensaio=atendente-imova`) usa a v5 e a régua nova. O worker ganhou três travas:
+  - **O link de visita** (`eLinkDeVisita`): pega o tipo "visita", um imóvel numa "reunião" ou a palavra "visita" no texto do link. Nesses casos não sai link nenhum: o cliente recebe a frase da visita, e a conversa vai para uma pessoa (`ia_atendente_passar`), com "Visita: código · combinar o dia e o horário com o cliente" no motivo.
+  - **O Calendly no caderno:** o endereço não chega ao modelo; o worker troca por "[link da agenda]".
+  - **O Calendly no texto:** sai de qualquer resposta comum (`semOCalendlyNoTexto`); o link só sai pelo banco, na reunião.
 - O relatório diz o que a v5 mudou.
 - Nada muda no banco.
+
+**Verificado:** `packages/prompts` 459 testes, typecheck e lint; workers 599 testes, typecheck e lint; Vitest do relatório e typecheck do site. Um revisor independente leu o primeiro commit e achou 6 erros de correção, 4 contradições no texto e lacunas nos testes. Todos foram corrigidos neste commit. O ensaio contra o modelo de verdade não foi rodado, porque pede a chave da Anthropic, que não está nesta máquina. A v5 tem 426 tokens de sistema a mais que a v4, cerca de US$ 0,00002 a mais por chamada sem cache.
 
 **Pendente (da entrevista, para a versão seguinte):**
 - O push do pedido de visita para todos os usuários do CRM. Hoje a passagem cria uma tarefa só para quem recebe a conversa, e o push para todos precisa de migração.

@@ -231,13 +231,13 @@ describe('preços e conta por chamada', () => {
         // 505 tokens de sistema a mais (a visita, a reunião e os links já mandados) e 18 a
         // menos de mensagem: os horários de visita saíram da entrada. A v4 (12/11/2026, o
         // rascunho também recebe o link) tem 41 tokens de sistema a mais que a v3, e a v5
-        // (12/11/2026, a visita presencial sem link) 177 a mais que a v4.
+        // (12/11/2026, a visita presencial sem link) 426 a mais que a v4.
         id: 'atendente-imova',
         modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 3322,
+        tokensDeSistema: 3571,
         tokensDaMensagem: 142,
         tokensDeSaida: 102,
-        semCache: 0.0004,
+        semCache: 0.00042,
         comCache: 0.0001,
       },
       {

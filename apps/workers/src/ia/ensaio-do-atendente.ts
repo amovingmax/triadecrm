@@ -8,10 +8,11 @@
  * `cenarios-v4.ts` e `cenarios-v5.ts`) e rodam sem rede no `pnpm test`, com uma resposta
  * boa escrita à mão. Este comando manda as mesmas conversas ao modelo que a configuração
  * escolheu (`ia.atendente.modelo`, o Haiku 5.5 por padrão) e passa cada resposta pelo
- * mesmo `conferirCenario`: visita sem dia, visita sem imóvel, imóvel fora da lista, link
+ * mesma régua do `pnpm test` (`conferirCenarioV5`, a da v3 mais a da visita): visita sem dia, visita sem imóvel, imóvel fora da lista, link
  * já mandado, link de visita antiga pedido de novo, reunião do proprietário, "amanhã às
  * 10h", só o preço, já agendou, mudou de imóvel, rascunho, pausado, a resposta com o dia,
- * "me manda o link" para visitar e o link da reunião pedido de novo.
+ * "me manda o link" para visitar, o "ok, obrigado" depois da pergunta do dia e o link da
+ * reunião pedido de novo.
  *
  * Cada chamada passa pelo caminho de sempre (`executar`: pseudonimização, auditoria,
  * freio do orçamento, schema e a linha em `ai_runs`, sem ficha e sem conversa). Nada é
@@ -25,7 +26,7 @@ import {
   type PromptVersionado,
   type SaidaDoAtendenteV3,
   atendenteImovaV5,
-  conferirCenario,
+  conferirCenarioV5,
   sistemaComBaseV5,
 } from '@komune/prompts';
 
@@ -86,7 +87,7 @@ export async function ensaiarAtendente(
       );
       cenarios.push({
         nome: cenario.nome,
-        falhas: conferirCenario(cenario, executada.saida),
+        falhas: conferirCenarioV5(cenario, executada.saida),
         saida: executada.saida,
         custoUsd: executada.custoUsd,
       });

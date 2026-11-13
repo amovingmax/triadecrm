@@ -10,12 +10,15 @@ import {
   sistemaComBaseV5,
   trocarBloco,
 } from '../src/prompts/atendente-imova/v5';
-import { type CenarioDoAtendente, conferirCenario } from '../src/prompts/atendente-imova/cenarios-v3';
+import type { CenarioDoAtendente } from '../src/prompts/atendente-imova/cenarios-v3';
 import { CENARIOS_DO_ATENDENTE_V4 } from '../src/prompts/atendente-imova/cenarios-v4';
 import {
   BASE_DO_ENSAIO_V5,
+  CENARIOS_DE_VISITA_V5,
   CENARIOS_DO_ATENDENTE_V5,
+  CENARIOS_QUE_PERGUNTAM_O_DIA_V5,
   FRASE_DA_VISITA_NA_MENSAGEM,
+  conferirCenarioV5,
 } from '../src/prompts/atendente-imova/cenarios-v5';
 
 /**
@@ -24,8 +27,8 @@ import {
  * Decisão do usuário (caderno, 12/11/2026, e entrevista do mesmo dia): o link da agenda é
  * só de reunião online; na visita, a IA pergunta o dia e o período, diz "Vou consultar um
  * horário em que entre na minha agenda e te retorno pra combinarmos" e passa a conversa.
- * Prova-se aqui que a v5 é a v4 com só o bloco da agenda (e a linha da saída) trocados, e
- * que os cenários medem a troca.
+ * Prova-se aqui que a v5 é a v4 com só os trechos da agenda trocados, e que a régua
+ * recusa as respostas erradas que a revisão de 12/11 achou passando.
  */
 
 const CONTATO = {
@@ -62,32 +65,49 @@ describe('atendente-imova@v5: o contrato', () => {
     expect(v5.sistema).not.toContain('mande o link. "rascunho"');
     expect(v5.sistema).toContain('A REUNIÃO ONLINE (acao = enviar_link_da_agenda):');
     expect(v5.sistema).toContain('A VISITA PRESENCIAL (ir ver um imóvel ou terreno): NUNCA mande o link');
+    expect(v5.sistema).toContain('A visita nunca fica sem passagem.');
+    expect(v5.sistema).toContain('Imóvel "pausado": não pergunte o dia');
     expect(v5.sistema).toContain(FRASE_DA_VISITA);
     expect(FRASE_DA_VISITA).toBe(
       'Vou consultar um horário em que entre na minha agenda e te retorno pra combinarmos.',
     );
     expect(v5.sistema).toContain('sempre {"tipo": "reuniao"');
+    // A reunião não leva imóvel embaixo, e não é "por vídeo" (o usuário disse "online").
+    expect(v5.sistema).not.toContain('o CRM põe embaixo\n  o imóvel e o link');
+    expect(v5.sistema).not.toMatch(/conversa por v[íi]deo/);
   });
 
-  it('fora do bloco da agenda e da linha da saída, o texto é o da v4, na mesma ordem', () => {
-    const corte = (s: string): [string, string] => {
-      const de = s.indexOf(s.includes('A VISITA E A REUNIÃO') ? 'A VISITA E A REUNIÃO' : 'A REUNIÃO ONLINE');
-      const ate = s.indexOf('O QUE É DE GENTE');
-      return [s.slice(0, de), s.slice(ate)];
-    };
-    const [antesV4, depoisV4] = corte(v4.sistema);
-    const [antesV5, depoisV5] = corte(v5.sistema);
+  it('fora dos trechos trocados, o texto é o da v4, linha por linha e na mesma ordem', () => {
+    const [antesV4, depoisV4] = [
+      v4.sistema.slice(0, v4.sistema.indexOf('A VISITA E A REUNIÃO')),
+      v4.sistema.slice(v4.sistema.indexOf('O QUE É DE GENTE')),
+    ];
+    const [antesV5, depoisV5] = [
+      v5.sistema.slice(0, v5.sistema.indexOf('A REUNIÃO ONLINE')),
+      v5.sistema.slice(v5.sistema.indexOf('O QUE É DE GENTE')),
+    ];
     expect(antesV5).toBe(antesV4);
-    const soNaV4 = depoisV4.split('\n').filter((l) => !depoisV5.split('\n').includes(l));
-    const soNaV5 = depoisV5.split('\n').filter((l) => !depoisV4.split('\n').includes(l));
+    const linhasV4 = depoisV4.split('\n');
+    const linhasV5 = depoisV5.split('\n');
+    const soNaV4 = linhasV4.filter((l) => !linhasV5.includes(l));
+    const soNaV5 = linhasV5.filter((l) => !linhasV4.includes(l));
+    // A regra de verdade 2 (o pausado), a linha da mensagem e a linha da agenda na saída.
     expect(soNaV4).toEqual([
+      '   diga que vai confirmar a disponibilidade com o corretor antes de qualquer visita.',
+      '- `mensagem`: o que vai para o cliente. No link da agenda, só o começo: o CRM põe embaixo',
+      '  o imóvel e o link.',
       '- `agenda`: só em enviar_link_da_agenda (o tipo, e o código do imóvel na visita); senão',
       '  null.',
     ]);
     expect(soNaV5).toEqual([
+      '   não afirme que está disponível; a visita a ele segue A VISITA PRESENCIAL.',
+      '- `mensagem`: o que vai para o cliente. No link da agenda, só o começo: o CRM põe o link',
+      '  embaixo.',
       '- `agenda`: só em enviar_link_da_agenda, e então sempre {"tipo": "reuniao",',
       '  "imovelCodigo": null}; senão null.',
     ]);
+    // O resto, na mesma ordem e sem repetição.
+    expect(linhasV5.filter((l) => !soNaV5.includes(l))).toEqual(linhasV4.filter((l) => !soNaV4.includes(l)));
   });
 
   it('a troca de bloco recusa marcador ausente, repetido ou fora de ordem', () => {
@@ -97,95 +117,127 @@ describe('atendente-imova@v5: o contrato', () => {
     expect(() => trocarBloco('[y] [x]', '[x]', '[y]', 'N')).toThrow(/antes do começo/);
   });
 
-  it('o bloco de sistema com a base não tem dado pessoal', () => {
-    expect(varrerMontagem(sistemaComBaseV5(BASE_DO_ENSAIO_V5))).toEqual([]);
+  it('o bloco de sistema com a base não tem dado pessoal e leva a nota AGENDA sem o endereço', () => {
+    const texto = sistemaComBaseV5(BASE_DO_ENSAIO_V5);
+    expect(varrerMontagem(texto)).toEqual([]);
+    expect(texto).toContain('[30] AGENDA: Quando o cliente quiser visitar o imóvel');
+    expect(texto).not.toMatch(/calendly/i);
   });
 });
 
 describe('atendente-imova@v5: os cenários do ensaio', () => {
-  it('são os da v4, com as visitas trocadas e três a mais', () => {
-    expect(CENARIOS_DO_ATENDENTE_V5).toHaveLength(CENARIOS_DO_ATENDENTE_V4.length + 3);
-    const nomes = CENARIOS_DO_ATENDENTE_V5.map((c) => c.nome);
-    expect(new Set(nomes).size).toBe(nomes.length);
-    // Nenhum cenário da v5 aceita link de visita.
-    for (const c of CENARIOS_DO_ATENDENTE_V5) {
-      if (c.espera.acoes.includes('enviar_link_da_agenda')) {
-        expect(c.espera.agenda?.tipo, c.nome).toBe('reuniao');
-      }
-    }
-  });
-
-  it('toda conversa passa pelo schema e pela auditoria, com a base do ensaio', () => {
-    for (const cenario of CENARIOS_DO_ATENDENTE_V5) {
-      expect(() => prepararChamada(comBase, cenario.entrada, CONTATO), cenario.nome).not.toThrow();
-    }
-  });
-
-  it('a resposta boa de cada cenário passa pelo schema e pelo conferidor', () => {
-    for (const cenario of CENARIOS_DO_ATENDENTE_V5) {
-      expect(() => v5.saida.parse(cenario.respostaBoa), cenario.nome).not.toThrow();
-      expect(conferirCenario(cenario, cenario.respostaBoa), cenario.nome).toEqual([]);
-    }
-  });
-
   const cenario = (trecho: RegExp): CenarioDoAtendente => {
     const achado = CENARIOS_DO_ATENDENTE_V5.find((c) => trecho.test(c.nome));
     if (achado === undefined) throw new Error(`sem o cenário ${trecho.source}`);
     return achado;
   };
 
-  it('o link da visita é erro em todo cenário de visita', () => {
-    const deVisita = CENARIOS_DO_ATENDENTE_V5.filter((c) => !c.espera.acoes.includes('enviar_link_da_agenda'));
-    expect(deVisita.length).toBeGreaterThan(8);
-    for (const c of deVisita) {
-      expect(
-        conferirCenario(c, {
-          ...c.respostaBoa,
-          acao: 'enviar_link_da_agenda',
-          agenda: { tipo: 'visita', imovelCodigo: 'IM0007' },
-          mensagem: 'Vou te mandar o link da agenda para você escolher o horário da visita.',
-        }),
-        c.nome,
-      ).not.toEqual([]);
+  it('são os da v4, com as visitas trocadas e quatro a mais', () => {
+    expect(CENARIOS_DO_ATENDENTE_V5).toHaveLength(CENARIOS_DO_ATENDENTE_V4.length + 4);
+    const nomes = CENARIOS_DO_ATENDENTE_V5.map((c) => c.nome);
+    expect(new Set(nomes).size).toBe(nomes.length);
+    for (const nome of CENARIOS_DE_VISITA_V5) expect(nomes, nome).toContain(nome);
+    for (const nome of CENARIOS_QUE_PERGUNTAM_O_DIA_V5) expect(CENARIOS_DE_VISITA_V5.has(nome), nome).toBe(true);
+    expect(CENARIOS_DE_VISITA_V5.size).toBe(11);
+    // Só a reunião aceita o link.
+    for (const c of CENARIOS_DO_ATENDENTE_V5) {
+      if (c.espera.acoes.includes('enviar_link_da_agenda')) {
+        expect(c.espera.agenda?.tipo, c.nome).toBe('reuniao');
+        expect(CENARIOS_DE_VISITA_V5.has(c.nome), c.nome).toBe(false);
+      }
     }
   });
 
-  it('com o dia dito, perguntar de novo é erro, e a frase sem passar também', () => {
-    const respondeu = cenario(/^respondeu o dia da visita/);
-    expect(
-      conferirCenario(respondeu, {
-        ...respondeu.respostaBoa,
-        acao: 'responder',
-        mensagem: 'Qual dia e período ficam melhores pra você?',
-      }),
-    ).not.toEqual([]);
-    expect(
-      conferirCenario(respondeu, { ...respondeu.respostaBoa, acao: 'responder' }),
-    ).not.toEqual([]);
-    expect(
-      conferirCenario(respondeu, {
-        ...respondeu.respostaBoa,
-        mensagem: 'Vou verificar e te retorno.',
-      }),
-    ).not.toEqual([]);
+  it('toda conversa passa pelo schema e pela auditoria, com a base do ensaio', () => {
+    for (const c of CENARIOS_DO_ATENDENTE_V5) {
+      expect(() => prepararChamada(comBase, c.entrada, CONTATO), c.nome).not.toThrow();
+    }
+  });
+
+  it('a resposta boa de cada cenário passa pelo schema e pela régua da v5', () => {
+    for (const c of CENARIOS_DO_ATENDENTE_V5) {
+      expect(() => v5.saida.parse(c.respostaBoa), c.nome).not.toThrow();
+      expect(conferirCenarioV5(c, c.respostaBoa), c.nome).toEqual([]);
+    }
+  });
+
+  it('em todo cenário de visita, o link (de visita ou com o imóvel na reunião) é erro', () => {
+    for (const nome of CENARIOS_DE_VISITA_V5) {
+      const c = cenario(new RegExp(`^${nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
+      for (const agenda of [
+        { tipo: 'visita' as const, imovelCodigo: 'IM0007' },
+        { tipo: 'reuniao' as const, imovelCodigo: 'IM0007' },
+      ]) {
+        expect(
+          conferirCenarioV5(c, {
+            ...c.respostaBoa,
+            acao: 'enviar_link_da_agenda',
+            agenda,
+            mensagem: 'Segue o link para escolher o horário.',
+          }),
+          `${c.nome} (${agenda.tipo})`,
+        ).not.toEqual([]);
+      }
+    }
+  });
+
+  it('perguntar outra coisa no lugar do dia é erro, mesmo com "Boa tarde"', () => {
+    for (const nome of CENARIOS_QUE_PERGUNTAM_O_DIA_V5) {
+      const c = CENARIOS_DO_ATENDENTE_V5.find((x) => x.nome === nome)!;
+      for (const mensagem of [
+        'Boa tarde! Qual imóvel você quer visitar?',
+        'Boa tarde! Prefere comprar ou alugar?',
+        'Boa tarde! Quer que eu te mande o [link da agenda]?',
+      ]) {
+        expect(
+          conferirCenarioV5(c, { ...c.respostaBoa, acao: 'responder', agenda: null, mensagem }),
+          `${nome}: ${mensagem}`,
+        ).not.toEqual([]);
+      }
+    }
+  });
+
+  it('passar a visita sem a frase, falando em corretor ou sem "Visita:" no motivo é erro', () => {
+    for (const nome of CENARIOS_DE_VISITA_V5) {
+      const c = CENARIOS_DO_ATENDENTE_V5.find((x) => x.nome === nome)!;
+      if (!c.espera.acoes.includes('passar_para_corretor')) continue;
+      const boa = { ...c.respostaBoa, acao: 'passar_para_corretor' as const, agenda: null };
+      expect(conferirCenarioV5(c, { ...boa, mensagem: 'Já vou passar para um corretor.', motivo: 'Visita: IM0007' }), nome).not.toEqual([]);
+      expect(
+        conferirCenarioV5(c, { ...boa, mensagem: `${FRASE_DA_VISITA} Já vou te passar para um corretor.`, motivo: 'Visita: IM0007' }),
+        nome,
+      ).not.toEqual([]);
+      expect(conferirCenarioV5(c, { ...boa, mensagem: FRASE_DA_VISITA, motivo: 'Quer visitar o IM0007.' }), nome).not.toEqual([]);
+      expect(conferirCenarioV5(c, { ...boa, mensagem: FRASE_DA_VISITA, motivo: 'Visita: IM0007 · dia a combinar.' }), nome).toEqual([]);
+    }
+  });
+
+  it('a visita dada por marcada é erro, mesmo com a frase', () => {
+    for (const trecho of [/^respondeu o dia da visita/, /amanhã às 10h/]) {
+      const c = cenario(trecho);
+      expect(
+        conferirCenarioV5(c, { ...c.respostaBoa, mensagem: `Combinado, te espero lá! ${FRASE_DA_VISITA}` }),
+        c.nome,
+      ).not.toEqual([]);
+    }
     expect(FRASE_DA_VISITA_NA_MENSAGEM.test(FRASE_DA_VISITA)).toBe(true);
   });
 
-  it('o horário proposto não pode virar visita marcada', () => {
-    const amanha = cenario(/amanhã às 10h/);
+  it('o "ok, obrigado" depois da pergunta do dia não é silêncio', () => {
+    const c = cenario(/^perguntou o dia e ele só agradeceu/);
+    expect(conferirCenarioV5(c, { ...c.respostaBoa, acao: 'nao_responder', mensagem: '' })).not.toEqual([]);
+  });
+
+  it('o pausado passa já: perguntar o dia é erro', () => {
+    const c = cenario(/^imóvel pausado/);
     expect(
-      conferirCenario(amanha, {
-        ...amanha.respostaBoa,
-        mensagem: `Combinado, amanhã às 10h! ${FRASE_DA_VISITA}`,
-      }),
+      conferirCenarioV5(c, { ...c.respostaBoa, acao: 'responder', mensagem: 'Boa tarde! Qual dia e período ficam melhores pra você?' }),
     ).not.toEqual([]);
   });
 
   it('o link da reunião continua: pedido de novo, sai de novo', () => {
-    const reuniao = cenario(/^pediu o link da reunião de novo/);
-    expect(conferirCenario(reuniao, reuniao.respostaBoa)).toEqual([]);
-    expect(
-      conferirCenario(reuniao, { ...reuniao.respostaBoa, acao: 'responder', agenda: null }),
-    ).not.toEqual([]);
+    const c = cenario(/^pediu o link da reunião de novo/);
+    expect(conferirCenarioV5(c, c.respostaBoa)).toEqual([]);
+    expect(conferirCenarioV5(c, { ...c.respostaBoa, acao: 'responder', agenda: null })).not.toEqual([]);
   });
 });
