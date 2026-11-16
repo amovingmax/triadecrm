@@ -10636,3 +10636,19 @@ Pedido do usuário: "os clientes e prospectados entram na mesma aba de conversa 
 
 **No ar desde 13/11/2026, ~16h05 (pedido do usuário: "Suba essa mudança e coloque no ar"):** `main` em `b901ab7` (avanço direto de `beeb5ee`). Site da KOMUNE `triade-ewp0yhekh`, da cópia limpa `~/triadecrm-publicar-komune`, em `triade-crm-tawny.vercel.app` e `ir.komune.app.br`; volta: `triade-36w5yto7a`. Leva junto o que entrou na `main` desde 12/11 (o CPF do cliente e o código dos portais, que na KOMUNE fica desligado pelo módulo `anuncios`). Sem banco e sem worker: a mudança é só de tela, e as migrações `20261113130000` e `20261113131000` (portais, só da Imova) continuam fora do banco da KOMUNE. A Imova não foi republicada. Conferido de fora: `/login` 200 com `data-empresa="komune"`, `/conversas` sem login vai para o login, `/auth/dev` 404. A tela com login não foi aberta em produção (login pelo Google).
 - **Decisão humana:** o lead automático (`app.lead_automatico`, desde 21/09/2026) transforma em ficha de fornecedor quem responde ao menu do robô com as próprias palavras, e essa pessoa cai em Fornecedores mesmo sendo cliente. Com as caixas, faz sentido criar a ficha só para quem escolheu "Quero ser fornecedor ou parceiro"? Não deu para medir em produção quantas fichas nasceram assim (leitura do banco da KOMUNE não autorizada nesta sessão).
+
+## 16/11/2026 — a largura e o comprimento do terreno no anúncio (branch `medidas-do-terreno`; só na Imova)
+
+Pedido do usuário: "Quando a gente estiver cadastrando um imóvel nos anúncios do CRM da Imova, eu preciso que tenhamos um campo dedicado à metragem da largura e comprimento do terreno também."
+
+- **Banco (migração `20261116120000`, só na Imova; na KOMUNE não cria nada):** `public.anuncios.largura_terreno` e `comprimento_terreno`, `numeric(8,2)` (metros com duas casas, maior que zero), opcionais, para qualquer tipo de imóvel. `public.anuncio_salvar` passa a gravá-las; fora isso é a de `20261110100000`, linha por linha. As medidas não entram nas pendências nem no arquivo do Canal Pro: ficam no CRM.
+- **Tela (`editor-anuncio.tsx`):** no bloco Tamanho, "Medidas do terreno" com Largura (m) ("A frente") e Comprimento (m) ("Da frente ao fundo"). Aceita "12,5", "12.5", "12,50 m" e "1.200" (`lerMetros` em `tipos.ts`); o que não dá para ler é avisado no campo ao salvar, e não apagado. Com as duas medidas, a tela mostra a conta ("12,5 × 30 m = 375 m²") e o botão "Usar na área total" (ou "Trocar a área total por esta"). A área total continua à parte, porque o terreno pode ser irregular.
+- **Verificado:**
+  - pgTAP `174` (17 de 17) e as regressões `123` (60) e `141` (21), com a migração no banco local da Imova, numa transação desfeita;
+  - a migração no banco local da KOMUNE não cria coluna;
+  - Vitest do site, 2.148 testes (5 novos em `medidas-do-terreno.test.ts`); typecheck do site, do schema e dos workers; lint e prettier;
+  - no site local (`next dev`, banco local da Imova, gestor de teste): preencher, usar na área total, o aviso de "trinta", salvar e reabrir (12,5 × 30 e área total 375 voltam do banco), no computador e no celular. Os dois anúncios de teste foram apagados do banco local, que ficou com a migração aplicada (sem registro em `schema_migrations`; ela pode rodar de novo sem erro).
+- **Pendente:**
+  - publicar: push na `main`, `publicar-banco imova migrar` e o site da Imova. O banco vem antes do site: o site novo manda as medidas, e o `anuncio_salvar` antigo as ignoraria;
+  - a IA que atende (`atendente-imova`) ainda não conhece as medidas: entram na leitura do imóvel (`to_jsonb(a)`) e numa versão nova do prompt, se o usuário quiser;
+  - a lista e o cartão do anúncio não mostram as medidas (`anuncios_na_lista` não mudou).

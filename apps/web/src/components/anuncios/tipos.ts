@@ -414,6 +414,10 @@ export type DadosDoAnuncio = {
   iptu_periodo: 'anual' | 'mensal';
   area_util: number | null;
   area_total: number | null;
+  /** A frente do terreno, em metros (até duas casas). Fica no CRM, não vai ao portal (16/11/2026). */
+  largura_terreno: number | null;
+  /** Da frente ao fundo do terreno, em metros (até duas casas). Fica no CRM, não vai ao portal. */
+  comprimento_terreno: number | null;
   quartos: number | null;
   suites: number | null;
   banheiros: number | null;
@@ -631,6 +635,39 @@ export function lerInteiro(texto: string): number | null {
   if (limpo === '') return null;
   const n = Number(limpo);
   return Number.isSafeInteger(n) ? n : null;
+}
+
+/** A maior medida que o banco aceita (numeric(8,2): 999.999,99 m). */
+const MAIOR_MEDIDA = 999_999.99;
+
+/**
+ * A medida do terreno em metros, como a pessoa escreve: "12,5", "12.5",
+ * "12,50 m" → 12.5; "1.200" (milhar) → 1200. Até duas casas (a terceira
+ * arredonda, como o banco). Vazio → null; lixo, zero ou grande demais →
+ * undefined, para o formulário avisar em vez de apagar a medida.
+ */
+export function lerMetros(texto: string): number | null | undefined {
+  let t = texto.trim().toLowerCase().replace(/\s*m$/, '').replace(/\s+/g, '');
+  if (t === '') return null;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  if (!/^\d+(\.\d+)?$/.test(t)) return undefined;
+  // Pelo expoente, e não por * 100: 12,345 * 100 dá 1234,4999… e arredondaria para baixo.
+  const n = Number(`${Math.round(Number(`${t}e2`))}e-2`);
+  return n > 0 && n <= MAIOR_MEDIDA ? n : undefined;
+}
+
+/** 12.5 → "12,5"; 30 → "30"; null → "". Sem ponto de milhar, para voltar ao campo como foi escrito. */
+export function formatarMetros(n: number | null): string {
+  if (n === null) return '';
+  return n.toLocaleString('pt-BR', { maximumFractionDigits: 2, useGrouping: false });
+}
+
+/** A área pelas medidas (largura × comprimento), em m² inteiros, como a área total; sem as duas → null. */
+export function areaDasMedidas(largura: number | null, comprimento: number | null): number | null {
+  if (largura === null || comprimento === null) return null;
+  const area = Math.round(largura * comprimento);
+  return area > 0 ? area : null;
 }
 
 /** "59090000" → "59090-000". */
