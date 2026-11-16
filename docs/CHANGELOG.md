@@ -10648,7 +10648,9 @@ Pedido do usuário: "Quando a gente estiver cadastrando um imóvel nos anúncios
   - a migração no banco local da KOMUNE não cria coluna;
   - Vitest do site, 2.148 testes (5 novos em `medidas-do-terreno.test.ts`); typecheck do site, do schema e dos workers; lint e prettier;
   - no site local (`next dev`, banco local da Imova, gestor de teste): preencher, usar na área total, o aviso de "trinta", salvar e reabrir (12,5 × 30 e área total 375 voltam do banco), no computador e no celular. Os dois anúncios de teste foram apagados do banco local, que ficou com a migração aplicada (sem registro em `schema_migrations`; ela pode rodar de novo sem erro).
+
+**No ar desde 16/11/2026 (pedido do usuário: "Suba pro ar"):** `main` em `8af5ae3` (avanço direto de `0b7baba`); banco da Imova pelo `publicar-banco imova migrar` (só a `20261116120000` estava pendente); site da Imova `imova-dkr6vm387`, da cópia limpa `~/triadecrm-publicar-imova`, em `imova-crm.vercel.app`; volta: `imova-jaswrqlpt`. Leva junto as duas caixas de Conversas (`b901ab7`), que na Imova ficam desligadas. A KOMUNE não foi tocada: banco e site como estavam (a migração não faz nada lá quando for aplicada). Conferido de fora: `/login` 200 com `data-empresa="imova"`, `/anuncios/novo` sem login vai para o login, `/auth/dev` 404; no banco, as duas colunas `numeric(8,2)` e o `anuncio_salvar` novo. A tela com login não foi aberta em produção (login pelo Google).
+
 - **Pendente:**
-  - publicar: push na `main`, `publicar-banco imova migrar` e o site da Imova. O banco vem antes do site: o site novo manda as medidas, e o `anuncio_salvar` antigo as ignoraria;
   - a IA que atende (`atendente-imova`) ainda não conhece as medidas: entram na leitura do imóvel (`to_jsonb(a)`) e numa versão nova do prompt, se o usuário quiser;
   - a lista e o cartão do anúncio não mostram as medidas (`anuncios_na_lista` não mudou).
