@@ -5,6 +5,7 @@ import {
   fraseDoResultado,
   MOTIVOS_DA_FICHA,
   nomeDoCliente,
+  pareceFornecedor,
 } from './fora-da-base-dados';
 import type { FioCru } from './mensagens';
 import { escopoInicialDe, estadoDaUrl, urlDoEstado, FILTROS_VAZIOS } from './tipos';
@@ -180,5 +181,22 @@ describe('com que recorte a tela de Conversas abre', () => {
 
   it('"Limpar filtros" continua levando a "Todas"', () => {
     expect(FILTROS_VAZIOS.escopo).toBe('todas');
+  });
+});
+
+describe('pareceFornecedor (as caixas de Conversas, 13/11/2026)', () => {
+  it('quem escolheu "Quero ser fornecedor" ou "Já sou parceiro" no robô parece fornecedor', () => {
+    expect(pareceFornecedor({ organization_id: null, ai_intent: 'parceria' })).toBe(true);
+    expect(pareceFornecedor({ organization_id: null, ai_intent: 'suporte' })).toBe(true);
+  });
+
+  it('cliente, financeiro ou sem escolha continua cliente', () => {
+    expect(pareceFornecedor({ organization_id: null, ai_intent: 'cliente' })).toBe(false);
+    expect(pareceFornecedor({ organization_id: null, ai_intent: 'financeiro' })).toBe(false);
+    expect(pareceFornecedor({ organization_id: null, ai_intent: null })).toBe(false);
+  });
+
+  it('quem já tem ficha não é avisado: já está em Fornecedores', () => {
+    expect(pareceFornecedor({ organization_id: 'org-1', ai_intent: 'parceria' })).toBe(false);
   });
 });

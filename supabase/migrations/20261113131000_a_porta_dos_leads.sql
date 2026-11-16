@@ -247,7 +247,7 @@ begin
     from r;
 
   -- d. O último lead que chegou, de qualquer tipo, e quantos são. Contados pela
-  --    própria lista de leads (`portal_leads_na_lista`, 20261112180000): sem o
+  --    própria lista de leads (`portal_leads_na_lista`, 20261113130000): sem o
   --    lead do WhatsApp que saiu da lista e com o par (WhatsApp e clique do
   --    Grupo OLX da mesma pessoa) uma vez só. Assim o "Ver o lead" abre um lead
   --    que a lista mostra. Quem chama é admin ou gestor, que a lista mostra tudo.

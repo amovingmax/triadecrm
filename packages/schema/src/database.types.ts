@@ -1983,6 +1983,7 @@ export type Database = {
           cidade: string | null
           codigo: string
           complemento: string | null
+          comprimento_terreno: number | null
           condominio: number | null
           criado_em: string
           criado_por: string | null
@@ -1996,6 +1997,7 @@ export type Database = {
           importado_em: string | null
           iptu: number | null
           iptu_periodo: string
+          largura_terreno: number | null
           mostrar_endereco: string
           motivo_exclusao: string | null
           negocio: string
@@ -2028,6 +2030,7 @@ export type Database = {
           cidade?: string | null
           codigo?: string
           complemento?: string | null
+          comprimento_terreno?: number | null
           condominio?: number | null
           criado_em?: string
           criado_por?: string | null
@@ -2041,6 +2044,7 @@ export type Database = {
           importado_em?: string | null
           iptu?: number | null
           iptu_periodo?: string
+          largura_terreno?: number | null
           mostrar_endereco?: string
           motivo_exclusao?: string | null
           negocio?: string
@@ -2073,6 +2077,7 @@ export type Database = {
           cidade?: string | null
           codigo?: string
           complemento?: string | null
+          comprimento_terreno?: number | null
           condominio?: number | null
           criado_em?: string
           criado_por?: string | null
@@ -2086,6 +2091,7 @@ export type Database = {
           importado_em?: string | null
           iptu?: number | null
           iptu_periodo?: string
+          largura_terreno?: number | null
           mostrar_endereco?: string
           motivo_exclusao?: string | null
           negocio?: string

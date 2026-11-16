@@ -12,6 +12,7 @@ import {
   type Perdidas,
 } from '@/components/ligacao-whatsapp/logica';
 import { FaixaDePerdida, SeloDeLigacaoPerdida } from '@/components/ligacao-whatsapp/perdidas';
+import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
 import { Etiqueta } from '@/components/etiqueta';
 import { formatarTelefone } from '@/components/parceiros/formatos';
@@ -24,7 +25,7 @@ import { CanalNaLista } from './canal-de-chegada';
 import type { BaseDosCanais } from './canal-de-chegada-dados';
 import { canalNaLista } from './canal-de-chegada-regra';
 import { SeloDeConcluida } from './concluir-conversa';
-import { nomeDoCliente } from './fora-da-base-dados';
+import { nomeDoCliente, pareceFornecedor } from './fora-da-base-dados';
 import { local, quandoNaLista } from './formatos';
 import { ICONE_CANAL } from './icones';
 import { ChipDaJanela } from './janela-24h';
@@ -231,9 +232,14 @@ function PorLer({ quantas, silenciada }: { quantas: number; silenciada: boolean 
 }
 
 /** Um selo miúdo da segunda linha: "Concluída", "bloqueado", "não contatar". */
-function Selo({ children }: { children: React.ReactNode }) {
+function Selo({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-wpp-chip px-2 text-[11px] font-semibold text-wpp-chip-texto">
+    <span
+      className={cn(
+        'inline-flex h-5 shrink-0 items-center rounded-full bg-wpp-chip px-2 text-[11px] font-semibold text-wpp-chip-texto',
+        className,
+      )}
+    >
       {children}
     </span>
   );
@@ -482,7 +488,11 @@ function LinhaDeCliente({
           <SeloDeConcluida concluidaEm={fio.arquivada_em} />
           {/* Onde o parceiro tem a etapa, o cliente diz o que é: é esta palavra
               que explica por que a linha não tem funil nem bairro. */}
-          <Selo>cliente</Selo>
+          {EMPRESA.modulos.caixasDeConversa && pareceFornecedor(fio) ? (
+            <Selo className="bg-wpp-janela text-wpp-janela-texto">parece fornecedor</Selo>
+          ) : (
+            <Selo>cliente</Selo>
+          )}
           <IconesDaLinha marcas={marcas} />
           {nova ? <MarcaDeNova className="shrink-0" /> : null}
           {fio.unread_count > 0 ? (

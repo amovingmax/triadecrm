@@ -224,6 +224,21 @@ const casos: readonly CasoDeEval<CasoDeTexto, string>[] = [
     esperado: 'nota fiscal [[DOCUMENTO_1]] emitida',
   },
   {
+    nome: 'CPF com pontuação vira DOCUMENTO',
+    entrada: { texto: 'meu cpf é 529.982.247-25, não consigo entrar', contexto: CONTATO },
+    esperado: 'meu cpf é [[DOCUMENTO_1]], não consigo entrar',
+  },
+  {
+    nome: 'CPF sem pontuação vira DOCUMENTO, não TELEFONE',
+    entrada: { texto: 'cpf 52998224725 pra resolver o cadastro', contexto: CONTATO },
+    esperado: 'cpf [[DOCUMENTO_1]] pra resolver o cadastro',
+  },
+  {
+    nome: 'onze dígitos que não fecham como CPF continuam telefone',
+    entrada: { texto: 'me chama no 84999990104', contexto: CONTATO },
+    esperado: 'me chama no [[TELEFONE_2]]',
+  },
+  {
     nome: 'negativo: data sozinha não é telefone',
     entrada: { texto: 'a formatura é 12/12/2026, às 20h', contexto: CONTATO },
     esperado: 'a formatura é 12/12/2026, às 20h',

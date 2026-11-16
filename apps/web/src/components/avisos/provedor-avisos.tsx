@@ -163,6 +163,11 @@ interface Avisos {
    * ainda. `null` enquanto não se sabe.
    */
   readonly respostasNovas: number | null;
+  /**
+   * Quantas das `respostasNovas` são de quem não tem ficha (a caixa Clientes de
+   * Conversas, 13/11/2026). As outras são da caixa Fornecedores.
+   */
+  readonly respostasDosClientes: number | null;
   /** O papel desta pessoa é avisado? Leitura e financeiro não são. */
   readonly recebe: boolean;
   readonly silenciado: boolean;
@@ -203,6 +208,7 @@ interface AcoesDosAvisos {
 
 const SEM_AVISOS: Avisos = {
   respostasNovas: null,
+  respostasDosClientes: null,
   recebe: false,
   silenciado: false,
   silenciar: () => undefined,
@@ -269,6 +275,7 @@ export function ProvedorDeAvisos({
   const emConversas = estaAtivo(rota, '/conversas');
 
   const [respostasNovas, setRespostasNovas] = useState<number | null>(null);
+  const [respostasDosClientes, setRespostasDosClientes] = useState<number | null>(null);
   const [novasIds, setNovasIds] = useState<ReadonlySet<string>>(SEM_NOVAS);
   const [cartoes, setCartoes] = useState<readonly CartaoDeAviso[]>([]);
   const [silenciado, silenciar] = useSilenciado(usuarioId);
@@ -312,7 +319,9 @@ export function ProvedorDeAvisos({
     // A silenciada (27/10/2026) continua com a marca "Nova" na lista — a
     // conversa espera do mesmo jeito —, mas sai do número do menu de quem a
     // silenciou.
-    setRespostasNovas(contaNoMenu(aEspera).length);
+    const noMenu = contaNoMenu(aEspera);
+    setRespostasNovas(noMenu.length);
+    setRespostasDosClientes(noMenu.filter((c) => c.organizacaoId === null).length);
     setNovasIds((atuais) => (mesmoConjunto(atuais, ids) ? atuais : new Set(ids)));
     return aEspera;
   }, []);
@@ -600,6 +609,7 @@ export function ProvedorDeAvisos({
   const valor = useMemo<Avisos>(
     () => ({
       respostasNovas: recebe ? respostasNovas : null,
+      respostasDosClientes: recebe ? respostasDosClientes : null,
       recebe,
       silenciado,
       silenciar,
@@ -624,6 +634,7 @@ export function ProvedorDeAvisos({
     [
       recebe,
       respostasNovas,
+      respostasDosClientes,
       silenciado,
       silenciar,
       somLigado,

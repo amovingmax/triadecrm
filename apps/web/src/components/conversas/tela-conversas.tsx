@@ -3,13 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, CircleCheck, MessageSquarePlus, Search, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  CircleCheck,
+  MessageSquarePlus,
+  Search,
+  Store,
+  UserRound,
+  Users,
+} from 'lucide-react';
 import { Popover as PopoverPrimitive } from 'radix-ui';
 import { ROTULO_DO_CANAL as ROTULO_DA_CHEGADA } from '@komune/schema';
 
 import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
-import { useAcoesDosAvisos } from '@/components/avisos/provedor-avisos';
+import { useAcoesDosAvisos, useAvisos } from '@/components/avisos/provedor-avisos';
 import { TelaGrupos } from '@/components/grupos/tela-grupos';
 import { juntarAsPerdidas } from '@/components/ligacao-whatsapp/logica';
 import { useLigacoesPerdidas } from '@/components/ligacao-whatsapp/perdidas';
@@ -40,7 +48,7 @@ import {
 import { BotaoDeFiltros, BuscaDaLista } from './filtros-conversas';
 import { local } from './formatos';
 import { ConversaForaDaBase, ListaForaDaBase } from './fora-da-base';
-import { conversasForaDaBase } from './fora-da-base-dados';
+import { conversasForaDaBase, nomeDoCliente } from './fora-da-base-dados';
 import { ListaConversas } from './lista-conversas';
 import {
   aplicarFiltros,
@@ -111,6 +119,21 @@ import { AvatarDaConversa, BotaoRedondo, ChipDeAba, Segmentado } from './wpp';
  * (`components/avisos`), em qualquer tela e só a quem atende. Esta tela só conta
  * a ela qual conversa está aberta e como abrir outra sem navegar.
  */
+/**
+ * AS DUAS CAIXAS (13/11/2026, só onde `caixasDeConversa` está ligado: a KOMUNE).
+ * "Hoje as conversas estão bastante confusas, pois os clientes e prospectados
+ * entram na mesma aba de conversa." Desde então a tela tem duas caixas no alto
+ * da lista, cada uma com o seu número de conversas esperando resposta:
+ * - Fornecedores: quem tem ficha em Prospectados. Abas Conversas, Consultoria,
+ *   Automáticas e Grupos, como antes; a lista de Conversas não leva mais cliente.
+ * - Clientes: quem escreve sem ficha (quase sempre usuário do app). É a aba
+ *   `fora` de sempre, com busca e a gaveta das concluídas.
+ * Quem escreveu sem ficha mas escolheu "Quero ser fornecedor" no robô leva o selo
+ * "parece fornecedor", e "Mover para Fornecedores" é o "Virar parceiro" de antes.
+ * Desligado, vale o que diz a seção "QUEM NÃO É PARCEIRO APARECE EM 'TODAS'".
+ */
+const CAIXAS = EMPRESA.modulos.caixasDeConversa;
+
 export function TelaConversas({
   catalogos,
   filtrosIniciais,
@@ -144,6 +167,10 @@ export function TelaConversas({
    * aparece.
    */
   const [foraId, setForaId] = useState<string | null>(clienteInicial);
+  /** A busca e a gaveta das concluídas da caixa Clientes (13/11/2026). */
+  const [buscaClientes, setBuscaClientes] = useState('');
+  const [clientesConcluidos, setClientesConcluidos] = useState(false);
+  const { respostasNovas, respostasDosClientes } = useAvisos();
 
   const consulta = useQuery({ queryKey: CHAVE_CONVERSAS, queryFn: carregarConversas });
   // Fixar e silenciar, de quem está olhando (27/10/2026): a lista sobe as
@@ -255,13 +282,17 @@ export function TelaConversas({
           e.id === 'todas'
             ? null
             : aplicarFiltros(captacao, { ...filtros, escopo: e.id }, quem, chegadas).length +
-              filtrarClientes(clientes, { ...filtros, escopo: e.id }, quem, chegadas).length,
+              (CAIXAS
+                ? 0
+                : filtrarClientes(clientes, { ...filtros, escopo: e.id }, quem, chegadas).length),
       })),
     [captacao, clientes, filtros, quem, chegadas],
   );
 
   // Os clientes que cabem no recorte da lista de Conversas ("Minhas", busca...).
   const clientesNaLista = useMemo(() => {
+    // Com as caixas, cliente mora só na caixa Clientes.
+    if (CAIXAS) return [];
     const recorte = filtrarClientes(clientes, filtros, quem, chegadas);
     if (perdidas.size === 0 || filtros.escopo === 'todas') return recorte;
     return juntarAsPerdidas(
@@ -280,7 +311,34 @@ export function TelaConversas({
   // escolha, a direita mostra a tela de entrada com a marca da empresa, como o
   // WhatsApp do computador (`TelaDeEntrada`). Até aqui o desktop abria sozinho a
   // primeira linha da lista.
-  const foraAberta = aba === 'fora' || aba === 'conversas' ? clienteEscolhido : null;
+  const foraAberta = aba === 'fora' || (!CAIXAS && aba === 'conversas') ? clienteEscolhido : null;
+
+  // A lista da caixa Clientes: as abertas ou, na gaveta, as concluídas; e a busca
+  // por nome, telefone (a partir de 3 dígitos) ou, embaixo, pelo texto.
+  const clientesConcluidosTodos = useMemo(
+    () => (CAIXAS && CONCLUIR_NA_EMPRESA ? clientes.filter((f) => f.arquivada_em !== null) : []),
+    [clientes],
+  );
+  const clientesDaCaixa = useMemo(() => {
+    if (!CAIXAS) return foraDaBase;
+    const base = clientesConcluidos ? clientesConcluidosTodos : foraDaBase;
+    const termo = normalizar(buscaClientes);
+    if (!termo) return base;
+    const digitos = buscaClientes.replace(/\D/g, '');
+    return base.filter(
+      (f) =>
+        normalizar(nomeDoCliente(f)).includes(termo) ||
+        (digitos.length >= 3 && f.peer_phone_e164.includes(digitos)),
+    );
+  }, [foraDaBase, clientesConcluidos, clientesConcluidosTodos, buscaClientes]);
+  const fiosComFicha = useMemo(
+    () => (consulta.data?.fios ?? []).filter((f) => f.organization_id !== null),
+    [consulta.data],
+  );
+  const fiosSemFicha = useMemo(
+    () => (consulta.data?.fios ?? []).filter((f) => f.organization_id === null),
+    [consulta.data],
+  );
 
   // Com um cliente aberto, nenhuma conversa de parceiro está aberta.
   // Na aba Grupos nenhuma conversa está aberta: o aviso de resposta tem de chegar.
@@ -324,7 +382,8 @@ export function TelaConversas({
   }, [conversaAbertaId, olharConversa]);
   useEffect(() => {
     registrarAbridor(({ conversaId, organizacaoId }) => {
-      setAba('conversas');
+      // Com as caixas, o aviso de quem não tem ficha abre na caixa Clientes.
+      setAba(organizacaoId || !CAIXAS ? 'conversas' : 'fora');
       if (organizacaoId) escolherParceiro(organizacaoId);
       else escolherCliente(conversaId);
     });
@@ -368,7 +427,7 @@ export function TelaConversas({
     const so = { ...filtros, concluidas: true };
     return (
       aplicarFiltros(captacao, so, quem, chegadas).length +
-      filtrarClientes(clientes, so, quem, chegadas).length
+      (CAIXAS ? 0 : filtrarClientes(clientes, so, quem, chegadas).length)
     );
   }, [aba, filtros, captacao, clientes, quem, chegadas]);
 
@@ -377,14 +436,36 @@ export function TelaConversas({
   const [fichaAberta, setFichaAberta] = useState(false);
   const alternarFicha = useCallback(() => setFichaAberta((v) => !v), []);
 
-  // As abas, como as pílulas do alto da lista do WhatsApp.
+  // As abas, como as pílulas do alto da lista do WhatsApp. Com as caixas, o
+  // seletor vem antes, e as pílulas são só as da caixa Fornecedores.
+  const caixa: Caixa = aba === 'fora' ? 'clientes' : 'fornecedores';
+  const esperamClientes = respostasDosClientes;
+  const esperamFornecedores =
+    respostasNovas === null || respostasDosClientes === null
+      ? null
+      : Math.max(0, respostasNovas - respostasDosClientes);
   const chips = (
-    <ChipsDasAbas
-      aba={aba}
-      aoTrocar={setAba}
-      consultoria={consultoria.length}
-      foraDaBase={foraDaBase.length + clientesFichados.length}
-    />
+    <>
+      {CAIXAS ? (
+        <SeletorDeCaixas
+          caixa={caixa}
+          fornecedores={esperamFornecedores}
+          clientes={esperamClientes}
+          aoTrocar={(c) => {
+            setAba(c === 'clientes' ? 'fora' : 'conversas');
+            setClientesConcluidos(false);
+          }}
+        />
+      ) : null}
+      {CAIXAS && caixa === 'clientes' ? null : (
+        <ChipsDasAbas
+          aba={aba}
+          aoTrocar={setAba}
+          consultoria={consultoria.length}
+          foraDaBase={CAIXAS ? null : foraDaBase.length + clientesFichados.length}
+        />
+      )}
+    </>
   );
 
   return (
@@ -428,7 +509,9 @@ export function TelaConversas({
             aria-label={
               aba === 'consultoria'
                 ? 'Quem fechou, por interação mais recente'
-                : 'Parceiros por interação mais recente'
+                : aba === 'fora'
+                  ? 'Clientes por mensagem mais recente'
+                  : 'Parceiros por interação mais recente'
             }
             // `min-w-0`: sem ele o item de grade assume `min-width: auto` e
             // cresce até o conteúdo, e em 390px a lista nascia com 484px.
@@ -436,6 +519,8 @@ export function TelaConversas({
           >
             {verConcluidas ? (
               <CabecalhoDasConcluidas aoVoltar={() => mudar({ concluidas: false })} />
+            ) : CAIXAS && aba === 'fora' && clientesConcluidos ? (
+              <CabecalhoDasConcluidas aoVoltar={() => setClientesConcluidos(false)} />
             ) : (
               <div className="flex shrink-0 flex-col gap-3 px-3.5 pt-3.5 pb-2.5">
                 <div className="flex items-center gap-0.5">
@@ -464,6 +549,12 @@ export function TelaConversas({
                     porque não se aplica: lá a lista já é curta e é inteira. */}
                 {aba === 'conversas' ? (
                   <BuscaDaLista valor={filtros.q} aoMudar={mudarBusca} />
+                ) : CAIXAS && aba === 'fora' ? (
+                  <BuscaDaLista
+                    valor={buscaClientes}
+                    aoMudar={setBuscaClientes}
+                    placeholder="Buscar nome, telefone ou mensagem"
+                  />
                 ) : null}
                 {chips}
                 {aba === 'conversas' && !consulta.isPending ? (
@@ -498,6 +589,16 @@ export function TelaConversas({
                   aoAbrir={() => mudar({ concluidas: true })}
                 />
               ) : null}
+              {CAIXAS &&
+              aba === 'fora' &&
+              !clientesConcluidos &&
+              clientesConcluidosTodos.length > 0 &&
+              !consulta.isPending ? (
+                <LinhaDasConcluidas
+                  quantas={clientesConcluidosTodos.length}
+                  aoAbrir={() => setClientesConcluidos(true)}
+                />
+              ) : null}
               {consulta.isPending ? (
                 <EsqueletoLista />
               ) : consulta.isError ? (
@@ -520,9 +621,19 @@ export function TelaConversas({
                   canais={canais}
                   porInteresse={interesse !== null}
                 />
+              ) : CAIXAS &&
+                aba === 'fora' &&
+                clientesDaCaixa.length === 0 &&
+                buscaClientes.trim() ? (
+                <p className="px-4 py-8 text-sm text-wpp-suave">
+                  Nenhum cliente com &ldquo;{buscaClientes.trim()}&rdquo; no nome ou no telefone.
+                  {/* A busca pelo texto das mensagens aparece logo abaixo. */}
+                </p>
+              ) : CAIXAS && aba === 'fora' && clientesConcluidos && clientesDaCaixa.length === 0 ? (
+                <p className="px-4 py-8 text-sm text-wpp-suave">Nenhum atendimento concluído.</p>
               ) : aba === 'fora' ? (
                 <ListaForaDaBase
-                  fios={foraDaBase}
+                  fios={clientesDaCaixa}
                   selecionadoId={foraAberta?.id ?? null}
                   aoEscolher={setForaId}
                   atitudes={atitudes}
@@ -589,12 +700,22 @@ export function TelaConversas({
               {aba === 'conversas' && !consulta.isPending && !consulta.isError ? (
                 <BuscaDeMensagens
                   texto={filtros.q}
-                  fios={consulta.data?.fios ?? []}
+                  fios={CAIXAS ? fiosComFicha : (consulta.data?.fios ?? [])}
                   organizacoes={consulta.data?.organizacoes ?? []}
                   aoAbrir={({ conversaId, organizacaoId, mensagemId }) => {
                     setMensagemAlvo(mensagemId);
                     if (organizacaoId) escolherParceiro(organizacaoId);
                     else escolherCliente(conversaId);
+                  }}
+                />
+              ) : CAIXAS && aba === 'fora' && !consulta.isPending && !consulta.isError ? (
+                <BuscaDeMensagens
+                  texto={buscaClientes}
+                  fios={fiosSemFicha}
+                  organizacoes={[]}
+                  aoAbrir={({ conversaId, mensagemId }) => {
+                    setMensagemAlvo(mensagemId);
+                    escolherCliente(conversaId);
                   }}
                 />
               ) : null}
@@ -789,17 +910,17 @@ function ChipsDasAbas({
   aoTrocar: (aba: AbaDaEsquerda) => void;
   /** Parceiros que já fecharam — a contagem do que foi carregado. */
   consultoria: number;
-  /** Conversas de números que não são ficha. */
-  foraDaBase: number;
+  /** Conversas de números que não são ficha. `null` = a pílula não existe (as caixas). */
+  foraDaBase: number | null;
 }) {
-  const itens: readonly { id: AbaDaEsquerda; rotulo: string; contagem?: number }[] = [
+  const todas: readonly { id: AbaDaEsquerda; rotulo: string; contagem?: number }[] = [
     { id: 'conversas', rotulo: 'Conversas' },
     // Pós-venda (06/10/2026): quem fechou com a gente sai da lista de
     // Conversas e vem para cá.
     { id: 'consultoria', rotulo: 'Consultoria', contagem: consultoria },
     // "Clientes", e não "Fora da base" (01/10/2026): é o nome do que chega
     // aqui na prática — gente que escreveu e não é lead.
-    { id: 'fora', rotulo: 'Clientes', contagem: foraDaBase },
+    { id: 'fora', rotulo: 'Clientes', contagem: foraDaBase ?? undefined },
     // SEM CONTAGEM, de propósito: um número aqui diria "trabalho parado",
     // e o feed não é fila — a maior parte das automáticas não pede nada de
     // ninguém.
@@ -807,6 +928,8 @@ function ChipsDasAbas({
     // Os grupos de WhatsApp (27/10/2026): até 8 pessoas, entrada por link.
     { id: 'grupos', rotulo: 'Grupos' },
   ];
+  // Com as caixas (13/11/2026), Clientes é a outra caixa, não uma pílula.
+  const itens = foraDaBase === null ? todas.filter((i) => i.id !== 'fora') : todas;
   // A pílula da aba aberta fica sempre à vista: em Grupos ela é a última e
   // nascia escondida à direita da fileira.
   const fileira = useRef<HTMLDivElement>(null);
@@ -838,6 +961,97 @@ function ChipsDasAbas({
           {item.rotulo}
         </ChipDeAba>
       ))}
+    </div>
+  );
+}
+
+type Caixa = 'fornecedores' | 'clientes';
+
+/**
+ * As duas caixas no alto da lista (13/11/2026): Fornecedores, na menta da casa, e
+ * Clientes, em azul, cada uma com quantas conversas esperam resposta desta
+ * pessoa. O número é o do menu (`components/avisos`), dividido por quem tem ficha.
+ */
+function SeletorDeCaixas({
+  caixa,
+  fornecedores,
+  clientes,
+  aoTrocar,
+}: {
+  caixa: Caixa;
+  fornecedores: number | null;
+  clientes: number | null;
+  aoTrocar: (caixa: Caixa) => void;
+}) {
+  const opcoes = [
+    {
+      id: 'fornecedores' as const,
+      rotulo: 'Fornecedores',
+      Icone: Store,
+      esperam: fornecedores,
+      tinta: 'bg-wpp-chip-ativo text-wpp-chip-ativo-texto',
+      ponto: 'bg-wpp-cita-barra',
+    },
+    {
+      id: 'clientes' as const,
+      rotulo: 'Clientes',
+      Icone: UserRound,
+      esperam: clientes,
+      tinta: 'bg-wpp-cliente-fundo text-wpp-cliente-texto',
+      ponto: 'bg-wpp-cliente',
+    },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label="Caixas de conversa"
+      className="grid w-full max-w-md grid-cols-2 gap-1 rounded-2xl bg-wpp-busca p-1"
+    >
+      {opcoes.map(({ id, rotulo, Icone, esperam, tinta, ponto }) => {
+        const ativa = caixa === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={ativa}
+            onClick={() => aoTrocar(id)}
+            className={cn(
+              'toque flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left outline-none transition-colors',
+              'focus-visible:ring-3 focus-visible:ring-ring/50',
+              ativa
+                ? 'bg-wpp-painel text-foreground shadow-wpp-caixa ring-1 ring-wpp-linha'
+                : 'text-wpp-suave hover:text-foreground',
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                'flex size-9 shrink-0 items-center justify-center rounded-[10px]',
+                ativa ? tinta : 'bg-transparent',
+              )}
+            >
+              <Icone className="size-[18px]" />
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-sm leading-tight font-semibold">{rotulo}</span>
+              {esperam ? (
+                <span className="flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap text-foreground">
+                  <span
+                    aria-hidden="true"
+                    className={cn('size-[7px] shrink-0 rounded-full', ponto)}
+                  />
+                  {esperam} esperando
+                </span>
+              ) : (
+                <span className="text-xs whitespace-nowrap text-wpp-suave">
+                  {esperam === 0 ? 'em dia' : '\u00a0'}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

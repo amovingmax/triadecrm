@@ -10525,7 +10525,7 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
 - **Os leads já chegavam pelo WhatsApp do CRM, com o texto pronto do portal.** Por exemplo, "…que encontrei no VivaReal: … Código da oferta: PT0001_IMOVA", em 11/11 às 18:50. O canal de chegada os marcava como `portal_zap`/`portal_vivareal`, mas eles nunca viravam `portal_leads`. Por isso a aba Leads mostrava 0.
 
 **Entregue:**
-- **O WhatsApp do portal vira lead (migração `20261112180000`, pgTAP 172):**
+- **O WhatsApp do portal vira lead (migração `20261113130000`, pgTAP 172):**
   - Toda chegada cujo canal que vale é Anúncios com subcanal de portal (ZAP, Viva Real, OLX ou Canal Pro), pela regra, pela IA ou por gente, vira um lead em `portal_leads`, um por chegada. A origem é `whatsapp`, a chave é `whatsapp:<chegada>` e o tipo é `WHATSAPP_DO_PORTAL`. O lead entra em "Mandaram mensagem", com o portal (coluna `portal`), o anúncio pelo código, a conversa e o contato em `portal_lead_contatos` (só a gestão vê o telefone, e o SDR revela).
   - O lead nasce por gatilho em `chegadas`, que engole erro e espera trava por no máximo 1 s. A rotina `portal_leads_do_whatsapp`, a cada 5 min, refaz o que o gatilho perdeu e liga a ficha. As chegadas antigas viram lead quando a migração roda.
   - **O código do anúncio:** a função tenta o código inteiro ("BRISA MALL - loja 2"), depois a primeira palavra, depois o `codigo_do_anuncio` da chegada. A comparação é exata e, se não achar, segue sem o `_IMOVA`, sem caixa, sem pontuação e sem zeros à esquerda. O código para na vírgula e no ponto final.
@@ -10533,7 +10533,7 @@ Correção (migração `20261112110000_o_limite_da_meta_chega_ao_crm.sql`, pgTAP
   - **Desmarcar** a chegada esconde o lead que ninguém mexeu (`escondido_em`). O que já foi assumido, mudado ou descartado fica.
   - O lead do WhatsApp não dispara o push "Lead novo dos portais" nem o cartão do vigia: a mensagem já avisou.
   - **Tela:** "Mensagem no WhatsApp" e "WhatsApp pelo ZAP Imóveis / pelo Viva Real / pela OLX", o filtro "WhatsApp pelo portal" e "Abrir conversa" na ficha. O lead suprimido, sem conversa, pode ser marcado como respondido à mão.
-- **A porta dos leads (migração `20261112181000`, pgTAP 173, função `grupozap-lead`):**
+- **A porta dos leads (migração `20261113131000`, pgTAP 173, função `grupozap-lead`):**
   - **Lead gravado é 200, sempre.** Antes, o lead de anúncio sem `clientListingId` recebia 422. Os anúncios criados direto no Canal Pro (o Edifício Simone tem 58 contatos) vão sem código, e há relato de que falhas seguidas desligam a integração. O log mantém o aviso `anuncio_sem_codigo`.
   - **Cada chamada é anotada** em `grupozap_lead_chamadas`, sem dado pessoal: dia, resultado (`recebido`, `repetido`, `teste`, `recusado_credencial`, `erro`), se veio do Grupo OLX, contador, último horário e status. A gravação é por upsert, com no máximo 10 linhas por dia, e o que passa de 365 dias sai. A anotação roda depois da resposta (`EdgeRuntime.waitUntil`, prazo de 3 s) e nunca muda a resposta. A tabela tem RLS, sem política e sem grade, e a RPC `grupozap_lead_anotar_chamada` é só da service_role.
   - A resposta saiu para `atender.ts` (com dependências injetadas, testável) e a anotação para `porta.ts`. `autenticacao.ts` não mudou.
@@ -10570,7 +10570,7 @@ O pgTAP 34 do 172 dependia da ordem de um `inicio_em` empatado e foi fixado. Na 
 - a tela "Receber leads no CRM" do Canal Pro, que vem da pesquisa (a central de ajuda recusa acesso automático).
 
 **Para publicar (só na Imova):**
-1. Banco: `publicar-banco.mjs imova migrar`, só a `20261112180000` e a `20261112181000`. A produção já tem tudo da `main` até a `20261112170000`.
+1. Banco: `publicar-banco.mjs imova migrar`, só a `20261113130000` e a `20261113131000`. A produção já tem tudo da `main` até a `20261112170000`, mais a `20261113120000` (o CPF do cliente).
 2. Função: `supabase functions deploy grupozap-lead --project-ref kkqadgxvmzulcamuakzk`, de cópia limpa da `main`. Nunca de versão anterior a `bda070d`.
 3. Site da Imova.
 
@@ -10634,3 +10634,61 @@ Qualquer ordem é segura: a função sem a tabela só registra aviso, e o site s
 **Para publicar:** só o `imova-worker-ai` (`fly deploy`) e, para a frase do relatório, o site da Imova. Sem banco e sem Edge Function.
 
 **Para a sessão das fotos do anúncio:** a v4 da branch `ia-fotos-escolha` (feita a partir da v2) passa a ser a v6, feita a partir desta v5.
+
+## 13/11/2026 — o CPF que o cliente manda chega à conversa (branch `cpf-do-cliente`; ADR-09 muda na mensagem recebida da KOMUNE; RF-CON-03)
+
+Pedido do usuário: "quando o cliente manda o CPF pelo CRM da Komune, a gente não consegue receber. Quando a pessoa escrever o CPF e enviar, a gente precisa receber, pois muitas vezes se trata de resolução de cadastro."
+
+**A causa:** a constraint `messages_sem_cpf` (ADR-09) recusava qualquer mensagem com CPF válido, inclusive a recebida. O INSERT de `app.wa_registrar_entrada` falhava, a esteira tentava de novo, desistia e mandava a mensagem para a `wa_dlq`: na conversa, a mensagem simplesmente não aparecia. Na KOMUNE foram 24 assim, de 05/10 a 13/11/2026 (22 na `wa_dlq`, 2 ainda em nova tentativa); todas guardadas em `webhook_deliveries`.
+
+**Entregue** (migração `20261113120000_o_cpf_do_cliente_chega.sql`, `packages/prompts`):
+- `messages_sem_cpf` vale só para a mensagem que sai (`direction = 'in'` passa). O que a equipe, a IA ou um modelo mandam continua sem CPF.
+- Gatilho `messages_cpf_da_entrada` (BEFORE INSERT e UPDATE do texto, só na recebida), por empresa (`public.empresa_do_banco()`):
+  - **KOMUNE:** a mensagem fica como veio, com o CPF.
+  - **Imova** (e banco sem identidade): o número vira "[CPF apagado]" (`app.cpf_trocado`) e o resto chega. A política pública da Imova diz que o CRM não guarda CPF, e ela continua verdadeira; antes, a mensagem inteira se perdia.
+- A pseudonimização da IA passa a trocar por `[[DOCUMENTO_n]]` também o CPF sem pontuação (11 dígitos que fecham no verificador); o CPF com pontuação já era trocado. A IA nunca vê o número e `ai_runs_sem_cpf` fica como está. +3 casos no eval de pseudonimização.
+- Verificado: evals e testes de `packages/prompts` (446), typecheck e lint; a migração rodou nos dois bancos de produção dentro de uma transação desfeita no fim (KOMUNE guarda "529.982.247-25" e "52998224725"; Imova grava "meu cpf é [CPF apagado], pode ver?"), sem deixar linha nem gatilho.
+
+**No ar desde 13/11/2026, ~12h15:** a migração `20261113120000` nos bancos da Imova e da KOMUNE (`publicar-banco.mjs`, Imova primeiro; só esta migração: a `20261113130000` e a `20261113131000`, dos portais, continuam fora dos dois bancos). Conferido na KOMUNE: constraint nova e gatilho ativos.
+
+**Pendente:**
+- O `triade-worker-ai` (KOMUNE, publicado em 17/09) não foi republicado, por decisão do usuário: até lá, o CPF sem pontuação numa conversa chega ao modelo como veio (o com pontuação já vira `[[DOCUMENTO_n]]`). Publicar o worker leva junto tudo o que mudou na main desde 17/09.
+- Recuperar as 22 mensagens da KOMUNE que estão na `wa_dlq` por causa do CPF (devolver à fila `wa_inbound`). As que ainda estavam em nova tentativa entram sozinhas.
+- pgTAP do gatilho: não rodou aqui (sem Docker para o `supabase start`).
+- Grupos do WhatsApp (`wa_grupo_mensagens`) ficaram como estavam: a mensagem com CPF chega sem o texto.
+
+**Decisão humana tomada:** o ADR-09 ("sem CPF no CRM") deixa de valer para a mensagem que o cliente manda na KOMUNE, a pedido do usuário em 13/11/2026.
+
+### Renumeração das migrações dos portais (13/11/2026)
+- As migrações `20261112180000` (o WhatsApp do portal vira lead) e `20261112181000` (a porta dos leads) passam a `20261113130000` e `20261113131000`, com as referências no código, nos testes e nos guias. Motivo: a `20261113120000` (o CPF do cliente) já está nos bancos da Imova e da KOMUNE, e o `supabase db push` do `publicar-banco.mjs` (sem `--include-all`) recusa migração com data anterior à última do banco. Nenhuma das duas estava em produção; o conteúdo é o mesmo.
+- Junta a branch `cpf-do-cliente` na `main` (a migração dela já estava nos dois bancos; sem ela no repositório, o `db push` também recusaria).
+
+## Conversas em duas caixas: Fornecedores e Clientes — 13/11/2026 (branch `conversas-duas-caixas`, só no localhost)
+Pedido do usuário: "os clientes e prospectados entram na mesma aba de conversa e ficam no mesmo chat. Gostaria de dividir isso". Protótipo aprovado (artifact "Conversas da Tríade") e levado para o código atrás do módulo `caixasDeConversa` (ligado na KOMUNE, desligado na Imova).
+- **As duas caixas no alto da lista** (`SeletorDeCaixas`, `tela-conversas.tsx`): Fornecedores (menta; quem tem ficha em Prospectados, com as abas Conversas, Consultoria, Automáticas e Grupos) e Clientes (azul; a aba `fora` de sempre, com busca por nome, telefone ou mensagem e a gaveta das concluídas). Cada caixa mostra quantas conversas esperam resposta desta pessoa: é o número do menu, dividido por quem tem ficha (`respostasDosClientes` em `provedor-avisos.tsx`). Desfaz, na KOMUNE, a mistura de 01/10/2026 (cliente na lista de Conversas).
+- **Avisos e busca abrem na caixa certa:** o cartão de mensagem nova de quem não tem ficha abre em Clientes; a busca pelo texto das mensagens procura só na caixa aberta.
+- **"Parece fornecedor"** (`pareceFornecedor`, `fora-da-base-dados.ts`): quem escreveu sem ficha mas escolheu no robô de entrada "Quero ser fornecedor ou parceiro" ou "Já sou parceiro e preciso de ajuda" (`ai_intent` `parceria`/`suporte`) leva o selo na lista e uma faixa amarela na conversa com "Mover para Fornecedores", que é o "Virar parceiro" de antes (criar ou ligar a ficha).
+- Cores novas `--wpp-cliente*` no `globals.css`. Vitest: 3 testes novos de `pareceFornecedor`; typecheck, lint e testes de conversas, avisos e schema verdes.
+- O selo e a faixa "parece fornecedor" só aparecem onde as caixas estão ligadas (na Imova, nada muda na tela).
+- Pendente: o menu lateral continua com um número só (o trilho de 72px não comporta as duas caixas).
+
+**No ar desde 13/11/2026, ~16h05 (pedido do usuário: "Suba essa mudança e coloque no ar"):** `main` em `b901ab7` (avanço direto de `beeb5ee`). Site da KOMUNE `triade-ewp0yhekh`, da cópia limpa `~/triadecrm-publicar-komune`, em `triade-crm-tawny.vercel.app` e `ir.komune.app.br`; volta: `triade-36w5yto7a`. Leva junto o que entrou na `main` desde 12/11 (o CPF do cliente e o código dos portais, que na KOMUNE fica desligado pelo módulo `anuncios`). Sem banco e sem worker: a mudança é só de tela, e as migrações `20261113130000` e `20261113131000` (portais, só da Imova) continuam fora do banco da KOMUNE. A Imova não foi republicada. Conferido de fora: `/login` 200 com `data-empresa="komune"`, `/conversas` sem login vai para o login, `/auth/dev` 404. A tela com login não foi aberta em produção (login pelo Google).
+- **Decisão humana:** o lead automático (`app.lead_automatico`, desde 21/09/2026) transforma em ficha de fornecedor quem responde ao menu do robô com as próprias palavras, e essa pessoa cai em Fornecedores mesmo sendo cliente. Com as caixas, faz sentido criar a ficha só para quem escolheu "Quero ser fornecedor ou parceiro"? Não deu para medir em produção quantas fichas nasceram assim (leitura do banco da KOMUNE não autorizada nesta sessão).
+
+## 16/11/2026 — a largura e o comprimento do terreno no anúncio (branch `medidas-do-terreno`; só na Imova)
+
+Pedido do usuário: "Quando a gente estiver cadastrando um imóvel nos anúncios do CRM da Imova, eu preciso que tenhamos um campo dedicado à metragem da largura e comprimento do terreno também."
+
+- **Banco (migração `20261116120000`, só na Imova; na KOMUNE não cria nada):** `public.anuncios.largura_terreno` e `comprimento_terreno`, `numeric(8,2)` (metros com duas casas, maior que zero), opcionais, para qualquer tipo de imóvel. `public.anuncio_salvar` passa a gravá-las; fora isso é a de `20261110100000`, linha por linha. As medidas não entram nas pendências nem no arquivo do Canal Pro: ficam no CRM.
+- **Tela (`editor-anuncio.tsx`):** no bloco Tamanho, "Medidas do terreno" com Largura (m) ("A frente") e Comprimento (m) ("Da frente ao fundo"). Aceita "12,5", "12.5", "12,50 m" e "1.200" (`lerMetros` em `tipos.ts`); o que não dá para ler é avisado no campo ao salvar, e não apagado. Com as duas medidas, a tela mostra a conta ("12,5 × 30 m = 375 m²") e o botão "Usar na área total" (ou "Trocar a área total por esta"). A área total continua à parte, porque o terreno pode ser irregular.
+- **Verificado:**
+  - pgTAP `174` (17 de 17) e as regressões `123` (60) e `141` (21), com a migração no banco local da Imova, numa transação desfeita;
+  - a migração no banco local da KOMUNE não cria coluna;
+  - Vitest do site, 2.148 testes (5 novos em `medidas-do-terreno.test.ts`); typecheck do site, do schema e dos workers; lint e prettier;
+  - no site local (`next dev`, banco local da Imova, gestor de teste): preencher, usar na área total, o aviso de "trinta", salvar e reabrir (12,5 × 30 e área total 375 voltam do banco), no computador e no celular. Os dois anúncios de teste foram apagados do banco local, que ficou com a migração aplicada (sem registro em `schema_migrations`; ela pode rodar de novo sem erro).
+
+**No ar desde 16/11/2026 (pedido do usuário: "Suba pro ar"):** `main` em `8af5ae3` (avanço direto de `0b7baba`); banco da Imova pelo `publicar-banco imova migrar` (só a `20261116120000` estava pendente); site da Imova `imova-dkr6vm387`, da cópia limpa `~/triadecrm-publicar-imova`, em `imova-crm.vercel.app`; volta: `imova-jaswrqlpt`. Leva junto as duas caixas de Conversas (`b901ab7`), que na Imova ficam desligadas. A KOMUNE não foi tocada: banco e site como estavam (a migração não faz nada lá quando for aplicada). Conferido de fora: `/login` 200 com `data-empresa="imova"`, `/anuncios/novo` sem login vai para o login, `/auth/dev` 404; no banco, as duas colunas `numeric(8,2)` e o `anuncio_salvar` novo. A tela com login não foi aberta em produção (login pelo Google).
+
+- **Pendente:**
+  - a IA que atende (`atendente-imova`) ainda não conhece as medidas: entram na leitura do imóvel (`to_jsonb(a)`) e numa versão nova do prompt, se o usuário quiser;
+  - a lista e o cartão do anúncio não mostram as medidas (`anuncios_na_lista` não mudou).

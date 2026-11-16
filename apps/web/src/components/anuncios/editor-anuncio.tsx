@@ -43,14 +43,17 @@ import { SituacaoNoPortal } from './no-portal';
 import { consequenciaForaDoArquivo, travasDoPlano } from './regras-do-cartao';
 import {
   type Anuncio,
+  areaDasMedidas,
   CARACTERISTICAS,
   type DadosDoAnuncio,
   type Destaque,
   DESTAQUES,
   formatarCep,
+  formatarMetros,
   formatarPreco,
   fraseDaRecusa,
   lerInteiro,
+  lerMetros,
   lerValor,
   MOSTRAR_ENDERECO,
   type MostrarEndereco,
@@ -91,6 +94,8 @@ type Valores = {
   iptu_periodo: 'anual' | 'mensal';
   area_util: string;
   area_total: string;
+  largura_terreno: string;
+  comprimento_terreno: string;
   quartos: string;
   suites: string;
   banheiros: string;
@@ -121,6 +126,8 @@ const VAZIO: Valores = {
   iptu_periodo: 'anual',
   area_util: '',
   area_total: '',
+  largura_terreno: '',
+  comprimento_terreno: '',
   quartos: '',
   suites: '',
   banheiros: '',
@@ -155,6 +162,8 @@ function valoresDe(a: Anuncio): Valores {
     iptu_periodo: a.iptu_periodo,
     area_util: texto(a.area_util),
     area_total: texto(a.area_total),
+    largura_terreno: formatarMetros(a.largura_terreno ?? null),
+    comprimento_terreno: formatarMetros(a.comprimento_terreno ?? null),
     quartos: texto(a.quartos),
     suites: texto(a.suites),
     banheiros: texto(a.banheiros),
@@ -189,6 +198,8 @@ function dadosDe(v: Valores): DadosDoAnuncio {
     iptu_periodo: v.iptu_periodo,
     area_util: lerInteiro(v.area_util) || null,
     area_total: lerInteiro(v.area_total) || null,
+    largura_terreno: lerMetros(v.largura_terreno) ?? null,
+    comprimento_terreno: lerMetros(v.comprimento_terreno) ?? null,
     quartos: lerInteiro(v.quartos),
     suites: lerInteiro(v.suites),
     banheiros: lerInteiro(v.banheiros),
@@ -213,6 +224,10 @@ function conferir(v: Valores): { campo: keyof Valores; mensagem: string } | null
   if (cep !== '' && cep.length !== 8) return { campo: 'cep', mensagem: 'O CEP tem 8 números.' };
   if (v.estado.trim() !== '' && !/^[A-Za-z]{2}$/.test(v.estado.trim()))
     return { campo: 'estado', mensagem: 'Use a sigla do estado, como RN.' };
+  if (lerMetros(v.largura_terreno) === undefined)
+    return { campo: 'largura_terreno', mensagem: 'Escreva em metros, como 12 ou 12,5.' };
+  if (lerMetros(v.comprimento_terreno) === undefined)
+    return { campo: 'comprimento_terreno', mensagem: 'Escreva em metros, como 30 ou 30,5.' };
   if (v.titulo.length > 100)
     return { campo: 'titulo', mensagem: 'O título vai até 100 caracteres.' };
   if (v.descricao.length > 3000)
@@ -821,6 +836,10 @@ function Formulario({
   const erros = formState.errors;
   const precoVenda = formatarPreco(lerValor(watch('preco_venda')));
   const precoAluguel = formatarPreco(lerValor(watch('preco_aluguel')));
+  const largura = lerMetros(watch('largura_terreno')) ?? null;
+  const comprimento = lerMetros(watch('comprimento_terreno')) ?? null;
+  const areaPelasMedidas = areaDasMedidas(largura, comprimento);
+  const areaTotal = lerInteiro(watch('area_total'));
 
   // O CEP preenche rua, bairro, cidade e estado pelo ViaCEP (serviço público dos
   // Correios, só com o CEP), sem apagar o que a pessoa já escreveu.
@@ -1065,6 +1084,64 @@ function Formulario({
               {...register('vagas')}
             />
           </Campo>
+        </div>
+        {/* As medidas do terreno (16/11/2026): ficam no CRM, não vão ao portal. */}
+        <div role="group" aria-labelledby={`${id}-terreno`} className="flex flex-col gap-3">
+          <p id={`${id}-terreno`} className="text-sm font-medium">
+            Medidas do terreno
+          </p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Campo
+              id={`${id}-largura`}
+              rotulo="Largura (m)"
+              erro={erros.largura_terreno?.message}
+              dica="A frente. Opcional."
+            >
+              <Input
+                id={`${id}-largura`}
+                inputMode="decimal"
+                placeholder="Ex.: 12,5"
+                className={ENTRADA}
+                {...register('largura_terreno')}
+              />
+            </Campo>
+            <Campo
+              id={`${id}-comprimento`}
+              rotulo="Comprimento (m)"
+              erro={erros.comprimento_terreno?.message}
+              dica="Da frente ao fundo. Opcional."
+            >
+              <Input
+                id={`${id}-comprimento`}
+                inputMode="decimal"
+                placeholder="Ex.: 30"
+                className={ENTRADA}
+                {...register('comprimento_terreno')}
+              />
+            </Campo>
+            {areaPelasMedidas !== null && largura !== null && comprimento !== null ? (
+              <div className="col-span-2 flex min-w-0 flex-col items-start gap-1.5 sm:col-span-1 sm:pt-6">
+                <p className="text-sm">
+                  {formatarMetros(largura)} × {formatarMetros(comprimento)} m ={' '}
+                  <span className="font-medium">{areaPelasMedidas} m²</span>
+                </p>
+                {areaTotal === areaPelasMedidas ? (
+                  <p className="text-xs text-muted-foreground">É a área total do anúncio.</p>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setValue('area_total', String(areaPelasMedidas), { shouldDirty: true })
+                    }
+                  >
+                    {areaTotal === null ? 'Usar na área total' : 'Trocar a área total por esta'}
+                  </Button>
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
       </Secao>
 

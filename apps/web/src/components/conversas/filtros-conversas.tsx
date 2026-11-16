@@ -177,10 +177,13 @@ export function BuscaDaLista({
   valor,
   aoMudar,
   className,
+  placeholder = 'Buscar nome, bairro ou mensagem',
 }: {
   valor: string;
   aoMudar: (q: string) => void;
   className?: string;
+  /** A caixa Clientes (13/11/2026) busca por nome, telefone ou mensagem. */
+  placeholder?: string;
 }) {
   const id = useId();
   const [texto, setTexto] = useState(valor);
@@ -219,7 +222,7 @@ export function BuscaDaLista({
         inputMode="search"
         autoComplete="off"
         enterKeyHint="search"
-        placeholder="Buscar nome, bairro ou mensagem"
+        placeholder={placeholder}
         aria-describedby={`${id}-dica`}
         value={texto}
         onChange={(e) => setTexto(e.target.value)}

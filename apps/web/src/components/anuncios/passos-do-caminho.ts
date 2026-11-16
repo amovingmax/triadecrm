@@ -2,7 +2,7 @@
  * O caminho até o primeiro lead dos portais (11/11/2026), só na Imova: a regra
  * que decide cada passo, sem React e sem banco, para o Vitest. Quem desenha é
  * `caminho-do-lead.tsx`; quem junta o estado é `public.anuncios_caminho_do_lead`
- * (migrações 20261111203000 e 20261112181000).
+ * (migrações 20261111203000 e 20261113131000).
  *
  * O gargalo era "entra pouco lead": a produção tinha 0 leads dos portais, o
  * Canal Pro lia o arquivo do sistema que publicava antes do CRM (a Arbo, que a

@@ -1,6 +1,6 @@
 -- =====================================================================
 -- pgTAP — O WhatsApp que vem do portal vira lead do portal (migração
--- 20261112180000), só na Imova
+-- 20261113130000), só na Imova
 --
 -- A aba Leads mostrava 0 leads, mas os leads dos portais já chegavam pelo
 -- WhatsApp, com o texto pronto do ZAP e do Viva Real, e o canal de chegada já

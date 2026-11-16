@@ -272,9 +272,9 @@ const contagem = (v: unknown): Contagem => {
 
 /**
  * O estado do caminho numa chamada (`public.anuncios_caminho_do_lead`, migrações
- * 20261111203000 e 20261112181000). Só admin e gestor: para os outros o banco
+ * 20261111203000 e 20261113131000). Só admin e gestor: para os outros o banco
  * devolve `sem_permissao`, e aqui vira erro. Sem `entrega` (o banco ainda sem a
- * 20261112181000), o passo dos leads fica como "nunca entregou".
+ * 20261113131000), o passo dos leads fica como "nunca entregou".
  */
 export async function carregarCaminhoDoLead(): Promise<EstadoDoCaminho> {
   const { data, error } = await createClient().rpc('anuncios_caminho_do_lead');

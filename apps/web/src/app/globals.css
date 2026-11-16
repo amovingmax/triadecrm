@@ -932,6 +932,10 @@
   --wpp-marca: #fde68a;
   --wpp-marca-texto: #111110;
   --wpp-papel: #efeae2;
+  /* A caixa Clientes de Conversas (13/11/2026): o azul que a separa da menta. */
+  --wpp-cliente: #6d9cf4;
+  --wpp-cliente-fundo: #e3ecfc;
+  --wpp-cliente-texto: #2457b3;
   --wpp-papel-desenho: url(/conversas/rabiscos-claro.svg);
   --wpp-sombra: 0 1px 0.5px rgba(11, 20, 26, 0.13);
   --wpp-sombra-caixa: 0 1px 2px rgba(17, 17, 16, 0.06);
@@ -974,6 +978,9 @@
   --wpp-marca: #8a6d1f;
   --wpp-marca-texto: #ffffff;
   --wpp-papel: #0d1411;
+  --wpp-cliente: #82acff;
+  --wpp-cliente-fundo: rgba(120, 165, 255, 0.16);
+  --wpp-cliente-texto: #a9c4ff;
   --wpp-papel-desenho: url(/conversas/rabiscos-escuro.svg);
   --wpp-sombra: 0 1px 0.5px rgba(0, 0, 0, 0.45);
   --wpp-sombra-caixa: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -983,6 +990,9 @@
 @theme inline {
   --color-wpp-painel: var(--wpp-painel);
   --color-wpp-painel2: var(--wpp-painel2);
+  --color-wpp-cliente: var(--wpp-cliente);
+  --color-wpp-cliente-fundo: var(--wpp-cliente-fundo);
+  --color-wpp-cliente-texto: var(--wpp-cliente-texto);
   --color-wpp-linha: var(--wpp-linha);
   --color-wpp-linha-forte: var(--wpp-linha-forte);
   --color-wpp-suave: var(--wpp-suave);
