@@ -10635,6 +10635,12 @@ Qualquer ordem é segura: a função sem a tabela só registra aviso, e o site s
 
 **Para a sessão das fotos do anúncio:** a v4 da branch `ia-fotos-escolha` (feita a partir da v2) passa a ser a v6, feita a partir desta v5.
 
+**No ar desde 16/11/2026, ~16h14 (pedido do usuário: "suba a atualização mais recente e coloque no ar"):** `main` em `acd6b43` (a branch juntada com a `main` de `eea2c7d`; o único conflito era este CHANGELOG, com as duas entradas mantidas em ordem de data). `imova-worker-ai` v11, da cópia limpa `~/triadecrm-publicar-imova`; para voltar, `fly releases rollback` para a v10 (13/11). Sem banco e sem site.
+- **Verificado antes de publicar:** Vitest dos prompts (462) e dos workers (599), os testes de relatórios do site (104), typecheck e lint de prompts, workers e schema. O worker subiu sem erro (só o aviso de sempre, sem `GROQ_API_KEY`).
+- **Não verificado:** o ensaio contra o modelo (`workers ai --ensaio=atendente-imova`), porque não há chave da Anthropic nesta máquina. Conferir na conversa de treino com um pedido de visita presencial.
+- **No mesmo dia, o caderno foi trocado pela tela pelo usuário:** 18 notas novas (ids 41 a 58) no lugar das 23 antigas, a partir da entrevista de 16/11. A nota 9 do caderno segura as regras firmes até a v6.
+- **Pendente (v6 e código):** `atendente-imova@v6` com as regras firmes da entrevista de 16/11 (300 caracteres, um imóvel, sem código, sem "corretor", "me liga" com link, nada de interrogatório) e os 42 cenários do simulador como ensaio; o push para todos; a trava `eLinkDeVisita` passar a olhar o tipo e não a palavra "visit" (visita por vídeo e avaliação do proprietário são reunião); a regra `app.ia_pediu_corretor`. A IA continua em modo treino.
+
 ## 13/11/2026 — o CPF que o cliente manda chega à conversa (branch `cpf-do-cliente`; ADR-09 muda na mensagem recebida da KOMUNE; RF-CON-03)
 
 Pedido do usuário: "quando o cliente manda o CPF pelo CRM da Komune, a gente não consegue receber. Quando a pessoa escrever o CPF e enviar, a gente precisa receber, pois muitas vezes se trata de resolução de cadastro."
