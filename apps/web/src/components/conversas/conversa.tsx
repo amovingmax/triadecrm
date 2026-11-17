@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/sheet';
 import { formatarProximaAcao } from '@/components/parceiros/formatos';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
+import { EmailDaFicha } from '@/components/parceiros/email-da-ficha';
 import { DiasSemContato } from '@/components/temperatura';
 import { definicaoTemperatura } from '@/components/temperatura/escala-termica';
 import { BotaoLigar } from '@/components/ligacao/voz-botao-ligar';
@@ -359,6 +360,10 @@ export function Conversa({
           mascarado={item.telefoneMascarado}
           whatsapp={meta?.numeroConfigurado ? 'nenhum' : 'externo'}
         />
+      </Campo>
+      {/* O e-mail (17/11/2026): o que o cliente escreve na conversa entra sozinho. */}
+      <Campo variante={variante} rotulo="E-mail">
+        <EmailDaFicha organizationId={item.id} email={item.email} />
       </Campo>
       {negocio?.next_action || proxima ? (
         <Campo variante={variante} rotulo="Próxima ação">

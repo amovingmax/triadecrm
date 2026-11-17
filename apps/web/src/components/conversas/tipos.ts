@@ -144,6 +144,11 @@ export type ItemConversa = {
   telefone: string | null;
   /** Espelho de `organizations_view.phone_is_masked`: liga o botão "Revelar". */
   telefoneMascarado: boolean;
+  /**
+   * O e-mail da ficha (17/11/2026). O que o cliente escreve na conversa chega aqui
+   * sozinho (`messages_zzz_email_na_ficha`); a equipe corrige em Editar.
+   */
+  email: string | null;
   naoContatar: boolean;
   etapa: string | null;
   funil: string | null;

@@ -34,6 +34,7 @@ import {
   type Ficha,
   type NegocioDaFicha,
 } from '@/components/parceiros/ficha';
+import { EmailDaFicha } from '@/components/parceiros/email-da-ficha';
 import { AcoesDaFicha } from '@/components/parceiros/ficha-acoes';
 import { FichaExcluida } from '@/components/parceiros/ficha-excluida';
 import { CompletarAFicha, EdicaoDaFicha, EditarContato } from '@/components/parceiros/ficha-edicao';
@@ -836,9 +837,13 @@ function Contato({
 
         {ficha.email ? (
           <LinhaDeContato icone={Mail} rotulo="E-mail">
-            <a href={`mailto:${ficha.email}`} className={cn(LINK_VALOR, 'break-all')}>
-              {ficha.email}
-            </a>
+            {/* Com o copiar e a resposta às ofertas por e-mail (17/11/2026). */}
+            <EmailDaFicha
+              organizationId={ficha.id}
+              email={ficha.email}
+              className="min-h-11 justify-start md:min-h-0"
+              linkClassName="underline underline-offset-4"
+            />
           </LinhaDeContato>
         ) : null}
 
