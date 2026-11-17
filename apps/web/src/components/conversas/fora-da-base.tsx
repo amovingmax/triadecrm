@@ -58,7 +58,14 @@ import {
   FaixaDaLigacao,
 } from '@/components/ligacao-whatsapp/botao-na-conversa';
 import { SEM_PERDIDAS, type Perdidas } from '@/components/ligacao-whatsapp/logica';
-import { AreaDoFio, FichaAoLado, ROTULO_DA_SECAO, useAvisoDeNaoLidas } from './fio-wpp';
+import {
+  ACAO_DA_FOLHA,
+  AreaDoFio,
+  FichaAoLado,
+  GRADE_DAS_ACOES,
+  ROTULO_DA_SECAO,
+  useAvisoDeNaoLidas,
+} from './fio-wpp';
 import { Janela24h, PilulaDaJanela } from './janela-24h';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { agruparPorDia, montarLinhaDoTempo } from './montagem';
@@ -268,7 +275,7 @@ export function ConversaForaDaBase({
 
       <section aria-label="Ações" className="flex flex-col gap-2">
         <h3 className={ROTULO_DA_SECAO}>Ações</h3>
-        <div className={cn('grid gap-2', naFolha ? 'grid-cols-2' : 'grid-cols-1')}>
+        <div className={GRADE_DAS_ACOES}>
           {virando ? null : (
             <Button
               type="button"
@@ -679,14 +686,6 @@ function ArquivarCliente({
     </Button>
   );
 }
-
-/**
- * Uma ação da folha do celular: bloco de 56 px, ícone e nome (como em `conversa.tsx`).
- * O nome quebra em duas linhas (`whitespace-normal`) em vez de vazar: em 375 px
- * cada coluna tem ~167 px, e "Registrar contato" passava da borda do bloco.
- */
-const ACAO_DA_FOLHA =
-  'toque h-14 w-full justify-start gap-2.5 rounded-xl px-4 text-left text-[15px] leading-tight font-medium whitespace-normal md:h-14';
 
 /** Fornecedor, produtor e cerimonialista, só os que a empresa usa e com o rótulo dela. */
 const TIPOS = TIPOS_EM_USO;

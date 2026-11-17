@@ -51,7 +51,14 @@ import { ProvedorDoFio } from './contexto-do-fio';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { ErroDaTela, EsqueletoLinha } from './estados';
 import { contagemDeInteracoes, local } from './formatos';
-import { FichaAoLado, ROTULO_DA_SECAO, AreaDoFio, useAvisoDeNaoLidas } from './fio-wpp';
+import {
+  ACAO_DA_FOLHA,
+  AreaDoFio,
+  FichaAoLado,
+  GRADE_DAS_ACOES,
+  ROTULO_DA_SECAO,
+  useAvisoDeNaoLidas,
+} from './fio-wpp';
 import { Janela24h, PilulaDaJanela, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
 import { ControleDaIa, SeloDaIa } from '@/components/ia-que-atende/na-conversa';
@@ -358,11 +365,20 @@ export function Conversa({
           telefone={item.telefone}
           mascarado={item.telefoneMascarado}
           whatsapp={meta?.numeroConfigurado ? 'nenhum' : 'externo'}
+          className="justify-end"
         />
       </Campo>
       {negocio?.next_action || proxima ? (
         <Campo variante={variante} rotulo="Próxima ação">
-          <span className={cn('truncate', proxima?.atrasada && 'font-medium')}>
+          {/* Até três linhas, e o texto inteiro no `title` (17/11/2026): numa
+              linha só, "Buscar novos terrenos na região da …" escondia o que fazer. */}
+          <span
+            className={cn(
+              'line-clamp-3 [overflow-wrap:anywhere]',
+              proxima?.atrasada && 'font-medium',
+            )}
+            title={negocio?.next_action ?? undefined}
+          >
             {negocio?.next_action ?? 'combinada'}
           </span>
           {proxima ? (
@@ -402,16 +418,18 @@ export function Conversa({
 
       <section aria-label="Ações" className="flex flex-col gap-2">
         <h3 className={ROTULO_DA_SECAO}>Ações</h3>
-        <div className={cn('grid gap-2', naFolha ? 'grid-cols-2' : 'grid-cols-1')}>
+        <div className={GRADE_DAS_ACOES}>
           {podeAssumir && fio ? (
             <AssumirConversa
               fioId={fio.id}
               organizacaoId={item.id}
-              className={cn(ACAO_DA_FOLHA, 'col-span-2')}
+              className={cn(ACAO_DA_FOLHA, 'col-span-full')}
             />
           ) : null}
           {/* O link da agenda (Imova, 11/11/2026): também com a janela fechada, e
-              aí desligado, dizendo por quê. Na folha ocupa a linha inteira. */}
+              aí desligado, dizendo por quê. O botão é uma célula da grade como as
+              outras, e o porquê ocupa a linha inteira logo embaixo (17/11/2026):
+              preso ao bloco do botão, virava um parágrafo de meia coluna. */}
           {fio && eu?.podeEscrever ? (
             <BotaoDoLinkDaAgenda
               conversaId={fio.id}
@@ -420,7 +438,8 @@ export function Conversa({
               naoContatar={item.naoContatar}
               bloqueada={fio.bloqueadaEm !== null}
               className={ACAO_DA_FOLHA}
-              classeDoBloco={naFolha ? 'col-span-2' : undefined}
+              classeDoBloco="contents"
+              classeDoAviso="col-span-full"
             />
           ) : null}
           {fio && eu?.podeEscrever ? (
@@ -432,7 +451,9 @@ export function Conversa({
               className={ACAO_DA_FOLHA}
             />
           ) : null}
-          {fio && eu?.podeEscrever ? <ControleDaIa fioId={fio.id} className={ACAO_DA_FOLHA} /> : null}
+          {fio && eu?.podeEscrever ? (
+            <ControleDaIa fioId={fio.id} className={ACAO_DA_FOLHA} />
+          ) : null}
           <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
             <Link href={registrarHref}>
               <MessageSquarePlus aria-hidden="true" />
@@ -826,14 +847,6 @@ function Arquivar({
     </Button>
   );
 }
-
-/**
- * Uma ação da folha do celular: bloco de 56 px, ícone e nome, em duas colunas.
- * O nome quebra em duas linhas (`whitespace-normal`) em vez de vazar: em 375 px
- * cada coluna tem ~167 px, e "Registrar contato" passava da borda do bloco.
- */
-const ACAO_DA_FOLHA =
-  'toque h-14 w-full justify-start gap-2.5 rounded-xl px-4 text-left text-[15px] leading-tight font-medium whitespace-normal md:h-14';
 
 function Campo({
   rotulo,

@@ -77,9 +77,9 @@ export function TransferirConversa({
         onClick={() => setAberta(true)}
       >
         <ArrowRightLeft aria-hidden="true" />
-        {/* Pela largura do cabeçalho da conversa (`@container`), não da tela. */}
-        <span className="hidden @xs:inline">Transferir</span>
-        <span className="sr-only @xs:hidden">Transferir</span>
+        {/* O nome sempre (17/11/2026). O botão saiu do cabeçalho para as Ações, e
+            o "só o ícone abaixo de 20rem" de lá apagava o nome na coluna de 1280. */}
+        Transferir
       </Button>
       {aberta ? (
         <Folha
@@ -126,15 +126,19 @@ function Folha({
       return r;
     },
     onSuccess: (r) => {
-      toast.success(`Conversa passada para ${r.para ?? 'o setor'}${r.setor ? ` (${r.setor})` : ''}.`, {
-        description: 'Quem recebe ganhou uma tarefa com a sua nota.',
-      });
+      toast.success(
+        `Conversa passada para ${r.para ?? 'o setor'}${r.setor ? ` (${r.setor})` : ''}.`,
+        {
+          description: 'Quem recebe ganhou uma tarefa com a sua nota.',
+        },
+      );
       void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
       void clientes.invalidateQueries({ queryKey: chaveDaLinha(organizacaoId) });
       void clientes.invalidateQueries({ queryKey: ['conversas', 'transferencia', fioId] });
       aoFechar();
     },
-    onError: (erro: Error) => toast.error('Não deu para transferir.', { description: erro.message }),
+    onError: (erro: Error) =>
+      toast.error('Não deu para transferir.', { description: erro.message }),
   });
 
   const podeTransferir = pessoa !== NINGUEM || setor !== NINGUEM;
