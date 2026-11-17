@@ -241,7 +241,9 @@ function Bloco({
   return (
     // Cada bloco num CARTÃO (29/09/2026): eram títulos de 14px soltos sobre o
     // cinza, e com três blocos no dia a lista parecia uma coisa só.
-    <section className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-5">
+    // 16px de margem no celular e 20px de `sm` para cima (16/11/2026): o cartão
+    // do compromisso já tem a dele, e as duas somadas comiam 72px de uma tela de 375.
+    <section className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-4 sm:p-5">
       <header className="flex flex-col gap-0.5">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
           <span className="text-muted-foreground">{icone}</span>

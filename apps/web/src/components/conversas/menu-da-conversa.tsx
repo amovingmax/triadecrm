@@ -233,17 +233,22 @@ export function MenuDaConversa({
               <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-[15px]">
                 <BellOff className="size-5 shrink-0" aria-hidden="true" />
                 <span className="mr-auto">Silenciar</span>
-                {SILENCIOS.map((s) => (
-                  <Button
-                    key={s.id}
-                    type="button"
-                    variant="outline"
-                    className="toque h-9 px-3"
-                    onClick={fazer(() => void silenciar(s.id))}
-                  >
-                    {s.rotulo}
-                  </Button>
-                ))}
+                {/* Os três prazos andam juntos: em 375 e 390 px eles não cabem na linha
+                    do "Silenciar" e descem os três para a linha de baixo, em vez de
+                    deixar o "Sempre" sozinho embaixo dos outros dois. */}
+                <span className="flex flex-wrap gap-2">
+                  {SILENCIOS.map((s) => (
+                    <Button
+                      key={s.id}
+                      type="button"
+                      variant="outline"
+                      className="toque h-9 px-3"
+                      onClick={fazer(() => void silenciar(s.id))}
+                    >
+                      {s.rotulo}
+                    </Button>
+                  ))}
+                </span>
               </div>
             )}
           </li>

@@ -29,7 +29,9 @@ export default async function PaginaSemPermissao() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button asChild>
+          {/* 44px no celular (16/11/2026): é a única saída da tela, e com a altura
+              padrão do botão (32px) ela era o menor alvo da página. */}
+          <Button asChild className="toque h-11 w-full sm:w-auto md:h-9">
             <Link href="/meu-dia">Voltar para Meu dia</Link>
           </Button>
         </CardContent>

@@ -169,3 +169,29 @@ export function FichaAoLado({
 /** O título miúdo das seções da ficha e da folha do celular. */
 export const ROTULO_DA_SECAO =
   'text-[11px] font-semibold tracking-[0.07em] text-wpp-suave uppercase';
+
+/**
+ * A GRADE DAS AÇÕES, igual na coluna "Dados do contato" e na folha do celular
+ * (17/11/2026). Quantas colunas cabem é a largura de quem a contém que diz, e não
+ * a da janela: duas colunas a partir de 9rem cada (a coluna do computador tem de
+ * 300 a 340 px; a folha, 343 px em 375), uma só quando nem isso cabe.
+ *
+ * Era `grid-cols-1` no computador e `grid-cols-2` na folha, e o "Assumir conversa"
+ * com `col-span-2` criava na coluna uma segunda trilha implícita, do tamanho do
+ * conteúdo: "Enviar link da agenda" ficava com 100 px e invadia o "Transferir", e
+ * em 1280 o "Transferir" perdia o nome. Quem ocupa a linha inteira usa
+ * `col-span-full`, que não cria trilha. `dense`: o aviso de uma ação, de largura
+ * inteira, não deixa buraco ao lado dela (o vizinho sobe para a mesma linha).
+ */
+export const GRADE_DAS_ACOES =
+  'grid grid-flow-row-dense grid-cols-[repeat(auto-fill,minmax(min(100%,9rem),1fr))] gap-2';
+
+/**
+ * Uma ação da grade: bloco de pelo menos 56 px, ícone e nome. O nome quebra
+ * (`whitespace-normal`) e o bloco cresce com ele (`min-h-14`, não `h-14`): com
+ * altura fixa, um nome em três linhas vazava pela borda. A palavra que sozinha
+ * não cabe ("Fornecedores", 93 px) quebra no meio em vez de vazar
+ * (`overflow-wrap: anywhere`), o que só acontece abaixo de 9rem.
+ */
+export const ACAO_DA_FOLHA =
+  'toque h-auto min-h-14 w-full justify-start gap-2 rounded-xl px-3 py-2 text-left text-[15px] leading-tight font-medium whitespace-normal [overflow-wrap:anywhere] md:h-auto';

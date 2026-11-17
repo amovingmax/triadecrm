@@ -185,7 +185,10 @@ function CampoBusca({
           aria-describedby={`${id}-dica`}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          className="h-11 pl-9 md:h-9"
+          // `pr-12` e o X nativo do `type="search"` escondido (16/11/2026): o texto
+          // corria por baixo do nosso "limpar", e o X azul do navegador aparecia
+          // encavalado nele, dois "limpar" um em cima do outro.
+          className="h-11 pr-12 pl-9 md:h-9 md:pr-9 [&::-webkit-search-cancel-button]:appearance-none"
         />
         {texto ? (
           <Button

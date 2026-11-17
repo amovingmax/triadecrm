@@ -81,7 +81,11 @@ export function QuadroPainel<L>({
   return (
     <section className="flex w-full flex-col gap-4" aria-label={painel.titulo}>
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1">
+        {/* `basis-full` no celular (16/11/2026): o `flex-1` sozinho tem base 0, então o
+            `flex-wrap` nunca quebrava a linha e os dois botões de arquivo espremiam o
+            título e a frase numa coluna de 170px em 375. No celular os botões descem
+            para baixo do texto; do `sm` para cima a linha volta a ser a de antes. */}
+        <div className="min-w-0 flex-1 basis-full sm:basis-0">
           <h2 className="font-heading text-lg font-semibold tracking-tight">{painel.titulo}</h2>
           <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">
             {painel.descricao}

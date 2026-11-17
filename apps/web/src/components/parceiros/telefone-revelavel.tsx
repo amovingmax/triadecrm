@@ -6,6 +6,7 @@ import { Copy, Eye, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { createClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 import { formatarTelefone, linkWhatsapp } from './formatos';
@@ -32,6 +33,7 @@ export function TelefoneRevelavel({
   telefone,
   mascarado,
   whatsapp: destino = 'externo',
+  className,
 }: {
   organizationId: string;
   /** O que veio do banco: número completo ou máscara, conforme o papel. */
@@ -43,6 +45,11 @@ export function TelefoneRevelavel({
    * enquanto o número não existe.
    */
   whatsapp?: 'externo' | 'crm' | 'nenhum';
+  /**
+   * Para alinhar a linha que quebra: nos dados do contato o valor encosta à
+   * direita, e o "Abrir no WhatsApp" da segunda linha ficava solto no meio.
+   */
+  className?: string;
 }) {
   // O número revelado vale só para a máscara que o revelou. Guardado sozinho, ele
   // sobrevivia à troca do telefone na folha de edição: a linha continuava
@@ -99,7 +106,7 @@ export function TelefoneRevelavel({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className={cn('flex flex-wrap items-center gap-2', className)}>
       <span className="numerico">{formatarTelefone(visivel)}</span>
 
       {paraCopiar ? (

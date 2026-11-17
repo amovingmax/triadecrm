@@ -92,9 +92,13 @@ export function PainelCanalPro({
 
   return (
     <Sheet open={aberto} onOpenChange={aoMudar}>
+      {/* `data-[side=right]:w-full` e não `w-full` (16/11/2026): a folha da casca
+          traz `data-[side=right]:w-3/4`, que vence o `w-full` solto, e no celular
+          ela abria com três quartos da tela, com o e-mail cortado. No computador
+          nada muda: lá quem manda é o teto da folha. */}
       <SheetContent
         side="right"
-        className="w-full sm:max-w-lg"
+        className="data-[side=right]:w-full sm:max-w-lg"
         // A folha abre para ler; o cursor no primeiro campo, com o nome
         // selecionado, parecia pedir para preencher (06/11/2026).
         onOpenAutoFocus={(e) => {
@@ -481,7 +485,11 @@ export function EnderecoDeLeads() {
   return <EnderecoParaCopiar url={urlDeLeads()} nome="URL de leads" />;
 }
 
-/** Uma URL só de leitura (selecionada ao focar) e o botão "Copiar". */
+/**
+ * Uma URL só de leitura (selecionada ao focar) e o botão "Copiar". A letra é de
+ * 16px no celular (16/11/2026): abaixo disso o iOS dá zoom ao tocar no campo, e
+ * no app (WebView) a tela fica ampliada até a pessoa desfazer com dois dedos.
+ */
 function EnderecoParaCopiar({ url, nome }: { url: string; nome: string }) {
   async function copiar() {
     try {
@@ -498,7 +506,7 @@ function EnderecoParaCopiar({ url, nome }: { url: string; nome: string }) {
         readOnly
         value={url}
         aria-label={nome}
-        className="h-11 min-w-0 font-mono text-xs md:h-9"
+        className="h-11 min-w-0 font-mono text-base md:h-9 md:text-xs"
         onFocus={(e) => e.currentTarget.select()}
       />
       <Button

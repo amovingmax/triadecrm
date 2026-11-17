@@ -29,12 +29,15 @@ export function VirarTarefa({ mensagemId }: { mensagemId: string }) {
     });
   }
 
+  // A pílula é pequena para não pesar embaixo de cada balão, mas o dedo acerta
+  // uma área de ~33 px de altura: o `after` estende o toque 8 px para cima e
+  // para baixo sem mudar o desenho nem o espaço entre os balões.
   return (
     <button
       type="button"
       disabled={feito || indo}
       onClick={() => void virar()}
-      className="ml-auto inline-flex items-center gap-1 rounded px-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-60"
+      className="relative ml-auto inline-flex items-center gap-1 rounded px-1 text-[11px] text-muted-foreground after:absolute after:-inset-x-1 after:-inset-y-2 after:content-[''] hover:text-foreground disabled:opacity-60"
     >
       <ListTodo className="size-3" aria-hidden="true" />
       {feito ? 'Virou tarefa' : 'Virar tarefa'}

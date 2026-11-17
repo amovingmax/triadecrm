@@ -308,46 +308,59 @@ function Fila({
           </SemDado>
         </div>
       ) : (
-        // `relative`: o texto só para leitor de tela (`sr-only`) é absoluto e, sem um
-        // contêiner posicionado, escapa da rolagem e alarga a página no celular.
-        <div className="relative overflow-x-auto" style={SOMBRA_DE_ROLAGEM_NO_CARTAO}>
-          <table className="w-full min-w-[1080px] border-collapse text-[13px]">
-            <caption className="sr-only">Fila de hoje: os leads parados, um por linha</caption>
-            <thead>
-              <tr className="text-left text-xs text-muted-foreground">
-                <th scope="col" className="w-10 py-2 pr-2 pl-4 font-semibold md:pl-5">
-                  #
-                </th>
-                <th scope="col" className="px-2 py-2 font-semibold">
-                  Lead e calor
-                </th>
-                <th scope="col" className="px-2 py-2 font-semibold">
-                  Imóvel
-                </th>
-                <th scope="col" className="px-2 py-2 font-semibold">
-                  Situação
-                </th>
-                <th scope="col" className="px-2 py-2 font-semibold">
-                  O que fazer
-                </th>
-                <th scope="col" className="px-2 py-2 text-right font-semibold">
-                  Em jogo
-                </th>
-                <th scope="col" className="px-2 py-2 font-semibold">
-                  Com quem
-                </th>
-                <th scope="col" className="py-2 pr-4 pl-2 md:pr-5">
-                  <span className="sr-only">Conversa</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {naTela.map((l, i) => (
-                <LinhaDaTabela key={`${l.conversation_id}-${l.situacao}`} linha={l} posicao={i + 1} agora={agora} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* No celular a fila é uma LISTA DE CARTÕES (16/11/2026). A tabela tem 1080px
+              de largura mínima: em 375 aparecia só "#, Lead e calor, Imóvel", cada
+              linha com 200px de altura vazia, e o "Abrir conversa" — a ação da fila —
+              ficava a três telas de arrasto para o lado. O cartão traz as mesmas
+              colunas, na ordem em que se age: quem, por que parou, o que fazer, abrir.
+              Do `md` para cima continua a tabela de sempre. */}
+          <ol className="flex flex-col md:hidden" aria-label="Fila de hoje: os leads parados, um por cartão">
+            {naTela.map((l, i) => (
+              <CartaoDaFila key={`${l.conversation_id}-${l.situacao}`} linha={l} posicao={i + 1} agora={agora} />
+            ))}
+          </ol>
+          {/* `relative`: o texto só para leitor de tela (`sr-only`) é absoluto e, sem um
+              contêiner posicionado, escapa da rolagem e alarga a página no celular. */}
+          <div className="relative hidden overflow-x-auto md:block" style={SOMBRA_DE_ROLAGEM_NO_CARTAO}>
+            <table className="w-full min-w-[1080px] border-collapse text-[13px]">
+              <caption className="sr-only">Fila de hoje: os leads parados, um por linha</caption>
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground">
+                  <th scope="col" className="w-10 py-2 pr-2 pl-4 font-semibold md:pl-5">
+                    #
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-semibold">
+                    Lead e calor
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-semibold">
+                    Imóvel
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-semibold">
+                    Situação
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-semibold">
+                    O que fazer
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-semibold">
+                    Em jogo
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-semibold">
+                    Com quem
+                  </th>
+                  <th scope="col" className="py-2 pr-4 pl-2 md:pr-5">
+                    <span className="sr-only">Conversa</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {naTela.map((l, i) => (
+                  <LinhaDaTabela key={`${l.conversation_id}-${l.situacao}`} linha={l} posicao={i + 1} agora={agora} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline px-4 py-2 md:px-5">
@@ -392,6 +405,98 @@ function PilulaDaFila({
       {children}
       <span className="numerico text-xs opacity-75">{inteiro(n)}</span>
     </button>
+  );
+}
+
+/**
+ * Um lead da fila no celular: o que a linha da tabela mostra, em pilha. O valor em
+ * jogo fica no canto, à altura do nome, como na conversa fica a hora; o botão de
+ * abrir a conversa ocupa a largura inteira no pé, com 44px, porque é a ação da fila.
+ */
+function CartaoDaFila({ linha: l, posicao, agora }: { linha: LinhaDaFila; posicao: number; agora: Date }) {
+  const urgente = situacaoUrgente(l.situacao);
+  const tempo = tempoDaSituacao(l.situacao, l.desde, agora);
+  return (
+    <li className="relative flex flex-col gap-2.5 border-t border-hairline px-4 py-3.5">
+      <div className="flex items-start gap-3">
+        <span className="numerico w-5 shrink-0 pt-0.5 text-[13px] text-muted-foreground">{posicao}</span>
+        <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <span className="text-sm font-semibold [overflow-wrap:anywhere]">{l.nome}</span>
+          <span className="flex items-center gap-2">
+            <BarraDeCalor calor={numero(l.calor)} cor={l.nivel ? COR_DO_NIVEL[l.nivel] : 'resto'} />
+            <span className="numerico text-xs font-semibold">{inteiro(l.calor)}</span>
+            <span className="text-[11px] text-muted-foreground">{rotuloDoNivel(l.nivel)}</span>
+          </span>
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-0.5">
+          <span className="numerico text-sm font-medium">{dinheiroCurto(l.valor)}</span>
+          <span className="text-[11px] whitespace-nowrap text-muted-foreground">chance {pctDaChance(l.chance)}</span>
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1 pl-8">
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span
+            className={cn(
+              'inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold whitespace-nowrap',
+              urgente ? 'bg-quente-fundo text-quente-texto' : 'bg-muted',
+            )}
+          >
+            {rotuloDaSituacao(l.situacao)}
+          </span>
+          {tempo ? (
+            <span className={cn('numerico text-[11px]', urgente ? 'font-semibold text-quente-texto' : 'text-muted-foreground')}>
+              {tempo}
+            </span>
+          ) : null}
+        </span>
+        <span className="text-xs leading-snug text-muted-foreground">{l.porque}</span>
+      </div>
+
+      <div
+        className={cn(
+          'ml-8 flex items-start gap-1.5 rounded-lg px-2.5 py-2 text-[13px] leading-snug',
+          l.fazer_da_ia ? FUNDO_DA_IA : 'bg-muted',
+        )}
+      >
+        {l.fazer_da_ia ? (
+          <>
+            <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+            <span className="sr-only">Sugestão da IA: </span>
+          </>
+        ) : null}
+        <span>{l.fazer}</span>
+      </div>
+
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 pl-8 text-xs">
+        <dt className="text-muted-foreground">Imóvel</dt>
+        <dd className="min-w-0">
+          {l.codigo || l.imovel ? (
+            <span className="line-clamp-2">
+              {l.codigo ? <span className="numerico font-semibold">{l.codigo}</span> : null}
+              {l.codigo && l.imovel ? ' · ' : null}
+              {l.imovel ? <span className="text-muted-foreground">{l.imovel}</span> : null}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </dd>
+        <dt className="text-muted-foreground">Com quem</dt>
+        <dd className="min-w-0 truncate">
+          {l.dono ? l.dono : <span className="font-semibold text-quente-texto">Sem dono</span>}
+        </dd>
+      </dl>
+
+      <div className="pl-8">
+        <Button asChild variant="outline" className="toque h-11 w-full">
+          <Link href={linkDoLead(l)}>
+            <MessageCircle aria-hidden="true" />
+            Abrir conversa
+            <span className="sr-only"> com {l.nome}</span>
+          </Link>
+        </Button>
+      </div>
+    </li>
   );
 }
 

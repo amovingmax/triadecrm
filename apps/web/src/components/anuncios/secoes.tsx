@@ -53,7 +53,7 @@ export function SecoesDosAnuncios({ ativa }: { ativa: 'anuncios' | 'leads' }) {
             {item.contagem ? (
               <span
                 className={cn(
-                  'numerico ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]',
+                  'numerico ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[11px] md:text-[10px]',
                   selecionado ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground',
                 )}
               >

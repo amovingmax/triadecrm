@@ -241,12 +241,14 @@ export function CartaoDoAnuncio({
                 </Chip>
               ))}
               <Chip>{rotuloDaOrigem(a)}</Chip>
+              {/* Copiar o código é toque de verdade no celular (colar no Canal Pro):
+                  32px de alvo lá, os 24px do chip no computador (16/11/2026). */}
               <button
                 type="button"
                 onClick={() => void copiarCodigo()}
                 title="Copiar o código"
                 aria-label={`Copiar o código ${a.codigo}`}
-                className="toque inline-flex h-6 max-w-full items-center gap-1 rounded-full border border-hairline px-2 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="toque inline-flex h-8 max-w-full items-center gap-1 rounded-full border border-hairline px-2.5 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 md:h-6 md:px-2"
               >
                 <Copy className="size-3.5 shrink-0" aria-hidden="true" />
                 <span className="numerico truncate">{a.codigo}</span>

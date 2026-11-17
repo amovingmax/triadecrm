@@ -68,42 +68,57 @@ export function LeituraDaIa({ fioId, className }: { fioId: string; className?: s
   const magra = leituraVaziaDemais(data);
   const faixa = faixaDoScore(data.score);
   const intencao = rotuloDaIntencao(data.intencao);
+  const frase = magra ? (
+    <span>Conversa curta demais para uma leitura.</span>
+  ) : intencao || data.resumo ? (
+    <>
+      {intencao ? <span className="text-foreground">{intencao}</span> : null}
+      {intencao && data.resumo ? <span aria-hidden="true"> · </span> : null}
+      {data.resumo}
+    </>
+  ) : null;
+  const temNumero = data.score !== null && !magra;
+  const fraseEmbaixo = temNumero || data.alertas.length > 0;
 
   return (
     <section
       aria-label="Leitura da IA sobre esta conversa"
       className={cn('max-w-3xl rounded-lg border border-hairline bg-card/60', className)}
     >
-      <div className="flex items-center gap-2.5 px-3 py-2">
+      {/* DUAS LINHAS (17/11/2026). Em cima, o número, os alertas e o "Por quê";
+          embaixo, a frase, com até três linhas. Numa faixa só, a frase era o que
+          sobrava entre o número, o alerta e o botão: na coluna dos dados do
+          contato (300 px) ficava "30 ▬ mens… risco de perder Por quê". Os
+          alertas aparecem também no celular (eram `hidden sm:inline`): agora há
+          lugar para eles, e eles são o que mais pede atenção. */}
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1 px-3 py-2">
         <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
 
-        {data.score !== null && !magra ? (
-          <span className="flex shrink-0 items-baseline gap-1.5" title="Quanto a conversa indica intenção de fechar (0 a 100). Não é a temperatura: essa continua sendo a do CRM.">
-            <span className="numerico text-sm leading-none font-semibold">{data.score}</span>
-            <Medidor score={data.score} />
-          </span>
-        ) : null}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          {temNumero && data.score !== null ? (
+            <span
+              className="flex shrink-0 items-baseline gap-1.5"
+              title="Quanto a conversa indica intenção de fechar (0 a 100). Não é a temperatura: essa continua sendo a do CRM."
+            >
+              <span className="numerico text-sm leading-none font-semibold">{data.score}</span>
+              <Medidor score={data.score} />
+            </span>
+          ) : null}
 
-        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          {magra ? (
-            <span>Conversa curta demais para uma leitura.</span>
-          ) : (
-            <>
-              {intencao ? <span className="text-foreground">{intencao}</span> : null}
-              {intencao && data.resumo ? <span aria-hidden="true"> · </span> : null}
-              {data.resumo}
-            </>
-          )}
-        </p>
+          {data.alertas.map((alerta) => (
+            <span
+              key={alerta}
+              className="shrink-0 rounded-md border border-hairline px-1.5 py-0.5 text-[11px] whitespace-nowrap"
+            >
+              {rotuloDoAlerta(alerta)}
+            </span>
+          ))}
 
-        {data.alertas.map((alerta) => (
-          <span
-            key={alerta}
-            className="hidden shrink-0 rounded-md border border-hairline px-1.5 py-0.5 text-[11px] whitespace-nowrap sm:inline"
-          >
-            {rotuloDoAlerta(alerta)}
-          </span>
-        ))}
+          {/* Sem número nem alerta, a frase sobe para esta linha. */}
+          {frase && !fraseEmbaixo ? (
+            <p className="min-w-0 text-xs text-muted-foreground">{frase}</p>
+          ) : null}
+        </div>
 
         <Button
           variant="ghost"
@@ -118,6 +133,12 @@ export function LeituraDaIa({ fioId, className }: { fioId: string; className?: s
             aria-hidden="true"
           />
         </Button>
+
+        {frase && fraseEmbaixo ? (
+          <p className="col-span-2 col-start-2 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+            {frase}
+          </p>
+        ) : null}
       </div>
 
       {aberta ? <Detalhe fioId={fioId} leitura={data} faixa={faixa} /> : null}
@@ -132,7 +153,10 @@ export function LeituraDaIa({ fioId, className }: { fioId: string; className?: s
  */
 function Medidor({ score }: { score: number }) {
   return (
-    <span className="relative inline-block h-1 w-6 overflow-hidden rounded-full bg-hairline" role="presentation">
+    <span
+      className="relative inline-block h-1 w-6 overflow-hidden rounded-full bg-hairline"
+      role="presentation"
+    >
       <span
         className="absolute inset-y-0 left-0 rounded-full bg-foreground/70"
         style={{ width: `${Math.max(2, Math.min(100, score))}%` }}
@@ -180,7 +204,10 @@ function Detalhe({
           <p className="text-foreground">
             {leitura.proximaAcao}
             {leitura.proximaAcaoEm ? (
-              <span className="text-muted-foreground" title={dataHoraCompleta(leitura.proximaAcaoEm)}>
+              <span
+                className="text-muted-foreground"
+                title={dataHoraCompleta(leitura.proximaAcaoEm)}
+              >
                 {' '}
                 · até {rotuloDoDia(leitura.proximaAcaoEm).palavra.toLowerCase()}
                 <span className="numerico">{rotuloDoDia(leitura.proximaAcaoEm).numero}</span>

@@ -169,7 +169,7 @@ function Evento({
             {hora(evento.em)}
           </time>
           {evento.portaAberta ? (
-            <Badge variant="pilula" className="h-5 gap-1 px-1.5 text-[10px] font-normal">
+            <Badge variant="pilula" className="h-5 gap-1 px-1.5 text-[11px] font-normal md:text-[10px]">
               <DoorOpen className="size-3" aria-hidden="true" />
               porta aberta
             </Badge>

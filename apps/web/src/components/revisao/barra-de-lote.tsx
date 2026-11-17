@@ -19,6 +19,16 @@ import type { CandidatoDaFila, OpcaoCategoriaRadar } from './tipos';
 const DE_CADA_UM = '__de_cada_um__';
 
 /**
+ * Os dois "sim" do lote. No celular ocupam a largura e QUEBRAM LINHA (16/11/2026):
+ * o botão nomeia a categoria, e "Só aprovar 12 nomes em Locais (salões, chácaras,
+ * hotéis, restaurantes, praia)" numa linha só (o `Button` é `whitespace-nowrap`)
+ * passava da tela de 390px e alargava a página. No `md` volta a ser a pílula de
+ * uma linha, do tamanho do texto.
+ */
+const BOTAO_DO_LOTE =
+  'toque h-auto min-h-11 w-full py-2 whitespace-normal md:h-9 md:min-h-0 md:w-auto md:py-0 md:whitespace-nowrap';
+
+/**
  * A barra do lote: aparece quando há nome marcado, e some quando não há.
  *
  * POR QUÊ: em 25/09/2026 a fila tinha 155 nomes presos, quase todos pelo mesmo
@@ -76,10 +86,24 @@ export function BarraDeLote({
   return (
     <div className="sticky bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior))] z-30 -mx-4 flex flex-col gap-2 border-t border-hairline bg-background/95 px-4 py-3 backdrop-blur md:bottom-0 md:mx-0 md:flex-row md:items-center md:rounded-xl md:border md:px-4">
       <div className="min-w-0 md:flex-1">
-        <p className="text-sm font-medium">
-          <span className="numerico">{formatarNumero(marcados.length)}</span>{' '}
-          {marcados.length === 1 ? 'nome marcado' : 'nomes marcados'}
-        </p>
+        {/* No celular o "Desmarcar" sobe para a linha da contagem (16/11/2026): a
+            barra gruda em cima da barra de baixo e chegava a 250px numa tela de
+            667px, com uma linha inteira só para ele. No `md` ele volta para o fim
+            da fila de botões, onde sempre esteve. */}
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-medium">
+            <span className="numerico">{formatarNumero(marcados.length)}</span>{' '}
+            {marcados.length === 1 ? 'nome marcado' : 'nomes marcados'}
+          </p>
+          <Button
+            variant="ghost"
+            onClick={aoLimpar}
+            className="toque -my-1.5 -mr-2 h-11 shrink-0 md:hidden"
+          >
+            <X aria-hidden="true" />
+            Desmarcar
+          </Button>
+        </div>
         {impedidos > 0 ? (
           <p className="text-sm text-muted-foreground">
             <span className="numerico">{formatarNumero(impedidos)}</span>{' '}
@@ -113,10 +137,16 @@ export function BarraDeLote({
             disabled={ocupado || passariam <= 0}
             onClick={() => aoAprovar(true)}
             title="Cria as fichas e põe a mensagem automática de cada uma na fila. Elas saem aos poucos."
-            className="toque h-11 md:h-9"
+            className={BOTAO_DO_LOTE}
           >
             <MessageCircle aria-hidden="true" />
-            Aprovar <span className="numerico">{formatarNumero(passariam)}</span> e mandar mensagem
+            {/* Um `<span>` só para a frase: solta dentro do `inline-flex`, cada
+                pedaço ("Aprovar", o número, o resto) virava um item da fila e,
+                ao quebrar linha, quebrava em colunas em vez de em frase. */}
+            <span className="min-w-0">
+              Aprovar <span className="numerico">{formatarNumero(passariam)}</span> e mandar
+              mensagem
+            </span>
           </Button>
         ) : null}
         <Button
@@ -124,14 +154,16 @@ export function BarraDeLote({
           disabled={ocupado || passariam <= 0}
           onClick={() => aoAprovar(false)}
           title="Cria as fichas em Prospectados, sem mensagem."
-          className="toque h-11 md:h-9"
+          className={BOTAO_DO_LOTE}
         >
           <Check aria-hidden="true" />
-          Só aprovar <span className="numerico">{formatarNumero(passariam)}</span>{' '}
-          {passariam === 1 ? 'nome' : 'nomes'}
-          {nomeDaCategoria ? ` em ${nomeDaCategoria}` : ''}
+          <span className="min-w-0">
+            Só aprovar <span className="numerico">{formatarNumero(passariam)}</span>{' '}
+            {passariam === 1 ? 'nome' : 'nomes'}
+            {nomeDaCategoria ? ` em ${nomeDaCategoria}` : ''}
+          </span>
         </Button>
-        <Button variant="ghost" onClick={aoLimpar} className="toque h-11 md:h-9">
+        <Button variant="ghost" onClick={aoLimpar} className="toque hidden h-11 md:inline-flex md:h-9">
           <X aria-hidden="true" />
           Desmarcar
         </Button>

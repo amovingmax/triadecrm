@@ -125,7 +125,9 @@ export function FaixaDoAnuncio({ anuncio, nossa }: { anuncio: Anuncio; nossa: bo
             href={anuncio.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs underline underline-offset-2"
+            // O `after` estende o toque 8 px para cima e para baixo (~32 px), sem
+            // engordar a faixa dentro do balão.
+            className="relative text-xs underline underline-offset-2 after:absolute after:-inset-x-1 after:-inset-y-2 after:content-['']"
           >
             Ver o anúncio
           </a>

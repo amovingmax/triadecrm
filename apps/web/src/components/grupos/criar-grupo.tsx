@@ -185,8 +185,10 @@ export function Chave({
         aria-checked={ligada}
         disabled={desligada}
         onClick={() => aoMudar(!ligada)}
+        // A chave tem 24 px de altura; o `after` estende o toque para ~44 px sem
+        // mudar o desenho.
         className={cn(
-          'relative mt-1 h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50',
+          "relative mt-1 h-6 w-11 shrink-0 rounded-full transition-colors after:absolute after:-inset-x-1 after:-inset-y-2.5 after:content-[''] disabled:opacity-50",
           ligada ? 'bg-menta' : 'bg-muted-foreground/30',
         )}
       >

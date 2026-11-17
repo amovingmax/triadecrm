@@ -211,9 +211,13 @@ export function TelaParceiros({
             {veExcluidos ? (
               <>
                 {' · '}
+                {/* `-my-3 py-3` no celular (16/11/2026): o link tinha 17px de altura,
+                    menor que qualquer alvo de toque. O acolchoado aumenta a área do
+                    toque e a margem negativa devolve a altura, então a linha do
+                    subtítulo não cresce. */}
                 <Link
                   href={HREF_EXCLUIDOS}
-                  className="underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="-my-3 inline-block py-3 underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 md:my-0 md:inline md:py-0"
                 >
                   Excluídos
                 </Link>

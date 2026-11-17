@@ -95,10 +95,12 @@ export function CartaoDoArquivo({
                 {menuAberto ? null : (
                   <>
                     {' · '}
+                    {/* `-my-2.5 py-2.5` no celular: 20px de altura viravam 40px de
+                        toque sem a linha crescer (16/11/2026). */}
                     <button
                       type="button"
                       onClick={aoAbrirMenu}
-                      className="toque underline underline-offset-4 hover:text-foreground"
+                      className="toque -my-2.5 py-2.5 underline underline-offset-4 hover:text-foreground md:my-0 md:py-0"
                     >
                       trocar
                     </button>

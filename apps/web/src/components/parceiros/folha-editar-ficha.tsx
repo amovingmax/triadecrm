@@ -262,7 +262,12 @@ export function FolhaEditarFicha({
         </SheetTrigger>
       )}
 
-      <SheetContent side="right" className="w-full sm:max-w-lg">
+      {/* `data-[side=right]:w-full`, e não `w-full` (16/11/2026): a folha traz
+          `data-[side=right]:w-3/4`, que pesa mais que uma classe solta, e o
+          `w-full` daqui nunca valeu — no celular de 375px o formulário tinha
+          266px, com 94px de véu sobrando ao lado. No desktop nada muda: o teto
+          `sm:max-w-sm` da folha segura a largura do mesmo jeito. */}
+      <SheetContent side="right" className="data-[side=right]:w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>Editar {ficha.name}</SheetTitle>
           <SheetDescription>
@@ -273,7 +278,9 @@ export function FolhaEditarFicha({
 
         <form
           onSubmit={form.handleSubmit(salvar)}
-          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
+          // A área segura de baixo, como nas outras folhas: no celular a folha vai
+          // até o pé da tela, e sem ela o "Cancelar" ficava sob a barra do iPhone.
+          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-[calc(1rem+var(--area-segura-inferior))]"
         >
           <Campo id={`${id}-nome`} rotulo="Nome" erro={form.formState.errors.name?.message}>
             <Input id={`${id}-nome`} className="h-11 md:h-9" {...form.register('name')} />

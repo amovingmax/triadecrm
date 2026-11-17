@@ -709,10 +709,14 @@ function MultiploDaEquipe({ passo, equipe }: { passo: Passo; equipe: readonly Li
           const v = valores[i] ?? null;
           const destaque = v !== null && v === melhor;
           return (
-            <li key={p.pessoa_id} className="grid grid-cols-[minmax(0,4.5rem)_minmax(0,1fr)_3.25rem] items-center gap-2.5">
+            // A coluna do número tem 4.75rem (era 3.25rem, 16/11/2026): "1 h 5 min"
+            // quebrava em duas linhas e a linha da pessoa dobrava de altura. Largura
+            // fixa, e não `auto`, porque cada pessoa é uma grade própria e as barras
+            // só se comparam se começarem e acabarem no mesmo lugar.
+            <li key={p.pessoa_id} className="grid grid-cols-[minmax(0,4.5rem)_minmax(0,1fr)_4.75rem] items-center gap-2.5">
               <span className={cn('truncate text-[13px]', destaque && 'font-semibold')}>{p.nome}</span>
               <Barra valor={v} maximo={teto} cor={destaque ? 'tinta' : 'resto'} marcador={m === null ? null : m / teto} />
-              <span className="numerico text-right text-[13px] font-medium">{v === null ? '—' : passo.texto(v)}</span>
+              <span className="numerico text-right text-[13px] font-medium whitespace-nowrap">{v === null ? '—' : passo.texto(v)}</span>
             </li>
           );
         })}

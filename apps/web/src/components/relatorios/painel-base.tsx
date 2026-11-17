@@ -177,7 +177,9 @@ export function PainelBase({ painel, periodo }: { painel: DefinicaoPainel; perio
   return (
     <section className="flex w-full flex-col gap-4" aria-label={painel.titulo}>
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1">
+        {/* `basis-full` no celular: o botão desce para baixo do texto em vez de
+            espremê-lo (a mesma razão do cabeçalho de `QuadroPainel`). */}
+        <div className="min-w-0 flex-1 basis-full sm:basis-0">
           <h2 className="font-heading text-lg font-semibold tracking-tight">{painel.titulo}</h2>
           <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">
             {painel.descricao}

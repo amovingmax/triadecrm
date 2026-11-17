@@ -10741,6 +10741,75 @@ Pedido do usuário: "faz uma API do CRM do Tríade, preciso integrar softwares e
 
 **No ar desde 17/11/2026, ~16h (pedido do usuário: "suba alteração pro ar"):** `main` em `6ce6cf5` (avanço direto de `49d6a7b`). Banco da Imova pelo `publicar-banco imova migrar` (só a `20261117200000`) e da KOMUNE pelo `komune migrar` (a `20261116120000`, das medidas do terreno, que lá não faz nada, e a `20261117200000`). Função `api` publicada nos dois projetos (`kkqadgxvmzulcamuakzk` e `toqdjcajyrowutunczhr`). Sites das cópias limpas `~/triadecrm-publicar-imova` e `~/triadecrm-publicar-komune`: Imova `imova-all4tm6eg` (volta: `imova-n8sb0vonx`) e KOMUNE `triade-16ppkvbyr` (volta: `triade-ie9ldpwld`). Conferido de fora: nas duas, `GET /v1` sem chave dá 401 `chave_ausente` (a função) e com uma chave inventada no formato certo dá 401 `chave_invalida` com a frase do banco (a função chega a `public.api_atender`, com as permissões certas); `api_avisos` (15 s) e `api_limpar` ativos no `cron.job` dos dois bancos; `/login` 200 com `data-empresa` certo, `/admin?aba=integracoes` sem login vai para o login, `/auth/dev` 404. Nenhuma chave nem webhook foi criado em produção: a primeira chave é criada por um admin ou gestor em Ajustes → Integrações, e a tela com login não foi aberta em produção (login pelo Google).
 
+## 16/11/2026 — a folha "Mais" do celular vira grade de atalhos, e todas as telas passam pela varredura do celular (branch `menu-e-celular`, só no localhost; as duas empresas)
+
+Pedido do usuário, com print do iPhone: "preciso que [o menu do Mais] fique algo mais organizado" e "uma varredura para verificar se todas as telas estão responsivas no mobile de acordo com o display do celular". Sete agentes, cada um dono das próprias pastas (casca e menu; Meu dia e Conversas; Lotes, Agenda, Registrar e Disparos; Prospectados, Funis, Revisão e Importar; Anúncios e IA que atende; Metas, Relatórios, Ajustes e páginas públicas; propostas, só leitura). Conferido com Playwright e Chrome em modo celular, em 375, 390 e 430 px, contra o site local da Imova; o computador (1280) não mudou.
+
+- **Folha "Mais" (`layout/bottom-nav.tsx`, `layout/nav-link.tsx` variante `menu`, `lib/navegacao.ts`):** era um documento, com descrição de duas linhas cortada em "…" em cada item, um parágrafo em cada grupo, rolagem para chegar a Metas e Ajustes e um anel de foco grosso no X ao abrir. Agora:
+  - puxador que fecha arrastando;
+  - "Buscar no CRM", que abre a mesma paleta do cabeçalho (`abrirPaletaDeComandos()` em `paleta-comandos.tsx`, por evento; nada de segunda paleta);
+  - os três grupos com uma linha curta (`GRUPOS[].apoio` no lugar de `explicacao`), cada um numa grade de 4 ladrilhos (3 quando nenhum grupo tem 4, como na KOMUNE);
+  - o número continua sendo trabalho parado (selo no canto, dentro do `aria-label`), e o ativo leva a menta da barra.
+  - Com os 8 itens da Imova, a folha cabe inteira em 375×667. A `descricao` continua sendo o índice da paleta.
+- **Campo não dá zoom no iPhone (`app/globals.css`):** abaixo do `md`, todo campo de digitar tem 16px, fora de `@layer` para vencer qualquer utilitário. O campo da paleta (`ui/command.tsx`) também.
+- **Componentes compartilhados (`components/ui`):**
+  - a folha da direita ocupa a tela inteira no celular (o `w-3/4` vencia o `w-full` das telas);
+  - o diálogo tem teto de `100svh − 2rem`, rola por dentro, e o X ganha 44px de toque sem mudar o desenho;
+  - itens de menu suspenso com 40px no celular;
+  - a contagem da aba com 11px no celular;
+  - a faixa de abas que rola mostra a aba ativa (Ajustes escondia Ligações, Catálogos e LGPD).
+- **O que estava quebrado de verdade:**
+  - `/ligar/<id>`: um nome de lote longo alargava a página a 444px numa tela de 375 (`ligacao/tela-chamada.tsx`);
+  - Revisão: um site longo no cartão vazava 16px e levava junto a barra de baixo (`revisao/cartao-candidato.tsx`);
+  - Importar → "Ver todas": os cartões de coluna tinham 1.444px (`importacao/passo-mapa.tsx`);
+  - editor de anúncio: o Salvar ficava escondido atrás da barra de baixo e não aparecia em lugar nenhum (`anuncios/editor-anuncio.tsx`).
+- **No resto, ajuste fino:**
+  - conversa aberta com mais espaço para as mensagens em 375×667 ("Assumir conversa" no fim da frase de quem atende);
+  - Meu dia sem título espremido;
+  - Agenda com a hora em cima do nome;
+  - Disparos com o cabeçalho empilhado e o painel em tela cheia;
+  - fotos do anúncio com botões de 40px;
+  - "Fila de hoje" dos Relatórios em cartões no celular, e a tabela continua do `md` para cima;
+  - De-para dos Ajustes em cartões;
+  - botões da IA que atende com 40 a 44px;
+  - selos e rótulos de 10px passaram a 11px no celular;
+  - área segura do iPhone nos rodapés fixos e nas páginas `/aplicativo` e `/privacidade`.
+- **Verificado:** `tsc --noEmit` sem erro, eslint sem erro nos arquivos alterados, Vitest com 2.148 testes passando, e 23 telas × 3 larguras sem rolagem lateral (a régua mede contra a largura pedida, não contra `innerWidth`, que no modo celular cresce junto com o vazamento). O banco local da Imova recebeu à mão as 9 migrações da main que faltavam (20261112100000 a 20261113131000), sem registro em `schema_migrations`.
+- **Ficou de fora:**
+  - a visão de SDR (o `auth/dev?quem=sdr` cai em /login no banco local);
+  - a KOMUNE (só simulada, porque o site local roda como Imova);
+  - a rota com paradas reais (o banco local não tem coordenadas).
+- **Anotado, sem mexer (é comportamento):**
+  - `/cadencias` e `/cadencias/resumo` ainda abrem as telas antigas;
+  - Automáticas mostra "expirou_na_fila" sem tradução;
+  - "Atualizar do sistema atual" (Anúncios) e "Tirar de uso" (Categorias) gravam no clique, sem confirmar.
+- **Publicar:** só tela, sem banco nem worker. Commit e push na `main`, depois o site da Imova e o da KOMUNE.
+- **Porte (17/11/2026):** a branch não tinha commit; o diff dela foi aplicado com 3-way sobre a `main` de c496385 na branch `telas-responsivas`. Os dois conflitos, `relatorios/graficos-vende.tsx` e `relatorios/painel-vende-ia.tsx`, ficaram com a versão da `main` (os Relatórios novos já trazem os ajustes de celular desses dois arquivos). O resto entrou limpo.
+
+## 17/11/2026 — telas mais responsivas: a coluna "Dados do contato", o cabeçalho da conversa e a varredura do resto (branch `telas-responsivas`, só no localhost; as duas empresas)
+
+Pedido do usuário: "A gente deve arrumar as telas e deixá-las mais responsivas", com dois prints da coluna "Dados do contato" ao lado da conversa (tema escuro, uns 370 px). A branch começa pelo porte da `menu-e-celular` (entrada acima) e segue com o que segue abaixo. A regra em tudo: quem decide é a largura de quem contém (`@container`, grade que vira uma coluna, texto que quebra), e não a da janela.
+
+- **Coluna "Dados do contato" e folha do celular, os quatro defeitos dos prints:**
+  - **"Enviar link da agenda" invadindo o "Transferir".** A causa era a grade: `grid-cols-1` no computador, e o "Assumir conversa" com `col-span-2` criava uma segunda trilha implícita, do tamanho do conteúdo; a primeira coluna ficava com uns 100 px e, em 1280, o "Transferir" perdia o nome. Agora uma grade só, na coluna e na folha (`GRADE_DAS_ACOES` em `conversas/fio-wpp.tsx`): duas colunas a partir de 9rem cada, uma quando nem isso cabe (coluna abaixo de ~330 px, como em 1100 e 1024); quem ocupa a linha inteira usa `col-span-full`. O bloco de ação (`ACAO_DA_FOLHA`, agora compartilhado com `fora-da-base.tsx`) tem `min-h-14` em vez de `h-14`, então um nome em três linhas faz o bloco crescer em vez de vazar, e a palavra que sozinha não cabe quebra no meio em vez de sair da borda.
+  - **O aviso do cadeado preso em meia coluna.** O botão do link virou uma célula da grade como as outras e o porquê ocupa a linha inteira logo embaixo (`classeDoBloco="contents"` e `classeDoAviso="col-span-full"` em `enviar-link-da-agenda.tsx`, com `grid-flow-row-dense` para o "Transferir" subir para o lado do botão). O aviso agora descreve o botão (`aria-describedby`).
+  - **O cartão da IA cortado em "mens…".** `leitura-da-ia.tsx` em duas linhas: em cima o número, os alertas e o "Por quê"; embaixo a frase, com até três linhas. Os alertas ("risco de perder") passam a aparecer também no celular (eram `hidden sm:inline`).
+  - **"Próxima ação" numa linha só.** Até três linhas (`line-clamp-3`), com o texto inteiro no `title`.
+  - De quebra: o "Transferir" mostra sempre o nome (o "só o ícone abaixo de 20rem" era de quando ele morava no cabeçalho) e o telefone da ficha fica alinhado à direita quando o "Abrir no WhatsApp" desce de linha (`className` novo, opcional, em `parceiros/telefone-revelavel.tsx`).
+  - A seção FICHA continua sendo a mesma lista de `<Campo>` (a outra sessão acrescenta o E-mail depois do Telefone): só a classe da "Próxima ação" e o `className` do telefone mudaram.
+- **Cabeçalho da conversa no computador (`conversa.tsx` e `fora-da-base.tsx`):** em 1280 ele pedia 839 px num painel de 798, e 710 px em 463 com a coluna aberta: o nome do contato ficava com 12 px e o "Assumir conversa" saía cortado pela coluna. Agora a largura do painel decide quem fica: o canal de chegada só com 56rem de painel (ele também está em "Como chegou", na coluna); "Pedir para ligar" e "Assumir conversa" com nome a partir de 48rem (`rotuloPelaLargura` novo em `assumir-conversa.tsx` e `ligacao-whatsapp/botao-na-conversa.tsx`); a pílula da IA e o "Concluir" com nome a partir de 64rem (era 48rem); abaixo de 36rem a lupa e o "Concluir" saem, porque também estão no "⋯". Medido: nome com 249 px em 1280 sem a coluna, 221 px com a coluna, 248 px em 1440 com a coluna e 100 px em 1024 com a coluna; o cabeçalho cabe no painel em todas.
+- **Escolher o imóvel (`agenda/escolher-imovel.tsx`; link da agenda, novo compromisso e "Definir o imóvel"):** o código ficava numa coluna de 4.5rem, e "PT0001_IMOVA" passava por cima do título. Agora o código e a situação em cima, o título em até duas linhas e o endereço embaixo, todos na largura toda.
+- **Listas no celular, o que importa quebra em vez de virar "…":** Meu dia, o nome e o que fazer em até duas linhas (`meu-dia/linha-nova.tsx`; a prévia da mensagem continua numa) e o título do bloco com `text-balance` (o "h" de "Esperando há mais de 24 h" ficava sozinho); Prospectados, o nome em até duas linhas (`parceiros/lista-cartoes.tsx`); Leads dos portais, "como chegou · anúncio" em até duas linhas (`anuncios/leads/tela-leads.tsx`); Relatórios, a unidade das sugestões da IA com `text-balance` (`relatorios/painel-vende-visao.tsx`).
+- **Verificado:** `pnpm typecheck` sem erro; `pnpm lint` (eslint) sem nenhum problema; Vitest com 134 arquivos e 2.157 testes passando; prettier nos arquivos tocados. Com Playwright e Chrome contra o site local da Imova (porta 3103): a coluna em 1280 e 1440 e a folha em 375, temas escuro e claro, antes e depois (a próxima ação comprida e a leitura da IA do print entram pela interceptação da leitura, sem gravar nada no banco); 24 rotas × 375, 390, 430, 1280 e 1440 sem rolagem lateral e sem botão com texto vazando; 10 folhas e diálogos (ficha, transferir, link da agenda, pedir para ligar, novo compromisso, montar lote, editar ficha, novo parceiro, metas, ajustes do Canal Pro) × 375, 430, 1280 e 1440 (a folha "Mais" ficou com a conferência do porte); o cabeçalho em 1024, 1280, 1366, 1440 e 1920, com e sem a coluna; a conversa de cliente sem ficha em 1280 e 1440.
+- **Ficou de fora:**
+  - a KOMUNE, só no código (o site local roda como Imova): a palavra mais longa das ações dela, "Fornecedores" (93 px em "Mover para Fornecedores"), cabe numa coluna de 9rem; o "Ligar" da telefonia não ganhou rótulo pela largura (é curto e cabe nas contas);
+  - a visão de SDR (o `auth/dev?quem=sdr` cai em /login no banco local);
+  - `relatorios/painel-vende-visao.tsx` não passa no prettier desde a `main` (235 linhas): formatei só a linha tocada, para não reescrever um arquivo publicado hoje.
+- **Anotado, sem mexer (é decisão de desenho ou de outra tela recém-feita):**
+  - lista de Conversas: a linha miúda das etiquetas corta o próximo passo da IA em 48 a 96 px; é a densidade de duas linhas do WhatsApp, escolhida de propósito;
+  - Relatórios em 1280: no ranking de imóveis o nome fica com 160 px e o "mais quente" com 142 px; a tabela de Leads no computador corta o título do anúncio em 160 px (tem `title`).
+- **Publicar:** só tela, sem banco nem worker. Commit e push na `main`, depois o site da Imova e o da KOMUNE.
+
 ## 17/11/2026 — O e-mail do cliente vai sozinho para a ficha, e a IA convida para ofertas por e-mail (branch `email-do-cliente`; `atendente-imova@v6`; RF-BAS-01, RF-BAS-06, RF-CON-06)
 
 Pedidos do usuário, sobre a Imova: "Precisamos criar um campo de email para cada cliente/usuario, e caso seja fornecido a informação devemos colocar esse email que foi fornecido à ficha dele" e "Devemos treinar a IA para pedir o email das pessoas caso elas queiram receber mais ofertas e receberem mais promocoes". A ficha já tinha a coluna (`organizations.email`) e a folha de editar já tinha o campo; faltava o e-mail chegar à ficha pela conversa, aparecer na conversa e a IA saber pedir.

@@ -145,7 +145,8 @@ export function LinhaDoCanalPro({
             {trazido ? (
               <>
                 No CRM como{' '}
-                <Link href={`/anuncios/${trazido.id}`} className="underline underline-offset-4">
+                {/* `py-2` no link em linha: alvo de dedo sem mexer no texto (16/11/2026). */}
+                <Link href={`/anuncios/${trazido.id}`} className="py-2 underline underline-offset-4">
                   {trazido.codigo}
                 </Link>{' '}
                 ({SITUACOES[trazido.situacao].toLowerCase()})
@@ -156,7 +157,10 @@ export function LinhaDoCanalPro({
             ) : pareceCom ? (
               <>
                 Anúncio repetido de{' '}
-                <Link href={`/anuncios/${pareceCom.id}`} className="underline underline-offset-4">
+                <Link
+                  href={`/anuncios/${pareceCom.id}`}
+                  className="py-2 underline underline-offset-4"
+                >
                   {pareceCom.codigo}
                 </Link>{' '}
                 (mesma cidade e mesma área), mais antigo.

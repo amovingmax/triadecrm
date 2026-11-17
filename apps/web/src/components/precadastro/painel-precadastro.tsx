@@ -261,11 +261,14 @@ export function PainelPreCadastro({
             O que o fornecedor vê ao abrir o link
             {p.fotosPublicas === 0 ? '. Nenhuma foto vai junto.' : ''}
           </p>
-          <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+          {/* `grid-cols-1` e `wrap-anywhere` (16/11/2026): o rascunho leva site e
+              e-mail, palavras sem espaço que, na coluna implícita `auto` do
+              `grid`, alargavam o cartão para fora da tela do celular. */}
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
             {p.rascunho.map((linha) => (
-              <div key={linha.campo} className="flex flex-col gap-0.5">
+              <div key={linha.campo} className="flex min-w-0 flex-col gap-0.5">
                 <dt className="text-xs text-muted-foreground">{linha.campo}</dt>
-                <dd className="text-sm">{linha.valor}</dd>
+                <dd className="text-sm wrap-anywhere">{linha.valor}</dd>
               </div>
             ))}
           </dl>

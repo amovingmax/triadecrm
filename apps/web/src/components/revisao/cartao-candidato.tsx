@@ -156,14 +156,21 @@ export function CartaoCandidato({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         {/* ------------------------------------------------ quem é */}
         <div className="flex min-w-0 flex-1 gap-3">
+          {/* A caixa continua de 16px, mas o toque é o do `<label>` em volta: 44px
+              no celular (16/11/2026). Só a caixa, ela era um alvo de 16x16 colado
+              no nome, e o dedo abria o link do nome em vez de marcar. A margem
+              negativa devolve o espaço que o acolchoado ocupa, então o nome não
+              sai do lugar. */}
           {marcado === null ? null : (
-            <input
-              type="checkbox"
-              checked={marcado}
-              onChange={(e) => aoMarcar(e.target.checked)}
-              aria-label={`Marcar ${candidato.nome} para aprovar em lote`}
-              className="mt-1 size-4 shrink-0 accent-foreground"
-            />
+            <label className="-m-3.5 flex shrink-0 cursor-pointer self-start p-3.5 md:m-0 md:p-0">
+              <input
+                type="checkbox"
+                checked={marcado}
+                onChange={(e) => aoMarcar(e.target.checked)}
+                aria-label={`Marcar ${candidato.nome} para aprovar em lote`}
+                className="mt-1 size-4 shrink-0 accent-foreground"
+              />
+            </label>
           )}
 
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -225,7 +232,11 @@ export function CartaoCandidato({
                   rel="noreferrer noopener"
                   title={`Abrir em ${candidato.fonte}`}
                   aria-label={`Abrir em ${candidato.fonte}`}
-                  className={ALVO_INLINE + ' text-muted-foreground hover:text-foreground'}
+                  // `-mx-3 px-3` no celular: o ícone sozinho era um alvo de 14px de
+                  // largura; o acolchoado leva o toque a 38px sem mexer na linha.
+                  className={
+                    ALVO_INLINE + ' -mx-3 px-3 text-muted-foreground hover:text-foreground md:mx-0 md:px-0'
+                  }
                 >
                   <ExternalLink className="size-3.5" aria-hidden="true" />
                 </a>
@@ -325,6 +336,11 @@ export function CartaoCandidato({
 
         {/* ------------------------------------------------ a decisão */}
         {pendente && podeDecidir ? (
+          // No celular (16/11/2026) o "Aprovar e mandar mensagem" ocupa a linha
+          // inteira e o "Só aprovar" estica até os dois discos: antes os botões
+          // quebravam onde a largura mandasse, o de cima com 240px e o de baixo
+          // com 125px, e a fila de decisões parecia torta de cartão em cartão.
+          // A partir de `sm` volta a ser a fila de botões do tamanho do texto.
           <div className="flex shrink-0 flex-wrap items-center gap-2 lg:pl-4">
             {/* DOIS "SIM", E CADA UM É UM CAMINHO (pivô de 06/10/2026).
                 "Aprovar e mandar mensagem" cria a ficha e põe a mensagem
@@ -339,7 +355,7 @@ export function CartaoCandidato({
                 onClick={() => aoDecidir('aprovar', undefined, true)}
                 disabled={ocupado || candidato.nao_contatar}
                 title="Cria a ficha e põe a mensagem automática na fila. O lead aparece em Conversas quando responder."
-                className="toque h-11 px-4 md:h-9"
+                className="toque h-11 w-full px-4 sm:w-auto md:h-9"
               >
                 <MessageCircle aria-hidden="true" />
                 Aprovar e mandar mensagem
@@ -350,7 +366,7 @@ export function CartaoCandidato({
               onClick={() => aoDecidir('aprovar')}
               disabled={ocupado || candidato.nao_contatar}
               title="Cria a ficha em Prospectados, sem mensagem. De lá ela entra num lote de ligação."
-              className="toque h-11 px-4 md:h-9"
+              className="toque h-11 flex-1 px-4 sm:flex-none md:h-9"
             >
               <Check aria-hidden="true" />
               Só aprovar
@@ -452,13 +468,18 @@ function Dado({
   rotulo: string;
   children: React.ReactNode;
 }) {
+  // `min-w-0 max-w-full` e o `wrap-anywhere` no valor (16/11/2026): um site
+  // inteiro ("https://www.imobiliariacasadosolnatal.com.br/imoveis") é uma palavra
+  // só, e sem ponto de quebra ele passava 16px da tela de 375px. No celular isso
+  // alarga a página inteira — a barra de baixo e o botão flutuante iam junto para
+  // fora. Agora o endereço quebra onde precisar, e só onde precisar.
   return (
-    <li className="flex items-center gap-1.5">
-      <span className="text-muted-foreground" aria-hidden="true">
+    <li className="flex max-w-full min-w-0 items-center gap-1.5">
+      <span className="shrink-0 text-muted-foreground" aria-hidden="true">
         {icone}
       </span>
       <span className="sr-only">{rotulo}: </span>
-      {children}
+      <span className="min-w-0 wrap-anywhere">{children}</span>
     </li>
   );
 }

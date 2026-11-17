@@ -43,7 +43,10 @@ export default function Privacidade() {
   ];
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-10 sm:py-16">
+    // Celular (16/11/2026): o fim da página soma a área segura do iPhone (a barra de
+    // gestos não cobre a última linha) e `break-words` deixa um e-mail comprido
+    // quebrar em vez de alargar a página numa tela de 320.
+    <main className="mx-auto w-full max-w-2xl px-4 pt-10 pb-[calc(2.5rem+var(--area-segura-inferior))] break-words sm:pt-16 sm:pb-[calc(4rem+var(--area-segura-inferior))]">
       <header className="border-b pb-6">
         <p className="text-sm font-medium text-muted-foreground">{p.controlador}</p>
         <h1 className="mt-1 font-heading text-2xl font-semibold sm:text-3xl">

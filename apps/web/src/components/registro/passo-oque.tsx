@@ -206,7 +206,10 @@ function Cabecalho({ alvo, aoVoltar }: { alvo: AlvoDoRegistro; aoVoltar: () => v
         <span className="sr-only">Trocar de parceiro</span>
       </button>
       <div className="min-w-0 flex-1">
-        <p className="truncate font-heading text-2xl leading-tight font-normal tracking-[-0.02em]">
+        {/* Até duas linhas, e 20px no celular (16/11/2026): numa linha só de 24px, em
+            375, "Carlos Lima — apartamento em Ponta Negra" virava "Carlos Lima — ap…",
+            e o cabeçalho existe justamente para conferir que é o parceiro certo. */}
+        <p className="line-clamp-2 font-heading text-xl leading-tight font-normal tracking-[-0.02em] break-words sm:text-2xl">
           {alvo.nome}
         </p>
         {alvo.etapa ? (
