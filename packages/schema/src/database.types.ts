@@ -10959,6 +10959,31 @@ export type Database = {
       anuncio_salvar: { Args: { p_dados: Json; p_id?: string }; Returns: Json }
       anuncio_tirar_do_ar: { Args: { p_id: string }; Returns: Json }
       anuncios_caminho_do_lead: { Args: never; Returns: Json }
+      api_atender: {
+        Args: {
+          p_caminho: string
+          p_consulta?: Json
+          p_corpo?: Json
+          p_idempotencia?: string
+          p_metodo: string
+          p_resumo: string
+        }
+        Returns: Json
+      }
+      api_chave_criar: {
+        Args: { p_em_nome_de?: string; p_escopos: string[]; p_nome: string }
+        Returns: Json
+      }
+      api_chave_revogar: { Args: { p_id: string }; Returns: Json }
+      api_integracoes: { Args: never; Returns: Json }
+      api_webhook_ativar: { Args: { p_ativo: boolean; p_id: string }; Returns: Json }
+      api_webhook_criar: {
+        Args: { p_descricao?: string; p_eventos: string[]; p_url: string }
+        Returns: Json
+      }
+      api_webhook_entregas: { Args: { p_id: string; p_limite?: number }; Returns: Json }
+      api_webhook_excluir: { Args: { p_id: string }; Returns: Json }
+      api_webhook_testar: { Args: { p_id: string }; Returns: Json }
       aprovar_rascunho: {
         Args: { p_draft_id: string; p_texto_final?: string }
         Returns: Json

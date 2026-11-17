@@ -15,7 +15,7 @@ select is((select count(*)::int from public.categories where "group" = 'producao
 -- (ADR-12). A contagem continua EXATA de propósito — entrar com uma fonte nova é
 -- decisão registrada, não trabalho de rotina, e é este número que obriga quem
 -- acrescenta uma a passar por aqui.
-select is((select count(*)::int from public.sources),                             13, 'seed: 13 origens/fontes, com "Chegou pelo WhatsApp" e o Google Maps raspado (GetNinjas não entra no catálogo)');
+select is((select count(*)::int from public.sources),                             14, 'seed: 14 origens/fontes, com "Chegou pelo WhatsApp", o Google Maps raspado e a API (17/11/2026; GetNinjas não entra no catálogo)');
 
 -- O Radar parou de coletar (Fase 2 do pivô, 25/09/2026). O estado é
 -- `is_enabled = false` nas CINCO fontes de coleta, e não linha apagada: os 277
