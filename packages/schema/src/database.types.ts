@@ -6592,6 +6592,54 @@ export type Database = {
         }
         Relationships: []
       }
+      ofertas_por_email: {
+        Row: {
+          aceita: boolean
+          conversation_id: string | null
+          id: string
+          message_id: string | null
+          ocorrido_em: string
+          organization_id: string
+          origem: string
+          registrado_por: string | null
+        }
+        Insert: {
+          aceita: boolean
+          conversation_id?: string | null
+          id?: string
+          message_id?: string | null
+          ocorrido_em?: string
+          organization_id: string
+          origem: string
+          registrado_por?: string | null
+        }
+        Update: {
+          aceita?: boolean
+          conversation_id?: string | null
+          id?: string
+          message_id?: string | null
+          ocorrido_em?: string
+          organization_id?: string
+          origem?: string
+          registrado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ofertas_por_email_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ofertas_por_email_registrado_por_fkey"
+            columns: ["registrado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_categories: {
         Row: {
           category_id: number
@@ -11422,6 +11470,14 @@ export type Database = {
           p_prompt_version?: string
           p_texto: string
           p_tipo: string
+        }
+        Returns: Json
+      }
+      ia_atendente_ofertas_por_email: {
+        Args: {
+          p_aceita: boolean
+          p_conversation_id: string
+          p_message_id: string
         }
         Returns: Json
       }
