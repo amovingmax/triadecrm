@@ -22,7 +22,7 @@ import {
   esquecerRegraDoDePara,
   type RegraDoDePara,
 } from './dados';
-import { ErroDoPainel, EsqueletoLista } from './estados';
+import { ErroDoPainel, EsqueletoLista, Vazio } from './estados';
 import { mensagemDoErro } from './formatos';
 
 /**
@@ -91,58 +91,88 @@ export function PainelDePara({ podeEsquecer }: { podeEsquecer: boolean }) {
         produto e só muda por publicação.
       </p>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>O que a fonte escreve</TableHead>
-            <TableHead>Vira</TableHead>
-            <TableHead>Fonte</TableHead>
-            <TableHead>De onde veio</TableHead>
-            <TableHead className="text-right">Fichas</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {regras.map((r) => (
-            <TableRow key={`${r.fonteId}:${r.nomeNaFonte}`}>
-              <TableCell className="font-medium">{r.nomeNaFonte}</TableCell>
-              <TableCell>{r.categoria}</TableCell>
-              <TableCell className="text-muted-foreground">{r.fonte}</TableCell>
-              <TableCell>
-                {r.origem === 'aprendido' ? (
-                  <span className="text-sm">
-                    {r.quem ?? 'alguém'}
-                    {r.aprendidoEm ? (
-                      <span className="text-muted-foreground">
-                        {' '}
-                        em <span className="numerico">{formatarData(r.aprendidoEm)}</span>
-                      </span>
-                    ) : null}
-                    {r.vezes > 1 ? (
-                      <span className="text-muted-foreground">
-                        {' '}
-                        · <span className="numerico">{r.vezes}</span> escolhas
-                      </span>
-                    ) : null}
-                  </span>
-                ) : (
-                  <Badge variant="pilula" className="font-normal">
-                    semeado
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell className="numerico text-right">{formatarNumero(r.fichas)}</TableCell>
-              <TableCell className="text-right">
+      {regras.length === 0 ? (
+        <Vazio
+          titulo="Nenhuma tradução ainda"
+          texto="Quando alguém escolher a categoria de um nome novo na fila ou na importação, a regra aparece aqui."
+        />
+      ) : (
+        <>
+          {/* Celular: um cartão por regra (16/11/2026). A tabela tem seis colunas e,
+              em 375, rolava de lado sem nenhum sinal de que havia mais à direita — o
+              "Esquecer" ficava fora da tela. No `md` para cima, a tabela de sempre. */}
+          <ul
+            className="sombra-base rounded-xl bg-card px-4 py-1 md:hidden"
+            aria-label="Traduções de categoria por fonte"
+          >
+            {regras.map((r) => (
+              <li
+                key={`${r.fonteId}:${r.nomeNaFonte}`}
+                className="flex flex-col gap-1.5 border-b border-hairline py-3 last:border-0"
+              >
+                <p className="font-medium [overflow-wrap:anywhere]">
+                  {r.nomeNaFonte} <span className="font-normal text-muted-foreground">→</span>{' '}
+                  {r.categoria}
+                </p>
+                <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+                  <dt className="text-xs text-muted-foreground">Fonte</dt>
+                  <dd className="min-w-0 text-muted-foreground">{r.fonte}</dd>
+                  <dt className="text-xs text-muted-foreground">De onde veio</dt>
+                  <dd className="min-w-0">
+                    <Origem regra={r} />
+                  </dd>
+                  <dt className="text-xs text-muted-foreground">Fichas</dt>
+                  <dd className="numerico min-w-0">{formatarNumero(r.fichas)}</dd>
+                </dl>
                 {podeEsquecer && r.origem === 'aprendido' ? (
-                  <Button variant="ghost" size="sm" onClick={() => setEmDuvida(r)}>
+                  <Button
+                    variant="outline"
+                    className="toque mt-1 h-11 self-start"
+                    onClick={() => setEmDuvida(r)}
+                  >
                     Esquecer
                   </Button>
                 ) : null}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>O que a fonte escreve</TableHead>
+                  <TableHead>Vira</TableHead>
+                  <TableHead>Fonte</TableHead>
+                  <TableHead>De onde veio</TableHead>
+                  <TableHead className="text-right">Fichas</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {regras.map((r) => (
+                  <TableRow key={`${r.fonteId}:${r.nomeNaFonte}`}>
+                    <TableCell className="font-medium">{r.nomeNaFonte}</TableCell>
+                    <TableCell>{r.categoria}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.fonte}</TableCell>
+                    <TableCell>
+                      <Origem regra={r} />
+                    </TableCell>
+                    <TableCell className="numerico text-right">{formatarNumero(r.fichas)}</TableCell>
+                    <TableCell className="text-right">
+                      {podeEsquecer && r.origem === 'aprendido' ? (
+                        <Button variant="ghost" size="sm" onClick={() => setEmDuvida(r)}>
+                          Esquecer
+                        </Button>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
 
       <DialogoConfirmar
         aberto={emDuvida !== null}
@@ -158,5 +188,30 @@ export function PainelDePara({ podeEsquecer }: { podeEsquecer: boolean }) {
         aoFechar={() => setEmDuvida(null)}
       />
     </div>
+  );
+}
+
+/** De onde veio a regra: quem a ensinou (e quando, e quantas vezes) ou "semeado". */
+function Origem({ regra: r }: { regra: RegraDoDePara }) {
+  return r.origem === 'aprendido' ? (
+    <span className="text-sm">
+      {r.quem ?? 'alguém'}
+      {r.aprendidoEm ? (
+        <span className="text-muted-foreground">
+          {' '}
+          em <span className="numerico">{formatarData(r.aprendidoEm)}</span>
+        </span>
+      ) : null}
+      {r.vezes > 1 ? (
+        <span className="text-muted-foreground">
+          {' '}
+          · <span className="numerico">{r.vezes}</span> escolhas
+        </span>
+      ) : null}
+    </span>
+  ) : (
+    <Badge variant="pilula" className="font-normal">
+      semeado
+    </Badge>
   );
 }

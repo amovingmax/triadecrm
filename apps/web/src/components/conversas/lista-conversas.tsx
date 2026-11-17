@@ -636,7 +636,7 @@ function Linha({
                 key={e.id}
                 nome={e.nome}
                 cor={e.cor}
-                className="h-4 shrink-0 px-1.5 text-[10px]"
+                className="h-4 shrink-0 px-1.5 text-[11px] md:text-[10px]"
               />
             ))}
             {item.etiquetas.length > 2 ? (
@@ -648,7 +648,7 @@ function Linha({
                 <span className="min-w-0 flex-1 truncate">{item.leituraDaIa.proximaAcao}</span>
                 {(item.leituraDaIa.score ?? 0) >= NOTA_QUE_VALE ? (
                   <span
-                    className="numerico shrink-0 rounded-full bg-wpp-chip px-1.5 text-[10px]"
+                    className="numerico shrink-0 rounded-full bg-wpp-chip px-1.5 text-[11px] md:text-[10px]"
                     title={`A IA vê ${item.leituraDaIa.score} de 100 de intenção de fechar nesta conversa`}
                   >
                     IA {item.leituraDaIa.score}

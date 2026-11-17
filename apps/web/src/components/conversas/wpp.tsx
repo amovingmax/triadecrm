@@ -144,8 +144,10 @@ export function Segmentado<T extends string>({
           type="button"
           aria-pressed={item.id === ativo}
           onClick={() => aoTrocar(item.id)}
+          // 32 px no celular (o mínimo de uma ação em linha no toque); 28 px no
+          // computador, onde o ponteiro é fino e a trilha fica mais leve.
           className={cn(
-            'inline-flex h-7 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-medium whitespace-nowrap transition-colors outline-none',
+            'inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-medium whitespace-nowrap transition-colors outline-none md:h-7',
             'focus-visible:ring-3 focus-visible:ring-ring/50',
             item.id === ativo
               ? 'bg-wpp-seg text-foreground shadow-wpp-caixa'

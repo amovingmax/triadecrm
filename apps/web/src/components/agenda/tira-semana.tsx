@@ -106,10 +106,11 @@ export function TiraDaSemana({
             >
               <span className="leading-none">{rotuloSemanaCurto(dia)}</span>
               <span className="numerico text-sm leading-none font-medium">{numeroDoDia(dia)}</span>
-              {/* A contagem é número, não bolinha: no sol, um ponto de 4px some. */}
+              {/* A contagem é número, não bolinha: no sol, um ponto de 4px some.
+                  11px e não 10 (16/11/2026): é o piso de rótulo do CRM no celular. */}
               <span
                 className={cn(
-                  'numerico text-[10px] leading-none',
+                  'numerico text-[11px] leading-none',
                   quantos > 0 ? (ativo ? '' : 'text-foreground') : 'invisible',
                 )}
               >

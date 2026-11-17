@@ -346,6 +346,10 @@ export function Interruptor({
         onClick={() => aoMudar(!ligado)}
         className={cn(
           'relative mt-1 h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50',
+          // A chave desenhada tem 24px de altura; o dedo precisa de 44 (16/11/2026).
+          // O `after` invisível estende a área de toque 10px para cada lado sem mudar
+          // o desenho. O título ao lado também liga e desliga: é `<label htmlFor>`.
+          "after:absolute after:-inset-2.5 after:content-['']",
           // Ligado é MENTA (29/09/2026): o interruptor ligado era tinta, e um
           // painel de cinco interruptores pretos lia como cinco "desligados"
           // de relance. Menta é o "sim" da interface.

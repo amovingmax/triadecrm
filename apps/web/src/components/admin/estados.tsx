@@ -233,7 +233,9 @@ export function ListaAdmin<T>({
                 .map((coluna) => (
                   <div key={coluna.id} className="contents">
                     <dt className="text-xs text-muted-foreground">{coluna.rotulo}</dt>
-                    <dd className="min-w-0">{coluna.celula(linha)}</dd>
+                    {/* `overflow-wrap:anywhere`: e-mail e código sem espaço quebram
+                        dentro da coluna em vez de vazar do cartão. */}
+                    <dd className="min-w-0 [overflow-wrap:anywhere]">{coluna.celula(linha)}</dd>
                   </div>
                 ))}
             </dl>

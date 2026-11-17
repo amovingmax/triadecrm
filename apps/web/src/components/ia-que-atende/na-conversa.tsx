@@ -46,6 +46,14 @@ import {
  */
 export const IA_QUE_ATENDE: boolean = EMPRESA.modulos.iaQueAtende;
 
+/**
+ * Os diálogos daqui no celular (16/11/2026): cabem na altura da tela e rolam por
+ * dentro (com o teclado aberto o campo de texto não empurra os botões para fora),
+ * e os botões têm 44px de alvo. Do `md` para cima, os 32px de antes.
+ */
+const CAIXA_DO_DIALOGO = 'max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-md';
+const BOTAO_DO_DIALOGO = 'toque h-11 md:h-8';
+
 function mensagemDoErro(e: unknown): string {
   if (e instanceof ErroDaIa) return e.message;
   return 'O servidor não respondeu. Tente de novo.';
@@ -184,7 +192,7 @@ export function ControleDaIa({
         {rotulo(pilula ? rotuloDeQuemAtende(data) : 'Parar a IA')}
       </Button>
       <Dialog open={aberto} onOpenChange={(v) => !parar.isPending && setAberto(v)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className={CAIXA_DO_DIALOGO}>
           <DialogHeader>
             <DialogTitle>Parar a IA nesta conversa</DialogTitle>
             <DialogDescription>
@@ -205,10 +213,21 @@ export function ControleDaIa({
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:text-sm"
           />
           <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={() => setAberto(false)} disabled={parar.isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              className={BOTAO_DO_DIALOGO}
+              onClick={() => setAberto(false)}
+              disabled={parar.isPending}
+            >
               Voltar
             </Button>
-            <Button type="button" onClick={() => parar.mutate()} disabled={parar.isPending}>
+            <Button
+              type="button"
+              className={BOTAO_DO_DIALOGO}
+              onClick={() => parar.mutate()}
+              disabled={parar.isPending}
+            >
               <BotOff aria-hidden="true" />
               Parar a IA
             </Button>
@@ -328,7 +347,7 @@ export function DialogoDeCorrecao({
 
   return (
     <Dialog open={resposta !== null} onOpenChange={(v) => !v && !corrigir.isPending && aoFechar()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={CAIXA_DO_DIALOGO}>
         <DialogHeader>
           <DialogTitle>Corrigir a resposta da IA</DialogTitle>
           <DialogDescription>
@@ -354,14 +373,20 @@ export function DialogoDeCorrecao({
           className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:text-sm"
         />
         <DialogFooter className="gap-2">
-          <Button type="button" variant="outline" onClick={aoFechar} disabled={corrigir.isPending}>
+          <Button
+            type="button"
+            variant="outline"
+            className={BOTAO_DO_DIALOGO}
+            onClick={aoFechar}
+            disabled={corrigir.isPending}
+          >
             Voltar
           </Button>
           <Button
             type="button"
             onClick={() => resposta && corrigir.mutate(resposta)}
             disabled={corrigir.isPending || texto.trim().length < 3}
-            className={cn(corrigir.isPending && 'opacity-80')}
+            className={cn(BOTAO_DO_DIALOGO, corrigir.isPending && 'opacity-80')}
           >
             Anotar a correção
           </Button>

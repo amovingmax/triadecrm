@@ -319,7 +319,7 @@ export function Mensagem({
               ? selos.map((selo) => (
                   <span
                     key={selo}
-                    className="rounded-full bg-wpp-sis px-2 py-0.5 text-[10.5px] text-wpp-sis-texto shadow-wpp"
+                    className="rounded-full bg-wpp-sis px-2 py-0.5 text-[11px] text-wpp-sis-texto shadow-wpp md:text-[10.5px]"
                   >
                     {selo}
                   </span>
@@ -893,7 +893,7 @@ function Audio({ mensagem }: { mensagem: MensagemDoFio }) {
 function Transcricao({ texto }: { texto: string }) {
   return (
     <div className="rounded-lg border border-dashed border-hairline bg-background/40 px-2.5 py-2">
-      <p className="mb-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+      <p className="mb-1 flex items-center gap-1.5 text-[11px] text-muted-foreground md:text-[10px]">
         <AudioLines className="size-3" aria-hidden="true" />
         transcrição automática, ninguém conferiu
       </p>

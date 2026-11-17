@@ -304,7 +304,7 @@ export function ChipDaJanela({ estado }: { estado: EstadoDaJanela }) {
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center gap-1 rounded-full border border-hairline px-1.5 text-[10px]',
+        'inline-flex shrink-0 items-center gap-1 rounded-full border border-hairline px-1.5 text-[11px] md:text-[10px]',
         apertada ? 'text-foreground' : 'text-muted-foreground',
       )}
       title={`Janela de 24 h aberta até ${dataHoraCompleta(estado.expiraEm)}`}

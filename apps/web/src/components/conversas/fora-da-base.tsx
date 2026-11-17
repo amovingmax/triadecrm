@@ -680,9 +680,13 @@ function ArquivarCliente({
   );
 }
 
-/** Uma ação da folha do celular: bloco de 56 px, ícone e nome (como em `conversa.tsx`). */
+/**
+ * Uma ação da folha do celular: bloco de 56 px, ícone e nome (como em `conversa.tsx`).
+ * O nome quebra em duas linhas (`whitespace-normal`) em vez de vazar: em 375 px
+ * cada coluna tem ~167 px, e "Registrar contato" passava da borda do bloco.
+ */
 const ACAO_DA_FOLHA =
-  'toque h-14 w-full justify-start gap-2.5 rounded-xl px-4 text-[15px] font-medium md:h-14';
+  'toque h-14 w-full justify-start gap-2.5 rounded-xl px-4 text-left text-[15px] leading-tight font-medium whitespace-normal md:h-14';
 
 /** Fornecedor, produtor e cerimonialista, só os que a empresa usa e com o rótulo dela. */
 const TIPOS = TIPOS_EM_USO;

@@ -323,7 +323,8 @@ export function PainelCatalogos({
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{modeloAberto?.nome}</DialogTitle>
+            {/* `pr-8`: o nome comprido do modelo corria por baixo do X de fechar. */}
+            <DialogTitle className="pr-8">{modeloAberto?.nome}</DialogTitle>
             <DialogDescription>
               {modeloAberto ? (
                 <>

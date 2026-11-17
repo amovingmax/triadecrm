@@ -119,6 +119,8 @@ export function SecaoRespostasProntas({ podeEditar }: { podeEditar: boolean }) {
                 size="icon-sm"
                 aria-label={`Apagar /${r.atalho}`}
                 onClick={() => setParaApagar(r)}
+                // 36px no celular (era 28): a lixeira encostada no texto pedia mira.
+                className="-my-1 size-9 md:my-0 md:size-7"
               >
                 <Trash2 aria-hidden="true" />
               </Button>
@@ -221,7 +223,9 @@ export function SecaoEtiquetas({ podeEditar }: { podeEditar: boolean }) {
                 type="button"
                 aria-label={`Apagar a etiqueta ${e.name}`}
                 onClick={() => setParaApagar(e)}
-                className="rounded-full p-1 text-muted-foreground hover:text-destructive"
+                // 32px de alvo (era 22): a margem negativa deixa a pílula com a mesma
+                // altura, e o círculo de toque passa por cima da borda dela.
+                className="-my-1.5 -mr-0.5 inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:text-destructive"
               >
                 <Trash2 className="size-3.5" aria-hidden="true" />
               </button>
@@ -247,7 +251,7 @@ export function SecaoEtiquetas({ podeEditar }: { podeEditar: boolean }) {
                 aria-checked={cor === c}
                 aria-label={`Cor ${c}`}
                 onClick={() => setCor(c)}
-                className={cn('size-7 rounded-full border-2', cor === c ? 'border-foreground' : 'border-transparent')}
+                className={cn('size-8 rounded-full border-2 md:size-7', cor === c ? 'border-foreground' : 'border-transparent')}
                 style={{ background: c }}
               />
             ))}

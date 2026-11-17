@@ -1177,11 +1177,18 @@ function Topo({
         variant="ghost"
         // 44 px no celular: é o botão de SAIR da tela, e ele estava com 36. No desktop
         // segue compacto, onde quem clica tem um mouse.
-        className="h-11 -ml-2 text-muted-foreground sm:h-9"
+        //
+        // `min-w-0 max-w-full` + o nome em `truncate` (16/11/2026): o botão herda
+        // `shrink-0` e `whitespace-nowrap`, e o nome do lote é escrito por quem monta.
+        // "Proprietários de Ponta Negra e Capim Macio — turno da tarde" deixava a
+        // linha com 444 px num celular de 375: o navegador alargava a página inteira,
+        // a tela rolava de lado e a barra de baixo ia parar fora da tela.
+        className="h-11 -ml-2 min-w-0 max-w-full text-muted-foreground sm:h-9"
+        title={lote.nome}
         onClick={aoSair}
       >
         <ChevronLeft aria-hidden="true" />
-        {lote.nome}
+        <span className="truncate">{lote.nome}</span>
       </Button>
 
       <p className="text-sm text-muted-foreground">

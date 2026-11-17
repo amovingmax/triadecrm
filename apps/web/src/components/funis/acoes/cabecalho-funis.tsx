@@ -83,19 +83,26 @@ export function FiltrosDoQuadro({
   aoTrocarCanal: (canal: Channel | null) => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative min-w-0 flex-1 md:max-w-xs">
+    // No celular a busca ganha a linha de cima inteira, e "Todos" e o canal dividem
+    // a de baixo (16/11/2026). Os três numa linha só deixavam a busca com 95px a
+    // 375px: o "Procurar no funil" virava "Procu" e o nome digitado mostrava cinco
+    // letras. A partir de `sm` volta a ser uma linha só, como era.
+    <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+      <div className="relative min-w-0 basis-full sm:flex-1 sm:basis-auto md:max-w-xs">
         <Search
           aria-hidden="true"
           className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
         />
+        {/* `pr-11` para o texto não correr por baixo do X, e o X nativo do
+            `type="search"` escondido: com o acolchoado ele aparecia ao lado do
+            nosso, e a busca ficava com dois "limpar" (16/11/2026). */}
         <Input
           type="search"
           value={q}
           onChange={(e) => aoBuscar(e.target.value)}
           placeholder="Procurar no funil"
           aria-label="Procurar parceiro dentro deste funil"
-          className="h-11 pl-8 md:h-8"
+          className="h-11 pr-11 pl-8 md:h-8 md:pr-2.5 [&::-webkit-search-cancel-button]:appearance-none"
         />
         {q ? (
           <Button
@@ -104,7 +111,7 @@ export function FiltrosDoQuadro({
             size="icon-sm"
             aria-label="Limpar a busca"
             onClick={() => aoBuscar('')}
-            className="absolute top-1/2 right-1 -translate-y-1/2"
+            className="absolute top-1/2 right-0 size-11 -translate-y-1/2 md:right-1 md:size-7"
           >
             <X aria-hidden="true" />
           </Button>
@@ -133,7 +140,7 @@ export function FiltrosDoQuadro({
         aria-label="Filtrar o funil pelo canal do último toque"
         title="O canal do último toque com o negócio, não o canal em que ele entrou."
         onChange={(e) => aoTrocarCanal((e.target.value || null) as Channel | null)}
-        className="toque h-11 shrink-0 rounded-lg border border-input bg-background px-2 text-base focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-8 md:text-sm"
+        className="toque h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-base focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:flex-none sm:shrink-0 md:h-8 md:text-sm"
       >
         <option value="">Todos os canais</option>
         {CANAIS_EM_ORDEM.map((c) => (

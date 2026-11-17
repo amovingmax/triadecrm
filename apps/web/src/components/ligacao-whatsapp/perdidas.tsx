@@ -54,7 +54,7 @@ export function SeloDeLigacaoPerdida({
     <span
       title={`${texto}. Sai quando alguém ligar de volta ou escrever ao cliente.`}
       className={cn(
-        'inline-flex h-4 shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-1.5 text-[10px] font-semibold text-destructive-texto',
+        'inline-flex h-4 shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-1.5 text-[11px] font-semibold text-destructive-texto md:text-[10px]',
         className,
       )}
     >

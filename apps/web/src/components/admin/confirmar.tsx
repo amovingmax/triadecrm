@@ -41,7 +41,9 @@ export function DialogoConfirmar({
     <Dialog open={aberto} onOpenChange={(estado) => (estado ? null : aoFechar())}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{titulo}</DialogTitle>
+          {/* `pr-8`: o título com nome comprido ("Apagar a etiqueta …?") não corre por
+              baixo do X de fechar. */}
+          <DialogTitle className="pr-8">{titulo}</DialogTitle>
           <DialogDescription asChild>
             <div className="space-y-2 text-left leading-relaxed">{descricao}</div>
           </DialogDescription>

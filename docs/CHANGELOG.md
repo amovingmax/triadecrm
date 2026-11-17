@@ -10740,3 +10740,48 @@ Pedido do usuário: "faz uma API do CRM do Tríade, preciso integrar softwares e
 - **Pendente:** entregar a mídia das mensagens; trocar telefone, excluir e juntar fichas; tarefas, visitas e reuniões; aviso no celular para lead que chega pela API; anúncios da Imova; um arquivo OpenAPI para importar em Postman, Make e n8n.
 
 **No ar desde 17/11/2026, ~16h (pedido do usuário: "suba alteração pro ar"):** `main` em `6ce6cf5` (avanço direto de `49d6a7b`). Banco da Imova pelo `publicar-banco imova migrar` (só a `20261117200000`) e da KOMUNE pelo `komune migrar` (a `20261116120000`, das medidas do terreno, que lá não faz nada, e a `20261117200000`). Função `api` publicada nos dois projetos (`kkqadgxvmzulcamuakzk` e `toqdjcajyrowutunczhr`). Sites das cópias limpas `~/triadecrm-publicar-imova` e `~/triadecrm-publicar-komune`: Imova `imova-all4tm6eg` (volta: `imova-n8sb0vonx`) e KOMUNE `triade-16ppkvbyr` (volta: `triade-ie9ldpwld`). Conferido de fora: nas duas, `GET /v1` sem chave dá 401 `chave_ausente` (a função) e com uma chave inventada no formato certo dá 401 `chave_invalida` com a frase do banco (a função chega a `public.api_atender`, com as permissões certas); `api_avisos` (15 s) e `api_limpar` ativos no `cron.job` dos dois bancos; `/login` 200 com `data-empresa` certo, `/admin?aba=integracoes` sem login vai para o login, `/auth/dev` 404. Nenhuma chave nem webhook foi criado em produção: a primeira chave é criada por um admin ou gestor em Ajustes → Integrações, e a tela com login não foi aberta em produção (login pelo Google).
+
+## 16/11/2026 — a folha "Mais" do celular vira grade de atalhos, e todas as telas passam pela varredura do celular (branch `menu-e-celular`, só no localhost; as duas empresas)
+
+Pedido do usuário, com print do iPhone: "preciso que [o menu do Mais] fique algo mais organizado" e "uma varredura para verificar se todas as telas estão responsivas no mobile de acordo com o display do celular". Sete agentes, cada um dono das próprias pastas (casca e menu; Meu dia e Conversas; Lotes, Agenda, Registrar e Disparos; Prospectados, Funis, Revisão e Importar; Anúncios e IA que atende; Metas, Relatórios, Ajustes e páginas públicas; propostas, só leitura). Conferido com Playwright e Chrome em modo celular, em 375, 390 e 430 px, contra o site local da Imova; o computador (1280) não mudou.
+
+- **Folha "Mais" (`layout/bottom-nav.tsx`, `layout/nav-link.tsx` variante `menu`, `lib/navegacao.ts`):** era um documento, com descrição de duas linhas cortada em "…" em cada item, um parágrafo em cada grupo, rolagem para chegar a Metas e Ajustes e um anel de foco grosso no X ao abrir. Agora:
+  - puxador que fecha arrastando;
+  - "Buscar no CRM", que abre a mesma paleta do cabeçalho (`abrirPaletaDeComandos()` em `paleta-comandos.tsx`, por evento; nada de segunda paleta);
+  - os três grupos com uma linha curta (`GRUPOS[].apoio` no lugar de `explicacao`), cada um numa grade de 4 ladrilhos (3 quando nenhum grupo tem 4, como na KOMUNE);
+  - o número continua sendo trabalho parado (selo no canto, dentro do `aria-label`), e o ativo leva a menta da barra.
+  - Com os 8 itens da Imova, a folha cabe inteira em 375×667. A `descricao` continua sendo o índice da paleta.
+- **Campo não dá zoom no iPhone (`app/globals.css`):** abaixo do `md`, todo campo de digitar tem 16px, fora de `@layer` para vencer qualquer utilitário. O campo da paleta (`ui/command.tsx`) também.
+- **Componentes compartilhados (`components/ui`):**
+  - a folha da direita ocupa a tela inteira no celular (o `w-3/4` vencia o `w-full` das telas);
+  - o diálogo tem teto de `100svh − 2rem`, rola por dentro, e o X ganha 44px de toque sem mudar o desenho;
+  - itens de menu suspenso com 40px no celular;
+  - a contagem da aba com 11px no celular;
+  - a faixa de abas que rola mostra a aba ativa (Ajustes escondia Ligações, Catálogos e LGPD).
+- **O que estava quebrado de verdade:**
+  - `/ligar/<id>`: um nome de lote longo alargava a página a 444px numa tela de 375 (`ligacao/tela-chamada.tsx`);
+  - Revisão: um site longo no cartão vazava 16px e levava junto a barra de baixo (`revisao/cartao-candidato.tsx`);
+  - Importar → "Ver todas": os cartões de coluna tinham 1.444px (`importacao/passo-mapa.tsx`);
+  - editor de anúncio: o Salvar ficava escondido atrás da barra de baixo e não aparecia em lugar nenhum (`anuncios/editor-anuncio.tsx`).
+- **No resto, ajuste fino:**
+  - conversa aberta com mais espaço para as mensagens em 375×667 ("Assumir conversa" no fim da frase de quem atende);
+  - Meu dia sem título espremido;
+  - Agenda com a hora em cima do nome;
+  - Disparos com o cabeçalho empilhado e o painel em tela cheia;
+  - fotos do anúncio com botões de 40px;
+  - "Fila de hoje" dos Relatórios em cartões no celular, e a tabela continua do `md` para cima;
+  - De-para dos Ajustes em cartões;
+  - botões da IA que atende com 40 a 44px;
+  - selos e rótulos de 10px passaram a 11px no celular;
+  - área segura do iPhone nos rodapés fixos e nas páginas `/aplicativo` e `/privacidade`.
+- **Verificado:** `tsc --noEmit` sem erro, eslint sem erro nos arquivos alterados, Vitest com 2.148 testes passando, e 23 telas × 3 larguras sem rolagem lateral (a régua mede contra a largura pedida, não contra `innerWidth`, que no modo celular cresce junto com o vazamento). O banco local da Imova recebeu à mão as 9 migrações da main que faltavam (20261112100000 a 20261113131000), sem registro em `schema_migrations`.
+- **Ficou de fora:**
+  - a visão de SDR (o `auth/dev?quem=sdr` cai em /login no banco local);
+  - a KOMUNE (só simulada, porque o site local roda como Imova);
+  - a rota com paradas reais (o banco local não tem coordenadas).
+- **Anotado, sem mexer (é comportamento):**
+  - `/cadencias` e `/cadencias/resumo` ainda abrem as telas antigas;
+  - Automáticas mostra "expirou_na_fila" sem tradução;
+  - "Atualizar do sistema atual" (Anúncios) e "Tirar de uso" (Categorias) gravam no clique, sem confirmar.
+- **Publicar:** só tela, sem banco nem worker. Commit e push na `main`, depois o site da Imova e o da KOMUNE.
+- **Porte (17/11/2026):** a branch não tinha commit; o diff dela foi aplicado com 3-way sobre a `main` de c496385 na branch `telas-responsivas`. Os dois conflitos, `relatorios/graficos-vende.tsx` e `relatorios/painel-vende-ia.tsx`, ficaram com a versão da `main` (os Relatórios novos já trazem os ajustes de celular desses dois arquivos). O resto entrou limpo.

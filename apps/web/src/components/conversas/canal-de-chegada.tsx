@@ -51,7 +51,7 @@ import { ROTULO_DA_SECAO } from './fio-wpp';
 type Tamanho = 'lista' | 'topo';
 
 const TAMANHO: Record<Tamanho, { caixa: string; icone: string }> = {
-  lista: { caixa: 'h-4 gap-1 px-1.5 text-[10px]', icone: 'size-2.5' },
+  lista: { caixa: 'h-4 gap-1 px-1.5 text-[11px] md:text-[10px]', icone: 'size-2.5' },
   topo: { caixa: 'h-7 gap-1.5 px-2.5 text-[12px]', icone: 'size-3.5' },
 };
 

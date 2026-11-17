@@ -190,7 +190,7 @@ export function CartaoNegocio({
               : 'Negócio do bolo comum: quem mover assume.'
           }
           className={cn(
-            'flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold',
+            'flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
             iniciais ? 'bg-muted text-foreground' : 'border border-dashed border-input text-muted-foreground',
           )}
         >

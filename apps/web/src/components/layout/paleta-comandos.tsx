@@ -27,6 +27,23 @@ function preCarregar() {
   void carregarLista();
 }
 
+/**
+ * ABRIR A PALETA DE FORA DO CABEÇALHO (16/11/2026). A folha "Mais" do celular tem no
+ * topo um "Buscar no CRM" que é esta mesma paleta, e não uma segunda: duas instâncias
+ * seriam dois atalhos ⌘K brigando pela mesma tecla e duas listas para manter. Quem
+ * quer abrir dispara um evento na janela; a única paleta, montada no cabeçalho de toda
+ * página, escuta e abre. Um evento, e não um contexto, porque a folha e o cabeçalho
+ * são irmãos na casca e nenhum dos dois precisa saber se a paleta está aberta.
+ */
+const EVENTO_ABRIR_PALETA = 'triade:abrir-paleta';
+
+export function abrirPaletaDeComandos() {
+  window.dispatchEvent(new Event(EVENTO_ABRIR_PALETA));
+}
+
+/** Baixa a lista da paleta antes do toque, para quem tem um botão que a abre. */
+export const preCarregarPaleta = preCarregar;
+
 export function PaletaComandos({ papel }: { papel: AppRole }) {
   const [aberta, setAberta] = useState(false);
   // A lista só monta na primeira abertura e depois fica montada: é o que deixa o
@@ -50,6 +67,12 @@ export function PaletaComandos({ papel }: { papel: AppRole }) {
     document.addEventListener('keydown', aoTeclar);
     return () => document.removeEventListener('keydown', aoTeclar);
   }, []);
+
+  useEffect(() => {
+    const abrir = () => mudar(true);
+    window.addEventListener(EVENTO_ABRIR_PALETA, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_PALETA, abrir);
+  }, [mudar]);
 
   useEffect(() => {
     if (typeof window.requestIdleCallback === 'function') {

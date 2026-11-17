@@ -715,7 +715,9 @@ function FormularioDeMontagem({ aoFechar }: { aoFechar: () => void }) {
         </div>
       </div>
 
-      <footer className="flex flex-col gap-2 border-t bg-popover px-4 pt-3 pb-4">
+      {/* A folha vai até o pé da tela: no iPhone, sem a área segura, "Montar" e
+          "Cancelar" ficavam em cima da barrinha de voltar ao início (16/11/2026). */}
+      <footer className="flex flex-col gap-2 border-t bg-popover px-4 pt-3 pb-[calc(1rem+var(--area-segura-inferior))]">
         {recusa ? (
           <p className="flex items-start gap-2 text-sm text-destructive-texto">
             <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />

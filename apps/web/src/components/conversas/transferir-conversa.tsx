@@ -231,17 +231,24 @@ const transferenciaSchema = z.object({
  * mesma conversa sem saber uma da outra. Não bloqueia: quem responde assume, e
  * é isso que a frase diz ANTES de a pessoa escrever. Traz também a nota da
  * última transferência, que é o contexto que quem recebe precisa.
+ *
+ * `acao` é o "Assumir" do celular, no fim da frase (16/11/2026): ele vinha num
+ * bloco de 44 px só dele, embaixo do aviso, e com a janela apertada o rodapé
+ * passava de 280 px num celular de 667 — sobravam ~220 px para as mensagens.
+ * Na frase ele fica onde a pessoa acabou de ler por que assumiria.
  */
 export function AvisoDeQuemAtende({
   fioId,
   atendente,
   paraMim,
   nomeDaPessoa,
+  acao,
 }: {
   fioId: string;
   atendente: string | null;
   paraMim: boolean;
   nomeDaPessoa: Map<string, string>;
+  acao?: React.ReactNode;
 }) {
   const ultima = useQuery({
     queryKey: ['conversas', 'transferencia', fioId],
@@ -268,6 +275,7 @@ export function AvisoDeQuemAtende({
         <p>
           <span className="font-medium text-foreground">{atendente ?? 'Outra pessoa'}</span> está
           atendendo esta conversa. Se você responder, ela passa para você.
+          {acao}
         </p>
       )}
       {nota ? (

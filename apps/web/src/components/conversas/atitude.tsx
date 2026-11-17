@@ -68,7 +68,7 @@ export function ChipDaAtitude({
     <span
       title={atitude.motivo ?? undefined}
       className={cn(
-        'inline-flex h-4 max-w-full shrink-0 items-center gap-1 truncate rounded-full px-1.5 text-[10px] leading-none font-medium',
+        'inline-flex h-4 max-w-full shrink-0 items-center gap-1 truncate rounded-full px-1.5 text-[11px] leading-none font-medium md:text-[10px]',
         ESTILO[atitude.etiqueta],
         className,
       )}
@@ -101,7 +101,7 @@ export function AtitudeNaLista({
       <ChipDaAtitude atitude={atitude} />
       {nomes.length > 0 ? (
         <span
-          className="inline-flex h-4 max-w-32 shrink-0 items-center truncate rounded-full border border-hairline px-1.5 text-[10px] leading-none text-muted-foreground"
+          className="inline-flex h-4 max-w-32 shrink-0 items-center truncate rounded-full border border-hairline px-1.5 text-[11px] leading-none text-muted-foreground md:text-[10px]"
           title={`Objeção: ${nomes.join(', ')}`}
         >
           objeção: {nomes[0]!.toLowerCase()}

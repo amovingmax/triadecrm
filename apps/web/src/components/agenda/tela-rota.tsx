@@ -181,7 +181,8 @@ function CabecalhoDaRota({
   const origemConfirmada = rota.config?.origem?.confirmada === true;
 
   return (
-    <section className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-5">
+    // `p-4` no celular, `p-5` de `sm` para cima: a mesma régua dos cartões da aba Dia.
+    <section className="sombra-base flex flex-col gap-3 rounded-xl bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
@@ -408,7 +409,7 @@ function CartaoDaParada({
   return (
     <article
       className={cn(
-        'sombra-base flex flex-col gap-2.5 rounded-xl bg-card p-5',
+        'sombra-base flex flex-col gap-2.5 rounded-xl bg-card p-4 sm:p-5',
         !parada.ainda_vale && 'opacity-60',
       )}
     >

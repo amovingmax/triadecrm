@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
+
 import { cn } from '@/lib/utils';
 
 /**
@@ -70,8 +72,27 @@ export function SeletorDeAba<T extends string>({
    */
   rolavel?: boolean;
 }) {
+  // A ABA ESCOLHIDA FICA À VISTA (16/11/2026). A faixa rola de lado quando os nomes
+  // não cabem, e no celular de 375px Ajustes mostrava "Pessoas … WhatsA" com a aba
+  // ativa (Ligações, Catálogos, LGPD) escondida à direita: a pessoa não via onde
+  // estava. Ao montar e a cada troca, a faixa rola só o necessário para mostrar a
+  // aba ativa. Não é `scrollIntoView`, que também rolaria a PÁGINA na vertical
+  // quando a faixa está fora da dobra.
+  const faixa = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const trilho = faixa.current;
+    const aba = trilho?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!trilho || !aba || trilho.scrollWidth <= trilho.clientWidth) return;
+    const t = trilho.getBoundingClientRect();
+    const a = aba.getBoundingClientRect();
+    const folga = 8;
+    if (a.left < t.left) trilho.scrollLeft -= t.left - a.left + folga;
+    else if (a.right > t.right) trilho.scrollLeft += a.right - t.right + folga;
+  }, [ativo]);
+
   return (
     <div
+      ref={faixa}
       role="tablist"
       aria-label={rotulo}
       className={cn(
@@ -130,7 +151,7 @@ export function SeletorDeAba<T extends string>({
             {item.contagem ? (
               <span
                 className={cn(
-                  'numerico ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]',
+                  'numerico ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[11px] md:text-[10px]',
                   selecionado ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground',
                 )}
               >

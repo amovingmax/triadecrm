@@ -686,18 +686,27 @@ export function Conversa({
           ) : null}
           {/* Quem atende, logo acima da caixa: quem vai responder precisa saber
               se está respondendo no lugar de alguém. */}
+          {/* No celular o "Assumir" sai do cabeçalho (não cabe na linha) e vem
+              para cá, onde a pessoa já está com o dedo: no fim da frase do aviso,
+              e não num bloco de largura inteira embaixo dele (16/11/2026), que
+              comia 52 px da conversa num celular de 667. Quem pode assumir é
+              sempre quem não está atendendo, então o aviso sempre aparece junto. */}
           {fio ? (
             <AvisoDeQuemAtende
               fioId={fio.id}
               atendente={fio.responsavel}
               paraMim={fio.responsavelId === eu?.id}
               nomeDaPessoa={nomeDaPessoa}
+              acao={
+                podeAssumir ? (
+                  <AssumirConversa
+                    fioId={fio.id}
+                    organizacaoId={item.id}
+                    className="my-0.5 ml-1.5 h-8 px-3 align-middle text-[13px] md:hidden"
+                  />
+                ) : null
+              }
             />
-          ) : null}
-          {/* No celular o "Assumir" sai do cabeçalho (não cabe na linha) e vem
-              para cá, onde a pessoa já está com o dedo. */}
-          {podeAssumir && fio ? (
-            <AssumirConversa fioId={fio.id} organizacaoId={item.id} className="w-full md:hidden" />
           ) : null}
           {/* Só no computador de teste e só na conversa do treino da IA. */}
           {fio ? <ClienteDeTeste fioId={fio.id} className="mx-1" /> : null}
@@ -818,9 +827,13 @@ function Arquivar({
   );
 }
 
-/** Uma ação da folha do celular: bloco de 56 px, ícone e nome, em duas colunas. */
+/**
+ * Uma ação da folha do celular: bloco de 56 px, ícone e nome, em duas colunas.
+ * O nome quebra em duas linhas (`whitespace-normal`) em vez de vazar: em 375 px
+ * cada coluna tem ~167 px, e "Registrar contato" passava da borda do bloco.
+ */
 const ACAO_DA_FOLHA =
-  'toque h-14 w-full justify-start gap-2.5 rounded-xl px-4 text-[15px] font-medium md:h-14';
+  'toque h-14 w-full justify-start gap-2.5 rounded-xl px-4 text-left text-[15px] leading-tight font-medium whitespace-normal md:h-14';
 
 function Campo({
   rotulo,

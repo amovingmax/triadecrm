@@ -60,13 +60,13 @@ type Props = {
  * subirem, perderiam o topo do acento pelo mesmo motivo. Cabe nos 64px da barra:
  * 20px de ícone + 4px + 16px de rótulo = 40px.
  *
- * Na variante "menu" (a folha "Mais" do celular) o item traz a DESCRIÇÃO sob o
- * rótulo. Treze rótulos de uma palavra são treze adivinhações: "Cadências", "Revisão"
- * e "Ligar" não dizem a ninguém o que há do outro lado, e a frase que explica isso
- * já existia em `NAVEGACAO` servindo só de índice invisível da paleta. Duas linhas
- * no máximo (`line-clamp-2`): a folha lista oito módulos, e um parágrafo por item
- * empurraria os últimos para fora da tela. A frase inteira continua indo para a
- * busca da paleta, que não depende do que está visível.
+ * Na variante "menu" (a folha "Mais" do celular) o item é um LADRILHO (16/11/2026):
+ * o ícone num quadrado de canto macio, o rótulo inteiro embaixo e o número como selo
+ * no ombro do quadrado. De 09/09 a 16/11/2026 era uma linha com a DESCRIÇÃO sob o
+ * rótulo, cortada em duas linhas com reticências; oito linhas assim, mais um
+ * parágrafo por grupo, faziam da folha um documento que se rolava para achar
+ * "Ajustes". O porquê do desenho novo está em `bottom-nav.tsx`; a descrição continua
+ * inteira na paleta, que o "Buscar no CRM" do topo da folha abre.
  */
 /*
  * A TELA JÁ ESTÁ AQUI QUANDO O DEDO CHEGA (21/10/2026). Toda tela do CRM é dinâmica
@@ -234,45 +234,43 @@ export function NavLink({
         href={item.href}
         prefetch={ADIANTAR_A_TELA}
         aria-current={ativo ? 'page' : undefined}
+        // O nome do link com o número junto ("Anúncios, 4 esperando"). O selo fica
+        // no canto do quadrado, dentro de um `aria-hidden`, e sem isto o leitor de
+        // tela diria só "Anúncios" — o número é o motivo de o ladrilho existir.
+        aria-label={rotuloDoNumero ? `${item.rotulo}, ${rotuloDoNumero}` : undefined}
         onClick={onNavegar}
         className={cn(
-          // `min-h-11` e não `h-11`: o alvo de toque continua garantido, mas a linha
-          // agora cresce com a descrição em vez de cortá-la pela metade.
-          'toque flex min-h-11 items-start gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-          ativo ? 'bg-accent font-medium text-accent-foreground' : 'text-foreground',
+          // A célula inteira é o alvo: o quadrado de 48px mais o rótulo passam dos
+          // 44px de toque com folga, e o dedo que erra o ícone por pouco ainda acerta.
+          // `min-w-0` deixa a coluna da grade mandar na largura; o rótulo quebra
+          // dentro dela em vez de alargá-la.
+          'toque flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-0.5 pt-1 pb-1.5 text-center text-xs leading-4 outline-none',
+          'focus-visible:ring-3 focus-visible:ring-ring/50',
+          ativo ? 'font-semibold text-foreground' : 'text-foreground',
         )}
       >
-        <Icone className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="flex min-w-0 flex-col">
-          <span className="flex items-center gap-2">
-            <span className="truncate">{item.rotulo}</span>
-            {numero !== null ? (
-              <span
-                aria-label={rotuloDoNumero}
-                className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[11px] leading-none font-medium tabular-nums text-accent-foreground"
-              >
-                {numero > 99 ? '99+' : numero}
-              </span>
-            ) : null}
-          </span>
-          {/* `text-xs` e tinta secundária: é apoio ao rótulo, não um segundo rótulo.
-              Some quando a descrição está vazia em vez de abrir um buraco na linha.
-
-              No item ativo a tinta sobe para `accent-foreground`: sobre o `bg-accent`
-              do escuro (#3f3f46) o esmaecido para em 4,07:1, abaixo dos 4,5:1 que
-              12px exigem. Fora do ativo ele tem folga (5,81:1 no escuro, 5,15:1 no
-              claro) e a hierarquia se sustenta no tamanho, não na cor. */}
-          {item.descricao ? (
+        <QuadradoDoIcone ativo={ativo}>
+          <Icone className={cn('size-[22px]', ativo && 'stroke-[2.25]')} strokeWidth={1.75} />
+          {numero !== null ? (
+            // O SELO NO OMBRO, como no trilho do desktop e na barra de baixo: menta
+            // com tinta, e invertido quando o quadrado já é menta. O anel na cor da
+            // folha descola o selo do quadrado.
             <span
               className={cn(
-                'line-clamp-2 text-xs leading-snug',
-                ativo ? 'text-accent-foreground' : 'text-muted-foreground',
+                'numerico absolute -top-1.5 -right-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] leading-none font-semibold ring-2 ring-popover',
+                ativo ? 'bg-menta-tinta text-menta' : 'bg-menta text-menta-tinta',
               )}
             >
-              {item.descricao}
+              {numero > 99 ? '99+' : numero}
             </span>
           ) : null}
-        </span>
+        </QuadradoDoIcone>
+        {/* O rótulo inteiro, sem reticências: "IA que atende" quebra entre palavras
+            quando a coluna aperta, e `text-balance` divide as duas linhas por igual
+            em vez de deixar uma palavra órfã. Uma palavra só que não caiba
+            ("Prospectados" numa coluna de 76px com a Poppins da KOMUNE) quebra por
+            sílaba (`hyphens-auto`, o documento é pt-BR), nunca some. */}
+        <span className="text-balance hyphens-auto">{item.rotulo}</span>
       </Link>
     );
   }
@@ -346,6 +344,31 @@ function PilulaDoIcone({ ativo, children }: { ativo: boolean; children: React.Re
       className={cn(
         'flex h-7 w-12 items-center justify-center rounded-full transition-colors',
         ativo ? 'bg-menta text-menta-tinta' : pending && 'bg-menta/40 text-foreground',
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
+ * O quadrado de canto macio do ladrilho da folha "Mais". Inativo, a superfície
+ * esmaecida (`bg-muted`) com o ícone na tinta; ativo, a menta cheia com a tinta por
+ * cima — a mesma pílula da barra de baixo, só que na forma do ladrilho. Enquanto a
+ * tela tocada não entra, a menta clara do toque, como na pílula.
+ */
+function QuadradoDoIcone({ ativo, children }: { ativo: boolean; children: React.ReactNode }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'relative flex size-12 shrink-0 items-center justify-center rounded-2xl transition-colors',
+        ativo
+          ? 'bg-menta text-menta-tinta'
+          : pending
+            ? 'bg-menta/40 text-foreground'
+            : 'bg-muted text-foreground',
       )}
     >
       {children}

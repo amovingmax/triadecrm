@@ -320,8 +320,14 @@ function LinhaDoRanking({
         aria-pressed={ativa}
         aria-label={`${m.titulo}, ${m.codigo}: ${contar(total, 'lead', 'leads')} (${textoDoInteresse(m)})`}
         onClick={() => aoEscolher(m.codigo)}
+        // No celular a linha vira duas faixas (16/11/2026): nome e número em cima, a
+        // barra na largura inteira embaixo. Em três colunas, em 375, o nome ficava com
+        // 130px ("Terreno Comercial ...") e a barra com outro tanto, e nenhum dos dois
+        // se lia. Do `md` para cima (a lista ao lado do detalhe) volta a ser uma faixa.
+        // O número é posto à mão na 1ª linha, 2ª coluna: sem isso a barra de duas
+        // colunas o empurraria para uma terceira linha.
         className={cn(
-          'toque grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_1.75rem] items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+          'toque grid w-full grid-cols-[minmax(0,1fr)_1.75rem] items-center gap-x-3 gap-y-1.5 rounded-lg px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_1.75rem] md:gap-y-1',
           ativa ? 'bg-muted shadow-[inset_3px_0_0_var(--foreground)]' : 'hover:bg-muted',
         )}
       >
@@ -333,14 +339,18 @@ function LinhaDoRanking({
         </span>
         <BarraEmpilhada
           maximo={maximo}
+          altura="h-3 md:h-4"
+          className="col-span-2 md:col-span-1"
           segmentos={[
             { valor: contagem(m.muito), cor: 'muito' },
             { valor: contagem(m.interessado), cor: 'interessado' },
             { valor: contagem(m.morno), cor: 'morno' },
           ]}
         />
-        <span className="numerico text-right text-sm font-medium">{inteiro(total)}</span>
-        <span className="col-span-3 truncate text-xs">
+        <span className="numerico col-start-2 row-start-1 text-right text-sm font-medium md:col-start-auto md:row-start-auto">
+          {inteiro(total)}
+        </span>
+        <span className="col-span-2 truncate text-xs md:col-span-3">
           {m.lider ? (
             <>
               Mais quente: {m.lider.nome} · calor <span className="numerico">{inteiro(m.lider.calor)}</span>

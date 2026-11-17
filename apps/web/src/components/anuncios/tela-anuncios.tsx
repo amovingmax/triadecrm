@@ -209,7 +209,10 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
             >
               <Settings2 aria-hidden="true" />
             </Button>
-            <Button asChild className="toque h-11 md:h-9">
+            {/* No celular, "Novo anúncio" vem primeiro (16/11/2026): é o que se
+                faz no local do imóvel, e no fim da fila ele caía sozinho na
+                terceira linha. No computador continua por último, à direita. */}
+            <Button asChild className="toque h-11 max-md:order-first md:h-9">
               <Link href="/anuncios/novo">
                 <Plus aria-hidden="true" />
                 Novo anúncio
@@ -387,6 +390,13 @@ function rotuloDoRecorte(r: Recorte): string {
   return 'Rascunhos';
 }
 
+/**
+ * O botão que se lê como link no meio da frase. O `-my-1.5 py-1.5` dá 32px de
+ * alvo ao dedo sem mexer na altura da linha (16/11/2026): a margem negativa
+ * devolve o que o recheio acrescenta.
+ */
+const BOTAO_DE_TEXTO = '-my-1.5 py-1.5 text-left underline underline-offset-4';
+
 function ResumoDaIntegracao({
   carregando,
   ultimaLeitura,
@@ -424,7 +434,7 @@ function ResumoDaIntegracao({
             <button
               type="button"
               onClick={aoAbrir}
-              className="text-left underline underline-offset-4"
+              className={BOTAO_DE_TEXTO}
             >
               Falta ligar a integração com o Canal Pro.
             </button>
@@ -438,7 +448,7 @@ function ResumoDaIntegracao({
             <button
               type="button"
               onClick={aoAbrir}
-              className="text-left underline underline-offset-4"
+              className={BOTAO_DE_TEXTO}
             >
               O Grupo OLX ainda não leu o arquivo. Veja como ligar.
             </button>
@@ -483,7 +493,7 @@ function ResumoDaIntegracao({
           <button
             type="button"
             onClick={aoImportar}
-            className="text-foreground underline underline-offset-4"
+            className="-my-1.5 py-1.5 text-foreground underline underline-offset-4"
           >
             {importadoEm ? 'Atualizar de novo' : 'Trazer a lista do Canal Pro'}
           </button>

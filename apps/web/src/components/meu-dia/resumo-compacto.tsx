@@ -92,7 +92,12 @@ export function ResumoCompacto({
           <span>
             Sem meta para hoje: os números abaixo mostram só o realizado.{' '}
             {podeDefinirMeta ? (
-              <Link href="/metas" className="underline underline-offset-4 hover:text-foreground">
+              // O `after` estende o toque do link para ~30 px de altura, sem mexer
+              // na linha do texto.
+              <Link
+                href="/metas"
+                className="relative underline underline-offset-4 after:absolute after:-inset-x-1 after:-inset-y-2 after:content-[''] hover:text-foreground"
+              >
                 Definir metas
               </Link>
             ) : (
@@ -148,13 +153,20 @@ function CartaoCompacto({ metrica, ritmo }: { metrica: MetricaDoDia; ritmo: Ritm
       title={definicao ? `${metrica.rotulo}: ${definicao}` : metrica.rotulo}
       className="sombra-base flex flex-col gap-2 rounded-xl bg-card px-4 py-4 sm:px-5"
     >
-      <p className="flex items-center gap-2.5 text-sm text-muted-foreground">
+      {/* `min-h-10` no celular: a linha do nome tem sempre a altura de duas linhas,
+          e o número dos dois cartões lado a lado fica na mesma altura. */}
+      <p className="flex items-center gap-2.5 text-sm text-muted-foreground max-md:min-h-10">
         {Icone ? (
           <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-muted text-foreground">
             <Icone className="size-4" aria-hidden="true" strokeWidth={1.75} />
           </span>
         ) : null}
-        <span className="truncate">{metrica.rotulo}</span>
+        {/* No celular o nome quebra em até duas linhas: em duas colunas de 375 px
+            sobram ~90 px ao lado do ícone, e "Contatos feitos" e "Visitas e
+            avaliações" viravam "Contatos fei…" e "Visitas e aval…". */}
+        <span className="min-w-0 leading-snug max-md:line-clamp-2 md:truncate">
+          {metrica.rotulo}
+        </span>
       </p>
 
       <p className="flex items-baseline gap-1.5">
