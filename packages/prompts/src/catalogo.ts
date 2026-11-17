@@ -3,6 +3,7 @@ import { atendenteImovaV2 } from './prompts/atendente-imova/v2';
 import { atendenteImovaV3 } from './prompts/atendente-imova/v3';
 import { atendenteImovaV4 } from './prompts/atendente-imova/v4';
 import { atendenteImovaV5 } from './prompts/atendente-imova/v5';
+import { atendenteImovaV6 } from './prompts/atendente-imova/v6';
 import { fotoDoAnuncioV1 } from './prompts/foto-do-anuncio/v1';
 import { avaliacaoDoAtendimentoV1 } from './prompts/avaliacao-do-atendimento/v1';
 import { avaliacaoDoAtendimentoV2 } from './prompts/avaliacao-do-atendimento/v2';
@@ -60,6 +61,7 @@ export const CATALOGO = {
     3: atendenteImovaV3,
     4: atendenteImovaV4,
     5: atendenteImovaV5,
+    6: atendenteImovaV6,
   },
   // Só da Imova (09/11/2026): de qual anúncio é a foto que o cliente mandou.
   'foto-do-anuncio': { 1: fotoDoAnuncioV1 },
@@ -110,7 +112,11 @@ export const VIGENTES = {
   // que entre na minha agenda e te retorno pra combinarmos" e passa a conversa. Entrada
   // e saída são as da v3: voltar à v4 é trocar este número, o import do worker e tirar
   // dele a trava da visita.
-  'atendente-imova': 5,
+  // v6 desde 17/11/2026: a v5 com o e-mail para ofertas: a IA convida, uma vez e na hora
+  // certa, quem ainda não tem e-mail na ficha a receber ofertas por e-mail, e diz se ele
+  // aceitou ou recusou (`ofertasPorEmail`). A entrada ganha `cliente.email` e a saída
+  // `ofertasPorEmail`: voltar à v5 é trocar este número e o import do worker.
+  'atendente-imova': 6,
   'foto-do-anuncio': 1,
   // v2 desde 09/11/2026: a juíza diz também a lacuna, onde a IA que atende falhou no
   // dia, para o relatório contar por tema. Voltar é trocar este número.

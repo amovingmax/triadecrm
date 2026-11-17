@@ -33,18 +33,19 @@ import { z } from 'zod';
 import {
   type BaseDoAtendenteV2,
   type ConviteDaAgenda,
-  type EntradaDoAtendenteV3,
+  type EntradaDoAtendenteV6,
   type ImovelDaBaseV2,
   type PromptVersionado,
-  type SaidaDoAtendenteV3,
+  type SaidaDoAtendenteV6,
   type TipoDaAgenda,
   CANAIS_DE_CHEGADA,
   MODELOS,
+  RESPOSTAS_AS_OFERTAS,
   TIPOS_DA_AGENDA,
   FRASE_DA_VISITA,
-  atendenteImovaV5,
+  atendenteImovaV6,
   reidratar,
-  sistemaComBaseV5,
+  sistemaComBaseV6,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -96,6 +97,13 @@ const entradaDoBanco = z.object({
   // novo primeiro. Lidos um a um em `convitesDaEntrada`; uma forma inesperada aqui vira
   // lista vazia, e não derruba a resposta.
   convites_da_agenda: z.array(z.unknown()).optional().catch(undefined),
+  // O e-mail (17/11/2026, `app.ia_email_do_cliente`): se a ficha tem e-mail (nunca o
+  // endereço) e a resposta mais nova ao convite de ofertas por e-mail. Banco sem a chave
+  // ou com forma inesperada: undefined, e quem decide é a ficha (ver `montarEntrada`).
+  email: z
+    .object({ na_ficha: z.boolean(), ofertas: z.enum(RESPOSTAS_AS_OFERTAS).nullable() })
+    .optional()
+    .catch(undefined),
   ultima_do_cliente: uuid.nullable().optional(),
   respostas_na_ultima_hora: z.number().optional(),
   mensagens: z
@@ -249,8 +257,10 @@ function agoraComT(agora: string | undefined): string {
 export function montarEntrada(
   e: EntradaDoBancoDoAtendente,
   leadId: string,
+  /** A ficha tem e-mail? Só vale quando o banco não disse (banco antes de 17/11/2026). */
+  fichaTemEmail = false,
 ): {
-  entrada: EntradaDoAtendenteV3;
+  entrada: EntradaDoAtendenteV6;
   /** m1, m2... → o id da mensagem no banco (para a foto que o treino ensina). */
   rotulos: Map<string, string>;
 } {
@@ -285,8 +295,12 @@ export function montarEntrada(
           local: v.local === null ? null : v.local.slice(0, 200),
         })),
         canalDeChegada: (CANAIS_DE_CHEGADA as readonly string[]).includes(canal ?? '')
-          ? (canal as EntradaDoAtendenteV3['cliente']['canalDeChegada'])
+          ? (canal as EntradaDoAtendenteV6['cliente']['canalDeChegada'])
           : null,
+        email: {
+          naFicha: e.email?.na_ficha ?? fichaTemEmail,
+          ofertas: e.email?.ofertas ?? null,
+        },
       },
       convitesDaAgenda: convitesDaEntrada(e.convites_da_agenda),
       respostasNaUltimaHora: Math.max(0, Math.trunc(e.respostas_na_ultima_hora ?? 0)),
@@ -355,7 +369,7 @@ export async function modeloEscolhido(contexto: ContextoDaIa): Promise<string> {
   const valor = ((data as { value?: unknown } | null)?.value ?? {}) as Record<string, unknown>;
   return typeof valor.modelo === 'string' && MODELOS_DO_ATENDENTE.has(valor.modelo)
     ? valor.modelo
-    : atendenteImovaV5.modelo;
+    : atendenteImovaV6.modelo;
 }
 
 /** Entrega a conversa a uma pessoa, com o aviso padrão e o motivo para a equipe. */
@@ -440,12 +454,13 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   const { entrada, rotulos } = montarEntrada(
     { ...e, mensagens: aplicarReconhecimentos(e.mensagens ?? [], reconhecidas) },
     leadId,
+    ficha.emails.length > 0,
   );
 
-  const prompt: PromptVersionado<EntradaDoAtendenteV3, SaidaDoAtendenteV3> = {
-    ...atendenteImovaV5,
-    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV5.modelo,
-    sistema: sistemaComBaseV5(base),
+  const prompt: PromptVersionado<EntradaDoAtendenteV6, SaidaDoAtendenteV6> = {
+    ...atendenteImovaV6,
+    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo,
+    sistema: sistemaComBaseV6(base),
   };
 
   let executada;
@@ -498,6 +513,22 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     modelo: prompt.modelo,
     base: base.versao ?? null,
   };
+
+  // A resposta ao convite de ofertas por e-mail (v6, 17/11/2026): fica registrada antes
+  // da resposta, com a mensagem do cliente como prova. Falha aqui não derruba a resposta:
+  // o pior caso é a IA convidar de novo numa próxima conversa.
+  if (saida.ofertasPorEmail !== null) {
+    await rpc(contexto, 'ia_atendente_ofertas_por_email', {
+      p_conversation_id: payload.conversation_id,
+      p_message_id: payload.message_id,
+      p_aceita: saida.ofertasPorEmail === 'aceitou',
+    }).catch((erro: unknown) =>
+      contexto.logger.warn('não deu para registrar a resposta às ofertas por e-mail', {
+        conversa: payload.conversation_id,
+        erro: erro instanceof Error ? erro.message : String(erro),
+      }),
+    );
+  }
 
   // O treino: o que a equipe ensinou vai para o caderno antes da resposta, para a
   // próxima mensagem já ler.

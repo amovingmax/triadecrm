@@ -103,6 +103,18 @@ export {
 } from './prompts/atendente-imova/v5';
 
 export {
+  type EmailDoCliente,
+  type EntradaDoAtendenteV6,
+  FRASE_DO_CONVITE,
+  RESPOSTAS_AS_OFERTAS,
+  type RespostaAsOfertas,
+  type SaidaDoAtendenteV6,
+  atendenteImovaV6,
+  linhaDoEmail,
+  sistemaComBaseV6,
+} from './prompts/atendente-imova/v6';
+
+export {
   BASE_DO_ENSAIO_V5,
   CENARIOS_DE_VISITA_V5,
   CENARIOS_DO_ATENDENTE_V5,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { FRASE_DA_VISITA, type SaidaDoAtendenteV3 } from '@komune/prompts';
+import { FRASE_DA_VISITA, type SaidaDoAtendenteV6 } from '@komune/prompts';
 
 import {
   atenderCliente,
@@ -173,7 +173,7 @@ function loggerDeTeste(): Logger {
   return { debug: nada, info: nada, warn: nada, error: nada };
 }
 
-function saidaDoModelo(mudanca: Partial<SaidaDoAtendenteV3> = {}): SaidaDoAtendenteV3 {
+function saidaDoModelo(mudanca: Partial<SaidaDoAtendenteV6> = {}): SaidaDoAtendenteV6 {
   return {
     // Desde a v5 (12/11/2026), o link da agenda é só da reunião online.
     acao: 'enviar_link_da_agenda',
@@ -183,6 +183,8 @@ function saidaDoModelo(mudanca: Partial<SaidaDoAtendenteV3> = {}): SaidaDoAtende
     anotacoes: [],
     fotosEnsinadas: [],
     confianca: 0.9,
+    // Desde a v6 (17/11/2026): a resposta ao convite de ofertas por e-mail.
+    ofertasPorEmail: null,
     ...mudanca,
   };
 }
@@ -193,7 +195,7 @@ function saidaDoModelo(mudanca: Partial<SaidaDoAtendenteV3> = {}): SaidaDoAtende
  * (que é do agente do convite e ainda não existe aqui).
  */
 function montar(
-  saida: SaidaDoAtendenteV3,
+  saida: SaidaDoAtendenteV6,
   enviarLink: (argumentos: Record<string, unknown>) => unknown = () => ({ ok: true, mensagem_id: 'm', link: 'x', convite_id: 'c' }),
   opcoes: { erroNoLink?: string; entrada?: Record<string, unknown>; caderno?: unknown[] } = {},
 ) {
@@ -215,6 +217,7 @@ function montar(
         ia_atendente_enviar_link: enviarLink,
         ia_atendente_responder: () => ({ ok: true, message_id: 'r' }),
         ia_atendente_passar: () => ({ ok: true }),
+        ia_atendente_ofertas_por_email: () => ({ ok: true, gravado: true }),
       },
     },
   );
@@ -249,13 +252,13 @@ function montar(
 }
 
 describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () => {
-  it('a reunião: o tipo, o texto e o ai_run, com a versão vigente (v5)', async () => {
+  it('a reunião: o tipo, o texto e o ai_run, com a versão vigente (v6)', async () => {
     const { contexto, chamadas, banco } = montar(saidaDoModelo());
     const r = await atenderCliente(contexto, PAYLOAD);
 
     expect(r).toMatchObject({ feito: true, motivo: 'enviar_link_da_agenda' });
     const run = banco.tabelas.ai_runs?.[0] as Record<string, unknown>;
-    expect(run.prompt_version).toBe('atendente-imova@v5');
+    expect(run.prompt_version).toBe('atendente-imova@v6');
     expect(chamadas('ia_atendente_enviar_link')).toEqual([
       {
         p_conversation_id: CONVERSA,
@@ -264,7 +267,7 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
         p_imovel_codigo: null,
         p_texto: 'Claro! Vou te mandar o link da agenda para você escolher o dia e o horário da nossa conversa.',
         p_ai_run_id: run.id,
-        p_prompt_version: 'atendente-imova@v5',
+        p_prompt_version: 'atendente-imova@v6',
       },
     ]);
     expect(chamadas('ia_atendente_marcar_visita')).toEqual([]);
@@ -293,7 +296,7 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
         p_texto: FRASE_DA_VISITA,
         p_motivo: 'Visita: TE0004 · combinar o dia e o horário com o cliente',
         p_ai_run_id: run.id,
-        p_prompt_version: 'atendente-imova@v5',
+        p_prompt_version: 'atendente-imova@v6',
       },
     ]);
   });
@@ -449,7 +452,7 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
   it('a saída da v2 (marcar_visita) não passa mais pelo schema: vai para uma pessoa', async () => {
     const { contexto, chamadas } = montar({
       ...saidaDoModelo(),
-      acao: 'marcar_visita' as SaidaDoAtendenteV3['acao'],
+      acao: 'marcar_visita' as SaidaDoAtendenteV6['acao'],
     });
     const r = await atenderCliente(contexto, PAYLOAD);
     expect(r.motivo).toMatch(/não conseguiu escrever a resposta/);
@@ -465,5 +468,71 @@ describe('enviar_link_da_agenda: o worker chama ia_atendente_enviar_link', () =>
     expect(r.feito).toBe(true);
     expect(pedidos[0]?.mensagem).toContain('LINKS DA AGENDA que já saíram nesta conversa (o mais novo primeiro):\n— nenhum');
     expect(chamadas('ia_atendente_enviar_link')).toHaveLength(1);
+  });
+});
+
+describe('o e-mail para ofertas (v6, 17/11/2026)', () => {
+  const resposta = (mudanca: Partial<SaidaDoAtendenteV6> = {}) =>
+    saidaDoModelo({ acao: 'responder', agenda: null, mensagem: 'Perfeito, anotado!', ...mudanca });
+
+  it('"aceitou": registra no banco, com a mensagem do cliente como prova, e responde', async () => {
+    const { contexto, chamadas } = montar(resposta({ ofertasPorEmail: 'aceitou' }));
+    const r = await atenderCliente(contexto, PAYLOAD);
+    expect(r.feito).toBe(true);
+    expect(chamadas('ia_atendente_ofertas_por_email')).toEqual([
+      { p_conversation_id: CONVERSA, p_message_id: ULTIMA, p_aceita: true },
+    ]);
+    expect(chamadas('ia_atendente_responder')).toHaveLength(1);
+  });
+
+  it('"recusou": registra o não', async () => {
+    const { contexto, chamadas } = montar(resposta({ ofertasPorEmail: 'recusou' }));
+    await atenderCliente(contexto, PAYLOAD);
+    expect(chamadas('ia_atendente_ofertas_por_email')).toEqual([
+      { p_conversation_id: CONVERSA, p_message_id: ULTIMA, p_aceita: false },
+    ]);
+  });
+
+  it('sem resposta ao convite, o banco não é chamado', async () => {
+    const { contexto, chamadas } = montar(resposta());
+    await atenderCliente(contexto, PAYLOAD);
+    expect(chamadas('ia_atendente_ofertas_por_email')).toEqual([]);
+  });
+
+  it('o modelo lê o que o banco diz do e-mail, sem o endereço', async () => {
+    const { contexto, pedidos } = montar(resposta(), undefined, {
+      entrada: entradaNoBanco({ email: { na_ficha: false, ofertas: 'recusou', ofertas_em: '2026-11-17' } }),
+    });
+    await atenderCliente(contexto, PAYLOAD);
+    expect(pedidos[0]?.mensagem).toContain(
+      'e-mail do cliente: ainda não está na ficha; ofertas por e-mail: recusou (não convide de novo)',
+    );
+  });
+
+  it('banco sem a chave do e-mail: vale a ficha (e o endereço não vai ao modelo)', async () => {
+    const { contexto, pedidos } = montar(resposta());
+    await atenderCliente(contexto, PAYLOAD);
+    expect(pedidos[0]?.mensagem).toContain('e-mail do cliente: ainda não está na ficha');
+    // Com e-mail na ficha, a mesma conversa diz que está.
+    const outra = montar(resposta());
+    (outra.banco.tabelas.organizations as { email: string | null }[])[0]!.email = 'janio@exemplo.com';
+    await atenderCliente(outra.contexto, PAYLOAD);
+    expect(outra.pedidos[0]?.mensagem).toContain('e-mail do cliente: já está na ficha');
+    expect(outra.pedidos[0]?.mensagem).not.toContain('janio@exemplo.com');
+  });
+
+  it('erro ao registrar a resposta não derruba a resposta ao cliente', async () => {
+    const { contexto, chamadas } = montar(resposta({ ofertasPorEmail: 'aceitou' }));
+    const rpcOriginal = contexto.cliente.rpc.bind(contexto.cliente);
+    const cliente = {
+      ...(contexto.cliente as unknown as Record<string, unknown>),
+      rpc: async (nome: string, argumentos: Record<string, unknown>) =>
+        nome === 'ia_atendente_ofertas_por_email'
+          ? { data: null, error: { message: 'caiu' } }
+          : rpcOriginal(nome as never, argumentos as never),
+    } as unknown as ClienteDoBanco;
+    const r = await atenderCliente({ ...contexto, cliente }, PAYLOAD);
+    expect(r.feito).toBe(true);
+    expect(chamadas('ia_atendente_responder')).toHaveLength(1);
   });
 });
