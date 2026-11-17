@@ -378,11 +378,17 @@ export function ConversaForaDaBase({
             <CanalNoTopo
               conversaId={fio.id}
               podeEscrever={Boolean(eu?.podeEscrever)}
-              className="mx-1 max-md:hidden conversa-estreita:hidden"
+              className="mx-1 max-md:hidden conversa-estreita:hidden @max-4xl:hidden"
             />
-            <BotaoDeBuscarNoFio className="max-md:hidden" />
+            {/* As mesmas regras do cabeçalho de `conversa.tsx` (17/11/2026). */}
+            <BotaoDeBuscarNoFio className="max-md:hidden @max-xl:hidden" />
             {eu?.podeEscrever ? (
-              <BotaoDeLigarNaConversa conversaId={fio.id} nome={rotulo} compacto={ehCelular} />
+              <BotaoDeLigarNaConversa
+                conversaId={fio.id}
+                nome={rotulo}
+                compacto={ehCelular}
+                rotuloPelaLargura
+              />
             ) : null}
             {virando ? null : (
               <Button
@@ -403,7 +409,7 @@ export function ConversaForaDaBase({
                   fioId={fio.id}
                   concluidaEm={fio.arquivada_em}
                   rotuloPelaLargura
-                  className="mx-1 conversa-estreita:hidden"
+                  className="mx-1 conversa-estreita:hidden @max-xl:hidden"
                 />
               ) : (
                 <ArquivarCliente fio={fio} className="conversa-estreita:hidden" />

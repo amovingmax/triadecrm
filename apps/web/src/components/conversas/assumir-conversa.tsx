@@ -55,10 +55,18 @@ export function AssumirConversa({
   fioId,
   organizacaoId,
   className,
+  rotuloPelaLargura = false,
 }: {
   fioId: string;
   organizacaoId: string;
   className?: string;
+  /**
+   * No cabeçalho do computador: abaixo de 48rem de painel fica só a mão, com o nome
+   * para o leitor de tela e no `title` (17/11/2026). Com a coluna dos dados do
+   * contato aberta, em 1280, o nome do contato sumia atrás dos botões. Pede um
+   * `@container` em volta.
+   */
+  rotuloPelaLargura?: boolean;
 }) {
   const clientes = useQueryClient();
   const assumir = useMutation({
@@ -83,15 +91,24 @@ export function AssumirConversa({
     },
   });
 
+  const rotulo = assumir.isPending ? 'Assumindo...' : 'Assumir conversa';
   return (
     <Button
       variant="outline"
       className={cn('toque h-11 md:h-9', className)}
       disabled={assumir.isPending}
       onClick={() => assumir.mutate()}
+      title={rotuloPelaLargura ? 'Assumir conversa' : undefined}
     >
       <Hand aria-hidden="true" />
-      {assumir.isPending ? 'Assumindo...' : 'Assumir conversa'}
+      {rotuloPelaLargura ? (
+        <>
+          <span className="hidden @3xl:inline">{rotulo}</span>
+          <span className="sr-only @3xl:hidden">{rotulo}</span>
+        </>
+      ) : (
+        rotulo
+      )}
     </Button>
   );
 }

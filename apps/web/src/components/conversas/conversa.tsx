@@ -559,10 +559,18 @@ export function Conversa({
             <CanalNoTopo
               conversaId={fio.id}
               podeEscrever={Boolean(eu?.podeEscrever)}
-              className="mx-1 max-md:hidden conversa-estreita:hidden"
+              className="mx-1 max-md:hidden conversa-estreita:hidden @max-4xl:hidden"
             />
           ) : null}
-          {fio ? <BotaoDeBuscarNoFio className="max-md:hidden" /> : null}
+          {/* QUEM CABE NO CABEÇALHO É A LARGURA DO PAINEL QUE DIZ (17/11/2026), e o
+              nome do contato vem primeiro. Em 1280 o cabeçalho pedia 839 px num
+              painel de 798 (com a coluna dos dados do contato aberta, 710 em 463), e
+              o nome ficava com 12 px. Agora: o canal de chegada só com 56rem de
+              painel (ele também está em "Como chegou", nos dados do contato);
+              "Pedir para ligar" e "Assumir conversa" com nome a partir de 48rem, e
+              a IA e o "Concluir" a partir de 64rem; abaixo de 36rem, a lupa e o
+              "Concluir" saem, porque também estão no "⋯". */}
+          {fio ? <BotaoDeBuscarNoFio className="max-md:hidden @max-xl:hidden" /> : null}
           {eu?.podeEscrever ? (
             <BotaoLigar
               organizationId={item.id}
@@ -571,12 +579,18 @@ export function Conversa({
             />
           ) : null}
           {fio && eu?.podeEscrever ? (
-            <BotaoDeLigarNaConversa conversaId={fio.id} nome={item.nome} compacto={ehCelular} />
+            <BotaoDeLigarNaConversa
+              conversaId={fio.id}
+              nome={item.nome}
+              compacto={ehCelular}
+              rotuloPelaLargura
+            />
           ) : null}
           {podeAssumir && fio ? (
             <AssumirConversa
               fioId={fio.id}
               organizacaoId={item.id}
+              rotuloPelaLargura
               className="rounded-full max-md:hidden md:h-10"
             />
           ) : null}
@@ -590,7 +604,7 @@ export function Conversa({
                 fioId={fio.id}
                 concluidaEm={fio.arquivadaEm}
                 rotuloPelaLargura
-                className="mx-1 conversa-estreita:hidden"
+                className="mx-1 conversa-estreita:hidden @max-xl:hidden"
               />
             ) : (
               <Arquivar fio={fio} className="conversa-estreita:hidden" />

@@ -86,7 +86,9 @@ export function SeloDaIa({ fioId, naFolha = false }: { fioId: string; naFolha?: 
             ? 'Conversa de teste: a IA conversa como com um cliente e não aprende nada aqui. Para parar, use "Parar a IA".'
             : 'A IA responde esta conversa sozinha. Para parar, use "Parar a IA".'
       }
-      className={naFolha ? 'h-9 gap-1.5 px-3 text-sm font-normal' : 'h-5 gap-1 px-2 text-[11px] font-normal'}
+      className={
+        naFolha ? 'h-9 gap-1.5 px-3 text-sm font-normal' : 'h-5 gap-1 px-2 text-[11px] font-normal'
+      }
     >
       <Icone className="size-3" aria-hidden="true" />
       {rotulo}
@@ -108,7 +110,8 @@ export function ControleDaIa({
   /**
    * `bloco` na folha e na coluna de dados ("Parar a IA" / "Ligar a IA aqui");
    * `pilula` no cabeçalho, ao lado de "Concluir": diz o estado ("IA atendendo" /
-   * "IA parada") e o toque faz o contrário. Em cabeçalho estreito fica só o ícone.
+   * "IA parada") e o toque faz o contrário. Em cabeçalho estreito fica só o ícone
+   * (o nome, com 64rem de painel ou mais, como o "Concluir").
    */
   variante?: 'bloco' | 'pilula';
 }) {
@@ -140,7 +143,8 @@ export function ControleDaIa({
       if (atende) toast.success('A IA voltou a atender esta conversa.');
       else
         toast.message('A IA foi ligada aqui, mas ainda não responde.', {
-          description: 'Ela está desligada na tela "IA que atende", ou esta conversa não está no modo dela.',
+          description:
+            'Ela está desligada na tela "IA que atende", ou esta conversa não está no modo dela.',
         });
     },
     onError: (e) => toast.error(mensagemDoErro(e)),
@@ -154,8 +158,8 @@ export function ControleDaIa({
   const rotulo = (texto: string) =>
     pilula ? (
       <>
-        <span className="hidden @3xl:inline">{texto}</span>
-        <span className="sr-only @3xl:hidden">{texto}</span>
+        <span className="hidden @5xl:inline">{texto}</span>
+        <span className="sr-only @5xl:hidden">{texto}</span>
       </>
     ) : (
       texto
@@ -316,7 +320,10 @@ export function AvaliacaoDaIa({ fioId, mensagemId }: { fioId: string; mensagemId
           Corrigir
         </button>
       </span>
-      <DialogoDeCorrecao resposta={corrigindo ? resposta : null} aoFechar={() => setCorrigindo(false)} />
+      <DialogoDeCorrecao
+        resposta={corrigindo ? resposta : null}
+        aoFechar={() => setCorrigindo(false)}
+      />
     </>
   );
 }
