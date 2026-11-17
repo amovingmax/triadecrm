@@ -240,26 +240,31 @@ function EscolherAnuncio({
         >
           {vistos.map((a) => (
             <li key={a.id}>
+              {/* O código em cima e o título embaixo, os dois na largura toda
+                  (17/11/2026). Numa coluna de 4.5rem, "PT0001_IMOVA" passava por cima
+                  do título e "Brisa Mall - Loja 02" quebrava em duas linhas; e o
+                  título, com o resto, virava "Sala comercial 38m2 - P…". */}
               <button
                 type="button"
                 onClick={() => aoEscolher(a.id)}
-                className="toque flex min-h-11 w-full items-start gap-3 rounded-lg px-3 py-2 text-left outline-none hover:bg-muted/45 focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="toque flex min-h-11 w-full flex-col gap-0.5 rounded-lg px-3 py-2 text-left outline-none hover:bg-muted/45 focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                <span className="numerico w-[4.5rem] shrink-0 pt-px text-sm font-medium">
-                  {a.codigo}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="numerico min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
+                    {a.codigo}
+                  </span>
+                  {a.situacao === 'no_ar' ? null : (
+                    <Badge
+                      variant="pilula"
+                      className="ml-auto shrink-0 font-normal text-muted-foreground"
+                    >
+                      {SITUACOES[a.situacao]}
+                    </Badge>
+                  )}
                 </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate text-sm">{a.titulo}</span>
-                    {a.situacao === 'no_ar' ? null : (
-                      <Badge variant="pilula" className="font-normal text-muted-foreground">
-                        {SITUACOES[a.situacao]}
-                      </Badge>
-                    )}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {a.endereco ?? 'Sem endereço no anúncio'}
-                  </span>
+                <span className="line-clamp-2 text-sm">{a.titulo}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {a.endereco ?? 'Sem endereço no anúncio'}
                 </span>
               </button>
             </li>
