@@ -52,6 +52,7 @@ import {
   MolduraDaAba,
   PlacarDaMeta,
   Quadrinho,
+  ReguaDaNota,
   Rodape,
   SeloIA,
   SemDado,
@@ -426,14 +427,33 @@ function NotaDaIA({ dados, aoAbrirPainel }: { dados: PainelVisao; aoAbrirPainel:
     .map((v) => ({ indice: indiceDaSemana(inicios, v.desde), rotulo: versaoCurta(v.versao) }))
     .filter((m) => m.indice >= 0);
   const ia = dados.ia;
+  // Linha com um ponto só não é gráfico (era um ponto encostado num eixo vazio, o print
+  // que o dono reclamou no Progresso da IA): com uma semana com nota, a nota vai na
+  // régua de 1 a 5 e a frase diz quando a linha aparece.
+  const unica = validas.length === 1 ? notas.find((n) => numero(n.nota) !== null) : undefined;
 
   return (
     <Cartao
       titulo={tituloDaNotaDaIA(notas)}
-      sub={`Nota média da avaliação diária (de 1 a 5), por semana desde que a IA começou. Os tracejados são as versões. O eixo começa em ${piso}.`}
+      sub={
+        unica
+          ? 'Nota média da avaliação diária, de 1 a 5.'
+          : `Nota média da avaliação diária (de 1 a 5), por semana desde que a IA começou. Os tracejados são as versões. O eixo começa em ${piso}.`
+      }
     >
       {validas.length === 0 ? (
         <SemDado>A avaliação diária ainda não deu nota às conversas da IA.</SemDado>
+      ) : unica ? (
+        <div className="flex flex-col gap-2.5">
+          <p className="numerico text-xs text-muted-foreground">
+            Semana de {diaMes(unica.semana)}:{' '}
+            <span className="font-semibold text-foreground">{decimalFixo(unica.nota)} de 5</span>
+          </p>
+          <ReguaDaNota nota={numero(unica.nota) ?? 1} />
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            A linha semana a semana aparece com a 2ª semana com nota.
+          </p>
+        </div>
       ) : (
         <div className="flex flex-col gap-1.5">
           <Linha

@@ -255,7 +255,7 @@ function Conteudo({
           ) : null}
         </Cartao>
 
-        <div ref={detalhe} className="scroll-mt-4">
+        <div ref={detalhe} className="scroll-mt-(--topo-relatorios)">
           {linha ? (
             <Detalhe
               key={linha.codigo}

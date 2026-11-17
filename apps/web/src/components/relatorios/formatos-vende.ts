@@ -9,7 +9,6 @@ import type {
   NivelDeInteresse,
   Premissas,
   Previsao,
-  SemanaDaIA,
   SituacaoParada,
   Sugestao,
   TipoDeImovel,
@@ -1023,78 +1022,6 @@ export function pontas(valores: readonly (number | null | undefined)[]): { prime
   const primeiro = bons[0];
   const ultimo = bons[bons.length - 1];
   return primeiro === undefined || ultimo === undefined ? null : { primeiro, ultimo };
-}
-
-/** "As três notas subiram; informação útil foi a que mais cresceu". */
-export function tituloDasNotas(semanas: readonly SemanaDaIA[]): string {
-  const deltas = SERIES_DA_NOTA.map((s) => {
-    const p = pontas(semanas.map((w) => w[s.chave]));
-    return { rotulo: s.rotulo, p, d: p ? Math.round((p.ultimo - p.primeiro) * 10) / 10 : null };
-  }).filter((x) => x.d !== null && x.p !== null);
-  if (deltas.length === 0) return 'A avaliação diária ainda não deu nota à IA';
-  const subiram = deltas.filter((x) => (x.d ?? 0) > 0);
-  const maior = [...deltas].sort((a, b) => (b.d ?? 0) - (a.d ?? 0))[0];
-  if (!maior || subiram.length === 0) return 'As notas da avaliação diária, semana a semana';
-  const nome = maior.rotulo.charAt(0).toLowerCase() + maior.rotulo.slice(1);
-  if (subiram.length === deltas.length && deltas.length === 3) {
-    return `As três notas subiram; ${nome} foi a que mais cresceu`;
-  }
-  return `${maior.rotulo} foi a nota que mais cresceu: ${decimalFixo(maior.p?.primeiro)} → ${decimalFixo(maior.p?.ultimo)}`;
-}
-
-/** "O cliente sai da conversa mais interessado: 18% no começo, 31% agora". */
-export function tituloDoInteresse(semanas: readonly SemanaDaIA[]): string {
-  const p = pontas(semanas.map((s) => s.subiu_pct));
-  if (!p) return 'O interesse antes e depois de cada conversa com a IA';
-  if (Math.round(p.ultimo) > Math.round(p.primeiro)) {
-    return `O cliente sai da conversa mais interessado: ${pct(p.primeiro)} no começo, ${pct(p.ultimo)} agora`;
-  }
-  return `${pct(p.ultimo)} dos clientes saem da conversa com a IA mais interessados`;
-}
-
-/** "Resolve sozinha mais da metade das conversas: 56%". */
-export function tituloDasResolvidas(semanas: readonly SemanaDaIA[]): string {
-  const p = pontas(semanas.map((s) => s.resolvidas_pct));
-  if (!p) return 'Conversas que a IA resolve sozinha';
-  return p.ultimo >= 50
-    ? `Resolve sozinha mais da metade das conversas: ${pct(p.ultimo)}`
-    : `Resolve sozinha ${pct(p.ultimo)} das conversas`;
-}
-
-/**
- * "Marcou 4 visitas na última semana completa; começou com 1". A última semana da
- * lista é a corrente (ainda pela metade): a frase lê a anterior a ela.
- */
-export function tituloDasVisitasDaIA(semanas: readonly SemanaDaIA[]): string {
-  if (semanas.length === 0) return 'Visitas marcadas pela IA';
-  if (semanas.length === 1) {
-    return `Marcou ${contar(contagem(semanas[0]?.visitas), 'visita', 'visitas')} nesta semana`;
-  }
-  const completa = contagem(semanas[semanas.length - 2]?.visitas);
-  if (semanas.length === 2) {
-    return `Marcou ${contar(completa, 'visita', 'visitas')} na primeira semana`;
-  }
-  const primeiro = contagem(semanas[0]?.visitas);
-  const frase = `Marcou ${contar(completa, 'visita', 'visitas')} na última semana completa`;
-  return completa === primeiro ? frase : `${frase}; começou com ${inteiro(primeiro)}`;
-}
-
-/** "O que ainda falta: “Não sabia o condomínio ou o IPTU” é a maior lacuna". */
-export function tituloDasLacunas(lacunas: readonly { lacuna: LacunaDaIA; agora: number }[]): string {
-  const topo = [...lacunas].sort((a, b) => contagem(b.agora) - contagem(a.agora))[0];
-  if (!topo || contagem(topo.agora) === 0) return 'A avaliação diária não achou falha nas últimas 4 semanas';
-  return `O que ainda falta: “${rotuloDaLacuna(topo.lacuna)}” é a maior lacuna`;
-}
-
-/** "Onde a IA depende da equipe: 9 de 23 leads passados esperaram mais de 2 horas". */
-export function tituloDaPassagem(passagem: readonly { faixa: FaixaDePassagem; leads: number }[]): string {
-  const total = passagem.reduce((s, p) => s + contagem(p.leads), 0);
-  if (total === 0) return 'A IA não passou nenhuma conversa para a equipe nas últimas 4 semanas';
-  const lentos = passagem
-    .filter((p) => p.faixa === 'mais_2h' || p.faixa === 'sem_resposta')
-    .reduce((s, p) => s + contagem(p.leads), 0);
-  if (lentos === 0) return `A equipe respondeu os ${inteiro(total)} leads passados pela IA em até 2 horas`;
-  return `Onde a IA depende da equipe: ${inteiro(lentos)} de ${inteiro(total)} leads passados esperaram mais de 2 horas`;
 }
 
 /** A frase das 8 semanas do imóvel. */

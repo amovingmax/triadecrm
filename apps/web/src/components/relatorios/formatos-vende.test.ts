@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { LinhaImovel, LinhaPessoaVende, Previsao, SemanaDaIA } from './dados-vende';
+import type { LinhaImovel, LinhaPessoaVende, Previsao } from './dados-vende';
 import {
   comoCorrigirLacuna,
   oQueMudouNaVersao,
@@ -40,20 +40,15 @@ import {
   tituloDaEquipe,
   tituloDaMesa,
   tituloDaNotaDaIA,
-  tituloDaPassagem,
   tituloDaPrevisao,
   tituloDaPrevisaoPorEtapa,
   tituloDaVelocidade,
-  tituloDasLacunas,
-  tituloDasNotas,
   tituloDasObjecoes,
   tituloDasPerguntas,
   tituloDasSemanasDoImovel,
   tituloDasSituacoes,
-  tituloDasVisitasDaIA,
   tituloDoFunilCurto,
   tituloDoFunilLongo,
-  tituloDoInteresse,
   tituloDoMaisProcurado,
   tituloDoRanking,
   tituloDosCanais,
@@ -94,21 +89,6 @@ function previsao(parcial: Partial<Previsao> = {}): Previsao {
     meta: 6,
     por_etapa: [],
     ritmo: { visitas_por_negocio: 6, comparecimento: 0.74, visitas_marcadas_por_semana: 7 },
-    ...parcial,
-  };
-}
-
-function semana(parcial: Partial<SemanaDaIA> & { inicio: string }): SemanaDaIA {
-  return {
-    conversas: 10,
-    duvida: null,
-    informacao: null,
-    satisfacao: null,
-    subiu_pct: null,
-    igual_pct: null,
-    caiu_pct: null,
-    resolvidas_pct: null,
-    visitas: 0,
     ...parcial,
   };
 }
@@ -504,39 +484,6 @@ describe('frases-título', () => {
     );
     expect(tituloDaNotaDaIA([])).toBe('A IA ainda não tem nota da avaliação diária');
 
-    const semanas = [
-      semana({ inicio: '2026-09-01', duvida: 3.4, informacao: 3.1, satisfacao: 3.6, subiu_pct: 18 }),
-      semana({ inicio: '2026-09-08', duvida: 4.3, informacao: 4.1, satisfacao: 4.4, subiu_pct: 31 }),
-    ];
-    expect(tituloDasNotas(semanas)).toBe('As três notas subiram; informação útil foi a que mais cresceu');
-    expect(tituloDasNotas([])).toBe('A avaliação diária ainda não deu nota à IA');
-    expect(tituloDoInteresse(semanas)).toBe(
-      'O cliente sai da conversa mais interessado: 18% no começo, 31% agora',
-    );
-
-    const v = (n: number[]) => n.map((visitas, i) => semana({ inicio: `2026-10-${10 + i}`, visitas }));
-    expect(tituloDasVisitasDaIA(v([1, 2, 4, 0]))).toBe('Marcou 4 visitas na última semana completa; começou com 1');
-    expect(tituloDasVisitasDaIA(v([1, 0]))).toBe('Marcou 1 visita na primeira semana');
-    expect(tituloDasVisitasDaIA(v([2]))).toBe('Marcou 2 visitas nesta semana');
-    expect(tituloDasVisitasDaIA([])).toBe('Visitas marcadas pela IA');
-
-    expect(
-      tituloDasLacunas([
-        { lacuna: 'financiamento', agora: 5 },
-        { lacuna: 'condominio_iptu', agora: 7 },
-      ]),
-    ).toBe('O que ainda falta: “Não sabia o condomínio ou o IPTU” é a maior lacuna');
-    expect(tituloDasLacunas([])).toBe('A avaliação diária não achou falha nas últimas 4 semanas');
-
-    expect(
-      tituloDaPassagem([
-        { faixa: 'ate_15', leads: 7 },
-        { faixa: '15_60', leads: 5 },
-        { faixa: '1_2h', leads: 2 },
-        { faixa: 'mais_2h', leads: 9 },
-      ]),
-    ).toBe('Onde a IA depende da equipe: 9 de 23 leads passados esperaram mais de 2 horas');
-    expect(tituloDaPassagem([])).toBe('A IA não passou nenhuma conversa para a equipe nas últimas 4 semanas');
   });
 
   it('as 8 semanas do imóvel', () => {

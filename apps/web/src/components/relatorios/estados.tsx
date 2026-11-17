@@ -50,9 +50,9 @@ export function EsqueletoRelatorio({ colunas = 8, linhas = 10 }: { colunas?: num
  */
 export function ErroDoRelatorio({ causa, aoTentar }: { causa: string; aoTentar: () => void }) {
   return (
-    <Moldura icone={<CircleAlert className="size-5" aria-hidden="true" />} titulo="O relatório não abriu">
-      <p className="max-w-prose text-sm text-muted-foreground">{causa}</p>
-      <Button variant="outline" onClick={aoTentar} className="toque h-11 md:h-9">
+    <Moldura icone={<CircleAlert className="size-[18px]" aria-hidden="true" />} titulo="O relatório não abriu" tom="erro">
+      <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{causa}</p>
+      <Button variant="outline" onClick={aoTentar} className="toque mt-1 h-11 md:h-9">
         <RotateCw aria-hidden="true" />
         Tentar de novo
       </Button>
@@ -92,10 +92,10 @@ export function VazioDoRelatorio({
   acao?: AcaoDoVazio;
 }) {
   return (
-    <Moldura icone={<Inbox className="size-5" aria-hidden="true" />} titulo={titulo}>
-      <p className="max-w-prose text-sm text-muted-foreground">{texto}</p>
+    <Moldura icone={<Inbox className="size-[18px]" aria-hidden="true" />} titulo={titulo}>
+      <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{texto}</p>
       {acao ? (
-        <Button asChild variant="outline" className="toque h-11 md:h-9">
+        <Button asChild variant="outline" className="toque mt-1 h-11 md:h-9">
           <Link href={acao.href}>
             {acao.icone}
             {acao.rotulo}
@@ -124,21 +124,34 @@ export function LinkNoTexto({ href, children }: { href: string; children: ReactN
   );
 }
 
+/**
+ * A forma comum do erro e do vazio: o ícone num círculo com contorno hairline, o
+ * título e o texto logo embaixo, e a ação. O erro pinta só o ÍCONE com o destrutivo
+ * (marca gráfica, 3:1); o título já diz "não abriu", então a cor não carrega o
+ * sentido sozinha. O vazio fica no cinza: não é alarme, é o estado do mundo.
+ */
 function Moldura({
   icone,
   titulo,
+  tom = 'neutro',
   children,
 }: {
   icone: React.ReactNode;
   titulo: string;
+  tom?: 'neutro' | 'erro';
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-start gap-3 px-1 py-10">
-      <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+    <div className="flex flex-col items-start gap-2.5 px-1 py-10">
+      <span
+        className={cn(
+          'mb-1 flex size-10 items-center justify-center rounded-full ring-1 ring-hairline',
+          tom === 'erro' ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground',
+        )}
+      >
         {icone}
       </span>
-      <h3 className="font-heading text-base font-semibold tracking-tight">{titulo}</h3>
+      <h3 className="font-heading text-base leading-snug font-semibold tracking-tight">{titulo}</h3>
       {children}
     </div>
   );
