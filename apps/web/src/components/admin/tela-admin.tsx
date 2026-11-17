@@ -11,6 +11,7 @@ import { PainelCatalogos } from './painel-catalogos';
 import { PainelLgpd } from './painel-lgpd';
 import { PainelAtendimento } from './painel-atendimento';
 import { PainelAvisos } from './painel-avisos';
+import { PainelIntegracoes } from './painel-integracoes';
 import { PainelLigacoes } from './painel-ligacoes';
 import { PainelPessoas } from './painel-pessoas';
 import { PainelWhatsapp } from './painel-whatsapp';
@@ -100,6 +101,7 @@ export function TelaAdmin({
           podeEsquecer={sessao.papel === 'admin' || sessao.papel === 'gestor'}
         />
       ) : null}
+      {aba === 'integracoes' ? <PainelIntegracoes eu={sessao.id} /> : null}
       {aba === 'lgpd' ? <PainelLgpd sessao={sessao} secao={lgpd} aoTrocarSecao={setLgpd} /> : null}
     </div>
   );

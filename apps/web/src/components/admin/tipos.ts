@@ -12,7 +12,14 @@ import type { AppRole } from '@/lib/auth/role';
 import { EMPRESA } from '@/lib/empresa';
 
 export type Aba =
-  'pessoas' | 'avisos' | 'atendimento' | 'whatsapp' | 'ligacoes' | 'catalogos' | 'lgpd';
+  | 'pessoas'
+  | 'avisos'
+  | 'atendimento'
+  | 'whatsapp'
+  | 'ligacoes'
+  | 'catalogos'
+  | 'integracoes'
+  | 'lgpd';
 
 export const ABAS: readonly {
   id: Aba;
@@ -57,6 +64,13 @@ export const ABAS: readonly {
     rotulo: 'Catálogos',
     descricao:
       'As listas do CRM: categorias, cidades, feriados, motivos, desfechos, modelos, respostas prontas e etiquetas.',
+  },
+  {
+    // A API do CRM (17/11/2026, nas duas empresas): chaves e avisos para fora.
+    id: 'integracoes',
+    rotulo: 'Integrações',
+    descricao:
+      'As chaves com que outros sistemas falam com o CRM, e os avisos que o CRM manda para eles (webhooks).',
   },
   {
     id: 'lgpd',
