@@ -9116,6 +9116,7 @@ export type Database = {
         Row: {
           assignee_id: string | null
           completed_at: string | null
+          concluida_com_conversa: string | null
           contact_id: string | null
           created_at: string
           created_by: string | null
@@ -9133,6 +9134,7 @@ export type Database = {
         Insert: {
           assignee_id?: string | null
           completed_at?: string | null
+          concluida_com_conversa?: string | null
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -9150,6 +9152,7 @@ export type Database = {
         Update: {
           assignee_id?: string | null
           completed_at?: string | null
+          concluida_com_conversa?: string | null
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -9165,6 +9168,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_concluida_com_conversa_fkey"
+            columns: ["concluida_com_conversa"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_assignee_id_fkey"
             columns: ["assignee_id"]

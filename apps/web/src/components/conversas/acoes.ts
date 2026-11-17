@@ -484,22 +484,41 @@ export async function arquivarConversa(fioId: string, arquivar: boolean): Promis
 }
 
 /**
+ * O que concluir ou reabrir fez com as tarefas do cliente (17/11/2026):
+ * concluir fecha as abertas, reabrir devolve as que a conclusão fechou. Zero
+ * quando o banco é de antes da migração 20261117210000 e não devolve as chaves.
+ */
+export type TarefasDaConclusao = { concluidas: number; devolvidas: number };
+
+/**
  * Conclui a conversa, ou reabre (03/11/2026, Imova). É a MESMA porta do
  * arquivar (`conversa_arquivar`), com as palavras da tela: quem clicou em
  * "Concluir" não pode ler "não deu para arquivar". Ver `concluir-conversa.tsx`.
  */
-export async function concluirConversa(fioId: string, concluir: boolean): Promise<void> {
-  await trocarArquivo(fioId, concluir, concluir ? 'concluir' : 'reabrir');
+export async function concluirConversa(
+  fioId: string,
+  concluir: boolean,
+): Promise<TarefasDaConclusao> {
+  return trocarArquivo(fioId, concluir, concluir ? 'concluir' : 'reabrir');
 }
 
-async function trocarArquivo(fioId: string, arquivar: boolean, verbo: string): Promise<void> {
+async function trocarArquivo(
+  fioId: string,
+  arquivar: boolean,
+  verbo: string,
+): Promise<TarefasDaConclusao> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc('conversa_arquivar', {
     p_conversation_id: fioId,
     p_arquivar: arquivar,
   });
   if (error) levantar(error.code, error);
-  const r = data as { ok?: boolean; motivo?: string } | null;
+  const r = data as {
+    ok?: boolean;
+    motivo?: string;
+    tarefas_concluidas?: number;
+    tarefas_devolvidas?: number;
+  } | null;
   if (!r?.ok) {
     throw new ErroDaConversa(
       r?.motivo === 'sem_permissao'
@@ -508,6 +527,7 @@ async function trocarArquivo(fioId: string, arquivar: boolean, verbo: string): P
       false,
     );
   }
+  return { concluidas: r.tarefas_concluidas ?? 0, devolvidas: r.tarefas_devolvidas ?? 0 };
 }
 
 // ---------------------------------------------------------------------------

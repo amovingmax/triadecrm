@@ -166,3 +166,21 @@ export function nomeExibido(nomeDaFicha: string, nomeDoPerfil: string | null): s
   if (!FICHA_SEM_NOME.test(ficha)) return nomeDaFicha;
   return nomeDoPerfil?.trim() || ficha.replace(FICHA_SEM_NOME, '').trim() || nomeDaFicha;
 }
+
+/**
+ * O que concluir ou reabrir fez com as tarefas do cliente, para o começo do
+ * aviso (17/11/2026, migração 20261117210000): concluir fecha as abertas,
+ * reabrir devolve as que a conclusão fechou. Vazio quando não havia nenhuma;
+ * termina com espaço para a frase seguinte encostar.
+ */
+export function fraseDasTarefas(quantas: number, concluir: boolean): string {
+  if (!Number.isFinite(quantas) || quantas <= 0) return '';
+  if (concluir) {
+    return quantas === 1
+      ? 'A tarefa aberta deste cliente foi concluída e saiu do Meu dia. '
+      : `As ${quantas} tarefas abertas deste cliente foram concluídas e saíram do Meu dia. `;
+  }
+  return quantas === 1
+    ? 'A tarefa deste cliente voltou para o Meu dia. '
+    : `As ${quantas} tarefas deste cliente voltaram para o Meu dia. `;
+}
