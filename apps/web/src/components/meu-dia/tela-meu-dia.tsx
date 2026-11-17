@@ -840,7 +840,12 @@ function GrupoNovo({
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <span id={idDoTitulo} className="font-heading text-lg leading-snug font-semibold">
+            {/* `text-balance` (17/11/2026): em 375, "Esperando há mais de 24 h"
+                deixava o "h" sozinho na segunda linha. */}
+            <span
+              id={idDoTitulo}
+              className="font-heading text-lg leading-snug font-semibold text-balance"
+            >
               {bloco.titulo}
             </span>
             <span className="numerico rounded-full bg-muted px-2 py-0.5 text-[13px] font-bold text-foreground/80">

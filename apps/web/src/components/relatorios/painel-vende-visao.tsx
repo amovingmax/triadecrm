@@ -222,7 +222,11 @@ function Sugestoes({ sugestoes, aoAbrirPainel }: { sugestoes: readonly Sugestao[
                 >
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="numerico text-lg leading-tight font-medium sm:text-xl">{impacto.numero}</span>
-                    <span className="text-[11px] leading-snug text-muted-foreground">{impacto.unidade}</span>
+                    {/* `text-balance` (17/11/2026): "esperaram mais de 2 h" deixava o "h"
+                        sozinho na terceira linha da coluna de 5.75rem. */}
+                    <span className="text-[11px] leading-snug text-balance text-muted-foreground">
+                      {impacto.unidade}
+                    </span>
                   </span>
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="text-sm leading-snug font-semibold">{s.acao}</span>
