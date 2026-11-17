@@ -517,3 +517,11 @@ verify_jwt = false
 # corpo. Com `true` o gateway recusaria todo aviso com 401.
 [functions.calendly-webhook]
 verify_jwt = false
+
+# A API externa do CRM (17/11/2026), nas duas empresas. Quem integra chama com a
+# chave da API (`Authorization: Bearer trd_<empresa>_...`, criada em Ajustes →
+# Integrações), que não é JWT do Supabase: quem confere é o Postgres
+# (`public.api_atender`, pelo SHA-256 da chave). Com `true` o gateway recusaria
+# toda chamada com 401 antes de chegar à função.
+[functions.api]
+verify_jwt = false
