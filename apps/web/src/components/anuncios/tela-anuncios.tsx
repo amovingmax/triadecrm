@@ -3,86 +3,125 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, FileSpreadsheet, Plus, RotateCw, Settings2 } from 'lucide-react';
+import {
+  ArrowRight,
+  Layers,
+  Plus,
+  RefreshCw,
+  RotateCw,
+  Search,
+  Settings2,
+  UserRound,
+  X,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ChipsDeSecao } from '@/components/ui/abas';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
+import {
+  casaComABusca,
+  estadoDoCartao,
+  itensDeAtencao,
+  juntarDoCanalPro,
+  naoPublicadoPronto,
+} from './aba-dos-anuncios';
 import { LinhaDoCanalPro } from './anuncios-no-canal-pro';
-import { CaminhoDoLead } from './caminho-do-lead';
 import { CartaoDoAnuncio } from './cartao-do-anuncio';
 import {
   carregarAnuncios,
+  carregarCaminhoDoLead,
   carregarCanalPro,
+  carregarListaDoCanalPro,
   carregarManuais,
+  CHAVE_DA_LISTA_DO_CANAL_PRO,
+  CHAVE_DO_CAMINHO,
   CHAVE_DO_CANAL_PRO,
   CHAVE_DOS_ANUNCIOS,
   CHAVE_DOS_MANUAIS,
 } from './dados';
+import { FichaDoAnuncio } from './ficha-do-anuncio';
+import { FolhaSincronizar } from './folha-sincronizar';
 import { ImportarCanalPro } from './importar-canal-pro';
-import { ImportarSistemaAtual } from './importar-sistema-atual';
-import { formatarQuando } from './no-portal';
+import { resumoDosTipos } from './leads/leads-rotulos';
+import { NovoAnuncioConferido } from './novo-anuncio-conferido';
 import { PainelCanalPro } from './painel-canal-pro';
+import { diasDeCalendario, haQuanto } from './passos-do-caminho';
+import { PrecisaDeVoce } from './precisa-de-voce';
 import { estadoNoPortal, situacaoForaDoCrm, type EstadoNoPortal } from './regras-do-cartao';
 import { ativoNoCanalPro } from './relatorio-canal-pro';
 import { SecoesDosAnuncios } from './secoes';
-import { rotuloDoDestaque, type Situacao, type SituacaoDoCanalPro } from './tipos';
+import { TrocaDaArbo } from './troca-da-arbo';
 
-/**
- * As abas com as palavras do Canal Pro (05/11/2026): cada anúncio cai na aba da
- * situação dele no portal (`estadoNoPortal`); os do relatório sem anúncio no CRM,
- * pela situação de lá. Inativo fica em "Não publicados", marcado como inativo.
- */
+/** As abas com as palavras do Canal Pro (05/11/2026). */
 type Recorte = 'todos' | 'publicados' | 'nao_publicados' | 'rascunhos' | 'excluidos';
 const ESTADO_DO_RECORTE: Partial<Record<Recorte, EstadoNoPortal>> = {
   publicados: 'publicado',
   nao_publicados: 'nao_publicado',
   rascunhos: 'rascunho',
 };
+/** Os filtros que vêm de um botão (da troca ou do "Precisa de você"). */
+type Filtro = 'arbo' | 'prontos';
+const ROTULO_DO_FILTRO: Record<Filtro, string> = {
+  arbo: 'Só os publicados pela Arbo',
+  prontos: 'Só os não publicados prontos para ir ao ar',
+};
+
+/** Mais que isso sem a lista do Canal Pro, o número fica em alerta. */
+const DIAS_DA_LISTA = 7;
 
 /**
- * A lista de Anúncios (04/11/2026), só na Imova.
+ * A aba Anúncios (04/11/2026; redesenhada em 18/11/2026), só na Imova.
  *
- * Uma linha por anúncio, do mexido mais recente para o mais antigo, com o que
- * decide o próximo passo: o que falta para ir ao ar (rascunho), ou se o Grupo
- * OLX já leu a última mudança (no ar). O arquivo é lido a cada 12 horas, e a
- * tela diz isso em vez de prometer "publicado" na hora do clique.
+ * O pedido de 18/11: "tem muita informação repetida entrando no CRM ... a ideia é
+ * deixar a aba de anúncios cada vez menos repetitiva, mais objetiva, mais clara e
+ * mais funcional". Aprovado pelo protótipo no mesmo dia. De cima para baixo:
  *
- * "No ar" mostra TUDO o que está no Canal Pro (decisão da noite de 04/11): os
- * anúncios do CRM e, embaixo, os que estão lá por fora do CRM, do relatório que
- * ele exporta (`importar-canal-pro.tsx`). Os do CRM saem do ar por aqui; os de
- * lá saem por onde entraram — o sistema que publica hoje ("Via Integração") ou
- * o próprio Canal Pro ("Via CanalPro") —, e a linha guia
- * (`anuncios-no-canal-pro.tsx`).
+ *   1. Três números: as vagas do plano, os leads dos portais e a última lista do
+ *      Canal Pro (com o "Sincronizar"). Cada número aparece uma vez só na tela.
+ *   2. A troca da Arbo pelo CRM, só com o passo atual (`troca-da-arbo.tsx`).
+ *   3. "Precisa de você": uma linha por pendência, com a ação.
+ *   4. A busca, as abas com as palavras do Canal Pro e a lista: UM CARTÃO POR
+ *      IMÓVEL, com o que o Canal Pro diz dele e as cópias antigas juntadas
+ *      (`aba-dos-anuncios.ts`). O clique abre a ficha por cima.
  *
- * O plano do Canal Pro fica contado no alto (vagas e destaques em uso, CRM e
- * manuais juntos), com a mesma conta que o banco usa para recusar a publicação
- * (migração 20261104180000).
- *
- * Os LEADS (05/11/2026) moram na seção ao lado (`/anuncios/leads`): o seletor no
- * alto leva a ela, e cada anúncio mostra quantos leads recebeu, com o atalho
- * para a lista só dos dele.
- *
- * Desde 05/11/2026 cada anúncio é um cartão no desenho do Canal Pro
- * (`cartao-do-anuncio.tsx`): o endereço como título, a nota de qualidade, a
- * situação com as palavras de lá e as ações no menu ⋮.
+ * Saíram do cabeçalho "Atualizar do sistema atual" e "Atualizar do Canal Pro":
+ * viraram "Sincronizar Canal Pro", e os dois jeitos de antes moram dentro dele.
+ * A lista "No Canal Pro, sem anúncio no CRM" ficou só para o que não tem cartão
+ * nem é cópia de um.
  */
 export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
   const [recorte, setRecorte] = useState<Recorte>('todos');
+  const [filtro, setFiltro] = useState<Filtro | null>(null);
+  const [busca, setBusca] = useState('');
+  const [fichaDe, setFichaDe] = useState<string | null>(null);
   const [painelAberto, setPainelAberto] = useState(false);
-  const [importarAberto, setImportarAberto] = useState(false);
+  const [planilhaAberta, setPlanilhaAberta] = useState(false);
+  const [sincronizarAberto, setSincronizarAberto] = useState(false);
+  const [novoAberto, setNovoAberto] = useState(false);
   const excluidos = recorte === 'excluidos';
 
   const consulta = useQuery({
     queryKey: [...CHAVE_DOS_ANUNCIOS, 'lista', excluidos],
     queryFn: () => carregarAnuncios(excluidos),
   });
-  // Os do CRM, sempre, para ligar cada manual ao anúncio que veio dele.
+  // Os do CRM, sempre: os números, o "Precisa de você" e a troca contam com eles.
   const doCrm = useQuery({
     queryKey: [...CHAVE_DOS_ANUNCIOS, 'lista', false],
     queryFn: () => carregarAnuncios(false),
     enabled: excluidos,
+  });
+  // Os excluídos, sempre: o código deles não volta pela sincronização, então a
+  // linha do Canal Pro com esse código não é "sem cartão" (revisão de 18/11/2026).
+  const excluidosSempre = useQuery({
+    queryKey: [...CHAVE_DOS_ANUNCIOS, 'lista', true],
+    queryFn: () => carregarAnuncios(true),
+    enabled: !excluidos,
+  });
+  const listaDoCanalPro = useQuery({
+    queryKey: CHAVE_DA_LISTA_DO_CANAL_PRO,
+    queryFn: carregarListaDoCanalPro,
   });
   const manuais = useQuery({ queryKey: CHAVE_DOS_MANUAIS, queryFn: carregarManuais });
   const canalPro = useQuery({ queryKey: CHAVE_DO_CANAL_PRO, queryFn: carregarCanalPro });
@@ -92,23 +131,23 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
     () => (excluidos ? (doCrm.data ?? []) : todos),
     [excluidos, doCrm.data, todos],
   );
-  const listaManual = useMemo(() => manuais.data ?? [], [manuais.data]);
-  // Com o mesmo código (ou ligado pelo "Trazer para o CRM"), o anúncio do CRM no
-  // ar e a linha do relatório são um anúncio só no Canal Pro: conta uma vez,
-  // como `app.canal_pro_ocupadas` (migração 20261105110000).
-  // Só o que está ATIVO no Canal Pro está no ar lá (o relatório de verdade traz
-  // os inativos também).
-  const manuaisSemParNoAr = useMemo(() => {
-    const noAr = ativos.filter((a) => a.situacao === 'no_ar');
-    return listaManual.filter(
-      (m) =>
-        ativoNoCanalPro(m.situacao) &&
-        !noAr.some((a) => a.codigo === m.codigo || a.id === m.anuncio_id),
-    ).length;
-  }, [ativos, listaManual]);
-  // No portal por fora do CRM (sistema atual ou relatório) e não no ar NO CRM: o
-  // arquivo do CRM não os leva, e o Canal Pro os tiraria do ar se passasse a
-  // ler o arquivo do CRM agora. Os ajustes avisam antes de colar (06/11/2026).
+  const listaDeExcluidos = useMemo(
+    () => (excluidos ? todos : (excluidosSempre.data ?? [])),
+    [excluidos, todos, excluidosSempre.data],
+  );
+  const { porAnuncio, soltas } = useMemo(
+    () => juntarDoCanalPro([...ativos, ...listaDeExcluidos], listaDoCanalPro.data ?? []),
+    [ativos, listaDeExcluidos, listaDoCanalPro.data],
+  );
+  const plano = canalPro.data?.plano ?? null;
+  const vagasLivres =
+    plano?.anuncios != null ? Math.max(0, plano.anuncios - plano.anunciosEmUso) : null;
+  const itens = useMemo(
+    () =>
+      podePublicar ? itensDeAtencao({ anuncios: ativos, porAnuncio, soltas, vagasLivres }) : [],
+    [podePublicar, ativos, porAnuncio, soltas, vagasLivres],
+  );
+  // No portal por fora do CRM e não no ar no CRM: a troca os tiraria do ar.
   const aAssumir = useMemo(
     () =>
       ativos.filter(
@@ -116,56 +155,45 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
       ),
     [ativos],
   );
-  // Na seção "No Canal Pro hoje" ficam só os que não têm cartão no CRM: a linha
-  // com o mesmo código de um anúncio do CRM já aparece no cartão dele ("No Canal
-  // Pro: Ativo"). Os ativos primeiro.
-  const listaDoCanalPro = useMemo(
-    () =>
-      listaManual
-        .filter((m) => !ativos.some((a) => a.codigo === m.codigo))
-        .sort((x, y) => Number(ativoNoCanalPro(y.situacao)) - Number(ativoNoCanalPro(x.situacao))),
-    [ativos, listaManual],
-  );
-  const inativosNoCanalPro = listaDoCanalPro.filter((m) => !ativoNoCanalPro(m.situacao)).length;
-  const contagem = useMemo(() => {
-    const c: Record<Situacao, number> = { rascunho: 0, no_ar: 0, pausado: 0 };
-    for (const a of ativos) c[a.situacao] += 1;
-    return c;
-  }, [ativos]);
-  const destaquesNoAr = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const a of ativos) {
-      if (a.situacao === 'no_ar' && a.destaque !== 'padrao') {
-        const r = rotuloDoDestaque(a.destaque);
-        m.set(r, (m.get(r) ?? 0) + 1);
-      }
-    }
-    return [...m.entries()];
-  }, [ativos]);
-
   const porEstado = useMemo(() => {
     const c: Record<EstadoNoPortal, number> = { publicado: 0, nao_publicado: 0, rascunho: 0 };
     for (const a of ativos) c[estadoNoPortal(a)] += 1;
     return c;
   }, [ativos]);
-  const ativosSoNoCanalPro = listaDoCanalPro.length - inativosNoCanalPro;
-  const estadoDaAba = ESTADO_DO_RECORTE[recorte];
-  const linhas =
-    excluidos || recorte === 'todos'
-      ? todos
-      : todos.filter((a) => estadoNoPortal(a) === estadoDaAba);
-  const mostraManuais =
-    recorte === 'todos' || recorte === 'publicados' || recorte === 'nao_publicados';
-  const listaDaAba =
-    recorte === 'publicados'
-      ? listaDoCanalPro.filter((m) => ativoNoCanalPro(m.situacao))
-      : recorte === 'nao_publicados'
-        ? listaDoCanalPro.filter((m) => !ativoNoCanalPro(m.situacao))
-        : listaDoCanalPro;
-  const ultimaLeitura = canalPro.data?.ultimaLeitura ?? null;
-  const plano = canalPro.data?.plano ?? null;
 
-  const vazio = linhas.length === 0 && (!mostraManuais || listaDaAba.length === 0);
+  const estadoDaAba = ESTADO_DO_RECORTE[recorte];
+  const linhas = todos.filter(
+    (a) =>
+      (excluidos || recorte === 'todos' || estadoNoPortal(a) === estadoDaAba) &&
+      (filtro !== 'arbo' || estadoDoCartao(a).tom === 'arbo') &&
+      (filtro !== 'prontos' || naoPublicadoPronto(a)) &&
+      casaComABusca(a, porAnuncio.get(a.id)?.copias ?? [], busca),
+  );
+  const soltasNaLista = (manuais.data ?? []).filter(
+    (m) =>
+      soltas.some((s) => s.id === m.id) &&
+      !excluidos &&
+      filtro === null &&
+      (recorte === 'todos' ||
+        (recorte === 'publicados' && ativoNoCanalPro(m.situacao)) ||
+        (recorte === 'nao_publicados' && !ativoNoCanalPro(m.situacao))) &&
+      casaComABusca(
+        { codigo: m.codigo, titulo: m.titulo ?? '', bairro: m.bairro, cidade: m.cidade },
+        [],
+        busca,
+      ),
+  );
+  const ficha = fichaDe
+    ? ([...ativos, ...todos, ...listaDeExcluidos].find((a) => a.id === fichaDe) ?? null)
+    : null;
+
+  function irParaALista() {
+    requestAnimationFrame(() =>
+      document
+        .getElementById('lista-de-anuncios')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    );
+  }
 
   return (
     <div className="flex w-full max-w-5xl flex-col gap-5">
@@ -177,29 +205,21 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
               Anúncios
             </h1>
             <p className="max-w-2xl text-sm text-muted-foreground">
-              Os imóveis que sobem para o ZAP, o Viva Real e a OLX pelo Canal Pro. O Grupo OLX lê o
-              arquivo do CRM a cada 12 horas: o que muda aqui aparece no portal depois da próxima
-              leitura.
+              Os imóveis da Imova no ZAP, Viva Real e OLX. Um cartão por imóvel, com o que vem da
+              Arbo e do Canal Pro junto.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {podePublicar ? (
-              <ImportarSistemaAtual
-                temEndereco={canalPro.data?.sistemaAtual.temEndereco ?? false}
-              />
-            ) : null}
-            {podePublicar ? (
               <Button
                 variant="outline"
                 className="toque h-11 md:h-9"
-                onClick={() => setImportarAberto(true)}
+                onClick={() => setSincronizarAberto(true)}
               >
-                <FileSpreadsheet aria-hidden="true" />
-                Atualizar do Canal Pro
+                <RefreshCw aria-hidden="true" />
+                Sincronizar Canal Pro
               </Button>
             ) : null}
-            {/* O contato, o plano e o endereço do arquivo do CRM: ajustes que se
-                fazem uma vez, fora do caminho de atualizar a lista (06/11/2026). */}
             <Button
               variant="outline"
               className="toque size-11 p-0 md:size-9"
@@ -209,300 +229,353 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
             >
               <Settings2 aria-hidden="true" />
             </Button>
-            {/* No celular, "Novo anúncio" vem primeiro (16/11/2026): é o que se
-                faz no local do imóvel, e no fim da fila ele caía sozinho na
-                terceira linha. No computador continua por último, à direita. */}
-            <Button asChild className="toque h-11 max-md:order-first md:h-9">
-              <Link href="/anuncios/novo">
-                <Plus aria-hidden="true" />
-                Novo anúncio
-              </Link>
+            <Button className="toque h-11 md:h-9" onClick={() => setNovoAberto(true)}>
+              <Plus aria-hidden="true" />
+              Novo anúncio
             </Button>
           </div>
         </div>
-
-        {/* O que falta para o primeiro lead dos portais (11/11/2026): só para quem
-            publica, cola a URL e exclui os repetidos. */}
-        {podePublicar ? (
-          <CaminhoDoLead
-            chave={canalPro.data?.chave ?? null}
-            noPortalSoPeloSistemaAtual={aAssumir.length}
-            aoImportar={() => setImportarAberto(true)}
-          />
-        ) : null}
-
-        <ResumoDaIntegracao
-          carregando={canalPro.isPending}
-          ultimaLeitura={ultimaLeitura}
-          semContato={canalPro.data ? !canalPro.data.email : false}
-          noAr={contagem.no_ar}
-          noCanalPro={manuaisSemParNoAr}
-          destaques={destaquesNoAr}
-          plano={canalPro.data?.plano ?? null}
-          importadoEm={canalPro.data?.importadoEm ?? null}
-          sistemaAtualLidoEm={canalPro.data?.sistemaAtual.lidoEm ?? null}
-          podeImportar={podePublicar}
-          aoAbrir={() => setPainelAberto(true)}
-          aoImportar={() => setImportarAberto(true)}
-        />
-
-        <ChipsDeSecao<Recorte>
-          rotulo="Que anúncios mostrar"
-          ativo={recorte}
-          aoTrocar={setRecorte}
-          itens={[
-            { id: 'todos', rotulo: 'Todos' },
-            {
-              id: 'publicados',
-              rotulo: 'Publicados',
-              contagem: porEstado.publicado + ativosSoNoCanalPro,
-            },
-            {
-              id: 'nao_publicados',
-              rotulo: 'Não publicados',
-              contagem: porEstado.nao_publicado + inativosNoCanalPro,
-            },
-            { id: 'rascunhos', rotulo: 'Rascunhos', contagem: porEstado.rascunho },
-            { id: 'excluidos', rotulo: 'Excluídos' },
-          ]}
-        />
       </header>
 
-      {consulta.isPending ? (
-        <div aria-busy="true" className="flex flex-col gap-2">
-          <span className="sr-only">Carregando os anúncios.</span>
-          {Array.from({ length: 3 }, (_, i) => (
-            <Skeleton key={i} className="h-[420px] w-full rounded-xl md:h-[232px]" />
-          ))}
-        </div>
-      ) : consulta.isError ? (
-        <Vazio titulo="A lista não carregou." texto="Não deu para falar com o servidor.">
-          <Button
-            variant="outline"
-            onClick={() => void consulta.refetch()}
-            className="toque h-11 md:h-9"
-          >
-            <RotateCw aria-hidden="true" />
-            Tentar de novo
-          </Button>
-        </Vazio>
-      ) : vazio ? (
-        excluidos ? (
-          <Vazio
-            titulo="Nenhum anúncio excluído."
-            texto="O anúncio excluído sai do arquivo do Canal Pro e vem para cá."
-          />
-        ) : recorte === 'todos' || recorte === 'publicados' ? (
-          <Vazio
-            titulo={
-              recorte === 'publicados' ? 'Nenhum anúncio publicado.' : 'Nenhum anúncio ainda.'
-            }
-            texto="Crie um anúncio pelo CRM ou traga a lista do que já está no Canal Pro."
-          >
-            <div className="flex flex-wrap gap-2">
-              <Button asChild className="toque h-11 md:h-9">
-                <Link href="/anuncios/novo">
-                  <Plus aria-hidden="true" />
-                  Novo anúncio
-                </Link>
-              </Button>
-              {podePublicar ? (
-                <Button
-                  variant="outline"
-                  className="toque h-11 md:h-9"
-                  onClick={() => setImportarAberto(true)}
-                >
-                  <FileSpreadsheet aria-hidden="true" />
-                  Trazer a lista do Canal Pro
-                </Button>
-              ) : null}
-            </div>
-          </Vazio>
-        ) : (
-          <Vazio
-            titulo={`Nenhum anúncio em "${rotuloDoRecorte(recorte)}".`}
-            texto="Troque o filtro acima para ver os outros."
-          />
-        )
-      ) : (
-        <>
-          {linhas.length > 0 ? (
-            <ul className="flex flex-col gap-3">
-              {linhas.map((a) => (
-                <CartaoDoAnuncio key={a.id} anuncio={a} podePublicar={podePublicar} plano={plano} />
-              ))}
-            </ul>
-          ) : null}
+      <Numeros
+        carregando={canalPro.isPending}
+        plano={plano}
+        importadoEm={canalPro.data?.importadoEm ?? null}
+        leadsDosAnuncios={ativos.reduce((s, a) => s + a.leads, 0)}
+        podePublicar={podePublicar}
+        aoSincronizar={() => setSincronizarAberto(true)}
+      />
 
-          {mostraManuais && listaDaAba.length > 0 ? (
-            <section className="flex flex-col gap-2">
-              <div>
-                <h2 className="text-base font-medium">
-                  {recorte === 'nao_publicados'
-                    ? 'Inativos no Canal Pro, sem anúncio no CRM'
-                    : recorte === 'publicados'
-                      ? 'Ativos no Canal Pro, sem anúncio no CRM'
-                      : 'No Canal Pro, sem anúncio no CRM'}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Vêm de anúncios antigos, do sistema que publica hoje (Via Integração) ou foram
-                  cadastrados no Canal Pro. Do relatório importado{' '}
-                  {canalPro.data?.importadoEm ? formatarQuando(canalPro.data.importadoEm) : ''}. O
-                  repetido de um anúncio do CRM tem o botão Excluir duplicado; os outros dizem como
-                  sair do ar.
-                </p>
-              </div>
-              <ul className="sombra-base flex flex-col divide-y divide-hairline overflow-hidden rounded-xl bg-card">
-                {listaDaAba.map((m) => (
-                  <LinhaDoCanalPro
-                    key={m.id}
-                    anuncio={m}
-                    trazido={ativos.find((a) => a.id === m.anuncio_id) ?? null}
-                    pareceCom={ativos.find((a) => a.id === m.parece_com) ?? null}
+      {podePublicar ? (
+        <TrocaDaArbo
+          chave={canalPro.data?.chave ?? null}
+          noPortalSoPeloSistemaAtual={aAssumir.length}
+          aoVerNaLista={() => {
+            setRecorte('todos');
+            setFiltro('arbo');
+            setBusca('');
+            irParaALista();
+          }}
+        />
+      ) : null}
+
+      {podePublicar && !consulta.isPending && !listaDoCanalPro.isPending ? (
+        <PrecisaDeVoce
+          itens={itens}
+          aoSincronizar={() => setSincronizarAberto(true)}
+          aoAbrir={setFichaDe}
+          aoFiltrarProntos={() => {
+            setRecorte('todos');
+            setFiltro('prontos');
+            setBusca('');
+            irParaALista();
+          }}
+        />
+      ) : null}
+
+      <section
+        id="lista-de-anuncios"
+        aria-label="Lista de anúncios"
+        className="flex scroll-mt-20 flex-col gap-3"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="flex h-11 min-w-0 flex-1 basis-60 items-center gap-2 rounded-full border border-input bg-card px-4 md:h-9 md:max-w-sm">
+            <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Código, título ou bairro"
+              aria-label="Buscar anúncio"
+              className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
+            />
+          </label>
+          <ChipsDeSecao<Recorte>
+            rotulo="Que anúncios mostrar"
+            ativo={recorte}
+            aoTrocar={(r) => {
+              setRecorte(r);
+              setFiltro(null);
+            }}
+            itens={[
+              { id: 'todos', rotulo: 'Todos' },
+              { id: 'publicados', rotulo: 'Publicados', contagem: porEstado.publicado },
+              { id: 'nao_publicados', rotulo: 'Não publicados', contagem: porEstado.nao_publicado },
+              { id: 'rascunhos', rotulo: 'Rascunhos', contagem: porEstado.rascunho },
+              { id: 'excluidos', rotulo: 'Excluídos' },
+            ]}
+          />
+        </div>
+        {filtro ? (
+          <p className="flex items-center gap-2 text-sm">
+            <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary/12 pr-1 pl-3 font-medium text-primary">
+              {ROTULO_DO_FILTRO[filtro]}
+              <button
+                type="button"
+                onClick={() => setFiltro(null)}
+                aria-label="Tirar o filtro"
+                className="toque grid size-7 place-items-center rounded-full outline-none hover:bg-primary/15 focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </span>
+          </p>
+        ) : null}
+
+        {consulta.isPending ? (
+          <div aria-busy="true" className="flex flex-col gap-3">
+            <span className="sr-only">Carregando os anúncios.</span>
+            {Array.from({ length: 3 }, (_, i) => (
+              <Skeleton key={i} className="h-[380px] w-full rounded-xl md:h-[180px]" />
+            ))}
+          </div>
+        ) : consulta.isError ? (
+          <Vazio titulo="A lista não carregou." texto="Não deu para falar com o servidor.">
+            <Button
+              variant="outline"
+              onClick={() => void consulta.refetch()}
+              className="toque h-11 md:h-9"
+            >
+              <RotateCw aria-hidden="true" />
+              Tentar de novo
+            </Button>
+          </Vazio>
+        ) : linhas.length === 0 && soltasNaLista.length === 0 ? (
+          excluidos ? (
+            <Vazio
+              titulo="Nenhum anúncio excluído."
+              texto="O anúncio excluído sai do arquivo do Canal Pro e fica aqui para restaurar."
+            />
+          ) : busca.trim() || filtro ? (
+            <Vazio
+              titulo={
+                busca.trim() ? `Nada encontrado para “${busca.trim()}”.` : 'Nada neste filtro.'
+              }
+              texto="Troque a busca ou tire o filtro."
+            />
+          ) : (
+            <Vazio
+              titulo={recorte === 'todos' ? 'Nenhum anúncio ainda.' : 'Nenhum anúncio nesta aba.'}
+              texto="Crie um anúncio pelo CRM ou sincronize com o Canal Pro."
+            >
+              <Button className="toque h-11 w-fit md:h-9" onClick={() => setNovoAberto(true)}>
+                <Plus aria-hidden="true" />
+                Novo anúncio
+              </Button>
+            </Vazio>
+          )
+        ) : (
+          <>
+            {linhas.length ? (
+              <ul className="flex flex-col gap-3">
+                {linhas.map((a) => (
+                  <CartaoDoAnuncio
+                    key={a.id}
+                    anuncio={a}
+                    doCanalPro={porAnuncio.get(a.id)}
                     podePublicar={podePublicar}
+                    plano={plano}
+                    aoAbrir={() => setFichaDe(a.id)}
+                    aoSincronizar={() => setSincronizarAberto(true)}
                   />
                 ))}
               </ul>
-            </section>
-          ) : null}
-        </>
-      )}
+            ) : null}
+            {soltasNaLista.length ? (
+              <section className="flex flex-col gap-2">
+                <h2 className="flex items-center gap-1.5 text-base font-medium">
+                  <Layers className="size-4 text-muted-foreground" aria-hidden="true" />
+                  No Canal Pro, sem cartão no CRM
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Não são cópia de nenhum anúncio do CRM. A sincronização os traz com as fotos; aqui
+                  dá para trazer um por um.
+                </p>
+                <ul className="sombra-base flex flex-col divide-y divide-hairline overflow-hidden rounded-xl bg-card">
+                  {soltasNaLista.map((m) => (
+                    <LinhaDoCanalPro
+                      key={m.id}
+                      anuncio={m}
+                      trazido={ativos.find((a) => a.id === m.anuncio_id) ?? null}
+                      pareceCom={null}
+                      podePublicar={podePublicar}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </>
+        )}
+      </section>
 
+      <FichaDoAnuncio
+        anuncio={ficha}
+        doCanalPro={ficha ? porAnuncio.get(ficha.id) : undefined}
+        podePublicar={podePublicar}
+        aoMudar={(aberto) => {
+          if (!aberto) setFichaDe(null);
+        }}
+        aoSincronizar={() => {
+          setFichaDe(null);
+          setSincronizarAberto(true);
+        }}
+      />
       <PainelCanalPro
         aberto={painelAberto}
         aoMudar={setPainelAberto}
         podeAjustar={podePublicar}
         aAssumir={aAssumir}
-        soNoCanalProNoAr={ativosSoNoCanalPro}
+        soNoCanalProNoAr={soltas.filter((s) => ativoNoCanalPro(s.situacao)).length}
+      />
+      <NovoAnuncioConferido
+        aberto={novoAberto}
+        aoMudar={setNovoAberto}
+        anuncios={[...ativos, ...listaDeExcluidos]}
+        aoAbrir={setFichaDe}
       />
       {podePublicar ? (
-        <ImportarCanalPro aberto={importarAberto} aoMudar={setImportarAberto} />
+        <>
+          <FolhaSincronizar
+            aberto={sincronizarAberto}
+            aoMudar={setSincronizarAberto}
+            sincronizadoEm={canalPro.data?.importadoEm ?? null}
+            temEnderecoDoSistemaAtual={canalPro.data?.sistemaAtual.temEndereco ?? false}
+            aoAbrirPlanilha={() => setPlanilhaAberta(true)}
+          />
+          <ImportarCanalPro aberto={planilhaAberta} aoMudar={setPlanilhaAberta} />
+        </>
       ) : null}
     </div>
   );
 }
 
-function rotuloDoRecorte(r: Recorte): string {
-  if (r === 'todos') return 'Todos';
-  if (r === 'excluidos') return 'Excluídos';
-  if (r === 'publicados') return 'Publicados';
-  if (r === 'nao_publicados') return 'Não publicados';
-  return 'Rascunhos';
-}
-
 /**
- * O botão que se lê como link no meio da frase. O `-my-1.5 py-1.5` dá 32px de
- * alvo ao dedo sem mexer na altura da linha (16/11/2026): a margem negativa
- * devolve o que o recheio acrescenta.
+ * Os três números do alto. Cada um aparece uma vez só na tela: as vagas não se
+ * repetem na troca, a lista do Canal Pro não se repete no "Precisa de você".
  */
-const BOTAO_DE_TEXTO = '-my-1.5 py-1.5 text-left underline underline-offset-4';
-
-function ResumoDaIntegracao({
+function Numeros({
   carregando,
-  ultimaLeitura,
-  semContato,
-  noAr,
-  noCanalPro,
-  destaques,
   plano,
   importadoEm,
-  sistemaAtualLidoEm,
-  podeImportar,
-  aoAbrir,
-  aoImportar,
+  leadsDosAnuncios,
+  podePublicar,
+  aoSincronizar,
 }: {
   carregando: boolean;
-  ultimaLeitura: { em: string; anuncios: number } | null;
-  semContato: boolean;
-  noAr: number;
-  noCanalPro: number;
-  destaques: [string, number][];
-  plano: SituacaoDoCanalPro['plano'] | null;
+  plano: {
+    anuncios: number | null;
+    destaques: number | null;
+    anunciosEmUso: number;
+    destaquesEmUso: number;
+  } | null;
   importadoEm: string | null;
-  sistemaAtualLidoEm: string | null;
-  podeImportar: boolean;
-  aoAbrir: () => void;
-  aoImportar: () => void;
+  leadsDosAnuncios: number;
+  podePublicar: boolean;
+  aoSincronizar: () => void;
 }) {
-  if (carregando) return <Skeleton className="h-11 w-full max-w-2xl rounded-xl" />;
-  return (
-    <div className="flex flex-col gap-1 text-sm">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span className="flex items-center gap-1.5">
-          <Building2 className="size-4 text-muted-foreground" aria-hidden="true" />
-          {semContato ? (
-            <button
-              type="button"
-              onClick={aoAbrir}
-              className={BOTAO_DE_TEXTO}
-            >
-              Falta ligar a integração com o Canal Pro.
-            </button>
-          ) : ultimaLeitura ? (
-            <span>
-              Última leitura do Grupo OLX {formatarQuando(ultimaLeitura.em)}, com{' '}
-              <span className="numerico">{ultimaLeitura.anuncios}</span>{' '}
-              {ultimaLeitura.anuncios === 1 ? 'anúncio' : 'anúncios'}.
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={aoAbrir}
-              className={BOTAO_DE_TEXTO}
-            >
-              O Grupo OLX ainda não leu o arquivo. Veja como ligar.
-            </button>
-          )}
-        </span>
-        {plano?.anuncios != null ? (
-          <span className={plano.anunciosEmUso >= plano.anuncios ? 'font-medium' : undefined}>
-            {plano.anunciosEmUso >= plano.anuncios ? 'Plano cheio: ' : 'Plano: '}
-            <span className="numerico">{plano.anunciosEmUso}</span> de{' '}
-            <span className="numerico">{plano.anuncios}</span> vagas
-            {plano.destaques != null ? (
-              <>
-                {' · '}
-                <span className="numerico">{plano.destaquesEmUso}</span> de{' '}
-                <span className="numerico">{plano.destaques}</span> destaques
-              </>
-            ) : null}
-          </span>
-        ) : null}
-        <span className="text-muted-foreground">
-          <span className="numerico">{noAr}</span> no ar pelo CRM
-          {destaques.map(([rotulo, n]) => (
-            <span key={rotulo}>
-              {' · '}
-              <span className="numerico">{n}</span> {rotulo.toLowerCase()}
-            </span>
-          ))}
-          {noCanalPro ? (
-            <>
-              {' · '}
-              <span className="numerico">{noCanalPro}</span> no Canal Pro por fora do CRM
-            </>
-          ) : null}
-        </span>
+  const caminho = useQuery({
+    queryKey: CHAVE_DO_CAMINHO,
+    queryFn: carregarCaminhoDoLead,
+    enabled: podePublicar,
+  });
+  if (carregando) {
+    return (
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {Array.from({ length: 3 }, (_, i) => (
+          <Skeleton key={i} className="h-[104px] rounded-xl" />
+        ))}
       </div>
-      <span className="flex flex-wrap items-center gap-x-2 text-muted-foreground">
-        <FileSpreadsheet className="size-4" aria-hidden="true" />
-        {importadoEm
-          ? `Lista do Canal Pro importada ${formatarQuando(importadoEm)}.`
-          : 'Os anúncios que já estão no Canal Pro ainda não aparecem aqui.'}
-        {podeImportar ? (
+    );
+  }
+  const agora = new Date();
+  const dias = importadoEm ? diasDeCalendario(importadoEm, agora) : null;
+  const velha = dias === null || dias > DIAS_DA_LISTA;
+  const leads = caminho.data?.leads;
+  const total = leads?.total ?? leadsDosAnuncios;
+  const ultimo = leads?.ultimo ?? null;
+  const cheio = plano?.anuncios != null && plano.anunciosEmUso >= plano.anuncios;
+
+  return (
+    <section aria-label="Situação" className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="sombra-base flex flex-col gap-1.5 rounded-xl bg-card px-4 py-3.5">
+        <p className="text-[13px] text-muted-foreground">Vagas do plano no portal</p>
+        {plano?.anuncios != null ? (
+          <>
+            <p
+              className={cn(
+                'font-heading text-2xl leading-tight font-semibold',
+                cheio && 'text-destructive-texto',
+              )}
+            >
+              <span className="numerico">{plano.anunciosEmUso}</span>{' '}
+              <span className="text-sm font-medium text-muted-foreground">de {plano.anuncios}</span>
+            </p>
+            <span className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <span
+                className="block h-full rounded-full bg-primary"
+                style={{
+                  width: `${Math.min(100, (plano.anunciosEmUso / Math.max(1, plano.anuncios)) * 100)}%`,
+                }}
+              />
+            </span>
+            {plano.destaques != null ? (
+              <p className="text-[13px] text-muted-foreground numerico">
+                {plano.destaquesEmUso} de {plano.destaques} destaques
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">O plano não está no CRM (Ajustes).</p>
+        )}
+      </div>
+
+      <Link
+        href="/anuncios/leads"
+        className="sombra-base flex flex-col gap-1.5 rounded-xl bg-card px-4 py-3.5 outline-none hover:ring-1 hover:ring-border focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+          <UserRound className="size-3.5" aria-hidden="true" />
+          Leads dos portais
+        </p>
+        <p className="font-heading text-2xl leading-tight font-semibold numerico">{total}</p>
+        <p className="text-[13px] text-muted-foreground">
+          {ultimo
+            ? `Último ${haQuanto(ultimo.em, agora)}${ultimo.anuncio ? ` · ${ultimo.anuncio}` : ''} · ${resumoDosTipos(ultimo.tipos).toLowerCase()}`
+            : 'Nenhum lead dos portais ainda.'}
+        </p>
+        <span className="mt-auto inline-flex items-center gap-1 text-[13px] font-medium text-primary">
+          Ver os leads <ArrowRight className="size-3.5" aria-hidden="true" />
+        </span>
+      </Link>
+
+      <div className="sombra-base flex flex-col gap-1.5 rounded-xl bg-card px-4 py-3.5">
+        <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+          <RefreshCw className="size-3.5" aria-hidden="true" />
+          Última lista do Canal Pro
+        </p>
+        <p
+          className={cn(
+            'font-heading text-2xl leading-tight font-semibold',
+            velha && 'text-morno-texto',
+          )}
+        >
+          {dias === null ? 'nunca' : dias === 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias`}
+        </p>
+        <p className="text-[13px] text-muted-foreground">
+          Situação, visualizações, contatos e fotos de tudo o que está lá.
+        </p>
+        {podePublicar ? (
           <button
             type="button"
-            onClick={aoImportar}
-            className="-my-1.5 py-1.5 text-foreground underline underline-offset-4"
+            onClick={aoSincronizar}
+            className="mt-auto inline-flex w-fit items-center gap-1 rounded-sm text-[13px] font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            {importadoEm ? 'Atualizar de novo' : 'Trazer a lista do Canal Pro'}
+            {velha ? 'Sincronizar agora' : 'Sincronizar'}{' '}
+            <ArrowRight className="size-3.5" aria-hidden="true" />
           </button>
         ) : null}
-        {sistemaAtualLidoEm ? (
-          <span>· Sistema atual lido {formatarQuando(sistemaAtualLidoEm)}.</span>
-        ) : null}
-      </span>
-    </div>
+      </div>
+    </section>
   );
 }
 

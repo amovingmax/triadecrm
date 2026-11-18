@@ -10,6 +10,7 @@
 import { createClient } from '@/lib/supabase/client';
 import { supabaseUrl } from '@/lib/env';
 
+import { inteiroDaLinha, type LinhaDoCanalPro } from './aba-dos-anuncios';
 import type { Contagem, EstadoDoCaminho } from './passos-do-caminho';
 import { ocupaVagaPeloRelatorio } from './regras-do-cartao';
 import type { AnuncioDoRelatorio } from './relatorio-canal-pro';
@@ -394,6 +395,77 @@ export async function carregarManuais(): Promise<AnuncioNoCanalPro[]> {
     .order('codigo');
   if (error) throw new Error(error.message);
   return (data ?? []) as AnuncioNoCanalPro[];
+}
+
+// ---------------------------------------------------------------------------
+// A última lista do Canal Pro, inteira (18/11/2026)
+// ---------------------------------------------------------------------------
+
+export const CHAVE_DA_LISTA_DO_CANAL_PRO = ['anuncios', 'lista-do-canal-pro'] as const;
+
+/**
+ * Todas as linhas da última lista do Canal Pro, inclusive as marcadas como
+ * excluídas: a aba junta cada uma ao cartão do anúncio dela (a de mesmo código) ou
+ * como cópia antiga do mesmo imóvel (`parece_com`). As fotos, as visualizações e
+ * os contatos saem da linha guardada.
+ */
+export async function carregarListaDoCanalPro(): Promise<LinhaDoCanalPro[]> {
+  const { data, error } = await createClient()
+    .from('anuncios_no_canal_pro')
+    .select(
+      'id, codigo, titulo, situacao, anuncio_id, excluido_em, marcado_excluido_em, visto_em, preco_venda, preco_aluguel, linha, parece_com:canal_pro_parece_com',
+    )
+    .eq('no_relatorio', true)
+    .order('codigo');
+  if (error) throw new Error(error.message);
+  return (
+    (data ?? []) as unknown as (Omit<LinhaDoCanalPro, 'fotos' | 'visualizacoes' | 'contatos'> & {
+      linha: unknown;
+    })[]
+  ).map(({ linha, ...l }) => ({
+    ...l,
+    fotos: inteiroDaLinha(linha, ['numero de fotos', 'fotos']),
+    visualizacoes: inteiroDaLinha(linha, ['total de visualizacoes', 'visualizacoes']),
+    contatos: inteiroDaLinha(linha, ['total de contatos', 'contatos']),
+  }));
+}
+
+export type FotosDoCanalPro =
+  { ok: true; vieram: number; falharam: number; pulado: boolean } | { ok: false; motivo: string };
+
+/**
+ * Leva as fotos do Canal Pro para um anúncio, pela rota que baixa no servidor.
+ * Cada foto vem com as versões que a rota tenta (a maior primeiro). 'se_vazio'
+ * só enche anúncio sem foto; 'trocar' sobe as novas antes de tirar as antigas.
+ */
+export async function trazerFotosDoCanalPro(
+  anuncioId: string,
+  urls: string[][],
+  modo: 'se_vazio' | 'trocar',
+): Promise<FotosDoCanalPro> {
+  let resposta: Response;
+  try {
+    resposta = await fetch('/api/anuncios/importar/fotos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ anuncio_id: anuncioId, urls, modo }),
+    });
+  } catch {
+    return { ok: false, motivo: 'rede' };
+  }
+  const r = (await resposta.json().catch(() => null)) as {
+    ok?: boolean;
+    motivo?: string;
+    pulado?: string;
+    fotos?: { ok: boolean }[] | number;
+  } | null;
+  if (!r?.ok) return { ok: false, motivo: r?.motivo ?? `status_${resposta.status}` };
+  // Resposta antiga da rota: a troca falhou, mas as fotos tinham entrado.
+  if ((r as { troca?: string }).troca) return { ok: false, motivo: 'troca_falhou' };
+  if (r.pulado) return { ok: true, vieram: 0, falharam: 0, pulado: true };
+  const fotos = Array.isArray(r.fotos) ? r.fotos : [];
+  const vieram = fotos.filter((f) => f.ok).length;
+  return { ok: true, vieram, falharam: fotos.length - vieram, pulado: false };
 }
 
 export async function importarRelatorio(

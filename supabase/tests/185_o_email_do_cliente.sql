@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — O e-mail do cliente (migração 20261117220000), nas duas empresas
+-- pgTAP — O e-mail do cliente (migração 20261118150000), nas duas empresas
 --
 -- Prova: o e-mail que o cliente escreve vai para a ficha sem e-mail; o cliente
 -- corrigindo troca o que ele mesmo mandou; o que a equipe digitou não é trocado
@@ -16,7 +16,7 @@ begin;
 select plan(30);
 
 insert into public.allowed_users (email, role, note) values
-  ('g181@teste.local', 'gestor', 'pgTAP 181');
+  ('g181@teste.local', 'gestor', 'pgTAP 185');
 insert into auth.users (id, email, raw_user_meta_data) values
   ('a0000000-0000-4000-8000-000000018101'::uuid, 'g181@teste.local', '{"full_name":"Gil Gestor"}');
 

@@ -127,6 +127,14 @@ export interface Empresa {
      */
     meuDiaNovo: boolean;
     /**
+     * A aba inicial vira o Painel do dia (17/11/2026, `public.meu_dia_painel`):
+     * números do período (leads novos, visitas marcadas, negócios fechados), a
+     * agenda de hoje com a foto do imóvel, o que a IA fez, um "Precisa de você"
+     * com até 5 itens, os leads novos e os imóveis em alta. A lista completa
+     * continua em `/meu-dia?aba=fazer`. Só da Imova, por enquanto.
+     */
+    painelDoDia: boolean;
+    /**
      * A visita marcada no CRM com hora (`visita_marcar`, `tasks.origin = 'manual'`)
      * mostra a hora e o fim no cartão da Agenda (11/11/2026, junto com o Calendly:
      * na imobiliária a visita é horário combinado com o cliente). Na KOMUNE a visita
@@ -329,6 +337,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       relatoriosDaImova: false,
       canalDeChegada: false,
       meuDiaNovo: false,
+      painelDoDia: false,
       horaNaVisita: false,
       avisosDaEquipe: false,
       calendly: false,
@@ -393,6 +402,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       relatoriosDaImova: true,
       canalDeChegada: true,
       meuDiaNovo: true,
+      painelDoDia: true,
       horaNaVisita: true,
       avisosDaEquipe: true,
       calendly: true,

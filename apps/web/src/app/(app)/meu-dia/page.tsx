@@ -9,6 +9,7 @@ import { EMPRESA } from '@/lib/empresa';
 import { dataPorExtenso, primeiroNome, saudacaoDoDia } from '@/components/meu-dia/formatos';
 import { nomeDaSaudacao } from '@/components/meu-dia/novo';
 import { TelaMeuDia, type PessoaDoSeletor } from '@/components/meu-dia/tela-meu-dia';
+import { PainelDoDia } from '@/components/meu-dia/painel/painel-do-dia';
 import { abaDaUrl } from '@/components/meu-dia/tipos';
 
 export const metadata: Metadata = { title: 'Meu dia' };
@@ -43,6 +44,22 @@ export default async function Pagina({
   // se o bloco "Responderam e estão esperando" da `meu_dia` é a fila de todos
   // (admin, gestor e sdr) ou a da pessoa (embaixador) — `alcanceDeQuemRespondeu`.
   const pessoas: PessoaDoSeletor[] = await carregarPessoasAcompanhadas(sessao);
+
+  // O Painel do dia (17/11/2026, só da Imova) é a entrada; a lista de antes abre
+  // com `?aba=` (o "Lista completa" e o "Ver todas" do painel levam a `?aba=fazer`).
+  if (EMPRESA.modulos.painelDoDia && typeof params.aba !== 'string') {
+    return (
+      <PainelDoDia
+        nome={nomeDaSaudacao(sessao.nome)}
+        saudacao={saudacaoDoDia(agora)}
+        data={dataPorExtenso(agora)}
+        usuarioId={sessao.id}
+        hoje={hojeEmNatal(agora)}
+        pessoas={pessoas}
+        pessoaInicial={pessoaPedida(params.pessoa, pessoas, sessao.id)}
+      />
+    );
+  }
 
   return (
     <TelaMeuDia

@@ -12,7 +12,7 @@
  *   de uma passagem), uma vez por conversa, a frase do convite e o que dizer quando o
  *   e-mail chega.
  * - A entrada ganha `cliente.email` ({naFicha, ofertas}), vinda do banco
- *   (`app.ia_email_do_cliente`, migração 20261117220000). Nunca o endereço: o e-mail que
+ *   (`app.ia_email_do_cliente`, migração 20261118150000). Nunca o endereço: o e-mail que
  *   o cliente escreve chega ao modelo como marcador (`[[EMAIL_1]]`), e quem o grava na
  *   ficha é um gatilho do banco (`messages_zzz_email_na_ficha`), não a IA.
  * - A saída ganha `ofertasPorEmail` ("aceitou" | "recusou" | null), que o worker leva a

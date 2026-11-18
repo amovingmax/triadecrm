@@ -10741,6 +10741,148 @@ Pedido do usuário: "faz uma API do CRM do Tríade, preciso integrar softwares e
 
 **No ar desde 17/11/2026, ~16h (pedido do usuário: "suba alteração pro ar"):** `main` em `6ce6cf5` (avanço direto de `49d6a7b`). Banco da Imova pelo `publicar-banco imova migrar` (só a `20261117200000`) e da KOMUNE pelo `komune migrar` (a `20261116120000`, das medidas do terreno, que lá não faz nada, e a `20261117200000`). Função `api` publicada nos dois projetos (`kkqadgxvmzulcamuakzk` e `toqdjcajyrowutunczhr`). Sites das cópias limpas `~/triadecrm-publicar-imova` e `~/triadecrm-publicar-komune`: Imova `imova-all4tm6eg` (volta: `imova-n8sb0vonx`) e KOMUNE `triade-16ppkvbyr` (volta: `triade-ie9ldpwld`). Conferido de fora: nas duas, `GET /v1` sem chave dá 401 `chave_ausente` (a função) e com uma chave inventada no formato certo dá 401 `chave_invalida` com a frase do banco (a função chega a `public.api_atender`, com as permissões certas); `api_avisos` (15 s) e `api_limpar` ativos no `cron.job` dos dois bancos; `/login` 200 com `data-empresa` certo, `/admin?aba=integracoes` sem login vai para o login, `/auth/dev` 404. Nenhuma chave nem webhook foi criado em produção: a primeira chave é criada por um admin ou gestor em Ajustes → Integrações, e a tela com login não foi aberta em produção (login pelo Google).
 
+## 17/11/2026 — concluir a conversa limpa o Meu dia (branch `meu-dia-concluida`; nas duas empresas; RF-CON-04, RF-MET-03/04)
+
+Pedido do usuário: "Assim que concluirmos conversa com cliente não pode haver nada desse cliente na aba de 'meu dia', as tarefas associadas a ele devem ser concluídas e não mostradas como pendente".
+
+O que acontecia: concluir (04/11) tirava do Meu dia só o "Responder no WhatsApp". As tarefas do cliente continuavam abertas e vencidas; sem tarefa, o negócio dele subia como "próxima ação vencida" ou "parado"; e o sistema seguia criando tarefa para ele. Na Imova, em 17/11, havia 17 tarefas abertas de clientes concluídos (12 "Follow-up D+3" e "Reengajar", 5 avisos da IA), e 6 delas nasceram depois da conclusão.
+
+- **Banco (migração `20261117210000_concluir_limpa_o_meu_dia.sql`):**
+  - **concluir fecha as tarefas do cliente:** `public.conversa_arquivar` marca como feitas as tarefas abertas da ficha (`app.concluir_fecha_tarefas`) e anota em `tasks.concluida_com_conversa` (coluna nova) qual conclusão as fechou. A resposta diz quantas (`tarefas_concluidas`). Se a mesma ficha tiver outra conversa aberta, nada é fechado;
+  - **o compromisso marcado fica:** visita e reunião com data daqui para frente continuam na Agenda e em "Próximos dias" (marcar como feita uma visita que não aconteceu mentiria na Agenda). A que já passou e ficou aberta é fechada;
+  - **o que o sistema cria sozinho para cliente concluído já nasce feito:** gatilho `tasks_a_nasce_concluida`. Tarefa sem pessoa por trás (relógio do "Reengajar", worker de IA, webhook) entra como feita, com a mesma marca. Tarefa criada por uma pessoa (pela tela ou pela API, que age como ela) nasce aberta. Visita e reunião nunca nascem feitas (o Calendly marca visita sem pessoa);
+  - **a `meu_dia` não mostra o negócio do cliente concluído**, nem o registro "sem resultado" de antes da conclusão (o de depois aparece);
+  - **"Desfazer" e "Reabrir" devolvem as tarefas que esta conclusão fechou** (`tarefas_devolvidas`). Quando o cliente escreve de novo, a conversa volta, mas as tarefas velhas não: o item novo é "Responder no WhatsApp";
+  - "cliente concluído" tem uma definição só, `app.cliente_concluido_em(org)`: tem conversa, todas concluídas, e nenhuma mensagem do cliente ou de uma pessoa do time depois da conclusão. A mensagem conta mesmo dentro do próprio insert, antes de o gatilho que desarquiva rodar;
+  - **o que já estava preso é fechado na migração**, com a mesma marca ("Reabrir" devolve), menos a tarefa que uma pessoa criou depois de concluir. No banco local da Imova foram 3. Contadas em produção em 17/11 (só leitura): 17 na Imova e 32 na KOMUNE (20 clientes concluídos; 28 "Follow-up"/"Reengajar", 2 avisos da IA, 1 mensagem e 1 criada à mão, que fica aberta se nasceu depois da conclusão).
+- **Tela:** o aviso de "Conversa concluída" diz quantas tarefas saíram do Meu dia ("As 3 tarefas abertas deste cliente foram concluídas e saíram do Meu dia."), e o de "Reabrir" diz quantas voltaram (`fraseDasTarefas`, em `conversas/formatos.ts`). Concluir e reabrir recarregam o Meu dia e a Agenda na hora.
+- **O que não muda:** o "Feito hoje" (é história), os relatórios (nenhum conta visita pela tarefa feita), o WhatsApp (nada é enviado), o bloco "Primeira resposta" (já ignorava conversa concluída).
+- **Verificado:**
+  - pgTAP `181` (31 de 31) nos bancos locais da KOMUNE e da Imova, com a migração, numa transação desfeita;
+  - regressões, com e sem a migração e resultado idêntico: a suíte pgTAP inteira no banco local da KOMUNE; e, com as tabelas esvaziadas dentro da transação (os testes contam linhas exatas), `87`, `90`, `14`, `93`, `122`, `104`, `117`, `120`, `138`, `150`, `159`, `91` e `10`, todos passando, e `151` no banco local da Imova. As falhas que o banco local já tinha (`119`, `172`–`174` e outros, porque ele está atrás da `main`) são as mesmas com e sem a migração;
+  - typecheck, lint e Vitest de todo o repositório (2.161 no site, 4 novos em `tarefas-da-conclusao.test.ts`).
+- **Para decidir:**
+  - a visita ou reunião marcada para hoje com cliente concluído continua aparecendo na "Agenda de hoje" do Meu dia (e na fila, se for nas próximas 3 h). Se o usuário quiser que ela também suma, ou seja cancelada, muda uma condição;
+  - conversa de quem não tem ficha (fora da base) não tem tarefa ligada a ela, e por isso não fecha nada.
+- **Protótipo antes de subir:** `next dev` em `192.168.0.194:3104`, banco local da Imova com a migração aplicada de vez (sem registro em `schema_migrations`) e dois clientes de demonstração (`collector = 'demo-concluir'`). No Playwright: o aviso "As 2 tarefas abertas deste cliente foram concluídas e saíram do Meu dia", e o Meu dia do gestor de 45 para 43 pendências, sem a cliente concluída em nenhum bloco.
+
+**No ar desde 17/11/2026 (pedido do usuário: "Suba essa atualização pro ar"):** `main` em `69a68f8` (avanço direto de `c496385`). Banco da Imova pelo `publicar-banco imova migrar` e da KOMUNE pelo `komune migrar` (só a `20261117210000` pendente nas duas; a KOMUNE respondeu 502 da API do Supabase duas vezes antes de aceitar, sem nada aplicado nas tentativas). Sites das cópias limpas: Imova `imova-o1a5n2k91` (volta: `imova-all4tm6eg`) e KOMUNE `triade-k59hou3bb` (volta: `triade-16ppkvbyr`). Worker não mudou.
+- **O que a migração fechou em produção:** 17 tarefas na Imova (não sobrou nenhuma aberta de cliente concluído) e 29 na KOMUNE. Ficaram abertas na KOMUNE 3 "Follow-up D+3" de 2 clientes arquivados em 30/09, quando a mensagem do time ainda não trazia a conversa de volta: a equipe escreveu para eles depois e criou esses follow-ups à mão (02 e 07/10). Pela definição de hoje esses clientes não estão concluídos, e as tarefas ficam. Para limpar, basta "Reabrir" e "Concluir" de novo nas duas conversas.
+- **Conferido de fora:** nas duas, `/login` 200 com `data-empresa` certo (`imova-crm.vercel.app` e `triade-crm-tawny.vercel.app`), `/meu-dia` sem login vai para o login, `/auth/dev` 404; no banco, a coluna `tasks.concluida_com_conversa` com as tarefas marcadas. A tela com login não foi aberta em produção (login pelo Google).
+
+## 17/11/2026 — o Painel do dia: a aba inicial nova da Imova (branch `painel-do-dia`; só na Imova; RF-MET-03/04)
+
+Pedido do usuário: "Muitas informações hoje são inúteis. Preciso de uma aba inicial mais amigável e que seja mais interessante". Decidido com ele, por perguntas e protótipos (rascunhos em `~/Documents/imova-meu-dia-2026-11-17`): Imova primeiro; ver primeiro os resultados, as visitas de hoje e os leads novos (não "quem responder agora", porque a IA atende); deixar interessante com o que a IA fez e as fotos dos imóveis; pendências num bloco pequeno; os números do topo são leads novos, visitas marcadas e negócios fechados; o layout "Painel do dia", na versão mais profissional.
+
+- **Banco (migração `20261117220000_o_painel_do_dia.sql`, só na Imova; na KOMUNE não cria nada, no CI cria):** `public.meu_dia_painel(p_periodo, p_pessoa)`, uma leitura só que devolve cada bloco em jsonb. As contas são as dos Relatórios da Imova, para os números das duas telas nunca discordarem: lead novo e negócio fechado de `app.imova_funil_periodo`, visita marcada = reunião criada e não cancelada (uma por cliente), "pela IA" = `reunioes.marcada_por = 'robo'`, imóveis em alta de `app.imova_ranking_imoveis` (7 dias), a IA de `ia_respostas` (sem treino e teste), a meta do mês de `relatorio.premissas`. Números, IA, leads e imóveis só para quem vê a base inteira (`app.sees_all()`); agenda e pendências da pessoa (outra pessoa só para a gestão). Não escreve nada; ~25 ms no banco local.
+- **Tela (`components/meu-dia/painel/`, módulo `painelDoDia`):** `/meu-dia` passa a ser o painel na Imova:
+  - no alto, a saudação e os três números com a comparação ao período anterior (Hoje / 7 dias / Mês), a série dos dias e, em negócios fechados, o último negócio e a barra da meta do mês;
+  - à esquerda, a **agenda de hoje** (visitas e reuniões com a foto do imóvel, código, endereço, "Cliente confirmou" / "Marcada pela IA", conversa e "Como chegar" no Google Maps) e os **leads novos** (canal de chegada, situação, quando chegou);
+  - à direita, **a IA** (conversas, visitas, passadas para a equipe e as últimas ações, cada uma abrindo a conversa), **Precisa de você** (até 5: passagem da IA sem resposta da equipe, tarefa vencida e de hoje, cada uma com o botão certo; o aviso do motor sem cliente fica de fora) e os **imóveis em alta** com foto;
+  - a lista de antes continua inteira em `/meu-dia?aba=fazer` ("Lista completa" e "Ver todas"), com "← Painel do dia" de volta. A KOMUNE não muda.
+- **Verificado:**
+  - pgTAP `182` (15 de 15) no banco local da Imova, com a migração; no banco local da KOMUNE a migração não cria nada (o 182 só roda onde a função existe, como os outros da Imova);
+  - Vitest `painel.test.ts` (14), typecheck, lint;
+  - no site local (`next dev` na 3104, banco local da Imova com clientes de demonstração `collector = 'demo-painel'`), pelo Playwright em 1440 e 390 px: sem rolagem lateral, sem erro no console, troca de período e ida e volta à lista completa.
+- **Correção antes de ir ao ar (migração `20261117221000_o_painel_sem_o_resumo_da_passagem.sql`):** a primeira versão lia o motivo da passagem em `ia_resumos_da_passagem`, que só existe no banco local (entrega da IA não publicada). Aplicada em produção, a função dava 42P01; o ensaio de leitura em produção (como admin, transação desfeita) pegou o erro antes de a tela subir. Agora o motivo vem de `ia_respostas.detalhes`, e a tarefa que a IA cria ao passar o cliente não repete a passagem da mesma ficha. pgTAP 182 passa com a tabela escondida, e o ensaio em produção respondeu nos três períodos.
+
+**No ar desde 17/11/2026, à noite (pedido do usuário: "Quero que suba essa alteração para o ar"):** `main` em `d98d950` + `93d7ace` (a correção). Banco da Imova pelo `publicar-banco imova migrar` (a `20261117220000` e depois a `20261117221000`) e da KOMUNE pelo `komune migrar` (as duas, que lá não criam nada: o RPC responde PGRST202). Sites das cópias limpas: Imova `imova-1ootda9h8` (volta: `imova-o1a5n2k91`) e KOMUNE `triade-gjahm9814` (volta: `triade-k59hou3bb`; na KOMUNE a tela não muda, `painelDoDia` desligado). A primeira tentativa dos dois deploys em paralelo voltou "Not authorized" da Vercel sem publicar nada; um de cada vez, passou. Conferido: a função em produção, como admin e só leitura, responde nos três períodos (hoje: 1 lead, 3 imóveis em alta, 19 pendências do admin) e sem `ia_resumos_da_passagem`; de fora, `/login` 200 com `data-empresa` certo nas duas, `/meu-dia` sem login vai para o login, `/auth/dev` 404. A tela com login não foi aberta em produção (login pelo Google).
+
+- **Pendente / para decidir:** levar à KOMUNE (lá os números seriam outros: fornecedores, ligações); um bloco de ligações para quem usa telefone; os títulos de tarefas automáticas antigas ("O robô parou nesta conversa…") seguem como estão.
+
+## 17/11/2026 — a IA da Imova volta a atender 24 h depois do time (branch `ia-volta-24h`; só na Imova; no ar; RF-CON-09)
+
+Pedido do usuário: "Quero que a IA da Imova fique ligada para atender todos os clientes que entrarem em contato". A IA já estava ligada no modo clientes desde 17/11 às 14h04, mas parava de vez numa conversa quando alguém do time escrevia ou quando ela passava a conversa para a equipe: 22 das 27 conversas recentes estavam assim, e quem voltasse a escrever ficava sem resposta automática. Decidido com ele, por pergunta: a IA volta quando a mensagem do cliente chega 24 h ou mais depois da última mensagem do time.
+
+- **Banco (migração `20261117230000_a_ia_volta_depois_de_24h.sql`, só na Imova; na KOMUNE não faz nada):** muda só `app.ia_atende`, que é a pergunta que a fila, o selo da conversa, a visita e o lembrete já fazem.
+  - o "agora" passa a ser a mensagem do cliente que espera resposta (a última da conversa, quando é dele); sem ela, o momento atual (a tela mostra se a IA responderia a próxima);
+  - o time escreveu nas 24 h antes desse "agora", ou depois dele: a conversa é do time (como antes). Uma resposta do cliente dada dentro das 24 h fica com o time mesmo depois que as 24 h passam;
+  - a IA passou para a equipe (`parada` sem `mudou_por`): vale como mensagem do time no momento da passagem;
+  - "Parar a IA" por uma pessoa (`parada` com `mudou_por`) continua valendo até alguém religar. Robô pausado, conversa bloqueada, chave desligada e modo treino, iguais.
+- **Verificado:** pgTAP `183` (16 de 16) no banco local da Imova, com a migração (sem ela, 5 falham); `133` (66), `143` (26), `156` (114) e `170` (130) iguais com e sem a migração; na KOMUNE local, só o aviso. Antes de publicar, a regra simulada com os dados de produção: ninguém receberia resposta na hora (a IA só age na próxima mensagem do cliente).
+- **No ar desde 17/11/2026 (o usuário escolheu "testo antes e publico"):** banco da Imova pelo `publicar-banco imova migrar` (só a `20261117230000`). Sem site e sem worker. Conferido em produção (só leitura): a função nova no ar; a IA atende 26 das 34 conversas com mensagem de cliente; ficam com o time as 7 em que alguém escreveu nas últimas 24 h e o Mariano Nobre, parado por uma pessoa às 14h18. Para desfazer, reaplicar `app.ia_atende` da `20261110150000`.
+- **Pendente / para decidir:** a KOMUNE não recebeu a migração (lá não faz nada; entra no próximo `komune migrar`); os textos da tela ainda dizem que quem escreve "para a IA" (o selo já segue a regra nova, porque lê `app.ia_atende`); parceiros e pessoas de dentro que escrevem no número também são atendidos pela IA, e quem não quiser isso numa conversa usa "Parar a IA".
+
+## 18/11/2026 — a aba Anúncios sem repetição e todas as fotos do Canal Pro (branch `anuncios-sem-repeticao`; só na Imova)
+
+Pedido do usuário: "tem muita informação repetida entrando no CRM ... o TE0001 já existe aqui dentro do CRM, não tem para que ficar aparecendo novamente"; "a gente deve estar recebendo todas as imagens cadastradas do terreno dentro do nosso CRM", inclusive dos não publicados no Canal Pro; e a aba "menos repetitiva, mais objetiva, mais clara e mais funcional". Aprovado pelo protótipo navegável (https://claude.ai/artifact/JxhgD1FcBnfqm3Svt6VQ8t, com os dados reais de 18/11) e mandado ao ar no mesmo dia ("Gostei da atualização. Suba pro ar").
+
+- **O que o banco mostrou (só leitura, 18/11):** a lista do Canal Pro (`anuncios_no_canal_pro`) tinha 17 linhas para 13 anúncios. Os 7 da Arbo tinham o mesmo código no CRM, mas não estavam ligados ao anúncio, e só casavam na tela. 6 linhas eram o mesmo imóvel com outro código (por exemplo, "Terreno Capim Macio" é o TE0001_IMOVA). A gestão as excluía à mão, e cada relatório importado as trazia de volta. Faltavam 121 fotos: as 120 dos 4 não publicados (Brisa Mall - Loja 02 13, Casa extremox 24, Edifício Simone 47 e SANTA CATARINA 36) e 1 do SA0012 (7 de 8).
+- **Um imóvel, um cartão (`aba-dos-anuncios.ts`, Vitest 26):** cada linha do Canal Pro vai para o cartão do anúncio dela. A de mesmo código, ou a ligada pelo "trazer", é a própria. A de outro código que `canal_pro_parece_com` reconhece (mesma cidade, mesma área, mesmo bairro) é uma cópia antiga dentro do cartão. Na lista sobram só as que não têm par.
+- **O cartão:** foto, título, código, tipo, área, bairro, preço, uma etiqueta de situação (Publicado pela Arbo, No ar no CRM · aguarda a troca, Publicado pelo CRM, Não publicado, Rascunho · falta N, No ar com pendência), os números do Canal Pro e dos leads, e uma ação só: Trazer fotos, Completar, Corrigir, Pôr no ar ou Restaurar. O clique abre a **ficha por cima**, com as fotos, a situação explicada, os números, a nota de qualidade, a ficha do imóvel, as cópias antigas (avisando preço diferente e cópia ainda ativa) e "De onde veio". Saíram do cartão a origem, as datas e a nota.
+- **O alto da aba:**
+  - três números, cada um uma vez só na tela: vagas do plano, leads dos portais (com o último) e a última lista do Canal Pro;
+  - **Troca da Arbo pelo CRM** (`troca-da-arbo.tsx`) no lugar do "Caminho até o primeiro lead": só o passo atual (leads no CRM, anúncios no ar pelo CRM, Canal Pro lê o arquivo do CRM), e "Ver os 7 na lista" filtra a lista em vez de listar de novo;
+  - **Precisa de você**, uma linha por pendência com a ação: fotos que faltam, no ar fora do arquivo, rascunho incompleto, cópia antiga ainda ativa, anúncio do Canal Pro sem cartão e não publicados prontos com vaga livre.
+
+  Busca por código, título, bairro ou código da cópia. "Atualizar do sistema atual" e "Atualizar do Canal Pro" saíram do cabeçalho e moram dentro de "Sincronizar Canal Pro".
+- **Sincronizar com o Canal Pro (`sincronizar-canal-pro.ts`, Vitest 20):**
+  - o código público do site do Canal Pro mostra que "Meus anúncios" vem da API GraphQL `https://gandalf-api.grupozap.com/`, consulta `listings`, com todos os anúncios da conta (ativos, inativos, rascunhos), `images` e `leads`. A sessão vai no Authorization (o token da loja Vuex `account/token`) e nos X-PublisherId, X-OdinID, X-ContractID e X-PublisherContractType;
+  - o favorito "Imova: sincronizar" roda na aba do Canal Pro com o login de quem clica, pede as páginas (100 por vez) e abre `/anuncios/sincronizar` com a lista no fragmento do endereço, que não vai a servidor nenhum;
+  - a tela confere antes de gravar: entram como novos, ganham fotos, só atualizam situação e números, mesmo imóvel com outro código (não entram) e os que saíram do Canal Pro. Com a lista incompleta (vieram menos que o total), o "Aplicar" fica travado;
+  - gravar é a `canal_pro_importar` de sempre, com as linhas no formato da planilha, e depois as fotos de cada anúncio pela rota. No anúncio sem foto entram todas; no que tem menos que o Canal Pro, as de lá substituem as do CRM; o CRM com mais fotos fica como está.
+- **Novo anúncio confere antes (`novo-anuncio-conferido.tsx`):** com tipo, cidade, bairro e área, o CRM procura um imóvel parecido (mesmo grupo de tipo, mesma cidade, área a até 5%, mesmo bairro). Se achar, oferece abrir o que existe; senão, o editor abre com esses campos preenchidos (`/anuncios/novo?tipo=&cidade=&bairro=&area=`).
+- **Banco (migração `20261118120000_todas_as_fotos_do_canal_pro.sql`, só na Imova; na KOMUNE não faz nada):** é a migração escrita em 09/11 na branch `fotos-do-canal-pro`, que nunca subiu, com data nova:
+  - teto de fotos de 40 para 60;
+  - `anuncio_fotos_trocar`, que deixa só as novas, na ordem, numa transação.
+
+  A rota `api/anuncios/importar/fotos` ganhou os modos `se_vazio`, `juntar` e `trocar` e as versões de cada foto (a maior primeiro). pgTAP `184` (15).
+- **Verificado:**
+  - pgTAP 123 (60), 126 (39), 128 (18), 174 (17) e 184 (15) no banco local da Imova;
+  - Vitest com 2.221 testes, typecheck e lint;
+  - ensaio da migração no banco de produção da Imova, numa transação desfeita (aplica; nada ficou);
+  - no site local (3105), pelo Chrome sem janela: a aba em 1440 e 390 px, sem rolagem lateral; a ficha; o "Novo anúncio" achando o TE0001 para "Terreno, Natal, Capim Macio, 3000";
+  - a sincronização de ponta a ponta com um pacote simulado no formato do Canal Pro: um anúncio novo entrou com as fotos, o SA0012 foi de 8 para 9, o Simone e a Casa extremox ganharam fotos, a cópia "Terreno Capim Macio" não entrou e o apagado ficou de fora. Numa segunda rodada só o anúncio novo de verdade entrou. A tela do resultado tinha um defeito (voltava a "nenhuma lista chegou"), corrigido antes de subir.
+- **Revisão independente antes de subir (8 achados, corrigidos):**
+  - a troca de fotos ficou tudo ou nada: se faltar alguma das pedidas, o anúncio volta a ficar só com as antigas (`troca_incompleta`), e uma troca que falha não é mais contada como sucesso. Ensaiado no local com uma foto quebrada: as 9 antigas ficaram;
+  - não propõe troca quando o CRM e o Canal Pro juntos passam de 60 fotos (fica em "Ficam como estão"), nem no anúncio que o CRM já publica pelo arquivo;
+  - a lista só é aplicada inteira: sem o total, ou com menos códigos que ele, o "Aplicar" trava. Quando algum anúncio sai da lista, pede para confirmar;
+  - o favorito pede todas as situações (ativo, inativo, rascunho, em processamento e bloqueado) e tenta um pedido mais simples se o Canal Pro recusar;
+  - dois novos do mesmo imóvel seguem a ordem do banco (ativo primeiro; o outro vira cópia), e as fotos de um novo vão para o anúncio que a linha trouxe, mesmo que ele tenha ganhado outro código;
+  - área em texto ou com casas decimais vira inteiro;
+  - os anúncios excluídos contam para a junção e para o "Novo anúncio".
+- **Não testado com o Canal Pro de verdade:** o favorito depende da sessão do Canal Pro aberta no navegador do usuário. O primeiro clique dele é o teste. Se falhar, o favorito avisa o motivo na própria página do Canal Pro, e os dois jeitos de antes continuam dentro de "Sincronizar Canal Pro".
+
+**No ar desde 18/11/2026, 14h33 (pedido do usuário: "Gostei da atualização. Suba pro ar"):**
+- `main` em `77cb078`;
+- banco da Imova pelo `publicar-banco imova migrar`, só a `20261118120000`, conferida em produção (`anuncio_fotos_trocar` existe e o teto é 60);
+- site `imova-mak4gjdo3` em imova-crm.vercel.app. O mesmo código também gerou o `imova-p3hcr46bp`, porque o primeiro `vercel deploy` respondeu sem mostrar a URL e foi repetido. Para voltar, use `imova-1ootda9h8`.
+
+Conferido de fora: `/login` responde 200 com `data-empresa="imova"`; `/anuncios` e `/anuncios/sincronizar` sem login levam ao login; `/auth/dev` dá 404. A tela com login não foi aberta em produção (o login é pelo Google).
+
+A KOMUNE não recebeu a migração; lá ela não faz nada, e entra no próximo `komune migrar`.
+
+### 18/11/2026 — O favorito "Imova: sincronizar" no Canal Pro novo (só na Imova)
+
+O pedido: "precisamos de uma forma de subirmos as fotos dos anúncios no CRM; os anúncios já devem vir com as suas fotos". O CRM avisava "5 anúncios com fotos faltando · 121 estão no Canal Pro": SANTA CATARINA (36), Brisa Mall - Loja 02 (13), Edifício Simone (47), Casa extremox (24) e SA0012_IMOVA (7 de 8). Os quatro primeiros entraram pela planilha do Canal Pro, que não traz fotos, e o caminho que traz todas (o favorito) não funcionava.
+
+- **Por que o favorito parou:** o endereço canal-pro.grupozap.com virou outro site, em React (`div#root`, Redux), sem `#app.__vue__` nem `$store`. O favorito procurava o login no Vue, não achava e dizia "esta aba do Canal Pro não está logada" mesmo com o login feito. O endereço antigo (canalpro.grupozap.com) continua em Vue, e o Canal Pro alterna entre os dois.
+- **O que o código público do site novo mostra (18/11):**
+  - o login fica em cookies do grupozap.com que o próprio site grava pelo JavaScript: `bb-authenticationToken`, `publisher_id`, `odin_id` e `contract_id`. Os mesmos dados estão na loja Redux, em `auth`;
+  - os cabeçalhos da API são os de antes, em minúsculas, e a consulta `listings` aceita os mesmos campos;
+  - há uma situação nova, READY_TO_PUBLISH. Os "não publicados" do site são INACTIVE mais READY_TO_PUBLISH;
+  - as fotos (`newResizedUrl`) ganharam o molde `{extension}`.
+- **O favorito novo (versão 4 do pacote, `sincronizar-canal-pro.ts`):**
+  - acha o login de quatro jeitos: os cabeçalhos que a própria página manda à API (no primeiro clique ele passa a escutar os pedidos da página, e o clique seguinte os usa), a loja Redux pela árvore do React, os cookies e a loja do Vue. No endereço antigo, o Vue vem primeiro;
+  - pede cada situação numa consulta à parte (ACTIVE, INACTIVE, READY_TO_PUBLISH, DRAFT, BLOCKED e PENDING) e, por último, uma sem filtro. Uma situação que a API não conhece é pulada sem derrubar as outras; antes, uma situação desconhecida derrubava a consulta inteira, e o favorito caía numa consulta sem filtro, que pode trazer só os publicados;
+  - três mensagens diferentes: "não encontrei o site do Canal Pro", "não achei o login" e "a API do Canal Pro recusou o pedido (código 401)";
+  - quando uma situação falha de verdade, o pacote vai sem o total e com o motivo. A tela mostra "Uma parte da lista não veio" e trava o "Aplicar", como antes;
+  - "Pronto para publicar" vira o nome da situação nova, e o molde `{extension}` vira `jpg`.
+- **Tela:** "Sincronizar Canal Pro" avisa para apagar o favorito antigo e arrastar o novo. A versão 3 do pacote continua aceita.
+- **A conferência não mudou:** com a lista certa, os quatro sem foto recebem todas (`se_vazio`), e o SA0012 troca as 7 pelas 8 do Canal Pro (`trocar`, tudo ou nada). Os cinco estão como rascunho no CRM, então o CRM não é a fonte deles.
+- **Verificado:**
+  - Vitest com 2.236 testes, typecheck e lint;
+  - no Chrome sem janela, na página real do Canal Pro novo, sem login: o favorito achou as duas lojas Redux com `auth.gandalf_token` pela árvore do React, avisou "não achei o login" e passou a escutar a página;
+  - na mesma página, com um cookie de login falso e a API do Canal Pro e o CRM respondidos pelo próprio navegador de teste (nenhum pedido do favorito saiu): oito consultas, a PENDING pulada e o pacote com 3 anúncios e 8, 47 e 13 fotos, nos dois endereços;
+  - a tela do CRM local (3106) com esse pacote: "Ganham fotos" com o Edifício Simone (+47) e a Brisa Mall - Loja 02 (+13). Com uma falha simulada, mostra o motivo e trava o "Aplicar".
+- **Não testado com o login de verdade:** o primeiro clique do usuário é o teste. Não foi possível confirmar fora do login se a API aceita PENDING; se não aceitar, a consulta é pulada.
+
+**No ar desde 18/11/2026 (o usuário rodou os comandos):**
+- `main` em `3d2c028`; sem migração;
+- site `imova-p3u32y1yh` em imova-crm.vercel.app. Para voltar, use `imova-mak4gjdo3`.
+
+Conferido de fora: `/login` responde 200 com `data-empresa="imova"`; `/anuncios` e `/anuncios/sincronizar` sem login levam ao login; `/auth/dev` dá 404. Falta o primeiro clique do usuário no Canal Pro, com o favorito novo arrastado de novo para a barra.
+
 ## 16/11/2026 — a folha "Mais" do celular vira grade de atalhos, e todas as telas passam pela varredura do celular (branch `menu-e-celular`, só no localhost; as duas empresas)
 
 Pedido do usuário, com print do iPhone: "preciso que [o menu do Mais] fique algo mais organizado" e "uma varredura para verificar se todas as telas estão responsivas no mobile de acordo com o display do celular". Sete agentes, cada um dono das próprias pastas (casca e menu; Meu dia e Conversas; Lotes, Agenda, Registrar e Disparos; Prospectados, Funis, Revisão e Importar; Anúncios e IA que atende; Metas, Relatórios, Ajustes e páginas públicas; propostas, só leitura). Conferido com Playwright e Chrome em modo celular, em 375, 390 e 430 px, contra o site local da Imova; o computador (1280) não mudou.
@@ -10814,7 +10956,7 @@ Pedido do usuário: "A gente deve arrumar as telas e deixá-las mais responsivas
 
 Pedidos do usuário, sobre a Imova: "Precisamos criar um campo de email para cada cliente/usuario, e caso seja fornecido a informação devemos colocar esse email que foi fornecido à ficha dele" e "Devemos treinar a IA para pedir o email das pessoas caso elas queiram receber mais ofertas e receberem mais promocoes". A ficha já tinha a coluna (`organizations.email`) e a folha de editar já tinha o campo; faltava o e-mail chegar à ficha pela conversa, aparecer na conversa e a IA saber pedir.
 
-- **Banco (migração `20261117220000`, as duas empresas):**
+- **Banco (migração `20261118150000`, as duas empresas):**
   - `messages_zzz_email_na_ficha` (AFTER INSERT, depois do lead automático): o primeiro e-mail da mensagem recebida (`app.email_achado`) vai para a ficha sem e-mail; se o e-mail de agora também veio da conversa (o cliente corrigindo), troca; se foi a equipe que digitou (ou veio de importação), não troca e deixa a anotação com o e-mail novo, para a equipe decidir em Editar. Toda vez fica uma atividade `system` ("E-mail anotado pela conversa: …"), que não conta como contato. Conversa sem ficha: nada é gravado. O contato da conversa (KOMUNE) ganha o e-mail quando não tem. Qualquer erro vira WARNING e a mensagem chega (lição do CPF de 13/11).
   - `public.ofertas_por_email`: sim/não às ofertas por e-mail, com a origem (`ia`, `equipe`, `formulario`), a conversa e a mensagem que provam. Só se acrescenta (a linha mais nova vale; `app.ofertas_por_email_situacao`). **Não é `consent_events` de propósito:** lá, `contact_optout` suprime o contato inteiro (`app.consent_apply`: `do_not_contact`, supressão, negócios para o opt-out), e quem diz "não quero ofertas por e-mail" continua sendo atendido pelo WhatsApp.
   - `public.ia_entrada_do_atendente` ganha `email` (`app.ia_email_do_cliente`: `na_ficha`, `ofertas`, `ofertas_em`; nunca o endereço). `public.ia_atendente_ofertas_por_email(conversa, mensagem, aceita)` (só o worker), idempotente.

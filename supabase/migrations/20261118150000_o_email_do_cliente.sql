@@ -78,7 +78,7 @@ as $$
            '([A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})'))[1]), '.'), '')
 $$;
 comment on function app.email_achado(text) is
-  'O primeiro e-mail de um texto, em minúsculas, ou null. Usado pelo gatilho que leva à ficha o e-mail que o cliente escreve (20261117220000).';
+  'O primeiro e-mail de um texto, em minúsculas, ou null. Usado pelo gatilho que leva à ficha o e-mail que o cliente escreve (20261118150000).';
 revoke all on function app.email_achado(text) from public, anon;
 grant execute on function app.email_achado(text) to authenticated, service_role;
 
@@ -304,7 +304,7 @@ begin
   end if;
   execute replace(v_def, v_ancora,
     replace(v_ancora, ');', ',') || $a$
-    -- O e-mail (20261117220000): se a ficha tem e-mail e se ele já respondeu
+    -- O e-mail (20261118150000): se a ficha tem e-mail e se ele já respondeu
     -- ao convite de ofertas por e-mail. Nunca o endereço.
     'email', app.ia_email_do_cliente(c.id));$a$);
 end $migr$;
@@ -329,7 +329,7 @@ as $$
    where f.organization_id = p_organization_id
 $$;
 comment on function app.lgpd_ofertas_por_email(uuid) is
-  'O histórico de "quero / não quero ofertas por e-mail" do titular, para o dossiê da LGPD (20261117220000).';
+  'O histórico de "quero / não quero ofertas por e-mail" do titular, para o dossiê da LGPD (20261118150000).';
 revoke all on function app.lgpd_ofertas_por_email(uuid) from public, anon, authenticated;
 
 do $migr$
@@ -355,9 +355,9 @@ begin
   return v || jsonb_build_object('ofertas_por_email', app.lgpd_ofertas_por_email(p_organization_id));
 end $$;
 comment on function app.lgpd_dossie(uuid) is
-  'Dossiê do art. 18 (I/II) e art. 9º: a definição de antes (app.lgpd_dossie_sem_ofertas_por_email) mais o histórico de ofertas por e-mail (20261117220000). Interna: quem chama é exportar_lgpd ou exportar_lgpd_por_token.';
+  'Dossiê do art. 18 (I/II) e art. 9º: a definição de antes (app.lgpd_dossie_sem_ofertas_por_email) mais o histórico de ofertas por e-mail (20261118150000). Interna: quem chama é exportar_lgpd ou exportar_lgpd_por_token.';
 comment on function app.lgpd_dossie_sem_ofertas_por_email(uuid) is
-  'O dossiê da LGPD como era antes de 20261117220000. Chamado só pela casca app.lgpd_dossie, que acrescenta as ofertas por e-mail.';
+  'O dossiê da LGPD como era antes de 20261118150000. Chamado só pela casca app.lgpd_dossie, que acrescenta as ofertas por e-mail.';
 revoke all on function app.lgpd_dossie(uuid) from public, anon, authenticated;
 grant execute on function app.lgpd_dossie(uuid) to service_role;
 revoke all on function app.lgpd_dossie_sem_ofertas_por_email(uuid) from public, anon, authenticated;

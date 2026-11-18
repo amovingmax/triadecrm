@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 
 import { concluirConversa } from './acoes';
 import { CHAVE_CONVERSAS, mensagemDoErro } from './dados';
-import { rotuloDoDia } from './formatos';
+import { fraseDasTarefas, rotuloDoDia } from './formatos';
 
 /**
  * CONCLUIR A CONVERSA (03/11/2026), nas duas empresas desde 04/11/2026.
@@ -59,18 +59,27 @@ export function useConcluirConversa(fioId: string) {
   const { reconferir } = useAcoesDosAvisos();
   const acao = useMutation({
     mutationFn: (concluir: boolean) => concluirConversa(fioId, concluir),
-    onSuccess: (_r, concluir) => {
+    onSuccess: (tarefas, concluir) => {
       void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
+      // Desde 17/11/2026 concluir fecha as tarefas do cliente (e reabrir as
+      // devolve): o Meu dia e a Agenda mudam junto, e quem volta para lá não
+      // pode ver o cliente que acabou de concluir.
+      void clientes.invalidateQueries({ queryKey: ['meu-dia'] });
+      void clientes.invalidateQueries({ queryKey: ['agenda'] });
       // A concluída sai do número do menu: a casca reconfere na hora, em vez de
       // esperar o próximo minuto.
       reconferir();
       if (concluir) {
         toast.success('Conversa concluída.', {
-          description: `O histórico fica guardado. ${COMO_VOLTA}`,
+          description: `${fraseDasTarefas(tarefas.concluidas, true)}O histórico fica guardado. ${COMO_VOLTA}`,
           action: { label: 'Desfazer', onClick: () => acao.mutate(false) },
         });
       } else {
-        toast.success('Conversa reaberta: de volta na lista.');
+        const voltaram = fraseDasTarefas(tarefas.devolvidas, false);
+        toast.success(
+          'Conversa reaberta: de volta na lista.',
+          voltaram ? { description: voltaram.trim() } : undefined,
+        );
       }
     },
     onError: (e) => toast.error(mensagemDoErro(e)),

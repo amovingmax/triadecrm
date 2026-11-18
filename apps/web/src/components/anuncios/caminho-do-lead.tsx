@@ -241,7 +241,7 @@ function DetalheDoPasso({
  * Ligar os leads (12/11/2026): a URL de leads com o botão de copiar, o caminho
  * no Canal Pro em passos curtos e os três avisos (a Arbo, o suporte, o e-mail).
  */
-function DetalheDaEntrega({ passo }: { passo: PassoDaEntrega }) {
+export function DetalheDaEntrega({ passo }: { passo: PassoDaEntrega }) {
   return (
     <>
       {passo.ligar ? (
@@ -374,7 +374,13 @@ function DetalheDosAnuncios({
   );
 }
 
-function DetalheDoArquivo({ passo, chave }: { passo: PassoDoArquivo; chave: string | null }) {
+export function DetalheDoArquivo({
+  passo,
+  chave,
+}: {
+  passo: PassoDoArquivo;
+  chave: string | null;
+}) {
   return (
     <>
       {passo.antesDeColar ? (

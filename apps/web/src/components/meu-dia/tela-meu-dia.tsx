@@ -187,7 +187,9 @@ export function TelaMeuDia({
   // o dia em que se estava.
   useEffect(() => {
     const busca = new URLSearchParams();
-    if (aba !== 'fazer') busca.set('aba', aba);
+    // Com o Painel do dia (Imova), `/meu-dia` sem `?aba=` é o painel: a lista
+    // escreve sempre a aba, senão recarregar a página voltaria ao painel.
+    if (aba !== 'fazer' || EMPRESA.modulos.painelDoDia) busca.set('aba', aba);
     if (!doProprio) busca.set('pessoa', pessoa);
     const texto = busca.toString();
     const destino = `${window.location.pathname}${texto ? `?${texto}` : ''}`;
@@ -354,7 +356,16 @@ export function TelaMeuDia({
               400 com tracking de -0.02em. O `font-semibold text-2xl` de antes
               era um título de seção com cara de página; o sistema separa os dois
               pelo PESO — título grande é leve, ênfase é que é pesada. */}
-          <p className="text-xs text-muted-foreground">Início · Meu dia</p>
+          {EMPRESA.modulos.painelDoDia ? (
+            <Link
+              href="/meu-dia"
+              className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
+              ← Painel do dia
+            </Link>
+          ) : (
+            <p className="text-xs text-muted-foreground">Início · Meu dia</p>
+          )}
           <h1 className="mt-1 font-heading text-[32px] leading-tight font-normal tracking-[-0.02em] break-words">
             {saudacao}
             {nome ? `, ${nome}` : ''}.
