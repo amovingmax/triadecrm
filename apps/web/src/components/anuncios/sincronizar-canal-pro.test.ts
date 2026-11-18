@@ -348,6 +348,80 @@ describe('conferir', () => {
   });
 });
 
+describe('conferir: o que a revisão de 18/11 pediu', () => {
+  const fotos = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ imageUrl: `https://x.example/${i}.jpg` }));
+  const base = anuncio({ id: 'a', codigo: 'A1', area_util: 100, fotos: 30 });
+
+  it('a lista só é inteira com o total e com códigos bastantes', () => {
+    const um = [doCanalPro({ externalId: 'A1' })];
+    expect(conferir(pacote(um, 1), [], []).inteira).toBe(true);
+    expect(conferir(pacote(um, null), [], []).inteira).toBe(false);
+    expect(conferir(pacote(um, 2), [], []).inteira).toBe(false);
+    // O apagado conta como código que veio (o total do Canal Pro pode incluí-lo).
+    const comApagado = [
+      doCanalPro({ externalId: 'A1' }),
+      doCanalPro({ externalId: 'X', status: 'DELETED' }),
+    ];
+    expect(conferir(pacote(comApagado, 2), [], []).inteira).toBe(true);
+  });
+
+  it('não propõe troca quando as duas somam mais de 60 fotos', () => {
+    const c = conferir(pacote([doCanalPro({ externalId: 'A1', images: fotos(40) })]), [base], []);
+    expect(c.fotos).toEqual([]);
+    expect(c.semTroca).toEqual([{ codigo: 'A1', tem: 30, vem: 40 }]);
+  });
+
+  it('não mexe nas fotos do anúncio que o CRM já publica pelo arquivo', () => {
+    const publicado = {
+      ...base,
+      fotos: 3,
+      situacao: 'no_ar' as const,
+      ultima_leitura_do_portal: '2026-11-19T03:07:00Z',
+    };
+    const c = conferir(
+      pacote([doCanalPro({ externalId: 'A1', images: fotos(8) })]),
+      [publicado],
+      [],
+    );
+    expect(c.fotos).toEqual([]);
+    expect(c.semTroca).toEqual([]);
+  });
+
+  it('dois novos do mesmo imóvel: entra o ativo, o outro é cópia dele', () => {
+    const c = conferir(
+      pacote([
+        doCanalPro({
+          externalId: 'Velho',
+          status: 'INACTIVE',
+          usableAreas: [250],
+          totalAreas: [250],
+          address: { city: 'Natal', neighborhood: 'Tirol' },
+        }),
+        doCanalPro({
+          externalId: 'Novo',
+          status: 'ACTIVE',
+          usableAreas: [250],
+          totalAreas: [250],
+          address: { city: 'Natal', neighborhood: 'Tirol' },
+        }),
+      ]),
+      [],
+      [],
+    );
+    expect(c.novos.map((n) => n.codigo)).toEqual(['Novo']);
+    expect(c.copias).toEqual([
+      { codigo: 'Velho', situacao: 'Inativo', anuncioId: null, codigoNoCrm: 'Novo' },
+    ]);
+  });
+
+  it('área em texto ou com casas decimais vira inteiro', () => {
+    const r = paraORelatorio(doCanalPro({ usableAreas: ['57.4'], totalAreas: [86] }))!;
+    expect(r.area).toBe(57);
+    expect(r.linha['Área útil']).toBe('57');
+  });
+});
+
 describe('pareceComNoCrm', () => {
   it('mesma regra do banco: cidade, área igual e bairro quando os dois dizem', () => {
     const a = [
@@ -470,10 +544,11 @@ describe('o favorito', () => {
     expect(p?.total).toBe(2);
   });
 
-  it('sem título no esquema, tenta de novo sem ele', async () => {
+  it('pede todas as situações e, se o Canal Pro recusar, tenta mais simples', async () => {
     const r = rodar({
       paginas: [
         { errors: [{ message: 'Cannot query field "title"' }] },
+        { errors: [{ message: 'Unknown type "ListingStatusEnumType"' }] },
         {
           data: {
             listings: { listListing: [{ externalId: 'A' }], totalPages: 1, totalResults: 1 },
@@ -481,11 +556,23 @@ describe('o favorito', () => {
         },
       ],
     });
-    await espera();
-    await espera();
-    await espera();
-    expect(String(r.pedidos[0]!.init.body)).toContain('title description');
-    expect(String(r.pedidos[1]!.init.body)).not.toContain('title description');
+    for (let i = 0; i < 5; i++) await espera();
+    const corpos = r.pedidos.map(
+      (p) =>
+        JSON.parse(String(p.init.body)) as { query: string; variables: Record<string, unknown> },
+    );
+    expect(corpos[0]!.query).toContain('title description');
+    expect(corpos[0]!.variables.listingStatus).toEqual([
+      'ACTIVE',
+      'INACTIVE',
+      'DRAFT',
+      'PENDING',
+      'BLOCKED',
+    ]);
+    expect(corpos[1]!.query).not.toContain('title description');
+    expect(corpos[1]!.variables.listingStatus).toBeDefined();
+    expect(corpos[2]!.query).not.toContain('listingStatus');
+    expect(corpos[2]!.variables.listingStatus).toBeUndefined();
     expect(r.janela.location.href).toContain('/anuncios/sincronizar#d=');
   });
 
@@ -497,15 +584,10 @@ describe('o favorito', () => {
   });
 
   it('quando o Canal Pro recusa, fecha a aba e avisa', async () => {
-    const r = rodar({
-      paginas: [
-        { errors: [{ message: 'Unauthorized' }] },
-        { errors: [{ message: 'Unauthorized' }] },
-      ],
-    });
-    await espera();
-    await espera();
-    await espera();
+    const erro = { errors: [{ message: 'Unauthorized' }] };
+    const r = rodar({ paginas: [erro, erro, erro] });
+    for (let i = 0; i < 6; i++) await espera();
+    expect(r.pedidos).toHaveLength(3);
     expect(r.janela.close).toHaveBeenCalled();
     expect(r.alertas[0]).toMatch(/não entregou a lista \(Unauthorized\)/);
   });

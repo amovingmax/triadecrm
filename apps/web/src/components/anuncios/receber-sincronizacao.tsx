@@ -78,6 +78,7 @@ export function ReceberSincronizacao() {
     [fragmento],
   );
   const [sem, setSem] = useState<Set<string>>(new Set());
+  const [saidaConfirmada, setSaidaConfirmada] = useState(false);
   const [gravando, setGravando] = useState<string | null>(null);
   const [fim, setFim] = useState<Fim | null>(null);
 
@@ -147,7 +148,7 @@ export function ReceberSincronizacao() {
   }
 
   const c = conferencia;
-  const faltouPagina = c.total !== null && pacote.anuncios.length < c.total;
+  const faltouPagina = !c.inteira;
   const fotosMarcadas = c.fotos.filter((f) => !sem.has(f.codigo));
   const quantasFotos = fotosQueVem({ fotos: fotosMarcadas });
 
@@ -159,18 +160,26 @@ export function ReceberSincronizacao() {
       toast.error('A lista não foi gravada.', { description: fraseDaRecusa(r.motivo) });
       return;
     }
-    // Os novos só têm cartão depois de gravar: acha cada um pelo código.
+    // Os novos só têm cartão depois de gravar: acha cada um pela linha do Canal Pro
+    // que o trouxe (o "trazer" pode dar outro código ao anúncio) e, sem ela, pelo código.
     let ids = new Map<string, string>();
     if (fotosMarcadas.some((f) => f.anuncioId === null)) {
-      const agora = await carregarAnuncios(false).catch(() => []);
+      const [agora, linhas] = await Promise.all([
+        carregarAnuncios(false).catch(() => []),
+        carregarListaDoCanalPro().catch(() => []),
+      ]);
       ids = new Map(agora.map((a) => [a.codigo, a.id]));
+      for (const l of linhas) if (l.anuncio_id) ids.set(l.codigo, l.anuncio_id);
     }
     const falhas: string[] = [];
     let fotos = 0;
     let comFoto = 0;
     for (const [i, f] of fotosMarcadas.entries()) {
       const id = f.anuncioId ?? ids.get(f.codigo) ?? null;
-      if (!id) continue;
+      if (!id) {
+        falhas.push(`${f.codigo}: o anúncio não entrou no CRM, então as fotos ficaram de fora`);
+        continue;
+      }
       setGravando(`Levando as fotos: ${f.codigo} (${i + 1} de ${fotosMarcadas.length})...`);
       const t = await trazerFotosDoCanalPro(id, f.urls, f.modo);
       if (!t.ok) {
@@ -210,10 +219,12 @@ export function ReceberSincronizacao() {
       </p>
       {faltouPagina ? (
         <p className="flex items-start gap-2 rounded-xl bg-morno-fundo p-3 text-sm text-morno-texto">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />O Canal Pro diz que
-          tem {c.total} anúncios, e vieram {pacote.anuncios.length}. Recarregue a página do Canal
-          Pro e clique de novo no favorito: gravar uma lista pela metade marcaria os outros como
-          fora do Canal Pro.
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {c.total === null
+            ? 'O Canal Pro não disse quantos anúncios tem, então o CRM não tem como saber se a lista veio inteira.'
+            : `O Canal Pro diz que tem ${c.total} anúncios, e vieram ${c.distintos}.`}{' '}
+          Recarregue a página do Canal Pro e clique de novo no favorito: gravar uma lista pela
+          metade marcaria os outros como fora do Canal Pro.
         </p>
       ) : null}
 
@@ -295,15 +306,40 @@ export function ReceberSincronizacao() {
         >
           <p className="px-4 py-2.5 text-sm text-muted-foreground">
             {c.sairam.join(', ')}. Estavam na última lista e não vieram agora: saem da lista do
-            Canal Pro. Os anúncios do CRM continuam.
+            Canal Pro, e os cartões deles deixam de mostrar a situação de lá. Os anúncios do CRM
+            continuam.
           </p>
+          <label className="flex items-center gap-2 px-4 pb-3 text-sm">
+            <input
+              type="checkbox"
+              checked={saidaConfirmada}
+              onChange={(e) => setSaidaConfirmada(e.target.checked)}
+              className="size-4 accent-[var(--primary)]"
+            />
+            Conferi no Canal Pro:{' '}
+            {c.sairam.length === 1 ? 'esse não está mais lá' : 'esses não estão mais lá'}.
+          </label>
         </Grupo>
+      ) : null}
+
+      {c.semTroca.length ? (
+        <p className="flex items-start gap-2 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
+          <Camera className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          Ficam como estão, porque o CRM e o Canal Pro juntos passam de 60 fotos:{' '}
+          {c.semTroca.map((x) => `${x.codigo} (${x.tem} no CRM, ${x.vem} no Canal Pro)`).join(', ')}
+          . Tire algumas fotos no editor e sincronize de novo.
+        </p>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
           className="toque h-11 md:h-9"
-          disabled={gravando !== null || faltouPagina || c.vieram === 0}
+          disabled={
+            gravando !== null ||
+            faltouPagina ||
+            c.vieram === 0 ||
+            (c.sairam.length > 0 && !saidaConfirmada)
+          }
           onClick={() => void aplicar()}
         >
           <CircleCheck aria-hidden="true" />

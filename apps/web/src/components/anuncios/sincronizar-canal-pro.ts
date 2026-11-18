@@ -40,7 +40,7 @@ import { chave } from '@/components/importacao/mapeamento';
 
 import type { LinhaDoCanalPro } from './aba-dos-anuncios';
 import { FOTOS_POR_ANUNCIO } from './arquivo-vrsync';
-import { tipoDoCrm, type AnuncioDoRelatorio } from './relatorio-canal-pro';
+import { ativoNoCanalPro, tipoDoCrm, type AnuncioDoRelatorio } from './relatorio-canal-pro';
 import type { AnuncioNaLista, Negocio } from './tipos';
 
 /** A versão do pacote que o favorito manda. */
@@ -91,19 +91,27 @@ export const COLETOR = String.raw`function (d, l, j, crm) {
     'pricingInfos { price businessType monthlyCondoFee yearlyIptu rentalInfo { period } } ' +
     'leads { views phoneView clickWhatsapp contactForm clickProposal clickSchedule } ' +
     'images { imageId imageUrl resizedUrl newResizedUrl }';
-  var comTitulo = true, todos = [];
+  // Do pedido mais completo ao mais simples: com título e descrição e com todas
+  // as situações; sem título; sem o filtro de situação (o Canal Pro decide).
+  var jeitos = [{ t: true, s: true }, { t: false, s: true }, { t: false, s: false }];
+  var jeito = 0, todos = [];
+  var SITUACOES = ['ACTIVE', 'INACTIVE', 'DRAFT', 'PENDING', 'BLOCKED'];
   function pagina(n) {
-    var q = 'query listings($pageSize: Int, $pageNumber: Int) { listings(pageSize: $pageSize, pageNumber: $pageNumber) { listListing { ' +
-      (comTitulo ? 'title description ' : '') + CAMPOS + ' } pageNumber totalPages totalResults } }';
+    var j0 = jeitos[jeito];
+    var q = 'query listings($pageSize: Int, $pageNumber: Int' + (j0.s ? ', $listingStatus: [ListingStatusEnumType]' : '') + ') { ' +
+      'listings(pageSize: $pageSize, pageNumber: $pageNumber' + (j0.s ? ', listingStatus: $listingStatus' : '') + ') { listListing { ' +
+      (j0.t ? 'title description ' : '') + CAMPOS + ' } pageNumber totalPages totalResults } }';
+    var vars = { pageSize: 100, pageNumber: n };
+    if (j0.s) vars.listingStatus = SITUACOES;
     return j.fetch('https://gandalf-api.grupozap.com/', {
       method: 'POST', headers: cab,
-      body: JSON.stringify({ operationName: 'listings', query: q, variables: { pageSize: 100, pageNumber: n } })
+      body: JSON.stringify({ operationName: 'listings', query: q, variables: vars })
     }).then(function (r) { return r.json(); });
   }
   function seguir(n) {
     return pagina(n).then(function (r) {
       var ls = r && r.data && r.data.listings;
-      if (!ls && comTitulo && r && r.errors && r.errors.length) { comTitulo = false; return seguir(n); }
+      if (!ls && n === 1 && jeito < jeitos.length - 1 && r && r.errors && r.errors.length) { jeito++; return seguir(n); }
       if (!ls) throw new Error((r && r.errors && r.errors[0] && r.errors[0].message) || 'resposta sem anúncios');
       todos = todos.concat(ls.listListing || []);
       if (ls.totalPages && n < ls.totalPages && n < 30) return seguir(n + 1);
@@ -111,7 +119,7 @@ export const COLETOR = String.raw`function (d, l, j, crm) {
     });
   }
   seguir(1).then(function (total) {
-    var pacote = { v: 3, de: l.origin, em: new Date().toISOString(), total: total, titulos: comTitulo, anuncios: todos };
+    var pacote = { v: 3, de: l.origin, em: new Date().toISOString(), total: total, jeito: jeito, anuncios: todos };
     var url = crm + '/anuncios/sincronizar#d=' + encodeURIComponent(JSON.stringify(pacote));
     if (janela && !janela.closed) janela.location.href = url; else l.href = url;
   })['catch'](function (e) {
@@ -141,12 +149,12 @@ export type AnuncioDoCanalPro = {
   status?: string | null;
   publicationType?: string | null;
   unitTypes?: string[] | null;
-  usableAreas?: (number | null)[] | null;
-  totalAreas?: (number | null)[] | null;
-  bedrooms?: (number | null)[] | null;
-  bathrooms?: (number | null)[] | null;
-  suites?: (number | null)[] | null;
-  parkingSpaces?: (number | null)[] | null;
+  usableAreas?: (number | string | null)[] | null;
+  totalAreas?: (number | string | null)[] | null;
+  bedrooms?: (number | string | null)[] | null;
+  bathrooms?: (number | string | null)[] | null;
+  suites?: (number | string | null)[] | null;
+  parkingSpaces?: (number | string | null)[] | null;
   createdAt?: string | null;
   address?: {
     city?: string | null;
@@ -257,9 +265,13 @@ const TIPO: Record<string, string> = {
   HOTEL: 'Hotel',
 };
 
-const primeiro = (v: (number | null)[] | null | undefined): number | null => {
-  const n = Array.isArray(v) ? v.find((x) => typeof x === 'number' && Number.isFinite(x)) : null;
-  return typeof n === 'number' ? n : null;
+/** O primeiro número da lista; aceita número em texto ("3000") e arredonda (o banco quer inteiro). */
+const primeiro = (v: (number | string | null)[] | null | undefined): number | null => {
+  for (const x of Array.isArray(v) ? v : []) {
+    const n = typeof x === 'number' ? x : typeof x === 'string' ? Number(x.replace(',', '.')) : NaN;
+    if (Number.isFinite(n) && n >= 0) return Math.round(n);
+  }
+  return null;
 };
 const valor = (v: unknown): number | null => {
   const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v.replace(',', '.')) : NaN;
@@ -465,15 +477,29 @@ export type FotosParaTrazer = {
 export type Conferencia = {
   /** Quantos vieram (sem os apagados no Canal Pro). */
   vieram: number;
-  /** Quantos o Canal Pro disse que tem; pode ser maior que `vieram` se faltou página. */
+  /** Quantos o Canal Pro disse que tem. */
   total: number | null;
+  /** Códigos diferentes no pacote, inclusive os apagados: é o que se compara com `total`. */
+  distintos: number;
+  /** A lista veio inteira? Sem o total, ou com menos códigos que ele, não. */
+  inteira: boolean;
   linhas: AnuncioDoRelatorio[];
   novos: { codigo: string; titulo: string | null; situacao: string | null }[];
   /** Mesmo código que um anúncio do CRM (ou ligado a um): só atualizam situação e números. */
   casam: { codigo: string; anuncioId: string }[];
-  /** Mesmo imóvel de um anúncio do CRM, com outro código: não entram como anúncio novo. */
-  copias: { codigo: string; situacao: string | null; anuncioId: string; codigoNoCrm: string }[];
+  /**
+   * Mesmo imóvel de um anúncio do CRM (ou de um novo desta mesma lista), com outro
+   * código: não entram como anúncio novo.
+   */
+  copias: {
+    codigo: string;
+    situacao: string | null;
+    anuncioId: string | null;
+    codigoNoCrm: string;
+  }[];
   fotos: FotosParaTrazer[];
+  /** O CRM e o Canal Pro juntos passam do teto: a troca fica para o editor. */
+  semTroca: { codigo: string; tem: number; vem: number }[];
   /** Estavam na última lista do Canal Pro e não vieram agora. */
   sairam: string[];
 };
@@ -481,8 +507,13 @@ export type Conferencia = {
 /**
  * Compara o que veio do Canal Pro com o que o CRM já tem, sem gravar nada. As
  * fotos vêm quando o Canal Pro tem MAIS que o CRM: no anúncio sem foto, todas; no
- * que tem algumas, o CRM troca pelas de lá (a rota sobe as novas antes de tirar
- * as antigas). O CRM com mais fotos que o Canal Pro fica como está.
+ * que tem algumas, o CRM troca pelas de lá (a rota só troca se todas chegarem).
+ * Ficam como estão: o CRM com mais fotos; o anúncio que o CRM já publica (o
+ * Grupo OLX lê o arquivo do CRM, então o CRM é a fonte); e o que passaria do teto
+ * de fotos somando as duas (vai em `semTroca`).
+ *
+ * Os novos seguem a ordem do banco (`canal_pro_importar`: ativos primeiro, depois
+ * pelo código): dois do mesmo imóvel só trazem o primeiro; o outro é cópia dele.
  */
 export function conferir(
   pacote: PacoteDoCanalPro,
@@ -494,17 +525,24 @@ export function conferir(
   const ligados = new Map(
     linhasDoCanalPro.filter((l) => l.anuncio_id).map((l) => [l.codigo, l.anuncio_id!]),
   );
+  const distintos = new Set(
+    pacote.anuncios.map(codigoDoCanalPro).filter((c): c is string => c !== null),
+  ).size;
   const resultado: Conferencia = {
     vieram: 0,
     total: pacote.total,
+    distintos,
+    inteira: pacote.total !== null && distintos >= pacote.total,
     linhas: [],
     novos: [],
     casam: [],
     copias: [],
     fotos: [],
+    semTroca: [],
     sairam: [],
   };
   const vistos = new Set<string>();
+  const candidatos: { linha: AnuncioDoRelatorio; urls: string[][] }[] = [];
   for (const cru of pacote.anuncios) {
     const linha = paraORelatorio(cru);
     if (!linha || vistos.has(linha.codigo)) continue;
@@ -520,15 +558,20 @@ export function conferir(
       // Excluído no CRM: a linha entra (situação e números), mas nada volta para ele.
       if (doCrm.excluido_em) continue;
       resultado.casam.push({ codigo: linha.codigo, anuncioId: doCrm.id });
-      if (urls.length > doCrm.fotos) {
-        resultado.fotos.push({
-          codigo: doCrm.codigo,
-          anuncioId: doCrm.id,
-          tem: doCrm.fotos,
-          vem: urls.length,
-          modo: doCrm.fotos === 0 ? 'se_vazio' : 'trocar',
-          urls,
-        });
+      const crmEhAFonte = doCrm.situacao === 'no_ar' && doCrm.ultima_leitura_do_portal !== null;
+      if (urls.length > doCrm.fotos && !crmEhAFonte) {
+        if (doCrm.fotos > 0 && doCrm.fotos + urls.length > FOTOS_POR_ANUNCIO) {
+          resultado.semTroca.push({ codigo: doCrm.codigo, tem: doCrm.fotos, vem: urls.length });
+        } else {
+          resultado.fotos.push({
+            codigo: doCrm.codigo,
+            anuncioId: doCrm.id,
+            tem: doCrm.fotos,
+            vem: urls.length,
+            modo: doCrm.fotos === 0 ? 'se_vazio' : 'trocar',
+            urls,
+          });
+        }
       }
       continue;
     }
@@ -543,6 +586,35 @@ export function conferir(
       });
       continue;
     }
+    candidatos.push({ linha, urls });
+  }
+  // Os novos, na ordem do banco; cada um aceito vira referência para os seguintes.
+  candidatos.sort(
+    (x, y) =>
+      Number(ativoNoCanalPro(y.linha.situacao)) - Number(ativoNoCanalPro(x.linha.situacao)) ||
+      (x.linha.codigo < y.linha.codigo ? -1 : x.linha.codigo > y.linha.codigo ? 1 : 0),
+  );
+  const aceitos: Parameters<typeof pareceComNoCrm>[1][number][] = [];
+  for (const { linha, urls } of candidatos) {
+    const igual = pareceComNoCrm(linha, aceitos);
+    if (igual) {
+      resultado.copias.push({
+        codigo: linha.codigo,
+        situacao: linha.situacao,
+        anuncioId: null,
+        codigoNoCrm: igual,
+      });
+      continue;
+    }
+    aceitos.push({
+      id: linha.codigo,
+      codigo: linha.codigo,
+      cidade: linha.cidade,
+      bairro: linha.bairro,
+      area_util: linha.area,
+      area_total: linha.area,
+      excluido_em: null,
+    });
     resultado.novos.push({ codigo: linha.codigo, titulo: linha.titulo, situacao: linha.situacao });
     if (urls.length) {
       resultado.fotos.push({

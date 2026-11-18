@@ -205,7 +205,11 @@ const FRASES_DA_FOTO: Record<string, string> = {
   sem_tempo: 'o tempo acabou antes',
   balde_recusou: 'o armazenamento recusou',
   arquivo_nao_chegou: 'não chegou ao armazenamento',
-  fotos_demais: 'passou de 40 fotos',
+  fotos_demais: 'passou de 60 fotos',
+  fotos_demais_para_trocar:
+    'o CRM e o Canal Pro juntos passam de 60 fotos: tire algumas no editor e sincronize de novo',
+  troca_incompleta: 'nem todas as fotos do Canal Pro vieram, e as do CRM ficaram como estavam',
+  troca_falhou: 'a troca não terminou, e as fotos do CRM ficaram como estavam',
   so_gestao_mexe_no_ar: 'o anúncio está no ar',
 };
 

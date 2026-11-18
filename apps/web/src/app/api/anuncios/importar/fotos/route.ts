@@ -130,6 +130,22 @@ export async function POST(request: NextRequest) {
     return recusa(modo === 'trocar' ? 'fotos_demais_para_trocar' : 'fotos_demais', 400);
   }
 
+  // Em 'trocar', as que o anúncio tem agora, na ordem: se a troca não puder ser
+  // inteira, o anúncio volta a ficar só com elas (18/11/2026).
+  let antigas: string[] = [];
+  if (modo === 'trocar' && jaTem > 0) {
+    const { data: atuais, error: erroDasAtuais } = await supabase
+      .from('anuncio_fotos')
+      .select('id')
+      .eq('anuncio_id', anuncioId)
+      .order('posicao');
+    if (erroDasAtuais) {
+      registrarRecusa('anuncios/importar/fotos', 'consulta_falhou');
+      return recusa('consulta_falhou', 500);
+    }
+    antigas = (atuais ?? []).map((f) => f.id as string);
+  }
+
   const admin = criarClienteAdmin();
   const permitirLocal = process.env.NODE_ENV !== 'production';
   const inicio = Date.now();
@@ -203,21 +219,35 @@ export async function POST(request: NextRequest) {
     fotos.push({ url, ok: true, motivo: null });
   }
 
-  // Trocar: só com alguma nova no anúncio; sem nenhuma, as antigas ficam.
+  // Trocar: só quando TODAS as pedidas chegaram. Com alguma faltando (o Canal
+  // Pro recusou, o tempo acabou), o anúncio volta a ficar só com as antigas: uma
+  // troca pela metade deixaria o anúncio no ar com menos fotos do que tinha
+  // (achado da revisão de 18/11/2026). A volta é a mesma função, com as antigas.
   let removidas: number | undefined;
   if (modo === 'trocar' && novas.length > 0) {
-    const { data, error: erroDaTroca } = await supabase.rpc('anuncio_fotos_trocar', {
-      p_anuncio: anuncioId,
-      p_novas: novas,
-    });
-    const t = (data ?? {}) as { ok?: boolean; motivo?: string; removidas?: string[] };
-    if (erroDaTroca || !t.ok) {
-      registrarRecusa('anuncios/importar/fotos', t.motivo ?? 'troca_falhou');
-      return NextResponse.json({ ok: true, fotos, troca: t.motivo ?? 'troca_falhou' });
+    const inteira = novas.length === fotosPedidas.length;
+    const voltar = !inteira && antigas.length > 0;
+    if (inteira || voltar) {
+      const { data, error: erroDaTroca } = await supabase.rpc('anuncio_fotos_trocar', {
+        p_anuncio: anuncioId,
+        p_novas: inteira ? novas : antigas,
+      });
+      const t = (data ?? {}) as { ok?: boolean; motivo?: string; removidas?: string[] };
+      if (erroDaTroca || !t.ok) {
+        registrarRecusa('anuncios/importar/fotos', t.motivo ?? 'troca_falhou');
+        return NextResponse.json({ ok: false, motivo: 'troca_falhou', fotos });
+      }
+      // As linhas já saíram; os arquivos saem do balde (se falhar, sobra só o arquivo).
+      if (t.removidas?.length) await admin.storage.from(BALDE).remove(t.removidas);
+      if (voltar) {
+        registrarAviso('anuncios/importar/fotos', 'troca_incompleta', {
+          pedidas: fotosPedidas.length,
+          chegaram: novas.length,
+        });
+        return NextResponse.json({ ok: false, motivo: 'troca_incompleta', fotos });
+      }
+      removidas = t.removidas?.length ?? 0;
     }
-    removidas = t.removidas?.length ?? 0;
-    // As linhas já saíram; os arquivos saem do balde (se falhar, sobra só o arquivo).
-    if (t.removidas?.length) await admin.storage.from(BALDE).remove(t.removidas);
   }
 
   const falharam = fotos.filter((f) => !f.ok);

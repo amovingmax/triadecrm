@@ -10802,3 +10802,43 @@ Pedido do usuário: "Quero que a IA da Imova fique ligada para atender todos os 
 - **Verificado:** pgTAP `183` (16 de 16) no banco local da Imova, com a migração (sem ela, 5 falham); `133` (66), `143` (26), `156` (114) e `170` (130) iguais com e sem a migração; na KOMUNE local, só o aviso. Antes de publicar, a regra simulada com os dados de produção: ninguém receberia resposta na hora (a IA só age na próxima mensagem do cliente).
 - **No ar desde 17/11/2026 (o usuário escolheu "testo antes e publico"):** banco da Imova pelo `publicar-banco imova migrar` (só a `20261117230000`). Sem site e sem worker. Conferido em produção (só leitura): a função nova no ar; a IA atende 26 das 34 conversas com mensagem de cliente; ficam com o time as 7 em que alguém escreveu nas últimas 24 h e o Mariano Nobre, parado por uma pessoa às 14h18. Para desfazer, reaplicar `app.ia_atende` da `20261110150000`.
 - **Pendente / para decidir:** a KOMUNE não recebeu a migração (lá não faz nada; entra no próximo `komune migrar`); os textos da tela ainda dizem que quem escreve "para a IA" (o selo já segue a regra nova, porque lê `app.ia_atende`); parceiros e pessoas de dentro que escrevem no número também são atendidos pela IA, e quem não quiser isso numa conversa usa "Parar a IA".
+
+## 18/11/2026 — a aba Anúncios sem repetição e todas as fotos do Canal Pro (branch `anuncios-sem-repeticao`; só na Imova)
+
+Pedido do usuário: "tem muita informação repetida entrando no CRM ... o TE0001 já existe aqui dentro do CRM, não tem para que ficar aparecendo novamente"; "a gente deve estar recebendo todas as imagens cadastradas do terreno dentro do nosso CRM", inclusive dos não publicados no Canal Pro; e a aba "menos repetitiva, mais objetiva, mais clara e mais funcional". Aprovado pelo protótipo navegável (https://claude.ai/artifact/JxhgD1FcBnfqm3Svt6VQ8t, com os dados reais de 18/11) e mandado ao ar no mesmo dia ("Gostei da atualização. Suba pro ar").
+
+- **O que o banco mostrou (só leitura, 18/11):** a lista do Canal Pro (`anuncios_no_canal_pro`) tinha 17 linhas para 13 anúncios. Os 7 da Arbo tinham o mesmo código no CRM, mas não estavam ligados ao anúncio, e só casavam na tela. 6 linhas eram o mesmo imóvel com outro código (por exemplo, "Terreno Capim Macio" é o TE0001_IMOVA). A gestão as excluía à mão, e cada relatório importado as trazia de volta. Faltavam 121 fotos: as 120 dos 4 não publicados (Brisa Mall - Loja 02 13, Casa extremox 24, Edifício Simone 47 e SANTA CATARINA 36) e 1 do SA0012 (7 de 8).
+- **Um imóvel, um cartão (`aba-dos-anuncios.ts`, Vitest 26):** cada linha do Canal Pro vai para o cartão do anúncio dela. A de mesmo código, ou a ligada pelo "trazer", é a própria. A de outro código que `canal_pro_parece_com` reconhece (mesma cidade, mesma área, mesmo bairro) é uma cópia antiga dentro do cartão. Na lista sobram só as que não têm par.
+- **O cartão:** foto, título, código, tipo, área, bairro, preço, uma etiqueta de situação (Publicado pela Arbo, No ar no CRM · aguarda a troca, Publicado pelo CRM, Não publicado, Rascunho · falta N, No ar com pendência), os números do Canal Pro e dos leads, e uma ação só: Trazer fotos, Completar, Corrigir, Pôr no ar ou Restaurar. O clique abre a **ficha por cima**, com as fotos, a situação explicada, os números, a nota de qualidade, a ficha do imóvel, as cópias antigas (avisando preço diferente e cópia ainda ativa) e "De onde veio". Saíram do cartão a origem, as datas e a nota.
+- **O alto da aba:**
+  - três números, cada um uma vez só na tela: vagas do plano, leads dos portais (com o último) e a última lista do Canal Pro;
+  - **Troca da Arbo pelo CRM** (`troca-da-arbo.tsx`) no lugar do "Caminho até o primeiro lead": só o passo atual (leads no CRM, anúncios no ar pelo CRM, Canal Pro lê o arquivo do CRM), e "Ver os 7 na lista" filtra a lista em vez de listar de novo;
+  - **Precisa de você**, uma linha por pendência com a ação: fotos que faltam, no ar fora do arquivo, rascunho incompleto, cópia antiga ainda ativa, anúncio do Canal Pro sem cartão e não publicados prontos com vaga livre.
+
+  Busca por código, título, bairro ou código da cópia. "Atualizar do sistema atual" e "Atualizar do Canal Pro" saíram do cabeçalho e moram dentro de "Sincronizar Canal Pro".
+- **Sincronizar com o Canal Pro (`sincronizar-canal-pro.ts`, Vitest 20):**
+  - o código público do site do Canal Pro mostra que "Meus anúncios" vem da API GraphQL `https://gandalf-api.grupozap.com/`, consulta `listings`, com todos os anúncios da conta (ativos, inativos, rascunhos), `images` e `leads`. A sessão vai no Authorization (o token da loja Vuex `account/token`) e nos X-PublisherId, X-OdinID, X-ContractID e X-PublisherContractType;
+  - o favorito "Imova: sincronizar" roda na aba do Canal Pro com o login de quem clica, pede as páginas (100 por vez) e abre `/anuncios/sincronizar` com a lista no fragmento do endereço, que não vai a servidor nenhum;
+  - a tela confere antes de gravar: entram como novos, ganham fotos, só atualizam situação e números, mesmo imóvel com outro código (não entram) e os que saíram do Canal Pro. Com a lista incompleta (vieram menos que o total), o "Aplicar" fica travado;
+  - gravar é a `canal_pro_importar` de sempre, com as linhas no formato da planilha, e depois as fotos de cada anúncio pela rota. No anúncio sem foto entram todas; no que tem menos que o Canal Pro, as de lá substituem as do CRM; o CRM com mais fotos fica como está.
+- **Novo anúncio confere antes (`novo-anuncio-conferido.tsx`):** com tipo, cidade, bairro e área, o CRM procura um imóvel parecido (mesmo grupo de tipo, mesma cidade, área a até 5%, mesmo bairro). Se achar, oferece abrir o que existe; senão, o editor abre com esses campos preenchidos (`/anuncios/novo?tipo=&cidade=&bairro=&area=`).
+- **Banco (migração `20261118120000_todas_as_fotos_do_canal_pro.sql`, só na Imova; na KOMUNE não faz nada):** é a migração escrita em 09/11 na branch `fotos-do-canal-pro`, que nunca subiu, com data nova:
+  - teto de fotos de 40 para 60;
+  - `anuncio_fotos_trocar`, que deixa só as novas, na ordem, numa transação.
+
+  A rota `api/anuncios/importar/fotos` ganhou os modos `se_vazio`, `juntar` e `trocar` e as versões de cada foto (a maior primeiro). pgTAP `184` (15).
+- **Verificado:**
+  - pgTAP 123 (60), 126 (39), 128 (18), 174 (17) e 184 (15) no banco local da Imova;
+  - Vitest com 2.221 testes, typecheck e lint;
+  - ensaio da migração no banco de produção da Imova, numa transação desfeita (aplica; nada ficou);
+  - no site local (3105), pelo Chrome sem janela: a aba em 1440 e 390 px, sem rolagem lateral; a ficha; o "Novo anúncio" achando o TE0001 para "Terreno, Natal, Capim Macio, 3000";
+  - a sincronização de ponta a ponta com um pacote simulado no formato do Canal Pro: um anúncio novo entrou com as fotos, o SA0012 foi de 8 para 9, o Simone e a Casa extremox ganharam fotos, a cópia "Terreno Capim Macio" não entrou e o apagado ficou de fora. Numa segunda rodada só o anúncio novo de verdade entrou. A tela do resultado tinha um defeito (voltava a "nenhuma lista chegou"), corrigido antes de subir.
+- **Revisão independente antes de subir (8 achados, corrigidos):**
+  - a troca de fotos ficou tudo ou nada: se faltar alguma das pedidas, o anúncio volta a ficar só com as antigas (`troca_incompleta`), e uma troca que falha não é mais contada como sucesso. Ensaiado no local com uma foto quebrada: as 9 antigas ficaram;
+  - não propõe troca quando o CRM e o Canal Pro juntos passam de 60 fotos (fica em "Ficam como estão"), nem no anúncio que o CRM já publica pelo arquivo;
+  - a lista só é aplicada inteira: sem o total, ou com menos códigos que ele, o "Aplicar" trava. Quando algum anúncio sai da lista, pede para confirmar;
+  - o favorito pede todas as situações (ativo, inativo, rascunho, em processamento e bloqueado) e tenta um pedido mais simples se o Canal Pro recusar;
+  - dois novos do mesmo imóvel seguem a ordem do banco (ativo primeiro; o outro vira cópia), e as fotos de um novo vão para o anúncio que a linha trouxe, mesmo que ele tenha ganhado outro código;
+  - área em texto ou com casas decimais vira inteiro;
+  - os anúncios excluídos contam para a junção e para o "Novo anúncio".
+- **Não testado com o Canal Pro de verdade:** o favorito depende da sessão do Canal Pro aberta no navegador do usuário. O primeiro clique dele é o teste. Se falhar, o favorito avisa o motivo na própria página do Canal Pro, e os dois jeitos de antes continuam dentro de "Sincronizar Canal Pro".

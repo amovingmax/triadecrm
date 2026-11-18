@@ -460,6 +460,8 @@ export async function trazerFotosDoCanalPro(
     fotos?: { ok: boolean }[] | number;
   } | null;
   if (!r?.ok) return { ok: false, motivo: r?.motivo ?? `status_${resposta.status}` };
+  // Resposta antiga da rota: a troca falhou, mas as fotos tinham entrado.
+  if ((r as { troca?: string }).troca) return { ok: false, motivo: 'troca_falhou' };
   if (r.pulado) return { ok: true, vieram: 0, falharam: 0, pulado: true };
   const fotos = Array.isArray(r.fotos) ? r.fotos : [];
   const vieram = fotos.filter((f) => f.ok).length;

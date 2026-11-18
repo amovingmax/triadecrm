@@ -112,6 +112,13 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
     queryFn: () => carregarAnuncios(false),
     enabled: excluidos,
   });
+  // Os excluídos, sempre: o código deles não volta pela sincronização, então a
+  // linha do Canal Pro com esse código não é "sem cartão" (revisão de 18/11/2026).
+  const excluidosSempre = useQuery({
+    queryKey: [...CHAVE_DOS_ANUNCIOS, 'lista', true],
+    queryFn: () => carregarAnuncios(true),
+    enabled: !excluidos,
+  });
   const listaDoCanalPro = useQuery({
     queryKey: CHAVE_DA_LISTA_DO_CANAL_PRO,
     queryFn: carregarListaDoCanalPro,
@@ -124,9 +131,13 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
     () => (excluidos ? (doCrm.data ?? []) : todos),
     [excluidos, doCrm.data, todos],
   );
+  const listaDeExcluidos = useMemo(
+    () => (excluidos ? todos : (excluidosSempre.data ?? [])),
+    [excluidos, todos, excluidosSempre.data],
+  );
   const { porAnuncio, soltas } = useMemo(
-    () => juntarDoCanalPro([...ativos, ...(excluidos ? todos : [])], listaDoCanalPro.data ?? []),
-    [ativos, excluidos, todos, listaDoCanalPro.data],
+    () => juntarDoCanalPro([...ativos, ...listaDeExcluidos], listaDoCanalPro.data ?? []),
+    [ativos, listaDeExcluidos, listaDoCanalPro.data],
   );
   const plano = canalPro.data?.plano ?? null;
   const vagasLivres =
@@ -172,7 +183,9 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
         busca,
       ),
   );
-  const ficha = fichaDe ? ([...ativos, ...todos].find((a) => a.id === fichaDe) ?? null) : null;
+  const ficha = fichaDe
+    ? ([...ativos, ...todos, ...listaDeExcluidos].find((a) => a.id === fichaDe) ?? null)
+    : null;
 
   function irParaALista() {
     requestAnimationFrame(() =>
@@ -417,7 +430,7 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
       <NovoAnuncioConferido
         aberto={novoAberto}
         aoMudar={setNovoAberto}
-        anuncios={ativos}
+        anuncios={[...ativos, ...listaDeExcluidos]}
         aoAbrir={setFichaDe}
       />
       {podePublicar ? (
