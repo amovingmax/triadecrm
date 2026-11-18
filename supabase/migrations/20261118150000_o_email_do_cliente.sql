@@ -289,6 +289,12 @@ declare
   v_ancora text := $a$'convites_da_agenda', app.ia_convites_da_agenda(c.id));$a$;
   v_vezes int;
 begin
+  -- Banco sem a IA que atende (a KOMUNE em produção: a 20261106170000 não cria
+  -- nada lá): não há entrada do worker para ganhar a chave. Achado no ensaio em
+  -- produção de 18/11/2026, com a transação desfeita.
+  if to_regprocedure('public.ia_entrada_do_atendente(uuid)') is null then
+    return;
+  end if;
   v_def := pg_get_functiondef('public.ia_entrada_do_atendente(uuid)'::regprocedure);
   if position('app.ia_email_do_cliente' in v_def) > 0 then
     return;
@@ -308,8 +314,13 @@ begin
     -- ao convite de ofertas por e-mail. Nunca o endereço.
     'email', app.ia_email_do_cliente(c.id));$a$);
 end $migr$;
-comment on function public.ia_entrada_do_atendente(uuid) is
+do $migr$
+begin
+  if to_regprocedure('public.ia_entrada_do_atendente(uuid)') is not null then
+    comment on function public.ia_entrada_do_atendente(uuid) is
   'Porta do worker de IA: o que a IA que atende lê de uma conversa (Imova): as 40 mensagens mais recentes, o cliente (ficha, etapa, perfil, visitas, canal de chegada), os horários livres de visita, se é a conversa do treino, convites_da_agenda (11/11/2026) e email (17/11/2026: na_ficha, ofertas, ofertas_em; nunca o endereço).';
+  end if;
+end $migr$;
 
 -- ---------------------------------------------------------------------------
 -- 5. O dossiê da LGPD
