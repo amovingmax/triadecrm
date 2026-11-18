@@ -55,11 +55,11 @@ import { PAINEIS, type ChavePainel, type DefinicaoPainel } from './tipos';
  */
 const ICONE_DO_PAINEL: Record<ChavePainel, LucideIcon> = {
   visao: LayoutDashboard,
+  origem: Signpost,
   imoveis: Building2,
   oportunidades: HandCoins,
   funil_equipe: Funnel,
   progresso_ia: Bot,
-  canais: Signpost,
   ligacoes: PhoneCall,
   atendimento: MessageCircle,
   semana: Newspaper,

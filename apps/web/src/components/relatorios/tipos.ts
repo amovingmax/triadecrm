@@ -18,8 +18,6 @@ export type LinhaBairro = FunctionReturns<'relatorio_por_bairro'>[number];
 export type LinhaPessoa = FunctionReturns<'relatorio_por_responsavel'>[number];
 export type LinhaHorario = FunctionReturns<'relatorio_por_horario'>[number];
 export type LinhaFonte = FunctionReturns<'relatorio_por_fonte'>[number];
-/** O canal de chegada (06/11/2026, só Imova): uma linha por canal e subcanal. */
-export type LinhaCanal = FunctionReturns<'relatorio_por_canal'>[number];
 
 /** Uma temperatura da escala e quantas organizações estão nela hoje. */
 export type FatiaTermica = { temperatura: Temperature; organizacoes: number };
@@ -61,6 +59,7 @@ export type Coluna<L> = {
 export type ChavePainel =
   // Os da Imova: o "relatório que vende" (09/11/2026), `relatoriosDaImova`.
   | 'visao'
+  | 'origem'
   | 'imoveis'
   | 'oportunidades'
   | 'funil_equipe'
@@ -74,7 +73,6 @@ export type ChavePainel =
   | 'pessoas'
   | 'horarios'
   | 'fontes'
-  | 'canais'
   | 'base';
 
 /**
@@ -109,6 +107,17 @@ const TODOS_OS_PAINEIS: readonly (DefinicaoPainel & { onde: OndeAparece })[] = [
     titulo: 'O período em números e onde está o dinheiro',
     descricao:
       'Os números do período contra o período anterior, o que a IA sugere para vender mais, a previsão do mês, os imóveis mais procurados, o funil, a IA e a comissão parada.',
+    onde: 'imobiliaria',
+  },
+  // ORIGEM E INTERESSE (18/11/2026): a segunda da barra. Juntou a antiga aba Canais
+  // (06/11/2026), que ficava no fim, com o interesse, os anúncios, os meses e o
+  // atendimento. Um link antigo com `?painel=canais` abre aqui (`painelDaUrl`).
+  {
+    chave: 'origem',
+    rotulo: 'Origem e interesse',
+    titulo: 'De onde vêm os clientes e como o sistema lida com eles',
+    descricao:
+      'Placa, anúncio, portal ou redes sociais: quantos chegaram por cada caminho, quanto cada anúncio é visto e gera interesse, quem ficou mais interessado, os meses lado a lado e o que a IA e a equipe fizeram com quem chegou.',
     onde: 'imobiliaria',
   },
   {
@@ -217,21 +226,6 @@ const TODOS_OS_PAINEIS: readonly (DefinicaoPainel & { onde: OndeAparece })[] = [
     descricao:
       'De cada fonte: quantos entraram, quantos responderam, autorizaram e publicaram.',
   },
-  // O CANAL DE CHEGADA (06/11/2026): só onde o módulo existe (a Imova), no fim da
-  // barra do "relatório que vende". Fora dele a leitura nem aparece na barra, e
-  // `?painel=canais` cai na de sempre.
-  ...(EMPRESA.modulos.canalDeChegada
-    ? [
-        {
-          chave: 'canais',
-          onde: 'imobiliaria',
-          rotulo: 'Canais',
-          titulo: 'Por onde os clientes chegaram',
-          descricao:
-            'Placa, anúncios, redes sociais ou outros: quantos procuraram por cada canal, quantos foram atendidos, visitaram e fecharam.',
-        } satisfies DefinicaoPainel & { onde: OndeAparece },
-      ]
-    : []),
   {
     chave: 'base',
     onde: 'captacao',
@@ -266,7 +260,9 @@ export function painelDaUrl(
   valor: string | string[] | undefined,
   paineis: readonly DefinicaoPainel[] = PAINEIS,
 ): ChavePainel {
-  const bruto = Array.isArray(valor) ? valor[0] : valor;
+  const pedido = Array.isArray(valor) ? valor[0] : valor;
+  // A aba Canais virou parte de Origem e interesse (18/11/2026).
+  const bruto = pedido === 'canais' ? 'origem' : pedido;
   const achado = paineis.find((p) => p.chave === bruto);
   return achado?.chave ?? paineis[0]?.chave ?? 'ligacoes';
 }
