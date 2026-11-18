@@ -10842,3 +10842,12 @@ Pedido do usuário: "tem muita informação repetida entrando no CRM ... o TE000
   - área em texto ou com casas decimais vira inteiro;
   - os anúncios excluídos contam para a junção e para o "Novo anúncio".
 - **Não testado com o Canal Pro de verdade:** o favorito depende da sessão do Canal Pro aberta no navegador do usuário. O primeiro clique dele é o teste. Se falhar, o favorito avisa o motivo na própria página do Canal Pro, e os dois jeitos de antes continuam dentro de "Sincronizar Canal Pro".
+
+**No ar desde 18/11/2026, 14h33 (pedido do usuário: "Gostei da atualização. Suba pro ar"):**
+- `main` em `77cb078`;
+- banco da Imova pelo `publicar-banco imova migrar`, só a `20261118120000`, conferida em produção (`anuncio_fotos_trocar` existe e o teto é 60);
+- site `imova-mak4gjdo3` em imova-crm.vercel.app. O mesmo código também gerou o `imova-p3hcr46bp`, porque o primeiro `vercel deploy` respondeu sem mostrar a URL e foi repetido. Para voltar, use `imova-1ootda9h8`.
+
+Conferido de fora: `/login` responde 200 com `data-empresa="imova"`; `/anuncios` e `/anuncios/sincronizar` sem login levam ao login; `/auth/dev` dá 404. A tela com login não foi aberta em produção (o login é pelo Google).
+
+A KOMUNE não recebeu a migração; lá ela não faz nada, e entra no próximo `komune migrar`.
