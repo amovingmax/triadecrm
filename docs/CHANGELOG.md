@@ -10954,6 +10954,13 @@ Pedido do usuário: "A gente deve arrumar as telas e deixá-las mais responsivas
 
 ## 17/11/2026 — O e-mail do cliente vai sozinho para a ficha, e a IA convida para ofertas por e-mail (branch `email-do-cliente`; `atendente-imova@v6`; RF-BAS-01, RF-BAS-06, RF-CON-06)
 
+**No ar desde 18/11/2026, ~17h10 (pedido do usuário: "Pode subir para o ar"), junto com as telas responsivas e o menu "Mais" do celular (as duas entradas acima):** `main` em `2a41ff2`. Antes de subir, a `email-do-cliente` recebeu a main (a tela de Anúncios ficou como estava no ar; a de fotos guarda os botões largos no celular com o teto novo de 60) e a migração foi renumerada de `20261117220000` (que a main já usava, no Painel do dia) para `20261118150000`, com o pgTAP 181 virando 185. O ensaio em produção, numa transação desfeita, achou que a KOMUNE não tem `public.ia_entrada_do_atendente`; a migração passou a pular essa parte onde a IA que atende não existe (`2a41ff2`).
+- Verificado: typecheck e lint; Vitest web 2236, workers 605, prompts 476, schema 114; pgTAP 185 30/30 nos bancos locais da Imova e da KOMUNE; ensaio nos dois bancos de produção com rollback, sem deixar nada.
+- Banco da Imova: `20261118150000`. Banco da KOMUNE: `20261117230000`, `20261118120000` e `20261118150000` (as duas primeiras são da Imova e lá não criam nada). Os dois sem migração pendente.
+- Sites: Imova `imova-rd1ag1cag` (volta `imova-p3u32y1yh`); KOMUNE `triade-1n6et9g8n` (volta `triade-gjahm9814`).
+- `imova-worker-ai` v12, com a `atendente-imova@v6` (volta: rollback para a v11). O ensaio contra o modelo não rodou.
+- Na KOMUNE o gatilho também grava na ficha o e-mail que o usuário do aplicativo escreve (decisão ainda aberta).
+
 Pedidos do usuário, sobre a Imova: "Precisamos criar um campo de email para cada cliente/usuario, e caso seja fornecido a informação devemos colocar esse email que foi fornecido à ficha dele" e "Devemos treinar a IA para pedir o email das pessoas caso elas queiram receber mais ofertas e receberem mais promocoes". A ficha já tinha a coluna (`organizations.email`) e a folha de editar já tinha o campo; faltava o e-mail chegar à ficha pela conversa, aparecer na conversa e a IA saber pedir.
 
 - **Banco (migração `20261118150000`, as duas empresas):**
