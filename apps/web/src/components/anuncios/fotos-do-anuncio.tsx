@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 
+import { FOTOS_POR_ANUNCIO } from './arquivo-vrsync';
 import { ErroDaFoto, ordenarFotos, removerFoto, subirFoto, urlDaFoto } from './dados';
 import { type FotoDoAnuncio, fraseDaRecusa } from './tipos';
 
@@ -18,7 +19,7 @@ import { type FotoDoAnuncio, fraseDaRecusa } from './tipos';
  *
  * Cada foto vira JPEG no navegador (o portal só importa JPG, até 7 MB) e sobe
  * direto para o balde. Para ir ao ar basta uma (o formato do portal exige uma);
- * o máximo é 40. Sem mínimo maior: decisão do usuário em 05/11/2026.
+ * o máximo é 60 (era 40 até 18/11/2026). Sem mínimo maior: decisão do usuário em 05/11/2026.
  */
 export function FotosDoAnuncio({
   anuncioId,
@@ -42,9 +43,10 @@ export function FotosDoAnuncio({
     );
     if (entrada.current) entrada.current.value = '';
     if (arquivos.length === 0) return;
-    const cabem = Math.max(0, 40 - ordem.length);
+    const cabem = Math.max(0, FOTOS_POR_ANUNCIO - ordem.length);
     const vao = arquivos.slice(0, cabem);
-    if (vao.length < arquivos.length) toast.warning(`Só cabem mais ${cabem} fotos: o máximo é 40.`);
+    if (vao.length < arquivos.length)
+      toast.warning(`Só cabem mais ${cabem} fotos: o máximo é ${FOTOS_POR_ANUNCIO}.`);
 
     setSubindo({ feitas: 0, total: vao.length });
     let falhas = 0;
@@ -198,7 +200,7 @@ export function FotosDoAnuncio({
             type="button"
             variant="outline"
             className="toque h-11 md:h-9"
-            disabled={subindo !== null || ordem.length >= 40}
+            disabled={subindo !== null || ordem.length >= FOTOS_POR_ANUNCIO}
             onClick={() => entrada.current?.click()}
           >
             <ImagePlus aria-hidden="true" />

@@ -237,12 +237,19 @@ function conferir(v: Valores): { campo: keyof Valores; mensagem: string } | null
 
 type DadosDoEditor = NonNullable<Awaited<ReturnType<typeof carregarAnuncio>>>;
 
+/** O que o "Novo anúncio" já sabe, depois de conferir se o imóvel existe (18/11/2026). */
+export type InicioDoAnuncio = Partial<
+  Pick<Valores, 'tipo' | 'cidade' | 'bairro' | 'area_util' | 'area_total'>
+>;
+
 export function EditorDeAnuncio({
   id,
   podePublicar,
+  inicio,
 }: {
   id: string | null;
   podePublicar: boolean;
+  inicio?: InicioDoAnuncio;
 }) {
   const consulta = useQuery({
     queryKey: [...CHAVE_DOS_ANUNCIOS, 'um', id],
@@ -270,7 +277,9 @@ export function EditorDeAnuncio({
       </div>
     );
   }
-  return <Editor id={id} podePublicar={podePublicar} dados={consulta.data ?? null} />;
+  return (
+    <Editor id={id} podePublicar={podePublicar} dados={consulta.data ?? null} inicio={inicio} />
+  );
 }
 
 /**
@@ -284,10 +293,12 @@ function Editor({
   id,
   podePublicar,
   dados,
+  inicio,
 }: {
   id: string | null;
   podePublicar: boolean;
   dados: DadosDoEditor | null;
+  inicio?: InicioDoAnuncio;
 }) {
   const router = useRouter();
   const cliente = useQueryClient();
@@ -298,7 +309,9 @@ function Editor({
     queryFn: carregarProximosCodigos,
     enabled: dados === null || tagTrocavel(dados.anuncio),
   });
-  const form = useForm<Valores>({ defaultValues: dados ? valoresDe(dados.anuncio) : VAZIO });
+  const form = useForm<Valores>({
+    defaultValues: dados ? valoresDe(dados.anuncio) : { ...VAZIO, ...inicio },
+  });
   const [salvando, setSalvando] = useState(false);
   const [agindo, setAgindo] = useState<null | 'publicar' | 'tirar' | 'destaque' | 'excluir'>(null);
   const [excluir, setExcluir] = useState(false);

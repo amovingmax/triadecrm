@@ -100,8 +100,11 @@ export function codigoValido(codigo: string): boolean {
   return tamanho >= 1 && tamanho <= 50 && codigo === codigo.trim() && !/[<>\p{Cc}]/u.test(codigo);
 }
 
-/** O teto de `public.anuncio_foto_adicionar`. */
-export const FOTOS_POR_ANUNCIO = 40;
+/**
+ * O teto de `public.anuncio_foto_adicionar`: 60 desde 18/11/2026 (era 40, escolha
+ * do CRM; o Edifício Simone tem 47 fotos no Canal Pro).
+ */
+export const FOTOS_POR_ANUNCIO = 60;
 
 // ---------------------------------------------------------------------------
 // Os vocabulários do VRSync, ao contrário

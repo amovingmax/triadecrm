@@ -1,28 +1,23 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ArchiveRestore,
-  BedDouble,
   Camera,
-  Car,
   CircleCheck,
-  CircleDashed,
-  CircleOff,
   CirclePlus,
-  Clock,
   CloudOff,
   CloudUpload,
   Copy,
   EllipsisVertical,
   Eye,
   ImageOff,
+  Layers,
   MessagesSquare,
   Pencil,
-  Ruler,
-  ShowerHead,
+  Star,
   Trash2,
   TriangleAlert,
   UserRound,
@@ -52,6 +47,14 @@ import {
 import { cn } from '@/lib/utils';
 
 import {
+  copiaAtiva,
+  type DoCanalPro,
+  estadoDoCartao,
+  type EstadoDoCartao,
+  fotosQueFaltam,
+  type TomDoEstado,
+} from './aba-dos-anuncios';
+import {
   CHAVE_DOS_ANUNCIOS,
   escolherDestaque,
   excluirAnuncio,
@@ -60,28 +63,15 @@ import {
   tirarDoAr,
   urlDaFoto,
 } from './dados';
-import { formatarQuando } from './no-portal';
 import {
-  type Comodo,
-  comodosDoCartao,
-  enderecoDoCartao,
+  ehTerreno,
   faixaDaNota,
   type FaixaDaNota,
-  diaDeCriacao,
   foraDoArquivo,
-  formatarDia,
-  fraseForaDoArquivo,
   formatarNota,
   type ItemDaNota,
-  negociosDoCartao,
-  noPortalPeloSistemaAtual,
   ocupaVagaPeloRelatorio,
-  saiuDoSistemaAtual,
   situacaoForaDoCrm,
-  qualidadeDoAnuncio,
-  rotuloDaOrigem,
-  seloDoAnuncio,
-  type SeloDoAnuncio,
   travasDoPlano,
 } from './regras-do-cartao';
 import {
@@ -97,35 +87,83 @@ import {
 
 type Agindo = null | 'publicar' | 'tirar' | 'destaque' | 'excluir' | 'restaurar';
 
+/** As cores de cada situação: quem publica muda a tinta, o resto fica neutro. */
+export const TOM_DA_SITUACAO: Record<TomDoEstado, string> = {
+  arbo: 'border border-primary/45 text-primary',
+  espera: 'bg-primary/12 text-primary',
+  crm: 'bg-primary text-primary-foreground',
+  fora: 'bg-muted text-muted-foreground',
+  rascunho: 'bg-morno-fundo text-morno-texto',
+  alerta: 'bg-destructive/10 text-destructive-texto',
+  excluido: 'bg-destructive/10 text-destructive-texto',
+};
+
+export function EtiquetaDaSituacao({ estado }: { estado: EstadoDoCartao }) {
+  return (
+    <span
+      title={estado.dica}
+      className={cn(
+        'inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap',
+        TOM_DA_SITUACAO[estado.tom],
+      )}
+    >
+      <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+      {estado.rotulo}
+    </span>
+  );
+}
+
 /**
- * Um anúncio da lista, no desenho do cartão do Canal Pro (05/11/2026): a foto
- * grande à esquerda (em cima, no celular), o endereço como título, os chips, a
- * área e os cômodos, o preço, as datas e, depois da linha, a nota de qualidade,
- * a situação, as visualizações e os leads. As ações moram no menu ⋮, com as
- * mesmas confirmações e avisos que tinham na linha e no editor.
+ * Um anúncio da lista (18/11/2026): um cartão por imóvel. A foto, o título (é por
+ * ele que o time reconhece o imóvel), o código, o tipo, a área e o bairro, o
+ * preço, UMA etiqueta de situação, os números do Canal Pro e dos leads, e uma
+ * ação só, a que o anúncio pede agora. O resto mora na ficha (que abre por cima,
+ * ao clicar) e no menu ⋮. As cópias antigas do mesmo imóvel no Canal Pro ficam
+ * dentro do cartão, numa linha.
+ *
+ * Saíram do cartão (estão na ficha): a origem, as datas de criação e atualização
+ * e a nota de qualidade. Até 18/11 o pé do cartão repetia a situação em três
+ * lugares ("Publicado", "No portal pelo sistema atual · No Canal Pro: Ativo · no
+ * CRM: rascunho").
  */
 export function CartaoDoAnuncio({
   anuncio: a,
+  doCanalPro,
   podePublicar,
   plano,
+  aoAbrir,
+  aoSincronizar,
 }: {
   anuncio: AnuncioNaLista;
+  doCanalPro: DoCanalPro | undefined;
   podePublicar: boolean;
   plano: SituacaoDoCanalPro['plano'] | null;
+  aoAbrir: () => void;
+  aoSincronizar: () => void;
 }) {
   const cliente = useQueryClient();
   const [agindo, setAgindo] = useState<Agindo>(null);
   const [excluir, setExcluir] = useState(false);
-  const [notaAberta, setNotaAberta] = useState(false);
 
   const excluido = a.excluido_em !== null;
-  const endereco = enderecoDoCartao(a);
-  const qualidade = useMemo(() => qualidadeDoAnuncio(a), [a]);
-  const criacao = diaDeCriacao(a);
-  const selo = seloDoAnuncio(a);
-  const comodos = comodosDoCartao(a);
+  const estado = estadoDoCartao(a);
   const linkDoAnuncio = `/anuncios/${a.id}`;
   const linkDosLeads = `/anuncios/leads?anuncio=${encodeURIComponent(a.codigo)}`;
+  const propria = doCanalPro?.propria ?? null;
+  const copias = doCanalPro?.copias ?? [];
+  const ativas = copias.filter(copiaAtiva);
+  const faltamFotos = fotosQueFaltam(a, doCanalPro);
+  const visualizacoes = a.no_canal_pro_visualizacoes ?? propria?.visualizacoes ?? null;
+  const contatos = a.no_canal_pro_contatos ?? propria?.contatos ?? null;
+  const tipo = tipoDeImovel(a.tipo).rotulo;
+  // Terreno se mede pela área total; o resto, pela útil (como o Canal Pro mostra).
+  const area = ehTerreno(a.tipo) ? (a.area_total ?? a.area_util) : (a.area_util ?? a.area_total);
+  const meta = [
+    tipo,
+    area ? `${area.toLocaleString('pt-BR')} m²` : null,
+    a.quartos ? `${a.quartos} ${a.quartos === 1 ? 'quarto' : 'quartos'}` : null,
+    [a.bairro, a.cidade].filter(Boolean).join(', ') || null,
+  ].filter((x): x is string => !!x);
 
   function atualizar() {
     void cliente.invalidateQueries({ queryKey: CHAVE_DOS_ANUNCIOS });
@@ -153,7 +191,11 @@ export function CartaoDoAnuncio({
       });
       return;
     }
-    toast.success('No ar. Entra no portal na próxima leitura do Grupo OLX (a cada 12 horas).');
+    toast.success(
+      a.ultima_leitura_do_portal
+        ? 'No ar. Entra no portal na próxima leitura do Grupo OLX (a cada 12 horas).'
+        : 'No ar pelo CRM. Vai ao portal depois da troca da URL no Canal Pro.',
+    );
   }
 
   async function tirar() {
@@ -208,6 +250,71 @@ export function CartaoDoAnuncio({
     atualizar();
   }
 
+  // A ação que o anúncio pede agora (uma só).
+  const { semVaga } = travasDoPlano(plano, {
+    situacao: a.situacao,
+    destaque: a.destaque,
+    ocupaVagaPeloRelatorio: ocupaVagaPeloRelatorio(a),
+  });
+  const pendencias = a.pendencias ?? [];
+  const soFaltaFoto = pendencias.length > 0 && pendencias.every((p) => /foto/i.test(p));
+  let acao: React.ReactNode = null;
+  if (podePublicar) {
+    if (excluido) {
+      acao = (
+        <Button
+          variant="outline"
+          className="toque h-11 md:h-9"
+          disabled={agindo !== null}
+          onClick={() => void restaurar()}
+        >
+          <ArchiveRestore aria-hidden="true" />
+          {agindo === 'restaurar' ? 'Restaurando...' : 'Restaurar'}
+        </Button>
+      );
+    } else if (faltamFotos > 0 && a.fotos === 0) {
+      acao = (
+        <Button className="toque h-11 md:h-9" onClick={aoSincronizar}>
+          <Camera aria-hidden="true" />
+          Trazer fotos
+        </Button>
+      );
+    } else if (
+      foraDoArquivo(a) ||
+      (a.situacao === 'rascunho' && pendencias.length > 0 && !soFaltaFoto)
+    ) {
+      acao = (
+        <Button
+          asChild
+          variant={foraDoArquivo(a) ? 'default' : 'outline'}
+          className="toque h-11 md:h-9"
+        >
+          <Link href={linkDoAnuncio}>
+            <Pencil aria-hidden="true" />
+            {foraDoArquivo(a) ? 'Corrigir' : 'Completar'}
+          </Link>
+        </Button>
+      );
+    } else if (
+      a.situacao !== 'no_ar' &&
+      pendencias.length === 0 &&
+      situacaoForaDoCrm(a) !== 'ativo'
+    ) {
+      acao = (
+        <Button
+          variant="outline"
+          className="toque h-11 md:h-9"
+          disabled={agindo !== null || semVaga}
+          title={semVaga ? 'Plano cheio: tire outro do ar antes' : undefined}
+          onClick={() => void publicar()}
+        >
+          <CloudUpload aria-hidden="true" />
+          {agindo === 'publicar' ? 'Pondo no ar...' : semVaga ? 'Sem vaga' : 'Pôr no ar'}
+        </Button>
+      );
+    }
+  }
+
   return (
     <li>
       <article
@@ -217,41 +324,26 @@ export function CartaoDoAnuncio({
         <Foto
           caminho={a.capa}
           fotos={a.fotos}
-          href={linkDoAnuncio}
-          apagada={excluido || a.situacao === 'pausado'}
+          noCanalPro={propria?.fotos ?? null}
+          apagada={excluido || estado.tom === 'fora'}
+          aoAbrir={aoAbrir}
+          codigo={a.codigo}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col gap-2 p-4 md:py-4 md:pr-4 md:pl-5">
-          {/* Endereço, chips e o menu */}
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-4 md:py-4 md:pr-4 md:pl-5">
           <div className="flex items-start gap-2">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1.5">
-              <h2 className="mr-1 min-w-0 text-[15px] leading-snug font-medium tracking-tight break-words">
-                <Link
-                  href={linkDoAnuncio}
-                  className="rounded-sm outline-none hover:underline hover:underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  {endereco ?? (
-                    <span className="text-muted-foreground">Endereço por preencher</span>
-                  )}
-                </Link>
-              </h2>
-              {negociosDoCartao(a.negocio).map((n) => (
-                <Chip key={n} forte>
-                  {n}
-                </Chip>
-              ))}
-              <Chip>{rotuloDaOrigem(a)}</Chip>
+            <h2 className="min-w-0 flex-1 text-[15px] leading-snug font-medium tracking-tight">
               <button
                 type="button"
-                onClick={() => void copiarCodigo()}
-                title="Copiar o código"
-                aria-label={`Copiar o código ${a.codigo}`}
-                className="toque inline-flex h-6 max-w-full items-center gap-1 rounded-full border border-hairline px-2 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+                onClick={aoAbrir}
+                className={cn(
+                  'line-clamp-2 rounded-sm text-left outline-none hover:underline hover:underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50',
+                  !a.titulo.trim() && 'text-muted-foreground italic',
+                )}
               >
-                <Copy className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="numerico truncate">{a.codigo}</span>
+                {a.titulo.trim() || 'Sem título'}
               </button>
-            </div>
+            </h2>
             <MenuDoAnuncio
               anuncio={a}
               podePublicar={podePublicar}
@@ -268,99 +360,98 @@ export function CartaoDoAnuncio({
             />
           </div>
 
-          {/* O título do anúncio: é por ele que o time reconhece o imóvel */}
-          <p className="-mt-0.5 line-clamp-2 text-sm text-muted-foreground sm:line-clamp-1">
-            {a.titulo.trim() || 'Sem título'}
-          </p>
-
-          <LinhaDeComodos tipo={tipoDeImovel(a.tipo).rotulo} comodos={comodos} />
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => void copiarCodigo()}
+              title="Copiar o código"
+              aria-label={`Copiar o código ${a.codigo}`}
+              className="toque inline-flex h-6 max-w-full items-center gap-1 rounded-full border border-hairline px-2 text-xs font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <Copy className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="numerico truncate">{a.codigo}</span>
+            </button>
+            {meta.map((m, i) => (
+              <span key={m} className="inline-flex items-center gap-2.5">
+                {i > 0 ? (
+                  <span className="size-1 rounded-full bg-current opacity-50" aria-hidden="true" />
+                ) : null}
+                <span className="numerico">{m}</span>
+              </span>
+            ))}
+          </div>
 
           <p className="text-xl leading-tight font-semibold tracking-tight numerico">
             {precoDoAnuncio(a)}
           </p>
 
-          <p className="text-xs text-muted-foreground">
-            <span
-              className="whitespace-nowrap"
-              title={
-                criacao.doCanalPro
-                  ? 'Data em que o anúncio foi criado no Canal Pro, do último relatório importado'
-                  : 'Data em que o anúncio entrou no CRM'
-              }
-            >
-              Criado em <span className="numerico">{criacao.dia}</span>
-            </span>
-            <span aria-hidden="true"> · </span>
-            <span className="whitespace-nowrap">
-              Atualizado em <span className="numerico">{formatarDia(a.updated_at)}</span>
-            </span>
-            {a.proprietario_nome ? (
-              <>
-                <span aria-hidden="true"> · </span>
-                <span>Proprietário: {a.proprietario_nome}</span>
-              </>
-            ) : null}
-          </p>
-
-          {/* Depois da linha: qualidade, situação e números */}
-          <div className="mt-auto flex flex-col gap-2 border-t border-hairline pt-3">
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-              <BotaoDaNota nota={qualidade.nota} aoAbrir={() => setNotaAberta(true)} />
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                {a.destaque !== 'padrao' && !excluido ? (
-                  <span className="inline-flex h-7 items-center rounded-full border border-hairline px-2.5 text-xs font-medium">
-                    {rotuloDoDestaque(a.destaque)}
-                  </span>
-                ) : null}
-                <Selo selo={selo} />
-                {a.no_canal_pro_visualizacoes !== null ? (
+          <div className="mt-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-t border-hairline pt-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2">
+              <EtiquetaDaSituacao estado={estado} />
+              {a.destaque !== 'padrao' && !excluido ? (
+                <span className="inline-flex h-7 items-center gap-1 rounded-full border border-menta/60 px-2.5 text-xs font-medium text-menta-texto">
+                  <Star className="size-3.5" aria-hidden="true" />
+                  {rotuloDoDestaque(a.destaque)}
+                </span>
+              ) : null}
+              <span className="flex items-center gap-3 text-sm">
+                {visualizacoes !== null ? (
                   <span
-                    className="inline-flex items-center gap-1 text-sm"
-                    title="Visualizações no Canal Pro, do último relatório importado"
+                    className="inline-flex items-center gap-1"
+                    title="Visualizações no Canal Pro"
                   >
                     <Eye className="size-4 text-muted-foreground" aria-hidden="true" />
-                    <span className="numerico">{a.no_canal_pro_visualizacoes}</span>
-                    <span className="sr-only">
-                      {a.no_canal_pro_visualizacoes === 1 ? 'visualização' : 'visualizações'} no
-                      Canal Pro
+                    <span className="numerico font-medium">
+                      {visualizacoes.toLocaleString('pt-BR')}
                     </span>
+                    <span className="sr-only">visualizações no Canal Pro</span>
                   </span>
                 ) : null}
-                {a.no_canal_pro_contatos !== null ? (
-                  <span
-                    className="inline-flex items-center gap-1 text-sm"
-                    title="Contatos no Canal Pro (por qualquer meio), do último relatório importado"
-                  >
+                {contatos !== null ? (
+                  <span className="inline-flex items-center gap-1" title="Contatos no Canal Pro">
                     <MessagesSquare className="size-4 text-muted-foreground" aria-hidden="true" />
-                    <span className="numerico">{a.no_canal_pro_contatos}</span>
-                    <span className="sr-only">
-                      {a.no_canal_pro_contatos === 1 ? 'contato' : 'contatos'} no Canal Pro
-                    </span>
+                    <span className="numerico font-medium">{contatos}</span>
+                    <span className="sr-only">contatos no Canal Pro</span>
                   </span>
                 ) : null}
                 <Link
                   href={linkDosLeads}
-                  title="Ver os leads deste anúncio no CRM"
-                  className="toque inline-flex h-8 items-center gap-1 rounded-full px-1.5 text-sm outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+                  title="Leads deste anúncio no CRM"
+                  className="toque inline-flex h-8 items-center gap-1 rounded-full px-1.5 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
                   <UserRound className="size-4 text-muted-foreground" aria-hidden="true" />
-                  <span className="numerico">{a.leads}</span>
-                  <span className="sr-only">{a.leads === 1 ? 'lead' : 'leads'}</span>
+                  <span className="numerico font-medium">{a.leads}</span>
+                  <span className="sr-only">{a.leads === 1 ? 'lead' : 'leads'} no CRM</span>
                 </Link>
-              </div>
+              </span>
+              {copias.length ? (
+                <button
+                  type="button"
+                  onClick={aoAbrir}
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-sm text-xs outline-none hover:underline hover:underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50',
+                    ativas.length ? 'font-medium text-morno-texto' : 'text-muted-foreground',
+                  )}
+                >
+                  {ativas.length ? (
+                    <TriangleAlert className="size-3.5" aria-hidden="true" />
+                  ) : (
+                    <Layers className="size-3.5" aria-hidden="true" />
+                  )}
+                  {ativas.length
+                    ? ativas.length === 1
+                      ? 'Cópia antiga ainda ativa no Canal Pro'
+                      : `${ativas.length} cópias antigas ainda ativas no Canal Pro`
+                    : copias.length === 1
+                      ? '1 cópia antiga juntada'
+                      : `${copias.length} cópias antigas juntadas`}
+                </button>
+              ) : null}
             </div>
-            <Avisos anuncio={a} podePublicar={podePublicar} />
+            {acao}
           </div>
         </div>
       </article>
-
-      <DialogoDaNota
-        aberto={notaAberta}
-        aoMudar={setNotaAberta}
-        nota={qualidade.nota}
-        itens={qualidade.itens}
-        linkDoAnuncio={excluido ? null : linkDoAnuncio}
-      />
 
       {podePublicar && !excluido ? (
         <DialogoExcluir
@@ -405,20 +496,25 @@ export function CartaoDoAnuncio({
 function Foto({
   caminho,
   fotos,
-  href,
+  noCanalPro,
   apagada,
+  aoAbrir,
+  codigo,
 }: {
   caminho: string | null;
   fotos: number;
-  href: string;
+  /** Quantas o Canal Pro tem (do último relatório ou sincronização). */
+  noCanalPro: number | null;
   apagada: boolean;
+  aoAbrir: () => void;
+  codigo: string;
 }) {
   return (
-    <Link
-      href={href}
-      tabIndex={-1}
-      aria-hidden="true"
-      className="relative block aspect-[16/9] w-full shrink-0 overflow-hidden bg-muted md:aspect-auto md:min-h-[212px] md:w-[34%]"
+    <button
+      type="button"
+      onClick={aoAbrir}
+      aria-label={`Abrir a ficha de ${codigo}`}
+      className="relative block aspect-[16/9] w-full shrink-0 overflow-hidden bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:aspect-auto md:min-h-[176px] md:w-[30%] md:max-w-[260px]"
     >
       {caminho ? (
         // eslint-disable-next-line @next/next/no-img-element -- foto do balde público, sem otimizador do Next
@@ -432,169 +528,26 @@ function Foto({
           )}
         />
       ) : (
-        <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground">
-          <ImageOff className="size-6" />
-          Sem fotos
+        <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[repeating-linear-gradient(135deg,var(--muted)_0_12px,transparent_12px_24px)] px-3 text-center text-xs text-muted-foreground">
+          <ImageOff className="size-6" aria-hidden="true" />
+          <span className="font-medium text-foreground">Sem fotos no CRM</span>
+          {noCanalPro ? (
+            <span>
+              o Canal Pro tem <span className="numerico font-medium">{noCanalPro}</span>
+            </span>
+          ) : null}
         </span>
       )}
       {fotos > 0 ? (
         <span className="absolute bottom-2 left-2 inline-flex h-6 items-center gap-1 rounded-full bg-background/85 px-2 text-xs font-medium text-foreground backdrop-blur-sm">
-          <Camera className="size-3.5" />
-          <span className="numerico">{fotos}</span>
+          <Camera className="size-3.5" aria-hidden="true" />
+          <span className="numerico">
+            {fotos}
+            {noCanalPro !== null && noCanalPro > fotos ? ` de ${noCanalPro}` : ''}
+          </span>
         </span>
       ) : null}
-    </Link>
-  );
-}
-
-function Chip({ children, forte = false }: { children: React.ReactNode; forte?: boolean }) {
-  return (
-    <span
-      className={cn(
-        'inline-block h-6 max-w-full truncate rounded-full px-2 text-xs leading-6 font-medium',
-        forte ? 'bg-secondary text-secondary-foreground' : 'border border-hairline text-foreground',
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-const ICONE_DO_COMODO: Record<Comodo['id'], typeof Ruler> = {
-  area: Ruler,
-  quartos: BedDouble,
-  banheiros: ShowerHead,
-  vagas: Car,
-};
-
-function LinhaDeComodos({ tipo, comodos }: { tipo: string; comodos: Comodo[] }) {
-  return (
-    <ul className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-sm">
-      <li className="text-muted-foreground">{tipo}</li>
-      {comodos.map((c) => {
-        const Icone = ICONE_DO_COMODO[c.id];
-        return (
-          <li key={c.id} className="inline-flex items-center gap-1" title={c.descricao}>
-            <Icone className="size-4 text-muted-foreground" aria-hidden="true" />
-            <span className="numerico" aria-hidden="true">
-              {c.texto}
-            </span>
-            <span className="sr-only">{c.descricao}</span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-const COR_DA_FAIXA: Record<FaixaDaNota, string> = {
-  boa: 'bg-cliente',
-  media: 'bg-morno',
-  baixa: 'bg-destructive',
-};
-
-function BotaoDaNota({ nota, aoAbrir }: { nota: number; aoAbrir: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={aoAbrir}
-      aria-haspopup="dialog"
-      aria-label={`Qualidade do anúncio: ${formatarNota(nota)} de 10. Ver o que sobe a nota.`}
-      className="toque -mx-1.5 flex min-h-9 items-center gap-3 rounded-lg px-1.5 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-    >
-      <span className="text-sm">Qualidade do anúncio</span>
-      <span className="h-2 w-24 overflow-hidden rounded-full bg-foreground/10 sm:w-36">
-        <span
-          className={cn('block h-full rounded-full', COR_DA_FAIXA[faixaDaNota(nota)])}
-          style={{ width: `${Math.min(100, Math.max(0, nota * 10))}%` }}
-        />
-      </span>
-      <span className="text-sm numerico">
-        <span className="font-semibold underline decoration-dotted underline-offset-4">
-          {formatarNota(nota)}
-        </span>
-        <span className="text-muted-foreground">/10</span>
-      </span>
     </button>
-  );
-}
-
-const TOM_DO_SELO: Record<SeloDoAnuncio['tom'], { classe: string; Icone: typeof Clock }> = {
-  publicado: { classe: 'bg-cliente-fundo text-cliente-texto', Icone: CircleCheck },
-  processando: { classe: 'bg-morno-fundo text-morno-texto', Icone: Clock },
-  rascunho: { classe: 'border border-border text-foreground', Icone: CircleDashed },
-  apagado: { classe: 'bg-muted text-muted-foreground', Icone: CircleOff },
-  // No ar no CRM, mas fora do arquivo (11/11/2026): sai do portal sem ninguém pedir.
-  alerta: { classe: 'bg-destructive/10 text-destructive-texto', Icone: TriangleAlert },
-};
-
-function Selo({ selo }: { selo: SeloDoAnuncio }) {
-  const { classe, Icone } = TOM_DO_SELO[selo.tom];
-  return (
-    <span
-      className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold',
-        classe,
-      )}
-    >
-      <Icone className="size-3.5" aria-hidden="true" />
-      {selo.rotulo}
-    </span>
-  );
-}
-
-/**
- * As linhas pequenas do pé do cartão: à esquerda, o próximo passo (o que falta
- * para ir ao ar, ou se o Grupo OLX já levou); à direita, o que o portal diz do
- * anúncio por fora do CRM.
- */
-function Avisos({ anuncio: a, podePublicar }: { anuncio: AnuncioNaLista; podePublicar: boolean }) {
-  const excluido = a.excluido_em !== null;
-  const leitura = a.ultima_leitura_do_portal;
-  const fora = foraDoArquivo(a);
-  let passo: string;
-  if (excluido) {
-    passo = `Excluído ${a.excluido_em ? formatarQuando(a.excluido_em) : ''}${
-      a.motivo_exclusao ? `: “${a.motivo_exclusao}”` : '.'
-    }`;
-  } else if (fora) {
-    // O arquivo só leva o que está no ar SEM pendência: este é pulado (11/11/2026).
-    passo = fraseForaDoArquivo(a.pendencias ?? [], leitura);
-  } else if (a.situacao === 'no_ar') {
-    const lido = (iso: string | null) =>
-      iso !== null && leitura !== null && new Date(leitura).getTime() > new Date(iso).getTime();
-    passo = !lido(a.publicado_em)
-      ? 'Entra no portal na próxima leitura do Grupo OLX (a cada 12 horas).'
-      : !lido(a.updated_at)
-        ? 'A última mudança chega ao portal na próxima leitura do Grupo OLX.'
-        : `Levado pelo Grupo OLX ${formatarQuando(leitura!)}. Erros aparecem no relatório de integração do Canal Pro.`;
-  } else if ((a.pendencias?.length ?? 0) > 0) {
-    const p = a.pendencias!;
-    passo = `Para ir ao ar falta: ${p.slice(0, 4).join(', ')}${p.length > 4 ? ` e mais ${p.length - 4}` : ''}.`;
-  } else {
-    passo = podePublicar ? 'Pronto para pôr no ar.' : 'Pronto: avise um gestor para pôr no ar.';
-  }
-
-  const saiu = saiuDoSistemaAtual(a) && !a.excluido_em;
-  const portal = [
-    saiu && a.sistema_atual_em
-      ? `Saiu do sistema atual ${formatarQuando(a.sistema_atual_em)}`
-      : noPortalPeloSistemaAtual(a) && situacaoForaDoCrm(a) === 'ativo'
-        ? 'No portal pelo sistema atual'
-        : null,
-    a.no_canal_pro_situacao ? `No Canal Pro: ${a.no_canal_pro_situacao}` : null,
-    a.situacao === 'rascunho' && (saiu || noPortalPeloSistemaAtual(a)) ? 'no CRM: rascunho' : null,
-  ].filter(Boolean);
-
-  return (
-    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      <p className={cn('min-w-0 flex-1 basis-64', fora && 'font-medium text-destructive-texto')}>
-        {passo}
-      </p>
-      {portal.length ? (
-        <p className="font-medium text-foreground sm:text-right">{portal.join(' · ')}</p>
-      ) : null}
-    </div>
   );
 }
 
@@ -744,9 +697,41 @@ function MenuDoAnuncio({
   );
 }
 
+const COR_DA_FAIXA: Record<FaixaDaNota, string> = {
+  boa: 'bg-cliente',
+  media: 'bg-morno',
+  baixa: 'bg-destructive',
+};
+
+export function BotaoDaNota({ nota, aoAbrir }: { nota: number; aoAbrir: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={aoAbrir}
+      aria-haspopup="dialog"
+      aria-label={`Qualidade do anúncio: ${formatarNota(nota)} de 10. Ver o que sobe a nota.`}
+      className="toque -mx-1.5 flex min-h-9 items-center gap-3 rounded-lg px-1.5 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <span className="text-sm">Qualidade do anúncio</span>
+      <span className="h-2 w-24 overflow-hidden rounded-full bg-foreground/10 sm:w-36">
+        <span
+          className={cn('block h-full rounded-full', COR_DA_FAIXA[faixaDaNota(nota)])}
+          style={{ width: `${Math.min(100, Math.max(0, nota * 10))}%` }}
+        />
+      </span>
+      <span className="text-sm numerico">
+        <span className="font-semibold underline decoration-dotted underline-offset-4">
+          {formatarNota(nota)}
+        </span>
+        <span className="text-muted-foreground">/10</span>
+      </span>
+    </button>
+  );
+}
+
 const PONTOS = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
 
-function DialogoDaNota({
+export function DialogoDaNota({
   aberto,
   aoMudar,
   nota,
