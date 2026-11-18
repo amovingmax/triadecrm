@@ -10851,3 +10851,28 @@ Pedido do usuário: "tem muita informação repetida entrando no CRM ... o TE000
 Conferido de fora: `/login` responde 200 com `data-empresa="imova"`; `/anuncios` e `/anuncios/sincronizar` sem login levam ao login; `/auth/dev` dá 404. A tela com login não foi aberta em produção (o login é pelo Google).
 
 A KOMUNE não recebeu a migração; lá ela não faz nada, e entra no próximo `komune migrar`.
+
+### 18/11/2026 — O favorito "Imova: sincronizar" no Canal Pro novo (só na Imova)
+
+O pedido: "precisamos de uma forma de subirmos as fotos dos anúncios no CRM; os anúncios já devem vir com as suas fotos". O CRM avisava "5 anúncios com fotos faltando · 121 estão no Canal Pro": SANTA CATARINA (36), Brisa Mall - Loja 02 (13), Edifício Simone (47), Casa extremox (24) e SA0012_IMOVA (7 de 8). Os quatro primeiros entraram pela planilha do Canal Pro, que não traz fotos, e o caminho que traz todas (o favorito) não funcionava.
+
+- **Por que o favorito parou:** o endereço canal-pro.grupozap.com virou outro site, em React (`div#root`, Redux), sem `#app.__vue__` nem `$store`. O favorito procurava o login no Vue, não achava e dizia "esta aba do Canal Pro não está logada" mesmo com o login feito. O endereço antigo (canalpro.grupozap.com) continua em Vue, e o Canal Pro alterna entre os dois.
+- **O que o código público do site novo mostra (18/11):**
+  - o login fica em cookies do grupozap.com que o próprio site grava pelo JavaScript: `bb-authenticationToken`, `publisher_id`, `odin_id` e `contract_id`. Os mesmos dados estão na loja Redux, em `auth`;
+  - os cabeçalhos da API são os de antes, em minúsculas, e a consulta `listings` aceita os mesmos campos;
+  - há uma situação nova, READY_TO_PUBLISH. Os "não publicados" do site são INACTIVE mais READY_TO_PUBLISH;
+  - as fotos (`newResizedUrl`) ganharam o molde `{extension}`.
+- **O favorito novo (versão 4 do pacote, `sincronizar-canal-pro.ts`):**
+  - acha o login de quatro jeitos: os cabeçalhos que a própria página manda à API (no primeiro clique ele passa a escutar os pedidos da página, e o clique seguinte os usa), a loja Redux pela árvore do React, os cookies e a loja do Vue. No endereço antigo, o Vue vem primeiro;
+  - pede cada situação numa consulta à parte (ACTIVE, INACTIVE, READY_TO_PUBLISH, DRAFT, BLOCKED e PENDING) e, por último, uma sem filtro. Uma situação que a API não conhece é pulada sem derrubar as outras; antes, uma situação desconhecida derrubava a consulta inteira, e o favorito caía numa consulta sem filtro, que pode trazer só os publicados;
+  - três mensagens diferentes: "não encontrei o site do Canal Pro", "não achei o login" e "a API do Canal Pro recusou o pedido (código 401)";
+  - quando uma situação falha de verdade, o pacote vai sem o total e com o motivo. A tela mostra "Uma parte da lista não veio" e trava o "Aplicar", como antes;
+  - "Pronto para publicar" vira o nome da situação nova, e o molde `{extension}` vira `jpg`.
+- **Tela:** "Sincronizar Canal Pro" avisa para apagar o favorito antigo e arrastar o novo. A versão 3 do pacote continua aceita.
+- **A conferência não mudou:** com a lista certa, os quatro sem foto recebem todas (`se_vazio`), e o SA0012 troca as 7 pelas 8 do Canal Pro (`trocar`, tudo ou nada). Os cinco estão como rascunho no CRM, então o CRM não é a fonte deles.
+- **Verificado:**
+  - Vitest com 2.236 testes, typecheck e lint;
+  - no Chrome sem janela, na página real do Canal Pro novo, sem login: o favorito achou as duas lojas Redux com `auth.gandalf_token` pela árvore do React, avisou "não achei o login" e passou a escutar a página;
+  - na mesma página, com um cookie de login falso e a API do Canal Pro e o CRM respondidos pelo próprio navegador de teste (nenhum pedido do favorito saiu): oito consultas, a PENDING pulada e o pacote com 3 anúncios e 8, 47 e 13 fotos, nos dois endereços;
+  - a tela do CRM local (3106) com esse pacote: "Ganham fotos" com o Edifício Simone (+47) e a Brisa Mall - Loja 02 (+13). Com uma falha simulada, mostra o motivo e trava o "Aplicar".
+- **Não testado com o login de verdade:** o primeiro clique do usuário é o teste. Não foi possível confirmar fora do login se a API aceita PENDING; se não aceitar, a consulta é pulada.

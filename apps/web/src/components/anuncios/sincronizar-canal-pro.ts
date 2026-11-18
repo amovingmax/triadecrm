@@ -22,10 +22,38 @@
  * O FAVORITO "Imova: sincronizar" é um endereço `javascript:` que a gestão guarda
  * uma vez na barra de favoritos e clica com o Canal Pro aberto e logado. Ele roda
  * NA aba do Canal Pro, com a sessão de quem clicou (o CRM não guarda senha nem
- * token): acha a loja do Vue, pede a lista página por página (100 por vez) e abre
- * o CRM numa aba nova com tudo no fragmento do endereço (`#d=`), que não vai a
+ * token): acha o login, pede a lista página por página (100 por vez) e abre o
+ * CRM numa aba nova com tudo no fragmento do endereço (`#d=`), que não vai a
  * servidor nenhum. A aba nova é aberta NA HORA do clique e só recebe o endereço
  * depois, para o bloqueador de janelas não a barrar.
+ *
+ * O CANAL PRO NOVO (18/11/2026, versão 4 do pacote). O endereço
+ * canal-pro.grupozap.com virou outro site, em React (`div#root`, Redux), sem
+ * `#app.__vue__` nem `$store`; o favorito da versão 3 não achava o login e dizia
+ * "não está logada" com o login feito. O endereço antigo (canalpro.grupozap.com)
+ * continua em Vue. Lido no código público do site novo, na mesma data:
+ * - o login fica em cookies do domínio grupozap.com, que o próprio site grava
+ *   pelo JavaScript (portanto legíveis em `document.cookie`):
+ *   `bb-authenticationToken` (ou `bb-ldapAuthenticationToken`, de funcionário do
+ *   Grupo OLX), `publisher_id`, `odin_id` e `contract_id`. Os mesmos dados estão
+ *   na loja Redux, em `auth` (`gandalf_token`, `publisher_id`, `odin_id`,
+ *   `contract_id`, `currentPublisher.publisherContractType` e
+ *   `currentContract.contractCompany`);
+ * - os cabeçalhos são os mesmos de antes, em minúsculas: authorization,
+ *   x-publisherid, x-odinId, x-contractid, x-publishercontracttype, x-clientid
+ *   (CANALPRO_WEB) e x-company;
+ * - a consulta `listings` aceita os mesmos campos, e as situações agora incluem
+ *   READY_TO_PUBLISH ("não publicados" = INACTIVE + READY_TO_PUBLISH; "com
+ *   aviso" = BLOCKED + DRAFT);
+ * - os endereços das fotos (`newResizedUrl`) ganharam o molde `{extension}`.
+ *
+ * Por isso o favorito procura o login de quatro jeitos, nesta ordem: os
+ * cabeçalhos que a própria página mandou à API (o favorito passa a escutar os
+ * pedidos da página no primeiro clique, e o clique seguinte os usa); a loja
+ * Redux, achada pela árvore do React; os cookies; e a loja do Vue. E pede cada
+ * situação numa consulta à parte, porque uma situação que a API não conhece
+ * derruba a consulta inteira (era o que tirava os não publicados da lista), e
+ * por último uma consulta sem filtro, para não perder uma situação nova.
  *
  * O CRM CONFERE ANTES DE GRAVAR (`conferir`): o que é novo, o que só atualiza
  * situação e números, o que é o mesmo imóvel com outro código (não entra) e o que
@@ -43,8 +71,9 @@ import { FOTOS_POR_ANUNCIO } from './arquivo-vrsync';
 import { ativoNoCanalPro, tipoDoCrm, type AnuncioDoRelatorio } from './relatorio-canal-pro';
 import type { AnuncioNaLista, Negocio } from './tipos';
 
-/** A versão do pacote que o favorito manda. */
-export const VERSAO_DO_PACOTE = 3;
+/** A versão do pacote que o favorito manda (a 3, do Canal Pro em Vue, ainda é aceita). */
+export const VERSAO_DO_PACOTE = 4;
+const VERSOES_ACEITAS: readonly number[] = [3, 4];
 
 /**
  * O corpo do favorito, em JavaScript puro: vai inteiro no endereço do favorito e
@@ -55,35 +84,149 @@ export const VERSAO_DO_PACOTE = 3;
 export const COLETOR = String.raw`function (d, l, j, crm) {
   function avisar(t) { j.alert('Imova: ' + t); }
   if (!/(^|\.)canal-?pro\.grupozap\.com$/.test(l.hostname)) {
-    avisar('abra o Canal Pro (canalpro.grupozap.com), entre com o login da Imova e clique de novo no favorito.');
+    avisar('abra o Canal Pro (canal-pro.grupozap.com), entre com o login da Imova e clique de novo no favorito.');
     return;
   }
-  var raiz = null, app = d.getElementById('app');
-  if (app && app.__vue__) raiz = app.__vue__.$root;
-  if (!raiz) {
-    var els = d.querySelectorAll('body *');
-    for (var i = 0; i < els.length && i < 5000; i++) {
-      if (els[i].__vue__) { raiz = els[i].__vue__.$root; break; }
+  var API = 'https://gandalf-api.grupozap.com/';
+  // Só os cabeçalhos que o próprio Canal Pro manda à API (outro não passa no CORS).
+  var CHAVES = ['authorization', 'x-publisherid', 'x-odinid', 'x-contractid', 'x-publishercontracttype', 'x-clientid', 'x-appversion', 'x-company', 'disabled-druid'];
+  function limpo(h) {
+    var c = {};
+    for (var k in h) {
+      var n = String(k).toLowerCase(), v = h[k];
+      if (CHAVES.indexOf(n) >= 0 && v !== undefined && v !== null && v !== '') c[n] = String(v);
+    }
+    if (!c.authorization) return null;
+    if (!c['x-clientid']) c['x-clientid'] = 'CANALPRO_WEB';
+    return c;
+  }
+  // 1. Escuta os pedidos da própria página à API e guarda os cabeçalhos dela.
+  function escutar() {
+    if (j.__imovaFetch) return;
+    var f0 = j.fetch;
+    j.__imovaFetch = f0;
+    function guardar(u, hs) {
+      if (!/gandalf-api\.grupozap\.com/.test(String(u || ''))) return;
+      var h = {};
+      if (hs && typeof hs.forEach === 'function') hs.forEach(function (v, k) { h[k] = v; });
+      else if (hs) for (var k in hs) h[k] = hs[k];
+      var c = limpo(h);
+      if (c) j.__imovaCab = c;
+    }
+    j.fetch = function (u, o) {
+      try { guardar(typeof u === 'string' ? u : u && u.url, (o && o.headers) || (u && u.headers)); } catch (e) {}
+      return f0.apply(j, arguments);
+    };
+    var X = j.XMLHttpRequest && j.XMLHttpRequest.prototype;
+    if (X) {
+      var abrir = X.open, por = X.setRequestHeader, enviar = X.send;
+      X.open = function (m, u) { this.__imova = { u: u, h: {} }; return abrir.apply(this, arguments); };
+      X.setRequestHeader = function (k, v) { try { if (this.__imova) this.__imova.h[k] = v; } catch (e) {} return por.apply(this, arguments); };
+      X.send = function () { try { if (this.__imova) guardar(this.__imova.u, this.__imova.h); } catch (e) {} return enviar.apply(this, arguments); };
     }
   }
-  var loja = raiz && raiz.$store, tk = null, pub = null;
-  try { tk = loja.getters['account/token'](); } catch (e) { tk = null; }
-  if (!tk || !tk.token) {
-    avisar('esta aba do Canal Pro não está logada. Entre com o login da Imova, abra Meus anúncios e clique de novo no favorito.');
+  function biscoito(nome) {
+    var partes = ('; ' + (d.cookie || '')).split('; ' + nome + '=');
+    if (partes.length < 2) return null;
+    var v = partes.pop().split(';')[0];
+    try { v = decodeURIComponent(v); } catch (e) {}
+    return v || null;
+  }
+  function guardado(nome) {
+    var v = biscoito(nome);
+    if (!v) { try { v = j.localStorage.getItem(nome); } catch (e) { v = null; } }
+    return v || null;
+  }
+  // 2. O site novo (React + Redux): a loja com auth.gandalf_token, pela árvore do React.
+  function doReact() {
+    var raiz = d.getElementById('root');
+    if (!raiz) return null;
+    var ks = Object.keys(raiz), f = null, i;
+    for (i = 0; i < ks.length; i++) {
+      if (ks[i].indexOf('__reactContainer$') === 0) { f = raiz[ks[i]]; break; }
+      if (ks[i] === '_reactRootContainer') { var rr = raiz[ks[i]]; f = rr && rr._internalRoot && rr._internalRoot.current; break; }
+    }
+    var pilha = f ? [f] : [], vistos = 0;
+    while (pilha.length && vistos < 30000) {
+      var n = pilha.pop();
+      vistos++;
+      try {
+        var p = n.memoizedProps, s = p && (p.store || (p.value && p.value.store));
+        if (s && typeof s.getState === 'function') {
+          var a = s.getState().auth;
+          if (a && a.gandalf_token) return a;
+        }
+      } catch (e) {}
+      if (n.sibling) pilha.push(n.sibling);
+      if (n.child) pilha.push(n.child);
+    }
+    return null;
+  }
+  // 3. Os cookies que o site novo grava (o token, como o próprio site lê, vence o da loja).
+  function doSiteNovo(a) {
+    a = a || {};
+    var tk = biscoito('bb-ldapAuthenticationToken') || biscoito('bb-authenticationToken') || a.gandalf_token;
+    if (!tk) { try { tk = j.sessionStorage.getItem('gandalf_token'); } catch (e) { tk = null; } }
+    return limpo({
+      'authorization': tk,
+      'x-publisherid': a.publisher_id || guardado('publisher_id') || guardado('bb-legacy-publisherId'),
+      'x-odinid': a.odin_id || guardado('odin_id') || guardado('bb-publisherId'),
+      'x-contractid': a.contract_id || guardado('contract_id'),
+      'x-publishercontracttype': a.currentPublisher && a.currentPublisher.publisherContractType,
+      'x-company': a.currentContract && a.currentContract.contractCompany
+    });
+  }
+  // 4. O site antigo (Vue 2 + Vuex), em canalpro.grupozap.com.
+  function doVue() {
+    var raiz = null, app = d.getElementById('app');
+    if (app && app.__vue__) raiz = app.__vue__.$root;
+    if (!raiz) {
+      var els = d.querySelectorAll('body *');
+      for (var i = 0; i < els.length && i < 5000; i++) {
+        if (els[i].__vue__) { raiz = els[i].__vue__.$root; break; }
+      }
+    }
+    var loja = raiz && raiz.$store, tk = null, pub = null;
+    try { tk = loja.getters['account/token'](); } catch (e) { tk = null; }
+    if (!tk || !tk.token) return null;
+    try { pub = loja.getters['account/selectedPublisher']; } catch (e) { pub = null; }
+    return limpo({
+      'authorization': tk.token,
+      'x-publisherid': tk.publisherId,
+      'x-odinid': tk.odinId,
+      'x-contractid': tk.contractId,
+      'x-publishercontracttype': tk.publisherContractType,
+      'x-company': pub && pub.contract
+    });
+  }
+  function siteNovo() {
+    var auth = null;
+    try { auth = doReact(); } catch (e) { auth = null; }
+    var c = doSiteNovo(auth);
+    if (c) como = auth ? 'react' : 'cookies';
+    return c;
+  }
+  function siteAntigo() {
+    var c = null;
+    try { c = doVue(); } catch (e) { c = null; }
+    if (c) como = 'vue';
+    return c;
+  }
+  escutar();
+  var buscar = j.__imovaFetch, cab = null, como = null;
+  if (j.__imovaCab) { cab = j.__imovaCab; como = 'pagina'; }
+  // Os cookies valem para todo o grupozap.com: no endereço antigo, o Vue vem primeiro.
+  var jeitos = /canal-pro\./.test(l.hostname) ? [siteNovo, siteAntigo] : [siteAntigo, siteNovo];
+  for (var q = 0; !cab && q < jeitos.length; q++) cab = jeitos[q]();
+  if (!cab) {
+    if (!d.getElementById('root') && !d.getElementById('app')) {
+      avisar('não encontrei o site do Canal Pro nesta aba. Espere a página terminar de carregar e clique de novo no favorito.');
+    } else {
+      avisar('não achei o login nesta aba do Canal Pro. Se ainda não entrou, entre com o login da Imova. Depois abra Meus anúncios nesta mesma aba e clique de novo no favorito.');
+    }
     return;
   }
-  try { pub = loja.getters['account/selectedPublisher']; } catch (e) { pub = null; }
-  var cab = {
-    'Content-Type': 'application/json',
-    'Authorization': tk.token,
-    'X-PublisherId': tk.publisherId,
-    'X-OdinID': tk.odinId,
-    'X-ContractID': tk.contractId,
-    'X-PublisherContractType': tk.publisherContractType,
-    'X-ClientID': 'CANALPRO_WEB',
-    'X-Company': pub && pub.contract
-  };
-  for (var k in cab) { if (cab[k] === undefined || cab[k] === null || cab[k] === '') delete cab[k]; }
+  cab['content-type'] = 'application/json';
   var janela = j.open('', '_blank');
   try { janela.document.write('<p style="font:16px sans-serif;padding:24px">Imova: lendo os anúncios do Canal Pro…</p>'); } catch (e) {}
   var CAMPOS = 'externalId id status publicationType unitTypes usableAreas totalAreas bedrooms bathrooms suites parkingSpaces createdAt updatedAt ' +
@@ -91,39 +234,86 @@ export const COLETOR = String.raw`function (d, l, j, crm) {
     'pricingInfos { price businessType monthlyCondoFee yearlyIptu rentalInfo { period } } ' +
     'leads { views phoneView clickWhatsapp contactForm clickProposal clickSchedule } ' +
     'images { imageId imageUrl resizedUrl newResizedUrl }';
-  // Do pedido mais completo ao mais simples: com título e descrição e com todas
-  // as situações; sem título; sem o filtro de situação (o Canal Pro decide).
-  var jeitos = [{ t: true, s: true }, { t: false, s: true }, { t: false, s: false }];
-  var jeito = 0, todos = [];
-  var SITUACOES = ['ACTIVE', 'INACTIVE', 'DRAFT', 'PENDING', 'BLOCKED'];
-  function pagina(n) {
-    var j0 = jeitos[jeito];
-    var q = 'query listings($pageSize: Int, $pageNumber: Int' + (j0.s ? ', $listingStatus: [ListingStatusEnumType]' : '') + ') { ' +
-      'listings(pageSize: $pageSize, pageNumber: $pageNumber' + (j0.s ? ', listingStatus: $listingStatus' : '') + ') { listListing { ' +
-      (j0.t ? 'title description ' : '') + CAMPOS + ' } pageNumber totalPages totalResults } }';
+  // Uma consulta por situação; a última, sem filtro, pega uma situação que o CRM não conheça.
+  var SITUACOES = ['ACTIVE', 'INACTIVE', 'READY_TO_PUBLISH', 'DRAFT', 'BLOCKED', 'PENDING'];
+  var listas = SITUACOES.concat([null]);
+  var comTitulo = true, todos = [], porId = {}, total = 0, contou = false, erros = [];
+  function Recusa(status) { this.status = status; }
+  function recusou(r) {
+    var es = (r && r.errors) || [];
+    for (var i = 0; i < es.length; i++) {
+      var c = es[i] && es[i].extensions && es[i].extensions.code;
+      if (/UNAUTHENTICATED|FORBIDDEN/.test(String(c || '')) || /unauthori[sz]ed|unauthenticated|forbidden/i.test(String(es[i] && es[i].message))) return true;
+    }
+    return false;
+  }
+  function pagina(sit, n, t) {
+    var q = 'query listings($pageSize: Int, $pageNumber: Int' + (sit ? ', $listingStatus: [ListingStatusEnumType]' : '') + ') { ' +
+      'listings(pageSize: $pageSize, pageNumber: $pageNumber' + (sit ? ', listingStatus: $listingStatus' : '') + ') { listListing { ' +
+      (t ? 'title description ' : '') + CAMPOS + ' } pageNumber totalPages totalResults } }';
     var vars = { pageSize: 100, pageNumber: n };
-    if (j0.s) vars.listingStatus = SITUACOES;
-    return j.fetch('https://gandalf-api.grupozap.com/', {
+    if (sit) vars.listingStatus = [sit];
+    return buscar.call(j, API, {
       method: 'POST', headers: cab,
       body: JSON.stringify({ operationName: 'listings', query: q, variables: vars })
-    }).then(function (r) { return r.json(); });
-  }
-  function seguir(n) {
-    return pagina(n).then(function (r) {
-      var ls = r && r.data && r.data.listings;
-      if (!ls && n === 1 && jeito < jeitos.length - 1 && r && r.errors && r.errors.length) { jeito++; return seguir(n); }
-      if (!ls) throw new Error((r && r.errors && r.errors[0] && r.errors[0].message) || 'resposta sem anúncios');
-      todos = todos.concat(ls.listListing || []);
-      if (ls.totalPages && n < ls.totalPages && n < 30) return seguir(n + 1);
-      return ls.totalResults;
+    }).then(function (r) {
+      if (r && (r.status === 401 || r.status === 403)) throw new Recusa(r.status);
+      return r.json().then(function (x) {
+        if (recusou(x)) throw new Recusa(r.status || 200);
+        return x;
+      });
     });
   }
-  seguir(1).then(function (total) {
-    var pacote = { v: 3, de: l.origin, em: new Date().toISOString(), total: total, jeito: jeito, anuncios: todos };
+  function juntar(ls) {
+    var vem = ls.listListing || [];
+    for (var i = 0; i < vem.length; i++) {
+      var a = vem[i], k = a && (a.id || a.externalId);
+      if (!k || porId[k]) continue;
+      porId[k] = 1;
+      todos.push(a);
+    }
+  }
+  // Situação que a API não conhece é pulada; outra falha numa situação deixa a lista
+  // incompleta (sem o total, o CRM trava o "Aplicar"). A consulta sem filtro é só reforço.
+  function lista(sit) {
+    var t = comTitulo;
+    function seguir(n) {
+      return pagina(sit, n, t).then(function (r) {
+        var ls = r && r.data && r.data.listings;
+        var msg = (r && r.errors && r.errors[0] && r.errors[0].message) || 'resposta sem anúncios';
+        if (!ls && n === 1 && t) { t = false; return seguir(1); }
+        if (!ls) {
+          // A API desconhece a situação quando o erro cita o próprio nome dela.
+          if (!(sit && n === 1 && msg.indexOf(sit) >= 0)) { erros.push(msg); if (sit) falhou = true; }
+          return;
+        }
+        if (n === 1 && !t) comTitulo = false;
+        juntar(ls);
+        if (sit && n === 1 && typeof ls.totalResults === 'number') { total += ls.totalResults; contou = true; }
+        if (ls.totalPages && n < ls.totalPages && n < 30) return seguir(n + 1);
+        if (sit && ls.totalPages && n < ls.totalPages) falhou = true;
+      });
+    }
+    return seguir(1)['catch'](function (e) {
+      if (e instanceof Recusa) throw e;
+      erros.push(String((e && e.message) || e));
+      if (sit) falhou = true;
+    });
+  }
+  var cadeia = Promise.resolve(), falhou = false;
+  listas.forEach(function (sit) { cadeia = cadeia.then(function () { return lista(sit); }); });
+  cadeia.then(function () {
+    if (!todos.length && erros.length) throw new Error(erros[0]);
+    var pacote = { v: 4, de: l.origin, em: new Date().toISOString(), total: contou && !falhou ? total : null, como: como, falhas: erros.slice(0, 3), anuncios: todos };
     var url = crm + '/anuncios/sincronizar#d=' + encodeURIComponent(JSON.stringify(pacote));
     if (janela && !janela.closed) janela.location.href = url; else l.href = url;
   })['catch'](function (e) {
     try { if (janela) janela.close(); } catch (x) {}
+    if (e instanceof Recusa) {
+      if (como === 'pagina') j.__imovaCab = null;
+      avisar('a API do Canal Pro recusou o pedido (código ' + e.status + '). Nesta mesma aba, sem recarregar, abra Meus anúncios e clique de novo no favorito. Se continuar, saia e entre de novo no Canal Pro.');
+      return;
+    }
     avisar('o Canal Pro não entregou a lista (' + ((e && e.message) || e) + '). Recarregue a página do Canal Pro e clique de novo.');
   });
 }`;
@@ -192,6 +382,10 @@ export type PacoteDoCanalPro = {
   em: string;
   /** Quantos o Canal Pro disse que tem, para conferir com quantos vieram. */
   total: number | null;
+  /** Onde o favorito achou o login (versão 4): 'pagina', 'react', 'cookies' ou 'vue'. */
+  como?: string | null;
+  /** O que o Canal Pro respondeu nas consultas que falharam (versão 4; até 3). */
+  falhas?: string[];
   anuncios: AnuncioDoCanalPro[];
 };
 
@@ -210,13 +404,18 @@ export function lerPacote(fragmento: string): PacoteDoCanalPro | null {
   }
   if (!cru || typeof cru !== 'object') return null;
   const p = cru as Cru;
-  if (p.v !== VERSAO_DO_PACOTE || !Array.isArray(p.anuncios)) return null;
+  if (typeof p.v !== 'number' || !VERSOES_ACEITAS.includes(p.v) || !Array.isArray(p.anuncios))
+    return null;
   const anuncios = p.anuncios
     .filter((a): a is AnuncioDoCanalPro => !!a && typeof a === 'object')
     .slice(0, ANUNCIOS_NO_PACOTE);
   return {
-    versao: VERSAO_DO_PACOTE,
+    versao: p.v,
     de: typeof p.de === 'string' ? p.de : '',
+    como: typeof p.como === 'string' ? p.como : null,
+    falhas: Array.isArray(p.falhas)
+      ? p.falhas.filter((f): f is string => typeof f === 'string').slice(0, 3)
+      : [],
     em: typeof p.em === 'string' ? p.em : '',
     total: typeof p.total === 'number' ? p.total : null,
     anuncios,
@@ -232,6 +431,7 @@ const SITUACAO: Record<string, string> = {
   ACTIVE: 'Ativo',
   INACTIVE: 'Inativo',
   DRAFT: 'Rascunho',
+  READY_TO_PUBLISH: 'Pronto para publicar',
   PENDING: 'Em processamento',
   PROCESSING: 'Em processamento',
   BLOCKED: 'Bloqueado',
@@ -328,7 +528,8 @@ function diaDoRelatorio(iso: string | null | undefined): string | null {
 /**
  * As fotos do anúncio, na ordem do Canal Pro, cada uma com as versões que a rota
  * tenta (a maior primeiro). Os endereços redimensionados do Grupo OLX vêm com
- * moldes (`{action}`, `{width}x{height}`), que viram a versão grande.
+ * moldes (`{action}`, `{width}x{height}` e, no Canal Pro novo, `{extension}`),
+ * que viram a versão grande em JPEG.
  */
 export function fotosDoCanalPro(a: AnuncioDoCanalPro): string[][] {
   const preencher = (url: string, largura: number, altura: number) =>
@@ -336,6 +537,7 @@ export function fotosDoCanalPro(a: AnuncioDoCanalPro): string[][] {
       .replace(/\{action\}/g, 'fit-in')
       .replace(/\{width\}/g, String(largura))
       .replace(/\{height\}/g, String(altura))
+      .replace(/\{extension\}/g, 'jpg')
       .replace(/\{description\}/g, 'foto');
   const fotos: string[][] = [];
   for (const imagem of a.images ?? []) {

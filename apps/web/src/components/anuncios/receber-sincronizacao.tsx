@@ -220,9 +220,11 @@ export function ReceberSincronizacao() {
       {faltouPagina ? (
         <p className="flex items-start gap-2 rounded-xl bg-morno-fundo p-3 text-sm text-morno-texto">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {c.total === null
-            ? 'O Canal Pro não disse quantos anúncios tem, então o CRM não tem como saber se a lista veio inteira.'
-            : `O Canal Pro diz que tem ${c.total} anúncios, e vieram ${c.distintos}.`}{' '}
+          {pacote.falhas?.length
+            ? `Uma parte da lista não veio. O Canal Pro respondeu: “${pacote.falhas[0]}”.`
+            : c.total === null
+              ? 'O Canal Pro não disse quantos anúncios tem, então o CRM não tem como saber se a lista veio inteira.'
+              : `O Canal Pro diz que tem ${c.total} anúncios, e vieram ${c.distintos}.`}{' '}
           Recarregue a página do Canal Pro e clique de novo no favorito: gravar uma lista pela
           metade marcaria os outros como fora do Canal Pro.
         </p>

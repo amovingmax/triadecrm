@@ -144,6 +144,21 @@ describe('lerPacote', () => {
     const r = lerPacote(`#d=${encodeURIComponent(JSON.stringify(p))}`);
     expect(r?.anuncios).toHaveLength(1);
     expect(r?.total).toBe(1);
+    expect(r?.versao).toBe(3);
+  });
+  it('lê a versão 4, do Canal Pro novo, com o jeito do login e as falhas', () => {
+    const p = {
+      v: 4,
+      de: 'https://canal-pro.grupozap.com',
+      em: 'x',
+      total: null,
+      como: 'react',
+      falhas: ['Internal server error', 7],
+      anuncios: [{ externalId: 'A' }],
+    };
+    const r = lerPacote(`#d=${encodeURIComponent(JSON.stringify(p))}`);
+    expect(r).toMatchObject({ versao: 4, como: 'react', total: null });
+    expect(r?.falhas).toEqual(['Internal server error']);
   });
   it('recusa o que não é um pacote do favorito', () => {
     expect(lerPacote('')).toBeNull();
@@ -180,6 +195,11 @@ describe('paraORelatorio', () => {
       CEP: '59082130',
       Descrição: 'Área à venda em Capim Macio.',
     });
+  });
+  it('o "pronto para publicar" do Canal Pro novo ganha nome', () => {
+    expect(paraORelatorio(doCanalPro({ status: 'READY_TO_PUBLISH' }))?.situacao).toBe(
+      'Pronto para publicar',
+    );
   });
   it('inativo vira "Inativo", sem link; aluguel vira aluguel', () => {
     const r = paraORelatorio(
@@ -223,6 +243,26 @@ describe('fotosDoCanalPro', () => {
     );
     expect(new Set(f[0]).size).toBe(f[0]!.length);
     expect(f[1]).toEqual(['https://imgs.example/2.jpg']);
+  });
+  it('no Canal Pro novo, o molde {extension} vira jpg', () => {
+    const f = fotosDoCanalPro(
+      doCanalPro({
+        images: [
+          {
+            imageUrl: 'https://resizedimgs.zapimoveis.com.br/img/vr-listing/abc/foto.webp',
+            newResizedUrl:
+              'https://resizedimgs.zapimoveis.com.br/{action}/{width}x{height}/vr.images.sp/abc.{extension}',
+          },
+        ],
+      }),
+    );
+    expect(f).toEqual([
+      [
+        'https://resizedimgs.zapimoveis.com.br/img/vr-listing/abc/foto.webp',
+        'https://resizedimgs.zapimoveis.com.br/fit-in/1920x1080/vr.images.sp/abc.jpg',
+        'https://resizedimgs.zapimoveis.com.br/fit-in/870x707/vr.images.sp/abc.jpg',
+      ],
+    ]);
   });
   it('fica no teto de fotos do CRM', () => {
     const muitas = Array.from({ length: 70 }, (_, i) => ({
@@ -444,9 +484,22 @@ describe('o favorito', () => {
     );
   });
 
-  /** Roda o coletor numa página falsa do Canal Pro. */
-  function rodar(opcoes: { host?: string; token?: string | null; paginas?: unknown[] }) {
-    const respostas = [...(opcoes.paginas ?? [])];
+  type Resposta = unknown | { status: number; corpo?: unknown };
+  /**
+   * Roda o coletor numa página falsa do Canal Pro. `site` escolhe o site: 'react'
+   * (canal-pro.grupozap.com, loja Redux na árvore do React), 'cookies' (só os
+   * cookies do site novo), 'vue' (canalpro.grupozap.com) ou 'nada' (sem login).
+   * `responder` recebe o corpo de cada pedido e devolve a resposta da API.
+   */
+  function rodar(opcoes: {
+    host?: string;
+    site?: 'react' | 'cookies' | 'vue' | 'nada';
+    j?: Record<string, unknown>;
+    /** A página ainda sem o site (nem `#root` nem `#app`). */
+    semRaiz?: boolean;
+    responder?: (corpo: { query: string; variables: Record<string, unknown> }) => Resposta;
+  }) {
+    const site = opcoes.site ?? 'react';
     const pedidos: { url: string; init: RequestInit }[] = [];
     const janela = {
       document: { write: vi.fn() },
@@ -454,141 +507,318 @@ describe('o favorito', () => {
       closed: false,
       close: vi.fn(),
     };
-    const loja = {
-      getters: {
-        'account/token': () =>
-          opcoes.token === null
-            ? {}
-            : {
-                token: opcoes.token ?? 'tk',
-                publisherId: 'p1',
-                odinId: 'o1',
-                contractId: '',
-                publisherContractType: 'PRO',
-              },
-        'account/selectedPublisher': { contract: 'c9' },
+    const auth = {
+      gandalf_token: 'tk-loja',
+      publisher_id: '81234',
+      odin_id: 'odin-1',
+      contract_id: 'ct-1',
+      currentPublisher: { publisherContractType: 'REAL_ESTATE' },
+      currentContract: { contractCompany: 'ZAP_OLX' },
+    };
+    const outraLoja = { getState: () => ({ auth: { gandalf_token: null } }) };
+    const loja = { getState: () => ({ auth }) };
+    // A árvore do React: a raiz, um provedor sem login e, mais fundo, o com login.
+    const fibra = {
+      memoizedProps: null,
+      child: {
+        memoizedProps: { store: outraLoja },
+        sibling: { memoizedProps: { children: [] }, child: { memoizedProps: { store: loja } } },
       },
     };
-    const app = { __vue__: { $root: { $store: loja } } };
-    const d = { getElementById: () => app, querySelectorAll: () => [] };
-    const l = {
-      hostname: opcoes.host ?? 'canalpro.grupozap.com',
-      origin: 'https://canalpro.grupozap.com',
-      href: '',
+    const raiz = site === 'react' ? { __reactContainer$abc123: fibra } : {};
+    const app =
+      site === 'vue'
+        ? {
+            __vue__: {
+              $root: {
+                $store: {
+                  getters: {
+                    'account/token': () => ({
+                      token: 'tk-vue',
+                      publisherId: 'p1',
+                      odinId: 'o1',
+                      contractId: '',
+                      publisherContractType: 'PRO',
+                    }),
+                    'account/selectedPublisher': { contract: 'c9' },
+                  },
+                },
+              },
+            },
+          }
+        : null;
+    const cookie =
+      site === 'react' || site === 'cookies'
+        ? 'auid=x; bb-authenticationToken=tk%20cookie; publisher_id=81234; odin_id=odin-1; contract_id=ct-1'
+        : 'auid=x';
+    const d = {
+      cookie,
+      getElementById: (id: string) =>
+        opcoes.semRaiz
+          ? null
+          : id === 'root' && site !== 'vue'
+            ? raiz
+            : id === 'app' && site === 'vue'
+              ? app
+              : null,
+      querySelectorAll: () => [],
     };
+    const host =
+      opcoes.host ?? (site === 'vue' ? 'canalpro.grupozap.com' : 'canal-pro.grupozap.com');
+    const l = { hostname: host, origin: `https://${host}`, href: '' };
     const alertas: string[] = [];
-    const j = {
+    const responder =
+      opcoes.responder ??
+      (() => ({ data: { listings: { listListing: [], totalPages: 1, totalResults: 0 } } }));
+    const j: Record<string, unknown> = {
       alert: (t: string) => alertas.push(t),
       open: vi.fn(() => janela),
+      localStorage: { getItem: () => null },
+      sessionStorage: { getItem: () => null },
       fetch: vi.fn((url: string, init: RequestInit) => {
         pedidos.push({ url, init });
-        return Promise.resolve({ json: () => Promise.resolve(respostas.shift()) });
+        const r = responder(
+          JSON.parse(String(init.body)) as { query: string; variables: Record<string, unknown> },
+        ) as { status?: number; corpo?: unknown };
+        const status = typeof r?.status === 'number' ? r.status : 200;
+        const corpo = typeof r?.status === 'number' ? r.corpo : r;
+        return Promise.resolve({ status, json: () => Promise.resolve(corpo) });
       }),
+      ...opcoes.j,
     };
     const fn = new Function(`return (${COLETOR})`)() as (...a: unknown[]) => void;
     fn(d, l, j, 'https://imova-crm.vercel.app');
-    return { pedidos, janela, alertas, j, l };
+    const corpos = () =>
+      pedidos.map(
+        (p) =>
+          JSON.parse(String(p.init.body)) as { query: string; variables: Record<string, unknown> },
+      );
+    return { pedidos, corpos, janela, alertas, j, l };
   }
-  const espera = () => new Promise((r) => setTimeout(r, 0));
-
-  it('pede todas as páginas com a sessão do Canal Pro e abre o CRM com o pacote', async () => {
-    const r = rodar({
-      paginas: [
-        {
-          data: {
-            listings: {
-              listListing: [{ externalId: 'A' }],
-              pageNumber: 1,
-              totalPages: 2,
-              totalResults: 2,
-            },
-          },
-        },
-        {
-          data: {
-            listings: {
-              listListing: [{ externalId: 'B' }],
-              pageNumber: 2,
-              totalPages: 2,
-              totalResults: 2,
-            },
-          },
-        },
-      ],
+  const espera = async (vezes = 30) => {
+    for (let i = 0; i < vezes; i++) await new Promise((r) => setTimeout(r, 0));
+  };
+  const pacoteDa = (r: { janela: { location: { href: string } } }) =>
+    lerPacote(r.janela.location.href.slice(r.janela.location.href.indexOf('#')));
+  /** Uma API que tem A (ativo, 2 páginas com B), C (pronto para publicar) e D (bloqueado). */
+  const apiComQuatro = (c: { query: string; variables: Record<string, unknown> }) => {
+    const sit = (c.variables.listingStatus as string[] | undefined)?.[0];
+    const n = c.variables.pageNumber as number;
+    const pag = (itens: unknown[], totalPages: number, totalResults: number) => ({
+      data: { listings: { listListing: itens, pageNumber: n, totalPages, totalResults } },
     });
+    if (sit === 'ACTIVE')
+      return pag(n === 1 ? [{ id: '1', externalId: 'A' }] : [{ id: '2', externalId: 'B' }], 2, 2);
+    if (sit === 'READY_TO_PUBLISH') return pag([{ id: '3', externalId: 'C' }], 1, 1);
+    if (sit === 'BLOCKED') return pag([{ id: '4', externalId: 'D' }], 1, 1);
+    if (sit === 'PENDING')
+      return {
+        errors: [{ message: 'Value "PENDING" does not exist in "ListingStatusEnumType" enum.' }],
+      };
+    if (!sit) return pag([{ id: '1', externalId: 'A' }], 1, 1);
+    return pag([], 0, 0);
+  };
+
+  it('no Canal Pro novo (React), acha o login na loja e manda os cabeçalhos do site', async () => {
+    const r = rodar({ responder: apiComQuatro });
     await espera();
-    await espera();
-    await espera();
-    expect(r.pedidos).toHaveLength(2);
+    expect(r.alertas).toEqual([]);
     expect(r.pedidos[0]!.url).toBe('https://gandalf-api.grupozap.com/');
     const cab = r.pedidos[0]!.init.headers as Record<string, string>;
-    expect(cab).toMatchObject({
-      Authorization: 'tk',
-      'X-PublisherId': 'p1',
-      'X-OdinID': 'o1',
-      'X-Company': 'c9',
-      'X-ClientID': 'CANALPRO_WEB',
+    expect(cab).toEqual({
+      authorization: 'tk cookie',
+      'x-publisherid': '81234',
+      'x-odinid': 'odin-1',
+      'x-contractid': 'ct-1',
+      'x-publishercontracttype': 'REAL_ESTATE',
+      'x-company': 'ZAP_OLX',
+      'x-clientid': 'CANALPRO_WEB',
+      'content-type': 'application/json',
     });
-    expect(cab).not.toHaveProperty('X-ContractID');
-    const corpo = JSON.parse(String(r.pedidos[1]!.init.body)) as {
-      variables: { pageNumber: number };
-      query: string;
-    };
-    expect(corpo.variables.pageNumber).toBe(2);
-    expect(corpo.query).toContain('images { imageId imageUrl resizedUrl newResizedUrl }');
+    expect(r.corpos()[0]!.query).toContain('images { imageId imageUrl resizedUrl newResizedUrl }');
+    expect(r.corpos()[0]!.query).toContain('title description');
     expect(
       r.janela.location.href.startsWith('https://imova-crm.vercel.app/anuncios/sincronizar#d='),
     ).toBe(true);
-    const p = lerPacote(r.janela.location.href.slice(r.janela.location.href.indexOf('#')));
-    expect(p?.anuncios.map((a) => a.externalId)).toEqual(['A', 'B']);
-    expect(p?.total).toBe(2);
+    const p = pacoteDa(r);
+    expect(p?.versao).toBe(4);
+    expect(p?.como).toBe('react');
+    expect(p?.anuncios.map((a) => a.externalId)).toEqual(['A', 'B', 'C', 'D']);
+    // 2 ativos + 1 pronto para publicar + 1 bloqueado; o PENDING desconhecido não conta.
+    expect(p?.total).toBe(4);
+    expect(p?.falhas).toEqual([]);
   });
 
-  it('pede todas as situações e, se o Canal Pro recusar, tenta mais simples', async () => {
-    const r = rodar({
-      paginas: [
-        { errors: [{ message: 'Cannot query field "title"' }] },
-        { errors: [{ message: 'Unknown type "ListingStatusEnumType"' }] },
-        {
-          data: {
-            listings: { listListing: [{ externalId: 'A' }], totalPages: 1, totalResults: 1 },
-          },
-        },
-      ],
-    });
-    for (let i = 0; i < 5; i++) await espera();
-    const corpos = r.pedidos.map(
-      (p) =>
-        JSON.parse(String(p.init.body)) as { query: string; variables: Record<string, unknown> },
-    );
-    expect(corpos[0]!.query).toContain('title description');
-    expect(corpos[0]!.variables.listingStatus).toEqual([
+  it('pede cada situação à parte, com o "pronto para publicar", e por último sem filtro', async () => {
+    const r = rodar({ responder: apiComQuatro });
+    await espera();
+    const pedidas = r
+      .corpos()
+      .filter((c) => c.variables.pageNumber === 1 && c.query.includes('title'))
+      .map((c) => (c.variables.listingStatus as string[] | undefined)?.[0] ?? 'sem filtro');
+    expect(pedidas).toEqual([
       'ACTIVE',
       'INACTIVE',
+      'READY_TO_PUBLISH',
       'DRAFT',
-      'PENDING',
       'BLOCKED',
+      'PENDING',
+      'sem filtro',
     ]);
+    const semFiltro = r.corpos().at(-1)!;
+    expect(semFiltro.query).not.toContain('listingStatus');
+    expect(semFiltro.variables.listingStatus).toBeUndefined();
+    // A segunda página dos ativos foi pedida.
+    expect(
+      r
+        .corpos()
+        .some(
+          (c) =>
+            (c.variables.listingStatus as string[])?.[0] === 'ACTIVE' &&
+            c.variables.pageNumber === 2,
+        ),
+    ).toBe(true);
+  });
+
+  it('só com os cookies do site novo também funciona', async () => {
+    const r = rodar({ site: 'cookies', responder: apiComQuatro });
+    await espera();
+    const cab = r.pedidos[0]!.init.headers as Record<string, string>;
+    expect(cab.authorization).toBe('tk cookie');
+    expect(cab['x-publisherid']).toBe('81234');
+    expect(cab['x-odinid']).toBe('odin-1');
+    expect(cab).not.toHaveProperty('x-company');
+    expect(pacoteDa(r)?.como).toBe('cookies');
+  });
+
+  it('no endereço antigo (Vue), usa a loja do Vue', async () => {
+    const r = rodar({ site: 'vue', responder: apiComQuatro });
+    await espera();
+    const cab = r.pedidos[0]!.init.headers as Record<string, string>;
+    expect(cab).toMatchObject({
+      authorization: 'tk-vue',
+      'x-publisherid': 'p1',
+      'x-odinid': 'o1',
+      'x-company': 'c9',
+      'x-clientid': 'CANALPRO_WEB',
+    });
+    expect(cab).not.toHaveProperty('x-contractid');
+    expect(pacoteDa(r)?.como).toBe('vue');
+  });
+
+  it('se o Canal Pro recusar o título, pede de novo sem ele e segue sem ele', async () => {
+    const r = rodar({
+      responder: (c) =>
+        c.query.includes('title')
+          ? { errors: [{ message: 'Cannot query field "title" on type "Listing"' }] }
+          : apiComQuatro(c),
+    });
+    await espera();
+    const corpos = r.corpos();
+    expect(corpos[0]!.query).toContain('title description');
     expect(corpos[1]!.query).not.toContain('title description');
-    expect(corpos[1]!.variables.listingStatus).toBeDefined();
-    expect(corpos[2]!.query).not.toContain('listingStatus');
-    expect(corpos[2]!.variables.listingStatus).toBeUndefined();
-    expect(r.janela.location.href).toContain('/anuncios/sincronizar#d=');
+    // Depois de descobrir, as outras situações já vão sem o título.
+    expect(corpos.filter((c) => c.query.includes('title'))).toHaveLength(1);
+    expect(pacoteDa(r)?.anuncios.map((a) => a.externalId)).toEqual(['A', 'B', 'C', 'D']);
   });
 
-  it('fora do Canal Pro, ou sem login, só avisa', () => {
-    expect(rodar({ host: 'www.google.com' }).alertas[0]).toMatch(/abra o Canal Pro/);
-    const semLogin = rodar({ token: null });
-    expect(semLogin.alertas[0]).toMatch(/não está logada/);
-    expect(semLogin.j.open).not.toHaveBeenCalled();
+  it('uma situação que falha de verdade deixa a lista sem total (o CRM trava o Aplicar)', async () => {
+    const r = rodar({
+      responder: (c) =>
+        (c.variables.listingStatus as string[] | undefined)?.[0] === 'INACTIVE'
+          ? { errors: [{ message: 'Internal server error' }] }
+          : apiComQuatro(c),
+    });
+    await espera();
+    const p = pacoteDa(r);
+    expect(p?.total).toBeNull();
+    expect(p?.falhas).toEqual(['Internal server error']);
+    expect(p?.anuncios).toHaveLength(4);
   });
 
-  it('quando o Canal Pro recusa, fecha a aba e avisa', async () => {
-    const erro = { errors: [{ message: 'Unauthorized' }] };
-    const r = rodar({ paginas: [erro, erro, erro] });
-    for (let i = 0; i < 6; i++) await espera();
-    expect(r.pedidos).toHaveLength(3);
+  it('a API recusando o login (401) fecha a aba e diz que foi a API', async () => {
+    const r = rodar({ responder: () => ({ status: 401, corpo: { message: 'Unauthorized' } }) });
+    await espera();
+    expect(r.pedidos).toHaveLength(1);
     expect(r.janela.close).toHaveBeenCalled();
-    expect(r.alertas[0]).toMatch(/não entregou a lista \(Unauthorized\)/);
+    expect(r.alertas[0]).toMatch(/a API do Canal Pro recusou o pedido \(código 401\)/);
+  });
+
+  it('a API recusando pelo GraphQL (UNAUTHENTICATED) também é recusa', async () => {
+    const r = rodar({
+      responder: () => ({ errors: [{ message: 'x', extensions: { code: 'UNAUTHENTICATED' } }] }),
+    });
+    await espera();
+    expect(r.alertas[0]).toMatch(/recusou o pedido/);
+  });
+
+  it('quando nada vem, fecha a aba e avisa com o motivo', async () => {
+    const r = rodar({ responder: () => ({ errors: [{ message: 'Bad gateway' }] }) });
+    await espera();
+    expect(r.janela.close).toHaveBeenCalled();
+    expect(r.alertas[0]).toMatch(/não entregou a lista \(Bad gateway\)/);
+  });
+
+  it('fora do Canal Pro, sem o site ou sem login: só avisa, com a mensagem certa', () => {
+    expect(rodar({ host: 'www.google.com' }).alertas[0]).toMatch(/abra o Canal Pro/);
+    const semLogin = rodar({ site: 'nada' });
+    expect(semLogin.alertas[0]).toMatch(/não achei o login nesta aba/);
+    expect(semLogin.j.open).not.toHaveBeenCalled();
+    const semSite = rodar({ site: 'nada', semRaiz: true });
+    expect(semSite.alertas[0]).toMatch(/não encontrei o site do Canal Pro/);
+  });
+
+  it('sem login à vista, escuta a página; o clique seguinte usa os cabeçalhos dela', async () => {
+    const original = vi.fn((url: string, init: RequestInit) => {
+      void url;
+      void init;
+      return Promise.resolve({
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            data: {
+              listings: {
+                listListing: [{ id: '9', externalId: 'Z' }],
+                totalPages: 1,
+                totalResults: 1,
+              },
+            },
+          }),
+      });
+    });
+    const primeiro = rodar({ site: 'nada', j: { fetch: original } });
+    expect(primeiro.alertas[0]).toMatch(/não achei o login/);
+    // A própria página pede algo à API, com os cabeçalhos dela.
+    const j = primeiro.j as { fetch: typeof fetch };
+    await j.fetch('https://gandalf-api.grupozap.com/', {
+      method: 'POST',
+      headers: { Authorization: 'tk-pagina', 'X-PublisherId': '81234', 'X-Ignorado': 'y' },
+      body: '{}',
+    });
+    expect(original).toHaveBeenCalledTimes(1);
+    // Segundo clique, na mesma aba.
+    const fn = new Function(`return (${COLETOR})`)() as (...a: unknown[]) => void;
+    const janela = {
+      document: { write: vi.fn() },
+      location: { href: '' },
+      closed: false,
+      close: vi.fn(),
+    };
+    (primeiro.j as { open: unknown }).open = vi.fn(() => janela);
+    fn(
+      { cookie: '', getElementById: () => null, querySelectorAll: () => [] },
+      { hostname: 'canal-pro.grupozap.com', origin: 'https://canal-pro.grupozap.com', href: '' },
+      primeiro.j,
+      'https://imova-crm.vercel.app',
+    );
+    await espera();
+    const cab = original.mock.calls[1]![1].headers as Record<string, string>;
+    expect(cab).toEqual({
+      authorization: 'tk-pagina',
+      'x-publisherid': '81234',
+      'x-clientid': 'CANALPRO_WEB',
+      'content-type': 'application/json',
+    });
+    expect(pacoteDa({ janela })?.como).toBe('pagina');
   });
 });

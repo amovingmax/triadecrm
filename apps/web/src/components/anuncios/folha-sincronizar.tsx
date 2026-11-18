@@ -20,7 +20,8 @@ import { URL_DO_CANAL_PRO } from './tipos';
 
 /**
  * "Sincronizar Canal Pro" (18/11/2026): ensina a guardar o favorito e a clicar
- * nele com o Canal Pro aberto. A conferência e a gravação acontecem na aba que o
+ * nele com o Canal Pro aberto. O favorito de hoje é a versão 4, que funciona no
+ * Canal Pro novo (React); quem guardou o da versão 3 precisa trocar. A conferência e a gravação acontecem na aba que o
  * favorito abre (`/anuncios/sincronizar`). Os dois jeitos de antes (a planilha
  * do Canal Pro e o arquivo da Arbo) ficam aqui embaixo, fora do cabeçalho.
  */
@@ -58,6 +59,10 @@ export function FolhaSincronizar({
               navegador (no Chrome, Ctrl+Shift+B ou ⌘+Shift+B mostra a barra).
             </p>
             {aberto ? <Favorito /> : null}
+            <p className="text-xs text-muted-foreground">
+              Já tinha o favorito? Apague o antigo e arraste este de novo. O Canal Pro mudou de site
+              em novembro de 2026, e o antigo dizia “não está logada” mesmo com o login feito.
+            </p>
           </Passo>
           <Passo n={2} titulo="No Canal Pro, abra Meus anúncios e clique no favorito">
             <p className="text-muted-foreground">
