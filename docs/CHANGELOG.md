@@ -10876,3 +10876,9 @@ O pedido: "precisamos de uma forma de subirmos as fotos dos anúncios no CRM; os
   - na mesma página, com um cookie de login falso e a API do Canal Pro e o CRM respondidos pelo próprio navegador de teste (nenhum pedido do favorito saiu): oito consultas, a PENDING pulada e o pacote com 3 anúncios e 8, 47 e 13 fotos, nos dois endereços;
   - a tela do CRM local (3106) com esse pacote: "Ganham fotos" com o Edifício Simone (+47) e a Brisa Mall - Loja 02 (+13). Com uma falha simulada, mostra o motivo e trava o "Aplicar".
 - **Não testado com o login de verdade:** o primeiro clique do usuário é o teste. Não foi possível confirmar fora do login se a API aceita PENDING; se não aceitar, a consulta é pulada.
+
+**No ar desde 18/11/2026 (o usuário rodou os comandos):**
+- `main` em `3d2c028`; sem migração;
+- site `imova-p3u32y1yh` em imova-crm.vercel.app. Para voltar, use `imova-mak4gjdo3`.
+
+Conferido de fora: `/login` responde 200 com `data-empresa="imova"`; `/anuncios` e `/anuncios/sincronizar` sem login levam ao login; `/auth/dev` dá 404. Falta o primeiro clique do usuário no Canal Pro, com o favorito novo arrastado de novo para a barra.
