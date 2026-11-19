@@ -1,0 +1,47 @@
+# =============================================================================
+# imova-worker-mercado no Fly.io — a coleta da Inteligência de mercado (19/11/2026)
+# =============================================================================
+#
+# O mesmo Dockerfile dos outros workers, com o comando `mercado`. Só a Imova: no
+# banco da KOMUNE o worker lê `mercado_worker_estado`, registra o motivo e sai com 0.
+#
+# App separado, como o `imova-worker-ai`: publicar este app nunca reinicia o robô do
+# WhatsApp nem a IA. O NOME DO APP ESTÁ AQUI DENTRO DE PROPÓSITO; passe
+# `--app imova-worker-mercado` em todo comando.
+#
+# Publicar (da RAIZ do repositório, de uma cópia limpa do commit), só DEPOIS das
+# migrações 20261119160000 a 20261119169000 no banco da Imova:
+#   fly apps create imova-worker-mercado            (uma vez)
+#   fly deploy . --config infra/nuvem/fly.imova-worker-mercado.toml --dockerfile apps/workers/Dockerfile
+#
+# Segredos por `fly secrets set --app imova-worker-mercado` (nunca neste arquivo):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY — os do `.env.imova`, os mesmos do
+#                                             `imova-worker-ai`
+#   COLETOR_CONTATO (opcional) — e-mail GENÉRICO no User-Agent do robô, sem o nome
+#                                da Imova nem de portal (o worker recusa subir).
+#
+# Com a chave `mercado.ligado` desligada, o worker só bate ponto e espera: nenhum
+# pedido sai para fora. Ligar a chave é outra etapa, com o "pode" do dono.
+# =============================================================================
+
+app = "imova-worker-mercado"
+primary_region = "gru"
+
+# O SIGTERM para depois da fonte atual, nunca no meio (workers/mercado.ts). Uma página
+# de imobiliária leva até 5 s de intervalo; 70 s dão folga, como nos outros workers.
+kill_signal = "SIGTERM"
+kill_timeout = "70s"
+
+[env]
+  WORKER_COMANDO = "mercado"
+  NODE_ENV = "production"
+  TZ = "America/Fortaleza"
+
+# Caiu, volta. A mensagem da fila `mercado_coleta` volta quando o visibility timeout
+# expira, e a coleta aberta é fechada pela rotina diária.
+[[restart]]
+  policy = "always"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
