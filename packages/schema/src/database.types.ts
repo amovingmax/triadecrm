@@ -1985,6 +1985,7 @@ export type Database = {
           complemento: string | null
           comprimento_terreno: number | null
           condominio: number | null
+          coordenadas_lidas_em: string | null
           criado_em: string
           criado_por: string | null
           descricao: string
@@ -2034,6 +2035,7 @@ export type Database = {
           complemento?: string | null
           comprimento_terreno?: number | null
           condominio?: number | null
+          coordenadas_lidas_em?: string | null
           criado_em?: string
           criado_por?: string | null
           descricao?: string
@@ -2083,6 +2085,7 @@ export type Database = {
           complemento?: string | null
           comprimento_terreno?: number | null
           condominio?: number | null
+          coordenadas_lidas_em?: string | null
           criado_em?: string
           criado_por?: string | null
           descricao?: string
@@ -10392,6 +10395,7 @@ export type Database = {
           endereco: string | null
           estado: string | null
           excluido_em: string | null
+          falta_pino: boolean | null
           fotos: number | null
           id: string | null
           importado_em: string | null

@@ -5,10 +5,14 @@
 --   1. as coordenadas: as duas juntas, na faixa, fora do 0,0; o importador as
 --      grava do arquivo e não as apaga quando o arquivo não traz (nem com valor
 --      torto); salvar o anúncio não as apaga; o arquivo do Canal Pro as leva;
+--      salvar com outro endereço tira o pino velho; a lista diz quando falta
+--      trazer o pino do arquivo do sistema atual (`falta_pino`);
 --   2. pôr no ar limpa `saiu_do_ar_em`, e o anúncio reposto volta à carteira;
 --   3. antes da troca, o importador atualiza o anúncio no ar; depois (o robô do
---      Grupo OLX leu o arquivo do CRM), pula o anúncio no ar e devolve o
---      motivo, e o rascunho e o anúncio novo continuam vindo;
+--      Grupo OLX leu o arquivo do CRM nos últimos 90 dias), pula o anúncio no
+--      ar e devolve o motivo, menos o pino que falta (só ele entra), e o
+--      rascunho e o anúncio novo continuam vindo; leitura do robô com mais de
+--      90 dias não conta;
 --   4. a lista diz se a linha do relatório gasta destaque, também para o SDR;
 --      o rascunho que é um dos destaques do portal vai ao ar com destaque com o
 --      plano "cheio", e o outro não;
@@ -19,7 +23,7 @@
 -- Roda em transação e desfaz tudo.
 -- =====================================================================
 begin;
-select plan(45);
+select plan(59);
 
 insert into public.allowed_users (email, role, note) values
   ('a187.g@teste.local', 'gestor', 'pgTAP troca da Arbo'),
@@ -125,6 +129,46 @@ select is(pg_temp.v('salvar') ->> 'ok', 'true', 'o editor salva o anúncio');
 select is(((pg_temp.anuncio('T187A')).latitude, (pg_temp.anuncio('T187A')).longitude)::text,
   '(-6.0559925,-35.1708741)', 'salvar não apaga as coordenadas');
 
+-- Com outro endereço, o pino velho sai (o portal acha o lugar pelo endereço novo).
+select pg_temp.gestor();
+insert into t187 select 'impJ', public.anuncio_importar(
+  pg_temp.completo('T187J', 'Terreno que muda de número')
+  || '{"numero": "100", "complemento": "Lote 3", "latitude": -5.8623832, "longitude": -35.1979617}');
+insert into t187 select 'salvarJ1', public.anuncio_salvar(
+  (pg_temp.completo('T187J', 'Terreno que muda de número, título novo')
+  || '{"numero": " 100 ", "complemento": "Lote 3", "cep": "59090000", "estado": "rn"}'::jsonb) - 'codigo',
+  (pg_temp.anuncio('T187J')).id);
+select pg_temp.sair();
+select is(((pg_temp.anuncio('T187J')).latitude, (pg_temp.anuncio('T187J')).titulo)::text,
+  '(-5.8623832,"Terreno que muda de número, título novo")',
+  'o mesmo endereço escrito de outro jeito (CEP sem traço, UF minúscula, espaço) não tira o pino');
+select pg_temp.gestor();
+insert into t187 select 'salvarJ2', public.anuncio_salvar(
+  (pg_temp.completo('T187J', 'Terreno que muda de número, título novo')
+  || '{"numero": "200", "complemento": "Lote 3"}'::jsonb) - 'codigo',
+  (pg_temp.anuncio('T187J')).id);
+select pg_temp.sair();
+select is(pg_temp.v('salvarJ2') ->> 'ok', 'true', 'salvar com outro número dá certo');
+select is(((pg_temp.anuncio('T187J')).latitude, (pg_temp.anuncio('T187J')).longitude)::text, '(,)',
+  'e as coordenadas saem, as duas');
+select pg_temp.gestor();
+insert into t187 select 'salvarJ3', public.anuncio_salvar(
+  (pg_temp.completo('T187J', 'Terreno que muda de número, título novo')
+  || '{"numero": "200", "complemento": "Lote 4"}'::jsonb) - 'codigo',
+  (pg_temp.anuncio('T187J')).id);
+select pg_temp.sair();
+select is(pg_temp.v('salvarJ3') ->> 'ok', 'true', 'o complemento também conta como endereço (e sem pino não há o que tirar)');
+
+-- `falta_pino`: sem coordenada e sem o importador ter procurado no arquivo.
+insert into public.anuncios (codigo, titulo, tipo, negocio) values ('T187H', 'Nunca importado', 'terreno', 'venda');
+select pg_temp.gestor();
+insert into t187 select 'impI', public.anuncio_importar(pg_temp.completo('T187I', 'O arquivo não tem o pino dele'));
+select is((select string_agg(codigo || '=' || falta_pino::text, ' ' order by codigo)
+             from public.anuncios_na_lista where codigo in ('T187A', 'T187H', 'T187I', 'T187J')),
+  'T187A=false T187H=true T187I=false T187J=false',
+  'falta o pino só de quem o importador nunca procurou (procurou e não tinha não pede de novo)');
+select pg_temp.sair();
+
 -- No ar, o arquivo do Canal Pro as leva.
 select pg_temp.foto('T187A');
 select pg_temp.gestor();
@@ -158,6 +202,19 @@ select ok(exists (select 1 from app.imova_carteira() k where k.codigo = 'T187A')
 -- 3. Antes da troca, o importador atualiza o anúncio no ar; depois, não
 -- =====================================================================
 select ok(not app.canal_pro_crm_publica(), 'sem leitura do robô do Grupo OLX, o CRM ainda não publica');
+insert into public.canal_pro_leituras (em, user_agent, do_grupo_olx, anuncios)
+values (now() - interval '91 days', 'VivaRealBot/2.0', true, 7);
+select ok(not app.canal_pro_crm_publica(),
+  'leitura do robô com mais de 90 dias não conta (o Canal Pro voltou para a Arbo, e ninguém lê o arquivo para limpar)');
+
+-- Um anúncio no ar sem pino (o arquivo de antes não tinha), para depois da troca.
+select pg_temp.gestor();
+insert into t187 select 'impG', public.anuncio_importar(pg_temp.completo('T187G', 'No ar sem o pino do mapa'));
+select pg_temp.sair();
+select pg_temp.foto('T187G');
+select pg_temp.gestor();
+select is(public.anuncio_publicar((pg_temp.anuncio('T187G')).id) ->> 'ok', 'true', 'vai ao ar sem pino');
+select pg_temp.sair();
 select pg_temp.gestor();
 insert into t187 select 'antes', public.anuncio_importar(
   pg_temp.completo('T187A', 'Apartamento com vista para o mar, do arquivo'));
@@ -180,7 +237,7 @@ insert into t187 select 'rascunhoB2', public.anuncio_importar(pg_temp.completo('
 insert into t187 select 'novoC', public.anuncio_importar(pg_temp.completo('T187C', 'Anúncio novo que veio da Arbo'));
 select pg_temp.sair();
 select is(pg_temp.v('depois') - 'id' - 'pendencias',
-  '{"ok": true, "novo": false, "fotos": 1, "codigo": "T187A", "pulado": "no_ar_pelo_crm"}'::jsonb,
+  '{"ok": true, "novo": false, "pino": false, "fotos": 1, "codigo": "T187A", "pulado": "no_ar_pelo_crm"}'::jsonb,
   'depois da troca, o anúncio no ar é pulado, com o motivo');
 select is((pg_temp.anuncio('T187A')).titulo, 'Apartamento com vista para o mar, do arquivo',
   'e o título do CRM fica');
@@ -188,6 +245,27 @@ select is(((pg_temp.anuncio('T187A')).latitude, (pg_temp.anuncio('T187A')).longi
   '(-6.0559925,-35.1708741)', 'e as coordenadas também');
 select is((pg_temp.anuncio('T187B')).titulo, 'Rascunho atualizado pela Arbo', 'o rascunho continua vindo');
 select is(pg_temp.v('novoC') ->> 'novo', 'true', 'e o anúncio novo também');
+select is(pg_temp.v('depois') ->> 'pino', 'false', 'quem já tem pino não ganha outro');
+
+-- O anúncio no ar sem pino ganha o do arquivo, e só ele.
+-- A transação inteira tem o mesmo now(): a data de mudança volta uma hora, para ver se anda.
+update public.anuncios set updated_at = now() - interval '1 hour' where codigo = 'T187G';
+select pg_temp.gestor();
+insert into t187 select 'pinoG', public.anuncio_importar(
+  pg_temp.completo('T187G', 'Título velho da Arbo') || '{"latitude": -6.2211806, "longitude": -35.1048713, "bairro": "Pipa"}');
+insert into t187 select 'pinoG2', public.anuncio_importar(
+  pg_temp.completo('T187G', 'Título velho da Arbo') || '{"latitude": -5.1, "longitude": -35.1}');
+select pg_temp.sair();
+select is((pg_temp.v('pinoG') ->> 'pulado', pg_temp.v('pinoG') ->> 'pino')::text, '(no_ar_pelo_crm,true)',
+  'depois da troca, o anúncio no ar sem pino ganha o pino do arquivo (e a tela diz)');
+select is(((pg_temp.anuncio('T187G')).latitude, (pg_temp.anuncio('T187G')).longitude)::text,
+  '(-6.2211806,-35.1048713)', 'as coordenadas entram');
+select is(((pg_temp.anuncio('T187G')).titulo, (pg_temp.anuncio('T187G')).bairro)::text,
+  '("No ar sem o pino do mapa","Ponta Negra")', 'e nada mais muda (nem o título, nem o bairro)');
+select ok((pg_temp.anuncio('T187G')).updated_at = now(),
+  'o portal vê o pino novo: a data de mudança anda');
+select is(pg_temp.v('pinoG2') ->> 'pino', 'false', 'da segunda vez, o pino não troca');
+select is((pg_temp.anuncio('T187G')).latitude, -6.2211806::numeric, 'e fica o primeiro');
 
 -- =====================================================================
 -- 4. A linha do relatório que gasta destaque
