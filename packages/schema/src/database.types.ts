@@ -1998,6 +1998,8 @@ export type Database = {
           iptu: number | null
           iptu_periodo: string
           largura_terreno: number | null
+          latitude: number | null
+          longitude: number | null
           mostrar_endereco: string
           motivo_exclusao: string | null
           negocio: string
@@ -2045,6 +2047,8 @@ export type Database = {
           iptu?: number | null
           iptu_periodo?: string
           largura_terreno?: number | null
+          latitude?: number | null
+          longitude?: number | null
           mostrar_endereco?: string
           motivo_exclusao?: string | null
           negocio?: string
@@ -2092,6 +2096,8 @@ export type Database = {
           iptu?: number | null
           iptu_periodo?: string
           largura_terreno?: number | null
+          latitude?: number | null
+          longitude?: number | null
           mostrar_endereco?: string
           motivo_exclusao?: string | null
           negocio?: string
@@ -10394,6 +10400,7 @@ export type Database = {
           mostrar_endereco: string | null
           motivo_exclusao: string | null
           negocio: string | null
+          no_canal_pro_com_destaque: boolean | null
           no_canal_pro_contatos: number | null
           no_canal_pro_criado_em: string | null
           no_canal_pro_situacao: string | null
