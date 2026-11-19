@@ -26,6 +26,13 @@
  * banco tira as antigas (`anuncio_fotos_trocar`), numa transação: o anúncio no
  * ar nunca fica sem foto, e se nenhuma nova chegar as antigas ficam. A ordem
  * pedida é a ordem do anúncio: baixa até 4 de cada vez, registra na ordem.
+ *
+ * Depois da troca (19/11/2026), o anúncio NO AR não recebe fotos por aqui, em
+ * modo nenhum: o robô do Grupo OLX já leu o arquivo do CRM, o Canal Pro só
+ * espelha o CRM, e trocar as fotos muda as URLs (o portal as trata como fotos
+ * novas). A conferência do favorito já não as pede (`conferir`, `crmEhAFonte`);
+ * esta é a trava do servidor → { ok: false, motivo: 'crm_publica' } (409). As
+ * fotos do anúncio no ar mudam no editor (`api/anuncios/fotos`).
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -103,7 +110,7 @@ export async function POST(request: NextRequest) {
   // O anúncio precisa ser visível E editável pela sessão de quem pede.
   const { data: anuncio, error } = await supabase
     .from('anuncios')
-    .select('id, excluido_em')
+    .select('id, excluido_em, situacao')
     .eq('id', anuncioId)
     .maybeSingle();
   if (error) {
@@ -112,6 +119,19 @@ export async function POST(request: NextRequest) {
   }
   if (!anuncio) return recusa('nao_encontrado', 404);
   if (anuncio.excluido_em) return recusa('excluido', 409);
+  // No ar, depois da troca, quem manda nas fotos é o CRM (a mesma regra de
+  // `app.canal_pro_crm_publica`: o robô do Grupo OLX já leu o arquivo do CRM).
+  if (anuncio.situacao === 'no_ar') {
+    const { count: leituras, error: erroDaLeitura } = await supabase
+      .from('canal_pro_leituras')
+      .select('id', { count: 'exact', head: true })
+      .eq('do_grupo_olx', true);
+    if (erroDaLeitura) {
+      registrarRecusa('anuncios/importar/fotos', 'consulta_falhou');
+      return recusa('consulta_falhou', 500);
+    }
+    if ((leituras ?? 0) > 0) return recusa('crm_publica', 409);
+  }
 
   const { count, error: erroDaContagem } = await supabase
     .from('anuncio_fotos')

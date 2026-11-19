@@ -440,6 +440,7 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
             aoMudar={setSincronizarAberto}
             sincronizadoEm={canalPro.data?.importadoEm ?? null}
             temEnderecoDoSistemaAtual={canalPro.data?.sistemaAtual.temEndereco ?? false}
+            crmPublica={canalPro.data?.ultimaLeitura != null}
             aoAbrirPlanilha={() => setPlanilhaAberta(true)}
           />
           <ImportarCanalPro aberto={planilhaAberta} aoMudar={setPlanilhaAberta} />

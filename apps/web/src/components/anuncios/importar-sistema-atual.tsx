@@ -46,6 +46,8 @@ type Resultado =
       codigo: string;
       ok: true;
       novo: boolean;
+      /** No ar pelo CRM depois da troca: o banco não mudou nada (20261119120000). */
+      pulado: string | null;
       fotos:
         | { tipo: 'nenhuma' }
         | { tipo: 'mantidas'; quantas: number }
@@ -80,7 +82,9 @@ type Como =
  * o endereço toda vez e mostrava uma lista para marcar.
  *
  * Nada muda no Canal Pro: ele continua lendo o sistema atual até alguém trocar o
- * endereço lá.
+ * endereço lá. Depois da troca (19/11/2026), o banco não deixa o arquivo do
+ * sistema atual mudar anúncio no ar (devolve `pulado`), e a folha Sincronizar
+ * tira este botão: quem publica é o CRM.
  */
 export function ImportarSistemaAtual({ temEndereco }: { temEndereco: boolean }) {
   const cliente = useQueryClient();
@@ -200,11 +204,15 @@ export function ImportarSistemaAtual({ temEndereco }: { temEndereco: boolean }) 
 
     if (feitos.length < lista.length) return;
     const novos = feitos.filter((f) => f.ok && f.novo).length;
-    const atualizados = feitos.filter((f) => f.ok && !f.novo).length;
-    const falharam = feitos.length - novos - atualizados;
+    const pulados = feitos.filter((f) => f.ok && f.pulado).length;
+    const atualizados = feitos.filter((f) => f.ok && !f.novo && !f.pulado).length;
+    const falharam = feitos.length - novos - atualizados - pulados;
     const partes = [
       novos ? `${novos} ${novos === 1 ? 'novo' : 'novos'}` : null,
       atualizados ? `${atualizados} ${atualizados === 1 ? 'atualizado' : 'atualizados'}` : null,
+      pulados
+        ? `${pulados} no ar pelo CRM ${pulados === 1 ? 'ficou' : 'ficaram'} como ${pulados === 1 ? 'estava' : 'estavam'}`
+        : null,
       registro?.ok && registro.sairam
         ? `${registro.sairam} ${registro.sairam === 1 ? 'saiu' : 'saíram'} do sistema atual`
         : null,
@@ -328,9 +336,12 @@ async function trazerUm(a: AnuncioDoArquivo, aoAndar: (agora: string) => void): 
     codigo: a.codigo,
     ok: true,
     novo: r.novo,
+    pulado: r.pulado,
     fotos,
     pendencias: null,
   });
+  // No ar pelo CRM depois da troca: nem os dados nem as fotos mudam.
+  if (r.pulado) return pronto({ tipo: 'mantidas', quantas: r.fotos });
   if (a.fotos.length === 0) return pronto({ tipo: 'nenhuma' });
   if (r.fotos > 0) return pronto({ tipo: 'mantidas', quantas: r.fotos });
 
@@ -442,7 +453,7 @@ function Andamento({
   const pct =
     trazendo && trazendo.total > 0 ? Math.round((trazendo.feitos / trazendo.total) * 100) : 100;
   const novos = resultados.filter((r) => r.ok && r.novo).length;
-  const atualizados = resultados.filter((r) => r.ok && !r.novo).length;
+  const atualizados = resultados.filter((r) => r.ok && !r.novo && !r.pulado).length;
 
   return (
     <section className="flex flex-col gap-3">
@@ -523,9 +534,19 @@ function Andamento({
               <span className="min-w-0 flex-1">
                 <span className="numerico font-medium">{r.codigo}</span>{' '}
                 <span className="text-muted-foreground">
-                  {r.ok ? (r.novo ? '· novo' : '· atualizado') : '· não veio'}
+                  {r.ok
+                    ? r.novo
+                      ? '· novo'
+                      : r.pulado
+                        ? '· ficou como estava'
+                        : '· atualizado'
+                    : '· não veio'}
                 </span>
-                {r.ok ? (
+                {r.ok && r.pulado ? (
+                  <span className="block text-xs text-muted-foreground">
+                    {fraseDaImportacao(r.pulado)}
+                  </span>
+                ) : r.ok ? (
                   <>
                     <span className="block text-xs text-muted-foreground">
                       {fraseDasFotos(r.fotos)}

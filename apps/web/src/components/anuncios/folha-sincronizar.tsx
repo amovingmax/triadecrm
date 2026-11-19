@@ -24,12 +24,17 @@ import { URL_DO_CANAL_PRO } from './tipos';
  * Canal Pro novo (React); quem guardou o da versão 3 precisa trocar. A conferência e a gravação acontecem na aba que o
  * favorito abre (`/anuncios/sincronizar`). Os dois jeitos de antes (a planilha
  * do Canal Pro e o arquivo da Arbo) ficam aqui embaixo, fora do cabeçalho.
+ *
+ * Depois da troca (o robô do Grupo OLX leu o arquivo do CRM, 19/11/2026), o
+ * arquivo da Arbo sai daqui: ele é velho e desfaria o que o CRM publica. O
+ * banco também não o deixa mudar anúncio no ar (`anuncio_importar`).
  */
 export function FolhaSincronizar({
   aberto,
   aoMudar,
   sincronizadoEm,
   temEnderecoDoSistemaAtual,
+  crmPublica,
   aoAbrirPlanilha,
 }: {
   aberto: boolean;
@@ -37,6 +42,8 @@ export function FolhaSincronizar({
   /** A última lista do Canal Pro (planilha ou sincronização). */
   sincronizadoEm: string | null;
   temEnderecoDoSistemaAtual: boolean;
+  /** O Canal Pro já lê o arquivo do CRM (a troca da Arbo está feita). */
+  crmPublica: boolean;
   aoAbrirPlanilha: () => void;
 }) {
   return (
@@ -93,8 +100,9 @@ export function FolhaSincronizar({
           <div className="flex flex-col gap-2 border-t border-hairline pt-4">
             <p className="font-medium">Outros jeitos</p>
             <p className="text-muted-foreground">
-              Se o favorito não funcionar: a planilha que o Canal Pro exporta (traz situação e
-              números, sem fotos) ou o arquivo da Arbo, o sistema que publica hoje.
+              {crmPublica
+                ? 'Se o favorito não funcionar: a planilha que o Canal Pro exporta (traz situação e números, sem fotos).'
+                : 'Se o favorito não funcionar: a planilha que o Canal Pro exporta (traz situação e números, sem fotos) ou o arquivo da Arbo, o sistema que publica hoje.'}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -108,8 +116,14 @@ export function FolhaSincronizar({
                 <FileSpreadsheet aria-hidden="true" />
                 Planilha do Canal Pro
               </Button>
-              <ImportarSistemaAtual temEndereco={temEnderecoDoSistemaAtual} />
+              {crmPublica ? null : <ImportarSistemaAtual temEndereco={temEnderecoDoSistemaAtual} />}
             </div>
+            {crmPublica ? (
+              <p className="text-xs text-muted-foreground">
+                O Canal Pro já lê o arquivo do CRM: agora é o CRM quem publica. Por isso o arquivo
+                da Arbo não atualiza mais os anúncios daqui.
+              </p>
+            ) : null}
           </div>
         </div>
       </SheetContent>
