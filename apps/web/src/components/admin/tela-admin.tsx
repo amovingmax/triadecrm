@@ -13,6 +13,7 @@ import { PainelAtendimento } from './painel-atendimento';
 import { PainelAvisos } from './painel-avisos';
 import { PainelIntegracoes } from './painel-integracoes';
 import { PainelLigacoes } from './painel-ligacoes';
+import { PainelMercado } from './painel-mercado';
 import { PainelPessoas } from './painel-pessoas';
 import { PainelWhatsapp } from './painel-whatsapp';
 import { ABAS_DA_EMPRESA, type Aba, type SecaoCatalogo, type SecaoLgpd } from './tipos';
@@ -102,6 +103,7 @@ export function TelaAdmin({
         />
       ) : null}
       {aba === 'integracoes' ? <PainelIntegracoes eu={sessao.id} /> : null}
+      {aba === 'mercado' ? <PainelMercado /> : null}
       {aba === 'lgpd' ? <PainelLgpd sessao={sessao} secao={lgpd} aoTrocarSecao={setLgpd} /> : null}
     </div>
   );

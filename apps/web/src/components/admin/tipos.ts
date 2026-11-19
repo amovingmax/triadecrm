@@ -19,6 +19,7 @@ export type Aba =
   | 'ligacoes'
   | 'catalogos'
   | 'integracoes'
+  | 'mercado'
   | 'lgpd';
 
 export const ABAS: readonly {
@@ -71,6 +72,15 @@ export const ABAS: readonly {
     rotulo: 'Integrações',
     descricao:
       'As chaves com que outros sistemas falam com o CRM, e os avisos que o CRM manda para eles (webhooks).',
+  },
+  {
+    // Inteligência de mercado (19/11/2026, só na Imova): o dono libera as fontes e
+    // liga a coleta com o próprio login (`painel-mercado.tsx`).
+    id: 'mercado',
+    rotulo: 'Inteligência de mercado',
+    descricao:
+      'De onde vêm os números do mercado: quais fontes o robô pode ler e se a coleta de segunda e quinta está ligada.',
+    modulo: 'inteligenciaMercado',
   },
   {
     id: 'lgpd',

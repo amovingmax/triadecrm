@@ -131,6 +131,9 @@ const NOME_DA_TABELA: Record<string, string> = {
   tags: 'Etiqueta',
   sources: 'Origem',
   pipelines: 'Funil',
+  // Ajustes → Inteligência de mercado (19/11/2026): liberar fonte e ligar a coleta.
+  mercado_fontes: 'Fonte de mercado',
+  app_settings: 'Ajuste do CRM',
 };
 
 export function rotuloDaTabela(tabela: string): string {
