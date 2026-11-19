@@ -2,7 +2,7 @@
  * Parse dos argumentos do CLI dos workers. Sem dependências, para ser testável e rápido.
  */
 
-export const WORKER_COMMANDS = ['wa', 'ai', 'rotas'] as const;
+export const WORKER_COMMANDS = ['wa', 'ai', 'rotas', 'mercado'] as const;
 export type WorkerCommand = (typeof WORKER_COMMANDS)[number];
 
 /**
@@ -14,6 +14,7 @@ export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
   wa: ['uma-vez', 'conectar', 'sincronizar-modelos'],
   ai: ['uma-vez', 'chamada-de-teste', 'foto', 'ensaio'],
   rotas: ['uma-vez', 'geocodificar'],
+  mercado: ['uma-vez', 'fonte', 'ensaio'],
 };
 
 export const USAGE = `Uso: workers <comando> [opções]
@@ -22,6 +23,8 @@ Comandos:
   wa       WhatsApp: recebe, registra opt-out e envia pela Cloud API da Meta (D5, RF-CON)
   ai       IA: classificação, rascunhos, resumos e Assistente (D6, ADR-10)
   rotas    Rotas de visita: geocodificação (Nominatim) e ordem das paradas no OSRM (RF-ROT)
+  mercado  Inteligência de mercado (só Imova): coleta as fontes PERMITIDAS da lista mercado_fontes
+           (fila mercado_coleta, segunda e quinta às 6h), grava e roda a veracidade
 
 Opções de "wa":
   --uma-vez              Esvazia as filas de entrada e de saída uma vez e sai.
@@ -47,6 +50,16 @@ Opções de "rotas":
   --geocodificar         Faz UMA passada de geocodificação no Nominatim (1 req/s) e sai.
                          Não entra no laço da fila: as perguntas acabam.
   --uma-vez              Esvazia a fila rotas_jobs uma vez e sai, em vez de ficar rodando.
+
+Opções de "mercado":
+  --uma-vez              Esvazia a fila mercado_coleta uma vez, roda o pós-rodada (veracidade e,
+                         na segunda, a amostra da semana) e sai.
+  --fonte=<id>           Roda UMA fonte da lista agora, fora da fila (as mesmas travas: fonte
+                         liberada, chave mercado.ligado, robots.txt), e sai.
+  --fonte=<id> --ensaio  Lê a fonte de verdade, mas NÃO grava nada no banco: imprime o que
+                         gravaria. Serve para conferir um coletor. Com a chave mercado.ligado
+                         desligada, ou com a mesma fonte rodando, não roda (nenhum pedido sai).
+                         Num banco que não é o da Imova, o worker sai sem fazer nada.
 
 Opções gerais:
   -h, --help   Mostra esta ajuda

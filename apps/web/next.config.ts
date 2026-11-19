@@ -19,6 +19,13 @@ const nextConfig: NextConfig = {
   // Sem o botão "N" do Next no canto da tela em `next dev` (em produção ele nunca
   // aparece). Erro de compilação ou de execução continua abrindo o aviso do Next.
   devIndicators: false,
+  // A página pronta da Inteligência de mercado (18/11/2026, só no deploy da Imova) fica
+  // fora de public/ e fora do git, e a rota /inteligencia/painel a lê do disco
+  // (`app/(inteligencia)/inteligencia/pagina-pronta.ts`). Isto garante que a função
+  // publicada leve o arquivo junto. No build sem o arquivo (KOMUNE, CI), não leva nada.
+  outputFileTracingIncludes: {
+    '/inteligencia/painel': ['./privado/inteligencia/painel.html.gz'],
+  },
   images: {
     // Avatares do Google (foto do usuário logado).
     remotePatterns: [{ protocol: 'https', hostname: '*.googleusercontent.com' }],

@@ -1,8 +1,9 @@
 /**
- * CLI dos workers do KOMUNE CRM — uma imagem Docker, três comandos: wa | ai | rotas.
+ * CLI dos workers do KOMUNE CRM — uma imagem Docker, quatro comandos: wa | ai | rotas | mercado.
  *
  * `wa` recebe e envia pela Cloud API da Meta (e `wa --conectar` liga o número de ponta a
- * ponta); `ai` consome `ai_jobs`; `rotas` geocodifica e ordena visitas. Sem comando na
+ * ponta); `ai` consome `ai_jobs`; `rotas` geocodifica e ordena visitas; `mercado` coleta as
+ * fontes permitidas da inteligência de mercado (só Imova). Sem comando na
  * linha, vale `WORKER_COMANDO`.
  *
  * Códigos de saída: 0 ok · 1 ambiente inválido ou falha em execução · 2 uso incorreto do CLI.
@@ -12,6 +13,7 @@ import type { WorkerRunner } from './lib/context';
 import { formatEnvIssues, loadEnv } from './lib/env';
 import { createLogger } from './lib/log';
 import { runAi } from './workers/ai';
+import { runMercado } from './workers/mercado';
 import { runRotas } from './workers/rotas';
 import { runWa } from './workers/wa';
 
@@ -56,6 +58,8 @@ export async function main(argv: readonly string[]): Promise<number> {
       return start('ai', runAi, parsed.opcoes);
     case 'rotas':
       return start('rotas', runRotas, parsed.opcoes);
+    case 'mercado':
+      return start('mercado', runMercado, parsed.opcoes);
   }
 }
 

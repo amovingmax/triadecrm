@@ -14,6 +14,8 @@
 # Perfis (ligue com COMPOSE_PROFILES no ./.env, ou --profile na linha de comando):
 #   (nenhum)      metabase, faster-whisper
 #   workers       worker-wa, worker-ai, worker-rotas
+#   mercado       worker-mercado (inteligência de mercado: SÓ na máquina da Imova; no banco da
+#                 KOMUNE o worker sai sozinho, sem bater ponto)
 #   rotas         osrm  (exige o grafo já preparado — veja o perfil osrm-preparo)
 #   osrm-preparo  osrm-preparo (tarefa única: extract → partition → customize)
 #   tunel         cloudflared (só se o Metabase precisar sair do tailnet)
@@ -128,6 +130,38 @@ services:
     pids_limit: 256
     healthcheck:
       test: ['CMD', 'node', '/opt/healthchecks/worker-heartbeat.mjs', 'rotas']
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+
+  # Inteligência de mercado da Imova (18/11/2026): consome a fila `mercado_coleta`, que o
+  # pg_cron enche segunda e quinta às 6h com as fontes PERMITIDAS e liberadas pelo dono
+  # (`mercado_fontes`). Fora das rodadas, só espera a fila. Perfil próprio (`mercado`), fora de
+  # `workers`: a máquina da KOMUNE não liga. Se ligar num banco que não é o da Imova, o worker
+  # registra o motivo e sai com 0; `on-failure` não o reinicia (não vira laço).
+  # COLETOR_CONTATO (opcional) vem do ../../.env (env_file do x-worker): e-mail GENÉRICO no
+  # User-Agent do robô. Não repetir aqui em `environment` (vazio aqui apagaria o do arquivo).
+  worker-mercado:
+    <<: *worker
+    command: ['mercado']
+    profiles: ['mercado']
+    restart: on-failure
+    # O worker para ENTRE fontes, e uma fonte pode levar até 50 min. Parado no meio (SIGKILL
+    # depois de 60 s), a coleta fica aberta, o pós-rodada a fecha como abandonada (3 h, ninguém
+    # ganha falta) e o pedido volta à fila pelo visibility timeout.
+    stop_grace_period: 60s
+    environment:
+      NODE_ENV: production
+      TZ: America/Fortaleza
+      WORKER_INSTANCE: ${WORKER_INSTANCE:-default}
+    mem_limit: ${MEM_WORKER_MERCADO:-512m}
+    mem_reservation: 128m
+    memswap_limit: ${MEM_WORKER_MERCADO:-512m}
+    cpus: 1.0
+    pids_limit: 256
+    healthcheck:
+      test: ['CMD', 'node', '/opt/healthchecks/worker-heartbeat.mjs', 'mercado']
       interval: 60s
       timeout: 15s
       retries: 3

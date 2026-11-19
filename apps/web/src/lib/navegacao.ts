@@ -101,6 +101,7 @@ import {
   SquareKanban,
   Sun,
   Target,
+  Telescope,
 } from 'lucide-react';
 
 import type { Empresa } from '@komune/schema/empresas';
@@ -412,6 +413,26 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
       'A IA que responde os clientes sozinha: ligar e desligar, a conversa do treino, o caderno do que ela sabe, as respostas para avaliar (boa ou corrigir) e o placar da semana.',
     papeis: PAPEIS_DO_CRM,
     modulo: 'iaQueAtende',
+  },
+  {
+    // Inteligência de mercado (18/11/2026), só na Imova. Por enquanto é a página
+    // pronta do protótipo, entregue pelo próprio CRM (`/inteligencia/painel`, que
+    // confere papel, perfil no banco e empresa) e aberta em tela própria, com
+    // "Voltar ao CRM" (a "opção B" do plano de integração). É uma foto: muda só
+    // quando alguém copia a página de novo e publica o site (fase 2: ler do banco de
+    // mercado, com RLS). Fica em Controle porque é estudo da semana, não trabalho do dia.
+    href: '/inteligencia',
+    rotulo: 'Inteligência de mercado',
+    icone: Telescope,
+    grupo: 'controle',
+    // As palavras que alguém digitaria na paleta: mercado, m², preço, bairro,
+    // região, vantagens, procura, valorização, oportunidades, IBGE, FipeZAP.
+    descricao:
+      'O mercado em volta dos nossos imóveis: m² e preço por bairro e região, cada imóvel comparado com os parecidos e as vantagens dele, procura e oferta, valorização, oportunidades e as fontes (FipeZAP, IBGE, Prefeitura), com os dados da última atualização da página (a data aparece no alto).',
+    // Decisão assumida em 18/11/2026 (o dono pode mudar): admin, gestor e SDR. O
+    // porteiro confere o mesmo conjunto antes de entregar o arquivo.
+    papeis: PAPEIS_DO_CRM,
+    modulo: 'inteligenciaMercado',
   },
   {
     // Era "Admin". "Ajustes" diz o que a tela faz; "Admin" dizia quem entra —

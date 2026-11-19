@@ -199,6 +199,16 @@ export interface Empresa {
      * KOMUNE: na Imova o cliente tem ficha e a aba Clientes é outra coisa.
      */
     caixasDeConversa: boolean;
+    /**
+     * A Inteligência de Mercado (18/11/2026): o item "Inteligência de mercado" no
+     * menu e a rota `/inteligencia`, que abre a página pronta do protótipo (os
+     * nossos imóveis comparados com o mercado, m² por região, procura e as
+     * vantagens de cada imóvel), com os dados congelados na data em que a página
+     * foi copiada e publicada. Só da Imova: na KOMUNE `/inteligencia` e tudo
+     * embaixo dela dão "não encontrado" (o porteiro em `lib/supabase/middleware.ts`
+     * e a rota `/inteligencia/painel`).
+     */
+    inteligenciaMercado: boolean;
   };
   /**
    * As palavras de tela que mudam com o ramo (11/11/2026: Agenda, Meu dia e Metas).
@@ -346,6 +356,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       agendaComImovel: false,
       emailDeReuniao: true,
       caixasDeConversa: true,
+      inteligenciaMercado: false,
     },
     vocabulario: {
       parceiro: 'parceiro',
@@ -412,6 +423,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       // Sem Resend no `imova-worker-wa` (11/11/2026): a Agenda não promete e-mail.
       emailDeReuniao: false,
       caixasDeConversa: false,
+      inteligenciaMercado: true,
     },
     // Quem está do outro lado é o cliente (ou o proprietário), e quem marca sozinho é
     // a IA que atende. As métricas trocam o jargão da captação ("porta batida",

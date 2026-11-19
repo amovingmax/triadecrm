@@ -43,6 +43,7 @@ describe('empresas', () => {
       agendaComImovel: false,
       emailDeReuniao: true,
       caixasDeConversa: true,
+      inteligenciaMercado: false,
     });
     // As palavras que a Agenda, o Meu dia e as Metas já escreviam (11/11/2026).
     expect(k.vocabulario).toEqual({
@@ -121,6 +122,7 @@ describe('empresas', () => {
       agendaComImovel: true,
       emailDeReuniao: false,
       caixasDeConversa: false,
+      inteligenciaMercado: true,
     });
     expect(i.tipos.cerimonialista).toBeNull();
   });

@@ -11,6 +11,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import type { Empresa } from '@komune/schema/empresas';
 
 import { VOLTA_DO_APP } from '@/lib/auth/entrada-pelo-app';
+import { type AppRole, roleFromClaims } from '@/lib/auth/role';
 import { EMPRESA } from '@/lib/empresa';
 import { supabaseAnonKey, supabaseUrl } from '@/lib/env';
 
@@ -94,6 +95,80 @@ export function destinoNoHostDosLinks(host: string | null, pathname: string): st
   return pathname.startsWith('/r/') ? null : SITE_DA_KOMUNE;
 }
 
+/**
+ * A Inteligência de mercado (18/11/2026), só na Imova.
+ *
+ * `/inteligencia` é a página do CRM que abre a página pronta do protótipo, e
+ * `/inteligencia/painel` é a rota que entrega a página pronta (cerca de 7 MB, com os
+ * dados dentro, guardada em gzip FORA de `public/`). Quem decide se entrega é a
+ * própria rota, no servidor: sessão, papel, perfil no banco e banco da empresa
+ * (`app/(inteligencia)/inteligencia/painel/route.ts`). Este porteiro é a primeira
+ * camada, antes de qualquer coisa embaixo de `/inteligencia`:
+ *
+ *  - na empresa sem o módulo (a KOMUNE), a rota e tudo embaixo dela não existem:
+ *    "não encontrado", com ou sem login (o mesmo código publica os dois sites);
+ *  - sem login, vai para o login, como qualquer tela (quem faz é o fluxo de sempre);
+ *  - com login, mas fora dos papéis, vai para `/sem-permissao`.
+ *
+ * Nada da Inteligência mora em `public/`: o `matcher` do `proxy.ts` deixa passar SEM
+ * LOGIN o que termina em .json, .png, .svg, .txt e outros (o teste
+ * `pagina-pronta.test.ts` confere que a pasta não existe).
+ */
+export const ROTA_DA_INTELIGENCIA = '/inteligencia';
+
+/** A rota que entrega a página pronta que `scripts/inteligencia/copiar-prototipo.mjs` grava. */
+export const PAGINA_PRONTA_DA_INTELIGENCIA = '/inteligencia/painel';
+
+/**
+ * Quem entra: admin, gestor e SDR (decisão assumida em 18/11/2026; o dono pode
+ * mudar). Espelho dos `papeis` do item do menu, que um teste confere: aqui não se
+ * importa `lib/navegacao`, que puxaria os ícones do menu para o porteiro.
+ */
+export const PAPEIS_DA_INTELIGENCIA: readonly AppRole[] = ['admin', 'gestor', 'sdr'];
+
+/**
+ * O caminho como o servidor o entende: decodificado (`/%69nteligencia/…` é o mesmo
+ * endereço), sem barras repetidas e em minúsculas (num disco que não distingue
+ * maiúscula, `/Inteligencia/…` abriria o mesmo arquivo, se um dia houver um). Sem
+ * isso, um endereço escrito de outro jeito passaria pelo porteiro como "fora".
+ */
+function caminhoNormalizado(pathname: string): string {
+  let caminho = pathname;
+  for (let i = 0; i < 3; i += 1) {
+    try {
+      const decodificado = decodeURIComponent(caminho);
+      if (decodificado === caminho) break;
+      caminho = decodificado;
+    } catch {
+      break;
+    }
+  }
+  return caminho.replace(/[\\/]+/g, '/').toLowerCase();
+}
+
+export function ehDaInteligencia(pathname: string): boolean {
+  const caminho = caminhoNormalizado(pathname);
+  return caminho === ROTA_DA_INTELIGENCIA || caminho.startsWith(`${ROTA_DA_INTELIGENCIA}/`);
+}
+
+export type DecisaoDaInteligencia = 'fora' | 'nao_encontrado' | 'login' | 'sem_permissao' | 'entra';
+
+/**
+ * O que o porteiro faz com um caminho, sem Next nem Supabase (para testar).
+ * `papel` é null quando não há sessão. 'fora' = o caminho não é da Inteligência.
+ */
+export function porteiroDaInteligencia(
+  pathname: string,
+  papel: AppRole | null,
+  empresa: Empresa = EMPRESA,
+): DecisaoDaInteligencia {
+  if (!ehDaInteligencia(pathname)) return 'fora';
+  if (!empresa.modulos.inteligenciaMercado) return 'nao_encontrado';
+  if (papel === null) return 'login';
+  if (!PAPEIS_DA_INTELIGENCIA.includes(papel)) return 'sem_permissao';
+  return 'entra';
+}
+
 export async function atualizarSessao(request: NextRequest): Promise<NextResponse> {
   const foraDoLink = destinoNoHostDosLinks(request.headers.get('host'), request.nextUrl.pathname);
   if (foraDoLink !== null) return NextResponse.redirect(foraDoLink, 302);
@@ -122,6 +197,26 @@ export async function atualizarSessao(request: NextRequest): Promise<NextRespons
 
   const { pathname, search } = request.nextUrl;
 
+  const inteligencia = porteiroDaInteligencia(
+    pathname,
+    autenticado ? roleFromClaims(data?.claims) : null,
+  );
+  if (inteligencia === 'nao_encontrado') {
+    // A página `/inteligencia` responde "não encontrado" sozinha (`notFound()`), com a
+    // tela de sempre; o que estiver embaixo dela (a rota da página pronta) é levado
+    // até ela, em vez de ser entregue.
+    if (pathname === ROTA_DA_INTELIGENCIA) return response;
+    const url = request.nextUrl.clone();
+    url.pathname = ROTA_DA_INTELIGENCIA;
+    url.search = '';
+    return reescreverPreservandoCookies(url, response);
+  }
+  if (inteligencia === 'sem_permissao') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/sem-permissao';
+    url.search = '';
+    return redirecionarPreservandoCookies(url, response);
+  }
   if (!autenticado && !ehRotaPublica(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
@@ -138,6 +233,13 @@ export async function atualizarSessao(request: NextRequest): Promise<NextRespons
   }
 
   return response;
+}
+
+/** Reescreve (mesmo endereço na barra, outra rota por dentro) sem perder cookies de sessão. */
+function reescreverPreservandoCookies(url: URL, original: NextResponse): NextResponse {
+  const reescrita = NextResponse.rewrite(url);
+  original.cookies.getAll().forEach((cookie) => reescrita.cookies.set(cookie));
+  return reescrita;
 }
 
 /** Redireciona (307) sem perder cookies de sessão eventualmente renovados nesta requisição. */

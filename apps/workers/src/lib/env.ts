@@ -11,10 +11,12 @@
  * - ai: ANTHROPIC_API_KEY; opcional ANTHROPIC_BASE_URL (dublê local)
  * - rotas: OSRM_URL e NOMINATIM_USER_AGENT (a política do Nominatim EXIGE identificação);
  *          opcional NOMINATIM_URL, para apontar para uma instância própria ou para um dublê
+ * - mercado: opcional COLETOR_CONTATO (e-mail genérico no User-Agent do robô de dados públicos)
  */
 import { z } from 'zod';
 
 import type { WorkerCommand } from '../cli';
+import { contatoValido } from '../mercado/identidade';
 
 /** Ao copiar o `.env.example`, valores ficam como string vazia; tratamos vazio como "não informado". */
 const emptyToUndefined = (value: unknown): unknown =>
@@ -141,10 +143,30 @@ const rotasEnvSchema = baseEnvSchema.extend({
   NOMINATIM_URL: optionalUrl,
 });
 
+/**
+ * Mercado (só Imova). `COLETOR_CONTATO` é opcional: um e-mail GENÉRICO que vai
+ * no User-Agent ("coletor-de-dados-publicos/1.0 (+contato: ...)"). Recusado se
+ * citar a empresa ou um portal (decisão do dono: nenhum uso do nome da Imova
+ * nas requisições). Vazio, o robô se identifica sem contato.
+ */
+const mercadoEnvSchema = baseEnvSchema.extend({
+  COLETOR_CONTATO: z.preprocess(
+    emptyToUndefined,
+    z
+      .string()
+      .optional()
+      .superRefine((valor, c) => {
+        const r = contatoValido(valor);
+        if (!r.ok) c.addIssue({ code: 'custom', message: r.motivo });
+      }),
+  ),
+});
+
 export const envSchemas = {
   wa: waEnvSchema,
   ai: aiEnvSchema,
   rotas: rotasEnvSchema,
+  mercado: mercadoEnvSchema,
 } as const;
 
 export type BaseEnv = z.infer<typeof baseEnvSchema>;

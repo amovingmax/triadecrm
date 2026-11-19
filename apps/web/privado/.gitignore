@@ -1,0 +1,8 @@
+# Dado interno que NÃO vai para o git (18/11/2026): a página pronta da Inteligência de
+# mercado da Imova (privado/inteligencia/painel.html.gz), gravada por
+# scripts/inteligencia/copiar-prototipo.mjs e entregue pela rota /inteligencia/painel,
+# que confere o acesso. Chega à Vercel só no deploy da Imova: o passo de publicar copia o
+# arquivo para a cópia limpa antes do `vercel deploy` (a CLI não lê .gitignore).
+# Ver docs/CHANGELOG.md, entrada de 18/11/2026 da Inteligência de mercado.
+*
+!.gitignore

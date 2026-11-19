@@ -27,6 +27,123 @@ export type Database = {
         }
         Relationships: []
       }
+      mercado_sorteio_trabalho: {
+        Row: {
+          anuncio: string | null
+          chave: number | null
+          estrato: string | null
+          fonte: string | null
+          item_ref: string | null
+          item_tipo: string | null
+          link: string | null
+          peso: number | null
+          preco: number | null
+          resumo: Json | null
+        }
+        Insert: {
+          anuncio?: string | null
+          chave?: number | null
+          estrato?: string | null
+          fonte?: string | null
+          item_ref?: string | null
+          item_tipo?: string | null
+          link?: string | null
+          peso?: number | null
+          preco?: number | null
+          resumo?: Json | null
+        }
+        Update: {
+          anuncio?: string | null
+          chave?: number | null
+          estrato?: string | null
+          fonte?: string | null
+          item_ref?: string | null
+          item_tipo?: string | null
+          link?: string | null
+          peso?: number | null
+          preco?: number | null
+          resumo?: Json | null
+        }
+        Relationships: []
+      }
+      mercado_verificar_anc: {
+        Row: {
+          area_ref: number | null
+          foto: unknown
+          id: string
+          lat: number | null
+          lng: number | null
+          loc: string | null
+          membros: number | null
+          modo: string | null
+          preco: number | null
+          quartos: number | null
+          regiao_id: string | null
+          rua: string | null
+          sub: string | null
+        }
+        Insert: {
+          area_ref?: number | null
+          foto?: unknown
+          id: string
+          lat?: number | null
+          lng?: number | null
+          loc?: string | null
+          membros?: number | null
+          modo?: string | null
+          preco?: number | null
+          quartos?: number | null
+          regiao_id?: string | null
+          rua?: string | null
+          sub?: string | null
+        }
+        Update: {
+          area_ref?: number | null
+          foto?: unknown
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          loc?: string | null
+          membros?: number | null
+          modo?: string | null
+          preco?: number | null
+          quartos?: number | null
+          regiao_id?: string | null
+          rua?: string | null
+          sub?: string | null
+        }
+        Relationships: []
+      }
+      mercado_verificar_v: {
+        Row: {
+          estado: string | null
+          grupo: string | null
+          id: string
+          marcas: string[] | null
+          motivo: string | null
+          nosso: string | null
+          possivel: boolean | null
+        }
+        Insert: {
+          estado?: string | null
+          grupo?: string | null
+          id: string
+          marcas?: string[] | null
+          motivo?: string | null
+          nosso?: string | null
+          possivel?: boolean | null
+        }
+        Update: {
+          estado?: string | null
+          grupo?: string | null
+          id?: string
+          marcas?: string[] | null
+          motivo?: string | null
+          nosso?: string | null
+          possivel?: boolean | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       deal_cards: {
@@ -196,6 +313,10 @@ export type Database = {
         Returns: boolean
       }
       aviso_ligacao_vencer: { Args: never; Returns: number }
+      binomial_acumulada: {
+        Args: { n: number; p: number; x: number }
+        Returns: number
+      }
       business_days: { Args: { p_ate: string; p_de: string }; Returns: number }
       cadencias_agendar: { Args: never; Returns: number }
       cadencias_encerrar_silencio: { Args: never; Returns: number }
@@ -234,6 +355,10 @@ export type Database = {
       }
       categoria_por_radical: { Args: { p_nome: string }; Returns: number }
       chave_catalogo: { Args: { t: string }; Returns: string }
+      clopper_pearson_sup: {
+        Args: { alfa?: number; n: number; x: number }
+        Returns: number
+      }
       cnpj_is_valid: { Args: { c: string }; Returns: boolean }
       compute_temperature: {
         Args: {
@@ -574,6 +699,7 @@ export type Database = {
         }
         Returns: Json
       }
+      k_max_sinal: { Args: { alfa?: number; n: number }; Returns: number }
       komune_aplicar_evento: {
         Args: { p_delivery_id: string; p_payload: Json }
         Returns: Json
@@ -618,6 +744,193 @@ export type Database = {
       lista_da_base: { Args: { p_base: Json }; Returns: string }
       lista_de_etapas: { Args: { p_lista: Json }; Returns: string }
       mask_phone: { Args: { p: string }; Returns: string }
+      mercado_amostra_em_dia: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      mercado_argumentos_suspender: {
+        Args: { p_anuncio: string; p_item: string; p_motivo: string }
+        Returns: number
+      }
+      mercado_argumentos_vencer: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      mercado_bruto_permitido: {
+        Args: { p_bruto: Json; p_nivel?: number }
+        Returns: Json
+      }
+      mercado_carteira: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          anuncio_id: string
+          area_ref: number
+          area_total: number
+          area_util: number
+          bairro: string
+          cidade: string
+          codigo: string
+          logradouro: string
+          negocio: string
+          origem: string
+          preco_aluguel: number
+          preco_venda: number
+          quartos: number
+          regiao_id: string
+          situacao: string
+          sub: string
+          tipo: string
+        }[]
+      }
+      mercado_coleta_enfileirar: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      mercado_config: { Args: Record<PropertyKey, never>; Returns: Json }
+      mercado_confrontar_celulas: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      mercado_confronto_fipezap: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      mercado_ficha: { Args: { p_codigo: string }; Returns: Json }
+      mercado_ficha_hash: { Args: { p_codigo: string }; Returns: string }
+      mercado_fontes_em_quarentena: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      mercado_hoje: { Args: Record<PropertyKey, never>; Returns: string }
+      mercado_ligado: { Args: Record<PropertyKey, never>; Returns: boolean }
+      mercado_limpar_texto: { Args: { p_texto: string }; Returns: string }
+      mercado_liquidez: {
+        Args: {
+          p_dias?: number
+          p_modo?: string
+          p_regiao: string
+          p_sub: string
+        }
+        Returns: {
+          acompanhados: number
+          ativos: number
+          baixaram_preco: number
+          coletas: number
+          desde: string
+          leitura: string
+          mediana_dias_ate_sair: number
+          queda_media_pct: number
+          sairam: number
+        }[]
+      }
+      mercado_m2: {
+        Args: {
+          p_area_max?: number
+          p_area_min?: number
+          p_modo?: string
+          p_regiao: string
+          p_sub: string
+          p_vizinhos?: boolean
+        }
+        Returns: {
+          amostra: string
+          maximo: number
+          media: number
+          mediana: number
+          minimo: number
+          n: number
+          n_suspeitos: number
+          q1: number
+          q3: number
+          regioes: string[]
+        }[]
+      }
+      mercado_menciona: {
+        Args: { p_nomes: Json; p_texto: string }
+        Returns: boolean
+      }
+      mercado_nomeia_fonte: { Args: { p_texto: string }; Returns: boolean }
+      mercado_numeros_perto: {
+        Args: { p_lim: number; p_novo: Json; p_ref: Json }
+        Returns: boolean
+      }
+      mercado_obra_valida_ate: {
+        Args: { p_fase: string; p_publicado_em: string; p_tipo: string }
+        Returns: string
+      }
+      mercado_par_vigente: {
+        Args: {
+          p_decisao: string
+          p_preco_atual: number
+          p_preco_decisao: number
+        }
+        Returns: boolean
+      }
+      mercado_preco_bloqueado: { Args: { p_codigo: string }; Returns: boolean }
+      mercado_proximidade_usavel: {
+        Args: { p: Database["public"]["Tables"]["mercado_proximidades"]["Row"] }
+        Returns: boolean
+      }
+      mercado_regiao_do_bairro: {
+        Args: { p_bairro: string; p_cidade: string }
+        Returns: string
+      }
+      mercado_regioes_da_conta: {
+        Args: { p_regiao: string; p_vizinhos: boolean }
+        Returns: string[]
+      }
+      mercado_regra_num: {
+        Args: { p_caminho: string[]; p_padrao?: number }
+        Returns: number
+      }
+      mercado_regras: { Args: Record<PropertyKey, never>; Returns: Json }
+      mercado_rodada: { Args: Record<PropertyKey, never>; Returns: string }
+      mercado_rotina_diaria: { Args: Record<PropertyKey, never>; Returns: Json }
+      mercado_saude_fontes: {
+        Args: { p_semana?: string }
+        Returns: {
+          conferidos_8s: number
+          conferidos_semana: number
+          cp_sup_8s: number
+          desatualizados_semana: number
+          erros_8s: number
+          erros_semana: number
+          estado: string
+          fonte: string
+          semana: string
+          taxa_8s: number
+        }[]
+      }
+      mercado_semana: { Args: { p_data?: string }; Returns: string }
+      mercado_sortear_amostra: { Args: { p_semana?: string }; Returns: number }
+      mercado_sorteio_u: { Args: { p_semente: string }; Returns: number }
+      mercado_sub: {
+        Args: {
+          p_area_ref: number
+          p_atributos: Json
+          p_subtipo: string
+          p_tipo: string
+          p_titulo: string
+        }
+        Returns: string
+      }
+      mercado_tem_link_bloqueado: { Args: { p_item: Json }; Returns: boolean }
+      mercado_texto_chave: { Args: { p_texto: string }; Returns: string }
+      mercado_texto_molde: { Args: { p_texto: string }; Returns: string }
+      mercado_texto_proibido: { Args: { p_texto: string }; Returns: boolean }
+      mercado_tipo_base: { Args: { p_tipo: string }; Returns: string }
+      mercado_url_bloqueada: { Args: { p_url: string }; Returns: boolean }
+      mercado_url_canonica: { Args: { p_url: string }; Returns: string }
+      mercado_validade_anuncios: {
+        Args: { p_base: string; p_regiao: string }
+        Returns: string
+      }
+      mercado_vantagens_do_imovel: { Args: { p_codigo: string }; Returns: Json }
+      mercado_vantagens_para_ia: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      mercado_verificar: { Args: Record<PropertyKey, never>; Returns: Json }
       mesclar_candidato: {
         Args: {
           p_batch_id?: string
@@ -1155,6 +1468,7 @@ export type Database = {
         Returns: string
       }
       website_domain: { Args: { u: string }; Returns: string }
+      wilson: { Args: { k: number; n: number; z?: number }; Returns: unknown }
     }
     Enums: {
       activity_type:
@@ -5979,6 +6293,1642 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_anuncio_precos: {
+        Row: {
+          anuncio_id: string
+          coleta_id: number | null
+          id: number
+          preco: number
+          visto_em: string
+        }
+        Insert: {
+          anuncio_id: string
+          coleta_id?: number | null
+          id?: never
+          preco: number
+          visto_em: string
+        }
+        Update: {
+          anuncio_id?: string
+          coleta_id?: number | null
+          id?: never
+          preco?: number
+          visto_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_anuncio_precos_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_anuncios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_anuncio_precos_coleta_id_fkey"
+            columns: ["coleta_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_coletas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_anuncios: {
+        Row: {
+          area_ref: number | null
+          area_total: number | null
+          area_util: number | null
+          atributos: NonNullable<Json>
+          bairro: string | null
+          banheiros: number | null
+          bruto: NonNullable<Json>
+          cidade: string | null
+          consulta_completa: boolean
+          consulta_id: string | null
+          contestado_em: string | null
+          correcao_humana: Json | null
+          data_dado: string
+          estado: string
+          faltas: number
+          fonte: string
+          foto_hash: unknown
+          geog: unknown
+          grupo_dup: string | null
+          hash_bruto: string | null
+          id: string
+          id_externo: string
+          lat: number | null
+          lng: number | null
+          loc_precisao: string | null
+          localidade: string | null
+          logradouro: string | null
+          m2: number | null
+          marcas: string[]
+          marcas_do_coletor: string[]
+          modo: string
+          motivo: string | null
+          nosso_imovel: boolean | null
+          nosso_imovel_codigo: string | null
+          origem: string
+          possivel_mesmo_imovel: boolean
+          preco: number | null
+          primeira_coleta_id: number
+          primeira_vez_visto: string
+          quartos: number | null
+          regiao_id: string | null
+          representante: boolean | null
+          saiu_do_ar_em: string | null
+          sub: string | null
+          subtipo: string | null
+          suites: number | null
+          tipo: string
+          titulo: string | null
+          uf: string
+          ultima_coleta_id: number
+          ultima_vez_visto: string
+          url: string
+          vagas: number | null
+          valor_condominio: number | null
+          verificado_em: string | null
+        }
+        Insert: {
+          area_ref?: never
+          area_total?: number | null
+          area_util?: number | null
+          atributos?: NonNullable<Json>
+          bairro?: string | null
+          banheiros?: number | null
+          bruto?: NonNullable<Json>
+          cidade?: string | null
+          consulta_completa?: boolean
+          consulta_id?: string | null
+          contestado_em?: string | null
+          correcao_humana?: Json | null
+          data_dado?: string
+          estado?: string
+          faltas?: number
+          fonte: string
+          foto_hash?: unknown
+          geog?: never
+          grupo_dup?: string | null
+          hash_bruto?: string | null
+          id?: string
+          id_externo: string
+          lat?: number | null
+          lng?: number | null
+          loc_precisao?: string | null
+          localidade?: string | null
+          logradouro?: string | null
+          m2?: never
+          marcas?: string[]
+          marcas_do_coletor?: string[]
+          modo?: string
+          motivo?: string | null
+          nosso_imovel?: never
+          nosso_imovel_codigo?: string | null
+          origem?: string
+          possivel_mesmo_imovel?: boolean
+          preco?: number | null
+          primeira_coleta_id: number
+          primeira_vez_visto?: string
+          quartos?: number | null
+          regiao_id?: string | null
+          representante?: never
+          saiu_do_ar_em?: string | null
+          sub?: string | null
+          subtipo?: string | null
+          suites?: number | null
+          tipo: string
+          titulo?: string | null
+          uf?: string
+          ultima_coleta_id: number
+          ultima_vez_visto?: string
+          url: string
+          vagas?: number | null
+          valor_condominio?: number | null
+          verificado_em?: string | null
+        }
+        Update: {
+          area_ref?: never
+          area_total?: number | null
+          area_util?: number | null
+          atributos?: NonNullable<Json>
+          bairro?: string | null
+          banheiros?: number | null
+          bruto?: NonNullable<Json>
+          cidade?: string | null
+          consulta_completa?: boolean
+          consulta_id?: string | null
+          contestado_em?: string | null
+          correcao_humana?: Json | null
+          data_dado?: string
+          estado?: string
+          faltas?: number
+          fonte?: string
+          foto_hash?: unknown
+          geog?: never
+          grupo_dup?: string | null
+          hash_bruto?: string | null
+          id?: string
+          id_externo?: string
+          lat?: number | null
+          lng?: number | null
+          loc_precisao?: string | null
+          localidade?: string | null
+          logradouro?: string | null
+          m2?: never
+          marcas?: string[]
+          marcas_do_coletor?: string[]
+          modo?: string
+          motivo?: string | null
+          nosso_imovel?: never
+          nosso_imovel_codigo?: string | null
+          origem?: string
+          possivel_mesmo_imovel?: boolean
+          preco?: number | null
+          primeira_coleta_id?: number
+          primeira_vez_visto?: string
+          quartos?: number | null
+          regiao_id?: string | null
+          representante?: never
+          saiu_do_ar_em?: string | null
+          sub?: string | null
+          subtipo?: string | null
+          suites?: number | null
+          tipo?: string
+          titulo?: string | null
+          uf?: string
+          ultima_coleta_id?: number
+          ultima_vez_visto?: string
+          url?: string
+          vagas?: number | null
+          valor_condominio?: number | null
+          verificado_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_anuncios_fonte_fkey"
+            columns: ["fonte"]
+            isOneToOne: false
+            referencedRelation: "mercado_fontes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_anuncios_primeira_coleta_id_fkey"
+            columns: ["primeira_coleta_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_coletas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_anuncios_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_regioes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_anuncios_ultima_coleta_id_fkey"
+            columns: ["ultima_coleta_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_coletas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_argumento_eventos: {
+        Row: {
+          argumento_id: string
+          em: string
+          evento: string
+          hash_dados: string | null
+          id: number
+          motivo: string | null
+          numeros_antes: Json | null
+          numeros_depois: Json | null
+          por: string | null
+          prova: Json | null
+          status_antes: string | null
+          status_depois: string
+          texto: string | null
+        }
+        Insert: {
+          argumento_id: string
+          em?: string
+          evento: string
+          hash_dados?: string | null
+          id?: never
+          motivo?: string | null
+          numeros_antes?: Json | null
+          numeros_depois?: Json | null
+          por?: string | null
+          prova?: Json | null
+          status_antes?: string | null
+          status_depois: string
+          texto?: string | null
+        }
+        Update: {
+          argumento_id?: string
+          em?: string
+          evento?: string
+          hash_dados?: string | null
+          id?: never
+          motivo?: string | null
+          numeros_antes?: Json | null
+          numeros_depois?: Json | null
+          por?: string | null
+          prova?: Json | null
+          status_antes?: string | null
+          status_depois?: string
+          texto?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_argumento_eventos_argumento_id_fkey"
+            columns: ["argumento_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_argumentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_argumento_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_argumento_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_argumentos: {
+        Row: {
+          anel: string | null
+          anuncio_id: string | null
+          aprovado_em: string | null
+          aprovado_marcas: string[] | null
+          aprovado_numeros: Json | null
+          aprovado_por: string | null
+          aprovado_texto: string | null
+          atualizado_em: string
+          aviso: string | null
+          chave: string
+          coletado_em: string
+          criado_em: string
+          data_dado: string
+          eixo: string
+          explica_preco: boolean
+          ficha_hash: string | null
+          fonte_texto: string
+          fontes: string[]
+          forca: string
+          hash_dados: string
+          id: string
+          imovel_codigo: string
+          localidade: string | null
+          marcas: string[]
+          molde: string
+          momentos: string[]
+          motivo_status: string | null
+          motor_versao: string
+          numeros: NonNullable<Json>
+          objecoes: string[]
+          prova: NonNullable<Json>
+          recusado_em: string | null
+          recusado_numeros: Json | null
+          recusado_por: string | null
+          regiao_id: string | null
+          regra: string
+          regras_versao: string | null
+          renovacoes: number
+          renovado_em: string | null
+          rodadas_seguidas: number
+          so_com_preco_dito: boolean
+          status: string
+          sub: string | null
+          texto: string
+          ultima_execucao_id: number | null
+          ultima_rodada: string | null
+          ultima_versao_em: string | null
+          ultima_versao_numeros: Json | null
+          valido_ate: string
+        }
+        Insert: {
+          anel?: string | null
+          anuncio_id?: string | null
+          aprovado_em?: string | null
+          aprovado_marcas?: string[] | null
+          aprovado_numeros?: Json | null
+          aprovado_por?: string | null
+          aprovado_texto?: string | null
+          atualizado_em?: string
+          aviso?: string | null
+          chave: string
+          coletado_em: string
+          criado_em?: string
+          data_dado: string
+          eixo: string
+          explica_preco?: boolean
+          ficha_hash?: string | null
+          fonte_texto: string
+          fontes?: string[]
+          forca: string
+          hash_dados: string
+          id?: string
+          imovel_codigo: string
+          localidade?: string | null
+          marcas?: string[]
+          molde: string
+          momentos?: string[]
+          motivo_status?: string | null
+          motor_versao: string
+          numeros?: NonNullable<Json>
+          objecoes?: string[]
+          prova?: NonNullable<Json>
+          recusado_em?: string | null
+          recusado_numeros?: Json | null
+          recusado_por?: string | null
+          regiao_id?: string | null
+          regra: string
+          regras_versao?: string | null
+          renovacoes?: number
+          renovado_em?: string | null
+          rodadas_seguidas?: number
+          so_com_preco_dito?: boolean
+          status?: string
+          sub?: string | null
+          texto: string
+          ultima_execucao_id?: number | null
+          ultima_rodada?: string | null
+          ultima_versao_em?: string | null
+          ultima_versao_numeros?: Json | null
+          valido_ate: string
+        }
+        Update: {
+          anel?: string | null
+          anuncio_id?: string | null
+          aprovado_em?: string | null
+          aprovado_marcas?: string[] | null
+          aprovado_numeros?: Json | null
+          aprovado_por?: string | null
+          aprovado_texto?: string | null
+          atualizado_em?: string
+          aviso?: string | null
+          chave?: string
+          coletado_em?: string
+          criado_em?: string
+          data_dado?: string
+          eixo?: string
+          explica_preco?: boolean
+          ficha_hash?: string | null
+          fonte_texto?: string
+          fontes?: string[]
+          forca?: string
+          hash_dados?: string
+          id?: string
+          imovel_codigo?: string
+          localidade?: string | null
+          marcas?: string[]
+          molde?: string
+          momentos?: string[]
+          motivo_status?: string | null
+          motor_versao?: string
+          numeros?: NonNullable<Json>
+          objecoes?: string[]
+          prova?: NonNullable<Json>
+          recusado_em?: string | null
+          recusado_numeros?: Json | null
+          recusado_por?: string | null
+          regiao_id?: string | null
+          regra?: string
+          regras_versao?: string | null
+          renovacoes?: number
+          renovado_em?: string | null
+          rodadas_seguidas?: number
+          so_com_preco_dito?: boolean
+          status?: string
+          sub?: string | null
+          texto?: string
+          ultima_execucao_id?: number | null
+          ultima_rodada?: string | null
+          ultima_versao_em?: string | null
+          ultima_versao_numeros?: Json | null
+          valido_ate?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_argumentos_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_argumentos_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios_na_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_argumentos_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_argumentos_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_argumentos_recusado_por_fkey"
+            columns: ["recusado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_argumentos_recusado_por_fkey"
+            columns: ["recusado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_argumentos_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_regioes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_argumentos_ultima_execucao_id_fkey"
+            columns: ["ultima_execucao_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_motor_execucoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_celulas: {
+        Row: {
+          calculada_em: string
+          causa: string | null
+          causa_aprovada_em: string | null
+          causa_aprovada_por: string | null
+          d: number | null
+          estado: string
+          mediana: number | null
+          mediana_anterior: number | null
+          modo: string
+          n: number
+          n_anterior: number | null
+          q1: number | null
+          q3: number | null
+          quarentena_desde: string | null
+          referencia_mediana: number | null
+          referencia_mes: string | null
+          referencia_n: number | null
+          referencia_serie: string | null
+          regiao_id: string
+          rodada_ref: string | null
+          salto: boolean
+          sub: string
+        }
+        Insert: {
+          calculada_em?: string
+          causa?: string | null
+          causa_aprovada_em?: string | null
+          causa_aprovada_por?: string | null
+          d?: number | null
+          estado?: string
+          mediana?: number | null
+          mediana_anterior?: number | null
+          modo: string
+          n?: number
+          n_anterior?: number | null
+          q1?: number | null
+          q3?: number | null
+          quarentena_desde?: string | null
+          referencia_mediana?: number | null
+          referencia_mes?: string | null
+          referencia_n?: number | null
+          referencia_serie?: string | null
+          regiao_id: string
+          rodada_ref?: string | null
+          salto?: boolean
+          sub: string
+        }
+        Update: {
+          calculada_em?: string
+          causa?: string | null
+          causa_aprovada_em?: string | null
+          causa_aprovada_por?: string | null
+          d?: number | null
+          estado?: string
+          mediana?: number | null
+          mediana_anterior?: number | null
+          modo?: string
+          n?: number
+          n_anterior?: number | null
+          q1?: number | null
+          q3?: number | null
+          quarentena_desde?: string | null
+          referencia_mediana?: number | null
+          referencia_mes?: string | null
+          referencia_n?: number | null
+          referencia_serie?: string | null
+          regiao_id?: string
+          rodada_ref?: string | null
+          salto?: boolean
+          sub?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_celulas_causa_aprovada_por_fkey"
+            columns: ["causa_aprovada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_celulas_causa_aprovada_por_fkey"
+            columns: ["causa_aprovada_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_celulas_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_regioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_coletas: {
+        Row: {
+          coletor_versao: string
+          custo: number | null
+          detalhes: NonNullable<Json>
+          erro: string | null
+          fim: string | null
+          fonte: string
+          hash_bruto: string | null
+          id: number
+          inicio: string
+          licenca: string | null
+          metodo: string
+          novos: number
+          origem: string
+          quantos: number
+          recusados: number
+          regiao_id: string | null
+          situacao: string
+        }
+        Insert: {
+          coletor_versao: string
+          custo?: number | null
+          detalhes?: NonNullable<Json>
+          erro?: string | null
+          fim?: string | null
+          fonte: string
+          hash_bruto?: string | null
+          id?: never
+          inicio?: string
+          licenca?: string | null
+          metodo?: string
+          novos?: number
+          origem?: string
+          quantos?: number
+          recusados?: number
+          regiao_id?: string | null
+          situacao?: string
+        }
+        Update: {
+          coletor_versao?: string
+          custo?: number | null
+          detalhes?: NonNullable<Json>
+          erro?: string | null
+          fim?: string | null
+          fonte?: string
+          hash_bruto?: string | null
+          id?: never
+          inicio?: string
+          licenca?: string | null
+          metodo?: string
+          novos?: number
+          origem?: string
+          quantos?: number
+          recusados?: number
+          regiao_id?: string | null
+          situacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_coletas_fonte_fkey"
+            columns: ["fonte"]
+            isOneToOne: false
+            referencedRelation: "mercado_fontes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_coletas_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_regioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_conferencias: {
+        Row: {
+          causa: string | null
+          causa_em: string | null
+          causa_por: string | null
+          conferido_em: string | null
+          conferido_por: string | null
+          estrato: string
+          fonte: string
+          hash_rodada: string
+          id: number
+          item_ref: string
+          item_tipo: string
+          link: string
+          mercado_anuncio_id: string | null
+          observacao: string | null
+          ok: boolean | null
+          ordem: number
+          peso: number | null
+          preco_do_sistema: number | null
+          preco_no_sorteio: number | null
+          reclassificada: string | null
+          resposta: string | null
+          resumo: NonNullable<Json>
+          semana: string
+          sorteado_em: string
+          valor_visto: Json | null
+          vence_em: string
+        }
+        Insert: {
+          causa?: string | null
+          causa_em?: string | null
+          causa_por?: string | null
+          conferido_em?: string | null
+          conferido_por?: string | null
+          estrato: string
+          fonte: string
+          hash_rodada: string
+          id?: never
+          item_ref: string
+          item_tipo: string
+          link: string
+          mercado_anuncio_id?: string | null
+          observacao?: string | null
+          ok?: never
+          ordem: number
+          peso?: number | null
+          preco_do_sistema?: number | null
+          preco_no_sorteio?: number | null
+          reclassificada?: string | null
+          resposta?: string | null
+          resumo?: NonNullable<Json>
+          semana: string
+          sorteado_em?: string
+          valor_visto?: Json | null
+          vence_em: string
+        }
+        Update: {
+          causa?: string | null
+          causa_em?: string | null
+          causa_por?: string | null
+          conferido_em?: string | null
+          conferido_por?: string | null
+          estrato?: string
+          fonte?: string
+          hash_rodada?: string
+          id?: never
+          item_ref?: string
+          item_tipo?: string
+          link?: string
+          mercado_anuncio_id?: string | null
+          observacao?: string | null
+          ok?: never
+          ordem?: number
+          peso?: number | null
+          preco_do_sistema?: number | null
+          preco_no_sorteio?: number | null
+          reclassificada?: string | null
+          resposta?: string | null
+          resumo?: NonNullable<Json>
+          semana?: string
+          sorteado_em?: string
+          valor_visto?: Json | null
+          vence_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_conferencias_causa_por_fkey"
+            columns: ["causa_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_conferencias_causa_por_fkey"
+            columns: ["causa_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_conferencias_conferido_por_fkey"
+            columns: ["conferido_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_conferencias_conferido_por_fkey"
+            columns: ["conferido_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_conferencias_fonte_fkey"
+            columns: ["fonte"]
+            isOneToOne: false
+            referencedRelation: "mercado_fontes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_conferencias_mercado_anuncio_id_fkey"
+            columns: ["mercado_anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_anuncios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_fontes: {
+        Row: {
+          atribuicao: string | null
+          atualizada_em: string
+          auditada_em: string
+          coletor: string | null
+          condicoes: string[]
+          evidencia: NonNullable<Json>
+          frequencia: string
+          grupo: string
+          id: string
+          intervalo_min_seg: number | null
+          liberada: boolean
+          liberada_em: string | null
+          liberada_motivo: string | null
+          liberada_por: string | null
+          licenca: string | null
+          max_por_rodada: number | null
+          nome: string
+          obs: string | null
+          pode_coletar: boolean | null
+          reconferir: boolean
+          regioes: string[]
+          ritmo_maximo: string | null
+          tipo_de_dado: string | null
+          url: string | null
+          veredito: string
+        }
+        Insert: {
+          atribuicao?: string | null
+          atualizada_em?: string
+          auditada_em: string
+          coletor?: string | null
+          condicoes?: string[]
+          evidencia?: NonNullable<Json>
+          frequencia?: string
+          grupo: string
+          id: string
+          intervalo_min_seg?: number | null
+          liberada?: boolean
+          liberada_em?: string | null
+          liberada_motivo?: string | null
+          liberada_por?: string | null
+          licenca?: string | null
+          max_por_rodada?: number | null
+          nome: string
+          obs?: string | null
+          pode_coletar?: never
+          reconferir?: boolean
+          regioes?: string[]
+          ritmo_maximo?: string | null
+          tipo_de_dado?: string | null
+          url?: string | null
+          veredito: string
+        }
+        Update: {
+          atribuicao?: string | null
+          atualizada_em?: string
+          auditada_em?: string
+          coletor?: string | null
+          condicoes?: string[]
+          evidencia?: NonNullable<Json>
+          frequencia?: string
+          grupo?: string
+          id?: string
+          intervalo_min_seg?: number | null
+          liberada?: boolean
+          liberada_em?: string | null
+          liberada_motivo?: string | null
+          liberada_por?: string | null
+          licenca?: string | null
+          max_por_rodada?: number | null
+          nome?: string
+          obs?: string | null
+          pode_coletar?: never
+          reconferir?: boolean
+          regioes?: string[]
+          ritmo_maximo?: string | null
+          tipo_de_dado?: string | null
+          url?: string | null
+          veredito?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_fontes_liberada_por_fkey"
+            columns: ["liberada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_fontes_liberada_por_fkey"
+            columns: ["liberada_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_ibge: {
+        Row: {
+          ano: number
+          codigo_ibge: string | null
+          coleta_id: number
+          coletado_em: string
+          crescimento_2010_2022_pct: number | null
+          dados: NonNullable<Json>
+          definicao: string | null
+          escopo: string
+          fonte: string
+          id: number
+          idade_mediana: number | null
+          municipio: string
+          nome: string
+          pct_0_14: number | null
+          pct_60_mais: number | null
+          pct_alugado: number | null
+          pct_apartamento: number | null
+          pct_casa: number | null
+          pct_proprio: number | null
+          pct_uso_ocasional: number | null
+          pct_vagos: number | null
+          populacao: number | null
+          regiao_id: string | null
+          renda_media_responsavel: number | null
+          renda_mediana_responsavel: number | null
+          url: string
+        }
+        Insert: {
+          ano?: number
+          codigo_ibge?: string | null
+          coleta_id: number
+          coletado_em?: string
+          crescimento_2010_2022_pct?: number | null
+          dados?: NonNullable<Json>
+          definicao?: string | null
+          escopo: string
+          fonte?: string
+          id?: never
+          idade_mediana?: number | null
+          municipio: string
+          nome: string
+          pct_0_14?: number | null
+          pct_60_mais?: number | null
+          pct_alugado?: number | null
+          pct_apartamento?: number | null
+          pct_casa?: number | null
+          pct_proprio?: number | null
+          pct_uso_ocasional?: number | null
+          pct_vagos?: number | null
+          populacao?: number | null
+          regiao_id?: string | null
+          renda_media_responsavel?: number | null
+          renda_mediana_responsavel?: number | null
+          url: string
+        }
+        Update: {
+          ano?: number
+          codigo_ibge?: string | null
+          coleta_id?: number
+          coletado_em?: string
+          crescimento_2010_2022_pct?: number | null
+          dados?: NonNullable<Json>
+          definicao?: string | null
+          escopo?: string
+          fonte?: string
+          id?: never
+          idade_mediana?: number | null
+          municipio?: string
+          nome?: string
+          pct_0_14?: number | null
+          pct_60_mais?: number | null
+          pct_alugado?: number | null
+          pct_apartamento?: number | null
+          pct_casa?: number | null
+          pct_proprio?: number | null
+          pct_uso_ocasional?: number | null
+          pct_vagos?: number | null
+          populacao?: number | null
+          regiao_id?: string | null
+          renda_media_responsavel?: number | null
+          renda_mediana_responsavel?: number | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_ibge_coleta_id_fkey"
+            columns: ["coleta_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_coletas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_ibge_fonte_fkey"
+            columns: ["fonte"]
+            isOneToOne: false
+            referencedRelation: "mercado_fontes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_ibge_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_regioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_indices: {
+        Row: {
+          amostra: number | null
+          aproximado: boolean
+          coleta_id: number
+          coletado_em: string
+          fonte: string
+          local: string | null
+          mes: string
+          metodo: string
+          modo: string | null
+          nome: string
+          obs: string | null
+          regiao_id: string | null
+          serie: string
+          sub: string | null
+          unidade: string
+          url: string
+          valor: number
+        }
+        Insert: {
+          amostra?: number | null
+          aproximado?: boolean
+          coleta_id: number
+          coletado_em?: string
+          fonte: string
+          local?: string | null
+          mes: string
+          metodo?: string
+          modo?: string | null
+          nome: string
+          obs?: string | null
+          regiao_id?: string | null
+          serie: string
+          sub?: string | null
+          unidade: string
+          url: string
+          valor: number
+        }
+        Update: {
+          amostra?: number | null
+          aproximado?: boolean
+          coleta_id?: number
+          coletado_em?: string
+          fonte?: string
+          local?: string | null
+          mes?: string
+          metodo?: string
+          modo?: string | null
+          nome?: string
+          obs?: string | null
+          regiao_id?: string | null
+          serie?: string
+          sub?: string | null
+          unidade?: string
+          url?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_indices_coleta_id_fkey"
+            columns: ["coleta_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_coletas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_indices_fonte_fkey"
+            columns: ["fonte"]
+            isOneToOne: false
+            referencedRelation: "mercado_fontes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_indices_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_regioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_motor_execucoes: {
+        Row: {
+          executado_em: string
+          ficha_hash: string | null
+          id: number
+          imovel_codigo: string
+          motor_versao: string
+          n_argumentos: number
+          nao_use: string[]
+          regras_versao: string | null
+          rodada: string | null
+        }
+        Insert: {
+          executado_em?: string
+          ficha_hash?: string | null
+          id?: never
+          imovel_codigo: string
+          motor_versao: string
+          n_argumentos?: number
+          nao_use?: string[]
+          regras_versao?: string | null
+          rodada?: string | null
+        }
+        Update: {
+          executado_em?: string
+          ficha_hash?: string | null
+          id?: never
+          imovel_codigo?: string
+          motor_versao?: string
+          n_argumentos?: number
+          nao_use?: string[]
+          regras_versao?: string | null
+          rodada?: string | null
+        }
+        Relationships: []
+      }
+      mercado_obras: {
+        Row: {
+          bairro: string | null
+          cidade: string | null
+          coleta_id: number
+          coletado_em: string
+          contestado_em: string | null
+          documento: string | null
+          fase: string
+          fonte: string
+          id: number
+          id_externo: string
+          lat: number | null
+          lng: number | null
+          local_texto: string | null
+          objeto: string
+          orgao: string | null
+          precisao_ponto: string | null
+          publicado_em: string
+          regiao_id: string | null
+          tipo: string
+          unidades: number | null
+          url: string
+          valor: number | null
+        }
+        Insert: {
+          bairro?: string | null
+          cidade?: string | null
+          coleta_id: number
+          coletado_em?: string
+          contestado_em?: string | null
+          documento?: string | null
+          fase: string
+          fonte: string
+          id?: never
+          id_externo: string
+          lat?: number | null
+          lng?: number | null
+          local_texto?: string | null
+          objeto: string
+          orgao?: string | null
+          precisao_ponto?: string | null
+          publicado_em: string
+          regiao_id?: string | null
+          tipo: string
+          unidades?: number | null
+          url: string
+          valor?: number | null
+        }
+        Update: {
+          bairro?: string | null
+          cidade?: string | null
+          coleta_id?: number
+          coletado_em?: string
+          contestado_em?: string | null
+          documento?: string | null
+          fase?: string
+          fonte?: string
+          id?: never
+          id_externo?: string
+          lat?: number | null
+          lng?: number | null
+          local_texto?: string | null
+          objeto?: string
+          orgao?: string | null
+          precisao_ponto?: string | null
+          publicado_em?: string
+          regiao_id?: string | null
+          tipo?: string
+          unidades?: number | null
+          url?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_obras_coleta_id_fkey"
+            columns: ["coleta_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_coletas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_obras_fonte_fkey"
+            columns: ["fonte"]
+            isOneToOne: false
+            referencedRelation: "mercado_fontes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_obras_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_regioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_pares: {
+        Row: {
+          criado_em: string
+          decidido_em: string | null
+          decidido_por: string | null
+          decisao: string | null
+          id: number
+          imovel_codigo: string
+          mercado_anuncio_id: string
+          obs: string | null
+          preco_na_decisao: number | null
+          preco_na_marca: number | null
+          regra: string
+          tipo: string
+        }
+        Insert: {
+          criado_em?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          decisao?: string | null
+          id?: never
+          imovel_codigo: string
+          mercado_anuncio_id: string
+          obs?: string | null
+          preco_na_decisao?: number | null
+          preco_na_marca?: number | null
+          regra: string
+          tipo: string
+        }
+        Update: {
+          criado_em?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          decisao?: string | null
+          id?: never
+          imovel_codigo?: string
+          mercado_anuncio_id?: string
+          obs?: string | null
+          preco_na_decisao?: number | null
+          preco_na_marca?: number | null
+          regra?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_pares_decidido_por_fkey"
+            columns: ["decidido_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_pares_decidido_por_fkey"
+            columns: ["decidido_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_pares_mercado_anuncio_id_fkey"
+            columns: ["mercado_anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_anuncios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_proximidades: {
+        Row: {
+          atribuicao: string
+          categoria: string
+          coleta_id: number
+          coletado_em: string
+          confirmado_equipe_em: string | null
+          confirmado_por: string | null
+          contestado_em: string | null
+          data_dado: string
+          distancia_dita_m: number | null
+          distancia_m: number
+          etiqueta: string
+          faixa_praia: string | null
+          fonte: string
+          id: number
+          imovel_codigo: string | null
+          lat: number | null
+          lng: number | null
+          mercado_anuncio_id: string | null
+          nome: string | null
+          osm_id: number
+          osm_timestamp: string | null
+          osm_tipo: string
+          osm_versao: number | null
+          precisao_ponto: string
+          segunda_fonte: string | null
+          segunda_fonte_ok: boolean | null
+          suspenso: boolean
+          suspenso_motivo: string | null
+          url: string
+          valido_ate: string
+        }
+        Insert: {
+          atribuicao?: string
+          categoria: string
+          coleta_id: number
+          coletado_em?: string
+          confirmado_equipe_em?: string | null
+          confirmado_por?: string | null
+          contestado_em?: string | null
+          data_dado: string
+          distancia_dita_m?: never
+          distancia_m: number
+          etiqueta: string
+          faixa_praia?: never
+          fonte: string
+          id?: never
+          imovel_codigo?: string | null
+          lat?: number | null
+          lng?: number | null
+          mercado_anuncio_id?: string | null
+          nome?: string | null
+          osm_id: number
+          osm_timestamp?: string | null
+          osm_tipo: string
+          osm_versao?: number | null
+          precisao_ponto: string
+          segunda_fonte?: string | null
+          segunda_fonte_ok?: boolean | null
+          suspenso?: boolean
+          suspenso_motivo?: string | null
+          url: string
+          valido_ate: string
+        }
+        Update: {
+          atribuicao?: string
+          categoria?: string
+          coleta_id?: number
+          coletado_em?: string
+          confirmado_equipe_em?: string | null
+          confirmado_por?: string | null
+          contestado_em?: string | null
+          data_dado?: string
+          distancia_dita_m?: never
+          distancia_m?: number
+          etiqueta?: string
+          faixa_praia?: never
+          fonte?: string
+          id?: never
+          imovel_codigo?: string | null
+          lat?: number | null
+          lng?: number | null
+          mercado_anuncio_id?: string | null
+          nome?: string | null
+          osm_id?: number
+          osm_timestamp?: string | null
+          osm_tipo?: string
+          osm_versao?: number | null
+          precisao_ponto?: string
+          segunda_fonte?: string | null
+          segunda_fonte_ok?: boolean | null
+          suspenso?: boolean
+          suspenso_motivo?: string | null
+          url?: string
+          valido_ate?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_proximidades_coleta_id_fkey"
+            columns: ["coleta_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_coletas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_proximidades_confirmado_por_fkey"
+            columns: ["confirmado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_proximidades_confirmado_por_fkey"
+            columns: ["confirmado_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_proximidades_fonte_fkey"
+            columns: ["fonte"]
+            isOneToOne: false
+            referencedRelation: "mercado_fontes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_proximidades_mercado_anuncio_id_fkey"
+            columns: ["mercado_anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_anuncios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_regioes: {
+        Row: {
+          abrangencia: string
+          ativa: boolean
+          atualizada_em: string
+          chaves: string[]
+          cidade: string
+          codigo_ibge: string | null
+          criada_em: string
+          curto: string
+          definicao: string | null
+          id: string
+          lat: number | null
+          litoral: boolean
+          lng: number | null
+          nome: string
+          papel: string
+          poligono: unknown
+          uf: string
+          vizinhos: NonNullable<Json>
+        }
+        Insert: {
+          abrangencia?: string
+          ativa?: boolean
+          atualizada_em?: string
+          chaves?: string[]
+          cidade: string
+          codigo_ibge?: string | null
+          criada_em?: string
+          curto: string
+          definicao?: string | null
+          id: string
+          lat?: number | null
+          litoral?: boolean
+          lng?: number | null
+          nome: string
+          papel?: string
+          poligono?: unknown
+          uf?: string
+          vizinhos?: NonNullable<Json>
+        }
+        Update: {
+          abrangencia?: string
+          ativa?: boolean
+          atualizada_em?: string
+          chaves?: string[]
+          cidade?: string
+          codigo_ibge?: string | null
+          criada_em?: string
+          curto?: string
+          definicao?: string | null
+          id?: string
+          lat?: number | null
+          litoral?: boolean
+          lng?: number | null
+          nome?: string
+          papel?: string
+          poligono?: unknown
+          uf?: string
+          vizinhos?: NonNullable<Json>
+        }
+        Relationships: []
+      }
+      mercado_regras: {
+        Row: {
+          aprovada_em: string | null
+          aprovada_por: string | null
+          ativa: boolean
+          criada_em: string
+          obs: string | null
+          regras: NonNullable<Json>
+          versao: string
+        }
+        Insert: {
+          aprovada_em?: string | null
+          aprovada_por?: string | null
+          ativa?: boolean
+          criada_em?: string
+          obs?: string | null
+          regras: NonNullable<Json>
+          versao: string
+        }
+        Update: {
+          aprovada_em?: string | null
+          aprovada_por?: string | null
+          ativa?: boolean
+          criada_em?: string
+          obs?: string | null
+          regras?: NonNullable<Json>
+          versao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_regras_aprovada_por_fkey"
+            columns: ["aprovada_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_regras_aprovada_por_fkey"
+            columns: ["aprovada_por"]
+            isOneToOne: false
+            referencedRelation: "team_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercado_temporada: {
+        Row: {
+          anuncios: number
+          coleta_id: number
+          coletado_em: string
+          data_dado: string
+          diaria_mediana: number | null
+          fonte: string
+          id: number
+          janela_fim: string
+          janela_inicio: string
+          metodo: string
+          municipio: string
+          obs: string | null
+          ocupacao_mediana_pct: number | null
+          regiao_id: string | null
+          url: string
+        }
+        Insert: {
+          anuncios: number
+          coleta_id: number
+          coletado_em?: string
+          data_dado: string
+          diaria_mediana?: number | null
+          fonte: string
+          id?: never
+          janela_fim: string
+          janela_inicio: string
+          metodo?: string
+          municipio: string
+          obs?: string | null
+          ocupacao_mediana_pct?: number | null
+          regiao_id?: string | null
+          url: string
+        }
+        Update: {
+          anuncios?: number
+          coleta_id?: number
+          coletado_em?: string
+          data_dado?: string
+          diaria_mediana?: number | null
+          fonte?: string
+          id?: never
+          janela_fim?: string
+          janela_inicio?: string
+          metodo?: string
+          municipio?: string
+          obs?: string | null
+          ocupacao_mediana_pct?: number | null
+          regiao_id?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercado_temporada_coleta_id_fkey"
+            columns: ["coleta_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_coletas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_temporada_fonte_fkey"
+            columns: ["fonte"]
+            isOneToOne: false
+            referencedRelation: "mercado_fontes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercado_temporada_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "mercado_regioes"
             referencedColumns: ["id"]
           },
         ]
@@ -11607,6 +13557,117 @@ export type Database = {
           respondeu_em: string
           rotulo: string
         }[]
+      }
+      mercado_anuncios_registrar: {
+        Args: { p_anuncios: Json; p_coleta: number }
+        Returns: Json
+      }
+      mercado_argumento_decidir: {
+        Args: {
+          p_confirmo_conferido?: boolean
+          p_decisao: string
+          p_id: string
+          p_motivo?: string
+        }
+        Returns: Json
+      }
+      mercado_argumentos_aprovar_imovel: {
+        Args: {
+          p_confirmo_conferido?: boolean
+          p_ids?: string[]
+          p_imovel: string
+        }
+        Returns: Json
+      }
+      mercado_argumentos_propor: {
+        Args: {
+          p_argumentos: Json
+          p_imovel: string
+          p_motor_versao: string
+          p_nao_use?: string[]
+        }
+        Returns: Json
+      }
+      mercado_celula_liberar: {
+        Args: {
+          p_causa: string
+          p_modo: string
+          p_regiao: string
+          p_sub: string
+        }
+        Returns: Json
+      }
+      mercado_coleta_abrir: {
+        Args: {
+          p_coletor_versao?: string
+          p_detalhes?: Json
+          p_fonte: string
+          p_origem?: string
+          p_regiao?: string
+        }
+        Returns: Json
+      }
+      mercado_coleta_fechar: {
+        Args: {
+          p_completa?: boolean
+          p_custo?: number
+          p_detalhes?: Json
+          p_erro?: string
+          p_hash_bruto?: string
+          p_id: number
+        }
+        Returns: Json
+      }
+      mercado_conferencia_causa: {
+        Args: { p_causa: string; p_item: number }
+        Returns: Json
+      }
+      mercado_conferir: {
+        Args: {
+          p_item: number
+          p_observacao?: string
+          p_resposta: string
+          p_valor?: Json
+        }
+        Returns: Json
+      }
+      mercado_fonte_liberar: {
+        Args: { p_fonte: string; p_liberar: boolean; p_motivo: string }
+        Returns: Json
+      }
+      mercado_liquidez: {
+        Args: {
+          p_dias?: number
+          p_modo?: string
+          p_regiao: string
+          p_sub: string
+        }
+        Returns: Json
+      }
+      mercado_m2: {
+        Args: {
+          p_area_max?: number
+          p_area_min?: number
+          p_modo?: string
+          p_regiao: string
+          p_sub: string
+          p_vizinhos?: boolean
+        }
+        Returns: Json
+      }
+      mercado_par_decidir: {
+        Args: {
+          p_anuncio: string
+          p_codigo: string
+          p_decisao: string
+          p_obs?: string
+        }
+        Returns: Json
+      }
+      mercado_saude_fontes: { Args: { p_semana?: string }; Returns: Json[] }
+      mercado_vantagens_para_ia: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       meu_dia: {
         Args: { p_limite?: number; p_user_id?: string }
