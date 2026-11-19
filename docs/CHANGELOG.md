@@ -11197,3 +11197,11 @@ Pedido: uma tela para o DONO da Imova liberar as fontes da Inteligência de merc
   - "Reconferir antes" não tem botão: tirar `reconferir` de uma fonte continua sendo por migração, depois de alguém ler de novo as regras do site;
   - os nomes de tela das fontes `grupo-olx` e `fipezap-planilha` (acima) são decisão assumida;
   - o banco de teste ficou com a identidade Imova, a coleta ligada, a Lopes liberada e o admin de teste; `supabase db reset --local` limpa.
+
+## 19/11/2026 — Inteligência de mercado NO AR na Imova (etapas 0, 1, 3 e 5; a 2 e a 4 ficam com o dono, pela tela)
+- **Banco da Imova:** migrações `20261119160000` a `20261119170000` aplicadas (235 no banco, 0 pendentes), cada uma ensaiada antes em produção numa transação desfeita por erro proposital. A chave `mercado.ligado` segue **desligada**. KOMUNE não recebeu nada.
+- **Worker:** Fly app `imova-worker-mercado` (máquina `857619da4d49d8`, gru, 512 MB; `infra/nuvem/fly.imova-worker-mercado.toml`), segredos do `.env.imova`, heartbeat ok na fila `mercado_coleta`. Com a chave desligada, só bate ponto.
+- **Site:** `imova-fe7l9tnvd` (volta: `imova-ef3atqsb4`), com a aba Ajustes → Inteligência de mercado (`/admin?aba=mercado`) e a página `/inteligencia/painel` montada do protótipo limpo de 19/11 (mapa sem fundo; 16 menções de portal em texto, todas negação/trava/teste, liberadas na cópia).
+- **Ensaio das fontes (sem gravar, banco de teste, 19/11):** chavesnamao-mcp 3.313 anúncios; lopes 138, catalogue 100, ibeda 285, imobinova-pipa 82, marta-de-graglia 96, primore 73, zil-monteiro 40; fipezap 221 índices, siconfi 99, geomapas 380, dom-natal 58 obras. **abreu-imoveis respondeu 403** (o site recusa o robô: não liberar). bcb: robots.txt deu 502 nas duas tentativas (já liberada; o robô recusa enquanto o robots não responder).
+- **Com o dono, pela tela:** liberar as 7 imobiliárias que passaram no ensaio e ligar a coleta. A primeira rodada sai na segunda ou quinta seguinte, às 6h.
+- **Não deu para conferir aqui:** a página e a aba com login de verdade (a sessão é do dono).
