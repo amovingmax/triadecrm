@@ -13685,6 +13685,10 @@ export type Database = {
         }
         Returns: Json
       }
+      mercado_coleta_ligar: {
+        Args: { p_ligar: boolean; p_motivo: string }
+        Returns: Json
+      }
       mercado_conferencia_causa: {
         Args: { p_causa: string; p_item: number }
         Returns: Json
