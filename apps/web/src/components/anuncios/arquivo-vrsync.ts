@@ -59,6 +59,12 @@ export type DadosParaImportar = {
   mostrar_endereco: MostrarEndereco;
   video_youtube: string | null;
   destaque: Destaque;
+  /**
+   * O pino do mapa (19/11/2026): <Latitude> e <Longitude> de <Location>, em graus,
+   * 7 casas, as duas ou nenhuma. O banco não apaga as que tem quando vêm nulas.
+   */
+  latitude: number | null;
+  longitude: number | null;
 };
 
 /** Um anúncio do arquivo: os dados, as fotos (capa primeiro) e o que não coube. */
@@ -639,6 +645,49 @@ function caracteristicas(no: No, avisos: string[]): string[] {
   return [...conhecidas];
 }
 
+/**
+ * Uma coordenada em graus: "-6.055992499999999" ou "-6,0559925" (há quem mande
+ * vírgula). Sete casas, como o banco guarda (`numeric(10,7)`); null se ilegível.
+ */
+export function grausDoArquivo(bruto: string | null): number | null {
+  if (bruto === null) return null;
+  const t = bruto.trim().replace(/^(-?\d{1,3}),(\d+)$/, '$1.$2');
+  if (!/^-?\d{1,3}(\.\d+)?$/.test(t)) return null;
+  // Arredonda para longe do zero, como o `round` do Postgres.
+  const x = Number(t);
+  const n = (Math.sign(x) * Math.round(Math.abs(x) * 1e7)) / 1e7;
+  return Number.isFinite(n) ? n + 0 : null;
+}
+
+/**
+ * Latitude e longitude de <Location>, juntas: as duas legíveis, na faixa (−90 a
+ * 90, −180 a 180) e fora do 0,0 (o valor de quem não tem). Senão, nenhuma, com
+ * aviso quando o arquivo mandou alguma.
+ */
+function coordenadas(
+  no: No,
+  avisos: string[],
+): { latitude: number | null; longitude: number | null } {
+  const latBruta = campo(filho(no, 'Latitude'));
+  const lonBruta = campo(filho(no, 'Longitude'));
+  if (latBruta === null && lonBruta === null) return { latitude: null, longitude: null };
+  const latitude = grausDoArquivo(latBruta);
+  const longitude = grausDoArquivo(lonBruta);
+  if (
+    latitude === null ||
+    longitude === null ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180 ||
+    (latitude === 0 && longitude === 0)
+  ) {
+    avisos.push(
+      `As coordenadas do mapa (${latBruta ?? 'sem latitude'}, ${lonBruta ?? 'sem longitude'}) não conferem: ficaram de fora, e o portal acha o lugar pelo endereço.`,
+    );
+    return { latitude: null, longitude: null };
+  }
+  return { latitude, longitude };
+}
+
 function local(no: No, avisos: string[]) {
   const mostrarBruto = atributo(no, 'displayAddress');
   let mostrar: MostrarEndereco = 'rua';
@@ -674,6 +723,7 @@ function local(no: No, avisos: string[]) {
     numero: cortar(campo(filho(no, 'StreetNumber')), TETO.numero, 'O número', avisos),
     complemento: cortar(campo(filho(no, 'Complement')), TETO.complemento, 'O complemento', avisos),
     cep,
+    ...coordenadas(no, avisos),
   };
 }
 

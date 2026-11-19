@@ -8,6 +8,7 @@ import {
 import {
   codigoValido,
   dadosParaImportar,
+  grausDoArquivo,
   descricaoDoArquivo,
   lerArquivoVrsync,
   numeroDoArquivo,
@@ -259,6 +260,8 @@ describe('lerArquivoVrsync: o arquivo do sistema atual', () => {
       mostrar_endereco: 'rua',
       video_youtube: 'https://www.youtube.com/watch?v=MukVADdjQD8',
       destaque: 'destaque',
+      latitude: null,
+      longitude: null,
     });
     expect(a.fotos).toEqual([
       'https://fotos.sistema.com.br/sa0012/01.jpg',
@@ -418,6 +421,8 @@ describe('lerArquivoVrsync: o arquivo que o próprio CRM gera volta igual', () =
     complemento: 'Apto 301',
     mostrar_endereco: 'rua',
     video_youtube: 'https://www.youtube.com/watch?v=abc123',
+    latitude: null,
+    longitude: null,
     fotos: ['IMV/1.jpg', 'IMV/2.jpg'],
   };
 
@@ -442,6 +447,25 @@ describe('lerArquivoVrsync: o arquivo que o próprio CRM gera volta igual', () =
       'https://exemplo.supabase.co/storage/v1/object/public/anuncios/IMV/1.jpg',
       'https://exemplo.supabase.co/storage/v1/object/public/anuncios/IMV/2.jpg',
     ]);
+    expect(a.avisos).toEqual([]);
+  });
+
+  it('o pino do mapa vai e volta (com o endereço inteiro à mostra)', () => {
+    const comPino: AnuncioDoFeed = {
+      ...base,
+      mostrar_endereco: 'completo',
+      latitude: -6.0559925,
+      longitude: -35.1708741,
+    };
+    const r = lido(
+      montarVrsync(
+        { nome: 'Imova', email: 'a@b.co', telefone: null, site: null },
+        [comPino],
+        (c) => `https://exemplo.supabase.co/storage/v1/object/public/anuncios/${c}`,
+      ),
+    );
+    const a = r.anuncios[0]!;
+    expect([a.latitude, a.longitude]).toEqual([-6.0559925, -35.1708741]);
     expect(a.avisos).toEqual([]);
   });
 
@@ -511,6 +535,71 @@ describe('numeroDoArquivo', () => {
     ['-10', null],
   ])('%s → %s', (texto, numero) => {
     expect(numeroDoArquivo(texto)).toBe(numero);
+  });
+});
+
+describe('as coordenadas do arquivo da Arbo (19/11/2026)', () => {
+  /** O TE0004 como a Arbo manda: 15 casas na latitude, depois do CEP e antes do complemento. */
+  const TE0004 = feed(`
+    <Listing>
+      <ListingID>TE0004_IMOVA</ListingID>
+      <Title><![CDATA[Terreno Frente ao Mar com 810m² – Praia de Tabatinga | Escriturado]]></Title>
+      <TransactionType>For Sale</TransactionType>
+      <Location displayAddress="All">
+        <Country>Brasil</Country>
+        <State abbreviation="RN"><![CDATA[RN]]></State>
+        <City><![CDATA[Nísia Floresta]]></City>
+        <Neighborhood><![CDATA[Praia de Tabatinga]]></Neighborhood>
+        <Address><![CDATA[Av Barra de Tabatinga, 2004]]></Address>
+        <StreetNumber>2004</StreetNumber>
+        <PostalCode>59164-000</PostalCode>
+        <Latitude>-6.055992499999999</Latitude>
+        <Longitude>-35.1708741</Longitude>
+        <Complement><![CDATA[Terreno Tabatinga]]></Complement>
+      </Location>
+      <Details><PropertyType>Residential / Land Lot</PropertyType><UsageType>Residential</UsageType></Details>
+    </Listing>`);
+
+  it('vêm em graus, com 7 casas, como o banco guarda', () => {
+    const a = lido(TE0004).anuncios[0]!;
+    expect([a.latitude, a.longitude]).toEqual([-6.0559925, -35.1708741]);
+    expect(a.cep).toBe('59164000');
+    expect(a.mostrar_endereco).toBe('completo');
+    expect(a.avisos.some((x) => /coordenadas/.test(x))).toBe(false);
+  });
+
+  it('uma sem a outra, fora da faixa ou no 0,0: nenhuma, com aviso', () => {
+    const sem = (xml: string) => lido(xml).anuncios[0]!;
+    const soLatitude = sem(TE0004.replace('<Longitude>-35.1708741</Longitude>', ''));
+    expect([soLatitude.latitude, soLatitude.longitude]).toEqual([null, null]);
+    expect(soLatitude.avisos).toContain(
+      'As coordenadas do mapa (-6.055992499999999, sem longitude) não conferem: ficaram de fora, e o portal acha o lugar pelo endereço.',
+    );
+    const fora = sem(TE0004.replace('-6.055992499999999', '-96.1'));
+    expect(fora.latitude).toBeNull();
+    const zero = sem(TE0004.replace('-6.055992499999999', '0').replace('-35.1708741', '0'));
+    expect([zero.latitude, zero.longitude]).toEqual([null, null]);
+    // Sem nenhuma das duas, nem aviso.
+    const nenhuma = sem(
+      TE0004.replace(/<Latitude>.*<\/Latitude>/, '').replace(/<Longitude>.*<\/Longitude>/, ''),
+    );
+    expect([nenhuma.latitude, nenhuma.longitude]).toEqual([null, null]);
+    expect(nenhuma.avisos.some((x) => /coordenadas/.test(x))).toBe(false);
+  });
+
+  it.each([
+    ['-6.055992499999999', -6.0559925],
+    ['-35.1708741', -35.1708741],
+    ['-5,8623832', -5.8623832],
+    [' -15.844255 ', -15.844255],
+    ['0.00000005', 0.0000001],
+    ['-0.00000005', -0.0000001],
+    ['1234.5', null],
+    ['-6.05e-1', null],
+    ['abc', null],
+    ['', null],
+  ])('grausDoArquivo(%j) → %s', (texto, graus) => {
+    expect(grausDoArquivo(texto)).toBe(graus);
   });
 });
 
