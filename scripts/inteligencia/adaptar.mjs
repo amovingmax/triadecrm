@@ -477,6 +477,27 @@ export function rastrosDePortais(html) {
  * indispensável; `avisos` é o que dá para publicar mesmo assim, mas alguém precisa
  * saber.
  */
+/**
+ * O fundo do mapa (decisão de 19/11/2026, com a liberdade dada pelo dono): a página roda em
+ * `sandbox`, sem origem, e por isso os pedidos de ladrilho ao OpenStreetMap sairiam sem
+ * Referer, o que a política de uso do OSM não aceita. Na cópia do CRM o mapa fica sem
+ * fundo: cada ladrilho vira um GIF transparente de 1 px, dentro da página (nenhum pedido
+ * sai). Contornos, costa, pontos e balões continuam; a atribuição continua citando o OSM,
+ * porque os contornos vêm de dados dele (ODbL), guardados no protótipo.
+ */
+export const LADRILHO_TRANSPARENTE =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+const LADRILHOS_DO_OSM = /https:\/\/(?:[a-c]\.|\{s\}\.)?tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png/g;
+
+export function semFundoDoMapa(html) {
+  let trocados = 0;
+  const pronto = html.replace(LADRILHOS_DO_OSM, () => {
+    trocados++;
+    return LADRILHO_TRANSPARENTE;
+  });
+  return { html: pronto, trocados };
+}
+
 export function adaptarParaOCrm(
   html,
   {
@@ -532,7 +553,8 @@ export function adaptarParaOCrm(
         'conferindo o hash com o que a CDN publica, e a origem na política da rota (inteligencia/cabecalhos.ts).',
     );
 
-  const ponte = porAPonte(bibliotecas.html);
+  const mapa = semFundoDoMapa(bibliotecas.html);
+  const ponte = porAPonte(mapa.html);
   if (!ponte.posta) throw new ErroDaCopia('Não achei o <head> para pôr a ponte do CRM.');
   const faixa = porAFaixaDaData(marcarOHead(ponte.html, { mencoesLiberadas: liberadas }), quando);
   if (!faixa.posta)
@@ -540,6 +562,8 @@ export function adaptarParaOCrm(
 
   const pronto = carimbar(faixa.html, { origem, quando, mencoesLiberadas: liberadas });
   const finais = [...problemasDaPagina(pronto), ...problemasDeIntegridade(pronto)];
+  if (/tile\.openstreetmap\.org/i.test(pronto))
+    finais.push('a página ainda pede ladrilhos ao OpenStreetMap (sem Referer, por causa do sandbox): ajuste semFundoDoMapa().');
   if (finais.length)
     throw new ErroDaCopia(`A página adaptada saiu com problema:\n- ${finais.join('\n- ')}`);
 
@@ -553,6 +577,7 @@ export function adaptarParaOCrm(
     avisos,
     tamanho,
     voltarTrocados: voltar.trocados,
+    ladrilhosTrocados: mapa.trocados,
     mencoesLiberadas: liberadas,
     atualizadaEm: dataDaPagina(quando),
   };

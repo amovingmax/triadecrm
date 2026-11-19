@@ -112,7 +112,7 @@ describe('a política da página pronta', () => {
   });
 
   it('o fundo do mapa (OpenStreetMap) pode carregar', () => {
-    expect(diretiva('img-src')).toContain('https://tile.openstreetmap.org');
+    expect(diretiva('img-src')).not.toContain('openstreetmap');
   });
 });
 

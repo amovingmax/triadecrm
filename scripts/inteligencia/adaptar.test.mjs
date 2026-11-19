@@ -23,6 +23,8 @@ import {
   rastrosDePortais,
   ROTA_INICIAL_DO_CRM,
   seguirOTemaDoCrm,
+  semFundoDoMapa,
+  LADRILHO_TRANSPARENTE,
 } from './adaptar.mjs';
 
 const ECHARTS = 'https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js';
@@ -410,5 +412,21 @@ describe('foraDosScripts', () => {
       return parte.toUpperCase();
     });
     assert.deepEqual(vistos, ['a', 'c', 'e']);
+  });
+});
+
+describe('o mapa sem fundo (sandbox não manda Referer ao OpenStreetMap)', () => {
+  it('troca cada ladrilho do OSM pelo GIF transparente e conta', () => {
+    const html = `<script>L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{a:1});L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")</script>`;
+    const r = semFundoDoMapa(html);
+    assert.equal(r.trocados, 2);
+    assert.ok(!/tile\.openstreetmap\.org/.test(r.html));
+    assert.ok(r.html.includes(`L.tileLayer("${LADRILHO_TRANSPARENTE}"`));
+  });
+  it('não mexe no link da atribuição nem em texto que só cita o OSM', () => {
+    const html = '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> "https://nominatim.openstreetmap.org/"';
+    const r = semFundoDoMapa(html);
+    assert.equal(r.trocados, 0);
+    assert.equal(r.html, html);
   });
 });

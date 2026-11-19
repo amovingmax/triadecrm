@@ -10,11 +10,11 @@
  * comprometida) lê cookie, localStorage ou faz pedido com a sessão do CRM. As
  * bibliotecas ainda vão presas ao hash (`integrity`, em `scripts/inteligencia/adaptar.mjs`).
  *
- * O PREÇO DO `sandbox`. Página de origem opaca não manda o cabeçalho Referer. Os
- * ladrilhos do mapa vêm de tile.openstreetmap.org, cuja política pede Referer de quem
- * usa pelo navegador ("referer-stripping ... may be blocked without notice"). O fundo
- * do mapa pode sair bloqueado; contornos, pontos e o resto da página não dependem
- * dele. É decisão do dono (registrada no CHANGELOG de 18/11/2026).
+ * O PREÇO DO `sandbox`. Página de origem opaca não manda o cabeçalho Referer, e a
+ * política de uso do OpenStreetMap pede Referer de quem pede ladrilho pelo navegador.
+ * Decisão de 19/11/2026: a cópia do CRM fica SEM fundo de mapa (`semFundoDoMapa`, em
+ * `scripts/inteligencia/adaptar.mjs`, troca cada ladrilho por um GIF transparente dentro
+ * da página), e por isso tile.openstreetmap.org saiu do `img-src`: nenhum pedido sai.
  */
 
 /** De onde a página pode carregar código. Cada arquivo vai preso ao hash pelo adaptar.mjs. */
@@ -24,8 +24,8 @@ export const ORIGENS_DE_SCRIPT = ['https://cdn.jsdelivr.net', 'https://cdnjs.clo
 const ORIGENS_DE_ESTILO = ['https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'];
 const ORIGENS_DE_FONTE = ['https://fonts.gstatic.com'];
 
-/** Imagens: os ladrilhos do OpenStreetMap e os ícones do CSS do Leaflet. */
-const ORIGENS_DE_IMAGEM = ['https://tile.openstreetmap.org', 'https://cdnjs.cloudflare.com'];
+/** Imagens: os ícones do CSS do Leaflet. O mapa vai sem fundo (ver acima). */
+const ORIGENS_DE_IMAGEM = ['https://cdnjs.cloudflare.com'];
 
 export const SANDBOX_DA_PAGINA_PRONTA =
   'sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox';
