@@ -2299,6 +2299,7 @@ export type Database = {
           complemento: string | null
           comprimento_terreno: number | null
           condominio: number | null
+          coordenadas_lidas_em: string | null
           criado_em: string
           criado_por: string | null
           descricao: string
@@ -2312,6 +2313,8 @@ export type Database = {
           iptu: number | null
           iptu_periodo: string
           largura_terreno: number | null
+          latitude: number | null
+          longitude: number | null
           mostrar_endereco: string
           motivo_exclusao: string | null
           negocio: string
@@ -2346,6 +2349,7 @@ export type Database = {
           complemento?: string | null
           comprimento_terreno?: number | null
           condominio?: number | null
+          coordenadas_lidas_em?: string | null
           criado_em?: string
           criado_por?: string | null
           descricao?: string
@@ -2359,6 +2363,8 @@ export type Database = {
           iptu?: number | null
           iptu_periodo?: string
           largura_terreno?: number | null
+          latitude?: number | null
+          longitude?: number | null
           mostrar_endereco?: string
           motivo_exclusao?: string | null
           negocio?: string
@@ -2393,6 +2399,7 @@ export type Database = {
           complemento?: string | null
           comprimento_terreno?: number | null
           condominio?: number | null
+          coordenadas_lidas_em?: string | null
           criado_em?: string
           criado_por?: string | null
           descricao?: string
@@ -2406,6 +2413,8 @@ export type Database = {
           iptu?: number | null
           iptu_periodo?: string
           largura_terreno?: number | null
+          latitude?: number | null
+          longitude?: number | null
           mostrar_endereco?: string
           motivo_exclusao?: string | null
           negocio?: string
@@ -8542,6 +8551,54 @@ export type Database = {
         }
         Relationships: []
       }
+      ofertas_por_email: {
+        Row: {
+          aceita: boolean
+          conversation_id: string | null
+          id: string
+          message_id: string | null
+          ocorrido_em: string
+          organization_id: string
+          origem: string
+          registrado_por: string | null
+        }
+        Insert: {
+          aceita: boolean
+          conversation_id?: string | null
+          id?: string
+          message_id?: string | null
+          ocorrido_em?: string
+          organization_id: string
+          origem: string
+          registrado_por?: string | null
+        }
+        Update: {
+          aceita?: boolean
+          conversation_id?: string | null
+          id?: string
+          message_id?: string | null
+          ocorrido_em?: string
+          organization_id?: string
+          origem?: string
+          registrado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ofertas_por_email_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ofertas_por_email_registrado_por_fkey"
+            columns: ["registrado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_categories: {
         Row: {
           category_id: number
@@ -12288,6 +12345,7 @@ export type Database = {
           endereco: string | null
           estado: string | null
           excluido_em: string | null
+          falta_pino: boolean | null
           fotos: number | null
           id: string | null
           importado_em: string | null
@@ -12296,6 +12354,7 @@ export type Database = {
           mostrar_endereco: string | null
           motivo_exclusao: string | null
           negocio: string | null
+          no_canal_pro_com_destaque: boolean | null
           no_canal_pro_contatos: number | null
           no_canal_pro_criado_em: string | null
           no_canal_pro_situacao: string | null
@@ -13382,6 +13441,14 @@ export type Database = {
           p_prompt_version?: string
           p_texto: string
           p_tipo: string
+        }
+        Returns: Json
+      }
+      ia_atendente_ofertas_por_email: {
+        Args: {
+          p_aceita: boolean
+          p_conversation_id: string
+          p_message_id: string
         }
         Returns: Json
       }

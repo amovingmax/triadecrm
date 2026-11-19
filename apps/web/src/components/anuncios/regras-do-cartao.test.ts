@@ -12,6 +12,9 @@ import {
   ocupaVagaPeloRelatorio,
   oQueFalta,
   travasDoPlano,
+  crmPublica,
+  DIAS_DO_SINAL_DA_TROCA,
+  precisaDoPino,
   formatarDia,
   formatarNota,
   negociosDoCartao,
@@ -587,14 +590,33 @@ describe('o plano antes do clique (11/11/2026)', () => {
     ).toBe(true);
   });
 
-  it('o destaque do anúncio que o relatório conta fica com o banco', () => {
-    const comDestaque = { situacao: 'rascunho' as const, destaque: 'destaque' };
+  it('o destaque: a mesma conta do banco (a linha do próprio anúncio não conta contra ele)', () => {
+    // A Imova em 19/11/2026: 2 de 2 em uso, e os dois são o TE0001 e o TE0002 no
+    // relatório (ativos, "Destaque"). Os dois são rascunho no CRM.
+    const te0001 = {
+      situacao: 'rascunho' as const,
+      destaque: 'padrao',
+      ocupaVagaPeloRelatorio: true,
+      destaqueNoRelatorio: true,
+    };
+    expect(travasDoPlano(plano, te0001).semDestaque).toBe(false);
+    expect(travasDoPlano(plano, { ...te0001, destaque: 'destaque' }).destaqueBarrado).toBe(false);
+    // O TE0003 está no portal sem destaque: os 2 são dos outros.
+    const te0003 = { ...te0001, destaqueNoRelatorio: false };
+    expect(travasDoPlano(plano, te0003).semDestaque).toBe(true);
+    expect(travasDoPlano(plano, { ...te0003, destaque: 'destaque' }).destaqueBarrado).toBe(true);
+    // Fora do portal, a linha do relatório não conta, nem que diga "Destaque"
+    // (Casa extremox e SANTA CATARINA, inativos).
+    const inativo = { ...te0001, ocupaVagaPeloRelatorio: false };
+    expect(travasDoPlano(plano, inativo).semDestaque).toBe(true);
+    // Sem dizer nada da linha, ela não conta.
     expect(
-      travasDoPlano(plano, { ...comDestaque, ocupaVagaPeloRelatorio: false }).destaqueBarrado,
+      travasDoPlano(plano, {
+        situacao: 'rascunho',
+        destaque: 'destaque',
+        ocupaVagaPeloRelatorio: true,
+      }).destaqueBarrado,
     ).toBe(true);
-    expect(
-      travasDoPlano(plano, { ...comDestaque, ocupaVagaPeloRelatorio: true }).destaqueBarrado,
-    ).toBe(false);
   });
 
   it('no ar, o próprio destaque não conta contra ele; sem plano, nada trava', () => {
@@ -611,5 +633,33 @@ describe('o plano antes do clique (11/11/2026)', () => {
         ocupaVagaPeloRelatorio: false,
       }),
     ).toEqual({ semVaga: false, semDestaque: false, destaqueBarrado: false });
+  });
+});
+
+describe('a troca e o pino do mapa (19/11/2026)', () => {
+  const agora = new Date('2026-11-19T15:00:00Z');
+  const diasAntes = (d: number) => new Date(agora.getTime() - d * 86_400_000).toISOString();
+
+  it('o sinal da troca é a leitura do robô nos últimos 90 dias', () => {
+    expect(DIAS_DO_SINAL_DA_TROCA).toBe(90);
+    expect(crmPublica(null, agora)).toBe(false);
+    expect(crmPublica(undefined, agora)).toBe(false);
+    expect(crmPublica(diasAntes(1), agora)).toBe(true);
+    expect(crmPublica(diasAntes(89.9), agora)).toBe(true);
+    // O Canal Pro voltou para a Arbo e ninguém lê o arquivo do CRM há 90 dias.
+    expect(crmPublica(diasAntes(90.1), agora)).toBe(false);
+    expect(crmPublica('lixo', agora)).toBe(false);
+  });
+
+  it('precisa do pino quem está no arquivo do sistema atual, sem coordenada e sem o importador ter procurado', () => {
+    const da = { excluido_em: null, no_sistema_atual: true as boolean | null, falta_pino: true };
+    expect(precisaDoPino(da)).toBe(true);
+    expect(precisaDoPino({ ...da, falta_pino: false })).toBe(false);
+    // Fora do arquivo da Arbo (criado no CRM, ou saiu de lá): de onde viria o pino?
+    expect(precisaDoPino({ ...da, no_sistema_atual: null })).toBe(false);
+    expect(precisaDoPino({ ...da, no_sistema_atual: false })).toBe(false);
+    expect(precisaDoPino({ ...da, excluido_em: '2026-11-19T12:00:00Z' })).toBe(false);
+    // Banco anterior à migração: a lista não traz a coluna.
+    expect(precisaDoPino({ excluido_em: null, no_sistema_atual: true })).toBe(false);
   });
 });

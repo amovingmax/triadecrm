@@ -304,6 +304,7 @@ export function BotaoDoLinkDaAgenda({
   bloqueada = false,
   className,
   classeDoBloco,
+  classeDoAviso,
 }: {
   conversaId: string;
   organizacaoId: string | null;
@@ -311,10 +312,16 @@ export function BotaoDoLinkDaAgenda({
   naoContatar?: boolean;
   bloqueada?: boolean;
   className?: string;
-  /** O bloco do botão e da frase (na folha do celular, a linha inteira). */
+  /**
+   * O bloco do botão e da frase. Nas Ações, `contents`: o botão vira uma célula da
+   * grade e a frase, com `classeDoAviso`, uma linha inteira embaixo.
+   */
   classeDoBloco?: string;
+  /** A frase do porquê (nas Ações, `col-span-full`). */
+  classeDoAviso?: string;
 }) {
   const [aberta, setAberta] = useState(false);
+  const idDoPorque = useId();
   if (!LINK_DA_AGENDA_NA_EMPRESA) return null;
   const porque = porqueOLinkNaoSai({ janela, naoContatar, bloqueada });
 
@@ -324,13 +331,20 @@ export function BotaoDoLinkDaAgenda({
         variant="outline"
         className={className}
         disabled={porque !== null}
+        aria-describedby={porque ? idDoPorque : undefined}
         onClick={() => setAberta(true)}
       >
         <CalendarPlus aria-hidden="true" />
         Enviar link da agenda
       </Button>
       {porque ? (
-        <p className="flex items-start gap-1.5 px-1 text-xs leading-relaxed text-muted-foreground">
+        <p
+          id={idDoPorque}
+          className={cn(
+            'flex items-start gap-1.5 px-1 text-xs leading-relaxed text-muted-foreground',
+            classeDoAviso,
+          )}
+        >
           <LockKeyhole className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
           {porque}
         </p>

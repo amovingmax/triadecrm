@@ -29,7 +29,9 @@ import {
   urlDeLeads,
   urlDoArquivo,
 } from './dados';
+import { ImportarSistemaAtual } from './importar-sistema-atual';
 import { formatarQuando } from './no-portal';
+import { DESTACADOR_AUTOMATICO } from './regras-do-cartao';
 import { type AnuncioNaLista, fraseDaRecusa, lerInteiro, type SituacaoDoCanalPro } from './tipos';
 
 /**
@@ -55,6 +57,7 @@ export function PainelCanalPro({
   aoMudar,
   podeAjustar,
   aAssumir,
+  semPino,
   soNoCanalProNoAr,
 }: {
   aberto: boolean;
@@ -62,6 +65,8 @@ export function PainelCanalPro({
   podeAjustar: boolean;
   /** No portal por fora do CRM e não no ar no CRM: sairiam do ar na troca. */
   aAssumir: AnuncioNaLista[];
+  /** No portal pelo sistema atual e sem o pino do mapa no CRM (19/11/2026). */
+  semPino: AnuncioNaLista[];
   /** Ativos no Canal Pro sem anúncio no CRM (cadastrados lá): o CRM não os tira. */
   soNoCanalProNoAr: number;
 }) {
@@ -92,9 +97,13 @@ export function PainelCanalPro({
 
   return (
     <Sheet open={aberto} onOpenChange={aoMudar}>
+      {/* `data-[side=right]:w-full` e não `w-full` (16/11/2026): a folha da casca
+          traz `data-[side=right]:w-3/4`, que vence o `w-full` solto, e no celular
+          ela abria com três quartos da tela, com o e-mail cortado. No computador
+          nada muda: lá quem manda é o teto da folha. */}
       <SheetContent
         side="right"
-        className="w-full sm:max-w-lg"
+        className="data-[side=right]:w-full sm:max-w-lg"
         // A folha abre para ler; o cursor no primeiro campo, com o nome
         // selecionado, parecia pedir para preencher (06/11/2026).
         onOpenAutoFocus={(e) => {
@@ -143,7 +152,11 @@ export function PainelCanalPro({
                 <section className="flex flex-col gap-3">
                   <h3 className="text-sm font-medium">O endereço do arquivo</h3>
                   <EnderecoDoArquivo chave={chave} />
-                  <AntesDeColar aAssumir={aAssumir} soNoCanalProNoAr={soNoCanalProNoAr} />
+                  <AntesDeColar
+                    aAssumir={aAssumir}
+                    semPino={dados.sistemaAtual.temEndereco ? semPino : []}
+                    soNoCanalProNoAr={soNoCanalProNoAr}
+                  />
                   <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm text-muted-foreground">
                     <li>Salve o contato e resolva o quadro &ldquo;Antes de colar&rdquo;.</li>
                     <li>
@@ -372,7 +385,8 @@ function Plano({
         </Campo>
       </fieldset>
       <p className="text-xs text-muted-foreground">
-        O CRM não deixa pôr no ar além disso. Deixe vazio para o CRM não conferir.
+        O CRM não deixa pôr no ar além disso. Deixe vazio para o CRM não conferir.{' '}
+        {DESTACADOR_AUTOMATICO}
       </p>
       {podeAjustar ? (
         <Button type="submit" disabled={salvando} className="toque h-11 w-fit md:h-9">
@@ -412,14 +426,36 @@ function Campo({
  */
 function AntesDeColar({
   aAssumir,
+  semPino,
   soNoCanalProNoAr,
 }: {
   aAssumir: AnuncioNaLista[];
+  /** Só quando o CRM tem o endereço do sistema atual (é de lá que o pino vem). */
+  semPino: AnuncioNaLista[];
   soNoCanalProNoAr: number;
 }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-hairline p-3 text-sm">
       <h4 className="font-medium">Antes de colar o endereço no Canal Pro</h4>
+      {semPino.length > 0 ? (
+        <>
+          <p className="text-muted-foreground">
+            <span className="text-foreground">
+              {semPino.length === 1
+                ? '1 anúncio no portal pela Arbo está sem o pino do mapa no CRM'
+                : `${semPino.length} anúncios no portal pela Arbo estão sem o pino do mapa no CRM`}
+            </span>
+            : “Atualizar do sistema atual” traz as coordenadas do arquivo da Arbo. Sem elas, o
+            portal acha o lugar só pelo endereço.
+          </p>
+          <p className="numerico text-xs text-muted-foreground">
+            {semPino.map((a) => a.codigo).join(' · ')}
+          </p>
+          <div>
+            <ImportarSistemaAtual temEndereco />
+          </div>
+        </>
+      ) : null}
       {aAssumir.length > 0 ? (
         <>
           <p className="text-muted-foreground">
@@ -481,7 +517,11 @@ export function EnderecoDeLeads() {
   return <EnderecoParaCopiar url={urlDeLeads()} nome="URL de leads" />;
 }
 
-/** Uma URL só de leitura (selecionada ao focar) e o botão "Copiar". */
+/**
+ * Uma URL só de leitura (selecionada ao focar) e o botão "Copiar". A letra é de
+ * 16px no celular (16/11/2026): abaixo disso o iOS dá zoom ao tocar no campo, e
+ * no app (WebView) a tela fica ampliada até a pessoa desfazer com dois dedos.
+ */
 function EnderecoParaCopiar({ url, nome }: { url: string; nome: string }) {
   async function copiar() {
     try {
@@ -498,7 +538,7 @@ function EnderecoParaCopiar({ url, nome }: { url: string; nome: string }) {
         readOnly
         value={url}
         aria-label={nome}
-        className="h-11 min-w-0 font-mono text-xs md:h-9"
+        className="h-11 min-w-0 font-mono text-base md:h-9 md:text-xs"
         onFocus={(e) => e.currentTarget.select()}
       />
       <Button

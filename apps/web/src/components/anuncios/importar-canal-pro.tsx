@@ -127,7 +127,9 @@ export function ImportarCanalPro({
         aoMudar(estado);
       }}
     >
-      <SheetContent side="right" className="w-full sm:max-w-lg">
+      {/* Tela inteira no celular: o `w-full` solto perdia para o
+          `data-[side=right]:w-3/4` da folha (16/11/2026; ver painel-canal-pro). */}
+      <SheetContent side="right" className="data-[side=right]:w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>Atualizar do Canal Pro</SheetTitle>
           <SheetDescription>

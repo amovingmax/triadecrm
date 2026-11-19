@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/sheet';
 import { formatarProximaAcao } from '@/components/parceiros/formatos';
 import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
+import { EmailDaFicha } from '@/components/parceiros/email-da-ficha';
 import { DiasSemContato } from '@/components/temperatura';
 import { definicaoTemperatura } from '@/components/temperatura/escala-termica';
 import { BotaoLigar } from '@/components/ligacao/voz-botao-ligar';
@@ -51,7 +52,14 @@ import { ProvedorDoFio } from './contexto-do-fio';
 import { carregarLinhaDoParceiro, chaveDaLinha, CHAVE_CONVERSAS, mensagemDoErro } from './dados';
 import { ErroDaTela, EsqueletoLinha } from './estados';
 import { contagemDeInteracoes, local } from './formatos';
-import { FichaAoLado, ROTULO_DA_SECAO, AreaDoFio, useAvisoDeNaoLidas } from './fio-wpp';
+import {
+  ACAO_DA_FOLHA,
+  AreaDoFio,
+  FichaAoLado,
+  GRADE_DAS_ACOES,
+  ROTULO_DA_SECAO,
+  useAvisoDeNaoLidas,
+} from './fio-wpp';
 import { Janela24h, PilulaDaJanela, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
 import { ControleDaIa, SeloDaIa } from '@/components/ia-que-atende/na-conversa';
@@ -358,11 +366,24 @@ export function Conversa({
           telefone={item.telefone}
           mascarado={item.telefoneMascarado}
           whatsapp={meta?.numeroConfigurado ? 'nenhum' : 'externo'}
+          className="justify-end"
         />
+      </Campo>
+      {/* O e-mail (17/11/2026): o que o cliente escreve na conversa entra sozinho. */}
+      <Campo variante={variante} rotulo="E-mail">
+        <EmailDaFicha organizationId={item.id} email={item.email} />
       </Campo>
       {negocio?.next_action || proxima ? (
         <Campo variante={variante} rotulo="Próxima ação">
-          <span className={cn('truncate', proxima?.atrasada && 'font-medium')}>
+          {/* Até três linhas, e o texto inteiro no `title` (17/11/2026): numa
+              linha só, "Buscar novos terrenos na região da …" escondia o que fazer. */}
+          <span
+            className={cn(
+              'line-clamp-3 [overflow-wrap:anywhere]',
+              proxima?.atrasada && 'font-medium',
+            )}
+            title={negocio?.next_action ?? undefined}
+          >
             {negocio?.next_action ?? 'combinada'}
           </span>
           {proxima ? (
@@ -402,16 +423,18 @@ export function Conversa({
 
       <section aria-label="Ações" className="flex flex-col gap-2">
         <h3 className={ROTULO_DA_SECAO}>Ações</h3>
-        <div className={cn('grid gap-2', naFolha ? 'grid-cols-2' : 'grid-cols-1')}>
+        <div className={GRADE_DAS_ACOES}>
           {podeAssumir && fio ? (
             <AssumirConversa
               fioId={fio.id}
               organizacaoId={item.id}
-              className={cn(ACAO_DA_FOLHA, 'col-span-2')}
+              className={cn(ACAO_DA_FOLHA, 'col-span-full')}
             />
           ) : null}
           {/* O link da agenda (Imova, 11/11/2026): também com a janela fechada, e
-              aí desligado, dizendo por quê. Na folha ocupa a linha inteira. */}
+              aí desligado, dizendo por quê. O botão é uma célula da grade como as
+              outras, e o porquê ocupa a linha inteira logo embaixo (17/11/2026):
+              preso ao bloco do botão, virava um parágrafo de meia coluna. */}
           {fio && eu?.podeEscrever ? (
             <BotaoDoLinkDaAgenda
               conversaId={fio.id}
@@ -420,7 +443,8 @@ export function Conversa({
               naoContatar={item.naoContatar}
               bloqueada={fio.bloqueadaEm !== null}
               className={ACAO_DA_FOLHA}
-              classeDoBloco={naFolha ? 'col-span-2' : undefined}
+              classeDoBloco="contents"
+              classeDoAviso="col-span-full"
             />
           ) : null}
           {fio && eu?.podeEscrever ? (
@@ -432,7 +456,9 @@ export function Conversa({
               className={ACAO_DA_FOLHA}
             />
           ) : null}
-          {fio && eu?.podeEscrever ? <ControleDaIa fioId={fio.id} className={ACAO_DA_FOLHA} /> : null}
+          {fio && eu?.podeEscrever ? (
+            <ControleDaIa fioId={fio.id} className={ACAO_DA_FOLHA} />
+          ) : null}
           <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
             <Link href={registrarHref}>
               <MessageSquarePlus aria-hidden="true" />
@@ -538,10 +564,18 @@ export function Conversa({
             <CanalNoTopo
               conversaId={fio.id}
               podeEscrever={Boolean(eu?.podeEscrever)}
-              className="mx-1 max-md:hidden conversa-estreita:hidden"
+              className="mx-1 max-md:hidden conversa-estreita:hidden @max-4xl:hidden"
             />
           ) : null}
-          {fio ? <BotaoDeBuscarNoFio className="max-md:hidden" /> : null}
+          {/* QUEM CABE NO CABEÇALHO É A LARGURA DO PAINEL QUE DIZ (17/11/2026), e o
+              nome do contato vem primeiro. Em 1280 o cabeçalho pedia 839 px num
+              painel de 798 (com a coluna dos dados do contato aberta, 710 em 463), e
+              o nome ficava com 12 px. Agora: o canal de chegada só com 56rem de
+              painel (ele também está em "Como chegou", nos dados do contato);
+              "Pedir para ligar" e "Assumir conversa" com nome a partir de 48rem, e
+              a IA e o "Concluir" a partir de 64rem; abaixo de 36rem, a lupa e o
+              "Concluir" saem, porque também estão no "⋯". */}
+          {fio ? <BotaoDeBuscarNoFio className="max-md:hidden @max-xl:hidden" /> : null}
           {eu?.podeEscrever ? (
             <BotaoLigar
               organizationId={item.id}
@@ -550,12 +584,18 @@ export function Conversa({
             />
           ) : null}
           {fio && eu?.podeEscrever ? (
-            <BotaoDeLigarNaConversa conversaId={fio.id} nome={item.nome} compacto={ehCelular} />
+            <BotaoDeLigarNaConversa
+              conversaId={fio.id}
+              nome={item.nome}
+              compacto={ehCelular}
+              rotuloPelaLargura
+            />
           ) : null}
           {podeAssumir && fio ? (
             <AssumirConversa
               fioId={fio.id}
               organizacaoId={item.id}
+              rotuloPelaLargura
               className="rounded-full max-md:hidden md:h-10"
             />
           ) : null}
@@ -569,7 +609,7 @@ export function Conversa({
                 fioId={fio.id}
                 concluidaEm={fio.arquivadaEm}
                 rotuloPelaLargura
-                className="mx-1 conversa-estreita:hidden"
+                className="mx-1 conversa-estreita:hidden @max-xl:hidden"
               />
             ) : (
               <Arquivar fio={fio} className="conversa-estreita:hidden" />
@@ -686,18 +726,27 @@ export function Conversa({
           ) : null}
           {/* Quem atende, logo acima da caixa: quem vai responder precisa saber
               se está respondendo no lugar de alguém. */}
+          {/* No celular o "Assumir" sai do cabeçalho (não cabe na linha) e vem
+              para cá, onde a pessoa já está com o dedo: no fim da frase do aviso,
+              e não num bloco de largura inteira embaixo dele (16/11/2026), que
+              comia 52 px da conversa num celular de 667. Quem pode assumir é
+              sempre quem não está atendendo, então o aviso sempre aparece junto. */}
           {fio ? (
             <AvisoDeQuemAtende
               fioId={fio.id}
               atendente={fio.responsavel}
               paraMim={fio.responsavelId === eu?.id}
               nomeDaPessoa={nomeDaPessoa}
+              acao={
+                podeAssumir ? (
+                  <AssumirConversa
+                    fioId={fio.id}
+                    organizacaoId={item.id}
+                    className="my-0.5 ml-1.5 h-8 px-3 align-middle text-[13px] md:hidden"
+                  />
+                ) : null
+              }
             />
-          ) : null}
-          {/* No celular o "Assumir" sai do cabeçalho (não cabe na linha) e vem
-              para cá, onde a pessoa já está com o dedo. */}
-          {podeAssumir && fio ? (
-            <AssumirConversa fioId={fio.id} organizacaoId={item.id} className="w-full md:hidden" />
           ) : null}
           {/* Só no computador de teste e só na conversa do treino da IA. */}
           {fio ? <ClienteDeTeste fioId={fio.id} className="mx-1" /> : null}
@@ -817,10 +866,6 @@ function Arquivar({
     </Button>
   );
 }
-
-/** Uma ação da folha do celular: bloco de 56 px, ícone e nome, em duas colunas. */
-const ACAO_DA_FOLHA =
-  'toque h-14 w-full justify-start gap-2.5 rounded-xl px-4 text-[15px] font-medium md:h-14';
 
 function Campo({
   rotulo,

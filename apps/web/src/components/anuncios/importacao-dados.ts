@@ -100,7 +100,21 @@ export async function codigosNoCrm(codigos: string[]): Promise<NoCrm> {
 }
 
 export type AnuncioImportado =
-  | { ok: true; id: string; codigo: string; novo: boolean; fotos: number; pendencias: string[] }
+  | {
+      ok: true;
+      id: string;
+      codigo: string;
+      novo: boolean;
+      fotos: number;
+      pendencias: string[];
+      /**
+       * Depois da troca, o anúncio no ar não muda pelo sistema atual: o banco o
+       * pula e diz por quê ('no_ar_pelo_crm', 20261119120000).
+       */
+      pulado: string | null;
+      /** Pulado, mas ganhou o pino do mapa que faltava (só as coordenadas). */
+      pino: boolean;
+    }
   | { ok: false; motivo: string; pendencias?: string[] };
 
 export async function importarAnuncio(dados: DadosParaImportar): Promise<AnuncioImportado> {
@@ -114,6 +128,8 @@ export async function importarAnuncio(dados: DadosParaImportar): Promise<Anuncio
     novo?: boolean;
     fotos?: number;
     pendencias?: string[] | null;
+    pulado?: string | null;
+    pino?: boolean | null;
   };
   if (!r.ok || !r.id) {
     return { ok: false, motivo: r.motivo ?? 'falhou', pendencias: r.pendencias ?? undefined };
@@ -125,6 +141,8 @@ export async function importarAnuncio(dados: DadosParaImportar): Promise<Anuncio
     novo: r.novo ?? false,
     fotos: r.fotos ?? 0,
     pendencias: r.pendencias ?? [],
+    pulado: r.pulado ?? null,
+    pino: r.pino === true,
   };
 }
 
@@ -188,6 +206,10 @@ const FRASES: Record<string, string> = {
   proprietario_invalido: 'O proprietário ligado ao anúncio não está mais na base.',
   dados_invalidos:
     'Algum valor do arquivo não cabe no anúncio. Confira o anúncio no sistema atual.',
+  no_ar_pelo_crm:
+    'No ar pelo CRM: o Canal Pro já lê o arquivo do CRM, e o arquivo do sistema atual só completa o pino do mapa que falta.',
+  crm_publica:
+    'O anúncio está no ar pelo CRM: o Canal Pro só espelha o CRM, então as fotos dele mudam no editor.',
   nao_configurado: 'O servidor não está configurado para guardar fotos. Avise quem cuida do CRM.',
 };
 
@@ -211,6 +233,7 @@ const FRASES_DA_FOTO: Record<string, string> = {
   troca_incompleta: 'nem todas as fotos do Canal Pro vieram, e as do CRM ficaram como estavam',
   troca_falhou: 'a troca não terminou, e as fotos do CRM ficaram como estavam',
   so_gestao_mexe_no_ar: 'o anúncio está no ar',
+  crm_publica: 'o anúncio está no ar pelo CRM (as fotos dele mudam no editor)',
 };
 
 export function fraseDaFoto(motivo: string | null | undefined): string {

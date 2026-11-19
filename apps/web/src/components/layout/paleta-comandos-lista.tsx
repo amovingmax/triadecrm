@@ -22,7 +22,8 @@ import { HREF_NOVO_PARCEIRO, navegacaoPara, podeCriarParceiro } from '@/lib/nave
  * Paleta de comandos (⌘K, ou Ctrl+K fora do Mac): ir para qualquer módulo, abrir o
  * cadastro rápido de parceiro e trocar o tema, sem tirar a mão do teclado. No desktop
  * ela substitui o caminho "olhar a lateral, mirar, clicar"; no celular o botão é só
- * a lupa, porque a navegação de campo é a barra inferior.
+ * a lupa, porque a navegação de campo é a barra inferior, e o topo da folha "Mais"
+ * tem um "Buscar no CRM" que abre esta mesma paleta (16/11/2026).
  *
  * A lista de módulos é a mesma da lateral e já vem filtrada pelo papel.
  *

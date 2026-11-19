@@ -119,7 +119,12 @@ export function CartaoCompromisso({
     <li
       ref={linha}
       className={cn(
-        'flex items-start gap-3 rounded-lg bg-muted/45 px-4 py-3 transition-shadow duration-700',
+        // No celular a hora vai EM CIMA do nome, e não numa coluna ao lado (16/11/2026):
+        // a coluna de 96px, somada às margens da seção e do cartão, deixava 160px para
+        // o resto num aparelho de 375 — o nome cortava em duas palavras e cada botão
+        // de resposta (Realizada, Não compareceu, Remarcar…) ocupava uma linha inteira.
+        // De `sm` para cima a coluna da hora volta, como era.
+        'flex flex-col gap-1 rounded-lg bg-muted/45 px-3 py-3 transition-shadow duration-700 sm:flex-row sm:items-start sm:gap-3 sm:px-4',
         compromisso.concluido && !compromisso.resultado && 'opacity-70',
         destacado && 'ring-2 ring-menta',
       )}
@@ -129,7 +134,7 @@ export function CartaoCompromisso({
           tem fim para mostrar. A `meeting` antiga, sem objeto, continua com só a
           hora: fim não se inventa para a linha ficar bonita. */}
       {temHora ? (
-        <p className={cn('shrink-0 pt-0.5', compromisso.fim ? 'w-24' : 'w-12')}>
+        <p className={cn('shrink-0 sm:pt-0.5', compromisso.fim ? 'sm:w-24' : 'sm:w-12')}>
           <span className="numerico text-sm font-medium">{faixaDeHoras(compromisso)}</span>
         </p>
       ) : null}
@@ -138,7 +143,9 @@ export function CartaoCompromisso({
         <div className="flex items-start justify-between gap-3">
           <Link
             href={`/parceiros/${compromisso.organizationId}`}
-            className="truncate text-[15px] font-medium tracking-tight outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            // 35px de alvo no celular (o nome abre a ficha); a margem negativa devolve
+            // a linha à altura de antes. No desktop, só o texto, como era.
+            className="-my-1.5 block truncate py-1.5 text-[15px] font-medium tracking-tight outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 md:my-0 md:py-0"
           >
             {compromisso.organizacao}
           </Link>

@@ -34,6 +34,7 @@ import {
   type Ficha,
   type NegocioDaFicha,
 } from '@/components/parceiros/ficha';
+import { EmailDaFicha } from '@/components/parceiros/email-da-ficha';
 import { AcoesDaFicha } from '@/components/parceiros/ficha-acoes';
 import { FichaExcluida } from '@/components/parceiros/ficha-excluida';
 import { CompletarAFicha, EdicaoDaFicha, EditarContato } from '@/components/parceiros/ficha-edicao';
@@ -305,8 +306,13 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
 
           No celular as colunas se desfazem (`contents`) e a ordem é a de quem
           vai falar com o parceiro agora: o que a IA leu, o que está marcado, o
-          que foi dito por último — e só então o cadastro. */}
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          que foi dito por último — e só então o cadastro.
+
+          `grid-cols-1` (16/11/2026): a coluna implícita do `grid` é `auto` e
+          cresce até o conteúdo mínimo do cartão mais largo — uma palavra sem
+          espaço (um e-mail, um link colado na atividade) alargava a ficha
+          inteira no celular. `minmax(0, 1fr)` prende a coluna na tela. */}
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
           <Contato
             ficha={ficha}
@@ -836,9 +842,13 @@ function Contato({
 
         {ficha.email ? (
           <LinhaDeContato icone={Mail} rotulo="E-mail">
-            <a href={`mailto:${ficha.email}`} className={cn(LINK_VALOR, 'break-all')}>
-              {ficha.email}
-            </a>
+            {/* Com o copiar e a resposta às ofertas por e-mail (17/11/2026). */}
+            <EmailDaFicha
+              organizationId={ficha.id}
+              email={ficha.email}
+              className="min-h-11 justify-start md:min-h-0"
+              linkClassName="underline underline-offset-4"
+            />
           </LinhaDeContato>
         ) : null}
 

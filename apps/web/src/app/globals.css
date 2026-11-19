@@ -879,6 +879,37 @@
   }
 }
 
+/* CAMPO NÃO DÁ ZOOM NO IPHONE (16/11/2026). Abaixo de 16px, o iOS amplia a tela
+   inteira ao focar um campo e não desfaz ao sair; no WebView do app isso desmonta o
+   layout até a pessoa fechar e abrir de novo. `ui/input.tsx` e a maioria das áreas
+   de texto já nascem com `text-base md:text-sm`, mas sobravam campos escritos à mão
+   em 12 a 15px (a URL do Canal Pro, a opção da pergunta, o recado da ligação), e
+   cada tela nova é uma chance de esquecer. Esta é a rede: abaixo do md, todo campo
+   em que se digita tem 16px, venha a classe que vier.
+
+   Fora de @layer de propósito, como as regras do sonner acima: CSS sem camada vence
+   qualquer utilitário do Tailwind, que mora em `@layer utilities`. Do md para cima a
+   regra não existe e o `md:text-sm` de cada campo volta a valer. Nenhum campo do CRM
+   pede mais de 16px, então a rede só sobe tamanhos, nunca desce. */
+@media (width < 48rem) {
+  input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='color'],
+      [type='file'],
+      [type='button'],
+      [type='submit'],
+      [type='reset'],
+      [type='image'],
+      [type='hidden']
+    ),
+  textarea,
+  select {
+    font-size: 1rem;
+  }
+}
+
 /* Altura da barra inferior do celular (usada como padding do conteúdo) e área segura do iOS. */
 :root {
   --altura-barra-inferior: 4rem;

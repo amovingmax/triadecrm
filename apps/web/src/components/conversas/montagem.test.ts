@@ -891,6 +891,7 @@ function itemDaLista(parcial: Partial<ItemConversa> & { id: string }): ItemConve
     precisaAtencao: false,
     telefone: null,
     telefoneMascarado: false,
+    email: null,
     naoContatar: false,
     etapa: 'Respondeu',
     funil: 'Captação de fornecedores',

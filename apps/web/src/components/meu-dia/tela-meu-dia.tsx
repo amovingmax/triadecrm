@@ -338,7 +338,19 @@ export function TelaMeuDia({
           encostado à esquerda, empurrando o resumo para baixo da dobra. Ele é uma
           ação secundária e o lugar dela é o canto, ao lado do título, nos dois
           tamanhos de tela. */}
-      <header className="flex items-start justify-between gap-3">
+      {/* MEU DIA NOVO NO CELULAR (16/11/2026): com o seletor de pessoa ao lado do
+          "Atualizar", os dois juntos ocupavam ~180 px de 343 em 375 px, e o título
+          e a frase ficavam numa coluna de 160 px — a saudação quebrava em duas
+          linhas e a frase em quatro. Abaixo de `sm` os controles descem para uma
+          linha própria, o seletor esticado e o "Atualizar" no canto: o texto ganha
+          a largura toda e o bloco fica mais baixo do que antes. Fora do Meu dia
+          novo (a KOMUNE) continua o botão sozinho no canto, como diz a nota acima. */}
+      <header
+        className={cn(
+          'flex items-start justify-between gap-3',
+          NOVO && pessoas.length > 1 && 'max-sm:flex-col max-sm:items-stretch',
+        )}
+      >
         <div className="min-w-0 flex-1">
           {/* Trilha e título no degrau do sistema (29/09/2026): 32px em peso
               400 com tracking de -0.02em. O `font-semibold text-2xl` de antes
@@ -404,13 +416,13 @@ export function TelaMeuDia({
         </div>
 
         {NOVO ? (
-          <div className="flex shrink-0 items-center gap-2 self-end sm:gap-3">
+          <div className="flex shrink-0 items-center gap-2 self-end max-sm:self-stretch sm:gap-3">
             {pessoas.length > 1 ? (
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground max-sm:min-w-0 max-sm:flex-1">
                 <span className="hidden md:inline">Vendo o dia de</span>
                 <Select value={pessoa} onValueChange={setPessoa}>
                   <SelectTrigger
-                    className="toque h-11 min-w-32 bg-card md:h-10"
+                    className="toque h-11 min-w-32 bg-card max-sm:w-full max-sm:min-w-0 max-sm:flex-1 md:h-10"
                     aria-label="De quem é o dia"
                   >
                     <span className="flex min-w-0 items-center gap-2 text-foreground">
@@ -839,7 +851,12 @@ function GrupoNovo({
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <span id={idDoTitulo} className="font-heading text-lg leading-snug font-semibold">
+            {/* `text-balance` (17/11/2026): em 375, "Esperando há mais de 24 h"
+                deixava o "h" sozinho na segunda linha. */}
+            <span
+              id={idDoTitulo}
+              className="font-heading text-lg leading-snug font-semibold text-balance"
+            >
               {bloco.titulo}
             </span>
             <span className="numerico rounded-full bg-muted px-2 py-0.5 text-[13px] font-bold text-foreground/80">

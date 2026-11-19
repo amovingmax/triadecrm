@@ -90,7 +90,10 @@ function Cartao({
   return (
     <li
       {...revelar}
-      className={cn('flex items-center border-b border-hairline last:border-b-0', revelar.className)}
+      className={cn(
+        'flex items-center border-b border-hairline last:border-b-0',
+        revelar.className,
+      )}
     >
       <Link
         href={`/parceiros/${linha.id}`}
@@ -107,7 +110,10 @@ function Cartao({
             o "misturado" da tela em miniatura. Etapa, responsável e próxima ação
             estão a um toque, na ficha — e no desktop também só aparecem no 2xl. */}
         <div className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1">
-          <p className="truncate font-medium">{linha.name}</p>
+          {/* O nome quebra em até duas linhas (17/11/2026): com a etapa ao lado, em
+              375 sobravam 137 px e "Carlos Lima — apartamento em Ponta Negra" virava
+              "Carlos Lima — a…". O cartão só cresce quando o nome é comprido. */}
+          <p className="line-clamp-2 font-medium [overflow-wrap:anywhere]">{linha.name}</p>
           {/* A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026, ADR-16). A cor sumiu do
               canto: ela achatava as 12 etapas do funil em três matizes, e num
               traço de 3px não sobrevivia a daltonismo de todo jeito. O que fica é

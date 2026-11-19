@@ -9,11 +9,11 @@ import { BarraDePeriodo, idDaAba, SeletorDePainel } from './barra-recorte';
 import { PainelAtendimento } from './painel-atendimento';
 import { PainelBairros } from './painel-bairros';
 import { PainelBase } from './painel-base';
-import { PainelCanais } from './painel-canais';
 import { PainelCategorias } from './painel-categorias';
 import { PainelFontes } from './painel-fontes';
 import { PainelFunil } from './painel-funil';
 import { PainelHorarios } from './painel-horarios';
+import { PainelOrigem } from './painel-origem';
 import { PainelPessoas } from './painel-pessoas';
 import { PainelSemana } from './painel-semana';
 import { PainelVendeFunil } from './painel-vende-funil';
@@ -236,6 +236,8 @@ function Painel({
     // Os da Imova: o "relatório que vende" (09/11/2026).
     case 'visao':
       return <PainelVendeVisao painel={painel} periodo={periodo} aoAbrirPainel={aoAbrirPainel} />;
+    case 'origem':
+      return <PainelOrigem painel={painel} periodo={periodo} />;
     case 'imoveis':
       return <PainelVendeImoveis painel={painel} periodo={periodo} imovelInicial={alvo} />;
     case 'oportunidades':
@@ -269,8 +271,6 @@ function Painel({
       return <PainelHorarios painel={painel} periodo={periodo} />;
     case 'fontes':
       return <PainelFontes painel={painel} periodo={periodo} />;
-    case 'canais':
-      return <PainelCanais painel={painel} periodo={periodo} />;
     case 'base':
       return <PainelBase painel={painel} periodo={periodo} />;
   }

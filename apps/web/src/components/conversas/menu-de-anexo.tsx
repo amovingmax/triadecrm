@@ -113,7 +113,9 @@ export function MenuDeAnexo({
             <span className="sr-only">Anexar: foto, documento, localização, contato…</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" side="top" className="w-60">
+        {/* `collisionPadding`: no celular o clipe fica perto da borda direita, e o
+            menu de 15rem encostava na beira da tela, sem respiro. */}
+        <DropdownMenuContent align="start" side="top" collisionPadding={8} className="w-60">
           <DropdownMenuItem className="h-10 md:h-8" onSelect={() => fotos.current?.click()}>
             <ImageIcon aria-hidden="true" />
             Foto ou vídeo

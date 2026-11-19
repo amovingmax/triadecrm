@@ -50,10 +50,15 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
 
   return (
     <Sheet open={id !== null} onOpenChange={(v) => !v && aoFechar()}>
-      <SheetContent className="flex w-full flex-col gap-0 sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>{envio?.nome ?? 'Disparo'}</SheetTitle>
-          <SheetDescription>
+      {/* `data-[side=right]:w-full` (16/11/2026): o `w-full` solto perdia para o
+          `w-3/4` da folha, que vem com o seletor do lado, e no celular o painel abria
+          com 281px — "Responderam" vazava da caixa e o nome do modelo saía cortado na
+          borda. No computador nada muda: o teto de largura da folha continua valendo.
+          O cabeçalho reserva 48px à direita para o X, que ficava em cima do nome. */}
+      <SheetContent className="flex w-full flex-col gap-0 data-[side=right]:w-full sm:max-w-xl">
+        <SheetHeader className="pr-14 md:pr-12">
+          <SheetTitle className="break-words">{envio?.nome ?? 'Disparo'}</SheetTitle>
+          <SheetDescription className="[overflow-wrap:anywhere]">
             {envio
               ? `${STATUS_DO_ENVIO[envio.status]} · ${rotuloDaMensagem(envio.modelo)} · ${envio.por_hora} por hora · criada por ${envio.criado_por ?? '—'}`
               : 'Carregando…'}
@@ -61,7 +66,7 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
         </SheetHeader>
 
         {envio ? (
-          <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
+          <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-[calc(1rem+var(--area-segura-inferior))]">
             {envio.status === 'parado' && envio.motivo_parada ? (
               <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
                 {envio.motivo_parada}
@@ -145,8 +150,14 @@ export function Numeros({ c, compacto = false }: { c: Contagem; compacto?: boole
   return (
     <dl className={cn('grid gap-2', compacto ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-3')}>
       {visiveis.map((b) => (
-        <div key={b.rotulo} className="rounded-lg border border-hairline bg-card/60 px-2.5 py-2">
-          <dt className="text-[11px] text-muted-foreground">{b.rotulo}</dt>
+        // Número no pé da caixa: no celular "Tocaram no botão" quebra em duas linhas e,
+        // com o número logo abaixo do rótulo, os três da mesma fileira ficavam em
+        // alturas diferentes (16/11/2026).
+        <div
+          key={b.rotulo}
+          className="flex min-w-0 flex-col justify-between rounded-lg border border-hairline bg-card/60 px-2.5 py-2"
+        >
+          <dt className="text-[11px] leading-snug break-words text-muted-foreground">{b.rotulo}</dt>
           <dd
             className={cn(
               'numerico text-lg font-semibold',
@@ -200,7 +211,12 @@ function Itens({ itens, daMarca }: { itens: ItemDoEnvio[]; daMarca: boolean }) {
             ) : null}
           </span>
           {i.conversa_id ? (
-            <Link href={`/conversas?org=${i.organization_id}`} className="shrink-0 text-xs text-primary hover:underline">
+            <Link
+              href={`/conversas?org=${i.organization_id}`}
+              // 32px de altura no celular, o piso das ações em linha; a margem
+              // negativa devolve a linha à altura de antes.
+              className="-my-1.5 inline-flex min-h-8 shrink-0 items-center text-xs text-primary hover:underline md:my-0 md:min-h-0"
+            >
               Abrir conversa
             </Link>
           ) : null}

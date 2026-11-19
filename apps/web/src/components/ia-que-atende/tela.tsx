@@ -44,6 +44,12 @@ import { DialogoDeCorrecao } from './na-conversa';
  * que a equipe escrever) e "Configuração" liga, desliga e escolhe a conversa do
  * treino e as de teste (10/11/2026: a IA conversa ali sem aprender). A IA lê o
  * caderno e os imóveis da aba Anúncios a cada resposta.
+ *
+ * No celular (16/11/2026) os botões que se tocam ganham altura de dedo — 44px no
+ * que muda a IA (ligar, modo, anotar) e 36 a 40px nos de cada linha (Boa,
+ * Corrigir, Editar, Tirar) —, os seletores e campos ficam com letra de 16px (o
+ * iOS dá zoom abaixo disso) e o link da conversa do treino desce para debaixo
+ * do texto quando não cabe ao lado. Do `md` para cima, as medidas de antes.
  */
 
 type Aba = 'respostas' | 'caderno' | 'configuracao';
@@ -53,6 +59,14 @@ const ABAS: readonly { id: Aba; rotulo: string }[] = [
   { id: 'caderno', rotulo: 'Caderno' },
   { id: 'configuracao', rotulo: 'Configuração' },
 ];
+
+/** O que muda a IA (ligar, modo, anotar): 44px de alvo no celular. */
+const BOTAO_PRINCIPAL = 'toque h-11 md:h-8';
+/** Os botões de cada linha (Boa, Corrigir, Editar, Tirar…): 40px no celular, os 28px de `sm` no computador. */
+const BOTAO_DA_LINHA = 'toque h-10 px-3 md:h-7 md:px-2.5';
+/** Seletor nativo com letra de 16px no celular: abaixo disso o iOS dá zoom ao tocar. */
+const SELETOR =
+  'h-11 min-w-0 rounded-lg border border-input bg-background px-3 text-base md:h-10 md:text-sm';
 
 function mensagemDoErro(e: unknown): string {
   if (e instanceof ErroDaIa) return e.message;
@@ -126,16 +140,16 @@ function Situacao({ painel }: { painel: PainelDaIa }) {
   return (
     <p
       className={cn(
-        'flex items-center gap-2 rounded-lg border border-hairline px-3 py-2 text-sm',
+        'flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-hairline px-3 py-2 text-sm',
         config.ligada ? 'bg-card' : 'bg-muted/40 text-muted-foreground',
       )}
     >
       {config.ligada ? <Bot className="size-4 shrink-0" aria-hidden="true" /> : <BotOff className="size-4 shrink-0" aria-hidden="true" />}
-      <span>{texto}</span>
+      <span className="min-w-0 flex-1 basis-56">{texto}</span>
       {treino && config.ligada ? (
         <Link
           href={linkDaConversa({ organizacaoId: treino.organizacaoId, conversaId: treino.id })}
-          className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs underline underline-offset-2"
+          className="ml-auto inline-flex min-h-8 shrink-0 items-center gap-1 text-xs underline underline-offset-2 md:min-h-0"
         >
           Abrir a conversa <ExternalLink className="size-3" aria-hidden="true" />
         </Link>
@@ -179,8 +193,16 @@ function Placar({ painel }: { painel: PainelDaIa }) {
         Últimos 7 dias
       </h2>
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {itens.map((i) => (
-          <div key={i.rotulo} className="rounded-lg border border-hairline bg-card px-3 py-2">
+        {itens.map((i, n) => (
+          <div
+            key={i.rotulo}
+            className={cn(
+              'rounded-lg border border-hairline bg-card px-3 py-2',
+              // Sete números em duas colunas: o último ocupa a linha inteira no
+              // celular, em vez de sobrar meia linha vazia ao lado.
+              itens.length % 2 === 1 && n === itens.length - 1 && 'col-span-2 sm:col-span-1',
+            )}
+          >
             <dt className="text-xs text-muted-foreground">{i.rotulo}</dt>
             <dd className="numerico text-xl">{i.valor}</dd>
             {i.detalhe ? <dd className="text-[11px] text-muted-foreground">{i.detalhe}</dd> : null}
@@ -234,7 +256,10 @@ function Respostas() {
               </time>
               <span>·</span>
               <span>{ROTULO_DA_ACAO[r.acao] ?? r.acao}</span>
-              <Link href={linkDaConversa(r)} className="ml-auto inline-flex items-center gap-1 underline underline-offset-2">
+              <Link
+                href={linkDaConversa(r)}
+                className="ml-auto inline-flex min-h-8 items-center gap-1 underline underline-offset-2 md:min-h-0"
+              >
                 Abrir <ExternalLink className="size-3" aria-hidden="true" />
               </Link>
             </div>
@@ -259,10 +284,23 @@ function Respostas() {
                 </span>
               ) : (
                 <>
-                  <Button type="button" size="sm" variant="outline" disabled={boa.isPending} onClick={() => boa.mutate(r)}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={BOTAO_DA_LINHA}
+                    disabled={boa.isPending}
+                    onClick={() => boa.mutate(r)}
+                  >
                     <ThumbsUp aria-hidden="true" /> Boa
                   </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => setCorrigindo(r)}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={BOTAO_DA_LINHA}
+                    onClick={() => setCorrigindo(r)}
+                  >
                     <Pencil aria-hidden="true" /> Corrigir
                   </Button>
                 </>
@@ -336,6 +374,7 @@ function Caderno() {
         <div>
           <Button
             type="button"
+            className={BOTAO_PRINCIPAL}
             disabled={escrever.isPending || novo.trim().length < 3}
             onClick={() => escrever.mutate({ texto: novo.trim(), id: null })}
           >
@@ -368,12 +407,19 @@ function Caderno() {
                     <Button
                       type="button"
                       size="sm"
+                      className={BOTAO_DA_LINHA}
                       disabled={escrever.isPending || editando.texto.trim().length < 3}
                       onClick={() => escrever.mutate({ texto: editando.texto.trim(), id: l.id })}
                     >
                       Salvar
                     </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => setEditando(null)}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={BOTAO_DA_LINHA}
+                      onClick={() => setEditando(null)}
+                    >
                       Cancelar
                     </Button>
                   </div>
@@ -392,6 +438,7 @@ function Caderno() {
                         type="button"
                         size="sm"
                         variant="ghost"
+                        className={BOTAO_DA_LINHA}
                         onClick={() => setEditando({ id: l.id, texto: l.texto })}
                       >
                         <Pencil aria-hidden="true" /> Editar
@@ -400,6 +447,7 @@ function Caderno() {
                         type="button"
                         size="sm"
                         variant="ghost"
+                        className={BOTAO_DA_LINHA}
                         disabled={tirar.isPending}
                         onClick={() => tirar.mutate(l.id)}
                       >
@@ -444,7 +492,13 @@ function ProcurarConversa({
       <label htmlFor={id} className="text-xs text-muted-foreground">
         Procurar pelo nome ou telefone
       </label>
-      <Input id={id} value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={placeholder} />
+      <Input
+        id={id}
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        placeholder={placeholder}
+        className="h-11 md:h-8"
+      />
       {achadas.data && achadas.data.length > 0 ? (
         <ul className="flex flex-col gap-1">
           {achadas.data.map((c) => (
@@ -521,6 +575,7 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
           <Button
             type="button"
             variant={config.ligada ? 'outline' : 'default'}
+            className={BOTAO_PRINCIPAL}
             disabled={salvar.isPending}
             onClick={() => salvar.mutate({ ligada: !config.ligada })}
           >
@@ -536,6 +591,7 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
           <Button
             type="button"
             variant={config.modo === 'treino' ? 'default' : 'outline'}
+            className={BOTAO_PRINCIPAL}
             disabled={salvar.isPending}
             onClick={() => salvar.mutate({ modo: 'treino' })}
           >
@@ -544,6 +600,7 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
           <Button
             type="button"
             variant={config.modo === 'clientes' ? 'default' : 'outline'}
+            className={BOTAO_PRINCIPAL}
             disabled={salvar.isPending}
             onClick={() => salvar.mutate({ modo: 'clientes' })}
           >
@@ -570,6 +627,7 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
               type="button"
               size="sm"
               variant="outline"
+              className={BOTAO_DA_LINHA}
               disabled={salvar.isPending || c.id === config.conversaDeTreino}
               onClick={() => {
                 salvar.mutate({ conversa_de_treino: c.id });
@@ -611,6 +669,7 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
                   type="button"
                   size="sm"
                   variant="ghost"
+                  className={BOTAO_DA_LINHA}
                   disabled={marcar.isPending}
                   onClick={() => marcar.mutate({ id: t.id, teste: false })}
                 >
@@ -632,6 +691,7 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
                 type="button"
                 size="sm"
                 variant="outline"
+                className={BOTAO_DA_LINHA}
                 disabled={marcar.isPending || jaE || doTreino}
                 title={doTreino ? 'É a conversa do treino: lá a IA aprende.' : undefined}
                 onClick={() => {
@@ -658,7 +718,7 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
           onChange={(e) =>
             salvar.mutate({ setor_corretores: e.target.value === '' ? null : Number(e.target.value) })
           }
-          className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+          className={SELETOR}
         >
           <option value="">Fica com quem já atende a conversa</option>
           {(setores.data ?? []).map((s) => (
@@ -683,6 +743,7 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
             type="button"
             size="sm"
             variant="outline"
+            className={BOTAO_DA_LINHA}
             disabled={salvar.isPending || aviso.trim() === config.avisoCorretor || aviso.trim().length < 10}
             onClick={() => salvar.mutate({ aviso_corretor: aviso.trim() })}
           >
@@ -700,7 +761,7 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
           value={config.modelo}
           disabled={salvar.isPending}
           onChange={(e) => salvar.mutate({ modelo: e.target.value })}
-          className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+          className={SELETOR}
         >
           <option value="claude-haiku-5-5">Claude Haiku 5.5: o mais econômico (menos de 0,2 centavo de dólar por resposta)</option>
           <option value="claude-sonnet-5-5">Claude Sonnet 5.5: intermediário (metade do custo do Opus)</option>

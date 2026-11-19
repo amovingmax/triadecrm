@@ -17,7 +17,10 @@ export const metadata: Metadata = {
 export default function Aplicativo() {
   const a = APLICATIVO;
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-10 sm:py-16">
+    // Celular (16/11/2026): o fim da página soma a área segura do iPhone (a barra de
+    // gestos não cobre a última linha) e `break-words` deixa um e-mail comprido
+    // quebrar em vez de alargar a página numa tela de 320.
+    <main className="mx-auto w-full max-w-2xl px-4 pt-10 pb-[calc(2.5rem+var(--area-segura-inferior))] break-words sm:pt-16 sm:pb-[calc(4rem+var(--area-segura-inferior))]">
       <header className="border-b pb-6">
         <p className="text-sm font-medium text-muted-foreground">{a.desenvolvedora}</p>
         <h1 className="mt-1 font-heading text-2xl font-semibold sm:text-3xl">App {a.nome}</h1>
@@ -29,7 +32,7 @@ export default function Aplicativo() {
       <Secao id="quem-pode-usar" titulo="Quem pode usar">
         <p>
           Só quem faz parte dessas equipes. Não há cadastro aberto: o administrador da sua equipe
-          libera o seu e-mail, e você entra com a conta Google desse e-mail.
+          libera o seu <EMail />, e você entra com a conta Google desse <EMail />.
         </p>
       </Secao>
 
@@ -38,7 +41,7 @@ export default function Aplicativo() {
           itens={[
             <>
               <strong>&ldquo;Não consigo entrar.&rdquo;</strong> Confira se escolheu a empresa certa
-              na tela de login e se entrou com o e-mail que o administrador liberou.
+              na tela de login e se entrou com o <EMail /> que o administrador liberou.
             </>,
             <>
               <strong>&ldquo;Não recebo os avisos.&rdquo;</strong> Em Ajustes → Notificações →
@@ -59,10 +62,25 @@ export default function Aplicativo() {
       </Secao>
 
       <Secao id="privacidade" titulo="Privacidade">
+        {/* Link sozinho na linha, e não no meio de uma frase: ganha os 44px de toque
+            (é o que a revisão da Apple procura nesta página). */}
         <p>
-          <Link href="/aplicativo/privacidade">Política de privacidade do app {a.nome}</Link>
+          <a
+            className="inline-flex min-h-11 items-center underline underline-offset-4"
+            href="/aplicativo/privacidade"
+          >
+            Política de privacidade do app {a.nome}
+          </a>
         </p>
       </Secao>
     </main>
   );
+}
+
+/**
+ * "e-mail" sem quebra no hífen: em 390 a linha partia em "seu e-" / "mail", e é a
+ * primeira frase que a revisão da Apple lê na página de suporte.
+ */
+function EMail() {
+  return <span className="whitespace-nowrap">e-mail</span>;
 }

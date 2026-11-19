@@ -268,6 +268,8 @@ const entrada = entradaDoAtendenteV1.omit({ horariosDeVisita: true }).extend({
 });
 
 export type EntradaDoAtendenteV3 = z.infer<typeof entrada>;
+/** O schema da entrada da v3, para a v6 estender (17/11/2026). */
+export const entradaDoAtendenteV3 = entrada;
 export type ConviteDaAgenda = z.infer<typeof conviteDaAgenda>;
 
 /**
@@ -305,6 +307,8 @@ const saida = z.object({
 });
 
 export type SaidaDoAtendenteV3 = z.infer<typeof saida>;
+/** O schema da saída da v3, para a v6 estender (17/11/2026). */
+export const saidaDoAtendenteV3 = saida;
 
 /** O bloco de sistema de uma chamada da v3: as regras, mais a base da Imova (a da v2). */
 export function sistemaComBaseV3(base: BaseDoAtendenteV2): string {

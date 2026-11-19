@@ -107,13 +107,16 @@ export function TelaExcluidos() {
             aria-hidden="true"
             className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
           />
+          {/* `pr-11` para o texto não correr por baixo do X, e o X nativo do
+              `type="search"` escondido: com o acolchoado ele aparecia ao lado do
+              nosso, e a busca ficava com dois "limpar" (16/11/2026). */}
           <Input
             type="search"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Procurar pelo nome"
             aria-label="Procurar entre os parceiros excluídos"
-            className="h-11 pl-8 md:h-9"
+            className="h-11 pr-11 pl-8 md:h-9 md:pr-2.5 [&::-webkit-search-cancel-button]:appearance-none"
           />
           {busca ? (
             <Button
@@ -122,7 +125,9 @@ export function TelaExcluidos() {
               size="icon-sm"
               aria-label="Limpar a busca"
               onClick={() => setBusca('')}
-              className="absolute top-1/2 right-1 -translate-y-1/2"
+              // 44px no celular, como o "limpar" da busca de Prospectados: com os
+              // 28px de antes o X era o menor alvo da tela.
+              className="absolute top-1/2 right-0 size-11 -translate-y-1/2 md:right-1 md:size-7"
             >
               <X aria-hidden="true" />
             </Button>

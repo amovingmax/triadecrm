@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ImagePlus, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 import { FOTOS_POR_ANUNCIO } from './arquivo-vrsync';
@@ -20,7 +21,16 @@ import { type FotoDoAnuncio, fraseDaRecusa } from './tipos';
  * Cada foto vira JPEG no navegador (o portal só importa JPG, até 7 MB) e sobe
  * direto para o balde. Para ir ao ar basta uma (o formato do portal exige uma);
  * o máximo é 60 (era 40 até 18/11/2026). Sem mínimo maior: decisão do usuário em 05/11/2026.
+ *
+ * No celular (16/11/2026) os quatro botões de cada foto dividem a largura dela
+ * em partes iguais, com 40px de altura: na coluna de ~145px de um iPhone eles
+ * eram quatro quadrados de 32px espremidos à esquerda, fáceis de errar com o
+ * dedo — e errar aqui é tirar a foto em vez de mover. A lixeira fica sempre na
+ * última casa, também na capa (que não tem a estrela). Do `md` para cima, o
+ * desenho de antes.
  */
+const BOTAO_DA_FOTO = 'toque h-10 w-full md:size-8';
+
 export function FotosDoAnuncio({
   anuncioId,
   fotos,
@@ -129,13 +139,13 @@ export function FotosDoAnuncio({
                 ) : null}
               </div>
               {editavel ? (
-                <div className="flex items-center justify-between gap-1">
-                  <div className="flex gap-1">
+                <div className="grid grid-cols-4 gap-1 md:flex md:items-center md:justify-between">
+                  <div className="contents md:flex md:gap-1">
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="toque"
+                      className={BOTAO_DA_FOTO}
                       aria-label={`Mover a foto ${i + 1} para trás`}
                       disabled={i === 0 || ocupada !== null || subindo !== null}
                       onClick={() => void mover(i, i - 1)}
@@ -146,7 +156,7 @@ export function FotosDoAnuncio({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="toque"
+                      className={BOTAO_DA_FOTO}
                       aria-label={`Mover a foto ${i + 1} para a frente`}
                       disabled={i === ordem.length - 1 || ocupada !== null || subindo !== null}
                       onClick={() => void mover(i, i + 1)}
@@ -158,7 +168,7 @@ export function FotosDoAnuncio({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="toque"
+                        className={BOTAO_DA_FOTO}
                         aria-label={`Pôr a foto ${i + 1} como capa`}
                         disabled={ocupada !== null || subindo !== null}
                         onClick={() => void mover(i, 0)}
@@ -171,7 +181,7 @@ export function FotosDoAnuncio({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="toque"
+                    className={cn(BOTAO_DA_FOTO, 'col-start-4')}
                     aria-label={`Tirar a foto ${i + 1}`}
                     disabled={ocupada !== null || subindo !== null}
                     onClick={() => void remover(foto)}
@@ -199,7 +209,7 @@ export function FotosDoAnuncio({
           <Button
             type="button"
             variant="outline"
-            className="toque h-11 md:h-9"
+            className="toque h-11 w-full md:h-9 md:w-auto"
             disabled={subindo !== null || ordem.length >= FOTOS_POR_ANUNCIO}
             onClick={() => entrada.current?.click()}
           >

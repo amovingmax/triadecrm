@@ -45,8 +45,12 @@ export function TelaEnvios({ catalogos, criaModelo }: { catalogos: Catalogos; cr
   return (
     // A MESMA COLUNA E O MESMO TÍTULO DAS OUTRAS TELAS (29/09/2026).
     <div className="flex w-full flex-col gap-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+      {/* No celular o botão desce para baixo do texto (16/11/2026): ao lado, ele
+          espremia a frase numa coluna de 200px, em cinco linhas, e quebrava "Novo
+          disparo" em duas. O "Voltar" sobe para cima do título, onde se procura a
+          volta. De `sm` para cima, título à esquerda e botão à direita, como era. */}
+      <header className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:justify-between">
+        <div className="w-full min-w-0 sm:w-auto sm:flex-1">
           <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
             {montando ? 'Novo disparo' : 'Disparos'}
           </h1>
@@ -57,7 +61,11 @@ export function TelaEnvios({ catalogos, criaModelo }: { catalogos: Catalogos; cr
           </p>
         </div>
         {montando ? (
-          <Button variant="ghost" className="toque h-11 md:h-9" onClick={() => setMontando(false)}>
+          <Button
+            variant="ghost"
+            className="toque h-11 max-sm:order-first max-sm:-mb-2 max-sm:-ml-2 md:h-9"
+            onClick={() => setMontando(false)}
+          >
             <ArrowLeft aria-hidden="true" />
             Voltar aos disparos
           </Button>

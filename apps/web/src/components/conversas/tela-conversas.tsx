@@ -582,7 +582,15 @@ export function TelaConversas({
               </div>
             )}
 
-            <div className="min-h-0 flex-1 md:overflow-y-auto">
+            {/* `pb-20` no celular: o botão redondo de "Nova conversa" (56 px, 16 px
+                acima da barra) cobria a data e o "por ler" da última linha. Com a
+                folga, a última conversa sobe acima dele, como no WhatsApp. */}
+            <div
+              className={cn(
+                'min-h-0 flex-1 md:overflow-y-auto',
+                ehCelular && !verConcluidas && 'pb-20',
+              )}
+            >
               {aba === 'conversas' && !verConcluidas && quantasConcluidas > 0 ? (
                 <LinhaDasConcluidas
                   quantas={quantasConcluidas}
@@ -1156,10 +1164,13 @@ function NovaConversa({
           collisionPadding={12}
           className="z-50 flex max-h-[min(30rem,var(--radix-popover-content-available-height))] w-[20rem] flex-col rounded-2xl border border-wpp-linha bg-popover p-1.5 text-popover-foreground shadow-wpp-pop outline-none"
         >
-          <p className="mx-2.5 mt-1.5 mb-2 text-xs font-medium text-wpp-suave">
+          {/* Só a lista encolhe (`min-h-0`): o título, a busca e o "Ver todos" ficam
+              com a altura deles (`shrink-0`). Sem isso, num celular baixo (375x667) o
+              teto da altura disponível espremia a busca e o link para 19 px. */}
+          <p className="mx-2.5 mt-1.5 mb-2 shrink-0 text-xs font-medium text-wpp-suave">
             Prospectados ainda sem conversa
           </p>
-          <label className="mx-1 mb-1 flex h-9 items-center gap-2 rounded-full bg-wpp-busca px-3 text-wpp-suave">
+          <label className="mx-1 mb-1 flex h-9 shrink-0 items-center gap-2 rounded-full bg-wpp-busca px-3 text-wpp-suave">
             <Search className="size-4 shrink-0" aria-hidden="true" />
             <span className="sr-only">Procurar prospectado</span>
             <input
@@ -1200,7 +1211,7 @@ function NovaConversa({
           <span className="mx-1 my-1.5 h-px shrink-0 bg-wpp-linha" />
           <Link
             href="/parceiros"
-            className="flex h-10 items-center gap-2.5 rounded-xl px-3 text-sm hover:bg-wpp-sel"
+            className="flex h-10 shrink-0 items-center gap-2.5 rounded-xl px-3 text-sm hover:bg-wpp-sel"
           >
             <Users className="size-4 text-wpp-suave" aria-hidden="true" />
             Ver todos em Prospectados

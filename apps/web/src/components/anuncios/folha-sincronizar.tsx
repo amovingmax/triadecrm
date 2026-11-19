@@ -20,15 +20,23 @@ import { URL_DO_CANAL_PRO } from './tipos';
 
 /**
  * "Sincronizar Canal Pro" (18/11/2026): ensina a guardar o favorito e a clicar
- * nele com o Canal Pro aberto. A conferência e a gravação acontecem na aba que o
+ * nele com o Canal Pro aberto. O favorito de hoje é a versão 4, que funciona no
+ * Canal Pro novo (React); quem guardou o da versão 3 precisa trocar. A conferência e a gravação acontecem na aba que o
  * favorito abre (`/anuncios/sincronizar`). Os dois jeitos de antes (a planilha
  * do Canal Pro e o arquivo da Arbo) ficam aqui embaixo, fora do cabeçalho.
+ *
+ * Depois da troca (o robô do Grupo OLX leu o arquivo do CRM, 19/11/2026), o
+ * arquivo da Arbo sai daqui: ele é velho e desfaria o que o CRM publica. O
+ * banco também não o deixa mudar anúncio no ar (`anuncio_importar`). A exceção
+ * é o pino do mapa: com anúncio no ar sem ele, o botão volta, só para trazê-lo.
  */
 export function FolhaSincronizar({
   aberto,
   aoMudar,
   sincronizadoEm,
   temEnderecoDoSistemaAtual,
+  crmPublica,
+  noArSemPino,
   aoAbrirPlanilha,
 }: {
   aberto: boolean;
@@ -36,6 +44,10 @@ export function FolhaSincronizar({
   /** A última lista do Canal Pro (planilha ou sincronização). */
   sincronizadoEm: string | null;
   temEnderecoDoSistemaAtual: boolean;
+  /** O Canal Pro já lê o arquivo do CRM (a troca da Arbo está feita). */
+  crmPublica: boolean;
+  /** No ar sem o pino do mapa, que o arquivo da Arbo ainda pode trazer (19/11/2026). */
+  noArSemPino: number;
   aoAbrirPlanilha: () => void;
 }) {
   return (
@@ -58,6 +70,10 @@ export function FolhaSincronizar({
               navegador (no Chrome, Ctrl+Shift+B ou ⌘+Shift+B mostra a barra).
             </p>
             {aberto ? <Favorito /> : null}
+            <p className="text-xs text-muted-foreground">
+              Já tinha o favorito? Apague o antigo e arraste este de novo. O Canal Pro mudou de site
+              em novembro de 2026, e o antigo dizia “não está logada” mesmo com o login feito.
+            </p>
           </Passo>
           <Passo n={2} titulo="No Canal Pro, abra Meus anúncios e clique no favorito">
             <p className="text-muted-foreground">
@@ -88,8 +104,9 @@ export function FolhaSincronizar({
           <div className="flex flex-col gap-2 border-t border-hairline pt-4">
             <p className="font-medium">Outros jeitos</p>
             <p className="text-muted-foreground">
-              Se o favorito não funcionar: a planilha que o Canal Pro exporta (traz situação e
-              números, sem fotos) ou o arquivo da Arbo, o sistema que publica hoje.
+              {crmPublica
+                ? 'Se o favorito não funcionar: a planilha que o Canal Pro exporta (traz situação e números, sem fotos).'
+                : 'Se o favorito não funcionar: a planilha que o Canal Pro exporta (traz situação e números, sem fotos) ou o arquivo da Arbo, o sistema que publica hoje.'}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -103,8 +120,28 @@ export function FolhaSincronizar({
                 <FileSpreadsheet aria-hidden="true" />
                 Planilha do Canal Pro
               </Button>
-              <ImportarSistemaAtual temEndereco={temEnderecoDoSistemaAtual} />
+              {crmPublica ? null : <ImportarSistemaAtual temEndereco={temEnderecoDoSistemaAtual} />}
             </div>
+            {crmPublica ? (
+              <p className="text-xs text-muted-foreground">
+                O Canal Pro já lê o arquivo do CRM: agora é o CRM quem publica. Por isso o arquivo
+                da Arbo não atualiza mais os anúncios daqui.
+              </p>
+            ) : null}
+            {crmPublica && noArSemPino > 0 && temEnderecoDoSistemaAtual ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {noArSemPino === 1
+                    ? '1 anúncio no ar está sem o pino do mapa.'
+                    : `${noArSemPino} anúncios no ar estão sem o pino do mapa.`}{' '}
+                  Do arquivo da Arbo, ele traz só as coordenadas que faltam; nada mais muda no
+                  anúncio no ar.
+                </p>
+                <div>
+                  <ImportarSistemaAtual temEndereco soPino />
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </SheetContent>

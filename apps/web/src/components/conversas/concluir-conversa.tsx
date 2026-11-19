@@ -106,7 +106,9 @@ export function ConcluirConversa({
   tamanho?: 'pilula' | 'bloco';
   /**
    * Em cabeçalho apertado o rótulo sai e fica o ícone (o nome continua para o
-   * leitor de tela). Pede um `@container` em volta.
+   * leitor de tela). Pede um `@container` em volta. O nome só aparece com 64rem
+   * de painel (era 48rem até 17/11/2026: com ele, o "Assumir conversa" e o
+   * "Pedir para ligar", o nome do contato sumia em 1280).
    */
   rotuloPelaLargura?: boolean;
 }) {
@@ -135,8 +137,8 @@ export function ConcluirConversa({
       {concluida ? <RotateCcw aria-hidden="true" /> : <CircleCheck aria-hidden="true" />}
       {rotuloPelaLargura ? (
         <>
-          <span className="hidden @3xl:inline">{rotulo}</span>
-          <span className="sr-only @3xl:hidden">{rotulo}</span>
+          <span className="hidden @5xl:inline">{rotulo}</span>
+          <span className="sr-only @5xl:hidden">{rotulo}</span>
         </>
       ) : (
         rotulo

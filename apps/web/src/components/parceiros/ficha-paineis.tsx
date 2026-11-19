@@ -276,7 +276,7 @@ function Nota({ nota, faixa }: { nota: number; faixa: string | null }) {
         <span className="numerico text-[22px] font-semibold tracking-[-0.03em] md:text-[27px]">
           {nota}
         </span>
-        <span className="mt-[3px] text-[10px] text-muted-foreground">
+        <span className="mt-[3px] text-[11px] text-muted-foreground">
           de <span className="numerico">100</span>
         </span>
       </div>

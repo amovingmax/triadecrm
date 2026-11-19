@@ -49,6 +49,9 @@ export interface AnuncioDoFeed {
   complemento: string | null;
   mostrar_endereco: MostrarEndereco;
   video_youtube: string | null;
+  /** Graus, 7 casas; as duas ou nenhuma (migração 20261119120000). */
+  latitude: number | null;
+  longitude: number | null;
   fotos: string[];
 }
 
@@ -255,6 +258,27 @@ function detalhes(a: AnuncioDoFeed): string {
   );
 }
 
+/** "-6.0559925": sete casas no máximo, sem zero no fim e nunca em notação científica. */
+export function grausDoPortal(valor: number): string {
+  return valor.toFixed(7).replace(/\.?0+$/, '');
+}
+
+/**
+ * O pino do mapa: <Latitude> e <Longitude> dentro de <Location>, depois do CEP,
+ * como no exemplo da documentação (listing.html#location) e no arquivo da Arbo.
+ * Só com as duas, na faixa e fora do 0,0. E só com o endereço inteiro à mostra
+ * (displayAddress="All"): com "Street" ou "Neighborhood" o anúncio esconde o
+ * número, e a coordenada exata o entregaria no mapa. Os 7 da Arbo mostram tudo.
+ */
+export function coordenadasDoPortal(a: AnuncioDoFeed): string {
+  const { latitude: lat, longitude: lon } = a;
+  if (a.mostrar_endereco !== 'completo') return '';
+  if (typeof lat !== 'number' || typeof lon !== 'number') return '';
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '';
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180 || (lat === 0 && lon === 0)) return '';
+  return elemento('Latitude', grausDoPortal(lat)) + elemento('Longitude', grausDoPortal(lon));
+}
+
 function local(a: AnuncioDoFeed): string {
   const uf = (a.estado ?? '').toUpperCase();
   return elemento(
@@ -269,6 +293,7 @@ function local(a: AnuncioDoFeed): string {
       // "Essa informação não vai aparecer nos portais" (listing.html#location).
       texto('Complement', a.complemento, true),
       a.cep ? elemento('PostalCode', cepDoPortal(a.cep)) : '',
+      coordenadasDoPortal(a),
     ].join(''),
     { displayAddress: MOSTRAR[a.mostrar_endereco] },
   );

@@ -174,7 +174,13 @@ function Colunas({
   return (
     <div className="flex flex-col gap-2">
       {titulo ? <h3 className="text-sm font-medium">{titulo}</h3> : null}
-      <ul className="grid gap-2 md:grid-cols-2">
+      {/* `grid-cols-1` no celular, e não a coluna implícita do `grid` (16/11/2026):
+          a coluna implícita é `auto`, mede o conteúdo MÍNIMO de cada cartão, e a
+          amostra de uma coluna de links ("https://www.google.com/maps/place/?q=…",
+          sem espaço nenhum) fazia o cartão ter 1.444px numa tela de 375px — a
+          página inteira rolava de lado ao abrir "Ver todas as colunas". Com
+          `minmax(0, 1fr)` o `truncate` da amostra volta a cortar. */}
+      <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {indices.map((indice) => {
           const titulo = planilha.cabecalho[indice] ?? '';
           const campo = porColuna.get(indice);
@@ -189,7 +195,7 @@ function Colunas({
             <li
               key={`${titulo}-${indice}`}
               className={cn(
-                'flex flex-col gap-2 rounded-lg bg-muted/45 p-3',
+                'flex min-w-0 flex-col gap-2 rounded-lg bg-muted/45 p-3',
                 campo === undefined && 'opacity-70',
               )}
             >

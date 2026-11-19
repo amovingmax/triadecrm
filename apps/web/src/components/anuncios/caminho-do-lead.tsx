@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { DialogoExcluirDuplicado } from './anuncios-no-canal-pro';
 import { carregarCaminhoDoLead, CHAVE_DO_CAMINHO } from './dados';
 import { formatarQuando } from './no-portal';
+import { ImportarSistemaAtual } from './importar-sistema-atual';
 import { BotaoPorNoAr, EnderecoDeLeads, EnderecoDoArquivo } from './painel-canal-pro';
 import {
   type AnuncioComPendencia,
@@ -83,7 +84,7 @@ export function CaminhoDoLead({
         <button
           type="button"
           onClick={() => void consulta.refetch()}
-          className="inline-flex items-center gap-1 text-foreground underline underline-offset-4"
+          className="-my-1.5 inline-flex items-center gap-1 py-1.5 text-foreground underline underline-offset-4"
         >
           <RotateCw className="size-3.5" aria-hidden="true" />
           Tentar de novo
@@ -107,7 +108,7 @@ export function CaminhoDoLead({
         <button
           type="button"
           onClick={() => setAberto(true)}
-          className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          className="-my-1.5 py-1.5 text-muted-foreground underline underline-offset-4 hover:text-foreground"
         >
           Ver o caminho
         </button>
@@ -167,7 +168,7 @@ export function CaminhoDoLead({
                       {' '}
                       <Link
                         href={`/anuncios/leads?lead=${encodeURIComponent(consulta.data.leads.ultimo.id)}`}
-                        className="underline underline-offset-4"
+                        className="py-2 underline underline-offset-4"
                       >
                         Ver o lead
                       </Link>
@@ -296,9 +297,11 @@ function LinhaDoAnuncio({
   return (
     <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 py-2">
       <p className="min-w-0 flex-1 basis-56">
+        {/* `py-2` num link em linha alarga o alvo do dedo até a altura da linha da
+            lista sem mexer no texto (16/11/2026): eram 17px de altura. */}
         <Link
           href={`/anuncios/${id}`}
-          className="numerico font-medium underline-offset-4 hover:underline"
+          className="numerico py-2 font-medium underline-offset-4 hover:underline"
         >
           {codigo}
         </Link>
@@ -386,6 +389,13 @@ export function DetalheDoArquivo({
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           {passo.antesDeColar}
         </p>
+      ) : null}
+      {/* O pino do mapa antes da URL (19/11/2026): o endereço do sistema atual
+          está guardado, então o botão já começa a ler. */}
+      {passo.pinoAntes ? (
+        <div className="flex flex-wrap gap-2">
+          <ImportarSistemaAtual temEndereco />
+        </div>
       ) : null}
       {passo.colar ? (
         chave ? (
@@ -476,16 +486,21 @@ function DetalheDosRepetidos({
             : `${repetidosInativos} repetidos inativos não ocupam vaga; eles estão na lista do Canal Pro, mais abaixo.`}
         </p>
       ) : null}
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
-        <FileSpreadsheet className="size-4" aria-hidden="true" />
-        {passo.relatorio ? `${passo.relatorio}. O ideal é uma vez por semana.` : null}
-        <button
-          type="button"
-          onClick={aoImportar}
-          className="text-foreground underline underline-offset-4"
-        >
-          {passo.relatorio ? 'Importar de novo' : 'Importar o relatório'}
-        </button>
+      {/* O ícone fica na margem e o texto corre ao lado dele (16/11/2026): com
+          tudo solto num flex que quebra linha, no celular o ícone sobrava sozinho
+          numa linha e a frase descia para a de baixo. */}
+      <p className="flex items-start gap-2 text-muted-foreground">
+        <FileSpreadsheet className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span className="min-w-0">
+          {passo.relatorio ? `${passo.relatorio}. O ideal é uma vez por semana. ` : null}
+          <button
+            type="button"
+            onClick={aoImportar}
+            className="-my-1.5 py-1.5 text-foreground underline underline-offset-4"
+          >
+            {passo.relatorio ? 'Importar de novo' : 'Importar o relatório'}
+          </button>
+        </span>
       </p>
       {excluindo ? (
         <DialogoExcluirDuplicado

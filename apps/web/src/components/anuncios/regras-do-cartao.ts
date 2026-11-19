@@ -614,22 +614,79 @@ export function ocupaVagaPeloRelatorio(
 
 /**
  * O que o plano trava antes do clique, no menu do cartão e no editor. Quem recusa
- * é o banco (`anuncio_publicar`, `anuncio_destaque`); a tela só avisa. Desde
- * 11/11/2026, o anúncio que o relatório já conta não é barrado pelo plano cheio:
- * ele só ocuparia a própria vaga. O destaque dele não é conferido aqui (a tela
- * não sabe se a linha do relatório tem destaque): o banco decide.
+ * é o banco (`anuncio_publicar`, `anuncio_destaque`); a tela só avisa, com a mesma
+ * conta de `app.canal_pro_ocupadas(p_fora)` (migração 20261111203000): a vaga e
+ * o destaque do próprio anúncio não contam contra ele.
+ *   * Desde 11/11/2026, o anúncio que o relatório já conta não é barrado pelo
+ *     plano cheio: ele só ocuparia a própria vaga.
+ *   * Desde 19/11/2026, o mesmo vale para o destaque: o rascunho cuja linha do
+ *     relatório gasta destaque (`destaqueNoRelatorio`, da lista) só ocuparia o
+ *     próprio. Antes a tela contava esse destaque como "dos outros" e, com "2 de
+ *     2 em uso", esmaecia Destaque em todo rascunho, até no TE0001 e no TE0002,
+ *     que são os 2 destaques do portal.
  */
 export function travasDoPlano(
   plano: SituacaoDoCanalPro['plano'] | null,
-  a: { situacao: AnuncioNaLista['situacao']; destaque: string; ocupaVagaPeloRelatorio: boolean },
+  a: {
+    situacao: AnuncioNaLista['situacao'];
+    destaque: string;
+    ocupaVagaPeloRelatorio: boolean;
+    /** A linha do relatório que é este anúncio gasta destaque do plano. */
+    destaqueNoRelatorio?: boolean;
+  },
 ): { semVaga: boolean; semDestaque: boolean; destaqueBarrado: boolean } {
   const noAr = a.situacao === 'no_ar';
   const vagasDosOutros = (plano?.anunciosEmUso ?? 0) - (a.ocupaVagaPeloRelatorio ? 1 : 0);
   const semVaga = !noAr && plano?.anuncios != null && vagasDosOutros >= plano.anuncios;
-  const destaquesDosOutros =
-    (plano?.destaquesEmUso ?? 0) - (noAr && a.destaque !== 'padrao' ? 1 : 0);
+  // No ar, o destaque dele está na conta do CRM; fora do ar, na linha do
+  // relatório (quando ela está ativa e gasta destaque). Nunca nas duas.
+  const proprio = noAr
+    ? a.destaque !== 'padrao'
+    : a.ocupaVagaPeloRelatorio && a.destaqueNoRelatorio === true;
+  const destaquesDosOutros = (plano?.destaquesEmUso ?? 0) - (proprio ? 1 : 0);
   const semDestaque = plano?.destaques != null && destaquesDosOutros >= plano.destaques;
-  const destaqueBarrado =
-    !noAr && a.destaque !== 'padrao' && semDestaque && !a.ocupaVagaPeloRelatorio;
+  const destaqueBarrado = !noAr && a.destaque !== 'padrao' && semDestaque;
   return { semVaga, semDestaque, destaqueBarrado };
+}
+
+/**
+ * O Destacador Automático do Grupo OLX: com integração, o destaque manual no
+ * Canal Pro fica bloqueado e quem manda é o arquivo; e, se o arquivo manda menos
+ * destaques do que o plano tem, o Canal Pro escolhe sozinho quais destacar
+ * (ajuda.zapimoveis.com.br, "como destacar um anúncio via integração"). É por
+ * isso que o TE0001 e o TE0002 aparecem como Destaque com a Arbo mandando
+ * STANDARD em todos.
+ */
+export const DESTACADOR_AUTOMATICO =
+  'Com menos destaques no arquivo do que o plano tem, o Canal Pro escolhe sozinho quais destacar.';
+
+// ---------------------------------------------------------------------------
+// A troca e o pino do mapa (19/11/2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Quantos dias uma leitura do robô do Grupo OLX vale como sinal da troca. A
+ * mesma conta de `app.canal_pro_crm_publica()` (migração 20261119120000): se o
+ * Canal Pro voltar para a Arbo, 90 dias depois da última leitura o CRM deixa de
+ * se ver como quem publica.
+ */
+export const DIAS_DO_SINAL_DA_TROCA = 90;
+
+/** O Canal Pro lê o arquivo do CRM (a troca está feita), pela última leitura do robô. */
+export function crmPublica(ultimaLeituraDoRobo: string | null | undefined, agora: Date): boolean {
+  if (!ultimaLeituraDoRobo) return false;
+  const em = Date.parse(ultimaLeituraDoRobo);
+  return !Number.isNaN(em) && agora.getTime() - em < DIAS_DO_SINAL_DA_TROCA * 24 * 3_600_000;
+}
+
+/**
+ * Está no portal pelo sistema atual (no arquivo dele, na última leitura), sem o
+ * pino do mapa no CRM, e o importador nunca o procurou (`falta_pino`). É quem
+ * "Atualizar do sistema atual" completa: antes de colar a URL, e, depois da
+ * troca, só o pino de quem está no ar.
+ */
+export function precisaDoPino(
+  a: Pick<AnuncioNaLista, 'excluido_em' | 'no_sistema_atual' | 'falta_pino'>,
+): boolean {
+  return !a.excluido_em && a.no_sistema_atual === true && a.falta_pino === true;
 }

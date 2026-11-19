@@ -79,6 +79,8 @@ export type OrganizacaoCrua = {
   temperature: Temperature;
   phone_e164: string | null;
   phone_is_masked: boolean | null;
+  /** O e-mail da ficha (17/11/2026): o que a equipe digitou ou o que o cliente escreveu na conversa. */
+  email?: string | null;
   do_not_contact: boolean;
   /** `organizations.kind`: o tipo da ficha (na Imova, `produtor` é Cliente). */
   kind?: OrgKind | null;
@@ -315,6 +317,7 @@ export function montarConversas({
       precisaAtencao: negocio?.needs_attention ?? false,
       telefone: o.phone_e164,
       telefoneMascarado: o.phone_is_masked ?? true,
+      email: o.email ?? null,
       naoContatar: o.do_not_contact,
       etapa: etapa?.nome ?? null,
       funil: etapa?.funil ?? null,

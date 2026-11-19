@@ -81,7 +81,10 @@ export function CartaoPessoa({
     <Card className="min-w-0">
       <CardHeader>
         <div className="flex min-w-0 items-center gap-2">
-          <CardTitle className="truncate">{pessoa.nome}</CardTitle>
+          {/* Até duas linhas, quebrando em qualquer ponto (16/11/2026): com o botão
+              "Definir meta" ao lado, em 375 sobravam 120px e o e-mail de quem ainda não
+              tem nome virava "gestor.teste@te…", sem dizer de quem era o cartão. */}
+          <CardTitle className="line-clamp-2 [overflow-wrap:anywhere]">{pessoa.nome}</CardTitle>
           {ehVoce ? (
             <Badge variant="pilula" className="shrink-0 font-normal">
               você
@@ -351,7 +354,7 @@ function ChipProxy() {
     <Badge
       variant="pilula"
       title="Contado pelo funil do CRM. A fonte da verdade é a plataforma Komune, cuja integração ainda não está ligada."
-      className="shrink-0 text-[10px] font-normal text-muted-foreground"
+      className="shrink-0 text-[11px] font-normal text-muted-foreground"
     >
       proxy
     </Badge>

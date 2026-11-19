@@ -104,7 +104,7 @@ function LinhaDoGrupo({
           {selo ? (
             <span
               className={cn(
-                'shrink-0 rounded-full px-1.5 py-px text-[10px]',
+                'shrink-0 rounded-full px-1.5 py-px text-[11px] md:text-[10px]',
                 grupo.estado === 'falhou' || grupo.estado === 'suspenso'
                   ? 'bg-destructive/10 text-destructive-texto'
                   : 'bg-muted text-muted-foreground',

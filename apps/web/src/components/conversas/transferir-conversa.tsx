@@ -77,9 +77,9 @@ export function TransferirConversa({
         onClick={() => setAberta(true)}
       >
         <ArrowRightLeft aria-hidden="true" />
-        {/* Pela largura do cabeçalho da conversa (`@container`), não da tela. */}
-        <span className="hidden @xs:inline">Transferir</span>
-        <span className="sr-only @xs:hidden">Transferir</span>
+        {/* O nome sempre (17/11/2026). O botão saiu do cabeçalho para as Ações, e
+            o "só o ícone abaixo de 20rem" de lá apagava o nome na coluna de 1280. */}
+        Transferir
       </Button>
       {aberta ? (
         <Folha
@@ -126,15 +126,19 @@ function Folha({
       return r;
     },
     onSuccess: (r) => {
-      toast.success(`Conversa passada para ${r.para ?? 'o setor'}${r.setor ? ` (${r.setor})` : ''}.`, {
-        description: 'Quem recebe ganhou uma tarefa com a sua nota.',
-      });
+      toast.success(
+        `Conversa passada para ${r.para ?? 'o setor'}${r.setor ? ` (${r.setor})` : ''}.`,
+        {
+          description: 'Quem recebe ganhou uma tarefa com a sua nota.',
+        },
+      );
       void clientes.invalidateQueries({ queryKey: CHAVE_CONVERSAS });
       void clientes.invalidateQueries({ queryKey: chaveDaLinha(organizacaoId) });
       void clientes.invalidateQueries({ queryKey: ['conversas', 'transferencia', fioId] });
       aoFechar();
     },
-    onError: (erro: Error) => toast.error('Não deu para transferir.', { description: erro.message }),
+    onError: (erro: Error) =>
+      toast.error('Não deu para transferir.', { description: erro.message }),
   });
 
   const podeTransferir = pessoa !== NINGUEM || setor !== NINGUEM;
@@ -231,17 +235,24 @@ const transferenciaSchema = z.object({
  * mesma conversa sem saber uma da outra. Não bloqueia: quem responde assume, e
  * é isso que a frase diz ANTES de a pessoa escrever. Traz também a nota da
  * última transferência, que é o contexto que quem recebe precisa.
+ *
+ * `acao` é o "Assumir" do celular, no fim da frase (16/11/2026): ele vinha num
+ * bloco de 44 px só dele, embaixo do aviso, e com a janela apertada o rodapé
+ * passava de 280 px num celular de 667 — sobravam ~220 px para as mensagens.
+ * Na frase ele fica onde a pessoa acabou de ler por que assumiria.
  */
 export function AvisoDeQuemAtende({
   fioId,
   atendente,
   paraMim,
   nomeDaPessoa,
+  acao,
 }: {
   fioId: string;
   atendente: string | null;
   paraMim: boolean;
   nomeDaPessoa: Map<string, string>;
+  acao?: React.ReactNode;
 }) {
   const ultima = useQuery({
     queryKey: ['conversas', 'transferencia', fioId],
@@ -268,6 +279,7 @@ export function AvisoDeQuemAtende({
         <p>
           <span className="font-medium text-foreground">{atendente ?? 'Outra pessoa'}</span> está
           atendendo esta conversa. Se você responder, ela passa para você.
+          {acao}
         </p>
       )}
       {nota ? (

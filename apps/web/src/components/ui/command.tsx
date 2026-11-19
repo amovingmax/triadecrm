@@ -64,10 +64,12 @@ function CommandInput({
   return (
     <div className="flex h-11 items-center gap-2 border-b px-3">
       <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      {/* 16px no celular, 14px do md para cima: abaixo de 16px o iPhone dá zoom na
+          tela ao focar o campo, e a paleta abre com o foco nele. */}
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          'flex h-full w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50',
+          'flex h-full w-full bg-transparent text-base outline-none placeholder:text-muted-foreground disabled:opacity-50 md:text-sm',
           className,
         )}
         {...props}

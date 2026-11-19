@@ -520,6 +520,17 @@ export type AnuncioNaLista = {
   no_sistema_atual: boolean | null;
   /** A leitura que confirmou `no_sistema_atual` (a última, ou a em que sumiu). */
   sistema_atual_em: string | null;
+  /**
+   * A linha do último relatório do Canal Pro gasta destaque do plano
+   * (`app.canal_pro_destaque_do_relatorio`, 20261119120000). Vale com
+   * `no_canal_pro_situacao` ativa; null em banco anterior.
+   */
+  no_canal_pro_com_destaque?: boolean | null;
+  /**
+   * Sem coordenada e o importador do sistema atual nunca a procurou no arquivo
+   * (20261119120000): falta trazer o pino do mapa. Null em banco anterior.
+   */
+  falta_pino?: boolean | null;
 };
 
 /**

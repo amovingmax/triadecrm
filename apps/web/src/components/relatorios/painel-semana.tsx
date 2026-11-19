@@ -97,7 +97,7 @@ export function PainelSemana({
             {EMPRESA.modulos.plataformaKomune && l.proxy ? (
               <Badge
                 variant="pilula"
-                className="h-5 shrink-0 px-2 text-[10px] font-normal"
+                className="h-5 shrink-0 px-2 text-[11px] font-normal"
                 title="Sai do funil do CRM, não da plataforma Komune: a integração ainda não está ligada."
               >
                 proxy
@@ -299,9 +299,9 @@ function SeletorDeSemana({
               >
                 {semana.rotulo}
                 {semana.parcial ? (
-                  <span className="text-[10px] text-muted-foreground">em curso</span>
+                  <span className="text-[11px] text-muted-foreground">em curso</span>
                 ) : !semana.gerado ? (
-                  <span className="text-[10px] text-muted-foreground">não gerada</span>
+                  <span className="text-[11px] text-muted-foreground">não gerada</span>
                 ) : null}
               </Button>
             </li>

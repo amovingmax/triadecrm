@@ -9,7 +9,9 @@
 //   2. texto livre nunca vira marcação: CDATA nos textos, "]]>" partido,
 //      entidades no resto;
 //   3. as regras de área e de quartos por tipo (terreno, kitnet, studio);
-//   4. a capa é a primeira foto e o vídeo do YouTube vai junto.
+//   4. a capa é a primeira foto e o vídeo do YouTube vai junto;
+//   5. o pino do mapa (19/11/2026): Latitude e Longitude dentro de Location,
+//      depois do CEP, só com as duas e com o endereço inteiro à mostra.
 // =============================================================================
 
 import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@1';
@@ -17,8 +19,10 @@ import {
   type AnuncioDoFeed,
   cdata,
   cepDoPortal,
+  coordenadasDoPortal,
   dataDoCabecalho,
   descricaoDoPortal,
+  grausDoPortal,
   type Imobiliaria,
   montarVrsync,
 } from './vrsync.ts';
@@ -63,6 +67,8 @@ function apartamento(extra: Partial<AnuncioDoFeed> = {}): AnuncioDoFeed {
     complemento: 'Apto 1201',
     mostrar_endereco: 'rua',
     video_youtube: null,
+    latitude: null,
+    longitude: null,
     fotos: ['a/1.jpg', 'a/2.jpg', 'a/3.jpg', 'a/4.jpg', 'a/5.jpg'],
     ...extra,
   };
@@ -195,4 +201,53 @@ Deno.test('CEP e data no formato dos exemplos', () => {
 Deno.test('sem anúncio no ar, o arquivo é válido e vazio', () => {
   const xml = montarVrsync(IMOVA, [], foto, AGORA);
   assertStringIncludes(xml, '<Listings>\n</Listings>');
+});
+
+Deno.test('o pino do mapa vai em Location, depois do CEP, como na Arbo', () => {
+  // O TE0004 da Arbo: CEP genérico de Nísia Floresta, o pino é o que acha o terreno.
+  const terreno = apartamento({
+    codigo: 'TE0004_IMOVA',
+    cep: '59164000',
+    mostrar_endereco: 'completo',
+    complemento: 'Terreno Tabatinga',
+    latitude: -6.0559925,
+    longitude: -35.1708741,
+  });
+  const xml = montarVrsync(IMOVA, [terreno], foto, AGORA);
+  assertStringIncludes(
+    xml,
+    '<Complement><![CDATA[Terreno Tabatinga]]></Complement><PostalCode>59164-000</PostalCode><Latitude>-6.0559925</Latitude><Longitude>-35.1708741</Longitude></Location>',
+  );
+  assertStringIncludes(xml, '<Location displayAddress="All">');
+});
+
+Deno.test('sem as duas, fora da faixa, no 0,0 ou com o endereço escondido, o pino não vai', () => {
+  const com = {
+    mostrar_endereco: 'completo' as const,
+    latitude: -5.8623832,
+    longitude: -35.1979617,
+  };
+  assertEquals(
+    coordenadasDoPortal(apartamento(com)),
+    '<Latitude>-5.8623832</Latitude><Longitude>-35.1979617</Longitude>',
+  );
+  assertEquals(coordenadasDoPortal(apartamento({ ...com, longitude: null })), '');
+  assertEquals(coordenadasDoPortal(apartamento({ ...com, latitude: 91 })), '');
+  assertEquals(coordenadasDoPortal(apartamento({ ...com, latitude: 0, longitude: 0 })), '');
+  // "A rua, sem o número" e "só o bairro": a coordenada exata entregaria o número.
+  assertEquals(coordenadasDoPortal(apartamento({ ...com, mostrar_endereco: 'rua' })), '');
+  assertEquals(coordenadasDoPortal(apartamento({ ...com, mostrar_endereco: 'bairro' })), '');
+  // O banco ainda sem as colunas (função publicada antes da migração): nada muda.
+  const antigo = apartamento({ mostrar_endereco: 'completo' }) as Partial<AnuncioDoFeed>;
+  delete antigo.latitude;
+  delete antigo.longitude;
+  assertEquals(coordenadasDoPortal(antigo as AnuncioDoFeed), '');
+  assert(!montarVrsync(IMOVA, [apartamento()], foto, AGORA).includes('<Latitude>'));
+});
+
+Deno.test('graus com até 7 casas, sem zero no fim e sem notação científica', () => {
+  assertEquals(grausDoPortal(-6.0559925), '-6.0559925');
+  assertEquals(grausDoPortal(-15.844255), '-15.844255');
+  assertEquals(grausDoPortal(-35), '-35');
+  assertEquals(grausDoPortal(-0.0000001), '-0.0000001');
 });

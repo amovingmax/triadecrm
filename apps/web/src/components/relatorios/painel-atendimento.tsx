@@ -89,7 +89,11 @@ function Blocos({ dados }: { dados: Awaited<ReturnType<typeof carregarAtendiment
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Bloco titulo="Por atendente" vazio={pessoas.length === 0 ? 'Ninguém atendeu conversa no período.' : null}>
-          <table className="w-full text-sm">
+          {/* Rola dentro do cartão no celular (16/11/2026): quatro colunas e a barra de
+              96px não cabem em 311px com um nome comprido, e sem o contêiner a tabela
+              alargava a página inteira. */}
+          <div className="-mx-4 overflow-x-auto px-4">
+          <table className="w-full min-w-[18rem] text-sm">
             <thead>
               <tr className="text-left text-xs text-muted-foreground">
                 <th className="py-1.5 font-medium">Pessoa</th>
@@ -103,7 +107,7 @@ function Blocos({ dados }: { dados: Awaited<ReturnType<typeof carregarAtendiment
                 <tr key={x.pessoa_id} className="border-t border-hairline">
                   <td className="py-2">{x.nome}</td>
                   <td className="py-2">
-                    <span className="ml-auto flex w-24 flex-col items-end gap-1">
+                    <span className="ml-auto flex w-16 flex-col items-end gap-1 md:w-24">
                       <span className="numerico">{formatarInteiro(x.conversas)}</span>
                       <BarraProporcao valor={x.conversas} maximo={maiorConversas} />
                     </span>
@@ -114,12 +118,16 @@ function Blocos({ dados }: { dados: Awaited<ReturnType<typeof carregarAtendiment
               ))}
             </tbody>
           </table>
+          </div>
         </Bloco>
 
         <Bloco titulo="Conversão por etapa (captação)" vazio={dados.conversao.length === 0 ? 'Sem negócios no período.' : null}>
           <ul className="flex flex-col gap-2 text-sm">
             {dados.conversao.map((x) => (
-              <li key={x.etapa} className="grid grid-cols-[minmax(0,1fr)_6rem_7rem] items-center gap-3">
+              // No celular a barra e o número encolhem: com 6rem e 7rem, o nome da etapa
+              // sobrava com 79px em 375 e virava "Apresent…". Larguras fixas, e não
+              // `auto`, porque cada linha é uma grade e as barras precisam se alinhar.
+              <li key={x.etapa} className="grid grid-cols-[minmax(0,1fr)_4rem_5.5rem] items-center gap-3 md:grid-cols-[minmax(0,1fr)_6rem_7rem]">
                 <span className="truncate">{x.etapa}</span>
                 <BarraProporcao valor={x.chegaram} maximo={maiorChegaram} />
                 <span className="numerico text-right whitespace-nowrap text-muted-foreground">
@@ -134,7 +142,7 @@ function Blocos({ dados }: { dados: Awaited<ReturnType<typeof carregarAtendiment
         <Bloco titulo="Motivos de perda" vazio={dados.perdas.length === 0 ? 'Nenhum negócio perdido no período.' : null}>
           <ul className="flex flex-col gap-2 text-sm">
             {dados.perdas.map((x) => (
-              <li key={x.motivo} className="grid grid-cols-[minmax(0,1fr)_6rem_2.5rem] items-center gap-3">
+              <li key={x.motivo} className="grid grid-cols-[minmax(0,1fr)_4rem_2.5rem] items-center gap-3 md:grid-cols-[minmax(0,1fr)_6rem_2.5rem]">
                 <span className="truncate">{x.motivo}</span>
                 <BarraProporcao valor={x.total} maximo={maiorPerda} />
                 <span className="numerico text-right">{formatarInteiro(x.total)}</span>

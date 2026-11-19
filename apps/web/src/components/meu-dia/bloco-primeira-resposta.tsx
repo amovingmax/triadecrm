@@ -336,7 +336,9 @@ function Equipe({
                   <button
                     type="button"
                     onClick={() => aoVerPessoa(pessoa.id)}
-                    className="toque cursor-pointer truncate text-left underline-offset-4 hover:underline"
+                    // `py-1.5 -my-1.5`: o toque ganha 32 px de altura sem a linha
+                    // da equipe crescer (o nome sozinho tinha 20 px).
+                    className="toque -my-1.5 cursor-pointer truncate py-1.5 text-left underline-offset-4 hover:underline"
                     title={`Ver o dia de ${nome}`}
                   >
                     {nome}

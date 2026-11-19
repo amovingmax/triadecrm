@@ -41,9 +41,9 @@ const CONTATO = {
 const comBase = { ...v5, sistema: sistemaComBaseV5(BASE_DO_ENSAIO_V5) };
 
 describe('atendente-imova@v5: o contrato', () => {
-  it('é a vigente, e a v4 continua no catálogo', () => {
-    expect(VIGENTES['atendente-imova']).toBe(5);
-    expect(promptVigente('atendente-imova')).toBe(v5);
+  it('continua no catálogo (a vigente é a v6, desde 17/11/2026), e a v4 também', () => {
+    expect(VIGENTES['atendente-imova']).toBe(6);
+    expect(promptVigente('atendente-imova')).not.toBe(v5);
     expect(obterPrompt('atendente-imova', 5)).toBe(v5);
     expect(obterPrompt('atendente-imova', 4)).toBe(v4);
     expect(v5.versao).toBe(5);

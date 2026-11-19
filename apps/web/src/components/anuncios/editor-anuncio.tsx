@@ -40,7 +40,11 @@ import {
 } from './dados';
 import { FotosDoAnuncio } from './fotos-do-anuncio';
 import { SituacaoNoPortal } from './no-portal';
-import { consequenciaForaDoArquivo, travasDoPlano } from './regras-do-cartao';
+import {
+  consequenciaForaDoArquivo,
+  DESTACADOR_AUTOMATICO,
+  travasDoPlano,
+} from './regras-do-cartao';
 import {
   type Anuncio,
   areaDasMedidas,
@@ -338,6 +342,7 @@ function Editor({
     situacao: anuncio?.situacao ?? 'rascunho',
     destaque: anuncio?.destaque ?? 'padrao',
     ocupaVagaPeloRelatorio: ocupaVaga,
+    destaqueNoRelatorio: dados?.destaqueNoRelatorio ?? false,
   });
 
   function atualizar() {
@@ -437,7 +442,7 @@ function Editor({
       <header className="flex flex-col gap-3">
         <Voltar />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="font-heading text-[28px] leading-tight font-normal tracking-[-0.02em]">
+          <h1 className="min-w-0 font-heading text-[28px] leading-tight font-normal tracking-[-0.02em] break-words">
             {anuncio ? anuncio.titulo.trim() || 'Anúncio sem título' : 'Novo anúncio'}
           </h1>
           {anuncio ? (
@@ -483,9 +488,15 @@ function Editor({
             )}
           </Secao>
 
+          {/* O rodapé do Salvar gruda ACIMA da barra inferior no celular (16/11/2026):
+              com `bottom-0` ele grudava atrás dela (a barra é fixa, z-30), e quem
+              preenchia o anúncio no local do imóvel não via o botão até o fim da
+              página. Mesma medida da barra de lote da Revisão; no computador não há
+              barra, e ele volta ao `bottom-0`. Fica de ponta a ponta (-mx-4) com o
+              traço em cima, para não parecer um campo a mais do formulário. */}
           {editavel ? (
-            <div className="sticky bottom-0 z-10 -mx-1 flex gap-2 bg-background/90 px-1 py-3 backdrop-blur">
-              <Button type="submit" disabled={salvando} className="toque h-11 md:h-9">
+            <div className="sticky bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior))] z-20 -mx-4 flex gap-2 border-t border-hairline bg-background/95 px-4 py-3 backdrop-blur md:bottom-0 md:z-10 md:-mx-1 md:border-t-0 md:bg-background/90 md:px-1">
+              <Button type="submit" disabled={salvando} className="toque h-11 flex-1 md:h-9 md:flex-none">
                 {salvando ? 'Salvando...' : anuncio ? 'Salvar' : 'Salvar e pôr as fotos'}
               </Button>
               {formState.isDirty && anuncio ? (
@@ -647,7 +658,7 @@ function Editor({
                       <p className="text-xs text-muted-foreground">
                         {DESTAQUES.find((d) => d.id === anuncio.destaque)?.dica}{' '}
                         {plano?.destaques != null
-                          ? `Destaques do plano em uso: ${plano.destaquesEmUso} de ${plano.destaques}.`
+                          ? `Destaques do plano em uso: ${plano.destaquesEmUso} de ${plano.destaques}. ${DESTACADOR_AUTOMATICO}`
                           : 'O destaque gasta a cota do plano do Canal Pro.'}
                       </p>
                     </div>
@@ -1145,6 +1156,7 @@ function Formulario({
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="toque h-10 px-3.5 md:h-7 md:px-2.5"
                     onClick={() =>
                       setValue('area_total', String(areaPelasMedidas), { shouldDirty: true })
                     }
@@ -1158,14 +1170,18 @@ function Formulario({
         </div>
       </Secao>
 
+      {/* No celular a grade também tem 6 colunas (16/11/2026): Cidade e Estado, e
+          Número e Complemento, dividem a linha, como no papel. Antes era uma coluna
+          só, e o bloco tinha oito campos empilhados para rolar no local do imóvel.
+          Do `sm` para cima, as medidas de sempre. */}
       <Secao titulo="Endereço" dica="O portal pede CEP, estado, cidade e bairro.">
-        <div className="grid gap-4 sm:grid-cols-6">
+        <div className="grid grid-cols-6 gap-4">
           <Campo
             id={`${id}-cep`}
             rotulo="CEP"
             erro={erros.cep?.message}
             dica="Preenche a rua e o bairro."
-            className="sm:col-span-2"
+            className="col-span-6 sm:col-span-2"
           >
             <Input
               id={`${id}-cep`}
@@ -1175,14 +1191,14 @@ function Formulario({
               {...register('cep', { onBlur: () => void completarPeloCep() })}
             />
           </Campo>
-          <Campo id={`${id}-cidade`} rotulo="Cidade" className="sm:col-span-3">
+          <Campo id={`${id}-cidade`} rotulo="Cidade" className="col-span-4 sm:col-span-3">
             <Input id={`${id}-cidade`} className={ENTRADA} {...register('cidade')} />
           </Campo>
           <Campo
             id={`${id}-uf`}
             rotulo="Estado"
             erro={erros.estado?.message}
-            className="sm:col-span-1"
+            className="col-span-2 sm:col-span-1"
           >
             <Input
               id={`${id}-uf`}
@@ -1192,20 +1208,20 @@ function Formulario({
               {...register('estado')}
             />
           </Campo>
-          <Campo id={`${id}-bairro`} rotulo="Bairro" className="sm:col-span-3">
+          <Campo id={`${id}-bairro`} rotulo="Bairro" className="col-span-6 sm:col-span-3">
             <Input id={`${id}-bairro`} className={ENTRADA} {...register('bairro')} />
           </Campo>
-          <Campo id={`${id}-rua`} rotulo="Rua" className="sm:col-span-3">
+          <Campo id={`${id}-rua`} rotulo="Rua" className="col-span-6 sm:col-span-3">
             <Input id={`${id}-rua`} className={ENTRADA} {...register('endereco')} />
           </Campo>
-          <Campo id={`${id}-numero`} rotulo="Número" className="sm:col-span-2">
+          <Campo id={`${id}-numero`} rotulo="Número" className="col-span-2">
             <Input id={`${id}-numero`} className={ENTRADA} {...register('numero')} />
           </Campo>
           <Campo
             id={`${id}-compl`}
             rotulo="Complemento"
             dica="Não aparece no portal."
-            className="sm:col-span-4"
+            className="col-span-4"
           >
             <Input
               id={`${id}-compl`}
@@ -1214,7 +1230,7 @@ function Formulario({
               {...register('complemento')}
             />
           </Campo>
-          <Campo id={`${id}-mostrar`} rotulo="O portal mostra" className="sm:col-span-6">
+          <Campo id={`${id}-mostrar`} rotulo="O portal mostra" className="col-span-6">
             <Controller
               control={control}
               name="mostrar_endereco"
@@ -1353,8 +1369,11 @@ function Proprietario({ form }: { form: UseFormReturn<Valores> }) {
     return (
       <div className="flex flex-col gap-1.5">
         <Label>Proprietário</Label>
-        <div className="flex items-center gap-2">
-          <Link href={`/parceiros/${atual.id}`} className="text-sm underline underline-offset-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Link
+            href={`/parceiros/${atual.id}`}
+            className="min-w-0 text-sm break-words underline underline-offset-4"
+          >
             {atual.nome}
           </Link>
           <Button
@@ -1362,7 +1381,7 @@ function Proprietario({ form }: { form: UseFormReturn<Valores> }) {
             variant="ghost"
             size="icon"
             aria-label="Tirar o proprietário"
-            className="toque"
+            className="toque size-11 shrink-0 md:size-8"
             onClick={() => form.setValue('proprietario', null, { shouldDirty: true })}
           >
             <X aria-hidden="true" />
@@ -1394,7 +1413,7 @@ function Proprietario({ form }: { form: UseFormReturn<Valores> }) {
               <li key={p.id}>
                 <button
                   type="button"
-                  className="toque w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted"
+                  className="toque min-h-11 w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted md:min-h-0"
                   onClick={() => {
                     form.setValue('proprietario', p, { shouldDirty: true });
                     setBusca('');

@@ -61,10 +61,13 @@
  * DUAS COISAS QUE JÁ CUSTARAM CARO
  * ---------------------------------------------------------------------------
  * 1. `descricao` não é enfeite nem roadmap: ela é o índice de busca da paleta
- *    (⌘K) e o texto que aparece sob o rótulo no menu "Mais" do celular. Uma
- *    descrição desatualizada não fica só feia: manda a pessoa para a tela errada
- *    em silêncio. Ao mexer numa tela, releia a linha dela aqui. O que a frase
- *    promete, a tela entrega HOJE.
+ *    (⌘K) e o texto que aparece sob o rótulo em cada linha dela. Uma descrição
+ *    desatualizada não fica só feia: manda a pessoa para a tela errada em
+ *    silêncio. Ao mexer numa tela, releia a linha dela aqui. O que a frase
+ *    promete, a tela entrega HOJE. (De 09/09 a 16/11/2026 ela também aparecia sob
+ *    o rótulo na folha "Mais" do celular, cortada em duas linhas; a folha virou
+ *    uma grade de atalhos e a frase ficou na paleta, que o "Buscar no CRM" do
+ *    topo da folha abre.)
  *
  * 2. `papeis` não é cosmético. Sem ele o item aparece para quem a rota vai
  *    recusar, e a recusa do `requireRole` é um `redirect('/sem-permissao')`: a
@@ -128,8 +131,8 @@ export type ItemNavegacao = {
   icone: LucideIcon;
   grupo: ChaveDeGrupo;
   /**
-   * O que a tela entrega HOJE, em uma frase. É texto visível (paleta e menu
-   * "Mais") e, ao mesmo tempo, o índice pelo qual a paleta encontra o módulo: as
+   * O que a tela entrega HOJE, em uma frase. É texto visível (sob o rótulo, na
+   * paleta) e, ao mesmo tempo, o índice pelo qual a paleta encontra o módulo: as
    * palavras que alguém digitaria para chegar aqui precisam estar nesta frase.
    */
   descricao: string;
@@ -183,33 +186,34 @@ export type GrupoDeNavegacao = {
   /** Cabeçalho na lateral. Curto: cabe em 208px menos o respiro. */
   titulo: string;
   /**
-   * A frase que explica o grupo, para quem nunca viu o CRM.
+   * O grupo em três ou quatro palavras, ao lado do título na folha "Mais" do
+   * celular: o que o grupo É, para quem nunca viu o CRM, numa linha só.
    *
-   * Não cabe na lateral do desktop (um cabeçalho de 11px numa coluna de 208px é
-   * uma linha, não um parágrafo) e por isso aparece na folha "Mais" do celular,
-   * que é onde alguém de fato para para ler o que é cada coisa.
+   * De 09/09 a 16/11/2026 era `explicacao`, uma frase de duas ou três linhas por grupo
+   * ("O que você faz com as próprias mãos, várias vezes por dia. Se você só abrir
+   * estas telas, o dia acontece."). Somada à descrição de cada item, a folha virou
+   * um documento a rolar, e o pedido foi "algo mais organizado". O critério
+   * inteiro de cada grupo continua escrito no topo deste arquivo, que é onde quem
+   * mexe no menu precisa dele; na tela fica o que cabe numa olhada.
    */
-  explicacao: string;
+  apoio: string;
 };
 
 export const GRUPOS: readonly GrupoDeNavegacao[] = [
   {
     chave: 'todo_dia',
     titulo: 'Todo dia',
-    explicacao:
-      'O que você faz com as próprias mãos, várias vezes por dia. Se você só abrir estas telas, o dia acontece.',
+    apoio: 'o trabalho de cada dia',
   },
   {
     chave: 'a_base',
     titulo: 'A base',
-    explicacao:
-      'Quem já está no CRM e em que pé está cada negócio. Você vem aqui para achar alguém e para organizar, não para produzir contato.',
+    apoio: 'quem já está no CRM',
   },
   {
     chave: 'controle',
     titulo: 'Controle',
-    explicacao:
-      'Os números da semana e as regras que o CRM segue sozinho depois de configuradas. Mexe-se uma vez por semana, ou menos.',
+    apoio: 'números e regras',
   },
 ];
 

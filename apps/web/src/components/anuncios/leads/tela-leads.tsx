@@ -908,17 +908,21 @@ function CartoesDeLeads({
                   {recebidoHa(chegou, agora)}
                 </span>
               </span>
-              <span className="flex w-full min-w-0 items-center gap-1.5 text-sm">
+              {/* Como chegou e de qual anúncio, em até duas linhas (17/11/2026): numa
+                  só, em 375, o anúncio virava "TE0002_IMOVA Terreno C…". */}
+              <span className="flex w-full min-w-0 items-start gap-1.5 text-sm">
                 <IconeDoTipo
                   tipo={jeito ? TIPO_DA_CHEGADA[jeito] : null}
-                  className="text-muted-foreground"
+                  className="mt-0.5 text-muted-foreground"
                 />
-                <span className="shrink-0">{comoChegouOLead(lead) ?? 'Mensagem'}</span>
-                <span className="text-muted-foreground">·</span>
-                <span className="min-w-0 truncate text-muted-foreground">
-                  {origemDoLead(lead).tipo === 'parecido' ? 'parecido com ' : ''}
-                  <span className="numerico">{codigoDoAnuncioDoLead(lead) ?? 'sem anúncio'}</span>
-                  {titulo ? ` ${titulo}` : ''}
+                <span className="line-clamp-2 min-w-0">
+                  {comoChegouOLead(lead) ?? 'Mensagem'}
+                  <span className="text-muted-foreground">
+                    {' · '}
+                    {origemDoLead(lead).tipo === 'parecido' ? 'parecido com ' : ''}
+                    <span className="numerico">{codigoDoAnuncioDoLead(lead) ?? 'sem anúncio'}</span>
+                    {titulo ? ` ${titulo}` : ''}
+                  </span>
                 </span>
               </span>
               {telefone ? (
@@ -1145,16 +1149,16 @@ function CartoesDeCliques({
                   {recebidoHa(chegou, agora)}
                 </span>
               </span>
-              <span className="flex w-full min-w-0 items-center gap-1.5 text-sm">
-                <IconeDoTipo tipo={tipos[0] ?? null} className="text-muted-foreground" />
-                <span className="shrink-0">
+              <span className="flex w-full min-w-0 items-start gap-1.5 text-sm">
+                <IconeDoTipo tipo={tipos[0] ?? null} className="mt-0.5 text-muted-foreground" />
+                <span className="line-clamp-2 min-w-0">
                   {tipos.length > 0 ? tipos.map((t) => rotuloDoTipo(t)).join(' e ') : 'Clicou'}
-                </span>
-                <span className="text-muted-foreground">·</span>
-                <span className="min-w-0 truncate text-muted-foreground">
-                  {origemDoLead(lead).tipo === 'parecido' ? 'parecido com ' : ''}
-                  <span className="numerico">{codigoDoAnuncioDoLead(lead) ?? 'sem anúncio'}</span>
-                  {titulo ? ` ${titulo}` : ''}
+                  <span className="text-muted-foreground">
+                    {' · '}
+                    {origemDoLead(lead).tipo === 'parecido' ? 'parecido com ' : ''}
+                    <span className="numerico">{codigoDoAnuncioDoLead(lead) ?? 'sem anúncio'}</span>
+                    {titulo ? ` ${titulo}` : ''}
+                  </span>
                 </span>
               </span>
               {lead.email ? (

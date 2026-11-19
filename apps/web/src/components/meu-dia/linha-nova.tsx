@@ -130,7 +130,12 @@ export function LinhaNova({
           </span>
         ) : null}
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="min-w-0 truncate font-semibold sm:text-base">{nome}</span>
+          {/* O nome (ou o que fazer, quando não há pessoa) quebra em até duas linhas
+              (17/11/2026): em 375 sobravam 159 px, e "Responder quem escreveu de fora
+              da base" virava "Responder quem es…". */}
+          <span className="line-clamp-2 min-w-0 font-semibold [overflow-wrap:anywhere] sm:text-base">
+            {nome}
+          </span>
           {contexto ? (
             <span className="min-w-0 truncate text-[13px] text-muted-foreground">{contexto}</span>
           ) : null}
@@ -138,7 +143,9 @@ export function LinhaNova({
         {previa ? (
           <p className="mt-0.5 truncate text-sm text-foreground/80">{previa}</p>
         ) : oQueFazer ? (
-          <p className="mt-0.5 truncate text-sm text-foreground/80">{oQueFazer}</p>
+          // O que fazer em até duas linhas: é a tarefa, e cortada ("Reengajar: Ana
+          // Souza —…") não dizia o quê. A prévia da mensagem continua numa linha.
+          <p className="mt-0.5 line-clamp-2 text-sm text-foreground/80">{oQueFazer}</p>
         ) : null}
         {motivo ? <p className="mt-0.5 text-xs text-muted-foreground">{motivo}</p> : null}
       </div>
@@ -237,7 +244,9 @@ export function LinhaNova({
       ) : (
         <div className={molde}>
           {miolo}
-          <span className="sr-only">Sem {VOCABULARIO.parceiro} ligado: não há para onde abrir.</span>
+          <span className="sr-only">
+            Sem {VOCABULARIO.parceiro} ligado: não há para onde abrir.
+          </span>
         </div>
       )}
     </li>

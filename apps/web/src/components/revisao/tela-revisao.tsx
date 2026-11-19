@@ -409,8 +409,11 @@ export function TelaRevisao({
             ) : (
               <>
                 {podeDecidir && linhas.some(entraNoLote) ? (
+                  // `min-h-11` no celular (16/11/2026): a linha inteira do "Marcar os N"
+                  // e cada atalho "os N de …" tinham 20px de altura, um alvo de texto
+                  // corrido no meio da fila. A partir do `md` voltam ao tamanho do texto.
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-                    <label className="flex items-center gap-2 text-sm">
+                    <label className="flex min-h-11 items-center gap-2 text-sm md:min-h-0">
                       <input
                         type="checkbox"
                         checked={
@@ -441,7 +444,7 @@ export function TelaRevisao({
                       <button
                         key={g.nome}
                         type="button"
-                        className="text-sm underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                        className="min-h-11 text-left text-sm underline underline-offset-2 text-muted-foreground hover:text-foreground md:min-h-0"
                         onClick={() =>
                           setSelecionados((atual) => {
                             const novo = new Set(atual);
@@ -523,10 +526,17 @@ export function TelaRevisao({
 
       {podeDecidir ? (
         <>
+          {/* Some enquanto há nome marcado (16/11/2026): a barra do lote gruda no
+              mesmo canto, em cima da barra de baixo, e o flutuante pousava sobre o
+              "Só aprovar N nomes" e o "Desmarcar". Com a seleção na tela, a ação da
+              vez é decidir o lote, não cadastrar mais um. */}
           <Button
             onClick={() => setFolhaAberta(true)}
             aria-label="Cadastrar um nome"
-            className="toque sombra-base-forte fixed right-4 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] z-40 size-14 rounded-full ring-4 ring-background md:hidden"
+            className={cn(
+              'toque sombra-base-forte fixed right-4 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] z-40 size-14 rounded-full ring-4 ring-background md:hidden',
+              marcados.length > 0 && 'hidden',
+            )}
           >
             <Plus className="size-5" aria-hidden="true" />
           </Button>

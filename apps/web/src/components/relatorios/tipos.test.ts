@@ -19,9 +19,10 @@ describe('os painéis de cada empresa', () => {
     ]);
   });
 
-  it('a Imova tem só as cinco abas do relatório que vende, e abre na Visão geral', () => {
+  it('a Imova tem as seis abas, abre na Visão geral e Origem e interesse vem logo depois', () => {
     expect(paineisDaEmpresa(true).map((p) => [p.chave, p.rotulo])).toEqual([
       ['visao', 'Visão geral'],
+      ['origem', 'Origem e interesse'],
       ['imoveis', 'Imóveis'],
       ['oportunidades', 'Oportunidades'],
       ['funil_equipe', 'Funil e equipe'],
@@ -38,6 +39,9 @@ describe('os painéis de cada empresa', () => {
     expect(painelDaUrl('quentes', imova)).toBe('visao');
     expect(painelDaUrl('atendimento', imova)).toBe('visao');
     expect(painelDaUrl('oportunidades', imova)).toBe('oportunidades');
+    // A aba Canais virou parte de Origem e interesse (18/11/2026).
+    expect(painelDaUrl('canais', imova)).toBe('origem');
+    expect(painelDaUrl('canais', komune)).toBe('ligacoes');
     expect(painelDaUrl(undefined, komune)).toBe('ligacoes');
     expect(painelDaUrl('imoveis', komune)).toBe('ligacoes');
     expect(painelDaUrl('funil', komune)).toBe('funil');
@@ -49,6 +53,7 @@ describe('os painéis de cada empresa', () => {
     expect(painelUsaPeriodo('visao')).toBe(true);
     expect(painelUsaPeriodo('imoveis')).toBe(true);
     expect(painelUsaPeriodo('funil_equipe')).toBe(true);
+    expect(painelUsaPeriodo('origem')).toBe(true);
     // A KOMUNE fica como estava.
     expect(painelUsaPeriodo('semana')).toBe(false);
     expect(painelUsaPeriodo('ligacoes')).toBe(false);

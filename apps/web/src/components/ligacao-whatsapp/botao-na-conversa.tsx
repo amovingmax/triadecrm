@@ -42,11 +42,18 @@ export function BotaoDeLigarNaConversa({
   conversaId,
   nome,
   compacto = false,
+  rotuloPelaLargura = false,
 }: {
   conversaId: string;
   nome: string;
   /** O cabeçalho do celular: só o ícone. */
   compacto?: boolean;
+  /**
+   * O cabeçalho do computador: o nome só com 48rem de painel ou mais; abaixo, o
+   * ícone, com o nome no `title` e para o leitor de tela (17/11/2026). Pede um
+   * `@container` em volta.
+   */
+  rotuloPelaLargura?: boolean;
 }) {
   const { disponivel, ocupado, ligar } = useLigacaoWhatsapp();
   const clientes = useQueryClient();
@@ -107,10 +114,17 @@ export function BotaoDeLigarNaConversa({
           className="toque h-9"
           disabled={botao.desligado}
           onClick={aoClicar}
-          title={botao.nota ?? undefined}
+          title={botao.nota ?? (rotuloPelaLargura ? rotulo : undefined)}
         >
           <Icone aria-hidden="true" />
-          {rotulo}
+          {rotuloPelaLargura ? (
+            <>
+              <span className="hidden @3xl:inline">{rotulo}</span>
+              <span className="sr-only @3xl:hidden">{rotulo}</span>
+            </>
+          ) : (
+            rotulo
+          )}
         </Button>
       )}
 
@@ -135,7 +149,12 @@ export function BotaoDeLigarNaConversa({
             />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" className="toque" onClick={() => setPedindo(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              className="toque"
+              onClick={() => setPedindo(false)}
+            >
               Agora não
             </Button>
             <Button
@@ -154,7 +173,13 @@ export function BotaoDeLigarNaConversa({
 }
 
 /** A linha que conta o que está acontecendo: a permissão, o limite ou a ligação perdida. */
-export function FaixaDaLigacao({ conversaId, className }: { conversaId: string; className?: string }) {
+export function FaixaDaLigacao({
+  conversaId,
+  className,
+}: {
+  conversaId: string;
+  className?: string;
+}) {
   const { disponivel, ocupado } = useLigacaoWhatsapp();
   const { data: estado } = useEstadoNaConversa(conversaId);
   if (!disponivel || !estado) return null;

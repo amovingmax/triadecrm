@@ -52,8 +52,10 @@ export function ChavesDeAvisos({ iniciais }: { iniciais: AvisoDaPessoa[] }) {
             aria-label={aviso.nome}
             disabled={salvando === aviso.tipo}
             onClick={() => void trocar(aviso.tipo, !aviso.ligado)}
+            // A chave tem 28 px de altura, mas o dedo acerta 48: o `after` estende
+            // o toque 10 px para cima e para baixo e 8 px para os lados.
             className={cn(
-              'toque relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors disabled:opacity-60',
+              "toque relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors after:absolute after:-inset-x-2 after:-inset-y-2.5 after:content-[''] disabled:opacity-60",
               aviso.ligado ? 'bg-foreground' : 'bg-foreground/15',
             )}
           >

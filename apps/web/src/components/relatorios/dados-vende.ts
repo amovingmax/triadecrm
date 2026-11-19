@@ -410,3 +410,180 @@ export const salvarPremissas = (p: {
     p_alugueis_na_locacao: p.alugueis_na_locacao,
     p_meta_mes: p.meta_mes,
   });
+
+// ---------------------------------------------------------------------------
+// 6. Origem e interesse — relatorio_imova_painel_origem(p_de, p_ate)  (18/11/2026)
+// ---------------------------------------------------------------------------
+
+/** O grupo de origem da aba: a Meta à parte dos portais. */
+export type GrupoDeOrigem = 'placa' | 'meta' | 'portais' | 'redes_sociais' | 'outros' | 'nao_identificado';
+
+export type AnuncioDaMeta = {
+  /** O `source_id` que a Meta manda no clique. Nulo quando o clique veio sem id. */
+  id: string | null;
+  titulo: string | null;
+  chegadas: number;
+  sem_resposta: number;
+  /** O que a equipe disse do anúncio: nulo = ninguém disse. */
+  da_imova: boolean | null;
+};
+
+export type LinhaDoGrupo = {
+  grupo: GrupoDeOrigem;
+  chegadas: number;
+  responderam: number;
+  /** Respondidas em até 5 minutos. */
+  rapidas: number;
+  /** Mediana da primeira resposta, em minutos, de quem foi respondido. */
+  mediana_min: number | null;
+  /** Etiqueta Interessado ou Muito interessado agora. */
+  interessados: number;
+  /** Etiqueta Esfriando agora. */
+  esfriando: number;
+  visitas: number;
+  /** O detalhe (subcanal), fora da Meta. */
+  subs: { subcanal: string; chegadas: number }[];
+  /** Só na Meta: cada anúncio. */
+  anuncios: AnuncioDaMeta[];
+};
+
+export type SituacaoDoAnuncio = 'no_ar' | 'fora_do_ar' | 'so_no_crm';
+
+export type LinhaDoAnuncio = {
+  codigo: string;
+  titulo: string;
+  situacao: SituacaoDoAnuncio;
+  /** Acumulado desde que o anúncio entrou no ar (o Canal Pro só informa isso). */
+  vistos: number | null;
+  contatos: number | null;
+  /** O que o anúncio teve no período, pela foto diária. Nulo enquanto não houver foto antes do período. */
+  vistos_periodo: number | null;
+  contatos_periodo: number | null;
+  /** Os códigos dos anúncios antigos do mesmo imóvel, somados. */
+  juntou: string[];
+  /** Pessoas que vieram com o código (texto pronto do portal ou lead do portal). */
+  chegaram: number;
+  /** Contatos do Grupo OLX deste anúncio que ainda não viraram conversa. */
+  sem_conversa: number;
+  interessados: number;
+  muito: number;
+};
+
+export type MesDaOrigem = {
+  /** 'AAAA-MM' */
+  mes: string;
+  /** Dias do mês com CRM até hoje (para a conta "por dia"). */
+  dias: number;
+  chegadas: number;
+  grupos: Record<GrupoDeOrigem, number>;
+  /** Conversas que nós começamos (sem chegada). */
+  nossas: number;
+  responderam: number;
+  rapidas: number;
+  mediana_min: number | null;
+  sem_resposta: number;
+  recebidas: number;
+  ia: number;
+  equipe: number;
+  subiram: number;
+  esfriaram: number;
+  visitas: number;
+  fechados: number;
+};
+
+export type PainelOrigem = {
+  periodo: { de: string; ate: string };
+  /** O primeiro dia do CRM (a primeira chegada ou conversa). */
+  desde: string | null;
+  /** Admin e gestor marcam o anúncio da Meta. */
+  pode_marcar: boolean;
+  kpis: {
+    chegadas: number;
+    identificadas: number;
+    responderam: number;
+    rapidas: number;
+    mediana_min: number | null;
+    subiram: number;
+    esfriaram: number;
+    visitas: number;
+    visitas_canceladas: number;
+    fechados: number;
+  };
+  /** Os seis grupos, sempre, na ordem da tela. */
+  grupos: LinhaDoGrupo[];
+  placa: { fotos: number; fotos_com_codigo: number };
+  /** As semanas do período (segunda a domingo), da mais antiga para a atual. */
+  semanas: { inicio: string; parcial: boolean; grupos: Record<GrupoDeOrigem, number> }[];
+  interesse: {
+    hoje: {
+      sem_resposta: number;
+      morno: number;
+      interessado: number;
+      muito_interessado: number;
+      esfriando: number;
+      sem_interesse: number;
+      sem_etiqueta: number;
+      total: number;
+    };
+    subiram: number;
+    /** Sem resposta → morno. */
+    responderam: number;
+    /** Chegaram a Interessado vindo de baixo. */
+    ficaram_interessadas: number;
+    viraram_muito: number;
+    esfriaram: number;
+    /** A nota da juíza da IA: o interesse depois da conversa. */
+    juiza: { subiu: number; igual: number; caiu: number };
+  };
+  anuncios: LinhaDoAnuncio[];
+  /** O primeiro dia da foto diária do Canal Pro. */
+  numeros_desde: string | null;
+  sistema: {
+    primeiro: {
+      ia: number;
+      ia_mediana_min: number | null;
+      equipe: number;
+      equipe_mediana_min: number | null;
+      ninguem: number;
+    };
+    descoberta: {
+      regra: number;
+      ia: number;
+      equipe: number;
+      sem_pista: number;
+      fotos: number;
+      fotos_da_imova: number;
+      prints: number;
+      fotos_com_codigo: number;
+    };
+    /** Até 20, da mais nova para a mais antiga. */
+    sem_resposta: {
+      conversation_id: string;
+      organization_id: string | null;
+      inicio_em: string;
+      grupo: GrupoDeOrigem;
+    }[];
+    grupo_olx: {
+      contatos: number;
+      sem_conversa: number;
+      /** O primeiro contato do Grupo OLX que chegou ao CRM. */
+      desde: string | null;
+      telefone: number;
+      chat: number;
+      formulario: number;
+      whatsapp: number;
+      visita: number;
+      por_anuncio: { codigo: string; contatos: number }[];
+    };
+    mensagens: { recebidas: number; ia: number; equipe: number };
+  };
+  /** Até seis meses, do mais antigo para o atual. */
+  meses: MesDaOrigem[];
+};
+
+export const carregarPainelOrigem = (periodo: Periodo) =>
+  rpc<PainelOrigem>('relatorio_imova_painel_origem', doPeriodo(periodo));
+
+/** Admin e gestor: o anúncio da Meta é (ou não é) da Imova. */
+export const marcarAnuncioDaMeta = (anuncioId: string, daImova: boolean) =>
+  rpc<null>('anuncio_da_meta_marcar', { p_anuncio_id: anuncioId, p_da_imova: daImova });

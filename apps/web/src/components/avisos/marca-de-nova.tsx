@@ -23,7 +23,7 @@ export function MarcaDeNova({ className }: { className?: string }) {
     <span
       title="Mensagem nova, ainda sem resposta"
       className={cn(
-        'inline-flex shrink-0 items-center gap-1 rounded-full bg-menta py-px pr-1.5 pl-1 text-[10px] leading-4 font-semibold tracking-[0.04em] text-menta-tinta uppercase',
+        'inline-flex shrink-0 items-center gap-1 rounded-full bg-menta py-px pr-1.5 pl-1 text-[11px] leading-4 font-semibold tracking-[0.04em] text-menta-tinta uppercase md:text-[10px]',
         className,
       )}
     >
