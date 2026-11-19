@@ -58,6 +58,8 @@ export async function carregarAnuncio(id: string): Promise<{
   pendencias: string[];
   /** O último relatório do Canal Pro já o conta como vaga (11/11/2026). */
   ocupaVagaPeloRelatorio: boolean;
+  /** E a linha dele no relatório gasta destaque do plano (19/11/2026). */
+  destaqueNoRelatorio: boolean;
 } | null> {
   const supabase = createClient();
   const [anuncio, fotos, lista] = await Promise.all([
@@ -70,7 +72,7 @@ export async function carregarAnuncio(id: string): Promise<{
     supabase
       .from('anuncios_na_lista')
       .select(
-        'pendencias, proprietario_nome, codigo_no_canal_pro, no_canal_pro_situacao, no_canal_pro_visto_em',
+        'pendencias, proprietario_nome, codigo_no_canal_pro, no_canal_pro_situacao, no_canal_pro_visto_em, no_canal_pro_com_destaque',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -91,6 +93,7 @@ export async function carregarAnuncio(id: string): Promise<{
       no_canal_pro_situacao: lista.data?.no_canal_pro_situacao ?? null,
       no_canal_pro_visto_em: lista.data?.no_canal_pro_visto_em ?? null,
     }),
+    destaqueNoRelatorio: lista.data?.no_canal_pro_com_destaque === true,
   };
 }
 

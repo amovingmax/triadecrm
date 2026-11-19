@@ -86,6 +86,7 @@ export function TrocaDaArbo({
   }
 
   const caminho = caminhoDoLead(consulta.data, new Date(), noPortalSoPeloSistemaAtual);
+  const lido = consulta.data.arquivo.leituraDoRobo !== null;
   const daTroca = PASSOS.map((p) => caminho.passos.find((x) => x.id === p.id) as PassoDoCaminho);
   const atual = daTroca.findIndex((p) => p.situacao === 'falta');
   if (atual < 0) return null;
@@ -174,7 +175,11 @@ export function TrocaDaArbo({
               <div className="flex flex-wrap gap-2">
                 <BotaoPorNoAr
                   anuncios={passo.cabem}
-                  aoPorTodos="Continuam no portal pela Arbo até o Canal Pro ler o arquivo do CRM (o próximo passo)."
+                  aoPorTodos={
+                    lido
+                      ? 'Entram no portal na próxima leitura do Grupo OLX.'
+                      : 'Continuam no portal pela Arbo até o Canal Pro ler o arquivo do CRM (o próximo passo).'
+                  }
                 />
                 <Button variant="outline" className="toque h-11 md:h-9" onClick={aoVerNaLista}>
                   <ListFilter aria-hidden="true" />
@@ -187,6 +192,14 @@ export function TrocaDaArbo({
                 Esperam vaga no plano:{' '}
                 <span className="numerico">
                   {passo.esperamVaga.map((a) => a.codigo).join(' · ')}
+                </span>
+              </p>
+            ) : null}
+            {passo.depoisDaTroca.length > 0 ? (
+              <p className="text-muted-foreground">
+                Ficam para depois da troca (não estão no portal hoje):{' '}
+                <span className="numerico">
+                  {passo.depoisDaTroca.map((a) => a.codigo).join(' · ')}
                 </span>
               </p>
             ) : null}

@@ -614,22 +614,48 @@ export function ocupaVagaPeloRelatorio(
 
 /**
  * O que o plano trava antes do clique, no menu do cartão e no editor. Quem recusa
- * é o banco (`anuncio_publicar`, `anuncio_destaque`); a tela só avisa. Desde
- * 11/11/2026, o anúncio que o relatório já conta não é barrado pelo plano cheio:
- * ele só ocuparia a própria vaga. O destaque dele não é conferido aqui (a tela
- * não sabe se a linha do relatório tem destaque): o banco decide.
+ * é o banco (`anuncio_publicar`, `anuncio_destaque`); a tela só avisa, com a mesma
+ * conta de `app.canal_pro_ocupadas(p_fora)` (migração 20261111203000): a vaga e
+ * o destaque do próprio anúncio não contam contra ele.
+ *   * Desde 11/11/2026, o anúncio que o relatório já conta não é barrado pelo
+ *     plano cheio: ele só ocuparia a própria vaga.
+ *   * Desde 19/11/2026, o mesmo vale para o destaque: o rascunho cuja linha do
+ *     relatório gasta destaque (`destaqueNoRelatorio`, da lista) só ocuparia o
+ *     próprio. Antes a tela contava esse destaque como "dos outros" e, com "2 de
+ *     2 em uso", esmaecia Destaque em todo rascunho, até no TE0001 e no TE0002,
+ *     que são os 2 destaques do portal.
  */
 export function travasDoPlano(
   plano: SituacaoDoCanalPro['plano'] | null,
-  a: { situacao: AnuncioNaLista['situacao']; destaque: string; ocupaVagaPeloRelatorio: boolean },
+  a: {
+    situacao: AnuncioNaLista['situacao'];
+    destaque: string;
+    ocupaVagaPeloRelatorio: boolean;
+    /** A linha do relatório que é este anúncio gasta destaque do plano. */
+    destaqueNoRelatorio?: boolean;
+  },
 ): { semVaga: boolean; semDestaque: boolean; destaqueBarrado: boolean } {
   const noAr = a.situacao === 'no_ar';
   const vagasDosOutros = (plano?.anunciosEmUso ?? 0) - (a.ocupaVagaPeloRelatorio ? 1 : 0);
   const semVaga = !noAr && plano?.anuncios != null && vagasDosOutros >= plano.anuncios;
-  const destaquesDosOutros =
-    (plano?.destaquesEmUso ?? 0) - (noAr && a.destaque !== 'padrao' ? 1 : 0);
+  // No ar, o destaque dele está na conta do CRM; fora do ar, na linha do
+  // relatório (quando ela está ativa e gasta destaque). Nunca nas duas.
+  const proprio = noAr
+    ? a.destaque !== 'padrao'
+    : a.ocupaVagaPeloRelatorio && a.destaqueNoRelatorio === true;
+  const destaquesDosOutros = (plano?.destaquesEmUso ?? 0) - (proprio ? 1 : 0);
   const semDestaque = plano?.destaques != null && destaquesDosOutros >= plano.destaques;
-  const destaqueBarrado =
-    !noAr && a.destaque !== 'padrao' && semDestaque && !a.ocupaVagaPeloRelatorio;
+  const destaqueBarrado = !noAr && a.destaque !== 'padrao' && semDestaque;
   return { semVaga, semDestaque, destaqueBarrado };
 }
+
+/**
+ * O Destacador Automático do Grupo OLX: com integração, o destaque manual no
+ * Canal Pro fica bloqueado e quem manda é o arquivo; e, se o arquivo manda menos
+ * destaques do que o plano tem, o Canal Pro escolhe sozinho quais destacar
+ * (ajuda.zapimoveis.com.br, "como destacar um anúncio via integração"). É por
+ * isso que o TE0001 e o TE0002 aparecem como Destaque com a Arbo mandando
+ * STANDARD em todos.
+ */
+export const DESTACADOR_AUTOMATICO =
+  'Com menos destaques no arquivo do que o plano tem, o Canal Pro escolhe sozinho quais destacar.';

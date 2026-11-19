@@ -64,6 +64,7 @@ import {
   urlDaFoto,
 } from './dados';
 import {
+  DESTACADOR_AUTOMATICO,
   ehTerreno,
   faixaDaNota,
   type FaixaDaNota,
@@ -255,6 +256,7 @@ export function CartaoDoAnuncio({
     situacao: a.situacao,
     destaque: a.destaque,
     ocupaVagaPeloRelatorio: ocupaVagaPeloRelatorio(a),
+    destaqueNoRelatorio: a.no_canal_pro_com_destaque === true,
   });
   const pendencias = a.pendencias ?? [];
   const soFaltaFoto = pendencias.length > 0 && pendencias.every((p) => /foto/i.test(p));
@@ -583,11 +585,13 @@ function MenuDoAnuncio({
   const pendente = (a.pendencias?.length ?? 0) > 0;
   // O plano do Canal Pro, com a mesma conta do editor: quem recusa é o banco
   // (migrações 20261104180000 e 20261111203000); o menu só avisa antes do clique.
-  // O anúncio que o relatório já conta não é barrado: só ocuparia a própria vaga.
+  // O anúncio que o relatório já conta não é barrado: só ocuparia a própria vaga,
+  // e o próprio destaque, quando a linha dele é destaque (19/11/2026).
   const { semVaga, semDestaque, destaqueBarrado } = travasDoPlano(plano, {
     situacao: a.situacao,
     destaque: a.destaque,
     ocupaVagaPeloRelatorio: ocupaVagaPeloRelatorio(a),
+    destaqueNoRelatorio: a.no_canal_pro_com_destaque === true,
   });
   const motivoParaNaoPublicar = pendente
     ? 'falta preencher'
@@ -668,6 +672,11 @@ function MenuDoAnuncio({
               {plano?.destaques != null
                 ? ` · ${plano.destaquesEmUso} de ${plano.destaques} em uso`
                 : ''}
+              {plano?.destaques != null ? (
+                <span className="mt-0.5 block text-[11px] leading-snug">
+                  {DESTACADOR_AUTOMATICO}
+                </span>
+              ) : null}
             </DropdownMenuLabel>
             <DropdownMenuRadioGroup
               value={a.destaque}

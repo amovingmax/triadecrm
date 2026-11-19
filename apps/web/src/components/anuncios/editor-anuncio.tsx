@@ -40,7 +40,11 @@ import {
 } from './dados';
 import { FotosDoAnuncio } from './fotos-do-anuncio';
 import { SituacaoNoPortal } from './no-portal';
-import { consequenciaForaDoArquivo, travasDoPlano } from './regras-do-cartao';
+import {
+  consequenciaForaDoArquivo,
+  DESTACADOR_AUTOMATICO,
+  travasDoPlano,
+} from './regras-do-cartao';
 import {
   type Anuncio,
   areaDasMedidas,
@@ -338,6 +342,7 @@ function Editor({
     situacao: anuncio?.situacao ?? 'rascunho',
     destaque: anuncio?.destaque ?? 'padrao',
     ocupaVagaPeloRelatorio: ocupaVaga,
+    destaqueNoRelatorio: dados?.destaqueNoRelatorio ?? false,
   });
 
   function atualizar() {
@@ -653,7 +658,7 @@ function Editor({
                       <p className="text-xs text-muted-foreground">
                         {DESTAQUES.find((d) => d.id === anuncio.destaque)?.dica}{' '}
                         {plano?.destaques != null
-                          ? `Destaques do plano em uso: ${plano.destaquesEmUso} de ${plano.destaques}.`
+                          ? `Destaques do plano em uso: ${plano.destaquesEmUso} de ${plano.destaques}. ${DESTACADOR_AUTOMATICO}`
                           : 'O destaque gasta a cota do plano do Canal Pro.'}
                       </p>
                     </div>

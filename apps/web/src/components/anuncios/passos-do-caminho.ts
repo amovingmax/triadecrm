@@ -134,6 +134,11 @@ export type PassoDosAnuncios = Base & {
   cabem: AnuncioPronto[];
   /** Os prontos que esperam vaga. */
   esperamVaga: AnuncioPronto[];
+  /**
+   * Antes da troca, os prontos que não estão no portal pelo sistema atual: ficam
+   * para depois da troca, sem segurar o passo (19/11/2026).
+   */
+  depoisDaTroca: AnuncioPronto[];
 };
 
 export type PassoDoArquivo = Base & {
@@ -361,15 +366,30 @@ export function passoDaEntrega(e: EstadoDoCaminho, agora: Date): PassoDaEntrega 
  * os que o relatório já conta, que não gastam vaga nova); os outros cabem até as
  * vagas livres do plano. No ar com pendência é o pior caso: o anúncio parece no
  * ar, e o arquivo o pula.
+ *
+ * ANTES DA TROCA (19/11/2026): enquanto o robô do Grupo OLX não leu o arquivo do
+ * CRM, o passo só oferece os que estão no portal pelo sistema atual (`ocupaVaga`:
+ * ativos no relatório com o mesmo código). É o que protege a troca: sem eles no
+ * ar aqui, a troca os tira do portal. Os outros rascunhos prontos ficam para
+ * depois da troca (`depoisDaTroca`): não seguram o passo nem entram no botão.
+ * Na Imova eram os 4 inativos trazidos do relatório, e o botão punha 8 no ar (o
+ * 8º, "Brisa Mall - Loja 02", bloqueado pelo Grupo OLX); com os 7 no ar, o passo
+ * travava em "1 anúncio pronto" e nunca mostrava o passo 3. Se nada está no
+ * portal nem no ar pelo CRM, não há o que proteger: os prontos vão como sempre.
+ * Depois da troca, rascunho pronto é sugestão normal.
  */
 export function passoDosAnuncios(e: EstadoDoCaminho): PassoDosAnuncios {
   const { plano, anuncios: a } = e;
+  const lido = e.arquivo.leituraDoRobo !== null;
+  const soOsDoPortal = !lido && (a.noAr > 0 || a.prontos.some((p) => p.ocupaVaga));
   let livres =
     plano.anuncios == null ? Infinity : Math.max(0, plano.anuncios - plano.anunciosEmUso);
   const cabem: AnuncioPronto[] = [];
   const esperamVaga: AnuncioPronto[] = [];
+  const depoisDaTroca: AnuncioPronto[] = [];
   for (const p of a.prontos) {
     if (p.ocupaVaga) cabem.push(p);
+    else if (soOsDoPortal) depoisDaTroca.push(p);
     else if (livres > 0) {
       cabem.push(p);
       livres -= 1;
@@ -378,7 +398,7 @@ export function passoDosAnuncios(e: EstadoDoCaminho): PassoDosAnuncios {
   const vagas = plano.anuncios == null ? null : `${plano.anunciosEmUso} de ${plano.anuncios} vagas`;
   const comVagas = (texto: string) => (vagas ? `${texto} · ${vagas}` : texto);
   const nome = 'Anúncios no ar pelo CRM';
-  const base = { id: 'anuncios' as const, nome, vagas, cabem, esperamVaga };
+  const base = { id: 'anuncios' as const, nome, vagas, cabem, esperamVaga, depoisDaTroca };
   const n = a.foraDoArquivo.length;
 
   if (n > 0) {
@@ -393,16 +413,21 @@ export function passoDosAnuncios(e: EstadoDoCaminho): PassoDosAnuncios {
     };
   }
   if (cabem.length > 0) {
-    const lido = e.arquivo.leituraDoRobo !== null;
     return {
       ...base,
       situacao: 'falta',
       resumo: comVagas(
-        `${cabem.length} ${plural(cabem.length, 'anúncio pronto', 'anúncios prontos')} para pôr no ar`,
+        soOsDoPortal
+          ? `${cabem.length} ${plural(cabem.length, 'anúncio do portal pronto', 'anúncios do portal prontos')} para pôr no ar pelo CRM`
+          : `${cabem.length} ${plural(cabem.length, 'anúncio pronto', 'anúncios prontos')} para pôr no ar`,
       ),
       detalhe: lido
         ? 'Entram no portal na próxima leitura do Grupo OLX.'
-        : 'Enquanto o Canal Pro ler o arquivo do sistema atual, isto não muda o portal: deixa o arquivo do CRM pronto para a troca.',
+        : `Enquanto o Canal Pro ler o arquivo do sistema atual, isto não muda o portal: deixa o arquivo do CRM pronto para a troca.${
+            depoisDaTroca.length > 0
+              ? ' Os outros rascunhos prontos ficam para depois da troca.'
+              : ''
+          }`,
     };
   }
   if (esperamVaga.length > 0) {

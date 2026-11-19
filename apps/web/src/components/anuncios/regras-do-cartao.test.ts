@@ -587,14 +587,33 @@ describe('o plano antes do clique (11/11/2026)', () => {
     ).toBe(true);
   });
 
-  it('o destaque do anúncio que o relatório conta fica com o banco', () => {
-    const comDestaque = { situacao: 'rascunho' as const, destaque: 'destaque' };
+  it('o destaque: a mesma conta do banco (a linha do próprio anúncio não conta contra ele)', () => {
+    // A Imova em 19/11/2026: 2 de 2 em uso, e os dois são o TE0001 e o TE0002 no
+    // relatório (ativos, "Destaque"). Os dois são rascunho no CRM.
+    const te0001 = {
+      situacao: 'rascunho' as const,
+      destaque: 'padrao',
+      ocupaVagaPeloRelatorio: true,
+      destaqueNoRelatorio: true,
+    };
+    expect(travasDoPlano(plano, te0001).semDestaque).toBe(false);
+    expect(travasDoPlano(plano, { ...te0001, destaque: 'destaque' }).destaqueBarrado).toBe(false);
+    // O TE0003 está no portal sem destaque: os 2 são dos outros.
+    const te0003 = { ...te0001, destaqueNoRelatorio: false };
+    expect(travasDoPlano(plano, te0003).semDestaque).toBe(true);
+    expect(travasDoPlano(plano, { ...te0003, destaque: 'destaque' }).destaqueBarrado).toBe(true);
+    // Fora do portal, a linha do relatório não conta, nem que diga "Destaque"
+    // (Casa extremox e SANTA CATARINA, inativos).
+    const inativo = { ...te0001, ocupaVagaPeloRelatorio: false };
+    expect(travasDoPlano(plano, inativo).semDestaque).toBe(true);
+    // Sem dizer nada da linha, ela não conta.
     expect(
-      travasDoPlano(plano, { ...comDestaque, ocupaVagaPeloRelatorio: false }).destaqueBarrado,
+      travasDoPlano(plano, {
+        situacao: 'rascunho',
+        destaque: 'destaque',
+        ocupaVagaPeloRelatorio: true,
+      }).destaqueBarrado,
     ).toBe(true);
-    expect(
-      travasDoPlano(plano, { ...comDestaque, ocupaVagaPeloRelatorio: true }).destaqueBarrado,
-    ).toBe(false);
   });
 
   it('no ar, o próprio destaque não conta contra ele; sem plano, nada trava', () => {

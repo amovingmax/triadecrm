@@ -30,6 +30,7 @@ import {
   urlDoArquivo,
 } from './dados';
 import { formatarQuando } from './no-portal';
+import { DESTACADOR_AUTOMATICO } from './regras-do-cartao';
 import { type AnuncioNaLista, fraseDaRecusa, lerInteiro, type SituacaoDoCanalPro } from './tipos';
 
 /**
@@ -376,7 +377,8 @@ function Plano({
         </Campo>
       </fieldset>
       <p className="text-xs text-muted-foreground">
-        O CRM não deixa pôr no ar além disso. Deixe vazio para o CRM não conferir.
+        O CRM não deixa pôr no ar além disso. Deixe vazio para o CRM não conferir.{' '}
+        {DESTACADOR_AUTOMATICO}
       </p>
       {podeAjustar ? (
         <Button type="submit" disabled={salvando} className="toque h-11 w-fit md:h-9">
