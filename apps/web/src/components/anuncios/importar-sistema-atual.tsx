@@ -48,6 +48,8 @@ type Resultado =
       novo: boolean;
       /** No ar pelo CRM depois da troca: o banco não mudou nada (20261119120000). */
       pulado: string | null;
+      /** Pulado, mas ganhou o pino do mapa que faltava. */
+      pino: boolean;
       fotos:
         | { tipo: 'nenhuma' }
         | { tipo: 'mantidas'; quantas: number }
@@ -84,9 +86,18 @@ type Como =
  * Nada muda no Canal Pro: ele continua lendo o sistema atual até alguém trocar o
  * endereço lá. Depois da troca (19/11/2026), o banco não deixa o arquivo do
  * sistema atual mudar anúncio no ar (devolve `pulado`), e a folha Sincronizar
- * tira este botão: quem publica é o CRM.
+ * tira este botão: quem publica é o CRM. Ele volta, como `soPino`, quando há
+ * anúncio no ar sem o pino do mapa: do arquivo vêm só as coordenadas que faltam
+ * (os rascunhos seguem sendo atualizados, como sempre).
  */
-export function ImportarSistemaAtual({ temEndereco }: { temEndereco: boolean }) {
+export function ImportarSistemaAtual({
+  temEndereco,
+  soPino = false,
+}: {
+  temEndereco: boolean;
+  /** Depois da troca: o botão existe só para trazer o pino que falta. */
+  soPino?: boolean;
+}) {
   const cliente = useQueryClient();
   const entrada = useRef<HTMLInputElement>(null);
   const [aberto, setAberto] = useState(false);
@@ -205,6 +216,7 @@ export function ImportarSistemaAtual({ temEndereco }: { temEndereco: boolean }) 
     if (feitos.length < lista.length) return;
     const novos = feitos.filter((f) => f.ok && f.novo).length;
     const pulados = feitos.filter((f) => f.ok && f.pulado).length;
+    const pinos = feitos.filter((f) => f.ok && f.pino).length;
     const atualizados = feitos.filter((f) => f.ok && !f.novo && !f.pulado).length;
     const falharam = feitos.length - novos - atualizados - pulados;
     const partes = [
@@ -213,6 +225,7 @@ export function ImportarSistemaAtual({ temEndereco }: { temEndereco: boolean }) 
       pulados
         ? `${pulados} no ar pelo CRM ${pulados === 1 ? 'ficou' : 'ficaram'} como ${pulados === 1 ? 'estava' : 'estavam'}`
         : null,
+      pinos ? `${pinos} ${pinos === 1 ? 'ganhou' : 'ganharam'} o pino do mapa` : null,
       registro?.ok && registro.sairam
         ? `${registro.sairam} ${registro.sairam === 1 ? 'saiu' : 'saíram'} do sistema atual`
         : null,
@@ -243,7 +256,7 @@ export function ImportarSistemaAtual({ temEndereco }: { temEndereco: boolean }) 
     <>
       <Button variant="outline" className="toque h-11 md:h-9" onClick={abrir}>
         <Import aria-hidden="true" />
-        Atualizar do sistema atual
+        {soPino ? 'Trazer o pino do mapa da Arbo' : 'Atualizar do sistema atual'}
       </Button>
       <Sheet open={aberto} onOpenChange={mudarAberto}>
         <SheetContent
@@ -253,9 +266,9 @@ export function ImportarSistemaAtual({ temEndereco }: { temEndereco: boolean }) 
           <SheetHeader>
             <SheetTitle>Atualizar do sistema atual</SheetTitle>
             <SheetDescription>
-              Traz para o CRM todos os anúncios que o sistema atual publica no Canal Pro, com o
-              mesmo código e as fotos. Os que estão no ar aparecem em Publicados; os que saíram do
-              arquivo, em Não publicados. Nada muda no Canal Pro.
+              {soPino
+                ? 'O Canal Pro já lê o arquivo do CRM. Do arquivo do sistema atual, o anúncio no ar pelo CRM recebe só o pino do mapa que falta; os rascunhos são atualizados como antes.'
+                : 'Traz para o CRM todos os anúncios que o sistema atual publica no Canal Pro, com o mesmo código e as fotos. Os que estão no ar aparecem em Publicados; os que saíram do arquivo, em Não publicados. Nada muda no Canal Pro.'}
             </SheetDescription>
           </SheetHeader>
 
@@ -337,6 +350,7 @@ async function trazerUm(a: AnuncioDoArquivo, aoAndar: (agora: string) => void): 
     ok: true,
     novo: r.novo,
     pulado: r.pulado,
+    pino: r.pino,
     fotos,
     pendencias: null,
   });
@@ -538,7 +552,9 @@ function Andamento({
                     ? r.novo
                       ? '· novo'
                       : r.pulado
-                        ? '· ficou como estava'
+                        ? r.pino
+                          ? '· ganhou o pino do mapa'
+                          : '· ficou como estava'
                         : '· atualizado'
                     : '· não veio'}
                 </span>

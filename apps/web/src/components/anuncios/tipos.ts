@@ -526,6 +526,11 @@ export type AnuncioNaLista = {
    * `no_canal_pro_situacao` ativa; null em banco anterior.
    */
   no_canal_pro_com_destaque?: boolean | null;
+  /**
+   * Sem coordenada e o importador do sistema atual nunca a procurou no arquivo
+   * (20261119120000): falta trazer o pino do mapa. Null em banco anterior.
+   */
+  falta_pino?: boolean | null;
 };
 
 /**

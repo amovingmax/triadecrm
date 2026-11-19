@@ -149,7 +149,20 @@ export type PassoDoArquivo = Base & {
   antesDeColar: string | null;
   /** A leitura de outro programa, quando o robô nunca leu. */
   outraLeitura: string | null;
+  /**
+   * Antes de colar, trazer o pino do mapa: mostrar "Atualizar do sistema atual"
+   * no lugar da URL (19/11/2026).
+   */
+  pinoAntes: boolean;
 };
+
+/**
+ * O pino do mapa antes de colar (19/11/2026): quantos anúncios que estão no
+ * portal pelo sistema atual ainda não têm as coordenadas no CRM (e o importador
+ * nunca as procurou), e se o CRM tem o endereço do arquivo do sistema atual.
+ */
+export type PinoAntesDeColar = { faltam: number; temEndereco: boolean };
+const SEM_PINO_A_TRAZER: PinoAntesDeColar = { faltam: 0, temEndereco: false };
 
 export type PassoDosRepetidos = Base & {
   id: 'repetidos';
@@ -374,14 +387,16 @@ export function passoDaEntrega(e: EstadoDoCaminho, agora: Date): PassoDaEntrega 
  * depois da troca (`depoisDaTroca`): não seguram o passo nem entram no botão.
  * Na Imova eram os 4 inativos trazidos do relatório, e o botão punha 8 no ar (o
  * 8º, "Brisa Mall - Loja 02", bloqueado pelo Grupo OLX); com os 7 no ar, o passo
- * travava em "1 anúncio pronto" e nunca mostrava o passo 3. Se nada está no
- * portal nem no ar pelo CRM, não há o que proteger: os prontos vão como sempre.
+ * travava em "1 anúncio pronto" e nunca mostrava o passo 3. Antes da troca, o
+ * botão nunca leva quem não ocupa vaga: se nada está no portal pelo sistema
+ * atual nem no ar pelo CRM (o relatório não foi importado, por exemplo), o passo
+ * pede um olhar ("atencao") em vez de travar, e nenhum rascunho vai ao botão.
  * Depois da troca, rascunho pronto é sugestão normal.
  */
 export function passoDosAnuncios(e: EstadoDoCaminho): PassoDosAnuncios {
   const { plano, anuncios: a } = e;
   const lido = e.arquivo.leituraDoRobo !== null;
-  const soOsDoPortal = !lido && (a.noAr > 0 || a.prontos.some((p) => p.ocupaVaga));
+  const soOsDoPortal = !lido;
   let livres =
     plano.anuncios == null ? Infinity : Math.max(0, plano.anuncios - plano.anunciosEmUso);
   const cabem: AnuncioPronto[] = [];
@@ -430,6 +445,18 @@ export function passoDosAnuncios(e: EstadoDoCaminho): PassoDosAnuncios {
           }`,
     };
   }
+  // Antes da troca, nada no portal pelo sistema atual e nada no ar: não há o que
+  // proteger, e o botão não oferece rascunho inativo ou bloqueado.
+  if (soOsDoPortal && a.noAr === 0 && depoisDaTroca.length > 0) {
+    return {
+      ...base,
+      situacao: 'atencao',
+      resumo: comVagas('Nada está no portal pelo sistema atual'),
+      detalhe: e.relatorio.importadoEm
+        ? 'O último relatório do Canal Pro não tem anúncio ativo com o código de um anúncio do CRM. Os rascunhos prontos ficam para depois da troca.'
+        : 'Sem o relatório do Canal Pro, o CRM não sabe o que o sistema atual publica: importe-o em Sincronizar Canal Pro. Os rascunhos prontos ficam para depois da troca.',
+    };
+  }
   if (esperamVaga.length > 0) {
     const m = esperamVaga.length;
     return {
@@ -467,26 +494,46 @@ export function passoDosAnuncios(e: EstadoDoCaminho): PassoDosAnuncios {
  *
  * `noPortalSoPeloSistemaAtual`: os anúncios que estão no portal pelo sistema
  * atual e não estão no ar no CRM (a mesma conta do "Antes de colar").
+ *
+ * `pino` (19/11/2026): antes de mostrar a URL, se algum anúncio do portal pelo
+ * sistema atual está sem o pino do mapa e o CRM tem o endereço do arquivo, o
+ * passo pede primeiro "Atualizar do sistema atual". A coluna das coordenadas
+ * nasce vazia: colando sem isso, os 7 da Arbo iriam ao portal sem o pino (o
+ * importador ainda o traz depois da troca, mas o portal já terá lido sem).
  */
 export function passoDoArquivo(
   e: EstadoDoCaminho,
   agora: Date,
   noPortalSoPeloSistemaAtual: number,
+  pino: PinoAntesDeColar = SEM_PINO_A_TRAZER,
 ): PassoDoArquivo {
   const nome = 'O Grupo OLX lê o arquivo do CRM';
   const l = e.arquivo.leituraDoRobo;
-  const base = { id: 'arquivo' as const, nome, antesDeColar: null, outraLeitura: null };
+  const base = {
+    id: 'arquivo' as const,
+    nome,
+    antesDeColar: null,
+    outraLeitura: null,
+    pinoAntes: false,
+  };
 
   if (!l) {
     const n = noPortalSoPeloSistemaAtual;
     const outra = e.arquivo.outraLeitura;
+    const semPino = pino.temEndereco ? pino.faltam : 0;
     return {
       ...base,
       situacao: 'falta',
-      resumo: 'Cole a URL do CRM no Canal Pro',
+      resumo:
+        semPino > 0
+          ? 'Antes de colar a URL, traga o pino do mapa'
+          : 'Cole a URL do CRM no Canal Pro',
       detalhe:
-        'O Grupo OLX ainda não leu o arquivo do CRM: o portal mostra o que o sistema atual (a Arbo) manda.',
-      colar: true,
+        semPino > 0
+          ? `${plural(semPino, 'Um anúncio que está', `${semPino} anúncios que estão`)} no portal pela Arbo ainda não ${plural(semPino, 'tem', 'têm')} no CRM o pino do mapa (as coordenadas). Clique em “Atualizar do sistema atual” uma vez: ele traz as do arquivo da Arbo. Sem elas, o portal acha o lugar só pelo endereço.`
+          : 'O Grupo OLX ainda não leu o arquivo do CRM: o portal mostra o que o sistema atual (a Arbo) manda.',
+      colar: semPino === 0,
+      pinoAntes: semPino > 0,
       antesDeColar:
         n > 0
           ? `Antes de colar, ponha no ar pelo CRM ${plural(n, 'o anúncio que está', `os ${n} anúncios que estão`)} no portal pelo sistema atual (passo 2). O arquivo do CRM só leva o que está no ar aqui: sem isso, a troca ${plural(n, 'o tira', 'os tira')} do portal.`
@@ -625,11 +672,12 @@ export function caminhoDoLead(
   e: EstadoDoCaminho,
   agora: Date,
   noPortalSoPeloSistemaAtual: number,
+  pino: PinoAntesDeColar = SEM_PINO_A_TRAZER,
 ): Caminho {
   const passos: Caminho['passos'] = [
     passoDaEntrega(e, agora),
     passoDosAnuncios(e),
-    passoDoArquivo(e, agora, noPortalSoPeloSistemaAtual),
+    passoDoArquivo(e, agora, noPortalSoPeloSistemaAtual, pino),
     passoDosRepetidos(e, agora),
     passoDosLeads(e, agora),
   ];

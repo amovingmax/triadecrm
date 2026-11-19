@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { DetalheDaEntrega, DetalheDoArquivo } from './caminho-do-lead';
 import { carregarCaminhoDoLead, CHAVE_DO_CAMINHO } from './dados';
 import { BotaoPorNoAr } from './painel-canal-pro';
-import { caminhoDoLead, type PassoDoCaminho } from './passos-do-caminho';
+import { caminhoDoLead, type PassoDoCaminho, type PinoAntesDeColar } from './passos-do-caminho';
 
 /** Os três passos da troca, com o nome curto da faixa. */
 const PASSOS = [
@@ -43,10 +43,13 @@ const lerRecolhida = () => {
 export function TrocaDaArbo({
   chave,
   noPortalSoPeloSistemaAtual,
+  pino,
   aoVerNaLista,
 }: {
   chave: string | null;
   noPortalSoPeloSistemaAtual: number;
+  /** Os do portal pelo sistema atual sem o pino do mapa (19/11/2026). */
+  pino: PinoAntesDeColar;
   aoVerNaLista: () => void;
 }) {
   const consulta = useQuery({
@@ -85,7 +88,7 @@ export function TrocaDaArbo({
     );
   }
 
-  const caminho = caminhoDoLead(consulta.data, new Date(), noPortalSoPeloSistemaAtual);
+  const caminho = caminhoDoLead(consulta.data, new Date(), noPortalSoPeloSistemaAtual, pino);
   const lido = consulta.data.arquivo.leituraDoRobo !== null;
   const daTroca = PASSOS.map((p) => caminho.passos.find((x) => x.id === p.id) as PassoDoCaminho);
   const atual = daTroca.findIndex((p) => p.situacao === 'falta');

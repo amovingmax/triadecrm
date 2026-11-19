@@ -430,16 +430,31 @@ describe('2. Anúncios no ar pelo CRM', () => {
     expect(p.detalhe).toBe('Entram no portal na próxima leitura do Grupo OLX.');
   });
 
-  it('nada no portal nem no ar pelo CRM: não há o que proteger, os prontos vão como sempre', () => {
+  it('antes da troca, nada no portal pelo sistema atual: nenhum rascunho no botão, e o passo pede um olhar', () => {
+    // O relatório do Canal Pro não foi importado: nada ocupa vaga, nada no ar.
     const e: EstadoDoCaminho = {
       ...HOJE,
       plano: { ...HOJE.plano, anunciosEmUso: 0 },
-      anuncios: { ...HOJE.anuncios, prontos: [pronto('IM0001', false), pronto('IM0002', false)] },
+      anuncios: { ...HOJE.anuncios, prontos: SO_DO_RELATORIO },
+      relatorio: { importadoEm: null, repetidosAtivos: [], repetidosInativos: 0 },
     };
     const p = passoDosAnuncios(e);
-    expect(p.cabem.map((a) => a.codigo)).toEqual(['IM0001', 'IM0002']);
-    expect(p.depoisDaTroca).toEqual([]);
-    expect(p.resumo).toBe('2 anúncios prontos para pôr no ar · 0 de 10 vagas');
+    expect(p.cabem).toEqual([]);
+    expect(p.esperamVaga).toEqual([]);
+    expect(p.depoisDaTroca.map((a) => a.codigo)).toEqual(SO_DO_RELATORIO.map((a) => a.codigo));
+    expect(p.situacao).toBe('atencao');
+    expect(p.resumo).toBe('Nada está no portal pelo sistema atual · 0 de 10 vagas');
+    expect(p.detalhe).toMatch(
+      /^Sem o relatório do Canal Pro, o CRM não sabe o que o sistema atual publica/,
+    );
+    // Com o relatório importado, a frase diz que ele não tem nenhum ativo do CRM.
+    const comRelatorio = passoDosAnuncios({ ...e, relatorio: HOJE.relatorio });
+    expect(comRelatorio.situacao).toBe('atencao');
+    expect(comRelatorio.detalhe).toMatch(/^O último relatório do Canal Pro não tem anúncio ativo/);
+    // E o caminho não trava no passo 2: o próximo que falta é o arquivo.
+    const c = caminhoDoLead({ ...e, entrega: LIGADO.entrega }, AGORA, 0);
+    expect(c.passos[1].situacao).toBe('atencao');
+    expect(c.passos[2].situacao).toBe('falta');
   });
 
   it('com o plano cheio, o que ocupa a própria vaga cabe; o novo espera', () => {
@@ -553,6 +568,39 @@ describe('3. O Grupo OLX lê o arquivo do CRM', () => {
 
   it('nunca leu e nada a assumir: sem o aviso', () => {
     expect(passoDoArquivo(HOJE, AGORA, 0).antesDeColar).toBeNull();
+  });
+
+  it('antes de mostrar a URL, pede o pino do mapa de quem está no portal pela Arbo sem ele', () => {
+    const p = passoDoArquivo(HOJE, AGORA, 0, { faltam: 7, temEndereco: true });
+    expect(p.situacao).toBe('falta');
+    expect(p.resumo).toBe('Antes de colar a URL, traga o pino do mapa');
+    expect(p.colar).toBe(false);
+    expect(p.pinoAntes).toBe(true);
+    expect(p.detalhe).toMatch(
+      /^7 anúncios que estão no portal pela Arbo ainda não têm no CRM o pino/,
+    );
+    expect(p.detalhe).toMatch(/“Atualizar do sistema atual”/);
+    expect(passoDoArquivo(HOJE, AGORA, 0, { faltam: 1, temEndereco: true }).detalhe).toMatch(
+      /^Um anúncio que está no portal pela Arbo ainda não tem/,
+    );
+  });
+
+  it('com o pino trazido, ou sem o endereço do sistema atual guardado, volta a mostrar a URL', () => {
+    for (const pino of [
+      { faltam: 0, temEndereco: true },
+      { faltam: 7, temEndereco: false },
+    ]) {
+      const p = passoDoArquivo(HOJE, AGORA, 0, pino);
+      expect(p.resumo).toBe('Cole a URL do CRM no Canal Pro');
+      expect(p.colar).toBe(true);
+      expect(p.pinoAntes).toBe(false);
+    }
+  });
+
+  it('depois da troca, o passo 3 não pede o pino (o importador ainda o traz para quem está no ar)', () => {
+    const p = passoDoArquivo(LIGADO, AGORA, 0, { faltam: 7, temEndereco: true });
+    expect(p.situacao).toBe('feito');
+    expect(p.pinoAntes).toBe(false);
   });
 
   it('nunca leu, mas outro programa abriu: diz quem e quando', () => {

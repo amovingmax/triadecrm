@@ -112,6 +112,8 @@ export type AnuncioImportado =
        * pula e diz por quê ('no_ar_pelo_crm', 20261119120000).
        */
       pulado: string | null;
+      /** Pulado, mas ganhou o pino do mapa que faltava (só as coordenadas). */
+      pino: boolean;
     }
   | { ok: false; motivo: string; pendencias?: string[] };
 
@@ -127,6 +129,7 @@ export async function importarAnuncio(dados: DadosParaImportar): Promise<Anuncio
     fotos?: number;
     pendencias?: string[] | null;
     pulado?: string | null;
+    pino?: boolean | null;
   };
   if (!r.ok || !r.id) {
     return { ok: false, motivo: r.motivo ?? 'falhou', pendencias: r.pendencias ?? undefined };
@@ -139,6 +142,7 @@ export async function importarAnuncio(dados: DadosParaImportar): Promise<Anuncio
     fotos: r.fotos ?? 0,
     pendencias: r.pendencias ?? [],
     pulado: r.pulado ?? null,
+    pino: r.pino === true,
   };
 }
 
@@ -203,7 +207,7 @@ const FRASES: Record<string, string> = {
   dados_invalidos:
     'Algum valor do arquivo não cabe no anúncio. Confira o anúncio no sistema atual.',
   no_ar_pelo_crm:
-    'No ar pelo CRM: o Canal Pro já lê o arquivo do CRM, e o arquivo do sistema atual não muda mais o anúncio no ar.',
+    'No ar pelo CRM: o Canal Pro já lê o arquivo do CRM, e o arquivo do sistema atual só completa o pino do mapa que falta.',
   crm_publica:
     'O anúncio está no ar pelo CRM: o Canal Pro só espelha o CRM, então as fotos dele mudam no editor.',
   nao_configurado: 'O servidor não está configurado para guardar fotos. Avise quem cuida do CRM.',

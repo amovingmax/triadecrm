@@ -12,6 +12,9 @@ import {
   ocupaVagaPeloRelatorio,
   oQueFalta,
   travasDoPlano,
+  crmPublica,
+  DIAS_DO_SINAL_DA_TROCA,
+  precisaDoPino,
   formatarDia,
   formatarNota,
   negociosDoCartao,
@@ -630,5 +633,33 @@ describe('o plano antes do clique (11/11/2026)', () => {
         ocupaVagaPeloRelatorio: false,
       }),
     ).toEqual({ semVaga: false, semDestaque: false, destaqueBarrado: false });
+  });
+});
+
+describe('a troca e o pino do mapa (19/11/2026)', () => {
+  const agora = new Date('2026-11-19T15:00:00Z');
+  const diasAntes = (d: number) => new Date(agora.getTime() - d * 86_400_000).toISOString();
+
+  it('o sinal da troca é a leitura do robô nos últimos 90 dias', () => {
+    expect(DIAS_DO_SINAL_DA_TROCA).toBe(90);
+    expect(crmPublica(null, agora)).toBe(false);
+    expect(crmPublica(undefined, agora)).toBe(false);
+    expect(crmPublica(diasAntes(1), agora)).toBe(true);
+    expect(crmPublica(diasAntes(89.9), agora)).toBe(true);
+    // O Canal Pro voltou para a Arbo e ninguém lê o arquivo do CRM há 90 dias.
+    expect(crmPublica(diasAntes(90.1), agora)).toBe(false);
+    expect(crmPublica('lixo', agora)).toBe(false);
+  });
+
+  it('precisa do pino quem está no arquivo do sistema atual, sem coordenada e sem o importador ter procurado', () => {
+    const da = { excluido_em: null, no_sistema_atual: true as boolean | null, falta_pino: true };
+    expect(precisaDoPino(da)).toBe(true);
+    expect(precisaDoPino({ ...da, falta_pino: false })).toBe(false);
+    // Fora do arquivo da Arbo (criado no CRM, ou saiu de lá): de onde viria o pino?
+    expect(precisaDoPino({ ...da, no_sistema_atual: null })).toBe(false);
+    expect(precisaDoPino({ ...da, no_sistema_atual: false })).toBe(false);
+    expect(precisaDoPino({ ...da, excluido_em: '2026-11-19T12:00:00Z' })).toBe(false);
+    // Banco anterior à migração: a lista não traz a coluna.
+    expect(precisaDoPino({ excluido_em: null, no_sistema_atual: true })).toBe(false);
   });
 });

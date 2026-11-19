@@ -659,3 +659,34 @@ export function travasDoPlano(
  */
 export const DESTACADOR_AUTOMATICO =
   'Com menos destaques no arquivo do que o plano tem, o Canal Pro escolhe sozinho quais destacar.';
+
+// ---------------------------------------------------------------------------
+// A troca e o pino do mapa (19/11/2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Quantos dias uma leitura do robô do Grupo OLX vale como sinal da troca. A
+ * mesma conta de `app.canal_pro_crm_publica()` (migração 20261119120000): se o
+ * Canal Pro voltar para a Arbo, 90 dias depois da última leitura o CRM deixa de
+ * se ver como quem publica.
+ */
+export const DIAS_DO_SINAL_DA_TROCA = 90;
+
+/** O Canal Pro lê o arquivo do CRM (a troca está feita), pela última leitura do robô. */
+export function crmPublica(ultimaLeituraDoRobo: string | null | undefined, agora: Date): boolean {
+  if (!ultimaLeituraDoRobo) return false;
+  const em = Date.parse(ultimaLeituraDoRobo);
+  return !Number.isNaN(em) && agora.getTime() - em < DIAS_DO_SINAL_DA_TROCA * 24 * 3_600_000;
+}
+
+/**
+ * Está no portal pelo sistema atual (no arquivo dele, na última leitura), sem o
+ * pino do mapa no CRM, e o importador nunca o procurou (`falta_pino`). É quem
+ * "Atualizar do sistema atual" completa: antes de colar a URL, e, depois da
+ * troca, só o pino de quem está no ar.
+ */
+export function precisaDoPino(
+  a: Pick<AnuncioNaLista, 'excluido_em' | 'no_sistema_atual' | 'falta_pino'>,
+): boolean {
+  return !a.excluido_em && a.no_sistema_atual === true && a.falta_pino === true;
+}

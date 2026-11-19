@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { DialogoExcluirDuplicado } from './anuncios-no-canal-pro';
 import { carregarCaminhoDoLead, CHAVE_DO_CAMINHO } from './dados';
 import { formatarQuando } from './no-portal';
+import { ImportarSistemaAtual } from './importar-sistema-atual';
 import { BotaoPorNoAr, EnderecoDeLeads, EnderecoDoArquivo } from './painel-canal-pro';
 import {
   type AnuncioComPendencia,
@@ -388,6 +389,13 @@ export function DetalheDoArquivo({
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           {passo.antesDeColar}
         </p>
+      ) : null}
+      {/* O pino do mapa antes da URL (19/11/2026): o endereço do sistema atual
+          está guardado, então o botão já começa a ler. */}
+      {passo.pinoAntes ? (
+        <div className="flex flex-wrap gap-2">
+          <ImportarSistemaAtual temEndereco />
+        </div>
       ) : null}
       {passo.colar ? (
         chave ? (

@@ -29,6 +29,7 @@ import {
   urlDeLeads,
   urlDoArquivo,
 } from './dados';
+import { ImportarSistemaAtual } from './importar-sistema-atual';
 import { formatarQuando } from './no-portal';
 import { DESTACADOR_AUTOMATICO } from './regras-do-cartao';
 import { type AnuncioNaLista, fraseDaRecusa, lerInteiro, type SituacaoDoCanalPro } from './tipos';
@@ -56,6 +57,7 @@ export function PainelCanalPro({
   aoMudar,
   podeAjustar,
   aAssumir,
+  semPino,
   soNoCanalProNoAr,
 }: {
   aberto: boolean;
@@ -63,6 +65,8 @@ export function PainelCanalPro({
   podeAjustar: boolean;
   /** No portal por fora do CRM e não no ar no CRM: sairiam do ar na troca. */
   aAssumir: AnuncioNaLista[];
+  /** No portal pelo sistema atual e sem o pino do mapa no CRM (19/11/2026). */
+  semPino: AnuncioNaLista[];
   /** Ativos no Canal Pro sem anúncio no CRM (cadastrados lá): o CRM não os tira. */
   soNoCanalProNoAr: number;
 }) {
@@ -148,7 +152,11 @@ export function PainelCanalPro({
                 <section className="flex flex-col gap-3">
                   <h3 className="text-sm font-medium">O endereço do arquivo</h3>
                   <EnderecoDoArquivo chave={chave} />
-                  <AntesDeColar aAssumir={aAssumir} soNoCanalProNoAr={soNoCanalProNoAr} />
+                  <AntesDeColar
+                    aAssumir={aAssumir}
+                    semPino={dados.sistemaAtual.temEndereco ? semPino : []}
+                    soNoCanalProNoAr={soNoCanalProNoAr}
+                  />
                   <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm text-muted-foreground">
                     <li>Salve o contato e resolva o quadro &ldquo;Antes de colar&rdquo;.</li>
                     <li>
@@ -418,14 +426,36 @@ function Campo({
  */
 function AntesDeColar({
   aAssumir,
+  semPino,
   soNoCanalProNoAr,
 }: {
   aAssumir: AnuncioNaLista[];
+  /** Só quando o CRM tem o endereço do sistema atual (é de lá que o pino vem). */
+  semPino: AnuncioNaLista[];
   soNoCanalProNoAr: number;
 }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-hairline p-3 text-sm">
       <h4 className="font-medium">Antes de colar o endereço no Canal Pro</h4>
+      {semPino.length > 0 ? (
+        <>
+          <p className="text-muted-foreground">
+            <span className="text-foreground">
+              {semPino.length === 1
+                ? '1 anúncio no portal pela Arbo está sem o pino do mapa no CRM'
+                : `${semPino.length} anúncios no portal pela Arbo estão sem o pino do mapa no CRM`}
+            </span>
+            : “Atualizar do sistema atual” traz as coordenadas do arquivo da Arbo. Sem elas, o
+            portal acha o lugar só pelo endereço.
+          </p>
+          <p className="numerico text-xs text-muted-foreground">
+            {semPino.map((a) => a.codigo).join(' · ')}
+          </p>
+          <div>
+            <ImportarSistemaAtual temEndereco />
+          </div>
+        </>
+      ) : null}
       {aAssumir.length > 0 ? (
         <>
           <p className="text-muted-foreground">

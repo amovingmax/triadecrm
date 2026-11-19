@@ -49,7 +49,13 @@ import { NovoAnuncioConferido } from './novo-anuncio-conferido';
 import { PainelCanalPro } from './painel-canal-pro';
 import { diasDeCalendario, haQuanto } from './passos-do-caminho';
 import { PrecisaDeVoce } from './precisa-de-voce';
-import { estadoNoPortal, situacaoForaDoCrm, type EstadoNoPortal } from './regras-do-cartao';
+import {
+  crmPublica,
+  estadoNoPortal,
+  precisaDoPino,
+  situacaoForaDoCrm,
+  type EstadoNoPortal,
+} from './regras-do-cartao';
 import { ativoNoCanalPro } from './relatorio-canal-pro';
 import { SecoesDosAnuncios } from './secoes';
 import { TrocaDaArbo } from './troca-da-arbo';
@@ -155,6 +161,11 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
       ),
     [ativos],
   );
+  // No portal pelo sistema atual e sem o pino do mapa no CRM (19/11/2026): o
+  // "Atualizar do sistema atual" o traz, antes de colar a URL e, depois da troca,
+  // só para quem está no ar.
+  const semPino = useMemo(() => ativos.filter(precisaDoPino), [ativos]);
+  const temEnderecoDoSistemaAtual = canalPro.data?.sistemaAtual.temEndereco ?? false;
   const porEstado = useMemo(() => {
     const c: Record<EstadoNoPortal, number> = { publicado: 0, nao_publicado: 0, rascunho: 0 };
     for (const a of ativos) c[estadoNoPortal(a)] += 1;
@@ -250,6 +261,7 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
         <TrocaDaArbo
           chave={canalPro.data?.chave ?? null}
           noPortalSoPeloSistemaAtual={aAssumir.length}
+          pino={{ faltam: semPino.length, temEndereco: temEnderecoDoSistemaAtual }}
           aoVerNaLista={() => {
             setRecorte('todos');
             setFiltro('arbo');
@@ -425,6 +437,7 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
         aoMudar={setPainelAberto}
         podeAjustar={podePublicar}
         aAssumir={aAssumir}
+        semPino={semPino}
         soNoCanalProNoAr={soltas.filter((s) => ativoNoCanalPro(s.situacao)).length}
       />
       <NovoAnuncioConferido
@@ -439,8 +452,9 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
             aberto={sincronizarAberto}
             aoMudar={setSincronizarAberto}
             sincronizadoEm={canalPro.data?.importadoEm ?? null}
-            temEnderecoDoSistemaAtual={canalPro.data?.sistemaAtual.temEndereco ?? false}
-            crmPublica={canalPro.data?.ultimaLeitura != null}
+            temEnderecoDoSistemaAtual={temEnderecoDoSistemaAtual}
+            crmPublica={crmPublica(canalPro.data?.ultimaLeitura?.em, new Date())}
+            noArSemPino={semPino.filter((a) => a.situacao === 'no_ar').length}
             aoAbrirPlanilha={() => setPlanilhaAberta(true)}
           />
           <ImportarCanalPro aberto={planilhaAberta} aoMudar={setPlanilhaAberta} />

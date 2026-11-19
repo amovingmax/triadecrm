@@ -27,7 +27,8 @@ import { URL_DO_CANAL_PRO } from './tipos';
  *
  * Depois da troca (o robô do Grupo OLX leu o arquivo do CRM, 19/11/2026), o
  * arquivo da Arbo sai daqui: ele é velho e desfaria o que o CRM publica. O
- * banco também não o deixa mudar anúncio no ar (`anuncio_importar`).
+ * banco também não o deixa mudar anúncio no ar (`anuncio_importar`). A exceção
+ * é o pino do mapa: com anúncio no ar sem ele, o botão volta, só para trazê-lo.
  */
 export function FolhaSincronizar({
   aberto,
@@ -35,6 +36,7 @@ export function FolhaSincronizar({
   sincronizadoEm,
   temEnderecoDoSistemaAtual,
   crmPublica,
+  noArSemPino,
   aoAbrirPlanilha,
 }: {
   aberto: boolean;
@@ -44,6 +46,8 @@ export function FolhaSincronizar({
   temEnderecoDoSistemaAtual: boolean;
   /** O Canal Pro já lê o arquivo do CRM (a troca da Arbo está feita). */
   crmPublica: boolean;
+  /** No ar sem o pino do mapa, que o arquivo da Arbo ainda pode trazer (19/11/2026). */
+  noArSemPino: number;
   aoAbrirPlanilha: () => void;
 }) {
   return (
@@ -123,6 +127,20 @@ export function FolhaSincronizar({
                 O Canal Pro já lê o arquivo do CRM: agora é o CRM quem publica. Por isso o arquivo
                 da Arbo não atualiza mais os anúncios daqui.
               </p>
+            ) : null}
+            {crmPublica && noArSemPino > 0 && temEnderecoDoSistemaAtual ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {noArSemPino === 1
+                    ? '1 anúncio no ar está sem o pino do mapa.'
+                    : `${noArSemPino} anúncios no ar estão sem o pino do mapa.`}{' '}
+                  Do arquivo da Arbo, ele traz só as coordenadas que faltam; nada mais muda no
+                  anúncio no ar.
+                </p>
+                <div>
+                  <ImportarSistemaAtual temEndereco soPino />
+                </div>
+              </div>
             ) : null}
           </div>
         </div>
