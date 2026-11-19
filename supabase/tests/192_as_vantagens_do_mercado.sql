@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — As vantagens de cada imóvel nosso (migração 20261118214000)
+-- pgTAP — As vantagens de cada imóvel nosso (migração 20261119164000)
 --
 -- Decisões do dono (16/11 e 18/11/2026): o sistema calcula e propõe, a gestão
 -- aprova POR IMÓVEL, a vantagem aprovada se renova sozinha quando cada número

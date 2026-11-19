@@ -59,7 +59,7 @@
 --                 'tatiana-maia-imoveis', 'jl-imoveis-rn', 'ibeda', 'imobinova-pipa', 'abreu-imoveis',
 --                 'feeds-imobiliarias', 'dom-natal', 'obrasgov');
 --   (o Chaves na Mão, a Fipe, o Banco Central, o SICONFI, A Corrida e o GeoMapas
---   já nascem com o coletor na 20261118210000: o update aqui não muda nada neles.)
+--   já nascem com o coletor na 20261119160000: o update aqui não muda nada neles.)
 --   update public.mercado_fontes set frequencia = 'semanal' where id = 'obrasgov';
 -- =====================================================================
 

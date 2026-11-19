@@ -1,6 +1,6 @@
 /**
  * FORA DA RODADA desde 18/11/2026 (revisão): nenhuma fonte da lista aponta
- * para este coletor (a migração 20261118219000 deixa `osm-overpass` sem
+ * para este coletor (a migração 20261119169000 deixa `osm-overpass` sem
  * coletor). Três motivos: (1) o robots.txt do overpass-api.de fecha /api/
  * ("Disallow: /api/"), e o navegador respeita o robots, então toda rodada
  * pararia com erro; (2) `lerPontosParaMedir` só lê ponto "exata" ou

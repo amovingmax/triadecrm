@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — O worker de mercado (migração 20261118219000)
+-- pgTAP — O worker de mercado (migração 20261119169000)
 --
 -- Prova as portas que o comando `mercado` dos workers usa, e que a gravação
 -- dele é idempotente:
@@ -39,7 +39,7 @@ begin;
 do $$
 begin
   if to_regprocedure('public.mercado_pos_rodada()') is null then
-    raise exception 'pgTAP 194 é da Imova: rode num banco com as migrações de mercado e a 20261118219000';
+    raise exception 'pgTAP 194 é da Imova: rode num banco com as migrações de mercado e a 20261119169000';
   end if;
 end $$;
 

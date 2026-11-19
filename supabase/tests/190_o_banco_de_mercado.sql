@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — O banco de mercado da Imova (migrações 20261118210000 e 211000)
+-- pgTAP — O banco de mercado da Imova (migrações 20261119160000 e 211000)
 --
 -- Pedido do dono (18/11/2026): um pipeline GRATUITO de dados imobiliários,
 -- com ZERO associação com Canal Pro, ZAP, VivaReal ou OLX, coletado duas

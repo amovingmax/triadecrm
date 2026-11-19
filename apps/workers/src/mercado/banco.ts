@@ -180,7 +180,7 @@ export interface EstadoDoMercado {
 
 /**
  * Lê o estado. Devolve null quando o banco não tem a função: é o banco da
- * KOMUNE (a migração não cria nada lá) ou a migração 20261118219000 ainda não
+ * KOMUNE (a migração não cria nada lá) ou a migração 20261119169000 ainda não
  * foi aplicada. Outro erro sobe.
  */
 export async function lerEstadoDoMercado(
@@ -206,7 +206,7 @@ export async function lerEstadoDoMercado(
 /** Por que o worker de mercado não serve para este banco (ou null se serve). */
 export function motivoDoBancoErrado(estado: EstadoDoMercado | null): string | null {
   if (!estado)
-    return 'este banco não tem a inteligência de mercado (é o da KOMUNE, ou a migração 20261118219000 não foi aplicada)';
+    return 'este banco não tem a inteligência de mercado (é o da KOMUNE, ou a migração 20261119169000 não foi aplicada)';
   if (estado.empresa !== 'imova')
     return `a inteligência de mercado é só da Imova; este banco é da ${estado.empresa ?? 'empresa desconhecida'}`;
   if (!estado.fila) return 'a fila mercado_coleta não existe neste banco';

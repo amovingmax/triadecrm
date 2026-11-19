@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — A conferência semanal do mercado pela equipe (migração 20261118213000)
+-- pgTAP — A conferência semanal do mercado pela equipe (migração 20261119163000)
 --
 -- Decisão do dono (18/11/2026): além da veracidade automática, toda semana
 -- uma pequena amostra vai para a equipe conferir no link. Este arquivo prova:

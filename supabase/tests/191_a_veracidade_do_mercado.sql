@@ -1,5 +1,5 @@
 -- =====================================================================
--- pgTAP — A veracidade do mercado (migração 20261118212000)
+-- pgTAP — A veracidade do mercado (migração 20261119162000)
 --
 -- As regras de `_redesign/pipeline/veracidade.md`, com os casos reais de
 -- 18/11 (§12.5) refeitos com anúncios de teste:

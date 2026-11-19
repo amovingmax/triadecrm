@@ -3,7 +3,7 @@
  *
  * O pg_cron de segunda e quinta às 6h (Fortaleza) põe na fila `mercado_coleta`
  * uma mensagem por fonte que pode ser coletada e está no prazo da frequência
- * dela (`app.mercado_coleta_enfileirar`, migração 20261118210000). Este laço
+ * dela (`app.mercado_coleta_enfileirar`, migração 20261119160000). Este laço
  * lê a fila, uma fonte por vez, e para cada uma chama `executarFonte`
  * (`mercado/rodada.ts`). Quando a fila esvazia, chama `mercado_pos_rodada`:
  * veracidade de novo e, na segunda, a amostra da semana para a equipe.
