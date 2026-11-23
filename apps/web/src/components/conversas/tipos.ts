@@ -117,10 +117,11 @@ export type LeituraNaLista = {
 };
 
 /**
- * Que parceria (Imova, 23/11/2026): `public.consultoria.tipo`. A marca posta
- * pelo botão de Prospectados vem sem tipo.
+ * A tag do Parceiro (Imova, 23/11/2026): `public.consultoria.tipo`. São três,
+ * e todo Parceiro novo tem uma (migração 20261123200000). Marca de antes, sem
+ * tag, chega como `null` e aparece como "Sem tag".
  */
-export type TipoDeParceria = 'inquilino' | 'proprietario' | 'comprador' | 'outro';
+export type TipoDeParceria = 'proprietario' | 'colaborador' | 'inquilino';
 
 /** O perfil de Parceiro de uma ficha, como a lista e a conversa mostram. */
 export type PerfilDoParceiro = {

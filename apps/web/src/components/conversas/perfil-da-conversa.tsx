@@ -27,6 +27,7 @@ import {
   descricaoDoParceiro,
   recadoDoPerfil,
   rotuloDaParceria,
+  SEM_TAG,
   TIPOS_DE_PARCERIA,
   type RecorteDosParceiros,
 } from './perfil-regra';
@@ -39,8 +40,9 @@ import { ChipDeAba } from './wpp';
  *
  * Onde se muda o perfil: na faixa logo abaixo do cabeçalho da conversa ("Mudar
  * para Parceiro" / "Voltar para Clientes") e na setinha de cada linha da lista.
- * Virar Parceiro abre um diálogo curto (o tipo da parceria e, se quiser, o
- * imóvel); voltar para Clientes é um clique, com "Desfazer" no aviso.
+ * Virar Parceiro abre um diálogo curto (a tag, Proprietário, Colaborador ou
+ * Inquilino, e, se quiser, o imóvel); voltar para Clientes é um clique, com
+ * "Desfazer" no aviso.
  */
 
 /** A ficha cujo perfil vai mudar, e o que a tela já sabe dela. */
@@ -156,7 +158,7 @@ export function ProvedorDoPerfil({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** O diálogo de virar Parceiro: o tipo (obrigatório) e o imóvel (opcional). */
+/** O diálogo de virar Parceiro: a tag (obrigatória) e o imóvel (opcional). */
 function DialogoDoParceiro({
   alvo,
   enviando,
@@ -225,37 +227,12 @@ function FormularioDoParceiro({
         </DialogTitle>
         <DialogDescription>
           {corrigindo
-            ? 'Corrija o tipo ou o imóvel. A conversa continua em Parceiros.'
+            ? 'Corrija a tag ou o imóvel. A conversa continua em Parceiros.'
             : `A conversa sai de Clientes e passa a ficar em Parceiros. Quando escrever de novo, continua lá. A IA que atende não responde Parceiros: quem responde é a equipe.`}
         </DialogDescription>
       </DialogHeader>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-medium">Que parceria?</legend>
-        <div role="radiogroup" aria-label="Que parceria" className="flex flex-wrap gap-2">
-          {TIPOS_DE_PARCERIA.map((t) => {
-            const marcado = tipo === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                role="radio"
-                aria-checked={marcado}
-                onClick={() => setTipo(t.id)}
-                className={cn(
-                  'toque inline-flex h-11 items-center rounded-full border px-4 text-sm transition-colors outline-none md:h-9',
-                  'focus-visible:ring-3 focus-visible:ring-ring/50',
-                  marcado
-                    ? 'border-wpp-cliente bg-wpp-cliente-fundo font-semibold text-wpp-cliente-texto'
-                    : 'border-transparent bg-wpp-chip text-wpp-chip-texto hover:bg-foreground/10',
-                )}
-              >
-                {t.rotulo}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
+      <EscolhaDaTag valor={tipo} aoMudar={setTipo} />
 
       <div className="flex flex-col gap-1">
         <EscolherImovel valor={imovel} aoMudar={setImovel} permiteSemAnuncio={false} />
@@ -282,9 +259,50 @@ function FormularioDoParceiro({
 }
 
 /**
+ * As três tags como botões de escolha (Proprietário, Colaborador, Inquilino).
+ * Mora aqui e serve também ao botão "Mudar para Parceiro" de Prospectados.
+ */
+export function EscolhaDaTag({
+  valor,
+  aoMudar,
+}: {
+  valor: TipoDeParceria | null;
+  aoMudar: (tipo: TipoDeParceria) => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-2 text-sm font-medium">Qual tag?</legend>
+      <div role="radiogroup" aria-label="Tag do Parceiro" className="flex flex-wrap gap-2">
+        {TIPOS_DE_PARCERIA.map((t) => {
+          const marcado = valor === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={marcado}
+              onClick={() => aoMudar(t.id)}
+              className={cn(
+                'toque inline-flex h-11 items-center rounded-full border px-4 text-sm transition-colors outline-none md:h-9',
+                'focus-visible:ring-3 focus-visible:ring-ring/50',
+                marcado
+                  ? 'border-wpp-cliente bg-wpp-cliente-fundo font-semibold text-wpp-cliente-texto'
+                  : 'border-transparent bg-wpp-chip text-wpp-chip-texto hover:bg-foreground/10',
+              )}
+            >
+              {t.rotulo}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+/**
  * A faixa do perfil, logo abaixo do cabeçalho da conversa. Cliente: o selo e o
  * "Mudar para Parceiro" (com negócio ganho, a faixa fica amarela e sugere).
- * Parceiro: o tipo, o imóvel, desde quando e por quem, e "Voltar para Clientes".
+ * Parceiro: a tag, o imóvel, desde quando e por quem, e "Voltar para Clientes".
  */
 export function FaixaDoPerfil({
   alvo,
@@ -381,7 +399,7 @@ export function FaixaDoPerfil({
   );
 }
 
-/** "Cliente" ou "Parceiro · Inquilino", como na faixa da conversa. */
+/** "Cliente" ou "Parceiro · Inquilino" (ou "Parceiro · Sem tag"), como na faixa da conversa. */
 export function SeloDoPerfil({
   parceiro,
   className,
@@ -409,7 +427,7 @@ export function SeloDoPerfil({
   );
 }
 
-/** O tipo da parceria na linha da lista, miúdo como as outras marcas de lá. */
+/** A tag do Parceiro na linha da lista, miúda como as outras marcas de lá. */
 export function ParceriaNaLista({ parceiro }: { parceiro: PerfilDoParceiro }) {
   return (
     <>
@@ -435,7 +453,11 @@ export function GanhoNaLista() {
   );
 }
 
-/** As pílulas da caixa Parceiros: todos ou um tipo só. */
+/**
+ * As pílulas da caixa Parceiros: todos ou uma tag só. As três tags aparecem
+ * sempre, mesmo com zero (é a categoria, não só um filtro); "Sem tag" só
+ * quando há Parceiro de antes das tags esperando uma.
+ */
 export function FiltroDaParceria({
   tipo,
   total,
@@ -444,19 +466,20 @@ export function FiltroDaParceria({
 }: {
   tipo: RecorteDosParceiros['tipo'];
   total: number;
-  porTipo: ReadonlyMap<TipoDeParceria, number>;
+  porTipo: ReadonlyMap<TipoDeParceria | typeof SEM_TAG, number>;
   aoTrocar: (tipo: RecorteDosParceiros['tipo']) => void;
 }) {
+  const semTag = porTipo.get(SEM_TAG) ?? 0;
   return (
     <div
       role="group"
-      aria-label="Que parceria mostrar"
-      className="relative -mx-3.5 flex gap-1.5 overflow-x-auto px-3.5 pb-0.5 [scrollbar-width:none]"
+      aria-label="Que tag mostrar"
+      className="flex flex-wrap gap-1.5 pb-0.5"
     >
       <ChipDeAba ativo={tipo === 'todos'} contagem={total} onClick={() => aoTrocar('todos')}>
         Todos
       </ChipDeAba>
-      {TIPOS_DE_PARCERIA.filter((t) => (porTipo.get(t.id) ?? 0) > 0 || tipo === t.id).map((t) => (
+      {TIPOS_DE_PARCERIA.map((t) => (
         <ChipDeAba
           key={t.id}
           ativo={tipo === t.id}
@@ -466,6 +489,11 @@ export function FiltroDaParceria({
           {t.plural}
         </ChipDeAba>
       ))}
+      {semTag > 0 || tipo === SEM_TAG ? (
+        <ChipDeAba ativo={tipo === SEM_TAG} contagem={semTag} onClick={() => aoTrocar(SEM_TAG)}>
+          Sem tag
+        </ChipDeAba>
+      ) : null}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   contarPorTipo,
   dataCurta,
   descricaoDoParceiro,
+  ehTipoDeParceria,
   esperamPorCaixa,
   filtrarParceiros,
   mapaDosParceiros,
@@ -11,7 +12,9 @@ import {
   recadoDoPerfil,
   rotuloDaParceria,
   rotuloDoImovel,
+  SEM_TAG,
   sugestaoDeTipo,
+  TIPOS_DE_PARCERIA,
 } from './perfil-regra';
 import type { ItemConversa, PerfilDoParceiro } from './tipos';
 
@@ -102,9 +105,16 @@ describe('rotuloDoImovel e rotuloDaParceria', () => {
     expect(rotuloDoImovel({ codigo: null, titulo: 'Casa' })).toBe('Casa');
     expect(rotuloDoImovel(null)).toBeNull();
   });
-  it('sem tipo, diz só "Parceiro"', () => {
+  it('as três tags, e "Sem tag" para a marca de antes delas', () => {
     expect(rotuloDaParceria('proprietario')).toBe('Proprietário');
-    expect(rotuloDaParceria(null)).toBe('Parceiro');
+    expect(rotuloDaParceria('colaborador')).toBe('Colaborador');
+    expect(rotuloDaParceria('inquilino')).toBe('Inquilino');
+    expect(rotuloDaParceria(null)).toBe('Sem tag');
+  });
+  it('são só três, na ordem do pedido', () => {
+    expect(TIPOS_DE_PARCERIA.map((t) => t.id)).toEqual(['proprietario', 'colaborador', 'inquilino']);
+    expect(ehTipoDeParceria('comprador')).toBe(false);
+    expect(ehTipoDeParceria('outro')).toBe(false);
   });
 });
 
@@ -114,7 +124,7 @@ describe('filtrarParceiros (a caixa Parceiros)', () => {
     'Ana Costa',
     perfil({ tipo: 'inquilino', imovel: 'AP0003 · Apto em Ponta Negra' }),
   );
-  const beto = item('b', 'Beto Lins', perfil({ tipo: 'comprador' }), { bairro: 'Pipa' });
+  const beto = item('b', 'Beto Lins', perfil({ tipo: 'colaborador' }), { bairro: 'Pipa' });
   const caio = item('c', 'Caio Sá', perfil({ tipo: null }));
 
   it('sem recorte, mostra todos os abertos', () => {
@@ -125,13 +135,19 @@ describe('filtrarParceiros (a caixa Parceiros)', () => {
     ]);
   });
 
-  it('o tipo filtra, e quem não tem tipo conta como Outro', () => {
-    expect(filtrarParceiros([ana, beto, caio], { ...RECORTE_INICIAL, tipo: 'comprador' })).toEqual([
-      beto,
+  it('a tag filtra, e quem não tem tag fica em "Sem tag"', () => {
+    expect(filtrarParceiros([ana, beto, caio], { ...RECORTE_INICIAL, tipo: 'colaborador' })).toEqual(
+      [beto],
+    );
+    expect(filtrarParceiros([ana, beto, caio], { ...RECORTE_INICIAL, tipo: 'inquilino' })).toEqual([
+      ana,
     ]);
-    expect(filtrarParceiros([ana, beto, caio], { ...RECORTE_INICIAL, tipo: 'outro' })).toEqual([
+    expect(filtrarParceiros([ana, beto, caio], { ...RECORTE_INICIAL, tipo: SEM_TAG })).toEqual([
       caio,
     ]);
+    expect(filtrarParceiros([ana, beto, caio], { ...RECORTE_INICIAL, tipo: 'proprietario' })).toEqual(
+      [],
+    );
   });
 
   it('a busca acha pelo nome, pelo bairro e pelo imóvel, sem acento', () => {
@@ -152,11 +168,11 @@ describe('filtrarParceiros (a caixa Parceiros)', () => {
     ).toEqual(['d']);
   });
 
-  it('contarPorTipo conta os sem tipo como Outro', () => {
+  it('contarPorTipo conta cada tag, e os sem tag à parte', () => {
     const contagem = contarPorTipo([ana, beto, caio]);
     expect(contagem.get('inquilino')).toBe(1);
-    expect(contagem.get('comprador')).toBe(1);
-    expect(contagem.get('outro')).toBe(1);
+    expect(contagem.get('colaborador')).toBe(1);
+    expect(contagem.get(SEM_TAG)).toBe(1);
     expect(contagem.get('proprietario')).toBeUndefined();
   });
 });
@@ -178,9 +194,9 @@ describe('esperamPorCaixa (o número de cada caixa)', () => {
 });
 
 describe('sugestaoDeTipo (o que o diálogo já traz marcado)', () => {
-  it('Proprietário pela ficha, comprador pelo negócio ganho, e nada sem pista', () => {
+  it('Proprietário pela ficha; negócio ganho não escolhe a tag; nada sem pista', () => {
     expect(sugestaoDeTipo({ tipo: 'fornecedor', ganhou: true })).toBe('proprietario');
-    expect(sugestaoDeTipo({ tipo: 'produtor', ganhou: true })).toBe('comprador');
+    expect(sugestaoDeTipo({ tipo: 'produtor', ganhou: true })).toBeNull();
     expect(sugestaoDeTipo({ tipo: 'produtor', ganhou: false })).toBeNull();
   });
 });
@@ -205,7 +221,12 @@ describe('descricaoDoParceiro (a faixa da conversa)', () => {
 
 describe('recadoDoPerfil', () => {
   it('traduz as recusas do banco', () => {
-    expect(recadoDoPerfil('tipo_invalido')).toBe('Escolha o tipo da parceria.');
+    expect(recadoDoPerfil('tipo_invalido')).toBe(
+      'Escolha uma das três tags: Proprietário, Colaborador ou Inquilino.',
+    );
+    expect(recadoDoPerfil('falta_a_tag')).toBe(
+      'Escolha a tag do Parceiro: Proprietário, Colaborador ou Inquilino.',
+    );
     expect(recadoDoPerfil('qualquer')).toBe('Não deu certo. Tente de novo em instantes.');
   });
 });

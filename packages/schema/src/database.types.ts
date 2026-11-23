@@ -13852,6 +13852,10 @@ export type Database = {
           tipo: Database["app"]["Enums"]["org_kind"]
         }[]
       }
+      parceiros_marcar: {
+        Args: { p_organization_ids: string[]; p_tipo: string }
+        Returns: Json
+      }
       pipeline_board: {
         Args: {
           p_canal?: Database["app"]["Enums"]["channel"]

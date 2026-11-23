@@ -15,7 +15,8 @@ import { ErroDaLista, EsqueletoLista, VazioDeVerdade, VazioPorFiltro } from './e
 import { FolhaCadastroRapido } from './folha-cadastro-rapido';
 import { formatarNumero } from './formatos';
 import { ListaCartoes } from './lista-cartoes';
-import { useConsultoria } from './consultoria-botoes';
+import { DialogoDaTag, useConsultoria } from './consultoria-botoes';
+import { MARCA_E_PARCEIRO } from './consultoria';
 import { BarraDaSelecao, useSaudacao } from './saudacao-botoes';
 import { TabelaParceiros, type AcoesNaTabela, type SaudacaoNaTabela } from './tabela-parceiros';
 import { useEhCelular } from './usar-eh-celular';
@@ -164,6 +165,11 @@ export function TelaParceiros({
   // decide é `move_deal`). A Consultoria é só de admin e gestor; o banco confere o mesmo.
   const consultoria = useConsultoria(podeMarcarConsultoria);
   const marcarConsultoria = consultoria.marcar;
+  // Imova (23/11/2026): virar Parceiro pede a tag, num diálogo; tirar é um clique.
+  const [pedindoTag, setPedindoTag] = useState<{
+    ids: readonly string[];
+    nome: string | null;
+  } | null>(null);
   const acoesNaTabela = useMemo<AcoesNaTabela | null>(
     () =>
       podeCriar
@@ -171,7 +177,10 @@ export function TelaParceiros({
             consultoria: podeMarcarConsultoria
               ? {
                   naConsultoria: consultoria.naConsultoria,
-                  marcar: (id, sim) => void marcarConsultoria([id], sim),
+                  marcar: (id, sim, nome) =>
+                    MARCA_E_PARCEIRO && sim
+                      ? setPedindoTag({ ids: [id], nome })
+                      : void marcarConsultoria([id], sim),
                 }
               : null,
             aoMudarEtapa: () =>
@@ -298,7 +307,11 @@ export function TelaParceiros({
                 quantos={escolhidos.size}
                 ocupado={saudacao.ocupado}
                 aoMandar={() => pedir([...escolhidos])}
-                aoConsultoria={() => marcarConsultoria([...escolhidos], true)}
+                aoConsultoria={() => {
+                  if (!MARCA_E_PARCEIRO) return marcarConsultoria([...escolhidos], true);
+                  setPedindoTag({ ids: [...escolhidos], nome: null });
+                  return Promise.resolve(true);
+                }}
                 aoLimpar={() => marcar([...escolhidos], false)}
               />
             ) : null}
@@ -354,6 +367,14 @@ export function TelaParceiros({
             aoCriar={() => void clienteDeConsultas.invalidateQueries({ queryKey: ['parceiros'] })}
           />
         </>
+      ) : null}
+
+      {MARCA_E_PARCEIRO && podeMarcarConsultoria ? (
+        <DialogoDaTag
+          pedido={pedindoTag}
+          aoFechar={() => setPedindoTag(null)}
+          aoConfirmar={consultoria.marcarComTag}
+        />
       ) : null}
     </div>
   );

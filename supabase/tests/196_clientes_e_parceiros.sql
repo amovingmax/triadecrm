@@ -1,5 +1,7 @@
 -- =====================================================================
--- pgTAP — Clientes e Parceiros nas Conversas da Imova (migração 20261123120000)
+-- pgTAP — Clientes e Parceiros nas Conversas da Imova (migração 20261123120000;
+-- as três tags, 20261123200000: comprador virou colaborador e o botão de
+-- Prospectados põe a marca com tag, por `parceiros_marcar`)
 --
 -- Prova:
 --   1. o gestor e o SDR mudam o perfil para Parceiro, com tipo e imóvel;
@@ -9,7 +11,7 @@
 --   5. tudo vai para o audit_log;
 --   6. a IA que atende fica quieta com Parceiro e volta com Cliente, e a
 --      tela sabe por quê (`ia_conversa_estado`);
---   7. a marca sem tipo do botão de Prospectados também cala a IA;
+--   7. a marca do botão de Prospectados (com tag) também cala a IA;
 --   8. sem login, a função recusa.
 --
 -- Só na Imova. Roda em transação e desfaz tudo.
@@ -71,7 +73,7 @@ $$;
 insert into public.organizations (id, name, phone_e164, source_id, owner_id)
 select x.id, x.nome, x.tel, (select id from public.sources where slug = 'captura_campo'), pg_temp.gil()
   from (values ('c0000000-0000-4000-8000-000000019601'::uuid, 'Ana Inquilina', '+5584988819601'),
-               ('c0000000-0000-4000-8000-000000019602'::uuid, 'Beto Comprador', '+5584988819602'),
+               ('c0000000-0000-4000-8000-000000019602'::uuid, 'Beto Colaborador', '+5584988819602'),
                ('c0000000-0000-4000-8000-000000019603'::uuid, 'Caio Prospectados', '+5584988819603')) x(id, nome, tel);
 insert into t196 values
   ('ana', 'c0000000-0000-4000-8000-000000019601'), ('beto', 'c0000000-0000-4000-8000-000000019602'),
@@ -131,11 +133,11 @@ select is(app.ia_atende(pg_temp.id('conversa_ana')), false,
           'Parceiro: a IA que atende fica quieta');
 
 select pg_temp.entrar(pg_temp.sara(), 'sdr');
-select is((public.parceiro_mudar(pg_temp.id('beto'), true, 'comprador', null) ->> 'ok')::boolean, true,
+select is((public.parceiro_mudar(pg_temp.id('beto'), true, 'colaborador', null) ->> 'ok')::boolean, true,
           'o SDR também muda o perfil (quem atende muda)');
 select pg_temp.sair();
-select is((select tipo from public.consultoria where organization_id = pg_temp.id('beto')), 'comprador',
-          'o Beto virou Parceiro comprador, sem imóvel');
+select is((select tipo from public.consultoria where organization_id = pg_temp.id('beto')), 'colaborador',
+          'o Beto virou Parceiro colaborador, sem imóvel');
 select ok((select anuncio_id is null from public.consultoria where organization_id = pg_temp.id('beto')),
           'o imóvel é opcional');
 
@@ -197,14 +199,14 @@ select is((select actor_id from public.audit_log
           'com quem fez');
 
 -- ---------------------------------------------------------------------
--- 7. A marca do botão de Prospectados (sem tipo) também cala a IA
+-- 7. A marca do botão de Prospectados (com tag) também cala a IA
 -- ---------------------------------------------------------------------
 select is(app.ia_atende(pg_temp.id('conversa_caio')), true, 'o Caio, Cliente, tem IA');
 select pg_temp.entrar(pg_temp.gil(), 'gestor');
-select public.consultoria_marcar(array[pg_temp.id('caio')], true);
+select public.parceiros_marcar(array[pg_temp.id('caio')], 'proprietario');
 select pg_temp.sair();
 select is(app.ia_atende(pg_temp.id('conversa_caio')), false,
-          'marcado pelo botão de Prospectados (sem tipo): a IA fica quieta');
+          'marcado pelo botão de Prospectados: a IA fica quieta');
 
 -- ---------------------------------------------------------------------
 -- 8. Sem login

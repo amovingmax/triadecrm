@@ -11297,3 +11297,20 @@ Pedido: "Quando uma pessoa manda mensagem direto da OLX pelo chat da própria OL
 - **Banco local:** os leads `demo-198-*`, os contatos deles e a conversa "Demo 198 WhatsApp da OLX" foram apagados.
 - **Não deu para conferir aqui:** a tela em produção com login de verdade.
 - **Continua pendente:** as cores do ZAP e do Viva Real (ou os logos oficiais).
+
+## 23/11/2026 — As três tags dos Parceiros (branch `parceiros-tres-tags`; só na Imova; nada publicado)
+
+Pedido: "Quero conseguir filtrar e categorizar todas as pessoas que tenho contato no CRM da Imova. Hoje lá dentro eu tenho contatos que são parceiros e devem ser divididos entre: Proprietário, Colaborador, Inquilino. Essas são as tags que os parceiros devem ter. Já os clientes devem ter a placa de prospecção (que já possuem)."
+
+- **As tags:** Proprietário, Colaborador e Inquilino, nessa ordem. Comprador e Outro (de Clientes e Parceiros, mesmo dia) saíram. Todo Parceiro novo tem uma das três: o banco recusa sem tag.
+- **Clientes não mudam:** a placa deles é o canal de chegada (Placa, Anúncios, Redes sociais, Outros, Não identificado), que já tem filtro em Conversas.
+- **Banco (migração `20261123200000_as_tres_tags_dos_parceiros.sql`):**
+  - nas duas empresas, a regra `consultoria_tipo_valido` passa a ser `proprietario`, `colaborador` ou `inquilino` (ou nula). Linha com comprador ou outro fica nula ("Sem tag"). Em produção, em 23/11, `consultoria` tinha 0 linhas na Imova; na KOMUNE a coluna é sempre nula;
+  - só na Imova: `parceiro_mudar` exige a tag (`falta_a_tag`); nova `public.parceiros_marcar(ids, tipo)` põe vários de uma vez com a tag, ou troca a tag de quem já é (imóvel, "desde" e "por" ficam), até 200, admin, gestor e SDR, auditada (`PARCEIROS_MARCADOS`); `consultoria_marcar(ids, true)` passa a recusar (`falta_a_tag`) e continua tirando (`false`).
+  - Desfazer: reaplicar a regra e `parceiro_mudar` da 20261123120000, `consultoria_marcar` da 20261014100000, e `drop function public.parceiros_marcar(uuid[], text)`.
+- **Tela:**
+  - Conversas → Parceiros: as pílulas Todos, Proprietários, Colaboradores e Inquilinos aparecem sempre, com o número de cada uma, e quebram linha em vez de rolar de lado; "Sem tag" só aparece quando há Parceiro sem tag. O diálogo "Mudar para Parceiro" pergunta "Qual tag?" (`EscolhaDaTag`, reaproveitada em Prospectados). Negócio ganho não sugere mais "comprador"; ficha de proprietário (funil de captação) continua sugerindo Proprietário.
+  - Prospectados: o botão da linha e o "Mudar para Parceiro" da barra dos marcados abrem o diálogo da tag (`DialogoDaTag`); a pílula da linha mostra a tag ("Proprietário") em vez de "Parceiro". Tirar continua um clique. O aviso diz a tag ("2 contatos agora são Parceiros: Colaboradores."); o "Desfazer" só aparece quando todos eram Clientes.
+- **Verificado:** pgTAP 199 (24) novo, 196 (30, comprador → colaborador e o botão com tag) e 111 (35, o SDR põe a marca com tag na Imova) no banco local da Imova; a migração num ensaio desfeito no banco local da KOMUNE (só a regra muda). O 110 já falhava no banco local da Imova antes (telefone repetido nos dados locais). Vitest de conversas, parceiros e lib (686), `tsc` e `eslint` dos arquivos tocados verdes (o único erro do `tsc`, `RouteContext`, é do tipo gerado pelo Next, ausente numa cópia nova). Site local na porta 3105, no Chrome por Playwright: a caixa Parceiros com as quatro pílulas, o diálogo da conversa e o de vários em Prospectados, e o clique de ponta a ponta (dois contatos viraram Colaboradores no banco).
+- **Banco local da Imova:** 4 contatos de demonstração viraram Parceiros (Maria e João Demonstração, Proprietários; Família Andrade, Inquilino; Lucas Ferreira, Colaborador). Apagar antes de outro teste: `delete from public.consultoria`.
+- **Pendente:** publicar, só com pedido (a migração na Imova antes do site; a KOMUNE recebe a regra na próxima `komune migrar`). O filtro por tag é só em Conversas: a lista de Prospectados mostra a tag na linha mas não filtra por ela (pede mexer em `search_organizations`, que a KOMUNE também usa).

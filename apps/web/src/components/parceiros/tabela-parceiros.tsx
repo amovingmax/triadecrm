@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { RevelarLista, useRevelarLinha } from '@/components/movimento';
 import { EtiquetaEtapa } from '@/components/funis/etapa';
 import { MudarEtapa } from '@/components/funis/mudar-etapa';
+import type { TipoDeParceria } from '@/components/conversas/tipos';
 
 import { BotaoConsultoria } from './consultoria-botoes';
 
@@ -44,8 +45,10 @@ const ContextoDaSaudacao = createContext<SaudacaoNaTabela | null>(null);
 export type AcoesNaTabela = {
   /** `null` para quem não marca Consultoria (o SDR): a etapa muda, a marca não aparece. */
   consultoria: {
-    naConsultoria: ReadonlySet<string>;
-    marcar: (id: string, sim: boolean) => void;
+    /** Quem tem a marca, e a tag dele (Imova; na KOMUNE, sempre nula). */
+    naConsultoria: ReadonlyMap<string, TipoDeParceria | null>;
+    /** `nome` vai junto para o diálogo da tag dizer de quem é. */
+    marcar: (id: string, sim: boolean, nome: string) => void;
   } | null;
   aoMudarEtapa: () => void;
 };
@@ -454,7 +457,8 @@ function CelulaEtapa({ linha }: { linha: LinhaParceiro }) {
         <BotaoConsultoria
           nome={linha.name}
           marcado={acoes.consultoria.naConsultoria.has(linha.id)}
-          aoMudar={(sim) => acoes.consultoria?.marcar(linha.id, sim)}
+          tag={acoes.consultoria.naConsultoria.get(linha.id) ?? null}
+          aoMudar={(sim) => acoes.consultoria?.marcar(linha.id, sim, linha.name)}
         />
       ) : null}
     </span>

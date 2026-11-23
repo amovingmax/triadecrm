@@ -830,7 +830,7 @@ export function TelaConversas({
                       ? 'Nenhuma conversa de Parceiro concluída.'
                       : recorteParceiros.busca.trim() || recorteParceiros.tipo !== 'todos'
                         ? 'Nenhum Parceiro com esse filtro.'
-                        : 'Nenhum Parceiro ainda. Na conversa de um cliente que já fechou com a Imova (inquilino, proprietário, comprador), use “Mudar para Parceiro”: ela passa a ficar aqui.'}
+                        : 'Nenhum Parceiro ainda. Na conversa de quem já fechou com a Imova, use “Mudar para Parceiro” e escolha a tag (Proprietário, Colaborador ou Inquilino): ela passa a ficar aqui.'}
                   </p>
                 )
               ) : aba === 'consultoria' ? (

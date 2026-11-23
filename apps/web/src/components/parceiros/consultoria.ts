@@ -15,6 +15,8 @@
  */
 import { EMPRESA } from '@/lib/empresa';
 import { createClient } from '@/lib/supabase/client';
+import { ehTipoDeParceria, TIPOS_DE_PARCERIA } from '@/components/conversas/perfil-regra';
+import type { TipoDeParceria } from '@/components/conversas/tipos';
 
 /**
  * Na Imova, desde 23/11/2026, a marca é o perfil de Parceiro (Clientes e
@@ -34,12 +36,20 @@ export const ROTULO_DE_MARCAR = MARCA_E_PARCEIRO
   ? 'Mudar para Parceiro'
   : 'Mandar para a Consultoria';
 
-/** Quem tem a marca. A tabela é pequena (uma linha por parceiro marcado). */
-export async function carregarConsultoria(): Promise<ReadonlySet<string>> {
+/**
+ * Quem tem a marca, e com que tag (Imova, 23/11/2026; na KOMUNE a tag é sempre
+ * nula). A tabela é pequena (uma linha por parceiro marcado).
+ */
+export async function carregarConsultoria(): Promise<ReadonlyMap<string, TipoDeParceria | null>> {
   const supabase = createClient();
-  const { data, error } = await supabase.from('consultoria').select('organization_id').limit(5000);
+  const { data, error } = await supabase
+    .from('consultoria')
+    .select('organization_id, tipo')
+    .limit(5000);
   if (error) throw error;
-  return new Set((data ?? []).map((c) => c.organization_id));
+  return new Map(
+    (data ?? []).map((c) => [c.organization_id, ehTipoDeParceria(c.tipo) ? c.tipo : null]),
+  );
 }
 
 export type ResultadoDaConsultoria = { ok: true; mudaram: number } | { ok: false; motivo: string };
@@ -60,12 +70,34 @@ export async function marcarConsultoria(
   return r.ok ? { ok: true, mudaram: r.mudaram ?? 0 } : { ok: false, motivo: r.motivo ?? 'falhou' };
 }
 
+/**
+ * Põe vários em Parceiros com a mesma tag, ou troca a tag de quem já é (Imova,
+ * 23/11/2026: `public.parceiros_marcar`). Tirar continua em `marcarConsultoria`.
+ */
+export async function marcarParceirosComTag(
+  ids: readonly string[],
+  tipo: TipoDeParceria,
+): Promise<ResultadoDaConsultoria> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('parceiros_marcar', {
+    p_organization_ids: [...ids],
+    p_tipo: tipo,
+  });
+  if (error || !data || typeof data !== 'object' || Array.isArray(data)) {
+    return { ok: false, motivo: 'falhou' };
+  }
+  const r = data as { ok?: boolean; mudaram?: number; motivo?: string };
+  return r.ok ? { ok: true, mudaram: r.mudaram ?? 0 } : { ok: false, motivo: r.motivo ?? 'falhou' };
+}
+
 const RECUSA: Record<string, string> = {
   sem_permissao: MARCA_E_PARCEIRO
     ? 'Seu perfil não muda o perfil de contatos. Fale com um gestor.'
     : 'Seu perfil não mexe na Consultoria. Isso é de admin e gestor.',
   muitos_de_uma_vez: 'São muitos de uma vez. Mande no máximo 200 por pedido.',
   nada_escolhido: 'Escolha pelo menos um parceiro.',
+  falta_a_tag: 'Escolha a tag do Parceiro: Proprietário, Colaborador ou Inquilino.',
+  tipo_invalido: 'Escolha uma das três tags: Proprietário, Colaborador ou Inquilino.',
 };
 
 export function recadoDaConsultoria(motivo: string): string {
@@ -93,4 +125,15 @@ export function avisoDoParceiro(sim: boolean, pedidos: number, mudaram: number):
   }
   if (mudaram === 0) return pedidos === 1 ? 'Já era Cliente.' : 'Nenhum era Parceiro.';
   return mudaram === 1 ? 'Voltou para Clientes.' : `${mudaram} contatos voltaram para Clientes.`;
+}
+
+/** O aviso de pôr a tag em vários (Imova, 23/11/2026). Pura, para caber em teste. */
+export function avisoDaTag(tipo: TipoDeParceria, pedidos: number, mudaram: number): string {
+  const t = TIPOS_DE_PARCERIA.find((x) => x.id === tipo);
+  const rotulo = t?.rotulo ?? tipo;
+  const plural = t?.plural ?? tipo;
+  if (mudaram === 0) return pedidos === 1 ? `Já era ${rotulo}.` : `Todos já eram ${plural}.`;
+  return mudaram === 1
+    ? `Agora é Parceiro: ${rotulo}.`
+    : `${mudaram} contatos agora são Parceiros: ${plural}.`;
 }

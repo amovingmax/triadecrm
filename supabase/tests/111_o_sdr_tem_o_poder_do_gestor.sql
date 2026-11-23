@@ -90,7 +90,12 @@ begin
   perform pg_temp.entrar(pg_temp.ana(), 'sdr');
   insert into pg_temp.r values ('excluir', public.parceiro_excluir(pg_temp.org(), 'pgTAP 111: teste do SDR'));
   insert into pg_temp.r values ('restaurar', public.parceiro_restaurar(pg_temp.org()));
-  insert into pg_temp.r values ('consultoria', public.consultoria_marcar(array[pg_temp.org()], true));
+  -- Na Imova, desde 23/11/2026, pôr a marca pede a tag (`parceiros_marcar`).
+  if to_regprocedure('public.parceiros_marcar(uuid[],text)') is not null then
+    insert into pg_temp.r values ('consultoria', public.parceiros_marcar(array[pg_temp.org()], 'inquilino'));
+  else
+    insert into pg_temp.r values ('consultoria', public.consultoria_marcar(array[pg_temp.org()], true));
+  end if;
 end $$;
 select pg_temp.sair();
 select is((select valor ->> 'ok' from pg_temp.r where chave = 'excluir'), 'true',

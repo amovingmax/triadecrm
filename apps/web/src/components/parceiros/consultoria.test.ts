@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { avisoDaConsultoria, recadoDaConsultoria } from './consultoria';
+import { avisoDaConsultoria, avisoDaTag, recadoDaConsultoria } from './consultoria';
 
 describe('o aviso do botão da Consultoria (14/10/2026)', () => {
   it('conta quantos entraram ou saíram', () => {
@@ -20,5 +20,21 @@ describe('o aviso do botão da Consultoria (14/10/2026)', () => {
     expect(recadoDaConsultoria('sem_permissao')).toMatch(/admin e gestor/);
     expect(recadoDaConsultoria('muitos_de_uma_vez')).toMatch(/200/);
     expect(recadoDaConsultoria('qualquer_coisa')).toMatch(/Tente de novo/);
+  });
+});
+
+describe('a tag do Parceiro pelo botão de Prospectados (Imova, 23/11/2026)', () => {
+  it('diz a tag de quem virou Parceiro', () => {
+    expect(avisoDaTag('inquilino', 1, 1)).toBe('Agora é Parceiro: Inquilino.');
+    expect(avisoDaTag('colaborador', 5, 3)).toBe('3 contatos agora são Parceiros: Colaboradores.');
+  });
+
+  it('diz quando todos já tinham essa tag', () => {
+    expect(avisoDaTag('proprietario', 1, 0)).toBe('Já era Proprietário.');
+    expect(avisoDaTag('proprietario', 4, 0)).toBe('Todos já eram Proprietários.');
+  });
+
+  it('a recusa por falta de tag vira frase', () => {
+    expect(recadoDaConsultoria('falta_a_tag')).toMatch(/Proprietário, Colaborador ou Inquilino/);
   });
 });
