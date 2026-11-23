@@ -96,11 +96,7 @@ export { atendenteImovaV4, sistemaComBaseV4 } from './prompts/atendente-imova/v4
 
 export { BASE_DO_ENSAIO_V4, CENARIOS_DO_ATENDENTE_V4 } from './prompts/atendente-imova/cenarios-v4';
 
-export {
-  FRASE_DA_VISITA,
-  atendenteImovaV5,
-  sistemaComBaseV5,
-} from './prompts/atendente-imova/v5';
+export { FRASE_DA_VISITA, atendenteImovaV5, sistemaComBaseV5 } from './prompts/atendente-imova/v5';
 
 export {
   type EmailDoCliente,
@@ -130,12 +126,25 @@ export {
 } from './prompts/atendente-imova/cenarios-v5';
 
 export {
+  CASOS_DA_BATERIA,
+  type CasoDaBateria,
+  GRUPOS_DA_BATERIA,
+  type GrupoDaBateria,
+  type RespostaParaConferir,
+  TETO_DE_CARACTERES,
+  casosDaBateria,
+  conferirCasoDaBateria,
+  contarPerguntas,
+  entradaDoCaso,
+  quandoDaFala,
+} from './prompts/atendente-imova/bateria';
+
+export {
   CERTEZAS_DA_FOTO,
   type EntradaDaFoto,
   type SaidaDaFoto,
   fotoDoAnuncioV1,
 } from './prompts/foto-do-anuncio/v1';
-
 
 export {
   CANAIS_NO_PROMPT,
@@ -203,11 +212,7 @@ export {
   conselheiroDoImovelV1,
 } from './prompts/conselheiro-do-imovel/v1';
 
-export {
-  type EntradaDoPulso,
-  type SaidaDoPulso,
-  pulsoDoDiaV1,
-} from './prompts/pulso-do-dia/v1';
+export { type EntradaDoPulso, type SaidaDoPulso, pulsoDoDiaV1 } from './prompts/pulso-do-dia/v1';
 
 export {
   type EntradaDaTriagem,

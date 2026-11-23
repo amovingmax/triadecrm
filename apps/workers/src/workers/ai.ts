@@ -43,6 +43,7 @@ import {
   chamadaDeTeste,
   ePromptDaChamadaDeTeste,
 } from '../ia/chamada-de-teste';
+import { relatorioDaBateria, rodarBateria } from '../ia/bateria-do-atendente';
 import { ENSAIOS, eEnsaio, ensaiarAtendente, relatorioDoEnsaio } from '../ia/ensaio-do-atendente';
 import type { ContextoDaIa } from '../ia/execucao';
 import { criarBuscaNoMapa, nominatimDaIa } from '../ia/mapa';
@@ -108,7 +109,10 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
   // `--ensaio=atendente-imova` (11/11/2026): os cenários da IA que atende contra o modelo.
   const pedidoDeEnsaio = opcoes.ensaio;
   if (pedidoDeEnsaio !== undefined && !eEnsaio(pedidoDeEnsaio)) {
-    logger.error('ensaio que não existe', { pedido: String(pedidoDeEnsaio), aceitos: ENSAIOS.join(', ') });
+    logger.error('ensaio que não existe', {
+      pedido: String(pedidoDeEnsaio),
+      aceitos: ENSAIOS.join(', '),
+    });
     return 2;
   }
 
@@ -166,6 +170,37 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
       chave: env.GROQ_API_KEY,
     },
   };
+
+  // `--ensaio=bateria` (23/11/2026): os 40 casos com a base de produção. Imprime o relatório
+  // e, entre as marcas, o resultado inteiro em JSON, para guardar e comparar versões.
+  if (pedidoDeEnsaio === 'bateria') {
+    const numero = (chave: string, padrao: number): number => {
+      const valor = Number(opcoes[chave]);
+      return typeof opcoes[chave] === 'string' && Number.isFinite(valor) && valor > 0
+        ? valor
+        : padrao;
+    };
+    const versao = numero('versao', 7) === 6 ? 6 : 7;
+    const r = await rodarBateria(contexto, {
+      versao,
+      repeticoes: Math.min(5, Math.trunc(numero('repeticoes', 1))),
+      tetoUsd: Math.min(20, numero('teto', 8)),
+      juiza: opcoes.juiza !== 'nao',
+      casos: typeof opcoes.casos === 'string' ? opcoes.casos.split(',') : [],
+    });
+    logger.info('bateria concluída', {
+      prompt: r.promptVersion,
+      respostas: r.respostas.length,
+      certas: r.respostas.filter((x) => x.falhas.length === 0).length,
+      custo_usd: r.custoUsd,
+      parou_em: r.parouEm,
+    });
+    process.stdout.write(relatorioDaBateria(r));
+    process.stdout.write(
+      `\n=====BATERIA-JSON=====\n${JSON.stringify(r)}\n=====FIM-BATERIA-JSON=====\n`,
+    );
+    return 0;
+  }
 
   if (pedidoDeEnsaio !== undefined) {
     const r = await ensaiarAtendente(contexto);

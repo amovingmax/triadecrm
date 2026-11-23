@@ -128,7 +128,7 @@ const entradaDoBanco = z.object({
 
 export type EntradaDoBancoDoAtendente = z.infer<typeof entradaDoBanco>;
 
-const baseDoBanco = z.object({
+export const baseDoBanco = z.object({
   caderno: z.array(z.object({ id: z.number(), texto: z.string(), origem: z.string() })),
   imoveis: z.array(z.object({ codigo: z.string() }).passthrough()),
   versao: z.record(z.string(), z.unknown()).optional(),
