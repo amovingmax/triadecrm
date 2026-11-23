@@ -233,14 +233,18 @@ describe('preços e conta por chamada', () => {
         // rascunho também recebe o link) tem 41 tokens de sistema a mais que a v3, e a v5
         // (12/11/2026, a visita presencial sem link) 426 a mais que a v4. A v6 (17/11/2026, o
         // e-mail para ofertas) tem 603 de sistema a mais que a v5 (o bloco do convite), 23
-        // de mensagem (a linha do e-mail) e 6 de saída (`ofertasPorEmail`).
+        // de mensagem (a linha do e-mail) e 6 de saída (`ofertasPorEmail`). A v7
+        // (23/11/2026, a busca no mapa) tem 321 de sistema a mais: o parágrafo do mapa e a
+        // declaração da ferramenta, no prefixo em cache. Quando a IA busca, a resposta vira
+        // duas a quatro voltas: cada uma reenvia a conversa e o resultado do mapa, com o
+        // prefixo (regras, caderno e imóveis) lido do cache.
         id: 'atendente-imova',
         modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 4174,
+        tokensDeSistema: 4495,
         tokensDaMensagem: 165,
         tokensDeSaida: 108,
-        semCache: 0.00049,
-        comCache: 0.00011,
+        semCache: 0.00052,
+        comCache: 0.00012,
       },
       {
         // De qual anúncio é a foto do cliente (09/11/2026, Imova). A conta mede só o
@@ -255,21 +259,6 @@ describe('preços e conta por chamada', () => {
         tokensDeSaida: 68,
         semCache: 0.0001,
         comCache: 0.00005,
-      },
-      {
-        // O Localizador da Imova (23/11/2026): agente com ferramentas (o mapa e a conta
-        // da distância). A conta é de UMA volta, do exemplo da Alinne; o sistema inclui
-        // as três ferramentas. Uma leitura típica tem de três a cinco voltas, e cada volta
-        // reenvia a conversa com os resultados do mapa (o prefixo fica em cache): da
-        // ordem de US$ 0,002 a 0,004 por mensagem com pista, com o raciocínio do Haiku
-        // 5.5. Só roda quando uma mensagem nova tem pista de lugar (o filtro do worker).
-        id: 'localizador-imova',
-        modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 1244,
-        tokensDaMensagem: 176,
-        tokensDeSaida: 116,
-        semCache: 0.0002,
-        comCache: 0.00009,
       },
       {
         // A IA juíza da Imova (06/11/2026): uma avaliação por conversa e por dia em que

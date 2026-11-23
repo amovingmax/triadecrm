@@ -115,6 +115,14 @@ export {
 } from './prompts/atendente-imova/v6';
 
 export {
+  FERRAMENTA_BUSCAR_NO_MAPA,
+  MAX_BUSCAS_NO_MAPA,
+  MAX_VOLTAS_DO_ATENDENTE,
+  atendenteImovaV7,
+  sistemaComBaseV7,
+} from './prompts/atendente-imova/v7';
+
+export {
   BASE_DO_ENSAIO_V5,
   CENARIOS_DE_VISITA_V5,
   CENARIOS_DO_ATENDENTE_V5,
@@ -128,13 +136,6 @@ export {
   fotoDoAnuncioV1,
 } from './prompts/foto-do-anuncio/v1';
 
-export {
-  CERTEZAS_DO_LOCALIZADOR,
-  LIMITES_DO_LOCALIZADOR,
-  type EntradaDoLocalizador,
-  type SaidaDoLocalizador,
-  localizadorImovaV1,
-} from './prompts/localizador-imova/v1';
 
 export {
   CANAIS_NO_PROMPT,
