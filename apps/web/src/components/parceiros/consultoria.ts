@@ -42,6 +42,16 @@ export const ROTULO_DE_MARCAR = MARCA_E_PARCEIRO
  */
 export async function carregarConsultoria(): Promise<ReadonlyMap<string, TipoDeParceria | null>> {
   const supabase = createClient();
+  // A coluna `tipo` só é pedida na Imova: no banco da KOMUNE ela chega com a
+  // migração 20261123120000, que pode não estar lá quando este site for publicado.
+  if (!MARCA_E_PARCEIRO) {
+    const { data, error } = await supabase
+      .from('consultoria')
+      .select('organization_id')
+      .limit(5000);
+    if (error) throw error;
+    return new Map((data ?? []).map((c) => [c.organization_id, null]));
+  }
   const { data, error } = await supabase
     .from('consultoria')
     .select('organization_id, tipo')
