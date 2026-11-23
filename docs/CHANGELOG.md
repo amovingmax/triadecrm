@@ -11288,3 +11288,12 @@ Pedido: "Quando uma pessoa manda mensagem direto da OLX pelo chat da própria OL
   - publicar, só com pedido: a migração na Imova antes do site (a KOMUNE recebe na próxima `komune migrar`; a tela de Leads só existe na Imova);
   - apagar do banco local os leads `demo-198-*`, os contatos deles e a conversa "Demo 198 WhatsApp da OLX";
   - decisão humana: as cores do ZAP e do Viva Real (ou os arquivos oficiais dos logos).
+
+### NO AR na Imova em 23/11/2026, ~16h37 (pedido: "Suba pra o ar")
+
+- **Código:** `main` em `d6594e4` (avanço rápido da `leads-icone-do-portal`).
+- **Banco da Imova:** migração `20261123170000` (`publicar-banco imova migrar`), depois de um ensaio em produção numa transação desfeita: a lista, vista como admin, passou de 10 para 9 linhas (a Kívia virou uma, com SA0012_IMOVA e a OLX), os dois chats ganharam a OLX, e o "ver telefone" do Janio de 12/11 ficou sem portal. Conferido que o ensaio não deixou nada e, depois de publicar, que a lista de produção é igual à do ensaio. A KOMUNE não foi tocada (recebe a view na próxima `komune migrar`; não tem lead).
+- **Site da Imova:** `imova-r60yey7yk` em imova-crm.vercel.app (volta: `imova-bvccgemrf`), pela cópia limpa `~/triadecrm-publicar-imova`.
+- **Banco local:** os leads `demo-198-*`, os contatos deles e a conversa "Demo 198 WhatsApp da OLX" foram apagados.
+- **Não deu para conferir aqui:** a tela em produção com login de verdade.
+- **Continua pendente:** as cores do ZAP e do Viva Real (ou os logos oficiais).
