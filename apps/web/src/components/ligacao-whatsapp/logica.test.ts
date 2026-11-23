@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   aindaTocando,
   botaoDaConversa,
+  chamadaNoAparelho,
   chamadaViva,
   dataCurta,
   fraseDaFaixa,
@@ -232,5 +233,16 @@ describe('as regras pequenas', () => {
     expect(t).toContain('Imova Imobiliária');
     expect(t.toLowerCase()).not.toContain('sempre permitir');
     expect(t.length).toBeLessThanOrEqual(1024);
+  });
+});
+
+describe('a ligação no app do iPhone (23/11/2026)', () => {
+  it('o app com a tela de chamada se identifica, e só ele', () => {
+    const iphone =
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
+    expect(chamadaNoAparelho(`${iphone} TriadeApp/1.1.0 TriadeChamada/1`)).toBe(true);
+    expect(chamadaNoAparelho(`${iphone} TriadeApp/1.0.0`)).toBe(false);
+    expect(chamadaNoAparelho(iphone)).toBe(false);
+    expect(chamadaNoAparelho(undefined)).toBe(false);
   });
 });

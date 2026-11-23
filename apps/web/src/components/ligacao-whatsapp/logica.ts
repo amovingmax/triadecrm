@@ -53,6 +53,17 @@ export function aindaTocando(tocouEm: string, agora: Date): boolean {
   return agora.getTime() - new Date(tocouEm).getTime() < TOQUE_VALE_MS;
 }
 
+/**
+ * O app do iPhone a partir da 1.1.0 (23/11/2026) toca a ligação recebida na tela de
+ * chamada do próprio iPhone, mesmo fechado (`apps/app`, migração 20261124090000). Dentro
+ * dele a página não toca nem atende a recebida: seriam dois toques e dois "Atender". Ele
+ * se identifica com `TriadeChamada/<n>` no user-agent. No navegador e no app antigo,
+ * nada muda.
+ */
+export function chamadaNoAparelho(userAgent: string | undefined | null): boolean {
+  return /\bTriadeChamada\/\d/.test(userAgent ?? '');
+}
+
 export type BotaoDaConversa =
   | { tipo: 'nenhum' }
   | { tipo: 'pedir'; desligado: boolean; nota: string | null }

@@ -36,13 +36,25 @@ export const ID_DO_APP = 'app.triade.ios';
 export const ID_DO_APP_ANDROID = 'app.triade.android';
 
 /** A versão da casca. Sobe junto com cada nova versão enviada às lojas. */
-export const VERSAO_DA_CASCA = '1.0.0';
+export const VERSAO_DA_CASCA = '1.1.0';
 
 /** O que o site procura no user-agent para saber que está dentro do app. */
 export const MARCA_DO_APP = 'TriadeApp';
 
 /** O que a casca acrescenta ao user-agent do aparelho. */
 export const MARCA_NO_USER_AGENT = `${MARCA_DO_APP}/${VERSAO_DA_CASCA}`;
+
+/**
+ * O app que toca a ligação pelo WhatsApp na tela de chamada do iPhone (1.1.0, 23/11/2026)
+ * diz isso ao site, que então não toca nem atende a recebida dentro da página
+ * (`chamadaNoAparelho`, em `apps/web/src/components/ligacao-whatsapp/logica.ts`).
+ * Só vai quando o módulo nativo existe: no Expo Go e no Android, a página segue tocando.
+ */
+export const MARCA_DA_CHAMADA = 'TriadeChamada/1';
+
+export function marcaNoUserAgent(comTelaDeChamada: boolean): string {
+  return comTelaDeChamada ? `${MARCA_NO_USER_AGENT} ${MARCA_DA_CHAMADA}` : MARCA_NO_USER_AGENT;
+}
 
 /**
  * Os endereços no ar (memória "Endereços do CRM"). A troca de empresa é a mesma do site,

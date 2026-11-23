@@ -497,6 +497,14 @@ verify_jwt = false
 [functions.wa-chamada]
 verify_jwt = false
 
+# O iPhone atende com o convite do aviso de chamada (sem sessão do site).
+[functions.wa-chamada-app]
+verify_jwt = false
+
+# Cutucada pelo banco (pg_net); decide pelo estado da ligação, não pelo pedido.
+[functions.voip-push]
+verify_jwt = false
+
 # O arquivo de anúncios que o Canal Pro lê (04/11/2026), só no projeto da Imova.
 # O robô do Grupo OLX baixa sem credencial do Supabase: quem confere é a chave
 # de 64 caracteres na URL, comparada pelo Postgres (`public.canal_pro_feed`).

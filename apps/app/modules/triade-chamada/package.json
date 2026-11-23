@@ -1,0 +1,7 @@
+{
+  "name": "triade-chamada",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A tela de chamada do iPhone (CallKit) e o aviso de voz da Apple (PushKit) para a ligação pelo WhatsApp tocar com o app fechado.",
+  "main": "index.ts"
+}

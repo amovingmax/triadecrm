@@ -4,6 +4,7 @@ import {
   ENDERECOS,
   MARCA_DO_APP,
   MARCA_NO_USER_AGENT,
+  marcaNoUserAgent,
   ambienteDoApp,
   hostDoMac,
   partesDoEndereco,
@@ -58,6 +59,14 @@ describe('ambiente do app', () => {
 
   it('a casca se identifica ao site pelo user-agent, e só por ele', () => {
     expect(MARCA_NO_USER_AGENT).toMatch(new RegExp(`^${MARCA_DO_APP}/\\d+\\.\\d+\\.\\d+$`));
+  });
+
+  it('com a tela de chamada, o app avisa o site para não tocar a ligação na página', () => {
+    expect(marcaNoUserAgent(true)).toBe(`${MARCA_NO_USER_AGENT} TriadeChamada/1`);
+    expect(marcaNoUserAgent(false)).toBe(MARCA_NO_USER_AGENT);
+    // A mesma regra do site (`chamadaNoAparelho`, apps/web/.../ligacao-whatsapp/logica.ts).
+    expect(/\bTriadeChamada\/\d/.test(marcaNoUserAgent(true))).toBe(true);
+    expect(/\bTriadeApp\/\d/.test(marcaNoUserAgent(true))).toBe(true);
   });
 });
 

@@ -39,9 +39,19 @@ export function enderecoDoAviso(
  * desta empresa (a saída da conta o lê) e o registra para a pessoa logada. Falhar aqui
  * não atrapalha nada: o app tenta de novo na próxima vez que abrir.
  */
-export function scriptDoAparelho(token: string, plataforma: Plataforma): string {
+export function scriptDoAparelho(
+  token: string,
+  plataforma: Plataforma,
+  chamada?: { voip: string; sandbox: boolean } | null,
+): string {
   const t = JSON.stringify(token);
   const p = JSON.stringify(plataforma);
+  // O endereço de chamada da Apple (app 1.1.0): a ligação pelo WhatsApp toca na tela de
+  // chamada do iPhone. Só hexadecimal passa; o site confere de novo (`voipValido`).
+  const extra =
+    chamada && /^[0-9a-f]{64,200}$/.test(chamada.voip)
+      ? `, voip: ${JSON.stringify(chamada.voip)}, voip_sandbox: ${chamada.sandbox ? 'true' : 'false'}`
+      : '';
   return `(function () {
   try {
     var seguro = location.protocol === 'https:' ? '; secure' : '';
@@ -50,7 +60,7 @@ export function scriptDoAparelho(token: string, plataforma: Plataforma): string 
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: ${t}, plataforma: ${p} })
+      body: JSON.stringify({ token: ${t}, plataforma: ${p}${extra} })
     }).catch(function () {});
   } catch (e) {}
 })();

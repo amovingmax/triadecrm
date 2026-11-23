@@ -24,6 +24,57 @@ O áudio vai direto entre o navegador e a Meta. Não há gravação.
 
 O número do cliente nunca chega à tela: o SDR vê o telefone mascarado, então só `wa_chamada_para_meta`, que é do serviço, o entrega à `wa-chamada`.
 
+## A ligação no app do iPhone (tela de chamada, 23/11/2026)
+
+Pedido do usuário (23/11/2026): "o celular [precisa] receber ligações com o app fechado [...] uma interface para aceitar ou rejeitar chamada, assim como a do WhatsApp, e [...] um toque que seja audível".
+
+A partir do app **1.1.0**, a ligação do cliente toca no iPhone de cada pessoa da equipe na **tela de chamada do próprio iPhone** (CallKit): em tela cheia com o celular bloqueado, ou no aviso de chamada no alto com ele desbloqueado, com **Atender** e **Recusar** e o **toque de ligação do iPhone**, no volume da campainha (no modo silencioso, vibra). Funciona com o app fechado. Atendendo, a conversa é no próprio iPhone; com o app aberto, aparece por cima do CRM uma tela com o nome, o tempo, Mudo, Alto-falante, Ver conversa e Desligar.
+
+**Como funciona**
+
+```
+cliente liga no WhatsApp ──► Meta ──► wa-webhook ──► wa_chamadas (tocando)
+                                                        │ gatilho wa_chamadas_cutucar_aparelhos (pg_net)
+                                                        ▼
+                         voip-push ── pergunta ao banco (voip_a_enviar): quem toca, um convite por aparelho
+                             │
+                             └──► Apple (aviso de VOZ, PushKit, topic app.triade.ios.voip)
+                                        │
+                     iPhone acorda o app ▼  CallKit: tela de chamada, toque
+                     Atender ──► wa-chamada-app (convite): atender → oferta da Meta
+                                 WebRTC nativo → pre_aceitar → aceitar → microfone liberado
+                                 estado a cada 3 s (o cliente desligou?) · encerrar ao desligar
+alguém atendeu / o cliente desistiu / ninguém atendeu ──► gatilho ──► voip-push ──► "parar" nos outros iPhones
+```
+
+- **Toca para quem atende** (admin, gestor e SDR ativos, a mesma lista do aviso "está ligando"), em todos os iPhones com o app 1.1.0 ou mais novo. Quem desligou "Cliente ligando" em Avisos no celular não recebe a chamada.
+- **O primeiro que atender leva**, pelo celular ou pelo computador; os outros iPhones param de tocar ("atendida em outro aparelho").
+- **Recusar só para de tocar no próprio iPhone.** A ligação continua tocando para o resto da equipe; se ninguém atender, vira perdida, como hoje. O app avisa o servidor (`recusar`), que não manda "parar" a esse aparelho. (Decisão de projeto: com a equipe inteira tocando, recusar não derruba a ligação para todos. Recusar para o cliente seria outra regra.)
+- **Tocando, o iPhone confere sozinho:** a cada 3 s pergunta ao servidor, com o convite, se a ligação ainda toca, e desiste em 60 s. Um "parar" perdido não deixa o celular tocando.
+- **Atender com o iPhone bloqueado funciona com o app fechado.** Por isso o áudio é todo nativo (`apps/app/modules/triade-chamada/ios`): no Expo 58 o React Native só sobe quando o app abre numa tela, e quem atende pela tela bloqueada não abre o app.
+- **O microfone** é pedido ao entrar no CRM da Imova pelo app (com o iPhone bloqueado não há como perguntar). Sem ele, a ligação volta a tocar para quem está com o CRM aberto e a tela do app diz como liberar.
+- **Sem telefone no aviso.** O aviso de voz leva o nome que a conversa mostra, a conversa e um **convite** de 32 bytes, de uso de um aparelho e de uma ligação (o banco guarda só o hash, `app.voip_convites`). É ele que deixa o app atender sem a sessão do site (`public.wa_chamada_app`, só para o serviço).
+- **O aviso comum "está ligando"** não vai ao aparelho que já toca na tela de chamada. "Ligação perdida" continua igual.
+- **Dentro do app 1.1.0 a página não toca a recebida** (ela se identifica com `TriadeChamada/1` no user-agent, `chamadaNoAparelho`); no navegador e no app antigo, nada muda.
+- **Na KOMUNE nada muda:** `app.voip_ligado()` depende de `app.wa_ligacao_ligada()`, que só liga no banco da Imova.
+
+**A chave de avisos da Apple** é a "Aurora push" (`Q2FD3T3CSC`, equipe `8GF4F9C98L`), a mesma que o Expo usa para os avisos comuns do app (`~/.komune-secrets/AuthKey_Q2FD3T3CSC.p8`). Uma chave de avisos serve a todos os apps da equipe e aos dois tipos de aviso. Conferido em 23/11/2026: a Apple aceitou o JWT dela e o tópico `app.triade.ios.voip`, nos servidores de produção e de teste (resposta `BadDeviceToken` para um endereço inventado; com chave ou tópico errados a resposta seria 403 ou `TopicDisallowed`).
+
+### Como ligar, em ordem (só com pedido)
+
+1. **Banco da Imova:** `node scripts/publicar-banco.mjs imova migrar` (migração `20261124090000`). Nasce desligada: nada muda.
+2. **Funções da Imova:** `supabase functions deploy voip-push wa-chamada-app --project-ref kkqadgxvmzulcamuakzk` (as duas com `verify_jwt = false` no `config.toml`).
+3. **Segredos da Imova** (Supabase → Edge Functions → Secrets, ou `supabase secrets set --project-ref kkqadgxvmzulcamuakzk`): `APNS_CHAVE_P8` = o arquivo `.p8` em base64 numa linha (`base64 < AuthKey_Q2FD3T3CSC.p8 | tr -d '\n'`), `APNS_CHAVE_ID=Q2FD3T3CSC`, `APNS_EQUIPE_ID=8GF4F9C98L`. O `META_WA_ACCESS_TOKEN` e o `META_WA_PHONE_NUMBER_ID` já estão lá (a `wa-chamada` usa).
+4. **Site da Imova:** publicar (rota `/api/aparelhos` com o endereço de chamada e a página que não toca dentro do app novo). A KOMUNE recebe o mesmo site, sem efeito.
+5. **App 1.1.0 no TestFlight:** `eas build -p ios --profile producao --auto-submit` em `apps/app`. Não pede login na Apple: os modos de segundo plano (`voip`, `audio`) são do Info.plist, e o aviso de voz usa a mesma permissão de notificações que o perfil já tem.
+6. **Cada pessoa** atualiza o Tríade pelo TestFlight, abre o app e entra na Imova (o app registra o endereço de chamada e pede o microfone).
+7. **Ligar a chave:** `update public.app_settings set value = '{"ativa": true, "funcao_url": "https://kkqadgxvmzulcamuakzk.supabase.co/functions/v1"}' where key = 'ligacao.app';`
+8. **Teste entre celulares nossos:** com o app fechado e o iPhone bloqueado, ligar pelo WhatsApp para a Imova: toca, atende, fala, desliga. Repetir com dois iPhones da equipe: o segundo para de tocar quando o primeiro atende. Conferir em `app.voip_envios` (status 200 em cada aviso).
+
+**Desligar:** `update public.app_settings set value = value || '{"ativa": false}' where key = 'ligacao.app';`. Volta na hora ao aviso comum "está ligando"; o app 1.1.0 não toca a recebida dentro da página, então, desligada a chave, o celular fica só com o aviso comum e o computador continua tocando.
+
+**Onde olhar quando não toca:** `app.voip_envios` (um "tocar" por aparelho e ligação, com o status da Apple: 200 entregue; 400 `BadDeviceToken` = endereço do ambiente errado ou inventado; 410 = app apagado, o endereço é esquecido; 0 `sem_chave_da_apple` = faltam os segredos), `public.aparelhos_push.voip_token` (o iPhone entregou o endereço?) e os logs da função `voip-push`.
+
 ## Regras da Meta
 
 | Regra | Valor |
@@ -111,6 +162,6 @@ Uma permissão que existe na Meta e o CRM não viu (a resposta veio antes desta 
 - **Pedir permissão fora das 24 h:** exige um modelo aprovado pela Meta com `call_permission_request`. Hoje a tela diz que só dá para pedir dentro da janela.
 - **Relatório do dia por pessoa:** a ligação pelo WhatsApp entra na linha do tempo da ficha, mas não em `ligacoes_do_dia`, que conta `call_attempts`.
 - **Aviso de `USER_INITIATED_CALLS_LOW_PICKUP_RATE`:** o `account_update` já chega ao CRM, mas não vira alerta na tela.
-- **App:** tocar com o app fechado e a tela bloqueada exige aviso de chamada da Apple, CallKit e áudio nativo, porque o WKWebView perde o microfone em segundo plano (`app-celular.md`).
+- **App:** feito em 23/11/2026 no app 1.1.0 (ver "A ligação no app do iPhone"); falta publicar e o teste entre celulares. Android não tem tela de chamada (não há build do Android).
 - **Chave em Ajustes:** hoje ela é ligada pelo Terminal, com `node scripts/ligacao-whatsapp.mjs estado | ligar | abrir | fechar | desligar | janela`, que mexe na Meta e no CRM juntos.
-- **Tocar com o CRM fechado:** o toque e o aviso do sistema dependem de uma aba do CRM aberta. Com todas fechadas, a ligação só aparece depois, como perdida.
+- **Tocar com o CRM fechado:** no computador, o toque depende de uma aba do CRM aberta. No iPhone, com o app 1.1.0, toca com tudo fechado.

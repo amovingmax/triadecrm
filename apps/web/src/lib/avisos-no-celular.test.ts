@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { plataformaValida, tokenValido } from './avisos-no-celular';
+import { plataformaValida, tokenValido, voipValido } from './avisos-no-celular';
 
 describe('o endereço de push que o app entrega', () => {
   it('aceita o formato do Expo', () => {
@@ -19,5 +19,13 @@ describe('o endereço de push que o app entrega', () => {
     expect(plataformaValida('ios')).toBe(true);
     expect(plataformaValida('android')).toBe(true);
     expect(plataformaValida('web')).toBe(false);
+  });
+
+  it('o endereço de chamada do iPhone é hexadecimal, de 32 bytes para cima', () => {
+    expect(voipValido('ab'.repeat(32))).toBe(true);
+    expect(voipValido('AB'.repeat(32))).toBe(false);
+    expect(voipValido('ab'.repeat(10))).toBe(false);
+    expect(voipValido(`${'ab'.repeat(32)}'--`)).toBe(false);
+    expect(voipValido(null)).toBe(false);
   });
 });

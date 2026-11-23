@@ -11326,3 +11326,40 @@ Pedido: "Quero conseguir filtrar e categorizar todas as pessoas que tenho contat
 - **Site da Imova:** `imova-ft8s50sr7` em imova-crm.vercel.app (volta: `imova-r60yey7yk`), pela cópia limpa `~/triadecrm-publicar-imova`.
 - **KOMUNE não foi tocada:** nem banco nem site. Na próxima `komune migrar` recebe a 20261123120000, a 20261123200000 (só a regra da coluna) e a 20261123210000 (`p_perfil`, sem mudança sem ele).
 - **Não deu para conferir aqui:** a tela em produção com login de verdade.
+
+## 23/11/2026 — A ligação toca no iPhone, com o app fechado, e o diagnóstico dos avisos do app (branch `ligacao-no-app`; só na Imova; nada publicado)
+
+Pedido: "Preciso que o testflight suba os pushs quando algum evento acontecer e também preciso que o celular receba ligações com o app fechado [...] uma interface para aceitar ou rejeitar chamada, assim como a do WhatsApp, e que também tenha um toque que seja audível."
+
+### Os avisos do app (diagnóstico em produção, só leitura)
+
+- **O envio funciona.** O banco da Imova manda ao Expo e o Expo entrega à Apple: os recibos de 23/11 (13h36, 15h41 e 15h55) estão todos `ok`. Nada a consertar no envio.
+- **Os avisos vão para outra conta.** O iPhone do Rafael está registrado na conta `rafaelabreu31@gmail.com`; a maior parte dos avisos dos últimos 5 dias foi para `contato@imovaimobiliaria.com.br` (46, todos `sem_aparelho`: nenhum celular com essa conta). O aparelho é de quem está logado no app. A conta `contato@komune.app.br` (16) e a Monaisa (18) também não têm o app.
+- **Decisão humana:** entrar no app com a conta que recebe as conversas (contato@imovaimobiliaria.com.br) ou passar as conversas para a conta que está no celular; e pôr a Monaisa no TestFlight (`app-celular.md`, "Como a equipe da Imova passa a receber os avisos").
+
+### A ligação na tela de chamada do iPhone
+
+- **Como fica:** a ligação do cliente pelo WhatsApp toca na tela de chamada do próprio iPhone (CallKit), com o app fechado e o celular bloqueado, com Atender e Recusar e o toque de ligação do iPhone (no volume da campainha; no silencioso, vibra). Atendendo, a conversa é no iPhone. Com o app aberto, uma tela por cima do CRM mostra o nome, o tempo, Mudo, Alto-falante, Ver conversa e Desligar. Guia: `docs/operacao/ligacao-whatsapp.md`, "A ligação no app do iPhone".
+- **Banco (migração `20261124090000_a_ligacao_toca_no_app.sql`, nasce desligada):** `aparelhos_push.voip_token` e `voip_sandbox` (`public.aparelho_voip_registrar`); `app.voip_convites` e `app.voip_envios`; `public.voip_a_enviar` (quem toca e quem para, pelo estado da ligação, sem repetir); `public.voip_resultado` (410 esquece o endereço); o gatilho `wa_chamadas_cutucar_aparelhos` (pg_net para a função, nunca falha o webhook); `public.wa_chamada_app` (atender, autorizar, encerrar, soltar e estado com o convite, as regras do navegador); `app.avisos_push_enviar` igual ao de produção, menos o "está ligando" para quem já toca na tela de chamada. Chave `ligacao.app` (`ativa`, `funcao_url`) e `app.voip_ligado()`, que depende de `app.wa_ligacao_ligada()`: na KOMUNE nunca liga.
+- **Funções:** `voip-push` (manda o aviso de voz direto à Apple, JWT ES256 com a chave "Aurora push", `_compartilhado/apns.ts`) e `wa-chamada-app` (o iPhone atende com o convite; a `wa-chamada` do navegador não mudou). As duas com `verify_jwt = false`.
+- **Site:** `/api/aparelhos` grava o endereço de chamada; dentro do app 1.1.0 (`TriadeChamada/1` no user-agent) a página não toca nem atende a recebida.
+- **App 1.1.0:** módulo nativo local `apps/app/modules/triade-chamada` (Swift): PushKit, CallKit e o áudio por WebRTC (pod `JitsiWebRTC` 155.0.1). Tudo nativo porque no Expo 58 o React Native só sobe quando o app abre numa tela, e quem atende pela tela bloqueada não abre o app. `UIBackgroundModes` `voip` e `audio`. O microfone é pedido ao entrar na Imova pelo app.
+- **Recusar só para de tocar naquele iPhone** (a equipe inteira toca; recusar não derruba a ligação para os outros) e avisa o servidor (`recusar`), que não manda "parar" a esse aparelho. Se ninguém atende, vira perdida, como hoje.
+- **Tocando, o iPhone não depende só do "parar":** pergunta o estado ao servidor a cada 3 s com o convite e desiste sozinho em 60 s.
+- **Revisão independente do código nativo** (antes de qualquer montagem): seis defeitos corrigidos — a fila de eventos mexida fora da fila principal (o Expo chama `OnStartObserving` em outra fila); a reserva presa quando a pessoa desliga com o "atender" a caminho ou a rede cai (agora encerra, ou tenta de novo e solta); o microfone conferido antes de reservar (sem microfone, a ligação segue tocando para a equipe); a conexão que cai antes do aceite vira falha, não ligação muda; o reinício do CallKit desliga também com a Meta; o áudio não é zerado ao preparar a segunda ligação. A ligação encerrada sai da memória e o que ficou guardado com o app fechado não reaparece como se fosse agora.
+
+### Verificado
+
+- **Apple, de verdade:** a chave "Aurora push" (`Q2FD3T3CSC`) e o tópico `app.triade.ios.voip` foram aceitos pela Apple nos servidores de produção e de teste (resposta `BadDeviceToken` para um endereço inventado: nada chegou a aparelho nenhum).
+- **Banco isolado** (`supabase start` com outro `project_id`, migrações do zero): pgTAP **199** 53/53; 118, 135 e 152 sem falha. Na suíte inteira, as falhas que aparecem (08, 52, 107, 119, 127, 151, 154, 170, 171, 183, 186 e 196) são as mesmas sem esta migração (conferido desfazendo-a numa transação).
+- **De ponta a ponta no local**, com as funções servidas pelo `supabase functions serve` e o dublê da Meta: a ligação que entra cutuca a `voip-push`, que fala com a Apple e anota a resposta; o convite falso é recusado; o convite verdadeiro reserva a ligação e devolve a oferta; `pre_accept`, `accept` e `terminate` chegam à Meta (dublê); o "parar" vai só aos aparelhos que não atenderam.
+- **Deno:** 7 testes de `apns.ts` (JWT conferido com a chave pública, cabeçalhos do aviso de voz) e `deno check` das três funções.
+- **App:** `tsc`, `eslint` e Vitest (49); o Expo gera o projeto do iPhone com `voip` e `audio` e acha o módulo local. O Swift passou na checagem de tipos contra as APIs do iPhone (Mac Catalyst 16.4, com os cabeçalhos do WebRTC 155): **não há Xcode de iPhone neste Mac, então a compilação de verdade só acontece na montagem do EAS.**
+- **Site:** Vitest dos arquivos tocados (24), `typecheck` e `eslint` verdes.
+
+### Pendente
+
+- **Publicar, só com pedido**, na ordem do guia: migração na Imova; funções `voip-push` e `wa-chamada-app`; segredos `APNS_CHAVE_P8`, `APNS_CHAVE_ID`, `APNS_EQUIPE_ID`; site; app 1.1.0 no TestFlight; cada pessoa atualiza e abre o app; ligar a chave `ligacao.app`; teste entre celulares nossos.
+- **Decisões humanas:** a conta do celular do Rafael (acima); se Recusar deve derrubar a ligação para todos; se a ligação deve tocar de madrugada (hoje toca a qualquer hora, como o botão do WhatsApp, que está sempre disponível).
+- **Decidido pelo usuário (23/11/2026):** o toque é o padrão do iPhone (o de Ajustes → Sons e Tato → Toque de cada pessoa); o toque próprio da Imova, mostrado no protótipo, não entra.
+- **Sem Android** (não há build do Android).

@@ -33,6 +33,17 @@ describe('a entrega do aparelho à empresa', () => {
     expect(roteiro).toContain('triade_aparelho=');
   });
 
+  it('o endereço de chamada do iPhone vai junto, e só se for hexadecimal', () => {
+    const voip = 'ab'.repeat(32);
+    const com = scriptDoAparelho('ExponentPushToken[abc]', 'ios', { voip, sandbox: false });
+    expect(com).toContain(`voip: "${voip}", voip_sandbox: false`);
+    const teste = scriptDoAparelho('ExponentPushToken[abc]', 'ios', { voip, sandbox: true });
+    expect(teste).toContain('voip_sandbox: true');
+    const sem = scriptDoAparelho('ExponentPushToken[abc]', 'ios', { voip: "x'); alert(1); ('", sandbox: false });
+    expect(sem).not.toContain('voip');
+    expect(scriptDoAparelho('ExponentPushToken[abc]', 'android')).not.toContain('voip');
+  });
+
   it('cada empresa é uma origem', () => {
     expect(origemDe('https://imova-crm.vercel.app/meu-dia?x=1')).toBe(
       'https://imova-crm.vercel.app',

@@ -11,7 +11,7 @@
     "pnpm": ">=11"
   },
   "scripts": {
-    "lint": "../../node_modules/.bin/eslint app.config.ts index.ts src scripts",
+    "lint": "../../node_modules/.bin/eslint app.config.ts index.ts src modules scripts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "site": "tsx scripts/site-na-rede.ts",

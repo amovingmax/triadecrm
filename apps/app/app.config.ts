@@ -63,6 +63,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           'O Tríade usa o microfone para gravar áudios e fazer ligações.',
         NSCameraUsageDescription: 'O Tríade usa a câmera para anexar fotos nas conversas.',
         NSPhotoLibraryUsageDescription: 'O Tríade abre suas fotos para anexar nas conversas.',
+        // A ligação pelo WhatsApp na tela de chamada do iPhone (23/11/2026,
+        // `modules/triade-chamada`): `voip` deixa o aviso de voz da Apple acordar o app
+        // fechado, e `audio` mantém a conversa com o iPhone bloqueado.
+        UIBackgroundModes: ['voip', 'audio'],
         // Só no teste: o site do Mac é http. No ar, o iPhone exige https (o padrão).
         ...(ambiente === 'local'
           ? {

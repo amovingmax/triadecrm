@@ -21,6 +21,17 @@ export function tokenValido(valor: unknown): valor is string {
 
 export type Plataforma = 'ios' | 'android';
 
+/**
+ * O endereço de chamada da Apple (PushKit) que o app do iPhone entrega junto, desde a
+ * versão 1.1.0 (23/11/2026): a ligação pelo WhatsApp toca na tela de chamada do iPhone
+ * (migração 20261124090000). Hexadecimal; a Apple não promete o tamanho.
+ */
+const VOIP = /^[0-9a-f]{64,200}$/;
+
+export function voipValido(valor: unknown): valor is string {
+  return typeof valor === 'string' && VOIP.test(valor);
+}
+
 export function plataformaValida(valor: unknown): valor is Plataforma {
   return valor === 'ios' || valor === 'android';
 }

@@ -22,14 +22,20 @@ import { WebView, type WebViewProps } from 'react-native-webview';
 import {
   EMPRESA_PADRAO,
   FUNDO,
-  MARCA_NO_USER_AGENT,
   ambienteDoApp,
+  marcaNoUserAgent,
   origensDasEmpresas,
   regrasDaCasca,
   type EmpresaDoApp,
 } from './ambiente';
 import { arquivoDaMensagem, type ArquivoRecebido } from './arquivo';
 import { enderecoDoAviso, origemDe, scriptDoAparelho } from './aviso';
+import {
+  enderecoDeChamada,
+  iniciarChamadas,
+  pedirMicrofone,
+  temTelaDeChamada,
+} from './chamada-nativa';
 import { AVISAR_COR_DA_BARRA, corDaMensagem, estiloDaBarra } from './cor-da-barra';
 import { empresaGuardada, empresaParaLembrar } from './empresa';
 import {
@@ -41,6 +47,7 @@ import {
 } from './entrada';
 import { destinoDoEndereco } from './navegacao';
 import { FUNDO_SEM_INTERNET, SemInternet } from './sem-internet';
+import { TelaDeChamada } from './tela-de-chamada';
 
 // O react-native-webview 14 declara `WebView<P = undefined>`, e `WebViewProps &
 // undefined` vira `never` no TypeScript 5.9: fixar P em `object` devolve os tipos.
@@ -49,6 +56,11 @@ const PaginaWeb = WebView<object>;
 // O ambiente sai do `app.config.ts` (`extra.ambiente`); o Mac, do endereço do Expo.
 const ambiente = ambienteDoApp(Constants.expoConfig?.extra?.ambiente as string | undefined);
 const ORIGENS = origensDasEmpresas(ambiente, Constants.expoConfig?.hostUri);
+
+// A ligação pelo WhatsApp na tela de chamada do iPhone (`chamada-nativa.ts`): os ouvintes
+// do nativo ligam já na abertura, porque o app pode ter sido aberto pelo próprio toque.
+iniciarChamadas();
+const MARCA_NO_USER_AGENT = marcaNoUserAgent(temTelaDeChamada);
 
 // A última empresa em que a pessoa entrou, guardada no aparelho (`empresa.ts`). Sem
 // arquivo, ou com um que não se lê, é a KOMUNE: o pior caso é o login da outra empresa.
@@ -264,8 +276,13 @@ function Tela() {
     entregueEm.current.add(origem);
     const token = await pedirEnderecoDePush();
     if (!token) return;
+    // O endereço de chamada vai junto (só no iPhone com o módulo da tela de chamada). Na
+    // Imova, onde a ligação toca, o microfone é pedido agora, com o app aberto: com o
+    // iPhone bloqueado ele não conseguiria perguntar na hora de atender.
+    const chamada = Platform.OS === 'ios' ? await enderecoDeChamada() : null;
+    if (chamada && empresaParaLembrar(endereco, ORIGENS) === 'imova') await pedirMicrofone();
     webview.current?.injectJavaScript(
-      scriptDoAparelho(token, Platform.OS === 'android' ? 'android' : 'ios'),
+      scriptDoAparelho(token, Platform.OS === 'android' ? 'android' : 'ios', chamada),
     );
   }
 
@@ -407,6 +424,14 @@ function Tela() {
         automaticallyAdjustContentInsets={false}
         // No teste, o Safari do Mac inspeciona a página (Desenvolvedor → iPhone).
         webviewDebuggingEnabled={__DEV__}
+      />
+      <TelaDeChamada
+        folgaSuperior={bordas.top}
+        folgaInferior={bordas.bottom}
+        abrirConversa={(empresa, caminho) => {
+          const destino = enderecoDoAviso({ empresa, caminho }, ORIGENS);
+          if (destino) irPara(destino);
+        }}
       />
     </View>
   );

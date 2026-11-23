@@ -23,6 +23,7 @@ import { relogioDaLigacao, segundosDeConversa } from '@/components/ligacao/voz-l
 
 import {
   aindaTocando,
+  chamadaNoAparelho,
   chamadaViva,
   fraseDoMicrofone,
   fraseDoMotivo,
@@ -101,6 +102,15 @@ const CONEXAO_ANTES_DE_ATENDER_MS = 4000;
 /** Ligação encerrada: o painel sai sozinho. */
 const PAINEL_SOME_EM_MS = 3000;
 
+/**
+ * Dentro do app do iPhone com a tela de chamada (1.1.0 em diante), a recebida toca no
+ * próprio iPhone, mesmo com o app fechado, e é atendida lá (`apps/app/src/chamada.ts`):
+ * aqui ela não toca nem oferece Atender. A ligação feita pela empresa continua aqui.
+ */
+function tocaNoAparelho(): boolean {
+  return typeof navigator !== 'undefined' && chamadaNoAparelho(navigator.userAgent);
+}
+
 export function ProvedorDaLigacaoWhatsapp({
   podeLigar,
   children,
@@ -175,6 +185,7 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
 
   const receberNoToque = useCallback((row: ChamadaNoBanco) => {
     const toca =
+      !tocaNoAparelho() &&
       row.direcao === 'recebida' &&
       row.estado === 'tocando' &&
       !dispensadas.current.has(row.id) &&
@@ -231,8 +242,9 @@ function ProvedorLigado({ children }: { children: React.ReactNode }) {
     };
   }, [aplicarNaLinha, atualizarConversa, clientes, receberNoToque]);
 
-  // A reserva: o toque.
+  // A reserva: o toque. No app com a tela de chamada, quem toca é o iPhone.
   useEffect(() => {
+    if (tocaNoAparelho()) return;
     const ler = () => {
       void lerTocando(new Date(Date.now() - TOQUE_VALE_MS)).then((lista) => {
         const validas = lista.filter((c) => !dispensadas.current.has(c.id));
