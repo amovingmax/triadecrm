@@ -171,7 +171,7 @@ describe('catálogo do Tríade', () => {
     // `vigentes()` e não `promptVigente(id)` num laço: com `id` de tipo união o
     // índice `CATALOGO[Id][VIGENTES[Id]]` devolve `unknown`.
     for (const prompt of vigentes()) {
-      // Com ferramentas (o Localizador, 23/11/2026), o prefixo cacheável é o sistema
+      // Com ferramentas (a busca no mapa da v7, 23/11/2026), o prefixo cacheável é o sistema
       // mais a declaração delas, e o número conta as duas coisas.
       const ferramentas = (prompt.ferramentas ?? [])
         .map((f) => `${f.nome}\n${f.descricao}\n${JSON.stringify(f.entrada)}`)

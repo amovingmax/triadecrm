@@ -203,7 +203,7 @@ export interface PromptVersionado<Entrada, Saida> extends MetadadosDePrompt {
    */
   readonly imagens?: ImagensDoPrompt;
   /**
-   * As ferramentas que esta versão pode chamar (o Localizador da Imova, 23/11/2026).
+   * As ferramentas que esta versão pode chamar (a busca no mapa da v7 da Imova, 23/11/2026).
    * Ausente em todo prompt de um tiro só: quem chama é `executar`, que não as manda.
    * Com ferramentas, quem chama é o laço (`executarComFerramentas` do worker), que
    * audita cada resultado antes de ele voltar ao modelo. A descrição e o esquema fazem

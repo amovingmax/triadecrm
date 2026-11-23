@@ -78,7 +78,7 @@ create table if not exists public.ia_lugares_no_mapa (
 );
 alter table public.ia_lugares_no_mapa enable row level security;
 comment on table public.ia_lugares_no_mapa is
-  'Cache do mapa da IA que atende (Imova, 23/11/2026): o que o OpenStreetMap (ODbL) devolveu para cada lugar que o Localizador procurou ou que um anúncio sem pino tem. Só o worker lê e grava.';
+  'Cache do mapa da IA que atende (Imova, 23/11/2026): o que o OpenStreetMap (ODbL) devolveu para cada lugar que a IA que atende procurou ou que um anúncio sem pino tem. Só o worker lê e grava.';
 
 -- ---------------------------------------------------------------------
 -- 2. As portas do worker
