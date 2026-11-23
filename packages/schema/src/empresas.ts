@@ -200,6 +200,18 @@ export interface Empresa {
      */
     caixasDeConversa: boolean;
     /**
+     * Clientes e Parceiros em Conversas (23/11/2026), o formato das caixas da
+     * KOMUNE com outro corte: quem escreve pela primeira vez entra em Clientes e
+     * fica lá até alguém mudar o perfil para Parceiro (quem já fechou algo com a
+     * empresa: inquilino, proprietário, comprador). Parceiro é a marca da
+     * Consultoria (`public.consultoria`, com tipo e imóvel), e a pílula
+     * Consultoria vira a caixa Parceiros; a pílula Clientes sai, porque a lista
+     * de Conversas já é a dos clientes. A IA que atende não responde Parceiros e
+     * negócio ganho não muda o perfil sozinho (só sugere). Só da Imova: o banco
+     * também trava (`public.parceiro_mudar` só existe lá).
+     */
+    clientesEParceiros: boolean;
+    /**
      * A Inteligência de Mercado (18/11/2026): o item "Inteligência de mercado" no
      * menu e a rota `/inteligencia`, que abre a página pronta do protótipo (os
      * nossos imóveis comparados com o mercado, m² por região, procura e as
@@ -356,6 +368,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       agendaComImovel: false,
       emailDeReuniao: true,
       caixasDeConversa: true,
+      clientesEParceiros: false,
       inteligenciaMercado: false,
     },
     vocabulario: {
@@ -423,6 +436,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       // Sem Resend no `imova-worker-wa` (11/11/2026): a Agenda não promete e-mail.
       emailDeReuniao: false,
       caixasDeConversa: false,
+      clientesEParceiros: true,
       inteligenciaMercado: true,
     },
     // Quem está do outro lado é o cliente (ou o proprietário), e quem marca sozinho é

@@ -74,6 +74,11 @@ export interface EstadoDaIaNaConversa {
   readonly teste: boolean;
   /** A IA responde nesta conversa agora? */
   readonly atende: boolean;
+  /**
+   * A ficha é Parceiro (23/11/2026): a IA não responde, e quem explica é a
+   * faixa do perfil na conversa. Muda-se o perfil, não a IA.
+   */
+  readonly parceiro: boolean;
   /** O que alguém (ou a IA) decidiu aqui: atendendo, parada ou nada ainda. */
   readonly estado: 'atendendo' | 'parada' | null;
   readonly motivo: string | null;
@@ -93,6 +98,7 @@ export async function carregarEstado(fioId: string): Promise<EstadoDaIaNaConvers
     treino: e.treino === true,
     teste: e.teste === true,
     atende: e.atende === true,
+    parceiro: e.parceiro === true,
     estado: e.estado === 'atendendo' || e.estado === 'parada' ? e.estado : null,
     motivo: texto(e.motivo),
     mudouEm: texto(e.mudou_em),

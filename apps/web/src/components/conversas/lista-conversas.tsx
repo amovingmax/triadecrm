@@ -36,6 +36,8 @@ import { previaDoDigitado, useTextosDigitados } from './texto-digitado';
 import { ROTULO_CANAL, type ItemConversa } from './tipos';
 import { useToqueLongo } from './acoes-da-mensagem';
 import { BarraDaSelecao, MenuDaLinha, type EstadoDaLinha } from './menu-da-linha';
+import { GanhoNaLista, ParceriaNaLista } from './perfil-da-conversa';
+import { sugestaoDeTipo } from './perfil-regra';
 import { AvatarDaConversa } from './wpp';
 
 /**
@@ -562,15 +564,30 @@ function Linha({
             silenciada: marcas.silenciada,
             naoLidas: item.naoLidas,
             concluidaEm: fio.arquivadaEm,
+            // Clientes e Parceiros (Imova): `parceiro` só existe com o módulo.
+            perfil:
+              item.parceiro !== undefined
+                ? {
+                    organizacaoId: item.id,
+                    nome: item.nome,
+                    parceiro: item.parceiro,
+                    sugestao: sugestaoDeTipo(item),
+                  }
+                : null,
           }
         : null,
-    [fio, item.nome, marcas, item.naoLidas],
+    [fio, item, marcas],
   );
+  const parceiro = Boolean(item.parceiro);
   const temTerceira =
+    Boolean(item.parceiro) ||
+    Boolean(item.ganhou && !item.parceiro) ||
     item.etiquetas.length > 0 ||
-    atitude !== undefined ||
-    canal !== null ||
-    Boolean(item.leituraDaIa?.proximaAcao);
+    // Na linha de Parceiro (Imova) a atitude, o canal e o próximo passo da IA
+    // saem: são da venda, e quem está ali já fechou.
+    (!parceiro && atitude !== undefined) ||
+    (!parceiro && canal !== null) ||
+    (!parceiro && Boolean(item.leituraDaIa?.proximaAcao));
 
   return (
     <LinhaWpp
@@ -629,8 +646,10 @@ function Linha({
           // linha miúda só: a lista do WhatsApp tem duas linhas, e esta só aparece
           // quando há o que dizer.
           <span className="flex min-w-0 items-center gap-1 overflow-hidden text-[11px] text-wpp-suave">
-            <AtitudeNaLista atitude={atitude} objecoes={objecoes} />
-            <CanalNaLista canal={canal} />
+            {item.parceiro ? <ParceriaNaLista parceiro={item.parceiro} /> : null}
+            {item.ganhou && item.parceiro === null ? <GanhoNaLista /> : null}
+            {parceiro ? null : <AtitudeNaLista atitude={atitude} objecoes={objecoes} />}
+            {parceiro ? null : <CanalNaLista canal={canal} />}
             {item.etiquetas.slice(0, 2).map((e) => (
               <Etiqueta
                 key={e.id}
@@ -642,7 +661,7 @@ function Linha({
             {item.etiquetas.length > 2 ? (
               <span className="numerico shrink-0">+{item.etiquetas.length - 2}</span>
             ) : null}
-            {item.leituraDaIa?.proximaAcao ? (
+            {!parceiro && item.leituraDaIa?.proximaAcao ? (
               <>
                 <Sparkles className="ml-0.5 size-3 shrink-0" aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate">{item.leituraDaIa.proximaAcao}</span>

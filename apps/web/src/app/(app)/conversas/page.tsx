@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { requireRole } from '@/lib/auth/session';
 import { PAPEIS_DO_CRM } from '@/lib/navegacao';
 import { carregarCatalogos } from '@/components/conversas/catalogos';
+import { ProvedorDoPerfil } from '@/components/conversas/perfil-da-conversa';
 import { TelaConversas } from '@/components/conversas/tela-conversas';
 import { ProvedorDoTextoDigitado } from '@/components/conversas/texto-digitado';
 import { escopoInicialDe, estadoDaUrl } from '@/components/conversas/tipos';
@@ -57,14 +58,18 @@ export default async function Pagina({
     // Quem está digitando: o texto por enviar de cada conversa fica guardado no
     // navegador com a chave desta pessoa (`texto-digitado.ts`).
     <ProvedorDoTextoDigitado dono={sessao.id}>
-      <TelaConversas
-        catalogos={catalogos}
-        filtrosIniciais={filtros}
-        escopoInicial={escopoInicial}
-        organizacaoInicial={organizacaoId}
-        clienteInicial={clienteId}
-        abaInicial={aba}
-      />
+      {/* Clientes e Parceiros (Imova, 23/11/2026): o diálogo de "Mudar para
+          Parceiro", aberto pela faixa da conversa e pela setinha da linha. */}
+      <ProvedorDoPerfil>
+        <TelaConversas
+          catalogos={catalogos}
+          filtrosIniciais={filtros}
+          escopoInicial={escopoInicial}
+          organizacaoInicial={organizacaoId}
+          clienteInicial={clienteId}
+          abaInicial={aba}
+        />
+      </ProvedorDoPerfil>
     </ProvedorDoTextoDigitado>
   );
 }

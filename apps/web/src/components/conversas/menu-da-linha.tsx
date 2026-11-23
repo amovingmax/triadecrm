@@ -6,11 +6,13 @@ import {
   BellOff,
   ChevronDown,
   CircleCheck,
+  Handshake,
   MessageSquareDot,
   MessageSquareText,
   Pin,
   PinOff,
   RotateCcw,
+  UserRound,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -37,6 +39,7 @@ import {
 import { useEu } from './assumir-conversa';
 import { CONCLUIR_NA_EMPRESA, useConcluirConversa } from './concluir-conversa';
 import { CHAVE_CONVERSAS, CHAVE_PREFERENCIAS } from './dados';
+import { usePerfilDaConversa, type AlvoDoPerfil } from './perfil-da-conversa';
 import { ateDoSilencio, SILENCIOS, type Silencio } from './preferencias';
 import { BotaoRedondo } from './wpp';
 
@@ -58,6 +61,12 @@ export type EstadoDaLinha = {
   silenciada: boolean;
   naoLidas: number;
   concluidaEm: string | null;
+  /**
+   * Clientes e Parceiros (Imova, 23/11/2026): a ficha da linha e o perfil dela,
+   * para "Mudar para Parceiro" e "Voltar para Clientes". Ausente na linha sem
+   * ficha e fora da Imova.
+   */
+  perfil?: AlvoDoPerfil | null;
 };
 
 function frase(erro: unknown): string {
@@ -71,8 +80,18 @@ export function useAcoesDaLinha(linha: EstadoDaLinha) {
   const concluir = useConcluirConversa(linha.fioId);
   const podeEscrever = Boolean(eu?.podeEscrever);
 
+  const perfil = usePerfilDaConversa();
+  const alvo = podeEscrever && perfil ? (linha.perfil ?? null) : null;
+
   return {
     podeEscrever,
+    /** A ficha cujo perfil esta linha muda; `null` = a linha não oferece. */
+    perfilDaLinha: alvo,
+    mudarPerfil: () => {
+      if (!alvo || !perfil) return;
+      if (alvo.parceiro) perfil.voltarParaClientes(alvo);
+      else perfil.pedirParceiro(alvo);
+    },
     podeConcluir: podeEscrever && CONCLUIR_NA_EMPRESA,
     concluir: () => concluir.mutate(linha.concluidaEm === null),
     async fixar() {
@@ -148,6 +167,16 @@ export function MenuDaLinha({
         align="end"
         className="w-[15.5rem] rounded-2xl border-wpp-linha p-1.5 shadow-wpp-pop [&_[role=menuitem]]:min-h-10 [&_[role=menuitem]]:rounded-[10px] [&_[role=menuitem]]:px-3 [&_[role=menuitem]]:text-sm"
       >
+        {acoes.perfilDaLinha ? (
+          <DropdownMenuItem onSelect={acoes.mudarPerfil}>
+            {acoes.perfilDaLinha.parceiro ? (
+              <UserRound aria-hidden="true" />
+            ) : (
+              <Handshake aria-hidden="true" />
+            )}
+            {acoes.perfilDaLinha.parceiro ? 'Voltar para Clientes' : 'Mudar para Parceiro'}
+          </DropdownMenuItem>
+        ) : null}
         {acoes.podeConcluir ? (
           <DropdownMenuItem onSelect={acoes.concluir}>
             {concluida ? <RotateCcw aria-hidden="true" /> : <CircleCheck aria-hidden="true" />}
@@ -225,6 +254,19 @@ export function BarraDaSelecao({
         <X aria-hidden="true" />
       </BotaoRedondo>
       <span className="numerico flex-1 text-lg font-semibold">1</span>
+      {acoes.perfilDaLinha ? (
+        <BotaoRedondo
+          onClick={depois(acoes.mudarPerfil)}
+          aria-label={acoes.perfilDaLinha.parceiro ? 'Voltar para Clientes' : 'Mudar para Parceiro'}
+          className="text-foreground"
+        >
+          {acoes.perfilDaLinha.parceiro ? (
+            <UserRound aria-hidden="true" />
+          ) : (
+            <Handshake aria-hidden="true" />
+          )}
+        </BotaoRedondo>
+      ) : null}
       {acoes.podeConcluir ? (
         <BotaoRedondo
           onClick={depois(acoes.concluir)}

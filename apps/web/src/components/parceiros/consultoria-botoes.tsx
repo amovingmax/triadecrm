@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Headset } from 'lucide-react';
+import { Check, Handshake, Headset } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ import {
   carregarConsultoria,
   CHAVE_CONSULTORIA,
   HREF_CONSULTORIA,
+  MARCA_E_PARCEIRO,
   marcarConsultoria,
   recadoDaConsultoria,
 } from './consultoria';
@@ -51,7 +52,14 @@ export function useConsultoria(ligada: boolean) {
     async (ids: readonly string[], sim: boolean): Promise<boolean> => {
       const r = await marcarConsultoria(ids, sim);
       if (!r.ok) {
-        toast.error(sim ? 'Não foi para a Consultoria.' : 'Não saiu da Consultoria.', {
+        const erro = MARCA_E_PARCEIRO
+          ? sim
+            ? 'Não virou Parceiro.'
+            : 'Não voltou para Clientes.'
+          : sim
+            ? 'Não foi para a Consultoria.'
+            : 'Não saiu da Consultoria.';
+        toast.error(erro, {
           description: recadoDaConsultoria(r.motivo),
         });
         return false;
@@ -59,7 +67,9 @@ export function useConsultoria(ligada: boolean) {
       void clientes.invalidateQueries({ queryKey: CHAVE_CONSULTORIA });
       toast.success(avisoDaConsultoria(sim, ids.length, r.mudaram), {
         description: sim
-          ? 'Aparece em Conversas → Consultoria. A etapa do funil não muda.'
+          ? MARCA_E_PARCEIRO
+            ? 'Aparece em Conversas → Parceiros, e a IA que atende não responde lá. A etapa do funil não muda.'
+            : 'Aparece em Conversas → Consultoria. A etapa do funil não muda.'
           : 'Volta para a lista de Conversas, se tiver conversa.',
         action:
           r.mudaram > 0
@@ -92,9 +102,13 @@ export function BotaoConsultoria({
   aoMudar: (sim: boolean) => void;
   className?: string;
 }) {
-  const rotulo = marcado
-    ? `${nome} está na Consultoria. Tirar de lá`
-    : `Mandar ${nome} para a Consultoria, em Conversas`;
+  const rotulo = MARCA_E_PARCEIRO
+    ? marcado
+      ? `${nome} é Parceiro. Voltar para Clientes`
+      : `Mudar ${nome} para Parceiro, em Conversas`
+    : marcado
+      ? `${nome} está na Consultoria. Tirar de lá`
+      : `Mandar ${nome} para a Consultoria, em Conversas`;
   return (
     <button
       type="button"
@@ -114,8 +128,10 @@ export function BotaoConsultoria({
       {marcado ? (
         <>
           <Check className="size-3" aria-hidden="true" />
-          Consultoria
+          {MARCA_E_PARCEIRO ? 'Parceiro' : 'Consultoria'}
         </>
+      ) : MARCA_E_PARCEIRO ? (
+        <Handshake className="size-4" aria-hidden="true" />
       ) : (
         <Headset className="size-4" aria-hidden="true" />
       )}

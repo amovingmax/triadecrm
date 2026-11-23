@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Check, Headset, Send, X } from 'lucide-react';
+import { Check, Handshake, Headset, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DialogoConfirmar } from '@/components/admin/confirmar';
 
+import { MARCA_E_PARCEIRO, ROTULO_DE_MARCAR } from './consultoria';
 import { avisoDaSaudacao, desfazerSaudacao, mandarSaudacao, recadoDaSaudacao } from './saudacao';
 
 /**
@@ -173,8 +174,8 @@ export function BarraDaSelecao({
             className="toque h-9"
             onClick={() => void aoConsultoria()}
           >
-            <Headset aria-hidden="true" />
-            Mandar para a Consultoria
+            {MARCA_E_PARCEIRO ? <Handshake aria-hidden="true" /> : <Headset aria-hidden="true" />}
+            {ROTULO_DE_MARCAR}
           </Button>
         ) : null}
         <Button variant="ghost" size="sm" className="toque h-9" onClick={aoLimpar}>

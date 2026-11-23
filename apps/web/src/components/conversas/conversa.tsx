@@ -41,6 +41,8 @@ import {
 import { arquivarConversa } from './acoes';
 import { AssumirConversa, useEu } from './assumir-conversa';
 import { CONCLUIR_NA_EMPRESA, ConcluirConversa, FaixaDeConcluida } from './concluir-conversa';
+import { FaixaDoPerfil } from './perfil-da-conversa';
+import { sugestaoDeTipo } from './perfil-regra';
 import { AvisoDeQuemAtende, TransferirConversa } from './transferir-conversa';
 import { AtitudeDaConversaNoTopo } from './atitude';
 import { CanalNoTopo, ComoChegou } from './canal-de-chegada';
@@ -658,6 +660,20 @@ export function Conversa({
           />
         ) : null}
         {fio ? <FaixaDaLigacao conversaId={fio.id} className="border-b border-wpp-linha" /> : null}
+        {/* Clientes e Parceiros (Imova, 23/11/2026): o perfil e a troca dele. */}
+        {item.parceiro !== undefined ? (
+          <FaixaDoPerfil
+            alvo={{
+              organizacaoId: item.id,
+              nome: item.nome,
+              parceiro: item.parceiro,
+              sugestao: sugestaoDeTipo(item),
+            }}
+            ganhou={Boolean(item.ganhou)}
+            podeMudar={Boolean(eu?.podeEscrever)}
+            nomeDe={(id) => nomeDaPessoa.get(id)?.split(' ')[0] ?? null}
+          />
+        ) : null}
 
         <Sheet open={folha} onOpenChange={setFolha}>
           <SheetContent

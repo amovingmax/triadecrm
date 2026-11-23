@@ -4383,21 +4383,34 @@ export type Database = {
       }
       consultoria: {
         Row: {
+          anuncio_id: string | null
           desde: string
           organization_id: string
           por: string | null
+          tipo: string | null
         }
         Insert: {
+          anuncio_id?: string | null
           desde?: string
           organization_id: string
           por?: string | null
+          tipo?: string | null
         }
         Update: {
+          anuncio_id?: string | null
           desde?: string
           organization_id?: string
           por?: string | null
+          tipo?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "consultoria_anuncio_id_fkey"
+            columns: ["anuncio_id"]
+            isOneToOne: false
+            referencedRelation: "anuncios"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "consultoria_organization_id_fkey"
             columns: ["organization_id"]
@@ -13813,6 +13826,15 @@ export type Database = {
       origem_dos_dados: { Args: { p_organization_id: string }; Returns: Json }
       parceiro_excluir: {
         Args: { p_motivo: string; p_organization_id: string }
+        Returns: Json
+      }
+      parceiro_mudar: {
+        Args: {
+          p_anuncio_id?: string
+          p_organization_id: string
+          p_parceiro: boolean
+          p_tipo?: string
+        }
         Returns: Json
       }
       parceiro_restaurar: { Args: { p_organization_id: string }; Returns: Json }

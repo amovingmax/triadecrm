@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   CircleCheck,
+  Handshake,
   MessageSquarePlus,
   Search,
   Store,
@@ -50,6 +51,16 @@ import { local } from './formatos';
 import { ConversaForaDaBase, ListaForaDaBase } from './fora-da-base';
 import { conversasForaDaBase, nomeDoCliente } from './fora-da-base-dados';
 import { ListaConversas } from './lista-conversas';
+import { FiltroDaParceria } from './perfil-da-conversa';
+import {
+  CLIENTES_E_PARCEIROS,
+  contarPorTipo,
+  esperamPorCaixa,
+  filtrarParceiros,
+  mapaDosParceiros,
+  RECORTE_INICIAL,
+  type RecorteDosParceiros,
+} from './perfil-regra';
 import {
   aplicarFiltros,
   clientesComFicha,
@@ -134,6 +145,21 @@ import { AvatarDaConversa, BotaoRedondo, ChipDeAba, Segmentado } from './wpp';
  */
 const CAIXAS = EMPRESA.modulos.caixasDeConversa;
 
+/**
+ * CLIENTES E PARCEIROS (23/11/2026, só onde `clientesEParceiros` está ligado: a
+ * Imova). "Todos os que entram em contato pela primeira vez com a Imova devem
+ * entrar como Cliente e devem permanecer por lá até que seja mudado o perfil
+ * dele para Parceiro." O formato é o das caixas da KOMUNE, com outro corte:
+ * - Clientes: a lista de Conversas de sempre (com ficha ou sem), com Minhas,
+ *   Meu setor, a ordem, os filtros e as pílulas Automáticas e Grupos.
+ * - Parceiros: quem tem a marca (`public.consultoria`, com o tipo e o imóvel).
+ *   É a aba `consultoria` de antes, agora com busca, as pílulas do tipo e a
+ *   gaveta das concluídas. Negócio ganho não põe ninguém aqui sozinho.
+ * As pílulas Consultoria e Clientes saem: viraram as duas caixas. O número de
+ * cada caixa é o do menu, dividido pela marca (`esperamPorCaixa`).
+ */
+const PERFIS = CLIENTES_E_PARCEIROS;
+
 export function TelaConversas({
   catalogos,
   filtrosIniciais,
@@ -160,7 +186,11 @@ export function TelaConversas({
   const ehCelular = useEhCelular();
   const [filtros, setFiltros] = useState<FiltrosConversas>(filtrosIniciais);
   const [escolhidoId, setEscolhidoId] = useState<string | null>(organizacaoInicial);
-  const [aba, setAba] = useState<AbaDaEsquerda>(abaInicial);
+  // Na Imova, desde Clientes e Parceiros, a aba "Clientes" é a própria lista de
+  // Conversas: um link antigo com `?aba=fora` cai nela.
+  const [aba, setAba] = useState<AbaDaEsquerda>(
+    PERFIS && abaInicial === 'fora' ? 'conversas' : abaInicial,
+  );
   /**
    * A conversa de cliente aberta (id da conversa, não da ficha). Vale na aba
    * "Clientes" e, desde 01/10/2026, na aba "Conversas", onde o cliente também
@@ -170,7 +200,9 @@ export function TelaConversas({
   /** A busca e a gaveta das concluídas da caixa Clientes (13/11/2026). */
   const [buscaClientes, setBuscaClientes] = useState('');
   const [clientesConcluidos, setClientesConcluidos] = useState(false);
-  const { respostasNovas, respostasDosClientes } = useAvisos();
+  const { respostasNovas, respostasDosClientes, fichasDasRespostas } = useAvisos();
+  /** A busca, o tipo e a gaveta das concluídas da caixa Parceiros (Imova). */
+  const [recorteParceiros, setRecorteParceiros] = useState<RecorteDosParceiros>(RECORTE_INICIAL);
 
   const consulta = useQuery({ queryKey: CHAVE_CONVERSAS, queryFn: carregarConversas });
   // Fixar e silenciar, de quem está olhando (27/10/2026): a lista sobe as
@@ -201,6 +233,17 @@ export function TelaConversas({
     staleTime: 5 * 60 * 1000,
   });
 
+  // Quem é Parceiro, e como (Imova). `null` na KOMUNE: vale a Consultoria de sempre.
+  const mapaParceiros = useMemo(
+    () => (PERFIS ? mapaDosParceiros(consulta.data?.parceiros ?? []) : null),
+    [consulta.data],
+  );
+  // O abridor dos avisos lê o mapa da hora, sem se registrar de novo a cada leitura.
+  const parceirosAgora = useRef(mapaParceiros);
+  useEffect(() => {
+    parceirosAgora.current = mapaParceiros;
+  }, [mapaParceiros]);
+
   const todos = useMemo<ItemConversa[]>(() => {
     if (!consulta.data) return [];
     return montarConversas({
@@ -213,9 +256,10 @@ export function TelaConversas({
       etiquetas: consulta.data.etiquetas,
       etiquetasDoParceiro: consulta.data.etiquetasDoParceiro,
       emConsultoria: consulta.data.emConsultoria,
+      parceiros: mapaParceiros,
       catalogos,
     });
-  }, [consulta.data, catalogos]);
+  }, [consulta.data, catalogos, mapaParceiros]);
 
   // Quem está olhando: é o que "Minhas" e "Meu setor" perguntam (Fase 1).
   const quem = useMemo(
@@ -382,8 +426,17 @@ export function TelaConversas({
   }, [conversaAbertaId, olharConversa]);
   useEffect(() => {
     registrarAbridor(({ conversaId, organizacaoId }) => {
-      // Com as caixas, o aviso de quem não tem ficha abre na caixa Clientes.
-      setAba(organizacaoId || !CAIXAS ? 'conversas' : 'fora');
+      // Com as caixas, o aviso de quem não tem ficha abre na caixa Clientes. Com
+      // Clientes e Parceiros (Imova), o de Parceiro abre na caixa Parceiros.
+      setAba(
+        PERFIS
+          ? organizacaoId && parceirosAgora.current?.has(organizacaoId)
+            ? 'consultoria'
+            : 'conversas'
+          : organizacaoId || !CAIXAS
+            ? 'conversas'
+            : 'fora',
+      );
       if (organizacaoId) escolherParceiro(organizacaoId);
       else escolherCliente(conversaId);
     });
@@ -431,6 +484,35 @@ export function TelaConversas({
     );
   }, [aba, filtros, captacao, clientes, quem, chegadas]);
 
+  // A CAIXA PARCEIROS (Imova, 23/11/2026): a busca, o tipo e a gaveta das
+  // concluídas. As pílulas contam as abertas (ou as concluídas, na gaveta).
+  const parceirosDaCaixa = useMemo(
+    () => (PERFIS ? filtrarParceiros(consultoria, recorteParceiros, chegadas) : consultoria),
+    [consultoria, recorteParceiros, chegadas],
+  );
+  const parceirosPorTipo = useMemo(
+    () =>
+      contarPorTipo(
+        PERFIS
+          ? filtrarParceiros(
+              consultoria,
+              { ...RECORTE_INICIAL, concluidas: recorteParceiros.concluidas },
+              chegadas,
+            )
+          : [],
+      ),
+    [consultoria, recorteParceiros.concluidas, chegadas],
+  );
+  const quantosParceiros = [...parceirosPorTipo.values()].reduce((a, n) => a + n, 0);
+  const parceirosConcluidos = useMemo(
+    () =>
+      PERFIS && CONCLUIR_NA_EMPRESA
+        ? filtrarParceiros(consultoria, { ...recorteParceiros, concluidas: true }, chegadas).length
+        : 0,
+    [consultoria, recorteParceiros, chegadas],
+  );
+  const verParceirosConcluidos = PERFIS && aba === 'consultoria' && recorteParceiros.concluidas;
+
   // A ficha ao lado da conversa (computador): aberta ou fechada vale para todas as
   // conversas, como no WhatsApp, e não volta a fechar a cada troca.
   const [fichaAberta, setFichaAberta] = useState(false);
@@ -444,17 +526,76 @@ export function TelaConversas({
     respostasNovas === null || respostasDosClientes === null
       ? null
       : Math.max(0, respostasNovas - respostasDosClientes);
-  const chips = (
+  // Clientes e Parceiros (Imova): a caixa é a aba `consultoria` ou o resto.
+  const caixaDaImova: 'clientes' | 'parceiros' = aba === 'consultoria' ? 'parceiros' : 'clientes';
+  const esperamNaImova = PERFIS
+    ? esperamPorCaixa(fichasDasRespostas, mapaParceiros ?? new Map())
+    : null;
+  const chips = PERFIS ? (
+    <>
+      <SeletorDeCaixas
+        ativa={caixaDaImova}
+        aoTrocar={(c) => {
+          setAba(c === 'parceiros' ? 'consultoria' : 'conversas');
+          setRecorteParceiros(RECORTE_INICIAL);
+        }}
+        opcoes={[
+          {
+            id: 'clientes',
+            rotulo: 'Clientes',
+            Icone: UserRound,
+            esperam: esperamNaImova?.clientes ?? null,
+            tinta: 'bg-wpp-chip-ativo text-wpp-chip-ativo-texto',
+            ponto: 'bg-wpp-cita-barra',
+          },
+          {
+            id: 'parceiros',
+            rotulo: 'Parceiros',
+            Icone: Handshake,
+            esperam: esperamNaImova?.parceiros ?? null,
+            tinta: 'bg-wpp-cliente-fundo text-wpp-cliente-texto',
+            ponto: 'bg-wpp-cliente',
+          },
+        ]}
+      />
+      {caixaDaImova === 'parceiros' ? (
+        <FiltroDaParceria
+          tipo={recorteParceiros.tipo}
+          total={quantosParceiros}
+          porTipo={parceirosPorTipo}
+          aoTrocar={(tipo) => setRecorteParceiros((r) => ({ ...r, tipo }))}
+        />
+      ) : (
+        <ChipsDasAbas aba={aba} aoTrocar={setAba} consultoria={null} foraDaBase={null} />
+      )}
+    </>
+  ) : (
     <>
       {CAIXAS ? (
         <SeletorDeCaixas
-          caixa={caixa}
-          fornecedores={esperamFornecedores}
-          clientes={esperamClientes}
+          ativa={caixa}
           aoTrocar={(c) => {
             setAba(c === 'clientes' ? 'fora' : 'conversas');
             setClientesConcluidos(false);
           }}
+          opcoes={[
+            {
+              id: 'fornecedores',
+              rotulo: 'Fornecedores',
+              Icone: Store,
+              esperam: esperamFornecedores,
+              tinta: 'bg-wpp-chip-ativo text-wpp-chip-ativo-texto',
+              ponto: 'bg-wpp-cita-barra',
+            },
+            {
+              id: 'clientes',
+              rotulo: 'Clientes',
+              Icone: UserRound,
+              esperam: esperamClientes,
+              tinta: 'bg-wpp-cliente-fundo text-wpp-cliente-texto',
+              ponto: 'bg-wpp-cliente',
+            },
+          ]}
         />
       ) : null}
       {CAIXAS && caixa === 'clientes' ? null : (
@@ -508,7 +649,9 @@ export function TelaConversas({
           <section
             aria-label={
               aba === 'consultoria'
-                ? 'Quem fechou, por interação mais recente'
+                ? PERFIS
+                  ? 'Parceiros por interação mais recente'
+                  : 'Quem fechou, por interação mais recente'
                 : aba === 'fora'
                   ? 'Clientes por mensagem mais recente'
                   : 'Parceiros por interação mais recente'
@@ -519,6 +662,10 @@ export function TelaConversas({
           >
             {verConcluidas ? (
               <CabecalhoDasConcluidas aoVoltar={() => mudar({ concluidas: false })} />
+            ) : verParceirosConcluidos ? (
+              <CabecalhoDasConcluidas
+                aoVoltar={() => setRecorteParceiros((r) => ({ ...r, concluidas: false }))}
+              />
             ) : CAIXAS && aba === 'fora' && clientesConcluidos ? (
               <CabecalhoDasConcluidas aoVoltar={() => setClientesConcluidos(false)} />
             ) : (
@@ -554,6 +701,12 @@ export function TelaConversas({
                     valor={buscaClientes}
                     aoMudar={setBuscaClientes}
                     placeholder="Buscar nome, telefone ou mensagem"
+                  />
+                ) : PERFIS && aba === 'consultoria' ? (
+                  <BuscaDaLista
+                    valor={recorteParceiros.busca}
+                    aoMudar={(busca) => setRecorteParceiros((r) => ({ ...r, busca }))}
+                    placeholder="Buscar nome, bairro ou imóvel"
                   />
                 ) : null}
                 {chips}
@@ -595,6 +748,16 @@ export function TelaConversas({
                 <LinhaDasConcluidas
                   quantas={quantasConcluidas}
                   aoAbrir={() => mudar({ concluidas: true })}
+                />
+              ) : null}
+              {PERFIS &&
+              aba === 'consultoria' &&
+              !recorteParceiros.concluidas &&
+              parceirosConcluidos > 0 &&
+              !consulta.isPending ? (
+                <LinhaDasConcluidas
+                  quantas={parceirosConcluidos}
+                  aoAbrir={() => setRecorteParceiros((r) => ({ ...r, concluidas: true }))}
                 />
               ) : null}
               {CAIXAS &&
@@ -650,6 +813,26 @@ export function TelaConversas({
                   preferencias={preferencias.data}
                   porInteresse={interesse !== null}
                 />
+              ) : aba === 'consultoria' && PERFIS ? (
+                parceirosDaCaixa.length > 0 ? (
+                  <ListaConversas
+                    itens={parceirosDaCaixa}
+                    selecionadoId={aberta?.id ?? null}
+                    aoEscolher={escolherParceiro}
+                    preferencias={preferencias.data}
+                    atitudes={atitudes}
+                    canais={canais}
+                    perdidas={perdidas}
+                  />
+                ) : (
+                  <p className="px-4 py-8 text-sm text-wpp-suave">
+                    {recorteParceiros.concluidas
+                      ? 'Nenhuma conversa de Parceiro concluída.'
+                      : recorteParceiros.busca.trim() || recorteParceiros.tipo !== 'todos'
+                        ? 'Nenhum Parceiro com esse filtro.'
+                        : 'Nenhum Parceiro ainda. Na conversa de um cliente que já fechou com a Imova (inquilino, proprietário, comprador), use “Mudar para Parceiro”: ela passa a ficar aqui.'}
+                  </p>
+                )
               ) : aba === 'consultoria' ? (
                 consultoria.length === 0 ? (
                   <p className="px-4 py-8 text-sm text-wpp-suave">
@@ -795,10 +978,13 @@ export function TelaConversas({
                     // base", pelo id do FIO — o mesmo caminho que `fora-da-base.tsx`
                     // já usa, e o único que existe para quem não é parceiro.
                     if (organizacaoId) {
-                      setAba('conversas');
+                      setAba(
+                        PERFIS && mapaParceiros?.has(organizacaoId) ? 'consultoria' : 'conversas',
+                      );
                       escolherParceiro(organizacaoId);
                     } else if (conversaId) {
-                      setAba('fora');
+                      // Na Imova quem não tem ficha está na própria lista de Conversas.
+                      setAba(PERFIS ? 'conversas' : 'fora');
                       setForaId(conversaId);
                     }
                   }}
@@ -916,8 +1102,11 @@ function ChipsDasAbas({
 }: {
   aba: AbaDaEsquerda;
   aoTrocar: (aba: AbaDaEsquerda) => void;
-  /** Parceiros que já fecharam — a contagem do que foi carregado. */
-  consultoria: number;
+  /**
+   * Parceiros que já fecharam — a contagem do que foi carregado. `null` = a
+   * pílula não existe (Clientes e Parceiros, na Imova: virou a caixa Parceiros).
+   */
+  consultoria: number | null;
   /** Conversas de números que não são ficha. `null` = a pílula não existe (as caixas). */
   foraDaBase: number | null;
 }) {
@@ -925,7 +1114,7 @@ function ChipsDasAbas({
     { id: 'conversas', rotulo: 'Conversas' },
     // Pós-venda (06/10/2026): quem fechou com a gente sai da lista de
     // Conversas e vem para cá.
-    { id: 'consultoria', rotulo: 'Consultoria', contagem: consultoria },
+    { id: 'consultoria', rotulo: 'Consultoria', contagem: consultoria ?? undefined },
     // "Clientes", e não "Fora da base" (01/10/2026): é o nome do que chega
     // aqui na prática — gente que escreveu e não é lead.
     { id: 'fora', rotulo: 'Clientes', contagem: foraDaBase ?? undefined },
@@ -936,8 +1125,13 @@ function ChipsDasAbas({
     // Os grupos de WhatsApp (27/10/2026): até 8 pessoas, entrada por link.
     { id: 'grupos', rotulo: 'Grupos' },
   ];
-  // Com as caixas (13/11/2026), Clientes é a outra caixa, não uma pílula.
-  const itens = foraDaBase === null ? todas.filter((i) => i.id !== 'fora') : todas;
+  // Com as caixas (13/11/2026), Clientes é a outra caixa, não uma pílula; com
+  // Clientes e Parceiros (Imova, 23/11/2026), a Consultoria também.
+  const itens = todas.filter(
+    (i) =>
+      !(i.id === 'fora' && foraDaBase === null) &&
+      !(i.id === 'consultoria' && consultoria === null),
+  );
   // A pílula da aba aberta fica sempre à vista: em Grupos ela é a última e
   // nascia escondida à direita da fileira.
   const fileira = useRef<HTMLDivElement>(null);
@@ -975,40 +1169,33 @@ function ChipsDasAbas({
 
 type Caixa = 'fornecedores' | 'clientes';
 
+/** Uma caixa do seletor: o nome, o ícone, quantas esperam e as cores dela. */
+type OpcaoDeCaixa<Id extends string> = {
+  id: Id;
+  rotulo: string;
+  Icone: typeof Store;
+  esperam: number | null;
+  /** O fundo e a tinta do ícone quando a caixa está aberta. */
+  tinta: string;
+  /** A cor do ponto de "N esperando". */
+  ponto: string;
+};
+
 /**
- * As duas caixas no alto da lista (13/11/2026): Fornecedores, na menta da casa, e
- * Clientes, em azul, cada uma com quantas conversas esperam resposta desta
- * pessoa. O número é o do menu (`components/avisos`), dividido por quem tem ficha.
+ * As duas caixas no alto da lista (13/11/2026), cada uma com quantas conversas
+ * esperam resposta desta pessoa. O número é o do menu (`components/avisos`),
+ * dividido por caixa. Na KOMUNE: Fornecedores, na menta da casa, e Clientes, em
+ * azul. Na Imova (23/11/2026): Clientes, no petróleo, e Parceiros, em azul.
  */
-function SeletorDeCaixas({
-  caixa,
-  fornecedores,
-  clientes,
+function SeletorDeCaixas<Id extends string>({
+  opcoes,
+  ativa,
   aoTrocar,
 }: {
-  caixa: Caixa;
-  fornecedores: number | null;
-  clientes: number | null;
-  aoTrocar: (caixa: Caixa) => void;
+  opcoes: readonly OpcaoDeCaixa<Id>[];
+  ativa: Id;
+  aoTrocar: (caixa: Id) => void;
 }) {
-  const opcoes = [
-    {
-      id: 'fornecedores' as const,
-      rotulo: 'Fornecedores',
-      Icone: Store,
-      esperam: fornecedores,
-      tinta: 'bg-wpp-chip-ativo text-wpp-chip-ativo-texto',
-      ponto: 'bg-wpp-cita-barra',
-    },
-    {
-      id: 'clientes' as const,
-      rotulo: 'Clientes',
-      Icone: UserRound,
-      esperam: clientes,
-      tinta: 'bg-wpp-cliente-fundo text-wpp-cliente-texto',
-      ponto: 'bg-wpp-cliente',
-    },
-  ];
   return (
     <div
       role="tablist"
@@ -1016,18 +1203,18 @@ function SeletorDeCaixas({
       className="grid w-full max-w-md grid-cols-2 gap-1 rounded-2xl bg-wpp-busca p-1"
     >
       {opcoes.map(({ id, rotulo, Icone, esperam, tinta, ponto }) => {
-        const ativa = caixa === id;
+        const aberta = ativa === id;
         return (
           <button
             key={id}
             type="button"
             role="tab"
-            aria-selected={ativa}
+            aria-selected={aberta}
             onClick={() => aoTrocar(id)}
             className={cn(
               'toque flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left outline-none transition-colors',
               'focus-visible:ring-3 focus-visible:ring-ring/50',
-              ativa
+              aberta
                 ? 'bg-wpp-painel text-foreground shadow-wpp-caixa ring-1 ring-wpp-linha'
                 : 'text-wpp-suave hover:text-foreground',
             )}
@@ -1036,7 +1223,7 @@ function SeletorDeCaixas({
               aria-hidden="true"
               className={cn(
                 'flex size-9 shrink-0 items-center justify-center rounded-[10px]',
-                ativa ? tinta : 'bg-transparent',
+                aberta ? tinta : 'bg-transparent',
               )}
             >
               <Icone className="size-[18px]" />

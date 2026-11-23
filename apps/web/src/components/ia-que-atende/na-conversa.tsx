@@ -71,7 +71,7 @@ function useEstadoDaIa(fioId: string) {
 /** O selo do cabeçalho: "IA atendendo", "IA em treino", "IA em teste" ou "IA parada". */
 export function SeloDaIa({ fioId, naFolha = false }: { fioId: string; naFolha?: boolean }) {
   const { data } = useEstadoDaIa(fioId);
-  if (!IA_QUE_ATENDE || !data || !data.ligada) return null;
+  if (!IA_QUE_ATENDE || !data || !data.ligada || data.parceiro) return null;
   if (!data.atende && data.estado !== 'parada') return null;
   const parada = !data.atende;
   const rotulo = parada ? 'IA parada' : rotuloDeQuemAtende(data);
@@ -151,6 +151,9 @@ export function ControleDaIa({
   });
 
   if (!IA_QUE_ATENDE || !data || !data.ligada) return null;
+  // Parceiro (23/11/2026): a IA não atende, e ligar aqui não adiantaria. Quem
+  // explica é a faixa do perfil, com o "Voltar para Clientes".
+  if (data.parceiro) return null;
   if (!data.atende && !podeLigarAqui(data)) return null;
   const pilula = variante === 'pilula';
   const classeDaPilula =

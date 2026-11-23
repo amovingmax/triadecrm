@@ -1270,6 +1270,71 @@ describe('quem fechou vai para a Consultoria (pivô de 06/10/2026)', () => {
   });
 });
 
+describe('Clientes e Parceiros: só a marca põe em Parceiros (Imova, 23/11/2026)', () => {
+  const agora = new Date('2026-11-23T12:00:00Z');
+  const parceiros = new Map([
+    [
+      'inquilina',
+      {
+        tipo: 'inquilino' as const,
+        anuncioId: null,
+        imovel: 'AP0003 · Apto em Ponta Negra',
+        desde: '2026-11-20T12:00:00Z',
+        porId: null,
+      },
+    ],
+  ]);
+  const itens = montarConversas({
+    organizacoes: [
+      organizacao('inquilina', 'Ana Inquilina'),
+      organizacao('ganhou', 'Beto que Fechou'),
+      { ...organizacao('temperatura', 'Caio Cliente'), temperature: 'cliente' },
+      organizacao('marca-sem-tipo', 'Dora do Botão'),
+    ],
+    atividades: [],
+    negocios: [negocio({ id: 'd1', organization_id: 'ganhou', status: 'won' })],
+    emConsultoria: ['inquilina', 'marca-sem-tipo'],
+    parceiros,
+    catalogos: CATALOGOS,
+    agora,
+  });
+  const porId = new Map(itens.map((i) => [i.id, i]));
+
+  it('negócio ganho e temperatura de cliente NÃO mudam o perfil sozinhos', () => {
+    expect(porId.get('ganhou')?.fechou).toBe(false);
+    expect(porId.get('temperatura')?.fechou).toBe(false);
+    expect(contatosDeConsultoria(itens).map((i) => i.id)).toEqual(['inquilina']);
+  });
+
+  it('quem ganhou fica em Clientes com a sugestão (ganhou)', () => {
+    expect(porId.get('ganhou')?.ganhou).toBe(true);
+    expect(porId.get('ganhou')?.parceiro).toBeNull();
+  });
+
+  it('o Parceiro leva o perfil inteiro para a lista', () => {
+    expect(porId.get('inquilina')?.parceiro?.tipo).toBe('inquilino');
+    expect(porId.get('inquilina')?.parceiro?.imovel).toBe('AP0003 · Apto em Ponta Negra');
+  });
+
+  it('a marca da Consultoria só vale pelo mapa: quem não está nele é Cliente', () => {
+    // `emConsultoria` é a lista de antes; com o mapa, ele é quem manda.
+    expect(porId.get('marca-sem-tipo')?.fechou).toBe(false);
+  });
+
+  it('sem o mapa (a KOMUNE), nada muda: não há perfil nem "ganhou"', () => {
+    const komune = montarConversas({
+      organizacoes: [organizacao('ganhou', 'Beto que Fechou')],
+      atividades: [],
+      negocios: [negocio({ id: 'd1', organization_id: 'ganhou', status: 'won' })],
+      catalogos: CATALOGOS,
+      agora,
+    });
+    expect(komune[0]?.fechou).toBe(true);
+    expect('parceiro' in (komune[0] ?? {})).toBe(false);
+    expect('ganhou' in (komune[0] ?? {})).toBe(false);
+  });
+});
+
 describe('clientesComFicha: a aba Clientes quando todo cliente tem ficha (Imova, 03/11/2026)', () => {
   const lista = [
     itemDaLista({ id: 'cliente', tipo: 'produtor' }),

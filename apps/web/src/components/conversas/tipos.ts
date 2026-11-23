@@ -116,6 +116,24 @@ export type LeituraNaLista = {
   alertas: string[];
 };
 
+/**
+ * Que parceria (Imova, 23/11/2026): `public.consultoria.tipo`. A marca posta
+ * pelo botão de Prospectados vem sem tipo.
+ */
+export type TipoDeParceria = 'inquilino' | 'proprietario' | 'comprador' | 'outro';
+
+/** O perfil de Parceiro de uma ficha, como a lista e a conversa mostram. */
+export type PerfilDoParceiro = {
+  tipo: TipoDeParceria | null;
+  anuncioId: string | null;
+  /** "TE0007 · Lote em Pipa", quando a parceria tem anúncio. */
+  imovel: string | null;
+  /** Quando virou Parceiro (ISO). */
+  desde: string;
+  /** Quem mudou o perfil. */
+  porId: string | null;
+};
+
 /** Uma etiqueta do parceiro, como a lista e o cabeçalho mostram. */
 export type EtiquetaDoParceiro = { id: number; nome: string; cor: string | null };
 
@@ -173,6 +191,17 @@ export type ItemConversa = {
    * (03/11/2026). Ausente nas listas montadas antes disso.
    */
   tipo?: OrgKind | null;
+  /**
+   * O perfil de Parceiro (Imova, 23/11/2026): a marca da Consultoria com o tipo
+   * da parceria e o imóvel. `null` = Cliente. Ausente onde o módulo
+   * `clientesEParceiros` está desligado (a KOMUNE).
+   */
+  parceiro?: PerfilDoParceiro | null;
+  /**
+   * Tem negócio ganho (Imova, 23/11/2026). Desde Clientes e Parceiros, ganhar
+   * não muda o perfil sozinho: a conversa só sugere "Mudar para Parceiro".
+   */
+  ganhou?: boolean;
   /** ISO da interação humana mais recente; `null` quando ninguém falou ainda. */
   ultimaEm: string | null;
   /** Dias inteiros desde `ultimaEm`; `null` quando nunca houve contato. */

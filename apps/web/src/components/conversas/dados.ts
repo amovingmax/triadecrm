@@ -4,6 +4,7 @@ import type { AtividadeCrua, HistoricoCru, NegocioCru, OrganizacaoCrua } from '.
 import type { FioCru, MensagemCrua, RascunhoCru } from './mensagens';
 import type { PreferenciaDaConversa, Preferencias } from './preferencias';
 import type { DependenciasDaMeta, EtiquetaDoParceiro } from './tipos';
+import { CLIENTES_E_PARCEIROS, type MarcaDeParceiro } from './perfil-regra';
 
 /**
  * As consultas da tela de Conversas, no navegador, sob a mesma RLS de todo o resto.
@@ -106,6 +107,11 @@ export type BaseDasConversas = {
    * 14/10/2026), além de quem tem negócio ganho.
    */
   emConsultoria: string[];
+  /**
+   * Clientes e Parceiros (Imova, 23/11/2026): a mesma marca, com o tipo da
+   * parceria, o imóvel e quem mudou. Vazia onde o módulo está desligado.
+   */
+  parceiros: MarcaDeParceiro[];
   meusSetores: number[];
   euId: string | null;
 };
@@ -182,7 +188,14 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
       .from('organization_tags')
       .select('organization_id, tag_id')
       .limit(TETO_ORGANIZACOES * 3),
-    supabase.from('consultoria').select('organization_id').limit(TETO_ORGANIZACOES),
+    // Na Imova a marca é o perfil de Parceiro: vem com o tipo e o imóvel
+    // (23/11/2026). Na KOMUNE, só quem tem a marca, como sempre.
+    CLIENTES_E_PARCEIROS
+      ? supabase
+          .from('consultoria')
+          .select('organization_id, tipo, anuncio_id, desde, por, anuncios(codigo, titulo)')
+          .limit(TETO_ORGANIZACOES)
+      : supabase.from('consultoria').select('organization_id').limit(TETO_ORGANIZACOES),
   ]);
 
   const erro =
@@ -208,6 +221,7 @@ export async function carregarConversas(): Promise<BaseDasConversas> {
     etiquetasDoParceiro: etiquetasDoParceiro.data ?? [],
     // Acréscimo, como as etiquetas: sem ela a lista abre igual, só sem a marca.
     emConsultoria: (consultoria.data ?? []).map((c) => c.organization_id),
+    parceiros: CLIENTES_E_PARCEIROS ? ((consultoria.data ?? []) as MarcaDeParceiro[]) : [],
     meusSetores: (meus.data ?? []).map((m) => m.setor_id),
     euId,
   };

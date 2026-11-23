@@ -13,13 +13,26 @@
  * como publicado em relatório nem em meta: é só "este parceiro é atendido pela
  * Consultoria". Quem tem negócio ganho continua lá sem precisar da marca.
  */
+import { EMPRESA } from '@/lib/empresa';
 import { createClient } from '@/lib/supabase/client';
+
+/**
+ * Na Imova, desde 23/11/2026, a marca é o perfil de Parceiro (Clientes e
+ * Parceiros, em Conversas), e os textos daqui falam disso. Na KOMUNE, os de
+ * sempre.
+ */
+export const MARCA_E_PARCEIRO: boolean = EMPRESA.modulos.clientesEParceiros;
 
 /** Chave da consulta de quem está marcado (TanStack Query). */
 export const CHAVE_CONSULTORIA = ['parceiros-consultoria'] as const;
 
 /** Onde a aba mora: a lista de Conversas, aberta direto nela. */
 export const HREF_CONSULTORIA = '/conversas?aba=consultoria';
+
+/** O nome do botão de pôr a marca. */
+export const ROTULO_DE_MARCAR = MARCA_E_PARCEIRO
+  ? 'Mudar para Parceiro'
+  : 'Mandar para a Consultoria';
 
 /** Quem tem a marca. A tabela é pequena (uma linha por parceiro marcado). */
 export async function carregarConsultoria(): Promise<ReadonlySet<string>> {
@@ -48,7 +61,9 @@ export async function marcarConsultoria(
 }
 
 const RECUSA: Record<string, string> = {
-  sem_permissao: 'Seu perfil não mexe na Consultoria. Isso é de admin e gestor.',
+  sem_permissao: MARCA_E_PARCEIRO
+    ? 'Seu perfil não muda o perfil de contatos. Fale com um gestor.'
+    : 'Seu perfil não mexe na Consultoria. Isso é de admin e gestor.',
   muitos_de_uma_vez: 'São muitos de uma vez. Mande no máximo 200 por pedido.',
   nada_escolhido: 'Escolha pelo menos um parceiro.',
 };
@@ -59,6 +74,7 @@ export function recadoDaConsultoria(motivo: string): string {
 
 /** O aviso depois do clique. Pura, para caber em teste. */
 export function avisoDaConsultoria(sim: boolean, pedidos: number, mudaram: number): string {
+  if (MARCA_E_PARCEIRO) return avisoDoParceiro(sim, pedidos, mudaram);
   if (sim) {
     if (mudaram === 0)
       return pedidos === 1 ? 'Já estava na Consultoria.' : 'Todos já estavam na Consultoria.';
@@ -67,4 +83,14 @@ export function avisoDaConsultoria(sim: boolean, pedidos: number, mudaram: numbe
   if (mudaram === 0)
     return pedidos === 1 ? 'Não estava na Consultoria.' : 'Nenhum estava na Consultoria.';
   return mudaram === 1 ? 'Saiu da Consultoria.' : `${mudaram} parceiros saíram da Consultoria.`;
+}
+
+/** O mesmo aviso, na Imova: o perfil de Parceiro (23/11/2026). */
+export function avisoDoParceiro(sim: boolean, pedidos: number, mudaram: number): string {
+  if (sim) {
+    if (mudaram === 0) return pedidos === 1 ? 'Já era Parceiro.' : 'Todos já eram Parceiros.';
+    return mudaram === 1 ? 'Agora é Parceiro.' : `${mudaram} contatos agora são Parceiros.`;
+  }
+  if (mudaram === 0) return pedidos === 1 ? 'Já era Cliente.' : 'Nenhum era Parceiro.';
+  return mudaram === 1 ? 'Voltou para Clientes.' : `${mudaram} contatos voltaram para Clientes.`;
 }

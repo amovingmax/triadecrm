@@ -20,6 +20,7 @@ import {
   type EventoDaLinha,
   type FiltrosConversas,
   type ItemConversa,
+  type PerfilDoParceiro,
 } from './tipos';
 import { melhorNegocio } from './escolher-negocio';
 import { chaveDoDia, nomeExibido } from './formatos';
@@ -196,6 +197,7 @@ export function montarConversas({
   etiquetas = [],
   etiquetasDoParceiro = [],
   emConsultoria = [],
+  parceiros = null,
   agora = new Date(),
 }: {
   organizacoes: OrganizacaoCrua[];
@@ -213,6 +215,13 @@ export function montarConversas({
   etiquetasDoParceiro?: { organization_id: string; tag_id: number }[];
   /** Quem foi mandado para a Consultoria pelo botão (14/10/2026). */
   emConsultoria?: readonly string[];
+  /**
+   * Clientes e Parceiros (Imova, 23/11/2026): o perfil de quem é Parceiro.
+   * Presente, só a marca põe a conversa em Parceiros (`fechou`): negócio ganho
+   * e temperatura de cliente deixam de mudar o perfil sozinhos. `null` (a
+   * KOMUNE) = a regra da Consultoria, como sempre.
+   */
+  parceiros?: ReadonlyMap<string, PerfilDoParceiro> | null;
   agora?: Date;
 }): ItemConversa[] {
   const nomeDaPessoa = new Map(catalogos.pessoas.map((p) => [p.id, p.nome]));
@@ -310,10 +319,12 @@ export function montarConversas({
       bairro: o.neighborhood,
       cidade: o.city_name,
       temperatura: o.temperature,
-      fechou:
-        ganhou.has(o.id) ||
-        TEMPERATURAS_DE_CLIENTE.includes(o.temperature) ||
-        naConsultoria.has(o.id),
+      fechou: parceiros
+        ? parceiros.has(o.id)
+        : ganhou.has(o.id) ||
+          TEMPERATURAS_DE_CLIENTE.includes(o.temperature) ||
+          naConsultoria.has(o.id),
+      ...(parceiros ? { parceiro: parceiros.get(o.id) ?? null, ganhou: ganhou.has(o.id) } : {}),
       precisaAtencao: negocio?.needs_attention ?? false,
       telefone: o.phone_e164,
       telefoneMascarado: o.phone_is_masked ?? true,

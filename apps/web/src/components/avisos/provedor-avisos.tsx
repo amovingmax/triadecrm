@@ -168,6 +168,12 @@ interface Avisos {
    * Conversas, 13/11/2026). As outras são da caixa Fornecedores.
    */
   readonly respostasDosClientes: number | null;
+  /**
+   * A ficha de cada uma das `respostasNovas` (`null` = sem ficha). Clientes e
+   * Parceiros (Imova, 23/11/2026) divide o número pela marca de Parceiro, que só
+   * a tela de Conversas conhece.
+   */
+  readonly fichasDasRespostas: readonly (string | null)[] | null;
   /** O papel desta pessoa é avisado? Leitura e financeiro não são. */
   readonly recebe: boolean;
   readonly silenciado: boolean;
@@ -209,6 +215,7 @@ interface AcoesDosAvisos {
 const SEM_AVISOS: Avisos = {
   respostasNovas: null,
   respostasDosClientes: null,
+  fichasDasRespostas: null,
   recebe: false,
   silenciado: false,
   silenciar: () => undefined,
@@ -276,6 +283,9 @@ export function ProvedorDeAvisos({
 
   const [respostasNovas, setRespostasNovas] = useState<number | null>(null);
   const [respostasDosClientes, setRespostasDosClientes] = useState<number | null>(null);
+  const [fichasDasRespostas, setFichasDasRespostas] = useState<readonly (string | null)[] | null>(
+    null,
+  );
   const [novasIds, setNovasIds] = useState<ReadonlySet<string>>(SEM_NOVAS);
   const [cartoes, setCartoes] = useState<readonly CartaoDeAviso[]>([]);
   const [silenciado, silenciar] = useSilenciado(usuarioId);
@@ -322,6 +332,12 @@ export function ProvedorDeAvisos({
     const noMenu = contaNoMenu(aEspera);
     setRespostasNovas(noMenu.length);
     setRespostasDosClientes(noMenu.filter((c) => c.organizacaoId === null).length);
+    const fichas = noMenu.map((c) => c.organizacaoId);
+    setFichasDasRespostas((atuais) =>
+      atuais !== null && atuais.length === fichas.length && atuais.every((f, i) => f === fichas[i])
+        ? atuais
+        : fichas,
+    );
     setNovasIds((atuais) => (mesmoConjunto(atuais, ids) ? atuais : new Set(ids)));
     return aEspera;
   }, []);
@@ -610,6 +626,7 @@ export function ProvedorDeAvisos({
     () => ({
       respostasNovas: recebe ? respostasNovas : null,
       respostasDosClientes: recebe ? respostasDosClientes : null,
+      fichasDasRespostas: recebe ? fichasDasRespostas : null,
       recebe,
       silenciado,
       silenciar,
@@ -635,6 +652,7 @@ export function ProvedorDeAvisos({
       recebe,
       respostasNovas,
       respostasDosClientes,
+      fichasDasRespostas,
       silenciado,
       silenciar,
       somLigado,
