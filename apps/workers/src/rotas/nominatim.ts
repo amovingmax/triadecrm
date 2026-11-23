@@ -114,9 +114,84 @@ export function lerResposta(bruto: unknown): RespostaDoNominatim {
   };
 }
 
+/**
+ * Um lugar de uma busca com vários resultados (a busca no mapa da IA da Imova,
+ * 23/11/2026). `bairro` e `cidade` saem de `address` (pedido com `addressdetails=1`).
+ */
+export type LugarDoNominatim = {
+  nome: string;
+  /** `addresstype` do OSM (road, village, suburb, city, postcode…). */
+  tipo: string;
+  bairro: string | null;
+  cidade: string | null;
+  lat: number;
+  lng: number;
+};
+
+export type RespostaComVarios = { lugares: LugarDoNominatim[]; licenca?: string };
+
+const CHAVES_DE_BAIRRO = ['suburb', 'neighbourhood', 'quarter', 'village', 'hamlet', 'city_district'] as const;
+const CHAVES_DE_CIDADE = ['city', 'town', 'municipality', 'village'] as const;
+
+function primeiroTexto(objeto: Record<string, unknown>, chaves: readonly string[]): string | null {
+  for (const chave of chaves) {
+    const valor = objeto[chave];
+    if (typeof valor === 'string' && valor.trim() !== '') return valor.trim();
+  }
+  return null;
+}
+
+/** Traduz até `limite` resultados. Lista vazia é resposta legítima. */
+export function lerLugares(bruto: unknown, limite: number): RespostaComVarios {
+  if (!Array.isArray(bruto)) {
+    throw new ErroDoNominatim('formato', 'O Nominatim devolveu algo que não é uma lista de lugares.');
+  }
+  const lugares: LugarDoNominatim[] = [];
+  let licenca: string | undefined;
+  for (const item of bruto.slice(0, limite)) {
+    const r = (item ?? {}) as Record<string, unknown>;
+    const lat = numero(r.lat);
+    const lng = numero(r.lon);
+    if (lat === undefined || lng === undefined) continue;
+    const endereco = (r.address ?? {}) as Record<string, unknown>;
+    const exibido = typeof r.display_name === 'string' ? r.display_name : '';
+    const nome = (typeof r.name === 'string' && r.name.trim() !== '' ? r.name : exibido.split(',')[0] ?? '').trim();
+    // Sem `address` (ou sem cidade nele), a cidade é a parte antes do estado no nome
+    // exibido: "Avenida X, Camurupim, Nísia Floresta, Rio Grande do Norte, …".
+    const partes = exibido.split(',').map((p) => p.trim());
+    const doEstado = partes.findIndex((p) => /rio grande do norte/i.test(p));
+    const cidade =
+      primeiroTexto(endereco, CHAVES_DE_CIDADE) ?? (doEstado > 0 && partes[doEstado - 1] !== nome ? partes[doEstado - 1] ?? null : null);
+    const bairro =
+      primeiroTexto(endereco, CHAVES_DE_BAIRRO) ??
+      (doEstado > 1 && partes[doEstado - 2] !== nome ? partes[doEstado - 2] ?? null : null);
+    lugares.push({
+      nome: nome || exibido.slice(0, 80),
+      tipo: typeof r.addresstype === 'string' ? r.addresstype : typeof r.type === 'string' ? r.type : 'lugar',
+      bairro: bairro !== null && bairro !== cidade ? bairro : null,
+      cidade,
+      lat,
+      lng,
+    });
+    if (licenca === undefined && typeof r.licence === 'string') licenca = r.licence;
+  }
+  return licenca === undefined ? { lugares } : { lugares, licenca };
+}
+
 export type ClienteDoNominatim = {
   buscar(consulta: string): Promise<RespostaDoNominatim>;
+  /**
+   * Até `limite` lugares (o de `criarClienteDoNominatim`, 3 por padrão), na caixa
+   * `viewbox` quando houver. Mesma fila e mesmo intervalo de `buscar`.
+   */
+  buscarVarios(consulta: string): Promise<RespostaComVarios>;
 };
+
+/**
+ * O Rio Grande do Norte, para a busca no mapa da IA da Imova: oeste, norte, leste, sul (a ordem
+ * do `viewbox` do Nominatim). Com `bounded=1`, nada de fora entra.
+ */
+export const CAIXA_DO_RN = '-38.6,-4.8,-34.9,-7.0';
 
 /**
  * Cliente serializado: a próxima pergunta só sai depois de `INTERVALO_MINIMO_MS`
@@ -129,7 +204,14 @@ export function criarClienteDoNominatim(argumentos: {
   intervaloMs?: number;
   fetchImpl?: typeof fetch;
   dormir?: (ms: number) => Promise<void>;
+  /** Só para `buscarVarios`: quantos resultados (1 a 10; padrão 3). */
+  limite?: number;
+  /** Só para `buscarVarios`: a caixa onde procurar ("oeste,norte,leste,sul"), fechada. */
+  viewbox?: string;
 }): ClienteDoNominatim {
+  if (argumentos.userAgent.trim() === '') {
+    throw new ErroDoNominatim('formato', 'Sem User-Agent o Nominatim não é chamado (política de uso).');
+  }
   const base = (argumentos.baseUrl ?? URL_PADRAO).replace(/\/+$/, '');
   const intervalo = argumentos.intervaloMs ?? INTERVALO_MINIMO_MS;
   const buscarNaRede = argumentos.fetchImpl ?? fetch;
@@ -138,6 +220,40 @@ export function criarClienteDoNominatim(argumentos: {
 
   let ultimoFim = 0;
   let fila: Promise<unknown> = Promise.resolve();
+
+  const limite = Math.min(Math.max(Math.trunc(argumentos.limite ?? 3), 1), 10);
+  const caixa = argumentos.viewbox === undefined ? '' : `&viewbox=${encodeURIComponent(argumentos.viewbox)}&bounded=1`;
+
+  const pedir = async (url: string): Promise<unknown> => {
+    const espera = intervalo - (Date.now() - ultimoFim);
+    if (espera > 0) await dormir(espera);
+    try {
+      const resposta = await buscarNaRede(url, {
+        headers: { 'User-Agent': argumentos.userAgent, 'Accept-Language': 'pt-BR' },
+      });
+      if (!resposta.ok) {
+        throw new ErroDoNominatim('http', `O Nominatim respondeu HTTP ${resposta.status}.`);
+      }
+      return (await resposta.json()) as unknown;
+    } catch (erro) {
+      if (erro instanceof ErroDoNominatim) throw erro;
+      throw new ErroDoNominatim(
+        'rede',
+        `Não deu para falar com o Nominatim: ${erro instanceof Error ? erro.message : String(erro)}`,
+      );
+    } finally {
+      ultimoFim = Date.now();
+    }
+  };
+
+  const varios = async (consulta: string): Promise<RespostaComVarios> =>
+    lerLugares(
+      await pedir(
+        `${base}/search?format=jsonv2&limit=${limite}&countrycodes=br&addressdetails=1${caixa}` +
+          `&q=${encodeURIComponent(consulta)}`,
+      ),
+      limite,
+    );
 
   const uma = async (consulta: string): Promise<RespostaDoNominatim> => {
     const espera = intervalo - (Date.now() - ultimoFim);
@@ -171,6 +287,14 @@ export function criarClienteDoNominatim(argumentos: {
       const proxima = fila.then(
         () => uma(consulta),
         () => uma(consulta),
+      );
+      fila = proxima.catch(() => undefined);
+      return proxima;
+    },
+    buscarVarios(consulta) {
+      const proxima = fila.then(
+        () => varios(consulta),
+        () => varios(consulta),
       );
       fila = proxima.catch(() => undefined);
       return proxima;

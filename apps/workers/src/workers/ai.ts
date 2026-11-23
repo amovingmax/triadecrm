@@ -45,6 +45,7 @@ import {
 } from '../ia/chamada-de-teste';
 import { ENSAIOS, eEnsaio, ensaiarAtendente, relatorioDoEnsaio } from '../ia/ensaio-do-atendente';
 import type { ContextoDaIa } from '../ia/execucao';
+import { criarBuscaNoMapa, nominatimDaIa } from '../ia/mapa';
 
 /** O balde privado das mídias recebidas (migração 20260905000201). */
 const BALDE_DE_MIDIAS = 'mensagens';
@@ -135,10 +136,27 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
   if (erroDaEmpresa) {
     logger.warn('não deu para ler de que empresa é o banco', { erro: erroDaEmpresa.message });
   }
+  // A busca no mapa da IA que atende (Imova, v7, 23/11/2026): só com o User-Agent que a
+  // política do OpenStreetMap pede. Sem ele, a IA responde pela v6, sem ferramenta.
+  const mapa =
+    empresa === 'imova' && env.NOMINATIM_USER_AGENT !== undefined
+      ? criarBuscaNoMapa({
+          cliente,
+          logger,
+          nominatim: nominatimDaIa({
+            userAgent: env.NOMINATIM_USER_AGENT,
+            ...(env.NOMINATIM_URL === undefined ? {} : { baseUrl: env.NOMINATIM_URL }),
+          }),
+        })
+      : undefined;
+  if (empresa === 'imova' && mapa === undefined) {
+    logger.warn('sem NOMINATIM_USER_AGENT: a busca no mapa da IA que atende fica desligada (v6)');
+  }
   const contexto: ContextoDaIa = {
     cliente,
     modelo,
     logger,
+    ...(mapa === undefined ? {} : { mapa }),
     empresa: typeof empresa === 'string' ? empresa : null,
     // A foto que o cliente manda, reconhecida pela IA que atende (Imova, 09/11/2026).
     baldeDeMidias: BALDE_DE_MIDIAS,

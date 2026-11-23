@@ -91,8 +91,76 @@ export interface RespostaDoModelo {
   readonly paradaPor: string | null;
 }
 
+/** Uma ferramenta como vai à API (a declaração do prompt, `FerramentaDoPrompt`). */
+export interface FerramentaDoPedido {
+  readonly nome: string;
+  readonly descricao: string;
+  readonly entrada: Readonly<Record<string, unknown>>;
+}
+
+/** Uma chamada de ferramenta que o modelo pediu. */
+export interface ChamadaDeFerramenta {
+  /** O `tool_use.id`, que volta no `tool_result`. */
+  readonly id: string;
+  readonly nome: string;
+  readonly entrada: unknown;
+}
+
+/**
+ * Um turno da conversa com ferramentas (a busca no mapa da IA da Imova, v7, 23/11/2026).
+ * `assistente.conteudo` são os blocos crus que a API devolveu (pensamento, texto e
+ * `tool_use`), devolvidos como vieram: a API exige o pensamento assinado de volta.
+ */
+export type TurnoComFerramentas =
+  | { readonly papel: 'usuario'; readonly texto: string }
+  | { readonly papel: 'assistente'; readonly conteudo: readonly unknown[] }
+  | {
+      readonly papel: 'resultados';
+      readonly resultados: readonly { readonly id: string; readonly texto: string; readonly erro: boolean }[];
+    };
+
+/** Uma volta do laço: o sistema, as ferramentas e a conversa até aqui. */
+export interface PedidoComFerramentas {
+  readonly modelo: string;
+  readonly sistema: string;
+  readonly maxTokens: number;
+  /** JSON Schema da resposta FINAL (a que vem quando o modelo não pede mais ferramenta). */
+  readonly esquema: Record<string, unknown>;
+  readonly ferramentas: readonly FerramentaDoPedido[];
+  readonly turnos: readonly TurnoComFerramentas[];
+  /**
+   * A última volta do laço: as ferramentas continuam declaradas (a conversa as cita, e o
+   * prefixo em cache não muda), mas o modelo não pode chamá-las (`tool_choice: none`) e
+   * responde o JSON final.
+   */
+  readonly semFerramentas?: boolean;
+}
+
+/** O que uma volta devolve: ou o modelo pediu ferramentas, ou respondeu o JSON final. */
+export type VoltaDoModelo =
+  | {
+      readonly tipo: 'ferramentas';
+      readonly chamadas: readonly ChamadaDeFerramenta[];
+      readonly conteudo: readonly unknown[];
+      readonly uso: UsoDoModelo;
+      readonly modelo: string;
+      readonly paradaPor: string | null;
+    }
+  | {
+      readonly tipo: 'final';
+      readonly json: unknown;
+      readonly uso: UsoDoModelo;
+      readonly modelo: string;
+      readonly paradaPor: string | null;
+    };
+
 export interface ClienteDoModelo {
   conversar(pedido: PedidoAoModelo): Promise<RespostaDoModelo>;
+  /**
+   * Uma volta do laço com ferramentas. Opcional: os dublês antigos não a têm, e quem
+   * chama (`executarComFerramentas`) recusa com nome quando ela falta.
+   */
+  conversarComFerramentas?(pedido: PedidoComFerramentas): Promise<VoltaDoModelo>;
 }
 
 /** Erro de conversa com o modelo, com o nome do modelo e o status quando houver. */
@@ -315,6 +383,61 @@ export function corpoDaRequisicao(pedido: PedidoAoModelo): Anthropic.MessageCrea
   };
 }
 
+/** As mensagens da API a partir dos turnos do laço. */
+function mensagensDosTurnos(turnos: readonly TurnoComFerramentas[]): Anthropic.MessageParam[] {
+  return turnos.map((turno): Anthropic.MessageParam => {
+    switch (turno.papel) {
+      case 'usuario':
+        return { role: 'user', content: turno.texto };
+      case 'assistente':
+        return { role: 'assistant', content: turno.conteudo as Anthropic.ContentBlockParam[] };
+      case 'resultados':
+        return {
+          role: 'user',
+          content: turno.resultados.map((r) => ({
+            type: 'tool_result' as const,
+            tool_use_id: r.id,
+            content: r.texto,
+            ...(r.erro ? { is_error: true } : {}),
+          })),
+        };
+    }
+  });
+}
+
+/**
+ * O corpo de uma volta com ferramentas. O mesmo de `corpoDaRequisicao` (sistema em
+ * cache, saída estruturada, esforço por modelo), mais `tools` e a conversa inteira.
+ */
+export function corpoComFerramentas(pedido: PedidoComFerramentas): Anthropic.MessageCreateParamsNonStreaming {
+  const esforco = ESFORCO_POR_MODELO[pedido.modelo];
+  return {
+    model: pedido.modelo,
+    max_tokens: pedido.maxTokens,
+    system: [{ type: 'text', text: pedido.sistema, cache_control: { type: 'ephemeral' } }],
+    tools: pedido.ferramentas.map((f) => ({
+      name: f.nome,
+      description: f.descricao,
+      input_schema: f.entrada as Anthropic.Tool.InputSchema,
+    })),
+    ...(pedido.semFerramentas === true ? { tool_choice: { type: 'none' as const } } : {}),
+    messages: mensagensDosTurnos(pedido.turnos),
+    output_config: {
+      format: { type: 'json_schema', schema: esquemaLimpo(pedido.esquema) },
+      ...(esforco === undefined ? {} : { effort: esforco }),
+    },
+  };
+}
+
+function usoDaResposta(usage: Anthropic.Usage): UsoDoModelo {
+  return {
+    entrada: usage.input_tokens,
+    saida: usage.output_tokens,
+    escritaDeCache: usage.cache_creation_input_tokens ?? 0,
+    leituraDeCache: usage.cache_read_input_tokens ?? 0,
+  };
+}
+
 /** A categoria da recusa, quando a API a manda (`stop_details`, só em `refusal`). */
 function categoriaDaRecusa(resposta: unknown): string | null {
   const detalhes = (resposta as { stop_details?: { category?: unknown } | null }).stop_details;
@@ -379,6 +502,45 @@ export function clienteAnthropic(opcoes: OpcoesDoCliente): ClienteDoModelo {
           leituraDeCache: resposta.usage.cache_read_input_tokens ?? 0,
         },
       };
+    },
+
+    async conversarComFerramentas(pedido: PedidoComFerramentas): Promise<VoltaDoModelo> {
+      let resposta;
+      try {
+        resposta = await anthropic.messages.create(corpoComFerramentas(pedido));
+      } catch (erro) {
+        throw traduzirErro(erro);
+      }
+      const uso = usoDaResposta(resposta.usage);
+      if (resposta.stop_reason === 'refusal') {
+        throw new RecusaDoModeloError(categoriaDaRecusa(resposta), uso, resposta.model);
+      }
+      const chamadas = resposta.content
+        .filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+        .map((b) => ({ id: b.id, nome: b.name, entrada: b.input }));
+      if (chamadas.length > 0) {
+        return {
+          tipo: 'ferramentas',
+          chamadas,
+          conteudo: resposta.content,
+          uso,
+          modelo: resposta.model,
+          paradaPor: resposta.stop_reason,
+        };
+      }
+      const texto = primeiroTexto(resposta.content);
+      if (texto === null) {
+        throw new RespostaIlegivelError(
+          `nenhum bloco de texto nem ferramenta (parada: ${resposta.stop_reason ?? 'desconhecida'})`,
+        );
+      }
+      let json: unknown;
+      try {
+        json = JSON.parse(texto);
+      } catch {
+        throw new RespostaIlegivelError('o bloco de texto não é JSON');
+      }
+      return { tipo: 'final', json, uso, modelo: resposta.model, paradaPor: resposta.stop_reason };
     },
   };
 }

@@ -15,7 +15,7 @@ import {
   textoParaOLink,
 } from './atendente';
 import { bancoFalso } from './banco-de-teste';
-import type { PedidoAoModelo } from './cliente';
+import type { PedidoAoModelo, PedidoComFerramentas, VoltaDoModelo } from './cliente';
 import { clienteDuble } from './duble';
 import type { ContextoDaIa } from './execucao';
 
@@ -534,5 +534,67 @@ describe('o e-mail para ofertas (v6, 17/11/2026)', () => {
     const r = await atenderCliente({ ...contexto, cliente }, PAYLOAD);
     expect(r.feito).toBe(true);
     expect(chamadas('ia_atendente_responder')).toHaveLength(1);
+  });
+});
+
+describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
+  function comMapa(montado: ReturnType<typeof montar>, voltas: VoltaDoModelo[]) {
+    const pedidos: PedidoComFerramentas[] = [];
+    const buscas: string[] = [];
+    const contexto: ContextoDaIa = {
+      ...montado.contexto,
+      mapa: {
+        buscar: (consulta) => {
+          buscas.push(consulta);
+          return Promise.resolve({ lugares: [], doCache: false });
+        },
+      },
+      modelo: {
+        ...montado.contexto.modelo,
+        conversarComFerramentas: (pedido) => {
+          pedidos.push(pedido);
+          const volta = voltas.shift();
+          return volta === undefined ? Promise.reject(new Error('sem volta')) : Promise.resolve(volta);
+        },
+      },
+    };
+    return { contexto, pedidos, buscas };
+  }
+  const uso = { entrada: 100, saida: 20, escritaDeCache: 0, leituraDeCache: 0 };
+
+  it('com mapa: a v7 com a ferramenta; a busca vai ao mapa e a resposta cita a volta final', async () => {
+    const montado = montar(saidaDoModelo());
+    const { contexto, pedidos, buscas } = comMapa(montado, [
+      {
+        tipo: 'ferramentas',
+        chamadas: [{ id: 't1', nome: 'buscar_no_mapa', entrada: { referencia: 'Condomínio Serv Club', cidade: 'Nísia Floresta' } }],
+        conteudo: [{ type: 'tool_use', id: 't1', name: 'buscar_no_mapa', input: {} }],
+        uso,
+        modelo: 'claude-haiku-5-5',
+        paradaPor: 'tool_use',
+      },
+      { tipo: 'final', json: saidaDoModelo(), uso, modelo: 'claude-haiku-5-5', paradaPor: 'end_turn' },
+    ]);
+    const r = await atenderCliente(contexto, PAYLOAD);
+    expect(r).toMatchObject({ feito: true, motivo: 'enviar_link_da_agenda' });
+    expect(buscas).toEqual(['Condomínio Serv Club, Nísia Floresta, RN']);
+    expect(pedidos).toHaveLength(2);
+    expect(pedidos[0]?.ferramentas.map((f) => f.nome)).toEqual(['buscar_no_mapa']);
+    expect(pedidos[0]?.sistema).toContain('A BUSCA NO MAPA:');
+    const runs = montado.banco.tabelas.ai_runs as Record<string, unknown>[];
+    expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v7', 'atendente-imova@v7']);
+    expect(montado.chamadas('ia_atendente_enviar_link')[0]).toMatchObject({
+      p_ai_run_id: runs[1]?.id,
+      p_prompt_version: 'atendente-imova@v7',
+    });
+    expect(montado.pedidos).toHaveLength(0);
+  });
+
+  it('sem mapa: a v6 de sempre, sem ferramenta (é a volta fácil)', async () => {
+    const montado = montar(saidaDoModelo());
+    await atenderCliente(montado.contexto, PAYLOAD);
+    const runs = montado.banco.tabelas.ai_runs as Record<string, unknown>[];
+    expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v6']);
+    expect(montado.pedidos[0]?.sistema).not.toContain('A BUSCA NO MAPA:');
   });
 });

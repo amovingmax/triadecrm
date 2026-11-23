@@ -125,6 +125,14 @@ const aiEnvSchema = baseEnvSchema.extend({
    * do worker (apps/workers/src/ia/duble-servidor.ts).
    */
   ANTHROPIC_BASE_URL: optionalUrl,
+  /**
+   * A busca no mapa da IA que atende da Imova (v7, 23/11/2026): o User-Agent que o
+   * OpenStreetMap exige, com contato (política do Nominatim). Vazio = a busca fica
+   * desligada e a IA responde pela v6, sem ferramenta; o worker sobe do mesmo jeito.
+   */
+  NOMINATIM_USER_AGENT: optionalString,
+  /** Vazio = o serviço público do OpenStreetMap. */
+  NOMINATIM_URL: optionalUrl,
 });
 
 /**

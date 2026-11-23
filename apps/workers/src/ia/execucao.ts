@@ -42,10 +42,19 @@ import {
   type ImagemAceita,
   type ImagemParaOModelo,
   type MapaDePseudonimos,
+  type ModeloAlvo,
   type PromptVersionado,
+  verificarSemPiiNaConversa,
 } from '@komune/prompts';
 
-import { RecusaDoModeloError, RespostaIlegivelError, type ClienteDoModelo } from './cliente';
+import {
+  RecusaDoModeloError,
+  RespostaIlegivelError,
+  type ChamadaDeFerramenta,
+  type ClienteDoModelo,
+  type TurnoComFerramentas,
+} from './cliente';
+import type { BuscaNoMapa } from './mapa';
 import { USO_ZERADO, registrarChamada, type VinculosDaChamada } from './registro';
 
 import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
@@ -139,6 +148,12 @@ export interface ContextoDaIa {
    * nenhum dos dois, a foto conta como indisponível.
    */
   readonly baldeDeMidias?: string;
+  /**
+   * O mapa da IA que atende (Imova, v7, 23/11/2026): o OpenStreetMap com cache. Ausente (sem
+   * `NOMINATIM_USER_AGENT` no worker): a busca fica desligada e a IA que atende
+   * responde como antes.
+   */
+  readonly mapa?: BuscaNoMapa;
 }
 
 /** O que uma chamada leva além do texto. Hoje, só imagens. */
@@ -393,6 +408,268 @@ export async function executar<Entrada, Saida>(
     custoUsd: registro.custoUsd,
     promptVersion,
   };
+}
+
+// ===========================================================================
+// O LAÇO COM FERRAMENTAS (a busca no mapa da IA da Imova, v7, 23/11/2026)
+// ===========================================================================
+
+/** O laço passou do teto de voltas ou do prazo sem resposta final. Nada foi decidido. */
+export class TetoDoLacoError extends Error {
+  readonly motivo: 'voltas' | 'prazo';
+  readonly aiRunIds: readonly number[];
+
+  constructor(motivo: 'voltas' | 'prazo', aiRunIds: readonly number[]) {
+    super(`O laço com ferramentas parou sem resposta final (${motivo === 'voltas' ? 'teto de voltas' : 'prazo'}).`);
+    this.name = 'TetoDoLacoError';
+    this.motivo = motivo;
+    this.aiRunIds = aiRunIds;
+  }
+}
+
+/** Quem executa uma ferramenta: devolve o texto que volta ao modelo. Nunca lança. */
+export type FerramentaDoLaco = (entrada: unknown) => Promise<{ readonly texto: string; readonly erro?: boolean }>;
+
+export interface OpcoesDoLaco {
+  /** Quantas idas ao modelo, no máximo (cada uma é uma linha em `ai_runs`). */
+  readonly maxVoltas: number;
+  /** Prazo do laço inteiro, em ms: passou, a próxima volta não sai. */
+  readonly prazoMs?: number;
+  /** O modelo, quando a configuração escolheu outro que não o da versão. */
+  readonly modelo?: ModeloAlvo;
+}
+
+export interface ExecutadaComFerramentas<Saida> {
+  readonly saida: Saida;
+  readonly mapa: MapaDePseudonimos;
+  /** A linha da resposta final (a que a mensagem enviada cita), como em `executar`. */
+  readonly aiRunId: number;
+  readonly aiRunIds: readonly number[];
+  readonly custoUsd: number;
+  readonly voltas: number;
+  readonly chamadas: readonly { readonly nome: string; readonly entrada: unknown }[];
+  readonly promptVersion: string;
+}
+
+/**
+ * `executar`, em laço, para um prompt com ferramentas.
+ *
+ * As mesmas portas, na mesma ordem, e a cada volta: a primeira mensagem passa por
+ * `prepararChamada` (pseudonimização e auditoria, como toda chamada); antes de CADA ida
+ * ao modelo, a supressão do alvo e o freio do orçamento são perguntados de novo; CADA
+ * volta vira uma linha em `ai_runs` (modelo, tokens, custo); e CADA resultado de
+ * ferramenta passa pela varredura de conversa antes de voltar ao modelo — o resultado é
+ * texto que o código montou, mas com dado de fora dentro (o nome que o mapa deu).
+ *
+ * A última volta não oferece ferramenta (`semFerramentas`): o modelo responde o JSON
+ * final com o que já tem. Ainda assim sem resposta final (não deve acontecer), ou prazo
+ * estourado: `TetoDoLacoError`, e nada foi decidido.
+ *
+ * Quem usa: a IA que atende da Imova, desde a v7 (23/11/2026), com `buscar_no_mapa`.
+ */
+export async function executarComFerramentas<Entrada, Saida>(
+  contexto: ContextoDaIa,
+  prompt: PromptVersionado<Entrada, Saida>,
+  entrada: unknown,
+  contato: ContextoDoContato,
+  vinculos: VinculosDaChamada,
+  ferramentas: Readonly<Record<string, FerramentaDoLaco>>,
+  opcoes: OpcoesDoLaco,
+): Promise<ExecutadaComFerramentas<Saida>> {
+  const promptVersion = `${prompt.id}@v${prompt.versao}`;
+  const modelo = opcoes.modelo ?? prompt.modelo;
+  const comum = { proposito: prompt.proposito, modelo, promptVersion, vinculos } as const;
+  const conversarComFerramentas = contexto.modelo.conversarComFerramentas?.bind(contexto.modelo);
+  if (conversarComFerramentas === undefined) {
+    throw new Error(`o cliente do modelo não conversa com ferramentas (${promptVersion})`);
+  }
+  if (prompt.ferramentas === undefined || prompt.ferramentas.length === 0) {
+    throw new Error(`${promptVersion} não declara ferramentas: use executar`);
+  }
+
+  // ---------------------------------------------------------------- montagem
+  let chamada;
+  try {
+    chamada = prepararChamada(prompt, entrada, contato);
+  } catch (erro) {
+    if (erro instanceof PiiNaChamadaError || erro instanceof TipoNaoAuditavelError) {
+      const registro = await registrarChamada(contexto.cliente, contexto.logger, {
+        ...comum,
+        situacao: 'bloqueado',
+        uso: USO_ZERADO,
+        latenciaMs: null,
+        saida: null,
+        erro: erro.message.slice(0, 4000),
+      });
+      const taskId = await abrirTarefaDeBloqueio(contexto, prompt.id, erro.message, vinculos, registro.id);
+      contexto.logger.warn('chamada bloqueada pelo guardrail de PII', {
+        prompt: promptVersion,
+        ai_run_id: registro.id,
+        task_id: taskId,
+        erro: erro.name,
+      });
+      throw new ChamadaBloqueadaError(erro.message, registro.id, taskId);
+    }
+    throw erro;
+  }
+
+  const comecou = Date.now();
+  const aiRunIds: number[] = [];
+  const feitas: { nome: string; entrada: unknown }[] = [];
+  let custoUsd = 0;
+  const turnos: TurnoComFerramentas[] = [{ papel: 'usuario', texto: chamada.mensagem }];
+  const bloquear = async (erro: string): Promise<number> => {
+    const registro = await registrarChamada(contexto.cliente, contexto.logger, {
+      ...comum,
+      situacao: 'bloqueado',
+      uso: USO_ZERADO,
+      latenciaMs: null,
+      saida: null,
+      erro,
+    });
+    aiRunIds.push(registro.id);
+    return registro.id;
+  };
+
+  for (let volta = 1; volta <= opcoes.maxVoltas; volta += 1) {
+    if (opcoes.prazoMs !== undefined && Date.now() - comecou > opcoes.prazoMs) {
+      throw new TetoDoLacoError('prazo', aiRunIds);
+    }
+    if (await alvoEstaSuprimido(contexto, vinculos)) {
+      const id = await bloquear('alvo suprimido na entrega (RF-CON-18): a volta não saiu');
+      throw new AlvoSuprimidoError(vinculos.organizationId ?? null, id);
+    }
+    const freio = await orcamentoPermite(contexto, prompt.proposito);
+    if (freio !== null) {
+      const id = await bloquear(`orçamento de IA: ${freio} — a volta não saiu`);
+      throw new OrcamentoEsgotadoError(freio, id);
+    }
+
+    const inicioDaVolta = Date.now();
+    let resposta;
+    try {
+      resposta = await conversarComFerramentas({
+        modelo,
+        sistema: chamada.sistema,
+        maxTokens: chamada.maxTokens,
+        esquema: esquemaDeSaida(prompt),
+        ferramentas: prompt.ferramentas,
+        turnos,
+        ...(volta === opcoes.maxVoltas ? { semFerramentas: true } : {}),
+      });
+    } catch (erro) {
+      const recusa = erro instanceof RecusaDoModeloError ? erro : null;
+      const registro = await registrarChamada(contexto.cliente, contexto.logger, {
+        ...comum,
+        situacao: 'erro',
+        uso: recusa?.uso ?? USO_ZERADO,
+        latenciaMs: Date.now() - inicioDaVolta,
+        saida: null,
+        erro: (erro instanceof Error ? erro.message : String(erro)).slice(0, 4000),
+      });
+      aiRunIds.push(registro.id);
+      if (recusa !== null) throw recusa.registrada(registro.id);
+      throw erro;
+    }
+
+    if (resposta.tipo === 'final') {
+      let saida: Saida;
+      try {
+        saida = chamada.interpretar(resposta.json);
+      } catch (erro) {
+        const registro = await registrarChamada(contexto.cliente, contexto.logger, {
+          ...comum,
+          situacao: 'erro',
+          uso: resposta.uso,
+          latenciaMs: Date.now() - inicioDaVolta,
+          saida: resposta.json,
+          erro: `a saída não passou pelo schema de ${promptVersion}: ${
+            erro instanceof Error ? erro.message : String(erro)
+          }`.slice(0, 4000),
+        });
+        aiRunIds.push(registro.id);
+        throw new RespostaIlegivelError(`fora do schema de ${promptVersion}`);
+      }
+      const registro = await registrarChamada(contexto.cliente, contexto.logger, {
+        ...comum,
+        situacao: 'ok',
+        uso: resposta.uso,
+        latenciaMs: Date.now() - inicioDaVolta,
+        saida,
+        erro: null,
+      });
+      aiRunIds.push(registro.id);
+      custoUsd += registro.custoUsd;
+      contexto.logger.info('laço com ferramentas concluído', {
+        prompt: promptVersion,
+        modelo: resposta.modelo,
+        voltas: volta,
+        ferramentas: feitas.length,
+        custo_usd: Math.round(custoUsd * 1e6) / 1e6,
+        latencia_ms: Date.now() - comecou,
+      });
+      return {
+        saida,
+        mapa: chamada.mapa,
+        aiRunId: registro.id,
+        aiRunIds,
+        custoUsd,
+        voltas: volta,
+        chamadas: feitas,
+        promptVersion,
+      };
+    }
+
+    // O modelo pediu ferramentas: a volta é registrada com o que ele pediu.
+    const pedidas: readonly ChamadaDeFerramenta[] = resposta.chamadas;
+    const registro = await registrarChamada(contexto.cliente, contexto.logger, {
+      ...comum,
+      situacao: 'ok',
+      uso: resposta.uso,
+      latenciaMs: Date.now() - inicioDaVolta,
+      saida: { volta, ferramentas: pedidas.map((c) => ({ nome: c.nome, entrada: c.entrada })) },
+      erro: null,
+    });
+    aiRunIds.push(registro.id);
+    custoUsd += registro.custoUsd;
+
+    const resultados: { id: string; texto: string; erro: boolean }[] = [];
+    for (const pedida of pedidas) {
+      feitas.push({ nome: pedida.nome, entrada: pedida.entrada });
+      const executora = ferramentas[pedida.nome];
+      let resultado: { texto: string; erro?: boolean };
+      if (executora === undefined) {
+        resultado = { texto: `ferramenta desconhecida: ${pedida.nome}`, erro: true };
+      } else {
+        try {
+          resultado = await executora(pedida.entrada);
+        } catch (erro) {
+          contexto.logger.warn('a ferramenta falhou', {
+            prompt: promptVersion,
+            ferramenta: pedida.nome,
+            erro: erro instanceof Error ? erro.message.slice(0, 300) : String(erro),
+          });
+          resultado = { texto: 'a ferramenta falhou agora; siga com o que já tem', erro: true };
+        }
+      }
+      // O resultado volta ao modelo: a mesma auditoria do que vem de fora. O que ela
+      // barra não sai (fica registrado como bloqueado) e o modelo recebe "indisponível":
+      // a resposta ao cliente não cai por causa de uma ferramenta.
+      const problemas = verificarSemPiiNaConversa(resultado.texto);
+      if (problemas.length > 0) {
+        await bloquear(`o resultado de ${pedida.nome} trouxe ${problemas.map((p) => p.tipo).join(', ')}: não voltou ao modelo`);
+        contexto.logger.warn('o resultado da ferramenta foi barrado pela auditoria', {
+          prompt: promptVersion,
+          ferramenta: pedida.nome,
+          tipos: problemas.map((p) => p.tipo),
+        });
+        resultado = { texto: 'resultado indisponível agora; siga com o que já tem', erro: true };
+      }
+      resultados.push({ id: pedida.id, texto: resultado.texto, erro: resultado.erro === true });
+    }
+    turnos.push({ papel: 'assistente', conteudo: resposta.conteudo }, { papel: 'resultados', resultados });
+  }
+  throw new TetoDoLacoError('voltas', aiRunIds);
 }
 
 /**

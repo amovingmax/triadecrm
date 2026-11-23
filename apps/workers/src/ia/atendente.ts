@@ -43,13 +43,18 @@ import {
   RESPOSTAS_AS_OFERTAS,
   TIPOS_DA_AGENDA,
   FRASE_DA_VISITA,
+  MAX_BUSCAS_NO_MAPA,
+  MAX_VOLTAS_DO_ATENDENTE,
   atendenteImovaV6,
+  atendenteImovaV7,
   reidratar,
   sistemaComBaseV6,
+  sistemaComBaseV7,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
 import { buscarContatoDaFicha } from './banco';
+import { ferramentaBuscarNoMapa } from './busca-no-mapa';
 import { ErroDoModelo, RespostaIlegivelError } from './cliente';
 import {
   aplicarReconhecimentos,
@@ -61,7 +66,9 @@ import {
   ChamadaBloqueadaError,
   type ContextoDaIa,
   OrcamentoEsgotadoError,
+  TetoDoLacoError,
   executar,
+  executarComFerramentas,
   leadIdCurto,
 } from './execucao';
 
@@ -457,15 +464,35 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     ficha.emails.length > 0,
   );
 
-  const prompt: PromptVersionado<EntradaDoAtendenteV6, SaidaDoAtendenteV6> = {
-    ...atendenteImovaV6,
-    modelo: (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo,
-    sistema: sistemaComBaseV6(base),
-  };
+  // A busca no mapa (v7, 23/11/2026): com o mapa no worker (NOMINATIM_USER_AGENT), a IA
+  // tem a ferramenta `buscar_no_mapa` e a chamada vira um laço; sem ele, a v6 de sempre.
+  const mapa = contexto.mapa;
+  const comMapa = mapa !== undefined && typeof contexto.modelo.conversarComFerramentas === 'function';
+  const modelo = (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo;
+  const prompt: PromptVersionado<EntradaDoAtendenteV6, SaidaDoAtendenteV6> = comMapa
+    ? { ...atendenteImovaV7, modelo, sistema: sistemaComBaseV7(base) }
+    : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(base) };
 
   let executada;
   try {
-    executada = await executar(contexto, prompt, entrada, contato, vinculos);
+    executada = comMapa
+      ? await executarComFerramentas(
+          contexto,
+          prompt,
+          entrada,
+          contato,
+          vinculos,
+          {
+            buscar_no_mapa: ferramentaBuscarNoMapa({
+              cliente: contexto.cliente,
+              busca: mapa,
+              logger: contexto.logger,
+              maxBuscas: MAX_BUSCAS_NO_MAPA,
+            }),
+          },
+          { maxVoltas: MAX_VOLTAS_DO_ATENDENTE },
+        )
+      : await executar(contexto, prompt, entrada, contato, vinculos);
   } catch (erro) {
     if (erro instanceof ChamadaBloqueadaError) {
       return passarParaGente(
@@ -485,7 +512,11 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
         null,
       );
     }
-    if (erro instanceof RespostaIlegivelError || (erro instanceof ErroDoModelo && !erro.transitorio)) {
+    if (
+      erro instanceof RespostaIlegivelError ||
+      erro instanceof TetoDoLacoError ||
+      (erro instanceof ErroDoModelo && !erro.transitorio)
+    ) {
       return passarParaGente(
         contexto,
         payload.conversation_id,
