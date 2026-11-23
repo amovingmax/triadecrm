@@ -11318,3 +11318,11 @@ Pedido: "Quero conseguir filtrar e categorizar todas as pessoas que tenho contat
   - tela: "Perfil" é o primeiro filtro da barra (só na Imova, `FILTRO_DE_PERFIL`): Clientes, Parceiros e, no grupo "Parceiros por tag", Proprietários, Colaboradores e Inquilinos. Vai para a URL (`?perfil=inquilino`), conta no "Limpar (n)" e no estado vazio;
   - verificado: pgTAP 200 (14) no banco local da Imova; no banco local da KOMUNE, numa transação desfeita com as duas migrações, 200 (14), 104 (54), 09 (50), 110 (23) e 111 (35) passam, e o banco ficou como estava. Vitest 690 (inclui `perfil-na-lista.test.ts`, Imova e KOMUNE). No site local: sem filtro 75; Clientes 71; Parceiros 4; Proprietários 2; Colaboradores 1; Inquilinos 1; nenhum erro no console.
 - **Pendente:** publicar, só com pedido: as duas migrações na Imova antes do site (antes, conferir em produção que o corpo de `search_organizations` é o da 20260911100000). A KOMUNE recebe as duas na próxima `komune migrar`, sem mudança de comportamento.
+
+### NO AR na Imova em 23/11/2026, ~17h20 (pedido: "Pode subir essa atualização pro ar")
+
+- **Código:** `main` em `653afe0` (avanço rápido da `parceiros-tres-tags`). Antes de publicar, a lista de Prospectados passou a pedir a coluna `consultoria.tipo` só na Imova (o banco da KOMUNE ainda não a tem; sem isso, a próxima publicação do site da KOMUNE quebraria a lista).
+- **Banco da Imova:** migrações `20261123200000` e `20261123210000` (`publicar-banco imova migrar`), depois de um ensaio em produção numa transação desfeita: 41 contatos, 41 Clientes, 0 Parceiros; sem tag e o botão antigo recusados (`falta_a_tag`); `parceiros_marcar` com Inquilino → 1 Inquilino, 1 Parceiro, 40 Clientes; uma `search_organizations` só. Antes, o md5 do corpo de `search_organizations` em produção era o da 20260911100000. Conferido depois: regra com as três tags, `parceiros_marcar` e a busca com `p_perfil`, `consultoria` com 0 linhas.
+- **Site da Imova:** `imova-ft8s50sr7` em imova-crm.vercel.app (volta: `imova-r60yey7yk`), pela cópia limpa `~/triadecrm-publicar-imova`.
+- **KOMUNE não foi tocada:** nem banco nem site. Na próxima `komune migrar` recebe a 20261123120000, a 20261123200000 (só a regra da coluna) e a 20261123210000 (`p_perfil`, sem mudança sem ele).
+- **Não deu para conferir aqui:** a tela em produção com login de verdade.
