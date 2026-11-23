@@ -16,7 +16,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { contarFiltros, SITUACOES_DO_CONTATO, type Catalogos, type FiltrosParceiros } from './tipos';
+import {
+  contarFiltros,
+  FILTRO_DE_PERFIL,
+  PERFIS_DA_LISTA,
+  SITUACOES_DO_CONTATO,
+  type Catalogos,
+  type FiltrosParceiros,
+} from './tipos';
 
 /** Valor do "sem filtro" no Radix Select, que não aceita item com valor vazio. */
 const TODOS = 'todos';
@@ -65,6 +72,16 @@ export function BarraFiltros({
               lista, e a pergunta da manhã é "para quem eu ligo?" — quem ainda não
               foi contatado, ou quem não atendeu e está esperando a próxima tentativa.
               Categoria e cidade recortam o QUE; este recorta o PRÓXIMO PASSO. */}
+          {/* Clientes e Parceiros (Imova, 23/11/2026): quem é quem na base, com as
+              três tags dos Parceiros. Na KOMUNE não aparece. */}
+          {FILTRO_DE_PERFIL ? (
+            <FiltroLista
+              rotulo="Perfil"
+              valor={filtros.perfil}
+              aoMudar={(v) => aoMudar({ perfil: v, pagina: 1 })}
+              opcoes={PERFIS_DA_LISTA.map((p) => ({ ...p }))}
+            />
+          ) : null}
           <FiltroLista
             rotulo="Contato"
             valor={filtros.contato}

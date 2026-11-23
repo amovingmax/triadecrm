@@ -77,6 +77,7 @@ export function chaveDaBusca(f: FiltrosParceiros) {
     // página do filtro anterior direto do cache — a lista mudaria de rótulo e não
     // de conteúdo, e ninguém perceberia.
     f.contato,
+    f.perfil,
     f.pagina,
   ] as const;
 }
@@ -95,6 +96,7 @@ export async function buscarParceiros(f: FiltrosParceiros): Promise<ResultadoBus
     p_stage_id: f.etapaId ?? undefined,
     p_owner_id: f.responsavelId ?? undefined,
     p_contato: f.contato ?? undefined,
+    p_perfil: f.perfil ?? undefined,
     p_limit: POR_PAGINA,
     p_offset: (Math.max(1, f.pagina) - 1) * POR_PAGINA,
   });

@@ -14307,6 +14307,7 @@ export type Database = {
           p_limit?: number
           p_offset?: number
           p_owner_id?: string
+          p_perfil?: string
           p_stage_id?: number
           q?: string
         }

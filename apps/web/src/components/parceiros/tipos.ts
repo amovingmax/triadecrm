@@ -1,5 +1,7 @@
 import type { OrgKind, Temperature } from '@komune/schema';
 
+import { EMPRESA } from '@/lib/empresa';
+
 /**
  * Tipos da tela de Parceiros.
  *
@@ -72,6 +74,30 @@ function ehSituacao(v: string): v is SituacaoDoContato {
   return SITUACOES_DO_CONTATO.some((s) => s.valor === v);
 }
 
+/**
+ * O perfil (Imova, 23/11/2026): "a aba de prospectados também deve aparecer um
+ * filtro para buscarmos os clientes e os parceiros". Cliente é quem não tem a
+ * marca de Parceiro (`public.consultoria`); Parceiro, quem tem; e as três tags.
+ * Espelha os valores que `search_organizations(p_perfil)` aceita.
+ */
+export type PerfilDaLista = 'cliente' | 'parceiro' | 'proprietario' | 'colaborador' | 'inquilino';
+
+export const PERFIS_DA_LISTA: readonly { valor: PerfilDaLista; rotulo: string; grupo?: string }[] =
+  [
+    { valor: 'cliente', rotulo: 'Clientes' },
+    { valor: 'parceiro', rotulo: 'Parceiros' },
+    { valor: 'proprietario', rotulo: 'Proprietários', grupo: 'Parceiros por tag' },
+    { valor: 'colaborador', rotulo: 'Colaboradores', grupo: 'Parceiros por tag' },
+    { valor: 'inquilino', rotulo: 'Inquilinos', grupo: 'Parceiros por tag' },
+  ];
+
+/** O filtro de perfil existe nesta empresa? Só onde há Clientes e Parceiros (a Imova). */
+export const FILTRO_DE_PERFIL: boolean = EMPRESA.modulos.clientesEParceiros;
+
+function ehPerfil(v: string): v is PerfilDaLista {
+  return PERFIS_DA_LISTA.some((p) => p.valor === v);
+}
+
 export type ResultadoBusca = {
   linhas: LinhaParceiro[];
   total: number;
@@ -111,6 +137,8 @@ export type FiltrosParceiros = {
   responsavelId: string | null;
   /** Recorte pelo último contato de gente. */
   contato: SituacaoDoContato | null;
+  /** Cliente, Parceiro ou uma tag (só na Imova). */
+  perfil: PerfilDaLista | null;
   /** Começa em 1. */
   pagina: number;
 };
@@ -122,6 +150,7 @@ export const FILTROS_VAZIOS: FiltrosParceiros = {
   etapaId: null,
   responsavelId: null,
   contato: null,
+  perfil: null,
   pagina: 1,
 };
 
@@ -133,13 +162,14 @@ export function temRecorte(f: FiltrosParceiros): boolean {
     f.cidadeId !== null ||
     f.etapaId !== null ||
     f.responsavelId !== null ||
-    f.contato !== null
+    f.contato !== null ||
+    f.perfil !== null
   );
 }
 
 /** Quantos filtros de lista (fora a busca) estão ligados: alimenta o contador do botão. */
 export function contarFiltros(f: FiltrosParceiros): number {
-  return [f.categoriaId, f.cidadeId, f.etapaId, f.responsavelId, f.contato].filter(
+  return [f.categoriaId, f.cidadeId, f.etapaId, f.responsavelId, f.contato, f.perfil].filter(
     (v) => v !== null,
   ).length;
 }
@@ -169,6 +199,8 @@ export function filtrosDaUrl(params: Record<string, string | string[] | undefine
     // Valor desconhecido na URL vira "sem filtro", e não um erro: é um link velho
     // ou digitado à mão, e a lista inteira é uma resposta melhor que uma tela quebrada.
     contato: ehSituacao(texto('contato')) ? (texto('contato') as SituacaoDoContato) : null,
+    perfil:
+      FILTRO_DE_PERFIL && ehPerfil(texto('perfil')) ? (texto('perfil') as PerfilDaLista) : null,
     pagina: inteiro('pagina') ?? 1,
   } satisfies FiltrosParceiros;
 }
@@ -182,6 +214,7 @@ export function urlDosFiltros(f: FiltrosParceiros): string {
   if (f.etapaId) p.set('etapa', String(f.etapaId));
   if (f.responsavelId) p.set('responsavel', f.responsavelId);
   if (f.contato) p.set('contato', f.contato);
+  if (f.perfil) p.set('perfil', f.perfil);
   if (f.pagina > 1) p.set('pagina', String(f.pagina));
   const busca = p.toString();
   return busca ? `?${busca}` : '';

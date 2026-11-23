@@ -471,11 +471,7 @@ export function FiltroDaParceria({
 }) {
   const semTag = porTipo.get(SEM_TAG) ?? 0;
   return (
-    <div
-      role="group"
-      aria-label="Que tag mostrar"
-      className="flex flex-wrap gap-1.5 pb-0.5"
-    >
+    <div role="group" aria-label="Que tag mostrar" className="flex flex-wrap gap-1.5 pb-0.5">
       <ChipDeAba ativo={tipo === 'todos'} contagem={total} onClick={() => aoTrocar('todos')}>
         Todos
       </ChipDeAba>

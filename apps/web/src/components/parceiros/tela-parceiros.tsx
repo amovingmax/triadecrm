@@ -23,6 +23,7 @@ import { useEhCelular } from './usar-eh-celular';
 import {
   contarFiltros,
   FILTROS_VAZIOS,
+  PERFIS_DA_LISTA,
   POR_PAGINA,
   temRecorte,
   urlDosFiltros,
@@ -444,6 +445,8 @@ function descreverRecorte(
 ): string {
   const partes: string[] = [];
   if (filtros.q.trim()) partes.push(`busca "${filtros.q.trim()}"`);
+  const perfil = PERFIS_DA_LISTA.find((p) => p.valor === filtros.perfil);
+  if (perfil) partes.push(`o perfil ${perfil.rotulo}`);
   const categoria = catalogos.categorias.find((c) => c.id === filtros.categoriaId);
   if (categoria) partes.push(`categoria ${categoria.nome}`);
   const cidade = catalogos.cidades.find((c) => c.id === filtros.cidadeId);
